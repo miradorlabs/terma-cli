@@ -3,6 +3,276 @@
   "harness": "claude-desktop",
   "steps": [
     {
+      "version": "5.11492.0",
+      "previous": "5.1231.2",
+      "changes": [
+        {
+          "id": "prompt.context.2.text",
+          "category": "prompt",
+          "op": "changed",
+          "title": "Injected context changed (+44 −44 chars)",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "tools.mcp__ccd_host__clean_up_worktrees.input_schema.properties.removes",
+          "category": "tools",
+          "op": "added",
+          "title": "mcp__ccd_host__clean_up_worktrees tool parameter removes added",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "tools.mcp__ccd_host__clean_up_worktrees.input_schema.properties.sessions_deleted",
+          "category": "tools",
+          "op": "added",
+          "title": "mcp__ccd_host__clean_up_worktrees tool parameter sessions_deleted added",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "tools.mcp__ccd_host__clean_up_worktrees.input_schema.properties.uncommitted_changes_lost",
+          "category": "tools",
+          "op": "added",
+          "title": "mcp__ccd_host__clean_up_worktrees tool parameter uncommitted_changes_lost added",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "tools.mcp__ccd_host__clean_up_worktrees.input_schema.properties.worktrees",
+          "category": "tools",
+          "op": "added",
+          "title": "mcp__ccd_host__clean_up_worktrees tool parameter worktrees added",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "tools.mcp__ccd_session_mgmt__archive_session.input_schema.properties.session",
+          "category": "tools",
+          "op": "added",
+          "title": "mcp__ccd_session_mgmt__archive_session tool parameter session added",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "tools.mcp__ccd_session_mgmt__clear_session.input_schema.properties.session",
+          "category": "tools",
+          "op": "added",
+          "title": "mcp__ccd_session_mgmt__clear_session tool parameter session added",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "tools.mcp__ccd_session_mgmt__set_remote_control.input_schema.properties.session",
+          "category": "tools",
+          "op": "added",
+          "title": "mcp__ccd_session_mgmt__set_remote_control tool parameter session added",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "tools.mcp__ccd_session_mgmt__set_session_effort.input_schema.properties.session",
+          "category": "tools",
+          "op": "added",
+          "title": "mcp__ccd_session_mgmt__set_session_effort tool parameter session added",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "tools.mcp__ccd_session_mgmt__set_session_fast_mode.input_schema.properties.session",
+          "category": "tools",
+          "op": "added",
+          "title": "mcp__ccd_session_mgmt__set_session_fast_mode tool parameter session added",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "tools.mcp__ccd_session_mgmt__set_session_model.input_schema.properties.session",
+          "category": "tools",
+          "op": "added",
+          "title": "mcp__ccd_session_mgmt__set_session_model tool parameter session added",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "tools.mcp__ccd_session_mgmt__set_session_output_style.input_schema.properties.current_style",
+          "category": "tools",
+          "op": "added",
+          "title": "mcp__ccd_session_mgmt__set_session_output_style tool parameter current_style added",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "tools.mcp__ccd_session_mgmt__set_session_output_style.input_schema.properties.session",
+          "category": "tools",
+          "op": "added",
+          "title": "mcp__ccd_session_mgmt__set_session_output_style tool parameter session added",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "tools.mcp__ccd_session_mgmt__set_session_permission_mode.input_schema.properties.current_mode",
+          "category": "tools",
+          "op": "added",
+          "title": "mcp__ccd_session_mgmt__set_session_permission_mode tool parameter current_mode added",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "tools.mcp__ccd_session_mgmt__set_session_permission_mode.input_schema.properties.session",
+          "category": "tools",
+          "op": "added",
+          "title": "mcp__ccd_session_mgmt__set_session_permission_mode tool parameter session added",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "tools.mcp__ccd_session_mgmt__stop_session.input_schema.properties.session",
+          "category": "tools",
+          "op": "added",
+          "title": "mcp__ccd_session_mgmt__stop_session tool parameter session added",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "tools.mcp__ccd_session_mgmt__unarchive_session.input_schema.properties.session",
+          "category": "tools",
+          "op": "added",
+          "title": "mcp__ccd_session_mgmt__unarchive_session tool parameter session added",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "cli.launch.argv.--disallowedTools=SubscribePR,Edit(//**/ccd-*h.501),Edit(//**/ccd-*h.501/**)",
+          "category": "cli",
+          "op": "added",
+          "title": "The app now starts its agent with `--disallowedTools=SubscribePR,Edit(//**/ccd-*h.501),Edit(…`",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "cli.launch.argv.{\"deniedMcpServers\":[{\"serverName\":\"Claude Browser\"},{\"serverName\":\"Claude Code Android Emulator\"},{\"serverName\":\"Claude Code iOS Simulator\"},{\"serverName\":\"Claude Preview\"},{\"serverName\":\"Claude_Browser\"},{\"serverName\":\"Claude_Code_Android_Emulator\"},{\"serverName\":\"Claude_Code_iOS_Simulator\"},{\"serverName\":\"Claude_Preview\"},{\"serverName\":\"Claude_for_Chrome\"},{\"serverName\":\"Framebuffer\"},{\"serverName\":\"Window Halo\"},{\"serverName\":\"Window_Halo\"},{\"serverName\":\"ccd_connectors\"},{\"serverName\":\"ccd_directory\"},{\"serverName\":\"ccd_host\"},{\"serverName\":\"ccd_pr\"},{\"serverName\":\"ccd_session\"},{\"serverName\":\"ccd_session_mgmt\"},{\"serverName\":\"ccd_settings\"},{\"serverName\":\"ccd_sidebar\"},{\"serverName\":\"ccd_turn\"},{\"serverName\":\"ccd_view\"},{\"serverName\":\"ccd_window\"},{\"serverName\":\"claude-in-chrome\"},{\"serverName\":\"claude_browser\"},{\"serverName\":\"claude_code_android_emulator\"},{\"serverName\":\"claude_code_ios_simulator\"},{\"serverName\":\"claude_for_chrome\"},{\"serverName\":\"claude_in_chrome\"},{\"serverName\":\"claude_preview\"},{\"serverName\":\"computer-use\"},{\"serverName\":\"computer_use\"},{\"serverName\":\"cowork\"},{\"serverName\":\"cowork-onboarding\"},{\"serverName\":\"cowork_onboarding\"},{\"serverName\":\"dev-debug\"},{\"serverName\":\"dev_debug\"},{\"serverName\":\"dispatch\"},{\"serverName\":\"framebuffer\"},{\"serverName\":\"mcp-registry\"},{\"serverName\":\"mcp_registry\"},{\"serverName\":\"plugins\"},{\"serverName\":\"remote-devices\"},{\"serverName\":\"remote_devices\"},{\"serverName\":\"scheduled-tasks\"},{\"serverName\":\"scheduled_tasks\"},{\"serverName\":\"session_info\"},{\"serverName\":\"skills\"},{\"serverName\":\"window_halo\"}],\"sandbox\":{\"filesystem\":{\"denyWrite\":[\"<tmp>\",\"/System/Volumes/Data<tmp>\",\"<tmp>/ccd-ssh.501\",\"/System/Volumes/Data<tmp>/ccd-ssh.501\",\"<tmp>\",\"/System/Volumes/Data<tmp>\",\"<tmp>\",\"/System/Volumes/Data<tmp>\"]}}}",
+          "category": "cli",
+          "op": "added",
+          "title": "The app now starts its agent with `{\"deniedMcpServers\":[{\"serverName\":\"Claude Browser\"},{\"se…`",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "cli.launch.argv.--disallowedTools=SubscribePR",
+          "category": "cli",
+          "op": "removed",
+          "title": "The app no longer starts its agent with `--disallowedTools=SubscribePR`",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "cli.launch.argv.{\"deniedMcpServers\":[{\"serverName\":\"Claude Browser\"},{\"serverName\":\"Claude Code Android Emulator\"},{\"serverName\":\"Claude Code iOS Simulator\"},{\"serverName\":\"Claude Preview\"},{\"serverName\":\"Claude_Browser\"},{\"serverName\":\"Claude_Code_Android_Emulator\"},{\"serverName\":\"Claude_Code_iOS_Simulator\"},{\"serverName\":\"Claude_Preview\"},{\"serverName\":\"Claude_for_Chrome\"},{\"serverName\":\"Framebuffer\"},{\"serverName\":\"Window Halo\"},{\"serverName\":\"Window_Halo\"},{\"serverName\":\"ccd_connectors\"},{\"serverName\":\"ccd_directory\"},{\"serverName\":\"ccd_host\"},{\"serverName\":\"ccd_pr\"},{\"serverName\":\"ccd_session\"},{\"serverName\":\"ccd_session_mgmt\"},{\"serverName\":\"ccd_settings\"},{\"serverName\":\"ccd_sidebar\"},{\"serverName\":\"ccd_turn\"},{\"serverName\":\"ccd_view\"},{\"serverName\":\"ccd_window\"},{\"serverName\":\"claude-in-chrome\"},{\"serverName\":\"claude_browser\"},{\"serverName\":\"claude_code_android_emulator\"},{\"serverName\":\"claude_code_ios_simulator\"},{\"serverName\":\"claude_for_chrome\"},{\"serverName\":\"claude_in_chrome\"},{\"serverName\":\"claude_preview\"},{\"serverName\":\"computer-use\"},{\"serverName\":\"computer_use\"},{\"serverName\":\"cowork\"},{\"serverName\":\"cowork-onboarding\"},{\"serverName\":\"cowork_onboarding\"},{\"serverName\":\"dev-debug\"},{\"serverName\":\"dev_debug\"},{\"serverName\":\"dispatch\"},{\"serverName\":\"framebuffer\"},{\"serverName\":\"mcp-registry\"},{\"serverName\":\"mcp_registry\"},{\"serverName\":\"plugins\"},{\"serverName\":\"remote-devices\"},{\"serverName\":\"remote_devices\"},{\"serverName\":\"scheduled-tasks\"},{\"serverName\":\"scheduled_tasks\"},{\"serverName\":\"session_info\"},{\"serverName\":\"skills\"},{\"serverName\":\"window_halo\"}]}",
+          "category": "cli",
+          "op": "removed",
+          "title": "The app no longer starts its agent with `{\"deniedMcpServers\":[{\"serverName\":\"Claude Browser\"},{\"se…`",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "cli.launch.env.CLAUDE_CODE_AUTO_MODE_MODEL",
+          "category": "cli",
+          "op": "added",
+          "title": "The app now sets its agent's CLAUDE_CODE_AUTO_MODE_MODEL",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "cli.launch.env_values.BAGGAGE",
+          "category": "cli",
+          "op": "changed",
+          "title": "The app's agent's BAGGAGE: none → none",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "cli.launch.env_values.CLAUDE_CODE_AUTO_MODE_MODEL",
+          "category": "cli",
+          "op": "added",
+          "title": "The app's agent's CLAUDE_CODE_AUTO_MODE_MODEL: none → ",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "cli.launch.env_values.SENTRY-TRACE",
+          "category": "cli",
+          "op": "changed",
+          "title": "The app's agent's SENTRY-TRACE: <hex>-a008d91b966eb681 → <hex>-9ef8b3fcf7fb3729",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "cli.launch.parents.<app>/Contents/Helpers/disclaimer --pgroup -- <agent> --output-format stream-json --verbose --input-format stream-json --effort=medium --model=claude-opus-5-5 --permission-prompt-tool=stdio --allowedTools=mcp__computer-use,mcp__ccd_session__spawn_task,mcp__ccd_session__dismiss_task,mcp__ccd_session__mark_chapter,mcp__ccd_session_mgmt__list_sessions,mcp__ccd_session_mgmt__get_session,mcp__ccd_session_mgmt__get_usage,mcp__ccd_host__get_storage_usage,mcp__ccd_session_mgmt__set_session_title,mcp__ccd_session_mgmt__send_message,mcp__ccd_session_mgmt__detach_session,mcp__ccd_sidebar__list_groups,mcp__ccd_sidebar__create_group,mcp__ccd_sidebar__set_view,mcp__ccd_sidebar__list_sections,mcp__ccd_sidebar__create_section,mcp__ccd_turn__wrap_up,mcp__ccd_turn__update_plan,mcp__ccd_session_mgmt__search_session_transcripts,mcp__ccd_session_mgmt__list_events,mcp__ccd_session_mgmt__export_transcript,mcp__scheduled-tasks__list_task_runs,mcp__ccd_session__read_widget_context,mcp__ccd_session__list_start_targets,mcp__ccd_view__show_pane,mcp__ccd_view__close_pane,mcp__ccd_view__get_layout,mcp__ccd_view__set_transcript_view,mcp__ccd_settings__get_settings,mcp__ccd_pr__get_status,mcp__ccd_window__open_session_in,mcp__ccd_window__close_split,mcp__ccd_window__set_sidebar_collapsed,mcp__ccd_window__get_window_layout --disallowedTools=SubscribePR,Edit(//**/ccd-*h.501),Edit(//**/ccd-*h.501/**) --setting-sources=user,project,local --permission-mode=auto --include-partial-messages --await-initialize --managed-settings {\"disableClaudeAiConnectors\":true,\"permissions\":{\"allow\":[]},\"sandbox\":{\"network\":{\"allowedDomains\":[],\"allowManagedDomainsOnly\":true},\"enabled\":true,\"allowUnsandboxedCommands\":false}} --thinking-display omitted --replay-user-messages --settings {\"deniedMcpServers\":[{\"serverName\":\"Claude Browser\"},{\"serverName\":\"Claude Code Android Emulator\"},{\"serverName\":\"Claude Code iOS Simulator\"},{\"serverName\":\"Claude Preview\"},{\"serverName\":\"Claude_Browser\"},{\"serverName\":\"Claude_Code_Android_Emulator\"},{\"serverName\":\"Claude_Code_iOS_Simulator\"},{\"serverName\":\"Claude_Preview\"},{\"serverName\":\"Claude_for_Chrome\"},{\"serverName\":\"Framebuffer\"},{\"serverName\":\"Window Halo\"},{\"serverName\":\"Window_Halo\"},{\"serverName\":\"ccd_connectors\"},{\"serverName\":\"ccd_directory\"},{\"serverName\":\"ccd_host\"},{\"serverName\":\"ccd_pr\"},{\"serverName\":\"ccd_session\"},{\"serverName\":\"ccd_session_mgmt\"},{\"serverName\":\"ccd_settings\"},{\"serverName\":\"ccd_sidebar\"},{\"serverName\":\"ccd_turn\"},{\"serverName\":\"ccd_view\"},{\"serverName\":\"ccd_window\"},{\"serverName\":\"claude-in-chrome\"},{\"serverName\":\"claude_browser\"},{\"serverName\":\"claude_code_android_emulator\"},{\"serverName\":\"claude_code_ios_simulator\"},{\"serverName\":\"claude_for_chrome\"},{\"serverName\":\"claude_in_chrome\"},{\"serverName\":\"claude_preview\"},{\"serverName\":\"computer-use\"},{\"serverName\":\"computer_use\"},{\"serverName\":\"cowork\"},{\"serverName\":\"cowork-onboarding\"},{\"serverName\":\"cowork_onboarding\"},{\"serverName\":\"dev-debug\"},{\"serverName\":\"dev_debug\"},{\"serverName\":\"dispatch\"},{\"serverName\":\"framebuffer\"},{\"serverName\":\"mcp-registry\"},{\"serverName\":\"mcp_registry\"},{\"serverName\":\"plugins\"},{\"serverName\":\"remote-devices\"},{\"serverName\":\"remote_devices\"},{\"serverName\":\"scheduled-tasks\"},{\"serverName\":\"scheduled_tasks\"},{\"serverName\":\"session_info\"},{\"serverName\":\"skills\"},{\"serverName\":\"window_halo\"}],\"sandbox\":{\"filesystem\":{\"denyWrite\":[\"<tmp>\",\"/System/Volumes/Data<tmp>\",\"<tmp>/ccd-ssh.501\",\"/System/Volumes/Data<tmp>/ccd-ssh.501\",\"<tmp>\",\"/System/Volumes/Data<tmp>\",\"<tmp>\",\"/System/Volumes/Data<tmp>\"]}}}",
+          "category": "cli",
+          "op": "added",
+          "title": "The processes between the app and its agent added",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "cli.launch.parents.<app>/Contents/Helpers/disclaimer --pgroup -- <agent> --output-format stream-json --verbose --input-format stream-json --effort=medium --model=claude-opus-5-5 --permission-prompt-tool=stdio --allowedTools=mcp__computer-use,mcp__ccd_session__spawn_task,mcp__ccd_session__dismiss_task,mcp__ccd_session__mark_chapter,mcp__ccd_session_mgmt__list_sessions,mcp__ccd_session_mgmt__get_session,mcp__ccd_session_mgmt__get_usage,mcp__ccd_host__get_storage_usage,mcp__ccd_session_mgmt__set_session_title,mcp__ccd_session_mgmt__send_message,mcp__ccd_session_mgmt__detach_session,mcp__ccd_sidebar__list_groups,mcp__ccd_sidebar__create_group,mcp__ccd_sidebar__set_view,mcp__ccd_sidebar__list_sections,mcp__ccd_sidebar__create_section,mcp__ccd_turn__wrap_up,mcp__ccd_turn__update_plan,mcp__ccd_session_mgmt__search_session_transcripts,mcp__ccd_session_mgmt__list_events,mcp__ccd_session_mgmt__export_transcript,mcp__scheduled-tasks__list_task_runs,mcp__ccd_session__read_widget_context,mcp__ccd_session__list_start_targets,mcp__ccd_view__show_pane,mcp__ccd_view__close_pane,mcp__ccd_view__get_layout,mcp__ccd_view__set_transcript_view,mcp__ccd_settings__get_settings,mcp__ccd_pr__get_status,mcp__ccd_window__open_session_in,mcp__ccd_window__close_split,mcp__ccd_window__set_sidebar_collapsed,mcp__ccd_window__get_window_layout --disallowedTools=SubscribePR --setting-sources=user,project,local --permission-mode=auto --include-partial-messages --await-initialize --managed-settings {\"disableClaudeAiConnectors\":true,\"permissions\":{\"allow\":[]},\"sandbox\":{\"network\":{\"allowedDomains\":[],\"allowManagedDomainsOnly\":true},\"enabled\":true,\"allowUnsandboxedCommands\":false}} --thinking-display omitted --replay-user-messages --settings {\"deniedMcpServers\":[{\"serverName\":\"Claude Browser\"},{\"serverName\":\"Claude Code Android Emulator\"},{\"serverName\":\"Claude Code iOS Simulator\"},{\"serverName\":\"Claude Preview\"},{\"serverName\":\"Claude_Browser\"},{\"serverName\":\"Claude_Code_Android_Emulator\"},{\"serverName\":\"Claude_Code_iOS_Simulator\"},{\"serverName\":\"Claude_Preview\"},{\"serverName\":\"Claude_for_Chrome\"},{\"serverName\":\"Framebuffer\"},{\"serverName\":\"Window Halo\"},{\"serverName\":\"Window_Halo\"},{\"serverName\":\"ccd_connectors\"},{\"serverName\":\"ccd_directory\"},{\"serverName\":\"ccd_host\"},{\"serverName\":\"ccd_pr\"},{\"serverName\":\"ccd_session\"},{\"serverName\":\"ccd_session_mgmt\"},{\"serverName\":\"ccd_settings\"},{\"serverName\":\"ccd_sidebar\"},{\"serverName\":\"ccd_turn\"},{\"serverName\":\"ccd_view\"},{\"serverName\":\"ccd_window\"},{\"serverName\":\"claude-in-chrome\"},{\"serverName\":\"claude_browser\"},{\"serverName\":\"claude_code_android_emulator\"},{\"serverName\":\"claude_code_ios_simulator\"},{\"serverName\":\"claude_for_chrome\"},{\"serverName\":\"claude_in_chrome\"},{\"serverName\":\"claude_preview\"},{\"serverName\":\"computer-use\"},{\"serverName\":\"computer_use\"},{\"serverName\":\"cowork\"},{\"serverName\":\"cowork-onboarding\"},{\"serverName\":\"cowork_onboarding\"},{\"serverName\":\"dev-debug\"},{\"serverName\":\"dev_debug\"},{\"serverName\":\"dispatch\"},{\"serverName\":\"framebuffer\"},{\"serverName\":\"mcp-registry\"},{\"serverName\":\"mcp_registry\"},{\"serverName\":\"plugins\"},{\"serverName\":\"remote-devices\"},{\"serverName\":\"remote_devices\"},{\"serverName\":\"scheduled-tasks\"},{\"serverName\":\"scheduled_tasks\"},{\"serverName\":\"session_info\"},{\"serverName\":\"skills\"},{\"serverName\":\"window_halo\"}]}",
+          "category": "cli",
+          "op": "removed",
+          "title": "The processes between the app and its agent removed",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_headless_latency",
+          "category": "network",
+          "op": "removed",
+          "title": "Vendor telemetry event no longer sent: tengu_headless_latency",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_sdk_schema_violation",
+          "category": "network",
+          "op": "removed",
+          "title": "Vendor telemetry event no longer sent: tengu_sdk_schema_violation",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST claude.ai/api/event_logging/v2/batch.events.desktop_launch_preview_client_certificate_hosts_latched",
+          "category": "network",
+          "op": "added",
+          "title": "New vendor telemetry event: desktop_launch_preview_client_certificate_hosts_latched",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST claude.ai/api/event_logging/v2/batch.events.desktop_low_data_mode_state.fields.auth.account_uuid",
+          "category": "network",
+          "op": "removed",
+          "title": "desktop_low_data_mode_state telemetry event field auth.account_uuid removed",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST claude.ai/api/event_logging/v2/batch.events.desktop_update_check_started.fields.auth.account_uuid",
+          "category": "network",
+          "op": "removed",
+          "title": "desktop_update_check_started telemetry event field auth.account_uuid removed",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST claude.ai/api/event_logging/v2/batch.events.desktop_update_not_available.fields.auth.account_uuid",
+          "category": "network",
+          "op": "removed",
+          "title": "desktop_update_not_available telemetry event field auth.account_uuid removed",
+          "impact": "notable",
+          "documented": null
+        }
+      ]
+    },
+    {
       "version": "5.1231.2",
       "previous": "5.1231.0",
       "changes": [
@@ -1129,14 +1399,6 @@
           "category": "network",
           "op": "added",
           "title": "New vendor telemetry event: desktop_low_data_mode_state",
-          "impact": "notable",
-          "documented": null
-        },
-        {
-          "id": "network.telemetry.POST claude.ai/api/event_logging/v2/batch.events.desktop_main_event_loop_stall",
-          "category": "network",
-          "op": "removed",
-          "title": "Vendor telemetry event no longer sent: desktop_main_event_loop_stall",
           "impact": "notable",
           "documented": null
         },

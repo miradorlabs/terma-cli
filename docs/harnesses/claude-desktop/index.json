@@ -6,23 +6,55 @@
     "vendor": "Anthropic",
     "homepage": "https://claude.ai/download",
     "source": null,
-    "latest": "5.1231.2",
+    "latest": "5.11492.0",
     "support": "untested",
-    "versions_tracked": 3,
+    "versions_tracked": 4,
     "first_tracked": "2026-11-03",
     "last_change": {
-      "from": "5.1231.0",
-      "to": "5.1231.2",
-      "at": "2026-11-11T01:31:58.028457459Z",
-      "released_at": "2026-11-11T00:05:48.791Z",
-      "changes": 12,
+      "from": "5.1231.2",
+      "to": "5.11492.0",
+      "at": "2026-11-12T15:48:45.504112256Z",
+      "released_at": "2026-11-12T07:14:46.344Z",
+      "changes": 33,
       "categories": {
-        "cli": 2,
-        "network": 10
+        "cli": 10,
+        "network": 6,
+        "prompt": 1,
+        "tools": 16
       }
     }
   },
   "versions": [
+    {
+      "version": "5.11492.0",
+      "released_at": "2026-11-12T07:14:46.344Z",
+      "captured_at": "2026-11-12T15:48:45.504112256Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "5.1231.2",
+      "changes": 33,
+      "categories": {
+        "cli": 10,
+        "network": 6,
+        "prompt": 1,
+        "tools": 16
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 33
+      },
+      "undocumented": null,
+      "highlights": [
+        "Injected context changed (+44 −44 chars)",
+        "mcp__ccd_host__clean_up_worktrees tool parameter removes added",
+        "mcp__ccd_host__clean_up_worktrees tool parameter sessions_deleted added"
+      ],
+      "signing": "valid"
+    },
     {
       "version": "5.1231.2",
       "released_at": "2026-11-11T00:05:48.791Z",
@@ -60,12 +92,12 @@
       ],
       "support": "untested",
       "previous": "4.16336.0",
-      "changes": 136,
+      "changes": 135,
       "categories": {
         "binary": 4,
         "cli": 7,
         "config": 10,
-        "network": 84,
+        "network": 83,
         "prompt": 3,
         "request": 1,
         "side_requests": 5,
@@ -75,7 +107,7 @@
         "breaking": 0,
         "degrading": 0,
         "informational": 15,
-        "notable": 121
+        "notable": 120
       },
       "undocumented": null,
       "highlights": [

@@ -7,14 +7,6 @@
       "previous": "0.167.1",
       "changes": [
         {
-          "id": "telemetry.surfaces.traces/auth.parents.traces/load_with_cli_overrides",
-          "category": "telemetry",
-          "op": "added",
-          "title": "Telemetry surfaces.traces/auth.parents.traces/load_with_cli_overrides added",
-          "impact": "informational",
-          "documented": false
-        },
-        {
           "id": "cli.help.completion -h",
           "category": "cli",
           "op": "changed",

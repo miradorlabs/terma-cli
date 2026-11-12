@@ -18,13 +18,12 @@
     "last_change": {
       "from": "0.167.1",
       "to": "0.167.2",
-      "at": "2026-11-12T05:15:55.281711967Z",
+      "at": "2026-11-12T15:48:45.504112256Z",
       "released_at": "2026-11-11T22:50:04.191Z",
-      "changes": 3,
+      "changes": 2,
       "categories": {
         "cli": 1,
-        "config": 1,
-        "telemetry": 1
+        "config": 1
       }
     }
   },
@@ -32,28 +31,26 @@
     {
       "version": "0.167.2",
       "released_at": "2026-11-11T22:50:04.191Z",
-      "captured_at": "2026-11-12T05:15:55.281711967Z",
+      "captured_at": "2026-11-12T15:48:45.504112256Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"
       ],
       "support": "supported",
       "previous": "0.167.1",
-      "changes": 3,
+      "changes": 2,
       "categories": {
         "cli": 1,
-        "config": 1,
-        "telemetry": 1
+        "config": 1
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 3,
+        "informational": 2,
         "notable": 0
       },
-      "undocumented": 2,
+      "undocumented": 1,
       "highlights": [
-        "Telemetry surfaces.traces/auth.parents.traces/load_with_cli_overrides added",
         "Full help text of `completion -h` changed (+105 −0 chars)",
         "New setting: features.incremental_tools_legacy_gcp"
       ],
@@ -62,7 +59,7 @@
     {
       "version": "0.167.1",
       "released_at": "2026-11-10T21:39:51.99Z",
-      "captured_at": "2026-11-12T05:15:55.281711967Z",
+      "captured_at": "2026-11-12T15:48:45.504112256Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"

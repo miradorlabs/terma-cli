@@ -1,34 +1,64 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-12T05:34:32.55702Z",
+  "generated_at": "2026-11-12T15:48:45.504112256Z",
   "versions": [
+    {
+      "harness": "claude-desktop",
+      "name": "Claude Desktop (Code)",
+      "version": "5.11492.0",
+      "released_at": "2026-11-12T07:14:46.344Z",
+      "captured_at": "2026-11-12T15:48:45.504112256Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "5.1231.2",
+      "changes": 33,
+      "categories": {
+        "cli": 10,
+        "network": 6,
+        "prompt": 1,
+        "tools": 16
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 33
+      },
+      "undocumented": null,
+      "highlights": [
+        "Injected context changed (+44 −44 chars)",
+        "mcp__ccd_host__clean_up_worktrees tool parameter removes added",
+        "mcp__ccd_host__clean_up_worktrees tool parameter sessions_deleted added"
+      ],
+      "signing": "valid"
+    },
     {
       "harness": "codex",
       "name": "Codex CLI",
       "version": "0.167.2",
       "released_at": "2026-11-11T22:50:04.191Z",
-      "captured_at": "2026-11-12T05:15:55.281711967Z",
+      "captured_at": "2026-11-12T15:48:45.504112256Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"
       ],
       "support": "supported",
       "previous": "0.167.1",
-      "changes": 3,
+      "changes": 2,
       "categories": {
         "cli": 1,
-        "config": 1,
-        "telemetry": 1
+        "config": 1
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 3,
+        "informational": 2,
         "notable": 0
       },
-      "undocumented": 2,
+      "undocumented": 1,
       "highlights": [
-        "Telemetry surfaces.traces/auth.parents.traces/load_with_cli_overrides added",
         "Full help text of `completion -h` changed (+105 −0 chars)",
         "New setting: features.incremental_tools_legacy_gcp"
       ],
@@ -92,7 +122,7 @@
       "name": "Codex CLI",
       "version": "0.167.1",
       "released_at": "2026-11-10T21:39:51.99Z",
-      "captured_at": "2026-11-12T05:15:55.281711967Z",
+      "captured_at": "2026-11-12T15:48:45.504112256Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"
@@ -123,7 +153,7 @@
       "name": "Gemini CLI",
       "version": "0.68.0",
       "released_at": "2026-11-10T21:22:49.277Z",
-      "captured_at": "2026-11-12T05:15:55.281711967Z",
+      "captured_at": "2026-11-12T15:48:45.504112256Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -214,12 +244,12 @@
       ],
       "support": "untested",
       "previous": "4.16336.0",
-      "changes": 136,
+      "changes": 135,
       "categories": {
         "binary": 4,
         "cli": 7,
         "config": 10,
-        "network": 84,
+        "network": 83,
         "prompt": 3,
         "request": 1,
         "side_requests": 5,
@@ -229,7 +259,7 @@
         "breaking": 0,
         "degrading": 0,
         "informational": 15,
-        "notable": 121
+        "notable": 120
       },
       "undocumented": null,
       "highlights": [
@@ -244,7 +274,7 @@
       "name": "Claude Code",
       "version": "2.1.322",
       "released_at": "2026-11-10T01:58:41.811Z",
-      "captured_at": "2026-11-12T05:15:55.281711967Z",
+      "captured_at": "2026-11-12T15:48:45.504112256Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"
@@ -6188,37 +6218,6 @@
         "spawn_agent tool description changed (+263 −32 chars)"
       ],
       "signing": "rejected"
-    },
-    {
-      "harness": "codex",
-      "name": "Codex CLI",
-      "version": "0.130.0",
-      "released_at": "2026-05-08T23:12:58.744Z",
-      "captured_at": "2026-11-05T09:54:28.532441Z",
-      "platforms": [
-        "darwin/arm64",
-        "linux/amd64"
-      ],
-      "support": "untested",
-      "previous": "0.129.0",
-      "changes": 13,
-      "categories": {
-        "cli": 5,
-        "config": 8
-      },
-      "impact": {
-        "breaking": 0,
-        "degrading": 0,
-        "informational": 11,
-        "notable": 2
-      },
-      "undocumented": 12,
-      "highlights": [
-        "Setting no longer read: experimental_thread_store.endpoint",
-        "Setting no longer read: experimental_thread_store_endpoint",
-        "New command: `codex remote-control`"
-      ],
-      "signing": "revoked"
     }
   ]
 }

@@ -3,16 +3,16 @@
   "harness": "claude-desktop",
   "from": "4.16336.0",
   "to": "5.1231.0",
-  "generated_at": "2026-11-10T16:47:46.966590707Z",
+  "generated_at": "2026-11-12T15:48:45.504112256Z",
   "source": null,
   "changelog": null,
   "summary": {
-    "changes": 136,
+    "changes": 135,
     "categories": {
       "binary": 4,
       "cli": 7,
       "config": 10,
-      "network": 84,
+      "network": 83,
       "prompt": 3,
       "request": 1,
       "side_requests": 5,
@@ -22,7 +22,7 @@
       "breaking": 0,
       "degrading": 0,
       "informational": 15,
-      "notable": 121
+      "notable": 120
     },
     "undocumented": null
   },
@@ -3070,38 +3070,6 @@
           "user_properties.user_id"
         ]
       },
-      "text_diff": null,
-      "terma": null,
-      "source": null,
-      "documented": null
-    },
-    {
-      "id": "network.telemetry.POST claude.ai/api/event_logging/v2/batch.events.desktop_main_event_loop_stall",
-      "category": "network",
-      "op": "removed",
-      "path": [
-        "network",
-        "telemetry",
-        "POST claude.ai/api/event_logging/v2/batch",
-        "events",
-        "desktop_main_event_loop_stall"
-      ],
-      "title": "Vendor telemetry event no longer sent: desktop_main_event_loop_stall",
-      "impact": "notable",
-      "before": {
-        "count": 2,
-        "fields": [
-          "auth",
-          "auth.account_uuid",
-          "auth.organization_uuid",
-          "event_name",
-          "metadata",
-          "timestamp",
-          "user_properties",
-          "user_properties.user_id"
-        ]
-      },
-      "after": null,
       "text_diff": null,
       "terma": null,
       "source": null,
