@@ -40,7 +40,7 @@ func TestReadAndSettleEachEventOnItsOwn(t *testing.T) {
 	}
 	_, _ = f.WriteString("not json\n")
 	_ = f.Close()
-	events, res, err := s.Read(t.Context(), now)
+	events, _, res, err := s.Read(t.Context(), now)
 	if err != nil || res.Expired != 1 || res.Dropped != 1 || len(events) != 3 || events[0].Name != "a" {
 		t.Fatalf("Read = %+v, %+v, %v", events, res, err)
 	}
@@ -76,7 +76,7 @@ func TestTakeKeepsTwoSendersApart(t *testing.T) {
 	if err := s.Append(Event{Name: "x", Time: time.Now()}); err != nil {
 		t.Fatal(err)
 	}
-	events, _, err := s.Read(t.Context(), time.Now())
+	events, _, _, err := s.Read(t.Context(), time.Now())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -117,7 +117,7 @@ func TestSettleTakesOneOfTwinLines(t *testing.T) {
 	if err := s.Append(twin, Event{Name: "between", Time: at}, twin); err != nil {
 		t.Fatal(err)
 	}
-	events, _, err := s.Read(t.Context(), at)
+	events, _, _, err := s.Read(t.Context(), at)
 	if err != nil || len(events) != 3 {
 		t.Fatalf("Read = %+v, %v", events, err)
 	}
@@ -146,7 +146,7 @@ func TestRemove(t *testing.T) {
 	if err := s.Append(Event{Name: "a", Time: at}, Event{Name: "b", Time: at}, Event{Name: "c", Time: at}); err != nil {
 		t.Fatal(err)
 	}
-	events, _, err := s.Read(t.Context(), at)
+	events, _, _, err := s.Read(t.Context(), at)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -170,7 +170,7 @@ func TestIdleWaitsForASender(t *testing.T) {
 	if err := s.Append(Event{Name: "x", Time: time.Now()}); err != nil {
 		t.Fatal(err)
 	}
-	events, _, err := s.Read(t.Context(), time.Now())
+	events, _, _, err := s.Read(t.Context(), time.Now())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -205,5 +205,31 @@ func TestSize(t *testing.T) {
 	}
 	if s.Size() == 0 {
 		t.Fatal("a queued event has no size")
+	}
+}
+
+// A settle and an append of the same length leave the queue as long as it was, and still
+// another state of it.
+func TestAStampSeesASettleAndAnEqualAppend(t *testing.T) {
+	s, err := Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	at := time.Now()
+	if err := s.Append(Event{Name: "a", Time: at}, Event{Name: "b", Time: at}); err != nil {
+		t.Fatal(err)
+	}
+	events, stamp, _, err := s.Read(t.Context(), at)
+	if err != nil || !stamp.Same(s.Stamp()) {
+		t.Fatalf("Read's stamp is not the queue's: %v", err)
+	}
+	if err := s.Settle(events[0]); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Append(Event{Name: "c", Time: at}); err != nil {
+		t.Fatal(err)
+	}
+	if now := s.Stamp(); now.size != stamp.size || now.Same(stamp) {
+		t.Fatalf("sizes %d and %d; same %v", now.size, stamp.size, now.Same(stamp))
 	}
 }

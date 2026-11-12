@@ -24,29 +24,62 @@ import (
 type Pending struct {
 	Event
 	line []byte
+	// read is the queue as Read saw it, which Take compares before it reads again.
+	read Stamp
+}
+
+// Stamp is one state of the queue file: its size, its modification time and the file
+// itself, which every rewrite replaces (an atomic rename). An append changes the first two,
+// a settle the third, so no change is missed, an equal-length append after a settle
+// included.
+type Stamp struct {
+	size int64
+	mod  time.Time
+	file os.FileInfo
+}
+
+// Same reports whether a and b are one state of the queue: nothing appended or rewritten
+// between them.
+func (a Stamp) Same(b Stamp) bool {
+	if a.file == nil || b.file == nil {
+		return a.file == nil && b.file == nil
+	}
+	return a.size == b.size && a.mod.Equal(b.mod) && os.SameFile(a.file, b.file)
+}
+
+// Stamp is the queue as it stands now: one stat.
+func (s *Spool) Stamp() Stamp {
+	info, err := os.Stat(s.path())
+	if err != nil {
+		return Stamp{}
+	}
+	return Stamp{size: info.Size(), mod: info.ModTime(), file: info}
 }
 
 // ErrNotQueued is an event whose line the queue no longer holds: another sender settled it.
 var ErrNotQueued = errors.New("the event is no longer queued")
 
 // Read is every whole line queued, once the queue is pruned to MaxBytes and rid of expired
-// and unreadable lines, which the result counts.
-func (s *Spool) Read(ctx context.Context, now time.Time) ([]Pending, Result, error) {
+// and unreadable lines, which the result counts, and the queue's Stamp as it read it: a
+// later Stamp that is not the Same says something was queued or settled since.
+func (s *Spool) Read(ctx context.Context, now time.Time) ([]Pending, Stamp, Result, error) {
 	var res Result
 	unlock, err := flock.Lock(ctx, filepath.Join(s.dir, lockFile))
 	if err != nil {
-		return nil, res, err
+		return nil, Stamp{}, res, err
 	}
 	defer unlock()
 	if res.Pruned, err = s.prune(); err != nil {
-		return nil, res, err
+		return nil, Stamp{}, res, err
 	}
+	// Taken under the lock every append and rewrite takes, before the read: it is what was read.
+	stamp := s.Stamp()
 	data, err := os.ReadFile(s.path())
 	if errors.Is(err, fs.ErrNotExist) {
-		return nil, res, nil
+		return nil, Stamp{}, res, nil
 	}
 	if err != nil {
-		return nil, res, err
+		return nil, Stamp{}, res, err
 	}
 	var events []Pending
 	var kept []byte
@@ -75,10 +108,14 @@ func (s *Spool) Read(ctx context.Context, now time.Time) ([]Pending, Result, err
 	}
 	if res.Dropped > 0 || res.Expired > 0 {
 		if err := config.WriteFileAtomicNoSync(s.path(), append(kept, rest...), fileMode); err != nil {
-			return nil, res, err
+			return nil, Stamp{}, res, err
 		}
+		stamp = s.Stamp()
 	}
-	return events, res, nil
+	for i := range events {
+		events[i].read = stamp
+	}
+	return events, stamp, res, nil
 }
 
 // Take takes the delivery lock for sending p, waiting for another sender until ctx ends,
@@ -87,6 +124,10 @@ func (s *Spool) Take(ctx context.Context, p Pending) (release func(), err error)
 	unlock, err := flock.Lock(ctx, filepath.Join(s.dir, deliveryLockFile))
 	if err != nil {
 		return nil, err
+	}
+	if p.read.file != nil && p.read.Same(s.Stamp()) {
+		// Nothing appended or rewritten since Read: p is still queued.
+		return unlock, nil
 	}
 	data, err := os.ReadFile(s.path())
 	if err == nil && lineAt(data, p.line) < 0 || errors.Is(err, fs.ErrNotExist) {

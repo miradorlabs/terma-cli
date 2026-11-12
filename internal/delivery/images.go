@@ -90,11 +90,12 @@ func (r Router) FlushImages(ctx context.Context, events *spool.Spool, cfg *confi
 
 // imageTurns is how a pass shares out its sends among projects and tells of them: it starts
 // after the project after names, so the one that went first last time goes last, and
-// records the one it started with in first; uploading, set, is told as each upload starts
-// and ends.
+// records the one it started with in first; read, set, gets the queue's Stamp as the pass
+// read it; uploading, set, is told as each upload starts and ends.
 type imageTurns struct {
 	after     string
 	first     *string
+	read      *spool.Stamp
 	uploading func(bool)
 }
 
@@ -107,8 +108,11 @@ func (r Router) flushImages(ctx context.Context, events *spool.Spool, cfg *confi
 	now := time.Now()
 	p := &imagePass{s: s, accepted: map[string]bool{}}
 	res := &p.res
-	queued, read, err := s.Read(ctx, now)
+	queued, stamp, read, err := s.Read(ctx, now)
 	res.Expired, res.Pruned, res.Dropped = read.Expired, read.Pruned, read.Dropped
+	if turns.read != nil {
+		*turns.read = stamp
+	}
 	if err != nil {
 		res.Err = err
 		return *res
@@ -148,9 +152,10 @@ func (r Router) flushImages(ctx context.Context, events *spool.Spool, cfg *confi
 		}
 		sender, err := r.senderFor(cfg, id)
 		if err != nil {
-			// The keychain is locked or out of reach: as for the events, a failure, asked
-			// again next time.
+			// The keychain is locked or out of reach: as for the events, a failure, with a
+			// window doctor shows, asked again when it ends.
 			p.errs = append(p.errs, fmt.Errorf("%s: %w", id, err))
+			res.Failures = append(res.Failures, Failure{ProjectID: id, Err: err, RetryAt: s.DestinationFailed(id, time.Now())})
 			res.Failed += len(items)
 			continue
 		}

@@ -16,6 +16,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/delivery"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
+	"github.com/miradorlabs/terma-cli/internal/relay"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
@@ -263,7 +264,7 @@ func TestTeardownWaitsForTheImagePass(t *testing.T) {
 	if err := s.Append(spool.Event{Name: semconv.TermaPromptImageEvent}); err != nil {
 		t.Fatal(err)
 	}
-	queued, _, err := s.Read(t.Context(), time.Now())
+	queued, _, _, err := s.Read(t.Context(), time.Now())
 	if err != nil || len(queued) != 1 {
 		t.Fatalf("Read = %v, %v", queued, err)
 	}
@@ -322,5 +323,31 @@ func TestAnImageFlushDeliversOnceTheKeyIsThere(t *testing.T) {
 	out, err = runTerma(t, "spool", "flush", "--images")
 	if err != nil || !strings.Contains(out, "Flushed 1 image.") {
 		t.Fatalf("with the key: %v\n%s", err, out)
+	}
+}
+
+// The relay runs the image sender: it is a worker, an accepted export nudges it without
+// waiting, and its upload counts as the relay's work.
+func TestTheRelayRunsTheImageSender(t *testing.T) {
+	useConfigDir(t, t.TempDir())
+	var engine relay.Options
+	workers := testApp.relayImages(&engine, nil)
+	if len(workers) != 1 || engine.Accepted == nil || engine.Busy == nil {
+		t.Fatalf("workers %d, accepted set %v, busy set %v", len(workers), engine.Accepted != nil, engine.Busy != nil)
+	}
+	done := make(chan struct{})
+	go func() {
+		for range 3 {
+			engine.Accepted()
+		}
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("an accepted export waited on the image sender")
+	}
+	if engine.Busy() {
+		t.Fatal("an idle sender says it is busy")
 	}
 }

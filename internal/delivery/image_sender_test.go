@@ -9,7 +9,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/miradorlabs/terma-cli/internal/account/keystore"
 	"github.com/miradorlabs/terma-cli/internal/config"
+	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 )
 
 // startSender runs a sender for r until the test ends, and returns it once its first pass,
@@ -164,4 +166,67 @@ func TestTheSenderAndAManualFlushSendEachImageOnce(t *testing.T) {
 	if sent != 1 || res.Sent != 0 {
 		t.Fatalf("the image went %d times (the manual flush sent %d)", sent, res.Sent)
 	}
+}
+
+// An image queued while the sender uploads another is new to it: the next export sends it.
+func TestAnImageQueuedMidUploadGoesAtTheNextExport(t *testing.T) {
+	t.Parallel()
+	arrived, release := make(chan struct{}), make(chan struct{})
+	var once sync.Once
+	rec := &recorder{}
+	r, cfg, stateDir := imageFixture(t, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		once.Do(func() {
+			close(arrived)
+			<-release
+		})
+		rec.ServeHTTP(w, req)
+	}), true)
+	first, second := pixelN(1), pixelN(2)
+	store(t, stateDir, first, second)
+	queue(t, r.Images, imageEvent(first))
+	s := NewImageSender(r, openSpool(t), func() (*config.Config, error) { return cfg, nil })
+	ctx, cancel := context.WithCancel(t.Context())
+	done := make(chan struct{})
+	go func() { s.Run(ctx); close(done) }()
+	t.Cleanup(func() { cancel(); <-done })
+	<-arrived
+	queue(t, r.Images, imageEvent(second)) // a hook, while the first image is on its way
+	close(release)
+	waitFor(t, "the first pass", func() bool { return s.passes.Load() >= 1 })
+	s.Nudge()
+	waitFor(t, "the second image", func() bool {
+		for _, body := range rec.requests() {
+			if strings.Contains(body, second.ID()) {
+				return true
+			}
+		}
+		return false
+	})
+}
+
+// Images held for a key have a deadline of their own: once the key is there, they go with
+// no new image and no export.
+func TestHeldImagesAreLookedAtAgain(t *testing.T) {
+	t.Parallel()
+	rec := &recorder{}
+	r, cfg, stateDir := imageFixture(t, rec, true)
+	img := pixelN(1)
+	store(t, stateDir, img)
+	e := imageEvent(img)
+	e.Attrs[hookrun.AttrProjectID] = "keyless"
+	queue(t, r.Images, e)
+	s := NewImageSender(r, openSpool(t), func() (*config.Config, error) { return cfg, nil })
+	s.heldMin = 50 * time.Millisecond
+	ctx, cancel := context.WithCancel(t.Context())
+	done := make(chan struct{})
+	go func() { s.Run(ctx); close(done) }()
+	t.Cleanup(func() { cancel(); <-done })
+	waitFor(t, "the first pass", func() bool { return s.passes.Load() >= 1 })
+	if len(rec.requests()) != 0 {
+		t.Fatal("an image with no key went")
+	}
+	if err := keystore.Set(r.ConfigDir, "keyless", testKey, keystore.Hosts{}); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "the held image", func() bool { return len(rec.requests()) == 1 })
 }
