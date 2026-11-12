@@ -107,11 +107,15 @@ func (sb *Sandbox) StartT3(b Binary, env ...string) *T3 {
 		t.Fatal(err)
 	}
 	t.Cleanup(x.Stop)
+	// Up once it answers with anything but a server error: 0.1.9 accepts connections before
+	// its routes are attached, and answers 503 until they are.
 	deadline := time.Now().Add(60 * time.Second)
 	for time.Now().Before(deadline) {
 		if resp, err := t3Client.Get(x.url + "/"); err == nil {
 			_ = resp.Body.Close()
-			break
+			if resp.StatusCode/100 != 5 {
+				break
+			}
 		}
 		time.Sleep(300 * time.Millisecond)
 	}
@@ -126,15 +130,15 @@ func (sb *Sandbox) StartT3(b Binary, env ...string) *T3 {
 		t.Fatalf("t3 auth session issue: %v\n%s", err, x.out.String())
 	}
 	x.token = strings.TrimSpace(string(tok))
-	// 0.1.0 answers the old snapshot route with its web app, and serves its own shell
-	// snapshot instead. A build that answers the shell route with its web app or a 404
-	// too speaks neither API. Any other answer (an error, a refusal, a server that never
-	// came up) fails the scenario, here or in the old API, as it should.
-	if x.servesWebApp("/api/orchestration/snapshot") {
-		if !x.servesShell() {
-			SkipBuild(t, "the test driver can't drive this version (it serves neither /api/orchestration/snapshot nor /api/orchestration/shell)")
-		}
+	// The API the build speaks: 0.0.x serves its orchestration snapshot as JSON (and a shell
+	// route of its own), 0.1.0 on answers that route with its web app and serves its shell
+	// snapshot instead. A build that serves neither as JSON is one the driver cannot drive.
+	switch {
+	case x.servesJSON("/api/orchestration/snapshot", nil):
+	case x.servesJSON("/api/orchestration/shell", http.Header{t3ProtocolHeader: {t3Protocol}}):
 		x.v2 = true
+	default:
+		SkipBuild(t, "the test driver can't drive this version (it serves neither /api/orchestration/snapshot nor /api/orchestration/shell)")
 	}
 	return x
 }
@@ -152,31 +156,19 @@ func (sb *Sandbox) t3Shell() string {
 	return path
 }
 
-// servesWebApp says whether T3 answers a GET of path with its web app's HTML, as a build
-// that no longer serves path as an API route does.
-func (x *T3) servesWebApp(path string) bool {
-	req, _ := http.NewRequest(http.MethodGet, x.url+path, nil)
-	req.Header.Set("Authorization", "Bearer "+x.token)
-	resp, err := t3Client.Do(req)
-	if err != nil {
-		return false
-	}
-	_ = resp.Body.Close()
-	return resp.StatusCode/100 == 2 && strings.HasPrefix(resp.Header.Get("Content-Type"), "text/html")
-}
-
-// servesShell says whether T3 serves 0.1.0's shell snapshot route: true where it answers
-// with JSON, false where it answers with its web app or a 404, as a build without the
-// route does. Anything else fails the scenario, once a server error or a dropped
-// connection has had a few seconds to clear: a build that cannot answer is broken, not
-// one the driver cannot drive.
-func (x *T3) servesShell() bool {
+// servesJSON says whether T3 serves path as an API route: true where it answers with JSON,
+// false where it answers with its web app or a 404, as a build without the route does. Anything
+// else fails the scenario, once a server error or a dropped connection has had a few seconds
+// to clear: a build that cannot answer is broken, not one the driver cannot drive.
+func (x *T3) servesJSON(path string, header http.Header) bool {
 	x.t.Helper()
 	var last string
 	for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline); time.Sleep(500 * time.Millisecond) {
-		req, _ := http.NewRequest(http.MethodGet, x.url+"/api/orchestration/shell", nil)
+		req, _ := http.NewRequest(http.MethodGet, x.url+path, nil)
 		req.Header.Set("Authorization", "Bearer "+x.token)
-		req.Header.Set(t3ProtocolHeader, t3Protocol)
+		for k, vs := range header {
+			req.Header[k] = vs
+		}
 		resp, err := t3Client.Do(req)
 		if err != nil {
 			last = err.Error()
@@ -194,9 +186,9 @@ func (x *T3) servesShell() bool {
 			last = resp.Status + " " + string(body)
 			continue
 		}
-		x.t.Fatalf("t3 GET /api/orchestration/shell: %s (%s) %s\n%s", resp.Status, kind, body, tail(x.out.String(), 2000))
+		x.t.Fatalf("t3 GET %s: %s (%s) %s\n%s", path, resp.Status, kind, body, tail(x.out.String(), 2000))
 	}
-	x.t.Fatalf("t3 GET /api/orchestration/shell: %s\n%s", last, tail(x.out.String(), 2000))
+	x.t.Fatalf("t3 GET %s: %s\n%s", path, last, tail(x.out.String(), 2000))
 	return false
 }
 
@@ -348,7 +340,7 @@ const (
 
 // turnV2 is Turn on 0.1.0: the thread launched with its first message in one command, as
 // the front end launches a new thread, then T3's shell snapshot polled until the
-// thread's latest run has ended. Anything but "completed" fails the scenario.
+// thread's latest run has settled (t3SettledRuns). Anything but "completed" fails the scenario.
 func (x *T3) turnV2(project, thread string, agent map[string]any, prompt string) {
 	x.t.Helper()
 	x.rpc("orchestration.launchThread", map[string]any{"commandId": uuid.NewString(), "creationSource": "web", "threadId": thread,
@@ -360,7 +352,7 @@ func (x *T3) turnV2(project, thread string, agent map[string]any, prompt string)
 	deadline := time.Now().Add(3 * time.Minute)
 	for time.Now().Before(deadline) {
 		if th, ok := x.shellThread(thread); ok {
-			if th.LatestRunID != nil && th.ActiveRunID == nil {
+			if th.LatestRunID != nil && t3SettledRuns[th.Status] {
 				if th.Status != "completed" {
 					x.t.Fatalf("T3's %v thread %s: run %s: %s (%s)\n%s", agent["instanceId"], thread, th.Status, th.LastError, th.LastErrorClass, tail(x.out.String(), 3000))
 				}
@@ -381,6 +373,10 @@ func deref(s *string) string {
 	}
 	return *s
 }
+
+// t3SettledRuns are the statuses of a run that has ended (OrchestrationV2RunStatus in T3's
+// contracts); the others are live: preparing, queued, starting, running, waiting.
+var t3SettledRuns = map[string]bool{"completed": true, "interrupted": true, "failed": true, "cancelled": true, "rolled_back": true}
 
 // t3ShellThread is what turnV2 reads of a thread in 0.1.0's shell snapshot.
 type t3ShellThread struct {
@@ -435,7 +431,7 @@ func (x *T3) rpc(tag string, payload any) json.RawMessage {
 	const id = "1" // the connection's only request
 	req := map[string]any{"_tag": "Request", "id": id, "tag": tag, "payload": payload, "headers": []any{}}
 	if err := websocket.JSON.Send(ws, req); err != nil {
-		x.t.Fatalf("t3 %s: %v", tag, err)
+		x.t.Fatalf("t3 %s: %v\n%s", tag, err, tail(x.out.String(), 2000))
 	}
 	for {
 		var msg struct {
