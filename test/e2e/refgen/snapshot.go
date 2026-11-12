@@ -173,9 +173,6 @@ func (n night) profileOf(id buildID) (e2e.Profile, bool, bool) {
 		if len(merged.Binary) == 0 {
 			merged.Binary = p.Binary
 		}
-		if len(merged.Command) == 0 {
-			merged.Command = p.Command
-		}
 		for _, note := range p.Notes {
 			if !slices.Contains(merged.Notes, note) {
 				merged.Notes = append(merged.Notes, note)
@@ -183,8 +180,10 @@ func (n night) profileOf(id buildID) (e2e.Profile, bool, bool) {
 		}
 	}
 	// The command published is the one that took the turn published, not a probe's that sorts
-	// before it (TestGeminiProbeHooks before TestGeminiProfileEgress).
-	if src >= 0 && len(ps[src].Command) > 0 {
+	// before it (TestGeminiProbeHooks before TestGeminiProfileEgress); none where no turn was
+	// taken, so a capture's command says it took one (publish's firstTurn, merge's keepWhole).
+	merged.Command = nil
+	if src >= 0 {
 		merged.Command = ps[src].Command
 	}
 	preferBinaryScenario(&merged, ps)

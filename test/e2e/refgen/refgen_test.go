@@ -1378,6 +1378,9 @@ func TestCaptureWholeness(t *testing.T) {
 	cut := claudeProfile("1.0.0", "Truncated.", []string{"Bash"}, "", "")
 	cut.Failed = true
 	files := e2e.Profile{Harness: "claude", Version: "1.0.0", Platform: "linux/amd64", Scenario: "TestClaudeProfileFiles", Failed: true}
+	// A probe records its command and what it found, never a first turn.
+	probeOnly := e2e.Profile{Harness: "claude", Version: "1.0.0", Platform: "darwin/arm64", Scenario: "TestClaudeProbeHooks", Command: []string{"claude", "--probe"},
+		Probes: map[string]json.RawMessage{"signing": json.RawMessage(`{"format":"developer-id","status":"valid"}`)}}
 	rows := func(id buildID) []HistoryEntry {
 		return []HistoryEntry{{Harness: id.harness, Version: id.version, Platform: "darwin/arm64", Capability: "relay.telemetry", Result: "pass"}}
 	}
@@ -1399,6 +1402,11 @@ func TestCaptureWholeness(t *testing.T) {
 			nights: []night{{attempted: []buildID{t3}, unfinished: []buildID{t3}}, {history: rows(t3)}}, partial: true, notes: []string{unfinishedNote}},
 		{name: "a page that never took a turn takes a truncated one's, truncated", id: claude,
 			nights:  []night{{attempted: []buildID{claude}, history: rows(claude)}, {attempted: []buildID{claude}, profiles: []e2e.Profile{cut}}},
+			partial: true, truncated: true, notes: []string{failedNote}},
+		{name: "a capture of probes alone took no turn: partial, and its command none", id: claude,
+			nights: []night{{attempted: []buildID{claude}, profiles: []e2e.Profile{probeOnly}}}, partial: true, notes: []string{failedNote}},
+		{name: "a page of probes alone takes a truncated turn's, truncated", id: claude,
+			nights:  []night{{attempted: []buildID{claude}, profiles: []e2e.Profile{probeOnly}}, {attempted: []buildID{claude}, profiles: []e2e.Profile{probeOnly, cut}}},
 			partial: true, truncated: true, notes: []string{failedNote}},
 		{name: "a partial page's note is its latest attempt's", id: claude,
 			nights:  []night{{attempted: []buildID{claude}, unfinished: []buildID{claude}, history: rows(claude)}, {attempted: []buildID{claude}, history: rows(claude)}},
