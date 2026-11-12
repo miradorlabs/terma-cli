@@ -318,7 +318,8 @@ two batches: from one, it is a stall's.
 A new capture of a build replaces what it measured and keeps the rest: a census-only capture
 keeps the probe's findings, a probe-only one every surface and its keys, a probe that did not
 see a surface keeps the findings of the one that did, and a partial capture (its profile's turn
-failed) takes the census but none of its probe's findings.
+failed) takes the census but none of its probe's findings, so one without a census changes
+nothing.
 
 ### hooks
 

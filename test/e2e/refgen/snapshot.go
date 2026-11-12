@@ -360,7 +360,11 @@ func merge(old, tonight *Snapshot, now time.Time) *Snapshot {
 			// replaces none of a whole one's. The census, which ran apart, still counts.
 			tel = withoutProbe(tel)
 		}
-		tt["telemetry"] = mergeTelemetry(ot["telemetry"], tel)
+		if tel == nil {
+			tt["telemetry"] = ot["telemetry"] // nothing measured tonight: nothing replaced
+		} else {
+			tt["telemetry"] = mergeTelemetry(ot["telemetry"], tel)
+		}
 	}
 	took := false
 	for _, sec := range present(tonight) {
@@ -457,12 +461,12 @@ func hasFirstTurn(p e2e.Profile) bool {
 	return false
 }
 
-// withoutProbe is telemetry section t without the probe's findings: its export and each surface's
-// probe fields.
+// withoutProbe is telemetry section t without the probe's findings: its census, the surfaces with
+// their keys alone; nil where t has no census, and so nothing left measured.
 func withoutProbe(t any) any {
 	m, _ := t.(map[string]any)
-	if m == nil {
-		return t
+	if census, _ := refdiff.TelemetryMeasured(m); !census {
+		return nil
 	}
 	out := maps.Clone(m)
 	delete(out, "export")
@@ -470,15 +474,11 @@ func withoutProbe(t any) any {
 	kept := map[string]any{}
 	for name, raw := range surfaces {
 		s, _ := raw.(map[string]any)
-		c := maps.Clone(s)
-		for _, f := range refdiff.ProbeFields {
-			delete(c, f)
+		if keys, ok := s["keys"]; ok {
+			kept[name] = map[string]any{"keys": keys}
 		}
-		kept[name] = c
 	}
-	if surfaces != nil {
-		out["surfaces"] = kept
-	}
+	out["surfaces"] = kept
 	return out
 }
 
