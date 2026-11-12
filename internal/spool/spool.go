@@ -168,16 +168,31 @@ func (s *Spool) AppendContext(ctx context.Context, events ...Event) error {
 	return err
 }
 
-// Pending reports how many events are queued and the spool size in bytes.
+// Pending reports how many events are queued and the spool size in bytes, settled lines
+// (Settle) not counted.
 func (s *Spool) Pending() (count int, size int64, err error) {
-	data, err := os.ReadFile(s.path())
-	if errors.Is(err, fs.ErrNotExist) {
-		return 0, 0, nil
-	}
+	data, err := s.queued()
 	if err != nil {
 		return 0, 0, err
 	}
 	return bytes.Count(data, []byte{'\n'}), int64(len(data)), nil
+}
+
+// queued is the queue's lines as they stand, without those settled since the last
+// compaction; nil with no queue.
+func (s *Spool) queued() ([]byte, error) {
+	data, err := os.ReadFile(s.path())
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	settled, err := s.settled()
+	if err != nil || len(settled) == 0 {
+		return data, err
+	}
+	return withoutSettled(data, settled), nil
 }
 
 // Writable reports whether an event would land, by appending a probe line under the
@@ -218,15 +233,13 @@ func (s *Spool) Writable() error {
 	return f.Sync()
 }
 
-// Mentions reports which of the needles appear in a queued event's line. It reads the file
-// as it stands, without the append lock or decoding a line: an append is whole lines and a
-// rewrite an atomic rename, so a needle unique enough to name one thing (a sha256) is
-// found wherever it is queued, and a false match only says too much.
+// Mentions reports which of the needles appear in a queued event's line, settled lines not
+// counted. It reads the file as it stands, without the append lock or decoding a line: an
+// append is whole lines and a rewrite an atomic rename, so a needle unique enough to name
+// one thing (a sha256) is found wherever it is queued, and a false match only says too
+// much.
 func (s *Spool) Mentions(needles []string) (map[string]bool, error) {
-	data, err := os.ReadFile(s.path())
-	if errors.Is(err, fs.ErrNotExist) {
-		return map[string]bool{}, nil
-	}
+	data, err := s.queued()
 	if err != nil {
 		return nil, err
 	}
@@ -248,6 +261,9 @@ func (s *Spool) Peek(n int) ([]Event, error) {
 		return nil, err
 	}
 	defer unlock()
+	if err := s.compact(); err != nil {
+		return nil, err
+	}
 	events, err := s.readBatch(n, 0, time.Time{})
 	return events.Events, err
 }

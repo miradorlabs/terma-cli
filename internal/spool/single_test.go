@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -211,6 +212,9 @@ func TestAStampSeesASettleAndAnEqualAppend(t *testing.T) {
 	if err := s.Settle(events[0]); err != nil {
 		t.Fatal(err)
 	}
+	if err := s.Compact(); err != nil { // the rewrite
+		t.Fatal(err)
+	}
 	if err := s.Append(Event{Name: "c", Time: at}); err != nil {
 		t.Fatal(err)
 	}
@@ -283,5 +287,82 @@ func TestTakeFindsTheLineWhereverItIs(t *testing.T) {
 	// c now sits where a stood: a line at a's offset is not a's.
 	if err := take(events[0]); !errors.Is(err, ErrNotQueued) {
 		t.Fatalf("a settled event at another's offset: %v", err)
+	}
+}
+
+// Settling every image of a pass rewrites the queue not once: each settle appends to the
+// settled log, and one compaction rewrites the queue at the end.
+func TestSettlesDoNotRewriteTheQueue(t *testing.T) {
+	s, err := Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	at := time.Now()
+	for i := range 20 {
+		if err := s.Append(Event{Name: fmt.Sprint("e", i), Time: at}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	events, _, _, err := s.Read(t.Context(), at)
+	if err != nil {
+		t.Fatal(err)
+	}
+	before, err := os.Stat(s.path())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range events[:19] {
+		if err := s.Settle(e); err != nil {
+			t.Fatal(err)
+		}
+	}
+	after, err := os.Stat(s.path())
+	if err != nil || !os.SameFile(before, after) || after.Size() != before.Size() {
+		t.Fatal("a settle rewrote the queue")
+	}
+	if n, _, _ := s.Pending(); n != 1 {
+		t.Fatalf("%d pending; settled lines still count", n)
+	}
+	if err := s.Compact(); err != nil {
+		t.Fatal(err)
+	}
+	if got := names(t, s); got != "e19" {
+		t.Fatalf("after the compaction the queue holds %s", got)
+	}
+}
+
+// A sender killed between its settles and the compaction hands out nothing it settled
+// again: the settled log outlives it, and the next Read compacts.
+func TestASettledLineIsNeverHandedOutAgain(t *testing.T) {
+	dir := t.TempDir()
+	s, err := Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	at := time.Now()
+	if err := s.Append(Event{Name: "sent", Time: at}, Event{Name: "left", Time: at}); err != nil {
+		t.Fatal(err)
+	}
+	events, _, _, err := s.Read(t.Context(), at)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Settle(events[0]); err != nil {
+		t.Fatal(err)
+	}
+	// The sender dies here; the next one opens the queue afresh.
+	again, err := Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if found, _ := again.Mentions([]string{`"sent"`}); found[`"sent"`] {
+		t.Fatal("a settled line is still mentioned")
+	}
+	events, _, _, err = again.Read(t.Context(), at)
+	if err != nil || len(events) != 1 || events[0].Name != "left" {
+		t.Fatalf("Read after a crash = %+v, %v", events, err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, settledFile)); !os.IsNotExist(err) {
+		t.Fatalf("the settled log outlived the compaction: %v", err)
 	}
 }
