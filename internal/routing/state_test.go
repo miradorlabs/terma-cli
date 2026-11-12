@@ -189,8 +189,13 @@ func TestUpdate(t *testing.T) {
 	if err != nil || !ok || len(s.Bindings) != 20 || s.Generation != 21 {
 		t.Fatalf("after 20 concurrent writes: %d bindings, generation %d, %v", len(s.Bindings), s.Generation, err)
 	}
-	if again, err := Update(dir, "default", func(s *State) error { return s.Bind("github.com/owner0", "acme", false) }); err != nil || again.Generation != s.Generation {
-		t.Fatalf("a change that changed nothing was written: generation %d, %v", again.Generation, err)
+	for _, noop := range []func(*State) error{
+		func(s *State) error { return s.Bind("github.com/owner0", "acme", false) },
+		func(s *State) error { return s.Unbind("github.com/never-bound") },
+	} {
+		if again, err := Update(dir, "default", noop); err != nil || again.Generation != s.Generation {
+			t.Fatalf("a change that changed nothing was written: generation %d, %v", again.Generation, err)
+		}
 	}
 
 	if _, err := Update(dir, "default", func(s *State) error {

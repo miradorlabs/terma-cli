@@ -10,16 +10,24 @@ import (
 // in: lowercased whole, as config.Policy.Admits compares ignoring case, then
 // gitx.RepositoryID's `host/path`, without scheme, port, credentials, `.git` or a
 // trailing slash, from scp, `https://`, `ssh://` and bare `host/path` forms alike. It is
-// idempotent. "" for what names no hosted repository, including anything still
-// percent-encoded, which no two readers would decode alike.
+// idempotent (FuzzNormalize): it returns only a form that reads back as itself, and ""
+// for anything else, such as a path that decodes to `%`, `?`, `#` or a control
+// character, as for what names no hosted repository.
 func Normalize(s string) string {
+	id := readRepository(s)
+	if readRepository(id) != id {
+		return ""
+	}
+	return id
+}
+
+// readRepository is one reading of s as a repository: lowercased, then gitx.RepositoryID,
+// as a URL or scp remote, else as a bare `host/path`.
+func readRepository(s string) string {
 	s = strings.ToLower(strings.TrimSpace(s))
 	id := gitx.RepositoryID(s)
 	if id == "" && !strings.Contains(s, "://") {
 		id = gitx.RepositoryID("https://" + s)
-	}
-	if strings.Contains(id, "%") {
-		return ""
 	}
 	return id
 }
