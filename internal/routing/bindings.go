@@ -113,8 +113,8 @@ func (s *State) Refuse(key string) error {
 	return nil
 }
 
-// Unbind removes the decision on key: it becomes pending if a selected organization's
-// entry needs it, and free otherwise.
+// Unbind removes the decision on key. Route then derives it as pending while a selected
+// organization's entry needs it, and free otherwise; neither is stored.
 func (s *State) Unbind(key string) error {
 	key, err := bindingKey(key)
 	if err != nil {
@@ -132,10 +132,10 @@ func (s *State) set(key string, b Binding) {
 }
 
 // bindingKey normalises an owner (`host/owner`) or a repository (`host/owner/name`), in
-// any form Normalize reads; a wildcard is never one, and an empty segment is refused
-// rather than folded away.
+// any form Normalize reads; a wildcard is never one, and an empty segment, a query or a
+// fragment is refused rather than folded away.
 func bindingKey(raw string) (string, error) {
-	if key := Normalize(raw); !emptySegment(raw) && (isOwnerKey(key) || validRepo(key)) {
+	if key := Normalize(raw); !reinterpreted(raw) && (isOwnerKey(key) || validRepo(key)) {
 		return key, nil
 	}
 	return "", fmt.Errorf("%q is neither an owner (host/owner) nor a repository (host/owner/name)", raw)

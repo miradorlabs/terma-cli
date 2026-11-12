@@ -42,7 +42,10 @@ func TestOneNormaliserForEveryForm(t *testing.T) {
 	if err := bad.Bind("git@github.com:acme/*", "acme", false); err == nil {
 		t.Error("bound a wildcard")
 	}
-	for _, key := range []string{"github.com/acme//secret", "github.com/acme/../secret", "github.com/./acme/x"} {
+	for _, key := range []string{
+		"github.com/acme//secret", "github.com/acme/../secret", "github.com/./acme/x",
+		"github.com/acme/*?note", "github.com/acme/*#note", "github.com/acme/api?x", "https://github.com/acme/api#main",
+	} {
 		if err := bad.Bind(key, "acme", false); err == nil {
 			t.Errorf("bound %q", key)
 		}
