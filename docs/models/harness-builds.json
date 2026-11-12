@@ -7318,7 +7318,7 @@
           ]
         },
         "2.1.322": {
-          "captured_at": "2026-11-12T05:15:55.281711967Z",
+          "captured_at": "2026-11-12T15:48:45.504112256Z",
           "captured": true,
           "uses": [
             {
@@ -7389,6 +7389,32 @@
       "builds": {
         "4.16336.0": {
           "captured_at": "2026-11-05T11:56:08.292632Z",
+          "captured": true,
+          "uses": [
+            {
+              "model": "claude-opus-5-5",
+              "role": "default",
+              "params": {
+                "output_config": {
+                  "effort": "medium"
+                },
+                "thinking": {
+                  "type": "adaptive"
+                }
+              }
+            },
+            {
+              "model": "claude-haiku-5-5",
+              "role": "side_request"
+            },
+            {
+              "model": "claude-opus-5-5",
+              "role": "side_request"
+            }
+          ]
+        },
+        "5.11492.0": {
+          "captured_at": "2026-11-12T15:48:45.504112256Z",
           "captured": true,
           "uses": [
             {
@@ -10114,7 +10140,7 @@
           ]
         },
         "0.167.1": {
-          "captured_at": "2026-11-12T05:15:55.281711967Z",
+          "captured_at": "2026-11-12T15:48:45.504112256Z",
           "captured": true,
           "uses": [
             {
@@ -10146,7 +10172,7 @@
           ]
         },
         "0.167.2": {
-          "captured_at": "2026-11-12T05:15:55.281711967Z",
+          "captured_at": "2026-11-12T15:48:45.504112256Z",
           "captured": true,
           "uses": [
             {
@@ -13128,7 +13154,7 @@
           "captured": true
         },
         "0.68.0": {
-          "captured_at": "2026-11-12T05:15:55.281711967Z",
+          "captured_at": "2026-11-12T15:48:45.504112256Z",
           "captured": true
         }
       }

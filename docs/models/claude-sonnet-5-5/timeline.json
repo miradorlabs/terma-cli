@@ -3,6 +3,33 @@
   "id": "claude-sonnet-5-5",
   "steps": [
     {
+      "at": "2026-11-12T15:52:35.859355299Z",
+      "event": "changed",
+      "changes": [
+        {
+          "id": "docs/whats_new",
+          "category": "docs",
+          "op": "changed",
+          "path": [
+            "docs",
+            "whats_new"
+          ],
+          "title": "What's new page changed (+1652 −1862 chars)",
+          "impact": "informational",
+          "before": null,
+          "after": null,
+          "text_diff": "@@ -78,22 +78,20 @@\n | From Claude Sonnet 5.5, to Claude Opus 5.5, Claude Fable 5.2, or Claude Mythos 5.2                                | Yes, on the Claude API and Claude Models on Google Cloud (Google managed) only |\n | From Claude Sonnet 5.5, to any other model                                                                        | No                                                                             |\n \n-When a request carries a block the target model can’t read, the API drops it before the model sees it.\n+When a request carries a block the target model can’t read, the API drops it before the model receives it.\n The request succeeds, and dropped blocks aren’t billed.\n-With the `thinking-binding-controls-2026-08-01` beta header, the drop is reported in a top-level `input_transformations` array.\n-See [Switching models mid-conversation](https://platform.claude.com/docs/en/build-with-claude/preserved-thinking#switching-models).\n+With the `thinking-binding-controls-2026-08-01` beta header, the API reports the drop in a top-level `input_transformations` array.\n+See [Switch models and back](https://platform.claude.com/docs/en/build-with-claude/preserved-thinking#switching-models).\n For switches that don’t involve Claude Sonnet 5.5, see [Which model switches keep the reasoning on the Claude API](https://platform.claude.com/docs/en/build-with-claude/preserved-thinking#which-model-switches-keep-reasoning).\n \n-The API also checks whether anything before a Claude Sonnet 5.5 thinking block has changed since the block was produced: the `system` prompt, the `tools`, or an earlier message.\n+The API also checks whether anything before a Claude Sonnet 5.5 thinking block has changed since the model produced the block.\n+This prefix check covers the `system` prompt, the `tools`, and every earlier message.\n Keep the conversation append-only: change instructions or tools with [mid-conversation system messages](https://platform.claude.com/docs/en/build-with-claude/mid-conversation-system-messages) rather than edits.\n \n-A request that replays a block after such a change, with `thinking.block_binding.prefix_mismatch_behavior` unset, gets a 400 error.\n-This applies to accounts created on or after August 31, 2026, 00:00 UTC.\n-[Preserved thinking availability](https://platform.claude.com/docs/en/build-with-claude/preserved-thinking#feature-availability) lists the platforms where this applies.\n-On accounts created before that date, the request might or might not get the error.\n-To drop the affected blocks instead, send the `thinking-binding-controls-2026-08-01` beta header and set the field to `\"drop_block\"`.\n+Failing the [prefix check](https://platform.claude.com/docs/en/build-with-claude/preserved-thinking/prefix-checks#prefix-check) might or might not result in a [400 error](https://platform.claude.com/docs/en/api/errors#thinking-block-conversation-mismatch).\n+To identify and handle both cases, see [Prefix checks on thinking blocks](https://platform.claude.com/docs/en/build-with-claude/preserved-thinking/prefix-checks).\n \n-`block_binding` works only with `thinking: {\"type\": \"adaptive\"}`. With any other thinking setting, you can’t send `block_binding`. Instead, strip the block the error names and every later `thinking` and `redacted_thinking` block. Leave them out of later requests, and retry.\n+The prefix check runs on the Claude API and on [some cloud platforms](https://platform.claude.com/docs/en/build-with-claude/preserved-thinking#feature-availability).\n \n See [Preserved thinking](https://platform.claude.com/docs/en/build-with-claude/preserved-thinking) and the migration guide’s [note on thinking blocks](https://platform.claude.com/docs/en/models/sonnet-5-5/migration-guide#thinking-blocks).\n \n@@ -165,14 +163,15 @@\n \n Thinking blocks that Claude Sonnet 5.5 produces work only in the account that produced them, or in an account linked to it.\n When another account sends one of these blocks, the API drops the block before the model receives it, and the request succeeds.\n+Blocks from Claude Haiku 5.5, Claude Fable 5.2, and Claude Mythos 5.2 follow the same rule.\n+\n On the Claude API and Claude Models on Google Cloud (Google managed), you can see which blocks were dropped.\n Send the `thinking-binding-controls-2026-08-01` beta header, and the response lists each dropped block in `input_transformations` with `reason: \"organization_binding_mismatch\"`.\n-Blocks from earlier models aren’t affected.\n-See [Thinking blocks stay with the account that produced them](https://platform.claude.com/docs/en/build-with-claude/preserved-thinking#account-bound-thinking).\n+See [Accounts and cloud platforms](https://platform.claude.com/docs/en/build-with-claude/preserved-thinking#account-bound-thinking).\n \n ## Behavior differences\n \n-Claude Sonnet 5.5 differs from Claude Sonnet 5 in several ways that show up without any code change. [Prompting Claude Sonnet 5.5](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-sonnet-5-5) has guidance for each:\n+For guidance on each of the following, see [Prompting Claude Sonnet 5.5](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-sonnet-5-5). Claude Sonnet 5.5 differs from Claude Sonnet 5 in these ways, which show up without any code change:\n \n * **Effort levels are recalibrated.** An [effort](https://platform.claude.com/docs/en/build-with-claude/effort) level doesn’t produce the same amount of thinking as it did on Claude Sonnet 5.\n Re-run your effort sweep rather than carrying a setting over.\n",
+          "stats": {
+            "added_chars": 1652,
+            "removed_chars": 1862
+          },
+          "terma": null,
+          "source": null,
+          "documented": null
+        }
+      ]
+    },
+    {
       "at": "2026-11-11T17:23:42.167641842Z",
       "event": "changed",
       "changes": [
