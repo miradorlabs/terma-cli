@@ -132,6 +132,10 @@ func compare(a, b *Snapshot) []Change {
 		if c.Path[0] == "storage" && c.Op != "changed" && (len(c.Path) > 2 || !structured(c.Before, c.After)) {
 			continue
 		}
+		// Why a check did not run is the run's explanation (a skip's message), not the build's.
+		if c.Path[0] == "support" && c.Path[len(c.Path)-1] == "why" {
+			continue
+		}
 		// A capability checked on a platform for one build and not the other was not tested
 		// there, not lost: only a result that changed is a change.
 		if c.Path[0] == "support" && len(c.Path) == 3 && c.Path[1] == "capabilities" && c.Op != "changed" {

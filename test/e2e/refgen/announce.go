@@ -70,30 +70,19 @@ type SlackText struct {
 // ImpactN counts a version's changes by impact.
 type ImpactN map[string]int
 
-// captured reports a snapshot with something captured of the build itself, not only terma's
-// verdict on it.
-func captured(s *Snapshot) bool {
-	for _, sec := range present(s) {
-		if sec != "support" {
-			return true
-		}
-	}
-	return false
-}
-
-// newestCaptured is the newest version with something captured of it, "" for none.
-func newestCaptured(byVersion map[string]*Snapshot) string {
+// newestPublished is the newest version with a page, "" for none.
+func newestPublished(byVersion map[string]*Snapshot) string {
 	newest := ""
-	for v, s := range byVersion {
-		if captured(s) && (newest == "" || versionLess(newest, v)) {
+	for v := range byVersion {
+		if newest == "" || versionLess(newest, v) {
 			newest = v
 		}
 	}
 	return newest
 }
 
-// announce is what a harness has to announce after the night: its versions captured now
-// that are newer than the newest captured before.
+// announce is what a harness has to announce after the run: its versions published now that are
+// newer than the newest published before.
 func announce(site string, entry HarnessEntry, entries []VersionEntry, diffs map[string]*Diff, byVersion map[string]*Snapshot, before string) []Announcement {
 	if before == "" || site == "" {
 		return nil
@@ -102,7 +91,10 @@ func announce(site string, entry HarnessEntry, entries []VersionEntry, diffs map
 	// entries are newest first; announce oldest first, as they came out.
 	for i := len(entries) - 1; i >= 0; i-- {
 		e := entries[i]
-		if !versionLess(before, e.Version) || !captured(byVersion[e.Version]) {
+		// A page begins with a capture, or a capture that failed (publish): a version newer than
+		// every page before the run is a release this run captured, whatever its capture found,
+		// a harness terma tests through others (T3 Code) included.
+		if !versionLess(before, e.Version) {
 			continue
 		}
 		s := byVersion[e.Version]
@@ -204,7 +196,7 @@ func postText(a Announcement) string {
 // and to the comparison with the version before.
 func slackMessage(a Announcement) *SlackMessage {
 	summary := fmt.Sprintf("*%s %s* is out", a.Name, a.Version)
-	if a.Previous != "" {
+	if a.Previous != "" && a.Changes > 0 {
 		summary += fmt.Sprintf(": %d %s since %s", a.Changes, plural(a.Changes, "change", "changes"), a.Previous)
 	}
 	var counts []string

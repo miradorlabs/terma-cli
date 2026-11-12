@@ -1073,3 +1073,21 @@ func TestMergeKeepsTelemetryTonightDidNotMeasure(t *testing.T) {
 		t.Errorf("tonight's probe did not replace the probe's findings: %v", got)
 	}
 }
+
+// A release of a harness terma tests through others (T3 Code: no profile of its own) is announced
+// all the same, with what its run found: here, that terma could not test it.
+func TestReleaseWithoutProfileIsAnnounced(t *testing.T) {
+	dir := t.TempDir()
+	opt := options{site: "https://terma.ai"}
+	first := night{now: time.Now(), attempted: []buildID{{"t3", "0.1.8"}}}
+	if _, err := publish(dir, first, opt); err != nil {
+		t.Fatal(err)
+	}
+	news, err := publish(dir, night{now: time.Now(), attempted: []buildID{{"t3", "0.1.9"}}}, opt)
+	if err != nil || len(news) != 1 || news[0].Version != "0.1.9" || news[0].Support != "untested" {
+		t.Fatalf("announced %+v (%v)", news, err)
+	}
+	if v := teamVerdict(news[0]); !strings.Contains(v, "Not tested with terma") {
+		t.Errorf("verdict = %q", v)
+	}
+}

@@ -165,11 +165,11 @@ func publish(dir string, n night, opt options) ([]Announcement, error) {
 	if err != nil {
 		return nil, err
 	}
-	// The newest version of each harness published with something captured of it, before the
-	// night: a version newer than it, captured tonight, is news.
+	// The newest version of each harness published before the run: a version newer than it,
+	// published by the run, is news.
 	before := map[string]string{}
 	for h, byVersion := range pub.snapshots {
-		before[h] = newestCaptured(byVersion)
+		before[h] = newestPublished(byVersion)
 	}
 	// Each harness id and version names a folder or file of the tree: one that would name
 	// something outside it (a vendor's feed's ../../x) is refused before anything is written.
