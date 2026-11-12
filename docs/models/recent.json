@@ -1,7 +1,19 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-12T17:53:06.258113706Z",
+  "generated_at": "2026-11-12T18:17:01.427562636Z",
   "events": [
+    {
+      "at": "2026-11-12T18:17:01.427562636Z",
+      "model": "gemini-4-hydrogen",
+      "vendor": "google",
+      "name": "Gemini 4 Hydrogen",
+      "event": "changed",
+      "changes": 2,
+      "highlights": [
+        "Default effort: now medium",
+        "Reasoning effort: now xhigh, high, medium, low"
+      ]
+    },
     {
       "at": "2026-11-12T17:53:06.258113706Z",
       "model": "gemini-4-hydrogen",

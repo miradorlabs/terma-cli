@@ -3,6 +3,51 @@
   "id": "gemini-4-hydrogen",
   "steps": [
     {
+      "at": "2026-11-12T18:17:01.427562636Z",
+      "event": "changed",
+      "changes": [
+        {
+          "id": "facts/default_effort",
+          "category": "facts",
+          "op": "added",
+          "path": [
+            "facts",
+            "default_effort"
+          ],
+          "title": "Default effort: now medium",
+          "impact": "notable",
+          "before": null,
+          "after": "medium",
+          "text_diff": null,
+          "terma": null,
+          "source": null,
+          "documented": null
+        },
+        {
+          "id": "facts/reasoning_efforts",
+          "category": "facts",
+          "op": "added",
+          "path": [
+            "facts",
+            "reasoning_efforts"
+          ],
+          "title": "Reasoning effort: now xhigh, high, medium, low",
+          "impact": "notable",
+          "before": null,
+          "after": [
+            "xhigh",
+            "high",
+            "medium",
+            "low"
+          ],
+          "text_diff": null,
+          "terma": null,
+          "source": null,
+          "documented": null
+        }
+      ]
+    },
+    {
       "at": "2026-11-12T17:53:06.258113706Z",
       "event": "listed",
       "changes": []
