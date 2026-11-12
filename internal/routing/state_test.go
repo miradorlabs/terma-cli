@@ -1,6 +1,7 @@
 package routing
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -105,9 +106,21 @@ func TestApplyRefreshKeepsRefusalsInOrder(t *testing.T) {
 	if _, err := s.ApplyRefresh(Refresh{EnrollmentID: id, Epoch: s.team(id).Epoch, Policy: ok(1)}); err == nil {
 		t.Fatal("accepted an older revision")
 	}
-	apply(Refresh{EnrollmentID: id, Epoch: s.team(id).Epoch, Failure: SignIn})
+	beforeSignIn := s.team(id).Epoch
+	apply(Refresh{EnrollmentID: id, Epoch: beforeSignIn, Failure: SignIn})
 	if state() != SignInNeeded {
 		t.Fatal("a refused sign-in did not block the team")
+	}
+	if apply(Refresh{EnrollmentID: id, Epoch: beforeSignIn, Policy: ok(3)}) || state() != SignInNeeded {
+		t.Fatal("a success started under the refused sign-in cleared it")
+	}
+	for _, bad := range []Refresh{
+		{EnrollmentID: id, Epoch: s.team(id).Epoch, Policy: &config.Policy{TeamID: "clientco-contractors", Revision: 9, FetchedAt: now}},
+		{EnrollmentID: id, Epoch: s.team(id).Epoch},
+	} {
+		if _, err := s.ApplyRefresh(bad); err == nil {
+			t.Errorf("accepted %+v", bad)
+		}
 	}
 
 	s.Deselect(id)
@@ -149,6 +162,15 @@ func TestSelect(t *testing.T) {
 func TestUpdate(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
+	if _, err := Update(dir, "default", func(*State) error { return nil }); !errors.Is(err, ErrNoState) {
+		t.Fatalf("Update made a routing state that did not exist: %v", err)
+	}
+	if _, err := Create(dir, "default", func(*State) error { return nil }); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Create(dir, "default", func(*State) error { return nil }); err == nil {
+		t.Fatal("Create overwrote an existing routing state")
+	}
 	var wg sync.WaitGroup
 	for i := range 20 {
 		wg.Add(1)
@@ -164,8 +186,11 @@ func TestUpdate(t *testing.T) {
 	}
 	wg.Wait()
 	s, ok, err := Load(dir, "default")
-	if err != nil || !ok || len(s.Bindings) != 20 || s.Generation != 20 {
+	if err != nil || !ok || len(s.Bindings) != 20 || s.Generation != 21 {
 		t.Fatalf("after 20 concurrent writes: %d bindings, generation %d, %v", len(s.Bindings), s.Generation, err)
+	}
+	if again, err := Update(dir, "default", func(s *State) error { return s.Bind("github.com/owner0", "acme", false) }); err != nil || again.Generation != s.Generation {
+		t.Fatalf("a change that changed nothing was written: generation %d, %v", again.Generation, err)
 	}
 
 	if _, err := Update(dir, "default", func(s *State) error {

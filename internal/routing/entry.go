@@ -1,41 +1,74 @@
 package routing
 
 import (
-	"slices"
 	"strings"
+
+	"github.com/miradorlabs/terma-cli/internal/gitx"
 )
 
 // Normalize is the one form binding keys, policy entries and repositories are compared
-// in: trimmed, without a trailing slash, compared ignoring case as config.Policy.Admits
-// compares them. A repository reaches it already as gitx.RepositoryID makes it, host
-// lowercased without port or credentials.
+// in: gitx.RepositoryID's `host/path`, with the host lowercased without scheme, port or
+// credentials and the path without `.git` or a trailing slash, from scp, `https://`,
+// `ssh://` and bare `host/path` forms alike; then lowercased whole, as
+// config.Policy.Admits compares ignoring case. "" for what names no hosted repository.
 func Normalize(s string) string {
-	return strings.ToLower(strings.TrimRight(strings.TrimSpace(s), "/"))
+	s = strings.TrimSpace(s)
+	id := gitx.RepositoryID(s)
+	if id == "" && !strings.Contains(s, "://") {
+		id = gitx.RepositoryID("https://" + s)
+	}
+	return strings.ToLower(id)
+}
+
+// segments counts the path segments of a normalised key, host included; 0 if one is
+// empty.
+func segments(key string) int {
+	if key == "" {
+		return 0
+	}
+	parts := strings.Split(key, "/")
+	for _, p := range parts {
+		if p == "" {
+			return 0
+		}
+	}
+	return len(parts)
+}
+
+// validRepo reports whether a normalised key names a repository: a host, an owner and a
+// name at least.
+func validRepo(key string) bool { return segments(key) >= 3 && !strings.Contains(key, "*") }
+
+// isOwnerKey reports whether a normalised key names an owner, `host/owner`.
+func isOwnerKey(key string) bool { return segments(key) == 2 && !strings.Contains(key, "*") }
+
+// owner is a normalised repository's host and first path segment.
+func owner(repo string) string {
+	host, rest, _ := strings.Cut(repo, "/")
+	name, _, _ := strings.Cut(rest, "/")
+	return host + "/" + name
 }
 
 // Owner is a repository's host and first path segment, `github.com/acme` for
 // `github.com/acme/api` and `gitlab.com/acme` for `gitlab.com/acme/platform/api`: the key
-// an owner binding is kept under. "" when repo has no owner and name.
+// an owner binding is kept under. "" when repo names no repository. Unlike
+// gitx.ParseOrigin's owner, it never includes a GitLab subgroup.
 func Owner(repo string) string {
-	parts := strings.Split(Normalize(repo), "/")
-	if len(parts) < 3 || slices.Contains(parts, "") {
+	repo = Normalize(repo)
+	if !validRepo(repo) {
 		return ""
 	}
-	return parts[0] + "/" + parts[1]
-}
-
-// isOwnerKey reports whether a normalised binding key names an owner, `host/owner`,
-// rather than a repository, which has at least a host, an owner and a name.
-func isOwnerKey(key string) bool {
-	return strings.Count(key, "/") == 1
+	return owner(repo)
 }
 
 // Entry is one repository entry of a team's policy: an exact repository, or a wildcard
 // over every repository below a prefix of at least a host and an owner.
 type Entry struct {
 	// Raw is the entry as the policy lists it.
-	Raw      string
-	prefix   []string
+	Raw string
+	// key is the normalised repository, or a wildcard's normalised prefix.
+	key      string
+	fixed    int
 	wildcard bool
 }
 
@@ -45,34 +78,33 @@ type Entry struct {
 // has, as an older reader takes it. `github.com/*`, `*` and `github.com/acme/terma-*`
 // are never wildcards. False for an entry that is neither.
 func ParseEntry(raw string, wildcards bool) (Entry, bool) {
-	parts := strings.Split(Normalize(raw), "/")
-	if slices.Contains(parts, "") {
-		return Entry{}, false
-	}
-	if wildcards && parts[len(parts)-1] == "*" {
-		prefix := parts[:len(parts)-1]
-		if len(prefix) < 2 || slices.ContainsFunc(prefix, func(p string) bool { return strings.Contains(p, "*") }) {
-			return Entry{}, false
+	norm := Normalize(raw)
+	if prefix, ok := strings.CutSuffix(norm, "/*"); wildcards && ok {
+		if n := segments(prefix); n >= 2 && !strings.Contains(prefix, "*") {
+			return Entry{Raw: raw, key: prefix, fixed: n, wildcard: true}, true
 		}
-		return Entry{Raw: raw, prefix: prefix, wildcard: true}, true
-	}
-	if len(parts) < 3 || wildcards && slices.ContainsFunc(parts, func(p string) bool { return strings.Contains(p, "*") }) {
 		return Entry{}, false
 	}
-	return Entry{Raw: raw, prefix: parts}, true
+	n := segments(norm)
+	if n < 3 || wildcards && strings.Contains(norm, "*") {
+		return Entry{}, false
+	}
+	return Entry{Raw: raw, key: norm, fixed: n}, true
 }
 
 // Matches reports whether the entry names repo: an exact entry equals it, a wildcard is a
 // strict prefix of it by whole segments.
 func (e Entry) Matches(repo string) bool {
-	parts := strings.Split(Normalize(repo), "/")
-	if len(parts) < 3 || slices.Contains(parts, "") {
-		return false
-	}
+	repo = Normalize(repo)
+	return validRepo(repo) && e.matches(repo)
+}
+
+// matches is Matches for a repository already normalised.
+func (e Entry) matches(repo string) bool {
 	if !e.wildcard {
-		return slices.Equal(parts, e.prefix)
+		return repo == e.key
 	}
-	return len(parts) > len(e.prefix) && slices.Equal(parts[:len(e.prefix)], e.prefix)
+	return strings.HasPrefix(repo, e.key+"/")
 }
 
 // Wildcard reports whether the entry covers every repository below its prefix.
@@ -82,9 +114,9 @@ func (e Entry) Wildcard() bool { return e.wildcard }
 // its repository for an exact entry, which its owner's binding also satisfies.
 func (e Entry) Key() string {
 	if e.wildcard {
-		return e.prefix[0] + "/" + e.prefix[1]
+		return owner(e.key)
 	}
-	return strings.Join(e.prefix, "/")
+	return e.key
 }
 
 // moreSpecific reports whether a is to be tried before b: an exact entry before any
@@ -93,21 +125,5 @@ func moreSpecific(a, b Entry) bool {
 	if a.wildcard != b.wildcard {
 		return !a.wildcard
 	}
-	return len(a.prefix) > len(b.prefix)
-}
-
-// bestEntry is the most specific of entries that matches repo, read under wildcards.
-func bestEntry(entries []string, wildcards bool, repo string) (Entry, bool) {
-	var best Entry
-	found := false
-	for _, raw := range entries {
-		e, ok := ParseEntry(raw, wildcards)
-		if !ok || !e.Matches(repo) {
-			continue
-		}
-		if !found || moreSpecific(e, best) {
-			best, found = e, true
-		}
-	}
-	return best, found
+	return a.fixed > b.fixed
 }

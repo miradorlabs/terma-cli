@@ -1,6 +1,10 @@
 package routing
 
-import "time"
+import (
+	"cmp"
+	"slices"
+	"time"
+)
 
 // LocationKind is what is known about where a record ran.
 type LocationKind string
@@ -20,7 +24,8 @@ const (
 // Location is where a record ran.
 type Location struct {
 	Kind LocationKind
-	// Repository is the origin as gitx.RepositoryID makes it, when Kind is Repository.
+	// Repository is the checkout's origin, when Kind is Repository; any form Normalize
+	// reads. One that names no repository is treated as unknown, never as personal's.
 	Repository string
 	// Narrow is set on an unknown record that arrived while personal could not take
 	// unknown records: it never can later, whatever is unticked since.
@@ -41,6 +46,27 @@ const (
 	Drop Outcome = "drop"
 )
 
+// Reason says why Route decided as it did, in a word doctor and the relay's counters
+// group by.
+type Reason string
+
+// Reasons.
+const (
+	ReasonMatched           Reason = "matched"
+	ReasonPersonal          Reason = "personal"
+	ReasonUnknownToPersonal Reason = "unknown_to_personal"
+	// ReasonBlocked: the team that would collect it cannot send now (Decision.Blocked).
+	ReasonBlocked Reason = "blocked"
+	// ReasonPending: the developer has not decided the binding the entry needs.
+	ReasonPending Reason = "pending"
+	ReasonUnknown Reason = "unknown"
+	ReasonMixed   Reason = "mixed"
+	ReasonNoMatch Reason = "no_match"
+	// ReasonBoundNotCollected: bound to an organization none of whose selected teams
+	// collects it.
+	ReasonBoundNotCollected Reason = "bound_not_collected"
+)
+
 // Decision is where Route sends a record, and why.
 type Decision struct {
 	Outcome Outcome
@@ -49,30 +75,147 @@ type Decision struct {
 	EnrollmentID string
 	// Entry is the policy entry that matched or blocked, so a route can be explained.
 	Entry string
-	// Authority is who decided about the repository.
+	// Authority is who decided about the repository; for a pending hold, Key is the
+	// binding the developer has yet to decide.
 	Authority Authority
-	// Reason says why, in a word doctor and the relay's counters can group by.
-	Reason string
+	Reason    Reason
+	// Blocked is the holding team's state when Reason is ReasonBlocked.
+	Blocked TeamState
 }
+
+// Router routes against one routing state, each team's entries read once: a caller that
+// routes many records keeps one per state it loads.
+type Router struct {
+	s     State
+	teams []compiled
+}
+
+// compiled is one team's entries: exact repositories by key, and wildcards most specific
+// first. A policy that collects everything or nothing has neither.
+type compiled struct {
+	exact map[string]Entry
+	wild  []Entry
+}
+
+// NewRouter compiles s for routing.
+func NewRouter(s State) *Router {
+	r := &Router{s: s, teams: make([]compiled, len(s.Teams))}
+	for i, t := range s.Teams {
+		c := compiled{exact: map[string]Entry{}}
+		if !t.Policy.Global() && !t.Policy.Unset {
+			for _, raw := range t.Policy.Repositories {
+				e, ok := ParseEntry(raw, t.Policy.Wildcards)
+				switch {
+				case !ok:
+				case e.wildcard:
+					c.wild = append(c.wild, e)
+				case c.exact[e.key].Raw == "":
+					c.exact[e.key] = e
+				}
+			}
+			slices.SortStableFunc(c.wild, func(a, b Entry) int { return cmp.Compare(b.fixed, a.fixed) })
+		}
+		r.teams[i] = c
+	}
+	return r
+}
+
+// match is the most specific entry of compiled team i that names a normalised repo.
+func (r *Router) match(i int, repo string) (Entry, bool) {
+	if e, ok := r.teams[i].exact[repo]; ok {
+		return e, true
+	}
+	for _, e := range r.teams[i].wild {
+		if e.matches(repo) {
+			return e, true
+		}
+	}
+	return Entry{}, false
+}
+
+// Route is where a record that ran at loc goes, under s at now. See Router.Route.
+func Route(loc Location, s State, now time.Time) Decision { return NewRouter(s).Route(loc, now) }
 
 // Route is where a record that ran at loc goes: the first selected team whose policy
 // matches it, organizations before personal. An organization sends only what the
 // developer bound to it, by both the repository's authority and the matching entry's
 // binding; a team that cannot send holds what its last list matches instead of passing
 // it on; personal takes only what no organization is bound to.
-func Route(loc Location, s State, now time.Time) Decision {
+func (r *Router) Route(loc Location, now time.Time) Decision {
 	switch loc.Kind {
 	case Mixed:
-		return Decision{Outcome: Drop, Reason: "mixed"}
+		return Decision{Outcome: Drop, Reason: ReasonMixed}
 	case OutsideGit:
-		return s.routePersonal("", Authority{Kind: Free}, now)
+		return r.personal("", Authority{Kind: Free}, now)
 	case Repository:
-		return s.routeRepository(loc.Repository, now)
+		if repo := Normalize(loc.Repository); validRepo(repo) {
+			return r.repository(repo, now)
+		}
+		loc.Narrow = true
 	}
-	if !loc.Narrow && s.unknownToPersonal(now) {
-		return Decision{Outcome: Send, EnrollmentID: s.Teams[0].EnrollmentID, Reason: "unknown_to_personal"}
+	if !loc.Narrow && r.s.unknownToPersonal(now) {
+		return Decision{Outcome: Send, EnrollmentID: r.s.Teams[0].EnrollmentID, Reason: ReasonUnknownToPersonal}
 	}
-	return Decision{Outcome: Hold, Reason: "unknown"}
+	return Decision{Outcome: Hold, Reason: ReasonUnknown}
+}
+
+func (r *Router) repository(repo string, now time.Time) Decision {
+	auth := r.s.decided(repo)
+	// Among the organization teams the authority lets match, the most specific entry
+	// first, then the developer's order.
+	best, bestEntry := -1, Entry{}
+	for i, t := range r.s.Teams {
+		if t.Personal || auth.Kind == RefusedAll {
+			continue
+		}
+		e, ok := r.match(i, repo)
+		if !ok || auth.Kind == Bound && (t.OrganizationID != auth.Organization || !r.s.consents(e, t.OrganizationID)) {
+			continue
+		}
+		if best < 0 || moreSpecific(e, bestEntry) {
+			best, bestEntry = i, e
+		}
+	}
+	if auth.Kind == Free && best >= 0 {
+		auth = Authority{Kind: Pending, Key: bestEntry.Key()}
+	}
+	switch {
+	case auth.Kind == Free || auth.Kind == RefusedAll:
+		return r.personal(repo, auth, now)
+	case best < 0:
+		return Decision{Outcome: Drop, Authority: auth, Reason: ReasonBoundNotCollected}
+	}
+	t := r.s.Teams[best]
+	d := Decision{Outcome: Send, EnrollmentID: t.EnrollmentID, Entry: bestEntry.Raw, Authority: auth, Reason: ReasonMatched}
+	switch st := t.StateAt(now); {
+	case auth.Kind == Pending:
+		d.Outcome, d.Reason = Hold, ReasonPending
+	case st != Active:
+		d.Outcome, d.Reason, d.Blocked = Hold, ReasonBlocked, st
+	}
+	return d
+}
+
+// personal sends repo, or a location outside git when repo is "", to personal when its
+// policy collects it, while it is Active; a blocked personal team holds it.
+func (r *Router) personal(repo string, auth Authority, now time.Time) Decision {
+	last := len(r.s.Teams) - 1
+	if last < 0 || !r.s.Teams[last].Personal {
+		return Decision{Outcome: Drop, Authority: auth, Reason: ReasonNoMatch}
+	}
+	p := r.s.Teams[last]
+	d := Decision{Outcome: Send, EnrollmentID: p.EnrollmentID, Authority: auth, Reason: ReasonPersonal}
+	if !p.collectsEverything() {
+		e, ok := r.match(last, repo)
+		if repo == "" || !ok {
+			return Decision{Outcome: Drop, Authority: auth, Reason: ReasonNoMatch}
+		}
+		d.Entry = e.Raw
+	}
+	if st := p.StateAt(now); st != Active {
+		d.Outcome, d.Reason, d.Blocked = Hold, ReasonBlocked, st
+	}
+	return d
 }
 
 // UnknownToPersonal reports whether an unknown record arriving now may go to personal,
@@ -86,79 +229,30 @@ func (s State) unknownToPersonal(now time.Time) bool {
 		!s.boundToAnOrganization()
 }
 
-func (s State) routeRepository(repo string, now time.Time) Decision {
-	auth := s.authority(repo)
-	if auth.Kind == Free || auth.Kind == RefusedAll {
-		return s.routePersonal(repo, auth, now)
-	}
-	// Among the organization teams whose entry matches, the most specific entry first,
-	// then the developer's order.
-	var best *Team
-	var bestEntry Entry
-	for i := range s.Teams {
-		t := &s.Teams[i]
-		if t.Personal {
-			continue
-		}
-		e, ok := t.match(repo)
-		if !ok {
-			continue
-		}
-		if auth.Kind == Bound && (t.OrganizationID != auth.Organization || !s.consents(e, t.OrganizationID)) {
-			continue
-		}
-		if best == nil || moreSpecific(e, bestEntry) {
-			best, bestEntry = t, e
-		}
-	}
-	switch {
-	case best == nil:
-		return Decision{Outcome: Drop, Authority: auth, Reason: "bound_not_collected"}
-	case auth.Kind == Pending:
-		return Decision{Outcome: Hold, EnrollmentID: best.EnrollmentID, Entry: bestEntry.Raw, Authority: auth, Reason: "pending"}
-	case best.StateAt(now) != Active:
-		return Decision{Outcome: Hold, EnrollmentID: best.EnrollmentID, Entry: bestEntry.Raw, Authority: auth, Reason: string(best.StateAt(now))}
-	}
-	return Decision{Outcome: Send, EnrollmentID: best.EnrollmentID, Entry: bestEntry.Raw, Authority: auth, Reason: "matched"}
-}
-
-// routePersonal sends repo, or a location outside git when repo is "", to personal when
-// its policy collects it, while it is Active; a blocked personal team holds it.
-func (s State) routePersonal(repo string, auth Authority, now time.Time) Decision {
-	if len(s.Teams) == 0 || !s.Teams[len(s.Teams)-1].Personal {
-		return Decision{Outcome: Drop, Authority: auth, Reason: "no_match"}
-	}
-	p := s.Teams[len(s.Teams)-1]
-	d := Decision{Outcome: Send, EnrollmentID: p.EnrollmentID, Authority: auth, Reason: "personal"}
-	if !p.collectsEverything() {
-		e, ok := p.match(repo)
-		if repo == "" || !ok {
-			return Decision{Outcome: Drop, Authority: auth, Reason: "no_match"}
-		}
-		d.Entry = e.Raw
-	}
-	if st := p.StateAt(now); st != Active {
-		d.Outcome, d.Reason = Hold, string(st)
-	}
-	return d
+// OrganizationOf is the organization a location belongs to, under s at now. See
+// Router.OrganizationOf.
+func OrganizationOf(loc Location, s State, now time.Time) (org string, pending, ok bool) {
+	return NewRouter(s).OrganizationOf(loc, now)
 }
 
 // OrganizationOf is the organization a location belongs to, for telling when a run
 // crosses organizations: the one its repository is bound to, else the one of the team
-// Route sends or holds it for, personal included. Pending belongs to no organization
-// a run can share, so it reports pending. False when nothing collects or binds it.
-func OrganizationOf(loc Location, s State, now time.Time) (org string, pending, ok bool) {
+// Route sends or holds it for, personal included. A pending repository belongs to no
+// organization a run can share, so it reports pending. False when nothing collects or
+// binds it.
+func (r *Router) OrganizationOf(loc Location, now time.Time) (org string, pending, ok bool) {
 	if loc.Kind == Repository {
-		switch auth := s.authority(loc.Repository); auth.Kind {
-		case Bound:
-			return auth.Organization, false, true
-		case Pending:
-			return "", true, true
+		if a := r.s.decided(Normalize(loc.Repository)); a.Kind == Bound {
+			return a.Organization, false, true
 		}
 	}
-	d := Route(Location{Kind: loc.Kind, Repository: loc.Repository, Narrow: true}, s, now)
-	if d.Outcome == Drop || d.EnrollmentID == "" {
+	loc.Narrow = true
+	d := r.Route(loc, now)
+	switch {
+	case d.Authority.Kind == Pending:
+		return "", true, true
+	case d.Outcome == Drop || d.EnrollmentID == "":
 		return "", false, false
 	}
-	return s.team(d.EnrollmentID).OrganizationID, false, true
+	return r.s.team(d.EnrollmentID).OrganizationID, false, true
 }
