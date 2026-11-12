@@ -3,47 +3,43 @@ package refdiff
 import "maps"
 
 // What a capture measured of a build's own telemetry: its field census (every surface the build
-// sent, each with its keys) and its telemetry probe (the export's cadence, and each surface's
-// metric type, unit and temporality or span parents). A capture can hold one without the other:
-// the frequent check runs the probe alone, and an older capture predates the probe. So two
-// builds' telemetry is compared only in the parts both captures measured. What one did not
-// measure is not observed there: never a surface "no longer sent", nor an export "added".
+// sent with a key, each with its keys) and its telemetry probe (the export, and the metric type,
+// unit and temporality or span parents of each surface its one turn made). A capture can hold
+// one without the other: the frequent check ran the probe alone, and an older capture predates
+// the probe. So two builds' telemetry is compared only in the parts both captures measured. What
+// one did not measure is not observed there: never a surface "no longer sent", nor an export
+// "added". Which surfaces a build sends is the census's to say: what a probe saw depends on what
+// its turn did.
 
 // ProbeFields are what the telemetry probe adds to a surface.
 var ProbeFields = []string{"type", "unit", "temporality", "monotonic", "parent", "parents", "root"}
 
 // TelemetryMeasured says whether t holds a field census (a surface with its keys) and a probe's
-// findings (the export, or a surface's probe fields).
+// findings (the export, which the probe always records).
 func TelemetryMeasured(t map[string]any) (census, probe bool) {
 	_, probe = t["export"]
 	surfaces, _ := t["surfaces"].(map[string]any)
 	for _, raw := range surfaces {
 		s, _ := raw.(map[string]any)
 		if _, ok := s["keys"]; ok {
-			census = true
-		}
-		for _, f := range ProbeFields {
-			if _, ok := s[f]; ok {
-				probe = true
-			}
+			return true, probe
 		}
 	}
-	return census, probe
+	return false, probe
 }
 
 // comparableTelemetry are copies of a's and b's telemetry sections holding only what both
 // captures measured: the census's keys where both have a census, the probe's findings where
-// both ran the probe, and the surfaces both have where they measured them differently (the
-// census sees every surface, the probe alone fewer).
+// both ran the probe, and the surfaces both have unless both took the census.
 func comparableTelemetry(a, b map[string]any) (map[string]any, map[string]any) {
 	ac, ap := TelemetryMeasured(a)
 	bc, bp := TelemetryMeasured(b)
-	m := measuredByBoth{keys: ac && bc, probe: ap && bp, sameSurfaces: ac == bc}
+	m := measuredByBoth{keys: ac && bc, probe: ap && bp, sameSurfaces: ac && bc}
 	return m.strip(a, b), m.strip(b, a)
 }
 
 // measuredByBoth is what two captures both measured: the census's keys, the probe's findings,
-// and whether they saw the same surfaces (both took the census, or neither did).
+// and which surfaces are sent (both took the census).
 type measuredByBoth struct{ keys, probe, sameSurfaces bool }
 
 // strip is a copy of telemetry t without what m says t's capture alone measured, beside other's.

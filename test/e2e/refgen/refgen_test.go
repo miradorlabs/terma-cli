@@ -1007,6 +1007,14 @@ func TestMergeKeepsTelemetryTonightDidNotMeasure(t *testing.T) {
 		t.Errorf("tonight's probe did not replace the probe's findings: %v", got)
 	}
 
+	// The census records a surface by its keys: one the probe alone saw (a metric without
+	// attributes) is left out, as a night with both leaves it out.
+	bare := parse(`{"export":{"protocol":"http/json"},"surfaces":{"metrics/m":{"type":"gauge"},"metrics/bare":{"type":"sum"}}}`)
+	got = merge(snap(parse(whole)), snap(bare), now).Telemetry
+	if b, ok := got["surfaces"].(map[string]any)["metrics/bare"]; ok {
+		t.Errorf("a surface the census never recorded came in with the probe: %v", b)
+	}
+
 	// The probe sees fewer surfaces than the census: one it did not see keeps its findings.
 	withHistogram := parse(`{"export":{"protocol":"http/protobuf"},"surfaces":{"metrics/m":{"keys":{},"type":"sum"},"metrics/h":{"keys":{},"type":"histogram"}}}`)
 	got = merge(snap(withHistogram), snap(probeOnly), now).Telemetry

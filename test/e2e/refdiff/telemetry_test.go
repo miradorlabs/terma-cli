@@ -57,9 +57,15 @@ func TestTelemetryComparesWhatBothMeasured(t *testing.T) {
 	if got := telemetryTitles(telemetrySnapshot(t, "1", census), telemetrySnapshot(t, "2", gone)); len(got) != 1 || !strings.Contains(got[0], "logs/codex.api_request") {
 		t.Errorf("a surface both censuses measured, gone: %q", got)
 	}
-	unit := strings.Replace(probeOnly, `"monotonic":true`, `"monotonic":false`, 1)
-	if got := telemetryTitles(telemetrySnapshot(t, "1", probeOnly), telemetrySnapshot(t, "2", unit)); len(got) != 1 {
+	monotonic := strings.Replace(probeOnly, `"monotonic":true`, `"monotonic":false`, 1)
+	if got := telemetryTitles(telemetrySnapshot(t, "1", probeOnly), telemetrySnapshot(t, "2", monotonic)); len(got) != 1 {
 		t.Errorf("a probe finding both probes measured, changed: %q", got)
+	}
+	// What a probe saw is what its turn made: a surface one probe saw and the other did not is
+	// not "no longer sent" without a census on both sides.
+	moreTurn := strings.Replace(probeOnly, `"surfaces":{`, `"surfaces":{"metrics/codex.tool_calls":{"type":"sum"},`, 1)
+	if got := telemetryTitles(telemetrySnapshot(t, "1", moreTurn), telemetrySnapshot(t, "2", probeOnly)); len(got) > 0 {
+		t.Errorf("a surface one probe alone saw: %q", got)
 	}
 	newKey := strings.Replace(censusOnly, `"keys":{}`, `"keys":{"turn":{"kinds":["int"],"class":"safe"}}`, 1)
 	if got := telemetryTitles(telemetrySnapshot(t, "1", census), telemetrySnapshot(t, "2", newKey)); len(got) != 1 {
@@ -85,6 +91,8 @@ func TestExportIntervalNeedsSeveralBatches(t *testing.T) {
 		{export(1000, 3), export(500, 1), 0},
 		{export(1000, 3), export(1000, 5), 0},
 		{export(1000, 3), export(500, 4), 1},
+		{export(1000, 2), export(500, 2), 1},
+		{export(1000, 2), export(500, 1), 0},
 		// A run that caught no batch before the cutoff measured no interval at all.
 		{export(1000, 1), noInterval, 0},
 		{noInterval, export(1000, 1), 0},
