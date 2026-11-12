@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
 	"github.com/miradorlabs/terma-cli/internal/relay/shape"
@@ -166,6 +167,31 @@ func TestCodexQuotaNamesTheSeatAndWithholdsTheEmailWithContent(t *testing.T) {
 			if _, ok := q.Attrs["account_user_id"]; ok {
 				t.Fatalf("the login's user id is sent: %+v", q.Attrs)
 			}
+		}
+	}
+}
+
+// Under a global policy, a quota says so, as Env.EmitFor's events do: delivery drops it if
+// the policy is no longer global when it leaves.
+func TestCodexQuotaIsMarkedGlobal(t *testing.T) {
+	env := fundingEnv(t)
+	env.Policy.Mode, env.Policy.DefaultProjectID = config.ModeGlobal, "p-default"
+	t.Setenv("OPENAI_API_KEY", "")
+	writeRealCodexAuth(t, "chatgpt", nil)
+	id := "funding-session"
+	path := realRolloutTranscript(t, env, id)
+	b, _ := json.Marshal(map[string]any{"session_id": id, "cwd": env.Cwd, "transcript_path": path})
+	env.Stdin = strings.NewReader(string(b))
+	if err := stop(context.Background(), env); err != nil {
+		t.Fatal(err)
+	}
+	quotas := hookruntest.Named(hookruntest.Spooled(t, env.Spool), semconv.TermaSessionQuotaEvent)
+	if len(quotas) == 0 {
+		t.Fatal("no quota spooled")
+	}
+	for _, q := range quotas {
+		if !q.Global {
+			t.Fatalf("quota not marked global under a global policy: %+v", q)
 		}
 	}
 }

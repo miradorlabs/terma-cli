@@ -82,7 +82,7 @@ func sessionEnd(ctx context.Context, env hookrun.Env) error {
 	if !ok {
 		return nil
 	}
-	limitFromTranscript(env, r, in)
+	limitFromTranscript(ctx, env, r, in)
 	// A turn's last response can reach the transcript after its Stop read it, and an interrupted
 	// turn has no Stop.
 	captureClaudeCallResponses(ctx, env, r, in.SessionID, in.TranscriptPath)

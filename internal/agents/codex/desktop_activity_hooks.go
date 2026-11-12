@@ -48,7 +48,7 @@ func captureCodexDesktopActivity(ctx context.Context, e hookrun.Env, r *hookrun.
 		if at.IsZero() || at.After(e.Time()) {
 			at = e.Time()
 		}
-		ev := spool.Event{Time: at, SessionID: in.SessionID, TraceID: a.TraceID, Repository: r.Repository, Attrs: attrs}
+		ev := spool.Event{Time: at, SessionID: in.SessionID, TraceID: a.TraceID, Repository: r.Repository, Global: e.Policy.Global(), Attrs: attrs}
 		switch a.Kind {
 		case "tool":
 			ev.Name = semconv.TermaToolCallEvent

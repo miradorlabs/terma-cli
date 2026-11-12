@@ -69,7 +69,7 @@ func captureCodexFunding(ctx context.Context, e hookrun.Env, r *hookrun.Repo, in
 		if !ev.SourceTime.IsZero() {
 			attrs[semconv.TermaObservationTimeKey] = ev.SourceTime.UTC().Format(time.RFC3339Nano)
 		}
-		return e.Spool.Append(spool.Event{Time: e.Time(), Name: semconv.TermaSessionQuotaEvent, SessionID: in.SessionID, Repository: r.Repository, Attrs: attrs})
+		return e.Spool.Append(spool.Event{Time: e.Time(), Name: semconv.TermaSessionQuotaEvent, SessionID: in.SessionID, Repository: r.Repository, Global: e.Policy.Global(), Attrs: attrs})
 	})
 	if next != cursor {
 		b, _ := json.Marshal(next)

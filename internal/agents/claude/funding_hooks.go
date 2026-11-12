@@ -158,8 +158,8 @@ func stopFailure(ctx context.Context, env hookrun.Env) error {
 // limitFromTranscript spools the session's last API error unless a report followed it: Claude
 // Code signals a headless run's StopFailure hook as it starts, often before terma can spool
 // anything, but awaits SessionEnd.
-func limitFromTranscript(env hookrun.Env, r *hookrun.Repo, in *claudeHookInput) {
-	at, kind, ok := lastAPIError(in.TranscriptPath, in.SessionID)
+func limitFromTranscript(ctx context.Context, env hookrun.Env, r *hookrun.Repo, in *claudeHookInput) {
+	at, kind, ok := lastAPIError(in.TranscriptPath, in.SessionID, env.Admission(ctx))
 	// Past the sweep's retention its marker may be gone, so the error cannot be told unreported.
 	if !ok || env.Time().Sub(at) > spool.MaxAge {
 		return
@@ -226,8 +226,10 @@ func markLimit(env hookrun.Env, sessionID string) {
 	}
 }
 
-// lastAPIError returns the time and category of the session's last API error in the transcript.
-func lastAPIError(transcript, sessionID string) (time.Time, string, bool) {
+// lastAPIError returns the time and category of the session's last API error in the transcript
+// that admits takes by where it happened: one from before the session moved into a listed
+// repository stays on the machine.
+func lastAPIError(transcript, sessionID string, admits func(cwd string) bool) (time.Time, string, bool) {
 	if transcript == "" {
 		return time.Time{}, "", false
 	}
@@ -243,11 +245,12 @@ func lastAPIError(transcript, sessionID string) (time.Time, string, bool) {
 		}
 		var rec struct {
 			SessionID  string    `json:"sessionId"`
+			Cwd        string    `json:"cwd"`
 			Timestamp  time.Time `json:"timestamp"`
 			IsAPIError bool      `json:"isApiErrorMessage"`
 			Error      string    `json:"error"`
 		}
-		if json.Unmarshal(line, &rec) == nil && rec.IsAPIError && rec.SessionID == sessionID {
+		if json.Unmarshal(line, &rec) == nil && rec.IsAPIError && rec.SessionID == sessionID && admits(rec.Cwd) {
 			at, kind = rec.Timestamp, rec.Error
 		}
 	}
