@@ -66,14 +66,21 @@ func (t Team) StateAt(now time.Time) TeamState {
 	switch {
 	case t.Refusals >= 2:
 		return Refused
+	case t.SignInNeeded:
+		// Ahead of a suspension: both block, and signing in is what the developer can do.
+		return SignInNeeded
 	case t.Refusals == 1:
 		return Suspended
-	case t.SignInNeeded:
-		return SignInNeeded
 	case t.Policy.FetchedAt.IsZero() || t.Policy.Expired(now):
 		return Expired
 	}
 	return Active
+}
+
+// owns reports whether p was fetched for t: its team, under its organization's login, in
+// its environment. Any other policy never becomes t's grant.
+func (t Team) owns(p config.Policy) bool {
+	return p.TeamID == t.TeamID && p.OrganizationID == t.OrganizationID && p.AuthURL == t.AuthURL
 }
 
 // collectsEverything reports whether t's policy collects every location it may: only a
@@ -119,8 +126,8 @@ func (s *State) ApplyRefresh(r Refresh) (bool, error) {
 	}
 	switch {
 	case r.Policy != nil:
-		if r.Policy.TeamID != t.TeamID || r.Policy.Revision < t.Policy.Revision {
-			return false, errors.New("the refreshed policy is another team's or an older revision")
+		if !t.owns(*r.Policy) || r.Policy.Revision < t.Policy.Revision {
+			return false, errors.New("the refreshed policy is another team's, organization's or environment's, or an older revision")
 		}
 		pol := *r.Policy
 		if pol.Global() && !t.Personal {
@@ -157,7 +164,7 @@ func (s *State) team(id string) *Team {
 // Select adds t under a new enrollment, organizations before personal, and returns the
 // enrollment ID. t must carry its first validated policy: there is no team waiting for one.
 func (s *State) Select(t Team) (string, error) {
-	if t.Policy.FetchedAt.IsZero() || t.Policy.TeamID != t.TeamID || t.OrganizationID == "" {
+	if t.Policy.FetchedAt.IsZero() || t.OrganizationID == "" || !t.owns(t.Policy) {
 		return "", errors.New("a team is selected only with its organization and its own validated policy")
 	}
 	if t.Policy.Global() && !t.Personal {
