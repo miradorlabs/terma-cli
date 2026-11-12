@@ -484,6 +484,9 @@ func mergeTelemetry(old, tonight any) any {
 			continue
 		}
 		s, _ := raw.(map[string]any)
+		if s == nil {
+			s = map[string]any{} // not an object: nothing measured of it, and never a nil map
+		}
 		surfaces[name] = maps.Clone(s)
 	}
 	for name, raw := range oldSurfaces {

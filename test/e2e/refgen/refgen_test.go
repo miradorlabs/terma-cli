@@ -1030,6 +1030,12 @@ func TestMergeKeepsTelemetryTonightDidNotMeasure(t *testing.T) {
 		t.Errorf("a surface tonight's probe did not see lost its type: %v", m)
 	}
 
+	// A surface that is not an object is nothing measured, never a crash.
+	odd := parse(`{"export":{"protocol":"http/json"},"surfaces":{"metrics/m":null}}`)
+	if got = merge(snap(parse(whole)), snap(odd), now).Telemetry; got["surfaces"].(map[string]any)["metrics/m"].(map[string]any)["type"] != "sum" {
+		t.Errorf("a null surface tonight: %v", got)
+	}
+
 	// The census sees every surface: one it did not see tonight is gone, probe findings and all.
 	withoutLogs := parse(`{"surfaces":{"metrics/m":{"keys":{}}}}`)
 	got = merge(snap(parse(whole)), snap(withoutLogs), now).Telemetry
