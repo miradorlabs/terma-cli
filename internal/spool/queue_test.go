@@ -164,8 +164,9 @@ func TestRemove(t *testing.T) {
 	}
 }
 
-// Idle waits out a sender holding an event.
-func TestIdleWaitsForASender(t *testing.T) {
+// Discard waits out a sender holding an event, then empties the queue and runs its fn under
+// the delivery lock; a sender that read the event before finds it gone.
+func TestDiscardWaitsForASenderThenEmptiesTheQueue(t *testing.T) {
 	s, err := OpenQueue(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
@@ -186,11 +187,26 @@ func TestIdleWaitsForASender(t *testing.T) {
 		taken.Release()
 	}()
 	start := time.Now()
-	if err := s.Idle(t.Context()); err != nil {
+	err = s.Discard(t.Context(), func() error {
+		// No sender gets the lock while fn runs.
+		ctx, cancel := context.WithTimeout(t.Context(), 20*time.Millisecond)
+		defer cancel()
+		if _, err := s.Take(ctx, events[0]); err == nil {
+			t.Error("a sender took an event while Discard ran its fn")
+		}
+		return nil
+	})
+	if err != nil {
 		t.Fatal(err)
 	}
 	if waited := time.Since(start); waited < 50*time.Millisecond {
-		t.Fatalf("Idle returned after %v while a sender held an event", waited)
+		t.Fatalf("Discard returned after %v while a sender held an event", waited)
+	}
+	if _, err := s.Take(t.Context(), events[0]); !errors.Is(err, ErrNotQueued) {
+		t.Fatalf("Take after Discard = %v, want ErrNotQueued", err)
+	}
+	if got := names(t, s); got != "" {
+		t.Fatalf("queue holds %s after Discard", got)
 	}
 }
 

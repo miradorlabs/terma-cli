@@ -155,7 +155,7 @@ func (app *App) removeHookState() error {
 	names := append(app.hookStateDirs(), hookrun.AgentsDir, termaproject.WorkspacesDir, spool.Dir, config.PoliciesDir)
 	// An image still being sent keeps its queue and bytes: removing them under the sender
 	// would let it write the queue back. Teardown's warning says to run it again.
-	sending := app.awaitImageSend()
+	sending := app.discardImages()
 	if sending == nil {
 		names = append(names, spool.ImageDir, promptimage.DirName)
 	}
@@ -179,11 +179,13 @@ func (app *App) removeHookState() error {
 // defaultImageSendWait is how long teardown waits for an image being sent.
 const defaultImageSendWait = 10 * time.Second
 
-// awaitImageSend waits, briefly, for an image being sent to settle: the relay has stopped,
-// cutting its upload off, but a manual `terma spool flush --images` stops before its next
-// image only, and Windows keeps the image queue while its lock is open. It says when one is
-// still uploading after the wait.
-func (app *App) awaitImageSend() error {
+// discardImages empties the image queue and removes the images' bytes once no image is being
+// sent, waiting briefly for one that is: the relay has stopped, cutting its upload off, but a
+// manual `terma spool flush --images` stops before its next image only, and Windows keeps the
+// image queue while its lock is open. Both go under the queue's delivery lock, so a flush
+// waiting for it finds nothing left to send. It says when an image is still uploading after
+// the wait.
+func (app *App) discardImages() error {
 	dir := filepath.Join(app.stateDir, spool.ImageDir)
 	if _, err := os.Stat(dir); err != nil {
 		return nil
@@ -198,7 +200,7 @@ func (app *App) awaitImageSend() error {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), wait)
 	defer cancel()
-	return s.Idle(ctx)
+	return s.Discard(ctx, func() error { return os.RemoveAll(filepath.Join(app.stateDir, promptimage.DirName)) })
 }
 
 // retireRelayToken removes the relay's token, keeping it for this sign-in when keep.

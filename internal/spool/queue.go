@@ -379,12 +379,27 @@ func (q *Queue) queued() ([]byte, error) {
 	return withoutSettled(data, settled), nil
 }
 
-// Idle waits until no sender holds an event of the queue, or ctx is done.
-func (q *Queue) Idle(ctx context.Context) error {
+// Discard waits until no sender holds an event of the queue, or ctx is done, then empties
+// the queue and runs fn, both holding the delivery lock: a sender that was waiting for the
+// lock then finds its event gone (ErrNotQueued) rather than sending what fn removes. The
+// lock files stay, for the caller to remove with the folder.
+func (q *Queue) Discard(ctx context.Context, fn func() error) error {
 	unlock, err := flock.Lock(ctx, filepath.Join(q.s.dir, deliveryLockFile))
 	if err != nil {
 		return err
 	}
-	unlock()
-	return nil
+	defer unlock()
+	err = q.underAppendLock(func() error {
+		var errs []error
+		for _, path := range []string{q.s.path(), filepath.Join(q.s.dir, settledFile)} {
+			if err := os.Remove(path); err != nil && !errors.Is(err, fs.ErrNotExist) {
+				errs = append(errs, err)
+			}
+		}
+		return errors.Join(errs...)
+	})
+	if err != nil {
+		return err
+	}
+	return fn()
 }
