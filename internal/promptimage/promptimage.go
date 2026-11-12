@@ -12,6 +12,7 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"image"
 	_ "image/gif"  // DecodeConfig reads GIF headers
 	_ "image/jpeg" // and JPEG's
@@ -21,6 +22,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/config"
@@ -272,14 +274,38 @@ func Load(stateDir, id string) (string, bool) {
 // record on its way that needs it.
 func Sweep(stateDir string, ids []string, named func(id string) bool, since time.Time) {
 	for _, id := range ids {
-		if !ValidID(id) || named(id) {
-			continue
-		}
-		path := filepath.Join(Dir(stateDir), id)
-		if info, err := os.Stat(path); err == nil && info.ModTime().Before(since) {
-			_ = os.Remove(path)
+		if ValidID(id) && !named(id) {
+			removeUnlessTouched(filepath.Join(Dir(stateDir), id), since)
 		}
 	}
+}
+
+// sweepChose runs once removeUnlessTouched has chosen to remove a file, before it does: a
+// test keeps the image again there.
+var sweepChose = func(path string) {}
+
+// asides numbers the names removeUnlessTouched moves files aside to.
+var asides atomic.Int64
+
+// removeUnlessTouched removes the file at path unless it was stored or touched since since.
+// It moves the file aside before it looks again, so a Store racing it is never lost: one
+// that touched the file first shows in the moved file's time, which puts it back, and one
+// after finds no file and writes it anew.
+func removeUnlessTouched(path string, since time.Time) {
+	if info, err := os.Stat(path); err != nil || !info.ModTime().Before(since) {
+		return
+	}
+	sweepChose(path)
+	aside := fmt.Sprintf("%s.%d-%d.swept", path, os.Getpid(), asides.Add(1))
+	if os.Rename(path, aside) != nil {
+		return
+	}
+	if info, err := os.Stat(aside); err == nil && !info.ModTime().Before(since) {
+		// The same bytes: putting them back over a copy written meanwhile changes nothing.
+		_ = os.Rename(aside, path)
+		return
+	}
+	_ = os.Remove(aside)
 }
 
 // Prune removes the images stored before before, the age past which the spool drops the
@@ -291,10 +317,8 @@ func Prune(stateDir string, before time.Time) {
 		return
 	}
 	for _, e := range entries {
-		info, err := e.Info()
-		if err != nil || !info.Mode().IsRegular() || !info.ModTime().Before(before) {
-			continue
+		if e.Type().IsRegular() {
+			removeUnlessTouched(filepath.Join(dir, e.Name()), before)
 		}
-		_ = os.Remove(filepath.Join(dir, e.Name()))
 	}
 }

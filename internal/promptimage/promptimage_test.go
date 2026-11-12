@@ -260,3 +260,36 @@ func TestStoreMakesRoomFromTheOldest(t *testing.T) {
 		}
 	}
 }
+
+// A sweep that chose an image to remove keeps it when a hook keeps the image again before
+// the removal: the record on its way needs it.
+func TestSweepLosesNoImageKeptMeanwhile(t *testing.T) {
+	dir := t.TempDir()
+	img := Image{Data: pngOf(t, 3, 2), MIMEType: "image/png", Index: 1}
+	if err := Store(dir, img); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(Dir(dir), img.ID())
+	old := time.Now().Add(-time.Hour)
+	if err := os.Chtimes(path, old, old); err != nil {
+		t.Fatal(err)
+	}
+	sweepChose = func(string) {
+		if err := Store(dir, img); err != nil {
+			t.Error(err)
+		}
+	}
+	t.Cleanup(func() { sweepChose = func(string) {} })
+	Sweep(dir, []string{img.ID()}, func(string) bool { return false }, time.Now().Add(-time.Minute))
+	if _, ok := Load(dir, img.ID()); !ok {
+		t.Fatal("a sweep removed an image kept again while it ran")
+	}
+	if entries, _ := os.ReadDir(Dir(dir)); len(entries) != 1 {
+		t.Fatalf("the store holds %d files", len(entries))
+	}
+	sweepChose = func(string) {}
+	Sweep(dir, []string{img.ID()}, func(string) bool { return false }, time.Now().Add(time.Minute))
+	if entries, _ := os.ReadDir(Dir(dir)); len(entries) != 0 {
+		t.Fatalf("a sweep left %d files", len(entries))
+	}
+}
