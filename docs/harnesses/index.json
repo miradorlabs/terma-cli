@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-12T15:48:45.504112256Z",
+  "generated_at": "2026-11-12T20:46:56.111817078Z",
   "harnesses": [
     {
       "id": "claude",
@@ -9,18 +9,25 @@
       "homepage": "https://claude.com/claude-code",
       "source": null,
       "changelog": "https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md",
-      "latest": "2.1.322",
-      "support": "supported",
-      "versions_tracked": 103,
+      "latest": "2.1.323",
+      "support": "untested",
+      "versions_tracked": 104,
       "first_tracked": "2026-07-09",
       "last_change": {
-        "from": "2.1.321",
-        "to": "2.1.322",
-        "at": "2026-11-12T15:48:45.504112256Z",
-        "released_at": "2026-11-10T01:58:41.811Z",
-        "changes": 1,
+        "from": "2.1.322",
+        "to": "2.1.323",
+        "at": "2026-11-12T20:46:56.111817078Z",
+        "released_at": "2026-11-12T20:29:28.626Z",
+        "changes": 95,
         "categories": {
-          "config": 1
+          "binary": 1,
+          "cli": 7,
+          "config": 26,
+          "filesystem": 7,
+          "hooks": 4,
+          "network": 2,
+          "telemetry": 44,
+          "tools": 4
         }
       }
     },

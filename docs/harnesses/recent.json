@@ -1,7 +1,44 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-12T15:48:45.504112256Z",
+  "generated_at": "2026-11-12T20:46:56.111817078Z",
   "versions": [
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.323",
+      "released_at": "2026-11-12T20:29:28.626Z",
+      "captured_at": "2026-11-12T20:46:56.111817078Z",
+      "platforms": [
+        "darwin/arm64",
+        "linux/amd64"
+      ],
+      "support": "untested",
+      "previous": "2.1.322",
+      "changes": 95,
+      "categories": {
+        "binary": 1,
+        "cli": 7,
+        "config": 26,
+        "filesystem": 7,
+        "hooks": 4,
+        "network": 2,
+        "telemetry": 44,
+        "tools": 4
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 20,
+        "informational": 48,
+        "notable": 27
+      },
+      "undocumented": null,
+      "highlights": [
+        "Telemetry surface no longer sent: logs/api_request",
+        "Telemetry surface no longer sent: logs/assistant_response",
+        "Telemetry surface no longer sent: logs/hook_execution_complete"
+      ],
+      "signing": "valid"
+    },
     {
       "harness": "claude-desktop",
       "name": "Claude Desktop (Code)",
@@ -6181,43 +6218,6 @@
         "view_image tool parameter detail: description changed (+94 −85 chars)"
       ],
       "signing": "valid"
-    },
-    {
-      "harness": "codex",
-      "name": "Codex CLI",
-      "version": "0.131.0",
-      "released_at": "2026-05-18T18:08:19.71Z",
-      "captured_at": "2026-11-05T09:54:28.532441Z",
-      "platforms": [
-        "darwin/arm64",
-        "linux/amd64"
-      ],
-      "support": "untested",
-      "previous": "0.130.0",
-      "changes": 171,
-      "categories": {
-        "behavior": 9,
-        "binary": 2,
-        "cli": 53,
-        "config": 70,
-        "filesystem": 29,
-        "prompt": 2,
-        "request": 4,
-        "tools": 2
-      },
-      "impact": {
-        "breaking": 0,
-        "degrading": 0,
-        "informational": 122,
-        "notable": 49
-      },
-      "undocumented": 90,
-      "highlights": [
-        "System prompt changed (+81 −81 chars)",
-        "System prompt changed (+218 −203 chars)",
-        "spawn_agent tool description changed (+263 −32 chars)"
-      ],
-      "signing": "rejected"
     }
   ]
 }

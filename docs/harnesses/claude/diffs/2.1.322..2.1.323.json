@@ -1,0 +1,4208 @@
+{
+  "schema_version": 1,
+  "harness": "claude",
+  "from": "2.1.322",
+  "to": "2.1.323",
+  "generated_at": "2026-11-12T20:46:56.111817078Z",
+  "source": null,
+  "changelog": null,
+  "summary": {
+    "changes": 95,
+    "categories": {
+      "binary": 1,
+      "cli": 7,
+      "config": 26,
+      "filesystem": 7,
+      "hooks": 4,
+      "network": 2,
+      "telemetry": 44,
+      "tools": 4
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 20,
+      "informational": 48,
+      "notable": 27
+    },
+    "undocumented": null
+  },
+  "changes": [
+    {
+      "id": "tools.Agent.description",
+      "category": "tools",
+      "op": "changed",
+      "path": [
+        "tools",
+        "Agent",
+        "description"
+      ],
+      "title": "Agent tool description changed (+81 −83 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,6 +1,6 @@\n Launch a new agent to handle complex, multi-step tasks. Each agent type has specific capabilities and tools available to it.\n \n-Available agent types are listed in <system-reminder> messages in the conversation.\n+Available agent types are listed in messages from the system in the conversation.\n \n When using the Agent tool, specify a subagent_type to select an agent: `\"fork\"` forks yourself (the fork inherits your full conversation context and always runs on your model — a `model` override is ignored); any other type — or omitting it — starts a fresh agent (general-purpose by default).\n \n",
+      "stats": {
+        "added_chars": 81,
+        "removed_chars": 83
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "tools.Skill.description",
+      "category": "tools",
+      "op": "changed",
+      "path": [
+        "tools",
+        "Skill",
+        "description"
+      ],
+      "title": "Skill tool description changed (+80 −80 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,7 +1,7 @@\n Invoke a skill.\n \n A skill is a packaged set of instructions the user or project has set up for a particular kind of task (deploy steps, a review checklist, a repo-specific workflow).\n-Available skills appear in a system-reminder listing with one-line descriptions.\n+Available skills appear in a listing from the system with one-line descriptions.\n When the task at hand is one a listed skill covers, call this tool first — the skill's instructions load into the turn for you to follow in place of your default approach; some skills instead run in a subagent and return the finished result.\n A skill that runs in the background returns only the agent's name — its result arrives later as a task notification, so don't wait on it or invoke it again in the meantime.\n Users may also ask for one by name (`/<name>`, or \"slash command\"); that's a request to invoke it.\n",
+      "stats": {
+        "added_chars": 80,
+        "removed_chars": 80
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "tools.ToolSearch.description",
+      "category": "tools",
+      "op": "changed",
+      "path": [
+        "tools",
+        "ToolSearch",
+        "description"
+      ],
+      "title": "ToolSearch tool description changed (+59 −60 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,6 +1,6 @@\n Fetches full schema definitions for deferred tools so they can be called.\n \n-Deferred tools appear by name in <system-reminder> messages.\n+Deferred tools appear by name in a message from the system.\n Until fetched, only the name is known — there is no parameter schema, so the tool cannot be invoked.\n This tool takes a query, matches it against the deferred tool list, and returns the matched tools' complete JSONSchema definitions inside a <functions> block.\n Once a tool's schema appears in that result, it is callable exactly like any tool defined at the top of the prompt.\n",
+      "stats": {
+        "added_chars": 59,
+        "removed_chars": 60
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "tools.Workflow.description",
+      "category": "tools",
+      "op": "changed",
+      "path": [
+        "tools",
+        "Workflow",
+        "description"
+      ],
+      "title": "Workflow tool description changed (+245 −229 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,8 +1,8 @@\n Execute a workflow script that orchestrates multiple subagents deterministically. Workflows run in the background — this tool returns immediately with a task ID, and a <task-notification> arrives when the workflow completes. Use /workflows to watch live progress.\n \n ONLY call this tool when the user has explicitly opted into multi-agent orchestration. Workflows can spawn dozens of agents and consume a large amount of tokens; the user must request that scale, not have it inferred. Explicit opt-in means one of:\n-- The user included the keyword \"ultracode\" in their prompt (you'll see a system-reminder confirming it).\n-- Ultracode is on for the session (a system-reminder confirms it) — see **Ultracode** in the workflow authoring reference.\n+- The user included the keyword \"ultracode\" in their prompt (you'll see a message from the system confirming it).\n+- Ultracode is on for the session (a message from the system confirms it) — see **Ultracode** in the workflow authoring reference.\n - The user directly asked you to run a workflow or use multi-agent orchestration in their own words (\"use a workflow\", \"run a workflow\", \"fan out agents\", \"orchestrate this with subagents\"). The ask must be in the user's words — a task that would merely benefit from a workflow does not count.\n - The user invoked a skill or slash command whose instructions tell you to call Workflow.\n - The user asked you to run a specific named or saved workflow.\n",
+      "stats": {
+        "added_chars": 245,
+        "removed_chars": 229
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "telemetry.export",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "export"
+      ],
+      "title": "Telemetry export added",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "interval_batches": {
+          "logs": 2,
+          "metrics": 1
+        },
+        "interval_ms": {
+          "logs": 5000,
+          "metrics": 60000
+        },
+        "protocol": "http/protobuf"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "telemetry.surfaces.logs/api_request",
+      "category": "telemetry",
+      "op": "removed",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "logs/api_request"
+      ],
+      "title": "Telemetry surface no longer sent: logs/api_request",
+      "impact": "degrading",
+      "before": {
+        "keys": {
+          "agent.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "agent_id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "anthropic.custom_base_url": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "anthropic.provider": {
+            "class": "unclassified",
+            "kinds": [
+              "text"
+            ]
+          },
+          "cache_creation_1h_tokens": {
+            "class": "unclassified",
+            "kinds": [
+              "number"
+            ]
+          },
+          "cache_creation_5m_tokens": {
+            "class": "unclassified",
+            "kinds": [
+              "number"
+            ]
+          },
+          "cache_creation_tokens": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "cache_read_tokens": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "cost_usd": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "cost_usd_micros": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "duration_ms": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "event.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "event.sequence": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "event.timestamp": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "input_tokens": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "model": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "output_tokens": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "prompt.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "query_source": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "request_id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "session.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "speed": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "terminal.type": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "ttft_ms": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "user.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          }
+        }
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "telemetry.surfaces.logs/assistant_response",
+      "category": "telemetry",
+      "op": "removed",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "logs/assistant_response"
+      ],
+      "title": "Telemetry surface no longer sent: logs/assistant_response",
+      "impact": "degrading",
+      "before": {
+        "keys": {
+          "agent_id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "anthropic.custom_base_url": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "anthropic.provider": {
+            "class": "unclassified",
+            "kinds": [
+              "text"
+            ]
+          },
+          "event.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "event.sequence": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "event.timestamp": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "message.uuid": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "model": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "prompt.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "query_source": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "request_id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "response": {
+            "class": "prompt",
+            "kinds": [
+              "text"
+            ]
+          },
+          "response_length": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "session.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "terminal.type": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "user.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          }
+        }
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "telemetry.surfaces.logs/hook_execution_complete",
+      "category": "telemetry",
+      "op": "removed",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "logs/hook_execution_complete"
+      ],
+      "title": "Telemetry surface no longer sent: logs/hook_execution_complete",
+      "impact": "degrading",
+      "before": {
+        "keys": {
+          "additional_context_chars": {
+            "class": "unclassified",
+            "kinds": [
+              "number"
+            ]
+          },
+          "agent_id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "anthropic.custom_base_url": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "anthropic.provider": {
+            "class": "unclassified",
+            "kinds": [
+              "text"
+            ]
+          },
+          "event.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "event.sequence": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "event.timestamp": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "hook_event": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "hook_name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "hook_source": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "initial_user_message_chars": {
+            "class": "unclassified",
+            "kinds": [
+              "number"
+            ]
+          },
+          "managed_only": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "num_blocking": {
+            "class": "unclassified",
+            "kinds": [
+              "number"
+            ]
+          },
+          "num_cancelled": {
+            "class": "unclassified",
+            "kinds": [
+              "number"
+            ]
+          },
+          "num_hooks": {
+            "class": "unclassified",
+            "kinds": [
+              "number"
+            ]
+          },
+          "num_non_blocking_error": {
+            "class": "unclassified",
+            "kinds": [
+              "number"
+            ]
+          },
+          "num_outputs_persisted": {
+            "class": "unclassified",
+            "kinds": [
+              "number"
+            ]
+          },
+          "num_success": {
+            "class": "unclassified",
+            "kinds": [
+              "number"
+            ]
+          },
+          "prompt.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "safe_mode": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "session.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "stdout_chars": {
+            "class": "unclassified",
+            "kinds": [
+              "number"
+            ]
+          },
+          "system_message_chars": {
+            "class": "unclassified",
+            "kinds": [
+              "number"
+            ]
+          },
+          "terminal.type": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "total_duration_ms": {
+            "class": "unclassified",
+            "kinds": [
+              "number"
+            ]
+          },
+          "user.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          }
+        }
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "telemetry.surfaces.logs/hook_execution_start",
+      "category": "telemetry",
+      "op": "removed",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "logs/hook_execution_start"
+      ],
+      "title": "Telemetry surface no longer sent: logs/hook_execution_start",
+      "impact": "degrading",
+      "before": {
+        "keys": {
+          "agent_id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "anthropic.custom_base_url": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "anthropic.provider": {
+            "class": "unclassified",
+            "kinds": [
+              "text"
+            ]
+          },
+          "event.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "event.sequence": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "event.timestamp": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "hook_event": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "hook_name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "hook_source": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "managed_only": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "num_hooks": {
+            "class": "unclassified",
+            "kinds": [
+              "number"
+            ]
+          },
+          "prompt.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "safe_mode": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "session.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "terminal.type": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "user.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          }
+        }
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "telemetry.surfaces.logs/hook_registered",
+      "category": "telemetry",
+      "op": "removed",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "logs/hook_registered"
+      ],
+      "title": "Telemetry surface no longer sent: logs/hook_registered",
+      "impact": "degrading",
+      "before": {
+        "keys": {
+          "anthropic.custom_base_url": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "anthropic.provider": {
+            "class": "unclassified",
+            "kinds": [
+              "text"
+            ]
+          },
+          "event.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "event.sequence": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "event.timestamp": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "hook_event": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "hook_matcher": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "hook_source": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "hook_type": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "safe_mode": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "session.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "terminal.type": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "user.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          }
+        }
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "telemetry.surfaces.logs/managed_settings_resolved",
+      "category": "telemetry",
+      "op": "removed",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "logs/managed_settings_resolved"
+      ],
+      "title": "Telemetry surface no longer sent: logs/managed_settings_resolved",
+      "impact": "degrading",
+      "before": {
+        "keys": {
+          "anthropic.custom_base_url": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "anthropic.provider": {
+            "class": "unclassified",
+            "kinds": [
+              "text"
+            ]
+          },
+          "event.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "event.sequence": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "event.timestamp": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "managed_settings.helper.applied": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "managed_settings.helper.state": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "managed_settings.source_behavior": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "managed_settings.sources": {
+            "class": "safe",
+            "kinds": [
+              "list"
+            ]
+          },
+          "managed_settings.trigger": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "session.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "terminal.type": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "user.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          }
+        }
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "telemetry.surfaces.logs/permission_mode_changed",
+      "category": "telemetry",
+      "op": "removed",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "logs/permission_mode_changed"
+      ],
+      "title": "Telemetry surface no longer sent: logs/permission_mode_changed",
+      "impact": "degrading",
+      "before": {
+        "keys": {
+          "anthropic.custom_base_url": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "anthropic.provider": {
+            "class": "unclassified",
+            "kinds": [
+              "text"
+            ]
+          },
+          "event.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "event.sequence": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "event.timestamp": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "from_mode": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "session.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "terminal.type": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "to_mode": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "trigger": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "user.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          }
+        }
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "telemetry.surfaces.logs/plugin_loaded",
+      "category": "telemetry",
+      "op": "removed",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "logs/plugin_loaded"
+      ],
+      "title": "Telemetry surface no longer sent: logs/plugin_loaded",
+      "impact": "degrading",
+      "before": {
+        "keys": {
+          "agent_path_count": {
+            "class": "unclassified",
+            "kinds": [
+              "number"
+            ]
+          },
+          "anthropic.custom_base_url": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "anthropic.provider": {
+            "class": "unclassified",
+            "kinds": [
+              "text"
+            ]
+          },
+          "command_path_count": {
+            "class": "unclassified",
+            "kinds": [
+              "number"
+            ]
+          },
+          "enabled_via": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "event.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "event.sequence": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "event.timestamp": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "has_hooks": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "has_mcp": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "host_owned_mcp": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "marketplace.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "plugin.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "plugin.scope": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "plugin_id_hash": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "safe_mode": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "session.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "skill_path_count": {
+            "class": "unclassified",
+            "kinds": [
+              "number"
+            ]
+          },
+          "terminal.type": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "user.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          }
+        }
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "telemetry.surfaces.logs/subagent_completed",
+      "category": "telemetry",
+      "op": "removed",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "logs/subagent_completed"
+      ],
+      "title": "Telemetry surface no longer sent: logs/subagent_completed",
+      "impact": "degrading",
+      "before": {
+        "keys": {
+          "agent.source": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "agent_id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "agent_type": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "anthropic.custom_base_url": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "anthropic.provider": {
+            "class": "unclassified",
+            "kinds": [
+              "text"
+            ]
+          },
+          "duration_ms": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "event.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "event.sequence": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "event.timestamp": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "final_model": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "is_async": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "is_built_in": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "model": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "model_swapped": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "prompt.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "session.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "terminal.type": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "total_tokens": {
+            "class": "unclassified",
+            "kinds": [
+              "number"
+            ]
+          },
+          "total_tool_uses": {
+            "class": "unclassified",
+            "kinds": [
+              "number"
+            ]
+          },
+          "user.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          }
+        }
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "telemetry.surfaces.logs/tool_decision",
+      "category": "telemetry",
+      "op": "removed",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "logs/tool_decision"
+      ],
+      "title": "Telemetry surface no longer sent: logs/tool_decision",
+      "impact": "degrading",
+      "before": {
+        "keys": {
+          "anthropic.custom_base_url": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "anthropic.provider": {
+            "class": "unclassified",
+            "kinds": [
+              "text"
+            ]
+          },
+          "decision": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "event.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "event.sequence": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "event.timestamp": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "permission_mode": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "prompt.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "request_id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "session.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "source": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "terminal.type": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "tool_name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "tool_parameters": {
+            "class": "tool_content",
+            "kinds": [
+              "text"
+            ]
+          },
+          "tool_source": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "tool_use_id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "user.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          }
+        }
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "telemetry.surfaces.logs/tool_result",
+      "category": "telemetry",
+      "op": "removed",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "logs/tool_result"
+      ],
+      "title": "Telemetry surface no longer sent: logs/tool_result",
+      "impact": "degrading",
+      "before": {
+        "keys": {
+          "anthropic.custom_base_url": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "anthropic.provider": {
+            "class": "unclassified",
+            "kinds": [
+              "text"
+            ]
+          },
+          "decision_source": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "decision_type": {
+            "class": "unclassified",
+            "kinds": [
+              "text"
+            ]
+          },
+          "duration_ms": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "error": {
+            "class": "prompt",
+            "kinds": [
+              "text"
+            ]
+          },
+          "error_type": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "event.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "event.sequence": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "event.timestamp": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "prompt.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "request_id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "session.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "success": {
+            "class": "safe",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "terminal.type": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "tool_input": {
+            "class": "tool_content",
+            "kinds": [
+              "text"
+            ]
+          },
+          "tool_input_size_bytes": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "tool_name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "tool_parameters": {
+            "class": "tool_content",
+            "kinds": [
+              "text"
+            ]
+          },
+          "tool_result_size_bytes": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "tool_use_id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "user.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          }
+        }
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "telemetry.surfaces.logs/user_prompt",
+      "category": "telemetry",
+      "op": "removed",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "logs/user_prompt"
+      ],
+      "title": "Telemetry surface no longer sent: logs/user_prompt",
+      "impact": "degrading",
+      "before": {
+        "keys": {
+          "anthropic.custom_base_url": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "anthropic.provider": {
+            "class": "unclassified",
+            "kinds": [
+              "text"
+            ]
+          },
+          "event.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "event.sequence": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "event.timestamp": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "message.uuid": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "prompt": {
+            "class": "prompt",
+            "kinds": [
+              "text"
+            ]
+          },
+          "prompt.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "prompt_length": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "prompt_text": {
+            "class": "prompt",
+            "kinds": [
+              "text"
+            ]
+          },
+          "session.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "terminal.type": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "user.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          }
+        }
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "telemetry.surfaces.metrics/claude_code.active_time.total.keys",
+      "category": "telemetry",
+      "op": "removed",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "metrics/claude_code.active_time.total",
+        "keys"
+      ],
+      "title": "Telemetry surfaces.metrics/claude_code.active_time.total.keys removed",
+      "impact": "notable",
+      "before": {
+        "anthropic.custom_base_url": {
+          "class": "unclassified",
+          "kinds": [
+            "bool"
+          ]
+        },
+        "anthropic.provider": {
+          "class": "unclassified",
+          "kinds": [
+            "text"
+          ]
+        },
+        "session.id": {
+          "class": "safe",
+          "kinds": [
+            "text"
+          ]
+        },
+        "terminal.type": {
+          "class": "safe",
+          "kinds": [
+            "text"
+          ]
+        },
+        "type": {
+          "class": "safe",
+          "kinds": [
+            "text"
+          ]
+        },
+        "user.id": {
+          "class": "safe",
+          "kinds": [
+            "text"
+          ]
+        }
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "telemetry.surfaces.metrics/claude_code.active_time.total.monotonic",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "metrics/claude_code.active_time.total",
+        "monotonic"
+      ],
+      "title": "Telemetry surfaces.metrics/claude_code.active_time.total.monotonic added",
+      "impact": "informational",
+      "before": null,
+      "after": true,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "telemetry.surfaces.metrics/claude_code.active_time.total.temporality",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "metrics/claude_code.active_time.total",
+        "temporality"
+      ],
+      "title": "Telemetry surfaces.metrics/claude_code.active_time.total.temporality added",
+      "impact": "informational",
+      "before": null,
+      "after": "delta",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "telemetry.surfaces.metrics/claude_code.active_time.total.type",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "metrics/claude_code.active_time.total",
+        "type"
+      ],
+      "title": "Telemetry surfaces.metrics/claude_code.active_time.total.type added",
+      "impact": "informational",
+      "before": null,
+      "after": "sum",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "telemetry.surfaces.metrics/claude_code.active_time.total.unit",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "metrics/claude_code.active_time.total",
+        "unit"
+      ],
+      "title": "Telemetry surfaces.metrics/claude_code.active_time.total.unit added",
+      "impact": "informational",
+      "before": null,
+      "after": "s",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "telemetry.surfaces.metrics/claude_code.code_edit_tool.decision",
+      "category": "telemetry",
+      "op": "removed",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "metrics/claude_code.code_edit_tool.decision"
+      ],
+      "title": "Telemetry surface no longer sent: metrics/claude_code.code_edit_tool.decision",
+      "impact": "degrading",
+      "before": {
+        "keys": {
+          "anthropic.custom_base_url": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "anthropic.provider": {
+            "class": "unclassified",
+            "kinds": [
+              "text"
+            ]
+          },
+          "decision": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "language": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "session.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "source": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "terminal.type": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "tool_name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "user.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          }
+        }
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "telemetry.surfaces.metrics/claude_code.cost.usage.keys",
+      "category": "telemetry",
+      "op": "removed",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "metrics/claude_code.cost.usage",
+        "keys"
+      ],
+      "title": "Telemetry surfaces.metrics/claude_code.cost.usage.keys removed",
+      "impact": "notable",
+      "before": {
+        "agent.name": {
+          "class": "safe",
+          "kinds": [
+            "text"
+          ]
+        },
+        "anthropic.custom_base_url": {
+          "class": "unclassified",
+          "kinds": [
+            "bool"
+          ]
+        },
+        "anthropic.provider": {
+          "class": "unclassified",
+          "kinds": [
+            "text"
+          ]
+        },
+        "model": {
+          "class": "safe",
+          "kinds": [
+            "text"
+          ]
+        },
+        "query_source": {
+          "class": "safe",
+          "kinds": [
+            "text"
+          ]
+        },
+        "session.id": {
+          "class": "safe",
+          "kinds": [
+            "text"
+          ]
+        },
+        "terminal.type": {
+          "class": "safe",
+          "kinds": [
+            "text"
+          ]
+        },
+        "user.id": {
+          "class": "safe",
+          "kinds": [
+            "text"
+          ]
+        }
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "telemetry.surfaces.metrics/claude_code.cost.usage.monotonic",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "metrics/claude_code.cost.usage",
+        "monotonic"
+      ],
+      "title": "Telemetry surfaces.metrics/claude_code.cost.usage.monotonic added",
+      "impact": "informational",
+      "before": null,
+      "after": true,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "telemetry.surfaces.metrics/claude_code.cost.usage.temporality",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "metrics/claude_code.cost.usage",
+        "temporality"
+      ],
+      "title": "Telemetry surfaces.metrics/claude_code.cost.usage.temporality added",
+      "impact": "informational",
+      "before": null,
+      "after": "delta",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "telemetry.surfaces.metrics/claude_code.cost.usage.type",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "metrics/claude_code.cost.usage",
+        "type"
+      ],
+      "title": "Telemetry surfaces.metrics/claude_code.cost.usage.type added",
+      "impact": "informational",
+      "before": null,
+      "after": "sum",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "telemetry.surfaces.metrics/claude_code.cost.usage.unit",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "metrics/claude_code.cost.usage",
+        "unit"
+      ],
+      "title": "Telemetry surfaces.metrics/claude_code.cost.usage.unit added",
+      "impact": "informational",
+      "before": null,
+      "after": "USD",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "telemetry.surfaces.metrics/claude_code.lines_of_code.count",
+      "category": "telemetry",
+      "op": "removed",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "metrics/claude_code.lines_of_code.count"
+      ],
+      "title": "Telemetry surface no longer sent: metrics/claude_code.lines_of_code.count",
+      "impact": "degrading",
+      "before": {
+        "keys": {
+          "anthropic.custom_base_url": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "anthropic.provider": {
+            "class": "unclassified",
+            "kinds": [
+              "text"
+            ]
+          },
+          "model": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "session.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "terminal.type": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "type": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "user.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          }
+        }
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "telemetry.surfaces.metrics/claude_code.session.count.keys",
+      "category": "telemetry",
+      "op": "removed",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "metrics/claude_code.session.count",
+        "keys"
+      ],
+      "title": "Telemetry surfaces.metrics/claude_code.session.count.keys removed",
+      "impact": "notable",
+      "before": {
+        "anthropic.custom_base_url": {
+          "class": "unclassified",
+          "kinds": [
+            "bool"
+          ]
+        },
+        "anthropic.provider": {
+          "class": "unclassified",
+          "kinds": [
+            "text"
+          ]
+        },
+        "session.id": {
+          "class": "safe",
+          "kinds": [
+            "text"
+          ]
+        },
+        "start_type": {
+          "class": "safe",
+          "kinds": [
+            "text"
+          ]
+        },
+        "terminal.type": {
+          "class": "safe",
+          "kinds": [
+            "text"
+          ]
+        },
+        "user.id": {
+          "class": "safe",
+          "kinds": [
+            "text"
+          ]
+        }
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "telemetry.surfaces.metrics/claude_code.session.count.monotonic",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "metrics/claude_code.session.count",
+        "monotonic"
+      ],
+      "title": "Telemetry surfaces.metrics/claude_code.session.count.monotonic added",
+      "impact": "informational",
+      "before": null,
+      "after": true,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "telemetry.surfaces.metrics/claude_code.session.count.temporality",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "metrics/claude_code.session.count",
+        "temporality"
+      ],
+      "title": "Telemetry surfaces.metrics/claude_code.session.count.temporality added",
+      "impact": "informational",
+      "before": null,
+      "after": "delta",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "telemetry.surfaces.metrics/claude_code.session.count.type",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "metrics/claude_code.session.count",
+        "type"
+      ],
+      "title": "Telemetry surfaces.metrics/claude_code.session.count.type added",
+      "impact": "informational",
+      "before": null,
+      "after": "sum",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "telemetry.surfaces.metrics/claude_code.token.usage.keys",
+      "category": "telemetry",
+      "op": "removed",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "metrics/claude_code.token.usage",
+        "keys"
+      ],
+      "title": "Telemetry surfaces.metrics/claude_code.token.usage.keys removed",
+      "impact": "notable",
+      "before": {
+        "agent.name": {
+          "class": "safe",
+          "kinds": [
+            "text"
+          ]
+        },
+        "anthropic.custom_base_url": {
+          "class": "unclassified",
+          "kinds": [
+            "bool"
+          ]
+        },
+        "anthropic.provider": {
+          "class": "unclassified",
+          "kinds": [
+            "text"
+          ]
+        },
+        "model": {
+          "class": "safe",
+          "kinds": [
+            "text"
+          ]
+        },
+        "query_source": {
+          "class": "safe",
+          "kinds": [
+            "text"
+          ]
+        },
+        "session.id": {
+          "class": "safe",
+          "kinds": [
+            "text"
+          ]
+        },
+        "terminal.type": {
+          "class": "safe",
+          "kinds": [
+            "text"
+          ]
+        },
+        "type": {
+          "class": "safe",
+          "kinds": [
+            "text"
+          ]
+        },
+        "user.id": {
+          "class": "safe",
+          "kinds": [
+            "text"
+          ]
+        }
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "telemetry.surfaces.metrics/claude_code.token.usage.monotonic",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "metrics/claude_code.token.usage",
+        "monotonic"
+      ],
+      "title": "Telemetry surfaces.metrics/claude_code.token.usage.monotonic added",
+      "impact": "informational",
+      "before": null,
+      "after": true,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "telemetry.surfaces.metrics/claude_code.token.usage.temporality",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "metrics/claude_code.token.usage",
+        "temporality"
+      ],
+      "title": "Telemetry surfaces.metrics/claude_code.token.usage.temporality added",
+      "impact": "informational",
+      "before": null,
+      "after": "delta",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "telemetry.surfaces.metrics/claude_code.token.usage.type",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "metrics/claude_code.token.usage",
+        "type"
+      ],
+      "title": "Telemetry surfaces.metrics/claude_code.token.usage.type added",
+      "impact": "informational",
+      "before": null,
+      "after": "sum",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "telemetry.surfaces.metrics/claude_code.token.usage.unit",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "metrics/claude_code.token.usage",
+        "unit"
+      ],
+      "title": "Telemetry surfaces.metrics/claude_code.token.usage.unit added",
+      "impact": "informational",
+      "before": null,
+      "after": "tokens",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "telemetry.surfaces.resource",
+      "category": "telemetry",
+      "op": "removed",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "resource"
+      ],
+      "title": "Telemetry surface no longer sent: resource",
+      "impact": "degrading",
+      "before": {
+        "keys": {
+          "host.arch": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "os.type": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "os.version": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "service.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "service.version": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          }
+        }
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "telemetry.surfaces.traces/claude_code.interaction.keys",
+      "category": "telemetry",
+      "op": "removed",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "traces/claude_code.interaction",
+        "keys"
+      ],
+      "title": "Telemetry surfaces.traces/claude_code.interaction.keys removed",
+      "impact": "notable",
+      "before": {
+        "anthropic.custom_base_url": {
+          "class": "unclassified",
+          "kinds": [
+            "bool"
+          ]
+        },
+        "anthropic.provider": {
+          "class": "unclassified",
+          "kinds": [
+            "text"
+          ]
+        },
+        "gen_ai.conversation.id": {
+          "class": "safe",
+          "kinds": [
+            "text"
+          ]
+        },
+        "gen_ai.operation.name": {
+          "class": "safe",
+          "kinds": [
+            "text"
+          ]
+        },
+        "gen_ai.provider.name": {
+          "class": "safe",
+          "kinds": [
+            "text"
+          ]
+        },
+        "interaction.duration_ms": {
+          "class": "safe",
+          "kinds": [
+            "number"
+          ]
+        },
+        "interaction.sequence": {
+          "class": "safe",
+          "kinds": [
+            "number"
+          ]
+        },
+        "parent.source": {
+          "class": "safe",
+          "kinds": [
+            "text"
+          ]
+        },
+        "queued_sends": {
+          "class": "safe",
+          "kinds": [
+            "number"
+          ]
+        },
+        "session.id": {
+          "class": "safe",
+          "kinds": [
+            "text"
+          ]
+        },
+        "span.type": {
+          "class": "safe",
+          "kinds": [
+            "text"
+          ]
+        },
+        "terminal.type": {
+          "class": "safe",
+          "kinds": [
+            "text"
+          ]
+        },
+        "user.id": {
+          "class": "safe",
+          "kinds": [
+            "text"
+          ]
+        },
+        "user_prompt": {
+          "class": "prompt",
+          "kinds": [
+            "text"
+          ]
+        },
+        "user_prompt_length": {
+          "class": "safe",
+          "kinds": [
+            "number"
+          ]
+        }
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "telemetry.surfaces.traces/claude_code.interaction.root",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "traces/claude_code.interaction",
+        "root"
+      ],
+      "title": "Telemetry surfaces.traces/claude_code.interaction.root added",
+      "impact": "informational",
+      "before": null,
+      "after": true,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "telemetry.surfaces.traces/claude_code.llm_request.keys",
+      "category": "telemetry",
+      "op": "removed",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "traces/claude_code.llm_request",
+        "keys"
+      ],
+      "title": "Telemetry surfaces.traces/claude_code.llm_request.keys removed",
+      "impact": "notable",
+      "before": {
+        "agent_id": {
+          "class": "safe",
+          "kinds": [
+            "text"
+          ]
+        },
+        "anthropic.custom_base_url": {
+          "class": "unclassified",
+          "kinds": [
+            "bool"
+          ]
+        },
+        "anthropic.provider": {
+          "class": "unclassified",
+          "kinds": [
+            "text"
+          ]
+        },
+        "attempt": {
+          "class": "safe",
+          "kinds": [
+            "number"
+          ]
+        },
+        "cache_creation_tokens": {
+          "class": "safe",
+          "kinds": [
+            "number"
+          ]
+        },
+        "cache_read_tokens": {
+          "class": "safe",
+          "kinds": [
+            "number"
+          ]
+        },
+        "duration_ms": {
+          "class": "safe",
+          "kinds": [
+            "number"
+          ]
+        },
+        "first_content_ms": {
+          "class": "safe",
+          "kinds": [
+            "number"
+          ]
+        },
+        "gen_ai.conversation.id": {
+          "class": "safe",
+          "kinds": [
+            "text"
+          ]
+        },
+        "gen_ai.provider.name": {
+          "class": "safe",
+          "kinds": [
+            "text"
+          ]
+        },
+        "gen_ai.request.model": {
+          "class": "safe",
+          "kinds": [
+            "text"
+          ]
+        },
+        "gen_ai.response.finish_reasons": {
+          "class": "safe",
+          "kinds": [
+            "list"
+          ]
+        },
+        "gen_ai.response.id": {
+          "class": "safe",
+          "kinds": [
+            "text"
+          ]
+        },
+        "gen_ai.system": {
+          "class": "safe",
+          "kinds": [
+            "text"
+          ]
+        },
+        "input_tokens": {
+          "class": "safe",
+          "kinds": [
+            "number"
+          ]
+        },
+        "llm_request.context": {
+          "class": "safe",
+          "kinds": [
+            "text"
+          ]
+        },
+        "model": {
+          "class": "safe",
+          "kinds": [
+            "text"
+          ]
+        },
+        "output_tokens": {
+          "class": "safe",
+          "kinds": [
+            "number"
+          ]
+        },
+        "query_source_safe": {
+          "class": "safe",
+          "kinds": [
+            "text"
+          ]
+        },
+        "request_id": {
+          "class": "safe",
+          "kinds": [
+            "text"
+          ]
+        },
+        "session.id": {
+          "class": "safe",
+          "kinds": [
+            "text"
+          ]
+        },
+        "span.type": {
+          "class": "safe",
+          "kinds": [
+            "text"
+          ]
+        },
+        "speed": {
+          "class": "safe",
+          "kinds": [
+            "text"
+          ]
+        },
+        "stop_reason": {
+          "class": "safe",
+          "kinds": [
+            "text"
+          ]
+        },
+        "success": {
+          "class": "safe",
+          "kinds": [
+            "bool"
+          ]
+        },
+        "terminal.type": {
+          "class": "safe",
+          "kinds": [
+            "text"
+          ]
+        },
+        "ttft_ms": {
+          "class": "safe",
+          "kinds": [
+            "number"
+          ]
+        },
+        "user.id": {
+          "class": "safe",
+          "kinds": [
+            "text"
+          ]
+        }
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "telemetry.surfaces.traces/claude_code.llm_request.parent",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "traces/claude_code.llm_request",
+        "parent"
+      ],
+      "title": "Telemetry surfaces.traces/claude_code.llm_request.parent added",
+      "impact": "informational",
+      "before": null,
+      "after": "traces/claude_code.interaction",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "telemetry.surfaces.traces/claude_code.llm_request/events/gen_ai.request.attempt",
+      "category": "telemetry",
+      "op": "removed",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "traces/claude_code.llm_request/events/gen_ai.request.attempt"
+      ],
+      "title": "Telemetry surface no longer sent: traces/claude_code.llm_request/events/gen_ai.request.attempt",
+      "impact": "degrading",
+      "before": {
+        "keys": {
+          "attempt": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          }
+        }
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "telemetry.surfaces.traces/claude_code.tool",
+      "category": "telemetry",
+      "op": "removed",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "traces/claude_code.tool"
+      ],
+      "title": "Telemetry surface no longer sent: traces/claude_code.tool",
+      "impact": "degrading",
+      "before": {
+        "keys": {
+          "anthropic.custom_base_url": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "anthropic.provider": {
+            "class": "unclassified",
+            "kinds": [
+              "text"
+            ]
+          },
+          "bash_argv0": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "bash_command_class": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "duration_ms": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "file_path": {
+            "class": "tool_content",
+            "kinds": [
+              "text"
+            ]
+          },
+          "full_command": {
+            "class": "tool_content",
+            "kinds": [
+              "text"
+            ]
+          },
+          "gen_ai.conversation.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "gen_ai.operation.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "gen_ai.provider.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "gen_ai.tool.call.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "gen_ai.tool.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "session.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "span.type": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "subagent_type": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "terminal.type": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "tool_name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "tool_name_safe": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "tool_use_id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "user.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          }
+        }
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "telemetry.surfaces.traces/claude_code.tool.blocked_on_user",
+      "category": "telemetry",
+      "op": "removed",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "traces/claude_code.tool.blocked_on_user"
+      ],
+      "title": "Telemetry surface no longer sent: traces/claude_code.tool.blocked_on_user",
+      "impact": "degrading",
+      "before": {
+        "keys": {
+          "anthropic.custom_base_url": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "anthropic.provider": {
+            "class": "unclassified",
+            "kinds": [
+              "text"
+            ]
+          },
+          "decision": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "duration_ms": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "gen_ai.conversation.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "gen_ai.provider.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "session.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "source": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "span.type": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "terminal.type": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "user.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          }
+        }
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "telemetry.surfaces.traces/claude_code.tool.execution",
+      "category": "telemetry",
+      "op": "removed",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "traces/claude_code.tool.execution"
+      ],
+      "title": "Telemetry surface no longer sent: traces/claude_code.tool.execution",
+      "impact": "degrading",
+      "before": {
+        "keys": {
+          "anthropic.custom_base_url": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "anthropic.provider": {
+            "class": "unclassified",
+            "kinds": [
+              "text"
+            ]
+          },
+          "duration_ms": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "error": {
+            "class": "prompt",
+            "kinds": [
+              "text"
+            ]
+          },
+          "error.type": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "error_class": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "gen_ai.conversation.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "gen_ai.provider.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "gen_ai.tool.call.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "session.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "span.type": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "success": {
+            "class": "safe",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "terminal.type": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "tool_use_id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "user.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          }
+        }
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "telemetry.surfaces.traces/claude_code.tool/events/tool.output",
+      "category": "telemetry",
+      "op": "removed",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "traces/claude_code.tool/events/tool.output"
+      ],
+      "title": "Telemetry surface no longer sent: traces/claude_code.tool/events/tool.output",
+      "impact": "degrading",
+      "before": {
+        "keys": {
+          "bash_command": {
+            "class": "tool_content",
+            "kinds": [
+              "text"
+            ]
+          },
+          "content": {
+            "class": "tool_content",
+            "kinds": [
+              "text"
+            ]
+          },
+          "diff": {
+            "class": "tool_content",
+            "kinds": [
+              "text"
+            ]
+          },
+          "file_path": {
+            "class": "tool_content",
+            "kinds": [
+              "text"
+            ]
+          },
+          "output": {
+            "class": "tool_content",
+            "kinds": [
+              "text"
+            ]
+          }
+        }
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "hooks.events.PermissionRequest.keys.permission_suggestions[].behavior",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "PermissionRequest",
+        "keys",
+        "permission_suggestions[].behavior"
+      ],
+      "title": "PermissionRequest hook payload field permission_suggestions[].behavior removed",
+      "impact": "notable",
+      "before": "permission_suggestions[].behavior",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "hooks.events.PermissionRequest.keys.permission_suggestions[].rules",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "PermissionRequest",
+        "keys",
+        "permission_suggestions[].rules"
+      ],
+      "title": "PermissionRequest hook payload field permission_suggestions[].rules removed",
+      "impact": "notable",
+      "before": "permission_suggestions[].rules",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "hooks.events.PermissionRequest.keys.permission_suggestions[].rules[].ruleContent",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "PermissionRequest",
+        "keys",
+        "permission_suggestions[].rules[].ruleContent"
+      ],
+      "title": "PermissionRequest hook payload field permission_suggestions[].rules[].ruleContent removed",
+      "impact": "notable",
+      "before": "permission_suggestions[].rules[].ruleContent",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "hooks.events.PermissionRequest.keys.permission_suggestions[].rules[].toolName",
+      "category": "hooks",
+      "op": "removed",
+      "path": [
+        "hooks",
+        "events",
+        "PermissionRequest",
+        "keys",
+        "permission_suggestions[].rules[].toolName"
+      ],
+      "title": "PermissionRequest hook payload field permission_suggestions[].rules[].toolName removed",
+      "impact": "notable",
+      "before": "permission_suggestions[].rules[].toolName",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "cli.commands.claude mcp #",
+      "category": "cli",
+      "op": "removed",
+      "path": [
+        "cli",
+        "commands",
+        "claude mcp #"
+      ],
+      "title": "Command removed: `claude mcp #`",
+      "impact": "notable",
+      "before": {
+        "helped": false
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "cli.commands.claude mcp Add",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "commands",
+        "claude mcp Add"
+      ],
+      "title": "New command: `claude mcp Add`",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "helped": false
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "cli.commands.claude mcp Examples:",
+      "category": "cli",
+      "op": "removed",
+      "path": [
+        "cli",
+        "commands",
+        "claude mcp Examples:"
+      ],
+      "title": "Command removed: `claude mcp Examples:`",
+      "impact": "notable",
+      "before": {
+        "helped": false
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "cli.commands.claude mcp claude",
+      "category": "cli",
+      "op": "removed",
+      "path": [
+        "cli",
+        "commands",
+        "claude mcp claude"
+      ],
+      "title": "Command removed: `claude mcp claude`",
+      "impact": "notable",
+      "before": {
+        "helped": false
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "cli.help.--help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "--help"
+      ],
+      "title": "Full help text of `--help` changed (+300 −152 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -295,8 +295,10 @@\n   respawn [options] [id]                Restart a background session, or all of\n                                         them with --all, so it runs the current\n                                         Claude Code version\n-  rm <id>                               Delete a background session, and its\n-                                        worktree when that is safe. Works on\n+  rm <id>                               If it's safe, remove a background\n+                                        session from the list and delete its\n+                                        worktree. Its conversation is kept:\n+                                        `claude --resume` lists it. Works on\n                                         sessions that have already exited\n   setup-token                           Set up a long-lived authentication token\n                                         (requires Claude subscription)\n",
+      "stats": {
+        "added_chars": 300,
+        "removed_chars": 152
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "cli.help.mcp --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "mcp --help"
+      ],
+      "title": "Full help text of `mcp --help` changed (+70 −559 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -6,20 +6,8 @@\n   -h, --help                            Display help for command\n \n Commands:\n-  add [options] <name> <commandOrUrl> [args...]  Add an MCP server to Claude Code.\n-  \n-  Examples:\n-    # Add HTTP server:\n-    claude mcp add --transport http sentry https://mcp.sentry.dev/mcp\n-  \n-    # Add HTTP server with headers:\n-    claude mcp add --transport http corridor https://app.corridor.dev/api/mcp --header \"Authorization: Bearer ...\"\n-  \n-    # Add stdio server with environment variables:\n-    claude mcp add my-server -e API_KEY=xxx -- npx my-mcp-server\n-  \n-    # Add stdio server with subprocess flags:\n-    claude mcp add my-server -- my-command --some-flag arg1\n+  add [options] <name> <commandOrUrl> [args...]\n+      Add an MCP server\n   add-from-claude-desktop [options]     Import MCP servers from Claude Desktop\n                                         (Mac and WSL only)\n   add-json [options] <name> <json>      Add an MCP server (stdio, SSE, HTTP, or\n",
+      "stats": {
+        "added_chars": 70,
+        "removed_chars": 559
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "cli.help.rm --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "rm --help"
+      ],
+      "title": "Full help text of `rm --help` changed (+185 −96 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,6 +1,6 @@\n Usage: claude rm <id> [--discard-unpushed <commit>@<worktree-id>] [--force-remove-worktree <worktree-id>]\n \n-  Delete a background session and its worktree. Unlike `stop`, works on already-exited sessions.\n+  If it's safe, remove a background session from the list and delete its worktree. Its conversation is kept: `claude --resume` lists it. Unlike `stop`, works on already-exited sessions.\n   --discard-unpushed <commit>@<worktree-id>  also discard the worktree's unpushed commits (and any uncommitted changes) while it is still the same worktree at that commit — pass the value a previous 'claude rm <id>' reported\n   --force-remove-worktree <worktree-id>      delete the worktree directory even though the WorktreeRemove hook or git couldn't remove it (its repository must list it as a worktree, or have dropped it in a removal that couldn't delete it; no uncommitted changes to tracked files, submodules included; the branch is kept) — pass the value a previous 'claude rm <id>' reported\n \n",
+      "stats": {
+        "added_chars": 185,
+        "removed_chars": 96
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.additionalMarketplaces.<name>.pluginDigests.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "additionalMarketplaces.<name>.pluginDigests",
+        "description"
+      ],
+      "title": "additionalMarketplaces.<name>.pluginDigests description changed (+320 −290 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,6 +1,6 @@\n Managed settings only: the plugins of this marketplace that an organization delivers with its own tier, by plugin name, each with the digests of its releases.\n A plugin also enabled and listed in prependPlugins or appendPlugins by managed settings the session vouches for loads its hooks module only from a folder that proves one of them, and is then seated in that tier; any other copy does not load.\n-A digest is sha256- and the base64 SHA-256 of, for every regular file in the folder in UTF-16 code unit order of its path, not normalized, \"f PATH\" NUL BYTE-LENGTH NUL BYTES, with / in paths; .git, .in_use, .orphaned_at, .claude-plugin-link and .links_materialized at the root are left out.\n+A digest is sha256- and the base64 SHA-256 of, for every regular file in the folder in UTF-16 code unit order of its path, not normalized, \"f PATH\" NUL BYTE-LENGTH NUL BYTES, with / in paths; .git, .in_use, .orphaned_at, .claude-plugin-link, .claude-directory-proof.json and .links_materialized at the root are left out.\n The plugin keeps its manifest at .claude-plugin/plugin.json and names one module in hooks/hooks.json.\n A string of any other form, or a list that is empty or of any other shape, matches no folder.\n A symbolic link, or a surface module, proves nothing.\n",
+      "stats": {
+        "added_chars": 320,
+        "removed_chars": 290
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.additionalMarketplaces.<name>.source.package.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "additionalMarketplaces.<name>.source.package",
+        "description"
+      ],
+      "title": "additionalMarketplaces.<name>.source.package description changed (+218 −311 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,3 +1,1 @@\n-npm package containing marketplace.json (e.g.\n-\"@acme/claude-marketplace\").\n-In strictKnownMarketplaces / blockedMarketplaces an entry also governs plugins installed straight from the npm marketplace (`<package>@npm`): an exact package name matches that package, and \"@acme/*\" matches every package under the scope.\n+npm package containing marketplace.json (e.g. \"@acme/claude-marketplace\"). A scope wildcard such as \"@acme/*\" still parses in a managed list, so a list that holds one stays valid, but it matches no marketplace package.\n",
+      "stats": {
+        "added_chars": 218,
+        "removed_chars": 311
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.additionalMarketplaces.<name>.source.registry.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "additionalMarketplaces.<name>.source.registry",
+        "description"
+      ],
+      "title": "additionalMarketplaces.<name>.source.registry description changed (+267 −413 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,4 +1,1 @@\n-Registry URL.\n-When adding a marketplace: a one-off registry override (otherwise your npm configuration decides).\n-In a policy entry: the origin and path prefix the package's RESOLVED tarball URL must fall under (e.g.\n-\"https://npm.example.com/api/npm/internal/\"); under allowManagedPermissionRulesOnly, an npm marketplace keeps plugin allowed-tools only when both the entry and the registration pin this same registry.\n+Registry URL. When adding a marketplace: a one-off registry override (otherwise your npm configuration decides). Under allowManagedPermissionRulesOnly, an npm marketplace keeps plugin allowed-tools only when both the entry and the registration pin this same registry.\n",
+      "stats": {
+        "added_chars": 267,
+        "removed_chars": 413
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.allowedMarketplaces[].package.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "allowedMarketplaces[].package",
+        "description"
+      ],
+      "title": "allowedMarketplaces[].package description changed (+218 −311 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,3 +1,1 @@\n-npm package containing marketplace.json (e.g.\n-\"@acme/claude-marketplace\").\n-In strictKnownMarketplaces / blockedMarketplaces an entry also governs plugins installed straight from the npm marketplace (`<package>@npm`): an exact package name matches that package, and \"@acme/*\" matches every package under the scope.\n+npm package containing marketplace.json (e.g. \"@acme/claude-marketplace\"). A scope wildcard such as \"@acme/*\" still parses in a managed list, so a list that holds one stays valid, but it matches no marketplace package.\n",
+      "stats": {
+        "added_chars": 218,
+        "removed_chars": 311
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.allowedMarketplaces[].registry.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "allowedMarketplaces[].registry",
+        "description"
+      ],
+      "title": "allowedMarketplaces[].registry description changed (+267 −413 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,4 +1,1 @@\n-Registry URL.\n-When adding a marketplace: a one-off registry override (otherwise your npm configuration decides).\n-In a policy entry: the origin and path prefix the package's RESOLVED tarball URL must fall under (e.g.\n-\"https://npm.example.com/api/npm/internal/\"); under allowManagedPermissionRulesOnly, an npm marketplace keeps plugin allowed-tools only when both the entry and the registration pin this same registry.\n+Registry URL. When adding a marketplace: a one-off registry override (otherwise your npm configuration decides). Under allowManagedPermissionRulesOnly, an npm marketplace keeps plugin allowed-tools only when both the entry and the registration pin this same registry.\n",
+      "stats": {
+        "added_chars": 267,
+        "removed_chars": 413
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.askUserQuestionTimeout.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "askUserQuestionTimeout",
+        "description"
+      ],
+      "title": "askUserQuestionTimeout description changed (+662 −0 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,8 @@\n-\n+Idle time before Claude's questions in the terminal auto-continue with any answers selected so far.\n+When unset, the terminal does not auto-continue.\n+The Claude desktop and web apps show Claude's questions in their own interface and may move on from some unanswered ones after a wait the app sets.\n+Claude is then told that nobody answered and uses its best judgment.\n+In sessions that read this setting, only \"never\" stops the apps from moving on.\n+Leaving it unset does not.\n+Cloud sessions and Cowork tasks do not read your user settings file (~/.claude/settings.json), and managed settings do not reach all of them.\n+This setting is ignored in a project's settings files.\n",
+      "stats": {
+        "added_chars": 662,
+        "removed_chars": 0
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.autoMode",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "autoMode"
+      ],
+      "title": "Setting no longer read: autoMode",
+      "impact": "notable",
+      "before": {
+        "description": "Auto mode classifier prompt customization",
+        "type": "object"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.axScreenReader",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "axScreenReader"
+      ],
+      "title": "Setting no longer read: axScreenReader",
+      "impact": "notable",
+      "before": {
+        "description": "Render screen-reader friendly output (flat text, no decorative borders or animations). Overridden by the CLAUDE_AX_SCREEN_READER env var and the --ax-screen-reader CLI flag. Ignored in project and local settings.",
+        "type": "boolean"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.clawdFileProgressEnabled",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "clawdFileProgressEnabled"
+      ],
+      "title": "New setting: clawdFileProgressEnabled",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "@internal Whether to show Clawd, Claude Code's mascot, carrying the file on the progress line when a file goes to or from a connector",
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.defaultView",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "defaultView"
+      ],
+      "title": "Setting no longer read: defaultView",
+      "impact": "notable",
+      "before": {
+        "description": "Default transcript view: chat (SendUserMessage checkpoints only) or transcript (full)",
+        "enum": [
+          "chat",
+          "transcript"
+        ],
+        "type": "string"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.disableDeepLinkRegistration",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "disableDeepLinkRegistration"
+      ],
+      "title": "Setting no longer read: disableDeepLinkRegistration",
+      "impact": "notable",
+      "before": {
+        "description": "Prevent claude-cli:// protocol handler registration with the OS",
+        "enum": [
+          "disable"
+        ],
+        "type": "string"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.enabledPlugins.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "enabledPlugins",
+        "description"
+      ],
+      "title": "enabledPlugins description changed (+90 −55 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,4 +1,4 @@\n Enabled plugins using plugin-id@marketplace-id format.\n Example: { \"formatter@anthropic-tools\": true }.\n-Also supports extended format with version constraints.\n+Only true turns on a marketplace plugin: a list of versions is accepted but leaves it off.\n Settings precedence is user < project < local < flag < policy, so to disable a plugin that project settings enable, set it to false in .claude/settings.local.json — setting false in ~/.claude/settings.json is overridden by the project.\n",
+      "stats": {
+        "added_chars": 90,
+        "removed_chars": 55
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.extraKnownMarketplaces.<name>.pluginDigests.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "extraKnownMarketplaces.<name>.pluginDigests",
+        "description"
+      ],
+      "title": "extraKnownMarketplaces.<name>.pluginDigests description changed (+320 −290 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,6 +1,6 @@\n Managed settings only: the plugins of this marketplace that an organization delivers with its own tier, by plugin name, each with the digests of its releases.\n A plugin also enabled and listed in prependPlugins or appendPlugins by managed settings the session vouches for loads its hooks module only from a folder that proves one of them, and is then seated in that tier; any other copy does not load.\n-A digest is sha256- and the base64 SHA-256 of, for every regular file in the folder in UTF-16 code unit order of its path, not normalized, \"f PATH\" NUL BYTE-LENGTH NUL BYTES, with / in paths; .git, .in_use, .orphaned_at, .claude-plugin-link and .links_materialized at the root are left out.\n+A digest is sha256- and the base64 SHA-256 of, for every regular file in the folder in UTF-16 code unit order of its path, not normalized, \"f PATH\" NUL BYTE-LENGTH NUL BYTES, with / in paths; .git, .in_use, .orphaned_at, .claude-plugin-link, .claude-directory-proof.json and .links_materialized at the root are left out.\n The plugin keeps its manifest at .claude-plugin/plugin.json and names one module in hooks/hooks.json.\n A string of any other form, or a list that is empty or of any other shape, matches no folder.\n A symbolic link, or a surface module, proves nothing.\n",
+      "stats": {
+        "added_chars": 320,
+        "removed_chars": 290
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.extraKnownMarketplaces.<name>.source.package.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "extraKnownMarketplaces.<name>.source.package",
+        "description"
+      ],
+      "title": "extraKnownMarketplaces.<name>.source.package description changed (+218 −311 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,3 +1,1 @@\n-npm package containing marketplace.json (e.g.\n-\"@acme/claude-marketplace\").\n-In strictKnownMarketplaces / blockedMarketplaces an entry also governs plugins installed straight from the npm marketplace (`<package>@npm`): an exact package name matches that package, and \"@acme/*\" matches every package under the scope.\n+npm package containing marketplace.json (e.g. \"@acme/claude-marketplace\"). A scope wildcard such as \"@acme/*\" still parses in a managed list, so a list that holds one stays valid, but it matches no marketplace package.\n",
+      "stats": {
+        "added_chars": 218,
+        "removed_chars": 311
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.extraKnownMarketplaces.<name>.source.registry.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "extraKnownMarketplaces.<name>.source.registry",
+        "description"
+      ],
+      "title": "extraKnownMarketplaces.<name>.source.registry description changed (+267 −413 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,4 +1,1 @@\n-Registry URL.\n-When adding a marketplace: a one-off registry override (otherwise your npm configuration decides).\n-In a policy entry: the origin and path prefix the package's RESOLVED tarball URL must fall under (e.g.\n-\"https://npm.example.com/api/npm/internal/\"); under allowManagedPermissionRulesOnly, an npm marketplace keeps plugin allowed-tools only when both the entry and the registration pin this same registry.\n+Registry URL. When adding a marketplace: a one-off registry override (otherwise your npm configuration decides). Under allowManagedPermissionRulesOnly, an npm marketplace keeps plugin allowed-tools only when both the entry and the registration pin this same registry.\n",
+      "stats": {
+        "added_chars": 267,
+        "removed_chars": 413
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.permissions.blockReadsOutsideWorkingDirectories.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "permissions.blockReadsOutsideWorkingDirectories",
+        "description"
+      ],
+      "title": "permissions.blockReadsOutsideWorkingDirectories description changed (+417 −276 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,4 @@\n-Refuse file-tool reads (Read, Grep, Glob, LSP) outside the working directories in every permission mode; true in any settings source wins. No allow rule lifts it. Also set when the user picks \"block\" on the one-time auto-mode prompt for a read outside the working directories.\n+Refuse file-tool reads (Read, Grep, Glob, LSP) outside the working directories in every permission mode; true in any settings source wins.\n+No allow rule lifts it.\n+Also binds shell commands: one that names a path outside them is asked about in every mode, and the sandbox, where it is on, denies such reads.\n+Also set when the user picks \"block\" on the one-time auto-mode prompt for a read outside the working directories.\n",
+      "stats": {
+        "added_chars": 417,
+        "removed_chars": 276
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.permissions.blockWritesOutsideWorkingDirectories.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "permissions.blockWritesOutsideWorkingDirectories",
+        "description"
+      ],
+      "title": "permissions.blockWritesOutsideWorkingDirectories description changed (+566 −406 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,7 +1,7 @@\n Refuse file-tool writes (Write, Edit, NotebookEdit) outside the working directories in every permission mode; true in any settings source wins.\n No allow rule lifts it.\n-Files that Claude Code keeps for the session are not refused: its plan files, scratchpad and background job folder, and the auto-memory of this project, unless a repository settings file points it elsewhere.\n+Files that Claude Code keeps for the session are not refused: its plan files, scratchpad and background job folder, and the auto-memory of this project, unless a repository settings file points it elsewhere (a setting of the program that starts Claude Code can narrow this and the working directories).\n Nothing runs them unless the model asks.\n-Also refuses file-tool writes to Claude Code settings files, inside the working directories too, and takes EnterWorktree and ExitWorktree, which move the working directory, out of the tools on offer.\n+Also refuses file-tool writes to Claude Code settings files, inside the working directories too, and takes EnterWorktree and ExitWorktree, which move the working directory, out of the tools on offer (a setting of the program that starts Claude Code can keep them).\n Does not limit shell commands, MCP tools, the programs that hooks run, or the memory tools.\n Cloud sessions (Claude Code on the web), whose file tools run in a container that is itself the boundary, may not apply it.\n",
+      "stats": {
+        "added_chars": 566,
+        "removed_chars": 406
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.precomputeArmTokens",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "precomputeArmTokens"
+      ],
+      "title": "New setting: precomputeArmTokens",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "@internal Read from the flag settings only, for a host that sends /compact below the automatic threshold: the main conversation starts its background compaction summary at this many tokens, when that is sooner than it would by itself, so that /compact finds it ready. A window set below the billing boundary compacts without a background summary, and this does not change that.",
+        "type": "integer"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.skipAutoPermissionPrompt",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "skipAutoPermissionPrompt"
+      ],
+      "title": "Setting no longer read: skipAutoPermissionPrompt",
+      "impact": "notable",
+      "before": {
+        "description": "Whether the user has accepted the auto mode opt-in dialog",
+        "type": "boolean"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.strictKnownMarketplaces[].package.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "strictKnownMarketplaces[].package",
+        "description"
+      ],
+      "title": "strictKnownMarketplaces[].package description changed (+218 −311 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,3 +1,1 @@\n-npm package containing marketplace.json (e.g.\n-\"@acme/claude-marketplace\").\n-In strictKnownMarketplaces / blockedMarketplaces an entry also governs plugins installed straight from the npm marketplace (`<package>@npm`): an exact package name matches that package, and \"@acme/*\" matches every package under the scope.\n+npm package containing marketplace.json (e.g. \"@acme/claude-marketplace\"). A scope wildcard such as \"@acme/*\" still parses in a managed list, so a list that holds one stays valid, but it matches no marketplace package.\n",
+      "stats": {
+        "added_chars": 218,
+        "removed_chars": 311
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.strictKnownMarketplaces[].registry.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "strictKnownMarketplaces[].registry",
+        "description"
+      ],
+      "title": "strictKnownMarketplaces[].registry description changed (+267 −413 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,4 +1,1 @@\n-Registry URL.\n-When adding a marketplace: a one-off registry override (otherwise your npm configuration decides).\n-In a policy entry: the origin and path prefix the package's RESOLVED tarball URL must fall under (e.g.\n-\"https://npm.example.com/api/npm/internal/\"); under allowManagedPermissionRulesOnly, an npm marketplace keeps plugin allowed-tools only when both the entry and the registration pin this same registry.\n+Registry URL. When adding a marketplace: a one-off registry override (otherwise your npm configuration decides). Under allowManagedPermissionRulesOnly, an npm marketplace keeps plugin allowed-tools only when both the entry and the registration pin this same registry.\n",
+      "stats": {
+        "added_chars": 267,
+        "removed_chars": 413
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.subagentStatusLine.deprecated",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "subagentStatusLine",
+        "deprecated"
+      ],
+      "title": "Setting subagentStatusLine deprecated",
+      "impact": "notable",
+      "before": null,
+      "after": true,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.subagentStatusLine.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "subagentStatusLine",
+        "description"
+      ],
+      "title": "subagentStatusLine description changed (+80 −95 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Custom per-subagent status line shown in the agent panel; receives row context as JSON on stdin\n+Deprecated: no longer has any effect. Subagent rows always use the default look.\n",
+      "stats": {
+        "added_chars": 80,
+        "removed_chars": 95
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.useAutoModeDuringPlan",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "useAutoModeDuringPlan"
+      ],
+      "title": "Setting no longer read: useAutoModeDuringPlan",
+      "impact": "notable",
+      "before": {
+        "description": "Whether plan mode uses auto mode semantics when auto mode is available (default: true)",
+        "type": "boolean"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.voiceEnabled",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "voiceEnabled"
+      ],
+      "title": "Setting no longer read: voiceEnabled",
+      "impact": "notable",
+      "before": {
+        "description": "Enable voice mode (hold-to-talk dictation)",
+        "type": "boolean"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "env_vars"
+      ],
+      "title": "Environment variables: +27 −6",
+      "impact": "informational",
+      "before": [
+        "CLAUDE_CODE_CCR_REQUESTS_BY_FETCH",
+        "NODE_ENVfunctionSource",
+        "OTEL_EXPORTER_OTLP_LOGS_PROTOCOL",
+        "OTEL_EXPORTER_OTLP_METRICS_PROTOCOL",
+        "OTEL_EXPORTER_OTLP_TRACES_PROTOCOL",
+        "UnsupportedTarget"
+      ],
+      "after": [
+        "CLAUDE_BG_SESSION_CREDENTIAL",
+        "CLAUDE_CODE_AUTOMOUNT_ROOTS",
+        "CLAUDE_CODE_CCR_SKIP_NEEDLESS_STARTUP_READS",
+        "CLAUDE_CODE_DESKTOP_MESSAGE_CARD",
+        "CLAUDE_CODE_DESKTOP_MODE_FROM_RECORD",
+        "CLAUDE_CODE_DESKTOP_PLUGIN_INSTALL_FRAMES",
+        "CLAUDE_CODE_FEATURE_FLAGS_KICK_FROM_INIT",
+        "CLAUDE_CODE_FEATURE_FLAGS_KICK_ON_WARM_CACHE",
+        "CLAUDE_CODE_HOOK_HEARTBEAT_INTERVAL_MS",
+        "CLAUDE_CODE_HOST_ARTIFACT_TYPE_COMMANDS",
+        "CLAUDE_CODE_MCP_SERVE_MEMORY_WALKS_DEADLINE_MS",
+        "CLAUDE_CODE_OVERLOADED_RETRY_MAX_WAIT_MS",
+        "CLAUDE_CODE_PLUGIN_REMOTE_MCP_REACHABLE_HOSTS_HINT",
+        "CLAUDE_CODE_PROJECT_DOC_LOOK_TIMEOUT_MS",
+        "CLAUDE_CODE_RESUME_HINT_COMMAND",
+        "CLAUDE_CODE_SDK_MCP_TOOL_IDLE_TIMEOUT",
+        "CLAUDE_CODE_SESSION_CREATED_AT_MS",
+        "CLAUDE_CODE_SHOWN_PLUGINS_DIR",
+        "CLAUDE_CODE_SYSTEM_PROMPT_FEATURE_FLAG",
+        "CLAUDE_CODE_ULTRAREVIEW_REVIEW_MD_FILE",
+        "CLAUDE_CODE_USER_DELEGATED_SESSION",
+        "CLAUDE_CODE_USER_DELEGATED_SESSION_ANY_CHECK_MODEL",
+        "NODE_INSPECTOR_IPC",
+        "TSC_NONPOLLING_WATCHER",
+        "TSC_WATCHDIRECTORY",
+        "TSC_WATCHFILE",
+        "VSCODE_INSPECTOR_OPTIONS"
+      ],
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "network.egress.GET api.anthropic.com/mcp-registry/v0/servers",
+      "category": "network",
+      "op": "removed",
+      "path": [
+        "network",
+        "egress",
+        "GET api.anthropic.com/mcp-registry/v0/servers"
+      ],
+      "title": "Network request no longer made: GET api.anthropic.com/mcp-registry/v0/servers",
+      "impact": "notable",
+      "before": {
+        "host": "api.anthropic.com",
+        "method": "GET",
+        "path": "/mcp-registry/v0/servers",
+        "when": "before"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "network.egress.GET api.anthropic.com/api/directory/server-urls",
+      "category": "network",
+      "op": "added",
+      "path": [
+        "network",
+        "egress",
+        "GET api.anthropic.com/api/directory/server-urls"
+      ],
+      "title": "New network request: GET api.anthropic.com/api/directory/server-urls",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "host": "api.anthropic.com",
+        "method": "GET",
+        "path": "/api/directory/server-urls",
+        "when": "before"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "filesystem.darwin/arm64.exec.rg --no-config --files --hidden <repo>.phases.turn",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "darwin/arm64",
+        "exec",
+        "rg --no-config --files --hidden <repo>",
+        "phases",
+        "turn"
+      ],
+      "title": "`rg --no-config --files --hidden <repo>` now also runs at turn (darwin/arm64)",
+      "impact": "informational",
+      "before": null,
+      "after": "turn",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "filesystem.darwin/arm64.exec.rg --no-config --files --hidden <repo>.phases.startup",
+      "category": "filesystem",
+      "op": "removed",
+      "path": [
+        "filesystem",
+        "darwin/arm64",
+        "exec",
+        "rg --no-config --files --hidden <repo>",
+        "phases",
+        "startup"
+      ],
+      "title": "`rg --no-config --files --hidden <repo>` no longer runs at startup (darwin/arm64)",
+      "impact": "informational",
+      "before": "startup",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "filesystem.darwin/arm64.exec./bin/zsh -c source <claude-config>/shell-snapshots/snapshot-zsh-<n>-<id>.sh 2>/dev/null || true && \\builtin setopt NO_EXTENDED_GLOB NO_BARE_GLOB_QUAL NO_BRACE_CCL NO_MAGIC_EQUAL_SUBST 2>/dev/null || true && { \\builtin unalias -- 'which'; \\builtin unset -f -- 'which'; } >/dev/null 2>&1 || true && { \\builtin unalias -- 'unsetenv'; \\builtin unset -f -- 'unsetenv'; } >/dev/null 2>&1 || true && eval 'git status --short && git log --oneline -1' < /dev/null && pwd -P >| <tmp>/claude-<id>-cwd",
+      "category": "filesystem",
+      "op": "changed",
+      "path": [
+        "filesystem",
+        "darwin/arm64",
+        "exec",
+        "/bin/zsh -c source <claude-config>/shell-snapshots/snapshot-zsh-<n>-<id>.sh 2>/dev/null || true && \\builtin setopt NO_EXTENDED_GLOB NO_BARE_GLOB_QUAL NO_BRACE_CCL NO_MAGIC_EQUAL_SUBST 2>/dev/null || true && { \\builtin unalias -- 'which'; \\builtin unset -f -- 'which'; } >/dev/null 2>&1 || true && { \\builtin unalias -- 'unsetenv'; \\builtin unset -f -- 'unsetenv'; } >/dev/null 2>&1 || true && eval 'git status --short && git log --oneline -1' < /dev/null && pwd -P >| <tmp>/claude-<id>-cwd"
+      ],
+      "title": "Command changed: `/bin/zsh -c source <claude-config>/shell-snapshots/snapshot-zsh-<n>-<id>.sh 2>/dev/null || true && \\ …` (+216 −173 chars) (darwin/arm64)",
+      "impact": "informational",
+      "before": "/bin/zsh -c source <claude-config>/shell-snapshots/snapshot-zsh-<n>-<id>.sh 2>/dev/null || true && setopt NO_EXTENDED_GLOB NO_BARE_GLOB_QUAL 2>/dev/null || true && { \\builtin unalias -- 'which'; \\builtin unset -f -- 'which'; } >/dev/null 2>&1 || true && { \\builtin unalias -- 'unsetenv'; \\builtin unset -f -- 'unsetenv'; } >/dev/null 2>&1 || true && eval 'git status --short && git log --oneline -1' < /dev/null && pwd -P >| <tmp>/claude-<id>-cwd",
+      "after": "/bin/zsh -c source <claude-config>/shell-snapshots/snapshot-zsh-<n>-<id>.sh 2>/dev/null || true && \\builtin setopt NO_EXTENDED_GLOB NO_BARE_GLOB_QUAL NO_BRACE_CCL NO_MAGIC_EQUAL_SUBST 2>/dev/null || true && { \\builtin unalias -- 'which'; \\builtin unset -f -- 'which'; } >/dev/null 2>&1 || true && { \\builtin unalias -- 'unsetenv'; \\builtin unset -f -- 'unsetenv'; } >/dev/null 2>&1 || true && eval 'git status --short && git log --oneline -1' < /dev/null && pwd -P >| <tmp>/claude-<id>-cwd",
+      "text_diff": "@@ -1,5 +1,5 @@\n /bin/zsh\n--c source <claude-config>/shell-snapshots/snapshot-zsh-<n>-<id>.sh 2>/dev/null || true && setopt NO_EXTENDED_GLOB NO_BARE_GLOB_QUAL 2>/dev/null || true && { \\builtin unalias\n+-c source <claude-config>/shell-snapshots/snapshot-zsh-<n>-<id>.sh 2>/dev/null || true && \\builtin setopt NO_EXTENDED_GLOB NO_BARE_GLOB_QUAL NO_BRACE_CCL NO_MAGIC_EQUAL_SUBST 2>/dev/null || true && { \\builtin unalias\n -- 'which'; \\builtin unset\n -f\n -- 'which'; } >/dev/null 2>&1 || true && { \\builtin unalias\n",
+      "stats": {
+        "added_chars": 216,
+        "removed_chars": 173
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "filesystem.linux/amd64.paths./home",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "/home"
+      ],
+      "title": "Now checks /home (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "ops": [
+          "stat"
+        ],
+        "phases": [
+          "startup"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "filesystem.linux/amd64.exec.rg --no-config --files --hidden <repo>.phases.turn",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "exec",
+        "rg --no-config --files --hidden <repo>",
+        "phases",
+        "turn"
+      ],
+      "title": "`rg --no-config --files --hidden <repo>` now also runs at turn (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": "turn",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "filesystem.linux/amd64.exec.rg --no-config --files --hidden <repo>.phases.startup",
+      "category": "filesystem",
+      "op": "removed",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "exec",
+        "rg --no-config --files --hidden <repo>",
+        "phases",
+        "startup"
+      ],
+      "title": "`rg --no-config --files --hidden <repo>` no longer runs at startup (linux/amd64)",
+      "impact": "informational",
+      "before": "startup",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "filesystem.linux/amd64.exec./bin/bash -c source <claude-config>/shell-snapshots/snapshot-bash-<n>-<id>.sh 2>/dev/null || true && \\builtin shopt -u extglob 2>/dev/null || true && { \\builtin unalias -- 'which'; \\builtin unset -f -- 'which'; } >/dev/null 2>&1 || true && { \\builtin unalias -- 'unsetenv'; \\builtin unset -f -- 'unsetenv'; } >/dev/null 2>&1 || true && eval 'git status --short && git log --oneline -1' < /dev/null && pwd -P >| <tmp>/claude-<id>-cwd",
+      "category": "filesystem",
+      "op": "changed",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "exec",
+        "/bin/bash -c source <claude-config>/shell-snapshots/snapshot-bash-<n>-<id>.sh 2>/dev/null || true && \\builtin shopt -u extglob 2>/dev/null || true && { \\builtin unalias -- 'which'; \\builtin unset -f -- 'which'; } >/dev/null 2>&1 || true && { \\builtin unalias -- 'unsetenv'; \\builtin unset -f -- 'unsetenv'; } >/dev/null 2>&1 || true && eval 'git status --short && git log --oneline -1' < /dev/null && pwd -P >| <tmp>/claude-<id>-cwd"
+      ],
+      "title": "Command changed: `/bin/bash -c source <claude-config>/shell-snapshots/snapshot-bash-<n>-<id>.sh 2>/dev/null || true && …` (+105 −96 chars) (linux/amd64)",
+      "impact": "informational",
+      "before": "/bin/bash -c source <claude-config>/shell-snapshots/snapshot-bash-<n>-<id>.sh 2>/dev/null || true && shopt -u extglob 2>/dev/null || true && { \\builtin unalias -- 'which'; \\builtin unset -f -- 'which'; } >/dev/null 2>&1 || true && { \\builtin unalias -- 'unsetenv'; \\builtin unset -f -- 'unsetenv'; } >/dev/null 2>&1 || true && eval 'git status --short && git log --oneline -1' < /dev/null && pwd -P >| <tmp>/claude-<id>-cwd",
+      "after": "/bin/bash -c source <claude-config>/shell-snapshots/snapshot-bash-<n>-<id>.sh 2>/dev/null || true && \\builtin shopt -u extglob 2>/dev/null || true && { \\builtin unalias -- 'which'; \\builtin unset -f -- 'which'; } >/dev/null 2>&1 || true && { \\builtin unalias -- 'unsetenv'; \\builtin unset -f -- 'unsetenv'; } >/dev/null 2>&1 || true && eval 'git status --short && git log --oneline -1' < /dev/null && pwd -P >| <tmp>/claude-<id>-cwd",
+      "text_diff": "@@ -1,5 +1,5 @@\n /bin/bash\n--c source <claude-config>/shell-snapshots/snapshot-bash-<n>-<id>.sh 2>/dev/null || true && shopt\n+-c source <claude-config>/shell-snapshots/snapshot-bash-<n>-<id>.sh 2>/dev/null || true && \\builtin shopt\n -u extglob 2>/dev/null || true && { \\builtin unalias\n -- 'which'; \\builtin unset\n -f\n",
+      "stats": {
+        "added_chars": 105,
+        "removed_chars": 96
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "binary.size_bytes",
+      "category": "binary",
+      "op": "changed",
+      "path": [
+        "binary",
+        "size_bytes"
+      ],
+      "title": "Binary size: 323,702,464 → 344,369,984 bytes (323.7 MB → 344.4 MB)",
+      "impact": "informational",
+      "before": 323702464,
+      "after": 344369984,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    }
+  ]
+}
