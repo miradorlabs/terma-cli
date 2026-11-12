@@ -391,3 +391,30 @@ func runsThis(t *testing.T, yes bool) {
 	serviceRunsThis = func(string) bool { return yes }
 	t.Cleanup(func() { serviceRunsThis = was })
 }
+
+// A relay asked to make way while an image is on its way waits for it: the image would be
+// sent again whole by the next relay.
+func TestAReplacedRelayWaitsForAnUpload(t *testing.T) {
+	stateDir, dir, _ := setUpRelay(t)
+	c := runConfig(stateDir, 0, nil)
+	var uploading atomic.Bool
+	uploading.Store(true)
+	c.Engine.Busy = uploading.Load
+	r := startRun(t, c)
+	awaitRecord(t, r, dir)
+	askToMakeWay(t, dir)
+	select {
+	case <-r.done:
+		t.Fatalf("the relay stepped aside mid-upload: %+v", r.res)
+	case <-time.After(2 * time.Second):
+	}
+	uploading.Store(false)
+	select {
+	case <-r.done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the relay kept running once the upload was over")
+	}
+	if !r.res.Replaced {
+		t.Fatalf("Run = %+v, want Replaced", r.res)
+	}
+}

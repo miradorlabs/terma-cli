@@ -421,8 +421,9 @@ func watch(ctx context.Context, r *relay.Relay, stateDir string, idle time.Durat
 				}
 				return stopUpdated, installed.Installed, nil
 			}
-		} else if !replacing.IsZero() && (!r.Holding() || time.Since(replacing) >= replacedMaxWait) {
-			// Once the hold is empty, since what it keeps is lost at exit; the queue is on disk.
+		} else if !replacing.IsZero() && (!r.Holding() && !r.Busy() || time.Since(replacing) >= replacedMaxWait) {
+			// Once the hold is empty, since what it keeps is lost at exit, and no image is on its
+			// way, which would be sent again whole; the queues are on disk.
 			return stopReplaced, installed.Installed, nil
 		}
 		if time.Since(lastPrune) > time.Hour {
