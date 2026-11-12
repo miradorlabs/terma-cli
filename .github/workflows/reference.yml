@@ -131,6 +131,9 @@ jobs:
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          # Copilot CLI runs against GitHub's service on this job's token, as in CI's copilot shard:
+          # Copilot's capture alone, or its contracts skip and every release reads "Not tested".
+          COPILOT_GITHUB_TOKEN: ${{ matrix.harness == 'copilot' && github.token || '' }}
           TERMA_E2E: "1"
           TERMA_E2E_BINARY: ${{ github.workspace }}/test/e2e/bin/terma
           TERMA_E2E_UNCLASSIFIED: note

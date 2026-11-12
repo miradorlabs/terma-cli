@@ -151,11 +151,11 @@ func TestCaptureArgs(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(runs, "profiles-desktop"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(runs, "profiles-desktop", "profiles.json"), []byte(`[{"harness":"codex-desktop","version":"26.1106.1"}]`+"\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(runs, "profiles-desktop", "profiles.json"), []byte(`[{"harness":"codex-desktop","version":"26.1106.1"},{"harness":"claude-desktop","version":"1.1.0"}]`+"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	cmd := exec.Command("bash", "reference/capture-args.sh", runs)
-	cmd.Env = append(cmd.Environ(), "BUILDS=claude=2.1.1\ngemini=0.9.0\ncodex=0.200.0\nclaude-desktop=1.2.0\ncodex-desktop=26.1106.1",
+	cmd.Env = append(cmd.Environ(), "BUILDS=claude=2.1.1\ngemini=0.9.0\ncodex=0.200.0\nclaude-desktop=1.1.0,1.2.0\ncodex-desktop=26.1106.1",
 		"CLAUDE_BUILDS=2.1.1", "CODEX_BUILDS=0.200.0", "DESKTOP_CAPTURE=failure")
 	out, err := cmd.Output()
 	if err != nil {
@@ -166,7 +166,7 @@ func TestCaptureArgs(t *testing.T) {
 		"-attempted", "claude=2.1.1",
 		"-attempted", "gemini=0.9.0",
 		"-attempted", "codex=0.200.0", "-unfinished", "codex=0.200.0", // macOS wrote nothing
-		"-attempted", "claude-desktop=1.2.0", "-unfinished", "claude-desktop=1.2.0", // the desktop job failed, recording nothing of it
+		"-attempted", "claude-desktop=1.1.0,1.2.0", "-unfinished", "claude-desktop=1.2.0", // the desktop job failed, recording 1.1.0 alone
 		"-attempted", "codex-desktop=26.1106.1", // recorded beside it
 		"-unfinished", "claude=2.1.1", "-unfinished", "codex=0.200.0", // Linux wrote nothing
 	}

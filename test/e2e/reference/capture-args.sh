@@ -14,14 +14,17 @@ set -euo pipefail
 
 runs=$1
 
-# recorded reports that the desktop job recorded a profile of every version of harness listed.
-recorded() {
-	local harness=$1 versions=$2 v
-	[ -f "$runs/profiles-desktop/profiles.json" ] || return 1
+# unrecorded prints, comma-separated, the versions of harness the desktop job recorded no profile of.
+unrecorded() {
+	local harness=$1 versions=$2 v missing=""
 	for v in ${versions//,/ }; do
-		jq -e --arg h "$harness" --arg v "$v" 'any(.[]; .harness == $h and .version == $v)' \
-			"$runs/profiles-desktop/profiles.json" >/dev/null || return 1
+		if ! [ -f "$runs/profiles-desktop/profiles.json" ] ||
+			! jq -e --arg h "$harness" --arg v "$v" 'any(.[]; .harness == $h and .version == $v)' \
+				"$runs/profiles-desktop/profiles.json" >/dev/null; then
+			missing="${missing:+$missing,}$v"
+		fi
 	done
+	echo "$missing"
 }
 
 while IFS= read -r line; do
@@ -29,7 +32,12 @@ while IFS= read -r line; do
 	harness=${line%%=*}
 	printf '%s\n' -attempted "$line"
 	case "$harness" in
-	claude-desktop | codex-desktop) [ "${DESKTOP_CAPTURE:-}" = success ] || recorded "$harness" "${line#*=}" || printf '%s\n' -unfinished "$line" ;;
+	claude-desktop | codex-desktop)
+		if [ "${DESKTOP_CAPTURE:-}" != success ]; then
+			missing=$(unrecorded "$harness" "${line#*=}")
+			if [ -n "$missing" ]; then printf '%s\n' -unfinished "$harness=$missing"; fi
+		fi
+		;;
 	*) [ -f "$runs/capture-$harness/compat.json" ] || printf '%s\n' -unfinished "$line" ;;
 	esac
 done <<<"${BUILDS:-}"
