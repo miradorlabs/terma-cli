@@ -10876,10 +10876,7 @@
               "user_type"
             ]
           }
-        },
-        "unobserved": [
-          "tengu_headless_latency"
-        ]
+        }
       }
     }
   },

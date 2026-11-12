@@ -12,20 +12,19 @@
     },
     "changelog": "https://github.com/openai/codex/releases",
     "latest": "0.167.2",
-    "support": "untested",
+    "support": "supported",
     "versions_tracked": 103,
     "first_tracked": "2026-01-25",
     "last_change": {
       "from": "0.167.1",
       "to": "0.167.2",
-      "at": "2026-11-11T23:00:33.595186074Z",
+      "at": "2026-11-12T05:15:55.281711967Z",
       "released_at": "2026-11-11T22:50:04.191Z",
-      "changes": 475,
+      "changes": 4,
       "categories": {
-        "cli": 2,
+        "cli": 1,
         "config": 1,
-        "filesystem": 8,
-        "telemetry": 464
+        "telemetry": 2
       }
     }
   },
@@ -33,61 +32,60 @@
     {
       "version": "0.167.2",
       "released_at": "2026-11-11T22:50:04.191Z",
-      "captured_at": "2026-11-11T23:00:33.595186074Z",
+      "captured_at": "2026-11-12T05:15:55.281711967Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"
       ],
-      "support": "untested",
+      "support": "supported",
       "previous": "0.167.1",
-      "changes": 475,
+      "changes": 4,
       "categories": {
-        "cli": 2,
+        "cli": 1,
         "config": 1,
-        "filesystem": 8,
-        "telemetry": 464
+        "telemetry": 2
       },
       "impact": {
         "breaking": 0,
-        "degrading": 38,
-        "informational": 268,
-        "notable": 169
+        "degrading": 0,
+        "informational": 4,
+        "notable": 0
       },
-      "undocumented": 474,
+      "undocumented": 3,
       "highlights": [
-        "Telemetry surface no longer sent: logs/codex.api_request",
-        "Telemetry surface no longer sent: logs/codex.conversation_starts",
-        "Telemetry surface no longer sent: logs/codex.sse_event"
+        "Telemetry export.interval_ms.logs changed: 1000 → 500",
+        "Telemetry surfaces.traces/auth.parents.traces/load_with_cli_overrides added",
+        "Full help text of `completion -h` changed (+105 −0 chars)"
       ],
       "signing": "valid"
     },
     {
       "version": "0.167.1",
       "released_at": "2026-11-10T21:39:51.99Z",
-      "captured_at": "2026-11-11T23:00:33.595186074Z",
+      "captured_at": "2026-11-12T05:15:55.281711967Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"
       ],
       "support": "supported",
       "previous": "0.167.0",
-      "changes": 8,
+      "changes": 263,
       "categories": {
-        "cli": 2,
         "config": 1,
-        "filesystem": 5
+        "filesystem": 7,
+        "telemetry": 255
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 8,
+        "informational": 263,
         "notable": 0
       },
-      "undocumented": 8,
+      "undocumented": 263,
       "highlights": [
-        "Description of `codex cloud` changed",
-        "Full help text of `cloud --help` changed (+88 −0 chars)",
-        "New setting: features.incremental_tools_legacy"
+        "Telemetry export added",
+        "Telemetry surfaces.metrics/codex.api_request.monotonic added",
+        "Telemetry surfaces.metrics/codex.api_request.temporality added"
       ],
       "signing": "valid"
     },
@@ -101,24 +99,24 @@
       ],
       "support": "supported",
       "previous": "0.166.0",
-      "changes": 27,
+      "changes": 28,
       "categories": {
         "cli": 6,
         "config": 12,
-        "filesystem": 8,
+        "filesystem": 9,
         "prompt": 1
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 21,
-        "notable": 6
+        "informational": 26,
+        "notable": 2
       },
-      "undocumented": 17,
+      "undocumented": 18,
       "highlights": [
         "Injected context changed (+47 −53 chars)",
         "New setting: model_providers.<name>.gateway_oauth.credentials_store",
-        "New command at turn: `/proc/self/exe --codex-run-as-process-setup <n> <n> pipe  <repo> <install>/codex codex-linux-sandbox …` (linux/amd64)"
+        "Description of `codex agents` changed"
       ],
       "signing": "valid"
     },
@@ -162,51 +160,50 @@
       ],
       "support": "supported",
       "previous": "0.164.0",
-      "changes": 11,
+      "changes": 207,
       "categories": {
         "config": 9,
-        "telemetry": 2
+        "telemetry": 198
       },
       "impact": {
         "breaking": 0,
-        "degrading": 1,
-        "informational": 10,
+        "degrading": 0,
+        "informational": 207,
         "notable": 0
       },
-      "undocumented": 10,
+      "undocumented": 198,
       "highlights": [
-        "Telemetry surface no longer sent: traces/codex.turn_input/events/event otel/src/events/session_telemetry.rs",
-        "New telemetry surface: traces/run_hooks_and_record_inputs/events/event otel/src/events/session_telemetry.rs (18 fields)",
-        "New setting: auto_review.timeout_ms"
+        "New telemetry surface: logs/codex.api_request (19 fields)",
+        "New telemetry surface: logs/codex.conversation_starts (19 fields)",
+        "New telemetry surface: logs/codex.sse_event (19 fields)"
       ],
       "signing": "valid"
     },
     {
       "version": "0.164.0",
       "released_at": "2026-10-23T04:52:29.24Z",
-      "captured_at": "2026-11-05T09:54:28.532441Z",
+      "captured_at": "2026-11-12T05:15:55.281711967Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"
       ],
       "support": "supported",
       "previous": "0.163.0",
-      "changes": 286,
+      "changes": 89,
       "categories": {
         "behavior": 7,
         "binary": 1,
         "cli": 18,
         "config": 59,
-        "filesystem": 4,
-        "telemetry": 197
+        "filesystem": 4
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 273,
+        "informational": 76,
         "notable": 13
       },
-      "undocumented": 229,
+      "undocumented": 54,
       "highlights": [
         "Behaviour: compaction tools changed: 0 → 11",
         "Behaviour: subagents system 4 text changed",
@@ -217,7 +214,7 @@
     {
       "version": "0.163.0",
       "released_at": "2026-10-15T21:37:11.083Z",
-      "captured_at": "2026-11-11T05:17:29.64320186Z",
+      "captured_at": "2026-11-12T05:15:55.281711967Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"
@@ -249,7 +246,7 @@
     {
       "version": "0.162.1",
       "released_at": "2026-10-09T19:50:30.512Z",
-      "captured_at": "2026-11-11T05:17:29.64320186Z",
+      "captured_at": "2026-11-12T05:15:55.281711967Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"
@@ -276,33 +273,33 @@
     {
       "version": "0.162.0",
       "released_at": "2026-10-08T19:01:18.07Z",
-      "captured_at": "2026-11-11T05:17:29.64320186Z",
+      "captured_at": "2026-11-12T05:15:55.281711967Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"
       ],
       "support": "supported",
       "previous": "0.161.0",
-      "changes": 31,
+      "changes": 32,
       "categories": {
         "behavior": 1,
         "cli": 8,
         "config": 17,
         "prompt": 1,
-        "telemetry": 2,
+        "telemetry": 3,
         "tools": 2
       },
       "impact": {
         "breaking": 0,
-        "degrading": 0,
+        "degrading": 1,
         "informational": 24,
         "notable": 7
       },
-      "undocumented": 16,
+      "undocumented": 17,
       "highlights": [
+        "Telemetry surface no longer sent: traces/codex.turn_input/events/event otel/src/events/session_telemetry.rs",
         "System prompt changed (+201 −230 chars)",
-        "exec tool description changed (+3383 −0 chars)",
-        "collaboration/spawn_agent tool parameter fork_turns: description changed (+126 −148 chars)"
+        "exec tool description changed (+3383 −0 chars)"
       ],
       "signing": "valid"
     },

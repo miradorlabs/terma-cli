@@ -14,13 +14,12 @@
     "last_change": {
       "from": "2.1.321",
       "to": "2.1.322",
-      "at": "2026-11-11T23:00:33.595186074Z",
+      "at": "2026-11-12T05:15:55.281711967Z",
       "released_at": "2026-11-10T01:58:41.811Z",
-      "changes": 3,
+      "changes": 19,
       "categories": {
         "config": 1,
-        "hooks": 1,
-        "network": 1
+        "telemetry": 18
       }
     }
   },
@@ -28,30 +27,29 @@
     {
       "version": "2.1.322",
       "released_at": "2026-11-10T01:58:41.811Z",
-      "captured_at": "2026-11-11T23:00:33.595186074Z",
+      "captured_at": "2026-11-12T05:15:55.281711967Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"
       ],
       "support": "supported",
       "previous": "2.1.321",
-      "changes": 3,
+      "changes": 19,
       "categories": {
         "config": 1,
-        "hooks": 1,
-        "network": 1
+        "telemetry": 18
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 2,
-        "notable": 1
+        "informational": 19,
+        "notable": 0
       },
-      "undocumented": 3,
+      "undocumented": 19,
       "highlights": [
-        "New vendor telemetry event: tengu_startup_timing",
-        "FileChanged hook environment variable CLAUDE_ENV_FILE: <claude-config>/session-env/<uuid>/filechanged-hook-0.sh → <claude-config>/session-env/<session>/filechanged-hook-0.sh",
-        "fastMode description changed (+132 −72 chars)"
+        "Telemetry export added",
+        "Telemetry surfaces.metrics/claude_code.active_time.total.monotonic added",
+        "Telemetry surfaces.metrics/claude_code.active_time.total.temporality added"
       ],
       "signing": "valid"
     },
@@ -507,14 +505,14 @@
       ],
       "support": "supported",
       "previous": "2.1.303",
-      "changes": 83,
+      "changes": 84,
       "categories": {
         "behavior": 12,
         "cli": 9,
         "config": 17,
         "filesystem": 2,
         "hooks": 11,
-        "network": 1,
+        "network": 2,
         "prompt": 17,
         "request": 1,
         "tools": 13
@@ -523,7 +521,7 @@
         "breaking": 0,
         "degrading": 0,
         "informational": 38,
-        "notable": 45
+        "notable": 46
       },
       "undocumented": 39,
       "highlights": [

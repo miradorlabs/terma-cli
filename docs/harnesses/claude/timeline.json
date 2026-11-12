@@ -7,10 +7,146 @@
       "previous": "2.1.321",
       "changes": [
         {
-          "id": "hooks.events.FileChanged.env_paths.CLAUDE_ENV_FILE",
-          "category": "hooks",
-          "op": "changed",
-          "title": "FileChanged hook environment variable CLAUDE_ENV_FILE: <claude-config>/session-env/<uuid>/filechanged-hook-0.sh → <claude-config>/session-env/<session>/filechanged-hook-0.sh",
+          "id": "telemetry.export",
+          "category": "telemetry",
+          "op": "added",
+          "title": "Telemetry export added",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/claude_code.active_time.total.monotonic",
+          "category": "telemetry",
+          "op": "added",
+          "title": "Telemetry surfaces.metrics/claude_code.active_time.total.monotonic added",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/claude_code.active_time.total.temporality",
+          "category": "telemetry",
+          "op": "added",
+          "title": "Telemetry surfaces.metrics/claude_code.active_time.total.temporality added",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/claude_code.active_time.total.type",
+          "category": "telemetry",
+          "op": "added",
+          "title": "Telemetry surfaces.metrics/claude_code.active_time.total.type added",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/claude_code.active_time.total.unit",
+          "category": "telemetry",
+          "op": "added",
+          "title": "Telemetry surfaces.metrics/claude_code.active_time.total.unit added",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/claude_code.cost.usage.monotonic",
+          "category": "telemetry",
+          "op": "added",
+          "title": "Telemetry surfaces.metrics/claude_code.cost.usage.monotonic added",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/claude_code.cost.usage.temporality",
+          "category": "telemetry",
+          "op": "added",
+          "title": "Telemetry surfaces.metrics/claude_code.cost.usage.temporality added",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/claude_code.cost.usage.type",
+          "category": "telemetry",
+          "op": "added",
+          "title": "Telemetry surfaces.metrics/claude_code.cost.usage.type added",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/claude_code.cost.usage.unit",
+          "category": "telemetry",
+          "op": "added",
+          "title": "Telemetry surfaces.metrics/claude_code.cost.usage.unit added",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/claude_code.session.count.monotonic",
+          "category": "telemetry",
+          "op": "added",
+          "title": "Telemetry surfaces.metrics/claude_code.session.count.monotonic added",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/claude_code.session.count.temporality",
+          "category": "telemetry",
+          "op": "added",
+          "title": "Telemetry surfaces.metrics/claude_code.session.count.temporality added",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/claude_code.session.count.type",
+          "category": "telemetry",
+          "op": "added",
+          "title": "Telemetry surfaces.metrics/claude_code.session.count.type added",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/claude_code.token.usage.monotonic",
+          "category": "telemetry",
+          "op": "added",
+          "title": "Telemetry surfaces.metrics/claude_code.token.usage.monotonic added",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/claude_code.token.usage.temporality",
+          "category": "telemetry",
+          "op": "added",
+          "title": "Telemetry surfaces.metrics/claude_code.token.usage.temporality added",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/claude_code.token.usage.type",
+          "category": "telemetry",
+          "op": "added",
+          "title": "Telemetry surfaces.metrics/claude_code.token.usage.type added",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/claude_code.token.usage.unit",
+          "category": "telemetry",
+          "op": "added",
+          "title": "Telemetry surfaces.metrics/claude_code.token.usage.unit added",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/claude_code.interaction.root",
+          "category": "telemetry",
+          "op": "added",
+          "title": "Telemetry surfaces.traces/claude_code.interaction.root added",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/claude_code.llm_request.parent",
+          "category": "telemetry",
+          "op": "added",
+          "title": "Telemetry surfaces.traces/claude_code.llm_request.parent added",
           "impact": "informational",
           "documented": false
         },
@@ -20,14 +156,6 @@
           "op": "changed",
           "title": "fastMode description changed (+132 −72 chars)",
           "impact": "informational",
-          "documented": false
-        },
-        {
-          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_startup_timing",
-          "category": "network",
-          "op": "added",
-          "title": "New vendor telemetry event: tengu_startup_timing",
-          "impact": "notable",
           "documented": false
         }
       ]
@@ -3473,6 +3601,14 @@
           "category": "network",
           "op": "added",
           "title": "New vendor telemetry event: tengu_deferred_tools_pool_change",
+          "impact": "notable",
+          "documented": true
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_headless_latency",
+          "category": "network",
+          "op": "removed",
+          "title": "Vendor telemetry event no longer sent: tengu_headless_latency",
           "impact": "notable",
           "documented": true
         },

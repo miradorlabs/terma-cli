@@ -3,7 +3,7 @@
   "harness": "dsh",
   "version": "0.2.2-rc.1",
   "platform": "darwin/arm64",
-  "captured_at": "2026-11-11T05:17:29.64320186Z",
+  "captured_at": "2026-11-12T05:15:55.281711967Z",
   "capture": {
     "command": [
       "dsh",
@@ -15,12 +15,12 @@
       "The first turn ran behind a local proxy that answers every other request empty: the build used the feature flags it ships with. What live flags changed is under live."
     ],
     "sections": {
-      "behavior": "2026-11-11T05:17:29.64320186Z",
+      "behavior": "2026-11-12T05:15:55.281711967Z",
       "binary": "2026-11-10T05:19:19.197557181Z",
       "caching": "2026-11-10T05:19:19.197557181Z",
       "cli": "2026-11-10T05:19:19.197557181Z",
       "config": "2026-11-10T05:19:19.197557181Z",
-      "model": "2026-11-11T05:17:29.64320186Z",
+      "model": "2026-11-12T05:15:55.281711967Z",
       "prompt": "2026-11-10T05:19:19.197557181Z",
       "request": "2026-11-10T05:19:19.197557181Z",
       "side_requests": "2026-11-10T05:19:19.197557181Z",
@@ -399,7 +399,7 @@
               "preset": "workspace-write"
             },
             "seq": 0,
-            "time": 1794372394785,
+            "time": 1794458749914,
             "type": "permission/preset"
           },
           {
@@ -407,7 +407,7 @@
               "mode": "workspace-write"
             },
             "seq": 1,
-            "time": 1794372394787,
+            "time": 1794458749926,
             "type": "sandbox/mode"
           },
           {
@@ -415,7 +415,7 @@
               "policy": "ask"
             },
             "seq": 2,
-            "time": 1794372394787,
+            "time": 1794458749927,
             "type": "approval/policy"
           },
           {
@@ -439,7 +439,7 @@
               "target": "next-turn"
             },
             "seq": 3,
-            "time": 1794372394788,
+            "time": 1794458749930,
             "type": "agent/inbox/spliced"
           },
           {
@@ -447,7 +447,7 @@
               "turn": 1
             },
             "seq": 4,
-            "time": 1794372394789,
+            "time": 1794458749932,
             "type": "turn/start"
           },
           {
@@ -458,7 +458,7 @@
               "target": "next-turn"
             },
             "seq": 5,
-            "time": 1794372394789,
+            "time": 1794458749933,
             "type": "agent/inbox/spliced"
           },
           {
@@ -467,7 +467,7 @@
               "turn": 1
             },
             "seq": 6,
-            "time": 1794372394860,
+            "time": 1794458750033,
             "type": "step/start"
           },
           {
@@ -490,7 +490,7 @@
             },
             "seq": 7,
             "surfaceOp": "append",
-            "time": 1794372394863,
+            "time": 1794458750036,
             "type": "system/message"
           },
           {
@@ -509,7 +509,7 @@
             },
             "seq": 8,
             "surfaceOp": "append",
-            "time": 1794372394863,
+            "time": 1794458750036,
             "type": "user/message"
           },
           {
@@ -543,7 +543,7 @@
             },
             "seq": 9,
             "surfaceOp": "append",
-            "time": 1794372394864,
+            "time": 1794458750037,
             "type": "user/message"
           },
           {
@@ -1179,7 +1179,7 @@
               "reason": "initial"
             },
             "seq": 10,
-            "time": 1794372394865,
+            "time": 1794458750037,
             "type": "request/header"
           },
           {
@@ -1190,7 +1190,7 @@
               "systemPromptUpdate": "in-history"
             },
             "seq": 11,
-            "time": 1794372394866,
+            "time": 1794458750038,
             "type": "request/context"
           },
           {
@@ -1204,7 +1204,7 @@
               "title": "<prompt>"
             },
             "seq": 12,
-            "time": 1794372394871,
+            "time": 1794458750040,
             "type": "session/title"
           },
           {
@@ -1237,12 +1237,12 @@
               "titleProvider": "session-title-first-prompt-llm"
             },
             "seq": 13,
-            "time": 1794372394873,
+            "time": 1794458750041,
             "type": "session/title-llm-request"
           }
         ],
         "session": {
-          "createdAt": 1794372394779,
+          "createdAt": 1794458749901,
           "cwd": "<repo>",
           "id": "session-<uuid>",
           "version": 4
@@ -1974,9 +1974,9 @@
         "429": {
           "attempts": 4,
           "backoff_ms": [
-            2,
-            2055,
-            2030
+            0,
+            2079,
+            2064
           ],
           "failed": 3,
           "failed_first": 3,
@@ -1988,9 +1988,9 @@
         "529": {
           "attempts": 4,
           "backoff_ms": [
-            2,
-            2057,
-            2030
+            0,
+            2078,
+            2073
           ],
           "failed": 3,
           "failed_first": 3,

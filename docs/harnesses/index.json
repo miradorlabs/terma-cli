@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-11T23:00:33.595186074Z",
+  "generated_at": "2026-11-12T05:15:55.281711967Z",
   "harnesses": [
     {
       "id": "claude",
@@ -16,13 +16,12 @@
       "last_change": {
         "from": "2.1.321",
         "to": "2.1.322",
-        "at": "2026-11-11T23:00:33.595186074Z",
+        "at": "2026-11-12T05:15:55.281711967Z",
         "released_at": "2026-11-10T01:58:41.811Z",
-        "changes": 3,
+        "changes": 19,
         "categories": {
           "config": 1,
-          "hooks": 1,
-          "network": 1
+          "telemetry": 18
         }
       }
     },
@@ -60,20 +59,19 @@
       },
       "changelog": "https://github.com/openai/codex/releases",
       "latest": "0.167.2",
-      "support": "untested",
+      "support": "supported",
       "versions_tracked": 103,
       "first_tracked": "2026-01-25",
       "last_change": {
         "from": "0.167.1",
         "to": "0.167.2",
-        "at": "2026-11-11T23:00:33.595186074Z",
+        "at": "2026-11-12T05:15:55.281711967Z",
         "released_at": "2026-11-11T22:50:04.191Z",
-        "changes": 475,
+        "changes": 4,
         "categories": {
-          "cli": 2,
+          "cli": 1,
           "config": 1,
-          "filesystem": 8,
-          "telemetry": 464
+          "telemetry": 2
         }
       }
     },
@@ -110,7 +108,7 @@
       "last_change": {
         "from": "1.0.108",
         "to": "1.0.109",
-        "at": "2026-11-11T05:17:29.64320186Z",
+        "at": "2026-11-12T05:15:55.281711967Z",
         "released_at": "2026-11-10T17:01:16.753Z",
         "changes": 55,
         "categories": {
@@ -137,7 +135,7 @@
       "last_change": {
         "from": "0.2.1-rc.5",
         "to": "0.2.2-rc.1",
-        "at": "2026-11-11T05:17:29.64320186Z",
+        "at": "2026-11-12T05:15:55.281711967Z",
         "released_at": "2026-11-04T09:20:32.31Z",
         "changes": 116,
         "categories": {
@@ -168,15 +166,15 @@
       "last_change": {
         "from": "0.67.0",
         "to": "0.68.0",
-        "at": "2026-11-11T23:00:33.595186074Z",
+        "at": "2026-11-12T05:15:55.281711967Z",
         "released_at": "2026-11-10T21:22:49.277Z",
-        "changes": 13,
+        "changes": 38,
         "categories": {
           "config": 3,
           "hooks": 1,
-          "network": 7,
           "request": 1,
-          "storage": 1
+          "storage": 1,
+          "telemetry": 32
         }
       }
     },
@@ -232,7 +230,7 @@
       "last_change": {
         "from": "1.19.4",
         "to": "1.19.5",
-        "at": "2026-11-11T05:17:29.64320186Z",
+        "at": "2026-11-12T05:15:55.281711967Z",
         "released_at": "2026-10-28T06:17:11.1Z",
         "changes": 0,
         "categories": {}
@@ -256,7 +254,7 @@
       "last_change": {
         "from": "1.5.1",
         "to": "1.5.2",
-        "at": "2026-11-11T05:17:29.64320186Z",
+        "at": "2026-11-12T05:15:55.281711967Z",
         "released_at": "2026-11-10T12:24:55.226Z",
         "changes": 0,
         "categories": {}

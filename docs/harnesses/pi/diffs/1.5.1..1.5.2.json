@@ -3,7 +3,7 @@
   "harness": "pi",
   "from": "1.5.1",
   "to": "1.5.2",
-  "generated_at": "2026-11-11T05:17:29.64320186Z",
+  "generated_at": "2026-11-12T05:15:55.281711967Z",
   "source": {
     "compare": "https://github.com/earendil-works/pi/compare/v1.5.1...v1.5.2"
   },

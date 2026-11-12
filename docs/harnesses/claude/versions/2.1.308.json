@@ -9525,7 +9525,6 @@
           "tengu_feature_bad",
           "tengu_feature_sad",
           "tengu_fork_subagent_enabled",
-          "tengu_headless_latency",
           "tengu_headless_plugin_install",
           "tengu_input_prompt",
           "tengu_managed_config_ready",

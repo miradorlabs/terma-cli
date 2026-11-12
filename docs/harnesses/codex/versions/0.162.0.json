@@ -3,7 +3,7 @@
   "harness": "codex",
   "version": "0.162.0",
   "platform": "darwin/arm64",
-  "captured_at": "2026-11-11T05:17:29.64320186Z",
+  "captured_at": "2026-11-12T05:15:55.281711967Z",
   "capture": {
     "command": [
       "codex",
@@ -48,7 +48,7 @@
       "side_requests": "2026-11-05T02:11:01.502194Z",
       "storage": "2026-11-05T02:11:01.502194Z",
       "support": "2026-11-05T02:11:01.502194Z",
-      "telemetry": "2026-11-11T05:17:29.64320186Z",
+      "telemetry": "2026-11-12T05:15:55.281711967Z",
       "tools": "2026-11-05T02:11:01.502194Z"
     }
   },
@@ -568,118 +568,6 @@
   },
   "telemetry": {
     "surfaces": {
-      "traces/codex.turn_input/events/event otel/src/events/session_telemetry.rs": {
-        "keys": {
-          "app.version": {
-            "class": "safe",
-            "kinds": [
-              "text"
-            ]
-          },
-          "auth_mode": {
-            "class": "safe",
-            "kinds": [
-              "text"
-            ]
-          },
-          "code.file.path": {
-            "class": "safe",
-            "kinds": [
-              "text"
-            ]
-          },
-          "code.line.number": {
-            "class": "safe",
-            "kinds": [
-              "number"
-            ]
-          },
-          "code.module.name": {
-            "class": "safe",
-            "kinds": [
-              "text"
-            ]
-          },
-          "conversation.id": {
-            "class": "safe",
-            "kinds": [
-              "text"
-            ]
-          },
-          "event.name": {
-            "class": "safe",
-            "kinds": [
-              "text"
-            ]
-          },
-          "event.timestamp": {
-            "class": "safe",
-            "kinds": [
-              "text"
-            ]
-          },
-          "image_input_count": {
-            "class": "unclassified",
-            "kinds": [
-              "number"
-            ]
-          },
-          "level": {
-            "class": "safe",
-            "kinds": [
-              "text"
-            ]
-          },
-          "local_image_input_count": {
-            "class": "unclassified",
-            "kinds": [
-              "number"
-            ]
-          },
-          "model": {
-            "class": "safe",
-            "kinds": [
-              "text"
-            ]
-          },
-          "originator": {
-            "class": "safe",
-            "kinds": [
-              "text"
-            ]
-          },
-          "prompt_length": {
-            "class": "safe",
-            "kinds": [
-              "number"
-            ]
-          },
-          "slug": {
-            "class": "safe",
-            "kinds": [
-              "text"
-            ]
-          },
-          "target": {
-            "class": "safe",
-            "kinds": [
-              "text"
-            ]
-          },
-          "terminal.type": {
-            "class": "safe",
-            "kinds": [
-              "text"
-            ]
-          },
-          "text_input_count": {
-            "class": "unclassified",
-            "kinds": [
-              "number"
-            ]
-          }
-        }
-      },
       "traces/handle_tool_call_with_source/events/codex.tool_result_ready": {
         "keys": {
           "call_id": {

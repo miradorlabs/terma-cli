@@ -3,7 +3,7 @@
   "harness": "claude",
   "from": "2.1.311",
   "to": "2.1.312",
-  "generated_at": "2026-11-11T05:17:29.64320186Z",
+  "generated_at": "2026-11-12T05:15:55.281711967Z",
   "source": null,
   "changelog": {
     "url": "https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md",

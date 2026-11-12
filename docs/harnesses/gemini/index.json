@@ -18,15 +18,15 @@
     "last_change": {
       "from": "0.67.0",
       "to": "0.68.0",
-      "at": "2026-11-11T23:00:33.595186074Z",
+      "at": "2026-11-12T05:15:55.281711967Z",
       "released_at": "2026-11-10T21:22:49.277Z",
-      "changes": 13,
+      "changes": 38,
       "categories": {
         "config": 3,
         "hooks": 1,
-        "network": 7,
         "request": 1,
-        "storage": 1
+        "storage": 1,
+        "telemetry": 32
       }
     }
   },
@@ -34,27 +34,27 @@
     {
       "version": "0.68.0",
       "released_at": "2026-11-10T21:22:49.277Z",
-      "captured_at": "2026-11-11T23:00:33.595186074Z",
+      "captured_at": "2026-11-12T05:15:55.281711967Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "supported",
       "previous": "0.67.0",
-      "changes": 13,
+      "changes": 38,
       "categories": {
         "config": 3,
         "hooks": 1,
-        "network": 7,
         "request": 1,
-        "storage": 1
+        "storage": 1,
+        "telemetry": 32
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 2,
-        "notable": 11
+        "informational": 34,
+        "notable": 4
       },
-      "undocumented": 12,
+      "undocumented": 36,
       "highlights": [
         "Request endpoint changed",
         "Default of modelConfigs: {\"aliases\":{\"agent-history-provider-summarizer\":{\"modelCo… → {\"aliases\":{\"agent-history-provider-summarizer\":{\"modelCo…",

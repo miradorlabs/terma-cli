@@ -12766,8 +12766,7 @@
         },
         "unobserved": [
           "tengu_cache_eviction_hint",
-          "tengu_feature_sad",
-          "tengu_headless_latency"
+          "tengu_feature_sad"
         ]
       }
     }
