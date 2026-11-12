@@ -2,6 +2,7 @@ package routing
 
 import (
 	"cmp"
+	"maps"
 	"slices"
 	"time"
 )
@@ -83,8 +84,8 @@ type Decision struct {
 	Blocked TeamState
 }
 
-// Router routes against one routing state, each team's entries read once: a caller that
-// routes many records keeps one per state it loads.
+// Router routes against one routing state, each team's entries read once: a caller keeps
+// one per state it loads, and compiles a new one when it loads a new generation.
 type Router struct {
 	s     State
 	teams []compiled
@@ -97,8 +98,10 @@ type compiled struct {
 	wild  []Entry
 }
 
-// NewRouter compiles s for routing.
+// NewRouter compiles s for routing. It keeps its own copy, so changing s afterwards never
+// changes what the router decides.
 func NewRouter(s State) *Router {
+	s.Teams, s.Bindings = slices.Clone(s.Teams), maps.Clone(s.Bindings)
 	r := &Router{s: s, teams: make([]compiled, len(s.Teams))}
 	for i, t := range s.Teams {
 		c := compiled{exact: map[string]Entry{}}
@@ -132,9 +135,6 @@ func (r *Router) match(i int, repo string) (Entry, bool) {
 	}
 	return Entry{}, false
 }
-
-// Route is where a record that ran at loc goes, under s at now. See Router.Route.
-func Route(loc Location, s State, now time.Time) Decision { return NewRouter(s).Route(loc, now) }
 
 // Route is where a record that ran at loc goes: the first selected team whose policy
 // matches it, organizations before personal. An organization sends only what the
@@ -229,20 +229,14 @@ func (s State) unknownToPersonal(now time.Time) bool {
 		!s.boundToAnOrganization()
 }
 
-// OrganizationOf is the organization a location belongs to, under s at now. See
-// Router.OrganizationOf.
-func OrganizationOf(loc Location, s State, now time.Time) (org string, pending, ok bool) {
-	return NewRouter(s).OrganizationOf(loc, now)
-}
-
 // OrganizationOf is the organization a location belongs to, for telling when a run
 // crosses organizations: the one its repository is bound to, else the one of the team
 // Route sends or holds it for, personal included. A pending repository belongs to no
 // organization a run can share, so it reports pending. False when nothing collects or
-// binds it.
+// binds it, and for a repository that names no repository, as Route holds it.
 func (r *Router) OrganizationOf(loc Location, now time.Time) (org string, pending, ok bool) {
-	if loc.Kind == Repository {
-		if a := r.s.decided(Normalize(loc.Repository)); a.Kind == Bound {
+	if repo := Normalize(loc.Repository); loc.Kind == Repository && validRepo(repo) {
+		if a := r.s.decided(repo); a.Kind == Bound {
 			return a.Organization, false, true
 		}
 	}

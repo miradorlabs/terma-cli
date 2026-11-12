@@ -7,32 +7,46 @@ import (
 )
 
 // Normalize is the one form binding keys, policy entries and repositories are compared
-// in: gitx.RepositoryID's `host/path`, with the host lowercased without scheme, port or
-// credentials and the path without `.git` or a trailing slash, from scp, `https://`,
-// `ssh://` and bare `host/path` forms alike; then lowercased whole, as
-// config.Policy.Admits compares ignoring case. "" for what names no hosted repository.
+// in: lowercased whole, as config.Policy.Admits compares ignoring case, then
+// gitx.RepositoryID's `host/path`, without scheme, port, credentials, `.git` or a
+// trailing slash, from scp, `https://`, `ssh://` and bare `host/path` forms alike. It is
+// idempotent. "" for what names no hosted repository, including anything still
+// percent-encoded, which no two readers would decode alike.
 func Normalize(s string) string {
-	s = strings.TrimSpace(s)
+	s = strings.ToLower(strings.TrimSpace(s))
 	id := gitx.RepositoryID(s)
 	if id == "" && !strings.Contains(s, "://") {
 		id = gitx.RepositoryID("https://" + s)
 	}
-	return strings.ToLower(id)
+	if strings.Contains(id, "%") {
+		return ""
+	}
+	return id
 }
 
 // segments counts the path segments of a normalised key, host included; 0 if one is
-// empty.
+// empty, `.` or `..`.
 func segments(key string) int {
 	if key == "" {
 		return 0
 	}
 	parts := strings.Split(key, "/")
 	for _, p := range parts {
-		if p == "" {
+		if p == "" || p == "." || p == ".." {
 			return 0
 		}
 	}
 	return len(parts)
+}
+
+// emptySegment reports whether raw, as typed, has an empty path segment, which
+// Normalize would fold away: an entry or a binding key with one is refused, not
+// reinterpreted.
+func emptySegment(raw string) bool {
+	if _, rest, ok := strings.Cut(raw, "://"); ok {
+		raw = rest
+	}
+	return strings.Contains(raw, "//")
 }
 
 // validRepo reports whether a normalised key names a repository: a host, an owner and a
@@ -78,6 +92,9 @@ type Entry struct {
 // has, as an older reader takes it. `github.com/*`, `*` and `github.com/acme/terma-*`
 // are never wildcards. False for an entry that is neither.
 func ParseEntry(raw string, wildcards bool) (Entry, bool) {
+	if emptySegment(raw) {
+		return Entry{}, false
+	}
 	norm := Normalize(raw)
 	if prefix, ok := strings.CutSuffix(norm, "/*"); wildcards && ok {
 		if n := segments(prefix); n >= 2 && !strings.Contains(prefix, "*") {

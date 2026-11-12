@@ -39,9 +39,15 @@ func TestOneNormaliserForEveryForm(t *testing.T) {
 		}
 	}
 	bad := fixture(t)
-	for _, key := range []string{"git@github.com:acme/*", "github.com/acme//secret"} {
+	if err := bad.Bind("git@github.com:acme/*", "acme", false); err == nil {
+		t.Error("bound a wildcard")
+	}
+	for _, key := range []string{"github.com/acme//secret", "github.com/acme/../secret", "github.com/./acme/x"} {
 		if err := bad.Bind(key, "acme", false); err == nil {
 			t.Errorf("bound %q", key)
+		}
+		if _, ok := ParseEntry(key, true); ok {
+			t.Errorf("parsed %q as an entry", key)
 		}
 	}
 	bad.Bindings = map[string]Binding{"git@github.com:acme": {Organization: "acme"}}
@@ -54,6 +60,35 @@ func TestOneNormaliserForEveryForm(t *testing.T) {
 	}
 }
 
+// Normalize is idempotent, so a key stored normalised compares equal to every reading of
+// it: `.GIT` strips like `.git`, and percent-encoding names no repository.
+func TestNormalizeIsIdempotent(t *testing.T) {
+	t.Parallel()
+	for _, form := range []string{
+		"git@github.com:acme/secret", "git@github.com:Acme/Secret.git", "https://github.com/acme/api.GIT",
+		"git@github.com:acme/api.Git", "https://user:token@github.com:443/acme/secret", "ssh://git@github.com/acme/secret",
+		"github.com:443/acme/secret", "user@github.com/acme/secret", "GitHub.com/ACME/secret/", "github.com/acme/*",
+		"github.com/a%2541/b", "gitlab.com/acme/platform/api",
+	} {
+		once := Normalize(form)
+		if twice := Normalize(once); twice != once {
+			t.Errorf("Normalize(%q) = %q, but again %q", form, once, twice)
+		}
+	}
+	if Normalize("github.com/a%2541/b") != "" {
+		t.Error("a percent-encoded path named a repository")
+	}
+	s := fixture(t, team("acme", "acme-platform", "github.com/acme/api"), personal())
+	must(t, s.Unbind("github.com/acme"))
+	must(t, s.Bind("github.com/acme/api.GIT", "acme", false))
+	for _, origin := range []string{"https://github.com/acme/api.GIT", "git@github.com:acme/api.Git"} {
+		expect(t, s, repo(origin), Send, "acme-platform")
+	}
+	if err := s.check(); err != nil {
+		t.Fatal(err)
+	}
+}
+
 // What the reviewer found unpinned: blocked teams hold rather than pass on, ties keep
 // the developer's order, and nothing malformed or personal-bound reaches personal.
 func TestRouteEdges(t *testing.T) {
@@ -63,7 +98,7 @@ func TestRouteEdges(t *testing.T) {
 		s.Teams[2].SignInNeeded = true
 		expect(t, s, repo("github.com/dawson/side"), Hold, "personal")
 		expect(t, s, Location{Kind: OutsideGit}, Hold, "personal")
-		if d := Route(Location{Kind: OutsideGit}, *s, now); d.Reason != ReasonBlocked || d.Blocked != SignInNeeded {
+		if d := NewRouter(*s).Route(Location{Kind: OutsideGit}, now); d.Reason != ReasonBlocked || d.Blocked != SignInNeeded {
 			t.Errorf("a blocked hold said %s/%s", d.Reason, d.Blocked)
 		}
 	})
@@ -85,16 +120,40 @@ func TestRouteEdges(t *testing.T) {
 			expect(t, alone, repo(r), Hold, "")
 		}
 	})
-	t.Run("nothing is bound to the personal organization", func(t *testing.T) {
+	t.Run("nothing is bound to the personal organization, in either order", func(t *testing.T) {
 		if err := fixture(t).Bind("github.com/dawson", "me", false); err == nil {
 			t.Fatal("bound an owner to the personal organization")
+		}
+		before := &State{Profile: "default"}
+		must(t, before.Bind("github.com/dawson", "me", false))
+		if _, err := before.Select(personal()); err == nil {
+			t.Fatal("ticked personal while an owner was bound to it")
+		}
+		s := fixture(t)
+		s.Bindings["github.com/dawson"] = Binding{Organization: "me"}
+		if s.check() == nil {
+			t.Fatal("check accepted a binding to the personal organization")
+		}
+	})
+	t.Run("a router keeps its own copy of the state", func(t *testing.T) {
+		s := fixture(t)
+		r := NewRouter(*s)
+		must(t, s.Refuse("github.com/acme"))
+		s.Teams[0].Refusals = 2
+		if d := r.Route(repo("github.com/acme/api"), now); d.Outcome != Send {
+			t.Fatalf("changing the state after compiling changed the route: %+v", d)
+		}
+	})
+	t.Run("OrganizationOf holds a repository that names none, as Route does", func(t *testing.T) {
+		if _, _, ok := NewRouter(*fixture(t)).OrganizationOf(repo("github.com/acme"), now); ok {
+			t.Fatal("a two-segment origin belonged to an organization")
 		}
 	})
 	t.Run("a pending hold names the binding to decide", func(t *testing.T) {
 		s := fixture(t)
 		s.Teams[1].Policy.Repositories = append(s.Teams[1].Policy.Repositories, "github.com/dawson/*", "github.com/torvalds/linux")
 		for r, key := range map[string]string{"github.com/dawson/side": "github.com/dawson", "github.com/torvalds/linux": "github.com/torvalds/linux"} {
-			if d := Route(repo(r), *s, now); d.Reason != ReasonPending || d.Authority.Key != key {
+			if d := NewRouter(*s).Route(repo(r), now); d.Reason != ReasonPending || d.Authority.Key != key {
 				t.Errorf("Route(%s) held for %q (%s), want %q", r, d.Authority.Key, d.Reason, key)
 			}
 		}
