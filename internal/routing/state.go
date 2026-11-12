@@ -171,6 +171,11 @@ func (s *State) Select(t Team) (string, error) {
 			return "", errors.New("only one personal team can be selected")
 		}
 	}
+	for key, b := range s.Bindings {
+		if t.Personal && b.Organization == t.OrganizationID {
+			return "", fmt.Errorf("%s is bound to the personal organization: unbind it first", key)
+		}
+	}
 	id, err := newEnrollmentID()
 	if err != nil {
 		return "", err
@@ -221,6 +226,9 @@ func (s State) check() error {
 		}
 		if b.Refused == (b.Organization != "") {
 			return fmt.Errorf("binding %q must be either refused or bound to one organization", key)
+		}
+		if n := len(s.Teams); n > 0 && s.Teams[n-1].Personal && b.Organization == s.Teams[n-1].OrganizationID {
+			return fmt.Errorf("binding %q names the personal organization", key)
 		}
 	}
 	return nil

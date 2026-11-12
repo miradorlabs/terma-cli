@@ -3,7 +3,6 @@ package routing
 import (
 	"errors"
 	"fmt"
-	"strings"
 )
 
 // Binding is the developer's decision about an owner or a repository: bound to one
@@ -136,11 +135,7 @@ func (s *State) set(key string, b Binding) {
 // any form Normalize reads; a wildcard is never one, and an empty segment is refused
 // rather than folded away.
 func bindingKey(raw string) (string, error) {
-	_, rest, scheme := strings.Cut(raw, "://")
-	if !scheme {
-		rest = raw
-	}
-	if key := Normalize(raw); !strings.Contains(rest, "//") && (isOwnerKey(key) || validRepo(key)) {
+	if key := Normalize(raw); !emptySegment(raw) && (isOwnerKey(key) || validRepo(key)) {
 		return key, nil
 	}
 	return "", fmt.Errorf("%q is neither an owner (host/owner) nor a repository (host/owner/name)", raw)

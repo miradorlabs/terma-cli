@@ -68,7 +68,7 @@ func repo(r string) Location { return Location{Kind: Repository, Repository: r} 
 // expect routes loc and checks the outcome and, unless want is "", the team.
 func expect(t *testing.T, s *State, loc Location, outcome Outcome, want string) {
 	t.Helper()
-	d := Route(loc, *s, now)
+	d := NewRouter(*s).Route(loc, now)
 	got := ""
 	if d.EnrollmentID != "" {
 		got = s.team(d.EnrollmentID).TeamID
@@ -259,17 +259,17 @@ func TestOrganizationOf(t *testing.T) {
 		{repo("github.com/dawson/side"), "me", false, true},
 		{Location{Kind: OutsideGit}, "me", false, true},
 	} {
-		org, pending, ok := OrganizationOf(c.loc, *s, now)
+		org, pending, ok := NewRouter(*s).OrganizationOf(c.loc, now)
 		if org != c.org || pending != c.pending || ok != c.ok {
 			t.Errorf("OrganizationOf(%+v) = %q, %v, %v; want %q, %v, %v", c.loc, org, pending, ok, c.org, c.pending, c.ok)
 		}
 	}
 	s.Teams[1].Policy.Repositories = append(s.Teams[1].Policy.Repositories, "github.com/dawson/*")
-	if _, pending, ok := OrganizationOf(repo("github.com/dawson/side"), *s, now); !pending || !ok {
+	if _, pending, ok := NewRouter(*s).OrganizationOf(repo("github.com/dawson/side"), now); !pending || !ok {
 		t.Error("a pending repository did not report pending")
 	}
 	narrowed := fixture(t, team("acme", "acme-platform", "github.com/acme/*"), personal("github.com/dawson/terma"))
-	if _, _, ok := OrganizationOf(repo("github.com/dawson/side"), *narrowed, now); ok {
+	if _, _, ok := NewRouter(*narrowed).OrganizationOf(repo("github.com/dawson/side"), now); ok {
 		t.Error("a location nothing collects or binds belongs to an organization")
 	}
 }
