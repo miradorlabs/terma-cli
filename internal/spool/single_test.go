@@ -191,8 +191,8 @@ func TestIdleWaitsForASender(t *testing.T) {
 	}
 }
 
-// A settle and an append of the same length leave the queue as long as it was, and still
-// another state of it.
+// A settle and an append of the same length leave the queue as long as it was, and, its
+// time put back, as old: still another state of it, by the file's identity.
 func TestAStampSeesASettleAndAnEqualAppend(t *testing.T) {
 	s, err := Open(t.TempDir())
 	if err != nil {
@@ -212,7 +212,11 @@ func TestAStampSeesASettleAndAnEqualAppend(t *testing.T) {
 	if err := s.Append(Event{Name: "c", Time: at}); err != nil {
 		t.Fatal(err)
 	}
-	if now := s.Stamp(); now.size != stamp.size || now.Same(stamp) {
-		t.Fatalf("sizes %d and %d; same %v", now.size, stamp.size, now.Same(stamp))
+	// The same size and, put back, the same time: only the file's identity tells them apart.
+	if err := os.Chtimes(s.path(), stamp.mod, stamp.mod); err != nil {
+		t.Fatal(err)
+	}
+	if now := s.Stamp(); now.size != stamp.size || !now.mod.Equal(stamp.mod) || now.Same(stamp) {
+		t.Fatalf("sizes %d and %d, times %v and %v; same %v", now.size, stamp.size, now.mod, stamp.mod, now.Same(stamp))
 	}
 }
