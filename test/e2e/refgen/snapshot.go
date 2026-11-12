@@ -457,8 +457,9 @@ func hasFirstTurn(p e2e.Profile) bool {
 // mergeTelemetry is the telemetry section with what tonight measured over old's, and old's where
 // tonight did not measure it (refdiff.TelemetryMeasured): a night with the census alone keeps
 // the probe's export and metric types from before, and one with the probe alone (the frequent
-// check) keeps every surface and its keys. Without this, a render with less evidence than the
-// last took the published findings for gone.
+// check) keeps every surface and its keys, and a surface tonight's probe did not see keeps the
+// findings of the probe that did. Without this, a render with less evidence than the last took
+// the published findings for gone.
 func mergeTelemetry(old, tonight any) any {
 	o, _ := old.(map[string]any)
 	t, _ := tonight.(map[string]any)
@@ -468,8 +469,8 @@ func mergeTelemetry(old, tonight any) any {
 	oc, op := refdiff.TelemetryMeasured(o)
 	tc, tp := refdiff.TelemetryMeasured(t)
 	keepKeys, keepProbe := oc && !tc, op && !tp
-	if !keepKeys && !keepProbe {
-		return tonight
+	if !keepKeys && !op {
+		return tonight // old has nothing tonight did not measure
 	}
 	out := maps.Clone(t)
 	if e, ok := o["export"]; ok && keepProbe {
@@ -503,8 +504,9 @@ func mergeTelemetry(old, tonight any) any {
 		if keys, ok := was["keys"]; ok && keepKeys {
 			s["keys"] = keys
 		}
-		if keepProbe {
-			// Tonight measured no probe findings at all (TelemetryMeasured), so none is replaced.
+		if !refdiff.Probed(s) {
+			// Tonight's probe did not see the surface (or did not run): what its turn did not
+			// make keeps the findings of the turn that did.
 			for _, f := range refdiff.ProbeFields {
 				if v, ok := was[f]; ok {
 					s[f] = v

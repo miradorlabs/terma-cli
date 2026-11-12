@@ -8,8 +8,9 @@ import "maps"
 // one without the other: the frequent check ran the probe alone, and an older capture predates
 // the probe. So two builds' telemetry is compared only in the parts both captures measured. What
 // one did not measure is not observed there: never a surface "no longer sent", nor an export
-// "added". Which surfaces a build sends is the census's to say: what a probe saw depends on what
-// its turn did.
+// "added". Which surfaces a build sends is the census's to say where there is one; a harness the
+// census never covers (Copilot) has its probe's. A surface's probe findings are compared where both
+// probes saw it: what a probe saw depends on what its turn did.
 
 // ProbeFields are what the telemetry probe adds to a surface.
 var ProbeFields = []string{"type", "unit", "temporality", "monotonic", "parent", "parents", "root"}
@@ -30,17 +31,29 @@ func TelemetryMeasured(t map[string]any) (census, probe bool) {
 
 // comparableTelemetry are copies of a's and b's telemetry sections holding only what both
 // captures measured: the census's keys where both have a census, the probe's findings where
-// both ran the probe, and the surfaces both have unless both took the census.
+// both probes saw the surface, and every surface where both listed them the same way (a census
+// on both sides, or a probe on both and a census on neither), else the surfaces both have.
 func comparableTelemetry(a, b map[string]any) (map[string]any, map[string]any) {
 	ac, ap := TelemetryMeasured(a)
 	bc, bp := TelemetryMeasured(b)
-	m := measuredByBoth{keys: ac && bc, probe: ap && bp, sameSurfaces: ac && bc}
+	m := measuredByBoth{keys: ac && bc, probe: ap && bp, sameSurfaces: (ac && bc) || (!ac && !bc && ap && bp)}
 	return m.strip(a, b), m.strip(b, a)
 }
 
 // measuredByBoth is what two captures both measured: the census's keys, the probe's findings,
-// and which surfaces are sent (both took the census).
+// and which surfaces are sent.
 type measuredByBoth struct{ keys, probe, sameSurfaces bool }
+
+// Probed says whether the probe saw surface s: it has a probe field (a metric's type, a span's
+// place). A log has none, seen or not.
+func Probed(s map[string]any) bool {
+	for _, f := range ProbeFields {
+		if _, ok := s[f]; ok {
+			return true
+		}
+	}
+	return false
+}
 
 // strip is a copy of telemetry t without what m says t's capture alone measured, beside other's.
 func (m measuredByBoth) strip(t, other map[string]any) map[string]any {
@@ -58,22 +71,24 @@ func (m measuredByBoth) strip(t, other map[string]any) map[string]any {
 	others, _ := other["surfaces"].(map[string]any)
 	kept := map[string]any{}
 	for name, raw := range surfaces {
-		if _, both := others[name]; m.sameSurfaces || both {
+		o, both := others[name].(map[string]any)
+		if m.sameSurfaces || both {
 			s, _ := raw.(map[string]any)
-			kept[name] = m.stripSurface(s)
+			kept[name] = m.stripSurface(s, both && Probed(s) && Probed(o))
 		}
 	}
 	out["surfaces"] = kept
 	return out
 }
 
-// stripSurface is a copy of surface s with only what both captures measured.
-func (m measuredByBoth) stripSurface(s map[string]any) map[string]any {
+// stripSurface is a copy of surface s with only what both captures measured, its probe findings
+// where both probes saw it.
+func (m measuredByBoth) stripSurface(s map[string]any, bothProbed bool) map[string]any {
 	c := maps.Clone(s)
 	if !m.keys {
 		delete(c, "keys")
 	}
-	if !m.probe {
+	if !m.probe || !bothProbed {
 		for _, f := range ProbeFields {
 			delete(c, f)
 		}
