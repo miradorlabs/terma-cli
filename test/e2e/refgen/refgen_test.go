@@ -1382,11 +1382,12 @@ func TestCaptureWholeness(t *testing.T) {
 		return []HistoryEntry{{Harness: id.harness, Version: id.version, Platform: "darwin/arm64", Capability: "relay.telemetry", Result: "pass"}}
 	}
 	for _, c := range []struct {
-		name    string
-		id      buildID
-		nights  []night
-		partial bool
-		notes   []string
+		name      string
+		id        buildID
+		nights    []night
+		partial   bool
+		truncated bool
+		notes     []string
 	}{
 		{name: "a profiled build whose first turn never ran (its download failed) is partial", id: claude,
 			nights: []night{{attempted: []buildID{claude}, history: rows(claude)}}, partial: true, notes: []string{failedNote}},
@@ -1396,6 +1397,9 @@ func TestCaptureWholeness(t *testing.T) {
 			nights: []night{{attempted: []buildID{claude}, profiles: []e2e.Profile{cut}}, {attempted: []buildID{claude}, profiles: []e2e.Profile{whole}}}},
 		{name: "a T3 page stays partial in a run that did not set out to capture it", id: t3,
 			nights: []night{{attempted: []buildID{t3}, unfinished: []buildID{t3}}, {history: rows(t3)}}, partial: true, notes: []string{unfinishedNote}},
+		{name: "a page that never took a turn takes a truncated one's, truncated", id: claude,
+			nights:  []night{{attempted: []buildID{claude}, history: rows(claude)}, {attempted: []buildID{claude}, profiles: []e2e.Profile{cut}}},
+			partial: true, truncated: true, notes: []string{failedNote}},
 		{name: "a partial page's note is its latest attempt's", id: claude,
 			nights:  []night{{attempted: []buildID{claude}, unfinished: []buildID{claude}, history: rows(claude)}, {attempted: []buildID{claude}, history: rows(claude)}},
 			partial: true, notes: []string{failedNote}},
@@ -1414,8 +1418,11 @@ func TestCaptureWholeness(t *testing.T) {
 				t.Fatal(err)
 			}
 			notes := slices.DeleteFunc(slices.Clone(s.Capture.Notes), func(n string) bool { return !isPartialNote(n) })
-			if s.Capture.Partial != c.partial || s.Capture.Truncated || !slices.Equal(notes, c.notes) {
-				t.Errorf("capture = %+v; want partial %v, not truncated, notes %q", s.Capture, c.partial, c.notes)
+			if s.Capture.Partial != c.partial || s.Capture.Truncated != c.truncated || !slices.Equal(notes, c.notes) {
+				t.Errorf("capture = %+v; want partial %v, truncated %v, notes %q", s.Capture, c.partial, c.truncated, c.notes)
+			}
+			if c.truncated && len(s.Capture.Command) == 0 {
+				t.Errorf("a page of a truncated turn without its command: %+v", s.Capture)
 			}
 		})
 	}

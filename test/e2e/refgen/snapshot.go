@@ -361,7 +361,9 @@ func merge(old, tonight *Snapshot, now time.Time) *Snapshot {
 	if out.Capture.Sections == nil {
 		out.Capture.Sections = map[string]time.Time{}
 	}
-	keepWhole := tonight.Capture.Truncated && !old.Capture.Truncated
+	// A page keeps its sections from a truncated turn only where a whole turn took them: one
+	// whose capture never took a turn (its download failed) takes the truncated one's.
+	keepWhole := tonight.Capture.Truncated && !old.Capture.Truncated && len(old.Capture.Command) > 0
 	ot, tt := out.Tree(), tonight.Tree()
 	if tt["filesystem"] != nil {
 		tt["filesystem"] = mergeFilesystem(ot["filesystem"], tt["filesystem"])

@@ -105,8 +105,11 @@ jobs:
     runs-on: macos-latest
     timeout-minutes: 90
     environment: live-harnesses
+    # copilot-requests lets Copilot CLI's capture run on this job's own token, its AI credits
+    # billed to the organization, as in CI's copilot shard.
     permissions:
       contents: read
+      copilot-requests: write
     steps:
       # No token left in .git/config: this job runs vendor builds, and pushes nothing.
       - uses: actions/checkout@v7
