@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -31,7 +32,9 @@ type Pending struct {
 // Stamp is one state of the queue file: its size, its modification time and the file
 // itself, which every rewrite replaces (an atomic rename). An append changes the first two,
 // a settle the third, so no change is missed, an equal-length append after a settle
-// included.
+// included. It is taken from an open file (stampOf): on Windows that alone records the
+// file's identity as it was, where a stat by path leaves os.SameFile to look it up later,
+// at whatever the path names by then.
 type Stamp struct {
 	size int64
 	mod  time.Time
@@ -47,9 +50,19 @@ func (a Stamp) Same(b Stamp) bool {
 	return a.size == b.size && a.mod.Equal(b.mod) && os.SameFile(a.file, b.file)
 }
 
-// Stamp is the queue as it stands now: one stat.
+// Stamp is the queue as it stands now: one open and stat.
 func (s *Spool) Stamp() Stamp {
-	info, err := os.Stat(s.path())
+	f, err := os.Open(s.path())
+	if err != nil {
+		return Stamp{}
+	}
+	defer f.Close()
+	return stampOf(f)
+}
+
+// stampOf is the Stamp of the open file f.
+func stampOf(f *os.File) Stamp {
+	info, err := f.Stat()
 	if err != nil {
 		return Stamp{}
 	}
@@ -72,12 +85,17 @@ func (s *Spool) Read(ctx context.Context, now time.Time) ([]Pending, Stamp, Resu
 	if res.Pruned, err = s.prune(); err != nil {
 		return nil, Stamp{}, res, err
 	}
-	// Taken under the lock every append and rewrite takes, before the read: it is what was read.
-	stamp := s.Stamp()
-	data, err := os.ReadFile(s.path())
+	f, err := os.Open(s.path())
 	if errors.Is(err, fs.ErrNotExist) {
 		return nil, Stamp{}, res, nil
 	}
+	if err != nil {
+		return nil, Stamp{}, res, err
+	}
+	// Taken under the lock every append and rewrite takes, from the file read: what was read.
+	stamp := stampOf(f)
+	data, err := io.ReadAll(f)
+	_ = f.Close()
 	if err != nil {
 		return nil, Stamp{}, res, err
 	}
@@ -185,16 +203,6 @@ func (s *Spool) rewrite(ps []Pending, tail []byte) error {
 		data = append(bytes.Clone(data[:at]), data[at+len(p.line):]...)
 	}
 	return config.WriteFileAtomicNoSync(s.path(), append(data, tail...), fileMode)
-}
-
-// Size is the queue file's size in bytes, 0 when there is none: one stat, for a sender
-// deciding whether anything was queued since it last looked.
-func (s *Spool) Size() int64 {
-	info, err := os.Stat(s.path())
-	if err != nil {
-		return 0
-	}
-	return info.Size()
 }
 
 // lineAt is where line, a whole line with its newline, first starts a line of data; -1

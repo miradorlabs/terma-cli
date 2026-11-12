@@ -191,23 +191,6 @@ func TestIdleWaitsForASender(t *testing.T) {
 	}
 }
 
-// Size grows with what is queued, one stat.
-func TestSize(t *testing.T) {
-	s, err := Open(t.TempDir())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if s.Size() != 0 {
-		t.Fatal("an empty spool has a size")
-	}
-	if err := s.Append(Event{Name: "x"}); err != nil {
-		t.Fatal(err)
-	}
-	if s.Size() == 0 {
-		t.Fatal("a queued event has no size")
-	}
-}
-
 // A settle and an append of the same length leave the queue as long as it was, and still
 // another state of it.
 func TestAStampSeesASettleAndAnEqualAppend(t *testing.T) {
