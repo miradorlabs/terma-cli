@@ -1349,3 +1349,54 @@ func TestRetryKeepsAWholeTurnOfAPartialPage(t *testing.T) {
 		t.Errorf("the page no longer says it is partial: %+v", s.Capture)
 	}
 }
+
+// When a capture is whole, partial or neither (a page already whole), and what its page then says.
+func TestCaptureWholeness(t *testing.T) {
+	claude := buildID{"claude", "1.0.0"}
+	t3 := buildID{"t3", "0.1.9"}
+	whole := claudeProfile("1.0.0", "Be brief.", []string{"Bash"}, "", "")
+	cut := claudeProfile("1.0.0", "Truncated.", []string{"Bash"}, "", "")
+	cut.Failed = true
+	files := e2e.Profile{Harness: "claude", Version: "1.0.0", Platform: "linux/amd64", Scenario: "TestClaudeProfileFiles", Failed: true}
+	rows := func(id buildID) []HistoryEntry {
+		return []HistoryEntry{{Harness: id.harness, Version: id.version, Platform: "darwin/arm64", Capability: "relay.telemetry", Result: "pass"}}
+	}
+	for _, c := range []struct {
+		name    string
+		id      buildID
+		nights  []night
+		partial bool
+		notes   []string
+	}{
+		{name: "a profiled build whose first turn never ran (its download failed) is partial", id: claude,
+			nights: []night{{attempted: []buildID{claude}, history: rows(claude)}}, partial: true, notes: []string{failedNote}},
+		{name: "a whole page stays whole under a capture that failed beside it", id: claude,
+			nights: []night{{attempted: []buildID{claude}, profiles: []e2e.Profile{whole}}, {attempted: []buildID{claude}, profiles: []e2e.Profile{whole, files}}}},
+		{name: "a truncated page made whole by a whole retry", id: claude,
+			nights: []night{{attempted: []buildID{claude}, profiles: []e2e.Profile{cut}}, {attempted: []buildID{claude}, profiles: []e2e.Profile{whole}}}},
+		{name: "a T3 page stays partial in a run that did not set out to capture it", id: t3,
+			nights: []night{{attempted: []buildID{t3}, unfinished: []buildID{t3}}, {history: rows(t3)}}, partial: true, notes: []string{unfinishedNote}},
+		{name: "a partial page's note is its latest attempt's", id: claude,
+			nights:  []night{{attempted: []buildID{claude}, unfinished: []buildID{claude}, history: rows(claude)}, {attempted: []buildID{claude}, history: rows(claude)}},
+			partial: true, notes: []string{failedNote}},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			dir := t.TempDir()
+			at := time.Now()
+			for _, n := range c.nights {
+				n.now, at = at, at.Add(7*time.Hour)
+				if _, err := publish(dir, n, options{}); err != nil {
+					t.Fatal(err)
+				}
+			}
+			var s Snapshot
+			if err := readJSON(filepath.Join(dir, c.id.harness, "versions", c.id.version+".json"), &s); err != nil {
+				t.Fatal(err)
+			}
+			notes := slices.DeleteFunc(slices.Clone(s.Capture.Notes), func(n string) bool { return !isPartialNote(n) })
+			if s.Capture.Partial != c.partial || s.Capture.Truncated || !slices.Equal(notes, c.notes) {
+				t.Errorf("capture = %+v; want partial %v, not truncated, notes %q", s.Capture, c.partial, c.notes)
+			}
+		})
+	}
+}

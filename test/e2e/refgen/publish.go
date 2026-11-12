@@ -201,21 +201,23 @@ func publish(dir string, n night, opt options) ([]Announcement, error) {
 			}
 			merged.Capture.Attempts++
 		}
+		// A capture is whole when every job of it finished, no scenario of it failed, and it took
+		// the build's first turn, which a scenario that failed before it recorded anything (the
+		// build's download, its sandbox) leaves untaken; a harness no profile scenario captures
+		// (T3) has its terma checks alone. A page already whole stays whole: a capture that failed
+		// beside it (a run by hand overlapping the schedule) takes nothing it lacked.
+		unfinished := slices.Contains(n.unfinished, id)
+		failed := n.failedScenario(id)
+		firstTurn := len(tonight.Capture.Command) > 0 || metaOf(id.harness).unprofiled
 		switch {
-		case slices.Contains(n.unfinished, id):
-			// A job of the run that did not finish took less of the build than it set out to.
+		case old != nil && !old.Capture.Partial && (unfinished || failed || attempted && !firstTurn):
+		case unfinished:
 			markPartial(merged, unfinishedNote)
-		case n.failedScenario(id):
-			// A scenario of the capture failed (a files profile, a census): its job wrote its
-			// results all the same, but took less of the build than it set out to.
+		case failed, attempted && !firstTurn:
 			markPartial(merged, failedNote)
 		case attempted && !tonight.Capture.Partial:
-			// Every job finished and what tonight took is whole: so is the build, though no
-			// profile replaced the capture's own (T3, which has no profile scenario).
 			merged.Capture.Partial = false
-			merged.Capture.Notes = slices.DeleteFunc(merged.Capture.Notes, func(note string) bool {
-				return note == failedNote || note == unfinishedNote
-			})
+			merged.Capture.Notes = slices.DeleteFunc(merged.Capture.Notes, isPartialNote)
 		}
 		if old == nil || !sameSections(old, merged) {
 			changed[id] = true
@@ -835,13 +837,14 @@ func markUnobservedEvents(versions []string, byVersion map[string]*Snapshot) {
 	}
 }
 
-// markPartial marks s partial, saying why.
+// markPartial marks s partial, saying why its latest attempt was.
 func markPartial(s *Snapshot, note string) {
 	s.Capture.Partial = true
-	if !slices.Contains(s.Capture.Notes, note) {
-		s.Capture.Notes = append(s.Capture.Notes, note)
-	}
+	s.Capture.Notes = append(slices.DeleteFunc(s.Capture.Notes, isPartialNote), note)
 }
+
+// isPartialNote reports one of the notes a partial capture carries.
+func isPartialNote(note string) bool { return note == failedNote || note == unfinishedNote }
 
 // failedScenario reports a scenario of the night that failed for the build: any of its profiles
 // (the first turn's, a probe's, a platform's files profile) or its field census.
