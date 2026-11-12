@@ -10,10 +10,13 @@ import (
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/config"
+	"github.com/miradorlabs/terma-cli/internal/flock"
 )
 
 // Per-destination retry windows, so one refused project does not hold back the others.
-// Only a Sender inside Flush writes them: the delivery lock makes the read-edit-rename safe.
+// Two senders can write them at once (the image lane's takes the delivery lock per image,
+// not around its windows), so each read-edit-rename holds the windows' own lock
+// (editWindows).
 
 const retryFile = "retry.json"
 
@@ -85,26 +88,47 @@ func (s *Spool) DestinationStalled(dest string, now time.Time) time.Time {
 // openWindow opens or doubles dest's window, to until at least, saying whether a stall
 // opened it.
 func (s *Spool) openWindow(dest string, now time.Time, stalled bool, until time.Time) time.Time {
-	windows := s.loadRetryWindows()
-	wait := minBackoff
-	if prev := windows[dest].Wait; prev > 0 {
-		wait = time.Duration(prev) * time.Second * 2
-	}
-	wait = min(wait, maxBackoff)
-	next := now.Add(min(max(wait, until.Sub(now)), maxBackoff))
-	windows[dest] = retryWindow{Next: next.Unix(), Wait: int64(wait / time.Second), Stalled: stalled}
-	s.saveRetryWindows(windows, now)
+	var next time.Time
+	s.editWindows(now, func(windows map[string]retryWindow) bool {
+		wait := minBackoff
+		if prev := windows[dest].Wait; prev > 0 {
+			wait = time.Duration(prev) * time.Second * 2
+		}
+		wait = min(wait, maxBackoff)
+		next = now.Add(min(max(wait, until.Sub(now)), maxBackoff))
+		windows[dest] = retryWindow{Next: next.Unix(), Wait: int64(wait / time.Second), Stalled: stalled}
+		return true
+	})
 	return time.Unix(next.Unix(), 0)
 }
 
 // DestinationDelivered closes dest's window.
 func (s *Spool) DestinationDelivered(dest string, now time.Time) {
-	windows := s.loadRetryWindows()
-	if _, ok := windows[dest]; !ok {
-		return
+	s.editWindows(now, func(windows map[string]retryWindow) bool {
+		if _, ok := windows[dest]; !ok {
+			return false
+		}
+		delete(windows, dest)
+		return true
+	})
+}
+
+// editWindows reads the windows, has edit change them, and saves them when it says so,
+// holding the windows' lock throughout, so a window another sender opens meanwhile is never
+// lost. A lock that cannot be had in ackTimeout still lets the edit through, unguarded: at
+// worst it loses another's window, which only brings that retry forward, where dropping
+// the edit would lose this one.
+func (s *Spool) editWindows(now time.Time, edit func(map[string]retryWindow) bool) {
+	rmw := func() error {
+		windows := s.loadRetryWindows()
+		if edit(windows) {
+			s.saveRetryWindows(windows, now)
+		}
+		return nil
 	}
-	delete(windows, dest)
-	s.saveRetryWindows(windows, now)
+	if flock.Locked(filepath.Join(s.dir, retryFile), ackTimeout, rmw) != nil {
+		_ = rmw()
+	}
 }
 
 // RetryWindows lists the destinations whose window is open at now, with each one's end.

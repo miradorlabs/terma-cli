@@ -3,8 +3,10 @@ package spool
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -218,5 +220,68 @@ func TestAStampSeesASettleAndAnEqualAppend(t *testing.T) {
 	}
 	if now := s.Stamp(); now.size != stamp.size || !now.mod.Equal(stamp.mod) || now.Same(stamp) {
 		t.Fatalf("sizes %d and %d, times %v and %v; same %v", now.size, stamp.size, now.mod, stamp.mod, now.Same(stamp))
+	}
+}
+
+// Senders writing windows at once lose none of each other's.
+func TestWindowsWrittenAtOnceAreAllKept(t *testing.T) {
+	s, err := Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now()
+	var wg sync.WaitGroup
+	for i := range 40 {
+		wg.Go(func() { s.DestinationFailed(fmt.Sprint("p", i), now) })
+	}
+	wg.Wait()
+	if n := len(s.RetryWindows(now)); n != 40 {
+		t.Fatalf("%d of 40 windows kept", n)
+	}
+}
+
+// Take finds a line where Read found it, after an append, and elsewhere after a rewrite;
+// one settled meanwhile is not queued.
+func TestTakeFindsTheLineWhereverItIs(t *testing.T) {
+	s, err := Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	at := time.Now()
+	if err := s.Append(Event{Name: "a", Time: at}, Event{Name: "b", Time: at}, Event{Name: "c", Time: at}); err != nil {
+		t.Fatal(err)
+	}
+	events, _, _, err := s.Read(t.Context(), at)
+	if err != nil {
+		t.Fatal(err)
+	}
+	take := func(p Pending) error {
+		release, err := s.Take(t.Context(), p)
+		if err == nil {
+			release()
+		}
+		return err
+	}
+	if err := s.Append(Event{Name: "d", Time: at}); err != nil {
+		t.Fatal(err)
+	}
+	if err := take(events[2]); err != nil {
+		t.Fatalf("after an append: %v", err)
+	}
+	if err := s.Settle(events[0]); err != nil {
+		t.Fatal(err)
+	}
+	if err := take(events[2]); err != nil {
+		t.Fatalf("after a rewrite moved it: %v", err)
+	}
+	if err := take(events[0]); !errors.Is(err, ErrNotQueued) {
+		t.Fatalf("a settled event's take = %v", err)
+	}
+	if err := s.Settle(events[1]); err != nil {
+		t.Fatal(err)
+	}
+	// c now sits where a stood: a line at a's offset is not a's.
+	if err := take(events[0]); !errors.Is(err, ErrNotQueued) {
+		t.Fatalf("a settled event at another's offset: %v", err)
 	}
 }

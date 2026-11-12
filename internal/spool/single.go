@@ -25,7 +25,9 @@ import (
 type Pending struct {
 	Event
 	line []byte
-	// read is the queue as Read saw it, which Take compares before it reads again.
+	// at is where Read found the line in the queue, which Take looks at first; read is the
+	// queue as Read saw it, which Take compares before it reads anything.
+	at   int64
 	read Stamp
 }
 
@@ -107,6 +109,7 @@ func (s *Spool) Read(ctx context.Context, now time.Time) ([]Pending, Stamp, Resu
 		if idx < 0 {
 			break // a line still being written stays as it is
 		}
+		at := int64(len(data) - len(rest))
 		line := rest[:idx+1]
 		rest = rest[idx+1:]
 		if len(bytes.TrimSpace(line)) == 0 {
@@ -121,7 +124,7 @@ func (s *Spool) Read(ctx context.Context, now time.Time) ([]Pending, Stamp, Resu
 			res.Expired++
 			continue
 		}
-		events = append(events, Pending{Event: e, line: line})
+		events = append(events, Pending{Event: e, line: line, at: at})
 		kept = append(kept, line...)
 	}
 	if res.Dropped > 0 || res.Expired > 0 {
@@ -129,6 +132,12 @@ func (s *Spool) Read(ctx context.Context, now time.Time) ([]Pending, Stamp, Resu
 			return nil, Stamp{}, res, err
 		}
 		stamp = s.Stamp()
+		// The rewrite keeps the events in order, without what it dropped.
+		var at int64
+		for i := range events {
+			events[i].at = at
+			at += int64(len(events[i].line))
+		}
 	}
 	for i := range events {
 		events[i].read = stamp
@@ -143,8 +152,9 @@ func (s *Spool) Take(ctx context.Context, p Pending) (release func(), err error)
 	if err != nil {
 		return nil, err
 	}
-	if p.read.file != nil && p.read.Same(s.Stamp()) {
-		// Nothing appended or rewritten since Read: p is still queued.
+	if p.read.file != nil && p.read.Same(s.Stamp()) || s.lineAtOffset(p) {
+		// Nothing appended or rewritten since Read, or p's line is where Read found it: p is
+		// still queued, without reading the queue.
 		return unlock, nil
 	}
 	data, err := os.ReadFile(s.path())
@@ -203,6 +213,24 @@ func (s *Spool) rewrite(ps []Pending, tail []byte) error {
 		data = append(bytes.Clone(data[:at]), data[at+len(p.line):]...)
 	}
 	return config.WriteFileAtomicNoSync(s.path(), append(data, tail...), fileMode)
+}
+
+// lineAtOffset reports whether p's line still starts a line where Read found it.
+func (s *Spool) lineAtOffset(p Pending) bool {
+	f, err := os.Open(s.path())
+	if err != nil {
+		return false
+	}
+	defer f.Close()
+	from := max(p.at-1, 0)
+	buf := make([]byte, p.at-from+int64(len(p.line)))
+	if _, err := f.ReadAt(buf, from); err != nil {
+		return false
+	}
+	if p.at > 0 && buf[0] != '\n' {
+		return false
+	}
+	return bytes.Equal(buf[p.at-from:], p.line)
 }
 
 // lineAt is where line, a whole line with its newline, first starts a line of data; -1
