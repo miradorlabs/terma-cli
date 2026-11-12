@@ -54,12 +54,12 @@ func compare(a, b *Snapshot) []Change {
 			continue
 		}
 		if sec == "telemetry" {
-			if a, ok := at[sec].(map[string]any); ok {
-				if b, ok := bt[sec].(map[string]any); ok {
-					a, b = comparableTelemetry(a, b) // the parts both captures measured (telemetry.go)
-					diffValue([]string{sec}, a, b, &out)
-					continue
-				}
+			ta, aok := at[sec].(map[string]any)
+			tb, bok := bt[sec].(map[string]any)
+			if aok && bok {
+				ta, tb = comparableTelemetry(ta, tb) // the parts both captures measured (telemetry.go)
+				diffValue([]string{sec}, ta, tb, &out)
+				continue
 			}
 		}
 		if a, b, ok := configs(sec, at[sec], bt[sec]); ok {

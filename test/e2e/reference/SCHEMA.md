@@ -301,13 +301,16 @@ scenarios) gives every surface the build sent with a key, with its `keys`; the t
 `interval_ms` and the `interval_batches` it rests on) and the `type`, `unit`, `temporality`,
 `monotonic`, `parent`, `parents` and `root` of each surface its turn made. A capture can hold
 one without the other: the frequent check ran the probe alone, and a capture older than the
-probe has none of its fields. Which surfaces are sent is the census's to say: a surface the
-probe alone saw (a metric without attributes) is not listed.
+probe has none of its fields. Which surfaces are sent is the census's to say where there is
+one: a surface the probe alone saw (a metric without attributes) is not listed. A harness the
+census never covers (Copilot) lists what its probe saw.
 
 Two builds' telemetry is compared only in what both captures measured: keys where both have a
-census, the probe's fields and `export` where both ran the probe, and which surfaces exist only
-where both have a census. What one did not measure is not observed there, never a surface "no
-longer sent" or an export "added". `interval_batches` is the run's, and an
+census, `export` where both ran the probe and a surface's probe fields where both probes saw it
+(what a probe sees is what its turn made), and which surfaces exist where both listed them the
+same way, a census on both sides or a probe on both and a census on neither. What one did not
+measure is not observed there, never a surface "no longer sent" or an export "added". A capture
+whose probe did not see a surface keeps the findings of the one that did. `interval_batches` is the run's, and an
 interval is compared only where both rest on at least two batches: from one, it is a stall's.
 
 ### hooks

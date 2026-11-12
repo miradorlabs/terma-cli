@@ -61,11 +61,19 @@ func TestTelemetryComparesWhatBothMeasured(t *testing.T) {
 	if got := telemetryTitles(telemetrySnapshot(t, "1", probeOnly), telemetrySnapshot(t, "2", monotonic)); len(got) != 1 {
 		t.Errorf("a probe finding both probes measured, changed: %q", got)
 	}
-	// What a probe saw is what its turn made: a surface one probe saw and the other did not is
-	// not "no longer sent" without a census on both sides.
-	moreTurn := strings.Replace(probeOnly, `"surfaces":{`, `"surfaces":{"metrics/codex.tool_calls":{"type":"sum"},`, 1)
-	if got := telemetryTitles(telemetrySnapshot(t, "1", moreTurn), telemetrySnapshot(t, "2", probeOnly)); len(got) > 0 {
-		t.Errorf("a surface one probe alone saw: %q", got)
+	// A harness the census never covers (Copilot) lists its surfaces by its probe: one the
+	// newer build's probe no longer saw is no longer sent.
+	more := strings.Replace(probeOnly, `"surfaces":{`, `"surfaces":{"metrics/codex.tool_calls":{"type":"sum"},`, 1)
+	if got := telemetryTitles(telemetrySnapshot(t, "1", more), telemetrySnapshot(t, "2", probeOnly)); len(got) != 1 || !strings.Contains(got[0], "metrics/codex.tool_calls") {
+		t.Errorf("a surface both probes, and no census, listed, gone: %q", got)
+	}
+	// A surface both censuses list that one probe's turn did not make has no probe findings
+	// there: its type is not "removed".
+	unseen := strings.Replace(census, `"keys":{},"type":"sum","monotonic":true`, `"keys":{}`, 1)
+	for _, pair := range [][2]string{{census, unseen}, {unseen, census}} {
+		if got := telemetryTitles(telemetrySnapshot(t, "1", pair[0]), telemetrySnapshot(t, "2", pair[1])); len(got) > 0 {
+			t.Errorf("a surface one probe alone saw, both censuses listing it: %q", got)
+		}
 	}
 	newKey := strings.Replace(censusOnly, `"keys":{}`, `"keys":{"turn":{"kinds":["int"],"class":"safe"}}`, 1)
 	if got := telemetryTitles(telemetrySnapshot(t, "1", census), telemetrySnapshot(t, "2", newKey)); len(got) != 1 {
