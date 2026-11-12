@@ -88,13 +88,16 @@ for entry in "${harnesses[@]}"; do
 	echo "$harness=$(paste -sd, - <<<"$new")"
 done
 
-# The desktop apps (TERMA_E2E_<APP>_APP_VERSIONS), by the update feed each one's updater reads:
-# Claude Desktop's Squirrel RELEASES.json names its current release alone, the Codex app's
-# Sparkle appcast every release. Only the newest is the frequent check's: the app's update feed
-# is all there is to fetch an app by, and an older release than the newest is the night's.
+# The harnesses published by an update feed rather than a registry, by the feed their updater
+# reads: the desktop apps' (TERMA_E2E_<APP>_APP_VERSIONS), Claude Desktop's Squirrel
+# RELEASES.json naming its current release alone, the Codex app's Sparkle appcast every release;
+# and Muse's channel (TERMA_E2E_MUSE_VERSIONS), its current build alone. Only the newest is the
+# frequent check's: the feed is all there is to fetch a build by, and an older one than the
+# newest is the night's.
 desktop=(
 	"claude-desktop https://downloads.claude.ai/releases/darwin/universal/RELEASES.json squirrel"
 	"codex-desktop https://persistent.oaistatic.com/codex-app-prod/appcast.xml sparkle"
+	"muse https://api.meta.ai/muse-code/channels/muse-stable channel"
 )
 for entry in "${desktop[@]}"; do
 	read -r harness feed kind <<<"$entry"
@@ -104,6 +107,8 @@ for entry in "${desktop[@]}"; do
 	fi
 	if [ "$kind" = squirrel ]; then
 		newest=$(jq -r '.releases[].updateTo.version // empty' <<<"$doc" | vsort | tail -n 1)
+	elif [ "$kind" = channel ]; then
+		newest=$(jq -r '.version // empty' <<<"$doc" | grep -E '^[0-9A-Za-z][0-9A-Za-z.+_-]*$' || true)
 	else
 		newest=$(grep -o '<sparkle:shortVersionString>[^<]*' <<<"$doc" | sed 's/.*>//' | vsort | tail -n 1)
 	fi

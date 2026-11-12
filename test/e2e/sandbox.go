@@ -73,6 +73,8 @@ type Sandbox struct {
 	Codex  Binary
 	// ClaudeBaseURL is set only by scenarios using a synthetic loopback provider.
 	ClaudeBaseURL string
+	// MuseBaseURL is the fixture Muse's provider is pointed at (--base-url), where one is.
+	MuseBaseURL string
 	// ExcludeContent is a team policy that withholds prompts and tool content, applied by
 	// the relay: no exporter has a switch for it.
 	ExcludeContent bool

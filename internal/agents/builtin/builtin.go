@@ -11,6 +11,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/agents/dsh"
 	"github.com/miradorlabs/terma-cli/internal/agents/gemini"
 	"github.com/miradorlabs/terma-cli/internal/agents/hermes"
+	"github.com/miradorlabs/terma-cli/internal/agents/muse"
 	"github.com/miradorlabs/terma-cli/internal/agents/omp"
 	"github.com/miradorlabs/terma-cli/internal/agents/opencode"
 	"github.com/miradorlabs/terma-cli/internal/agents/pi"
@@ -21,6 +22,7 @@ import (
 func Agents(configDir string) *agents.Registry {
 	claudeCode, codexCLI := claude.Agent{ConfigDir: configDir}, codex.Agent{ConfigDir: configDir}
 	githubCopilot := copilot.Agent{ConfigDir: configDir}
+	museCode := muse.Agent{}
 	return agents.New(
 		claudeCode,
 		cursor.Agent{},
@@ -33,5 +35,6 @@ func Agents(configDir string) *agents.Registry {
 		gemini.Agent{},
 		dsh.Agent{},
 		antigravity.Agent{},
-	).Support(claudeCode, codexCLI, githubCopilot)
+		museCode,
+	).Support(claudeCode, codexCLI, githubCopilot, museCode)
 }

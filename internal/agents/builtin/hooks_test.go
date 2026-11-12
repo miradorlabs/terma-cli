@@ -161,6 +161,7 @@ func TestUserHooksInstallIdempotentlyAndRemoveCleanly(t *testing.T) {
 		"codex":   `{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"say done"}]}]}}`,
 		"cursor":  `{"version":1,"hooks":{"stop":[{"command":"say done"}]}}`,
 		"copilot": `{"version":1,"hooks":{"Stop":[{"type":"command","bash":"say done"}]}}`,
+		"muse":    `{"schema_version":1,"model":"muse-1","hooks":{"Stop":[{"hooks":[{"type":"command","command":"say done","timeout":5}]}]}}`,
 	}
 	for _, a := range reg.With[agents.UserHooks]() {
 		t.Run(a.Name(), func(t *testing.T) {

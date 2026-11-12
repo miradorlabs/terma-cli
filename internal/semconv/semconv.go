@@ -23,6 +23,8 @@ const (
 	GenAIRequestReasoningLevelKey = "gen_ai.request.reasoning.level"
 	// GenAIResponseFinishReasonsKey is gen_ai.response.finish_reasons: Array of reasons the model stopped generating tokens, corresponding to each generation received.
 	GenAIResponseFinishReasonsKey = "gen_ai.response.finish_reasons"
+	// GenAIResponseIDKey is gen_ai.response.id: The unique identifier for the completion.
+	GenAIResponseIDKey = "gen_ai.response.id"
 	// GenAIResponseModelKey is gen_ai.response.model: The name of the model that generated the response.
 	GenAIResponseModelKey = "gen_ai.response.model"
 	// GenAIToolCallArgumentsKey is gen_ai.tool.call.arguments: Parameters passed to the tool call.
@@ -33,6 +35,14 @@ const (
 	GenAIToolNameKey = "gen_ai.tool.name"
 	// GenAIToolTypeKey is gen_ai.tool.type: Type of the tool utilized by the agent
 	GenAIToolTypeKey = "gen_ai.tool.type"
+	// GenAIUsageCacheReadInputTokensKey is gen_ai.usage.cache_read.input_tokens: The number of input tokens served from a provider-managed cache.
+	GenAIUsageCacheReadInputTokensKey = "gen_ai.usage.cache_read.input_tokens"
+	// GenAIUsageCacheWriteInputTokensKey is gen_ai.usage.cache_write.input_tokens: The number of input tokens written to a provider-managed cache.
+	GenAIUsageCacheWriteInputTokensKey = "gen_ai.usage.cache_write.input_tokens"
+	// GenAIUsageInputTokensKey is gen_ai.usage.input_tokens: The number of tokens used in the GenAI input (prompt).
+	GenAIUsageInputTokensKey = "gen_ai.usage.input_tokens"
+	// GenAIUsageOutputTokensKey is gen_ai.usage.output_tokens: The number of tokens used in the GenAI response (completion).
+	GenAIUsageOutputTokensKey = "gen_ai.usage.output_tokens"
 	// GenAIUsageReasoningOutputTokensKey is gen_ai.usage.reasoning.output_tokens: The number of output tokens used for reasoning (e.g. chain-of-thought, extended thinking).
 	GenAIUsageReasoningOutputTokensKey = "gen_ai.usage.reasoning.output_tokens"
 	// HostNameKey is host.name: Name of the host. On UNIX systems, it may contain what the hostname command returns, or the fully qualified hostname, or another name specified by the user.
@@ -277,6 +287,8 @@ const (
 	TermaToolCallCountKey = "terma.tool_call.count"
 	// TermaTurnIDKey is terma.turn.id: The turn the event belongs to, in the agent's own id.
 	TermaTurnIDKey = "terma.turn.id"
+	// TermaTurnTimeToFirstTokenMsKey is terma.turn.time_to_first_token_ms: Milliseconds from the turn's start to the model's first token, as the agent measured it.
+	TermaTurnTimeToFirstTokenMsKey = "terma.turn.time_to_first_token_ms"
 	// TermaUpdateAutoKey is terma.update.auto: Whether the relay installs new releases of its terma by itself.
 	TermaUpdateAutoKey = "terma.update.auto"
 	// TermaUsageCacheReadTokensKey is terma.usage.cache_read_tokens: Cache-read input tokens as the agent reported them, in a snapshot rather than per call.
@@ -333,6 +345,8 @@ const (
 	TermaCompactionEvent = "terma.compaction"
 	// TermaFilesTouchedEvent is terma.files.touched: A session wrote files in the repository.
 	TermaFilesTouchedEvent = "terma.files.touched"
+	// TermaModelCallEvent is terma.model.call: One model call of an agent whose hooks are its only export, with the usage the agent reported for it.
+	TermaModelCallEvent = "terma.model.call"
 	// TermaModelCallResponseEvent is terma.model_call.response: What the API answered for one model call, as the agent recorded it and its telemetry does not say.
 	TermaModelCallResponseEvent = "terma.model_call.response"
 	// TermaPushEvent is terma.push: A branch was pushed, one event per branch the push updated.
@@ -363,6 +377,10 @@ const (
 	TermaSubagentStartEvent = "terma.subagent.start"
 	// TermaToolCallEvent is terma.tool.call: One tool call, keyed on its call id, which is its replay identity.
 	TermaToolCallEvent = "terma.tool.call"
+	// TermaTurnEvent is terma.turn: One finished turn of an agent whose hooks are its only export, as the agent's own session API reports it: how it ended and how long it took.
+	TermaTurnEvent = "terma.turn"
+	// TermaUserMessageEvent is terma.user.message: One prompt to an agent whose hooks are its only export; content as a whole.
+	TermaUserMessageEvent = "terma.user.message"
 )
 
 // Enum values.

@@ -10,8 +10,16 @@ import (
 	"testing"
 	"time"
 
+	"encoding/base64"
 	"github.com/miradorlabs/terma-cli/e2e"
 	"github.com/miradorlabs/terma-cli/e2e/refdiff"
+	collogspb "go.opentelemetry.io/proto/otlp/collector/logs/v1"
+	coltracepb "go.opentelemetry.io/proto/otlp/collector/trace/v1"
+	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
+	logspb "go.opentelemetry.io/proto/otlp/logs/v1"
+	resourcepb "go.opentelemetry.io/proto/otlp/resource/v1"
+	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
+	"google.golang.org/protobuf/proto"
 )
 
 func TestNormalize(t *testing.T) {
@@ -967,5 +975,52 @@ func TestTimelineArchives(t *testing.T) {
 	data, _ := os.ReadFile(filepath.Join(dir, "timeline.json"))
 	if strings.Contains(string(data), "archives") {
 		t.Errorf("a timeline with every step says archives:\n%s", data)
+	}
+}
+
+// Muse's own telemetry is OTLP protobuf: a log record is the event its event_name attribute
+// names, a span the one its name is, each with its attributes' keys and the resource's; never a
+// value.
+func TestVendorTelemetryOTLP(t *testing.T) {
+	str := func(k, v string) *commonpb.KeyValue {
+		return &commonpb.KeyValue{Key: k, Value: &commonpb.AnyValue{Value: &commonpb.AnyValue_StringValue{StringValue: v}}}
+	}
+	resource := &resourcepb.Resource{Attributes: []*commonpb.KeyValue{str("service.name", "tbh"), str("workspace_repo", "github:acme/secret")}}
+	logs, _ := proto.Marshal(&collogspb.ExportLogsServiceRequest{ResourceLogs: []*logspb.ResourceLogs{{Resource: resource,
+		ScopeLogs: []*logspb.ScopeLogs{{LogRecords: []*logspb.LogRecord{
+			{Attributes: []*commonpb.KeyValue{str("event_name", "session_start"), str("session_id", "01a1")}},
+			{Attributes: []*commonpb.KeyValue{str("event_name", "session_start"), str("model_id", "muse-wonder-1.0")}},
+		}}}}}})
+	spans, _ := proto.Marshal(&coltracepb.ExportTraceServiceRequest{ResourceSpans: []*tracepb.ResourceSpans{{Resource: resource,
+		ScopeSpans: []*tracepb.ScopeSpans{{Spans: []*tracepb.Span{{Name: "turn", Attributes: []*commonpb.KeyValue{str("turn_index", "1")}}}}}}}})
+	header := map[string][]string{"content-type": {"application/x-protobuf"}}
+	tel := vendorTelemetry([]e2e.ProviderRequest{
+		{Method: "POST", Host: "api.meta.ai", Path: "/muse-code/telemetry/logs", Header: header, Text: "base64:" + base64.StdEncoding.EncodeToString(logs)},
+		{Method: "POST", Host: "api.meta.ai", Path: "/muse-code/telemetry/traces", Header: header, Text: "base64:" + base64.StdEncoding.EncodeToString(spans)},
+		{Method: "POST", Host: "api.meta.ai", Path: "/muse-code/telemetry/logs", Text: "base64:" + base64.StdEncoding.EncodeToString(logs)},
+	})
+	start := tel["POST api.meta.ai/muse-code/telemetry/logs"].(map[string]any)["events"].(map[string]any)["session_start"].(map[string]any)
+	if start["count"] != 2 || strings.Join(start["fields"].([]string), ",") != "event_name,model_id,resource.service.name,resource.workspace_repo,session_id" {
+		t.Errorf("session_start = %v", start)
+	}
+	if got := sortedEventNames(tel["POST api.meta.ai/muse-code/telemetry/traces"].(map[string]any)); strings.Join(got, ",") != "span:turn" {
+		t.Errorf("spans = %v", got)
+	}
+	if s := fmt.Sprint(tel); strings.Contains(s, "acme") || strings.Contains(s, "01a1") || strings.Contains(s, "wonder") {
+		t.Errorf("a value reached the published telemetry: %s", s)
+	}
+}
+
+// A telemetry routing probe is the network section's telemetry_routing, beside what the build
+// sends.
+func TestTelemetryRoutingIsNetwork(t *testing.T) {
+	s := &Snapshot{Harness: "muse", Version: "1"}
+	deriveOutOfBand(s, e2e.Profile{Probes: map[string]json.RawMessage{
+		"telemetry-routing": json.RawMessage(`{"routes":[{"control":"default","outcome":"vendor","hosts":["api.meta.ai"],"credential":true},` +
+			`{"control":"settings.json telemetry.endpoint","outcome":"redirected","hosts":["<endpoint>"],"credential":true}]}`),
+	}})
+	routes, _ := s.Network["telemetry_routing"].([]any)
+	if len(routes) != 2 || routes[1].(map[string]any)["outcome"] != "redirected" {
+		t.Errorf("network = %v", s.Network)
 	}
 }

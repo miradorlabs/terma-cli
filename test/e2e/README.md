@@ -468,7 +468,9 @@ night. Of a burst of more than five releases between nights, only the newest fiv
 and the next night starts from the newest. Where the history has no release of a harness on
 this platform, or cannot be read, it is the last three, and the report says why. Version lists come from the npm registry;
 binaries come from Claude Code's download service (manifest checksum) and
-Codex's GitHub release tarballs (CLI and code-mode host), cached under `versions/`. A recording shim in
+Codex's GitHub release tarballs (CLI and code-mode host), and Muse's from Meta's download host by
+its full build string (`1.4.15-R8339.1`, its manifest's checksum; the channel names the current
+build alone, so `lastN` is that one), cached under `versions/`. A recording shim in
 front of `terma` keeps every hook payload each build sends, so payload shapes
 are golden files too. The complete Codex installation matters: the companion host makes file-edit hooks
 work on 0.153.3 and 0.153.4 too. Missing edit events fail the attribution contract;
@@ -487,6 +489,20 @@ Code, Codex and git hooks; the listed origin from a subdirectory, a differently 
 checkout, its ssh and https forms and linked worktrees; nothing in a same-named folder
 with another origin, a fork, a repository with no origin or a folder outside git; and a
 Codex thread resumed into an unlisted repository.
+
+## Muse
+
+Muse Code runs against a local Responses API fixture (`museProvider`): `muse exec --model
+muse-wonder-1.0 --base-url <fixture>` with `META_API_KEY=synthetic`, so no Meta account is used.
+`--model` spares the fixture Muse's model catalog. Muse reads a strict stream (`sequence_number`
+on every event, a reply's text in its content part's events), names its tools in the `muse`
+namespace (`muse.bash`), and runs reminder agents beside the main thread (`X-Tbh-Agent-Role:
+reminder:*`), which the fixture answers with no reminder. Its hook events come from the session
+protocol schema each build exports (`muse schema generate-json-schema`).
+`TestMuseProbeTelemetryRouting` records where Muse's own telemetry (OTLP to `api.meta.ai`) can be
+sent: settings.json's `telemetry.endpoint` redirects it, credential included;
+`OTEL_EXPORTER_OTLP_ENDPOINT` turns it off; so do `telemetry.enabled: false` and
+`TBH_DISABLE_TELEMETRY=1`.
 
 ## Cursor
 

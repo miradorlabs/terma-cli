@@ -95,7 +95,11 @@ func (m Machine) ApplyUserHooks(selected []string, install bool) ([]string, erro
 				continue
 			}
 		}
-		plan, err := a.PlanUserHooks(dir, hookmgr.UserHookCommand(terma), want)
+		command := hookmgr.UserHookCommand(terma)
+		if _, clean := a.(agents.CleanHookEnv); clean {
+			command = hookmgr.UserHookCommandIn(terma, map[string]string{"TERMA_CONFIG_DIR": m.ConfigDir, "TERMA_STATE_DIR": m.StateDir})
+		}
+		plan, err := a.PlanUserHooks(dir, command, want)
 		if err != nil {
 			return changed, err
 		}

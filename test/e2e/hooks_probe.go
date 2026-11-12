@@ -3,6 +3,7 @@ package e2e
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
 	"debug/elf"
 	"debug/macho"
 	"encoding/json"
@@ -11,6 +12,7 @@ import (
 	"io"
 	"maps"
 	"os"
+	"os/exec"
 	"os/user"
 	"path/filepath"
 	"regexp"
@@ -740,6 +742,8 @@ var hookSeeds = map[string][]string{
 		"UserPromptSubmit", "SubagentStart", "SubagentStop", "Stop"},
 	"gemini": {"BeforeTool", "AfterTool", "BeforeAgent", "AfterAgent", "BeforeModel", "AfterModel", "BeforeToolSelection",
 		"SessionStart", "SessionEnd", "PreCompress", "Notification"},
+	"muse": {"SessionStart", "UserPromptSubmit", "PreToolUse", "PermissionRequest", "PostToolUse", "PreLLMCall", "PostLLMCall",
+		"PreCompact", "PostCompact", "SubagentStart", "SubagentStop", "Stop", "SessionEnd", "Notification", "PostToolUseFailure", "StopFailure"},
 	"copilot": {"preToolUse", "postToolUse", "userPromptSubmitted", "sessionStart", "sessionEnd", "errorOccurred", "agentStop", "subagentStop"},
 }
 
@@ -777,6 +781,12 @@ func HookEventsOf(b Binary) ([]string, string, error) {
 			}
 		}
 		events = GeminiHookEventsIn(sourceOf(root, []string{".js", ".mjs", ".cjs"}, false))
+	case "muse":
+		schema, err := museSchema(path)
+		if err != nil {
+			return seedEvents(b.Harness), "seed", err
+		}
+		events = MuseHookEventsIn(schema)
 	case "copilot":
 		native := npmPlatformBinary(path)
 		if native == "" {
@@ -874,6 +884,47 @@ func CopilotHookEventsIn(js []byte) []string {
 	for _, m := range copilotHookTypeRE.FindAllSubmatch(js, -1) {
 		for _, q := range jsQuotedRE.FindAllSubmatch(m[1], -1) {
 			out = append(out, string(q[1]))
+		}
+	}
+	return sortedUnique(out)
+}
+
+// museSchema is the session protocol's JSON Schema the Muse build at path exports, offline
+// (`muse schema generate-json-schema`).
+func museSchema(path string) ([]byte, error) {
+	dir, err := os.MkdirTemp("", "muse-schema-")
+	if err != nil {
+		return nil, err
+	}
+	defer os.RemoveAll(dir)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, path, "schema", "generate-json-schema", "--out", dir)
+	cmd.Env = append(os.Environ(), "MUSE_NO_AUTO_UPDATE=1")
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return nil, fmt.Errorf("muse schema: %v: %s", err, out)
+	}
+	return os.ReadFile(filepath.Join(dir, "msp.schema.json"))
+}
+
+// MuseHookEventsIn are the hook events of the Muse build whose session protocol schema is
+// schema: its HookEventName enum, which spells each event's settings name with a lowercase first
+// letter ("postLLMCall" is PostLLMCall).
+func MuseHookEventsIn(schema []byte) []string {
+	var doc struct {
+		Defs struct {
+			HookEventName struct {
+				Enum []string `json:"enum"`
+			} `json:"HookEventName"`
+		} `json:"$defs"`
+	}
+	if json.Unmarshal(schema, &doc) != nil {
+		return nil
+	}
+	var out []string
+	for _, e := range doc.Defs.HookEventName.Enum {
+		if e != "" {
+			out = append(out, strings.ToUpper(e[:1])+e[1:])
 		}
 	}
 	return sortedUnique(out)

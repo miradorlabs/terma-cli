@@ -134,3 +134,21 @@ func countOf(vs []string, v string) int {
 	}
 	return n
 }
+
+// A --version line's release, or the build after it in parentheses that names it, which is
+// what a Muse build is fetched by.
+func TestNumberOf(t *testing.T) {
+	for line, want := range map[string]string{
+		"2.1.321 (Claude Code)":             "2.1.321",
+		"codex-cli 0.166.0":                 "0.166.0",
+		"omp/18.3.0":                        "18.3.0",
+		"Muse Code 1.4.15 (1.4.15-R8339.1)": "1.4.15-R8339.1",
+		"Muse Code 1.4.15 (1.4.16-R9000.1)": "1.4.15",
+		"tool 1.2.3 (built 2026-11-10)":     "1.2.3",
+		"no version here":                   "",
+	} {
+		if got := numberOf(line); got != want {
+			t.Errorf("numberOf(%q) = %q, want %q", line, got, want)
+		}
+	}
+}

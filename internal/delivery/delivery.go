@@ -187,7 +187,7 @@ func (r Router) Allowed(org config.Policy, projectID string, e spool.Event) bool
 	if org.CollectsNothing || e.Global && !org.Global() || !org.Admits(e.Repository) {
 		return false
 	}
-	if e.Name == semconv.TermaAssistantMessageEvent || e.Name == semconv.TermaSessionTitleEvent {
+	if e.Name == semconv.TermaAssistantMessageEvent || e.Name == semconv.TermaUserMessageEvent || e.Name == semconv.TermaSessionTitleEvent {
 		prompts, _ := org.Content()
 		return prompts && r.consented(e, org.Global())
 	}

@@ -126,7 +126,8 @@ never on disk, and a stopping relay drops it.
   gone. All logic lives in the binary.
 - `prepare-commit-msg` stays local: no network, at most one git subprocess.
 - Only `internal/agents` names a specific agent. A new agent is a new package plus a line
-  in `internal/agents/builtin`.
+  in `internal/agents/builtin`; `docs/adding-a-harness.md` walks through the rest, across
+  terma, the platform and the frontend.
 - Wire names are contracts with other repositories, so never rename them: the commit
   trailers, hook event names, and every event and attribute terma sends. The Weaver
   registry in `semconv/registry` is their source of truth; `make semconv` renders

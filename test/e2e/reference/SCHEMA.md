@@ -391,7 +391,9 @@ answered locally and empty, never forwarded: this is what the build asks for whe
 answer nothing.
 
 `telemetry` is the build's own telemetry to its vendor, read from those requests' bodies
-(Claude Code's `event_logging` batches, Gemini CLI's Clearcut log), by endpoint:
+(Claude Code's `event_logging` batches, Gemini CLI's Clearcut log, Muse's OTLP protobuf logs and
+traces: a log record by its `event_name` attribute, a span as `span:<name>`, the resource's
+attributes among the fields as `resource.<key>`), by endpoint:
 
 ```json
 "telemetry": { "POST api.anthropic.com/api/event_logging/v2/batch": {
@@ -404,6 +406,26 @@ values. `count` is the run's and is not compared. `unobserved` are events builds
 this one reported there and its run did not (one reported only sometimes): not compared as
 removed and added. Two builds where one's interception failed (an egress `error` the other has
 not) are not compared in `network`.
+
+`telemetry_routing` is where the build's own telemetry can be sent, for a harness that says how
+(Muse's, `TestMuseProbeTelemetryRouting`): one profile turn a control, keyed by it, behind the
+recording proxy with a local endpoint beside it:
+
+```json
+"telemetry_routing": [
+  { "control": "default", "outcome": "vendor", "hosts": ["api.meta.ai"],
+    "paths": ["/muse-code/telemetry/logs", "/muse-code/telemetry/traces"], "credential": true },
+  { "control": "settings.json telemetry.endpoint", "outcome": "redirected", "hosts": ["<endpoint>"],
+    "paths": ["/muse-code/telemetry/logs", "/muse-code/telemetry/traces"], "credential": true },
+  { "control": "OTEL_EXPORTER_OTLP_ENDPOINT", "outcome": "off", "credential": false,
+    "notice": "notice: telemetry export DISABLED — OTEL_EXPORTER_OTLP_ENDPOINT points at host …" }
+]
+```
+
+`outcome` is `vendor` (sent where the build sends by default), `redirected` (to the endpoint the
+control named, and not to the vendor), `vendor and redirected`, or `off` (sent nowhere).
+`credential` says whether the requests carried an `Authorization` header: the build's own
+sign-in, which goes wherever its telemetry is sent. `notice` is what the build printed of it.
 
 ### filesystem
 

@@ -52,6 +52,9 @@ var harnesses = map[string]harnessMeta{
 	"copilot": {name: "GitHub Copilot CLI", vendor: "GitHub", homepage: "https://github.com/github/copilot-cli", npm: "@github/copilot",
 		changelog:    "https://github.com/github/copilot-cli/blob/main/changelog.md",
 		changelogRaw: "https://raw.githubusercontent.com/github/copilot-cli/main/changelog.md"},
+	// Muse Code is closed, and published by Meta's download host alone: no registry dates its
+	// builds, and no changelog is published.
+	"muse": {name: "Muse Code", vendor: "Meta"},
 	"t3": {name: "T3 Code", vendor: "Ping Labs", homepage: "https://github.com/pingdotgg/t3code", npm: "t3",
 		repo: "pingdotgg/t3code", language: "typescript", tag: "v%s", changelog: "https://github.com/pingdotgg/t3code/releases"},
 	"cursor": {name: "Cursor", vendor: "Anysphere", homepage: "https://cursor.com"},

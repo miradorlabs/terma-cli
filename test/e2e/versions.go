@@ -139,17 +139,25 @@ func resolve(t *testing.T, harness, spec string, list func() ([]string, error), 
 	return out
 }
 
-// numberOf pulls the x.y.z out of a --version line.
+// numberOf pulls the x.y.z out of a --version line, or the build after it that names it in
+// parentheses, which Muse is fetched by: "Muse Code 1.4.15 (1.4.15-R8339.1)".
 func numberOf(line string) string {
-	for f := range strings.FieldsSeq(line) {
+	fields := strings.Fields(line)
+	for i, f := range fields {
 		// "omp/18.3.0" names itself before the version.
 		if _, after, ok := strings.Cut(f, "/"); ok {
 			f = after
 		}
 		f = strings.TrimPrefix(f, "v")
-		if isRelease(f) {
-			return f
+		if !isRelease(f) {
+			continue
 		}
+		if i+1 < len(fields) {
+			if build := strings.Trim(fields[i+1], "()"); strings.HasPrefix(build, f+"-") && fields[i+1] == "("+build+")" {
+				return build
+			}
+		}
+		return f
 	}
 	return ""
 }

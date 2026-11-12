@@ -37,6 +37,7 @@ jobs:
       opencode: ${{ steps.new.outputs.opencode }}
       copilot: ${{ steps.new.outputs.copilot }}
       dsh: ${{ steps.new.outputs.dsh }}
+      muse: ${{ steps.new.outputs.muse }}
       claude_desktop: ${{ steps.new.outputs.claude_desktop }}
       codex_desktop: ${{ steps.new.outputs.codex_desktop }}
       desktop_tests: ${{ steps.new.outputs.desktop_tests }}
@@ -137,6 +138,7 @@ jobs:
           TERMA_E2E_OPENCODE_VERSIONS: ${{ needs.detect.outputs.opencode }}
           TERMA_E2E_COPILOT_VERSIONS: ${{ needs.detect.outputs.copilot }}
           TERMA_E2E_DSH_VERSIONS: ${{ needs.detect.outputs.dsh }}
+          TERMA_E2E_MUSE_VERSIONS: ${{ needs.detect.outputs.muse }}
           TERMA_E2E_HARNESSES: ${{ needs.detect.outputs.harnesses }}
           TESTS: ${{ needs.detect.outputs.tests }}
         run: ./bin/e2e.test -test.v -test.timeout 50m -test.run "$TESTS"

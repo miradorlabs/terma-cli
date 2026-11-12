@@ -7,9 +7,11 @@ import (
 	"cmp"
 	"errors"
 	"io/fs"
+	"maps"
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"unicode"
 
@@ -20,8 +22,26 @@ import (
 // UserHookCommand is the command a machine-wide hook entry runs: terma by absolute path,
 // since a desktop-started agent has the system PATH, with --user.
 func UserHookCommand(terma string) func(event string) string {
-	return userHookCommand("'" + strings.ReplaceAll(terma, "'", `'\''`) + "'")
+	return userHookCommand(shellQuote(terma))
 }
+
+// UserHookCommandIn is UserHookCommand for an agent that runs its hooks in an environment
+// of its own (agents.CleanHookEnv): the TERMA_ variables in env, terma's directories, are
+// set on the command itself, so terma finds the same ones the developer's shell does.
+func UserHookCommandIn(terma string, env map[string]string) func(event string) string {
+	q := shellQuote(terma)
+	var assign strings.Builder
+	for _, k := range slices.Sorted(maps.Keys(env)) {
+		if env[k] != "" && strings.HasPrefix(k, "TERMA_") {
+			assign.WriteString(k + "=" + shellQuote(env[k]) + " ")
+		}
+	}
+	return func(event string) string {
+		return "[ -x " + q + " ] && " + assign.String() + q + " hook --user " + event + " || true"
+	}
+}
+
+func shellQuote(s string) string { return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'" }
 
 // userHookCommand runs terma, quoted as q, when it is there to run.
 func userHookCommand(q string) func(event string) string {

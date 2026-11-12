@@ -54,6 +54,8 @@ type Deps struct {
 	Flush   func()
 	// AwaitPush starts a detached hookrun.AwaitPush for a recorded push.
 	AwaitPush func(path string)
+	// Detach starts `terma hook <event> args...` detached from the hook that asks.
+	Detach func(event string, args ...string)
 }
 
 // Profile is what a hook reads of the developer's setup.
@@ -125,6 +127,7 @@ func run(ctx context.Context, d Deps, r Request, handler agents.Handler, flush b
 		OnClaim:   func(root string) { claimed, claimedIn = true, root },
 		Flush:     func() { flushed = true; d.Flush() },
 		AwaitPush: d.AwaitPush,
+		Detach:    d.Detach,
 		Stdout:    r.Stdout,
 		Stderr:    r.Stderr,
 		ConfigDir: d.ConfigDir,

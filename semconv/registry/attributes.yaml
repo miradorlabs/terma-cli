@@ -52,6 +52,10 @@ attributes:
     type: string
     stability: development
     brief: The turn the event belongs to, in the agent's own id.
+  - key: terma.turn.time_to_first_token_ms
+    type: int
+    stability: development
+    brief: Milliseconds from the turn's start to the model's first token, as the agent measured it.
   - key: terma.model_call.id
     type: string
     stability: development

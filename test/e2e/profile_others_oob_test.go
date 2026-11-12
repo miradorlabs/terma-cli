@@ -352,3 +352,28 @@ func TestGeminiProfileTelemetry(t *testing.T) {
 		RecordTelemetry(t, b, front, hold.Answered())
 	})
 }
+
+// TestMuseProfileEgress: Muse's profile turn behind the recording proxy, with nothing turned off:
+// what it sends Meta besides its model calls, which nothing in its settings or environment
+// points anywhere else.
+func TestMuseProfileEgress(t *testing.T) {
+	forEachMuse(t, func(t *testing.T, b Binary) {
+		profileOtherOutOfBand(t, b, otherProfile{
+			program: "muse",
+			isModelCall: func(r *http.Request) bool {
+				return r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/responses")
+			},
+			provider: func(calls *atomic.Int32) http.Handler { return museProvider(calls, nil) },
+			setup:    func(sb *Sandbox, url string) { sb.UseMuse(url) },
+			run: func(t *testing.T, sb *Sandbox, b Binary) []string {
+				args := sb.museArgs(profilePrompt, false)
+				runProfileCommand(t, b, sb.Repo, sb.termaEnv(), args...)
+				return args[:len(args)-1]
+			},
+			kinds: []StorageKind{
+				{regexp.MustCompile(`^<home>/\.local/share/muse/sessions/`), "transcript"},
+				{regexp.MustCompile(`^<home>/\.local/share/muse/local-tracing/`), "log"},
+			},
+		})
+	})
+}
