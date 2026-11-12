@@ -157,8 +157,8 @@ func (s *State) team(id string) *Team {
 // Select adds t under a new enrollment, organizations before personal, and returns the
 // enrollment ID. t must carry its first validated policy: there is no team waiting for one.
 func (s *State) Select(t Team) (string, error) {
-	if t.Policy.FetchedAt.IsZero() || t.Policy.TeamID != t.TeamID {
-		return "", errors.New("a team is selected only with its own validated policy")
+	if t.Policy.FetchedAt.IsZero() || t.Policy.TeamID != t.TeamID || t.OrganizationID == "" {
+		return "", errors.New("a team is selected only with its organization and its own validated policy")
 	}
 	if t.Policy.Global() && !t.Personal {
 		return "", errors.New("only a personal organization's policy may collect everything")
@@ -172,7 +172,7 @@ func (s *State) Select(t Team) (string, error) {
 		}
 	}
 	for key, b := range s.Bindings {
-		if t.Personal && b.Organization == t.OrganizationID {
+		if t.Personal && !b.Refused && b.Organization == t.OrganizationID {
 			return "", fmt.Errorf("%s is bound to the personal organization: unbind it first", key)
 		}
 	}
@@ -227,7 +227,7 @@ func (s State) check() error {
 		if b.Refused == (b.Organization != "") {
 			return fmt.Errorf("binding %q must be either refused or bound to one organization", key)
 		}
-		if n := len(s.Teams); n > 0 && s.Teams[n-1].Personal && b.Organization == s.Teams[n-1].OrganizationID {
+		if n := len(s.Teams); n > 0 && s.Teams[n-1].Personal && !b.Refused && b.Organization == s.Teams[n-1].OrganizationID {
 			return fmt.Errorf("binding %q names the personal organization", key)
 		}
 	}

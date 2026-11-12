@@ -190,3 +190,42 @@ func BenchmarkRoute(b *testing.B) {
 		})
 	}
 }
+
+// Normalize is idempotent, and an entry and a binding key read the same text alike.
+func FuzzNormalize(f *testing.F) {
+	for _, seed := range []string{
+		"git@github.com:acme/api.Git", "https://user:tok@github.com:443/acme/api.GIT/", "github.com/acme/a%3fb",
+		"github.com/acme/a%2541", "github.com/acme/a%23b", "gitlab.com/acme/platform/*", "github.com//acme/api",
+		"github.com/acme/../api", "ssh://git@github.com/acme/api", "HTTPS://GitHub.com/Acme/API.GIT/",
+	} {
+		f.Add(seed)
+	}
+	f.Fuzz(func(t *testing.T, raw string) {
+		once := Normalize(raw)
+		if twice := Normalize(once); twice != once {
+			t.Fatalf("Normalize(%q) = %q, but again %q", raw, once, twice)
+		}
+		key, err := bindingKey(raw)
+		if e, ok := ParseEntry(raw, false); ok && err == nil && e.Key() != key {
+			t.Fatalf("%q reads as entry %q but binding key %q", raw, e.Key(), key)
+		}
+	})
+}
+
+// A refused binding is no organization's, so it never trips the personal guard.
+func TestRefusedBindingsAreNotBoundToPersonal(t *testing.T) {
+	t.Parallel()
+	s := &State{Profile: "default"}
+	must(t, s.Refuse("github.com/acme"))
+	if _, err := s.Select(personal()); err != nil {
+		t.Fatalf("a refusal blocked ticking personal: %v", err)
+	}
+	must(t, s.Refuse("github.com/clientco"))
+	if err := s.check(); err != nil {
+		t.Fatalf("a refusal after ticking personal broke the state: %v", err)
+	}
+	noOrg := team("", "orphan", "github.com/acme/*")
+	if _, err := s.Select(noOrg); err == nil {
+		t.Fatal("selected a team with no organization")
+	}
+}
