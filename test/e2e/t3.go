@@ -141,7 +141,7 @@ func (sb *Sandbox) StartT3(b Binary, env ...string) *T3 {
 
 // api is the API the build speaks: "0.0" where it serves its orchestration snapshot as JSON
 // (0.0.x, which serves a shell route of its own too), "0.1" where it answers that route with its
-// web app and serves its shell snapshot for the driver's protocol instead (0.1.0 on), "" where
+// web app and serves its shell snapshot for the driver's protocol instead (0.1.0 and later), "" where
 // it does neither, as a build on another protocol does.
 func (x *T3) api() string {
 	x.t.Helper()

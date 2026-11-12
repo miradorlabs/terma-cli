@@ -5,6 +5,8 @@ import (
 	"net/http/httptest"
 	"sync/atomic"
 	"testing"
+
+	"golang.org/x/net/websocket"
 )
 
 // t3Server answers the routes the driver probes as a build of one shape: snapshot and shell are
@@ -81,5 +83,31 @@ func TestT3SettledRuns(t *testing.T) {
 		if !t3SettledRuns[settled] {
 			t.Errorf("%s read as live", settled)
 		}
+	}
+}
+
+// An RPC call over T3's WebSocket sends one request and returns the Exit that names it, past
+// whatever else the server says first.
+func TestT3RPC(t *testing.T) {
+	var got map[string]any
+	srv := httptest.NewServer(websocket.Handler(func(ws *websocket.Conn) {
+		if ws.Request().Header.Get("Authorization") != "Bearer token" {
+			return
+		}
+		if err := websocket.JSON.Receive(ws, &got); err != nil {
+			return
+		}
+		_ = websocket.JSON.Send(ws, map[string]any{"_tag": "Pong"})
+		_ = websocket.JSON.Send(ws, map[string]any{"_tag": "Exit", "requestId": "other", "exit": map[string]any{"_tag": "Success", "value": "not this"}})
+		_ = websocket.JSON.Send(ws, map[string]any{"_tag": "Exit", "requestId": got["id"], "exit": map[string]any{"_tag": "Success", "value": map[string]string{"threadId": "t1"}}})
+	}))
+	defer srv.Close()
+	x := &T3{t: t, url: srv.URL, token: "token"}
+	value := x.rpc("orchestration.launchThread", map[string]any{"threadId": "t1"})
+	if string(value) != `{"threadId":"t1"}` {
+		t.Errorf("value = %s", value)
+	}
+	if got["_tag"] != "Request" || got["tag"] != "orchestration.launchThread" {
+		t.Errorf("request = %v", got)
 	}
 }
