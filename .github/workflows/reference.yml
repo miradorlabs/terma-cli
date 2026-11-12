@@ -29,9 +29,12 @@ permissions:
   contents: read
 
 # One at a time: a capture can outlast the quarter hour, and the next check must see what it
-# published rather than capture the same build again.
+# published rather than capture the same build again. So a long capture of one harness holds the
+# next check of every other back until it is published; a lock a harness would let two checks
+# capture the same new build. A run by hand has a group of its own, so the schedule never takes
+# its place in the queue (GitHub keeps one pending run a group).
 concurrency:
-  group: harness-reference-new-builds
+  group: harness-reference-new-builds-${{ github.event_name }}
   cancel-in-progress: false
 
 jobs:
@@ -55,6 +58,7 @@ jobs:
           # module but the standard library.
           sparse-checkout: |
             test/e2e/reference/new-builds.sh
+            test/e2e/reference/capture-plan.sh
             test/e2e/go.mod
             test/e2e/go.sum
             test/e2e/refdiff/
@@ -72,33 +76,16 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
           if [ -n "$ASKED" ]; then
-            builds=$(tr ' ' '\n' <<<"$ASKED" | grep -E '^[a-z][a-z0-9-]*=[0-9A-Za-z.,+_-]+$' || true)
+            asked=$(tr ' ' '\n' <<<"$ASKED")
           else
-            builds=$(test/e2e/reference/new-builds.sh)
+            asked=$(test/e2e/reference/new-builds.sh)
           fi
+          # Each harness's builds, the capture jobs' matrix and the desktop apps' scenarios.
+          builds=$(test/e2e/reference/capture-plan.sh "$GITHUB_OUTPUT" <<<"$asked")
           if [ -z "$builds" ]; then
             echo 'Nothing to capture: the reference has every build whole.' >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
-          # A command-line harness's builds are captured by a job of their own; a desktop app's by
-          # capture-desktop, by the scenario its tests carry.
-          include='[]'
-          desktop=()
-          while IFS='=' read -r harness versions; do
-            echo "${harness//-/_}=$versions" >> "$GITHUB_OUTPUT"
-            case "$harness" in
-              claude-desktop) desktop+=(TestClaudeDesktopProfile) ;;
-              codex-desktop) desktop+=(TestCodexDesktopProfile) ;;
-              *) include=$(jq -c --arg h "$harness" --arg v "$versions" '. + [{harness: $h, versions: $v}]' <<<"$include") ;;
-            esac
-          done <<<"$builds"
-          if [ "$include" != '[]' ]; then
-            echo "matrix=$(jq -c '{include: .}' <<<"$include")" >> "$GITHUB_OUTPUT"
-          fi
-          if [ ${#desktop[@]} -gt 0 ]; then
-            echo "desktop_tests=^($(IFS='|'; echo "${desktop[*]}"))\$" >> "$GITHUB_OUTPUT"
-          fi
-          { echo 'builds<<EOF'; echo "$builds"; echo 'EOF'; } >> "$GITHUB_OUTPUT"
           { echo '| harness | builds to capture |'; echo '|---|---|'; sed 's/=/ | /; s/^/| /; s/$/ |/' <<<"$builds"; } >> "$GITHUB_STEP_SUMMARY"
 
   # A harness's builds captured whole on macOS: every scenario of the harness's, as the night ran
@@ -150,6 +137,11 @@ jobs:
           VERSIONS: ${{ matrix.versions }}
         run: |
           export "TERMA_E2E_$(tr '[:lower:]-' '[:upper:]_' <<<"$HARNESS")_VERSIONS=$VERSIONS"
+          # A harness that drives Codex or Claude Code (T3) runs their newest build alone.
+          for driven in CLAUDE CODEX; do
+            var="TERMA_E2E_${driven}_VERSIONS"
+            [ -n "${!var:-}" ] || export "$var=last1"
+          done
           ./bin/e2e.test -test.v -test.timeout 80m
       - name: Publish the run's summary
         if: always()

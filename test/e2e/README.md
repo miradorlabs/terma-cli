@@ -421,8 +421,8 @@ Each build is captured once, whole, when it comes out. `reference.yml` checks ev
 hour: `reference/new-builds.sh` asks each registry for the builds the reference has yet to
 capture whole (a few requests, no build; nothing else runs when there are none): a new release
 among each harness's newest five, or one of its newest five published builds whose capture was
-partial and whose last attempt (`attempted_at`) is six hours old, four times a day until five
-newer builds are published. It reads the published index through
+partial and whose last attempt (`attempted_at`) is six hours old, until it has made four
+attempts. It reads the published index through
 GitHub's API, so a check queued behind a capture sees what that capture published. Only then does it capture them, everything the suite does with a build: on
 macOS, one job a harness, every scenario of the harness's against these builds alone
 (`TERMA_E2E_ONLY` and the versions: its profile and probes, its files profile, terma's contracts

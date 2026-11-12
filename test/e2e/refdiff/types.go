@@ -87,6 +87,9 @@ type Capture struct {
 	// that failed again moves it though it moves nothing else, so the frequent check waits from
 	// the last attempt before it tries again (reference/new-builds.sh).
 	AttemptedAt *time.Time `json:"attempted_at,omitempty"`
+	// Attempts is how many runs set out to capture the build: the frequent check gives up on a
+	// partial build after a few.
+	Attempts int `json:"attempts,omitempty"`
 }
 
 // Sections are a snapshot's sections in the schema's order, which is also the order a diff's

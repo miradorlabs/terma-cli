@@ -190,15 +190,28 @@ func publish(dir string, n night, opt options) ([]Announcement, error) {
 		if old == nil && !n.captures(id) {
 			continue
 		}
-		merged := merge(old, n.tonight(id), n.now)
-		if slices.Contains(n.attempted, id) {
+		tonight := n.tonight(id)
+		merged := merge(old, tonight, n.now)
+		attempted := slices.Contains(n.attempted, id)
+		if attempted {
 			at := n.now
 			merged.Capture.AttemptedAt = &at
+			merged.Capture.Attempts++
 		}
-		// A job of the run that did not finish took less of the build than it set out to.
-		if slices.Contains(n.unfinished, id) && !merged.Capture.Partial {
-			merged.Capture.Partial = true
-			merged.Capture.Notes = append(merged.Capture.Notes, "Part of this build's capture did not finish; the frequent check tries it again.")
+		switch {
+		case slices.Contains(n.unfinished, id):
+			// A job of the run that did not finish took less of the build than it set out to.
+			if !merged.Capture.Partial {
+				merged.Capture.Partial = true
+				merged.Capture.Notes = append(merged.Capture.Notes, unfinishedNote)
+			}
+		case attempted && !tonight.Capture.Partial:
+			// Every job finished and what tonight took is whole: so is the build, though no
+			// profile replaced the capture's own (T3, which has no profile scenario).
+			merged.Capture.Partial = false
+			merged.Capture.Notes = slices.DeleteFunc(merged.Capture.Notes, func(note string) bool {
+				return note == failedNote || note == unfinishedNote
+			})
 		}
 		if old == nil || !sameSections(old, merged) {
 			changed[id] = true
@@ -315,7 +328,7 @@ func publish(dir string, n night, opt options) ([]Announcement, error) {
 			s := byVersion[v]
 			e := VersionEntry{Version: v, CapturedAt: s.CapturedAt, Platforms: platformsOf(s), Support: supportOf(s),
 				Categories: map[string]int{}, Impact: map[string]int{"breaking": 0, "degrading": 0, "notable": 0, "informational": 0}, Highlights: []string{},
-				Partial: s.Capture.Partial, AttemptedAt: s.Capture.AttemptedAt}
+				Partial: s.Capture.Partial, AttemptedAt: s.Capture.AttemptedAt, Attempts: s.Capture.Attempts}
 			var bin binaryView
 			view(s.Binary, &bin)
 			if bin.Signing != nil {

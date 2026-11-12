@@ -45,6 +45,7 @@ func TestNewBuilds(t *testing.T) {
 		}
 		return e
 	}
+	withAttempts := func(e map[string]any, n int) map[string]any { e["attempts"] = n; return e }
 	releases := []string{"1.0.0", "1.0.1", "1.0.2", "1.0.3", "1.0.4", "1.0.5", "1.1.0-beta.1"}
 	afterFour := func(e map[string]any) []map[string]any { return append(whole("1.0.1", "1.0.2", "1.0.3", "1.0.4"), e) }
 	for _, c := range []struct {
@@ -70,6 +71,10 @@ func TestNewBuilds(t *testing.T) {
 			index: append(whole("1.0.1", "1.0.2", "1.0.3", "1.0.4", "1.0.5"), partial("1.0.0", stamp(7)))},
 		{name: "an attempt stamped with an offset is read as the time it is",
 			index: afterFour(partial("1.0.5", now.Add(-time.Hour).Format("2006-01-02T15:04:05.000+00:00")))},
+		{name: "a partial build that has used its attempts stays as it is",
+			index: afterFour(withAttempts(partial("1.0.5", stamp(7)), 4))},
+		{name: "a partial build with attempts to spare is tried again",
+			index: afterFour(withAttempts(partial("1.0.5", stamp(7)), 3)), want: "claude=1.0.5"},
 		{name: "an attempt time that does not parse is an old one",
 			index: afterFour(partial("1.0.5", "yesterday")), want: "claude=1.0.5"},
 		{name: "a reference that cannot be read is no build to capture", down: true},
@@ -155,5 +160,53 @@ func TestCaptureArgs(t *testing.T) {
 	}
 	if !slices.Equal(got, want) {
 		t.Errorf("capture-args.sh =\n%s\nwant\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
+	}
+}
+
+// reference/capture-plan.sh: the detect job's outputs from the builds to capture, one job a
+// command-line harness, the desktop apps' scenarios together, and no line that is not a harness
+// and its versions.
+func TestCapturePlan(t *testing.T) {
+	for _, tool := range []string{"bash", "jq"} {
+		if _, err := exec.LookPath(tool); err != nil {
+			t.Skipf("no %s", tool)
+		}
+	}
+	out := filepath.Join(t.TempDir(), "outputs")
+	cmd := exec.Command("bash", "reference/capture-plan.sh", out)
+	cmd.Stdin = strings.NewReader("claude=2.1.1,2.1.2\nclaude-desktop=1.2.0\nt3=0.1.9\n../etc=1\ncodex=0.2;rm\n")
+	taken, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("capture-plan.sh: %v", err)
+	}
+	if got, want := strings.TrimSpace(string(taken)), "claude=2.1.1,2.1.2\nclaude-desktop=1.2.0\nt3=0.1.9"; got != want {
+		t.Errorf("taken:\n%s\nwant\n%s", got, want)
+	}
+	data, err := os.ReadFile(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	outputs := string(data)
+	for _, want := range []string{
+		"claude=2.1.1,2.1.2\n", "claude_desktop=1.2.0\n", "t3=0.1.9\n",
+		`matrix={"include":[{"harness":"claude","versions":"2.1.1,2.1.2"},{"harness":"t3","versions":"0.1.9"}]}` + "\n",
+		"desktop_tests=^(TestClaudeDesktopProfile)$\n",
+		"builds<<EOF\nclaude=2.1.1,2.1.2\nclaude-desktop=1.2.0\nt3=0.1.9\nEOF\n",
+	} {
+		if !strings.Contains(outputs, want) {
+			t.Errorf("outputs lack %q:\n%s", want, outputs)
+		}
+	}
+	if strings.Contains(outputs, "etc") || strings.Contains(outputs, "rm") {
+		t.Errorf("an input that names no harness reached the outputs:\n%s", outputs)
+	}
+
+	cmd = exec.Command("bash", "reference/capture-plan.sh", out+"-none")
+	cmd.Stdin = strings.NewReader("")
+	if taken, err := cmd.Output(); err != nil || len(taken) > 0 {
+		t.Errorf("no builds: %q, %v", taken, err)
+	}
+	if _, err := os.Stat(out + "-none"); !os.IsNotExist(err) {
+		t.Errorf("no builds wrote outputs: %v", err)
 	}
 }

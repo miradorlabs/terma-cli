@@ -167,8 +167,9 @@ jobs:
 
   # The matrix, the field catalog and the Harness Reference: this run's rows, and the field census
   # and profiles it takes, merged into the published history, catalog and reference
-  # (docs/harnesses) and rendered, as an artefact and the run's summary; the frequent check
-  # publishes them (reference.yml). First the job says what the run changed against them
+  # (docs/harnesses) and rendered, as an artefact and the run's summary, never published: the
+  # frequent check (reference.yml) publishes its own captures. First the job says what the run
+  # changed against them
   # (compatgen -digest): new and removed fields per harness build, fields the relay withholds as
   # unclassified, capabilities whose result changed, and a census that did not run.
   compat:
@@ -221,7 +222,7 @@ jobs:
           # this run's or an earlier one's: a backfill that took no census still has it.
           # Every step stays in timeline.json (-timeline-steps 1000) until the reader's pages
           # load the timeline-<n>.json archives; then the default pages it.
-          go run ./refgen "${args[@]}" -catalog ../../docs/compat/fields.json -history ../../docs/compat/history.json -compat ../../docs/compat/compat.json -out ../../docs/harnesses -timeline-steps 1000 -fetch -source -announce "$RUNNER_TEMP/announcements.json"
+          go run ./refgen "${args[@]}" -catalog ../../docs/compat/fields.json -history ../../docs/compat/history.json -compat ../../docs/compat/compat.json -out ../../docs/harnesses -timeline-steps 1000 -fetch -source
           # The comparison of any two versions, run in the reader's browser: the same code that
           # made the diffs, built reproducibly, so an unchanged engine is no change on the branch.
           GOOS=js GOARCH=wasm go build -trimpath -buildvcs=false -ldflags='-s -w' -o ../../docs/harnesses/refdiff.wasm ./refdiff/wasm

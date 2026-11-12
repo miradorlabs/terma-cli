@@ -56,6 +56,12 @@ type night struct {
 
 type buildID struct{ harness, version string }
 
+// The notes a partial capture carries until a whole one replaces them.
+const (
+	failedNote     = "This build's capture failed; the frequent check tries it again."
+	unfinishedNote = "Part of this build's capture did not finish; the frequent check tries it again."
+)
+
 // builds are the builds the night has anything of, by harness then version.
 func (n night) builds() []buildID {
 	seen := map[buildID]bool{}
@@ -214,7 +220,7 @@ func (n night) tonight(id buildID) *Snapshot {
 	n.deriveSupport(s)
 	scrubMachine(s)
 	if len(present(s)) == 0 && slices.Contains(n.attempted, id) {
-		s.Capture = Capture{Partial: true, Notes: []string{"This build's capture failed; the frequent check tries it again."}}
+		s.Capture = Capture{Partial: true, Notes: []string{failedNote}}
 	}
 	return s
 }

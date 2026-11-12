@@ -1,16 +1,17 @@
 #!/usr/bin/env bash
 # Which harness builds the Harness Reference has yet to capture whole, so the frequent check
-# (reference.yml) captures each of them once, fully, within the quarter hour: its page and
-# changelog are published once, complete, and the night does not capture it again. A few
-# requests a harness: its registry's releases, and the published index. Prints one line a
+# (reference.yml) captures each of them once, fully, when it comes out: its page and changelog
+# are published once, with terma's verdict. A few requests a harness: its registry's releases,
+# and the published index. Prints one line a
 # harness with builds to capture, "harness=version,version", oldest first; prints nothing when
 # there are none.
 #
 # A build to capture is one of a harness's newest TERMA_REFERENCE_MAX (5) releases the reference
 # has not published (a backport released late among them), or one of its newest five published
 # builds where that one's capture was partial and its last attempt is TERMA_REFERENCE_RETRY_AFTER
-# seconds old (6 h): a capture that failed is tried again, four times a day, until five newer
-# builds are published. A harness the reference has never published is its newest build alone.
+# seconds old (6 h), until it has made TERMA_REFERENCE_MAX_ATTEMPTS (4) attempts: a capture that
+# failed is tried again, but neither every quarter hour nor for good. A harness the reference has
+# never published is its newest build alone.
 #
 # A registry or the reference that cannot be read is a warning, not a failure: the next check
 # catches up. Only a reference that says it has no index for a harness (404) makes it a harness
@@ -26,6 +27,7 @@ set -euo pipefail
 
 max=${TERMA_REFERENCE_MAX:-5}
 retry_after=${TERMA_REFERENCE_RETRY_AFTER:-21600}
+max_attempts=${TERMA_REFERENCE_MAX_ATTEMPTS:-4}
 registry=${TERMA_NPM_REGISTRY:-https://registry.npmjs.org}
 only=${TERMA_REFERENCE_HARNESSES:-}
 
@@ -91,14 +93,14 @@ read_index() {
 	esac
 }
 
-# retry is, of the published builds it is given, those whose capture was partial and whose last
-# attempt (attempted_at; captured_at before there was one) is old enough to try again. A time
-# that does not parse is an old one: the build is tried again rather than never.
+# retry is, of the published builds it is given, those whose capture was partial, with attempts to
+# spare, and whose last attempt (attempted_at; captured_at before there was one) is old enough to
+# try again. A time that does not parse is an old one: the build is tried again rather than never.
 retry() {
-	jq -r --argjson after "$retry_after" '
+	jq -r --argjson after "$retry_after" --argjson max "$max_attempts" '
 		$ARGS.positional as $builds
 		| .versions[] | select(.version as $v | $builds | index($v))
-		| select(.partial == true)
+		| select(.partial == true and (.attempts // 1) < $max)
 		| ((.attempted_at // .captured_at) as $at
 			| try ($at | sub("\\.[0-9]+"; "") | sub("[+-]00:00$"; "Z") | fromdateiso8601) catch 0) as $t
 		| select(now - $t > $after)

@@ -1226,3 +1226,30 @@ func TestReleaseWithoutProfileIsAnnounced(t *testing.T) {
 		t.Errorf("verdict = %q", v)
 	}
 }
+
+// A build no profile scenario captures (T3, its terma checks alone) is made whole by an attempt
+// whose jobs all finished, as a profiled build is by its profile; every attempt is counted.
+func TestUnprofiledBuildBecomesWhole(t *testing.T) {
+	dir := t.TempDir()
+	id := buildID{"t3", "0.1.9"}
+	rows := []HistoryEntry{{Harness: "t3", Version: "0.1.9", Platform: "darwin/arm64", Capability: "relay.telemetry", Result: "pass"}}
+	read := func() Snapshot {
+		var s Snapshot
+		if err := readJSON(filepath.Join(dir, "t3", "versions", "0.1.9.json"), &s); err != nil {
+			t.Fatal(err)
+		}
+		return s
+	}
+	if _, err := publish(dir, night{now: time.Now(), attempted: []buildID{id}, unfinished: []buildID{id}}, options{}); err != nil {
+		t.Fatal(err)
+	}
+	if s := read(); !s.Capture.Partial || s.Capture.Attempts != 1 {
+		t.Fatalf("an unfinished attempt: %+v", s.Capture)
+	}
+	if _, err := publish(dir, night{now: time.Now(), attempted: []buildID{id}, history: rows}, options{}); err != nil {
+		t.Fatal(err)
+	}
+	if s := read(); s.Capture.Partial || len(s.Capture.Notes) > 0 || s.Capture.Attempts != 2 || s.Support == nil {
+		t.Errorf("a finished attempt left the build: %+v", s.Capture)
+	}
+}
