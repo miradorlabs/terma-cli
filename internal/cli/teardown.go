@@ -166,10 +166,14 @@ func (app *App) removeHookState() error {
 	if err := errors.Join(errs...); err != nil {
 		return fmt.Errorf("remove the hooks' state: %w", err)
 	}
-	if sending != nil {
-		return fmt.Errorf("an image is still being sent, so its queue is kept: %w", sending)
+	switch {
+	case sending == nil:
+		return nil
+	case errors.Is(sending, context.DeadlineExceeded):
+		return errors.New("an image is still being sent, so its queue is kept")
+	default:
+		return fmt.Errorf("could not check the image queue, so it is kept: %w", sending)
 	}
-	return nil
 }
 
 // defaultImageSendWait is how long teardown waits for an image being sent.

@@ -105,6 +105,11 @@ that then does not come (an export arrived) resumes it (`relay.Options.Resume`).
 - **Boundaries.** `internal/relay/daemon` may import `delivery`, `spool` and `promptimage` (no
   boundary rule bans them; no import cycle). Wiring from `cli` is simplest and keeps the engine
   (`internal/relay`) free of `routing`.
+- **Prompts off.** A hook reads past the images of a team that does not collect prompts and keeps
+  nothing of them. Its read position lives in the agent's hook state, which teardown removes and
+  which is pruned after 14 days unread: a session resumed after either is read again from its start,
+  and images pasted while prompts were off go if prompts are on by then. Accepted: the policy then
+  collects them, and the platform folds an image it already has away.
 - **Doctor.** It keeps reading `image-spool/retry.json`. Its fix text stops saying doctor started a
   pass; it says the relay will retry at the window's end.
 

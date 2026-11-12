@@ -93,8 +93,8 @@ func captureClaudePromptImages(e hookrun.Env, r *hookrun.Repo, sessionID, transc
 		hookrun.BoundedAttr(ids, semconv.TermaPromptIDKey, p.PromptID)
 		for _, img := range p.Images {
 			// A store that cannot keep the bytes still lets the record say what the image was.
-			attrs, err := promptimage.Keep(e.StateDir, img, collect)
-			if err != nil {
+			attrs := img.Attrs()
+			if err := promptimage.Store(e.StateDir, img); err != nil {
 				e.Logf("prompt image: %v", err)
 			}
 			attrs[semconv.GenAIMainAgentNameKey] = claudeTool

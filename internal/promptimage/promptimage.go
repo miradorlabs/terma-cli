@@ -189,18 +189,6 @@ func ValidID(id string) bool {
 	return true
 }
 
-// Keep is what a terma.prompt.image record says of img, its bytes aside, and keeps those
-// bytes under stateDir for delivery when collect says the team takes them: an image the
-// policy withholds never leaves, so its bytes are not copied. An error is a store that could
-// not keep them; the record still says what the image was.
-func Keep(stateDir string, img Image, collect bool) (map[string]any, error) {
-	attrs := img.Attrs()
-	if !collect {
-		return attrs, nil
-	}
-	return attrs, Store(stateDir, img)
-}
-
 // Store keeps the image's bytes under stateDir until delivery has sent every record that
 // names them, once per id, the oldest images going first when the folder is full. An image
 // over MaxBytes is never sent, so it is not kept.

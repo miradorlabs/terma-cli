@@ -145,6 +145,21 @@ func TestCodexStopSpoolsPromptImages(t *testing.T) {
 	}
 }
 
+// A team that does not collect prompts never gets the image, so nothing of it is kept: no
+// record and no bytes.
+func TestCodexImagesKeepNothingWhenPromptsAreOff(t *testing.T) {
+	env := fundingEnv(t)
+	env.Policy.IncludePrompts = false
+	codexImageStop(t, env)
+	if images := hookruntest.Named(hookruntest.Queued(t, env.Images), semconv.TermaPromptImageEvent); len(images) != 0 {
+		t.Fatalf("spooled %d images the team does not collect", len(images))
+	}
+	img, _ := promptimage.FromDataURL(codexPixel)
+	if _, ok := promptimage.Load(env.StateDir, img.ID()); ok {
+		t.Fatal("bytes the team does not collect were kept")
+	}
+}
+
 // Images the image queue cannot take park with the events, as Claude Code's do, and the
 // next hook hands them on.
 func TestCodexImagesParkWhenTheImageQueueRefuses(t *testing.T) {

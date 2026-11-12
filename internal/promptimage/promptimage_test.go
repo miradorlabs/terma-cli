@@ -114,12 +114,6 @@ func TestAttrsAndStore(t *testing.T) {
 	if !ok || got != base64.StdEncoding.EncodeToString(img.Data) {
 		t.Fatalf("Load = %v", ok)
 	}
-	if a, err := Keep(dir, Image{Data: pngOf(t, 5, 5), MIMEType: "image/png"}, false); err != nil || a[semconv.TermaImageIDKey] == nil {
-		t.Fatalf("Keep withheld = %v, %v", a, err)
-	} else if _, ok := Load(dir, a[semconv.TermaImageIDKey].(string)); ok {
-		t.Fatal("an image the policy withholds was kept")
-	}
-
 	big := Image{Data: append(pngOf(t, 1, 1), make([]byte, MaxBytes)...), MIMEType: "image/png", Index: 2}
 	if big.Attrs()[semconv.TermaImageOmittedKey] != semconv.TermaImageOmittedTooLarge {
 		t.Fatalf("big attrs = %v", big.Attrs()[semconv.TermaImageOmittedKey])
