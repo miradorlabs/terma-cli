@@ -1,7 +1,16 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-12T17:37:10.713435881Z",
+  "generated_at": "2026-11-12T17:53:06.258113706Z",
   "events": [
+    {
+      "at": "2026-11-12T17:53:06.258113706Z",
+      "model": "gemini-4-hydrogen",
+      "vendor": "google",
+      "name": "Gemini 4 Hydrogen",
+      "event": "listed",
+      "changes": 0,
+      "highlights": []
+    },
     {
       "at": "2026-11-11T17:23:42.167641842Z",
       "model": "claude-sonnet-4-6",

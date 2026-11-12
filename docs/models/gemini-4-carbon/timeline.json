@@ -3,6 +3,33 @@
   "id": "gemini-4-carbon",
   "steps": [
     {
+      "at": "2026-11-12T17:53:06.258113706Z",
+      "event": "changed",
+      "changes": [
+        {
+          "id": "docs/whats_new",
+          "category": "docs",
+          "op": "changed",
+          "path": [
+            "docs",
+            "whats_new"
+          ],
+          "title": "What's new page changed (+221 −208 chars)",
+          "impact": "informational",
+          "before": null,
+          "after": null,
+          "text_diff": "@@ -12,7 +12,7 @@\n Like [Gemini 4 Argon](/docs/whats-new-gemini-4-argon), it supports a unified 1M-token context window, long decode up to 1M tokens, and tunable thinking levels (`low`, `medium`, `high`) at the same per-token price.\n \n {% card-grid %}\n-  {% card description=\"Test prompts and multimodal files with Gemini 4 Carbon in AI Studio.\" href=\"https://aistudio.google.com/prompts/new_chat?model=gemini-4-carbon\" icon=\"chat\" title=\"Try in Playground\" /%}\n+  {% card description=\"View token limits, supported capabilities, and full specifications.\" href=\"/docs/models/gemini-4-carbon\" icon=\"id_card\" title=\"Model card\" /%}\n \n   {% card description=\"Build and verify full-stack web and 3D apps with Gemini 4 Carbon.\" href=\"https://aistudio.google.com/apps?model=gemini-4-carbon\" icon=\"experiment\" title=\"Build in AI Studio\" /%}\n \n@@ -438,6 +438,7 @@\n ## Other models  {% id=\"other-models\" %}\n \n * [Latest Gemini models](/docs/latest-model)\n+* [Gemini 4 Hydrogen](/docs/whats-new-gemini-4-hydrogen)\n * [Gemini 4 Argon](/docs/whats-new-gemini-4-argon)\n * [Gemini 3.8 Flash](/docs/whats-new-gemini-3.8)\n * [Gemini 3.6 Flash and 3.5 Flash-Lite](/docs/whats-new-gemini-3.6)\n",
+          "stats": {
+            "added_chars": 221,
+            "removed_chars": 208
+          },
+          "terma": null,
+          "source": null,
+          "documented": null
+        }
+      ]
+    },
+    {
       "at": "2026-11-11T14:15:45.0307666Z",
       "event": "listed",
       "changes": []

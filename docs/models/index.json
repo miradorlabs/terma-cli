@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-12T17:37:10.713435881Z",
+  "generated_at": "2026-11-12T17:53:06.258113706Z",
   "vendors": [
     {
       "id": "anthropic",
@@ -21,7 +21,7 @@
       "name": "Google",
       "docs": "https://ai.google.dev/gemini-api/docs/models",
       "changelog": "https://ai.google.dev/gemini-api/docs/changelog",
-      "models": 16
+      "models": 17
     },
     {
       "id": "xai",
@@ -32,6 +32,24 @@
     }
   ],
   "models": [
+    {
+      "id": "gemini-4-hydrogen",
+      "vendor": "google",
+      "name": "Gemini 4 Hydrogen",
+      "family": "gemini-hydrogen",
+      "status": "active",
+      "released_at": "2026-11-12",
+      "first_seen": "2026-11-12T17:53:06.258113706Z",
+      "predecessor": null,
+      "successor": null,
+      "context_window": 1048576,
+      "max_output": 65536,
+      "knowledge_cutoff": null,
+      "reasoning": true,
+      "harnesses": [],
+      "last_change": null,
+      "probed": false
+    },
     {
       "id": "gemini-4-carbon",
       "vendor": "google",
@@ -47,7 +65,10 @@
       "knowledge_cutoff": "2026-03",
       "reasoning": true,
       "harnesses": [],
-      "last_change": null,
+      "last_change": {
+        "at": "2026-11-12T17:53:06.258113706Z",
+        "changes": 1
+      },
       "probed": false
     },
     {
@@ -309,7 +330,10 @@
       "knowledge_cutoff": null,
       "reasoning": true,
       "harnesses": [],
-      "last_change": null,
+      "last_change": {
+        "at": "2026-11-12T17:53:06.258113706Z",
+        "changes": 1
+      },
       "probed": false
     },
     {

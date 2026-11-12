@@ -3,6 +3,33 @@
   "id": "gemini-3.8-flash",
   "steps": [
     {
+      "at": "2026-11-12T17:53:06.258113706Z",
+      "event": "changed",
+      "changes": [
+        {
+          "id": "docs/whats_new",
+          "category": "docs",
+          "op": "changed",
+          "path": [
+            "docs",
+            "whats_new"
+          ],
+          "title": "What's new page changed (+56 −176 chars)",
+          "impact": "informational",
+          "before": null,
+          "after": null,
+          "text_diff": "@@ -5,8 +5,6 @@\n \n # What's new in Gemini 3.8 Flash\n \n-{% button href=\"/docs/latest-model\" variant=\"ais\" %}Latest model{% /button %} {% button href=\"/docs/whats-new-gemini-3.8#other-models\" variant=\"ais\" %}Other models{% /button %}\n-\n Gemini 3.8 Flash (`gemini-3.8-flash`) is our most intelligent Flash model, engineered for long-horizon software engineering, autonomous agents, and complex enterprise workflows.\n \n This guide explains what's new in Gemini 3.8 Flash, API changes, code examples, and migration guidance.\n@@ -467,6 +465,7 @@\n ## Other models  {% id=\"other-models\" %}\n \n * [Latest Gemini models](/docs/latest-model)\n+* [Gemini 4 Hydrogen](/docs/whats-new-gemini-4-hydrogen)\n * [Gemini 4 Carbon](/docs/whats-new-gemini-4-carbon)\n * [Gemini 4 Argon](/docs/whats-new-gemini-4-argon)\n * [Gemini 3.6 Flash and 3.5 Flash-Lite](/docs/whats-new-gemini-3.6)\n",
+          "stats": {
+            "added_chars": 56,
+            "removed_chars": 176
+          },
+          "terma": null,
+          "source": null,
+          "documented": null
+        }
+      ]
+    },
+    {
       "at": "2026-11-11T14:15:45.0307666Z",
       "event": "listed",
       "changes": []
