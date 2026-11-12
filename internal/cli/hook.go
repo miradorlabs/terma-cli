@@ -73,9 +73,8 @@ func (app *App) hookDeps() dispatch.Deps {
 				fmt.Fprintf(os.Stderr, "terma hook: this repository's commit hooks: %v\n", err)
 			}
 		},
-		Flush:       spawnFlush,
-		FlushImages: app.startImageFlush,
-		AwaitPush:   func(path string) { spawnDetached("spool", "await-push", path) },
+		Flush:     spawnFlush,
+		AwaitPush: func(path string) { spawnDetached("spool", "await-push", path) },
 	}
 }
 
@@ -123,10 +122,6 @@ func (app *App) openImageSpool() *spool.Spool {
 
 // spawnFlush is silent on failure: the next flush picks up whatever this one leaves.
 func spawnFlush() { spawnDetached("spool", "flush", "--quiet") }
-
-// spawnImageFlush starts the image lane's pass, silent on failure as spawnFlush is; one
-// already running makes it a no-op.
-func spawnImageFlush() { spawnDetached("spool", "flush", "--images", "--quiet") }
 
 // spawnDetached starts terma with args, detached from the hook that asks; it is silent on
 // failure.

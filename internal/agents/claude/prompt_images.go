@@ -104,9 +104,6 @@ func captureClaudePromptImages(e hookrun.Env, r *hookrun.Repo, sessionID, transc
 		}
 		return true
 	})
-	if spooled > 0 && e.FlushImages != nil {
-		e.FlushImages()
-	}
 	if err != nil {
 		e.Logf("prompt images: %v", err)
 	}

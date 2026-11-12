@@ -52,9 +52,6 @@ type Env struct {
 	// Flush, when set, starts detached delivery of what the spool holds, refreshing a stale
 	// policy first.
 	Flush func()
-	// FlushImages, when set, starts the image lane's detached delivery, once a hook has
-	// spooled an image.
-	FlushImages func()
 	// AwaitPush, when set, starts a detached AwaitPush for the push recorded at path.
 	AwaitPush func(path string)
 	// Policy is the organization's collection policy; global mode places every session in its DefaultProjectID.

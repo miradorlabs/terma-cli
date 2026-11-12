@@ -48,9 +48,8 @@ type Deps struct {
 	// Profile is the developer's setup as hooks read it locally.
 	Profile func() Profile
 	Spool   func() *spool.Spool
-	// Images opens the image lane's spool, and FlushImages starts its detached delivery.
-	Images      func() *spool.Spool
-	FlushImages func()
+	// Images opens the image lane's spool, which the relay sends.
+	Images func() *spool.Spool
 	// Claimed runs once a hook has claimed its session, with the checkout it claimed and
 	// the policy in force: the relay, and that repository's commit hooks.
 	Claimed func(cwd string, policy config.Policy)
@@ -139,8 +138,6 @@ func run(ctx context.Context, d Deps, r Request, handler agents.Handler, flush b
 		Team:      p.Team,
 		Agents:    p.Agents,
 	}
-	// An image the hook spools goes in a lane of its own.
-	env.FlushImages = d.FlushImages
 	if d.Images != nil {
 		env.Images = d.Images()
 	}

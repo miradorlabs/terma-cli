@@ -52,8 +52,6 @@ func TestClaudeStopSpoolsEachPastedImageOnce(t *testing.T) {
 		`{"type":"user","uuid":"u2","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t1","content":[{"type":"image","source":{"type":"base64","media_type":"image/png","data":"`+claudePixel+`"}}]}]}}`,
 		`{"type":"user","uuid":"u3","isSidechain":true,"message":{"role":"user","content":[{"type":"image","source":{"type":"base64","media_type":"image/png","data":"`+claudePixel+`"}}]}}`,
 	)
-	flushes := 0
-	env.FlushImages = func() { flushes++ }
 	stopClaude(t, env, path)
 	if images := hookruntest.Named(hookruntest.Spooled(t, env.Spool), semconv.TermaPromptImageEvent); len(images) != 0 {
 		t.Fatalf("%d images went to the events' spool", len(images))
@@ -87,9 +85,6 @@ func TestClaudeStopSpoolsEachPastedImageOnce(t *testing.T) {
 	}
 	if data, ok := promptimage.Load(env.StateDir, img.ID()); !ok || data != claudePixel {
 		t.Fatal("the image's bytes were not kept for delivery")
-	}
-	if flushes != 1 {
-		t.Fatalf("the image lane's delivery started %d times, want once", flushes)
 	}
 
 	appendTranscript(t, path, pastedRecord("u4", "p2", []int{3}, claudePixel)+"\n")

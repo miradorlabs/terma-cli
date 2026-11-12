@@ -112,17 +112,12 @@ func codexImageStop(t *testing.T, env hookrun.Env) {
 
 // With prompts consented, a turn's end spools each image the user put in its prompt to the
 // image queue under the turn's trace id, its bytes kept aside for delivery rather than in
-// the spool, and starts the image queue's delivery.
+// the spool.
 func TestCodexStopSpoolsPromptImages(t *testing.T) {
 	env := fundingEnv(t)
-	flushes := 0
-	env.FlushImages = func() { flushes++ }
 	codexImageStop(t, env)
 	if spooled := hookruntest.Named(hookruntest.Spooled(t, env.Spool), semconv.TermaPromptImageEvent); len(spooled) != 0 {
 		t.Fatalf("%d images went to the events' spool", len(spooled))
-	}
-	if flushes != 1 {
-		t.Fatalf("the image lane's delivery started %d times, want once", flushes)
 	}
 	images := hookruntest.Named(hookruntest.Spooled(t, env.Images), semconv.TermaPromptImageEvent)
 	if len(images) != 2 {

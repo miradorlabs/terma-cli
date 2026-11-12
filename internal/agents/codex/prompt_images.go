@@ -102,9 +102,6 @@ func captureCodexImages(ctx context.Context, e hookrun.Env, r *hookrun.Repo, in 
 		}
 		return nil
 	})
-	if spooled > 0 && e.FlushImages != nil {
-		e.FlushImages()
-	}
 	if err != nil && !errors.Is(err, context.DeadlineExceeded) {
 		e.Logf("codex images: %v", err)
 	}
