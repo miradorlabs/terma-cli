@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-12T05:15:55.281711967Z",
+  "generated_at": "2026-11-12T05:34:32.55702Z",
   "harnesses": [
     {
       "id": "claude",
@@ -18,10 +18,9 @@
         "to": "2.1.322",
         "at": "2026-11-12T05:15:55.281711967Z",
         "released_at": "2026-11-10T01:58:41.811Z",
-        "changes": 19,
+        "changes": 1,
         "categories": {
-          "config": 1,
-          "telemetry": 18
+          "config": 1
         }
       }
     },
@@ -67,11 +66,11 @@
         "to": "0.167.2",
         "at": "2026-11-12T05:15:55.281711967Z",
         "released_at": "2026-11-11T22:50:04.191Z",
-        "changes": 4,
+        "changes": 3,
         "categories": {
           "cli": 1,
           "config": 1,
-          "telemetry": 2
+          "telemetry": 1
         }
       }
     },
@@ -168,13 +167,12 @@
         "to": "0.68.0",
         "at": "2026-11-12T05:15:55.281711967Z",
         "released_at": "2026-11-10T21:22:49.277Z",
-        "changes": 38,
+        "changes": 6,
         "categories": {
           "config": 3,
           "hooks": 1,
           "request": 1,
-          "storage": 1,
-          "telemetry": 32
+          "storage": 1
         }
       }
     },

@@ -16,10 +16,9 @@
       "to": "2.1.322",
       "at": "2026-11-12T05:15:55.281711967Z",
       "released_at": "2026-11-10T01:58:41.811Z",
-      "changes": 19,
+      "changes": 1,
       "categories": {
-        "config": 1,
-        "telemetry": 18
+        "config": 1
       }
     }
   },
@@ -34,22 +33,19 @@
       ],
       "support": "supported",
       "previous": "2.1.321",
-      "changes": 19,
+      "changes": 1,
       "categories": {
-        "config": 1,
-        "telemetry": 18
+        "config": 1
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 19,
+        "informational": 1,
         "notable": 0
       },
-      "undocumented": 19,
+      "undocumented": 1,
       "highlights": [
-        "Telemetry export added",
-        "Telemetry surfaces.metrics/claude_code.active_time.total.monotonic added",
-        "Telemetry surfaces.metrics/claude_code.active_time.total.temporality added"
+        "fastMode description changed (+132 −72 chars)"
       ],
       "signing": "valid"
     },

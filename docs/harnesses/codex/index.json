@@ -20,11 +20,11 @@
       "to": "0.167.2",
       "at": "2026-11-12T05:15:55.281711967Z",
       "released_at": "2026-11-11T22:50:04.191Z",
-      "changes": 4,
+      "changes": 3,
       "categories": {
         "cli": 1,
         "config": 1,
-        "telemetry": 2
+        "telemetry": 1
       }
     }
   },
@@ -39,23 +39,23 @@
       ],
       "support": "supported",
       "previous": "0.167.1",
-      "changes": 4,
+      "changes": 3,
       "categories": {
         "cli": 1,
         "config": 1,
-        "telemetry": 2
+        "telemetry": 1
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 4,
+        "informational": 3,
         "notable": 0
       },
-      "undocumented": 3,
+      "undocumented": 2,
       "highlights": [
-        "Telemetry export.interval_ms.logs changed: 1000 → 500",
         "Telemetry surfaces.traces/auth.parents.traces/load_with_cli_overrides added",
-        "Full help text of `completion -h` changed (+105 −0 chars)"
+        "Full help text of `completion -h` changed (+105 −0 chars)",
+        "New setting: features.incremental_tools_legacy_gcp"
       ],
       "signing": "valid"
     },
@@ -69,23 +69,22 @@
       ],
       "support": "supported",
       "previous": "0.167.0",
-      "changes": 263,
+      "changes": 8,
       "categories": {
         "config": 1,
-        "filesystem": 7,
-        "telemetry": 255
+        "filesystem": 7
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 263,
+        "informational": 8,
         "notable": 0
       },
-      "undocumented": 263,
+      "undocumented": 8,
       "highlights": [
-        "Telemetry export added",
-        "Telemetry surfaces.metrics/codex.api_request.monotonic added",
-        "Telemetry surfaces.metrics/codex.api_request.temporality added"
+        "New setting: features.incremental_tools_legacy",
+        "Command no longer run: `<xcode>/usr/bin/xcodebuild -sdk <xcode>/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk -find gi …` (darwin/arm64)",
+        "Command no longer run: `sh -c <xcode>/usr/bin/xcodebuild -sdk <xcode>/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk -f …` (darwin/arm64)"
       ],
       "signing": "valid"
     },

@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-12T05:15:55.281711967Z",
+  "generated_at": "2026-11-12T05:34:32.55702Z",
   "versions": [
     {
       "harness": "codex",
@@ -14,23 +14,23 @@
       ],
       "support": "supported",
       "previous": "0.167.1",
-      "changes": 4,
+      "changes": 3,
       "categories": {
         "cli": 1,
         "config": 1,
-        "telemetry": 2
+        "telemetry": 1
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 4,
+        "informational": 3,
         "notable": 0
       },
-      "undocumented": 3,
+      "undocumented": 2,
       "highlights": [
-        "Telemetry export.interval_ms.logs changed: 1000 → 500",
         "Telemetry surfaces.traces/auth.parents.traces/load_with_cli_overrides added",
-        "Full help text of `completion -h` changed (+105 −0 chars)"
+        "Full help text of `completion -h` changed (+105 −0 chars)",
+        "New setting: features.incremental_tools_legacy_gcp"
       ],
       "signing": "valid"
     },
@@ -99,23 +99,22 @@
       ],
       "support": "supported",
       "previous": "0.167.0",
-      "changes": 263,
+      "changes": 8,
       "categories": {
         "config": 1,
-        "filesystem": 7,
-        "telemetry": 255
+        "filesystem": 7
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 263,
+        "informational": 8,
         "notable": 0
       },
-      "undocumented": 263,
+      "undocumented": 8,
       "highlights": [
-        "Telemetry export added",
-        "Telemetry surfaces.metrics/codex.api_request.monotonic added",
-        "Telemetry surfaces.metrics/codex.api_request.temporality added"
+        "New setting: features.incremental_tools_legacy",
+        "Command no longer run: `<xcode>/usr/bin/xcodebuild -sdk <xcode>/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk -find gi …` (darwin/arm64)",
+        "Command no longer run: `sh -c <xcode>/usr/bin/xcodebuild -sdk <xcode>/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk -f …` (darwin/arm64)"
       ],
       "signing": "valid"
     },
@@ -130,21 +129,20 @@
       ],
       "support": "supported",
       "previous": "0.67.0",
-      "changes": 38,
+      "changes": 6,
       "categories": {
         "config": 3,
         "hooks": 1,
         "request": 1,
-        "storage": 1,
-        "telemetry": 32
+        "storage": 1
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 34,
+        "informational": 2,
         "notable": 4
       },
-      "undocumented": 36,
+      "undocumented": 5,
       "highlights": [
         "Request endpoint changed",
         "Default of modelConfigs: {\"aliases\":{\"agent-history-provider-summarizer\":{\"modelCo… → {\"aliases\":{\"agent-history-provider-summarizer\":{\"modelCo…",
@@ -253,22 +251,19 @@
       ],
       "support": "supported",
       "previous": "2.1.321",
-      "changes": 19,
+      "changes": 1,
       "categories": {
-        "config": 1,
-        "telemetry": 18
+        "config": 1
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 19,
+        "informational": 1,
         "notable": 0
       },
-      "undocumented": 19,
+      "undocumented": 1,
       "highlights": [
-        "Telemetry export added",
-        "Telemetry surfaces.metrics/claude_code.active_time.total.monotonic added",
-        "Telemetry surfaces.metrics/claude_code.active_time.total.temporality added"
+        "fastMode description changed (+132 −72 chars)"
       ],
       "signing": "valid"
     },
