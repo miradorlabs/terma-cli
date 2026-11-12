@@ -1067,3 +1067,7 @@ attributes:
     type: int
     stability: development
     brief: How many processes the session started, the agent's own included.
+  - key: terma.governance.exited
+    type: boolean
+    stability: development
+    brief: Whether the agent's process exited; false when it started.

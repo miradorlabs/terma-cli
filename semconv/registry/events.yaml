@@ -772,3 +772,5 @@ events:
       - ref: terma.capture.surface
         requirement_level: required
       - ref: terma.governance.processes.count
+      - ref: terma.governance.exited
+        requirement_level: required

@@ -155,6 +155,8 @@ const (
 	TermaFilesPathsKey = "terma.files.paths"
 	// TermaFundingStatusKey is terma.funding.status: Whether the record carries who paid for the session.
 	TermaFundingStatusKey = "terma.funding.status"
+	// TermaGovernanceExitedKey is terma.governance.exited: Whether the agent's process exited; false when it started.
+	TermaGovernanceExitedKey = "terma.governance.exited"
 	// TermaGovernanceProcessesCountKey is terma.governance.processes.count: How many processes the session started, the agent's own included.
 	TermaGovernanceProcessesCountKey = "terma.governance.processes.count"
 	// TermaHookEventKey is terma.hook.event: The agent hook that produced the record.
