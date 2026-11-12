@@ -232,3 +232,42 @@ func TestRefusedBindingsAreNotBoundToPersonal(t *testing.T) {
 		t.Fatal("selected a team with no organization")
 	}
 }
+
+// An encoded wildcard is refused, a policy fetched for another
+// organization or environment never becomes a team's grant, and a 401 shows over a
+// suspension.
+func TestNoGrantFromEncodedEntriesOrForeignPolicies(t *testing.T) {
+	t.Parallel()
+	for _, raw := range []string{"github.com/acme/%2A", "github.com/acme%2F%2A", "github.com/acme/%61pi"} {
+		if _, ok := ParseEntry(raw, true); ok {
+			t.Errorf("parsed %q as an entry", raw)
+		}
+		if _, err := bindingKey(raw); err == nil {
+			t.Errorf("accepted %q as a binding key", raw)
+		}
+	}
+
+	s := fixture(t)
+	id := enrollment(t, s, "acme-platform")
+	for _, p := range []config.Policy{
+		{Mode: config.ModeRepo, TeamID: "acme-platform", OrganizationID: "clientco", Revision: 5, FetchedAt: now},
+		{Mode: config.ModeRepo, TeamID: "acme-platform", OrganizationID: "acme", AuthURL: "https://auth.other", Revision: 5, FetchedAt: now},
+	} {
+		if _, err := s.ApplyRefresh(Refresh{EnrollmentID: id, Epoch: s.team(id).Epoch, Policy: &p}); err == nil {
+			t.Errorf("a policy fetched under %s/%s became the team's grant", p.OrganizationID, p.AuthURL)
+		}
+	}
+	other := team("acme", "acme-mobile", "github.com/acme/api")
+	other.Policy.OrganizationID = "clientco"
+	if _, err := s.Select(other); err == nil {
+		t.Error("selected a team with another organization's policy")
+	}
+
+	_, err := s.ApplyRefresh(Refresh{EnrollmentID: id, Epoch: s.team(id).Epoch, Failure: Terminal})
+	must(t, err)
+	_, err = s.ApplyRefresh(Refresh{EnrollmentID: id, Epoch: s.team(id).Epoch, Failure: SignIn})
+	must(t, err)
+	if st := s.team(id).StateAt(now); st != SignInNeeded {
+		t.Fatalf("a 401 after a suspension shows %s", st)
+	}
+}

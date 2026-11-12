@@ -47,15 +47,15 @@ func segments(key string) int {
 	return len(parts)
 }
 
-// reinterpreted reports whether raw, as typed, has something Normalize would fold away or
-// cut off: an empty path segment, a query or a fragment. An entry or a binding key with
-// one is refused, never read as something wider, such as `github.com/acme/*?note` as
-// `github.com/acme/*`.
+// reinterpreted reports whether raw, as typed, has something Normalize would fold away,
+// cut off or decode: an empty path segment, a query, a fragment or a percent-encoding.
+// An entry or a binding key with one is refused, never read as something wider, such as
+// `github.com/acme/*?note` or `github.com/acme/%2A` as `github.com/acme/*`.
 func reinterpreted(raw string) bool {
 	if _, rest, ok := strings.Cut(raw, "://"); ok {
 		raw = rest
 	}
-	return strings.Contains(raw, "//") || strings.ContainsAny(raw, "?#")
+	return strings.Contains(raw, "//") || strings.ContainsAny(raw, "?#%")
 }
 
 // validRepo reports whether a normalised key names a repository: a host, an owner and a

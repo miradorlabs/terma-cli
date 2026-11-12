@@ -12,7 +12,7 @@ var now = time.Date(2026, 11, 12, 12, 0, 0, 0, time.UTC)
 // team is a selected team with a policy validated an hour before now.
 func team(org, id string, entries ...string) Team {
 	return Team{OrganizationID: org, TeamID: id, Policy: config.Policy{
-		Mode: config.ModeRepo, TeamID: id, Repositories: entries, Wildcards: true, Revision: 1,
+		Mode: config.ModeRepo, TeamID: id, OrganizationID: org, Repositories: entries, Wildcards: true, Revision: 1,
 		FetchedAt: now.Add(-time.Hour),
 	}}
 }
@@ -236,7 +236,7 @@ func TestAuthorityAndConsent(t *testing.T) {
 	t.Run("an organization's collect-everything policy collects nothing", func(t *testing.T) {
 		s := fixture(t)
 		_, err := s.ApplyRefresh(Refresh{EnrollmentID: s.Teams[0].EnrollmentID, Policy: &config.Policy{
-			Mode: config.ModeGlobal, TeamID: "acme-platform", Revision: 2, FetchedAt: now,
+			Mode: config.ModeGlobal, TeamID: "acme-platform", OrganizationID: "acme", Revision: 2, FetchedAt: now,
 		}})
 		must(t, err)
 		expect(t, s, repo("github.com/acme/api"), Drop, "")
