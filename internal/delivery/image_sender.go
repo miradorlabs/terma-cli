@@ -31,10 +31,9 @@ type ImageSender struct {
 	// after is the project the last pass started with; read the queue as it read it.
 	after string
 	read  spool.Stamp
-	// due is when the sender wakes by itself (nextDeadlines alone writes it); notBefore the
-	// earliest a deadline may start the next pass, after one that sent nothing.
-	due       deadlines
-	notBefore time.Time
+	// timing is when the sender wakes by itself and whether a wake runs a pass: its whole
+	// timing policy, worked out by timing.wake and timing.after alone.
+	timing timing
 	// heldMin and heldMax bound the wait for held images; heldMin is also the least a
 	// deadline-started pass that sent nothing waits before the next.
 	heldMin, heldMax time.Duration
@@ -119,49 +118,38 @@ func (s *ImageSender) Run(ctx context.Context) {
 		}
 		var fired <-chan time.Time
 		stop := func() bool { return false }
-		if at := s.wakeAt(); !at.IsZero() {
+		if at := s.timing.wakeAt(); !at.IsZero() {
 			fired, stop = s.timer(at.Sub(s.clock()))
 		}
-		woken := false
+		cause := wokeByTimer
 		select {
 		case <-ctx.Done():
 		case <-s.wake:
-			woken = true
+			cause = wokeByNudge
 		case <-fired:
 		}
 		stop()
 		if ctx.Err() != nil {
 			return
 		}
-		if woken && !s.due.passed(s.clock()) && s.router.Images.Stamp().Same(s.read) {
-			continue
+		changed := cause == wokeByNudge && !s.router.Images.Stamp().Same(s.read)
+		if run, forDeadline := s.timing.wake(cause, changed, s.clock()); run {
+			s.pass(ctx, forDeadline)
 		}
-		s.pass(ctx, !woken)
 	}
-}
-
-// wakeAt is when the sender wakes by itself: its next deadline, no earlier than notBefore.
-func (s *ImageSender) wakeAt() time.Time {
-	at := s.due.next()
-	if !at.IsZero() && at.Before(s.notBefore) {
-		at = s.notBefore
-	}
-	return at
 }
 
 // pass delivers the queue once, then notes what the next wake compares against: the queue
 // as the pass read it, so whatever was queued or settled since, by a hook or by the pass
-// itself, makes the next nudge run another pass; and its deadlines (nextDeadlines). A pass
-// its deadline started that sent nothing, or could not read the profile or the queue, has
-// the next deadline wait heldMin at least: whatever is wrong is retried slowly, never in a
-// loop.
-func (s *ImageSender) pass(ctx context.Context, byDeadline bool) {
+// itself, makes the next nudge run another pass; and its timing (timing.after). A pass that
+// could not read the profile or the queue notes the queue as it is now, so nudges wait for
+// it to change, or for the look heldMin on.
+func (s *ImageSender) pass(ctx context.Context, forDeadline bool) {
 	defer s.passes.Add(1)
-	out := passOutcome{heldLook: s.due.heldPassed(s.clock())}
+	out := passOutcome{heldLook: s.timing.due.heldPassed(s.clock())}
 	sent := false
 	if cfg, err := s.config(); err != nil {
 		s.logError(err)
-		s.read = spool.Stamp{}
 		out.unread = true
 	} else {
 		first := s.after
@@ -174,12 +162,66 @@ func (s *ImageSender) pass(ctx context.Context, byDeadline bool) {
 			s.logError(res.Err)
 		}
 	}
-	now := s.clock()
-	s.due = nextDeadlines(s.due, out, now, s.heldMin, s.heldMax)
-	s.notBefore = time.Time{}
-	if byDeadline && !sent {
-		s.notBefore = now.Add(s.heldMin)
+	if out.unread {
+		s.read = s.router.Images.Stamp()
 	}
+	s.timing = s.timing.after(out, forDeadline, sent, s.clock(), s.heldMin, s.heldMax)
+}
+
+// timing is the sender's timing policy's state: its deadlines, and notBefore, the earliest
+// a deadline may start a pass once one a deadline started sent nothing.
+type timing struct {
+	due       deadlines
+	notBefore time.Time
+}
+
+// wakeCause is what woke the sender.
+type wakeCause int
+
+const (
+	// wokeByNudge is an export the relay accepted; wokeByTimer the timer wakeAt armed.
+	wokeByNudge wakeCause = iota
+	wokeByTimer
+)
+
+// wake decides whether a wake runs a pass, and whether that pass is a deadline's. The timer
+// is armed at wakeAt, so its firing runs one, for the deadline. A nudge runs one when the
+// queue changed since the last pass read it; otherwise only for a deadline that has come,
+// and not while notBefore holds deadlines off.
+func (t timing) wake(cause wakeCause, queueChanged bool, now time.Time) (run, forDeadline bool) {
+	switch {
+	case cause == wokeByTimer:
+		return true, true
+	case queueChanged:
+		return true, false
+	case t.due.passed(now) && !now.Before(t.notBefore):
+		return true, true
+	}
+	return false, false
+}
+
+// wakeAt is when the sender wakes by itself: its next deadline, no earlier than notBefore.
+func (t timing) wakeAt() time.Time {
+	at := t.due.next()
+	if !at.IsZero() && at.Before(t.notBefore) {
+		at = t.notBefore
+	}
+	return at
+}
+
+// after is the timing once a pass ended at now with out: the deadlines nextDeadlines
+// works out, and notBefore, which only a pass that sent something clears, and which a
+// deadline's pass that sent nothing sets heldMin on: whatever is wrong is retried slowly,
+// never in a loop.
+func (t timing) after(out passOutcome, forDeadline, sent bool, now time.Time, heldMin, heldMax time.Duration) timing {
+	next := timing{due: nextDeadlines(t.due, out, now, heldMin, heldMax), notBefore: t.notBefore}
+	switch {
+	case sent:
+		next.notBefore = time.Time{}
+	case forDeadline:
+		next.notBefore = now.Add(heldMin)
+	}
+	return next
 }
 
 // deadlines are when the sender wakes by itself: a retry window's end, and the next look

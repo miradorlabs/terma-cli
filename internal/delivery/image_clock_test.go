@@ -3,6 +3,7 @@ package delivery
 import (
 	"context"
 	"errors"
+	"net/http"
 	"os"
 	"path/filepath"
 	"sync"
@@ -148,7 +149,7 @@ func TestAnUnreadableProfileDoesNotSpin(t *testing.T) {
 	s := NewImageSender(r, openSpool(t), func() (*config.Config, error) { return nil, errors.New("config.json: unreadable") })
 	s.Logf = func(string, ...any) { logged.Add(1) }
 	s.heldMin = 20 * time.Millisecond
-	s.due.windowEnds = time.Now().Add(-time.Second)
+	s.timing.due.windowEnds = time.Now().Add(-time.Second)
 	runSender(t, s)
 	time.Sleep(500 * time.Millisecond)
 	if n := s.passes.Load(); n > 30 {
@@ -167,13 +168,14 @@ func TestADeadlinePassThatSendsNothingWaits(t *testing.T) {
 	clk := newFakeClock()
 	s := onClock(NewImageSender(r, openSpool(t), func() (*config.Config, error) { return cfg, nil }), clk)
 	s.pass(t.Context(), true)
-	s.due.windowEnds = clk.Now().Add(-time.Second) // as a bug would leave it
-	if at := s.wakeAt(); at.Before(clk.Now().Add(s.heldMin)) {
+	s.timing.due.windowEnds = clk.Now().Add(-time.Second) // as a bug would leave it
+	if at := s.timing.wakeAt(); at.Before(clk.Now().Add(s.heldMin)) {
 		t.Fatalf("the next deadline pass may start at %v, before heldMin from now", at)
 	}
-	s.pass(t.Context(), false) // a nudge's: no wait
-	if s.notBefore.After(clk.Now()) {
-		t.Fatal("a nudged pass delayed the next deadline")
+	guard := s.timing.notBefore
+	s.pass(t.Context(), false) // a nudge's, sending nothing: the guard stands as it was
+	if !s.timing.notBefore.Equal(guard) {
+		t.Fatalf("a nudged pass that sent nothing moved the guard from %v to %v", guard, s.timing.notBefore)
 	}
 }
 
@@ -262,5 +264,121 @@ func TestAnUnreadableQueueIsMarked(t *testing.T) {
 	}
 	if res := r.FlushImages(t.Context(), openSpool(t), cfg, false); !res.Unread || res.Err == nil {
 		t.Fatalf("FlushImages = %+v", res)
+	}
+}
+
+// The sender's whole timing policy: when a wake runs a pass, and what a pass leaves.
+func TestTiming(t *testing.T) {
+	t.Parallel()
+	now := time.Date(2026, 11, 12, 12, 0, 0, 0, time.UTC)
+	past, ahead := now.Add(-time.Second), now.Add(time.Minute)
+	type woke struct {
+		cause   wakeCause
+		changed bool
+	}
+	for _, c := range []struct {
+		name             string
+		t                timing
+		woke             woke
+		run, forDeadline bool
+	}{
+		{"the timer", timing{}, woke{wokeByTimer, false}, true, true},
+		{"a nudge, the queue changed", timing{}, woke{wokeByNudge, true}, true, false},
+		{"a nudge, the queue changed, under the guard", timing{notBefore: ahead}, woke{wokeByNudge, true}, true, false},
+		{"a nudge, nothing new", timing{}, woke{wokeByNudge, false}, false, false},
+		{"a nudge, nothing new, a deadline come", timing{due: deadlines{windowEnds: past}}, woke{wokeByNudge, false}, true, true},
+		{"a nudge, nothing new, a deadline come, under the guard", timing{due: deadlines{windowEnds: past}, notBefore: ahead}, woke{wokeByNudge, false}, false, false},
+		{"a nudge, nothing new, a deadline ahead", timing{due: deadlines{heldDue: ahead}}, woke{wokeByNudge, false}, false, false},
+	} {
+		run, forDeadline := c.t.wake(c.woke.cause, c.woke.changed, now)
+		if run != c.run || forDeadline != c.forDeadline {
+			t.Errorf("%s: wake = %v, %v; want %v, %v", c.name, run, forDeadline, c.run, c.forDeadline)
+		}
+	}
+	if at := (timing{due: deadlines{windowEnds: past}, notBefore: ahead}).wakeAt(); !at.Equal(ahead) {
+		t.Errorf("wakeAt under the guard = %v, want %v", at, ahead)
+	}
+	const minWait = 30 * time.Second
+	for _, c := range []struct {
+		name              string
+		t                 timing
+		forDeadline, sent bool
+		want              time.Time
+	}{
+		{"a deadline's pass that sent nothing sets the guard", timing{}, true, false, now.Add(minWait)},
+		{"a deadline's pass that sent something clears it", timing{notBefore: ahead}, true, true, time.Time{}},
+		{"a nudge's pass that sent something clears it", timing{notBefore: ahead}, false, true, time.Time{}},
+		{"a nudge's pass that sent nothing leaves it", timing{notBefore: ahead}, false, false, ahead},
+	} {
+		if got := c.t.after(passOutcome{}, c.forDeadline, c.sent, now, minWait, time.Hour).notBefore; !got.Equal(c.want) {
+			t.Errorf("%s: notBefore = %v, want %v", c.name, got, c.want)
+		}
+	}
+}
+
+// A pass that could not read the profile notes the queue as it is, so nudges with nothing
+// new run no pass until the look heldMin on.
+func TestAnUnreadPassNotesTheQueue(t *testing.T) {
+	t.Parallel()
+	r, _, _ := imageFixture(t, &recorder{}, true)
+	queue(t, r.Images, imageEvent(pixelN(1)))
+	s := NewImageSender(r, openSpool(t), func() (*config.Config, error) { return nil, errors.New("config.json: unreadable") })
+	s.pass(t.Context(), false)
+	if !s.read.Same(r.Images.Stamp()) {
+		t.Fatal("an unread pass left the queue unnoted: every nudge would run another")
+	}
+}
+
+// A nudge while the guard holds deadlines off, with nothing new queued, runs no pass,
+// though a deadline has come: the guard holds for nudges as for the timer.
+func TestANudgeUnderTheGuardRunsNoPass(t *testing.T) {
+	t.Parallel()
+	rec := &recorder{status: http.StatusServiceUnavailable, refuse: func(string) bool { return true }}
+	r, cfg, stateDir := imageFixture(t, rec, true)
+	if err := keystore.Set(r.ConfigDir, "p2", testKey, keystore.Hosts{}); err != nil {
+		t.Fatal(err)
+	}
+	clk := newFakeClock()
+	img := pixelN(1)
+	store(t, stateDir, img)
+	theirs := imageEvent(img)
+	theirs.Attrs[hookrun.AttrProjectID] = "p2"
+	held := imageEvent(pixelN(2))
+	held.Attrs[hookrun.AttrProjectID] = "keyless"
+	queue(t, r.Images, theirs, held)
+	r.Images.DestinationFailed("p2", clk.Now().Add(-29*time.Second)) // ends within a second
+	s := onClock(NewImageSender(r, openSpool(t), func() (*config.Config, error) { return cfg, nil }), clk)
+	s.heldMin = 2 * time.Minute // a guard longer than p2's next window
+	runSender(t, s)
+	waitFor(t, "the first pass's timer", func() bool { return clk.armed() == 1 })
+	// The window ends; the host is between deploys (503): p2's image keeps its place, the
+	// queue is unchanged, a window of a minute opens, and the guard of two.
+	clk.Advance(2 * time.Second)
+	waitFor(t, "the deadline's pass", func() bool { return s.passes.Load() == 2 && clk.armed() == 1 })
+	clk.Advance(80 * time.Second) // p2's window is over; the guard is not
+	passes, loops := s.passes.Load(), s.loops.Load()
+	s.Nudge()
+	waitFor(t, "the nudge", func() bool { return s.loops.Load() > loops })
+	if n := s.passes.Load(); n != passes {
+		t.Fatalf("a nudge under the guard, with nothing new, ran %d passes", n-passes)
+	}
+}
+
+// A pass keeps one clock: the windows it opens start at its now, so a fake clock drives
+// their ends.
+func TestAPassKeepsItsOwnClock(t *testing.T) {
+	t.Parallel()
+	rec := &recorder{refuse: func(string) bool { return true }} // a 500
+	r, cfg, stateDir := imageFixture(t, rec, true)
+	img := pixelN(1)
+	store(t, stateDir, img)
+	queue(t, r.Images, imageEvent(img))
+	then := time.Now().Add(-time.Hour)
+	res := r.flushImages(t.Context(), openSpool(t), cfg, false, imageTurns{now: func() time.Time { return then }})
+	if len(res.Failures) != 1 {
+		t.Fatalf("flushImages = %+v", res)
+	}
+	if at := res.Failures[0].RetryAt; at.After(then.Add(time.Minute)) {
+		t.Fatalf("the window ends at %v, by another clock than the pass's %v", at, then)
 	}
 }

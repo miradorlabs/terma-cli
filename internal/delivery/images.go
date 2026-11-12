@@ -130,11 +130,12 @@ func (r Router) flushImages(ctx context.Context, events *spool.Spool, cfg *confi
 	if s == nil {
 		return ImageResult{Err: errNoImageLane}
 	}
-	now := time.Now()
-	if turns.now != nil {
-		now = turns.now()
+	clock := turns.now
+	if clock == nil {
+		clock = time.Now
 	}
-	p := &imagePass{s: s, accepted: map[string]bool{}}
+	now := clock()
+	p := &imagePass{s: s, accepted: map[string]bool{}, now: clock}
 	res := &p.res
 	queued, stamp, read, err := s.Read(ctx, now)
 	res.Expired, res.Pruned, res.Dropped = read.Expired, read.Pruned, read.Dropped
@@ -183,7 +184,7 @@ func (r Router) flushImages(ctx context.Context, events *spool.Spool, cfg *confi
 			// The keychain is locked or out of reach: as for the events, a failure, with a
 			// window doctor shows, asked again when it ends.
 			p.errs = append(p.errs, fmt.Errorf("%s: %w", id, err))
-			res.Failures = append(res.Failures, Failure{ProjectID: id, Err: err, RetryAt: s.DestinationFailed(id, time.Now())})
+			res.Failures = append(res.Failures, Failure{ProjectID: id, Err: err, RetryAt: s.DestinationFailed(id, clock())})
 			res.Failed += len(items)
 			continue
 		}
@@ -231,7 +232,9 @@ func (r Router) flushImages(ctx context.Context, events *spool.Spool, cfg *confi
 
 // imagePass is what one pass over the image queue has done so far.
 type imagePass struct {
-	s        *spool.Spool
+	s *spool.Spool
+	// now is the pass's clock, for the windows it judges and opens.
+	now      func() time.Time
 	res      ImageResult
 	errs     []error
 	accepted map[string]bool
@@ -254,7 +257,7 @@ func (p *imagePass) send(ctx context.Context, r Router, q *imageQueue, item imag
 	case err != nil:
 		// The queue's lock cannot be taken: a failure here, not the host's, with a window,
 		// so the image is tried again when it ends rather than at once.
-		p.res.Failures = append(p.res.Failures, Failure{ProjectID: q.id, Err: err, RetryAt: p.s.DestinationFailed(q.id, time.Now())})
+		p.res.Failures = append(p.res.Failures, Failure{ProjectID: q.id, Err: err, RetryAt: p.s.DestinationFailed(q.id, p.now())})
 		p.errs = append(p.errs, fmt.Errorf("take an image record: %w", err))
 		p.res.Failed++
 		return false
@@ -325,7 +328,7 @@ var imageRules = [imageOutcomes]imageRule{
 // project's other images wait for the window it opened.
 func (p *imagePass) record(ctx context.Context, q *imageQueue, item imageItem, sent imageSend) bool {
 	rule := imageRules[sent.outcome]
-	now := time.Now()
+	now := p.now()
 	switch rule.window {
 	case closeWindow:
 		p.s.DestinationDelivered(q.id, now)

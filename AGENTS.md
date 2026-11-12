@@ -32,7 +32,8 @@ internal/agents/        one package per coding agent; builtin/ is the only list 
 internal/hooks/         `terma hook <event>`: dispatch, runtime (hookrun), hook-file writers (hookmgr)
 internal/relay/         the local relay daemon
 internal/spool/         the local queue hooks append to
-internal/delivery/      sends the spool to each project, from a detached flush
+internal/delivery/      sends the spool to each project, from a detached flush, and the image
+                        queue from the relay's image sender
 internal/session/       session manifests and commit attribution
 internal/doctor/        `terma doctor` checks
 internal/setup/         `terma setup`; internal/globalmode/ writes the machine-wide hooks

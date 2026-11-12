@@ -55,8 +55,8 @@ type promptImageState struct {
 
 // captureClaudePromptImages spools one terma.prompt.image per image the user put in a
 // prompt since the last read to the image lane, its bytes kept aside for delivery, when a
-// turn stops or fails or the session ends, and starts the lane's delivery. They leave under
-// the title's consent while the team collects prompts.
+// turn stops or fails or the session ends; the relay sends them. They leave under the
+// title's consent while the team collects prompts.
 func captureClaudePromptImages(e hookrun.Env, r *hookrun.Repo, sessionID, transcript string) {
 	if transcript == "" || !session.ValidID(sessionID) || !titleConsented(e.Consent()) {
 		return
