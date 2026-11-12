@@ -35,7 +35,9 @@ type ImageResult struct {
 	// Rejected counts the records dropped because the host refused them even without their
 	// bytes, more than imageMaxAttempts times.
 	Rejected int
-	Err      error
+	// Unread says the queue could not be read: the pass did nothing else.
+	Unread bool
+	Err    error
 	// Failures names each project whose image the host refused, left unanswered or could not
 	// be reached for; Stalls each whose upload did not finish in its time (the uplink, which
 	// fails nothing). Both are requeued and back off the project's images.
@@ -111,13 +113,15 @@ func (r Router) FlushImages(ctx context.Context, events *spool.Spool, cfg *confi
 // after the project after names, so the one that went first last time goes last, and
 // records the one it started with in first; read, set, gets the queue's Stamp as the pass
 // read it; begin, set, is asked before each image and stops the pass when it says no (the
-// sender halted), and end is told when that image is done.
+// sender halted), and end is told when that image is done; now, set, is the clock the pass
+// judges windows and ages by.
 type imageTurns struct {
 	after string
 	first *string
 	read  *spool.Stamp
 	begin func() bool
 	end   func()
+	now   func() time.Time
 }
 
 // flushImages is FlushImages, with turns.
@@ -127,6 +131,9 @@ func (r Router) flushImages(ctx context.Context, events *spool.Spool, cfg *confi
 		return ImageResult{Err: errNoImageLane}
 	}
 	now := time.Now()
+	if turns.now != nil {
+		now = turns.now()
+	}
 	p := &imagePass{s: s, accepted: map[string]bool{}}
 	res := &p.res
 	queued, stamp, read, err := s.Read(ctx, now)
@@ -135,7 +142,7 @@ func (r Router) flushImages(ctx context.Context, events *spool.Spool, cfg *confi
 		*turns.read = stamp
 	}
 	if err != nil {
-		res.Err = err
+		res.Err, res.Unread = err, true
 		return *res
 	}
 	byProject := map[string][]imageItem{}

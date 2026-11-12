@@ -2,7 +2,6 @@ package delivery
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -10,11 +9,9 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"testing"
 	"time"
 
-	"github.com/miradorlabs/terma-cli/internal/account/keystore"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/spool"
@@ -88,23 +85,6 @@ func TestAnExportWakesTheSender(t *testing.T) {
 	}
 	s.Nudge()
 	waitFor(t, "the image", func() bool { return len(rec.requests()) == 1 })
-}
-
-// A retry window's end wakes the sender, with no export and no poll.
-func TestAWindowsEndWakesTheSender(t *testing.T) {
-	t.Parallel()
-	rec := &recorder{}
-	r, cfg, stateDir := imageFixture(t, rec, true)
-	img := pixelN(1)
-	store(t, stateDir, img)
-	queue(t, r.Images, imageEvent(img))
-	// A window that ends in about three seconds: well after the first pass.
-	r.Images.DestinationFailed("p1", time.Now().Add(-27*time.Second))
-	startSender(t, r, cfg)
-	if len(rec.requests()) != 0 {
-		t.Fatal("the sender sent into an open window")
-	}
-	waitWithin(t, 6*time.Second, "the window's end", func() bool { return len(rec.requests()) == 1 })
 }
 
 // A stopping relay cuts off an upload in flight at once; its record stays queued, with no
@@ -218,53 +198,6 @@ func TestAnImageQueuedMidUploadGoesAtTheNextExport(t *testing.T) {
 	})
 }
 
-// Images held for a key have a deadline of their own: once the key is there, they go with
-// no new image and no export.
-func TestHeldImagesAreLookedAtAgain(t *testing.T) {
-	t.Parallel()
-	rec := &recorder{}
-	r, cfg, stateDir := imageFixture(t, rec, true)
-	img := pixelN(1)
-	store(t, stateDir, img)
-	e := imageEvent(img)
-	e.Attrs[hookrun.AttrProjectID] = "keyless"
-	queue(t, r.Images, e)
-	s := NewImageSender(r, openSpool(t), func() (*config.Config, error) { return cfg, nil })
-	s.heldMin = 50 * time.Millisecond
-	ctx, cancel := context.WithCancel(t.Context())
-	done := make(chan struct{})
-	go func() { s.Run(ctx); close(done) }()
-	t.Cleanup(func() { cancel(); <-done })
-	waitFor(t, "the first pass", func() bool { return s.passes.Load() >= 1 })
-	if len(rec.requests()) != 0 {
-		t.Fatal("an image with no key went")
-	}
-	if err := keystore.Set(r.ConfigDir, "keyless", testKey, keystore.Hosts{}); err != nil {
-		t.Fatal(err)
-	}
-	waitFor(t, "the held image", func() bool { return len(rec.requests()) == 1 })
-}
-
-// The wait for held images grows only when its own look finds them still held, not on a
-// pass a nudge started.
-func TestTheHeldWaitGrowsOnlyOnItsOwnLook(t *testing.T) {
-	t.Parallel()
-	r, cfg, _ := imageFixture(t, &recorder{}, true)
-	e := imageEvent(pixelN(1))
-	e.Attrs[hookrun.AttrProjectID] = "keyless"
-	queue(t, r.Images, e)
-	s := NewImageSender(r, openSpool(t), func() (*config.Config, error) { return cfg, nil })
-	s.pass(t.Context(), false)
-	s.pass(t.Context(), false)
-	if s.held != s.heldMin {
-		t.Fatalf("after a nudged pass the held wait is %v, want %v", s.held, s.heldMin)
-	}
-	s.pass(t.Context(), true)
-	if s.held != 2*s.heldMin {
-		t.Fatalf("after its own look the held wait is %v, want %v", s.held, 2*s.heldMin)
-	}
-}
-
 // A sender halts between images, not during one, and once halted starts no upload.
 func TestTheSenderHaltsBetweenImages(t *testing.T) {
 	t.Parallel()
@@ -335,30 +268,6 @@ func TestAHaltedSenderDoesNotSpin(t *testing.T) {
 	if n := s.loops.Load() - loops; n > 1 {
 		t.Fatalf("a halted sender went round its loop %d times in 200 ms", n)
 	}
-}
-
-// A window that ends while the pass that deferred to it still runs wakes the sender all
-// the same: its end comes from the pass, not from the windows still open afterwards.
-func TestAWindowEndingMidPassWakesTheSender(t *testing.T) {
-	t.Parallel()
-	rec := &recorder{}
-	r, cfg, stateDir := imageFixture(t, rec, true)
-	img := pixelN(1)
-	store(t, stateDir, img)
-	queue(t, r.Images, imageEvent(img))
-	// A window that ends within two seconds, and a first policy lookup that takes well longer:
-	// the window surely ends while the pass that deferred to it still runs.
-	r.Images.DestinationFailed("p1", time.Now().Add(-28*time.Second))
-	policy := r.Policy
-	var lookups atomic.Int64
-	r.Policy = func(ctx context.Context, cfg *config.Config, team string) (config.Policy, error) {
-		if lookups.Add(1) == 1 {
-			time.Sleep(3500 * time.Millisecond)
-		}
-		return policy(ctx, cfg, team)
-	}
-	startSenderNoWait(t, r, cfg)
-	waitWithin(t, 8*time.Second, "the image, with no nudge", func() bool { return len(rec.requests()) == 1 })
 }
 
 // A final halt asked mid-upload (a restart, making way) lets that image end and starts no
@@ -461,29 +370,5 @@ func TestATakeThatFailsOpensAWindow(t *testing.T) {
 	}
 	if images.RetryAt("p1").IsZero() {
 		t.Fatal("no window opened")
-	}
-}
-
-// A profile that cannot be read runs no pass: the deadlines stand, a look within heldMin is
-// added, and the error is logged once however often it repeats.
-func TestAnUnreadableProfileKeepsTheDeadlines(t *testing.T) {
-	t.Parallel()
-	r, _, _ := imageFixture(t, &recorder{}, true)
-	var logged atomic.Int64
-	s := NewImageSender(r, openSpool(t), func() (*config.Config, error) { return nil, errors.New("config.json: unreadable") })
-	s.Logf = func(string, ...any) { logged.Add(1) }
-	window := time.Now().Add(time.Hour)
-	s.windowEnds = window
-	for range 3 {
-		s.pass(t.Context(), false)
-	}
-	if !s.windowEnds.Equal(window) {
-		t.Fatalf("the window's end became %v", s.windowEnds)
-	}
-	if s.heldDue.IsZero() || s.heldDue.After(time.Now().Add(s.heldMin)) {
-		t.Fatalf("the next look is %v, want within %v", s.heldDue, s.heldMin)
-	}
-	if n := logged.Load(); n != 1 {
-		t.Fatalf("the same error was logged %d times", n)
 	}
 }

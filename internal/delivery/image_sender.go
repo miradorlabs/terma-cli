@@ -28,19 +28,22 @@ type ImageSender struct {
 	halting atomic.Bool
 	passes  atomic.Int64
 	loops   atomic.Int64
-	// after is the project the last pass started with; read the queue as it read it;
-	// windowEnds the earliest retry window's end, zero for none.
-	after      string
-	read       spool.Stamp
-	windowEnds time.Time
-	// held is how long images held for what they need wait for the next look, which is
-	// heldDue: heldMin, doubling to heldMax each time that look finds them still held.
-	held             time.Duration
-	heldDue          time.Time
+	// after is the project the last pass started with; read the queue as it read it.
+	after string
+	read  spool.Stamp
+	// due is when the sender wakes by itself (nextDeadlines alone writes it); notBefore the
+	// earliest a deadline may start the next pass, after one that sent nothing.
+	due       deadlines
+	notBefore time.Time
+	// heldMin and heldMax bound the wait for held images; heldMin is also the least a
+	// deadline-started pass that sent nothing waits before the next.
 	heldMin, heldMax time.Duration
 	// lastErr is the error last logged, when.
 	lastErr    string
 	lastLogged time.Time
+	// clock and timer are time.Now and time.NewTimer, but for tests.
+	clock func() time.Time
+	timer func(d time.Duration) (<-chan time.Time, func() bool)
 }
 
 // The sender's states. It moves between idle and uploading around each image, and from idle
@@ -57,7 +60,11 @@ const (
 // are swept (FlushImages).
 func NewImageSender(r Router, events *spool.Spool, config func() (*config.Config, error)) *ImageSender {
 	return &ImageSender{router: r, events: events, config: config, wake: make(chan struct{}, 1),
-		heldMin: 30 * time.Second, heldMax: time.Hour}
+		heldMin: 30 * time.Second, heldMax: time.Hour, clock: time.Now,
+		timer: func(d time.Duration) (<-chan time.Time, func() bool) {
+			t := time.NewTimer(d)
+			return t.C, t.Stop
+		}}
 }
 
 // Nudge wakes the sender, without waiting: the relay accepted an export.
@@ -110,87 +117,147 @@ func (s *ImageSender) Run(ctx context.Context) {
 			<-ctx.Done()
 			return
 		}
-		var deadline <-chan time.Time
-		var timer *time.Timer
-		if next := s.next(); !next.IsZero() {
-			timer = time.NewTimer(time.Until(next))
-			deadline = timer.C
+		var fired <-chan time.Time
+		stop := func() bool { return false }
+		if at := s.wakeAt(); !at.IsZero() {
+			fired, stop = s.timer(at.Sub(s.clock()))
 		}
 		woken := false
 		select {
 		case <-ctx.Done():
 		case <-s.wake:
 			woken = true
-		case <-deadline:
+		case <-fired:
 		}
-		if timer != nil {
-			timer.Stop()
-		}
+		stop()
 		if ctx.Err() != nil {
 			return
 		}
-		now := time.Now()
-		heldLook := !s.heldDue.IsZero() && !now.Before(s.heldDue)
-		windowEnded := !s.windowEnds.IsZero() && !now.Before(s.windowEnds)
-		if woken && !heldLook && !windowEnded && s.router.Images.Stamp().Same(s.read) {
+		if woken && !s.due.passed(s.clock()) && s.router.Images.Stamp().Same(s.read) {
 			continue
 		}
-		s.pass(ctx, heldLook)
+		s.pass(ctx, !woken)
 	}
 }
 
-// next is the sender's next deadline: a window's end or the next look at held images.
-func (s *ImageSender) next() time.Time {
-	switch {
-	case s.windowEnds.IsZero():
-		return s.heldDue
-	case s.heldDue.IsZero() || s.windowEnds.Before(s.heldDue):
-		return s.windowEnds
+// wakeAt is when the sender wakes by itself: its next deadline, no earlier than notBefore.
+func (s *ImageSender) wakeAt() time.Time {
+	at := s.due.next()
+	if !at.IsZero() && at.Before(s.notBefore) {
+		at = s.notBefore
 	}
-	return s.heldDue
+	return at
 }
 
 // pass delivers the queue once, then notes what the next wake compares against: the queue
 // as the pass read it, so whatever was queued or settled since, by a hook or by the pass
-// itself, makes the next nudge run another pass. heldLook says the held images' deadline
-// started it: only that look, finding them still held, lengthens the next wait.
-func (s *ImageSender) pass(ctx context.Context, heldLook bool) {
+// itself, makes the next nudge run another pass; and its deadlines (nextDeadlines). A pass
+// its deadline started that sent nothing, or could not read the profile or the queue, has
+// the next deadline wait heldMin at least: whatever is wrong is retried slowly, never in a
+// loop.
+func (s *ImageSender) pass(ctx context.Context, byDeadline bool) {
 	defer s.passes.Add(1)
-	cfg, err := s.config()
-	if err != nil {
-		// No pass, so the deadlines stand; and nothing says when the profile is readable
-		// again, so the sender looks again within heldMin as for held images.
+	out := passOutcome{heldLook: s.due.heldPassed(s.clock())}
+	sent := false
+	if cfg, err := s.config(); err != nil {
 		s.logError(err)
 		s.read = spool.Stamp{}
-		if next := time.Now().Add(s.heldMin); s.heldDue.IsZero() || next.Before(s.heldDue) {
-			s.heldDue = next
+		out.unread = true
+	} else {
+		first := s.after
+		res := s.router.flushImages(ctx, s.events, cfg, false,
+			imageTurns{after: s.after, first: &first, read: &s.read, begin: s.begin, end: s.end, now: s.clock})
+		s.after = first
+		out.unread, out.held, out.window = res.Unread, res.Held > 0, res.nextWindow()
+		sent = res.Sent > 0
+		if res.Err != nil && ctx.Err() == nil {
+			s.logError(res.Err)
 		}
-		return
 	}
-	first := s.after
-	res := s.router.flushImages(ctx, s.events, cfg, false,
-		imageTurns{after: s.after, first: &first, read: &s.read, begin: s.begin, end: s.end})
-	s.after = first
-	held := res.Held > 0
-	if res.Err != nil && ctx.Err() == nil {
-		s.logError(res.Err)
+	now := s.clock()
+	s.due = nextDeadlines(s.due, out, now, s.heldMin, s.heldMax)
+	s.notBefore = time.Time{}
+	if byDeadline && !sent {
+		s.notBefore = now.Add(s.heldMin)
 	}
-	// The windows this pass waited out or opened, as it saw them: one that ended while the
-	// pass ran is a deadline already past, which wakes the next pass at once.
-	s.windowEnds = res.nextWindow()
-	now := time.Now()
+}
+
+// deadlines are when the sender wakes by itself: a retry window's end, and the next look
+// at images held for what they need (a key, a policy), which waits held.
+type deadlines struct {
+	windowEnds, heldDue time.Time
+	held                time.Duration
+}
+
+// next is the earlier deadline, zero for none.
+func (d deadlines) next() time.Time {
 	switch {
-	case !held:
-		s.held, s.heldDue = 0, time.Time{}
-	case s.held == 0:
-		// Nothing tells the sender a key or a policy arrived: it looks again, less often.
-		s.held = s.heldMin
-	case heldLook:
-		s.held = min(2*s.held, s.heldMax)
+	case d.windowEnds.IsZero():
+		return d.heldDue
+	case d.heldDue.IsZero() || d.windowEnds.Before(d.heldDue):
+		return d.windowEnds
 	}
-	if held {
-		s.heldDue = now.Add(s.held)
+	return d.heldDue
+}
+
+// passed reports whether a deadline has come at now.
+func (d deadlines) passed(now time.Time) bool {
+	next := d.next()
+	return !next.IsZero() && !now.Before(next)
+}
+
+// heldPassed reports whether the look at held images has come at now.
+func (d deadlines) heldPassed(now time.Time) bool {
+	return !d.heldDue.IsZero() && !now.Before(d.heldDue)
+}
+
+// passOutcome is what a pass learned for the deadlines.
+type passOutcome struct {
+	// unread is a pass that could not read the profile or the queue, and did nothing.
+	unread bool
+	// window is the earliest end of the windows it waited out or opened (nextWindow).
+	window time.Time
+	// held says images were held for what they need; heldLook that the held images'
+	// deadline came as the pass started.
+	held, heldLook bool
+}
+
+// nextDeadlines is the sender's deadlines after a pass that ended at now with out, from
+// prev: the one place they are worked out. A deadline already past is never kept. A pass
+// that read nothing keeps the deadlines still ahead and looks again within heldMin, nothing
+// telling it when the profile or the queue can be read. Otherwise the window's end is the
+// pass's own, due at once if it ended while the pass ran; the held images' wait starts at
+// heldMin and doubles, to heldMax, only when their own look found them still held.
+func nextDeadlines(prev deadlines, out passOutcome, now time.Time, heldMin, heldMax time.Duration) deadlines {
+	ahead := func(t time.Time) time.Time {
+		if t.After(now) {
+			return t
+		}
+		return time.Time{}
 	}
+	if out.unread {
+		d := deadlines{windowEnds: ahead(prev.windowEnds), heldDue: ahead(prev.heldDue), held: prev.held}
+		if look := now.Add(heldMin); d.heldDue.IsZero() || look.Before(d.heldDue) {
+			d.heldDue = look
+		}
+		return d
+	}
+	d := deadlines{windowEnds: out.window}
+	if !d.windowEnds.IsZero() && !d.windowEnds.After(now) {
+		d.windowEnds = now
+	}
+	switch {
+	case !out.held:
+		return d
+	case prev.held == 0:
+		d.held = heldMin
+	case out.heldLook:
+		d.held = min(2*prev.held, heldMax)
+	default:
+		d.held = prev.held
+	}
+	d.heldDue = now.Add(d.held)
+	return d
 }
 
 // errorLogEvery is how often the sender logs an error it already logged.
@@ -199,9 +266,9 @@ const errorLogEvery = 10 * time.Minute
 // logError tells Logf of err, once while it repeats, again every errorLogEvery.
 func (s *ImageSender) logError(err error) {
 	msg := err.Error()
-	if s.Logf == nil || msg == s.lastErr && time.Since(s.lastLogged) < errorLogEvery {
+	if s.Logf == nil || msg == s.lastErr && s.clock().Sub(s.lastLogged) < errorLogEvery {
 		return
 	}
-	s.lastErr, s.lastLogged = msg, time.Now()
+	s.lastErr, s.lastLogged = msg, s.clock()
 	s.Logf("image sender: %s", msg)
 }
