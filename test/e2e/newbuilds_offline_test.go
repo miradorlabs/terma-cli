@@ -147,8 +147,15 @@ func TestCaptureArgs(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	// The desktop job failed for one app: the other's profile is there.
+	if err := os.MkdirAll(filepath.Join(runs, "profiles-desktop"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(runs, "profiles-desktop", "profiles.json"), []byte(`[{"harness":"codex-desktop","version":"26.1106.1"}]`+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	cmd := exec.Command("bash", "reference/capture-args.sh", runs)
-	cmd.Env = append(cmd.Environ(), "BUILDS=claude=2.1.1\ngemini=0.9.0\ncodex=0.200.0\nclaude-desktop=1.2.0",
+	cmd.Env = append(cmd.Environ(), "BUILDS=claude=2.1.1\ngemini=0.9.0\ncodex=0.200.0\nclaude-desktop=1.2.0\ncodex-desktop=26.1106.1",
 		"CLAUDE_BUILDS=2.1.1", "CODEX_BUILDS=0.200.0", "DESKTOP_CAPTURE=failure")
 	out, err := cmd.Output()
 	if err != nil {
@@ -159,11 +166,19 @@ func TestCaptureArgs(t *testing.T) {
 		"-attempted", "claude=2.1.1",
 		"-attempted", "gemini=0.9.0",
 		"-attempted", "codex=0.200.0", "-unfinished", "codex=0.200.0", // macOS wrote nothing
-		"-attempted", "claude-desktop=1.2.0", "-unfinished", "claude-desktop=1.2.0", // the desktop job failed
+		"-attempted", "claude-desktop=1.2.0", "-unfinished", "claude-desktop=1.2.0", // the desktop job failed, recording nothing of it
+		"-attempted", "codex-desktop=26.1106.1", // recorded beside it
 		"-unfinished", "claude=2.1.1", "-unfinished", "codex=0.200.0", // Linux wrote nothing
 	}
 	if !slices.Equal(got, want) {
 		t.Errorf("capture-args.sh =\n%s\nwant\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
+	}
+
+	// A desktop job that succeeded finished every app it ran.
+	cmd = exec.Command("bash", "reference/capture-args.sh", t.TempDir())
+	cmd.Env = append(cmd.Environ(), "BUILDS=claude-desktop=1.2.0", "DESKTOP_CAPTURE=success")
+	if out, err := cmd.Output(); err != nil || strings.TrimSpace(string(out)) != "-attempted\nclaude-desktop=1.2.0" {
+		t.Errorf("a desktop job that succeeded: %q, %v", out, err)
 	}
 }
 
