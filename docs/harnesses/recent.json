@@ -1,7 +1,39 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-12T20:46:56.111817078Z",
+  "generated_at": "2026-11-12T23:16:49.659858398Z",
   "versions": [
+    {
+      "harness": "copilot",
+      "name": "GitHub Copilot CLI",
+      "version": "1.0.110",
+      "released_at": "2026-11-12T22:59:46.318Z",
+      "captured_at": "2026-11-12T23:16:49.659858398Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "1.0.109",
+      "changes": 16,
+      "categories": {
+        "cli": 3,
+        "config": 10,
+        "storage": 1,
+        "tools": 2
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 13,
+        "notable": 3
+      },
+      "undocumented": 3,
+      "highlights": [
+        "run_dynamic_workflow tool parameters changed",
+        "run_dynamic_workflow tool parameter limits: description changed (+154 −64 chars)",
+        "Flag removed: `copilot --plain-diff`"
+      ],
+      "signing": "valid"
+    },
     {
       "harness": "claude",
       "name": "Claude Code",
@@ -6181,41 +6213,6 @@
         "System prompt changed (+276 −173 chars)",
         "Tool removed: close_agent",
         "Tool removed: resume_agent"
-      ],
-      "signing": "valid"
-    },
-    {
-      "harness": "codex",
-      "name": "Codex CLI",
-      "version": "0.132.0",
-      "released_at": "2026-05-20T02:39:00.388Z",
-      "captured_at": "2026-11-05T09:54:28.532441Z",
-      "platforms": [
-        "darwin/arm64",
-        "linux/amd64"
-      ],
-      "support": "untested",
-      "previous": "0.131.0",
-      "changes": 12,
-      "categories": {
-        "binary": 2,
-        "cli": 4,
-        "config": 1,
-        "filesystem": 1,
-        "prompt": 1,
-        "tools": 3
-      },
-      "impact": {
-        "breaking": 0,
-        "degrading": 0,
-        "informational": 7,
-        "notable": 5
-      },
-      "undocumented": 5,
-      "highlights": [
-        "System prompt changed (+385 −429 chars)",
-        "spawn_agent tool description changed (+641 −2100 chars)",
-        "view_image tool parameter detail: description changed (+94 −85 chars)"
       ],
       "signing": "valid"
     }

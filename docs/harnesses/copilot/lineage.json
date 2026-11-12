@@ -3,8 +3,8 @@
   "harness": "copilot",
   "window": {
     "oldest": "1.0.105",
-    "newest": "1.0.109",
-    "builds": 5
+    "newest": "1.0.110",
+    "builds": 6
   },
   "items": {
     "cli.commands.copilot app": {
@@ -1420,8 +1420,8 @@
       "ranges": [
         {
           "since": "1.0.105",
-          "until": null,
-          "removed": null
+          "until": "1.0.109",
+          "removed": "1.0.110"
         }
       ],
       "since_bounded": false
@@ -3532,8 +3532,8 @@
       "ranges": [
         {
           "since": "1.0.105",
-          "until": null,
-          "removed": null
+          "until": "1.0.109",
+          "removed": "1.0.110"
         }
       ],
       "since_bounded": false

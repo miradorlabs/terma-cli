@@ -3,6 +3,140 @@
   "harness": "copilot",
   "steps": [
     {
+      "version": "1.0.110",
+      "previous": "1.0.109",
+      "changes": [
+        {
+          "id": "tools.run_dynamic_workflow.input_schema.description",
+          "category": "tools",
+          "op": "changed",
+          "title": "run_dynamic_workflow tool parameters changed",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "tools.run_dynamic_workflow.input_schema.properties.limits.description",
+          "category": "tools",
+          "op": "changed",
+          "title": "run_dynamic_workflow tool parameter limits: description changed (+154 −64 chars)",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "cli.commands.copilot.options.--plain-diff",
+          "category": "cli",
+          "op": "removed",
+          "title": "Flag removed: `copilot --plain-diff`",
+          "impact": "notable",
+          "documented": true
+        },
+        {
+          "id": "cli.help.--help",
+          "category": "cli",
+          "op": "changed",
+          "title": "Full help text of `--help` changed (+0 −124 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "cli.help.help environment",
+          "category": "cli",
+          "op": "changed",
+          "title": "Full help text of `help environment` changed (+473 −549 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.aiSecretDetection.description",
+          "category": "config",
+          "op": "changed",
+          "title": "aiSecretDetection description changed (+297 −185 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.experimental.description",
+          "category": "config",
+          "op": "changed",
+          "title": "experimental description changed (+284 −29 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.sandbox.sandboxLspServers.description",
+          "category": "config",
+          "op": "changed",
+          "title": "sandbox.sandboxLspServers description changed (+302 −50 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.sandbox.sandboxMcpServers.description",
+          "category": "config",
+          "op": "changed",
+          "title": "sandbox.sandboxMcpServers description changed (+402 −50 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.sandbox.userPolicy.filesystem.deniedPaths.description",
+          "category": "config",
+          "op": "changed",
+          "title": "sandbox.userPolicy.filesystem.deniedPaths description changed (+300 −0 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.sandbox.userPolicy.filesystem.readonlyPaths.description",
+          "category": "config",
+          "op": "changed",
+          "title": "sandbox.userPolicy.filesystem.readonlyPaths description changed (+363 −0 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.sandbox.userPolicy.filesystem.readwritePaths.description",
+          "category": "config",
+          "op": "changed",
+          "title": "sandbox.userPolicy.filesystem.readwritePaths description changed (+363 −0 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.sandbox.userPolicy.network.allowedHosts.description",
+          "category": "config",
+          "op": "changed",
+          "title": "sandbox.userPolicy.network.allowedHosts description changed (+633 −191 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.sandbox.userPolicy.network.blockedHosts.description",
+          "category": "config",
+          "op": "changed",
+          "title": "sandbox.userPolicy.network.blockedHosts description changed (+597 −208 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.env_vars.PLAIN_DIFF",
+          "category": "config",
+          "op": "removed",
+          "title": "Environment variable no longer read: PLAIN_DIFF",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "storage.logs.path",
+          "category": "storage",
+          "op": "changed",
+          "title": "On-disk logs path changed",
+          "impact": "informational",
+          "documented": true
+        }
+      ]
+    },
+    {
       "version": "1.0.109",
       "previous": "1.0.108",
       "changes": [
