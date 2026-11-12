@@ -324,8 +324,9 @@ network egress, what it writes to disk and what its binary says of itself. The r
 placeholders), builds its snapshot with its field census and its capability history, merges
 it into the published snapshots (a section the night did not capture keeps the last night's),
 compares each harness's versions in order, checks each change against the vendor's changelog,
-and writes `docs/harnesses/`. The nightly `compat` job runs it after compatgen and publishes
-the tree on `compat-matrix` beside the matrix; `publish.sh restore` starts each night from it.
+and writes `docs/harnesses/`. The frequent check (`reference.yml`) runs it for the builds it
+captures, and the nightly `compat` job after compatgen; both publish the tree on `compat-matrix`
+beside the matrix, and `publish.sh restore` starts each from it.
 
 ```sh
 make run RUN='^(TestClaudeProfile|TestCodexProfile)$'
@@ -414,14 +415,27 @@ unless the machine is a GitHub-hosted runner (`GITHUB_ACTIONS=true`,
 (`latest`, `lastN` or versions the feed lists); `TERMA_E2E_DESKTOP_DEBUG` keeps screenshots,
 the window's accessibility tree and the app's logs.
 
-Harnesses release more often than nightly, so `reference.yml` checks every quarter hour:
-`reference/new-builds.sh` asks each registry for builds newer than the newest the reference
-has published (a few requests, no build; nothing else runs when nothing is new), and only
-then captures those builds' profiles on macOS and publishes the reference alone
-(`publish.sh publish-reference`). A build it set out to capture is published even where the
-capture failed, partial (`refgen -attempted`), so the next check does not take it for new
-again; the night tries it again. Its publish job and the nightly compat job share a
-concurrency group, so they never push `compat-matrix` at once.
+Each build is captured once, whole, when it comes out. `reference.yml` checks every quarter
+hour: `reference/new-builds.sh` asks each registry for the builds the reference has yet to
+capture whole (a few requests, no build; nothing else runs when there are none): a new release
+among each harness's newest five, or its newest build where that one's capture was partial and
+is six hours old. Only then does it capture them, everything the suite does with a build: on
+macOS, one job a harness, every scenario of the harness's against these builds alone
+(`TERMA_E2E_ONLY` and the versions: its profile and probes, its files profile, terma's contracts
+and the field census); on Linux, Claude Code's and Codex's relay contracts and files profiles;
+and a desktop app's on a machine of its own. The publish job waits for all of them, so a build's
+page and changelog are published once, complete, with terma's verdict, and announced then
+(`publish.sh publish-reference`). A capture that failed is published partial (`refgen
+-attempted`), marked `partial` in the index and not announced; the capture that makes it whole
+announces it. Its publish job and the nightly compat job share a concurrency group, so they
+never push `compat-matrix` at once.
+
+The night does not capture those builds again: it runs terma's contracts against the builds
+people run, which moves only a build's verdict, and skips the watched harnesses' reference
+scenarios (`reference/scenarios.sh skip`; the Linux machine runs `MACHINE_PROFILES=`). It still
+captures the harnesses the frequent check does not watch (Pi, omp, Hermes, T3 Code). Terma's
+checks alone never begin a build's page (`refgen`): one the night tested before the frequent
+check captured it waits for that capture.
 
 ## Model Reference
 

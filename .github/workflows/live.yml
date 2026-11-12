@@ -1,5 +1,12 @@
 name: E2E harness contracts
 
+# Every night, terma's contracts against the builds people run: the newest build each harness
+# was checked on and every release since (versions.go, "checked"), with this night's terma, on
+# macOS and on a Linux machine. The matrix, the field catalog and each build's verdict on the
+# Harness Reference follow. The builds of the harnesses the reference's frequent check watches
+# (reference.yml, reference/new-builds.sh) were captured there, once and whole, when they came
+# out: the night does not capture them again, and captures only the harnesses it does not watch.
+
 on:
   workflow_dispatch:
     inputs:
@@ -102,6 +109,13 @@ jobs:
           go build -o test/e2e/bin/terma ./cmd/terma
           cd test/e2e
           go test -c -o bin/e2e.test .
+      # The frequent check captured the watched harnesses' builds whole: their reference scenarios
+      # (profile and probes) are not run again here, and the shared probes run for the rest.
+      - name: Leave the frequent check's captures to it
+        working-directory: test/e2e
+        run: |
+          echo "TERMA_E2E_REFERENCE_SKIP=$(reference/scenarios.sh skip)" >> "$GITHUB_ENV"
+          echo "TERMA_E2E_HARNESSES=$(reference/scenarios.sh unwatched)" >> "$GITHUB_ENV"
       - name: Run e2e contracts (subscription coverage is opt-in)
         working-directory: test/e2e
         env:
@@ -110,7 +124,7 @@ jobs:
           CLAUDE_CODE_OAUTH_TOKEN: ${{ inputs.include_subscriptions && secrets.CLAUDE_CODE_OAUTH_TOKEN || '' }}
           TERMA_E2E: "1"
           TERMA_E2E_BINARY: ${{ github.workspace }}/test/e2e/bin/terma
-        run: ./bin/e2e.test -test.v -test.timeout 75m
+        run: ./bin/e2e.test -test.v -test.timeout 75m -test.skip "$TERMA_E2E_REFERENCE_SKIP"
       - name: Publish coverage summary
         if: always()
         run: |
@@ -161,8 +175,8 @@ jobs:
         run: rm -f "$RUNNER_TEMP/terma-codex-auth.json"
 
   # The same night on a fresh Linux machine (test/e2e/machine/Dockerfile): global mode, the
-  # managed configuration and the core relay contracts with real Claude Code and Codex, and
-  # their files profiles, traced with strace.
+  # managed configuration and the core relay contracts with real Claude Code and Codex. Their
+  # files profiles are the frequent check's, taken once a build (reference.yml).
   machines:
     runs-on: ubuntu-latest
     timeout-minutes: 60
@@ -189,7 +203,7 @@ jobs:
         env:
           TERMA_E2E_UNCLASSIFIED: note
         # The agents' newest releases; the rows record the versions they turn out to be.
-        run: make machines HOST_ARCH=amd64 CLAUDE_VERSION=latest CODEX_VERSION=latest
+        run: make machines HOST_ARCH=amd64 CLAUDE_VERSION=latest CODEX_VERSION=latest MACHINE_PROFILES=
       - name: Upload this platform's compatibility rows
         if: always()
         uses: actions/upload-artifact@v7

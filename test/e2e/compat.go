@@ -75,8 +75,10 @@ var (
 	skipWhy    = map[string]string{} // test → why it skipped its build (SkipBuild)
 )
 
-// scenarioOf says t is a scenario of harness: each forEach helper's build, and Proves.
+// scenarioOf says t is a scenario of harness: each forEach helper's build, and Proves. A run
+// limited to other harnesses (TERMA_E2E_ONLY) skips it.
 func scenarioOf(t *testing.T, harness string) {
+	skipUnlessSelected(t, harness)
 	compatMu.Lock()
 	defer compatMu.Unlock()
 	scenarios[t.Name()] = harness

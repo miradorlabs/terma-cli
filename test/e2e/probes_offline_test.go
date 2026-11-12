@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os/exec"
+	"slices"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -378,5 +379,22 @@ func TestHarnessListedOffline(t *testing.T) {
 	t.Setenv("TERMA_E2E_HARNESSES", "gemini,dsh")
 	if !harnessListed("dsh") || harnessListed("copilot") {
 		t.Error("a list takes its harnesses and no other")
+	}
+}
+
+// The night skips the reference scenarios of the harnesses the frequent check captures, and runs
+// the shared probes for the rest (reference/scenarios.sh): its list of those probes' harnesses
+// is harnessDrivers'.
+func TestScenariosListsEveryDriver(t *testing.T) {
+	out, err := exec.Command("reference/scenarios.sh", "drivers").Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var want []string
+	for _, d := range harnessDrivers {
+		want = append(want, d.harness)
+	}
+	if got := strings.Fields(string(out)); !slices.Equal(got, want) {
+		t.Errorf("reference/scenarios.sh drivers = %v, harnessDrivers %v", got, want)
 	}
 }

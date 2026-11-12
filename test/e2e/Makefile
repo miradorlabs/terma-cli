@@ -44,7 +44,12 @@ CODEX_VERSION   ?= 0.158.0
 # The files profile (profile_files_test.go) traces each build with strace here, the Linux
 # build of each harness: MACHINE_CLAUDE_VERSIONS / MACHINE_CODEX_VERSIONS pick other builds
 # than the image's (a version list the suite fetches), as the reference's frequent check does.
-MACHINE_RUN     ?= ^(TestGlobalMode.*|TestRelayClaude|TestRelayCodex|TestRelayNegativeControls|TestRelayResumedElsewhere|TestClaudeProfileFiles|TestCodexProfileFiles)$$
+# MACHINE_CONTRACTS are terma's checks, MACHINE_PROFILES the reference's files profiles: the
+# night runs the checks alone (MACHINE_PROFILES=), the reference's frequent check both, for the
+# harness of each build it captures.
+MACHINE_CONTRACTS ?= TestGlobalMode.*|TestRelayClaude|TestRelayCodex|TestRelayNegativeControls|TestRelayResumedElsewhere
+MACHINE_PROFILES  ?= TestClaudeProfileFiles|TestCodexProfileFiles
+MACHINE_RUN     ?= ^($(MACHINE_CONTRACTS)$(if $(MACHINE_PROFILES),|$(MACHINE_PROFILES)))$$
 MACHINE_CLAUDE_VERSIONS ?= installed
 MACHINE_CODEX_VERSIONS  ?= installed
 LINUX_GO := docker run --rm -v "$(ROOT)":/src -w /src/test/e2e \
