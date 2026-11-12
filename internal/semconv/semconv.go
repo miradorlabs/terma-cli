@@ -411,6 +411,8 @@ const (
 	TermaImageOmittedUnavailable = "unavailable"
 	// TermaImageOmittedRefused is terma.image.omitted refused: The platform refused the record with its image; it was sent again without it.
 	TermaImageOmittedRefused = "refused"
+	// TermaImageOmittedUnsent is terma.image.omitted unsent: The image could not be uploaded after several attempts; the record was sent without its bytes.
+	TermaImageOmittedUnsent = "unsent"
 	// TermaInstallMethodScript is terma.install.method script: A release binary terma replaces itself, from the install script or a release archive downloaded by hand.
 	TermaInstallMethodScript = "script"
 	// TermaInstallMethodHomebrew is terma.install.method homebrew: Homebrew's, as a cask or a formula.

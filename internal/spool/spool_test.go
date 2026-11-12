@@ -496,3 +496,70 @@ func TestDeliveredBatchIsAcknowledgedPastTheDeadline(t *testing.T) {
 		t.Fatalf("spool holds %+v, %v; want only the undelivered event", left, err)
 	}
 }
+
+// A stall opens a window as a failure does, doubling it, and says so; a failure after it
+// no longer does.
+func TestDestinationStalled(t *testing.T) {
+	s, err := Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now()
+	first := s.DestinationStalled("p1", now)
+	if second := s.DestinationStalled("p1", now); second.Sub(first) != minBackoff {
+		t.Fatalf("a second stall's window ends %v after the first's, want %v", second.Sub(first), minBackoff)
+	}
+	if _, ok := s.StalledWindows(now)["p1"]; !ok || s.RetryWindows(now)["p1"].IsZero() {
+		t.Fatal("a stall's window is not listed as one")
+	}
+	s.DestinationFailed("p1", now)
+	if _, ok := s.StalledWindows(now)["p1"]; ok {
+		t.Fatal("a failure's window is listed as a stall's")
+	}
+}
+
+// A flusher that will not wait leaves at once while another delivers the spool.
+func TestFlushNoWaitSkipsABusySpool(t *testing.T) {
+	s, err := Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Append(Event{Name: "x"}); err != nil {
+		t.Fatal(err)
+	}
+	sending, release := make(chan struct{}), make(chan struct{})
+	done := make(chan Result)
+	go func() {
+		done <- s.Flush(context.Background(), SenderFunc(func(context.Context, []Event) ([]Event, error) {
+			close(sending)
+			<-release
+			return nil, nil
+		}), FlushOptions{Force: true})
+	}()
+	<-sending
+	res := s.Flush(context.Background(), SenderFunc(func(context.Context, []Event) ([]Event, error) {
+		t.Error("a busy spool was sent")
+		return nil, nil
+	}), FlushOptions{Force: true, NoWait: true})
+	close(release)
+	if !res.Skipped || res.Reason != SkipBusy {
+		t.Fatalf("Flush = %+v", res)
+	}
+	if first := <-done; first.Sent != 1 {
+		t.Fatalf("first flush = %+v", first)
+	}
+}
+
+// An image record's stalls survive the queue.
+func TestStallsSurviveTheQueue(t *testing.T) {
+	s, err := Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Append(Event{Name: "x", Stalls: 2}); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := s.Peek(1); err != nil || len(got) != 1 || got[0].Stalls != 2 {
+		t.Fatalf("Peek = %+v, %v", got, err)
+	}
+}

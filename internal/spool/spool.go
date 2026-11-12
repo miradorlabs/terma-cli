@@ -35,6 +35,9 @@ type Event struct {
 	// event to the repository list in force when it leaves. Local only.
 	Repository config.Repository `json:"repository,omitzero"`
 	Attrs      map[string]any    `json:"attrs,omitempty"`
+	// Stalls counts the sends of an image record whose upload did not get through in its
+	// time; delivery gives up the image's bytes after a few. Local only.
+	Stalls int `json:"stalls,omitempty"`
 }
 
 // ValidTraceID reports whether id is an OTel trace id: 32 lowercase hex digits, not all zero.
@@ -81,6 +84,10 @@ func (f SenderFunc) Send(ctx context.Context, events []Event) ([]Event, error) {
 
 // Dir is the spool's folder under the state directory.
 const Dir = "spool"
+
+// ImageDir is the image lane's spool folder under the state directory: terma.prompt.image
+// records wait there, apart from the events, so no event waits on an image's upload.
+const ImageDir = "image-spool"
 
 const (
 	eventsFile       = "events.jsonl"

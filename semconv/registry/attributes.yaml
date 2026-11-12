@@ -273,6 +273,10 @@ attributes:
           value: refused
           brief: The platform refused the record with its image; it was sent again without it.
           stability: development
+        - id: unsent
+          value: unsent
+          brief: The image could not be uploaded after several attempts; the record was sent without its bytes.
+          stability: development
     stability: development
     brief: Why a record carries no terma.image.data although the policy collects prompts.
 

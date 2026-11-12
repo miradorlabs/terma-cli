@@ -179,6 +179,8 @@ type App struct {
 	runUpdateStep        func(ctx context.Context, out io.Writer, argv ...string) error
 	nateBinaryCandidates func() []string
 	nateRemoveBinary     func(cmd *cobra.Command, path string) error
+	// startImageFlush starts the image lane's detached pass (spawnImageFlush).
+	startImageFlush func()
 	// spawnRelay starts the terma at exe (this one when "") as a relay for a state
 	// directory, detached, as a hook does.
 	spawnRelay func(exe, stateDir, version string)
@@ -198,8 +200,7 @@ type App struct {
 func New(agentsFor func(configDir string) *agents.Registry, version string) *App {
 	app := &App{agentsFor: agentsFor, version: version, binDirs: doctor.WellKnownBinDirs, hookExecutable: procinfo.AbsExecutable,
 		managedRoot: "/", runUpdateStep: runUpdateStep, nateRemoveBinary: removeNateBinary, spawnRelay: daemon.SpawnFrom,
-		backgroundStep: runBackgroundStep,
-		canAsk:         canPrompt}
+		backgroundStep: runBackgroundStep, startImageFlush: spawnImageFlush, canAsk: canPrompt}
 	app.nateBinaryCandidates = app.installedTermaBinaries
 	if exe, err := os.Executable(); err == nil {
 		app.binary, _ = os.Stat(exe)

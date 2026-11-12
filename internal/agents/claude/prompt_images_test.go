@@ -52,8 +52,13 @@ func TestClaudeStopSpoolsEachPastedImageOnce(t *testing.T) {
 		`{"type":"user","uuid":"u2","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t1","content":[{"type":"image","source":{"type":"base64","media_type":"image/png","data":"`+claudePixel+`"}}]}]}}`,
 		`{"type":"user","uuid":"u3","isSidechain":true,"message":{"role":"user","content":[{"type":"image","source":{"type":"base64","media_type":"image/png","data":"`+claudePixel+`"}}]}}`,
 	)
+	flushes := 0
+	env.FlushImages = func() { flushes++ }
 	stopClaude(t, env, path)
-	got := spooledImages(t, env.Spool)
+	if images := hookruntest.Named(hookruntest.Spooled(t, env.Spool), semconv.TermaPromptImageEvent); len(images) != 0 {
+		t.Fatalf("%d images went to the events' spool", len(images))
+	}
+	got := spooledImages(t, env.Images)
 	if len(got) != 2 {
 		t.Fatalf("spooled %d images, want the prompt's two: %+v", len(got), got)
 	}
@@ -83,10 +88,13 @@ func TestClaudeStopSpoolsEachPastedImageOnce(t *testing.T) {
 	if data, ok := promptimage.Load(env.StateDir, img.ID()); !ok || data != claudePixel {
 		t.Fatal("the image's bytes were not kept for delivery")
 	}
+	if flushes != 1 {
+		t.Fatalf("the image lane's delivery started %d times, want once", flushes)
+	}
 
 	appendTranscript(t, path, pastedRecord("u4", "p2", []int{3}, claudePixel)+"\n")
 	stopClaude(t, env, path)
-	got = spooledImages(t, env.Spool)
+	got = spooledImages(t, env.Images)
 	if len(got) != 1 || got[0].Attrs[semconv.TermaMessageIDKey] != "u4" || got[0].Attrs[semconv.TermaImageLabelKey] != "[Image #3]" {
 		t.Fatalf("second stop: got %+v, want u4's image alone", got)
 	}
@@ -98,7 +106,7 @@ func TestClaudeImagesNeedConsent(t *testing.T) {
 	env.Agents = nil
 	path := transcript(t, t.TempDir(), pastedRecord("u1", "p1", []int{1}, claudePixel))
 	stopClaude(t, env, path)
-	if got := spooledImages(t, env.Spool); len(got) != 0 {
+	if got := spooledImages(t, env.Images); len(got) != 0 {
 		t.Fatalf("spooled %+v without consent", got)
 	}
 }
@@ -131,7 +139,7 @@ func TestClaudeImagesKeepNoBytesWhenPromptsAreOff(t *testing.T) {
 	env.Policy.IncludePrompts = false
 	path := transcript(t, t.TempDir(), pastedRecord("u1", "p1", []int{1}, claudePixel))
 	stopClaude(t, env, path)
-	if got := spooledImages(t, env.Spool); len(got) != 1 {
+	if got := spooledImages(t, env.Images); len(got) != 1 {
 		t.Fatalf("spooled %d images", len(got))
 	}
 	img, _ := promptimage.FromBase64("image/png", claudePixel)

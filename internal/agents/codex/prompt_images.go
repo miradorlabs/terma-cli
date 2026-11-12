@@ -49,10 +49,10 @@ type codexPrompt struct {
 }
 
 // captureCodexImages spools one terma.prompt.image per image the user put in a prompt since
-// the last capture, from the turns the team collects, its bytes kept aside for delivery,
-// which sends them only while the team's policy collects prompts.
+// the last capture, from the turns the team collects, to the image lane, its bytes kept
+// aside for delivery, which sends them only while the team's policy collects prompts.
 func captureCodexImages(ctx context.Context, e hookrun.Env, r *hookrun.Repo, in *codexHookInput) {
-	if e.Spool == nil || !session.ValidID(in.SessionID) || !repliesConsented(e.Consent()) {
+	if e.Images == nil || !session.ValidID(in.SessionID) || !repliesConsented(e.Consent()) {
 		return
 	}
 	dir := filepath.Join(e.StateDir, codexImageCursorDir)
@@ -74,6 +74,7 @@ func captureCodexImages(ctx context.Context, e hookrun.Env, r *hookrun.Repo, in 
 	ctx, cancel := context.WithTimeout(ctx, codexCaptureTimeout)
 	defer cancel()
 	collect, _ := e.Policy.Content()
+	spooled := 0
 	next, err := readRolloutImages(ctx, rollout, in.TranscriptPath, cursor, turnAdmission(ctx, e), func(p codexPrompt) error {
 		for _, img := range p.Images {
 			// A store that cannot keep the bytes still lets the record say what the image was.
@@ -92,12 +93,16 @@ func captureCodexImages(ctx context.Context, e hookrun.Env, r *hookrun.Repo, in 
 			if ev.Time.IsZero() || ev.Time.After(e.Time()) {
 				ev.Time = e.Time()
 			}
-			if err := e.Spool.Append(ev); err != nil {
+			if err := e.Images.Append(ev); err != nil {
 				return err
 			}
+			spooled++
 		}
 		return nil
 	})
+	if spooled > 0 && e.FlushImages != nil {
+		e.FlushImages()
+	}
 	if err != nil && !errors.Is(err, context.DeadlineExceeded) {
 		e.Logf("codex images: %v", err)
 	}

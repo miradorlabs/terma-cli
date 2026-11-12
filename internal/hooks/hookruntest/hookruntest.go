@@ -122,6 +122,16 @@ func Project(t *testing.T) (root, stateDir string, sp *spool.Spool) {
 	return root, t.TempDir(), sp
 }
 
+// Spool is a private spool, such as the image lane's beside Project's.
+func Spool(t *testing.T) *spool.Spool {
+	t.Helper()
+	sp, err := spool.Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	return sp
+}
+
 // Named is the events called name, in order.
 func Named(events []spool.Event, name string) []spool.Event {
 	var out []spool.Event

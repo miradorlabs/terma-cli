@@ -40,7 +40,10 @@ type Env struct {
 	// StateDir is terma's state directory, where hooks keep their state.
 	StateDir string
 	// Spool may be nil (it could not be opened): events are then dropped, never fatal.
-	Spool   *spool.Spool
+	Spool *spool.Spool
+	// Images is the image lane's spool, where terma.prompt.image records wait apart from the
+	// events (EmitImageFor); nil, as for Spool, when it could not be opened.
+	Images  *spool.Spool
 	Version string
 	Debug   bool
 	// OnClaim, when set, is called after a relay claim with the claimed checkout's root, so
@@ -49,6 +52,9 @@ type Env struct {
 	// Flush, when set, starts detached delivery of what the spool holds, refreshing a stale
 	// policy first.
 	Flush func()
+	// FlushImages, when set, starts the image lane's detached delivery, once a hook has
+	// spooled an image.
+	FlushImages func()
 	// AwaitPush, when set, starts a detached AwaitPush for the push recorded at path.
 	AwaitPush func(path string)
 	// Policy is the organization's collection policy; global mode places every session in its DefaultProjectID.
@@ -273,6 +279,26 @@ func (e Env) EmitFor(r *Repo, ev spool.Event) bool {
 		ev.Time = e.Time()
 	}
 	return e.emit(ev) || e.park(r, parkedEvents, ev)
+}
+
+// EmitImageFor spools a terma.prompt.image record to the image lane, stamped and claimed as
+// EmitFor stamps and claims an event, and reports whether it was kept. A record the lane's
+// spool refuses parks with the events: the hook that unparks it puts it in the events'
+// spool, whose pass hands it on to the image lane.
+func (e Env) EmitImageFor(r *Repo, ev spool.Event) bool {
+	ev = e.stamp(r, ev)
+	e.claimForRelay(r, ev)
+	if ev.Time.IsZero() {
+		ev.Time = e.Time()
+	}
+	if e.Images != nil {
+		err := e.Images.Append(ev)
+		if err == nil {
+			return true
+		}
+		e.Logf("image spool append failed: %v", err)
+	}
+	return e.park(r, parkedEvents, ev)
 }
 
 // stamp names the event's repository, for delivery's admission, and its project.

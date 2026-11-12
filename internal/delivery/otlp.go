@@ -4,12 +4,15 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"maps"
 	"net/http"
+	"net/http/httptrace"
 	"slices"
 	"strconv"
+	"sync/atomic"
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/semconv"
@@ -27,6 +30,12 @@ type otlpSender struct {
 	// UserID, set, names the Mirador user on the resource as terma.user.id, as the relay does.
 	UserID string
 	HTTP   *http.Client
+	// Whole sends a request only when the context leaves it all the time it is given
+	// (errNoTimeLeft otherwise): an image's upload is all or nothing, and one the pass would
+	// cut short spends the uplink on nothing.
+	Whole bool
+	// timeout stands in for timeoutFor when set.
+	timeout func(n int) time.Duration
 }
 
 const (
@@ -137,14 +146,20 @@ func newHTTPClient() *http.Client {
 	}
 }
 
+// errNoTimeLeft is a Whole request not sent because too little of the pass was left for it.
+var errNoTimeLeft = errors.New("too little of the pass left for the request")
+
 // Send implements spool.Sender.
 func (o *otlpSender) Send(ctx context.Context, events []spool.Event) ([]spool.Event, error) {
-	return nil, o.send(ctx, events)
+	_, err := o.post(ctx, events)
+	return nil, err
 }
 
-func (o *otlpSender) send(ctx context.Context, events []spool.Event) error {
+// post sends events in one request, and reports whether it reached the host: a connection
+// was made, through DNS, the dial and the TLS handshake, before it failed.
+func (o *otlpSender) post(ctx context.Context, events []spool.Event) (connected bool, err error) {
 	if o.Endpoint == "" || o.APIKey == "" {
-		return fmt.Errorf("spool flush needs an OTLP endpoint and a team key — run `terma setup`")
+		return false, fmt.Errorf("spool flush needs an OTLP endpoint and a team key — run `terma setup`")
 	}
 	records := make([]map[string]any, 0, len(events))
 	for _, e := range events {
@@ -187,31 +202,40 @@ func (o *otlpSender) send(ctx context.Context, events []spool.Event) error {
 	}
 	body, err := json.Marshal(payload)
 	if err != nil {
-		return err
+		return false, err
 	}
 	client := o.HTTP
 	if client == nil {
 		client = newHTTPClient()
 	}
-	ctx, cancel := context.WithTimeout(ctx, timeoutFor(len(body)))
+	timeout := timeoutFor(len(body))
+	if o.timeout != nil {
+		timeout = o.timeout(len(body))
+	}
+	if deadline, ok := ctx.Deadline(); o.Whole && ok && time.Until(deadline) < timeout {
+		return false, errNoTimeLeft
+	}
+	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
+	var reached atomic.Bool
+	ctx = httptrace.WithClientTrace(ctx, &httptrace.ClientTrace{GotConn: func(httptrace.GotConnInfo) { reached.Store(true) }})
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, o.Endpoint+otlpLogsPath, bytes.NewReader(body))
 	if err != nil {
-		return err
+		return false, err
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+o.APIKey)
 	req.Header.Set("User-Agent", serviceName+"/"+o.Version)
 	resp, err := client.Do(req)
 	if err != nil {
-		return err
+		return reached.Load(), err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		detail, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
-		return &IngestError{Status: resp.StatusCode, Detail: string(bytes.TrimSpace(detail))}
+		return true, &IngestError{Status: resp.StatusCode, Detail: string(bytes.TrimSpace(detail))}
 	}
-	return nil
+	return true, nil
 }
 
 // IngestError is a non-2xx answer from the ingest host.

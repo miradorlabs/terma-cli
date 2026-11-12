@@ -15,6 +15,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/delivery"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
+	"github.com/miradorlabs/terma-cli/internal/semconv"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
@@ -200,5 +201,59 @@ func TestDescribeFlushNamesEveryReasonOnce(t *testing.T) {
 	}
 	if strings.Join(undelivered, "|") != strings.Join(want, "|") {
 		t.Errorf("undelivered =\n  %q\nwant\n  %q", undelivered, want)
+	}
+}
+
+// The events' flush sends no image: it hands one an older build queued with the events to
+// the image queue, starts that queue's own pass, and says what waits there; `--images`
+// runs that pass here.
+func TestSpoolFlushLeavesImagesToTheirOwnPass(t *testing.T) {
+	useConfigDir(t, t.TempDir())
+	acceptingOTLP(t)
+	s := spoolForTest(t)
+	appendEvent(t, s, spoolTestProject, time.Now())
+	image := spool.Event{Name: semconv.TermaPromptImageEvent, Time: time.Now(), Repository: appRepo,
+		Attrs: map[string]any{hookrun.AttrProjectID: spoolTestProject, semconv.TermaImageIDKey: strings.Repeat("a", 64)}}
+	if err := s.Append(image); err != nil {
+		t.Fatal(err)
+	}
+	started := 0
+	prev := testApp.startImageFlush
+	testApp.startImageFlush = func() { started++ }
+	t.Cleanup(func() { testApp.startImageFlush = prev })
+
+	out, _ := runTerma(t, "spool", "flush")
+	if !strings.Contains(out, "handed 1 image record to the image queue") || !strings.Contains(out, "Images: 1 queued") {
+		t.Fatalf("the report should say where the image went:\n%s", out)
+	}
+	if started != 1 {
+		t.Fatalf("the image queue's pass started %d times, want once", started)
+	}
+	if n, _, _ := s.Pending(); n != 1 {
+		t.Fatalf("the events' spool should hold only the keyless event, pending=%d", n)
+	}
+
+	// No policy collects prompts here, so the pass withholds the image.
+	out, err := runTerma(t, "spool", "flush", "--images")
+	if err != nil || !strings.Contains(out, "Flushed 0 images, withheld 1 by capture policy") {
+		t.Fatalf("the image pass: %v\n%s", err, out)
+	}
+	if q := testApp.imageQueue(); q.Queued != 0 {
+		t.Fatalf("the image queue holds %d", q.Queued)
+	}
+}
+
+// An image pass's clauses name the images, and a stall apart from a failure.
+func TestDescribeFlushWordsTheImagePass(t *testing.T) {
+	at := time.Date(2026, 11, 12, 15, 4, 0, 0, time.Local)
+	delivered, undelivered := describeFlush(delivery.Result{Images: true, Sent: 1, Deferred: 2,
+		Stalls: []delivery.Failure{{ProjectID: "p1", RetryAt: at}}, Waiting: []delivery.Wait{{ProjectID: "p2", RetryAt: at}}})
+	want := []string{
+		"an image for team p1 did not finish uploading in its time; its images retry after 3:04PM",
+		"retrying team p2's images after 3:04PM",
+		"leaving 2 for a later pass",
+	}
+	if delivered != "1 image" || strings.Join(undelivered, "|") != strings.Join(want, "|") {
+		t.Fatalf("describeFlush = %q, %q", delivered, undelivered)
 	}
 }

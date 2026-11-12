@@ -105,10 +105,18 @@ func TestCodexStopSpoolsPromptImages(t *testing.T) {
 	}, "\n")+"\n")
 	b, _ := json.Marshal(map[string]any{"session_id": replySession, "cwd": env.Cwd, "transcript_path": path})
 	env.Stdin = strings.NewReader(string(b))
+	flushes := 0
+	env.FlushImages = func() { flushes++ }
 	if err := stop(context.Background(), env); err != nil {
 		t.Fatal(err)
 	}
-	images := hookruntest.Named(hookruntest.Spooled(t, env.Spool), semconv.TermaPromptImageEvent)
+	if spooled := hookruntest.Named(hookruntest.Spooled(t, env.Spool), semconv.TermaPromptImageEvent); len(spooled) != 0 {
+		t.Fatalf("%d images went to the events' spool", len(spooled))
+	}
+	if flushes != 1 {
+		t.Fatalf("the image lane's delivery started %d times, want once", flushes)
+	}
+	images := hookruntest.Named(hookruntest.Spooled(t, env.Images), semconv.TermaPromptImageEvent)
 	if len(images) != 2 {
 		t.Fatalf("spooled %d images, want the prompt's two", len(images))
 	}

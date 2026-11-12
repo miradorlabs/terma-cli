@@ -21,6 +21,8 @@ import (
 var testApp = func() *App {
 	app := New(builtin.Agents, "dev")
 	app.binDirs = func() []string { return nil }
+	// A test's image queue is no reason to start this test binary as a flush.
+	app.startImageFlush = func() {}
 	return app
 }()
 

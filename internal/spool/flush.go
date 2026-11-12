@@ -27,7 +27,10 @@ type FlushOptions struct {
 	Force bool
 	// MinInterval skips the flush when one completed more recently (`terma spool flush --min-interval`).
 	MinInterval time.Duration
-	Now         time.Time
+	// NoWait skips the flush when another flusher is delivering the spool, rather than
+	// waiting for it to finish.
+	NoWait bool
+	Now    time.Time
 }
 
 // SkipReason says why a flush did nothing without failing.
@@ -38,6 +41,8 @@ const (
 	SkipBackoff SkipReason = "backing off after a failed delivery"
 	// SkipMinInterval means a flush completed more recently than the caller's throttle.
 	SkipMinInterval SkipReason = "a flush completed within the throttle interval"
+	// SkipBusy means another flusher was delivering the spool (FlushOptions.NoWait).
+	SkipBusy SkipReason = "another flush is delivering this queue"
 )
 
 // Result summarizes a flush; its counts are disjoint, and only Expired, Pruned and
@@ -77,7 +82,16 @@ func (s *Spool) Flush(ctx context.Context, sender Sender, opts FlushOptions) Res
 	defer cancel()
 
 	// Only flushers take this lock, so hooks can append during a send.
-	unlock, err := flock.Lock(ctx, filepath.Join(s.dir, deliveryLockFile))
+	var unlock func()
+	var err error
+	if opts.NoWait {
+		unlock, err = flock.TryLock(filepath.Join(s.dir, deliveryLockFile))
+		if flock.IsBusy(err) {
+			return Result{Skipped: true, Reason: SkipBusy}
+		}
+	} else {
+		unlock, err = flock.Lock(ctx, filepath.Join(s.dir, deliveryLockFile))
+	}
 	if err != nil {
 		return Result{Err: err}
 	}

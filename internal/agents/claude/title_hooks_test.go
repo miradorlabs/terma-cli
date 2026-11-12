@@ -48,6 +48,7 @@ func titleEnv(t *testing.T) hookrun.Env {
 		t.Fatal(err)
 	}
 	env.Agents = []string{name}
+	env.Images = hookruntest.Spool(t)
 	return env
 }
 

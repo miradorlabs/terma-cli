@@ -29,7 +29,8 @@ func fundingEnv(t *testing.T) hookrun.Env {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return hookrun.Env{ConfigDir: t.TempDir(), StateDir: stateDir, Now: time.Now(), Cwd: root, Spool: sp, Version: "test", Policy: hookruntest.Admitting(root), Team: "project-a"}
+	return hookrun.Env{ConfigDir: t.TempDir(), StateDir: stateDir, Now: time.Now(), Cwd: root, Spool: sp, Images: hookruntest.Spool(t),
+		Version: "test", Policy: hookruntest.Admitting(root), Team: "project-a"}
 }
 
 func TestCodexStopCapturesRolloutAndDeduplicates(t *testing.T) {

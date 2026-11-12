@@ -54,10 +54,11 @@ type promptImageState struct {
 }
 
 // captureClaudePromptImages spools one terma.prompt.image per image the user put in a
-// prompt since the last read, its bytes kept aside for delivery, when a turn stops or fails
-// or the session ends. They leave under the title's consent while the team collects prompts.
+// prompt since the last read to the image lane, its bytes kept aside for delivery, when a
+// turn stops or fails or the session ends, and starts the lane's delivery. They leave under
+// the title's consent while the team collects prompts.
 func captureClaudePromptImages(e hookrun.Env, r *hookrun.Repo, sessionID, transcript string) {
-	if transcript == "" || e.Spool == nil || !session.ValidID(sessionID) || !titleConsented(e.Consent()) {
+	if transcript == "" || e.Images == nil || !session.ValidID(sessionID) || !titleConsented(e.Consent()) {
 		return
 	}
 	dir := filepath.Join(e.StateDir, claudePromptImageStateDir)
@@ -77,6 +78,7 @@ func captureClaudePromptImages(e hookrun.Env, r *hookrun.Repo, sessionID, transc
 		last = promptImageState{}
 	}
 	collect, _ := e.Policy.Content()
+	spooled := 0
 	offset, err := readPromptImages(transcript, last.Offset, func(p claudePrompt) bool {
 		// A record with no id the platform can take is skipped before its bytes are kept.
 		ids := map[string]any{}
@@ -95,12 +97,16 @@ func captureClaudePromptImages(e hookrun.Env, r *hookrun.Repo, sessionID, transc
 			attrs[semconv.TermaEvidenceSourceKey] = sourceClaudeTranscript
 			maps.Copy(attrs, ids)
 			// Unsent images stay past the stored offset, for the next stop; the platform folds a re-sent one away.
-			if !e.EmitFor(r, spool.Event{Time: p.Time, Name: semconv.TermaPromptImageEvent, SessionID: sessionID, Attrs: attrs}) {
+			if !e.EmitImageFor(r, spool.Event{Time: p.Time, Name: semconv.TermaPromptImageEvent, SessionID: sessionID, Attrs: attrs}) {
 				return false
 			}
+			spooled++
 		}
 		return true
 	})
+	if spooled > 0 && e.FlushImages != nil {
+		e.FlushImages()
+	}
 	if err != nil {
 		e.Logf("prompt images: %v", err)
 	}

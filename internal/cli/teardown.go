@@ -18,6 +18,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	termaproject "github.com/miradorlabs/terma-cli/internal/project"
+	"github.com/miradorlabs/terma-cli/internal/promptimage"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
 	"github.com/miradorlabs/terma-cli/internal/spool"
@@ -147,11 +148,11 @@ func (app *App) undoSetup(ctx context.Context, out io.Writer, keepToken bool) er
 	return nil
 }
 
-// removeHookState removes what hooks kept per session, which only they would prune, and
-// the policies they ran under.
+// removeHookState removes what hooks kept per session, which only they would prune, what
+// they queued, the images among it, and the policies they ran under.
 func (app *App) removeHookState() error {
 	var errs []error
-	for _, name := range append(app.hookStateDirs(), hookrun.AgentsDir, termaproject.WorkspacesDir, spool.Dir, config.PoliciesDir) {
+	for _, name := range append(app.hookStateDirs(), hookrun.AgentsDir, termaproject.WorkspacesDir, spool.Dir, spool.ImageDir, promptimage.DirName, config.PoliciesDir) {
 		errs = append(errs, os.RemoveAll(filepath.Join(app.stateDir, name)))
 	}
 	if err := errors.Join(errs...); err != nil {
