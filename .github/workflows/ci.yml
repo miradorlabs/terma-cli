@@ -8,31 +8,39 @@ on:
 permissions:
   contents: read
 
-# macOS runners are few and harness-telemetry holds four for ~5 minutes: a pull request's
+# macOS runners are few and harness-telemetry holds five for ~5 minutes: a pull request's
 # superseded runs are cancelled rather than queued ahead of its latest. Each push to main
 # runs in a group of its own.
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
+# Linux jobs run on Blacksmith (Ubuntu 24.04), as mirador-platform's do: their apt mirrors
+# and network are not GitHub-hosted runners'. macOS and Windows stay on GitHub's.
 jobs:
   npm-installer:
+    # The check keeps its name (`npm-installer (ubuntu-latest)` is required): a matrix job's
+    # default name would list `runner` too.
+    name: npm-installer (${{ matrix.os }})
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
+        include:
+          - os: ubuntu-latest
+            runner: blacksmith-2vcpu-ubuntu-2404
+    runs-on: ${{ matrix.runner || matrix.os }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v5
         with:
           node-version: 18
       - run: npm test --prefix npm
 
   test:
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-go@v6
         with:
@@ -47,6 +55,10 @@ jobs:
           fi
 
       - run: go vet ./...
+
+      # The shell launcher tests parse their fish block with a real fish where one is installed.
+      - name: Install fish
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends fish
 
       # The version lives in .golangci-lint-version, which `make lint` reads too.
       - name: golangci-lint
@@ -83,7 +95,7 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 25
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
@@ -112,9 +124,9 @@ jobs:
   # The same through the Secret Service a Linux desktop runs (GNOME Keyring), unlocked
   # in a D-Bus session of its own; macOS's Keychain is exercised by hand.
   keychain-linux:
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
@@ -130,14 +142,14 @@ jobs:
 
   # The e2e suite is a separate module; its offline contracts must run in CI too.
   live-contracts:
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     defaults:
       run:
         working-directory: test/e2e
     env:
       TERMA_E2E: "0"
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: actions/setup-go@v6
         with:
           go-version-file: test/e2e/go.mod
@@ -153,16 +165,22 @@ jobs:
     name: harness-telemetry (${{ matrix.shard }})
     runs-on: macos-latest
     timeout-minutes: 30
+    # copilot-requests lets the Copilot CLI run on this job's own token, its AI credits
+    # billed to the organization (its "Copilot CLI billed to the organization" policy).
+    permissions:
+      contents: read
+      copilot-requests: write
     strategy:
       fail-fast: false
       matrix:
-        shard: [claude, codex-a, codex-b, others]
+        shard: [claude, codex-a, codex-b, copilot, others]
     env:
       # TestRelay* is the local relay: the same harnesses exporting globally through
       # `terma relay run`, and nothing but the claimed session reaching the receiver.
       # TestMachineHooks* is where setup's machine-wide hooks record: beside a
-      # repository's own, in the repositories the team admits.
-      E2E_TESTS: '^(TestClaudeTelemetry|TestCodexTelemetry|TestClaudeStopFailureDelivery|TestRelay.*|TestMachineHooks.*|TestPi.*|TestGemini.*|TestDsh.*|TestHermes.*)$'
+      # repository's own, in the repositories the team admits. TestDesktopGrant is Terma
+      # Desktop signing the CLI in over its stdin.
+      E2E_TESTS: '^(TestClaudeTelemetry|TestCodexTelemetry|TestClaudeStopFailureDelivery|TestRelay.*|TestMachineHooks.*|TestPi.*|TestGemini.*|TestDsh.*|TestHermes.*|TestCopilot.*|TestDesktopGrant)$'
       TERMA_ENV: dev
       TERMA_E2E: "1"
       TERMA_E2E_CLAUDE_VERSIONS: "2.1.283"
@@ -170,12 +188,20 @@ jobs:
       TERMA_E2E_OPENCODE_VERSIONS: "1.18.33"
       TERMA_E2E_GEMINI_VERSIONS: "0.62.0"
       TERMA_E2E_DSH_VERSIONS: "0.2.0-rc.2"
+      TERMA_E2E_COPILOT_VERSIONS: "1.0.96"
+      # Copilot CLI runs against GitHub's service on this job's token, in the copilot shard
+      # alone. A fork's pull request gets a read-only one, so there the Copilot tests skip
+      # rather than fail.
+      COPILOT_GITHUB_TOKEN: ${{ matrix.shard == 'copilot' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && github.token || '' }}
       TERMA_E2E_BINARY: ${{ github.workspace }}/test/e2e/bin/terma
       # Codex 0.158.0 sometimes exits without running its SessionEnd hook, with or
       # without Terma (TestCodexSessionEndProbe), so it is reported instead of failing.
       TERMA_E2E_KNOWN_UPSTREAM: codex-session-end
     steps:
-      - uses: actions/checkout@v5
+      # Every shard's token may bill Copilot requests; none needs it in .git/config.
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - uses: actions/setup-go@v6
         with:
           go-version-file: test/e2e/go.mod
@@ -212,12 +238,12 @@ jobs:
   # plugin directory and ships in the release archives. `make test-plugin` skips it
   # wherever bun is absent, so CI is where it is actually run.
   opencode-plugin:
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     defaults:
       run:
         working-directory: internal/agents/opencode/plugin
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
@@ -226,9 +252,9 @@ jobs:
   # terma setup's git hook scripts run on every developer's machine: they must be
   # POSIX sh, and they must keep working on the sh that Debian/Alpine ship.
   shim-portability:
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
@@ -244,9 +270,9 @@ jobs:
   # real release's does (a --snapshot build's would not, and `brew audit` rejects
   # it). Nothing is published. The two jobs after this one install what it built.
   release-dry-run:
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - uses: actions/setup-go@v6
@@ -254,7 +280,7 @@ jobs:
           go-version-file: go.mod
           cache: true
       - run: git tag v0.0.0-ci
-      - uses: goreleaser/goreleaser-action@v6
+      - uses: goreleaser/goreleaser-action@v7
         with:
           version: "~> v2"
           # `before` is `go test`, which the test job already runs; `sign` needs the
@@ -263,7 +289,7 @@ jobs:
         env:
           # Read only by the cask template; the dry run pushes nothing.
           HOMEBREW_TAP_TOKEN: dry-run
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v7
         with:
           name: release-dry-run
           path: |
@@ -280,10 +306,10 @@ jobs:
   # scripts/test-install.sh.
   install-script:
     needs: release-dry-run
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/download-artifact@v5
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
         with:
           name: release-dry-run
           path: dist
@@ -301,8 +327,8 @@ jobs:
     needs: release-dry-run
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/download-artifact@v5
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
         with:
           name: release-dry-run
           path: dist
@@ -313,6 +339,36 @@ jobs:
       - run: go test ./internal/shellrc/
       - run: ./scripts/test-install.sh dist v0.0.0-ci
 
+  # `irm https://terma.ai/install.ps1 | iex`, as Terma Desktop runs it on Windows, against
+  # those archives served over loopback: under Windows PowerShell 5.1 and PowerShell 7, the
+  # default destination and the user PATH (never the machine's), a reinstall over a running
+  # terma, the opt-out, and the two refusals. scripts/test-install.ps1.
+  install-script-windows:
+    needs: release-dry-run
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: release-dry-run
+          path: dist
+      # Windows PowerShell 5.1 is what `powershell` starts on every Windows machine; the
+      # script must not use anything newer.
+      - name: Parse under Windows PowerShell 5.1 and PowerShell 7
+        shell: pwsh
+        run: |
+          foreach ($shell in 'powershell', 'pwsh') {
+            & $shell -NoProfile -Command {
+              foreach ($f in 'install.ps1', 'scripts/test-install.ps1') {
+                $errors = $null
+                [void][Management.Automation.Language.Parser]::ParseFile((Resolve-Path $f).Path, [ref]$null, [ref]$errors)
+                if ($errors) { $errors | ForEach-Object { Write-Host "${f}: $_" }; exit 1 }
+              }
+            }
+            if ($LASTEXITCODE) { throw "install.ps1 does not parse under $shell" }
+          }
+      - run: pwsh -NoProfile -File scripts/test-install.ps1 dist v0.0.0-ci
+
   # `brew install miradorlabs/tap/terma`, with the cask the release would push:
   # `brew audit --strict`, then a real install from a throwaway local tap whose
   # URLs point at the loopback mirror — download, sha256, the preflight that strips
@@ -322,8 +378,8 @@ jobs:
     needs: release-dry-run
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/download-artifact@v5
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
         with:
           name: release-dry-run
           path: dist

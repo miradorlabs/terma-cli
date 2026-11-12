@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -199,5 +200,37 @@ func TestLoadCredentialIgnoresSingleCredentialShape(t *testing.T) {
 	}
 	if _, err := LoadCredentialFor(dir, "default", "org-a"); err != ErrNotLoggedIn {
 		t.Fatalf("unsupported organization authenticated: %v", err)
+	}
+}
+
+// A write waits for a holder that hangs only until lockWait, then fails naming the lock.
+func TestSaveCredential_GivesUpOnAHungHolder(t *testing.T) {
+	saved := lockWait
+	lockWait = 200 * time.Millisecond
+	t.Cleanup(func() { lockWait = saved })
+	dir := t.TempDir()
+	held, release := make(chan struct{}), make(chan struct{})
+	done := make(chan error)
+	go func() {
+		done <- Locked(t.Context(), dir, func(*Tx) error {
+			close(held)
+			<-release
+			return nil
+		})
+	}()
+	<-held
+
+	start := time.Now()
+	_, err := SaveCredential(dir, config.DefaultProfile, sampleCredential())
+	elapsed := time.Since(start)
+	close(release)
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+	if err == nil || !strings.Contains(err.Error(), "another terma process held them") {
+		t.Fatalf("SaveCredential behind a hung holder = %v; want the lock's deadline", err)
+	}
+	if elapsed > lockWait+2*time.Second {
+		t.Fatalf("SaveCredential waited %v; want about %v", elapsed, lockWait)
 	}
 }

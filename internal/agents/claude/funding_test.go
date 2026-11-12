@@ -28,11 +28,15 @@ func TestClaudeFundingSnapshotAndHints(t *testing.T) {
 	t.Setenv("ANTHROPIC_AUTH_TOKEN", "never-export-token")
 	t.Setenv("CLAUDE_CODE_OAUTH_TOKEN", "")
 	t.Setenv("CLAUDE_CODE_USE_BEDROCK", "1")
-	writeEvidenceFile(t, filepath.Join(dir, ".claude.json"), `{"oauthAccount":{"accountUuid":"account-a","organizationUuid":"org-a","billingType":"stripe_subscription","organizationType":"claude_team","seatTier":"team_tier_1","hasExtraUsageEnabled":false,"cachedExtraUsageDisabledReason":"org_level_disabled_until","emailAddress":"private@example.test","accessToken":"never-export"},"projects":{"private":"never-export"}}`)
+	writeEvidenceFile(t, filepath.Join(dir, ".claude.json"), `{"oauthAccount":{"accountUuid":"account-a","organizationUuid":"org-a","billingType":"stripe_subscription","organizationType":"claude_team","seatTier":"team_tier_1","userRateLimitTier":"default_claude_max_5x","organizationRateLimitTier":"default_raven","hasExtraUsageEnabled":false,"cachedExtraUsageDisabledReason":"org_level_disabled_until","emailAddress":"private@example.test","accessToken":"never-export"},"projects":{"private":"never-export"}}`)
 	writeEvidenceFile(t, filepath.Join(repo, ".claude", "settings.local.json"), `{"apiKeyHelper":"touch /tmp/never-run-this-command"}`)
 	e := readFunding(repo)
 	if e.Status != "present" || e.Attrs[semconv.TermaAccountIDKey] != "account-a" || e.Attrs[semconv.TermaAccountExtraUsageEnabledKey] != false || e.oauthEffective {
 		t.Fatalf("snapshot: %+v", e)
+	}
+	// The tier, not the plan, sets what a percent buys: this Team seat runs on Max 5x limits.
+	if e.Attrs[semconv.TermaAccountRateLimitTierKey] != "default_claude_max_5x" || e.Attrs[semconv.TermaAccountOrganizationRateLimitTierKey] != "default_raven" {
+		t.Fatalf("rate limit tiers: %+v", e.Attrs)
 	}
 	// The credential hints decide the gate and never leave.
 	for _, k := range []string{"api_key_helper_state", "api_key_present", "bedrock_enabled", "oauth_token_visibility", "hint_scope", "extra_usage_disabled_reason"} {
@@ -58,6 +62,11 @@ func TestClaudeFundingSnapshotAndHints(t *testing.T) {
 	}
 	if _, ok := e.Attrs[semconv.TermaAccountExtraUsageEnabledKey]; ok {
 		t.Fatal("unknown extra usage became false")
+	}
+	for _, k := range []string{semconv.TermaAccountRateLimitTierKey, semconv.TermaAccountOrganizationRateLimitTierKey} {
+		if _, ok := e.Attrs[k]; ok {
+			t.Fatalf("a login without a tier reported %s", k)
+		}
 	}
 }
 

@@ -77,9 +77,14 @@ func fileDigest(path string) (string, error) {
 	return hex.EncodeToString(h.Sum(nil)), nil
 }
 
-// npmLauncherDigest pins the published npm launcher, which doctor must never run to
-// learn where it points.
-const npmLauncherDigest = "a90d18d5df9946c37f39c80fe34f178202a1f65bf58abffaf0eb1f6f4f15cedb"
+// npmLauncherDigests pin every published npm launcher (npm/bin/terma.js), which doctor must
+// never run to learn where it points. A global install's binary updates itself in place, so
+// it may sit under the launcher of an earlier package: a launcher's digest stays here after
+// the launcher changes.
+var npmLauncherDigests = map[string]bool{
+	"a90d18d5df9946c37f39c80fe34f178202a1f65bf58abffaf0eb1f6f4f15cedb": true, // to 0.2.8
+	"48e57926316e12bfed1500041467fa10d9e0500cdaed0515975c0b2ae389360a": true,
+}
 
 // InstalledBinary resolves the official npm launcher to its vendor binary, and anything
 // else, an edited launcher included, to itself.
@@ -91,7 +96,7 @@ func InstalledBinary(path string) string {
 	if err != nil || !strings.HasSuffix(filepath.ToSlash(resolved), "/node_modules/@miradorlabs/terma/bin/terma.js") {
 		return path
 	}
-	if digest, err := fileDigest(resolved); err != nil || digest != npmLauncherDigest {
+	if digest, err := fileDigest(resolved); err != nil || !npmLauncherDigests[digest] {
 		return path
 	}
 	vendor := filepath.Clean(filepath.Join(filepath.Dir(resolved), "..", "vendor", "terma"))

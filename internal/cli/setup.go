@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"runtime"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -41,6 +40,9 @@ type setupFlags struct {
 	verbose       bool
 	// insecureStorage is --insecure-storage: credentials in plain-text files, not the keychain.
 	insecureStorage bool
+	// desktopGrant is the hidden --desktop-grant: Terma Desktop signs this CLI in over
+	// stdin and stdout (signInWithGrant), for the --org and --team it names.
+	desktopGrant bool
 }
 
 // agentChoice is an onboarding surface: one repository adapter may be offered as several
@@ -103,11 +105,19 @@ rotate it.`,
 	cmd.Flags().BoolVar(&f.insecureStorage, "insecure-storage", false, "save credentials in plain text instead of the system keychain")
 	cmd.Flags().StringVar(&f.managedConfig, "managed-config", "", "write the machine-wide hooks as managed configuration into this directory, for your organization to deploy, and exit")
 	cmd.Flags().StringVar(&f.managedTerma, "managed-terma", "$HOME/.local/bin/terma", "with --managed-config: where terma is installed on the machines")
+	// Hidden like auth and hook: Terma Desktop runs it, people do not.
+	cmd.Flags().BoolVar(&f.desktopGrant, "desktop-grant", false, "sign in with a code Terma Desktop writes on stdin (with -y, --org and --team ids)")
+	_ = cmd.Flags().MarkHidden("desktop-grant")
 	return cmd
 }
 
 func (app *App) runSetup(cmd *cobra.Command, f setupFlags) error {
 	out := cmd.OutOrStdout()
+	if f.desktopGrant {
+		if err := app.checkDesktopGrant(f); err != nil {
+			return err
+		}
+	}
 	if f.managedConfig != "" {
 		files, err := globalmode.WriteManaged(app.agents, f.managedConfig, f.managedTerma)
 		if err != nil {
@@ -123,8 +133,16 @@ func (app *App) runSetup(cmd *cobra.Command, f setupFlags) error {
 	if err != nil {
 		return err
 	}
-	if p := style.For(out); p.Enabled() {
-		fmt.Fprintln(out, style.Header(p, app.setupHeaderInfo(cfg, p)))
+	if f.desktopGrant && cfg.APIKey != "" {
+		return errors.New("TERMA_API_KEY is set — unset it for Terma Desktop to sign in as the developer")
+	}
+	// Under --desktop-grant, stdout's first line is the grant's: the header goes to stderr.
+	headerOut := out
+	if f.desktopGrant {
+		headerOut = cmd.ErrOrStderr()
+	}
+	if p := style.For(headerOut); p.Enabled() {
+		fmt.Fprintln(headerOut, style.Header(p, app.setupHeaderInfo(cfg, p)))
 	}
 	switch f.relayService {
 	case "", "on", "off":
@@ -151,8 +169,14 @@ func (app *App) runSetup(cmd *cobra.Command, f setupFlags) error {
 	team := ""
 	steps := setup.Steps{
 		SignIn: func(_ context.Context, cfg *config.Config) (*config.Config, error) {
-			opts := signInOptions{org: parseOrgRef(f.org), noBrowser: f.noBrowser, pauseBeforeBrowser: !f.assumeYes}
-			cfg, kept, err := app.setupSignIn(cmd, cfg, opts, askOrganization(cmd, f.assumeYes))
+			var kept int
+			var err error
+			if f.desktopGrant {
+				cfg, err = app.signInWithGrant(cmd, cfg, parseOrgRef(f.org).ID)
+			} else {
+				opts := signInOptions{org: parseOrgRef(f.org), noBrowser: f.noBrowser, pauseBeforeBrowser: !f.assumeYes}
+				cfg, kept, err = app.setupSignIn(cmd, cfg, opts, askOrganization(cmd, f.assumeYes))
+			}
 			if err == nil {
 				fmt.Fprintln(out)
 				ui.Summary("Signed in", signedInAs(cfg))
@@ -258,6 +282,9 @@ func (app *App) runSetup(cmd *cobra.Command, f setupFlags) error {
 		}
 		return nil
 	}
+	if failure, ok := errors.AsType[*auth.GrantError](err); ok && f.desktopGrant {
+		return writeGrantFailure(out, cmd.ErrOrStderr(), failure)
+	}
 	if err != nil {
 		ui.printLines()
 		return err
@@ -281,7 +308,7 @@ func (app *App) reportUpdates(ui *setupUI) {
 	if err != nil {
 		return
 	}
-	ui.Summary("Updates", updatesSummary(exe, app.version, runtime.GOOS, p.Auto))
+	ui.Summary("Updates", updatesSummary(selfupdate.InstallOf(exe, app.version), p.Auto))
 }
 
 // chooseHarnesses resolves the machine-level agent list: --harness, else a picker,

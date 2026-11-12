@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/netip"
-	"os"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -23,6 +22,7 @@ import (
 	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/miradorlabs/terma-cli/internal/machine"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
 )
@@ -955,7 +955,7 @@ func TestRelayHeartbeat(t *testing.T) {
 		attr(res, semconv.TermaSchemaVersionKey) != semconv.SchemaVersion {
 		t.Fatalf("heartbeat resource %v", res)
 	}
-	host, _ := os.Hostname()
+	host := machine.Name()
 	rec := beat.ResourceLogs[0].ScopeLogs[0].LogRecords[0]
 	if rec.EventName != semconv.TermaRelayHeartbeatEvent {
 		t.Errorf("heartbeat EventName = %q", rec.EventName)

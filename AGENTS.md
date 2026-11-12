@@ -3,8 +3,8 @@
 This file provides guidance to coding agents (Claude Code, Codex and others) when working
 with code in this repository.
 
-`terma` is a Go CLI that connects coding agents (Claude Code, Codex) to Terma and stamps
-the commits they produce with the agent session that wrote them.
+`terma` is a Go CLI that connects coding agents (Claude Code, Codex, GitHub Copilot) to
+Terma and stamps the commits they produce with the agent session that wrote them.
 
 ## Commands
 
@@ -38,6 +38,8 @@ internal/doctor/        `terma doctor` checks
 internal/setup/         `terma setup`; internal/globalmode/ writes the machine-wide hooks
 internal/repohooks/     the commit hooks a claimed session installs in a repository's own
                         .git/hooks, chained to whatever was there
+internal/shellrc/        the developer's shell startup files: install.sh's PATH line, and the
+                        function that starts an agent's command through `terma launch`
 internal/semconv/       event names and attribute keys, rendered from semconv/registry
 internal/boundary/      tests that enforce this layout
 test/e2e/               tests against the real agent binaries (its own Go module)
@@ -95,7 +97,11 @@ nothing below it reads them from the environment (`internal/boundary`).
 **Telemetry.** Claude Code and Codex ignore exporter settings in repository config, and
 desktop apps and IDE extensions read only user-level settings. But a user-level exporter
 sends everything, personal work included, under one key. So every agent's user-level
-exporter points at a relay that terma runs on `127.0.0.1`. A hook in a collected repository
+exporter points at a relay that terma runs on `127.0.0.1`. An agent whose command reads
+its exporter from its environment alone (`agents.Launched`: the Copilot CLI) has no
+settings file to point: setup defines a shell function (`shellrc.InstallLauncher`) that
+starts it through `terma launch <agent>`, which adds the exporter to that one process's
+environment, and the real command as it was once terma is gone. A hook in a collected repository
 claims its session for the developer's team, naming the repository. The relay forwards
 only claimed sessions, only from the processes the claim names, and only while the policy
 still lists the claim's repository. It sends them with the team's key and applies the team's
@@ -129,6 +135,8 @@ never on disk, and a stopping relay drops it.
   hooks go under `.git/hooks`, which git neither tracks nor carries in a commit.
   The rule is about the repositories terma watches: install.sh's PATH line in the
   developer's shell startup files is outside it, even where a dotfiles repository keeps
-  those files (`TERMA_NO_MODIFY_PATH` opts out). What a developer collects is the
+  those files (`TERMA_NO_MODIFY_PATH` opts out), and so is the function setup defines
+  there for an agent it starts through `terma launch` (`TERMA_SHELL_LAUNCHERS=0` opts
+  out): like a hook entry it only calls terma, and holds no endpoint or token. What a developer collects is the
   team policy's repository list, read through `config.Policy.Admits` alone.
 - Help text never mentions the hidden `dev` and `local` environments.

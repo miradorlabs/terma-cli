@@ -21,6 +21,7 @@ type configView struct {
 	AuthURL          string `json:"auth_url"`
 	AppURL           string `json:"app_url"`
 	OTLPURL          string `json:"otlp_url"`
+	MCPURL           string `json:"mcp_url"`
 	OrganizationID   string `json:"organization_id,omitempty"`
 	OrganizationName string `json:"organization_name,omitempty"`
 	ProjectID        string `json:"project_id,omitempty"`
@@ -73,6 +74,7 @@ func (app *App) newConfigShowCommand() *cobra.Command {
 				AuthURL:          cfg.AuthURL,
 				AppURL:           cfg.AppURL,
 				OTLPURL:          cfg.OTLPURL,
+				MCPURL:           cfg.MCPURL,
 				OrganizationID:   cfg.OrganizationID,
 				OrganizationName: cfg.OrganizationName,
 				ProjectID:        cfg.ProjectID,
@@ -87,6 +89,7 @@ func (app *App) newConfigShowCommand() *cobra.Command {
 				{"auth url", cfg.AuthURL},
 				{"app url", cfg.AppURL},
 				{"otlp url", cfg.OTLPURL},
+				{"mcp url", cfg.MCPURL},
 				{"organization", cmp.Or(cfg.OrganizationName, cfg.OrganizationID)},
 				{"team", cmp.Or(cfg.ProjectName, cfg.ProjectID)},
 				{"auth", authMode},

@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"maps"
-	"os"
 	"slices"
 	"strings"
 	"time"
@@ -13,17 +12,20 @@ import (
 	logspb "go.opentelemetry.io/proto/otlp/logs/v1"
 	resourcepb "go.opentelemetry.io/proto/otlp/resource/v1"
 
+	"github.com/miradorlabs/terma-cli/internal/machine"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
 )
 
-// The heartbeat is one log record naming the machine, with terma's version and what
-// started the relay on its resource, timestamped when sent; it goes through HeartbeatSend,
-// never the outbox, and a failed beat is not kept. Its terma.relay.heartbeat.reason says why
-// it was sent. Every beat carries the counters since the previous one as
-// terma.relay.heartbeat.counter.<name> ints, and a failed beat hands its counters to the
-// next. The last, sent as a relay a hook or a developer started stops, also says why; the
-// service's relay sends none (daemon.Result.LastBeatDue). So a relay's beats sum to what it
-// counted up to its last delivered beat; what came after stays in its stats.json.
+// The heartbeat is one log record naming the machine, with terma's version, what started
+// the relay and how terma was installed on its resource, and whether terma installs new
+// releases by itself on the record, asked at each beat. Timestamped when sent, it goes
+// through HeartbeatSend, never the outbox, and a failed beat is not kept. Its
+// terma.relay.heartbeat.reason says why it was sent. Every beat carries the counters since
+// the previous one as terma.relay.heartbeat.counter.<name> ints, and a failed beat hands its
+// counters to the next. The last, sent as a relay a hook or a developer started stops, also
+// says why; the service's relay sends none (daemon.Result.LastBeatDue). So a relay's beats
+// sum to what it counted up to its last delivered beat; what came after stays in its
+// stats.json.
 
 const (
 	// HeartbeatService is the heartbeat's service.name.
@@ -101,7 +103,7 @@ func NameHeartbeatUser(beat *logspb.LogsData, user string) {
 }
 
 func (r *Relay) heartbeatData(reason string, attrs []*commonpb.KeyValue) *logspb.LogsData {
-	host, _ := os.Hostname()
+	host := machine.Name()
 	now := uint64(r.opts.Now().UnixNano())
 	rec := &logspb.LogRecord{
 		TimeUnixNano: now, ObservedTimeUnixNano: now,
@@ -113,6 +115,11 @@ func (r *Relay) heartbeatData(reason string, attrs []*commonpb.KeyValue) *logspb
 			{Key: semconv.HostNameKey, Value: strValue(host)},
 		}, attrs...),
 	}
+	if r.opts.UpdateAuto != nil {
+		if auto := r.opts.UpdateAuto(); auto != "" {
+			rec.Attributes = append(rec.Attributes, &commonpb.KeyValue{Key: semconv.TermaUpdateAutoKey, Value: strValue(auto)})
+		}
+	}
 	res := &resourcepb.Resource{Attributes: []*commonpb.KeyValue{
 		{Key: semconv.ServiceNameKey, Value: strValue(HeartbeatService)},
 		{Key: semconv.ServiceVersionKey, Value: strValue(r.opts.Version)},
@@ -121,6 +128,9 @@ func (r *Relay) heartbeatData(reason string, attrs []*commonpb.KeyValue) *logspb
 	}}
 	if r.opts.Launch != "" {
 		res.Attributes = append(res.Attributes, &commonpb.KeyValue{Key: semconv.TermaRelayLaunchKey, Value: strValue(r.opts.Launch)})
+	}
+	if r.opts.InstallMethod != "" {
+		res.Attributes = append(res.Attributes, &commonpb.KeyValue{Key: semconv.TermaInstallMethodKey, Value: strValue(r.opts.InstallMethod)})
 	}
 	return &logspb.LogsData{ResourceLogs: []*logspb.ResourceLogs{{Resource: res,
 		ScopeLogs: []*logspb.ScopeLogs{{Scope: &commonpb.InstrumentationScope{Name: HeartbeatService, Version: r.opts.Version}, LogRecords: []*logspb.LogRecord{rec}}}}}}

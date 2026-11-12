@@ -16,6 +16,7 @@ const maxLines = 450
 var longFiles = map[string]string{
 	"internal/session/session.go":   "the store: every writer under one lock, read together",
 	"internal/agents/codex/toml.go": "the [otel] splice, verified before it is written, reviewed as one",
+	"internal/semconv/semconv.go":   "rendered whole from the Weaver registry, never edited by hand",
 }
 
 // No source file outgrows its job: split one past maxLines by responsibility, or say here

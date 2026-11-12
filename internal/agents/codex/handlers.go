@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/miradorlabs/terma-cli/internal/agents/internal/applypatch"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
 
@@ -313,7 +314,7 @@ func codexEditedPaths(in *codexHookInput, cwd string) (paths []string, commits [
 			out = append(out, p)
 		}
 	}
-	return append(out, applyPatchPaths(input.Command)...), nil
+	return append(out, applypatch.Paths(input.Command)...), nil
 }
 
 // codexShellTool is the tool_name Codex gives every shell call (exec_command and the rest).
@@ -330,36 +331,4 @@ func boundedCodexContent(s string) string {
 		s = s[:codexContentLimit]
 	}
 	return strings.ToValidUTF8(s, "")
-}
-
-// applyPatchHeaders name a file; "Move to" is a rename's destination, recorded beside its
-// source because the commit touches both.
-var applyPatchHeaders = []string{
-	"*** Add File:",
-	"*** Update File:",
-	"*** Delete File:",
-	"*** Move to:",
-}
-
-// applyPatchPaths reads the envelope from the raw command text: Codex has no structured
-// field, and the patch may be the tool's or heredoc'd into a shell call.
-func applyPatchPaths(command string) []string {
-	if !strings.Contains(command, "*** ") {
-		return nil
-	}
-	var out []string
-	for line := range strings.SplitSeq(command, "\n") {
-		line = strings.TrimSpace(line)
-		for _, header := range applyPatchHeaders {
-			rest, ok := strings.CutPrefix(line, header)
-			if !ok {
-				continue
-			}
-			if p := strings.TrimSpace(rest); p != "" {
-				out = append(out, p)
-			}
-			break
-		}
-	}
-	return out
 }

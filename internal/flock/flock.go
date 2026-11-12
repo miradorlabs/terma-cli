@@ -16,13 +16,15 @@ import (
 // fileMode keeps lock files private: they sit beside credentials and keys.
 const fileMode = 0o600
 
-// A contended lock is retried after pollMin, doubling up to pollMax, because holders
+// A contended lock is retried after pollMin, doubling up to PollMax, because holders
 // finish in well under a millisecond: with 200 µs holders, twenty-four take 22 ms
 // (118 ms at a fixed 5 ms poll).
-const (
-	pollMin = 100 * time.Microsecond
-	pollMax = time.Millisecond
-)
+const pollMin = 100 * time.Microsecond
+
+// PollMax is the longest a waiter goes between two tries of a contended lock. The lock is
+// not fair: a holder that releases and at once locks again usually wins, so one that must
+// let waiters in leaves the lock free for longer than this.
+const PollMax = time.Millisecond
 
 // Lock takes an exclusive lock on path, creating it if needed, waiting until it is free
 // or ctx is done; without platform locks it succeeds without excluding anyone.

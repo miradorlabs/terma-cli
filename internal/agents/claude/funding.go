@@ -54,7 +54,8 @@ func readFunding(repoRoot string) claudeFunding {
 			for from, to := range map[string]string{
 				"accountUuid": semconv.TermaAccountIDKey, "organizationUuid": semconv.TermaAccountOrganizationIDKey,
 				"billingType": semconv.TermaAccountBillingTypeKey, "organizationType": semconv.TermaAccountOrganizationTypeKey,
-				"seatTier": semconv.TermaAccountSeatTierKey,
+				"seatTier": semconv.TermaAccountSeatTierKey, "userRateLimitTier": semconv.TermaAccountRateLimitTierKey,
+				"organizationRateLimitTier": semconv.TermaAccountOrganizationRateLimitTierKey,
 			} {
 				hookrun.CopyEvidenceString(e.Attrs, account, from, to)
 			}

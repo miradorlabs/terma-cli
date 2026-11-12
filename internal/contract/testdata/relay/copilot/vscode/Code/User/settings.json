@@ -1,0 +1,7 @@
+{
+    "chat.agentHost.otel.enabled": true,
+    "chat.agentHost.otel.exporterType": "otlp-http",
+    "chat.agentHost.otel.otlpEndpoint": "http://127.0.0.1:43180/relay-token/v1/traces",
+    "chat.agentHost.otel.captureContent": true,
+    "settingsSync.ignoredSettings": ["chat.agentHost.otel.enabled","chat.agentHost.otel.exporterType","chat.agentHost.otel.otlpEndpoint","chat.agentHost.otel.captureContent"]
+}

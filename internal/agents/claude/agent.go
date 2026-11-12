@@ -131,7 +131,7 @@ var (
 
 // StateDirs are the directories its hooks keep state in.
 func (Agent) StateDirs() []string {
-	return []string{claudeSubagentDir, statusLineStateDir, claudeTitleStateDir, claudeAccountStateDir, claudeLimitStateDir}
+	return []string{claudeSubagentDir, statusLineStateDir, claudeTitleStateDir, claudeAccountStateDir, claudeLimitStateDir, claudeCallResponseStateDir}
 }
 
 // ContentConsented is the consent session titles travel under.

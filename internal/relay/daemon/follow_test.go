@@ -11,13 +11,17 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 )
 
-// followed records the directories Supersede starts a follower for, in place of starting one.
+// followed records the directories Supersede starts a follower for, in place of starting one,
+// and the binary it would run ("" for this one) as <dir>:<exe>, when it is not this one.
 func followed(t *testing.T) func() []string {
 	var mu sync.Mutex
 	var dirs []string
 	was := follow
-	follow = func(dir string) {
+	follow = func(dir, exe string) {
 		mu.Lock()
+		if exe != "" {
+			dir += ":" + exe
+		}
 		dirs = append(dirs, dir)
 		mu.Unlock()
 	}
@@ -69,6 +73,27 @@ func TestASupersededRelayIsFollowedUnlessTheServiceTakesOver(t *testing.T) {
 				t.Fatalf("followers started for %v, want %v", got, want)
 			}
 		})
+	}
+}
+
+// A relay whose package manager upgraded it starts its follower from the link the manager
+// moved, as it does its successor (SpawnFrom), not from the versioned path it ran from.
+func TestAFollowerRunsTheBinaryItsSpawnerNames(t *testing.T) {
+	runsThis(t, false)
+	calls := followed(t)
+	stateDir, _, _ := setUpRelay(t)
+	c := runConfig(stateDir, 0, nil)
+	c.Version = "1.2.0"
+	r := startRun(t, c)
+	awaitRecord(t, r, claim.Dir(stateDir))
+	SpawnFrom("/opt/homebrew/bin/terma", stateDir, "1.3.0")
+	if got, want := calls(), []string{claim.Dir(stateDir) + ":/opt/homebrew/bin/terma"}; !slices.Equal(got, want) {
+		t.Fatalf("followers started for %v, want %v", got, want)
+	}
+	// Named no version, it asks no relay to make way.
+	SpawnFrom("/opt/homebrew/bin/terma", stateDir, "")
+	if got := calls(); len(got) != 1 {
+		t.Fatalf("a spawn naming no version superseded the relay: %v", got)
 	}
 }
 

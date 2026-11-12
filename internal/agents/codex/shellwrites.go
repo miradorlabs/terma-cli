@@ -7,6 +7,8 @@ import (
 	"strings"
 
 	"mvdan.cc/sh/v3/syntax"
+
+	"github.com/miradorlabs/terma-cli/internal/agents/internal/applypatch"
 )
 
 // shellWrites returns the files a shell command names as written (redirect targets, the
@@ -17,7 +19,7 @@ import (
 func shellWrites(command, cwd string) (paths []string, commits []int) {
 	file, err := syntax.NewParser().Parse(strings.NewReader(command), "")
 	if err != nil {
-		for _, p := range applyPatchPaths(command) {
+		for _, p := range applypatch.Paths(command) {
 			if !filepath.IsAbs(p) {
 				p = filepath.Join(cwd, p)
 			}
@@ -83,7 +85,7 @@ func shellWrites(command, cwd string) (paths []string, commits []int) {
 		case *syntax.Stmt:
 			// apply_patch takes its patch as an argument or a heredoc; it makes any directory.
 			for _, patch := range patches(n) {
-				for _, p := range applyPatchPaths(patch) {
+				for _, p := range applypatch.Paths(patch) {
 					if p, ok := resolve(word{p, true}); ok {
 						out = append(out, p)
 					}

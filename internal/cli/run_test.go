@@ -3,6 +3,7 @@ package cli
 import (
 	"bytes"
 	"context"
+	"io"
 	"testing"
 	"time"
 )
@@ -13,6 +14,8 @@ type termaRun struct {
 	// within bounds the run, so a wait at the browser or on a feed fails in seconds.
 	within time.Duration
 	env    map[string]string
+	// stdin is what the command reads, the test's own stdin when nil.
+	stdin io.Reader
 }
 
 // within is a run bounded by d, a call because a composite literal cannot open an if.
@@ -39,6 +42,9 @@ func (r termaRun) exec(t *testing.T, args ...string) (stdout, stderr string, err
 	var out, errOut bytes.Buffer
 	root.SetOut(&out)
 	root.SetErr(&errOut)
+	if r.stdin != nil {
+		root.SetIn(r.stdin)
+	}
 	root.SetArgs(args)
 	err = root.ExecuteContext(ctx)
 	return out.String(), errOut.String(), err

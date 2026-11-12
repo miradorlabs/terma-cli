@@ -21,6 +21,8 @@ const (
 	GenAIRequestModelKey = "gen_ai.request.model"
 	// GenAIRequestReasoningLevelKey is gen_ai.request.reasoning.level: The reasoning or thinking effort level requested for a GenAI model.
 	GenAIRequestReasoningLevelKey = "gen_ai.request.reasoning.level"
+	// GenAIResponseFinishReasonsKey is gen_ai.response.finish_reasons: Array of reasons the model stopped generating tokens, corresponding to each generation received.
+	GenAIResponseFinishReasonsKey = "gen_ai.response.finish_reasons"
 	// GenAIResponseModelKey is gen_ai.response.model: The name of the model that generated the response.
 	GenAIResponseModelKey = "gen_ai.response.model"
 	// GenAIToolCallArgumentsKey is gen_ai.tool.call.arguments: Parameters passed to the tool call.
@@ -31,6 +33,8 @@ const (
 	GenAIToolNameKey = "gen_ai.tool.name"
 	// GenAIToolTypeKey is gen_ai.tool.type: Type of the tool utilized by the agent
 	GenAIToolTypeKey = "gen_ai.tool.type"
+	// GenAIUsageReasoningOutputTokensKey is gen_ai.usage.reasoning.output_tokens: The number of output tokens used for reasoning (e.g. chain-of-thought, extended thinking).
+	GenAIUsageReasoningOutputTokensKey = "gen_ai.usage.reasoning.output_tokens"
 	// HostNameKey is host.name: Name of the host. On UNIX systems, it may contain what the hostname command returns, or the fully qualified hostname, or another name specified by the user.
 	HostNameKey = "host.name"
 	// MiradorProjectIDKey is mirador.project.id: The Mirador project the record is delivered to, the platform's routing key.
@@ -49,10 +53,14 @@ const (
 	TermaAccountIDKey = "terma.account.id"
 	// TermaAccountOrganizationIDKey is terma.account.organization.id: The provider's id for the account's organization.
 	TermaAccountOrganizationIDKey = "terma.account.organization.id"
+	// TermaAccountOrganizationRateLimitTierKey is terma.account.organization.rate_limit_tier: The provider's word for the usage limits of the account's organization.
+	TermaAccountOrganizationRateLimitTierKey = "terma.account.organization.rate_limit_tier"
 	// TermaAccountOrganizationTypeKey is terma.account.organization.type: The provider's word for the organization's kind.
 	TermaAccountOrganizationTypeKey = "terma.account.organization.type"
 	// TermaAccountPlanTypeKey is terma.account.plan_type: The provider's word for the account's plan.
 	TermaAccountPlanTypeKey = "terma.account.plan_type"
+	// TermaAccountRateLimitTierKey is terma.account.rate_limit_tier: The provider's word for the usage limits the account's user runs under.
+	TermaAccountRateLimitTierKey = "terma.account.rate_limit_tier"
 	// TermaAccountSeatIDKey is terma.account.seat.id: An opaque id for one person's seat in a shared account.
 	TermaAccountSeatIDKey = "terma.account.seat.id"
 	// TermaAccountSeatTierKey is terma.account.seat_tier: The provider's word for the seat's tier.
@@ -129,6 +137,8 @@ const (
 	TermaFundingStatusKey = "terma.funding.status"
 	// TermaHookEventKey is terma.hook.event: The agent hook that produced the record.
 	TermaHookEventKey = "terma.hook.event"
+	// TermaInstallMethodKey is terma.install.method: How the relay's terma was installed, which says how it gets new releases.
+	TermaInstallMethodKey = "terma.install.method"
 	// TermaInvocationInitialStepsKey is terma.invocation.initial_steps: How many steps the conversation held when the invocation began.
 	TermaInvocationInitialStepsKey = "terma.invocation.initial_steps"
 	// TermaInvocationNumberKey is terma.invocation.number: The agent's invocation counter.
@@ -147,6 +157,8 @@ const (
 	TermaMessageTextKey = "terma.message.text"
 	// TermaMessageTruncatedKey is terma.message.truncated: Whether terma.message.text was cut at terma's bound.
 	TermaMessageTruncatedKey = "terma.message.truncated"
+	// TermaModelCallIDKey is terma.model_call.id: The model call the event is about, in the agent's own id.
+	TermaModelCallIDKey = "terma.model_call.id"
 	// TermaModelParamContextKey is terma.model_param.context: The context setting the developer selected for the model.
 	TermaModelParamContextKey = "terma.model_param.context"
 	// TermaModelParamThinkingKey is terma.model_param.thinking: The thinking setting the developer selected for the model.
@@ -245,6 +257,10 @@ const (
 	TermaRepositoryWorktreeLinkedKey = "terma.repository.worktree.linked"
 	// TermaRepositoryWorktreeNameKey is terma.repository.worktree.name: Git's name for the linked worktree the session's hooks last ran in.
 	TermaRepositoryWorktreeNameKey = "terma.repository.worktree.name"
+	// TermaResponseInferenceGeoKey is terma.response.inference_geo: Where the provider says it ran the call, in its own spelling.
+	TermaResponseInferenceGeoKey = "terma.response.inference_geo"
+	// TermaResponseServiceTierKey is terma.response.service_tier: The service tier the provider says served the call, in its own spelling.
+	TermaResponseServiceTierKey = "terma.response.service_tier"
 	// TermaSchemaVersionKey is terma.schema.version: The version of this registry the record follows.
 	TermaSchemaVersionKey = "terma.schema.version"
 	// TermaSessionParentIDKey is terma.session.parent.id: The session that opened this one for a subagent.
@@ -261,6 +277,8 @@ const (
 	TermaToolCallCountKey = "terma.tool_call.count"
 	// TermaTurnIDKey is terma.turn.id: The turn the event belongs to, in the agent's own id.
 	TermaTurnIDKey = "terma.turn.id"
+	// TermaUpdateAutoKey is terma.update.auto: Whether the relay installs new releases of its terma by itself.
+	TermaUpdateAutoKey = "terma.update.auto"
 	// TermaUsageCacheReadTokensKey is terma.usage.cache_read_tokens: Cache-read input tokens as the agent reported them, in a snapshot rather than per call.
 	TermaUsageCacheReadTokensKey = "terma.usage.cache_read_tokens"
 	// TermaUsageCacheWriteTokensKey is terma.usage.cache_write_tokens: Cache-write input tokens as the agent reported them, in a snapshot rather than per call.
@@ -315,6 +333,8 @@ const (
 	TermaCompactionEvent = "terma.compaction"
 	// TermaFilesTouchedEvent is terma.files.touched: A session wrote files in the repository.
 	TermaFilesTouchedEvent = "terma.files.touched"
+	// TermaModelCallResponseEvent is terma.model_call.response: What the API answered for one model call, as the agent recorded it and its telemetry does not say.
+	TermaModelCallResponseEvent = "terma.model_call.response"
 	// TermaPushEvent is terma.push: A branch was pushed, one event per branch the push updated.
 	TermaPushEvent = "terma.push"
 	// TermaRelayHeartbeatEvent is terma.relay.heartbeat: The relay is running; sent with service.name terma-relay.
@@ -363,6 +383,16 @@ const (
 	TermaCompactionTriggerAuto = "auto"
 	// TermaCompactionTriggerManual is terma.compaction.trigger manual: The developer asked for it.
 	TermaCompactionTriggerManual = "manual"
+	// TermaInstallMethodScript is terma.install.method script: A release binary terma replaces itself, from the install script or a release archive downloaded by hand.
+	TermaInstallMethodScript = "script"
+	// TermaInstallMethodHomebrew is terma.install.method homebrew: Homebrew's, as a cask or a formula.
+	TermaInstallMethodHomebrew = "homebrew"
+	// TermaInstallMethodNpm is terma.install.method npm: The global npm package @miradorlabs/terma, or any npm install of it on Windows.
+	TermaInstallMethodNpm = "npm"
+	// TermaInstallMethodNpmProject is terma.install.method npm_project: A project's npm dependency, which the project's own lockfile pins; also another package manager's global install in npm's layout (yarn, pnpm or bun), which terma cannot tell apart.
+	TermaInstallMethodNpmProject = "npm_project"
+	// TermaInstallMethodSource is terma.install.method source: A build that is not a numbered release, wherever it is installed: go build or go install, or make on a commit that is not a release tag (make on a release tag builds that release).
+	TermaInstallMethodSource = "source"
 	// TermaOperationDurationStatusInvalid is terma.operation.duration_status invalid: The agent reported a duration that is not a non-negative integer.
 	TermaOperationDurationStatusInvalid = "invalid"
 	// TermaPushRangeUpdate is terma.push.range update: The commits in the new revision and not the old one, exactly.
@@ -403,6 +433,12 @@ const (
 	TermaRelayLaunchHook = "hook"
 	// TermaRelayLaunchManual is terma.relay.launch manual: A developer started it from the command line.
 	TermaRelayLaunchManual = "manual"
+	// TermaUpdateAutoOn is terma.update.auto on: The relay installs each new release by itself.
+	TermaUpdateAutoOn = "on"
+	// TermaUpdateAutoOff is terma.update.auto off: It could, but automatic updates are off (`terma update --auto off`, or CI or TERMA_NO_UPDATE_CHECK=1 in the relay's environment).
+	TermaUpdateAutoOff = "off"
+	// TermaUpdateAutoUnsupported is terma.update.auto unsupported: It cannot, whatever the developer chooses; update notices only.
+	TermaUpdateAutoUnsupported = "unsupported"
 	// TermaUsageScopeParentTurn is terma.usage.scope parent_turn: The parent conversation's turn, subagents excluded.
 	TermaUsageScopeParentTurn = "parent_turn"
 	// TermaUsageSemanticsSnapshot is terma.usage.semantics snapshot: A repeated snapshot, never an additive delta.

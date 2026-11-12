@@ -1,0 +1,40 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "type": "command",
+        "command": "[ -x '/usr/local/bin/terma' ] && '/usr/local/bin/terma' hook --user copilot-post-tool-use || true",
+        "timeoutSec": 10
+      }
+    ],
+    "SessionEnd": [
+      {
+        "type": "command",
+        "command": "[ -x '/usr/local/bin/terma' ] && '/usr/local/bin/terma' hook --user copilot-session-end || true",
+        "timeoutSec": 10
+      }
+    ],
+    "SessionStart": [
+      {
+        "type": "command",
+        "command": "[ -x '/usr/local/bin/terma' ] && '/usr/local/bin/terma' hook --user copilot-session-start || true",
+        "timeoutSec": 10
+      }
+    ],
+    "Stop": [
+      {
+        "type": "command",
+        "command": "[ -x '/usr/local/bin/terma' ] && '/usr/local/bin/terma' hook --user copilot-stop || true",
+        "timeoutSec": 10
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "type": "command",
+        "command": "[ -x '/usr/local/bin/terma' ] && '/usr/local/bin/terma' hook --user copilot-prompt || true",
+        "timeoutSec": 10
+      }
+    ]
+  },
+  "version": 1
+}

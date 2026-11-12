@@ -16,17 +16,19 @@ import (
 type claudeHookInput struct {
 	SessionID      string `json:"session_id"`
 	TranscriptPath string `json:"transcript_path"`
-	Cwd            string `json:"cwd"`
-	Event          string `json:"hook_event_name"`
-	Error          string `json:"error"`
-	Source         string `json:"source"`
-	Model          string `json:"model"`
-	PromptID       string `json:"prompt_id"`
-	AgentID        string `json:"agent_id"`
-	AgentType      string `json:"agent_type"`
-	ToolName       string `json:"tool_name"`
-	ToolUseID      string `json:"tool_use_id"`
-	ToolInput      struct {
+	// AgentTranscriptPath is a subagent's own transcript, on SubagentStop.
+	AgentTranscriptPath string `json:"agent_transcript_path"`
+	Cwd                 string `json:"cwd"`
+	Event               string `json:"hook_event_name"`
+	Error               string `json:"error"`
+	Source              string `json:"source"`
+	Model               string `json:"model"`
+	PromptID            string `json:"prompt_id"`
+	AgentID             string `json:"agent_id"`
+	AgentType           string `json:"agent_type"`
+	ToolName            string `json:"tool_name"`
+	ToolUseID           string `json:"tool_use_id"`
+	ToolInput           struct {
 		FilePath     string `json:"file_path"`
 		NotebookPath string `json:"notebook_path"`
 		Edits        []struct {
@@ -81,13 +83,17 @@ func sessionEnd(ctx context.Context, env hookrun.Env) error {
 		return nil
 	}
 	limitFromTranscript(env, r, in)
+	// A turn's last response can reach the transcript after its Stop read it, and an interrupted
+	// turn has no Stop.
+	captureClaudeCallResponses(env, r, in.SessionID, in.TranscriptPath)
 	env.EndSession(r, in.SessionID, claudeTool)
 	// A /rename after the last turn ends no turn.
 	captureClaudeTitle(env, r, in)
 	return nil
 }
 
-// stop refreshes account evidence and the session's title before the dispatcher starts delivery.
+// stop refreshes account evidence, the session's title and its calls' responses before the
+// dispatcher starts delivery.
 func stop(ctx context.Context, env hookrun.Env) error {
 	in, err := readClaudeInput(env.Stdin)
 	if err != nil {
@@ -101,6 +107,7 @@ func stop(ctx context.Context, env hookrun.Env) error {
 	}
 	captureClaudeAccount(env, r, in)
 	captureClaudeTitle(env, r, in)
+	captureClaudeCallResponses(env, r, in.SessionID, in.TranscriptPath)
 	return nil
 }
 

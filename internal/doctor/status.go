@@ -59,7 +59,7 @@ func Local(ctx context.Context, env Env) (LocalReport, error) {
 		} else if cred.ServerKey != "" {
 			add("Account", "server key %s in %s", cred.ServerKey, cmp.Or(cfg.OrganizationName, cred.OrganizationID))
 		} else {
-			add("Account", "%s in %s, credentials %s", cmp.Or(cred.Email, "signed in"), cmp.Or(cfg.OrganizationName, cred.OrganizationID), cred.Storage())
+			add("Account", "%s in %s%s, credentials %s", cmp.Or(cred.Email, "signed in"), cmp.Or(cfg.OrganizationName, cred.OrganizationID), cred.Origin(), cred.Storage())
 		}
 	}
 	rep.Rows = append(rep.Rows, machineRows(cfg)...)
@@ -166,13 +166,15 @@ func Local(ctx context.Context, env Env) (LocalReport, error) {
 }
 
 // Context is what `terma doctor` prints above its checks, which do not cover it: what this
-// machine collects, which backend it reports to, and the repository's work in progress.
+// machine collects, which backend it reports to, how it gets new releases (Env.Updates),
+// and the repository's work in progress.
 func Context(env Env) []Row {
 	if env.Config == nil {
 		return nil
 	}
 	rows := append([]Row{{"Config", output.TildePath(env.ConfigDir)}, {"State", output.TildePath(env.StateDir)}},
 		machineRows(env.Config)...)
+	rows = append(rows, env.Updates...)
 	if env.RepoErr != nil {
 		return rows
 	}

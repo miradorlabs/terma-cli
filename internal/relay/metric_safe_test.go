@@ -18,6 +18,8 @@ var pinnedMetricSafeKeys = map[string][]string{
 	"codex.sandbox_integrity.duration_ms":    {"backend"},
 	"codex.sandbox_integrity.preparation_ms": {"backend"},
 	"codex.tools.registered":                 {"exposure", "tool_mode"},
+	"codex.tool.call":                        {"shell_snapshot_mode"},
+	"codex.tool.call.duration_ms":            {"shell_snapshot_mode"},
 }
 
 func TestComposedMetricSafeKeysArePinned(t *testing.T) {

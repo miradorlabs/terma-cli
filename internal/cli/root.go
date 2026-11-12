@@ -91,8 +91,11 @@ Every command is safe to run again.`,
 		app.newUpdateCommand(),
 		app.newTeardownCommand(),
 		// Hidden. Other programs run these: agents and git run hook, the relay service runs
-		// relay, hooks run spool, the Homebrew cask runs completion and install.sh version.
+		// relay, hooks run spool, the Homebrew cask runs completion and install.sh version,
+		// the shell functions setup writes run launch, and the terma-mcp bridge runs auth.
+		app.newAuthCommand(),
 		app.newHookCommand(),
+		app.newLaunchCommand(),
 		app.newRelayCommand(),
 		app.newSpoolCommand(),
 		app.newVersionCommand(),
@@ -123,10 +126,14 @@ func (app *App) newVersionCommand() *cobra.Command {
 }
 
 // printUpdateNotice runs update maintenance after interactive commands, never from a
-// hook or a spool flush, which must stay silent and fast.
+// hook or a spool flush, which must stay silent and fast. It first says, once, what the
+// relay, which prints nothing, installed in the background since the last one.
 func (app *App) printUpdateNotice(cmd *cobra.Command) {
 	if !app.automaticUpdatesAllowed(cmd, canPrompt()) {
 		return
+	}
+	if line := selfupdate.TellUpdated(app.stateDir); line != "" {
+		fmt.Fprintln(cmd.ErrOrStderr(), line)
 	}
 	app.refreshAfterUpgrade(cmd.Context(), cmd.ErrOrStderr())
 	exe, err := os.Executable()
@@ -137,13 +144,14 @@ func (app *App) printUpdateNotice(cmd *cobra.Command) {
 }
 
 func (app *App) automaticUpdatesAllowed(cmd *cobra.Command, interactive bool) bool {
-	if !interactive || (app.flags.output != "" && app.flags.output != "table") || os.Getenv("CI") != "" || os.Getenv("TERMA_NO_UPDATE_CHECK") == "1" {
+	if !interactive || (app.flags.output != "" && app.flags.output != "table") || selfupdate.OptedOut(os.Getenv) {
 		return false
 	}
 	for c := cmd; c != nil; c = c.Parent() {
 		switch c.Name() {
 		// nate removes the updater's state and the executable; its post-run must not recreate them.
-		case "hook", "spool", "update", "version", "completion", "__complete", "__completeNoDesc", "nate":
+		// auth's stdout is read by the terma-mcp bridge, which waits on it.
+		case "auth", "hook", "launch", "spool", "update", "version", "completion", "__complete", "__completeNoDesc", "nate":
 			return false
 		}
 	}
@@ -171,8 +179,12 @@ type App struct {
 	runUpdateStep        func(ctx context.Context, out io.Writer, argv ...string) error
 	nateBinaryCandidates func() []string
 	nateRemoveBinary     func(cmd *cobra.Command, path string) error
-	// spawnRelay starts a relay for a state directory, detached, as a hook does.
-	spawnRelay func(stateDir, version string)
+	// spawnRelay starts the terma at exe (this one when "") as a relay for a state
+	// directory, detached, as a hook does.
+	spawnRelay func(exe, stateDir, version string)
+	// backgroundStep runs one update program for the relay, with no terminal and detached,
+	// its output to out.
+	backgroundStep func(ctx context.Context, out io.Writer, argv ...string) error
 	// canAsk reports whether a person is at a terminal to answer questions.
 	canAsk func() bool
 	// binary is the executable as this process started from it, for the updater: a command
@@ -185,8 +197,9 @@ type App struct {
 // version.
 func New(agentsFor func(configDir string) *agents.Registry, version string) *App {
 	app := &App{agentsFor: agentsFor, version: version, binDirs: doctor.WellKnownBinDirs, hookExecutable: procinfo.AbsExecutable,
-		managedRoot: "/", runUpdateStep: runUpdateStep, nateRemoveBinary: removeNateBinary, spawnRelay: daemon.Spawn,
-		canAsk: canPrompt}
+		managedRoot: "/", runUpdateStep: runUpdateStep, nateRemoveBinary: removeNateBinary, spawnRelay: daemon.SpawnFrom,
+		backgroundStep: runBackgroundStep,
+		canAsk:         canPrompt}
 	app.nateBinaryCandidates = app.installedTermaBinaries
 	if exe, err := os.Executable(); err == nil {
 		app.binary, _ = os.Stat(exe)
@@ -220,8 +233,13 @@ func (app *App) Execute() int {
 		if quietCommand(os.Args[1:]) {
 			return 0
 		}
-		fmt.Fprintf(style.Highlight(os.Stderr), "%s %v\n", style.For(os.Stderr).Fail("Error:"), err)
-		return 1
+		// The developer typed their agent's command, not terma's: it starts all the same,
+		// with nothing of terma's in its environment.
+		if !launchCommand(os.Args[1:]) {
+			fmt.Fprintf(style.Highlight(os.Stderr), "%s %v\n", style.For(os.Stderr).Fail("Error:"), err)
+			return 1
+		}
+		dir, stateDir = "", ""
 	}
 	app.configure(dir, stateDir)
 

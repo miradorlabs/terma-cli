@@ -202,13 +202,13 @@ func TestClaudeTitleNeedsTheConsentPromptsTravelUnder(t *testing.T) {
 // A rename has no length limit of its own; the title is cut on a rune boundary.
 func TestClaudeTitleIsBounded(t *testing.T) {
 	env := titleEnv(t)
-	long := strings.Repeat("é", claudeTitleMaxText)
+	long := strings.Repeat("é", hookrun.TitleMaxBytes)
 	titles := stopClaudeTitles(t, env, transcript(t, t.TempDir(), titleRecord("custom-title", long)))
 	if len(titles) != 1 {
 		t.Fatalf("titles: %+v", titles)
 	}
 	got := titles[0].Attrs[semconv.TermaSessionTitleKey].(string)
-	if len(got) > claudeTitleMaxText || !strings.HasPrefix(long, got) || len(got)%2 != 0 {
-		t.Fatalf("title cut to %d bytes, not on a rune boundary within %d", len(got), claudeTitleMaxText)
+	if len(got) > hookrun.TitleMaxBytes || !strings.HasPrefix(long, got) || len(got)%2 != 0 {
+		t.Fatalf("title cut to %d bytes, not on a rune boundary within %d", len(got), hookrun.TitleMaxBytes)
 	}
 }

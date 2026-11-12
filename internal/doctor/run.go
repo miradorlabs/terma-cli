@@ -29,6 +29,9 @@ type Env struct {
 	Root, GitDir string
 	RepoErr      error
 	Probes       Probes
+	// Updates are the rows saying how this terma gets new releases and what it last
+	// installed by itself, among the context doctor prints first.
+	Updates []Row
 }
 
 // Probes reach the event spool and the platform's APIs for a run.
@@ -58,6 +61,18 @@ type Credential struct {
 	// ServerKey is, masked, the team server key a profile set up with one signs in with;
 	// "" for a developer's login.
 	ServerKey string
+	// ViaDesktop is a login Terma Desktop delegated to this CLI (its label ends
+	// auth.Credential.ViaDesktop), not one approved in the browser.
+	ViaDesktop bool
+}
+
+// Origin says how a developer's login was made: ", signed in through Terma Desktop" for
+// one the desktop delegated, "" for a browser sign-in or a server key.
+func (c Credential) Origin() string {
+	if c.ViaDesktop && c.ServerKey == "" {
+		return ", signed in through Terma Desktop"
+	}
+	return ""
 }
 
 // Storage names where a credential's tokens are kept.
@@ -257,7 +272,7 @@ func (d *run) signedIn() Check {
 	if cred.OtherEnvironment {
 		return Check{Status: Fail, Detail: "signed in against a different environment", Fix: "terma setup"}
 	}
-	who, storage := cmp.Or(cred.Email, "your account"), ", credentials "+cred.Storage()
+	who, storage := cmp.Or(cred.Email, "your account"), cred.Origin()+", credentials "+cred.Storage()
 	if cred.ServerKey != "" {
 		who, storage = "server key "+cred.ServerKey, ""
 	}

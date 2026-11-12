@@ -168,8 +168,20 @@ out="$(install_as /bin/bash "$home")"
 clean "$out"
 grep -qF "in ~/.bashrc and ~/.profile, for bash (your login shell)" <<<"$out" || fail "bash said: $out"
 [ "$(reloads /bin/bash "$home" "$out")" = "$home/.local/bin/terma" ] || fail "bash's source step does not find terma: $out"
-for mode in -ic -lc; do
-  [ "$(env -i HOME="$home" PATH=/usr/bin:/bin /bin/bash "$mode" 'command -v terma' 2>/dev/null)" = "$home/.local/bin/terma" ] \
+# The last line is `command -v`'s: the system's bashrc may print first, as Ubuntu's does its
+# "To run a command as administrator" hint for a user in the sudo group. A login shell reads
+# /etc/profile before the home's files, and where that sets HOME (Blacksmith's runners point
+# it back at the runner's own home) it never reads this home: its check is left to the hosts
+# where it can (install-script-macos), and the skip is said.
+modes=(-ic)
+# shellcheck disable=SC2016 # $HOME is the login shell's
+if [ "$(env -i HOME="$home" PATH=/usr/bin:/bin /bin/bash -lc 'printf "%s\n" "$HOME"' 2>/dev/null | tail -n 1)" = "$home" ]; then
+  modes+=(-lc)
+else
+  echo "   bash -lc skipped: this machine's /etc/profile sets HOME"
+fi
+for mode in "${modes[@]}"; do
+  [ "$(env -i HOME="$home" PATH=/usr/bin:/bin /bin/bash "$mode" 'command -v terma' 2>/dev/null | tail -n 1)" = "$home/.local/bin/terma" ] \
     || fail "bash $mode does not find terma: $(ls -A "$home")"
 done
 home="$(fresh_home)"

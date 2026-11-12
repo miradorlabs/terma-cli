@@ -347,3 +347,56 @@ func TestNameHeartbeatUserNamesTheRecord(t *testing.T) {
 		}
 	}
 }
+
+// How terma was installed rides the resource, as it was when the relay started; whether it
+// updates itself rides each record, asked again at every beat, since the developer can turn
+// automatic updates on or off while the relay runs.
+func TestHeartbeatCarriesInstallMethodAndAskedUpdateAutoEachBeat(t *testing.T) {
+	t.Parallel()
+	var beats []*logspb.LogsData
+	var mu sync.Mutex
+	auto, asked := semconv.TermaUpdateAutoOn, 0
+	r := newRelay(Options{Dir: t.TempDir(), Token: token, InstallMethod: semconv.TermaInstallMethodHomebrew,
+		UpdateAuto: func() string {
+			mu.Lock()
+			defer mu.Unlock()
+			asked++
+			return auto
+		},
+		HeartbeatSend: func(_ context.Context, b *logspb.LogsData) error { beats = append(beats, b); return nil }})
+	if err := r.heartbeat(context.Background(), semconv.TermaRelayHeartbeatReasonStart, ""); err != nil {
+		t.Fatal(err)
+	}
+	mu.Lock()
+	auto = semconv.TermaUpdateAutoOff
+	mu.Unlock()
+	if err := r.StopHeartbeat(context.Background(), semconv.TermaRelayExitReasonAsked); err != nil {
+		t.Fatal(err)
+	}
+	if asked != 2 {
+		t.Errorf("UpdateAuto asked %d times for 2 beats", asked)
+	}
+	for i, want := range []string{semconv.TermaUpdateAutoOn, semconv.TermaUpdateAutoOff} {
+		res, rec := beats[i].ResourceLogs[0].Resource.Attributes, beats[i].ResourceLogs[0].ScopeLogs[0].LogRecords[0].Attributes
+		if got := attr(rec, semconv.TermaUpdateAutoKey); got != want {
+			t.Errorf("beat %d: terma.update.auto = %q, want %q", i, got, want)
+		}
+		if got := attr(res, semconv.TermaInstallMethodKey); got != semconv.TermaInstallMethodHomebrew {
+			t.Errorf("beat %d: terma.install.method = %q on the resource", i, got)
+		}
+		if attr(res, semconv.TermaUpdateAutoKey) != "" || attr(rec, semconv.TermaInstallMethodKey) != "" {
+			t.Errorf("beat %d put an attribute in the other's place: resource %v, record %v", i, res, rec)
+		}
+	}
+	// A relay told neither, as in tests, sends neither.
+	var bare *logspb.LogsData
+	r = newRelay(Options{Dir: t.TempDir(), Token: token,
+		HeartbeatSend: func(_ context.Context, b *logspb.LogsData) error { bare = b; return nil }})
+	if err := r.heartbeat(context.Background(), semconv.TermaRelayHeartbeatReasonInterval, ""); err != nil {
+		t.Fatal(err)
+	}
+	if attr(bare.ResourceLogs[0].Resource.Attributes, semconv.TermaInstallMethodKey) != "" ||
+		attr(bare.ResourceLogs[0].ScopeLogs[0].LogRecords[0].Attributes, semconv.TermaUpdateAutoKey) != "" {
+		t.Errorf("a relay told neither sent one: %v", bare)
+	}
+}

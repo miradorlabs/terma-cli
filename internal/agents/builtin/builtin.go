@@ -6,6 +6,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/agents/antigravity"
 	"github.com/miradorlabs/terma-cli/internal/agents/claude"
 	"github.com/miradorlabs/terma-cli/internal/agents/codex"
+	"github.com/miradorlabs/terma-cli/internal/agents/copilot"
 	"github.com/miradorlabs/terma-cli/internal/agents/cursor"
 	"github.com/miradorlabs/terma-cli/internal/agents/dsh"
 	"github.com/miradorlabs/terma-cli/internal/agents/gemini"
@@ -15,14 +16,16 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/agents/pi"
 )
 
-// Agents is every agent terma knows in install order, the supported ones, and the ones
-// only announced; those that keep records do so under terma's config directory configDir.
+// Agents is every agent terma knows in install order, and the supported ones; those that
+// keep records do so under terma's config directory configDir.
 func Agents(configDir string) *agents.Registry {
 	claudeCode, codexCLI := claude.Agent{ConfigDir: configDir}, codex.Agent{ConfigDir: configDir}
+	githubCopilot := copilot.Agent{ConfigDir: configDir}
 	return agents.New(
 		claudeCode,
 		cursor.Agent{},
 		codexCLI,
+		githubCopilot,
 		opencode.Agent{ConfigDir: configDir},
 		omp.Agent{ConfigDir: configDir},
 		pi.Agent{},
@@ -30,5 +33,5 @@ func Agents(configDir string) *agents.Registry {
 		gemini.Agent{},
 		dsh.Agent{},
 		antigravity.Agent{},
-	).Support(claudeCode, codexCLI).Upcoming("GitHub Copilot")
+	).Support(claudeCode, codexCLI, githubCopilot)
 }

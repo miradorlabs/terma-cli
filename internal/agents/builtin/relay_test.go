@@ -39,7 +39,7 @@ func TestConfigureIsolatesAgentFilesAndEnvironment(t *testing.T) {
 			for key, dir := range map[string]string{
 				"CLAUDE_CONFIG_DIR": "claude", "CODEX_HOME": "codex", "XDG_CONFIG_HOME": "xdg",
 				"PI_CODING_AGENT_DIR": "pi", "OMP_DIR": "omp", "HERMES_HOME": "hermes",
-				"GEMINI_CLI_HOME": "gemini", "DSH_HOME": "dsh",
+				"GEMINI_CLI_HOME": "gemini", "DSH_HOME": "dsh", "COPILOT_HOME": "copilot",
 			} {
 				t.Setenv(key, filepath.Join(home, dir))
 			}
@@ -48,6 +48,7 @@ func TestConfigureIsolatesAgentFilesAndEnvironment(t *testing.T) {
 				"opencode": "xdg/opencode/plugins/terma.js", "omp": "omp/agent/extensions/terma-relay.ts",
 				"pi": "pi/extensions/terma.ts", "hermes": "hermes/plugins/terma/__init__.py",
 				"gemini": "gemini/.gemini/settings.json", "dsh": "dsh/plugins/terma-relay.mjs",
+				"copilot": vscodeSettings(t, home),
 			}
 			if _, ok := paths[e.Name()]; !ok {
 				t.Fatalf("this test knows no configuration file for %s", e.Name())
@@ -112,6 +113,27 @@ func TestConfigureIsolatesAgentFilesAndEnvironment(t *testing.T) {
 	}
 }
 
+// vscodeSettings is the user settings file, relative to home, of a VS Code Copilot has run
+// in, in the sandbox: an editor it never ran in gets no settings.
+func vscodeSettings(t *testing.T, home string) string {
+	t.Helper()
+	base := filepath.Join(home, "vscode")
+	t.Setenv("VSCODE_APPDATA", base)
+	// No exporter of the developer's own in the shell the tests run from: VS Code would
+	// read it ahead of its settings, and setup then writes none.
+	t.Setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "")
+	t.Setenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", "")
+	user := filepath.Join(base, "Code", "User")
+	if err := os.MkdirAll(filepath.Join(user, "globalStorage", "github.copilot-chat"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	rel, err := filepath.Rel(home, filepath.Join(user, "settings.json"))
+	if err != nil || strings.HasPrefix(rel, "..") {
+		t.Fatalf("VS Code's settings are outside the sandbox: %s, %v", user, err)
+	}
+	return filepath.ToSlash(rel)
+}
+
 // Unconfiguring leaves none of the relay's token in an agent's files, and again has nothing to undo.
 func TestUnconfigureRelayUndoesConfigure(t *testing.T) {
 	for _, a := range reg.With[agents.RelayExporter]() {
@@ -123,11 +145,12 @@ func TestUnconfigureRelayUndoesConfigure(t *testing.T) {
 			for key, dir := range map[string]string{
 				"CLAUDE_CONFIG_DIR": "claude", "CODEX_HOME": "codex", "XDG_CONFIG_HOME": "xdg",
 				"PI_CODING_AGENT_DIR": "pi", "OMP_DIR": "omp", "HERMES_HOME": "hermes",
-				"GEMINI_CLI_HOME": "gemini", "DSH_HOME": "dsh",
+				"GEMINI_CLI_HOME": "gemini", "DSH_HOME": "dsh", "COPILOT_HOME": "copilot",
 			} {
 				t.Setenv(key, filepath.Join(home, dir))
 			}
 			e, _ := Agents(filepath.Join(home, "terma")).Find[agents.RelayExporter](a.Name())
+			vscodeSettings(t, home)
 			const token = "relay-token-0123456789abcdef"
 			cfg := agents.RelayConfig{Endpoint: "http://127.0.0.1:43180", Token: token, HookCommand: []string{"terma", "hook"}}
 			if _, err := e.ConfigureRelay(t.Context(), cfg); err != nil {

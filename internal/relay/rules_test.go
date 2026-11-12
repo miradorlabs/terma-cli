@@ -35,6 +35,7 @@ var (
 	pinnedToolContentFields    = []string{"tool_parameters", "tool_input", "full_command", "bash_command", "arguments", "output",
 		"gen_ai.tool.call.arguments", "gen_ai.tool.call.result", "opencode.tool.file_path", "opencode.session.directory",
 		"function_args", "hook_input", "hook_output", "stdout", "stderr",
+		"github.copilot.tool.parameters.command", "github.copilot.tool.parameters.file_path",
 		"file_path", "result", "cwd"}
 	pinnedToolContentEvents = []string{"tool.output", "tool.input"}
 	pinnedSessionKeys       = []string{"session.id", "conversation.id", "gen_ai.conversation.id", "thread.id", "thread_id"}

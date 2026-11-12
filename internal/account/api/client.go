@@ -92,9 +92,12 @@ type Client struct {
 	// tokenGen counts credential replacements, so a 401 that raced another goroutine's
 	// refresh retries with its token instead of redeeming the refresh token twice.
 	tokenGen uint64
-	// refreshMu serializes the token exchange: the server's reuse detection revokes the
-	// whole session when a rotated refresh token is redeemed twice.
-	refreshMu sync.Mutex
+	// unsaved holds the refresh tokens this client spent since its last successful save.
+	// A store that still holds one of them is behind this client.
+	unsaved []string
+	// refreshing is a one-slot semaphore for this process's token exchanges. The
+	// credential lock serializes them across processes.
+	refreshing chan struct{}
 
 	projectID string
 }
@@ -116,14 +119,15 @@ func New(cfg *config.Config, opts Options) (*Client, error) {
 		timeout = 30 * time.Second
 	}
 	c := &Client{
-		baseURL:   strings.TrimRight(cfg.APIURL, "/"),
-		authURL:   strings.TrimRight(cfg.AuthURL, "/"),
-		http:      newHTTPClient(timeout),
-		version:   opts.Version,
-		dir:       cfg.Dir,
-		profile:   cfg.ProfileName,
-		apiKey:    cfg.APIKey,
-		projectID: firstNonEmpty(opts.ProjectID, cfg.ProjectID),
+		baseURL:    strings.TrimRight(cfg.APIURL, "/"),
+		authURL:    strings.TrimRight(cfg.AuthURL, "/"),
+		http:       newHTTPClient(timeout),
+		version:    opts.Version,
+		dir:        cfg.Dir,
+		profile:    cfg.ProfileName,
+		apiKey:     cfg.APIKey,
+		projectID:  firstNonEmpty(opts.ProjectID, cfg.ProjectID),
+		refreshing: make(chan struct{}, 1),
 	}
 	if c.apiKey != "" {
 		return c, nil
@@ -148,9 +152,10 @@ func New(cfg *config.Config, opts Options) (*Client, error) {
 // NewAnonymous builds a credential-less client for the auth host's minting endpoints.
 func NewAnonymous(authURL, version string) *Client {
 	return &Client{
-		authURL: strings.TrimRight(authURL, "/"),
-		http:    newHTTPClient(30 * time.Second),
-		version: version,
+		authURL:    strings.TrimRight(authURL, "/"),
+		http:       newHTTPClient(30 * time.Second),
+		version:    version,
+		refreshing: make(chan struct{}, 1),
 	}
 }
 
@@ -288,7 +293,11 @@ func (c *Client) do(ctx context.Context, h host, method, path string, query url.
 
 	if resp.StatusCode == http.StatusUnauthorized && c.canRefresh() {
 		resp.Body.Close()
-		if refreshErr := c.refreshIfCurrent(ctx, gen); refreshErr != nil {
+		// The refused token is redeemed past unless another process already has.
+		refused := func(held, current *auth.Credential) bool {
+			return current.AccessToken == held.AccessToken || current.Expired()
+		}
+		if refreshErr := c.refreshIfCurrent(ctx, gen, refused); refreshErr != nil {
 			return nil, refreshErr
 		}
 		resp, err = c.attempt(ctx, h, method, path, query, headers, body)

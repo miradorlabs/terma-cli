@@ -67,8 +67,9 @@ release:
     # The installer travels with the release it installs. https://terma.ai/install.sh
     # redirects to releases/latest/download/install.sh, so the script people pipe into
     # a shell is the one that was tested against these exact archives and is covered
-    # by the same provenance attestation.
+    # by the same provenance attestation. install.ps1 is Windows' (https://terma.ai/install.ps1).
     - glob: ./install.sh
+    - glob: ./install.ps1
 
 snapshot:
   version_template: "{{ incpatch .Version }}-next"

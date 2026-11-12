@@ -97,6 +97,13 @@ type Options struct {
 	// Launch is what started the relay, on the heartbeat's resource: the service manager,
 	// a hook on demand, or a developer. A string; the daemon owns the vocabulary.
 	Launch string
+	// InstallMethod is how this terma was installed, on the heartbeat's resource as
+	// terma.install.method; "" sends none.
+	InstallMethod string
+	// UpdateAuto, set, is asked at every heartbeat whether this terma installs new releases
+	// by itself, sent on its record as terma.update.auto: the developer can turn automatic
+	// updates on or off while the relay runs.
+	UpdateAuto func() string
 	// Logf, when set, is told why each part that could not leave was dropped (TERMA_RELAY_DEBUG=1).
 	Logf func(format string, args ...any)
 	// Warnf, when set, is told what an operator should see whatever the debug setting: a

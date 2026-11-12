@@ -7,7 +7,7 @@
 
 The `terma` cli connects coding agents to [Terma](https://terma.ai), then stamps the commits
 they produce so agent spend can be traced to shipped code. It supports **Claude Code**
-(CLI and Desktop) and **Codex** (CLI and Desktop).
+(CLI and Desktop), **Codex** (CLI and Desktop) and **GitHub Copilot** (CLI and VS Code).
 
 ## Get started
 
@@ -25,8 +25,23 @@ curl -fsSL https://terma.ai/install.sh | bash
 terma setup
 ```
 
-**Homebrew** (macOS and Linux). It updates with `brew upgrade terma`; `terma update` runs
-that through the Homebrew that owns this terma.
+**Installer script** (Windows). Installs to `%LOCALAPPDATA%\Programs\terma`, without
+administrator rights, verifies `checksums.txt`, and adds that folder to your user PATH (never
+the machine's), so new terminals find `terma`, and so does the PowerShell you run it in. It
+runs in Windows PowerShell 5.1 and PowerShell 7, and takes the same `TERMA_INSTALL_DIR`,
+`TERMA_VERSION` and `TERMA_NO_MODIFY_PATH` as the script above. In PowerShell:
+
+```powershell
+irm https://terma.ai/install.ps1 | iex
+terma setup
+```
+
+From Command Prompt, `powershell -NoProfile -ExecutionPolicy Bypass -Command "irm https://terma.ai/install.ps1 | iex"`
+installs the same way; open a new terminal before `terma setup`, since the PATH of the one you
+ran it from does not change.
+
+**Homebrew** (macOS and Linux). terma keeps it up to date through the Homebrew that owns it
+(see [Updates](#updates)); `terma update` runs `brew upgrade terma` there at once.
 
 ```bash
 brew tap miradorlabs/tap
@@ -35,9 +50,12 @@ brew install terma
 terma setup
 ```
 
-**npm**. It updates with `npm install -g @miradorlabs/terma@latest`; `terma update` runs
-that through the npm that owns this terma. The npm shim adds Node's startup time to every commit, so prefer the
-installer script or Homebrew where terma runs inside git hooks.
+**npm**. terma keeps a global install up to date in place, as the installer script's,
+replacing the package's binary (see [Updates](#updates)); `npm ls -g` shows the version npm
+last installed until your next `npm i -g`. When a newer release is out, `terma update` runs
+`npm install -g @miradorlabs/terma@latest` through the npm that owns it. A project's own
+dependency is upgraded in that project. The npm shim adds Node's startup time to every commit, so prefer
+the installer script or Homebrew where terma runs inside git hooks.
 
 ```bash
 npm install -g @miradorlabs/terma
@@ -81,7 +99,7 @@ instead: see [Scripted and headless setup](#scripted-and-headless-setup).
 
 ```mermaid
 flowchart LR
-  agent["Claude Code / Codex"] -- "telemetry" --> relay["terma relay<br/>(127.0.0.1)"]
+  agent["Claude Code / Codex / Copilot"] -- "telemetry" --> relay["terma relay<br/>(127.0.0.1)"]
   agent -- "hook events" --> hook["terma hook"]
   git["git commit"] -- "commit hooks" --> hook
   hook -- "claims the session<br/>for your team" --> relay
@@ -134,11 +152,13 @@ relay, spool delivery, shell completion — and for Terma's own engineers.
 
 terma keeps itself up to date. It looks for a new release (after a failed lookup, again in
 15 minutes, then less often, up to hourly) and installs it in place, verified against the
-release checksum. The local relay does this every few minutes in the background, so a machine
-nobody runs a terma command on still updates, and each terma command you run in a terminal
-does it at most hourly. Hooks,
-scripts, CI and `--output` other than a table never look. A relay that installed a
-release keeps running until nothing it holds is waiting, no export is arriving and none
+release checksum, or through Homebrew where Homebrew installed terma; a global npm
+package's binary is replaced in place too. The local relay does this every few minutes in
+the background, so a machine nobody runs a terma command on still updates, and each terma
+command you run in a terminal does it at most hourly, though it leaves Homebrew's upgrade,
+which can take minutes, to the relay and only says a release is out. Hooks, scripts, CI and `--output` other than a
+table never look. A relay that installed a release keeps running until nothing it holds
+is waiting, no export is arriving and none
 has for half a minute (after 12 hours it stops waiting for that pause), then restarts on
 the new binary. It never restarts while it holds anything, so the restart loses nothing:
 what it has queued for delivery is on disk, and the new relay sends it; an export that
@@ -167,12 +187,30 @@ terma update --auto on      # install new releases automatically again (the defa
 terma update --auto status  # show the current choice
 ```
 
-terma never replaces a Homebrew or npm installation or a Windows binary by itself; those
-only get the notice, and `terma setup` says which applies to yours. `terma update`
-upgrades Homebrew and npm through the package manager that owns them, and when it cannot
-find that package manager it names the command to run; a Windows binary is replaced by
-hand, as Get started says. A build between release tags is never updated and gets no
-notice.
+A Homebrew installation updates the same way, on the same schedule, through the Homebrew
+that owns it — that one, never whichever is first on PATH — which the relay runs with no
+terminal, its output in `upgrade.log` in terma's state folder, `update/`. It runs apart from
+the relay, and from the relay's service under systemd, so a relay that stops meanwhile
+leaves it to finish rather than leave terma half installed; after 15 minutes it is stopped.
+Homebrew updates its taps before an upgrade only once a day, so on its first tries at a
+release the relay has it update them first; it upgrades terma alone, and leaves your other
+packages, and Homebrew's cleanup of them, alone. The tap is published a little after the
+release itself: when Homebrew does not have the release yet, or another of its processes is
+running, the relay asks again in 15 minutes, then less often, up to hourly, rather than
+waiting a day as it does after a failed install, such as a tap Homebrew does not trust; a
+tap that is behind installs the release it has. A relay that installed a release has it
+refresh what terma installed (see below), then restarts on the link Homebrew moved to it.
+A global npm installation is updated in place, as the installer script's: the package is a
+shim that runs its binary, which terma replaces, so the relay never needs npm or node.
+
+The relay prints nothing, so the next terma command you run in a terminal says what it
+installed, once, and `terma doctor` shows how yours updates, the last release terma
+installed by itself, and why the last attempt failed, if it did. `terma setup` says how
+yours updates too. A project's npm dependency, a Homebrew installation without its brew,
+and an installation terma may not write (a root-owned npm prefix, another user's Homebrew, a
+binary installed with sudo) only get the notice; `terma update` runs the package manager's
+upgrade at once, and when it cannot find that package manager it names the command to run.
+A Windows binary only gets the notice, and is replaced by hand, as Get started says. A build between release tags is never updated and gets no notice.
 
 **Signed releases.** Every release's `checksums.txt`, which names each archive's digest, is
 signed together with the release's tag, and terma installs only a release whose signature
@@ -201,15 +239,16 @@ installs it automatically.
 After an update, the new version also refreshes what earlier versions wrote in your home
 directory — the wrapped Claude Code status line, the OpenCode plugin, the relay's service —
 keeping every choice you made. It works from what is on disk, never signs in, and never
-adds a file. After an update the relay installed, it runs at your next terma command. On
-the latest release, `terma update` does just that refresh.
+adds a file. After an update the relay installed, the relay has the new version run it
+before it restarts, and otherwise your next terma command runs it. On the latest release,
+`terma update` does just that refresh.
 
 ## Scripted and headless setup
 
 Every question `terma setup` asks has a flag:
 
 ```bash
-terma setup --org acme --team platform --harness claude,codex --yes
+terma setup --org acme --team platform --harness claude,codex,copilot --yes
 ```
 
 - `--org <name-or-id>` signs in to that organization. Without it, setup asks when you
@@ -217,7 +256,7 @@ terma setup --org acme --team platform --harness claude,codex --yes
 - `--team <name-or-id>` sets up that team; without it, setup asks when your organization
   has several teams, with the one you chose before as the default, else takes the only
   one; when it cannot ask (`--yes` or no terminal), it keeps the team you chose before.
-- `--harness <agents>` records those agents (`claude`, `codex`); with `--yes` or no
+- `--harness <agents>` records those agents (`claude`, `codex`, `copilot`); with `--yes` or no
   terminal and no `--harness`, setup records the agents recorded before and every
   supported agent installed on this machine.
 - `--yes` skips the browser prompt and the organization and agents questions. The team
@@ -354,6 +393,37 @@ listed does not leave. An edit the agent's hook saw names its checkout by
 `terma.checkout.id`, a hash of the working tree's path, under any policy: it names no path,
 though anyone who can guess the path can recompute it.
 
+GitHub Copilot runs the same runtime in two places, and setup points each one's exporter
+where it reads it. VS Code runs it in its agent host, configured from the user
+`settings.json`: setup adds `chat.agentHost.otel.*` (the OTLP/HTTP exporter, replacing
+a file or console one of yours) and lists those settings under
+`settingsSync.ignoredSettings`, since they name this machine's relay. It changes no
+other byte of the file, comments included, and `terma teardown` puts back what the
+settings held before; restart VS Code after setup. VS Code reads an exporter from its
+environment ahead of its settings, so where `OTEL_EXPORTER_OTLP_ENDPOINT` in your shell
+names a collector of your own (or the relay over `https`), `COPILOT_OTEL_EXPORTER_TYPE`
+any exporter but `otlp-http`, or a protocol variable (`OTEL_EXPORTER_OTLP_PROTOCOL`, its
+traces variant, `COPILOT_OTEL_PROTOCOL`) gRPC, setup writes none of its settings into VS
+Code and says so: Copilot there already exports where that says, and terma's settings
+would only add what was said to it. The agent host's exporter is VS Code's, not Copilot's alone: the Claude and Codex
+agents you have VS Code host there are handed the same one. An organization's policy for
+Copilot's telemetry outranks both your environment and these settings, and terma reads
+neither the policy nor what it sets: where it manages the agent host's exporter, Copilot
+in VS Code exports where the policy says, the relay receives nothing from it, and `terma
+doctor` still reports VS Code pointed at the relay, since it reads only the settings setup
+wrote. Where the policy names an endpoint and leaves content capture to you, the
+`captureContent` setup writes applies to that endpoint.
+Copilot Chat's own exporter (`github.copilot.chat.otel.*`) is never switched on: VS Code
+would copy its endpoint into every extension's environment. The Copilot CLI reads its
+exporter only from its environment, so setup defines a `copilot` shell function in your
+shell's startup file (zsh, bash or fish) that starts it through `terma launch copilot`:
+the variables reach that one process, never your shell or other programs, and the file
+holds no endpoint or token. An alias or function of your own named `copilot` is left as
+it is, and a `copilot` started another way (a script, an absolute path, an editor) is
+still claimed by its hooks but exports nothing. `TERMA_SHELL_LAUNCHERS=0` keeps the
+function out of your startup files. Copilot reports token counts and AI credits, not a
+cost, and a file one of its shell commands writes is not attributed to its session.
+
 `terma setup` runs the relay as a per-user background service, so it is up before any
 agent starts; with `--relay-service off`, hooks start it on demand. `terma update`
 rewrites a service an earlier terma wrote. `terma doctor` shows whether it runs and
@@ -382,7 +452,8 @@ tested against a sub-50 ms budget.
 
 ## Privacy and security
 
-Authentication uses a browser handoff with PKCE and a loopback callback, or, with
+Authentication uses a browser handoff with PKCE and a loopback callback, which accepts the
+one-time code in a form POST so it need not appear in a URL, or, with
 `TERMA_API_KEY`, a team server key, which terma keeps as the team's key and sends only to
 the auth host it was set up against. Credentials and
 team keys stay in the user's configuration directory (`~/.config/terma`, or

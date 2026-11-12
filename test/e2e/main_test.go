@@ -6,6 +6,7 @@ import (
 )
 
 func TestMain(m *testing.M) {
+	RunHookRecorder() // the hooks probe starts this binary as its recording hook
 	code := m.Run()
 	if Enabled() {
 		dir := os.Getenv("TERMA_E2E_REPORT")
@@ -24,6 +25,9 @@ func TestMain(m *testing.M) {
 		}
 		if err := WriteFields(dir, terma); err != nil {
 			os.Stderr.WriteString("live fields: " + err.Error() + "\n")
+		}
+		if err := WriteProfiles(dir); err != nil {
+			os.Stderr.WriteString("live profiles: " + err.Error() + "\n")
 		}
 	}
 	os.Exit(code)

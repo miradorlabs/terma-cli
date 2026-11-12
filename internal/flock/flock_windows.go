@@ -52,7 +52,7 @@ func lock(ctx context.Context, path string) (func(), error) {
 			return nil, ctx.Err()
 		case <-timer.C:
 		}
-		wait = min(wait*2, pollMax)
+		wait = min(wait*2, PollMax)
 	}
 	return func() { unlockFile(f) }, nil
 }
@@ -82,7 +82,7 @@ func openLockFile(ctx context.Context, path string) (*os.File, error) {
 			return nil, err
 		case <-timer.C:
 		}
-		wait = min(wait*2, pollMax)
+		wait = min(wait*2, PollMax)
 	}
 }
 

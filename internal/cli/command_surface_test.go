@@ -18,11 +18,11 @@ var primaryCommands = []string{
 	"doctor", "setup", "switch", "teardown", "update",
 }
 
-// advancedCommands are hidden: other programs run them (hook, relay, spool, version),
-// Terma's engineers do (config, nate), or the e2e suites still do (status; MIR-80 removes
-// it once those move to the primary commands).
+// advancedCommands are hidden: other programs run them (auth, hook, launch, relay, spool,
+// version), Terma's engineers do (config, nate), or the e2e suites still do (status; MIR-80
+// removes it once those move to the primary commands).
 var advancedCommands = []string{
-	"config", "hook", "nate", "relay", "spool", "status", "version",
+	"auth", "config", "hook", "launch", "nate", "relay", "spool", "status", "version",
 }
 
 func commandNamed(root *cobra.Command, name string) *cobra.Command {
@@ -159,6 +159,20 @@ func TestCompletionIsHiddenNotRemoved(t *testing.T) {
 	out, err := runTerma(t, "completion", "zsh")
 	if err != nil || !strings.Contains(out, "compdef") {
 		t.Fatalf("`terma completion zsh` = %v, output %.200q", err, out)
+	}
+}
+
+// --desktop-grant is Terma Desktop's, never a person's: setup takes it, and its help does
+// not show it.
+func TestDesktopGrantIsAHiddenSetupFlag(t *testing.T) {
+	setup := commandNamed(testApp.NewRootCommand(), "setup")
+	flag := setup.Flags().Lookup("desktop-grant")
+	if flag == nil || !flag.Hidden {
+		t.Fatalf("setup's --desktop-grant = %+v, want a hidden flag", flag)
+	}
+	help, _, err := termaRun{}.exec(t, "setup", "--help")
+	if err != nil || strings.Contains(help, "desktop-grant") {
+		t.Fatalf("`terma setup --help` shows --desktop-grant (%v):\n%s", err, help)
 	}
 }
 
