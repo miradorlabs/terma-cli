@@ -21,8 +21,10 @@ const retryFile = "retry.json"
 type retryWindow struct {
 	Next int64 `json:"next"` // unix seconds
 	Wait int64 `json:"wait"` // seconds
-	// Stalled says a stall opened the window (DestinationStalled), not a failure.
+	// Stalled says a stall opened the window (DestinationStalled), not a failure; Held that
+	// nothing was tried (DestinationHeld).
 	Stalled bool `json:"stalled,omitempty"`
+	Held    bool `json:"held,omitempty"`
 }
 
 func (s *Spool) loadRetryWindows() map[string]retryWindow {
@@ -69,7 +71,8 @@ func (s *Spool) DestinationFailed(dest string, now time.Time) time.Time {
 }
 
 // DestinationFailedUntil is DestinationFailed for a host that said when to ask again: the
-// window lasts until then at least, and an hour at most.
+// window lasts until then at least, and an hour at most. The next failure doubles the
+// backoff as it was, not the host's wait.
 func (s *Spool) DestinationFailedUntil(dest string, now, until time.Time) time.Time {
 	return s.openWindow(dest, now, false, until)
 }
@@ -89,11 +92,21 @@ func (s *Spool) openWindow(dest string, now time.Time, stalled bool, until time.
 	if prev := windows[dest].Wait; prev > 0 {
 		wait = time.Duration(prev) * time.Second * 2
 	}
-	wait = min(max(wait, until.Sub(now)), maxBackoff)
-	next := now.Add(wait)
+	wait = min(wait, maxBackoff)
+	next := now.Add(min(max(wait, until.Sub(now)), maxBackoff))
 	windows[dest] = retryWindow{Next: next.Unix(), Wait: int64(wait / time.Second), Stalled: stalled}
 	s.saveRetryWindows(windows, now)
 	return time.Unix(next.Unix(), 0)
+}
+
+// DestinationHeld keeps dest waiting until until, though nothing was sent to it: what it
+// needs (a key, a policy) is not there yet. It counts no failure and keeps any backoff.
+func (s *Spool) DestinationHeld(dest string, until time.Time) {
+	windows := s.loadRetryWindows()
+	w := windows[dest]
+	w.Next, w.Held, w.Stalled = max(w.Next, until.Unix()), true, false
+	windows[dest] = w
+	s.saveRetryWindows(windows, time.Now())
 }
 
 // DestinationDelivered closes dest's window.
@@ -123,6 +136,18 @@ func (s *Spool) StalledWindows(now time.Time) map[string]time.Time {
 	open := map[string]time.Time{}
 	for dest, w := range s.loadRetryWindows() {
 		if next := time.Unix(w.Next, 0); w.Stalled && now.Before(next) {
+			open[dest] = next
+		}
+	}
+	return open
+}
+
+// HeldWindows lists the destinations whose window is open at now because what they need
+// was not there (DestinationHeld), with each one's end.
+func (s *Spool) HeldWindows(now time.Time) map[string]time.Time {
+	open := map[string]time.Time{}
+	for dest, w := range s.loadRetryWindows() {
+		if next := time.Unix(w.Next, 0); w.Held && now.Before(next) {
 			open[dest] = next
 		}
 	}

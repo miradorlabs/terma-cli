@@ -567,8 +567,14 @@ func TestDrainSettlesEachEventOnItsOwn(t *testing.T) {
 	_, _ = f.WriteString("not json\n")
 	_ = f.Close()
 	var settledEarly []Event
+	var later [][]Pending
 	res := s.Drain(context.Background(), DrainOptions{Now: now}, func(_ context.Context, events []Pending) {
-		if len(events) != 3 || events[0].Name != "a" || events[1].Name != "b" || events[2].Name != "c" {
+		if later != nil || len(events) != 3 || events[0].Name != "a" {
+			later = append(later, events)
+			return
+		}
+		later = [][]Pending{}
+		if events[1].Name != "b" || events[2].Name != "c" {
 			t.Fatalf("Drain handed out %+v", events)
 		}
 		if err := s.Settle(events[0]); err != nil {
@@ -589,6 +595,10 @@ func TestDrainSettlesEachEventOnItsOwn(t *testing.T) {
 	})
 	if res.Expired != 1 || res.Dropped != 1 || res.Err != nil {
 		t.Fatalf("Drain = %+v", res)
+	}
+	// What was appended meanwhile is handed out in the same pass; what was requeued is not.
+	if len(later) != 1 || len(later[0]) != 1 || later[0][0].Name != "new" {
+		t.Fatalf("Drain then handed out %+v", later)
 	}
 	if len(settledEarly) != 2 || settledEarly[0].Name != "b" {
 		t.Fatalf("after the first settle the queue held %+v", settledEarly)
@@ -652,7 +662,14 @@ func TestSettleTakesOneOfTwinLines(t *testing.T) {
 	if err := s.Append(twin, Event{Name: "between", Time: at}, twin); err != nil {
 		t.Fatal(err)
 	}
+	rounds := 0
 	s.Drain(context.Background(), DrainOptions{Now: at}, func(_ context.Context, events []Pending) {
+		if rounds++; rounds > 1 {
+			if len(events) != 1 || events[0].Name != "appended" {
+				t.Errorf("the second round handed out %+v", events)
+			}
+			return
+		}
 		if len(events) != 3 {
 			t.Fatalf("Drain handed out %+v", events)
 		}
@@ -731,5 +748,62 @@ func TestDestinationFailedUntil(t *testing.T) {
 	}
 	if got := s.DestinationFailedUntil("p3", now, time.Time{}); got.Sub(now) > minBackoff+time.Second {
 		t.Fatalf("window with no Retry-After ends %v after now", got.Sub(now))
+	}
+}
+
+// A host's Retry-After stretches one window and does not become the base the next failure
+// doubles.
+func TestRetryAfterIsNoBackoffBase(t *testing.T) {
+	s, err := Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now()
+	s.DestinationFailedUntil("p1", now, now.Add(50*time.Minute))
+	if got := s.DestinationFailed("p1", now); got.Sub(now) > 2*minBackoff+time.Second {
+		t.Fatalf("the next failure waits %v, want the doubled %v", got.Sub(now), 2*minBackoff)
+	}
+}
+
+// A held destination waits without counting a failure, and a failure after it is a
+// failure's window.
+func TestDestinationHeld(t *testing.T) {
+	s, err := Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now()
+	s.DestinationHeld("p1", now.Add(5*time.Minute))
+	if _, held := s.HeldWindows(now)["p1"]; !held || s.RetryAt("p1").Before(now.Add(4*time.Minute)) {
+		t.Fatal("a held destination does not wait")
+	}
+	if got := s.DestinationFailed("p1", now); got.Sub(now) > minBackoff+time.Second {
+		t.Fatalf("a failure after a hold waits %v", got.Sub(now))
+	}
+	if _, held := s.HeldWindows(now)["p1"]; held {
+		t.Fatal("a failure's window is listed as held")
+	}
+}
+
+// Remove takes several events out in one rewrite, and none when one is gone.
+func TestRemove(t *testing.T) {
+	s, err := Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	at := time.Now()
+	if err := s.Append(Event{Name: "a", Time: at}, Event{Name: "b", Time: at}, Event{Name: "c", Time: at}); err != nil {
+		t.Fatal(err)
+	}
+	s.Drain(context.Background(), DrainOptions{Now: at}, func(_ context.Context, events []Pending) {
+		if err := s.Remove(events[0], events[2]); err != nil {
+			t.Fatal(err)
+		}
+		if err := s.Remove(events[1], events[0]); !errors.Is(err, errNotQueued) {
+			t.Fatalf("removing a gone event = %v", err)
+		}
+	})
+	if left, err := s.Peek(10); err != nil || len(left) != 1 || left[0].Name != "b" {
+		t.Fatalf("queue holds %+v, %v", left, err)
 	}
 }

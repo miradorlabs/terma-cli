@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io/fs"
+	"maps"
 	"os"
 	"path/filepath"
 	"time"
@@ -24,6 +25,29 @@ import (
 type Pending struct {
 	Event
 	line []byte
+	pass *drainPass
+}
+
+// drainPass is what one Drain has handed out, or requeued, by line: a line queued more
+// than once counts each time.
+type drainPass struct {
+	seen map[string]int
+}
+
+// fresh is the events of queued not handed out yet this pass, which it now counts as handed out.
+func (d *drainPass) fresh(queued []Pending) []Pending {
+	left := maps.Clone(d.seen)
+	var out []Pending
+	for _, p := range queued {
+		if left[string(p.line)] > 0 {
+			left[string(p.line)]--
+			continue
+		}
+		p.pass = d
+		d.seen[string(p.line)]++
+		out = append(out, p)
+	}
+	return out
 }
 
 // DrainOptions tunes one Drain.
@@ -39,10 +63,11 @@ type DrainOptions struct {
 // errNotQueued is a settled event whose line the queue no longer holds.
 var errNotQueued = errors.New("the event is no longer queued")
 
-// Drain hands fn every event queued when the pass begins, once the queue is pruned to
-// MaxBytes and rid of expired and unreadable lines, and holds the delivery lock until fn
-// returns. fn settles what it is done with (Settle); the rest stays where it is. The
-// result counts only what Drain itself let go.
+// Drain hands fn every event queued, once the queue is pruned to MaxBytes and rid of
+// expired and unreadable lines, holding the delivery lock until it is done. fn settles what
+// it is done with (Settle); the rest stays where it is. When fn returns with time left, any
+// events appended meanwhile go to fn too, until none are new: an event fn requeued is not
+// new. The result counts only what Drain itself let go.
 func (s *Spool) Drain(ctx context.Context, opts DrainOptions, fn func(ctx context.Context, events []Pending)) Result {
 	timeout := opts.Timeout
 	if timeout <= 0 {
@@ -68,12 +93,21 @@ func (s *Spool) Drain(ctx context.Context, opts DrainOptions, fn func(ctx contex
 	if now.IsZero() {
 		now = time.Now()
 	}
-	events, res, err := s.readPending(ctx, now)
-	if err != nil {
-		res.Err = err
-		return res
-	}
-	if len(events) > 0 {
+	var res Result
+	pass := &drainPass{seen: map[string]int{}}
+	for ctx.Err() == nil {
+		queued, read, err := s.readPending(ctx, now)
+		res.Expired += read.Expired
+		res.Pruned += read.Pruned
+		res.Dropped += read.Dropped
+		if err != nil {
+			res.Err = err
+			break
+		}
+		events := pass.fresh(queued)
+		if len(events) == 0 {
+			break
+		}
 		fn(ctx, events)
 	}
 	return res
@@ -136,6 +170,33 @@ func (s *Spool) readPending(ctx context.Context, now time.Time) ([]Pending, Resu
 // pass cut short still settles what it delivered. An event the queue no longer holds is an
 // error, and requeues nothing.
 func (s *Spool) Settle(p Pending, requeue ...Event) error {
+	var tail []byte
+	for _, e := range requeue {
+		line, err := json.Marshal(e)
+		if err != nil {
+			return err
+		}
+		line = append(line, '\n')
+		if p.pass != nil {
+			// Requeued, it is not new to the pass that settled it.
+			p.pass.seen[string(line)]++
+		}
+		tail = append(tail, line...)
+	}
+	return s.rewrite([]Pending{p}, tail)
+}
+
+// Remove takes every one of ps out of the queue, in one rewrite as Settle does. An event
+// the queue no longer holds is an error, and removes none.
+func (s *Spool) Remove(ps ...Pending) error {
+	if len(ps) == 0 {
+		return nil
+	}
+	return s.rewrite(ps, nil)
+}
+
+// rewrite takes ps's lines out of the queue and appends tail, under the append lock.
+func (s *Spool) rewrite(ps []Pending, tail []byte) error {
 	ctx, cancel := context.WithTimeout(context.Background(), ackTimeout)
 	defer cancel()
 	unlock, err := flock.Lock(ctx, filepath.Join(s.dir, lockFile))
@@ -147,19 +208,14 @@ func (s *Spool) Settle(p Pending, requeue ...Event) error {
 	if err != nil {
 		return err
 	}
-	at := lineAt(data, p.line)
-	if at < 0 {
-		return errNotQueued
-	}
-	out := append(bytes.Clone(data[:at]), data[at+len(p.line):]...)
-	for _, e := range requeue {
-		line, err := json.Marshal(e)
-		if err != nil {
-			return err
+	for _, p := range ps {
+		at := lineAt(data, p.line)
+		if at < 0 {
+			return errNotQueued
 		}
-		out = append(append(out, line...), '\n')
+		data = append(bytes.Clone(data[:at]), data[at+len(p.line):]...)
 	}
-	return config.WriteFileAtomicNoSync(s.path(), out, fileMode)
+	return config.WriteFileAtomicNoSync(s.path(), append(data, tail...), fileMode)
 }
 
 // lineAt is where line, a whole line with its newline, first starts a line of data; -1
