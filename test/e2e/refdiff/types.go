@@ -78,8 +78,13 @@ type Capability struct {
 // Capture says how a snapshot was taken.
 type Capture struct {
 	Command []string `json:"command,omitempty"`
-	Partial bool     `json:"partial"`
-	Notes   []string `json:"notes,omitempty"`
+	// Partial marks a capture that failed somewhere: its published turn, a platform's files
+	// profile, the field census, a job that did not finish. Truncated marks the narrower case
+	// whose sections may stop short, the published turn's scenario failed: a later truncated
+	// capture replaces none of the sections a whole one took.
+	Partial   bool     `json:"partial"`
+	Truncated bool     `json:"truncated,omitempty"`
+	Notes     []string `json:"notes,omitempty"`
 	// Sections says when each section was last captured: a night that did not capture one
 	// keeps the last night's.
 	Sections map[string]time.Time `json:"sections,omitempty"`

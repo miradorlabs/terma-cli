@@ -53,6 +53,7 @@ func TestNewBuilds(t *testing.T) {
 		harness string           // claude unless set
 		index   []map[string]any // nil: the reference has no index (404)
 		down    bool             // the reference answers 500
+		env     []string         // the script's settings
 		want    string
 	}{
 		{name: "never published: the newest release alone", want: "claude=1.0.5"},
@@ -75,6 +76,8 @@ func TestNewBuilds(t *testing.T) {
 			index: afterFour(withAttempts(partial("1.0.5", stamp(7)), 4))},
 		{name: "a partial build with attempts to spare is tried again",
 			index: afterFour(withAttempts(partial("1.0.5", stamp(7)), 3)), want: "claude=1.0.5"},
+		{name: "a page from before attempts were counted made one",
+			index: afterFour(partial("1.0.5", stamp(7))), env: []string{"TERMA_REFERENCE_MAX_ATTEMPTS=1"}},
 		{name: "an attempt time that does not parse is an old one",
 			index: afterFour(partial("1.0.5", "yesterday")), want: "claude=1.0.5"},
 		{name: "a reference that cannot be read is no build to capture", down: true},
@@ -117,6 +120,7 @@ func TestNewBuilds(t *testing.T) {
 			cmd := exec.Command("bash", "reference/new-builds.sh")
 			cmd.Env = append(cmd.Environ(), "TERMA_REFERENCE_HARNESSES="+harness, "TERMA_NPM_REGISTRY="+srv.URL+"/registry",
 				"TERMA_REFERENCE_FEEDS_URL="+srv.URL+"/feeds", "TERMA_REFERENCE_URL="+srv.URL+"/reference")
+			cmd.Env = append(cmd.Env, c.env...)
 			out, err := cmd.Output()
 			if err != nil {
 				t.Fatalf("new-builds.sh: %v\n%s", err, out)

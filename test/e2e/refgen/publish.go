@@ -205,7 +205,7 @@ func publish(dir string, n night, opt options) ([]Announcement, error) {
 		case slices.Contains(n.unfinished, id):
 			// A job of the run that did not finish took less of the build than it set out to.
 			markPartial(merged, unfinishedNote)
-		case attempted && n.failedScenario(id):
+		case n.failedScenario(id):
 			// A scenario of the capture failed (a files profile, a census): its job wrote its
 			// results all the same, but took less of the build than it set out to.
 			markPartial(merged, failedNote)
@@ -835,10 +835,10 @@ func markUnobservedEvents(versions []string, byVersion map[string]*Snapshot) {
 	}
 }
 
-// markPartial marks s partial, saying why where it was whole.
+// markPartial marks s partial, saying why.
 func markPartial(s *Snapshot, note string) {
-	if !s.Capture.Partial {
-		s.Capture.Partial = true
+	s.Capture.Partial = true
+	if !slices.Contains(s.Capture.Notes, note) {
 		s.Capture.Notes = append(s.Capture.Notes, note)
 	}
 }

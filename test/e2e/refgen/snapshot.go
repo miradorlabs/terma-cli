@@ -188,8 +188,8 @@ func (n night) profileOf(id buildID) (e2e.Profile, bool, bool) {
 		merged.Command = ps[src].Command
 	}
 	preferBinaryScenario(&merged, ps)
-	// A probe that failed says nothing of the first turn: only the turn published is the
-	// capture's whole or partial.
+	// A probe that failed says nothing of the first turn: only the turn published makes the
+	// capture's sections whole or truncated (a failed probe leaves it partial: failedScenario).
 	merged.Failed = src >= 0 && ps[src].Failed
 	return merged, first >= 0, true
 }
@@ -199,7 +199,7 @@ func (n night) tonight(id buildID) *Snapshot {
 	s := &Snapshot{SchemaVersion: schemaVersion, Harness: id.harness, Version: id.version, CapturedAt: n.now}
 	if p, proxied, ok := n.profileOf(id); ok {
 		s.Platform = p.Platform
-		s.Capture = Capture{Command: p.Command, Partial: p.Failed,
+		s.Capture = Capture{Command: p.Command, Partial: p.Failed, Truncated: p.Failed,
 			Notes: []string{"Model requests were answered by a local fixture provider, not the vendor's API; nothing was sent to a model."}}
 		if proxied {
 			s.Capture.Notes = append(s.Capture.Notes, "The first turn ran behind a local proxy that answers every other request empty: "+
@@ -357,7 +357,7 @@ func merge(old, tonight *Snapshot, now time.Time) *Snapshot {
 	if out.Capture.Sections == nil {
 		out.Capture.Sections = map[string]time.Time{}
 	}
-	keepWhole := tonight.Capture.Partial && !old.Capture.Partial
+	keepWhole := tonight.Capture.Truncated && !old.Capture.Truncated
 	ot, tt := out.Tree(), tonight.Tree()
 	if tt["filesystem"] != nil {
 		tt["filesystem"] = mergeFilesystem(ot["filesystem"], tt["filesystem"])
@@ -397,6 +397,7 @@ func merge(old, tonight *Snapshot, now time.Time) *Snapshot {
 	if len(tonight.Capture.Command) > 0 && !keepWhole {
 		merged.Capture.Command = tonight.Capture.Command
 		merged.Capture.Partial = tonight.Capture.Partial
+		merged.Capture.Truncated = tonight.Capture.Truncated
 		merged.Capture.Notes = tonight.Capture.Notes
 		merged.Platform = tonight.Platform
 	}

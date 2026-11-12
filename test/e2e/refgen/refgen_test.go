@@ -1154,7 +1154,7 @@ func TestMergeKeepsTelemetryTonightDidNotMeasure(t *testing.T) {
 	// A partial night (its profile's turn failed) took a truncated probe: the whole one's findings
 	// stay, and the census, which ran apart, still counts.
 	truncated := snap(parse(`{"export":{"protocol":"http/json"},"surfaces":{"logs/a":{"keys":{"k":{"class":"safe"},"k2":{"class":"safe"}}},"metrics/m":{"keys":{},"type":"gauge"}}}`))
-	truncated.Capture.Partial = true
+	truncated.Capture.Partial, truncated.Capture.Truncated = true, true
 	got = merge(snap(parse(whole)), truncated, now).Telemetry
 	if got["export"].(map[string]any)["protocol"] != "http/protobuf" || got["surfaces"].(map[string]any)["metrics/m"].(map[string]any)["type"] != "sum" {
 		t.Errorf("a partial night's probe replaced a whole one's: %v", got)
@@ -1166,7 +1166,7 @@ func TestMergeKeepsTelemetryTonightDidNotMeasure(t *testing.T) {
 	// A partial night of a harness the census never covers measured nothing it can be trusted
 	// with: the surfaces stay as they were.
 	truncatedProbe := snap(parse(`{"export":{"protocol":"http/json"},"surfaces":{"metrics/m":{"type":"gauge"}}}`))
-	truncatedProbe.Capture.Partial = true
+	truncatedProbe.Capture.Partial, truncatedProbe.Capture.Truncated = true, true
 	probesWhole := parse(`{"export":{"protocol":"http/protobuf"},"surfaces":{"metrics/m":{"type":"sum"},"metrics/n":{"type":"sum"}}}`)
 	got = merge(snap(probesWhole), truncatedProbe, now).Telemetry
 	if surfaces := got["surfaces"].(map[string]any); surfaces["metrics/n"] == nil || surfaces["metrics/m"].(map[string]any)["type"] != "sum" {
@@ -1314,5 +1314,38 @@ func TestAttemptsOfAnOlderPage(t *testing.T) {
 	}
 	if s.Capture.Attempts != 2 {
 		t.Errorf("attempts = %d, want 2", s.Capture.Attempts)
+	}
+}
+
+// A page partial for another reason (a job that did not finish) took a whole first turn: a retry
+// whose turn fails replaces none of its sections, and the page says it is still partial.
+func TestRetryKeepsAWholeTurnOfAPartialPage(t *testing.T) {
+	dir := t.TempDir()
+	id := buildID{"claude", "1.0.0"}
+	read := func() Snapshot {
+		var s Snapshot
+		if err := readJSON(filepath.Join(dir, "claude", "versions", "1.0.0.json"), &s); err != nil {
+			t.Fatal(err)
+		}
+		return s
+	}
+	whole := claudeProfile("1.0.0", "Be brief.", []string{"Bash"}, "", "")
+	if _, err := publish(dir, night{now: time.Now(), profiles: []e2e.Profile{whole}, attempted: []buildID{id}, unfinished: []buildID{id}}, options{}); err != nil {
+		t.Fatal(err)
+	}
+	if s := read(); !s.Capture.Partial || s.Capture.Truncated {
+		t.Fatalf("a whole turn beside an unfinished job: %+v", s.Capture)
+	}
+	cut := claudeProfile("1.0.0", "Truncated.", []string{"Bash"}, "", "")
+	cut.Failed = true
+	if _, err := publish(dir, night{now: time.Now().Add(7 * time.Hour), profiles: []e2e.Profile{cut}, attempted: []buildID{id}}, options{}); err != nil {
+		t.Fatal(err)
+	}
+	s := read()
+	if data, _ := json.Marshal(s.Prompt); !strings.Contains(string(data), "Be brief.") {
+		t.Errorf("a failed turn replaced a whole one's prompt: %s", data)
+	}
+	if !s.Capture.Partial || len(s.Capture.Notes) == 0 {
+		t.Errorf("the page no longer says it is partial: %+v", s.Capture)
 	}
 }

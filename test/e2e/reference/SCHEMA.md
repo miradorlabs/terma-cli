@@ -116,7 +116,11 @@ signed with is read before.
 
 ## versions/<version>.json: a snapshot
 
-Each section is what one kind of capture saw. A section the night did not capture is absent.
+Each section is what one kind of capture saw. A section no capture took is absent.
+`capture.partial` marks a capture that failed somewhere (its published turn, a platform's files
+profile, the field census's direct run, a job that did not finish); `capture.truncated` (present
+only when true) the narrower case whose sections may stop short, the published turn's scenario
+failed: a later truncated capture replaces none of the sections a whole one took.
 Text is normalized, so two snapshots differ only where the builds do. The run's own literals
 become `<repo>`, `<home>`, `<sandbox>`, `<workdir>`, `<claude-config>`, `<codex-home>`,
 `<terma-config>`, `<provider>` (the fixture's URL) and `<prompt>` (the scenario's own

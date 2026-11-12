@@ -130,10 +130,10 @@ func compareShapes(t *testing.T, direct, relayed map[string]int, unshut bool) {
 // the relay dropped nothing. The direct run's fields join the census (ObserveFields).
 func runBoth(t *testing.T, b Binary, sandbox func(t *testing.T) *Sandbox, run func(t *testing.T, sb *Sandbox)) {
 	t.Helper()
-	TakesCensus(t, b)
 	var direct map[string]int
 	directEnded := false
 	t.Run("direct", func(t *testing.T) {
+		TakesCensus(t, b)
 		sb := sandbox(t)
 		run(t, sb)
 		time.Sleep(6 * time.Second)
