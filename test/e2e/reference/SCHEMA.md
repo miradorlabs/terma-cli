@@ -299,17 +299,18 @@ Absent where there was no proxied turn to compare it with.
 ### telemetry
 
 The build's own OTLP export, from two measurements. The field census (the relay workloads'
-scenarios, nightly) gives every surface the build sent with its `keys`; the telemetry probe
+scenarios) gives every surface the build sent with a key, with its `keys`; the telemetry probe
 (the profile's turn) gives `export` (protocol, compression, each signal's measured
-`interval_ms` and the `interval_batches` it rests on) and each surface's `type`, `unit`,
-`temporality`, `monotonic`, `parent`, `parents` and `root`. A capture can hold one without the
-other: the frequent check runs the probe alone, and a capture older than the probe has none of
-its fields.
+`interval_ms` and the `interval_batches` it rests on) and the `type`, `unit`, `temporality`,
+`monotonic`, `parent`, `parents` and `root` of each surface its turn made. A capture can hold
+one without the other: the frequent check ran the probe alone, and a capture older than the
+probe has none of its fields. Which surfaces are sent is the census's to say: a surface the
+probe alone saw (a metric without attributes) is not listed.
 
 Two builds' telemetry is compared only in what both captures measured: keys where both have a
-census, the probe's fields and `export` where both ran the probe, and which surfaces exist
-only where both measured them the same way. What one did not measure is not observed there,
-never a surface "no longer sent" or an export "added". `interval_batches` is the run's, and an
+census, the probe's fields and `export` where both ran the probe, and which surfaces exist only
+where both have a census. What one did not measure is not observed there, never a surface "no
+longer sent" or an export "added". `interval_batches` is the run's, and an
 interval is compared only where both rest on at least two batches: from one, it is a stall's.
 
 ### hooks

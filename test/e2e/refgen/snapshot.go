@@ -477,11 +477,17 @@ func mergeTelemetry(old, tonight any) any {
 	}
 	surfaces := map[string]any{}
 	tonightSurfaces, _ := t["surfaces"].(map[string]any)
+	oldSurfaces, _ := o["surfaces"].(map[string]any)
 	for name, raw := range tonightSurfaces {
+		// Which surfaces are sent is the census's to say, and it records a surface by its keys
+		// alone: one the probe saw that the census did not (a metric without attributes) is
+		// left out, as a night with both leaves it out (deriveTelemetry).
+		if _, known := oldSurfaces[name]; keepKeys && !known {
+			continue
+		}
 		s, _ := raw.(map[string]any)
 		surfaces[name] = maps.Clone(s)
 	}
-	oldSurfaces, _ := o["surfaces"].(map[string]any)
 	for name, raw := range oldSurfaces {
 		was, _ := raw.(map[string]any)
 		s, ok := surfaces[name].(map[string]any)
