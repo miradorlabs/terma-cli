@@ -35,27 +35,22 @@ type Authority struct {
 	Kind AuthorityKind
 	// Organization is the deciding organization when Kind is Bound.
 	Organization string
-	// Key is the owner or repository the decision was made on; "" when none was.
+	// Key is the owner or repository decided on, or for Pending the binding the matching
+	// entry needs; "" when Free.
 	Key string
 }
 
-// authority is who decides about repo: an explicit decision on the repository, else on
-// its owner, else pending if a selected organization's entry needs one, else free.
-// Pending is derived, never stored, so an organization adding an entry never shadows a
-// decision the developer made.
-func (s State) authority(repo string) Authority {
-	repo = Normalize(repo)
-	for _, key := range []string{repo, Owner(repo)} {
-		if b, ok := s.Bindings[key]; ok && key != "" {
+// decided is the developer's explicit decision about a normalised repo: on the
+// repository, else on its owner; Free when there is none. Route derives Pending from the
+// selected teams' entries, never storing it, so an organization adding an entry never
+// shadows a decision the developer made.
+func (s State) decided(repo string) Authority {
+	for _, key := range []string{repo, owner(repo)} {
+		if b, ok := s.Bindings[key]; ok {
 			if b.Refused {
 				return Authority{Kind: RefusedAll, Key: key}
 			}
 			return Authority{Kind: Bound, Organization: b.Organization, Key: key}
-		}
-	}
-	for _, t := range s.Teams {
-		if _, ok := t.match(repo); ok && !t.Personal {
-			return Authority{Kind: Pending}
 		}
 	}
 	return Authority{Kind: Free}
@@ -66,7 +61,7 @@ func (s State) authority(repo string) Authority {
 func (s State) consents(e Entry, org string) bool {
 	keys := []string{e.Key()}
 	if !e.wildcard {
-		keys = append(keys, Owner(e.Key()))
+		keys = append(keys, owner(e.key))
 	}
 	for _, key := range keys {
 		if b, ok := s.Bindings[key]; ok && !b.Refused && b.Organization == org {
@@ -88,8 +83,9 @@ func (s State) boundToAnOrganization() bool {
 }
 
 // Bind binds an owner or a repository to organization. A repository decision against an
-// owner already bound to another organization is made only with override, so the caller
-// has named the conflict to the developer first.
+// owner already decided otherwise is made only with override, so the caller has named the
+// conflict to the developer first. Nothing is bound to the personal organization: personal
+// collects what no organization is bound to.
 func (s *State) Bind(key, organization string, override bool) error {
 	key, err := bindingKey(key)
 	if err != nil {
@@ -98,8 +94,11 @@ func (s *State) Bind(key, organization string, override bool) error {
 	if organization == "" {
 		return errors.New("bind to which organization?")
 	}
-	if b, ok := s.Bindings[Owner(key)]; ok && !isOwnerKey(key) && !override && (b.Refused || b.Organization != organization) {
-		return fmt.Errorf("%s is under %s, which is decided otherwise", key, Owner(key))
+	if n := len(s.Teams); n > 0 && s.Teams[n-1].Personal && s.Teams[n-1].OrganizationID == organization {
+		return errors.New("nothing is bound to the personal organization: it collects what no organization is bound to")
+	}
+	if b, ok := s.Bindings[owner(key)]; ok && validRepo(key) && !override && (b.Refused || b.Organization != organization) {
+		return fmt.Errorf("%s is under %s, which is decided otherwise", key, owner(key))
 	}
 	s.set(key, Binding{Organization: organization})
 	return nil
@@ -133,11 +132,15 @@ func (s *State) set(key string, b Binding) {
 	s.Bindings[key] = b
 }
 
-// bindingKey normalises an owner (`host/owner`) or a repository (`host/owner/name`); a
-// wildcard is never one.
+// bindingKey normalises an owner (`host/owner`) or a repository (`host/owner/name`), in
+// any form Normalize reads; a wildcard is never one, and an empty segment is refused
+// rather than folded away.
 func bindingKey(raw string) (string, error) {
-	key := Normalize(raw)
-	if !strings.Contains(key, "*") && (isOwnerKey(key) && Owner(key+"/x") == key || Owner(key) != "") {
+	_, rest, scheme := strings.Cut(raw, "://")
+	if !scheme {
+		rest = raw
+	}
+	if key := Normalize(raw); !strings.Contains(rest, "//") && (isOwnerKey(key) || validRepo(key)) {
 		return key, nil
 	}
 	return "", fmt.Errorf("%q is neither an owner (host/owner) nor a repository (host/owner/name)", raw)

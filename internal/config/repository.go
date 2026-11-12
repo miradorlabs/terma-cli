@@ -23,6 +23,10 @@ type Repository struct {
 // `file://` URL is never admitted. An entry has a host and at least two path segments, none
 // empty; a longer path matches a longer `origin` path exactly (GitLab subgroups). An empty
 // list admits nothing.
+//
+// Multi-org routing reads entries through routing.ParseEntry instead, which adds
+// wildcards on a policy that allows them (Wildcards). Admits keeps today's exact matching
+// for the callers not yet moved onto routing.Route, and goes once they have.
 func (p Policy) Admits(r Repository) bool {
 	if p.Global() {
 		return true

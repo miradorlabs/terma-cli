@@ -82,14 +82,6 @@ func (t Team) collectsEverything() bool {
 	return t.Personal && t.Policy.Global()
 }
 
-// match is the most specific entry of t's last list that names repo.
-func (t Team) match(repo string) (Entry, bool) {
-	if t.Policy.Global() || t.Policy.Unset {
-		return Entry{}, false
-	}
-	return bestEntry(t.Policy.Repositories, t.Policy.Wildcards, repo)
-}
-
 // ErrorClass is how a refresh failed, which decides what it does to the team.
 type ErrorClass string
 
@@ -98,7 +90,9 @@ const (
 	// Transient covers network errors, 5xx, 429 and any 403 without a known terminal
 	// reason: the last policy stays in force until it expires.
 	Transient ErrorClass = "transient"
-	// SignIn is a 401: the team blocks until the developer signs in again.
+	// SignIn is a 401: the team blocks until the developer signs in again. Like a
+	// terminal refusal it advances the epoch, so a success already in flight under the
+	// refused sign-in cannot clear it.
 	SignIn ErrorClass = "sign_in"
 	// Terminal is a 403 the backend says is final (not a member, team deleted): the first
 	// suspends the team, the second in a row makes it Refused.
@@ -116,8 +110,8 @@ type Refresh struct {
 
 // ApplyRefresh records r on its enrollment and reports whether it changed anything. A
 // result for an ended enrollment, or from a request started before the last terminal
-// refusal, is discarded, so a success already in flight cannot undo a refusal. A policy
-// whose revision moved backwards is refused.
+// refusal or refused sign-in, is discarded, so a success already in flight cannot undo
+// either. A policy whose revision moved backwards is refused.
 func (s *State) ApplyRefresh(r Refresh) (bool, error) {
 	t := s.team(r.EnrollmentID)
 	if t == nil || r.Epoch != t.Epoch {
@@ -129,7 +123,6 @@ func (s *State) ApplyRefresh(r Refresh) (bool, error) {
 			return false, errors.New("the refreshed policy is another team's or an older revision")
 		}
 		pol := *r.Policy
-		pol.Personal = t.Personal
 		if pol.Global() && !t.Personal {
 			// Only a personal organization may collect everything: anyone else's such
 			// policy collects nothing.
@@ -142,6 +135,7 @@ func (s *State) ApplyRefresh(r Refresh) (bool, error) {
 		t.LastError = Terminal
 	case r.Failure == SignIn:
 		t.SignInNeeded, t.LastError = true, SignIn
+		t.Epoch++
 	case r.Failure == Transient:
 		t.LastError = Transient
 	default:
@@ -182,7 +176,6 @@ func (s *State) Select(t Team) (string, error) {
 		return "", err
 	}
 	t.EnrollmentID, t.Epoch, t.Refusals, t.SignInNeeded, t.LastError = id, 0, 0, false, ""
-	t.Policy.Personal = t.Personal
 	if t.Personal || len(s.Teams) == 0 || !s.Teams[len(s.Teams)-1].Personal {
 		s.Teams = append(s.Teams, t)
 	} else {
@@ -223,7 +216,7 @@ func (s State) check() error {
 		seen[t.EnrollmentID] = true
 	}
 	for key, b := range s.Bindings {
-		if key != Normalize(key) || (Owner(key) == "" && !isOwnerKey(key)) {
+		if key != Normalize(key) || !isOwnerKey(key) && !validRepo(key) {
 			return fmt.Errorf("binding %q is not a normalised owner or repository", key)
 		}
 		if b.Refused == (b.Organization != "") {
