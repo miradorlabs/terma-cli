@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -1071,6 +1072,35 @@ func TestMergeKeepsTelemetryTonightDidNotMeasure(t *testing.T) {
 	}
 	if got["export"].(map[string]any)["protocol"] != "http/json" || surfaces["metrics/m"].(map[string]any)["type"] != "gauge" {
 		t.Errorf("tonight's probe did not replace the probe's findings: %v", got)
+	}
+
+	// The probe sees fewer surfaces than the census: one it did not see keeps its findings.
+	withHistogram := parse(`{"export":{"protocol":"http/protobuf"},"surfaces":{"metrics/m":{"keys":{},"type":"sum"},"metrics/h":{"keys":{},"type":"histogram"}}}`)
+	got = merge(snap(withHistogram), snap(probeOnly), now).Telemetry
+	if h, _ := got["surfaces"].(map[string]any)["metrics/h"].(map[string]any); h["type"] != "histogram" || h["keys"] == nil {
+		t.Errorf("a surface tonight's probe did not see lost what it had: %v", h)
+	}
+
+	// The census sees every surface: one it did not see tonight is gone, probe findings and all.
+	withoutLogs := parse(`{"surfaces":{"metrics/m":{"keys":{}}}}`)
+	got = merge(snap(parse(whole)), snap(withoutLogs), now).Telemetry
+	if a, ok := got["surfaces"].(map[string]any)["logs/a"]; ok {
+		t.Errorf("a surface tonight's census did not see came back: %v", a)
+	}
+}
+
+// refdiff.ProbeFields name every field the telemetry probe records of a surface: one it left out
+// would read as added or removed between a census and a probe, and a census-only night would
+// drop it from the published page.
+func TestProbeFieldsAreSurfaceShapes(t *testing.T) {
+	var tags []string
+	st := reflect.TypeFor[e2e.SurfaceShape]()
+	for i := range st.NumField() {
+		name, _, _ := strings.Cut(st.Field(i).Tag.Get("json"), ",")
+		tags = append(tags, name)
+	}
+	if !slices.Equal(tags, refdiff.ProbeFields) {
+		t.Errorf("SurfaceShape's fields are %v, refdiff.ProbeFields %v", tags, refdiff.ProbeFields)
 	}
 }
 

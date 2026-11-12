@@ -1,5 +1,7 @@
 package refdiff
 
+import "maps"
+
 // What a capture measured of a build's own telemetry: its field census (every surface the build
 // sent, each with its keys) and its telemetry probe (the export's cadence, and each surface's
 // metric type, unit and temporality or span parents). A capture can hold one without the other:
@@ -36,47 +38,51 @@ func TelemetryMeasured(t map[string]any) (census, probe bool) {
 func comparableTelemetry(a, b map[string]any) (map[string]any, map[string]any) {
 	ac, ap := TelemetryMeasured(a)
 	bc, bp := TelemetryMeasured(b)
-	sameSurfaces := ac == bc
-	strip := func(t, other map[string]any) map[string]any {
-		out := map[string]any{}
-		for k, v := range t {
-			out[k] = v
-		}
-		if !(ap && bp) {
-			delete(out, "export")
-		} else if e, ok := t["export"].(map[string]any); ok {
-			other, _ := other["export"].(map[string]any)
-			out["export"] = comparableExport(e, other)
-		}
-		surfaces, _ := t["surfaces"].(map[string]any)
-		others, _ := other["surfaces"].(map[string]any)
-		if surfaces == nil {
-			return out
-		}
-		kept := map[string]any{}
-		for name, raw := range surfaces {
-			if _, both := others[name]; !sameSurfaces && !both {
-				continue
-			}
-			s, _ := raw.(map[string]any)
-			c := map[string]any{}
-			for k, v := range s {
-				c[k] = v
-			}
-			if !(ac && bc) {
-				delete(c, "keys")
-			}
-			if !(ap && bp) {
-				for _, f := range ProbeFields {
-					delete(c, f)
-				}
-			}
-			kept[name] = c
-		}
-		out["surfaces"] = kept
+	m := measuredByBoth{keys: ac && bc, probe: ap && bp, sameSurfaces: ac == bc}
+	return m.strip(a, b), m.strip(b, a)
+}
+
+// measuredByBoth is what two captures both measured: the census's keys, the probe's findings,
+// and whether they saw the same surfaces (both took the census, or neither did).
+type measuredByBoth struct{ keys, probe, sameSurfaces bool }
+
+// strip is a copy of telemetry t without what m says t's capture alone measured, beside other's.
+func (m measuredByBoth) strip(t, other map[string]any) map[string]any {
+	out := maps.Clone(t)
+	if !m.probe {
+		delete(out, "export")
+	} else if e, ok := t["export"].(map[string]any); ok {
+		o, _ := other["export"].(map[string]any)
+		out["export"] = comparableExport(e, o)
+	}
+	surfaces, _ := t["surfaces"].(map[string]any)
+	if surfaces == nil {
 		return out
 	}
-	return strip(a, b), strip(b, a)
+	others, _ := other["surfaces"].(map[string]any)
+	kept := map[string]any{}
+	for name, raw := range surfaces {
+		if _, both := others[name]; m.sameSurfaces || both {
+			s, _ := raw.(map[string]any)
+			kept[name] = m.stripSurface(s)
+		}
+	}
+	out["surfaces"] = kept
+	return out
+}
+
+// stripSurface is a copy of surface s with only what both captures measured.
+func (m measuredByBoth) stripSurface(s map[string]any) map[string]any {
+	c := maps.Clone(s)
+	if !m.keys {
+		delete(c, "keys")
+	}
+	if !m.probe {
+		for _, f := range ProbeFields {
+			delete(c, f)
+		}
+	}
+	return c
 }
 
 // minIntervalBatches is how many exports of a signal its measured interval must rest on to be
@@ -88,10 +94,7 @@ const minIntervalBatches = 2
 // how many batches arrived (interval_batches), and a signal's interval where e or other measured
 // it from fewer than minIntervalBatches.
 func comparableExport(e, other map[string]any) map[string]any {
-	out := map[string]any{}
-	for k, v := range e {
-		out[k] = v
-	}
+	out := maps.Clone(e)
 	delete(out, "interval_batches")
 	intervals, _ := e["interval_ms"].(map[string]any)
 	if intervals == nil {
@@ -108,6 +111,12 @@ func comparableExport(e, other map[string]any) map[string]any {
 			kept[signal] = v
 		}
 	}
-	out["interval_ms"] = kept
+	// An interval neither side measured from enough batches is not observed: no interval_ms at
+	// all, as on a side that measured none, and never an emptied one that reads as removed.
+	if len(kept) == 0 {
+		delete(out, "interval_ms")
+	} else {
+		out["interval_ms"] = kept
+	}
 	return out
 }
