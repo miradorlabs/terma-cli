@@ -39,7 +39,7 @@ func captureCodexDesktopActivity(ctx context.Context, e hookrun.Env, r *hookrun.
 	}
 	ctx, cancel := context.WithTimeout(ctx, codexCaptureTimeout)
 	defer cancel()
-	next, status, err := readDesktopActivity(ctx, codexRolloutID(in), in.TranscriptPath, cursor, turnAdmission(ctx, e), func(a desktopActivity) error {
+	next, status, err := readDesktopActivity(ctx, codexRolloutID(in), in.TranscriptPath, cursor, e.Admission(ctx), func(a desktopActivity) error {
 		attrs := hookrun.EvidenceAttrs(codexTool, sourceCodexRollout, "desktop")
 		attrs[semconv.TermaCaptureSurfaceKey] = semconv.TermaCaptureSurfaceDesktop
 		hookrun.BoundedAttr(attrs, semconv.TermaTurnIDKey, a.TurnID)
@@ -48,7 +48,7 @@ func captureCodexDesktopActivity(ctx context.Context, e hookrun.Env, r *hookrun.
 		if at.IsZero() || at.After(e.Time()) {
 			at = e.Time()
 		}
-		ev := spool.Event{Time: at, SessionID: in.SessionID, TraceID: a.TraceID, Repository: r.Repository, Attrs: attrs}
+		ev := spool.Event{Time: at, SessionID: in.SessionID, TraceID: a.TraceID, Attrs: attrs}
 		switch a.Kind {
 		case "tool":
 			ev.Name = semconv.TermaToolCallEvent
@@ -73,12 +73,7 @@ func captureCodexDesktopActivity(ctx context.Context, e hookrun.Env, r *hookrun.
 		default:
 			return nil
 		}
-		// Spooled without Env.EmitFor, so the team is stamped here: with no project id the
-		// flush drops it as unroutable.
-		if r.ProjectID != "" {
-			attrs[hookrun.AttrProjectID] = r.ProjectID
-		}
-		return e.Spool.Append(ev)
+		return e.Append(r, ev)
 	})
 	if err != nil {
 		e.Logf("desktop activity (%s): %v", status, err)

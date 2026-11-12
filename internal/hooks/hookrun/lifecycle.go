@@ -144,6 +144,8 @@ func (e Env) report(r *Repo, sess session.Session, toolName string, paths []stri
 		if c.repo == r {
 			e.EmitFor(r, ev)
 		} else {
+			// Another checkout's files: stamped for it, but the session's claim stays with the
+			// checkout the hook runs in.
 			e.emit(e.stamp(c.repo, ev))
 		}
 	}

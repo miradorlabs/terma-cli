@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
@@ -469,5 +470,17 @@ func TestStatusLineTimeoutConfiguration(t *testing.T) {
 				t.Fatalf("explicit override ignored: %s", got)
 			}
 		})
+	}
+}
+
+// Under a global policy, a quota says so, as an emitted event does: delivery drops it if the
+// policy has left global mode when it leaves.
+func TestClaudeQuotaIsMarkedGlobal(t *testing.T) {
+	env, _, sp := statusEnv(t, quotaPayload)
+	env.Policy.Mode, env.Policy.DefaultProjectID = config.ModeGlobal, "p-default"
+	statusLine(context.Background(), env, statusLineOptions{CaptureOnly: true})
+	evs := hookruntest.Spooled(t, sp)
+	if len(evs) != 1 || evs[0].Name != semconv.TermaSessionQuotaEvent || !evs[0].Global {
+		t.Fatalf("quota under a global policy = %+v", evs)
 	}
 }
