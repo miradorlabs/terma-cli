@@ -1024,3 +1024,40 @@ func TestChecksAloneBeginNoPage(t *testing.T) {
 		t.Fatalf("the published page lost its verdict: %+v (%v)", s.Support, err)
 	}
 }
+
+// A night that measured less of a build's telemetry than the last keeps what it did not measure:
+// the census alone keeps the probe's export and metric types, the probe alone every surface and
+// its keys; what it did measure replaces the old.
+func TestMergeKeepsTelemetryTonightDidNotMeasure(t *testing.T) {
+	parse := func(doc string) map[string]any {
+		var v map[string]any
+		if err := json.Unmarshal([]byte(doc), &v); err != nil {
+			t.Fatal(err)
+		}
+		return v
+	}
+	whole := `{"export":{"protocol":"http/protobuf"},"surfaces":{"logs/a":{"keys":{"k":{"class":"safe"}}},"metrics/m":{"keys":{},"type":"sum"}}}`
+	snap := func(tel map[string]any) *Snapshot {
+		return &Snapshot{Harness: "codex", Version: "1", Telemetry: tel, Capture: Capture{Command: []string{"codex"}}}
+	}
+	now := time.Now()
+
+	censusOnly := parse(`{"surfaces":{"logs/a":{"keys":{"k":{"class":"safe"},"k2":{"class":"safe"}}},"metrics/m":{"keys":{}}}}`)
+	got := merge(snap(parse(whole)), snap(censusOnly), now).Telemetry
+	if got["export"] == nil || got["surfaces"].(map[string]any)["metrics/m"].(map[string]any)["type"] != "sum" {
+		t.Errorf("a census-only night lost the probe's findings: %v", got)
+	}
+	if keys := got["surfaces"].(map[string]any)["logs/a"].(map[string]any)["keys"].(map[string]any); keys["k2"] == nil {
+		t.Errorf("tonight's census did not replace the keys: %v", keys)
+	}
+
+	probeOnly := parse(`{"export":{"protocol":"http/json"},"surfaces":{"metrics/m":{"type":"gauge"}}}`)
+	got = merge(snap(parse(whole)), snap(probeOnly), now).Telemetry
+	surfaces := got["surfaces"].(map[string]any)
+	if surfaces["logs/a"] == nil || surfaces["metrics/m"].(map[string]any)["keys"] == nil {
+		t.Errorf("a probe-only night lost the census's surfaces or keys: %v", surfaces)
+	}
+	if got["export"].(map[string]any)["protocol"] != "http/json" || surfaces["metrics/m"].(map[string]any)["type"] != "gauge" {
+		t.Errorf("tonight's probe did not replace the probe's findings: %v", got)
+	}
+}
