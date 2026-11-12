@@ -11,10 +11,12 @@ import (
 	"encoding/base64"
 	"encoding/binary"
 	"encoding/hex"
+	"errors"
 	"image"
 	_ "image/gif"  // DecodeConfig reads GIF headers
 	_ "image/jpeg" // and JPEG's
 	_ "image/png"  // and PNG's
+	"io/fs"
 	"os"
 	"path/filepath"
 	"slices"
@@ -206,11 +208,12 @@ func Store(stateDir string, img Image) error {
 	}
 	dir := Dir(stateDir)
 	path := filepath.Join(dir, img.ID())
-	if _, err := os.Stat(path); err == nil {
-		// Touched, so an image pasted again outlives the prune of the first paste, and a
-		// pass already sending it keeps it for the new record.
-		now := time.Now()
-		return os.Chtimes(path, now, now)
+	// Touched, so an image pasted again outlives the prune of the first paste, and a pass
+	// already sending it keeps it for the new record. One that is not there, or that a sweep
+	// removed since, is written.
+	now := time.Now()
+	if err := os.Chtimes(path, now, now); !errors.Is(err, fs.ErrNotExist) {
+		return err
 	}
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return err

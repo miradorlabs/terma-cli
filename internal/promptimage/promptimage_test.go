@@ -132,6 +132,36 @@ func TestAttrsAndStore(t *testing.T) {
 	}
 }
 
+// Storing an image already kept touches it; one a sweep removed since is written again.
+func TestStoreTouchesOrWritesAgain(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	img := Image{Data: pngOf(t, 2, 2), MIMEType: "image/png", Index: 1}
+	if err := Store(dir, img); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(Dir(dir), img.ID())
+	old := time.Now().Add(-time.Hour)
+	if err := os.Chtimes(path, old, old); err != nil {
+		t.Fatal(err)
+	}
+	if err := Store(dir, img); err != nil {
+		t.Fatal(err)
+	}
+	if info, err := os.Stat(path); err != nil || !info.ModTime().After(old) {
+		t.Fatalf("a stored image was not touched: %v", err)
+	}
+	if err := os.Remove(path); err != nil {
+		t.Fatal(err)
+	}
+	if err := Store(dir, img); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := Load(dir, img.ID()); !ok {
+		t.Fatal("an image removed since it was kept was not written again")
+	}
+}
+
 // Nothing but an image id names a file, and the store forgets images past their age.
 func TestStoreKeepsToItsFolder(t *testing.T) {
 	t.Parallel()
