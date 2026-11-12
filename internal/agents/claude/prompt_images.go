@@ -58,7 +58,7 @@ type promptImageState struct {
 // turn stops or fails or the session ends, and starts the lane's delivery. They leave under
 // the title's consent while the team collects prompts.
 func captureClaudePromptImages(e hookrun.Env, r *hookrun.Repo, sessionID, transcript string) {
-	if transcript == "" || e.Images == nil || !session.ValidID(sessionID) || !titleConsented(e.Consent()) {
+	if transcript == "" || !session.ValidID(sessionID) || !titleConsented(e.Consent()) {
 		return
 	}
 	dir := filepath.Join(e.StateDir, claudePromptImageStateDir)
