@@ -7,12 +7,12 @@ package refdiff
 // builds' telemetry is compared only in the parts both captures measured. What one did not
 // measure is not observed there: never a surface "no longer sent", nor an export "added".
 
-// probeFields are what the telemetry probe adds to a surface.
-var probeFields = []string{"type", "unit", "temporality", "monotonic", "parent", "parents", "root"}
+// ProbeFields are what the telemetry probe adds to a surface.
+var ProbeFields = []string{"type", "unit", "temporality", "monotonic", "parent", "parents", "root"}
 
-// telemetryMeasured says whether t holds a field census (a surface with its keys) and a probe's
+// TelemetryMeasured says whether t holds a field census (a surface with its keys) and a probe's
 // findings (the export, or a surface's probe fields).
-func telemetryMeasured(t map[string]any) (census, probe bool) {
+func TelemetryMeasured(t map[string]any) (census, probe bool) {
 	_, probe = t["export"]
 	surfaces, _ := t["surfaces"].(map[string]any)
 	for _, raw := range surfaces {
@@ -20,7 +20,7 @@ func telemetryMeasured(t map[string]any) (census, probe bool) {
 		if _, ok := s["keys"]; ok {
 			census = true
 		}
-		for _, f := range probeFields {
+		for _, f := range ProbeFields {
 			if _, ok := s[f]; ok {
 				probe = true
 			}
@@ -34,8 +34,8 @@ func telemetryMeasured(t map[string]any) (census, probe bool) {
 // both ran the probe, and the surfaces both have where they measured them differently (the
 // census sees every surface, the probe alone fewer).
 func comparableTelemetry(a, b map[string]any) (map[string]any, map[string]any) {
-	ac, ap := telemetryMeasured(a)
-	bc, bp := telemetryMeasured(b)
+	ac, ap := TelemetryMeasured(a)
+	bc, bp := TelemetryMeasured(b)
 	sameSurfaces := ac == bc
 	strip := func(t, other map[string]any) map[string]any {
 		out := map[string]any{}
@@ -67,7 +67,7 @@ func comparableTelemetry(a, b map[string]any) (map[string]any, map[string]any) {
 				delete(c, "keys")
 			}
 			if !(ap && bp) {
-				for _, f := range probeFields {
+				for _, f := range ProbeFields {
 					delete(c, f)
 				}
 			}

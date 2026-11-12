@@ -353,6 +353,9 @@ func merge(old, tonight *Snapshot, now time.Time) *Snapshot {
 	if tt["filesystem"] != nil {
 		tt["filesystem"] = mergeFilesystem(ot["filesystem"], tt["filesystem"])
 	}
+	if tt["telemetry"] != nil {
+		tt["telemetry"] = mergeTelemetry(ot["telemetry"], tt["telemetry"])
+	}
 	took := false
 	for _, sec := range present(tonight) {
 		if keepWhole && sec != "support" && sec != "telemetry" && ot[sec] != nil {
@@ -446,4 +449,59 @@ func hasFirstTurn(p e2e.Profile) bool {
 		}
 	}
 	return false
+}
+
+// mergeTelemetry is the telemetry section with what tonight measured over old's, and old's where
+// tonight did not measure it (refdiff.TelemetryMeasured): a night with the census alone keeps
+// the probe's export and metric types from before, and one with the probe alone (the frequent
+// check) keeps every surface and its keys. Without this, a render with less evidence than the
+// last took the published findings for gone.
+func mergeTelemetry(old, tonight any) any {
+	o, _ := old.(map[string]any)
+	t, _ := tonight.(map[string]any)
+	if o == nil || t == nil {
+		return tonight
+	}
+	oc, op := refdiff.TelemetryMeasured(o)
+	tc, tp := refdiff.TelemetryMeasured(t)
+	keepKeys, keepProbe := oc && !tc, op && !tp
+	if !keepKeys && !keepProbe {
+		return tonight
+	}
+	out := maps.Clone(t)
+	if e, ok := o["export"]; ok && keepProbe {
+		out["export"] = e
+	}
+	surfaces := map[string]any{}
+	tonightSurfaces, _ := t["surfaces"].(map[string]any)
+	for name, raw := range tonightSurfaces {
+		s, _ := raw.(map[string]any)
+		surfaces[name] = maps.Clone(s)
+	}
+	oldSurfaces, _ := o["surfaces"].(map[string]any)
+	for name, raw := range oldSurfaces {
+		was, _ := raw.(map[string]any)
+		s, ok := surfaces[name].(map[string]any)
+		if !ok {
+			if !keepKeys {
+				continue // a surface the census did not see tonight is gone; the probe's alone is not
+			}
+			s = map[string]any{}
+			surfaces[name] = s
+		}
+		if keys, ok := was["keys"]; ok && keepKeys {
+			s["keys"] = keys
+		}
+		if keepProbe {
+			for _, f := range refdiff.ProbeFields {
+				if v, ok := was[f]; ok {
+					if _, has := s[f]; !has {
+						s[f] = v
+					}
+				}
+			}
+		}
+	}
+	out["surfaces"] = surfaces
+	return out
 }
