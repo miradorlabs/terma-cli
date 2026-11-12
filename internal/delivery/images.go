@@ -173,7 +173,9 @@ func (r Router) flushImages(ctx context.Context, events *spool.Spool, cfg *confi
 		gone = append(gone, q)
 		p.ids = append(p.ids, imageID(q.Event))
 	}
-	// What never leaves goes in one rewrite; a delivered image is settled on its own.
+	// What never leaves goes in one rewrite; a delivered image is settled on its own. Not
+	// queued is a queue discarded (teardown), or one record another sender settled, which
+	// keeps the rest until the next pass removes them.
 	if err := s.Remove(gone...); err != nil && !errors.Is(err, spool.ErrNotQueued) {
 		p.errs = append(p.errs, fmt.Errorf("remove image records that cannot leave: %w", err))
 	}

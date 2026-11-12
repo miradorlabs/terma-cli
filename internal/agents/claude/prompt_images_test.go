@@ -148,6 +148,8 @@ func TestClaudeImagesKeepNothingWhenPromptsAreOff(t *testing.T) {
 // the read moves past it.
 func TestClaudeImagesStayHomeWhereTheTeamDoesNotCollect(t *testing.T) {
 	env := titleEnv(t)
+	// Hooks run in the session's directory: a record naming none must not be judged by it.
+	t.Chdir(env.Cwd)
 	path := transcript(t, t.TempDir(),
 		pastedRecord(t.TempDir(), "u1", "p1", []int{1}, claudePixel),
 		pastedRecord("", "u2", "p2", []int{2}, claudePixel),

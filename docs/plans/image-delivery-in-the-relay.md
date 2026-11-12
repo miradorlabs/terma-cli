@@ -77,11 +77,14 @@ outcome, `Result.Grew`/`drainPass.unseen` and the re-spawn, `NoWait`/`SkipBusy`/
 1. **The wake signal.** The recommendation above uses the agent's telemetry, which is already
    arriving. Its gap: a session whose agent exports no telemetry to the relay (an exporter turned off
    by the user or an enterprise policy) gets its images only when the relay next starts or another
-   session's telemetry arrives. The alternative is a direct nudge from the hook: `cli` (not the
+   session's telemetry arrives. The same holds for an image a hook appends after the export that
+   woke the sender has been read: it waits for the next export from any session, the relay's next
+   start, or `terma spool flush --images`. The alternative is a direct nudge from the hook: `cli` (not the
    offline hook packages) posts to a new token-authenticated `POST /wake` on the relay, beside
    `/heartbeat`. That is exact, but it is a hook making a loopback HTTP request, which reads against
    "hooks never touch the network". A third option, a 1 s check of the queue's size on the relay's
    existing 1 s tick, breaks "never poll". I recommend the telemetry nudge, plus start and windows.
+   Chosen (2026-11-12): the telemetry nudge, start and windows, with the gaps above accepted.
 2. **No relay.** Without the per-user service (opted out, unsupported OS), the relay is started by a
    claiming hook and exits after 8 h idle. Images then go while it runs, and on its next start. That
    matches how the relay already treats agents' telemetry.

@@ -156,8 +156,12 @@ func (app *App) removeHookState() error {
 	// An image still being sent keeps its queue and bytes: removing them under the sender
 	// would let it write the queue back. Teardown's warning says to run it again.
 	sending := app.discardImages()
-	if sending == nil {
+	switch {
+	case sending == nil:
 		names = append(names, spool.ImageDir, promptimage.DirName)
+	case errors.Is(sending, errImageBytesKept):
+		// The queue was emptied: only the bytes are left, for the next teardown.
+		names = append(names, spool.ImageDir)
 	}
 	var errs []error
 	for _, name := range names {
@@ -171,10 +175,15 @@ func (app *App) removeHookState() error {
 		return nil
 	case errors.Is(sending, context.DeadlineExceeded):
 		return errors.New("an image is still being sent, so its queue is kept")
+	case errors.Is(sending, errImageBytesKept):
+		return sending
 	default:
 		return fmt.Errorf("the image queue is kept: %w", sending)
 	}
 }
+
+// errImageBytesKept is an emptied image queue whose images' bytes could not all be removed.
+var errImageBytesKept = errors.New("the images' bytes were not all removed")
 
 // defaultImageSendWait is how long teardown waits for an image being sent.
 const defaultImageSendWait = 10 * time.Second
@@ -202,7 +211,7 @@ func (app *App) discardImages() error {
 	defer cancel()
 	return s.Discard(ctx, func() error {
 		if err := os.RemoveAll(filepath.Join(app.stateDir, promptimage.DirName)); err != nil {
-			return fmt.Errorf("remove the images' bytes: %w", err)
+			return fmt.Errorf("%w: %w", errImageBytesKept, err)
 		}
 		return nil
 	})

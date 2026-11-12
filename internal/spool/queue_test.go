@@ -448,3 +448,24 @@ func TestTakeFromAGoneQueueIsNotQueued(t *testing.T) {
 		t.Fatalf("the queue's folder came back: %v", err)
 	}
 }
+
+// A queue Discard emptied, its folder still there, holds nothing to remove.
+func TestRemoveFromADiscardedQueueIsNotQueued(t *testing.T) {
+	s, err := OpenQueue(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Append(Event{Name: "x", Time: time.Now()}); err != nil {
+		t.Fatal(err)
+	}
+	events, _, _, err := s.Read(t.Context(), time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Discard(t.Context(), func() error { return nil }); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Remove(events...); !errors.Is(err, ErrNotQueued) {
+		t.Fatalf("Remove = %v, want ErrNotQueued", err)
+	}
+}
