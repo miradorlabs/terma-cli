@@ -66,7 +66,7 @@ func watch(ctx context.Context, r *relay.Relay, stateDir string, idle time.Durat
 				}
 				return stopUpdated, installed.Installed, nil
 			}
-		} else if !replacing.IsZero() && (!r.Holding() && r.TryHalt() || time.Since(replacing) >= replacedMaxWait) {
+		} else if !replacing.IsZero() && (r.TryStop() || time.Since(replacing) >= replacedMaxWait) {
 			// Once the hold is empty, since what it keeps is lost at exit, and the image sender
 			// halts between two images: one cut off would be sent again whole. The queues are
 			// on disk.
@@ -76,7 +76,8 @@ func watch(ctx context.Context, r *relay.Relay, stateDir string, idle time.Durat
 			claim.Prune(stateDir, time.Now())
 			lastPrune = time.Now()
 		}
-		if d, quiet := r.Idle(); quiet && idle > 0 && d >= idle && r.TryHalt() {
+		// A relay about to restart or make way does that instead.
+		if d, quiet := r.Idle(); quiet && idle > 0 && d >= idle && upgraded.IsZero() && replacing.IsZero() && r.TryHalt() {
 			return stopIdle, installed.Installed, nil
 		}
 	}

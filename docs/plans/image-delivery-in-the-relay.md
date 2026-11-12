@@ -97,7 +97,8 @@ outcome, `Result.Grew`/`drainPass.unseen` and the re-spawn, `NoWait`/`SkipBusy`/
   compare-and-swap; the relay asks `TryHalt` (`relay.Options.Halt`) last, once nothing else keeps it,
   before an idle exit, a quiesce for an update, or making way. It succeeds only between images, and
   a halted sender starts nothing more and waits for its end: images keep going until the relay can
-  actually stop, and a halt never lands mid-upload.
+  actually stop, and a halt never lands mid-upload. A restart or making way asks a final halt, which
+  also has the sender start no further image, so it lands at the end of the one under way.
 - **Two senders.** The relay's sender and a manual `--images` flush take the image queue's delivery
   lock per image, so they never send the same record twice.
 - **Boundaries.** `internal/relay/daemon` may import `delivery`, `spool` and `promptimage` (no

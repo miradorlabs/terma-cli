@@ -118,7 +118,7 @@ func (r *Relay) Holding() bool {
 func (r *Relay) Quiesce(quiet time.Duration) bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if r.heldN > 0 || r.inflight > 0 || r.opts.Now().Sub(r.lastSeen) < quiet || !r.TryHalt() {
+	if r.heldN > 0 || r.inflight > 0 || r.opts.Now().Sub(r.lastSeen) < quiet || !r.halt(true) {
 		return false
 	}
 	r.refusing = true
@@ -126,9 +126,21 @@ func (r *Relay) Quiesce(quiet time.Duration) bool {
 }
 
 // TryHalt stops the work beside the engine if it is between two pieces of it, and reports
-// whether it did (Options.Halt). Asked only once nothing else keeps the relay, since a halt
-// is for good.
-func (r *Relay) TryHalt() bool { return r.opts.Halt == nil || r.opts.Halt() }
+// whether it did (Options.Halt): for an idle exit, asked only once nothing else keeps the
+// relay, since a halt is for good.
+func (r *Relay) TryHalt() bool { return r.halt(false) }
+
+// TryStop reports whether a relay making way can go now: it holds nothing, and the work
+// beside it halted, for good (a final halt, which starts nothing new meanwhile). Both are
+// judged under the relay's lock, as Quiesce judges them.
+func (r *Relay) TryStop() bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.heldN == 0 && r.halt(true)
+}
+
+// halt asks Options.Halt.
+func (r *Relay) halt(final bool) bool { return r.opts.Halt == nil || r.opts.Halt(final) }
 
 // Idle reports how long the relay has had no export, if it holds and queues nothing.
 func (r *Relay) Idle() (time.Duration, bool) {

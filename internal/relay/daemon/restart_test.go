@@ -399,7 +399,7 @@ func TestAReplacedRelayWaitsForAnUpload(t *testing.T) {
 	c := runConfig(stateDir, 0, nil)
 	var uploading atomic.Bool
 	uploading.Store(true)
-	c.Engine.Halt = func() bool { return !uploading.Load() }
+	c.Engine.Halt = func(bool) bool { return !uploading.Load() }
 	r := startRun(t, c)
 	awaitRecord(t, r, dir)
 	askToMakeWay(t, dir)
@@ -424,7 +424,7 @@ func TestAReplacedRelayHaltsItsWork(t *testing.T) {
 	stateDir, dir, _ := setUpRelay(t)
 	c := runConfig(stateDir, 0, nil)
 	var halted atomic.Bool
-	c.Engine.Halt = func() bool { halted.Store(true); return true }
+	c.Engine.Halt = func(final bool) bool { halted.Store(final); return true }
 	r := startRun(t, c)
 	awaitRecord(t, r, dir)
 	askToMakeWay(t, dir)
@@ -434,7 +434,7 @@ func TestAReplacedRelayHaltsItsWork(t *testing.T) {
 		t.Fatal("the relay did not make way")
 	}
 	if !halted.Load() || !r.res.Replaced {
-		t.Fatalf("Run = %+v, halted %v", r.res, halted.Load())
+		t.Fatalf("Run = %+v, halted for good %v", r.res, halted.Load())
 	}
 }
 
@@ -444,7 +444,7 @@ func TestAnIdleRelayWaitsForAnUpload(t *testing.T) {
 	c := runConfig(stateDir, time.Millisecond, nil)
 	var uploading atomic.Bool
 	uploading.Store(true)
-	c.Engine.Halt = func() bool { return !uploading.Load() }
+	c.Engine.Halt = func(bool) bool { return !uploading.Load() }
 	r := startRun(t, c)
 	awaitRecord(t, r, dir)
 	select {

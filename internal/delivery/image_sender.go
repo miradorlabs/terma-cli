@@ -2,6 +2,7 @@ package delivery
 
 import (
 	"context"
+	"slices"
 	"sync/atomic"
 	"time"
 
@@ -23,10 +24,11 @@ type ImageSender struct {
 	// Logf, when set, is told of a pass that could not deliver everything it tried.
 	Logf func(format string, args ...any)
 
-	wake   chan struct{}
-	state  atomic.Int32
-	passes atomic.Int64
-	loops  atomic.Int64
+	wake    chan struct{}
+	state   atomic.Int32
+	halting atomic.Bool
+	passes  atomic.Int64
+	loops   atomic.Int64
 	// after is the project the last pass started with; read the queue as it read it;
 	// windowEnds the earliest retry window's end, zero for none.
 	after      string
@@ -66,16 +68,28 @@ func (s *ImageSender) Nudge() {
 
 // TryHalt stops the sender for good if it is between two images, and reports whether it
 // is stopped: the relay asks it last before an idle exit, a restart or making way, and
-// waits while an image is on its way.
-func (s *ImageSender) TryHalt() bool {
+// waits while an image is on its way. A final halt (a restart, making way: the relay goes
+// whatever happens) also has the sender start no further image, so it stops at the next
+// image's end; an idle exit's is not, since a new export may yet keep the relay.
+func (s *ImageSender) TryHalt(final bool) bool {
+	if final {
+		s.halting.Store(true)
+	}
 	return s.state.CompareAndSwap(senderIdle, senderStopped) || s.state.Load() == senderStopped
 }
 
 // uploading reports whether an image is on its way.
 func (s *ImageSender) uploading() bool { return s.state.Load() == senderUploading }
 
-// begin moves the sender to uploading before an image, unless it was halted.
-func (s *ImageSender) begin() bool { return s.state.CompareAndSwap(senderIdle, senderUploading) }
+// begin moves the sender to uploading before an image, unless it was halted, or a final
+// halt was asked, which stops it now.
+func (s *ImageSender) begin() bool {
+	if s.halting.Load() {
+		s.state.CompareAndSwap(senderIdle, senderStopped)
+		return false
+	}
+	return s.state.CompareAndSwap(senderIdle, senderUploading)
+}
 
 // end moves it back once the image is done.
 func (s *ImageSender) end() { s.state.CompareAndSwap(senderUploading, senderIdle) }
@@ -141,6 +155,7 @@ func (s *ImageSender) next() time.Time {
 func (s *ImageSender) pass(ctx context.Context, heldLook bool) {
 	defer s.passes.Add(1)
 	held := false
+	s.windowEnds = time.Time{}
 	if cfg, err := s.config(); err != nil {
 		s.logf("image sender: %v", err)
 		s.read = spool.Stamp{}
@@ -152,6 +167,13 @@ func (s *ImageSender) pass(ctx context.Context, heldLook bool) {
 		held = res.Held > 0
 		if res.Err != nil && ctx.Err() == nil {
 			s.logf("image sender: %v", res.Err)
+		}
+		// The windows this pass waited out or opened, as it saw them: one that ended while the
+		// pass ran is a deadline already past, which wakes the next pass at once.
+		for _, end := range windowsOf(res) {
+			if s.windowEnds.IsZero() || end.Before(s.windowEnds) {
+				s.windowEnds = end
+			}
 		}
 	}
 	now := time.Now()
@@ -167,12 +189,20 @@ func (s *ImageSender) pass(ctx context.Context, heldLook bool) {
 	if held {
 		s.heldDue = now.Add(s.held)
 	}
-	s.windowEnds = time.Time{}
-	for _, end := range s.router.Images.RetryWindows(now) {
-		if s.windowEnds.IsZero() || end.Before(s.windowEnds) {
-			s.windowEnds = end
+}
+
+// windowsOf is the end of each window a pass waited out or opened.
+func windowsOf(res ImageResult) []time.Time {
+	var ends []time.Time
+	for _, w := range res.Waiting {
+		ends = append(ends, w.RetryAt)
+	}
+	for _, f := range slices.Concat(res.Failures, res.Stalls) {
+		if !f.RetryAt.IsZero() {
+			ends = append(ends, f.RetryAt)
 		}
 	}
+	return ends
 }
 
 func (s *ImageSender) logf(format string, args ...any) {

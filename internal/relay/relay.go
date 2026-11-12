@@ -109,8 +109,10 @@ type Options struct {
 	Accepted func()
 	// Halt, set, stops work beside the engine (the image sender) if it is between two pieces
 	// of it, and reports whether it did: an idle exit, a quiesce and making way ask it last,
-	// once nothing else keeps the relay, and wait while it says no. Nil always halts.
-	Halt func() bool
+	// once nothing else keeps the relay, and wait while it says no. final says the relay
+	// goes whatever happens (a restart, making way): the work then starts nothing new, and
+	// stops at the end of the piece under way. Nil always halts.
+	Halt func(final bool) bool
 	// Logf, when set, is told why each part that could not leave was dropped (TERMA_RELAY_DEBUG=1).
 	Logf func(format string, args ...any)
 	// Warnf, when set, is told what an operator should see whatever the debug setting: a

@@ -2,10 +2,12 @@ package delivery
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -30,7 +32,13 @@ func startSender(t *testing.T, r Router, cfg *config.Config) (*ImageSender, cont
 // waitFor waits up to 3 s for cond.
 func waitFor(t *testing.T, what string, cond func() bool) {
 	t.Helper()
-	deadline := time.Now().Add(3 * time.Second)
+	waitWithin(t, 3*time.Second, what, cond)
+}
+
+// waitWithin waits up to d for cond.
+func waitWithin(t *testing.T, d time.Duration, what string, cond func() bool) {
+	t.Helper()
+	deadline := time.Now().Add(d)
 	for !cond() {
 		if time.Now().After(deadline) {
 			t.Fatalf("timed out waiting for %s", what)
@@ -60,8 +68,10 @@ func TestAnExportWakesTheSender(t *testing.T) {
 	rec := &recorder{}
 	r, cfg, stateDir := imageFixture(t, rec, true)
 	s, _, _ := startSender(t, r, cfg)
+	loops := s.loops.Load()
 	s.Nudge()
-	time.Sleep(50 * time.Millisecond)
+	// The loop has taken the nudge once it goes round again.
+	waitFor(t, "the nudge", func() bool { return s.loops.Load() > loops })
 	if n := s.passes.Load(); n != 1 {
 		t.Fatalf("a nudge with nothing new ran a pass: %d passes", n)
 	}
@@ -84,13 +94,13 @@ func TestAWindowsEndWakesTheSender(t *testing.T) {
 	img := pixelN(1)
 	store(t, stateDir, img)
 	queue(t, r.Images, imageEvent(img))
-	// A window that ends in about a second.
-	r.Images.DestinationFailed("p1", time.Now().Add(-29*time.Second))
+	// A window that ends in about three seconds: well after the first pass.
+	r.Images.DestinationFailed("p1", time.Now().Add(-27*time.Second))
 	startSender(t, r, cfg)
 	if len(rec.requests()) != 0 {
 		t.Fatal("the sender sent into an open window")
 	}
-	waitFor(t, "the window's end", func() bool { return len(rec.requests()) == 1 })
+	waitWithin(t, 6*time.Second, "the window's end", func() bool { return len(rec.requests()) == 1 })
 }
 
 // A stopping relay cuts off an upload in flight at once; its record stays queued, with no
@@ -112,7 +122,7 @@ func TestStoppingCutsAnUploadOff(t *testing.T) {
 	done := make(chan struct{})
 	go func() { s.Run(ctx); close(done) }()
 	<-arrived
-	if !s.uploading() || s.TryHalt() {
+	if !s.uploading() || s.TryHalt(false) {
 		t.Fatal("the sender is not uploading, or halts, mid-upload")
 	}
 	cancel()
@@ -276,15 +286,15 @@ func TestTheSenderHaltsBetweenImages(t *testing.T) {
 	go func() { s.Run(ctx); close(done) }()
 	t.Cleanup(func() { cancel(); <-done })
 	<-arrived
-	if s.TryHalt() {
+	if s.TryHalt(false) {
 		t.Fatal("the sender halted mid-upload")
 	}
 	free()
 	waitFor(t, "the first pass", func() bool { return s.passes.Load() >= 1 })
-	if !s.TryHalt() {
+	if !s.TryHalt(false) {
 		t.Fatal("an idle sender would not halt")
 	}
-	if !s.TryHalt() {
+	if !s.TryHalt(false) {
 		t.Fatal("a halted sender says it is not")
 	}
 	queue(t, r.Images, imageEvent(second))
@@ -312,11 +322,87 @@ func TestAHaltedSenderDoesNotSpin(t *testing.T) {
 	go func() { s.Run(ctx); close(done) }()
 	t.Cleanup(func() { cancel(); <-done })
 	waitFor(t, "the first pass", func() bool { return s.passes.Load() >= 1 })
-	if !s.TryHalt() {
+	if !s.TryHalt(false) {
 		t.Fatal("an idle sender would not halt")
 	}
+	loops := s.loops.Load()
 	time.Sleep(200 * time.Millisecond)
-	if n := s.loops.Load(); n > 3 {
+	// At most the turn under way as it halted, which finds it halted and waits.
+	if n := s.loops.Load() - loops; n > 1 {
 		t.Fatalf("a halted sender went round its loop %d times in 200 ms", n)
 	}
+}
+
+// A window that ends while the pass that deferred to it still runs wakes the sender all
+// the same: its end comes from the pass, not from the windows still open afterwards.
+func TestAWindowEndingMidPassWakesTheSender(t *testing.T) {
+	t.Parallel()
+	rec := &recorder{}
+	r, cfg, stateDir := imageFixture(t, rec, true)
+	img := pixelN(1)
+	store(t, stateDir, img)
+	queue(t, r.Images, imageEvent(img))
+	// A window that ends within a second, and a first policy lookup that takes longer.
+	r.Images.DestinationFailed("p1", time.Now().Add(-29*time.Second))
+	policy := r.Policy
+	var lookups atomic.Int64
+	r.Policy = func(ctx context.Context, cfg *config.Config, team string) (config.Policy, error) {
+		if lookups.Add(1) == 1 {
+			time.Sleep(1500 * time.Millisecond)
+		}
+		return policy(ctx, cfg, team)
+	}
+	startSender(t, r, cfg)
+	waitWithin(t, 4*time.Second, "the image, with no nudge", func() bool { return len(rec.requests()) == 1 })
+}
+
+// A final halt asked mid-upload (a restart, making way) lets that image end and starts no
+// other: the halt lands at the next image's boundary, inside the pass.
+func TestAFinalHaltLandsAtTheNextImage(t *testing.T) {
+	t.Parallel()
+	for _, final := range []bool{true, false} {
+		t.Run(fmt.Sprint("final=", final), func(t *testing.T) {
+			t.Parallel()
+			arrived, release := make(chan struct{}), make(chan struct{})
+			var once, freed sync.Once
+			free := func() { freed.Do(func() { close(release) }) }
+			rec := &recorder{}
+			r, cfg, stateDir := imageFixture(t, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+				once.Do(func() {
+					close(arrived)
+					<-release
+				})
+				rec.ServeHTTP(w, req)
+			}), true)
+			t.Cleanup(free)
+			first, second := pixelN(1), pixelN(2)
+			store(t, stateDir, first, second)
+			queue(t, r.Images, imageEvent(first), imageEvent(second))
+			s, _, _ := startSenderNoWait(t, r, cfg)
+			<-arrived
+			if s.TryHalt(final) {
+				t.Fatal("the sender halted mid-upload")
+			}
+			free()
+			waitFor(t, "the pass", func() bool { return s.passes.Load() >= 1 })
+			if final {
+				if n := len(rec.requests()); n != 1 || !s.TryHalt(false) {
+					t.Fatalf("%d uploads; halted %v", n, s.TryHalt(false))
+				}
+			} else if n := len(rec.requests()); n != 2 {
+				t.Fatalf("an idle exit's halt kept the next image back: %d uploads", n)
+			}
+		})
+	}
+}
+
+// startSenderNoWait runs a sender for r until the test ends, and returns it at once.
+func startSenderNoWait(t *testing.T, r Router, cfg *config.Config) (*ImageSender, context.CancelFunc, <-chan struct{}) {
+	t.Helper()
+	s := NewImageSender(r, openSpool(t), func() (*config.Config, error) { return cfg, nil })
+	ctx, cancel := context.WithCancel(t.Context())
+	done := make(chan struct{})
+	go func() { s.Run(ctx); close(done) }()
+	t.Cleanup(func() { cancel(); <-done })
+	return s, cancel, done
 }

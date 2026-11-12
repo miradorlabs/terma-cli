@@ -116,7 +116,7 @@ func TestWorkBesideTheEngineKeepsTheRelay(t *testing.T) {
 	// A relay with nothing else to do, asked to halt its work only once nothing else keeps it.
 	var uploading atomic.Bool
 	var asked atomic.Int64
-	quiet := newRelay(Options{Dir: t.TempDir(), Token: token, Halt: func() bool { asked.Add(1); return !uploading.Load() }})
+	quiet := newRelay(Options{Dir: t.TempDir(), Token: token, Halt: func(bool) bool { asked.Add(1); return !uploading.Load() }})
 	uploading.Store(true)
 	if quiet.Quiesce(0) {
 		t.Fatal("quiesced while an upload is under way")

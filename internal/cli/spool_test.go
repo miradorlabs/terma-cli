@@ -348,7 +348,7 @@ func TestTheRelayRunsTheImageSender(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatal("an accepted export waited on the image sender")
 	}
-	if !engine.Halt() {
+	if !engine.Halt(false) {
 		t.Fatal("an idle sender would not halt")
 	}
 }
