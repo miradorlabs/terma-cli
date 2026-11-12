@@ -164,7 +164,7 @@ func teamVerdict(a Announcement) string {
 		v += ": " + slackEscape(strings.Join(a.Failed, "; "))
 	}
 	if a.Partial {
-		v += "\n:hourglass: Its capture failed in part; it is captured again within hours, and its page updates then."
+		v += "\n:hourglass: Its capture failed in part; it is captured again in a few hours, and its page updates then."
 	}
 	return v
 }

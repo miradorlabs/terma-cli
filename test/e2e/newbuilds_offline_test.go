@@ -4,61 +4,85 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"os/exec"
+	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
 )
 
-// reference/new-builds.sh against a registry and a published reference of the test's own: which
-// builds the frequent check captures, from what each harness has released and what the reference
-// has published of it.
+// reference/new-builds.sh against a registry, an update feed and a published reference of the
+// test's own: which builds the frequent check captures, from what each harness has released and
+// what the reference has published of it.
 func TestNewBuilds(t *testing.T) {
 	for _, tool := range []string{"bash", "curl", "jq", "go"} {
 		if _, err := exec.LookPath(tool); err != nil {
 			t.Skipf("no %s", tool)
 		}
 	}
-	type published struct {
-		Version     string     `json:"version"`
-		CapturedAt  time.Time  `json:"captured_at"`
-		AttemptedAt *time.Time `json:"attempted_at,omitempty"`
-		Partial     bool       `json:"partial,omitempty"`
-	}
 	now := time.Now().UTC()
-	hoursAgo := func(h int) *time.Time { at := now.Add(-time.Duration(h) * time.Hour); return &at }
-	whole := func(versions ...string) []published {
-		var out []published
+	stamp := func(hours int) string { return now.Add(-time.Duration(hours) * time.Hour).Format(time.RFC3339Nano) }
+	// published is an index entry as refgen writes it: whole, captured two days ago.
+	published := func(version string) map[string]any {
+		return map[string]any{"version": version, "captured_at": stamp(48)}
+	}
+	whole := func(versions ...string) []map[string]any {
+		var out []map[string]any
 		for _, v := range versions {
-			out = append(out, published{Version: v, CapturedAt: now.Add(-48 * time.Hour)})
+			out = append(out, published(v))
 		}
 		return out
 	}
-	partial := func(v string, attempted *time.Time) published {
-		return published{Version: v, CapturedAt: now.Add(-48 * time.Hour), AttemptedAt: attempted, Partial: true}
+	// partial is a partial entry whose last attempt was at attempted ("" for an entry from
+	// before attempted_at).
+	partial := func(version, attempted string) map[string]any {
+		e := published(version)
+		e["partial"] = true
+		if attempted != "" {
+			e["attempted_at"] = attempted
+		}
+		return e
 	}
 	releases := []string{"1.0.0", "1.0.1", "1.0.2", "1.0.3", "1.0.4", "1.0.5", "1.1.0-beta.1"}
+	afterFour := func(e map[string]any) []map[string]any { return append(whole("1.0.1", "1.0.2", "1.0.3", "1.0.4"), e) }
 	for _, c := range []struct {
-		name  string
-		index []published // nil: the reference has no index (404)
-		down  bool        // the reference answers 500
-		want  string
+		name    string
+		harness string           // claude unless set
+		index   []map[string]any // nil: the reference has no index (404)
+		down    bool             // the reference answers 500
+		want    string
 	}{
 		{name: "never published: the newest release alone", want: "claude=1.0.5"},
 		{name: "the newest five not published, a late backport among them",
 			index: whole("1.0.0", "1.0.1", "1.0.3", "1.0.5"), want: "claude=1.0.2,1.0.4"},
 		{name: "every release published", index: whole("1.0.1", "1.0.2", "1.0.3", "1.0.4", "1.0.5")},
 		{name: "a partial newest, attempted long ago, is tried again",
-			index: append(whole("1.0.1", "1.0.2", "1.0.3", "1.0.4"), partial("1.0.5", hoursAgo(7))), want: "claude=1.0.5"},
+			index: afterFour(partial("1.0.5", stamp(7))), want: "claude=1.0.5"},
 		{name: "a partial newest, attempted lately, waits though captured long ago",
-			index: append(whole("1.0.1", "1.0.2", "1.0.3", "1.0.4"), partial("1.0.5", hoursAgo(1)))},
+			index: afterFour(partial("1.0.5", stamp(1)))},
 		{name: "a partial newest from before attempted_at waits from its capture",
-			index: append(whole("1.0.1", "1.0.2", "1.0.3", "1.0.4"), partial("1.0.5", nil)), want: "claude=1.0.5"},
-		{name: "a partial older build stays as it is",
-			index: append(whole("1.0.1", "1.0.2", "1.0.3", "1.0.5"), partial("1.0.4", hoursAgo(7)))},
+			index: afterFour(partial("1.0.5", "")), want: "claude=1.0.5"},
+		{name: "a partial build among the newest five is tried again too",
+			index: append(whole("1.0.1", "1.0.2", "1.0.3", "1.0.5"), partial("1.0.4", stamp(7))), want: "claude=1.0.4"},
+		{name: "a partial build older than the newest five stays as it is",
+			index: append(whole("1.0.1", "1.0.2", "1.0.3", "1.0.4", "1.0.5"), partial("1.0.0", stamp(7)))},
+		{name: "an attempt stamped with an offset is read as the time it is",
+			index: afterFour(partial("1.0.5", now.Add(-time.Hour).Format("2006-01-02T15:04:05.000+00:00")))},
+		{name: "an attempt time that does not parse is an old one",
+			index: afterFour(partial("1.0.5", "yesterday")), want: "claude=1.0.5"},
 		{name: "a reference that cannot be read is no build to capture", down: true},
+		{name: "a desktop app never published: its feed's newest", harness: "claude-desktop", want: "claude-desktop=1.2.0"},
+		{name: "a desktop app's newest published", harness: "claude-desktop", index: whole("1.2.0")},
+		{name: "a desktop app's partial newest, attempted long ago", harness: "claude-desktop",
+			index: []map[string]any{partial("1.2.0", stamp(7))}, want: "claude-desktop=1.2.0"},
 	} {
 		t.Run(c.name, func(t *testing.T) {
+			harness := c.harness
+			if harness == "" {
+				harness = "claude"
+			}
 			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				switch r.URL.Path {
 				case "/registry/@anthropic-ai/claude-code":
@@ -67,7 +91,11 @@ func TestNewBuilds(t *testing.T) {
 						versions[v] = map[string]any{}
 					}
 					_ = json.NewEncoder(w).Encode(map[string]any{"versions": versions, "dist-tags": map[string]string{"latest": "1.0.5"}})
-				case "/reference/claude/index.json":
+				case "/feeds/claude-desktop":
+					_ = json.NewEncoder(w).Encode(map[string]any{"releases": []any{
+						map[string]any{"updateTo": map[string]string{"version": "1.1.0"}},
+						map[string]any{"updateTo": map[string]string{"version": "1.2.0"}}}})
+				case "/reference/" + harness + "/index.json":
 					switch {
 					case c.down:
 						http.Error(w, "down", http.StatusInternalServerError)
@@ -82,8 +110,8 @@ func TestNewBuilds(t *testing.T) {
 			}))
 			defer srv.Close()
 			cmd := exec.Command("bash", "reference/new-builds.sh")
-			cmd.Env = append(cmd.Environ(), "TERMA_REFERENCE_HARNESSES=claude", "TERMA_NPM_REGISTRY="+srv.URL+"/registry",
-				"TERMA_REFERENCE_URL="+srv.URL+"/reference")
+			cmd.Env = append(cmd.Environ(), "TERMA_REFERENCE_HARNESSES="+harness, "TERMA_NPM_REGISTRY="+srv.URL+"/registry",
+				"TERMA_REFERENCE_FEEDS_URL="+srv.URL+"/feeds", "TERMA_REFERENCE_URL="+srv.URL+"/reference")
 			out, err := cmd.Output()
 			if err != nil {
 				t.Fatalf("new-builds.sh: %v\n%s", err, out)
@@ -92,5 +120,40 @@ func TestNewBuilds(t *testing.T) {
 				t.Errorf("new-builds.sh = %q, want %q", got, c.want)
 			}
 		})
+	}
+}
+
+// reference/capture-args.sh: every build a run set out to capture is attempted, and one whose job
+// wrote no compat.json (it did not finish), or whose desktop job failed, is unfinished.
+func TestCaptureArgs(t *testing.T) {
+	if _, err := exec.LookPath("bash"); err != nil {
+		t.Skip("no bash")
+	}
+	runs := t.TempDir()
+	for _, job := range []string{"capture-claude", "capture-gemini"} {
+		if err := os.MkdirAll(filepath.Join(runs, job), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(runs, job, "compat.json"), []byte("[]\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	cmd := exec.Command("bash", "reference/capture-args.sh", runs)
+	cmd.Env = append(cmd.Environ(), "BUILDS=claude=2.1.1\ngemini=0.9.0\ncodex=0.200.0\nclaude-desktop=1.2.0",
+		"CLAUDE_BUILDS=2.1.1", "CODEX_BUILDS=0.200.0", "DESKTOP_CAPTURE=failure")
+	out, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("capture-args.sh: %v\n%s", err, out)
+	}
+	got := strings.Split(strings.TrimSpace(string(out)), "\n")
+	want := []string{
+		"-attempted", "claude=2.1.1",
+		"-attempted", "gemini=0.9.0",
+		"-attempted", "codex=0.200.0", "-unfinished", "codex=0.200.0", // macOS wrote nothing
+		"-attempted", "claude-desktop=1.2.0", "-unfinished", "claude-desktop=1.2.0", // the desktop job failed
+		"-unfinished", "claude=2.1.1", "-unfinished", "codex=0.200.0", // Linux wrote nothing
+	}
+	if !slices.Equal(got, want) {
+		t.Errorf("capture-args.sh =\n%s\nwant\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
 	}
 }

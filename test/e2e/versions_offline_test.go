@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"cmp"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -160,6 +161,31 @@ func TestSkipUnlessSelected(t *testing.T) {
 	}
 }
 
+// A run limited to one harness fetches no build of another for that one's own scenarios, but
+// does for a scenario of its own harness that drives the other (T3 runs Codex).
+func TestResolveForAnotherHarnessScenario(t *testing.T) {
+	unrestricted(t)
+	t.Setenv("TERMA_E2E_ONLY", "t3")
+	list := func() ([]string, error) { return []string{"1.0.0"}, nil }
+	ensure := func(v string) (string, error) { return "/bin/" + v, nil }
+	resolved := func(scenario string) (n int, skipped bool) {
+		t.Run(cmp.Or(scenario, "none"), func(t *testing.T) {
+			defer func() { skipped = t.Skipped() }()
+			if scenario != "" {
+				scenarioOf(t, scenario)
+			}
+			n = len(resolve(t, "codex", "1.0.0", list, ensure))
+		})
+		return n, skipped
+	}
+	if n, skipped := resolved("t3"); skipped || n != 1 {
+		t.Errorf("a T3 scenario resolving Codex: %d builds, skipped %v", n, skipped)
+	}
+	if _, skipped := resolved(""); !skipped {
+		t.Error("Codex's own builds were resolved in a run limited to T3")
+	}
+}
+
 // A vendor's package is installed without the run's credentials: its install scripts run as soon
 // as the release is out.
 func TestInstallEnvHoldsNoCredential(t *testing.T) {
@@ -167,14 +193,14 @@ func TestInstallEnvHoldsNoCredential(t *testing.T) {
 	for _, name := range credentials {
 		t.Setenv(name, "secret")
 	}
-	t.Setenv("TERMA_E2E_HARNESSES", "codex")
+	t.Setenv("TERMA_E2E_ONLY", "codex")
 	env := installEnv()
 	for _, kv := range env {
 		if name, _, _ := strings.Cut(kv, "="); slices.Contains(credentials, name) {
 			t.Errorf("the install environment holds %s", name)
 		}
 	}
-	if !slices.Contains(env, "TERMA_E2E_HARNESSES=codex") {
+	if !slices.Contains(env, "TERMA_E2E_ONLY=codex") {
 		t.Error("the install environment lost a variable that is no credential")
 	}
 }

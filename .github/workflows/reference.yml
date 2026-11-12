@@ -146,7 +146,6 @@ jobs:
           TERMA_E2E_UNCLASSIFIED: note
           TERMA_E2E_KNOWN_UPSTREAM: codex-session-end
           TERMA_E2E_ONLY: ${{ matrix.harness }}
-          TERMA_E2E_HARNESSES: ${{ matrix.harness }}
           HARNESS: ${{ matrix.harness }}
           VERSIONS: ${{ matrix.versions }}
         run: |
@@ -284,8 +283,7 @@ jobs:
     # After every capture, so each build is published once, whole. A capture that failed still
     # publishes its builds, partial, and announces them saying so: the next check does not take
     # them for new again, and captures them again once some hours have passed since this attempt
-    # (new-builds.sh), without announcing them twice. A desktop app's release whose capture failed
-    # is not published as tried: the next check tries it again.
+    # (new-builds.sh), without announcing them twice.
     if: always() && needs.detect.outputs.builds != ''
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -343,19 +341,10 @@ jobs:
           # The capture's census of the builds.
           for f in $(find runs -name fields.json | sort); do args+=(-fields "$f"); done
           for f in $(find runs -name census.json | sort); do args+=(-census "$f"); done
-          # A run writes its compat.json when it gets to its end: a job without one did not finish
-          # (a timeout, a runner lost), and its builds are published partial, to be tried again.
-          while read -r line; do
-            case "$line" in
-              claude-desktop=*|codex-desktop=*) [ "$DESKTOP_CAPTURE" = success ] || continue ;;
-              *) [ -f "runs/capture-${line%%=*}/compat.json" ] || args+=(-unfinished "$line") ;;
-            esac
-            args+=(-attempted "$line")
-          done <<<"$BUILDS"
-          if [ ! -f runs/compat-linux/compat.json ]; then
-            if [ -n "$CLAUDE_BUILDS" ]; then args+=(-unfinished "claude=$CLAUDE_BUILDS"); fi
-            if [ -n "$CODEX_BUILDS" ]; then args+=(-unfinished "codex=$CODEX_BUILDS"); fi
-          fi
+          # Every build the run set out to capture, and those a job of it did not finish, which
+          # are published partial and tried again some hours later.
+          mapfile -t captured < <(reference/capture-args.sh runs)
+          args+=("${captured[@]}")
           # Every step stays in timeline.json (-timeline-steps 1000) until the reader's pages
           # load the timeline-<n>.json archives; then the default pages it.
           go run ./refgen "${args[@]}" -catalog ../../docs/compat/fields.json -history ../../docs/compat/history.json -compat ../../docs/compat/compat.json -out ../../docs/harnesses -timeline-steps 1000 -fetch -source -announce "$RUNNER_TEMP/announcements.json"

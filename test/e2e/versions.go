@@ -78,13 +78,19 @@ func CodexBinaries(t *testing.T) []Binary {
 	return resolve(t, "codex", os.Getenv("TERMA_E2E_CODEX_VERSIONS"), codexVersionList, ensureCodex)
 }
 
-// skipUnlessSelected skips a scenario of harness when TERMA_E2E_ONLY, a comma list of
-// harness ids, does not name it: the frequent check runs each harness's scenarios on a job of
-// its own (reference.yml). Unset, every harness's scenarios run.
+// selected reports whether this run takes harness's scenarios: every harness, unless
+// TERMA_E2E_ONLY, a comma list of harness ids, leaves it out. The frequent check runs each
+// harness's scenarios on a job of its own (reference.yml).
+func selected(harness string) bool {
+	only := os.Getenv("TERMA_E2E_ONLY")
+	return only == "" || listed(only, harness)
+}
+
+// skipUnlessSelected skips a scenario of harness this run does not take (selected).
 func skipUnlessSelected(t *testing.T, harness string) {
 	t.Helper()
-	if only := os.Getenv("TERMA_E2E_ONLY"); only != "" && !listed(only, harness) {
-		t.Skipf("%s is not among TERMA_E2E_ONLY (%s)", harness, only)
+	if !selected(harness) {
+		t.Skipf("%s is not among TERMA_E2E_ONLY (%s)", harness, os.Getenv("TERMA_E2E_ONLY"))
 	}
 }
 
@@ -118,7 +124,12 @@ func listed(list, harness string) bool {
 
 func resolve(t *testing.T, harness, spec string, list func() ([]string, error), ensure func(string) (string, error)) []Binary {
 	t.Helper()
-	skipUnlessSelected(t, harness)
+	// Before fetching a build: a run that does not take harness's scenarios fetches none. A
+	// scenario of another harness that drives this one (T3 runs Codex and Claude Code) is the
+	// other's, and its selection is already made.
+	if h := harnessOf(t); h == "" || h == harness {
+		skipUnlessSelected(t, harness)
+	}
 	if spec == "" {
 		spec = "installed,last3"
 	}

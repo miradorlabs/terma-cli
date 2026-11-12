@@ -420,8 +420,9 @@ the window's accessibility tree and the app's logs.
 Each build is captured once, whole, when it comes out. `reference.yml` checks every quarter
 hour: `reference/new-builds.sh` asks each registry for the builds the reference has yet to
 capture whole (a few requests, no build; nothing else runs when there are none): a new release
-among each harness's newest five, or its newest build where that one's capture was partial and
-its last attempt (`attempted_at`) is six hours old. It reads the published index through
+among each harness's newest five, or one of its newest five published builds whose capture was
+partial and whose last attempt (`attempted_at`) is six hours old, four times a day until five
+newer builds are published. It reads the published index through
 GitHub's API, so a check queued behind a capture sees what that capture published. Only then does it capture them, everything the suite does with a build: on
 macOS, one job a harness, every scenario of the harness's against these builds alone
 (`TERMA_E2E_ONLY` and the versions: its profile and probes, its files profile, terma's contracts
@@ -429,8 +430,8 @@ and the field census); on Linux, Claude Code's and Codex's relay contracts and f
 and a desktop app's on a machine of its own. The publish job waits for all of them, so a build's
 page and changelog are published once, complete, with terma's verdict, and announced then
 (`publish.sh publish-reference`). A capture that failed, or a job of it that did not finish (it
-wrote no `compat.json`: `refgen -unfinished`), is published partial (`refgen -attempted`) and
-marked `partial` in the index. Each version newer than any captured before is announced once, when
+wrote no `compat.json`, or the desktop job failed: `reference/capture-args.sh`, `refgen
+-unfinished`), is published partial (`refgen -attempted`) and marked `partial` in the index. Each version newer than any captured before is announced once, when
 first published: whether terma works with the build, "Works", "Partly broken" or "Broken" with the
 checks that failed, or "Not tested", and that its capture failed in part where it did. Its publish
 job and Model Reference's share a concurrency group, so they never push `compat-matrix` at once.

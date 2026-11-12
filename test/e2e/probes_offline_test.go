@@ -368,15 +368,3 @@ func TestLargeOutputOffline(t *testing.T) {
 		t.Errorf("%s printed %d bytes, starting %q", out.Command, len(got), got[:min(len(got), 40)])
 	}
 }
-
-// The frequent check's run takes the shared probes for the harnesses it lists alone.
-func TestHarnessListedOffline(t *testing.T) {
-	t.Setenv("TERMA_E2E_HARNESSES", "")
-	if !harnessListed("gemini") {
-		t.Error("with no list, every harness is taken")
-	}
-	t.Setenv("TERMA_E2E_HARNESSES", "gemini,dsh")
-	if !harnessListed("dsh") || harnessListed("copilot") {
-		t.Error("a list takes its harnesses and no other")
-	}
-}

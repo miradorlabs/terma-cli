@@ -7,11 +7,10 @@
 # there are none.
 #
 # A build to capture is one of a harness's newest TERMA_REFERENCE_MAX (5) releases the reference
-# has not published (a backport released late among them), or its newest published build where
-# that one's capture was partial and its last attempt is TERMA_REFERENCE_RETRY_AFTER seconds old
-# (6 h): a capture that failed is tried again, but not every quarter hour. Only the newest: an
-# older build's partial capture stays as it is. A harness the reference has never published is
-# its newest build alone.
+# has not published (a backport released late among them), or one of its newest five published
+# builds where that one's capture was partial and its last attempt is TERMA_REFERENCE_RETRY_AFTER
+# seconds old (6 h): a capture that failed is tried again, four times a day, until five newer
+# builds are published. A harness the reference has never published is its newest build alone.
 #
 # A registry or the reference that cannot be read is a warning, not a failure: the next check
 # catches up. Only a reference that says it has no index for a harness (404) makes it a harness
@@ -21,7 +20,8 @@
 # raw.githubusercontent.com, which serves a copy up to five minutes old: a check queued behind a
 # long capture would read the index from before that capture and capture its builds again.
 # TERMA_REFERENCE_URL reads <url>/<harness>/index.json instead, TERMA_NPM_REGISTRY another npm
-# registry, and TERMA_REFERENCE_HARNESSES (a comma list) asks about those harnesses alone.
+# registry, TERMA_REFERENCE_FEEDS_URL a desktop app's update feed at <url>/<harness>, and
+# TERMA_REFERENCE_HARNESSES (a comma list) asks about those harnesses alone.
 set -euo pipefail
 
 max=${TERMA_REFERENCE_MAX:-5}
@@ -91,17 +91,18 @@ read_index() {
 	esac
 }
 
-# retry is harness's newest published build when its capture was partial and its last attempt
-# (attempted_at; captured_at before there was one) is old enough to try again, else nothing. A
-# time that does not parse is an old one: the build is tried again rather than never.
+# retry is, of the published builds it is given, those whose capture was partial and whose last
+# attempt (attempted_at; captured_at before there was one) is old enough to try again. A time
+# that does not parse is an old one: the build is tried again rather than never.
 retry() {
-	jq -r --argjson after "$retry_after" --arg newest "$1" '
-		[.versions[] | select(.version == $newest)][0] // empty
+	jq -r --argjson after "$retry_after" '
+		$ARGS.positional as $builds
+		| .versions[] | select(.version as $v | $builds | index($v))
 		| select(.partial == true)
 		| ((.attempted_at // .captured_at) as $at
 			| try ($at | sub("\\.[0-9]+"; "") | sub("[+-]00:00$"; "Z") | fromdateiso8601) catch 0) as $t
 		| select(now - $t > $after)
-		| .version' <<<"$index"
+		| .version' --args "$@" <<<"$index"
 }
 
 for entry in "${harnesses[@]}"; do
@@ -132,7 +133,8 @@ for entry in "${harnesses[@]}"; do
 		# one again, where its capture was partial.
 		todo=$({
 			tail -n "$max" <<<"$releases" | grep -vxF -f <(printf '%s\n' "$published") || true
-			retry "$(tail -n 1 <<<"$published")"
+			# shellcheck disable=SC2046 # one version a word
+			retry $(tail -n "$max" <<<"$published")
 		} | vsort -u)
 	fi
 	[ -n "$todo" ] || continue
@@ -142,6 +144,7 @@ done
 for entry in "${desktop[@]}"; do
 	read -r harness feed kind <<<"$entry"
 	watched "$harness" || continue
+	if [ -n "${TERMA_REFERENCE_FEEDS_URL:-}" ]; then feed="$TERMA_REFERENCE_FEEDS_URL/$harness"; fi
 	if ! doc=$(curl -fsSL --max-time 30 "$feed"); then
 		echo "::warning::could not read $harness's update feed" >&2
 		continue
