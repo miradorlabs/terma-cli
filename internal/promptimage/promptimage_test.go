@@ -293,3 +293,31 @@ func TestSweepLosesNoImageKeptMeanwhile(t *testing.T) {
 		t.Fatalf("a sweep left %d files", len(entries))
 	}
 }
+
+// A Store landing after the sweep moved the image aside finds no file and writes it anew,
+// and the sweep leaves that copy in place.
+func TestSweepLeavesAnImageStoredAfterTheMove(t *testing.T) {
+	dir := t.TempDir()
+	img := Image{Data: pngOf(t, 3, 3), MIMEType: "image/png", Index: 1}
+	if err := Store(dir, img); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(Dir(dir), img.ID())
+	old := time.Now().Add(-time.Hour)
+	if err := os.Chtimes(path, old, old); err != nil {
+		t.Fatal(err)
+	}
+	sweptAside = func(string) {
+		if err := Store(dir, img); err != nil {
+			t.Error(err)
+		}
+	}
+	t.Cleanup(func() { sweptAside = func(string) {} })
+	Sweep(dir, []string{img.ID()}, func(string) bool { return false }, time.Now().Add(-time.Minute))
+	if _, ok := Load(dir, img.ID()); !ok {
+		t.Fatal("a sweep removed an image stored after it moved the old copy aside")
+	}
+	if entries, _ := os.ReadDir(Dir(dir)); len(entries) != 1 {
+		t.Fatalf("the store holds %d files", len(entries))
+	}
+}

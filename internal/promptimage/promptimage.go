@@ -280,9 +280,9 @@ func Sweep(stateDir string, ids []string, named func(id string) bool, since time
 	}
 }
 
-// sweepChose runs once removeUnlessTouched has chosen to remove a file, before it does: a
-// test keeps the image again there.
-var sweepChose = func(path string) {}
+// sweepChose runs once removeUnlessTouched has chosen to remove a file, and sweptAside once
+// it has moved it aside: tests keep the image again there.
+var sweepChose, sweptAside = func(string) {}, func(string) {}
 
 // asides numbers the names removeUnlessTouched moves files aside to.
 var asides atomic.Int64
@@ -300,6 +300,7 @@ func removeUnlessTouched(path string, since time.Time) {
 	if os.Rename(path, aside) != nil {
 		return
 	}
+	sweptAside(path)
 	if info, err := os.Stat(aside); err == nil && !info.ModTime().Before(since) {
 		// The same bytes: putting them back over a copy written meanwhile changes nothing.
 		_ = os.Rename(aside, path)
