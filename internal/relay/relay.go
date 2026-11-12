@@ -104,6 +104,12 @@ type Options struct {
 	// by itself, sent on its record as terma.update.auto: the developer can turn automatic
 	// updates on or off while the relay runs.
 	UpdateAuto func() string
+	// Accepted, set, is told of each export the relay accepted, as it is answered; it must
+	// not block. The image sender wakes on it: an agent's export is how its turn ends.
+	Accepted func()
+	// Busy, set, reports work beside the engine, an image's upload, that an idle exit or a
+	// quiesce waits for.
+	Busy func() bool
 	// Logf, when set, is told why each part that could not leave was dropped (TERMA_RELAY_DEBUG=1).
 	Logf func(format string, args ...any)
 	// Warnf, when set, is told what an operator should see whatever the debug setting: a
@@ -331,6 +337,9 @@ func (r *Relay) export(w http.ResponseWriter, req *http.Request, s Signal) {
 			p.session = procKey(pid)
 		}
 		r.route(p)
+	}
+	if r.opts.Accepted != nil {
+		r.opts.Accepted()
 	}
 	// An empty success response is valid OTLP in either encoding.
 	if isJSON {

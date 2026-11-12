@@ -87,3 +87,46 @@ func TestAQuiescedRelayAsksForExportsAgain(t *testing.T) {
 		t.Fatalf("refused_restarting = %d, want 1", got)
 	}
 }
+
+// Work beside the engine (an image's upload) keeps the relay from idling out or quiescing,
+// and an export it accepts is told on, for the image sender to wake.
+func TestWorkBesideTheEngineKeepsTheRelay(t *testing.T) {
+	t.Parallel()
+	u := newUpstream(t)
+	var busy atomic.Bool
+	var accepted atomic.Int64
+	r := newRelay(Options{Dir: t.TempDir(), Token: token,
+		Accepted: func() { accepted.Add(1) },
+		Lookup:   func(string, time.Time) (claim.Claim, bool) { return claim.Claim{ProjectID: "p1"}, true },
+		Resolve: func(claim.Claim) (Policy, error) {
+			return Policy{Endpoint: u.srv.URL, Key: "key-p1", IncludePrompts: true, IncludeToolContent: true}, nil
+		}})
+	srv := httptest.NewServer(r.Handler())
+	defer srv.Close()
+	body, err := proto.Marshal(logsOf("session", 1))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if code := post(t, srv, "/v1/logs", body, "application/x-protobuf", token, false); code != http.StatusOK || accepted.Load() != 1 {
+		t.Fatalf("export = %d, told of %d", code, accepted.Load())
+	}
+	if code := post(t, srv, "/v1/logs", body, "application/x-protobuf", "wrong", false); code == http.StatusOK || accepted.Load() != 1 {
+		t.Fatalf("a refused export = %d, told of %d", code, accepted.Load())
+	}
+	// A relay with nothing else to do.
+	quiet := newRelay(Options{Dir: t.TempDir(), Token: token, Busy: busy.Load})
+	busy.Store(true)
+	if _, idle := quiet.Idle(); idle {
+		t.Fatal("idle while an upload is under way")
+	}
+	if quiet.Quiesce(0) {
+		t.Fatal("quiesced while an upload is under way")
+	}
+	busy.Store(false)
+	if _, idle := quiet.Idle(); !idle {
+		t.Fatal("not idle once the upload is over")
+	}
+	if !quiet.Quiesce(0) {
+		t.Fatal("did not quiesce once the upload is over")
+	}
+}

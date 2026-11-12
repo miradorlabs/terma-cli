@@ -118,18 +118,22 @@ func (r *Relay) Holding() bool {
 func (r *Relay) Quiesce(quiet time.Duration) bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if r.heldN > 0 || r.inflight > 0 || r.opts.Now().Sub(r.lastSeen) < quiet {
+	if r.heldN > 0 || r.inflight > 0 || r.opts.Now().Sub(r.lastSeen) < quiet || r.busy() {
 		return false
 	}
 	r.refusing = true
 	return true
 }
 
-// Idle reports how long the relay has had no export, if it holds and queues nothing.
+// busy reports whether work beside the engine is under way (Options.Busy).
+func (r *Relay) busy() bool { return r.opts.Busy != nil && r.opts.Busy() }
+
+// Idle reports how long the relay has had no export, if it holds and queues nothing and
+// nothing beside it is under way.
 func (r *Relay) Idle() (time.Duration, bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if r.heldN > 0 {
+	if r.heldN > 0 || r.busy() {
 		return 0, false
 	}
 	for _, s := range r.senders {

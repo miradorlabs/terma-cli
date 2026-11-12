@@ -46,7 +46,7 @@ type Config struct {
 	Version string
 	// Engine is the engine's options; Run sets its Token.
 	Engine relay.Options
-	// Workers run beside the engine until it stops, and are waited for.
+	// Workers run beside the engine until it stops, and are waited for, workerWait at most.
 	Workers []func(ctx context.Context)
 	// Updater, set, installs each new release in place of this terma, and the relay then
 	// restarts on it.
@@ -234,7 +234,14 @@ func Run(ctx context.Context, c Config) (Result, error) {
 	open.Wait()
 	cancel()
 	<-engine
-	workers.Wait()
+	// A worker returns as its context ends; one that does not keeps the relay no longer.
+	waited := make(chan struct{})
+	go func() { workers.Wait(); close(waited) }()
+	select {
+	case <-waited:
+	case <-time.After(workerWait):
+		c.Log.Printf("relay pid %d: a worker did not stop within %s", os.Getpid(), workerWait)
+	}
 	snap := r.Stats().Snapshot()
 	if data, err := json.MarshalIndent(snap, "", "  "); err == nil {
 		// The previous relay's exit counters stay beside this one's.
@@ -289,6 +296,9 @@ func (r stopReason) describe(err error) string {
 	}
 	return "asked to stop"
 }
+
+// workerWait bounds how long a stopping relay waits for its workers.
+var workerWait = 10 * time.Second
 
 // exitBeatWait bounds the last heartbeat, which a stopped relay's process waits for.
 const exitBeatWait = 3 * time.Second
