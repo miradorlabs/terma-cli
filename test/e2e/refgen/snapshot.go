@@ -354,7 +354,13 @@ func merge(old, tonight *Snapshot, now time.Time) *Snapshot {
 		tt["filesystem"] = mergeFilesystem(ot["filesystem"], tt["filesystem"])
 	}
 	if tt["telemetry"] != nil {
-		tt["telemetry"] = mergeTelemetry(ot["telemetry"], tt["telemetry"])
+		tel := tt["telemetry"]
+		if keepWhole {
+			// The probe's findings come from the profile's turn, which failed: a truncated probe
+			// replaces none of a whole one's. The census, which ran apart, still counts.
+			tel = withoutProbe(tel)
+		}
+		tt["telemetry"] = mergeTelemetry(ot["telemetry"], tel)
 	}
 	took := false
 	for _, sec := range present(tonight) {
@@ -449,6 +455,31 @@ func hasFirstTurn(p e2e.Profile) bool {
 		}
 	}
 	return false
+}
+
+// withoutProbe is telemetry section t without the probe's findings: its export and each surface's
+// probe fields.
+func withoutProbe(t any) any {
+	m, _ := t.(map[string]any)
+	if m == nil {
+		return t
+	}
+	out := maps.Clone(m)
+	delete(out, "export")
+	surfaces, _ := m["surfaces"].(map[string]any)
+	kept := map[string]any{}
+	for name, raw := range surfaces {
+		s, _ := raw.(map[string]any)
+		c := maps.Clone(s)
+		for _, f := range refdiff.ProbeFields {
+			delete(c, f)
+		}
+		kept[name] = c
+	}
+	if surfaces != nil {
+		out["surfaces"] = kept
+	}
+	return out
 }
 
 // mergeTelemetry is the telemetry section with what tonight measured over old's, and old's where

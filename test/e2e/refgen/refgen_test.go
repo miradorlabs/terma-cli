@@ -1036,6 +1036,18 @@ func TestMergeKeepsTelemetryTonightDidNotMeasure(t *testing.T) {
 		t.Errorf("a null surface tonight: %v", got)
 	}
 
+	// A partial night (its profile's turn failed) took a truncated probe: the whole one's findings
+	// stay, and the census, which ran apart, still counts.
+	truncated := snap(parse(`{"export":{"protocol":"http/json"},"surfaces":{"logs/a":{"keys":{"k":{"class":"safe"},"k2":{"class":"safe"}}},"metrics/m":{"keys":{},"type":"gauge"}}}`))
+	truncated.Capture.Partial = true
+	got = merge(snap(parse(whole)), truncated, now).Telemetry
+	if got["export"].(map[string]any)["protocol"] != "http/protobuf" || got["surfaces"].(map[string]any)["metrics/m"].(map[string]any)["type"] != "sum" {
+		t.Errorf("a partial night's probe replaced a whole one's: %v", got)
+	}
+	if keys := got["surfaces"].(map[string]any)["logs/a"].(map[string]any)["keys"].(map[string]any); keys["k2"] == nil {
+		t.Errorf("a partial night's census was not taken: %v", keys)
+	}
+
 	// A harness the census never covers lists its surfaces by its probe: one tonight's probe no
 	// longer saw is gone.
 	probes := parse(`{"export":{"protocol":"http/json"},"surfaces":{"metrics/m":{"type":"sum"},"metrics/gone":{"type":"sum"}}}`)

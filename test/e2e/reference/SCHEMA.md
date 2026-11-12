@@ -311,10 +311,14 @@ Two builds' telemetry is compared only in what both captures measured: keys wher
 census, `export` where both ran the probe and a surface's probe fields where both probes saw it
 (what a probe sees is what its turn made), and which surfaces exist where both listed them the
 same way, a census on both sides or a probe on both and a census on neither. What one did not
-measure is not observed there, never a surface "no longer sent" or an export "added". A capture
-whose probe did not see a surface keeps the findings of the one that did. `interval_batches` is
-the run's, and an interval is compared only where both rest on at least two batches: from one,
-it is a stall's.
+measure is not observed there, never a surface "no longer sent" or an export "added".
+`interval_batches` is the run's, and an interval is compared only where both rest on at least
+two batches: from one, it is a stall's.
+
+A new capture of a build replaces what it measured and keeps the rest: a census-only capture
+keeps the probe's findings, a probe-only one every surface and its keys, a probe that did not
+see a surface keeps the findings of the one that did, and a partial capture (its profile's turn
+failed) takes the census but none of its probe's findings.
 
 ### hooks
 
