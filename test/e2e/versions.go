@@ -76,20 +76,27 @@ func CodexBinaries(t *testing.T) []Binary {
 }
 
 // skipUnlessSelected skips a scenario of harness when TERMA_E2E_ONLY, a comma list of
-// harness ids, does not name it: the frequent check runs the contracts of the harnesses with
-// a new build alone (reference.yml). Unset, every harness's scenarios run.
+// harness ids, does not name it, or TERMA_E2E_EXCEPT does: the frequent check runs the
+// scenarios of the harness with a new build alone (reference.yml), and the night those of the
+// harnesses that check does not watch (live.yml). Unset, every harness's scenarios run.
 func skipUnlessSelected(t *testing.T, harness string) {
 	t.Helper()
-	only := os.Getenv("TERMA_E2E_ONLY")
-	if only == "" {
-		return
+	if except := os.Getenv("TERMA_E2E_EXCEPT"); listed(except, harness) {
+		t.Skipf("%s is among TERMA_E2E_EXCEPT (%s)", harness, except)
 	}
-	for h := range strings.SplitSeq(only, ",") {
+	if only := os.Getenv("TERMA_E2E_ONLY"); only != "" && !listed(only, harness) {
+		t.Skipf("%s is not among TERMA_E2E_ONLY (%s)", harness, only)
+	}
+}
+
+// listed reports whether the comma list names harness.
+func listed(list, harness string) bool {
+	for h := range strings.SplitSeq(list, ",") {
 		if strings.TrimSpace(h) == harness {
-			return
+			return true
 		}
 	}
-	t.Skipf("%s is not among TERMA_E2E_ONLY (%s)", harness, only)
+	return false
 }
 
 func resolve(t *testing.T, harness, spec string, list func() ([]string, error), ensure func(string) (string, error)) []Binary {

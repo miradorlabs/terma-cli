@@ -45,8 +45,8 @@ CODEX_VERSION   ?= 0.158.0
 # build of each harness: MACHINE_CLAUDE_VERSIONS / MACHINE_CODEX_VERSIONS pick other builds
 # than the image's (a version list the suite fetches), as the reference's frequent check does.
 # MACHINE_CONTRACTS are terma's checks, MACHINE_PROFILES the reference's files profiles: the
-# night runs the checks alone (MACHINE_PROFILES=), the reference's frequent check both, for the
-# harness of each build it captures.
+# reference's frequent check runs the checks and the profiles of the harness of each build it
+# captures (MACHINE_PROFILES=TestCodexProfileFiles).
 MACHINE_CONTRACTS ?= TestGlobalMode.*|TestRelayClaude|TestRelayCodex|TestRelayNegativeControls|TestRelayResumedElsewhere
 MACHINE_PROFILES  ?= TestClaudeProfileFiles|TestCodexProfileFiles
 MACHINE_RUN     ?= ^($(MACHINE_CONTRACTS)$(if $(MACHINE_PROFILES),|$(MACHINE_PROFILES)))$$

@@ -8,8 +8,7 @@ name: Harness Reference new builds
 # files profile and relay contracts, and a desktop app's on a machine of its own. The build's
 # page and changelog are published once, complete, with terma's verdict, and announced then
 # (refgen, publish.sh publish-reference). The night (live.yml) does not capture these builds
-# again: it runs terma's contracts against the builds people run, and captures the harnesses
-# this check does not watch.
+# again, nor test them: it runs the harnesses this check does not watch.
 
 on:
   schedule:
@@ -170,8 +169,8 @@ jobs:
           retention-days: 90
 
   # The new Claude Code and Codex builds on Linux, in the machine image (test/e2e/machine/Dockerfile,
-  # `make machines`): their relay contracts, and their files profile traced with strace, the
-  # snapshot's filesystem section for linux/amd64.
+  # `make machines`): the machine contracts (global mode, the managed configuration, the relay),
+  # and their files profile traced with strace, the snapshot's filesystem section for linux/amd64.
   capture-linux:
     needs: detect
     if: needs.detect.outputs.claude != '' || needs.detect.outputs.codex != ''
@@ -197,14 +196,15 @@ jobs:
           CLAUDE_BUILDS: ${{ needs.detect.outputs.claude }}
           CODEX_BUILDS: ${{ needs.detect.outputs.codex }}
         run: |
-          # Only the harnesses with new builds: an empty version list would mean the image's.
-          contracts=()
+          # Every machine contract (global mode, the managed configuration, the relay's), with
+          # the new builds and the newest of the other harness; the files profile of the new
+          # builds alone (an empty version list would mean the image's).
           profiles=()
-          if [ -n "$CLAUDE_BUILDS" ]; then contracts+=(TestRelayClaude); profiles+=(TestClaudeProfileFiles); fi
-          if [ -n "$CODEX_BUILDS" ]; then contracts+=(TestRelayCodex); profiles+=(TestCodexProfileFiles); fi
+          if [ -n "$CLAUDE_BUILDS" ]; then profiles+=(TestClaudeProfileFiles); fi
+          if [ -n "$CODEX_BUILDS" ]; then profiles+=(TestCodexProfileFiles); fi
           make machines HOST_ARCH=amd64 CLAUDE_VERSION=latest CODEX_VERSION=latest \
             MACHINE_CLAUDE_VERSIONS="${CLAUDE_BUILDS:-installed}" MACHINE_CODEX_VERSIONS="${CODEX_BUILDS:-installed}" \
-            MACHINE_CONTRACTS="$(IFS='|'; echo "${contracts[*]}")" MACHINE_PROFILES="$(IFS='|'; echo "${profiles[*]}")"
+            MACHINE_PROFILES="$(IFS='|'; echo "${profiles[*]}")"
       - name: Upload the contracts' rows
         if: always()
         uses: actions/upload-artifact@v7

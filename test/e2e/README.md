@@ -101,9 +101,11 @@ The main CI workflow runs this module's offline contracts with the race detector
 and the credential-free telemetry scenarios against pinned real harness builds,
 tolerating only Codex's documented SessionEnd race there
 (`TERMA_E2E_KNOWN_UPSTREAM=codex-session-end`; see `TestCodexSessionEndProbe`).
-`E2E harness contracts` (`live.yml`) runs nightly and on manual dispatch against the newest
-build of each harness the published history checked on macOS and every release since
-(`checked`, below); DeepSeek, which ships prereleases alone, against its newest build. Every contract that needs no account runs against local fixture providers, as
+A watched harness's build (`reference/new-builds.sh --tracked`) is tested when it comes out:
+the Harness Reference's frequent check (`reference.yml`, below) runs every scenario of the
+harness's against it once, terma's contracts included. `E2E harness contracts` (`live.yml`)
+runs nightly and on manual dispatch for the rest (`TERMA_E2E_EXCEPT`): the harnesses that check
+does not watch, at their newest, and the scenarios of no one harness. Every contract that needs no account runs against local fixture providers, as
 PR CI's do: the relay and hook contracts, the field census and the drift digest. One that needs
 an account runs where the `live-harnesses` environment has its secret, `OPENAI_API_KEY` for
 Codex's real API scenarios and `ANTHROPIC_API_KEY` for Claude's, and is skipped where it has
@@ -430,12 +432,12 @@ page and changelog are published once, complete, with terma's verdict, and annou
 announces it. Its publish job and the nightly compat job share a concurrency group, so they
 never push `compat-matrix` at once.
 
-The night does not capture those builds again: it runs terma's contracts against the builds
-people run, which moves only a build's verdict, and skips the watched harnesses' reference
-scenarios (`reference/scenarios.sh skip`; the Linux machine runs `MACHINE_PROFILES=`). It still
-captures the harnesses the frequent check does not watch (Pi, omp, Hermes, T3 Code). Terma's
-checks alone never begin a build's page (`refgen`): one the night tested before the frequent
-check captured it waits for that capture.
+The night does not capture or test those builds again: a build is tested when it comes out,
+which is when it can stop sending what terma expects, and terma's own changes are tested by CI.
+It runs everything else (`TERMA_E2E_EXCEPT`, the watched harnesses from `new-builds.sh
+--tracked`): the harnesses the frequent check does not watch (Pi, omp, Hermes, T3 Code, at their
+newest), the scenarios of no one harness, and the matrix, catalog and digest. Terma's checks alone
+never begin a build's page (`refgen`).
 
 ## Model Reference
 

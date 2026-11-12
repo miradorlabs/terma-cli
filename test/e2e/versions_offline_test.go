@@ -158,3 +158,29 @@ func TestSkipUnlessSelected(t *testing.T) {
 		}
 	}
 }
+
+// TERMA_E2E_EXCEPT skips the harnesses it names, the night's run leaving the watched ones to the
+// frequent check; beside TERMA_E2E_ONLY, both apply.
+func TestSkipExcepted(t *testing.T) {
+	for _, tc := range []struct {
+		only, except, harness string
+		skipped               bool
+	}{
+		{"", "claude,codex", "pi", false},
+		{"", "claude,codex", "codex", true},
+		{"", "claude", "claude-desktop", false},
+		{"pi,codex", "codex", "codex", true},
+		{"pi,codex", "codex", "pi", false},
+	} {
+		t.Setenv("TERMA_E2E_ONLY", tc.only)
+		t.Setenv("TERMA_E2E_EXCEPT", tc.except)
+		skipped := false
+		t.Run(tc.harness, func(t *testing.T) {
+			defer func() { skipped = t.Skipped() }()
+			skipUnlessSelected(t, tc.harness)
+		})
+		if skipped != tc.skipped {
+			t.Errorf("ONLY=%q EXCEPT=%q, %s: skipped %v, want %v", tc.only, tc.except, tc.harness, skipped, tc.skipped)
+		}
+	}
+}
