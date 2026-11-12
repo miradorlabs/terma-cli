@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/account/keystore"
+	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/delivery"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
@@ -327,18 +328,31 @@ func TestSpoolFlushStartsNoImagePassWhileImagesWait(t *testing.T) {
 	}
 }
 
-// Images waiting for a key are no failed delivery: the image queue's report leaves their
-// window out, which doctor's key check covers.
-func TestHeldImagesAreNoFailedDelivery(t *testing.T) {
+// A manual image flush delivers what waited for a key as soon as the key is there.
+func TestAnImageFlushDeliversOnceTheKeyIsThere(t *testing.T) {
 	useConfigDir(t, t.TempDir())
+	acceptingOTLP(t)
+	spoolForTest(t)
+	if err := config.UpdateProfile(testApp.dir, config.DefaultProfile, func(p *config.Profile) { p.Harnesses = []string{"claude"} }); err != nil {
+		t.Fatal(err)
+	}
 	images, err := spool.Open(filepath.Join(testApp.stateDir, spool.ImageDir))
 	if err != nil {
 		t.Fatal(err)
 	}
-	images.DestinationHeld("keyless", time.Now().Add(time.Minute))
-	images.DestinationFailed("failing", time.Now())
-	q := testApp.imageQueue()
-	if _, held := q.Windows["keyless"]; held || q.Windows["failing"].IsZero() {
-		t.Fatalf("image queue windows = %v", q.Windows)
+	if err := images.Append(spool.Event{Name: semconv.TermaPromptImageEvent, Repository: appRepo, Attrs: map[string]any{
+		hookrun.AttrProjectID: spoolTestProject, semconv.GenAIMainAgentNameKey: "claude-code", semconv.TermaImageIDKey: strings.Repeat("b", 64)}}); err != nil {
+		t.Fatal(err)
+	}
+	out, err := runTerma(t, "spool", "flush", "--images")
+	if code, _ := exitCodeOf(err); code != ExitIncomplete || !strings.Contains(out, "holding 1 for a team key") {
+		t.Fatalf("without a key: code %d\n%s", code, out)
+	}
+	if err := keystore.Set(testApp.dir, spoolTestProject, "ter_srv_test", keystore.Hosts{}); err != nil {
+		t.Fatal(err)
+	}
+	out, err = runTerma(t, "spool", "flush", "--images")
+	if err != nil || !strings.Contains(out, "Flushed 1 image.") {
+		t.Fatalf("with the key: %v\n%s", err, out)
 	}
 }

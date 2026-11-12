@@ -21,10 +21,8 @@ const retryFile = "retry.json"
 type retryWindow struct {
 	Next int64 `json:"next"` // unix seconds
 	Wait int64 `json:"wait"` // seconds
-	// Stalled says a stall opened the window (DestinationStalled), not a failure; Held that
-	// nothing was tried (DestinationHeld).
+	// Stalled says a stall opened the window (DestinationStalled), not a failure.
 	Stalled bool `json:"stalled,omitempty"`
-	Held    bool `json:"held,omitempty"`
 }
 
 func (s *Spool) loadRetryWindows() map[string]retryWindow {
@@ -99,16 +97,6 @@ func (s *Spool) openWindow(dest string, now time.Time, stalled bool, until time.
 	return time.Unix(next.Unix(), 0)
 }
 
-// DestinationHeld keeps dest waiting until until, though nothing was sent to it: what it
-// needs (a key, a policy) is not there yet. It counts no failure and keeps any backoff.
-func (s *Spool) DestinationHeld(dest string, until time.Time) {
-	windows := s.loadRetryWindows()
-	w := windows[dest]
-	w.Next, w.Held, w.Stalled = max(w.Next, until.Unix()), true, false
-	windows[dest] = w
-	s.saveRetryWindows(windows, time.Now())
-}
-
 // DestinationDelivered closes dest's window.
 func (s *Spool) DestinationDelivered(dest string, now time.Time) {
 	windows := s.loadRetryWindows()
@@ -136,18 +124,6 @@ func (s *Spool) StalledWindows(now time.Time) map[string]time.Time {
 	open := map[string]time.Time{}
 	for dest, w := range s.loadRetryWindows() {
 		if next := time.Unix(w.Next, 0); w.Stalled && now.Before(next) {
-			open[dest] = next
-		}
-	}
-	return open
-}
-
-// HeldWindows lists the destinations whose window is open at now because what they need
-// was not there (DestinationHeld), with each one's end.
-func (s *Spool) HeldWindows(now time.Time) map[string]time.Time {
-	open := map[string]time.Time{}
-	for dest, w := range s.loadRetryWindows() {
-		if next := time.Unix(w.Next, 0); w.Held && now.Before(next) {
 			open[dest] = next
 		}
 	}

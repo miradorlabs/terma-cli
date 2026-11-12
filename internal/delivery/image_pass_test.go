@@ -691,8 +691,8 @@ func TestAnImageSpooledDuringAPassLeavesInIt(t *testing.T) {
 	}
 }
 
-// Images held for a key make their project wait a while, so no events' flush starts a pass
-// for them each time it runs, and doctor is not told their delivery failed.
+// Images held for a key start no pass of their own for a while, so no events' flush starts
+// one for them each time it runs; a pass still looks, and delivers once the key is there.
 func TestHeldImagesWaitAWhile(t *testing.T) {
 	t.Parallel()
 	rec := &recorder{}
@@ -700,17 +700,59 @@ func TestHeldImagesWaitAWhile(t *testing.T) {
 	img := imageEvent(pixelN(1))
 	img.Attrs[hookrun.AttrProjectID] = "keyless"
 	queue(t, r.Images, img)
-	if res := r.FlushImages(t.Context(), openSpool(t), cfg, false); res.Held != 1 {
+	if res := r.FlushImages(t.Context(), openSpool(t), cfg, false); res.Held != 1 || len(res.Waiting) != 0 {
 		t.Fatalf("FlushImages = %+v", res)
 	}
 	now := time.Now()
-	if _, held := r.Images.HeldWindows(now)["keyless"]; !held {
-		t.Fatal("held images opened no held window")
+	if _, held := r.Images.Holds(now)["keyless"]; !held {
+		t.Fatal("held images were not held")
+	}
+	if !r.Images.RetryAt("keyless").IsZero() {
+		t.Fatal("held images opened a retry window")
 	}
 	if ImagesDue(r.Images, now) {
 		t.Fatal("images held for a key are due")
 	}
 	if !ImagesDue(r.Images, now.Add(imageHeldWait+time.Minute)) {
 		t.Fatal("held images are not due once their wait is over")
+	}
+	// The key arrives: the next pass, not forced, delivers.
+	if err := keystore.Set(r.ConfigDir, "keyless", testKey, keystore.Hosts{}); err != nil {
+		t.Fatal(err)
+	}
+	if res := r.FlushImages(t.Context(), openSpool(t), cfg, false); res.Sent != 1 {
+		t.Fatalf("FlushImages once the key is there = %+v", res)
+	}
+	if _, held := r.Images.Holds(time.Now())["keyless"]; held {
+		t.Fatal("a delivered project stayed held")
+	}
+}
+
+// Every outcome has a rule, and every rule a count or a stall's name.
+func TestEveryOutcomeHasARule(t *testing.T) {
+	t.Parallel()
+	for o := range imageOutcomes {
+		if rule := imageRules[o]; rule.counter == nil && rule.window != stallWindow {
+			t.Errorf("outcome %d has no rule, or counts nowhere", o)
+		}
+	}
+}
+
+// A project is named once in a pass, however many rounds see it: a failure in one round and
+// its window in the next make one failure.
+func TestAProjectIsNamedOncePerPass(t *testing.T) {
+	t.Parallel()
+	var r Router
+	var once sync.Once
+	r, cfg, stateDir := imageFixture(t, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		_, _ = io.ReadAll(req.Body)
+		once.Do(func() { queue(t, r.Images, imageEvent(pixelN(2))) })
+		w.WriteHeader(http.StatusInternalServerError)
+	}), true)
+	store(t, stateDir, pixelN(1), pixelN(2))
+	queue(t, r.Images, imageEvent(pixelN(1)))
+	res := r.FlushImages(t.Context(), openSpool(t), cfg, false)
+	if len(res.Failures) != 1 || len(res.Waiting) != 0 || res.Deferred != 1 {
+		t.Fatalf("FlushImages = %+v", res)
 	}
 }

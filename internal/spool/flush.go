@@ -59,6 +59,9 @@ type Result struct {
 	Skipped bool
 	Reason  SkipReason
 	Err     error
+	// Grew says a Drain left lines appended after it last read the queue, which it did not
+	// hand out: another pass has work.
+	Grew bool
 }
 
 // add folds one read's losses into the pass; Sent and Held are counted at delivery.

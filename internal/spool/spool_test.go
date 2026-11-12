@@ -622,11 +622,15 @@ func TestIdleWaitsForAFlusher(t *testing.T) {
 	if err := s.Append(Event{Name: "x"}); err != nil {
 		t.Fatal(err)
 	}
-	draining := make(chan struct{})
-	go s.Drain(context.Background(), DrainOptions{}, func(context.Context, []Pending) {
-		close(draining)
-		time.Sleep(100 * time.Millisecond)
-	})
+	draining, done := make(chan struct{}), make(chan struct{})
+	go func() {
+		defer close(done)
+		s.Drain(context.Background(), DrainOptions{}, func(context.Context, []Pending) {
+			close(draining)
+			time.Sleep(100 * time.Millisecond)
+		})
+	}()
+	t.Cleanup(func() { <-done })
 	<-draining
 	start := time.Now()
 	if err := s.Idle(context.Background()); err != nil {
@@ -765,23 +769,54 @@ func TestRetryAfterIsNoBackoffBase(t *testing.T) {
 	}
 }
 
-// A held destination waits without counting a failure, and a failure after it is a
-// failure's window.
-func TestDestinationHeld(t *testing.T) {
+// A hold lasts until it ends or is taken away, and leaves retry windows alone: it neither
+// opens one nor hides or stretches a failure's.
+func TestHolds(t *testing.T) {
 	s, err := Open(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
 	now := time.Now()
-	s.DestinationHeld("p1", now.Add(5*time.Minute))
-	if _, held := s.HeldWindows(now)["p1"]; !held || s.RetryAt("p1").Before(now.Add(4*time.Minute)) {
-		t.Fatal("a held destination does not wait")
+	failed := s.DestinationFailed("p1", now)
+	s.Hold(now.Add(5*time.Minute), "p1", "p2")
+	holds := s.Holds(now)
+	if len(holds) != 2 || holds["p2"].Before(now.Add(4*time.Minute)) {
+		t.Fatalf("holds = %v", holds)
 	}
-	if got := s.DestinationFailed("p1", now); got.Sub(now) > minBackoff+time.Second {
-		t.Fatalf("a failure after a hold waits %v", got.Sub(now))
+	if !s.RetryAt("p1").Equal(failed) || !s.RetryAt("p2").IsZero() {
+		t.Fatalf("a hold moved the retry windows: p1 %v (failed until %v), p2 %v", s.RetryAt("p1"), failed, s.RetryAt("p2"))
 	}
-	if _, held := s.HeldWindows(now)["p1"]; held {
-		t.Fatal("a failure's window is listed as held")
+	s.Unhold("p2")
+	if _, held := s.Holds(now)["p2"]; held {
+		t.Fatal("a hold taken away stayed")
+	}
+	if len(s.Holds(now.Add(time.Hour))) != 0 {
+		t.Fatal("a hold outlived its end")
+	}
+}
+
+// A Drain says when lines were appended after its last read, which it did not hand out.
+func TestDrainSaysItLeftWork(t *testing.T) {
+	s, err := Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	at := time.Now()
+	if err := s.Append(Event{Name: "a", Time: at}, Event{Name: "b", Time: at}); err != nil {
+		t.Fatal(err)
+	}
+	quiet := s.Drain(context.Background(), DrainOptions{Now: at}, func(_ context.Context, events []Pending) {
+		again := events[0].Event
+		again.Attempts = 1
+		_ = s.Settle(events[0], again)
+	})
+	if quiet.Grew {
+		t.Fatal("a drain with nothing appended says it left work")
+	}
+	drainEnding = func() { _ = s.Append(Event{Name: "late", Time: at}) }
+	t.Cleanup(func() { drainEnding = func() {} })
+	if res := s.Drain(context.Background(), DrainOptions{Now: at}, func(context.Context, []Pending) {}); !res.Grew {
+		t.Fatal("a drain that missed an append says nothing")
 	}
 }
 

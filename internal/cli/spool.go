@@ -316,7 +316,12 @@ func (app *App) flushImages(ctx context.Context, force bool) (delivery.ImageResu
 	if err != nil {
 		return delivery.ImageResult{}, err
 	}
-	return r.FlushImages(ctx, app.openSpool(), cfg, force), nil
+	res := r.FlushImages(ctx, app.openSpool(), cfg, force)
+	// An image spooled as the pass ended found it running and started none.
+	if res.Grew && app.startImageFlush != nil {
+		app.startImageFlush()
+	}
+	return res, nil
 }
 
 // imageQueue is the image lane's spool as the events' flush and doctor report it.
@@ -331,12 +336,7 @@ func (app *App) imageQueue() doctor.ImageQueue {
 	for id := range s.StalledWindows(now) {
 		stalled[id] = true
 	}
-	// Images waiting for a key or a policy are no failed delivery; doctor's other checks say why.
-	windows := s.RetryWindows(now)
-	for id := range s.HeldWindows(now) {
-		delete(windows, id)
-	}
-	return doctor.ImageQueue{Queued: n, Windows: windows, Stalled: stalled}
+	return doctor.ImageQueue{Queued: n, Windows: s.RetryWindows(now), Stalled: stalled}
 }
 
 var errTornDown = errors.New("terma is not set up on this machine; run `terma setup`")

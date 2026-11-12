@@ -88,7 +88,6 @@ func (s *Spool) Drain(ctx context.Context, opts DrainOptions, fn func(ctx contex
 	if err != nil {
 		return Result{Err: err}
 	}
-	defer unlock()
 	now := opts.Now
 	if now.IsZero() {
 		now = time.Now()
@@ -110,7 +109,34 @@ func (s *Spool) Drain(ctx context.Context, opts DrainOptions, fn func(ctx contex
 		}
 		fn(ctx, events)
 	}
+	drainEnding()
+	unlock()
+	// An append between the last read and the unlock found the pass running and started none.
+	res.Grew = pass.unseen(s)
 	return res
+}
+
+// drainEnding runs as a Drain stops looking, before it unlocks: a test appends there.
+var drainEnding = func() {}
+
+// unseen reports whether the queue holds a whole line the pass never handed out nor
+// requeued. It reads the file as Mentions does, without the lock.
+func (d *drainPass) unseen(s *Spool) bool {
+	data, err := os.ReadFile(s.path())
+	if err != nil {
+		return false
+	}
+	left := maps.Clone(d.seen)
+	for line := range bytes.Lines(data) {
+		if !bytes.HasSuffix(line, []byte{'\n'}) || len(bytes.TrimSpace(line)) == 0 {
+			continue
+		}
+		if left[string(line)] == 0 {
+			return true
+		}
+		left[string(line)]--
+	}
+	return false
 }
 
 // readPending reads every whole line queued, under the append lock, and rewrites the queue

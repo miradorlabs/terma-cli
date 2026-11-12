@@ -38,6 +38,8 @@ const (
 	// imageUnavailable is a host that could not take any record then: nothing about this
 	// one, so it counts no attempt and keeps its place.
 	imageUnavailable
+	// imageOutcomes is how many outcomes there are.
+	imageOutcomes
 )
 
 // judgeImage is how a send that ended in err went, in pass, having got as far as got.
