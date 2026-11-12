@@ -48,11 +48,14 @@ type codexPrompt struct {
 	Images              []promptimage.Image
 }
 
+// errImageNotKept is an image record neither spooled nor parked: the rollout is read again.
+var errImageNotKept = errors.New("the image record could not be kept")
+
 // captureCodexImages spools one terma.prompt.image per image the user put in a prompt since
 // the last capture, from the turns the team collects, to the image lane, its bytes kept
 // aside for delivery, which sends them only while the team's policy collects prompts.
 func captureCodexImages(ctx context.Context, e hookrun.Env, r *hookrun.Repo, in *codexHookInput) {
-	if e.Images == nil || !session.ValidID(in.SessionID) || !repliesConsented(e.Consent()) {
+	if !session.ValidID(in.SessionID) || !repliesConsented(e.Consent()) {
 		return
 	}
 	dir := filepath.Join(e.StateDir, codexImageCursorDir)
@@ -85,16 +88,15 @@ func captureCodexImages(ctx context.Context, e hookrun.Env, r *hookrun.Repo, in 
 			attrs[semconv.GenAIMainAgentNameKey] = codexTool
 			attrs[semconv.TermaEvidenceSourceKey] = sourceCodexRollout
 			attrs[semconv.TermaMessageIDKey] = p.ID
-			attrs[hookrun.AttrProjectID] = r.ProjectID
 			attrs = hookrun.AgentAttrs(attrs, in.AgentID, in.AgentType)
 			hookrun.BoundedAttr(attrs, semconv.TermaTurnIDKey, p.TurnID)
 			// Under the turn's trace id, as its replies are, so the platform files it in that turn.
-			ev := spool.Event{Time: p.At, Name: semconv.TermaPromptImageEvent, SessionID: in.SessionID, TraceID: p.TraceID, Repository: r.Repository, Global: e.Policy.Global(), Attrs: attrs}
+			ev := spool.Event{Time: p.At, Name: semconv.TermaPromptImageEvent, SessionID: in.SessionID, TraceID: p.TraceID, Attrs: attrs}
 			if ev.Time.IsZero() || ev.Time.After(e.Time()) {
 				ev.Time = e.Time()
 			}
-			if err := e.Images.Append(ev); err != nil {
-				return err
+			if !e.EmitImageFor(r, ev) {
+				return errImageNotKept
 			}
 			spooled++
 		}

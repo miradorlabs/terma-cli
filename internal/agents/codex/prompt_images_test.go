@@ -11,6 +11,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
 	"github.com/miradorlabs/terma-cli/internal/promptimage"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
@@ -90,10 +91,9 @@ func TestCodexImagesAreNotAcknowledgedUntilSpooled(t *testing.T) {
 	}
 }
 
-// With prompts consented, a turn's end spools each image the user put in its prompt under
-// the turn's trace id, its bytes kept aside for delivery rather than in the spool.
-func TestCodexStopSpoolsPromptImages(t *testing.T) {
-	env := fundingEnv(t)
+// codexImageStop runs Codex's Stop on a rollout whose turn put two images in its prompt.
+func codexImageStop(t *testing.T, env hookrun.Env) {
+	t.Helper()
 	routeCodex(t, &env)
 	path := filepath.Join(os.Getenv("CODEX_HOME"), "sessions", "2026", "09", "19", "rollout-2026-09-19T12-18-12-"+replySession+".jsonl")
 	hookruntest.WriteFile(t, filepath.Dir(path), filepath.Base(path), strings.Join([]string{
@@ -105,11 +105,19 @@ func TestCodexStopSpoolsPromptImages(t *testing.T) {
 	}, "\n")+"\n")
 	b, _ := json.Marshal(map[string]any{"session_id": replySession, "cwd": env.Cwd, "transcript_path": path})
 	env.Stdin = strings.NewReader(string(b))
-	flushes := 0
-	env.FlushImages = func() { flushes++ }
 	if err := stop(context.Background(), env); err != nil {
 		t.Fatal(err)
 	}
+}
+
+// With prompts consented, a turn's end spools each image the user put in its prompt to the
+// image queue under the turn's trace id, its bytes kept aside for delivery rather than in
+// the spool, and starts the image queue's delivery.
+func TestCodexStopSpoolsPromptImages(t *testing.T) {
+	env := fundingEnv(t)
+	flushes := 0
+	env.FlushImages = func() { flushes++ }
+	codexImageStop(t, env)
 	if spooled := hookruntest.Named(hookruntest.Spooled(t, env.Spool), semconv.TermaPromptImageEvent); len(spooled) != 0 {
 		t.Fatalf("%d images went to the events' spool", len(spooled))
 	}
@@ -124,21 +132,35 @@ func TestCodexStopSpoolsPromptImages(t *testing.T) {
 	img, _ := promptimage.FromDataURL(codexPixel)
 	for k, want := range map[string]any{
 		semconv.GenAIMainAgentNameKey: codexTool, semconv.TermaEvidenceSourceKey: sourceCodexRollout,
-		semconv.TermaMessageIDKey: "msg_u1", semconv.TermaTurnIDKey: replyTurn,
+		semconv.TermaMessageIDKey: "msg_u1", semconv.TermaTurnIDKey: replyTurn, hookrun.AttrProjectID: env.Team,
 		semconv.TermaImageIDKey: img.ID(), semconv.TermaImageLabelKey: "[Image #1]", semconv.TermaImageIndexKey: float64(1),
 	} {
 		if first.Attrs[k] != want {
 			t.Errorf("%s = %v, want %v", k, first.Attrs[k], want)
 		}
 	}
-	if first.TraceID != replyTrace || first.SessionID != replySession {
-		t.Errorf("image in trace %q session %q", first.TraceID, first.SessionID)
+	if first.TraceID != replyTrace || first.SessionID != replySession || first.Repository.Origin == "" {
+		t.Errorf("image in trace %q session %q repository %+v", first.TraceID, first.SessionID, first.Repository)
 	}
 	if _, ok := first.Attrs[semconv.TermaImageDataKey]; ok {
 		t.Error("the image's bytes went into the spool")
 	}
 	if _, ok := promptimage.Load(env.StateDir, img.ID()); !ok {
 		t.Error("the image's bytes were not kept for delivery")
+	}
+}
+
+// Images the image queue cannot take park with the events, as Claude Code's do, and the
+// next hook hands them on.
+func TestCodexImagesParkWhenTheImageQueueRefuses(t *testing.T) {
+	env := fundingEnv(t)
+	env.Images = nil
+	codexImageStop(t, env)
+	if _, err := env.Repo(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if parked := hookruntest.Named(hookruntest.Spooled(t, env.Spool), semconv.TermaPromptImageEvent); len(parked) != 2 {
+		t.Fatalf("%d images handed on from the parking, want 2", len(parked))
 	}
 }
 
