@@ -411,8 +411,8 @@
       "name": "GitHub Copilot CLI",
       "role": "default",
       "first": "1.0.105",
-      "last": "1.0.109",
-      "builds": 5,
+      "last": "1.0.110",
+      "builds": 6,
       "current": true,
       "params": {
         "temperature": 1,
