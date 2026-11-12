@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-12T18:27:17.685902446Z",
+  "generated_at": "2026-11-12T22:38:32.071670157Z",
   "vendors": [
     {
       "id": "anthropic",
@@ -510,7 +510,10 @@
       "knowledge_cutoff": "2026-02-16",
       "reasoning": true,
       "harnesses": [],
-      "last_change": null,
+      "last_change": {
+        "at": "2026-11-12T22:38:32.071670157Z",
+        "changes": 1
+      },
       "probed": false
     },
     {
@@ -642,7 +645,10 @@
       "knowledge_cutoff": "2025-12-01",
       "reasoning": true,
       "harnesses": [],
-      "last_change": null,
+      "last_change": {
+        "at": "2026-11-12T22:38:32.071670157Z",
+        "changes": 1
+      },
       "probed": false
     },
     {
@@ -738,7 +744,7 @@
     {
       "id": "gpt-5.4-mini",
       "vendor": "openai",
-      "name": "GPT-5.4 Mini",
+      "name": "GPT-5.4 mini",
       "family": "gpt-mini",
       "status": null,
       "released_at": "2026-03-17",
@@ -750,7 +756,10 @@
       "knowledge_cutoff": "2025-08-31",
       "reasoning": true,
       "harnesses": [],
-      "last_change": null,
+      "last_change": {
+        "at": "2026-11-12T22:38:32.071670157Z",
+        "changes": 2
+      },
       "probed": false
     },
     {
@@ -822,7 +831,10 @@
       "knowledge_cutoff": "2025-08-31",
       "reasoning": true,
       "harnesses": [],
-      "last_change": null,
+      "last_change": {
+        "at": "2026-11-12T22:38:32.071670157Z",
+        "changes": 1
+      },
       "probed": false
     },
     {
@@ -954,7 +966,10 @@
       "knowledge_cutoff": "2025-08-31",
       "reasoning": true,
       "harnesses": [],
-      "last_change": null,
+      "last_change": {
+        "at": "2026-11-12T22:38:32.071670157Z",
+        "changes": 1
+      },
       "probed": false
     },
     {
@@ -1313,7 +1328,7 @@
     {
       "id": "gpt-6-cyber",
       "vendor": "openai",
-      "name": "GPT-6-Cyber",
+      "name": "GPT-6 Cyber",
       "family": "gpt-cyber",
       "status": null,
       "released_at": null,
@@ -1325,7 +1340,10 @@
       "knowledge_cutoff": null,
       "reasoning": true,
       "harnesses": [],
-      "last_change": null,
+      "last_change": {
+        "at": "2026-11-12T22:38:32.071670157Z",
+        "changes": 2
+      },
       "probed": false
     },
     {

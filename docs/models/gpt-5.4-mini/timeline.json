@@ -3,6 +3,50 @@
   "id": "gpt-5.4-mini",
   "steps": [
     {
+      "at": "2026-11-12T22:38:32.071670157Z",
+      "event": "changed",
+      "changes": [
+        {
+          "id": "facts/name",
+          "category": "facts",
+          "op": "changed",
+          "path": [
+            "facts",
+            "name"
+          ],
+          "title": "Name: GPT-5.4 Mini → GPT-5.4 mini",
+          "impact": "notable",
+          "before": "GPT-5.4 Mini",
+          "after": "GPT-5.4 mini",
+          "text_diff": null,
+          "terma": null,
+          "source": null,
+          "documented": null
+        },
+        {
+          "id": "docs/overview",
+          "category": "docs",
+          "op": "changed",
+          "path": [
+            "docs",
+            "overview"
+          ],
+          "title": "Model page changed (+399 −399 chars)",
+          "impact": "informational",
+          "before": null,
+          "after": null,
+          "text_diff": "@@ -1,4 +1,4 @@\n-# GPT-5.4 Mini\n+# GPT-5.4 mini\n \n > For the complete documentation index, see [llms.txt](/llms.txt). Markdown versions of documentation pages are available by appending `.md` to the page URL.\n \n@@ -6,7 +6,7 @@\n \n Model ID: `gpt-5.4-mini`\n \n-GPT-5.4 Mini brings the strengths of GPT-5.4 to a faster, more efficient\n+GPT-5.4 mini brings the strengths of GPT-5.4 to a faster, more efficient\n model designed for high-volume workloads. Learn more in our\n [Model guidance](/api/docs/guides/latest-model) page. Reasoning.effort supports: none (default), low, medium, high and xhigh.\n \n@@ -33,7 +33,7 @@\n | Cached input | $0.075 | 1M tokens |\n | Output | $4.5 | 1M tokens |\n \n-- Regional processing (data residency) endpoints are charged a 10% uplift for GPT-5.4 Mini.\n+- Regional processing (data residency) endpoints are charged a 10% uplift for GPT-5.4 mini.\n \n ## Endpoints\n \n@@ -89,13 +89,13 @@\n \n | Model | Input | Cached input | Output |\n | --- | ---: | ---: | ---: |\n-| GPT-5.4 Mini | $0.75 | $0.075 | $4.5 |\n+| GPT-5.4 mini | $0.75 | $0.075 | $4.5 |\n | GPT-5.4 | $2.5 | $0.25 | $15 |\n | GPT-5.4 nano | $0.2 | $0.02 | $1.25 |\n \n ## Snapshots\n \n-Snapshots let you lock in a specific version of the model so that performance and behavior remain consistent. Below is a list of all available snapshots and aliases for GPT-5.4 Mini.\n+Snapshots let you lock in a specific version of the model so that performance and behavior remain consistent. Below is a list of all available snapshots and aliases for GPT-5.4 mini.\n \n - `gpt-5.4-mini-2026-03-17`\n \n",
+          "stats": {
+            "added_chars": 399,
+            "removed_chars": 399
+          },
+          "terma": null,
+          "source": null,
+          "documented": null
+        }
+      ]
+    },
+    {
       "at": "2026-11-11T14:15:45.0307666Z",
       "event": "listed",
       "changes": []

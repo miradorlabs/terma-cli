@@ -3,6 +3,33 @@
   "id": "gpt-5.5",
   "steps": [
     {
+      "at": "2026-11-12T22:38:32.071670157Z",
+      "event": "changed",
+      "changes": [
+        {
+          "id": "docs/overview",
+          "category": "docs",
+          "op": "changed",
+          "path": [
+            "docs",
+            "overview"
+          ],
+          "title": "Model page changed (+40 −40 chars)",
+          "impact": "informational",
+          "before": null,
+          "after": null,
+          "text_diff": "@@ -90,7 +90,7 @@\n | --- | ---: | ---: | ---: |\n | GPT-5.5 | $5 | $0.5 | $30 |\n | GPT-5.4 | $2.5 | $0.25 | $15 |\n-| GPT-5.4 Mini | $0.75 | $0.075 | $4.5 |\n+| GPT-5.4 mini | $0.75 | $0.075 | $4.5 |\n \n ## Snapshots\n \n",
+          "stats": {
+            "added_chars": 40,
+            "removed_chars": 40
+          },
+          "terma": null,
+          "source": null,
+          "documented": null
+        }
+      ]
+    },
+    {
       "at": "2026-11-11T14:15:45.0307666Z",
       "event": "listed",
       "changes": []

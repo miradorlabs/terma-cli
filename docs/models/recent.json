@@ -1,7 +1,31 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-12T18:27:17.685902446Z",
+  "generated_at": "2026-11-12T22:38:32.071670157Z",
   "events": [
+    {
+      "at": "2026-11-12T22:38:32.071670157Z",
+      "model": "gpt-6-cyber",
+      "vendor": "openai",
+      "name": "GPT-6 Cyber",
+      "event": "changed",
+      "changes": 2,
+      "highlights": [
+        "Name: GPT-6-Cyber → GPT-6 Cyber",
+        "Model page changed (+426 −426 chars)"
+      ]
+    },
+    {
+      "at": "2026-11-12T22:38:32.071670157Z",
+      "model": "gpt-5.4-mini",
+      "vendor": "openai",
+      "name": "GPT-5.4 mini",
+      "event": "changed",
+      "changes": 2,
+      "highlights": [
+        "Name: GPT-5.4 Mini → GPT-5.4 mini",
+        "Model page changed (+399 −399 chars)"
+      ]
+    },
     {
       "at": "2026-11-12T18:27:17.685902446Z",
       "model": "gemini-4-hydrogen",

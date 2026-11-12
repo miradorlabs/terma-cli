@@ -3,6 +3,50 @@
   "id": "gpt-6-cyber",
   "steps": [
     {
+      "at": "2026-11-12T22:38:32.071670157Z",
+      "event": "changed",
+      "changes": [
+        {
+          "id": "facts/name",
+          "category": "facts",
+          "op": "changed",
+          "path": [
+            "facts",
+            "name"
+          ],
+          "title": "Name: GPT-6-Cyber → GPT-6 Cyber",
+          "impact": "notable",
+          "before": "GPT-6-Cyber",
+          "after": "GPT-6 Cyber",
+          "text_diff": null,
+          "terma": null,
+          "source": null,
+          "documented": null
+        },
+        {
+          "id": "docs/overview",
+          "category": "docs",
+          "op": "changed",
+          "path": [
+            "docs",
+            "overview"
+          ],
+          "title": "Model page changed (+426 −426 chars)",
+          "impact": "informational",
+          "before": null,
+          "after": null,
+          "text_diff": "@@ -1,4 +1,4 @@\n-# GPT-6-Cyber\n+# GPT-6 Cyber\n \n > For the complete documentation index, see [llms.txt](/llms.txt). Markdown versions of documentation pages are available by appending `.md` to the page URL.\n \n@@ -6,7 +6,7 @@\n \n Model ID: `gpt-6-cyber`\n \n-Your organization needs Daybreak Red access and approval to use GPT-6-Cyber. Your account team can confirm access. The standard rate limits below apply to approved organizations and may differ if your organization has custom limits.\n+Your organization needs Daybreak Red access and approval to use GPT-6 Cyber. Your account team can confirm access. The standard rate limits below apply to approved organizations and may differ if your organization has custom limits.\n \n [Set up your organization and project](/api/docs/guides/daybreak#set-up-gpt-6-cyber) before sending your first request.\n \n@@ -86,7 +86,7 @@\n \n ## Snapshots\n \n-Snapshots let you lock in a specific version of the model so that performance and behavior remain consistent. Below is a list of all available snapshots and aliases for GPT-6-Cyber.\n+Snapshots let you lock in a specific version of the model so that performance and behavior remain consistent. Below is a list of all available snapshots and aliases for GPT-6 Cyber.\n \n - `gpt-6-cyber`\n \n",
+          "stats": {
+            "added_chars": 426,
+            "removed_chars": 426
+          },
+          "terma": null,
+          "source": null,
+          "documented": null
+        }
+      ]
+    },
+    {
       "at": "2026-11-11T14:15:45.0307666Z",
       "event": "listed",
       "changes": []
