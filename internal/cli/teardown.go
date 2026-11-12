@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -151,6 +152,7 @@ func (app *App) undoSetup(ctx context.Context, out io.Writer, keepToken bool) er
 // removeHookState removes what hooks kept per session, which only they would prune, what
 // they queued, the images among it, and the policies they ran under.
 func (app *App) removeHookState() error {
+	app.awaitImagePass()
 	var errs []error
 	for _, name := range append(app.hookStateDirs(), hookrun.AgentsDir, termaproject.WorkspacesDir, spool.Dir, spool.ImageDir, promptimage.DirName, config.PoliciesDir) {
 		errs = append(errs, os.RemoveAll(filepath.Join(app.stateDir, name)))
@@ -159,6 +161,26 @@ func (app *App) removeHookState() error {
 		return fmt.Errorf("remove the hooks' state: %w", err)
 	}
 	return nil
+}
+
+// imagePassWait is how long teardown waits for a running image pass to stop.
+const imagePassWait = 10 * time.Second
+
+// awaitImagePass waits, briefly, for an image pass to stop: with the relay's token gone it
+// stops before its next image, and Windows keeps the image queue while its lock is open. A
+// pass still uploading after the wait leaves teardown's warning to run again.
+func (app *App) awaitImagePass() {
+	dir := filepath.Join(app.stateDir, spool.ImageDir)
+	if _, err := os.Stat(dir); err != nil {
+		return
+	}
+	s, err := spool.Open(dir)
+	if err != nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), imagePassWait)
+	defer cancel()
+	_ = s.Idle(ctx)
 }
 
 // retireRelayToken removes the relay's token, keeping it for this sign-in when keep.

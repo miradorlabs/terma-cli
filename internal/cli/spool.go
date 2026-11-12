@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"maps"
 	"os"
 	"slices"
@@ -79,13 +80,17 @@ The exit status distinguishes the outcomes a script needs apart:
      their team's retry window (--force overrides), images left for a later
      pass, or events given up on for age, disk pressure, or being unreadable`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			var res delivery.Result
-			var err error
 			if images {
-				res, err = app.flushImages(cmd.Context(), force)
-			} else {
-				res, err = app.flushSpool(cmd.Context(), force, minInterval)
+				res, err := app.flushImages(cmd.Context(), force)
+				if quiet {
+					return nil
+				}
+				if err != nil {
+					return err
+				}
+				return reportImagePass(cmd.OutOrStdout(), res)
 			}
+			res, err := app.flushSpool(cmd.Context(), force, minInterval)
 			if quiet {
 				return nil
 			}
@@ -94,27 +99,23 @@ The exit status distinguishes the outcomes a script needs apart:
 			}
 			out := cmd.OutOrStdout()
 			if res.Skipped {
-				switch res.Reason {
-				case spool.SkipMinInterval:
+				if res.Reason == spool.SkipMinInterval {
 					fmt.Fprintln(out, "Skipped: a flush ran recently (drop --min-interval to flush now).")
 					return nil
-				case spool.SkipBusy:
-					fmt.Fprintln(out, "Skipped: another flush is already delivering the images.")
-					return exitWith(ExitBackoff)
 				}
 				fmt.Fprintf(out, "Skipped: backing off until %s after an earlier failure (use --force to retry now).\n", res.NextAttempt.Local().Format(time.Kitchen))
 				return exitWith(ExitBackoff)
 			}
 			delivered, undelivered := describeFlush(res)
 			fmt.Fprintf(out, "Flushed %s.\n", strings.Join(append([]string{delivered}, undelivered...), ", "))
-			if line := describeImageQueue(app.imageQueue()); line != "" && !images {
+			if line := describeImageQueue(app.imageQueue()); line != "" {
 				fmt.Fprintln(out, line)
 			}
 			if res.Err != nil {
 				return res.Err
 			}
 			// Held and waiting events are unfinished work, and every other counter is a loss.
-			if res.Held > 0 || res.Failed > 0 || res.Deferred > 0 || len(res.Stalls) > 0 || res.Lost() {
+			if res.Held > 0 || res.Failed > 0 || res.Lost() {
 				return exitWith(ExitIncomplete)
 			}
 			return nil
@@ -130,20 +131,30 @@ The exit status distinguishes the outcomes a script needs apart:
 // describeFlush words a flush pass: what was delivered, then one clause per reason an
 // event was not; `terma spool flush` and doctor share it so they agree on the terms.
 func describeFlush(res delivery.Result) (delivered string, undelivered []string) {
-	noun, teams := "event", "team %s"
-	if res.Images {
-		noun, teams = "image", "team %s's images"
-	}
-	delivered = fmt.Sprintf("%d %s%s", res.Sent, noun, plural(res.Sent))
-	if res.Held > 0 {
-		undelivered = append(undelivered, fmt.Sprintf("holding %d for a team key (run `terma setup`)", res.Held))
-	}
-	if res.Failed > 0 {
-		undelivered = append(undelivered, fmt.Sprintf("keeping %d queued after a failed delivery", res.Failed))
-	}
+	delivered = fmt.Sprintf("%d event%s", res.Sent, plural(res.Sent))
+	undelivered = heldClauses(res.Held, res.Failed)
 	for _, f := range res.Failures {
 		if !f.RetryAt.IsZero() {
-			undelivered = append(undelivered, fmt.Sprintf("retrying "+teams+" after %s", f.ProjectID, f.RetryAt.Local().Format(time.Kitchen)))
+			undelivered = append(undelivered, fmt.Sprintf("retrying team %s after %s", f.ProjectID, f.RetryAt.Local().Format(time.Kitchen)))
+		}
+	}
+	for _, w := range res.Waiting {
+		undelivered = append(undelivered, fmt.Sprintf("retrying team %s after %s", w.ProjectID, w.RetryAt.Local().Format(time.Kitchen)))
+	}
+	if res.Moved > 0 {
+		undelivered = append(undelivered, fmt.Sprintf("handed %d image record%s to the image queue", res.Moved, plural(res.Moved)))
+	}
+	return delivered, append(undelivered, lossClauses(res.Expired, res.Pruned, res.Unroutable, res.Dropped, res.Withheld)...)
+}
+
+// describeImagePass words an image pass as describeFlush words the events', telling an
+// image that did not finish uploading (the uplink) from a failed delivery (the host).
+func describeImagePass(res delivery.ImageResult) (delivered string, undelivered []string) {
+	delivered = fmt.Sprintf("%d image%s", res.Sent, plural(res.Sent))
+	undelivered = heldClauses(res.Held, res.Failed)
+	for _, f := range res.Failures {
+		if !f.RetryAt.IsZero() {
+			undelivered = append(undelivered, fmt.Sprintf("retrying team %s's images after %s", f.ProjectID, f.RetryAt.Local().Format(time.Kitchen)))
 		}
 	}
 	for _, st := range res.Stalls {
@@ -151,30 +162,64 @@ func describeFlush(res delivery.Result) (delivered string, undelivered []string)
 			st.ProjectID, st.RetryAt.Local().Format(time.Kitchen)))
 	}
 	for _, w := range res.Waiting {
-		undelivered = append(undelivered, fmt.Sprintf("retrying "+teams+" after %s", w.ProjectID, w.RetryAt.Local().Format(time.Kitchen)))
+		undelivered = append(undelivered, fmt.Sprintf("retrying team %s's images after %s", w.ProjectID, w.RetryAt.Local().Format(time.Kitchen)))
 	}
 	if res.Deferred > 0 {
 		undelivered = append(undelivered, fmt.Sprintf("leaving %d for a later pass", res.Deferred))
 	}
-	if res.Moved > 0 {
-		undelivered = append(undelivered, fmt.Sprintf("handed %d image record%s to the image queue", res.Moved, plural(res.Moved)))
+	return delivered, append(undelivered, lossClauses(res.Expired, res.Pruned, res.Unroutable, res.Dropped, res.Withheld)...)
+}
+
+// reportImagePass prints an image pass and returns its exit status, as the command does
+// for the events'.
+func reportImagePass(out io.Writer, res delivery.ImageResult) error {
+	if res.Skipped {
+		fmt.Fprintln(out, "Skipped: another flush is already delivering the images.")
+		return exitWith(ExitBackoff)
 	}
-	if res.Expired > 0 {
-		undelivered = append(undelivered, fmt.Sprintf("expired %d past the spool's age limit", res.Expired))
+	delivered, undelivered := describeImagePass(res)
+	fmt.Fprintf(out, "Flushed %s.\n", strings.Join(append([]string{delivered}, undelivered...), ", "))
+	if res.Err != nil {
+		return res.Err
 	}
-	if res.Pruned > 0 {
-		undelivered = append(undelivered, fmt.Sprintf("pruned %d to stay under the size limit", res.Pruned))
+	if res.Held > 0 || res.Failed > 0 || res.Deferred > 0 || len(res.Stalls) > 0 ||
+		res.Expired > 0 || res.Pruned > 0 || res.Dropped > 0 || res.Unroutable > 0 {
+		return exitWith(ExitIncomplete)
 	}
-	if res.Unroutable > 0 {
-		undelivered = append(undelivered, fmt.Sprintf("dropped %d with no team id", res.Unroutable))
+	return nil
+}
+
+// heldClauses word what a pass kept queued: held for a key, or after a failure.
+func heldClauses(held, failed int) []string {
+	var clauses []string
+	if held > 0 {
+		clauses = append(clauses, fmt.Sprintf("holding %d for a team key (run `terma setup`)", held))
 	}
-	if res.Dropped > 0 {
-		undelivered = append(undelivered, fmt.Sprintf("dropped %d unreadable", res.Dropped))
+	if failed > 0 {
+		clauses = append(clauses, fmt.Sprintf("keeping %d queued after a failed delivery", failed))
 	}
-	if res.Withheld > 0 {
-		undelivered = append(undelivered, fmt.Sprintf("withheld %d by capture policy", res.Withheld))
+	return clauses
+}
+
+// lossClauses word what a pass let go without sending it.
+func lossClauses(expired, pruned, unroutable, dropped, withheld int) []string {
+	var clauses []string
+	if expired > 0 {
+		clauses = append(clauses, fmt.Sprintf("expired %d past the spool's age limit", expired))
 	}
-	return delivered, undelivered
+	if pruned > 0 {
+		clauses = append(clauses, fmt.Sprintf("pruned %d to stay under the size limit", pruned))
+	}
+	if unroutable > 0 {
+		clauses = append(clauses, fmt.Sprintf("dropped %d with no team id", unroutable))
+	}
+	if dropped > 0 {
+		clauses = append(clauses, fmt.Sprintf("dropped %d unreadable", dropped))
+	}
+	if withheld > 0 {
+		clauses = append(clauses, fmt.Sprintf("withheld %d by capture policy", withheld))
+	}
+	return clauses
 }
 
 // describeImageQueue words what the image queue holds and each team's images window, for
@@ -183,7 +228,7 @@ func describeImageQueue(q doctor.ImageQueue) string {
 	if q.Queued == 0 {
 		return ""
 	}
-	line := fmt.Sprintf("Images: %d queued, delivered in the background (--images delivers them now)", q.Queued)
+	line := fmt.Sprintf("Images: %d queued, delivered in the background (rerun with --images to deliver them now)", q.Queued)
 	for _, id := range slices.Sorted(maps.Keys(q.Windows)) {
 		why := "a failed delivery"
 		if q.Stalled[id] {
@@ -211,6 +256,7 @@ func (app *App) delivery() delivery.Router {
 		Policy:     app.policies().Current,
 		User:       app.teamUser,
 		Images:     app.openImageSpool(),
+		SetUp:      func() bool { return claim.Enabled(app.stateDir) },
 		Consent: func(tool string, c hookrun.Consent) bool {
 			a, ok := app.agents.ForTool(tool)
 			if !ok {
@@ -256,17 +302,17 @@ func (app *App) flushSpool(ctx context.Context, force bool, minInterval time.Dur
 }
 
 // flushImages delivers the image queue, in a pass of its own (delivery.ImagePassTimeout).
-func (app *App) flushImages(ctx context.Context, force bool) (delivery.Result, error) {
+func (app *App) flushImages(ctx context.Context, force bool) (delivery.ImageResult, error) {
 	if !claim.Enabled(app.stateDir) {
-		return delivery.Result{}, errTornDown
+		return delivery.ImageResult{}, errTornDown
 	}
 	r := app.delivery()
 	if r.Images == nil {
-		return delivery.Result{}, errors.New("cannot open the image queue")
+		return delivery.ImageResult{}, errors.New("cannot open the image queue")
 	}
 	cfg, err := app.loadConfig()
 	if err != nil {
-		return delivery.Result{}, err
+		return delivery.ImageResult{}, err
 	}
 	return r.FlushImages(ctx, app.openSpool(), cfg, force), nil
 }

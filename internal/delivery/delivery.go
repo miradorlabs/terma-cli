@@ -37,6 +37,9 @@ type Router struct {
 	// Images is the image lane's spool, which FlushImages delivers; Flush hands it any image
 	// record an older build spooled with the events.
 	Images *spool.Spool
+	// SetUp reports whether terma is still set up on this machine: an image pass stops
+	// before its next image once teardown has begun. Nil is set up.
+	SetUp func() bool
 
 	// imagePass and requestTimeout stand in for ImagePassTimeout and timeoutFor when set.
 	imagePass      time.Duration
@@ -48,24 +51,16 @@ type Result struct {
 	Sent, Held, Failed, Expired, Pruned, Dropped, Unroutable, Withheld int
 	// Moved counts the image records an older build spooled with the events, which the
 	// events' pass handed to the image lane.
-	Moved int
-	// Deferred counts the images an image pass left untried for a later one: their project's
-	// images wait out a window, or too little of the pass was left for one. Still queued.
-	Deferred    int
+	Moved       int
 	Skipped     bool
 	Reason      spool.SkipReason
 	NextAttempt time.Time
 	Err         error
 	// Failures names each failed project once, in order; doctor tells its own from another's.
 	Failures []Failure
-	// Stalls names each project whose image did not get through in its time, one record each:
-	// news about the uplink, not the host, so the pass does not fail for it. Still queued.
-	Stalls []Failure
 	// Waiting names each project skipped because its retry window was open.
 	Waiting   []Wait
 	Endpoints []string
-	// Images says the pass was the image lane's (FlushImages): its counts are images.
-	Images bool
 }
 
 // Failure is a project's failed delivery; RetryAt is zero when the pass ran out of time.
@@ -102,6 +97,10 @@ func (r Router) Flush(ctx context.Context, s *spool.Spool, cfg *config.Config, f
 	router := spool.SenderFunc(func(ctx context.Context, events []spool.Event) ([]spool.Event, error) {
 		var undelivered []spool.Event
 		var errs []error
+		// An image record goes on to the image queue. Should this batch's acknowledgement
+		// then fail, the next pass moves it again and the image queue holds it twice: each
+		// is sent, and the platform folds the second away. That costs one more upload after a
+		// rare failure, so no move is checked against what the image queue holds.
 		events, images := splitImages(events)
 		if len(images) > 0 {
 			err := errNoImageLane
@@ -115,7 +114,22 @@ func (r Router) Flush(ctx context.Context, s *spool.Spool, cfg *config.Config, f
 				res.Moved += len(images)
 			}
 		}
-		byProject, held, _ := r.route(ctx, cfg, events, &res)
+		byProject := map[string][]spool.Event{}
+		var held []spool.Event
+		places := r.places(cfg)
+		for _, e := range events {
+			id, out, place := places.of(ctx, e)
+			switch place {
+			case placeSend:
+				byProject[id] = append(byProject[id], out)
+			case placeHeld:
+				held = append(held, e)
+			case placeUnroutable:
+				res.Unroutable++
+			case placeWithheld:
+				res.Withheld++
+			}
+		}
 		for _, id := range slices.Sorted(maps.Keys(byProject)) {
 			batch := byProject[id]
 			sender, err := r.senderFor(cfg, id)
@@ -179,43 +193,56 @@ func (r Router) Flush(ctx context.Context, s *spool.Spool, cfg *config.Config, f
 	return res
 }
 
-// route sorts events by project, each as its team's policy now lets it leave. An event
-// whose policy is out of reach is held for a later pass; one with no project or that the
-// policy withholds whole is counted in res and returned as gone.
-func (r Router) route(ctx context.Context, cfg *config.Config, events []spool.Event, res *Result) (byProject map[string][]spool.Event, held, gone []spool.Event) {
-	byProject = map[string][]spool.Event{}
-	policies := map[string]config.Policy{}
-	policyErrors := map[string]error{}
-	for _, e := range events {
-		id, _ := e.Attrs[hookrun.AttrProjectID].(string)
-		if id == "" {
-			res.Unroutable++
-			gone = append(gone, e)
-			continue
-		}
-		pol, checked := policies[id]
-		if !checked && policyErrors[id] == nil {
-			var err error
-			pol, err = r.Policy(ctx, cfg, id)
-			if err != nil {
-				policyErrors[id] = err
-			} else {
-				policies[id] = pol
-			}
-		}
-		if policyErrors[id] != nil {
-			held = append(held, e)
-			continue
-		}
-		out, ok := r.Outgoing(pol, id, e)
-		if !ok {
-			res.Withheld++
-			gone = append(gone, e)
-			continue
-		}
-		byProject[id] = append(byProject[id], out)
+// place is where an event goes this pass.
+type place int
+
+const (
+	// placeSend is an event its project's policy lets leave.
+	placeSend place = iota
+	// placeHeld is an event whose project's policy is out of reach: it waits for a later pass.
+	placeHeld
+	// placeUnroutable is an event with no project, and placeWithheld one its project's
+	// policy withholds whole: neither ever leaves.
+	placeUnroutable
+	placeWithheld
+)
+
+// placer places a pass's events, asking each project's policy once.
+type placer struct {
+	r        Router
+	cfg      *config.Config
+	policies map[string]config.Policy
+	errs     map[string]error
+}
+
+// places is a placer for one pass.
+func (r Router) places(cfg *config.Config) *placer {
+	return &placer{r: r, cfg: cfg, policies: map[string]config.Policy{}, errs: map[string]error{}}
+}
+
+// of is where e goes: its project, and e as its team's policy now lets it leave.
+func (p *placer) of(ctx context.Context, e spool.Event) (string, spool.Event, place) {
+	id, _ := e.Attrs[hookrun.AttrProjectID].(string)
+	if id == "" {
+		return "", e, placeUnroutable
 	}
-	return byProject, held, gone
+	pol, checked := p.policies[id]
+	if !checked && p.errs[id] == nil {
+		var err error
+		if pol, err = p.r.Policy(ctx, p.cfg, id); err != nil {
+			p.errs[id] = err
+		} else {
+			p.policies[id] = pol
+		}
+	}
+	if p.errs[id] != nil {
+		return id, e, placeHeld
+	}
+	out, ok := p.r.Outgoing(pol, id, e)
+	if !ok {
+		return id, e, placeWithheld
+	}
+	return id, out, placeSend
 }
 
 // senderFor is how project id is sent to: with its own key, to its own host. A nil sender

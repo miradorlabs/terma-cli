@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 )
@@ -518,8 +519,8 @@ func TestDestinationStalled(t *testing.T) {
 	}
 }
 
-// A flusher that will not wait leaves at once while another delivers the spool.
-func TestFlushNoWaitSkipsABusySpool(t *testing.T) {
+// A drain that will not wait leaves at once while another delivers the spool.
+func TestDrainNoWaitSkipsABusySpool(t *testing.T) {
 	s, err := Open(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
@@ -527,26 +528,102 @@ func TestFlushNoWaitSkipsABusySpool(t *testing.T) {
 	if err := s.Append(Event{Name: "x"}); err != nil {
 		t.Fatal(err)
 	}
-	sending, release := make(chan struct{}), make(chan struct{})
-	done := make(chan Result)
+	draining, release := make(chan struct{}), make(chan struct{})
+	done := make(chan struct{})
 	go func() {
-		done <- s.Flush(context.Background(), SenderFunc(func(context.Context, []Event) ([]Event, error) {
-			close(sending)
+		s.Drain(context.Background(), DrainOptions{}, func(context.Context, []Pending) {
+			close(draining)
 			<-release
-			return nil, nil
-		}), FlushOptions{Force: true})
+		})
+		close(done)
 	}()
-	<-sending
-	res := s.Flush(context.Background(), SenderFunc(func(context.Context, []Event) ([]Event, error) {
-		t.Error("a busy spool was sent")
-		return nil, nil
-	}), FlushOptions{Force: true, NoWait: true})
+	<-draining
+	res := s.Drain(context.Background(), DrainOptions{NoWait: true}, func(context.Context, []Pending) {
+		t.Error("a busy spool was drained")
+	})
 	close(release)
+	<-done
 	if !res.Skipped || res.Reason != SkipBusy {
-		t.Fatalf("Flush = %+v", res)
+		t.Fatalf("Drain = %+v", res)
 	}
-	if first := <-done; first.Sent != 1 {
-		t.Fatalf("first flush = %+v", first)
+}
+
+// A drain hands out what is queued, rid of what expired or cannot be read; each event
+// settled leaves the queue at once, requeued ones go to its tail, the rest stay where they
+// were, and what was appended meanwhile is kept.
+func TestDrainSettlesEachEventOnItsOwn(t *testing.T) {
+	s, err := Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now()
+	if err := s.Append(Event{Name: "a", Time: now}, Event{Name: "old", Time: now.Add(-MaxAge - time.Hour)}, Event{Name: "b", Time: now}, Event{Name: "c", Time: now}); err != nil {
+		t.Fatal(err)
+	}
+	f, err := os.OpenFile(s.path(), os.O_APPEND|os.O_WRONLY, 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _ = f.WriteString("not json\n")
+	_ = f.Close()
+	var settledEarly []Event
+	res := s.Drain(context.Background(), DrainOptions{Now: now}, func(_ context.Context, events []Pending) {
+		if len(events) != 3 || events[0].Name != "a" || events[1].Name != "b" || events[2].Name != "c" {
+			t.Fatalf("Drain handed out %+v", events)
+		}
+		if err := s.Settle(events[0]); err != nil {
+			t.Fatal(err)
+		}
+		settledEarly, _ = s.Peek(10)
+		if err := s.Append(Event{Name: "new", Time: now}); err != nil {
+			t.Fatal(err)
+		}
+		again := events[1].Event
+		again.Stalls = 1
+		if err := s.Settle(events[1], again); err != nil {
+			t.Fatal(err)
+		}
+		if err := s.Settle(events[0]); !errors.Is(err, errNotQueued) {
+			t.Fatalf("settling twice = %v", err)
+		}
+	})
+	if res.Expired != 1 || res.Dropped != 1 || res.Err != nil {
+		t.Fatalf("Drain = %+v", res)
+	}
+	if len(settledEarly) != 2 || settledEarly[0].Name != "b" {
+		t.Fatalf("after the first settle the queue held %+v", settledEarly)
+	}
+	left, err := s.Peek(10)
+	var names []string
+	for _, e := range left {
+		names = append(names, e.Name)
+	}
+	if err != nil || strings.Join(names, ",") != "c,new,b" || left[2].Stalls != 1 {
+		t.Fatalf("queue holds %v, %v", names, err)
+	}
+}
+
+// Idle waits out a flusher delivering the spool.
+func TestIdleWaitsForAFlusher(t *testing.T) {
+	s, err := Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Append(Event{Name: "x"}); err != nil {
+		t.Fatal(err)
+	}
+	draining := make(chan struct{})
+	go s.Drain(context.Background(), DrainOptions{}, func(context.Context, []Pending) {
+		close(draining)
+		time.Sleep(100 * time.Millisecond)
+	})
+	<-draining
+	start := time.Now()
+	if err := s.Idle(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if waited := time.Since(start); waited < 50*time.Millisecond {
+		t.Fatalf("Idle returned after %v while a drain ran", waited)
 	}
 }
 

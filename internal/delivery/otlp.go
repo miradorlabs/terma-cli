@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"maps"
@@ -30,10 +29,6 @@ type otlpSender struct {
 	// UserID, set, names the Mirador user on the resource as terma.user.id, as the relay does.
 	UserID string
 	HTTP   *http.Client
-	// Whole sends a request only when the context leaves it all the time it is given
-	// (errNoTimeLeft otherwise): an image's upload is all or nothing, and one the pass would
-	// cut short spends the uplink on nothing.
-	Whole bool
 	// timeout stands in for timeoutFor when set.
 	timeout func(n int) time.Duration
 }
@@ -146,8 +141,33 @@ func newHTTPClient() *http.Client {
 	}
 }
 
-// errNoTimeLeft is a Whole request not sent because too little of the pass was left for it.
-var errNoTimeLeft = errors.New("too little of the pass left for the request")
+// progress is how far a request got before it ended.
+type progress int32
+
+const (
+	// notReached is a request that never had a connection to the host: DNS, the dial or the
+	// TLS handshake (its timeout too) failed, or nothing was tried.
+	notReached progress = iota
+	// reached is a request that had a connection and was writing its body.
+	reached
+	// written is a request whose body was all written, waiting for the host's answer. The
+	// operating system may still be sending the body's last socket buffer.
+	written
+)
+
+// progressTrace records in got how far a request gets. A request retried on a new
+// connection, after a reused one failed, starts over.
+func progressTrace(got *atomic.Int32) *httptrace.ClientTrace {
+	return &httptrace.ClientTrace{
+		ConnectStart: func(string, string) { got.Store(int32(notReached)) },
+		GotConn:      func(httptrace.GotConnInfo) { got.Store(int32(reached)) },
+		WroteRequest: func(info httptrace.WroteRequestInfo) {
+			if info.Err == nil {
+				got.Store(int32(written))
+			}
+		},
+	}
+}
 
 // Send implements spool.Sender.
 func (o *otlpSender) Send(ctx context.Context, events []spool.Event) ([]spool.Event, error) {
@@ -155,11 +175,10 @@ func (o *otlpSender) Send(ctx context.Context, events []spool.Event) ([]spool.Ev
 	return nil, err
 }
 
-// post sends events in one request, and reports whether it reached the host: a connection
-// was made, through DNS, the dial and the TLS handshake, before it failed.
-func (o *otlpSender) post(ctx context.Context, events []spool.Event) (connected bool, err error) {
+// post sends events in one request, and reports how far it got.
+func (o *otlpSender) post(ctx context.Context, events []spool.Event) (progress, error) {
 	if o.Endpoint == "" || o.APIKey == "" {
-		return false, fmt.Errorf("spool flush needs an OTLP endpoint and a team key — run `terma setup`")
+		return notReached, fmt.Errorf("spool flush needs an OTLP endpoint and a team key — run `terma setup`")
 	}
 	records := make([]map[string]any, 0, len(events))
 	for _, e := range events {
@@ -202,7 +221,7 @@ func (o *otlpSender) post(ctx context.Context, events []spool.Event) (connected 
 	}
 	body, err := json.Marshal(payload)
 	if err != nil {
-		return false, err
+		return notReached, err
 	}
 	client := o.HTTP
 	if client == nil {
@@ -212,30 +231,27 @@ func (o *otlpSender) post(ctx context.Context, events []spool.Event) (connected 
 	if o.timeout != nil {
 		timeout = o.timeout(len(body))
 	}
-	if deadline, ok := ctx.Deadline(); o.Whole && ok && time.Until(deadline) < timeout {
-		return false, errNoTimeLeft
-	}
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	var reached atomic.Bool
-	ctx = httptrace.WithClientTrace(ctx, &httptrace.ClientTrace{GotConn: func(httptrace.GotConnInfo) { reached.Store(true) }})
+	var got atomic.Int32
+	ctx = httptrace.WithClientTrace(ctx, progressTrace(&got))
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, o.Endpoint+otlpLogsPath, bytes.NewReader(body))
 	if err != nil {
-		return false, err
+		return notReached, err
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+o.APIKey)
 	req.Header.Set("User-Agent", serviceName+"/"+o.Version)
 	resp, err := client.Do(req)
 	if err != nil {
-		return reached.Load(), err
+		return progress(got.Load()), err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		detail, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
-		return true, &IngestError{Status: resp.StatusCode, Detail: string(bytes.TrimSpace(detail))}
+		return written, &IngestError{Status: resp.StatusCode, Detail: string(bytes.TrimSpace(detail))}
 	}
-	return true, nil
+	return written, nil
 }
 
 // IngestError is a non-2xx answer from the ingest host.

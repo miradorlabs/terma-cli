@@ -246,7 +246,7 @@ func TestSpoolFlushLeavesImagesToTheirOwnPass(t *testing.T) {
 // An image pass's clauses name the images, and a stall apart from a failure.
 func TestDescribeFlushWordsTheImagePass(t *testing.T) {
 	at := time.Date(2026, 11, 12, 15, 4, 0, 0, time.Local)
-	delivered, undelivered := describeFlush(delivery.Result{Images: true, Sent: 1, Deferred: 2,
+	delivered, undelivered := describeImagePass(delivery.ImageResult{Sent: 1, Deferred: 2,
 		Stalls: []delivery.Failure{{ProjectID: "p1", RetryAt: at}}, Waiting: []delivery.Wait{{ProjectID: "p2", RetryAt: at}}})
 	want := []string{
 		"an image for team p1 did not finish uploading in its time; its images retry after 3:04PM",
@@ -255,5 +255,40 @@ func TestDescribeFlushWordsTheImagePass(t *testing.T) {
 	}
 	if delivered != "1 image" || strings.Join(undelivered, "|") != strings.Join(want, "|") {
 		t.Fatalf("describeFlush = %q, %q", delivered, undelivered)
+	}
+}
+
+// Teardown waits for a running image pass, which stops before its next image without the
+// relay's token, so its open lock does not keep Windows from removing the image queue.
+func TestTeardownWaitsForTheImagePass(t *testing.T) {
+	useConfigDir(t, t.TempDir())
+	s, err := spool.Open(filepath.Join(testApp.stateDir, spool.ImageDir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Append(spool.Event{Name: semconv.TermaPromptImageEvent}); err != nil {
+		t.Fatal(err)
+	}
+	draining, done := make(chan struct{}), make(chan struct{})
+	var ended time.Time
+	go func() {
+		s.Drain(t.Context(), spool.DrainOptions{}, func(context.Context, []spool.Pending) {
+			close(draining)
+			time.Sleep(200 * time.Millisecond)
+			ended = time.Now()
+		})
+		close(done)
+	}()
+	<-draining
+	if err := testApp.removeHookState(); err != nil {
+		t.Fatal(err)
+	}
+	removedAt := time.Now()
+	<-done
+	if removedAt.Before(ended) {
+		t.Fatal("teardown removed the image queue while a pass delivered it")
+	}
+	if _, err := os.Stat(filepath.Join(testApp.stateDir, spool.ImageDir)); !os.IsNotExist(err) {
+		t.Fatalf("the image queue outlived teardown: %v", err)
 	}
 }
