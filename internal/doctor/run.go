@@ -146,7 +146,7 @@ type Delivery struct {
 	// Delivered words what was sent, and Undelivered what was not.
 	Delivered   string
 	Undelivered []string
-	// Images is the image queue after the flush, which started its pass in the background.
+	// Images is the image queue after the flush, which the relay sends.
 	Images ImageQueue
 }
 
