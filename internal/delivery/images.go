@@ -45,6 +45,11 @@ type ImageResult struct {
 	// Waiting names each project whose images window was open.
 	Waiting   []Wait
 	Endpoints []string
+
+	// read is the queue's Stamp as the pass read it, and first the project it started with:
+	// what the relay's sender carries to its next pass.
+	read  spool.Stamp
+	first string
 }
 
 // nextWindow is the earliest end of the windows the pass waited out (Waiting) or opened
@@ -109,19 +114,21 @@ func (r Router) FlushImages(ctx context.Context, events *spool.Spool, cfg *confi
 	return r.flushImages(ctx, events, cfg, force, imageTurns{})
 }
 
-// imageTurns is how a pass shares out its sends among projects and tells of them: it starts
-// after the project after names, so the one that went first last time goes last, and
-// records the one it started with in first; read, set, gets the queue's Stamp as the pass
-// read it; begin, set, is asked before each image and stops the pass when it says no (the
-// sender halted), and end is told when that image is done; now, set, is the clock the pass
-// judges windows and ages by.
+// imageTurns is how the relay's sender runs a pass: it starts after the project after
+// names, so the one that went first last time goes last (ImageResult.first says which went
+// first this time); gate, set, is asked before each image and told when it is done; now,
+// set, is the clock the pass judges and opens windows by.
 type imageTurns struct {
 	after string
-	first *string
-	read  *spool.Stamp
-	begin func() bool
-	end   func()
+	gate  imageGate
 	now   func() time.Time
+}
+
+// imageGate is the sender's say over each image a pass sends: begin is asked first, and a
+// no stops the pass (the sender halted); end is told once the image is done.
+type imageGate interface {
+	begin() bool
+	end()
 }
 
 // flushImages is FlushImages, with turns.
@@ -139,9 +146,7 @@ func (r Router) flushImages(ctx context.Context, events *spool.Spool, cfg *confi
 	res := &p.res
 	queued, stamp, read, err := s.Read(ctx, now)
 	res.Expired, res.Pruned, res.Dropped = read.Expired, read.Pruned, read.Dropped
-	if turns.read != nil {
-		*turns.read = stamp
-	}
+	res.read = stamp
 	if err != nil {
 		res.Err, res.Unread = err, true
 		return *res
@@ -197,13 +202,13 @@ func (r Router) flushImages(ctx context.Context, events *spool.Spool, cfg *confi
 		})
 		queues = append(queues, &imageQueue{id: id, sender: sender, items: items})
 	}
-	if len(queues) > 0 && turns.first != nil {
-		*turns.first = queues[0].id
+	if len(queues) > 0 {
+		res.first = queues[0].id
 	}
 	for len(queues) > 0 {
 		var next []*imageQueue
 		for _, q := range queues {
-			if r.SetUp != nil && !r.SetUp() || ctx.Err() != nil || turns.begin != nil && !turns.begin() {
+			if r.SetUp != nil && !r.SetUp() || ctx.Err() != nil || turns.gate != nil && !turns.gate.begin() {
 				// Torn down, or the sender is stopping or halted: what is left stays queued.
 				for _, q := range queues {
 					res.Deferred += len(q.items)
@@ -213,8 +218,8 @@ func (r Router) flushImages(ctx context.Context, events *spool.Spool, cfg *confi
 			item := q.items[0]
 			q.items = q.items[1:]
 			sent := p.send(ctx, r, q, item)
-			if turns.end != nil {
-				turns.end()
+			if turns.gate != nil {
+				turns.gate.end()
 			}
 			if !sent {
 				// The project's other images wait for the window just opened.
@@ -268,6 +273,10 @@ func (p *imagePass) send(ctx context.Context, r Router, q *imageQueue, item imag
 
 // finish sweeps the bytes the pass let go and sums it up.
 func (p *imagePass) finish(r Router, events *spool.Spool, start time.Time) ImageResult {
+	// What the pass settled leaves the queue in one rewrite.
+	if err := p.s.Compact(); err != nil {
+		p.errs = append(p.errs, fmt.Errorf("compact the image queue: %w", err))
+	}
 	r.forgetImages(p.ids, start, events, p.s)
 	p.res.Endpoints = slices.Sorted(maps.Keys(p.accepted))
 	p.res.Err = errors.Join(append([]error{p.res.Err}, p.errs...)...)
@@ -340,7 +349,11 @@ func (p *imagePass) record(ctx context.Context, q *imageQueue, item imageItem, s
 		f := Failure{ProjectID: q.id, Endpoint: q.sender.Endpoint, Err: sent.err}
 		// A sender stopping mid-send learned nothing about the host.
 		if ctx.Err() == nil {
-			f.RetryAt = p.s.DestinationFailedUntil(q.id, now, sent.retryAfter)
+			until := time.Time{}
+			if sent.retryAfter > 0 {
+				until = now.Add(sent.retryAfter)
+			}
+			f.RetryAt = p.s.DestinationFailedUntil(q.id, now, until)
 		}
 		p.res.Failures = append(p.res.Failures, f)
 		p.errs = append(p.errs, fmt.Errorf("%s (%s): %w", q.id, q.sender.Endpoint, sent.err))

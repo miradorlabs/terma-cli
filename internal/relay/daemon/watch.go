@@ -20,7 +20,7 @@ import (
 // hook, so waiting loses nothing, while what it holds in memory would be lost. Its queue is
 // on disk, so a route still retrying never keeps it, and a newer hook asking it to make way
 // is answered by that same wait. Every way out but a signal, a teardown or a cap asks the
-// work beside the engine to halt last (TryHalt), and waits while an image is on its way.
+// work beside the engine to halt last (Options.Halt), and waits while an image is on its way.
 func watch(ctx context.Context, r *relay.Relay, stateDir string, idle time.Duration, served <-chan error, updated <-chan Pass) (stopReason, string, error) {
 	dir := claim.Dir(stateDir)
 	var replacing time.Time // when a newer terma asked this relay to make way
@@ -77,7 +77,7 @@ func watch(ctx context.Context, r *relay.Relay, stateDir string, idle time.Durat
 			lastPrune = time.Now()
 		}
 		// A relay about to restart or make way does that instead.
-		if d, quiet := r.Idle(); quiet && idle > 0 && d >= idle && upgraded.IsZero() && replacing.IsZero() && r.TryHalt() {
+		if upgraded.IsZero() && replacing.IsZero() && r.TryIdleExit(idle) {
 			return stopIdle, installed.Installed, nil
 		}
 	}

@@ -129,3 +129,32 @@ func TestWorkBesideTheEngineKeepsTheRelay(t *testing.T) {
 		t.Fatal("did not quiesce once the upload was over")
 	}
 }
+
+// A relay exits for being idle only after the quiet asked for, and once the work beside it
+// halts, not finally: a new export may yet keep it.
+func TestTryIdleExit(t *testing.T) {
+	t.Parallel()
+	var ahead atomic.Int64
+	var uploading atomic.Bool
+	var finals atomic.Int64
+	r := newRelay(Options{Dir: t.TempDir(), Token: token,
+		Now: func() time.Time { return time.Now().Add(time.Duration(ahead.Load())) },
+		Halt: func(final bool) bool {
+			if final {
+				finals.Add(1)
+			}
+			return !uploading.Load()
+		}})
+	if r.TryIdleExit(time.Hour) || r.TryIdleExit(0) {
+		t.Fatal("exited before the quiet asked for, or with none asked")
+	}
+	ahead.Store(int64(2 * time.Hour))
+	uploading.Store(true)
+	if r.TryIdleExit(time.Hour) {
+		t.Fatal("exited mid-upload")
+	}
+	uploading.Store(false)
+	if !r.TryIdleExit(time.Hour) || finals.Load() != 0 {
+		t.Fatalf("did not exit once idle and halted, or asked a final halt (%d)", finals.Load())
+	}
+}

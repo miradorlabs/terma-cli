@@ -2,6 +2,8 @@ package delivery
 
 import (
 	"context"
+	"os"
+	"slices"
 	"sync/atomic"
 	"time"
 
@@ -28,9 +30,12 @@ type ImageSender struct {
 	halting atomic.Bool
 	passes  atomic.Int64
 	loops   atomic.Int64
-	// after is the project the last pass started with; read the queue as it read it.
-	after string
-	read  spool.Stamp
+	// after is the project the last pass started with; read the queue as it read it, and
+	// seen each watched file as it stood then.
+	after   string
+	read    spool.Stamp
+	watched []string
+	seen    []fileMark
 	// timing is when the sender wakes by itself and whether a wake runs a pass: its whole
 	// timing policy, worked out by timing.wake and timing.after alone.
 	timing timing
@@ -132,7 +137,7 @@ func (s *ImageSender) Run(ctx context.Context) {
 		if ctx.Err() != nil {
 			return
 		}
-		changed := cause == wokeByNudge && !s.router.Images.Stamp().Same(s.read)
+		changed := cause == wokeByNudge && (!s.router.Images.Stamp().Same(s.read) || !slices.Equal(marks(s.watched), s.seen))
 		if run, forDeadline := s.timing.wake(cause, changed, s.clock()); run {
 			s.pass(ctx, forDeadline)
 		}
@@ -146,16 +151,18 @@ func (s *ImageSender) Run(ctx context.Context) {
 // it to change, or for the look heldMin on.
 func (s *ImageSender) pass(ctx context.Context, forDeadline bool) {
 	defer s.passes.Add(1)
+	s.seen = marks(s.watched)
 	out := passOutcome{heldLook: s.timing.due.heldPassed(s.clock())}
 	sent := false
 	if cfg, err := s.config(); err != nil {
 		s.logError(err)
 		out.unread = true
 	} else {
-		first := s.after
-		res := s.router.flushImages(ctx, s.events, cfg, false,
-			imageTurns{after: s.after, first: &first, read: &s.read, begin: s.begin, end: s.end, now: s.clock})
-		s.after = first
+		res := s.router.flushImages(ctx, s.events, cfg, false, imageTurns{after: s.after, gate: s, now: s.clock})
+		s.read = res.read
+		if res.first != "" {
+			s.after = res.first
+		}
 		out.unread, out.held, out.window = res.Unread, res.Held > 0, res.nextWindow()
 		sent = res.Sent > 0
 		if res.Err != nil && ctx.Err() == nil {
@@ -168,138 +175,29 @@ func (s *ImageSender) pass(ctx context.Context, forDeadline bool) {
 	s.timing = s.timing.after(out, forDeadline, sent, s.clock(), s.heldMin, s.heldMax)
 }
 
-// timing is the sender's timing policy's state: its deadlines, and notBefore, the earliest
-// a deadline may start a pass once one a deadline started sent nothing.
-type timing struct {
-	due       deadlines
-	notBefore time.Time
+// Watch has a nudge run a pass when one of paths changed since the last, as when the queue
+// did: the keys and the policies, which images held for a key or a policy wait for, so they
+// go soon after `terma setup` stores them rather than at their next look. One stat each.
+func (s *ImageSender) Watch(paths ...string) { s.watched = paths }
+
+// fileMark is a file or folder as one stat finds it: gone, or its size and modification
+// time. A file rewritten by an atomic rename, or a folder something was renamed into, has
+// another.
+type fileMark struct {
+	exists bool
+	size   int64
+	mod    int64
 }
 
-// wakeCause is what woke the sender.
-type wakeCause int
-
-const (
-	// wokeByNudge is an export the relay accepted; wokeByTimer the timer wakeAt armed.
-	wokeByNudge wakeCause = iota
-	wokeByTimer
-)
-
-// wake decides whether a wake runs a pass, and whether that pass is a deadline's. The timer
-// is armed at wakeAt, so its firing runs one, for the deadline. A nudge runs one when the
-// queue changed since the last pass read it; otherwise only for a deadline that has come,
-// and not while notBefore holds deadlines off.
-func (t timing) wake(cause wakeCause, queueChanged bool, now time.Time) (run, forDeadline bool) {
-	switch {
-	case cause == wokeByTimer:
-		return true, true
-	case queueChanged:
-		return true, false
-	case t.due.passed(now) && !now.Before(t.notBefore):
-		return true, true
-	}
-	return false, false
-}
-
-// wakeAt is when the sender wakes by itself: its next deadline, no earlier than notBefore.
-func (t timing) wakeAt() time.Time {
-	at := t.due.next()
-	if !at.IsZero() && at.Before(t.notBefore) {
-		at = t.notBefore
-	}
-	return at
-}
-
-// after is the timing once a pass ended at now with out: the deadlines nextDeadlines
-// works out, and notBefore, which only a pass that sent something clears, and which a
-// deadline's pass that sent nothing sets heldMin on: whatever is wrong is retried slowly,
-// never in a loop.
-func (t timing) after(out passOutcome, forDeadline, sent bool, now time.Time, heldMin, heldMax time.Duration) timing {
-	next := timing{due: nextDeadlines(t.due, out, now, heldMin, heldMax), notBefore: t.notBefore}
-	switch {
-	case sent:
-		next.notBefore = time.Time{}
-	case forDeadline:
-		next.notBefore = now.Add(heldMin)
-	}
-	return next
-}
-
-// deadlines are when the sender wakes by itself: a retry window's end, and the next look
-// at images held for what they need (a key, a policy), which waits held.
-type deadlines struct {
-	windowEnds, heldDue time.Time
-	held                time.Duration
-}
-
-// next is the earlier deadline, zero for none.
-func (d deadlines) next() time.Time {
-	switch {
-	case d.windowEnds.IsZero():
-		return d.heldDue
-	case d.heldDue.IsZero() || d.windowEnds.Before(d.heldDue):
-		return d.windowEnds
-	}
-	return d.heldDue
-}
-
-// passed reports whether a deadline has come at now.
-func (d deadlines) passed(now time.Time) bool {
-	next := d.next()
-	return !next.IsZero() && !now.Before(next)
-}
-
-// heldPassed reports whether the look at held images has come at now.
-func (d deadlines) heldPassed(now time.Time) bool {
-	return !d.heldDue.IsZero() && !now.Before(d.heldDue)
-}
-
-// passOutcome is what a pass learned for the deadlines.
-type passOutcome struct {
-	// unread is a pass that could not read the profile or the queue, and did nothing.
-	unread bool
-	// window is the earliest end of the windows it waited out or opened (nextWindow).
-	window time.Time
-	// held says images were held for what they need; heldLook that the held images'
-	// deadline came as the pass started.
-	held, heldLook bool
-}
-
-// nextDeadlines is the sender's deadlines after a pass that ended at now with out, from
-// prev: the one place they are worked out. A deadline already past is never kept. A pass
-// that read nothing keeps the deadlines still ahead and looks again within heldMin, nothing
-// telling it when the profile or the queue can be read. Otherwise the window's end is the
-// pass's own, due at once if it ended while the pass ran; the held images' wait starts at
-// heldMin and doubles, to heldMax, only when their own look found them still held.
-func nextDeadlines(prev deadlines, out passOutcome, now time.Time, heldMin, heldMax time.Duration) deadlines {
-	ahead := func(t time.Time) time.Time {
-		if t.After(now) {
-			return t
+// marks are paths as they stand.
+func marks(paths []string) []fileMark {
+	out := make([]fileMark, len(paths))
+	for i, p := range paths {
+		if info, err := os.Stat(p); err == nil {
+			out[i] = fileMark{exists: true, size: info.Size(), mod: info.ModTime().UnixNano()}
 		}
-		return time.Time{}
 	}
-	if out.unread {
-		d := deadlines{windowEnds: ahead(prev.windowEnds), heldDue: ahead(prev.heldDue), held: prev.held}
-		if look := now.Add(heldMin); d.heldDue.IsZero() || look.Before(d.heldDue) {
-			d.heldDue = look
-		}
-		return d
-	}
-	d := deadlines{windowEnds: out.window}
-	if !d.windowEnds.IsZero() && !d.windowEnds.After(now) {
-		d.windowEnds = now
-	}
-	switch {
-	case !out.held:
-		return d
-	case prev.held == 0:
-		d.held = heldMin
-	case out.heldLook:
-		d.held = min(2*prev.held, heldMax)
-	default:
-		d.held = prev.held
-	}
-	d.heldDue = now.Add(d.held)
-	return d
+	return out
 }
 
 // errorLogEvery is how often the sender logs an error it already logged.

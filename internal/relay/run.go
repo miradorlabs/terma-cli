@@ -106,7 +106,7 @@ func (r *Relay) countQueuedAtExit() {
 
 // Quiesce prepares the relay to stop without losing what it holds in memory: when nothing is
 // held, no export is being read or routed, none has arrived for quiet, and the work beside
-// it halts (TryHalt, asked last), it answers every later export 503, which an exporter sends
+// it halts (Options.Halt, final, asked last), it answers every later export 503, which an exporter sends
 // again, to the next relay, and reports true. What is queued is on disk, so it does not count.
 func (r *Relay) Quiesce(quiet time.Duration) bool {
 	r.mu.Lock()
@@ -117,11 +117,6 @@ func (r *Relay) Quiesce(quiet time.Duration) bool {
 	r.refusing = true
 	return true
 }
-
-// TryHalt stops the work beside the engine if it is between two pieces of it, and reports
-// whether it did (Options.Halt): for an idle exit, asked only once nothing else keeps the
-// relay, since a halt is for good.
-func (r *Relay) TryHalt() bool { return r.halt(false) }
 
 // TryStop reports whether a relay making way can go now: it holds nothing, and the work
 // beside it halted, for good (a final halt, which starts nothing new meanwhile). Both are
@@ -139,6 +134,11 @@ func (r *Relay) halt(final bool) bool { return r.opts.Halt == nil || r.opts.Halt
 func (r *Relay) Idle() (time.Duration, bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	return r.idle()
+}
+
+// idle is Idle, under r.mu.
+func (r *Relay) idle() (time.Duration, bool) {
 	if r.heldN > 0 {
 		return 0, false
 	}
@@ -148,4 +148,15 @@ func (r *Relay) Idle() (time.Duration, bool) {
 		}
 	}
 	return r.opts.Now().Sub(r.lastSeen), true
+}
+
+// TryIdleExit reports whether the relay may exit for being idle: it has held and queued
+// nothing and had no export for after, and the work beside it halts (Options.Halt, not
+// final: a new export may yet keep the relay). Both are
+// judged under the relay's lock, so no export lands between them.
+func (r *Relay) TryIdleExit(after time.Duration) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	d, quiet := r.idle()
+	return quiet && after > 0 && d >= after && r.halt(false)
 }

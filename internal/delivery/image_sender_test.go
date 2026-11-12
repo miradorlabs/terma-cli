@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/miradorlabs/terma-cli/internal/account/keystore"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/spool"
@@ -371,4 +372,26 @@ func TestATakeThatFailsOpensAWindow(t *testing.T) {
 	if images.RetryAt("p1").IsZero() {
 		t.Fatal("no window opened")
 	}
+}
+
+// A key stored while images wait for it wakes them at the next export, not at their next
+// look: a nudge looks at the keys as at the queue.
+func TestANewKeyWakesHeldImagesAtTheNextExport(t *testing.T) {
+	t.Parallel()
+	rec := &recorder{}
+	r, cfg, stateDir := imageFixture(t, rec, true)
+	img := pixelN(1)
+	store(t, stateDir, img)
+	e := imageEvent(img)
+	e.Attrs[hookrun.AttrProjectID] = "keyless"
+	queue(t, r.Images, e)
+	s := NewImageSender(r, openSpool(t), func() (*config.Config, error) { return cfg, nil })
+	s.Watch(keystore.FilePath(r.ConfigDir))
+	runSender(t, s)
+	waitFor(t, "the first pass", func() bool { return s.passes.Load() >= 1 })
+	if err := keystore.Set(r.ConfigDir, "keyless", testKey, keystore.Hosts{}); err != nil {
+		t.Fatal(err)
+	}
+	s.Nudge()
+	waitFor(t, "the held image", func() bool { return len(rec.requests()) == 1 })
 }

@@ -123,15 +123,19 @@ func TestNextDeadlines(t *testing.T) {
 		{"held at the cap", deadlines{held: maxWait}, passOutcome{held: true, heldLook: true}, deadlines{held: maxWait, heldDue: now.Add(maxWait)}},
 		{"no longer held", deadlines{held: minWait, heldDue: soon}, passOutcome{}, deadlines{}},
 		{"unread keeps what is ahead", deadlines{windowEnds: later, heldDue: later, held: maxWait}, passOutcome{unread: true},
-			deadlines{windowEnds: later, heldDue: now.Add(minWait), held: maxWait}},
-		{"unread keeps an earlier look", deadlines{heldDue: soon, held: minWait}, passOutcome{unread: true}, deadlines{heldDue: soon, held: minWait}},
+			deadlines{windowEnds: later, heldDue: now.Add(minWait), held: maxWait, unread: minWait}},
+		{"unread keeps an earlier look", deadlines{heldDue: soon, held: minWait}, passOutcome{unread: true}, deadlines{heldDue: soon, held: minWait, unread: minWait}},
 		{"unread drops what is past", deadlines{windowEnds: past, heldDue: past, held: minWait}, passOutcome{unread: true},
-			deadlines{heldDue: now.Add(minWait), held: minWait}},
-		{"unread does not double the wait", deadlines{heldDue: past, held: minWait}, passOutcome{unread: true, heldLook: true},
-			deadlines{heldDue: now.Add(minWait), held: minWait}},
+			deadlines{heldDue: now.Add(minWait), held: minWait, unread: minWait}},
+		{"unread does not double the held wait", deadlines{heldDue: past, held: minWait}, passOutcome{unread: true, heldLook: true},
+			deadlines{heldDue: now.Add(minWait), held: minWait, unread: minWait}},
+		{"unread again backs off", deadlines{heldDue: past, unread: minWait}, passOutcome{unread: true},
+			deadlines{heldDue: now.Add(2 * minWait), unread: 2 * minWait}},
+		{"unread at the cap", deadlines{unread: maxWait}, passOutcome{unread: true}, deadlines{heldDue: now.Add(maxWait), unread: maxWait}},
+		{"read again, the back-off ends", deadlines{heldDue: past, unread: maxWait}, passOutcome{}, deadlines{}},
 	} {
 		got := nextDeadlines(c.prev, c.out, now, minWait, maxWait)
-		if !got.windowEnds.Equal(c.want.windowEnds) || !got.heldDue.Equal(c.want.heldDue) || got.held != c.want.held {
+		if !got.windowEnds.Equal(c.want.windowEnds) || !got.heldDue.Equal(c.want.heldDue) || got.held != c.want.held || got.unread != c.want.unread {
 			t.Errorf("%s: nextDeadlines = %+v, want %+v", c.name, got, c.want)
 		}
 		if next := got.next(); !next.IsZero() && next.Before(now) {

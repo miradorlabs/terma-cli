@@ -7,13 +7,16 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"slices"
 	"syscall"
 	"time"
 
 	"github.com/spf13/cobra"
 
+	"github.com/miradorlabs/terma-cli/internal/account/keystore"
 	"github.com/miradorlabs/terma-cli/internal/agents"
+	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/delivery"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
@@ -105,6 +108,7 @@ func (app *App) relayImages(run *daemon.Config, logf func(string, ...any)) {
 	}
 	images := delivery.NewImageSender(r, app.openSpool(), app.loadConfig)
 	images.Logf = logf
+	images.Watch(keystore.FilePath(app.dir), filepath.Join(app.stateDir, config.PoliciesDir))
 	run.Engine.Accepted, run.Engine.Halt = images.Nudge, images.TryHalt
 	run.Workers = append(run.Workers, images.Run)
 }

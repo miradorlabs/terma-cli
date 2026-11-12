@@ -103,8 +103,8 @@ type imageSend struct {
 	// refused says the host refused the image's bytes (400 or 413), and bare that the last
 	// request carried none.
 	refused, bare bool
-	// retryAfter is when the host asked to be asked again; zero when it did not say.
-	retryAfter time.Time
+	// retryAfter is how long the host asked to be left; zero when it did not say.
+	retryAfter time.Duration
 }
 
 // sendImage sends one image record with its bytes from the store, in the time its size

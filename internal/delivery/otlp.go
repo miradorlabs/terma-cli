@@ -131,11 +131,19 @@ func timeoutFor(n int) time.Duration {
 	return sendTimeout + time.Duration(n)*time.Second/uploadFloor
 }
 
+// otlpClient is every sender's client, so requests to a host reuse its connections.
+var otlpClient = newHTTPClient()
+
+// drainLimit bounds what is read of an answer only to reuse its connection.
+const drainLimit = 64 << 10
+
 // newHTTPClient refuses redirects: Go keeps the Authorization header on a same-host
 // https→http downgrade, which would send the server key in cleartext.
 // Each request's own deadline, which grows with its body, bounds it.
+// Its own transport keeps its own pool of connections to the ingest hosts.
 func newHTTPClient() *http.Client {
 	return &http.Client{
+		Transport: http.DefaultTransport.(*http.Transport).Clone(),
 		CheckRedirect: func(req *http.Request, _ []*http.Request) error {
 			return fmt.Errorf("refusing to follow redirect to %s: the OTLP endpoint does not redirect log exports", req.URL.Redacted())
 		},
@@ -226,7 +234,7 @@ func (o *otlpSender) post(ctx context.Context, events []spool.Event) (progress, 
 	}
 	client := o.HTTP
 	if client == nil {
-		client = newHTTPClient()
+		client = otlpClient
 	}
 	timeout := timeoutFor(len(body))
 	if o.timeout != nil {
@@ -247,7 +255,11 @@ func (o *otlpSender) post(ctx context.Context, events []spool.Event) (progress, 
 	if err != nil {
 		return progress(got.Load()), err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		// Read to its end (a little at most), so the connection goes back to the pool.
+		_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, drainLimit))
+		_ = resp.Body.Close()
+	}()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		detail, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
 		return written, &IngestError{Status: resp.StatusCode, Detail: string(bytes.TrimSpace(detail)),
@@ -260,20 +272,22 @@ func (o *otlpSender) post(ctx context.Context, events []spool.Event) (progress, 
 type IngestError struct {
 	Status int
 	Detail string
-	// RetryAfter is when the host's Retry-After asked to be asked again; zero when it did not.
-	RetryAfter time.Time
+	// RetryAfter is how long the host's Retry-After asked it be left; zero when it did not.
+	// A wait, not a time, so whoever opens the window does so by its own clock.
+	RetryAfter time.Duration
 }
 
-// retryAfter reads a Retry-After header, in seconds or as an HTTP date; zero for none.
-func retryAfter(h string, now time.Time) time.Time {
+// retryAfter reads a Retry-After header, in seconds or as an HTTP date (as of now, the time
+// it was answered); zero for none, an hour at most.
+func retryAfter(h string, now time.Time) time.Duration {
 	if secs, err := strconv.Atoi(strings.TrimSpace(h)); err == nil && secs > 0 {
 		// No window outlasts an hour; a larger number would overflow the multiplication.
-		return now.Add(time.Duration(min(secs, 3600)) * time.Second)
+		return time.Duration(min(secs, 3600)) * time.Second
 	}
 	if at, err := http.ParseTime(h); err == nil && at.After(now) {
-		return at
+		return min(at.Sub(now), time.Hour)
 	}
-	return time.Time{}
+	return 0
 }
 
 func (e *IngestError) Error() string {

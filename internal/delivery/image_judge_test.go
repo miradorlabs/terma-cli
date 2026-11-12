@@ -129,16 +129,66 @@ func TestProgressStartsOverOnANewConnection(t *testing.T) {
 func TestRetryAfter(t *testing.T) {
 	t.Parallel()
 	now := time.Date(2026, 11, 12, 12, 0, 0, 0, time.UTC)
-	for h, want := range map[string]time.Time{
-		"120":                           now.Add(2 * time.Minute),
-		"99999999999999":                now.Add(time.Hour),
-		"Thu, 12 Nov 2026 12:10:00 GMT": now.Add(10 * time.Minute),
-		"Thu, 12 Nov 2026 11:00:00 GMT": {},
-		"":                              {},
-		"soon":                          {},
+	for h, want := range map[string]time.Duration{
+		"120":                           2 * time.Minute,
+		"99999999999999":                time.Hour,
+		"Thu, 12 Nov 2026 12:10:00 GMT": 10 * time.Minute,
+		"Thu, 13 Nov 2026 12:10:00 GMT": time.Hour,
+		"Thu, 12 Nov 2026 11:00:00 GMT": 0,
+		"":                              0,
+		"soon":                          0,
 	} {
-		if got := retryAfter(h, now); !got.Equal(want) {
+		if got := retryAfter(h, now); got != want {
 			t.Errorf("retryAfter(%q) = %v, want %v", h, got, want)
 		}
+	}
+}
+
+// Requests to a host reuse one connection: senders share a client, and each answer is read
+// to its end (a Close alone only sometimes drains it, as it happens to be timed).
+func TestSendsReuseTheirConnection(t *testing.T) {
+	t.Parallel()
+	var opened atomic.Int64
+	srv := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		_, _ = io.ReadAll(req.Body)
+		_, _ = w.Write([]byte(strings.Repeat("x", 16<<10))) // an answer with more body than a read buffer holds
+	}))
+	srv.Config.ConnState = func(_ net.Conn, s http.ConnState) {
+		if s == http.StateNew {
+			opened.Add(1)
+		}
+	}
+	srv.Start()
+	defer srv.Close()
+	client := newHTTPClient() // the one otlpClient is, unshared with other tests'
+	for range 20 {
+		sender := &otlpSender{Endpoint: srv.URL, APIKey: testKey, HTTP: client}
+		if _, err := sender.post(t.Context(), []spool.Event{{Name: "x"}}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if n := opened.Load(); n != 1 {
+		t.Fatalf("%d connections for twenty requests", n)
+	}
+}
+
+// A host's Retry-After opens a window by the pass's clock, not the one it was answered by.
+func TestRetryAfterRunsOnThePassClock(t *testing.T) {
+	t.Parallel()
+	r, cfg, stateDir := imageFixture(t, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		_, _ = io.ReadAll(req.Body)
+		w.Header().Set("Retry-After", "600")
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}), true)
+	img := pixelN(1)
+	store(t, stateDir, img)
+	queue(t, r.Images, imageEvent(img))
+	then := time.Now().Add(-time.Hour)
+	res := r.flushImages(t.Context(), openSpool(t), cfg, false, imageTurns{now: func() time.Time { return then }})
+	if len(res.Failures) != 1 {
+		t.Fatalf("flushImages = %+v", res)
+	}
+	if at := res.Failures[0].RetryAt; at.Before(then.Add(590*time.Second)) || at.After(then.Add(610*time.Second)) {
+		t.Fatalf("the window ends at %v; want ten minutes after the pass's %v", at, then)
 	}
 }
