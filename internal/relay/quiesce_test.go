@@ -88,12 +88,12 @@ func TestAQuiescedRelayAsksForExportsAgain(t *testing.T) {
 	}
 }
 
-// Work beside the engine (an image's upload) keeps the relay from idling out or quiescing,
-// and an export it accepts is told on, for the image sender to wake.
+// Work beside the engine (an image's upload) keeps the relay from quiescing until it halts,
+// which it is asked last; and an export the relay accepts is told on, for the image sender
+// to wake.
 func TestWorkBesideTheEngineKeepsTheRelay(t *testing.T) {
 	t.Parallel()
 	u := newUpstream(t)
-	var busy atomic.Bool
 	var accepted atomic.Int64
 	r := newRelay(Options{Dir: t.TempDir(), Token: token,
 		Accepted: func() { accepted.Add(1) },
@@ -113,20 +113,19 @@ func TestWorkBesideTheEngineKeepsTheRelay(t *testing.T) {
 	if code := post(t, srv, "/v1/logs", body, "application/x-protobuf", "wrong", false); code == http.StatusOK || accepted.Load() != 1 {
 		t.Fatalf("a refused export = %d, told of %d", code, accepted.Load())
 	}
-	// A relay with nothing else to do.
-	quiet := newRelay(Options{Dir: t.TempDir(), Token: token, Busy: busy.Load})
-	busy.Store(true)
-	if _, idle := quiet.Idle(); idle {
-		t.Fatal("idle while an upload is under way")
-	}
+	// A relay with nothing else to do, asked to halt its work only once nothing else keeps it.
+	var uploading atomic.Bool
+	var asked atomic.Int64
+	quiet := newRelay(Options{Dir: t.TempDir(), Token: token, Halt: func() bool { asked.Add(1); return !uploading.Load() }})
+	uploading.Store(true)
 	if quiet.Quiesce(0) {
 		t.Fatal("quiesced while an upload is under way")
 	}
-	busy.Store(false)
-	if _, idle := quiet.Idle(); !idle {
-		t.Fatal("not idle once the upload is over")
+	if quiet.Quiesce(time.Hour) || asked.Load() != 1 {
+		t.Fatalf("asked the work to halt %d times; want only when nothing else kept the relay", asked.Load())
 	}
+	uploading.Store(false)
 	if !quiet.Quiesce(0) {
-		t.Fatal("did not quiesce once the upload is over")
+		t.Fatal("did not quiesce once the upload was over")
 	}
 }

@@ -92,8 +92,12 @@ outcome, `Result.Grew`/`drainPass.unseen` and the re-spawn, `NoWait`/`SkipBusy`/
   The sender must return promptly when its context ends: it cancels an upload in flight (the record
   stays queued, settled only on a 2xx), so a replace, an update or `terma teardown` never waits on an
   upload. Add a bound to `workers.Wait()` in the same change.
-- **Idle exit and updates.** `Idle()`/`Quiesce()` ignore workers today, so an 8 h idle exit could cut
-  an upload. The sender reports busy while uploading, and `Idle()` counts it.
+- **Idle exit, updates and making way.** `Idle()`/`Quiesce()` ignored workers, so an 8 h idle exit
+  could cut an upload. As built, the sender has one state, idle, uploading or stopped, changed by
+  compare-and-swap; the relay asks `TryHalt` (`relay.Options.Halt`) last, once nothing else keeps it,
+  before an idle exit, a quiesce for an update, or making way. It succeeds only between images, and
+  a halted sender starts nothing more and waits for its end: images keep going until the relay can
+  actually stop, and a halt never lands mid-upload.
 - **Two senders.** The relay's sender and a manual `--images` flush take the image queue's delivery
   lock per image, so they never send the same record twice.
 - **Boundaries.** `internal/relay/daemon` may import `delivery`, `spool` and `promptimage` (no

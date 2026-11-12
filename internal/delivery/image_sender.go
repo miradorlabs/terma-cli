@@ -23,10 +23,10 @@ type ImageSender struct {
 	// Logf, when set, is told of a pass that could not deliver everything it tried.
 	Logf func(format string, args ...any)
 
-	wake    chan struct{}
-	busy    atomic.Bool
-	winding atomic.Bool
-	passes  atomic.Int64
+	wake   chan struct{}
+	state  atomic.Int32
+	passes atomic.Int64
+	loops  atomic.Int64
 	// after is the project the last pass started with; read the queue as it read it;
 	// windowEnds the earliest retry window's end, zero for none.
 	after      string
@@ -38,6 +38,15 @@ type ImageSender struct {
 	heldDue          time.Time
 	heldMin, heldMax time.Duration
 }
+
+// The sender's states. It moves between idle and uploading around each image, and from idle
+// to stopped (TryHalt), for good; each move is a compare-and-swap, so a halt never lands
+// mid-upload and an upload never starts once halted.
+const (
+	senderIdle int32 = iota
+	senderUploading
+	senderStopped
+)
 
 // NewImageSender sends r.Images under the profile config reads at each pass, since keys and
 // hosts change while the relay runs. events is the events' spool, read before stored bytes
@@ -55,21 +64,36 @@ func (s *ImageSender) Nudge() {
 	}
 }
 
-// Busy reports whether an image is being uploaded, which an idle exit or a quiesce waits for.
-func (s *ImageSender) Busy() bool { return s.busy.Load() }
+// TryHalt stops the sender for good if it is between two images, and reports whether it
+// is stopped: the relay asks it last before an idle exit, a restart or making way, and
+// waits while an image is on its way.
+func (s *ImageSender) TryHalt() bool {
+	return s.state.CompareAndSwap(senderIdle, senderStopped) || s.state.Load() == senderStopped
+}
 
-// WindDown has the sender start no new upload: the relay is about to make way, or to
-// restart on a newer terma, and waits only for the one under way (Busy).
-func (s *ImageSender) WindDown() { s.winding.Store(true) }
+// uploading reports whether an image is on its way.
+func (s *ImageSender) uploading() bool { return s.state.Load() == senderUploading }
 
-// Run delivers the queue at once, then each time it is woken, until ctx ends. An upload in
-// flight then is cut off, and its record stays queued.
+// begin moves the sender to uploading before an image, unless it was halted.
+func (s *ImageSender) begin() bool { return s.state.CompareAndSwap(senderIdle, senderUploading) }
+
+// end moves it back once the image is done.
+func (s *ImageSender) end() { s.state.CompareAndSwap(senderUploading, senderIdle) }
+
+// Run delivers the queue at once, then each time it is woken, until ctx ends or it is
+// halted. An upload in flight as ctx ends is cut off, and its record stays queued.
 func (s *ImageSender) Run(ctx context.Context) {
 	if s.router.Images == nil {
 		return
 	}
 	s.pass(ctx, false)
 	for {
+		s.loops.Add(1)
+		if s.state.Load() == senderStopped {
+			// Halted for good: nothing more to wake for.
+			<-ctx.Done()
+			return
+		}
 		var deadline <-chan time.Time
 		var timer *time.Timer
 		if next := s.next(); !next.IsZero() {
@@ -92,7 +116,7 @@ func (s *ImageSender) Run(ctx context.Context) {
 		now := time.Now()
 		heldLook := !s.heldDue.IsZero() && !now.Before(s.heldDue)
 		windowEnded := !s.windowEnds.IsZero() && !now.Before(s.windowEnds)
-		if s.winding.Load() || woken && !heldLook && !windowEnded && s.router.Images.Stamp().Same(s.read) {
+		if woken && !heldLook && !windowEnded && s.router.Images.Stamp().Same(s.read) {
 			continue
 		}
 		s.pass(ctx, heldLook)
@@ -123,7 +147,7 @@ func (s *ImageSender) pass(ctx context.Context, heldLook bool) {
 	} else {
 		first := s.after
 		res := s.router.flushImages(ctx, s.events, cfg, false,
-			imageTurns{after: s.after, first: &first, read: &s.read, uploading: s.busy.Store, halt: s.winding.Load})
+			imageTurns{after: s.after, first: &first, read: &s.read, begin: s.begin, end: s.end})
 		s.after = first
 		held = res.Held > 0
 		if res.Err != nil && ctx.Err() == nil {

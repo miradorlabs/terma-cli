@@ -112,28 +112,29 @@ func (r *Relay) Holding() bool {
 }
 
 // Quiesce prepares the relay to stop without losing what it holds in memory: when nothing is
-// held, no export is being read or routed, and none has arrived for quiet, it answers every
-// later export 503, which an exporter sends again, to the next relay, and reports true. What
-// is queued is on disk, so it does not count.
+// held, no export is being read or routed, none has arrived for quiet, and the work beside
+// it halts (TryHalt, asked last), it answers every later export 503, which an exporter sends
+// again, to the next relay, and reports true. What is queued is on disk, so it does not count.
 func (r *Relay) Quiesce(quiet time.Duration) bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if r.heldN > 0 || r.inflight > 0 || r.opts.Now().Sub(r.lastSeen) < quiet || r.Busy() {
+	if r.heldN > 0 || r.inflight > 0 || r.opts.Now().Sub(r.lastSeen) < quiet || !r.TryHalt() {
 		return false
 	}
 	r.refusing = true
 	return true
 }
 
-// Busy reports whether work beside the engine is under way (Options.Busy).
-func (r *Relay) Busy() bool { return r.opts.Busy != nil && r.opts.Busy() }
+// TryHalt stops the work beside the engine if it is between two pieces of it, and reports
+// whether it did (Options.Halt). Asked only once nothing else keeps the relay, since a halt
+// is for good.
+func (r *Relay) TryHalt() bool { return r.opts.Halt == nil || r.opts.Halt() }
 
-// Idle reports how long the relay has had no export, if it holds and queues nothing and
-// nothing beside it is under way.
+// Idle reports how long the relay has had no export, if it holds and queues nothing.
 func (r *Relay) Idle() (time.Duration, bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if r.heldN > 0 || r.Busy() {
+	if r.heldN > 0 {
 		return 0, false
 	}
 	for _, s := range r.senders {

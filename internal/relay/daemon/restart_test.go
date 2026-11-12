@@ -399,7 +399,7 @@ func TestAReplacedRelayWaitsForAnUpload(t *testing.T) {
 	c := runConfig(stateDir, 0, nil)
 	var uploading atomic.Bool
 	uploading.Store(true)
-	c.Engine.Busy = uploading.Load
+	c.Engine.Halt = func() bool { return !uploading.Load() }
 	r := startRun(t, c)
 	awaitRecord(t, r, dir)
 	askToMakeWay(t, dir)
@@ -419,12 +419,12 @@ func TestAReplacedRelayWaitsForAnUpload(t *testing.T) {
 	}
 }
 
-// A relay asked to make way has the work beside it wind down first.
-func TestAReplacedRelayWindsItsWorkDown(t *testing.T) {
+// A relay asked to make way halts the work beside it before it goes.
+func TestAReplacedRelayHaltsItsWork(t *testing.T) {
 	stateDir, dir, _ := setUpRelay(t)
 	c := runConfig(stateDir, 0, nil)
-	var wound atomic.Bool
-	c.WindDown = func() { wound.Store(true) }
+	var halted atomic.Bool
+	c.Engine.Halt = func() bool { halted.Store(true); return true }
 	r := startRun(t, c)
 	awaitRecord(t, r, dir)
 	askToMakeWay(t, dir)
@@ -433,7 +433,29 @@ func TestAReplacedRelayWindsItsWorkDown(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("the relay did not make way")
 	}
-	if !wound.Load() {
-		t.Fatal("the relay made way without winding its work down")
+	if !halted.Load() || !r.res.Replaced {
+		t.Fatalf("Run = %+v, halted %v", r.res, halted.Load())
+	}
+}
+
+// An idle relay waits for an image on its way before it exits.
+func TestAnIdleRelayWaitsForAnUpload(t *testing.T) {
+	stateDir, dir, _ := setUpRelay(t)
+	c := runConfig(stateDir, time.Millisecond, nil)
+	var uploading atomic.Bool
+	uploading.Store(true)
+	c.Engine.Halt = func() bool { return !uploading.Load() }
+	r := startRun(t, c)
+	awaitRecord(t, r, dir)
+	select {
+	case <-r.done:
+		t.Fatalf("the relay idled out mid-upload: %+v", r.res)
+	case <-time.After(2 * time.Second):
+	}
+	uploading.Store(false)
+	select {
+	case <-r.done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the relay kept running once the upload was over")
 	}
 }

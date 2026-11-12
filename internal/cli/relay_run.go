@@ -96,9 +96,8 @@ func (app *App) newRelayRunCommand() *cobra.Command {
 
 // relayImages wires the relay's image lane, sending the image queue as this build
 // delivers, into run: it is one of its workers; an agent's export ends its turn, and wakes
-// the sender for the images its hooks queued; an upload keeps the relay from idling out or
-// making way, and a relay about to make way or restart starts no new one. Nothing when the
-// queue cannot be opened.
+// the sender for the images its hooks queued; and the relay halts it, between two images,
+// before an idle exit, a restart or making way. Nothing when the queue cannot be opened.
 func (app *App) relayImages(run *daemon.Config, logf func(string, ...any)) {
 	r := app.delivery()
 	if r.Images == nil {
@@ -106,8 +105,7 @@ func (app *App) relayImages(run *daemon.Config, logf func(string, ...any)) {
 	}
 	images := delivery.NewImageSender(r, app.openSpool(), app.loadConfig)
 	images.Logf = logf
-	run.Engine.Accepted, run.Engine.Busy = images.Nudge, images.Busy
-	run.WindDown = images.WindDown
+	run.Engine.Accepted, run.Engine.Halt = images.Nudge, images.TryHalt
 	run.Workers = append(run.Workers, images.Run)
 }
 

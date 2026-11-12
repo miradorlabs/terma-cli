@@ -19,8 +19,9 @@ import (
 // updatePauseWait), however long that takes: the release is already in place for every
 // hook, so waiting loses nothing, while what it holds in memory would be lost. Its queue is
 // on disk, so a route still retrying never keeps it, and a newer hook asking it to make way
-// is answered by that same wait.
-func watch(ctx context.Context, r *relay.Relay, stateDir string, idle time.Duration, served <-chan error, updated <-chan Pass, windDown func()) (stopReason, string, error) {
+// is answered by that same wait. Every way out but a signal, a teardown or a cap asks the
+// work beside the engine to halt last (TryHalt), and waits while an image is on its way.
+func watch(ctx context.Context, r *relay.Relay, stateDir string, idle time.Duration, served <-chan error, updated <-chan Pass) (stopReason, string, error) {
 	dir := claim.Dir(stateDir)
 	var replacing time.Time // when a newer terma asked this relay to make way
 	var upgraded time.Time  // when it installed one itself
@@ -42,9 +43,6 @@ func watch(ctx context.Context, r *relay.Relay, stateDir string, idle time.Durat
 			// no reason to keep running the release they both replaced any longer.
 			if upgraded.IsZero() {
 				upgraded = time.Now()
-				if replacing.IsZero() && windDown != nil {
-					windDown()
-				}
 			}
 		case <-tick.C:
 		}
@@ -56,9 +54,6 @@ func watch(ctx context.Context, r *relay.Relay, stateDir string, idle time.Durat
 		}
 		if replacing.IsZero() && requested(dir, ReplaceFile) {
 			replacing = time.Now()
-			if upgraded.IsZero() && windDown != nil {
-				windDown()
-			}
 		}
 		if !upgraded.IsZero() {
 			quiet := updateQuiet
@@ -71,16 +66,17 @@ func watch(ctx context.Context, r *relay.Relay, stateDir string, idle time.Durat
 				}
 				return stopUpdated, installed.Installed, nil
 			}
-		} else if !replacing.IsZero() && (!r.Holding() && !r.Busy() || time.Since(replacing) >= replacedMaxWait) {
-			// Once the hold is empty, since what it keeps is lost at exit, and no image is on its
-			// way, which would be sent again whole; the queues are on disk.
+		} else if !replacing.IsZero() && (!r.Holding() && r.TryHalt() || time.Since(replacing) >= replacedMaxWait) {
+			// Once the hold is empty, since what it keeps is lost at exit, and the image sender
+			// halts between two images: one cut off would be sent again whole. The queues are
+			// on disk.
 			return stopReplaced, installed.Installed, nil
 		}
 		if time.Since(lastPrune) > time.Hour {
 			claim.Prune(stateDir, time.Now())
 			lastPrune = time.Now()
 		}
-		if d, quiet := r.Idle(); quiet && idle > 0 && d >= idle {
+		if d, quiet := r.Idle(); quiet && idle > 0 && d >= idle && r.TryHalt() {
 			return stopIdle, installed.Installed, nil
 		}
 	}

@@ -45,9 +45,6 @@ type Config struct {
 	Engine relay.Options
 	// Workers run beside the engine until it stops, and are waited for, workerWait at most.
 	Workers []func(ctx context.Context)
-	// WindDown, set, is told once the relay is to make way or restart on a newer terma: work
-	// beside the engine starts nothing new (Engine.Busy then ends with what is under way).
-	WindDown func()
 	// Updater, set, installs each new release in place of this terma, and the relay then
 	// restarts on it.
 	Updater   *Updater
@@ -213,7 +210,7 @@ func Run(ctx context.Context, c Config) (Result, error) {
 		workers.Go(func() { u.Run(engineCtx, updated) })
 	}
 
-	why, installed, serveErr := watch(ctx, r, c.StateDir, c.Idle, served, updated, c.WindDown)
+	why, installed, serveErr := watch(ctx, r, c.StateDir, c.Idle, served, updated)
 	res.Replaced = why == stopReplaced
 	res.Updated = why == stopUpdated || why == stopUpdatedByAnother
 	if res.Updated {

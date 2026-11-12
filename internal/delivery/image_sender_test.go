@@ -112,8 +112,8 @@ func TestStoppingCutsAnUploadOff(t *testing.T) {
 	done := make(chan struct{})
 	go func() { s.Run(ctx); close(done) }()
 	<-arrived
-	if !s.Busy() {
-		t.Fatal("the sender is not busy while it uploads")
+	if !s.uploading() || s.TryHalt() {
+		t.Fatal("the sender is not uploading, or halts, mid-upload")
 	}
 	cancel()
 	select {
@@ -121,8 +121,8 @@ func TestStoppingCutsAnUploadOff(t *testing.T) {
 	case <-time.After(2 * time.Second):
 		t.Fatal("the sender did not return promptly once stopped")
 	}
-	if s.Busy() {
-		t.Fatal("a stopped sender is still busy")
+	if s.uploading() {
+		t.Fatal("a stopped sender is still uploading")
 	}
 	if left := queued(t, r.Images); len(left) != 1 || left[0].Attempts != 0 {
 		t.Fatalf("image queue holds %+v", left)
@@ -251,21 +251,72 @@ func TestTheHeldWaitGrowsOnlyOnItsOwnLook(t *testing.T) {
 	}
 }
 
-// A sender winding down starts no new upload, so the relay waits for none.
-func TestAWindingDownSenderStartsNoUpload(t *testing.T) {
+// A sender halts between images, not during one, and once halted starts no upload.
+func TestTheSenderHaltsBetweenImages(t *testing.T) {
 	t.Parallel()
+	arrived, release := make(chan struct{}), make(chan struct{})
+	var once sync.Once
 	rec := &recorder{}
-	r, cfg, stateDir := imageFixture(t, rec, true)
-	img := pixelN(1)
-	store(t, stateDir, img)
-	queue(t, r.Images, imageEvent(img))
+	r, cfg, stateDir := imageFixture(t, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		once.Do(func() {
+			close(arrived)
+			<-release
+		})
+		rec.ServeHTTP(w, req)
+	}), true)
+	var freed sync.Once
+	free := func() { freed.Do(func() { close(release) }) }
+	t.Cleanup(free) // a failing test still lets the server go
+	first, second := pixelN(1), pixelN(2)
+	store(t, stateDir, first, second)
+	queue(t, r.Images, imageEvent(first))
 	s := NewImageSender(r, openSpool(t), func() (*config.Config, error) { return cfg, nil })
-	s.WindDown()
-	s.pass(t.Context(), false)
-	if len(rec.requests()) != 0 || s.Busy() {
-		t.Fatalf("%d uploads from a sender winding down", len(rec.requests()))
+	ctx, cancel := context.WithCancel(t.Context())
+	done := make(chan struct{})
+	go func() { s.Run(ctx); close(done) }()
+	t.Cleanup(func() { cancel(); <-done })
+	<-arrived
+	if s.TryHalt() {
+		t.Fatal("the sender halted mid-upload")
+	}
+	free()
+	waitFor(t, "the first pass", func() bool { return s.passes.Load() >= 1 })
+	if !s.TryHalt() {
+		t.Fatal("an idle sender would not halt")
+	}
+	if !s.TryHalt() {
+		t.Fatal("a halted sender says it is not")
+	}
+	queue(t, r.Images, imageEvent(second))
+	s.Nudge()
+	time.Sleep(100 * time.Millisecond)
+	if n := len(rec.requests()); n != 1 {
+		t.Fatalf("%d uploads; a halted sender started one", n)
 	}
 	if left := queued(t, r.Images); len(left) != 1 {
 		t.Fatalf("image queue holds %+v", left)
+	}
+}
+
+// A halted sender waits for its end, however its deadlines pass: it does not spin.
+func TestAHaltedSenderDoesNotSpin(t *testing.T) {
+	t.Parallel()
+	r, cfg, _ := imageFixture(t, &recorder{}, true)
+	e := imageEvent(pixelN(1))
+	e.Attrs[hookrun.AttrProjectID] = "keyless" // held: a deadline 10 ms on
+	queue(t, r.Images, e)
+	s := NewImageSender(r, openSpool(t), func() (*config.Config, error) { return cfg, nil })
+	s.heldMin = 10 * time.Millisecond
+	ctx, cancel := context.WithCancel(t.Context())
+	done := make(chan struct{})
+	go func() { s.Run(ctx); close(done) }()
+	t.Cleanup(func() { cancel(); <-done })
+	waitFor(t, "the first pass", func() bool { return s.passes.Load() >= 1 })
+	if !s.TryHalt() {
+		t.Fatal("an idle sender would not halt")
+	}
+	time.Sleep(200 * time.Millisecond)
+	if n := s.loops.Load(); n > 3 {
+		t.Fatalf("a halted sender went round its loop %d times in 200 ms", n)
 	}
 }

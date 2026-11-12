@@ -327,14 +327,14 @@ func TestAnImageFlushDeliversOnceTheKeyIsThere(t *testing.T) {
 }
 
 // The relay runs the image sender: it is a worker, an accepted export nudges it without
-// waiting, its upload counts as the relay's work, and a relay winding down tells it.
+// waiting, and the relay halts it before it stops.
 func TestTheRelayRunsTheImageSender(t *testing.T) {
 	useConfigDir(t, t.TempDir())
 	var run daemon.Config
 	testApp.relayImages(&run, nil)
 	engine := run.Engine
-	if len(run.Workers) != 1 || engine.Accepted == nil || engine.Busy == nil || run.WindDown == nil {
-		t.Fatalf("workers %d, accepted set %v, busy set %v, wind-down set %v", len(run.Workers), engine.Accepted != nil, engine.Busy != nil, run.WindDown != nil)
+	if len(run.Workers) != 1 || engine.Accepted == nil || engine.Halt == nil {
+		t.Fatalf("workers %d, accepted set %v, halt set %v", len(run.Workers), engine.Accepted != nil, engine.Halt != nil)
 	}
 	done := make(chan struct{})
 	go func() {
@@ -348,7 +348,7 @@ func TestTheRelayRunsTheImageSender(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatal("an accepted export waited on the image sender")
 	}
-	if engine.Busy() {
-		t.Fatal("an idle sender says it is busy")
+	if !engine.Halt() {
+		t.Fatal("an idle sender would not halt")
 	}
 }
