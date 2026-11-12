@@ -179,6 +179,25 @@ func lineAt(data, line []byte) int {
 	return -1
 }
 
+// markFile holds the value a Drain's sender keeps between passes (Mark).
+const markFile = "mark"
+
+// Mark is the value a Drain's sender kept with SetMark, such as where its last pass
+// began; "" when none was kept.
+func (s *Spool) Mark() string {
+	data, err := os.ReadFile(filepath.Join(s.dir, markFile))
+	if err != nil {
+		return ""
+	}
+	return string(data)
+}
+
+// SetMark keeps v for the next pass, best effort: only a Drain's sender, under the
+// delivery lock, writes it.
+func (s *Spool) SetMark(v string) {
+	_ = config.WriteFileAtomicNoSync(filepath.Join(s.dir, markFile), []byte(v), fileMode)
+}
+
 // Idle waits until no flusher is delivering the spool, or ctx is done.
 func (s *Spool) Idle(ctx context.Context) error {
 	unlock, err := flock.Lock(ctx, filepath.Join(s.dir, deliveryLockFile))

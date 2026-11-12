@@ -579,7 +579,7 @@ func TestDrainSettlesEachEventOnItsOwn(t *testing.T) {
 			t.Fatal(err)
 		}
 		again := events[1].Event
-		again.Stalls = 1
+		again.Attempts = 1
 		if err := s.Settle(events[1], again); err != nil {
 			t.Fatal(err)
 		}
@@ -598,7 +598,7 @@ func TestDrainSettlesEachEventOnItsOwn(t *testing.T) {
 	for _, e := range left {
 		names = append(names, e.Name)
 	}
-	if err != nil || strings.Join(names, ",") != "c,new,b" || left[2].Stalls != 1 {
+	if err != nil || strings.Join(names, ",") != "c,new,b" || left[2].Attempts != 1 {
 		t.Fatalf("queue holds %v, %v", names, err)
 	}
 }
@@ -627,16 +627,70 @@ func TestIdleWaitsForAFlusher(t *testing.T) {
 	}
 }
 
-// An image record's stalls survive the queue.
-func TestStallsSurviveTheQueue(t *testing.T) {
+// An image record's attempts survive the queue.
+func TestAttemptsSurviveTheQueue(t *testing.T) {
 	s, err := Open(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := s.Append(Event{Name: "x", Stalls: 2}); err != nil {
+	if err := s.Append(Event{Name: "x", Attempts: 2}); err != nil {
 		t.Fatal(err)
 	}
-	if got, err := s.Peek(1); err != nil || len(got) != 1 || got[0].Stalls != 2 {
+	if got, err := s.Peek(1); err != nil || len(got) != 1 || got[0].Attempts != 2 {
 		t.Fatalf("Peek = %+v, %v", got, err)
+	}
+}
+
+// Settle takes one line of two alike, and keeps what was appended while a drain ran.
+func TestSettleTakesOneOfTwinLines(t *testing.T) {
+	s, err := Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	at := time.Now()
+	twin := Event{Name: "twin", Time: at}
+	if err := s.Append(twin, Event{Name: "between", Time: at}, twin); err != nil {
+		t.Fatal(err)
+	}
+	s.Drain(context.Background(), DrainOptions{Now: at}, func(_ context.Context, events []Pending) {
+		if len(events) != 3 {
+			t.Fatalf("Drain handed out %+v", events)
+		}
+		if err := s.Append(Event{Name: "appended", Time: at}); err != nil {
+			t.Fatal(err)
+		}
+		// The second twin's line is the first's too: either settles one, the first in the queue.
+		if err := s.Settle(events[2]); err != nil {
+			t.Fatal(err)
+		}
+		if err := s.Settle(events[0]); err != nil {
+			t.Fatal(err)
+		}
+		if err := s.Settle(events[0]); !errors.Is(err, errNotQueued) {
+			t.Fatalf("a third settle of two twins = %v", err)
+		}
+	})
+	left, err := s.Peek(10)
+	var names []string
+	for _, e := range left {
+		names = append(names, e.Name)
+	}
+	if err != nil || strings.Join(names, ",") != "between,appended" {
+		t.Fatalf("queue holds %v, %v", names, err)
+	}
+}
+
+// A sender's mark outlives its pass.
+func TestMark(t *testing.T) {
+	s, err := Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s.Mark() != "" {
+		t.Fatal("a new spool has a mark")
+	}
+	s.SetMark("p2")
+	if again, _ := Open(s.dir); again.Mark() != "p2" {
+		t.Fatalf("mark = %q", again.Mark())
 	}
 }

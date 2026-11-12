@@ -234,7 +234,7 @@ func describeImageQueue(q doctor.ImageQueue) string {
 		if q.Stalled[id] {
 			why = "an upload that did not finish in its time"
 		}
-		line += fmt.Sprintf("; team %s's wait until %s, after %s", id, q.Windows[id].Local().Format(time.Kitchen), why)
+		line += fmt.Sprintf("; team %s's images wait until %s, after %s", id, q.Windows[id].Local().Format(time.Kitchen), why)
 	}
 	return line + "."
 }
@@ -292,11 +292,10 @@ func (app *App) flushSpool(ctx context.Context, force bool, minInterval time.Dur
 		r.Policy = refreshOnce(ctx, cfg, cfg.Policy.Team(), r.Policy)
 	}
 	res := r.Flush(ctx, s, cfg, force, minInterval)
-	// Images leave in a pass of their own, detached, so no event waits on an upload.
-	if r.Images != nil && app.startImageFlush != nil {
-		if n, _, err := r.Images.Pending(); err == nil && n > 0 {
-			app.startImageFlush()
-		}
+	// Images leave in a pass of their own, detached, so no event waits on an upload; one
+	// starts only when a queued image's project is not waiting out its window.
+	if r.Images != nil && app.startImageFlush != nil && delivery.ImagesDue(r.Images, time.Now()) {
+		app.startImageFlush()
 	}
 	return res, nil
 }

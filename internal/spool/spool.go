@@ -35,9 +35,9 @@ type Event struct {
 	// event to the repository list in force when it leaves. Local only.
 	Repository config.Repository `json:"repository,omitzero"`
 	Attrs      map[string]any    `json:"attrs,omitempty"`
-	// Stalls counts the sends of an image record whose upload did not get through in its
-	// time; delivery gives up the image's bytes after a few. Local only.
-	Stalls int `json:"stalls,omitempty"`
+	// Attempts counts the sends of an image record that reached the host and did not get
+	// through; delivery gives up the image's bytes after a few. Local only.
+	Attempts int `json:"attempts,omitempty"`
 }
 
 // ValidTraceID reports whether id is an OTel trace id: 32 lowercase hex digits, not all zero.

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"maps"
+	"math"
 	"net"
 	"net/http"
 	"slices"
@@ -15,30 +16,27 @@ import (
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/config"
+	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/promptimage"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
-// A terma.prompt.image record leaves in a lane of its own. Hooks spool it to the image
-// spool (spool.ImageDir), apart from the events, and a detached pass of its own sends it,
-// so no event waits on an upload. The spool holds what the record says of the image, never
-// the bytes, which wait in the image store (promptimage) and join the record only in its
-// own request: no request outgrows what the platform takes in one. The store forgets the
-// bytes once no record still queued names them.
+// A terma.prompt.image record leaves in a lane of its own: hooks spool it to the image
+// spool (spool.ImageDir) and a detached pass sends it, so no event waits on an upload. The
+// record holds no bytes; they wait in the image store (promptimage) and join the record only
+// in its own request, and the store forgets them once no queued record names them.
 
-// ImagePassTimeout bounds a pass of the image lane. The largest image's request
-// (promptimage.MaxBytes in base64, about 2.8 MB) is given timeoutFor's minute on the slowest
-// uplink it allows for, 64 KiB/s, and is started only with all of it left: the pass has room
-// for five of those, where the events' 30 s (spool.DefaultFlushTimeout) has room for none.
+// ImagePassTimeout bounds a pass of the image lane. The largest image's request (about
+// 2.8 MB) gets timeoutFor's minute at 64 KiB/s and starts only with all of it left: five fit
+// in a pass, none in the events' 30 s.
 const ImagePassTimeout = 5 * time.Minute
 
-// imageMaxStalls is how many times an image's upload may stall before its record is sent
-// without its bytes (unsent): each stall spent up to a minute of the uplink on it.
-const imageMaxStalls = 4
+// imageMaxAttempts is how many sends of an image that reached the host and did not get
+// through it is given before its record is sent without its bytes (unsent).
+const imageMaxAttempts = 4
 
-// imageEnvelope bounds what an image record's request holds besides the image: the
-// record's other attributes and the OTLP envelope around it.
+// imageEnvelope bounds an image request's size besides the image itself.
 const imageEnvelope = 8 << 10
 
 // errNoTimeLeft is an image not sent because too little of the pass was left for it.
@@ -48,17 +46,16 @@ var errNoTimeLeft = errors.New("too little of the pass left for the image")
 // reason, and count image records.
 type ImageResult struct {
 	Sent, Held, Failed, Expired, Pruned, Dropped, Unroutable, Withheld int
-	// Deferred counts the images left untried for a later pass: their project's images
-	// wait out a window, too little of the pass was left for one, or the pass ended first.
+	// Deferred counts the images left untried for a later pass: a window was open, too
+	// little of the pass was left, or the pass ended first.
 	Deferred int
 	Skipped  bool
 	Reason   spool.SkipReason
 	Err      error
-	// Failures names each project whose image the host refused or could not be reached for.
-	Failures []Failure
-	// Stalls names each project whose image did not get through in its time, one record each:
-	// news about the uplink, not the host, so the pass does not fail for it.
-	Stalls []Failure
+	// Failures names each project whose image the host refused, left unanswered or could not
+	// be reached for; Stalls each whose upload did not finish in its time (the uplink, which
+	// fails nothing). Both are requeued and back off the project's images.
+	Failures, Stalls []Failure
 	// Waiting names each project whose images window was open.
 	Waiting   []Wait
 	Endpoints []string
@@ -98,18 +95,13 @@ type imageItem struct {
 	out    spool.Event
 }
 
-// FlushImages delivers the image lane, r.Images: each image in a request of its own, with
-// its bytes, settled in the queue as soon as it went, so a pass cut short resends none.
-// Projects take turns, one image each, so no team's backlog fills the pass, and a project's
-// images go in the order of how often they stalled. Its pass runs up to ImagePassTimeout,
-// and only one runs at a time: another already delivering skips this one. events is the
-// events' spool, which may still hold image records an older build spooled there; their
-// bytes stay too.
-//
-// An image that stalls (its upload did not get through in its time) goes to the back of
-// the queue and opens its project's images window: the project's other images wait for the
-// window rather than spend the pass on an uplink that just failed one. After imageMaxStalls
-// stalls its record is sent without its bytes.
+// FlushImages delivers the image lane, r.Images, one image to a request, settling each in
+// the queue as it goes so a pass cut short resends none. Projects take turns, one image
+// each, starting a project further on each pass; a project's images go fewest attempts
+// first, then oldest. A send that reaches the host and does not get through counts an
+// attempt, goes to the back of the queue and opens the project's images window. Only one
+// pass runs at a time. events is the events' spool, whose records from an older build may
+// still name stored bytes; nil keeps every stored image.
 func (r Router) FlushImages(ctx context.Context, events *spool.Spool, cfg *config.Config, force bool) ImageResult {
 	var res ImageResult
 	s := r.Images
@@ -149,7 +141,7 @@ func (r Router) FlushImages(ctx context.Context, events *spool.Spool, cfg *confi
 				ids = append(ids, imageID(p.Event))
 			}
 			var turns []*imageQueue
-			for _, id := range slices.Sorted(maps.Keys(byProject)) {
+			for _, id := range startingAfter(slices.Sorted(maps.Keys(byProject)), s.Mark()) {
 				items := byProject[id]
 				// The window first: a project waiting out one needs no key this pass.
 				if next := s.RetryAt(id); !force && now.Before(next) {
@@ -168,8 +160,13 @@ func (r Router) FlushImages(ctx context.Context, events *spool.Spool, cfg *confi
 					res.Held += len(items)
 					continue
 				}
-				slices.SortStableFunc(items, func(a, b imageItem) int { return cmp.Compare(a.out.Stalls, b.out.Stalls) })
+				slices.SortStableFunc(items, func(a, b imageItem) int {
+					return cmp.Or(cmp.Compare(a.out.Attempts, b.out.Attempts), a.out.Time.Compare(b.out.Time))
+				})
 				turns = append(turns, &imageQueue{id: id, sender: sender, items: items})
+			}
+			if len(turns) > 0 {
+				s.SetMark(turns[0].id)
 			}
 			for len(turns) > 0 {
 				var next []*imageQueue
@@ -191,14 +188,20 @@ func (r Router) FlushImages(ctx context.Context, events *spool.Spool, cfg *confi
 						accepted[q.sender.Endpoint] = true
 						res.Sent++
 						ids = append(ids, imageID(item.out))
+						if len(q.items) > 0 {
+							next = append(next, q)
+						}
+						continue
 					case imageDeferred:
 						res.Deferred++
+						if len(q.items) > 0 {
+							next = append(next, q)
+						}
+						continue
 					case imageStalled:
-						item.out.Stalls++
-						settle(item.queued, item.out)
 						res.Stalls = append(res.Stalls, Failure{ProjectID: q.id, Endpoint: q.sender.Endpoint, Err: err,
 							RetryAt: s.DestinationStalled(q.id, time.Now())})
-					case imageFailed:
+					case imageFailed, imageUnreached:
 						f := Failure{ProjectID: q.id, Endpoint: q.sender.Endpoint, Err: err}
 						// A pass cut short by its own deadline learned nothing about the host.
 						if ctx.Err() == nil {
@@ -208,14 +211,14 @@ func (r Router) FlushImages(ctx context.Context, events *spool.Spool, cfg *confi
 						errs = append(errs, fmt.Errorf("%s (%s): %w", q.id, q.sender.Endpoint, err))
 						res.Failed++
 					}
-					if outcome == imageStalled || outcome == imageFailed {
-						// The project's other images wait for the window its stall or failure opened.
-						res.Deferred += len(q.items)
-						q.items = nil
+					if outcome != imageUnreached {
+						// An attempt the record may be to blame for: it goes to the back.
+						again := item.queued.Event
+						again.Attempts++
+						settle(item.queued, again)
 					}
-					if len(q.items) > 0 {
-						next = append(next, q)
-					}
+					// The project's other images wait for the window just opened.
+					res.Deferred += len(q.items)
 				}
 				turns = next
 			}
@@ -233,27 +236,56 @@ func (r Router) FlushImages(ctx context.Context, events *spool.Spool, cfg *confi
 	return res
 }
 
-// imageOutcome is how one image's send went, for what the lane does next.
+// ImagesDue reports whether a pass of the image lane s has work at now: a queued record
+// whose project's images window is closed, or that names no project. A queue it cannot
+// read is due, for the pass to sort out.
+func ImagesDue(s *spool.Spool, now time.Time) bool {
+	queued, err := s.Peek(math.MaxInt)
+	if err != nil {
+		return true
+	}
+	windows := s.RetryWindows(now)
+	for _, e := range queued {
+		id, _ := e.Attrs[hookrun.AttrProjectID].(string)
+		if _, waiting := windows[id]; !waiting {
+			return true
+		}
+	}
+	return false
+}
+
+// startingAfter is ids, sorted, rotated to start with the first after mark, so the
+// project that went first last pass goes last this one.
+func startingAfter(ids []string, mark string) []string {
+	i, _ := slices.BinarySearch(ids, mark)
+	if i < len(ids) && ids[i] == mark {
+		i++
+	}
+	i %= max(len(ids), 1)
+	return slices.Concat(ids[i:], ids[:i])
+}
+
+// imageOutcome is how one image's send went.
 type imageOutcome int
 
 const (
 	// imageDelivered is an image the host took.
 	imageDelivered imageOutcome = iota
-	// imageDeferred is an image left for a later pass having learned nothing: too little of
-	// the pass was left to start it, the pass was cancelled, or it ran out before the host
-	// was reached.
+	// imageDeferred is an image untried, or cut off by the pass having learned nothing.
 	imageDeferred
-	// imageStalled is an upload that reached the host and did not finish writing its body in
-	// its time: news about the uplink, which backs off only the project's images.
+	// imageStalled is an upload that reached the host and did not finish in its time: the
+	// uplink. It counts an attempt.
 	imageStalled
-	// imageFailed is news about the host: its own answer, no answer in time to a body all
-	// written, or a failure to reach it (DNS, the dial, the TLS handshake, its timeout too).
+	// imageFailed is an image the host refused, or did not answer once its body was all
+	// written (the last socket buffer of it may still have been on its way). It counts an
+	// attempt.
 	imageFailed
+	// imageUnreached is a host that could not be reached (DNS, the dial, the TLS handshake)
+	// or refused the key: nothing about the record, so it counts no attempt.
+	imageUnreached
 )
 
-// judgeImage is how a send that ended in err went, in pass, having got as far as got. A
-// body all written that the host did not answer in time is the host's, though the last
-// socket buffer of it may still have been on its way: its window backs off all the same.
+// judgeImage is how a send that ended in err went, in pass, having got as far as got.
 func judgeImage(pass context.Context, err error, got progress) imageOutcome {
 	var ingest *IngestError
 	switch {
@@ -261,10 +293,14 @@ func judgeImage(pass context.Context, err error, got progress) imageOutcome {
 		return imageDelivered
 	case errors.Is(err, errNoTimeLeft), errors.Is(pass.Err(), context.Canceled):
 		return imageDeferred
+	case errors.As(err, &ingest) && ingest.KeyRefused():
+		return imageUnreached
 	case errors.As(err, &ingest):
 		return imageFailed
 	case got == notReached && errors.Is(pass.Err(), context.DeadlineExceeded):
 		return imageDeferred
+	case got == notReached:
+		return imageUnreached
 	case got == reached && uploadBroke(err):
 		return imageStalled
 	}
@@ -282,10 +318,8 @@ func uploadBroke(err error) bool {
 }
 
 // sendImage sends one image record with its bytes from the store, and judges how it went.
-// An image is started only with all its request's time left, judged from the size its
-// record names before its bytes are read. An image the platform refuses outright (a 400 or
-// 413: the record, not the host or the key) goes again without them, saying so, rather than
-// holding up every image after it for as long as it waits.
+// It starts only with all its request's time left, judged from the record's size before the
+// bytes are read. One refused outright (400 or 413) goes again without them, saying so.
 func (r Router) sendImage(ctx context.Context, sender *otlpSender, e spool.Event) (imageOutcome, error) {
 	if err := ctx.Err(); err != nil {
 		return judgeImage(ctx, err, notReached), err
@@ -308,7 +342,7 @@ func (r Router) sendImage(ctx context.Context, sender *otlpSender, e spool.Event
 // imageRequestSize is how large e's request will be at most, from the size its record names:
 // its bytes in base64 when it will carry them, and its envelope.
 func imageRequestSize(e spool.Event) int {
-	if _, omitted := e.Attrs[semconv.TermaImageOmittedKey]; omitted || e.Stalls >= imageMaxStalls {
+	if _, omitted := e.Attrs[semconv.TermaImageOmittedKey]; omitted || e.Attempts >= imageMaxAttempts {
 		return imageEnvelope
 	}
 	// A spooled number decodes as float64; a record not yet spooled holds an int.
@@ -331,46 +365,41 @@ func (r Router) timeout(n int) time.Duration {
 }
 
 // forgetImages removes the stored bytes of the images ids this pass sent or let go that no
-// record still queued in spools names: a replayed batch, or another prompt with the same
-// image still waiting, keeps them. It reads spools in order, so the events' spool goes
-// before the image lane's: the events' pass hands an image on to the lane before it lets
-// it go from its own, and a record moving meanwhile is found in one or the other. It then
-// prunes what outlived the spool's records.
+// record still queued in spools names, and prunes what outlived the spools' records. It
+// sweeps nothing unless it read every spool: a nil one may hold records it cannot see. The
+// events' spool goes first: its pass hands an image on to the lane before letting it go, so
+// a record moving meanwhile is found in one or the other.
 //
-// A record parked in a repository's git directory (hookrun's park) is in no spool: when the
-// same image's other record is sent first, the parked one later leaves saying its bytes are
-// unavailable. Parking is a sandboxed hook's last resort and the same image pasted twice
-// across it rare, so that is accepted rather than searched for in every repository.
+// A record parked in a repository's git directory (hookrun's park) is in no spool: should
+// its image's other record go first, it later leaves saying its bytes are unavailable.
+// Parking is a sandboxed hook's last resort and such twins rare, so that is accepted.
 func (r Router) forgetImages(ids []string, passStart time.Time, spools ...*spool.Spool) {
-	if len(ids) > 0 {
-		named := map[string]bool{}
-		read := true
-		for _, s := range spools {
-			if s == nil {
-				continue
-			}
-			found, err := s.Mentions(ids)
-			if err != nil {
-				read = false
-				break
-			}
-			maps.Copy(named, found)
-		}
-		if read {
-			promptimage.Sweep(r.StateDir, ids, func(id string) bool { return named[id] }, passStart)
-		}
-	}
 	promptimage.Prune(r.StateDir, passStart.Add(-spool.MaxAge))
+	if len(ids) == 0 {
+		return
+	}
+	named := map[string]bool{}
+	for _, s := range spools {
+		if s == nil {
+			return
+		}
+		found, err := s.Mentions(ids)
+		if err != nil {
+			return
+		}
+		maps.Copy(named, found)
+	}
+	promptimage.Sweep(r.StateDir, ids, func(id string) bool { return named[id] }, passStart)
 }
 
 // withImageData is the image record e with its bytes from the store, or saying why it has
-// none: they are gone, or its upload stalled too often to try again.
+// none: they are gone, or it was tried too often.
 func withImageData(stateDir string, e spool.Event) spool.Event {
 	if _, omitted := e.Attrs[semconv.TermaImageOmittedKey]; omitted {
 		return e
 	}
 	e.Attrs = maps.Clone(e.Attrs)
-	if e.Stalls >= imageMaxStalls {
+	if e.Attempts >= imageMaxAttempts {
 		e.Attrs[semconv.TermaImageOmittedKey] = semconv.TermaImageOmittedUnsent
 	} else if data, ok := promptimage.Load(stateDir, imageID(e)); ok {
 		e.Attrs[semconv.TermaImageDataKey] = data

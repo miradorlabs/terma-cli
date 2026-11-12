@@ -292,3 +292,36 @@ func TestTeardownWaitsForTheImagePass(t *testing.T) {
 		t.Fatalf("the image queue outlived teardown: %v", err)
 	}
 }
+
+// The events' flush starts no image pass while every queued image's team waits out its
+// images window.
+func TestSpoolFlushStartsNoImagePassWhileImagesWait(t *testing.T) {
+	useConfigDir(t, t.TempDir())
+	acceptingOTLP(t)
+	spoolForTest(t)
+	images, err := spool.Open(filepath.Join(testApp.stateDir, spool.ImageDir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := images.Append(spool.Event{Name: semconv.TermaPromptImageEvent, Attrs: map[string]any{hookrun.AttrProjectID: spoolTestProject}}); err != nil {
+		t.Fatal(err)
+	}
+	images.DestinationStalled(spoolTestProject, time.Now())
+	started := 0
+	prev := testApp.startImageFlush
+	testApp.startImageFlush = func() { started++ }
+	t.Cleanup(func() { testApp.startImageFlush = prev })
+	if _, err := testApp.flushSpool(t.Context(), true, 0); err != nil {
+		t.Fatal(err)
+	}
+	if started != 0 {
+		t.Fatal("an image pass started while its team's images wait")
+	}
+	images.DestinationDelivered(spoolTestProject, time.Now())
+	if _, err := testApp.flushSpool(t.Context(), true, 0); err != nil {
+		t.Fatal(err)
+	}
+	if started != 1 {
+		t.Fatalf("image passes started: %d, want 1 once the window closed", started)
+	}
+}

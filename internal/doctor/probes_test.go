@@ -222,9 +222,13 @@ func TestTheBackendCheckWarnsForAStalledImage(t *testing.T) {
 					return Delivery{Sent: 1, Delivered: "1 event", Images: images}, nil
 				}}
 			c := BackendCheck(t.Context(), p, "p1")
-			want := "were not delivered"
+			whose := "one of this team's images"
+			if project != "p1" {
+				whose = "one of another team's (p2) images"
+			}
+			want := whose + " was not delivered"
 			if stalled {
-				want = "did not finish uploading"
+				want = whose + " did not finish uploading"
 			}
 			if c.Status != Warn || !strings.Contains(c.Detail, want) {
 				t.Errorf("%s's images, stalled %v: %+v", project, stalled, c)

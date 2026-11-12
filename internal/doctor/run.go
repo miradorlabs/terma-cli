@@ -417,9 +417,9 @@ func imageNotes(q ImageQueue, projectID string) []string {
 		}
 		at := q.Windows[id].Local().Format(time.Kitchen)
 		if q.Stalled[id] {
-			notes = append(notes, "an image of "+team+" did not finish uploading in its time (a slow connection); its images retry after "+at)
+			notes = append(notes, "one of "+team+" images did not finish uploading in its time (a slow connection); they retry after "+at)
 		} else {
-			notes = append(notes, team+" images were not delivered; they retry after "+at)
+			notes = append(notes, "one of "+team+" images was not delivered; they retry after "+at)
 		}
 	}
 	return notes
