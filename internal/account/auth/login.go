@@ -26,7 +26,11 @@ const maxCallbackBody = 8 << 10
 
 // TokenExchanger performs the code exchange against the API gateway.
 type TokenExchanger interface {
+	// ExchangeCode redeems a browser approval's code, sent to the listener on port.
 	ExchangeCode(ctx context.Context, code, verifier string, port int) (*Credential, error)
+	// ExchangeDelegatedCode redeems a code Terma Desktop obtained for this process's
+	// challenge, which no listener took (redirect_port 0).
+	ExchangeDelegatedCode(ctx context.Context, code, verifier string) (*Credential, error)
 }
 
 // LoginOptions is what a browser sign-in needs beyond the token exchange.

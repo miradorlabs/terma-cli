@@ -76,6 +76,9 @@ type Profile struct {
 	// Failed marks a scenario that failed for the build: its requests may stop short of a
 	// whole turn, or be an error path's.
 	Failed bool `json:"failed,omitempty"`
+	// unpublished marks a profile a test recorded that ran no harness's build, a unit test's of
+	// a made-up one: the test reads it back, and WriteProfiles leaves it out.
+	unpublished bool
 	// Command is the scenario's command line, the prompt left out: what it set that a
 	// user's own run would not (a fixture provider, a feature off) is said there.
 	Command  []string          `json:"command,omitempty"`
@@ -128,13 +131,14 @@ func profileOf(t *testing.T, b Binary) *Profile {
 	t.Helper()
 	scenario, _, _ := strings.Cut(t.Name(), "/")
 	id := profileID{b.Harness, b.Version, scenario}
+	unpublished := harnessOf(t) == ""
 	profilesMu.Lock()
 	defer profilesMu.Unlock()
 	if p := profiles[id]; p != nil {
 		return p
 	}
 	p := &Profile{Harness: b.Harness, Version: b.Version, Scenario: scenario, Platform: runtime.GOOS + "/" + runtime.GOARCH,
-		Requests: []ProviderRequest{}, At: time.Now().UTC()}
+		Requests: []ProviderRequest{}, At: time.Now().UTC(), unpublished: unpublished}
 	profiles[id] = p
 	t.Cleanup(func() {
 		profilesMu.Lock()
@@ -417,7 +421,9 @@ func WriteProfiles(dir string) error {
 	profilesMu.Lock()
 	rows := make([]Profile, 0, len(profiles))
 	for _, p := range profiles {
-		rows = append(rows, *p)
+		if !p.unpublished {
+			rows = append(rows, *p)
+		}
 	}
 	profilesMu.Unlock()
 	if len(rows) == 0 {

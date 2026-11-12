@@ -21,7 +21,8 @@ type tokenRequest struct {
 	GrantType    string `json:"grant_type"`
 	Code         string `json:"code,omitempty"`
 	CodeVerifier string `json:"code_verifier,omitempty"`
-	RedirectPort int    `json:"redirect_port,omitempty"`
+	// RedirectPort is a pointer so a delegated code's 0 is sent, and a refresh sends none.
+	RedirectPort *int   `json:"redirect_port,omitempty"`
 	RefreshToken string `json:"refresh_token,omitempty"`
 }
 
@@ -50,11 +51,22 @@ type LoginResult struct {
 
 // ExchangeCode implements auth.TokenExchanger.
 func (c *Client) ExchangeCode(ctx context.Context, code, verifier string, port int) (*auth.Credential, error) {
+	return c.exchangeCode(ctx, code, verifier, port)
+}
+
+// ExchangeDelegatedCode implements auth.TokenExchanger for a code Terma Desktop obtained
+// for this process's challenge. No listener took it, so redirect_port is 0; the auth host
+// accepts 0 only for a code its own record says was delegated.
+func (c *Client) ExchangeDelegatedCode(ctx context.Context, code, verifier string) (*auth.Credential, error) {
+	return c.exchangeCode(ctx, code, verifier, 0)
+}
+
+func (c *Client) exchangeCode(ctx context.Context, code, verifier string, port int) (*auth.Credential, error) {
 	resp, err := c.postToken(ctx, tokenRequest{
 		GrantType:    "authorization_code",
 		Code:         code,
 		CodeVerifier: verifier,
-		RedirectPort: port,
+		RedirectPort: &port,
 	})
 	if err != nil {
 		return nil, err
@@ -259,9 +271,10 @@ func (c *Client) redeem(ctx context.Context, held, current *auth.Credential, red
 		return err
 	}
 	cred := c.credentialFrom(resp)
-	// A refresh keeps the session and its user.
+	// A refresh keeps the session, its user and its label.
 	cred.SessionID = cmp.Or(cred.SessionID, current.SessionID)
 	cred.UserID = cmp.Or(cred.UserID, current.UserID)
+	cred.Label = current.Label
 	// The server has spent current's refresh token, so this pair is the session's only
 	// live one. Hold it before trying to store it.
 	c.replace(cred)

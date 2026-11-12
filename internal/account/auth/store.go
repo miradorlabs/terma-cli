@@ -37,6 +37,9 @@ type Credential struct {
 	// UserID is the Mirador user who signed in, as every token exchange names them: a
 	// credential saved before it was kept gains it at its next refresh.
 	UserID string `json:"user_id,omitempty"`
+	// Label is the session label a desktop grant asked for (DesktopLabel), kept so doctor
+	// can say the sign-in came from Terma Desktop; "" for a browser sign-in.
+	Label string `json:"label,omitempty"`
 	// StaleKeychainItem marks a credential kept in the file while its earlier tokens may
 	// still sit in the keychain, which could not remove them then; sign-out tries again.
 	StaleKeychainItem bool `json:"stale_keychain_item,omitempty"`

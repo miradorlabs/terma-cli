@@ -15,13 +15,21 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
+# Linux jobs run on Blacksmith (Ubuntu 24.04), as mirador-platform's do: their apt mirrors
+# and network are not GitHub-hosted runners'. macOS and Windows stay on GitHub's.
 jobs:
   npm-installer:
+    # The check keeps its name (`npm-installer (ubuntu-latest)` is required): a matrix job's
+    # default name would list `runner` too.
+    name: npm-installer (${{ matrix.os }})
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
+        include:
+          - os: ubuntu-latest
+            runner: blacksmith-2vcpu-ubuntu-2404
+    runs-on: ${{ matrix.runner || matrix.os }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v5
@@ -30,7 +38,7 @@ jobs:
       - run: npm test --prefix npm
 
   test:
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
       - uses: actions/checkout@v7
 
@@ -116,7 +124,7 @@ jobs:
   # The same through the Secret Service a Linux desktop runs (GNOME Keyring), unlocked
   # in a D-Bus session of its own; macOS's Keychain is exercised by hand.
   keychain-linux:
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v6
@@ -134,7 +142,7 @@ jobs:
 
   # The e2e suite is a separate module; its offline contracts must run in CI too.
   live-contracts:
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     defaults:
       run:
         working-directory: test/e2e
@@ -170,8 +178,9 @@ jobs:
       # TestRelay* is the local relay: the same harnesses exporting globally through
       # `terma relay run`, and nothing but the claimed session reaching the receiver.
       # TestMachineHooks* is where setup's machine-wide hooks record: beside a
-      # repository's own, in the repositories the team admits.
-      E2E_TESTS: '^(TestClaudeTelemetry|TestCodexTelemetry|TestClaudeStopFailureDelivery|TestRelay.*|TestMachineHooks.*|TestPi.*|TestGemini.*|TestDsh.*|TestHermes.*|TestCopilot.*)$'
+      # repository's own, in the repositories the team admits. TestDesktopGrant is Terma
+      # Desktop signing the CLI in over its stdin.
+      E2E_TESTS: '^(TestClaudeTelemetry|TestCodexTelemetry|TestClaudeStopFailureDelivery|TestRelay.*|TestMachineHooks.*|TestPi.*|TestGemini.*|TestDsh.*|TestHermes.*|TestCopilot.*|TestDesktopGrant)$'
       TERMA_ENV: dev
       TERMA_E2E: "1"
       TERMA_E2E_CLAUDE_VERSIONS: "2.1.283"
@@ -229,7 +238,7 @@ jobs:
   # plugin directory and ships in the release archives. `make test-plugin` skips it
   # wherever bun is absent, so CI is where it is actually run.
   opencode-plugin:
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     defaults:
       run:
         working-directory: internal/agents/opencode/plugin
@@ -243,7 +252,7 @@ jobs:
   # terma setup's git hook scripts run on every developer's machine: they must be
   # POSIX sh, and they must keep working on the sh that Debian/Alpine ship.
   shim-portability:
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v6
@@ -261,7 +270,7 @@ jobs:
   # real release's does (a --snapshot build's would not, and `brew audit` rejects
   # it). Nothing is published. The two jobs after this one install what it built.
   release-dry-run:
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
       - uses: actions/checkout@v7
         with:
@@ -297,7 +306,7 @@ jobs:
   # scripts/test-install.sh.
   install-script:
     needs: release-dry-run
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     steps:
       - uses: actions/checkout@v7
       - uses: actions/download-artifact@v8
@@ -329,6 +338,36 @@ jobs:
           cache: true
       - run: go test ./internal/shellrc/
       - run: ./scripts/test-install.sh dist v0.0.0-ci
+
+  # `irm https://terma.ai/install.ps1 | iex`, as Terma Desktop runs it on Windows, against
+  # those archives served over loopback: under Windows PowerShell 5.1 and PowerShell 7, the
+  # default destination and the user PATH (never the machine's), a reinstall over a running
+  # terma, the opt-out, and the two refusals. scripts/test-install.ps1.
+  install-script-windows:
+    needs: release-dry-run
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: release-dry-run
+          path: dist
+      # Windows PowerShell 5.1 is what `powershell` starts on every Windows machine; the
+      # script must not use anything newer.
+      - name: Parse under Windows PowerShell 5.1 and PowerShell 7
+        shell: pwsh
+        run: |
+          foreach ($shell in 'powershell', 'pwsh') {
+            & $shell -NoProfile -Command {
+              foreach ($f in 'install.ps1', 'scripts/test-install.ps1') {
+                $errors = $null
+                [void][Management.Automation.Language.Parser]::ParseFile((Resolve-Path $f).Path, [ref]$null, [ref]$errors)
+                if ($errors) { $errors | ForEach-Object { Write-Host "${f}: $_" }; exit 1 }
+              }
+            }
+            if ($LASTEXITCODE) { throw "install.ps1 does not parse under $shell" }
+          }
+      - run: pwsh -NoProfile -File scripts/test-install.ps1 dist v0.0.0-ci
 
   # `brew install miradorlabs/tap/terma`, with the cask the release would push:
   # `brew audit --strict`, then a real install from a throwaway local tap whose

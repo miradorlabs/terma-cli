@@ -1,19 +1,28 @@
 package cli
 
 import (
+	"bytes"
 	"context"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/spf13/cobra"
 
 	"github.com/miradorlabs/terma-cli/internal/account/auth"
+	"github.com/miradorlabs/terma-cli/internal/account/keystore"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/doctor"
+	"github.com/miradorlabs/terma-cli/internal/relay"
+	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
 )
 
@@ -409,5 +418,161 @@ func TestSetupReleasesTheRelayFromADeselectedAgent(t *testing.T) {
 	}
 	if got := read(geminiSettings); got != geminiMine {
 		t.Fatalf("Gemini CLI's own settings changed:\n%s", got)
+	}
+}
+
+// otlpRequest is one request an ingest host received: the key it came with and its body.
+type otlpRequest struct {
+	auth string
+	body []byte
+}
+
+// recordingIngest is an ingest host that takes every request and keeps it.
+type recordingIngest struct {
+	*httptest.Server
+	mu       sync.Mutex
+	requests []otlpRequest
+}
+
+func newRecordingIngest(t *testing.T) *recordingIngest {
+	t.Helper()
+	h := &recordingIngest{}
+	h.Server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		h.mu.Lock()
+		h.requests = append(h.requests, otlpRequest{auth: r.Header.Get("Authorization"), body: body})
+		h.mu.Unlock()
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(h.Close)
+	return h
+}
+
+// take returns the requests received since the last take.
+func (h *recordingIngest) take() []otlpRequest {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	got := h.requests
+	h.requests = nil
+	return got
+}
+
+// The cutover when Terma Desktop moves the CLI to another organization (the organization-
+// model council's item 1a), proved on the existing routing: work in flight keeps its team
+// and that team's restrictions, nothing is sent for the old team while the profile is on
+// the new organization, never with the new team's key nor under its wider policy, and a
+// switch back collects for the old team under its own policy again.
+func TestDesktopGrantCutoverKeepsInFlightWorkWithItsTeam(t *testing.T) {
+	gateway := grantSandbox(t)
+	t.Setenv("TERMA_POLICY_STUB", "") // the real fetches, which the account service scopes
+	gateway.scopedPolicies = true
+	teamA, personal := teamOrgTeam(), personalTeam()
+	gateway.policyBodies = map[string]string{
+		// The SHARED organization's team: one repository, no prompts, no tool content.
+		teamA: `{"policy":{"version":"1.1","terma":{"per_repository":{"repositories":["github.com/acme/app"]},"git_hooks":false,"capture":{"exclude_prompts":true,"exclude_tool_content":true}}},"revision":1,"updated_at":"2026-11-01T00:00:00Z"}`,
+		// Personal's starts on Collect All: every session, all content.
+		personal: `{"policy":{"version":"1.1","terma":{"global":{},"git_hooks":false,"capture":{"exclude_prompts":false,"exclude_tool_content":false}}},"revision":1,"updated_at":"2026-11-01T00:00:00Z"}`,
+	}
+	ingest := newRecordingIngest(t)
+	t.Setenv("TERMA_OTLP_URL", ingest.URL)
+	gateway.grant("to-team", orgA().ID, deskUser)
+	gateway.grant("to-personal", personalOrg().ID, deskUser)
+	setupFor := func(org organization, team, code string) {
+		t.Helper()
+		stdin := identityLine(deskUser, org.ID)
+		if code != "" {
+			stdin += `{"code":"` + code + `"}` + "\n"
+		}
+		if stdout, stderr, err := desktopSetup(t, stdin, org.ID, team); err != nil {
+			t.Fatalf("setup for %s: %v\n%s%s", org.Name, err, stdout, stderr)
+		}
+		ingest.take() // setup's own check-in is not the delivery under test
+	}
+	keyOf := func(team string) string {
+		t.Helper()
+		key, err := keystore.Get(testApp.dir, team)
+		if err != nil || key == "" {
+			t.Fatalf("no key for team %s: %v", team, err)
+		}
+		return key
+	}
+	// resolve is what a relay started now does with the claim of session sid.
+	resolve := func(sid string) (relay.Policy, error) {
+		t.Helper()
+		c, ok := claim.Read(testApp.stateDir, sid, time.Now())
+		if !ok {
+			t.Fatalf("session %s has no claim", sid)
+		}
+		cfg, err := testApp.loadConfig()
+		if err != nil {
+			t.Fatal(err)
+		}
+		return testApp.relayDeps().Resolver(cfg, nil)(c)
+	}
+	flush := func() []otlpRequest {
+		t.Helper()
+		if _, err := testApp.flushSpool(t.Context(), true, 0); err != nil {
+			t.Fatal(err)
+		}
+		return ingest.take()
+	}
+
+	// On the SHARED organization: events queued for team A, and a session claimed for it.
+	setupFor(orgA(), teamA, "to-team")
+	keyA := keyOf(teamA)
+	s := spoolForTest(t)
+	appendEvent(t, s, teamA, time.Now())
+	appendEvent(t, s, teamA, time.Now())
+	if !claim.Write(testApp.stateDir, "in-flight", claim.Claim{ProjectID: teamA, Tool: "codex", Repository: appRepo}, time.Now()) {
+		t.Fatal("could not claim the session")
+	}
+	if pol, err := resolve("in-flight"); err != nil || pol.Key != keyA || pol.IncludePrompts || pol.IncludeToolContent {
+		t.Fatalf("before the switch the claim resolves to %+v, %v; want team A's key and policy", pol, err)
+	}
+
+	// Onboarding moves the CLI to Personal.
+	setupFor(personalOrg(), personal, "to-personal")
+	keyP := keyOf(personal)
+	appendEvent(t, s, personal, time.Now()) // Personal's own, which must still go
+	sent := flush()
+	if len(sent) == 0 {
+		t.Fatal("Personal's own event was not delivered: the pass proves nothing")
+	}
+	for _, r := range sent {
+		if r.auth != "Bearer "+keyP || bytes.Contains(r.body, []byte(teamA)) {
+			t.Fatalf("while on Personal a request went with %q carrying team A: %v", r.auth, bytes.Contains(r.body, []byte(teamA)))
+		}
+	}
+	if queued := queuedProjects(t); len(queued) != 2 || queued[0] != teamA || queued[1] != teamA {
+		t.Fatalf("queue = %v, want team A's two events kept under team A", queued)
+	}
+	// A relay started on Personal neither sends the claimed session with Personal's key nor
+	// under Personal's policy: it has no validated policy for team A, so it withholds.
+	if pol, err := resolve("in-flight"); err == nil && (pol.Key == keyP || pol.Signals == nil || len(pol.Signals) != 0) {
+		t.Fatalf("on Personal the claim for team A resolves to %+v", pol)
+	}
+
+	// The desktop switches back: the stored sign-in serves, and team A collects under its own
+	// policy, with its own key.
+	setupFor(orgA(), teamA, "")
+	if gateway.exchanges.Load() != 2 {
+		t.Fatalf("the switch back exchanged a code (%d exchanges); it reuses the stored sign-in", gateway.exchanges.Load())
+	}
+	pol, err := resolve("in-flight")
+	if err != nil || pol.Key != keyA || pol.IncludePrompts || pol.IncludeToolContent || pol.Unadmitted || pol.Signals != nil {
+		t.Fatalf("back on the SHARED organization the claim resolves to %+v, %v; want team A's key and restrictions", pol, err)
+	}
+	appendEvent(t, s, teamA, time.Now())
+	sent = flush()
+	if len(sent) == 0 {
+		t.Fatal("team A's events were not delivered after the switch back")
+	}
+	for _, r := range sent {
+		if r.auth != "Bearer "+keyA {
+			t.Fatalf("team A's events went with %q, not team A's own key", r.auth)
+		}
+	}
+	if queued := queuedProjects(t); len(queued) != 0 {
+		t.Fatalf("queue = %v after the switch back", queued)
 	}
 }

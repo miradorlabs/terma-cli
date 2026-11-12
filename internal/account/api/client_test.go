@@ -168,8 +168,9 @@ func TestClient_RefreshesExpiredTokenBeforeRequesting(t *testing.T) {
 	}
 }
 
-// A refresh that names no user keeps the session's: it is the same sign-in.
-func TestClient_RefreshKeepsTheSessionsUser(t *testing.T) {
+// A refresh that names no user keeps the session's, and its label: it is the same sign-in,
+// so one Terma Desktop delegated stays one for doctor.
+func TestClient_RefreshKeepsTheSessionsUserAndLabel(t *testing.T) {
 	t.Parallel()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == tokenPath {
@@ -184,7 +185,7 @@ func TestClient_RefreshKeepsTheSessionsUser(t *testing.T) {
 	}))
 	defer srv.Close()
 	expired := &auth.Credential{AccessToken: "mir_cli_stale", OrganizationID: "org-1", RefreshToken: "mir_clr_stale",
-		ExpiresAt: time.Now().Add(-time.Hour), UserID: "user-1"}
+		ExpiresAt: time.Now().Add(-time.Hour), UserID: "user-1", Label: "laptop" + auth.DesktopLabelSuffix}
 	client := newTestClient(t, srv.URL, expired, "project-123")
 	if err := client.Get(context.Background(), "/v1/identity", nil, &struct{}{}); err != nil {
 		t.Fatalf("Get: %v", err)
@@ -193,8 +194,9 @@ func TestClient_RefreshKeepsTheSessionsUser(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadCredential: %v", err)
 	}
-	if saved.RefreshToken != "mir_clr_rotated" || saved.UserID != "user-1" {
-		t.Errorf("stored %q / user %q, want the rotated pair and user-1 kept", saved.RefreshToken, saved.UserID)
+	if saved.RefreshToken != "mir_clr_rotated" || saved.UserID != "user-1" || saved.Label != expired.Label {
+		t.Errorf("stored %q / user %q / label %q, want the rotated pair with user-1 and %q kept",
+			saved.RefreshToken, saved.UserID, saved.Label, expired.Label)
 	}
 }
 

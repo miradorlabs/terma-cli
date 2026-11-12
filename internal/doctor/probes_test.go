@@ -98,6 +98,8 @@ func TestDoctorTellsALockedKeychainFromNoSignIn(t *testing.T) {
 	for cred, want := range map[Credential]string{
 		{Email: "dev@example.com", OrganizationID: "org_a"}:               "credentials in the system keychain",
 		{Email: "dev@example.com", OrganizationID: "org_a", InFile: true}: "credentials in plain text",
+		// Terma Desktop's sign-in says so, so a person can tell the two apart.
+		{Email: "dev@example.com", OrganizationID: "org_a", ViaDesktop: true}: "dev@example.com in org_a, signed in through Terma Desktop, credentials in the system keychain",
 	} {
 		probe := func() (Credential, error) { return cred, nil }
 		if c := check(Run(t.Context(), env(t, Probes{Credential: probe, Spool: func() SpoolState { return SpoolState{} }}), Progress{}), KeyAuth); c.Status != Pass || !strings.Contains(c.Detail, want) {

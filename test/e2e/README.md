@@ -423,6 +423,27 @@ capture failed, partial (`refgen -attempted`), so the next check does not take i
 again; the night tries it again. Its publish job and the nightly compat job share a
 concurrency group, so they never push `compat-matrix` at once.
 
+## Model Reference
+
+The same for the models the harnesses run on (`modelref/SCHEMA.md`, published as
+`docs/models` on `compat-matrix`, shown at terma.ai/models and terma.ai/m/<model>). Every
+quarter hour `models.yml` runs `modelref`, which reads Anthropic's, OpenAI's, Google's and xAI's
+model docs as Markdown, models.dev and OpenRouter, and each vendor's API where its key is set
+(`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`, `XAI_API_KEY`); probes each model it has
+not probed with small requests that change one parameter each (`modelref/probe_vendors.go`), and
+every model once a day; joins the Harness Reference for the harnesses that use each model; and
+writes each model's facts, notes against the model before it in its family, and a timeline of
+what changed. A run that finds nothing new writes the same bytes, so `publish.sh publish-models`
+commits only on change; a source not read (an outage) or a probe not answered keeps what it said
+before. Each model listed for the first time is announced in Slack, its X post's text in the
+run's summary.
+
+```bash
+git archive origin/compat-matrix docs/models | tar -x -C /tmp/ref
+go run ./modelref -out /tmp/ref/docs/models -probe none \
+  -harnesses https://raw.githubusercontent.com/miradorlabs/terma-cli/compat-matrix/docs/harnesses
+```
+
 ## Relay restarts
 
 `TestRelayClaudeMidTurn` and `TestRelayCodexMidTurn` stop the relay at a session's second

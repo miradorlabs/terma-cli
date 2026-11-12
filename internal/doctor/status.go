@@ -59,7 +59,7 @@ func Local(ctx context.Context, env Env) (LocalReport, error) {
 		} else if cred.ServerKey != "" {
 			add("Account", "server key %s in %s", cred.ServerKey, cmp.Or(cfg.OrganizationName, cred.OrganizationID))
 		} else {
-			add("Account", "%s in %s, credentials %s", cmp.Or(cred.Email, "signed in"), cmp.Or(cfg.OrganizationName, cred.OrganizationID), cred.Storage())
+			add("Account", "%s in %s%s, credentials %s", cmp.Or(cred.Email, "signed in"), cmp.Or(cfg.OrganizationName, cred.OrganizationID), cred.Origin(), cred.Storage())
 		}
 	}
 	rep.Rows = append(rep.Rows, machineRows(cfg)...)

@@ -7,7 +7,9 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -39,6 +41,29 @@ type fakeAuth struct {
 	// keyPermissions are what whoami says a server key may do: Ingest alone for a key not
 	// listed, nothing at all for one listed as nil.
 	keyPermissions map[string]map[string]bool
+	// grants are the delegated codes /v1/auth/cli/token redeems, each once, for the
+	// session it signs in (fakeGrant); verifiers are the code verifiers it was sent.
+	grants    map[string]fakeGrant
+	exchanges atomic.Int32
+	// scopedPolicies refuses a team's policy to a login of another organization, as the
+	// account service does (403); policyBodies are each team's, over policyBody.
+	scopedPolicies bool
+	policyBodies   map[string]string
+	mu             sync.Mutex
+	verifiers      []string
+	revoked        []string
+}
+
+// fakeGrant is who a delegated code signs in.
+type fakeGrant struct{ org, user string }
+
+// fakeToken is the access token the fake auth host takes for user in org: `ter_cli_<org>`
+// for its default user, u-1, else `ter_cli_<org>~<user>`.
+func fakeToken(org, user string) string {
+	if user == "" || user == "u-1" {
+		return "ter_cli_" + org
+	}
+	return "ter_cli_" + org + "~" + user
 }
 
 var fakeOrgs = []organization{
@@ -58,10 +83,17 @@ func newFakeAuth(t *testing.T) *fakeAuth {
 			f.serveServerKey(w, r, token)
 			return
 		}
-		org := ""
+		if r.URL.Path == "/v1/auth/cli/token" {
+			f.serveToken(w, r)
+			return
+		}
+		org, user := "", "u-1"
 		for _, o := range fakeOrgs {
-			if token == "ter_cli_"+o.ID {
+			if rest, ok := strings.CutPrefix(token, "ter_cli_"+o.ID); ok && (rest == "" || strings.HasPrefix(rest, "~")) {
 				org = o.ID
+				if rest != "" {
+					user = strings.TrimPrefix(rest, "~")
+				}
 			}
 		}
 		if org == "" || token == f.deadToken {
@@ -73,7 +105,7 @@ func newFakeAuth(t *testing.T) *fakeAuth {
 		case "/v1/whoami":
 			f.whoamis.Add(1)
 			_ = json.NewEncoder(w).Encode(map[string]any{
-				"organization_id": org, "auth_type": "cli_token", "user_id": "u-1", "email": "dev@example.com",
+				"organization_id": org, "auth_type": "cli_token", "user_id": user, "email": "dev@example.com",
 			})
 		case "/v1/organizations":
 			f.orgLists.Add(1)
@@ -94,13 +126,23 @@ func newFakeAuth(t *testing.T) *fakeAuth {
 				http.Error(w, "missing project_id", http.StatusBadRequest)
 				return
 			}
-			if f.policyBody != "" {
+			if f.scopedPolicies && !slices.ContainsFunc(projectsIn(org), func(p project) bool { return p.ID == r.URL.Query().Get("project_id") }) {
+				w.WriteHeader(http.StatusForbidden)
+				fmt.Fprint(w, `{"code":"PERMISSION_DENIED","message":"no such team in this organization"}`)
+				return
+			}
+			if body, ok := f.policyBodies[r.URL.Query().Get("project_id")]; ok {
+				fmt.Fprint(w, body)
+			} else if f.policyBody != "" {
 				fmt.Fprint(w, f.policyBody)
 			} else {
 				fmt.Fprint(w, `{"policy":null}`)
 			}
 		case "/v1/auth/cli/revoke":
 			f.revokes.Add(1)
+			f.mu.Lock()
+			f.revoked = append(f.revoked, token)
+			f.mu.Unlock()
 			fmt.Fprint(w, `{}`)
 		case "/v1/api-keys/server":
 			f.keysMint.Add(1)
@@ -116,6 +158,72 @@ func newFakeAuth(t *testing.T) *fakeAuth {
 	}))
 	t.Cleanup(f.srv.Close)
 	return f
+}
+
+// serveToken redeems a delegated code, once, as /v1/auth/cli/token does: only with
+// redirect_port 0, and only for a code it delegated. Every refusal is the auth gateway's
+// one 401 UNAUTHENTICATED, in its envelope.
+func (f *fakeAuth) serveToken(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		GrantType    string `json:"grant_type"`
+		Code         string `json:"code"`
+		CodeVerifier string `json:"code_verifier"`
+		RedirectPort *int   `json:"redirect_port"`
+	}
+	_ = json.NewDecoder(r.Body).Decode(&body)
+	if body.GrantType != "authorization_code" {
+		// Refreshes are refused, as every token here is for good or dead.
+		w.WriteHeader(http.StatusUnauthorized)
+		fmt.Fprint(w, `{"error":{"code":"UNAUTHENTICATED","message":"invalid or expired credentials"}}`)
+		return
+	}
+	f.mu.Lock()
+	grant, ok := f.grants[body.Code]
+	delete(f.grants, body.Code)
+	f.verifiers = append(f.verifiers, body.CodeVerifier)
+	f.mu.Unlock()
+	if !ok || body.RedirectPort == nil || *body.RedirectPort != 0 || body.CodeVerifier == "" {
+		w.WriteHeader(http.StatusUnauthorized)
+		fmt.Fprint(w, `{"error":{"code":"UNAUTHENTICATED","message":"invalid or expired credentials"}}`)
+		return
+	}
+	n := f.exchanges.Add(1)
+	name := ""
+	for _, o := range fakeOrgs {
+		if o.ID == grant.org {
+			name = o.Name
+		}
+	}
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"access_token": fakeToken(grant.org, grant.user), "refresh_token": fmt.Sprintf("ter_clr_granted_%d", n),
+		"token_type": "Bearer", "expires_in": 3600, "session_id": fmt.Sprintf("s-granted-%d", n),
+		"organization": map[string]string{"id": grant.org, "name": name},
+		"user":         map[string]string{"id": grant.user, "email": "dev@example.com"},
+	})
+}
+
+// grant makes code a delegated code for user in org.
+func (f *fakeAuth) grant(code, org, user string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.grants == nil {
+		f.grants = map[string]fakeGrant{}
+	}
+	f.grants[code] = fakeGrant{org: org, user: user}
+}
+
+// verifiersSent are the code verifiers the token endpoint was sent.
+func (f *fakeAuth) verifiersSent() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]string(nil), f.verifiers...)
+}
+
+// revokedTokens are the access tokens of the sessions ended so far.
+func (f *fakeAuth) revokedTokens() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]string(nil), f.revoked...)
 }
 
 type createServerKeyRequestShape struct {
@@ -193,6 +301,25 @@ func TestMatchOrganization(t *testing.T) {
 	}
 	if _, err := matchOrganization(ambiguous, "ac"); err == nil || !strings.Contains(err.Error(), "several") {
 		t.Fatalf("an ambiguous prefix must not guess: %v", err)
+	}
+}
+
+// /v1/organizations' type tells the person's own workspace from a shared organization,
+// whatever the names: the picker says "personal" beside it, and the role beside a shared
+// one.
+func TestOrganizationTypeNamesThePersonalWorkspace(t *testing.T) {
+	var list listOrganizationsResponse
+	body := `{"organizations":[{"id":"s","name":"Personal","role":"admin","type":"shared"},` +
+		`{"id":"p","name":"Personal","role":"admin","type":"personal"},{"id":"o","name":"Old","role":"member"}]}`
+	if err := json.Unmarshal([]byte(body), &list); err != nil {
+		t.Fatal(err)
+	}
+	var notes []string
+	for _, o := range list.Organizations {
+		notes = append(notes, o.note())
+	}
+	if got := strings.Join(notes, ","); got != "admin,personal,member" {
+		t.Fatalf("notes = %s, want admin,personal,member", got)
 	}
 }
 

@@ -1,0 +1,134 @@
+name: Model Reference
+
+# Vendors ship models without notice: every quarter hour, modelref (test/e2e/modelref) reads
+# each vendor's model docs and the public catalogs (a few dozen requests), each vendor's API
+# where its key is set, and probes the models it has not probed yet; once a day it probes every
+# model again (-probe daily). It merges what it read into the published Model Reference (docs/models on
+# compat-matrix), which changes, and is committed, only when something it observes did; and it
+# announces each model listed for the first time in Slack. SCHEMA.md beside modelref says what
+# is published.
+
+on:
+  schedule:
+    # Off the Harness Reference's minutes (reference.yml) and the hour's quarters.
+    - cron: "4,19,34,49 * * * *"
+  workflow_dispatch:
+    inputs:
+      probe:
+        description: "Which models to probe: daily (new, and each model a day after its last answer), new (never probed), all, or none"
+        default: daily
+      announce_since:
+        description: "Also announce models released on or after this date (YYYY-MM-DD), for a vendor's first publish"
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: model-reference
+  cancel-in-progress: false
+
+jobs:
+  # Reading and probing take minutes and hold nothing: only this workflow writes docs/models, and
+  # its own group runs it one at a time.
+  render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      changed: ${{ steps.render.outputs.changed }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: test/e2e/go.mod
+          cache-dependency-path: test/e2e/go.sum
+      - name: Read, probe and render
+        id: render
+        working-directory: test/e2e
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          XAI_API_KEY: ${{ secrets.XAI_API_KEY }}
+          # Each model once a day, by when its probes last observed it (docs/models/probes.json): a
+          # model the API keeps failing is due again next run, alone, at one request a run.
+          PROBE: ${{ inputs.probe || 'daily' }}
+          SINCE: ${{ inputs.announce_since }}
+          HARNESSES: https://raw.githubusercontent.com/${{ github.repository }}/compat-matrix/docs/harnesses
+        run: |
+          (cd ../.. && test/e2e/compatgen/publish.sh restore-models)
+          mkdir -p ../../docs/models && cp -R ../../docs/models "$RUNNER_TEMP/before"
+          status=0
+          go run ./modelref -out ../../docs/models -harnesses "$HARNESSES" -probe "$PROBE" \
+            -announce-since "$SINCE" -announce ../../docs/announcements.json 2>"$RUNNER_TEMP/modelref.log" || status=$?
+          cat "$RUNNER_TEMP/modelref.log" >&2
+          { echo '```'; cat "$RUNNER_TEMP/modelref.log"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          [ "$status" -eq 0 ] || exit "$status"
+          # A run that found nothing new wrote the same bytes: nothing to publish or announce.
+          if diff -rq "$RUNNER_TEMP/before" ../../docs/models >/dev/null; then
+            echo changed=false >> "$GITHUB_OUTPUT"
+          else
+            echo changed=true >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/upload-artifact@v7
+        if: steps.render.outputs.changed == 'true'
+        with:
+          name: models
+          path: |
+            docs/models
+            docs/announcements.json
+          retention-days: 3
+
+  publish:
+    needs: render
+    if: needs.render.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # For the Slack webhook the announcements are posted with.
+    environment: live-harnesses
+    permissions:
+      contents: write
+    # The compat-matrix branch is published by three jobs (this one, reference.yml's and the
+    # nightly live.yml's): never two at once. This one holds it only to publish, starting from
+    # the branch as it is then (publish.sh publish-models).
+    concurrency:
+      group: compat-matrix
+      cancel-in-progress: false
+    steps:
+      # Keeps its token: this job pushes to compat-matrix (publish.sh).
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: models
+          path: docs
+      - name: Publish the reference
+        run: |
+          news=$(jq -r '[.[].model] | join(" ")' docs/announcements.json)
+          mv docs/announcements.json "$RUNNER_TEMP/announcements.json"
+          TERMA_MODELS_SUMMARY="${news:+new $news}" test/e2e/compatgen/publish.sh publish-models
+      # Each model once, the run it is first listed, after it is published. The X post's text is
+      # in the run's summary, to post by hand until the reference has an account to post with.
+      # A post that fails fails the run, so someone sees it and posts it from the summary: a model is
+      # announced the run it is first published, never again. Re-running this job posts every
+      # message again, those that got through included.
+      - name: Announce new models
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_MODELS_WEBHOOK_URL || secrets.SLACK_RELEASES_WEBHOOK_URL || secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          news="$RUNNER_TEMP/announcements.json"
+          [ "$(jq length "$news")" -gt 0 ] || exit 0
+          jq -r '.[] | "### \(.name)\n\n```\n\(.text)\n```\n"' "$news" >> "$GITHUB_STEP_SUMMARY"
+          if [ -z "$SLACK_WEBHOOK_URL" ]; then
+            echo "::notice::No Slack webhook in the live-harnesses environment: $(jq length "$news") new models not announced."
+            exit 0
+          fi
+          failed=0
+          while read -r message; do
+            curl -fsS -X POST -H 'Content-Type: application/json' --data "$message" "$SLACK_WEBHOOK_URL" || failed=$((failed + 1))
+          done < <(jq -c '.[].slack' "$news")
+          if [ "$failed" -gt 0 ]; then
+            echo "::error::$failed of $(jq length "$news") announcements did not reach Slack; their text is in this run's summary."
+            exit 1
+          fi
