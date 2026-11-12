@@ -84,6 +84,9 @@ type Options struct {
 	PeerPID func(client, server netip.AddrPort) (int, bool)
 	// ProcessAlive reports whether a sender still runs; sessionless parts go by process once it exits.
 	ProcessAlive func(pid int) bool
+	// GovernanceSender reports whether a sender is the signed Terma app (DesktopSender), whose
+	// governance records a session's claim places by time; none is when nil.
+	GovernanceSender func(pid int) bool
 	// HTTP sends upstream; a no-redirect client with a 15-second timeout when nil.
 	HTTP *http.Client
 	// Dir is the on-disk outbox, so a restart loses nothing; required for anything to leave.
@@ -310,11 +313,14 @@ func (r *Relay) export(w http.ResponseWriter, req *http.Request, s Signal) {
 	pid := r.senderPID(req)
 	_, global := r.catchAll()
 	narrow := r.opts.CatchAll != nil && !global
+	desktop := pid != 0 && r.opts.GovernanceSender != nil && r.opts.GovernanceSender(pid)
 	for _, p := range parts {
 		p.pid, p.narrow = pid, narrow
 		p.at = earliest(p.msg)
+		p.governance = desktop && governanceOnly(p)
 		r.stats.received(s, p.records)
-		if p.session != "" && !strings.HasPrefix(p.session, tracePrefix) {
+		// The app reports on many sessions: its process names none of them (learnProcess).
+		if p.session != "" && !strings.HasPrefix(p.session, tracePrefix) && !p.governance {
 			r.learnProcess(pid, p.session)
 			p.start = r.rules.conversationStart(p)
 		}

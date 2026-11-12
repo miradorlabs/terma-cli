@@ -23,6 +23,8 @@ const (
 	GenAIRequestReasoningLevelKey = "gen_ai.request.reasoning.level"
 	// GenAIResponseFinishReasonsKey is gen_ai.response.finish_reasons: Array of reasons the model stopped generating tokens, corresponding to each generation received.
 	GenAIResponseFinishReasonsKey = "gen_ai.response.finish_reasons"
+	// GenAIResponseIDKey is gen_ai.response.id: The unique identifier for the completion.
+	GenAIResponseIDKey = "gen_ai.response.id"
 	// GenAIResponseModelKey is gen_ai.response.model: The name of the model that generated the response.
 	GenAIResponseModelKey = "gen_ai.response.model"
 	// GenAIToolCallArgumentsKey is gen_ai.tool.call.arguments: Parameters passed to the tool call.
@@ -39,6 +41,12 @@ const (
 	HostNameKey = "host.name"
 	// MiradorProjectIDKey is mirador.project.id: The Mirador project the record is delivered to, the platform's routing key.
 	MiradorProjectIDKey = "mirador.project.id"
+	// NetworkTransportKey is network.transport: [OSI transport layer](https://wikipedia.org/wiki/Transport_layer) or [inter-process communication method](https://wikipedia.org/wiki/Inter-process_communication).
+	NetworkTransportKey = "network.transport"
+	// ServerAddressKey is server.address: Server domain name if available without reverse DNS lookup; otherwise, IP address or UNIX domain socket name.
+	ServerAddressKey = "server.address"
+	// ServerPortKey is server.port: Server port number.
+	ServerPortKey = "server.port"
 	// ServiceNameKey is service.name: Logical name of the service.
 	ServiceNameKey = "service.name"
 	// ServiceVersionKey is service.version: The version string of the service component. The format is not defined by these conventions.
@@ -131,10 +139,24 @@ const (
 	TermaEvidenceStatusKey = "terma.evidence.status"
 	// TermaExecutionNumberKey is terma.execution.number: The agent's execution counter.
 	TermaExecutionNumberKey = "terma.execution.number"
+	// TermaFileChangedKey is terma.file.changed: Whether the session wrote to the file.
+	TermaFileChangedKey = "terma.file.changed"
+	// TermaFilePathKey is terma.file.path: A file the session's processes used, the home folder written ~.
+	TermaFilePathKey = "terma.file.path"
+	// TermaFileReadBytesKey is terma.file.read_bytes: The bytes the session read from the file, where the platform counts them.
+	TermaFileReadBytesKey = "terma.file.read_bytes"
+	// TermaFileRemovedKey is terma.file.removed: Whether the session deleted the file.
+	TermaFileRemovedKey = "terma.file.removed"
+	// TermaFileRenamedToKey is terma.file.renamed_to: Where the file was moved to, the home folder written ~.
+	TermaFileRenamedToKey = "terma.file.renamed_to"
+	// TermaFileWrittenBytesKey is terma.file.written_bytes: The bytes the session wrote to the file, where the platform counts them.
+	TermaFileWrittenBytesKey = "terma.file.written_bytes"
 	// TermaFilesPathsKey is terma.files.paths: Repository-relative paths the session wrote.
 	TermaFilesPathsKey = "terma.files.paths"
 	// TermaFundingStatusKey is terma.funding.status: Whether the record carries who paid for the session.
 	TermaFundingStatusKey = "terma.funding.status"
+	// TermaGovernanceProcessesCountKey is terma.governance.processes.count: How many processes the session started, the agent's own included.
+	TermaGovernanceProcessesCountKey = "terma.governance.processes.count"
 	// TermaHookEventKey is terma.hook.event: The agent hook that produced the record.
 	TermaHookEventKey = "terma.hook.event"
 	// TermaInstallMethodKey is terma.install.method: How the relay's terma was installed, which says how it gets new releases.
@@ -163,6 +185,32 @@ const (
 	TermaModelParamContextKey = "terma.model_param.context"
 	// TermaModelParamThinkingKey is terma.model_param.thinking: The thinking setting the developer selected for the model.
 	TermaModelParamThinkingKey = "terma.model_param.thinking"
+	// TermaNetworkClosedMsKey is terma.network.closed_ms: When the connection closed, in milliseconds since the Unix epoch; absent while it is open.
+	TermaNetworkClosedMsKey = "terma.network.closed_ms"
+	// TermaNetworkConnectionIDKey is terma.network.connection_id: A connection's id, stable while it is open; its events are versions of one connection.
+	TermaNetworkConnectionIDKey = "terma.network.connection_id"
+	// TermaNetworkExchangeDurationMsKey is terma.network.exchange.duration_ms: How long the exchange took, in milliseconds, its first byte to its last.
+	TermaNetworkExchangeDurationMsKey = "terma.network.exchange.duration_ms"
+	// TermaNetworkExchangeIndexKey is terma.network.exchange.index: The exchange's place on its connection, from 0; with the connection id, its event key.
+	TermaNetworkExchangeIndexKey = "terma.network.exchange.index"
+	// TermaNetworkExchangeKindKey is terma.network.exchange.kind: What an exchange was, as the Mac worked it out (shared/fixtures/governance.json, kinds).
+	TermaNetworkExchangeKindKey = "terma.network.exchange.kind"
+	// TermaNetworkExchangeReceivedBytesKey is terma.network.exchange.received_bytes: The bytes the exchange received.
+	TermaNetworkExchangeReceivedBytesKey = "terma.network.exchange.received_bytes"
+	// TermaNetworkExchangeRequestIDKey is terma.network.exchange.request_id: The model provider's id for the request a model call exchange carried (Anthropic's req_ id).
+	TermaNetworkExchangeRequestIDKey = "terma.network.exchange.request_id"
+	// TermaNetworkExchangeSentBytesKey is terma.network.exchange.sent_bytes: The bytes the exchange sent.
+	TermaNetworkExchangeSentBytesKey = "terma.network.exchange.sent_bytes"
+	// TermaNetworkExchangeStartMsKey is terma.network.exchange.start_ms: When the exchange's first byte went, in milliseconds since the Unix epoch.
+	TermaNetworkExchangeStartMsKey = "terma.network.exchange.start_ms"
+	// TermaNetworkOpenedMsKey is terma.network.opened_ms: When the connection opened, in milliseconds since the Unix epoch.
+	TermaNetworkOpenedMsKey = "terma.network.opened_ms"
+	// TermaNetworkProtocolKey is terma.network.protocol: What the connection was, as far as its port says.
+	TermaNetworkProtocolKey = "terma.network.protocol"
+	// TermaNetworkReceivedBytesKey is terma.network.received_bytes: The bytes the connection received so far.
+	TermaNetworkReceivedBytesKey = "terma.network.received_bytes"
+	// TermaNetworkSentBytesKey is terma.network.sent_bytes: The bytes the connection sent so far.
+	TermaNetworkSentBytesKey = "terma.network.sent_bytes"
 	// TermaObservationIDKey is terma.observation.id: The replay-stable id of one observation.
 	TermaObservationIDKey = "terma.observation.id"
 	// TermaObservationSequenceKey is terma.observation.sequence: The observation's position in its stream.
@@ -179,6 +227,28 @@ const (
 	TermaOperationInterruptedKey = "terma.operation.interrupted"
 	// TermaOperationStatusKey is terma.operation.status: How the operation the event records ended.
 	TermaOperationStatusKey = "terma.operation.status"
+	// TermaPolicyEnforcedKey is terma.policy.enforced: Whether it was stopped, or only reported under a policy that does not enforce.
+	TermaPolicyEnforcedKey = "terma.policy.enforced"
+	// TermaPolicyKindKey is terma.policy.kind: What the policy denied.
+	TermaPolicyKindKey = "terma.policy.kind"
+	// TermaPolicyPathKey is terma.policy.path: The path a file denial was for, the home folder written ~.
+	TermaPolicyPathKey = "terma.policy.path"
+	// TermaPolicyRuleKey is terma.policy.rule: The policy rule that denied it; absent when an allow list denied what it did not name.
+	TermaPolicyRuleKey = "terma.policy.rule"
+	// TermaProcessAgentOwnKey is terma.process.agent_own: Whether the session's agent made the connection itself, rather than a tool it ran.
+	TermaProcessAgentOwnKey = "terma.process.agent_own"
+	// TermaProcessCommandKey is terma.process.command: The command line of a tool's process that made the connection, credentials masked.
+	TermaProcessCommandKey = "terma.process.command"
+	// TermaProcessProgramKey is terma.process.program: The program that made the connection, by name (the session's agent, curl, git), never by path.
+	TermaProcessProgramKey = "terma.process.program"
+	// TermaProcessSignerIdentifierKey is terma.process.signer.identifier: The program's signing identifier (com.apple.curl).
+	TermaProcessSignerIdentifierKey = "terma.process.signer.identifier"
+	// TermaProcessSignerKindKey is terma.process.signer.kind: Who signed the program, as the kernel knows the running process.
+	TermaProcessSignerKindKey = "terma.process.signer.kind"
+	// TermaProcessSignerTeamKey is terma.process.signer.team: The signing developer's team id.
+	TermaProcessSignerTeamKey = "terma.process.signer.team"
+	// TermaProcessVersionKey is terma.process.version: The program's version, where its path says it.
+	TermaProcessVersionKey = "terma.process.version"
 	// TermaProviderSessionIDKey is terma.provider.session.id: The agent's own session id, where it differs from the session.id terma files the record under.
 	TermaProviderSessionIDKey = "terma.provider.session.id"
 	// TermaPushCommitCountKey is terma.push.commit.count: How many commits the push sent; exact below 10000, at least 10000 otherwise.
@@ -331,10 +401,20 @@ const (
 	TermaCommitUnattributedEvent = "terma.commit.unattributed"
 	// TermaCompactionEvent is terma.compaction: The agent compacted the conversation.
 	TermaCompactionEvent = "terma.compaction"
+	// TermaFilesAccessedEvent is terma.files.accessed: A file a session's processes used, changed, moved or deleted, as the operating system saw it: sent as it happens, at most once a second a file.
+	TermaFilesAccessedEvent = "terma.files.accessed"
 	// TermaFilesTouchedEvent is terma.files.touched: A session wrote files in the repository.
 	TermaFilesTouchedEvent = "terma.files.touched"
+	// TermaGovernanceRunEvent is terma.governance.run: An agent's process started or exited under governance.
+	TermaGovernanceRunEvent = "terma.governance.run"
 	// TermaModelCallResponseEvent is terma.model_call.response: What the API answered for one model call, as the agent recorded it and its telemetry does not say.
 	TermaModelCallResponseEvent = "terma.model_call.response"
+	// TermaNetworkConnectionEvent is terma.network.connection: A connection a session's process made: sent when it opens, as it grows (at most once a second) and when it closes, each a version of the one connection.
+	TermaNetworkConnectionEvent = "terma.network.connection"
+	// TermaNetworkExchangeEvent is terma.network.exchange: What a connection sent and what came back (on HTTP/1.1, a request and its response): sent when it ends, and again when a model call is placed on it.
+	TermaNetworkExchangeEvent = "terma.network.exchange"
+	// TermaPolicyDeniedEvent is terma.policy.denied: The governance policy denied something a session's process did, as it happened.
+	TermaPolicyDeniedEvent = "terma.policy.denied"
 	// TermaPushEvent is terma.push: A branch was pushed, one event per branch the push updated.
 	TermaPushEvent = "terma.push"
 	// TermaRelayHeartbeatEvent is terma.relay.heartbeat: The relay is running; sent with service.name terma-relay.
@@ -369,10 +449,22 @@ const (
 const (
 	// ErrorTypeOther is error.type _OTHER: A fallback error value to be used when the instrumentation doesn't define a custom value.
 	ErrorTypeOther = "_OTHER"
+	// NetworkTransportTcp is network.transport tcp: TCP
+	NetworkTransportTcp = "tcp"
+	// NetworkTransportUdp is network.transport udp: UDP
+	NetworkTransportUdp = "udp"
+	// NetworkTransportPipe is network.transport pipe: Named or anonymous pipe.
+	NetworkTransportPipe = "pipe"
+	// NetworkTransportUnix is network.transport unix: UNIX domain socket
+	NetworkTransportUnix = "unix"
+	// NetworkTransportQuic is network.transport quic: QUIC
+	NetworkTransportQuic = "quic"
 	// TermaCaptureGapInvalidCheckpoint is terma.capture.gap invalid_checkpoint: The ordering checkpoint was unreadable, so a new stream began.
 	TermaCaptureGapInvalidCheckpoint = "invalid_checkpoint"
 	// TermaCaptureSurfaceDesktop is terma.capture.surface desktop: Records only terma reports for the agent, sent from every surface.
 	TermaCaptureSurfaceDesktop = "desktop"
+	// TermaCaptureSurfaceGovernance is terma.capture.surface governance: Terma Desktop's system governance: what the operating system saw an agent session's processes do (connections, files, denials), sent by the signed Terma app through the relay.
+	TermaCaptureSurfaceGovernance = "governance"
 	// TermaCommitMessageSourceMessage is terma.commit.message_source message: The message came from -m or -F.
 	TermaCommitMessageSourceMessage = "message"
 	// TermaCommitMessageSourceTemplate is terma.commit.message_source template: The message came from a template.
@@ -393,8 +485,62 @@ const (
 	TermaInstallMethodNpmProject = "npm_project"
 	// TermaInstallMethodSource is terma.install.method source: A build that is not a numbered release, wherever it is installed: go build or go install, or make on a commit that is not a release tag (make on a release tag builds that release).
 	TermaInstallMethodSource = "source"
+	// TermaNetworkExchangeKindModel is terma.network.exchange.kind model: Carried a model call the agent's transcript records.
+	TermaNetworkExchangeKindModel = "model"
+	// TermaNetworkExchangeKindHandshake is terma.network.exchange.kind handshake: A TLS connection's handshake.
+	TermaNetworkExchangeKindHandshake = "handshake"
+	// TermaNetworkExchangeKindStartup is terma.network.exchange.kind startup: The agent's own before its first model request.
+	TermaNetworkExchangeKindStartup = "startup"
+	// TermaNetworkExchangeKindExit is terma.network.exchange.kind exit: The agent's own in its last seconds as it quit.
+	TermaNetworkExchangeKindExit = "exit"
+	// TermaNetworkExchangeKindUpload is terma.network.exchange.kind upload: Mostly sent.
+	TermaNetworkExchangeKindUpload = "upload"
+	// TermaNetworkExchangeKindDownload is terma.network.exchange.kind download: Mostly received.
+	TermaNetworkExchangeKindDownload = "download"
+	// TermaNetworkExchangeKindRequest is terma.network.exchange.kind request: Small both ways.
+	TermaNetworkExchangeKindRequest = "request"
+	// TermaNetworkProtocolHttps is terma.network.protocol https: TLS on port 443.
+	TermaNetworkProtocolHttps = "https"
+	// TermaNetworkProtocolHttp is terma.network.protocol http: Plain HTTP on port 80.
+	TermaNetworkProtocolHttp = "http"
+	// TermaNetworkProtocolQuic is terma.network.protocol quic: UDP on port 443.
+	TermaNetworkProtocolQuic = "quic"
+	// TermaNetworkProtocolDns is terma.network.protocol dns: Port 53.
+	TermaNetworkProtocolDns = "dns"
+	// TermaNetworkProtocolSsh is terma.network.protocol ssh: Port 22.
+	TermaNetworkProtocolSsh = "ssh"
+	// TermaNetworkProtocolOther is terma.network.protocol other: Any other port.
+	TermaNetworkProtocolOther = "other"
 	// TermaOperationDurationStatusInvalid is terma.operation.duration_status invalid: The agent reported a duration that is not a non-negative integer.
 	TermaOperationDurationStatusInvalid = "invalid"
+	// TermaPolicyKindConnect is terma.policy.kind connect: A connection.
+	TermaPolicyKindConnect = "connect"
+	// TermaPolicyKindOpen is terma.policy.kind open: Opening a file.
+	TermaPolicyKindOpen = "open"
+	// TermaPolicyKindCreate is terma.policy.kind create: Creating a file.
+	TermaPolicyKindCreate = "create"
+	// TermaPolicyKindTruncate is terma.policy.kind truncate: Emptying a file.
+	TermaPolicyKindTruncate = "truncate"
+	// TermaPolicyKindUnlink is terma.policy.kind unlink: Deleting a file.
+	TermaPolicyKindUnlink = "unlink"
+	// TermaPolicyKindRename is terma.policy.kind rename: Moving a file.
+	TermaPolicyKindRename = "rename"
+	// TermaPolicyKindLink is terma.policy.kind link: A hard link to a file.
+	TermaPolicyKindLink = "link"
+	// TermaPolicyKindClone is terma.policy.kind clone: Cloning a file.
+	TermaPolicyKindClone = "clone"
+	// TermaPolicyKindCopy is terma.policy.kind copy: Copying a file.
+	TermaPolicyKindCopy = "copy"
+	// TermaProcessSignerKindApple is terma.process.signer.kind apple: Signed by Apple.
+	TermaProcessSignerKindApple = "apple"
+	// TermaProcessSignerKindDeveloper is terma.process.signer.kind developer: Signed by a developer with a team id.
+	TermaProcessSignerKindDeveloper = "developer"
+	// TermaProcessSignerKindAdhoc is terma.process.signer.kind adhoc: Signed with no identity.
+	TermaProcessSignerKindAdhoc = "adhoc"
+	// TermaProcessSignerKindUnsigned is terma.process.signer.kind unsigned: Not signed.
+	TermaProcessSignerKindUnsigned = "unsigned"
+	// TermaProcessSignerKindInvalid is terma.process.signer.kind invalid: A signature that no longer matches the program.
+	TermaProcessSignerKindInvalid = "invalid"
 	// TermaPushRangeUpdate is terma.push.range update: The commits in the new revision and not the old one, exactly.
 	TermaPushRangeUpdate = "update"
 	// TermaPushRangeNewBranch is terma.push.range new_branch: A new branch: the commits in the new revision that no branch of the remote had, as the local remote-tracking branches showed before the push.

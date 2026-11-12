@@ -43,6 +43,9 @@ type part struct {
 	narrow bool
 	// claimed marks a part named by a Claimed session key: only its session's claim may send it.
 	claimed bool
+	// governance marks a part of Terma Desktop's system governance from the signed app
+	// (governance.go): its session's claim places it by time, whichever process it reports on.
+	governance bool
 }
 
 // sessionOf is the first session key, by rank, on the record's attributes, then its

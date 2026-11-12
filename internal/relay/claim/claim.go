@@ -115,11 +115,23 @@ func (c Claim) placements() []Placement {
 // latest to start by at, whose ProjectID it carries, empty for one Mark wrote. False when
 // no placement covers pid.
 func (c Claim) At(pid int, at time.Time) (Claim, bool) {
+	return c.pick(at, func(p Placement) bool { return covers(p.PIDs, pid) })
+}
+
+// During is the claim as it applies at time at whichever process sent: the placement latest
+// to start by at. For a sender trusted to report on every process of a claimed session (the
+// relay's governance parts), which no placement names.
+func (c Claim) During(at time.Time) (Claim, bool) {
+	return c.pick(at, func(Placement) bool { return true })
+}
+
+// pick is the placement latest to start by at among those admit takes.
+func (c Claim) pick(at time.Time, admit func(Placement) bool) (Claim, bool) {
 	var best *Placement
 	all := c.placements()
 	for i := range all {
 		p := &all[i]
-		if !covers(p.PIDs, pid) {
+		if !admit(*p) {
 			continue
 		}
 		if best == nil || at.IsZero() || !p.Since.After(at) {

@@ -43,6 +43,23 @@ var generic = shape.CaptureRules{
 	ToolContentFields: []string{"gen_ai.tool.call.arguments", "gen_ai.tool.call.result", "file_path", "result", "cwd"},
 }
 
+// governance is Terma Desktop's system governance (governance.go), no agent's: hosts, kinds and
+// who signed a program leave under any policy; a tool's command line and the paths of files are
+// tool content.
+var governance = shape.CaptureRules{
+	SafeKeys: []string{
+		semconv.TermaCaptureSurfaceKey, "server.address", "network.transport",
+		semconv.TermaNetworkConnectionIDKey, semconv.TermaNetworkProtocolKey,
+		semconv.TermaNetworkExchangeKindKey, semconv.TermaNetworkExchangeRequestIDKey,
+		semconv.TermaProcessProgramKey, semconv.TermaProcessVersionKey,
+		semconv.TermaProcessSignerKindKey, semconv.TermaProcessSignerTeamKey, semconv.TermaProcessSignerIdentifierKey,
+		semconv.TermaPolicyKindKey,
+	},
+	ToolContentFields: []string{
+		semconv.TermaProcessCommandKey, semconv.TermaPolicyPathKey, semconv.TermaFilePathKey, semconv.TermaFileRenamedToKey,
+	},
+}
+
 func compose(correlators []shape.Correlator, capturers []shape.Capturer) *rules {
 	r := &rules{}
 	byAttr := map[string]shape.SessionKey{}
@@ -61,7 +78,7 @@ func compose(correlators []shape.Correlator, capturers []shape.Capturer) *rules 
 	})
 	r.safeKeys, r.safePrefixes = maps.Clone(genericSafeKeys), slices.Clone(genericSafePrefixes)
 	r.metricSafeKeys = map[string][]string{}
-	all := []shape.CaptureRules{generic}
+	all := []shape.CaptureRules{generic, governance}
 	for _, c := range capturers {
 		all = append(all, c.CaptureRules())
 	}

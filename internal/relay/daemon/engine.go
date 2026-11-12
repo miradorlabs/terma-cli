@@ -90,7 +90,7 @@ func (d Deps) Engine(ctx context.Context, stateDir string, cfg *config.Config, s
 		Hold: s.Hold, Dir: filepath.Join(claim.Dir(stateDir), relay.OutboxDir), Resolve: d.Resolver(cfg, minter.Mint), Version: d.Version,
 		Lookup:   func(sessionID string, now time.Time) (claim.Claim, bool) { return claim.Read(stateDir, sessionID, now) },
 		CatchAll: d.CatchAll(), HeartbeatSend: d.SendHeartbeat, HeartbeatEvery: s.Heartbeat,
-		PeerPID: procinfo.FindSender, ProcessAlive: procinfo.Alive, ClaimCacheTTL: time.Second, PolicyCacheTTL: time.Second}
+		PeerPID: procinfo.FindSender, ProcessAlive: procinfo.Alive, GovernanceSender: relay.DesktopSender, ClaimCacheTTL: time.Second, PolicyCacheTTL: time.Second}
 	if s.Debug && logw != nil {
 		opts.Logf = func(f string, a ...any) { fmt.Fprintf(logw, time.Now().Format("15:04:05.000 ")+f+"\n", a...) }
 	}

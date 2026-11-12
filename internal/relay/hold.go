@@ -123,7 +123,7 @@ func (r *Relay) sweep() {
 		var out []release
 		// A part that must wait holds up nothing: order matters only among parts that leave.
 		for _, h := range parts {
-			c, pol, why, ok, how := r.decide(key, h.p.pid, h.p.at, h.p.narrow, h.p.claimed)
+			c, pol, why, ok, how := r.decide(key, h.p)
 			limit := hold
 			if h.p.start && why == whyUnclaimed {
 				// A conversation start waits for the thread's first turn.

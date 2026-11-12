@@ -104,7 +104,11 @@ starts it through `terma launch <agent>`, which adds the exporter to that one pr
 environment, and the real command as it was once terma is gone. A hook in a collected repository
 claims its session for the developer's team, naming the repository. The relay forwards
 only claimed sessions, only from the processes the claim names, and only while the policy
-still lists the claim's repository. It sends them with the team's key and applies the team's
+still lists the claim's repository. The one sender a claim need not name is Terma Desktop,
+whose system governance reports what the operating system saw a session's processes do
+(`terma.capture.surface` governance): the relay checks the app's code signature with the
+kernel (`procinfo.Signer`, Mirador Labs' team) and takes only those records from it, placed by
+their session's claim at their time (`relay/governance.go`). It sends them with the team's key and applies the team's
 collection policy: agents export all content to it, and the policy alone decides what
 leaves (`config.Policy.Content`). The claim also names the checkout the hook ran in, which
 the relay stamps on the session's records (`stampCheckout`): its origin, branch and whether
