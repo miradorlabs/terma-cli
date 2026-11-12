@@ -1045,7 +1045,7 @@ func TestReleaseIsAnnouncedOnceWithTermasVerdict(t *testing.T) {
 	if a.Support != "unsupported" || !a.Partial || len(a.Failed) != 1 || a.Failed[0] != "Telemetry reaches the project (linux/amd64)" {
 		t.Errorf("announcement = %+v", a)
 	}
-	if v := teamVerdict(a); !strings.Contains(v, "Broken with terma*: Telemetry reaches the project (linux/amd64)") || !strings.Contains(v, "captured again") {
+	if v := teamVerdict(a); !strings.Contains(v, "Broken with terma*: Telemetry reaches the project (linux/amd64)") || !strings.Contains(v, "tried again") {
 		t.Errorf("verdict = %q", v)
 	}
 	var idx HarnessIndex
@@ -1251,5 +1251,68 @@ func TestUnprofiledBuildBecomesWhole(t *testing.T) {
 	}
 	if s := read(); s.Capture.Partial || len(s.Capture.Notes) > 0 || s.Capture.Attempts != 2 || s.Support == nil {
 		t.Errorf("a finished attempt left the build: %+v", s.Capture)
+	}
+}
+
+// A release with nothing changed since the one before says no "0 changes since".
+func TestAnnouncementWithoutChanges(t *testing.T) {
+	a := Announcement{Name: "Codex CLI", Version: "0.167.1", Previous: "0.167.0", URL: "https://terma.ai/h/codex/0.167.1", Support: "supported"}
+	if got := string(marshalPlain(slackMessage(a))); strings.Contains(got, "since") {
+		t.Errorf("slack message of an unchanged release: %s", got)
+	}
+	if got := postText(a); strings.Contains(got, "since") {
+		t.Errorf("post of an unchanged release: %s", got)
+	}
+}
+
+// A scenario of the capture that failed (a platform's files profile, the field census) leaves
+// the build partial though its job finished and its first turn is whole.
+func TestFailedScenarioLeavesTheBuildPartial(t *testing.T) {
+	id := buildID{"claude", "1.0.0"}
+	whole := claudeProfile("1.0.0", "Be brief.", []string{"Bash"}, "", "")
+	files := e2e.Profile{Harness: "claude", Version: "1.0.0", Platform: "linux/amd64", Scenario: "TestClaudeProfileFiles", Failed: true}
+	for name, n := range map[string]night{
+		"files profile": {profiles: []e2e.Profile{whole, files}},
+		"field census":  {profiles: []e2e.Profile{whole}, census: []CensusRun{{Harness: "claude", Version: "1.0.0", Failed: true}}},
+	} {
+		dir := t.TempDir()
+		n.now, n.attempted = time.Now(), []buildID{id}
+		if _, err := publish(dir, n, options{}); err != nil {
+			t.Fatal(err)
+		}
+		var s Snapshot
+		if err := readJSON(filepath.Join(dir, "claude", "versions", "1.0.0.json"), &s); err != nil {
+			t.Fatal(err)
+		}
+		if !s.Capture.Partial {
+			t.Errorf("a failed %s left the build whole: %+v", name, s.Capture)
+		}
+	}
+}
+
+// A page from before attempts were counted had one: its next attempt is its second.
+func TestAttemptsOfAnOlderPage(t *testing.T) {
+	dir := t.TempDir()
+	id := buildID{"codex", "0.200.0"}
+	if _, err := publish(dir, night{now: time.Now(), attempted: []buildID{id}}, options{}); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(dir, "codex", "versions", "0.200.0.json")
+	var s Snapshot
+	if err := readJSON(path, &s); err != nil {
+		t.Fatal(err)
+	}
+	s.Capture.Attempts = 0 // as published before
+	if err := writeJSON(path, &s); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := publish(dir, night{now: time.Now(), attempted: []buildID{id}}, options{}); err != nil {
+		t.Fatal(err)
+	}
+	if err := readJSON(path, &s); err != nil {
+		t.Fatal(err)
+	}
+	if s.Capture.Attempts != 2 {
+		t.Errorf("attempts = %d, want 2", s.Capture.Attempts)
 	}
 }

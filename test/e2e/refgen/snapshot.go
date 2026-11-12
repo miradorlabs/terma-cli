@@ -58,8 +58,8 @@ type buildID struct{ harness, version string }
 
 // The notes a partial capture carries until a whole one replaces them.
 const (
-	failedNote     = "This build's capture failed; the frequent check tries it again."
-	unfinishedNote = "Part of this build's capture did not finish; the frequent check tries it again."
+	failedNote     = "This build's capture failed; the frequent check tries it again, up to four attempts."
+	unfinishedNote = "Part of this build's capture did not finish; the frequent check tries it again, up to four attempts."
 )
 
 // builds are the builds the night has anything of, by harness then version.

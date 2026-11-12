@@ -174,7 +174,7 @@ func TestCapturePlan(t *testing.T) {
 	}
 	out := filepath.Join(t.TempDir(), "outputs")
 	cmd := exec.Command("bash", "reference/capture-plan.sh", out)
-	cmd.Stdin = strings.NewReader("claude=2.1.1,2.1.2\nclaude-desktop=1.2.0\nt3=0.1.9\n../etc=1\ncodex=0.2;rm\n")
+	cmd.Stdin = strings.NewReader("claude=2.1.1,2.1.2\nclaude-desktop=1.2.0\nt3=0.1.9\n../etc=1\ncodex=0.2;rm\ngemini=latest\ndsh=0.2.2,last1\n")
 	taken, err := cmd.Output()
 	if err != nil {
 		t.Fatalf("capture-plan.sh: %v", err)
@@ -197,7 +197,7 @@ func TestCapturePlan(t *testing.T) {
 			t.Errorf("outputs lack %q:\n%s", want, outputs)
 		}
 	}
-	if strings.Contains(outputs, "etc") || strings.Contains(outputs, "rm") {
+	if strings.Contains(outputs, "etc") || strings.Contains(outputs, "rm") || strings.Contains(outputs, "latest") || strings.Contains(outputs, "last1") {
 		t.Errorf("an input that names no harness reached the outputs:\n%s", outputs)
 	}
 

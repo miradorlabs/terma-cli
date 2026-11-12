@@ -32,7 +32,10 @@ permissions:
 # published rather than capture the same build again. So a long capture of one harness holds the
 # next check of every other back until it is published; a lock a harness would let two checks
 # capture the same new build. A run by hand has a group of its own, so the schedule never takes
-# its place in the queue (GitHub keeps one pending run a group).
+# its place in the queue (GitHub keeps one pending run a group); one that asks the registries
+# (no builds given) beside a scheduled check can capture a build twice, which publishes once
+# (the publish jobs' compat-matrix lock) and counts two attempts. A cancelled run publishes
+# nothing: it is no attempt.
 concurrency:
   group: harness-reference-new-builds-${{ github.event_name }}
   cancel-in-progress: false
@@ -276,7 +279,7 @@ jobs:
     # publishes its builds, partial, and announces them saying so: the next check does not take
     # them for new again, and captures them again once some hours have passed since this attempt
     # (new-builds.sh), without announcing them twice.
-    if: always() && needs.detect.outputs.builds != ''
+    if: ${{ !cancelled() && needs.detect.outputs.builds != '' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     # For the Slack webhook the announcements are posted with.

@@ -429,7 +429,8 @@ macOS, one job a harness, every scenario of the harness's against these builds a
 and the field census); on Linux, Claude Code's and Codex's relay contracts and files profiles;
 and a desktop app's on a machine of its own. The publish job waits for all of them, so a build's
 page and changelog are published once, complete, with terma's verdict, and announced then
-(`publish.sh publish-reference`). A capture that failed, or a job of it that did not finish (it
+(`publish.sh publish-reference`). A capture any scenario of which failed (its profile, a files
+profile, the field census), or a job of it that did not finish (it
 wrote no `compat.json`, or the desktop job failed: `reference/capture-args.sh`, `refgen
 -unfinished`), is published partial (`refgen -attempted`) and marked `partial` in the index. Each version newer than any captured before is announced once, when
 first published: whether terma works with the build, "Works", "Partly broken" or "Broken" with the

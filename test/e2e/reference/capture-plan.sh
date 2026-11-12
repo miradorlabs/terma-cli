@@ -5,11 +5,13 @@
 # with dashes as underscores; matrix, one capture job a command-line harness
 # ({"include":[{"harness","versions"}]}); desktop_tests, the profile scenarios of the desktop
 # apps; builds, every line taken. Prints the lines it takes: a line that names no harness and
-# versions is left out, so nothing of an input reaches a job's name or a path unchecked.
+# versions (each starting with a digit: no "latest", no "last1") is left out, so nothing of an
+# input reaches a job's name or a path unchecked, nor names a page after a word.
 set -euo pipefail
 
 out=$1
-builds=$(grep -E '^[a-z][a-z0-9-]*=[0-9A-Za-z.,+_-]+$' || true)
+version='[0-9][0-9A-Za-z.+_-]*'
+builds=$(grep -E "^[a-z][a-z0-9-]*=$version(,$version)*\$" || true)
 [ -n "$builds" ] || exit 0
 include='[]'
 desktop=()

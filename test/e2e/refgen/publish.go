@@ -196,15 +196,19 @@ func publish(dir string, n night, opt options) ([]Announcement, error) {
 		if attempted {
 			at := n.now
 			merged.Capture.AttemptedAt = &at
+			if merged.Capture.Attempts == 0 && old != nil {
+				merged.Capture.Attempts = 1 // a page from before attempts were counted had one
+			}
 			merged.Capture.Attempts++
 		}
 		switch {
 		case slices.Contains(n.unfinished, id):
 			// A job of the run that did not finish took less of the build than it set out to.
-			if !merged.Capture.Partial {
-				merged.Capture.Partial = true
-				merged.Capture.Notes = append(merged.Capture.Notes, unfinishedNote)
-			}
+			markPartial(merged, unfinishedNote)
+		case attempted && n.failedScenario(id):
+			// A scenario of the capture failed (a files profile, a census): its job wrote its
+			// results all the same, but took less of the build than it set out to.
+			markPartial(merged, failedNote)
 		case attempted && !tonight.Capture.Partial:
 			// Every job finished and what tonight took is whole: so is the build, though no
 			// profile replaced the capture's own (T3, which has no profile scenario).
@@ -829,6 +833,21 @@ func markUnobservedEvents(versions []string, byVersion map[string]*Snapshot) {
 			}
 		}
 	}
+}
+
+// markPartial marks s partial, saying why where it was whole.
+func markPartial(s *Snapshot, note string) {
+	if !s.Capture.Partial {
+		s.Capture.Partial = true
+		s.Capture.Notes = append(s.Capture.Notes, note)
+	}
+}
+
+// failedScenario reports a scenario of the night that failed for the build: any of its profiles
+// (the first turn's, a probe's, a platform's files profile) or its field census.
+func (n night) failedScenario(id buildID) bool {
+	return slices.ContainsFunc(n.profiles, func(p e2e.Profile) bool { return p.Harness == id.harness && p.Version == id.version && p.Failed }) ||
+		slices.ContainsFunc(n.census, func(c CensusRun) bool { return c.Harness == id.harness && c.Version == id.version && c.Failed })
 }
 
 // captures reports a build the night captured, or set out to: a profile of it, or an attempt.
