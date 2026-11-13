@@ -139,6 +139,27 @@ func LoadIdentity(dir, profile string) (*Credential, error) {
 	return cred, nil
 }
 
+// LoadIdentityFor is LoadIdentity for the profile's sign-in to one organization, active or
+// not: who signed in there, and to which auth host, without its tokens. It reads only the
+// credentials index, never the keychain, so nothing that calls it can prompt; ErrNotLoggedIn
+// when the profile never signed in to organizationID.
+func LoadIdentityFor(dir, profile, organizationID string) (*Credential, error) {
+	file, err := loadCredentials(dir, indexOf(dir))
+	if err != nil {
+		return nil, err
+	}
+	p := file[profile]
+	if p == nil {
+		return nil, ErrNotLoggedIn
+	}
+	cred := p.Organizations[organizationID]
+	if !cred.present() {
+		return nil, ErrNotLoggedIn
+	}
+	cred.AccessToken, cred.RefreshToken = "", ""
+	return cred, nil
+}
+
 // StoredInFile reports whether the profile's active credential keeps its tokens in
 // credentials.json rather than the system keychain.
 func StoredInFile(dir, profile string) bool {

@@ -207,6 +207,49 @@ func TestLoadIdentityNeverReadsTheKeychain(t *testing.T) {
 	}
 }
 
+// LoadIdentityFor answers who signed in to one organization, active or not, from the index
+// alone, on a migrated machine too: a locked keychain does not hide it, tokens the file
+// keeps are blanked, and an organization the profile never signed in to is ErrNotLoggedIn.
+func TestLoadIdentityForNeverReadsTheKeychain(t *testing.T) {
+	t.Parallel()
+	for _, migrated := range []bool{false, true} {
+		dir := t.TempDir()
+		if migrated {
+			if err := os.WriteFile(config.CredentialsV2Path(dir), []byte("{}"), 0o600); err != nil {
+				t.Fatal(err)
+			}
+		}
+		b := orgCredential("org-b", "s-b")
+		b.UserID = "user-b"
+		if _, err := SaveCredential(dir, config.DefaultProfile, b); err != nil {
+			t.Fatal(err)
+		}
+		a := orgCredential("org-a", "s-a")
+		a.UserID = "user-a"
+		unlock := secret.FailForTest(t, dir)
+		// With the keychain locked, org-a's tokens fall back to the file.
+		if _, err := SaveCredential(dir, config.DefaultProfile, a); err != nil {
+			t.Fatal(err)
+		}
+		for _, org := range []string{"org-a", "org-b"} {
+			cred, err := LoadIdentityFor(dir, config.DefaultProfile, org)
+			if err != nil || cred.OrganizationID != org || cred.UserID != "user-"+org[len("org-"):] ||
+				cred.AccessToken != "" || cred.RefreshToken != "" {
+				t.Fatalf("migrated %v: LoadIdentityFor(%s) = %+v, %v", migrated, org, cred, err)
+			}
+		}
+		for _, c := range []struct{ profile, org string }{{config.DefaultProfile, "org-c"}, {"other", "org-a"}} {
+			if _, err := LoadIdentityFor(dir, c.profile, c.org); !errors.Is(err, ErrNotLoggedIn) {
+				t.Fatalf("migrated %v: LoadIdentityFor(%s, %s) = %v, want ErrNotLoggedIn", migrated, c.profile, c.org, err)
+			}
+		}
+		unlock()
+		if !StoredInFile(dir, config.DefaultProfile) {
+			t.Fatalf("migrated %v: org-a's tokens are not in the file, so blanking them was not tested", migrated)
+		}
+	}
+}
+
 // An organization id with characters a keychain backend could misread, as a hostile
 // server could send, is still kept in the keychain, under an encoded name.
 func TestAnOddOrganizationIDIsKeptInTheKeychain(t *testing.T) {
