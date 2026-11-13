@@ -50,10 +50,10 @@ func (p *pass) routed(ctx context.Context, events []spool.Event) ([]spool.Event,
 			held = append(held, e)
 			continue
 		}
-		team, _ := teamOf(pr.state, e.Enrollment)
+		team := pr.state.Team(e.Enrollment)
 		v, d := pr.router.Recheck(routing.Destination{EnrollmentID: e.Enrollment, Location: locationOf(e)}, now)
 		switch {
-		case v == routing.Discard:
+		case v == routing.Discard || team == nil:
 			res.Discarded++
 		case p.mixed(e):
 			res.Mixed++
@@ -65,13 +65,13 @@ func (p *pass) routed(ctx context.Context, events []spool.Event) ([]spool.Event,
 			// organization, which a send to that team already implies.
 			res.Discarded++
 		default:
-			out, ok := p.r.outgoingTo(team, e)
+			out, ok := p.r.outgoingTo(*team, e)
 			if !ok {
 				res.Withheld++
 				continue
 			}
 			if parcels[e.Enrollment] == nil {
-				parcels[e.Enrollment] = &parcel{profile: e.Profile, team: team}
+				parcels[e.Enrollment] = &parcel{profile: e.Profile, team: *team}
 			}
 			parcels[e.Enrollment].events = append(parcels[e.Enrollment].events, out)
 		}
@@ -245,16 +245,6 @@ func (c routeCache) load(stateDir, profile string) *profileRoute {
 	pr := &profileRoute{state: s, router: routing.NewRouter(s)}
 	c[profile] = pr
 	return pr
-}
-
-// teamOf is the selected team whose enrollment is id.
-func teamOf(s routing.State, id string) (routing.Team, bool) {
-	for _, t := range s.Teams {
-		if t.EnrollmentID == id {
-			return t, true
-		}
-	}
-	return routing.Team{}, false
 }
 
 // locationOf is where e ran, as its hook named it: the checkout whose origin it carries,

@@ -37,7 +37,7 @@ func (d Deps) teamRefresher() *PolicyRefresher {
 		},
 		Fetched: func(enrollment string) time.Time {
 			_, st, ok := d.committed()
-			t := team(st, enrollment)
+			t := st.Team(enrollment)
 			switch {
 			case !ok || t == nil:
 				return time.Time{}
@@ -48,7 +48,7 @@ func (d Deps) teamRefresher() *PolicyRefresher {
 		},
 		Every: func(enrollment string) time.Duration {
 			if _, st, ok := d.committed(); ok {
-				if t := team(st, enrollment); t != nil && t.StateAt(time.Now()) == routing.Refused {
+				if t := st.Team(enrollment); t != nil && t.StateAt(time.Now()) == routing.Refused {
 					return RefusedRecheck
 				}
 			}
@@ -78,7 +78,7 @@ func (d Deps) committed() (*config.Config, routing.State, bool) {
 // routing state; a team that is now Refused loses its key on this machine.
 func (d Deps) refreshTeam(ctx context.Context, enrollment string) error {
 	cfg, st, ok := d.committed()
-	t := team(st, enrollment)
+	t := st.Team(enrollment)
 	if !ok || t == nil || d.RefreshTeam == nil {
 		return nil
 	}
@@ -88,7 +88,7 @@ func (d Deps) refreshTeam(ctx context.Context, enrollment string) error {
 		if _, err := s.ApplyRefresh(r); err != nil {
 			return err
 		}
-		now := team(*s, enrollment)
+		now := s.Team(enrollment)
 		refused = now != nil && now.StateAt(time.Now()) == routing.Refused
 		return nil
 	})
