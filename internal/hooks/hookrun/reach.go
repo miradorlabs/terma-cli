@@ -71,8 +71,10 @@ const maxShellPaths = 32
 
 // ShellPaths are the paths a shell command may reach, for Classify: each word that is
 // absolute, starts with ~/ or holds a /, and the target of every cd and pushd, that exists.
-// A word that is an option's or an assignment's value (--flag=X, -oX, NAME=X) is that
-// value. A relative word resolves against the cwd, and against where an earlier cd or
+// A word that names nothing there yet may be a file the command creates (> new.md, touch,
+// mkdir -p): it reaches its nearest folder that is there, whose checkout it would be in;
+// a cd or pushd to nowhere goes nowhere. A word that is an option's or an assignment's
+// value (--flag=X, -oX, NAME=X) is that value. A relative word resolves against the cwd, and against where an earlier cd or
 // pushd in the command went, since it may run there. Words are split as shellWords splits
 // them. It does not parse the shell: a word that only looks like a path counts too, and a
 // run it wrongly finds crossing turns Mixed and stops sending, the safe direction.
@@ -82,6 +84,11 @@ const maxShellPaths = 32
 // hook that runs on every shell call.
 func ShellPaths(command, cwd string) []string {
 	var out []string
+	keep := func(p string) {
+		if !slices.Contains(out, p) {
+			out = append(out, p)
+		}
+	}
 	// reach keeps the path w names from dir when something is there, and returns it.
 	reach := func(w, dir string) (string, os.FileInfo) {
 		p, ok := shellPath(w, dir)
@@ -92,10 +99,17 @@ func ShellPaths(command, cwd string) []string {
 		if err != nil {
 			return "", nil
 		}
-		if !slices.Contains(out, p) {
-			out = append(out, p)
-		}
+		keep(p)
 		return p, info
+	}
+	// reachNew keeps the nearest folder that is there above the path w names from dir: the
+	// folder a file the command creates would be in.
+	reachNew := func(w, dir string) {
+		if p, ok := shellPath(w, dir); ok {
+			if folder, ok := nearestDir(p); ok {
+				keep(folder)
+			}
+		}
 	}
 	type candidate struct{ word, dir string }
 	var examined []candidate
@@ -122,14 +136,35 @@ func ShellPaths(command, cwd string) []string {
 		}
 		examined = append(examined, c)
 		p, info := reach(w, dir)
+		var back string
 		if dir != cwd {
-			reach(w, cwd) // after a subshell's cd, the command is back in cwd
+			back, _ = reach(w, cwd) // after a subshell's cd, the command is back in cwd
+		}
+		if p == "" && back == "" && !target {
+			// There in neither place: a file the command may create, in either.
+			reachNew(w, dir)
+			if dir != cwd {
+				reachNew(w, cwd)
+			}
 		}
 		if target && info != nil && info.IsDir() {
 			dir = p // the words after a cd that went somewhere may run there
 		}
 	}
 	return out
+}
+
+// nearestDir is the nearest folder above p, a path not there, that is there; false when
+// what is there first is not a folder.
+func nearestDir(p string) (string, bool) {
+	for dir := filepath.Dir(p); ; dir = filepath.Dir(dir) {
+		if info, err := os.Stat(dir); err == nil {
+			return dir, info.IsDir()
+		}
+		if filepath.Dir(dir) == dir {
+			return "", false
+		}
+	}
 }
 
 // shellValue is the part of the shell word w that may be a path: an option's value after

@@ -14,7 +14,10 @@ import (
 
 // A shell command's paths are its absolute, ~/ and slashed words and every cd's target,
 // split at whitespace and the shell's operators outside quotes, resolved against the cwd,
-// and kept only where something is there.
+// and kept where something is there. A word with nothing there may be a file the command
+// creates, so it reaches the nearest folder that is there: another checkout's for a new
+// file there, the cwd's own for a word that only looks like a path. A cd to nowhere goes
+// nowhere.
 //
 // Some words are not paths whole: those inside a command substitution, $(...) or `...`,
 // quoted or not, and a subshell's, (...); an option's or an assignment's value (--flag=X,
@@ -40,16 +43,24 @@ func TestShellPathsAreTheWordsThatNameSomethingThere(t *testing.T) {
 		"cat <'../acme api/NOTES.md'|wc -l":  {notes},
 		"ls -la":                             nil,
 		"cd src; ls":                         {filepath.Join(cwd, "src")},
-		"cat '../acme api/MISSING.md'":       nil,
-		"curl https://example.com/a/b > out": nil,
+		"cat '../acme api/MISSING.md'":       {api},
+		"curl https://example.com/a/b > out": {cwd},
 		"echo cd && true":                    nil,
+
+		"echo x > '../acme api/new.md'":         {api},
+		"mkdir -p '../acme api/a/b'":            {api},
+		"echo x > src/new.go":                   {filepath.Join(cwd, "src")},
+		"cd '../acme api/nowhere' && ls":        nil,
+		"cd .. && echo x > 'acme api/new.md'":   {parent, api, cwd},
+		"cd src && echo x > '../src/new.go'":    {filepath.Join(cwd, "src"), parent},
+		"echo x > '" + notes + "/not-a-folder'": nil,
 
 		"echo $(cat '../acme api/NOTES.md')":          {notes},
 		"echo `cat ../acme\\ api/NOTES.md`":           {notes},
 		`echo "$(cat '../acme api/NOTES.md')"`:        {notes},
 		`echo "notes: $(cat "../acme api/NOTES.md")"`: {notes},
 		`x="$(cd '../acme api' && pwd)"`:              {api},
-		"echo '$(cat ../acme\\ api/NOTES.md)'":        nil,
+		"echo '$(cat ../acme\\ api/NOTES.md)'":        {cwd},
 		"(cd '../acme api')":                          {api},
 		"(cat '../acme api/NOTES.md')":                {notes},
 		"grep --file='../acme api/NOTES.md' TODO":     {notes},
