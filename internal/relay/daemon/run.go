@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"math"
 	"net"
 	"net/http"
 	"os"
@@ -57,6 +56,9 @@ type Config struct {
 	// Migration, set, is this machine's to migrate to multi-org routing once the relay
 	// listens (migrate).
 	Migration *migrate.Machine
+	// prune and pruneEvery replace prune and its period, for a test.
+	prune      func(ctx context.Context, stateDir string, r *relay.Relay)
+	pruneEvery time.Duration
 }
 
 // Result is how a relay's run ended.
@@ -171,7 +173,6 @@ func Run(ctx context.Context, c Config) (Result, error) {
 	if c.Listening != nil {
 		c.Listening(ln.Addr(), opts.Hold)
 	}
-	claim.Prune(c.StateDir, time.Now())
 	runPath := filepath.Join(dir, RunFile)
 	if data, err := json.Marshal(RunInfo{PID: os.Getpid(), Environment: c.Environment, Launch: launch, Service: res.Service, Version: c.Version}); err == nil {
 		_ = config.WriteFileAtomicNoSync(runPath, append(data, '\n'), 0o600)
@@ -207,8 +208,7 @@ func Run(ctx context.Context, c Config) (Result, error) {
 	for _, w := range c.Workers {
 		workers.Go(func() { w(engineCtx) })
 	}
-	// Then hourly with the claims (watch); it reads both queues, so not on the start path.
-	workers.Go(func() { pruneRuns(c.StateDir, r, time.Now()) })
+	workers.Go(func() { c.pruneLoop(engineCtx, r) })
 	updated := make(chan Pass, 1)
 	if c.Updater != nil {
 		u := *c.Updater
@@ -322,10 +322,39 @@ func listen(dir, addr string) (net.Listener, error) {
 	return ln, nil
 }
 
-// pruneRuns prunes the run ledger (runs.Prune) beside the claims, keeping every session a
-// record still queued names: in the relay's outbox, and in the spool. While either cannot
-// be read it prunes nothing, since a ledger pruned under a queued record would let it go.
-func pruneRuns(stateDir string, r *relay.Relay, now time.Time) {
+// pruneEvery is how often the relay prunes the claims and the run ledger.
+const pruneEvery = time.Hour
+
+// pruneLoop prunes once the relay listens, then every pruneEvery until ctx ends. It runs
+// beside the watch loop: a prune reads both queues, and no stop, replacement or idle exit
+// waits for it.
+func (c Config) pruneLoop(ctx context.Context, r *relay.Relay) {
+	run := c.prune
+	if run == nil {
+		run = prune
+	}
+	tick := time.NewTicker(cmp.Or(c.pruneEvery, pruneEvery))
+	defer tick.Stop()
+	for {
+		run(ctx, c.StateDir, r)
+		select {
+		case <-ctx.Done():
+			return
+		case <-tick.C:
+		}
+	}
+}
+
+// prune removes expired claims and prunes the run ledger (pruneRuns).
+func prune(ctx context.Context, stateDir string, r *relay.Relay) {
+	claim.Prune(stateDir, time.Now())
+	pruneRuns(ctx, stateDir, r, time.Now())
+}
+
+// pruneRuns prunes the run ledger (runs.Prune), keeping every session a record still
+// queued names: in the relay's outbox, and in the spool. While either cannot be read it
+// prunes nothing, since a ledger pruned under a queued record would let it go.
+func pruneRuns(ctx context.Context, stateDir string, r *relay.Relay, now time.Time) {
 	if _, err := os.Stat(filepath.Join(stateDir, runs.Dir)); err != nil {
 		return // no ledger: a machine not migrated keeps none
 	}
@@ -337,14 +366,8 @@ func pruneRuns(stateDir string, r *relay.Relay, now time.Time) {
 	if err != nil {
 		return
 	}
-	events, err := sp.Peek(math.MaxInt)
-	if err != nil {
+	if sp.Sessions(ctx, func(id string) { queued[id] = true }) != nil {
 		return
-	}
-	for _, e := range events {
-		if e.SessionID != "" {
-			queued[e.SessionID] = true
-		}
 	}
 	runs.Prune(stateDir, now, queued)
 }
