@@ -70,39 +70,97 @@ func (e Env) reached(r *Repo, paths []string) []touched {
 const maxShellPaths = 32
 
 // ShellPaths are the paths a shell command may reach, for Classify: each word that is
-// absolute, starts with ~/ or holds a /, and the target of every cd, resolved against cwd,
-// that exists. Words are split at whitespace and at ;, &&, ||, |, >, >> and <, outside
-// quotes, with the quotes removed. It does not parse the shell: a word that only looks
-// like a path counts too, and a run it wrongly finds crossing turns Mixed and stops
-// sending, the safe direction.
+// absolute, starts with ~/ or holds a /, and the target of every cd and pushd, that exists.
+// A word that is an option's or an assignment's value (--flag=X, -oX, NAME=X) is that
+// value. A relative word resolves against the cwd, and against where an earlier cd or
+// pushd in the command went, since it may run there. Words are split as shellWords splits
+// them. It does not parse the shell: a word that only looks like a path counts too, and a
+// run it wrongly finds crossing turns Mixed and stops sending, the safe direction.
 //
 // Accepted risk: only a command's first maxShellPaths candidates are examined, so a
 // crossing only a later one makes is missed. Examining every one would put no bound on a
 // hook that runs on every shell call.
 func ShellPaths(command, cwd string) []string {
-	var candidates []string
-	words := shellWords(command)
-	for i, w := range words {
-		cdTarget := i > 0 && words[i-1] == "cd" && !strings.HasPrefix(w, "-")
-		if w == "" || !cdTarget && !strings.Contains(w, "/") {
-			continue
-		}
-		if !slices.Contains(candidates, w) {
-			candidates = append(candidates, w)
-		}
-	}
-	candidates = candidates[:min(len(candidates), maxShellPaths)]
 	var out []string
-	for _, w := range candidates {
-		p, ok := shellPath(w, cwd)
+	// reach keeps the path w names from dir when something is there, and returns it.
+	reach := func(w, dir string) (string, os.FileInfo) {
+		p, ok := shellPath(w, dir)
 		if !ok {
+			return "", nil
+		}
+		info, err := os.Stat(p)
+		if err != nil {
+			return "", nil
+		}
+		if !slices.Contains(out, p) {
+			out = append(out, p)
+		}
+		return p, info
+	}
+	type candidate struct{ word, dir string }
+	var examined []candidate
+	dir, cd := cwd, false
+	for _, w := range shellWords(command) {
+		target := false
+		switch {
+		case w == "cd" || w == "pushd":
+			cd = true
+			continue
+		case cd && strings.HasPrefix(w, "-"):
+			continue // one of cd's options
+		case cd:
+			target, cd = true, false
+		default:
+			w = shellValue(w)
+		}
+		c := candidate{w, dir}
+		if w == "" || !target && !strings.Contains(w, "/") || slices.Contains(examined, c) {
 			continue
 		}
-		if _, err := os.Stat(p); err == nil && !slices.Contains(out, p) {
-			out = append(out, p)
+		if len(examined) == maxShellPaths {
+			break
+		}
+		examined = append(examined, c)
+		p, info := reach(w, dir)
+		if dir != cwd {
+			reach(w, cwd) // after a subshell's cd, the command is back in cwd
+		}
+		if target && info != nil && info.IsDir() {
+			dir = p // the words after a cd that went somewhere may run there
 		}
 	}
 	return out
+}
+
+// shellValue is the part of the shell word w that may be a path: an option's value after
+// its =, or a one-letter option's value written against it (-o/path), an assignment's
+// value (NAME=/path), else w itself. An option with no value has none.
+func shellValue(w string) string {
+	if strings.HasPrefix(w, "-") {
+		if _, v, ok := strings.Cut(w, "="); ok {
+			return v
+		}
+		if len(w) > 2 && w[1] != '-' {
+			return w[2:]
+		}
+		return ""
+	}
+	if name, v, ok := strings.Cut(w, "="); ok && isName(name) {
+		return v
+	}
+	return w
+}
+
+// isName reports whether s is a shell variable's name: letters, digits and underscores, not
+// starting with a digit.
+func isName(s string) bool {
+	for i, r := range s {
+		letter := r == '_' || 'a' <= r && r <= 'z' || 'A' <= r && r <= 'Z'
+		if !letter && (i == 0 || r < '0' || r > '9') {
+			return false
+		}
+	}
+	return s != ""
 }
 
 // shellPath is the path the shell word w names, from cwd: ~ is the home directory.
@@ -122,14 +180,20 @@ func shellPath(w, cwd string) (string, bool) {
 	return filepath.Join(cwd, w), true
 }
 
-// shellWords splits command into words at whitespace and the operators ;, &, |, < and >
-// (so &&, ||, >> and 2>&1 too) outside quotes, dropping the quotes and a backslash's escape.
+// shellWords splits command into words at whitespace, the operators ;, &, |, < and > (so
+// &&, ||, >> and 2>&1 too) and the parentheses and backticks around a subshell or a command
+// substitution, outside quotes, dropping the quotes and a backslash's escape. A command
+// substitution inside double quotes, "$(...)" or "`...`", is split as a command of its own.
 func shellWords(command string) []string {
 	var words []string
 	var cur strings.Builder
 	inWord := false
 	var quote rune
 	escaped := false
+	// open are the subshells and substitutions entered and not yet left, each with what
+	// closes it and the quote it was entered from, which its end returns to.
+	type nested struct{ close, quote rune }
+	var open []nested
 	end := func() {
 		if inWord {
 			words = append(words, cur.String())
@@ -137,7 +201,15 @@ func shellWords(command string) []string {
 			inWord = false
 		}
 	}
-	for _, c := range command {
+	enter := func(closer rune) {
+		end()
+		open = append(open, nested{close: closer, quote: quote})
+		quote = 0
+	}
+	rs := []rune(command)
+	for i := 0; i < len(rs); i++ {
+		c := rs[i]
+		substitution := c == '$' && i+1 < len(rs) && rs[i+1] == '('
 		switch {
 		case escaped:
 			// Inside double quotes a backslash escapes only what is special there.
@@ -146,19 +218,41 @@ func shellWords(command string) []string {
 			}
 			cur.WriteRune(c)
 			escaped = false
-		case quote != 0:
+		case quote == '\'':
 			if c == quote {
 				quote = 0
-			} else if c == '\\' && quote == '"' {
-				escaped = true
 			} else {
+				cur.WriteRune(c)
+			}
+		case quote == '"' && substitution:
+			i++ // past the (
+			enter(')')
+		case quote == '"' && c == '`':
+			enter('`')
+		case quote == '"':
+			switch c {
+			case '"':
+				quote = 0
+			case '\\':
+				escaped = true
+			default:
 				cur.WriteRune(c)
 			}
 		case c == '\'' || c == '"':
 			quote, inWord = c, true
 		case c == '\\':
 			escaped, inWord = true, true
-		case unicode.IsSpace(c) || strings.ContainsRune(";&|<>", c):
+		case len(open) > 0 && c == open[len(open)-1].close:
+			end()
+			quote, open = open[len(open)-1].quote, open[:len(open)-1]
+			inWord = quote != 0
+		case c == '(':
+			enter(')')
+		case c == '`':
+			enter('`')
+		case substitution:
+			end() // the ( that follows enters it
+		case unicode.IsSpace(c) || strings.ContainsRune(";&|<>)", c):
 			end()
 		default:
 			cur.WriteRune(c)
