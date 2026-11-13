@@ -10,8 +10,8 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-// teamSender delivers one enrollment's queue for one tool, as sender delivers a route's.
-// Each part is rechecked (Router.Recheck) as it comes up: sent only to the team it was
+// teamSender keeps one enrollment's queue for one tool, for drain to send, as sender keeps
+// a route's. Each part is rechecked (Router.Recheck) as it comes up: sent only to the team it was
 // routed to while that team takes it, kept while the team may recover, and dropped
 // otherwise. A part kept waiting holds up none behind it that may leave.
 type teamSender struct {
@@ -38,7 +38,7 @@ func (r *Relay) teamSender(rt teamRoute) *teamSender {
 		s = &teamSender{r: r, route: rt, wake: make(chan struct{}, 1)}
 		r.teamSenders[rt] = s
 		r.wg.Add(1)
-		go s.loop()
+		go r.drain(s, s.wake)
 	}
 	return s
 }
@@ -218,144 +218,39 @@ func (s *teamSender) dropAll(why string) {
 	s.discard(s.take(func(teamEntry) bool { return true }), why, "")
 }
 
-// loop delivers the queue, as sender.loop does a route's.
-func (s *teamSender) loop() {
-	defer s.r.wg.Done()
-	ctx := s.r.sendCtx
-	backoff := time.Duration(0)
-	single := false
-	stopping := func() bool {
-		select {
-		case <-s.r.stopping:
-			return true
-		default:
-			return false
-		}
+// batch is the parts that may leave now (choose).
+func (s *teamSender) batch(limit int) ([]entry, bool) {
+	chosen, waiting := s.choose(limit)
+	out := make([]entry, len(chosen))
+	for i, e := range chosen {
+		out[i] = e.entry
 	}
-	sleep := func(d time.Duration) bool {
-		t := time.NewTimer(d)
-		defer t.Stop()
-		wake := s.wake
-		if backoff > 0 {
-			wake = nil
-		}
-		stop := s.r.stopping
-		if stopping() {
-			stop = nil
-		}
-		select {
-		case <-ctx.Done():
-			return false
-		case <-t.C:
-		case <-wake:
-		case <-stop:
-			if backoff > 0 {
-				return false
-			}
-		}
-		return true
-	}
-	for ctx.Err() == nil {
-		limit := maxMergeFiles
-		if single {
-			limit = 1
-		}
-		batch, waiting := s.choose(limit)
-		if len(batch) == 0 {
-			wait := idleWait
-			if waiting {
-				wait = keylessRetry
-			}
-			if stopping() || !sleep(wait) {
-				return
-			}
-			continue
-		}
-		pol, ok := s.r.resolveTeam(s.route.enrollment, s.route.toolLabel())
-		if !ok {
-			// Its key is minted, or the keychain locked: the parts wait for it.
-			s.wait(true)
-			if stopping() || !sleep(keylessRetry) {
-				return
-			}
-			continue
-		}
-		sig := batch[0].signal
-		var bodies [][]byte
-		var taken []entry
-		size := 0
-		for _, e := range batch {
-			b, err := s.r.outbox.readTeam(s.route, e.entry)
-			if err != nil {
-				if len(taken) == 0 {
-					s.r.stats.dropped(e.signal, "outbox_unreadable", e.records)
-					s.r.outbox.buryTeam(s.route, e.entry)
-					s.forget([]entry{e.entry})
-				}
-				break
-			}
-			if len(taken) > 0 && size+len(b) > maxMergeBytes {
-				break
-			}
-			bodies, taken, size = append(bodies, b), append(taken, e.entry), size+len(b)
-		}
-		if len(taken) == 0 {
-			continue
-		}
-		body := bodies[0]
-		if len(bodies) > 1 {
-			merged, err := mergeBodies(sig, bodies)
-			if err != nil {
-				taken, merged = taken[:1], bodies[0]
-			}
-			body = merged
-		}
-		records := 0
-		for _, e := range taken {
-			records += e.records
-		}
-		// The team's content policy as it stands now.
-		body, tl := s.r.withholdQueued(sig, body, pol)
-		if pol.Signals != nil && !contains(pol.Signals, string(sig)) || body == nil {
-			s.r.stats.dropped(sig, "policy_signal_or_content", records)
-			s.r.outbox.removeTeam(s.route, taken)
-			s.forget(taken)
-			continue
-		}
-		out, wait, detail, rejected := s.r.post(ctx, pol, sig, body)
-		switch out {
-		case sent:
-			s.r.count(sig, tl)
-			s.r.stats.forwarded(sig, records)
-			if rejected > 0 {
-				s.r.stats.add("upstream_rejected."+string(sig), int(rejected))
-			}
-			s.r.outbox.removeTeam(s.route, taken)
-			s.forget(taken)
-			single, backoff = false, 0
-		case refused:
-			if len(taken) > 1 {
-				single = true
-				continue
-			}
-			single = false
-			s.r.stats.dropped(sig, "upstream_"+detail, taken[0].records)
-			s.r.warnf("upstream %s refused %d %s: %s", s.route, taken[0].records, sig, detail)
-			s.r.outbox.buryTeam(s.route, taken[0])
-			s.forget(taken[:1])
-		case retry:
-			if ctx.Err() != nil {
-				return
-			}
-			s.r.stats.add("upstream_retries", 1)
-			s.r.warnf("upstream %s: %s; retrying", s.route, detail)
-			backoff = nextBackoff(backoff, wait)
-			if !sleep(jitter(backoff, wait)) {
-				return
-			}
-		}
-	}
+	return out, waiting
 }
+
+// policy is the team's send policy now: its key, its content rules.
+func (s *teamSender) policy() (Policy, bool, string) {
+	pol, ok := s.r.resolveTeam(s.route.enrollment, s.route.toolLabel())
+	if !ok {
+		// Its key is minted, or the keychain locked: the parts wait for it.
+		s.wait(true)
+	}
+	return pol, ok, ""
+}
+
+func (s *teamSender) read(e entry) ([]byte, error) { return s.r.outbox.readTeam(s.route, e) }
+
+func (s *teamSender) remove(batch []entry) {
+	s.r.outbox.removeTeam(s.route, batch)
+	s.forget(batch)
+}
+
+func (s *teamSender) bury(e entry) {
+	s.r.outbox.buryTeam(s.route, e)
+	s.forget([]entry{e})
+}
+
+func (s *teamSender) String() string { return s.route.String() }
 
 // dropMixed drops, from every enrollment's queue, session's parts attributed through its
 // run and made from from on, once for each earlier Mixed time learned.
