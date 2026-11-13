@@ -326,8 +326,9 @@ func listen(dir, addr string) (net.Listener, error) {
 const pruneEvery = time.Hour
 
 // pruneLoop prunes once the relay listens, then every pruneEvery until ctx ends. It runs
-// beside the watch loop: a prune reads both queues, and no stop, replacement or idle exit
-// waits for it.
+// beside the watch loop, which never waits for a prune to decide a stop, a replacement or an
+// idle exit. The exit itself waits for the workers, a prune under way included, once ctx
+// has ended: by then runs.Prune stops at its next file.
 func (c Config) pruneLoop(ctx context.Context, r *relay.Relay) {
 	run := c.prune
 	if run == nil {
@@ -369,5 +370,5 @@ func pruneRuns(ctx context.Context, stateDir string, r *relay.Relay, now time.Ti
 	if sp.Sessions(ctx, func(id string) { queued[id] = true }) != nil {
 		return
 	}
-	runs.Prune(stateDir, now, queued)
+	runs.Prune(ctx, stateDir, now, queued)
 }

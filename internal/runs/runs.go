@@ -8,16 +8,10 @@
 package runs
 
 import (
-	"crypto/rand"
-	"encoding/hex"
-	"encoding/json"
-	"errors"
 	"fmt"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"slices"
-	"strings"
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/config"
@@ -167,8 +161,18 @@ func Touch(stateDir, sessionID, runID string, locations []string) ([]string, err
 	if len(locations) == 0 {
 		return nil, nil
 	}
+	return touchWith(lockedEdit, stateDir, sessionID, runID, locations)
+}
+
+// TryTouch is Touch only if the ledger's lock is free now: it never waits. With no location
+// to add, it still folds the sidecar in (MarkAside).
+func TryTouch(stateDir, sessionID, runID string, locations []string) ([]string, error) {
+	return touchWith(tryEdit, stateDir, sessionID, runID, locations)
+}
+
+func touchWith(edit func(stateDir, sessionID string, edit func(path string, l *ledger) error) error, stateDir, sessionID, runID string, locations []string) ([]string, error) {
 	var merged []string
-	err := lockedEdit(stateDir, sessionID, func(path string, l *ledger) error {
+	err := edit(stateDir, sessionID, func(path string, l *ledger) error {
 		if len(l.Runs) == 0 {
 			id, err := newRunID()
 			if err != nil {
@@ -216,12 +220,13 @@ type Snapshot struct {
 	unreadable bool
 }
 
-// Read reads the ledger of idOrAlias, a session ID or one of its aliases, once.
+// Read reads the ledger of idOrAlias, a session ID or one of its aliases, once, with its
+// sidecar (MarkAside).
 func Read(stateDir, idOrAlias string) Snapshot {
 	if !session.ValidID(idOrAlias) {
 		return Snapshot{}
 	}
-	l, _, err := resolve(stateDir, idOrAlias)
+	l, _, _, err := resolve(stateDir, idOrAlias)
 	if err != nil {
 		return Snapshot{unreadable: true}
 	}
@@ -262,20 +267,26 @@ type Position struct {
 	Active time.Time
 	// MixedAt is when Run became Mixed; zero while it is not.
 	MixedAt time.Time
+	// Aside: a sidecar records a crossing the ledger has yet to fold in (MarkAside).
+	Aside bool
+	// Aliases are the subagent IDs sharing the session's runs (Aliases).
+	Aliases []string
 }
 
 // Locate reads the ledger once for what a hook needs: the current run, where it has been,
-// whether it is Mixed, and whether the ledger is due a Refresh.
+// whether it is Mixed (its sidecar included), whether the ledger is due a Refresh, and the
+// subagents sharing the session's runs.
 func Locate(stateDir, idOrAlias string) (Position, bool) {
 	if !session.ValidID(idOrAlias) {
 		return Position{}, false
 	}
-	l, ok, err := resolve(stateDir, idOrAlias)
+	l, ok, aside, err := resolve(stateDir, idOrAlias)
 	if err != nil || !ok || len(l.Runs) == 0 {
 		return Position{}, false
 	}
 	cur := l.Runs[len(l.Runs)-1]
-	return Position{Run: cur.ID, Locations: cur.Locations, Active: l.lastActive(time.Time{}), MixedAt: cur.MixedAt}, true
+	return Position{Run: cur.ID, Locations: cur.Locations, Active: l.lastActive(time.Time{}), MixedAt: cur.MixedAt,
+		Aside: aside, Aliases: l.Aliases}, true
 }
 
 // Refresh renews sessionID's ledger at now if its last activity is older than
@@ -287,9 +298,15 @@ func Refresh(stateDir, sessionID string, now time.Time) error {
 		return err
 	}
 	return flock.Locked(path, lockWait, func() error {
-		l, ok, err := load(path)
-		if err != nil || !ok || len(l.Runs) == 0 || now.Sub(l.lastActive(time.Time{})) <= RefreshEvery {
+		l, _, err := load(path)
+		if err != nil {
 			return err
+		}
+		if err := fold(stateDir, sessionID, path, &l); err != nil {
+			return err
+		}
+		if len(l.Runs) == 0 || now.Sub(l.lastActive(time.Time{})) <= RefreshEvery {
+			return nil
 		}
 		l.active(now)
 		return save(path, &l)
@@ -327,93 +344,4 @@ func inForce(runs []run, t time.Time) run {
 		return runs[earliest]
 	}
 	return runs[best]
-}
-
-// resolve reads the ledger idOrAlias names: its own, else its session's through its alias.
-func resolve(stateDir, idOrAlias string) (ledger, bool, error) {
-	path, err := ledgerPath(stateDir, idOrAlias)
-	if err != nil {
-		return ledger{}, false, err
-	}
-	l, ok, err := load(path)
-	if err != nil || ok {
-		return l, ok, err
-	}
-	b, err := os.ReadFile(aliasPath(stateDir, idOrAlias))
-	if errors.Is(err, fs.ErrNotExist) {
-		return ledger{}, false, nil
-	}
-	if err != nil {
-		return ledger{}, false, err
-	}
-	if path, err = ledgerPath(stateDir, strings.TrimSpace(string(b))); err != nil {
-		return ledger{}, false, err
-	}
-	return load(path)
-}
-
-// update applies change to sessionID's ledger, made if there is none, under its lock.
-func update(stateDir, sessionID string, change func(*ledger)) error {
-	return lockedEdit(stateDir, sessionID, func(path string, l *ledger) error {
-		change(l)
-		return save(path, l)
-	})
-}
-
-// lockedEdit runs edit on sessionID's ledger, empty if there is none, holding its lock.
-func lockedEdit(stateDir, sessionID string, edit func(path string, l *ledger) error) error {
-	path, err := ledgerPath(stateDir, sessionID)
-	if err != nil {
-		return err
-	}
-	return flock.Locked(path, lockWait, func() error {
-		l, _, err := load(path)
-		if err != nil {
-			return err
-		}
-		return edit(path, &l)
-	})
-}
-
-func ledgerPath(stateDir, sessionID string) (string, error) {
-	if !session.ValidID(sessionID) {
-		return "", fmt.Errorf("runs: invalid session id %q", sessionID)
-	}
-	return filepath.Join(stateDir, Dir, sessionID+".json"), nil
-}
-
-func aliasPath(stateDir, alias string) string {
-	return filepath.Join(stateDir, Dir, aliasesDir, alias)
-}
-
-func load(path string) (ledger, bool, error) {
-	b, err := os.ReadFile(path)
-	if errors.Is(err, fs.ErrNotExist) {
-		return ledger{}, false, nil
-	}
-	if err != nil {
-		return ledger{}, false, err
-	}
-	var l ledger
-	if err := json.Unmarshal(b, &l); err != nil {
-		return ledger{}, false, fmt.Errorf("parse %s: %w", path, err)
-	}
-	return l, true, nil
-}
-
-// save writes l durably: a crossing recorded here must survive a crash.
-func save(path string, l *ledger) error {
-	b, err := json.Marshal(l)
-	if err != nil {
-		return err
-	}
-	return config.WriteFileAtomic(path, b, 0o600)
-}
-
-func newRunID() (string, error) {
-	var b [16]byte
-	if _, err := rand.Read(b[:]); err != nil {
-		return "", err
-	}
-	return hex.EncodeToString(b[:]), nil
 }

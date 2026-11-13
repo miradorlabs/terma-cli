@@ -55,50 +55,110 @@ func (e Env) place(sessionID, agentID string, c claim.Claim, loc routing.Locatio
 }
 
 // judge classifies locs (where the run is, and what it touched) with the run's earlier
-// locations, records them in the run ledger, and writes the placement: c at locs[0] when
-// placed, else only a mixed one. The ledger decides Mixed, since delivery and the relay
-// read only it. A mixed placement it does not back is a failed write: each hook records it
-// again, from when the placement turned Mixed, until one succeeds.
+// locations (decide), records the result in the run ledger (recordRun), and writes the
+// placement: c at locs[0] when placed, else only a mixed one (placeRun). The ledger, with
+// its sidecar, decides Mixed, since delivery and the relay read only it.
 func (e Env) judge(sessionID, agentID string, c claim.Claim, locs []routing.Location, placed bool) {
-	rt := e.Routing
-	if !rt.Usable() || !session.ValidID(sessionID) {
+	if !e.Routing.Usable() || !session.ValidID(sessionID) {
 		return
 	}
 	now := e.Time()
 	cur := e.currentRun(sessionID)
 	e.keepRun(sessionID, now)
-	c.ProjectID, c.Run = "", cur.id
-	seen := newLocations(cur.locations, locs)
-	// Past the bound the ledger cannot rule a crossing out, so the run turns Mixed.
-	full := len(cur.locations)+len(seen) > maxRunLocations
-	prev, havePrev := claim.Read(e.StateDir, sessionID, now)
-	mixed, recorded := !cur.mixedAt.IsZero(), true
-	switch {
-	case mixed:
-	case havePrev && prev.Kind == claim.KindMixed && prev.Run == c.Run:
-		mixed, recorded = true, e.markMixed(sessionID, cur.id, mixedSince(prev, now))
-	case full || rt.crossed(prev, havePrev, c.Run, locs, cur.locations, now):
-		mixed, recorded = true, e.markMixed(sessionID, cur.id, now)
-	}
-	// A ledger that refused the mark would make this hook wait on it again for nothing.
-	if len(seen) > 0 && !full && recorded {
-		merged, err := runs.Touch(e.StateDir, sessionID, cur.id, seen)
-		if err != nil {
-			e.Logf("record run locations: %v", err)
-		} else {
-			rt.recorded(sessionID, cur.id, merged)
-		}
-		// Touch returns what other hooks recorded since this one read the ledger: of two
-		// hooks that each saw half a crossing, the later sees it whole.
-		if !mixed && len(merged) > len(cur.locations)+len(seen) &&
-			(len(merged) > maxRunLocations || rt.crossed(prev, havePrev, c.Run, locs, merged, now)) {
-			mixed = true
-			e.markMixed(sessionID, cur.id, now)
-		}
-	}
+	mixed := e.recordRun(sessionID, cur, e.decide(sessionID, cur, locs, now), now)
 	if !placed && !mixed {
 		return
 	}
+	c.ProjectID, c.Run = "", cur.id
+	e.placeRun(sessionID, agentID, c, mixed, now)
+}
+
+// verdict is what decide made of a hook's locations, for recordRun to write.
+type verdict struct {
+	// seen are the locations new to the run, as the ledger records them; full is set past
+	// maxRunLocations, where the ledger records no more.
+	seen []string
+	full bool
+	// mixed: the run is Mixed. since, when set, is when it turned Mixed, which the ledger
+	// does not record yet.
+	mixed bool
+	since time.Time
+	// crossedWith classifies the hook's locations again with been, all the run's locations
+	// the ledger returns.
+	crossedWith func(been []string) bool
+}
+
+// decide classifies locs with where cur, the run, has been and its placement. It writes
+// nothing. A mixed placement the ledger does not back is a crossing both of whose writes
+// failed (recordRun): it is recorded again, from when the placement turned Mixed, while the
+// placement lasts.
+func (e Env) decide(sessionID string, cur ledgerRun, locs []routing.Location, now time.Time) verdict {
+	rt := e.Routing
+	v := verdict{seen: newLocations(cur.locations, locs)}
+	// Past the bound the ledger cannot rule a crossing out, so the run turns Mixed.
+	v.full = len(cur.locations)+len(v.seen) > maxRunLocations
+	prev, havePrev := claim.Read(e.StateDir, sessionID, now)
+	v.crossedWith = func(been []string) bool {
+		return len(been) > maxRunLocations || rt.crossed(prev, havePrev, cur.id, locs, been, now)
+	}
+	switch {
+	case !cur.mixedAt.IsZero():
+		v.mixed = true
+	case havePrev && prev.Kind == claim.KindMixed && prev.Run == cur.id:
+		v.mixed, v.since = true, mixedSince(prev, now)
+	case v.full || rt.crossed(prev, havePrev, cur.id, locs, cur.locations, now):
+		v.mixed, v.since = true, now
+	}
+	return v
+}
+
+// recordRun writes v to the run ledger, a crossing it found and the locations it saw, and
+// reports whether the run is Mixed. A crossing the ledger refuses (its lock held past its
+// wait, or a failed write) goes to its sidecar, which never expires (markMixed), and the
+// locations are recorded only if the lock is free now: a second wait would most likely
+// fail too, and a Mixed run's locations decide nothing until a new run starts. The run's
+// next hook that can lock the ledger folds the sidecar in.
+func (e Env) recordRun(sessionID string, cur ledgerRun, v verdict, now time.Time) bool {
+	rt := e.Routing
+	mixed, recorded := v.mixed, true
+	if !v.since.IsZero() {
+		recorded = e.markMixed(sessionID, cur.id, v.since)
+	}
+	var seen []string
+	if !v.full {
+		seen = v.seen
+	}
+	var merged []string
+	var err error
+	switch {
+	case len(seen) > 0 && recorded:
+		merged, err = runs.Touch(e.StateDir, sessionID, cur.id, seen)
+	case len(seen) > 0 || cur.aside:
+		// Waiting for nothing: this hook already waited on a refused lock, or the lock
+		// only folds the sidecar in.
+		merged, err = runs.TryTouch(e.StateDir, sessionID, cur.id, seen)
+	default:
+		return mixed
+	}
+	switch {
+	case err != nil:
+		e.Logf("record run locations: %v", err)
+		return mixed
+	case len(seen) > 0:
+		rt.recorded(sessionID, cur.id, merged)
+	}
+	// Touch returns what other hooks recorded since this one read the ledger: of two hooks
+	// that each saw half a crossing, the later sees it whole.
+	if !mixed && len(merged) > len(cur.locations)+len(seen) && v.crossedWith(merged) {
+		mixed = true
+		e.markMixed(sessionID, cur.id, now)
+	}
+	return mixed
+}
+
+// placeRun writes c, the run's placement, under sessionID and agentID's, or a mixed one,
+// which also replaces the placement of every subagent sharing the run.
+func (e Env) placeRun(sessionID, agentID string, c claim.Claim, mixed bool, now time.Time) {
 	if mixed {
 		c = claim.Claim{Kind: claim.KindMixed, Run: c.Run, Tool: c.Tool, PIDs: c.PIDs}
 	}
@@ -108,6 +168,8 @@ func (e Env) judge(sessionID, agentID string, c claim.Claim, locs []routing.Loca
 		if claim.Write(e.StateDir, agentID, c, now) {
 			if err := runs.Alias(e.StateDir, sessionID, agentID); err != nil {
 				e.Logf("alias subagent: %v", err)
+			} else {
+				e.Routing.aliased(sessionID, agentID)
 			}
 		}
 	}
@@ -115,7 +177,7 @@ func (e Env) judge(sessionID, agentID string, c claim.Claim, locs []routing.Loca
 		return
 	}
 	// Mixed covers every subagent sharing the run, not only the one whose hook saw it.
-	aliases, err := runs.Aliases(e.StateDir, sessionID)
+	aliases, err := e.Routing.aliases(e.StateDir, sessionID)
 	if err != nil {
 		e.Logf("subagents of a mixed run: %v", err)
 	}
@@ -127,14 +189,22 @@ func (e Env) judge(sessionID, agentID string, c claim.Claim, locs []routing.Loca
 }
 
 // markMixed records in the run ledger that sessionID's run run became Mixed at at, and
-// reports whether it could.
+// reports whether the ledger took it. One that cannot take it now gets it in its sidecar
+// (runs.MarkAside), without its lock: every read of the ledger takes that for Mixed, and it
+// never expires, as the mixed placement does.
 func (e Env) markMixed(sessionID, run string, at time.Time) bool {
-	if err := runs.MarkMixed(e.StateDir, sessionID, at); err != nil {
-		e.Logf("mark run mixed: %v", err)
+	err := runs.MarkMixed(e.StateDir, sessionID, at)
+	if err == nil {
+		e.Routing.marked(sessionID, run, at)
+		return true
+	}
+	e.Logf("mark run mixed: %v", err)
+	if err := runs.MarkAside(e.StateDir, sessionID, run, at); err != nil {
+		e.Logf("mark run mixed aside: %v", err)
 		return false
 	}
 	e.Routing.marked(sessionID, run, at)
-	return true
+	return false
 }
 
 // mixedSince is when c, a mixed placement, turned Mixed: its latest placement's start,

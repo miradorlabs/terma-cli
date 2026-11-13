@@ -11,20 +11,28 @@ import (
 )
 
 // Mixed lists, sorted, for doctor, the sessions whose run in force at now is Mixed and that
-// were active within recent; older counts the rest the ledger keeps. An unreadable ledger
-// counts as active and Mixed, as MixedAt has it.
+// were active within recent; older counts the rest the ledger keeps. A sidecar counts with
+// its ledger, or alone (MarkAside), and an unreadable ledger or sidecar counts as active and
+// Mixed, as MixedAt has it.
 func Mixed(stateDir string, now time.Time, recent time.Duration) (active []string, older int) {
 	entries, err := os.ReadDir(filepath.Join(stateDir, Dir))
 	if err != nil {
 		return nil, 0
 	}
+	written := map[string]time.Time{}
 	for _, e := range entries {
-		id, ok := strings.CutSuffix(e.Name(), ".json")
-		if !ok || e.IsDir() || !session.ValidID(id) {
+		id, ok := sessionOf(e.Name())
+		if !ok || e.IsDir() != strings.HasSuffix(e.Name(), asideExt) {
 			continue
 		}
-		path := filepath.Join(stateDir, Dir, e.Name())
-		l, found, err := load(path)
+		var at time.Time
+		if info, err := e.Info(); err == nil {
+			at = info.ModTime()
+		}
+		written[id] = latest(written[id], at)
+	}
+	for id, at := range written {
+		l, found, _, err := resolve(stateDir, id)
 		switch {
 		case err != nil:
 			active = append(active, id)
@@ -32,11 +40,7 @@ func Mixed(stateDir string, now time.Time, recent time.Duration) (active []strin
 		case !found || len(l.Runs) == 0 || inForce(l.Runs, now).MixedAt.IsZero():
 			continue
 		}
-		var written time.Time
-		if info, err := e.Info(); err == nil {
-			written = info.ModTime()
-		}
-		if now.Sub(l.lastActive(written)) <= recent {
+		if now.Sub(l.lastActive(at)) <= recent {
 			active = append(active, id)
 		} else {
 			older++
@@ -44,4 +48,14 @@ func Mixed(stateDir string, now time.Time, recent time.Duration) (active []strin
 	}
 	slices.Sort(active)
 	return active, older
+}
+
+// sessionOf is the session whose ledger or sidecar is named name; false for any other file.
+func sessionOf(name string) (string, bool) {
+	for _, ext := range []string{".json", asideExt} {
+		if id, ok := strings.CutSuffix(name, ext); ok && session.ValidID(id) {
+			return id, true
+		}
+	}
+	return "", false
 }

@@ -2,6 +2,7 @@ package delivery
 
 import (
 	"context"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -19,84 +20,128 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
-// A crossing the run ledger could not record, its lock held past the hook's wait, is
-// recorded by the run's next hook, from when it happened. Delivery reads only the ledger,
-// so nothing that carries content and was spooled after the crossing is sent: neither a
-// reply the next hook spools before it places the session, nor what comes after.
-func TestACrossingTheLedgerMissedIsRecordedByTheNextHook(t *testing.T) {
-	t.Parallel()
-	m := migratedMachine(t)
-	acmeHost, personalHost := newIngest(t), newIngest(t)
+// crossingMachine is a migrated machine where Acme Platform collects github.com/acme/* and
+// personal, keeping prompts and tool content, everything else, each with its own ingest,
+// and a session that starts in personal's checkout an hour ago.
+type crossingMachine struct {
+	*machine
+	acmeHost, personalHost *ingest
+	side, api              string
+	began                  time.Time
+}
+
+const crossingSession = "unrecorded-crossing"
+
+func newCrossingMachine(t *testing.T) *crossingMachine {
+	t.Helper()
+	m := &crossingMachine{machine: migratedMachine(t), acmeHost: newIngest(t), personalHost: newIngest(t), began: time.Now().Add(-time.Hour)}
 	personal := personalTeam()
 	personal.Policy.IncludePrompts, personal.Policy.IncludeToolContent = true, true
 	e := m.route(config.DefaultProfile, []routing.Team{orgTeam("acme", "acme-platform", "github.com/acme/*"), personal}, bindAcme)
-	m.key(e["acme-platform"], "acme-platform", "ter_srv_acme", acmeHost)
-	m.key(e["personal"], "personal", "ter_srv_personal", personalHost)
-	side, api := hookruntest.RepoAt(t, "github.com/dawson/side"), hookruntest.RepoAt(t, "github.com/acme/api")
-	const sid = "unrecorded-crossing"
-	ctx := context.Background()
-	began := time.Now().Add(-time.Hour)
-	hook := func(at time.Time) (hookrun.Env, *hookrun.Repo) {
-		t.Helper()
-		env := hookrun.Env{StateDir: m.state, ConfigDir: m.config, Now: at, Spool: m.spool, Policy: config.NoPolicy("", ""),
-			Routing: hookrun.LoadRouting(m.state, config.DefaultProfile)}
-		r, ok := env.Open(ctx, sid, side)
-		if !ok {
-			t.Fatal("routing collects nothing in personal's checkout")
-		}
-		return env, r
-	}
-	toolCall := func(mark string, at time.Time) spool.Event {
-		return spool.Event{Time: at, Name: semconv.TermaToolCallEvent, SessionID: sid,
-			Attrs: map[string]any{semconv.GenAIMainAgentNameKey: "claude-code", semconv.TermaTurnIDKey: mark}}
-	}
-	sess := session.Session{ID: sid, Tool: "claude-code"}
-
-	start, r := hook(began)
-	start.StartRun(sid)
+	m.key(e["acme-platform"], "acme-platform", "ter_srv_acme", m.acmeHost)
+	m.key(e["personal"], "personal", "ter_srv_personal", m.personalHost)
+	m.side, m.api = hookruntest.RepoAt(t, "github.com/dawson/side"), hookruntest.RepoAt(t, "github.com/acme/api")
+	start, r := m.hook(m.began)
+	start.StartRun(crossingSession)
 	start.EmitFor(r, toolCall("before-the-crossing", time.Time{}))
+	return m
+}
 
-	unlock, err := flock.TryLock(filepath.Join(m.state, runs.Dir, sid+".json.lock"))
+// hook is a hook of the session in personal's checkout at at.
+func (m *crossingMachine) hook(at time.Time) (hookrun.Env, *hookrun.Repo) {
+	m.t.Helper()
+	env := hookrun.Env{StateDir: m.state, ConfigDir: m.config, Now: at, Spool: m.spool, Policy: config.NoPolicy("", ""),
+		Routing: hookrun.LoadRouting(m.state, config.DefaultProfile)}
+	r, ok := env.Open(context.Background(), crossingSession, m.side)
+	if !ok {
+		m.t.Fatal("routing collects nothing in personal's checkout")
+	}
+	return env, r
+}
+
+// cross is the hook that edits Acme's checkout at at, with the run ledger's lock held
+// throughout, so no write to the ledger can be made.
+func (m *crossingMachine) cross(at time.Time) {
+	m.t.Helper()
+	unlock, err := flock.TryLock(filepath.Join(m.state, runs.Dir, crossingSession+".json.lock"))
 	if err != nil {
-		t.Fatal(err)
+		m.t.Fatal(err)
 	}
-	crossedAt := began.Add(10 * time.Minute)
-	cross, r := hook(crossedAt)
-	cross.Touch(r, sess, "Edit", []string{filepath.Join(api, "main.go")}, nil)
-	unlock()
-	if _, mixed := runs.MixedAt(m.state, sid, time.Time{}); mixed {
-		t.Fatal("the crossing hook wrote the ledger through a held lock")
+	defer unlock()
+	env, r := m.hook(at)
+	env.Touch(r, session.Session{ID: crossingSession, Tool: "claude-code"}, "Edit", []string{filepath.Join(m.api, "main.go")}, nil)
+	if c, ok := claim.Read(m.state, crossingSession, at); !ok || c.Kind != claim.KindMixed {
+		m.t.Fatalf("the crossing hook's placement %+v", c)
 	}
-	if c, ok := claim.Read(m.state, sid, crossedAt); !ok || c.Kind != claim.KindMixed {
-		t.Fatalf("the crossing hook's placement %+v", c)
-	}
+}
 
-	// The next hook spools a reply before it places the session, as a turn's end does.
-	next, r := hook(began.Add(20 * time.Minute))
-	if err := m.spool.Append(next.Routed(r, toolCall("spooled-before-the-retry", began.Add(15*time.Minute)))); err != nil {
-		t.Fatal(err)
+// spoolAt spools a tool call marked mark at at, as a hook spools a turn's records, without
+// placing the session.
+func (m *crossingMachine) spoolAt(mark string, at time.Time) {
+	m.t.Helper()
+	env, r := m.hook(at)
+	if err := m.spool.Append(env.Routed(r, toolCall(mark, at))); err != nil {
+		m.t.Fatal(err)
 	}
-	hookrun.ClaimFromPayload(ctx, next, hookrun.PayloadSession{ID: sid, Cwd: side}, "claude-code")
-	if at, mixed := runs.MixedAt(m.state, sid, time.Time{}); !mixed || !at.Equal(crossedAt.UTC()) {
-		t.Fatalf("after the next hook the ledger reads Mixed %v from %v, want from %v", mixed, at, crossedAt.UTC())
-	}
-	after, r := hook(began.Add(30 * time.Minute))
-	after.EmitFor(r, toolCall("after-the-retry", time.Time{}))
+}
 
-	res := m.flush(m.router())
-	_, sent := personalHost.sent()
-	if !strings.Contains(sent, "before-the-crossing") {
-		t.Errorf("what came before the crossing was not sent: %+v", res)
-	}
-	for _, mark := range []string{"spooled-before-the-retry", "after-the-retry"} {
-		if strings.Contains(sent, mark) {
-			t.Errorf("%s was sent after its run crossed", mark)
+// delivered checks what a flush sent: every mark in sent to personal's ingest and none of
+// dropped, the crossing edit's file event to Acme's by its own checkout, and how many
+// records it dropped for the crossing.
+func (m *crossingMachine) delivered(res Result, sent, dropped []string, mixed int) {
+	m.t.Helper()
+	_, body := m.personalHost.sent()
+	for _, mark := range sent {
+		if !strings.Contains(body, mark) {
+			m.t.Errorf("%s was not sent: %+v", mark, res)
 		}
 	}
-	if _, touched := acmeHost.sent(); !strings.Contains(touched, "main.go") {
-		t.Error("the crossing edit's file event did not go to Acme by its own checkout")
+	for _, mark := range dropped {
+		if strings.Contains(body, mark) {
+			m.t.Errorf("%s was sent after its run crossed", mark)
+		}
 	}
-	if res.Mixed != 2 {
-		t.Errorf("Flush = %+v, want 2 dropped as Mixed", res)
+	if _, touched := m.acmeHost.sent(); !strings.Contains(touched, "main.go") {
+		m.t.Error("the crossing edit's file event did not go to Acme by its own checkout")
+	}
+	if res.Mixed != mixed {
+		m.t.Errorf("Flush = %+v, want %d dropped as Mixed", res, mixed)
+	}
+}
+
+func toolCall(mark string, at time.Time) spool.Event {
+	return spool.Event{Time: at, Name: semconv.TermaToolCallEvent, SessionID: crossingSession,
+		Attrs: map[string]any{semconv.GenAIMainAgentNameKey: "claude-code", semconv.TermaTurnIDKey: mark}}
+}
+
+// A crossing the run ledger refuses, its lock held past the hook's wait, is recorded aside,
+// in the ledger's sidecar, which never expires. Six hours on, with no hook of the session
+// since, its claim long expired and pruned, the run still reads Mixed from the crossing,
+// and delivery drops what carries content and was spooled after it. The next hook that
+// can lock the ledger folds the sidecar in.
+func TestACrossingTheLedgerRefusedOutlivesItsClaim(t *testing.T) {
+	t.Parallel()
+	m := newCrossingMachine(t)
+	crossedAt := m.began.Add(10 * time.Minute)
+	m.cross(crossedAt)
+	m.spoolAt("spooled-after-the-crossing", crossedAt.Add(5*time.Minute))
+
+	later := time.Now().Add(6 * time.Hour)
+	if _, ok := claim.Read(m.state, crossingSession, later); ok {
+		t.Fatal("the claim has not expired six hours on")
+	}
+	claim.Prune(m.state, later)
+	if at, mixed := runs.MixedAt(m.state, crossingSession, time.Time{}); !mixed || !at.Equal(crossedAt.UTC()) {
+		t.Fatalf("six hours on the run reads Mixed %v from %v, want from %v", mixed, at, crossedAt.UTC())
+	}
+	m.delivered(m.flush(m.router()), []string{"before-the-crossing"}, []string{"spooled-after-the-crossing"}, 1)
+
+	next, _ := m.hook(later)
+	hookrun.ClaimFromPayload(context.Background(), next, hookrun.PayloadSession{ID: crossingSession, Cwd: m.side}, "claude-code")
+	if _, err := os.Stat(filepath.Join(m.state, runs.Dir, crossingSession+".mixed")); !os.IsNotExist(err) {
+		t.Fatalf("the next hook left the sidecar: %v", err)
+	}
+	if at, mixed := runs.MixedAt(m.state, crossingSession, time.Time{}); !mixed || !at.Equal(crossedAt.UTC()) {
+		t.Fatalf("after the fold the run reads Mixed %v from %v, want from %v", mixed, at, crossedAt.UTC())
 	}
 }

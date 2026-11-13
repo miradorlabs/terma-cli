@@ -172,8 +172,12 @@ writes no manifest and spools nothing, and on a machine not migrated it does not
 the call touched, and that location, into the run ledger, and records and sends nothing
 else. `runs.Touch` returns the run's locations as it wrote them, so of two hooks of one run
 that each see half a crossing, the later sees it whole. The ledger alone says whether a run
-is Mixed: a mixed placement it does not back is a crossing whose write failed, and the run's
-next hook records it again, from when the placement turned Mixed. The commit hooks are installed, and `prepare-commit-msg` stamps, only where Route sends the repository
+is Mixed. A crossing whose ledger write fails (its lock held past the hook's wait) goes to
+the ledger's sidecar, `runs/<session>.mixed`, without the lock: a file per crossing that never
+expires, which every read takes for Mixed and the next hook that can lock the ledger folds
+in. A mixed placement neither backs is a crossing both of whose writes failed, and the run's
+next hook within the placement's lifetime records it again, from when the placement turned
+Mixed. The commit hooks are installed, and `prepare-commit-msg` stamps, only where Route sends the repository
 to a team whose policy turns `git_hooks` on. A record's destination never changes once
 routed: the relay queues each part for its enrollment, and the spool keeps each event's;
 both recheck it before sending (`routing.Router.Recheck`, then `runs.MixedAt`), and send it

@@ -178,7 +178,7 @@ func (app *App) removeHookState() error {
 		errs = append(errs, os.Remove(path))
 	}
 	// The spool and the relay's outbox are gone: nothing queued names a session.
-	runs.Prune(app.stateDir, time.Now(), nil)
+	runs.Prune(context.Background(), app.stateDir, time.Now(), nil)
 	if err := errors.Join(errs...); err != nil {
 		return fmt.Errorf("remove the hooks' state: %w", err)
 	}

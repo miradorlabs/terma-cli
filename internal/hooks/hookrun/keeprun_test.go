@@ -60,7 +60,7 @@ func TestALongMixedRunStaysMixed(t *testing.T) {
 						}
 					}
 				}
-				runs.Prune(m.stateDir, now, nil)
+				runs.Prune(context.Background(), m.stateDir, now, nil)
 				if _, err := os.Stat(ledger); err != nil {
 					t.Fatalf("day %d: the Mixed run's ledger was pruned: %v", day, err)
 				}
@@ -75,11 +75,11 @@ func TestALongMixedRunStaysMixed(t *testing.T) {
 			if ledger, placement := m.mixed(sid); !ledger || !placement {
 				t.Fatalf("after 20 days the run reads Mixed %v in the ledger, %v in its placement", ledger, placement)
 			}
-			runs.Prune(m.stateDir, later.Add(runs.MixedRetention-time.Hour), nil)
+			runs.Prune(context.Background(), m.stateDir, later.Add(runs.MixedRetention-time.Hour), nil)
 			if _, err := os.Stat(ledger); err != nil {
 				t.Fatalf("pruned within MixedRetention of its last hook: %v", err)
 			}
-			runs.Prune(m.stateDir, later.Add(runs.MixedRetention+24*time.Hour), nil)
+			runs.Prune(context.Background(), m.stateDir, later.Add(runs.MixedRetention+24*time.Hour), nil)
 			if _, err := os.Stat(ledger); !os.IsNotExist(err) {
 				t.Fatalf("kept past MixedRetention of its last hook: %v", err)
 			}

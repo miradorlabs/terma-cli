@@ -1,6 +1,7 @@
 package runs
 
 import (
+	"context"
 	"errors"
 	"io/fs"
 	"os"
@@ -44,7 +45,7 @@ func TestPrune(t *testing.T) {
 	must(t, err)
 	defer unlock()
 
-	Prune(dir, time.Now(), nil)
+	Prune(context.Background(), dir, time.Now(), nil)
 	for _, p := range []string{"old.json", "old.json.lock", "aliases/agent-old"} {
 		if !gone(filepath.Join(runs, p)) {
 			t.Errorf("%s survived the prune", p)
@@ -77,13 +78,13 @@ func TestPruneLeftovers(t *testing.T) {
 	for _, p := range []string{"aliases/agent-1", "lost.json.lock", ".tmp-123"} {
 		age(t, filepath.Join(runs, p), Retention+time.Hour)
 	}
-	Prune(dir, time.Now(), nil)
+	Prune(context.Background(), dir, time.Now(), nil)
 	for _, p := range []string{"aliases/agent-1", "lost.json.lock", ".tmp-123"} {
 		if !gone(filepath.Join(runs, p)) {
 			t.Errorf("%s survived the prune", p)
 		}
 	}
-	Prune(t.TempDir(), time.Now(), nil)
+	Prune(context.Background(), t.TempDir(), time.Now(), nil)
 }
 
 // A ledger goes by its last activity, a run starting, crossing or recording a location,
@@ -107,7 +108,7 @@ func TestPruneKeepsWhatIsActiveOrQueued(t *testing.T) {
 		age(t, filepath.Join(runs, s+".json"), Retention+time.Hour)
 	}
 
-	Prune(dir, now, map[string]bool{"queued": true, "agent-q": true})
+	Prune(context.Background(), dir, now, map[string]bool{"queued": true, "agent-q": true})
 	if !gone(filepath.Join(runs, "idle.json")) {
 		t.Error("an idle ledger nothing queued names survived")
 	}
@@ -121,14 +122,14 @@ func TestPruneKeepsWhatIsActiveOrQueued(t *testing.T) {
 	}
 	// Once its records have left the queues, it goes too, after MixedRetention if its run
 	// is Mixed.
-	Prune(dir, now, nil)
+	Prune(context.Background(), dir, now, nil)
 	if !gone(filepath.Join(runs, "queued-by-alias.json")) {
 		t.Error("queued-by-alias survived once nothing queued named it")
 	}
 	if gone(filepath.Join(runs, "queued.json")) {
 		t.Error("a Mixed run's ledger went once nothing queued named it")
 	}
-	Prune(dir, long.Add(MixedRetention+time.Hour), nil)
+	Prune(context.Background(), dir, long.Add(MixedRetention+time.Hour), nil)
 	if !gone(filepath.Join(runs, "queued.json")) {
 		t.Error("a Mixed run's ledger survived MixedRetention")
 	}
@@ -151,7 +152,7 @@ func TestPruneKeepsAMixedRunLonger(t *testing.T) {
 	for _, s := range []string{"mixed", "mixed-before"} {
 		age(t, filepath.Join(runs, s+".json"), Retention+24*time.Hour)
 	}
-	Prune(dir, now, nil)
+	Prune(context.Background(), dir, now, nil)
 	if gone(filepath.Join(runs, "mixed.json")) {
 		t.Fatal("a Mixed run's ledger went after Retention")
 	}
@@ -161,7 +162,7 @@ func TestPruneKeepsAMixedRunLonger(t *testing.T) {
 	if !gone(filepath.Join(runs, "mixed-before.json")) {
 		t.Error("a ledger whose current run is not Mixed survived Retention")
 	}
-	Prune(dir, long.Add(MixedRetention+time.Hour), nil)
+	Prune(context.Background(), dir, long.Add(MixedRetention+time.Hour), nil)
 	if !gone(filepath.Join(runs, "mixed.json")) {
 		t.Error("a Mixed run's ledger survived MixedRetention")
 	}
@@ -185,12 +186,26 @@ func TestRefreshRenewsAnOldLedgerOnly(t *testing.T) {
 	if p, _ := Locate(dir, "sess"); !p.Active.Equal(later.UTC()) {
 		t.Fatalf("activity %v, want %v", p.Active, later.UTC())
 	}
-	Prune(dir, start.Add(Retention+time.Hour), nil)
+	Prune(context.Background(), dir, start.Add(Retention+time.Hour), nil)
 	if gone(filepath.Join(dir, Dir, "sess.json")) {
 		t.Fatal("pruned a renewed ledger")
 	}
 	must(t, Refresh(dir, "none", later))
 	if !gone(filepath.Join(dir, Dir, "none.json")) {
 		t.Fatal("Refresh made a ledger")
+	}
+}
+
+// A prune stops once its context ends, as the relay stops: it removes nothing more.
+func TestPruneStopsWithItsContext(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	start(t, dir, "old", time.Now().Add(-Retention-24*time.Hour))
+	age(t, filepath.Join(dir, Dir, "old.json"), Retention+time.Hour)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	Prune(ctx, dir, time.Now(), nil)
+	if gone(filepath.Join(dir, Dir, "old.json")) {
+		t.Fatal("a prune whose context had ended removed a ledger")
 	}
 }

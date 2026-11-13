@@ -38,12 +38,17 @@ type Routing struct {
 
 // ledgerRun is a session's run as one hook process knows it: its ID, the locations the
 // run ledger records for it, as read and with those this process has added since, the
-// ledger's last activity, and when the ledger says the run became Mixed (runs.Position).
+// ledger's last activity, when the ledger says the run became Mixed, whether a sidecar
+// records that, and the subagents sharing the session's runs (runs.Position).
 type ledgerRun struct {
 	id        string
 	locations []string
 	active    time.Time
 	mixedAt   time.Time
+	aside     bool
+	// aliases are known once read with the run, or kept from the run before it.
+	aliases      []string
+	aliasesKnown bool
 }
 
 // NewRouting is profile's routing under st, its routing state: nil for one missing,
@@ -249,7 +254,7 @@ func (e Env) currentRun(sessionID string) ledgerRun {
 	cur, ok := rt.runs[sessionID]
 	if !ok {
 		p, _ := runs.Locate(e.StateDir, sessionID)
-		cur = &ledgerRun{id: p.Run, locations: p.Locations, active: p.Active, mixedAt: p.MixedAt}
+		cur = &ledgerRun{id: p.Run, locations: p.Locations, active: p.Active, mixedAt: p.MixedAt, aside: p.Aside, aliases: p.Aliases, aliasesKnown: true}
 		rt.runs[sessionID] = cur
 	}
 	out := *cur
@@ -262,7 +267,47 @@ func (e Env) currentRun(sessionID string) ledgerRun {
 func (rt *Routing) setRun(sessionID, run string, at time.Time) {
 	rt.mu.Lock()
 	defer rt.mu.Unlock()
-	rt.runs[sessionID] = &ledgerRun{id: run, active: at}
+	next := &ledgerRun{id: run, active: at}
+	if prev, ok := rt.runs[sessionID]; ok {
+		next.aliases, next.aliasesKnown = prev.aliases, prev.aliasesKnown
+	}
+	rt.runs[sessionID] = next
+}
+
+// aliases are the subagent IDs sharing sessionID's runs (runs.Aliases): as this process
+// read them with the run (currentRun), with those it has aliased since, read at most once.
+func (rt *Routing) aliases(stateDir, sessionID string) ([]string, error) {
+	rt.mu.Lock()
+	cur, ok := rt.runs[sessionID]
+	if ok && cur.aliasesKnown {
+		defer rt.mu.Unlock()
+		return slices.Clone(cur.aliases), nil
+	}
+	rt.mu.Unlock()
+	aliases, err := runs.Aliases(stateDir, sessionID)
+	if err != nil {
+		return nil, err
+	}
+	rt.mu.Lock()
+	defer rt.mu.Unlock()
+	if cur, ok := rt.runs[sessionID]; ok {
+		for _, a := range cur.aliases {
+			if !slices.Contains(aliases, a) {
+				aliases = append(aliases, a)
+			}
+		}
+		cur.aliases, cur.aliasesKnown = aliases, true
+	}
+	return slices.Clone(aliases), nil
+}
+
+// aliased notes that alias now shares sessionID's runs (runs.Alias).
+func (rt *Routing) aliased(sessionID, alias string) {
+	rt.mu.Lock()
+	defer rt.mu.Unlock()
+	if cur, ok := rt.runs[sessionID]; ok && !slices.Contains(cur.aliases, alias) {
+		cur.aliases = append(slices.Clip(cur.aliases), alias)
+	}
 }
 
 // keepRun renews sessionID's run ledger (runs.Refresh) once its last activity, as this
