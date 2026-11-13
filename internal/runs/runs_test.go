@@ -209,3 +209,45 @@ func TestRetentionOutlivesTheQueues(t *testing.T) {
 		t.Fatalf("Retention %v does not outlive the spool's %v", Retention, spool.MaxAge)
 	}
 }
+
+// Current is the latest run a session began, known by the session's ID or an alias's, as
+// long as the ledger is kept; Aliases are every subagent ID that shares its runs.
+func TestCurrentAndAliases(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	if run, ok := Current(dir, "sess"); ok || run != "" {
+		t.Fatalf("a session with no run is in %q", run)
+	}
+	if got, err := Aliases(dir, "sess"); err != nil || len(got) != 0 {
+		t.Fatalf("a session with no ledger has aliases %v, %v", got, err)
+	}
+	r1 := start(t, dir, "sess", t0)
+	must(t, Alias(dir, "sess", "agent-1"))
+	must(t, Alias(dir, "sess", "agent-2"))
+	must(t, Alias(dir, "sess", "agent-1"))
+	for _, id := range []string{"sess", "agent-1", "agent-2"} {
+		if run, ok := Current(dir, id); !ok || run != r1 {
+			t.Fatalf("Current(%s) = %q, %v; want %q", id, run, ok, r1)
+		}
+	}
+	r2 := start(t, dir, "sess", t0.Add(time.Hour))
+	if run, ok := Current(dir, "agent-2"); !ok || run != r2 {
+		t.Fatalf("after a resume, Current = %q, %v; want %q", run, ok, r2)
+	}
+	if got, err := Aliases(dir, "sess"); err != nil || len(got) != 2 || got[0] != "agent-1" || got[1] != "agent-2" {
+		t.Fatalf("Aliases = %v, %v", got, err)
+	}
+	if _, ok := Current(dir, "../escape"); ok {
+		t.Fatal("an ID no file can be named after has a run")
+	}
+	if _, err := Aliases(dir, "../escape"); err == nil {
+		t.Fatal("aliases of an ID no file can be named after")
+	}
+	must(t, os.WriteFile(filepath.Join(dir, Dir, "broken.json"), []byte("{"), 0o600))
+	if _, ok := Current(dir, "broken"); ok {
+		t.Fatal("an unreadable ledger has a current run")
+	}
+	if _, err := Aliases(dir, "broken"); err == nil {
+		t.Fatal("an unreadable ledger lists no aliases without an error")
+	}
+}

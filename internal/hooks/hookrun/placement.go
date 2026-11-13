@@ -74,14 +74,28 @@ func (e Env) place(sessionID, agentID string, c claim.Claim, loc routing.Locatio
 		c = claim.Claim{Kind: claim.KindMixed, Run: c.Run, Tool: c.Tool, PIDs: c.PIDs}
 	}
 	claim.Write(e.StateDir, sessionID, c, now)
-	if agentID == "" || agentID == sessionID || !session.ValidID(agentID) {
+	if agentID != "" && agentID != sessionID && session.ValidID(agentID) {
+		// A subagent whose telemetry names its own ID shares the session's run: it is an
+		// alias in the run ledger, so its crossing is the session's and the session's is
+		// its own.
+		if claim.Write(e.StateDir, agentID, c, now) {
+			if err := runs.Alias(e.StateDir, sessionID, agentID); err != nil {
+				e.Logf("alias subagent: %v", err)
+			}
+		}
+	}
+	if !mixed {
 		return
 	}
-	// A subagent whose telemetry names its own ID shares the session's run: it is an alias
-	// in the run ledger, so its crossing is the session's and the session's is its own.
-	if claim.Write(e.StateDir, agentID, c, now) {
-		if err := runs.Alias(e.StateDir, sessionID, agentID); err != nil {
-			e.Logf("alias subagent: %v", err)
+	// Mixed covers every identity the run's telemetry uses: each subagent that shares it,
+	// not only the one whose hook saw the crossing.
+	aliases, err := runs.Aliases(e.StateDir, sessionID)
+	if err != nil {
+		e.Logf("subagents of a mixed run: %v", err)
+	}
+	for _, alias := range aliases {
+		if alias != agentID {
+			claim.Write(e.StateDir, alias, c, now)
 		}
 	}
 }

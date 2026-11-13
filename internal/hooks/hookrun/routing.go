@@ -10,6 +10,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/project"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/routing"
+	"github.com/miradorlabs/terma-cli/internal/runs"
 	"github.com/miradorlabs/terma-cli/internal/session"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
@@ -219,8 +220,8 @@ func (e Env) destine(ev spool.Event, d *dest, own bool, run string) spool.Event 
 }
 
 // runOf is the run sessionID's hooks name: the one a session start began in this process,
-// else the one its claim's latest placement names; "" when neither is known, as before any
-// run began or once the claim has expired.
+// else the latest the run ledger records for it (runs.Current), however long the session
+// has been idle; "" before any run began.
 func (e Env) runOf(sessionID string) string {
 	rt := e.Routing
 	if rt == nil || sessionID == "" {
@@ -231,10 +232,7 @@ func (e Env) runOf(sessionID string) string {
 	if run, ok := rt.runs[sessionID]; ok {
 		return run
 	}
-	run := ""
-	if c, ok := claim.Read(e.StateDir, sessionID, e.Time()); ok {
-		run = c.Run
-	}
+	run, _ := runs.Current(e.StateDir, sessionID)
 	rt.runs[sessionID] = run
 	return run
 }

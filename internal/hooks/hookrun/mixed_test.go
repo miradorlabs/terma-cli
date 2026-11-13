@@ -139,3 +139,46 @@ func TestOnlyANewRunEndsMixed(t *testing.T) {
 		t.Errorf("the new run's placement %+v", c)
 	}
 }
+
+// A crossing seen by one subagent's hook covers every identity the run's telemetry uses:
+// the session's ID, that subagent's, and every other subagent the run ledger names, whose
+// placements turn mixed too.
+func TestAMixedRunCoversEverySubagent(t *testing.T) {
+	t.Parallel()
+	m := newRoutedMachine(t, acmeAndPersonal(t))
+	side, api := hookruntest.RepoAt(t, "github.com/dawson/side"), hookruntest.RepoAt(t, "github.com/acme/api")
+	const sid, quiet, crossing = "fanned-session", "agent-quiet", "agent-crossing"
+	r := startIn(t, m.hook(), sid, side)
+	m.hook().Touch(r, sessionOf(sid), "Edit", []string{filepath.Join(side, "a.go")}, AgentAttrs(map[string]any{}, quiet, "general-purpose"))
+	if c := m.claim(quiet); c.Kind != claim.KindRepository {
+		t.Fatalf("the quiet subagent's placement before the crossing: %+v", c)
+	}
+	m.hook().Touch(r, sessionOf(sid), "Edit", []string{filepath.Join(api, "main.go")}, AgentAttrs(map[string]any{}, crossing, "general-purpose"))
+	for _, id := range []string{sid, crossing, quiet} {
+		if c := m.claim(id); c.Kind != claim.KindMixed || c.Run != m.claim(sid).Run {
+			t.Errorf("%s's placement after the crossing: %+v", id, c)
+		}
+	}
+}
+
+// The run a session's events name comes from the run ledger, so a session idle for longer
+// than its claim lasts still names the run it is in, not none.
+func TestARunOutlivesItsClaim(t *testing.T) {
+	t.Parallel()
+	m := newRoutedMachine(t, acmeAndPersonal(t))
+	side := hookruntest.RepoAt(t, "github.com/dawson/side")
+	const sid = "idle-session"
+	startIn(t, m.hook(), sid, side)
+	run := hookruntest.Named(m.spooled(), semconv.TermaSessionStartEvent)[0].Run
+	later := m.hook()
+	later.Now = time.Now().Add(5 * time.Hour)
+	if _, ok := claim.Read(m.stateDir, sid, later.Now); ok {
+		t.Fatal("the claim has not expired yet")
+	}
+	r, _ := later.Open(context.Background(), sid, side)
+	later.EmitFor(r, spool.Event{Name: semconv.TermaToolCallEvent, SessionID: sid, Attrs: map[string]any{semconv.GenAIMainAgentNameKey: "claude-code"}})
+	calls := hookruntest.Named(m.spooled(), semconv.TermaToolCallEvent)
+	if run == "" || len(calls) != 1 || calls[0].Run != run {
+		t.Fatalf("after the claim expired the event names run %q, want %q", calls[0].Run, run)
+	}
+}

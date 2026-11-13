@@ -141,6 +141,34 @@ func MixedAt(stateDir, idOrAlias string, recordTime time.Time) (time.Time, bool)
 	return r.MixedAt, !r.MixedAt.IsZero()
 }
 
+// Current is the run idOrAlias, a session ID or one of its aliases, is in now: the latest
+// to begin. False when no run of it is recorded, or its ledger cannot be read. Hooks name
+// it on what they record, long after the session's claim has expired.
+func Current(stateDir, idOrAlias string) (string, bool) {
+	if !session.ValidID(idOrAlias) {
+		return "", false
+	}
+	l, ok, err := resolve(stateDir, idOrAlias)
+	if err != nil || !ok || len(l.Runs) == 0 {
+		return "", false
+	}
+	return l.Runs[len(l.Runs)-1].ID, true
+}
+
+// Aliases are the subagent IDs that share sessionID's runs (Alias), in the order they were
+// recorded: every identity a crossing of its run covers.
+func Aliases(stateDir, sessionID string) ([]string, error) {
+	path, err := ledgerPath(stateDir, sessionID)
+	if err != nil {
+		return nil, err
+	}
+	l, _, err := load(path)
+	if err != nil {
+		return nil, err
+	}
+	return slices.Clone(l.Aliases), nil
+}
+
 // inForce is the run in force at t among runs, in the order they began.
 func inForce(runs []run, t time.Time) run {
 	if t.IsZero() {
