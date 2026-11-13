@@ -93,10 +93,16 @@ func WriteRoutingState(t testing.TB, stateDir string, s *routing.State) {
 // origin's last segment, and its resolved path: what a routed test places sessions in.
 func RepoAt(t testing.TB, origin string) string {
 	t.Helper()
+	parent, _ := filepath.EvalSymlinks(t.TempDir())
+	return RepoIn(t, parent, origin)
+}
+
+// RepoIn is RepoAt in parent, beside whatever else is there.
+func RepoIn(t testing.TB, parent, origin string) string {
+	t.Helper()
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not installed")
 	}
-	parent, _ := filepath.EvalSymlinks(t.TempDir())
 	root := filepath.Join(parent, filepath.Base(origin))
 	for _, args := range [][]string{
 		{"init", "-q", "-b", "main", root},

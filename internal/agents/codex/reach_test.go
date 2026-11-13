@@ -96,12 +96,12 @@ func TestRoutedCodexShellReadsReachingAcmeMakeTheRunMixed(t *testing.T) {
 	}
 }
 
-// A shell command with more candidates than terma examines counts as reaching an
-// organization not known: though none of its 33 words names another checkout, the run turns
+// A shell command reaching more folders than terma examines counts as reaching an
+// organization not known: though none of its 257 folders is another checkout, the run turns
 // Mixed before it runs. One at the bound does not.
-func TestRoutedCodexShellPastTheCandidateBoundMakesTheRunMixed(t *testing.T) {
+func TestRoutedCodexShellPastThePlaceBoundMakesTheRunMixed(t *testing.T) {
 	const sid = "01a08bd5-0487-74b1-9d82-45e619c57aab"
-	for n, want := range map[int]bool{32: false, 33: true} {
+	for n, want := range map[int]bool{256: false, 257: true} {
 		t.Run(fmt.Sprint(n), func(t *testing.T) {
 			t.Setenv("CODEX_HOME", t.TempDir())
 			side := hookruntest.RepoAt(t, "github.com/dawson/side")
@@ -121,12 +121,13 @@ func TestRoutedCodexShellPastTheCandidateBoundMakesTheRunMixed(t *testing.T) {
 			hook(sessionStart, map[string]any{"hook_event_name": "SessionStart", "model": "gpt-6"})
 			command := "ls"
 			for i := range n {
-				command += fmt.Sprintf(" src/missing-%d.go", i)
+				hookruntest.WriteFile(t, side, fmt.Sprintf("d%03d/a.go", i), "package d\n")
+				command += fmt.Sprintf(" d%03d/a.go", i)
 			}
 			hook(preToolUse, map[string]any{"hook_event_name": "PreToolUse", "tool_name": codexShellTool, "tool_use_id": "c1",
 				"tool_input": map[string]any{"command": command}})
 			if _, mixed := runs.MixedAt(stateDir, sid, time.Time{}); mixed != want {
-				t.Fatalf("%d candidates: Mixed %v, want %v", n, mixed, want)
+				t.Fatalf("%d folders: Mixed %v, want %v", n, mixed, want)
 			}
 		})
 	}

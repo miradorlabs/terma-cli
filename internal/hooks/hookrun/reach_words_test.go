@@ -64,7 +64,7 @@ func TestShellPathsTakeBareWordsThatNameSomethingThere(t *testing.T) {
 		"ls side; acme-api":       {m.side},
 		"time acme-api x":         nil,
 		"X=1 acme-api":            nil,
-		"cat < acme-api/NOTES.md": {m.notes},
+		"cat < acme-api/NOTES.md": {m.api},
 	})
 	m.check(t, m.side, map[string][]string{
 		"cd .. && rg foo acme-api": {m.parent, m.api},
@@ -82,18 +82,18 @@ func TestShellPathsExpandVariables(t *testing.T) {
 		"ls $HOME/proj":                              {filepath.Join(m.home, "proj")},
 		"ls ${HOME}/proj":                            {filepath.Join(m.home, "proj")},
 		"ls ~/proj":                                  {filepath.Join(m.home, "proj")},
-		"cat $ACME/NOTES.md":                         {m.notes},
-		`cat "${ACME}/NOTES.md"`:                     {m.notes},
+		"cat $ACME/NOTES.md":                         {m.api},
+		`cat "${ACME}/NOTES.md"`:                     {m.api},
 		"ls $ACME":                                   {m.api},
-		"cd .. && cat $PWD/acme-api/NOTES.md":        {m.parent, m.notes},
-		"cat $(pwd)/../acme-api/NOTES.md":            {m.notes},
-		"cat `pwd`/../acme-api/NOTES.md":             {m.notes},
-		`cat "$(pwd -P)/../acme-api/NOTES.md"`:       {m.notes},
+		"cd .. && cat $PWD/acme-api/NOTES.md":        {m.parent, m.api},
+		"cat $(pwd)/../acme-api/NOTES.md":            {m.api},
+		"cat `pwd`/../acme-api/NOTES.md":             {m.api},
+		`cat "$(pwd -P)/../acme-api/NOTES.md"`:       {m.api},
 		"ls $OLDPWD/acme-api":                        {m.api},
 		"cd ../acme-api && cd ../side && ls $OLDPWD": {m.api, m.side},
 		"echo x > $TMPDIR/out":                       {filepath.Join(m.parent, "tmp")},
 		"D=../acme-api; ls $D":                       {m.api},
-		"D=../acme-api && cat $D/NOTES.md":           {m.api, m.notes},
+		"D=../acme-api && cat $D/NOTES.md":           {m.api},
 		"ls ${UNSET:-../acme-api}":                   {m.api},
 		"cd ../acme-api && cd - && ls":               {m.api},
 		"cd ../acme-api; cd; ls proj":                {m.api, m.home, filepath.Join(m.home, "proj")},
@@ -128,37 +128,65 @@ func TestShellPathsCannotResolveIsUnknown(t *testing.T) {
 	}
 }
 
-// A word with a live wildcard is what it matches, each match a candidate; a quoted wildcard
-// is taken as written, and a pattern that matches nothing is passed on as written.
+// A word with a live wildcard is what it matches, each match reaching its folder, or a
+// matched folder itself; a quoted wildcard is taken as written, and a pattern that matches
+// nothing is passed on as written. However many files a glob matches in one folder, it
+// reaches one place: only matches in more than maxShellPlaces folders reach somewhere not
+// known.
 func TestShellPathsExpandGlobs(t *testing.T) {
 	t.Parallel()
 	m := newWordsMachine(t)
 	m.check(t, m.side, map[string][]string{
-		"cat ../acme-*/NOTES.md":   {m.notes},
+		"cat ../acme-*/NOTES.md":   {m.api},
 		"ls ../acme-a?i":           {m.api},
 		"ls ../acme-[a]pi":         {m.api},
 		"cat '../acme-*/NOTES.md'": {m.parent},
 		`cat ../acme-\*/NOTES.md`:  {m.parent},
 		"cat ../nothing-*/x":       {m.parent},
-		"cat $ACME/*.md":           {m.notes},
+		"cat $ACME/*.md":           {m.api},
 	})
 	many := filepath.Join(m.parent, "many")
-	if err := os.MkdirAll(many, 0o700); err != nil {
-		t.Fatal(err)
-	}
-	for i := range maxShellPaths + 1 {
-		if err := os.WriteFile(filepath.Join(many, fmt.Sprintf("f%02d.go", i)), nil, 0o600); err != nil {
-			t.Fatal(err)
+	for i := range maxShellPlaces + 1 {
+		for _, rel := range []string{fmt.Sprintf("f%03d.go", i), fmt.Sprintf("d%03d/x.go", i)} {
+			if err := os.MkdirAll(filepath.Dir(filepath.Join(many, rel)), 0o700); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(many, rel), nil, 0o600); err != nil {
+				t.Fatal(err)
+			}
 		}
 	}
-	if got := m.paths("gofmt -l *.go", many); !slices.Contains(got, UnknownReach) || len(got) != maxShellPaths+1 {
-		t.Errorf("a glob past the bound: %d paths, UnknownReach %v", len(got), slices.Contains(got, UnknownReach))
+	m.check(t, many, map[string][]string{"gofmt -l *.go": {many}})
+	if got := m.paths("ls d*/*.go", many); !slices.Contains(got, UnknownReach) || len(got) != maxShellPlaces+1 {
+		t.Errorf("a glob past the bound: %d places, UnknownReach %v", len(got), slices.Contains(got, UnknownReach))
+	}
+}
+
+// The scan makes at most maxShellLookups lookups, a word's or a glob match's each: a command
+// past them reaches somewhere not known, however few places it names.
+func TestShellPathsPastTheLookupBoundIsUnknown(t *testing.T) {
+	t.Parallel()
+	m := newWordsMachine(t)
+	words := func(n int) string {
+		var b strings.Builder
+		b.WriteString("echo")
+		for i := range n {
+			fmt.Fprintf(&b, " word%d", i)
+		}
+		return b.String()
+	}
+	if got := m.paths(words(maxShellLookups), m.side); got != nil {
+		t.Errorf("%d words that name nothing: %q", maxShellLookups, got)
+	}
+	if got := m.paths(words(maxShellLookups+1), m.side); !slices.Equal(got, []string{UnknownReach}) {
+		t.Errorf("%d words that name nothing: %q, want UnknownReach", maxShellLookups+1, got)
 	}
 }
 
 // A here-document's body is data unless its command is a shell: only its slashed words may
-// be paths there, so a commit message's words are not candidates; a shell's body is
-// commands. A quoted delimiter's body expands nothing.
+// be paths there, so a commit message's words are not candidates, and one that names
+// nothing names no new file either; a shell's body is commands. A quoted delimiter's body
+// expands nothing.
 func TestShellPathsReadHereDocuments(t *testing.T) {
 	t.Parallel()
 	m := newWordsMachine(t)
@@ -166,9 +194,11 @@ func TestShellPathsReadHereDocuments(t *testing.T) {
 		"git commit -F - <<'EOF'\nfix acme-api and side\nEOF":   nil,
 		"git commit -m \"$(cat <<'EOF'\nfix acme-api\nEOF\n)\"": nil,
 		"bash <<'EOF'\ncd acme-api\nEOF":                        {m.api},
-		"cat <<'EOF' | bash\ncat acme-api/NOTES.md\nEOF":        {m.notes},
-		"cat <<EOF\n$(cat acme-api/NOTES.md)\nEOF":              {m.notes},
-		"cat <<'EOF'\n$UNSET/x\nEOF":                            {m.parent},
+		"cat <<'EOF' | bash\ncat acme-api/NOTES.md\nEOF":        {m.api},
+		"cat <<EOF\n$(cat acme-api/NOTES.md)\nEOF":              {m.api},
+		"cat <<'EOF'\n$UNSET/x\nEOF":                            nil,
+		"cat <<'EOF'\nsee acme-api/NOTES.md\nEOF":               {m.api},
+		"cat <<'EOF'\nsee acme-api/new/x.md and a/b\nEOF":       nil,
 		"cat <<-EOF > side/out\n\tacme-api\n\tEOF\nls side/src": {m.side, filepath.Join(m.side, "src")},
 	})
 }

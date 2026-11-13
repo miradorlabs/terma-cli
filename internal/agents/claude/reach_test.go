@@ -174,9 +174,9 @@ func TestRoutedClaudeShellCommandsReachingAcmeMakeTheRunMixed(t *testing.T) {
 		"a relative path after a cd out":    {func(*reachMachine) string { return "cd .. && cat acme-api/NOTES.md" }, true},
 		"a folder named alone, from above":  {func(*reachMachine) string { return "cd .. && git -C acme-api log" }, true},
 		"an unresolved path":                {func(*reachMachine) string { return "cat $(git rev-parse --show-toplevel)/x" }, true},
-		// 33 candidates, none of them in another checkout: past the bound, unknown.
-		"a command past the candidate bound": {func(*reachMachine) string { return "ls" + manyCandidates(33) }, true},
-		"a command at the candidate bound":   {func(*reachMachine) string { return "ls" + manyCandidates(32) }, false},
+		// 257 folders, none of them in another checkout: past hookrun's bound, unknown.
+		"a command past the place bound": {func(m *reachMachine) string { return "ls" + manyPlaces(m.t, m.side, 257) }, true},
+		"a command at the place bound":   {func(m *reachMachine) string { return "ls" + manyPlaces(m.t, m.side, 256) }, false},
 	} {
 		t.Run(name, func(t *testing.T) {
 			m := newReachMachine(t)
@@ -189,11 +189,13 @@ func TestRoutedClaudeShellCommandsReachingAcmeMakeTheRunMixed(t *testing.T) {
 	}
 }
 
-// manyCandidates is n path-like words, none of them there.
-func manyCandidates(n int) string {
+// manyPlaces is n words naming files in n folders of root, which it makes, two words each.
+func manyPlaces(t *testing.T, root string, n int) string {
+	t.Helper()
 	var b strings.Builder
 	for i := range n {
-		fmt.Fprintf(&b, " src/missing-%d.go", i)
+		hookruntest.WriteFile(t, root, fmt.Sprintf("d%03d/a.go", i), "package d\n")
+		fmt.Fprintf(&b, " d%03d/a.go d%03d/missing.go", i, i)
 	}
 	return b.String()
 }

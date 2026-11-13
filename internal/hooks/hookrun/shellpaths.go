@@ -1,40 +1,49 @@
 package hookrun
 
 import (
+	"io/fs"
 	"os"
 	"path/filepath"
-	"runtime"
 	"slices"
 	"strings"
 )
 
-// maxShellPaths bounds the candidates ShellPaths examines, keeping a hook that runs on every
-// shell call within its budget. Past it the call counts as reaching an unknown organization.
-const maxShellPaths = 32
+// maxShellPlaces bounds the places a shell command may reach: the folders ShellPaths
+// returns, each once however many of the command's words name it or something in it. Past
+// it the command may reach a checkout the scan does not name. Each place costs Classify a
+// checkout lookup, some 20µs, so the bound keeps a hook that runs on every shell call well
+// within its budget, while no command an agent runs comes near it.
+const maxShellPlaces = 256
 
-// UnknownReach is a path Classify takes to say the call may have reached a
-// checkout no path names: a shell command with more candidates than ShellPaths examines,
-// or a path-like word whose expansion it cannot resolve. It is no path (it holds a NUL),
-// and the run turns Mixed, as for a checkout of an organization not known.
+// maxShellLookups bounds the scan's own work: a lookup for each distinct candidate word and
+// each glob match, about 2µs each. Past it the reach is not known. It keeps a pathological
+// command (a megabyte of words) within the hook's budget.
+const maxShellLookups = 4096
+
+// UnknownReach is a path Classify takes to say the call may have reached a checkout no path
+// names: a shell command reaching more places than ShellPaths returns, or a path-like word
+// whose expansion it cannot resolve. It is no path (it holds a NUL), and the run turns
+// Mixed, as for a checkout of an organization not known.
 const UnknownReach = "\x00unknown"
 
-// ShellPaths are the existing paths a shell command may reach, for Classify, with
+// ShellPaths are the places a shell command may reach, for Classify: the folders of the
+// existing paths it names (a folder its own place, and a symlink's target's as well), with
 // UnknownReach when it may reach one it cannot name. Its candidates are each word that is
 // absolute, starts with ~/ or holds a /, every cd and pushd target, and each other word
 // but a command's name, which the shell looks up on PATH (a here-document's body read as
 // data has only its slashed words). A word naming nothing yet may be a file the command
-// creates (> new.md, touch, mkdir -p), so a slashed one reaches its nearest existing folder;
-// a cd to nowhere reaches nothing. An option's or assignment's value (--flag=X, -oX, NAME=X)
-// counts as the word. A relative word resolves against the cwd and against where an earlier
-// cd or pushd went.
+// creates (> new.md, touch, mkdir -p), so a slashed one reaches its nearest existing folder,
+// except in a here-document's body, which creates nothing; a cd to nowhere reaches nothing.
+// An option's or assignment's value (--flag=X, -oX, NAME=X) counts as the word. A relative
+// word resolves against the cwd and against where an earlier cd or pushd went.
 //
 // Words are expanded first: $HOME, $PWD (and $(pwd)), $OLDPWD, an assignment earlier in the
 // command, and any other variable the hook's environment sets; a word with a wildcard
-// (*, ? or [) to what it matches, each match a candidate. A word that may be a path but
-// whose expansion cannot be resolved (a command substitution's output, an unset variable)
-// is UnknownReach, as is a candidate past maxShellPaths. It does not parse the shell
-// beyond that: a word that only looks like a path counts, and a false crossing errs
-// toward Mixed, the safe way.
+// (*, ? or [) to what it matches, each match reaching its folder. A word that may be a path
+// but whose expansion cannot be resolved (a command substitution's output, an unset
+// variable) is UnknownReach, as is a command past maxShellPlaces or maxShellLookups. It
+// does not parse the shell beyond that: a word that only looks like a path counts, and a
+// false crossing errs toward Mixed, the safe way.
 //
 // Accepted risk: a word with no slash whose expansion cannot be resolved (a loop's
 // variable, rg TODO $DIR) counts for nothing: taking every such word for UnknownReach
@@ -48,7 +57,7 @@ func shellPaths(command, cwd string, env func(string) (string, bool)) []string {
 	var out []string
 	unknown := false
 	for _, escapes := range shellReadings() {
-		sc := &shellScan{cwd: cwd, dir: cwd, env: env, vars: map[string]*string{}}
+		sc := &shellScan{cwd: cwd, dir: cwd, env: env, vars: map[string]*string{}, places: map[string]bool{}, examined: map[candidate]bool{}}
 		sc.scan(shellWords(command, escapes))
 		unknown = unknown || sc.unknown
 		for _, p := range sc.out {
@@ -84,33 +93,64 @@ type shellScan struct {
 	env       func(string) (string, bool)
 	// vars are the command's assignments so far, nil for a value not resolved.
 	vars map[string]*string
-	out  []string
-	// examined are the candidates looked at, a word from a folder each; past maxShellPaths
-	// the scan stops, unknown.
-	examined []candidate
+	// out are the places reached, in the order found; places holds them.
+	out    []string
+	places map[string]bool
+	// examined are the candidates looked at, a word from a folder each, and lookups the
+	// lookups made; past maxShellLookups the scan stops, unknown.
+	examined map[candidate]bool
+	lookups  int
 	unknown  bool
 }
 
-type candidate struct{ word, dir string }
+// candidate is a word as expanded, whether its wildcards are live, and where it was read.
+type candidate struct {
+	word string
+	glob bool
+	dir  string
+}
 
-// keep adds p to what the command reaches.
-func (sc *shellScan) keep(p string) {
-	if !slices.Contains(sc.out, p) {
+// place adds the folder p to what the command reaches; past maxShellPlaces the scan stops,
+// unknown.
+func (sc *shellScan) place(p string) {
+	switch {
+	case sc.places[p]:
+	case len(sc.places) == maxShellPlaces:
+		sc.unknown = true
+	default:
+		sc.places[p] = true
 		sc.out = append(sc.out, p)
 	}
 }
 
-// examine counts c as examined and reports whether it may be: false once maxShellPaths
-// are, which makes the scan unknown, or for one already examined.
-func (sc *shellScan) examine(c candidate) bool {
-	if slices.Contains(sc.examined, c) {
-		return false
+// reachEntry adds the place of p, which exists and Lstat described as info: a folder is its
+// own, anything else its folder's, and a symlink's target's place as well.
+func (sc *shellScan) reachEntry(p string, info fs.FileInfo) {
+	switch {
+	case info.IsDir():
+		sc.place(p)
+	case info.Mode()&fs.ModeSymlink != 0:
+		sc.place(filepath.Dir(p))
+		if target, err := filepath.EvalSymlinks(p); err == nil {
+			if t, err := os.Stat(target); err == nil && t.IsDir() {
+				sc.place(target)
+			} else {
+				sc.place(filepath.Dir(target))
+			}
+		}
+	default:
+		sc.place(filepath.Dir(p))
 	}
-	if len(sc.examined) == maxShellPaths {
+}
+
+// spend counts a lookup and reports whether the scan may make it: false past
+// maxShellLookups, which makes the reach unknown.
+func (sc *shellScan) spend() bool {
+	if sc.lookups == maxShellLookups {
 		sc.unknown = true
 		return false
 	}
-	sc.examined = append(sc.examined, c)
+	sc.lookups++
 	return true
 }
 
@@ -174,10 +214,13 @@ func (sc *shellScan) word(w shellWord, x expansion, target bool) {
 		return
 	case !slashed && !target && (w.command || w.body):
 		return // a command's name, or a here-document's data
-	case x.glob && sc.glob(x):
+	}
+	c := candidate{x.text, x.glob, sc.dir}
+	if sc.examined[c] {
 		return
 	}
-	if !sc.examine(candidate{x.text, sc.dir}) {
+	sc.examined[c] = true
+	if x.glob && sc.glob(x) || !sc.spend() {
 		return
 	}
 	p, info := sc.reach(x.text, sc.dir)
@@ -185,7 +228,7 @@ func (sc *shellScan) word(w shellWord, x expansion, target bool) {
 	if sc.dir != sc.cwd {
 		back, _ = sc.reach(x.text, sc.cwd) // after a subshell's cd, the command is back in cwd
 	}
-	if p == "" && back == "" && !target && slashed {
+	if p == "" && back == "" && !target && slashed && !w.body {
 		// There in neither place: a file the command may create, in either.
 		sc.reachNew(x.text, sc.dir)
 		if sc.dir != sc.cwd {
@@ -197,8 +240,9 @@ func (sc *shellScan) word(w shellWord, x expansion, target bool) {
 	}
 }
 
-// glob keeps what x's pattern matches, from where the command is and the cwd, each match a
-// candidate; false when nothing matches, and the shell passes the word on as written.
+// glob reaches the places x's pattern matches, from where the command is and the cwd: a
+// match's folder, or a matched folder itself, each once however many matches it holds.
+// False when nothing matches, and the shell passes the word on as written.
 func (sc *shellScan) glob(x expansion) bool {
 	dirs := []string{sc.dir}
 	if sc.dir != sc.cwd {
@@ -213,142 +257,45 @@ func (sc *shellScan) glob(x expansion) bool {
 		matches, _ := filepath.Glob(pattern)
 		for _, m := range matches {
 			found = true
-			if sc.examine(candidate{m, ""}) {
-				sc.keep(m)
+			if !sc.spend() {
+				return true
+			}
+			if info, err := os.Lstat(m); err == nil {
+				sc.reachEntry(m, info)
 			}
 		}
 	}
 	return found
 }
 
-// reach keeps the path w names from dir when something is there, and returns it.
+// reach adds the place of the path w names from dir when something is there, and returns
+// the path with what is there, a symlink followed.
 func (sc *shellScan) reach(w, dir string) (string, os.FileInfo) {
 	p, ok := sc.path(w, dir)
 	if !ok {
 		return "", nil
 	}
-	info, err := os.Stat(p)
+	info, err := os.Lstat(p)
 	if err != nil {
 		return "", nil
 	}
-	sc.keep(p)
+	sc.reachEntry(p, info)
+	if info.Mode()&fs.ModeSymlink != 0 {
+		if info, err = os.Stat(p); err != nil {
+			return p, nil
+		}
+	}
 	return p, info
 }
 
-// reachNew keeps the nearest existing folder above the path w names from dir, where a file
+// reachNew adds the nearest existing folder above the path w names from dir, where a file
 // the command creates would go.
 func (sc *shellScan) reachNew(w, dir string) {
 	if p, ok := sc.path(w, dir); ok {
 		if folder, ok := nearestDir(p); ok {
-			sc.keep(folder)
+			sc.place(folder)
 		}
 	}
-}
-
-// expansion is a shell word expanded: its text, the glob pattern it makes (its quoted
-// wildcards escaped), whether a wildcard in it is live, and whether some part could not be
-// resolved (each such part a NUL in text).
-type expansion struct {
-	text, pattern string
-	glob          bool
-	unresolved    bool
-}
-
-// unresolvedPart stands in text for a part that could not be resolved.
-const unresolvedPart = "\x00"
-
-// expand expands w where the command is now.
-func (sc *shellScan) expand(w shellWord) expansion {
-	var x expansion
-	var text, pattern strings.Builder
-	for _, p := range w.parts {
-		switch p.kind {
-		case literal:
-			text.WriteString(p.text)
-			pattern.WriteString(p.text)
-			x.glob = x.glob || strings.ContainsAny(p.text, "*?[")
-		case quoted:
-			text.WriteString(p.text)
-			pattern.WriteString(escapeGlob(p.text))
-		case variable:
-			v, ok := sc.lookup(p.text)
-			if p.fallback != nil && (!ok || v == "") {
-				v, ok = *p.fallback, true
-			}
-			if !ok {
-				x.unresolved = true
-				v = unresolvedPart
-			}
-			text.WriteString(v)
-			pattern.WriteString(escapeGlob(v))
-		case opaque:
-			x.unresolved = true
-			text.WriteString(unresolvedPart)
-		}
-	}
-	x.text, x.pattern = text.String(), pattern.String()
-	return x
-}
-
-// value is x as shellValue reads it: an option's or assignment's value.
-func (x expansion) value() expansion {
-	v := shellValue(x.text)
-	if v == x.text {
-		return x
-	}
-	cut := x.text[:len(x.text)-len(v)]
-	if rest, ok := strings.CutPrefix(x.pattern, cut); ok {
-		x.pattern = rest
-	} else {
-		x.pattern, x.glob = v, false // a wildcard escaped before the value: taken as written
-	}
-	x.text, x.unresolved = v, strings.Contains(v, unresolvedPart)
-	return x
-}
-
-// lookup is the value of the variable name where the command is now: PWD and OLDPWD as its
-// cds left them, an assignment earlier in the command, else the hook's environment, HOME
-// falling back to the home directory.
-func (sc *shellScan) lookup(name string) (string, bool) {
-	switch name {
-	case "PWD":
-		return sc.dir, sc.dir != ""
-	case "OLDPWD":
-		if sc.prev != "" {
-			return sc.prev, true
-		}
-	}
-	if v, ok := sc.vars[name]; ok {
-		if v == nil {
-			return "", false
-		}
-		return *v, true
-	}
-	if v, ok := sc.env(name); ok {
-		return v, true
-	}
-	if name == "HOME" {
-		if home, err := os.UserHomeDir(); err == nil {
-			return home, true
-		}
-	}
-	return "", false
-}
-
-// escapeGlob is s with its wildcards escaped for filepath.Match, which on Windows has no
-// escape: there they stay live.
-func escapeGlob(s string) string {
-	if runtime.GOOS == "windows" || !strings.ContainsAny(s, "*?[\\") {
-		return s
-	}
-	var b strings.Builder
-	for _, r := range s {
-		if strings.ContainsRune("*?[\\", r) {
-			b.WriteRune('\\')
-		}
-		b.WriteRune(r)
-	}
-	return b.String()
 }
 
 // nearestDir is the nearest existing folder above p, which does not exist; false when the
@@ -362,58 +309,4 @@ func nearestDir(p string) (string, bool) {
 			return "", false
 		}
 	}
-}
-
-// shellValue is the part of the shell word w that may be a path: an option's value after
-// its =, or a one-letter option's value written against it (-o/path), an assignment's
-// value (NAME=/path), else w itself. An option with no value has none.
-func shellValue(w string) string {
-	if strings.HasPrefix(w, "-") {
-		if _, v, ok := strings.Cut(w, "="); ok {
-			return v
-		}
-		if len(w) > 2 && w[1] != '-' {
-			return w[2:]
-		}
-		return ""
-	}
-	if name, v, ok := strings.Cut(w, "="); ok && isName(name) {
-		return v
-	}
-	return w
-}
-
-// isName reports whether s is a shell variable's name: letters, digits and underscores, not
-// starting with a digit.
-func isName(s string) bool {
-	for i, r := range s {
-		letter := r == '_' || 'a' <= r && r <= 'z' || 'A' <= r && r <= 'Z'
-		if !letter && (i == 0 || r < '0' || r > '9') {
-			return false
-		}
-	}
-	return s != ""
-}
-
-// pathLike reports whether a shell word may name a path: it holds a slash, or on Windows a
-// backslash, or is absolute (C:\x). A quoted Windows path keeps its backslashes.
-func pathLike(w string) bool {
-	return strings.ContainsRune(w, '/') || strings.ContainsRune(w, filepath.Separator) || filepath.IsAbs(w)
-}
-
-// path is the path the shell word w names from dir: ~ is the home directory.
-func (sc *shellScan) path(w, dir string) (string, bool) {
-	switch {
-	case w == "~" || strings.HasPrefix(w, "~/"):
-		home, ok := sc.lookup("HOME")
-		if !ok {
-			return "", false
-		}
-		return filepath.Join(home, w[1:]), true
-	case filepath.IsAbs(w):
-		return filepath.Clean(w), true
-	case dir == "":
-		return "", false
-	}
-	return filepath.Join(dir, w), true
 }
