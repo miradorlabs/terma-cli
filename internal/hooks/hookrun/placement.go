@@ -80,10 +80,21 @@ func (e Env) place(sessionID, agentID string, c claim.Claim, loc routing.Locatio
 		mixed = true
 	}
 	if len(seen) > 0 && !full {
-		if err := runs.Touch(e.StateDir, sessionID, run, seen); err != nil {
+		merged, err := runs.Touch(e.StateDir, sessionID, run, seen)
+		if err != nil {
 			e.Logf("record run locations: %v", err)
 		} else {
-			rt.recorded(sessionID, run, seen)
+			rt.recorded(sessionID, run, merged)
+		}
+		// Another hook of the run (its subagent's, say) may have recorded locations after
+		// this one read the ledger: Touch read them under the lock it wrote under, so of two
+		// hooks that each saw half a crossing, the later writer sees it whole.
+		if !mixed && len(merged) > len(been)+len(seen) &&
+			(len(merged) > maxRunLocations || rt.crossed(prev, havePrev, c.Run, loc, touched, merged, now)) {
+			if err := runs.MarkMixed(e.StateDir, sessionID, now); err != nil {
+				e.Logf("mark run mixed: %v", err)
+			}
+			mixed = true
 		}
 	}
 	if mixed {
