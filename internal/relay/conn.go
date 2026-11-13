@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/netip"
 	"sync"
+	"time"
 )
 
 type connKey struct{}
@@ -13,10 +14,12 @@ type connKey struct{}
 // connInfo's sender is looked up at the first export, while the socket still exists, so a
 // part held for a later claim keeps its sender after the agent exits. client is the
 // connection's client end, server the relay's. desktop is whether the sender was the signed
-// Terma app when it was found (Options.GovernanceSender), judged once with the pid.
+// Terma app when it was found (Options.GovernanceSender), judged once with the pid; opened is
+// when the relay accepted the connection, which its sender must predate.
 type connInfo struct {
 	client  netip.AddrPort
 	server  netip.AddrPort
+	opened  time.Time
 	mu      sync.Mutex
 	pid     int
 	desktop bool
@@ -28,7 +31,7 @@ const maxSenderTries = 5
 
 // ConnContext is the http.Server hook that remembers each connection's two ends.
 func (r *Relay) ConnContext(ctx context.Context, c net.Conn) context.Context {
-	info := &connInfo{}
+	info := &connInfo{opened: time.Now()}
 	if addr, ok := c.RemoteAddr().(*net.TCPAddr); ok {
 		info.client = addr.AddrPort()
 	}
@@ -55,7 +58,7 @@ func (r *Relay) senderOf(req *http.Request) (pid int, desktop bool) {
 	info.tries++
 	if pid, ok := r.opts.PeerPID(info.client, info.server); ok {
 		info.pid = pid
-		info.desktop = r.opts.GovernanceSender != nil && r.opts.GovernanceSender(pid)
+		info.desktop = r.opts.GovernanceSender != nil && r.opts.GovernanceSender(pid, info.opened)
 	} else {
 		r.stats.add("sender_unresolved", 1)
 	}

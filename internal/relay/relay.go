@@ -84,10 +84,10 @@ type Options struct {
 	PeerPID func(client, server netip.AddrPort) (int, bool)
 	// ProcessAlive reports whether a sender still runs; sessionless parts go by process once it exits.
 	ProcessAlive func(pid int) bool
-	// GovernanceSender reports whether a sender is the signed Terma app (DesktopSender), whose
-	// governance records a session's claim places by time; asked once per connection, when its
-	// sender is found. None is when nil.
-	GovernanceSender func(pid int) bool
+	// GovernanceSender reports whether a sender, holding a connection the relay accepted at
+	// opened, is the signed Terma app (DesktopSender), whose governance records a session's
+	// claim places by time; asked once per connection, when its sender is found. None is when nil.
+	GovernanceSender func(pid int, opened time.Time) bool
 	// HTTP sends upstream; a no-redirect client with a 15-second timeout when nil.
 	HTTP *http.Client
 	// Dir is the on-disk outbox, so a restart loses nothing; required for anything to leave.

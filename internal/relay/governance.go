@@ -2,8 +2,10 @@ package relay
 
 import (
 	"sort"
+	"time"
 
 	logspb "go.opentelemetry.io/proto/otlp/logs/v1"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/miradorlabs/terma-cli/internal/procinfo"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
@@ -16,49 +18,65 @@ import (
 // else: a governance part goes where its session's claim placed the session at the record's
 // time (claim.During). The session must still be claimed, its repository collected, and the
 // team's content policy applies as to any record. The app is judged once per connection, when
-// its sender is found (senderOf), so a pid used again later inherits nothing.
+// its sender is found (senderOf), and only a process older than the connection can be it, so
+// a pid used again inherits nothing. A governance record from anyone else, or beside other
+// records, leaves only as its sender's own would under its session's claim, never by global
+// mode's catch-all.
 const (
 	desktopTeamID     = "YR8HVF742J" // Mirador Labs Inc.
 	desktopIdentifier = "ai.terma.desktop"
 )
 
-// DesktopSender reports whether pid is the Terma app as Mirador Labs signed it, with a
-// signature that still holds.
-func DesktopSender(pid int) bool {
+// DesktopSender reports whether pid, which held a connection opened at opened, is the Terma
+// app as Mirador Labs signed it, with a signature that still holds.
+func DesktopSender(pid int, opened time.Time) bool {
 	s, ok := procinfo.Signer(pid)
-	return ok && s.Valid && !s.Platform && s.TeamID == desktopTeamID && s.Identifier == desktopIdentifier
+	return ok && isDesktop(s, opened)
 }
 
-// governanceOnly reports whether every record of a log part is a governance record: the app's
-// trust covers no other kind.
-func governanceOnly(p *part) bool {
+// isDesktop reports whether s is the Terma app as Mirador Labs signed it, started no later
+// than opened: a process that started after the connection opened has its pid, not its socket.
+func isDesktop(s procinfo.Signature, opened time.Time) bool {
+	return s.Valid && !s.Platform && s.TeamID == desktopTeamID && s.Identifier == desktopIdentifier &&
+		s.Start != 0 && s.Start <= opened.UnixMicro()
+}
+
+// governanceRecords reports whether a log part holds governance records, and whether it holds
+// nothing else: the app's trust covers no other kind.
+func governanceRecords(p *part) (some, all bool) {
 	logs, ok := p.msg.(*logspb.LogsData)
 	if !ok {
-		return false
+		return false, false
 	}
-	n := 0
+	all = true
 	for _, rl := range logs.GetResourceLogs() {
 		for _, sl := range rl.GetScopeLogs() {
 			for _, lr := range sl.GetLogRecords() {
-				if attrString(lr.GetAttributes(), semconv.TermaCaptureSurfaceKey) != semconv.TermaCaptureSurfaceGovernance {
-					return false
+				if attrString(lr.GetAttributes(), semconv.TermaCaptureSurfaceKey) == semconv.TermaCaptureSurfaceGovernance {
+					some = true
+				} else {
+					all = false
 				}
-				n++
 			}
 		}
 	}
-	return n > 0
+	return some, some && all
 }
 
-// markGovernance marks p a governance part when the signed app sent it and it holds nothing
-// else. Only its session's claim may send it (part.claimed): global mode's catch-all, which
-// takes what no claim places, never takes it.
+// markGovernance marks a part holding governance records. Whoever sent it, only its session's
+// claim may send it (part.claimed): global mode's catch-all, which takes what no claim places,
+// never takes governance. It is a governance part, placed by its time, only when the signed
+// app sent it and it holds nothing else; otherwise its sender must be one its claim names.
 func markGovernance(p *part, desktop bool) {
-	if !desktop || !governanceOnly(p) {
+	some, all := governanceRecords(p)
+	if !some {
 		return
 	}
-	p.governance, p.claimed = true, true
-	p.until = nanos(lastLog(p.msg.(*logspb.LogsData)))
+	p.claimed = true
+	if desktop && all {
+		p.governance = true
+		p.until = nanos(lastLog(p.msg.(*logspb.LogsData)))
+	}
 }
 
 // byPlacement is p cut where its session moved to another placement within the time its
@@ -94,9 +112,11 @@ func (r *Relay) byPlacement(p *part) []*part {
 				if pieces[i] == nil {
 					pieces[i] = &logspb.LogsData{}
 				}
+				// Each piece its own resource and scope: the content policy and the project's
+				// stamp edit them in place, and the pieces may go to different projects.
 				pieces[i].ResourceLogs = append(pieces[i].ResourceLogs, &logspb.ResourceLogs{
-					Resource: rl.GetResource(), SchemaUrl: rl.GetSchemaUrl(),
-					ScopeLogs: []*logspb.ScopeLogs{{Scope: sl.GetScope(), SchemaUrl: sl.GetSchemaUrl(), LogRecords: recs}},
+					Resource: cloneResource(rl.GetResource()), SchemaUrl: rl.GetSchemaUrl(),
+					ScopeLogs: []*logspb.ScopeLogs{{Scope: proto.CloneOf(sl.GetScope()), SchemaUrl: sl.GetSchemaUrl(), LogRecords: recs}},
 				})
 			}
 		}

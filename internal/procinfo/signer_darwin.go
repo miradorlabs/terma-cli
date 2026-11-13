@@ -21,23 +21,38 @@ const (
 )
 
 // Signer is who signed pid while it runs, and when it started (so a pid used again is
-// another process); false when it is gone or the kernel will not say.
+// another process); false when it is gone or the kernel will not say. The start is read
+// before and after the signature, so all of it is one process's: a pid used again between
+// the reads is false.
 func Signer(pid int) (Signature, bool) {
-	kp, err := unix.SysctlKinfoProc("kern.proc.pid", pid)
-	if err != nil || int(kp.Proc.P_pid) != pid {
+	start, ok := startOf(pid)
+	if !ok {
 		return Signature{}, false
 	}
 	var flags uint32
 	if _, _, errno := syscall.Syscall6(sysCsops, uintptr(pid), csopsStatus, uintptr(unsafe.Pointer(&flags)), 4, 0, 0); errno != 0 {
 		return Signature{}, false
 	}
-	return Signature{
-		Start:      kp.Proc.P_starttime.Sec*1_000_000 + int64(kp.Proc.P_starttime.Usec),
+	s := Signature{
+		Start:      start,
 		Valid:      flags&csValid != 0,
 		Platform:   flags&csPlatform != 0,
 		Identifier: csopsBlob(pid, csopsIdentity),
 		TeamID:     csopsBlob(pid, csopsTeamID),
-	}, true
+	}
+	if again, ok := startOf(pid); !ok || again != start {
+		return Signature{}, false
+	}
+	return s, true
+}
+
+// startOf is when pid started, in microseconds since the Unix epoch.
+func startOf(pid int) (int64, bool) {
+	kp, err := unix.SysctlKinfoProc("kern.proc.pid", pid)
+	if err != nil || int(kp.Proc.P_pid) != pid {
+		return 0, false
+	}
+	return kp.Proc.P_starttime.Sec*1_000_000 + int64(kp.Proc.P_starttime.Usec), true
 }
 
 // csopsBlob is the text of a csops blob: an 8-byte header (magic, then the blob's length

@@ -121,7 +121,12 @@ func (c Claim) At(pid int, at time.Time) (Claim, bool) {
 // During is the claim as it applies at time at whichever process sent: the placement latest
 // to start by at. For a sender trusted to report on every process of a claimed session (the
 // relay's governance parts), which no placement names.
+// With its history full, a placement older than the first kept may have been dropped
+// (maxPlacements), so what came before the first kept has no known placement.
 func (c Claim) During(at time.Time) (Claim, bool) {
+	if len(c.Placements) >= maxPlacements && !at.IsZero() && at.Before(c.Placements[0].Since) {
+		return Claim{}, false
+	}
 	return c.pick(at, func(Placement) bool { return true })
 }
 
