@@ -159,8 +159,9 @@ happened and nothing else, keep their destination (`runs.Locational`). A run
 touches a checkout when it runs there, or when a tool call edits, reads or searches a path
 in it, or names one in a shell command (each path the command names that is there, and
 every `cd`'s target: `hookrun.ShellPaths`). An edit records and spools as it always has; a
-read, a search or a shell command only classifies (`hookrun.Env.Classify`): it writes no
-manifest and spools nothing. A hook whose own location Route drops still classifies what
+read, a search or a shell command only classifies (`hookrun.Env.Classify`), in a PreToolUse
+hook before it runs, so that its own result is exported after the crossing it makes: it
+writes no manifest and spools nothing, and on a machine not migrated it does nothing. A hook whose own location Route drops still classifies what
 the call touched, and that location, into the run ledger, and records and sends nothing
 else. `runs.Touch` returns the run's locations as it wrote them, so of two hooks of one run
 that each see half a crossing, the later sees it whole. The commit hooks are installed, and `prepare-commit-msg` stamps, only where Route sends the repository
