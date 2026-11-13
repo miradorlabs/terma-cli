@@ -110,6 +110,12 @@ attributes:
           value: desktop
           brief: Records only terma reports for the agent, sent from every surface.
           stability: development
+        - id: governance
+          value: governance
+          brief: >-
+            Terma Desktop's system governance: what the operating system saw an agent session's
+            processes do (connections, files, denials), sent by the signed Terma app through the relay.
+          stability: development
     stability: development
     brief: The capture path the record came from.
   - key: terma.capture.gap
@@ -892,3 +898,193 @@ attributes:
       may belong to another organization or environment. Terma sets it, so the platform shows it
       and never authorizes with it.
     examples: ["5b0e5f8c-3c2a-4d1e-9f6b-2a7c8d9e0f11"]
+
+  # System governance: what Terma Desktop's system extensions saw a session's processes do.
+  - key: terma.network.connection_id
+    type: string
+    stability: development
+    brief: A connection's id, stable while it is open; its events are versions of one connection.
+  - key: terma.network.protocol
+    type:
+      members:
+        - {id: https, value: https, brief: TLS on port 443., stability: development}
+        - {id: http, value: http, brief: Plain HTTP on port 80., stability: development}
+        - {id: quic, value: quic, brief: UDP on port 443., stability: development}
+        - {id: dns, value: dns, brief: Port 53., stability: development}
+        - {id: ssh, value: ssh, brief: Port 22., stability: development}
+        - {id: other, value: other, brief: Any other port., stability: development}
+    stability: development
+    brief: What the connection was, as far as its port says.
+  - key: terma.network.opened_ms
+    type: int
+    stability: development
+    brief: When the connection opened, in milliseconds since the Unix epoch.
+  - key: terma.network.closed_ms
+    type: int
+    stability: development
+    brief: When the connection closed, in milliseconds since the Unix epoch; absent while it is open.
+  - key: terma.network.sent_bytes
+    type: int
+    stability: development
+    brief: The bytes the connection sent so far.
+  - key: terma.network.received_bytes
+    type: int
+    stability: development
+    brief: The bytes the connection received so far.
+  - key: terma.network.exchange.index
+    type: int
+    stability: development
+    brief: The exchange's place on its connection, from 0; with the connection id, its event key.
+  - key: terma.network.exchange.start_ms
+    type: int
+    stability: development
+    brief: When the exchange's first byte went, in milliseconds since the Unix epoch.
+  - key: terma.network.exchange.duration_ms
+    type: int
+    stability: development
+    brief: How long the exchange took, in milliseconds, its first byte to its last.
+  - key: terma.network.exchange.sent_bytes
+    type: int
+    stability: development
+    brief: The bytes the exchange sent.
+  - key: terma.network.exchange.received_bytes
+    type: int
+    stability: development
+    brief: The bytes the exchange received.
+  - key: terma.network.exchange.kind
+    type:
+      members:
+        - {id: model, value: model, brief: Carried a model call the agent's transcript records., stability: development}
+        - {id: handshake, value: handshake, brief: A TLS connection's handshake., stability: development}
+        - {id: startup, value: startup, brief: The agent's own before its first model request., stability: development}
+        - {id: exit, value: exit, brief: The agent's own in its last seconds as it quit., stability: development}
+        - {id: upload, value: upload, brief: Mostly sent., stability: development}
+        - {id: download, value: download, brief: Mostly received., stability: development}
+        - {id: request, value: request, brief: Small both ways., stability: development}
+    stability: development
+    brief: What an exchange was, as the Mac worked it out (shared/fixtures/governance.json, kinds).
+  - key: terma.network.exchange.request_id
+    type: string
+    stability: development
+    brief: The model provider's id for the request a model call exchange carried (Anthropic's req_ id).
+  - key: terma.process.program
+    type: string
+    stability: development
+    brief: The program that made the connection, by name (the session's agent, curl, git), never by path.
+  - key: terma.process.version
+    type: string
+    stability: development
+    brief: The program's version, where its path says it.
+  - key: terma.process.agent_own
+    type: boolean
+    stability: development
+    brief: Whether the session's agent made the connection itself, rather than a tool it ran.
+  - key: terma.process.signer.kind
+    type:
+      members:
+        - {id: apple, value: apple, brief: Signed by Apple., stability: development}
+        - {id: developer, value: developer, brief: Signed by a developer with a team id., stability: development}
+        - {id: adhoc, value: adhoc, brief: Signed with no identity., stability: development}
+        - {id: unsigned, value: unsigned, brief: Not signed., stability: development}
+        - {id: invalid, value: invalid, brief: A signature that no longer matches the program., stability: development}
+    stability: development
+    brief: Who signed the program, as the kernel knows the running process.
+  - key: terma.process.signer.team
+    type: string
+    stability: development
+    brief: The signing developer's team id.
+  - key: terma.process.signer.identifier
+    type: string
+    stability: development
+    brief: The program's signing identifier (com.apple.curl).
+  - key: terma.process.command
+    type: string
+    stability: development
+    brief: The command line of a tool's process that made the connection, credentials masked.
+    note: Tool content; withheld unless the team's policy collects it. Never the agent's own.
+    annotations:
+      content: tool
+  - key: terma.policy.kind
+    type:
+      members:
+        - {id: connect, value: connect, brief: A connection., stability: development}
+        - {id: open, value: open, brief: Opening a file., stability: development}
+        - {id: create, value: create, brief: Creating a file., stability: development}
+        - {id: truncate, value: truncate, brief: Emptying a file., stability: development}
+        - {id: unlink, value: unlink, brief: Deleting a file., stability: development}
+        - {id: rename, value: rename, brief: Moving a file., stability: development}
+        - {id: link, value: link, brief: A hard link to a file., stability: development}
+        - {id: clone, value: clone, brief: Cloning a file., stability: development}
+        - {id: copy, value: copy, brief: Copying a file., stability: development}
+    stability: development
+    brief: What the policy denied.
+  - key: terma.policy.rule
+    type: int
+    stability: development
+    brief: The policy rule that denied it; absent when an allow list denied what it did not name.
+  - key: terma.policy.enforced
+    type: boolean
+    stability: development
+    brief: Whether it was stopped, or only reported under a policy that does not enforce.
+  - key: terma.policy.path
+    type: string
+    stability: development
+    brief: The path a file denial was for, the home folder written ~.
+    note: Tool content; withheld unless the team's policy collects it.
+    annotations:
+      content: tool
+  - key: terma.file.path
+    type: string
+    stability: development
+    brief: A file the session's processes used, the home folder written ~.
+    note: Tool content; withheld unless the team's policy collects it.
+    annotations:
+      content: tool
+  - key: terma.file.renamed_to
+    type: string
+    stability: development
+    brief: Where the file was moved to, the home folder written ~.
+    note: Tool content; withheld unless the team's policy collects it.
+    annotations:
+      content: tool
+  - key: terma.file.changed
+    type: boolean
+    stability: development
+    brief: Whether the session wrote to the file.
+  - key: terma.file.removed
+    type: boolean
+    stability: development
+    brief: Whether the session deleted the file.
+  - key: terma.file.read_bytes
+    type: int
+    stability: development
+    brief: The bytes the session read from the file, where the platform counts them.
+  - key: terma.file.written_bytes
+    type: int
+    stability: development
+    brief: The bytes the session wrote to the file, where the platform counts them.
+  - key: terma.governance.processes.count
+    type: int
+    stability: development
+    brief: How many processes the session started, the agent's own included.
+  - key: terma.governance.revision
+    type: int
+    stability: development
+    brief: >-
+      A versioned governance entity's revision (a connection, an exchange, a file access): the Mac's
+      clock in microseconds when the version was made, greater than the entity's previous one and kept
+      through retries. The platform keeps the highest, so a late retry never replaces a newer version.
+  - key: terma.file.id
+    type: string
+    stability: development
+    brief: >-
+      An opaque id for a file within its session, kept across its versions: what identifies a file
+      access when its path is withheld.
+  - key: terma.policy.denial_id
+    type: string
+    stability: development
+    brief: An opaque id minted for one denial when it happened, kept through retries.
+  - key: terma.governance.exited
+    type: boolean
+    stability: development
+    brief: Whether the agent's process exited; false when it started.

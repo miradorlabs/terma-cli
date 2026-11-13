@@ -645,3 +645,142 @@ events:
             When terma is signed in as a person in the profile's organization and environment,
             and the beat goes with the key of the team whose policy that login fetched, filed
             with the profile's own hosts, to the profile's own ingest.
+
+  # System governance, from Terma Desktop through the relay (terma.capture.surface governance):
+  # what the operating system saw a session's processes do, sent as it happens.
+  - name: terma.network.connection
+    stability: development
+    requirement_level: recommended
+    brief: >-
+      A connection a session's process made: sent when it opens, as it grows (at most once a
+      second) and when it closes, each a version of the one connection.
+    attributes:
+      - ref: session.id
+        requirement_level: required
+      - ref: gen_ai.main_agent.name
+        requirement_level: required
+      - ref: terma.capture.surface
+        requirement_level: required
+      - ref: terma.network.connection_id
+        requirement_level: required
+      - ref: terma.governance.revision
+        requirement_level: required
+      - ref: server.address
+        requirement_level: required
+        note: The host its TLS hello or DNS answer named, else its address.
+      - ref: server.port
+      - ref: network.transport
+      - ref: terma.network.protocol
+      - ref: terma.network.opened_ms
+        requirement_level: required
+      - ref: terma.network.closed_ms
+      - ref: terma.network.sent_bytes
+        requirement_level: required
+      - ref: terma.network.received_bytes
+        requirement_level: required
+      - ref: terma.process.program
+      - ref: terma.process.version
+      - ref: terma.process.agent_own
+        requirement_level: required
+      - ref: terma.process.signer.kind
+      - ref: terma.process.signer.team
+      - ref: terma.process.signer.identifier
+      - ref: gen_ai.tool.call.id
+        note: The agent's tool call whose process opened it.
+      - ref: terma.process.command
+
+  - name: terma.network.exchange
+    stability: development
+    requirement_level: recommended
+    brief: >-
+      What a connection sent and what came back (on HTTP/1.1, a request and its response): sent
+      when it ends, and again when a model call is placed on it.
+    attributes:
+      - ref: session.id
+        requirement_level: required
+      - ref: gen_ai.main_agent.name
+        requirement_level: required
+      - ref: terma.capture.surface
+        requirement_level: required
+      - ref: terma.network.connection_id
+        requirement_level: required
+      - ref: terma.network.exchange.index
+        requirement_level: required
+      - ref: terma.governance.revision
+        requirement_level: required
+      - ref: terma.network.exchange.start_ms
+        requirement_level: required
+      - ref: terma.network.exchange.duration_ms
+        requirement_level: required
+      - ref: terma.network.exchange.sent_bytes
+        requirement_level: required
+      - ref: terma.network.exchange.received_bytes
+        requirement_level: required
+      - ref: terma.network.exchange.kind
+        requirement_level: required
+      - ref: terma.network.exchange.request_id
+      - ref: gen_ai.response.id
+        note: The response the model call exchange carried, as the agent's transcript names it.
+
+  - name: terma.policy.denied
+    stability: development
+    requirement_level: recommended
+    brief: The governance policy denied something a session's process did, as it happened.
+    attributes:
+      - ref: session.id
+        requirement_level: required
+      - ref: gen_ai.main_agent.name
+        requirement_level: required
+      - ref: terma.capture.surface
+        requirement_level: required
+      - ref: terma.policy.denial_id
+        requirement_level: required
+      - ref: terma.policy.kind
+        requirement_level: required
+      - ref: terma.policy.rule
+      - ref: terma.policy.enforced
+        requirement_level: required
+      - ref: server.address
+        note: The host, for a connection.
+      - ref: terma.policy.path
+
+  - name: terma.files.accessed
+    stability: development
+    requirement_level: recommended
+    brief: >-
+      A file a session's processes used, changed, moved or deleted, as the operating system saw
+      it: sent as it happens, at most once a second a file.
+    attributes:
+      - ref: session.id
+        requirement_level: required
+      - ref: gen_ai.main_agent.name
+        requirement_level: required
+      - ref: terma.capture.surface
+        requirement_level: required
+      - ref: terma.file.id
+        requirement_level: required
+      - ref: terma.governance.revision
+        requirement_level: required
+      - ref: terma.file.path
+      - ref: terma.file.changed
+        requirement_level: required
+      - ref: terma.file.removed
+        requirement_level: required
+      - ref: terma.file.renamed_to
+      - ref: terma.file.read_bytes
+      - ref: terma.file.written_bytes
+
+  - name: terma.governance.run
+    stability: development
+    requirement_level: recommended
+    brief: An agent's process started or exited under governance.
+    attributes:
+      - ref: session.id
+        requirement_level: required
+      - ref: gen_ai.main_agent.name
+        requirement_level: required
+      - ref: terma.capture.surface
+        requirement_level: required
+      - ref: terma.governance.processes.count
+      - ref: terma.governance.exited
+        requirement_level: required

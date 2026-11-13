@@ -115,11 +115,41 @@ func (c Claim) placements() []Placement {
 // latest to start by at, whose ProjectID it carries, empty for one Mark wrote. False when
 // no placement covers pid.
 func (c Claim) At(pid int, at time.Time) (Claim, bool) {
+	return c.pick(at, func(p Placement) bool { return covers(p.PIDs, pid) })
+}
+
+// During is the claim as it applies at time at whichever process sent: the placement latest
+// to start by at. For a sender trusted to report on every process of a claimed session (the
+// relay's governance parts), which no placement names.
+// With its history full, a placement older than the first kept may have been dropped
+// (maxPlacements), so what came before the first kept has no known placement.
+func (c Claim) During(at time.Time) (Claim, bool) {
+	if len(c.Placements) >= maxPlacements && !at.IsZero() && at.Before(c.Placements[0].Since) {
+		return Claim{}, false
+	}
+	return c.pick(at, func(Placement) bool { return true })
+}
+
+// Moves are the times in (from, to] at which the session went to another placement: the
+// start of each placement but the first, which also takes what came before it. Records
+// from either side of one go to different placements (During).
+func (c Claim) Moves(from, to time.Time) []time.Time {
+	var out []time.Time
+	for i, p := range c.placements() {
+		if i > 0 && p.Since.After(from) && !p.Since.After(to) {
+			out = append(out, p.Since)
+		}
+	}
+	return out
+}
+
+// pick is the placement latest to start by at among those admit takes.
+func (c Claim) pick(at time.Time, admit func(Placement) bool) (Claim, bool) {
 	var best *Placement
 	all := c.placements()
 	for i := range all {
 		p := &all[i]
-		if !covers(p.PIDs, pid) {
+		if !admit(*p) {
 			continue
 		}
 		if best == nil || at.IsZero() || !p.Since.After(at) {
