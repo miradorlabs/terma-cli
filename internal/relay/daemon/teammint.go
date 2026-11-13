@@ -64,11 +64,17 @@ func NewTeamKeyMinter(ctx context.Context, cfg *config.Config, create CreateTeam
 	return &TeamKeyMinter{ctx: ctx, cfg: cfg, create: create, inFlight: map[string]bool{}, failedAt: map[string]time.Time{}}
 }
 
-// Mint starts minting team's key unless one is on the way, or failed lately. A profile set
-// up with a server key, or under TERMA_API_KEY, mints none: a server key cannot create
-// another.
-func (m *TeamKeyMinter) Mint(team routing.Team) {
-	if m == nil || m.create == nil || m.cfg.ServerKeySignIn || m.cfg.APIKey != "" || team.EnrollmentID == "" {
+// Mint starts minting the key of team, selected in cfg's profile (the minter's own when
+// nil), unless one is on the way, or failed lately. A profile set up with a server key, or
+// under TERMA_API_KEY, mints none: a server key cannot create another.
+func (m *TeamKeyMinter) Mint(cfg *config.Config, team routing.Team) {
+	if m == nil {
+		return
+	}
+	if cfg == nil {
+		cfg = m.cfg
+	}
+	if m.create == nil || cfg.ServerKeySignIn || cfg.APIKey != "" || team.EnrollmentID == "" {
 		return
 	}
 	id := team.EnrollmentID
@@ -80,7 +86,7 @@ func (m *TeamKeyMinter) Mint(team routing.Team) {
 	m.inFlight[id] = true
 	m.mu.Unlock()
 	go func() {
-		ok := m.mintNow(team)
+		ok := m.mintNow(cfg, team)
 		m.mu.Lock()
 		delete(m.inFlight, id)
 		if ok {
@@ -95,17 +101,17 @@ func (m *TeamKeyMinter) Mint(team routing.Team) {
 // mintNow mints team's key, if the routing state still lets it have one: selected, and
 // neither Suspended nor Refused. A key that lands after the team was refused or ended
 // meanwhile is taken back, so a refusal is never undone by a creation already in flight.
-func (m *TeamKeyMinter) mintNow(team routing.Team) bool {
-	if !keyAllowed(m.cfg, team.EnrollmentID) {
+func (m *TeamKeyMinter) mintNow(cfg *config.Config, team routing.Team) bool {
+	if !keyAllowed(cfg, team.EnrollmentID) {
 		return false
 	}
 	ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
 	defer cancel()
-	if err := MintTeamKey(ctx, m.cfg, team, m.create); err != nil {
+	if err := MintTeamKey(ctx, cfg, team, m.create); err != nil {
 		return false
 	}
-	if !keyAllowed(m.cfg, team.EnrollmentID) {
-		_ = keystore.DeleteTeam(m.cfg.Dir, team.EnrollmentID)
+	if !keyAllowed(cfg, team.EnrollmentID) {
+		_ = keystore.DeleteTeam(cfg.Dir, team.EnrollmentID)
 		return false
 	}
 	return true

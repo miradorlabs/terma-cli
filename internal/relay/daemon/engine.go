@@ -46,6 +46,9 @@ type Deps struct {
 	HookPolicy func() config.Policy
 	// LoadConfig is the configuration as the command line resolves it.
 	LoadConfig func() (*config.Config, error)
+	// LoadProfile is a named profile's configuration, as LoadConfig resolves the active one;
+	// nil takes the relay's own for every profile.
+	LoadProfile func(name string) (*config.Config, error)
 	// RefreshPolicy fetches and stores cfg's project's policy.
 	RefreshPolicy func(ctx context.Context, cfg *config.Config) error
 
@@ -101,12 +104,14 @@ func (d Deps) Engine(ctx context.Context, stateDir string, cfg *config.Config, s
 	minter := NewKeyMinter(ctx, cfg, d.CreateKey)
 	teamMinter := NewTeamKeyMinter(ctx, cfg, d.CreateTeamKey)
 	teams := NewTeams(cfg, TeamsDeps{AgentName: d.AgentName, RelayTargets: d.RelayTargets, OTLPPinned: d.OTLPPinned, Mint: teamMinter.Mint,
-		User: func(team routing.Team, endpoint string) string {
+		User: func(cfg *config.Config, team routing.Team, endpoint string) string {
 			if d.TeamUser == nil {
 				return ""
 			}
 			return d.TeamUser(cfg, team, endpoint)
-		}})
+		},
+		Active:  d.activeProfile,
+		Profile: d.LoadProfile})
 	opts := relay.Options{Correlators: d.Correlators, Capturers: d.Capturers, Router: teams,
 		Hold: s.Hold, Dir: filepath.Join(claim.Dir(stateDir), relay.OutboxDir), Resolve: d.Resolver(cfg, minter.Mint), Version: d.Version,
 		Lookup:   func(sessionID string, now time.Time) (claim.Claim, bool) { return claim.Read(stateDir, sessionID, now) },
@@ -116,6 +121,19 @@ func (d Deps) Engine(ctx context.Context, stateDir string, cfg *config.Config, s
 		opts.Logf = func(f string, a ...any) { fmt.Fprintf(logw, time.Now().Format("15:04:05.000 ")+f+"\n", a...) }
 	}
 	return opts
+}
+
+// activeProfile is the profile hooks route by now: the one LoadConfig resolves, as `terma
+// config use` last chose it; "" when it cannot be read.
+func (d Deps) activeProfile() string {
+	if d.LoadConfig == nil {
+		return ""
+	}
+	cfg, err := d.LoadConfig()
+	if err != nil {
+		return ""
+	}
+	return cfg.ProfileName
 }
 
 // Resolver turns a claim into its session's policy, minting a missing key with mint.

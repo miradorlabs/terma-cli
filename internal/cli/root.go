@@ -315,6 +315,19 @@ func (app *App) loadConfig() (*config.Config, error) {
 	})
 }
 
+// loadProfile is name's configuration, under the same flags as loadConfig: the relay
+// routes each session by the profile its hooks placed it under.
+func (app *App) loadProfile(name string) (*config.Config, error) {
+	return config.Load(app.dir, app.stateDir, config.Overrides{
+		Profile: name,
+		Env:     app.flags.env,
+		APIURL:  app.flags.apiURL,
+		AuthURL: app.flags.authURL,
+		AppURL:  app.flags.appURL,
+		OTLPURL: app.flags.otlpURL,
+	})
+}
+
 func (app *App) resolveFormat() (output.Format, error) {
 	return output.Resolve(app.flags.output)
 }

@@ -29,18 +29,28 @@ type TeamsDeps struct {
 	// OTLPPinned: the ingest host is pinned (a flag or TERMA_OTLP_URL), whatever host a
 	// team's key was stored with.
 	OTLPPinned bool
-	// User is who parts sent to team at endpoint name, by Mirador user id; "" names no one.
-	User func(team routing.Team, endpoint string) string
-	// Mint asks for a selected team's missing key; nil when none may be minted.
-	Mint func(team routing.Team)
+	// User is who parts sent to team, selected in cfg's profile, at endpoint name, by
+	// Mirador user id; "" names no one.
+	User func(cfg *config.Config, team routing.Team, endpoint string) string
+	// Mint asks for the missing key of a team selected in cfg's profile; nil when none may
+	// be minted.
+	Mint func(cfg *config.Config, team routing.Team)
 	// Now is the clock; time.Now when nil.
 	Now func() time.Time
+	// Active is the profile hooks route by now, as `terma config use` last chose it; nil
+	// keeps the relay's own.
+	Active func() string
+	// Profile is a profile's configuration: its sign-in environment, ingest and agents. Nil
+	// takes the relay's own for every profile.
+	Profile func(name string) (*config.Config, error)
 }
 
 // Teams is the relay's Router on a migrated machine: it routes each record by where it ran
-// over the profile's routing state (routing.Router), checks its run in the run ledger
-// first, and gives each team's key from keys.v2.json alone. A routing state that is
-// missing, unreadable, or still being migrated sends nothing.
+// over the routing state of the profile its session's hooks used (routing.Router), which
+// its placement names, the active profile's for a record with none; checks its run in the
+// run ledger first; and gives each team's key from keys.v2.json alone. A profile switched
+// while the relay runs never routes a session its hooks placed under the other one. A
+// routing state that is missing, unreadable, or still being migrated sends nothing.
 type Teams struct {
 	cfg  *config.Config
 	deps TeamsDeps
@@ -48,10 +58,15 @@ type Teams struct {
 	mu        sync.Mutex
 	migrated  bool
 	checkedAt time.Time
-	loadedAt  time.Time
-	st        routing.State
-	ok        bool
-	router    *routing.Router
+	// active is the profile hooks route by now, read at activeAt.
+	active   string
+	activeAt time.Time
+	// profiles are each profile's routing as last read, by name; owners the profile each
+	// enrollment was last found in.
+	profiles map[string]*profileRoute
+	owners   map[string]string
+	// ttl is how long the active profile and a routing state read are used: stateTTL.
+	ttl time.Duration
 
 	// A locked keychain is asked again only after keychainRetry, as Resolver does.
 	keyMu       sync.Mutex
@@ -84,7 +99,7 @@ func NewTeams(cfg *config.Config, deps TeamsDeps) *Teams {
 	if deps.Now == nil {
 		deps.Now = time.Now
 	}
-	return &Teams{cfg: cfg, deps: deps, users: map[string]cachedUser{},
+	return &Teams{cfg: cfg, deps: deps, users: map[string]cachedUser{}, profiles: map[string]*profileRoute{}, owners: map[string]string{}, ttl: stateTTL,
 		ledgers: map[string]cachedLedger{}, ledgerTTL: ledgerTTL, readLedger: runs.Read}
 }
 
@@ -105,42 +120,24 @@ func (t *Teams) Migrated() bool {
 	return t.migrated
 }
 
-// state is the profile's committed routing state and its compiled router, reread at most
-// once a second; the router is compiled again only for a new generation.
-func (t *Teams) state() (routing.State, *routing.Router, bool) {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	now := time.Now()
-	if !t.loadedAt.IsZero() && now.Sub(t.loadedAt) < stateTTL {
-		return t.st, t.router, t.ok
-	}
-	t.loadedAt = now
-	// A crash in the middle of migrating collects nothing until the next start commits.
-	st, found, err := routing.LoadReady(t.cfg.StateDir, t.cfg.ProfileName)
-	switch {
-	case err != nil || !found:
-		t.ok = false
-	default:
-		if !t.ok || t.router == nil || !routing.SameGeneration(st, t.st) {
-			t.router = routing.NewRouter(st)
-		}
-		t.st, t.ok = st, true
-	}
-	return t.st, t.router, t.ok
-}
-
 // UnknownToPersonal is the Unknown rule now (routing.UnknownToPersonal).
 func (t *Teams) UnknownToPersonal() bool {
-	st, _, ok := t.state()
-	return ok && routing.UnknownToPersonal(st, t.deps.Now())
+	pr := t.route("")
+	return pr.ok && routing.UnknownToPersonal(pr.st, t.deps.Now())
 }
 
-// Route decides where a record goes: dropped when its run was Mixed by its time, whatever
-// its placement says, and before any catch-all; else wherever routing.Router.Route sends
-// or holds its location.
+// Route decides where a record goes, under the profile its placement names (the active
+// one's for a record with none): dropped when its run was Mixed by its time, whatever its
+// placement says, and before any catch-all; else wherever routing.Router.Route sends or
+// holds its location.
 func (t *Teams) Route(rec relay.Record) relay.Routed {
-	st, router, ok := t.state()
-	if !ok {
+	profile := ""
+	if rec.Placed {
+		profile = rec.Placement.Profile
+	}
+	pr := t.route(profile)
+	st, router := pr.st, pr.router
+	if !pr.ok {
 		return relay.Routed{Outcome: relay.Hold, Why: relay.WhyNoState}
 	}
 	if from, mixed := t.mixedAt(rec.Session, rec.At); mixed || rec.Placed && rec.Placement.Kind == claim.KindMixed {
@@ -170,11 +167,11 @@ func (t *Teams) Route(rec relay.Record) relay.Routed {
 }
 
 // Recheck starts a pass over enrollment's queue (relay.Rechecker), against the routing
-// state as it stands now: the team's state is judged once for the whole pass, and each
-// session's run ledger read at most once.
+// state of the profile that selects it as it stands now: the team's state is judged once
+// for the whole pass, and each session's run ledger read at most once.
 func (t *Teams) Recheck(enrollment string) relay.Rechecker {
-	st, router, ok := t.state()
-	return &recheck{stateDir: t.cfg.StateDir, enrollment: enrollment, st: st, router: router, ok: ok,
+	pr, found, waits := t.owner(enrollment)
+	return &recheck{stateDir: t.cfg.StateDir, enrollment: enrollment, st: pr.st, router: pr.router, ok: found || !waits,
 		now: t.deps.Now(), runs: map[string]runs.Snapshot{}}
 }
 
@@ -218,6 +215,10 @@ func (p *recheck) Entry(q relay.Queued) relay.Rechecked {
 	if _, mixed := p.mixedAt(q.Session, q.At); mixed {
 		return relay.Rechecked{Verdict: relay.Discard, Why: relay.WhyMixed, Blocker: mixedBlocker(q.Session)}
 	}
+	if router == nil {
+		// No profile selects it any longer.
+		return relay.Rechecked{Verdict: relay.Discard, Why: relay.WhyDeselected}
+	}
 	loc := routing.Location{Kind: routing.LocationKind(q.Kind), Repository: q.Repository, Narrow: q.Narrow}
 	v, d := router.Recheck(routing.Destination{EnrollmentID: q.Enrollment, Location: loc}, p.now)
 	switch v {
@@ -236,11 +237,12 @@ func (p *recheck) Entry(q relay.Queued) relay.Rechecked {
 	return relay.Rechecked{Verdict: relay.Discard, Why: relay.WhyNoTeam}
 }
 
-// Selected reports whether enrollment is still selected; true while the state cannot be
-// read, so a lost state drops no queue before a new one says so.
+// Selected reports whether enrollment is still selected, in any profile; true while a
+// state that might select it cannot be read, so a lost state drops no queue before a new
+// one says so.
 func (t *Teams) Selected(enrollment string) bool {
-	st, _, ok := t.state()
-	return !ok || st.Selected(enrollment)
+	_, found, waits := t.owner(enrollment)
+	return found || waits
 }
 
 // Legacy maps a part queued before the migration for project to its cutover enrollment
@@ -248,8 +250,9 @@ func (t *Teams) Selected(enrollment string) bool {
 // the routing state cannot be read, as between the migration marking the machine migrated
 // and its commit, the part is mapped to no enrollment yet, and waits.
 func (t *Teams) Legacy(project string, repo config.Repository) (relay.Queued, bool) {
-	st, _, ok := t.state()
-	if !ok {
+	pr := t.route("")
+	st := pr.st
+	if !pr.ok {
 		return relay.Queued{}, true
 	}
 	if st.Migration == nil {
@@ -274,17 +277,18 @@ var errNoTeam = errors.New("no such selected team")
 // profile now points at: its key belongs there, so nothing is sent until it is unticked.
 var errOtherEnvironment = errors.New("the team was selected in another environment than this profile's")
 
-// Resolve is enrollment's send policy: the ingest its key was stored for, its key from
-// keys.v2.json (never another team's, nor an agent's), its content rules, and the user
-// parts name. A missing key is minted with the team's organization's sign-in, unless the
-// team is Suspended or Refused, which is never given one.
+// Resolve is enrollment's send policy, under the profile that selects it: the ingest its
+// key was stored for, its key from keys.v2.json (never another team's, nor an agent's),
+// its content rules, and the user parts name. A missing key is minted with the team's
+// organization's sign-in, unless the team is Suspended or Refused, which is never given
+// one.
 func (t *Teams) Resolve(enrollment, tool string) (relay.Policy, error) {
-	st, _, ok := t.state()
-	tm := st.Team(enrollment)
-	if !ok || tm == nil {
+	pr, found, _ := t.owner(enrollment)
+	if !found {
 		return relay.Policy{}, errNoTeam
 	}
-	if tm.AuthURL != t.cfg.AuthURL {
+	tm, cfg := pr.st.Team(enrollment), pr.cfg
+	if tm.AuthURL != cfg.AuthURL {
 		return relay.Policy{}, errOtherEnvironment
 	}
 	key, hosts, err := t.key(enrollment)
@@ -293,23 +297,23 @@ func (t *Teams) Resolve(enrollment, tool string) (relay.Policy, error) {
 	}
 	if key == "" {
 		if s := tm.StateAt(t.deps.Now()); s != routing.Suspended && s != routing.Refused && t.deps.Mint != nil {
-			t.deps.Mint(*tm)
+			t.deps.Mint(cfg, *tm)
 		}
 		return relay.Policy{}, relay.ErrNoKey
 	}
-	chosen := t.cfg.Harnesses
+	chosen := cfg.Harnesses
 	file, err := config.LoadFile(t.cfg.Dir)
 	if err != nil {
 		return relay.Policy{}, err
 	}
-	if p := file.Profiles[t.cfg.ProfileName]; p != nil {
+	if p := file.Profiles[cfg.ProfileName]; p != nil {
 		chosen = p.Harnesses
-	} else if t.cfg.ProfileName != "" {
+	} else if cfg.ProfileName != "" {
 		return relay.Policy{}, errors.New("profile removed; restart the relay")
 	}
-	endpoint := t.cfg.OTLPURL
+	endpoint := cfg.OTLPURL
 	if !t.deps.OTLPPinned {
-		endpoint = cmp.Or(hosts.OTLP, t.cfg.OTLPURL)
+		endpoint = cmp.Or(hosts.OTLP, cfg.OTLPURL)
 	}
 	pol := relay.Policy{Endpoint: endpoint, Key: key, RequireClaim: !tm.Personal || !tm.Policy.Global()}
 	pol.IncludePrompts, pol.IncludeToolContent = tm.Policy.Content()
@@ -325,23 +329,23 @@ func (t *Teams) Resolve(enrollment, tool string) (relay.Policy, error) {
 		pol.IncludePrompts, pol.IncludeToolContent = false, false
 		pol.Signals = []string{}
 	}
-	pol.User = t.user(*tm, endpoint)
+	pol.User = t.user(cfg, *tm, endpoint)
 	return pol, nil
 }
 
-// user is who parts sent to tm at endpoint name (TeamsDeps.User), asked at most once per
-// userTTL.
-func (t *Teams) user(tm routing.Team, endpoint string) string {
+// user is who parts sent to tm, selected in cfg's profile, at endpoint name
+// (TeamsDeps.User), asked at most once per userTTL.
+func (t *Teams) user(cfg *config.Config, tm routing.Team, endpoint string) string {
 	if t.deps.User == nil {
 		return ""
 	}
-	key := tm.OrganizationID + "\x00" + tm.AuthURL + "\x00" + endpoint
+	key := cfg.ProfileName + "\x00" + tm.OrganizationID + "\x00" + tm.AuthURL + "\x00" + endpoint
 	t.userMu.Lock()
 	defer t.userMu.Unlock()
 	if u, ok := t.users[key]; ok && time.Since(u.at) < userTTL {
 		return u.id
 	}
-	id := t.deps.User(tm, endpoint)
+	id := t.deps.User(cfg, tm, endpoint)
 	t.users[key] = cachedUser{id: id, at: time.Now()}
 	return id
 }

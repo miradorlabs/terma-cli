@@ -43,7 +43,9 @@ type Claim struct {
 	// Kind is the latest placement's (Placement.Kind).
 	Kind Kind `json:"kind,omitempty"`
 	// Run is the latest placement's (Placement.Run).
-	Run      string `json:"run,omitempty"`
+	Run string `json:"run,omitempty"`
+	// Profile is the latest placement's (Placement.Profile).
+	Profile  string `json:"profile,omitempty"`
 	Tool     string `json:"tool,omitempty"`
 	Repo     string `json:"repo,omitempty"`
 	Worktree string `json:"worktree,omitempty"`
@@ -98,7 +100,10 @@ type Placement struct {
 	Kind Kind `json:"kind,omitempty"`
 	// Run is the session run the placement belongs to (internal/runs); "" when the hook
 	// named none.
-	Run      string `json:"run,omitempty"`
+	Run string `json:"run,omitempty"`
+	// Profile is the profile whose routing state the hook placed it under, on a machine
+	// routing by teams: the relay routes its records by that profile's. "" elsewhere.
+	Profile  string `json:"profile,omitempty"`
 	Tool     string `json:"tool,omitempty"`
 	Repo     string `json:"repo,omitempty"`
 	Worktree string `json:"worktree,omitempty"`
@@ -138,7 +143,7 @@ func (c Claim) placements() []Placement {
 	if len(c.Placements) > 0 {
 		return c.Placements
 	}
-	return []Placement{{ProjectID: c.ProjectID, Kind: c.Kind, Run: c.Run, Tool: c.Tool, Repo: c.Repo, Worktree: c.Worktree, Repository: c.Repository,
+	return []Placement{{ProjectID: c.ProjectID, Kind: c.Kind, Run: c.Run, Profile: c.Profile, Tool: c.Tool, Repo: c.Repo, Worktree: c.Worktree, Repository: c.Repository,
 		Root: c.Root, Cwd: c.Cwd, Remote: c.Remote, Branch: c.Branch, PIDs: c.PIDs}}
 }
 
@@ -245,7 +250,7 @@ func write(dir, sessionID string, c Claim, now time.Time) bool {
 	if havePrev && samePlace(prev, c) {
 		since = prev.placements()[len(prev.placements())-1].Since
 	}
-	placements = append(placements, Placement{ProjectID: c.ProjectID, Kind: c.Kind, Run: c.Run, Tool: c.Tool, Repo: c.Repo, Worktree: c.Worktree,
+	placements = append(placements, Placement{ProjectID: c.ProjectID, Kind: c.Kind, Run: c.Run, Profile: c.Profile, Tool: c.Tool, Repo: c.Repo, Worktree: c.Worktree,
 		Repository: c.Repository, Root: c.Root, Cwd: c.Cwd, Remote: c.Remote, Branch: c.Branch, PIDs: c.PIDs, Since: since})
 	c.Evicted = havePrev && prev.Evicted
 	if len(placements) > maxPlacements {
@@ -265,9 +270,9 @@ func write(dir, sessionID string, c Claim, now time.Time) bool {
 // repository, or another directory in it, is the same run, whose Root and Cwd are rewritten in
 // place: a placement decides where records go, and a session switching between worktrees must
 // never push an earlier one out. Outside git the directory is the location, so another is
-// another place.
+// another place; and a placement under another profile's routing is another place.
 func samePlace(prev, c Claim) bool {
-	if prev.Kind != c.Kind || prev.ProjectID != c.ProjectID || prev.Repository != c.Repository {
+	if prev.Kind != c.Kind || prev.ProjectID != c.ProjectID || prev.Repository != c.Repository || prev.Profile != c.Profile {
 		return false
 	}
 	return c.Kind != KindOutsideGit || prev.Cwd == c.Cwd

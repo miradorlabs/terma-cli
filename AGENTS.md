@@ -155,8 +155,10 @@ and of the developer's bindings of owners and repositories to organizations: `te
 ticks and binds, and the relay refreshes each enrollment's policy with its own
 organization's sign-in. `routing.Router.Route` decides where every record goes, and a
 routing state the migration has not committed sends nothing (`routing.LoadReady`). Hooks
-route each location they record: a location-only placement for the session, each spooled
-event with the destination Route gave it and never a project, and each session's runs in
+route each location they record: a location-only placement for the session, naming the
+profile it was routed under, by whose routing state the relay routes the session's
+records, so a `terma config use` while the relay runs moves no session placed under the
+other; each spooled event with the destination Route gave it and never a project; and each session's runs in
 the run ledger (`runs/`, `internal/runs`), where a run that touches two organizations'
 checkouts turns Mixed and sends no telemetry until the session starts a new run. Mixed
 drops whatever carries content, a record that routes by a location of its own (an

@@ -39,7 +39,7 @@ func (c Claim) At(pid int, at time.Time) (Claim, bool) {
 	if best == nil {
 		return Claim{}, false
 	}
-	return Claim{ProjectID: best.ProjectID, Kind: best.Kind, Run: best.Run, Tool: best.Tool, Repo: best.Repo, Worktree: best.Worktree,
+	return Claim{ProjectID: best.ProjectID, Kind: best.Kind, Run: best.Run, Profile: best.Profile, Tool: best.Tool, Repo: best.Repo, Worktree: best.Worktree,
 		Repository: best.Repository, Root: best.Root, Cwd: best.Cwd, Remote: best.Remote, Branch: best.Branch,
 		PIDs: best.PIDs, ClaimedAt: c.ClaimedAt, Placements: c.Placements, Evicted: c.Evicted}, true
 }

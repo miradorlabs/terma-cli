@@ -101,8 +101,9 @@ func TestARoutedSessionSpoolsItsDestinationNotAProject(t *testing.T) {
 		t.Errorf("start run %q own %v; touch run %q own %v: the start is its run's, the file event its checkout's", start.Run, start.OwnLocation, touch.Run, touch.OwnLocation)
 	}
 	c := m.claim(sid)
-	if c.Kind != claim.KindRepository || c.ProjectID != "" || c.Run != start.Run || c.Repository.Origin != "github.com/acme/api" {
-		t.Errorf("placement %+v: location-only, in the session's run", c)
+	if c.Kind != claim.KindRepository || c.ProjectID != "" || c.Run != start.Run || c.Repository.Origin != "github.com/acme/api" ||
+		c.Profile != hookruntest.RoutedProfile {
+		t.Errorf("placement %+v: location-only, in the session's run, under the hook's profile", c)
 	}
 	if manifests, _ := r.Store.Manifests(); len(manifests) != 1 {
 		t.Errorf("manifests %+v: a location Route sends records its touched files", manifests)
