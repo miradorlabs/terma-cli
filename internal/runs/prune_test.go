@@ -127,3 +127,31 @@ func TestPruneKeepsWhatIsActiveOrQueued(t *testing.T) {
 		}
 	}
 }
+
+// Refresh renews a ledger's activity only once it is over RefreshEvery old, so Prune keeps
+// a session that goes on recording nothing new; it makes no ledger for a session with none.
+func TestRefreshRenewsAnOldLedgerOnly(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	start := time.Now()
+	if _, err := Start(dir, "sess", start); err != nil {
+		t.Fatal(err)
+	}
+	must(t, Refresh(dir, "sess", start.Add(RefreshEvery)))
+	if p, _ := Locate(dir, "sess"); !p.Active.Equal(start.UTC()) {
+		t.Fatalf("renewed a ledger a day old or less: %v", p.Active)
+	}
+	later := start.Add(RefreshEvery + time.Minute)
+	must(t, Refresh(dir, "sess", later))
+	if p, _ := Locate(dir, "sess"); !p.Active.Equal(later.UTC()) {
+		t.Fatalf("activity %v, want %v", p.Active, later.UTC())
+	}
+	Prune(dir, start.Add(Retention+time.Hour), nil)
+	if gone(filepath.Join(dir, Dir, "sess.json")) {
+		t.Fatal("pruned a renewed ledger")
+	}
+	must(t, Refresh(dir, "none", later))
+	if !gone(filepath.Join(dir, Dir, "none.json")) {
+		t.Fatal("Refresh made a ledger")
+	}
+}

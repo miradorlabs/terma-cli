@@ -34,7 +34,7 @@ func (e Env) StartRun(sessionID string) {
 		e.Logf("start run: %v", err)
 		return
 	}
-	e.Routing.setRun(sessionID, run)
+	e.Routing.setRun(sessionID, run, e.Time())
 }
 
 // placeFor is claimForRelay on a migrated machine: the event's session's location-only
@@ -58,7 +58,8 @@ func (e Env) placeFor(r *Repo, ev spool.Event) {
 // run has crossed organizations, when it is marked Mixed instead. touched are the other
 // checkouts the hook saw the session touch: loc, the run's earlier locations and they are
 // classified together, before anything filters any of them. The run ledger then records
-// loc and touched among the run's locations, for the hooks after this one.
+// loc and touched among the run's locations, for the hooks after this one, and is renewed
+// once a day while the run goes on (keepRun).
 func (e Env) place(sessionID, agentID string, c claim.Claim, loc routing.Location, touched []routing.Location) {
 	rt := e.Routing
 	if !rt.Usable() || !session.ValidID(sessionID) {
@@ -66,6 +67,7 @@ func (e Env) place(sessionID, agentID string, c claim.Claim, loc routing.Locatio
 	}
 	now := e.Time()
 	run, been := e.currentRun(sessionID)
+	e.keepRun(sessionID, now)
 	c.ProjectID, c.Run = "", run
 	seen := newLocations(been, append([]routing.Location{loc}, touched...))
 	// Past the bound, the ledger no longer keeps everywhere the run has been, so it cannot

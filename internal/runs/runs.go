@@ -41,6 +41,12 @@ const aliasesDir = "aliases"
 // Prune still keeps a ledger a queued record names.
 const Retention = 15 * 24 * time.Hour
 
+// RefreshEvery is how often a session's hooks renew its ledger's activity (Refresh). A run
+// that stays in one place records nothing new, and its ledger would be pruned while it
+// runs, a Mixed run's crossing with it; renewed once a day, it stays far inside Retention
+// for one write a day.
+const RefreshEvery = 24 * time.Hour
+
 // lockWait bounds the wait for a session's ledger lock. Every write is a read, a small
 // change and a rename; a hook that cannot have the lock gets an error, never a stall.
 const lockWait = 2 * time.Second
@@ -52,7 +58,7 @@ type ledger struct {
 	// Aliases are the subagent IDs that share the session's runs.
 	Aliases []string `json:"aliases,omitempty"`
 	// Active is when a hook last recorded here a run starting, crossing organizations or
-	// touching a new location: what Prune keeps the ledger by.
+	// touching a new location, or renewed it (Refresh): what Prune keeps the ledger by.
 	Active time.Time `json:"active,omitzero"`
 }
 
@@ -251,23 +257,58 @@ func (s Snapshot) MixedAt(recordTime time.Time) (time.Time, bool) {
 // to begin. False when no run of it is recorded, or its ledger cannot be read. Hooks name
 // it on what they record, long after the session's claim has expired.
 func Current(stateDir, idOrAlias string) (string, bool) {
-	run, _, ok := Locations(stateDir, idOrAlias)
-	return run, ok
+	p, ok := Locate(stateDir, idOrAlias)
+	return p.Run, ok
 }
 
-// Locations is Current with the locations that run was placed in or seen touching (Touch),
-// from one read of the ledger: a hook reads them once, to tell whether the run crosses
-// organizations at the locations it sees next.
+// Locations is Current with the locations that run was placed in or seen touching (Touch).
 func Locations(stateDir, idOrAlias string) (run string, locations []string, ok bool) {
+	p, ok := Locate(stateDir, idOrAlias)
+	return p.Run, p.Locations, ok
+}
+
+// Position is a session's current run as one read of its ledger found it (Locate).
+type Position struct {
+	// Run is the current run, the latest to begin, and Locations where it has been.
+	Run       string
+	Locations []string
+	// Active is the ledger's last activity, which Prune keeps it by; zero when it records
+	// none.
+	Active time.Time
+}
+
+// Locate is Locations with the ledger's last activity, from one read of the ledger: a hook
+// reads them once, to tell whether the run crosses organizations at the locations it sees
+// next, and whether the ledger is due its renewal (Refresh).
+func Locate(stateDir, idOrAlias string) (Position, bool) {
 	if !session.ValidID(idOrAlias) {
-		return "", nil, false
+		return Position{}, false
 	}
 	l, ok, err := resolve(stateDir, idOrAlias)
 	if err != nil || !ok || len(l.Runs) == 0 {
-		return "", nil, false
+		return Position{}, false
 	}
 	cur := l.Runs[len(l.Runs)-1]
-	return cur.ID, cur.Locations, true
+	return Position{Run: cur.ID, Locations: cur.Locations, Active: l.lastActive(time.Time{})}, true
+}
+
+// Refresh renews sessionID's ledger's activity at now, when its last activity is older
+// than RefreshEvery, so Prune keeps it while the session runs; a ledger with no run, or
+// none at all, is left as it is. A hook calls it only when its read of the ledger (Locate)
+// found it due, so a run's hooks write it at most once a day.
+func Refresh(stateDir, sessionID string, now time.Time) error {
+	path, err := ledgerPath(stateDir, sessionID)
+	if err != nil {
+		return err
+	}
+	return flock.Locked(path, lockWait, func() error {
+		l, ok, err := load(path)
+		if err != nil || !ok || len(l.Runs) == 0 || now.Sub(l.lastActive(time.Time{})) <= RefreshEvery {
+			return err
+		}
+		l.active(now)
+		return save(path, &l)
+	})
 }
 
 // Aliases are the subagent IDs that share sessionID's runs (Alias), in the order they were
