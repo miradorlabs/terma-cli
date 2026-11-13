@@ -36,9 +36,10 @@ type Env struct {
 	// Routing is set on a machine that routes by teams (config.Migrated), and nil on one
 	// that still routes by its one team, which doctor checks as it always has.
 	Routing *Routing
-	// MigrationBlocked says why this machine cannot move to routing by teams, such as a
-	// second terma install its agents' hooks run; "" when nothing blocks it.
-	MigrationBlocked string
+	// MigrationBlocked says why the last relay start did not move this machine to routing
+	// by teams, such as a second terma install its agents' hooks run; nil when nothing
+	// blocks it.
+	MigrationBlocked *MigrationBlock
 }
 
 // Probes reach the event spool and the platform's APIs for a run.
@@ -195,11 +196,8 @@ func Run(ctx context.Context, env Env, progress Progress) Report {
 	d := &run{ctx: ctx, env: env, cfg: cfg}
 	timed(KeyAuth, "signed in", d.signedIn)
 
-	if env.Routing == nil && env.MigrationBlocked != "" {
-		timed(KeyMigration, "routing by teams", func() Check {
-			return Check{Status: Fail, Detail: "this machine cannot move to routing by teams: " + env.MigrationBlocked,
-				Fix: "remove the other terma install, then run `terma teams`"}
-		})
+	if b := env.MigrationBlocked; env.Routing == nil && b != nil {
+		timed(KeyMigration, "routing by teams", func() Check { return MigrationCheck(*b) })
 	}
 	d.nonGit = env.RepoErr == nil && env.GitDir == ""
 	// The policy the hooks apply, so doctor never admits a repository they would not.

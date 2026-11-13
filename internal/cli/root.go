@@ -191,8 +191,9 @@ type App struct {
 	// canAsk reports whether a person is at a terminal to answer questions.
 	canAsk func() bool
 	// migrationBlocked says why the relay could not move this machine to routing by teams
-	// (two installs), from what the migration recorded; nil reads no record.
-	migrationBlocked func(configDir, stateDir string) string
+	// (two installs, say), from what the migration recorded (migrationBlockOf); nil when
+	// nothing blocks it.
+	migrationBlocked func(configDir, stateDir string) *doctor.MigrationBlock
 	// migrationWait bounds `terma teams`' wait for the relay it starts to migrate the
 	// machine; zero is defaultMigrationWait.
 	migrationWait time.Duration
@@ -207,8 +208,8 @@ type App struct {
 func New(agentsFor func(configDir string) *agents.Registry, version string) *App {
 	app := &App{agentsFor: agentsFor, version: version, binDirs: doctor.WellKnownBinDirs, hookExecutable: procinfo.AbsExecutable,
 		managedRoot: "/", runUpdateStep: runUpdateStep, nateRemoveBinary: removeNateBinary, spawnRelay: daemon.SpawnFrom,
-		backgroundStep: runBackgroundStep,
-		canAsk:         canPrompt}
+		backgroundStep: runBackgroundStep, migrationBlocked: migrationBlockOf,
+		canAsk: canPrompt}
 	app.nateBinaryCandidates = app.installedTermaBinaries
 	if exe, err := os.Executable(); err == nil {
 		app.binary, _ = os.Stat(exe)

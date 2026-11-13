@@ -7,9 +7,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/miradorlabs/terma-cli/internal/config"
+	"github.com/miradorlabs/terma-cli/internal/migrate"
 	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
-	"github.com/miradorlabs/terma-cli/internal/routing"
 )
 
 // defaultMigrationWait bounds how long `terma teams` waits for the relay it started to
@@ -18,15 +17,16 @@ const defaultMigrationWait = 30 * time.Second
 
 // errMigrationIncomplete is `terma teams` giving up on a migration it started: the machine
 // is as it was, collecting by its one team.
-var errMigrationIncomplete = errors.New("this machine's move to routing by teams did not finish, so nothing was changed: run `terma doctor` to see why")
+var errMigrationIncomplete = errors.New("this machine's move to routing by teams did not finish, so nothing was changed")
 
 // migrateFirst moves a machine not yet migrated to routing by teams before `terma teams`
 // changes anything: only a relay migrates, at start, holding the relay's and the spool
 // flush's locks. So it stops the running relay, which drops what it held in memory, starts
-// this executable's, and waits for the migration to commit for profile. It fails without
-// changing anything when the commit does not come.
+// this executable's, and waits until the machine has no migrating left to do
+// (migrate.Needed). It fails without changing anything when that does not come, saying
+// why when the relay recorded it (migrate.ReadBlock), as soon as it does.
 func (app *App) migrateFirst(cmd *cobra.Command, profile string) error {
-	if config.Migrated(app.dir) && migrationCommitted(app.stateDir, profile) {
+	if !migrate.Needed(app.dir, app.stateDir) {
 		return nil
 	}
 	fmt.Fprintln(cmd.ErrOrStderr(), "Moving this machine to routing by teams: restarting the relay…")
@@ -40,6 +40,7 @@ func (app *App) migrateFirst(cmd *cobra.Command, profile string) error {
 	if err != nil {
 		return err
 	}
+	started := time.Now().UTC()
 	app.spawnRelay(exe, app.stateDir, app.version)
 	wait := app.migrationWait
 	if wait == 0 {
@@ -47,11 +48,18 @@ func (app *App) migrateFirst(cmd *cobra.Command, profile string) error {
 	}
 	ctx := cmd.Context()
 	for deadline := time.Now().Add(wait); ; {
-		if config.Migrated(app.dir) && migrationCommitted(app.stateDir, profile) {
+		if !migrate.Needed(app.dir, app.stateDir) {
 			return nil
 		}
+		// A record from before this start says why an earlier one did not migrate.
+		if b, ok := migrate.ReadBlock(app.stateDir); ok && !b.At.Before(started.Truncate(time.Second)) {
+			return migrationBlockedError(b)
+		}
 		if time.Now().After(deadline) {
-			return errMigrationIncomplete
+			if b, ok := migrate.ReadBlock(app.stateDir); ok {
+				return migrationBlockedError(b)
+			}
+			return fmt.Errorf("%w: run `terma doctor` to see why", errMigrationIncomplete)
 		}
 		select {
 		case <-ctx.Done():
@@ -61,14 +69,9 @@ func (app *App) migrateFirst(cmd *cobra.Command, profile string) error {
 	}
 }
 
-// migrationCommitted reports whether profile's routing state is past the migration: not
-// in its preparing phase, which collects nothing until the relay commits it. A profile the
-// migration made no state for counts too: `terma teams` then says to run setup.
-func migrationCommitted(stateDir, profile string) bool {
-	st, ok, err := routing.Load(stateDir, profile)
-	if err != nil {
-		// Unreadable is past the migration: nothing waiting will mend it.
-		return true
-	}
-	return !ok || st.Migration == nil || st.Migration.Phase == routing.Committed
+// migrationBlockedError is errMigrationIncomplete, with why the relay did not migrate
+// and what to do about it.
+func migrationBlockedError(b migrate.Block) error {
+	w := blockWords(b)
+	return fmt.Errorf("%w: %s; %s", errMigrationIncomplete, w.Detail, w.Fix)
 }

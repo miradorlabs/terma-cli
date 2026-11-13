@@ -1,12 +1,14 @@
 package cli
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/miradorlabs/terma-cli/internal/relay"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
 	"github.com/miradorlabs/terma-cli/internal/routing"
@@ -14,8 +16,8 @@ import (
 )
 
 // On a migrated machine doctor lists the teams, fails while a binding is undecided, and
-// shows what Mixed runs dropped: the sessions from the run ledger, the count from the
-// relay's counters.
+// shows what Mixed runs dropped and what each blocker held: the sessions from the run
+// ledger, the counts from the relay's stats.json blocked keys.
 func TestDoctorOnAMigratedMachineShowsTheTeamsAndFailsOnWhatIsPending(t *testing.T) {
 	migratedMachine(t, func(f *fakeAuth, s *routing.State) error {
 		_, err := s.Select(stateTeam(f, orgA().ID, acmeAPI, false, "github.com/acme/api"))
@@ -32,7 +34,13 @@ func TestDoctorOnAMigratedMachineShowsTheTeamsAndFailsOnWhatIsPending(t *testing
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, daemon.StatsFile), []byte(`{"counters":{"dropped.mixed.logs":3,"dropped.mixed.spans":2,"dropped.unclaimed.logs":9}}`), 0o600); err != nil {
+	// The relay's last stop recorded what it kept from leaving, by what blocked it.
+	stats, err := json.Marshal(relay.Snapshot{Counters: map[string]int{"dropped.mixed_run.logs": 5, "dropped.unclaimed.logs": 9},
+		Blocked: map[string]int{"mixed:" + session: 3, "mixed:another-session": 2, "pending:github.com/acme/api": 4}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, daemon.StatsFile), stats, 0o600); err != nil {
 		t.Fatal(err)
 	}
 	out, err := runTerma(t, "doctor")
@@ -41,7 +49,7 @@ func TestDoctorOnAMigratedMachineShowsTheTeamsAndFailsOnWhatIsPending(t *testing
 	}
 	for _, want := range []string{
 		"FAIL  teams", "github.com/acme/api is undecided", "terma teams --bind github.com/acme/api=" + orgA().ID,
-		"Undecided:", "session " + session, "dropped 5 record(s)",
+		"Undecided:", "session " + session, "dropped 5 record(s)", "4 record(s) for github.com/acme/api, undecided",
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("doctor lacks %q:\n%s", want, out)
