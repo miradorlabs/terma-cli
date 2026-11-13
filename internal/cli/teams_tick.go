@@ -58,7 +58,7 @@ func (app *App) signInTo(cmd *cobra.Command, cfg *config.Config, ref orgRef, noB
 		return nil, err
 	}
 	if ref.ID != "" && res.cred.OrganizationID != ref.ID {
-		return nil, fmt.Errorf("signed in to %s rather than %s, so nothing was ticked there", cmp.Or(res.orgName, res.cred.OrganizationID), ref)
+		return nil, fmt.Errorf("%s was not authorized in the browser, so nothing was ticked there", ref)
 	}
 	return res.cred, nil
 }

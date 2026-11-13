@@ -60,8 +60,12 @@ type fakeAuth struct {
 	revoked     []string
 }
 
-// fakeGrant is who a delegated code signs in.
-type fakeGrant struct{ org, user string }
+// fakeGrant is who a delegated code signs in; browser marks a code the approval page
+// posted to the CLI's listener, which is redeemed only with that listener's port.
+type fakeGrant struct {
+	org, user string
+	browser   bool
+}
 
 // fakeToken is the access token the fake auth host takes for user in org: `ter_cli_<org>`
 // for its default user, u-1, else `ter_cli_<org>~<user>`.
@@ -94,7 +98,7 @@ func newFakeAuth(t *testing.T) *fakeAuth {
 			return
 		}
 		org, user := "", "u-1"
-		for _, o := range fakeOrgs {
+		for _, o := range append(slices.Clone(fakeOrgs), f.orgs...) {
 			if rest, ok := strings.CutPrefix(token, "ter_cli_"+o.ID); ok && (rest == "" || strings.HasPrefix(rest, "~")) {
 				org = o.ID
 				if rest != "" {
@@ -200,14 +204,14 @@ func (f *fakeAuth) serveToken(w http.ResponseWriter, r *http.Request) {
 	delete(f.grants, body.Code)
 	f.verifiers = append(f.verifiers, body.CodeVerifier)
 	f.mu.Unlock()
-	if !ok || body.RedirectPort == nil || *body.RedirectPort != 0 || body.CodeVerifier == "" {
+	if !ok || body.RedirectPort == nil || (*body.RedirectPort != 0) != grant.browser || body.CodeVerifier == "" {
 		w.WriteHeader(http.StatusUnauthorized)
 		fmt.Fprint(w, `{"error":{"code":"UNAUTHENTICATED","message":"invalid or expired credentials"}}`)
 		return
 	}
 	n := f.exchanges.Add(1)
 	name := ""
-	for _, o := range fakeOrgs {
+	for _, o := range append(slices.Clone(fakeOrgs), f.orgs...) {
 		if o.ID == grant.org {
 			name = o.Name
 		}
@@ -228,6 +232,16 @@ func (f *fakeAuth) grant(code, org, user string) {
 		f.grants = map[string]fakeGrant{}
 	}
 	f.grants[code] = fakeGrant{org: org, user: user}
+}
+
+// browserCode makes code one the approval page posts for org, signing in the default user.
+func (f *fakeAuth) browserCode(code, org string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.grants == nil {
+		f.grants = map[string]fakeGrant{}
+	}
+	f.grants[code] = fakeGrant{org: org, user: "u-1", browser: true}
 }
 
 // verifiersSent are the code verifiers the token endpoint was sent.

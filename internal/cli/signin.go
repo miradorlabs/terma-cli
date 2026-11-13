@@ -52,7 +52,11 @@ func (r orgRef) String() string { return cmp.Or(r.Name, r.ID) }
 
 type signInOptions struct {
 	// org empty means whichever is active, or whatever the user picks in the browser.
-	org                orgRef
+	org orgRef
+	// orgs are organizations to authorize in the browser, the ones its page pre-checks;
+	// set, the browser opens even though a stored sign-in works. Empty, the page pre-checks
+	// org alone, or with no org every organization.
+	orgs               []string
 	noBrowser          bool
 	pauseBeforeBrowser bool
 }
@@ -122,7 +126,6 @@ func (app *App) signIn(cmd *cobra.Command, cfg *config.Config, opts signInOption
 		return nil, errors.New("TERMA_API_KEY is set — unset it to sign in as a user, or keep using the server key")
 	}
 	ctx := cmd.Context()
-	errOut := cmd.ErrOrStderr()
 
 	want := opts.org
 	// A name must become an id to find a stored credential; without a working
@@ -134,10 +137,12 @@ func (app *App) signIn(cmd *cobra.Command, cfg *config.Config, opts signInOption
 			return nil, err
 		}
 	}
-	if res, ok, err := app.reuseStoredSession(ctx, cfg, want); err != nil {
-		return nil, err
-	} else if ok {
-		return res, nil
+	if len(opts.orgs) == 0 {
+		if res, ok, err := app.reuseStoredSession(ctx, cfg, want); err != nil {
+			return nil, err
+		} else if ok {
+			return res, nil
+		}
 	}
 
 	if opts.pauseBeforeBrowser && !opts.noBrowser && canPrompt() {
@@ -145,31 +150,11 @@ func (app *App) signIn(cmd *cobra.Command, cfg *config.Config, opts signInOption
 			return nil, err
 		}
 	}
-
-	client := api.NewAnonymous(cfg.AuthURL, app.version)
-	cred, err := auth.Login(ctx, client, auth.LoginOptions{
-		AppURL:       cfg.AppURL,
-		Label:        auth.DefaultLabel(),
-		Organization: want.hint(),
-		NoBrowser:    opts.noBrowser,
-		Out:          errOut,
-	})
-	if err != nil {
-		return nil, err
+	orgs := opts.orgs
+	if len(orgs) == 0 && !want.empty() {
+		orgs = []string{want.hint()}
 	}
-	orgName := ""
-	if result := client.LastLogin(); result != nil {
-		orgName = result.OrganizationName
-	}
-	if !want.empty() && !want.matches(cred.OrganizationID, orgName) {
-		fmt.Fprintf(errOut, "Note: you approved %s in the browser rather than %s. Signed in to %s.\n",
-			cmp.Or(orgName, cred.OrganizationID), want, cmp.Or(orgName, cred.OrganizationID))
-	}
-
-	if err := app.storeLogin(ctx, cfg, cred, orgName); err != nil {
-		return nil, err
-	}
-	return &signInResult{cred: cred, orgName: orgName}, nil
+	return app.browserSignIn(cmd, cfg, want, orgs, opts.noBrowser)
 }
 
 // storeLogin keeps a new sign-in and makes it the profile's. It replaces only its own
