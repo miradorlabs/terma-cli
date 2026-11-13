@@ -170,6 +170,25 @@ func TestEnsureSpoolKeyNeverMintsOnceMigrated(t *testing.T) {
 	}
 }
 
+// On a migrated machine with no team ticked, setup's key step sends the developer to
+// `terma teams`, where teams are ticked.
+func TestEnsureSpoolKeyWithNoTeamSaysTermaTeams(t *testing.T) {
+	routingSandbox(t)
+	cfg, err := testApp.loadConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(config.CredentialsV2Path(testApp.dir), []byte("{}"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := routing.Create(testApp.stateDir, cfg.ProfileName, func(*routing.State) error { return nil }); err != nil {
+		t.Fatal(err)
+	}
+	if k := testApp.ensureSpoolKey(context.Background(), cfg); !strings.Contains(k.fix, "`terma teams`") || strings.Contains(k.fix, "terma setup") {
+		t.Fatalf("with no team ticked: %+v", k)
+	}
+}
+
 // A migrated hook event names the profile's signed-in user only for a team of the
 // organization it is signed in to, going to the profile's own ingest.
 func TestEnrolledUserNamesOnlyTheSignedInOrganizationsUser(t *testing.T) {
