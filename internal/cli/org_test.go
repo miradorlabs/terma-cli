@@ -55,6 +55,10 @@ type fakeAuth struct {
 	goneTeams      map[string]bool
 	forbiddenTeams map[string]bool
 	mintDown       bool
+	// projects are each organization's teams, over projectsIn; slow, when set, runs
+	// before a team listing or a policy read is answered.
+	projects map[string][]project
+	slow     func(r *http.Request)
 	// mintedNames are the names keys were created with.
 	mintedNames []string
 	mu          sync.Mutex
@@ -131,9 +135,19 @@ func newFakeAuth(t *testing.T) *fakeAuth {
 			}
 			_ = json.NewEncoder(w).Encode(listOrganizationsResponse{Organizations: orgs})
 		case "/v1/projects":
-			_ = json.NewEncoder(w).Encode(listProjectsResponse{Projects: projectsIn(org)})
+			if f.slow != nil {
+				f.slow(r)
+			}
+			projects, ok := f.projects[org]
+			if !ok {
+				projects = projectsIn(org)
+			}
+			_ = json.NewEncoder(w).Encode(listProjectsResponse{Projects: projects})
 		case "/v1/policy":
 			f.policies.Add(1)
+			if f.slow != nil {
+				f.slow(r)
+			}
 			if r.URL.Query().Get("project_id") == "" {
 				http.Error(w, "missing project_id", http.StatusBadRequest)
 				return
