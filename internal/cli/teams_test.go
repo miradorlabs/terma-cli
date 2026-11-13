@@ -3,10 +3,13 @@ package cli
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -142,6 +145,68 @@ func TestTeamsListsEveryOrganizationAndTheSignedInOnesTeams(t *testing.T) {
 	text, err := runTerma(t, "teams")
 	if err != nil || !strings.Contains(text, "[ ] Acme API") || !strings.Contains(text, "Authorize 1 more organization: `terma teams --authorize`\n    Beta Labs\n") {
 		t.Errorf("the list as text (%v):\n%s", err, text)
+	}
+}
+
+// Listing fetches the organizations' teams and their policies concurrently, at most
+// listLimit requests at once, and lists them in the listing's order whichever answers
+// first: here an earlier organization's listing, and an earlier team's policy, answer later.
+func TestTeamsListsInTheListingsOrderWhicheverAnswersFirst(t *testing.T) {
+	const nOrgs, nTeams = 6, 3
+	var orgs []organization
+	projects := map[string][]project{}
+	for i := range nOrgs {
+		o := organization{ID: fmt.Sprintf("cccccccc-0000-4000-8000-%012d", i), Name: fmt.Sprintf("Org %d", i), Role: "member"}
+		orgs = append(orgs, o)
+		for j := range nTeams {
+			projects[o.ID] = append(projects[o.ID], project{ID: fmt.Sprintf("dddddddd-%04d-4000-8000-%012d", i, j), Name: fmt.Sprintf("Team %d.%d", i, j), OrganizationID: o.ID})
+		}
+	}
+	f := migratedMachine(t, nil, orgs...)
+	f.orgs, f.projects = orgs, projects
+	for i, o := range orgs {
+		for j, p := range projects[o.ID] {
+			f.policyBodies[p.ID] = policyBody(fmt.Sprintf("github.com/o%d/t%d", i, j))
+		}
+	}
+	var inFlight, most atomic.Int32
+	f.slow = func(r *http.Request) {
+		n := inFlight.Add(1)
+		defer inFlight.Add(-1)
+		for m := most.Load(); n > m && !most.CompareAndSwap(m, n); m = most.Load() {
+		}
+		delay := time.Millisecond
+		if team := r.URL.Query().Get("project_id"); team != "" {
+			var i, j int
+			_, _ = fmt.Sscanf(team, "dddddddd-%04d-4000-8000-%012d", &i, &j)
+			delay *= time.Duration(2*(nOrgs-i) + 5*(nTeams-j))
+		} else {
+			token := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ter_cli_")
+			delay *= time.Duration(5 * (nOrgs - slices.IndexFunc(orgs, func(o organization) bool { return o.ID == token })))
+		}
+		time.Sleep(delay)
+	}
+
+	v, out, err := teamsJSON(t)
+	if err != nil {
+		t.Fatalf("teams: %v\n%s", err, out)
+	}
+	if len(v.Organizations) != nOrgs {
+		t.Fatalf("organizations = %+v, want %d", v.Organizations, nOrgs)
+	}
+	for i, o := range v.Organizations {
+		if o.ID != orgs[i].ID || len(o.Teams) != nTeams {
+			t.Fatalf("organization %d = %s with %d teams, want %s with %d", i, o.ID, len(o.Teams), orgs[i].ID, nTeams)
+		}
+		for j, team := range o.Teams {
+			want := fmt.Sprintf("github.com/o%d/t%d", i, j)
+			if team.ID != projects[o.ID][j].ID || !slices.Equal(team.Entries, []string{want}) {
+				t.Errorf("organization %d's team %d = %s listing %v, want %s listing %s", i, j, team.ID, team.Entries, projects[o.ID][j].ID, want)
+			}
+		}
+	}
+	if got := most.Load(); got > listLimit || got < 2 {
+		t.Errorf("at most %d requests were in flight at once, want 2 to %d", got, listLimit)
 	}
 }
 

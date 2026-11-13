@@ -65,16 +65,6 @@ type LoginOptions struct {
 	Timeout time.Duration
 }
 
-// Login is LoginAll for a caller that keeps one sign-in: the first the approval page sent,
-// which is the organization it was asked for when that one was ticked.
-func Login(ctx context.Context, exchanger TokenExchanger, opts LoginOptions) (*Credential, error) {
-	signedIn, _, err := LoginAll(ctx, exchanger, opts)
-	if err != nil {
-		return nil, err
-	}
-	return signedIn[0].Credential, nil
-}
-
 // LoginAll runs the browser handoff, binding the loopback port before the browser opens so
 // no other process can race onto it. The approval page sends one code per organization
 // ticked there, and each is exchanged in turn with the one verifier. It returns every

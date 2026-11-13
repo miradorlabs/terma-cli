@@ -81,9 +81,9 @@ func TestApplyRefreshKeepsRefusalsInOrder(t *testing.T) {
 		must(t, err)
 		return changed
 	}
-	state := func() TeamState { return s.team(id).StateAt(now) }
+	state := func() TeamState { return s.Team(id).StateAt(now) }
 
-	inFlight := s.team(id).Epoch
+	inFlight := s.Team(id).Epoch
 	apply(Refresh{EnrollmentID: id, Epoch: inFlight, Failure: Terminal})
 	if state() != Suspended {
 		t.Fatalf("one terminal refusal left the team %s", state())
@@ -91,22 +91,22 @@ func TestApplyRefreshKeepsRefusalsInOrder(t *testing.T) {
 	if apply(Refresh{EnrollmentID: id, Epoch: inFlight, Policy: ok(2)}) || state() != Suspended {
 		t.Fatal("a success started before the refusal undid it")
 	}
-	apply(Refresh{EnrollmentID: id, Epoch: s.team(id).Epoch, Failure: Transient})
+	apply(Refresh{EnrollmentID: id, Epoch: s.Team(id).Epoch, Failure: Transient})
 	if state() != Suspended {
 		t.Fatal("a network failure cleared a suspension")
 	}
-	apply(Refresh{EnrollmentID: id, Epoch: s.team(id).Epoch, Failure: Terminal})
+	apply(Refresh{EnrollmentID: id, Epoch: s.Team(id).Epoch, Failure: Terminal})
 	if state() != Refused {
 		t.Fatalf("two terminal refusals in a row left the team %s", state())
 	}
-	apply(Refresh{EnrollmentID: id, Epoch: s.team(id).Epoch, Policy: ok(2)})
+	apply(Refresh{EnrollmentID: id, Epoch: s.Team(id).Epoch, Policy: ok(2)})
 	if state() != Active {
 		t.Fatal("the daily recheck's success did not restore the team")
 	}
-	if _, err := s.ApplyRefresh(Refresh{EnrollmentID: id, Epoch: s.team(id).Epoch, Policy: ok(1)}); err == nil {
+	if _, err := s.ApplyRefresh(Refresh{EnrollmentID: id, Epoch: s.Team(id).Epoch, Policy: ok(1)}); err == nil {
 		t.Fatal("accepted an older revision")
 	}
-	beforeSignIn := s.team(id).Epoch
+	beforeSignIn := s.Team(id).Epoch
 	apply(Refresh{EnrollmentID: id, Epoch: beforeSignIn, Failure: SignIn})
 	if state() != SignInNeeded {
 		t.Fatal("a refused sign-in did not block the team")
@@ -115,8 +115,8 @@ func TestApplyRefreshKeepsRefusalsInOrder(t *testing.T) {
 		t.Fatal("a success started under the refused sign-in cleared it")
 	}
 	for _, bad := range []Refresh{
-		{EnrollmentID: id, Epoch: s.team(id).Epoch, Policy: &config.Policy{TeamID: "clientco-contractors", Revision: 9, FetchedAt: now}},
-		{EnrollmentID: id, Epoch: s.team(id).Epoch},
+		{EnrollmentID: id, Epoch: s.Team(id).Epoch, Policy: &config.Policy{TeamID: "clientco-contractors", Revision: 9, FetchedAt: now}},
+		{EnrollmentID: id, Epoch: s.Team(id).Epoch},
 	} {
 		if _, err := s.ApplyRefresh(bad); err == nil {
 			t.Errorf("accepted %+v", bad)
@@ -126,7 +126,7 @@ func TestApplyRefreshKeepsRefusalsInOrder(t *testing.T) {
 	s.Deselect(id)
 	again, err := s.Select(team("acme", "acme-platform", "github.com/acme/*"))
 	must(t, err)
-	if apply(Refresh{EnrollmentID: id, Epoch: 0, Failure: Terminal}) || s.team(again).StateAt(now) != Active {
+	if apply(Refresh{EnrollmentID: id, Epoch: 0, Failure: Terminal}) || s.Team(again).StateAt(now) != Active {
 		t.Fatal("an ended enrollment's refresh reached the team ticked again")
 	}
 }

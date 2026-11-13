@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -107,10 +108,7 @@ func locationWords(loc routing.Location) string {
 func explainRoute(w io.Writer, st routing.State, names teamNames, loc routing.Location, now time.Time) {
 	d := routing.NewRouter(st).Route(loc, now)
 	fmt.Fprintf(w, "Location:  %s\n", locationWords(loc))
-	var team *routing.Team
-	if i := slices.IndexFunc(st.Teams, func(t routing.Team) bool { return t.EnrollmentID == d.EnrollmentID }); i >= 0 {
-		team = &st.Teams[i]
-	}
+	team := st.Team(d.EnrollmentID)
 	switch {
 	case d.Outcome == routing.Send:
 		fmt.Fprintf(w, "Goes to:   %s\n", teamLabel(names, *team))
@@ -187,7 +185,7 @@ func routeReasons(st routing.State, names teamNames, loc routing.Location, d rou
 	}
 	if d.Reason == routing.ReasonPersonal {
 		var bound []string
-		for _, k := range sortedBindingKeys(st.Bindings) {
+		for _, k := range slices.Sorted(maps.Keys(st.Bindings)) {
 			if b := st.Bindings[k]; !b.Refused && k != owner && routing.Owner(k) == owner {
 				bound = append(bound, k+" ("+cmp.Or(names.Orgs[b.Organization], b.Organization)+")")
 			}

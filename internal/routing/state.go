@@ -137,7 +137,7 @@ type Refresh struct {
 // refusal or refused sign-in, is discarded, so a success already in flight cannot undo
 // either. A policy whose revision moved backwards is refused.
 func (s *State) ApplyRefresh(r Refresh) (bool, error) {
-	t := s.team(r.EnrollmentID)
+	t := s.Team(r.EnrollmentID)
 	if t == nil || r.Epoch != t.Epoch {
 		return false, nil
 	}
@@ -180,8 +180,8 @@ func (s *State) ApplyRefresh(r Refresh) (bool, error) {
 	return true, nil
 }
 
-// team is the enrollment named id, or nil.
-func (s *State) team(id string) *Team {
+// Team is the selected team whose enrollment is id, or nil.
+func (s *State) Team(id string) *Team {
 	for i := range s.Teams {
 		if s.Teams[i].EnrollmentID == id {
 			return &s.Teams[i]
@@ -241,7 +241,7 @@ func (s *State) Deselect(enrollmentID string) bool {
 
 // Selected reports whether enrollmentID is still selected.
 func (s State) Selected(enrollmentID string) bool {
-	return s.team(enrollmentID) != nil
+	return s.Team(enrollmentID) != nil
 }
 
 // check reports the first way s breaks the shape every reader relies on.

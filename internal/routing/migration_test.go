@@ -13,12 +13,12 @@ func TestOrgAccessLostRefusesAtOnce(t *testing.T) {
 	t.Parallel()
 	s := fixture(t)
 	id := enrollment(t, s, "acme-platform")
-	inFlight := s.team(id).Epoch
+	inFlight := s.Team(id).Epoch
 	at := now.Add(time.Minute)
 	if changed, err := s.ApplyRefresh(Refresh{EnrollmentID: id, Epoch: inFlight, Failure: OrgAccessLost, At: at}); err != nil || !changed {
 		t.Fatalf("ApplyRefresh = %v, %v", changed, err)
 	}
-	tm := s.team(id)
+	tm := s.Team(id)
 	if tm.StateAt(now) != Refused || tm.Refusals != 2 || tm.LastError != OrgAccessLost || !tm.RefusedAt.Equal(at) {
 		t.Fatalf("one ORG_NOT_ACCESSIBLE left %+v", tm)
 	}
@@ -27,18 +27,18 @@ func TestOrgAccessLostRefusesAtOnce(t *testing.T) {
 	}
 	ok := team("acme", "acme-platform", "github.com/acme/*").Policy
 	ok.Revision = 2
-	if changed, _ := s.ApplyRefresh(Refresh{EnrollmentID: id, Epoch: inFlight, Policy: &ok}); changed || s.team(id).StateAt(now) != Refused {
+	if changed, _ := s.ApplyRefresh(Refresh{EnrollmentID: id, Epoch: inFlight, Policy: &ok}); changed || s.Team(id).StateAt(now) != Refused {
 		t.Fatal("a success started before the refusal undid it")
 	}
 
 	// Already Refused: another refusal keeps the time it became so.
-	must(t, applied(s, Refresh{EnrollmentID: id, Epoch: s.team(id).Epoch, Failure: Terminal, At: at.Add(time.Hour)}))
-	if !s.team(id).RefusedAt.Equal(at) {
-		t.Fatalf("RefusedAt moved to %v", s.team(id).RefusedAt)
+	must(t, applied(s, Refresh{EnrollmentID: id, Epoch: s.Team(id).Epoch, Failure: Terminal, At: at.Add(time.Hour)}))
+	if !s.Team(id).RefusedAt.Equal(at) {
+		t.Fatalf("RefusedAt moved to %v", s.Team(id).RefusedAt)
 	}
 	// The daily recheck's success restores the team and clears the time.
-	must(t, applied(s, Refresh{EnrollmentID: id, Epoch: s.team(id).Epoch, Policy: &ok}))
-	if tm := s.team(id); tm.StateAt(now) != Active || !tm.RefusedAt.IsZero() {
+	must(t, applied(s, Refresh{EnrollmentID: id, Epoch: s.Team(id).Epoch, Policy: &ok}))
+	if tm := s.Team(id); tm.StateAt(now) != Active || !tm.RefusedAt.IsZero() {
 		t.Fatalf("after the recheck: %+v", tm)
 	}
 }
@@ -54,21 +54,21 @@ func TestRefusedAtIsWhenTheTeamBecameRefused(t *testing.T) {
 	t.Parallel()
 	s := fixture(t)
 	id := enrollment(t, s, "clientco-contractors")
-	must(t, applied(s, Refresh{EnrollmentID: id, Epoch: s.team(id).Epoch, Failure: Terminal, At: now}))
-	if !s.team(id).RefusedAt.IsZero() {
+	must(t, applied(s, Refresh{EnrollmentID: id, Epoch: s.Team(id).Epoch, Failure: Terminal, At: now}))
+	if !s.Team(id).RefusedAt.IsZero() {
 		t.Fatal("a suspension stamped RefusedAt")
 	}
 	second := now.Add(time.Hour)
-	must(t, applied(s, Refresh{EnrollmentID: id, Epoch: s.team(id).Epoch, Failure: Terminal, At: second}))
-	if tm := s.team(id); tm.StateAt(now) != Refused || !tm.RefusedAt.Equal(second) {
+	must(t, applied(s, Refresh{EnrollmentID: id, Epoch: s.Team(id).Epoch, Failure: Terminal, At: second}))
+	if tm := s.Team(id); tm.StateAt(now) != Refused || !tm.RefusedAt.Equal(second) {
 		t.Fatalf("after two refusals: %+v", tm)
 	}
-	b, err := json.Marshal(s.team(id))
+	b, err := json.Marshal(s.Team(id))
 	must(t, err)
 	if !strings.Contains(string(b), `"refused_at":"2026-11-12T13:00:00Z"`) {
 		t.Fatalf("RefusedAt on the wire: %s", b)
 	}
-	b, err = json.Marshal(s.team(enrollment(t, s, "acme-platform")))
+	b, err = json.Marshal(s.Team(enrollment(t, s, "acme-platform")))
 	must(t, err)
 	if strings.Contains(string(b), "refused_at") {
 		t.Fatalf("a team never refused carries refused_at: %s", b)
