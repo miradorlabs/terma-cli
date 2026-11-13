@@ -84,6 +84,9 @@ type Wait struct {
 }
 
 // Lost reports whether the pass discarded events rather than delivering or holding them.
+// A drop by policy is not loss: neither Withheld, what a team's policy withholds, nor on a
+// migrated machine Discarded, what its team no longer collects, nor Mixed, what a session
+// that crossed organizations carried; `terma spool flush` reports each and succeeds.
 func (r Result) Lost() bool {
 	return r.Expired > 0 || r.Pruned > 0 || r.Dropped > 0 || r.Unroutable > 0
 }

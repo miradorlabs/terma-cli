@@ -18,6 +18,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/delivery"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/routing"
+	"github.com/miradorlabs/terma-cli/internal/runs"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
@@ -138,10 +139,50 @@ func TestDescribeFlushOnAMigratedMachine(t *testing.T) {
 		"holding 3 until their team can send again (run `terma doctor`)",
 		"holding 1 until this machine's routing state can be read (run `terma doctor`)",
 		"dropped 4 their team no longer collects",
-		"dropped 5 from session runs that crossed organizations",
+		"dropped 5 because their session crossed organizations",
 	}
 	if strings.Join(undelivered, "|") != strings.Join(want, "|") {
 		t.Errorf("undelivered =\n  %q\nwant\n  %q", undelivered, want)
+	}
+}
+
+// A flush whose only drops are by policy, an event its team no longer collects and one
+// from a session that crossed organizations, says how many of each it dropped and exits 0,
+// as one that withholds an event by its policy always has; one that drops an event naming
+// no team has lost it, and exits incomplete.
+func TestAFlushThatDropsOnlyByPolicySucceeds(t *testing.T) {
+	routingSandbox(t)
+	acme := migrateForTest(t)
+	host := newIngestHost(t, "ter_srv_acme")
+	if err := keystore.SetTeam(testApp.dir, acme, routeProdProject, "ter_srv_acme", keystore.Hosts{OTLP: host.URL}); err != nil {
+		t.Fatal(err)
+	}
+	s := spoolForTest(t)
+	event := func(session, origin string) spool.Event {
+		return spool.Event{Name: semconv.TermaToolCallEvent, SessionID: session, Time: time.Now(),
+			Repository: config.Repository{Origin: origin}, Profile: config.DefaultProfile, Enrollment: acme}
+	}
+	if err := runs.MarkMixed(testApp.stateDir, "crossed", time.Now().Add(-time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Append(event("s1", "github.com/acme/app"), event("s1", "github.com/dawson/side"), event("crossed", "github.com/acme/app")); err != nil {
+		t.Fatal(err)
+	}
+	out, err := runTerma(t, "spool", "flush")
+	if err != nil {
+		t.Fatalf("a flush that dropped only by policy failed: %v\n%s", err, out)
+	}
+	if !strings.Contains(out, "dropped 1 their team no longer collects") || !strings.Contains(out, "dropped 1 because their session crossed organizations") {
+		t.Fatalf("the report does not name both drops:\n%s", out)
+	}
+	if res := (delivery.Result{Discarded: 1, Mixed: 1}); res.Lost() {
+		t.Error("a drop by policy counts as loss")
+	}
+
+	appendEvent(t, s, "", time.Now())
+	out, err = runTerma(t, "spool", "flush")
+	if code, ok := exitCodeOf(err); !ok || code != ExitIncomplete {
+		t.Fatalf("an event naming no team: err=%v code=%d\n%s", err, code, out)
 	}
 }
 

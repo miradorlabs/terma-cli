@@ -72,7 +72,11 @@ The exit status distinguishes the outcomes a script needs apart:
   2  nothing was attempted: an earlier failure's retry window is open (--force overrides)
   3  the pass ran but left work: events held for a team key or until their
      team can send, or waiting out their team's retry window (--force
-     overrides), or given up on for age, disk pressure, or being unreadable`,
+     overrides), or given up on for age, disk pressure, or being unreadable
+
+Events dropped by policy are reported but are not a failure: those a team's
+policy withholds or no longer collects, and those of a session that crossed
+organizations.`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			res, err := app.flushSpool(cmd.Context(), force, minInterval)
 			if quiet {
@@ -156,7 +160,7 @@ func describeFlush(res delivery.Result) (delivered string, undelivered []string)
 		undelivered = append(undelivered, fmt.Sprintf("dropped %d their team no longer collects", res.Discarded))
 	}
 	if res.Mixed > 0 {
-		undelivered = append(undelivered, fmt.Sprintf("dropped %d from session runs that crossed organizations", res.Mixed))
+		undelivered = append(undelivered, fmt.Sprintf("dropped %d because their session crossed organizations", res.Mixed))
 	}
 	return delivered, undelivered
 }
