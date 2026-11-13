@@ -136,6 +136,9 @@ func postToolUse(ctx context.Context, env hookrun.Env) error {
 	attrs := hookrun.AgentAttrs(map[string]any{}, in.AgentID, in.AgentType)
 	r, err := env.Repo(ctx)
 	if err != nil {
+		// A location Route drops records nothing, but what the call reached still counts
+		// toward its run crossing organizations.
+		env.Classify(ctx, nil, sess, reachedPaths(in, env.Cwd), attrs)
 		return nil
 	}
 	if isClaudeAgentTool(in.ToolName) {
