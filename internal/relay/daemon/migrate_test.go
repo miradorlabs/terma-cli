@@ -16,7 +16,8 @@ import (
 )
 
 // legacyMachine is a relay's state directory on a machine before multi-org routing, with
-// one profile signed in with its team's server key, whose key is in keys.json.
+// one profile signed in with its team's server key, whose key is in keys.json, and whose
+// developer opted in to routing by teams (migrate.OptIn).
 func legacyMachine(t *testing.T) (configDir, stateDir string) {
 	t.Helper()
 	stateDir, _, _ = setUpRelay(t)
@@ -29,7 +30,52 @@ func legacyMachine(t *testing.T) (configDir, stateDir string) {
 	if err := keystore.Set(configDir, "acme-platform", "ter_srv_acme", keystore.Hosts{}); err != nil {
 		t.Fatal(err)
 	}
+	if err := migrate.OptIn(stateDir); err != nil {
+		t.Fatal(err)
+	}
 	return configDir, stateDir
+}
+
+// A relay start on a machine whose developer has not opted in leaves it as it was, and
+// does not wait on it: it asks nothing, records nothing, and is idle at once.
+func TestARelayStartLeavesAMachineNotOptedIn(t *testing.T) {
+	t.Parallel()
+	configDir, stateDir := legacyMachine(t)
+	if err := os.Remove(filepath.Join(stateDir, migrate.OptInFile)); err != nil {
+		t.Fatal(err)
+	}
+	c := runConfig(stateDir, time.Millisecond, nil)
+	c.Migration = &migrate.Machine{ConfigDir: configDir, StateDir: stateDir, FlushWait: time.Second,
+		OrgType: func(context.Context, string, string) (string, error) {
+			t.Error("asked an organization type on a machine not opted in")
+			return migrate.OrgShared, nil
+		}}
+	run(t, c)
+	if config.Migrated(configDir) {
+		t.Fatal("a relay migrated a machine not opted in")
+	}
+	if _, err := os.Stat(filepath.Join(stateDir, routing.StatesDir)); !os.IsNotExist(err) {
+		t.Fatalf("a relay prepared routing states on a machine not opted in: %v", err)
+	}
+	if _, ok := migrate.ReadBlock(stateDir); ok {
+		t.Fatal("a relay recorded why it did not migrate a machine not opted in")
+	}
+}
+
+// With migration automatic (the command line's migrateAutomatically), a relay start
+// migrates a machine whose developer has not opted in.
+func TestARelayStartMigratesAutomatically(t *testing.T) {
+	t.Parallel()
+	configDir, stateDir := legacyMachine(t)
+	if err := os.Remove(filepath.Join(stateDir, migrate.OptInFile)); err != nil {
+		t.Fatal(err)
+	}
+	c := runConfig(stateDir, time.Millisecond, nil)
+	c.Migration = &migrate.Machine{ConfigDir: configDir, StateDir: stateDir, FlushWait: time.Second, Automatic: true}
+	run(t, c)
+	if migrate.Needed(configDir, stateDir) {
+		t.Fatal("an automatic relay start did not migrate")
+	}
 }
 
 // A relay asked to migrate listens first, under today's rules, then migrates beside
@@ -155,6 +201,10 @@ func TestARelayStopsOnAMigrationLeftPartWay(t *testing.T) {
 	c.Idle = time.Millisecond
 	if !config.Migrated(configDir) || !migrate.Needed(configDir, stateDir) {
 		t.Fatal("the test did not leave the migration part way")
+	}
+	// Finished whatever was chosen: the machine collects nothing until it is.
+	if err := os.Remove(filepath.Join(stateDir, migrate.OptInFile)); err != nil {
+		t.Fatal(err)
 	}
 	unlock()
 	run(t, c)

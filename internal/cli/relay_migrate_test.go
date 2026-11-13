@@ -21,6 +21,7 @@ import (
 // legacyPersonalMachine is a machine before multi-org routing, signed in to Beta Labs,
 // which the fake auth host lists as the developer's personal organization, collecting
 // everything with its one team; the agents' hooks files sit in the test's own folders.
+// Its developer opted in to routing by teams (migrate.OptIn).
 func legacyPersonalMachine(t *testing.T) *fakeAuth {
 	t.Helper()
 	f := newFakeAuth(t)
@@ -43,6 +44,9 @@ func legacyPersonalMachine(t *testing.T) *fakeAuth {
 		t.Fatal(err)
 	}
 	if err := keystore.Set(testApp.dir, team, testServerKey, keystore.Hosts{}); err != nil {
+		t.Fatal(err)
+	}
+	if err := migrate.OptIn(testApp.stateDir); err != nil {
 		t.Fatal(err)
 	}
 	return f

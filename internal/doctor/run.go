@@ -40,6 +40,9 @@ type Env struct {
 	// by teams, such as a second terma install its agents' hooks run; nil when nothing
 	// blocks it.
 	MigrationBlocked *MigrationBlock
+	// NotOptedIn: the machine routes by its one team, and its developer has not opted in
+	// to routing by teams, so no relay start moves it (migrate.OptIn).
+	NotOptedIn bool
 }
 
 // Probes reach the event spool and the platform's APIs for a run.

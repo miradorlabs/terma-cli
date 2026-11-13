@@ -161,8 +161,10 @@ func (app *App) undoSetup(ctx context.Context, out io.Writer, keepToken bool) er
 // It keeps what the developer chose and signed in with, as it keeps config.json, the
 // sign-in and keys.json: each profile's routing state (routing.StatesDir), which alone
 // holds the teams selected, their states and the bindings, and is never rebuilt;
-// keys.v2.json; and credentials.v2.json, which marks the machine migrated, so the next
-// setup finds it so rather than a fresh machine. The run ledger (internal/runs) stays
+// keys.v2.json; credentials.v2.json, which marks the machine migrated, so the next
+// setup finds it so rather than a fresh machine; and the developer's opt-in to routing by
+// teams (migrate.OptInFile), which a relay start still owes a machine not yet moved. The
+// run ledger (internal/runs) stays
 // too, pruned of what has expired: a run Mixed before teardown stays Mixed after the
 // next setup until its session starts a new run, which only the ledger remembers.
 func (app *App) removeHookState() error {

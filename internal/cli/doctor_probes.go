@@ -31,8 +31,11 @@ func (app *App) doctorEnv(ctx context.Context) doctor.Env {
 		if config.Migrated(app.dir) {
 			env.Routing = app.routingFacts(env.Config)
 			env.Probes.Keys = app.routedKeys(env.Routing)
-		} else if app.migrationBlocked != nil {
-			env.MigrationBlocked = app.migrationBlocked(app.dir, app.stateDir)
+		} else {
+			env.NotOptedIn = !app.optedIn()
+			if app.migrationBlocked != nil {
+				env.MigrationBlocked = app.migrationBlocked(app.dir, app.stateDir)
+			}
 		}
 	}
 	return env

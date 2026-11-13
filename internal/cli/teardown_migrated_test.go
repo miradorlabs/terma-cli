@@ -34,7 +34,7 @@ func migratedForTeardown(t *testing.T, configDir, stateDir string) string {
 	if err := keystore.Set(configDir, "acme-platform", testServerKey, keystore.Hosts{}); err != nil {
 		t.Fatal(err)
 	}
-	if out, err := migrate.Run(context.Background(), migrate.Machine{ConfigDir: configDir, StateDir: stateDir, FlushWait: time.Second,
+	if out, err := migrate.Run(context.Background(), migrate.Machine{ConfigDir: configDir, StateDir: stateDir, FlushWait: time.Second, Automatic: true,
 		OrgType: func(context.Context, string, string) (string, error) { return migrate.OrgShared, nil }}); err != nil || out != migrate.Committed {
 		t.Fatalf("migrate = %s, %v", out, err)
 	}
