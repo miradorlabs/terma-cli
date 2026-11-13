@@ -4,10 +4,11 @@
 # lists and in a linked worktree of it (which shares the one install in the common git
 # directory), on a machine routing by its one team and on one moved to routing by teams
 # (where the hook reads the profile's routing state and asks Route), and fails when any
-# median exceeds the budget. It also times the post-tool-use hook Claude Code runs on an edit,
-# a read and a shell command; the read's and the shell command's, which run on nearly every
-# tool call, are held to the same budget. The first execution of a freshly written script
-# pays a one-time OS cost (macOS's exec policy check) that no commit after it sees.
+# median exceeds the budget. It also times the hooks Claude Code runs around a tool call: the
+# post-tool-use hook after an edit, and the pre-tool-use hook before a read and a shell
+# command, which runs on nearly every tool call and which Claude Code waits on before the
+# call runs, held to the same budget. The first execution of a freshly written script pays
+# a one-time OS cost (macOS's exec policy check) that no commit after it sees.
 set -eu
 BUDGET_MS="${TERMA_HOOK_BUDGET_MS:-50}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -57,21 +58,21 @@ machine() {
 # median <times>: the 4th of 7.
 median() { echo "$1" | tr ' ' '\n' | grep -v '^$' | sort -n | sed -n 4p; }
 
-# post_tool_use <label> <payload> [budget]: times the post-tool-use hook on payload 7 times,
+# tool_hook <hook> <label> <payload> [budget]: times terma's <hook> hook on payload 7 times,
 # and fails when a budget is given and the median exceeds it.
-post_tool_use() {
+tool_hook() {
   ptimes=""
   i=0
   while [ $i -lt 7 ]; do
     start=$(ms)
-    printf '%s' "$2" | terma hook --user post-tool-use
+    printf '%s' "$3" | terma hook --user "$1"
     end=$(ms)
     ptimes="$ptimes $((end - start))"
     i=$((i + 1))
   done
   pmedian=$(median "$ptimes")
-  echo "post-tool-use, $1: median ${pmedian}ms over 7 runs (${ptimes# })${3:+ — budget ${3}ms}"
-  [ -z "${3:-}" ] || [ "$pmedian" -le "$3" ] || { echo "post-tool-use, $1: over budget" >&2; exit 1; }
+  echo "$1, $2: median ${pmedian}ms over 7 runs (${ptimes# })${4:+ — budget ${4}ms}"
+  [ -z "${4:-}" ] || [ "$pmedian" -le "$4" ] || { echo "$1, $2: over budget" >&2; exit 1; }
 }
 
 # bench <checkout> <slug> <label> <other>: an agent session with a manifest, so the timed path
@@ -100,11 +101,11 @@ bench() {
   median=$(median "$times")
   echo "prepare-commit-msg, $label: median ${median}ms over 7 runs (${times# }) — budget ${BUDGET_MS}ms"
   [ "$median" -le "$BUDGET_MS" ] || { echo "$label: over budget" >&2; exit 1; }
-  # post-tool-use runs the Mixed check (place, the run ledger) on every edit, and now on
-  # every read and shell command too, which only classify what they reach.
-  post_tool_use "Edit, $label" "$(printf '{"session_id":"%s","hook_event_name":"PostToolUse","tool_name":"Edit","tool_input":{"file_path":"%s/src/a.go"},"cwd":"%s"}' "$sid" "$dir" "$dir")"
-  post_tool_use "Read, $label" "$(printf '{"session_id":"%s","hook_event_name":"PostToolUse","tool_name":"Read","tool_input":{"file_path":"%s/NOTES.md"},"cwd":"%s"}' "$sid" "$other" "$dir")" "$BUDGET_MS"
-  post_tool_use "Bash, $label" "$(printf '{"session_id":"%s","hook_event_name":"PostToolUse","tool_name":"Bash","tool_input":{"command":"cd %s && cat NOTES.md src/a.go | grep -c bench > /dev/null; ls -la %s/src"},"cwd":"%s"}' "$sid" "$other" "$dir" "$dir")" "$BUDGET_MS"
+  # post-tool-use runs the Mixed check (place, the run ledger) on every edit; pre-tool-use
+  # runs it before every read and shell command, which only classify what they reach.
+  tool_hook post-tool-use "Edit, $label" "$(printf '{"session_id":"%s","hook_event_name":"PostToolUse","tool_name":"Edit","tool_input":{"file_path":"%s/src/a.go"},"cwd":"%s"}' "$sid" "$dir" "$dir")"
+  tool_hook pre-tool-use "Read, $label" "$(printf '{"session_id":"%s","hook_event_name":"PreToolUse","tool_name":"Read","tool_input":{"file_path":"%s/NOTES.md"},"cwd":"%s"}' "$sid" "$other" "$dir")" "$BUDGET_MS"
+  tool_hook pre-tool-use "Bash, $label" "$(printf '{"session_id":"%s","hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"cd %s && cat NOTES.md src/a.go | grep -c bench > /dev/null; ls -la %s/src"},"cwd":"%s"}' "$sid" "$other" "$dir" "$dir")" "$BUDGET_MS"
 }
 
 machine single

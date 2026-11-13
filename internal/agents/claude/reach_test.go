@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"slices"
-	"strings"
 	"testing"
 	"time"
 
@@ -32,6 +31,8 @@ type reachMachine struct {
 	sp        *spool.Spool
 	st        *routing.State
 	side, api string
+	// stdout is what every hook printed, which Claude Code would read.
+	stdout bytes.Buffer
 }
 
 const reachSession = "reach-session"
@@ -69,7 +70,7 @@ func (m *reachMachine) run(handler func(context.Context, hookrun.Env) error, cwd
 	claimed := false
 	env := hookrun.Env{StateDir: m.stateDir, ConfigDir: m.t.TempDir(), Now: time.Now(), Cwd: cwd, Spool: m.sp,
 		Policy: config.NoPolicy("", ""), Routing: hookrun.NewRouting(hookruntest.RoutedProfile, m.st),
-		Stdin: bytes.NewReader(b), OnClaim: func(string) { claimed = true }}
+		Stdin: bytes.NewReader(b), Stdout: &m.stdout, OnClaim: func(string) { claimed = true }}
 	if err := handler(context.Background(), env); err != nil {
 		m.t.Fatal(err)
 	}
@@ -83,15 +84,29 @@ func (m *reachMachine) start(cwd string) {
 	m.run(sessionStart, cwd, map[string]any{"hook_event_name": "SessionStart", "source": "startup"})
 }
 
-// tool is a call of tool in cwd with input, which reaches terma only where the PostToolUse
-// matcher setup writes lets it, as Claude Code matches it: the whole tool name.
+// tool is a call of tool in cwd with input, as Claude Code runs terma's hooks around it:
+// PreToolUse before it runs, then PostToolUse.
 func (m *reachMachine) tool(cwd, tool string, input map[string]any) {
 	m.t.Helper()
-	i := slices.IndexFunc(claudeHooks, func(h struct{ Event, Matcher, Hook string }) bool { return h.Event == "PostToolUse" })
-	if !regexp.MustCompile(`^(?:` + claudeHooks[i].Matcher + `)$`).MatchString(tool) {
-		return
+	m.before(cwd, tool, input)
+	if hooked("PostToolUse", tool) {
+		m.run(postToolUse, cwd, map[string]any{"hook_event_name": "PostToolUse", "tool_name": tool, "tool_input": input, "tool_use_id": "toolu_1"})
 	}
-	m.run(postToolUse, cwd, map[string]any{"hook_event_name": "PostToolUse", "tool_name": tool, "tool_input": input, "tool_use_id": "toolu_1"})
+}
+
+// before is what terma sees of a call of tool before it runs: its PreToolUse hook.
+func (m *reachMachine) before(cwd, tool string, input map[string]any) {
+	m.t.Helper()
+	if hooked("PreToolUse", tool) {
+		m.run(preToolUse, cwd, map[string]any{"hook_event_name": "PreToolUse", "tool_name": tool, "tool_input": input, "tool_use_id": "toolu_1"})
+	}
+}
+
+// hooked reports whether terma's entry for event runs for tool: whether the matcher setup
+// writes matches it as Claude Code matches it, the whole tool name.
+func hooked(event, tool string) bool {
+	i := slices.IndexFunc(claudeHooks, func(h struct{ Event, Matcher, Hook string }) bool { return h.Event == event })
+	return i >= 0 && regexp.MustCompile(`^(?:`+claudeHooks[i].Matcher+`)$`).MatchString(tool)
 }
 
 // mixed reports whether the session's run is Mixed, in the run ledger and its placement alike.
@@ -138,7 +153,8 @@ func TestRoutedClaudeReadsAndSearchesReachingAcmeMakeTheRunMixed(t *testing.T) {
 	}
 }
 
-// A shell command reaches the paths it names that are there, and every cd's target.
+// A shell command reaches the paths it names that are there, a command substitution's
+// included, and every cd's target, and a relative path after a cd resolves where it went.
 func TestRoutedClaudeShellCommandsReachingAcmeMakeTheRunMixed(t *testing.T) {
 	for name, tc := range map[string]struct {
 		command func(m *reachMachine) string
@@ -148,6 +164,8 @@ func TestRoutedClaudeShellCommandsReachingAcmeMakeTheRunMixed(t *testing.T) {
 		"a cd into Acme's checkout":         {func(*reachMachine) string { return "cd ../acme-api && ls" }, true},
 		"a listing of its own checkout":     {func(*reachMachine) string { return "ls -la" }, false},
 		"a path that is not there, in Acme": {func(*reachMachine) string { return "cat ../acme-api/MISSING.md" }, false},
+		"a read inside a substitution":      {func(*reachMachine) string { return `echo "$(cat ../acme-api/NOTES.md)"` }, true},
+		"a relative path after a cd out":    {func(*reachMachine) string { return "cd .. && cat acme-api/NOTES.md" }, true},
 	} {
 		t.Run(name, func(t *testing.T) {
 			m := newReachMachine(t)
@@ -155,6 +173,46 @@ func TestRoutedClaudeShellCommandsReachingAcmeMakeTheRunMixed(t *testing.T) {
 			m.tool(m.side, "Bash", map[string]any{"command": tc.command(m), "description": name})
 			if got := m.mixed(); got != tc.mixed {
 				t.Fatalf("Mixed %v, want %v", got, tc.mixed)
+			}
+		})
+	}
+}
+
+// A read, a search or a shell command is classified before it runs, by the PreToolUse hook
+// alone: reaching Acme's checkout turns the run Mixed before the call's own result exists,
+// so that result is dropped with the run. The hook prints nothing, which Claude Code would
+// read as a decision on the call. Only edits and the Agent tool reach PostToolUse.
+func TestRoutedClaudeReadsAreClassifiedBeforeTheyRun(t *testing.T) {
+	for _, tool := range []string{"Read", "Grep", "Glob", "NotebookRead", "LS", "Bash"} {
+		if !hooked("PreToolUse", tool) || hooked("PostToolUse", tool) {
+			t.Errorf("%s: PreToolUse %v, PostToolUse %v; want only before it runs", tool, hooked("PreToolUse", tool), hooked("PostToolUse", tool))
+		}
+	}
+	for _, tool := range []string{"Edit", "Write", "MultiEdit", "NotebookEdit", "Agent", "Task"} {
+		if hooked("PreToolUse", tool) || !hooked("PostToolUse", tool) {
+			t.Errorf("%s: PreToolUse %v, PostToolUse %v; want only after it runs", tool, hooked("PreToolUse", tool), hooked("PostToolUse", tool))
+		}
+	}
+	for tool, input := range map[string]func(m *reachMachine) map[string]any{
+		"Read": func(m *reachMachine) map[string]any {
+			return map[string]any{"file_path": filepath.Join(m.api, "NOTES.md")}
+		},
+		"Bash": func(*reachMachine) map[string]any { return map[string]any{"command": "cat ../acme-api/NOTES.md"} },
+	} {
+		t.Run(tool, func(t *testing.T) {
+			m := newReachMachine(t)
+			m.start(m.side)
+			m.spooled()
+			before := time.Now()
+			m.before(m.side, tool, input(m))
+			if !m.mixed() {
+				t.Fatal("not Mixed before the call reaching Acme's checkout ran")
+			}
+			if from, _ := runs.MixedAt(m.stateDir, reachSession, time.Time{}); from.After(time.Now()) || from.Before(before) {
+				t.Fatalf("Mixed from %v, want the PreToolUse hook's time", from)
+			}
+			if evs := m.spooled(); len(evs) != 0 || m.stdout.Len() != 0 {
+				t.Fatalf("the PreToolUse hook spooled %s and printed %q", hookruntest.Names(evs), m.stdout.String())
 			}
 		})
 	}
@@ -227,9 +285,23 @@ func TestRoutedClaudeSessionInADroppedFolderStillRecordsWhatItReached(t *testing
 	}
 }
 
-// An upgrade rewrites the PostToolUse matcher an earlier setup wrote, running the terma it
-// ran, so reads and shell commands reach the hook with no new setup; it never installs.
-func TestRefreshRewritesAnOlderPostToolUseMatcher(t *testing.T) {
+// An upgrade rewrites the tool hooks an earlier setup wrote, running the terma it ran: a
+// PostToolUse matcher that took reads and shell commands, or none of them, loses them, and
+// they gain the PreToolUse entry, so they are classified before they run with no new setup.
+// It never installs.
+func TestRefreshMovesReadsAndShellCommandsToPreToolUse(t *testing.T) {
+	for name, olderPost := range map[string]string{
+		"reads after they ran": "Edit|Write|MultiEdit|NotebookEdit|Agent|Task|Read|Grep|Glob|NotebookRead|LS|Bash",
+		"no reads":             "Edit|Write|MultiEdit|NotebookEdit|Agent|Task",
+	} {
+		t.Run(name, func(t *testing.T) { refreshesOlderToolHooks(t, olderPost) })
+	}
+}
+
+// refreshesOlderToolHooks writes terma's hooks as a build with olderPost for its PostToolUse
+// matcher and no PreToolUse entry did, then refreshes them.
+func refreshesOlderToolHooks(t *testing.T, olderPost string) {
+	t.Helper()
 	dir := t.TempDir()
 	t.Setenv("CLAUDE_CONFIG_DIR", dir)
 	plan, err := planUserHooks(dir, testCommand, true)
@@ -239,13 +311,15 @@ func TestRefreshRewritesAnOlderPostToolUseMatcher(t *testing.T) {
 	if err := hookmgr.Apply(dir, plan); err != nil {
 		t.Fatal(err)
 	}
-	i := slices.IndexFunc(claudeHooks, func(h struct{ Event, Matcher, Hook string }) bool { return h.Event == "PostToolUse" })
-	current := hookruntest.ReadFile(t, dir, "settings.json")
-	older := strings.Replace(current, `"`+claudeHooks[i].Matcher+`"`, `"Edit|Write|MultiEdit|NotebookEdit|Agent|Task"`, 1)
-	if older == current {
-		t.Fatal("no PostToolUse matcher to make older")
+	var settings map[string]any
+	if err := json.Unmarshal([]byte(hookruntest.ReadFile(t, dir, "settings.json")), &settings); err != nil {
+		t.Fatal(err)
 	}
-	hookruntest.WriteFile(t, dir, "settings.json", older)
+	hooks := settings["hooks"].(map[string]any)
+	delete(hooks, "PreToolUse")
+	hooks["PostToolUse"].([]any)[0].(map[string]any)["matcher"] = olderPost
+	older, _ := json.MarshalIndent(settings, "", "  ")
+	hookruntest.WriteFile(t, dir, "settings.json", string(older)+"\n")
 
 	path, changed, err := Agent{ConfigDir: t.TempDir()}.RefreshMachine()
 	if err != nil || !changed || path != filepath.Join(dir, "settings.json") {
@@ -254,13 +328,21 @@ func TestRefreshRewritesAnOlderPostToolUseMatcher(t *testing.T) {
 	var doc struct {
 		Hooks map[string][]struct {
 			Matcher string `json:"matcher"`
+			Hooks   []struct {
+				Command string `json:"command"`
+			} `json:"hooks"`
 		} `json:"hooks"`
 	}
 	if err := json.Unmarshal([]byte(hookruntest.ReadFile(t, dir, "settings.json")), &doc); err != nil {
 		t.Fatal(err)
 	}
-	if got := doc.Hooks["PostToolUse"]; len(got) != 1 || got[0].Matcher != claudeHooks[i].Matcher {
-		t.Fatalf("PostToolUse after the refresh: %+v", got)
+	for _, h := range claudeHooks {
+		if h.Event != "PreToolUse" && h.Event != "PostToolUse" {
+			continue
+		}
+		if got := doc.Hooks[h.Event]; len(got) != 1 || got[0].Matcher != h.Matcher || got[0].Hooks[0].Command != testCommand(h.Hook) {
+			t.Fatalf("%s after the refresh: %+v", h.Event, got)
+		}
 	}
 	if again, _ := planUserHooks(dir, testCommand, true); !again.Empty() {
 		t.Fatal("the refreshed entries are not this build's, running the terma setup named")

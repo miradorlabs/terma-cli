@@ -211,17 +211,15 @@ func (p *recheck) TeamWaits() (relay.Rechecked, bool) {
 	return relay.Rechecked{Verdict: relay.Wait, Why: relay.WhyBlocked, Blocker: "team:" + p.enrollment}, true
 }
 
-// Entry judges a queued entry: one attributed through its run is dropped once the run was
-// Mixed by its time (the run ledger), then routing.Router.Recheck decides.
+// Entry judges a queued entry: it is dropped once its run was Mixed by its time (the run
+// ledger), since telemetry is content (runs.Locational), then routing.Router.Recheck decides.
 func (p *recheck) Entry(q relay.Queued) relay.Rechecked {
 	st, router, ok := p.st, p.router, p.ok
 	if !ok {
 		return relay.Rechecked{Verdict: relay.Wait, Why: relay.WhyNoState}
 	}
-	if !q.Own {
-		if _, mixed := p.mixedAt(q.Session, q.At); mixed {
-			return relay.Rechecked{Verdict: relay.Discard, Why: relay.WhyMixed, Blocker: mixedBlocker(q.Session)}
-		}
+	if _, mixed := p.mixedAt(q.Session, q.At); mixed {
+		return relay.Rechecked{Verdict: relay.Discard, Why: relay.WhyMixed, Blocker: mixedBlocker(q.Session)}
 	}
 	loc := routing.Location{Kind: routing.LocationKind(q.Kind), Repository: q.Repository, Narrow: q.Narrow}
 	v, d := router.Recheck(routing.Destination{EnrollmentID: q.Enrollment, Location: loc}, p.now)
@@ -249,7 +247,7 @@ func (t *Teams) Selected(enrollment string) bool {
 }
 
 // Legacy maps a part queued before the migration for project to its cutover enrollment
-// (routing.Migration.Legacy), as a record with a location of its own: it has no run. While
+// (routing.Migration.Legacy), by the location its claim named: it has no session run. While
 // the routing state cannot be read, as between the migration marking the machine migrated
 // and its commit, the part is mapped to no enrollment yet, and waits.
 func (t *Teams) Legacy(project string, repo config.Repository) (relay.Queued, bool) {
@@ -265,7 +263,7 @@ func (t *Teams) Legacy(project string, repo config.Repository) (relay.Queued, bo
 	if enrollment == "" || tm == nil {
 		return relay.Queued{}, false
 	}
-	q := relay.Queued{Enrollment: enrollment, Project: tm.TeamID, Kind: string(routing.Unknown), Narrow: true, Own: true}
+	q := relay.Queued{Enrollment: enrollment, Project: tm.TeamID, Kind: string(routing.Unknown), Narrow: true}
 	if repo.Origin != "" {
 		q.Kind, q.Repository, q.Narrow = string(routing.Repository), repo.Origin, false
 	}

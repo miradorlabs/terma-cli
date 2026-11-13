@@ -51,8 +51,8 @@ type Event struct {
 	// Run is the session run the event belongs to (internal/runs).
 	Run string `json:"run,omitempty"`
 	// OwnLocation is set when the event's location is its own, as a file event's checkout
-	// or the directory an agent's turn names is, rather than its run's: its run turning
-	// Mixed does not drop it.
+	// or the directory an agent's turn names is, rather than its run's. Its run turning
+	// Mixed still drops it unless it carries no content (runs.Locational).
 	OwnLocation bool `json:"own_location,omitempty"`
 }
 

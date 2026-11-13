@@ -11,7 +11,8 @@ import (
 // turn names, once per directory: a thread resumed in a collected repository still holds
 // its earlier turns, which a hook there reads, and those stay on the machine when nothing
 // collects where they ran. On a migrated machine a turn's directory is also the location
-// of what it recorded, which routes by it rather than by the session's run.
+// of what it recorded, which routes by it rather than by the session's run. What a turn
+// recorded is content, so the run turning Mixed still drops it (runs.Locational).
 type Turns struct {
 	ctx    context.Context
 	env    Env
@@ -43,8 +44,9 @@ func (t *Turns) Admits(cwd string) bool {
 }
 
 // Routed is ev, read from a turn in cwd, as Env.Routed has it spooled, except that on a
-// migrated machine its location is its own: cwd's, with the destination Route gave cwd. An
-// event read from no turn, cwd "", is attributed through the session's run, at r.
+// migrated machine its location is its own: cwd's, with the destination Route gave cwd. It
+// still names the session's run, whose Mixed state drops it as any content. An event read
+// from no turn, cwd "", is attributed through the session's run, at r.
 func (t *Turns) Routed(r *Repo, cwd string, ev spool.Event) spool.Event {
 	if t.env.Routing == nil || cwd == "" {
 		return t.env.Routed(r, ev)
