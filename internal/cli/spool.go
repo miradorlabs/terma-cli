@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/miradorlabs/terma-cli/internal/account/auth"
 	"github.com/miradorlabs/terma-cli/internal/account/keystore"
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/config"
@@ -217,17 +218,21 @@ func (app *App) flushSpool(ctx context.Context, force bool, minInterval time.Dur
 }
 
 // enrolledUser is teamUser on a migrated machine: who what terma sends with the key of team,
-// an enrollment in profile's routing state, to endpoint names. It is profile's signed-in
-// user, only while signed in to that team's organization in its environment, and only for
-// a key going to the profile's own ingest and filed, if with hosts at all, with the
-// profile's API host; anything else names no one.
+// an enrollment in profile's routing state, to endpoint names. It is the user profile's
+// sign-in to that team's organization names, active or not, in the team's environment, and
+// only for a key going to the profile's own ingest and filed, if with hosts at all, with the
+// profile's API host; a profile set up with a server key, and anything else, names no one.
+// It reads the credentials index alone, never the keychain: a flush must not prompt.
 func (app *App) enrolledUser(profile string, team routing.Team, hosts keystore.Hosts, endpoint string) string {
 	cfg, err := config.Load(app.dir, app.stateDir, config.Overrides{Profile: profile, Env: app.flags.env, APIURL: app.flags.apiURL, OTLPURL: app.flags.otlpURL})
-	if err != nil || !sameHost(endpoint, cfg.OTLPURL) || hosts.API != "" && !sameHost(hosts.API, cfg.APIURL) {
+	if err != nil || cfg.ServerKeySignIn || !sameHost(endpoint, cfg.OTLPURL) || hosts.API != "" && !sameHost(hosts.API, cfg.APIURL) {
 		return ""
 	}
-	cfg.OrganizationID, cfg.AuthURL = team.OrganizationID, team.AuthURL
-	return signedInUser(cfg)
+	cred, err := auth.LoadIdentityFor(cfg.Dir, cfg.ProfileName, team.OrganizationID)
+	if err != nil || cred.CheckEnvironment(team.AuthURL) != nil {
+		return ""
+	}
+	return cred.UserID
 }
 
 var errTornDown = errors.New("terma is not set up on this machine; run `terma setup`")
