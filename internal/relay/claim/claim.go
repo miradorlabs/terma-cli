@@ -37,12 +37,16 @@ const Refresh = 5 * time.Minute
 const markRefresh = TTL / 2
 
 // Claim says which project a session's telemetry belongs to; its top-level fields are the latest placement.
-// An empty ProjectID is a run in a working copy the team does not collect (Mark).
+// An empty ProjectID with no Kind is a run in a working copy the team does not collect (Mark).
 type Claim struct {
 	ProjectID string `json:"project_id"`
-	Tool      string `json:"tool,omitempty"`
-	Repo      string `json:"repo,omitempty"`
-	Worktree  string `json:"worktree,omitempty"`
+	// Kind is the latest placement's (Placement.Kind).
+	Kind Kind `json:"kind,omitempty"`
+	// Run is the latest placement's (Placement.Run).
+	Run      string `json:"run,omitempty"`
+	Tool     string `json:"tool,omitempty"`
+	Repo     string `json:"repo,omitempty"`
+	Worktree string `json:"worktree,omitempty"`
 	// Repository is the working copy as admission names it; the relay rechecks it.
 	Repository config.Repository `json:"repository,omitzero"`
 	// Root is the working tree the claiming hook ran in, "" outside git: what the relay
@@ -63,14 +67,41 @@ type Claim struct {
 	// Placements are where the session has run, oldest first: an agent can keep a session id
 	// across resumes in another repository, and the first run's late records stay its own.
 	Placements []Placement `json:"placements,omitempty"`
+	// Evicted is set once a placement has been dropped to keep maxPlacements, after which
+	// a record older than every kept placement is no longer known to be theirs (At).
+	Evicted bool `json:"evicted,omitempty"`
 }
 
-// Placement is one run of a session in one repository.
+// Kind is what a placement's location is.
+type Kind string
+
+// Placement kinds. A placement with no kind is a legacy one, as written before kinds:
+// with a project it is a run in a repository the team collects, and with none it was
+// written by Mark and means "not collected" everywhere, never "outside git".
+const (
+	// KindRepository is a run in a git checkout, located by its Repository whether or not
+	// anything collects it.
+	KindRepository Kind = "repository"
+	// KindOutsideGit is a run in a directory outside any checkout, located by its Cwd.
+	KindOutsideGit Kind = "outside_git"
+	// KindMixed is a run that has crossed organizations: it only ever turns on within a
+	// run, and its records are dropped.
+	KindMixed Kind = "mixed"
+)
+
+// Placement is one run of a session in one location: a repository, or a directory
+// outside git.
 type Placement struct {
 	ProjectID string `json:"project_id"`
-	Tool      string `json:"tool,omitempty"`
-	Repo      string `json:"repo,omitempty"`
-	Worktree  string `json:"worktree,omitempty"`
+	// Kind is what the location is; "" for a legacy placement. A placement with a kind
+	// may name no project: a location alone, for routing to decide.
+	Kind Kind `json:"kind,omitempty"`
+	// Run is the session run the placement belongs to (internal/runs); "" when the hook
+	// named none.
+	Run      string `json:"run,omitempty"`
+	Tool     string `json:"tool,omitempty"`
+	Repo     string `json:"repo,omitempty"`
+	Worktree string `json:"worktree,omitempty"`
 	// Repository is Claim.Repository for this run.
 	Repository config.Repository `json:"repository,omitzero"`
 	// Root is Claim.Root for this run.
@@ -107,31 +138,8 @@ func (c Claim) placements() []Placement {
 	if len(c.Placements) > 0 {
 		return c.Placements
 	}
-	return []Placement{{ProjectID: c.ProjectID, Tool: c.Tool, Repo: c.Repo, Worktree: c.Worktree, Repository: c.Repository, Root: c.Root, Cwd: c.Cwd,
-		Remote: c.Remote, Branch: c.Branch, PIDs: c.PIDs}}
-}
-
-// At is the claim as it applies to a record pid sent at time at: the covering placement
-// latest to start by at, whose ProjectID it carries, empty for one Mark wrote. False when
-// no placement covers pid.
-func (c Claim) At(pid int, at time.Time) (Claim, bool) {
-	var best *Placement
-	all := c.placements()
-	for i := range all {
-		p := &all[i]
-		if !covers(p.PIDs, pid) {
-			continue
-		}
-		if best == nil || at.IsZero() || !p.Since.After(at) {
-			best = p
-		}
-	}
-	if best == nil {
-		return Claim{}, false
-	}
-	return Claim{ProjectID: best.ProjectID, Tool: best.Tool, Repo: best.Repo, Worktree: best.Worktree,
-		Repository: best.Repository, Root: best.Root, Cwd: best.Cwd, Remote: best.Remote, Branch: best.Branch,
-		PIDs: best.PIDs, ClaimedAt: c.ClaimedAt, Placements: c.Placements}, true
+	return []Placement{{ProjectID: c.ProjectID, Kind: c.Kind, Run: c.Run, Tool: c.Tool, Repo: c.Repo, Worktree: c.Worktree, Repository: c.Repository,
+		Root: c.Root, Cwd: c.Cwd, Remote: c.Remote, Branch: c.Branch, PIDs: c.PIDs}}
 }
 
 // Dir is the relay directory under the state directory dir.
@@ -164,8 +172,11 @@ var lockWait = 250 * time.Millisecond
 // Write merges c into sessionID's claim under the state directory dir, unless a fresh one already names its processes,
 // and reports whether it wrote; a hook never fails for want of a claim. The merge runs
 // under a sidecar lock: unlocked, 14 of 16 concurrent writers' processes were lost.
+// c names a project, or, with a Kind, may name a location alone. Once the latest
+// placement is Mixed, a write of another kind replaces it only for a new run, and never
+// when the lock could not be had.
 func Write(dir, sessionID string, c Claim, now time.Time) bool {
-	if c.ProjectID == "" {
+	if c.ProjectID == "" && c.Kind == "" {
 		return false
 	}
 	return write(dir, sessionID, c, now)
@@ -180,7 +191,7 @@ func Mark(dir, sessionID, tool string, pids []int, now time.Time) bool {
 
 func write(dir, sessionID string, c Claim, now time.Time) bool {
 	refresh := Refresh
-	if c.ProjectID == "" {
+	if c.ProjectID == "" && c.Kind == "" {
 		refresh = markRefresh
 	}
 	p, ok := path(dir, sessionID)
@@ -188,7 +199,7 @@ func write(dir, sessionID string, c Claim, now time.Time) bool {
 		return false
 	}
 	// The fast path needs no lock: a fresh claim already naming these processes.
-	if prev, ok := read(p); ok && samePlace(prev, c) && sameDirs(prev, c) && subset(c.PIDs, prev.PIDs) {
+	if prev, ok := read(p); ok && samePlace(prev, c) && sameDirs(prev, c) && subset(c.PIDs, prev.PIDs) && sameRun(prev, c) {
 		if info, err := os.Stat(p); err == nil && now.Sub(info.ModTime()) < refresh {
 			return false
 		}
@@ -199,16 +210,20 @@ func write(dir, sessionID string, c Claim, now time.Time) bool {
 	ctx, cancel := context.WithTimeout(context.Background(), lockWait)
 	unlock, err := flock.Lock(ctx, p+".lock")
 	cancel()
-	if err == nil {
+	locked := err == nil
+	if locked {
 		defer unlock()
 	}
 	now = now.UTC()
 	prev, havePrev := read(p)
+	if havePrev && staysMixed(prev, c, locked) {
+		return false
+	}
 	placements := []Placement{}
 	switch {
 	case !havePrev:
 	case samePlace(prev, c):
-		if info, err := os.Stat(p); err == nil && now.Sub(info.ModTime()) < refresh && sameDirs(prev, c) && subset(c.PIDs, prev.PIDs) {
+		if info, err := os.Stat(p); err == nil && now.Sub(info.ModTime()) < refresh && sameDirs(prev, c) && subset(c.PIDs, prev.PIDs) && sameRun(prev, c) {
 			return false
 		}
 		c.PIDs = merge(prev.PIDs, c.PIDs)
@@ -217,6 +232,9 @@ func write(dir, sessionID string, c Claim, now time.Time) bool {
 		}
 		if c.Cwd == "" {
 			c.Cwd = prev.Cwd
+		}
+		if c.Run == "" {
+			c.Run = prev.Run
 		}
 		placements = prev.placements()
 		placements = placements[:len(placements)-1]
@@ -227,10 +245,12 @@ func write(dir, sessionID string, c Claim, now time.Time) bool {
 	if havePrev && samePlace(prev, c) {
 		since = prev.placements()[len(prev.placements())-1].Since
 	}
-	placements = append(placements, Placement{ProjectID: c.ProjectID, Tool: c.Tool, Repo: c.Repo, Worktree: c.Worktree, Repository: c.Repository,
-		Root: c.Root, Cwd: c.Cwd, Remote: c.Remote, Branch: c.Branch, PIDs: c.PIDs, Since: since})
+	placements = append(placements, Placement{ProjectID: c.ProjectID, Kind: c.Kind, Run: c.Run, Tool: c.Tool, Repo: c.Repo, Worktree: c.Worktree,
+		Repository: c.Repository, Root: c.Root, Cwd: c.Cwd, Remote: c.Remote, Branch: c.Branch, PIDs: c.PIDs, Since: since})
+	c.Evicted = havePrev && prev.Evicted
 	if len(placements) > maxPlacements {
 		placements = placements[len(placements)-maxPlacements:]
+		c.Evicted = true
 	}
 	c.Placements = placements
 	c.ClaimedAt = now
@@ -244,9 +264,29 @@ func write(dir, sessionID string, c Claim, now time.Time) bool {
 // samePlace reports whether c continues prev's latest run. Another working tree of the same
 // repository, or another directory in it, is the same run, whose Root and Cwd are rewritten in
 // place: a placement decides where records go, and a session switching between worktrees must
-// never push an earlier one out.
+// never push an earlier one out. Outside git the directory is the location, so another is
+// another place.
 func samePlace(prev, c Claim) bool {
-	return prev.ProjectID == c.ProjectID && prev.Repository == c.Repository
+	if prev.Kind != c.Kind || prev.ProjectID != c.ProjectID || prev.Repository != c.Repository {
+		return false
+	}
+	return c.Kind != KindOutsideGit || prev.Cwd == c.Cwd
+}
+
+// sameRun reports whether c names no run or prev's, so a fresh claim needs no rewrite.
+func sameRun(prev, c Claim) bool {
+	return c.Run == "" || c.Run == prev.Run
+}
+
+// staysMixed reports whether c must not replace prev's latest placement because it is
+// Mixed: Mixed only turns on within a run. Only a write naming another run, made under
+// the lock, may replace it. A write naming no run cannot tell whether its run is new, and
+// one made without the lock could undo a crossing a concurrent hook is recording.
+func staysMixed(prev, c Claim, locked bool) bool {
+	if prev.Kind != KindMixed || c.Kind == KindMixed {
+		return false
+	}
+	return !locked || c.Run == "" || c.Run == prev.Run
 }
 
 // sameDirs reports whether c names the working tree, directory, worktree, remote and branch
