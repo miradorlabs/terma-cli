@@ -57,6 +57,8 @@ const exitBeatWait = 3 * time.Second
 // exit is the last heartbeat's terma.relay.exit.reason for this run's end.
 func (r stopReason) exit(err error) string {
 	switch {
+	case r == stopUnfinished:
+		return semconv.TermaRelayExitReasonMigrationUnfinished
 	case err != nil:
 		return semconv.TermaRelayExitReasonServeFailed
 	case r == stopReplaced:
