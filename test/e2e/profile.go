@@ -159,7 +159,7 @@ var captureScenarioName = regexp.MustCompile(`^Test[A-Za-z0-9]*?(Profile|Probe)`
 // take a capture that lost a scenario for whole.
 func scenarioOfBuild(t *testing.T, b Binary) {
 	t.Helper()
-	scenarioOfBuild(t, b)
+	scenarioOf(t, b.Harness)
 	if scenario, _, _ := strings.Cut(t.Name(), "/"); captureScenarioName.MatchString(scenario) {
 		t.Cleanup(func() {
 			if t.Failed() {

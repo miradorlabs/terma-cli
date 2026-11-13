@@ -220,7 +220,10 @@ func TestFailedCaptureScenarioOffline(t *testing.T) {
 	}
 	b := Binary{Harness: "zz", Version: "9.9.9"}
 	t.Run("zz", func(t *testing.T) {
-		scenarioOf(t, "zz")
+		scenarioOfBuild(t, b)
+		if harnessOf(t) != "zz" {
+			t.Errorf("scenarioOfBuild did not make t a scenario of zz")
+		}
 		t.Cleanup(func() {
 			profilesMu.Lock()
 			delete(profiles, profileID{"zz", "9.9.9", "TestFailedCaptureScenarioOffline"})
