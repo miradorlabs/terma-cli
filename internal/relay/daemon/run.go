@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"net"
 	"net/http"
 	"os"
@@ -17,6 +18,8 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/migrate"
 	"github.com/miradorlabs/terma-cli/internal/relay"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
+	"github.com/miradorlabs/terma-cli/internal/runs"
+	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
 // Config is what a relay runs with.
@@ -204,6 +207,8 @@ func Run(ctx context.Context, c Config) (Result, error) {
 	for _, w := range c.Workers {
 		workers.Go(func() { w(engineCtx) })
 	}
+	// Then hourly with the claims (watch); it reads both queues, so not on the start path.
+	workers.Go(func() { pruneRuns(c.StateDir, r, time.Now()) })
 	updated := make(chan Pass, 1)
 	if c.Updater != nil {
 		u := *c.Updater
@@ -315,4 +320,28 @@ func listen(dir, addr string) (net.Listener, error) {
 	}
 	_ = os.Remove(filepath.Join(dir, ErrorFile))
 	return ln, nil
+}
+
+// pruneRuns prunes the run ledger (runs.Prune) beside the claims, keeping every session a
+// record still queued names: in the relay's outbox, and in the spool. While either cannot
+// be read it prunes nothing, since a ledger pruned under a queued record would let it go.
+func pruneRuns(stateDir string, r *relay.Relay, now time.Time) {
+	queued, err := r.QueuedSessions()
+	if err != nil {
+		return
+	}
+	sp, err := spool.Open(filepath.Join(stateDir, spool.Dir))
+	if err != nil {
+		return
+	}
+	events, err := sp.Peek(math.MaxInt)
+	if err != nil {
+		return
+	}
+	for _, e := range events {
+		if e.SessionID != "" {
+			queued[e.SessionID] = true
+		}
+	}
+	runs.Prune(stateDir, now, queued)
 }

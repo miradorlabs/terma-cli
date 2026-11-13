@@ -266,11 +266,15 @@ func TestMixedListsTheSessionsThatCrossed(t *testing.T) {
 	must(t, MarkMixed(dir, "resumed", t0.Add(time.Minute)))
 	start(t, dir, "resumed", t0.Add(time.Hour))
 	must(t, os.WriteFile(filepath.Join(dir, Dir, ".tmp-x.json"), []byte("{"), 0o600))
-	if got := Mixed(dir, t0.Add(2*time.Hour)); len(got) != 1 || got[0] != "crossed" {
-		t.Fatalf("Mixed = %v", got)
+	if got, older := Mixed(dir, t0.Add(2*time.Hour), 24*time.Hour); len(got) != 1 || got[0] != "crossed" || older != 0 {
+		t.Fatalf("Mixed = %v, %d older", got, older)
 	}
-	if got := Mixed(t.TempDir(), t0); got != nil {
-		t.Fatalf("Mixed with no ledger = %v", got)
+	if got, older := Mixed(t.TempDir(), t0, 24*time.Hour); got != nil || older != 0 {
+		t.Fatalf("Mixed with no ledger = %v, %d older", got, older)
+	}
+	// Doctor names only the runs active lately, and counts the others.
+	if got, older := Mixed(dir, t0.Add(48*time.Hour), 24*time.Hour); len(got) != 0 || older != 1 {
+		t.Fatalf("a day later, Mixed = %v, %d older", got, older)
 	}
 }
 

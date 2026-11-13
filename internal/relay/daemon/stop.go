@@ -133,6 +133,7 @@ func watch(ctx context.Context, r *relay.Relay, stateDir string, idle time.Durat
 		}
 		if time.Since(lastPrune) > time.Hour {
 			claim.Prune(stateDir, time.Now())
+			pruneRuns(stateDir, r, time.Now())
 			lastPrune = time.Now()
 		}
 		if d, quiet := r.Idle(); quiet && idle > 0 && d >= idle && migrated == nil {

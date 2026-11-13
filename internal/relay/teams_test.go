@@ -539,6 +539,28 @@ func TestAPartQueuedBeforeTheMigrationWaitsForItsCommit(t *testing.T) {
 	}
 }
 
+// The outbox names every session whose parts it still queues, for the run ledger to keep
+// (runs.Prune); a part queued before the migration names none.
+func TestQueuedSessionsNameEachQueuedRun(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	r := newRelay(Options{Dir: dir, Token: token})
+	o := outbox{dir: dir}
+	for i, q := range []Queued{{Enrollment: "e-acme", Session: "s1"}, {Enrollment: "e-acme", Session: "agent-2"}, {Enrollment: "e-personal", Session: "s3"}, {Enrollment: "e-personal"}} {
+		if err := o.putTeam(teamRoute{enrollment: q.Enrollment, tool: "claude-code"}, q, newEntry(time.Unix(int64(i), 0), Logs, 1), []byte("x")); err != nil {
+			t.Fatal(err)
+		}
+	}
+	c := claim.Claim{ProjectID: "acme", Repository: config.Repository{Origin: "github.com/acme/api"}}
+	if err := o.put(routeOf(c), c.Repository, newEntry(time.Unix(9, 0), Logs, 1), []byte("x")); err != nil {
+		t.Fatal(err)
+	}
+	got, err := r.QueuedSessions()
+	if err != nil || len(got) != 3 || !got["s1"] || !got["agent-2"] || !got["s3"] {
+		t.Fatalf("QueuedSessions = %v, %v", got, err)
+	}
+}
+
 // A relay that restarts sends what an enrollment's queue held, with its destination.
 func TestAnEnrollmentsQueueSurvivesARestart(t *testing.T) {
 	t.Parallel()

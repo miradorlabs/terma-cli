@@ -153,9 +153,10 @@ func (app *App) undoSetup(ctx context.Context, out io.Writer, keepToken bool) er
 }
 
 // removeHookState removes what hooks kept per session, which only they would prune, the
-// policies they ran under, the record of why a relay start did not migrate the machine,
-// which the next start writes again, the team names `terma teams` last listed, which only
-// label ids, and any routing state setup set aside as unreadable (<profile>.json.unreadable).
+// policies they ran under, the records of why a relay start did not migrate the machine
+// and of a relay migrating it, which the next start writes again, the team names `terma
+// teams` last listed, which only label ids, and any routing state setup set aside as
+// unreadable (<profile>.json.unreadable).
 //
 // It keeps what the developer chose and signed in with, as it keeps config.json, the
 // sign-in and keys.json: each profile's routing state (routing.StatesDir), which alone
@@ -166,7 +167,7 @@ func (app *App) undoSetup(ctx context.Context, out io.Writer, keepToken bool) er
 // next setup until its session starts a new run, which only the ledger remembers.
 func (app *App) removeHookState() error {
 	var errs []error
-	for _, name := range append(app.hookStateDirs(), hookrun.AgentsDir, termaproject.WorkspacesDir, spool.Dir, config.PoliciesDir, migrate.BlockFile, teamNamesDir) {
+	for _, name := range append(app.hookStateDirs(), hookrun.AgentsDir, termaproject.WorkspacesDir, spool.Dir, config.PoliciesDir, migrate.BlockFile, migrate.MigratingFile, teamNamesDir) {
 		errs = append(errs, os.RemoveAll(filepath.Join(app.stateDir, name)))
 	}
 	setAside, err := filepath.Glob(filepath.Join(app.stateDir, routing.StatesDir, "*.json.unreadable"))
@@ -174,7 +175,8 @@ func (app *App) removeHookState() error {
 	for _, path := range setAside {
 		errs = append(errs, os.Remove(path))
 	}
-	runs.Prune(app.stateDir, time.Now())
+	// The spool and the relay's outbox are gone: nothing queued names a session.
+	runs.Prune(app.stateDir, time.Now(), nil)
 	if err := errors.Join(errs...); err != nil {
 		return fmt.Errorf("remove the hooks' state: %w", err)
 	}

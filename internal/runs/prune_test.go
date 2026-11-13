@@ -22,19 +22,20 @@ func gone(path string) bool {
 	return errors.Is(err, fs.ErrNotExist)
 }
 
-// Prune drops a ledger untouched for longer than Retention, with its lock and the alias
-// files still naming it, and keeps everything younger, an alias re-pointed elsewhere, and
-// a ledger whose lock is held.
+// Prune drops a ledger idle for longer than Retention, with its lock and the alias files
+// still naming it, and keeps everything younger, an alias re-pointed elsewhere, and a
+// ledger whose lock is held.
 func TestPrune(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	runs := filepath.Join(dir, Dir)
-	start(t, dir, "old", t0)
+	long := time.Now().Add(-Retention - 24*time.Hour)
+	start(t, dir, "old", long)
 	must(t, Alias(dir, "old", "agent-old"))
 	must(t, Alias(dir, "old", "agent-moved"))
 	start(t, dir, "young", t0)
 	must(t, Alias(dir, "young", "agent-moved"))
-	start(t, dir, "held", t0)
+	start(t, dir, "held", long)
 	for _, f := range []string{"old.json", "held.json", "old.json.lock", "held.json.lock"} {
 		age(t, filepath.Join(runs, f), Retention+time.Hour)
 	}
@@ -43,7 +44,7 @@ func TestPrune(t *testing.T) {
 	must(t, err)
 	defer unlock()
 
-	Prune(dir, time.Now())
+	Prune(dir, time.Now(), nil)
 	for _, p := range []string{"old.json", "old.json.lock", "aliases/agent-old"} {
 		if !gone(filepath.Join(runs, p)) {
 			t.Errorf("%s survived the prune", p)
@@ -76,11 +77,53 @@ func TestPruneLeftovers(t *testing.T) {
 	for _, p := range []string{"aliases/agent-1", "lost.json.lock", ".tmp-123"} {
 		age(t, filepath.Join(runs, p), Retention+time.Hour)
 	}
-	Prune(dir, time.Now())
+	Prune(dir, time.Now(), nil)
 	for _, p := range []string{"aliases/agent-1", "lost.json.lock", ".tmp-123"} {
 		if !gone(filepath.Join(runs, p)) {
 			t.Errorf("%s survived the prune", p)
 		}
 	}
-	Prune(t.TempDir(), time.Now())
+	Prune(t.TempDir(), time.Now(), nil)
+}
+
+// A ledger goes by its last activity, a run starting, crossing or recording a location,
+// never by its file's age alone, and never while a queued record names its session or a
+// subagent sharing its runs: a Mixed run's records still queued would be sent without it.
+func TestPruneKeepsWhatIsActiveOrQueued(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	runs := filepath.Join(dir, Dir)
+	now := time.Now()
+	long := now.Add(-Retention - 24*time.Hour)
+	for _, s := range []string{"idle", "queued", "queued-by-alias", "crossed-lately", "touched-lately"} {
+		start(t, dir, s, long)
+	}
+	must(t, Alias(dir, "queued-by-alias", "agent-q"))
+	must(t, MarkMixed(dir, "queued", long))
+	must(t, MarkMixed(dir, "crossed-lately", now.Add(-time.Hour)))
+	touch(t, dir, "touched-lately", "", []string{"github.com/acme/api"})
+	// Every file looks long untouched: what keeps one is what it records.
+	for _, s := range []string{"idle", "queued", "queued-by-alias", "crossed-lately", "touched-lately"} {
+		age(t, filepath.Join(runs, s+".json"), Retention+time.Hour)
+	}
+
+	Prune(dir, now, map[string]bool{"queued": true, "agent-q": true})
+	if !gone(filepath.Join(runs, "idle.json")) {
+		t.Error("an idle ledger nothing queued names survived")
+	}
+	for _, s := range []string{"queued", "queued-by-alias", "crossed-lately", "touched-lately"} {
+		if gone(filepath.Join(runs, s+".json")) {
+			t.Errorf("%s was pruned", s)
+		}
+	}
+	if _, mixed := MixedAt(dir, "queued", now); !mixed {
+		t.Fatal("a queued record's run no longer reads as Mixed")
+	}
+	// Once its records have left the queues, it goes too.
+	Prune(dir, now, nil)
+	for _, s := range []string{"queued", "queued-by-alias"} {
+		if !gone(filepath.Join(runs, s+".json")) {
+			t.Errorf("%s survived once nothing queued named it", s)
+		}
+	}
 }

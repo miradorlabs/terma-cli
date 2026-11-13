@@ -19,6 +19,10 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/runs"
 )
 
+// mixedRecent is how lately a Mixed run was active for doctor to name its session; older
+// ones it counts.
+const mixedRecent = 24 * time.Hour
+
 // routingFacts are what doctor judges on a machine that routes by teams: the profile's
 // routing state, and whether the move to routing by teams committed it; the teams' keys in
 // keys.v2.json; and the runs that crossed organizations.
@@ -28,9 +32,9 @@ func (app *App) routingFacts(cfg *config.Config) *doctor.Routing {
 	r := &doctor.Routing{
 		State: st, Err: err, Missing: err == nil && !ok,
 		Teams: names.Teams, Orgs: names.Orgs,
-		Key:           app.teamKey,
-		MixedSessions: runs.Mixed(app.stateDir, time.Now()),
+		Key: app.teamKey,
 	}
+	r.MixedSessions, r.OlderMixed = runs.Mixed(app.stateDir, time.Now(), mixedRecent)
 	r.MixedDropped, r.Blocked = relayBlocked(app.stateDir)
 	if err == nil && ok && !st.Ready() {
 		r.Unfinished = "its keys and sign-ins are still moving"
