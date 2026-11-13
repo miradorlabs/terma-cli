@@ -1,26 +1,43 @@
 name: Harness Reference new builds
 
-# Harnesses release more often than nightly: every quarter hour, a check asks each registry
-# for builds the Harness Reference has not published (test/e2e/reference/new-builds.sh, a
-# few requests and no build), and only when there are, captures those builds' profiles on
-# macOS, and Claude Code's and Codex's files profiles on Linux, and the desktop apps' (Claude
-# Desktop's, the Codex app's) on a macOS runner of their own, and publishes them (refgen,
-# publish.sh publish-reference). The nightly E2E harness
-# contracts (live.yml) still run every contract and the field census, and publish the matrix.
+# Every quarter hour, a check asks each registry for the builds the Harness Reference has yet to
+# capture whole (test/e2e/reference/new-builds.sh: a few requests and no build): a new release,
+# or the newest build where its capture failed some hours ago. Only when there are, it captures
+# each of them once, fully: everything the e2e suite does with a build, on macOS (its profile
+# and probes, its files profile, every contract of terma's and the field census), its Linux
+# files profile and relay contracts, and a desktop app's on a machine of its own. The build's
+# page and changelog are published once, with terma's verdict, and announced then (refgen,
+# publish.sh publish-reference). This is when a build is tested: nothing runs on a schedule
+# besides; live.yml is a full run by hand that publishes nothing.
 
 on:
   schedule:
     # Off the hour and its quarters, when GitHub delays scheduled runs most.
     - cron: "7,22,37,52 * * * *"
   workflow_dispatch:
+    inputs:
+      builds:
+        description: Builds to capture instead of asking the registries, "harness=version,version" separated by spaces
+        type: string
+        default: ""
+      publish:
+        description: Publish and announce what the capture renders (off renders it, as a dry run)
+        type: boolean
+        default: true
 
 permissions:
   contents: read
 
 # One at a time: a capture can outlast the quarter hour, and the next check must see what it
-# published rather than capture the same build again.
+# published rather than capture the same build again. So a long capture of one harness holds the
+# next check of every other back until it is published; a lock a harness would let two checks
+# capture the same new build. A run by hand has a group of its own, so the schedule never takes
+# its place in the queue (GitHub keeps one pending run a group); one that asks the registries
+# (no builds given) beside a scheduled check can capture a build twice, which publishes once
+# (the publish jobs' compat-matrix lock) and counts two attempts. A cancelled run publishes
+# nothing: it is no attempt.
 concurrency:
-  group: harness-reference-new-builds
+  group: harness-reference-new-builds-${{ github.event_name }}
   cancel-in-progress: false
 
 jobs:
@@ -29,14 +46,10 @@ jobs:
     timeout-minutes: 5
     outputs:
       builds: ${{ steps.new.outputs.builds }}
-      tests: ${{ steps.new.outputs.tests }}
-      harnesses: ${{ steps.new.outputs.harnesses }}
+      # One capture job a harness with builds to capture: {"include":[{"harness","versions"}]}.
+      matrix: ${{ steps.new.outputs.matrix }}
       claude: ${{ steps.new.outputs.claude }}
       codex: ${{ steps.new.outputs.codex }}
-      gemini: ${{ steps.new.outputs.gemini }}
-      opencode: ${{ steps.new.outputs.opencode }}
-      copilot: ${{ steps.new.outputs.copilot }}
-      dsh: ${{ steps.new.outputs.dsh }}
       claude_desktop: ${{ steps.new.outputs.claude_desktop }}
       codex_desktop: ${{ steps.new.outputs.codex_desktop }}
       desktop_tests: ${{ steps.new.outputs.desktop_tests }}
@@ -48,6 +61,7 @@ jobs:
           # module but the standard library.
           sparse-checkout: |
             test/e2e/reference/new-builds.sh
+            test/e2e/reference/capture-plan.sh
             test/e2e/go.mod
             test/e2e/go.sum
             test/e2e/refdiff/
@@ -58,49 +72,44 @@ jobs:
           cache: false
       - name: Ask the registries what is new
         id: new
+        env:
+          ASKED: ${{ inputs.builds }}
+          # The published index, read through the API: the check queued behind a capture sees
+          # what that capture published, not a cached copy from before it.
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
-          builds=$(test/e2e/reference/new-builds.sh)
+          if [ -n "$ASKED" ]; then
+            asked=$(tr ' ' '\n' <<<"$ASKED")
+          else
+            asked=$(test/e2e/reference/new-builds.sh)
+          fi
+          # Each harness's builds, the capture jobs' matrix and the desktop apps' scenarios.
+          builds=$(test/e2e/reference/capture-plan.sh "$GITHUB_OUTPUT" <<<"$asked")
           if [ -z "$builds" ]; then
-            echo 'Nothing new since the reference was last published.' >> "$GITHUB_STEP_SUMMARY"
+            echo 'Nothing to capture: the reference has every build whole.' >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
-          # Each new harness's scenarios, by the name its tests carry; a desktop app's are its
-          # job's own (capture-desktop).
-          # Harnesses other than Claude Code and Codex also share the TestHarnessProbe*
-          # scenarios (across turns, retries, tool output), each a subtest by harness: the run
-          # takes those too, for the new harnesses alone (TERMA_E2E_HARNESSES).
-          names=()
-          desktop=()
-          shared=()
-          while IFS='=' read -r harness versions; do
-            echo "${harness//-/_}=$versions" >> "$GITHUB_OUTPUT"
-            case "$harness" in
-              claude|codex) names+=("$(tr '[:lower:]' '[:upper:]' <<<"${harness:0:1}")${harness:1}") ;;
-              opencode) names+=(OpenCode); shared+=(opencode) ;;
-              claude-desktop) desktop+=(TestClaudeDesktopProfile) ;;
-              codex-desktop) desktop+=(TestCodexDesktopProfile) ;;
-              *) names+=("$(tr '[:lower:]' '[:upper:]' <<<"${harness:0:1}")${harness:1}"); shared+=("$harness") ;;
-            esac
-          done <<<"$builds"
-          if [ ${#names[@]} -gt 0 ]; then
-            tests="^Test($(IFS='|'; echo "${names[*]}"))(Profile|Probe)"
-            if [ ${#shared[@]} -gt 0 ]; then
-              tests="$tests|^TestHarnessProbe(AcrossTurns|Retries|ToolOutput)\$"
-              echo "harnesses=$(IFS=','; echo "${shared[*]}")" >> "$GITHUB_OUTPUT"
-            fi
-            echo "tests=$tests" >> "$GITHUB_OUTPUT"
-          fi
-          if [ ${#desktop[@]} -gt 0 ]; then
-            echo "desktop_tests=^($(IFS='|'; echo "${desktop[*]}"))\$" >> "$GITHUB_OUTPUT"
-          fi
-          { echo 'builds<<EOF'; echo "$builds"; echo 'EOF'; } >> "$GITHUB_OUTPUT"
-          { echo '| harness | new builds |'; echo '|---|---|'; sed 's/=/ | /; s/^/| /; s/$/ |/' <<<"$builds"; } >> "$GITHUB_STEP_SUMMARY"
+          { echo '| harness | builds to capture |'; echo '|---|---|'; sed 's/=/ | /; s/^/| /; s/$/ |/' <<<"$builds"; } >> "$GITHUB_STEP_SUMMARY"
 
+  # A harness's builds captured whole on macOS: every scenario of the harness's, as the night ran
+  # them (its profile and probes, its files profile traced with eslogger, which the hosted runner
+  # allows as root, terma's contracts and the field census), against these builds alone
+  # (TERMA_E2E_ONLY and the versions). Every model request goes to the scenarios' fixture
+  # providers; a contract that needs an account runs where the environment has its secret.
   capture:
     needs: detect
-    if: needs.detect.outputs.tests != ''
+    if: needs.detect.outputs.matrix != ''
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.detect.outputs.matrix) }}
     runs-on: macos-latest
-    timeout-minutes: 60
+    timeout-minutes: 90
+    environment: live-harnesses
+    # copilot-requests lets Copilot CLI's capture run on this job's own token, its AI credits
+    # billed to the organization, as in CI's copilot shard.
+    permissions:
+      contents: read
+      copilot-requests: write
     steps:
       # No token left in .git/config: this job runs vendor builds, and pushes nothing.
       - uses: actions/checkout@v7
@@ -120,43 +129,56 @@ jobs:
           go build -o test/e2e/bin/terma ./cmd/terma
           cd test/e2e
           go test -c -o bin/e2e.test .
-      # No account: every model request goes to the scenarios' fixture providers. A build's
-      # scenario that fails still leaves its profile, partial, and refgen says so. The tests
-      # include Claude Code's and Codex's files profiles, traced with eslogger, which the hosted
-      # runner allows as root.
-      - name: Capture the new builds
+      - name: Capture ${{ matrix.harness }} ${{ matrix.versions }}
         working-directory: test/e2e
         env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          # Copilot CLI runs against GitHub's service on this job's token, as in CI's copilot shard:
+          # Copilot's capture alone, or its contracts skip and every release reads "Not tested".
+          COPILOT_GITHUB_TOKEN: ${{ matrix.harness == 'copilot' && github.token || '' }}
           TERMA_E2E: "1"
           TERMA_E2E_BINARY: ${{ github.workspace }}/test/e2e/bin/terma
           TERMA_E2E_UNCLASSIFIED: note
           TERMA_E2E_KNOWN_UPSTREAM: codex-session-end
-          TERMA_E2E_CLAUDE_VERSIONS: ${{ needs.detect.outputs.claude }}
-          TERMA_E2E_CODEX_VERSIONS: ${{ needs.detect.outputs.codex }}
-          TERMA_E2E_GEMINI_VERSIONS: ${{ needs.detect.outputs.gemini }}
-          TERMA_E2E_OPENCODE_VERSIONS: ${{ needs.detect.outputs.opencode }}
-          TERMA_E2E_COPILOT_VERSIONS: ${{ needs.detect.outputs.copilot }}
-          TERMA_E2E_DSH_VERSIONS: ${{ needs.detect.outputs.dsh }}
-          TERMA_E2E_HARNESSES: ${{ needs.detect.outputs.harnesses }}
-          TESTS: ${{ needs.detect.outputs.tests }}
-        run: ./bin/e2e.test -test.v -test.timeout 50m -test.run "$TESTS"
-      - name: Upload the profiles
+          TERMA_E2E_ONLY: ${{ matrix.harness }}
+          HARNESS: ${{ matrix.harness }}
+          VERSIONS: ${{ matrix.versions }}
+        run: |
+          export "TERMA_E2E_$(tr '[:lower:]-' '[:upper:]_' <<<"$HARNESS")_VERSIONS=$VERSIONS"
+          # A harness that drives Codex or Claude Code (T3) runs their newest build alone.
+          for driven in CLAUDE CODEX; do
+            var="TERMA_E2E_${driven}_VERSIONS"
+            [ -n "${!var:-}" ] || export "$var=last1"
+          done
+          ./bin/e2e.test -test.v -test.timeout 80m
+      - name: Publish the run's summary
+        if: always()
+        run: |
+          if [ -f test/e2e/report/latest.md ]; then cat test/e2e/report/latest.md >> "$GITHUB_STEP_SUMMARY"; fi
+      # The profiles, terma's verdict and the field census: one capture, published whole.
+      - name: Upload the capture
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: profiles-macos
-          path: test/e2e/report/profiles.json
+          name: capture-${{ matrix.harness }}
+          path: |
+            test/e2e/report/profiles.json
+            test/e2e/report/compat.json
+            test/e2e/report/notes.json
+            test/e2e/report/fields.json
+            test/e2e/report/census.json
           if-no-files-found: ignore
-          retention-days: 30
+          retention-days: 90
 
-  # The files profile of the new Claude Code and Codex builds on Linux, traced with strace in
-  # the machine image (test/e2e/machine/Dockerfile, `make machines`), beside macOS's capture: the
-  # snapshot's filesystem section for linux/amd64.
+  # The new Claude Code and Codex builds on Linux, in the machine image (test/e2e/machine/Dockerfile,
+  # `make machines`): the machine contracts (global mode, the managed configuration, the relay),
+  # and their files profile traced with strace, the snapshot's filesystem section for linux/amd64.
   capture-linux:
     needs: detect
     if: needs.detect.outputs.claude != '' || needs.detect.outputs.codex != ''
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 60
     permissions:
       contents: read
     steps:
@@ -164,26 +186,38 @@ jobs:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      # As the nightly machine job: Codex's bubblewrap needs capabilities in its user namespace.
+      # Codex's bubblewrap needs capabilities in its user namespace.
       - name: Let sandboxes have capabilities in their user namespaces
         run: |
           if [ -e /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]; then
             sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
           fi
-      - name: Trace the new builds
+      - name: Capture the new builds
         working-directory: test/e2e
         env:
           TERMA_E2E_UNCLASSIFIED: note
           CLAUDE_BUILDS: ${{ needs.detect.outputs.claude }}
           CODEX_BUILDS: ${{ needs.detect.outputs.codex }}
         run: |
-          # Only the harnesses with new builds: an empty version list would mean the default ones.
-          tests=()
-          [ -n "$CLAUDE_BUILDS" ] && tests+=(TestClaudeProfileFiles)
-          [ -n "$CODEX_BUILDS" ] && tests+=(TestCodexProfileFiles)
-          run="^($(IFS='|'; echo "${tests[*]}"))\$"
+          # Every machine contract (global mode, the managed configuration, the relay's), with
+          # the new builds and the newest of the other harness; the files profile of the new
+          # builds alone (an empty version list would mean the image's).
+          profiles=()
+          if [ -n "$CLAUDE_BUILDS" ]; then profiles+=(TestClaudeProfileFiles); fi
+          if [ -n "$CODEX_BUILDS" ]; then profiles+=(TestCodexProfileFiles); fi
           make machines HOST_ARCH=amd64 CLAUDE_VERSION=latest CODEX_VERSION=latest \
-            MACHINE_CLAUDE_VERSIONS="${CLAUDE_BUILDS:-installed}" MACHINE_CODEX_VERSIONS="${CODEX_BUILDS:-installed}" RUN="$run"
+            MACHINE_CLAUDE_VERSIONS="${CLAUDE_BUILDS:-installed}" MACHINE_CODEX_VERSIONS="${CODEX_BUILDS:-installed}" \
+            MACHINE_PROFILES="$(IFS='|'; echo "${profiles[*]}")"
+      - name: Upload the contracts' rows
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: compat-linux
+          path: |
+            test/e2e/report/linux/compat.json
+            test/e2e/report/linux/notes.json
+          if-no-files-found: ignore
+          retention-days: 30
       - name: Upload the profiles
         if: always()
         uses: actions/upload-artifact@v7
@@ -247,18 +281,18 @@ jobs:
 
   publish:
     needs: [detect, capture, capture-linux, capture-desktop]
-    # A capture that failed outright still publishes its builds, partial, so the next check
-    # does not take them for new again; the night tries them again. A desktop app's release is
-    # the exception: the night does not capture the apps, so one whose capture failed is not
-    # published as tried, and the next check takes it for new and tries it again.
-    if: always() && needs.detect.outputs.builds != ''
+    # After every capture, so each build is published once, whole. A capture that failed still
+    # publishes its builds, partial, and announces them saying so: the next check does not take
+    # them for new again, and captures them again once some hours have passed since this attempt
+    # (new-builds.sh), without announcing them twice.
+    if: ${{ !cancelled() && needs.detect.outputs.builds != '' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     # For the Slack webhook the announcements are posted with.
     environment: live-harnesses
     permissions:
       contents: write
-    # The nightly compat job (live.yml) publishes the same branch: never both at once.
+    # Model Reference's publish job (models.yml) pushes the same branch: never both at once.
     concurrency:
       group: compat-matrix
       cancel-in-progress: false
@@ -277,22 +311,41 @@ jobs:
         with:
           pattern: profiles-*
           path: test/e2e/runs
+      - uses: actions/download-artifact@v8
+        continue-on-error: true
+        with:
+          pattern: "{capture,compat}-*"
+          path: test/e2e/runs
       - name: Render the reference
         working-directory: test/e2e
         env:
           GITHUB_TOKEN: ${{ github.token }}
           BUILDS: ${{ needs.detect.outputs.builds }}
+          CLAUDE_BUILDS: ${{ needs.detect.outputs.claude }}
+          CODEX_BUILDS: ${{ needs.detect.outputs.codex }}
           DESKTOP_CAPTURE: ${{ needs.capture-desktop.result }}
         run: |
           mkdir -p runs
+          # The contracts' rows first, so the verdict refgen gives each build is theirs.
+          rows=()
+          for f in $(find runs -name compat.json | sort); do rows+=(-run "$f"); done
+          for f in $(find runs -name notes.json | sort); do rows+=(-notes "$f"); done
+          # And the census into the field catalog, which only these captures extend.
+          for f in $(find runs -name fields.json | sort); do rows+=(-fields "$f"); done
+          for f in $(find runs -name census.json | sort); do rows+=(-census "$f"); done
+          if [ ${#rows[@]} -gt 0 ]; then
+            go run ./compatgen "${rows[@]}"
+            echo "TERMA_REFERENCE_MATRIX=1" >> "$GITHUB_ENV"
+          fi
           args=()
           for f in $(find runs -name profiles.json | sort); do args+=(-profiles "$f"); done
-          while read -r line; do
-            case "$line" in
-              claude-desktop=*|codex-desktop=*) [ "$DESKTOP_CAPTURE" = success ] || continue ;;
-            esac
-            args+=(-attempted "$line")
-          done <<<"$BUILDS"
+          # The capture's census of the builds.
+          for f in $(find runs -name fields.json | sort); do args+=(-fields "$f"); done
+          for f in $(find runs -name census.json | sort); do args+=(-census "$f"); done
+          # Every build the run set out to capture, and those a job of it did not finish, which
+          # are published partial and tried again some hours later.
+          mapfile -t captured < <(reference/capture-args.sh runs)
+          args+=("${captured[@]}")
           # Every step stays in timeline.json (-timeline-steps 1000) until the reader's pages
           # load the timeline-<n>.json archives; then the default pages it.
           go run ./refgen "${args[@]}" -catalog ../../docs/compat/fields.json -history ../../docs/compat/history.json -compat ../../docs/compat/compat.json -out ../../docs/harnesses -timeline-steps 1000 -fetch -source -announce "$RUNNER_TEMP/announcements.json"
@@ -301,20 +354,28 @@ jobs:
           GOOS=js GOARCH=wasm go build -trimpath -buildvcs=false -ldflags='-s -w' -o ../../docs/harnesses/refdiff.wasm ./refdiff/wasm
           cp "$(go env GOROOT)/lib/wasm/wasm_exec.js" ../../docs/harnesses/wasm_exec.js
       - name: Publish the reference
+        if: github.event_name != 'workflow_dispatch' || inputs.publish
         env:
           BUILDS: ${{ needs.detect.outputs.builds }}
         run: TERMA_REFERENCE_BUILDS="$(paste -sd' ' - <<<"$BUILDS")" test/e2e/compatgen/publish.sh publish-reference
       # Each version newer than any captured before, once, after it is published: never a
-      # backfill, never twice. SLACK_RELEASES_WEBHOOK_URL picks a channel of its own; without
-      # it, the digest's.
+      # backfill. One announced while its capture was partial is told of once more, when a retry
+      # captures it whole. SLACK_RELEASES_WEBHOOK_URL picks a channel of its own; without it,
+      # the digest's. Each says whether terma works with the build. A dry run shows them in its
+      # summary instead.
       - name: Announce new versions
         if: success()
         continue-on-error: true
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_RELEASES_WEBHOOK_URL || secrets.SLACK_WEBHOOK_URL }}
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && !inputs.publish }}
         run: |
           news="$RUNNER_TEMP/announcements.json"
           [ -s "$news" ] || exit 0
+          if [ "$DRY_RUN" = true ]; then
+            { echo '### What would be announced'; jq -r '.[] | .slack.blocks[] | select(.text) | .text.text, ""' "$news"; } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
           if [ -z "$SLACK_WEBHOOK_URL" ]; then
             echo "::notice::No Slack webhook in the live-harnesses environment: $(jq length "$news") new versions not announced."
             exit 0

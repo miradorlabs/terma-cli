@@ -45,13 +45,22 @@ type night struct {
 	history  []HistoryEntry
 	labels   map[string]string // capability id → label
 	// attempted are builds a run set out to capture: one it captured nothing of is still
-	// published, partial, so the hourly check does not set out to capture it again.
+	// published, partial, so the frequent check captures it again only after a while.
 	attempted []buildID
-	now       time.Time
-	sources   *sourceConfigs // what public builds' source says of their configuration; nil reads none
+	// unfinished are builds a job of the run set out to capture and did not finish (a platform's
+	// capture that failed): published partial, whatever the other jobs took.
+	unfinished []buildID
+	now        time.Time
+	sources    *sourceConfigs // what public builds' source says of their configuration; nil reads none
 }
 
 type buildID struct{ harness, version string }
+
+// The notes a partial capture carries until a whole one replaces them.
+const (
+	failedNote     = "This build's capture failed; the frequent check tries it again, up to four attempts."
+	unfinishedNote = "Part of this build's capture did not finish; the frequent check tries it again, up to four attempts."
+)
 
 // builds are the builds the night has anything of, by harness then version.
 func (n night) builds() []buildID {
@@ -164,9 +173,6 @@ func (n night) profileOf(id buildID) (e2e.Profile, bool, bool) {
 		if len(merged.Binary) == 0 {
 			merged.Binary = p.Binary
 		}
-		if len(merged.Command) == 0 {
-			merged.Command = p.Command
-		}
 		for _, note := range p.Notes {
 			if !slices.Contains(merged.Notes, note) {
 				merged.Notes = append(merged.Notes, note)
@@ -174,13 +180,15 @@ func (n night) profileOf(id buildID) (e2e.Profile, bool, bool) {
 		}
 	}
 	// The command published is the one that took the turn published, not a probe's that sorts
-	// before it (TestGeminiProbeHooks before TestGeminiProfileEgress).
-	if src >= 0 && len(ps[src].Command) > 0 {
+	// before it (TestGeminiProbeHooks before TestGeminiProfileEgress); none where no turn was
+	// taken, so a capture's command says it took one (publish's firstTurn, merge's keepWhole).
+	merged.Command = nil
+	if src >= 0 {
 		merged.Command = ps[src].Command
 	}
 	preferBinaryScenario(&merged, ps)
-	// A probe that failed says nothing of the first turn: only the turn published is the
-	// capture's whole or partial.
+	// A probe that failed says nothing of the first turn: only the turn published makes the
+	// capture's sections whole or truncated (a failed probe leaves it partial: failedScenario).
 	merged.Failed = src >= 0 && ps[src].Failed
 	return merged, first >= 0, true
 }
@@ -190,7 +198,7 @@ func (n night) tonight(id buildID) *Snapshot {
 	s := &Snapshot{SchemaVersion: schemaVersion, Harness: id.harness, Version: id.version, CapturedAt: n.now}
 	if p, proxied, ok := n.profileOf(id); ok {
 		s.Platform = p.Platform
-		s.Capture = Capture{Command: p.Command, Partial: p.Failed,
+		s.Capture = Capture{Command: p.Command, Partial: p.Failed, Truncated: p.Failed,
 			Notes: []string{"Model requests were answered by a local fixture provider, not the vendor's API; nothing was sent to a model."}}
 		if proxied {
 			s.Capture.Notes = append(s.Capture.Notes, "The first turn ran behind a local proxy that answers every other request empty: "+
@@ -211,7 +219,7 @@ func (n night) tonight(id buildID) *Snapshot {
 	n.deriveSupport(s)
 	scrubMachine(s)
 	if len(present(s)) == 0 && slices.Contains(n.attempted, id) {
-		s.Capture = Capture{Partial: true, Notes: []string{"This build's capture failed; the next nightly run tries it again."}}
+		s.Capture = Capture{Partial: true, Notes: []string{failedNote}}
 	}
 	return s
 }
@@ -338,7 +346,7 @@ func verdict(pass, fail int, coreFailed bool) string {
 func merge(old, tonight *Snapshot, now time.Time) *Snapshot {
 	if old == nil {
 		out := *tonight
-		if tonight.Capture.Partial {
+		if tonight.Capture.Truncated {
 			// As below: a turn that failed publishes its census alone (withoutProbe).
 			out.Telemetry, _ = withoutProbe(tonight.Telemetry).(map[string]any)
 		}
@@ -352,14 +360,16 @@ func merge(old, tonight *Snapshot, now time.Time) *Snapshot {
 	if out.Capture.Sections == nil {
 		out.Capture.Sections = map[string]time.Time{}
 	}
-	keepWhole := tonight.Capture.Partial && !old.Capture.Partial
+	// A page keeps its sections from a truncated turn only where a whole turn took them: one
+	// whose capture never took a turn (its download failed) takes the truncated one's.
+	keepWhole := tonight.Capture.Truncated && !old.Capture.Truncated && len(old.Capture.Command) > 0
 	ot, tt := out.Tree(), tonight.Tree()
 	if tt["filesystem"] != nil {
 		tt["filesystem"] = mergeFilesystem(ot["filesystem"], tt["filesystem"])
 	}
 	if tt["telemetry"] != nil {
 		tel := tt["telemetry"]
-		if tonight.Capture.Partial {
+		if tonight.Capture.Truncated {
 			// The probe's findings come from the profile's turn, which failed: a truncated probe
 			// is published nowhere, over a whole page or a partial one. The census, which ran
 			// apart, still counts.
@@ -393,6 +403,7 @@ func merge(old, tonight *Snapshot, now time.Time) *Snapshot {
 	if len(tonight.Capture.Command) > 0 && !keepWhole {
 		merged.Capture.Command = tonight.Capture.Command
 		merged.Capture.Partial = tonight.Capture.Partial
+		merged.Capture.Truncated = tonight.Capture.Truncated
 		merged.Capture.Notes = tonight.Capture.Notes
 		merged.Platform = tonight.Platform
 	}

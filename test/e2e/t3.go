@@ -2,6 +2,7 @@ package e2e
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -36,18 +37,39 @@ import (
 // state read from /api/orchestration/shell. A build that speaks neither is skipped as
 // one the driver cannot drive (SkipBuild), not failed.
 
+// t3Package is T3 Code's npm package.
+const t3Package = "t3"
+
+// forEachT3 runs the installed build, or TERMA_E2E_T3_VERSIONS's from npm (the reference's
+// frequent check captures each release). The installed one says its version in its package, not
+// --version (t3Version).
 func forEachT3(t *testing.T, run func(t *testing.T, b Binary)) {
 	t.Helper()
 	if !Enabled() {
 		t.Skip("live tests run only with TERMA_E2E=1")
 	}
-	path, err := exec_LookPath("t3")
-	if err != nil {
+	skipUnlessSelected(t, "t3")
+	var builds []Binary
+	var rest []string
+	for part := range strings.SplitSeq(cmp.Or(os.Getenv("TERMA_E2E_T3_VERSIONS"), "installed"), ",") {
+		if strings.TrimSpace(part) != "installed" {
+			rest = append(rest, part)
+			continue
+		}
+		if path, err := exec_LookPath("t3"); err == nil {
+			builds = append(builds, Binary{Harness: "t3", Version: t3Version(path), Path: path, Installed: true})
+		}
+	}
+	if len(rest) > 0 {
+		builds = append(builds, resolve(t, "t3", strings.Join(rest, ","), func() ([]string, error) { return npmReleases(t3Package) }, ensureNpmBuild("t3", t3Package, "t3"))...)
+	}
+	if len(builds) == 0 {
 		Record(t.Name(), "not run", "t3 is not installed")
 		t.Skip("t3 is not installed")
 	}
-	b := Binary{Harness: "t3", Version: t3Version(path), Path: path, Installed: true}
-	t.Run(b.Label(), func(t *testing.T) { scenarioOf(t, b.Harness); run(t, b) })
+	for _, b := range builds {
+		t.Run(b.Label(), func(t *testing.T) { scenarioOfBuild(t, b); run(t, b) })
+	}
 }
 
 // t3Version reads the npm package's version: `t3 <anything> --help` starts the server.

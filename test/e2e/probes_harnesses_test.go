@@ -6,10 +6,8 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"os/exec"
 	"path/filepath"
-	"slices"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -212,7 +210,7 @@ func harnessProbe(t *testing.T, names []string, keep func(harnessDriver) bool, p
 	t.Helper()
 	skipUnlessProbe(t, names...)
 	for _, d := range harnessDrivers {
-		if !keep(d) || !harnessListed(d.harness) {
+		if !keep(d) || !selected(d.harness) {
 			continue
 		}
 		t.Run(d.harness, func(t *testing.T) {
@@ -223,13 +221,6 @@ func harnessProbe(t *testing.T, names []string, keep func(harnessDriver) bool, p
 			})
 		})
 	}
-}
-
-// harnessListed reports whether this run takes harness's shared probes: every harness, unless
-// TERMA_E2E_HARNESSES lists the ones it does (the frequent check's new builds).
-func harnessListed(harness string) bool {
-	list := os.Getenv("TERMA_E2E_HARNESSES")
-	return list == "" || slices.Contains(strings.Split(list, ","), harness)
 }
 
 // harnessFixture is a sandbox of t's whose harness d has provider as its model provider, and the

@@ -178,4 +178,22 @@ func TestPublishTwoNights(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(check, "README.md")); err == nil {
 		t.Error("compat-matrix carries main's files")
 	}
+
+	// A check that captured a new build publishes the matrix and field catalog its capture
+	// extended with its reference: there is no night to publish them any more.
+	contracts := filepath.Join(tmp, "contracts")
+	run(tmp, "git", "clone", "-q", "-b", "main", origin, contracts)
+	run(contracts, "bash", script, "restore")
+	for _, f := range generated {
+		write(contracts, f, "contracts\n")
+	}
+	t.Setenv("TERMA_REFERENCE_MATRIX", "1")
+	run(contracts, "bash", script, "publish-reference")
+	run(check, "git", "pull", "-q")
+	for _, f := range generated {
+		want := "contracts\n"
+		if b, err := os.ReadFile(filepath.Join(check, f)); err != nil || string(b) != want {
+			t.Errorf("after the contracts' check, compat-matrix has %s as %q (%v), want %q", f, b, err, want)
+		}
+	}
 }

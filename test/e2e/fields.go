@@ -73,8 +73,9 @@ func Withheld(class string, kinds, kept []string) bool {
 	return class == "unclassified" && slices.ContainsFunc(kinds, func(k string) bool { return !slices.Contains(kept, k) })
 }
 
-// CensusRun is a build a scenario that takes the census (the test that calls runBoth, and
-// TestClaudeInteractiveFields) ran, and whether it failed for it. A build's census is whole
+// CensusRun is a build a scenario that takes the census (the direct run of a test that calls
+// runBoth, whose fields the census holds, and TestClaudeInteractiveFields) ran, and whether it
+// failed for it: a failure of terma's own, in the relayed run beside it, leaves the census whole. A build's census is whole
 // only if every census scenario that ran that night ran it and none failed: one a scenario
 // failed for, or did not run, is partial. A build they ran and no census reached was not
 // reached. report/census.json holds them, beside the census.

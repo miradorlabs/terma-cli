@@ -27,6 +27,9 @@ type harnessMeta struct {
 	changelog              string // a page a person reads
 	changelogRaw           string // a markdown changelog with a heading a version, where there is one
 	feed                   string // a desktop app's: the harness whose update feed its release dates are read from
+	// unprofiled is a harness no profile scenario captures the first turn of: its terma checks
+	// are its whole capture (T3, which runs the other harnesses).
+	unprofiled bool
 }
 
 var harnesses = map[string]harnessMeta{
@@ -53,7 +56,7 @@ var harnesses = map[string]harnessMeta{
 		changelog:    "https://github.com/github/copilot-cli/blob/main/changelog.md",
 		changelogRaw: "https://raw.githubusercontent.com/github/copilot-cli/main/changelog.md"},
 	"t3": {name: "T3 Code", vendor: "Ping Labs", homepage: "https://github.com/pingdotgg/t3code", npm: "t3",
-		repo: "pingdotgg/t3code", language: "typescript", tag: "v%s", changelog: "https://github.com/pingdotgg/t3code/releases"},
+		repo: "pingdotgg/t3code", language: "typescript", tag: "v%s", changelog: "https://github.com/pingdotgg/t3code/releases", unprofiled: true},
 	"cursor": {name: "Cursor", vendor: "Anysphere", homepage: "https://cursor.com"},
 }
 

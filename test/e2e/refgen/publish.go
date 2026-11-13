@@ -165,11 +165,15 @@ func publish(dir string, n night, opt options) ([]Announcement, error) {
 	if err != nil {
 		return nil, err
 	}
-	// The newest version of each harness published with something captured of it, before the
-	// night: a version newer than it, captured tonight, is news.
+	// The newest version of each harness published before the run: a version newer than it,
+	// published by the run, is news.
 	before := map[string]string{}
+	partialBefore := map[buildID]bool{}
 	for h, byVersion := range pub.snapshots {
-		before[h] = newestCaptured(byVersion)
+		before[h] = newestPublished(byVersion)
+		for v, s := range byVersion {
+			partialBefore[buildID{h, v}] = s.Capture.Partial
+		}
 	}
 	// Each harness id and version names a folder or file of the tree: one that would name
 	// something outside it (a vendor's feed's ../../x) is refused before anything is written.
@@ -184,7 +188,41 @@ func publish(dir string, n night, opt options) ([]Announcement, error) {
 			pub.snapshots[id.harness] = map[string]*Snapshot{}
 		}
 		old := pub.snapshots[id.harness][id.version]
-		merged := merge(old, n.tonight(id), n.now)
+		// A build's page begins with its capture: terma's checks and the field census of a build
+		// no capture took (the night's contracts of a build the frequent check has yet to
+		// capture) update a published page, never begin one.
+		if old == nil && !n.captures(id) {
+			continue
+		}
+		tonight := n.tonight(id)
+		merged := merge(old, tonight, n.now)
+		attempted := slices.Contains(n.attempted, id)
+		if attempted {
+			at := n.now
+			merged.Capture.AttemptedAt = &at
+			if merged.Capture.Attempts == 0 && old != nil {
+				merged.Capture.Attempts = 1 // a page from before attempts were counted had one
+			}
+			merged.Capture.Attempts++
+		}
+		// A capture is whole when every job of it finished, no scenario of it failed, and it took
+		// the build's first turn, which a scenario that failed before it recorded anything (the
+		// build's download, its sandbox) leaves untaken; a harness no profile scenario captures
+		// (T3) has its terma checks alone. A page already whole stays whole: a capture that failed
+		// beside it (a run by hand overlapping the schedule) takes nothing it lacked.
+		unfinished := slices.Contains(n.unfinished, id)
+		failed := n.failedScenario(id)
+		firstTurn := len(tonight.Capture.Command) > 0 || metaOf(id.harness).unprofiled
+		switch {
+		case old != nil && !old.Capture.Partial && (unfinished || failed || attempted && !firstTurn):
+		case unfinished:
+			markPartial(merged, unfinishedNote)
+		case failed, attempted && !firstTurn:
+			markPartial(merged, failedNote)
+		case attempted && !tonight.Capture.Partial:
+			merged.Capture.Partial = false
+			merged.Capture.Notes = slices.DeleteFunc(merged.Capture.Notes, isPartialNote)
+		}
 		if old == nil || !sameSections(old, merged) {
 			changed[id] = true
 		}
@@ -299,7 +337,8 @@ func publish(dir string, n night, opt options) ([]Announcement, error) {
 		for i, v := range versions {
 			s := byVersion[v]
 			e := VersionEntry{Version: v, CapturedAt: s.CapturedAt, Platforms: platformsOf(s), Support: supportOf(s),
-				Categories: map[string]int{}, Impact: map[string]int{"breaking": 0, "degrading": 0, "notable": 0, "informational": 0}, Highlights: []string{}}
+				Categories: map[string]int{}, Impact: map[string]int{"breaking": 0, "degrading": 0, "notable": 0, "informational": 0}, Highlights: []string{},
+				Partial: s.Capture.Partial, AttemptedAt: s.Capture.AttemptedAt, Attempts: s.Capture.Attempts}
 			var bin binaryView
 			view(s.Binary, &bin)
 			if bin.Signing != nil {
@@ -359,7 +398,8 @@ func publish(dir string, n night, opt options) ([]Announcement, error) {
 			}
 			return writeLineage(filepath.Join(dir, h), h, versions, byVersion, src)
 		})
-		news = append(news, announce(opt.site, entry, entries, diffs, byVersion, before[h])...)
+		completed := func(v string) bool { return partialBefore[buildID{h, v}] }
+		news = append(news, announce(opt.site, entry, entries, diffs, byVersion, before[h], completed, n.now)...)
 		for _, e := range entries {
 			if e.Previous != nil {
 				recent = append(recent, RecentEntry{Harness: h, Name: meta.name, VersionEntry: e})
@@ -800,4 +840,33 @@ func markUnobservedEvents(versions []string, byVersion map[string]*Snapshot) {
 			}
 		}
 	}
+}
+
+// markPartial marks s partial, saying why its latest attempt was.
+func markPartial(s *Snapshot, note string) {
+	s.Capture.Partial = true
+	s.Capture.Notes = append(slices.DeleteFunc(s.Capture.Notes, isPartialNote), note)
+}
+
+// isPartialNote reports one of the notes a partial capture carries.
+func isPartialNote(note string) bool { return note == failedNote || note == unfinishedNote }
+
+// failedScenario reports a scenario of the night that failed for the build: any of its profiles
+// (the first turn's, a probe's, a platform's files profile) or its field census.
+func (n night) failedScenario(id buildID) bool {
+	return slices.ContainsFunc(n.profiles, func(p e2e.Profile) bool { return p.Harness == id.harness && p.Version == id.version && p.Failed }) ||
+		slices.ContainsFunc(n.census, func(c CensusRun) bool { return c.Harness == id.harness && c.Version == id.version && c.Failed })
+}
+
+// captures reports a build the night captured, or set out to: a profile of it, or an attempt.
+func (n night) captures(id buildID) bool {
+	if slices.Contains(n.attempted, id) {
+		return true
+	}
+	for _, p := range n.profiles {
+		if p.Harness == id.harness && p.Version == id.version {
+			return true
+		}
+	}
+	return false
 }

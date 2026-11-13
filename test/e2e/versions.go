@@ -3,6 +3,7 @@ package e2e
 import (
 	"archive/tar"
 	"compress/gzip"
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -11,9 +12,11 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -33,7 +36,8 @@ import (
 //
 // TERMA_E2E_CLAUDE_VERSIONS / TERMA_E2E_CODEX_VERSIONS (and each harness's own):
 // "installed", "lastN", "checked", or a comma list of versions; default
-// "installed,last3". "checked" is the newest build the history at TERMA_E2E_CHECKED
+// "installed,last3". TERMA_E2E_ONLY limits a run to the harnesses it names
+// (skipUnlessSelected). "checked" is the newest build the history at TERMA_E2E_CHECKED
 // has a result of on this platform and every release since, as the nightly runs them
 // (sinceChecked); it applies to harnesses that ship releases, not prereleases alone.
 // Downloads are cached under test/e2e/versions/ (ignored by git).
@@ -74,8 +78,59 @@ func CodexBinaries(t *testing.T) []Binary {
 	return resolve(t, "codex", os.Getenv("TERMA_E2E_CODEX_VERSIONS"), codexVersionList, ensureCodex)
 }
 
+// selected reports whether this run takes harness's scenarios: every harness, unless
+// TERMA_E2E_ONLY, a comma list of harness ids, leaves it out. The frequent check runs each
+// harness's scenarios on a job of its own (reference.yml). A desktop app's checks run its
+// agent's builds (TestRelayClaudeDesktop runs Claude Code), so they run with its agent's.
+func selected(harness string) bool {
+	only := os.Getenv("TERMA_E2E_ONLY")
+	return only == "" || listed(only, harness) || listed(only, agentOf(harness))
+}
+
+// skipUnlessSelected skips a scenario of harness this run does not take (selected).
+func skipUnlessSelected(t *testing.T, harness string) {
+	t.Helper()
+	if !selected(harness) {
+		t.Skipf("%s is not among TERMA_E2E_ONLY (%s)", harness, os.Getenv("TERMA_E2E_ONLY"))
+	}
+}
+
+// unrestricted clears TERMA_E2E_ONLY for t: an offline test of a harness's scenario runs
+// whatever harness its run is limited to.
+func unrestricted(t *testing.T) {
+	t.Setenv("TERMA_E2E_ONLY", "")
+}
+
+// installEnv is the environment a vendor's package is installed with: the test's own without
+// any credential (an API key, a token, a secret, an auth file), since its install scripts run as
+// soon as the release is out. Only a scenario that needs a credential hands it to the build.
+func installEnv() []string {
+	return slices.DeleteFunc(os.Environ(), func(kv string) bool {
+		name, _, _ := strings.Cut(kv, "=")
+		name = strings.ToUpper(name)
+		return strings.Contains(name, "PASSWORD") || slices.ContainsFunc([]string{"_KEY", "_TOKEN", "_SECRET", "_AUTH"},
+			func(suffix string) bool { return strings.HasSuffix(name, suffix) })
+	})
+}
+
+// listed reports whether the comma list names harness.
+func listed(list, harness string) bool {
+	for h := range strings.SplitSeq(list, ",") {
+		if strings.TrimSpace(h) == harness {
+			return true
+		}
+	}
+	return false
+}
+
 func resolve(t *testing.T, harness, spec string, list func() ([]string, error), ensure func(string) (string, error)) []Binary {
 	t.Helper()
+	// Before fetching a build: a run that does not take harness's scenarios fetches none. A
+	// scenario of another harness that drives this one (T3 runs Codex and Claude Code) is the
+	// other's, and its selection is already made.
+	if h := harnessOf(t); h == "" || h == harness {
+		skipUnlessSelected(t, harness)
+	}
 	if spec == "" {
 		spec = "installed,last3"
 	}
@@ -479,4 +534,27 @@ func CheckPathName(kind, name string) error {
 		return fmt.Errorf("refusing %s %q to name a file: want a letter or digit, then letters, digits and . + _ -, and no \"..\"", kind, name)
 	}
 	return nil
+}
+
+// ensureNpmBuild installs version of an npm package under the versions directory and returns its
+// command bin, as `npm install` puts it in node_modules/.bin.
+func ensureNpmBuild(harness, pkg, bin string) func(version string) (string, error) {
+	return func(version string) (string, error) {
+		if err := CheckPathName(harness+" version", version); err != nil {
+			return "", err
+		}
+		dir := filepath.Join(versionsDir(), harness, version)
+		path := filepath.Join(dir, "node_modules", ".bin", bin)
+		if _, err := os.Stat(path); err == nil {
+			return abs(path), nil
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), scenarioTimeout)
+		defer cancel()
+		cmd := exec.CommandContext(ctx, "npm", "install", "--silent", "--no-audit", "--no-fund", "--prefix", dir, pkg+"@"+version)
+		cmd.Env = installEnv()
+		if out, err := cmd.CombinedOutput(); err != nil {
+			return "", fmt.Errorf("npm install %s@%s: %v\n%s", pkg, version, err, out)
+		}
+		return abs(path), nil
+	}
 }

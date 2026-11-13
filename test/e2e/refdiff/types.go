@@ -78,11 +78,26 @@ type Capability struct {
 // Capture says how a snapshot was taken.
 type Capture struct {
 	Command []string `json:"command,omitempty"`
-	Partial bool     `json:"partial"`
-	Notes   []string `json:"notes,omitempty"`
+	// Partial marks a capture that failed somewhere: its published turn, a platform's files
+	// profile, the field census, a job that did not finish. Truncated marks the narrower case
+	// whose sections may stop short, the published turn's scenario failed: a later truncated
+	// capture replaces none of the sections a whole one took.
+	Partial   bool     `json:"partial"`
+	Truncated bool     `json:"truncated,omitempty"`
+	Notes     []string `json:"notes,omitempty"`
 	// Sections says when each section was last captured: a night that did not capture one
 	// keeps the last night's.
 	Sections map[string]time.Time `json:"sections,omitempty"`
+	// AttemptedAt is when a run last set out to capture the build, whatever it took: a capture
+	// that failed again moves it though it moves nothing else, so the frequent check waits from
+	// the last attempt before it tries again (reference/new-builds.sh).
+	AttemptedAt *time.Time `json:"attempted_at,omitempty"`
+	// Attempts is how many runs set out to capture the build: the frequent check gives up on a
+	// partial build after a few.
+	Attempts int `json:"attempts,omitempty"`
+	// AnnouncedAt is when the build was announced as a new release: one announced while its
+	// capture was partial is announced again once a capture makes it whole.
+	AnnouncedAt *time.Time `json:"announced_at,omitempty"`
 }
 
 // Sections are a snapshot's sections in the schema's order, which is also the order a diff's

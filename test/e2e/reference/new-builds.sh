@@ -1,19 +1,61 @@
 #!/usr/bin/env bash
-# Which harness builds are out that the Harness Reference has not yet published, so the
-# frequent check (reference.yml) captures them within the quarter hour instead of waiting
-# for the night. A few requests a harness: its registry's releases, and the published
-# index. Prints one line a harness with new builds, "harness=version,version", oldest
-# first, at most TERMA_REFERENCE_MAX (5) of a burst, as the nightly's `checked` does; a
-# harness the reference has never published is its newest build alone. Prints nothing when
-# nothing is new.
+# Which harness builds the Harness Reference has yet to capture whole, so the frequent check
+# (reference.yml) captures each of them once, fully, when it comes out: its page and changelog
+# are published once, with terma's verdict. A few requests a harness: its registry's releases,
+# and the published index. Prints one line a
+# harness with builds to capture, "harness=version,version", oldest first; prints nothing when
+# there are none.
 #
-# A registry or the reference that cannot be read is a warning, not a failure: the next
-# check, or the night, catches up. Only a reference that says it has no index for a harness
-# (404) makes it a harness never published.
+# A build to capture is one of a harness's newest TERMA_REFERENCE_MAX (5) releases the reference
+# has not published (a backport released late among them), or one of its newest five published
+# builds where that one's capture was partial and its last attempt is TERMA_REFERENCE_RETRY_AFTER
+# seconds old (6 h), until it has made TERMA_REFERENCE_MAX_ATTEMPTS (4) attempts: a capture that
+# failed is tried again, but neither every quarter hour nor for good. A harness the reference has
+# never published is its newest build alone.
+#
+# A registry or the reference that cannot be read is a warning, not a failure: the next check
+# catches up. Only a reference that says it has no index for a harness (404) makes it a harness
+# never published.
+#
+# The published index is read through GitHub's API (with GITHUB_TOKEN where it is set), not
+# raw.githubusercontent.com, which serves a copy up to five minutes old: a check queued behind a
+# long capture would read the index from before that capture and capture its builds again.
+# TERMA_REFERENCE_URL reads <url>/<harness>/index.json instead, TERMA_NPM_REGISTRY another npm
+# registry, TERMA_REFERENCE_FEEDS_URL a desktop app's update feed at <url>/<harness>, and
+# TERMA_REFERENCE_HARNESSES (a comma list) asks about those harnesses alone.
 set -euo pipefail
 
-base=${TERMA_REFERENCE_URL:-https://raw.githubusercontent.com/miradorlabs/terma-cli/compat-matrix/docs/harnesses}
 max=${TERMA_REFERENCE_MAX:-5}
+retry_after=${TERMA_REFERENCE_RETRY_AFTER:-21600}
+max_attempts=${TERMA_REFERENCE_MAX_ATTEMPTS:-4}
+registry=${TERMA_NPM_REGISTRY:-https://registry.npmjs.org}
+only=${TERMA_REFERENCE_HARNESSES:-}
+
+# watched says whether this run asks about harness.
+watched() { [ -z "$only" ] || [[ ",$only," == *",$1,"* ]]; }
+
+# The builds the suite can fetch by version (TERMA_E2E_<HARNESS>_VERSIONS), each with its
+# npm package, read in npm's abbreviated form (versions and tags, not every manifest).
+# DeepSeek Harness ships prereleases alone: its newest is npm's latest tag.
+harnesses=(
+	"claude @anthropic-ai/claude-code releases"
+	"codex @openai/codex releases"
+	"gemini @google/gemini-cli releases"
+	"opencode opencode-ai releases"
+	"copilot @github/copilot releases"
+	"dsh @deepseek-ai/dsh latest"
+	"pi @earendil-works/pi-coding-agent releases"
+	"t3 t3 releases"
+)
+
+# The desktop apps (TERMA_E2E_<APP>_APP_VERSIONS), by the update feed each one's updater reads:
+# Claude Desktop's Squirrel RELEASES.json names its current release alone, the Codex app's
+# Sparkle appcast every release. Only the newest is captured: the app's update feed is all
+# there is to fetch an app by.
+desktop=(
+	"claude-desktop https://downloads.claude.ai/releases/darwin/universal/RELEASES.json squirrel"
+	"codex-desktop https://persistent.oaistatic.com/codex-app-prod/appcast.xml sparkle"
+)
 
 # vsort sorts versions as the reference ranks them: it is refdiff.VersionCompare itself
 # (refdiff/cmd/versionsort, built once here from test/e2e's go.mod and refdiff alone, no module
@@ -30,9 +72,17 @@ vsort() { "$vsort_dir/versionsort" "$@"; }
 # 5xx), which the caller skips rather than take for never published: an outage of the host
 # would otherwise start every capture each quarter hour.
 read_index() {
-	local code
+	local code url
+	local -a auth=()
 	index=""
-	code=$(curl -sSL --max-time 30 -o "$vsort_dir/index.json" -w '%{http_code}' "$base/$1/index.json" 2>/dev/null) || code=000
+	if [ -n "${TERMA_REFERENCE_URL:-}" ]; then
+		url="$TERMA_REFERENCE_URL/$1/index.json"
+	else
+		url="https://api.github.com/repos/miradorlabs/terma-cli/contents/docs/harnesses/$1/index.json?ref=compat-matrix"
+		auth=(-H "Accept: application/vnd.github.raw+json")
+		if [ -n "${GITHUB_TOKEN:-}" ]; then auth+=(-H "Authorization: Bearer $GITHUB_TOKEN"); fi
+	fi
+	code=$(curl -sSL --max-time 30 ${auth[@]+"${auth[@]}"} -o "$vsort_dir/index.json" -w '%{http_code}' "$url" 2>/dev/null) || code=000
 	case "$code" in
 	200) index=$(cat "$vsort_dir/index.json") ;;
 	404) return 1 ;;
@@ -43,21 +93,24 @@ read_index() {
 	esac
 }
 
-# The builds the suite can fetch by version (TERMA_E2E_<HARNESS>_VERSIONS), each with its
-# npm package, read in npm's abbreviated form (versions and tags, not every manifest).
-# DeepSeek Harness ships prereleases alone: its newest is npm's latest tag.
-harnesses=(
-	"claude @anthropic-ai/claude-code releases"
-	"codex @openai/codex releases"
-	"gemini @google/gemini-cli releases"
-	"opencode opencode-ai releases"
-	"copilot @github/copilot releases"
-	"dsh @deepseek-ai/dsh latest"
-)
+# retry is, of the published builds it is given, those whose capture was partial, with attempts to
+# spare, and whose last attempt (attempted_at; captured_at before there was one) is old enough to
+# try again. A time that does not parse is an old one: the build is tried again rather than never.
+retry() {
+	jq -r --argjson after "$retry_after" --argjson max "$max_attempts" '
+		$ARGS.positional as $builds
+		| .versions[] | select(.version as $v | $builds | index($v))
+		| select(.partial == true and (.attempts // 1) < $max)
+		| ((.attempted_at // .captured_at) as $at
+			| try ($at | sub("\\.[0-9]+"; "") | sub("[+-]00:00$"; "Z") | fromdateiso8601) catch 0) as $t
+		| select(now - $t > $after)
+		| .version' --args "$@" <<<"$index"
+}
 
 for entry in "${harnesses[@]}"; do
 	read -r harness pkg mode <<<"$entry"
-	if ! doc=$(curl -fsSL --max-time 30 -H "Accept: application/vnd.npm.install-v1+json" "https://registry.npmjs.org/${pkg//\//%2F}"); then
+	watched "$harness" || continue
+	if ! doc=$(curl -fsSL --max-time 30 -H "Accept: application/vnd.npm.install-v1+json" "$registry/${pkg//\//%2F}"); then
 		echo "::warning::could not read $pkg's releases" >&2
 		continue
 	fi
@@ -76,28 +129,24 @@ for entry in "${harnesses[@]}"; do
 	2) continue ;;
 	esac
 	if [ -z "$published" ]; then
-		new=$(tail -n 1 <<<"$releases")
+		todo=$(tail -n 1 <<<"$releases")
 	else
-		newest=$(tail -n 1 <<<"$published")
-		# Newer than the newest published, and not published: an older build released late
-		# (a backport) is the night's to judge.
-		new=$(printf '%s\n%s\n' "$releases" "$newest" | vsort -u | sed -n "/^$(sed 's/[.]/\\./g' <<<"$newest")\$/,\$p" | tail -n +2 |
-			grep -vxF -f <(printf '%s\n' "$published") | tail -n "$max" || true)
+		# The newest releases not published, a backport among them; and the newest published
+		# one again, where its capture was partial.
+		todo=$({
+			tail -n "$max" <<<"$releases" | grep -vxF -f <(printf '%s\n' "$published") || true
+			# shellcheck disable=SC2046 # one version a word
+			retry $(tail -n "$max" <<<"$published")
+		} | vsort -u)
 	fi
-	[ -n "$new" ] || continue
-	echo "$harness=$(paste -sd, - <<<"$new")"
+	[ -n "$todo" ] || continue
+	echo "$harness=$(paste -sd, - <<<"$todo")"
 done
 
-# The desktop apps (TERMA_E2E_<APP>_APP_VERSIONS), by the update feed each one's updater reads:
-# Claude Desktop's Squirrel RELEASES.json names its current release alone, the Codex app's
-# Sparkle appcast every release. Only the newest is the frequent check's: the app's update feed
-# is all there is to fetch an app by, and an older release than the newest is the night's.
-desktop=(
-	"claude-desktop https://downloads.claude.ai/releases/darwin/universal/RELEASES.json squirrel"
-	"codex-desktop https://persistent.oaistatic.com/codex-app-prod/appcast.xml sparkle"
-)
 for entry in "${desktop[@]}"; do
 	read -r harness feed kind <<<"$entry"
+	watched "$harness" || continue
+	if [ -n "${TERMA_REFERENCE_FEEDS_URL:-}" ]; then feed="$TERMA_REFERENCE_FEEDS_URL/$harness"; fi
 	if ! doc=$(curl -fsSL --max-time 30 "$feed"); then
 		echo "::warning::could not read $harness's update feed" >&2
 		continue
@@ -111,7 +160,7 @@ for entry in "${desktop[@]}"; do
 	status=0
 	read_index "$harness" || status=$?
 	[ "$status" -ne 2 ] || continue
-	if [ "$status" -eq 0 ] && jq -r '.versions[].version' <<<"$index" | grep -qxF "$newest"; then
+	if [ "$status" -eq 0 ] && jq -r '.versions[].version' <<<"$index" | grep -qxF "$newest" && [ -z "$(retry "$newest")" ]; then
 		continue
 	fi
 	echo "$harness=$newest"

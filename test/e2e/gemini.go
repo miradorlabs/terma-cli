@@ -37,7 +37,7 @@ func forEachGemini(t *testing.T, run func(t *testing.T, b Binary)) {
 		t.Skip("no Gemini CLI build to test")
 	}
 	for _, b := range builds {
-		t.Run(b.Label(), func(t *testing.T) { scenarioOf(t, b.Harness); run(t, b) })
+		t.Run(b.Label(), func(t *testing.T) { scenarioOfBuild(t, b); run(t, b) })
 	}
 }
 
@@ -51,6 +51,7 @@ func ensureGemini(version string) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), scenarioTimeout)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, "npm", "install", "--silent", "--no-audit", "--no-fund", "--prefix", dir, "@google/gemini-cli@"+version)
+	cmd.Env = installEnv()
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return "", fmt.Errorf("npm install @google/gemini-cli@%s: %v\n%s", version, err, out)
 	}

@@ -22,13 +22,14 @@ func forEachOmp(t *testing.T, run func(t *testing.T, b Binary)) {
 	if !Enabled() {
 		t.Skip("live tests run only with TERMA_E2E=1")
 	}
+	skipUnlessSelected(t, "omp")
 	path, err := exec_LookPath("omp")
 	if err != nil {
 		Record(t.Name(), "not run", "omp is not installed")
 		t.Skip("omp is not installed")
 	}
 	b := Binary{Harness: "omp", Version: numberOf(Version(path)), Path: path, Installed: true}
-	t.Run(b.Label(), func(t *testing.T) { scenarioOf(t, b.Harness); run(t, b) })
+	t.Run(b.Label(), func(t *testing.T) { scenarioOfBuild(t, b); run(t, b) })
 }
 
 // UseOmpProvider points the sandbox's omp at an OpenAI-compatible endpoint.

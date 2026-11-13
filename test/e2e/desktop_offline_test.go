@@ -40,26 +40,47 @@ func TestDesktopFeedsOffline(t *testing.T) {
 	}
 }
 
-// The Claude Code build a Claude Desktop release pins is read from its archive's JavaScript.
+// The Claude Code build a Claude Desktop release pins is read from its archive's JavaScript:
+// a release, or (from 4.23118.1) a release candidate under its commit, whose manifest names its
+// base URL too; never the SSH helper's pin beside it.
 func TestClaudeDesktopPinOffline(t *testing.T) {
-	js := `function Q_(){return JSON.parse('{"version":"2.1.317","manifest":{"version":"2.1.317","commit":"3d3e","buildDate":"2026-11-02T22:41:52Z",` +
-		`"platforms":{"darwin-arm64":{"binary":"claude.zst","checksum":"f2e2","size":107811821,"bundle":{"checksum":"9118","size":107815075}}}},` +
-		`"baseUrl":"https://downloads.claude.ai/claude-code-releases","sdkWrapperVersion":"0.3.317"}')}function BEt(){return JSON.parse('{"version":"b308",` +
-		`"manifest":{"platforms":{}},"baseUrl":"https://downloads.claude.ai/claude-ssh-releases"}')}`
-	dir := t.TempDir()
-	bundle := filepath.Join(dir, "Claude.app")
-	if err := os.MkdirAll(filepath.Join(bundle, "Contents", "Resources"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	writeAsar(t, filepath.Join(bundle, "Contents", "Resources", "app.asar"), map[string]string{".vite/build/index.chunk-x.js": js, "package.json": "{}"})
-	pin, err := claudeDesktopPinOf(DesktopApp{Bundle: bundle})
-	if err != nil {
-		t.Fatal(err)
-	}
-	p := pin.Manifest.Platforms["darwin-arm64"]
-	if pin.Version != "2.1.317" || pin.SDKWrapperVersion != "0.3.317" || pin.BaseURL != "https://downloads.claude.ai/claude-code-releases" ||
-		p.Checksum != "f2e2" || p.Bundle == nil || p.Bundle.Checksum != "9118" {
-		t.Errorf("pin: %+v", pin)
+	ssh := `function BEt(){return JSON.parse('{"version":"b308","manifest":{"platforms":{}},"baseUrl":"https://downloads.claude.ai/claude-ssh-releases"}')}`
+	for _, tc := range []struct {
+		name, js, version, sdk, base string
+	}{
+		{
+			"release",
+			`function Q_(){return JSON.parse('{"version":"2.1.317","manifest":{"version":"2.1.317","commit":"3d3e","buildDate":"2026-11-02T22:41:52Z",` +
+				`"platforms":{"darwin-arm64":{"binary":"claude.zst","checksum":"f2e2","size":107811821,"bundle":{"checksum":"9118","size":107815075}}}},` +
+				`"baseUrl":"https://downloads.claude.ai/claude-code-releases","sdkWrapperVersion":"0.3.317"}')}` + ssh,
+			"2.1.317", "0.3.317", "https://downloads.claude.ai/claude-code-releases",
+		},
+		{
+			"release candidate",
+			`function Q_(){return JSON.parse('{"version":"2.1.321","manifest":{"version":"2.1.321","commit":"08fd","buildDate":"2026-11-09T03:00:42Z",` +
+				`"platforms":{"darwin-arm64":{"binary":"claude.zst","checksum":"f2e2","size":107811821,"bundle":{"checksum":"9118","size":107815075}}},` +
+				`"sdkCompat":{"testedWrapperVersions":["0.3.318","0.3.319"],"harnessSchema":1},"baseUrl":"https://downloads.claude.ai/claude-code-releases/rc/08fd"},` +
+				`"baseUrl":"https://downloads.claude.ai/claude-code-releases/rc/08fd","sdkWrapperVersion":"0.3.321-rc.20261109.t023950.sha08fd"}')}` + ssh,
+			"2.1.321", "0.3.321-rc.20261109.t023950.sha08fd", "https://downloads.claude.ai/claude-code-releases/rc/08fd",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			bundle := filepath.Join(dir, "Claude.app")
+			if err := os.MkdirAll(filepath.Join(bundle, "Contents", "Resources"), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			writeAsar(t, filepath.Join(bundle, "Contents", "Resources", "app.asar"), map[string]string{".vite/build/index.chunk-x.js": tc.js, "package.json": "{}"})
+			pin, err := claudeDesktopPinOf(DesktopApp{Bundle: bundle})
+			if err != nil {
+				t.Fatal(err)
+			}
+			p := pin.Manifest.Platforms["darwin-arm64"]
+			if pin.Version != tc.version || pin.SDKWrapperVersion != tc.sdk || pin.BaseURL != tc.base ||
+				p.Checksum != "f2e2" || p.Bundle == nil || p.Bundle.Checksum != "9118" {
+				t.Errorf("pin: %+v", pin)
+			}
+		})
 	}
 }
 

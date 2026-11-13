@@ -90,8 +90,8 @@ jobs:
     environment: live-harnesses
     permissions:
       contents: write
-    # The compat-matrix branch is published by three jobs (this one, reference.yml's and the
-    # nightly live.yml's): never two at once. This one holds it only to publish, starting from
+    # The compat-matrix branch is published by two jobs (this one and reference.yml's): never
+    # both at once. This one holds it only to publish, starting from
     # the branch as it is then (publish.sh publish-models).
     concurrency:
       group: compat-matrix
