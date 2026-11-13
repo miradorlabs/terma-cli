@@ -68,8 +68,10 @@ func (app *App) newSetupCommand() *cobra.Command {
 		Short:   "Sign in, choose your team and coding agents, and write machine-wide hooks",
 		Long: `Gets this machine ready to use terma, once per developer:
 
-  1. Signs you in (a browser handoff; --no-browser prints the URL instead) and, when
-     you belong to several organizations, asks which one (--org names it).
+  1. Signs you in with one approval in the browser (--no-browser prints the URL
+     instead), to every organization you tick there. The active one is --org's,
+     else the one you had, else your personal one. A working sign-in is reused,
+     asking which organization when you belong to several.
   2. Records which coding agents you work with.
   3. Chooses your team (--team names it) and fetches its collection policy, which
      lists the repositories it collects.
