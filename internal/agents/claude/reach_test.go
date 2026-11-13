@@ -189,3 +189,38 @@ func TestRoutedClaudeReadsAndShellCommandsOnlyClassify(t *testing.T) {
 		t.Fatalf("an edit recorded manifests %+v", manifests)
 	}
 }
+
+// A session whose own folder Route drops (outside git, or a repository nobody collects)
+// sends nothing, but still records in the run ledger the Acme checkout it reached: placed
+// in personal's checkout by a later hook, the run has crossed.
+func TestRoutedClaudeSessionInADroppedFolderStillRecordsWhatItReached(t *testing.T) {
+	for _, tc := range []struct {
+		where string
+		at    func(t *testing.T) string
+		tool  string
+	}{
+		{"outside git", func(t *testing.T) string { d, _ := filepath.EvalSymlinks(t.TempDir()); return d }, "Edit"},
+		{"outside git", func(t *testing.T) string { d, _ := filepath.EvalSymlinks(t.TempDir()); return d }, "Read"},
+		{"a repository nobody collects", func(t *testing.T) string { return hookruntest.RepoAt(t, "github.com/other/lib") }, "Edit"},
+	} {
+		t.Run(tc.where+", "+tc.tool, func(t *testing.T) {
+			m := newReachMachine(t)
+			own := tc.at(t)
+			m.start(own)
+			m.tool(own, tc.tool, map[string]any{"file_path": filepath.Join(m.api, "NOTES.md")})
+			if evs := m.spooled(); len(evs) != 0 {
+				t.Fatalf("a dropped folder spooled %s", hookruntest.Names(evs))
+			}
+			if m.mixed() {
+				t.Fatal("Mixed before the run was anywhere an organization collects")
+			}
+			if _, locs, _ := runs.Locations(m.stateDir, reachSession); !slices.Contains(locs, "github.com/acme/api") {
+				t.Fatalf("the run ledger records %v, without Acme's checkout", locs)
+			}
+			m.tool(m.side, "Read", map[string]any{"file_path": filepath.Join(m.side, "README.md")})
+			if !m.mixed() {
+				t.Fatal("placed in personal's checkout after reaching Acme's, the run is not Mixed")
+			}
+		})
+	}
+}
