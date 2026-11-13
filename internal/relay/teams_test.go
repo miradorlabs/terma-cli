@@ -447,3 +447,26 @@ func mustMarshal(t *testing.T, m *logspb.LogsData) []byte {
 	}
 	return b
 }
+
+// An unplaced record waits as it did before the migration, by the same reasons: for its
+// session's claim, a conversation start as long as a trace.
+func TestAnUnplacedRecordWaitsAsBefore(t *testing.T) {
+	t.Parallel()
+	u := newUpstream(t)
+	f := newTeamFixture(t, u)
+	r, srv := f.start(t)
+	start := &logspb.LogsData{ResourceLogs: []*logspb.ResourceLogs{{Resource: &resourcepb.Resource{}, ScopeLogs: []*logspb.ScopeLogs{{LogRecords: []*logspb.LogRecord{
+		{Attributes: []*commonpb.KeyValue{kv("session.id", "U"), kv("event.name", "codex.conversation_starts")}},
+	}}}}}}
+	postProto(t, srv, "/v1/logs", logsOf("W", 1))
+	postProto(t, srv, "/v1/logs", start)
+	waitForCounters(t, r, func(c map[string]int) bool { return c["held_parts"] == 2 })
+	f.mu.Lock()
+	f.now = f.now.Add(2 * time.Minute)
+	f.mu.Unlock()
+	r.sweep()
+	c := r.Stats().Snapshot().Counters
+	if c["dropped.unclaimed_expired.logs"] != 1 || !r.Holding() {
+		t.Fatalf("counters %v: want W dropped as unclaimed, the conversation start still held", c)
+	}
+}
