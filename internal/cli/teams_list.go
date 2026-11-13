@@ -54,6 +54,8 @@ type teamRow struct {
 	// Entries are its policy's repository list; Collects says it in words.
 	Entries  []string `json:"entries,omitempty"`
 	Collects string   `json:"collects"`
+	// GitHooks says its policy stamps commits in what it collects.
+	GitHooks bool `json:"git_hooks,omitempty"`
 	// Unreadable says why its policy could not be read.
 	Unreadable string `json:"unreadable,omitempty"`
 }
@@ -123,7 +125,7 @@ func (app *App) listTeams(ctx context.Context, cfg *config.Config, st routing.St
 			if err != nil {
 				t.Unreadable, t.Collects = err.Error(), "its policy could not be read"
 			} else {
-				t.Entries, t.Collects = pol.Repositories, collectsSummary(pol, o.Type == "personal")
+				t.Entries, t.Collects, t.GitHooks = pol.Repositories, collectsSummary(pol, o.Type == "personal"), pol.GitHooks
 			}
 			row.Teams = append(row.Teams, t)
 		}
@@ -154,7 +156,7 @@ func (v *teamsView) mergeState(st routing.State, names teamNames, now time.Time)
 		row := &org.Teams[i]
 		row.Selected, row.EnrollmentID, row.State, row.LastError = true, t.EnrollmentID, t.StateAt(now), t.LastError
 		if row.Unreadable == "" && row.Entries == nil {
-			row.Entries, row.Collects = t.Policy.Repositories, collectsSummary(t.Policy, t.Personal)
+			row.Entries, row.Collects, row.GitHooks = t.Policy.Repositories, collectsSummary(t.Policy, t.Personal), t.Policy.GitHooks
 		}
 		if t.Personal && org.Type == "" {
 			org.Type = "personal"
