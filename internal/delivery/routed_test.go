@@ -420,3 +420,55 @@ func TestMigratedDeliveryKeepsItsContentChecks(t *testing.T) {
 		t.Fatalf("sent:\n%s", body)
 	}
 }
+
+// A pass reads each session's run ledger once, across all its batches, and still drops
+// what its run's crossing covers: a session's subagent ID is a read of its own.
+func TestAPassReadsEachRunLedgerOnce(t *testing.T) {
+	t.Parallel()
+	m := migratedMachine(t)
+	host := newIngest(t)
+	e := m.route(config.DefaultProfile, []routing.Team{orgTeam("acme", "acme-platform", "github.com/acme/*")}, bindAcme)
+	m.key(e["acme-platform"], "acme-platform", "ter_srv_acme", host)
+	began := time.Now().Add(-time.Hour)
+	if _, err := runs.Start(m.state, "sess-1", began); err != nil {
+		t.Fatal(err)
+	}
+	crossed := began.Add(30 * time.Minute)
+	must := func(err error) {
+		t.Helper()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	must(runs.MarkMixed(m.state, "sess-1", crossed))
+	must(runs.Alias(m.state, "sess-1", "sub-1"))
+	var queued []spool.Event
+	for i := range 2*spool.DefaultBatch + 50 {
+		ev := routedEvent(e["acme-platform"], "github.com/acme/api", []string{"sess-1", "sub-1", "sess-2"}[i%3], "m")
+		ev.Time = crossed.Add(time.Duration(i%2*2-1) * time.Minute) // before and after the crossing
+		queued = append(queued, ev)
+	}
+	m.queue(queued...)
+	var mu sync.Mutex
+	reads := map[string]int{}
+	r := m.router()
+	r.readLedger = func(stateDir, id string) runs.Snapshot {
+		mu.Lock()
+		reads[id]++
+		mu.Unlock()
+		return runs.Read(stateDir, id)
+	}
+	res := m.flush(r)
+	if len(reads) != 3 || reads["sess-1"] != 1 || reads["sub-1"] != 1 || reads["sess-2"] != 1 {
+		t.Errorf("ledger reads %v, want one per session", reads)
+	}
+	var mixed int
+	for _, ev := range queued {
+		if ev.SessionID != "sess-2" && !ev.Time.Before(crossed) {
+			mixed++
+		}
+	}
+	if res.Mixed != mixed || res.Sent != len(queued)-mixed {
+		t.Errorf("Flush = %+v, want %d dropped as Mixed", res, mixed)
+	}
+}

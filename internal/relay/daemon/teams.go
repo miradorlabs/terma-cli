@@ -62,6 +62,12 @@ type Teams struct {
 	// userTTL: asking reads the keychain, and the relay resolves far more often.
 	userMu sync.Mutex
 	users  map[string]cachedUser
+
+	// ledgers are the run ledgers Route read, by session (Teams.ledger).
+	ledgerMu   sync.Mutex
+	ledgers    map[string]cachedLedger
+	ledgerTTL  time.Duration
+	readLedger func(stateDir, idOrAlias string) runs.Snapshot
 }
 
 type cachedUser struct {
@@ -78,7 +84,8 @@ func NewTeams(cfg *config.Config, deps TeamsDeps) *Teams {
 	if deps.Now == nil {
 		deps.Now = time.Now
 	}
-	return &Teams{cfg: cfg, deps: deps, users: map[string]cachedUser{}}
+	return &Teams{cfg: cfg, deps: deps, users: map[string]cachedUser{},
+		ledgers: map[string]cachedLedger{}, ledgerTTL: ledgerTTL, readLedger: runs.Read}
 }
 
 var _ relay.Router = (*Teams)(nil)
@@ -355,48 +362,6 @@ func (t *Teams) key(enrollment string) (string, keystore.Hosts, error) {
 		t.keyMu.Unlock()
 	}
 	return key, hosts, err
-}
-
-// mixedAt reports whether session's run in force at at was Mixed by then (runs.MixedAt),
-// and from when: a ledger that cannot be read is Mixed from the start.
-func (t *Teams) mixedAt(session string, at time.Time) (time.Time, bool) {
-	if session == "" {
-		return time.Time{}, false
-	}
-	return mixedFrom(runs.Read(t.cfg.StateDir, session), at)
-}
-
-// mixedAt is Teams.mixedAt from the pass's one read of session's ledger.
-func (p *recheck) mixedAt(session string, at time.Time) (time.Time, bool) {
-	if session == "" {
-		return time.Time{}, false
-	}
-	l, read := p.runs[session]
-	if !read {
-		l = runs.Read(p.stateDir, session)
-		p.runs[session] = l
-	}
-	return mixedFrom(l, at)
-}
-
-// mixedFrom reports whether the run in force at at, in a session's ledger l, was Mixed by
-// then, and from when: a ledger that cannot be read is Mixed from the start.
-func mixedFrom(l runs.Snapshot, at time.Time) (time.Time, bool) {
-	from, mixed := l.MixedAt(at)
-	if !mixed || !at.IsZero() && at.Before(from) {
-		return time.Time{}, false
-	}
-	if from.IsZero() {
-		from = time.Unix(0, 1)
-	}
-	return from, true
-}
-
-func mixedBlocker(session string) string {
-	if session == "" {
-		return ""
-	}
-	return "mixed:" + session
 }
 
 // held is why routing held a record, and what blocked it.

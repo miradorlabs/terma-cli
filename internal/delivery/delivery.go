@@ -17,6 +17,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/routing"
+	"github.com/miradorlabs/terma-cli/internal/runs"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
@@ -40,6 +41,8 @@ type Router struct {
 	// EnrolledUser is User on a migrated machine: who events sent to team, an enrollment in
 	// profile's routing state, with a key filed with hosts, at endpoint name.
 	EnrolledUser func(profile string, team routing.Team, hosts keystore.Hosts, endpoint string) string
+	// readLedger reads a session's run ledger; runs.Read when nil.
+	readLedger func(stateDir, idOrAlias string) runs.Snapshot
 }
 
 // Result summarizes one delivery pass; its counters are disjoint, one per reason, but for
@@ -96,7 +99,7 @@ func (r Router) Flush(ctx context.Context, s *spool.Spool, cfg *config.Config, f
 	sender := spool.SenderFunc(p.byProject)
 	if config.Migrated(r.ConfigDir) {
 		res.Migrated = true
-		p.routes = routeCache{}
+		p.routes, p.ledgers = routeCache{}, map[string]runs.Snapshot{}
 		sender = p.routed
 	}
 	fr := s.Flush(ctx, sender, spool.FlushOptions{Force: force, MinInterval: minInterval, Now: now})
@@ -126,6 +129,8 @@ type pass struct {
 	failed, waiting, accepted map[string]bool
 	// routes are a migrated machine's routing states, kept across the pass's batches.
 	routes routeCache
+	// ledgers are the run ledgers the pass read, by session or subagent ID (pass.mixed).
+	ledgers map[string]runs.Snapshot
 }
 
 // byProject sends a batch the way a machine not yet migrated always has: each event to the

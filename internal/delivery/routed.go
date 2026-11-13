@@ -266,15 +266,31 @@ func boundTo(d routing.Decision, organization string) bool {
 // and e is not exempt: a record that carries content obeys its run's Mixed state even
 // when it routes by its own location, as a reply read from an agent's turn does. Only a
 // record with its own location that says where something happened and nothing else (a
-// file event, a commit, a push: runs.Locational) keeps its destination. The run ledger
-// says so long after the claim that marked it has expired; one it cannot read counts as
-// Mixed from the start.
+// file event, a commit, a push: runs.Locational) keeps its destination. A ledger that
+// cannot be read counts as Mixed from the start.
+//
+// Each ledger is read once a pass. A pass sends only what was spooled before it began
+// (spool.Flush), so that one read is later than every event it judges, and sees every
+// crossing recorded before one of them was spooled.
 func (p *pass) mixed(e spool.Event) bool {
 	if e.SessionID == "" || e.OwnLocation && runs.Locational(e.Name) {
 		return false
 	}
-	at, mixed := runs.MixedAt(p.r.StateDir, e.SessionID, e.Time)
+	l, read := p.ledgers[e.SessionID]
+	if !read {
+		l = p.r.ledger(e.SessionID)
+		p.ledgers[e.SessionID] = l
+	}
+	at, mixed := l.MixedAt(e.Time)
 	return mixed && (e.Time.IsZero() || !at.After(e.Time))
+}
+
+// ledger reads the run ledger of idOrAlias.
+func (r Router) ledger(idOrAlias string) runs.Snapshot {
+	if r.readLedger != nil {
+		return r.readLedger(r.StateDir, idOrAlias)
+	}
+	return runs.Read(r.StateDir, idOrAlias)
 }
 
 // outgoingTo is e as it may leave for team, whose recheck found it still covers e: under
