@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -187,7 +188,7 @@ func routeReasons(st routing.State, names teamNames, loc routing.Location, d rou
 	}
 	if d.Reason == routing.ReasonPersonal {
 		var bound []string
-		for _, k := range sortedBindingKeys(st.Bindings) {
+		for _, k := range slices.Sorted(maps.Keys(st.Bindings)) {
 			if b := st.Bindings[k]; !b.Refused && k != owner && routing.Owner(k) == owner {
 				bound = append(bound, k+" ("+cmp.Or(names.Orgs[b.Organization], b.Organization)+")")
 			}

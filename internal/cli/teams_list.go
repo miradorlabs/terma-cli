@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"context"
 	"errors"
+	"maps"
 	"net/http"
 	"slices"
 	"strings"
@@ -224,12 +225,7 @@ func (v *teamsView) mergeState(st routing.State, names teamNames, now time.Time)
 			org.Type = "personal"
 		}
 	}
-	keys := make([]string, 0, len(st.Bindings))
-	for k := range st.Bindings {
-		keys = append(keys, k)
-	}
-	slices.Sort(keys)
-	for _, k := range keys {
+	for _, k := range slices.Sorted(maps.Keys(st.Bindings)) {
 		b := st.Bindings[k]
 		v.Bindings = append(v.Bindings, bindingRow{Key: k, Organization: b.Organization, Refused: b.Refused,
 			Name: cmp.Or(names.Orgs[b.Organization], v.orgName(b.Organization))})
