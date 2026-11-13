@@ -36,11 +36,13 @@ type Routing struct {
 	runs map[string]*ledgerRun
 }
 
-// ledgerRun is a session's run as one hook process knows it: its ID, and the locations the
-// run ledger records for it, as read and with those this process has added since.
+// ledgerRun is a session's run as one hook process knows it: its ID, the locations the
+// run ledger records for it, as read and with those this process has added since, and the
+// ledger's last activity (runs.Position).
 type ledgerRun struct {
 	id        string
 	locations []string
+	active    time.Time
 }
 
 // NewRouting is profile's routing under st, its routing state: nil for one missing,
@@ -243,18 +245,41 @@ func (e Env) currentRun(sessionID string) (run string, locations []string) {
 	defer rt.mu.Unlock()
 	cur, ok := rt.runs[sessionID]
 	if !ok {
-		cur = &ledgerRun{}
-		cur.id, cur.locations, _ = runs.Locations(e.StateDir, sessionID)
+		p, _ := runs.Locate(e.StateDir, sessionID)
+		cur = &ledgerRun{id: p.Run, locations: p.Locations, active: p.Active}
 		rt.runs[sessionID] = cur
 	}
 	return cur.id, slices.Clip(cur.locations)
 }
 
-// setRun records that sessionID's hooks name run from now on, a run that has been nowhere.
-func (rt *Routing) setRun(sessionID, run string) {
+// setRun records that sessionID's hooks name run from now on, a run that has been nowhere,
+// begun at at.
+func (rt *Routing) setRun(sessionID, run string, at time.Time) {
 	rt.mu.Lock()
 	defer rt.mu.Unlock()
-	rt.runs[sessionID] = &ledgerRun{id: run}
+	rt.runs[sessionID] = &ledgerRun{id: run, active: at}
+}
+
+// keepRun renews sessionID's run ledger (runs.Refresh) once its last activity, as this
+// process read it with the run (currentRun), is older than runs.RefreshEvery. A run that
+// stays in one place records nothing new, so without it the ledger, and a Mixed run's
+// crossing with it, would be pruned while the session runs. It costs no read, and a write
+// at most once a day.
+func (e Env) keepRun(sessionID string, now time.Time) {
+	rt := e.Routing
+	rt.mu.Lock()
+	cur, ok := rt.runs[sessionID]
+	due := ok && cur.id != "" && now.Sub(cur.active) > runs.RefreshEvery
+	if due {
+		cur.active = now
+	}
+	rt.mu.Unlock()
+	if !due {
+		return
+	}
+	if err := runs.Refresh(e.StateDir, sessionID, now); err != nil {
+		e.Logf("renew the run ledger: %v", err)
+	}
 }
 
 // recorded notes that the run ledger now records locations for sessionID's run run, as
