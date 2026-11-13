@@ -293,7 +293,7 @@ func (s *sender) policy(c claim.Claim) (pol Policy, ok bool, discard string) {
 	if !mapped {
 		return Policy{}, false, whyLegacy
 	}
-	switch v := s.r.opts.Router.Recheck(q); v.Verdict {
+	switch v := s.r.opts.Router.Recheck(q.Enrollment).Entry(q); v.Verdict {
 	case Discard:
 		return Policy{}, false, v.Why.reason()
 	case Wait:

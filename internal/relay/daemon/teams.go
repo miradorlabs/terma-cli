@@ -172,20 +172,59 @@ func (t *Teams) Route(rec relay.Record) relay.Routed {
 	return relay.Routed{Outcome: relay.Drop, Why: relay.WhyNoTeam}
 }
 
-// Recheck judges a queued entry: one attributed through its run is dropped once the run
-// was Mixed by its time (the run ledger), then routing.Router.Recheck decides.
-func (t *Teams) Recheck(q relay.Queued) relay.Rechecked {
+// Recheck starts a pass over enrollment's queue (relay.Rechecker), against the routing
+// state as it stands now: the team's state is judged once for the whole pass, and each
+// session's run ledger read at most once.
+func (t *Teams) Recheck(enrollment string) relay.Rechecker {
 	st, router, ok := t.state()
+	return &recheck{stateDir: t.cfg.StateDir, enrollment: enrollment, st: st, router: router, ok: ok,
+		now: t.deps.Now(), runs: map[string]runs.Snapshot{}}
+}
+
+// recheck is one pass over an enrollment's queue.
+type recheck struct {
+	stateDir, enrollment string
+	st                   routing.State
+	router               *routing.Router
+	ok                   bool
+	now                  time.Time
+	// runs are the sessions' ledgers, each read once in the pass.
+	runs map[string]runs.Snapshot
+}
+
+// TeamWaits reports whether every entry waits for its team: the routing state cannot be
+// read, or the team cannot send now but may recover (expired, signing in, suspended).
+// Nothing queued for it may leave then, so no entry is judged until it can: one its team
+// would no longer take waits with the rest, and is dropped once the team can send again.
+func (p *recheck) TeamWaits() (relay.Rechecked, bool) {
+	if !p.ok {
+		return relay.Rechecked{Verdict: relay.Wait, Why: relay.WhyNoState}, true
+	}
+	tm := team(p.st, p.enrollment)
+	if tm == nil {
+		return relay.Rechecked{}, false
+	}
+	switch tm.StateAt(p.now) {
+	case routing.Active, routing.Refused:
+		return relay.Rechecked{}, false
+	}
+	return relay.Rechecked{Verdict: relay.Wait, Why: relay.WhyBlocked, Blocker: "team:" + p.enrollment}, true
+}
+
+// Entry judges a queued entry: one attributed through its run is dropped once the run was
+// Mixed by its time (the run ledger), then routing.Router.Recheck decides.
+func (p *recheck) Entry(q relay.Queued) relay.Rechecked {
+	st, router, ok := p.st, p.router, p.ok
 	if !ok {
 		return relay.Rechecked{Verdict: relay.Wait, Why: relay.WhyNoState}
 	}
 	if !q.Own {
-		if _, mixed := t.mixedAt(q.Session, q.At); mixed {
+		if _, mixed := p.mixedAt(q.Session, q.At); mixed {
 			return relay.Rechecked{Verdict: relay.Discard, Why: relay.WhyMixed, Blocker: mixedBlocker(q.Session)}
 		}
 	}
 	loc := routing.Location{Kind: routing.LocationKind(q.Kind), Repository: q.Repository, Narrow: q.Narrow}
-	v, d := router.Recheck(routing.Destination{EnrollmentID: q.Enrollment, Location: loc}, t.deps.Now())
+	v, d := router.Recheck(routing.Destination{EnrollmentID: q.Enrollment, Location: loc}, p.now)
 	switch v {
 	case routing.SendNow:
 		return relay.Rechecked{Verdict: relay.SendNow}
@@ -331,7 +370,26 @@ func (t *Teams) mixedAt(session string, at time.Time) (time.Time, bool) {
 	if session == "" {
 		return time.Time{}, false
 	}
-	from, mixed := runs.MixedAt(t.cfg.StateDir, session, at)
+	return mixedFrom(runs.Read(t.cfg.StateDir, session), at)
+}
+
+// mixedAt is Teams.mixedAt from the pass's one read of session's ledger.
+func (p *recheck) mixedAt(session string, at time.Time) (time.Time, bool) {
+	if session == "" {
+		return time.Time{}, false
+	}
+	l, read := p.runs[session]
+	if !read {
+		l = runs.Read(p.stateDir, session)
+		p.runs[session] = l
+	}
+	return mixedFrom(l, at)
+}
+
+// mixedFrom reports whether the run in force at at, in a session's ledger l, was Mixed by
+// then, and from when: a ledger that cannot be read is Mixed from the start.
+func mixedFrom(l runs.Snapshot, at time.Time) (time.Time, bool) {
+	from, mixed := l.MixedAt(at)
 	if !mixed || !at.IsZero() && at.Before(from) {
 		return time.Time{}, false
 	}
