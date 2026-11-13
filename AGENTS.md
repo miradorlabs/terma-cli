@@ -33,6 +33,12 @@ internal/hooks/         `terma hook <event>`: dispatch, runtime (hookrun), hook-
 internal/relay/         the local relay daemon
 internal/spool/         the local queue hooks append to
 internal/delivery/      sends the spool to each project, from a detached flush
+internal/routing/       on a machine routing by teams, each profile's routing state (its
+                        teams, their policies and states, the bindings) and Route
+internal/runs/          the run ledger: each session's runs, and when one crossed organizations
+internal/migrate/       the relay's one-way move of the machine to routing by teams
+internal/account/       the platform's API (api), sign-ins (auth) and keys (keystore), their
+                        secrets in the system keychain (secret)
 internal/session/       session manifests and commit attribution
 internal/doctor/        `terma doctor` checks
 internal/setup/         `terma setup`; internal/globalmode/ writes the machine-wide hooks
@@ -84,8 +90,15 @@ setup changed: `config.json` (profiles and settings), `credentials.json`, `keys.
 credentials' secrets, sign-in tokens and server keys, live in the system keychain
 (`internal/account/secret`), as gh keeps its token: `credentials.json` and `keys.json`
 index them, and hold them only where there is no keychain or `--insecure-storage` asks.
-The state directory (`config.StateDir`) holds what terma writes as it runs: `relay/`,
-`spool/`, `policies/`, `agents/<agent>/` (each agent's hook state), `funding/`,
+On a machine routing by teams they are in `credentials.v2.json` and `keys.v2.json` instead,
+each team's key filed by its enrollment (keychain items
+`credential.v2/<profile>/<organization>` and `team-key/<enrollment>`), and
+`credentials.json` and `keys.json` are left empty; `credentials.v2.json` alone marks the
+machine migrated (`config.Migrated`), even once a routing state is lost. The state
+directory (`config.StateDir`) holds what terma writes as it runs: `relay/`, `spool/`,
+`policies/`, `routing/` (each profile's routing state), `runs/` (the run ledger),
+`team-names/` (the names `terma teams` last listed), `migration-blocked.json` (why the last
+relay start did not migrate), `agents/<agent>/` (each agent's hook state), `funding/`,
 `workspaces/` (session stores for work begun outside git) and `update/`; a repository's
 session store is `.git/terma/`, which also keeps what a git hook in an agent's sandbox could
 not write to the state directory, until a hook outside the sandbox moves it there. Names
@@ -119,6 +132,33 @@ policy's default project, and the relay sends what no claim places there too, ex
 session an agent's hooks claim every one of (`shape.SessionKey.Claimed`): it waits for its
 claim, so a hidden side thread no hook claims stays here. What is held stays in memory,
 never on disk, and a stopping relay drops it.
+
+**Routing by teams.** All of the above is a machine routing by its profile's one team. The
+relay moves it to routing by teams once and for good (`internal/migrate`): only a relay
+does, as it starts, holding its own lock and the spool flush's, so nothing else sends
+meanwhile. It checks that the agents' hooks run its own terma, and asks whether each team
+is a personal organization's with that profile's own sign-in; then it writes each profile's
+routing state in a Preparing phase, copies the keys and sign-ins into `keys.v2.json` and
+`credentials.v2.json`, empties `keys.json` and `credentials.json`, clears config.json's
+team, and commits. A start that cannot records why for doctor (`migrate.ReadBlock`), and
+the next tries again; until the commit, everything runs as before, and once it is made an
+older terma finds no team, key or sign-in, and collects nothing. On a migrated machine the
+profile's routing state (`routing/<profile>.json`) is the one store of the teams this
+machine sends to, each selection an enrollment with its last validated policy and state,
+and of the developer's bindings of owners and repositories to organizations: `terma teams`
+ticks and binds, and the relay refreshes each enrollment's policy with its own
+organization's sign-in. `routing.Router.Route` decides where every record goes, and a
+routing state the migration has not committed sends nothing (`routing.LoadReady`). Hooks
+route each location they record: a location-only placement for the session, each spooled
+event with the destination Route gave it and never a project, and each session's runs in
+the run ledger (`runs/`, `internal/runs`), where a run that touches two organizations'
+checkouts turns Mixed and sends no telemetry until the session starts a new run. The commit
+hooks are installed, and `prepare-commit-msg` stamps, only where Route sends the repository
+to a team whose policy turns `git_hooks` on. A record's destination never changes once
+routed: the relay queues each part for its enrollment, and the spool keeps each event's;
+both recheck it before sending (`routing.Router.Recheck`, then `runs.MixedAt`), and send it
+with that enrollment's own key from `keys.v2.json` alone, filtered by its team's content
+rules.
 
 ## Rules
 
