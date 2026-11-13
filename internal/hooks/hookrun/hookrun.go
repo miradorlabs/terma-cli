@@ -164,7 +164,19 @@ func (e *Env) Open(ctx context.Context, sessionID, cwd string) (*Repo, bool) {
 // or ErrNotAdmitted, before anything is written, for one the team policy does not collect.
 // It first hands on what hooks in an agent's sandbox parked there (unpark).
 func (e Env) Repo(ctx context.Context) (*Repo, error) {
-	r, err := e.resolve(ctx)
+	return e.RepoAt(ctx, nil)
+}
+
+// RepoAt is Repo for the checkout at Cwd that Classify located, so a hook that classifies
+// first locates it once; a nil located is located here.
+func (e Env) RepoAt(ctx context.Context, located *Repo) (*Repo, error) {
+	var r *Repo
+	var err error
+	if e.Routing != nil {
+		r, err = e.resolveRouted(ctx, located)
+	} else {
+		r, err = e.resolve(ctx)
+	}
 	if err == nil {
 		e.unpark(r)
 	}
@@ -175,7 +187,7 @@ func (e Env) Repo(ctx context.Context) (*Repo, error) {
 // budget to keep: the next hook hands the parked records on.
 func (e Env) resolve(ctx context.Context) (*Repo, error) {
 	if e.Routing != nil {
-		return e.resolveRouted(ctx)
+		return e.resolveRouted(ctx, nil)
 	}
 	root, gitDir, id, remote, err := e.locate(ctx)
 	if err != nil {

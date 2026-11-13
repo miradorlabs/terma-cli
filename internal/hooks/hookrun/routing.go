@@ -98,15 +98,18 @@ func (rt *Routing) route(loc routing.Location, now time.Time) *dest {
 	return &dest{loc: loc, d: rt.router.Route(loc, now)}
 }
 
-// resolveRouted is resolve on a migrated machine: the working copy at Cwd and its session
-// store when Route sends or holds its location, else ErrNotAdmitted.
-func (e Env) resolveRouted(ctx context.Context) (*Repo, error) {
+// resolveRouted is resolve on a migrated machine: the working copy at Cwd, r when already
+// located, and its session store when Route sends or holds its location, else
+// ErrNotAdmitted.
+func (e Env) resolveRouted(ctx context.Context, r *Repo) (*Repo, error) {
 	if !e.Routing.Usable() {
 		return nil, ErrNotAdmitted
 	}
-	r, err := e.routeHere(ctx)
-	if err != nil {
-		return nil, err
+	if r == nil {
+		var err error
+		if r, err = e.routeHere(ctx); err != nil {
+			return nil, err
+		}
 	}
 	if !r.dest.collected() {
 		return nil, ErrNotAdmitted
