@@ -20,6 +20,9 @@ import (
 // signed-in one's teams with what their policies collect, and the bindings.
 type teamsView struct {
 	Organizations []orgRow `json:"organizations"`
+	// Unauthorized counts the organizations listed that this machine has no sign-in for,
+	// which `terma teams --authorize` signs in to (auth.MaxCodes per approval).
+	Unauthorized int `json:"unauthorized"`
 	// Unlisted says why the organizations could not be listed; the selected teams are
 	// still shown, from the routing state.
 	Unlisted string       `json:"unlisted,omitempty"`
@@ -29,6 +32,8 @@ type teamsView struct {
 	// Changes say what this run did, and Warnings what the developer should know of it.
 	Changes  []string `json:"changes,omitempty"`
 	Warnings []string `json:"warnings,omitempty"`
+	// unauthorized are the organizations Unauthorized counts, in listing order.
+	unauthorized []organization
 }
 
 // orgRow is one organization: its teams once this machine has its sign-in.
@@ -108,6 +113,7 @@ func (app *App) listTeams(ctx context.Context, cfg *config.Config, st routing.St
 		if !ok {
 			row.Note = "sign in to see its teams"
 			v.Organizations = append(v.Organizations, row)
+			v.unauthorized = append(v.unauthorized, o)
 			continue
 		}
 		row.SignedIn = true
@@ -131,6 +137,7 @@ func (app *App) listTeams(ctx context.Context, cfg *config.Config, st routing.St
 		}
 		v.Organizations = append(v.Organizations, row)
 	}
+	v.Unauthorized = len(v.unauthorized)
 	names.save(app.stateDir, cfg.ProfileName)
 	v.mergeState(st, names, time.Now())
 	return v
