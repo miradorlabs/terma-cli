@@ -269,7 +269,7 @@ func (app *App) teamPolicy(ctx context.Context, cfg *config.Config, cred *auth.C
 	if err != nil {
 		return config.Policy{}, err
 	}
-	pol, err := client.CollectionPolicy(ctx)
+	pol, err := client.TeamPolicy(ctx)
 	if err != nil {
 		return config.Policy{}, err
 	}
