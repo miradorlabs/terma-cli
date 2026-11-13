@@ -85,7 +85,8 @@ type Options struct {
 	// ProcessAlive reports whether a sender still runs; sessionless parts go by process once it exits.
 	ProcessAlive func(pid int) bool
 	// GovernanceSender reports whether a sender is the signed Terma app (DesktopSender), whose
-	// governance records a session's claim places by time; none is when nil.
+	// governance records a session's claim places by time; asked once per connection, when its
+	// sender is found. None is when nil.
 	GovernanceSender func(pid int) bool
 	// HTTP sends upstream; a no-redirect client with a 15-second timeout when nil.
 	HTTP *http.Client
@@ -310,14 +311,13 @@ func (r *Relay) export(w http.ResponseWriter, req *http.Request, s Signal) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	pid := r.senderPID(req)
+	pid, desktop := r.senderOf(req)
 	_, global := r.catchAll()
 	narrow := r.opts.CatchAll != nil && !global
-	desktop := pid != 0 && r.opts.GovernanceSender != nil && r.opts.GovernanceSender(pid)
 	for _, p := range parts {
 		p.pid, p.narrow = pid, narrow
 		p.at = earliest(p.msg)
-		p.governance = desktop && governanceOnly(p)
+		markGovernance(p, desktop)
 		r.stats.received(s, p.records)
 		// The app reports on many sessions: its process names none of them (learnProcess).
 		if p.session != "" && !strings.HasPrefix(p.session, tracePrefix) && !p.governance {
@@ -336,7 +336,9 @@ func (r *Relay) export(w http.ResponseWriter, req *http.Request, s Signal) {
 			}
 			p.session = procKey(pid)
 		}
-		r.route(p)
+		for _, q := range r.byPlacement(p) {
+			r.route(q)
+		}
 	}
 	// An empty success response is valid OTLP in either encoding.
 	if isJSON {

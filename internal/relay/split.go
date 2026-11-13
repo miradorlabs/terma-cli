@@ -41,11 +41,15 @@ type part struct {
 	// narrow marks a part that arrived outside global mode, while the relay has one to
 	// enter: only a placement that needs a claim may send it, never one global mode grants.
 	narrow bool
-	// claimed marks a part named by a Claimed session key: only its session's claim may send it.
+	// claimed marks a part only its session's claim may send: one named by a Claimed session
+	// key, or a governance part.
 	claimed bool
 	// governance marks a part of Terma Desktop's system governance from the signed app
 	// (governance.go): its session's claim places it by time, whichever process it reports on.
 	governance bool
+	// until is a governance part's latest record time: the part must not span a move of its
+	// session to another placement (claim.Moves).
+	until time.Time
 }
 
 // sessionOf is the first session key, by rank, on the record's attributes, then its
@@ -354,10 +358,15 @@ func earliest(msg proto.Message) time.Time {
 			}
 		}
 	}
-	if first == 0 || first > math.MaxInt64 {
+	return nanos(first)
+}
+
+// nanos is t nanoseconds since the Unix epoch: zero when unset or past what a time.Time holds.
+func nanos(t uint64) time.Time {
+	if t == 0 || t > math.MaxInt64 {
 		return time.Time{}
 	}
-	return time.Unix(0, int64(first))
+	return time.Unix(0, int64(t))
 }
 
 func eachPointTime(m *metricspb.Metric, see func(uint64)) {

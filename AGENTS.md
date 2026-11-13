@@ -107,8 +107,8 @@ only claimed sessions, only from the processes the claim names, and only while t
 still lists the claim's repository. The one sender a claim need not name is Terma Desktop,
 whose system governance reports what the operating system saw a session's processes do
 (`terma.capture.surface` governance): the relay checks the app's code signature with the
-kernel (`procinfo.Signer`, Mirador Labs' team) and takes only those records from it, placed by
-their session's claim at their time (`relay/governance.go`). It sends them with the team's key and applies the team's
+kernel (`procinfo.Signer`, Mirador Labs' team, once per connection) and takes only those
+records from it, each placed by its session's claim at its own time (`relay/governance.go`). It sends them with the team's key and applies the team's
 collection policy: agents export all content to it, and the policy alone decides what
 leaves (`config.Policy.Content`). The claim also names the checkout the hook ran in, which
 the relay stamps on the session's records (`stampCheckout`): its origin, branch and whether
@@ -121,7 +121,8 @@ machine. The exception is a policy in global mode, which collects every session 
 machine: it admits every repository, a hook outside git claims its session for the
 policy's default project, and the relay sends what no claim places there too, except a
 session an agent's hooks claim every one of (`shape.SessionKey.Claimed`): it waits for its
-claim, so a hidden side thread no hook claims stays here. What is held stays in memory,
+claim, so a hidden side thread no hook claims stays here, and Terma Desktop's governance,
+which leaves only by a claim. What is held stays in memory,
 never on disk, and a stopping relay drops it.
 
 ## Rules

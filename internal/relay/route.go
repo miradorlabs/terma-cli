@@ -4,7 +4,6 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-	"time"
 
 	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
 	logspb "go.opentelemetry.io/proto/otlp/logs/v1"
@@ -24,6 +23,7 @@ const (
 	whyProcess        = "uncovered_process"  // claimed, but by other processes: resumed elsewhere
 	whyNoKey          = "no_key"             // claimed, but this machine holds no key for the project
 	whyAmbiguous      = "ambiguous_process"  // no session named; its process named more than one session
+	whySpansMove      = "spans_move"         // a governance part from both sides of its session's move: loss, never a guess
 	whyProcessIdle    = "no_session_process" // no session named; its process has named none
 	whyProcessRunning = "process_running"    // no session named; attributed only once its process exits
 	whyWidened        = "policy_widened"     // arrived outside global mode, now placed only by it: dropped at once
@@ -72,7 +72,7 @@ func (r *Relay) decide(key string, p *part) (claim.Claim, Policy, string, bool, 
 		}
 		return claim.Claim{}, Policy{}, whyNoTrace, false, attribution{}
 	}
-	c, pol, why, ok := r.decideClaimed(session, pid, at, narrow, p.governance)
+	c, pol, why, ok := r.decideClaimed(session, p)
 	return c, pol, why, ok, attribution{}
 }
 
@@ -80,16 +80,21 @@ func (r *Relay) decide(key string, p *part) (claim.Claim, Policy, string, bool, 
 // A narrow part never leaves under a policy that needs no claim: only global mode grants
 // one, so the part's session was not collected when it arrived, whatever repository it is in.
 // A governance part (part.governance) is placed by its time alone: Terma Desktop reports on
-// every process of the session, none of which the claim need name.
-func (r *Relay) decideClaimed(session string, pid int, at time.Time, narrow, governance bool) (claim.Claim, Policy, string, bool) {
+// every process of the session, none of which the claim need name. Its records must all lie
+// within one placement (byPlacement cuts them so at arrival).
+func (r *Relay) decideClaimed(session string, p *part) (claim.Claim, Policy, string, bool) {
+	narrow := p.narrow
 	c, ok := r.lookup(session)
 	if !ok {
 		return claim.Claim{}, Policy{}, whyUnclaimed, false
 	}
-	if governance {
-		c, ok = c.During(at)
-	} else {
-		c, ok = c.At(pid, at)
+	switch {
+	case !p.governance:
+		c, ok = c.At(p.pid, p.at)
+	case len(c.Moves(p.at, p.until)) > 0:
+		return claim.Claim{}, Policy{}, whySpansMove, false
+	default:
+		c, ok = c.During(p.at)
 	}
 	if !ok {
 		return claim.Claim{}, Policy{}, whyProcess, false

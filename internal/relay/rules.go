@@ -43,12 +43,12 @@ var generic = shape.CaptureRules{
 	ToolContentFields: []string{"gen_ai.tool.call.arguments", "gen_ai.tool.call.result", "file_path", "result", "cwd"},
 }
 
-// governance is Terma Desktop's system governance (governance.go), no agent's: hosts, kinds and
-// who signed a program leave under any policy; a tool's command line and the paths of files are
-// tool content.
+// governance is Terma Desktop's system governance (governance.go), no agent's: the agent's name,
+// hosts, kinds and who signed a program leave under any policy; a tool's command line and the
+// paths of files are tool content.
 var governance = shape.CaptureRules{
 	SafeKeys: []string{
-		semconv.TermaCaptureSurfaceKey, "server.address", "network.transport",
+		semconv.GenAIMainAgentNameKey, semconv.TermaCaptureSurfaceKey, "server.address", "network.transport",
 		semconv.TermaNetworkConnectionIDKey, semconv.TermaNetworkProtocolKey,
 		semconv.TermaNetworkExchangeKindKey, semconv.TermaNetworkExchangeRequestIDKey,
 		semconv.TermaProcessProgramKey, semconv.TermaProcessVersionKey,

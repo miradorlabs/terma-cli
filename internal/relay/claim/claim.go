@@ -125,6 +125,19 @@ func (c Claim) During(at time.Time) (Claim, bool) {
 	return c.pick(at, func(Placement) bool { return true })
 }
 
+// Moves are the times in (from, to] at which the session went to another placement: the
+// start of each placement but the first, which also takes what came before it. Records
+// from either side of one go to different placements (During).
+func (c Claim) Moves(from, to time.Time) []time.Time {
+	var out []time.Time
+	for i, p := range c.placements() {
+		if i > 0 && p.Since.After(from) && !p.Since.After(to) {
+			out = append(out, p.Since)
+		}
+	}
+	return out
+}
+
 // pick is the placement latest to start by at among those admit takes.
 func (c Claim) pick(at time.Time, admit func(Placement) bool) (Claim, bool) {
 	var best *Placement
