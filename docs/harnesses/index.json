@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-13T09:01:26.428937767Z",
+  "generated_at": "2026-11-13T12:55:12.122453Z",
   "harnesses": [
     {
       "id": "claude",
@@ -72,7 +72,7 @@
         "to": "0.169.0",
         "at": "2026-11-13T09:01:26.428937767Z",
         "released_at": "2026-11-13T08:43:21.818Z",
-        "changes": 514,
+        "changes": 39,
         "categories": {
           "behavior": 1,
           "binary": 1,
@@ -80,7 +80,7 @@
           "config": 17,
           "filesystem": 10,
           "prompt": 1,
-          "telemetry": 476
+          "telemetry": 1
         }
       }
     },

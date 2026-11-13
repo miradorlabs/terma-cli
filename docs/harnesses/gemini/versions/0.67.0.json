@@ -399,6 +399,19 @@
     }
   },
   "telemetry": {
+    "export": {
+      "interval_batches": {
+        "logs": 2,
+        "metrics": 6,
+        "traces": 1
+      },
+      "interval_ms": {
+        "logs": 5000,
+        "metrics": 10000,
+        "traces": 5000
+      },
+      "protocol": "http/json"
+    },
     "surfaces": {
       "logs/gemini_cli.api_request": {
         "keys": {
@@ -1560,7 +1573,10 @@
               "number"
             ]
           }
-        }
+        },
+        "monotonic": true,
+        "temporality": "cumulative",
+        "type": "sum"
       },
       "metrics/gemini_cli.api.request.latency": {
         "keys": {
@@ -1594,7 +1610,10 @@
               "text"
             ]
           }
-        }
+        },
+        "temporality": "cumulative",
+        "type": "histogram",
+        "unit": "ms"
       },
       "metrics/gemini_cli.file.operation.count": {
         "keys": {
@@ -1698,7 +1717,10 @@
               "bool"
             ]
           }
-        }
+        },
+        "monotonic": true,
+        "temporality": "cumulative",
+        "type": "sum"
       },
       "metrics/gemini_cli.hook_call.latency": {
         "keys": {
@@ -1744,7 +1766,10 @@
               "bool"
             ]
           }
-        }
+        },
+        "temporality": "cumulative",
+        "type": "histogram",
+        "unit": "ms"
       },
       "metrics/gemini_cli.lines.changed": {
         "keys": {
@@ -1854,7 +1879,10 @@
               "text"
             ]
           }
-        }
+        },
+        "temporality": "cumulative",
+        "type": "histogram",
+        "unit": "ms"
       },
       "metrics/gemini_cli.session.count": {
         "keys": {
@@ -1876,7 +1904,10 @@
               "text"
             ]
           }
-        }
+        },
+        "monotonic": true,
+        "temporality": "cumulative",
+        "type": "sum"
       },
       "metrics/gemini_cli.startup.duration": {
         "keys": {
@@ -1946,7 +1977,10 @@
               "text"
             ]
           }
-        }
+        },
+        "temporality": "cumulative",
+        "type": "histogram",
+        "unit": "ms"
       },
       "metrics/gemini_cli.token.usage": {
         "keys": {
@@ -1986,7 +2020,10 @@
               "text"
             ]
           }
-        }
+        },
+        "monotonic": true,
+        "temporality": "cumulative",
+        "type": "sum"
       },
       "metrics/gemini_cli.tool.call.count": {
         "keys": {
@@ -2124,7 +2161,10 @@
               "text"
             ]
           }
-        }
+        },
+        "temporality": "cumulative",
+        "type": "histogram",
+        "unit": "s"
       },
       "metrics/gen_ai.client.token.usage": {
         "keys": {
@@ -2182,7 +2222,10 @@
               "text"
             ]
           }
-        }
+        },
+        "temporality": "cumulative",
+        "type": "histogram",
+        "unit": "token"
       },
       "resource": {
         "keys": {
@@ -2346,7 +2389,8 @@
               "number"
             ]
           }
-        }
+        },
+        "root": true
       },
       "traces/schedule_tool_calls": {
         "keys": {

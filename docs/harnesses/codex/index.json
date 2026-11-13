@@ -20,7 +20,7 @@
       "to": "0.169.0",
       "at": "2026-11-13T09:01:26.428937767Z",
       "released_at": "2026-11-13T08:43:21.818Z",
-      "changes": 514,
+      "changes": 39,
       "categories": {
         "behavior": 1,
         "binary": 1,
@@ -28,7 +28,7 @@
         "config": 17,
         "filesystem": 10,
         "prompt": 1,
-        "telemetry": 476
+        "telemetry": 1
       }
     }
   },
@@ -43,7 +43,7 @@
       ],
       "support": "untested",
       "previous": "0.168.0",
-      "changes": 514,
+      "changes": 39,
       "categories": {
         "behavior": 1,
         "binary": 1,
@@ -51,19 +51,19 @@
         "config": 17,
         "filesystem": 10,
         "prompt": 1,
-        "telemetry": 476
+        "telemetry": 1
       },
       "impact": {
         "breaking": 0,
-        "degrading": 42,
-        "informational": 292,
-        "notable": 180
+        "degrading": 0,
+        "informational": 29,
+        "notable": 10
       },
-      "undocumented": 367,
+      "undocumented": 26,
       "highlights": [
-        "Telemetry surface no longer sent: logs/codex.api_request",
-        "Telemetry surface no longer sent: logs/codex.conversation_starts",
-        "Telemetry surface no longer sent: logs/codex.sse_event"
+        "System prompt changed (+634 −476 chars)",
+        "Behaviour: subagents system 1 text changed",
+        "Telemetry surfaces.traces/list_models.root removed"
       ],
       "signing": "valid"
     },
@@ -77,24 +77,24 @@
       ],
       "support": "supported",
       "previous": "0.167.2",
-      "changes": 52,
+      "changes": 59,
       "categories": {
         "cli": 5,
         "config": 37,
-        "telemetry": 9,
+        "telemetry": 16,
         "tools": 1
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 46,
-        "notable": 6
+        "informational": 49,
+        "notable": 10
       },
-      "undocumented": 40,
+      "undocumented": 44,
       "highlights": [
         "exec tool description changed (+281 −862 chars)",
-        "New setting: features.hosted_search_policy",
-        "Setting no longer read: features.incremental_tools_legacy"
+        "Telemetry surfaces.traces/auth.parents.traces/codex.turn_input removed",
+        "Telemetry surfaces.traces/auth.parents.traces/model_client.stream_responses_api removed"
       ],
       "signing": "valid"
     },
