@@ -472,3 +472,49 @@ func TestAPassReadsEachRunLedgerOnce(t *testing.T) {
 		t.Errorf("Flush = %+v, want %d dropped as Mixed", res, mixed)
 	}
 }
+
+// Two profiles that select one team hold an enrollment each, with its own key. One whose
+// key is refused backs off alone: the other's events still go, in that pass and in the
+// next, unforced one while the refused enrollment waits out its retry window. The team's
+// ID still names both in the request.
+func TestAnEnrollmentsFailureNeverHoldsBackAnotherOfTheSameTeam(t *testing.T) {
+	t.Parallel()
+	m := migratedMachine(t)
+	good := newIngest(t)
+	refusing := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusUnauthorized) }))
+	t.Cleanup(refusing.Close)
+	team := orgTeam("acme", "acme-platform", "github.com/acme/*")
+	bad := m.route("work", []routing.Team{team}, bindAcme)["acme-platform"]
+	ok := m.route("client", []routing.Team{team}, bindAcme)["acme-platform"]
+	if bad == ok {
+		t.Fatal("the two profiles share an enrollment")
+	}
+	if err := keystore.SetTeam(m.config, bad, "acme-platform", "ter_srv_revoked", keystore.Hosts{OTLP: refusing.URL}); err != nil {
+		t.Fatal(err)
+	}
+	m.key(ok, "acme-platform", "ter_srv_good", good)
+	event := func(profile, enrollment, mark string) spool.Event {
+		e := routedEvent(enrollment, "github.com/acme/api", "s-"+profile, mark)
+		e.Profile = profile
+		return e
+	}
+	m.queue(event("work", bad, "work-1"), event("client", ok, "client-1"))
+	first := m.flush(m.router())
+	if len(first.Failures) != 1 || first.Failures[0].ProjectID != "acme-platform" {
+		t.Fatalf("first pass failures %+v", first.Failures)
+	}
+	m.queue(event("client", ok, "client-2"))
+	second := m.router().Flush(m.t.Context(), m.spool, &config.Config{ProfileName: config.DefaultProfile, OTLPURL: "http://127.0.0.1:1"}, false, 0)
+	_, body := good.sent()
+	for _, mark := range []string{"client-1", "client-2"} {
+		if !strings.Contains(body, mark) {
+			t.Errorf("%s was held back by the other enrollment's failure: first %+v, second %+v", mark, first, second)
+		}
+	}
+	if len(second.Waiting) != 1 || second.Waiting[0].ProjectID != "acme-platform" {
+		t.Errorf("the refused enrollment does not wait out its window: %+v", second.Waiting)
+	}
+	if keys, _ := good.sent(); !slices.Equal(keys, []string{"Bearer ter_srv_good"}) {
+		t.Errorf("the good host saw keys %v", keys)
+	}
+}
