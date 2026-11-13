@@ -174,6 +174,9 @@ func Context(env Env) []Row {
 	}
 	rows := append([]Row{{"Config", output.TildePath(env.ConfigDir)}, {"State", output.TildePath(env.StateDir)}},
 		machineRows(env.Config)...)
+	if env.Routing != nil {
+		rows = append(rows, TeamRows(*env.Routing, time.Now())...)
+	}
 	rows = append(rows, env.Updates...)
 	if env.RepoErr != nil {
 		return rows

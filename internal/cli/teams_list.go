@@ -12,6 +12,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/account/api"
 	"github.com/miradorlabs/terma-cli/internal/account/auth"
 	"github.com/miradorlabs/terma-cli/internal/config"
+	"github.com/miradorlabs/terma-cli/internal/doctor"
 	"github.com/miradorlabs/terma-cli/internal/routing"
 )
 
@@ -207,39 +208,14 @@ func (v *teamsView) orgName(id string) string {
 	return ""
 }
 
-// pendingBindings are the bindings a selected organization's entry needs that no decision
+// pendingBindings are the bindings a ticked organization's entry needs that no decision
 // covers, each once: Route holds what such an entry matches until the developer decides.
 func pendingBindings(st routing.State) []pendingRow {
 	var out []pendingRow
-	seen := map[string]bool{}
-	for _, t := range st.Teams {
-		if t.Personal || t.Policy.Global() || t.Policy.Unset {
-			continue
-		}
-		for _, raw := range t.Policy.Repositories {
-			e, ok := routing.ParseEntry(raw, t.Policy.Wildcards)
-			if !ok || seen[e.Key()] || decidedFor(st, e) {
-				continue
-			}
-			seen[e.Key()] = true
-			out = append(out, pendingRow{Key: e.Key(), Organization: t.OrganizationID, TeamID: t.TeamID, Entry: raw})
-		}
+	for _, p := range doctor.Pending(st) {
+		out = append(out, pendingRow{Key: p.Key, Organization: p.Organization, TeamID: p.TeamID, Entry: p.Entry})
 	}
 	return out
-}
-
-// decidedFor reports whether any decision covers what e needs: one on its key, or for an
-// exact entry one on its owner. A decision for another organization, or a refusal, covers
-// it too: the entry is skipped then, never pending.
-func decidedFor(st routing.State, e routing.Entry) bool {
-	if _, ok := st.Bindings[e.Key()]; ok {
-		return true
-	}
-	if e.Wildcard() {
-		return false
-	}
-	_, ok := st.Bindings[routing.Owner(e.Key())]
-	return ok
 }
 
 // listOrganizations lists the developer's organizations with any one working sign-in.

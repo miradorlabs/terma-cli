@@ -190,6 +190,9 @@ type App struct {
 	backgroundStep func(ctx context.Context, out io.Writer, argv ...string) error
 	// canAsk reports whether a person is at a terminal to answer questions.
 	canAsk func() bool
+	// migrationBlocked says why the relay could not move this machine to routing by teams
+	// (two installs), from what the migration recorded; nil reads no record.
+	migrationBlocked func(configDir, stateDir string) string
 	// migrationWait bounds `terma teams`' wait for the relay it starts to migrate the
 	// machine; zero is defaultMigrationWait.
 	migrationWait time.Duration
