@@ -4,6 +4,7 @@
 package spool
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -231,6 +232,34 @@ func (s *Spool) Writable() error {
 		return err
 	}
 	return f.Sync()
+}
+
+// Sessions calls add with the session ID of every queued event that names one, a line at
+// a time, without the lock appends take, so no hook waits on it: an event appended
+// meanwhile may be missed. It stops with ctx's error once ctx is done.
+func (s *Spool) Sessions(ctx context.Context, add func(sessionID string)) error {
+	f, err := os.Open(s.path())
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	lines := bufio.NewScanner(f)
+	lines.Buffer(nil, MaxBytes)
+	for lines.Scan() {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		var e struct {
+			SessionID string `json:"session_id"`
+		}
+		if json.Unmarshal(lines.Bytes(), &e) == nil && e.SessionID != "" {
+			add(e.SessionID)
+		}
+	}
+	return lines.Err()
 }
 
 // Peek returns up to n queued events without consuming them.

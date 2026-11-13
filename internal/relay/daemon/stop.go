@@ -82,7 +82,6 @@ func watch(ctx context.Context, r *relay.Relay, stateDir string, idle time.Durat
 	var replacing time.Time // when a newer terma asked this relay to make way
 	var upgraded time.Time  // when it installed one itself
 	var installed Pass      // the release it installed last, or found in place
-	lastPrune := time.Now()
 	tick := time.NewTicker(time.Second)
 	defer tick.Stop()
 	for {
@@ -130,11 +129,6 @@ func watch(ctx context.Context, r *relay.Relay, stateDir string, idle time.Durat
 		} else if !replacing.IsZero() && (!r.Holding() || time.Since(replacing) >= replacedMaxWait) {
 			// Once the hold is empty, since what it keeps is lost at exit; the queue is on disk.
 			return stopReplaced, installed.Installed, nil
-		}
-		if time.Since(lastPrune) > time.Hour {
-			claim.Prune(stateDir, time.Now())
-			pruneRuns(stateDir, r, time.Now())
-			lastPrune = time.Now()
 		}
 		if d, quiet := r.Idle(); quiet && idle > 0 && d >= idle && migrated == nil {
 			return stopIdle, installed.Installed, nil
