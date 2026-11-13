@@ -16,8 +16,8 @@ type termaRun struct {
 	env    map[string]string
 	// stdin is what the command reads, the test's own stdin when nil.
 	stdin io.Reader
-	// stderr, set, also receives what the command writes to stderr as it writes it, for a
-	// test that answers it while it runs (a sign-in URL).
+	// stderr also sees what the command writes there, as it writes it: a fakeBrowser
+	// approving the link a sign-in prints.
 	stderr io.Writer
 }
 

@@ -304,7 +304,7 @@ func TestGrantIdentityIsLowercase(t *testing.T) {
 // echoingExchanger is an auth host whose refusal quotes what it was sent.
 type echoingExchanger struct{ verifier string }
 
-func (e *echoingExchanger) ExchangeCode(context.Context, string, string, int) (*Credential, error) {
+func (e *echoingExchanger) ExchangeCode(context.Context, string, string, int) (*LoginResult, error) {
 	return nil, errors.New("not a delegated exchange")
 }
 
