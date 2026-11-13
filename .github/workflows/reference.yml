@@ -66,7 +66,7 @@ jobs:
             test/e2e/go.sum
             test/e2e/refdiff/
           sparse-checkout-cone-mode: false
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-go@v7
         with:
           go-version-file: test/e2e/go.mod
           cache: false
@@ -115,7 +115,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-go@v7
         with:
           go-version-file: test/e2e/go.mod
           cache-dependency-path: |
@@ -240,7 +240,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-go@v7
         with:
           go-version-file: test/e2e/go.mod
           cache-dependency-path: |
@@ -301,7 +301,7 @@ jobs:
       - uses: actions/checkout@v7
       - name: Start from the published reference
         run: test/e2e/compatgen/publish.sh restore
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-go@v7
         with:
           go-version-file: test/e2e/go.mod
           cache-dependency-path: test/e2e/go.sum
