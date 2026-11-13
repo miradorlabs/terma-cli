@@ -155,6 +155,8 @@ func TestRoutedClaudeReadsAndSearchesReachingAcmeMakeTheRunMixed(t *testing.T) {
 
 // A shell command reaches the paths it names that are there, a command substitution's
 // included, and every cd's target, and a relative path after a cd resolves where it went.
+// A path not there yet, such as a new file a redirect creates, reaches the checkout it
+// would be in.
 func TestRoutedClaudeShellCommandsReachingAcmeMakeTheRunMixed(t *testing.T) {
 	for name, tc := range map[string]struct {
 		command func(m *reachMachine) string
@@ -163,7 +165,9 @@ func TestRoutedClaudeShellCommandsReachingAcmeMakeTheRunMixed(t *testing.T) {
 		"an append to Acme's file":          {func(m *reachMachine) string { return "echo x >> " + filepath.Join(m.api, "NOTES.md") }, true},
 		"a cd into Acme's checkout":         {func(*reachMachine) string { return "cd ../acme-api && ls" }, true},
 		"a listing of its own checkout":     {func(*reachMachine) string { return "ls -la" }, false},
-		"a path that is not there, in Acme": {func(*reachMachine) string { return "cat ../acme-api/MISSING.md" }, false},
+		"a path that is not there, in Acme": {func(*reachMachine) string { return "cat ../acme-api/MISSING.md" }, true},
+		"a new file in Acme's checkout":     {func(*reachMachine) string { return "echo x > ../acme-api/new.md" }, true},
+		"a new file in its own checkout":    {func(*reachMachine) string { return "echo x > ./new.md" }, false},
 		"a read inside a substitution":      {func(*reachMachine) string { return `echo "$(cat ../acme-api/NOTES.md)"` }, true},
 		"a relative path after a cd out":    {func(*reachMachine) string { return "cd .. && cat acme-api/NOTES.md" }, true},
 	} {
