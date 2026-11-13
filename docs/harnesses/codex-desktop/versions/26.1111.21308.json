@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "harness": "codex-desktop",
+  "version": "26.1111.21308",
+  "platform": "darwin/arm64",
+  "captured_at": "2026-11-13T02:23:09.350488615Z",
+  "capture": {
+    "partial": false,
+    "notes": [
+      "Model requests were answered by a local fixture provider, not the vendor's API; nothing was sent to a model."
+    ]
+  },
+  "side_requests": null
+}

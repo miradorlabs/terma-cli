@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "harness": "codex-desktop",
+  "from": "26.1106.51428",
+  "to": "26.1111.21308",
+  "generated_at": "2026-11-13T02:23:09.350488615Z",
+  "source": null,
+  "changelog": null,
+  "summary": {
+    "changes": 0,
+    "categories": {},
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 0,
+      "notable": 0
+    },
+    "undocumented": null
+  },
+  "changes": []
+}

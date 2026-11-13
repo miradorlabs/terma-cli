@@ -1,7 +1,30 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-12T23:16:49.659858398Z",
+  "generated_at": "2026-11-13T02:23:09.350488615Z",
   "versions": [
+    {
+      "harness": "codex-desktop",
+      "name": "Codex app",
+      "version": "26.1111.21308",
+      "released_at": "2026-11-13T01:59:16Z",
+      "captured_at": "2026-11-13T02:23:09.350488615Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "26.1106.51428",
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": null,
+      "highlights": [],
+      "signing": null
+    },
     {
       "harness": "copilot",
       "name": "GitHub Copilot CLI",
@@ -6176,43 +6199,6 @@
         "Flag removed: `codex --profile-v2`",
         "Flag removed: `codex exec --profile-v2`",
         "Flag removed: `codex fork --profile-v2`"
-      ],
-      "signing": "valid"
-    },
-    {
-      "harness": "codex",
-      "name": "Codex CLI",
-      "version": "0.133.0",
-      "released_at": "2026-05-21T17:13:06.253Z",
-      "captured_at": "2026-11-05T09:54:28.532441Z",
-      "platforms": [
-        "darwin/arm64",
-        "linux/amd64"
-      ],
-      "support": "untested",
-      "previous": "0.132.0",
-      "changes": 58,
-      "categories": {
-        "behavior": 8,
-        "cli": 11,
-        "config": 22,
-        "filesystem": 4,
-        "hooks": 2,
-        "prompt": 1,
-        "storage": 1,
-        "tools": 9
-      },
-      "impact": {
-        "breaking": 0,
-        "degrading": 0,
-        "informational": 37,
-        "notable": 21
-      },
-      "undocumented": 29,
-      "highlights": [
-        "System prompt changed (+276 −173 chars)",
-        "Tool removed: close_agent",
-        "Tool removed: resume_agent"
       ],
       "signing": "valid"
     }
