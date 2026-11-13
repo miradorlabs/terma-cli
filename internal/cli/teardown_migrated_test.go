@@ -56,7 +56,8 @@ func migratedForTeardown(t *testing.T, configDir, stateDir string) string {
 // routing state, the team's key in keys.v2.json and credentials.v2.json, so the machine
 // stays migrated, even after --sign-out, and the next setup never starts afresh over its
 // bindings. A run Mixed before teardown stays Mixed; only expired ledgers go, with the
-// record of a migration that did not happen.
+// record of a migration that did not happen, the team names `terma teams` listed and a
+// routing state setup set aside as unreadable.
 func TestTeardownKeepsAMigratedMachineMigrated(t *testing.T) {
 	_, configDir, stateDir, _ := nateTestEnvironment(t)
 	enrollment := migratedForTeardown(t, configDir, stateDir)
@@ -87,6 +88,15 @@ func TestTeardownKeepsAMigratedMachineMigrated(t *testing.T) {
 	if err := os.WriteFile(blocked, []byte(`{"reason":"flush_busy"}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
+	names, setAside := teamNamesPath(stateDir, "default"), statePath+".unreadable"
+	if err := os.MkdirAll(filepath.Dir(names), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range []string{names, setAside} {
+		if err := os.WriteFile(path, []byte("{}"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
 
 	for _, args := range [][]string{{"teardown", "--yes"}, {"teardown", "--yes", "--sign-out"}} {
 		if out, err := runTerma(t, args...); err != nil {
@@ -107,8 +117,10 @@ func TestTeardownKeepsAMigratedMachineMigrated(t *testing.T) {
 		if _, err := os.Stat(old); !os.IsNotExist(err) {
 			t.Fatalf("%v kept an expired ledger: %v", args, err)
 		}
-		if _, err := os.Stat(blocked); !os.IsNotExist(err) {
-			t.Fatalf("%v kept the migration's record: %v", args, err)
+		for _, path := range []string{blocked, names, setAside} {
+			if _, err := os.Stat(path); !os.IsNotExist(err) {
+				t.Fatalf("%v kept %s: %v", args, path, err)
+			}
 		}
 	}
 	if creds, err := auth.Credentials(configDir, "default"); err != nil || len(creds) != 0 {
