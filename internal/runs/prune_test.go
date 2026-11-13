@@ -119,12 +119,51 @@ func TestPruneKeepsWhatIsActiveOrQueued(t *testing.T) {
 	if _, mixed := MixedAt(dir, "queued", now); !mixed {
 		t.Fatal("a queued record's run no longer reads as Mixed")
 	}
-	// Once its records have left the queues, it goes too.
+	// Once its records have left the queues, it goes too, after MixedRetention if its run
+	// is Mixed.
 	Prune(dir, now, nil)
-	for _, s := range []string{"queued", "queued-by-alias"} {
-		if !gone(filepath.Join(runs, s+".json")) {
-			t.Errorf("%s survived once nothing queued named it", s)
-		}
+	if !gone(filepath.Join(runs, "queued-by-alias.json")) {
+		t.Error("queued-by-alias survived once nothing queued named it")
+	}
+	if gone(filepath.Join(runs, "queued.json")) {
+		t.Error("a Mixed run's ledger went once nothing queued named it")
+	}
+	Prune(dir, long.Add(MixedRetention+time.Hour), nil)
+	if !gone(filepath.Join(runs, "queued.json")) {
+		t.Error("a Mixed run's ledger survived MixedRetention")
+	}
+}
+
+// A ledger whose current run is Mixed is kept for MixedRetention after its last activity,
+// so a session that goes on after weeks idle without a new run still reads Mixed. One whose
+// earlier run alone was Mixed goes after Retention, as any other.
+func TestPruneKeepsAMixedRunLonger(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	runs := filepath.Join(dir, Dir)
+	now := time.Now()
+	long := now.Add(-Retention - 24*time.Hour)
+	for _, s := range []string{"mixed", "mixed-before"} {
+		start(t, dir, s, long.Add(-time.Hour))
+		must(t, MarkMixed(dir, s, long.Add(-time.Hour)))
+	}
+	start(t, dir, "mixed-before", long)
+	for _, s := range []string{"mixed", "mixed-before"} {
+		age(t, filepath.Join(runs, s+".json"), Retention+24*time.Hour)
+	}
+	Prune(dir, now, nil)
+	if gone(filepath.Join(runs, "mixed.json")) {
+		t.Fatal("a Mixed run's ledger went after Retention")
+	}
+	if _, mixed := MixedAt(dir, "mixed", time.Time{}); !mixed {
+		t.Fatal("the kept ledger does not read Mixed")
+	}
+	if !gone(filepath.Join(runs, "mixed-before.json")) {
+		t.Error("a ledger whose current run is not Mixed survived Retention")
+	}
+	Prune(dir, long.Add(MixedRetention+time.Hour), nil)
+	if !gone(filepath.Join(runs, "mixed.json")) {
+		t.Error("a Mixed run's ledger survived MixedRetention")
 	}
 }
 

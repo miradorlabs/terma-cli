@@ -41,6 +41,11 @@ const aliasesDir = "aliases"
 // Prune still keeps a ledger a queued record names.
 const Retention = 15 * 24 * time.Hour
 
+// MixedRetention is Retention for a ledger whose current run is Mixed. A session idle past
+// Retention may go on without a new run (no start or resume): its ledger, kept, says it is
+// still Mixed, where a pruned one would say it never was.
+const MixedRetention = 90 * 24 * time.Hour
+
 // RefreshEvery is how often a session's hooks renew its ledger's activity (Refresh). A run
 // that stays in one place records nothing new, and its ledger would be pruned while it
 // runs, a Mixed run's crossing with it; renewed once a day, it stays far inside Retention

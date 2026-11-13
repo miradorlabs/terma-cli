@@ -68,7 +68,7 @@ func pruneLedger(stateDir, path string, now time.Time, queued map[string]bool) {
 	}
 	sessionID := strings.TrimSuffix(filepath.Base(path), ".json")
 	l, _, err := load(path)
-	if err == nil && (now.Sub(l.lastActive(info.ModTime())) <= Retention || queued[sessionID] ||
+	if err == nil && (now.Sub(l.lastActive(info.ModTime())) <= l.retention() || queued[sessionID] ||
 		slices.ContainsFunc(l.Aliases, func(a string) bool { return queued[a] })) {
 		unlock()
 		return
@@ -80,6 +80,15 @@ func pruneLedger(stateDir, path string, now time.Time, queued map[string]bool) {
 	}
 	_ = os.Remove(path)
 	flock.Remove(lock, unlock)
+}
+
+// retention is how long l is kept after its last activity: MixedRetention while its
+// current run is Mixed, else Retention.
+func (l ledger) retention() time.Duration {
+	if n := len(l.Runs); n > 0 && !l.Runs[n-1].MixedAt.IsZero() {
+		return MixedRetention
+	}
+	return Retention
 }
 
 // pruneAliases removes alias files older than Retention whose session's ledger is gone.
