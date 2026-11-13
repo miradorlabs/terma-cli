@@ -17,6 +17,7 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/flock"
+	"github.com/miradorlabs/terma-cli/internal/migrate"
 	"github.com/miradorlabs/terma-cli/internal/relay"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
@@ -54,6 +55,8 @@ type Config struct {
 	Listening func(addr net.Addr, hold time.Duration)
 	// Log, when set, is told of the relay's start and exit, with its counters.
 	Log *Log
+	// Migration, set, is this machine's to migrate to multi-org routing at start (migrateAtStart).
+	Migration *migrate.Machine
 }
 
 // Result is how a relay's run ended.
@@ -145,6 +148,9 @@ func Run(ctx context.Context, c Config) (Result, error) {
 	_ = os.Remove(filepath.Join(dir, RunFile))
 	token, err := Token(c.StateDir)
 	if err != nil {
+		return res, err
+	}
+	if err := c.migrateAtStart(ctx); err != nil {
 		return res, err
 	}
 	addr := c.Addr
