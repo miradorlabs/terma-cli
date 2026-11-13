@@ -98,7 +98,8 @@ machine migrated (`config.Migrated`), even once a routing state is lost. The sta
 directory (`config.StateDir`) holds what terma writes as it runs: `relay/`, `spool/`,
 `policies/`, `routing/` (each profile's routing state), `runs/` (the run ledger),
 `team-names/` (the names `terma teams` last listed), `migration-blocked.json` (why the last
-relay start did not migrate), `migrating` (since when a relay has been migrating), `agents/<agent>/` (each agent's hook state), `funding/`,
+relay start did not migrate), `migrating` (since when a relay has been migrating),
+`migration-opted-in` (when the developer opted in to routing by teams), `agents/<agent>/` (each agent's hook state), `funding/`,
 `workspaces/` (session stores for work begun outside git) and `update/`; a repository's
 session store is `.git/terma/`, which also keeps what a git hook in an agent's sandbox could
 not write to the state directory, until a hook outside the sandbox moves it there. Names
@@ -133,7 +134,11 @@ session an agent's hooks claim every one of (`shape.SessionKey.Claimed`): it wai
 claim, so a hidden side thread no hook claims stays here. What is held stays in memory,
 never on disk, and a stopping relay drops it.
 
-**Routing by teams.** All of the above is a machine routing by its profile's one team. The
+**Routing by teams.** All of the above is a machine routing by its profile's one team. A
+machine moves to routing by teams only once its developer opts in: `terma teams`, or `terma
+setup` on a machine never set up before, records it (`migrate.OptIn`). Until then a relay
+start leaves the machine as it is, and doctor says that `terma teams` turns it on;
+`migrateAutomatically` (`internal/cli`) moves every machine instead. The
 relay moves it to routing by teams once and for good (`internal/migrate`): only a relay
 does, beside itself once it listens, holding its own lock and the spool flush's, so nothing
 else sends meanwhile; the relay routes each record by the rules in force as it does, so it

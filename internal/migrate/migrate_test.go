@@ -24,11 +24,14 @@ func must(t *testing.T, err error) {
 	}
 }
 
-// newMachine is an empty machine: its own config and state directories, where every
-// organization a sign-in asks about is a shared one.
+// newMachine is an empty machine whose developer opted in to routing by teams: its own
+// config and state directories, where every organization a sign-in asks about is a
+// shared one.
 func newMachine(t *testing.T) Machine {
 	t.Helper()
-	return Machine{ConfigDir: t.TempDir(), StateDir: t.TempDir(), FlushWait: time.Second, OrgType: orgsOfType(nil)}
+	m := Machine{ConfigDir: t.TempDir(), StateDir: t.TempDir(), FlushWait: time.Second, OrgType: orgsOfType(nil)}
+	must(t, OptIn(m.StateDir))
+	return m
 }
 
 // orgsOfType is a Machine.OrgType that answers from types by organization, OrgShared for

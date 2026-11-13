@@ -11,14 +11,27 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/migrate"
 )
 
+// migrateAutomatically moves every machine to routing by teams at its relay's next start,
+// whether or not its developer opted in. Off, a machine moves only once its developer
+// opts in (migrate.OptIn): `terma teams`, or `terma setup` on a machine never set up
+// before. A product decision: flipping it is the whole change.
+const migrateAutomatically = false
+
 // relayMigration is what the relay migrates at start (daemon.Config.Migration): this
 // machine's directories, the relay's own terma, exe ("" for this process's), the termas
 // the agents' machine-wide hooks run, and each team's organization type asked with its
-// profile's own sign-in. Every relay start migrates a machine not yet migrated, or
-// finishes a migration an earlier start left (internal/migrate).
+// profile's own sign-in. A relay start migrates a machine not yet migrated once its
+// developer opted in (migrateAutomatically), and finishes a migration an earlier start
+// left either way (internal/migrate).
 func (app *App) relayMigration(exe string) *migrate.Machine {
 	return &migrate.Machine{ConfigDir: app.dir, StateDir: app.stateDir, Executable: exe,
-		Hooked: app.hookedTermas, OrgType: app.organizationType}
+		Hooked: app.hookedTermas, OrgType: app.organizationType, Automatic: migrateAutomatically}
+}
+
+// optedIn reports whether a relay start moves this machine to routing by teams: its
+// developer opted in, or every machine moves (migrateAutomatically).
+func (app *App) optedIn() bool {
+	return migrateAutomatically || migrate.OptedIn(app.stateDir)
 }
 
 // hookedTermas lists, by path, the termas every agent's machine-wide hook entries run, read

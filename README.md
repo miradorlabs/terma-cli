@@ -153,8 +153,10 @@ nowhere until you unbind it, and `terma teams` says so when you untick.
 Without a terminal, the desktop apps and scripts use flags: `--select <team>`,
 `--deselect <team>`, `--release <team>` (a suspended or refused team),
 `--bind <owner-or-repository>=<organization>`, `--refuse <owner-or-repository>`,
-`--unbind <owner-or-repository>` and `--json`. The first `terma teams` moves the machine to
-routing by teams: it restarts the relay, which migrates every profile once.
+`--unbind <owner-or-repository>` and `--json`. Routing by teams is opt-in on a machine
+set up before it: the first `terma teams` moves the machine to it, restarting the relay,
+which migrates every profile once, and `terma doctor` says so until you do. `terma setup`
+on a new machine moves it at once.
 `terma route explain [path]` says which team a session started in a folder goes to, and why.
 
 Hidden commands remain for the programs that run them — hook execution, the local

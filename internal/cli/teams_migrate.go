@@ -39,11 +39,11 @@ var errMigrationPending = errors.New("this machine's move to routing by teams ha
 var errNotSetUp = errors.New("terma is not set up on this machine: run `terma setup`, which signs you in and shows this team checklist")
 
 // migrateFirst moves a machine not yet migrated to routing by teams before `terma teams`
-// changes anything: only a relay migrates, holding the relay's and the spool flush's
-// locks. So it stops the running relay, which drops what it held in memory, starts this
-// executable's, and waits on what that relay records (migrate.Migrating, migrate.ReadBlock)
-// until the machine has no migrating left to do (migrate.Needed), the relay records why
-// it did not migrate, or it stops without either. It fails saying so, and says nothing
+// changes anything, opting it in (migrate.OptIn): only a relay migrates, holding the
+// relay's and the spool flush's locks. So it stops the running relay, which drops what it
+// held in memory, starts this executable's, and waits on what that relay records
+// (migrate.Migrating, migrate.ReadBlock) until the machine has no migrating left to do
+// (migrate.Needed), the relay records why it did not migrate, or it stops without either. It fails saying so, and says nothing
 // was changed only when that is known: past its bounds the move may still be made.
 func (app *App) migrateFirst(cmd *cobra.Command, profile string) error {
 	if !migrate.Needed(app.dir, app.stateDir) {
@@ -53,6 +53,11 @@ func (app *App) migrateFirst(cmd *cobra.Command, profile string) error {
 	// only time out.
 	if _, err := daemon.Token(app.stateDir); err != nil {
 		return errNotSetUp
+	}
+	// Running `terma teams` is how a developer opts the machine in: from here on each relay
+	// start migrates it until one has.
+	if err := migrate.OptIn(app.stateDir); err != nil {
+		return err
 	}
 	fmt.Fprintln(cmd.ErrOrStderr(), "Moving this machine to routing by teams: restarting the relay…")
 	// A migration a crash left in its preparing phase is finished by the next relay start too.

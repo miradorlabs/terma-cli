@@ -223,8 +223,12 @@ func TestMultiOrgRoutingEndToEnd(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// The relay migrates once it listens. It runs as its own command line, as a relay is its
-	// own process, beside the commands this test runs.
+	// The relay migrates once it listens, the developer having opted in as `terma teams`
+	// does. It runs as its own command line, as a relay is its own process, beside the
+	// commands this test runs.
+	if err := migrate.OptIn(stateDir); err != nil {
+		t.Fatal(err)
+	}
 	relayApp := New(builtin.Agents, "dev")
 	relayApp.binDirs = func() []string { return nil }
 	relayApp.configure(configDir, stateDir)

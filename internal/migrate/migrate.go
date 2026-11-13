@@ -2,8 +2,9 @@
 // Only the relay runs it, once it has started listening under today's rules, holding the
 // relay's lock and the spool flush's, so no other terma sends while it runs; the relay
 // asks the config directory and the routing state as it routes each record, so it moves
-// to the new rules as the migration commits. It covers every profile at once, because
-// keys.json and credentials.json are shared by all of them:
+// to the new rules as the migration commits. A machine moves only once its developer opts
+// in (OptIn): `terma teams`, or `terma setup` on a machine never set up before. It covers
+// every profile at once, because keys.json and credentials.json are shared by all of them:
 //
 //  1. Check: the agents' hook entries run the relay's own terma. With two installs it
 //     does not migrate, and records why (ReadBlock), which doctor shows.
@@ -63,6 +64,8 @@ type Machine struct {
 	// FlushWait bounds the wait for a spool flush already running; zero is
 	// DefaultFlushWait.
 	FlushWait time.Duration
+	// Automatic migrates a machine whose developer has not opted in (OptIn) too.
+	Automatic bool
 
 	// fault, set by tests, fails the step it names as a crash just before it would.
 	fault func(step string) error
@@ -83,17 +86,27 @@ const (
 	// Unfinished: Run stopped after the machine was marked migrated and before every
 	// routing state was Committed. It collects nothing until a start finishes it.
 	Unfinished Outcome = "unfinished"
+	// NotOptedIn: the machine is not migrated and its developer has not opted in (OptIn),
+	// so Run asked, locked and recorded nothing, and every reader goes on with today's
+	// rules.
+	NotOptedIn Outcome = "not_opted_in"
 )
 
 // Run migrates the machine, or finishes a migration an earlier start left, while the
-// caller holds the relay's lock; the relay runs it beside itself, once it listens. It
-// takes the spool flush's lock, waiting out a flush already running for at most
-// m.FlushWait. While it runs it records that it does (Migrating). An error comes with
-// NotMigrated or Unfinished, and is recorded for doctor too (ReadBlock), except one ctx
-// ended, which changed nothing.
+// caller holds the relay's lock; the relay runs it beside itself, once it listens. A
+// machine not yet migrated moves only once its developer opted in (OptIn), or m.Automatic
+// says to. It takes the spool flush's lock, waiting out a flush already running for at
+// most m.FlushWait. While it runs it records that it does (Migrating). An error comes
+// with NotMigrated or Unfinished, and is recorded for doctor too (ReadBlock), except one
+// ctx ended, which changed nothing.
 func Run(ctx context.Context, m Machine) (Outcome, error) {
 	if !Needed(m.ConfigDir, m.StateDir) {
 		return Done, nil
+	}
+	// A migration already marked on the machine is finished whatever was chosen: until
+	// it is, the machine collects nothing.
+	if !m.Automatic && !config.Migrated(m.ConfigDir) && !OptedIn(m.StateDir) {
+		return NotOptedIn, nil
 	}
 	// Recorded first, and gone only once the outcome is: a block, or the commit.
 	defer m.migrating()()
@@ -154,8 +167,9 @@ func Run(ctx context.Context, m Machine) (Outcome, error) {
 	return Committed, nil
 }
 
-// Needed reports whether a relay start has migrating to do: the machine is not migrated,
-// or a routing state is still Preparing.
+// Needed reports whether the machine has migrating left to do: it is not migrated, or a
+// routing state is still Preparing. A relay start does the former only once the
+// developer opted in (Run).
 func Needed(configDir, stateDir string) bool {
 	if !config.Migrated(configDir) {
 		return true
