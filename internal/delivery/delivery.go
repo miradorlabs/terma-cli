@@ -128,7 +128,8 @@ type pass struct {
 	force bool
 	now   time.Time
 	res   *Result
-	// failed and waiting are keyed as retry windows are, by project; accepted by endpoint.
+	// failed and waiting are keyed as retry windows are, by project or enrollment
+	// (retryDest); accepted by endpoint.
 	failed, waiting, accepted map[string]bool
 	// routes are a migrated machine's routing states, kept across the pass's batches.
 	routes routeCache
@@ -191,7 +192,7 @@ func (p *pass) byProject(ctx context.Context, events []spool.Event) ([]spool.Eve
 		if r.User != nil {
 			user = func(endpoint string) string { return r.User(cfg, id, endpoint) }
 		}
-		left, err := p.deliver(ctx, id, key, r.Endpoint(cfg, id), user, batch)
+		left, err := p.deliver(ctx, id, id, key, r.Endpoint(cfg, id), user, batch)
 		undelivered = append(undelivered, left...)
 		if err != nil {
 			errs = append(errs, err)
@@ -200,18 +201,19 @@ func (p *pass) byProject(ctx context.Context, events []spool.Event) ([]spool.Eve
 	return p.settle(held, undelivered, errs)
 }
 
-// deliver sends batch with key to endpoint, for the project id that retry windows and
-// failures name, unless id was refused earlier in this pass or waits out its retry window.
-// It returns what stays queued, and the error a refused send left it with. user, when set,
-// is who the batch names, asked only as it is sent.
-func (p *pass) deliver(ctx context.Context, id, key, endpoint string, user func(endpoint string) string, batch []spool.Event) ([]spool.Event, error) {
-	if p.failed[id] {
-		// Refused earlier in this pass: one question per host per pass.
+// deliver sends batch with key to endpoint for the project id, which the request names
+// and failures and waits report, unless dest, whose retry window this send keeps (the
+// project, or on a migrated machine its enrollment: retryDest), was refused earlier in this
+// pass or waits out its retry window. It returns what stays queued, and the error a refused
+// send left it with. user, when set, is who the batch names, asked only as it is sent.
+func (p *pass) deliver(ctx context.Context, dest, id, key, endpoint string, user func(endpoint string) string, batch []spool.Event) ([]spool.Event, error) {
+	if p.failed[dest] {
+		// Refused earlier in this pass: one question per key and host per pass.
 		return batch, nil
 	}
-	if next := p.s.RetryAt(id); !p.force && p.now.Before(next) {
-		if !p.waiting[id] {
-			p.waiting[id] = true
+	if next := p.s.RetryAt(dest); !p.force && p.now.Before(next) {
+		if !p.waiting[dest] {
+			p.waiting[dest] = true
 			p.res.Waiting = append(p.res.Waiting, Wait{ProjectID: id, RetryAt: next})
 		}
 		return batch, nil
@@ -221,16 +223,16 @@ func (p *pass) deliver(ctx context.Context, id, key, endpoint string, user func(
 		sender.UserID = user(endpoint)
 	}
 	if _, err := sender.Send(ctx, wire(batch)); err != nil {
-		p.failed[id] = true
+		p.failed[dest] = true
 		f := Failure{ProjectID: id, Endpoint: endpoint, Err: err}
 		// A pass cut short by its own deadline learned nothing about the host.
 		if ctx.Err() == nil {
-			f.RetryAt = p.s.DestinationFailed(id, time.Now())
+			f.RetryAt = p.s.DestinationFailed(dest, time.Now())
 		}
 		p.res.Failures = append(p.res.Failures, f)
 		return batch, fmt.Errorf("%s (%s): %w", id, endpoint, err)
 	}
-	p.s.DestinationDelivered(id, time.Now())
+	p.s.DestinationDelivered(dest, time.Now())
 	p.accepted[endpoint] = true
 	p.res.Sent += len(batch)
 	return nil, nil

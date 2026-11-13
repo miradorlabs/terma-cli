@@ -101,7 +101,7 @@ func (p *pass) routed(ctx context.Context, events []spool.Event) ([]spool.Event,
 		if p.r.EnrolledUser != nil {
 			user = func(endpoint string) string { return p.r.EnrolledUser(pc.profile, pc.team, hosts, endpoint) }
 		}
-		left, err := p.deliver(ctx, pc.team.TeamID, key, endpoint, user, pc.events)
+		left, err := p.deliver(ctx, retryDest(enrollment), pc.team.TeamID, key, endpoint, user, pc.events)
 		undelivered = append(undelivered, left...)
 		if err != nil {
 			errs = append(errs, err)
@@ -109,6 +109,11 @@ func (p *pass) routed(ctx context.Context, events []spool.Event) ([]spool.Event,
 	}
 	return p.settle(held, undelivered, errs)
 }
+
+// retryDest is the retry window enrollment's sends keep. Two profiles that select one team
+// hold an enrollment each, with its own key: one refused never holds the other back, and
+// the team's ID names both only in the request and the report.
+func retryDest(enrollment string) string { return "enrollment/" + enrollment }
 
 // parcel is one enrollment's events in a batch, and the team and profile they go to.
 type parcel struct {
