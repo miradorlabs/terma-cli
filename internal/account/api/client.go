@@ -31,9 +31,22 @@ const (
 type Error struct {
 	StatusCode int
 	Code       string
-	Message    string
-	RequestID  string
+	// Reason is the refusal's AIP-193 reason (error.reason), "" when it carries none: what
+	// a caller classifies a refusal by, never its message.
+	Reason    string
+	Message   string
+	RequestID string
 }
+
+// The refusal reasons terma acts on (AIP-193, error.reason).
+const (
+	// ReasonTeamNotFound: GET /v1/policy found no active team with that id in the
+	// organization, whether missing, archived, deleted or another organization's.
+	ReasonTeamNotFound = "TEAM_NOT_FOUND"
+	// ReasonOrgNotAccessible: a token refresh was refused because the developer may no
+	// longer reach the organization (they left it, or it is suspended).
+	ReasonOrgNotAccessible = "ORG_NOT_ACCESSIBLE"
+)
 
 func (e *Error) Error() string {
 	msg := e.Message
@@ -54,6 +67,9 @@ func (e *Error) Error() string {
 	var detail []string
 	if e.Code != "" {
 		detail = append(detail, e.Code)
+	}
+	if e.Reason != "" {
+		detail = append(detail, e.Reason)
 	}
 	if e.RequestID != "" {
 		detail = append(detail, "request_id="+e.RequestID)
@@ -393,6 +409,7 @@ func parseError(resp *http.Response) error {
 	var envelope struct {
 		Error struct {
 			Code    string           `json:"code"`
+			Reason  string           `json:"reason"`
 			Message string           `json:"message"`
 			Details []map[string]any `json:"details"`
 		} `json:"error"`
@@ -400,6 +417,7 @@ func parseError(resp *http.Response) error {
 	apiErr := &Error{StatusCode: resp.StatusCode}
 	if json.Unmarshal(body, &envelope) == nil && envelope.Error.Message != "" {
 		apiErr.Code = envelope.Error.Code
+		apiErr.Reason = envelope.Error.Reason
 		apiErr.Message = envelope.Error.Message
 		for _, detail := range envelope.Error.Details {
 			if id, ok := detail["request_id"].(string); ok {
