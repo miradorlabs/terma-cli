@@ -37,12 +37,13 @@ type Routing struct {
 }
 
 // ledgerRun is a session's run as one hook process knows it: its ID, the locations the
-// run ledger records for it, as read and with those this process has added since, and the
-// ledger's last activity (runs.Position).
+// run ledger records for it, as read and with those this process has added since, the
+// ledger's last activity, and when the ledger says the run became Mixed (runs.Position).
 type ledgerRun struct {
 	id        string
 	locations []string
 	active    time.Time
+	mixedAt   time.Time
 }
 
 // NewRouting is profile's routing under st, its routing state: nil for one missing,
@@ -230,26 +231,27 @@ func (e Env) destine(ev spool.Event, d *dest, own bool, run string) spool.Event 
 // else the latest the run ledger records for it (runs.Locations), however long the session
 // has been idle; "" before any run began.
 func (e Env) runOf(sessionID string) string {
-	run, _ := e.currentRun(sessionID)
-	return run
+	return e.currentRun(sessionID).id
 }
 
-// currentRun is runOf with where the run has been, as the run ledger records it: read with
-// the run, once per process.
-func (e Env) currentRun(sessionID string) (run string, locations []string) {
+// currentRun is the run sessionID's hooks name, as the run ledger records it: read once per
+// process.
+func (e Env) currentRun(sessionID string) ledgerRun {
 	rt := e.Routing
 	if rt == nil || sessionID == "" {
-		return "", nil
+		return ledgerRun{}
 	}
 	rt.mu.Lock()
 	defer rt.mu.Unlock()
 	cur, ok := rt.runs[sessionID]
 	if !ok {
 		p, _ := runs.Locate(e.StateDir, sessionID)
-		cur = &ledgerRun{id: p.Run, locations: p.Locations, active: p.Active}
+		cur = &ledgerRun{id: p.Run, locations: p.Locations, active: p.Active, mixedAt: p.MixedAt}
 		rt.runs[sessionID] = cur
 	}
-	return cur.id, slices.Clip(cur.locations)
+	out := *cur
+	out.locations = slices.Clip(out.locations)
+	return out
 }
 
 // setRun records that sessionID's hooks name run from now on, a run that has been nowhere,
@@ -279,6 +281,15 @@ func (e Env) keepRun(sessionID string, now time.Time) {
 	}
 	if err := runs.Refresh(e.StateDir, sessionID, now); err != nil {
 		e.Logf("renew the run ledger: %v", err)
+	}
+}
+
+// marked notes that the run ledger now records sessionID's run run Mixed from at.
+func (rt *Routing) marked(sessionID, run string, at time.Time) {
+	rt.mu.Lock()
+	defer rt.mu.Unlock()
+	if cur, ok := rt.runs[sessionID]; ok && cur.id == run && (cur.mixedAt.IsZero() || at.Before(cur.mixedAt)) {
+		cur.mixedAt = at
 	}
 }
 

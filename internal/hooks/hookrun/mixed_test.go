@@ -385,8 +385,8 @@ func TestTwoInterleavedHooksThatEachSeeHalfACrossingMakeTheRunMixed(t *testing.T
 	const sid = "interleaved-session"
 	first, second := m.hook(), m.hook()
 	first.StartRun(sid)
-	if run, been := second.currentRun(sid); run == "" || len(been) != 0 {
-		t.Fatalf("the second hook read run %q at %v", run, been)
+	if cur := second.currentRun(sid); cur.id == "" || len(cur.locations) != 0 {
+		t.Fatalf("the second hook read run %q at %v", cur.id, cur.locations)
 	}
 	c := claim.Claim{Kind: claim.KindRepository, Tool: "claude-code", Repository: config.Repository{Origin: lib.Repository}}
 	first.place(sid, "", c, lib, []routing.Location{repo("github.com/acme/api")})

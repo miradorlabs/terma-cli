@@ -54,59 +54,65 @@ func (e Env) placeFor(r *Repo, ev spool.Event) {
 }
 
 // place records that sessionID's run is at loc now, with c, the placement's checkout and
-// processes: c's location-only placement under the session's ID and agentID's, unless the
-// run has crossed organizations, when it is marked Mixed instead. touched are the other
-// checkouts the hook saw the session touch: loc, the run's earlier locations and they are
-// classified together, before anything filters any of them. The run ledger then records
-// loc and touched among the run's locations, for the hooks after this one, and is renewed
-// once a day while the run goes on (keepRun).
+// processes, and that the hook saw it touch touched: c's location-only placement under the
+// session's ID and agentID's, or a mixed one once the run has crossed organizations.
 func (e Env) place(sessionID, agentID string, c claim.Claim, loc routing.Location, touched []routing.Location) {
+	e.judge(sessionID, agentID, c, append([]routing.Location{loc}, touched...), true)
+}
+
+// judge classifies locs, where the run is and what it touched, with the run's earlier
+// locations, records them in the run ledger, and writes the session's placement: c at
+// locs[0] when placed, else none unless the run is Mixed. The ledger is the judge of Mixed,
+// since delivery and the relay read only it. A mixed placement the ledger does not back is
+// a crossing whose write failed: every hook of the run records it again, from when the
+// placement turned Mixed, until one succeeds.
+func (e Env) judge(sessionID, agentID string, c claim.Claim, locs []routing.Location, placed bool) {
 	rt := e.Routing
 	if !rt.Usable() || !session.ValidID(sessionID) {
 		return
 	}
 	now := e.Time()
-	run, been := e.currentRun(sessionID)
+	cur := e.currentRun(sessionID)
 	e.keepRun(sessionID, now)
-	c.ProjectID, c.Run = "", run
-	seen := newLocations(been, append([]routing.Location{loc}, touched...))
-	// Past the bound, the ledger no longer keeps everywhere the run has been, so it cannot
-	// rule a crossing out: the run turns Mixed rather than miss one.
-	full := len(been)+len(seen) > maxRunLocations
+	c.ProjectID, c.Run = "", cur.id
+	seen := newLocations(cur.locations, locs)
+	// Past the bound the ledger cannot rule a crossing out, so the run turns Mixed.
+	full := len(cur.locations)+len(seen) > maxRunLocations
 	prev, havePrev := claim.Read(e.StateDir, sessionID, now)
-	mixed := havePrev && prev.Kind == claim.KindMixed && prev.Run == c.Run
-	if !mixed && (full || rt.crossed(prev, havePrev, c.Run, loc, touched, been, now)) {
-		if err := runs.MarkMixed(e.StateDir, sessionID, now); err != nil {
-			e.Logf("mark run mixed: %v", err)
-		}
-		mixed = true
+	mixed, recorded := !cur.mixedAt.IsZero(), true
+	switch {
+	case mixed:
+	case havePrev && prev.Kind == claim.KindMixed && prev.Run == c.Run:
+		mixed, recorded = true, e.markMixed(sessionID, cur.id, mixedSince(prev, now))
+	case full || rt.crossed(prev, havePrev, c.Run, locs, cur.locations, now):
+		mixed, recorded = true, e.markMixed(sessionID, cur.id, now)
 	}
-	if len(seen) > 0 && !full {
-		merged, err := runs.Touch(e.StateDir, sessionID, run, seen)
+	// A ledger that refused the mark would make this hook wait on it again for nothing.
+	if len(seen) > 0 && !full && recorded {
+		merged, err := runs.Touch(e.StateDir, sessionID, cur.id, seen)
 		if err != nil {
 			e.Logf("record run locations: %v", err)
 		} else {
-			rt.recorded(sessionID, run, merged)
+			rt.recorded(sessionID, cur.id, merged)
 		}
-		// Another hook of the run (its subagent's, say) may have recorded locations after
-		// this one read the ledger: Touch read them under the lock it wrote under, so of two
-		// hooks that each saw half a crossing, the later writer sees it whole.
-		if !mixed && len(merged) > len(been)+len(seen) &&
-			(len(merged) > maxRunLocations || rt.crossed(prev, havePrev, c.Run, loc, touched, merged, now)) {
-			if err := runs.MarkMixed(e.StateDir, sessionID, now); err != nil {
-				e.Logf("mark run mixed: %v", err)
-			}
+		// Touch read under its lock what another hook of the run recorded since this one read
+		// the ledger: of two hooks that each saw half a crossing, the later sees it whole.
+		if !mixed && len(merged) > len(cur.locations)+len(seen) &&
+			(len(merged) > maxRunLocations || rt.crossed(prev, havePrev, c.Run, locs, merged, now)) {
 			mixed = true
+			e.markMixed(sessionID, cur.id, now)
 		}
+	}
+	if !placed && !mixed {
+		return
 	}
 	if mixed {
 		c = claim.Claim{Kind: claim.KindMixed, Run: c.Run, Tool: c.Tool, PIDs: c.PIDs}
 	}
 	claim.Write(e.StateDir, sessionID, c, now)
 	if agentID != "" && agentID != sessionID && session.ValidID(agentID) {
-		// A subagent whose telemetry names its own ID shares the session's run: it is an
-		// alias in the run ledger, so its crossing is the session's and the session's is
-		// its own.
+		// A subagent whose telemetry names its own ID shares the session's run, as an alias
+		// in the run ledger.
 		if claim.Write(e.StateDir, agentID, c, now) {
 			if err := runs.Alias(e.StateDir, sessionID, agentID); err != nil {
 				e.Logf("alias subagent: %v", err)
@@ -116,8 +122,7 @@ func (e Env) place(sessionID, agentID string, c claim.Claim, loc routing.Locatio
 	if !mixed {
 		return
 	}
-	// Mixed covers every identity the run's telemetry uses: each subagent that shares it,
-	// not only the one whose hook saw the crossing.
+	// Mixed covers every subagent sharing the run, not only the one whose hook saw it.
 	aliases, err := runs.Aliases(e.StateDir, sessionID)
 	if err != nil {
 		e.Logf("subagents of a mixed run: %v", err)
@@ -129,12 +134,32 @@ func (e Env) place(sessionID, agentID string, c claim.Claim, loc routing.Locatio
 	}
 }
 
+// markMixed records in the run ledger that sessionID's run run became Mixed at at, and
+// reports whether it could.
+func (e Env) markMixed(sessionID, run string, at time.Time) bool {
+	if err := runs.MarkMixed(e.StateDir, sessionID, at); err != nil {
+		e.Logf("mark run mixed: %v", err)
+		return false
+	}
+	e.Routing.marked(sessionID, run, at)
+	return true
+}
+
+// mixedSince is when c, a mixed placement, turned Mixed: its latest placement's start,
+// which a mixed placement rewritten keeps. now when it names none.
+func mixedSince(c claim.Claim, now time.Time) time.Time {
+	if n := len(c.Placements); n > 0 && !c.Placements[n-1].Since.IsZero() {
+		return c.Placements[n-1].Since
+	}
+	return now
+}
+
 // crossed reports whether the run run, whose session's claim is prev and which the run
-// ledger records at been, crosses organizations at loc: whether any two of its locations,
-// from its placements, the ledger, loc and the checkouts touched, belong to different
-// organizations (crosses), each classified now, whenever it was recorded.
-func (rt *Routing) crossed(prev claim.Claim, havePrev bool, run string, loc routing.Location, touched []routing.Location, been []string, now time.Time) bool {
-	locs := append([]routing.Location{loc}, touched...)
+// ledger records at been, crosses organizations: whether any two of its locations, from
+// its placements, the ledger and locs, belong to different organizations, each classified
+// now.
+func (rt *Routing) crossed(prev claim.Claim, havePrev bool, run string, locs []routing.Location, been []string, now time.Time) bool {
+	locs = slices.Clone(locs)
 	if havePrev {
 		locs = append(locs, runLocations(prev, run)...)
 	}

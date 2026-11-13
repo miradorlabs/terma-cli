@@ -234,7 +234,7 @@ func (e Env) checkouts(r *Repo, paths []string) []touched {
 // collects is classified too.
 func (e Env) checkoutOf(r *Repo, dir string) *Repo {
 	root, gitDir, ok := gitx.LocateFS(dir)
-	if !ok || samePath(root, r.Root) || samePath(gitDir, r.GitDir) {
+	if !ok || r != nil && (samePath(root, r.Root) || samePath(gitDir, r.GitDir)) {
 		return r
 	}
 	origin, remote := gitx.OriginFS(gitDir)
