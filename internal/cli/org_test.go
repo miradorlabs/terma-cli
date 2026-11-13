@@ -62,8 +62,12 @@ type fakeAuth struct {
 	revoked     []string
 }
 
-// fakeGrant is who a delegated code signs in.
-type fakeGrant struct{ org, user string }
+// fakeGrant is who a delegated code signs in; browser marks a code a browser sign-in's
+// loopback listener received, which is redeemed with that listener's port, never 0.
+type fakeGrant struct {
+	org, user string
+	browser   bool
+}
 
 // fakeToken is the access token the fake auth host takes for user in org: `ter_cli_<org>`
 // for its default user, u-1, else `ter_cli_<org>~<user>`.
@@ -207,7 +211,7 @@ func (f *fakeAuth) serveToken(w http.ResponseWriter, r *http.Request) {
 	delete(f.grants, body.Code)
 	f.verifiers = append(f.verifiers, body.CodeVerifier)
 	f.mu.Unlock()
-	if !ok || body.RedirectPort == nil || *body.RedirectPort != 0 || body.CodeVerifier == "" {
+	if !ok || body.RedirectPort == nil || (*body.RedirectPort != 0) != grant.browser || body.CodeVerifier == "" {
 		w.WriteHeader(http.StatusUnauthorized)
 		fmt.Fprint(w, `{"error":{"code":"UNAUTHENTICATED","message":"invalid or expired credentials"}}`)
 		return
@@ -235,6 +239,17 @@ func (f *fakeAuth) grant(code, org, user string) {
 		f.grants = map[string]fakeGrant{}
 	}
 	f.grants[code] = fakeGrant{org: org, user: user}
+}
+
+// browserGrant makes code one the approval page hands a browser sign-in for user u-1 in
+// org: redeemed once, with the port of the loopback listener it was sent to.
+func (f *fakeAuth) browserGrant(code, org string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.grants == nil {
+		f.grants = map[string]fakeGrant{}
+	}
+	f.grants[code] = fakeGrant{org: org, user: "u-1", browser: true}
 }
 
 // verifiersSent are the code verifiers the token endpoint was sent.
