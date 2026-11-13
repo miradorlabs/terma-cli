@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 	"time"
 
@@ -30,7 +29,7 @@ func (app *App) routingFacts(cfg *config.Config) *doctor.Routing {
 		State: st, Err: err, Missing: err == nil && !ok,
 		Teams: names.Teams, Orgs: names.Orgs,
 		Key:           app.teamKey,
-		MixedSessions: mixedSessions(app.stateDir, time.Now()),
+		MixedSessions: runs.Mixed(app.stateDir, time.Now()),
 	}
 	r.MixedDropped, r.Blocked = relayBlocked(app.stateDir)
 	if err == nil && ok && !st.Ready() {
@@ -99,27 +98,6 @@ func (app *App) routedKeys(r *doctor.Routing) doctor.Keys {
 		}
 		return ""
 	}
-}
-
-// mixedSessions are the sessions whose current run crossed organizations, from the run
-// ledger: they send no telemetry until they start a new run.
-func mixedSessions(stateDir string, now time.Time) []string {
-	entries, err := os.ReadDir(filepath.Join(stateDir, runs.Dir))
-	if err != nil {
-		return nil
-	}
-	var out []string
-	for _, e := range entries {
-		id, ok := strings.CutSuffix(e.Name(), ".json")
-		if e.IsDir() || !ok {
-			continue
-		}
-		if _, mixed := runs.MixedAt(stateDir, id, now); mixed {
-			out = append(out, id)
-		}
-	}
-	slices.Sort(out)
-	return out
 }
 
 // relayBlocked is what the relay kept from leaving, as its last stop recorded it in
