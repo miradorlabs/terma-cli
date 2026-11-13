@@ -96,6 +96,13 @@ func preInvocation(ctx context.Context, env hookrun.Env) error {
 		return nil
 	}
 	env.Cwd = in.cwd(env.Cwd)
+	// A later turn, or a resumed conversation, was announced before: only a conversation's
+	// first step begins a run.
+	steps, _, stepsKnown := hookrun.JSONNumber(in.InitialNumSteps, true)
+	first := !stepsKnown || steps <= 1
+	if first {
+		env.StartRun(in.id())
+	}
 	r, err := env.Repo(ctx)
 	if err != nil {
 		env.Logf("not in a git repository: %v", err)
@@ -109,8 +116,7 @@ func preInvocation(ctx context.Context, env hookrun.Env) error {
 	}
 	env.SetActive(r, sess)
 	turn := beginAntigravityTurn(env, r, in)
-	// A later turn, or a resumed conversation, was announced before.
-	if steps, _, stepsKnown := hookrun.JSONNumber(in.InitialNumSteps, true); !stepsKnown || steps <= 1 {
+	if first {
 		env.PruneManifests(r, now)
 		env.EmitStart(r, sess, nil)
 	}
