@@ -41,10 +41,6 @@ import (
 // flush may take (spool.DefaultFlushTimeout), so one that is running ends first.
 const DefaultFlushWait = spool.DefaultFlushTimeout + 5*time.Second
 
-// deliveryLock is the lock every spool flush holds while it delivers, internal/spool's
-// delivery.lock: holding it, no flush sends.
-const deliveryLock = "delivery.lock"
-
 // Machine is what the relay migrates, and how it checks that it may.
 type Machine struct {
 	// ConfigDir and StateDir are terma's directories, as the command line resolved them.
@@ -145,7 +141,7 @@ func lockFlush(ctx context.Context, stateDir string, wait time.Duration) (func()
 	}
 	ctx, cancel := context.WithTimeout(ctx, wait)
 	defer cancel()
-	return flock.Lock(ctx, filepath.Join(dir, deliveryLock))
+	return flock.Lock(ctx, filepath.Join(dir, spool.DeliveryLockFile))
 }
 
 // run is the migration's steps 2 to 5, from wherever an earlier start stopped.
