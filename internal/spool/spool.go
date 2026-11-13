@@ -101,12 +101,17 @@ func (f SenderFunc) Send(ctx context.Context, events []Event) ([]Event, error) {
 // Dir is the spool's folder under the state directory.
 const Dir = "spool"
 
+// DeliveryLockFile is the lock, in Dir, every flush holds while it delivers: whoever holds
+// it knows no flush is sending, as the migration to multi-org routing must
+// (internal/migrate).
+const DeliveryLockFile = "delivery.lock"
+
 const (
 	eventsFile       = "events.jsonl"
 	backoffFile      = "next-attempt"
 	lastFlushFile    = "last-flush"
-	lockFile         = "flush.lock"    // shared by appends and queue rewrites
-	deliveryLockFile = "delivery.lock" // held only by flushers
+	lockFile         = "flush.lock" // shared by appends and queue rewrites
+	deliveryLockFile = DeliveryLockFile
 	// probeEventName is reserved for Writable's probe line, which never reaches a sender.
 	probeEventName = "terma-write-probe"
 	// MaxBytes bounds the spool; past it the next flush drops the oldest events.
