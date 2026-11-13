@@ -121,7 +121,7 @@ jobs:
           cache-dependency-path: |
             go.sum
             test/e2e/go.sum
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
       - name: Build native test binaries
