@@ -1,7 +1,41 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-13T14:03:31.446427386Z",
+  "generated_at": "2026-11-13T19:09:03.215136219Z",
   "versions": [
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.324",
+      "released_at": "2026-11-13T18:42:36.3Z",
+      "captured_at": "2026-11-13T19:09:03.215136219Z",
+      "platforms": [
+        "darwin/arm64",
+        "linux/amd64"
+      ],
+      "support": "supported",
+      "previous": "2.1.323",
+      "changes": 37,
+      "categories": {
+        "config": 29,
+        "filesystem": 6,
+        "prompt": 2
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 33,
+        "notable": 4
+      },
+      "undocumented": null,
+      "highlights": [
+        "Injected context changed (+275 −266 chars)",
+        "Interactive session's injected context changed (+275 −266 chars)",
+        "Setting additionalMarketplaces.<name>.pluginDigests deprecated"
+      ],
+      "signing": "valid",
+      "attempted_at": "2026-11-13T19:09:03.215136219Z",
+      "attempts": 1
+    },
     {
       "harness": "copilot",
       "name": "GitHub Copilot CLI",
@@ -1541,9 +1575,9 @@
       ],
       "support": "supported",
       "previous": "2.1.306",
-      "changes": 21,
+      "changes": 20,
       "categories": {
-        "config": 19,
+        "config": 18,
         "request": 1,
         "tools": 1
       },
@@ -1551,9 +1585,9 @@
         "breaking": 0,
         "degrading": 0,
         "informational": 15,
-        "notable": 6
+        "notable": 5
       },
-      "undocumented": 17,
+      "undocumented": 16,
       "highlights": [
         "Agent tool description changed (+1639 −410 chars)",
         "Beta dropped: prompt-caching-scope-2026-01-05",
@@ -6146,38 +6180,6 @@
         "New command at turn: `bwrap --new-session --die-with-parent --ro-bind / / --dev /dev --bind <tmp> <tmp> --perms 555 --tmpf …` (linux/amd64)",
         "New command at turn: `codex-linux-sandbox --sandbox-policy-cwd <repo> --command-cwd <repo> --permission-profile {\"type\":\"m …` (linux/amd64)",
         "New command at turn: `codex-linux-sandbox --sandbox-policy-cwd <repo> --command-cwd <repo> --permission-profile {\"type\":\"m …` (linux/amd64)"
-      ],
-      "signing": "valid"
-    },
-    {
-      "harness": "codex",
-      "name": "Codex CLI",
-      "version": "0.142.0",
-      "released_at": "2026-06-22T22:22:41.166Z",
-      "captured_at": "2026-11-05T09:54:28.532441Z",
-      "platforms": [
-        "darwin/arm64",
-        "linux/amd64"
-      ],
-      "support": "untested",
-      "previous": "0.141.0",
-      "changes": 44,
-      "categories": {
-        "behavior": 9,
-        "config": 33,
-        "filesystem": 2
-      },
-      "impact": {
-        "breaking": 0,
-        "degrading": 0,
-        "informational": 29,
-        "notable": 15
-      },
-      "undocumented": 25,
-      "highlights": [
-        "Behaviour: sandbox approval added",
-        "Behaviour: sandbox model added",
-        "Behaviour: sandbox provider added"
       ],
       "signing": "valid"
     }

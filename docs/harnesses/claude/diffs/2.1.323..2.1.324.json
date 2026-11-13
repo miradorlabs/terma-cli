@@ -1,0 +1,822 @@
+{
+  "schema_version": 1,
+  "harness": "claude",
+  "from": "2.1.323",
+  "to": "2.1.324",
+  "generated_at": "2026-11-13T19:09:03.215136219Z",
+  "source": null,
+  "changelog": null,
+  "summary": {
+    "changes": 37,
+    "categories": {
+      "config": 29,
+      "filesystem": 6,
+      "prompt": 2
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 33,
+      "notable": 4
+    },
+    "undocumented": null
+  },
+  "changes": [
+    {
+      "id": "prompt.context.2.text",
+      "category": "prompt",
+      "op": "changed",
+      "path": [
+        "prompt",
+        "context",
+        "2",
+        "text"
+      ],
+      "title": "Injected context changed (+275 −266 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -78,7 +78,7 @@\n - run: Launch and drive this project's app to see a change working.\n Use when asked to run, start, or screenshot the app, or to confirm a change works in the real app (not just tests).\n First looks for a project skill that already covers launching the app; otherwise falls back to built-in patterns per project type (CLI, server, TUI, Electron, browser-driven, library).\n-- plugin-authoring: Make a mod: a change to Claude's own interface or behaviour, such as a panel or pane that stays beside the chat and updates, a band, status line, toast, slash command, or hook on tool calls. Use to make, change or debug a mod or its hooks module.\n+- plugin-authoring: Make a mod: a change to Claude's own interface or behaviour, such as a theme, a panel or pane that stays beside the chat and updates, a band, status line, toast, slash command, or hook on tool calls. Use to make, change or debug a mod or its hooks module.\n - init: Initialize a new CLAUDE.md file with codebase documentation\n - security-review: Complete a security review of the pending changes on the current branch\n \n",
+      "stats": {
+        "added_chars": 275,
+        "removed_chars": 266
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "prompt.interactive.context.2.text",
+      "category": "prompt",
+      "op": "changed",
+      "path": [
+        "prompt",
+        "interactive",
+        "context",
+        "2",
+        "text"
+      ],
+      "title": "Interactive session's injected context changed (+275 −266 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -83,7 +83,7 @@\n - run: Launch and drive this project's app to see a change working.\n Use when asked to run, start, or screenshot the app, or to confirm a change works in the real app (not just tests).\n First looks for a project skill that already covers launching the app; otherwise falls back to built-in patterns per project type (CLI, server, TUI, Electron, browser-driven, library).\n-- plugin-authoring: Make a mod: a change to Claude's own interface or behaviour, such as a panel or pane that stays beside the chat and updates, a band, status line, toast, slash command, or hook on tool calls. Use to make, change or debug a mod or its hooks module.\n+- plugin-authoring: Make a mod: a change to Claude's own interface or behaviour, such as a theme, a panel or pane that stays beside the chat and updates, a band, status line, toast, slash command, or hook on tool calls. Use to make, change or debug a mod or its hooks module.\n - init: Initialize a new CLAUDE.md file with codebase documentation\n - security-review: Complete a security review of the pending changes on the current branch\n \n",
+      "stats": {
+        "added_chars": 275,
+        "removed_chars": 266
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.additionalMarketplaces.<name>.pluginDigests.deprecated",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "additionalMarketplaces.<name>.pluginDigests",
+        "deprecated"
+      ],
+      "title": "Setting additionalMarketplaces.<name>.pluginDigests deprecated",
+      "impact": "notable",
+      "before": null,
+      "after": true,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.additionalMarketplaces.<name>.pluginDigests.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "additionalMarketplaces.<name>.pluginDigests",
+        "description"
+      ],
+      "title": "additionalMarketplaces.<name>.pluginDigests description changed (+220 −1136 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,8 +1,1 @@\n-Managed settings only: the plugins of this marketplace that an organization delivers with its own tier, by plugin name, each with the digests of its releases.\n-A plugin also enabled and listed in prependPlugins or appendPlugins by managed settings the session vouches for loads its hooks module only from a folder that proves one of them, and is then seated in that tier; any other copy does not load.\n-A digest is sha256- and the base64 SHA-256 of, for every regular file in the folder in UTF-16 code unit order of its path, not normalized, \"f PATH\" NUL BYTE-LENGTH NUL BYTES, with / in paths; .git, .in_use, .orphaned_at, .claude-plugin-link, .claude-directory-proof.json and .links_materialized at the root are left out.\n-The plugin keeps its manifest at .claude-plugin/plugin.json and names one module in hooks/hooks.json.\n-A string of any other form, or a list that is empty or of any other shape, matches no folder.\n-A symbolic link, or a surface module, proves nothing.\n-A proved plugin ships bundled with no install step: the digest covers the whole folder, node_modules included.\n-A checkout whose line endings were converted proves nothing.\n+Deprecated and ignored: settings that hold it still load. A plugin takes the organization tier when managed settings enable it, declare its marketplace with a remote source and list it in prependPlugins or appendPlugins.\n",
+      "stats": {
+        "added_chars": 220,
+        "removed_chars": 1136
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.additionalMarketplaces.<name>.source.ref.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "additionalMarketplaces.<name>.source.ref",
+        "description"
+      ],
+      "title": "additionalMarketplaces.<name>.source.ref description changed (+431 −89 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,6 @@\n-Git branch or tag to use (e.g., \"main\", \"v1.0.0\"). Defaults to repository default branch.\n+Git branch, tag or full commit id to use (e.g., \"main\", \"v1.0.0\").\n+Defaults to repository default branch.\n+A full commit id (40 or 64 lowercase hex digits) holds the marketplace at that commit: refreshes and auto-updates do not move it.\n+A branch or tag of the repository must hold the commit.\n+Plugins listed with a remote source follow that source unless they name a `sha`.\n+Reserved Anthropic marketplace names do not accept a commit id.\n",
+      "stats": {
+        "added_chars": 431,
+        "removed_chars": 89
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.allowedMarketplaces[].ref.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "allowedMarketplaces[].ref",
+        "description"
+      ],
+      "title": "allowedMarketplaces[].ref description changed (+431 −89 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,6 @@\n-Git branch or tag to use (e.g., \"main\", \"v1.0.0\"). Defaults to repository default branch.\n+Git branch, tag or full commit id to use (e.g., \"main\", \"v1.0.0\").\n+Defaults to repository default branch.\n+A full commit id (40 or 64 lowercase hex digits) holds the marketplace at that commit: refreshes and auto-updates do not move it.\n+A branch or tag of the repository must hold the commit.\n+Plugins listed with a remote source follow that source unless they name a `sha`.\n+Reserved Anthropic marketplace names do not accept a commit id.\n",
+      "stats": {
+        "added_chars": 431,
+        "removed_chars": 89
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.blockedMarketplaces.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "blockedMarketplaces",
+        "description"
+      ],
+      "title": "blockedMarketplaces description changed (+260 −162 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,4 +1,4 @@\n Enterprise blocklist of marketplace sources.\n When set in managed settings, these sources are blocked from being added as marketplaces.\n-Entries match exactly, except that a github entry may use the owner-wildcard form {\"source\":\"github\",\"repo\":\"owner/*\"} to block every repository under that owner.\n+Entries match exactly, except that a github entry may use the owner-wildcard form {\"source\":\"github\",\"repo\":\"owner/*\"} to block every repository under that owner, and an entry naming a branch or tag in `ref` also blocks every full commit id in that repository.\n The check happens BEFORE downloading, so blocked sources never touch the filesystem.\n",
+      "stats": {
+        "added_chars": 260,
+        "removed_chars": 162
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.disableClaudeAiConnectors.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "disableClaudeAiConnectors",
+        "description"
+      ],
+      "title": "disableClaudeAiConnectors description changed (+182 −0 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,3 +1,4 @@\n When true in any settings source, claude.ai MCP cloud connectors are not auto-fetched or connected, and a claudeai-proxy server passed explicitly (e.g.\n via --mcp-config or the SDK mcpServers option) does not connect either.\n+Where a managed or served source sets it, the connectors that the desktop app's Code tab hands to a session do not connect either, from the app version that shows them as turned off.\n Any-source-true wins: a project can opt out, but a project-level false cannot override a user-level true.\n",
+      "stats": {
+        "added_chars": 182,
+        "removed_chars": 0
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.disabled",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "disabled"
+      ],
+      "title": "New setting: disabled",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "@internal Model is visible but not selectable (e.g. a model the org's Zero Data Retention setting excludes). The human-readable reason is folded into `description`; a structured disabledReason field is the extension point if a consumer ever needs the reason separately.",
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.displayName",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "displayName"
+      ],
+      "title": "New setting: displayName",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Human-readable display name",
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.extraKnownMarketplaces.<name>.pluginDigests.deprecated",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "extraKnownMarketplaces.<name>.pluginDigests",
+        "deprecated"
+      ],
+      "title": "Setting extraKnownMarketplaces.<name>.pluginDigests deprecated",
+      "impact": "notable",
+      "before": null,
+      "after": true,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.extraKnownMarketplaces.<name>.pluginDigests.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "extraKnownMarketplaces.<name>.pluginDigests",
+        "description"
+      ],
+      "title": "extraKnownMarketplaces.<name>.pluginDigests description changed (+220 −1136 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,8 +1,1 @@\n-Managed settings only: the plugins of this marketplace that an organization delivers with its own tier, by plugin name, each with the digests of its releases.\n-A plugin also enabled and listed in prependPlugins or appendPlugins by managed settings the session vouches for loads its hooks module only from a folder that proves one of them, and is then seated in that tier; any other copy does not load.\n-A digest is sha256- and the base64 SHA-256 of, for every regular file in the folder in UTF-16 code unit order of its path, not normalized, \"f PATH\" NUL BYTE-LENGTH NUL BYTES, with / in paths; .git, .in_use, .orphaned_at, .claude-plugin-link, .claude-directory-proof.json and .links_materialized at the root are left out.\n-The plugin keeps its manifest at .claude-plugin/plugin.json and names one module in hooks/hooks.json.\n-A string of any other form, or a list that is empty or of any other shape, matches no folder.\n-A symbolic link, or a surface module, proves nothing.\n-A proved plugin ships bundled with no install step: the digest covers the whole folder, node_modules included.\n-A checkout whose line endings were converted proves nothing.\n+Deprecated and ignored: settings that hold it still load. A plugin takes the organization tier when managed settings enable it, declare its marketplace with a remote source and list it in prependPlugins or appendPlugins.\n",
+      "stats": {
+        "added_chars": 220,
+        "removed_chars": 1136
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.extraKnownMarketplaces.<name>.source.ref.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "extraKnownMarketplaces.<name>.source.ref",
+        "description"
+      ],
+      "title": "extraKnownMarketplaces.<name>.source.ref description changed (+431 −89 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,6 @@\n-Git branch or tag to use (e.g., \"main\", \"v1.0.0\"). Defaults to repository default branch.\n+Git branch, tag or full commit id to use (e.g., \"main\", \"v1.0.0\").\n+Defaults to repository default branch.\n+A full commit id (40 or 64 lowercase hex digits) holds the marketplace at that commit: refreshes and auto-updates do not move it.\n+A branch or tag of the repository must hold the commit.\n+Plugins listed with a remote source follow that source unless they name a `sha`.\n+Reserved Anthropic marketplace names do not accept a commit id.\n",
+      "stats": {
+        "added_chars": 431,
+        "removed_chars": 89
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.prependPlugins.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "prependPlugins",
+        "description"
+      ],
+      "title": "prependPlugins description changed (+312 −178 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,5 +1,5 @@\n Managed plugins (plugin@marketplace ids that managed enabledPlugins sets true) whose hooks run first, outermost, in the listed order: the first id listed sees every event before any other plugin and every result after it.\n-Managed plugins not listed here or in appendPlugins follow the listed ones; user, project and marketplace plugins come after those; then appendPlugins; then the built-in plugins.\n+Managed plugins read in place from a local folder managed settings name, and not listed here or in appendPlugins, follow the listed ones; user, project and marketplace plugins come after those, with a managed plugin from a remote marketplace that neither key lists; then appendPlugins; then the built-in plugins.\n The bundled cc-plugin-sec-default@builtin seats itself outermost (on a machine with managed settings and for Team and Enterprise organizations) unless this list is set, in which case list it where it should sit or leave it out.\n Name it there as sec-default@builtin, the id every release reads, for as long as any machine in the organization may run a release from before its rename; a release that knows the new id reads either.\n Any other id that is not an enabled managed plugin is skipped; an id listed in both keys is prepended.\n",
+      "stats": {
+        "added_chars": 312,
+        "removed_chars": 178
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.promoListPrice",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "promoListPrice"
+      ],
+      "title": "New setting: promoListPrice",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "@internal List price (e.g. `$3/$15`) for a model currently on a launch promo. `description` carries only the promo price so plain-text consumers read it unambiguously; rich pickers prepend this struck-through before the first `$X/$Y` in `description`. Absent when no promo is active.",
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.resolvedModel",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "resolvedModel"
+      ],
+      "title": "New setting: resolvedModel",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Canonical wire model id this row's `value` resolves to (e.g. 'sonnet' → 'claude-sonnet-5'). Lets hosts match a persisted explicit id against the alias row that covers it.",
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.sandbox.autoAllowBashIfSandboxed.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "sandbox.autoAllowBashIfSandboxed",
+        "description"
+      ],
+      "title": "sandbox.autoAllowBashIfSandboxed description changed (+313 −0 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,3 @@\n-\n+macOS and Linux/WSL only: approve a Bash command that will run inside the sandbox without a permission prompt, unless a deny rule, a command-specific ask rule or a safety check stops it.\n+Default: false, so sandboxed commands go through the same permission flow as any other command.\n+Has no effect on native Windows.\n",
+      "stats": {
+        "added_chars": 313,
+        "removed_chars": 0
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.strictKnownMarketplaces[].ref.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "strictKnownMarketplaces[].ref",
+        "description"
+      ],
+      "title": "strictKnownMarketplaces[].ref description changed (+431 −89 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,6 @@\n-Git branch or tag to use (e.g., \"main\", \"v1.0.0\"). Defaults to repository default branch.\n+Git branch, tag or full commit id to use (e.g., \"main\", \"v1.0.0\").\n+Defaults to repository default branch.\n+A full commit id (40 or 64 lowercase hex digits) holds the marketplace at that commit: refreshes and auto-updates do not move it.\n+A branch or tag of the repository must hold the commit.\n+Plugins listed with a remote source follow that source unless they name a `sha`.\n+Reserved Anthropic marketplace names do not accept a commit id.\n",
+      "stats": {
+        "added_chars": 431,
+        "removed_chars": 89
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.supportedEffortLevels",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "supportedEffortLevels"
+      ],
+      "title": "New setting: supportedEffortLevels",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Available effort levels for this model",
+        "type": "array"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.supportsAdaptiveThinking",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "supportsAdaptiveThinking"
+      ],
+      "title": "New setting: supportsAdaptiveThinking",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Whether this model supports adaptive thinking (Claude decides when and how much to think)",
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.supportsAutoMode",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "supportsAutoMode"
+      ],
+      "title": "New setting: supportsAutoMode",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Whether this model supports auto mode",
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.supportsEffort",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "supportsEffort"
+      ],
+      "title": "New setting: supportsEffort",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Whether this model supports effort levels",
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.supportsFastMode",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "supportsFastMode"
+      ],
+      "title": "New setting: supportsFastMode",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Whether this model supports fast mode",
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.supportsThinkingOff",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "supportsThinkingOff"
+      ],
+      "title": "New setting: supportsThinkingOff",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "@internal Whether thinking can be turned off for this model",
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.value",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "value"
+      ],
+      "title": "New setting: value",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Model identifier to use in API calls",
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_DISABLE_EXPORTED_VARIABLE_PROMPT",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_DISABLE_EXPORTED_VARIABLE_PROMPT"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_DISABLE_EXPORTED_VARIABLE_PROMPT",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_DISABLE_EXPORTED_VARIABLE_PROMPT",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_MCP_APPS_NO_TOOL_ROUTE",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_MCP_APPS_NO_TOOL_ROUTE"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_MCP_APPS_NO_TOOL_ROUTE",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_MCP_APPS_NO_TOOL_ROUTE",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_PLUGIN_MCPB_DIR",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_PLUGIN_MCPB_DIR"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_PLUGIN_MCPB_DIR",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_PLUGIN_MCPB_DIR",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.SystemDrive",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "SystemDrive"
+      ],
+      "title": "New environment variable: SystemDrive",
+      "impact": "informational",
+      "before": null,
+      "after": "SystemDrive",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.TEMP",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "TEMP"
+      ],
+      "title": "New environment variable: TEMP",
+      "impact": "informational",
+      "before": null,
+      "after": "TEMP",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.TMP",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "TMP"
+      ],
+      "title": "New environment variable: TMP",
+      "impact": "informational",
+      "before": null,
+      "after": "TMP",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "filesystem.darwin/arm64.exec./bin/zsh -c -l SNAPSHOT_FILE=<claude-config>/shell-snapshots/snapshot-zsh-<n>-<id>.sh\n      # No user config file to source\n      \n\n      # First, create/clear the snapshot file\n      echo \"# Snapshot file\" >| \"$SNAPSHOT_FILE\"\n\n      # When this file is sourced, we first unalias to avoid conflicts\n      # This is necessary because aliases get \"frozen\" inside function definitions at definition time,\n      # which can cause unexpected behavior when functions use commands that conflict with aliases\n      echo \"# Unset all aliases to avoid conflicts with functions\" >> \"$SNAPSHOT_FILE\"\n      echo \"unalias -a 2>/dev/null || true\" >> \"$SNAPSHOT_FILE\"\n\n      \n\n      \n      cat >> \"$SNAPSHOT_FILE\" << 'CLAUDE_CODE_END_<id>'\n# Check for rg availability\nif ! hash rg 2>/dev/null && ! typeset -f rg >/dev/null 2>&1; then\n  function rg {\n  if [[ -x <install>/claude ]]; then\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=rg <install>/claude ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=rg <install>/claude ${1+\"$@\"}\n  else\n    (exec -a rg <install>/claude ${1+\"$@\"})\n  fi\n  elif [[ -x <home>/.local/bin/claude ]]; then\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=rg <home>/.local/bin/claude ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=rg <home>/.local/bin/claude ${1+\"$@\"}\n  else\n    (exec -a rg <home>/.local/bin/claude ${1+\"$@\"})\n  fi\n  else command rg ${1+\"$@\"}; fi\n}\nfi\n# Shadow find/grep with embedded bfs/ugrep\nunalias find 2>/dev/null || true\nunalias grep 2>/dev/null || true\nfunction find {\n  if [[ -x <install>/claude ]]; then\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=bfs <install>/claude -S dfs -regextype findutils-default ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=bfs <install>/claude -S dfs -regextype findutils-default ${1+\"$@\"}\n  else\n    (exec -a bfs <install>/claude -S dfs -regextype findutils-default ${1+\"$@\"})\n  fi\n  elif [[ -x <home>/.local/bin/claude ]]; then\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=bfs <home>/.local/bin/claude -S dfs -regextype findutils-default ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=bfs <home>/.local/bin/claude -S dfs -regextype findutils-default ${1+\"$@\"}\n  else\n    (exec -a bfs <home>/.local/bin/claude -S dfs -regextype findutils-default ${1+\"$@\"})\n  fi\n  else command find ${1+\"$@\"}; fi\n}\nfunction grep {\n  local _cc_a\n  for _cc_a in ${1+\"$@\"}; do\n    case \"$_cc_a\" in -*-filter*|-*-pager*|-*-view*|-*-format-open*|-*-config*|---*|-@*|-*-save-config*|-[Zz]*|-[!-]*[Zz]*|--null|--null-data) command grep ${1+\"$@\"}; return ;; esac\n  done\n  if [[ -x <install>/claude ]]; then\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=ugrep <install>/claude -G --ignore-files --hidden -I --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=ugrep <install>/claude -G --ignore-files --hidden -I --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"}\n  else\n    (exec -a ugrep <install>/claude -G --ignore-files --hidden -I --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"})\n  fi\n  elif [[ -x <home>/.local/bin/claude ]]; then\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=ugrep <home>/.local/bin/claude -G --ignore-files --hidden -I --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=ugrep <home>/.local/bin/claude -G --ignore-files --hidden -I --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"}\n  else\n    (exec -a ugrep <home>/.local/bin/claude -G --ignore-files --hidden -I --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"})\n  fi\n  else command grep ${1+\"$@\"}; fi\n}\n# Shadow pkill to refuse patterns matching the CLI process\nunalias pkill 2>/dev/null || true\nfunction pkill {\n  if [ -n \"${CLAUDE_PID:-}\" ] && [ -r \"/proc/${CLAUDE_PID}/comm\" ]; then\n    local _cc_skip=\"\" _cc_a\n    local -a _cc_probe=()\n    for _cc_a in ${1+\"$@\"}; do\n      if [ -n \"$_cc_skip\" ]; then _cc_skip=\"\"; continue; fi\n      case \"$_cc_a\" in\n        --signal) _cc_skip=1 ;;\n        --signal=*|-e|--echo) ;;\n        -[0-9]*) ;;\n        -[PUGOF]?*) _cc_probe+=(\"$_cc_a\") ;;\n        -[ABCDEFGHIJKLMNOPQRSTUVWXYZ][ABCDEFGHIJKLMNOPQRSTUVWXYZ0-9]*) ;;\n        *) _cc_probe+=(\"$_cc_a\") ;;\n      esac\n    done\n    if command pgrep ${_cc_probe[@]+\"${_cc_probe[@]}\"} 2>/dev/null | command grep -qx \"${CLAUDE_PID}\"; then\n      printf 'pkill: refusing to run — this pattern matches the Claude CLI process (PID %s). Narrow the pattern, or target your own children with `pkill -P $$ ...`.\\n' \"${CLAUDE_PID}\" >&2\n      return 1\n    fi\n  fi\n  command pkill ${1+\"$@\"}\n}\nexport PATH=<path>\nCLAUDE_CODE_END_<id>\n  \n\n      # Exit silently on success, only report errors\n      if [ ! -f \"$SNAPSHOT_FILE\" ]; then\n        echo \"Error: Snapshot file was not created at $SNAPSHOT_FILE\" >&2\n        exit 1\n      fi\n    ",
+      "category": "filesystem",
+      "op": "changed",
+      "path": [
+        "filesystem",
+        "darwin/arm64",
+        "exec",
+        "/bin/zsh -c -l SNAPSHOT_FILE=<claude-config>/shell-snapshots/snapshot-zsh-<n>-<id>.sh\n      # No user config file to source\n      \n\n      # First, create/clear the snapshot file\n      echo \"# Snapshot file\" >| \"$SNAPSHOT_FILE\"\n\n      # When this file is sourced, we first unalias to avoid conflicts\n      # This is necessary because aliases get \"frozen\" inside function definitions at definition time,\n      # which can cause unexpected behavior when functions use commands that conflict with aliases\n      echo \"# Unset all aliases to avoid conflicts with functions\" >> \"$SNAPSHOT_FILE\"\n      echo \"unalias -a 2>/dev/null || true\" >> \"$SNAPSHOT_FILE\"\n\n      \n\n      \n      cat >> \"$SNAPSHOT_FILE\" << 'CLAUDE_CODE_END_<id>'\n# Check for rg availability\nif ! hash rg 2>/dev/null && ! typeset -f rg >/dev/null 2>&1; then\n  function rg {\n  if [[ -x <install>/claude ]]; then\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=rg <install>/claude ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=rg <install>/claude ${1+\"$@\"}\n  else\n    (exec -a rg <install>/claude ${1+\"$@\"})\n  fi\n  elif [[ -x <home>/.local/bin/claude ]]; then\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=rg <home>/.local/bin/claude ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=rg <home>/.local/bin/claude ${1+\"$@\"}\n  else\n    (exec -a rg <home>/.local/bin/claude ${1+\"$@\"})\n  fi\n  else command rg ${1+\"$@\"}; fi\n}\nfi\n# Shadow find/grep with embedded bfs/ugrep\nunalias find 2>/dev/null || true\nunalias grep 2>/dev/null || true\nfunction find {\n  if [[ -x <install>/claude ]]; then\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=bfs <install>/claude -S dfs -regextype findutils-default ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=bfs <install>/claude -S dfs -regextype findutils-default ${1+\"$@\"}\n  else\n    (exec -a bfs <install>/claude -S dfs -regextype findutils-default ${1+\"$@\"})\n  fi\n  elif [[ -x <home>/.local/bin/claude ]]; then\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=bfs <home>/.local/bin/claude -S dfs -regextype findutils-default ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=bfs <home>/.local/bin/claude -S dfs -regextype findutils-default ${1+\"$@\"}\n  else\n    (exec -a bfs <home>/.local/bin/claude -S dfs -regextype findutils-default ${1+\"$@\"})\n  fi\n  else command find ${1+\"$@\"}; fi\n}\nfunction grep {\n  local _cc_a\n  for _cc_a in ${1+\"$@\"}; do\n    case \"$_cc_a\" in -*-filter*|-*-pager*|-*-view*|-*-format-open*|-*-config*|---*|-@*|-*-save-config*|-[Zz]*|-[!-]*[Zz]*|--null|--null-data) command grep ${1+\"$@\"}; return ;; esac\n  done\n  if [[ -x <install>/claude ]]; then\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=ugrep <install>/claude -G --ignore-files --hidden -I --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=ugrep <install>/claude -G --ignore-files --hidden -I --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"}\n  else\n    (exec -a ugrep <install>/claude -G --ignore-files --hidden -I --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"})\n  fi\n  elif [[ -x <home>/.local/bin/claude ]]; then\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=ugrep <home>/.local/bin/claude -G --ignore-files --hidden -I --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=ugrep <home>/.local/bin/claude -G --ignore-files --hidden -I --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"}\n  else\n    (exec -a ugrep <home>/.local/bin/claude -G --ignore-files --hidden -I --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"})\n  fi\n  else command grep ${1+\"$@\"}; fi\n}\n# Shadow pkill to refuse patterns matching the CLI process\nunalias pkill 2>/dev/null || true\nfunction pkill {\n  if [ -n \"${CLAUDE_PID:-}\" ] && [ -r \"/proc/${CLAUDE_PID}/comm\" ]; then\n    local _cc_skip=\"\" _cc_a\n    local -a _cc_probe=()\n    for _cc_a in ${1+\"$@\"}; do\n      if [ -n \"$_cc_skip\" ]; then _cc_skip=\"\"; continue; fi\n      case \"$_cc_a\" in\n        --signal) _cc_skip=1 ;;\n        --signal=*|-e|--echo) ;;\n        -[0-9]*) ;;\n        -[PUGOF]?*) _cc_probe+=(\"$_cc_a\") ;;\n        -[ABCDEFGHIJKLMNOPQRSTUVWXYZ][ABCDEFGHIJKLMNOPQRSTUVWXYZ0-9]*) ;;\n        *) _cc_probe+=(\"$_cc_a\") ;;\n      esac\n    done\n    if command pgrep ${_cc_probe[@]+\"${_cc_probe[@]}\"} 2>/dev/null | command grep -qx \"${CLAUDE_PID}\"; then\n      printf 'pkill: refusing to run — this pattern matches the Claude CLI process (PID %s). Narrow the pattern, or target your own children with `pkill -P $$ ...`.\\n' \"${CLAUDE_PID}\" >&2\n      return 1\n    fi\n  fi\n  command pkill ${1+\"$@\"}\n}\nexport PATH=<path>\nCLAUDE_CODE_END_<id>\n  \n\n      # Exit silently on success, only report errors\n      if [ ! -f \"$SNAPSHOT_FILE\" ]; then\n        echo \"Error: Snapshot file was not created at $SNAPSHOT_FILE\" >&2\n        exit 1\n      fi\n    "
+      ],
+      "title": "Command changed: `/bin/zsh -c -l SNAPSHOT_FILE=<claude-config>/shell-snapshots/snapshot-zsh-<n>-<id>.sh …` (+1991 −710 chars) (darwin/arm64)",
+      "impact": "informational",
+      "before": "/bin/zsh -c -l SNAPSHOT_FILE=<claude-config>/shell-snapshots/snapshot-zsh-<n>-<id>.sh\n      # No user config file to source\n      \n\n      # First, create/clear the snapshot file\n      echo \"# Snapshot file\" >| \"$SNAPSHOT_FILE\"\n\n      # When this file is sourced, we first unalias to avoid conflicts\n      # This is necessary because aliases get \"frozen\" inside function definitions at definition time,\n      # which can cause unexpected behavior when functions use commands that conflict with aliases\n      echo \"# Unset all aliases to avoid conflicts with functions\" >> \"$SNAPSHOT_FILE\"\n      echo \"unalias -a 2>/dev/null || true\" >> \"$SNAPSHOT_FILE\"\n\n      \n\n      \n      cat >> \"$SNAPSHOT_FILE\" << 'CLAUDE_CODE_END_<id>'\n# Check for rg availability\nif ! hash rg 2>/dev/null && ! typeset -f rg >/dev/null 2>&1; then\n  function rg {\n  local _cc_bin=\"${CLAUDE_CODE_EXECPATH:-}\"\n  [[ -x $_cc_bin ]] || _cc_bin=<home>/.local/bin/claude\n  if [[ ! -x $_cc_bin ]]; then command rg ${1+\"$@\"}; return; fi\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=rg \"$_cc_bin\" ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=rg \"$_cc_bin\" ${1+\"$@\"}\n  else\n    (exec -a rg \"$_cc_bin\" ${1+\"$@\"})\n  fi\n}\nfi\n# Shadow find/grep with embedded bfs/ugrep\nunalias find 2>/dev/null || true\nunalias grep 2>/dev/null || true\nfunction find {\n  local _cc_bin=\"${CLAUDE_CODE_EXECPATH:-}\"\n  [[ -x $_cc_bin ]] || _cc_bin=<home>/.local/bin/claude\n  if [[ ! -x $_cc_bin ]]; then command find ${1+\"$@\"}; return; fi\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=bfs \"$_cc_bin\" -S dfs -regextype findutils-default ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=bfs \"$_cc_bin\" -S dfs -regextype findutils-default ${1+\"$@\"}\n  else\n    (exec -a bfs \"$_cc_bin\" -S dfs -regextype findutils-default ${1+\"$@\"})\n  fi\n}\nfunction grep {\n  local _cc_a\n  for _cc_a in ${1+\"$@\"}; do\n    case \"$_cc_a\" in -*-filter*|-*-pager*|-*-view*|-*-format-open*|-*-config*|---*|-@*|-*-save-config*|-[Zz]*|-[!-]*[Zz]*|--null|--null-data) command grep ${1+\"$@\"}; return ;; esac\n  done\n  local _cc_bin=\"${CLAUDE_CODE_EXECPATH:-}\"\n  [[ -x $_cc_bin ]] || _cc_bin=<home>/.local/bin/claude\n  if [[ ! -x $_cc_bin ]]; then command grep ${1+\"$@\"}; return; fi\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=ugrep \"$_cc_bin\" -G --ignore-files --hidden -I --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=ugrep \"$_cc_bin\" -G --ignore-files --hidden -I --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"}\n  else\n    (exec -a ugrep \"$_cc_bin\" -G --ignore-files --hidden -I --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"})\n  fi\n}\n# Shadow pkill to refuse patterns matching the CLI process\nunalias pkill 2>/dev/null || true\nfunction pkill {\n  if [ -n \"${CLAUDE_PID:-}\" ] && [ -r \"/proc/${CLAUDE_PID}/comm\" ]; then\n    local _cc_skip=\"\" _cc_a\n    local -a _cc_probe=()\n    for _cc_a in ${1+\"$@\"}; do\n      if [ -n \"$_cc_skip\" ]; then _cc_skip=\"\"; continue; fi\n      case \"$_cc_a\" in\n        --signal) _cc_skip=1 ;;\n        --signal=*|-e|--echo) ;;\n        -[0-9]*) ;;\n        -[PUGOF]?*) _cc_probe+=(\"$_cc_a\") ;;\n        -[ABCDEFGHIJKLMNOPQRSTUVWXYZ][ABCDEFGHIJKLMNOPQRSTUVWXYZ0-9]*) ;;\n        *) _cc_probe+=(\"$_cc_a\") ;;\n      esac\n    done\n    if command pgrep ${_cc_probe[@]+\"${_cc_probe[@]}\"} 2>/dev/null | command grep -qx \"${CLAUDE_PID}\"; then\n      printf 'pkill: refusing to run — this pattern matches the Claude CLI process (PID %s). Narrow the pattern, or target your own children with `pkill -P $$ ...`.\\n' \"${CLAUDE_PID}\" >&2\n      return 1\n    fi\n  fi\n  command pkill ${1+\"$@\"}\n}\nexport PATH=<path>\nCLAUDE_CODE_END_<id>\n  \n\n      # Exit silently on success, only report errors\n      if [ ! -f \"$SNAPSHOT_FILE\" ]; then\n        echo \"Error: Snapshot file was not created at $SNAPSHOT_FILE\" >&2\n        exit 1\n      fi\n    ",
+      "after": "/bin/zsh -c -l SNAPSHOT_FILE=<claude-config>/shell-snapshots/snapshot-zsh-<n>-<id>.sh\n      # No user config file to source\n      \n\n      # First, create/clear the snapshot file\n      echo \"# Snapshot file\" >| \"$SNAPSHOT_FILE\"\n\n      # When this file is sourced, we first unalias to avoid conflicts\n      # This is necessary because aliases get \"frozen\" inside function definitions at definition time,\n      # which can cause unexpected behavior when functions use commands that conflict with aliases\n      echo \"# Unset all aliases to avoid conflicts with functions\" >> \"$SNAPSHOT_FILE\"\n      echo \"unalias -a 2>/dev/null || true\" >> \"$SNAPSHOT_FILE\"\n\n      \n\n      \n      cat >> \"$SNAPSHOT_FILE\" << 'CLAUDE_CODE_END_<id>'\n# Check for rg availability\nif ! hash rg 2>/dev/null && ! typeset -f rg >/dev/null 2>&1; then\n  function rg {\n  if [[ -x <install>/claude ]]; then\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=rg <install>/claude ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=rg <install>/claude ${1+\"$@\"}\n  else\n    (exec -a rg <install>/claude ${1+\"$@\"})\n  fi\n  elif [[ -x <home>/.local/bin/claude ]]; then\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=rg <home>/.local/bin/claude ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=rg <home>/.local/bin/claude ${1+\"$@\"}\n  else\n    (exec -a rg <home>/.local/bin/claude ${1+\"$@\"})\n  fi\n  else command rg ${1+\"$@\"}; fi\n}\nfi\n# Shadow find/grep with embedded bfs/ugrep\nunalias find 2>/dev/null || true\nunalias grep 2>/dev/null || true\nfunction find {\n  if [[ -x <install>/claude ]]; then\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=bfs <install>/claude -S dfs -regextype findutils-default ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=bfs <install>/claude -S dfs -regextype findutils-default ${1+\"$@\"}\n  else\n    (exec -a bfs <install>/claude -S dfs -regextype findutils-default ${1+\"$@\"})\n  fi\n  elif [[ -x <home>/.local/bin/claude ]]; then\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=bfs <home>/.local/bin/claude -S dfs -regextype findutils-default ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=bfs <home>/.local/bin/claude -S dfs -regextype findutils-default ${1+\"$@\"}\n  else\n    (exec -a bfs <home>/.local/bin/claude -S dfs -regextype findutils-default ${1+\"$@\"})\n  fi\n  else command find ${1+\"$@\"}; fi\n}\nfunction grep {\n  local _cc_a\n  for _cc_a in ${1+\"$@\"}; do\n    case \"$_cc_a\" in -*-filter*|-*-pager*|-*-view*|-*-format-open*|-*-config*|---*|-@*|-*-save-config*|-[Zz]*|-[!-]*[Zz]*|--null|--null-data) command grep ${1+\"$@\"}; return ;; esac\n  done\n  if [[ -x <install>/claude ]]; then\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=ugrep <install>/claude -G --ignore-files --hidden -I --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=ugrep <install>/claude -G --ignore-files --hidden -I --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"}\n  else\n    (exec -a ugrep <install>/claude -G --ignore-files --hidden -I --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"})\n  fi\n  elif [[ -x <home>/.local/bin/claude ]]; then\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=ugrep <home>/.local/bin/claude -G --ignore-files --hidden -I --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=ugrep <home>/.local/bin/claude -G --ignore-files --hidden -I --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"}\n  else\n    (exec -a ugrep <home>/.local/bin/claude -G --ignore-files --hidden -I --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"})\n  fi\n  else command grep ${1+\"$@\"}; fi\n}\n# Shadow pkill to refuse patterns matching the CLI process\nunalias pkill 2>/dev/null || true\nfunction pkill {\n  if [ -n \"${CLAUDE_PID:-}\" ] && [ -r \"/proc/${CLAUDE_PID}/comm\" ]; then\n    local _cc_skip=\"\" _cc_a\n    local -a _cc_probe=()\n    for _cc_a in ${1+\"$@\"}; do\n      if [ -n \"$_cc_skip\" ]; then _cc_skip=\"\"; continue; fi\n      case \"$_cc_a\" in\n        --signal) _cc_skip=1 ;;\n        --signal=*|-e|--echo) ;;\n        -[0-9]*) ;;\n        -[PUGOF]?*) _cc_probe+=(\"$_cc_a\") ;;\n        -[ABCDEFGHIJKLMNOPQRSTUVWXYZ][ABCDEFGHIJKLMNOPQRSTUVWXYZ0-9]*) ;;\n        *) _cc_probe+=(\"$_cc_a\") ;;\n      esac\n    done\n    if command pgrep ${_cc_probe[@]+\"${_cc_probe[@]}\"} 2>/dev/null | command grep -qx \"${CLAUDE_PID}\"; then\n      printf 'pkill: refusing to run — this pattern matches the Claude CLI process (PID %s). Narrow the pattern, or target your own children with `pkill -P $$ ...`.\\n' \"${CLAUDE_PID}\" >&2\n      return 1\n    fi\n  fi\n  command pkill ${1+\"$@\"}\n}\nexport PATH=<path>\nCLAUDE_CODE_END_<id>\n  \n\n      # Exit silently on success, only report errors\n      if [ ! -f \"$SNAPSHOT_FILE\" ]; then\n        echo \"Error: Snapshot file was not created at $SNAPSHOT_FILE\" >&2\n        exit 1\n      fi\n    ",
+      "text_diff": "@@ -22,46 +22,70 @@\n if ! hash rg 2>/dev/null && ! typeset\n -f rg >/dev/null 2>&1; then\n   function rg {\n-  local _cc_bin=\"${CLAUDE_CODE_EXECPATH:-}\"\n-  [[\n--x $_cc_bin ]] || _cc_bin=<home>/.local/bin/claude\n-  if [[ !\n--x $_cc_bin ]]; then command rg ${1+\"$@\"}; return; fi\n   if [[\n+-x <install>/claude ]]; then\n+  if [[\n -n ${ZSH_VERSION:-} ]]; then\n-    ARGV0=rg \"$_cc_bin\" ${1+\"$@\"}\n+    ARGV0=rg <install>/claude ${1+\"$@\"}\n   elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n-    ARGV0=rg \"$_cc_bin\" ${1+\"$@\"}\n+    ARGV0=rg <install>/claude ${1+\"$@\"}\n   else\n     (exec\n--a rg \"$_cc_bin\" ${1+\"$@\"})\n+-a rg <install>/claude ${1+\"$@\"})\n   fi\n+  elif [[\n+-x <home>/.local/bin/claude ]]; then\n+  if [[\n+-n ${ZSH_VERSION:-} ]]; then\n+    ARGV0=rg <home>/.local/bin/claude ${1+\"$@\"}\n+  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n+    ARGV0=rg <home>/.local/bin/claude ${1+\"$@\"}\n+  else\n+    (exec\n+-a rg <home>/.local/bin/claude ${1+\"$@\"})\n+  fi\n+  else command rg ${1+\"$@\"}; fi\n }\n fi\n # Shadow find/grep with embedded bfs/ugrep\n unalias find 2>/dev/null || true\n unalias grep 2>/dev/null || true\n function find {\n-  local _cc_bin=\"${CLAUDE_CODE_EXECPATH:-}\"\n-  [[\n--x $_cc_bin ]] || _cc_bin=<home>/.local/bin/claude\n-  if [[ !\n--x $_cc_bin ]]; then command find ${1+\"$@\"}; return; fi\n   if [[\n+-x <install>/claude ]]; then\n+  if [[\n -n ${ZSH_VERSION:-} ]]; then\n-    ARGV0=bfs \"$_cc_bin\"\n+    ARGV0=bfs <install>/claude\n -S dfs\n -regextype findutils-default ${1+\"$@\"}\n   elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n-    ARGV0=bfs \"$_cc_bin\"\n+    ARGV0=bfs <install>/claude\n -S dfs\n -regextype findutils-default ${1+\"$@\"}\n   else\n     (exec\n--a bfs \"$_cc_bin\"\n+-a bfs <install>/claude\n -S dfs\n -regextype findutils-default ${1+\"$@\"})\n   fi\n+  elif [[\n+-x <home>/.local/bin/claude ]]; then\n+  if [[\n+-n ${ZSH_VERSION:-} ]]; then\n+    ARGV0=bfs <home>/.local/bin/claude\n+-S dfs\n+-regextype findutils-default ${1+\"$@\"}\n+  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n+    ARGV0=bfs <home>/.local/bin/claude\n+-S dfs\n+-regextype findutils-default ${1+\"$@\"}\n+  else\n+    (exec\n+-a bfs <home>/.local/bin/claude\n+-S dfs\n+-regextype findutils-default ${1+\"$@\"})\n+  fi\n+  else command find ${1+\"$@\"}; fi\n }\n function grep {\n   local _cc_a\n@@ -69,14 +93,11 @@\n     case \"$_cc_a\" in\n -*-filter*|-*-pager*|-*-view*|-*-format-open*|-*-config*|---*|-@*|-*-save-config*|-[Zz]*|-[!-]*[Zz]*|--null|--null-data) command grep ${1+\"$@\"}; return ;; esac\n   done\n-  local _cc_bin=\"${CLAUDE_CODE_EXECPATH:-}\"\n-  [[\n--x $_cc_bin ]] || _cc_bin=<home>/.local/bin/claude\n-  if [[ !\n--x $_cc_bin ]]; then command grep ${1+\"$@\"}; return; fi\n   if [[\n+-x <install>/claude ]]; then\n+  if [[\n -n ${ZSH_VERSION:-} ]]; then\n-    ARGV0=ugrep \"$_cc_bin\"\n+    ARGV0=ugrep <install>/claude\n -G\n --ignore-files\n --hidden\n@@ -88,7 +109,7 @@\n --exclude-dir=.jj\n --exclude-dir=.sl ${1+\"$@\"}\n   elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n-    ARGV0=ugrep \"$_cc_bin\"\n+    ARGV0=ugrep <install>/claude\n -G\n --ignore-files\n --hidden\n@@ -101,7 +122,7 @@\n --exclude-dir=.sl ${1+\"$@\"}\n   else\n     (exec\n--a ugrep \"$_cc_bin\"\n+-a ugrep <install>/claude\n -G\n --ignore-files\n --hidden\n@@ -113,6 +134,48 @@\n --exclude-dir=.jj\n --exclude-dir=.sl ${1+\"$@\"})\n   fi\n+  elif [[\n+-x <home>/.local/bin/claude ]]; then\n+  if [[\n+-n ${ZSH_VERSION:-} ]]; then\n+    ARGV0=ugrep <home>/.local/bin/claude\n+-G\n+--ignore-files\n+--hidden\n+-I\n+--exclude-dir=.git\n+--exclude-dir=.svn\n+--exclude-dir=.hg\n+--exclude-dir=.bzr\n+--exclude-dir=.jj\n+--exclude-dir=.sl ${1+\"$@\"}\n+  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n+    ARGV0=ugrep <home>/.local/bin/claude\n+-G\n+--ignore-files\n+--hidden\n+-I\n+--exclude-dir=.git\n+--exclude-dir=.svn\n+--exclude-dir=.hg\n+--exclude-dir=.bzr\n+--exclude-dir=.jj\n+--exclude-dir=.sl ${1+\"$@\"}\n+  else\n+    (exec\n+-a ugrep <home>/.local/bin/claude\n+-G\n+--ignore-files\n+--hidden\n+-I\n+--exclude-dir=.git\n+--exclude-dir=.svn\n+--exclude-dir=.hg\n+--exclude-dir=.bzr\n+--exclude-dir=.jj\n+--exclude-dir=.sl ${1+\"$@\"})\n+  fi\n+  else command grep ${1+\"$@\"}; fi\n }\n # Shadow pkill to refuse patterns matching the CLI process\n unalias pkill 2>/dev/null || true\n",
+      "stats": {
+        "added_chars": 1991,
+        "removed_chars": 710
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "filesystem.darwin/arm64.exec.git -c core.hooksPath=/dev/null -c core.fsmonitor= -c safe.bareRepository=explicit -c protocol.file.allow=never ls-files --error-unmatch -- :(icase).claude/settings.local.json",
+      "category": "filesystem",
+      "op": "changed",
+      "path": [
+        "filesystem",
+        "darwin/arm64",
+        "exec",
+        "git -c core.hooksPath=/dev/null -c core.fsmonitor= -c safe.bareRepository=explicit -c protocol.file.allow=never ls-files --error-unmatch -- :(icase).claude/settings.local.json"
+      ],
+      "title": "Command changed: `git -c core.hooksPath=/dev/null -c core.fsmonitor= -c safe.bareRepository=explicit -c protocol.file. …` (+68 −18 chars) (darwin/arm64)",
+      "impact": "informational",
+      "before": "git -c core.hooksPath=/dev/null -c core.fsmonitor= -C <repo> ls-files --error-unmatch -- :(icase).claude/settings.local.json",
+      "after": "git -c core.hooksPath=/dev/null -c core.fsmonitor= -c safe.bareRepository=explicit -c protocol.file.allow=never ls-files --error-unmatch -- :(icase).claude/settings.local.json",
+      "text_diff": "@@ -1,6 +1,7 @@\n git\n -c core.hooksPath=/dev/null\n -c core.fsmonitor=\n--C <repo> ls-files\n+-c safe.bareRepository=explicit\n+-c protocol.file.allow=never ls-files\n --error-unmatch\n -- :(icase).claude/settings.local.json\n",
+      "stats": {
+        "added_chars": 68,
+        "removed_chars": 18
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "filesystem.linux/amd64.paths./etc/os-release.ops.stat",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "/etc/os-release",
+        "ops",
+        "stat"
+      ],
+      "title": "Now checks /etc/os-release (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": "stat",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<claude-config>/plugins/mcpb",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<claude-config>/plugins/mcpb"
+      ],
+      "title": "Now looks for <claude-config>/plugins/mcpb (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "ops": [
+          "probe"
+        ],
+        "phases": [
+          "turn"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<claude-config>/plugins/mcpb/installed_plugins.json",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<claude-config>/plugins/mcpb/installed_plugins.json"
+      ],
+      "title": "Now looks for <claude-config>/plugins/mcpb/installed_plugins.json (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "ops": [
+          "probe"
+        ],
+        "phases": [
+          "turn"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "filesystem.linux/amd64.exec.git -c core.hooksPath=/dev/null -c core.fsmonitor= -c safe.bareRepository=explicit -c protocol.file.allow=never ls-files --error-unmatch -- :(icase).claude/settings.local.json",
+      "category": "filesystem",
+      "op": "changed",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "exec",
+        "git -c core.hooksPath=/dev/null -c core.fsmonitor= -c safe.bareRepository=explicit -c protocol.file.allow=never ls-files --error-unmatch -- :(icase).claude/settings.local.json"
+      ],
+      "title": "Command changed: `git -c core.hooksPath=/dev/null -c core.fsmonitor= -c safe.bareRepository=explicit -c protocol.file. …` (+68 −18 chars) (linux/amd64)",
+      "impact": "informational",
+      "before": "git -c core.hooksPath=/dev/null -c core.fsmonitor= -C <repo> ls-files --error-unmatch -- :(icase).claude/settings.local.json",
+      "after": "git -c core.hooksPath=/dev/null -c core.fsmonitor= -c safe.bareRepository=explicit -c protocol.file.allow=never ls-files --error-unmatch -- :(icase).claude/settings.local.json",
+      "text_diff": "@@ -1,6 +1,7 @@\n git\n -c core.hooksPath=/dev/null\n -c core.fsmonitor=\n--C <repo> ls-files\n+-c safe.bareRepository=explicit\n+-c protocol.file.allow=never ls-files\n --error-unmatch\n -- :(icase).claude/settings.local.json\n",
+      "stats": {
+        "added_chars": 68,
+        "removed_chars": 18
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    }
+  ]
+}

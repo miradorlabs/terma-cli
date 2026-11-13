@@ -3,8 +3,8 @@
   "harness": "claude",
   "window": {
     "oldest": "2.1.206",
-    "newest": "2.1.323",
-    "builds": 104
+    "newest": "2.1.324",
+    "builds": 105
   },
   "items": {
     "cli.commands.claude agents": {
@@ -6624,6 +6624,17 @@
       ],
       "since_bounded": false
     },
+    "config.env_vars.CLAUDE_CODE_DISABLE_EXPORTED_VARIABLE_PROMPT": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "2.1.324",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.env_vars.CLAUDE_CODE_DISABLE_FAST_MODE": {
       "kind": "env_var",
       "ranges": [
@@ -9335,6 +9346,17 @@
       ],
       "since_bounded": true
     },
+    "config.env_vars.CLAUDE_CODE_MCP_APPS_NO_TOOL_ROUTE": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "2.1.324",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.env_vars.CLAUDE_CODE_MCP_AUTO_BACKGROUND_MS": {
       "kind": "env_var",
       "ranges": [
@@ -10269,6 +10291,17 @@
         }
       ],
       "since_bounded": false
+    },
+    "config.env_vars.CLAUDE_CODE_PLUGIN_MCPB_DIR": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "2.1.324",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
     },
     "config.env_vars.CLAUDE_CODE_PLUGIN_PREFER_HTTPS": {
       "kind": "env_var",
@@ -17705,6 +17738,17 @@
       ],
       "since_bounded": false
     },
+    "config.env_vars.SystemDrive": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "2.1.324",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.env_vars.SystemRoot": {
       "kind": "env_var",
       "ranges": [
@@ -17726,6 +17770,17 @@
         }
       ],
       "since_bounded": false
+    },
+    "config.env_vars.TEMP": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "2.1.324",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
     },
     "config.env_vars.TERM": {
       "kind": "env_var",
@@ -17836,6 +17891,17 @@
         }
       ],
       "since_bounded": false
+    },
+    "config.env_vars.TMP": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "2.1.324",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
     },
     "config.env_vars.TMPDIR": {
       "kind": "env_var",
@@ -20977,8 +21043,8 @@
       "ranges": [
         {
           "since": "2.1.305",
-          "until": "2.1.306",
-          "removed": "2.1.307"
+          "until": null,
+          "removed": null
         }
       ],
       "since_bounded": true
@@ -21170,6 +21236,17 @@
       ],
       "since_bounded": false
     },
+    "config.options.disabled": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.324",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.options.disabledMcpjsonServers": {
       "kind": "setting",
       "ranges": [
@@ -21180,6 +21257,17 @@
         }
       ],
       "since_bounded": false
+    },
+    "config.options.displayName": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.324",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
     },
     "config.options.doneMeansMerged": {
       "kind": "setting",
@@ -24635,6 +24723,17 @@
       ],
       "since_bounded": true
     },
+    "config.options.promoListPrice": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.324",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.options.promptCacheTtl": {
       "kind": "setting",
       "ranges": [
@@ -24843,6 +24942,17 @@
         }
       ],
       "since_bounded": false
+    },
+    "config.options.resolvedModel": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.324",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
     },
     "config.options.respectGitignore": {
       "kind": "setting",
@@ -28606,6 +28716,72 @@
       ],
       "since_bounded": true
     },
+    "config.options.supportedEffortLevels": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.324",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.supportsAdaptiveThinking": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.324",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.supportsAutoMode": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.324",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.supportsEffort": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.324",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.supportsFastMode": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.324",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.supportsThinkingOff": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.324",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.options.switchModelsOnFlag": {
       "kind": "setting",
       "ranges": [
@@ -28833,6 +29009,17 @@
           "since": "2.1.295",
           "until": "2.1.295",
           "removed": "2.1.296"
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.value": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.324",
+          "until": null,
+          "removed": null
         }
       ],
       "since_bounded": true

@@ -7,28 +7,56 @@
     "homepage": "https://claude.com/claude-code",
     "source": null,
     "changelog": "https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md",
-    "latest": "2.1.323",
+    "latest": "2.1.324",
     "support": "supported",
-    "versions_tracked": 104,
+    "versions_tracked": 105,
     "first_tracked": "2026-07-09",
     "last_change": {
-      "from": "2.1.322",
-      "to": "2.1.323",
-      "at": "2026-11-13T09:01:26.428937767Z",
-      "released_at": "2026-11-12T20:29:28.626Z",
-      "changes": 51,
+      "from": "2.1.323",
+      "to": "2.1.324",
+      "at": "2026-11-13T19:09:03.215136219Z",
+      "released_at": "2026-11-13T18:42:36.3Z",
+      "changes": 37,
       "categories": {
-        "binary": 1,
-        "cli": 7,
-        "config": 26,
-        "filesystem": 7,
-        "hooks": 4,
-        "network": 2,
-        "tools": 4
+        "config": 29,
+        "filesystem": 6,
+        "prompt": 2
       }
     }
   },
   "versions": [
+    {
+      "version": "2.1.324",
+      "released_at": "2026-11-13T18:42:36.3Z",
+      "captured_at": "2026-11-13T19:09:03.215136219Z",
+      "platforms": [
+        "darwin/arm64",
+        "linux/amd64"
+      ],
+      "support": "supported",
+      "previous": "2.1.323",
+      "changes": 37,
+      "categories": {
+        "config": 29,
+        "filesystem": 6,
+        "prompt": 2
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 33,
+        "notable": 4
+      },
+      "undocumented": null,
+      "highlights": [
+        "Injected context changed (+275 −266 chars)",
+        "Interactive session's injected context changed (+275 −266 chars)",
+        "Setting additionalMarketplaces.<name>.pluginDigests deprecated"
+      ],
+      "signing": "valid",
+      "attempted_at": "2026-11-13T19:09:03.215136219Z",
+      "attempts": 1
+    },
     {
       "version": "2.1.323",
       "released_at": "2026-11-12T20:29:28.626Z",
@@ -460,9 +488,9 @@
       ],
       "support": "supported",
       "previous": "2.1.306",
-      "changes": 21,
+      "changes": 20,
       "categories": {
-        "config": 19,
+        "config": 18,
         "request": 1,
         "tools": 1
       },
@@ -470,9 +498,9 @@
         "breaking": 0,
         "degrading": 0,
         "informational": 15,
-        "notable": 6
+        "notable": 5
       },
-      "undocumented": 17,
+      "undocumented": 16,
       "highlights": [
         "Agent tool description changed (+1639 −410 chars)",
         "Beta dropped: prompt-caching-scope-2026-01-05",

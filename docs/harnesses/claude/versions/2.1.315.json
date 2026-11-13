@@ -10424,6 +10424,7 @@
       "autoMode",
       "axScreenReader",
       "defaultView",
+      "description",
       "disableDeepLinkRegistration",
       "skipAutoPermissionPrompt",
       "useAutoModeDuringPlan",

@@ -3,6 +3,308 @@
   "harness": "claude",
   "steps": [
     {
+      "version": "2.1.324",
+      "previous": "2.1.323",
+      "changes": [
+        {
+          "id": "prompt.context.2.text",
+          "category": "prompt",
+          "op": "changed",
+          "title": "Injected context changed (+275 −266 chars)",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "prompt.interactive.context.2.text",
+          "category": "prompt",
+          "op": "changed",
+          "title": "Interactive session's injected context changed (+275 −266 chars)",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.additionalMarketplaces.<name>.pluginDigests.deprecated",
+          "category": "config",
+          "op": "changed",
+          "title": "Setting additionalMarketplaces.<name>.pluginDigests deprecated",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.additionalMarketplaces.<name>.pluginDigests.description",
+          "category": "config",
+          "op": "changed",
+          "title": "additionalMarketplaces.<name>.pluginDigests description changed (+220 −1136 chars)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.options.additionalMarketplaces.<name>.source.ref.description",
+          "category": "config",
+          "op": "changed",
+          "title": "additionalMarketplaces.<name>.source.ref description changed (+431 −89 chars)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.options.allowedMarketplaces[].ref.description",
+          "category": "config",
+          "op": "changed",
+          "title": "allowedMarketplaces[].ref description changed (+431 −89 chars)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.options.blockedMarketplaces.description",
+          "category": "config",
+          "op": "changed",
+          "title": "blockedMarketplaces description changed (+260 −162 chars)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.options.disableClaudeAiConnectors.description",
+          "category": "config",
+          "op": "changed",
+          "title": "disableClaudeAiConnectors description changed (+182 −0 chars)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.options.disabled",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: disabled",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.options.displayName",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: displayName",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.options.extraKnownMarketplaces.<name>.pluginDigests.deprecated",
+          "category": "config",
+          "op": "changed",
+          "title": "Setting extraKnownMarketplaces.<name>.pluginDigests deprecated",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.extraKnownMarketplaces.<name>.pluginDigests.description",
+          "category": "config",
+          "op": "changed",
+          "title": "extraKnownMarketplaces.<name>.pluginDigests description changed (+220 −1136 chars)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.options.extraKnownMarketplaces.<name>.source.ref.description",
+          "category": "config",
+          "op": "changed",
+          "title": "extraKnownMarketplaces.<name>.source.ref description changed (+431 −89 chars)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.options.prependPlugins.description",
+          "category": "config",
+          "op": "changed",
+          "title": "prependPlugins description changed (+312 −178 chars)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.options.promoListPrice",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: promoListPrice",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.options.resolvedModel",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: resolvedModel",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.options.sandbox.autoAllowBashIfSandboxed.description",
+          "category": "config",
+          "op": "changed",
+          "title": "sandbox.autoAllowBashIfSandboxed description changed (+313 −0 chars)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.options.strictKnownMarketplaces[].ref.description",
+          "category": "config",
+          "op": "changed",
+          "title": "strictKnownMarketplaces[].ref description changed (+431 −89 chars)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.options.supportedEffortLevels",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: supportedEffortLevels",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.options.supportsAdaptiveThinking",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: supportsAdaptiveThinking",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.options.supportsAutoMode",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: supportsAutoMode",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.options.supportsEffort",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: supportsEffort",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.options.supportsFastMode",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: supportsFastMode",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.options.supportsThinkingOff",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: supportsThinkingOff",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.options.value",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: value",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.env_vars.CLAUDE_CODE_DISABLE_EXPORTED_VARIABLE_PROMPT",
+          "category": "config",
+          "op": "added",
+          "title": "New environment variable: CLAUDE_CODE_DISABLE_EXPORTED_VARIABLE_PROMPT",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.env_vars.CLAUDE_CODE_MCP_APPS_NO_TOOL_ROUTE",
+          "category": "config",
+          "op": "added",
+          "title": "New environment variable: CLAUDE_CODE_MCP_APPS_NO_TOOL_ROUTE",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.env_vars.CLAUDE_CODE_PLUGIN_MCPB_DIR",
+          "category": "config",
+          "op": "added",
+          "title": "New environment variable: CLAUDE_CODE_PLUGIN_MCPB_DIR",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.env_vars.SystemDrive",
+          "category": "config",
+          "op": "added",
+          "title": "New environment variable: SystemDrive",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.env_vars.TEMP",
+          "category": "config",
+          "op": "added",
+          "title": "New environment variable: TEMP",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.env_vars.TMP",
+          "category": "config",
+          "op": "added",
+          "title": "New environment variable: TMP",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "filesystem.darwin/arm64.exec./bin/zsh -c -l SNAPSHOT_FILE=<claude-config>/shell-snapshots/snapshot-zsh-<n>-<id>.sh\n      # No user config file to source\n      \n\n      # First, create/clear the snapshot file\n      echo \"# Snapshot file\" >| \"$SNAPSHOT_FILE\"\n\n      # When this file is sourced, we first unalias to avoid conflicts\n      # This is necessary because aliases get \"frozen\" inside function definitions at definition time,\n      # which can cause unexpected behavior when functions use commands that conflict with aliases\n      echo \"# Unset all aliases to avoid conflicts with functions\" >> \"$SNAPSHOT_FILE\"\n      echo \"unalias -a 2>/dev/null || true\" >> \"$SNAPSHOT_FILE\"\n\n      \n\n      \n      cat >> \"$SNAPSHOT_FILE\" << 'CLAUDE_CODE_END_<id>'\n# Check for rg availability\nif ! hash rg 2>/dev/null && ! typeset -f rg >/dev/null 2>&1; then\n  function rg {\n  if [[ -x <install>/claude ]]; then\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=rg <install>/claude ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=rg <install>/claude ${1+\"$@\"}\n  else\n    (exec -a rg <install>/claude ${1+\"$@\"})\n  fi\n  elif [[ -x <home>/.local/bin/claude ]]; then\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=rg <home>/.local/bin/claude ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=rg <home>/.local/bin/claude ${1+\"$@\"}\n  else\n    (exec -a rg <home>/.local/bin/claude ${1+\"$@\"})\n  fi\n  else command rg ${1+\"$@\"}; fi\n}\nfi\n# Shadow find/grep with embedded bfs/ugrep\nunalias find 2>/dev/null || true\nunalias grep 2>/dev/null || true\nfunction find {\n  if [[ -x <install>/claude ]]; then\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=bfs <install>/claude -S dfs -regextype findutils-default ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=bfs <install>/claude -S dfs -regextype findutils-default ${1+\"$@\"}\n  else\n    (exec -a bfs <install>/claude -S dfs -regextype findutils-default ${1+\"$@\"})\n  fi\n  elif [[ -x <home>/.local/bin/claude ]]; then\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=bfs <home>/.local/bin/claude -S dfs -regextype findutils-default ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=bfs <home>/.local/bin/claude -S dfs -regextype findutils-default ${1+\"$@\"}\n  else\n    (exec -a bfs <home>/.local/bin/claude -S dfs -regextype findutils-default ${1+\"$@\"})\n  fi\n  else command find ${1+\"$@\"}; fi\n}\nfunction grep {\n  local _cc_a\n  for _cc_a in ${1+\"$@\"}; do\n    case \"$_cc_a\" in -*-filter*|-*-pager*|-*-view*|-*-format-open*|-*-config*|---*|-@*|-*-save-config*|-[Zz]*|-[!-]*[Zz]*|--null|--null-data) command grep ${1+\"$@\"}; return ;; esac\n  done\n  if [[ -x <install>/claude ]]; then\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=ugrep <install>/claude -G --ignore-files --hidden -I --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=ugrep <install>/claude -G --ignore-files --hidden -I --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"}\n  else\n    (exec -a ugrep <install>/claude -G --ignore-files --hidden -I --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"})\n  fi\n  elif [[ -x <home>/.local/bin/claude ]]; then\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=ugrep <home>/.local/bin/claude -G --ignore-files --hidden -I --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=ugrep <home>/.local/bin/claude -G --ignore-files --hidden -I --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"}\n  else\n    (exec -a ugrep <home>/.local/bin/claude -G --ignore-files --hidden -I --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"})\n  fi\n  else command grep ${1+\"$@\"}; fi\n}\n# Shadow pkill to refuse patterns matching the CLI process\nunalias pkill 2>/dev/null || true\nfunction pkill {\n  if [ -n \"${CLAUDE_PID:-}\" ] && [ -r \"/proc/${CLAUDE_PID}/comm\" ]; then\n    local _cc_skip=\"\" _cc_a\n    local -a _cc_probe=()\n    for _cc_a in ${1+\"$@\"}; do\n      if [ -n \"$_cc_skip\" ]; then _cc_skip=\"\"; continue; fi\n      case \"$_cc_a\" in\n        --signal) _cc_skip=1 ;;\n        --signal=*|-e|--echo) ;;\n        -[0-9]*) ;;\n        -[PUGOF]?*) _cc_probe+=(\"$_cc_a\") ;;\n        -[ABCDEFGHIJKLMNOPQRSTUVWXYZ][ABCDEFGHIJKLMNOPQRSTUVWXYZ0-9]*) ;;\n        *) _cc_probe+=(\"$_cc_a\") ;;\n      esac\n    done\n    if command pgrep ${_cc_probe[@]+\"${_cc_probe[@]}\"} 2>/dev/null | command grep -qx \"${CLAUDE_PID}\"; then\n      printf 'pkill: refusing to run — this pattern matches the Claude CLI process (PID %s). Narrow the pattern, or target your own children with `pkill -P $$ ...`.\\n' \"${CLAUDE_PID}\" >&2\n      return 1\n    fi\n  fi\n  command pkill ${1+\"$@\"}\n}\nexport PATH=<path>\nCLAUDE_CODE_END_<id>\n  \n\n      # Exit silently on success, only report errors\n      if [ ! -f \"$SNAPSHOT_FILE\" ]; then\n        echo \"Error: Snapshot file was not created at $SNAPSHOT_FILE\" >&2\n        exit 1\n      fi\n    ",
+          "category": "filesystem",
+          "op": "changed",
+          "title": "Command changed: `/bin/zsh -c -l SNAPSHOT_FILE=<claude-config>/shell-snapshots/snapshot-zsh-<n>-<id>.sh …` (+1991 −710 chars) (darwin/arm64)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "filesystem.darwin/arm64.exec.git -c core.hooksPath=/dev/null -c core.fsmonitor= -c safe.bareRepository=explicit -c protocol.file.allow=never ls-files --error-unmatch -- :(icase).claude/settings.local.json",
+          "category": "filesystem",
+          "op": "changed",
+          "title": "Command changed: `git -c core.hooksPath=/dev/null -c core.fsmonitor= -c safe.bareRepository=explicit -c protocol.file. …` (+68 −18 chars) (darwin/arm64)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "filesystem.linux/amd64.paths./etc/os-release.ops.stat",
+          "category": "filesystem",
+          "op": "added",
+          "title": "Now checks /etc/os-release (linux/amd64)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "filesystem.linux/amd64.paths.<claude-config>/plugins/mcpb",
+          "category": "filesystem",
+          "op": "added",
+          "title": "Now looks for <claude-config>/plugins/mcpb (linux/amd64)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "filesystem.linux/amd64.paths.<claude-config>/plugins/mcpb/installed_plugins.json",
+          "category": "filesystem",
+          "op": "added",
+          "title": "Now looks for <claude-config>/plugins/mcpb/installed_plugins.json (linux/amd64)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "filesystem.linux/amd64.exec.git -c core.hooksPath=/dev/null -c core.fsmonitor= -c safe.bareRepository=explicit -c protocol.file.allow=never ls-files --error-unmatch -- :(icase).claude/settings.local.json",
+          "category": "filesystem",
+          "op": "changed",
+          "title": "Command changed: `git -c core.hooksPath=/dev/null -c core.fsmonitor= -c safe.bareRepository=explicit -c protocol.file. …` (+68 −18 chars) (linux/amd64)",
+          "impact": "informational",
+          "documented": null
+        }
+      ]
+    },
+    {
       "version": "2.1.323",
       "previous": "2.1.322",
       "changes": [
@@ -2904,14 +3206,6 @@
           "title": "Setting no longer read: command",
           "impact": "notable",
           "documented": true
-        },
-        {
-          "id": "config.options.description",
-          "category": "config",
-          "op": "removed",
-          "title": "Setting no longer read: description",
-          "impact": "notable",
-          "documented": false
         },
         {
           "id": "config.options.name",
