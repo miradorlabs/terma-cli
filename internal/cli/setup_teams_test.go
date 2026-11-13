@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/miradorlabs/terma-cli/internal/account/auth"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/routing"
 )
@@ -62,7 +63,7 @@ func TestSetupOnAMigratedMachineKeepsItsTeamsAndTicksTeam(t *testing.T) {
 	if len(st.Teams) != 1 || st.Teams[0].TeamID != acmeAPI || st.Bindings["github.com/acme/api"].Organization != orgA().ID {
 		t.Fatalf("state = %+v", st)
 	}
-	if !strings.Contains(out, "Teams         Acme Acme API") || strings.Contains(out, "Personal      collects") {
+	if !strings.Contains(out, "Teams         Acme API") || strings.Contains(out, "Personal      collects") {
 		t.Errorf("setup:\n%s", out)
 	}
 }
@@ -86,4 +87,29 @@ func TestSetupSetsAnUnreadableRoutingStateAside(t *testing.T) {
 		t.Errorf("setup:\n%s", out)
 	}
 	loadState(t)
+}
+
+// On a machine not yet migrated setup runs as it always has: the profile's one team, and
+// no routing state or v2 index is made.
+func TestSetupOnAMachineNotMigratedKeepsItsOneTeam(t *testing.T) {
+	gateway := newFakeAuth(t)
+	authSandbox(t, gateway)
+	sandboxMachine(t)
+	t.Setenv("CODEX_HOME", t.TempDir())
+	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(gateway, orgA())); err != nil {
+		t.Fatal(err)
+	}
+	out, err := runTerma(t, "setup", "--harness", "codex", "-y")
+	if err != nil {
+		t.Fatalf("setup: %v\n%s", err, out)
+	}
+	if _, team, _ := selected(t); team == "" {
+		t.Errorf("setup recorded no team:\n%s", out)
+	}
+	if _, ok, err := routing.Load(testApp.stateDir, config.DefaultProfile); ok || err != nil || config.Migrated(testApp.dir) {
+		t.Errorf("setup on a machine not migrated made a routing state (%v, %v) or migrated it (%v)", ok, err, config.Migrated(testApp.dir))
+	}
+	if strings.Contains(out, "Teams ") {
+		t.Errorf("setup showed the teams checklist before migration:\n%s", out)
+	}
 }

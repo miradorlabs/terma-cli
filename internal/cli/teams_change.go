@@ -35,7 +35,8 @@ func (app *App) applyTeams(cmd *cobra.Command, cfg *config.Config, st routing.St
 	ctx := cmd.Context()
 	names := loadTeamNames(app.stateDir, cfg.ProfileName)
 	ch := &teamsChange{released: map[string]bool{}}
-	ask := !f.json && app.canAsk() && canPrompt()
+	// --yes takes every default, so it asks nothing even on a terminal.
+	ask := !f.json && !f.assumeYes && app.canAsk() && canPrompt()
 	var v teamsView
 	listed := false
 	list := func() teamsView {
@@ -236,12 +237,7 @@ func cloneBindings(m map[string]routing.Binding) map[string]routing.Binding {
 	return out
 }
 
-func tickLabel(tk *tick) string {
-	if tk.orgName == "" {
-		return tk.teamName
-	}
-	return tk.orgName + " " + tk.teamName
-}
+func tickLabel(tk *tick) string { return orgTeamLabel(tk.orgName, tk.teamName) }
 
 // describeOp says what a decision did.
 func describeOp(op bindingOp, orgName string) string {
