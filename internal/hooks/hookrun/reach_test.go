@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
+	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 )
 
 // A shell command's paths are its absolute, ~/ and slashed words and every cd's target,
@@ -108,6 +109,41 @@ func TestAShellCommandIsExaminedUpToTheCandidateBound(t *testing.T) {
 			env.Classify(context.Background(), r, sessionOf(sid), ShellPaths(strings.Join(words, " "), side), nil)
 			if ledger, placement := m.mixed(sid); ledger != tc.mixed || placement != tc.mixed {
 				t.Fatalf("ledger Mixed %v, mixed placement %v; want %v", ledger, placement, tc.mixed)
+			}
+		})
+	}
+}
+
+// A hook whose own checkout cannot be located, its cwd deleted, still classifies what the
+// call reached against where the run has been: a read of Acme's checkout by a run placed
+// in personal's turns it Mixed. A reach that crosses nothing writes no placement.
+func TestAHookThatCannotLocateItsCheckoutStillClassifiesWhatItReached(t *testing.T) {
+	t.Parallel()
+	for name, tc := range map[string]struct {
+		origin string
+		mixed  bool
+	}{
+		"another organization's":  {"github.com/acme/api", true},
+		"the same organization's": {"github.com/dawson/web", false},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			m := newRoutedMachine(t, acmeAndPersonal(t))
+			side, other := hookruntest.RepoAt(t, "github.com/dawson/side"), hookruntest.RepoAt(t, tc.origin)
+			const sid = "deleted-cwd"
+			startIn(t, m.hook(), sid, side)
+			before := m.claim(sid)
+			env := m.hook()
+			env.Cwd = filepath.Join(t.TempDir(), "deleted")
+			if _, err := env.routeHere(context.Background()); err == nil {
+				t.Fatal("the deleted cwd was located")
+			}
+			env.Classify(context.Background(), nil, sessionOf(sid), []string{filepath.Join(other, "README")}, nil)
+			if ledger, placement := m.mixed(sid); ledger != tc.mixed || placement != tc.mixed {
+				t.Fatalf("ledger Mixed %v, mixed placement %v; want %v", ledger, placement, tc.mixed)
+			}
+			if c := m.claim(sid); !tc.mixed && !slices.EqualFunc(c.Placements, before.Placements, func(a, b claim.Placement) bool { return a.Kind == b.Kind && a.Repository == b.Repository }) {
+				t.Errorf("a hook that located nothing placed the session: %+v", c.Placements)
 			}
 		})
 	}

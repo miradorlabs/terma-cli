@@ -8,6 +8,9 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/miradorlabs/terma-cli/internal/relay/claim"
+	"github.com/miradorlabs/terma-cli/internal/routing"
+	"github.com/miradorlabs/terma-cli/internal/semconv"
 	"github.com/miradorlabs/terma-cli/internal/session"
 )
 
@@ -33,14 +36,38 @@ func (e Env) Classify(ctx context.Context, r *Repo, sess session.Session, paths 
 	if r == nil {
 		var err error
 		if r, err = e.routeHere(ctx); err != nil {
+			e.classifyUnlocated(sess, extra, e.reached(nil, paths))
 			return
 		}
 	}
 	e.classifyTouches(r, sess, extra, e.reached(r, paths))
 }
 
-// reached are the checkouts other than r that paths reach, each once: a directory's own,
-// a file's (or a path's that is not there) its folder's. A path in no checkout reaches none.
+// classifyUnlocated is classifyTouches for a hook whose own checkout cannot be located,
+// its cwd deleted say: what the call reached is classified against where the run has been,
+// and a crossing turns the run Mixed. No placement is written for a location it does not
+// know.
+//
+// Accepted risk: the hook's own location is not classified. Marking the run Mixed for it
+// would turn every session whose cwd was deleted Mixed. The run's earlier hooks recorded
+// where it ran, and the next hook that can locate its checkout classifies it.
+func (e Env) classifyUnlocated(sess session.Session, extra map[string]any, reached []touched) {
+	var locs []routing.Location
+	for _, t := range reached {
+		if t.repo.dest != nil {
+			locs = append(locs, t.repo.dest.loc)
+		}
+	}
+	if len(locs) == 0 {
+		return
+	}
+	agent, _ := extra[semconv.TermaAgentIDKey].(string)
+	e.judge(sess.ID, agent, claim.Claim{Tool: sess.Tool, PIDs: claimPIDs()}, locs, false)
+}
+
+// reached are the checkouts other than r, which may be nil, that paths reach, each once: a
+// directory's own, a file's (or a path's that is not there) its folder's. A path in no
+// checkout reaches none.
 func (e Env) reached(r *Repo, paths []string) []touched {
 	var out []touched
 	dirs := map[string]bool{}

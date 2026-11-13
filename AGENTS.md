@@ -171,7 +171,9 @@ hook before it runs, so that its own result is exported after the crossing it ma
 writes no manifest and spools nothing, and on a machine not migrated it does nothing. A hook whose own location Route drops still classifies what
 the call touched, and that location, into the run ledger, and records and sends nothing
 else. `runs.Touch` returns the run's locations as it wrote them, so of two hooks of one run
-that each see half a crossing, the later sees it whole. The commit hooks are installed, and `prepare-commit-msg` stamps, only where Route sends the repository
+that each see half a crossing, the later sees it whole. The ledger alone says whether a run
+is Mixed: a mixed placement it does not back is a crossing whose write failed, and the run's
+next hook records it again, from when the placement turned Mixed. The commit hooks are installed, and `prepare-commit-msg` stamps, only where Route sends the repository
 to a team whose policy turns `git_hooks` on. A record's destination never changes once
 routed: the relay queues each part for its enrollment, and the spool keeps each event's;
 both recheck it before sending (`routing.Router.Recheck`, then `runs.MixedAt`), and send it

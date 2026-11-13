@@ -275,6 +275,8 @@ type Position struct {
 	// Active is the ledger's last activity, which Prune keeps it by; zero when it records
 	// none.
 	Active time.Time
+	// MixedAt is when Run became Mixed; zero while it is not.
+	MixedAt time.Time
 }
 
 // Locate is Locations with the ledger's last activity, from one read of the ledger: a hook
@@ -289,7 +291,7 @@ func Locate(stateDir, idOrAlias string) (Position, bool) {
 		return Position{}, false
 	}
 	cur := l.Runs[len(l.Runs)-1]
-	return Position{Run: cur.ID, Locations: cur.Locations, Active: l.lastActive(time.Time{})}, true
+	return Position{Run: cur.ID, Locations: cur.Locations, Active: l.lastActive(time.Time{}), MixedAt: cur.MixedAt}, true
 }
 
 // Refresh renews sessionID's ledger's activity at now, when its last activity is older
