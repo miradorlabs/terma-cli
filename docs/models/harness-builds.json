@@ -7446,6 +7446,71 @@
               "role": "subagents"
             }
           ]
+        },
+        "2.1.324": {
+          "captured_at": "2026-11-13T19:09:03.215136219Z",
+          "captured": true,
+          "uses": [
+            {
+              "model": "claude-opus-5-5",
+              "role": "default",
+              "params": {
+                "context_management": {
+                  "edits": [
+                    {
+                      "keep": "all",
+                      "type": "clear_thinking_20251015"
+                    }
+                  ]
+                },
+                "output_config": {
+                  "effort": "medium"
+                },
+                "thinking": {
+                  "display": "omitted",
+                  "type": "adaptive"
+                }
+              }
+            },
+            {
+              "model": "claude-haiku-5-5",
+              "role": "alias",
+              "label": "haiku"
+            },
+            {
+              "model": "claude-opus-5-5",
+              "role": "alias",
+              "label": "opus"
+            },
+            {
+              "model": "claude-opus-5-5",
+              "role": "alias",
+              "label": "opus[1m]"
+            },
+            {
+              "model": "claude-sonnet-5-5",
+              "role": "alias",
+              "label": "opusplan"
+            },
+            {
+              "model": "claude-sonnet-5-5",
+              "role": "alias",
+              "label": "sonnet"
+            },
+            {
+              "model": "claude-sonnet-5-5",
+              "role": "alias",
+              "label": "sonnet[1m]"
+            },
+            {
+              "model": "claude-opus-5-5",
+              "role": "compaction"
+            },
+            {
+              "model": "claude-opus-5-5",
+              "role": "subagents"
+            }
+          ]
         }
       }
     },
