@@ -148,7 +148,7 @@ func ShellPaths(command, cwd string) []string {
 			w = shellValue(w)
 		}
 		c := candidate{w, dir}
-		if w == "" || !target && !strings.Contains(w, "/") || slices.Contains(examined, c) {
+		if w == "" || !target && !pathLike(w) || slices.Contains(examined, c) {
 			continue
 		}
 		if len(examined) == maxShellPaths {
@@ -216,6 +216,12 @@ func isName(s string) bool {
 		}
 	}
 	return s != ""
+}
+
+// pathLike reports whether a shell word may name a path: it holds a slash, or on Windows a
+// backslash, or is absolute (C:\x). A quoted Windows path keeps its backslashes.
+func pathLike(w string) bool {
+	return strings.ContainsRune(w, '/') || strings.ContainsRune(w, filepath.Separator) || filepath.IsAbs(w)
 }
 
 // shellPath is the path the shell word w names, from cwd: ~ is the home directory.
