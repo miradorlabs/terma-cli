@@ -256,7 +256,7 @@ func TestNoGrantFromEncodedEntriesOrForeignPolicies(t *testing.T) {
 		{Mode: config.ModeRepo, TeamID: "acme-platform", OrganizationID: "clientco", AuthURL: authURL, Revision: 5, FetchedAt: now},
 		{Mode: config.ModeRepo, TeamID: "acme-platform", OrganizationID: "acme", AuthURL: "https://auth.other", Revision: 5, FetchedAt: now},
 	} {
-		if _, err := s.ApplyRefresh(Refresh{EnrollmentID: id, Epoch: s.team(id).Epoch, Policy: &p}); err == nil {
+		if _, err := s.ApplyRefresh(Refresh{EnrollmentID: id, Epoch: s.Team(id).Epoch, Policy: &p}); err == nil {
 			t.Errorf("a policy fetched under %s/%s became the team's grant", p.OrganizationID, p.AuthURL)
 		}
 	}
@@ -266,11 +266,11 @@ func TestNoGrantFromEncodedEntriesOrForeignPolicies(t *testing.T) {
 		t.Error("selected a team with another organization's policy")
 	}
 
-	_, err := s.ApplyRefresh(Refresh{EnrollmentID: id, Epoch: s.team(id).Epoch, Failure: Terminal})
+	_, err := s.ApplyRefresh(Refresh{EnrollmentID: id, Epoch: s.Team(id).Epoch, Failure: Terminal})
 	must(t, err)
-	_, err = s.ApplyRefresh(Refresh{EnrollmentID: id, Epoch: s.team(id).Epoch, Failure: SignIn})
+	_, err = s.ApplyRefresh(Refresh{EnrollmentID: id, Epoch: s.Team(id).Epoch, Failure: SignIn})
 	must(t, err)
-	if st := s.team(id).StateAt(now); st != SignInNeeded {
+	if st := s.Team(id).StateAt(now); st != SignInNeeded {
 		t.Fatalf("a 401 after a suspension shows %s", st)
 	}
 }
@@ -300,7 +300,7 @@ func TestOwnershipIsStrictEverywhere(t *testing.T) {
 	}
 	s := fixture(t)
 	id := enrollment(t, s, "acme-platform")
-	if _, err := s.ApplyRefresh(Refresh{EnrollmentID: id, Epoch: s.team(id).Epoch, Policy: &config.Policy{
+	if _, err := s.ApplyRefresh(Refresh{EnrollmentID: id, Epoch: s.Team(id).Epoch, Policy: &config.Policy{
 		Mode: config.ModeRepo, TeamID: "acme-platform", Revision: 5, FetchedAt: now,
 	}}); err == nil {
 		t.Error("a refresh with no organization or environment became the team's grant")

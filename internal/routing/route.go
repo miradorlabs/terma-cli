@@ -256,5 +256,5 @@ func (r *Router) OrganizationOf(loc Location, now time.Time) (org string, pendin
 	case d.Outcome == Drop || d.EnrollmentID == "":
 		return "", false, false
 	}
-	return r.s.team(d.EnrollmentID).OrganizationID, false, true
+	return r.s.Team(d.EnrollmentID).OrganizationID, false, true
 }

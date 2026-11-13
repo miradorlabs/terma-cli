@@ -74,7 +74,7 @@ func expect(t *testing.T, s *State, loc Location, outcome Outcome, want string) 
 	d := NewRouter(*s).Route(loc, now)
 	got := ""
 	if d.EnrollmentID != "" {
-		got = s.team(d.EnrollmentID).TeamID
+		got = s.Team(d.EnrollmentID).TeamID
 	}
 	if d.Outcome != outcome || got != want {
 		t.Errorf("Route(%+v) = %s to %q (%s), want %s to %q", loc, d.Outcome, got, d.Reason, outcome, want)
