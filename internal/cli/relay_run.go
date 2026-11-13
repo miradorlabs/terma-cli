@@ -52,9 +52,10 @@ func (app *App) newRelayRunCommand() *cobra.Command {
 			engine.UpdateAuto = func() string { return app.updateAuto(install) }
 			res, err := daemon.Run(ctx, daemon.Config{
 				StateDir: app.stateDir, Addr: addr, Idle: idle, Service: asService, Follow: follow, Launch: launch, Environment: cfg.Environment, Version: app.version, Log: log,
-				Engine:  engine,
-				Workers: []func(context.Context){deps.Refresher().Run, app.sweepHookState},
-				Updater: app.relayUpdater(install),
+				Engine:    engine,
+				Migration: app.relayMigration(install.Exe),
+				Workers:   []func(context.Context){deps.Refresher().Run, app.sweepHookState},
+				Updater:   app.relayUpdater(install),
 				Listening: func(at net.Addr, hold time.Duration) {
 					if !quiet {
 						fmt.Fprintf(cmd.OutOrStdout(), "Relay listening on %s (hold %s, idle exit %s).\n", at, hold, idle)
