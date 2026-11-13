@@ -49,7 +49,7 @@
       "xhigh"
     ],
     "released_at": "2026-04-23",
-    "sampling_parameters": false,
+    "sampling_parameters": true,
     "snapshots": [
       "gpt-5.5-2026-04-23"
     ],
@@ -178,7 +178,7 @@
       "models.dev": "2026-04-23"
     },
     "sampling_parameters": {
-      "models.dev": false
+      "models.dev": true
     },
     "snapshots": {
       "openai-docs": [

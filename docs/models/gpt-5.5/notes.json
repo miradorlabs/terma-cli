@@ -62,27 +62,9 @@
       "terma": null,
       "source": null,
       "documented": null
-    },
-    {
-      "id": "facts/sampling_parameters",
-      "category": "facts",
-      "op": "changed",
-      "path": [
-        "facts",
-        "sampling_parameters"
-      ],
-      "title": "Sampling parameters: yes → no",
-      "impact": "notable",
-      "before": true,
-      "after": false,
-      "text_diff": null,
-      "terma": null,
-      "source": null,
-      "documented": null
     }
   ],
   "highlights": [
-    "Knowledge cutoff: 2025-08-31 → 2025-12-01",
-    "Sampling parameters: yes → no"
+    "Knowledge cutoff: 2025-08-31 → 2025-12-01"
   ]
 }

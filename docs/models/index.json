@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-12T22:38:32.071670157Z",
+  "generated_at": "2026-11-13T07:14:48.993418816Z",
   "vendors": [
     {
       "id": "anthropic",
@@ -131,7 +131,10 @@
       "knowledge_cutoff": "2026-06-01",
       "reasoning": true,
       "harnesses": [],
-      "last_change": null,
+      "last_change": {
+        "at": "2026-11-13T07:14:48.993418816Z",
+        "changes": 1
+      },
       "probed": false
     },
     {
@@ -237,7 +240,10 @@
       "harnesses": [
         "codex-desktop"
       ],
-      "last_change": null,
+      "last_change": {
+        "at": "2026-11-13T07:14:48.993418816Z",
+        "changes": 1
+      },
       "probed": false
     },
     {
@@ -255,7 +261,10 @@
       "knowledge_cutoff": "2026-04-20",
       "reasoning": true,
       "harnesses": [],
-      "last_change": null,
+      "last_change": {
+        "at": "2026-11-13T07:14:48.993418816Z",
+        "changes": 1
+      },
       "probed": false
     },
     {
@@ -474,7 +483,10 @@
       "knowledge_cutoff": "2026-02-16",
       "reasoning": true,
       "harnesses": [],
-      "last_change": null,
+      "last_change": {
+        "at": "2026-11-13T07:14:48.993418816Z",
+        "changes": 1
+      },
       "probed": false
     },
     {
@@ -492,7 +504,10 @@
       "knowledge_cutoff": "2026-02-16",
       "reasoning": true,
       "harnesses": [],
-      "last_change": null,
+      "last_change": {
+        "at": "2026-11-13T07:14:48.993418816Z",
+        "changes": 1
+      },
       "probed": false
     },
     {
@@ -511,7 +526,7 @@
       "reasoning": true,
       "harnesses": [],
       "last_change": {
-        "at": "2026-11-12T22:38:32.071670157Z",
+        "at": "2026-11-13T07:14:48.993418816Z",
         "changes": 1
       },
       "probed": false
@@ -646,7 +661,7 @@
       "reasoning": true,
       "harnesses": [],
       "last_change": {
-        "at": "2026-11-12T22:38:32.071670157Z",
+        "at": "2026-11-13T07:14:48.993418816Z",
         "changes": 1
       },
       "probed": false

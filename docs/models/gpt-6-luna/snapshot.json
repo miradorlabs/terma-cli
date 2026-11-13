@@ -50,7 +50,7 @@
       "max"
     ],
     "released_at": "2026-09-22",
-    "sampling_parameters": false,
+    "sampling_parameters": true,
     "snapshots": [
       "gpt-6-luna"
     ],
@@ -189,7 +189,7 @@
       "models.dev": "2026-09-22"
     },
     "sampling_parameters": {
-      "models.dev": false
+      "models.dev": true
     },
     "snapshots": {
       "openai-docs": [

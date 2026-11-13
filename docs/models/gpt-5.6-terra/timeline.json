@@ -3,6 +3,29 @@
   "id": "gpt-5.6-terra",
   "steps": [
     {
+      "at": "2026-11-13T07:14:48.993418816Z",
+      "event": "changed",
+      "changes": [
+        {
+          "id": "facts/sampling_parameters",
+          "category": "facts",
+          "op": "changed",
+          "path": [
+            "facts",
+            "sampling_parameters"
+          ],
+          "title": "Sampling parameters: no → yes",
+          "impact": "notable",
+          "before": false,
+          "after": true,
+          "text_diff": null,
+          "terma": null,
+          "source": null,
+          "documented": null
+        }
+      ]
+    },
+    {
       "at": "2026-11-12T22:38:32.071670157Z",
       "event": "changed",
       "changes": [

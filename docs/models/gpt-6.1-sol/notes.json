@@ -53,10 +53,28 @@
       "terma": null,
       "source": null,
       "documented": null
+    },
+    {
+      "id": "facts/sampling_parameters",
+      "category": "facts",
+      "op": "changed",
+      "path": [
+        "facts",
+        "sampling_parameters"
+      ],
+      "title": "Sampling parameters: yes → no",
+      "impact": "notable",
+      "before": true,
+      "after": false,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
     }
   ],
   "highlights": [
     "Knowledge cutoff: 2026-04-20 → 2026-04-30",
-    "Reasoning effort removed: none"
+    "Reasoning effort removed: none",
+    "Sampling parameters: yes → no"
   ]
 }

@@ -1,7 +1,84 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-12T22:38:32.071670157Z",
+  "generated_at": "2026-11-13T07:14:48.993418816Z",
   "events": [
+    {
+      "at": "2026-11-13T07:14:48.993418816Z",
+      "model": "gpt-6.1-terra",
+      "vendor": "openai",
+      "name": "GPT-6.1 Terra",
+      "event": "changed",
+      "changes": 1,
+      "highlights": [
+        "Sampling parameters: no → yes"
+      ]
+    },
+    {
+      "at": "2026-11-13T07:14:48.993418816Z",
+      "model": "gpt-6-sol",
+      "vendor": "openai",
+      "name": "GPT-6 Sol",
+      "event": "changed",
+      "changes": 1,
+      "highlights": [
+        "Sampling parameters: no → yes"
+      ]
+    },
+    {
+      "at": "2026-11-13T07:14:48.993418816Z",
+      "model": "gpt-6-luna",
+      "vendor": "openai",
+      "name": "GPT-6 Luna",
+      "event": "changed",
+      "changes": 1,
+      "highlights": [
+        "Sampling parameters: no → yes"
+      ]
+    },
+    {
+      "at": "2026-11-13T07:14:48.993418816Z",
+      "model": "gpt-5.6-terra",
+      "vendor": "openai",
+      "name": "GPT-5.6 Terra",
+      "event": "changed",
+      "changes": 1,
+      "highlights": [
+        "Sampling parameters: no → yes"
+      ]
+    },
+    {
+      "at": "2026-11-13T07:14:48.993418816Z",
+      "model": "gpt-5.6-sol",
+      "vendor": "openai",
+      "name": "GPT-5.6 Sol",
+      "event": "changed",
+      "changes": 1,
+      "highlights": [
+        "Sampling parameters: no → yes"
+      ]
+    },
+    {
+      "at": "2026-11-13T07:14:48.993418816Z",
+      "model": "gpt-5.6-luna",
+      "vendor": "openai",
+      "name": "GPT-5.6 Luna",
+      "event": "changed",
+      "changes": 1,
+      "highlights": [
+        "Sampling parameters: no → yes"
+      ]
+    },
+    {
+      "at": "2026-11-13T07:14:48.993418816Z",
+      "model": "gpt-5.5",
+      "vendor": "openai",
+      "name": "GPT-5.5",
+      "event": "changed",
+      "changes": 1,
+      "highlights": [
+        "Sampling parameters: no → yes"
+      ]
+    },
     {
       "at": "2026-11-12T22:38:32.071670157Z",
       "model": "gpt-6-cyber",
