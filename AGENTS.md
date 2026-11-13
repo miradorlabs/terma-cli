@@ -152,7 +152,10 @@ routing state the migration has not committed sends nothing (`routing.LoadReady`
 route each location they record: a location-only placement for the session, each spooled
 event with the destination Route gave it and never a project, and each session's runs in
 the run ledger (`runs/`, `internal/runs`), where a run that touches two organizations'
-checkouts turns Mixed and sends no telemetry until the session starts a new run. A run
+checkouts turns Mixed and sends no telemetry until the session starts a new run. Mixed
+drops whatever carries content, a record that routes by a location of its own (an
+agent's turn) included; only a file event, a commit or a push, which say where something
+happened and nothing else, keep their destination (`runs.Locational`). A run
 touches a checkout when it runs there, or when a tool call edits, reads or searches a path
 in it, or names one in a shell command (each path the command names that is there, and
 every `cd`'s target: `hookrun.ShellPaths`). An edit records and spools as it always has; a
