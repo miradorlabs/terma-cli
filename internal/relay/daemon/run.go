@@ -4,14 +4,12 @@ import (
 	"cmp"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
+	"math"
 	"net"
 	"net/http"
 	"os"
 	"path/filepath"
-	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -20,7 +18,8 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/migrate"
 	"github.com/miradorlabs/terma-cli/internal/relay"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
-	"github.com/miradorlabs/terma-cli/internal/semconv"
+	"github.com/miradorlabs/terma-cli/internal/runs"
+	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
 // Config is what a relay runs with.
@@ -55,7 +54,8 @@ type Config struct {
 	Listening func(addr net.Addr, hold time.Duration)
 	// Log, when set, is told of the relay's start and exit, with its counters.
 	Log *Log
-	// Migration, set, is this machine's to migrate to multi-org routing at start (migrateAtStart).
+	// Migration, set, is this machine's to migrate to multi-org routing once the relay
+	// listens (migrate).
 	Migration *migrate.Machine
 }
 
@@ -150,9 +150,6 @@ func Run(ctx context.Context, c Config) (Result, error) {
 	if err != nil {
 		return res, err
 	}
-	if err := c.migrateAtStart(ctx); err != nil {
-		return res, err
-	}
 	addr := c.Addr
 	if addr == "" {
 		addr = Addr(dir)
@@ -210,6 +207,8 @@ func Run(ctx context.Context, c Config) (Result, error) {
 	for _, w := range c.Workers {
 		workers.Go(func() { w(engineCtx) })
 	}
+	// Then hourly with the claims (watch); it reads both queues, so not on the start path.
+	workers.Go(func() { pruneRuns(c.StateDir, r, time.Now()) })
 	updated := make(chan Pass, 1)
 	if c.Updater != nil {
 		u := *c.Updater
@@ -218,8 +217,17 @@ func Run(ctx context.Context, c Config) (Result, error) {
 		}
 		workers.Go(func() { u.Run(engineCtx, updated) })
 	}
+	// Off the start path: the relay already listens under today's rules meanwhile.
+	migrateCtx, stopMigrating := context.WithCancel(engineCtx)
+	defer stopMigrating()
+	var migrated chan error
+	if c.Migration != nil {
+		migrated = make(chan error, 1)
+		workers.Go(func() { migrated <- c.migrate(migrateCtx) })
+	}
 
-	why, installed, serveErr := watch(ctx, r, c.StateDir, c.Idle, served, updated)
+	why, installed, serveErr := watch(ctx, r, c.StateDir, c.Idle, served, updated, migrated)
+	stopMigrating()
 	res.Replaced = why == stopReplaced
 	res.Updated = why == stopUpdated || why == stopUpdatedByAnother
 	if res.Updated {
@@ -260,58 +268,6 @@ func Run(ctx context.Context, c Config) (Result, error) {
 		}
 	}
 	return res, serveErr
-}
-
-// stopReason is why a relay stops.
-type stopReason int
-
-const (
-	// stopAsked is a signal, or Stop's request where there are no signals (Windows).
-	stopAsked stopReason = iota
-	stopIdle
-	stopReplaced
-	stopUpdated
-	// stopUpdatedByAnother is stopUpdated for a release another install put in place.
-	stopUpdatedByAnother
-	stopSetupGone
-	stopServeFailed
-)
-
-// describe names how a run ended, for the relay log.
-func (r stopReason) describe(err error) string {
-	switch {
-	case err != nil:
-		return err.Error()
-	case r == stopReplaced:
-		return "a newer terma asked it to make way"
-	case r == stopUpdated:
-		return "it installed a newer terma"
-	case r == stopUpdatedByAnother:
-		return "another install replaced its terma"
-	case r == stopSetupGone:
-		return "its setup was removed"
-	case r == stopIdle:
-		return "idle"
-	}
-	return "asked to stop"
-}
-
-// exitBeatWait bounds the last heartbeat, which a stopped relay's process waits for.
-const exitBeatWait = 3 * time.Second
-
-// exit is the last heartbeat's terma.relay.exit.reason for this run's end.
-func (r stopReason) exit(err error) string {
-	switch {
-	case err != nil:
-		return semconv.TermaRelayExitReasonServeFailed
-	case r == stopReplaced:
-		return semconv.TermaRelayExitReasonReplaced
-	case r == stopUpdated, r == stopUpdatedByAnother:
-		return semconv.TermaRelayExitReasonUpdated
-	case r == stopIdle:
-		return semconv.TermaRelayExitReasonIdle
-	}
-	return semconv.TermaRelayExitReasonAsked
 }
 
 // setUp reports whether the relay's token is still under stateDir.
@@ -366,80 +322,29 @@ func listen(dir, addr string) (net.Listener, error) {
 	return ln, nil
 }
 
-// watch waits for a reason to stop. A relay that installed a newer terma stops once Quiesce
-// finds its hold empty, no export in flight and none for updateQuiet (for none at all after
-// updatePauseWait), however long that takes: the release is already in place for every
-// hook, so waiting loses nothing, while what it holds in memory would be lost. Its queue is
-// on disk, so a route still retrying never keeps it, and a newer hook asking it to make way
-// is answered by that same wait.
-func watch(ctx context.Context, r *relay.Relay, stateDir string, idle time.Duration, served <-chan error, updated <-chan Pass) (stopReason, string, error) {
-	dir := claim.Dir(stateDir)
-	var replacing time.Time // when a newer terma asked this relay to make way
-	var upgraded time.Time  // when it installed one itself
-	var installed Pass      // the release it installed last, or found in place
-	lastPrune := time.Now()
-	tick := time.NewTicker(time.Second)
-	defer tick.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return stopAsked, installed.Installed, nil
-		case err := <-served:
-			if errors.Is(err, http.ErrServerClosed) {
-				err = nil
-			}
-			return stopServeFailed, installed.Installed, err
-		case installed = <-updated:
-			// From the first release it installed: one installed while it waits to restart is
-			// no reason to keep running the release they both replaced any longer.
-			if upgraded.IsZero() {
-				upgraded = time.Now()
-			}
-		case <-tick.C:
-		}
-		if !setUp(stateDir) {
-			return stopSetupGone, installed.Installed, nil
-		}
-		if requested(dir, StopFile) {
-			return stopAsked, installed.Installed, nil
-		}
-		if replacing.IsZero() && requested(dir, ReplaceFile) {
-			replacing = time.Now()
-		}
-		if !upgraded.IsZero() {
-			quiet := updateQuiet
-			if time.Since(upgraded) >= updatePauseWait {
-				quiet = 0
-			}
-			if r.Quiesce(quiet) {
-				if installed.Replaced {
-					return stopUpdatedByAnother, installed.Installed, nil
-				}
-				return stopUpdated, installed.Installed, nil
-			}
-		} else if !replacing.IsZero() && (!r.Holding() || time.Since(replacing) >= replacedMaxWait) {
-			// Once the hold is empty, since what it keeps is lost at exit; the queue is on disk.
-			return stopReplaced, installed.Installed, nil
-		}
-		if time.Since(lastPrune) > time.Hour {
-			claim.Prune(stateDir, time.Now())
-			lastPrune = time.Now()
-		}
-		if d, quiet := r.Idle(); quiet && idle > 0 && d >= idle {
-			return stopIdle, installed.Installed, nil
-		}
+// pruneRuns prunes the run ledger (runs.Prune) beside the claims, keeping every session a
+// record still queued names: in the relay's outbox, and in the spool. While either cannot
+// be read it prunes nothing, since a ledger pruned under a queued record would let it go.
+func pruneRuns(stateDir string, r *relay.Relay, now time.Time) {
+	if _, err := os.Stat(filepath.Join(stateDir, runs.Dir)); err != nil {
+		return // no ledger: a machine not migrated keeps none
 	}
-}
-
-// requested takes the request in dir's file name; one naming another pid is a dead
-// relay's, and is cleared.
-func requested(dir, name string) bool {
-	path := filepath.Join(dir, name)
-	data, err := os.ReadFile(path)
+	queued, err := r.QueuedSessions()
 	if err != nil {
-		return false
+		return
 	}
-	_ = os.Remove(path)
-	pid, _ := strconv.Atoi(strings.TrimSpace(string(data)))
-	return pid == os.Getpid()
+	sp, err := spool.Open(filepath.Join(stateDir, spool.Dir))
+	if err != nil {
+		return
+	}
+	events, err := sp.Peek(math.MaxInt)
+	if err != nil {
+		return
+	}
+	for _, e := range events {
+		if e.SessionID != "" {
+			queued[e.SessionID] = true
+		}
+	}
+	runs.Prune(stateDir, now, queued)
 }

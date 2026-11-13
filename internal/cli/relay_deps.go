@@ -83,7 +83,7 @@ func (app *App) relayHeartbeatSend(ctx context.Context, beat *logspb.LogsData) e
 	selected := cmp.Or(cfg.Policy.TeamID, cfg.Policy.DefaultProjectID, cfg.ProjectID)
 	if key, err := keystore.Get(app.dir, selected); selected != "" && key == "" && err == nil && cfg.APIKey == "" {
 		if key, err := app.createProjectKey(ctx, cfg, selected); err == nil && key != "" {
-			_ = keystore.Set(app.dir, selected, key, keystore.HostsOf(cfg))
+			_ = keystore.SetLegacy(app.dir, selected, key, keystore.HostsOf(cfg))
 		}
 	}
 	others := keystore.CollectionProjects(app.dir)

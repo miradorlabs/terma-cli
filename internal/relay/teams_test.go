@@ -29,11 +29,13 @@ type fakeRouter struct {
 	unknownToPersonal bool
 	policies          map[string]Policy
 	deselected        map[string]bool
-	waiting           map[string]bool // enrollments whose entries wait at recheck
+	waiting           map[string]bool // enrollments whose team waits at recheck
 	discard           map[string]bool // enrollments whose entries are dropped at recheck
 	legacy            map[string]Queued
 	routed            []Record
 	rechecked         []Queued
+	passes            int     // rechecks of a whole queue begun
+	noState           bool    // the routing state cannot be read, as while the migration commits
 	hold              *Routed // set: every placed record is held so
 }
 
@@ -62,14 +64,37 @@ func (f *fakeRouter) Route(rec Record) Routed {
 	return Routed{Outcome: Hold, Why: WhyUnknown}
 }
 
-func (f *fakeRouter) Recheck(q Queued) Rechecked {
+func (f *fakeRouter) Recheck(enrollment string) Rechecker {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.rechecked = append(f.rechecked, q)
+	f.passes++
+	return fakeRecheck{f, enrollment}
+}
+
+// fakeRecheck is a pass of fakeRouter's: a waiting enrollment's team waits, a discarded
+// one's entries are dropped, and every entry judged is recorded.
+type fakeRecheck struct {
+	f          *fakeRouter
+	enrollment string
+}
+
+func (p fakeRecheck) TeamWaits() (Rechecked, bool) {
+	p.f.mu.Lock()
+	defer p.f.mu.Unlock()
+	if p.f.waiting[p.enrollment] {
+		return Rechecked{Verdict: Wait, Why: WhyBlocked, Blocker: "team:" + p.enrollment}, true
+	}
+	return Rechecked{}, false
+}
+
+func (p fakeRecheck) Entry(q Queued) Rechecked {
+	p.f.mu.Lock()
+	defer p.f.mu.Unlock()
+	p.f.rechecked = append(p.f.rechecked, q)
 	switch {
-	case f.discard[q.Enrollment]:
+	case p.f.discard[q.Enrollment]:
 		return Rechecked{Verdict: Discard, Why: WhyBlocked, Blocker: "team:" + q.Enrollment}
-	case f.waiting[q.Enrollment]:
+	case p.f.waiting[q.Enrollment]:
 		return Rechecked{Verdict: Wait, Why: WhyBlocked}
 	}
 	return Rechecked{Verdict: SendNow}
@@ -94,6 +119,9 @@ func (f *fakeRouter) Selected(enrollment string) bool {
 func (f *fakeRouter) Legacy(project string, _ config.Repository) (Queued, bool) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	if f.noState {
+		return Queued{}, true
+	}
 	q, ok := f.legacy[project]
 	return q, ok
 }
@@ -350,6 +378,60 @@ func TestQueuedEntriesAreRecheckedBeforeSending(t *testing.T) {
 	})
 }
 
+// A sender whose team cannot send judges none of its queue, and no new part wakes it:
+// before, each part pushed rechecked the whole queue, every entry a read of its run's
+// ledger, so 200 parts cost 20,101 rechecks. Once the team recovers, one pass sends them.
+func TestAQueueWaitingForItsTeamIsNotRecheckedPerPart(t *testing.T) {
+	t.Parallel()
+	u := newUpstream(t)
+	f := newTeamFixture(t, u)
+	f.router.waiting = map[string]bool{"e-acme": true}
+	r, srv := f.start(t)
+	rt := teamRoute{enrollment: "e-acme", tool: "claude-code"}
+	postProto(t, srv, "/v1/logs", logsOf("A", 1))
+	waitFor(t, func() bool {
+		r.mu.Lock()
+		s := r.teamSenders[rt]
+		r.mu.Unlock()
+		if s == nil {
+			return false
+		}
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		return s.blocked
+	})
+	f.router.mu.Lock()
+	passes := f.router.passes
+	f.router.mu.Unlock()
+	const parts = 200
+	for range parts {
+		postProto(t, srv, "/v1/logs", logsOf("A", 1))
+	}
+	waitFor(t, func() bool { return len(r.outbox.teamNames(rt)) == parts+1 })
+	f.router.mu.Lock()
+	judged, after := len(f.router.rechecked), f.router.passes
+	f.router.mu.Unlock()
+	// The first part's wake may still be pending as the sender starts waiting: one pass.
+	if judged != 0 || after-passes > 1 {
+		t.Fatalf("%d parts pushed to a waiting team: %d entries judged, %d passes begun (want 0, at most 1)", parts, judged, after-passes)
+	}
+	if _, quiet := r.Idle(); !quiet {
+		t.Fatal("a queue waiting for its team keeps the relay awake")
+	}
+	f.router.set(func(fr *fakeRouter) { fr.waiting = nil })
+	r.mu.Lock()
+	s := r.teamSenders[rt]
+	r.mu.Unlock()
+	s.poke()
+	waitForCounters(t, r, func(c map[string]int) bool { return c["forwarded.logs"] == parts+1 })
+	f.router.mu.Lock()
+	judged = len(f.router.rechecked)
+	f.router.mu.Unlock()
+	if judged > 2*(parts+1) {
+		t.Fatalf("sending %d parts judged %d entries", parts+1, judged)
+	}
+}
+
 // Unticking a team drops its queue.
 func TestUntickingDropsTheEnrollmentsQueue(t *testing.T) {
 	t.Parallel()
@@ -417,6 +499,65 @@ func TestPartsQueuedBeforeTheMigrationMapToTheCutoverEnrollment(t *testing.T) {
 	got, _ := u.logs(t)
 	if len(got) != 1 || len(got["Bearer key-acme"]) != 1 {
 		t.Fatalf("forwarded %v", got)
+	}
+}
+
+// The relay migrates the machine while it runs, so a part queued under today's rules can
+// come up for sending once the machine is marked migrated and before its routing state is
+// committed: it waits for the state, and is never dropped for it.
+func TestAPartQueuedBeforeTheMigrationWaitsForItsCommit(t *testing.T) {
+	t.Parallel()
+	u := newUpstream(t)
+	f := newTeamFixture(t, u)
+	f.router.noState = true
+	f.router.legacy = map[string]Queued{"acme": {Enrollment: "e-acme", Project: "acme", Kind: "repository", Repository: "github.com/acme/api", Own: true}}
+	c := claim.Claim{ProjectID: "acme", Repository: config.Repository{Origin: "github.com/acme/api"}}
+	if err := (outbox{dir: f.dir}).put(routeOf(c), c.Repository, newEntry(f.clock(), Logs, 1), mustMarshal(t, logsOf("A", 1))); err != nil {
+		t.Fatal(err)
+	}
+	r, _ := f.start(t)
+	var s *sender
+	waitFor(t, func() bool {
+		r.mu.Lock()
+		s = r.senders[routeOf(c)]
+		r.mu.Unlock()
+		if s == nil {
+			return false
+		}
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		return s.keyless
+	})
+	if c := r.Stats().Snapshot().Counters; c["dropped.legacy_unmapped.logs"] != 0 || c["forwarded.logs"] != 0 {
+		t.Fatalf("before the commit: %v", c)
+	}
+	f.router.set(func(fr *fakeRouter) { fr.noState = false })
+	s.poke()
+	waitForCounters(t, r, func(c map[string]int) bool { return c["forwarded.logs"] == 1 })
+	if got, _ := u.logs(t); len(got["Bearer key-acme"]) != 1 {
+		t.Fatalf("forwarded %v", got)
+	}
+}
+
+// The outbox names every session whose parts it still queues, for the run ledger to keep
+// (runs.Prune); a part queued before the migration names none.
+func TestQueuedSessionsNameEachQueuedRun(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	r := newRelay(Options{Dir: dir, Token: token})
+	o := outbox{dir: dir}
+	for i, q := range []Queued{{Enrollment: "e-acme", Session: "s1"}, {Enrollment: "e-acme", Session: "agent-2"}, {Enrollment: "e-personal", Session: "s3"}, {Enrollment: "e-personal"}} {
+		if err := o.putTeam(teamRoute{enrollment: q.Enrollment, tool: "claude-code"}, q, newEntry(time.Unix(int64(i), 0), Logs, 1), []byte("x")); err != nil {
+			t.Fatal(err)
+		}
+	}
+	c := claim.Claim{ProjectID: "acme", Repository: config.Repository{Origin: "github.com/acme/api"}}
+	if err := o.put(routeOf(c), c.Repository, newEntry(time.Unix(9, 0), Logs, 1), []byte("x")); err != nil {
+		t.Fatal(err)
+	}
+	got, err := r.QueuedSessions()
+	if err != nil || len(got) != 3 || !got["s1"] || !got["agent-2"] || !got["s3"] {
+		t.Fatalf("QueuedSessions = %v, %v", got, err)
 	}
 }
 

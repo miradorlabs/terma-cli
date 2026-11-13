@@ -32,20 +32,68 @@ func legacyMachine(t *testing.T) (configDir, stateDir string) {
 	return configDir, stateDir
 }
 
-// A relay asked to migrate does so at start, under its lock, before it listens.
-func TestARelayMigratesBeforeItListens(t *testing.T) {
+// A relay asked to migrate listens first, under today's rules, then migrates beside
+// itself, under its lock, and is not idle until it has.
+func TestARelayListensThenMigrates(t *testing.T) {
 	t.Parallel()
 	configDir, stateDir := legacyMachine(t)
 	c := runConfig(stateDir, time.Millisecond, func(net.Addr, time.Duration) {
-		s, ok, err := routing.Load(stateDir, "default")
-		if !config.Migrated(configDir) || !ok || err != nil || s.Migration.Phase != routing.Committed {
-			t.Errorf("listening on a machine not migrated: %+v, %v", s, err)
+		if config.Migrated(configDir) {
+			t.Error("the relay migrated before it listened")
 		}
 	})
 	c.Migration = &migrate.Machine{ConfigDir: configDir, StateDir: stateDir, FlushWait: time.Second}
 	run(t, c)
+	s, ok, err := routing.Load(stateDir, "default")
+	if migrate.Needed(configDir, stateDir) || !ok || err != nil || s.Migration.Phase != routing.Committed {
+		t.Fatalf("the relay left the migration to do: %+v, %v", s, err)
+	}
+	if _, migrating := migrate.Migrating(stateDir); migrating {
+		t.Fatal("the relay left its record that it is migrating")
+	}
+}
+
+// Asking each team's organization type never delays the relay's start: it listens while
+// it asks, records that it is migrating meanwhile, and migrates once it knows.
+func TestARelayListensWhileItAsksTheOrganizationTypes(t *testing.T) {
+	t.Parallel()
+	configDir, stateDir := legacyMachine(t)
+	if err := config.UpdateProfile(configDir, "default", func(p *config.Profile) { p.ServerKeySignIn = false }); err != nil {
+		t.Fatal(err)
+	}
+	listening, answer := make(chan struct{}), make(chan struct{})
+	c := runConfig(stateDir, time.Millisecond, func(net.Addr, time.Duration) { close(listening) })
+	c.Migration = &migrate.Machine{ConfigDir: configDir, StateDir: stateDir, FlushWait: time.Second,
+		OrgType: func(ctx context.Context, _, _ string) (string, error) {
+			select {
+			case <-answer:
+				return migrate.OrgShared, nil
+			case <-ctx.Done():
+				return "", ctx.Err()
+			}
+		}}
+	done := make(chan Result, 1)
+	go func() { done <- run(t, c) }()
+	select {
+	case <-listening:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the relay did not listen while the organization types were asked")
+	}
+	for deadline := time.Now().Add(5 * time.Second); ; time.Sleep(10 * time.Millisecond) {
+		if _, migrating := migrate.Migrating(stateDir); migrating {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("the relay did not record that it is migrating")
+		}
+	}
+	if config.Migrated(configDir) {
+		t.Fatal("migrated before the organization types were known")
+	}
+	close(answer)
+	<-done
 	if migrate.Needed(configDir, stateDir) {
-		t.Fatal("the relay left the migration to do")
+		t.Fatal("the relay did not migrate once it knew the organization types")
 	}
 }
 
@@ -86,23 +134,25 @@ func TestARelayThatMayNotMigrateRunsAsBefore(t *testing.T) {
 	}
 }
 
-// A migration that stops part way, once the machine is marked migrated, keeps the relay
-// from running: the machine collects nothing until a start finishes it, and the next
+// A migration that stops part way, once the machine is marked migrated, stops the relay
+// with its error: the machine collects nothing until a start finishes it, and the next
 // start does.
-func TestARelayDoesNotRunOnAMigrationLeftPartWay(t *testing.T) {
+func TestARelayStopsOnAMigrationLeftPartWay(t *testing.T) {
 	t.Parallel()
 	configDir, stateDir := legacyMachine(t)
 	listened := false
-	c := runConfig(stateDir, time.Millisecond, func(net.Addr, time.Duration) { listened = true })
+	c := runConfig(stateDir, 0, func(net.Addr, time.Duration) { listened = true })
 	c.Migration = &migrate.Machine{ConfigDir: configDir, StateDir: stateDir, FlushWait: time.Second}
 	// The profile has no sign-in to copy, so the copy marks the machine migrated; the
 	// locked keychain then keeps its team's key from being copied.
 	unlock := secret.FailForTest(t, configDir)
 	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 	defer cancel()
-	if _, err := Run(ctx, c); err == nil || listened {
-		t.Fatalf("Run = %v, listened %v", err, listened)
+	if _, err := Run(ctx, c); err == nil || ctx.Err() != nil {
+		t.Fatalf("Run = %v, the test's deadline %v", err, ctx.Err())
 	}
+	listened = false
+	c.Idle = time.Millisecond
 	if !config.Migrated(configDir) || !migrate.Needed(configDir, stateDir) {
 		t.Fatal("the test did not leave the migration part way")
 	}

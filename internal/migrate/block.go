@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/config"
@@ -79,3 +80,29 @@ func (m Machine) block(b Block) {
 
 // clearBlock removes the record once the machine is migrated.
 func clearBlock(stateDir string) { _ = os.Remove(filepath.Join(stateDir, BlockFile)) }
+
+// MigratingFile is the state directory's record that a relay is migrating the machine now,
+// and since when (Migrating). Run writes it before it asks or locks anything, and removes
+// it once it has committed, recorded why not (BlockFile), or stopped with the relay; one
+// a crash left stays until the next Run.
+const MigratingFile = "migrating"
+
+// Migrating reports since when a relay under stateDir has been migrating the machine;
+// false when none is.
+func Migrating(stateDir string) (time.Time, bool) {
+	b, err := os.ReadFile(filepath.Join(stateDir, MigratingFile))
+	if err != nil {
+		return time.Time{}, false
+	}
+	since, err := time.Parse(time.RFC3339Nano, strings.TrimSpace(string(b)))
+	return since, err == nil
+}
+
+// migrating records that this Run is under way, and returns what removes the record. The
+// record is advice for `terma teams` and doctor, as a block is.
+func (m Machine) migrating() func() {
+	path := filepath.Join(m.StateDir, MigratingFile)
+	_ = os.MkdirAll(m.StateDir, 0o700)
+	_ = config.WriteFileAtomic(path, []byte(time.Now().UTC().Format(time.RFC3339Nano)+"\n"), 0o600)
+	return func() { _ = os.Remove(path) }
+}

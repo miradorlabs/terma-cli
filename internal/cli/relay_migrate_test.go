@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"slices"
@@ -201,5 +202,84 @@ func TestTeamsSaysWhyTheRelayDidNotMigrate(t *testing.T) {
 	}
 	if config.Migrated(testApp.dir) {
 		t.Fatal("the machine moved")
+	}
+}
+
+// `terma teams` waits on the migration the relay records, not on a clock: a relay that
+// takes longer than the wait for it to begin, asking the organization types here, still
+// has the command go on once it commits.
+func TestTeamsWaitsForAMoveUnderWay(t *testing.T) {
+	legacyPersonalMachine(t)
+	writeRelayToken(t)
+	exe := fakeInstall(t, "build 2")
+	hookWith(t, exe)
+	prevSpawn, prevWait := testApp.spawnRelay, testApp.migrationWait
+	t.Cleanup(func() { testApp.spawnRelay, testApp.migrationWait = prevSpawn, prevWait })
+	testApp.migrationWait = 300 * time.Millisecond
+	relayDone := make(chan struct{})
+	testApp.spawnRelay = func(string, string, string) {
+		m := testApp.relayMigration(exe)
+		m.FlushWait = time.Second
+		ask := m.OrgType
+		m.OrgType = func(ctx context.Context, profile, org string) (string, error) {
+			time.Sleep(time.Second)
+			return ask(ctx, profile, org)
+		}
+		go func() {
+			defer close(relayDone)
+			if out, err := migrate.Run(context.Background(), *m); err != nil || out != migrate.Committed {
+				t.Errorf("migrate = %s, %v", out, err)
+			}
+		}()
+	}
+	if _, out, err := teamsJSON(t); err != nil {
+		t.Fatalf("teams while the relay migrates: %v\n%s", err, out)
+	}
+	<-relayDone
+	if !config.Migrated(testApp.dir) {
+		t.Fatal("the machine did not move")
+	}
+}
+
+// A relay stopped while it migrates, before it changed anything, records no outcome:
+// `terma teams` says so at once, rather than waiting out its bound.
+func TestTeamsSaysTheRelayStoppedBeforeItMoved(t *testing.T) {
+	legacyPersonalMachine(t)
+	writeRelayToken(t)
+	exe := fakeInstall(t, "build 2")
+	hookWith(t, exe)
+	prevSpawn, prevWait := testApp.spawnRelay, testApp.migrationWait
+	t.Cleanup(func() { testApp.spawnRelay, testApp.migrationWait = prevSpawn, prevWait })
+	testApp.migrationWait = time.Minute
+	relayDone := make(chan struct{})
+	testApp.spawnRelay = func(string, string, string) {
+		m := testApp.relayMigration(exe)
+		ctx, stop := context.WithCancel(context.Background())
+		m.OrgType = func(ctx context.Context, _, _ string) (string, error) {
+			time.Sleep(500 * time.Millisecond)
+			stop()
+			return "", ctx.Err()
+		}
+		go func() {
+			defer close(relayDone)
+			_, _ = migrate.Run(ctx, *m)
+		}()
+	}
+	start := time.Now()
+	_, _, err := teamsJSON(t)
+	<-relayDone
+	if !errors.Is(err, errMigrationIncomplete) || !strings.Contains(err.Error(), "stopped") {
+		t.Fatalf("teams = %v", err)
+	}
+	if took := time.Since(start); took > 20*time.Second || config.Migrated(testApp.dir) {
+		t.Fatalf("teams waited %s; migrated %v", took, config.Migrated(testApp.dir))
+	}
+}
+
+// A migration left part way is never reported as one that changed nothing.
+func TestAMoveLeftPartWayIsNotNothingChanged(t *testing.T) {
+	err := migrationBlockedError(migrate.Block{Reason: migrate.Failed, Detail: "copy profile default's team key: keychain locked", Unfinished: true})
+	if !errors.Is(err, errMigrationPartWay) || strings.Contains(err.Error(), "nothing was changed") {
+		t.Fatalf("a move left part way = %v", err)
 	}
 }
