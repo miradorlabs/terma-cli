@@ -4,8 +4,10 @@
 # lists and in a linked worktree of it (which shares the one install in the common git
 # directory), on a machine routing by its one team and on one moved to routing by teams
 # (where the hook reads the profile's routing state and asks Route), and fails when any
-# median exceeds the budget. The first execution of a freshly written script pays a
-# one-time OS cost (macOS's exec policy check) that no commit after it sees.
+# median exceeds the budget. It also times the post-tool-use hook Claude Code runs on an edit,
+# a read and a shell command; the read's and the shell command's, which run on nearly every
+# tool call, are held to the same budget. The first execution of a freshly written script
+# pays a one-time OS cost (macOS's exec policy check) that no commit after it sees.
 set -eu
 BUDGET_MS="${TERMA_HOOK_BUDGET_MS:-50}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -40,6 +42,8 @@ machine() {
   git -C "$repo" remote add origin git@github.com:acme/repo.git
   git -C "$repo" commit -q --allow-empty -m init
   git -C "$repo" worktree add -q "$tmp/wt"
+  # What the Read and Bash hooks reach: a file in the other checkout of the repository.
+  : > "$repo/NOTES.md"; : > "$tmp/wt/NOTES.md"
   now="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
   printf '{"active_profile":"default","profiles":{"default":{"team":"proj_bench"}}}' > "$TERMA_CONFIG_DIR/config.json"
   mkdir -p "$TERMA_STATE_DIR/policies"
@@ -50,10 +54,31 @@ machine() {
   hook="$repo/.git/hooks/prepare-commit-msg"
 }
 
-# bench <checkout> <slug> <label>: an agent session with a manifest, so the timed path
-# includes the staged-files intersection (the expensive branch), not the early exit.
+# median <times>: the 4th of 7.
+median() { echo "$1" | tr ' ' '\n' | grep -v '^$' | sort -n | sed -n 4p; }
+
+# post_tool_use <label> <payload> [budget]: times the post-tool-use hook on payload 7 times,
+# and fails when a budget is given and the median exceeds it.
+post_tool_use() {
+  ptimes=""
+  i=0
+  while [ $i -lt 7 ]; do
+    start=$(ms)
+    printf '%s' "$2" | terma hook --user post-tool-use
+    end=$(ms)
+    ptimes="$ptimes $((end - start))"
+    i=$((i + 1))
+  done
+  pmedian=$(median "$ptimes")
+  echo "post-tool-use, $1: median ${pmedian}ms over 7 runs (${ptimes# })${3:+ — budget ${3}ms}"
+  [ -z "${3:-}" ] || [ "$pmedian" -le "$3" ] || { echo "post-tool-use, $1: over budget" >&2; exit 1; }
+}
+
+# bench <checkout> <slug> <label> <other>: an agent session with a manifest, so the timed path
+# includes the staged-files intersection (the expensive branch), not the early exit. The Read
+# and Bash hooks reach <other>, a second checkout, so they classify a location besides their own.
 bench() {
-  dir="$1" sid="018f3a2c-bench-$2" label="$3"
+  dir="$1" sid="018f3a2c-bench-$2" label="$3" other="$4"
   cd "$dir"
   printf '{"session_id":"%s","hook_event_name":"SessionStart","cwd":"%s"}' "$sid" "$dir" | terma hook --user session-start
   mkdir -p src; echo "$label" > src/a.go
@@ -72,27 +97,20 @@ bench() {
     times="$times $((end - start))"
     i=$((i + 1))
   done
-  median=$(echo "$times" | tr ' ' '\n' | grep -v '^$' | sort -n | sed -n 4p)
+  median=$(median "$times")
   echo "prepare-commit-msg, $label: median ${median}ms over 7 runs (${times# }) — budget ${BUDGET_MS}ms"
   [ "$median" -le "$BUDGET_MS" ] || { echo "$label: over budget" >&2; exit 1; }
-  # post-tool-use runs the Mixed check (place, the run ledger) on every edit.
-  ptimes=""
-  i=0
-  while [ $i -lt 7 ]; do
-    start=$(ms)
-    printf '{"session_id":"%s","hook_event_name":"PostToolUse","tool_name":"Edit","tool_input":{"file_path":"%s/src/a.go"},"cwd":"%s"}' "$sid" "$dir" "$dir" | terma hook --user post-tool-use
-    end=$(ms)
-    ptimes="$ptimes $((end - start))"
-    i=$((i + 1))
-  done
-  pmedian=$(echo "$ptimes" | tr ' ' '\n' | grep -v '^$' | sort -n | sed -n 4p)
-  echo "post-tool-use, $label: median ${pmedian}ms over 7 runs (${ptimes# })"
+  # post-tool-use runs the Mixed check (place, the run ledger) on every edit, and now on
+  # every read and shell command too, which only classify what they reach.
+  post_tool_use "Edit, $label" "$(printf '{"session_id":"%s","hook_event_name":"PostToolUse","tool_name":"Edit","tool_input":{"file_path":"%s/src/a.go"},"cwd":"%s"}' "$sid" "$dir" "$dir")"
+  post_tool_use "Read, $label" "$(printf '{"session_id":"%s","hook_event_name":"PostToolUse","tool_name":"Read","tool_input":{"file_path":"%s/NOTES.md"},"cwd":"%s"}' "$sid" "$other" "$dir")" "$BUDGET_MS"
+  post_tool_use "Bash, $label" "$(printf '{"session_id":"%s","hook_event_name":"PostToolUse","tool_name":"Bash","tool_input":{"command":"cd %s && cat NOTES.md src/a.go | grep -c bench > /dev/null; ls -la %s/src"},"cwd":"%s"}' "$sid" "$other" "$dir" "$dir")" "$BUDGET_MS"
 }
 
 machine single
-bench "$repo" checkout checkout
-bench "$tmp/wt" worktree worktree
+bench "$repo" checkout checkout "$tmp/wt"
+bench "$tmp/wt" worktree worktree "$repo"
 
 machine teams -migrated
-bench "$repo" teams-checkout "checkout, routing by teams"
-bench "$tmp/wt" teams-worktree "worktree, routing by teams"
+bench "$repo" teams-checkout "checkout, routing by teams" "$tmp/wt"
+bench "$tmp/wt" teams-worktree "worktree, routing by teams" "$repo"
