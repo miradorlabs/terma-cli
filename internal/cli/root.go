@@ -12,6 +12,7 @@ import (
 	"os/signal"
 	"slices"
 	"syscall"
+	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/doctor"
@@ -52,8 +53,8 @@ func (app *App) NewRootCommand() *cobra.Command {
                    the repositories it collects; nothing is written into a
                    repository's files.
                    Run it again to repair the machine.
-  terma switch     signs out and runs setup again: another account, organization
-                   or team.
+  terma teams      chooses the teams this machine sends telemetry to, across all
+                   your organizations, and which organization owns a repository.
   terma doctor     verifies the whole chain end to end; every failure names its fix.
   terma update     installs the latest release and refreshes what terma installed.
   terma teardown   undoes setup on this machine (--sign-out also signs out).
@@ -86,7 +87,7 @@ Every command is safe to run again.`,
 
 	root.AddCommand(
 		app.newSetupCommand(),
-		app.newSwitchCommand(),
+		app.newTeamsCommand(),
 		app.newDoctorCommand(),
 		app.newUpdateCommand(),
 		app.newTeardownCommand(),
@@ -187,6 +188,9 @@ type App struct {
 	backgroundStep func(ctx context.Context, out io.Writer, argv ...string) error
 	// canAsk reports whether a person is at a terminal to answer questions.
 	canAsk func() bool
+	// migrationWait bounds `terma teams`' wait for the relay it starts to migrate the
+	// machine; zero is defaultMigrationWait.
+	migrationWait time.Duration
 	// binary is the executable as this process started from it, for the updater: a command
 	// that ran a while, or the relay, may outlive its version, once another install
 	// replaces the binary.
