@@ -13,28 +13,25 @@ import (
 
 // Organization types, as GET /v1/organizations names them (Machine.OrgType).
 const (
-	// OrgPersonal is a person's own workspace: its team migrates as personal, with no
-	// bindings, and a global policy there keeps collecting everything not bound elsewhere.
+	// OrgPersonal is a person's own workspace: its team migrates as personal, unbound, and
+	// its global policy keeps collecting everything not bound elsewhere.
 	OrgPersonal = "personal"
-	// OrgShared is every other organization: its team migrates with its entries bound to
-	// it, and a global policy there collects nothing.
+	// OrgShared is any other organization: its entries are bound to it, and its global
+	// policy collects nothing.
 	OrgShared = "shared"
 )
 
-// orgTypeWait bounds each organization type the migration asks for: it asks before it
-// takes the spool flush's lock, so no lock waits on the network.
+// orgTypeWait bounds each organization type question, asked before any lock is taken.
 const orgTypeWait = 10 * time.Second
 
-// errOrgTypeUnknown is a profile's team whose organization type the migration did not
-// learn before it took its locks, as when config.json changed meanwhile.
+// errOrgTypeUnknown is a team whose organization type was not learned before the locks,
+// as when config.json changed meanwhile.
 var errOrgTypeUnknown = errors.New("the organization type of a profile's team is not known")
 
-// orgTypes asks, before the migration takes its locks, whether each profile's team is a
-// personal organization's, with that profile's own sign-in to it (Machine.OrgType): the
-// answers are keyed by orgKey. A profile set up with a server key has no sign-in to ask
-// with; it stays single-team, and its team migrates as an organization's. Any type that
-// cannot be had is an error: the migration then waits for the next relay start, and the
-// machine keeps today's rules meanwhile.
+// orgTypes asks, before the locks, whether each profile's team is a personal
+// organization's, with that profile's sign-in (Machine.OrgType), keyed by orgKey. A
+// server-key profile has no sign-in, and migrates as an organization's. Any answer missing
+// is an error: today's rules stay until the next relay start.
 func (m Machine) orgTypes(ctx context.Context) (map[string]bool, error) {
 	file, err := config.LoadFile(m.ConfigDir)
 	if err != nil {

@@ -1,29 +1,23 @@
 // Package migrate is the machine's one-way move to multi-org routing (internal/routing).
-// Only the relay runs it, once it has started listening under today's rules, holding the
-// relay's lock and the spool flush's, so no other terma sends while it runs; the relay
-// asks the config directory and the routing state as it routes each record, so it moves
-// to the new rules as the migration commits. A machine moves only once its developer opts
-// in (OptIn): `terma teams`, or `terma setup` on a machine never set up before. It covers
-// every profile at once, because keys.json and credentials.json are shared by all of them:
+// Only a listening relay runs it, holding its own lock and the spool flush's, so nothing
+// else sends meanwhile; the relay routes each record by the rules in force, so it switches
+// at the commit. A machine moves only once its developer opts in (OptIn). Every profile
+// moves at once, since they share keys.json and credentials.json:
 //
-//  1. Check: the agents' hook entries run the relay's own terma. With two installs it
-//     does not migrate, and records why (ReadBlock), which doctor shows.
-//  2. Prepare: each profile's routing state is written in the Preparing phase, with a
-//     stable enrollment for its team, the bindings its validated entries need, and the
-//     map from its legacy project to that enrollment (routing.Migration.Legacy). Whether
-//     the team is a personal organization's is asked first, before any lock is taken,
-//     with the profile's sign-in (Machine.OrgType): a personal team needs no bindings and
-//     keeps a global policy, any other's global policy collects nothing.
+//  1. Check: the agents' hooks run the relay's own terma. With two installs it stops and
+//     records why (ReadBlock) for doctor.
+//  2. Prepare: each profile's routing state, Preparing, with a stable enrollment for its
+//     team, the bindings its validated entries need, and its legacy project mapped to the
+//     enrollment (routing.Migration.Legacy). Whether the team is a personal
+//     organization's is asked first, before any lock (Machine.OrgType).
 //  3. Copy: the sign-ins to credentials.v2.json, which marks the machine migrated
-//     (config.Migrated), then each profile's team key to keys.v2.json.
+//     (config.Migrated), then each team key to keys.v2.json.
 //  4. Retire: keys.json's keys, credentials.json's sign-ins and config.json's teams.
 //  5. Commit: every routing state Committed.
 //
-// A failure before the sign-ins are copied leaves every legacy entry in place, so every
-// reader goes on with today's rules, as after a failure before step 2; the next start
-// prepares again, keeping the enrollments already chosen. A failure after it leaves a
-// migrated machine whose routing states are Preparing, which collects nothing; the next
-// start finishes from there, and never goes back to today's rules.
+// A failure before step 3 leaves today's rules in force; the next start prepares again,
+// keeping the enrollments chosen. A failure after it leaves a migrated machine that
+// collects nothing until a start finishes, never going back.
 package migrate
 
 import (
@@ -43,8 +37,8 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
-// DefaultFlushWait bounds the wait for a spool flush already running: longer than a
-// flush may take (spool.DefaultFlushTimeout), so one that is running ends first.
+// DefaultFlushWait bounds the wait for a running spool flush: longer than a flush may take
+// (spool.DefaultFlushTimeout).
 const DefaultFlushWait = spool.DefaultFlushTimeout + 5*time.Second
 
 // Machine is what the relay migrates, and how it checks that it may.
@@ -53,12 +47,10 @@ type Machine struct {
 	ConfigDir, StateDir string
 	// Executable is the relay's own terma; "" is this process's (procinfo.AbsExecutable).
 	Executable string
-	// Hooked lists the termas the agents' machine-wide hook entries run, by path, as the
-	// command line reads them from each agent's hooks file; nil lists none.
+	// Hooked lists, by path, the termas the agents' machine-wide hook entries run.
 	Hooked func() ([]string, error)
-	// OrgType is organizationID's type, OrgPersonal or OrgShared, as profile's own sign-in
-	// to it lists it (GET /v1/organizations); the command line provides it. Nil asks
-	// nothing, so a profile signed in to a team's organization is not migrated
+	// OrgType is organizationID's type as profile's sign-in lists it (GET
+	// /v1/organizations). Nil asks nothing, so a signed-in profile is not migrated
 	// (OrgTypeUnknown).
 	OrgType func(ctx context.Context, profile, organizationID string) (string, error)
 	// FlushWait bounds the wait for a spool flush already running; zero is
@@ -80,38 +72,34 @@ const (
 	Done Outcome = "done"
 	// Committed: Run migrated the machine, or finished a migration an earlier start left.
 	Committed Outcome = "committed"
-	// NotMigrated: Run left the legacy entries as they were, for the reason ReadBlock
-	// reports, and every reader goes on with today's rules. The next start tries again.
+	// NotMigrated: Run left today's rules in force, for the reason ReadBlock reports. The
+	// next start tries again.
 	NotMigrated Outcome = "not_migrated"
-	// Unfinished: Run stopped after the machine was marked migrated and before every
-	// routing state was Committed. It collects nothing until a start finishes it.
+	// Unfinished: Run stopped after marking the machine migrated, before the commit. It
+	// collects nothing until a start finishes.
 	Unfinished Outcome = "unfinished"
-	// NotOptedIn: the machine is not migrated and its developer has not opted in (OptIn),
-	// so Run asked, locked and recorded nothing, and every reader goes on with today's
-	// rules.
+	// NotOptedIn: the developer has not opted in (OptIn), so Run did nothing.
 	NotOptedIn Outcome = "not_opted_in"
 )
 
-// Run migrates the machine, or finishes a migration an earlier start left, while the
-// caller holds the relay's lock; the relay runs it beside itself, once it listens. A
-// machine not yet migrated moves only once its developer opted in (OptIn), or m.Automatic
-// says to. It takes the spool flush's lock, waiting out a flush already running for at
-// most m.FlushWait. While it runs it records that it does (Migrating). An error comes
-// with NotMigrated or Unfinished, and is recorded for doctor too (ReadBlock), except one
-// ctx ended, which changed nothing.
+// Run migrates the machine, or finishes an earlier start's migration, while the caller
+// holds the relay's lock. A machine not yet migrated needs the developer's opt-in (OptIn)
+// or m.Automatic. It takes
+// the spool flush's lock, waiting at most m.FlushWait, and records that it runs
+// (Migrating). An error comes with NotMigrated or Unfinished and is recorded for doctor
+// (ReadBlock), unless ctx ended, which changes nothing.
 func Run(ctx context.Context, m Machine) (Outcome, error) {
 	if !Needed(m.ConfigDir, m.StateDir) {
 		return Done, nil
 	}
-	// A migration already marked on the machine is finished whatever was chosen: until
-	// it is, the machine collects nothing.
+	// A migration already marked is finished regardless: until then nothing is collected.
 	if !m.Automatic && !config.Migrated(m.ConfigDir) && !OptedIn(m.StateDir) {
 		return NotOptedIn, nil
 	}
 	// Recorded first, and gone only once the outcome is: a block, or the commit.
 	defer m.migrating()()
-	// Asked before any lock is taken: network calls never hold one. A machine already
-	// marked migrated only finishes what it prepared, which asks nothing.
+	// Asked before any lock: no lock waits on the network. A machine already marked
+	// migrated only finishes what it prepared, which asks nothing.
 	var personal map[string]bool
 	if !config.Migrated(m.ConfigDir) {
 		var err error
@@ -139,8 +127,7 @@ func Run(ctx context.Context, m Machine) (Outcome, error) {
 		return Done, nil
 	}
 	if !config.Migrated(m.ConfigDir) {
-		// Checked only while the legacy entries are all in place: once any has gone there
-		// is no going back, whatever terma the hooks run.
+		// Checked only while every legacy entry is in place: after that there is no going back.
 		exe, others, err := m.otherInstalls()
 		switch {
 		case err != nil:
@@ -167,9 +154,8 @@ func Run(ctx context.Context, m Machine) (Outcome, error) {
 	return Committed, nil
 }
 
-// Needed reports whether the machine has migrating left to do: it is not migrated, or a
-// routing state is still Preparing. A relay start does the former only once the
-// developer opted in (Run).
+// Needed reports whether migrating is left to do: the machine is not migrated, or a
+// routing state is still Preparing.
 func Needed(configDir, stateDir string) bool {
 	if !config.Migrated(configDir) {
 		return true
@@ -239,8 +225,8 @@ func (m Machine) step(name string, fn func() error) error {
 	return fn()
 }
 
-// retireTeams clears the team from every profile in config.json, so an older terma finds
-// none to collect for, and none to write back from a policy it could fetch.
+// retireTeams clears every profile's team in config.json, so an older terma collects
+// nothing and writes no policy back.
 func retireTeams(configDir string) error {
 	if _, err := os.Stat(config.Path(configDir)); errors.Is(err, os.ErrNotExist) {
 		return nil

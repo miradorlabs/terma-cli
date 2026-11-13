@@ -10,10 +10,9 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-// teamSender keeps one enrollment's queue for one tool, for drain to send, as sender keeps
-// a route's. Each part is rechecked (Router.Recheck) as it comes up: sent only to the team it was
-// routed to while that team takes it, kept while the team may recover, and dropped
-// otherwise. A part kept waiting holds up none behind it that may leave.
+// teamSender is one enrollment's queue for one tool, which drain sends. Each part is
+// rechecked (Router.Recheck) as it comes up: sent to its own team while it takes it, kept
+// while the team may recover, dropped otherwise. A waiting part holds up none behind it.
 type teamSender struct {
 	r     *Relay
 	route teamRoute
@@ -24,9 +23,8 @@ type teamSender struct {
 	queue []teamEntry
 	// waiting: every part left must wait, so the route keeps no relay awake.
 	waiting bool
-	// blocked: they wait for the team itself, which cannot send now (Rechecker.TeamWaits),
-	// or for its key. No new part changes that, so none wakes the sender; it looks again
-	// after keylessRetry.
+	// blocked: they wait for the team itself (Rechecker.TeamWaits) or its key, which no new
+	// part changes; the sender looks again after keylessRetry.
 	blocked bool
 }
 
@@ -43,8 +41,8 @@ func (r *Relay) teamSender(rt teamRoute) *teamSender {
 	return s
 }
 
-// enqueueTeam writes a part to its enrollment's queue before the export is answered, as
-// enqueue does. It runs under deliverMu.
+// enqueueTeam writes a part to its enrollment's queue before the export is answered. It
+// runs under deliverMu.
 func (r *Relay) enqueueTeam(q Queued, tool string, p *part) {
 	rt := teamRoute{enrollment: q.Enrollment, tool: tool}
 	if rt.tool == "" {
@@ -64,8 +62,7 @@ func (r *Relay) enqueueTeam(q Queued, tool string, p *part) {
 	r.teamSender(rt).push(teamEntry{e, q})
 }
 
-// push queues a part enqueueTeam wrote, and wakes the sender for it unless the sender
-// waits for its team, whatever the part.
+// push queues a part enqueueTeam wrote, and wakes the sender unless it waits for its team.
 func (s *teamSender) push(e teamEntry) {
 	s.mu.Lock()
 	s.queue = append(s.queue, e)
@@ -167,8 +164,8 @@ func (s *teamSender) take(match func(teamEntry) bool) []teamEntry {
 	return out
 }
 
-// dropRun drops session's parts made from from on: the run became Mixed then, and every
-// part is telemetry, which carries content (runs.Locational).
+// dropRun drops session's parts made from from on, when its run became Mixed: telemetry
+// carries content (runs.Locational).
 func (s *teamSender) dropRun(session string, from time.Time) {
 	gone := s.take(func(e teamEntry) bool {
 		return e.q.Session == session && (e.q.At.IsZero() || !e.q.At.Before(from))
@@ -176,10 +173,9 @@ func (s *teamSender) dropRun(session string, from time.Time) {
 	s.discard(gone, whyMixed, "mixed:"+session)
 }
 
-// choose rechecks the queue in order, in one pass (Router.Recheck): nothing at all while
-// its team waits, else it drops what may never leave, skips what must wait, and returns up
-// to limit parts that may leave now, of the signal of the first of them, with whether any
-// part waits.
+// choose rechecks the queue in one pass (Router.Recheck). While the team waits it judges
+// nothing; else it drops what may never leave, skips what must wait, and returns up to
+// limit parts of one signal that may leave now, and whether any part waits.
 func (s *teamSender) choose(limit int) ([]teamEntry, bool) {
 	rc := s.r.opts.Router.Recheck(s.route.enrollment)
 	if _, waits := rc.TeamWaits(); waits {
@@ -252,8 +248,8 @@ func (s *teamSender) bury(e entry) {
 
 func (s *teamSender) String() string { return s.route.String() }
 
-// dropMixed drops, from every enrollment's queue, session's parts made from from on, once
-// for each earlier Mixed time learned.
+// dropMixed drops session's parts made from from on from every enrollment's queue, once
+// per earlier Mixed time learned.
 func (r *Relay) dropMixed(session string, from time.Time) {
 	r.mu.Lock()
 	if seen, ok := r.mixedSeen[session]; ok && !from.Before(seen) {

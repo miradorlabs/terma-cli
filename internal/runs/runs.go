@@ -1,11 +1,10 @@
-// Package runs is the run ledger: for each agent session, its runs, where each has been and
-// when each became Mixed (crossed organizations), kept in the state directory long after the
-// session's claim has expired, for hooks to tell a crossing by and for the relay and delivery
-// to recheck queued records against. It lives outside internal/relay because delivery may
-// not import the relay's packages.
+// Package runs is the run ledger: each session's runs, where each has been, and when each
+// became Mixed (crossed organizations). Hooks tell a crossing by it; the relay and delivery
+// recheck queued records against it. It outlives the session's claim, and sits outside
+// internal/relay so that delivery may import it.
 //
-// A run begins at a session start or resume; a subagent starting is not a new run, and
-// its ID shares its session's runs (Alias). Mixed only turns on, and only a new run ends it.
+// A run begins at a session start or resume. A subagent shares its session's runs (Alias).
+// Mixed only turns on, and only a new run ends it.
 package runs
 
 import (
@@ -26,34 +25,26 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/session"
 )
 
-// Dir is the run ledger's folder under the state directory: one file per session, and
-// aliases/ naming each subagent ID's session.
+// Dir is the ledger's folder under the state directory: a file per session, and aliases/.
 const Dir = "runs"
 
 const aliasesDir = "aliases"
 
-// Retention is how long a session's ledger is kept after its last activity (ledger.Active):
-// a run starting, crossing organizations, or recording a location. The relay outbox and
-// the spool keep a record for at most 14 days, and a crossing is written here when a hook
-// sees it, so every queued record the ledger could drop leaves its queue within 14 days of
-// it. The extra day covers the clocks of the processes involved and when Prune happens to
-// run: a ledger pruned first would read as never Mixed, and the record would be sent.
-// Prune still keeps a ledger a queued record names.
+// Retention is how long a ledger is kept after its last activity (ledger.Active). Queued
+// records leave the relay outbox and the spool within 14 days; the extra day covers clock
+// skew and when Prune runs. A ledger pruned too early reads as never Mixed. Prune also keeps
+// any ledger a queued record names.
 const Retention = 15 * 24 * time.Hour
 
-// MixedRetention is Retention for a ledger whose current run is Mixed. A session idle past
-// Retention may go on without a new run (no start or resume): its ledger, kept, says it is
-// still Mixed, where a pruned one would say it never was.
+// MixedRetention is Retention for a ledger whose current run is Mixed: a session idle past
+// Retention may go on without a new run, and must still read Mixed.
 const MixedRetention = 90 * 24 * time.Hour
 
-// RefreshEvery is how often a session's hooks renew its ledger's activity (Refresh). A run
-// that stays in one place records nothing new, and its ledger would be pruned while it
-// runs, a Mixed run's crossing with it; renewed once a day, it stays far inside Retention
-// for one write a day.
+// RefreshEvery is how often hooks renew a ledger's activity (Refresh). A run that stays put
+// records nothing new; unrenewed, its ledger and any crossing in it would be pruned.
 const RefreshEvery = 24 * time.Hour
 
-// lockWait bounds the wait for a session's ledger lock. Every write is a read, a small
-// change and a rename; a hook that cannot have the lock gets an error, never a stall.
+// lockWait bounds the wait for a ledger's lock: a hook gets an error, never a stall.
 const lockWait = 2 * time.Second
 
 // ledger is one session's file.
@@ -62,8 +53,7 @@ type ledger struct {
 	Runs []run `json:"runs"`
 	// Aliases are the subagent IDs that share the session's runs.
 	Aliases []string `json:"aliases,omitempty"`
-	// Active is when a hook last recorded here a run starting, crossing organizations or
-	// touching a new location, or renewed it (Refresh): what Prune keeps the ledger by.
+	// Active is the last run start, crossing, new location or Refresh. Prune goes by it.
 	Active time.Time `json:"active,omitzero"`
 }
 
@@ -74,8 +64,8 @@ func (l *ledger) active(t time.Time) {
 	}
 }
 
-// lastActive is l's last activity; for a ledger written before Active was, its runs'
-// latest start or crossing, else written, its file's time.
+// lastActive is l's last activity. A ledger from before Active falls back to its runs'
+// latest start or crossing, then to written, its file's time.
 func (l ledger) lastActive(written time.Time) time.Time {
 	last := l.Active
 	for _, r := range l.Runs {
@@ -104,15 +94,13 @@ type run struct {
 	Started time.Time `json:"started"`
 	// MixedAt is when the run became Mixed; zero while it is not.
 	MixedAt time.Time `json:"mixed_at,omitzero"`
-	// Locations are the distinct locations the run was placed in or seen touching (Touch),
-	// in the order first recorded. The ledger does not read them: hooks record and classify
-	// them, each a normalised repository ID or a token of their own for outside git.
+	// Locations are where the run was placed or seen touching (Touch), first seen first:
+	// normalised repository IDs, or the hooks' token for outside git. Only hooks read them.
 	Locations []string `json:"locations,omitempty"`
 }
 
-// Start records that a new run of sessionID begins at at, a session start or resume, and
-// returns its ID. Whatever the previous run was, the new one is not Mixed and has been
-// nowhere yet.
+// Start records a new run of sessionID beginning at at (a session start or resume) and
+// returns its ID. The new run is not Mixed and has been nowhere.
 func Start(stateDir, sessionID string, at time.Time) (string, error) {
 	id, err := newRunID()
 	if err != nil {
@@ -128,8 +116,8 @@ func Start(stateDir, sessionID string, at time.Time) (string, error) {
 	return id, nil
 }
 
-// Alias records that alias, a subagent's ID its telemetry may name, shares sessionID's
-// runs: a subagent's crossing makes its session's run Mixed, and MixedAt answers for it.
+// Alias records that alias, a subagent ID its telemetry may name, shares sessionID's runs,
+// so MixedAt answers for it too.
 func Alias(stateDir, sessionID, alias string) error {
 	if !session.ValidID(alias) {
 		return fmt.Errorf("runs: invalid alias %q", alias)
@@ -152,9 +140,8 @@ func Alias(stateDir, sessionID, alias string) error {
 	})
 }
 
-// MarkMixed records that sessionID's current run, the latest to begin, became Mixed at
-// at. It only turns on: a run already Mixed keeps the earlier time. A crossing seen before
-// any run was recorded starts one that covers every earlier record.
+// MarkMixed records that sessionID's current run became Mixed at at; an earlier time wins.
+// With no run recorded yet, it starts one that covers every earlier record.
 func MarkMixed(stateDir, sessionID string, at time.Time) error {
 	id, err := newRunID()
 	if err != nil {
@@ -172,12 +159,10 @@ func MarkMixed(stateDir, sessionID string, at time.Time) error {
 	})
 }
 
-// Touch records that sessionID's run runID was placed in, or seen touching, locations: it
-// adds those the run does not record yet, and writes the ledger only when one is new. An
-// empty or unknown runID is the current run's. A location seen before any run was recorded
-// starts one, as MarkMixed does. It returns every location the run records now, read under
-// the lock it writes under: a hook that read the ledger before another hook of the run
-// wrote to it sees that hook's locations here.
+// Touch adds locations to sessionID's run runID (the current run when runID is empty or
+// unknown), writing only when one is new; with no run recorded it starts one. It returns
+// all the run's locations, read under the write lock: those another hook recorded since
+// this one read the ledger included.
 func Touch(stateDir, sessionID, runID string, locations []string) ([]string, error) {
 	if len(locations) == 0 {
 		return nil, nil
@@ -215,19 +200,16 @@ func Touch(stateDir, sessionID, runID string, locations []string) ([]string, err
 	return merged, nil
 }
 
-// MixedAt reports whether the run of idOrAlias, a session ID or one of its aliases, in
-// force at recordTime is Mixed, and from when: the caller drops a record attributed
-// through its run only at or after that time. The run in force is the latest to begin by
-// recordTime; a record older than every run is the earliest's, and one with no time the
-// current run's. A ledger that cannot be read counts as Mixed from the start, since it
-// may have recorded a crossing; none at all, as for an ID no file can be named after, is
-// never Mixed.
+// MixedAt reports whether the run of idOrAlias (a session or one of its aliases) in force
+// at recordTime is Mixed, and since when: the caller drops a record from then on. The run
+// in force is the latest to begin by recordTime; an older record's is the earliest, and
+// one with no time the current. An unreadable ledger is Mixed from the start; none, never.
 func MixedAt(stateDir, idOrAlias string, recordTime time.Time) (time.Time, bool) {
 	return Read(stateDir, idOrAlias).MixedAt(recordTime)
 }
 
-// Snapshot is a session's runs as one read of its ledger found them (Read), for a caller
-// that asks MixedAt of many records of the session, as the relay does of a queue.
+// Snapshot is one read of a session's ledger (Read), for a caller asking MixedAt of many
+// records, as the relay's queue recheck does.
 type Snapshot struct {
 	runs []run
 	// unreadable: the ledger could not be read, so every record counts as Mixed.
@@ -258,9 +240,8 @@ func (s Snapshot) MixedAt(recordTime time.Time) (time.Time, bool) {
 	return r.MixedAt, !r.MixedAt.IsZero()
 }
 
-// Current is the run idOrAlias, a session ID or one of its aliases, is in now: the latest
-// to begin. False when no run of it is recorded, or its ledger cannot be read. Hooks name
-// it on what they record, long after the session's claim has expired.
+// Current is the run idOrAlias is in now, the latest to begin; false when none is recorded
+// or the ledger cannot be read.
 func Current(stateDir, idOrAlias string) (string, bool) {
 	p, ok := Locate(stateDir, idOrAlias)
 	return p.Run, ok
@@ -272,21 +253,19 @@ func Locations(stateDir, idOrAlias string) (run string, locations []string, ok b
 	return p.Run, p.Locations, ok
 }
 
-// Position is a session's current run as one read of its ledger found it (Locate).
+// Position is a session's current run, from one read of its ledger (Locate).
 type Position struct {
-	// Run is the current run, the latest to begin, and Locations where it has been.
+	// Run is the current run, and Locations where it has been.
 	Run       string
 	Locations []string
-	// Active is the ledger's last activity, which Prune keeps it by; zero when it records
-	// none.
+	// Active is the ledger's last activity, which Prune goes by.
 	Active time.Time
 	// MixedAt is when Run became Mixed; zero while it is not.
 	MixedAt time.Time
 }
 
-// Locate is Locations with the ledger's last activity, from one read of the ledger: a hook
-// reads them once, to tell whether the run crosses organizations at the locations it sees
-// next, and whether the ledger is due its renewal (Refresh).
+// Locate reads the ledger once for what a hook needs: the current run, where it has been,
+// whether it is Mixed, and whether the ledger is due a Refresh.
 func Locate(stateDir, idOrAlias string) (Position, bool) {
 	if !session.ValidID(idOrAlias) {
 		return Position{}, false
@@ -299,10 +278,9 @@ func Locate(stateDir, idOrAlias string) (Position, bool) {
 	return Position{Run: cur.ID, Locations: cur.Locations, Active: l.lastActive(time.Time{}), MixedAt: cur.MixedAt}, true
 }
 
-// Refresh renews sessionID's ledger's activity at now, when its last activity is older
-// than RefreshEvery, so Prune keeps it while the session runs; a ledger with no run, or
-// none at all, is left as it is. A hook calls it only when its read of the ledger (Locate)
-// found it due, so a run's hooks write it at most once a day.
+// Refresh renews sessionID's ledger at now if its last activity is older than
+// RefreshEvery; one with no run, or none, is left alone. Hooks call it only when Locate
+// found it due, so at most once a day.
 func Refresh(stateDir, sessionID string, now time.Time) error {
 	path, err := ledgerPath(stateDir, sessionID)
 	if err != nil {
@@ -318,8 +296,7 @@ func Refresh(stateDir, sessionID string, now time.Time) error {
 	})
 }
 
-// Aliases are the subagent IDs that share sessionID's runs (Alias), in the order they were
-// recorded: every identity a crossing of its run covers.
+// Aliases are the subagent IDs sharing sessionID's runs (Alias), in recorded order.
 func Aliases(stateDir, sessionID string) ([]string, error) {
 	path, err := ledgerPath(stateDir, sessionID)
 	if err != nil {

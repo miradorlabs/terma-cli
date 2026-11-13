@@ -13,18 +13,14 @@ import (
 )
 
 // On a migrated machine a hook tells the relay where a session runs with a location-only
-// placement, which names no project: the relay routes the session's telemetry by it. Every
-// session gets one, outside git and where Route drops the location too, under its session
-// ID and the subagent ID its telemetry may use instead. A hook that sees the session's run
-// cross organizations (Sessions across organizations) marks the run Mixed in the run ledger
-// and writes a mixed placement instead, which only a new run replaces. The run ledger also
-// keeps where each run has been, so a crossing two hooks see between them, or that comes
-// after the session's claim has expired, is seen too.
+// placement, naming no project, under the session's ID and its subagent's. The relay routes
+// the session's telemetry by it. A run that crosses organizations is marked Mixed in the
+// run ledger and gets a mixed placement, which only a new run replaces. The ledger keeps
+// where each run has been, so a crossing split across hooks, or past the claim, is seen.
 
-// StartRun records, on a migrated machine, that sessionID begins a new run now: a session
-// start or a resume, never a subagent starting nor a session merely compacted. Its
-// placements and spooled events name the run from now on, and the new run is not Mixed,
-// whatever the last one was. Elsewhere it does nothing.
+// StartRun records, on a migrated machine, that sessionID begins a new run now: at a
+// session start or resume, not a subagent start or a compaction. What the session records
+// names the new run from now on, and it is not Mixed. Elsewhere it does nothing.
 func (e Env) StartRun(sessionID string) {
 	if e.Routing == nil || !e.Routing.Usable() || !session.ValidID(sessionID) {
 		return
@@ -37,8 +33,7 @@ func (e Env) StartRun(sessionID string) {
 	e.Routing.setRun(sessionID, run, e.Time())
 }
 
-// placeFor is claimForRelay on a migrated machine: the event's session's location-only
-// placement at r, under its ID and its subagent's, or its run marked Mixed.
+// placeFor is claimForRelay on a migrated machine: it places the event's session at r.
 func (e Env) placeFor(r *Repo, ev spool.Event) {
 	if r == nil || r.dest == nil || ev.SessionID == "" {
 		return
@@ -53,19 +48,17 @@ func (e Env) placeFor(r *Repo, ev spool.Event) {
 	}
 }
 
-// place records that sessionID's run is at loc now, with c, the placement's checkout and
-// processes, and that the hook saw it touch touched: c's location-only placement under the
-// session's ID and agentID's, or a mixed one once the run has crossed organizations.
+// place records that sessionID's run is at loc now, with c's checkout and processes, and
+// touched touched: c's placement under the session's ID and agentID's, or a mixed one.
 func (e Env) place(sessionID, agentID string, c claim.Claim, loc routing.Location, touched []routing.Location) {
 	e.judge(sessionID, agentID, c, append([]routing.Location{loc}, touched...), true)
 }
 
-// judge classifies locs, where the run is and what it touched, with the run's earlier
-// locations, records them in the run ledger, and writes the session's placement: c at
-// locs[0] when placed, else none unless the run is Mixed. The ledger is the judge of Mixed,
-// since delivery and the relay read only it. A mixed placement the ledger does not back is
-// a crossing whose write failed: every hook of the run records it again, from when the
-// placement turned Mixed, until one succeeds.
+// judge classifies locs (where the run is, and what it touched) with the run's earlier
+// locations, records them in the run ledger, and writes the placement: c at locs[0] when
+// placed, else only a mixed one. The ledger decides Mixed, since delivery and the relay
+// read only it. A mixed placement it does not back is a failed write: each hook records it
+// again, from when the placement turned Mixed, until one succeeds.
 func (e Env) judge(sessionID, agentID string, c claim.Claim, locs []routing.Location, placed bool) {
 	rt := e.Routing
 	if !rt.Usable() || !session.ValidID(sessionID) {
@@ -95,8 +88,8 @@ func (e Env) judge(sessionID, agentID string, c claim.Claim, locs []routing.Loca
 		} else {
 			rt.recorded(sessionID, cur.id, merged)
 		}
-		// Touch read under its lock what another hook of the run recorded since this one read
-		// the ledger: of two hooks that each saw half a crossing, the later sees it whole.
+		// Touch returns what other hooks recorded since this one read the ledger: of two
+		// hooks that each saw half a crossing, the later sees it whole.
 		if !mixed && len(merged) > len(cur.locations)+len(seen) &&
 			(len(merged) > maxRunLocations || rt.crossed(prev, havePrev, c.Run, locs, merged, now)) {
 			mixed = true
@@ -111,8 +104,7 @@ func (e Env) judge(sessionID, agentID string, c claim.Claim, locs []routing.Loca
 	}
 	claim.Write(e.StateDir, sessionID, c, now)
 	if agentID != "" && agentID != sessionID && session.ValidID(agentID) {
-		// A subagent whose telemetry names its own ID shares the session's run, as an alias
-		// in the run ledger.
+		// A subagent whose telemetry names its own ID shares the run, as a ledger alias.
 		if claim.Write(e.StateDir, agentID, c, now) {
 			if err := runs.Alias(e.StateDir, sessionID, agentID); err != nil {
 				e.Logf("alias subagent: %v", err)
@@ -146,7 +138,7 @@ func (e Env) markMixed(sessionID, run string, at time.Time) bool {
 }
 
 // mixedSince is when c, a mixed placement, turned Mixed: its latest placement's start,
-// which a mixed placement rewritten keeps. now when it names none.
+// which rewrites keep; now when it names none.
 func mixedSince(c claim.Claim, now time.Time) time.Time {
 	if n := len(c.Placements); n > 0 && !c.Placements[n-1].Since.IsZero() {
 		return c.Placements[n-1].Since
@@ -154,10 +146,8 @@ func mixedSince(c claim.Claim, now time.Time) time.Time {
 	return now
 }
 
-// crossed reports whether the run run, whose session's claim is prev and which the run
-// ledger records at been, crosses organizations: whether any two of its locations, from
-// its placements, the ledger and locs, belong to different organizations, each classified
-// now.
+// crossed reports whether any two of run's locations (locs, been from the ledger, and
+// prev's placements) belong to different organizations, each classified now.
 func (rt *Routing) crossed(prev claim.Claim, havePrev bool, run string, locs []routing.Location, been []string, now time.Time) bool {
 	locs = slices.Clone(locs)
 	if havePrev {
@@ -200,17 +190,15 @@ func runLocations(c claim.Claim, run string) []routing.Location {
 	return out
 }
 
-// maxRunLocations bounds the locations the run ledger keeps for one run. A run touches few
-// checkouts; one that has been to more turns Mixed (place).
+// maxRunLocations bounds the locations the ledger keeps for a run; past it the run turns
+// Mixed (judge).
 const maxRunLocations = 64
 
-// ledgerOutsideGit is how the run ledger records a location outside git. A repository ID
-// always has a host and a path, so it is never one.
+// ledgerOutsideGit is how the ledger records outside git; no repository ID can equal it.
 const ledgerOutsideGit = "outside-git"
 
-// ledgerLocation is how the run ledger records loc: its normalised repository, or
-// ledgerOutsideGit; "" for one crossed cannot classify, which belongs to no organization
-// whenever it is checked.
+// ledgerLocation is how the ledger records loc: its normalised repository, or
+// ledgerOutsideGit; "" for one that belongs to no organization.
 func ledgerLocation(loc routing.Location) string {
 	switch {
 	case loc.Kind == routing.OutsideGit:
@@ -229,8 +217,7 @@ func fromLedger(s string) routing.Location {
 	return routing.Location{Kind: routing.Repository, Repository: s}
 }
 
-// newLocations are the locations among locs, as the run ledger records them, that been, the
-// run's, does not have yet: each once.
+// newLocations are locs as the ledger records them, minus those in been, each once.
 func newLocations(been []string, locs []routing.Location) []string {
 	var out []string
 	for _, loc := range locs {
@@ -244,11 +231,9 @@ func newLocations(been []string, locs []routing.Location) []string {
 // organization is the organization a location belongs to, for telling a crossing.
 type organization struct {
 	id string
-	// pending is a repository whose binding is still to be decided: it belongs to no
-	// organization a run can share.
+	// pending is a repository whose binding is undecided: no run can share it.
 	pending bool
-	// repo is the normalised repository, which tells two locations in one pending
-	// repository, such as two of its worktrees, apart from two pending ones.
+	// repo tells two worktrees of one pending repository from two pending repositories.
 	repo string
 	ok   bool
 }
@@ -262,9 +247,8 @@ func (rt *Routing) organizationOf(loc routing.Location, now time.Time) organizat
 	return o
 }
 
-// crosses reports whether a and b belong to different organizations. A location nothing
-// collects and nothing binds belongs to none and never crosses; a pending one crosses
-// anything but its own repository.
+// crosses reports whether a and b belong to different organizations. A location no team
+// collects or binds never crosses; a pending one crosses all but its own repository.
 func crosses(a, b organization) bool {
 	switch {
 	case !a.ok || !b.ok:

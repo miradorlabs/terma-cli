@@ -19,19 +19,15 @@ type Reason string
 
 // Reasons.
 const (
-	// TwoInstalls: the agents' hook entries run another terma than the relay's
-	// (Block.Others), which would go on with the rules the migration retires. Doctor names
-	// the install to remove.
+	// TwoInstalls: the agents' hooks run another terma than the relay's (Block.Others),
+	// which would keep the retired rules. Doctor names the install to remove.
 	TwoInstalls Reason = "two_installs"
-	// Unchecked: the agents' hook entries could not be read, so which terma they run is
-	// not known (Block.Detail).
+	// Unchecked: the agents' hook entries could not be read (Block.Detail).
 	Unchecked Reason = "unchecked"
 	// FlushBusy: a spool flush kept its lock for longer than the relay waits.
 	FlushBusy Reason = "flush_busy"
 	// OrgTypeUnknown: whether a profile's team is a personal organization's could not be
-	// asked with that profile's sign-in (Block.Detail), and the migration needs it: a
-	// personal team keeps collecting everything, any other's global policy collects nothing.
-	// The machine keeps today's rules until a relay start can ask.
+	// asked with its sign-in (Block.Detail). Today's rules stay until a start can ask.
 	OrgTypeUnknown Reason = "org_type_unknown"
 	// Failed: a step failed (Block.Detail). With Block.Unfinished the machine collects
 	// nothing until a relay start finishes the migration.
@@ -47,8 +43,8 @@ type Block struct {
 	// run instead.
 	Executable string   `json:"executable,omitempty"`
 	Others     []string `json:"others,omitempty"`
-	// Unfinished: the machine is migrated (config.Migrated) but a routing state is still
-	// Preparing, so nothing is collected until a relay start finishes the migration.
+	// Unfinished: the machine is migrated but a routing state is still Preparing, so
+	// nothing is collected until a relay start finishes.
 	Unfinished bool `json:"unfinished,omitempty"`
 }
 
@@ -66,8 +62,7 @@ func ReadBlock(stateDir string) (Block, bool) {
 	return out, true
 }
 
-// block records b as why this start did not migrate. The record is advice for doctor:
-// one that cannot be written changes nothing the migration does.
+// block records b as why this start did not migrate: advice for doctor, best effort.
 func (m Machine) block(b Block) {
 	b.At = time.Now().UTC()
 	data, err := json.MarshalIndent(b, "", "  ")
@@ -81,10 +76,9 @@ func (m Machine) block(b Block) {
 // clearBlock removes the record once the machine is migrated.
 func clearBlock(stateDir string) { _ = os.Remove(filepath.Join(stateDir, BlockFile)) }
 
-// MigratingFile is the state directory's record that a relay is migrating the machine now,
-// and since when (Migrating). Run writes it before it asks or locks anything, and removes
-// it once it has committed, recorded why not (BlockFile), or stopped with the relay; one
-// a crash left stays until the next Run.
+// MigratingFile records under the state directory since when a relay has been migrating
+// (Migrating). Run writes it first and removes it at the commit, a block, or a stop; one a
+// crash left stays until the next Run.
 const MigratingFile = "migrating"
 
 // Migrating reports since when a relay under stateDir has been migrating the machine;
@@ -98,8 +92,8 @@ func Migrating(stateDir string) (time.Time, bool) {
 	return since, err == nil
 }
 
-// migrating records that this Run is under way, and returns what removes the record. The
-// record is advice for `terma teams` and doctor, as a block is.
+// migrating records that this Run is under way, for `terma teams` and doctor, and returns
+// what removes the record.
 func (m Machine) migrating() func() {
 	path := filepath.Join(m.StateDir, MigratingFile)
 	_ = os.MkdirAll(m.StateDir, 0o700)
