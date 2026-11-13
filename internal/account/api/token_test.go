@@ -79,12 +79,18 @@ func TestExchangeDelegatedCodeSendsRedirectPortZero(t *testing.T) {
 func TestExchangeCodeSendsTheListenersPort(t *testing.T) {
 	t.Parallel()
 	client, bodies := tokenBodies(t)
-	if _, err := client.ExchangeCode(context.Background(), "the-code", "v1", 5555); err != nil {
+	res, err := client.ExchangeCode(context.Background(), "the-code", "v1", 5555)
+	if err != nil {
 		t.Fatal(err)
 	}
 	want := map[string]any{"grant_type": "authorization_code", "code": "the-code", "code_verifier": "v1", "redirect_port": float64(5555)}
 	if len(*bodies) != 1 || !reflect.DeepEqual((*bodies)[0], want) {
 		t.Fatalf("token bodies = %v, want %v", *bodies, want)
+	}
+	// Each exchange names its own organization, so a sign-in to several never reads
+	// another's name from LastLogin.
+	if res.OrganizationName != "Personal" || res.Credential.OrganizationID != "org-1" || res.UserID != "user-1" {
+		t.Fatalf("result = %+v", res)
 	}
 }
 
