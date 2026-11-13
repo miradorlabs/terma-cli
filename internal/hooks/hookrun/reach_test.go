@@ -100,7 +100,8 @@ func TestAShellCommandIsExaminedUpToTheCandidateBound(t *testing.T) {
 			words := []string{"ls"}
 			for i := range tc.candidates {
 				if i == tc.acmeAt {
-					words = append(words, api)
+					// Quoted, as a shell needs a Windows path's backslashes.
+					words = append(words, "'"+api+"'")
 				} else {
 					words = append(words, fmt.Sprintf("src/missing-%d.go", i))
 				}
