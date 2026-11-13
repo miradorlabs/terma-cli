@@ -18,11 +18,12 @@ import (
 )
 
 // The relay prunes the run ledger with its sweep, keeping every session a record still
-// queued names, in the spool or its own outbox: only an idle session nothing names goes.
+// queued names, in the spool or its own outbox: only an idle session nothing names goes,
+// here Mixed and idle past MixedRetention.
 func TestTheRelaysSweepPrunesTheLedgerOfWhatIsNotQueued(t *testing.T) {
 	t.Parallel()
 	stateDir, _, _ := setUpRelay(t)
-	long := time.Now().Add(-runs.Retention - 24*time.Hour)
+	long := time.Now().Add(-runs.MixedRetention - 24*time.Hour)
 	for _, s := range []string{"idle", "spooled", "relayed"} {
 		if _, err := runs.Start(stateDir, s, long); err != nil {
 			t.Fatal(err)
