@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"slices"
 	"strings"
 	"sync"
@@ -218,6 +219,11 @@ func TestBrowserSignInSignsInToEveryOrganizationTicked(t *testing.T) {
 	}
 	if got := signedInOrgs(t); !slices.Equal(got, []string{orgA().ID, orgB().ID}) {
 		t.Fatalf("signed in to %v, want Acme and Beta Labs", got)
+	}
+	// A machine not migrated keeps every organization's sign-in in credentials.json, as
+	// it always could; the migration copies them to v2.
+	if _, err := os.Stat(config.CredentialsV2Path(testApp.dir)); err == nil || config.Migrated(testApp.dir) {
+		t.Fatal("a sign-in on a machine not migrated wrote credentials.v2.json")
 	}
 	if cred, profile := activeOrg(t); cred != orgB().ID || profile != orgB().ID || res.cred.OrganizationID != orgB().ID || res.orgName != "Beta Labs" {
 		t.Fatalf("active = %s, profile %s, result %s %q; want personal Beta Labs", cred, profile, res.cred.OrganizationID, res.orgName)

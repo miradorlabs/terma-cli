@@ -2,6 +2,7 @@ package cli
 
 import (
 	"os"
+	"slices"
 	"strings"
 	"testing"
 
@@ -112,4 +113,53 @@ func TestSetupOnAMachineNotMigratedKeepsItsOneTeam(t *testing.T) {
 	if strings.Contains(out, "Teams ") {
 		t.Errorf("setup showed the teams checklist before migration:\n%s", out)
 	}
+}
+
+// A signed-out migrated machine's setup signs in once, every organization pre-checked on
+// the page: each lands in credentials.v2.json, personal is active, and the new setup ticks
+// personal's team.
+func TestSetupSignsInToEveryOrganizationInOneApproval(t *testing.T) {
+	f := migratedMachine(t, nil)
+	personalBeta(f)
+	t.Setenv("CODEX_HOME", t.TempDir())
+	path, _ := routing.StatePath(testApp.stateDir, config.DefaultProfile)
+	if err := os.Remove(path); err != nil {
+		t.Fatal(err)
+	}
+	b := newFakeBrowser(t, f)
+	out, err := termaRun{stderr: b}.combined(t, "setup", "--harness", "codex", "-y", "--no-browser")
+	if err != nil {
+		t.Fatalf("setup: %v\n%s", err, out)
+	}
+	if links := b.approvalLinks(); len(links) != 1 || links[0].Get("codes") != "multiple" || links[0].Has("orgs") {
+		t.Fatalf("approval links = %v, want one with every organization pre-checked", links)
+	}
+	if got := signedInOrgs(t); !slices.Equal(got, []string{orgA().ID, orgB().ID}) {
+		t.Fatalf("signed in to %v, want both organizations", got)
+	}
+	if v2 := fileText(t, config.CredentialsV2Path(testApp.dir)); !strings.Contains(v2, orgA().ID) || !strings.Contains(v2, orgB().ID) {
+		t.Fatalf("credentials.v2.json lacks a sign-in:\n%s", v2)
+	}
+	if _, err := os.Stat(config.CredentialsPath(testApp.dir)); err == nil {
+		t.Fatal("a migrated machine's sign-in wrote credentials.json")
+	}
+	if cred, profile := activeOrg(t); cred != orgB().ID || profile != orgB().ID {
+		t.Fatalf("active = %s, profile %s; want personal", cred, profile)
+	}
+	if st := loadState(t); len(st.Teams) != 1 || !st.Teams[0].Personal || st.Teams[0].TeamID != betaCore {
+		t.Fatalf("teams = %+v", st.Teams)
+	}
+	if !strings.Contains(out, "Signed in to Beta Labs and Acme") || strings.Contains(out, "Not signed in") {
+		t.Errorf("setup:\n%s", out)
+	}
+}
+
+// fileText is the file at path, which must exist.
+func fileText(t *testing.T, path string) string {
+	t.Helper()
+	b, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(b)
 }
