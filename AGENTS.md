@@ -152,8 +152,15 @@ routing state the migration has not committed sends nothing (`routing.LoadReady`
 route each location they record: a location-only placement for the session, each spooled
 event with the destination Route gave it and never a project, and each session's runs in
 the run ledger (`runs/`, `internal/runs`), where a run that touches two organizations'
-checkouts turns Mixed and sends no telemetry until the session starts a new run. The commit
-hooks are installed, and `prepare-commit-msg` stamps, only where Route sends the repository
+checkouts turns Mixed and sends no telemetry until the session starts a new run. A run
+touches a checkout when it runs there, or when a tool call edits, reads or searches a path
+in it, or names one in a shell command (each path the command names that is there, and
+every `cd`'s target: `hookrun.ShellPaths`). An edit records and spools as it always has; a
+read, a search or a shell command only classifies (`hookrun.Env.Classify`): it writes no
+manifest and spools nothing. A hook whose own location Route drops still classifies what
+the call touched, and that location, into the run ledger, and records and sends nothing
+else. `runs.Touch` returns the run's locations as it wrote them, so of two hooks of one run
+that each see half a crossing, the later sees it whole. The commit hooks are installed, and `prepare-commit-msg` stamps, only where Route sends the repository
 to a team whose policy turns `git_hooks` on. A record's destination never changes once
 routed: the relay queues each part for its enrollment, and the spool keeps each event's;
 both recheck it before sending (`routing.Router.Recheck`, then `runs.MixedAt`), and send it
