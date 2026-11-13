@@ -2,13 +2,18 @@ package cli
 
 import (
 	"context"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/account/auth"
 	"github.com/miradorlabs/terma-cli/internal/account/keystore"
+	"github.com/miradorlabs/terma-cli/internal/account/secret"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/delivery"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
@@ -216,6 +221,117 @@ func TestEnrolledUserNamesOnlyTheSignedInOrganizationsUser(t *testing.T) {
 		if got := testApp.enrolledUser(config.DefaultProfile, tc.team, tc.hosts, tc.endpoint); got != tc.want {
 			t.Errorf("%s: %q, want %q", tc.name, got, tc.want)
 		}
+	}
+}
+
+// twoOrganizations makes testApp's machine migrated, its default profile selecting a team
+// of org-a collecting github.com/a/* and one of org-b collecting github.com/b/*, each owner
+// bound to its organization, and signed in to both organizations, org-a active. It returns
+// the two enrollments.
+func twoOrganizations(t *testing.T) (a, b string) {
+	t.Helper()
+	if err := os.WriteFile(config.CredentialsV2Path(testApp.dir), []byte("{}"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	team := func(org, id, owner string) routing.Team {
+		return routing.Team{OrganizationID: org, AuthURL: migratedAuth, TeamID: id, Policy: config.Policy{
+			Mode: config.ModeRepo, Repositories: []string{owner + "/*"}, Wildcards: true, Revision: 1,
+			TeamID: id, OrganizationID: org, AuthURL: migratedAuth, FetchedAt: time.Now(),
+		}}
+	}
+	_, err := routing.Create(testApp.stateDir, config.DefaultProfile, func(s *routing.State) error {
+		var err error
+		if a, err = s.Select(team("org-a", "team-a", "github.com/a")); err != nil {
+			return err
+		}
+		if b, err = s.Select(team("org-b", "team-b", "github.com/b")); err != nil {
+			return err
+		}
+		s.Migration = &routing.Migration{Phase: routing.Committed}
+		if err := s.Bind("github.com/a", "org-a", false); err != nil {
+			return err
+		}
+		return s.Bind("github.com/b", "org-b", false)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, org := range []string{"org-b", "org-a"} {
+		if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, &auth.Credential{AccessToken: "ter_cli_" + org,
+			OrganizationID: org, AuthURL: migratedAuth, UserID: "user-" + strings.TrimPrefix(org, "org-"), ExpiresAt: time.Now().Add(time.Hour)}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return a, b
+}
+
+// On a migrated machine signed in to two organizations, each team's spooled records name the
+// user the sign-in to that team's organization names, the active organization's or not.
+func TestAFlushNamesEachOrganizationsUser(t *testing.T) {
+	routingSandbox(t)
+	var mu sync.Mutex
+	sent := map[string]string{} // each key's request bodies, as the ingest accepted them
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		mu.Lock()
+		defer mu.Unlock()
+		sent[r.Header.Get("Authorization")] += string(body)
+	}))
+	defer srv.Close()
+	if err := config.UpdateProfile(testApp.dir, config.DefaultProfile, func(p *config.Profile) { p.OTLPURL = srv.URL }); err != nil {
+		t.Fatal(err)
+	}
+	a, b := twoOrganizations(t)
+	for enrollment, key := range map[string]string{a: "ter_srv_a", b: "ter_srv_b"} {
+		team := map[string]string{a: "team-a", b: "team-b"}[enrollment]
+		if err := keystore.SetTeam(testApp.dir, enrollment, team, key, keystore.Hosts{OTLP: srv.URL}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	s := spoolForTest(t)
+	for enrollment, origin := range map[string]string{a: "github.com/a/app", b: "github.com/b/app"} {
+		if err := s.Append(spool.Event{Name: semconv.TermaSessionStartEvent, SessionID: "s1", Time: time.Now(),
+			Repository: config.Repository{Origin: origin}, Profile: config.DefaultProfile, Enrollment: enrollment}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if out, err := runTerma(t, "spool", "flush"); err != nil {
+		t.Fatalf("flush: %v\n%s", err, out)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if len(sent) != 2 {
+		t.Fatalf("the ingest was sent with the keys of %v", sent)
+	}
+	for key, c := range map[string]struct{ user, other string }{"ter_srv_a": {"user-a", "user-b"}, "ter_srv_b": {"user-b", "user-a"}} {
+		body := sent["Bearer "+key]
+		if !strings.Contains(body, semconv.TermaUserIDKey) || !strings.Contains(body, `"stringValue":"`+c.user+`"`) ||
+			strings.Contains(body, `"stringValue":"`+c.other+`"`) {
+			t.Errorf("with %s the ingest was sent, wanting %s:\n%s", key, c.user, body)
+		}
+	}
+}
+
+// enrolledUser reads the credentials index alone, never the keychain, and a profile set up
+// with a server key names no one, signed in to the team's organization or not.
+func TestEnrolledUserNeverReadsTheKeychainNorNamesAServerKeysUser(t *testing.T) {
+	routingSandbox(t)
+	twoOrganizations(t)
+	own := "http://127.0.0.1:1"
+	b := routing.Team{OrganizationID: "org-b", AuthURL: migratedAuth, TeamID: "team-b"}
+	secret.FailForTest(t, testApp.dir)
+	if got := testApp.enrolledUser(config.DefaultProfile, b, keystore.Hosts{}, own); got != "user-b" {
+		t.Fatalf("with the keychain locked, the inactive organization's team names %q, want user-b", got)
+	}
+	if got := testApp.enrolledUser(config.DefaultProfile, routing.Team{OrganizationID: "org-b", AuthURL: "https://auth.other", TeamID: "team-b"},
+		keystore.Hosts{}, own); got != "" {
+		t.Errorf("a team of another environment names %q", got)
+	}
+	if err := config.UpdateProfile(testApp.dir, config.DefaultProfile, func(p *config.Profile) { p.ServerKeySignIn = true }); err != nil {
+		t.Fatal(err)
+	}
+	if got := testApp.enrolledUser(config.DefaultProfile, b, keystore.Hosts{}, own); got != "" {
+		t.Fatalf("a profile set up with a server key names %q", got)
 	}
 }
 
