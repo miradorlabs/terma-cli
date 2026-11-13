@@ -73,7 +73,7 @@ func TestApplyRefreshKeepsRefusalsInOrder(t *testing.T) {
 	s := fixture(t)
 	id := enrollment(t, s, "acme-platform")
 	ok := func(rev int64) *config.Policy {
-		return &config.Policy{Mode: config.ModeRepo, TeamID: "acme-platform", OrganizationID: "acme", Repositories: []string{"github.com/acme/*"}, Wildcards: true, Revision: rev, FetchedAt: now}
+		return &config.Policy{Mode: config.ModeRepo, TeamID: "acme-platform", OrganizationID: "acme", AuthURL: authURL, Repositories: []string{"github.com/acme/*"}, Wildcards: true, Revision: rev, FetchedAt: now}
 	}
 	apply := func(r Refresh) bool {
 		t.Helper()
