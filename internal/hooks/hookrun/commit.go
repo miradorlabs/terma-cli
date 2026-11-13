@@ -32,6 +32,11 @@ func PrepareCommitMsg(ctx context.Context, env Env) error {
 	if err != nil || r.GitDir == "" {
 		return nil
 	}
+	// On a migrated machine a commit is stamped only where Route sends its repository to a
+	// team whose policy turns git_hooks on: one held, or under git_hooks off, is not.
+	if env.Routing != nil && !env.Routing.stampsCommits(r.dest.d) {
+		return nil
+	}
 	env.Cwd = "" // git runs its hooks at the checkout's root, not where the agent works: keep its directory
 	manifests, err := r.Store.Manifests()
 	if err != nil {
@@ -87,7 +92,7 @@ func PrepareCommitMsg(ctx context.Context, env Env) error {
 		attrs[semconv.TermaCommitMessageSourceKey] = source
 	}
 	vcsAttrs(attrs, r)
-	env.EmitFor(r, spool.Event{Name: semconv.TermaCommitStampedEvent, SessionID: ids[0], Attrs: attrs})
+	env.emitFor(r, spool.Event{Name: semconv.TermaCommitStampedEvent, SessionID: ids[0], Attrs: attrs}, true, false)
 	return nil
 }
 
@@ -145,7 +150,7 @@ func PostCommit(ctx context.Context, env Env) error {
 		attrs[semconv.GenAIMainAgentNameKey] = agent
 	}
 	addFileStats(attrs, head.Files, owners)
-	env.EmitFor(r, spool.Event{Name: semconv.TermaCommitEvent, SessionID: stamped[0].SessionID, Attrs: attrs})
+	env.emitFor(r, spool.Event{Name: semconv.TermaCommitEvent, SessionID: stamped[0].SessionID, Attrs: attrs}, true, false)
 	return nil
 }
 
@@ -211,7 +216,7 @@ func emitUnattributedCommit(env Env, r *Repo, head gitx.Commit) {
 	if head.IsMerge() || head.IsSquash() {
 		return
 	}
-	env.EmitFor(r, spool.Event{Name: semconv.TermaCommitUnattributedEvent, Attrs: commitAttrs(r, head)})
+	env.emitFor(r, spool.Event{Name: semconv.TermaCommitUnattributedEvent, Attrs: commitAttrs(r, head)}, true, false)
 }
 
 // commitAttrs is a commit's identity and size, with no second git subprocess and no file names.

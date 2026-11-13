@@ -51,6 +51,7 @@ func sessionStart(ctx context.Context, env hookrun.Env) error {
 		return nil
 	}
 	env.Cwd = cmp.Or(in.Cwd, env.Cwd)
+	env.StartRun(in.SessionID)
 	r, err := env.Repo(ctx)
 	if err != nil {
 		return nil
