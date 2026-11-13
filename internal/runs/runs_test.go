@@ -274,6 +274,31 @@ func TestMixedListsTheSessionsThatCrossed(t *testing.T) {
 	}
 }
 
+// touch is Touch, failing the test on an error, returning what the run records after it.
+func touch(t *testing.T, dir, sid, run string, locs []string) []string {
+	t.Helper()
+	merged, err := Touch(dir, sid, run, locs)
+	must(t, err)
+	return merged
+}
+
+// Touch returns every location the run records once it has written, read under its lock:
+// a hook that read the ledger before another hook of the run touched it learns of the
+// other hook's locations here, whether or not its own were new.
+func TestTouchReturnsEveryLocationTheRunRecords(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	run := start(t, dir, "sess", t0)
+	_, stale, _ := Locations(dir, "sess")
+	touch(t, dir, "sess", run, []string{"github.com/acme/api"})
+	if got := touch(t, dir, "sess", run, []string{"github.com/dawson/side"}); !slices.Equal(got, []string{"github.com/acme/api", "github.com/dawson/side"}) || len(stale) != 0 {
+		t.Fatalf("Touch returned %v after a read of %v", got, stale)
+	}
+	if got := touch(t, dir, "sess", run, []string{"github.com/acme/api"}); !slices.Equal(got, []string{"github.com/acme/api", "github.com/dawson/side"}) {
+		t.Fatalf("Touch with nothing new returned %v", got)
+	}
+}
+
 // locations is what Locations reads of id's current run.
 func locations(t *testing.T, dir, id string) (string, []string) {
 	t.Helper()
@@ -292,8 +317,8 @@ func TestARunRemembersItsLocations(t *testing.T) {
 	dir := t.TempDir()
 	r1 := start(t, dir, "sess", t0)
 	must(t, Alias(dir, "sess", "agent-1"))
-	must(t, Touch(dir, "sess", r1, []string{"github.com/acme/api", "outside-git"}))
-	must(t, Touch(dir, "sess", "", []string{"github.com/acme/api", "github.com/dawson/side", ""}))
+	touch(t, dir, "sess", r1, []string{"github.com/acme/api", "outside-git"})
+	touch(t, dir, "sess", "", []string{"github.com/acme/api", "github.com/dawson/side", ""})
 	for _, id := range []string{"sess", "agent-1"} {
 		if run, locs := locations(t, dir, id); run != r1 || !slices.Equal(locs, []string{"github.com/acme/api", "outside-git", "github.com/dawson/side"}) {
 			t.Fatalf("Locations(%s) = %q, %v", id, run, locs)
@@ -304,8 +329,8 @@ func TestARunRemembersItsLocations(t *testing.T) {
 	if run, locs := locations(t, dir, "sess"); run != r2 || len(locs) != 0 {
 		t.Fatalf("the resumed run %q has been to %v", run, locs)
 	}
-	must(t, Touch(dir, "sess", r1, []string{"github.com/acme/web"}))
-	must(t, Touch(dir, "sess", "unknown-run", []string{"github.com/dawson/terma"}))
+	touch(t, dir, "sess", r1, []string{"github.com/acme/web"})
+	touch(t, dir, "sess", "unknown-run", []string{"github.com/dawson/terma"})
 	if _, locs := locations(t, dir, "sess"); !slices.Equal(locs, []string{"github.com/dawson/terma"}) {
 		t.Fatalf("the current run has been to %v", locs)
 	}
@@ -328,7 +353,7 @@ func TestARunRemembersItsLocations(t *testing.T) {
 	if _, _, ok := Locations(dir, "broken"); ok {
 		t.Fatal("an unreadable ledger has a current run")
 	}
-	if err := Touch(dir, "broken", "", []string{"github.com/acme/api"}); err == nil {
+	if _, err := Touch(dir, "broken", "", []string{"github.com/acme/api"}); err == nil {
 		t.Fatal("touched an unreadable ledger")
 	}
 }
@@ -345,14 +370,14 @@ func TestTouchWritesOnlyANewLocation(t *testing.T) {
 		return fi
 	}
 	run := start(t, dir, "sess", t0)
-	must(t, Touch(dir, "sess", run, []string{"github.com/acme/api"}))
+	touch(t, dir, "sess", run, []string{"github.com/acme/api"})
 	before := stat()
-	must(t, Touch(dir, "sess", run, []string{"github.com/acme/api"}))
-	must(t, Touch(dir, "sess", "", nil))
+	touch(t, dir, "sess", run, []string{"github.com/acme/api"})
+	touch(t, dir, "sess", "", nil)
 	if !os.SameFile(before, stat()) {
 		t.Fatal("rewrote the ledger with nothing new")
 	}
-	must(t, Touch(dir, "sess", run, []string{"github.com/acme/api", "github.com/acme/web"}))
+	touch(t, dir, "sess", run, []string{"github.com/acme/api", "github.com/acme/web"})
 	if os.SameFile(before, stat()) {
 		t.Fatal("a new location left the ledger as it was")
 	}
@@ -362,7 +387,7 @@ func TestTouchWritesOnlyANewLocation(t *testing.T) {
 func TestATouchBeforeAnyRunStartsOne(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	must(t, Touch(dir, "sess", "", []string{"github.com/acme/api"}))
+	touch(t, dir, "sess", "", []string{"github.com/acme/api"})
 	run, locs := locations(t, dir, "sess")
 	if run == "" || !slices.Equal(locs, []string{"github.com/acme/api"}) {
 		t.Fatalf("Locations = %q, %v", run, locs)

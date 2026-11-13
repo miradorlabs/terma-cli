@@ -261,11 +261,12 @@ func (rt *Routing) setRun(sessionID, run string) {
 	rt.runs[sessionID] = &ledgerRun{id: run}
 }
 
-// recorded notes that the run ledger now records locations for sessionID's run run too.
+// recorded notes that the run ledger now records locations for sessionID's run run, as
+// runs.Touch returned them.
 func (rt *Routing) recorded(sessionID, run string, locations []string) {
 	rt.mu.Lock()
 	defer rt.mu.Unlock()
 	if cur, ok := rt.runs[sessionID]; ok && cur.id == run {
-		cur.locations = append(cur.locations, locations...)
+		cur.locations = locations
 	}
 }

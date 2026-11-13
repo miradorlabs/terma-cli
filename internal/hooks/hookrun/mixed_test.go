@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/gitx"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
@@ -357,5 +358,46 @@ func TestARunPastTheLocationBoundTurnsMixed(t *testing.T) {
 	}
 	if _, locs, _ := runs.Locations(m.stateDir, sid); len(locs) != maxRunLocations {
 		t.Errorf("the ledger keeps %d locations", len(locs))
+	}
+}
+
+// acmeAndPersonalRepos is a machine where Acme Platform collects github.com/acme/*, bound to
+// Acme, and personal only github.com/dawson/*: github.com/other/lib, and every folder
+// outside git, is nobody's.
+func acmeAndPersonalRepos(t *testing.T) *routing.State {
+	return hookruntest.RoutingState(t, []routing.Team{
+		hookruntest.RoutedTeam("acme", "acme-platform", true, "github.com/acme/*"),
+		hookruntest.RoutedPersonal("github.com/dawson/*"),
+	}, map[string]string{"github.com/acme": "acme"})
+}
+
+// Two hooks of one run, a session's and its subagent's, each in a checkout nobody collects,
+// each see half a crossing: one reaches Acme's checkout, the other personal's. The second
+// read the run ledger before the first wrote to it, so neither read the other's location;
+// the second, writing after the first, is told it by the ledger, and the run turns Mixed.
+func TestTwoInterleavedHooksThatEachSeeHalfACrossingMakeTheRunMixed(t *testing.T) {
+	t.Parallel()
+	m := newRoutedMachine(t, acmeAndPersonalRepos(t))
+	repo := func(origin string) routing.Location {
+		return routing.Location{Kind: routing.Repository, Repository: origin}
+	}
+	lib := repo("github.com/other/lib")
+	const sid = "interleaved-session"
+	first, second := m.hook(), m.hook()
+	first.StartRun(sid)
+	if run, been := second.currentRun(sid); run == "" || len(been) != 0 {
+		t.Fatalf("the second hook read run %q at %v", run, been)
+	}
+	c := claim.Claim{Kind: claim.KindRepository, Tool: "claude-code", Repository: config.Repository{Origin: lib.Repository}}
+	first.place(sid, "", c, lib, []routing.Location{repo("github.com/acme/api")})
+	if ledger, placement := m.mixed(sid); ledger || placement {
+		t.Fatal("Mixed after half a crossing")
+	}
+	second.place(sid, "agent-7", c, lib, []routing.Location{repo("github.com/dawson/side")})
+	if ledger, placement := m.mixed(sid); !ledger || !placement {
+		t.Fatalf("after both halves: ledger Mixed %v, mixed placement %v", ledger, placement)
+	}
+	if c := m.claim("agent-7"); c.Kind != claim.KindMixed {
+		t.Errorf("the subagent's placement %+v", c)
 	}
 }

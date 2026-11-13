@@ -128,12 +128,15 @@ func MarkMixed(stateDir, sessionID string, at time.Time) error {
 // Touch records that sessionID's run runID was placed in, or seen touching, locations: it
 // adds those the run does not record yet, and writes the ledger only when one is new. An
 // empty or unknown runID is the current run's. A location seen before any run was recorded
-// starts one, as MarkMixed does.
-func Touch(stateDir, sessionID, runID string, locations []string) error {
+// starts one, as MarkMixed does. It returns every location the run records now, read under
+// the lock it writes under: a hook that read the ledger before another hook of the run
+// wrote to it sees that hook's locations here.
+func Touch(stateDir, sessionID, runID string, locations []string) ([]string, error) {
 	if len(locations) == 0 {
-		return nil
+		return nil, nil
 	}
-	return lockedEdit(stateDir, sessionID, func(path string, l *ledger) error {
+	var merged []string
+	err := lockedEdit(stateDir, sessionID, func(path string, l *ledger) error {
 		if len(l.Runs) == 0 {
 			id, err := newRunID()
 			if err != nil {
@@ -152,11 +155,16 @@ func Touch(stateDir, sessionID, runID string, locations []string) error {
 				r.Locations = append(r.Locations, loc)
 			}
 		}
+		merged = r.Locations
 		if len(r.Locations) == known {
 			return nil
 		}
 		return save(path, l)
 	})
+	if err != nil {
+		return nil, err
+	}
+	return merged, nil
 }
 
 // MixedAt reports whether the run of idOrAlias, a session ID or one of its aliases, in
