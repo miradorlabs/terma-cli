@@ -7504,6 +7504,32 @@
             }
           ]
         },
+        "5.11492.2": {
+          "captured_at": "2026-11-13T02:33:43.278084083Z",
+          "captured": true,
+          "uses": [
+            {
+              "model": "claude-opus-5-5",
+              "role": "default",
+              "params": {
+                "output_config": {
+                  "effort": "medium"
+                },
+                "thinking": {
+                  "type": "adaptive"
+                }
+              }
+            },
+            {
+              "model": "claude-haiku-5-5",
+              "role": "side_request"
+            },
+            {
+              "model": "claude-opus-5-5",
+              "role": "side_request"
+            }
+          ]
+        },
         "5.1231.0": {
           "captured_at": "2026-11-10T16:47:46.966590707Z",
           "captured": true,
