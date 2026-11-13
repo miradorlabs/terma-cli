@@ -253,7 +253,7 @@ func TestNoGrantFromEncodedEntriesOrForeignPolicies(t *testing.T) {
 	s := fixture(t)
 	id := enrollment(t, s, "acme-platform")
 	for _, p := range []config.Policy{
-		{Mode: config.ModeRepo, TeamID: "acme-platform", OrganizationID: "clientco", Revision: 5, FetchedAt: now},
+		{Mode: config.ModeRepo, TeamID: "acme-platform", OrganizationID: "clientco", AuthURL: authURL, Revision: 5, FetchedAt: now},
 		{Mode: config.ModeRepo, TeamID: "acme-platform", OrganizationID: "acme", AuthURL: "https://auth.other", Revision: 5, FetchedAt: now},
 	} {
 		if _, err := s.ApplyRefresh(Refresh{EnrollmentID: id, Epoch: s.team(id).Epoch, Policy: &p}); err == nil {
@@ -286,13 +286,19 @@ func TestOwnershipIsStrictEverywhere(t *testing.T) {
 		}
 	}
 
-	unstamped := team("acme", "acme-platform", "github.com/acme/*")
-	unstamped.Policy.OrganizationID = ""
-	s := &State{Profile: "default"}
-	if _, err := s.Select(unstamped); err == nil {
-		t.Error("selected a team whose policy names no organization")
+	for name, blank := range map[string]func(*Team){
+		"its policy names no organization":      func(tm *Team) { tm.Policy.OrganizationID = "" },
+		"its policy names no environment":       func(tm *Team) { tm.Policy.AuthURL = "" },
+		"it and its policy name no environment": func(tm *Team) { tm.AuthURL, tm.Policy.AuthURL = "", "" },
+		"it and its policy name no team":        func(tm *Team) { tm.TeamID, tm.Policy.TeamID = "", "" },
+	} {
+		unstamped := team("acme", "acme-platform", "github.com/acme/*")
+		blank(&unstamped)
+		if _, err := (&State{Profile: "default"}).Select(unstamped); err == nil {
+			t.Errorf("selected a team where %s", name)
+		}
 	}
-	s = fixture(t)
+	s := fixture(t)
 	id := enrollment(t, s, "acme-platform")
 	if _, err := s.ApplyRefresh(Refresh{EnrollmentID: id, Epoch: s.team(id).Epoch, Policy: &config.Policy{
 		Mode: config.ModeRepo, TeamID: "acme-platform", Revision: 5, FetchedAt: now,

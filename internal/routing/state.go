@@ -78,9 +78,12 @@ func (t Team) StateAt(now time.Time) TeamState {
 }
 
 // owns reports whether p was fetched for t: its team, under its organization's login, in
-// its environment. Any other policy never becomes t's grant.
+// its environment. Each must be named, since two blanks establish no scope: every fetch
+// stamps the organization and environment (internal/policy). Any other policy never
+// becomes t's grant.
 func (t Team) owns(p config.Policy) bool {
-	return p.TeamID == t.TeamID && p.OrganizationID == t.OrganizationID && p.AuthURL == t.AuthURL
+	return t.TeamID != "" && t.OrganizationID != "" && t.AuthURL != "" &&
+		p.TeamID == t.TeamID && p.OrganizationID == t.OrganizationID && p.AuthURL == t.AuthURL
 }
 
 // collectsEverything reports whether t's policy collects every location it may: only a

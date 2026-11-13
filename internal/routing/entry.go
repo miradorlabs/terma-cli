@@ -96,10 +96,11 @@ type Entry struct {
 }
 
 // ParseEntry reads raw as a policy lists it. An entry is a host and at least two path
-// segments, none empty. With wildcards, it may instead end in a whole `/*` segment after
-// at least a host and an owner; without, `/*` is an ordinary last segment that no origin
-// has, as an older reader takes it. `github.com/*`, `*` and `github.com/acme/terma-*`
-// are never wildcards. False for an entry that is neither.
+// segments, none empty. With wildcards, it may instead end, as typed, in a whole `/*`
+// segment after at least a host and an owner, so `*.git` and `*/` are refused; without,
+// `/*` is an ordinary last segment that no origin has, as an older reader takes it.
+// `github.com/*`, `*` and `github.com/acme/terma-*` are never wildcards. False for an
+// entry that is neither.
 func ParseEntry(raw string, wildcards bool) (Entry, bool) {
 	if reinterpreted(raw) {
 		return Entry{}, false
