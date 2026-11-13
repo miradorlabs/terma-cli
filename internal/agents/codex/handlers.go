@@ -293,8 +293,9 @@ func preToolUse(ctx context.Context, env hookrun.Env) error {
 	}
 	env.Cwd = cmp.Or(in.Cwd, env.Cwd)
 	sess := session.Session{ID: in.SessionID, Tool: codexTool, Model: in.Model}
+	var located *hookrun.Repo
 	if env.Routing != nil {
-		env.Classify(ctx, nil, sess, codexShellPaths(in, env.Cwd), hookrun.AgentAttrs(map[string]any{}, in.AgentID, in.AgentType))
+		located = env.Classify(ctx, nil, sess, codexShellPaths(in, env.Cwd), hookrun.AgentAttrs(map[string]any{}, in.AgentID, in.AgentType))
 	}
 	paths, commits := codexEditedPaths(in, env.Cwd)
 	if len(commits) > 0 {
@@ -303,7 +304,7 @@ func preToolUse(ctx context.Context, env hookrun.Env) error {
 	if len(paths) == 0 {
 		return nil
 	}
-	r, err := env.Repo(ctx)
+	r, err := env.RepoAt(ctx, located)
 	if err != nil {
 		return nil
 	}

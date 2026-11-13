@@ -2,6 +2,7 @@ package hookrun
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -146,5 +147,33 @@ func TestAHookThatCannotLocateItsCheckoutStillClassifiesWhatItReached(t *testing
 				t.Errorf("a hook that located nothing placed the session: %+v", c.Placements)
 			}
 		})
+	}
+}
+
+// A hook that classifies before it records locates its checkout once: RepoAt takes the
+// checkout Classify located and gives it its session store, and refuses one Route drops.
+func TestRepoAtTakesTheCheckoutClassifyLocated(t *testing.T) {
+	t.Parallel()
+	m := newRoutedMachine(t, acmeAndPersonalRepos(t))
+	ctx := context.Background()
+	for origin, collected := range map[string]bool{"github.com/dawson/side": true, "github.com/other/lib": false} {
+		root := hookruntest.RepoAt(t, origin)
+		env := m.hook()
+		env.Cwd = root
+		located := env.Classify(ctx, nil, sessionOf("located-once"), []string{filepath.Join(root, "README")}, nil)
+		if located == nil || located.Store != nil {
+			t.Fatalf("%s: Classify located %+v", origin, located)
+		}
+		r, err := env.RepoAt(ctx, located)
+		switch {
+		case collected && (err != nil || r != located || r.Store == nil):
+			t.Errorf("%s: RepoAt = %+v, %v; want the located checkout with its store", origin, r, err)
+		case !collected && !errors.Is(err, ErrNotAdmitted):
+			t.Errorf("%s: RepoAt = %+v, %v; want ErrNotAdmitted", origin, r, err)
+		}
+	}
+	env := m.hook()
+	if got := env.Classify(ctx, nil, sessionOf("located-once"), nil, nil); got != nil {
+		t.Errorf("Classify with nothing to classify located %+v", got)
 	}
 }

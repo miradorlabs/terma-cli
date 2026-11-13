@@ -27,20 +27,21 @@ import (
 // parked records handed on: a hook that only classifies, before its tool call runs, or a
 // location Route drops, which Repo refused, whose run is still classified and recorded so
 // that a later hook of the run in a collected location sees the crossing. Elsewhere it
-// does nothing.
-func (e Env) Classify(ctx context.Context, r *Repo, sess session.Session, paths []string, extra map[string]any) {
+// does nothing. It returns r, or the checkout it located, for RepoAt; nil for none.
+func (e Env) Classify(ctx context.Context, r *Repo, sess session.Session, paths []string, extra map[string]any) *Repo {
 	paths = slices.DeleteFunc(slices.Clone(paths), func(p string) bool { return p == "" })
 	if e.Routing == nil || !e.Routing.Usable() || len(paths) == 0 || !session.ValidID(sess.ID) {
-		return
+		return r
 	}
 	if r == nil {
 		var err error
 		if r, err = e.routeHere(ctx); err != nil {
 			e.classifyUnlocated(sess, extra, e.reached(nil, paths))
-			return
+			return nil
 		}
 	}
 	e.classifyTouches(r, sess, extra, e.reached(r, paths))
+	return r
 }
 
 // classifyUnlocated is classifyTouches for a hook whose own checkout cannot be located,
