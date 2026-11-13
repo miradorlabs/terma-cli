@@ -1,7 +1,8 @@
-// Package runs is the run ledger: for each agent session, its runs and when each became
-// Mixed (crossed organizations), kept in the state directory long after the session's
-// claim has expired, for the relay and delivery to recheck queued records against. It
-// lives outside internal/relay because delivery may not import the relay's packages.
+// Package runs is the run ledger: for each agent session, its runs, where each has been and
+// when each became Mixed (crossed organizations), kept in the state directory long after the
+// session's claim has expired, for hooks to tell a crossing by and for the relay and delivery
+// to recheck queued records against. It lives outside internal/relay because delivery may
+// not import the relay's packages.
 //
 // A run begins at a session start or resume; a subagent starting is not a new run, and
 // its ID shares its session's runs (Alias). Mixed only turns on, and only a new run ends it.
@@ -58,10 +59,15 @@ type run struct {
 	Started time.Time `json:"started"`
 	// MixedAt is when the run became Mixed; zero while it is not.
 	MixedAt time.Time `json:"mixed_at,omitzero"`
+	// Locations are the distinct locations the run was placed in or seen touching (Touch),
+	// in the order first recorded. The ledger does not read them: hooks record and classify
+	// them, each a normalised repository ID or a token of their own for outside git.
+	Locations []string `json:"locations,omitempty"`
 }
 
 // Start records that a new run of sessionID begins at at, a session start or resume, and
-// returns its ID. Whatever the previous run was, the new one is not Mixed.
+// returns its ID. Whatever the previous run was, the new one is not Mixed and has been
+// nowhere yet.
 func Start(stateDir, sessionID string, at time.Time) (string, error) {
 	id, err := newRunID()
 	if err != nil {
@@ -119,6 +125,40 @@ func MarkMixed(stateDir, sessionID string, at time.Time) error {
 	})
 }
 
+// Touch records that sessionID's run runID was placed in, or seen touching, locations: it
+// adds those the run does not record yet, and writes the ledger only when one is new. An
+// empty or unknown runID is the current run's. A location seen before any run was recorded
+// starts one, as MarkMixed does.
+func Touch(stateDir, sessionID, runID string, locations []string) error {
+	if len(locations) == 0 {
+		return nil
+	}
+	return lockedEdit(stateDir, sessionID, func(path string, l *ledger) error {
+		if len(l.Runs) == 0 {
+			id, err := newRunID()
+			if err != nil {
+				return err
+			}
+			l.Runs = append(l.Runs, run{ID: id})
+		}
+		i := slices.IndexFunc(l.Runs, func(r run) bool { return r.ID == runID })
+		if runID == "" || i < 0 {
+			i = len(l.Runs) - 1
+		}
+		r := &l.Runs[i]
+		known := len(r.Locations)
+		for _, loc := range locations {
+			if loc != "" && !slices.Contains(r.Locations, loc) {
+				r.Locations = append(r.Locations, loc)
+			}
+		}
+		if len(r.Locations) == known {
+			return nil
+		}
+		return save(path, l)
+	})
+}
+
 // MixedAt reports whether the run of idOrAlias, a session ID or one of its aliases, in
 // force at recordTime is Mixed, and from when: the caller drops a record attributed
 // through its run only at or after that time. The run in force is the latest to begin by
@@ -145,14 +185,23 @@ func MixedAt(stateDir, idOrAlias string, recordTime time.Time) (time.Time, bool)
 // to begin. False when no run of it is recorded, or its ledger cannot be read. Hooks name
 // it on what they record, long after the session's claim has expired.
 func Current(stateDir, idOrAlias string) (string, bool) {
+	run, _, ok := Locations(stateDir, idOrAlias)
+	return run, ok
+}
+
+// Locations is Current with the locations that run was placed in or seen touching (Touch),
+// from one read of the ledger: a hook reads them once, to tell whether the run crosses
+// organizations at the locations it sees next.
+func Locations(stateDir, idOrAlias string) (run string, locations []string, ok bool) {
 	if !session.ValidID(idOrAlias) {
-		return "", false
+		return "", nil, false
 	}
 	l, ok, err := resolve(stateDir, idOrAlias)
 	if err != nil || !ok || len(l.Runs) == 0 {
-		return "", false
+		return "", nil, false
 	}
-	return l.Runs[len(l.Runs)-1].ID, true
+	cur := l.Runs[len(l.Runs)-1]
+	return cur.ID, cur.Locations, true
 }
 
 // Aliases are the subagent IDs that share sessionID's runs (Alias), in the order they were
