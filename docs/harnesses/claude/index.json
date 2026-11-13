@@ -7,24 +7,52 @@
     "homepage": "https://claude.com/claude-code",
     "source": null,
     "changelog": "https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md",
-    "latest": "2.1.324",
+    "latest": "2.1.325",
     "support": "supported",
-    "versions_tracked": 105,
+    "versions_tracked": 106,
     "first_tracked": "2026-07-09",
     "last_change": {
-      "from": "2.1.323",
-      "to": "2.1.324",
-      "at": "2026-11-13T19:09:03.215136219Z",
-      "released_at": "2026-11-13T18:42:36.3Z",
-      "changes": 37,
+      "from": "2.1.324",
+      "to": "2.1.325",
+      "at": "2026-11-13T20:27:28.716036036Z",
+      "released_at": "2026-11-13T20:07:25.823Z",
+      "changes": 12,
       "categories": {
-        "config": 29,
-        "filesystem": 6,
-        "prompt": 2
+        "config": 12
       }
     }
   },
   "versions": [
+    {
+      "version": "2.1.325",
+      "released_at": "2026-11-13T20:07:25.823Z",
+      "captured_at": "2026-11-13T20:27:28.716036036Z",
+      "platforms": [
+        "darwin/arm64",
+        "linux/amd64"
+      ],
+      "support": "supported",
+      "previous": "2.1.324",
+      "changes": 12,
+      "categories": {
+        "config": 12
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 12
+      },
+      "undocumented": null,
+      "highlights": [
+        "Setting no longer read: description",
+        "Setting no longer read: disabled",
+        "Setting no longer read: displayName"
+      ],
+      "signing": "valid",
+      "attempted_at": "2026-11-13T20:27:28.716036036Z",
+      "attempts": 1
+    },
     {
       "version": "2.1.324",
       "released_at": "2026-11-13T18:42:36.3Z",
@@ -67,11 +95,11 @@
       ],
       "support": "supported",
       "previous": "2.1.322",
-      "changes": 51,
+      "changes": 44,
       "categories": {
         "binary": 1,
         "cli": 7,
-        "config": 26,
+        "config": 19,
         "filesystem": 7,
         "hooks": 4,
         "network": 2,
@@ -81,9 +109,9 @@
         "breaking": 0,
         "degrading": 0,
         "informational": 30,
-        "notable": 21
+        "notable": 14
       },
-      "undocumented": 14,
+      "undocumented": 7,
       "highlights": [
         "Agent tool description changed (+81 −83 chars)",
         "Skill tool description changed (+80 −80 chars)",

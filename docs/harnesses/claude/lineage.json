@@ -3,8 +3,8 @@
   "harness": "claude",
   "window": {
     "oldest": "2.1.206",
-    "newest": "2.1.324",
-    "builds": 105
+    "newest": "2.1.325",
+    "builds": 106
   },
   "items": {
     "cli.commands.claude agents": {
@@ -19954,8 +19954,8 @@
       "ranges": [
         {
           "since": "2.1.206",
-          "until": "2.1.322",
-          "removed": "2.1.323"
+          "until": null,
+          "removed": null
         }
       ],
       "since_bounded": false
@@ -20108,8 +20108,8 @@
       "ranges": [
         {
           "since": "2.1.206",
-          "until": "2.1.322",
-          "removed": "2.1.323"
+          "until": null,
+          "removed": null
         }
       ],
       "since_bounded": false
@@ -20933,8 +20933,8 @@
       "ranges": [
         {
           "since": "2.1.206",
-          "until": "2.1.322",
-          "removed": "2.1.323"
+          "until": null,
+          "removed": null
         }
       ],
       "since_bounded": false
@@ -21043,8 +21043,8 @@
       "ranges": [
         {
           "since": "2.1.305",
-          "until": null,
-          "removed": null
+          "until": "2.1.324",
+          "removed": "2.1.325"
         }
       ],
       "since_bounded": true
@@ -21164,8 +21164,8 @@
       "ranges": [
         {
           "since": "2.1.206",
-          "until": "2.1.322",
-          "removed": "2.1.323"
+          "until": null,
+          "removed": null
         }
       ],
       "since_bounded": false
@@ -21241,8 +21241,8 @@
       "ranges": [
         {
           "since": "2.1.324",
-          "until": null,
-          "removed": null
+          "until": "2.1.324",
+          "removed": "2.1.325"
         }
       ],
       "since_bounded": true
@@ -21263,8 +21263,8 @@
       "ranges": [
         {
           "since": "2.1.324",
-          "until": null,
-          "removed": null
+          "until": "2.1.324",
+          "removed": "2.1.325"
         }
       ],
       "since_bounded": true
@@ -24728,8 +24728,8 @@
       "ranges": [
         {
           "since": "2.1.324",
-          "until": null,
-          "removed": null
+          "until": "2.1.324",
+          "removed": "2.1.325"
         }
       ],
       "since_bounded": true
@@ -24948,8 +24948,8 @@
       "ranges": [
         {
           "since": "2.1.324",
-          "until": null,
-          "removed": null
+          "until": "2.1.324",
+          "removed": "2.1.325"
         }
       ],
       "since_bounded": true
@@ -27247,8 +27247,8 @@
       "ranges": [
         {
           "since": "2.1.206",
-          "until": "2.1.322",
-          "removed": "2.1.323"
+          "until": null,
+          "removed": null
         }
       ],
       "since_bounded": false
@@ -28721,8 +28721,8 @@
       "ranges": [
         {
           "since": "2.1.324",
-          "until": null,
-          "removed": null
+          "until": "2.1.324",
+          "removed": "2.1.325"
         }
       ],
       "since_bounded": true
@@ -28732,8 +28732,8 @@
       "ranges": [
         {
           "since": "2.1.324",
-          "until": null,
-          "removed": null
+          "until": "2.1.324",
+          "removed": "2.1.325"
         }
       ],
       "since_bounded": true
@@ -28743,8 +28743,8 @@
       "ranges": [
         {
           "since": "2.1.324",
-          "until": null,
-          "removed": null
+          "until": "2.1.324",
+          "removed": "2.1.325"
         }
       ],
       "since_bounded": true
@@ -28754,8 +28754,8 @@
       "ranges": [
         {
           "since": "2.1.324",
-          "until": null,
-          "removed": null
+          "until": "2.1.324",
+          "removed": "2.1.325"
         }
       ],
       "since_bounded": true
@@ -28765,8 +28765,8 @@
       "ranges": [
         {
           "since": "2.1.324",
-          "until": null,
-          "removed": null
+          "until": "2.1.324",
+          "removed": "2.1.325"
         }
       ],
       "since_bounded": true
@@ -28776,8 +28776,8 @@
       "ranges": [
         {
           "since": "2.1.324",
-          "until": null,
-          "removed": null
+          "until": "2.1.324",
+          "removed": "2.1.325"
         }
       ],
       "since_bounded": true
@@ -28996,8 +28996,8 @@
       "ranges": [
         {
           "since": "2.1.206",
-          "until": "2.1.322",
-          "removed": "2.1.323"
+          "until": null,
+          "removed": null
         }
       ],
       "since_bounded": false
@@ -29018,8 +29018,8 @@
       "ranges": [
         {
           "since": "2.1.324",
-          "until": null,
-          "removed": null
+          "until": "2.1.324",
+          "removed": "2.1.325"
         }
       ],
       "since_bounded": true
@@ -29183,8 +29183,8 @@
       "ranges": [
         {
           "since": "2.1.206",
-          "until": "2.1.322",
-          "removed": "2.1.323"
+          "until": null,
+          "removed": null
         }
       ],
       "since_bounded": false

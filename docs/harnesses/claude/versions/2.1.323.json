@@ -10995,7 +10995,14 @@
     ],
     "source": "the settings schema its bundle declares (zod, read from minified code)",
     "unobserved": [
-      "description"
+      "autoMode",
+      "axScreenReader",
+      "defaultView",
+      "description",
+      "disableDeepLinkRegistration",
+      "skipAutoPermissionPrompt",
+      "useAutoModeDuringPlan",
+      "voiceEnabled"
     ]
   },
   "network": {
@@ -22605,7 +22612,12 @@
           }
         }
       },
-      "tracer": "strace"
+      "tracer": "strace",
+      "unobserved": {
+        "paths": [
+          "<claude-config>/telemetry/1p_failed_events.<uuid>.<uuid>.json"
+        ]
+      }
     }
   },
   "binary": {

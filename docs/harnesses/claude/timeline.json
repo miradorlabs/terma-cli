@@ -3,6 +3,108 @@
   "harness": "claude",
   "steps": [
     {
+      "version": "2.1.325",
+      "previous": "2.1.324",
+      "changes": [
+        {
+          "id": "config.options.description",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting no longer read: description",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.disabled",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting no longer read: disabled",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.displayName",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting no longer read: displayName",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.promoListPrice",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting no longer read: promoListPrice",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.resolvedModel",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting no longer read: resolvedModel",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.supportedEffortLevels",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting no longer read: supportedEffortLevels",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.supportsAdaptiveThinking",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting no longer read: supportsAdaptiveThinking",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.supportsAutoMode",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting no longer read: supportsAutoMode",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.supportsEffort",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting no longer read: supportsEffort",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.supportsFastMode",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting no longer read: supportsFastMode",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.supportsThinkingOff",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting no longer read: supportsThinkingOff",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.value",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting no longer read: value",
+          "impact": "notable",
+          "documented": null
+        }
+      ]
+    },
+    {
       "version": "2.1.324",
       "previous": "2.1.323",
       "changes": [
@@ -477,43 +579,11 @@
           "documented": true
         },
         {
-          "id": "config.options.autoMode",
-          "category": "config",
-          "op": "removed",
-          "title": "Setting no longer read: autoMode",
-          "impact": "notable",
-          "documented": false
-        },
-        {
-          "id": "config.options.axScreenReader",
-          "category": "config",
-          "op": "removed",
-          "title": "Setting no longer read: axScreenReader",
-          "impact": "notable",
-          "documented": false
-        },
-        {
           "id": "config.options.clawdFileProgressEnabled",
           "category": "config",
           "op": "added",
           "title": "New setting: clawdFileProgressEnabled",
           "impact": "informational",
-          "documented": false
-        },
-        {
-          "id": "config.options.defaultView",
-          "category": "config",
-          "op": "removed",
-          "title": "Setting no longer read: defaultView",
-          "impact": "notable",
-          "documented": false
-        },
-        {
-          "id": "config.options.disableDeepLinkRegistration",
-          "category": "config",
-          "op": "removed",
-          "title": "Setting no longer read: disableDeepLinkRegistration",
-          "impact": "notable",
           "documented": false
         },
         {
@@ -573,14 +643,6 @@
           "documented": false
         },
         {
-          "id": "config.options.skipAutoPermissionPrompt",
-          "category": "config",
-          "op": "removed",
-          "title": "Setting no longer read: skipAutoPermissionPrompt",
-          "impact": "notable",
-          "documented": false
-        },
-        {
           "id": "config.options.strictKnownMarketplaces[].package.description",
           "category": "config",
           "op": "changed",
@@ -611,22 +673,6 @@
           "title": "subagentStatusLine description changed (+80 −95 chars)",
           "impact": "informational",
           "documented": true
-        },
-        {
-          "id": "config.options.useAutoModeDuringPlan",
-          "category": "config",
-          "op": "removed",
-          "title": "Setting no longer read: useAutoModeDuringPlan",
-          "impact": "notable",
-          "documented": false
-        },
-        {
-          "id": "config.options.voiceEnabled",
-          "category": "config",
-          "op": "removed",
-          "title": "Setting no longer read: voiceEnabled",
-          "impact": "notable",
-          "documented": false
         },
         {
           "id": "config.env_vars",

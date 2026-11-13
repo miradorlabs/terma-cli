@@ -1,7 +1,39 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-13T19:09:03.215136219Z",
+  "generated_at": "2026-11-13T20:27:28.716036036Z",
   "versions": [
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.325",
+      "released_at": "2026-11-13T20:07:25.823Z",
+      "captured_at": "2026-11-13T20:27:28.716036036Z",
+      "platforms": [
+        "darwin/arm64",
+        "linux/amd64"
+      ],
+      "support": "supported",
+      "previous": "2.1.324",
+      "changes": 12,
+      "categories": {
+        "config": 12
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 12
+      },
+      "undocumented": null,
+      "highlights": [
+        "Setting no longer read: description",
+        "Setting no longer read: disabled",
+        "Setting no longer read: displayName"
+      ],
+      "signing": "valid",
+      "attempted_at": "2026-11-13T20:27:28.716036036Z",
+      "attempts": 1
+    },
     {
       "harness": "claude",
       "name": "Claude Code",
@@ -236,11 +268,11 @@
       ],
       "support": "supported",
       "previous": "2.1.322",
-      "changes": 51,
+      "changes": 44,
       "categories": {
         "binary": 1,
         "cli": 7,
-        "config": 26,
+        "config": 19,
         "filesystem": 7,
         "hooks": 4,
         "network": 2,
@@ -250,9 +282,9 @@
         "breaking": 0,
         "degrading": 0,
         "informational": 30,
-        "notable": 21
+        "notable": 14
       },
-      "undocumented": 14,
+      "undocumented": 7,
       "highlights": [
         "Agent tool description changed (+81 −83 chars)",
         "Skill tool description changed (+80 −80 chars)",
@@ -6149,37 +6181,6 @@
         "Behaviour: sandbox approval removed",
         "Behaviour: sandbox model removed",
         "Behaviour: sandbox provider removed"
-      ],
-      "signing": "valid"
-    },
-    {
-      "harness": "codex",
-      "name": "Codex CLI",
-      "version": "0.142.1",
-      "released_at": "2026-06-25T00:38:54.309Z",
-      "captured_at": "2026-11-05T09:54:28.532441Z",
-      "platforms": [
-        "darwin/arm64",
-        "linux/amd64"
-      ],
-      "support": "untested",
-      "previous": "0.142.0",
-      "changes": 5,
-      "categories": {
-        "binary": 1,
-        "filesystem": 4
-      },
-      "impact": {
-        "breaking": 0,
-        "degrading": 0,
-        "informational": 2,
-        "notable": 3
-      },
-      "undocumented": 5,
-      "highlights": [
-        "New command at turn: `bwrap --new-session --die-with-parent --ro-bind / / --dev /dev --bind <tmp> <tmp> --perms 555 --tmpf …` (linux/amd64)",
-        "New command at turn: `codex-linux-sandbox --sandbox-policy-cwd <repo> --command-cwd <repo> --permission-profile {\"type\":\"m …` (linux/amd64)",
-        "New command at turn: `codex-linux-sandbox --sandbox-policy-cwd <repo> --command-cwd <repo> --permission-profile {\"type\":\"m …` (linux/amd64)"
       ],
       "signing": "valid"
     }

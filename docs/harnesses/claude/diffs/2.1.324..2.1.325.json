@@ -1,0 +1,276 @@
+{
+  "schema_version": 1,
+  "harness": "claude",
+  "from": "2.1.324",
+  "to": "2.1.325",
+  "generated_at": "2026-11-13T20:27:28.716036036Z",
+  "source": null,
+  "changelog": null,
+  "summary": {
+    "changes": 12,
+    "categories": {
+      "config": 12
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 0,
+      "notable": 12
+    },
+    "undocumented": null
+  },
+  "changes": [
+    {
+      "id": "config.options.description",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "description"
+      ],
+      "title": "Setting no longer read: description",
+      "impact": "notable",
+      "before": {
+        "description": "Description of the model's capabilities",
+        "type": "string"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.disabled",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "disabled"
+      ],
+      "title": "Setting no longer read: disabled",
+      "impact": "notable",
+      "before": {
+        "description": "@internal Model is visible but not selectable (e.g. a model the org's Zero Data Retention setting excludes). The human-readable reason is folded into `description`; a structured disabledReason field is the extension point if a consumer ever needs the reason separately.",
+        "type": "boolean"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.displayName",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "displayName"
+      ],
+      "title": "Setting no longer read: displayName",
+      "impact": "notable",
+      "before": {
+        "description": "Human-readable display name",
+        "type": "string"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.promoListPrice",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "promoListPrice"
+      ],
+      "title": "Setting no longer read: promoListPrice",
+      "impact": "notable",
+      "before": {
+        "description": "@internal List price (e.g. `$3/$15`) for a model currently on a launch promo. `description` carries only the promo price so plain-text consumers read it unambiguously; rich pickers prepend this struck-through before the first `$X/$Y` in `description`. Absent when no promo is active.",
+        "type": "string"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.resolvedModel",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "resolvedModel"
+      ],
+      "title": "Setting no longer read: resolvedModel",
+      "impact": "notable",
+      "before": {
+        "description": "Canonical wire model id this row's `value` resolves to (e.g. 'sonnet' → 'claude-sonnet-5'). Lets hosts match a persisted explicit id against the alias row that covers it.",
+        "type": "string"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.supportedEffortLevels",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "supportedEffortLevels"
+      ],
+      "title": "Setting no longer read: supportedEffortLevels",
+      "impact": "notable",
+      "before": {
+        "description": "Available effort levels for this model",
+        "type": "array"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.supportsAdaptiveThinking",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "supportsAdaptiveThinking"
+      ],
+      "title": "Setting no longer read: supportsAdaptiveThinking",
+      "impact": "notable",
+      "before": {
+        "description": "Whether this model supports adaptive thinking (Claude decides when and how much to think)",
+        "type": "boolean"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.supportsAutoMode",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "supportsAutoMode"
+      ],
+      "title": "Setting no longer read: supportsAutoMode",
+      "impact": "notable",
+      "before": {
+        "description": "Whether this model supports auto mode",
+        "type": "boolean"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.supportsEffort",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "supportsEffort"
+      ],
+      "title": "Setting no longer read: supportsEffort",
+      "impact": "notable",
+      "before": {
+        "description": "Whether this model supports effort levels",
+        "type": "boolean"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.supportsFastMode",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "supportsFastMode"
+      ],
+      "title": "Setting no longer read: supportsFastMode",
+      "impact": "notable",
+      "before": {
+        "description": "Whether this model supports fast mode",
+        "type": "boolean"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.supportsThinkingOff",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "supportsThinkingOff"
+      ],
+      "title": "Setting no longer read: supportsThinkingOff",
+      "impact": "notable",
+      "before": {
+        "description": "@internal Whether thinking can be turned off for this model",
+        "type": "boolean"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.value",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "value"
+      ],
+      "title": "Setting no longer read: value",
+      "impact": "notable",
+      "before": {
+        "description": "Model identifier to use in API calls",
+        "type": "string"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    }
+  ]
+}
