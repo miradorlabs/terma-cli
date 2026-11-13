@@ -155,6 +155,7 @@ Without a terminal, the desktop apps and scripts use flags: `--select <team>`,
 `--bind <owner-or-repository>=<organization>`, `--refuse <owner-or-repository>`,
 `--unbind <owner-or-repository>` and `--json`. The first `terma teams` moves the machine to
 routing by teams: it restarts the relay, which migrates every profile once.
+`terma route explain [path]` says which team a session started in a folder goes to, and why.
 
 Hidden commands remain for the programs that run them — hook execution, the local
 relay, spool delivery, shell completion — and for Terma's own engineers.

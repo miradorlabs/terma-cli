@@ -93,11 +93,13 @@ Every command is safe to run again.`,
 		app.newTeardownCommand(),
 		// Hidden. Other programs run these: agents and git run hook, the relay service runs
 		// relay, hooks run spool, the Homebrew cask runs completion and install.sh version,
-		// the shell functions setup writes run launch, and the terma-mcp bridge runs auth.
+		// the shell functions setup writes run launch, and the terma-mcp bridge runs auth;
+		// route explains one folder's routing to Terma's engineers and the desktop.
 		app.newAuthCommand(),
 		app.newHookCommand(),
 		app.newLaunchCommand(),
 		app.newRelayCommand(),
+		app.newRouteCommand(),
 		app.newSpoolCommand(),
 		app.newVersionCommand(),
 		// Hidden, for Terma's engineers: config switches deployments, nate wipes a machine.

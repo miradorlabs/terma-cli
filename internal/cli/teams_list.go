@@ -304,7 +304,7 @@ func teamNotFound(err error) bool {
 // teamLabel names a team for a message: its name and organization's, else their ids.
 func teamLabel(names teamNames, t routing.Team) string {
 	label := cmp.Or(names.Teams[t.TeamID], t.TeamID)
-	if org := names.Orgs[t.OrganizationID]; org != "" {
+	if org := names.Orgs[t.OrganizationID]; org != "" && org != label {
 		label = org + " " + label
 	}
 	return label
