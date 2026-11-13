@@ -52,6 +52,25 @@ func planClaude(root, path string, command func(event string) string, install bo
 	return hookmgr.MergeEventHooks(root, hookmgr.HooksFile{Path: path}, own, install)
 }
 
+// refreshUserHooks rewrites terma's machine-wide entries in the settings.json at path to this
+// build's, running the terma they already run: an upgrade that changes one (a matcher, say)
+// reaches the machine without a new setup. It never installs, so a file with none of terma's
+// entries is left as it is, and so is one whose entries run more than one terma, which only
+// setup can tell apart. It reports whether it rewrote the file.
+func refreshUserHooks(path string) (bool, error) {
+	termas, err := hookmgr.HookedTerma(path)
+	if err != nil || len(termas) != 1 {
+		return false, err
+	}
+	dir := filepath.Dir(path)
+	plan, err := planClaude(dir, filepath.Base(path), hookmgr.UserHookCommand(termas[0]), true)
+	if err != nil || plan.Empty() {
+		return false, err
+	}
+	// Often a dotfiles link: written through, as setup writes it.
+	return true, hookmgr.ApplyThroughLinks(dir, plan)
+}
+
 func managedSettings(command func(event string) string) ([]byte, error) {
 	dir, err := os.MkdirTemp("", "terma-managed")
 	if err != nil {

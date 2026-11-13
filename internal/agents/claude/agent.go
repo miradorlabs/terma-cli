@@ -72,9 +72,15 @@ func (Agent) ManagedDeploy() string {
 // Harness is how terma configures the agent's exporter.
 func (a Agent) Harness() harness.Harness { return exporter{dir: a.ConfigDir} }
 
-// RefreshMachine rewrites the status-line wrap.
+// RefreshMachine rewrites the status-line wrap and terma's machine-wide hooks, both in the
+// user's settings.json.
 func (a Agent) RefreshMachine() (string, bool, error) {
-	return exporter{dir: a.ConfigDir}.RefreshStatusLine()
+	path, changed, err := exporter{dir: a.ConfigDir}.RefreshStatusLine()
+	if err != nil || path == "" {
+		return path, changed, err
+	}
+	hooks, err := refreshUserHooks(path)
+	return path, changed || hooks, err
 }
 
 // Renders is the wrapped statusLine command; the renderer has its own deadline.

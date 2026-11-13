@@ -8,10 +8,12 @@ import (
 	"path/filepath"
 	"regexp"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/config"
+	"github.com/miradorlabs/terma-cli/internal/hooks/hookmgr"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
@@ -222,5 +224,56 @@ func TestRoutedClaudeSessionInADroppedFolderStillRecordsWhatItReached(t *testing
 				t.Fatal("placed in personal's checkout after reaching Acme's, the run is not Mixed")
 			}
 		})
+	}
+}
+
+// An upgrade rewrites the PostToolUse matcher an earlier setup wrote, running the terma it
+// ran, so reads and shell commands reach the hook with no new setup; it never installs.
+func TestRefreshRewritesAnOlderPostToolUseMatcher(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("CLAUDE_CONFIG_DIR", dir)
+	plan, err := planUserHooks(dir, testCommand, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := hookmgr.Apply(dir, plan); err != nil {
+		t.Fatal(err)
+	}
+	i := slices.IndexFunc(claudeHooks, func(h struct{ Event, Matcher, Hook string }) bool { return h.Event == "PostToolUse" })
+	current := hookruntest.ReadFile(t, dir, "settings.json")
+	older := strings.Replace(current, `"`+claudeHooks[i].Matcher+`"`, `"Edit|Write|MultiEdit|NotebookEdit|Agent|Task"`, 1)
+	if older == current {
+		t.Fatal("no PostToolUse matcher to make older")
+	}
+	hookruntest.WriteFile(t, dir, "settings.json", older)
+
+	path, changed, err := Agent{ConfigDir: t.TempDir()}.RefreshMachine()
+	if err != nil || !changed || path != filepath.Join(dir, "settings.json") {
+		t.Fatalf("refresh: %q changed %v err %v", path, changed, err)
+	}
+	var doc struct {
+		Hooks map[string][]struct {
+			Matcher string `json:"matcher"`
+		} `json:"hooks"`
+	}
+	if err := json.Unmarshal([]byte(hookruntest.ReadFile(t, dir, "settings.json")), &doc); err != nil {
+		t.Fatal(err)
+	}
+	if got := doc.Hooks["PostToolUse"]; len(got) != 1 || got[0].Matcher != claudeHooks[i].Matcher {
+		t.Fatalf("PostToolUse after the refresh: %+v", got)
+	}
+	if again, _ := planUserHooks(dir, testCommand, true); !again.Empty() {
+		t.Fatal("the refreshed entries are not this build's, running the terma setup named")
+	}
+	if _, changed, err := (Agent{}).RefreshMachine(); err != nil || changed {
+		t.Fatalf("a second refresh: changed %v err %v", changed, err)
+	}
+
+	hookruntest.WriteFile(t, dir, "settings.json", `{"model": "opus"}`+"\n")
+	if _, changed, err := (Agent{}).RefreshMachine(); err != nil || changed {
+		t.Fatalf("a refresh with no hooks of terma's: changed %v err %v", changed, err)
+	}
+	if got := hookruntest.ReadFile(t, dir, "settings.json"); got != `{"model": "opus"}`+"\n" {
+		t.Fatalf("a refresh installed hooks:\n%s", got)
 	}
 }
