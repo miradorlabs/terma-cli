@@ -216,13 +216,17 @@ func (r *Relay) decideTeams(key string, p *part) verdict {
 		}
 	}
 	if rec.Session != "" {
+		// Unplaced, the part waits as decide's would: for its session's claim (a conversation
+		// start as long as a trace), or for a placement covering its process.
+		held = whyUnclaimed
 		if c, ok := r.lookup(rec.Session); ok {
+			held = whyProcess
 			if c, ok = c.At(p.pid, p.at); ok {
 				if c.Kind == "" && c.ProjectID == "" {
 					// A legacy Mark: not collected, everywhere.
 					return verdict{why: whyNotCollected, final: true}
 				}
-				rec.Placement, rec.Placed = c, true
+				rec.Placement, rec.Placed, held = c, true, ""
 			}
 		}
 	}
