@@ -24,10 +24,22 @@ func must(t *testing.T, err error) {
 	}
 }
 
-// newMachine is an empty machine: its own config and state directories.
+// newMachine is an empty machine: its own config and state directories, where every
+// organization a sign-in asks about is a shared one.
 func newMachine(t *testing.T) Machine {
 	t.Helper()
-	return Machine{ConfigDir: t.TempDir(), StateDir: t.TempDir(), FlushWait: time.Second}
+	return Machine{ConfigDir: t.TempDir(), StateDir: t.TempDir(), FlushWait: time.Second, OrgType: orgsOfType(nil)}
+}
+
+// orgsOfType is a Machine.OrgType that answers from types by organization, OrgShared for
+// any other.
+func orgsOfType(types map[string]string) func(context.Context, string, string) (string, error) {
+	return func(_ context.Context, _, org string) (string, error) {
+		if kind, ok := types[org]; ok {
+			return kind, nil
+		}
+		return OrgShared, nil
+	}
 }
 
 // legacy is one profile as terma before multi-org routing leaves it: its team in
@@ -288,8 +300,8 @@ func TestRunMigratesAServerKeyProfile(t *testing.T) {
 	}
 }
 
-// A legacy team in global mode collects nothing once migrated: only a personal
-// organization may collect everything, and a migrated profile has no personal team.
+// A shared organization's legacy team in global mode collects nothing once migrated: only
+// a personal organization may collect everything.
 func TestRunMigratesAGlobalTeamToCollectNothing(t *testing.T) {
 	t.Parallel()
 	m := newMachine(t)
