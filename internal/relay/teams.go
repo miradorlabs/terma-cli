@@ -159,12 +159,10 @@ type Queued struct {
 	Repository string `json:"repository,omitempty"`
 	Narrow     bool   `json:"narrow,omitempty"`
 	// Session is the session ID, or subagent ID, the record's run is known by; At the
-	// record's time, which picks the run in the ledger.
+	// record's time, which picks the run in the ledger. Telemetry is content, so its run
+	// turning Mixed drops it whatever its location (runs.Locational).
 	Session string    `json:"session,omitempty"`
 	At      time.Time `json:"at,omitzero"`
-	// Own: the location is the record's own, not its run's, so its run turning Mixed does
-	// not drop it.
-	Own bool `json:"own,omitempty"`
 }
 
 // Why a part cannot leave on a migrated machine; the same reason names the drop.

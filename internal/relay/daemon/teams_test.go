@@ -131,7 +131,7 @@ func TestTeamsRouteEachRecordByWhereItRan(t *testing.T) {
 		if got.Outcome != tc.outcome || got.Queued.Enrollment != tc.to || got.Outcome != relay.Send && got.Why != tc.why {
 			t.Errorf("%s: %+v", tc.name, got)
 		}
-		if got.Outcome == relay.Send && (got.Queued.Session != "s1" || !got.Queued.At.Equal(at) || got.Queued.Own) {
+		if got.Outcome == relay.Send && (got.Queued.Session != "s1" || !got.Queued.At.Equal(at)) {
 			t.Errorf("%s: queued %+v without its run and time", tc.name, got.Queued)
 		}
 	}
@@ -191,8 +191,7 @@ func TestTeamsHoldByWhatBlocks(t *testing.T) {
 }
 
 // A queued entry is rechecked against the state now: its own team while Active, waiting
-// while it may recover, dropped once its enrollment ends or its run was Mixed by its time,
-// unless its location is its own.
+// while it may recover, dropped once its enrollment ends or its run was Mixed by its time.
 func TestTeamsRecheckAQueuedEntry(t *testing.T) {
 	cfg := migratedMachine(t)
 	ids := selectTeams(t, cfg, true, func(s *routing.State) { _ = s.Bind("github.com/acme", orgAcme, false) })
@@ -210,22 +209,22 @@ func TestTeamsRecheckAQueuedEntry(t *testing.T) {
 	if got := NewTeams(cfg, TeamsDeps{}).Recheck(q); got.Verdict != relay.Discard || got.Why != relay.WhyMixed {
 		t.Fatalf("its run Mixed before it: %+v", got)
 	}
-	own := q
-	own.Own = true
-	if got := NewTeams(cfg, TeamsDeps{}).Recheck(own); got.Verdict != relay.SendNow {
-		t.Fatalf("its own location, its run Mixed: %+v", got)
+	before := q
+	before.At = at.Add(-2 * time.Minute)
+	if got := NewTeams(cfg, TeamsDeps{}).Recheck(before); got.Verdict != relay.SendNow {
+		t.Fatalf("made before its run crossed: %+v", got)
 	}
 	update(t, cfg, func(s *routing.State) { s.Teams[0].Refusals = 1 })
-	if got := NewTeams(cfg, TeamsDeps{}).Recheck(own); got.Verdict != relay.Wait {
+	if got := NewTeams(cfg, TeamsDeps{}).Recheck(before); got.Verdict != relay.Wait {
 		t.Fatalf("suspended: %+v", got)
 	}
 	update(t, cfg, func(s *routing.State) { s.Teams[0].Refusals = 2 })
-	if got := NewTeams(cfg, TeamsDeps{}).Recheck(own); got.Verdict != relay.Discard || got.Why != relay.WhyBlocked {
+	if got := NewTeams(cfg, TeamsDeps{}).Recheck(before); got.Verdict != relay.Discard || got.Why != relay.WhyBlocked {
 		t.Fatalf("refused: %+v", got)
 	}
 	update(t, cfg, func(s *routing.State) { s.Deselect(ids["acme"]) })
 	teams := NewTeams(cfg, TeamsDeps{})
-	if got := teams.Recheck(own); got.Verdict != relay.Discard || got.Why != relay.WhyDeselected || teams.Selected(ids["acme"]) {
+	if got := teams.Recheck(before); got.Verdict != relay.Discard || got.Why != relay.WhyDeselected || teams.Selected(ids["acme"]) {
 		t.Fatalf("unticked: %+v", got)
 	}
 }

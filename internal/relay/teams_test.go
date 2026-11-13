@@ -219,7 +219,7 @@ func TestAMigratedRelaySendsEachRecordToItsTeam(t *testing.T) {
 	f.router.mu.Lock()
 	rechecked := slices.Clone(f.router.rechecked)
 	f.router.mu.Unlock()
-	if len(rechecked) != 2 || rechecked[0].Session == "" || rechecked[0].At.IsZero() || rechecked[0].Own {
+	if len(rechecked) != 2 || rechecked[0].Session == "" || rechecked[0].At.IsZero() {
 		t.Fatalf("rechecked %+v: each entry carries its run and time", rechecked)
 	}
 }
@@ -401,7 +401,7 @@ func TestPartsQueuedBeforeTheMigrationMapToTheCutoverEnrollment(t *testing.T) {
 	t.Parallel()
 	u := newUpstream(t)
 	f := newTeamFixture(t, u)
-	f.router.legacy = map[string]Queued{"acme": {Enrollment: "e-acme", Project: "acme", Kind: "repository", Repository: "github.com/acme/api", Own: true}}
+	f.router.legacy = map[string]Queued{"acme": {Enrollment: "e-acme", Project: "acme", Kind: "repository", Repository: "github.com/acme/api"}}
 	o := outbox{dir: f.dir}
 	for _, project := range []string{"acme", "old-team"} {
 		c := claim.Claim{ProjectID: project, Repository: config.Repository{Origin: "github.com/acme/api"}}

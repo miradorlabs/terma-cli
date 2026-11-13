@@ -176,17 +176,15 @@ func (t *Teams) Route(rec relay.Record) relay.Routed {
 	return relay.Routed{Outcome: relay.Drop, Why: relay.WhyNoTeam}
 }
 
-// Recheck judges a queued entry: one attributed through its run is dropped once the run
-// was Mixed by its time (the run ledger), then routing.Router.Recheck decides.
+// Recheck judges a queued entry: it is dropped once its run was Mixed by its time (the run
+// ledger), since telemetry is content (runs.Locational), then routing.Router.Recheck decides.
 func (t *Teams) Recheck(q relay.Queued) relay.Rechecked {
 	st, router, ok := t.state()
 	if !ok {
 		return relay.Rechecked{Verdict: relay.Wait, Why: relay.WhyNoState}
 	}
-	if !q.Own {
-		if _, mixed := t.mixedAt(q.Session, q.At); mixed {
-			return relay.Rechecked{Verdict: relay.Discard, Why: relay.WhyMixed, Blocker: mixedBlocker(q.Session)}
-		}
+	if _, mixed := t.mixedAt(q.Session, q.At); mixed {
+		return relay.Rechecked{Verdict: relay.Discard, Why: relay.WhyMixed, Blocker: mixedBlocker(q.Session)}
 	}
 	loc := routing.Location{Kind: routing.LocationKind(q.Kind), Repository: q.Repository, Narrow: q.Narrow}
 	v, d := router.Recheck(routing.Destination{EnrollmentID: q.Enrollment, Location: loc}, t.deps.Now())
@@ -214,7 +212,7 @@ func (t *Teams) Selected(enrollment string) bool {
 }
 
 // Legacy maps a part queued before the migration for project to its cutover enrollment
-// (routing.Migration.Legacy), as a record with a location of its own: it has no run.
+// (routing.Migration.Legacy), by the location its claim named: it has no session run.
 func (t *Teams) Legacy(project string, repo config.Repository) (relay.Queued, bool) {
 	st, _, ok := t.state()
 	if !ok || st.Migration == nil {
@@ -225,7 +223,7 @@ func (t *Teams) Legacy(project string, repo config.Repository) (relay.Queued, bo
 	if enrollment == "" || tm == nil {
 		return relay.Queued{}, false
 	}
-	q := relay.Queued{Enrollment: enrollment, Project: tm.TeamID, Kind: string(routing.Unknown), Narrow: true, Own: true}
+	q := relay.Queued{Enrollment: enrollment, Project: tm.TeamID, Kind: string(routing.Unknown), Narrow: true}
 	if repo.Origin != "" {
 		q.Kind, q.Repository, q.Narrow = string(routing.Repository), repo.Origin, false
 	}
