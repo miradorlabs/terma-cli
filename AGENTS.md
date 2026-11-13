@@ -32,7 +32,8 @@ internal/agents/        one package per coding agent; builtin/ is the only list 
 internal/hooks/         `terma hook <event>`: dispatch, runtime (hookrun), hook-file writers (hookmgr)
 internal/relay/         the local relay daemon
 internal/spool/         the local queue hooks append to
-internal/delivery/      sends the spool to each project, from a detached flush
+internal/delivery/      sends the spool to each project, from a detached flush, and the image
+                        queue from the relay's image sender
 internal/session/       session manifests and commit attribution
 internal/doctor/        `terma doctor` checks
 internal/setup/         `terma setup`; internal/globalmode/ writes the machine-wide hooks
@@ -75,8 +76,15 @@ records the refs git is about to push and hands them to a detached `terma spool
 await-push`, which waits for `git push` to exit, reads whether the remote-tracking branch
 moved, walks the pushed commits and spools one `terma.push` per branch. Hooks never
 touch the network: they append events to the spool, and a detached `terma spool flush`
-delivers them to each project. `internal/boundary` keeps `net/http` out of the hook, spool
-and agent packages.
+delivers them to each project. An image a user put in a prompt goes to a spool of its own,
+which the relay sends, one image to a request, so no event waits on an upload: an agent's
+export the relay accepts wakes its image sender, as do its start, a retry window's end and
+the next look at images held for a key or a policy (`delivery.ImageSender`). The relay
+halts it, between two images, only once nothing else keeps the relay (an idle exit, an
+update, making way), and resumes it if something then does. `terma spool flush --images` sends the same queue by hand. An image
+record an older build left in the events' spool, which the events' flush moves to the
+image queue, waits for the next of those wakes.
+`internal/boundary` keeps `net/http` out of the hook, spool and agent packages.
 
 **Files.** The config directory (`config.Dir`) holds what the developer chose and what
 setup changed: `config.json` (profiles and settings), `credentials.json`, `keys.json`, and
@@ -85,7 +93,9 @@ credentials' secrets, sign-in tokens and server keys, live in the system keychai
 (`internal/account/secret`), as gh keeps its token: `credentials.json` and `keys.json`
 index them, and hold them only where there is no keychain or `--insecure-storage` asks.
 The state directory (`config.StateDir`) holds what terma writes as it runs: `relay/`,
-`spool/`, `policies/`, `agents/<agent>/` (each agent's hook state), `funding/`,
+`spool/`, `image-spool/` (the records of those images, which the relay sends, the log of
+those it settled since it last compacted the queue, and their teams' retry windows), `images/` (the images a user put in a prompt, until delivery sends
+them), `policies/`, `agents/<agent>/` (each agent's hook state), `funding/`,
 `workspaces/` (session stores for work begun outside git) and `update/`; a repository's
 session store is `.git/terma/`, which also keeps what a git hook in an agent's sandbox could
 not write to the state directory, until a hook outside the sandbox moves it there. Names

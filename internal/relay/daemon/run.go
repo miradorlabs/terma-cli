@@ -4,14 +4,11 @@ import (
 	"cmp"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net"
 	"net/http"
 	"os"
 	"path/filepath"
-	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -46,7 +43,7 @@ type Config struct {
 	Version string
 	// Engine is the engine's options; Run sets its Token.
 	Engine relay.Options
-	// Workers run beside the engine until it stops, and are waited for.
+	// Workers run beside the engine until it stops, and are waited for, workerWait at most.
 	Workers []func(ctx context.Context)
 	// Updater, set, installs each new release in place of this terma, and the relay then
 	// restarts on it.
@@ -234,7 +231,14 @@ func Run(ctx context.Context, c Config) (Result, error) {
 	open.Wait()
 	cancel()
 	<-engine
-	workers.Wait()
+	// A worker returns as its context ends; one that does not keeps the relay no longer.
+	waited := make(chan struct{})
+	go func() { workers.Wait(); close(waited) }()
+	select {
+	case <-waited:
+	case <-time.After(workerWait):
+		c.Log.Printf("relay pid %d: a worker did not stop within %s", os.Getpid(), workerWait)
+	}
 	snap := r.Stats().Snapshot()
 	if data, err := json.MarshalIndent(snap, "", "  "); err == nil {
 		// The previous relay's exit counters stay beside this one's.
@@ -289,6 +293,9 @@ func (r stopReason) describe(err error) string {
 	}
 	return "asked to stop"
 }
+
+// workerWait bounds how long a stopping relay waits for its workers.
+var workerWait = 10 * time.Second
 
 // exitBeatWait bounds the last heartbeat, which a stopped relay's process waits for.
 const exitBeatWait = 3 * time.Second
@@ -358,82 +365,4 @@ func listen(dir, addr string) (net.Listener, error) {
 	}
 	_ = os.Remove(filepath.Join(dir, ErrorFile))
 	return ln, nil
-}
-
-// watch waits for a reason to stop. A relay that installed a newer terma stops once Quiesce
-// finds its hold empty, no export in flight and none for updateQuiet (for none at all after
-// updatePauseWait), however long that takes: the release is already in place for every
-// hook, so waiting loses nothing, while what it holds in memory would be lost. Its queue is
-// on disk, so a route still retrying never keeps it, and a newer hook asking it to make way
-// is answered by that same wait.
-func watch(ctx context.Context, r *relay.Relay, stateDir string, idle time.Duration, served <-chan error, updated <-chan Pass) (stopReason, string, error) {
-	dir := claim.Dir(stateDir)
-	var replacing time.Time // when a newer terma asked this relay to make way
-	var upgraded time.Time  // when it installed one itself
-	var installed Pass      // the release it installed last, or found in place
-	lastPrune := time.Now()
-	tick := time.NewTicker(time.Second)
-	defer tick.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return stopAsked, installed.Installed, nil
-		case err := <-served:
-			if errors.Is(err, http.ErrServerClosed) {
-				err = nil
-			}
-			return stopServeFailed, installed.Installed, err
-		case installed = <-updated:
-			// From the first release it installed: one installed while it waits to restart is
-			// no reason to keep running the release they both replaced any longer.
-			if upgraded.IsZero() {
-				upgraded = time.Now()
-			}
-		case <-tick.C:
-		}
-		if !setUp(stateDir) {
-			return stopSetupGone, installed.Installed, nil
-		}
-		if requested(dir, StopFile) {
-			return stopAsked, installed.Installed, nil
-		}
-		if replacing.IsZero() && requested(dir, ReplaceFile) {
-			replacing = time.Now()
-		}
-		if !upgraded.IsZero() {
-			quiet := updateQuiet
-			if time.Since(upgraded) >= updatePauseWait {
-				quiet = 0
-			}
-			if r.Quiesce(quiet) {
-				if installed.Replaced {
-					return stopUpdatedByAnother, installed.Installed, nil
-				}
-				return stopUpdated, installed.Installed, nil
-			}
-		} else if !replacing.IsZero() && (!r.Holding() || time.Since(replacing) >= replacedMaxWait) {
-			// Once the hold is empty, since what it keeps is lost at exit; the queue is on disk.
-			return stopReplaced, installed.Installed, nil
-		}
-		if time.Since(lastPrune) > time.Hour {
-			claim.Prune(stateDir, time.Now())
-			lastPrune = time.Now()
-		}
-		if d, quiet := r.Idle(); quiet && idle > 0 && d >= idle {
-			return stopIdle, installed.Installed, nil
-		}
-	}
-}
-
-// requested takes the request in dir's file name; one naming another pid is a dead
-// relay's, and is cleared.
-func requested(dir, name string) bool {
-	path := filepath.Join(dir, name)
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return false
-	}
-	_ = os.Remove(path)
-	pid, _ := strconv.Atoi(strings.TrimSpace(string(data)))
-	return pid == os.Getpid()
 }

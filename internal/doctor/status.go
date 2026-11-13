@@ -136,6 +136,12 @@ func Local(ctx context.Context, env Env) (LocalReport, error) {
 				line += fmt.Sprintf(", delivery failing for this team (retry at %s)", next.Local().Format(time.Kitchen))
 				backendOK = false
 			}
+			if q := s.Images; q.Queued > 0 {
+				line += fmt.Sprintf(", %d image(s) queued", q.Queued)
+				if next, open := q.Windows[projectID]; open && projectID != "" {
+					line += fmt.Sprintf(" (this team's retry at %s)", next.Local().Format(time.Kitchen))
+				}
+			}
 			if projectID != "" {
 				if key := keyOf(p.Keys, projectID); key != "" {
 					line += ", key " + key

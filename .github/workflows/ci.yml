@@ -115,6 +115,10 @@ jobs:
       # The Codex adapter on Windows paths: its hooks file, approval hashes, rollouts and relay.
       - name: Codex on Windows
         run: go test ./internal/agents/codex/... -count=1 -timeout=5m
+      # The queues hooks append to and the image lane: locks, atomic rewrites, the stamp a
+      # sender compares (file identity from an open handle) and Winsock's resets.
+      - name: Spool and delivery on Windows
+        run: go test ./internal/spool/... ./internal/delivery/... -count=1 -timeout=5m
       # Sign-in tokens and server keys in the Credential Manager, through the real store.
       - name: Credentials in the Windows Credential Manager
         env:

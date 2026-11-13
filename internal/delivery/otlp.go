@@ -8,8 +8,11 @@ import (
 	"io"
 	"maps"
 	"net/http"
+	"net/http/httptrace"
 	"slices"
 	"strconv"
+	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/semconv"
@@ -27,12 +30,17 @@ type otlpSender struct {
 	// UserID, set, names the Mirador user on the resource as terma.user.id, as the relay does.
 	UserID string
 	HTTP   *http.Client
+	// timeout stands in for timeoutFor when set.
+	timeout func(n int) time.Duration
 }
 
 const (
 	otlpLogsPath = "/v1/logs"
 	serviceName  = "terma-cli"
 	sendTimeout  = 15 * time.Second
+	// uploadFloor is the slowest uplink a request is given time for, past sendTimeout: a
+	// request of an image's 2.8 MB has about a minute, one of small events 15 s.
+	uploadFloor  = 64 << 10 // bytes a second
 	severityInfo = 9
 	severityText = "INFO"
 )
@@ -118,25 +126,68 @@ func arrayOf[T any](items []T) *otlpValues {
 	return &otlpValues{Values: values}
 }
 
+// timeoutFor is how long a request of n bytes may take.
+func timeoutFor(n int) time.Duration {
+	return sendTimeout + time.Duration(n)*time.Second/uploadFloor
+}
+
+// otlpClient is every sender's client, so requests to a host reuse its connections.
+var otlpClient = newHTTPClient()
+
+// drainLimit bounds what is read of an answer only to reuse its connection.
+const drainLimit = 64 << 10
+
 // newHTTPClient refuses redirects: Go keeps the Authorization header on a same-host
 // https→http downgrade, which would send the server key in cleartext.
+// Each request's own deadline, which grows with its body, bounds it.
+// Its own transport keeps its own pool of connections to the ingest hosts.
 func newHTTPClient() *http.Client {
 	return &http.Client{
-		Timeout: sendTimeout,
+		Transport: http.DefaultTransport.(*http.Transport).Clone(),
 		CheckRedirect: func(req *http.Request, _ []*http.Request) error {
 			return fmt.Errorf("refusing to follow redirect to %s: the OTLP endpoint does not redirect log exports", req.URL.Redacted())
 		},
 	}
 }
 
-// Send implements spool.Sender.
-func (o *otlpSender) Send(ctx context.Context, events []spool.Event) ([]spool.Event, error) {
-	return nil, o.send(ctx, events)
+// progress is how far a request got before it ended.
+type progress int32
+
+const (
+	// notReached is a request that never had a connection to the host: DNS, the dial or the
+	// TLS handshake (its timeout too) failed, or nothing was tried.
+	notReached progress = iota
+	// reached is a request that had a connection and was writing its body.
+	reached
+	// written is a request whose body was all written, waiting for the host's answer. The
+	// operating system may still be sending the body's last socket buffer.
+	written
+)
+
+// progressTrace records in got how far a request gets. A request retried on a new
+// connection, after a reused one failed, starts over.
+func progressTrace(got *atomic.Int32) *httptrace.ClientTrace {
+	return &httptrace.ClientTrace{
+		ConnectStart: func(string, string) { got.Store(int32(notReached)) },
+		GotConn:      func(httptrace.GotConnInfo) { got.Store(int32(reached)) },
+		WroteRequest: func(info httptrace.WroteRequestInfo) {
+			if info.Err == nil {
+				got.Store(int32(written))
+			}
+		},
+	}
 }
 
-func (o *otlpSender) send(ctx context.Context, events []spool.Event) error {
+// Send implements spool.Sender.
+func (o *otlpSender) Send(ctx context.Context, events []spool.Event) ([]spool.Event, error) {
+	_, err := o.post(ctx, events)
+	return nil, err
+}
+
+// post sends events in one request, and reports how far it got.
+func (o *otlpSender) post(ctx context.Context, events []spool.Event) (progress, error) {
 	if o.Endpoint == "" || o.APIKey == "" {
-		return fmt.Errorf("spool flush needs an OTLP endpoint and a team key — run `terma setup`")
+		return notReached, fmt.Errorf("spool flush needs an OTLP endpoint and a team key — run `terma setup`")
 	}
 	records := make([]map[string]any, 0, len(events))
 	for _, e := range events {
@@ -179,37 +230,64 @@ func (o *otlpSender) send(ctx context.Context, events []spool.Event) error {
 	}
 	body, err := json.Marshal(payload)
 	if err != nil {
-		return err
+		return notReached, err
 	}
 	client := o.HTTP
 	if client == nil {
-		client = newHTTPClient()
+		client = otlpClient
 	}
-	ctx, cancel := context.WithTimeout(ctx, sendTimeout)
+	timeout := timeoutFor(len(body))
+	if o.timeout != nil {
+		timeout = o.timeout(len(body))
+	}
+	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
+	var got atomic.Int32
+	ctx = httptrace.WithClientTrace(ctx, progressTrace(&got))
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, o.Endpoint+otlpLogsPath, bytes.NewReader(body))
 	if err != nil {
-		return err
+		return notReached, err
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+o.APIKey)
 	req.Header.Set("User-Agent", serviceName+"/"+o.Version)
 	resp, err := client.Do(req)
 	if err != nil {
-		return err
+		return progress(got.Load()), err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		// Read to its end (a little at most), so the connection goes back to the pool.
+		_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, drainLimit))
+		_ = resp.Body.Close()
+	}()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		detail, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
-		return &IngestError{Status: resp.StatusCode, Detail: string(bytes.TrimSpace(detail))}
+		return written, &IngestError{Status: resp.StatusCode, Detail: string(bytes.TrimSpace(detail)),
+			RetryAfter: retryAfter(resp.Header.Get("Retry-After"), time.Now())}
 	}
-	return nil
+	return written, nil
 }
 
 // IngestError is a non-2xx answer from the ingest host.
 type IngestError struct {
 	Status int
 	Detail string
+	// RetryAfter is how long the host's Retry-After asked it be left; zero when it did not.
+	// A wait, not a time, so whoever opens the window does so by its own clock.
+	RetryAfter time.Duration
+}
+
+// retryAfter reads a Retry-After header, in seconds or as an HTTP date (as of now, the time
+// it was answered); zero for none, an hour at most.
+func retryAfter(h string, now time.Time) time.Duration {
+	if secs, err := strconv.Atoi(strings.TrimSpace(h)); err == nil && secs > 0 {
+		// No window outlasts an hour; a larger number would overflow the multiplication.
+		return time.Duration(min(secs, 3600)) * time.Second
+	}
+	if at, err := http.ParseTime(h); err == nil && at.After(now) {
+		return min(at.Sub(now), time.Hour)
+	}
+	return 0
 }
 
 func (e *IngestError) Error() string {

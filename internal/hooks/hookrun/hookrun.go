@@ -40,7 +40,10 @@ type Env struct {
 	// StateDir is terma's state directory, where hooks keep their state.
 	StateDir string
 	// Spool may be nil (it could not be opened): events are then dropped, never fatal.
-	Spool   *spool.Spool
+	Spool *spool.Spool
+	// Images is the image lane's spool, where terma.prompt.image records wait apart from the
+	// events (EmitImageFor); nil, as for Spool, when it could not be opened.
+	Images  *spool.Queue
 	Version string
 	Debug   bool
 	// OnClaim, when set, is called after a relay claim with the claimed checkout's root, so
@@ -243,11 +246,36 @@ func (e Env) unpark(r *Repo) {
 }
 
 // Admits reports whether the team policy collects the working copy at dir, judged as Repo
-// judges the current directory.
+// judges the current directory. No directory is not collected: it would judge the process's
+// own.
 func (e Env) Admits(ctx context.Context, dir string) bool {
+	if dir == "" {
+		return false
+	}
 	e.Cwd = dir
 	_, _, id, _, err := e.locate(ctx)
 	return err == nil && e.Policy.Admits(id)
+}
+
+// Admission judges a transcript's records by their own working directory, once per
+// directory: a session resumed in a listed repository, or moved into one, still holds its
+// earlier records, which a hook there reads, and those stay on the machine when the team
+// does not collect where they were written. A record that names no directory, or one that
+// cannot be judged (gone, unreadable), is not collected. Global mode collects every session
+// on the machine, so it admits every record without looking.
+func (e Env) Admission(ctx context.Context) func(dir string) bool {
+	if e.Policy.Global() {
+		return func(string) bool { return true }
+	}
+	judged := map[string]bool{}
+	return func(dir string) bool {
+		ok, seen := judged[dir]
+		if !seen {
+			ok = e.Admits(ctx, dir)
+			judged[dir] = ok
+		}
+		return ok
+	}
 }
 
 // locate finds the working copy at Cwd, a Git checkout's root from any directory in it,
@@ -273,6 +301,26 @@ func (e Env) EmitFor(r *Repo, ev spool.Event) bool {
 		ev.Time = e.Time()
 	}
 	return e.emit(ev) || e.park(r, parkedEvents, ev)
+}
+
+// EmitImageFor spools a terma.prompt.image record to the image lane, stamped and claimed as
+// EmitFor stamps and claims an event, and reports whether it was kept. A record the lane's
+// spool refuses parks with the events: the hook that unparks it puts it in the events'
+// spool, whose pass hands it on to the image lane.
+func (e Env) EmitImageFor(r *Repo, ev spool.Event) bool {
+	ev = e.stamp(r, ev)
+	e.claimForRelay(r, ev)
+	if ev.Time.IsZero() {
+		ev.Time = e.Time()
+	}
+	if e.Images != nil {
+		err := e.Images.Append(ev)
+		if err == nil {
+			return true
+		}
+		e.Logf("image spool append failed: %v", err)
+	}
+	return e.park(r, parkedEvents, ev)
 }
 
 // stamp names the event's repository, for delivery's admission, and its project.

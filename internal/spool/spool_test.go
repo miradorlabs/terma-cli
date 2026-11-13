@@ -455,3 +455,111 @@ func TestWritableReportsAnUnwritableSpool(t *testing.T) {
 		t.Fatal("a spool whose queue cannot be written must report an error")
 	}
 }
+
+// Mentions finds a needle anywhere in a queued line, without decoding it.
+func TestMentions(t *testing.T) {
+	s, err := Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, err := s.Mentions([]string{"abc"}); err != nil || len(got) != 0 {
+		t.Fatalf("empty spool: %v, %v", got, err)
+	}
+	if err := s.Append(Event{Name: "x", Attrs: map[string]any{"id": "abc123"}}); err != nil {
+		t.Fatal(err)
+	}
+	got, err := s.Mentions([]string{"abc123", "def456", ""})
+	if err != nil || !got["abc123"] || got["def456"] || got[""] {
+		t.Fatalf("Mentions = %v, %v", got, err)
+	}
+}
+
+// What a sender delivered is acknowledged though the pass ran out of time sending it: the
+// batch does not replay, resending what went and holding up what waits behind it.
+func TestDeliveredBatchIsAcknowledgedPastTheDeadline(t *testing.T) {
+	s, err := Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Append(Event{Name: "sent"}, Event{Name: "cut"}); err != nil {
+		t.Fatal(err)
+	}
+	res := s.Flush(context.Background(), SenderFunc(func(ctx context.Context, events []Event) ([]Event, error) {
+		<-ctx.Done() // the pass's deadline passes mid-send
+		return nil, &PartialDelivery{Undelivered: events[1:], Err: ctx.Err()}
+	}), FlushOptions{Force: true, Timeout: 20 * time.Millisecond})
+	if res.Err == nil {
+		t.Fatal("a pass cut short reported no error")
+	}
+	left, err := s.Peek(10)
+	if err != nil || len(left) != 1 || left[0].Name != "cut" {
+		t.Fatalf("spool holds %+v, %v; want only the undelivered event", left, err)
+	}
+}
+
+// A stall opens a window as a failure does, doubling it, and says so; a failure after it
+// no longer does.
+func TestDestinationStalled(t *testing.T) {
+	s, err := Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now()
+	first := s.DestinationStalled("p1", now)
+	if second := s.DestinationStalled("p1", now); second.Sub(first) != minBackoff {
+		t.Fatalf("a second stall's window ends %v after the first's, want %v", second.Sub(first), minBackoff)
+	}
+	if _, ok := s.StalledWindows(now)["p1"]; !ok || s.RetryWindows(now)["p1"].IsZero() {
+		t.Fatal("a stall's window is not listed as one")
+	}
+	s.DestinationFailed("p1", now)
+	if _, ok := s.StalledWindows(now)["p1"]; ok {
+		t.Fatal("a failure's window is listed as a stall's")
+	}
+}
+
+// An image record's attempts survive the queue.
+func TestAttemptsSurviveTheQueue(t *testing.T) {
+	s, err := Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Append(Event{Name: "x", Attempts: 2}); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := s.Peek(1); err != nil || len(got) != 1 || got[0].Attempts != 2 {
+		t.Fatalf("Peek = %+v, %v", got, err)
+	}
+}
+
+// A host's Retry-After stretches the window, up to an hour.
+func TestDestinationFailedUntil(t *testing.T) {
+	s, err := Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now()
+	if got := s.DestinationFailedUntil("p1", now, now.Add(10*time.Minute)); got.Before(now.Add(10*time.Minute - time.Second)) {
+		t.Fatalf("window ends %v after now, want 10m", got.Sub(now))
+	}
+	if got := s.DestinationFailedUntil("p2", now, now.Add(5*time.Hour)); got.After(now.Add(maxBackoff + time.Second)) {
+		t.Fatalf("window ends %v after now, want at most an hour", got.Sub(now))
+	}
+	if got := s.DestinationFailedUntil("p3", now, time.Time{}); got.Sub(now) > minBackoff+time.Second {
+		t.Fatalf("window with no Retry-After ends %v after now", got.Sub(now))
+	}
+}
+
+// A host's Retry-After stretches one window and does not become the base the next failure
+// doubles.
+func TestRetryAfterIsNoBackoffBase(t *testing.T) {
+	s, err := Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now()
+	s.DestinationFailedUntil("p1", now, now.Add(50*time.Minute))
+	if got := s.DestinationFailed("p1", now); got.Sub(now) > 2*minBackoff+time.Second {
+		t.Fatalf("the next failure waits %v, want the doubled %v", got.Sub(now), 2*minBackoff)
+	}
+}

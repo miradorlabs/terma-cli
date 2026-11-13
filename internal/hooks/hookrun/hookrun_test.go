@@ -567,3 +567,36 @@ func TestPostCommitSkipsMergeAndSquashCommits(t *testing.T) {
 		t.Fatalf("an ordinary unstamped commit must spool one event, got %d", n)
 	}
 }
+
+// An image record goes to the image queue, stamped as an event is; one the image queue
+// cannot take parks with the events, and the next hook puts it in the events' spool, whose
+// flush hands it on to the image queue.
+func TestEmitImageForParksWithTheEvents(t *testing.T) {
+	root, stateDir, sp := hookruntest.Project(t)
+	env := Env{StateDir: stateDir, Now: time.Now(), Cwd: root, Policy: hookruntest.Admitting(root), Spool: sp, Team: hookruntest.Team}
+	r, err := env.Repo(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	image := spool.Event{Name: semconv.TermaPromptImageEvent, SessionID: "image-session"}
+	if !env.EmitImageFor(r, image) {
+		t.Fatal("an image record with no image queue was not parked")
+	}
+	if n, _, _ := sp.Pending(); n != 0 {
+		t.Fatalf("the events' spool holds %d before the next hook", n)
+	}
+	env.Images = hookruntest.Queue(t)
+	if !env.EmitImageFor(r, image) {
+		t.Fatal("an image record was not kept")
+	}
+	queued := hookruntest.Queued(t, env.Images)
+	if len(queued) != 1 || queued[0].Attrs[AttrProjectID] != hookruntest.Team || queued[0].Repository != r.Repository {
+		t.Fatalf("image queue holds %+v", queued)
+	}
+	if _, err := env.Repo(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if parked := hookruntest.Named(hookruntest.Spooled(t, sp), semconv.TermaPromptImageEvent); len(parked) != 1 {
+		t.Fatalf("the events' spool holds %+v after the next hook", parked)
+	}
+}

@@ -10,10 +10,13 @@ import (
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/config"
+	"github.com/miradorlabs/terma-cli/internal/flock"
 )
 
 // Per-destination retry windows, so one refused project does not hold back the others.
-// Only a Sender inside Flush writes them: the delivery lock makes the read-edit-rename safe.
+// Two senders can write them at once (the image lane's takes the delivery lock per image,
+// not around its windows), so each read-edit-rename holds the windows' own lock
+// (editWindows).
 
 const retryFile = "retry.json"
 
@@ -21,6 +24,8 @@ const retryFile = "retry.json"
 type retryWindow struct {
 	Next int64 `json:"next"` // unix seconds
 	Wait int64 `json:"wait"` // seconds
+	// Stalled says a stall opened the window (DestinationStalled), not a failure.
+	Stalled bool `json:"stalled,omitempty"`
 }
 
 func (s *Spool) loadRetryWindows() map[string]retryWindow {
@@ -63,26 +68,67 @@ func (s *Spool) RetryAt(dest string) time.Time {
 
 // DestinationFailed records a failed send to dest and returns when it may be retried (30s doubling to 1h).
 func (s *Spool) DestinationFailed(dest string, now time.Time) time.Time {
-	windows := s.loadRetryWindows()
-	wait := minBackoff
-	if prev := windows[dest].Wait; prev > 0 {
-		wait = time.Duration(prev) * time.Second * 2
-	}
-	wait = min(wait, maxBackoff)
-	next := now.Add(wait)
-	windows[dest] = retryWindow{Next: next.Unix(), Wait: int64(wait / time.Second)}
-	s.saveRetryWindows(windows, now)
+	return s.openWindow(dest, now, false, time.Time{})
+}
+
+// DestinationFailedUntil is DestinationFailed for a host that said when to ask again: the
+// window lasts until then at least, and an hour at most. The next failure doubles the
+// backoff as it was, not the host's wait.
+func (s *Spool) DestinationFailedUntil(dest string, now, until time.Time) time.Time {
+	return s.openWindow(dest, now, false, until)
+}
+
+// DestinationStalled records a send to dest that did not get through in its time, which is
+// news about the uplink rather than the host, and returns when it may be retried, as
+// DestinationFailed does; StalledWindows tells the two apart.
+func (s *Spool) DestinationStalled(dest string, now time.Time) time.Time {
+	return s.openWindow(dest, now, true, time.Time{})
+}
+
+// openWindow opens or doubles dest's window, to until at least, saying whether a stall
+// opened it.
+func (s *Spool) openWindow(dest string, now time.Time, stalled bool, until time.Time) time.Time {
+	var next time.Time
+	s.editWindows(now, func(windows map[string]retryWindow) bool {
+		wait := minBackoff
+		if prev := windows[dest].Wait; prev > 0 {
+			wait = time.Duration(prev) * time.Second * 2
+		}
+		wait = min(wait, maxBackoff)
+		next = now.Add(min(max(wait, until.Sub(now)), maxBackoff))
+		windows[dest] = retryWindow{Next: next.Unix(), Wait: int64(wait / time.Second), Stalled: stalled}
+		return true
+	})
 	return time.Unix(next.Unix(), 0)
 }
 
 // DestinationDelivered closes dest's window.
 func (s *Spool) DestinationDelivered(dest string, now time.Time) {
-	windows := s.loadRetryWindows()
-	if _, ok := windows[dest]; !ok {
-		return
+	s.editWindows(now, func(windows map[string]retryWindow) bool {
+		if _, ok := windows[dest]; !ok {
+			return false
+		}
+		delete(windows, dest)
+		return true
+	})
+}
+
+// editWindows reads the windows, has edit change them, and saves them when it says so,
+// holding the windows' lock throughout, so a window another sender opens meanwhile is never
+// lost. A lock that cannot be had in ackTimeout still lets the edit through, unguarded: at
+// worst it loses another's window, which only brings that retry forward, where dropping
+// the edit would lose this one.
+func (s *Spool) editWindows(now time.Time, edit func(map[string]retryWindow) bool) {
+	rmw := func() error {
+		windows := s.loadRetryWindows()
+		if edit(windows) {
+			s.saveRetryWindows(windows, now)
+		}
+		return nil
 	}
-	delete(windows, dest)
-	s.saveRetryWindows(windows, now)
+	if flock.Locked(filepath.Join(s.dir, retryFile), ackTimeout, rmw) != nil {
+		_ = rmw()
+	}
 }
 
 // RetryWindows lists the destinations whose window is open at now, with each one's end.
@@ -90,6 +136,18 @@ func (s *Spool) RetryWindows(now time.Time) map[string]time.Time {
 	open := map[string]time.Time{}
 	for dest, w := range s.loadRetryWindows() {
 		if next := time.Unix(w.Next, 0); now.Before(next) {
+			open[dest] = next
+		}
+	}
+	return open
+}
+
+// StalledWindows lists the destinations whose window is open at now because a send stalled
+// (DestinationStalled), with each one's end.
+func (s *Spool) StalledWindows(now time.Time) map[string]time.Time {
+	open := map[string]time.Time{}
+	for dest, w := range s.loadRetryWindows() {
+		if next := time.Unix(w.Next, 0); w.Stalled && now.Before(next) {
 			open[dest] = next
 		}
 	}

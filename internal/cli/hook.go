@@ -57,6 +57,7 @@ func (app *App) hookDeps() dispatch.Deps {
 		Agents:    app.agents,
 		Profile:   app.hookProfile,
 		Spool:     app.openSpool,
+		Images:    app.openImageSpool,
 		Claimed: func(cwd string, policy config.Policy) {
 			daemon.Spawn(app.stateDir, app.version)
 			// The repository's commit hooks are installed here, the first time a session is
@@ -104,6 +105,15 @@ func (app *App) hookPolicy() config.Policy {
 // never failing a hook.
 func (app *App) openSpool() *spool.Spool {
 	s, err := spool.Open(filepath.Join(app.stateDir, spool.Dir))
+	if err != nil {
+		return nil
+	}
+	return s
+}
+
+// openImageSpool is the image lane's queue, nil as for openSpool.
+func (app *App) openImageSpool() *spool.Queue {
+	s, err := spool.OpenQueue(filepath.Join(app.stateDir, spool.ImageDir))
 	if err != nil {
 		return nil
 	}

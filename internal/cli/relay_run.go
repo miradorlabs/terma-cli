@@ -7,13 +7,17 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"slices"
 	"syscall"
 	"time"
 
 	"github.com/spf13/cobra"
 
+	"github.com/miradorlabs/terma-cli/internal/account/keystore"
 	"github.com/miradorlabs/terma-cli/internal/agents"
+	"github.com/miradorlabs/terma-cli/internal/config"
+	"github.com/miradorlabs/terma-cli/internal/delivery"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
 	"github.com/miradorlabs/terma-cli/internal/selfupdate"
@@ -50,7 +54,7 @@ func (app *App) newRelayRunCommand() *cobra.Command {
 			install := app.installed()
 			engine.InstallMethod = install.Method
 			engine.UpdateAuto = func() string { return app.updateAuto(install) }
-			res, err := daemon.Run(ctx, daemon.Config{
+			run := daemon.Config{
 				StateDir: app.stateDir, Addr: addr, Idle: idle, Service: asService, Follow: follow, Launch: launch, Environment: cfg.Environment, Version: app.version, Log: log,
 				Engine:  engine,
 				Workers: []func(context.Context){deps.Refresher().Run, app.sweepHookState},
@@ -60,7 +64,9 @@ func (app *App) newRelayRunCommand() *cobra.Command {
 						fmt.Fprintf(cmd.OutOrStdout(), "Relay listening on %s (hold %s, idle exit %s).\n", at, hold, idle)
 					}
 				},
-			})
+			}
+			app.relayImages(&run, log.Printf)
+			res, err := daemon.Run(ctx, run)
 			if err != nil {
 				if res.LastBeatDue() {
 					res.ExitBeat()
@@ -89,6 +95,22 @@ func (app *App) newRelayRunCommand() *cobra.Command {
 	_ = cmd.Flags().MarkHidden("follow")
 	_ = cmd.Flags().MarkHidden("service")
 	return cmd
+}
+
+// relayImages wires the relay's image lane, sending the image queue as this build
+// delivers, into run: it is one of its workers; an agent's export ends its turn, and wakes
+// the sender for the images its hooks queued; and the relay halts it, between two images,
+// before an idle exit, a restart or making way. Nothing when the queue cannot be opened.
+func (app *App) relayImages(run *daemon.Config, logf func(string, ...any)) {
+	r := app.delivery()
+	if r.Images == nil {
+		return
+	}
+	images := delivery.NewImageSender(r, app.openSpool(), app.loadConfig)
+	images.Logf = logf
+	images.Watch(keystore.FilePath(app.dir), filepath.Join(app.stateDir, config.PoliciesDir))
+	run.Engine.Accepted, run.Engine.Halt, run.Engine.Resume = images.Nudge, images.TryHalt, images.Resume
+	run.Workers = append(run.Workers, images.Run)
 }
 
 // afterRelay ends a relay's run. A relay that should run again exits for the service manager

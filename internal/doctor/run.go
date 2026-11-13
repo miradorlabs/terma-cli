@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 	"time"
@@ -122,6 +123,18 @@ type SpoolState struct {
 	// NextAttempt ends the spool-wide retry window; Windows are each project's.
 	NextAttempt time.Time
 	Windows     map[string]time.Time
+	// Images is the image queue beside it.
+	Images ImageQueue
+}
+
+// ImageQueue is the image lane's spool: the images users put in prompts leave from it in
+// the background, apart from the events, so an upload holds up none of them.
+type ImageQueue struct {
+	Queued int
+	// Windows are the projects whose images wait, each until when; Stalled are those whose
+	// window an upload that did not finish in its time opened: the uplink, not the host.
+	Windows map[string]time.Time
+	Stalled map[string]bool
 }
 
 // Delivery is what one flush of the queue did.
@@ -133,6 +146,8 @@ type Delivery struct {
 	// Delivered words what was sent, and Undelivered what was not.
 	Delivered   string
 	Undelivered []string
+	// Images is the image queue after the flush, which the relay sends.
+	Images ImageQueue
 }
 
 // Failure is one project's failed delivery.
@@ -376,14 +391,38 @@ func BackendCheck(ctx context.Context, p Probes, projectID string) Check {
 	if res.Sent == 0 && len(undelivered) == 0 {
 		flushDetail = "nothing queued at verification time (hooks may already have flushed)"
 	}
-	detail := strings.Join(append(append([]string{flushDetail}, undelivered...), others...), "; ")
+	// Images leave in the background and prove nothing either way, so they only warn.
+	images := imageNotes(res.Images, projectID)
+	detail := strings.Join(slices.Concat([]string{flushDetail}, undelivered, others, images), "; ")
 	if len(others) > 0 {
 		return Check{Status: Warn, Detail: detail, Fix: othersFix}
+	}
+	if len(images) > 0 {
+		return Check{Status: Warn, Detail: detail, Fix: "the relay sends images, and tries a team's again when its window ends; run `terma doctor` later to see them go"}
 	}
 	if res.Sent == 0 {
 		return Check{Status: Skip, Inconclusive: true, Detail: detail}
 	}
 	return Check{Status: Pass, Detail: detail}
+}
+
+// imageNotes words each team's images window: a stall is the uplink being too slow for an
+// image, a failure the host's answer or a failure to reach it.
+func imageNotes(q ImageQueue, projectID string) []string {
+	var notes []string
+	for _, id := range slices.Sorted(maps.Keys(q.Windows)) {
+		team := "another team's (" + id + ")"
+		if id == projectID {
+			team = "this team's"
+		}
+		at := q.Windows[id].Local().Format(time.Kitchen)
+		if q.Stalled[id] {
+			notes = append(notes, "one of "+team+" images did not finish uploading in its time (a slow connection); the relay tries them again at "+at)
+		} else {
+			notes = append(notes, "one of "+team+" images was not delivered; the relay tries them again at "+at)
+		}
+	}
+	return notes
 }
 
 // describeFailure names the host, which a developer with projects in two environments cannot guess.

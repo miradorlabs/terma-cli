@@ -159,3 +159,25 @@ func TestTheWaitingServiceRelayTakesOverAtOnce(t *testing.T) {
 		t.Fatal("AwaitRelay reports a relay after both stopped")
 	}
 }
+
+// A worker that does not stop with the relay keeps it no longer than workerWait.
+func TestAStuckWorkerDoesNotKeepTheRelay(t *testing.T) {
+	prev := workerWait
+	workerWait = 100 * time.Millisecond
+	t.Cleanup(func() { workerWait = prev })
+	stateDir, _, _ := setUpRelay(t)
+	stuck := make(chan struct{})
+	t.Cleanup(func() { close(stuck) })
+	c := runConfig(stateDir, time.Millisecond, nil)
+	c.Workers = []func(context.Context){func(context.Context) { <-stuck }}
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		_, _ = Run(t.Context(), c)
+	}()
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("a stuck worker kept the relay")
+	}
+}
