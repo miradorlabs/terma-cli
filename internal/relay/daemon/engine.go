@@ -48,6 +48,19 @@ type Deps struct {
 	LoadConfig func() (*config.Config, error)
 	// RefreshPolicy fetches and stores cfg's project's policy.
 	RefreshPolicy func(ctx context.Context, cfg *config.Config) error
+
+	// On a migrated machine (config.Migrated):
+
+	// RefreshTeam fetches a selected team's policy with its organization's sign-in, under
+	// the epoch the team had as it started (policy.Source.RefreshTeam).
+	RefreshTeam func(ctx context.Context, cfg *config.Config, team routing.Team) (routing.Refresh, error)
+	// CreateTeamKey mints a selected team's key with its organization's sign-in.
+	CreateTeamKey CreateTeamKey
+	// TeamUser is who parts sent to team at endpoint name under cfg's profile, by Mirador
+	// user id; "" names no one.
+	TeamUser func(cfg *config.Config, team routing.Team, endpoint string) string
+	// OTLPPinned: the ingest host is pinned, whatever host a key was stored with.
+	OTLPPinned bool
 }
 
 // Settings are the relay's timings: TERMA_RELAY_HOLD and TERMA_RELAY_HEARTBEAT shorten
@@ -86,7 +99,15 @@ func Prepare(cfg *config.Config) {
 // only when a claim asks for a key, until ctx ends.
 func (d Deps) Engine(ctx context.Context, stateDir string, cfg *config.Config, s Settings, logw io.Writer) relay.Options {
 	minter := NewKeyMinter(ctx, cfg, d.CreateKey)
-	opts := relay.Options{Correlators: d.Correlators, Capturers: d.Capturers,
+	teamMinter := NewTeamKeyMinter(ctx, cfg, d.CreateTeamKey)
+	teams := NewTeams(cfg, TeamsDeps{AgentName: d.AgentName, RelayTargets: d.RelayTargets, OTLPPinned: d.OTLPPinned, Mint: teamMinter.Mint,
+		User: func(team routing.Team, endpoint string) string {
+			if d.TeamUser == nil {
+				return ""
+			}
+			return d.TeamUser(cfg, team, endpoint)
+		}})
+	opts := relay.Options{Correlators: d.Correlators, Capturers: d.Capturers, Router: teams,
 		Hold: s.Hold, Dir: filepath.Join(claim.Dir(stateDir), relay.OutboxDir), Resolve: d.Resolver(cfg, minter.Mint), Version: d.Version,
 		Lookup:   func(sessionID string, now time.Time) (claim.Claim, bool) { return claim.Read(stateDir, sessionID, now) },
 		CatchAll: d.CatchAll(), HeartbeatSend: d.SendHeartbeat, HeartbeatEvery: s.Heartbeat,
@@ -108,8 +129,36 @@ func (d Deps) Resolver(cfg *config.Config, mint func(projectID string)) func(cla
 func (d Deps) CatchAll() func() (claim.Claim, bool) { return CatchAll(d.HookPolicy) }
 
 // Refresher keeps fresh, while the relay runs, every team with a key here and the
-// selected team.
+// selected team; on a migrated machine, every enrollment in the profile's routing state
+// instead (teamRefresher). The machine can migrate as the relay starts, so each list is
+// asked for which rules are in force.
 func (d Deps) Refresher() *PolicyRefresher {
+	single, teams := d.singleRefresher(), d.teamRefresher()
+	migrated := func() bool {
+		if d.LoadConfig == nil {
+			return false
+		}
+		cfg, err := d.LoadConfig()
+		return err == nil && config.Migrated(cfg.Dir)
+	}
+	pick := func() *PolicyRefresher {
+		if migrated() {
+			return teams
+		}
+		return single
+	}
+	return &PolicyRefresher{
+		Interval: PolicyRefreshInterval,
+		Discover: 5 * time.Second,
+		Teams:    func() []string { return pick().Teams() },
+		Fetched:  func(team string) time.Time { return pick().Fetched(team) },
+		Every:    func(team string) time.Duration { return pick().every(team) },
+		Refresh:  func(ctx context.Context, team string) error { return pick().Refresh(ctx, team) },
+	}
+}
+
+// singleRefresher is Refresher on a machine not migrated.
+func (d Deps) singleRefresher() *PolicyRefresher {
 	return &PolicyRefresher{
 		Interval: PolicyRefreshInterval,
 		Discover: 5 * time.Second,
