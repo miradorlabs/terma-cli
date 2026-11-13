@@ -105,12 +105,21 @@ func (v teamsView) row(org, team string) (orgRow, teamRow, bool) {
 }
 
 // Listing (contract C4): every organization from one sign-in; a signed-in one's teams with
-// their entries; one without a sign-in says so; a team whose policy read says it is gone is
-// hidden.
+// their entries; one without a sign-in says so; a team whose policy read says it is gone
+// (TEAM_NOT_FOUND) is hidden, and one refused for no reason stays listed as unreadable.
 func TestTeamsListsEveryOrganizationAndTheSignedInOnesTeams(t *testing.T) {
 	f := migratedMachine(t, nil, orgA())
 	f.goneTeams = map[string]bool{acmeWeb: true}
+	f.forbiddenTeams = map[string]bool{acmeAPI: true}
 	v, out, err := teamsJSON(t)
+	if err != nil {
+		t.Fatalf("teams: %v\n%s", err, out)
+	}
+	if _, api, ok := v.row(orgA().ID, acmeAPI); !ok || api.Unreadable == "" {
+		t.Errorf("a team refused with a reasonless 403 = %+v (listed %v), want it listed as unreadable", api, ok)
+	}
+	f.forbiddenTeams = nil
+	v, out, err = teamsJSON(t)
 	if err != nil {
 		t.Fatalf("teams: %v\n%s", err, out)
 	}
