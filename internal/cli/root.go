@@ -194,8 +194,8 @@ type App struct {
 	// (two installs, say), from what the migration recorded (migrationBlockOf); nil when
 	// nothing blocks it.
 	migrationBlocked func(configDir, stateDir string) *doctor.MigrationBlock
-	// migrationWait bounds `terma teams`' wait for the relay it starts to migrate the
-	// machine; zero is defaultMigrationWait.
+	// migrationWait bounds `terma teams`' wait for the relay it starts to begin migrating
+	// the machine; zero is defaultMigrationWait.
 	migrationWait time.Duration
 	// binary is the executable as this process started from it, for the updater: a command
 	// that ran a while, or the relay, may outlive its version, once another install
