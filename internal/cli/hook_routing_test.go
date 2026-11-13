@@ -14,9 +14,9 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
-// migrate marks testApp's machine migrated, as the migration's credential index does, and
+// markMigrated marks testApp's machine migrated, as the migration's credential index does, and
 // writes st, when given, as its profile's routing state.
-func migrate(t *testing.T, st *routing.State) {
+func markMigrated(t *testing.T, st *routing.State) {
 	t.Helper()
 	if err := os.WriteFile(config.CredentialsV2Path(testApp.dir), []byte("{}"), 0o600); err != nil {
 		t.Fatal(err)
@@ -39,7 +39,7 @@ func TestHooksOnAMachineNotMigratedReadTheTeam(t *testing.T) {
 // even one config.json still names; with the routing state missing they route nothing.
 func TestHooksOnAMigratedMachineReadTheRoutingState(t *testing.T) {
 	collectedRepo(t)
-	migrate(t, nil)
+	markMigrated(t, nil)
 	if p := testApp.hookProfile(); p.Routing == nil || p.Routing.Usable() || p.Team != "" {
 		t.Fatalf("profile %+v with the routing state missing: routing that routes nothing", p)
 	}
@@ -64,7 +64,7 @@ func TestAMigratedMachinesCommitHooksFollowRouting(t *testing.T) {
 			t.Cleanup(func() { testApp.hookExecutable = prev })
 			st := hookruntest.RoutingState(t, []routing.Team{hookruntest.RoutedTeam("acme", "acme-platform", gitHooks, "github.com/acme/*")},
 				map[string]string{"github.com/acme": "acme"})
-			migrate(t, st)
+			markMigrated(t, st)
 
 			const sid = "sess-routed"
 			runHook(t, "session-start", `{"session_id":"`+sid+`","cwd":"`+hookruntest.InJSON(root)+`","hook_event_name":"SessionStart","source":"startup"}`)
