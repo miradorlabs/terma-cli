@@ -109,10 +109,11 @@ type codexHookInput struct {
 
 // codexDesktopRoute reports whether this session's Codex records that only terma reports
 // are sent, tagged terma.capture.surface=desktop on every surface: Codex is among the
-// developer's agents and the session has a project. What content they carry is the team
+// developer's agents and the session is collected, for a project or, on a migrated
+// machine, wherever routing sends or holds it. What content they carry is the team
 // policy's call.
 func codexDesktopRoute(e hookrun.Env, r *hookrun.Repo) bool {
-	return r.ProjectID != "" && slices.Contains(e.Agents, name)
+	return r.Collected() && slices.Contains(e.Agents, name)
 }
 
 func readCodexHookInput(r io.Reader) (*codexHookInput, error) {
@@ -133,6 +134,8 @@ func sessionStart(ctx context.Context, env hookrun.Env) error {
 		env.Logf("%v", err)
 		return nil
 	}
+	// A start or a resume begins a new run, wherever it is; notify, every turn's, never does.
+	env.StartRun(in.SessionID)
 	r, ok := env.Open(ctx, in.SessionID, in.Cwd)
 	if !ok {
 		return nil

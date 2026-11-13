@@ -114,6 +114,7 @@ func sessionStart(ctx context.Context, env hookrun.Env) error {
 		return nil
 	}
 	env.Cwd = in.cwd(env.Cwd)
+	env.StartRun(in.id())
 	r, err := env.Repo(ctx)
 	if err != nil {
 		env.Logf("not in a git repository: %v", err)

@@ -61,6 +61,11 @@ func sessionStart(ctx context.Context, env hookrun.Env) error {
 		env.Logf("%v", err)
 		return nil
 	}
+	// A start, a resume or a clear begins a new run, wherever it is; a compaction continues
+	// the run it compacts.
+	if in.Source != "compact" {
+		env.StartRun(in.SessionID)
+	}
 	r, ok := env.Open(ctx, in.SessionID, in.Cwd)
 	if !ok {
 		return nil
