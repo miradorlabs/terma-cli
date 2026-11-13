@@ -1,7 +1,9 @@
 // Package keystore holds the project server keys the spool flushes with, keyed by project
 // so a flush can deliver for any repository on this machine. keys.json (0600) indexes them
 // with their hosts; each key lives in the system keychain (internal/account/secret), or in
-// the file itself where there is none or config.json asks for files.
+// the file itself where there is none or config.json asks for files. keys.v2.json, which
+// the migration to multi-org routing creates, indexes each enrollment's team key the same
+// way (GetTeam); older binaries never read it.
 package keystore
 
 import (
