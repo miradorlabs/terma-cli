@@ -3,7 +3,9 @@
 //
 // credentials.json indexes each profile's credentials; their tokens live in the system
 // keychain (internal/account/secret), or in the file itself where there is none or
-// `terma setup --insecure-storage` asked for it, as gh keeps its token.
+// `terma setup --insecure-storage` asked for it, as gh keeps its token. On a migrated
+// machine (config.Migrated) credentials.v2.json takes its place, with keychain items of
+// its own, and older binaries find no sign-in.
 package auth
 
 import (
@@ -107,7 +109,8 @@ type credentialFile map[string]*profileCredentials
 
 // LoadCredential returns the active credential for a profile, or ErrNotLoggedIn.
 func LoadCredential(dir, profile string) (*Credential, error) {
-	file, err := loadCredentialFile(dir)
+	x := indexOf(dir)
+	file, err := loadCredentials(dir, x)
 	if err != nil {
 		return nil, err
 	}
@@ -115,7 +118,7 @@ func LoadCredential(dir, profile string) (*Credential, error) {
 	if cred == nil {
 		return nil, ErrNotLoggedIn
 	}
-	if err := hydrate(dir, profile, cred); err != nil {
+	if err := hydrate(dir, x, profile, cred); err != nil {
 		return nil, err
 	}
 	return cred, nil
@@ -124,7 +127,7 @@ func LoadCredential(dir, profile string) (*Credential, error) {
 // LoadIdentity returns the profile's active credential without its tokens: who signed in,
 // to which organization and auth host. It reads only credentials.json, never the keychain.
 func LoadIdentity(dir, profile string) (*Credential, error) {
-	file, err := loadCredentialFile(dir)
+	file, err := loadCredentials(dir, indexOf(dir))
 	if err != nil {
 		return nil, err
 	}
@@ -139,7 +142,7 @@ func LoadIdentity(dir, profile string) (*Credential, error) {
 // StoredInFile reports whether the profile's active credential keeps its tokens in
 // credentials.json rather than the system keychain.
 func StoredInFile(dir, profile string) bool {
-	file, err := loadCredentialFile(dir)
+	file, err := loadCredentials(dir, indexOf(dir))
 	if err != nil {
 		return false
 	}
@@ -150,7 +153,8 @@ func StoredInFile(dir, profile string) bool {
 // LoadCredentialFor returns the profile's credential for one organization, active or
 // not, or ErrNotLoggedIn when the profile never signed into it.
 func LoadCredentialFor(dir, profile, organizationID string) (*Credential, error) {
-	file, err := loadCredentialFile(dir)
+	x := indexOf(dir)
+	file, err := loadCredentials(dir, x)
 	if err != nil {
 		return nil, err
 	}
@@ -162,7 +166,7 @@ func LoadCredentialFor(dir, profile, organizationID string) (*Credential, error)
 	if !cred.present() {
 		return nil, ErrNotLoggedIn
 	}
-	if err := hydrate(dir, profile, cred); err != nil {
+	if err := hydrate(dir, x, profile, cred); err != nil {
 		return nil, err
 	}
 	return cred, nil
@@ -171,7 +175,8 @@ func LoadCredentialFor(dir, profile, organizationID string) (*Credential, error)
 // Credentials lists every credential a profile holds, the active one first. A
 // credential whose tokens are gone is left out; an unreachable keychain is an error.
 func Credentials(dir, profile string) ([]*Credential, error) {
-	file, err := loadCredentialFile(dir)
+	x := indexOf(dir)
+	file, err := loadCredentials(dir, x)
 	if err != nil {
 		return nil, err
 	}
@@ -194,7 +199,7 @@ func Credentials(dir, profile string) ([]*Credential, error) {
 	out := make([]*Credential, 0, len(keys))
 	for _, key := range keys {
 		cred := p.Organizations[key]
-		switch err := hydrate(dir, profile, cred); {
+		switch err := hydrate(dir, x, profile, cred); {
 		case errors.Is(err, ErrNotLoggedIn):
 			continue
 		case err != nil:
@@ -240,16 +245,16 @@ func (tx *Tx) saveReplacing(profile string, cred *Credential) (replaced *Credent
 		if old.present() {
 			copied := *old
 			indexed = &copied
-			if hydrate(dir, profile, old) == nil {
+			if hydrate(dir, tx.x, profile, old) == nil {
 				replaced = old
 			}
 		}
-		kept := keep(dir, profile, cred, indexed, inFile)
+		kept := keep(dir, tx.x, profile, cred, indexed, inFile)
 		unindexed = !old.present() && kept.AccessToken == ""
 		p.put(kept)
 		p.Active = cred.OrganizationID
 	})
-	tx.after = append(tx.after, func() { afterSave(dir, profile, cred.OrganizationID, unindexed, err) })
+	tx.after = append(tx.after, func() { afterSave(dir, tx.x, profile, cred.OrganizationID, unindexed, err) })
 	return replaced, err
 }
 
@@ -285,7 +290,9 @@ func UpdateCredential(dir, profile string, cred *Credential) error {
 // DeleteCredential forgets every credential a profile holds — logout.
 func DeleteCredential(dir, profile string) error {
 	var gone []*Credential
-	err := mutateCredentialFile(dir, func(file credentialFile) {
+	in := v1
+	err := mutateCredentialFile(dir, func(x credentialIndex, file credentialFile) {
+		in = x
 		if p := file[profile]; p != nil {
 			for _, c := range p.Organizations {
 				if c.present() {
@@ -298,13 +305,15 @@ func DeleteCredential(dir, profile string) error {
 	if err != nil {
 		return err
 	}
-	return forget(dir, profile, gone)
+	return forget(dir, in, profile, gone)
 }
 
 // DeleteCredentialFor forgets one organization's credential; if it was active, another becomes active.
 func DeleteCredentialFor(dir, profile, organizationID string) error {
 	var gone []*Credential
-	err := mutateCredentialFile(dir, func(file credentialFile) {
+	in := v1
+	err := mutateCredentialFile(dir, func(x credentialIndex, file credentialFile) {
+		in = x
 		p := file[profile]
 		if p == nil {
 			return
@@ -330,17 +339,20 @@ func DeleteCredentialFor(dir, profile, organizationID string) error {
 	if err != nil {
 		return err
 	}
-	return forget(dir, profile, gone)
+	return forget(dir, in, profile, gone)
 }
 
-// mutateCredentialFile runs mutate under a cross-process lock: unlocked, a second
-// concurrent writer erases the first's entry.
-func mutateCredentialFile(dir string, mutate func(credentialFile)) error {
-	return lockedWrite(dir, func(tx *Tx) error { return tx.mutate(mutate) })
+// mutateCredentialFile runs mutate under a cross-process lock on the index in use, which
+// it is given: unlocked, a second concurrent writer erases the first's entry.
+func mutateCredentialFile(dir string, mutate func(credentialIndex, credentialFile)) error {
+	return lockedWrite(dir, func(tx *Tx) error {
+		return tx.mutate(func(file credentialFile) { mutate(tx.x, file) })
+	})
 }
 
-func loadCredentialFile(dir string) (credentialFile, error) {
-	path := config.CredentialsPath(dir)
+// loadCredentials reads x's file under the config directory dir; none is an empty one.
+func loadCredentials(dir string, x credentialIndex) (credentialFile, error) {
+	path := x.path(dir)
 	data, err := os.ReadFile(path)
 	if errors.Is(err, fs.ErrNotExist) {
 		return credentialFile{}, nil
