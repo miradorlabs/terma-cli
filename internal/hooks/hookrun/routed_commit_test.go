@@ -4,14 +4,76 @@ import (
 	"context"
 	"encoding/json"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/gitx"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
+	"github.com/miradorlabs/terma-cli/internal/routing"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
 	"github.com/miradorlabs/terma-cli/internal/spool"
+	"github.com/miradorlabs/terma-cli/internal/trailer"
 )
+
+// On a migrated machine a commit is stamped only where Route sends its repository to a team
+// whose policy turns git_hooks on, which is also where the commit hooks are installed: a
+// team that turns git_hooks off stops trailers where the hooks already are, and a team that
+// cannot send, or a repository nobody collects any more, gets none.
+func TestARoutedCommitIsStampedOnlyWhereRouteSendsWithGitHooks(t *testing.T) {
+	t.Parallel()
+	team := func(gitHooks bool, fetched time.Time) *routing.State {
+		acme := hookruntest.RoutedTeam("acme", "acme-platform", gitHooks, "github.com/acme/*")
+		acme.Policy.FetchedAt = fetched
+		return hookruntest.RoutingState(t, []routing.Team{acme}, map[string]string{"github.com/acme": "acme"})
+	}
+	recent := time.Now().Add(-time.Hour)
+	for name, tc := range map[string]struct {
+		st      *routing.State
+		stamped bool
+	}{
+		"sent with git_hooks on":   {team(true, recent), true},
+		"git_hooks off":            {team(false, recent), false},
+		"held, the policy expired": {team(true, time.Now().Add(-config.MaxPolicyAge-time.Hour)), false},
+		"collected by nobody":      {hookruntest.RoutingState(t, nil, nil), false},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			// The session edited the file while Acme collected the repository with git_hooks on.
+			m := newRoutedMachine(t, team(true, recent))
+			root := hookruntest.RepoAt(t, "github.com/acme/api")
+			hookruntest.WriteFile(t, root, "main.go", "package main\n")
+			const sid = "committing-session"
+			r := startIn(t, m.hook(), sid, root)
+			m.hook().Touch(r, sessionOf(sid), "Edit", []string{filepath.Join(root, "main.go")}, nil)
+			m.spooled()
+
+			m.st = tc.st
+			env := func(args ...string) Env { e := m.hook(); e.Cwd, e.Args = root, args; return e }
+			if got := env().Routing.GitHooks(filepath.Join(root, ".git"), time.Now()); got != tc.stamped {
+				t.Errorf("GitHooks = %v, want %v: hooks go where commits are stamped", got, tc.stamped)
+			}
+			commitAs(t, env, root, "feat: x", "main.go")
+			msg, _ := gitx.Git(context.Background(), root, "log", "-1", "--format=%B")
+			stamped := len(trailer.Parse(msg, "")) > 0
+			if stamped != tc.stamped {
+				t.Fatalf("stamped %v, want %v: %q", stamped, tc.stamped, msg)
+			}
+			events := m.spooled()
+			if got := len(hookruntest.Named(events, semconv.TermaCommitStampedEvent)); got != map[bool]int{true: 1}[tc.stamped] {
+				t.Errorf("%d commit stamps spooled", got)
+			}
+			for _, ev := range events {
+				if ev.Enrollment == "" || !ev.OwnLocation || ev.Run != "" || ev.Attrs[AttrProjectID] != nil {
+					t.Errorf("%s: enrollment %q, own %v, run %q, attrs %v: a commit's location is its repository's own",
+						ev.Name, ev.Enrollment, ev.OwnLocation, ev.Run, ev.Attrs)
+				}
+			}
+		})
+	}
+}
 
 // A push is recorded with the destination its repository's route gives it, before the
 // detached report spools it: the report never routes it again.
