@@ -7318,7 +7318,7 @@
           ]
         },
         "2.1.322": {
-          "captured_at": "2026-11-12T15:48:45.504112256Z",
+          "captured_at": "2026-11-13T05:13:29.306022914Z",
           "captured": true,
           "uses": [
             {
@@ -7383,7 +7383,7 @@
           ]
         },
         "2.1.323": {
-          "captured_at": "2026-11-12T20:46:56.111817078Z",
+          "captured_at": "2026-11-13T05:13:29.306022914Z",
           "captured": true,
           "uses": [
             {
@@ -10263,7 +10263,7 @@
           ]
         },
         "0.167.2": {
-          "captured_at": "2026-11-12T15:48:45.504112256Z",
+          "captured_at": "2026-11-13T05:13:29.306022914Z",
           "captured": true,
           "uses": [
             {
@@ -10295,7 +10295,7 @@
           ]
         },
         "0.168.0": {
-          "captured_at": "2026-11-13T04:21:24.021969273Z",
+          "captured_at": "2026-11-13T05:13:29.306022914Z",
           "captured": true,
           "uses": [
             {
@@ -10741,7 +10741,7 @@
           ]
         },
         "1.0.110": {
-          "captured_at": "2026-11-12T23:16:49.659858398Z",
+          "captured_at": "2026-11-13T05:13:29.306022914Z",
           "captured": true,
           "uses": [
             {
@@ -12027,7 +12027,7 @@
           ]
         },
         "0.2.2-rc.1": {
-          "captured_at": "2026-11-12T05:15:55.281711967Z",
+          "captured_at": "2026-11-13T05:13:29.306022914Z",
           "captured": true,
           "uses": [
             {
@@ -12399,7 +12399,7 @@
                         "preset": "workspace-write"
                       },
                       "seq": 0,
-                      "time": 1794458749914,
+                      "time": 1794544976739,
                       "type": "permission/preset"
                     },
                     {
@@ -12407,7 +12407,7 @@
                         "mode": "workspace-write"
                       },
                       "seq": 1,
-                      "time": 1794458749926,
+                      "time": 1794544976740,
                       "type": "sandbox/mode"
                     },
                     {
@@ -12415,7 +12415,7 @@
                         "policy": "ask"
                       },
                       "seq": 2,
-                      "time": 1794458749927,
+                      "time": 1794544976741,
                       "type": "approval/policy"
                     },
                     {
@@ -12439,7 +12439,7 @@
                         "target": "next-turn"
                       },
                       "seq": 3,
-                      "time": 1794458749930,
+                      "time": 1794544976741,
                       "type": "agent/inbox/spliced"
                     },
                     {
@@ -12447,7 +12447,7 @@
                         "turn": 1
                       },
                       "seq": 4,
-                      "time": 1794458749932,
+                      "time": 1794544976742,
                       "type": "turn/start"
                     },
                     {
@@ -12458,7 +12458,7 @@
                         "target": "next-turn"
                       },
                       "seq": 5,
-                      "time": 1794458749933,
+                      "time": 1794544976742,
                       "type": "agent/inbox/spliced"
                     },
                     {
@@ -12467,7 +12467,7 @@
                         "turn": 1
                       },
                       "seq": 6,
-                      "time": 1794458750033,
+                      "time": 1794544976768,
                       "type": "step/start"
                     },
                     {
@@ -12490,7 +12490,7 @@
                       },
                       "seq": 7,
                       "surfaceOp": "append",
-                      "time": 1794458750036,
+                      "time": 1794544976770,
                       "type": "system/message"
                     },
                     {
@@ -12509,7 +12509,7 @@
                       },
                       "seq": 8,
                       "surfaceOp": "append",
-                      "time": 1794458750036,
+                      "time": 1794544976771,
                       "type": "user/message"
                     },
                     {
@@ -12543,7 +12543,7 @@
                       },
                       "seq": 9,
                       "surfaceOp": "append",
-                      "time": 1794458750037,
+                      "time": 1794544976772,
                       "type": "user/message"
                     },
                     {
@@ -13179,7 +13179,7 @@
                         "reason": "initial"
                       },
                       "seq": 10,
-                      "time": 1794458750037,
+                      "time": 1794544976772,
                       "type": "request/header"
                     },
                     {
@@ -13190,7 +13190,7 @@
                         "systemPromptUpdate": "in-history"
                       },
                       "seq": 11,
-                      "time": 1794458750038,
+                      "time": 1794544976773,
                       "type": "request/context"
                     },
                     {
@@ -13204,7 +13204,7 @@
                         "title": "<prompt>"
                       },
                       "seq": 12,
-                      "time": 1794458750040,
+                      "time": 1794544976775,
                       "type": "session/title"
                     },
                     {
@@ -13237,12 +13237,12 @@
                         "titleProvider": "session-title-first-prompt-llm"
                       },
                       "seq": 13,
-                      "time": 1794458750041,
+                      "time": 1794544976777,
                       "type": "session/title-llm-request"
                     }
                   ],
                   "session": {
-                    "createdAt": 1794458749901,
+                    "createdAt": 1794544976736,
                     "cwd": "<repo>",
                     "id": "session-<uuid>",
                     "version": 4
@@ -13299,7 +13299,7 @@
           "captured": true
         },
         "0.68.0": {
-          "captured_at": "2026-11-12T15:48:45.504112256Z",
+          "captured_at": "2026-11-13T05:13:29.306022914Z",
           "captured": true
         }
       }
@@ -13373,7 +13373,7 @@
           "captured": false
         },
         "1.19.5": {
-          "captured_at": "2026-11-12T05:15:55.281711967Z",
+          "captured_at": "2026-11-13T05:13:29.306022914Z",
           "captured": true,
           "uses": [
             {
@@ -13427,7 +13427,7 @@
           ]
         },
         "1.5.2": {
-          "captured_at": "2026-11-12T05:15:55.281711967Z",
+          "captured_at": "2026-11-13T05:13:29.306022914Z",
           "captured": true,
           "uses": [
             {
