@@ -1,7 +1,9 @@
 // Package migrate is the machine's one-way move to multi-org routing (internal/routing).
-// Only the relay runs it, at start, holding the relay's lock and the spool flush's, so no
-// other terma sends while it runs. It covers every profile at once, because keys.json and
-// credentials.json are shared by all of them:
+// Only the relay runs it, once it has started listening under today's rules, holding the
+// relay's lock and the spool flush's, so no other terma sends while it runs; the relay
+// asks the config directory and the routing state as it routes each record, so it moves
+// to the new rules as the migration commits. It covers every profile at once, because
+// keys.json and credentials.json are shared by all of them:
 //
 //  1. Check: the agents' hook entries run the relay's own terma. With two installs it
 //     does not migrate, and records why (ReadBlock), which doctor shows.
@@ -84,13 +86,17 @@ const (
 )
 
 // Run migrates the machine, or finishes a migration an earlier start left, while the
-// caller holds the relay's lock. It takes the spool flush's lock, waiting out a flush
-// already running for at most m.FlushWait. An error comes with NotMigrated or Unfinished,
-// and is recorded for doctor too (ReadBlock).
+// caller holds the relay's lock; the relay runs it beside itself, once it listens. It
+// takes the spool flush's lock, waiting out a flush already running for at most
+// m.FlushWait. While it runs it records that it does (Migrating). An error comes with
+// NotMigrated or Unfinished, and is recorded for doctor too (ReadBlock), except one ctx
+// ended, which changed nothing.
 func Run(ctx context.Context, m Machine) (Outcome, error) {
 	if !Needed(m.ConfigDir, m.StateDir) {
 		return Done, nil
 	}
+	// Recorded first, and gone only once the outcome is: a block, or the commit.
+	defer m.migrating()()
 	// Asked before any lock is taken: network calls never hold one. A machine already
 	// marked migrated only finishes what it prepared, which asks nothing.
 	var personal map[string]bool

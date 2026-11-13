@@ -98,7 +98,7 @@ machine migrated (`config.Migrated`), even once a routing state is lost. The sta
 directory (`config.StateDir`) holds what terma writes as it runs: `relay/`, `spool/`,
 `policies/`, `routing/` (each profile's routing state), `runs/` (the run ledger),
 `team-names/` (the names `terma teams` last listed), `migration-blocked.json` (why the last
-relay start did not migrate), `agents/<agent>/` (each agent's hook state), `funding/`,
+relay start did not migrate), `migrating` (since when a relay has been migrating), `agents/<agent>/` (each agent's hook state), `funding/`,
 `workspaces/` (session stores for work begun outside git) and `update/`; a repository's
 session store is `.git/terma/`, which also keeps what a git hook in an agent's sandbox could
 not write to the state directory, until a hook outside the sandbox moves it there. Names
@@ -135,8 +135,9 @@ never on disk, and a stopping relay drops it.
 
 **Routing by teams.** All of the above is a machine routing by its profile's one team. The
 relay moves it to routing by teams once and for good (`internal/migrate`): only a relay
-does, as it starts, holding its own lock and the spool flush's, so nothing else sends
-meanwhile. It checks that the agents' hooks run its own terma, and asks whether each team
+does, beside itself once it listens, holding its own lock and the spool flush's, so nothing
+else sends meanwhile; the relay routes each record by the rules in force as it does, so it
+moves to the new ones at the commit. It checks that the agents' hooks run its own terma, and asks whether each team
 is a personal organization's with that profile's own sign-in; then it writes each profile's
 routing state in a Preparing phase, copies the keys and sign-ins into `keys.v2.json` and
 `credentials.v2.json`, empties `keys.json` and `credentials.json`, clears config.json's

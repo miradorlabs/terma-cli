@@ -283,15 +283,20 @@ const (
 // why its parts are dropped. On a migrated machine a route queued before the migration is
 // its project's cutover enrollment's (Router.Legacy), rechecked as that team's, and
 // dropped where the project maps to none: records from before the migration keep their
-// project, and never reach another team.
+// project, and never reach another team. The relay migrates the machine while it runs, so
+// a route can be queued under one rule and sent under the other.
 func (s *sender) policy(c claim.Claim) (pol Policy, ok bool, discard string) {
 	if !s.r.teams() {
 		pol, ok = s.r.resolve(c)
 		return pol, ok, ""
 	}
 	q, mapped := s.r.opts.Router.Legacy(c.ProjectID, c.Repository)
-	if !mapped {
+	switch {
+	case !mapped:
 		return Policy{}, false, whyLegacy
+	case q.Enrollment == "":
+		// The routing state cannot be read yet, as while the migration commits: it waits.
+		return Policy{}, false, ""
 	}
 	switch v := s.r.opts.Router.Recheck(q.Enrollment).Entry(q); v.Verdict {
 	case Discard:

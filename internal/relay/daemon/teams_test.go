@@ -296,6 +296,9 @@ func TestTeamsWithoutACommittedStateSendNothing(t *testing.T) {
 		if !teams.Selected("e1") || teams.UnknownToPersonal() {
 			t.Errorf("%s: dropped a queue, or took unknown records", name)
 		}
+		if q, mapped := teams.Legacy("acme", config.Repository{}); !mapped || q.Enrollment != "" {
+			t.Errorf("%s: a part queued before the migration = %+v, %v; want it waiting", name, q, mapped)
+		}
 	}
 	check("missing")
 	selectTeams(t, cfg, true, func(s *routing.State) { s.Migration.Phase = routing.Preparing })
