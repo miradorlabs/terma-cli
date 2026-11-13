@@ -181,6 +181,31 @@ func TestTeamsSelectTicksATeamWithItsKeyAndBindings(t *testing.T) {
 	}
 }
 
+// A team whose policy has a wildcard is stored in major 2 (contract C1). `terma teams`
+// lists its entries and ticks it like any other, binding the wildcard's owner, and keeps
+// it a wildcard rather than a repository no origin names.
+func TestTeamsListsAndTicksAWildcardPolicy(t *testing.T) {
+	f := migratedMachine(t, nil, orgA())
+	f.policyBodies[acmeAPI] = `{"policy":{"version":"2.0","terma":{"capture":{"exclude_prompts":false,"exclude_tool_content":false},"git_hooks":true,"per_repository":{"repositories":["github.com/acme/*"]}}},"revision":4,"updated_at":"2026-11-01T00:00:00Z"}`
+	v, out, err := teamsJSON(t)
+	if err != nil {
+		t.Fatalf("teams: %v\n%s", err, out)
+	}
+	if _, row, ok := v.row(orgA().ID, acmeAPI); !ok || row.Unreadable != "" || !slices.Equal(row.Entries, []string{"github.com/acme/*"}) {
+		t.Fatalf("a 2.0 policy in the list = %+v (listed %v)", row, ok)
+	}
+	if _, out, err = teamsJSON(t, "--select", "Acme API", "--yes"); err != nil {
+		t.Fatalf("teams --select: %v\n%s", err, out)
+	}
+	st := loadState(t)
+	if len(st.Teams) != 1 || !st.Teams[0].Policy.Wildcards || !slices.Equal(st.Teams[0].Policy.Repositories, []string{"github.com/acme/*"}) {
+		t.Fatalf("ticked wildcard team = %+v", st.Teams)
+	}
+	if b := st.Bindings["github.com/acme"]; b.Organization != orgA().ID {
+		t.Errorf("the wildcard's owner is not bound to Acme: %+v", st.Bindings)
+	}
+}
+
 // Without anyone to ask and without --yes, what the ticked team needs stays to decide:
 // pending, holding what it matches, never decided for the developer.
 func TestTeamsSelectWithoutYesLeavesItsBindingsPending(t *testing.T) {
