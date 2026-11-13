@@ -123,6 +123,26 @@ func (o outbox) teamNames(rt teamRoute) []entry {
 	return out
 }
 
+// QueuedSessions are the session and subagent IDs the parts in the outbox name, which the
+// run ledger keeps (runs.Prune) while any is queued; an error when the outbox cannot be
+// listed. A part whose destination cannot be read is never sent, and names none. Parts
+// queued before the migration name no run.
+func (r *Relay) QueuedSessions() (map[string]bool, error) {
+	routes, err := r.outbox.teamRoutes()
+	if err != nil {
+		return nil, err
+	}
+	out := map[string]bool{}
+	for _, rt := range routes {
+		for _, e := range r.outbox.teamNames(rt) {
+			if q, err := r.outbox.header(rt, e); err == nil && q.Session != "" {
+				out[q.Session] = true
+			}
+		}
+	}
+	return out, nil
+}
+
 // header reads a queued part's destination alone.
 func (o outbox) header(rt teamRoute, e entry) (Queued, error) {
 	f, err := os.Open(filepath.Join(o.teamDir(rt), e.name))

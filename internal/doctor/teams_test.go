@@ -96,6 +96,26 @@ func TestTeamsCheckAndRowsShowWhatMixedRunsDropped(t *testing.T) {
 	}
 }
 
+// doctor names the sessions of Mixed runs active within the last day, and counts the
+// older ones the run ledger keeps.
+func TestTeamsRowsCountOlderMixedRuns(t *testing.T) {
+	t.Parallel()
+	r := routed(t)
+	r.MixedSessions, r.OlderMixed = []string{"s-1"}, 3
+	if c := TeamsCheck(r, time.Now()); !strings.Contains(c.Detail, "4 session run(s) crossed organizations") || !strings.Contains(c.Detail, "3 idle for over a day") {
+		t.Fatalf("check = %+v", c)
+	}
+	var sessions []string
+	for _, row := range TeamRows(r, time.Now()) {
+		if v, ok := strings.CutPrefix(row.Value, "session "); ok {
+			sessions = append(sessions, v)
+		}
+	}
+	if len(sessions) != 1 || sessions[0] != "s-1" {
+		t.Fatalf("rows name sessions %v", sessions)
+	}
+}
+
 // The repository check routes this repository: where it goes, or why it is held.
 func TestRoutedRepositoryRoutesThisRepository(t *testing.T) {
 	t.Parallel()

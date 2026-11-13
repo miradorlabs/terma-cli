@@ -27,6 +27,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/account/keystore"
 	"github.com/miradorlabs/terma-cli/internal/agents/builtin"
 	"github.com/miradorlabs/terma-cli/internal/config"
+	"github.com/miradorlabs/terma-cli/internal/migrate"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
 	"github.com/miradorlabs/terma-cli/internal/routing"
@@ -222,8 +223,8 @@ func TestMultiOrgRoutingEndToEnd(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// The relay migrates as it starts. It runs as its own command line, as a relay is its own
-	// process, beside the commands this test runs.
+	// The relay migrates once it listens. It runs as its own command line, as a relay is its
+	// own process, beside the commands this test runs.
 	relayApp := New(builtin.Agents, "dev")
 	relayApp.binDirs = func() []string { return nil }
 	relayApp.configure(configDir, stateDir)
@@ -242,6 +243,9 @@ func TestMultiOrgRoutingEndToEnd(t *testing.T) {
 		}
 	}()
 	awaitRelayRecord(t, claim.Dir(stateDir), 20*time.Second, relayDone)
+	for deadline := time.Now().Add(20 * time.Second); migrate.Needed(configDir, stateDir) && time.Now().Before(deadline); {
+		time.Sleep(20 * time.Millisecond)
+	}
 
 	st, ok, err := routing.LoadReady(stateDir, config.DefaultProfile)
 	if err != nil || !ok || len(st.Teams) != 1 || st.Teams[0].TeamID != acmeAPI || st.Bindings["github.com/acme/api"].Organization != orgA().ID {

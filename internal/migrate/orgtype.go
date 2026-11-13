@@ -22,7 +22,7 @@ const (
 )
 
 // orgTypeWait bounds each organization type the migration asks for: it asks before it
-// takes the spool flush's lock, while the relay that runs it is not listening yet.
+// takes the spool flush's lock, so no lock waits on the network.
 const orgTypeWait = 10 * time.Second
 
 // errOrgTypeUnknown is a profile's team whose organization type the migration did not

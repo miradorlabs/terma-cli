@@ -1,7 +1,7 @@
 package relay
 
 import (
-	"context"
+	"fmt"
 	"math/rand/v2"
 	"sync"
 	"time"
@@ -25,7 +25,8 @@ const (
 	idleWait          = 30 * time.Second
 )
 
-// sender delivers one route's outbox, so one refusing host never holds up another project.
+// sender keeps one route's outbox, for drain to send, so one refusing host never holds up
+// another project.
 type sender struct {
 	r     *Relay
 	route route
@@ -36,6 +37,11 @@ type sender struct {
 	// lists the directory again after recoverOutbox: a backed-up route drains in linear time.
 	queue   map[Signal][]entry
 	keyless bool // a keyless route waits and keeps no relay awake
+
+	// c is the route's claim, as its outbox names it: read once, when placed, by the
+	// goroutine that drains the route alone.
+	c      claim.Claim
+	placed bool
 }
 
 func (r *Relay) sender(rt route) *sender {
@@ -46,7 +52,7 @@ func (r *Relay) sender(rt route) *sender {
 		s = &sender{r: r, route: rt, wake: make(chan struct{}, 1), queue: map[Signal][]entry{}}
 		r.senders[rt] = s
 		r.wg.Add(1)
-		go s.loop()
+		go r.drain(s, s.wake)
 	}
 	return s
 }
@@ -96,17 +102,37 @@ func (s *sender) setKeyless(v bool) {
 	s.mu.Unlock()
 }
 
-// loop delivers the outbox oldest first; a stopping relay keeps going within its grace.
-func (s *sender) loop() {
-	defer s.r.wg.Done()
-	ctx := s.r.sendCtx
+// sendQueue is one destination's queue as drain sends it: a route's (sender) or an
+// enrollment's (teamSender). Each keeps its own queue, and says what may leave and under
+// which policy; drain sends, retries and backs off the same way for both.
+type sendQueue interface {
+	// batch is the next parts that may leave now, oldest first: up to limit, of one
+	// signal; and whether any part left waits, which only its team recovering moves.
+	batch(limit int) ([]entry, bool)
+	// policy is the send policy now: ok false while the parts wait for it, and discard
+	// naming why they are dropped instead.
+	policy() (pol Policy, ok bool, discard string)
+	// read is a queued part's body.
+	read(e entry) ([]byte, error)
+	// remove takes parts, sent or dropped, out of the outbox and the queue.
+	remove(batch []entry)
+	// bury sets a part aside with the dead letters, and takes it off the queue.
+	bury(e entry)
+	fmt.Stringer
+}
+
+// drain sends q oldest first, woken by wake when a part arrives; a stopping relay keeps
+// going within its grace. Each sender runs it on its own goroutine, so one refusing host
+// never holds up another destination.
+func (r *Relay) drain(q sendQueue, wake <-chan struct{}) {
+	defer r.wg.Done()
+	ctx := r.sendCtx
 	backoff := time.Duration(0)
 	// single sends one file per request after a merged request was refused, so one bad file is set aside alone.
 	single := false
-	c := claim.Claim{ProjectID: s.route.project, Tool: s.route.toolLabel(), Repository: s.r.outbox.identity(s.route)}
 	stopping := func() bool {
 		select {
-		case <-s.r.stopping:
+		case <-r.stopping:
 			return true
 		default:
 			return false
@@ -115,11 +141,11 @@ func (s *sender) loop() {
 	sleep := func(d time.Duration) bool {
 		t := time.NewTimer(d)
 		defer t.Stop()
-		wake := s.wake
+		wake := wake
 		if backoff > 0 {
 			wake = nil // new work does not cut a backoff short: the host is the same
 		}
-		stop := s.r.stopping
+		stop := r.stopping
 		if stopping() {
 			stop = nil
 		}
@@ -140,77 +166,57 @@ func (s *sender) loop() {
 		if single {
 			limit = 1
 		}
-		entries := s.next(limit)
+		entries, waiting := q.batch(limit)
 		if len(entries) == 0 {
-			if stopping() {
-				return
+			wait := idleWait
+			if waiting {
+				wait = keylessRetry
 			}
-			if !sleep(idleWait) {
+			if stopping() || !sleep(wait) {
 				return
 			}
 			continue
 		}
-		pol, ok, discard := s.policy(c)
+		pol, ok, discard := q.policy()
 		if discard != "" {
 			for _, e := range entries {
-				s.r.stats.dropped(e.signal, discard, e.records)
+				r.stats.dropped(e.signal, discard, e.records)
 			}
-			s.r.outbox.remove(s.route, entries)
-			s.forget(entries)
+			q.remove(entries)
 			continue
 		}
 		if !ok {
-			s.setKeyless(true)
 			if stopping() || !sleep(keylessRetry) {
 				return
 			}
 			continue
 		}
-		s.setKeyless(false)
-		// The repository list as it stands now: a repository removed since sends none still queued.
-		if pol.Unadmitted {
-			for _, e := range entries {
-				s.r.stats.dropped(e.signal, "policy_repository", e.records)
-			}
-			s.r.outbox.remove(s.route, entries)
-			s.forget(entries)
+		batch, body := r.take(q, entries)
+		if len(batch) == 0 {
 			continue
 		}
-		batch, body, err := s.take(entries)
-		if err != nil {
-			if !sleep(minBackoff) {
-				return
-			}
-			continue
+		sig, records := batch[0].signal, 0
+		for _, e := range batch {
+			records += e.records
 		}
-		// The content policy as it stands now: a project that turned prompts off since sends none still queued.
+		// The content policy as it stands now: a team that turned prompts off since sends none still queued.
 		// Counted only once the batch leaves the outbox: a retry filters it again.
-		body, tl := s.r.withholdQueued(batch[0].signal, body, pol)
-		if pol.Signals != nil && !contains(pol.Signals, string(batch[0].signal)) || body == nil {
-			reason, records := "policy_signal_or_content", 0
-			for _, e := range batch {
-				records += e.records
-			}
-			s.r.stats.dropped(batch[0].signal, reason, records)
-			s.r.outbox.remove(s.route, batch)
-			s.forget(batch)
+		body, tl := r.withholdQueued(sig, body, pol)
+		if pol.Signals != nil && !contains(pol.Signals, string(sig)) || body == nil {
+			r.stats.dropped(sig, "policy_signal_or_content", records)
+			q.remove(batch)
 			continue
 		}
-		out, wait, detail, rejected := s.send(ctx, pol, batch[0].signal, body)
+		out, wait, detail, rejected := r.post(ctx, pol, sig, body)
 		switch out {
 		case sent:
-			s.r.count(batch[0].signal, tl)
-			records := 0
-			for _, e := range batch {
-				records += e.records
-			}
-			s.r.stats.forwarded(batch[0].signal, records)
+			r.count(sig, tl)
+			r.stats.forwarded(sig, records)
 			if rejected > 0 {
 				// Resending a partial success would only duplicate what was kept.
-				s.r.stats.add("upstream_rejected."+string(batch[0].signal), int(rejected))
+				r.stats.add("upstream_rejected."+string(sig), int(rejected))
 			}
-			s.r.outbox.remove(s.route, batch)
-			s.forget(batch)
+			q.remove(batch)
 			single, backoff = false, 0
 		case refused:
 			if len(batch) > 1 {
@@ -218,16 +224,15 @@ func (s *sender) loop() {
 				continue
 			}
 			single = false
-			s.r.stats.dropped(batch[0].signal, "upstream_"+detail, batch[0].records)
-			s.r.warnf("upstream %s refused %d %s: %s", s.route, batch[0].records, batch[0].signal, detail)
-			s.r.outbox.bury(s.route, batch[0])
-			s.forget(batch[:1])
+			r.stats.dropped(sig, "upstream_"+detail, batch[0].records)
+			r.warnf("upstream %s refused %d %s: %s", q, batch[0].records, sig, detail)
+			q.bury(batch[0])
 		case retry:
 			if ctx.Err() != nil {
 				return
 			}
-			s.r.stats.add("upstream_retries", 1)
-			s.r.warnf("upstream %s: %s; retrying", s.route, detail)
+			r.stats.add("upstream_retries", 1)
+			r.warnf("upstream %s: %s; retrying", q, detail)
 			backoff = nextBackoff(backoff, wait)
 			if !sleep(jitter(backoff, wait)) {
 				return
@@ -236,40 +241,56 @@ func (s *sender) loop() {
 	}
 }
 
-func (s *sender) take(entries []entry) ([]entry, []byte, error) {
-	first := entries[0]
-	body, err := s.r.outbox.read(s.route, first)
-	if err != nil {
-		// A file that cannot be read never will be; it must not hold the rest back.
-		s.r.stats.dropped(first.signal, "outbox_unreadable", first.records)
-		s.r.outbox.bury(s.route, first)
-		s.forget([]entry{first})
-		return nil, nil, err
-	}
-	batch := []entry{first}
-	bodies := [][]byte{body}
-	size := len(body)
-	for _, e := range entries[1:] {
-		if len(batch) >= maxMergeFiles || e.signal != first.signal {
+// take reads entries, of one signal, into one request: as many as fit maxMergeBytes,
+// merged, and the parts it holds. A first part that cannot be read never will be, so it
+// is buried rather than hold back the rest, and take returns none.
+func (r *Relay) take(q sendQueue, entries []entry) ([]entry, []byte) {
+	var batch []entry
+	var bodies [][]byte
+	size := 0
+	for _, e := range entries {
+		b, err := q.read(e)
+		if err != nil {
+			if len(batch) == 0 {
+				r.stats.dropped(e.signal, "outbox_unreadable", e.records)
+				q.bury(e)
+			}
 			break
 		}
-		b, err := s.r.outbox.read(s.route, e)
-		if err != nil || size+len(b) > maxMergeBytes {
+		if len(batch) > 0 && size+len(b) > maxMergeBytes {
 			break
 		}
-		batch = append(batch, e)
-		bodies = append(bodies, b)
-		size += len(b)
+		batch, bodies, size = append(batch, e), append(bodies, b), size+len(b)
 	}
-	if len(batch) == 1 {
-		return batch, body, nil
+	if len(batch) <= 1 {
+		if len(batch) == 0 {
+			return nil, nil
+		}
+		return batch, bodies[0]
 	}
-	merged, err := mergeBodies(first.signal, bodies)
+	merged, err := mergeBodies(batch[0].signal, bodies)
 	if err != nil {
-		return batch[:1], body, nil
+		return batch[:1], bodies[0]
 	}
-	return batch, merged, nil
+	return batch, merged
 }
+
+// batch is the route's next parts (next); none of them waits.
+func (s *sender) batch(limit int) ([]entry, bool) { return s.next(limit), false }
+
+func (s *sender) read(e entry) ([]byte, error) { return s.r.outbox.read(s.route, e) }
+
+func (s *sender) remove(batch []entry) {
+	s.r.outbox.remove(s.route, batch)
+	s.forget(batch)
+}
+
+func (s *sender) bury(e entry) {
+	s.r.outbox.bury(s.route, e)
+	s.forget([]entry{e})
+}
+
+func (s *sender) String() string { return s.route.String() }
 
 type outcome int
 
@@ -279,21 +300,50 @@ const (
 	refused
 )
 
-// policy is the route's send policy now; ok false while it must wait, and discard names
-// why its parts are dropped. On a migrated machine a route queued before the migration is
-// its project's cutover enrollment's (Router.Legacy), rechecked as that team's, and
-// dropped where the project maps to none: records from before the migration keep their
-// project, and never reach another team.
-func (s *sender) policy(c claim.Claim) (pol Policy, ok bool, discard string) {
+// policy is the route's send policy now; ok false while it must wait, which keeps no
+// relay awake (keyless), and discard names why its parts are dropped: among them a
+// repository the list no longer admits.
+func (s *sender) policy() (Policy, bool, string) {
+	if !s.placed {
+		s.c = claim.Claim{ProjectID: s.route.project, Tool: s.route.toolLabel(), Repository: s.r.outbox.identity(s.route)}
+		s.placed = true
+	}
+	pol, ok, discard := s.policyFor(s.c)
+	switch {
+	case discard != "":
+		return Policy{}, false, discard
+	case !ok:
+		s.setKeyless(true)
+		return Policy{}, false, ""
+	}
+	s.setKeyless(false)
+	// The repository list as it stands now: a repository removed since sends none still queued.
+	if pol.Unadmitted {
+		return Policy{}, false, "policy_repository"
+	}
+	return pol, true, ""
+}
+
+// policyFor is the policy of c, the route's claim, now. On a migrated machine a route
+// queued before the migration is its project's cutover enrollment's (Router.Legacy),
+// rechecked as that team's, and dropped where the project maps to none: records from
+// before the migration keep their project, and never reach another team. The relay
+// migrates the machine while it runs, so a route can be queued under one rule and sent
+// under the other.
+func (s *sender) policyFor(c claim.Claim) (pol Policy, ok bool, discard string) {
 	if !s.r.teams() {
 		pol, ok = s.r.resolve(c)
 		return pol, ok, ""
 	}
 	q, mapped := s.r.opts.Router.Legacy(c.ProjectID, c.Repository)
-	if !mapped {
+	switch {
+	case !mapped:
 		return Policy{}, false, whyLegacy
+	case q.Enrollment == "":
+		// The routing state cannot be read yet, as while the migration commits: it waits.
+		return Policy{}, false, ""
 	}
-	switch v := s.r.opts.Router.Recheck(q); v.Verdict {
+	switch v := s.r.opts.Router.Recheck(q.Enrollment).Entry(q); v.Verdict {
 	case Discard:
 		return Policy{}, false, v.Why.reason()
 	case Wait:
@@ -301,11 +351,6 @@ func (s *sender) policy(c claim.Claim) (pol Policy, ok bool, discard string) {
 	}
 	pol, ok = s.r.resolveTeam(q.Enrollment, c.Tool)
 	return pol, ok, ""
-}
-
-// send is post for this route.
-func (s *sender) send(ctx context.Context, pol Policy, sig Signal, body []byte) (outcome, time.Duration, string, int64) {
-	return s.r.post(ctx, pol, sig, body)
 }
 
 func nextBackoff(prev, floor time.Duration) time.Duration {

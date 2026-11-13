@@ -198,7 +198,7 @@ func TestTeamsRecheckAQueuedEntry(t *testing.T) {
 	ids := selectTeams(t, cfg, true, func(s *routing.State) { _ = s.Bind("github.com/acme", orgAcme, false) })
 	at := time.Now()
 	q := relay.Queued{Enrollment: ids["acme"], Project: "acme", Kind: string(routing.Repository), Repository: "github.com/acme/api", Session: "s1", At: at}
-	if got := NewTeams(cfg, TeamsDeps{}).Recheck(q); got.Verdict != relay.SendNow {
+	if got := NewTeams(cfg, TeamsDeps{}).Recheck(q.Enrollment).Entry(q); got.Verdict != relay.SendNow {
 		t.Fatalf("active: %+v", got)
 	}
 	if _, err := runs.Start(cfg.StateDir, "s1", at.Add(-time.Hour)); err != nil {
@@ -207,26 +207,68 @@ func TestTeamsRecheckAQueuedEntry(t *testing.T) {
 	if err := runs.MarkMixed(cfg.StateDir, "s1", at.Add(-time.Minute)); err != nil {
 		t.Fatal(err)
 	}
-	if got := NewTeams(cfg, TeamsDeps{}).Recheck(q); got.Verdict != relay.Discard || got.Why != relay.WhyMixed {
+	if got := NewTeams(cfg, TeamsDeps{}).Recheck(q.Enrollment).Entry(q); got.Verdict != relay.Discard || got.Why != relay.WhyMixed {
 		t.Fatalf("its run Mixed before it: %+v", got)
 	}
 	own := q
 	own.Own = true
-	if got := NewTeams(cfg, TeamsDeps{}).Recheck(own); got.Verdict != relay.SendNow {
+	if got := NewTeams(cfg, TeamsDeps{}).Recheck(own.Enrollment).Entry(own); got.Verdict != relay.SendNow {
 		t.Fatalf("its own location, its run Mixed: %+v", got)
 	}
 	update(t, cfg, func(s *routing.State) { s.Teams[0].Refusals = 1 })
-	if got := NewTeams(cfg, TeamsDeps{}).Recheck(own); got.Verdict != relay.Wait {
+	if got := NewTeams(cfg, TeamsDeps{}).Recheck(own.Enrollment).Entry(own); got.Verdict != relay.Wait {
 		t.Fatalf("suspended: %+v", got)
 	}
 	update(t, cfg, func(s *routing.State) { s.Teams[0].Refusals = 2 })
-	if got := NewTeams(cfg, TeamsDeps{}).Recheck(own); got.Verdict != relay.Discard || got.Why != relay.WhyBlocked {
+	if got := NewTeams(cfg, TeamsDeps{}).Recheck(own.Enrollment).Entry(own); got.Verdict != relay.Discard || got.Why != relay.WhyBlocked {
 		t.Fatalf("refused: %+v", got)
 	}
 	update(t, cfg, func(s *routing.State) { s.Deselect(ids["acme"]) })
 	teams := NewTeams(cfg, TeamsDeps{})
-	if got := teams.Recheck(own); got.Verdict != relay.Discard || got.Why != relay.WhyDeselected || teams.Selected(ids["acme"]) {
+	if got := teams.Recheck(own.Enrollment).Entry(own); got.Verdict != relay.Discard || got.Why != relay.WhyDeselected || teams.Selected(ids["acme"]) {
 		t.Fatalf("unticked: %+v", got)
+	}
+}
+
+// A pass over a queue judges its team once: while the team cannot send but may recover,
+// every entry waits and none is judged; once it is Active, or Refused, each entry is. Each
+// session's run ledger is read once in the pass, however many of its entries are queued.
+func TestARecheckPassJudgesTheTeamOnceAndEachRunOnce(t *testing.T) {
+	cfg := migratedMachine(t)
+	ids := selectTeams(t, cfg, true, func(s *routing.State) { _ = s.Bind("github.com/acme", orgAcme, false) })
+	at := time.Now()
+	for _, s := range []string{"s1", "s2"} {
+		if _, err := runs.Start(cfg.StateDir, s, at.Add(-time.Hour)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := runs.MarkMixed(cfg.StateDir, "s2", at.Add(-time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	pass := NewTeams(cfg, TeamsDeps{}).Recheck(ids["acme"])
+	if v, waits := pass.TeamWaits(); waits {
+		t.Fatalf("an Active team waits: %+v", v)
+	}
+	sent, dropped := 0, 0
+	for i := range 1000 {
+		q := relay.Queued{Enrollment: ids["acme"], Project: "acme", Kind: string(routing.Repository), Repository: "github.com/acme/api",
+			Session: []string{"s1", "s2"}[i%2], At: at}
+		switch pass.Entry(q).Verdict {
+		case relay.SendNow:
+			sent++
+		case relay.Discard:
+			dropped++
+		}
+	}
+	if read := len(pass.(*recheck).runs); sent != 500 || dropped != 500 || read != 2 {
+		t.Fatalf("1000 entries of two sessions: %d sent, %d dropped, %d ledgers read", sent, dropped, read)
+	}
+	for refusals, waits := range map[int]bool{1: true, 2: false} {
+		update(t, cfg, func(s *routing.State) { s.Teams[0].Refusals = refusals })
+		v, got := NewTeams(cfg, TeamsDeps{}).Recheck(ids["acme"]).TeamWaits()
+		if got != waits || waits && (v.Verdict != relay.Wait || v.Why != relay.WhyBlocked || v.Blocker != "team:"+ids["acme"]) {
+			t.Errorf("%d refusals: TeamWaits = %+v, %v", refusals, v, got)
+		}
 	}
 }
 
@@ -241,7 +283,11 @@ func TestTeamsWithoutACommittedStateSendNothing(t *testing.T) {
 		if got := teams.Route(rec); got.Outcome != relay.Hold || got.Why != relay.WhyNoState {
 			t.Errorf("%s: Route = %+v", name, got)
 		}
-		if got := teams.Recheck(relay.Queued{Enrollment: "e1"}); got.Verdict != relay.Wait {
+		pass := teams.Recheck("e1")
+		if got, waits := pass.TeamWaits(); !waits || got.Verdict != relay.Wait || got.Why != relay.WhyNoState {
+			t.Errorf("%s: TeamWaits = %+v, %v", name, got, waits)
+		}
+		if got := pass.Entry(relay.Queued{Enrollment: "e1"}); got.Verdict != relay.Wait {
 			t.Errorf("%s: Recheck = %+v", name, got)
 		}
 		if _, err := teams.Resolve("e1", ""); err == nil {
@@ -249,6 +295,9 @@ func TestTeamsWithoutACommittedStateSendNothing(t *testing.T) {
 		}
 		if !teams.Selected("e1") || teams.UnknownToPersonal() {
 			t.Errorf("%s: dropped a queue, or took unknown records", name)
+		}
+		if q, mapped := teams.Legacy("acme", config.Repository{}); !mapped || q.Enrollment != "" {
+			t.Errorf("%s: a part queued before the migration = %+v, %v; want it waiting", name, q, mapped)
 		}
 	}
 	check("missing")

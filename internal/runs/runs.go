@@ -32,12 +32,13 @@ const Dir = "runs"
 
 const aliasesDir = "aliases"
 
-// Retention is how long a session's ledger is kept after it was last written. The relay
-// outbox and the spool keep a record for at most 14 days, and a crossing is written here
-// when a hook sees it, so every queued record the ledger could drop leaves its queue
-// within 14 days of the ledger's last write. The extra day covers the clocks of the
-// processes involved and when Prune happens to run: a ledger pruned first would read as
-// never Mixed, and the record would be sent.
+// Retention is how long a session's ledger is kept after its last activity (ledger.Active):
+// a run starting, crossing organizations, or recording a location. The relay outbox and
+// the spool keep a record for at most 14 days, and a crossing is written here when a hook
+// sees it, so every queued record the ledger could drop leaves its queue within 14 days of
+// it. The extra day covers the clocks of the processes involved and when Prune happens to
+// run: a ledger pruned first would read as never Mixed, and the record would be sent.
+// Prune still keeps a ledger a queued record names.
 const Retention = 15 * 24 * time.Hour
 
 // lockWait bounds the wait for a session's ledger lock. Every write is a read, a small
@@ -50,6 +51,39 @@ type ledger struct {
 	Runs []run `json:"runs"`
 	// Aliases are the subagent IDs that share the session's runs.
 	Aliases []string `json:"aliases,omitempty"`
+	// Active is when a hook last recorded here a run starting, crossing organizations or
+	// touching a new location: what Prune keeps the ledger by.
+	Active time.Time `json:"active,omitzero"`
+}
+
+// active records activity at t.
+func (l *ledger) active(t time.Time) {
+	if t = t.UTC(); t.After(l.Active) {
+		l.Active = t
+	}
+}
+
+// lastActive is l's last activity; for a ledger written before Active was, its runs'
+// latest start or crossing, else written, its file's time.
+func (l ledger) lastActive(written time.Time) time.Time {
+	last := l.Active
+	for _, r := range l.Runs {
+		last = latest(last, r.Started, r.MixedAt)
+	}
+	if last.IsZero() {
+		return written
+	}
+	return last
+}
+
+func latest(ts ...time.Time) time.Time {
+	var out time.Time
+	for _, t := range ts {
+		if t.After(out) {
+			out = t
+		}
+	}
+	return out
 }
 
 // run is one run of a session.
@@ -75,6 +109,7 @@ func Start(stateDir, sessionID string, at time.Time) (string, error) {
 	}
 	err = update(stateDir, sessionID, func(l *ledger) {
 		l.Runs = append(l.Runs, run{ID: id, Started: at.UTC()})
+		l.active(at)
 	})
 	if err != nil {
 		return "", err
@@ -122,6 +157,7 @@ func MarkMixed(stateDir, sessionID string, at time.Time) error {
 		if at = at.UTC(); cur.MixedAt.IsZero() || at.Before(cur.MixedAt) {
 			cur.MixedAt = at
 		}
+		l.active(at)
 	})
 }
 
@@ -159,6 +195,7 @@ func Touch(stateDir, sessionID, runID string, locations []string) ([]string, err
 		if len(r.Locations) == known {
 			return nil
 		}
+		l.active(time.Now())
 		return save(path, l)
 	})
 	if err != nil {
@@ -175,17 +212,38 @@ func Touch(stateDir, sessionID, runID string, locations []string) ([]string, err
 // may have recorded a crossing; none at all, as for an ID no file can be named after, is
 // never Mixed.
 func MixedAt(stateDir, idOrAlias string, recordTime time.Time) (time.Time, bool) {
+	return Read(stateDir, idOrAlias).MixedAt(recordTime)
+}
+
+// Snapshot is a session's runs as one read of its ledger found them (Read), for a caller
+// that asks MixedAt of many records of the session, as the relay does of a queue.
+type Snapshot struct {
+	runs []run
+	// unreadable: the ledger could not be read, so every record counts as Mixed.
+	unreadable bool
+}
+
+// Read reads the ledger of idOrAlias, a session ID or one of its aliases, once.
+func Read(stateDir, idOrAlias string) Snapshot {
 	if !session.ValidID(idOrAlias) {
-		return time.Time{}, false
+		return Snapshot{}
 	}
-	l, ok, err := resolve(stateDir, idOrAlias)
+	l, _, err := resolve(stateDir, idOrAlias)
+	if err != nil {
+		return Snapshot{unreadable: true}
+	}
+	return Snapshot{runs: l.Runs}
+}
+
+// MixedAt is the package's MixedAt, answered from this read of the ledger.
+func (s Snapshot) MixedAt(recordTime time.Time) (time.Time, bool) {
 	switch {
-	case err != nil:
+	case s.unreadable:
 		return time.Time{}, true
-	case !ok || len(l.Runs) == 0:
+	case len(s.runs) == 0:
 		return time.Time{}, false
 	}
-	r := inForce(l.Runs, recordTime)
+	r := inForce(s.runs, recordTime)
 	return r.MixedAt, !r.MixedAt.IsZero()
 }
 

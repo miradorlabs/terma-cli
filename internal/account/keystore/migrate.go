@@ -7,9 +7,33 @@ import (
 	"os"
 
 	"github.com/miradorlabs/terma-cli/internal/account/secret"
+	"github.com/miradorlabs/terma-cli/internal/account/serverkey"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/flock"
 )
+
+// ErrMigrated is SetLegacy on a migrated machine: keys.json takes no key there.
+var ErrMigrated = errors.New("keystore: this machine routes by teams, so keys.json takes no key")
+
+// SetLegacy is Set for a key minted under the rules before the migration, as the relay's
+// minter mints one while the migration runs beside it: refused with ErrMigrated once the
+// machine is migrated (config.Migrated), which it asks under keys.json's lock. The
+// migration marks the machine migrated before it copies and retires keys.json under that
+// lock, so such a key lands before the copy, and moves or goes with the rest, or not at
+// all: never in keys.json after it, where an older terma would send with it.
+func SetLegacy(dir, projectID, key string, hosts Hosts) error {
+	if projectID == "" || !serverkey.Is(key) {
+		return errors.New("keystore: a team id and a server key are required")
+	}
+	return updateOr(dir, func(f *file, inFile bool) error {
+		if config.Migrated(dir) {
+			return ErrMigrated
+		}
+		f.recordHosts(dir, projectID, key, hosts)
+		f.write(dir, f.Keys, projectID, projectItem(projectID), key, inFile)
+		return nil
+	})
+}
 
 // CopyLegacyToTeams is the migration's copy of keys: each project legacy maps (project →
 // cutover enrollment) has its own key and hosts copied from keys.json into keys.v2.json
