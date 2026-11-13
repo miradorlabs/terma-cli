@@ -5,14 +5,18 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
+
+	logspb "go.opentelemetry.io/proto/otlp/logs/v1"
 
 	"github.com/miradorlabs/terma-cli/internal/account/keystore"
 	"github.com/miradorlabs/terma-cli/internal/account/secret"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/migrate"
 	"github.com/miradorlabs/terma-cli/internal/routing"
+	"github.com/miradorlabs/terma-cli/internal/semconv"
 )
 
 // legacyMachine is a relay's state directory on a machine before multi-org routing, with
@@ -181,22 +185,39 @@ func TestARelayThatMayNotMigrateRunsAsBefore(t *testing.T) {
 }
 
 // A migration that stops part way, once the machine is marked migrated, stops the relay
-// with its error: the machine collects nothing until a start finishes it, and the next
-// start does.
+// with its error, and its last heartbeat says so rather than that its server failed: the
+// machine collects nothing until a start finishes it, and the next start does.
 func TestARelayStopsOnAMigrationLeftPartWay(t *testing.T) {
 	t.Parallel()
 	configDir, stateDir := legacyMachine(t)
 	listened := false
 	c := runConfig(stateDir, 0, func(net.Addr, time.Duration) { listened = true })
 	c.Migration = &migrate.Machine{ConfigDir: configDir, StateDir: stateDir, FlushWait: time.Second}
+	var mu sync.Mutex
+	var exits []string
+	c.Engine.HeartbeatEvery = time.Hour
+	c.Engine.HeartbeatSend = func(_ context.Context, b *logspb.LogsData) error {
+		mu.Lock()
+		defer mu.Unlock()
+		exits = append(exits, attrOf(b.ResourceLogs[0].ScopeLogs[0].LogRecords[0].Attributes, semconv.TermaRelayExitReasonKey))
+		return nil
+	}
 	// The profile has no sign-in to copy, so the copy marks the machine migrated; the
 	// locked keychain then keeps its team's key from being copied.
 	unlock := secret.FailForTest(t, configDir)
 	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 	defer cancel()
-	if _, err := Run(ctx, c); err == nil || ctx.Err() != nil {
+	res, err := Run(ctx, c)
+	if err == nil || ctx.Err() != nil {
 		t.Fatalf("Run = %v, the test's deadline %v", err, ctx.Err())
 	}
+	res.ExitBeat()
+	mu.Lock()
+	if len(exits) != 1 || exits[0] != semconv.TermaRelayExitReasonMigrationUnfinished {
+		t.Errorf("exit reasons %q, want %q", exits, semconv.TermaRelayExitReasonMigrationUnfinished)
+	}
+	mu.Unlock()
+	c.Engine.HeartbeatSend = nil
 	listened = false
 	c.Idle = time.Millisecond
 	if !config.Migrated(configDir) || !migrate.Needed(configDir, stateDir) {
