@@ -356,3 +356,46 @@ func TestClaimDuringIsThePlacementInForceWhoeverSent(t *testing.T) {
 		t.Error("At placed a process no placement names")
 	}
 }
+
+// A governance part is placed by the claim as it is now, never by one cached from before the
+// session moved: the relay caches claims for a second, and the app sends as it happens.
+func TestGovernanceFollowsTheClaimPastItsCache(t *testing.T) {
+	t.Parallel()
+	u := newUpstream(t)
+	f := newFixture()
+	f.claims["A"] = claim.Claim{ProjectID: "p1", PIDs: []int{100}}
+	const app = 777
+	r := newRelay(Options{Dir: t.TempDir(), Token: token, Hold: time.Minute, Lookup: f.lookup, Now: f.clock,
+		ClaimCacheTTL:    time.Hour,
+		PeerPID:          func(netip.AddrPort, netip.AddrPort) (int, bool) { return app, true },
+		GovernanceSender: func(pid int, _ time.Time) bool { return pid == app },
+		Resolve:          func(c claim.Claim) (Policy, error) { return allPolicies(u)[c.ProjectID], nil }})
+	runRelay(t, r)
+	srv := httptest.NewUnstartedServer(r.Handler())
+	srv.Config.ConnContext = r.ConnContext
+	srv.Start()
+	defer srv.Close()
+	send := func() {
+		body, _ := proto.Marshal(logsOf("A", 1, kv(semconv.TermaCaptureSurfaceKey, semconv.TermaCaptureSurfaceGovernance)))
+		req, _ := http.NewRequest(http.MethodPost, srv.URL+"/v1/logs", bytes.NewReader(body))
+		req.Header.Set("Authorization", "Bearer "+token)
+		req.Header.Set("Content-Type", "application/x-protobuf")
+		resp, err := (&http.Client{Transport: &http.Transport{DisableKeepAlives: true}}).Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_ = resp.Body.Close()
+	}
+	send()
+	waitFor(t, func() bool { return r.Stats().Snapshot().Counters["forwarded.logs"] == 1 })
+	f.mu.Lock()
+	f.claims["A"] = claim.Claim{ProjectID: "p2", PIDs: []int{100}}
+	f.mu.Unlock()
+	send()
+	waitFor(t, func() bool { return r.Stats().Snapshot().Counters["forwarded.logs"] == 2 })
+	u.mu.Lock()
+	defer u.mu.Unlock()
+	if got := []string{u.requests[0].auth, u.requests[1].auth}; got[0] != "Bearer key-p1" || got[1] != "Bearer key-p2" {
+		t.Fatalf("keys %v; want p1's then, after the move, p2's", got)
+	}
+}

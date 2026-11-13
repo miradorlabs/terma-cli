@@ -141,6 +141,8 @@ const (
 	TermaExecutionNumberKey = "terma.execution.number"
 	// TermaFileChangedKey is terma.file.changed: Whether the session wrote to the file.
 	TermaFileChangedKey = "terma.file.changed"
+	// TermaFileIDKey is terma.file.id: An opaque id for a file within its session, kept across its versions: what identifies a file access when its path is withheld.
+	TermaFileIDKey = "terma.file.id"
 	// TermaFilePathKey is terma.file.path: A file the session's processes used, the home folder written ~.
 	TermaFilePathKey = "terma.file.path"
 	// TermaFileReadBytesKey is terma.file.read_bytes: The bytes the session read from the file, where the platform counts them.
@@ -159,6 +161,8 @@ const (
 	TermaGovernanceExitedKey = "terma.governance.exited"
 	// TermaGovernanceProcessesCountKey is terma.governance.processes.count: How many processes the session started, the agent's own included.
 	TermaGovernanceProcessesCountKey = "terma.governance.processes.count"
+	// TermaGovernanceRevisionKey is terma.governance.revision: A versioned governance entity's revision (a connection, an exchange, a file access): the Mac's clock in microseconds when the version was made, greater than the entity's previous one and kept through retries. The platform keeps the highest, so a late retry never replaces a newer version.
+	TermaGovernanceRevisionKey = "terma.governance.revision"
 	// TermaHookEventKey is terma.hook.event: The agent hook that produced the record.
 	TermaHookEventKey = "terma.hook.event"
 	// TermaInstallMethodKey is terma.install.method: How the relay's terma was installed, which says how it gets new releases.
@@ -229,6 +233,8 @@ const (
 	TermaOperationInterruptedKey = "terma.operation.interrupted"
 	// TermaOperationStatusKey is terma.operation.status: How the operation the event records ended.
 	TermaOperationStatusKey = "terma.operation.status"
+	// TermaPolicyDenialIDKey is terma.policy.denial_id: An opaque id minted for one denial when it happened, kept through retries.
+	TermaPolicyDenialIDKey = "terma.policy.denial_id"
 	// TermaPolicyEnforcedKey is terma.policy.enforced: Whether it was stopped, or only reported under a policy that does not enforce.
 	TermaPolicyEnforcedKey = "terma.policy.enforced"
 	// TermaPolicyKindKey is terma.policy.kind: What the policy denied.

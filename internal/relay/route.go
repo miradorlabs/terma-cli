@@ -84,7 +84,11 @@ func (r *Relay) decide(key string, p *part) (claim.Claim, Policy, string, bool, 
 // within one placement (byPlacement cuts them so at arrival).
 func (r *Relay) decideClaimed(session string, p *part) (claim.Claim, Policy, string, bool) {
 	narrow := p.narrow
-	c, ok := r.lookup(session)
+	lookup := r.lookup
+	if p.governance {
+		lookup = r.lookupFresh
+	}
+	c, ok := lookup(session)
 	if !ok {
 		return claim.Claim{}, Policy{}, whyUnclaimed, false
 	}

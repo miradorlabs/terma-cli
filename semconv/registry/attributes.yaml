@@ -1067,6 +1067,23 @@ attributes:
     type: int
     stability: development
     brief: How many processes the session started, the agent's own included.
+  - key: terma.governance.revision
+    type: int
+    stability: development
+    brief: >-
+      A versioned governance entity's revision (a connection, an exchange, a file access): the Mac's
+      clock in microseconds when the version was made, greater than the entity's previous one and kept
+      through retries. The platform keeps the highest, so a late retry never replaces a newer version.
+  - key: terma.file.id
+    type: string
+    stability: development
+    brief: >-
+      An opaque id for a file within its session, kept across its versions: what identifies a file
+      access when its path is withheld.
+  - key: terma.policy.denial_id
+    type: string
+    stability: development
+    brief: An opaque id minted for one denial when it happened, kept through retries.
   - key: terma.governance.exited
     type: boolean
     stability: development

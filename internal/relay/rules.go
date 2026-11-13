@@ -53,7 +53,7 @@ var governance = shape.CaptureRules{
 		semconv.TermaNetworkExchangeKindKey, semconv.TermaNetworkExchangeRequestIDKey,
 		semconv.TermaProcessProgramKey, semconv.TermaProcessVersionKey,
 		semconv.TermaProcessSignerKindKey, semconv.TermaProcessSignerTeamKey, semconv.TermaProcessSignerIdentifierKey,
-		semconv.TermaPolicyKindKey,
+		semconv.TermaPolicyKindKey, semconv.TermaFileIDKey, semconv.TermaPolicyDenialIDKey,
 	},
 	ToolContentFields: []string{
 		semconv.TermaProcessCommandKey, semconv.TermaPolicyPathKey, semconv.TermaFilePathKey, semconv.TermaFileRenamedToKey,

@@ -663,6 +663,8 @@ events:
         requirement_level: required
       - ref: terma.network.connection_id
         requirement_level: required
+      - ref: terma.governance.revision
+        requirement_level: required
       - ref: server.address
         requirement_level: required
         note: The host its TLS hello or DNS answer named, else its address.
@@ -704,6 +706,8 @@ events:
         requirement_level: required
       - ref: terma.network.exchange.index
         requirement_level: required
+      - ref: terma.governance.revision
+        requirement_level: required
       - ref: terma.network.exchange.start_ms
         requirement_level: required
       - ref: terma.network.exchange.duration_ms
@@ -729,6 +733,8 @@ events:
         requirement_level: required
       - ref: terma.capture.surface
         requirement_level: required
+      - ref: terma.policy.denial_id
+        requirement_level: required
       - ref: terma.policy.kind
         requirement_level: required
       - ref: terma.policy.rule
@@ -750,6 +756,10 @@ events:
       - ref: gen_ai.main_agent.name
         requirement_level: required
       - ref: terma.capture.surface
+        requirement_level: required
+      - ref: terma.file.id
+        requirement_level: required
+      - ref: terma.governance.revision
         requirement_level: required
       - ref: terma.file.path
       - ref: terma.file.changed

@@ -22,6 +22,13 @@ import (
 // a pid used again inherits nothing. A governance record from anyone else, or beside other
 // records, leaves only as its sender's own would under its session's claim, never by global
 // mode's catch-all.
+//
+// What the signature check is not: a boundary against the developer's own processes. A process
+// running as the user can already write the claim files the relay trusts (claim.Dir), and one
+// that opens a connection and then execs the signed app keeps its pid and start time, so the
+// check passes for it. Neither gains it more than writing a claim would. The check keeps other
+// senders' records from being taken as the app's by mistake; a channel that authenticates the app
+// itself (an XPC service checking its audit token) is what would make it a boundary.
 const (
 	desktopTeamID     = "YR8HVF742J" // Mirador Labs Inc.
 	desktopIdentifier = "ai.terma.desktop"
