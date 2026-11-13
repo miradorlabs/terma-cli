@@ -45,12 +45,34 @@ func ShellPaths(command, cwd string) []string {
 
 // shellPaths is ShellPaths under env, the hook's environment.
 func shellPaths(command, cwd string, env func(string) (string, bool)) []string {
-	sc := &shellScan{cwd: cwd, dir: cwd, env: env, vars: map[string]*string{}}
-	sc.scan(shellWords(command))
-	if sc.unknown {
-		sc.out = append(sc.out, UnknownReach)
+	var out []string
+	unknown := false
+	for _, escapes := range shellReadings() {
+		sc := &shellScan{cwd: cwd, dir: cwd, env: env, vars: map[string]*string{}}
+		sc.scan(shellWords(command, escapes))
+		unknown = unknown || sc.unknown
+		for _, p := range sc.out {
+			if !slices.Contains(out, p) {
+				out = append(out, p)
+			}
+		}
 	}
-	return sc.out
+	if unknown {
+		out = append(out, UnknownReach)
+	}
+	return out
+}
+
+// shellReadings are the ways a command is read, each whether a backslash escapes. A POSIX
+// shell escapes with it. On Windows an agent's shell may be Git Bash, which escapes, or
+// PowerShell or cmd, where it separates C:\Users\..., so a command is
+// read both ways and reaches what either reading finds: a path only one finds errs toward
+// Mixed, the safe way.
+func shellReadings() []bool {
+	if filepath.Separator == '\\' {
+		return []bool{true, false}
+	}
+	return []bool{true}
 }
 
 // shellScan is one ShellPaths: where the command is, what it has assigned, and what it
