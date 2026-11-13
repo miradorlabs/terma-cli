@@ -238,20 +238,12 @@ func (c routeCache) load(stateDir, profile string) *profileRoute {
 		delete(c, profile)
 		return nil
 	}
-	if have := c[profile]; have != nil && sameGeneration(have.state, s) {
+	if have := c[profile]; have != nil && routing.SameGeneration(have.state, s) {
 		return have
 	}
 	pr := &profileRoute{state: s, router: routing.NewRouter(s)}
 	c[profile] = pr
 	return pr
-}
-
-// sameGeneration reports whether b is the generation of the state a was: the same number of
-// writes, and the same enrollments, so a state lost and made again is never taken for the
-// one it replaced.
-func sameGeneration(a, b routing.State) bool {
-	return a.Generation == b.Generation &&
-		slices.EqualFunc(a.Teams, b.Teams, func(x, y routing.Team) bool { return x.EnrollmentID == y.EnrollmentID })
 }
 
 // teamOf is the selected team whose enrollment is id.

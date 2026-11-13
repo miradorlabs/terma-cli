@@ -2,8 +2,6 @@ package migrate
 
 import (
 	"cmp"
-	"crypto/rand"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -103,7 +101,7 @@ func prepared(s *routing.State, team *routing.Team) error {
 		}
 		if id == "" {
 			var err error
-			if id, err = newEnrollmentID(); err != nil {
+			if id, err = routing.NewEnrollmentID(); err != nil {
 				return err
 			}
 		}
@@ -187,13 +185,4 @@ func preparing(stateDir string) ([]routing.State, error) {
 		}
 	}
 	return out, nil
-}
-
-// newEnrollmentID names a new enrollment as routing.State.Select does.
-func newEnrollmentID() (string, error) {
-	var b [16]byte
-	if _, err := rand.Read(b[:]); err != nil {
-		return "", err
-	}
-	return hex.EncodeToString(b[:]), nil
 }
