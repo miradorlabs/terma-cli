@@ -28,8 +28,15 @@ func OwnHooksPath(gitDir string) bool { return HooksPathScope(gitDir) != "" }
 // budget, so it reads the filesystem and never git, and writes only when something is
 // missing.
 func Sync(stateDir, terma string, policy config.Policy, now time.Time, dir string) (changed bool, err error) {
+	return SyncIf(stateDir, terma, func(gitDir string) bool { return Wanted(policy, now, gitDir) }, dir)
+}
+
+// SyncIf is Sync with what asks for the hooks given as wanted, which judges a repository
+// by its git directory: on a migrated machine, whether routing sends the repository to a
+// team whose policy turns git_hooks on.
+func SyncIf(stateDir, terma string, wanted func(gitDir string) bool, dir string) (changed bool, err error) {
 	_, gitDir, ok := gitx.LocateFS(dir)
-	if !ok || !Wanted(policy, now, gitDir) || OwnHooksPath(gitDir) {
+	if !ok || !wanted(gitDir) || OwnHooksPath(gitDir) {
 		return false, nil
 	}
 	return Install(stateDir, terma, gitDir)
