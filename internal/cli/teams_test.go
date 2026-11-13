@@ -388,7 +388,8 @@ func TestTeamsRefuseAndUnbind(t *testing.T) {
 }
 
 // Before migration, `terma teams` stops the relay, starts this executable, and waits for
-// the migration to commit; with no commit it fails and nothing changes.
+// the migration to commit; when the relay never begins it, it gives up without claiming
+// nothing changed, since the relay may yet make it.
 func TestTeamsMigratesTheMachineFirst(t *testing.T) {
 	f := newFakeAuth(t)
 	authSandbox(t, f)
@@ -403,7 +404,7 @@ func TestTeamsMigratesTheMachineFirst(t *testing.T) {
 	testApp.migrationWait = 300 * time.Millisecond
 	started := 0
 	testApp.spawnRelay = func(string, string, string) { started++ }
-	if _, _, err := teamsJSON(t); err == nil || !strings.Contains(err.Error(), "nothing was changed") {
+	if _, _, err := teamsJSON(t); !errors.Is(err, errMigrationPending) || strings.Contains(err.Error(), "nothing was changed") {
 		t.Fatalf("teams with no migration = %v", err)
 	}
 	if started != 1 || config.Migrated(testApp.dir) {
