@@ -16,10 +16,10 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/runs"
 )
 
-// migratedMachine is a machine the relay migrated: one profile signed in to acme, whose
+// migratedForTeardown is a machine the relay migrated: one profile signed in to acme, whose
 // sign-in environment answers nothing, with team acme-platform under one enrollment, and
 // a relay set up. It returns the enrollment.
-func migratedMachine(t *testing.T, configDir, stateDir string) string {
+func migratedForTeardown(t *testing.T, configDir, stateDir string) string {
 	t.Helper()
 	authURL := "http://" + freeAddr(t)
 	if err := config.UpdateProfile(configDir, "default", func(p *config.Profile) {
@@ -58,7 +58,7 @@ func migratedMachine(t *testing.T, configDir, stateDir string) string {
 // record of a migration that did not happen.
 func TestTeardownKeepsAMigratedMachineMigrated(t *testing.T) {
 	_, configDir, stateDir, _ := nateTestEnvironment(t)
-	enrollment := migratedMachine(t, configDir, stateDir)
+	enrollment := migratedForTeardown(t, configDir, stateDir)
 	statePath, err := routing.StatePath(stateDir, "default")
 	if err != nil {
 		t.Fatal(err)
