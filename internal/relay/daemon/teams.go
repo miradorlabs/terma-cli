@@ -249,10 +249,15 @@ func (t *Teams) Selected(enrollment string) bool {
 }
 
 // Legacy maps a part queued before the migration for project to its cutover enrollment
-// (routing.Migration.Legacy), as a record with a location of its own: it has no run.
+// (routing.Migration.Legacy), as a record with a location of its own: it has no run. While
+// the routing state cannot be read, as between the migration marking the machine migrated
+// and its commit, the part is mapped to no enrollment yet, and waits.
 func (t *Teams) Legacy(project string, repo config.Repository) (relay.Queued, bool) {
 	st, _, ok := t.state()
-	if !ok || st.Migration == nil {
+	if !ok {
+		return relay.Queued{}, true
+	}
+	if st.Migration == nil {
 		return relay.Queued{}, false
 	}
 	enrollment := st.Migration.Legacy[project]

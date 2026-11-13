@@ -37,6 +37,7 @@ type Router interface {
 	Selected(enrollment string) bool
 	// Legacy is the destination of a part queued before the migration for project, in
 	// repository repo: its cutover enrollment; false when it has none, and it is dropped.
+	// True with no enrollment while the routing state cannot be read: it waits.
 	Legacy(project string, repo config.Repository) (Queued, bool)
 }
 

@@ -68,5 +68,6 @@ func (m *KeyMinter) mintNow(projectID string) bool {
 	if err != nil || key == "" {
 		return false
 	}
-	return keystore.Set(m.cfg.Dir, projectID, key, keystore.HostsOf(m.cfg)) == nil
+	// The machine may have migrated meanwhile: the key then goes unused.
+	return keystore.SetLegacy(m.cfg.Dir, projectID, key, keystore.HostsOf(m.cfg)) == nil
 }

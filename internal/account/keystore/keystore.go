@@ -203,6 +203,14 @@ const lockWait = 5 * time.Second
 // update is the one way the file changes: unlocked, a concurrent install's rename
 // dropped the other's key.
 func update(dir string, edit func(f *file, inFile bool)) error {
+	return updateOr(dir, func(f *file, inFile bool) error {
+		edit(f, inFile)
+		return nil
+	})
+}
+
+// updateOr is update with an edit that may refuse: the file is then left as it was.
+func updateOr(dir string, edit func(f *file, inFile bool) error) error {
 	inFile := config.InsecureStorage(dir)
 	var added []string
 	err := flock.Locked(path(dir), lockWait, func() error {
@@ -210,8 +218,11 @@ func update(dir string, edit func(f *file, inFile bool)) error {
 		if err != nil {
 			return err
 		}
-		edit(f, inFile)
+		err = edit(f, inFile)
 		added = f.added
+		if err != nil {
+			return err
+		}
 		return save(dir, f)
 	})
 	if err != nil {

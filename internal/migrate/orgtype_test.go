@@ -159,3 +159,47 @@ func TestFinishingAMigrationAsksNoTypes(t *testing.T) {
 		t.Fatalf("the finished migration lost what the first start learned: %+v", tm)
 	}
 }
+
+// Run records that it is migrating, and since when, from before it asks anything until
+// it has an outcome: gone once it has committed or recorded why not, and gone when the
+// relay stops it first, which changes nothing. `terma teams` waits on it.
+func TestRunRecordsThatItIsMigrating(t *testing.T) {
+	t.Parallel()
+	for name, answer := range map[string]func(ctx context.Context, stop func()) (string, error){
+		"committed": func(context.Context, func()) (string, error) { return OrgShared, nil },
+		"blocked":   func(context.Context, func()) (string, error) { return "", errors.New("401 sign in again") },
+		"stopped": func(ctx context.Context, stop func()) (string, error) {
+			stop()
+			<-ctx.Done()
+			return "", ctx.Err()
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			m := severalMachine(t)
+			started := time.Now()
+			ctx, cancel := context.WithCancel(context.Background())
+			var recorded bool
+			m.OrgType = func(context.Context, string, string) (string, error) {
+				since, ok := Migrating(m.StateDir)
+				recorded = recorded || ok && !since.Before(started.Truncate(time.Second))
+				return answer(ctx, cancel)
+			}
+			out, _ := Run(ctx, m)
+			cancel()
+			if !recorded {
+				t.Fatal("not recorded while asking the organization types")
+			}
+			if _, ok := Migrating(m.StateDir); ok {
+				t.Fatalf("the record outlived the outcome (%s)", out)
+			}
+			_, blocked := ReadBlock(m.StateDir)
+			switch {
+			case name == "committed" && (out != Committed || blocked),
+				name == "blocked" && (out != NotMigrated || !blocked),
+				name == "stopped" && (out != NotMigrated || blocked || config.Migrated(m.ConfigDir)):
+				t.Fatalf("Run = %s, block recorded %v", out, blocked)
+			}
+		})
+	}
+}

@@ -35,6 +35,7 @@ type fakeRouter struct {
 	routed            []Record
 	rechecked         []Queued
 	passes            int     // rechecks of a whole queue begun
+	noState           bool    // the routing state cannot be read, as while the migration commits
 	hold              *Routed // set: every placed record is held so
 }
 
@@ -118,6 +119,9 @@ func (f *fakeRouter) Selected(enrollment string) bool {
 func (f *fakeRouter) Legacy(project string, _ config.Repository) (Queued, bool) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	if f.noState {
+		return Queued{}, true
+	}
 	q, ok := f.legacy[project]
 	return q, ok
 }
@@ -493,6 +497,43 @@ func TestPartsQueuedBeforeTheMigrationMapToTheCutoverEnrollment(t *testing.T) {
 	})
 	got, _ := u.logs(t)
 	if len(got) != 1 || len(got["Bearer key-acme"]) != 1 {
+		t.Fatalf("forwarded %v", got)
+	}
+}
+
+// The relay migrates the machine while it runs, so a part queued under today's rules can
+// come up for sending once the machine is marked migrated and before its routing state is
+// committed: it waits for the state, and is never dropped for it.
+func TestAPartQueuedBeforeTheMigrationWaitsForItsCommit(t *testing.T) {
+	t.Parallel()
+	u := newUpstream(t)
+	f := newTeamFixture(t, u)
+	f.router.noState = true
+	f.router.legacy = map[string]Queued{"acme": {Enrollment: "e-acme", Project: "acme", Kind: "repository", Repository: "github.com/acme/api", Own: true}}
+	c := claim.Claim{ProjectID: "acme", Repository: config.Repository{Origin: "github.com/acme/api"}}
+	if err := (outbox{dir: f.dir}).put(routeOf(c), c.Repository, newEntry(f.clock(), Logs, 1), mustMarshal(t, logsOf("A", 1))); err != nil {
+		t.Fatal(err)
+	}
+	r, _ := f.start(t)
+	var s *sender
+	waitFor(t, func() bool {
+		r.mu.Lock()
+		s = r.senders[routeOf(c)]
+		r.mu.Unlock()
+		if s == nil {
+			return false
+		}
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		return s.keyless
+	})
+	if c := r.Stats().Snapshot().Counters; c["dropped.legacy_unmapped.logs"] != 0 || c["forwarded.logs"] != 0 {
+		t.Fatalf("before the commit: %v", c)
+	}
+	f.router.set(func(fr *fakeRouter) { fr.noState = false })
+	s.poke()
+	waitForCounters(t, r, func(c map[string]int) bool { return c["forwarded.logs"] == 1 })
+	if got, _ := u.logs(t); len(got["Bearer key-acme"]) != 1 {
 		t.Fatalf("forwarded %v", got)
 	}
 }

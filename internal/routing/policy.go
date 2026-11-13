@@ -73,6 +73,12 @@ func StorePolicy(cfg *config.Config, pol *config.Policy) error {
 	}
 	var rejected error
 	err = config.UpdateProfile(cfg.Dir, cfg.ProfileName, func(p *config.Profile) {
+		if config.Migrated(cfg.Dir) {
+			// Migrated since the fetch: the migration retires config.json's teams under
+			// this lock after it marks the machine migrated, and a team written back would
+			// be one an older terma collects for.
+			return
+		}
 		if p.OrganizationID == "" && cfg.OrganizationID != "" {
 			p.SelectOrganization(cfg.OrganizationID, "")
 		}

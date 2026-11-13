@@ -2,10 +2,12 @@ package keystore
 
 import (
 	"errors"
+	"os"
 	"strings"
 	"testing"
 
 	"github.com/miradorlabs/terma-cli/internal/account/secret"
+	"github.com/miradorlabs/terma-cli/internal/config"
 )
 
 // legacyKeys is a machine before the migration: two teams' keys, an agent's own key for
@@ -132,5 +134,30 @@ func TestRetireV1RetriesTheKeychain(t *testing.T) {
 	mustNot(t, RetireV1(dir))
 	if _, err := secret.Get(dir, "key/acme-platform"); !errors.Is(err, secret.ErrNotFound) {
 		t.Fatalf("the item survived a second retirement: %v", err)
+	}
+}
+
+// A key minted under the rules before the migration lands in keys.json only while the
+// machine is not migrated: once it is, keys.json is left as it was, so no key reaches it
+// after the migration retired it, where an older terma would send with it.
+func TestSetLegacyStopsAtTheMigration(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	mustNot(t, SetLegacy(dir, "acme-platform", testKey, Hosts{}))
+	if got, _ := Get(dir, "acme-platform"); got != testKey {
+		t.Fatalf("before the migration: %q", got)
+	}
+	mustNot(t, RetireV1(dir))
+	mustNot(t, os.WriteFile(config.CredentialsV2Path(dir), []byte("{}"), 0o600))
+	before, err := os.ReadFile(FilePath(dir))
+	mustNot(t, err)
+	if err := SetLegacy(dir, "old-team", otherKey, Hosts{}); !errors.Is(err, ErrMigrated) {
+		t.Fatalf("SetLegacy on a migrated machine = %v", err)
+	}
+	if after, _ := os.ReadFile(FilePath(dir)); string(after) != string(before) {
+		t.Fatalf("keys.json changed:\n%s", after)
+	}
+	if got, _ := Get(dir, "old-team"); got != "" {
+		t.Fatalf("a key reached keys.json after the migration: %q", got)
 	}
 }
