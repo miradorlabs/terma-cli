@@ -14,12 +14,12 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 )
 
-// A shell command's paths are its absolute, ~/ and slashed words and every cd's target,
-// split at whitespace and the shell's operators outside quotes, resolved against the cwd,
-// and kept where something is there. A word with nothing there may be a file the command
-// creates, so it reaches the nearest folder that is there: another checkout's for a new
-// file there, the cwd's own for a word that only looks like a path. A cd to nowhere goes
-// nowhere.
+// A shell command's places are the folders of its absolute, ~/ and slashed words and every
+// cd's target, split at whitespace and the shell's operators outside quotes, resolved
+// against the cwd, where something is there: a folder is its own place, a file its
+// folder's. A word with nothing there may be a file the command creates, so it reaches the
+// nearest folder that is there: another checkout's for a new file there, the cwd's own for
+// a word that only looks like a path. A cd to nowhere goes nowhere.
 //
 // Some words are not paths whole: those inside a command substitution, $(...) or `...`,
 // quoted or not, and a subshell's, (...); an option's or an assignment's value (--flag=X,
@@ -39,10 +39,10 @@ func TestShellPathsAreTheWordsThatNameSomethingThere(t *testing.T) {
 		t.Fatal(err)
 	}
 	for command, want := range map[string][]string{
-		"echo x >> '" + notes + "'":          {notes},
+		"echo x >> '" + notes + "'":          {api},
 		`cd "../acme api"&&ls`:               {api},
 		`cd ../acme\ api || ls src/`:         {api, filepath.Join(cwd, "src")},
-		"cat <'../acme api/NOTES.md'|wc -l":  {notes},
+		"cat <'../acme api/NOTES.md'|wc -l":  {api},
 		"ls -la":                             nil,
 		"cd src; ls":                         {filepath.Join(cwd, "src")},
 		"cat '../acme api/MISSING.md'":       {api},
@@ -57,22 +57,23 @@ func TestShellPathsAreTheWordsThatNameSomethingThere(t *testing.T) {
 		"cd src && echo x > '../src/new.go'":    {filepath.Join(cwd, "src"), parent},
 		"echo x > '" + notes + "/not-a-folder'": nil,
 
-		"echo $(cat '../acme api/NOTES.md')":          {notes},
-		"echo `cat ../acme\\ api/NOTES.md`":           {notes},
-		`echo "$(cat '../acme api/NOTES.md')"`:        {notes},
-		`echo "notes: $(cat "../acme api/NOTES.md")"`: {notes},
+		"echo $(cat '../acme api/NOTES.md')":          {api},
+		"echo `cat ../acme\\ api/NOTES.md`":           {api},
+		`echo "$(cat '../acme api/NOTES.md')"`:        {api},
+		`echo "notes: $(cat "../acme api/NOTES.md")"`: {api},
 		`x="$(cd '../acme api' && pwd)"`:              {api},
 		"echo '$(cat ../acme\\ api/NOTES.md)'":        {cwd},
 		"(cd '../acme api')":                          {api},
-		"(cat '../acme api/NOTES.md')":                {notes},
-		"grep --file='../acme api/NOTES.md' TODO":     {notes},
+		"(cat '../acme api/NOTES.md')":                {api},
+		"grep --file='../acme api/NOTES.md' TODO":     {api},
 		"cc -I'../acme api' -o out.o x.c":             {api},
-		"cc -o'../acme api/NOTES.md' x.c":             {notes},
+		"cc -o'../acme api/NOTES.md' x.c":             {api},
 		"GIT_DIR='../acme api' git status":            {api},
 		"pushd src && ls":                             {filepath.Join(cwd, "src")},
 		"cd -P src":                                   {filepath.Join(cwd, "src")},
-		"cd .. && cat 'acme api/NOTES.md'":            {parent, notes},
-		"(cd src) && cat '../acme api/NOTES.md'":      {filepath.Join(cwd, "src"), notes},
+		"cd .. && cat 'acme api/NOTES.md'":            {parent, api},
+		"(cd src) && cat '../acme api/NOTES.md'":      {filepath.Join(cwd, "src"), api},
+		"cat src/../../'acme api'/NOTES.md src":       {api, filepath.Join(cwd, "src")},
 	} {
 		if got := ShellPaths(command, cwd); !sameReach(got, want) {
 			t.Errorf("ShellPaths(%q) = %q, want %q", command, got, want)
@@ -80,36 +81,42 @@ func TestShellPathsAreTheWordsThatNameSomethingThere(t *testing.T) {
 	}
 }
 
-// A command's first maxShellPaths candidates are examined, and one with more counts as
-// reaching an unknown organization: Acme's checkout among the first turns the run Mixed,
-// and so does any command past the bound, though none of its candidates names another
-// checkout.
-func TestAShellCommandPastTheCandidateBoundTurnsTheRunMixed(t *testing.T) {
+// A command reaches its first maxShellPlaces places, each folder once however many of its
+// words name it, and one reaching more counts as reaching an unknown organization: Acme's
+// checkout among the first turns the run Mixed, and so does any command past the bound,
+// though none of its places is another checkout. Words naming files of one folder are one
+// place.
+func TestAShellCommandPastThePlaceBoundTurnsTheRunMixed(t *testing.T) {
 	t.Parallel()
 	st := acmeAndPersonalRepos(t)
 	side, api := hookruntest.RepoAt(t, "github.com/dawson/side"), hookruntest.RepoAt(t, "github.com/acme/api")
+	for i := range maxShellPlaces + 5 {
+		hookruntest.WriteFile(t, side, fmt.Sprintf("d%03d/a.go", i), "package d\n")
+		hookruntest.WriteFile(t, side, fmt.Sprintf("d%03d/b.go", i), "package d\n")
+	}
 	for _, tc := range []struct {
-		candidates int
-		acmeAt     int // Acme's position among the candidates, from 0; -1 for none
-		mixed      bool
-	}{{maxShellPaths, 0, true}, {maxShellPaths, -1, false}, {maxShellPaths + 1, -1, true}, {maxShellPaths + 5, maxShellPaths, true}} {
-		t.Run(fmt.Sprint(tc.candidates, tc.acmeAt), func(t *testing.T) {
+		places int
+		acmeAt int // Acme's position among the places, from 0; -1 for none
+		mixed  bool
+	}{{maxShellPlaces, 0, true}, {maxShellPlaces, -1, false}, {maxShellPlaces + 1, -1, true}, {maxShellPlaces + 5, maxShellPlaces, true}} {
+		t.Run(fmt.Sprint(tc.places, tc.acmeAt), func(t *testing.T) {
 			t.Parallel()
 			m := newRoutedMachine(t, st)
-			sid := fmt.Sprintf("long-command-%d-%d", tc.candidates, tc.acmeAt)
+			sid := fmt.Sprintf("long-command-%d-%d", tc.places, tc.acmeAt)
 			r := startIn(t, m.hook(), sid, side)
 			words := []string{"ls"}
-			for i := range tc.candidates {
+			for i := range tc.places {
 				if i == tc.acmeAt {
 					// Quoted, as a shell needs a Windows path's backslashes.
 					words = append(words, "'"+api+"'")
 				} else {
-					words = append(words, fmt.Sprintf("src/missing-%d.go", i))
+					// Two files of one folder, and a new one there: one place.
+					words = append(words, fmt.Sprintf("d%03d/a.go d%03d/b.go d%03d/new.go", i, i, i))
 				}
 			}
 			paths := ShellPaths(strings.Join(words, " "), side)
-			if past := slices.Contains(paths, UnknownReach); past != (tc.candidates > maxShellPaths) {
-				t.Fatalf("ShellPaths named UnknownReach %v for %d candidates", past, tc.candidates)
+			if past := slices.Contains(paths, UnknownReach); past != (tc.places > maxShellPlaces) {
+				t.Fatalf("ShellPaths named UnknownReach %v for %d places", past, tc.places)
 			}
 			env := m.hook()
 			env.Cwd = side
@@ -197,8 +204,8 @@ func TestAnUnquotedWindowsPathIsAPath(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, command := range []string{"cat " + notes, "Get-Content " + notes + " | Select-Object -First 5", `type "` + notes + `"`} {
-		if got := ShellPaths(command, dir); !slices.Contains(got, notes) {
-			t.Errorf("ShellPaths(%q) = %q, want %q among them", command, got, notes)
+		if got := ShellPaths(command, dir); !slices.Contains(got, dir) {
+			t.Errorf("ShellPaths(%q) = %q, want %q among them", command, got, dir)
 		}
 	}
 }

@@ -165,13 +165,14 @@ drops whatever carries content, a record that routes by a location of its own (a
 agent's turn) included; only a file event, a commit or a push, which say where something
 happened and nothing else, keep their destination (`runs.Locational`). A run
 touches a checkout when it runs there, or when a tool call edits, reads or searches a path
-in it, or names one in a shell command (each path the command names that is there, a
-word without a slash included unless it names the command, the nearest folder that is
-there above one that is not, as a new file a redirect creates, and every `cd`'s and
-`pushd`'s target, after expanding variables, `$(pwd)` and globs: `hookrun.ShellPaths`); a
-path through a symlink touches its target's checkout too. A command with more candidates
-than are examined, or a path in it whose expansion cannot be resolved, touches an
-organization not known, and the run turns Mixed (`hookrun.UnknownReach`). An edit records and spools as it always has; a
+in it, or names one in a shell command (the folder of each path the command names that is
+there, a word without a slash included unless it names the command, the nearest folder
+that is there above one that is not, as a new file a redirect creates, and every `cd`'s
+and `pushd`'s target, after expanding variables, `$(pwd)` and globs: `hookrun.ShellPaths`);
+a path through a symlink touches its target's checkout too. A command reaching more
+folders than are examined, each counted once however many of its words name it, or a path
+in it whose expansion cannot be resolved, touches an organization not known, and the run
+turns Mixed (`hookrun.UnknownReach`). An edit records and spools as it always has; a
 read, a search or a shell command only classifies (`hookrun.Env.Classify`): it writes no
 manifest and spools nothing, and on a machine not migrated it does nothing. Where the agent
 has a hook before the call, it classifies there, so that the call's own result is exported
