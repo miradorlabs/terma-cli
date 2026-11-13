@@ -8,9 +8,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/miradorlabs/terma-cli/internal/account/keystore"
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/delivery"
+	"github.com/miradorlabs/terma-cli/internal/routing"
 
 	"github.com/spf13/cobra"
 
@@ -67,9 +69,9 @@ The exit status distinguishes the outcomes a script needs apart:
   1  delivery failed for at least one team; its events stay queued and that
      team backs off on its own, while every other team's are delivered
   2  nothing was attempted: an earlier failure's retry window is open (--force overrides)
-  3  the pass ran but left work: events held for a team key or waiting out
-     their team's retry window (--force overrides), or given up on for age,
-     disk pressure, or being unreadable`,
+  3  the pass ran but left work: events held for a team key or until their
+     team can send, or waiting out their team's retry window (--force
+     overrides), or given up on for age, disk pressure, or being unreadable`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			res, err := app.flushSpool(cmd.Context(), force, minInterval)
 			if quiet {
@@ -109,8 +111,19 @@ The exit status distinguishes the outcomes a script needs apart:
 // event was not; `terma spool flush` and doctor share it so they agree on the terms.
 func describeFlush(res delivery.Result) (delivered string, undelivered []string) {
 	delivered = fmt.Sprintf("%d event%s", res.Sent, plural(res.Sent))
-	if res.Held > 0 {
-		undelivered = append(undelivered, fmt.Sprintf("holding %d for a team key (run `terma setup`)", res.Held))
+	// Once migrated, the relay creates a team's missing key; doctor names the team.
+	fix := "run `terma setup`"
+	if res.Migrated {
+		fix = "run `terma doctor`"
+	}
+	if forKey := res.Held - res.Blocked - res.Unrouted; forKey > 0 {
+		undelivered = append(undelivered, fmt.Sprintf("holding %d for a team key (%s)", forKey, fix))
+	}
+	if res.Blocked > 0 {
+		undelivered = append(undelivered, fmt.Sprintf("holding %d until their team can send again (run `terma doctor`)", res.Blocked))
+	}
+	if res.Unrouted > 0 {
+		undelivered = append(undelivered, fmt.Sprintf("holding %d until this machine's routing state can be read (run `terma doctor`)", res.Unrouted))
 	}
 	if res.Failed > 0 {
 		undelivered = append(undelivered, fmt.Sprintf("keeping %d queued after a failed delivery", res.Failed))
@@ -138,6 +151,12 @@ func describeFlush(res delivery.Result) (delivered string, undelivered []string)
 	if res.Withheld > 0 {
 		undelivered = append(undelivered, fmt.Sprintf("withheld %d by capture policy", res.Withheld))
 	}
+	if res.Discarded > 0 {
+		undelivered = append(undelivered, fmt.Sprintf("dropped %d their team no longer collects", res.Discarded))
+	}
+	if res.Mixed > 0 {
+		undelivered = append(undelivered, fmt.Sprintf("dropped %d from session runs that crossed organizations", res.Mixed))
+	}
 	return delivered, undelivered
 }
 
@@ -151,12 +170,13 @@ func plural(n int) string {
 // delivery is how this build sends the spool.
 func (app *App) delivery() delivery.Router {
 	return delivery.Router{
-		ConfigDir:  app.dir,
-		StateDir:   app.stateDir,
-		Version:    app.version,
-		OTLPPinned: app.flags.otlpURL != "" || os.Getenv("TERMA_OTLP_URL") != "",
-		Policy:     app.policies().Current,
-		User:       app.teamUser,
+		ConfigDir:    app.dir,
+		StateDir:     app.stateDir,
+		Version:      app.version,
+		OTLPPinned:   app.flags.otlpURL != "" || os.Getenv("TERMA_OTLP_URL") != "",
+		Policy:       app.policies().Current,
+		User:         app.teamUser,
+		EnrolledUser: app.enrolledUser,
 		Consent: func(tool string, c hookrun.Consent) bool {
 			a, ok := app.agents.ForTool(tool)
 			if !ok {
@@ -188,10 +208,26 @@ func (app *App) flushSpool(ctx context.Context, force bool, minInterval time.Dur
 	}
 	r := app.delivery()
 	// A hook that found the policy stale started this flush to refresh it (hookrun refreshPolicy).
-	if cfg.Policy.Stale(time.Now()) {
+	// A migrated machine's policies are its routing state's, which this never writes: the
+	// profile's single-team refresh would also write the team back into config.json.
+	if !config.Migrated(app.dir) && cfg.Policy.Stale(time.Now()) {
 		r.Policy = refreshOnce(ctx, cfg, cfg.Policy.Team(), r.Policy)
 	}
 	return r.Flush(ctx, s, cfg, force, minInterval), nil
+}
+
+// enrolledUser is teamUser on a migrated machine: who what terma sends with the key of team,
+// an enrollment in profile's routing state, to endpoint names. It is profile's signed-in
+// user, only while signed in to that team's organization in its environment, and only for
+// a key going to the profile's own ingest and filed, if with hosts at all, with the
+// profile's API host; anything else names no one.
+func (app *App) enrolledUser(profile string, team routing.Team, hosts keystore.Hosts, endpoint string) string {
+	cfg, err := config.Load(app.dir, app.stateDir, config.Overrides{Profile: profile, Env: app.flags.env, APIURL: app.flags.apiURL, OTLPURL: app.flags.otlpURL})
+	if err != nil || !sameHost(endpoint, cfg.OTLPURL) || hosts.API != "" && !sameHost(hosts.API, cfg.APIURL) {
+		return ""
+	}
+	cfg.OrganizationID, cfg.AuthURL = team.OrganizationID, team.AuthURL
+	return signedInUser(cfg)
 }
 
 var errTornDown = errors.New("terma is not set up on this machine; run `terma setup`")

@@ -1,5 +1,8 @@
 // Package delivery sends the hook spool to Terma: each project's events with its own key
-// to its own environment's host, under the policy in force when they leave.
+// to its own environment's host, under the policy in force when they leave. On a machine
+// migrated to multi-org routing (config.Migrated), each event goes only to the enrollment
+// routing gave it when it was spooled, rechecked against its profile's routing state as it
+// leaves, and is never routed again (routed.go).
 package delivery
 
 import (
@@ -34,15 +37,29 @@ type Router struct {
 	// User is who events sent to projectID at endpoint name, by Mirador user id, asked as they
 	// are flushed, as the relay asks as it accepts a part; "" or a nil User names no one.
 	User func(cfg *config.Config, projectID, endpoint string) string
+	// EnrolledUser is User on a migrated machine: who events sent to team, an enrollment in
+	// profile's routing state, with a key filed with hosts, at endpoint name.
+	EnrolledUser func(profile string, team routing.Team, hosts keystore.Hosts, endpoint string) string
 }
 
-// Result summarizes one delivery pass; its counters are disjoint, one per reason.
+// Result summarizes one delivery pass; its counters are disjoint, one per reason, but for
+// Blocked and Unrouted, which say why some of Held were held.
 type Result struct {
 	Sent, Held, Failed, Expired, Pruned, Dropped, Unroutable, Withheld int
-	Skipped                                                            bool
-	Reason                                                             spool.SkipReason
-	NextAttempt                                                        time.Time
-	Err                                                                error
+	// Migrated is set when the pass ran under multi-org routing, where the rest apply.
+	Migrated bool
+	// Blocked are held until their team can send again (expired, signing in, suspended, or
+	// a binding still to be decided); Unrouted are held because their profile's routing
+	// state is missing, unreadable, or not yet committed by the migration.
+	Blocked, Unrouted int
+	// Discarded were dropped by their recheck: their team no longer collects them, or, for
+	// an event queued before the migration, its project maps to no team. Mixed were dropped
+	// because their session run crossed organizations by their time.
+	Discarded, Mixed int
+	Skipped          bool
+	Reason           spool.SkipReason
+	NextAttempt      time.Time
+	Err              error
 	// Failures names each failed project once, in order; doctor tells its own from another's.
 	Failures []Failure
 	// Waiting names each project skipped because its retry window was open.
@@ -69,102 +86,21 @@ func (r Result) Lost() bool {
 }
 
 // Flush delivers everything s holds, each project with its own key to its own host. A
-// keyless or policy-less project's events are held; a failing one backs off alone.
+// keyless or policy-less project's events are held; a failing one backs off alone. On a
+// migrated machine each event goes only to the destination it was spooled with (routed).
 func (r Router) Flush(ctx context.Context, s *spool.Spool, cfg *config.Config, force bool, minInterval time.Duration) Result {
 	var res Result
 	now := time.Now()
-	failed := map[string]bool{}
-	waiting := map[string]bool{}
-	accepted := map[string]bool{}
-	router := spool.SenderFunc(func(ctx context.Context, events []spool.Event) ([]spool.Event, error) {
-		byProject := map[string][]spool.Event{}
-		var held []spool.Event
-		policies := map[string]config.Policy{}
-		policyErrors := map[string]error{}
-		for _, e := range events {
-			id, _ := e.Attrs[hookrun.AttrProjectID].(string)
-			if id == "" {
-				res.Unroutable++
-				continue
-			}
-			pol, checked := policies[id]
-			if !checked && policyErrors[id] == nil {
-				var err error
-				pol, err = r.Policy(ctx, cfg, id)
-				if err != nil {
-					policyErrors[id] = err
-				} else {
-					policies[id] = pol
-				}
-			}
-			if policyErrors[id] != nil {
-				held = append(held, e)
-				continue
-			}
-			out, ok := r.Outgoing(pol, id, e)
-			if !ok {
-				res.Withheld++
-				continue
-			}
-			byProject[id] = append(byProject[id], out)
-		}
-		var undelivered []spool.Event
-		var errs []error
-		for _, id := range slices.Sorted(maps.Keys(byProject)) {
-			batch := byProject[id]
-			key, err := keystore.Get(r.ConfigDir, id)
-			if err != nil {
-				// The keychain is locked or out of reach: retry as for a refused send.
-				errs = append(errs, fmt.Errorf("%s: %w", id, err))
-				undelivered = append(undelivered, batch...)
-				continue
-			}
-			if key == "" {
-				// No key yet; MaxAge already dropped anything too old to wait.
-				held = append(held, batch...)
-				continue
-			}
-			if failed[id] {
-				// Refused earlier in this pass: one question per host per pass.
-				undelivered = append(undelivered, batch...)
-				continue
-			}
-			if next := s.RetryAt(id); !force && now.Before(next) {
-				if !waiting[id] {
-					waiting[id] = true
-					res.Waiting = append(res.Waiting, Wait{ProjectID: id, RetryAt: next})
-				}
-				undelivered = append(undelivered, batch...)
-				continue
-			}
-			endpoint := r.Endpoint(cfg, id)
-			sender := &otlpSender{Endpoint: endpoint, APIKey: key, ProjectID: id, Version: r.Version}
-			if r.User != nil {
-				sender.UserID = r.User(cfg, id, endpoint)
-			}
-			if _, err := sender.Send(ctx, wire(batch)); err != nil {
-				failed[id] = true
-				f := Failure{ProjectID: id, Endpoint: endpoint, Err: err}
-				// A pass cut short by its own deadline learned nothing about the host.
-				if ctx.Err() == nil {
-					f.RetryAt = s.DestinationFailed(id, time.Now())
-				}
-				res.Failures = append(res.Failures, f)
-				errs = append(errs, fmt.Errorf("%s (%s): %w", id, endpoint, err))
-				undelivered = append(undelivered, batch...)
-				continue
-			}
-			s.DestinationDelivered(id, time.Now())
-			accepted[endpoint] = true
-			res.Sent += len(batch)
-		}
-		if len(undelivered) > 0 {
-			return held, &spool.PartialDelivery{Undelivered: undelivered, Err: errors.Join(errs...)}
-		}
-		return held, nil
-	})
-	fr := s.Flush(ctx, router, spool.FlushOptions{Force: force, MinInterval: minInterval, Now: now})
-	res.Endpoints = slices.Sorted(maps.Keys(accepted))
+	p := &pass{r: r, s: s, cfg: cfg, force: force, now: now, res: &res,
+		failed: map[string]bool{}, waiting: map[string]bool{}, accepted: map[string]bool{}}
+	sender := spool.SenderFunc(p.byProject)
+	if config.Migrated(r.ConfigDir) {
+		res.Migrated = true
+		p.routes = routeCache{}
+		sender = p.routed
+	}
+	fr := s.Flush(ctx, sender, spool.FlushOptions{Force: force, MinInterval: minInterval, Now: now})
+	res.Endpoints = slices.Sorted(maps.Keys(p.accepted))
 	// Loss is the spool's to report; Sent is the router's per-project count.
 	res.Held = fr.Held
 	res.Failed = fr.Failed
@@ -178,18 +114,147 @@ func (r Router) Flush(ctx context.Context, s *spool.Spool, cfg *config.Config, f
 	return res
 }
 
+// pass is one Flush: what every batch it sends shares.
+type pass struct {
+	r     Router
+	s     *spool.Spool
+	cfg   *config.Config
+	force bool
+	now   time.Time
+	res   *Result
+	// failed and waiting are keyed as retry windows are, by project; accepted by endpoint.
+	failed, waiting, accepted map[string]bool
+	// routes are a migrated machine's routing states, kept across the pass's batches.
+	routes routeCache
+}
+
+// byProject sends a batch the way a machine not yet migrated always has: each event to the
+// project its attrs.project_id names, under that project's policy now.
+func (p *pass) byProject(ctx context.Context, events []spool.Event) ([]spool.Event, error) {
+	r, cfg, res := p.r, p.cfg, p.res
+	byProject := map[string][]spool.Event{}
+	var held []spool.Event
+	policies := map[string]config.Policy{}
+	policyErrors := map[string]error{}
+	for _, e := range events {
+		id, _ := e.Attrs[hookrun.AttrProjectID].(string)
+		if id == "" {
+			res.Unroutable++
+			continue
+		}
+		pol, checked := policies[id]
+		if !checked && policyErrors[id] == nil {
+			var err error
+			pol, err = r.Policy(ctx, cfg, id)
+			if err != nil {
+				policyErrors[id] = err
+			} else {
+				policies[id] = pol
+			}
+		}
+		if policyErrors[id] != nil {
+			held = append(held, e)
+			continue
+		}
+		out, ok := r.Outgoing(pol, id, e)
+		if !ok {
+			res.Withheld++
+			continue
+		}
+		byProject[id] = append(byProject[id], out)
+	}
+	var undelivered []spool.Event
+	var errs []error
+	for _, id := range slices.Sorted(maps.Keys(byProject)) {
+		batch := byProject[id]
+		key, err := keystore.Get(r.ConfigDir, id)
+		if err != nil {
+			// The keychain is locked or out of reach: retry as for a refused send.
+			errs = append(errs, fmt.Errorf("%s: %w", id, err))
+			undelivered = append(undelivered, batch...)
+			continue
+		}
+		if key == "" {
+			// No key yet; MaxAge already dropped anything too old to wait.
+			held = append(held, batch...)
+			continue
+		}
+		var user func(string) string
+		if r.User != nil {
+			user = func(endpoint string) string { return r.User(cfg, id, endpoint) }
+		}
+		left, err := p.deliver(ctx, id, key, r.Endpoint(cfg, id), user, batch)
+		undelivered = append(undelivered, left...)
+		if err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return p.settle(held, undelivered, errs)
+}
+
+// deliver sends batch with key to endpoint, for the project id that retry windows and
+// failures name, unless id was refused earlier in this pass or waits out its retry window.
+// It returns what stays queued, and the error a refused send left it with. user, when set,
+// is who the batch names, asked only as it is sent.
+func (p *pass) deliver(ctx context.Context, id, key, endpoint string, user func(endpoint string) string, batch []spool.Event) ([]spool.Event, error) {
+	if p.failed[id] {
+		// Refused earlier in this pass: one question per host per pass.
+		return batch, nil
+	}
+	if next := p.s.RetryAt(id); !p.force && p.now.Before(next) {
+		if !p.waiting[id] {
+			p.waiting[id] = true
+			p.res.Waiting = append(p.res.Waiting, Wait{ProjectID: id, RetryAt: next})
+		}
+		return batch, nil
+	}
+	sender := &otlpSender{Endpoint: endpoint, APIKey: key, ProjectID: id, Version: p.r.Version}
+	if user != nil {
+		sender.UserID = user(endpoint)
+	}
+	if _, err := sender.Send(ctx, wire(batch)); err != nil {
+		p.failed[id] = true
+		f := Failure{ProjectID: id, Endpoint: endpoint, Err: err}
+		// A pass cut short by its own deadline learned nothing about the host.
+		if ctx.Err() == nil {
+			f.RetryAt = p.s.DestinationFailed(id, time.Now())
+		}
+		p.res.Failures = append(p.res.Failures, f)
+		return batch, fmt.Errorf("%s (%s): %w", id, endpoint, err)
+	}
+	p.s.DestinationDelivered(id, time.Now())
+	p.accepted[endpoint] = true
+	p.res.Sent += len(batch)
+	return nil, nil
+}
+
+// settle is a batch's answer to the spool: what it holds, and what it could not deliver.
+func (p *pass) settle(held, undelivered []spool.Event, errs []error) ([]spool.Event, error) {
+	if len(undelivered) > 0 {
+		return held, &spool.PartialDelivery{Undelivered: undelivered, Err: errors.Join(errs...)}
+	}
+	return held, nil
+}
+
 // Allowed rechecks the policy ceiling on every delivery, since hook events bypass the
 // relay and may predate a tightened policy: an event from a repository the list no longer
 // names, a reply or a thread's name the policy's prompts-off withholds, sends nothing. Outgoing removes the
 // rest of what the policy withholds.
 func (r Router) Allowed(org config.Policy, projectID string, e spool.Event) bool {
 	org = routing.EffectivePolicy(r.StateDir, org, projectID)
-	if org.CollectsNothing || e.Global && !org.Global() || !org.Admits(e.Repository) {
+	return org.Admits(e.Repository) && r.mayLeave(org, e)
+}
+
+// mayLeave is delivery's own check of an event its team's policy pol covers: nothing under
+// a policy collecting nothing, nothing captured machine-wide once pol no longer is, and a
+// reply or a thread's name only with prompts and its agent's consent.
+func (r Router) mayLeave(pol config.Policy, e spool.Event) bool {
+	if pol.CollectsNothing || e.Global && !pol.Global() {
 		return false
 	}
 	if e.Name == semconv.TermaAssistantMessageEvent || e.Name == semconv.TermaSessionTitleEvent {
-		prompts, _ := org.Content()
-		return prompts && r.consented(e, org.Global())
+		prompts, _ := pol.Content()
+		return prompts && r.consented(e, pol.Global())
 	}
 	return true
 }
