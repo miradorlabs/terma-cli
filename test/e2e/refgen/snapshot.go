@@ -338,8 +338,12 @@ func verdict(pass, fail int, coreFailed bool) string {
 func merge(old, tonight *Snapshot, now time.Time) *Snapshot {
 	if old == nil {
 		out := *tonight
+		if tonight.Capture.Partial {
+			// As below: a turn that failed publishes its census alone (withoutProbe).
+			out.Telemetry, _ = withoutProbe(tonight.Telemetry).(map[string]any)
+		}
 		out.Capture.Sections = map[string]time.Time{}
-		for _, sec := range present(tonight) {
+		for _, sec := range present(&out) {
 			out.Capture.Sections[sec] = now
 		}
 		return &out
@@ -352,6 +356,20 @@ func merge(old, tonight *Snapshot, now time.Time) *Snapshot {
 	ot, tt := out.Tree(), tonight.Tree()
 	if tt["filesystem"] != nil {
 		tt["filesystem"] = mergeFilesystem(ot["filesystem"], tt["filesystem"])
+	}
+	if tt["telemetry"] != nil {
+		tel := tt["telemetry"]
+		if tonight.Capture.Partial {
+			// The probe's findings come from the profile's turn, which failed: a truncated probe
+			// is published nowhere, over a whole page or a partial one. The census, which ran
+			// apart, still counts.
+			tel = withoutProbe(tel)
+		}
+		if tel == nil {
+			tt["telemetry"] = ot["telemetry"] // nothing measured tonight: nothing replaced
+		} else {
+			tt["telemetry"] = mergeTelemetry(ot["telemetry"], tel)
+		}
 	}
 	took := false
 	for _, sec := range present(tonight) {
@@ -446,4 +464,92 @@ func hasFirstTurn(p e2e.Profile) bool {
 		}
 	}
 	return false
+}
+
+// withoutProbe is telemetry section t without the probe's findings: its census, the surfaces with
+// their keys alone; nil where t has no census, and so nothing left measured.
+func withoutProbe(t any) any {
+	m, _ := t.(map[string]any)
+	if census, _ := refdiff.TelemetryMeasured(m); !census {
+		return nil
+	}
+	out := maps.Clone(m)
+	delete(out, "export")
+	surfaces, _ := m["surfaces"].(map[string]any)
+	kept := map[string]any{}
+	for name, raw := range surfaces {
+		s, _ := raw.(map[string]any)
+		if keys, ok := s["keys"]; ok {
+			kept[name] = map[string]any{"keys": keys}
+		}
+	}
+	out["surfaces"] = kept
+	return out
+}
+
+// mergeTelemetry is the telemetry section with what tonight measured over old's, and old's where
+// tonight did not measure it (refdiff.TelemetryMeasured): a night with the census alone keeps
+// the probe's export and metric types from before, and one with the probe alone (the frequent
+// check) keeps every surface and its keys, and a surface tonight's probe did not see keeps the
+// findings of the probe that did. Without this, a render with less evidence than the last took
+// the published findings for gone.
+func mergeTelemetry(old, tonight any) any {
+	o, _ := old.(map[string]any)
+	t, _ := tonight.(map[string]any)
+	if o == nil || t == nil {
+		return tonight
+	}
+	oc, op := refdiff.TelemetryMeasured(o)
+	tc, tp := refdiff.TelemetryMeasured(t)
+	keepKeys, keepProbe := oc && !tc, op && !tp
+	if !keepKeys && !op {
+		return tonight // old has nothing tonight did not measure
+	}
+	out := maps.Clone(t)
+	if e, ok := o["export"]; ok && keepProbe {
+		out["export"] = e
+	}
+	surfaces := map[string]any{}
+	tonightSurfaces, _ := t["surfaces"].(map[string]any)
+	oldSurfaces, _ := o["surfaces"].(map[string]any)
+	for name, raw := range tonightSurfaces {
+		// Which surfaces are sent is the census's to say, and it records a surface by its keys
+		// alone: one the probe saw that the census did not (a metric without attributes) is
+		// left out, as a night with both leaves it out (deriveTelemetry).
+		if _, known := oldSurfaces[name]; keepKeys && !known {
+			continue
+		}
+		s, _ := raw.(map[string]any)
+		if s == nil {
+			s = map[string]any{} // not an object: nothing measured of it, and never a nil map
+		}
+		surfaces[name] = maps.Clone(s)
+	}
+	for name, raw := range oldSurfaces {
+		was, _ := raw.(map[string]any)
+		s, ok := surfaces[name].(map[string]any)
+		switch {
+		case !ok && !keepKeys:
+			continue // a surface the census did not see tonight is gone
+		case !ok:
+			// Only the probe ran tonight, and it sees fewer surfaces than the census: one it did
+			// not see keeps all it had, its probe findings as well as its keys.
+			surfaces[name] = maps.Clone(was)
+			continue
+		}
+		if keys, ok := was["keys"]; ok && keepKeys {
+			s["keys"] = keys
+		}
+		if !refdiff.Probed(s) {
+			// Tonight's probe did not see the surface (or did not run): what its turn did not
+			// make keeps the findings of the turn that did.
+			for _, f := range refdiff.ProbeFields {
+				if v, ok := was[f]; ok {
+					s[f] = v
+				}
+			}
+		}
+	}
+	out["surfaces"] = surfaces
+	return out
 }

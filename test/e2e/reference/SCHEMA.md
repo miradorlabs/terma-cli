@@ -293,6 +293,34 @@ so). `live` is the same turn as it ran with the vendor's live server-side flags 
 night whatever the build, so it is no section: it is never compared, and a diff never says it.
 Absent where there was no proxied turn to compare it with.
 
+### telemetry
+
+The build's own OTLP export, from two measurements. The field census (the relay workloads'
+scenarios) gives every surface the build sent with a key, with its `keys`; the telemetry probe
+(the profile's turn) gives `export` (protocol, compression, each signal's measured
+`interval_ms` and the `interval_batches` it rests on) and the `type`, `unit`, `temporality`,
+`monotonic`, `parent`, `parents` and `root` of each surface its turn made. A capture can hold
+one without the other: the frequent check ran the probe alone, and a capture older than the
+probe has none of its fields. A capture took the census where a surface has `keys` (a census
+that recorded no surface reads as none), and the probe where there is an `export`. Which surfaces
+are sent is the census's to say where there is one: a surface the probe alone saw (a metric
+without attributes) is not listed. A harness the census never covers (Copilot) lists what its
+probe saw.
+
+Two builds' telemetry is compared only in what both captures measured: keys where both have a
+census, `export` where both ran the probe and a surface's probe fields where both probes saw it
+(what a probe sees is what its turn made), and which surfaces exist where both listed them the
+same way, a census on both sides or a probe on both and a census on neither. What one did not
+measure is not observed there, never a surface "no longer sent" or an export "added".
+`interval_batches` is the run's, and an interval is compared only where both rest on at least
+two batches: from one, it is a stall's.
+
+A new capture of a build replaces what it measured and keeps the rest: a census-only capture
+keeps the probe's findings, a probe-only one every surface and its keys, a probe that did not
+see a surface keeps the findings of the one that did, and a partial capture (its profile's turn
+failed) takes the census but none of its probe's findings, so one without a census changes
+nothing.
+
 ### hooks
 
 Every hook event the build knows, and what it hands a hook when one fires (the hooks probe,
