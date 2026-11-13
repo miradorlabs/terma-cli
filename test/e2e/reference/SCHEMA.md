@@ -99,8 +99,10 @@ The harness's entry from `index.json`, and every version tracked, newest first:
 the snapshot says. `partial` (present only when true) marks a build whose capture failed, whole
 or in part, `attempted_at` when a run last set out to capture it, whatever it took, and
 `attempts` how many runs have: the frequent check tries a partial build among a harness's newest
-five again six hours after its last attempt, until it has made four. `previous` is the build the
-diff compares it with, null for the first tracked.
+five again six hours after its last attempt, until it has made four. `announced_at` is when the
+build was announced as a new release: one announced while partial is announced again, once, when
+a capture makes it whole. `previous` is the build the diff compares it with, null for the first
+tracked.
 `undocumented` counts changes the vendor's changelog for the version does not mention (null
 where there is no changelog to read). `signing` is Gatekeeper's verdict on the build's macOS
 code signature when last checked (`valid`, `revoked`, `rejected`, `unsigned`), null where it
@@ -144,7 +146,8 @@ model's) is part of the name and stays.
     "notes": ["Model requests answered by a local fixture provider, not the vendor's API."],
     "sections": { "prompt": "2026-11-04T04:41:09Z", "support": "2026-11-04T05:02:11Z" },
     "attempted_at": "2026-11-04T04:41:09Z",
-    "attempts": 1
+    "attempts": 1,
+    "announced_at": "2026-11-04T05:02:11Z"
   },
 
   "model": {

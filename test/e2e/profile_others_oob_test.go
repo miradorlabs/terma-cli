@@ -315,7 +315,7 @@ func TestCopilotProfileBinary(t *testing.T) {
 	}
 	for _, b := range CopilotBinaries(t) {
 		t.Run(b.Label(), func(t *testing.T) {
-			scenarioOf(t, b.Harness)
+			scenarioOfBuild(t, b)
 			track(t)
 			home := t.TempDir()
 			RecordBinaryFacts(t, b)

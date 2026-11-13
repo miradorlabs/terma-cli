@@ -80,10 +80,11 @@ func CodexBinaries(t *testing.T) []Binary {
 
 // selected reports whether this run takes harness's scenarios: every harness, unless
 // TERMA_E2E_ONLY, a comma list of harness ids, leaves it out. The frequent check runs each
-// harness's scenarios on a job of its own (reference.yml).
+// harness's scenarios on a job of its own (reference.yml). A desktop app's checks run its
+// agent's builds (TestRelayClaudeDesktop runs Claude Code), so they run with its agent's.
 func selected(harness string) bool {
 	only := os.Getenv("TERMA_E2E_ONLY")
-	return only == "" || listed(only, harness)
+	return only == "" || listed(only, harness) || listed(only, agentOf(harness))
 }
 
 // skipUnlessSelected skips a scenario of harness this run does not take (selected).

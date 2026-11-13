@@ -132,7 +132,7 @@ func forEachDesktopApp(t *testing.T, harness string, run func(t *testing.T, app 
 		t.Skip(why)
 	}
 	for _, app := range DesktopApps(t, harness) {
-		t.Run("v"+app.Version, func(t *testing.T) { scenarioOf(t, harness); run(t, app) })
+		t.Run("v"+app.Version, func(t *testing.T) { scenarioOfBuild(t, Binary{Harness: harness, Version: app.Version}); run(t, app) })
 	}
 }
 

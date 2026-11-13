@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"github.com/miradorlabs/terma-cli/e2e/refdiff"
@@ -10,9 +11,11 @@ import (
 
 // Announcements: a harness's new version, said where people will see it (the team's Slack,
 // later the public on X), linking to its page in the reference. A version is news once: the
-// night it is first captured, if it is newer than every version of the harness captured
-// before. A backfill (older versions), a build whose capture failed (nothing captured yet),
-// and a harness published for the first time (every version at once) announce nothing.
+// run it is first captured, if it is newer than every version of the harness captured
+// before, whatever its capture found. A backfill (older versions) and a harness published for
+// the first time (every version at once) announce nothing. A release announced while its
+// capture was partial is news to the team once more, when a retry makes it whole: what terma's
+// checks then say.
 
 // Announcement is one new version, said ready for each place it is posted.
 type Announcement struct {
@@ -33,6 +36,9 @@ type Announcement struct {
 	Support string   `json:"support"`
 	Failed  []string `json:"failed,omitempty"`
 	Partial bool     `json:"partial,omitempty"`
+	// Completed marks a release announced partial that a retry captured whole: the team's news
+	// alone, with no public post (Text).
+	Completed bool `json:"completed,omitempty"`
 	// Text is the announcement as a post of at most 280 characters, a link counted as X
 	// counts one (23).
 	Text  string        `json:"text"`
@@ -82,8 +88,10 @@ func newestPublished(byVersion map[string]*Snapshot) string {
 }
 
 // announce is what a harness has to announce after the run: its versions published now that are
-// newer than the newest published before.
-func announce(site string, entry HarnessEntry, entries []VersionEntry, diffs map[string]*Diff, byVersion map[string]*Snapshot, before string) []Announcement {
+// newer than the newest published before, each stamped announced, and the releases announced
+// before whose capture was partial before the run (partialBefore) and is whole now.
+func announce(site string, entry HarnessEntry, entries []VersionEntry, diffs map[string]*Diff, byVersion map[string]*Snapshot, before string,
+	partialBefore func(version string) bool, now time.Time) []Announcement {
 	if before == "" || site == "" {
 		return nil
 	}
@@ -94,13 +102,20 @@ func announce(site string, entry HarnessEntry, entries []VersionEntry, diffs map
 		// A page begins with a capture, or a capture that failed (publish): a version newer than
 		// every page before the run is a release this run captured, whatever its capture found,
 		// a harness terma tests through others (T3 Code) included.
-		if !versionLess(before, e.Version) {
+		s := byVersion[e.Version]
+		release := versionLess(before, e.Version)
+		completed := !release && partialBefore(e.Version) && !s.Capture.Partial && s.Capture.AnnouncedAt != nil
+		if !release && !completed {
 			continue
 		}
-		s := byVersion[e.Version]
+		if release {
+			at := now
+			s.Capture.AnnouncedAt = &at
+		}
 		a := Announcement{Harness: entry.ID, Name: entry.Name, Version: e.Version, Changes: e.Changes, Impact: ImpactN(e.Impact),
 			Undocumented: e.Undocumented, Highlights: []string{}, Signing: e.Signing,
-			URL: fmt.Sprintf("%s/h/%s/%s", site, entry.ID, e.Version), Support: e.Support, Failed: failedChecks(s), Partial: s.Capture.Partial}
+			URL: fmt.Sprintf("%s/h/%s/%s", site, entry.ID, e.Version), Support: e.Support, Failed: failedChecks(s), Partial: s.Capture.Partial,
+			Completed: completed}
 		if e.Previous != nil {
 			a.Previous = *e.Previous
 			a.CompareURL = fmt.Sprintf("%s/harnesses/%s/compare/%s...%s", site, entry.ID, *e.Previous, e.Version)
@@ -108,7 +123,9 @@ func announce(site string, entry HarnessEntry, entries []VersionEntry, diffs map
 				a.Highlights = refdiff.Highlights(d, 5)
 			}
 		}
-		a.Text = postText(a)
+		if !completed {
+			a.Text = postText(a)
+		}
 		a.Slack = slackMessage(a)
 		out = append(out, a)
 	}
@@ -195,6 +212,18 @@ func postText(a Announcement) string {
 // slackMessage is a as a Slack message: its headline, what changed, and buttons to its page
 // and to the comparison with the version before.
 func slackMessage(a Announcement) *SlackMessage {
+	section := func(text string) SlackBlock {
+		return SlackBlock{Type: "section", Text: &SlackText{Type: "mrkdwn", Text: text}}
+	}
+	button := func(label, url string) SlackButton {
+		return SlackButton{Type: "button", Text: SlackText{Type: "plain_text", Text: label}, URL: url}
+	}
+	if a.Completed {
+		// What changed was said when it came out: now, what terma's checks say of it whole.
+		return &SlackMessage{Text: fmt.Sprintf("%s %s is captured whole now (%s with terma): %s", a.Name, a.Version, verdictWord(a.Support), a.URL),
+			Blocks: []SlackBlock{section(fmt.Sprintf("*%s %s* is captured whole now", a.Name, a.Version)), section(teamVerdict(a)),
+				{Type: "actions", Elements: []SlackButton{button("View changelog", a.URL)}}}}
+	}
 	summary := fmt.Sprintf("*%s %s* is out", a.Name, a.Version)
 	if a.Previous != "" && a.Changes > 0 {
 		summary += fmt.Sprintf(": %d %s since %s", a.Changes, plural(a.Changes, "change", "changes"), a.Previous)
@@ -213,12 +242,6 @@ func slackMessage(a Announcement) *SlackMessage {
 	}
 	if len(counts) > 0 {
 		summary += "\n" + strings.Join(counts, " · ")
-	}
-	section := func(text string) SlackBlock {
-		return SlackBlock{Type: "section", Text: &SlackText{Type: "mrkdwn", Text: text}}
-	}
-	button := func(label, url string) SlackButton {
-		return SlackButton{Type: "button", Text: SlackText{Type: "plain_text", Text: label}, URL: url}
 	}
 	blocks := []SlackBlock{section(summary), section(teamVerdict(a))}
 	if len(a.Highlights) > 0 {

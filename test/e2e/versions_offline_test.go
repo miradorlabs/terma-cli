@@ -147,7 +147,8 @@ func TestSkipUnlessSelected(t *testing.T) {
 		{"claude,codex", "codex", false},
 		{"claude, codex", "codex", false},
 		{"claude,codex", "gemini", true},
-		{"claude", "claude-desktop", true},
+		{"claude", "claude-desktop", false}, // its checks run Claude Code's builds
+		{"codex", "claude-desktop", true},
 	} {
 		t.Setenv("TERMA_E2E_ONLY", tc.only)
 		skipped := false
@@ -203,4 +204,30 @@ func TestInstallEnvHoldsNoCredential(t *testing.T) {
 	if !slices.Contains(env, "TERMA_E2E_ONLY=codex") {
 		t.Error("the install environment lost a variable that is no credential")
 	}
+}
+
+// A capture scenario (a profile or a probe) that failed before it recorded anything of a build
+// still leaves its profile of the build, failed, so the reference publishes the build partial.
+func TestFailedCaptureScenarioOffline(t *testing.T) {
+	for name, capture := range map[string]bool{
+		"TestClaudeProfile": true, "TestClaudeProfileFiles": true, "TestCodexProbeHooks": true,
+		"TestHarnessProbeRetries": true, "TestOpenCodeProfileEgress": true, "TestClaudeDesktopProfile": true,
+		"TestRelayClaude": false, "TestRelayCodexDesktop": false, "TestClaudeInteractiveFields": false,
+	} {
+		if captureScenarioName.MatchString(name) != capture {
+			t.Errorf("%s: capture scenario %v, want %v", name, !capture, capture)
+		}
+	}
+	b := Binary{Harness: "zz", Version: "9.9.9"}
+	t.Run("zz", func(t *testing.T) {
+		scenarioOf(t, "zz")
+		t.Cleanup(func() {
+			profilesMu.Lock()
+			delete(profiles, profileID{"zz", "9.9.9", "TestFailedCaptureScenarioOffline"})
+			profilesMu.Unlock()
+		})
+		if p := failedCapture(t, b); !p.Failed || len(p.Requests) != 0 || p.unpublished {
+			t.Errorf("failed capture = %+v", p)
+		}
+	})
 }

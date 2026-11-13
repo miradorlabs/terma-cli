@@ -95,6 +95,9 @@ type Capture struct {
 	// Attempts is how many runs set out to capture the build: the frequent check gives up on a
 	// partial build after a few.
 	Attempts int `json:"attempts,omitempty"`
+	// AnnouncedAt is when the build was announced as a new release: one announced while its
+	// capture was partial is announced again once a capture makes it whole.
+	AnnouncedAt *time.Time `json:"announced_at,omitempty"`
 }
 
 // Sections are a snapshot's sections in the schema's order, which is also the order a diff's

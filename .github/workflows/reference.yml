@@ -359,9 +359,10 @@ jobs:
           BUILDS: ${{ needs.detect.outputs.builds }}
         run: TERMA_REFERENCE_BUILDS="$(paste -sd' ' - <<<"$BUILDS")" test/e2e/compatgen/publish.sh publish-reference
       # Each version newer than any captured before, once, after it is published: never a
-      # backfill, never twice. SLACK_RELEASES_WEBHOOK_URL picks a channel of its own; without
-      # it, the digest's.
-      # Each says whether terma works with the build. A dry run shows them in its summary instead.
+      # backfill. One announced while its capture was partial is told of once more, when a retry
+      # captures it whole. SLACK_RELEASES_WEBHOOK_URL picks a channel of its own; without it,
+      # the digest's. Each says whether terma works with the build. A dry run shows them in its
+      # summary instead.
       - name: Announce new versions
         if: success()
         continue-on-error: true

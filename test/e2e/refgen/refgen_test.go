@@ -1052,9 +1052,32 @@ func TestReleaseIsAnnouncedOnceWithTermasVerdict(t *testing.T) {
 	if err := readJSON(filepath.Join(dir, "claude", "index.json"), &idx); err != nil || !idx.Versions[0].Partial {
 		t.Fatalf("index = %+v (%v)", idx.Versions, err)
 	}
+	// The retry that captures it whole tells the team once more, its verdict alone and no post.
 	whole := night{now: time.Now(), profiles: []e2e.Profile{claudeProfile("1.0.1", "Be briefer.", []string{"Bash"}, "", "")}}
+	news, _ = publish(dir, whole, opt)
+	if len(news) != 1 || !news[0].Completed || news[0].Partial || news[0].Text != "" ||
+		!strings.Contains(string(marshalPlain(news[0].Slack)), "*Claude Code 1.0.1* is captured whole now") {
+		t.Errorf("the whole capture: %+v", news)
+	}
 	if news, _ = publish(dir, whole, opt); len(news) != 0 {
-		t.Errorf("the whole capture announced again: %+v", news)
+		t.Errorf("a whole build announced again: %+v", news)
+	}
+}
+
+// A build no announcement named (a backfill) is told of to no one when a retry makes it whole.
+func TestBackfillMadeWholeIsNotAnnounced(t *testing.T) {
+	dir := t.TempDir()
+	opt := options{site: "https://terma.ai"}
+	if _, err := publish(dir, night{now: time.Now(), profiles: []e2e.Profile{claudeProfile("1.0.1", "Be brief.", []string{"Bash"}, "", "")}}, opt); err != nil {
+		t.Fatal(err)
+	}
+	old := claudeProfile("1.0.0", "Be brief.", []string{"Bash"}, "", "")
+	old.Failed = true
+	if news, err := publish(dir, night{now: time.Now(), profiles: []e2e.Profile{old}}, opt); err != nil || len(news) != 0 {
+		t.Fatalf("a backfill announced: %+v (%v)", news, err)
+	}
+	if news, _ := publish(dir, night{now: time.Now(), profiles: []e2e.Profile{claudeProfile("1.0.0", "Be brief.", []string{"Bash"}, "", "")}}, opt); len(news) != 0 {
+		t.Errorf("a backfill made whole announced: %+v", news)
 	}
 }
 

@@ -432,9 +432,15 @@ page and changelog are published once, complete, with terma's verdict, and annou
 (`publish.sh publish-reference`). A capture any scenario of which failed (its profile, a files
 profile, the field census), or a job of it that did not finish (it
 wrote no `compat.json`, or the desktop job failed: `reference/capture-args.sh`, `refgen
--unfinished`), is published partial (`refgen -attempted`) and marked `partial` in the index. Each version newer than any captured before is announced once, when
-first published: whether terma works with the build, "Works", "Partly broken" or "Broken" with the
-checks that failed, or "Not tested", and that its capture failed in part where it did. Its publish
+-unfinished`), is published partial (`refgen -attempted`) and marked `partial` in the index. A
+capture scenario (`Test<Harness>Profile…`, `Test<Harness>Probe…`) that fails before it records
+anything still leaves its profile of the build, failed (`scenarioOfBuild`). Each version newer
+than any captured before is announced once, when first published: whether terma works with the
+build, "Works", "Partly broken" or "Broken" with the checks that failed, or "Not tested", and
+that its capture failed in part where it did; one announced so is told of once more, when a
+retry captures it whole. A desktop app's checks run its agent's builds, so they run with its
+agent's capture (`TERMA_E2E_ONLY=claude` takes `claude-desktop`'s), and its page reads those of
+the agent build it bundles. Its publish
 job and Model Reference's share a concurrency group, so they never push `compat-matrix` at once.
 
 A build is tested when it comes out, which is when it can stop sending what terma expects, and

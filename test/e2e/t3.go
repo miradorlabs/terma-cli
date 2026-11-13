@@ -62,7 +62,7 @@ func forEachT3(t *testing.T, run func(t *testing.T, b Binary)) {
 		t.Skip("t3 is not installed")
 	}
 	for _, b := range builds {
-		t.Run(b.Label(), func(t *testing.T) { scenarioOf(t, b.Harness); run(t, b) })
+		t.Run(b.Label(), func(t *testing.T) { scenarioOfBuild(t, b); run(t, b) })
 	}
 }
 

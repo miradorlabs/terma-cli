@@ -43,7 +43,7 @@ func forEachCopilot(t *testing.T, run func(t *testing.T, b Binary)) {
 		t.Skip("no Copilot CLI build to test")
 	}
 	for _, b := range builds {
-		t.Run(b.Label(), func(t *testing.T) { scenarioOf(t, b.Harness); run(t, b) })
+		t.Run(b.Label(), func(t *testing.T) { scenarioOfBuild(t, b); run(t, b) })
 	}
 }
 
