@@ -20,9 +20,11 @@ import (
 // paths, each a file or a directory, absolute or relative to Cwd: on a migrated machine it
 // classifies the checkouts they reach with the session's own location r and the run's
 // earlier locations (classifyTouches), and the run ledger records them. It writes no
-// manifest and spools nothing. A nil r is a location Route drops, which Repo refused: it
-// is located here, and its run is still classified and recorded, so that a later hook of
-// the run in a collected location sees the crossing. Elsewhere it does nothing.
+// manifest and spools nothing. A nil r is located here, with no session store and no
+// parked records handed on: a hook that only classifies, before its tool call runs, or a
+// location Route drops, which Repo refused, whose run is still classified and recorded so
+// that a later hook of the run in a collected location sees the crossing. Elsewhere it
+// does nothing.
 func (e Env) Classify(ctx context.Context, r *Repo, sess session.Session, paths []string, extra map[string]any) {
 	paths = slices.DeleteFunc(slices.Clone(paths), func(p string) bool { return p == "" })
 	if e.Routing == nil || !e.Routing.Usable() || len(paths) == 0 || !session.ValidID(sess.ID) {

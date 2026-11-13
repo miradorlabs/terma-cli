@@ -121,13 +121,39 @@ func stop(ctx context.Context, env hookrun.Env) error {
 	return nil
 }
 
+// preToolUse classifies what a read, a search or a shell command is about to reach, before
+// it runs (hookrun.Env.Classify): a crossing it makes is marked before its own result is
+// exported, so that result is dropped with the rest of the run. It records and spools
+// nothing, prints nothing, since Claude Code reads a PreToolUse hook's output as a decision
+// on the call, and never fails the call. On a machine not migrated nothing is classified,
+// so it returns before reading its payload: neither it nor dispatch, which claims from what
+// a handler read, locates a repository or hands parked records on.
+func preToolUse(ctx context.Context, env hookrun.Env) error {
+	if env.Routing == nil {
+		return nil
+	}
+	in, err := readClaudeInput(env.Stdin)
+	if err != nil {
+		env.Logf("%v", err)
+		return nil
+	}
+	if !session.ValidID(in.SessionID) || !claudeReadsOnly(in.ToolName) {
+		return nil
+	}
+	env.Cwd = cmp.Or(in.Cwd, env.Cwd)
+	sess := session.Session{ID: in.SessionID, Tool: claudeTool, Model: in.Model}
+	env.Classify(ctx, nil, sess, reachedPaths(in, env.Cwd), hookrun.AgentAttrs(map[string]any{}, in.AgentID, in.AgentType))
+	return nil
+}
+
 func postToolUse(ctx context.Context, env hookrun.Env) error {
 	in, err := readClaudeInput(env.Stdin)
 	if err != nil {
 		env.Logf("%v", err)
 		return nil
 	}
-	if !session.ValidID(in.SessionID) {
+	// A read reaching here is classified before it ran (preToolUse), never taken for an edit.
+	if !session.ValidID(in.SessionID) || claudeReadsOnly(in.ToolName) {
 		return nil
 	}
 	env.Cwd = cmp.Or(in.Cwd, env.Cwd)
@@ -136,7 +162,7 @@ func postToolUse(ctx context.Context, env hookrun.Env) error {
 	attrs := hookrun.AgentAttrs(map[string]any{}, in.AgentID, in.AgentType)
 	r, err := env.Repo(ctx)
 	if err != nil {
-		// A location Route drops records nothing, but what the call reached still counts
+		// A location Route drops records nothing, but what the call edited still counts
 		// toward its run crossing organizations.
 		env.Classify(ctx, nil, sess, reachedPaths(in, env.Cwd), attrs)
 		return nil
@@ -145,18 +171,14 @@ func postToolUse(ctx context.Context, env hookrun.Env) error {
 		claudeSubagentCall(env, r, in)
 		return nil
 	}
-	if claudeReadsOnly(in.ToolName) {
-		env.Classify(ctx, r, sess, reachedPaths(in, env.Cwd), attrs)
-		return nil
-	}
 	hookrun.BoundedAttr(attrs, semconv.GenAIToolCallIDKey, in.ToolUseID)
 	env.Touch(r, sess, in.ToolName, editedPaths(in), attrs)
 	return nil
 }
 
 // claudeReadsOnly reports whether the tool named reads, searches or runs a shell command:
-// its paths only count toward a crossing, and build no manifest. Any other tool's paths are
-// edits.
+// its paths only count toward a crossing, classified before it runs, and build no
+// manifest. Any other tool's paths are edits.
 func claudeReadsOnly(tool string) bool {
 	switch tool {
 	case "Read", "Grep", "Glob", "NotebookRead", "LS", "Bash":
