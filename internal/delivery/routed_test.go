@@ -308,9 +308,10 @@ func TestAPendingHoldSendsOnlyOnceBoundToTheHoldingOrganization(t *testing.T) {
 	}
 }
 
-// A run that crossed organizations drops the events attributed through it from the moment
-// it did, under the session's ID and its subagents'; an event with its own location, and
-// one from before the crossing, still go.
+// A run that crossed organizations drops its events from the moment it did, under the
+// session's ID and its subagents', those that carry content with a location of their own
+// (a Codex turn's reply) too; a file event with its own location, and an event from
+// before the crossing, still go.
 func TestAMixedRunDropsItsRunAttributedEvents(t *testing.T) {
 	t.Parallel()
 	m := migratedMachine(t)
@@ -334,24 +335,30 @@ func TestAMixedRunDropsItsRunAttributedEvents(t *testing.T) {
 		ev.Time, ev.Run, ev.OwnLocation = when, run, own
 		return ev
 	}
+	named := func(name string, ev spool.Event) spool.Event {
+		ev.Name = name
+		return ev
+	}
 	m.queue(
 		at("before", "sess-1", crossed.Add(-time.Minute), false),
 		at("at-the-crossing", "sess-1", crossed, false),
 		at("after", "sess-1", crossed.Add(time.Minute), false),
 		at("subagent-after", "sub-1", crossed.Add(time.Minute), false),
-		at("own-location", "sess-1", crossed.Add(time.Minute), true),
+		named(semconv.TermaFilesTouchedEvent, at("own-file-event", "sess-1", crossed.Add(time.Minute), true)),
+		named(semconv.TermaAssistantMessageEvent, at("own-reply", "sess-1", crossed.Add(time.Minute), true)),
+		at("own-content", "sess-1", crossed.Add(time.Minute), true),
 	)
 	res := m.flush(m.router())
-	if res.Sent != 2 || res.Mixed != 3 || m.pending() != 0 {
+	if res.Sent != 2 || res.Mixed != 5 || m.pending() != 0 {
 		t.Fatalf("Flush = %+v, pending %d", res, m.pending())
 	}
 	_, body := host.sent()
-	for _, mark := range []string{"before", "own-location"} {
+	for _, mark := range []string{"before", "own-file-event"} {
 		if !strings.Contains(body, `"`+mark+`"`) {
 			t.Errorf("%s was not sent:\n%s", mark, body)
 		}
 	}
-	for _, mark := range []string{"at-the-crossing", `"after"`, "subagent-after"} {
+	for _, mark := range []string{"at-the-crossing", `"after"`, "subagent-after", "own-reply", "own-content"} {
 		if strings.Contains(body, mark) {
 			t.Errorf("%s was sent after its run crossed:\n%s", mark, body)
 		}
