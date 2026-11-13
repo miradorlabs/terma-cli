@@ -34,8 +34,10 @@ type Routing struct {
 	// Key reports, masked, an enrollment's key on this machine: "" when it has none.
 	Key func(enrollmentID string) string
 	// MixedSessions are the sessions whose current run crossed organizations, and so sends
-	// no telemetry; MixedDropped counts what the relay dropped from such runs.
+	// no telemetry, active within the last day; OlderMixed counts the others the run
+	// ledger keeps. MixedDropped counts what the relay dropped from such runs.
 	MixedSessions []string
+	OlderMixed    int
 	MixedDropped  int
 	// Blocked counts what else the relay kept from leaving, as its last stop recorded it,
 	// by what blocked it: "pending:<binding>" for a binding still to decide and
@@ -119,7 +121,7 @@ func TeamsCheck(r Routing, now time.Time) Check {
 		fix = cmp.Or(fix, "terma teams --bind "+p.Key+"="+quoteWord(r.org(p.Organization))+" (or --refuse "+p.Key+")")
 	}
 	detail := strings.Join(parts, ", ")
-	if len(r.MixedSessions) > 0 || r.MixedDropped > 0 {
+	if len(r.MixedSessions) > 0 || r.OlderMixed > 0 || r.MixedDropped > 0 {
 		detail += "; " + MixedSummary(r)
 	}
 	switch {
@@ -133,7 +135,10 @@ func TeamsCheck(r Routing, now time.Time) Check {
 
 // MixedSummary says what runs that crossed organizations dropped.
 func MixedSummary(r Routing) string {
-	s := fmt.Sprintf("%d session run(s) crossed organizations and send no telemetry until they resume", len(r.MixedSessions))
+	s := fmt.Sprintf("%d session run(s) crossed organizations and send no telemetry until they resume", len(r.MixedSessions)+r.OlderMixed)
+	if r.OlderMixed > 0 {
+		s += fmt.Sprintf(" (%d idle for over a day)", r.OlderMixed)
+	}
 	if r.MixedDropped > 0 {
 		s += fmt.Sprintf("; the relay dropped %d record(s) from such runs", r.MixedDropped)
 	}
@@ -279,7 +284,7 @@ func TeamRows(r Routing, now time.Time) []Row {
 	for _, p := range Pending(r.State) {
 		rows = append(rows, Row{"Undecided", p.Key + ", needed by " + p.Entry})
 	}
-	if len(r.MixedSessions) > 0 || r.MixedDropped > 0 {
+	if len(r.MixedSessions) > 0 || r.OlderMixed > 0 || r.MixedDropped > 0 {
 		rows = append(rows, Row{"Mixed", MixedSummary(r)})
 		for _, s := range r.MixedSessions {
 			rows = append(rows, Row{"", "session " + s})

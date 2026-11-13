@@ -32,12 +32,13 @@ const Dir = "runs"
 
 const aliasesDir = "aliases"
 
-// Retention is how long a session's ledger is kept after it was last written. The relay
-// outbox and the spool keep a record for at most 14 days, and a crossing is written here
-// when a hook sees it, so every queued record the ledger could drop leaves its queue
-// within 14 days of the ledger's last write. The extra day covers the clocks of the
-// processes involved and when Prune happens to run: a ledger pruned first would read as
-// never Mixed, and the record would be sent.
+// Retention is how long a session's ledger is kept after its last activity (ledger.Active):
+// a run starting, crossing organizations, or recording a location. The relay outbox and
+// the spool keep a record for at most 14 days, and a crossing is written here when a hook
+// sees it, so every queued record the ledger could drop leaves its queue within 14 days of
+// it. The extra day covers the clocks of the processes involved and when Prune happens to
+// run: a ledger pruned first would read as never Mixed, and the record would be sent.
+// Prune still keeps a ledger a queued record names.
 const Retention = 15 * 24 * time.Hour
 
 // lockWait bounds the wait for a session's ledger lock. Every write is a read, a small
@@ -50,6 +51,39 @@ type ledger struct {
 	Runs []run `json:"runs"`
 	// Aliases are the subagent IDs that share the session's runs.
 	Aliases []string `json:"aliases,omitempty"`
+	// Active is when a hook last recorded here a run starting, crossing organizations or
+	// touching a new location: what Prune keeps the ledger by.
+	Active time.Time `json:"active,omitzero"`
+}
+
+// active records activity at t.
+func (l *ledger) active(t time.Time) {
+	if t = t.UTC(); t.After(l.Active) {
+		l.Active = t
+	}
+}
+
+// lastActive is l's last activity; for a ledger written before Active was, its runs'
+// latest start or crossing, else written, its file's time.
+func (l ledger) lastActive(written time.Time) time.Time {
+	last := l.Active
+	for _, r := range l.Runs {
+		last = latest(last, r.Started, r.MixedAt)
+	}
+	if last.IsZero() {
+		return written
+	}
+	return last
+}
+
+func latest(ts ...time.Time) time.Time {
+	var out time.Time
+	for _, t := range ts {
+		if t.After(out) {
+			out = t
+		}
+	}
+	return out
 }
 
 // run is one run of a session.
@@ -75,6 +109,7 @@ func Start(stateDir, sessionID string, at time.Time) (string, error) {
 	}
 	err = update(stateDir, sessionID, func(l *ledger) {
 		l.Runs = append(l.Runs, run{ID: id, Started: at.UTC()})
+		l.active(at)
 	})
 	if err != nil {
 		return "", err
@@ -122,6 +157,7 @@ func MarkMixed(stateDir, sessionID string, at time.Time) error {
 		if at = at.UTC(); cur.MixedAt.IsZero() || at.Before(cur.MixedAt) {
 			cur.MixedAt = at
 		}
+		l.active(at)
 	})
 }
 
@@ -159,6 +195,7 @@ func Touch(stateDir, sessionID, runID string, locations []string) ([]string, err
 		if len(r.Locations) == known {
 			return nil
 		}
+		l.active(time.Now())
 		return save(path, l)
 	})
 	if err != nil {
