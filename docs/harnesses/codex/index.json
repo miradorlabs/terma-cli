@@ -11,23 +11,58 @@
       "language": "rust"
     },
     "changelog": "https://github.com/openai/codex/releases",
-    "latest": "0.167.2",
-    "support": "supported",
-    "versions_tracked": 103,
+    "latest": "0.168.0",
+    "support": "untested",
+    "versions_tracked": 104,
     "first_tracked": "2026-01-25",
     "last_change": {
-      "from": "0.167.1",
-      "to": "0.167.2",
-      "at": "2026-11-12T15:48:45.504112256Z",
-      "released_at": "2026-11-11T22:50:04.191Z",
-      "changes": 2,
+      "from": "0.167.2",
+      "to": "0.168.0",
+      "at": "2026-11-13T04:21:24.021969273Z",
+      "released_at": "2026-11-13T04:00:31.594Z",
+      "changes": 518,
       "categories": {
-        "cli": 1,
-        "config": 1
+        "cli": 6,
+        "config": 37,
+        "filesystem": 8,
+        "telemetry": 466,
+        "tools": 1
       }
     }
   },
   "versions": [
+    {
+      "version": "0.168.0",
+      "released_at": "2026-11-13T04:00:31.594Z",
+      "captured_at": "2026-11-13T04:21:24.021969273Z",
+      "platforms": [
+        "darwin/arm64",
+        "linux/amd64"
+      ],
+      "support": "untested",
+      "previous": "0.167.2",
+      "changes": 518,
+      "categories": {
+        "cli": 6,
+        "config": 37,
+        "filesystem": 8,
+        "telemetry": 466,
+        "tools": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 38,
+        "informational": 305,
+        "notable": 175
+      },
+      "undocumented": 336,
+      "highlights": [
+        "Telemetry surface no longer sent: logs/codex.api_request",
+        "Telemetry surface no longer sent: logs/codex.conversation_starts",
+        "Telemetry surface no longer sent: logs/codex.sse_event"
+      ],
+      "signing": "valid"
+    },
     {
       "version": "0.167.2",
       "released_at": "2026-11-11T22:50:04.191Z",
@@ -66,22 +101,22 @@
       ],
       "support": "supported",
       "previous": "0.167.0",
-      "changes": 8,
+      "changes": 6,
       "categories": {
         "config": 1,
-        "filesystem": 7
+        "filesystem": 5
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 8,
+        "informational": 6,
         "notable": 0
       },
-      "undocumented": 8,
+      "undocumented": 6,
       "highlights": [
         "New setting: features.incremental_tools_legacy",
-        "Command no longer run: `<xcode>/usr/bin/xcodebuild -sdk <xcode>/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk -find gi …` (darwin/arm64)",
-        "Command no longer run: `sh -c <xcode>/usr/bin/xcodebuild -sdk <xcode>/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk -f …` (darwin/arm64)"
+        "No longer connects to <proxy> (tcp) (darwin/arm64)",
+        "Command changed: `/proc/self/exe --codex-run-as-process-setup <n> <n> pipe  <repo> <install>/codex codex-linux-sandbox …` (+424 −426 chars) (linux/amd64)"
       ],
       "signing": "valid"
     },
@@ -95,24 +130,24 @@
       ],
       "support": "supported",
       "previous": "0.166.0",
-      "changes": 28,
+      "changes": 27,
       "categories": {
         "cli": 6,
         "config": 12,
-        "filesystem": 9,
+        "filesystem": 8,
         "prompt": 1
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 26,
-        "notable": 2
+        "informational": 21,
+        "notable": 6
       },
-      "undocumented": 18,
+      "undocumented": 17,
       "highlights": [
         "Injected context changed (+47 −53 chars)",
         "New setting: model_providers.<name>.gateway_oauth.credentials_store",
-        "Description of `codex agents` changed"
+        "New command at turn: `/proc/self/exe --codex-run-as-process-setup <n> <n> pipe  <repo> <install>/codex codex-linux-sandbox …` (linux/amd64)"
       ],
       "signing": "valid"
     },

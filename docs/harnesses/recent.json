@@ -1,7 +1,41 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-13T02:33:43.278084083Z",
+  "generated_at": "2026-11-13T04:21:24.021969273Z",
   "versions": [
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "version": "0.168.0",
+      "released_at": "2026-11-13T04:00:31.594Z",
+      "captured_at": "2026-11-13T04:21:24.021969273Z",
+      "platforms": [
+        "darwin/arm64",
+        "linux/amd64"
+      ],
+      "support": "untested",
+      "previous": "0.167.2",
+      "changes": 518,
+      "categories": {
+        "cli": 6,
+        "config": 37,
+        "filesystem": 8,
+        "telemetry": 466,
+        "tools": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 38,
+        "informational": 305,
+        "notable": 175
+      },
+      "undocumented": 336,
+      "highlights": [
+        "Telemetry surface no longer sent: logs/codex.api_request",
+        "Telemetry surface no longer sent: logs/codex.conversation_starts",
+        "Telemetry surface no longer sent: logs/codex.sse_event"
+      ],
+      "signing": "valid"
+    },
     {
       "harness": "codex-desktop",
       "name": "Codex app",
@@ -251,22 +285,22 @@
       ],
       "support": "supported",
       "previous": "0.167.0",
-      "changes": 8,
+      "changes": 6,
       "categories": {
         "config": 1,
-        "filesystem": 7
+        "filesystem": 5
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 8,
+        "informational": 6,
         "notable": 0
       },
-      "undocumented": 8,
+      "undocumented": 6,
       "highlights": [
         "New setting: features.incremental_tools_legacy",
-        "Command no longer run: `<xcode>/usr/bin/xcodebuild -sdk <xcode>/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk -find gi …` (darwin/arm64)",
-        "Command no longer run: `sh -c <xcode>/usr/bin/xcodebuild -sdk <xcode>/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk -f …` (darwin/arm64)"
+        "No longer connects to <proxy> (tcp) (darwin/arm64)",
+        "Command changed: `/proc/self/exe --codex-run-as-process-setup <n> <n> pipe  <repo> <install>/codex codex-linux-sandbox …` (+424 −426 chars) (linux/amd64)"
       ],
       "signing": "valid"
     },
@@ -658,24 +692,24 @@
       ],
       "support": "supported",
       "previous": "0.166.0",
-      "changes": 28,
+      "changes": 27,
       "categories": {
         "cli": 6,
         "config": 12,
-        "filesystem": 9,
+        "filesystem": 8,
         "prompt": 1
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 26,
-        "notable": 2
+        "informational": 21,
+        "notable": 6
       },
-      "undocumented": 18,
+      "undocumented": 17,
       "highlights": [
         "Injected context changed (+47 −53 chars)",
         "New setting: model_providers.<name>.gateway_oauth.credentials_store",
-        "Description of `codex agents` changed"
+        "New command at turn: `/proc/self/exe --codex-run-as-process-setup <n> <n> pipe  <repo> <install>/codex codex-linux-sandbox …` (linux/amd64)"
       ],
       "signing": "valid"
     },
@@ -6163,40 +6197,6 @@
         "Injected context changed (+563 −0 chars)",
         "System prompt changed (+56 −81 chars)",
         "System prompt changed (+462 −376 chars)"
-      ],
-      "signing": "valid"
-    },
-    {
-      "harness": "codex",
-      "name": "Codex CLI",
-      "version": "0.135.0",
-      "released_at": "2026-05-28T19:08:37.797Z",
-      "captured_at": "2026-11-05T09:54:28.532441Z",
-      "platforms": [
-        "darwin/arm64",
-        "linux/amd64"
-      ],
-      "support": "untested",
-      "previous": "0.134.0",
-      "changes": 27,
-      "categories": {
-        "binary": 1,
-        "config": 23,
-        "filesystem": 1,
-        "storage": 1,
-        "tools": 1
-      },
-      "impact": {
-        "breaking": 0,
-        "degrading": 0,
-        "informational": 21,
-        "notable": 6
-      },
-      "undocumented": 22,
-      "highlights": [
-        "view_image tool description changed (+124 −171 chars)",
-        "Default of tui.keymap: {\"approval\":{\"approve\":null,\"approve_for_prefix\":null,\"ap… → {\"approval\":{\"approve\":null,\"approve_for_prefix\":null,\"ap…",
-        "Default of tui.keymap.chat: {\"decrease_reasoning_effort\":null,\"edit_queued_message\":n… → {\"decrease_reasoning_effort\":null,\"edit_queued_message\":n…"
       ],
       "signing": "valid"
     }
