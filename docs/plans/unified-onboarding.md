@@ -35,8 +35,9 @@ nothing the desktop holds can replay it.
 - `internal/account/auth/store.go` `Credential` carries `OrganizationID` and `UserID`. A profile keeps one credential
   per organization (`profileCredentials.Organizations`); `saveReplacing` replaces, and `signIn` revokes, only the same
   organization's previous one.
-- `internal/cli/switch.go` `terma switch`: revokes every organization's sign-in, forgets the organization and team,
-  and reruns setup, which asks for them (browser, then pickers). The desktop runs it today from the Agents page.
+- The switch command revoked every organization's sign-in, forgot the organization and team, and reran setup, which
+  asked for them (browser, then pickers). Multi-org routing removed it: `terma teams` ticks and unticks teams across
+  organizations instead.
 - `internal/account/auth/login.go` `Login`: PKCE (`pkce.go` `NewPKCE`), a loopback listener, `buildAuthorizeURL`,
   waits for the callback, calls `exchanger.ExchangeCode(ctx, code, verifier, port)` on `TokenExchanger`.
   `DefaultLabel` is there too.
@@ -101,8 +102,9 @@ organization:
   `{"reused":true}`: no grant, no delegate call.
 - Switching to an organization the CLI never held asks for a grant as above.
 
-The desktop stops offering `terma switch` for this (it signs out every organization and needs a terminal or browser
-to ask). `terma switch` itself is unchanged for people at a terminal.
+The desktop stops offering the switch command for this (it signed out every organization and needed a terminal or
+browser to ask). With multi-org routing the switch command is gone: onboarding ticks personal, and the desktop's
+"switch organization" becomes ticking and unticking teams in the same list (`terma teams --select`/`--deselect`).
 
 **What happens to work already in flight when the organization changes** (organization-model council). Existing
 routing already keeps tenants apart, so this adds no mechanism; a transition test proves it.

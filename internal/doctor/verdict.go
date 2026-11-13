@@ -50,9 +50,15 @@ const (
 // JudgeCommitHooks reads what terma's commit hooks do in the repository whose git
 // directory is gitDir, under the policy the hooks apply. Filesystem only: no git.
 func JudgeCommitHooks(gitDir string, policy config.Policy, now time.Time) CommitHooks {
-	installed, chained := repohooks.Installed(gitDir)
 	wanted := policy.Validated() && !policy.Expired(now) && policy.GitHooks
-	admitted := wanted && policy.Admits(config.Repository{Origin: gitx.RepositoryFS(gitDir)})
+	return judgeCommitHooks(gitDir, wanted, wanted && policy.Admits(config.Repository{Origin: gitx.RepositoryFS(gitDir)}))
+}
+
+// judgeCommitHooks is JudgeCommitHooks once it is known whether the policy wants the hooks
+// and whether it collects this repository.
+func judgeCommitHooks(gitDir string, wanted, admitted bool) CommitHooks {
+	admitted = wanted && admitted
+	installed, chained := repohooks.Installed(gitDir)
 	scope := repohooks.HooksPathScope(gitDir)
 	// Whether git runs .git/hooks at all comes first: a core.hooksPath set after terma's
 	// hooks went in keeps them from running though their files are there.
