@@ -9,13 +9,17 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
 	termaproject "github.com/miradorlabs/terma-cli/internal/project"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
+	"github.com/miradorlabs/terma-cli/internal/runs"
 	"github.com/miradorlabs/terma-cli/internal/session"
+	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
 // On a machine not yet migrated nothing is classified, so Claude Code's PreToolUse hook
-// for a read or a shell command returns before locating any repository or handing on the
+// for a read or a shell command, which the matcher setup writes (and `terma update
+// --refresh` rewrites) sends it, returns before locating any repository or handing on the
 // records a sandboxed git hook parked there, and dispatch claims nothing from a payload it
-// never read. An edit's PostToolUse in the same checkout still does both.
+// never read; it writes no run ledger and spools nothing. An edit's PostToolUse in the
+// same checkout still does both.
 func TestAReadHookOnAMachineNotMigratedDoesNothing(t *testing.T) {
 	if _, ok := testApp.agents.Event("pre-tool-use"); !ok {
 		t.Fatal("no agent handles pre-tool-use")
@@ -40,6 +44,12 @@ func TestAReadHookOnAMachineNotMigratedDoesNothing(t *testing.T) {
 	}
 	if !parked() {
 		t.Fatal("the PreToolUse hook handed on the parked records")
+	}
+	if _, err := os.Stat(filepath.Join(testApp.stateDir, runs.Dir)); !os.IsNotExist(err) {
+		t.Fatalf("the PreToolUse hook wrote the run ledger on a machine not migrated: %v", err)
+	}
+	if entries, _ := os.ReadDir(filepath.Join(testApp.stateDir, spool.Dir)); len(entries) != 0 {
+		t.Fatalf("the PreToolUse hook spooled on a machine not migrated: %v", entries)
 	}
 
 	runHook(t, "post-tool-use", `{"session_id":"`+sid+`","cwd":"`+hookruntest.InJSON(root)+`","hook_event_name":"PostToolUse","tool_name":"Write","tool_input":{"file_path":"`+
