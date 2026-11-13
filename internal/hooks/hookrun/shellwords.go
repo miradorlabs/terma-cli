@@ -227,7 +227,7 @@ func (s *scanner) word(closer rune) shellWord {
 		case c == '"':
 			s.i++
 			s.doubleQuoted(&w, add)
-		case c == '\\':
+		case c == '\\' && backslashEscapes:
 			switch next := s.peek(1); next {
 			case 0:
 				s.i++
@@ -253,6 +253,11 @@ func (s *scanner) word(closer rune) shellWord {
 	return w
 }
 
+// backslashEscapes is whether a backslash escapes the next character, as in a POSIX
+// shell. On Windows it is the path separator: PowerShell and cmd keep it as it is, and an
+// agent's shell command names C:\\Users\\... unquoted.
+var backslashEscapes = filepath.Separator == '/'
+
 // doubleQuoted reads the inside of double quotes into w: a backslash escapes only what is
 // special there, and expansions and substitutions stay live.
 func (s *scanner) doubleQuoted(w *shellWord, add func(partKind, string)) {
@@ -262,7 +267,7 @@ func (s *scanner) doubleQuoted(w *shellWord, add func(partKind, string)) {
 		case c == '"':
 			s.i++
 			return
-		case c == '\\' && strings.ContainsRune("\"\\$`\n", s.peek(1)):
+		case c == '\\' && backslashEscapes && strings.ContainsRune("\"\\$`\n", s.peek(1)):
 			if s.peek(1) != '\n' {
 				add(quoted, string(s.peek(1)))
 			}

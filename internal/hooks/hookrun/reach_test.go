@@ -183,3 +183,22 @@ func TestRepoAtTakesTheCheckoutClassifyLocated(t *testing.T) {
 		t.Errorf("Classify with nothing to classify located %+v", got)
 	}
 }
+
+// On Windows a backslash is the path separator, never an escape: an agent's shell command
+// (PowerShell, or Codex's shell) names C:\Users\... unquoted, and it is still a path.
+func TestAnUnquotedWindowsPathIsAPath(t *testing.T) {
+	t.Parallel()
+	if filepath.Separator != '\\' {
+		t.Skip("Windows paths")
+	}
+	dir := t.TempDir()
+	notes := filepath.Join(dir, "NOTES.md")
+	if err := os.WriteFile(notes, []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	for _, command := range []string{"cat " + notes, "Get-Content " + notes + " | Select-Object -First 5", `type "` + notes + `"`} {
+		if got := ShellPaths(command, dir); !slices.Contains(got, notes) {
+			t.Errorf("ShellPaths(%q) = %q, want %q among them", command, got, notes)
+		}
+	}
+}
