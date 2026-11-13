@@ -223,6 +223,8 @@ func postToolUse(ctx context.Context, env hookrun.Env) error {
 		return nil
 	}
 	env.Cwd = cmp.Or(in.Cwd, env.Cwd)
+	sess := session.Session{ID: in.SessionID, Tool: codexTool, Model: in.Model}
+	attrs := hookrun.AgentAttrs(map[string]any{}, in.AgentID, in.AgentType)
 	r, err := env.Repo(ctx)
 	if err != nil {
 		return nil
@@ -230,16 +232,17 @@ func postToolUse(ctx context.Context, env hookrun.Env) error {
 	captureCodexFunding(ctx, env, r, in)
 	captureCodexDesktopActivity(ctx, env, r, in)
 	captureCodexTitle(ctx, env, r, in, captureCodexReplies(ctx, env, r, in))
+	// Codex reads through the shell: what a command reached, read or written, counts toward
+	// a crossing; only what it wrote is recorded below.
+	env.Classify(ctx, r, sess, codexShellPaths(in, env.Cwd), attrs)
 	candidates, commits := codexEditedPaths(in, env.Cwd)
 	if len(candidates) == 0 {
 		return nil
 	}
-	attrs := hookrun.AgentAttrs(map[string]any{}, in.AgentID, in.AgentType)
 	hookrun.BoundedAttr(attrs, semconv.GenAIToolCallIDKey, in.ToolUseID)
 	if codexDesktopRoute(env, r) {
 		attrs[semconv.TermaCaptureSurfaceKey] = semconv.TermaCaptureSurfaceDesktop
 	}
-	sess := session.Session{ID: in.SessionID, Tool: codexTool, Model: in.Model}
 	if len(commits) == 0 {
 		switch in.ToolName {
 		case codexPatchTool:
@@ -318,6 +321,19 @@ func codexEditedPaths(in *codexHookInput, cwd string) (paths []string, commits [
 		}
 	}
 	return append(out, applypatch.Paths(input.Command)...), nil
+}
+
+// codexShellPaths are the paths a shell call reached (hookrun.ShellPaths), nil for any
+// other tool.
+func codexShellPaths(in *codexHookInput, cwd string) []string {
+	if in.ToolName != codexShellTool {
+		return nil
+	}
+	var input struct {
+		Command string `json:"command"`
+	}
+	_ = json.Unmarshal(in.ToolInput, &input)
+	return hookrun.ShellPaths(input.Command, cwd)
 }
 
 // codexShellTool is the tool_name Codex gives every shell call (exec_command and the rest).
