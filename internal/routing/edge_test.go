@@ -1,7 +1,10 @@
 package routing
 
 import (
+	"encoding/json"
 	"fmt"
+	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -269,5 +272,47 @@ func TestNoGrantFromEncodedEntriesOrForeignPolicies(t *testing.T) {
 	must(t, err)
 	if st := s.team(id).StateAt(now); st != SignInNeeded {
 		t.Fatalf("a 401 after a suspension shows %s", st)
+	}
+}
+
+// Ownership is strict, and holds for a loaded state as for Select and ApplyRefresh: a
+// policy without its organization and environment is no team's, since every fetch stamps
+// both (internal/policy). A wildcard is only an entry typed ending in `/*`.
+func TestOwnershipIsStrictEverywhere(t *testing.T) {
+	t.Parallel()
+	for _, raw := range []string{"github.com/acme/*.git", "github.com/acme/*/", "github.com/acme/*.GIT"} {
+		if _, ok := ParseEntry(raw, true); ok {
+			t.Errorf("parsed %q as a wildcard", raw)
+		}
+	}
+
+	unstamped := team("acme", "acme-platform", "github.com/acme/*")
+	unstamped.Policy.OrganizationID = ""
+	s := &State{Profile: "default"}
+	if _, err := s.Select(unstamped); err == nil {
+		t.Error("selected a team whose policy names no organization")
+	}
+	s = fixture(t)
+	id := enrollment(t, s, "acme-platform")
+	if _, err := s.ApplyRefresh(Refresh{EnrollmentID: id, Epoch: s.team(id).Epoch, Policy: &config.Policy{
+		Mode: config.ModeRepo, TeamID: "acme-platform", Revision: 5, FetchedAt: now,
+	}}); err == nil {
+		t.Error("a refresh with no organization or environment became the team's grant")
+	}
+
+	dir := t.TempDir()
+	_, err := Create(dir, "default", func(st *State) error { *st = *s; st.Generation = 0; return nil })
+	must(t, err)
+	path, _ := StatePath(dir, "default")
+	b, err := os.ReadFile(path)
+	must(t, err)
+	var stale State
+	must(t, json.Unmarshal(b, &stale))
+	stale.Teams[1].Policy.OrganizationID = "other"
+	b, err = json.Marshal(stale)
+	must(t, err)
+	must(t, os.WriteFile(path, b, 0o600))
+	if _, _, err := Load(dir, "default"); err == nil || !strings.Contains(err.Error(), "fetched for another") {
+		t.Fatalf("loaded a state whose team holds another organization's policy: %v", err)
 	}
 }
