@@ -17,10 +17,9 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/routing"
 )
 
-// prepare writes every profile's routing state in the Preparing phase (step 2), and
-// removes the Preparing states of profiles config.json no longer has, which an earlier
-// start left: committed, they would hold a team nobody selects. The machine is not
-// migrated yet, so nothing reads them.
+// prepare writes every profile's routing state, Preparing (step 2), and removes Preparing
+// states of profiles config.json no longer has: committed, they would hold a team nobody
+// selects. Nothing reads them before the machine is migrated.
 func (m Machine) prepare(personal map[string]bool) error {
 	file, err := config.LoadFile(m.ConfigDir)
 	if err != nil {
@@ -50,13 +49,11 @@ func (m Machine) prepare(personal map[string]bool) error {
 	return nil
 }
 
-// prepareProfile writes profile name's routing state in the Preparing phase: its team,
-// if it has one, as the one enrollment, with the bindings its validated entries need and
-// its legacy project mapped to it. A state an earlier start prepared is prepared again
-// from config.json as it is now, keeping its enrollment while the team is the same; a
-// state this migration did not prepare is the developer's, and is left as it is. personal
-// is what orgTypes learned before the locks were taken: a team whose organization it did
-// not ask about, as when config.json changed since, is errOrgTypeUnknown.
+// prepareProfile writes profile name's routing state, Preparing: its team as the one
+// enrollment, with the bindings its validated entries need and its legacy project mapped
+// to it. An earlier start's state is redone from config.json now, keeping the enrollment
+// while the team is the same; a state the migration did not prepare is left alone.
+// personal is what orgTypes learned; a team it did not ask about is errOrgTypeUnknown.
 func (m Machine) prepareProfile(name string, p *config.Profile, personal map[string]bool) error {
 	team, err := m.legacyTeam(name, p, false)
 	if err != nil {
@@ -115,14 +112,13 @@ func prepared(s *routing.State, team *routing.Team) error {
 	s.Teams = []routing.Team{t}
 	s.Migration.Legacy = map[string]string{t.TeamID: id}
 	if t.Personal {
-		// A personal team's entries are never bound: personal never needs a binding, and
-		// one naming the personal organization would keep its repositories from it.
+		// Never bound: a binding to the personal organization would keep its repositories
+		// from it.
 		return nil
 	}
-	// The team's validated entries are bound to its organization, an owner binding for a
-	// wildcard and a repository binding for an exact entry, so nothing is pending after
-	// the upgrade. An entry no binding can name, such as a literal `/*` on a policy
-	// without wildcards, matches nothing either way.
+	// Each validated entry is bound to the team's organization (an owner for a wildcard, a
+	// repository for an exact entry), so nothing is pending after the upgrade. An entry no
+	// binding can name, such as a literal `/*` without wildcards, matches nothing anyway.
 	for _, raw := range t.Policy.Repositories {
 		if e, ok := routing.ParseEntry(raw, t.Policy.Wildcards); ok {
 			_ = s.Bind(e.Key(), t.OrganizationID, false)
@@ -131,14 +127,11 @@ func prepared(s *routing.State, team *routing.Team) error {
 	return nil
 }
 
-// legacyTeam is profile name's team as its routing state's one enrollment, nil when it
-// has none or no organization is known for it. It carries the team's last validated
-// policy under the organization and environment that fetched it, as today's rules apply
-// it (config.Load); without one, an empty policy no refresh has validated, which blocks
-// nothing and stays Expired until the relay's refresh validates it. A personal
-// organization's team stays personal, and its global policy keeps collecting everything
-// not bound to an organization; any other's global policy collects nothing, as
-// routing.State.ApplyRefresh has it.
+// legacyTeam is profile name's team as its one enrollment; nil with no team or no known
+// organization. It carries the team's last validated policy, as config.Load applies it;
+// without one, an empty policy that stays Expired until the relay refreshes it. A personal
+// organization's team stays personal; any other's global policy collects nothing
+// (routing.State.ApplyRefresh).
 func (m Machine) legacyTeam(name string, p *config.Profile, personal bool) (*routing.Team, error) {
 	if p == nil || p.Team == "" {
 		return nil, nil
@@ -163,8 +156,8 @@ func (m Machine) legacyTeam(name string, p *config.Profile, personal bool) (*rou
 	return &routing.Team{OrganizationID: org, AuthURL: cfg.AuthURL, TeamID: p.Team, Personal: personal, Policy: pol}, nil
 }
 
-// preparing are the routing states under stateDir still in the Preparing phase. One that
-// cannot be read is left out: it grants nothing, and is never rebuilt.
+// preparing are the routing states under stateDir still Preparing. An unreadable one is
+// left out: it grants nothing and is never rebuilt.
 func preparing(stateDir string) ([]routing.State, error) {
 	entries, err := os.ReadDir(filepath.Join(stateDir, routing.StatesDir))
 	if errors.Is(err, fs.ErrNotExist) {

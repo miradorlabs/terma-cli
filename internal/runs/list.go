@@ -10,10 +10,9 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/session"
 )
 
-// Mixed lists, sorted, the sessions whose run in force at now is Mixed (MixedAt), and so
-// send no telemetry until they start a new run, as doctor shows them: those active within
-// recent of now (ledger.Active), and the number of the others the ledger still keeps. A
-// ledger that cannot be read counts, as MixedAt has it, as active.
+// Mixed lists, sorted, for doctor, the sessions whose run in force at now is Mixed and that
+// were active within recent; older counts the rest the ledger keeps. An unreadable ledger
+// counts as active and Mixed, as MixedAt has it.
 func Mixed(stateDir string, now time.Time, recent time.Duration) (active []string, older int) {
 	entries, err := os.ReadDir(filepath.Join(stateDir, Dir))
 	if err != nil {

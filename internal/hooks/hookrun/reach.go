@@ -14,20 +14,16 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/session"
 )
 
-// What a tool call reached counts toward a run crossing organizations, not only what it
-// edited: a read, a search or a shell command in another organization's checkout carries
-// its content into the session's telemetry too. Those calls only classify: Classify places
-// them as classifyTouches does, and records and sends nothing else.
+// A read, a search or a shell command in another organization's checkout carries its
+// content into the session's telemetry, so what a call reached counts toward a crossing,
+// not only what it edited. Such calls only classify: they record and send nothing else.
 
-// Classify is how a hook sees a tool call that read, searched or ran a shell command at
-// paths, each a file or a directory, absolute or relative to Cwd: on a migrated machine it
-// classifies the checkouts they reach with the session's own location r and the run's
-// earlier locations (classifyTouches), and the run ledger records them. It writes no
-// manifest and spools nothing. A nil r is located here, with no session store and no
-// parked records handed on: a hook that only classifies, before its tool call runs, or a
-// location Route drops, which Repo refused, whose run is still classified and recorded so
-// that a later hook of the run in a collected location sees the crossing. Elsewhere it
-// does nothing. It returns r, or the checkout it located, for RepoAt; nil for none.
+// Classify classifies, on a migrated machine, the checkouts that paths (files or folders,
+// absolute or relative to Cwd) reach, with the session's location r and the run's earlier
+// locations (classifyTouches). It writes no manifest and spools nothing. A nil r is located
+// here, with no store and nothing unparked: for a hook before its tool call runs, or in a
+// location Route drops, so a later hook still sees the crossing. It returns r, or the
+// checkout it located, for RepoAt; nil for none.
 func (e Env) Classify(ctx context.Context, r *Repo, sess session.Session, paths []string, extra map[string]any) *Repo {
 	paths = slices.DeleteFunc(slices.Clone(paths), func(p string) bool { return p == "" })
 	if e.Routing == nil || !e.Routing.Usable() || len(paths) == 0 || !session.ValidID(sess.ID) {
@@ -44,10 +40,9 @@ func (e Env) Classify(ctx context.Context, r *Repo, sess session.Session, paths 
 	return r
 }
 
-// classifyUnlocated is classifyTouches for a hook whose own checkout cannot be located,
-// its cwd deleted say: what the call reached is classified against where the run has been,
-// and a crossing turns the run Mixed. No placement is written for a location it does not
-// know.
+// classifyUnlocated is classifyTouches for a hook whose own checkout cannot be located (its
+// cwd deleted, say): what the call reached is classified against where the run has been.
+// It writes a placement only if the run turns Mixed.
 //
 // Accepted risk: the hook's own location is not classified. Marking the run Mixed for it
 // would turn every session whose cwd was deleted Mixed. The run's earlier hooks recorded
@@ -66,9 +61,8 @@ func (e Env) classifyUnlocated(sess session.Session, extra map[string]any, reach
 	e.judge(sess.ID, agent, claim.Claim{Tool: sess.Tool, PIDs: claimPIDs()}, locs, false)
 }
 
-// reached are the checkouts other than r, which may be nil, that paths reach, each once: a
-// directory's own, a file's (or a path's that is not there) its folder's. A path in no
-// checkout reaches none.
+// reached are the checkouts other than r (which may be nil) that paths reach, each once: a
+// folder's own, else its parent's. A path in no checkout reaches none.
 func (e Env) reached(r *Repo, paths []string) []touched {
 	var out []touched
 	dirs := map[string]bool{}
@@ -93,23 +87,21 @@ func (e Env) reached(r *Repo, paths []string) []touched {
 	return out
 }
 
-// maxShellPaths bounds the candidate paths ShellPaths examines in one command, so a hook
-// that runs on every shell call keeps to its budget whatever the command.
+// maxShellPaths bounds the candidates ShellPaths examines, keeping a hook that runs on every
+// shell call within its budget.
 const maxShellPaths = 32
 
-// ShellPaths are the paths a shell command may reach, for Classify: each word that is
-// absolute, starts with ~/ or holds a /, and the target of every cd and pushd, that exists.
-// A word that names nothing there yet may be a file the command creates (> new.md, touch,
-// mkdir -p): it reaches its nearest folder that is there, whose checkout it would be in;
-// a cd or pushd to nowhere goes nowhere. A word that is an option's or an assignment's
-// value (--flag=X, -oX, NAME=X) is that value. A relative word resolves against the cwd, and against where an earlier cd or
-// pushd in the command went, since it may run there. Words are split as shellWords splits
-// them. It does not parse the shell: a word that only looks like a path counts too, and a
-// run it wrongly finds crossing turns Mixed and stops sending, the safe direction.
+// ShellPaths are the existing paths a shell command may reach, for Classify: each word that
+// is absolute, starts with ~/ or holds a /, and every cd and pushd target. A word naming
+// nothing yet may be a file the command creates (> new.md, touch, mkdir -p), so it reaches
+// its nearest existing folder; a cd to nowhere reaches nothing. An option's or assignment's
+// value (--flag=X, -oX, NAME=X) counts as the word. A relative word resolves against the
+// cwd and against where an earlier cd or pushd went. It does not parse the shell: a word
+// that only looks like a path counts, and a false crossing errs toward Mixed, the safe way.
 //
-// Accepted risk: only a command's first maxShellPaths candidates are examined, so a
-// crossing only a later one makes is missed. Examining every one would put no bound on a
-// hook that runs on every shell call.
+// Accepted risk: only the first maxShellPaths candidates are examined, so a crossing only a
+// later one makes is missed. An unbounded scan would put no bound on a hook that runs on
+// every shell call.
 func ShellPaths(command, cwd string) []string {
 	var out []string
 	keep := func(p string) {
@@ -130,8 +122,8 @@ func ShellPaths(command, cwd string) []string {
 		keep(p)
 		return p, info
 	}
-	// reachNew keeps the nearest folder that is there above the path w names from dir: the
-	// folder a file the command creates would be in.
+	// reachNew keeps the nearest existing folder above the path w names from dir, where a
+	// file the command creates would go.
 	reachNew := func(w, dir string) {
 		if p, ok := shellPath(w, dir); ok {
 			if folder, ok := nearestDir(p); ok {
@@ -182,8 +174,8 @@ func ShellPaths(command, cwd string) []string {
 	return out
 }
 
-// nearestDir is the nearest folder above p, a path not there, that is there; false when
-// what is there first is not a folder.
+// nearestDir is the nearest existing folder above p, which does not exist; false when the
+// nearest existing path is not a folder.
 func nearestDir(p string) (string, bool) {
 	for dir := filepath.Dir(p); ; dir = filepath.Dir(dir) {
 		if info, err := os.Stat(dir); err == nil {
@@ -243,10 +235,9 @@ func shellPath(w, cwd string) (string, bool) {
 	return filepath.Join(cwd, w), true
 }
 
-// shellWords splits command into words at whitespace, the operators ;, &, |, < and > (so
-// &&, ||, >> and 2>&1 too) and the parentheses and backticks around a subshell or a command
-// substitution, outside quotes, dropping the quotes and a backslash's escape. A command
-// substitution inside double quotes, "$(...)" or "`...`", is split as a command of its own.
+// shellWords splits command into words outside quotes: at whitespace, at ;, &, |, < and >
+// (so &&, ||, >>, 2>&1), and around subshells and command substitutions, those inside
+// double quotes too. Quotes and escaping backslashes are dropped.
 func shellWords(command string) []string {
 	var words []string
 	var cur strings.Builder

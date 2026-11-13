@@ -13,13 +13,10 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/flock"
 )
 
-// Prune removes under the state directory stateDir every session ledger with no activity
-// for longer than Retention (ledger.Active) that no queued record names, with the alias
-// files that still name it, and what a crash or a removed ledger left behind. queued are
-// the session and subagent IDs the records still queued name, in the spool and the relay
-// outbox: a ledger one of them names is kept, since it may drop the record. A ledger
-// whose lock is held is left for the next prune. The relay runs it with its periodic
-// sweep, and teardown once it has removed both queues.
+// Prune removes each ledger idle past its retention that no queued record names, with its
+// lock and the alias files naming it, and what a crash left. queued are the session and
+// subagent IDs records in the spool and the relay outbox name. A ledger whose lock is held
+// waits for the next prune. The relay runs it hourly, and teardown once both queues are gone.
 func Prune(stateDir string, now time.Time, queued map[string]bool) {
 	dir := filepath.Join(stateDir, Dir)
 	entries, err := os.ReadDir(dir)
@@ -51,10 +48,9 @@ func Prune(stateDir string, now time.Time, queued map[string]bool) {
 	pruneAliases(stateDir, now)
 }
 
-// pruneLedger removes the ledger at path, if no writer holds it, it has had no activity
-// for longer than Retention and no queued record names its session or a subagent sharing
-// its runs, with its lock and the alias files that name it. One that cannot be read is
-// kept by its file's time alone: it may have recorded a crossing.
+// pruneLedger removes the ledger at path, with its lock and alias files, unless a writer
+// holds it, it was active within its retention, or a queued record names its session or an
+// alias. An unreadable one goes by its file's time alone: it may record a crossing.
 func pruneLedger(stateDir, path string, now time.Time, queued map[string]bool) {
 	lock := path + ".lock"
 	unlock, err := flock.TryLock(lock)

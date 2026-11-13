@@ -12,11 +12,10 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/procinfo"
 )
 
-// otherInstalls are the termas the agents' hook entries run that are not the relay's
-// own build (step 1). A hook running one would go on with the rules the migration
-// retires, and find nothing to collect for. A path that is the same file as the relay's,
-// or a copy of the same build, is the relay's; one that is gone runs nothing, since every
-// entry is guarded. It also returns the relay's own terma, for doctor to name.
+// otherInstalls are the termas the agents' hook entries run that are not the relay's own
+// build (step 1): they would keep the retired rules. The same file, or a copy of the same
+// build, is the relay's; a missing one runs nothing, as every entry is guarded. It also
+// returns the relay's terma, for doctor.
 func (m Machine) otherInstalls() (string, []string, error) {
 	if m.Hooked == nil {
 		return m.Executable, nil, nil
