@@ -1,6 +1,7 @@
 package hookrun
 
 import (
+	"slices"
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
@@ -16,7 +17,9 @@ import (
 // session gets one, outside git and where Route drops the location too, under its session
 // ID and the subagent ID its telemetry may use instead. A hook that sees the session's run
 // cross organizations (Sessions across organizations) marks the run Mixed in the run ledger
-// and writes a mixed placement instead, which only a new run replaces.
+// and writes a mixed placement instead, which only a new run replaces. The run ledger also
+// keeps where each run has been, so a crossing two hooks see between them, or that comes
+// after the session's claim has expired, is seen too.
 
 // StartRun records, on a migrated machine, that sessionID begins a new run now: a session
 // start or a resume, never a subagent starting nor a session merely compacted. Its
@@ -54,21 +57,34 @@ func (e Env) placeFor(r *Repo, ev spool.Event) {
 // processes: c's location-only placement under the session's ID and agentID's, unless the
 // run has crossed organizations, when it is marked Mixed instead. touched are the other
 // checkouts the hook saw the session touch: loc, the run's earlier locations and they are
-// classified together, before anything filters any of them.
+// classified together, before anything filters any of them. The run ledger then records
+// loc and touched among the run's locations, for the hooks after this one.
 func (e Env) place(sessionID, agentID string, c claim.Claim, loc routing.Location, touched []routing.Location) {
 	rt := e.Routing
 	if !rt.Usable() || !session.ValidID(sessionID) {
 		return
 	}
 	now := e.Time()
-	c.ProjectID, c.Run = "", e.runOf(sessionID)
+	run, been := e.currentRun(sessionID)
+	c.ProjectID, c.Run = "", run
+	seen := newLocations(been, append([]routing.Location{loc}, touched...))
+	// Past the bound, the ledger no longer keeps everywhere the run has been, so it cannot
+	// rule a crossing out: the run turns Mixed rather than miss one.
+	full := len(been)+len(seen) > maxRunLocations
 	prev, havePrev := claim.Read(e.StateDir, sessionID, now)
 	mixed := havePrev && prev.Kind == claim.KindMixed && prev.Run == c.Run
-	if !mixed && rt.crossed(prev, havePrev, c.Run, loc, touched, now) {
+	if !mixed && (full || rt.crossed(prev, havePrev, c.Run, loc, touched, been, now)) {
 		if err := runs.MarkMixed(e.StateDir, sessionID, now); err != nil {
 			e.Logf("mark run mixed: %v", err)
 		}
 		mixed = true
+	}
+	if len(seen) > 0 && !full {
+		if err := runs.Touch(e.StateDir, sessionID, run, seen); err != nil {
+			e.Logf("record run locations: %v", err)
+		} else {
+			rt.recorded(sessionID, run, seen)
+		}
 	}
 	if mixed {
 		c = claim.Claim{Kind: claim.KindMixed, Run: c.Run, Tool: c.Tool, PIDs: c.PIDs}
@@ -100,13 +116,17 @@ func (e Env) place(sessionID, agentID string, c claim.Claim, loc routing.Locatio
 	}
 }
 
-// crossed reports whether the run run, whose session's claim is prev, crosses
-// organizations at loc: whether any two of its locations, from its placements, loc and the
-// checkouts touched, belong to different organizations (crosses).
-func (rt *Routing) crossed(prev claim.Claim, havePrev bool, run string, loc routing.Location, touched []routing.Location, now time.Time) bool {
+// crossed reports whether the run run, whose session's claim is prev and which the run
+// ledger records at been, crosses organizations at loc: whether any two of its locations,
+// from its placements, the ledger, loc and the checkouts touched, belong to different
+// organizations (crosses), each classified now, whenever it was recorded.
+func (rt *Routing) crossed(prev claim.Claim, havePrev bool, run string, loc routing.Location, touched []routing.Location, been []string, now time.Time) bool {
 	locs := append([]routing.Location{loc}, touched...)
 	if havePrev {
 		locs = append(locs, runLocations(prev, run)...)
+	}
+	for _, l := range been {
+		locs = append(locs, fromLedger(l))
 	}
 	classes := make([]organization, 0, len(locs))
 	for _, l := range locs {
@@ -137,6 +157,47 @@ func runLocations(c claim.Claim, run string) []routing.Location {
 			out = append(out, routing.Location{Kind: routing.Repository, Repository: p.Repository.Origin})
 		case p.Kind == claim.KindOutsideGit:
 			out = append(out, routing.Location{Kind: routing.OutsideGit})
+		}
+	}
+	return out
+}
+
+// maxRunLocations bounds the locations the run ledger keeps for one run. A run touches few
+// checkouts; one that has been to more turns Mixed (place).
+const maxRunLocations = 64
+
+// ledgerOutsideGit is how the run ledger records a location outside git. A repository ID
+// always has a host and a path, so it is never one.
+const ledgerOutsideGit = "outside-git"
+
+// ledgerLocation is how the run ledger records loc: its normalised repository, or
+// ledgerOutsideGit; "" for one crossed cannot classify, which belongs to no organization
+// whenever it is checked.
+func ledgerLocation(loc routing.Location) string {
+	switch {
+	case loc.Kind == routing.OutsideGit:
+		return ledgerOutsideGit
+	case loc.Kind == routing.Repository && routing.Owner(loc.Repository) != "":
+		return routing.Normalize(loc.Repository)
+	}
+	return ""
+}
+
+// fromLedger is the location the run ledger records as s.
+func fromLedger(s string) routing.Location {
+	if s == ledgerOutsideGit {
+		return routing.Location{Kind: routing.OutsideGit}
+	}
+	return routing.Location{Kind: routing.Repository, Repository: s}
+}
+
+// newLocations are the locations among locs, as the run ledger records them, that been, the
+// run's, does not have yet: each once.
+func newLocations(been []string, locs []routing.Location) []string {
+	var out []string
+	for _, loc := range locs {
+		if l := ledgerLocation(loc); l != "" && !slices.Contains(been, l) && !slices.Contains(out, l) {
+			out = append(out, l)
 		}
 	}
 	return out

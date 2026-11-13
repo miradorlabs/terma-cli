@@ -2,10 +2,14 @@ package hookrun
 
 import (
 	"context"
+	"fmt"
+	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 	"time"
 
+	"github.com/miradorlabs/terma-cli/internal/gitx"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/routing"
@@ -180,5 +184,178 @@ func TestARunOutlivesItsClaim(t *testing.T) {
 	calls := hookruntest.Named(m.spooled(), semconv.TermaToolCallEvent)
 	if run == "" || len(calls) != 1 || calls[0].Run != run {
 		t.Fatalf("after the claim expired the event names run %q, want %q", calls[0].Run, run)
+	}
+}
+
+// A run remembers in the run ledger where it has been, so two hooks that each see half a
+// crossing make it Mixed between them. The first touches Acme's checkout from one that
+// belongs to no organization, which crosses nothing; the second places the run in personal's
+// checkout. The first hook reports from a checkout Route drops, as classifyTouches sees it.
+func TestACrossingSeenAcrossTwoHooksMakesTheRunMixed(t *testing.T) {
+	t.Parallel()
+	// Personal collects only github.com/dawson/*, so github.com/other/lib is nobody's.
+	st := hookruntest.RoutingState(t, []routing.Team{
+		hookruntest.RoutedTeam("acme", "acme-platform", true, "github.com/acme/*"),
+		hookruntest.RoutedPersonal("github.com/dawson/*"),
+	}, map[string]string{"github.com/acme": "acme"})
+	m := newRoutedMachine(t, st)
+	lib, api := hookruntest.RepoAt(t, "github.com/other/lib"), hookruntest.RepoAt(t, "github.com/acme/api")
+	side := hookruntest.RepoAt(t, "github.com/dawson/side")
+	const sid = "two-hook-session"
+	first := m.hook()
+	first.StartRun(sid)
+	first.Cwd = lib
+	r, err := first.routeHere(context.Background())
+	if err != nil || r.Collected() {
+		t.Fatalf("github.com/other/lib: %v, collected %v", err, err == nil && r.Collected())
+	}
+	first.Report(r, sessionOf(sid), "Read", []string{filepath.Join(api, "README")}, nil)
+	if ledger, placement := m.mixed(sid); ledger || placement {
+		t.Fatal("Mixed after touching Acme's checkout from one that belongs to no organization")
+	}
+	ClaimFromPayload(context.Background(), m.hook(), PayloadSession{ID: sid, Cwd: side}, "claude-code")
+	if ledger, placement := m.mixed(sid); !ledger || !placement {
+		t.Fatalf("placed in personal's checkout after touching Acme's: ledger Mixed %v, mixed placement %v", ledger, placement)
+	}
+}
+
+// The run ledger outlives the claim: a run that touched Acme's checkout, then idle for
+// longer than its claim lasts, crosses when it is next placed in personal's checkout.
+func TestACrossingIsSeenPastTheClaim(t *testing.T) {
+	t.Parallel()
+	m := newRoutedMachine(t, acmeAndPersonal(t))
+	api, side := hookruntest.RepoAt(t, "github.com/acme/api"), hookruntest.RepoAt(t, "github.com/dawson/side")
+	const sid = "idle-crossing-session"
+	r := startIn(t, m.hook(), sid, api)
+	m.hook().Touch(r, sessionOf(sid), "Edit", []string{filepath.Join(api, "main.go")}, nil)
+	later := m.hook()
+	later.Now = time.Now().Add(5 * time.Hour)
+	if _, ok := claim.Read(m.stateDir, sid, later.Now); ok {
+		t.Fatal("the claim has not expired yet")
+	}
+	ClaimFromPayload(context.Background(), later, PayloadSession{ID: sid, Cwd: side}, "claude-code")
+	if ledger, placement := m.mixed(sid); !ledger || !placement {
+		t.Fatalf("ledger Mixed %v, mixed placement %v", ledger, placement)
+	}
+}
+
+// A resume begins a run that has been nowhere: placed in personal's checkout after the
+// previous run touched Acme's, it is not Mixed.
+func TestAResumedRunRemembersNoLocations(t *testing.T) {
+	t.Parallel()
+	m := newRoutedMachine(t, acmeAndPersonal(t))
+	api, side := hookruntest.RepoAt(t, "github.com/acme/api"), hookruntest.RepoAt(t, "github.com/dawson/side")
+	const sid = "resumed-elsewhere"
+	r := startIn(t, m.hook(), sid, api)
+	m.hook().Touch(r, sessionOf(sid), "Edit", []string{filepath.Join(api, "main.go")}, nil)
+	startIn(t, m.hook(), sid, side)
+	ClaimFromPayload(context.Background(), m.hook(), PayloadSession{ID: sid, Cwd: side}, "claude-code")
+	if ledger, placement := m.mixed(sid); ledger || placement {
+		t.Fatalf("the resumed run: ledger Mixed %v, mixed placement %v", ledger, placement)
+	}
+	if _, locs, _ := runs.Locations(m.stateDir, sid); !slices.Equal(locs, []string{"github.com/dawson/side"}) {
+		t.Errorf("the resumed run has been to %v", locs)
+	}
+}
+
+// Worktrees of one pending repository never cross each other, from hook to hook either: a
+// run placed in one, then past its claim in another, is not Mixed.
+func TestWorktreesOfOnePendingRepositoryDoNotCrossAcrossHooks(t *testing.T) {
+	t.Parallel()
+	// ClientCo lists github.com/torvalds/linux, which nobody has decided.
+	st := hookruntest.RoutingState(t, []routing.Team{
+		hookruntest.RoutedTeam("clientco", "clientco-contractors", true, "github.com/torvalds/linux"),
+		hookruntest.RoutedPersonal("github.com/dawson/*"),
+	}, nil)
+	m := newRoutedMachine(t, st)
+	main := hookruntest.RepoAt(t, "github.com/torvalds/linux")
+	ctx := context.Background()
+	if _, err := gitx.Git(ctx, main, "commit", "-q", "--allow-empty", "-m", "init"); err != nil {
+		t.Fatal(err)
+	}
+	wt := filepath.Join(t.TempDir(), "linux-fix")
+	if _, err := gitx.Git(ctx, main, "worktree", "add", "-q", wt); err != nil {
+		t.Fatal(err)
+	}
+	wt, _ = filepath.EvalSymlinks(wt)
+	const sid = "pending-worktrees"
+	startIn(t, m.hook(), sid, main)
+	later := m.hook()
+	later.Now = time.Now().Add(5 * time.Hour)
+	ClaimFromPayload(ctx, later, PayloadSession{ID: sid, Cwd: wt}, "claude-code")
+	if ledger, placement := m.mixed(sid); ledger || placement {
+		t.Fatalf("ledger Mixed %v, mixed placement %v", ledger, placement)
+	}
+	if _, locs, _ := runs.Locations(m.stateDir, sid); !slices.Equal(locs, []string{"github.com/torvalds/linux"}) {
+		t.Errorf("the run has been to %v", locs)
+	}
+}
+
+// A hook writes the run ledger only when it sees the run somewhere new.
+func TestTheLedgerIsWrittenOnlyForANewLocation(t *testing.T) {
+	t.Parallel()
+	m := newRoutedMachine(t, acmeAndPersonal(t))
+	api, web := hookruntest.RepoAt(t, "github.com/acme/api"), hookruntest.RepoAt(t, "github.com/acme/web")
+	const sid = "quiet-ledger"
+	startIn(t, m.hook(), sid, api)
+	path := filepath.Join(m.stateDir, runs.Dir, sid+".json")
+	stat := func() os.FileInfo {
+		t.Helper()
+		fi, err := os.Stat(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return fi
+	}
+	touch := func(file string) {
+		t.Helper()
+		env := m.hook()
+		r, ok := env.Open(context.Background(), sid, api)
+		if !ok {
+			t.Fatal("no checkout")
+		}
+		env.Touch(r, sessionOf(sid), "Edit", []string{file}, nil)
+	}
+	before := stat()
+	touch(filepath.Join(api, "main.go"))
+	if !os.SameFile(before, stat()) {
+		t.Fatal("a hook with nothing new rewrote the ledger")
+	}
+	touch(filepath.Join(web, "main.go"))
+	if os.SameFile(before, stat()) {
+		t.Fatal("a hook that saw a new location left the ledger as it was")
+	}
+	if _, locs, _ := runs.Locations(m.stateDir, sid); !slices.Equal(locs, []string{"github.com/acme/api", "github.com/acme/web"}) {
+		t.Errorf("the run has been to %v", locs)
+	}
+}
+
+// The run ledger keeps at most maxRunLocations locations for a run. A run that has been to
+// more, all Acme's here, turns Mixed: the ledger could no longer rule a crossing out.
+func TestARunPastTheLocationBoundTurnsMixed(t *testing.T) {
+	t.Parallel()
+	m := newRoutedMachine(t, acmeAndPersonal(t))
+	const sid = "wandering-session"
+	env := m.hook()
+	env.StartRun(sid)
+	at := func(i int) routing.Location {
+		return routing.Location{Kind: routing.Repository, Repository: fmt.Sprintf("github.com/acme/r%d", i)}
+	}
+	var touched []routing.Location
+	for i := 1; i < maxRunLocations; i++ {
+		touched = append(touched, at(i))
+	}
+	c := claim.Claim{Kind: claim.KindRepository, Tool: "claude-code"}
+	env.place(sid, "", c, at(0), touched)
+	if ledger, placement := m.mixed(sid); ledger || placement {
+		t.Fatalf("Mixed at %d locations, all Acme's", maxRunLocations)
+	}
+	next := m.hook()
+	next.place(sid, "", c, at(0), []routing.Location{at(maxRunLocations)})
+	if ledger, placement := m.mixed(sid); !ledger || !placement {
+		t.Fatalf("past the bound: ledger Mixed %v, mixed placement %v", ledger, placement)
+	}
+	if _, locs, _ := runs.Locations(m.stateDir, sid); len(locs) != maxRunLocations {
+		t.Errorf("the ledger keeps %d locations", len(locs))
 	}
 }

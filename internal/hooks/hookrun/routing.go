@@ -2,6 +2,7 @@ package hookrun
 
 import (
 	"context"
+	"slices"
 	"sync"
 	"time"
 
@@ -30,14 +31,22 @@ type Routing struct {
 	router *routing.Router
 
 	mu sync.Mutex
-	// runs is the run each session's hooks name, by session ID, read once per process.
-	runs map[string]string
+	// runs is the run each session's hooks name, by session ID, and where the run ledger
+	// says it has been: read once per process.
+	runs map[string]*ledgerRun
+}
+
+// ledgerRun is a session's run as one hook process knows it: its ID, and the locations the
+// run ledger records for it, as read and with those this process has added since.
+type ledgerRun struct {
+	id        string
+	locations []string
 }
 
 // NewRouting is profile's routing under st, its routing state: nil for one missing,
 // unreadable, or still being prepared by the migration, under which a hook sends nothing.
 func NewRouting(profile string, st *routing.State) *Routing {
-	rt := &Routing{Profile: profile, runs: map[string]string{}}
+	rt := &Routing{Profile: profile, runs: map[string]*ledgerRun{}}
 	if st != nil && st.Ready() {
 		s := *st
 		rt.state, rt.router = &s, routing.NewRouter(s)
@@ -220,26 +229,43 @@ func (e Env) destine(ev spool.Event, d *dest, own bool, run string) spool.Event 
 }
 
 // runOf is the run sessionID's hooks name: the one a session start began in this process,
-// else the latest the run ledger records for it (runs.Current), however long the session
+// else the latest the run ledger records for it (runs.Locations), however long the session
 // has been idle; "" before any run began.
 func (e Env) runOf(sessionID string) string {
-	rt := e.Routing
-	if rt == nil || sessionID == "" {
-		return ""
-	}
-	rt.mu.Lock()
-	defer rt.mu.Unlock()
-	if run, ok := rt.runs[sessionID]; ok {
-		return run
-	}
-	run, _ := runs.Current(e.StateDir, sessionID)
-	rt.runs[sessionID] = run
+	run, _ := e.currentRun(sessionID)
 	return run
 }
 
-// setRun records that sessionID's hooks name run from now on.
+// currentRun is runOf with where the run has been, as the run ledger records it: read with
+// the run, once per process.
+func (e Env) currentRun(sessionID string) (run string, locations []string) {
+	rt := e.Routing
+	if rt == nil || sessionID == "" {
+		return "", nil
+	}
+	rt.mu.Lock()
+	defer rt.mu.Unlock()
+	cur, ok := rt.runs[sessionID]
+	if !ok {
+		cur = &ledgerRun{}
+		cur.id, cur.locations, _ = runs.Locations(e.StateDir, sessionID)
+		rt.runs[sessionID] = cur
+	}
+	return cur.id, slices.Clip(cur.locations)
+}
+
+// setRun records that sessionID's hooks name run from now on, a run that has been nowhere.
 func (rt *Routing) setRun(sessionID, run string) {
 	rt.mu.Lock()
 	defer rt.mu.Unlock()
-	rt.runs[sessionID] = run
+	rt.runs[sessionID] = &ledgerRun{id: run}
+}
+
+// recorded notes that the run ledger now records locations for sessionID's run run too.
+func (rt *Routing) recorded(sessionID, run string, locations []string) {
+	rt.mu.Lock()
+	defer rt.mu.Unlock()
+	if cur, ok := rt.runs[sessionID]; ok && cur.id == run {
+		cur.locations = append(cur.locations, locations...)
+	}
 }
