@@ -29,11 +29,12 @@ type fakeRouter struct {
 	unknownToPersonal bool
 	policies          map[string]Policy
 	deselected        map[string]bool
-	waiting           map[string]bool // enrollments whose entries wait at recheck
+	waiting           map[string]bool // enrollments whose team waits at recheck
 	discard           map[string]bool // enrollments whose entries are dropped at recheck
 	legacy            map[string]Queued
 	routed            []Record
 	rechecked         []Queued
+	passes            int     // rechecks of a whole queue begun
 	hold              *Routed // set: every placed record is held so
 }
 
@@ -62,14 +63,37 @@ func (f *fakeRouter) Route(rec Record) Routed {
 	return Routed{Outcome: Hold, Why: WhyUnknown}
 }
 
-func (f *fakeRouter) Recheck(q Queued) Rechecked {
+func (f *fakeRouter) Recheck(enrollment string) Rechecker {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.rechecked = append(f.rechecked, q)
+	f.passes++
+	return fakeRecheck{f, enrollment}
+}
+
+// fakeRecheck is a pass of fakeRouter's: a waiting enrollment's team waits, a discarded
+// one's entries are dropped, and every entry judged is recorded.
+type fakeRecheck struct {
+	f          *fakeRouter
+	enrollment string
+}
+
+func (p fakeRecheck) TeamWaits() (Rechecked, bool) {
+	p.f.mu.Lock()
+	defer p.f.mu.Unlock()
+	if p.f.waiting[p.enrollment] {
+		return Rechecked{Verdict: Wait, Why: WhyBlocked, Blocker: "team:" + p.enrollment}, true
+	}
+	return Rechecked{}, false
+}
+
+func (p fakeRecheck) Entry(q Queued) Rechecked {
+	p.f.mu.Lock()
+	defer p.f.mu.Unlock()
+	p.f.rechecked = append(p.f.rechecked, q)
 	switch {
-	case f.discard[q.Enrollment]:
+	case p.f.discard[q.Enrollment]:
 		return Rechecked{Verdict: Discard, Why: WhyBlocked, Blocker: "team:" + q.Enrollment}
-	case f.waiting[q.Enrollment]:
+	case p.f.waiting[q.Enrollment]:
 		return Rechecked{Verdict: Wait, Why: WhyBlocked}
 	}
 	return Rechecked{Verdict: SendNow}
@@ -348,6 +372,59 @@ func TestQueuedEntriesAreRecheckedBeforeSending(t *testing.T) {
 		got, _ := u.logs(t)
 		return len(got["Bearer key-acme"]) == 1
 	})
+}
+
+// A sender whose team cannot send judges none of its queue, and no new part wakes it:
+// before, each part pushed rechecked the whole queue, every entry a read of its run's
+// ledger, so 200 parts cost 20,101 rechecks. Once the team recovers, one pass sends them.
+func TestAQueueWaitingForItsTeamIsNotRecheckedPerPart(t *testing.T) {
+	t.Parallel()
+	u := newUpstream(t)
+	f := newTeamFixture(t, u)
+	f.router.waiting = map[string]bool{"e-acme": true}
+	r, srv := f.start(t)
+	rt := teamRoute{enrollment: "e-acme", tool: "claude-code"}
+	postProto(t, srv, "/v1/logs", logsOf("A", 1))
+	waitFor(t, func() bool {
+		r.mu.Lock()
+		s := r.teamSenders[rt]
+		r.mu.Unlock()
+		if s == nil {
+			return false
+		}
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		return s.blocked
+	})
+	f.router.mu.Lock()
+	passes := f.router.passes
+	f.router.mu.Unlock()
+	const parts = 200
+	for range parts {
+		postProto(t, srv, "/v1/logs", logsOf("A", 1))
+	}
+	waitFor(t, func() bool { return len(r.outbox.teamNames(rt)) == parts+1 })
+	f.router.mu.Lock()
+	judged, after := len(f.router.rechecked), f.router.passes
+	f.router.mu.Unlock()
+	if judged != 0 || after != passes {
+		t.Fatalf("%d parts pushed to a waiting team: %d entries judged, %d passes begun (want 0, 0)", parts, judged, after-passes)
+	}
+	if _, quiet := r.Idle(); !quiet {
+		t.Fatal("a queue waiting for its team keeps the relay awake")
+	}
+	f.router.set(func(fr *fakeRouter) { fr.waiting = nil })
+	r.mu.Lock()
+	s := r.teamSenders[rt]
+	r.mu.Unlock()
+	s.poke()
+	waitForCounters(t, r, func(c map[string]int) bool { return c["forwarded.logs"] == parts+1 })
+	f.router.mu.Lock()
+	judged = len(f.router.rechecked)
+	f.router.mu.Unlock()
+	if judged > 2*(parts+1) {
+		t.Fatalf("sending %d parts judged %d entries", parts+1, judged)
+	}
 }
 
 // Unticking a team drops its queue.

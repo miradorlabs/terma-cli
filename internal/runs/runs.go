@@ -175,17 +175,38 @@ func Touch(stateDir, sessionID, runID string, locations []string) ([]string, err
 // may have recorded a crossing; none at all, as for an ID no file can be named after, is
 // never Mixed.
 func MixedAt(stateDir, idOrAlias string, recordTime time.Time) (time.Time, bool) {
+	return Read(stateDir, idOrAlias).MixedAt(recordTime)
+}
+
+// Snapshot is a session's runs as one read of its ledger found them (Read), for a caller
+// that asks MixedAt of many records of the session, as the relay does of a queue.
+type Snapshot struct {
+	runs []run
+	// unreadable: the ledger could not be read, so every record counts as Mixed.
+	unreadable bool
+}
+
+// Read reads the ledger of idOrAlias, a session ID or one of its aliases, once.
+func Read(stateDir, idOrAlias string) Snapshot {
 	if !session.ValidID(idOrAlias) {
-		return time.Time{}, false
+		return Snapshot{}
 	}
-	l, ok, err := resolve(stateDir, idOrAlias)
+	l, _, err := resolve(stateDir, idOrAlias)
+	if err != nil {
+		return Snapshot{unreadable: true}
+	}
+	return Snapshot{runs: l.Runs}
+}
+
+// MixedAt is the package's MixedAt, answered from this read of the ledger.
+func (s Snapshot) MixedAt(recordTime time.Time) (time.Time, bool) {
 	switch {
-	case err != nil:
+	case s.unreadable:
 		return time.Time{}, true
-	case !ok || len(l.Runs) == 0:
+	case len(s.runs) == 0:
 		return time.Time{}, false
 	}
-	r := inForce(l.Runs, recordTime)
+	r := inForce(s.runs, recordTime)
 	return r.MixedAt, !r.MixedAt.IsZero()
 }
 

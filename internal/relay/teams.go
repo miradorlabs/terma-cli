@@ -25,9 +25,9 @@ type Router interface {
 	UnknownToPersonal() bool
 	// Route is where a record goes, checked against its run's Mixed state first.
 	Route(rec Record) Routed
-	// Recheck is what becomes of a queued entry now: sent only to the team it was routed
-	// to, while that team still takes it; kept while it may recover; dropped otherwise.
-	Recheck(q Queued) Rechecked
+	// Recheck starts one pass over enrollment's queue, as a sender makes before it sends
+	// (Rechecker), against the routing state as it stands now.
+	Recheck(enrollment string) Rechecker
 	// Resolve is an enrollment's send policy for the tool that claimed a record: its
 	// team's ingest and key, its content rules and the user it names. ErrNoKey while a
 	// key is minted; another error while the key cannot be read now (a locked keychain).
@@ -138,6 +138,17 @@ const (
 	// Discard: drop it. It is never sent to another team.
 	Discard
 )
+
+// Rechecker judges an enrollment's queued entries in one pass over the queue: it reads
+// the team's state once, and each session's run at most once.
+type Rechecker interface {
+	// TeamWaits reports whether every entry waits for the team itself, which cannot send
+	// now but may recover, and why: no entry is judged then, and no new part changes it.
+	TeamWaits() (Rechecked, bool)
+	// Entry is what becomes of a queued entry now: sent only to the team it was routed
+	// to, while that team still takes it; kept while it may recover; dropped otherwise.
+	Entry(q Queued) Rechecked
+}
 
 // Rechecked is a queued entry's verdict, and for a drop why, and what blocked it.
 type Rechecked struct {

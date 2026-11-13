@@ -24,6 +24,10 @@ type teamSender struct {
 	queue []teamEntry
 	// waiting: every part left must wait, so the route keeps no relay awake.
 	waiting bool
+	// blocked: they wait for the team itself, which cannot send now (Rechecker.TeamWaits),
+	// or for its key. No new part changes that, so none wakes the sender; it looks again
+	// after keylessRetry.
+	blocked bool
 }
 
 func (r *Relay) teamSender(rt teamRoute) *teamSender {
@@ -57,15 +61,28 @@ func (r *Relay) enqueueTeam(q Queued, tool string, p *part) {
 		r.warnf("outbox %s: %v; dropped %d %s", rt, err, p.records, p.signal)
 		return
 	}
-	s := r.teamSender(rt)
-	s.push(teamEntry{e, q})
-	s.poke()
+	r.teamSender(rt).push(teamEntry{e, q})
 }
 
+// push queues a part enqueueTeam wrote, and wakes the sender for it unless the sender
+// waits for its team, whatever the part.
 func (s *teamSender) push(e teamEntry) {
 	s.mu.Lock()
 	s.queue = append(s.queue, e)
-	s.waiting = false
+	blocked := s.blocked
+	if !blocked {
+		s.waiting = false
+	}
+	s.mu.Unlock()
+	if !blocked {
+		s.poke()
+	}
+}
+
+// wait records that every part left waits, and whether for the team itself (blocked).
+func (s *teamSender) wait(blocked bool) {
+	s.mu.Lock()
+	s.waiting, s.blocked = true, blocked
 	s.mu.Unlock()
 }
 
@@ -159,10 +176,16 @@ func (s *teamSender) dropRun(session string, from time.Time) {
 	s.discard(gone, whyMixed, "mixed:"+session)
 }
 
-// choose rechecks the queue in order: it drops what may never leave, skips what must wait,
-// and returns up to limit parts that may leave now, of the signal of the first of them,
-// with whether any part waits.
+// choose rechecks the queue in order, in one pass (Router.Recheck): nothing at all while
+// its team waits, else it drops what may never leave, skips what must wait, and returns up
+// to limit parts that may leave now, of the signal of the first of them, with whether any
+// part waits.
 func (s *teamSender) choose(limit int) ([]teamEntry, bool) {
+	rc := s.r.opts.Router.Recheck(s.route.enrollment)
+	if _, waits := rc.TeamWaits(); waits {
+		s.wait(true)
+		return nil, true
+	}
 	s.mu.Lock()
 	queue := slices.Clone(s.queue)
 	s.mu.Unlock()
@@ -175,7 +198,7 @@ func (s *teamSender) choose(limit int) ([]teamEntry, bool) {
 		if len(batch) > 0 && e.signal != batch[0].signal {
 			continue
 		}
-		switch v := s.r.opts.Router.Recheck(e.q); v.Verdict {
+		switch v := rc.Entry(e.q); v.Verdict {
 		case Discard:
 			s.discard([]teamEntry{e}, v.Why.reason(), v.Blocker)
 		case Wait:
@@ -185,7 +208,7 @@ func (s *teamSender) choose(limit int) ([]teamEntry, bool) {
 		}
 	}
 	s.mu.Lock()
-	s.waiting = len(batch) == 0 && waiting
+	s.waiting, s.blocked = len(batch) == 0 && waiting, false
 	s.mu.Unlock()
 	return batch, waiting
 }
@@ -250,10 +273,8 @@ func (s *teamSender) loop() {
 		}
 		pol, ok := s.r.resolveTeam(s.route.enrollment, s.route.toolLabel())
 		if !ok {
-			// Its key is minted, or the keychain locked: the parts wait.
-			s.mu.Lock()
-			s.waiting = true
-			s.mu.Unlock()
+			// Its key is minted, or the keychain locked: the parts wait for it.
+			s.wait(true)
 			if stopping() || !sleep(keylessRetry) {
 				return
 			}
