@@ -12,7 +12,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/account/auth"
 )
 
-// A refusal's AIP-193 reason is read from error.reason, and named among its details.
+// A refusal's AIP-193 reason is read from error.reason; its message is the one it always was.
 func TestParseErrorReadsTheReason(t *testing.T) {
 	t.Parallel()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -26,7 +26,7 @@ func TestParseErrorReadsTheReason(t *testing.T) {
 	if !errors.As(err, &apiErr) || apiErr.StatusCode != http.StatusForbidden || apiErr.Reason != ReasonTeamNotFound {
 		t.Fatalf("err = %#v, want a 403 with TEAM_NOT_FOUND", err)
 	}
-	if got := apiErr.Error(); got != "no such team (PERMISSION_DENIED, TEAM_NOT_FOUND)" {
+	if got := apiErr.Error(); got != "no such team (PERMISSION_DENIED)" {
 		t.Fatalf("message = %q", got)
 	}
 }

@@ -68,9 +68,6 @@ func (e *Error) Error() string {
 	if e.Code != "" {
 		detail = append(detail, e.Code)
 	}
-	if e.Reason != "" {
-		detail = append(detail, e.Reason)
-	}
 	if e.RequestID != "" {
 		detail = append(detail, "request_id="+e.RequestID)
 	}
