@@ -68,11 +68,11 @@ func (app *App) selectedTeamUser(cfg *config.Config, team routing.Team, endpoint
 // organization, else the first in the team list. It names that team's signed-in user, and
 // with no such team, nothing is sent. It mints no key: the relay does, for a team's records.
 func (app *App) teamHeartbeatSend(ctx context.Context, cfg *config.Config, beat *logspb.LogsData) error {
-	st, ok, err := routing.Load(app.stateDir, cfg.ProfileName)
+	st, ok, err := routing.LoadReady(app.stateDir, cfg.ProfileName)
 	if err != nil {
 		return err
 	}
-	if !ok || st.Migration != nil && st.Migration.Phase != routing.Committed {
+	if !ok {
 		return relay.ErrNoKey
 	}
 	order := make([]routing.Team, 0, len(st.Teams))

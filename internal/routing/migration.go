@@ -29,6 +29,15 @@ type Migration struct {
 	Legacy map[string]string `json:"legacy,omitempty"`
 }
 
+// Ready reports whether s may route anything: a state set up afresh, or one the migration
+// has committed. A state still Preparing sends nothing, to anyone: until the commit its
+// keys and sign-ins are moving, and a crash part way leaves a machine that collects
+// nothing until the next relay start finishes the move. LoadReady and every Router hold
+// to it, so no caller can forget it.
+func (s State) Ready() bool {
+	return s.Migration == nil || s.Migration.Phase == Committed
+}
+
 // check reports the first way m breaks its shape against s's teams.
 func (m *Migration) check(s State) error {
 	if m == nil {

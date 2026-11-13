@@ -67,8 +67,8 @@ func (d Deps) committed() (*config.Config, routing.State, bool) {
 	if err != nil {
 		return nil, routing.State{}, false
 	}
-	st, ok, err := routing.Load(cfg.StateDir, cfg.ProfileName)
-	if err != nil || !ok || st.Migration != nil && st.Migration.Phase != routing.Committed {
+	st, ok, err := routing.LoadReady(cfg.StateDir, cfg.ProfileName)
+	if err != nil || !ok {
 		return cfg, routing.State{}, false
 	}
 	return cfg, st, true

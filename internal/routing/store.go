@@ -45,6 +45,18 @@ func Load(stateDir, profile string) (State, bool, error) {
 	return load(path, profile)
 }
 
+// LoadReady is profile's routing state when it may route (State.Ready): false when there
+// is none, and when the migration has not committed it yet. Hooks, the relay and delivery
+// read their state through it, so a Preparing state sends nothing whichever reads it;
+// only the migration, doctor and `terma teams` read one that is not ready, with Load.
+func LoadReady(stateDir, profile string) (State, bool, error) {
+	s, ok, err := Load(stateDir, profile)
+	if err != nil || !ok || !s.Ready() {
+		return State{}, false, err
+	}
+	return s, true, nil
+}
+
 func load(path, profile string) (State, bool, error) {
 	b, err := os.ReadFile(path)
 	if errors.Is(err, fs.ErrNotExist) {

@@ -51,10 +51,10 @@ func (app *App) ensureSpoolKey(ctx context.Context, cfg *config.Config) spoolKey
 // team's organization's sign-in, named for its enrollment, and a key minted into keys.json
 // would be one an older terma binary could send with.
 func (app *App) teamKeys(profile string) spoolKey {
-	st, ok, err := routing.Load(app.stateDir, profile)
+	st, ok, err := routing.LoadReady(app.stateDir, profile)
 	switch {
 	case err != nil || !ok:
-		return spoolKey{"held: this profile's routing state is missing or unreadable", "Run `terma doctor` to see why."}
+		return spoolKey{"held: this profile's routing state is missing, unreadable or still being migrated", "Run `terma doctor` to see why."}
 	case len(st.Teams) == 0:
 		return spoolKey{"sent to no team: none is selected on this machine", "Run `terma setup` to choose the teams this machine sends to."}
 	}

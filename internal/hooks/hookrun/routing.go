@@ -37,7 +37,7 @@ type Routing struct {
 // unreadable, or still being prepared by the migration, under which a hook sends nothing.
 func NewRouting(profile string, st *routing.State) *Routing {
 	rt := &Routing{Profile: profile, runs: map[string]string{}}
-	if st != nil && (st.Migration == nil || st.Migration.Phase == routing.Committed) {
+	if st != nil && st.Ready() {
 		s := *st
 		rt.state, rt.router = &s, routing.NewRouter(s)
 	}
@@ -47,7 +47,7 @@ func NewRouting(profile string, st *routing.State) *Routing {
 // LoadRouting reads profile's routing state under the state directory stateDir and compiles
 // its Router, which routes everything one hook records: hooks load it once per invocation.
 func LoadRouting(stateDir, profile string) *Routing {
-	st, ok, err := routing.Load(stateDir, profile)
+	st, ok, err := routing.LoadReady(stateDir, profile)
 	if err != nil || !ok {
 		return NewRouting(profile, nil)
 	}
