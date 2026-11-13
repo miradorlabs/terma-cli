@@ -18,6 +18,10 @@ type FundingEvidence struct {
 	Status     string
 	SourceTime time.Time
 	Attrs      map[string]any
+	// Cwd is the working directory of the agent's turn the evidence was read from, "" when
+	// it names none: on a migrated machine the evidence routes by it (Turns.Routed). It is
+	// never part of the evidence itself.
+	Cwd string `json:"-"`
 }
 
 // EvidenceFileLimit bounds an evidence file terma reads.

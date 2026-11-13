@@ -78,7 +78,8 @@ func captureQuota(e hookrun.Env, p *statusLinePayload) bool {
 	}
 	projectID := r.ProjectID
 	accountID, orgID, _ := sessionFunding(e, r.Root, p.SessionID, p.TranscriptPath, false).oauthAccount()
-	next := quotaState{EmittedAt: now, Quota: quota, Model: p.Model.ID, Resets: resets, ProjectID: projectID, AccountID: accountID, OrgID: orgID}
+	// Keyed by where the snapshot goes, so a session that moves to another sends it there.
+	next := quotaState{EmittedAt: now, Quota: quota, Model: p.Model.ID, Resets: resets, ProjectID: r.RouteKey(), AccountID: accountID, OrgID: orgID}
 	if prev != nil && !quotaChanged(*prev, next) && now.Sub(prev.EmittedAt) < hookrun.QuotaHeartbeat {
 		return false
 	}
@@ -124,7 +125,7 @@ func captureQuota(e hookrun.Env, p *statusLinePayload) bool {
 		attrs[hookrun.AttrProjectID] = projectID
 	}
 	ev.Time = now
-	if err := e.Spool.Append(ev); err != nil {
+	if err := e.Spool.Append(e.Routed(r, ev)); err != nil {
 		e.Logf("quota append: %v", err)
 		return false
 	}

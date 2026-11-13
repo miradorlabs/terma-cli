@@ -2,6 +2,7 @@ package claude
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 	"testing"
 	"time"
@@ -12,6 +13,28 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/semconv"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
+
+// On a migrated machine the quota snapshot the status line spools itself carries the
+// destination routing gave the session's repository, and no project.
+func TestRoutedClaudeQuotaCarriesItsDestination(t *testing.T) {
+	env, _, sp := statusEnv(t, quotaPayload)
+	st := hookruntest.TwoOrganizations(t)
+	env.Policy, env.Team, env.Routing = config.NoPolicy("", ""), "", hookrun.NewRouting(hookruntest.RoutedProfile, st)
+	var p statusLinePayload
+	if err := json.Unmarshal([]byte(quotaPayload), &p); err != nil {
+		t.Fatal(err)
+	}
+	if !captureQuota(env, &p) {
+		t.Fatal("no snapshot captured")
+	}
+	evs := hookruntest.Spooled(t, sp)
+	if len(evs) != 1 || evs[0].Enrollment != hookruntest.Enrollment(t, st, "acme-platform") || evs[0].OwnLocation {
+		t.Fatalf("spooled %+v", evs)
+	}
+	if _, ok := evs[0].Attrs[hookrun.AttrProjectID]; ok {
+		t.Errorf("the snapshot names a project: %v", evs[0].Attrs)
+	}
+}
 
 // A session start, a resume or a clear begins a new run; a compaction continues the run it
 // compacts, so it never ends a Mixed one.
