@@ -213,10 +213,7 @@ func RoutedRepository(r Routing, gitDir string, repoErr error, now time.Time) (C
 		loc, where = routing.Location{Kind: routing.Repository, Repository: origin}, origin
 	}
 	d := routing.NewRouter(r.State).Route(loc, now)
-	var team *routing.Team
-	if i := slices.IndexFunc(r.State.Teams, func(t routing.Team) bool { return t.EnrollmentID == d.EnrollmentID }); i >= 0 {
-		team = &r.State.Teams[i]
-	}
+	team := r.State.Team(d.EnrollmentID)
 	switch {
 	case d.Outcome == routing.Send:
 		detail := where + " goes to " + r.label(*team)
@@ -305,8 +302,8 @@ func (r Routing) blockedRows() []Row {
 			what = name + ", undecided"
 		case "team":
 			what = name + ", no longer ticked"
-			if i := slices.IndexFunc(r.State.Teams, func(t routing.Team) bool { return t.EnrollmentID == name }); i >= 0 {
-				what = r.label(r.State.Teams[i]) + ", which could not send"
+			if t := r.State.Team(name); t != nil {
+				what = r.label(*t) + ", which could not send"
 			}
 		case "overflow":
 			what = "other blockers"

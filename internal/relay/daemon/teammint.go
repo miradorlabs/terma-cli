@@ -118,7 +118,7 @@ func keyAllowed(cfg *config.Config, enrollment string) bool {
 	if err != nil || !ok {
 		return false
 	}
-	t := team(st, enrollment)
+	t := st.Team(enrollment)
 	if t == nil {
 		return false
 	}

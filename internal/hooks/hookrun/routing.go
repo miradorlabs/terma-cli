@@ -83,12 +83,8 @@ func (rt *Routing) stampsCommits(d routing.Decision) bool {
 	if d.Outcome != routing.Send {
 		return false
 	}
-	for _, t := range rt.state.Teams {
-		if t.EnrollmentID == d.EnrollmentID {
-			return t.Policy.GitHooks
-		}
-	}
-	return false
+	t := rt.state.Team(d.EnrollmentID)
+	return t != nil && t.Policy.GitHooks
 }
 
 // route is where what loc records goes now, with loc; a drop when rt routes nothing.

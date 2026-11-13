@@ -122,16 +122,6 @@ func (t *Teams) state() (routing.State, *routing.Router, bool) {
 	return t.st, t.router, t.ok
 }
 
-// team is enrollment's team in st, or nil.
-func team(st routing.State, enrollment string) *routing.Team {
-	for i := range st.Teams {
-		if st.Teams[i].EnrollmentID == enrollment {
-			return &st.Teams[i]
-		}
-	}
-	return nil
-}
-
 // UnknownToPersonal is the Unknown rule now (routing.UnknownToPersonal).
 func (t *Teams) UnknownToPersonal() bool {
 	st, _, ok := t.state()
@@ -156,7 +146,7 @@ func (t *Teams) Route(rec relay.Record) relay.Routed {
 	d := router.Route(loc, t.deps.Now())
 	switch d.Outcome {
 	case routing.Send:
-		tm := team(st, d.EnrollmentID)
+		tm := st.Team(d.EnrollmentID)
 		if tm == nil {
 			return relay.Routed{Outcome: relay.Drop, Why: relay.WhyNoTeam}
 		}
@@ -200,7 +190,7 @@ func (p *recheck) TeamWaits() (relay.Rechecked, bool) {
 	if !p.ok {
 		return relay.Rechecked{Verdict: relay.Wait, Why: relay.WhyNoState}, true
 	}
-	tm := team(p.st, p.enrollment)
+	tm := p.st.Team(p.enrollment)
 	if tm == nil {
 		return relay.Rechecked{}, false
 	}
@@ -259,7 +249,7 @@ func (t *Teams) Legacy(project string, repo config.Repository) (relay.Queued, bo
 		return relay.Queued{}, false
 	}
 	enrollment := st.Migration.Legacy[project]
-	tm := team(st, enrollment)
+	tm := st.Team(enrollment)
 	if enrollment == "" || tm == nil {
 		return relay.Queued{}, false
 	}
@@ -283,7 +273,7 @@ var errOtherEnvironment = errors.New("the team was selected in another environme
 // team is Suspended or Refused, which is never given one.
 func (t *Teams) Resolve(enrollment, tool string) (relay.Policy, error) {
 	st, _, ok := t.state()
-	tm := team(st, enrollment)
+	tm := st.Team(enrollment)
 	if !ok || tm == nil {
 		return relay.Policy{}, errNoTeam
 	}
