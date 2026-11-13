@@ -4,6 +4,8 @@ import (
 	"cmp"
 	"errors"
 	"fmt"
+	"maps"
+	"slices"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -63,7 +65,7 @@ func resolveBindingFlags(cmd *cobra.Command, st routing.State, f teamsFlags, ask
 		}
 		ch.ops = append(ch.ops, bindingOp{key: key})
 		after := st
-		after.Bindings = cloneBindings(st.Bindings)
+		after.Bindings = maps.Clone(st.Bindings)
 		delete(after.Bindings, key)
 		what := "free: personal may collect it"
 		if pendingKey(after, key) {
@@ -128,7 +130,7 @@ func confirmConflict(cmd *cobra.Command, question string, ask, assumeYes bool) e
 // to org, that decide otherwise; on a terminal the developer keeps or removes each, and
 // without one each is kept and said.
 func keepRepositoryDecisions(cmd *cobra.Command, st routing.State, owner, org, orgName string, names teamNames, ask bool, ch *teamsChange) error {
-	for _, k := range sortedBindingKeys(st.Bindings) {
+	for _, k := range slices.Sorted(maps.Keys(st.Bindings)) {
 		b := st.Bindings[k]
 		if routing.Owner(k) != owner || !b.Refused && b.Organization == org {
 			continue

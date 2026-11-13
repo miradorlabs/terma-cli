@@ -4,9 +4,11 @@ import (
 	"cmp"
 	"context"
 	"errors"
+	"maps"
 	"net/http"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/account/api"
@@ -81,6 +83,9 @@ type pendingRow struct {
 	Entry        string `json:"entry"`
 }
 
+// listLimit caps the requests `terma teams` has in flight at once while it lists.
+const listLimit = 4
+
 // personalCollects is what a personal team collecting everything takes.
 const personalCollects = "everything not bound to an organization"
 
@@ -97,8 +102,8 @@ func collectsSummary(pol config.Policy, personal bool) string {
 
 // listTeams lists every organization with one sign-in (contract C4), and each one this
 // machine is signed in to with its teams and their entries, read with that organization's
-// own sign-in. A team whose policy read says it is gone is hidden. The selected teams are
-// always shown, from st, whatever the network says.
+// own sign-in (fetchTeams). A team whose policy read says it is gone is hidden. The
+// selected teams are always shown, from st, whatever the network says.
 func (app *App) listTeams(ctx context.Context, cfg *config.Config, st routing.State) teamsView {
 	var v teamsView
 	names := loadTeamNames(app.stateDir, cfg.ProfileName)
@@ -106,32 +111,30 @@ func (app *App) listTeams(ctx context.Context, cfg *config.Config, st routing.St
 	if err != nil {
 		v.Unlisted = err.Error()
 	}
-	for _, o := range orgs {
+	for i, listed := range app.fetchTeams(ctx, cfg, orgs) {
+		o := orgs[i]
 		row := orgRow{ID: o.ID, Name: o.Name, Type: o.Type}
 		names.org(o.ID, o.Name)
-		cred, ok := app.orgSignIn(cfg, o.ID)
-		if !ok {
+		if !listed.signedIn {
 			row.Note = "sign in to see its teams"
 			v.Organizations = append(v.Organizations, row)
 			v.unauthorized = append(v.unauthorized, o)
 			continue
 		}
 		row.SignedIn = true
-		projects, err := app.orgProjects(ctx, cfg, cred)
-		if err != nil {
-			row.Note = "its teams could not be listed: " + err.Error()
+		if listed.err != nil {
+			row.Note = "its teams could not be listed: " + listed.err.Error()
 		}
-		for _, p := range projects {
+		for _, p := range listed.teams {
 			names.team(p.ID, p.Name)
-			pol, err := app.teamPolicy(ctx, cfg, cred, o.ID, p.ID)
-			if teamNotFound(err) {
+			if teamNotFound(p.err) {
 				continue
 			}
 			t := teamRow{ID: p.ID, Name: p.Name}
-			if err != nil {
-				t.Unreadable, t.Collects = err.Error(), "its policy could not be read"
+			if p.err != nil {
+				t.Unreadable, t.Collects = p.err.Error(), "its policy could not be read"
 			} else {
-				t.Entries, t.Collects, t.GitHooks = pol.Repositories, collectsSummary(pol, o.Type == "personal"), pol.GitHooks
+				t.Entries, t.Collects, t.GitHooks = p.policy.Repositories, collectsSummary(p.policy, o.Type == "personal"), p.policy.GitHooks
 			}
 			row.Teams = append(row.Teams, t)
 		}
@@ -141,6 +144,59 @@ func (app *App) listTeams(ctx context.Context, cfg *config.Config, st routing.St
 	names.save(app.stateDir, cfg.ProfileName)
 	v.mergeState(st, names, time.Now())
 	return v
+}
+
+// listedOrg is what listing one organization's teams found: nothing without a sign-in.
+type listedOrg struct {
+	signedIn bool
+	// err says why its teams could not be listed.
+	err   error
+	teams []listedTeam
+}
+
+// listedTeam is one team as listed, with its policy or why that could not be read.
+type listedTeam struct {
+	project
+	policy config.Policy
+	err    error
+}
+
+// fetchTeams lists each signed-in organization's teams, then reads each team's policy,
+// with that organization's own sign-in: at most listLimit requests at once, all of them
+// shared, so one organization's policies are read while another's teams are still being
+// listed. Each result keeps its listing's place, so the order is the listing's whichever
+// request answers first, and one failing leaves only its own place without an answer.
+func (app *App) fetchTeams(ctx context.Context, cfg *config.Config, orgs []organization) []listedOrg {
+	out := make([]listedOrg, len(orgs))
+	slots := make(chan struct{}, listLimit)
+	limited := func(request func()) {
+		slots <- struct{}{}
+		defer func() { <-slots }()
+		request()
+	}
+	var wg sync.WaitGroup
+	for i, o := range orgs {
+		cred, ok := app.orgSignIn(cfg, o.ID)
+		if !ok {
+			continue
+		}
+		org := &out[i]
+		org.signedIn = true
+		wg.Go(func() {
+			var projects []project
+			limited(func() { projects, org.err = app.orgProjects(ctx, cfg, cred) })
+			org.teams = make([]listedTeam, len(projects))
+			for j, p := range projects {
+				team := &org.teams[j]
+				team.project = p
+				wg.Go(func() {
+					limited(func() { team.policy, team.err = app.teamPolicy(ctx, cfg, cred, o.ID, p.ID) })
+				})
+			}
+		})
+	}
+	wg.Wait()
+	return out
 }
 
 // mergeState marks the selected teams, adding any the listing lacks, and fills in the
@@ -169,12 +225,7 @@ func (v *teamsView) mergeState(st routing.State, names teamNames, now time.Time)
 			org.Type = "personal"
 		}
 	}
-	keys := make([]string, 0, len(st.Bindings))
-	for k := range st.Bindings {
-		keys = append(keys, k)
-	}
-	slices.Sort(keys)
-	for _, k := range keys {
+	for _, k := range slices.Sorted(maps.Keys(st.Bindings)) {
 		b := st.Bindings[k]
 		v.Bindings = append(v.Bindings, bindingRow{Key: k, Organization: b.Organization, Refused: b.Refused,
 			Name: cmp.Or(names.Orgs[b.Organization], v.orgName(b.Organization))})
