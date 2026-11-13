@@ -106,7 +106,7 @@ func TestATeamKeyIsCreatedWithItsOrganizationsSignIn(t *testing.T) {
 	}
 	mu.Lock()
 	defer mu.Unlock()
-	if bearer != "Bearer ter_cli_org-acme" || req.ProjectID != "acme" || !strings.HasSuffix(req.Name, "/"+team.EnrollmentID) || !strings.HasPrefix(req.Name, "terma-relay@") {
+	if bearer != "Bearer ter_cli_org-acme" || req.ProjectID != "acme" || !strings.HasSuffix(req.Name, "/"+team.EnrollmentID) || !strings.HasPrefix(req.Name, "terma@") {
 		t.Fatalf("asked with %q for %+v", bearer, req)
 	}
 }

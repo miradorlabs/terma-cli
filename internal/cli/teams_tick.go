@@ -9,10 +9,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/miradorlabs/terma-cli/internal/account/api"
 	"github.com/miradorlabs/terma-cli/internal/account/auth"
-	"github.com/miradorlabs/terma-cli/internal/account/keystore"
 	"github.com/miradorlabs/terma-cli/internal/config"
+	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
 	"github.com/miradorlabs/terma-cli/internal/routing"
 )
 
@@ -94,30 +93,13 @@ func (app *App) prepareTick(cmd *cobra.Command, cfg *config.Config, o orgRow, t 
 	return tk, nil
 }
 
-// teamKeyName names an enrollment's key for this machine's installation and the
-// enrollment, so the backend's reuse by name finds this machine's key for it and no other.
-func teamKeyName(enrollmentID string) string { return "terma@" + hostname() + "/" + enrollmentID }
-
-// mintTeamKey creates the team's key for this machine with its organization's sign-in, and
-// keeps it under the enrollment (keys.v2.json); one already there, which the relay may have
-// made meanwhile, is kept.
+// mintTeamKey creates the team's key for this machine with its organization's sign-in and
+// keeps it under the enrollment (keys.v2.json), through the relay's own minting, which
+// serializes creation on the machine: a key the relay made meanwhile is kept.
 func (app *App) mintTeamKey(ctx context.Context, cfg *config.Config, tk *tick) error {
-	if key, _, err := keystore.GetTeam(app.dir, tk.enrollmentID); err != nil {
-		return err
-	} else if key != "" {
-		return nil
-	}
-	scoped := *cfg
-	scoped.APIKey, scoped.ProjectID = "", tk.team.TeamID
-	client, err := api.New(&scoped, api.Options{Version: app.version, ProjectID: tk.team.TeamID, Credential: tk.cred})
-	if err != nil {
-		return err
-	}
-	key, _, err := client.CreateServerKey(ctx, tk.team.TeamID, teamKeyName(tk.enrollmentID), "Created by terma teams, for this machine's enrollment in the team")
-	if err != nil {
-		return err
-	}
-	return keystore.SetTeam(app.dir, tk.enrollmentID, tk.team.TeamID, key, keystore.HostsOf(cfg))
+	team := tk.team
+	team.EnrollmentID = tk.enrollmentID
+	return daemon.MintTeamKey(ctx, cfg, team, app.createTeamKey)
 }
 
 // tickAsker is how ticking asks about a binding: nil when no one can be asked.
