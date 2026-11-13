@@ -452,8 +452,8 @@
       "role": "alias",
       "label": "opusplan",
       "first": "2.1.284",
-      "last": "2.1.324",
-      "builds": 37,
+      "last": "2.1.325",
+      "builds": 38,
       "current": true
     },
     {
@@ -462,8 +462,8 @@
       "role": "alias",
       "label": "sonnet",
       "first": "2.1.284",
-      "last": "2.1.324",
-      "builds": 37,
+      "last": "2.1.325",
+      "builds": 38,
       "current": true
     },
     {
@@ -472,8 +472,8 @@
       "role": "alias",
       "label": "sonnet[1m]",
       "first": "2.1.284",
-      "last": "2.1.324",
-      "builds": 37,
+      "last": "2.1.325",
+      "builds": 38,
       "current": true
     }
   ]
