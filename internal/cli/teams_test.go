@@ -2,7 +2,9 @@ package cli
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -11,6 +13,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/account/auth"
 	"github.com/miradorlabs/terma-cli/internal/account/keystore"
 	"github.com/miradorlabs/terma-cli/internal/config"
+	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/routing"
 )
 
@@ -369,6 +372,7 @@ func TestTeamsMigratesTheMachineFirst(t *testing.T) {
 	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(f, orgA())); err != nil {
 		t.Fatal(err)
 	}
+	writeRelayToken(t)
 	prevSpawn, prevWait := testApp.spawnRelay, testApp.migrationWait
 	t.Cleanup(func() { testApp.spawnRelay, testApp.migrationWait = prevSpawn, prevWait })
 	testApp.migrationWait = 300 * time.Millisecond
@@ -403,6 +407,36 @@ func TestTeamsMigratesTheMachineFirst(t *testing.T) {
 	// Once migrated, it never restarts the relay again.
 	if _, _, err := teamsJSON(t); err != nil || started != 2 {
 		t.Fatalf("teams on a migrated machine: %v, relay starts %d", err, started)
+	}
+}
+
+// On a machine setup never prepared, `terma teams` says to run setup at once, without
+// starting a relay that would refuse to run.
+func TestTeamsOnAMachineNeverSetUpSaysRunSetup(t *testing.T) {
+	f := newFakeAuth(t)
+	authSandbox(t, f)
+	sandboxMachine(t)
+	t.Setenv("TERMA_POLICY_STUB", "")
+	prevSpawn := testApp.spawnRelay
+	t.Cleanup(func() { testApp.spawnRelay = prevSpawn })
+	started := 0
+	testApp.spawnRelay = func(string, string, string) { started++ }
+	if _, _, err := teamsJSON(t); !errors.Is(err, errNotSetUp) {
+		t.Fatalf("teams before setup = %v", err)
+	}
+	if started != 0 || config.Migrated(testApp.dir) {
+		t.Fatalf("relay starts %d, migrated %v", started, config.Migrated(testApp.dir))
+	}
+}
+
+// writeRelayToken is the relay token setup writes, which a relay needs to start.
+func writeRelayToken(t *testing.T) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(claim.TokenPath(testApp.stateDir)), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(claim.TokenPath(testApp.stateDir), []byte("tok\n"), 0o600); err != nil {
+		t.Fatal(err)
 	}
 }
 

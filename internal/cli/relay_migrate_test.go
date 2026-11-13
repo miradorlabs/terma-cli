@@ -178,6 +178,7 @@ func TestDoctorFailsAMoveNotFinished(t *testing.T) {
 // it, rather than waiting out its time, and changes nothing.
 func TestTeamsSaysWhyTheRelayDidNotMigrate(t *testing.T) {
 	legacyPersonalMachine(t)
+	writeRelayToken(t)
 	exe, older := fakeInstall(t, "build 2"), fakeInstall(t, "build 1")
 	hookWith(t, older)
 	prevSpawn, prevWait := testApp.spawnRelay, testApp.migrationWait

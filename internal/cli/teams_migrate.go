@@ -19,6 +19,10 @@ const defaultMigrationWait = 30 * time.Second
 // is as it was, collecting by its one team.
 var errMigrationIncomplete = errors.New("this machine's move to routing by teams did not finish, so nothing was changed")
 
+// errNotSetUp is `terma teams` on a machine `terma setup` never prepared: there is no relay
+// to migrate it, and setup signs in and shows the same team checklist.
+var errNotSetUp = errors.New("terma is not set up on this machine: run `terma setup`, which signs you in and shows this team checklist")
+
 // migrateFirst moves a machine not yet migrated to routing by teams before `terma teams`
 // changes anything: only a relay migrates, at start, holding the relay's and the spool
 // flush's locks. So it stops the running relay, which drops what it held in memory, starts
@@ -28,6 +32,11 @@ var errMigrationIncomplete = errors.New("this machine's move to routing by teams
 func (app *App) migrateFirst(cmd *cobra.Command, profile string) error {
 	if !migrate.Needed(app.dir, app.stateDir) {
 		return nil
+	}
+	// The relay refuses to start without the token setup writes, so waiting for it would
+	// only time out.
+	if _, err := daemon.Token(app.stateDir); err != nil {
+		return errNotSetUp
 	}
 	fmt.Fprintln(cmd.ErrOrStderr(), "Moving this machine to routing by teams: restarting the relay…")
 	// A migration a crash left in its preparing phase is finished by the next relay start too.
