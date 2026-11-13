@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-13T02:23:09.350488615Z",
+  "generated_at": "2026-11-13T02:33:43.278084083Z",
   "versions": [
     {
       "harness": "codex-desktop",
@@ -24,6 +24,36 @@
       "undocumented": null,
       "highlights": [],
       "signing": null
+    },
+    {
+      "harness": "claude-desktop",
+      "name": "Claude Desktop (Code)",
+      "version": "5.11492.2",
+      "released_at": "2026-11-13T01:04:40.68Z",
+      "captured_at": "2026-11-13T02:33:43.278084083Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "5.11492.0",
+      "changes": 7,
+      "categories": {
+        "cli": 2,
+        "side_requests": 5
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 7
+      },
+      "undocumented": null,
+      "highlights": [
+        "Side request POST /v1/messages/count_tokens claude-opus-5-5 tools changed",
+        "Side request POST /v1/messages/count_tokens claude-opus-5-5 tools changed",
+        "Side request POST /v1/messages/count_tokens claude-opus-5-5 tools changed"
+      ],
+      "signing": "valid"
     },
     {
       "harness": "copilot",
@@ -105,10 +135,10 @@
       ],
       "support": "untested",
       "previous": "5.1231.2",
-      "changes": 33,
+      "changes": 32,
       "categories": {
         "cli": 10,
-        "network": 6,
+        "network": 5,
         "prompt": 1,
         "tools": 16
       },
@@ -116,7 +146,7 @@
         "breaking": 0,
         "degrading": 0,
         "informational": 0,
-        "notable": 33
+        "notable": 32
       },
       "undocumented": null,
       "highlights": [
@@ -6167,38 +6197,6 @@
         "view_image tool description changed (+124 −171 chars)",
         "Default of tui.keymap: {\"approval\":{\"approve\":null,\"approve_for_prefix\":null,\"ap… → {\"approval\":{\"approve\":null,\"approve_for_prefix\":null,\"ap…",
         "Default of tui.keymap.chat: {\"decrease_reasoning_effort\":null,\"edit_queued_message\":n… → {\"decrease_reasoning_effort\":null,\"edit_queued_message\":n…"
-      ],
-      "signing": "valid"
-    },
-    {
-      "harness": "codex",
-      "name": "Codex CLI",
-      "version": "0.134.0",
-      "released_at": "2026-05-26T19:33:51.389Z",
-      "captured_at": "2026-11-05T09:54:28.532441Z",
-      "platforms": [
-        "darwin/arm64",
-        "linux/amd64"
-      ],
-      "support": "untested",
-      "previous": "0.133.0",
-      "changes": 42,
-      "categories": {
-        "cli": 35,
-        "config": 3,
-        "filesystem": 4
-      },
-      "impact": {
-        "breaking": 0,
-        "degrading": 0,
-        "informational": 33,
-        "notable": 9
-      },
-      "undocumented": 19,
-      "highlights": [
-        "Flag removed: `codex --profile-v2`",
-        "Flag removed: `codex exec --profile-v2`",
-        "Flag removed: `codex fork --profile-v2`"
       ],
       "signing": "valid"
     }

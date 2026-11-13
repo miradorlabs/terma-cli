@@ -3,6 +3,68 @@
   "harness": "claude-desktop",
   "steps": [
     {
+      "version": "5.11492.2",
+      "previous": "5.11492.0",
+      "changes": [
+        {
+          "id": "side_requests.POST /v1/messages/count_tokens claude-opus-5-5.tools",
+          "category": "side_requests",
+          "op": "changed",
+          "title": "Side request POST /v1/messages/count_tokens claude-opus-5-5 tools changed",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "side_requests.POST /v1/messages/count_tokens claude-opus-5-5.tools",
+          "category": "side_requests",
+          "op": "changed",
+          "title": "Side request POST /v1/messages/count_tokens claude-opus-5-5 tools changed",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "side_requests.POST /v1/messages/count_tokens claude-opus-5-5.tools",
+          "category": "side_requests",
+          "op": "changed",
+          "title": "Side request POST /v1/messages/count_tokens claude-opus-5-5 tools changed",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "side_requests.POST /v1/messages/count_tokens claude-opus-5-5.tools",
+          "category": "side_requests",
+          "op": "changed",
+          "title": "Side request POST /v1/messages/count_tokens claude-opus-5-5 tools changed",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "side_requests.POST /v1/messages/count_tokens claude-opus-5-5.tools",
+          "category": "side_requests",
+          "op": "changed",
+          "title": "Side request POST /v1/messages/count_tokens claude-opus-5-5 tools changed",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "cli.launch.env_values.BAGGAGE",
+          "category": "cli",
+          "op": "changed",
+          "title": "The app's agent's BAGGAGE: none → none",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "cli.launch.env_values.SENTRY-TRACE",
+          "category": "cli",
+          "op": "changed",
+          "title": "The app's agent's SENTRY-TRACE: <hex>-9ef8b3fcf7fb3729 → <hex>-bfd6b967034dfd3e",
+          "impact": "notable",
+          "documented": null
+        }
+      ]
+    },
+    {
       "version": "5.11492.0",
       "previous": "5.1231.2",
       "changes": [
@@ -227,14 +289,6 @@
           "category": "network",
           "op": "removed",
           "title": "Vendor telemetry event no longer sent: tengu_headless_latency",
-          "impact": "notable",
-          "documented": null
-        },
-        {
-          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_sdk_schema_violation",
-          "category": "network",
-          "op": "removed",
-          "title": "Vendor telemetry event no longer sent: tengu_sdk_schema_violation",
           "impact": "notable",
           "documented": null
         },

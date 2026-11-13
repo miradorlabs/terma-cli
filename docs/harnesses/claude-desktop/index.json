@@ -6,25 +6,51 @@
     "vendor": "Anthropic",
     "homepage": "https://claude.ai/download",
     "source": null,
-    "latest": "5.11492.0",
+    "latest": "5.11492.2",
     "support": "untested",
-    "versions_tracked": 4,
+    "versions_tracked": 5,
     "first_tracked": "2026-11-03",
     "last_change": {
-      "from": "5.1231.2",
-      "to": "5.11492.0",
-      "at": "2026-11-12T15:48:45.504112256Z",
-      "released_at": "2026-11-12T07:14:46.344Z",
-      "changes": 33,
+      "from": "5.11492.0",
+      "to": "5.11492.2",
+      "at": "2026-11-13T02:33:43.278084083Z",
+      "released_at": "2026-11-13T01:04:40.68Z",
+      "changes": 7,
       "categories": {
-        "cli": 10,
-        "network": 6,
-        "prompt": 1,
-        "tools": 16
+        "cli": 2,
+        "side_requests": 5
       }
     }
   },
   "versions": [
+    {
+      "version": "5.11492.2",
+      "released_at": "2026-11-13T01:04:40.68Z",
+      "captured_at": "2026-11-13T02:33:43.278084083Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "5.11492.0",
+      "changes": 7,
+      "categories": {
+        "cli": 2,
+        "side_requests": 5
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 7
+      },
+      "undocumented": null,
+      "highlights": [
+        "Side request POST /v1/messages/count_tokens claude-opus-5-5 tools changed",
+        "Side request POST /v1/messages/count_tokens claude-opus-5-5 tools changed",
+        "Side request POST /v1/messages/count_tokens claude-opus-5-5 tools changed"
+      ],
+      "signing": "valid"
+    },
     {
       "version": "5.11492.0",
       "released_at": "2026-11-12T07:14:46.344Z",
@@ -34,10 +60,10 @@
       ],
       "support": "untested",
       "previous": "5.1231.2",
-      "changes": 33,
+      "changes": 32,
       "categories": {
         "cli": 10,
-        "network": 6,
+        "network": 5,
         "prompt": 1,
         "tools": 16
       },
@@ -45,7 +71,7 @@
         "breaking": 0,
         "degrading": 0,
         "informational": 0,
-        "notable": 33
+        "notable": 32
       },
       "undocumented": null,
       "highlights": [

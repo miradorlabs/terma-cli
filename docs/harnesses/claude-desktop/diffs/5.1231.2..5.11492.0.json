@@ -3,14 +3,14 @@
   "harness": "claude-desktop",
   "from": "5.1231.2",
   "to": "5.11492.0",
-  "generated_at": "2026-11-12T15:48:45.504112256Z",
+  "generated_at": "2026-11-13T02:33:43.278084083Z",
   "source": null,
   "changelog": null,
   "summary": {
-    "changes": 33,
+    "changes": 32,
     "categories": {
       "cli": 10,
-      "network": 6,
+      "network": 5,
       "prompt": 1,
       "tools": 16
     },
@@ -18,7 +18,7 @@
       "breaking": 0,
       "degrading": 0,
       "informational": 0,
-      "notable": 33
+      "notable": 32
     },
     "undocumented": null
   },
@@ -664,68 +664,6 @@
           "is_interactive",
           "model",
           "process",
-          "session_id",
-          "user_type"
-        ]
-      },
-      "after": null,
-      "text_diff": null,
-      "terma": null,
-      "source": null,
-      "documented": null
-    },
-    {
-      "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_sdk_schema_violation",
-      "category": "network",
-      "op": "removed",
-      "path": [
-        "network",
-        "telemetry",
-        "POST api.anthropic.com/api/event_logging/v2/batch",
-        "events",
-        "tengu_sdk_schema_violation"
-      ],
-      "title": "Vendor telemetry event no longer sent: tengu_sdk_schema_violation",
-      "impact": "notable",
-      "before": {
-        "count": 1,
-        "fields": [
-          "additional_metadata",
-          "agent_sdk_version",
-          "betas",
-          "client_timestamp",
-          "client_type",
-          "device_id",
-          "entrypoint",
-          "env",
-          "env.arch",
-          "env.build_time",
-          "env.deployment_environment",
-          "env.is_ci",
-          "env.is_claubbit",
-          "env.is_claude_ai_auth",
-          "env.is_claude_code_action",
-          "env.is_claude_code_remote",
-          "env.is_conductor",
-          "env.is_github_action",
-          "env.is_local_agent_mode",
-          "env.is_running_with_bun",
-          "env.node_version",
-          "env.package_managers",
-          "env.platform",
-          "env.platform_raw",
-          "env.runtimes",
-          "env.shell",
-          "env.terminal",
-          "env.vcs",
-          "env.version",
-          "env.version_base",
-          "event_id",
-          "event_name",
-          "is_interactive",
-          "model",
-          "process",
-          "rh",
           "session_id",
           "user_type"
         ]

@@ -11773,7 +11773,10 @@
               "user_type"
             ]
           }
-        }
+        },
+        "unobserved": [
+          "tengu_sdk_schema_violation"
+        ]
       },
       "POST claude.ai/api/event_logging/v2/batch": {
         "events": {
