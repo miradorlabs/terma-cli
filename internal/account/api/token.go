@@ -100,7 +100,7 @@ func (c *Client) postToken(ctx context.Context, body tokenRequest) (*tokenRespon
 	if err := decode(resp, &out); err != nil {
 		var apiErr *Error
 		if errors.As(err, &apiErr) && apiErr.Unauthenticated() {
-			return nil, fmt.Errorf("%w: %s", auth.ErrNotLoggedIn, apiErr.Message)
+			return nil, &refusedError{msg: fmt.Sprintf("%s: %s", auth.ErrNotLoggedIn, apiErr.Message), refusal: apiErr}
 		}
 		return nil, err
 	}
@@ -109,6 +109,35 @@ func (c *Client) postToken(ctx context.Context, body tokenRequest) (*tokenRespon
 	}
 	return &out, nil
 }
+
+// refusedError is the token endpoint's 401: callers read it as auth.ErrNotLoggedIn, and
+// the gateway's structured refusal, its reason included, stays beneath it.
+type refusedError struct {
+	msg     string
+	refusal *Error
+}
+
+func (e *refusedError) Error() string { return e.msg }
+
+func (e *refusedError) Unwrap() []error { return []error{auth.ErrNotLoggedIn, e.refusal} }
+
+// RefreshError is a token refresh that failed: the request it was made for never went.
+// Err is the failure as the token endpoint gave it, so a refusal stays an *Error, with
+// its status and reason, beneath auth.ErrNotLoggedIn for a 401, and the context, a
+// refresh rather than the request, is this type: ORG_NOT_ACCESSIBLE means something only
+// here (policy.Classify).
+type RefreshError struct {
+	Err error
+}
+
+func (e *RefreshError) Error() string {
+	if errors.Is(e.Err, auth.ErrNotLoggedIn) {
+		return auth.ErrNotLoggedIn.Error() + ": session expired, run `terma setup`"
+	}
+	return e.Err.Error()
+}
+
+func (e *RefreshError) Unwrap() error { return e.Err }
 
 func (c *Client) credentialFrom(resp *tokenResponse) *auth.Credential {
 	cred := credentialFrom(resp)
@@ -265,10 +294,7 @@ func (c *Client) redeem(ctx context.Context, held, current *auth.Credential, red
 	}
 	resp, err := c.postToken(ctx, tokenRequest{GrantType: "refresh_token", RefreshToken: current.RefreshToken})
 	if err != nil {
-		if errors.Is(err, auth.ErrNotLoggedIn) {
-			return fmt.Errorf("%w: session expired, run `terma setup`", auth.ErrNotLoggedIn)
-		}
-		return err
+		return &RefreshError{Err: err}
 	}
 	cred := c.credentialFrom(resp)
 	// A refresh keeps the session, its user and its label.

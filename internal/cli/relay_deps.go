@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"os"
 	"slices"
 	"strings"
 
@@ -38,6 +39,10 @@ func (app *App) relayDeps() daemon.Deps {
 		HookPolicy:    app.hookPolicy,
 		LoadConfig:    app.loadConfig,
 		RefreshPolicy: pols.Refresh,
+		RefreshTeam:   pols.RefreshTeam,
+		CreateTeamKey: app.createTeamKey,
+		TeamUser:      app.selectedTeamUser,
+		OTLPPinned:    app.flags.otlpURL != "" || os.Getenv("TERMA_OTLP_URL") != "",
 	}
 }
 
@@ -65,11 +70,15 @@ func (app *App) createProjectKey(ctx context.Context, cfg *config.Config, projec
 
 // relayHeartbeatSend delivers a heartbeat to a project's ingest with that project's key: the
 // selected team's, minted if missing, else any project's held here; with none, nothing is sent.
-// It sends once, so the user teamUser names never rides on to another key.
+// It sends once, so the user teamUser names never rides on to another key. On a migrated
+// machine it goes to one selected team (teamHeartbeatSend).
 func (app *App) relayHeartbeatSend(ctx context.Context, beat *logspb.LogsData) error {
 	cfg, err := config.Load(app.dir, app.stateDir, config.Overrides{})
 	if err != nil {
 		return err
+	}
+	if config.Migrated(app.dir) {
+		return app.teamHeartbeatSend(ctx, cfg, beat)
 	}
 	selected := cmp.Or(cfg.Policy.TeamID, cfg.Policy.DefaultProjectID, cfg.ProjectID)
 	if key, err := keystore.Get(app.dir, selected); selected != "" && key == "" && err == nil && cfg.APIKey == "" {

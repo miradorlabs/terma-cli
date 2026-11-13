@@ -6,7 +6,6 @@ import (
 
 	"google.golang.org/protobuf/proto"
 
-	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
 )
 
@@ -102,6 +101,7 @@ func (r *Relay) sweep() {
 	r.mu.Unlock()
 	r.watchProcesses(now)
 	r.cache.expire(now)
+	r.dropDeselected()
 
 	r.deliverMu.Lock()
 	defer r.deliverMu.Unlock()
@@ -115,39 +115,43 @@ func (r *Relay) sweep() {
 		r.mu.Unlock()
 		var keep []heldPart
 		type release struct {
-			c   claim.Claim
-			pol Policy
-			p   *part
-			how attribution
+			v verdict
+			p *part
 		}
 		var out []release
 		// A part that must wait holds up nothing: order matters only among parts that leave.
 		for _, h := range parts {
-			c, pol, why, ok, how := r.decide(key, h.p.pid, h.p.at, h.p.narrow, h.p.claimed)
-			limit := hold
-			if h.p.start && why == whyUnclaimed {
-				// A conversation start waits for the thread's first turn.
-				limit = max(hold, r.opts.TraceHold)
-			}
-			if !ok && !h.p.narrow && !h.p.claimed && why != whyNoKey && now.Sub(h.at) >= limit {
-				if cc, cok := r.catchAll(); cok {
-					if cpol, pok := r.resolve(cc); pok && !cpol.RequireClaim {
-						c, pol, ok, how = cc, cpol, true, attribution{how: semconv.TermaRelayAttributionCatchAll}
-						r.stats.add("caught_by_default."+string(h.p.signal), h.p.records)
+			for _, piece := range r.pieces(key, h.p) {
+				v := r.judge(key, piece)
+				r.mixed(v)
+				limit := hold
+				if piece.start && v.why == whyUnclaimed {
+					// A conversation start waits for the thread's first turn.
+					limit = max(hold, r.opts.TraceHold)
+				}
+				if v.q == nil && !v.ok && !piece.narrow && !piece.claimed && v.why != whyNoKey && now.Sub(h.at) >= limit {
+					if cc, cok := r.catchAll(); cok {
+						if cpol, pok := r.resolve(cc); pok && !cpol.RequireClaim {
+							v = verdict{c: cc, pol: cpol, ok: true, how: attribution{how: semconv.TermaRelayAttributionCatchAll}}
+							r.stats.add("caught_by_default."+string(piece.signal), piece.records)
+						}
 					}
 				}
-			}
-			switch {
-			case ok:
-				out = append(out, release{c, pol, h.p, how})
-			case why == whyWidened || why == whyNotCollected || now.Sub(h.at) >= limit:
-				r.stats.dropped(h.p.signal, why, h.p.records)
-				if r.opts.Logf != nil {
-					c, _ := r.lookup(r.sessionFor(key))
-					r.opts.Logf("drop %s %s: %d %s from pid %d; claim %q pids %v", why, key, h.p.records, h.p.signal, h.p.pid, c.ProjectID, c.PIDs)
+				switch {
+				case v.ok:
+					out = append(out, release{v, piece})
+				case v.why == whyWidened || v.why == whyNotCollected || v.final || now.Sub(h.at) >= limit:
+					r.stats.dropped(piece.signal, v.why, piece.records)
+					r.block(v.blocker, piece.records)
+					if r.opts.Logf != nil {
+						c, _ := r.lookup(r.sessionFor(key))
+						r.opts.Logf("drop %s %s: %d %s from pid %d; claim %q pids %v", v.why, key, piece.records, piece.signal, piece.pid, c.ProjectID, c.PIDs)
+					}
+				case piece == h.p:
+					keep = append(keep, h)
+				default:
+					keep = append(keep, heldPart{piece, h.at, proto.Size(piece.msg)})
 				}
-			default:
-				keep = append(keep, h)
 			}
 		}
 		// hold runs only under deliverMu, which the sweep has.
@@ -168,7 +172,7 @@ func (r *Relay) sweep() {
 		r.mu.Unlock()
 		for _, rel := range out {
 			r.stats.add("released_after_hold", rel.p.records)
-			r.deliverAttributed(rel.c, rel.pol, rel.p, rel.how)
+			r.deliver(rel.v, rel.p)
 		}
 	}
 }
