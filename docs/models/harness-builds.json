@@ -9975,7 +9975,7 @@
           ]
         },
         "0.161.0": {
-          "captured_at": "2026-11-11T05:17:29.64320186Z",
+          "captured_at": "2026-11-13T14:03:31.446427386Z",
           "captured": true,
           "uses": [
             {
@@ -10007,7 +10007,7 @@
           ]
         },
         "0.162.0": {
-          "captured_at": "2026-11-12T05:15:55.281711967Z",
+          "captured_at": "2026-11-13T14:03:31.446427386Z",
           "captured": true,
           "uses": [
             {
@@ -10039,7 +10039,7 @@
           ]
         },
         "0.162.1": {
-          "captured_at": "2026-11-12T05:15:55.281711967Z",
+          "captured_at": "2026-11-13T14:03:31.446427386Z",
           "captured": true,
           "uses": [
             {
@@ -10774,6 +10774,24 @@
         },
         "1.0.110": {
           "captured_at": "2026-11-13T05:13:29.306022914Z",
+          "captured": true,
+          "uses": [
+            {
+              "model": "claude-sonnet-4.5",
+              "role": "default",
+              "params": {
+                "temperature": 1,
+                "thinking": {
+                  "budget_tokens": 1024,
+                  "display": "summarized",
+                  "type": "enabled"
+                }
+              }
+            }
+          ]
+        },
+        "1.0.111": {
+          "captured_at": "2026-11-13T14:02:26.572801989Z",
           "captured": true,
           "uses": [
             {
@@ -13477,8 +13495,24 @@
           "captured_at": "2026-11-05T02:11:01.502194Z",
           "captured": false
         },
+        "0.1.5": {
+          "captured_at": "2026-11-13T14:02:26.572801989Z",
+          "captured": false
+        },
+        "0.1.6": {
+          "captured_at": "2026-11-13T14:02:26.572801989Z",
+          "captured": false
+        },
+        "0.1.7": {
+          "captured_at": "2026-11-13T14:02:26.572801989Z",
+          "captured": false
+        },
         "0.1.8": {
           "captured_at": "2026-11-10T05:19:19.197557181Z",
+          "captured": false
+        },
+        "0.1.9": {
+          "captured_at": "2026-11-13T14:02:26.572801989Z",
           "captured": false
         }
       }
