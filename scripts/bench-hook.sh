@@ -31,6 +31,9 @@ machine() {
   export TERMA_CONFIG_DIR="$tmp/home" TERMA_STATE_DIR="$tmp/state" GIT_CONFIG_GLOBAL="$tmp/gitconfig"
   repo="$tmp/repo"; mkdir -p "$repo" "$TERMA_CONFIG_DIR" "$TERMA_STATE_DIR/relay"
   printf local > "$TERMA_STATE_DIR/relay/token"
+  # A relay that just failed is not launched again for a while (daemon.RetryAfter): no hook
+  # here starts one, which would migrate this machine mid-bench and outlive the bench.
+  : > "$TERMA_STATE_DIR/relay/last-error"
   git -C "$repo" init -q
   git -C "$repo" config user.email bench@example.com
   git -C "$repo" config user.name bench
@@ -72,6 +75,18 @@ bench() {
   median=$(echo "$times" | tr ' ' '\n' | grep -v '^$' | sort -n | sed -n 4p)
   echo "prepare-commit-msg, $label: median ${median}ms over 7 runs (${times# }) — budget ${BUDGET_MS}ms"
   [ "$median" -le "$BUDGET_MS" ] || { echo "$label: over budget" >&2; exit 1; }
+  # post-tool-use runs the Mixed check (place, the run ledger) on every edit.
+  ptimes=""
+  i=0
+  while [ $i -lt 7 ]; do
+    start=$(ms)
+    printf '{"session_id":"%s","hook_event_name":"PostToolUse","tool_name":"Edit","tool_input":{"file_path":"%s/src/a.go"},"cwd":"%s"}' "$sid" "$dir" "$dir" | terma hook --user post-tool-use
+    end=$(ms)
+    ptimes="$ptimes $((end - start))"
+    i=$((i + 1))
+  done
+  pmedian=$(echo "$ptimes" | tr ' ' '\n' | grep -v '^$' | sort -n | sed -n 4p)
+  echo "post-tool-use, $label: median ${pmedian}ms over 7 runs (${ptimes# })"
 }
 
 machine single
