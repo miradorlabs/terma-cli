@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/config"
+	"github.com/miradorlabs/terma-cli/internal/flock"
 	"github.com/miradorlabs/terma-cli/internal/gitx"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
@@ -401,3 +402,62 @@ func TestTwoInterleavedHooksThatEachSeeHalfACrossingMakeTheRunMixed(t *testing.T
 		t.Errorf("the subagent's placement %+v", c)
 	}
 }
+
+// The ledger write, on its own: a crossing the run ledger refuses, its lock held past the
+// hook's wait, is recorded in its sidecar, which every reader takes for Mixed from the
+// crossing, and the hook waits on the lock once, not again for the locations it saw. The
+// run's next hook that can lock the ledger folds the sidecar in and records them.
+func TestARefusedCrossingIsRecordedAside(t *testing.T) {
+	t.Parallel()
+	m := newRoutedMachine(t, acmeAndPersonal(t))
+	const sid = "refused-session"
+	env := m.hook()
+	env.StartRun(sid)
+	unlock, err := flock.TryLock(filepath.Join(m.stateDir, runs.Dir, sid+".json.lock"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	at := env.Time()
+	cur := env.currentRun(sid)
+	v := verdict{seen: []string{"github.com/acme/api"}, mixed: true, since: at, crossedWith: func([]string) bool { return true }}
+	began := time.Now()
+	if !env.recordRun(sid, cur, v, at) {
+		t.Fatal("recordRun did not report the run Mixed")
+	}
+	if waited := time.Since(began); waited > runsLockWait+time.Second {
+		t.Fatalf("recordRun waited %v: on the lock more than once", waited)
+	}
+	unlock()
+	if from, mixed := runs.MixedAt(m.stateDir, sid, time.Time{}); !mixed || !from.Equal(at.UTC()) {
+		t.Fatalf("the run reads Mixed %v from %v, want from %v", mixed, from, at.UTC())
+	}
+	if _, locs, _ := runs.Locations(m.stateDir, sid); len(locs) != 0 {
+		t.Fatalf("the ledger recorded %v through a held lock", locs)
+	}
+	sidecar := filepath.Join(m.stateDir, runs.Dir, sid+".mixed")
+	if _, err := os.Stat(sidecar); err != nil {
+		t.Fatalf("no sidecar: %v", err)
+	}
+
+	next := m.hook()
+	cur = next.currentRun(sid)
+	if !cur.aside || cur.mixedAt.IsZero() {
+		t.Fatalf("the next hook reads %+v", cur)
+	}
+	now := next.Time()
+	if !next.recordRun(sid, cur, next.decide(sid, cur, []routing.Location{{Kind: routing.Repository, Repository: "github.com/acme/api"}}, now), now) {
+		t.Fatal("the next hook's run is not Mixed")
+	}
+	if _, err := os.Stat(sidecar); !os.IsNotExist(err) {
+		t.Fatalf("the next hook left the sidecar: %v", err)
+	}
+	if _, locs, _ := runs.Locations(m.stateDir, sid); !slices.Equal(locs, []string{"github.com/acme/api"}) {
+		t.Errorf("the next hook recorded %v", locs)
+	}
+	if from, mixed := runs.MixedAt(m.stateDir, sid, time.Time{}); !mixed || !from.Equal(at.UTC()) {
+		t.Errorf("after the fold the run reads Mixed %v from %v, want from %v", mixed, from, at.UTC())
+	}
+}
+
+// runsLockWait is how long a ledger write waits for its lock (runs.lockWait).
+const runsLockWait = 2 * time.Second
