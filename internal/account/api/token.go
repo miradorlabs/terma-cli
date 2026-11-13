@@ -43,14 +43,11 @@ type tokenResponse struct {
 }
 
 // LoginResult is a completed sign-in, with the organization and user names to print.
-type LoginResult struct {
-	Credential       *auth.Credential
-	OrganizationName string
-	UserID           string
-}
+type LoginResult = auth.LoginResult
 
-// ExchangeCode implements auth.TokenExchanger.
-func (c *Client) ExchangeCode(ctx context.Context, code, verifier string, port int) (*auth.Credential, error) {
+// ExchangeCode implements auth.TokenExchanger: the sign-in, with the name of the
+// organization it is to, which the token response gives with each exchange.
+func (c *Client) ExchangeCode(ctx context.Context, code, verifier string, port int) (*auth.LoginResult, error) {
 	return c.exchangeCode(ctx, code, verifier, port)
 }
 
@@ -58,10 +55,14 @@ func (c *Client) ExchangeCode(ctx context.Context, code, verifier string, port i
 // for this process's challenge. No listener took it, so redirect_port is 0; the auth host
 // accepts 0 only for a code its own record says was delegated.
 func (c *Client) ExchangeDelegatedCode(ctx context.Context, code, verifier string) (*auth.Credential, error) {
-	return c.exchangeCode(ctx, code, verifier, 0)
+	res, err := c.exchangeCode(ctx, code, verifier, 0)
+	if err != nil {
+		return nil, err
+	}
+	return res.Credential, nil
 }
 
-func (c *Client) exchangeCode(ctx context.Context, code, verifier string, port int) (*auth.Credential, error) {
+func (c *Client) exchangeCode(ctx context.Context, code, verifier string, port int) (*auth.LoginResult, error) {
 	resp, err := c.postToken(ctx, tokenRequest{
 		GrantType:    "authorization_code",
 		Code:         code,
@@ -71,18 +72,19 @@ func (c *Client) exchangeCode(ctx context.Context, code, verifier string, port i
 	if err != nil {
 		return nil, err
 	}
-	cred := c.credentialFrom(resp)
-	c.mu.Lock()
-	c.lastLogin = &LoginResult{
-		Credential:       cred,
+	res := &auth.LoginResult{
+		Credential:       c.credentialFrom(resp),
 		OrganizationName: resp.Organization.Name,
 		UserID:           resp.User.ID,
 	}
+	c.mu.Lock()
+	c.lastLogin = res
 	c.mu.Unlock()
-	return cred, nil
+	return res, nil
 }
 
-// LastLogin returns the most recent exchange's result on this client.
+// LastLogin returns the most recent exchange's result on this client. A sign-in that
+// exchanges several codes reads each one's own result instead (ExchangeCode).
 func (c *Client) LastLogin() *LoginResult {
 	c.mu.Lock()
 	defer c.mu.Unlock()

@@ -21,7 +21,10 @@ type teamsFlags struct {
 	selects, deselects, releases []string
 	binds, refuses, unbinds      []string
 	// org is --org: an organization to sign in to first, so its teams can be listed and ticked.
-	org       string
+	org string
+	// authorize is --authorize: sign in first, in one approval, to the organizations this
+	// machine has no sign-in for, auth.MaxCodes at a time.
+	authorize bool
 	json      bool
 	noBrowser bool
 	// assumeYes takes every question's default answer: a binding a ticked team needs is
@@ -42,7 +45,7 @@ func (app *App) newTeamsCommand() *cobra.Command {
 		Long: `Lists every organization you belong to, and lets you tick the teams this machine sends
 telemetry to. Each team shows what its policy collects, so you see what you agree to
 before you tick it. An organization's teams are listed once this machine has a sign-in
-there: --org signs in to one.
+there: --authorize signs in to every one without, in one approval, and --org to one.
 
 Ticking a team signs in to its organization if needed, fetches its policy, creates its
 key for this machine and asks you to decide each binding its policy needs. A binding says
@@ -61,6 +64,8 @@ Without a terminal, change it with flags (each may repeat):
   --bind <owner-or-repository>=<org>    bind it to an organization
   --refuse <owner-or-repository>        refuse it to every organization
   --unbind <owner-or-repository>        remove the decision
+  --authorize                           sign in to the organizations without a sign-in here,
+                                        20 per approval
   --json                                print the list as JSON`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error { return app.runTeams(cmd, f) },
@@ -73,6 +78,7 @@ Without a terminal, change it with flags (each may repeat):
 	fl.StringArrayVar(&f.refuses, "refuse", nil, "refuse an owner or repository to every organization")
 	fl.StringArrayVar(&f.unbinds, "unbind", nil, "remove the decision on an owner or repository")
 	fl.StringVar(&f.org, "org", "", "sign in to this organization first, by name or id, to list and tick its teams")
+	fl.BoolVar(&f.authorize, "authorize", false, "sign in first, in one approval, to the organizations without a sign-in here (20 at a time)")
 	fl.BoolVar(&f.json, "json", false, "print the list, and what changed, as JSON")
 	fl.BoolVar(&f.noBrowser, "no-browser", false, "print the sign-in URL instead of opening a browser")
 	fl.BoolVarP(&f.assumeYes, "yes", "y", false, "take each question's default: bind what a ticked team needs to its organization")
@@ -106,12 +112,20 @@ func (app *App) runTeams(cmd *cobra.Command, f teamsFlags) error {
 			return err
 		}
 	}
+	if f.authorize {
+		if err := app.runAuthorize(cmd, cfg, f.noBrowser); err != nil {
+			return err
+		}
+		if cfg, err = app.loadConfig(); err != nil {
+			return err
+		}
+	}
 	switch {
 	case f.changes():
 		if v, err = app.applyTeams(cmd, cfg, st, f); err != nil {
 			return err
 		}
-	case !f.json && app.canAsk() && canPrompt():
+	case !f.json && !f.authorize && app.canAsk() && canPrompt():
 		if v, err = app.teamsChecklist(cmd, cfg, st, f); err != nil {
 			if errors.Is(err, errCancelled) {
 				fmt.Fprintln(cmd.OutOrStdout(), "Cancelled. Nothing was changed.")
@@ -164,11 +178,11 @@ func renderTeams(w io.Writer, v teamsView) {
 	}
 	tw := tabwriter.NewWriter(out, 0, 4, 2, ' ', 0)
 	for _, o := range v.Organizations {
-		fmt.Fprintf(tw, "\n  %s\n", orgTitle(o))
 		if !o.SignedIn && len(o.Teams) == 0 {
-			fmt.Fprintf(tw, "    %s\n", p.Dim(o.Note+": `terma teams --org "+quoteArg(orgTitle(o))+"`"))
+			// Offered together, by the one action below.
 			continue
 		}
+		fmt.Fprintf(tw, "\n  %s\n", orgTitle(o))
 		if o.Note != "" {
 			fmt.Fprintf(tw, "    %s\n", p.Dim(o.Note))
 		}
@@ -181,6 +195,9 @@ func renderTeams(w io.Writer, v teamsView) {
 		}
 	}
 	_ = tw.Flush()
+	if v.Unauthorized > 0 {
+		fmt.Fprintf(out, "\n  %s: `terma teams --authorize`\n    %s\n", authorizeLabel(v.Unauthorized), p.Dim(authorizeNames(v.unauthorized)))
+	}
 	if len(v.Bindings) > 0 {
 		fmt.Fprintf(out, "\n%s\n", p.Bold("Bindings:"))
 		tw = tabwriter.NewWriter(out, 0, 4, 2, ' ', 0)

@@ -133,8 +133,11 @@ func TestTeamsListsEveryOrganizationAndTheSignedInOnesTeams(t *testing.T) {
 	if i < 0 || v.Organizations[i].SignedIn || len(v.Organizations[i].Teams) != 0 || v.Organizations[i].Note != "sign in to see its teams" {
 		t.Errorf("Beta Labs, with no sign-in here = %+v", v.Organizations)
 	}
+	if v.Unauthorized != 1 {
+		t.Errorf("unauthorized = %d, want Beta Labs alone", v.Unauthorized)
+	}
 	text, err := runTerma(t, "teams")
-	if err != nil || !strings.Contains(text, "[ ] Acme API") || !strings.Contains(text, "`terma teams --org \"Beta Labs\"`") {
+	if err != nil || !strings.Contains(text, "[ ] Acme API") || !strings.Contains(text, "Authorize 1 more organization: `terma teams --authorize`\n    Beta Labs\n") {
 		t.Errorf("the list as text (%v):\n%s", err, text)
 	}
 }

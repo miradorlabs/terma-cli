@@ -151,7 +151,7 @@ func signInFromTheBrowser(t *testing.T, f *fakeAuth, org string, stderr io.Reade
 				continue
 			}
 			code := "browser-code-" + org[:8]
-			f.browserGrant(code, org)
+			f.browserCode(code, org)
 			resp, err := http.PostForm("http://127.0.0.1:"+u.Query().Get("port")+"/callback", url.Values{"state": {u.Query().Get("state")}, "code": {code}})
 			if err == nil {
 				_ = resp.Body.Close()

@@ -62,8 +62,8 @@ type fakeAuth struct {
 	revoked     []string
 }
 
-// fakeGrant is who a delegated code signs in; browser marks a code a browser sign-in's
-// loopback listener received, which is redeemed with that listener's port, never 0.
+// fakeGrant is who a delegated code signs in; browser marks a code the approval page
+// posted to the CLI's listener, which is redeemed only with that listener's port.
 type fakeGrant struct {
 	org, user string
 	browser   bool
@@ -100,7 +100,7 @@ func newFakeAuth(t *testing.T) *fakeAuth {
 			return
 		}
 		org, user := "", "u-1"
-		for _, o := range fakeOrgs {
+		for _, o := range append(slices.Clone(fakeOrgs), f.orgs...) {
 			if rest, ok := strings.CutPrefix(token, "ter_cli_"+o.ID); ok && (rest == "" || strings.HasPrefix(rest, "~")) {
 				org = o.ID
 				if rest != "" {
@@ -218,7 +218,7 @@ func (f *fakeAuth) serveToken(w http.ResponseWriter, r *http.Request) {
 	}
 	n := f.exchanges.Add(1)
 	name := ""
-	for _, o := range fakeOrgs {
+	for _, o := range append(slices.Clone(fakeOrgs), f.orgs...) {
 		if o.ID == grant.org {
 			name = o.Name
 		}
@@ -241,9 +241,8 @@ func (f *fakeAuth) grant(code, org, user string) {
 	f.grants[code] = fakeGrant{org: org, user: user}
 }
 
-// browserGrant makes code one the approval page hands a browser sign-in for user u-1 in
-// org: redeemed once, with the port of the loopback listener it was sent to.
-func (f *fakeAuth) browserGrant(code, org string) {
+// browserCode makes code one the approval page posts for org, signing in the default user.
+func (f *fakeAuth) browserCode(code, org string) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if f.grants == nil {
