@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"maps"
 	"os"
 	"slices"
 	"strings"
@@ -67,7 +68,7 @@ func (app *App) applyTeams(cmd *cobra.Command, cfg *config.Config, st routing.St
 	}
 	// What the flags decide comes first, so a ticked team is asked only what is left.
 	planned := st
-	planned.Bindings = cloneBindings(st.Bindings)
+	planned.Bindings = maps.Clone(st.Bindings)
 	for _, op := range ch.ops {
 		if err := op.apply(&planned); err != nil {
 			return teamsView{}, err
@@ -199,7 +200,7 @@ func (app *App) finishUnticks(next routing.State, ch *teamsChange, names teamNam
 		if slices.ContainsFunc(next.Teams, func(o routing.Team) bool { return o.OrganizationID == t.OrganizationID }) {
 			continue
 		}
-		for _, k := range sortedBindingKeys(next.Bindings) {
+		for _, k := range slices.Sorted(maps.Keys(next.Bindings)) {
 			if b := next.Bindings[k]; !b.Refused && b.Organization == t.OrganizationID {
 				ch.warnings = append(ch.warnings, fmt.Sprintf("%s stays bound to %s, so it collects nowhere until you unbind it: `terma teams --unbind %s`",
 					k, cmp.Or(names.Orgs[t.OrganizationID], t.OrganizationID), k))
@@ -218,23 +219,6 @@ func boundToAnOrganization(s routing.State) bool {
 		}
 	}
 	return false
-}
-
-func sortedBindingKeys(m map[string]routing.Binding) []string {
-	keys := make([]string, 0, len(m))
-	for k := range m {
-		keys = append(keys, k)
-	}
-	slices.Sort(keys)
-	return keys
-}
-
-func cloneBindings(m map[string]routing.Binding) map[string]routing.Binding {
-	out := make(map[string]routing.Binding, len(m))
-	for k, v := range m {
-		out[k] = v
-	}
-	return out
 }
 
 func tickLabel(tk *tick) string { return orgTeamLabel(tk.orgName, tk.teamName) }
