@@ -12373,7 +12373,9 @@
           }
         },
         "unobserved": [
-          "desktop_main_event_loop_stall"
+          "desktop_ccd_terminal_spawned",
+          "desktop_main_event_loop_stall",
+          "desktop_session_title_set"
         ]
       }
     }

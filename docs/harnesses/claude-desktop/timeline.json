@@ -3,6 +3,612 @@
   "harness": "claude-desktop",
   "steps": [
     {
+      "version": "5.11492.5",
+      "previous": "5.11492.2",
+      "changes": [
+        {
+          "id": "prompt.context.2.text",
+          "category": "prompt",
+          "op": "changed",
+          "title": "Injected context changed (+3310 −2217 chars)",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "prompt.system.0.text",
+          "category": "prompt",
+          "op": "changed",
+          "title": "System prompt changed",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "tools.Agent.description",
+          "category": "tools",
+          "op": "changed",
+          "title": "Agent tool description changed (+81 −83 chars)",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "tools.Skill.description",
+          "category": "tools",
+          "op": "changed",
+          "title": "Skill tool description changed (+80 −80 chars)",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "tools.Workflow.description",
+          "category": "tools",
+          "op": "changed",
+          "title": "Workflow tool description changed (+245 −229 chars)",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "request.headers.user-agent",
+          "category": "request",
+          "op": "changed",
+          "title": "Header user-agent: claude-cli/2.1.321 (external, claude-desktop-3p, agent-sd… → claude-cli/2.1.325 (external, claude-desktop-3p, agent-sd…",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "side_requests.POST /v1/messages/count_tokens claude-opus-5-5.tools",
+          "category": "side_requests",
+          "op": "changed",
+          "title": "Side request POST /v1/messages/count_tokens claude-opus-5-5 tools changed",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "side_requests.POST /v1/messages/count_tokens claude-opus-5-5.tools",
+          "category": "side_requests",
+          "op": "changed",
+          "title": "Side request POST /v1/messages/count_tokens claude-opus-5-5 tools changed",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "side_requests.POST /v1/messages/count_tokens claude-opus-5-5.tools",
+          "category": "side_requests",
+          "op": "changed",
+          "title": "Side request POST /v1/messages/count_tokens claude-opus-5-5 tools changed",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "side_requests.POST /v1/messages/count_tokens claude-opus-5-5.tools",
+          "category": "side_requests",
+          "op": "changed",
+          "title": "Side request POST /v1/messages/count_tokens claude-opus-5-5 tools changed",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "side_requests.POST /v1/messages/count_tokens claude-opus-5-5.tools",
+          "category": "side_requests",
+          "op": "changed",
+          "title": "Side request POST /v1/messages/count_tokens claude-opus-5-5 tools changed",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "hooks.events.MessageDisplay.env.CLAUDE_CODE_MAX_CONTEXT_TOKENS",
+          "category": "hooks",
+          "op": "added",
+          "title": "MessageDisplay hook environment variable CLAUDE_CODE_MAX_CONTEXT_TOKENS added",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "hooks.events.SessionStart.env.CLAUDE_CODE_MAX_CONTEXT_TOKENS",
+          "category": "hooks",
+          "op": "added",
+          "title": "SessionStart hook environment variable CLAUDE_CODE_MAX_CONTEXT_TOKENS added",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "hooks.events.Stop.env.CLAUDE_CODE_MAX_CONTEXT_TOKENS",
+          "category": "hooks",
+          "op": "added",
+          "title": "Stop hook environment variable CLAUDE_CODE_MAX_CONTEXT_TOKENS added",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "hooks.events.UserPromptSubmit.env.CLAUDE_CODE_MAX_CONTEXT_TOKENS",
+          "category": "hooks",
+          "op": "added",
+          "title": "UserPromptSubmit hook environment variable CLAUDE_CODE_MAX_CONTEXT_TOKENS added",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "cli.commands.claude mcp #",
+          "category": "cli",
+          "op": "removed",
+          "title": "Command removed: `claude mcp #`",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "cli.commands.claude mcp Add",
+          "category": "cli",
+          "op": "added",
+          "title": "New command: `claude mcp Add`",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "cli.commands.claude mcp Examples:",
+          "category": "cli",
+          "op": "removed",
+          "title": "Command removed: `claude mcp Examples:`",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "cli.commands.claude mcp claude",
+          "category": "cli",
+          "op": "removed",
+          "title": "Command removed: `claude mcp claude`",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "cli.help.--help",
+          "category": "cli",
+          "op": "changed",
+          "title": "Full help text of `--help` changed (+300 −152 chars)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "cli.help.mcp --help",
+          "category": "cli",
+          "op": "changed",
+          "title": "Full help text of `mcp --help` changed (+70 −559 chars)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "cli.help.rm --help",
+          "category": "cli",
+          "op": "changed",
+          "title": "Full help text of `rm --help` changed (+185 −96 chars)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "cli.launch.argv.{\"deniedMcpServers\":[{\"serverName\":\"Claude Browser\"},{\"serverName\":\"Claude Code Android Emulator\"},{\"serverName\":\"Claude Code iOS Simulator\"},{\"serverName\":\"Claude Preview\"},{\"serverName\":\"Claude_Browser\"},{\"serverName\":\"Claude_Code_Android_Emulator\"},{\"serverName\":\"Claude_Code_iOS_Simulator\"},{\"serverName\":\"Claude_Preview\"},{\"serverName\":\"Claude_for_Chrome\"},{\"serverName\":\"Framebuffer\"},{\"serverName\":\"Window Halo\"},{\"serverName\":\"Window_Halo\"},{\"serverName\":\"ccd_connectors\"},{\"serverName\":\"ccd_directory\"},{\"serverName\":\"ccd_host\"},{\"serverName\":\"ccd_pr\"},{\"serverName\":\"ccd_session\"},{\"serverName\":\"ccd_session_mgmt\"},{\"serverName\":\"ccd_settings\"},{\"serverName\":\"ccd_sidebar\"},{\"serverName\":\"ccd_turn\"},{\"serverName\":\"ccd_view\"},{\"serverName\":\"ccd_window\"},{\"serverName\":\"claude-in-chrome\"},{\"serverName\":\"claude_browser\"},{\"serverName\":\"claude_code_android_emulator\"},{\"serverName\":\"claude_code_ios_simulator\"},{\"serverName\":\"claude_for_chrome\"},{\"serverName\":\"claude_in_chrome\"},{\"serverName\":\"claude_preview\"},{\"serverName\":\"computer-use\"},{\"serverName\":\"computer_use\"},{\"serverName\":\"cowork\"},{\"serverName\":\"cowork-onboarding\"},{\"serverName\":\"cowork_onboarding\"},{\"serverName\":\"dev-debug\"},{\"serverName\":\"dev_debug\"},{\"serverName\":\"dispatch\"},{\"serverName\":\"framebuffer\"},{\"serverName\":\"mcp-registry\"},{\"serverName\":\"mcp_registry\"},{\"serverName\":\"plugins\"},{\"serverName\":\"remote-devices\"},{\"serverName\":\"remote_devices\"},{\"serverName\":\"scheduled-tasks\"},{\"serverName\":\"scheduled_tasks\"},{\"serverName\":\"session_info\"},{\"serverName\":\"skills\"},{\"serverName\":\"window_halo\"}],\"env\":{\"CLAUDE_CODE_MAX_CONTEXT_TOKENS\":\"200000\"},\"sandbox\":{\"filesystem\":{\"denyWrite\":[\"<tmp>\",\"/System/Volumes/Data<tmp>\",\"<tmp>/ccd-ssh.501\",\"/System/Volumes/Data<tmp>/ccd-ssh.501\",\"<tmp>\",\"/System/Volumes/Data<tmp>\",\"<tmp>\",\"/System/Volumes/Data<tmp>\"]}}}",
+          "category": "cli",
+          "op": "added",
+          "title": "The app now starts its agent with `{\"deniedMcpServers\":[{\"serverName\":\"Claude Browser\"},{\"se…`",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "cli.launch.argv.{\"deniedMcpServers\":[{\"serverName\":\"Claude Browser\"},{\"serverName\":\"Claude Code Android Emulator\"},{\"serverName\":\"Claude Code iOS Simulator\"},{\"serverName\":\"Claude Preview\"},{\"serverName\":\"Claude_Browser\"},{\"serverName\":\"Claude_Code_Android_Emulator\"},{\"serverName\":\"Claude_Code_iOS_Simulator\"},{\"serverName\":\"Claude_Preview\"},{\"serverName\":\"Claude_for_Chrome\"},{\"serverName\":\"Framebuffer\"},{\"serverName\":\"Window Halo\"},{\"serverName\":\"Window_Halo\"},{\"serverName\":\"ccd_connectors\"},{\"serverName\":\"ccd_directory\"},{\"serverName\":\"ccd_host\"},{\"serverName\":\"ccd_pr\"},{\"serverName\":\"ccd_session\"},{\"serverName\":\"ccd_session_mgmt\"},{\"serverName\":\"ccd_settings\"},{\"serverName\":\"ccd_sidebar\"},{\"serverName\":\"ccd_turn\"},{\"serverName\":\"ccd_view\"},{\"serverName\":\"ccd_window\"},{\"serverName\":\"claude-in-chrome\"},{\"serverName\":\"claude_browser\"},{\"serverName\":\"claude_code_android_emulator\"},{\"serverName\":\"claude_code_ios_simulator\"},{\"serverName\":\"claude_for_chrome\"},{\"serverName\":\"claude_in_chrome\"},{\"serverName\":\"claude_preview\"},{\"serverName\":\"computer-use\"},{\"serverName\":\"computer_use\"},{\"serverName\":\"cowork\"},{\"serverName\":\"cowork-onboarding\"},{\"serverName\":\"cowork_onboarding\"},{\"serverName\":\"dev-debug\"},{\"serverName\":\"dev_debug\"},{\"serverName\":\"dispatch\"},{\"serverName\":\"framebuffer\"},{\"serverName\":\"mcp-registry\"},{\"serverName\":\"mcp_registry\"},{\"serverName\":\"plugins\"},{\"serverName\":\"remote-devices\"},{\"serverName\":\"remote_devices\"},{\"serverName\":\"scheduled-tasks\"},{\"serverName\":\"scheduled_tasks\"},{\"serverName\":\"session_info\"},{\"serverName\":\"skills\"},{\"serverName\":\"window_halo\"}],\"sandbox\":{\"filesystem\":{\"denyWrite\":[\"<tmp>\",\"/System/Volumes/Data<tmp>\",\"<tmp>/ccd-ssh.501\",\"/System/Volumes/Data<tmp>/ccd-ssh.501\",\"<tmp>\",\"/System/Volumes/Data<tmp>\",\"<tmp>\",\"/System/Volumes/Data<tmp>\"]}}}",
+          "category": "cli",
+          "op": "removed",
+          "title": "The app no longer starts its agent with `{\"deniedMcpServers\":[{\"serverName\":\"Claude Browser\"},{\"se…`",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "cli.launch.env_values.BAGGAGE",
+          "category": "cli",
+          "op": "changed",
+          "title": "The app's agent's BAGGAGE: none → none",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "cli.launch.env_values.CLAUDE_AGENT_SDK_VERSION",
+          "category": "cli",
+          "op": "changed",
+          "title": "The app's agent's CLAUDE_AGENT_SDK_VERSION: 0.3.321 → 0.3.325",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "cli.launch.env_values.SENTRY-TRACE",
+          "category": "cli",
+          "op": "changed",
+          "title": "The app's agent's SENTRY-TRACE: <hex>-bfd6b967034dfd3e → <hex>-a31d37f06a47f780",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "cli.launch.parents.<app>/Contents/Helpers/disclaimer --pgroup -- <agent> --output-format stream-json --verbose --input-format stream-json --effort=medium --model=claude-opus-5-5 --permission-prompt-tool=stdio --allowedTools=mcp__computer-use,mcp__ccd_session__spawn_task,mcp__ccd_session__dismiss_task,mcp__ccd_session__mark_chapter,mcp__ccd_session_mgmt__list_sessions,mcp__ccd_session_mgmt__get_session,mcp__ccd_session_mgmt__get_usage,mcp__ccd_host__get_storage_usage,mcp__ccd_session_mgmt__set_session_title,mcp__ccd_session_mgmt__send_message,mcp__ccd_session_mgmt__detach_session,mcp__ccd_sidebar__list_groups,mcp__ccd_sidebar__create_group,mcp__ccd_sidebar__set_view,mcp__ccd_sidebar__list_sections,mcp__ccd_sidebar__create_section,mcp__ccd_turn__wrap_up,mcp__ccd_turn__update_plan,mcp__ccd_session_mgmt__search_session_transcripts,mcp__ccd_session_mgmt__list_events,mcp__ccd_session_mgmt__export_transcript,mcp__scheduled-tasks__list_task_runs,mcp__ccd_session__read_widget_context,mcp__ccd_session__list_start_targets,mcp__ccd_view__show_pane,mcp__ccd_view__close_pane,mcp__ccd_view__get_layout,mcp__ccd_view__set_transcript_view,mcp__ccd_settings__get_settings,mcp__ccd_pr__get_status,mcp__ccd_window__open_session_in,mcp__ccd_window__close_split,mcp__ccd_window__set_sidebar_collapsed,mcp__ccd_window__get_window_layout --disallowedTools=SubscribePR,Edit(//**/ccd-*h.501),Edit(//**/ccd-*h.501/**) --setting-sources=user,project,local --permission-mode=auto --include-partial-messages --await-initialize --managed-settings {\"disableClaudeAiConnectors\":true,\"permissions\":{\"allow\":[]},\"sandbox\":{\"network\":{\"allowedDomains\":[],\"allowManagedDomainsOnly\":true},\"enabled\":true,\"allowUnsandboxedCommands\":false}} --thinking-display omitted --replay-user-messages --settings {\"deniedMcpServers\":[{\"serverName\":\"Claude Browser\"},{\"serverName\":\"Claude Code Android Emulator\"},{\"serverName\":\"Claude Code iOS Simulator\"},{\"serverName\":\"Claude Preview\"},{\"serverName\":\"Claude_Browser\"},{\"serverName\":\"Claude_Code_Android_Emulator\"},{\"serverName\":\"Claude_Code_iOS_Simulator\"},{\"serverName\":\"Claude_Preview\"},{\"serverName\":\"Claude_for_Chrome\"},{\"serverName\":\"Framebuffer\"},{\"serverName\":\"Window Halo\"},{\"serverName\":\"Window_Halo\"},{\"serverName\":\"ccd_connectors\"},{\"serverName\":\"ccd_directory\"},{\"serverName\":\"ccd_host\"},{\"serverName\":\"ccd_pr\"},{\"serverName\":\"ccd_session\"},{\"serverName\":\"ccd_session_mgmt\"},{\"serverName\":\"ccd_settings\"},{\"serverName\":\"ccd_sidebar\"},{\"serverName\":\"ccd_turn\"},{\"serverName\":\"ccd_view\"},{\"serverName\":\"ccd_window\"},{\"serverName\":\"claude-in-chrome\"},{\"serverName\":\"claude_browser\"},{\"serverName\":\"claude_code_android_emulator\"},{\"serverName\":\"claude_code_ios_simulator\"},{\"serverName\":\"claude_for_chrome\"},{\"serverName\":\"claude_in_chrome\"},{\"serverName\":\"claude_preview\"},{\"serverName\":\"computer-use\"},{\"serverName\":\"computer_use\"},{\"serverName\":\"cowork\"},{\"serverName\":\"cowork-onboarding\"},{\"serverName\":\"cowork_onboarding\"},{\"serverName\":\"dev-debug\"},{\"serverName\":\"dev_debug\"},{\"serverName\":\"dispatch\"},{\"serverName\":\"framebuffer\"},{\"serverName\":\"mcp-registry\"},{\"serverName\":\"mcp_registry\"},{\"serverName\":\"plugins\"},{\"serverName\":\"remote-devices\"},{\"serverName\":\"remote_devices\"},{\"serverName\":\"scheduled-tasks\"},{\"serverName\":\"scheduled_tasks\"},{\"serverName\":\"session_info\"},{\"serverName\":\"skills\"},{\"serverName\":\"window_halo\"}],\"env\":{\"CLAUDE_CODE_MAX_CONTEXT_TOKENS\":\"200000\"},\"sandbox\":{\"filesystem\":{\"denyWrite\":[\"<tmp>\",\"/System/Volumes/Data<tmp>\",\"<tmp>/ccd-ssh.501\",\"/System/Volumes/Data<tmp>/ccd-ssh.501\",\"<tmp>\",\"/System/Volumes/Data<tmp>\",\"<tmp>\",\"/System/Volumes/Data<tmp>\"]}}}",
+          "category": "cli",
+          "op": "added",
+          "title": "The processes between the app and its agent added",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "cli.launch.parents.<app>/Contents/Helpers/disclaimer --pgroup -- <agent> --output-format stream-json --verbose --input-format stream-json --effort=medium --model=claude-opus-5-5 --permission-prompt-tool=stdio --allowedTools=mcp__computer-use,mcp__ccd_session__spawn_task,mcp__ccd_session__dismiss_task,mcp__ccd_session__mark_chapter,mcp__ccd_session_mgmt__list_sessions,mcp__ccd_session_mgmt__get_session,mcp__ccd_session_mgmt__get_usage,mcp__ccd_host__get_storage_usage,mcp__ccd_session_mgmt__set_session_title,mcp__ccd_session_mgmt__send_message,mcp__ccd_session_mgmt__detach_session,mcp__ccd_sidebar__list_groups,mcp__ccd_sidebar__create_group,mcp__ccd_sidebar__set_view,mcp__ccd_sidebar__list_sections,mcp__ccd_sidebar__create_section,mcp__ccd_turn__wrap_up,mcp__ccd_turn__update_plan,mcp__ccd_session_mgmt__search_session_transcripts,mcp__ccd_session_mgmt__list_events,mcp__ccd_session_mgmt__export_transcript,mcp__scheduled-tasks__list_task_runs,mcp__ccd_session__read_widget_context,mcp__ccd_session__list_start_targets,mcp__ccd_view__show_pane,mcp__ccd_view__close_pane,mcp__ccd_view__get_layout,mcp__ccd_view__set_transcript_view,mcp__ccd_settings__get_settings,mcp__ccd_pr__get_status,mcp__ccd_window__open_session_in,mcp__ccd_window__close_split,mcp__ccd_window__set_sidebar_collapsed,mcp__ccd_window__get_window_layout --disallowedTools=SubscribePR,Edit(//**/ccd-*h.501),Edit(//**/ccd-*h.501/**) --setting-sources=user,project,local --permission-mode=auto --include-partial-messages --await-initialize --managed-settings {\"disableClaudeAiConnectors\":true,\"permissions\":{\"allow\":[]},\"sandbox\":{\"network\":{\"allowedDomains\":[],\"allowManagedDomainsOnly\":true},\"enabled\":true,\"allowUnsandboxedCommands\":false}} --thinking-display omitted --replay-user-messages --settings {\"deniedMcpServers\":[{\"serverName\":\"Claude Browser\"},{\"serverName\":\"Claude Code Android Emulator\"},{\"serverName\":\"Claude Code iOS Simulator\"},{\"serverName\":\"Claude Preview\"},{\"serverName\":\"Claude_Browser\"},{\"serverName\":\"Claude_Code_Android_Emulator\"},{\"serverName\":\"Claude_Code_iOS_Simulator\"},{\"serverName\":\"Claude_Preview\"},{\"serverName\":\"Claude_for_Chrome\"},{\"serverName\":\"Framebuffer\"},{\"serverName\":\"Window Halo\"},{\"serverName\":\"Window_Halo\"},{\"serverName\":\"ccd_connectors\"},{\"serverName\":\"ccd_directory\"},{\"serverName\":\"ccd_host\"},{\"serverName\":\"ccd_pr\"},{\"serverName\":\"ccd_session\"},{\"serverName\":\"ccd_session_mgmt\"},{\"serverName\":\"ccd_settings\"},{\"serverName\":\"ccd_sidebar\"},{\"serverName\":\"ccd_turn\"},{\"serverName\":\"ccd_view\"},{\"serverName\":\"ccd_window\"},{\"serverName\":\"claude-in-chrome\"},{\"serverName\":\"claude_browser\"},{\"serverName\":\"claude_code_android_emulator\"},{\"serverName\":\"claude_code_ios_simulator\"},{\"serverName\":\"claude_for_chrome\"},{\"serverName\":\"claude_in_chrome\"},{\"serverName\":\"claude_preview\"},{\"serverName\":\"computer-use\"},{\"serverName\":\"computer_use\"},{\"serverName\":\"cowork\"},{\"serverName\":\"cowork-onboarding\"},{\"serverName\":\"cowork_onboarding\"},{\"serverName\":\"dev-debug\"},{\"serverName\":\"dev_debug\"},{\"serverName\":\"dispatch\"},{\"serverName\":\"framebuffer\"},{\"serverName\":\"mcp-registry\"},{\"serverName\":\"mcp_registry\"},{\"serverName\":\"plugins\"},{\"serverName\":\"remote-devices\"},{\"serverName\":\"remote_devices\"},{\"serverName\":\"scheduled-tasks\"},{\"serverName\":\"scheduled_tasks\"},{\"serverName\":\"session_info\"},{\"serverName\":\"skills\"},{\"serverName\":\"window_halo\"}],\"sandbox\":{\"filesystem\":{\"denyWrite\":[\"<tmp>\",\"/System/Volumes/Data<tmp>\",\"<tmp>/ccd-ssh.501\",\"/System/Volumes/Data<tmp>/ccd-ssh.501\",\"<tmp>\",\"/System/Volumes/Data<tmp>\",\"<tmp>\",\"/System/Volumes/Data<tmp>\"]}}}",
+          "category": "cli",
+          "op": "removed",
+          "title": "The processes between the app and its agent removed",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.additionalMarketplaces.<name>.pluginDigests.deprecated",
+          "category": "config",
+          "op": "changed",
+          "title": "Setting additionalMarketplaces.<name>.pluginDigests deprecated",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.additionalMarketplaces.<name>.pluginDigests.description",
+          "category": "config",
+          "op": "changed",
+          "title": "additionalMarketplaces.<name>.pluginDigests description changed (+220 −1106 chars)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.options.additionalMarketplaces.<name>.source.package.description",
+          "category": "config",
+          "op": "changed",
+          "title": "additionalMarketplaces.<name>.source.package description changed (+218 −311 chars)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.options.additionalMarketplaces.<name>.source.ref.description",
+          "category": "config",
+          "op": "changed",
+          "title": "additionalMarketplaces.<name>.source.ref description changed (+431 −89 chars)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.options.additionalMarketplaces.<name>.source.registry.description",
+          "category": "config",
+          "op": "changed",
+          "title": "additionalMarketplaces.<name>.source.registry description changed (+267 −413 chars)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.options.allowedMarketplaces[].package.description",
+          "category": "config",
+          "op": "changed",
+          "title": "allowedMarketplaces[].package description changed (+218 −311 chars)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.options.allowedMarketplaces[].ref.description",
+          "category": "config",
+          "op": "changed",
+          "title": "allowedMarketplaces[].ref description changed (+431 −89 chars)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.options.allowedMarketplaces[].registry.description",
+          "category": "config",
+          "op": "changed",
+          "title": "allowedMarketplaces[].registry description changed (+267 −413 chars)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.options.askUserQuestionTimeout.description",
+          "category": "config",
+          "op": "changed",
+          "title": "askUserQuestionTimeout description changed (+662 −0 chars)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.options.blockedMarketplaces.description",
+          "category": "config",
+          "op": "changed",
+          "title": "blockedMarketplaces description changed (+260 −162 chars)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.options.clawdFileProgressEnabled",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: clawdFileProgressEnabled",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.options.disableClaudeAiConnectors.description",
+          "category": "config",
+          "op": "changed",
+          "title": "disableClaudeAiConnectors description changed (+182 −0 chars)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.options.enabledPlugins.description",
+          "category": "config",
+          "op": "changed",
+          "title": "enabledPlugins description changed (+90 −55 chars)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.options.extraKnownMarketplaces.<name>.pluginDigests.deprecated",
+          "category": "config",
+          "op": "changed",
+          "title": "Setting extraKnownMarketplaces.<name>.pluginDigests deprecated",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.extraKnownMarketplaces.<name>.pluginDigests.description",
+          "category": "config",
+          "op": "changed",
+          "title": "extraKnownMarketplaces.<name>.pluginDigests description changed (+220 −1106 chars)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.options.extraKnownMarketplaces.<name>.source.package.description",
+          "category": "config",
+          "op": "changed",
+          "title": "extraKnownMarketplaces.<name>.source.package description changed (+218 −311 chars)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.options.extraKnownMarketplaces.<name>.source.ref.description",
+          "category": "config",
+          "op": "changed",
+          "title": "extraKnownMarketplaces.<name>.source.ref description changed (+431 −89 chars)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.options.extraKnownMarketplaces.<name>.source.registry.description",
+          "category": "config",
+          "op": "changed",
+          "title": "extraKnownMarketplaces.<name>.source.registry description changed (+267 −413 chars)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.options.fastMode.description",
+          "category": "config",
+          "op": "changed",
+          "title": "fastMode description changed (+132 −72 chars)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.options.permissions.blockReadsOutsideWorkingDirectories.description",
+          "category": "config",
+          "op": "changed",
+          "title": "permissions.blockReadsOutsideWorkingDirectories description changed (+417 −276 chars)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.options.permissions.blockWritesOutsideWorkingDirectories.description",
+          "category": "config",
+          "op": "changed",
+          "title": "permissions.blockWritesOutsideWorkingDirectories description changed (+566 −406 chars)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.options.precomputeArmTokens",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: precomputeArmTokens",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.options.prependPlugins.description",
+          "category": "config",
+          "op": "changed",
+          "title": "prependPlugins description changed (+312 −178 chars)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.options.sandbox.autoAllowBashIfSandboxed.description",
+          "category": "config",
+          "op": "changed",
+          "title": "sandbox.autoAllowBashIfSandboxed description changed (+313 −0 chars)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.options.strictKnownMarketplaces[].package.description",
+          "category": "config",
+          "op": "changed",
+          "title": "strictKnownMarketplaces[].package description changed (+218 −311 chars)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.options.strictKnownMarketplaces[].ref.description",
+          "category": "config",
+          "op": "changed",
+          "title": "strictKnownMarketplaces[].ref description changed (+431 −89 chars)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.options.strictKnownMarketplaces[].registry.description",
+          "category": "config",
+          "op": "changed",
+          "title": "strictKnownMarketplaces[].registry description changed (+267 −413 chars)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.options.subagentStatusLine.deprecated",
+          "category": "config",
+          "op": "changed",
+          "title": "Setting subagentStatusLine deprecated",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.subagentStatusLine.description",
+          "category": "config",
+          "op": "changed",
+          "title": "subagentStatusLine description changed (+80 −95 chars)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.env_vars",
+          "category": "config",
+          "op": "changed",
+          "title": "Environment variables: +33 −6",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "network.egress.GET api.anthropic.com/mcp-registry/v0/servers",
+          "category": "network",
+          "op": "removed",
+          "title": "Network request no longer made: GET api.anthropic.com/mcp-registry/v0/servers",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.egress.GET downloads.claude.ai/claude-code-releases/2.1.321/darwin-arm64/claude.app.tar.zst",
+          "category": "network",
+          "op": "removed",
+          "title": "Network request no longer made: GET downloads.claude.ai/claude-code-releases/2.1.321/darwin-arm64/claude.app.tar.zst",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.egress.GET api.anthropic.com/api/directory/server-urls",
+          "category": "network",
+          "op": "added",
+          "title": "New network request: GET api.anthropic.com/api/directory/server-urls",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.egress.GET downloads.claude.ai/claude-code-releases/2.1.325/darwin-arm64/claude.app.tar.zst",
+          "category": "network",
+          "op": "added",
+          "title": "New network request: GET downloads.claude.ai/claude-code-releases/2.1.325/darwin-arm64/claude.app.tar.zst",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_sdk_schema_violation",
+          "category": "network",
+          "op": "removed",
+          "title": "Vendor telemetry event no longer sent: tengu_sdk_schema_violation",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST claude.ai/api/event_logging/v2/batch.events.desktop_ccd_message_cycle_outcome",
+          "category": "network",
+          "op": "added",
+          "title": "New vendor telemetry event: desktop_ccd_message_cycle_outcome",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST claude.ai/api/event_logging/v2/batch.events.desktop_ccd_session_list_loaded.fields.auth.account_uuid",
+          "category": "network",
+          "op": "removed",
+          "title": "desktop_ccd_session_list_loaded telemetry event field auth.account_uuid removed",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST claude.ai/api/event_logging/v2/batch.events.desktop_ccd_session_start_timing",
+          "category": "network",
+          "op": "added",
+          "title": "New vendor telemetry event: desktop_ccd_session_start_timing",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST claude.ai/api/event_logging/v2/batch.events.desktop_ccd_spawn_tool_parity",
+          "category": "network",
+          "op": "added",
+          "title": "New vendor telemetry event: desktop_ccd_spawn_tool_parity",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST claude.ai/api/event_logging/v2/batch.events.desktop_ccd_stream_render",
+          "category": "network",
+          "op": "added",
+          "title": "New vendor telemetry event: desktop_ccd_stream_render",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST claude.ai/api/event_logging/v2/batch.events.desktop_notification_suppressed",
+          "category": "network",
+          "op": "added",
+          "title": "New vendor telemetry event: desktop_notification_suppressed",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST claude.ai/api/event_logging/v2/batch.events.desktop_protocol_handlers_lookup",
+          "category": "network",
+          "op": "added",
+          "title": "New vendor telemetry event: desktop_protocol_handlers_lookup",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "binary.agent.download",
+          "category": "binary",
+          "op": "changed",
+          "title": "Binary agent.download: https://downloads.claude.ai/claude-code-releases/2.1.321/… → https://downloads.claude.ai/claude-code-releases/2.1.325/…",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "binary.agent.sdk",
+          "category": "binary",
+          "op": "changed",
+          "title": "Binary agent.sdk: @anthropic-ai/claude-agent-sdk 0.3.321 → @anthropic-ai/claude-agent-sdk 0.3.325",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "binary.agent.version",
+          "category": "binary",
+          "op": "changed",
+          "title": "Runs its agent's build 2.1.325 (was 2.1.321)",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "binary.size_bytes",
+          "category": "binary",
+          "op": "changed",
+          "title": "Binary size: 323,686,048 → 347,406,976 bytes (323.7 MB → 347.4 MB)",
+          "impact": "informational",
+          "documented": null
+        }
+      ]
+    },
+    {
       "version": "5.11492.2",
       "previous": "5.11492.0",
       "changes": [
@@ -367,62 +973,6 @@
           "category": "network",
           "op": "removed",
           "title": "Vendor telemetry event no longer sent: chorus.ideas.suggestions_shown",
-          "impact": "notable",
-          "documented": null
-        },
-        {
-          "id": "network.telemetry.POST claude.ai/api/event_logging/v2/batch.events.desktop_ccd_keep_awake_held",
-          "category": "network",
-          "op": "removed",
-          "title": "Vendor telemetry event no longer sent: desktop_ccd_keep_awake_held",
-          "impact": "notable",
-          "documented": null
-        },
-        {
-          "id": "network.telemetry.POST claude.ai/api/event_logging/v2/batch.events.desktop_ccd_message_cycle_start",
-          "category": "network",
-          "op": "removed",
-          "title": "Vendor telemetry event no longer sent: desktop_ccd_message_cycle_start",
-          "impact": "notable",
-          "documented": null
-        },
-        {
-          "id": "network.telemetry.POST claude.ai/api/event_logging/v2/batch.events.desktop_ccd_remote_control_auto_enable",
-          "category": "network",
-          "op": "removed",
-          "title": "Vendor telemetry event no longer sent: desktop_ccd_remote_control_auto_enable",
-          "impact": "notable",
-          "documented": null
-        },
-        {
-          "id": "network.telemetry.POST claude.ai/api/event_logging/v2/batch.events.desktop_ccd_session_initialized",
-          "category": "network",
-          "op": "removed",
-          "title": "Vendor telemetry event no longer sent: desktop_ccd_session_initialized",
-          "impact": "notable",
-          "documented": null
-        },
-        {
-          "id": "network.telemetry.POST claude.ai/api/event_logging/v2/batch.events.desktop_ccd_session_visibility_changed",
-          "category": "network",
-          "op": "removed",
-          "title": "Vendor telemetry event no longer sent: desktop_ccd_session_visibility_changed",
-          "impact": "notable",
-          "documented": null
-        },
-        {
-          "id": "network.telemetry.POST claude.ai/api/event_logging/v2/batch.events.lam_internal_mcp_server_created",
-          "category": "network",
-          "op": "removed",
-          "title": "Vendor telemetry event no longer sent: lam_internal_mcp_server_created",
-          "impact": "notable",
-          "documented": null
-        },
-        {
-          "id": "network.telemetry.POST claude.ai/api/event_logging/v2/batch.events.lam_mcp_servers_setup_summary",
-          "category": "network",
-          "op": "removed",
-          "title": "Vendor telemetry event no longer sent: lam_mcp_servers_setup_summary",
           "impact": "notable",
           "documented": null
         }
@@ -1441,26 +1991,10 @@
           "documented": null
         },
         {
-          "id": "network.telemetry.POST claude.ai/api/event_logging/v2/batch.events.desktop_ccd_terminal_spawned",
-          "category": "network",
-          "op": "removed",
-          "title": "Vendor telemetry event no longer sent: desktop_ccd_terminal_spawned",
-          "impact": "notable",
-          "documented": null
-        },
-        {
           "id": "network.telemetry.POST claude.ai/api/event_logging/v2/batch.events.desktop_low_data_mode_state",
           "category": "network",
           "op": "added",
           "title": "New vendor telemetry event: desktop_low_data_mode_state",
-          "impact": "notable",
-          "documented": null
-        },
-        {
-          "id": "network.telemetry.POST claude.ai/api/event_logging/v2/batch.events.desktop_session_title_set",
-          "category": "network",
-          "op": "removed",
-          "title": "Vendor telemetry event no longer sent: desktop_session_title_set",
           "impact": "notable",
           "documented": null
         },

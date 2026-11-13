@@ -12367,7 +12367,18 @@
               "properties"
             ]
           }
-        }
+        },
+        "unobserved": [
+          "desktop_ccd_keep_awake_held",
+          "desktop_ccd_message_cycle_start",
+          "desktop_ccd_remote_control_auto_enable",
+          "desktop_ccd_session_initialized",
+          "desktop_ccd_session_visibility_changed",
+          "desktop_ccd_terminal_spawned",
+          "desktop_session_title_set",
+          "lam_internal_mcp_server_created",
+          "lam_mcp_servers_setup_summary"
+        ]
       }
     }
   },

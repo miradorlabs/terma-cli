@@ -3,20 +3,20 @@
   "harness": "claude-desktop",
   "from": "5.1231.0",
   "to": "5.1231.2",
-  "generated_at": "2026-11-12T15:48:45.504112256Z",
+  "generated_at": "2026-11-13T22:02:06.249513357Z",
   "source": null,
   "changelog": null,
   "summary": {
-    "changes": 12,
+    "changes": 5,
     "categories": {
       "cli": 2,
-      "network": 10
+      "network": 3
     },
     "impact": {
       "breaking": 0,
       "degrading": 0,
       "informational": 0,
-      "notable": 12
+      "notable": 5
     },
     "undocumented": null
   },
@@ -207,230 +207,6 @@
           "event_timestamp",
           "organization_uuid",
           "properties"
-        ]
-      },
-      "after": null,
-      "text_diff": null,
-      "terma": null,
-      "source": null,
-      "documented": null
-    },
-    {
-      "id": "network.telemetry.POST claude.ai/api/event_logging/v2/batch.events.desktop_ccd_keep_awake_held",
-      "category": "network",
-      "op": "removed",
-      "path": [
-        "network",
-        "telemetry",
-        "POST claude.ai/api/event_logging/v2/batch",
-        "events",
-        "desktop_ccd_keep_awake_held"
-      ],
-      "title": "Vendor telemetry event no longer sent: desktop_ccd_keep_awake_held",
-      "impact": "notable",
-      "before": {
-        "count": 1,
-        "fields": [
-          "auth",
-          "auth.account_uuid",
-          "auth.organization_uuid",
-          "event_name",
-          "metadata",
-          "timestamp",
-          "user_properties",
-          "user_properties.user_id"
-        ]
-      },
-      "after": null,
-      "text_diff": null,
-      "terma": null,
-      "source": null,
-      "documented": null
-    },
-    {
-      "id": "network.telemetry.POST claude.ai/api/event_logging/v2/batch.events.desktop_ccd_message_cycle_start",
-      "category": "network",
-      "op": "removed",
-      "path": [
-        "network",
-        "telemetry",
-        "POST claude.ai/api/event_logging/v2/batch",
-        "events",
-        "desktop_ccd_message_cycle_start"
-      ],
-      "title": "Vendor telemetry event no longer sent: desktop_ccd_message_cycle_start",
-      "impact": "notable",
-      "before": {
-        "count": 1,
-        "fields": [
-          "auth",
-          "auth.account_uuid",
-          "auth.organization_uuid",
-          "event_name",
-          "metadata",
-          "timestamp",
-          "user_properties",
-          "user_properties.user_id"
-        ]
-      },
-      "after": null,
-      "text_diff": null,
-      "terma": null,
-      "source": null,
-      "documented": null
-    },
-    {
-      "id": "network.telemetry.POST claude.ai/api/event_logging/v2/batch.events.desktop_ccd_remote_control_auto_enable",
-      "category": "network",
-      "op": "removed",
-      "path": [
-        "network",
-        "telemetry",
-        "POST claude.ai/api/event_logging/v2/batch",
-        "events",
-        "desktop_ccd_remote_control_auto_enable"
-      ],
-      "title": "Vendor telemetry event no longer sent: desktop_ccd_remote_control_auto_enable",
-      "impact": "notable",
-      "before": {
-        "count": 1,
-        "fields": [
-          "auth",
-          "auth.account_uuid",
-          "auth.organization_uuid",
-          "event_name",
-          "metadata",
-          "timestamp",
-          "user_properties",
-          "user_properties.user_id"
-        ]
-      },
-      "after": null,
-      "text_diff": null,
-      "terma": null,
-      "source": null,
-      "documented": null
-    },
-    {
-      "id": "network.telemetry.POST claude.ai/api/event_logging/v2/batch.events.desktop_ccd_session_initialized",
-      "category": "network",
-      "op": "removed",
-      "path": [
-        "network",
-        "telemetry",
-        "POST claude.ai/api/event_logging/v2/batch",
-        "events",
-        "desktop_ccd_session_initialized"
-      ],
-      "title": "Vendor telemetry event no longer sent: desktop_ccd_session_initialized",
-      "impact": "notable",
-      "before": {
-        "count": 1,
-        "fields": [
-          "auth",
-          "auth.account_uuid",
-          "auth.organization_uuid",
-          "event_name",
-          "metadata",
-          "timestamp",
-          "user_properties",
-          "user_properties.user_id"
-        ]
-      },
-      "after": null,
-      "text_diff": null,
-      "terma": null,
-      "source": null,
-      "documented": null
-    },
-    {
-      "id": "network.telemetry.POST claude.ai/api/event_logging/v2/batch.events.desktop_ccd_session_visibility_changed",
-      "category": "network",
-      "op": "removed",
-      "path": [
-        "network",
-        "telemetry",
-        "POST claude.ai/api/event_logging/v2/batch",
-        "events",
-        "desktop_ccd_session_visibility_changed"
-      ],
-      "title": "Vendor telemetry event no longer sent: desktop_ccd_session_visibility_changed",
-      "impact": "notable",
-      "before": {
-        "count": 1,
-        "fields": [
-          "auth",
-          "auth.account_uuid",
-          "auth.organization_uuid",
-          "event_name",
-          "metadata",
-          "timestamp",
-          "user_properties",
-          "user_properties.user_id"
-        ]
-      },
-      "after": null,
-      "text_diff": null,
-      "terma": null,
-      "source": null,
-      "documented": null
-    },
-    {
-      "id": "network.telemetry.POST claude.ai/api/event_logging/v2/batch.events.lam_internal_mcp_server_created",
-      "category": "network",
-      "op": "removed",
-      "path": [
-        "network",
-        "telemetry",
-        "POST claude.ai/api/event_logging/v2/batch",
-        "events",
-        "lam_internal_mcp_server_created"
-      ],
-      "title": "Vendor telemetry event no longer sent: lam_internal_mcp_server_created",
-      "impact": "notable",
-      "before": {
-        "count": 12,
-        "fields": [
-          "auth",
-          "auth.account_uuid",
-          "auth.organization_uuid",
-          "event_name",
-          "metadata",
-          "timestamp",
-          "user_properties",
-          "user_properties.user_id"
-        ]
-      },
-      "after": null,
-      "text_diff": null,
-      "terma": null,
-      "source": null,
-      "documented": null
-    },
-    {
-      "id": "network.telemetry.POST claude.ai/api/event_logging/v2/batch.events.lam_mcp_servers_setup_summary",
-      "category": "network",
-      "op": "removed",
-      "path": [
-        "network",
-        "telemetry",
-        "POST claude.ai/api/event_logging/v2/batch",
-        "events",
-        "lam_mcp_servers_setup_summary"
-      ],
-      "title": "Vendor telemetry event no longer sent: lam_mcp_servers_setup_summary",
-      "impact": "notable",
-      "before": {
-        "count": 1,
-        "fields": [
-          "auth",
-          "auth.account_uuid",
-          "auth.organization_uuid",
-          "event_name",
-          "metadata",
-          "timestamp",
-          "user_properties",
-          "user_properties.user_id"
         ]
       },
       "after": null,

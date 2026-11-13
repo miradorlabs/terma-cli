@@ -1,7 +1,46 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-13T20:27:28.716036036Z",
+  "generated_at": "2026-11-13T22:02:06.249513357Z",
   "versions": [
+    {
+      "harness": "claude-desktop",
+      "name": "Claude Desktop (Code)",
+      "version": "5.11492.5",
+      "released_at": "2026-11-13T21:03:43.363Z",
+      "captured_at": "2026-11-13T22:02:06.249513357Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "5.11492.2",
+      "changes": 75,
+      "categories": {
+        "binary": 4,
+        "cli": 14,
+        "config": 30,
+        "hooks": 4,
+        "network": 12,
+        "prompt": 2,
+        "request": 1,
+        "side_requests": 5,
+        "tools": 3
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 39,
+        "notable": 36
+      },
+      "undocumented": null,
+      "highlights": [
+        "Injected context changed (+3310 −2217 chars)",
+        "System prompt changed",
+        "Agent tool description changed (+81 −83 chars)"
+      ],
+      "signing": "valid",
+      "attempted_at": "2026-11-13T22:02:06.249513357Z",
+      "attempts": 1
+    },
     {
       "harness": "claude",
       "name": "Claude Code",
@@ -416,16 +455,16 @@
       ],
       "support": "untested",
       "previous": "5.1231.0",
-      "changes": 12,
+      "changes": 5,
       "categories": {
         "cli": 2,
-        "network": 10
+        "network": 3
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
         "informational": 0,
-        "notable": 12
+        "notable": 5
       },
       "undocumented": null,
       "highlights": [
@@ -562,12 +601,12 @@
       ],
       "support": "untested",
       "previous": "4.16336.0",
-      "changes": 135,
+      "changes": 133,
       "categories": {
         "binary": 4,
         "cli": 7,
         "config": 10,
-        "network": 83,
+        "network": 81,
         "prompt": 3,
         "request": 1,
         "side_requests": 5,
@@ -577,7 +616,7 @@
         "breaking": 0,
         "degrading": 0,
         "informational": 15,
-        "notable": 120
+        "notable": 118
       },
       "undocumented": null,
       "highlights": [
@@ -6148,39 +6187,6 @@
         "Caching across_turns.breakpoints: [[],[],[]] → [[]]",
         "Caching across_turns.stable_prefix_chars: 674 → none",
         "Caching across_turns.turns: 3 → 1"
-      ],
-      "signing": "valid"
-    },
-    {
-      "harness": "codex",
-      "name": "Codex CLI",
-      "version": "0.142.2",
-      "released_at": "2026-06-25T07:34:58.281Z",
-      "captured_at": "2026-11-05T09:54:28.532441Z",
-      "platforms": [
-        "darwin/arm64",
-        "linux/amd64"
-      ],
-      "support": "untested",
-      "previous": "0.142.1",
-      "changes": 13,
-      "categories": {
-        "behavior": 8,
-        "binary": 1,
-        "config": 1,
-        "filesystem": 3
-      },
-      "impact": {
-        "breaking": 0,
-        "degrading": 0,
-        "informational": 5,
-        "notable": 8
-      },
-      "undocumented": 10,
-      "highlights": [
-        "Behaviour: sandbox approval removed",
-        "Behaviour: sandbox model removed",
-        "Behaviour: sandbox provider removed"
       ],
       "signing": "valid"
     }
