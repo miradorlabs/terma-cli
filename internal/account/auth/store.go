@@ -214,8 +214,21 @@ func Credentials(dir, profile string) ([]*Credential, error) {
 // for the caller to revoke. Signing in decides where the tokens live: the system
 // keychain, unless there is none or config.json asks for files (InsecureStorage).
 func SaveCredential(dir, profile string, cred *Credential) (replaced *Credential, err error) {
+	return saveCredential(dir, profile, cred, true)
+}
+
+// SaveInactiveCredential is SaveCredential without activating cred: the profile's active
+// organization stays as it is. One approval signs in to several organizations, saved this
+// way one by one, and then activates exactly one of them (ActivateCredential). It writes
+// through the same transaction, to the index this machine uses, and returns the session
+// it displaced for the caller to revoke.
+func SaveInactiveCredential(dir, profile string, cred *Credential) (replaced *Credential, err error) {
+	return saveCredential(dir, profile, cred, false)
+}
+
+func saveCredential(dir, profile string, cred *Credential, activate bool) (replaced *Credential, err error) {
 	err = lockedWrite(dir, func(tx *Tx) error {
-		replaced, err = tx.saveReplacing(profile, cred)
+		replaced, err = tx.saveReplacing(profile, cred, activate)
 		return err
 	})
 	if replaced != nil && replaced.SessionID == cred.SessionID {
@@ -224,12 +237,34 @@ func SaveCredential(dir, profile string, cred *Credential) (replaced *Credential
 	return replaced, err
 }
 
+// ActivateCredential makes the profile's stored sign-in for organizationID its active one
+// and changes nothing else; ErrNotLoggedIn when the profile holds none there.
+func ActivateCredential(dir, profile, organizationID string) error {
+	return lockedWrite(dir, func(tx *Tx) error {
+		file, err := loadCredentials(dir, tx.x)
+		if err != nil {
+			return err
+		}
+		p := file[profile]
+		switch {
+		case p == nil || !p.Organizations[organizationID].present():
+			return ErrNotLoggedIn
+		case p.Active == organizationID:
+			return nil
+		}
+		p.Active = organizationID
+		return saveCredentialFile(tx.x.path(dir), file)
+	})
+}
+
 func (tx *Tx) save(profile string, cred *Credential) error {
-	_, err := tx.saveReplacing(profile, cred)
+	_, err := tx.saveReplacing(profile, cred, true)
 	return err
 }
 
-func (tx *Tx) saveReplacing(profile string, cred *Credential) (replaced *Credential, err error) {
+// saveReplacing stores cred under its organization, activating it when activate is set,
+// and returns the stored session it replaced.
+func (tx *Tx) saveReplacing(profile string, cred *Credential, activate bool) (replaced *Credential, err error) {
 	dir := tx.dir
 	inFile := config.InsecureStorage(dir)
 	var unindexed bool
@@ -252,7 +287,9 @@ func (tx *Tx) saveReplacing(profile string, cred *Credential) (replaced *Credent
 		kept := keep(dir, tx.x, profile, cred, indexed, inFile)
 		unindexed = !old.present() && kept.AccessToken == ""
 		p.put(kept)
-		p.Active = cred.OrganizationID
+		if activate {
+			p.Active = cred.OrganizationID
+		}
 	})
 	tx.after = append(tx.after, func() { afterSave(dir, tx.x, profile, cred.OrganizationID, unindexed, err) })
 	return replaced, err
