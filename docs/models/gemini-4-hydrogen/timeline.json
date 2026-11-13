@@ -3,6 +3,33 @@
   "id": "gemini-4-hydrogen",
   "steps": [
     {
+      "at": "2026-11-13T18:38:14.685672051Z",
+      "event": "changed",
+      "changes": [
+        {
+          "id": "docs/whats_new",
+          "category": "docs",
+          "op": "changed",
+          "path": [
+            "docs",
+            "whats_new"
+          ],
+          "title": "What's new page changed (+195 −133 chars)",
+          "impact": "informational",
+          "before": null,
+          "after": null,
+          "text_diff": "@@ -398,7 +398,7 @@\n * **Move off explicit context caching:** Gemini 4 Hydrogen does not support explicit caching (`cachedContents` and `caches.create`).\n Remove `cached_content` fields from requests.\n [Implicit caching](/docs/caching) runs by default on prompts of at least 4,096 tokens and discounts cached input tokens by 95% on cache hits.\n-* **Remove sampling parameters:** Remove `temperature`, `top_p`, and `top_k` from requests. The server ignores custom values if sent.\n+* **Remove sampling parameters:** Remove `temperature`, `top_p`, and `top_k` from requests. The server ignores in-range custom values if sent. Out-of-range values return a `400` validation error.\n * **Declare native tools or structured output schemas:** Do not prompt the model via system instructions to emit custom raw-text JSON tool calls with zero declared tools, which can return `MALFORMED_FUNCTION_CALL`.\n Always declare tools natively with [function calling](/docs/function-calling) or constrain JSON responses with [structured outputs](/docs/structured-output).\n * **Preserve conversation state and thought signatures:** Use `previous_interaction_id` in the Interactions API for multi-turn and tool-calling sessions.\n",
+          "stats": {
+            "added_chars": 195,
+            "removed_chars": 133
+          },
+          "terma": null,
+          "source": null,
+          "documented": null
+        }
+      ]
+    },
+    {
       "at": "2026-11-13T13:24:07.003706179Z",
       "event": "changed",
       "changes": [

@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-13T17:52:47.748337193Z",
+  "generated_at": "2026-11-13T18:38:14.685672051Z",
   "vendors": [
     {
       "id": "anthropic",
@@ -48,7 +48,7 @@
       "reasoning": true,
       "harnesses": [],
       "last_change": {
-        "at": "2026-11-13T13:24:07.003706179Z",
+        "at": "2026-11-13T18:38:14.685672051Z",
         "changes": 1
       },
       "probed": false
