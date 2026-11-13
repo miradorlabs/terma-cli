@@ -114,16 +114,12 @@ func (t *Teams) state() (routing.State, *routing.Router, bool) {
 	case err != nil || !found:
 		t.ok = false
 	default:
-		if !t.ok || t.router == nil || st.Generation != t.st.Generation || !sameEnrollments(st, t.st) {
+		if !t.ok || t.router == nil || !routing.SameGeneration(st, t.st) {
 			t.router = routing.NewRouter(st)
 		}
 		t.st, t.ok = st, true
 	}
 	return t.st, t.router, t.ok
-}
-
-func sameEnrollments(a, b routing.State) bool {
-	return slices.EqualFunc(a.Teams, b.Teams, func(x, y routing.Team) bool { return x.EnrollmentID == y.EnrollmentID })
 }
 
 // team is enrollment's team in st, or nil.

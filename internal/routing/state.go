@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/config"
@@ -24,6 +25,14 @@ type State struct {
 	// Migration records how this state was made from the profile's single team; nil for
 	// a state set up afresh.
 	Migration *Migration `json:"migration,omitempty"`
+}
+
+// SameGeneration reports whether b is the generation of the state a was: the same number
+// of writes, and the same enrollments, so a state lost and made again is never taken for
+// the one it replaced.
+func SameGeneration(a, b State) bool {
+	return a.Generation == b.Generation &&
+		slices.EqualFunc(a.Teams, b.Teams, func(x, y Team) bool { return x.EnrollmentID == y.EnrollmentID })
 }
 
 // Team is one enrollment: a team selected on this machine, with its last validated
@@ -212,7 +221,7 @@ func (s *State) Select(t Team) (string, error) {
 			return "", fmt.Errorf("%s is bound to the personal organization: unbind it first", key)
 		}
 	}
-	id, err := newEnrollmentID()
+	id, err := NewEnrollmentID()
 	if err != nil {
 		return "", err
 	}
@@ -274,7 +283,9 @@ func (s State) check() error {
 	return s.Migration.check(s)
 }
 
-func newEnrollmentID() (string, error) {
+// NewEnrollmentID names a new enrollment: a selection (Select), or the migration's of a
+// profile's one team.
+func NewEnrollmentID() (string, error) {
 	var b [16]byte
 	if _, err := rand.Read(b[:]); err != nil {
 		return "", err
