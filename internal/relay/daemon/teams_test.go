@@ -322,8 +322,10 @@ func TestTeamsResolveOnlyTheTeamsOwnKey(t *testing.T) {
 	}
 	var minted []string
 	deps := TeamsDeps{AgentName: func(string) string { return "claude" }, RelayTargets: func(s []string) []string { return s },
-		Mint: func(tm routing.Team) { minted = append(minted, tm.EnrollmentID) },
-		User: func(tm routing.Team, endpoint string) string { return "user@" + tm.OrganizationID + "@" + endpoint }}
+		Mint: func(_ *config.Config, tm routing.Team) { minted = append(minted, tm.EnrollmentID) },
+		User: func(_ *config.Config, tm routing.Team, endpoint string) string {
+			return "user@" + tm.OrganizationID + "@" + endpoint
+		}}
 	if _, err := NewTeams(cfg, deps).Resolve(ids["acme"], "claude-code"); !errors.Is(err, relay.ErrNoKey) || !slices.Equal(minted, []string{ids["acme"]}) {
 		t.Fatalf("Resolve = %v, minted %v: want no key and acme's minted", err, minted)
 	}
@@ -534,13 +536,13 @@ func TestTheTeamMinterNeverKeysARefusedTeam(t *testing.T) {
 		return teamKeyA, nil
 	})
 	st, _, _ := routing.Load(cfg.StateDir, cfg.ProfileName)
-	if m.mintNow(st.Teams[0]) {
+	if m.mintNow(cfg, st.Teams[0]) {
 		t.Fatal("a key minted for a team refused meanwhile was kept")
 	}
 	if key, _, _ := keystore.GetTeam(cfg.Dir, ids["acme"]); key != "" || created.Load() != 1 {
 		t.Fatalf("key %q after %d creations", key, created.Load())
 	}
-	if m.mintNow(st.Teams[0]) || created.Load() != 1 {
+	if m.mintNow(cfg, st.Teams[0]) || created.Load() != 1 {
 		t.Fatalf("a Refused team was given a key: %d creations", created.Load())
 	}
 }
@@ -625,5 +627,76 @@ func TestAMigratedRelaySendsEachSessionToItsTeam(t *testing.T) {
 	defer mu.Unlock()
 	if len(got) != 2 || got[teamKeyA] != "acme" || got[mintedKey] != "me" {
 		t.Fatalf("sent by key %v; counters %v", got, r.Stats().Snapshot().Counters)
+	}
+}
+
+// The relay routes each record by the profile its session's hooks placed it under, so a
+// switch of the active profile while it runs (terma config use) never sends a session
+// placed under the new profile with the old one's teams. Here the relay started under the
+// default profile, where Acme's checkouts go to Acme; client selects personal alone. A
+// record placed under client, one whose placement names no profile, and one with no
+// placement go by client once it is active; a session still placed under the default
+// profile goes on to its teams. Each enrollment is resolved and rechecked under its own
+// profile.
+func TestASwitchOfProfileWhileTheRelayRunsRoutesByTheSessionsProfile(t *testing.T) {
+	cfg := migratedMachine(t)
+	work := selectTeams(t, cfg, true, func(s *routing.State) { _ = s.Bind("github.com/acme", orgAcme, false) })
+	client := *cfg
+	client.ProfileName = "client"
+	if err := config.UpdateProfile(cfg.Dir, client.ProfileName, func(p *config.Profile) { p.Harnesses = []string{"claude"} }); err != nil {
+		t.Fatal(err)
+	}
+	other := selectTeams(t, &client, true, func(s *routing.State) { s.Deselect(s.Teams[0].EnrollmentID) })
+	var active atomic.Value
+	active.Store(config.DefaultProfile)
+	teams := NewTeams(cfg, TeamsDeps{Active: func() string { return active.Load().(string) }})
+	teams.ttl = 0
+	acme := func(profile string) relay.Record {
+		p := placed(claim.KindRepository, "github.com/acme/api")
+		p.Profile = profile
+		return relay.Record{Session: "s1", Placed: true, Placement: p, At: time.Now()}
+	}
+	if got := teams.Route(acme(config.DefaultProfile)); got.Outcome != relay.Send || got.Queued.Enrollment != work["acme"] {
+		t.Fatalf("before the switch: %+v", got)
+	}
+
+	active.Store(client.ProfileName)
+	for name, rec := range map[string]relay.Record{
+		"placed under client":          acme(client.ProfileName),
+		"placed under no profile":      acme(""),
+		"with no placement":            {Session: "s2", At: time.Now()},
+		"outside git, placed under it": {Session: "s3", Placed: true, Placement: claim.Claim{Kind: claim.KindOutsideGit, Profile: client.ProfileName}, At: time.Now()},
+	} {
+		got := teams.Route(rec)
+		if got.Outcome != relay.Send || got.Queued.Enrollment != other["me"] {
+			t.Errorf("%s after the switch: %+v, want client's personal %s", name, got, other["me"])
+		}
+		for _, old := range work {
+			if got.Queued.Enrollment == old {
+				t.Errorf("%s after the switch went to the default profile's %s", name, old)
+			}
+		}
+	}
+	if got := teams.Route(acme(config.DefaultProfile)); got.Outcome != relay.Send || got.Queued.Enrollment != work["acme"] {
+		t.Errorf("a session still placed under the default profile: %+v", got)
+	}
+
+	for _, e := range []string{work["acme"], other["me"]} {
+		if !teams.Selected(e) {
+			t.Errorf("%s is not taken for selected", e)
+		}
+		if _, err := teams.Resolve(e, ""); !errors.Is(err, relay.ErrNoKey) {
+			t.Errorf("Resolve(%s) = %v, want it found and waiting for its key", e, err)
+		}
+		q := relay.Queued{Enrollment: e, Kind: string(routing.OutsideGit), Session: "s3", At: time.Now()}
+		if e == work["acme"] {
+			q.Kind, q.Repository = string(routing.Repository), "github.com/acme/api"
+		}
+		if got := teams.Recheck(e).Entry(q); got.Verdict != relay.SendNow {
+			t.Errorf("Recheck(%s) = %+v", e, got)
+		}
+	}
+	if teams.Selected("enrollment-of-no-profile") {
+		t.Error("an enrollment no profile selects is taken for selected")
 	}
 }

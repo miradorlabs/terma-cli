@@ -296,3 +296,31 @@ func TestLegacyClaimsStayAsTheyWere(t *testing.T) {
 		}
 	}
 }
+
+// A placement names the profile its hook routed under, and one under another profile is
+// another place: a record made before the switch keeps the profile it was placed under, one
+// made after takes the new one.
+func TestAPlacementNamesItsProfile(t *testing.T) {
+	t.Parallel()
+	dir := enable(t)
+	before := time.Now().Add(-time.Minute)
+	work := placed(KindRepository, "github.com/acme/api", "", "r1", 10)
+	work.Profile = "work"
+	if !Write(dir, "s", work, before) {
+		t.Fatal("the first placement was not written")
+	}
+	client := work
+	client.Profile = "client"
+	if !Write(dir, "s", client, before.Add(30*time.Second)) {
+		t.Fatal("a placement under another profile was taken for the same place")
+	}
+	c := mustRead(t, dir, "s", time.Now())
+	if c.Profile != "client" || len(c.Placements) != 2 || c.Placements[0].Profile != "work" {
+		t.Fatalf("claim %+v", c)
+	}
+	for at, want := range map[time.Time]string{before.Add(10 * time.Second): "work", time.Now(): "client"} {
+		if got, ok := c.At(10, at); !ok || got.Profile != want {
+			t.Errorf("At(%v) = %+v, want profile %s", at, got, want)
+		}
+	}
+}

@@ -157,12 +157,15 @@ func (e Env) recordRun(sessionID string, cur ledgerRun, v verdict, now time.Time
 	return mixed
 }
 
-// placeRun writes c, the run's placement, under sessionID and agentID's, or a mixed one,
-// which also replaces the placement of every subagent sharing the run.
+// placeRun writes c, the run's placement under the hook's profile, under sessionID and
+// agentID's, or a mixed one, which also replaces the placement of every subagent sharing
+// the run.
 func (e Env) placeRun(sessionID, agentID string, c claim.Claim, mixed bool, now time.Time) {
 	if mixed {
 		c = claim.Claim{Kind: claim.KindMixed, Run: c.Run, Tool: c.Tool, PIDs: c.PIDs}
 	}
+	// The relay routes the session by this profile's routing state, whichever is active.
+	c.Profile = e.Routing.Profile
 	claim.Write(e.StateDir, sessionID, c, now)
 	if agentID != "" && agentID != sessionID && session.ValidID(agentID) {
 		// A subagent whose telemetry names its own ID shares the run, as a ledger alias.
