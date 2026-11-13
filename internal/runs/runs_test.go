@@ -251,3 +251,24 @@ func TestCurrentAndAliases(t *testing.T) {
 		t.Fatal("an unreadable ledger lists no aliases without an error")
 	}
 }
+
+// Mixed lists the sessions whose current run crossed organizations, and no other: not a
+// session whose Mixed run a resume ended, nor an alias, nor a file no session names.
+func TestMixedListsTheSessionsThatCrossed(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	start(t, dir, "calm", t0)
+	start(t, dir, "crossed", t0)
+	must(t, Alias(dir, "crossed", "crossed-agent"))
+	must(t, MarkMixed(dir, "crossed", t0.Add(time.Minute)))
+	start(t, dir, "resumed", t0)
+	must(t, MarkMixed(dir, "resumed", t0.Add(time.Minute)))
+	start(t, dir, "resumed", t0.Add(time.Hour))
+	must(t, os.WriteFile(filepath.Join(dir, Dir, ".tmp-x.json"), []byte("{"), 0o600))
+	if got := Mixed(dir, t0.Add(2*time.Hour)); len(got) != 1 || got[0] != "crossed" {
+		t.Fatalf("Mixed = %v", got)
+	}
+	if got := Mixed(t.TempDir(), t0); got != nil {
+		t.Fatalf("Mixed with no ledger = %v", got)
+	}
+}
