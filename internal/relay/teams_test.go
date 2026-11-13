@@ -411,8 +411,9 @@ func TestAQueueWaitingForItsTeamIsNotRecheckedPerPart(t *testing.T) {
 	f.router.mu.Lock()
 	judged, after := len(f.router.rechecked), f.router.passes
 	f.router.mu.Unlock()
-	if judged != 0 || after != passes {
-		t.Fatalf("%d parts pushed to a waiting team: %d entries judged, %d passes begun (want 0, 0)", parts, judged, after-passes)
+	// The first part's wake may still be pending as the sender starts waiting: one pass.
+	if judged != 0 || after-passes > 1 {
+		t.Fatalf("%d parts pushed to a waiting team: %d entries judged, %d passes begun (want 0, at most 1)", parts, judged, after-passes)
 	}
 	if _, quiet := r.Idle(); !quiet {
 		t.Fatal("a queue waiting for its team keeps the relay awake")
