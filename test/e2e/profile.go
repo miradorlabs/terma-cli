@@ -14,6 +14,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"slices"
 	"sort"
@@ -145,6 +146,35 @@ func profileOf(t *testing.T, b Binary) *Profile {
 		defer profilesMu.Unlock()
 		p.Failed = p.Failed || t.Failed()
 	})
+	return p
+}
+
+// captureScenarioName is a capture scenario's: Test<Harness>Profile… or Test<Harness>Probe…,
+// the profile and probe scenarios whose findings the Harness Reference publishes.
+var captureScenarioName = regexp.MustCompile(`^Test[A-Za-z0-9]*?(Profile|Probe)`)
+
+// scenarioOfBuild is scenarioOf for t, a scenario of build b's. A capture scenario that fails
+// before it records anything of b (its sandbox, a trace it could not start) still leaves its
+// profile of b, failed: the reference publishes b partial and captures it again, rather than
+// take a capture that lost a scenario for whole.
+func scenarioOfBuild(t *testing.T, b Binary) {
+	t.Helper()
+	scenarioOf(t, b.Harness)
+	if scenario, _, _ := strings.Cut(t.Name(), "/"); captureScenarioName.MatchString(scenario) {
+		t.Cleanup(func() {
+			if t.Failed() {
+				failedCapture(t, b)
+			}
+		})
+	}
+}
+
+// failedCapture is t's profile of b, failed: the one it recorded, or an empty one.
+func failedCapture(t *testing.T, b Binary) *Profile {
+	p := profileOf(t, b)
+	profilesMu.Lock()
+	defer profilesMu.Unlock()
+	p.Failed = true
 	return p
 }
 

@@ -39,7 +39,7 @@ func forEachClaude(t *testing.T, run func(t *testing.T, b Binary, newest bool)) 
 	}
 	for i, b := range builds {
 		t.Run(b.Label(), func(t *testing.T) {
-			scenarioOf(t, b.Harness)
+			scenarioOfBuild(t, b)
 			run(t, b, i == len(builds)-1 && !versionLess(b.Version, "2.1.272"))
 		})
 	}

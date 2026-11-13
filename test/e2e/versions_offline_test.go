@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"cmp"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -133,4 +134,103 @@ func countOf(vs []string, v string) int {
 		}
 	}
 	return n
+}
+
+// TERMA_E2E_ONLY runs the harnesses it names and skips the rest; unset, it skips none.
+func TestSkipUnlessSelected(t *testing.T) {
+	unrestricted(t)
+	for _, tc := range []struct {
+		only, harness string
+		skipped       bool
+	}{
+		{"", "gemini", false},
+		{"claude,codex", "codex", false},
+		{"claude, codex", "codex", false},
+		{"claude,codex", "gemini", true},
+		{"claude", "claude-desktop", false}, // its checks run Claude Code's builds
+		{"codex", "claude-desktop", true},
+	} {
+		t.Setenv("TERMA_E2E_ONLY", tc.only)
+		skipped := false
+		t.Run(tc.harness, func(t *testing.T) {
+			defer func() { skipped = t.Skipped() }()
+			skipUnlessSelected(t, tc.harness)
+		})
+		if skipped != tc.skipped {
+			t.Errorf("TERMA_E2E_ONLY=%q, %s: skipped %v, want %v", tc.only, tc.harness, skipped, tc.skipped)
+		}
+	}
+}
+
+// A run limited to one harness fetches no build of another for that one's own scenarios, but
+// does for a scenario of its own harness that drives the other (T3 runs Codex).
+func TestResolveForAnotherHarnessScenario(t *testing.T) {
+	unrestricted(t)
+	t.Setenv("TERMA_E2E_ONLY", "t3")
+	list := func() ([]string, error) { return []string{"1.0.0"}, nil }
+	ensure := func(v string) (string, error) { return "/bin/" + v, nil }
+	resolved := func(scenario string) (n int, skipped bool) {
+		t.Run(cmp.Or(scenario, "none"), func(t *testing.T) {
+			defer func() { skipped = t.Skipped() }()
+			if scenario != "" {
+				scenarioOf(t, scenario)
+			}
+			n = len(resolve(t, "codex", "1.0.0", list, ensure))
+		})
+		return n, skipped
+	}
+	if n, skipped := resolved("t3"); skipped || n != 1 {
+		t.Errorf("a T3 scenario resolving Codex: %d builds, skipped %v", n, skipped)
+	}
+	if _, skipped := resolved(""); !skipped {
+		t.Error("Codex's own builds were resolved in a run limited to T3")
+	}
+}
+
+// A vendor's package is installed without the run's credentials: its install scripts run as soon
+// as the release is out.
+func TestInstallEnvHoldsNoCredential(t *testing.T) {
+	credentials := []string{"OPENAI_API_KEY", "ANTHROPIC_API_KEY", "CLAUDE_CODE_OAUTH_TOKEN", "TERMA_E2E_CODEX_AUTH"}
+	for _, name := range credentials {
+		t.Setenv(name, "secret")
+	}
+	t.Setenv("TERMA_E2E_ONLY", "codex")
+	env := installEnv()
+	for _, kv := range env {
+		if name, _, _ := strings.Cut(kv, "="); slices.Contains(credentials, name) {
+			t.Errorf("the install environment holds %s", name)
+		}
+	}
+	if !slices.Contains(env, "TERMA_E2E_ONLY=codex") {
+		t.Error("the install environment lost a variable that is no credential")
+	}
+}
+
+// A capture scenario (a profile or a probe) that failed before it recorded anything of a build
+// still leaves its profile of the build, failed, so the reference publishes the build partial.
+func TestFailedCaptureScenarioOffline(t *testing.T) {
+	for name, capture := range map[string]bool{
+		"TestClaudeProfile": true, "TestClaudeProfileFiles": true, "TestCodexProbeHooks": true,
+		"TestHarnessProbeRetries": true, "TestOpenCodeProfileEgress": true, "TestClaudeDesktopProfile": true,
+		"TestRelayClaude": false, "TestRelayCodexDesktop": false, "TestClaudeInteractiveFields": false,
+	} {
+		if captureScenarioName.MatchString(name) != capture {
+			t.Errorf("%s: capture scenario %v, want %v", name, !capture, capture)
+		}
+	}
+	b := Binary{Harness: "zz", Version: "9.9.9"}
+	t.Run("zz", func(t *testing.T) {
+		scenarioOfBuild(t, b)
+		if harnessOf(t) != "zz" {
+			t.Errorf("scenarioOfBuild did not make t a scenario of zz")
+		}
+		t.Cleanup(func() {
+			profilesMu.Lock()
+			delete(profiles, profileID{"zz", "9.9.9", "TestFailedCaptureScenarioOffline"})
+			profilesMu.Unlock()
+		})
+		if p := failedCapture(t, b); !p.Failed || len(p.Requests) != 0 || p.unpublished {
+			t.Errorf("failed capture = %+v", p)
+		}
+	})
 }

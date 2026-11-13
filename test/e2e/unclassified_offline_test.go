@@ -36,6 +36,7 @@ func TestUnclassifiedIsANoteInTheNightly(t *testing.T) {
 
 // A key is noted with the harness of the scenario that met it, found up its parents.
 func TestUnclassifiedNotesNameTheHarness(t *testing.T) {
+	unrestricted(t)
 	t.Cleanup(func() {
 		compatMu.Lock()
 		delete(scenarios, t.Name()+"/v1.0.0")

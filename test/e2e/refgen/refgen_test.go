@@ -286,6 +286,54 @@ func TestAttemptedBuildIsPublished(t *testing.T) {
 	}
 }
 
+// A capture that fails again takes nothing new, so the build's captured_at stays; its
+// attempted_at is the last attempt's, which the frequent check waits from before it tries again.
+func TestEveryAttemptIsStamped(t *testing.T) {
+	dir := t.TempDir()
+	first := time.Date(2026, 11, 12, 6, 0, 0, 0, time.UTC)
+	again := first.Add(7 * time.Hour)
+	for _, at := range []time.Time{first, again} {
+		if _, err := publish(dir, night{now: at, attempted: []buildID{{"codex", "0.200.0"}}}, options{}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var idx HarnessIndex
+	if err := readJSON(filepath.Join(dir, "codex", "index.json"), &idx); err != nil {
+		t.Fatal(err)
+	}
+	e := idx.Versions[0]
+	if !e.Partial || !e.CapturedAt.Equal(first) || e.AttemptedAt == nil || !e.AttemptedAt.Equal(again) {
+		t.Errorf("index entry: partial %v, captured_at %v, attempted_at %v; want partial, %v, %v", e.Partial, e.CapturedAt, e.AttemptedAt, first, again)
+	}
+}
+
+// A job of the run that did not finish (a platform's capture) leaves the build partial, though
+// another job captured it whole; a later whole run makes it whole.
+func TestUnfinishedJobLeavesTheBuildPartial(t *testing.T) {
+	dir := t.TempDir()
+	id := buildID{"claude", "1.0.0"}
+	whole := []e2e.Profile{claudeProfile("1.0.0", "Be brief.", []string{"Bash"}, "", "")}
+	read := func() Snapshot {
+		var s Snapshot
+		if err := readJSON(filepath.Join(dir, "claude", "versions", "1.0.0.json"), &s); err != nil {
+			t.Fatal(err)
+		}
+		return s
+	}
+	if _, err := publish(dir, night{now: time.Now(), profiles: whole, attempted: []buildID{id}, unfinished: []buildID{id}}, options{}); err != nil {
+		t.Fatal(err)
+	}
+	if s := read(); !s.Capture.Partial || !slices.ContainsFunc(s.Capture.Notes, func(n string) bool { return strings.Contains(n, "did not finish") }) {
+		t.Errorf("an unfinished job's build: %+v", s.Capture)
+	}
+	if _, err := publish(dir, night{now: time.Now(), profiles: whole, attempted: []buildID{id}}, options{}); err != nil {
+		t.Fatal(err)
+	}
+	if s := read(); s.Capture.Partial {
+		t.Errorf("a whole capture left the build partial: %+v", s.Capture)
+	}
+}
+
 // A build's signature is published with its binary, and its certificate's revocation reads as
 // a notable change; when it was checked does not.
 func TestSigningChange(t *testing.T) {
@@ -855,8 +903,9 @@ func TestSlackMessageJSON(t *testing.T) {
 	for a, want := range map[*Announcement]string{
 		{Harness: "claude", Name: "Claude Code", Version: "2.1.319", Previous: "2.1.318", URL: "https://terma.ai/h/claude/2.1.319",
 			CompareURL: "https://terma.ai/harnesses/claude/compare/2.1.318...2.1.319", Changes: 4, Impact: ImpactN{"breaking": 1, "notable": 2, "degrading": 0},
-			Undocumented: &undoc, Highlights: []string{"New tool: Monitor", "a <b> & c"}, Signing: &sig}: `{"blocks":[{"text":{"text":"*Claude Code 2.1.319* is out: 4 changes since 2.1.318\n1 breaking · 2 notable · 2 not in the vendor's changelog · code signature revoked","type":"mrkdwn"},"type":"section"},{"text":{"text":"• New tool: Monitor\n• a &lt;b&gt; &amp; c","type":"mrkdwn"},"type":"section"},{"elements":[{"text":{"text":"View changelog","type":"plain_text"},"type":"button","url":"https://terma.ai/h/claude/2.1.319"},{"text":{"text":"Compare with 2.1.318","type":"plain_text"},"type":"button","url":"https://terma.ai/harnesses/claude/compare/2.1.318...2.1.319"}],"type":"actions"}],"text":"Claude Code 2.1.319 is out: https://terma.ai/h/claude/2.1.319","unfurl_links":false}`,
-		{Harness: "codex", Name: "Codex CLI", Version: "0.167.0", URL: "https://terma.ai/h/codex/0.167.0", Highlights: []string{}}: `{"blocks":[{"text":{"text":"*Codex CLI 0.167.0* is out","type":"mrkdwn"},"type":"section"},{"elements":[{"text":{"text":"View changelog","type":"plain_text"},"type":"button","url":"https://terma.ai/h/codex/0.167.0"}],"type":"actions"}],"text":"Codex CLI 0.167.0 is out: https://terma.ai/h/codex/0.167.0","unfurl_links":false}`,
+			Undocumented: &undoc, Highlights: []string{"New tool: Monitor", "a <b> & c"}, Signing: &sig,
+			Support: "unsupported", Failed: []string{"Telemetry reaches the project through the local relay (linux/amd64)"}}: `{"blocks":[{"text":{"text":"*Claude Code 2.1.319* is out: 4 changes since 2.1.318\n1 breaking · 2 notable · 2 not in the vendor's changelog · code signature revoked","type":"mrkdwn"},"type":"section"},{"text":{"text":":x: *Broken with terma*: Telemetry reaches the project through the local relay (linux/amd64)","type":"mrkdwn"},"type":"section"},{"text":{"text":"• New tool: Monitor\n• a &lt;b&gt; &amp; c","type":"mrkdwn"},"type":"section"},{"elements":[{"text":{"text":"View changelog","type":"plain_text"},"type":"button","url":"https://terma.ai/h/claude/2.1.319"},{"text":{"text":"Compare with 2.1.318","type":"plain_text"},"type":"button","url":"https://terma.ai/harnesses/claude/compare/2.1.318...2.1.319"}],"type":"actions"}],"text":"Claude Code 2.1.319 is out (broken with terma): https://terma.ai/h/claude/2.1.319","unfurl_links":false}`,
+		{Harness: "codex", Name: "Codex CLI", Version: "0.167.0", URL: "https://terma.ai/h/codex/0.167.0", Highlights: []string{}, Support: "supported"}: `{"blocks":[{"text":{"text":"*Codex CLI 0.167.0* is out","type":"mrkdwn"},"type":"section"},{"text":{"text":":white_check_mark: *Works with terma*","type":"mrkdwn"},"type":"section"},{"elements":[{"text":{"text":"View changelog","type":"plain_text"},"type":"button","url":"https://terma.ai/h/codex/0.167.0"}],"type":"actions"}],"text":"Codex CLI 0.167.0 is out (works with terma): https://terma.ai/h/codex/0.167.0","unfurl_links":false}`,
 	} {
 		if got := string(marshalPlain(slackMessage(*a))); got != want {
 			t.Errorf("slack message:\n got %s\nwant %s", got, want)
@@ -971,6 +1020,95 @@ func TestTimelineArchives(t *testing.T) {
 	}
 }
 
+// A release is announced once, at its first publication, with terma's verdict and the checks that
+// failed: a capture that failed in part too, saying so, since that is news of a break as well. The
+// capture that makes it whole announces nothing again.
+func TestReleaseIsAnnouncedOnceWithTermasVerdict(t *testing.T) {
+	dir := t.TempDir()
+	opt := options{site: "https://terma.ai"}
+	if _, err := publish(dir, night{now: time.Now(), profiles: []e2e.Profile{claudeProfile("1.0.0", "Be brief.", []string{"Bash"}, "", "")}}, opt); err != nil {
+		t.Fatal(err)
+	}
+	partial := claudeProfile("1.0.1", "Be briefer.", []string{"Bash"}, "", "")
+	partial.Failed = true
+	rows := []HistoryEntry{
+		{Harness: "claude", Version: "1.0.1", Platform: "darwin/arm64", Capability: "relay.telemetry", Result: "pass"},
+		{Harness: "claude", Version: "1.0.1", Platform: "linux/amd64", Capability: "relay.telemetry", Result: "fail"},
+	}
+	news, err := publish(dir, night{now: time.Now(), profiles: []e2e.Profile{partial}, history: rows,
+		labels: map[string]string{"relay.telemetry": "Telemetry reaches the project"}}, opt)
+	if err != nil || len(news) != 1 {
+		t.Fatalf("announced %+v (%v)", news, err)
+	}
+	a := news[0]
+	// relay.telemetry is the core check: failing it on a platform is the build unsupported.
+	if a.Support != "unsupported" || !a.Partial || len(a.Failed) != 1 || a.Failed[0] != "Telemetry reaches the project (linux/amd64)" {
+		t.Errorf("announcement = %+v", a)
+	}
+	if v := teamVerdict(a); !strings.Contains(v, "Broken with terma*: Telemetry reaches the project (linux/amd64)") || !strings.Contains(v, "tried again") {
+		t.Errorf("verdict = %q", v)
+	}
+	var idx HarnessIndex
+	if err := readJSON(filepath.Join(dir, "claude", "index.json"), &idx); err != nil || !idx.Versions[0].Partial {
+		t.Fatalf("index = %+v (%v)", idx.Versions, err)
+	}
+	// The retry that captures it whole tells the team once more, its verdict alone and no post.
+	whole := night{now: time.Now(), profiles: []e2e.Profile{claudeProfile("1.0.1", "Be briefer.", []string{"Bash"}, "", "")}}
+	news, _ = publish(dir, whole, opt)
+	if len(news) != 1 || !news[0].Completed || news[0].Partial || news[0].Text != "" ||
+		!strings.Contains(string(marshalPlain(news[0].Slack)), "*Claude Code 1.0.1* is captured whole now") {
+		t.Errorf("the whole capture: %+v", news)
+	}
+	if news, _ = publish(dir, whole, opt); len(news) != 0 {
+		t.Errorf("a whole build announced again: %+v", news)
+	}
+}
+
+// A build no announcement named (a backfill) is told of to no one when a retry makes it whole.
+func TestBackfillMadeWholeIsNotAnnounced(t *testing.T) {
+	dir := t.TempDir()
+	opt := options{site: "https://terma.ai"}
+	if _, err := publish(dir, night{now: time.Now(), profiles: []e2e.Profile{claudeProfile("1.0.1", "Be brief.", []string{"Bash"}, "", "")}}, opt); err != nil {
+		t.Fatal(err)
+	}
+	old := claudeProfile("1.0.0", "Be brief.", []string{"Bash"}, "", "")
+	old.Failed = true
+	if news, err := publish(dir, night{now: time.Now(), profiles: []e2e.Profile{old}}, opt); err != nil || len(news) != 0 {
+		t.Fatalf("a backfill announced: %+v (%v)", news, err)
+	}
+	if news, _ := publish(dir, night{now: time.Now(), profiles: []e2e.Profile{claudeProfile("1.0.0", "Be brief.", []string{"Bash"}, "", "")}}, opt); len(news) != 0 {
+		t.Errorf("a backfill made whole announced: %+v", news)
+	}
+}
+
+// A build's page begins with its capture: terma's checks of a build no capture took (the night's
+// contracts of one the frequent check has yet to capture) begin no page, and update one there is.
+func TestChecksAloneBeginNoPage(t *testing.T) {
+	dir := t.TempDir()
+	row := func(v, result string) HistoryEntry {
+		return HistoryEntry{Harness: "claude", Version: v, Platform: "darwin/arm64", Capability: "relay.telemetry", Result: result}
+	}
+	n := night{now: time.Now(), history: []HistoryEntry{row("2.0.0", "pass")}}
+	if _, err := publish(dir, n, options{}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "claude", "versions", "2.0.0.json")); err == nil {
+		t.Fatal("terma's checks alone began a page")
+	}
+	n = night{now: time.Now(), profiles: []e2e.Profile{claudeProfile("2.0.0", "Be brief.", []string{"Bash"}, "", "")}, history: []HistoryEntry{row("2.0.0", "pass")}}
+	if _, err := publish(dir, n, options{}); err != nil {
+		t.Fatal(err)
+	}
+	n = night{now: time.Now(), history: []HistoryEntry{row("2.0.0", "fail")}}
+	if _, err := publish(dir, n, options{}); err != nil {
+		t.Fatal(err)
+	}
+	var s Snapshot
+	if err := readJSON(filepath.Join(dir, "claude", "versions", "2.0.0.json"), &s); err != nil || s.Support == nil {
+		t.Fatalf("the published page lost its verdict: %+v (%v)", s.Support, err)
+	}
+}
+
 // A night that measured less of a build's telemetry than the last keeps what it did not measure:
 // the census alone keeps the probe's export and metric types, the probe alone every surface and
 // its keys; what it did measure replaces the old.
@@ -1039,7 +1177,7 @@ func TestMergeKeepsTelemetryTonightDidNotMeasure(t *testing.T) {
 	// A partial night (its profile's turn failed) took a truncated probe: the whole one's findings
 	// stay, and the census, which ran apart, still counts.
 	truncated := snap(parse(`{"export":{"protocol":"http/json"},"surfaces":{"logs/a":{"keys":{"k":{"class":"safe"},"k2":{"class":"safe"}}},"metrics/m":{"keys":{},"type":"gauge"}}}`))
-	truncated.Capture.Partial = true
+	truncated.Capture.Partial, truncated.Capture.Truncated = true, true
 	got = merge(snap(parse(whole)), truncated, now).Telemetry
 	if got["export"].(map[string]any)["protocol"] != "http/protobuf" || got["surfaces"].(map[string]any)["metrics/m"].(map[string]any)["type"] != "sum" {
 		t.Errorf("a partial night's probe replaced a whole one's: %v", got)
@@ -1051,7 +1189,7 @@ func TestMergeKeepsTelemetryTonightDidNotMeasure(t *testing.T) {
 	// A partial night of a harness the census never covers measured nothing it can be trusted
 	// with: the surfaces stay as they were.
 	truncatedProbe := snap(parse(`{"export":{"protocol":"http/json"},"surfaces":{"metrics/m":{"type":"gauge"}}}`))
-	truncatedProbe.Capture.Partial = true
+	truncatedProbe.Capture.Partial, truncatedProbe.Capture.Truncated = true, true
 	probesWhole := parse(`{"export":{"protocol":"http/protobuf"},"surfaces":{"metrics/m":{"type":"sum"},"metrics/n":{"type":"sum"}}}`)
 	got = merge(snap(probesWhole), truncatedProbe, now).Telemetry
 	if surfaces := got["surfaces"].(map[string]any); surfaces["metrics/n"] == nil || surfaces["metrics/m"].(map[string]any)["type"] != "sum" {
@@ -1111,5 +1249,212 @@ func TestProbeFieldsAreSurfaceShapes(t *testing.T) {
 	}
 	if !slices.Equal(tags, refdiff.ProbeFields) {
 		t.Errorf("SurfaceShape's fields are %v, refdiff.ProbeFields %v", tags, refdiff.ProbeFields)
+	}
+}
+
+// A release of a harness terma tests through others (T3 Code: no profile of its own) is announced
+// all the same, with what its run found: here, that terma could not test it.
+func TestReleaseWithoutProfileIsAnnounced(t *testing.T) {
+	dir := t.TempDir()
+	opt := options{site: "https://terma.ai"}
+	first := night{now: time.Now(), attempted: []buildID{{"t3", "0.1.8"}}}
+	if _, err := publish(dir, first, opt); err != nil {
+		t.Fatal(err)
+	}
+	news, err := publish(dir, night{now: time.Now(), attempted: []buildID{{"t3", "0.1.9"}}}, opt)
+	if err != nil || len(news) != 1 || news[0].Version != "0.1.9" || news[0].Support != "untested" {
+		t.Fatalf("announced %+v (%v)", news, err)
+	}
+	if v := teamVerdict(news[0]); !strings.Contains(v, "Not tested with terma") {
+		t.Errorf("verdict = %q", v)
+	}
+}
+
+// A build no profile scenario captures (T3, its terma checks alone) is made whole by an attempt
+// whose jobs all finished, as a profiled build is by its profile; every attempt is counted.
+func TestUnprofiledBuildBecomesWhole(t *testing.T) {
+	dir := t.TempDir()
+	id := buildID{"t3", "0.1.9"}
+	rows := []HistoryEntry{{Harness: "t3", Version: "0.1.9", Platform: "darwin/arm64", Capability: "relay.telemetry", Result: "pass"}}
+	read := func() Snapshot {
+		var s Snapshot
+		if err := readJSON(filepath.Join(dir, "t3", "versions", "0.1.9.json"), &s); err != nil {
+			t.Fatal(err)
+		}
+		return s
+	}
+	if _, err := publish(dir, night{now: time.Now(), attempted: []buildID{id}, unfinished: []buildID{id}}, options{}); err != nil {
+		t.Fatal(err)
+	}
+	if s := read(); !s.Capture.Partial || s.Capture.Attempts != 1 {
+		t.Fatalf("an unfinished attempt: %+v", s.Capture)
+	}
+	if _, err := publish(dir, night{now: time.Now(), attempted: []buildID{id}, history: rows}, options{}); err != nil {
+		t.Fatal(err)
+	}
+	if s := read(); s.Capture.Partial || len(s.Capture.Notes) > 0 || s.Capture.Attempts != 2 || s.Support == nil {
+		t.Errorf("a finished attempt left the build: %+v", s.Capture)
+	}
+}
+
+// A release with nothing changed since the one before says no "0 changes since".
+func TestAnnouncementWithoutChanges(t *testing.T) {
+	a := Announcement{Name: "Codex CLI", Version: "0.167.1", Previous: "0.167.0", URL: "https://terma.ai/h/codex/0.167.1", Support: "supported"}
+	if got := string(marshalPlain(slackMessage(a))); strings.Contains(got, "since") {
+		t.Errorf("slack message of an unchanged release: %s", got)
+	}
+	if got := postText(a); strings.Contains(got, "since") {
+		t.Errorf("post of an unchanged release: %s", got)
+	}
+}
+
+// A scenario of the capture that failed (a platform's files profile, the field census) leaves
+// the build partial though its job finished and its first turn is whole.
+func TestFailedScenarioLeavesTheBuildPartial(t *testing.T) {
+	id := buildID{"claude", "1.0.0"}
+	whole := claudeProfile("1.0.0", "Be brief.", []string{"Bash"}, "", "")
+	files := e2e.Profile{Harness: "claude", Version: "1.0.0", Platform: "linux/amd64", Scenario: "TestClaudeProfileFiles", Failed: true}
+	for name, n := range map[string]night{
+		"files profile": {profiles: []e2e.Profile{whole, files}},
+		"field census":  {profiles: []e2e.Profile{whole}, census: []CensusRun{{Harness: "claude", Version: "1.0.0", Failed: true}}},
+	} {
+		dir := t.TempDir()
+		n.now, n.attempted = time.Now(), []buildID{id}
+		if _, err := publish(dir, n, options{}); err != nil {
+			t.Fatal(err)
+		}
+		var s Snapshot
+		if err := readJSON(filepath.Join(dir, "claude", "versions", "1.0.0.json"), &s); err != nil {
+			t.Fatal(err)
+		}
+		if !s.Capture.Partial {
+			t.Errorf("a failed %s left the build whole: %+v", name, s.Capture)
+		}
+	}
+}
+
+// A page from before attempts were counted had one: its next attempt is its second.
+func TestAttemptsOfAnOlderPage(t *testing.T) {
+	dir := t.TempDir()
+	id := buildID{"codex", "0.200.0"}
+	if _, err := publish(dir, night{now: time.Now(), attempted: []buildID{id}}, options{}); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(dir, "codex", "versions", "0.200.0.json")
+	var s Snapshot
+	if err := readJSON(path, &s); err != nil {
+		t.Fatal(err)
+	}
+	s.Capture.Attempts = 0 // as published before
+	if err := writeJSON(path, &s); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := publish(dir, night{now: time.Now(), attempted: []buildID{id}}, options{}); err != nil {
+		t.Fatal(err)
+	}
+	if err := readJSON(path, &s); err != nil {
+		t.Fatal(err)
+	}
+	if s.Capture.Attempts != 2 {
+		t.Errorf("attempts = %d, want 2", s.Capture.Attempts)
+	}
+}
+
+// A page partial for another reason (a job that did not finish) took a whole first turn: a retry
+// whose turn fails replaces none of its sections, and the page says it is still partial.
+func TestRetryKeepsAWholeTurnOfAPartialPage(t *testing.T) {
+	dir := t.TempDir()
+	id := buildID{"claude", "1.0.0"}
+	read := func() Snapshot {
+		var s Snapshot
+		if err := readJSON(filepath.Join(dir, "claude", "versions", "1.0.0.json"), &s); err != nil {
+			t.Fatal(err)
+		}
+		return s
+	}
+	whole := claudeProfile("1.0.0", "Be brief.", []string{"Bash"}, "", "")
+	if _, err := publish(dir, night{now: time.Now(), profiles: []e2e.Profile{whole}, attempted: []buildID{id}, unfinished: []buildID{id}}, options{}); err != nil {
+		t.Fatal(err)
+	}
+	if s := read(); !s.Capture.Partial || s.Capture.Truncated {
+		t.Fatalf("a whole turn beside an unfinished job: %+v", s.Capture)
+	}
+	cut := claudeProfile("1.0.0", "Truncated.", []string{"Bash"}, "", "")
+	cut.Failed = true
+	if _, err := publish(dir, night{now: time.Now().Add(7 * time.Hour), profiles: []e2e.Profile{cut}, attempted: []buildID{id}}, options{}); err != nil {
+		t.Fatal(err)
+	}
+	s := read()
+	if data, _ := json.Marshal(s.Prompt); !strings.Contains(string(data), "Be brief.") {
+		t.Errorf("a failed turn replaced a whole one's prompt: %s", data)
+	}
+	if !s.Capture.Partial || len(s.Capture.Notes) == 0 {
+		t.Errorf("the page no longer says it is partial: %+v", s.Capture)
+	}
+}
+
+// When a capture is whole, partial or neither (a page already whole), and what its page then says.
+func TestCaptureWholeness(t *testing.T) {
+	claude := buildID{"claude", "1.0.0"}
+	t3 := buildID{"t3", "0.1.9"}
+	whole := claudeProfile("1.0.0", "Be brief.", []string{"Bash"}, "", "")
+	cut := claudeProfile("1.0.0", "Truncated.", []string{"Bash"}, "", "")
+	cut.Failed = true
+	files := e2e.Profile{Harness: "claude", Version: "1.0.0", Platform: "linux/amd64", Scenario: "TestClaudeProfileFiles", Failed: true}
+	// A probe records its command and what it found, never a first turn.
+	probeOnly := e2e.Profile{Harness: "claude", Version: "1.0.0", Platform: "darwin/arm64", Scenario: "TestClaudeProbeHooks", Command: []string{"claude", "--probe"},
+		Probes: map[string]json.RawMessage{"signing": json.RawMessage(`{"format":"developer-id","status":"valid"}`)}}
+	rows := func(id buildID) []HistoryEntry {
+		return []HistoryEntry{{Harness: id.harness, Version: id.version, Platform: "darwin/arm64", Capability: "relay.telemetry", Result: "pass"}}
+	}
+	for _, c := range []struct {
+		name      string
+		id        buildID
+		nights    []night
+		partial   bool
+		truncated bool
+		notes     []string
+	}{
+		{name: "a profiled build whose first turn never ran (its download failed) is partial", id: claude,
+			nights: []night{{attempted: []buildID{claude}, history: rows(claude)}}, partial: true, notes: []string{failedNote}},
+		{name: "a whole page stays whole under a capture that failed beside it", id: claude,
+			nights: []night{{attempted: []buildID{claude}, profiles: []e2e.Profile{whole}}, {attempted: []buildID{claude}, profiles: []e2e.Profile{whole, files}}}},
+		{name: "a truncated page made whole by a whole retry", id: claude,
+			nights: []night{{attempted: []buildID{claude}, profiles: []e2e.Profile{cut}}, {attempted: []buildID{claude}, profiles: []e2e.Profile{whole}}}},
+		{name: "a T3 page stays partial in a run that did not set out to capture it", id: t3,
+			nights: []night{{attempted: []buildID{t3}, unfinished: []buildID{t3}}, {history: rows(t3)}}, partial: true, notes: []string{unfinishedNote}},
+		{name: "a page that never took a turn takes a truncated one's, truncated", id: claude,
+			nights:  []night{{attempted: []buildID{claude}, history: rows(claude)}, {attempted: []buildID{claude}, profiles: []e2e.Profile{cut}}},
+			partial: true, truncated: true, notes: []string{failedNote}},
+		{name: "a capture of probes alone took no turn: partial, and its command none", id: claude,
+			nights: []night{{attempted: []buildID{claude}, profiles: []e2e.Profile{probeOnly}}}, partial: true, notes: []string{failedNote}},
+		{name: "a page of probes alone takes a truncated turn's, truncated", id: claude,
+			nights:  []night{{attempted: []buildID{claude}, profiles: []e2e.Profile{probeOnly}}, {attempted: []buildID{claude}, profiles: []e2e.Profile{probeOnly, cut}}},
+			partial: true, truncated: true, notes: []string{failedNote}},
+		{name: "a partial page's note is its latest attempt's", id: claude,
+			nights:  []night{{attempted: []buildID{claude}, unfinished: []buildID{claude}, history: rows(claude)}, {attempted: []buildID{claude}, history: rows(claude)}},
+			partial: true, notes: []string{failedNote}},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			dir := t.TempDir()
+			at := time.Now()
+			for _, n := range c.nights {
+				n.now, at = at, at.Add(7*time.Hour)
+				if _, err := publish(dir, n, options{}); err != nil {
+					t.Fatal(err)
+				}
+			}
+			var s Snapshot
+			if err := readJSON(filepath.Join(dir, c.id.harness, "versions", c.id.version+".json"), &s); err != nil {
+				t.Fatal(err)
+			}
+			notes := slices.DeleteFunc(slices.Clone(s.Capture.Notes), func(n string) bool { return !isPartialNote(n) })
+			if s.Capture.Partial != c.partial || s.Capture.Truncated != c.truncated || !slices.Equal(notes, c.notes) {
+				t.Errorf("capture = %+v; want partial %v, truncated %v, notes %q", s.Capture, c.partial, c.truncated, c.notes)
+			}
+			if c.truncated && len(s.Capture.Command) == 0 {
+				t.Errorf("a page of a truncated turn without its command: %+v", s.Capture)
+			}
+		})
 	}
 }

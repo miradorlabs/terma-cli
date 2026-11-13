@@ -134,6 +134,7 @@ func TestWriteProfilesOffline(t *testing.T) {
 // version) is the test's to read, and never reaches profiles.json: the nightly once published a
 // Claude Code 9.9.8 and 9.9.9 so.
 func TestUnitTestProfilesAreNotWrittenOffline(t *testing.T) {
+	unrestricted(t) // its scenario is a codex one, whatever a run is limited to
 	dir := t.TempDir()
 	profilesMu.Lock()
 	saved := profiles
