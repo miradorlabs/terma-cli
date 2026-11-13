@@ -56,7 +56,7 @@ func (app *App) teamKeys(profile string) spoolKey {
 	case err != nil || !ok:
 		return spoolKey{"held: this profile's routing state is missing, unreadable or still being migrated", "Run `terma doctor` to see why."}
 	case len(st.Teams) == 0:
-		return spoolKey{"sent to no team: none is selected on this machine", "Run `terma setup` to choose the teams this machine sends to."}
+		return spoolKey{"sent to no team: none is selected on this machine", "Run `terma teams` to choose the teams this machine sends to."}
 	}
 	var missing []string
 	for _, t := range st.Teams {
