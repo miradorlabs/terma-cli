@@ -73,6 +73,11 @@ type Options struct {
 	Resolve func(c claim.Claim) (Policy, error)
 	// CatchAll, in global mode, is where a part whose hold ran out unplaced goes instead of being dropped.
 	CatchAll func() (claim.Claim, bool)
+	// Router, set, decides once the machine is migrated (Router.Migrated): each record goes
+	// by where it ran to one selected team's enrollment, with that team's key alone, and is
+	// rechecked before it is sent. Until then, and when nil, Lookup's claims and Resolve
+	// decide, and CatchAll in global mode, as on a machine with one team.
+	Router Router
 	// HeartbeatSend, set, turns the heartbeat on; HeartbeatEvery is its period.
 	HeartbeatSend  func(ctx context.Context, beat *logspb.LogsData) error
 	HeartbeatEvery time.Duration
@@ -130,6 +135,10 @@ type Relay struct {
 	procs     map[int]*procState // sender pid → the sessions it named, and whether it exited
 	outbox    outbox
 	senders   map[route]*sender
+	// teamSenders are the enrollments' queues on a migrated machine.
+	teamSenders map[teamRoute]*teamSender
+	// mixedSeen is, by session, the earliest Mixed time whose queued parts were dropped.
+	mixedSeen map[string]time.Time
 	lastSeen  time.Time
 	// inflight counts the exports being read and routed; refusing, set by Quiesce, answers
 	// each new one 503 so its exporter sends it again, to the next relay.
@@ -179,6 +188,7 @@ func New(opts Options) *Relay {
 		cache:  lookupCache{claims: map[string]cachedClaim{}, policies: map[string]cachedPolicy{}},
 		held:   map[string][]heldPart{},
 		traces: map[string]traceSession{}, procs: map[int]*procState{}, senders: map[route]*sender{}, outbox: outbox{dir: opts.Dir},
+		teamSenders: map[teamRoute]*teamSender{}, mixedSeen: map[string]time.Time{},
 		lastSeen: opts.Now(), sendCtx: sendCtx, cancelSend: cancel, stopping: make(chan struct{}),
 	}
 }
@@ -310,6 +320,11 @@ func (r *Relay) export(w http.ResponseWriter, req *http.Request, s Signal) {
 	pid := r.senderPID(req)
 	_, global := r.catchAll()
 	narrow := r.opts.CatchAll != nil && !global
+	if r.teams() {
+		// The Unknown rule as the part arrives: one that could not go to personal now never
+		// may, whatever is unticked since.
+		narrow = !r.opts.Router.UnknownToPersonal()
+	}
 	for _, p := range parts {
 		p.pid, p.narrow = pid, narrow
 		p.at = earliest(p.msg)
@@ -322,11 +337,9 @@ func (r *Relay) export(w http.ResponseWriter, req *http.Request, s Signal) {
 	for _, p := range parts {
 		if p.session == "" {
 			// A part naming no session may still go by its process once it exits (decideExited).
-			if pid == 0 {
-				if _, global := r.catchAll(); !global {
-					r.stats.dropped(s, "no_session_id", p.records)
-					continue
-				}
+			if pid == 0 && !r.takesUnplaced() {
+				r.stats.dropped(s, "no_session_id", p.records)
+				continue
 			}
 			p.session = procKey(pid)
 		}

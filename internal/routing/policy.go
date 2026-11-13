@@ -36,7 +36,15 @@ func EffectivePolicy(stateDir string, fallback config.Policy, team string) confi
 // when the profile has none or chose it (setup). It refuses a policy fetched under
 // another login's organization or environment, or whose revision moved backwards; every
 // fetcher stores through it.
+//
+// On a migrated machine (config.Migrated) it writes the team's policy file alone: the
+// profile has no team any more, its teams are the routing state's, each fetched under its
+// own organization, so config.json is never touched, nor checked against the profile's
+// one organization.
 func StorePolicy(cfg *config.Config, pol *config.Policy) error {
+	if config.Migrated(cfg.Dir) {
+		return storeTeamPolicy(cfg.StateDir, pol)
+	}
 	if !pol.AppliesTo(cfg.OrganizationID, cfg.AuthURL) {
 		return errors.New("the collection policy fetched belongs to another organization or environment")
 	}
@@ -55,14 +63,7 @@ func StorePolicy(cfg *config.Config, pol *config.Policy) error {
 	if profile.OrganizationID != "" && profile.OrganizationID != cfg.OrganizationID {
 		return errors.New("organization changed while fetching collection policy")
 	}
-	err = flock.Locked(path, 5*time.Second, func() error {
-		prev, ok, _ := config.ReadPolicy(cfg.StateDir, pol.TeamID)
-		if ok && prev.OrganizationID == pol.OrganizationID && prev.AuthURL == pol.AuthURL && prev.Revision > pol.Revision {
-			return errors.New("collection policy revision moved backwards")
-		}
-		return config.WritePolicy(cfg.StateDir, *pol)
-	})
-	if err != nil {
+	if err := writePolicyFile(cfg.StateDir, path, pol); err != nil {
 		return err
 	}
 	// Only a profile that records something new is rewritten: refreshes leave config.json alone.
@@ -89,6 +90,31 @@ func StorePolicy(cfg *config.Config, pol *config.Policy) error {
 		return err
 	}
 	return rejected
+}
+
+// storeTeamPolicy is StorePolicy on a migrated machine: the team's policy file, for the
+// team, organization and environment it was fetched for, and nothing else.
+func storeTeamPolicy(stateDir string, pol *config.Policy) error {
+	if pol.TeamID == "" || pol.OrganizationID == "" || pol.AuthURL == "" {
+		return errors.New("a team's collection policy is stored only with its team, organization and environment")
+	}
+	path, err := config.PolicyPath(stateDir, pol.TeamID)
+	if err != nil {
+		return err
+	}
+	return writePolicyFile(stateDir, path, pol)
+}
+
+// writePolicyFile writes pol as its team's file at path, under the file's lock, unless the
+// revision stored for the same organization and environment is newer.
+func writePolicyFile(stateDir, path string, pol *config.Policy) error {
+	return flock.Locked(path, 5*time.Second, func() error {
+		prev, ok, _ := config.ReadPolicy(stateDir, pol.TeamID)
+		if ok && prev.OrganizationID == pol.OrganizationID && prev.AuthURL == pol.AuthURL && prev.Revision > pol.Revision {
+			return errors.New("collection policy revision moved backwards")
+		}
+		return config.WritePolicy(stateDir, *pol)
+	})
 }
 
 // ValidatedPolicy is team's last validated policy for cfg's organization and

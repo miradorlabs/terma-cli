@@ -1,18 +1,11 @@
 package relay
 
 import (
-	"bytes"
 	"context"
-	"fmt"
-	"io"
 	"math/rand/v2"
-	"net/http"
-	"strconv"
-	"strings"
 	"sync"
 	"time"
 
-	"google.golang.org/protobuf/encoding/protowire"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
@@ -157,7 +150,15 @@ func (s *sender) loop() {
 			}
 			continue
 		}
-		pol, ok := s.r.resolve(c)
+		pol, ok, discard := s.policy(c)
+		if discard != "" {
+			for _, e := range entries {
+				s.r.stats.dropped(e.signal, discard, e.records)
+			}
+			s.r.outbox.remove(s.route, entries)
+			s.forget(entries)
+			continue
+		}
 		if !ok {
 			s.setKeyless(true)
 			if stopping() || !sleep(keylessRetry) {
@@ -278,94 +279,33 @@ const (
 	refused
 )
 
-// send delivers one request and classifies the answer: 401, 403 and 404 are configuration fixed
-// on this machine and retried slowly; only a body the host judges bad is refused for good.
+// policy is the route's send policy now; ok false while it must wait, and discard names
+// why its parts are dropped. On a migrated machine a route queued before the migration is
+// its project's cutover enrollment's (Router.Legacy), rechecked as that team's, and
+// dropped where the project maps to none: records from before the migration keep their
+// project, and never reach another team.
+func (s *sender) policy(c claim.Claim) (pol Policy, ok bool, discard string) {
+	if !s.r.teams() {
+		pol, ok = s.r.resolve(c)
+		return pol, ok, ""
+	}
+	q, mapped := s.r.opts.Router.Legacy(c.ProjectID, c.Repository)
+	if !mapped {
+		return Policy{}, false, whyLegacy
+	}
+	switch v := s.r.opts.Router.Recheck(q); v.Verdict {
+	case Discard:
+		return Policy{}, false, v.Why.reason()
+	case Wait:
+		return Policy{}, false, ""
+	}
+	pol, ok = s.r.resolveTeam(q.Enrollment, c.Tool)
+	return pol, ok, ""
+}
+
+// send is post for this route.
 func (s *sender) send(ctx context.Context, pol Policy, sig Signal, body []byte) (outcome, time.Duration, string, int64) {
-	ctx, cancel := context.WithTimeout(ctx, sendTimeout)
-	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, strings.TrimRight(pol.Endpoint, "/")+"/v1/"+string(sig), bytes.NewReader(body))
-	if err != nil {
-		return refused, 0, "bad_endpoint", 0
-	}
-	req.Header.Set("Content-Type", "application/x-protobuf")
-	req.Header.Set("Authorization", "Bearer "+pol.Key)
-	req.Header.Set("User-Agent", "terma-relay/"+s.r.opts.Version)
-	resp, err := s.r.opts.HTTP.Do(req)
-	if err != nil {
-		return retry, 0, err.Error(), 0
-	}
-	defer func() { _ = resp.Body.Close() }()
-	answer, _ := io.ReadAll(io.LimitReader(resp.Body, 64<<10))
-	switch code := resp.StatusCode; {
-	case code/100 == 2:
-		return sent, 0, "", partialSuccess(answer)
-	case code == http.StatusUnauthorized || code == http.StatusForbidden:
-		return retry, refusedBackoff, fmt.Sprintf("HTTP %d: the team's key was refused", code), 0
-	case code == http.StatusRequestTimeout || code == http.StatusTooManyRequests || code == http.StatusNotFound || code >= 500:
-		return retry, retryAfter(resp.Header.Get("Retry-After")), fmt.Sprintf("HTTP %d", code), 0
-	default:
-		return refused, 0, "refused_" + strconv.Itoa(code), 0
-	}
-}
-
-// partialSuccess reads the rejected count (field 1 of field 1) by hand, since the collector
-// packages that define the response pull gRPC into every hook.
-func partialSuccess(body []byte) int64 {
-	ps := protoField(body, 1, protowire.BytesType)
-	if ps == nil {
-		return 0
-	}
-	for b := ps; len(b) > 0; {
-		num, typ, n := protowire.ConsumeTag(b)
-		if n < 0 {
-			return 0
-		}
-		b = b[n:]
-		if num == 1 && typ == protowire.VarintType {
-			v, m := protowire.ConsumeVarint(b)
-			if m < 0 {
-				return 0
-			}
-			return max(0, int64(v))
-		}
-		m := protowire.ConsumeFieldValue(num, typ, b)
-		if m < 0 {
-			return 0
-		}
-		b = b[m:]
-	}
-	return 0
-}
-
-func protoField(b []byte, num protowire.Number, typ protowire.Type) []byte {
-	for len(b) > 0 {
-		n, t, l := protowire.ConsumeTag(b)
-		if l < 0 {
-			return nil
-		}
-		b = b[l:]
-		if n == num && t == typ {
-			v, m := protowire.ConsumeBytes(b)
-			if m < 0 {
-				return nil
-			}
-			return v
-		}
-		m := protowire.ConsumeFieldValue(n, t, b)
-		if m < 0 {
-			return nil
-		}
-		b = b[m:]
-	}
-	return nil
-}
-
-func retryAfter(v string) time.Duration {
-	secs, err := strconv.Atoi(strings.TrimSpace(v))
-	if err != nil || secs <= 0 {
-		return 0
-	}
-	return min(time.Duration(secs)*time.Second, maxRetryAfter)
+	return s.r.post(ctx, pol, sig, body)
 }
 
 func nextBackoff(prev, floor time.Duration) time.Duration {
@@ -391,6 +331,27 @@ func (r *Relay) recoverOutbox() {
 	for _, rt := range routes {
 		r.recoverRoute(rt)
 	}
+	teams, _ := r.outbox.teamRoutes()
+	for _, rt := range teams {
+		r.recoverTeamRoute(rt)
+	}
+}
+
+// recoverTeamRoute is recoverRoute for an enrollment's queue.
+func (r *Relay) recoverTeamRoute(rt teamRoute) {
+	r.deliverMu.Lock()
+	defer r.deliverMu.Unlock()
+	entries, err := r.outbox.listTeam(rt)
+	if err != nil || len(entries) == 0 {
+		return
+	}
+	s := r.teamSender(rt)
+	n := 0
+	for _, e := range s.recover(entries) {
+		n += e.records
+	}
+	r.stats.add("recovered_from_outbox", n)
+	s.poke()
 }
 
 // recoverRoute queues what a previous relay left on rt. It holds deliverMu so an export
