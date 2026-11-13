@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -270,5 +271,103 @@ func TestMixedListsTheSessionsThatCrossed(t *testing.T) {
 	}
 	if got := Mixed(t.TempDir(), t0); got != nil {
 		t.Fatalf("Mixed with no ledger = %v", got)
+	}
+}
+
+// locations is what Locations reads of id's current run.
+func locations(t *testing.T, dir, id string) (string, []string) {
+	t.Helper()
+	run, locs, ok := Locations(dir, id)
+	if !ok {
+		t.Fatalf("no current run for %s", id)
+	}
+	return run, locs
+}
+
+// A run keeps each location it was placed in or seen touching once, in the order first
+// recorded, read through an alias too; a resume begins a run that has been nowhere, and a
+// location for an earlier run is that run's.
+func TestARunRemembersItsLocations(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	r1 := start(t, dir, "sess", t0)
+	must(t, Alias(dir, "sess", "agent-1"))
+	must(t, Touch(dir, "sess", r1, []string{"github.com/acme/api", "outside-git"}))
+	must(t, Touch(dir, "sess", "", []string{"github.com/acme/api", "github.com/dawson/side", ""}))
+	for _, id := range []string{"sess", "agent-1"} {
+		if run, locs := locations(t, dir, id); run != r1 || !slices.Equal(locs, []string{"github.com/acme/api", "outside-git", "github.com/dawson/side"}) {
+			t.Fatalf("Locations(%s) = %q, %v", id, run, locs)
+		}
+	}
+
+	r2 := start(t, dir, "sess", t0.Add(time.Hour))
+	if run, locs := locations(t, dir, "sess"); run != r2 || len(locs) != 0 {
+		t.Fatalf("the resumed run %q has been to %v", run, locs)
+	}
+	must(t, Touch(dir, "sess", r1, []string{"github.com/acme/web"}))
+	must(t, Touch(dir, "sess", "unknown-run", []string{"github.com/dawson/terma"}))
+	if _, locs := locations(t, dir, "sess"); !slices.Equal(locs, []string{"github.com/dawson/terma"}) {
+		t.Fatalf("the current run has been to %v", locs)
+	}
+	b, err := os.ReadFile(filepath.Join(dir, Dir, "sess.json"))
+	must(t, err)
+	var raw struct {
+		Runs []struct {
+			Locations []string `json:"locations"`
+		} `json:"runs"`
+	}
+	must(t, json.Unmarshal(b, &raw))
+	if len(raw.Runs) != 2 || !slices.Equal(raw.Runs[0].Locations, []string{"github.com/acme/api", "outside-git", "github.com/dawson/side", "github.com/acme/web"}) {
+		t.Fatalf("ledger on disk: %s", b)
+	}
+
+	if _, _, ok := Locations(dir, "../escape"); ok {
+		t.Fatal("an ID no file can be named after has a run")
+	}
+	must(t, os.WriteFile(filepath.Join(dir, Dir, "broken.json"), []byte("{"), 0o600))
+	if _, _, ok := Locations(dir, "broken"); ok {
+		t.Fatal("an unreadable ledger has a current run")
+	}
+	if err := Touch(dir, "broken", "", []string{"github.com/acme/api"}); err == nil {
+		t.Fatal("touched an unreadable ledger")
+	}
+}
+
+// Touch writes the ledger only when a location is new to the run.
+func TestTouchWritesOnlyANewLocation(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	path := filepath.Join(dir, Dir, "sess.json")
+	stat := func() os.FileInfo {
+		t.Helper()
+		fi, err := os.Stat(path)
+		must(t, err)
+		return fi
+	}
+	run := start(t, dir, "sess", t0)
+	must(t, Touch(dir, "sess", run, []string{"github.com/acme/api"}))
+	before := stat()
+	must(t, Touch(dir, "sess", run, []string{"github.com/acme/api"}))
+	must(t, Touch(dir, "sess", "", nil))
+	if !os.SameFile(before, stat()) {
+		t.Fatal("rewrote the ledger with nothing new")
+	}
+	must(t, Touch(dir, "sess", run, []string{"github.com/acme/api", "github.com/acme/web"}))
+	if os.SameFile(before, stat()) {
+		t.Fatal("a new location left the ledger as it was")
+	}
+}
+
+// A location seen before any run was recorded starts one, as a crossing does.
+func TestATouchBeforeAnyRunStartsOne(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	must(t, Touch(dir, "sess", "", []string{"github.com/acme/api"}))
+	run, locs := locations(t, dir, "sess")
+	if run == "" || !slices.Equal(locs, []string{"github.com/acme/api"}) {
+		t.Fatalf("Locations = %q, %v", run, locs)
+	}
+	if _, mixed := mixedAt(t, dir, "sess", t0); mixed {
+		t.Fatal("a run only touched is Mixed")
 	}
 }
