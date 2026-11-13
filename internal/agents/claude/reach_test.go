@@ -153,7 +153,8 @@ func TestRoutedClaudeReadsAndSearchesReachingAcmeMakeTheRunMixed(t *testing.T) {
 	}
 }
 
-// A shell command reaches the paths it names that are there, and every cd's target.
+// A shell command reaches the paths it names that are there, a command substitution's
+// included, and every cd's target, and a relative path after a cd resolves where it went.
 func TestRoutedClaudeShellCommandsReachingAcmeMakeTheRunMixed(t *testing.T) {
 	for name, tc := range map[string]struct {
 		command func(m *reachMachine) string
@@ -163,6 +164,8 @@ func TestRoutedClaudeShellCommandsReachingAcmeMakeTheRunMixed(t *testing.T) {
 		"a cd into Acme's checkout":         {func(*reachMachine) string { return "cd ../acme-api && ls" }, true},
 		"a listing of its own checkout":     {func(*reachMachine) string { return "ls -la" }, false},
 		"a path that is not there, in Acme": {func(*reachMachine) string { return "cat ../acme-api/MISSING.md" }, false},
+		"a read inside a substitution":      {func(*reachMachine) string { return `echo "$(cat ../acme-api/NOTES.md)"` }, true},
+		"a relative path after a cd out":    {func(*reachMachine) string { return "cd .. && cat acme-api/NOTES.md" }, true},
 	} {
 		t.Run(name, func(t *testing.T) {
 			m := newReachMachine(t)
