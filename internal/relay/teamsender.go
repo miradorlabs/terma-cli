@@ -150,11 +150,11 @@ func (s *teamSender) take(match func(teamEntry) bool) []teamEntry {
 	return out
 }
 
-// dropRun drops session's parts attributed through its run, made from from on: the run
-// became Mixed then.
+// dropRun drops session's parts made from from on: the run became Mixed then, and every
+// part is telemetry, which carries content (runs.Locational).
 func (s *teamSender) dropRun(session string, from time.Time) {
 	gone := s.take(func(e teamEntry) bool {
-		return !e.q.Own && e.q.Session == session && (e.q.At.IsZero() || !e.q.At.Before(from))
+		return e.q.Session == session && (e.q.At.IsZero() || !e.q.At.Before(from))
 	})
 	s.discard(gone, whyMixed, "mixed:"+session)
 }
@@ -336,8 +336,8 @@ func (s *teamSender) loop() {
 	}
 }
 
-// dropMixed drops, from every enrollment's queue, session's parts attributed through its
-// run and made from from on, once for each earlier Mixed time learned.
+// dropMixed drops, from every enrollment's queue, session's parts made from from on, once
+// for each earlier Mixed time learned.
 func (r *Relay) dropMixed(session string, from time.Time) {
 	r.mu.Lock()
 	if seen, ok := r.mixedSeen[session]; ok && !from.Before(seen) {
