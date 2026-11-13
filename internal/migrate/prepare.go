@@ -23,13 +23,13 @@ import (
 // removes the Preparing states of profiles config.json no longer has, which an earlier
 // start left: committed, they would hold a team nobody selects. The machine is not
 // migrated yet, so nothing reads them.
-func (m Machine) prepare() error {
+func (m Machine) prepare(personal map[string]bool) error {
 	file, err := config.LoadFile(m.ConfigDir)
 	if err != nil {
 		return err
 	}
 	for _, name := range slices.Sorted(maps.Keys(file.Profiles)) {
-		if err := m.step("prepare/"+name, func() error { return m.prepareProfile(name, file.Profiles[name]) }); err != nil {
+		if err := m.step("prepare/"+name, func() error { return m.prepareProfile(name, file.Profiles[name], personal) }); err != nil {
 			return fmt.Errorf("profile %s: %w", name, err)
 		}
 	}
@@ -56,11 +56,24 @@ func (m Machine) prepare() error {
 // if it has one, as the one enrollment, with the bindings its validated entries need and
 // its legacy project mapped to it. A state an earlier start prepared is prepared again
 // from config.json as it is now, keeping its enrollment while the team is the same; a
-// state this migration did not prepare is the developer's, and is left as it is.
-func (m Machine) prepareProfile(name string, p *config.Profile) error {
-	team, err := m.legacyTeam(name, p)
+// state this migration did not prepare is the developer's, and is left as it is. personal
+// is what orgTypes learned before the locks were taken: a team whose organization it did
+// not ask about, as when config.json changed since, is errOrgTypeUnknown.
+func (m Machine) prepareProfile(name string, p *config.Profile, personal map[string]bool) error {
+	team, err := m.legacyTeam(name, p, false)
 	if err != nil {
 		return err
+	}
+	if team != nil {
+		mine, ok := personal[orgKey(name, team.OrganizationID)]
+		if !ok {
+			return fmt.Errorf("%w: organization %s", errOrgTypeUnknown, team.OrganizationID)
+		}
+		if mine {
+			if team, err = m.legacyTeam(name, p, true); err != nil {
+				return err
+			}
+		}
 	}
 	_, found, err := routing.Load(m.StateDir, name)
 	if err != nil {
@@ -103,6 +116,11 @@ func prepared(s *routing.State, team *routing.Team) error {
 	t.EnrollmentID = id
 	s.Teams = []routing.Team{t}
 	s.Migration.Legacy = map[string]string{t.TeamID: id}
+	if t.Personal {
+		// A personal team's entries are never bound: personal never needs a binding, and
+		// one naming the personal organization would keep its repositories from it.
+		return nil
+	}
 	// The team's validated entries are bound to its organization, an owner binding for a
 	// wildcard and a repository binding for an exact entry, so nothing is pending after
 	// the upgrade. An entry no binding can name, such as a literal `/*` on a policy
@@ -119,10 +137,11 @@ func prepared(s *routing.State, team *routing.Team) error {
 // has none or no organization is known for it. It carries the team's last validated
 // policy under the organization and environment that fetched it, as today's rules apply
 // it (config.Load); without one, an empty policy no refresh has validated, which blocks
-// nothing and stays Expired until the relay's refresh validates it. A global policy
-// collects nothing, as routing.State.ApplyRefresh has it for any team but personal, and a
-// migrated team is never personal: the developer ticks personal themselves.
-func (m Machine) legacyTeam(name string, p *config.Profile) (*routing.Team, error) {
+// nothing and stays Expired until the relay's refresh validates it. A personal
+// organization's team stays personal, and its global policy keeps collecting everything
+// not bound to an organization; any other's global policy collects nothing, as
+// routing.State.ApplyRefresh has it.
+func (m Machine) legacyTeam(name string, p *config.Profile, personal bool) (*routing.Team, error) {
 	if p == nil || p.Team == "" {
 		return nil, nil
 	}
@@ -140,10 +159,10 @@ func (m Machine) legacyTeam(name string, p *config.Profile) (*routing.Team, erro
 		return nil, nil
 	}
 	pol.TeamID, pol.OrganizationID, pol.AuthURL = p.Team, org, cfg.AuthURL
-	if pol.Global() {
+	if pol.Global() && !personal {
 		pol.Mode, pol.Repositories = config.ModeRepo, nil
 	}
-	return &routing.Team{OrganizationID: org, AuthURL: cfg.AuthURL, TeamID: p.Team, Policy: pol}, nil
+	return &routing.Team{OrganizationID: org, AuthURL: cfg.AuthURL, TeamID: p.Team, Personal: personal, Policy: pol}, nil
 }
 
 // preparing are the routing states under stateDir still in the Preparing phase. One that

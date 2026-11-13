@@ -27,6 +27,11 @@ const (
 	Unchecked Reason = "unchecked"
 	// FlushBusy: a spool flush kept its lock for longer than the relay waits.
 	FlushBusy Reason = "flush_busy"
+	// OrgTypeUnknown: whether a profile's team is a personal organization's could not be
+	// asked with that profile's sign-in (Block.Detail), and the migration needs it: a
+	// personal team keeps collecting everything, any other's global policy collects nothing.
+	// The machine keeps today's rules until a relay start can ask.
+	OrgTypeUnknown Reason = "org_type_unknown"
 	// Failed: a step failed (Block.Detail). With Block.Unfinished the machine collects
 	// nothing until a relay start finishes the migration.
 	Failed Reason = "failed"

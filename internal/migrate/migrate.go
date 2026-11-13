@@ -7,7 +7,10 @@
 //     does not migrate, and records why (ReadBlock), which doctor shows.
 //  2. Prepare: each profile's routing state is written in the Preparing phase, with a
 //     stable enrollment for its team, the bindings its validated entries need, and the
-//     map from its legacy project to that enrollment (routing.Migration.Legacy).
+//     map from its legacy project to that enrollment (routing.Migration.Legacy). Whether
+//     the team is a personal organization's is asked first, before any lock is taken,
+//     with the profile's sign-in (Machine.OrgType): a personal team needs no bindings and
+//     keeps a global policy, any other's global policy collects nothing.
 //  3. Copy: the sign-ins to credentials.v2.json, which marks the machine migrated
 //     (config.Migrated), then each profile's team key to keys.v2.json.
 //  4. Retire: keys.json's keys, credentials.json's sign-ins and config.json's teams.
@@ -50,6 +53,11 @@ type Machine struct {
 	// Hooked lists the termas the agents' machine-wide hook entries run, by path, as the
 	// command line reads them from each agent's hooks file; nil lists none.
 	Hooked func() ([]string, error)
+	// OrgType is organizationID's type, OrgPersonal or OrgShared, as profile's own sign-in
+	// to it lists it (GET /v1/organizations); the command line provides it. Nil asks
+	// nothing, so a profile signed in to a team's organization is not migrated
+	// (OrgTypeUnknown).
+	OrgType func(ctx context.Context, profile, organizationID string) (string, error)
 	// FlushWait bounds the wait for a spool flush already running; zero is
 	// DefaultFlushWait.
 	FlushWait time.Duration
@@ -83,6 +91,19 @@ func Run(ctx context.Context, m Machine) (Outcome, error) {
 	if !Needed(m.ConfigDir, m.StateDir) {
 		return Done, nil
 	}
+	// Asked before any lock is taken: network calls never hold one. A machine already
+	// marked migrated only finishes what it prepared, which asks nothing.
+	var personal map[string]bool
+	if !config.Migrated(m.ConfigDir) {
+		var err error
+		if personal, err = m.orgTypes(ctx); err != nil {
+			if ctx.Err() != nil {
+				return NotMigrated, ctx.Err()
+			}
+			m.block(Block{Reason: OrgTypeUnknown, Detail: err.Error()})
+			return NotMigrated, nil
+		}
+	}
 	unlock, err := lockFlush(ctx, m.StateDir, cmp.Or(m.FlushWait, DefaultFlushWait))
 	switch {
 	case ctx.Err() != nil:
@@ -111,7 +132,11 @@ func Run(ctx context.Context, m Machine) (Outcome, error) {
 			return NotMigrated, nil
 		}
 	}
-	if err := m.run(); err != nil {
+	if err := m.run(personal); err != nil {
+		if errors.Is(err, errOrgTypeUnknown) && !config.Migrated(m.ConfigDir) {
+			m.block(Block{Reason: OrgTypeUnknown, Detail: err.Error()})
+			return NotMigrated, nil
+		}
 		if config.Migrated(m.ConfigDir) {
 			m.block(Block{Reason: Failed, Detail: err.Error(), Unfinished: true})
 			return Unfinished, err
@@ -144,10 +169,11 @@ func lockFlush(ctx context.Context, stateDir string, wait time.Duration) (func()
 	return flock.Lock(ctx, filepath.Join(dir, spool.DeliveryLockFile))
 }
 
-// run is the migration's steps 2 to 5, from wherever an earlier start stopped.
-func (m Machine) run() error {
+// run is the migration's steps 2 to 5, from wherever an earlier start stopped. personal
+// is whether each profile's team is a personal organization's (orgTypes).
+func (m Machine) run(personal map[string]bool) error {
 	if !config.Migrated(m.ConfigDir) {
-		if err := m.prepare(); err != nil {
+		if err := m.prepare(personal); err != nil {
 			return fmt.Errorf("prepare the routing states: %w", err)
 		}
 	}
