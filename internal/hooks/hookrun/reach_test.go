@@ -45,25 +45,30 @@ func TestShellPathsAreTheWordsThatNameSomethingThere(t *testing.T) {
 	}
 }
 
-// Past maxShellPaths candidates a command is not examined at all, as the accepted risk on
-// ShellPaths says: one that reaches Acme's checkout among more candidates than that leaves
-// the run as it was, while one at the bound turns it Mixed.
-func TestAShellCommandPastTheCandidateBoundIsNotExamined(t *testing.T) {
+// Only a command's first maxShellPaths candidates are examined, as the accepted risk on
+// ShellPaths says: Acme's checkout among the first turns the run Mixed however long the
+// command, and one only past the bound leaves the run as it was.
+func TestAShellCommandIsExaminedUpToTheCandidateBound(t *testing.T) {
 	t.Parallel()
 	st := acmeAndPersonalRepos(t)
 	side, api := hookruntest.RepoAt(t, "github.com/dawson/side"), hookruntest.RepoAt(t, "github.com/acme/api")
 	for _, tc := range []struct {
 		candidates int
+		acmeAt     int // Acme's position among the candidates, from 0
 		mixed      bool
-	}{{maxShellPaths, true}, {maxShellPaths + 1, false}} {
+	}{{maxShellPaths, 0, true}, {maxShellPaths + 5, 0, true}, {maxShellPaths + 5, maxShellPaths, false}} {
 		t.Run(fmt.Sprint(tc.candidates), func(t *testing.T) {
 			t.Parallel()
 			m := newRoutedMachine(t, st)
-			sid := fmt.Sprintf("long-command-%d", tc.candidates)
+			sid := fmt.Sprintf("long-command-%d-%d", tc.candidates, tc.acmeAt)
 			r := startIn(t, m.hook(), sid, side)
-			words := []string{"ls", api}
-			for i := 1; i < tc.candidates; i++ {
-				words = append(words, fmt.Sprintf("src/missing-%d.go", i))
+			words := []string{"ls"}
+			for i := range tc.candidates {
+				if i == tc.acmeAt {
+					words = append(words, api)
+				} else {
+					words = append(words, fmt.Sprintf("src/missing-%d.go", i))
+				}
 			}
 			env := m.hook()
 			env.Cwd = side

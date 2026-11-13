@@ -74,9 +74,9 @@ const maxShellPaths = 32
 // like a path counts too, and a run it wrongly finds crossing turns Mixed and stops
 // sending, the safe direction.
 //
-// Accepted risk: a command with more than maxShellPaths candidates is not examined at
-// all, so a crossing it alone makes is missed. Examining some would miss as surely, and
-// examining every one would put no bound on a hook that runs on every shell call.
+// Accepted risk: only a command's first maxShellPaths candidates are examined, so a
+// crossing only a later one makes is missed. Examining every one would put no bound on a
+// hook that runs on every shell call.
 func ShellPaths(command, cwd string) []string {
 	var candidates []string
 	words := shellWords(command)
@@ -89,9 +89,7 @@ func ShellPaths(command, cwd string) []string {
 			candidates = append(candidates, w)
 		}
 	}
-	if len(candidates) > maxShellPaths {
-		return nil
-	}
+	candidates = candidates[:min(len(candidates), maxShellPaths)]
 	var out []string
 	for _, w := range candidates {
 		p, ok := shellPath(w, cwd)
