@@ -12,6 +12,7 @@ import (
 	"os/signal"
 	"slices"
 	"syscall"
+	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/doctor"
@@ -52,8 +53,8 @@ func (app *App) NewRootCommand() *cobra.Command {
                    the repositories it collects; nothing is written into a
                    repository's files.
                    Run it again to repair the machine.
-  terma switch     signs out and runs setup again: another account, organization
-                   or team.
+  terma teams      chooses the teams this machine sends telemetry to, across all
+                   your organizations, and which organization owns a repository.
   terma doctor     verifies the whole chain end to end; every failure names its fix.
   terma update     installs the latest release and refreshes what terma installed.
   terma teardown   undoes setup on this machine (--sign-out also signs out).
@@ -86,17 +87,19 @@ Every command is safe to run again.`,
 
 	root.AddCommand(
 		app.newSetupCommand(),
-		app.newSwitchCommand(),
+		app.newTeamsCommand(),
 		app.newDoctorCommand(),
 		app.newUpdateCommand(),
 		app.newTeardownCommand(),
 		// Hidden. Other programs run these: agents and git run hook, the relay service runs
 		// relay, hooks run spool, the Homebrew cask runs completion and install.sh version,
-		// the shell functions setup writes run launch, and the terma-mcp bridge runs auth.
+		// the shell functions setup writes run launch, and the terma-mcp bridge runs auth;
+		// route explains one folder's routing to Terma's engineers and the desktop.
 		app.newAuthCommand(),
 		app.newHookCommand(),
 		app.newLaunchCommand(),
 		app.newRelayCommand(),
+		app.newRouteCommand(),
 		app.newSpoolCommand(),
 		app.newVersionCommand(),
 		// Hidden, for Terma's engineers: config switches deployments, nate wipes a machine.
@@ -187,6 +190,12 @@ type App struct {
 	backgroundStep func(ctx context.Context, out io.Writer, argv ...string) error
 	// canAsk reports whether a person is at a terminal to answer questions.
 	canAsk func() bool
+	// migrationBlocked says why the relay could not move this machine to routing by teams
+	// (two installs), from what the migration recorded; nil reads no record.
+	migrationBlocked func(configDir, stateDir string) string
+	// migrationWait bounds `terma teams`' wait for the relay it starts to migrate the
+	// machine; zero is defaultMigrationWait.
+	migrationWait time.Duration
 	// binary is the executable as this process started from it, for the updater: a command
 	// that ran a while, or the relay, may outlive its version, once another install
 	// replaces the binary.

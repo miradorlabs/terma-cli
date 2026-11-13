@@ -121,7 +121,7 @@ Every command is safe to run again:
 
 ```bash
 terma setup       # sign in, choose your organization, agents and team, write machine-wide hooks
-terma switch      # sign out and set up again: another account, organization or team
+terma teams       # choose the teams this machine sends telemetry to, across your organizations
 terma doctor      # show what this machine collects and check the chain end to end
 terma update      # install the latest release, or refresh what terma installed
 terma teardown    # undo setup on this machine (--sign-out also signs out)
@@ -134,16 +134,28 @@ edits), then checks every link: sign-in, whether the team collects this reposito
 the origin terma sees), the hooks, the agents' export, the queue, and delivery. Every
 failure names its fix.
 
-### Switching account, organization or team
+### Choosing teams across organizations
 
-`terma switch` signs this machine out and runs `terma setup` again, so you can sign in as
-any account and choose its organization, team and agents. It revokes the sign-in, as
-`terma teardown --sign-out` does, stops the relay, which runs on that sign-in, and
-forgets the organization and team setup chose; your agents' hooks stay in place.
+`terma teams` lists every organization you belong to and lets you tick the teams this
+machine sends telemetry to, each with what its policy collects. An organization's teams
+are listed once this machine has a sign-in there (`terma teams --org <organization>`
+signs in to one). Ticking a team signs in to its organization if needed, fetches its
+policy, creates its key for this machine and asks you to decide each binding its policy
+needs. Each record goes to the first ticked team whose policy matches where it ran:
+organizations first, personal last.
 
-The browser approves the sign-in as whoever is signed in to the Terma app there. To use
-another account, sign out of the app in that browser first, or open the link in a private
-window (`terma switch --no-browser` prints it).
+A binding says which organization an owner (`github.com/acme`) or a repository belongs to
+on this machine. Only that organization collects it, and personal never does. A wildcard
+entry such as `github.com/acme/*` needs its owner bound; an exact entry needs only its
+repository. Bindings outlive unticking: what stays bound to an organization collects
+nowhere until you unbind it, and `terma teams` says so when you untick.
+
+Without a terminal, the desktop apps and scripts use flags: `--select <team>`,
+`--deselect <team>`, `--release <team>` (a suspended or refused team),
+`--bind <owner-or-repository>=<organization>`, `--refuse <owner-or-repository>`,
+`--unbind <owner-or-repository>` and `--json`. The first `terma teams` moves the machine to
+routing by teams: it restarts the relay, which migrates every profile once.
+`terma route explain [path]` says which team a session started in a folder goes to, and why.
 
 Hidden commands remain for the programs that run them — hook execution, the local
 relay, spool delivery, shell completion — and for Terma's own engineers.

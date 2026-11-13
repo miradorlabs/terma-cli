@@ -28,6 +28,12 @@ func (app *App) doctorEnv(ctx context.Context) doctor.Env {
 	env.Root, env.GitDir, env.RepoErr = workspaceHere(ctx)
 	if env.Config != nil {
 		env.Probes = app.doctorProbes(env.Config)
+		if config.Migrated(app.dir) {
+			env.Routing = app.routingFacts(env.Config)
+			env.Probes.Keys = app.routedKeys(env.Routing)
+		} else if app.migrationBlocked != nil {
+			env.MigrationBlocked = app.migrationBlocked(app.dir, app.stateDir)
+		}
 	}
 	return env
 }

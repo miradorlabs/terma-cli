@@ -49,9 +49,15 @@ type fakeAuth struct {
 	// account service does (403); policyBodies are each team's, over policyBody.
 	scopedPolicies bool
 	policyBodies   map[string]string
-	mu             sync.Mutex
-	verifiers      []string
-	revoked        []string
+	// goneTeams answer their policy read as a team archived since the listing does (403,
+	// TEAM_NOT_FOUND); mintDown fails every key creation.
+	goneTeams map[string]bool
+	mintDown  bool
+	// mintedNames are the names keys were created with.
+	mintedNames []string
+	mu          sync.Mutex
+	verifiers   []string
+	revoked     []string
 }
 
 // fakeGrant is who a delegated code signs in.
@@ -131,6 +137,11 @@ func newFakeAuth(t *testing.T) *fakeAuth {
 				fmt.Fprint(w, `{"code":"PERMISSION_DENIED","message":"no such team in this organization"}`)
 				return
 			}
+			if f.goneTeams[r.URL.Query().Get("project_id")] {
+				w.WriteHeader(http.StatusForbidden)
+				fmt.Fprint(w, `{"error":{"code":"PERMISSION_DENIED","message":"no active team with this id","reason":"TEAM_NOT_FOUND"}}`)
+				return
+			}
 			if body, ok := f.policyBodies[r.URL.Query().Get("project_id")]; ok {
 				fmt.Fprint(w, body)
 			} else if f.policyBody != "" {
@@ -148,6 +159,13 @@ func newFakeAuth(t *testing.T) *fakeAuth {
 			f.keysMint.Add(1)
 			var body createServerKeyRequestShape
 			_ = json.NewDecoder(r.Body).Decode(&body)
+			if f.mintDown {
+				http.Error(w, "unavailable", http.StatusServiceUnavailable)
+				return
+			}
+			f.mu.Lock()
+			f.mintedNames = append(f.mintedNames, body.Name)
+			f.mu.Unlock()
 			_ = json.NewEncoder(w).Encode(map[string]any{
 				"key":        "ter_srv_" + strings.ReplaceAll(body.ProjectID, "-", "")[:24],
 				"server_key": map[string]any{"id": "k-1", "project_id": body.ProjectID, "name": body.Name, "key_prefix": "ter_srv_"},

@@ -20,6 +20,10 @@ type Steps struct {
 	ChooseAgents func(ctx context.Context, cfg *config.Config) ([]string, error)
 	SelectTeam   func(ctx context.Context, cfg *config.Config) error
 	FetchPolicy  func(ctx context.Context, cfg *config.Config) (config.Policy, error)
+	// ChooseTeams, on a machine that routes by teams, shows the checklist of teams in place
+	// of SelectTeam and FetchPolicy: ticking a team fetches its policy and creates its key,
+	// so neither a profile's team nor its policy, nor the spool key, is set up here.
+	ChooseTeams func(ctx context.Context, cfg *config.Config) error
 	// Recorded says which agents were recorded, before the policy is fetched.
 	Recorded func(names []string)
 	// StopRelay stops a running relay whose login or scope the new policy changed; a
@@ -45,8 +49,8 @@ type Result struct {
 // Run sets the machine up for cfg's profile. The agents are recorded before the policy
 // is fetched, and the policy is stored before anything is pointed at the relay.
 func Run(ctx context.Context, reg *agents.Registry, cfg *config.Config, s Steps) (Result, error) {
-	if s.SignIn == nil || s.ChooseAgents == nil || s.SelectTeam == nil || s.FetchPolicy == nil {
-		return Result{}, errors.New("setup: sign-in, the agent choice, the team and the policy fetch are required")
+	if s.SignIn == nil || s.ChooseAgents == nil || s.ChooseTeams == nil && (s.SelectTeam == nil || s.FetchPolicy == nil) {
+		return Result{}, errors.New("setup: sign-in, the agent choice, and the teams or the team and its policy fetch are required")
 	}
 	cfg, err := s.SignIn(ctx, cfg)
 	if err != nil {
@@ -61,27 +65,13 @@ func Run(ctx context.Context, reg *agents.Registry, cfg *config.Config, s Steps)
 	}
 	call(s.Recorded, names)
 
-	// Kept in the state directory: hooks and the relay read policy there, never the network.
-	if err := s.SelectTeam(ctx, cfg); err != nil {
-		return Result{}, err
-	}
-	pol, err := s.FetchPolicy(ctx, cfg)
-	if err != nil {
-		return Result{}, err
-	}
-	previous := cfg.Policy
-	cfg.Policy = pol
-	if err := routing.StorePolicy(cfg, &pol); err != nil {
-		return Result{}, err
-	}
-	if previous.OrganizationID != pol.OrganizationID || previous.AuthURL != pol.AuthURL || previous.TeamID != pol.TeamID {
-		if s.StopRelay != nil {
-			s.StopRelay()
+	var pol config.Policy
+	if s.ChooseTeams != nil {
+		if err := s.ChooseTeams(ctx, cfg); err != nil {
+			return Result{}, err
 		}
-	}
-	call(s.Fetched, pol)
-	if s.SpoolKey != nil {
-		s.SpoolKey(ctx, cfg)
+	} else if pol, err = singleTeam(ctx, cfg, s); err != nil {
+		return Result{}, err
 	}
 
 	if s.ConnectRelay != nil {
@@ -98,6 +88,34 @@ func Run(ctx context.Context, reg *agents.Registry, cfg *config.Config, s Steps)
 		s.CheckIn(ctx)
 	}
 	return Result{Agents: names, Policy: pol}, nil
+}
+
+// singleTeam selects the profile's one team and stores its policy, on a machine that has
+// not moved to routing by teams.
+func singleTeam(ctx context.Context, cfg *config.Config, s Steps) (config.Policy, error) {
+	// Kept in the state directory: hooks and the relay read policy there, never the network.
+	if err := s.SelectTeam(ctx, cfg); err != nil {
+		return config.Policy{}, err
+	}
+	pol, err := s.FetchPolicy(ctx, cfg)
+	if err != nil {
+		return config.Policy{}, err
+	}
+	previous := cfg.Policy
+	cfg.Policy = pol
+	if err := routing.StorePolicy(cfg, &pol); err != nil {
+		return config.Policy{}, err
+	}
+	if previous.OrganizationID != pol.OrganizationID || previous.AuthURL != pol.AuthURL || previous.TeamID != pol.TeamID {
+		if s.StopRelay != nil {
+			s.StopRelay()
+		}
+	}
+	call(s.Fetched, pol)
+	if s.SpoolKey != nil {
+		s.SpoolKey(ctx, cfg)
+	}
+	return pol, nil
 }
 
 func call[T any](f func(T), v T) {
