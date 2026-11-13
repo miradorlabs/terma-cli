@@ -94,10 +94,14 @@ func (app *App) browserSignIn(cmd *cobra.Command, cfg *config.Config, want orgRe
 		names = append(names, loginName(r, listed))
 	}
 	fmt.Fprintf(errOut, "Signed in to %s\n", output.And(names))
+	var missing []string
 	for _, o := range listed {
 		if !has(o.ID) {
-			fmt.Fprintf(errOut, "Not signed in to %s. Run `terma teams` to authorize it.\n", cmp.Or(o.Name, o.ID))
+			missing = append(missing, cmp.Or(o.Name, o.ID))
 		}
+	}
+	if line := notSignedIn(missing); line != "" {
+		fmt.Fprintln(errOut, line)
 	}
 	return res, nil
 }
@@ -172,4 +176,23 @@ func (app *App) storeLogins(ctx context.Context, cfg *config.Config, results []a
 		fmt.Fprintln(errOut, line)
 	}
 	return saved, nil
+}
+
+// notSignedInNamed is how many organizations without a sign-in notSignedIn names; the rest
+// are counted.
+const notSignedInNamed = 6
+
+// notSignedIn is the one line naming the organizations the developer belongs to that this
+// machine still has no sign-in for, often ones left unticked on purpose: "" for none.
+func notSignedIn(names []string) string {
+	switch n := len(names); {
+	case n == 0:
+		return ""
+	case n == 1:
+		return fmt.Sprintf("Not signed in to %s. Run `terma teams --authorize` to add it.", names[0])
+	case n <= notSignedInNamed:
+		return fmt.Sprintf("Not signed in to %d organizations: %s. Run `terma teams --authorize` to add them.", n, output.And(names))
+	default:
+		return fmt.Sprintf("Not signed in to %d organizations, including %s. Run `terma teams --authorize` to add them.", n, output.And(names[:notSignedInNamed-1]))
+	}
 }

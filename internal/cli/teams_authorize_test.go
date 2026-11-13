@@ -157,7 +157,7 @@ func TestTeamsAuthorizeTakesTwentyAtATime(t *testing.T) {
 	if err := json.Unmarshal([]byte(stdout), &v); err != nil || v.Unauthorized != 23 {
 		t.Fatalf("unauthorized = %d (%v), want 23", v.Unauthorized, err)
 	}
-	if !strings.Contains(stderr, "Signed in to Org 01\n") || strings.Count(stderr, "Not signed in to ") != 23 {
+	if !strings.Contains(stderr, "Signed in to Org 01\n") || strings.Count(stderr, "Not signed in to ") != 1 || !strings.Contains(stderr, "Not signed in to 23 organizations, including ") {
 		t.Fatalf("stderr:\n%s", stderr)
 	}
 }
