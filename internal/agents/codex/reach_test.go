@@ -3,6 +3,7 @@ package codex
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -90,6 +91,42 @@ func TestRoutedCodexShellReadsReachingAcmeMakeTheRunMixed(t *testing.T) {
 			}
 			if !mixed() {
 				t.Fatal("not Mixed after reading Acme's checkout")
+			}
+		})
+	}
+}
+
+// A shell command with more candidates than terma examines counts as reaching an
+// organization not known: though none of its 33 words names another checkout, the run turns
+// Mixed before it runs. One at the bound does not.
+func TestRoutedCodexShellPastTheCandidateBoundMakesTheRunMixed(t *testing.T) {
+	const sid = "01a08bd5-0487-74b1-9d82-45e619c57aab"
+	for n, want := range map[int]bool{32: false, 33: true} {
+		t.Run(fmt.Sprint(n), func(t *testing.T) {
+			t.Setenv("CODEX_HOME", t.TempDir())
+			side := hookruntest.RepoAt(t, "github.com/dawson/side")
+			st := hookruntest.TwoOrganizations(t)
+			stateDir := t.TempDir()
+			sp, _ := spool.Open(t.TempDir())
+			hook := func(handler func(context.Context, hookrun.Env) error, payload map[string]any) {
+				t.Helper()
+				payload["session_id"], payload["cwd"] = sid, side
+				b, _ := json.Marshal(payload)
+				env := hookrun.Env{StateDir: stateDir, ConfigDir: t.TempDir(), Now: time.Now(), Cwd: side, Spool: sp, Version: "test",
+					Policy: config.NoPolicy("", ""), Routing: hookrun.NewRouting(hookruntest.RoutedProfile, st), Stdin: strings.NewReader(string(b))}
+				if err := handler(context.Background(), env); err != nil {
+					t.Fatal(err)
+				}
+			}
+			hook(sessionStart, map[string]any{"hook_event_name": "SessionStart", "model": "gpt-6"})
+			command := "ls"
+			for i := range n {
+				command += fmt.Sprintf(" src/missing-%d.go", i)
+			}
+			hook(preToolUse, map[string]any{"hook_event_name": "PreToolUse", "tool_name": codexShellTool, "tool_use_id": "c1",
+				"tool_input": map[string]any{"command": command}})
+			if _, mixed := runs.MixedAt(stateDir, sid, time.Time{}); mixed != want {
+				t.Fatalf("%d candidates: Mixed %v, want %v", n, mixed, want)
 			}
 		})
 	}

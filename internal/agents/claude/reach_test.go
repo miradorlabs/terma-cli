@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -170,6 +172,11 @@ func TestRoutedClaudeShellCommandsReachingAcmeMakeTheRunMixed(t *testing.T) {
 		"a new file in its own checkout":    {func(*reachMachine) string { return "echo x > ./new.md" }, false},
 		"a read inside a substitution":      {func(*reachMachine) string { return `echo "$(cat ../acme-api/NOTES.md)"` }, true},
 		"a relative path after a cd out":    {func(*reachMachine) string { return "cd .. && cat acme-api/NOTES.md" }, true},
+		"a folder named alone, from above":  {func(*reachMachine) string { return "cd .. && git -C acme-api log" }, true},
+		"an unresolved path":                {func(*reachMachine) string { return "cat $(git rev-parse --show-toplevel)/x" }, true},
+		// 33 candidates, none of them in another checkout: past the bound, unknown.
+		"a command past the candidate bound": {func(*reachMachine) string { return "ls" + manyCandidates(33) }, true},
+		"a command at the candidate bound":   {func(*reachMachine) string { return "ls" + manyCandidates(32) }, false},
 	} {
 		t.Run(name, func(t *testing.T) {
 			m := newReachMachine(t)
@@ -180,6 +187,15 @@ func TestRoutedClaudeShellCommandsReachingAcmeMakeTheRunMixed(t *testing.T) {
 			}
 		})
 	}
+}
+
+// manyCandidates is n path-like words, none of them there.
+func manyCandidates(n int) string {
+	var b strings.Builder
+	for i := range n {
+		fmt.Fprintf(&b, " src/missing-%d.go", i)
+	}
+	return b.String()
 }
 
 // A read, a search or a shell command is classified before it runs, by the PreToolUse hook
