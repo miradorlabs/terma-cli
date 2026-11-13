@@ -18,17 +18,23 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"golang.org/x/net/websocket"
 )
 
 // T3 Code (pingdotgg/t3code, `t3` on npm) is a local server with a web front end that
 // runs other agents: `codex app-server` (one per T3 thread, in the thread's workspace)
-// and Claude Code through the Agent SDK (setting sources user, project and local),
-// with T3's own environment — it sets no OTEL_* of its own (0.0.42). So the agents'
-// user-level exporters and the repository's hooks work as they do anywhere, and the
-// relay needs nothing T3-specific; these scenarios prove it. T3 is driven the way its
-// front end drives it: commands POSTed to /api/orchestration/dispatch with a session
-// token, state read from /api/orchestration/snapshot. T3 0.1.0 replaced that API; a build
-// that no longer serves it is skipped as one the driver cannot drive (SkipBuild), not failed.
+// and Claude Code through the Agent SDK, each the one on PATH, with T3's own
+// environment — it sets no OTEL_* of its own (0.0.42, 0.1.0) and, on 0.1.0, passes
+// Claude no setting sources, which loads the user's, the project's and the local ones
+// as Claude does anywhere. So the agents' user-level exporters and the repository's
+// hooks work as they do anywhere, and the relay needs nothing T3-specific; these
+// scenarios prove it. T3 is driven the way its front end drives it, with a session
+// token from `t3 auth session issue`. Up to 0.0.x that is commands POSTed to
+// /api/orchestration/dispatch and state read from /api/orchestration/snapshot. 0.1.0
+// answers that snapshot route with its web app instead: projects are POSTed to
+// /api/projects/mutate, threads launched over its WebSocket (Effect RPC, JSON), and
+// state read from /api/orchestration/shell. A build that speaks neither is skipped as
+// one the driver cannot drive (SkipBuild), not failed.
 
 func forEachT3(t *testing.T, run func(t *testing.T, b Binary)) {
 	t.Helper()
@@ -71,8 +77,9 @@ type T3 struct {
 	bin   string
 	base  string
 	cmd   *exec.Cmd
-	out   bytes.Buffer
+	out   t3Output
 	once  sync.Once
+	v2    bool // 0.1.0's API: /api/projects, the WebSocket, /api/orchestration/shell
 }
 
 // StartT3 serves T3 for the sandbox, with its state under the sandbox and env added to
@@ -87,8 +94,7 @@ func (sb *Sandbox) StartT3(b Binary, env ...string) *T3 {
 	port := ln.Addr().(*net.TCPAddr).Port
 	_ = ln.Close()
 	x := &T3{t: t, sb: sb, url: fmt.Sprintf("http://127.0.0.1:%d", port), bin: b.Path, base: filepath.Join(sb.Dir, "t3")}
-	// T3 prepends the PATH of `$SHELL -ilc` to its own: a plain sh keeps the sandbox's.
-	x.env = append(append(sb.termaEnv(), "SHELL=/bin/sh", "T3CODE_HOME="+x.base, "T3CODE_TELEMETRY_ENABLED=false"), env...)
+	x.env = append(append(sb.termaEnv(), "SHELL="+sb.t3Shell(), "T3CODE_HOME="+x.base, "T3CODE_TELEMETRY_ENABLED=false"), env...)
 	x.cmd = exec.Command(b.Path, "serve", "--host", "127.0.0.1", "--port", fmt.Sprint(port), "--base-dir", x.base, sb.Repo)
 	x.cmd.Dir = sb.Repo
 	x.cmd.Env = x.env
@@ -101,11 +107,15 @@ func (sb *Sandbox) StartT3(b Binary, env ...string) *T3 {
 		t.Fatal(err)
 	}
 	t.Cleanup(x.Stop)
+	// Up once it answers with anything but a server error: 0.1.9 accepts connections before
+	// its routes are attached, and answers 503 until they are.
 	deadline := time.Now().Add(60 * time.Second)
 	for time.Now().Before(deadline) {
 		if resp, err := t3Client.Get(x.url + "/"); err == nil {
 			_ = resp.Body.Close()
-			break
+			if resp.StatusCode/100 != 5 {
+				break
+			}
 		}
 		time.Sleep(300 * time.Millisecond)
 	}
@@ -120,26 +130,104 @@ func (sb *Sandbox) StartT3(b Binary, env ...string) *T3 {
 		t.Fatalf("t3 auth session issue: %v\n%s", err, x.out.String())
 	}
 	x.token = strings.TrimSpace(string(tok))
-	// 0.1.0 answers the old snapshot route with its web app, and the dispatch with a 404:
-	// that answer alone says the driver cannot drive the build. Any other (an error, a
-	// refusal, a server that never came up) goes on, and fails the scenario as it should.
-	if x.servesWebApp("/api/orchestration/snapshot") {
-		SkipBuild(t, "the test driver can't drive this version yet (it no longer serves /api/orchestration)")
+	switch x.api() {
+	case "0.1":
+		x.v2 = true
+	case "":
+		SkipBuild(t, "the test driver can't drive this version (it serves neither /api/orchestration/snapshot nor /api/orchestration/shell for protocol "+t3Protocol+")")
 	}
 	return x
 }
 
-// servesWebApp says whether T3 answers a GET of path with its web app's HTML, as a build
-// that no longer serves path as an API route does.
-func (x *T3) servesWebApp(path string) bool {
-	req, _ := http.NewRequest(http.MethodGet, x.url+path, nil)
-	req.Header.Set("Authorization", "Bearer "+x.token)
-	resp, err := t3Client.Do(req)
-	if err != nil {
+// api is the API the build speaks: "0.0" where it serves its orchestration snapshot as JSON
+// (0.0.x, which serves a shell route of its own too), "0.1" where it answers that route with its
+// web app and serves its shell snapshot for the driver's protocol instead (0.1.0 and later), "" where
+// it does neither, as a build on another protocol does.
+func (x *T3) api() string {
+	x.t.Helper()
+	switch {
+	case x.servesJSON("/api/orchestration/snapshot", nil):
+		return "0.0"
+	case x.servesJSON("/api/orchestration/shell", http.Header{t3ProtocolHeader: {t3Protocol}}):
+		return "0.1"
+	}
+	return ""
+}
+
+// t3Output is T3's output, written by its process's copiers while a failing scenario reads it.
+type t3Output struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+}
+
+func (o *t3Output) Write(p []byte) (int, error) {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	return o.buf.Write(p)
+}
+
+func (o *t3Output) String() string {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	return o.buf.String()
+}
+
+// t3Shell writes the shell T3 is given as $SHELL and returns its path. T3 puts the PATH
+// of `$SHELL -ilc` ahead of its own, and a login shell on macOS puts /etc/paths ahead of
+// the sandbox's, so T3 would run the developer's `codex` and `claude`, not the builds
+// under test. This one runs the command without a login, keeping the sandbox's PATH.
+func (sb *Sandbox) t3Shell() string {
+	path := filepath.Join(sb.Dir, "t3-shell")
+	script := "#!/bin/sh\n# T3 runs `$SHELL -ilc CMD`: run CMD alone, with no login profile.\nfor last; do :; done\nexec /bin/sh -c \"$last\"\n"
+	if err := os.WriteFile(path, []byte(script), 0o755); err != nil {
+		sb.T.Fatal(err)
+	}
+	return path
+}
+
+// servesJSON says whether T3 serves path as an API route: true where it answers with JSON,
+// false where it answers with its web app, a 404, or a 400 (a route there, but not for this
+// client: another protocol). Anything else fails the scenario.
+func (x *T3) servesJSON(path string, header http.Header) bool {
+	x.t.Helper()
+	status, kind, body := x.get(path, header)
+	switch {
+	case status/100 == 2 && strings.HasPrefix(kind, "application/json"):
+		return true
+	case status/100 == 2 && strings.HasPrefix(kind, "text/html"), status == http.StatusNotFound, status == http.StatusBadRequest:
 		return false
 	}
-	_ = resp.Body.Close()
-	return resp.StatusCode/100 == 2 && strings.HasPrefix(resp.Header.Get("Content-Type"), "text/html")
+	x.t.Fatalf("t3 GET %s: %d (%s) %s\n%s", path, status, kind, body, tail(x.out.String(), 2000))
+	return false
+}
+
+// get is T3's first answer to a GET of path that is no server error, once a server error or a
+// dropped connection has had a few seconds to clear (a server still attaching its routes, a
+// moment's overload); after that, the scenario fails: a build that cannot answer is broken.
+func (x *T3) get(path string, header http.Header) (status int, kind string, body []byte) {
+	x.t.Helper()
+	var last string
+	for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline); time.Sleep(500 * time.Millisecond) {
+		req, _ := http.NewRequest(http.MethodGet, x.url+path, nil)
+		req.Header.Set("Authorization", "Bearer "+x.token)
+		for k, vs := range header {
+			req.Header[k] = vs
+		}
+		resp, err := t3Client.Do(req)
+		if err != nil {
+			last = err.Error()
+			continue
+		}
+		body, _ = io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+		_ = resp.Body.Close()
+		if resp.StatusCode/100 == 5 {
+			last = resp.Status + " " + string(body)
+			continue
+		}
+		return resp.StatusCode, resp.Header.Get("Content-Type"), body
+	}
+	x.t.Fatalf("t3 GET %s: %s\n%s", path, last, tail(x.out.String(), 2000))
+	return 0, "", nil
 }
 
 // t3Client bounds every request: a server that accepts and never answers must fail the
@@ -199,6 +287,11 @@ func (x *T3) dispatch(cmd map[string]any) {
 func (x *T3) Project(dir string) string {
 	x.t.Helper()
 	id := "proj-" + uuid.NewString()[:8]
+	if x.v2 {
+		x.request(http.MethodPost, "/api/projects/mutate", map[string]any{"type": "project.create", "commandId": uuid.NewString(),
+			"projectId": id, "title": filepath.Base(dir), "workspaceRoot": dir})
+		return id
+	}
 	x.dispatch(map[string]any{"type": "project.create", "projectId": id, "title": filepath.Base(dir), "workspaceRoot": dir})
 	return id
 }
@@ -214,6 +307,10 @@ var (
 func (x *T3) Turn(project string, agent map[string]any, prompt string) {
 	x.t.Helper()
 	thread := "thread-" + uuid.NewString()[:8]
+	if x.v2 {
+		x.turnV2(project, thread, agent, prompt)
+		return
+	}
 	x.dispatch(map[string]any{"type": "thread.create", "threadId": thread, "projectId": project, "title": "live", "modelSelection": agent,
 		"runtimeMode": "full-access", "interactionMode": "default", "branch": nil, "worktreePath": nil})
 	x.dispatch(map[string]any{"type": "thread.turn.start", "threadId": thread, "modelSelection": agent, "runtimeMode": "full-access", "interactionMode": "default",
@@ -260,4 +357,135 @@ func (x *T3) turnState(thread string) string {
 	}
 	walk(snap)
 	return state
+}
+
+// The header and the WebSocket query parameter that name the orchestration protocol a
+// 0.1.0 client speaks; a server answers a client of another with an error.
+const (
+	t3ProtocolHeader = "x-t3-orchestration-protocol"
+	t3Protocol       = "2"
+)
+
+// turnV2 is Turn on 0.1.0: the thread launched with its first message in one command, as
+// the front end launches a new thread, then T3's shell snapshot polled until the
+// thread's latest run has settled (t3SettledRuns). Anything but "completed" fails the scenario.
+func (x *T3) turnV2(project, thread string, agent map[string]any, prompt string) {
+	x.t.Helper()
+	x.rpc("orchestration.launchThread", map[string]any{"commandId": uuid.NewString(), "creationSource": "web", "threadId": thread,
+		"projectId": project, "title": "live", "modelSelection": agent, "runtimeMode": "full-access", "interactionMode": "default",
+		"workspaceStrategy": map[string]any{"type": "root"},
+		"initialMessage":    map[string]any{"messageId": uuid.NewString(), "text": prompt, "attachments": []any{}}})
+	x.t.Logf("T3: %v thread %s started", agent["instanceId"], thread)
+	seen := "no such thread in T3's shell snapshot"
+	deadline := time.Now().Add(3 * time.Minute)
+	for time.Now().Before(deadline) {
+		if th, ok := x.shellThread(thread); ok {
+			if th.LatestRunID != nil && t3SettledRuns[th.Status] {
+				if th.Status != "completed" {
+					x.t.Fatalf("T3's %v thread %s: run %s: %s (%s)\n%s", agent["instanceId"], thread, th.Status, th.LastError, th.LastErrorClass, tail(x.out.String(), 3000))
+				}
+				x.t.Logf("T3: %v thread %s completed", agent["instanceId"], thread)
+				return
+			}
+			seen = fmt.Sprintf("status %s, latest run %s, active run %s", th.Status, deref(th.LatestRunID), deref(th.ActiveRunID))
+		}
+		time.Sleep(time.Second)
+	}
+	x.t.Fatalf("T3's %v thread %s never settled (last seen: %s)\n%s", agent["instanceId"], thread, seen, tail(x.out.String(), 3000))
+}
+
+// deref is *s, or "none" where s is nil.
+func deref(s *string) string {
+	if s == nil {
+		return "none"
+	}
+	return *s
+}
+
+// t3SettledRuns are the statuses of a run that has ended (OrchestrationV2RunStatus in T3's
+// contracts); the others are live: preparing, queued, starting, running, waiting.
+var t3SettledRuns = map[string]bool{"completed": true, "interrupted": true, "failed": true, "cancelled": true, "rolled_back": true}
+
+// t3ShellThread is what turnV2 reads of a thread in 0.1.0's shell snapshot.
+type t3ShellThread struct {
+	ID          string  `json:"id"`
+	Status      string  `json:"status"`
+	LatestRunID *string `json:"latestRunId"`
+	ActiveRunID *string `json:"activeRunId"`
+	// Raw, as T3 sends them: what fails the scenario is shown, never what it could not decode.
+	LastError      json.RawMessage `json:"lastError"`
+	LastErrorClass json.RawMessage `json:"lastErrorClass"`
+}
+
+// shellThread is thread in T3's shell snapshot, false while the snapshot has no such thread.
+func (x *T3) shellThread(thread string) (t3ShellThread, bool) {
+	x.t.Helper()
+	var snap struct {
+		Threads []t3ShellThread `json:"threads"`
+	}
+	status, _, data := x.get("/api/orchestration/shell", http.Header{t3ProtocolHeader: {t3Protocol}})
+	if status/100 != 2 {
+		x.t.Fatalf("t3 shell snapshot: %d %s\n%s", status, tail(string(data), 2000), tail(x.out.String(), 2000))
+	}
+	if err := json.Unmarshal(data, &snap); err != nil {
+		x.t.Fatalf("t3 shell snapshot: %v\n%s", err, tail(string(data), 2000))
+	}
+	for _, th := range snap.Threads {
+		if th.ID == thread {
+			return th, true
+		}
+	}
+	return t3ShellThread{}, false
+}
+
+// rpc makes one Effect RPC call over 0.1.0's WebSocket and returns its result: one
+// connection per call, authenticated by the session token on the upgrade, its request
+// a JSON message and its answer the Exit that names the request. A failed call fails
+// the scenario with its cause. The client pings in Effect RPC and the server only
+// answers, so a call this short has nothing to answer but its Exit.
+func (x *T3) rpc(tag string, payload any) json.RawMessage {
+	x.t.Helper()
+	cfg, err := websocket.NewConfig(strings.Replace(x.url, "http", "ws", 1)+"/ws?orchestrationProtocol="+t3Protocol, x.url)
+	if err != nil {
+		x.t.Fatal(err)
+	}
+	cfg.Header.Set("Authorization", "Bearer "+x.token)
+	// The upgrade is bounded as every request is, not only the connect.
+	ctx, cancel := context.WithTimeout(context.Background(), t3Client.Timeout)
+	defer cancel()
+	ws, err := cfg.DialContext(ctx)
+	if err != nil {
+		x.t.Fatalf("t3 %s: %v\n%s", tag, err, tail(x.out.String(), 2000))
+	}
+	defer func() { _ = ws.Close() }()
+	_ = ws.SetDeadline(time.Now().Add(t3Client.Timeout))
+	const id = "1" // the connection's only request
+	req := map[string]any{"_tag": "Request", "id": id, "tag": tag, "payload": payload, "headers": []any{}}
+	if err := websocket.JSON.Send(ws, req); err != nil {
+		x.t.Fatalf("t3 %s: %v\n%s", tag, err, tail(x.out.String(), 2000))
+	}
+	for {
+		var msg struct {
+			Tag       string          `json:"_tag"`
+			RequestID string          `json:"requestId"`
+			Defect    json.RawMessage `json:"defect"`
+			Exit      struct {
+				Tag   string          `json:"_tag"`
+				Value json.RawMessage `json:"value"`
+				Cause json.RawMessage `json:"cause"`
+			} `json:"exit"`
+		}
+		if err := websocket.JSON.Receive(ws, &msg); err != nil {
+			x.t.Fatalf("t3 %s: no answer: %v\n%s", tag, err, tail(x.out.String(), 2000))
+		}
+		switch {
+		case msg.Tag == "Exit" && msg.RequestID == id:
+			if msg.Exit.Tag != "Success" {
+				x.t.Fatalf("t3 %s: %s %s\n%s", tag, msg.Exit.Tag, tail(string(msg.Exit.Cause), 2000), tail(x.out.String(), 2000))
+			}
+			return msg.Exit.Value
+		case msg.Tag == "Defect":
+			x.t.Fatalf("t3 %s: defect: %s\n%s", tag, tail(string(msg.Defect), 2000), tail(x.out.String(), 2000))
+		}
+	}
 }
