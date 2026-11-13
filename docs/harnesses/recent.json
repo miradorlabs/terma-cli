@@ -1,38 +1,73 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-13T05:13:29.306022914Z",
+  "generated_at": "2026-11-13T09:01:26.428937767Z",
   "versions": [
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "version": "0.169.0",
+      "released_at": "2026-11-13T08:43:21.818Z",
+      "captured_at": "2026-11-13T09:01:26.428937767Z",
+      "platforms": [
+        "darwin/arm64",
+        "linux/amd64"
+      ],
+      "support": "untested",
+      "previous": "0.168.0",
+      "changes": 514,
+      "categories": {
+        "behavior": 1,
+        "binary": 1,
+        "cli": 8,
+        "config": 17,
+        "filesystem": 10,
+        "prompt": 1,
+        "telemetry": 476
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 42,
+        "informational": 292,
+        "notable": 180
+      },
+      "undocumented": 367,
+      "highlights": [
+        "Telemetry surface no longer sent: logs/codex.api_request",
+        "Telemetry surface no longer sent: logs/codex.conversation_starts",
+        "Telemetry surface no longer sent: logs/codex.sse_event"
+      ],
+      "signing": "valid"
+    },
     {
       "harness": "codex",
       "name": "Codex CLI",
       "version": "0.168.0",
       "released_at": "2026-11-13T04:00:31.594Z",
-      "captured_at": "2026-11-13T05:13:29.306022914Z",
+      "captured_at": "2026-11-13T09:01:26.428937767Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"
       ],
       "support": "supported",
       "previous": "0.167.2",
-      "changes": 61,
+      "changes": 52,
       "categories": {
         "cli": 5,
         "config": 37,
-        "filesystem": 2,
-        "telemetry": 16,
+        "telemetry": 9,
         "tools": 1
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 51,
-        "notable": 10
+        "informational": 46,
+        "notable": 6
       },
-      "undocumented": 46,
+      "undocumented": 40,
       "highlights": [
         "exec tool description changed (+281 −862 chars)",
-        "Telemetry surfaces.traces/auth.parents.traces/codex.turn_input removed",
-        "Telemetry surfaces.traces/auth.parents.traces/model_client.stream_responses_api removed"
+        "New setting: features.hosted_search_policy",
+        "Setting no longer read: features.incremental_tools_legacy"
       ],
       "signing": "valid"
     },
@@ -125,7 +160,7 @@
       "name": "Claude Code",
       "version": "2.1.323",
       "released_at": "2026-11-12T20:29:28.626Z",
-      "captured_at": "2026-11-13T05:13:29.306022914Z",
+      "captured_at": "2026-11-13T09:01:26.428937767Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"
@@ -193,29 +228,26 @@
       "name": "Codex CLI",
       "version": "0.167.2",
       "released_at": "2026-11-11T22:50:04.191Z",
-      "captured_at": "2026-11-13T05:13:29.306022914Z",
+      "captured_at": "2026-11-13T09:01:26.428937767Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"
       ],
       "support": "supported",
       "previous": "0.167.1",
-      "changes": 256,
+      "changes": 1,
       "categories": {
-        "config": 1,
-        "telemetry": 255
+        "config": 1
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 256,
+        "informational": 1,
         "notable": 0
       },
-      "undocumented": 255,
+      "undocumented": 0,
       "highlights": [
-        "Telemetry export added",
-        "Telemetry surfaces.metrics/codex.api_request.monotonic added",
-        "Telemetry surfaces.metrics/codex.api_request.temporality added"
+        "New setting: features.incremental_tools_legacy_gcp"
       ],
       "signing": "valid"
     },
@@ -284,22 +316,22 @@
       ],
       "support": "supported",
       "previous": "0.167.0",
-      "changes": 6,
+      "changes": 5,
       "categories": {
         "config": 1,
-        "filesystem": 5
+        "filesystem": 4
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 6,
+        "informational": 5,
         "notable": 0
       },
-      "undocumented": 6,
+      "undocumented": 5,
       "highlights": [
         "New setting: features.incremental_tools_legacy",
-        "No longer connects to <proxy> (tcp) (darwin/arm64)",
-        "Command changed: `/proc/self/exe --codex-run-as-process-setup <n> <n> pipe  <repo> <install>/codex codex-linux-sandbox …` (+424 −426 chars) (linux/amd64)"
+        "Command changed: `/proc/self/exe --codex-run-as-process-setup <n> <n> pipe  <repo> <install>/codex codex-linux-sandbox …` (+424 −426 chars) (linux/amd64)",
+        "Command changed: `bwrap --as-pid-1 --new-session --die-with-parent --ro-bind / / --dev /dev --perms 000 --tmpfs <tmp>/ …` (+424 −426 chars) (linux/amd64)"
       ],
       "signing": "valid"
     },
@@ -308,27 +340,26 @@
       "name": "Gemini CLI",
       "version": "0.68.0",
       "released_at": "2026-11-10T21:22:49.277Z",
-      "captured_at": "2026-11-13T05:13:29.306022914Z",
+      "captured_at": "2026-11-13T09:01:26.428937767Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "supported",
       "previous": "0.67.0",
-      "changes": 38,
+      "changes": 6,
       "categories": {
         "config": 3,
         "hooks": 1,
         "request": 1,
-        "storage": 1,
-        "telemetry": 32
+        "storage": 1
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 34,
+        "informational": 2,
         "notable": 4
       },
-      "undocumented": 36,
+      "undocumented": 5,
       "highlights": [
         "Request endpoint changed",
         "Default of modelConfigs: {\"aliases\":{\"agent-history-provider-summarizer\":{\"modelCo… → {\"aliases\":{\"agent-history-provider-summarizer\":{\"modelCo…",
@@ -430,29 +461,26 @@
       "name": "Claude Code",
       "version": "2.1.322",
       "released_at": "2026-11-10T01:58:41.811Z",
-      "captured_at": "2026-11-13T05:13:29.306022914Z",
+      "captured_at": "2026-11-13T09:01:26.428937767Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"
       ],
       "support": "supported",
       "previous": "2.1.321",
-      "changes": 19,
+      "changes": 1,
       "categories": {
-        "config": 1,
-        "telemetry": 18
+        "config": 1
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 19,
+        "informational": 1,
         "notable": 0
       },
-      "undocumented": 19,
+      "undocumented": 1,
       "highlights": [
-        "Telemetry export added",
-        "Telemetry surfaces.metrics/claude_code.active_time.total.monotonic added",
-        "Telemetry surfaces.metrics/claude_code.active_time.total.temporality added"
+        "fastMode description changed (+132 −72 chars)"
       ],
       "signing": "valid"
     },
@@ -695,24 +723,24 @@
       ],
       "support": "supported",
       "previous": "0.166.0",
-      "changes": 28,
+      "changes": 27,
       "categories": {
         "cli": 6,
         "config": 12,
-        "filesystem": 9,
+        "filesystem": 8,
         "prompt": 1
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 26,
-        "notable": 2
+        "informational": 21,
+        "notable": 6
       },
-      "undocumented": 18,
+      "undocumented": 17,
       "highlights": [
         "Injected context changed (+47 −53 chars)",
         "New setting: model_providers.<name>.gateway_oauth.credentials_store",
-        "Description of `codex agents` changed"
+        "New command at turn: `/proc/self/exe --codex-run-as-process-setup <n> <n> pipe  <repo> <install>/codex codex-linux-sandbox …` (linux/amd64)"
       ],
       "signing": "valid"
     },
@@ -6164,42 +6192,6 @@
         "New setting: apps.<name>.approvals_reviewer",
         "New command at turn: `bwrap --new-session --die-with-parent --ro-bind / / --dev /dev --bind <tmp> <tmp> --perms 555 --tmpf …` (linux/amd64)",
         "New setting: features.local_thread_store_compression"
-      ],
-      "signing": "valid"
-    },
-    {
-      "harness": "codex",
-      "name": "Codex CLI",
-      "version": "0.136.0",
-      "released_at": "2026-06-01T18:53:55.315Z",
-      "captured_at": "2026-11-05T09:54:28.532441Z",
-      "platforms": [
-        "darwin/arm64",
-        "linux/amd64"
-      ],
-      "support": "untested",
-      "previous": "0.135.0",
-      "changes": 59,
-      "categories": {
-        "binary": 1,
-        "caching": 1,
-        "cli": 14,
-        "config": 9,
-        "filesystem": 12,
-        "prompt": 3,
-        "tools": 19
-      },
-      "impact": {
-        "breaking": 0,
-        "degrading": 0,
-        "informational": 31,
-        "notable": 28
-      },
-      "undocumented": 38,
-      "highlights": [
-        "Injected context changed (+563 −0 chars)",
-        "System prompt changed (+56 −81 chars)",
-        "System prompt changed (+462 −376 chars)"
       ],
       "signing": "valid"
     }

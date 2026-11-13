@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-13T05:13:29.306022914Z",
+  "generated_at": "2026-11-13T09:01:26.428937767Z",
   "harnesses": [
     {
       "id": "claude",
@@ -16,7 +16,7 @@
       "last_change": {
         "from": "2.1.322",
         "to": "2.1.323",
-        "at": "2026-11-13T05:13:29.306022914Z",
+        "at": "2026-11-13T09:01:26.428937767Z",
         "released_at": "2026-11-12T20:29:28.626Z",
         "changes": 51,
         "categories": {
@@ -63,22 +63,24 @@
         "language": "rust"
       },
       "changelog": "https://github.com/openai/codex/releases",
-      "latest": "0.168.0",
-      "support": "supported",
-      "versions_tracked": 104,
+      "latest": "0.169.0",
+      "support": "untested",
+      "versions_tracked": 105,
       "first_tracked": "2026-01-25",
       "last_change": {
-        "from": "0.167.2",
-        "to": "0.168.0",
-        "at": "2026-11-13T05:13:29.306022914Z",
-        "released_at": "2026-11-13T04:00:31.594Z",
-        "changes": 61,
+        "from": "0.168.0",
+        "to": "0.169.0",
+        "at": "2026-11-13T09:01:26.428937767Z",
+        "released_at": "2026-11-13T08:43:21.818Z",
+        "changes": 514,
         "categories": {
-          "cli": 5,
-          "config": 37,
-          "filesystem": 2,
-          "telemetry": 16,
-          "tools": 1
+          "behavior": 1,
+          "binary": 1,
+          "cli": 8,
+          "config": 17,
+          "filesystem": 10,
+          "prompt": 1,
+          "telemetry": 476
         }
       }
     },
@@ -174,15 +176,14 @@
       "last_change": {
         "from": "0.67.0",
         "to": "0.68.0",
-        "at": "2026-11-13T05:13:29.306022914Z",
+        "at": "2026-11-13T09:01:26.428937767Z",
         "released_at": "2026-11-10T21:22:49.277Z",
-        "changes": 38,
+        "changes": 6,
         "categories": {
           "config": 3,
           "hooks": 1,
           "request": 1,
-          "storage": 1,
-          "telemetry": 32
+          "storage": 1
         }
       }
     },

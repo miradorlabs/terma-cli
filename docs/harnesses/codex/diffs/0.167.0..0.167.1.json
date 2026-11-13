@@ -3,7 +3,7 @@
   "harness": "codex",
   "from": "0.167.0",
   "to": "0.167.1",
-  "generated_at": "2026-11-13T05:13:29.306022914Z",
+  "generated_at": "2026-11-13T09:01:26.428937767Z",
   "source": {
     "compare": "https://github.com/openai/codex/compare/rust-v0.167.0...rust-v0.167.1"
   },
@@ -12,18 +12,18 @@
     "text": "## Changelog\n\nFull Changelog: https://github.com/openai/codex/compare/rust-v0.167.0...rust-v0.167.1"
   },
   "summary": {
-    "changes": 6,
+    "changes": 5,
     "categories": {
       "config": 1,
-      "filesystem": 5
+      "filesystem": 4
     },
     "impact": {
       "breaking": 0,
       "degrading": 0,
-      "informational": 6,
+      "informational": 5,
       "notable": 0
     },
-    "undocumented": 6
+    "undocumented": 5
   },
   "changes": [
     {
@@ -53,32 +53,6 @@
         ],
         "gone": false
       },
-      "documented": false
-    },
-    {
-      "id": "filesystem.darwin/arm64.sockets.connections.tcp <proxy>",
-      "category": "filesystem",
-      "op": "removed",
-      "path": [
-        "filesystem",
-        "darwin/arm64",
-        "sockets",
-        "connections",
-        "tcp <proxy>"
-      ],
-      "title": "No longer connects to <proxy> (tcp) (darwin/arm64)",
-      "impact": "informational",
-      "before": {
-        "count": 1,
-        "phases": [
-          "exit"
-        ],
-        "role": "proxy"
-      },
-      "after": null,
-      "text_diff": null,
-      "terma": null,
-      "source": null,
       "documented": false
     },
     {

@@ -14,7 +14,7 @@
     "last_change": {
       "from": "2.1.322",
       "to": "2.1.323",
-      "at": "2026-11-13T05:13:29.306022914Z",
+      "at": "2026-11-13T09:01:26.428937767Z",
       "released_at": "2026-11-12T20:29:28.626Z",
       "changes": 51,
       "categories": {
@@ -32,7 +32,7 @@
     {
       "version": "2.1.323",
       "released_at": "2026-11-12T20:29:28.626Z",
-      "captured_at": "2026-11-13T05:13:29.306022914Z",
+      "captured_at": "2026-11-13T09:01:26.428937767Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"
@@ -66,29 +66,26 @@
     {
       "version": "2.1.322",
       "released_at": "2026-11-10T01:58:41.811Z",
-      "captured_at": "2026-11-13T05:13:29.306022914Z",
+      "captured_at": "2026-11-13T09:01:26.428937767Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"
       ],
       "support": "supported",
       "previous": "2.1.321",
-      "changes": 19,
+      "changes": 1,
       "categories": {
-        "config": 1,
-        "telemetry": 18
+        "config": 1
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 19,
+        "informational": 1,
         "notable": 0
       },
-      "undocumented": 19,
+      "undocumented": 1,
       "highlights": [
-        "Telemetry export added",
-        "Telemetry surfaces.metrics/claude_code.active_time.total.monotonic added",
-        "Telemetry surfaces.metrics/claude_code.active_time.total.temporality added"
+        "fastMode description changed (+132 −72 chars)"
       ],
       "signing": "valid"
     },

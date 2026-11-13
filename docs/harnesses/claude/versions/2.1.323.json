@@ -3,7 +3,7 @@
   "harness": "claude",
   "version": "2.1.323",
   "platform": "darwin/arm64",
-  "captured_at": "2026-11-13T05:13:29.306022914Z",
+  "captured_at": "2026-11-13T09:01:26.428937767Z",
   "capture": {
     "command": [
       "claude",
@@ -34,7 +34,7 @@
       "side_requests": "2026-11-12T20:46:56.111817078Z",
       "storage": "2026-11-12T20:46:56.111817078Z",
       "support": "2026-11-13T05:13:29.306022914Z",
-      "telemetry": "2026-11-13T05:13:29.306022914Z",
+      "telemetry": "2026-11-13T09:01:26.428937767Z",
       "tools": "2026-11-12T20:46:56.111817078Z"
     }
   },
@@ -887,17 +887,6 @@
     }
   },
   "telemetry": {
-    "export": {
-      "interval_batches": {
-        "logs": 2,
-        "metrics": 1
-      },
-      "interval_ms": {
-        "logs": 5000,
-        "metrics": 60000
-      },
-      "protocol": "http/protobuf"
-    },
     "surfaces": {
       "logs/api_request": {
         "keys": {
@@ -2257,11 +2246,7 @@
               "text"
             ]
           }
-        },
-        "monotonic": true,
-        "temporality": "delta",
-        "type": "sum",
-        "unit": "s"
+        }
       },
       "metrics/claude_code.code_edit_tool.decision": {
         "keys": {
@@ -2371,11 +2356,7 @@
               "text"
             ]
           }
-        },
-        "monotonic": true,
-        "temporality": "delta",
-        "type": "sum",
-        "unit": "USD"
+        }
       },
       "metrics/claude_code.lines_of_code.count": {
         "keys": {
@@ -2461,10 +2442,7 @@
               "text"
             ]
           }
-        },
-        "monotonic": true,
-        "temporality": "delta",
-        "type": "sum"
+        }
       },
       "metrics/claude_code.token.usage": {
         "keys": {
@@ -2522,11 +2500,7 @@
               "text"
             ]
           }
-        },
-        "monotonic": true,
-        "temporality": "delta",
-        "type": "sum",
-        "unit": "tokens"
+        }
       },
       "resource": {
         "keys": {
@@ -2654,8 +2628,7 @@
               "number"
             ]
           }
-        },
-        "root": true
+        }
       },
       "traces/claude_code.llm_request": {
         "keys": {
@@ -2827,8 +2800,7 @@
               "text"
             ]
           }
-        },
-        "parent": "traces/claude_code.interaction"
+        }
       },
       "traces/claude_code.llm_request/events/gen_ai.request.attempt": {
         "keys": {
@@ -24542,7 +24514,7 @@
         "read": false
       }
     },
-    "fetched_at": "2026-11-13T05:13:29.306022914Z",
+    "fetched_at": "2026-11-13T09:01:26.428937767Z",
     "settings": {
       "advisorModel": {
         "default": "unset, so the advisor is off",
@@ -24553,7 +24525,7 @@
         "type": "string, one of the aliases `\"fable\"`, `\"opus\"`, or `\"sonnet\"`, which resolve to Claude Code's current default version of that model family, or a full model ID such as `\"claude-opus-5-5\"`"
       },
       "agent": {
-        "default": "unset, so the main thread runs as Claude Code's default agent",
+        "default": "unset",
         "description": "Run the main thread as a named subagent, so Claude Code applies that subagent's system prompt, tool restrictions, and model to your session. The same key sets the default agent for sessions you dispatch from `claude agents`.",
         "read": true,
         "scope": "Any file",
@@ -26375,15 +26347,6 @@
         "topic": "Model and responses",
         "type": "string, one of:"
       },
-      "subagentStatusLine": {
-        "default": "unset, so Claude Code renders the default rows",
-        "description": "When Claude runs subagents, Claude Code lists them in a task display below the prompt, one row per subagent showing `name · description · token count`. This key lets you run your own command to rewrite those rows, for example to show each subagent's context usage as a percentage. On each refresh, Claude Code sends the visible rows as one JSON object on stdin, with a `tasks` array carrying each subagent's `id`, `name`, `status`, `model`, `tokenCount`, and more, and replaces the row for each `id` you write back as a `{\"id\", \"content\"}` line. Rows you don't write back keep the default rendering.",
-        "read": true,
-        "scope": "Any file",
-        "scope_note": "When `allowManagedHooksOnly` is on, or `disableAllHooks` is set outside managed settings, only the managed settings value runs.",
-        "topic": "Interface and terminal",
-        "type": "object with `type` set to `\"command\"` and a `command` string"
-      },
       "switchModelsOnFlag": {
         "default": "unset. Claude Code switches automatically, though it may ask first in an interactive session",
         "description": "Choose what happens when a safety classifier flags a request: switch to the fallback model and continue, or pause so you can choose between switching and editing the prompt.",
@@ -27647,6 +27610,7 @@
       "responseComparisonEnabled",
       "showMessageTimestamps",
       "skipWorkflowUsageWarning",
+      "subagentStatusLine",
       "todoFeatureEnabled",
       "totalTokensReminder",
       "totalTokensReminderAfterUserTurn",
