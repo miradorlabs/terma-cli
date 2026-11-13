@@ -35,6 +35,25 @@ type Event struct {
 	// event to the repository list in force when it leaves. Local only.
 	Repository config.Repository `json:"repository,omitzero"`
 	Attrs      map[string]any    `json:"attrs,omitempty"`
+
+	// The destination multi-org routing gave the event when it was spooled, which is
+	// fixed: delivery rechecks it before sending and never routes the event again. An
+	// event without these is routed by attrs.project_id, as before. Local only.
+
+	// Profile is the profile whose routing state routed the event.
+	Profile string `json:"profile,omitempty"`
+	// Enrollment is the event's destination: the enrollment it is sent to, or the one
+	// whose team holds it.
+	Enrollment string `json:"enrollment,omitempty"`
+	// HoldKey is the pending binding holding the event, which is sent only if that binding
+	// is then bound to the holding team's organization.
+	HoldKey string `json:"hold_key,omitempty"`
+	// Run is the session run the event belongs to (internal/runs).
+	Run string `json:"run,omitempty"`
+	// OwnLocation is set when the event's location is its own, as a file event's checkout
+	// or the directory an agent's turn names is, rather than its run's: its run turning
+	// Mixed does not drop it.
+	OwnLocation bool `json:"own_location,omitempty"`
 }
 
 // ValidTraceID reports whether id is an OTel trace id: 32 lowercase hex digits, not all zero.
