@@ -2,6 +2,7 @@ package daemon
 
 import (
 	"maps"
+	"slices"
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/runs"
@@ -22,7 +23,8 @@ type cachedLedger struct {
 // this old never lets a part out.
 const ledgerTTL = time.Second
 
-// maxLedgers bounds the ledgers Route keeps; past it the expired ones go, then all.
+// maxLedgers bounds the ledgers Route keeps; past it the expired ones go, then the oldest
+// quarter of those left, so the sessions read last stay cached.
 const maxLedgers = 4096
 
 // mixedAt reports whether session's run in force at at was Mixed by then (runs.MixedAt),
@@ -59,9 +61,15 @@ func (t *Teams) remember(session string, e cachedLedger) {
 	}
 	if len(t.ledgers) >= maxLedgers {
 		maps.DeleteFunc(t.ledgers, func(_ string, c cachedLedger) bool { return e.read.Sub(c.read) >= t.ledgerTTL })
-		if len(t.ledgers) >= maxLedgers {
-			clear(t.ledgers)
+	}
+	if n := len(t.ledgers); n >= maxLedgers {
+		reads := make([]time.Time, 0, n)
+		for _, c := range t.ledgers {
+			reads = append(reads, c.read)
 		}
+		slices.SortFunc(reads, time.Time.Compare)
+		cutoff := reads[n/4]
+		maps.DeleteFunc(t.ledgers, func(_ string, c cachedLedger) bool { return !c.read.After(cutoff) })
 	}
 	t.ledgers[session] = e
 }

@@ -1,6 +1,7 @@
 package daemon
 
 import (
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -115,5 +116,28 @@ func TestASlowLedgerReadNeverReplacesANewerOne(t *testing.T) {
 	}
 	if _, mixed := teams.mixedAt("s1", time.Now()); !mixed {
 		t.Fatal("the slow read replaced the newer one: the run reads as not Mixed")
+	}
+}
+
+// A full cache of reads still fresh drops its oldest quarter, not everything: the sessions
+// read last stay cached.
+func TestAFullLedgerCacheDropsItsOldest(t *testing.T) {
+	t.Parallel()
+	teams, _, _ := countingTeams(t)
+	base := time.Now()
+	for i := range maxLedgers {
+		teams.remember(fmt.Sprint("s", i), cachedLedger{read: base.Add(time.Duration(i) * time.Microsecond)})
+	}
+	teams.remember("newest", cachedLedger{read: base.Add(time.Millisecond)})
+	if n := len(teams.ledgers); n < maxLedgers/2 || n > maxLedgers {
+		t.Fatalf("the cache keeps %d of %d", n, maxLedgers)
+	}
+	for _, kept := range []string{"newest", fmt.Sprint("s", maxLedgers-1)} {
+		if _, ok := teams.ledgers[kept]; !ok {
+			t.Errorf("%s, read last, was dropped", kept)
+		}
+	}
+	if _, ok := teams.ledgers["s0"]; ok {
+		t.Error("the oldest read was kept")
 	}
 }
