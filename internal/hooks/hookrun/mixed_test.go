@@ -445,7 +445,7 @@ func TestARefusedCrossingIsRecordedAside(t *testing.T) {
 		t.Fatalf("the next hook reads %+v", cur)
 	}
 	now := next.Time()
-	if !next.recordRun(sid, cur, next.decide(sid, cur, []routing.Location{{Kind: routing.Repository, Repository: "github.com/acme/api"}}, now), now) {
+	if !next.recordRun(sid, cur, next.decide(sid, cur, []routing.Location{{Kind: routing.Repository, Repository: "github.com/acme/api"}}, false, now), now) {
 		t.Fatal("the next hook's run is not Mixed")
 	}
 	if _, err := os.Stat(sidecar); !os.IsNotExist(err) {

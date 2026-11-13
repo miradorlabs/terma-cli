@@ -51,21 +51,22 @@ func (e Env) placeFor(r *Repo, ev spool.Event) {
 // place records that sessionID's run is at loc now, with c's checkout and processes, and
 // touched touched: c's placement under the session's ID and agentID's, or a mixed one.
 func (e Env) place(sessionID, agentID string, c claim.Claim, loc routing.Location, touched []routing.Location) {
-	e.judge(sessionID, agentID, c, append([]routing.Location{loc}, touched...), true)
+	e.judge(sessionID, agentID, c, append([]routing.Location{loc}, touched...), true, false)
 }
 
 // judge classifies locs (where the run is, and what it touched) with the run's earlier
 // locations (decide), records the result in the run ledger (recordRun), and writes the
-// placement: c at locs[0] when placed, else only a mixed one (placeRun). The ledger, with
-// its sidecar, decides Mixed, since delivery and the relay read only it.
-func (e Env) judge(sessionID, agentID string, c claim.Claim, locs []routing.Location, placed bool) {
+// placement: c at locs[0] when placed, else only a mixed one (placeRun). A call that may
+// have reached somewhere not known (UnknownReach) turns the run Mixed. The ledger, with its
+// sidecar, decides Mixed, since delivery and the relay read only it.
+func (e Env) judge(sessionID, agentID string, c claim.Claim, locs []routing.Location, placed, unknown bool) {
 	if !e.Routing.Usable() || !session.ValidID(sessionID) {
 		return
 	}
 	now := e.Time()
 	cur := e.currentRun(sessionID)
 	e.keepRun(sessionID, now)
-	mixed := e.recordRun(sessionID, cur, e.decide(sessionID, cur, locs, now), now)
+	mixed := e.recordRun(sessionID, cur, e.decide(sessionID, cur, locs, unknown, now), now)
 	if !placed && !mixed {
 		return
 	}
@@ -88,11 +89,11 @@ type verdict struct {
 	crossedWith func(been []string) bool
 }
 
-// decide classifies locs with where cur, the run, has been and its placement. It writes
-// nothing. A mixed placement the ledger does not back is a crossing both of whose writes
+// decide classifies locs with where cur, the run, has been and its placement; unknown, a
+// reach somewhere not known, is a crossing. It writes nothing. A mixed placement the ledger does not back is a crossing both of whose writes
 // failed (recordRun): it is recorded again, from when the placement turned Mixed, while the
 // placement lasts.
-func (e Env) decide(sessionID string, cur ledgerRun, locs []routing.Location, now time.Time) verdict {
+func (e Env) decide(sessionID string, cur ledgerRun, locs []routing.Location, unknown bool, now time.Time) verdict {
 	rt := e.Routing
 	v := verdict{seen: newLocations(cur.locations, locs)}
 	// Past the bound the ledger cannot rule a crossing out, so the run turns Mixed.
@@ -106,7 +107,7 @@ func (e Env) decide(sessionID string, cur ledgerRun, locs []routing.Location, no
 		v.mixed = true
 	case havePrev && prev.Kind == claim.KindMixed && prev.Run == cur.id:
 		v.mixed, v.since = true, mixedSince(prev, now)
-	case v.full || rt.crossed(prev, havePrev, cur.id, locs, cur.locations, now):
+	case unknown || v.full || rt.crossed(prev, havePrev, cur.id, locs, cur.locations, now):
 		v.mixed, v.since = true, now
 	}
 	return v

@@ -80,19 +80,20 @@ func TestShellPathsAreTheWordsThatNameSomethingThere(t *testing.T) {
 	}
 }
 
-// Only a command's first maxShellPaths candidates are examined, as the accepted risk on
-// ShellPaths says: Acme's checkout among the first turns the run Mixed however long the
-// command, and one only past the bound leaves the run as it was.
-func TestAShellCommandIsExaminedUpToTheCandidateBound(t *testing.T) {
+// A command's first maxShellPaths candidates are examined, and one with more counts as
+// reaching an unknown organization: Acme's checkout among the first turns the run Mixed,
+// and so does any command past the bound, though none of its candidates names another
+// checkout.
+func TestAShellCommandPastTheCandidateBoundTurnsTheRunMixed(t *testing.T) {
 	t.Parallel()
 	st := acmeAndPersonalRepos(t)
 	side, api := hookruntest.RepoAt(t, "github.com/dawson/side"), hookruntest.RepoAt(t, "github.com/acme/api")
 	for _, tc := range []struct {
 		candidates int
-		acmeAt     int // Acme's position among the candidates, from 0
+		acmeAt     int // Acme's position among the candidates, from 0; -1 for none
 		mixed      bool
-	}{{maxShellPaths, 0, true}, {maxShellPaths + 5, 0, true}, {maxShellPaths + 5, maxShellPaths, false}} {
-		t.Run(fmt.Sprint(tc.candidates), func(t *testing.T) {
+	}{{maxShellPaths, 0, true}, {maxShellPaths, -1, false}, {maxShellPaths + 1, -1, true}, {maxShellPaths + 5, maxShellPaths, true}} {
+		t.Run(fmt.Sprint(tc.candidates, tc.acmeAt), func(t *testing.T) {
 			t.Parallel()
 			m := newRoutedMachine(t, st)
 			sid := fmt.Sprintf("long-command-%d-%d", tc.candidates, tc.acmeAt)
@@ -106,9 +107,13 @@ func TestAShellCommandIsExaminedUpToTheCandidateBound(t *testing.T) {
 					words = append(words, fmt.Sprintf("src/missing-%d.go", i))
 				}
 			}
+			paths := ShellPaths(strings.Join(words, " "), side)
+			if past := slices.Contains(paths, UnknownReach); past != (tc.candidates > maxShellPaths) {
+				t.Fatalf("ShellPaths named UnknownReach %v for %d candidates", past, tc.candidates)
+			}
 			env := m.hook()
 			env.Cwd = side
-			env.Classify(context.Background(), r, sessionOf(sid), ShellPaths(strings.Join(words, " "), side), nil)
+			env.Classify(context.Background(), r, sessionOf(sid), paths, nil)
 			if ledger, placement := m.mixed(sid); ledger != tc.mixed || placement != tc.mixed {
 				t.Fatalf("ledger Mixed %v, mixed placement %v; want %v", ledger, placement, tc.mixed)
 			}

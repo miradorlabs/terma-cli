@@ -130,7 +130,7 @@ func (e Env) Report(r *Repo, sess session.Session, toolName string, paths []stri
 
 func (e Env) report(r *Repo, sess session.Session, toolName string, paths []string, extra map[string]any, confirmed bool) {
 	checkouts := e.checkouts(r, paths)
-	e.classifyTouches(r, sess, extra, checkouts)
+	e.classifyTouches(r, sess, extra, checkouts, false)
 	for _, c := range checkouts {
 		if e.Routing != nil && !c.repo.Collected() {
 			continue // a checkout Route drops records nothing, but its touch was classified
@@ -160,8 +160,9 @@ func (e Env) report(r *Repo, sess session.Session, toolName string, paths []stri
 // classifyTouches classifies, on a migrated machine, the checkouts among touched other than
 // r, the session's own, with r and the run's earlier locations before anything filters
 // them: a touch of another organization's checkout, or of one nobody collects but a pending
-// binding, makes the run Mixed. A file outside every checkout is not classified.
-func (e Env) classifyTouches(r *Repo, sess session.Session, extra map[string]any, touched []touched) {
+// binding, makes the run Mixed, and so does a reach somewhere not known (unknown). A file
+// outside every checkout is not classified.
+func (e Env) classifyTouches(r *Repo, sess session.Session, extra map[string]any, touched []touched, unknown bool) {
 	if e.Routing == nil || r.dest == nil {
 		return
 	}
@@ -171,13 +172,13 @@ func (e Env) classifyTouches(r *Repo, sess session.Session, extra map[string]any
 			locs = append(locs, t.repo.dest.loc)
 		}
 	}
-	if len(locs) == 0 {
+	if len(locs) == 0 && !unknown {
 		return
 	}
 	agent, _ := extra[semconv.TermaAgentIDKey].(string)
 	c := r.claim(sess.Tool)
 	c.Cwd, c.PIDs = e.workingDir(), claimPIDs()
-	e.place(sess.ID, agent, c, r.dest.loc, locs)
+	e.judge(sess.ID, agent, c, append([]routing.Location{r.dest.loc}, locs...), true, unknown)
 }
 
 // touched is the files of one checkout, repo-relative, as a set.
