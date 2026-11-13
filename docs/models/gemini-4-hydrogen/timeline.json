@@ -3,6 +3,33 @@
   "id": "gemini-4-hydrogen",
   "steps": [
     {
+      "at": "2026-11-13T13:24:07.003706179Z",
+      "event": "changed",
+      "changes": [
+        {
+          "id": "docs/whats_new",
+          "category": "docs",
+          "op": "changed",
+          "path": [
+            "docs",
+            "whats_new"
+          ],
+          "title": "What's new page changed (+142 −122 chars)",
+          "impact": "informational",
+          "before": null,
+          "after": null,
+          "text_diff": "@@ -421,8 +421,8 @@\n Gemini 4 Hydrogen is available on the free tier of the Gemini API and in Google AI Studio, and uses flat standard pricing on the paid tier across the full 1M context window:\n \n * **Free tier:** Free of charge (rate-limited; see [rate limits](/docs/rate-limits))\n-* **Input tokens:** $1.50 per 1M tokens\n-* **Cached input tokens:** $0.075 per 1M tokens via implicit caching (95% discount)\n+* **Input tokens:** $1.50 per 1M tokens  *   **Cached input tokens:** Implicit caching discounts cached input by 95%, to $0.075 per 1M tokens.\n+\n * **Output tokens, including thinking tokens:** $7.50 per 1M tokens\n \n We count and bill every token the model processes, including thinking tokens and internal tool system instructions and function declarations when using grounding. Grounding with Google Search remains billed per query.\n",
+          "stats": {
+            "added_chars": 142,
+            "removed_chars": 122
+          },
+          "terma": null,
+          "source": null,
+          "documented": null
+        }
+      ]
+    },
+    {
       "at": "2026-11-12T18:27:17.685902446Z",
       "event": "changed",
       "changes": [
