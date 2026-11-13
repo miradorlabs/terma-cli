@@ -3,21 +3,28 @@ package gemini
 import (
 	"cmp"
 	"context"
+	"encoding/json"
 
+	"github.com/miradorlabs/terma-cli/internal/agents/internal/reach"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/session"
 )
 
 // geminiHookInput is a hook's stdin; session_id is the session.id its telemetry carries.
 type geminiHookInput struct {
-	SessionID string `json:"session_id"`
-	Cwd       string `json:"cwd"`
-	ToolName  string `json:"tool_name"`
-	ToolInput struct {
-		FilePath     string `json:"file_path"`
-		Path         string `json:"path"`
-		AbsolutePath string `json:"absolute_path"`
-	} `json:"tool_input"`
+	SessionID string          `json:"session_id"`
+	Cwd       string          `json:"cwd"`
+	ToolName  string          `json:"tool_name"`
+	ToolInput json.RawMessage `json:"tool_input"`
+}
+
+// geminiReach is where a read's, a search's or a shell command's input names what it
+// reached: read_file, read_many_files, list_directory, glob, search_file_content and
+// run_shell_command, whose directory is relative to the cwd.
+var geminiReach = reach.Spec{
+	Paths:    []string{"file_path", "absolute_path", "path", "dir_path", "paths"},
+	Commands: []string{"command"},
+	Dirs:     []string{"directory", "dir_path"},
 }
 
 const geminiTool = "gemini"
@@ -58,12 +65,29 @@ func prompt(_ context.Context, env hookrun.Env) error {
 	return nil
 }
 
+// afterTool records what an edit tool wrote. Any other call, a read, a search or a shell
+// command, only classifies what it reached (hookrun.Env.Classify), on a migrated machine
+// alone: AfterTool matches every tool, and terma writes no BeforeTool, so a crossing is
+// marked once the call has run.
 func afterTool(ctx context.Context, env hookrun.Env) error {
 	in, ok := readGeminiInput(env)
-	if !ok || !geminiEditTools[in.ToolName] {
+	if !ok {
 		return nil
 	}
-	file := cmp.Or(in.ToolInput.FilePath, in.ToolInput.AbsolutePath, in.ToolInput.Path)
+	if !geminiEditTools[in.ToolName] {
+		if env.Routing != nil {
+			env.Cwd = cmp.Or(in.Cwd, env.Cwd)
+			env.Classify(ctx, nil, session.Session{ID: in.SessionID, Tool: geminiTool}, geminiReach.Of(in.ToolInput, env.Cwd), nil)
+		}
+		return nil
+	}
+	var input struct {
+		FilePath     string `json:"file_path"`
+		Path         string `json:"path"`
+		AbsolutePath string `json:"absolute_path"`
+	}
+	_ = json.Unmarshal(in.ToolInput, &input)
+	file := cmp.Or(input.FilePath, input.AbsolutePath, input.Path)
 	if file == "" {
 		return nil
 	}
