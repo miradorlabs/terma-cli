@@ -16,11 +16,31 @@ type Stats struct {
 	mu       sync.Mutex
 	started  time.Time
 	counters map[string]int
+	// blocked counts, on a migrated machine, the records each pending binding, blocked team
+	// and Mixed run kept from leaving. Their names carry repositories, enrollments and
+	// sessions, so they stay on this machine, for doctor: never on the heartbeat.
+	blocked map[string]int
 	// beat is the counters as of the last heartbeat that took them.
 	beat map[string]int
 }
 
-func newStats() *Stats { return &Stats{started: time.Now(), counters: map[string]int{}} }
+func newStats() *Stats {
+	return &Stats{started: time.Now(), counters: map[string]int{}, blocked: map[string]int{}}
+}
+
+// maxBlocked bounds the blockers counted by name; the rest count together.
+const maxBlocked = 1024
+
+// block counts n records blocked by blocker: "pending:<binding>", "team:<enrollment>" or
+// "mixed:<session>".
+func (s *Stats) block(blocker string, n int) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.blocked[blocker]; !ok && len(s.blocked) >= maxBlocked {
+		blocker = "overflow"
+	}
+	s.blocked[blocker] += n
+}
 
 func (s *Stats) add(key string, n int) {
 	s.mu.Lock()
@@ -83,6 +103,10 @@ func (s *Stats) dropped(sig Signal, reason string, n int) {
 type Snapshot struct {
 	Since    time.Time      `json:"since"`
 	Counters map[string]int `json:"counters"`
+	// Blocked is, on a migrated machine, the records each blocker kept from leaving, by
+	// "pending:<binding>", "team:<enrollment>" and "mixed:<session>": what doctor shows.
+	// It is never sent.
+	Blocked map[string]int `json:"blocked,omitempty"`
 }
 
 // Snapshot copies the counters.
@@ -91,7 +115,11 @@ func (s *Stats) Snapshot() Snapshot {
 	defer s.mu.Unlock()
 	c := make(map[string]int, len(s.counters))
 	maps.Copy(c, s.counters)
-	return Snapshot{Since: s.started, Counters: c}
+	snap := Snapshot{Since: s.started, Counters: c}
+	if len(s.blocked) > 0 {
+		snap.Blocked = maps.Clone(s.blocked)
+	}
+	return snap
 }
 
 // Keys lists the counters in order, for printing.

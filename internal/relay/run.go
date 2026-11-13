@@ -80,9 +80,12 @@ func (r *Relay) dropHeldAtExit() {
 	r.mu.Unlock()
 	for key, parts := range held {
 		for _, h := range parts {
-			_, _, why, ok, _ := r.decide(key, h.p.pid, h.p.at, h.p.narrow, h.p.claimed)
-			if ok {
+			v := r.judge(key, h.p)
+			why := v.why
+			if v.ok {
 				why = "claimed"
+			} else {
+				r.block(v.blocker, h.p.records)
 			}
 			r.stats.dropped(h.p.signal, why+"_at_exit", h.p.records)
 			if r.opts.Logf != nil {
@@ -99,6 +102,12 @@ func (r *Relay) countQueuedAtExit() {
 	for _, rt := range routes {
 		entries, _ := r.outbox.list(rt)
 		for _, e := range entries {
+			r.stats.add("queued_at_exit."+string(e.signal), e.records)
+		}
+	}
+	teams, _ := r.outbox.teamRoutes()
+	for _, rt := range teams {
+		for _, e := range r.outbox.teamNames(rt) {
 			r.stats.add("queued_at_exit."+string(e.signal), e.records)
 		}
 	}
@@ -133,6 +142,11 @@ func (r *Relay) Idle() (time.Duration, bool) {
 		return 0, false
 	}
 	for _, s := range r.senders {
+		if s.busy() {
+			return 0, false
+		}
+	}
+	for _, s := range r.teamSenders {
 		if s.busy() {
 			return 0, false
 		}
