@@ -233,7 +233,7 @@ func TestBrowserSignInSignsInToEveryOrganizationTicked(t *testing.T) {
 	}
 	for _, want := range []string{
 		"Signed in to Beta Labs and Acme\n",
-		"Not signed in to ClientCo. Run `terma teams` to authorize it.\n",
+		"Not signed in to ClientCo. Run `terma teams --authorize` to add it.\n",
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("sign-in lacks %q:\n%s", want, out)
@@ -356,7 +356,7 @@ func TestBrowserSignInKeepsTheOthersWhenAnExchangeFails(t *testing.T) {
 	if got := signedInOrgs(t); !slices.Equal(got, []string{orgB().ID, clientCo.ID}) {
 		t.Fatalf("signed in to %v, want Beta Labs and ClientCo", got)
 	}
-	if !strings.Contains(out, "Signed in to Beta Labs and ClientCo\n") || !strings.Contains(out, "Not signed in to Acme. Run `terma teams` to authorize it.\n") {
+	if !strings.Contains(out, "Signed in to Beta Labs and ClientCo\n") || !strings.Contains(out, "Not signed in to Acme. Run `terma teams --authorize` to add it.\n") {
 		t.Fatalf("sign-in output:\n%s", out)
 	}
 	if cred, _ := activeOrg(t); cred != orgB().ID {
@@ -435,5 +435,24 @@ func TestBrowserSignInWithOneCodeSignsInAsBefore(t *testing.T) {
 	}
 	if !strings.Contains(out, "Signed in to Acme\n") {
 		t.Fatalf("sign-in output:\n%s", out)
+	}
+}
+
+// Organizations left without a sign-in are named in one line, not one line each: often
+// they were left unticked on purpose.
+func TestNotSignedInIsOneLine(t *testing.T) {
+	t.Parallel()
+	for _, c := range []struct {
+		names []string
+		want  string
+	}{
+		{nil, ""},
+		{[]string{"ClientCo"}, "Not signed in to ClientCo. Run `terma teams --authorize` to add it."},
+		{[]string{"A", "B", "C"}, "Not signed in to 3 organizations: A, B and C. Run `terma teams --authorize` to add them."},
+		{[]string{"A", "B", "C", "D", "E", "F", "G"}, "Not signed in to 7 organizations, including A, B, C, D and E. Run `terma teams --authorize` to add them."},
+	} {
+		if got := notSignedIn(c.names); got != c.want {
+			t.Errorf("notSignedIn(%v) = %q, want %q", c.names, got, c.want)
+		}
 	}
 }
