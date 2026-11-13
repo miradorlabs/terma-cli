@@ -21,9 +21,10 @@ import (
 
 // Codex reads through the shell. On a migrated machine where Acme Platform collects
 // github.com/acme/*, bound to Acme, and personal only github.com/dawson/*, a thread that
-// reads Acme's checkout from personal's has crossed, though it wrote nothing and nothing is
-// spooled for the read; one in a folder nobody collects records the read for a later hook
-// in personal's checkout to see the crossing.
+// reads Acme's checkout from personal's has crossed before the command runs (its
+// PreToolUse), though it wrote nothing and nothing is spooled for the read; one in a
+// folder nobody collects records the read for a later hook in personal's checkout to see
+// the crossing.
 func TestRoutedCodexShellReadsReachingAcmeMakeTheRunMixed(t *testing.T) {
 	const sid = "01a08bd5-0487-74b1-9d82-45e619c57aaa"
 	for name, from := range map[string]func(t *testing.T, side string) string{
@@ -72,8 +73,12 @@ func TestRoutedCodexShellReadsReachingAcmeMakeTheRunMixed(t *testing.T) {
 			at := from(t, side)
 			hook(sessionStart, at, map[string]any{"hook_event_name": "SessionStart", "model": "gpt-6"})
 			hookruntest.Spooled(t, sp)
-			hook(postToolUse, at, map[string]any{"hook_event_name": "PostToolUse", "tool_name": codexShellTool, "tool_use_id": "c1",
-				"tool_input": map[string]any{"command": "cat " + filepath.Join(api, "NOTES.md") + " | head -n 5"}})
+			input := map[string]any{"command": "cat " + filepath.Join(api, "NOTES.md") + " | head -n 5"}
+			hook(preToolUse, at, map[string]any{"hook_event_name": "PreToolUse", "tool_name": codexShellTool, "tool_use_id": "c1", "tool_input": input})
+			if at == side && !mixed() {
+				t.Fatal("not Mixed before the read of Acme's checkout ran")
+			}
+			hook(postToolUse, at, map[string]any{"hook_event_name": "PostToolUse", "tool_name": codexShellTool, "tool_use_id": "c1", "tool_input": input})
 			if evs := hookruntest.Named(hookruntest.Spooled(t, sp), semconv.TermaFilesTouchedEvent); len(evs) != 0 {
 				t.Fatalf("a read spooled file events %+v", evs)
 			}
