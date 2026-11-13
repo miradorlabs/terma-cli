@@ -16,8 +16,10 @@ var claudeHooks = []struct {
 	{"SessionStart", "", "session-start"},
 	{"SessionEnd", "", "session-end"},
 	// Edits build the manifest; the Agent tool's response (Task in older builds) is the only place a
-	// subagent's model is named.
-	{"PostToolUse", "Edit|Write|MultiEdit|NotebookEdit|Agent|Task", "post-tool-use"},
+	// subagent's model is named. Reads, searches and shell commands only tell whether the run
+	// reached another organization's checkout (hookrun.Env.Classify); LS and NotebookRead are
+	// older builds' names.
+	{"PostToolUse", "Edit|Write|MultiEdit|NotebookEdit|Agent|Task|Read|Grep|Glob|NotebookRead|LS|Bash", "post-tool-use"},
 	{"Stop", "", "stop"},
 	{"StopFailure", "", "stop-failure"},
 	// The one hook before a turn exports anything, so the relay is up and the session claimed first.
