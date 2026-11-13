@@ -212,7 +212,8 @@ func sessionEnd(ctx context.Context, env hookrun.Env) error {
 
 // postToolUse adds the files a call's patch or shell command wrote to the manifest; Codex
 // has no file-edit event. It also drains replies and the thread's name: a Desktop voice turn
-// can run for hours before its Stop.
+// can run for hours before its Stop. What a shell call reached was classified before it
+// ran (preToolUse).
 func postToolUse(ctx context.Context, env hookrun.Env) error {
 	in, err := readCodexHookInput(env.Stdin)
 	if err != nil {
@@ -227,18 +228,16 @@ func postToolUse(ctx context.Context, env hookrun.Env) error {
 	attrs := hookrun.AgentAttrs(map[string]any{}, in.AgentID, in.AgentType)
 	r, err := env.Repo(ctx)
 	if err != nil {
-		// A location Route drops records nothing, but what the call reached still counts
-		// toward its run crossing organizations.
+		// A location Route drops records nothing, but what the call wrote still counts
+		// toward its run crossing organizations; what a shell call reached was classified
+		// before it ran (preToolUse).
 		candidates, _ := codexEditedPaths(in, env.Cwd)
-		env.Classify(ctx, nil, sess, append(candidates, codexShellPaths(in, env.Cwd)...), attrs)
+		env.Classify(ctx, nil, sess, candidates, attrs)
 		return nil
 	}
 	captureCodexFunding(ctx, env, r, in)
 	captureCodexDesktopActivity(ctx, env, r, in)
 	captureCodexTitle(ctx, env, r, in, captureCodexReplies(ctx, env, r, in))
-	// Codex reads through the shell: what a command reached, read or written, counts toward
-	// a crossing; only what it wrote is recorded below.
-	env.Classify(ctx, r, sess, codexShellPaths(in, env.Cwd), attrs)
 	candidates, commits := codexEditedPaths(in, env.Cwd)
 	if len(candidates) == 0 {
 		return nil
@@ -274,11 +273,15 @@ func postToolUse(ctx context.Context, env hookrun.Env) error {
 	return nil
 }
 
-// preToolUse records the files a shell call writes before its first commit, so that commit
-// is stamped: the call's PostToolUse comes after it. A write between two commits is left
-// out, since it would claim the first. A call that makes no commit has all its files
-// recorded, since Codex sends no PostToolUse for a patch it runs from the shell. The turn's
-// Stop withdraws the claims on files the call left unchanged (expected.go).
+// preToolUse classifies what a shell call is about to reach, and records the files it
+// writes before its first commit, so that commit is stamped: the call's PostToolUse comes
+// after it. Codex reads through the shell, so what a command reaches, read or written,
+// counts toward a crossing, classified before it runs so that its own output is exported
+// after the crossing it makes (hookrun.Env.Classify); on a machine not migrated nothing is
+// classified. A write between two commits is left out, since it would claim the first. A
+// call that makes no commit has all its files recorded, since Codex sends no PostToolUse
+// for a patch it runs from the shell. The turn's Stop withdraws the claims on files the
+// call left unchanged (expected.go).
 func preToolUse(ctx context.Context, env hookrun.Env) error {
 	in, err := readCodexHookInput(env.Stdin)
 	if err != nil {
@@ -289,6 +292,10 @@ func preToolUse(ctx context.Context, env hookrun.Env) error {
 		return nil
 	}
 	env.Cwd = cmp.Or(in.Cwd, env.Cwd)
+	sess := session.Session{ID: in.SessionID, Tool: codexTool, Model: in.Model}
+	if env.Routing != nil {
+		env.Classify(ctx, nil, sess, codexShellPaths(in, env.Cwd), hookrun.AgentAttrs(map[string]any{}, in.AgentID, in.AgentType))
+	}
 	paths, commits := codexEditedPaths(in, env.Cwd)
 	if len(commits) > 0 {
 		paths = paths[:commits[0]] // a write after a commit must not claim it
@@ -300,7 +307,6 @@ func preToolUse(ctx context.Context, env hookrun.Env) error {
 	if err != nil {
 		return nil
 	}
-	sess := session.Session{ID: in.SessionID, Tool: codexTool, Model: in.Model}
 	held := heldFiles(r, sess.Key())
 	expect(env, r, sess, held, env.Expect(r, sess, paths))
 	return nil

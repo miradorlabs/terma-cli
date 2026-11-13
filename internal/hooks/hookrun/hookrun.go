@@ -297,8 +297,9 @@ func (e Env) EmitFor(r *Repo, ev spool.Event) bool {
 }
 
 // emitFor is EmitFor for an event whose location is its own when own is set, as a file
-// event's checkout or a commit's repository is: on a migrated machine its session's run
-// turning Mixed does not drop it. With inRun it names its session's run.
+// event's checkout or a commit's repository is: on a migrated machine it routes by that
+// location, and its session's run turning Mixed does not drop it, since it carries no
+// content (runs.Locational). With inRun it names its session's run.
 func (e Env) emitFor(r *Repo, ev spool.Event, own, inRun bool) bool {
 	ev = e.stampFor(r, ev, own, inRun)
 	e.claimForRelay(r, ev)

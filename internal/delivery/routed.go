@@ -22,7 +22,8 @@ import (
 // (routing.Router.Recheck, then the run ledger) decides the rest, the first match winning:
 //
 //   - its enrollment ended, is Refused, or no longer covers it: dropped;
-//   - attributed through its run, which became Mixed at or before its time: dropped;
+//   - its run became Mixed at or before its time: dropped, unless it says only where
+//     something happened and routes by a location of its own (runs.Locational);
 //   - its team expired, signing in or suspended, or its binding still pending: held;
 //   - its team Active and still covering it: sent with that enrollment's key, filtered by
 //     the team's content rules now, or held while that key is missing or locked away.
@@ -271,12 +272,15 @@ func boundTo(d routing.Decision, organization string) bool {
 	return d.Authority.Kind == routing.Bound && d.Authority.Organization == organization
 }
 
-// mixed reports whether e is attributed through its session's run, rather than carrying
-// its own location, and that run crossed organizations at or before e's time. The run
-// ledger says so long after the claim that marked it has expired; one it cannot read
-// counts as Mixed from the start.
+// mixed reports whether e's session's run crossed organizations at or before e's time,
+// and e is not exempt: a record that carries content obeys its run's Mixed state even
+// when it routes by its own location, as a reply read from an agent's turn does. Only a
+// record with its own location that says where something happened and nothing else (a
+// file event, a commit, a push: runs.Locational) keeps its destination. The run ledger
+// says so long after the claim that marked it has expired; one it cannot read counts as
+// Mixed from the start.
 func (p *pass) mixed(e spool.Event) bool {
-	if e.OwnLocation || e.SessionID == "" {
+	if e.SessionID == "" || e.OwnLocation && runs.Locational(e.Name) {
 		return false
 	}
 	at, mixed := runs.MixedAt(p.r.StateDir, e.SessionID, e.Time)
