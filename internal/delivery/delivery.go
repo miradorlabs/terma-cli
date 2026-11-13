@@ -1,5 +1,8 @@
 // Package delivery sends the hook spool to Terma: each project's events with its own key
-// to its own environment's host, under the policy in force when they leave.
+// to its own environment's host, under the policy in force when they leave. On a machine
+// migrated to multi-org routing (config.Migrated), each event goes only to the enrollment
+// routing gave it when it was spooled, rechecked against its profile's routing state as it
+// leaves, and is never routed again (routed.go).
 package delivery
 
 import (
@@ -34,15 +37,29 @@ type Router struct {
 	// User is who events sent to projectID at endpoint name, by Mirador user id, asked as they
 	// are flushed, as the relay asks as it accepts a part; "" or a nil User names no one.
 	User func(cfg *config.Config, projectID, endpoint string) string
+	// EnrolledUser is User on a migrated machine: who events sent to team, an enrollment in
+	// profile's routing state, with a key filed with hosts, at endpoint name.
+	EnrolledUser func(profile string, team routing.Team, hosts keystore.Hosts, endpoint string) string
 }
 
-// Result summarizes one delivery pass; its counters are disjoint, one per reason.
+// Result summarizes one delivery pass; its counters are disjoint, one per reason, but for
+// Blocked and Unrouted, which say why some of Held were held.
 type Result struct {
 	Sent, Held, Failed, Expired, Pruned, Dropped, Unroutable, Withheld int
-	Skipped                                                            bool
-	Reason                                                             spool.SkipReason
-	NextAttempt                                                        time.Time
-	Err                                                                error
+	// Migrated is set when the pass ran under multi-org routing, where the rest apply.
+	Migrated bool
+	// Blocked are held until their team can send again (expired, signing in, suspended, or
+	// a binding still to be decided); Unrouted are held because their profile's routing
+	// state is missing, unreadable, or not yet committed by the migration.
+	Blocked, Unrouted int
+	// Discarded were dropped by their recheck: their team no longer collects them, or, for
+	// an event queued before the migration, its project maps to no team. Mixed were dropped
+	// because their session run crossed organizations by their time.
+	Discarded, Mixed int
+	Skipped          bool
+	Reason           spool.SkipReason
+	NextAttempt      time.Time
+	Err              error
 	// Failures names each failed project once, in order; doctor tells its own from another's.
 	Failures []Failure
 	// Waiting names each project skipped because its retry window was open.
@@ -69,13 +86,20 @@ func (r Result) Lost() bool {
 }
 
 // Flush delivers everything s holds, each project with its own key to its own host. A
-// keyless or policy-less project's events are held; a failing one backs off alone.
+// keyless or policy-less project's events are held; a failing one backs off alone. On a
+// migrated machine each event goes only to the destination it was spooled with (routed).
 func (r Router) Flush(ctx context.Context, s *spool.Spool, cfg *config.Config, force bool, minInterval time.Duration) Result {
 	var res Result
 	now := time.Now()
 	p := &pass{r: r, s: s, cfg: cfg, force: force, now: now, res: &res,
 		failed: map[string]bool{}, waiting: map[string]bool{}, accepted: map[string]bool{}}
-	fr := s.Flush(ctx, spool.SenderFunc(p.byProject), spool.FlushOptions{Force: force, MinInterval: minInterval, Now: now})
+	sender := spool.SenderFunc(p.byProject)
+	if config.Migrated(r.ConfigDir) {
+		res.Migrated = true
+		p.routes = routeCache{}
+		sender = p.routed
+	}
+	fr := s.Flush(ctx, sender, spool.FlushOptions{Force: force, MinInterval: minInterval, Now: now})
 	res.Endpoints = slices.Sorted(maps.Keys(p.accepted))
 	// Loss is the spool's to report; Sent is the router's per-project count.
 	res.Held = fr.Held
@@ -100,6 +124,8 @@ type pass struct {
 	res   *Result
 	// failed and waiting are keyed as retry windows are, by project; accepted by endpoint.
 	failed, waiting, accepted map[string]bool
+	// routes are a migrated machine's routing states, kept across the pass's batches.
+	routes routeCache
 }
 
 // byProject sends a batch the way a machine not yet migrated always has: each event to the
