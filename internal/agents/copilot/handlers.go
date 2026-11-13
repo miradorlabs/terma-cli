@@ -7,6 +7,7 @@ import (
 	"slices"
 
 	"github.com/miradorlabs/terma-cli/internal/agents/internal/applypatch"
+	"github.com/miradorlabs/terma-cli/internal/agents/internal/reach"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/session"
 )
@@ -67,10 +68,30 @@ func prompt(_ context.Context, env hookrun.Env) error {
 	return nil
 }
 
+// copilotReach is where a read's, a search's or a shell command's input names what it
+// reached, in the runtime's tools and VS Code's (read_file, list_dir, grep_search,
+// run_in_terminal).
+var copilotReach = reach.Spec{
+	Paths:    []string{"path", "file_path", "filePath", "notebook_path", "dirPath", "directory"},
+	Commands: []string{"command"},
+	Dirs:     []string{"cwd"},
+}
+
+// postToolUse records what an edit tool wrote. Any other call, a read, a search or a shell
+// command, only classifies what it reached (hookrun.Env.Classify), on a migrated machine
+// alone: Copilot's hooks give terma no call before it runs, so a crossing it makes is
+// marked once it has run.
 func postToolUse(ctx context.Context, env hookrun.Env) error {
 	in, ok := readInput(env)
+	if ok && !editTools[in.ToolName] {
+		if env.Routing != nil {
+			env.Cwd = cmp.Or(in.Cwd, env.Cwd)
+			env.Classify(ctx, nil, session.Session{ID: in.SessionID, Tool: name}, copilotReach.Of(in.ToolInput, env.Cwd), nil)
+		}
+		return nil
+	}
 	// A result the runtime names as anything but a success wrote nothing.
-	if !ok || !editTools[in.ToolName] || in.ToolResult.ResultType != "" && in.ToolResult.ResultType != "success" {
+	if !ok || in.ToolResult.ResultType != "" && in.ToolResult.ResultType != "success" {
 		return nil
 	}
 	paths := editedPaths(in.ToolInput)

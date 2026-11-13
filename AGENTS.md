@@ -172,9 +172,15 @@ there above one that is not, as a new file a redirect creates, and every `cd`'s 
 path through a symlink touches its target's checkout too. A command with more candidates
 than are examined, or a path in it whose expansion cannot be resolved, touches an
 organization not known, and the run turns Mixed (`hookrun.UnknownReach`). An edit records and spools as it always has; a
-read, a search or a shell command only classifies (`hookrun.Env.Classify`), in a PreToolUse
-hook before it runs, so that its own result is exported after the crossing it makes: it
-writes no manifest and spools nothing, and on a machine not migrated it does nothing. A hook whose own location Route drops still classifies what
+read, a search or a shell command only classifies (`hookrun.Env.Classify`): it writes no
+manifest and spools nothing, and on a machine not migrated it does nothing. Where the agent
+has a hook before the call, it classifies there, so that the call's own result is exported
+after the crossing it makes: Claude Code's PreToolUse and Codex's (shell calls). The others
+give terma no hook before a call that is not a permission gate, so a hook after it
+classifies, and a result exported before that hook runs may leave: Copilot's PostToolUse
+and Gemini's AfterTool (every tool), Cursor's postToolUse and postToolUseFailure (Read,
+Grep and Shell's input), and Antigravity's PostToolUse (every step); each reads a tool's
+input only for this (`agents/internal/reach`). A hook whose own location Route drops still classifies what
 the call touched, and that location, into the run ledger, and records and sends nothing
 else. `runs.Touch` returns the run's locations as it wrote them, so of two hooks of one run
 that each see half a crossing, the later sees it whole. The ledger alone says whether a run
