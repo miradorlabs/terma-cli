@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-13T12:55:12.122453Z",
+  "generated_at": "2026-11-13T13:08:26.328461566Z",
   "harnesses": [
     {
       "id": "claude",
@@ -64,23 +64,23 @@
       },
       "changelog": "https://github.com/openai/codex/releases",
       "latest": "0.169.0",
-      "support": "untested",
+      "support": "supported",
       "versions_tracked": 105,
       "first_tracked": "2026-01-25",
       "last_change": {
         "from": "0.168.0",
         "to": "0.169.0",
-        "at": "2026-11-13T09:01:26.428937767Z",
+        "at": "2026-11-13T13:08:26.328461566Z",
         "released_at": "2026-11-13T08:43:21.818Z",
-        "changes": 39,
+        "changes": 42,
         "categories": {
           "behavior": 1,
           "binary": 1,
-          "cli": 8,
+          "cli": 6,
           "config": 17,
           "filesystem": 10,
           "prompt": 1,
-          "telemetry": 1
+          "telemetry": 6
         }
       }
     },

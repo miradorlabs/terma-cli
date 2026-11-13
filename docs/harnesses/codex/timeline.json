@@ -23,6 +23,38 @@
           "documented": false
         },
         {
+          "id": "telemetry.surfaces.metrics/codex.rollout.persistence.append",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: metrics/codex.rollout.persistence.append",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.rollout.persistence.bytes_removed",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: metrics/codex.rollout.persistence.bytes_removed",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.rollout.persistence.item_bytes_v2",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: metrics/codex.rollout.persistence.item_bytes_v2",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.rollout.persistence.turn_bytes_v2",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: metrics/codex.rollout.persistence.turn_bytes_v2",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
           "id": "telemetry.surfaces.traces/list_models.root",
           "category": "telemetry",
           "op": "removed",
@@ -31,12 +63,12 @@
           "documented": true
         },
         {
-          "id": "cli.commands.codex app.description",
-          "category": "cli",
-          "op": "changed",
-          "title": "Description of `codex app` changed",
+          "id": "telemetry.surfaces.traces/mcp.runtime.apps_catalog_wait",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/mcp.runtime.apps_catalog_wait (9 fields)",
           "impact": "informational",
-          "documented": true
+          "documented": false
         },
         {
           "id": "cli.commands.codex exec.options.--trust",
@@ -51,14 +83,6 @@
           "category": "cli",
           "op": "added",
           "title": "New flag `codex review --trust`",
-          "impact": "informational",
-          "documented": true
-        },
-        {
-          "id": "cli.help.app --help",
-          "category": "cli",
-          "op": "changed",
-          "title": "Full help text of `app --help` changed (+105 −0 chars)",
           "impact": "informational",
           "documented": true
         },
@@ -821,6 +845,14 @@
           "category": "config",
           "op": "added",
           "title": "New setting: features.incremental_tools_legacy",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "filesystem.darwin/arm64.sockets.connections.tcp <proxy>",
+          "category": "filesystem",
+          "op": "removed",
+          "title": "No longer connects to <proxy> (tcp) (darwin/arm64)",
           "impact": "informational",
           "documented": false
         },
