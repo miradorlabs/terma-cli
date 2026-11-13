@@ -224,6 +224,8 @@ func (s State) check() error {
 			return errors.New("the personal team must be last")
 		case t.Policy.Global() && !t.Personal:
 			return fmt.Errorf("team %s collects everything but is not personal", t.TeamID)
+		case !t.owns(t.Policy):
+			return fmt.Errorf("team %s holds a policy fetched for another team, organization or environment", t.TeamID)
 		}
 		seen[t.EnrollmentID] = true
 	}

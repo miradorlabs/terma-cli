@@ -106,7 +106,9 @@ func ParseEntry(raw string, wildcards bool) (Entry, bool) {
 	}
 	norm := Normalize(raw)
 	if prefix, ok := strings.CutSuffix(norm, "/*"); wildcards && ok {
-		if n := segments(prefix); n >= 2 && !strings.Contains(prefix, "*") {
+		// The entry as typed must end in the `/*` itself: `.git` or a trailing slash that
+		// Normalize strips never turns `*.git` or `*/` into a wildcard.
+		if n := segments(prefix); n >= 2 && !strings.Contains(prefix, "*") && strings.HasSuffix(strings.TrimSpace(raw), "/*") {
 			return Entry{Raw: raw, key: prefix, fixed: n, wildcard: true}, true
 		}
 		return Entry{}, false
