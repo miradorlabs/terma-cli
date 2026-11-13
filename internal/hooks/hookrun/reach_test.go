@@ -74,7 +74,7 @@ func TestShellPathsAreTheWordsThatNameSomethingThere(t *testing.T) {
 		"cd .. && cat 'acme api/NOTES.md'":            {parent, notes},
 		"(cd src) && cat '../acme api/NOTES.md'":      {filepath.Join(cwd, "src"), notes},
 	} {
-		if got := ShellPaths(command, cwd); !slices.Equal(got, want) {
+		if got := ShellPaths(command, cwd); !sameReach(got, want) {
 			t.Errorf("ShellPaths(%q) = %q, want %q", command, got, want)
 		}
 	}
@@ -185,7 +185,7 @@ func TestRepoAtTakesTheCheckoutClassifyLocated(t *testing.T) {
 }
 
 // On Windows a backslash is the path separator, never an escape: an agent's shell command
-// (PowerShell, or Codex's shell) names C:\Users\... unquoted, and it is still a path.
+// (PowerShell or cmd) names C:\Users\... unquoted, and it is still a path.
 func TestAnUnquotedWindowsPathIsAPath(t *testing.T) {
 	t.Parallel()
 	if filepath.Separator != '\\' {
@@ -199,6 +199,53 @@ func TestAnUnquotedWindowsPathIsAPath(t *testing.T) {
 	for _, command := range []string{"cat " + notes, "Get-Content " + notes + " | Select-Object -First 5", `type "` + notes + `"`} {
 		if got := ShellPaths(command, dir); !slices.Contains(got, notes) {
 			t.Errorf("ShellPaths(%q) = %q, want %q among them", command, got, notes)
+		}
+	}
+}
+
+// sameReach reports whether ShellPaths found want. On Windows a command is also read with
+// backslashes literal (shellReadings), so it may find more: each path that reading adds
+// can only make a run Mixed, never miss one.
+func sameReach(got, want []string) bool {
+	if len(shellReadings()) == 1 {
+		return slices.Equal(got, want)
+	}
+	for _, p := range want {
+		if !slices.Contains(got, p) {
+			return false
+		}
+	}
+	return true
+}
+
+// Read with escapes off, as on Windows for PowerShell and cmd, a backslash stays in the
+// word; read with them on, as a POSIX shell, it escapes the next character. On Windows
+// ShellPaths takes both readings.
+func TestABackslashEscapesOnlyInAPOSIXReading(t *testing.T) {
+	t.Parallel()
+	words := func(command string, escapes bool) []string {
+		var out []string
+		for _, w := range shellWords(command, escapes) {
+			var b strings.Builder
+			for _, p := range w.parts {
+				b.WriteString(p.text)
+			}
+			out = append(out, b.String())
+		}
+		return out
+	}
+	for _, c := range []struct {
+		command string
+		escapes bool
+		want    []string
+	}{
+		{`cat C:\Users\me\NOTES.md`, false, []string{"cat", `C:\Users\me\NOTES.md`}},
+		{`cat ../acme\ api/NOTES.md`, true, []string{"cat", "../acme api/NOTES.md"}},
+		{`cat ../acme\ api/NOTES.md`, false, []string{"cat", `../acme\`, "api/NOTES.md"}},
+		{`cat "C:\Users\me\NOTES.md"`, false, []string{"cat", `C:\Users\me\NOTES.md`}},
+	} {
+		if got := words(c.command, c.escapes); !slices.Equal(got, c.want) {
+			t.Errorf("shellWords(%q, escapes %v) = %q, want %q", c.command, c.escapes, got, c.want)
 		}
 	}
 }

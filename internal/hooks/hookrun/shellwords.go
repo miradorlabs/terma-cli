@@ -67,8 +67,8 @@ var keepsCommand = []string{"!", "{", "if", "then", "else", "elif", "do", "while
 // and escaping backslashes are dropped, and what they held is marked quoted. A
 // here-document's body is read only when its command is a shell or its delimiter is
 // unquoted, its words then marked body unless that command is a shell.
-func shellWords(command string) []shellWord {
-	s := &scanner{rs: []rune(command)}
+func shellWords(command string, escapes bool) []shellWord {
+	s := &scanner{rs: []rune(command), escapes: escapes}
 	s.commands(0)
 	return s.words
 }
@@ -84,6 +84,9 @@ type scanner struct {
 	body bool
 	// literal reads $ and ` as text: a body whose delimiter was quoted expands nothing.
 	literal bool
+	// escapes is whether a backslash escapes the next character, as in a POSIX shell; else
+	// it is literal, as in PowerShell and cmd, where it separates a Windows path.
+	escapes bool
 }
 
 // heredoc is a here-document still to be read: its delimiter, whether that was quoted (its
@@ -195,7 +198,7 @@ func (s *scanner) bodies() {
 			}
 			lines = append(lines, line)
 		}
-		body := &scanner{rs: []rune(strings.Join(lines, "\n")), body: s.body || !h.shell, literal: h.quoted && !h.shell}
+		body := &scanner{rs: []rune(strings.Join(lines, "\n")), body: s.body || !h.shell, literal: h.quoted && !h.shell, escapes: s.escapes}
 		body.commands(0)
 		s.words = append(s.words, body.words...)
 	}
@@ -227,7 +230,7 @@ func (s *scanner) word(closer rune) shellWord {
 		case c == '"':
 			s.i++
 			s.doubleQuoted(&w, add)
-		case c == '\\' && backslashEscapes:
+		case c == '\\' && s.escapes:
 			switch next := s.peek(1); next {
 			case 0:
 				s.i++
@@ -253,11 +256,6 @@ func (s *scanner) word(closer rune) shellWord {
 	return w
 }
 
-// backslashEscapes is whether a backslash escapes the next character, as in a POSIX
-// shell. On Windows it is the path separator: PowerShell and cmd keep it as it is, and an
-// agent's shell command names C:\\Users\\... unquoted.
-var backslashEscapes = filepath.Separator == '/'
-
 // doubleQuoted reads the inside of double quotes into w: a backslash escapes only what is
 // special there, and expansions and substitutions stay live.
 func (s *scanner) doubleQuoted(w *shellWord, add func(partKind, string)) {
@@ -267,7 +265,7 @@ func (s *scanner) doubleQuoted(w *shellWord, add func(partKind, string)) {
 		case c == '"':
 			s.i++
 			return
-		case c == '\\' && backslashEscapes && strings.ContainsRune("\"\\$`\n", s.peek(1)):
+		case c == '\\' && s.escapes && strings.ContainsRune("\"\\$`\n", s.peek(1)):
 			if s.peek(1) != '\n' {
 				add(quoted, string(s.peek(1)))
 			}
