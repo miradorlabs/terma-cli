@@ -3,6 +3,7 @@ package doctor
 import (
 	"cmp"
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 	"time"
@@ -22,10 +23,12 @@ const (
 // that still routes by its one team, which doctor checks as before.
 type Routing struct {
 	State routing.State
-	// Err says why the profile's routing state cannot be read; Missing that it has none.
-	// Either way nothing is sent.
-	Err     error
-	Missing bool
+	// Err says why the profile's routing state cannot be read; Missing that it has none;
+	// Unfinished that the move to routing by teams has not committed it, saying why when
+	// the relay recorded it. Any of them sends nothing.
+	Err        error
+	Missing    bool
+	Unfinished string
 	// Teams and Orgs name teams and organizations by id, as `terma teams` last listed them.
 	Teams, Orgs map[string]string
 	// Key reports, masked, an enrollment's key on this machine: "" when it has none.
@@ -34,6 +37,10 @@ type Routing struct {
 	// no telemetry; MixedDropped counts what the relay dropped from such runs.
 	MixedSessions []string
 	MixedDropped  int
+	// Blocked counts what else the relay kept from leaving, as its last stop recorded it,
+	// by what blocked it: "pending:<binding>" for a binding still to decide and
+	// "team:<enrollment>" for a team that could not send.
+	Blocked map[string]int
 }
 
 // label names t: its organization's and its own name, else its id.
@@ -47,6 +54,29 @@ func (r Routing) label(t routing.Team) string {
 
 func (r Routing) org(id string) string { return cmp.Or(r.Orgs[id], id) }
 
+// unusable reports whether r's routing state sends nothing at all: unreadable, missing, or
+// not yet committed by the move to routing by teams.
+func (r Routing) unusable() bool { return r.Err != nil || r.Missing || r.Unfinished != "" }
+
+// MigrationBlock is why the last relay start did not move this machine to routing by
+// teams. The machine goes on collecting by its one team meanwhile.
+type MigrationBlock struct {
+	// Detail says why, and Fix what the developer does about it.
+	Detail, Fix string
+	// Fail: only the developer can unblock it, as with a second install the agents' hooks
+	// run. Otherwise a later relay start may move the machine by itself, and doctor warns.
+	Fail bool
+}
+
+// MigrationCheck judges b: a failure when only the developer can unblock it, else a warning.
+func MigrationCheck(b MigrationBlock) Check {
+	status := Warn
+	if b.Fail {
+		status = Fail
+	}
+	return Check{Status: status, Detail: "this machine has not moved to routing by teams: " + b.Detail, Fix: b.Fix}
+}
+
 // TeamsCheck judges the ticked teams. It fails while the routing state is unreadable or
 // missing (nothing is sent), while a team is suspended or refused, and while a binding a
 // ticked organization's entry needs is undecided: each blocks what it covers until the
@@ -57,6 +87,9 @@ func TeamsCheck(r Routing, now time.Time) Check {
 		return Check{Status: Fail, Detail: "this machine's routing state cannot be read, so nothing is sent: " + r.Err.Error(), Fix: "terma setup"}
 	case r.Missing:
 		return Check{Status: Fail, Detail: "this profile has no routing state, so nothing is sent", Fix: "terma setup"}
+	case r.Unfinished != "":
+		return Check{Status: Fail, Detail: "this machine's move to routing by teams has not finished, so nothing is sent until the relay finishes it: " + r.Unfinished,
+			Fix: "terma teams (it restarts the relay, which finishes the move)"}
 	case len(r.State.Teams) == 0:
 		return Check{Status: Warn, Detail: "no team is ticked, so nothing is collected", Fix: "terma teams"}
 	}
@@ -167,7 +200,7 @@ func RoutedRepository(r Routing, gitDir string, repoErr error, now time.Time) (C
 	if repoErr != nil {
 		return Check{Status: Fail, Detail: repoErr.Error()}, nil
 	}
-	if r.Err != nil || r.Missing {
+	if r.unusable() {
 		return Check{Status: Fail, Detail: "nothing is sent without a routing state", Fix: "terma setup"}, nil
 	}
 	loc, where := routing.Location{Kind: routing.OutsideGit}, "outside any repository with a hosted origin"
@@ -201,8 +234,8 @@ func RoutedRepository(r Routing, gitDir string, repoErr error, now time.Time) (C
 // state and last error, its key and what it lists; the bindings; what is undecided; and
 // what Mixed runs dropped.
 func TeamRows(r Routing, now time.Time) []Row {
-	if r.Err != nil || r.Missing {
-		return []Row{{"Teams", "none: no readable routing state, so nothing is sent"}}
+	if r.unusable() {
+		return []Row{{"Teams", "none: no usable routing state, so nothing is sent"}}
 	}
 	var rows []Row
 	label := "Teams"
@@ -251,6 +284,30 @@ func TeamRows(r Routing, now time.Time) []Row {
 		for _, s := range r.MixedSessions {
 			rows = append(rows, Row{"", "session " + s})
 		}
+	}
+	return append(rows, r.blockedRows()...)
+}
+
+// blockedRows say what the relay held, then dropped, for each pending binding and blocked
+// team, as its last stop counted it.
+func (r Routing) blockedRows() []Row {
+	var rows []Row
+	label := "Relay held"
+	for _, k := range slices.Sorted(maps.Keys(r.Blocked)) {
+		what := k
+		switch kind, name, _ := strings.Cut(k, ":"); kind {
+		case "pending":
+			what = name + ", undecided"
+		case "team":
+			what = name + ", no longer ticked"
+			if i := slices.IndexFunc(r.State.Teams, func(t routing.Team) bool { return t.EnrollmentID == name }); i >= 0 {
+				what = r.label(r.State.Teams[i]) + ", which could not send"
+			}
+		case "overflow":
+			what = "other blockers"
+		}
+		rows = append(rows, Row{label, fmt.Sprintf("%d record(s) for %s", r.Blocked[k], what)})
+		label = ""
 	}
 	return rows
 }

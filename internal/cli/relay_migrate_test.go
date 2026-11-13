@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -139,5 +140,65 @@ func TestTheRelaysMigrationWaitsForTheOrganizationType(t *testing.T) {
 	}
 	if key, err := keystore.Get(testApp.dir, betaCore); err != nil || key != testServerKey {
 		t.Fatalf("keys.json lost its key: %q, %v", key, err)
+	}
+}
+
+// Doctor on a machine the relay could not move says why, from what the migration
+// recorded: two installs fail, since only the developer can remove one.
+func TestDoctorSaysWhyTheMachineHasNotMoved(t *testing.T) {
+	legacyPersonalMachine(t)
+	exe, older := fakeInstall(t, "build 2"), fakeInstall(t, "build 1")
+	hookWith(t, older)
+	m := testApp.relayMigration(exe)
+	m.FlushWait = time.Second
+	if out, err := migrate.Run(context.Background(), *m); err != nil || out != migrate.NotMigrated {
+		t.Fatalf("migrate = %s, %v", out, err)
+	}
+	out, err := runTerma(t, "doctor")
+	if err == nil || !strings.Contains(out, "has not moved to routing by teams") || !strings.Contains(out, older) || !strings.Contains(out, "remove the other terma install") {
+		t.Fatalf("doctor (%v):\n%s", err, out)
+	}
+}
+
+// A migrated machine whose routing state the relay has not committed sends nothing, and
+// doctor fails saying the move has not finished.
+func TestDoctorFailsAMoveNotFinished(t *testing.T) {
+	migratedMachine(t, func(f *fakeAuth, s *routing.State) error {
+		id, err := s.Select(stateTeam(f, orgA().ID, acmeAPI, false, "github.com/acme/api"))
+		s.Migration = &routing.Migration{Phase: routing.Preparing, Legacy: map[string]string{acmeAPI: id}}
+		return err
+	}, orgA())
+	out, err := runTerma(t, "doctor")
+	if err == nil || !strings.Contains(out, "move to routing by teams has not finished") {
+		t.Fatalf("doctor (%v):\n%s", err, out)
+	}
+}
+
+// `terma teams` on a machine its relay cannot move says why as soon as the relay records
+// it, rather than waiting out its time, and changes nothing.
+func TestTeamsSaysWhyTheRelayDidNotMigrate(t *testing.T) {
+	legacyPersonalMachine(t)
+	exe, older := fakeInstall(t, "build 2"), fakeInstall(t, "build 1")
+	hookWith(t, older)
+	prevSpawn, prevWait := testApp.spawnRelay, testApp.migrationWait
+	t.Cleanup(func() { testApp.spawnRelay, testApp.migrationWait = prevSpawn, prevWait })
+	testApp.migrationWait = time.Minute
+	testApp.spawnRelay = func(string, string, string) {
+		m := testApp.relayMigration(exe)
+		m.FlushWait = time.Second
+		if _, err := migrate.Run(context.Background(), *m); err != nil {
+			t.Error(err)
+		}
+	}
+	start := time.Now()
+	_, _, err := teamsJSON(t)
+	if err == nil || !strings.Contains(err.Error(), "nothing was changed") || !strings.Contains(err.Error(), older) || !strings.Contains(err.Error(), "remove the other terma install") {
+		t.Fatalf("teams = %v", err)
+	}
+	if took := time.Since(start); took > 20*time.Second {
+		t.Fatalf("teams waited %s for a migration the relay said it would not make", took)
+	}
+	if config.Migrated(testApp.dir) {
+		t.Fatal("the machine moved")
 	}
 }

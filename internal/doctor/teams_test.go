@@ -138,11 +138,51 @@ func TestDoctorRoutesByTeamsOnceMigrated(t *testing.T) {
 	}
 
 	blocked := env(t, Probes{Credential: signedIn, Spool: func() SpoolState { return SpoolState{Open: true} }})
-	blocked.MigrationBlocked = "the agents' hooks run another terma, /usr/local/bin/terma"
-	if c := check(Run(t.Context(), blocked, Progress{}), KeyMigration); c.Status != Fail || !strings.Contains(c.Detail, "/usr/local/bin/terma") {
+	blocked.MigrationBlocked = &MigrationBlock{Detail: "the agents' hooks run another terma, /usr/local/bin/terma", Fix: "remove it", Fail: true}
+	if c := check(Run(t.Context(), blocked, Progress{}), KeyMigration); c.Status != Fail || !strings.Contains(c.Detail, "/usr/local/bin/terma") || c.Fix != "remove it" {
 		t.Errorf("migration blocked = %+v", c)
+	}
+	// One a later relay start may get past by itself warns.
+	blocked.MigrationBlocked = &MigrationBlock{Detail: "the organization type could not be asked", Fix: "terma teams"}
+	if c := check(Run(t.Context(), blocked, Progress{}), KeyMigration); c.Status != Warn || !strings.Contains(c.Detail, "organization type") {
+		t.Errorf("migration deferred = %+v", c)
 	}
 	if c := check(Run(t.Context(), env(t, Probes{Credential: signedIn, Spool: func() SpoolState { return SpoolState{Open: true} }}), Progress{}), KeyTeams); c.Key != "missing" {
 		t.Errorf("a machine not migrated got a teams check: %+v", c)
+	}
+}
+
+// A migrated machine whose routing state the move to routing by teams has not committed
+// sends nothing: the teams check fails saying so, and names no team as collecting.
+func TestDoctorFailsAMoveToTeamsNotFinished(t *testing.T) {
+	t.Parallel()
+	r := routed(t)
+	r.Unfinished = "copy the sign-ins: keychain locked"
+	if c := TeamsCheck(r, time.Now()); c.Status != Fail || !strings.Contains(c.Detail, "has not finished") || !strings.Contains(c.Detail, "keychain locked") {
+		t.Errorf("teams = %+v", c)
+	}
+	if rows := TeamRows(r, time.Now()); len(rows) != 1 || !strings.Contains(rows[0].Value, "nothing is sent") {
+		t.Errorf("rows = %+v", rows)
+	}
+	if c, team := RoutedRepository(r, "", nil, time.Now()); c.Status != Fail || team != nil {
+		t.Errorf("repository = %+v, %v", c, team)
+	}
+}
+
+// What the relay held, then dropped, for each pending binding and blocked team, as its
+// last stop counted it, is shown by what blocked it.
+func TestDoctorShowsWhatTheRelayHeld(t *testing.T) {
+	t.Parallel()
+	r := routed(t)
+	r.Blocked = map[string]int{"pending:github.com/torvalds/linux": 3, "team:" + r.State.Teams[0].EnrollmentID: 2, "team:ended": 1}
+	var text []string
+	for _, row := range TeamRows(r, time.Now()) {
+		text = append(text, row.Label+"|"+row.Value)
+	}
+	joined := strings.Join(text, "\n")
+	for _, want := range []string{"3 record(s) for github.com/torvalds/linux, undecided", "2 record(s) for Acme Platform, which could not send", "1 record(s) for ended, no longer ticked", "Relay held|"} {
+		if !strings.Contains(joined, want) {
+			t.Errorf("rows lack %q:\n%s", want, joined)
+		}
 	}
 }
