@@ -50,9 +50,11 @@ type fakeAuth struct {
 	scopedPolicies bool
 	policyBodies   map[string]string
 	// goneTeams answer their policy read as a team archived since the listing does (403,
-	// TEAM_NOT_FOUND); mintDown fails every key creation.
-	goneTeams map[string]bool
-	mintDown  bool
+	// TEAM_NOT_FOUND); forbiddenTeams with a 403 that names no reason; mintDown fails
+	// every key creation.
+	goneTeams      map[string]bool
+	forbiddenTeams map[string]bool
+	mintDown       bool
 	// mintedNames are the names keys were created with.
 	mintedNames []string
 	mu          sync.Mutex
@@ -135,6 +137,11 @@ func newFakeAuth(t *testing.T) *fakeAuth {
 			if f.scopedPolicies && !slices.ContainsFunc(projectsIn(org), func(p project) bool { return p.ID == r.URL.Query().Get("project_id") }) {
 				w.WriteHeader(http.StatusForbidden)
 				fmt.Fprint(w, `{"code":"PERMISSION_DENIED","message":"no such team in this organization"}`)
+				return
+			}
+			if f.forbiddenTeams[r.URL.Query().Get("project_id")] {
+				w.WriteHeader(http.StatusForbidden)
+				fmt.Fprint(w, `{"error":{"code":"PERMISSION_DENIED","message":"forbidden"}}`)
 				return
 			}
 			if f.goneTeams[r.URL.Query().Get("project_id")] {

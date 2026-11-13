@@ -271,12 +271,12 @@ func (app *App) teamPolicy(ctx context.Context, cfg *config.Config, cred *auth.C
 }
 
 // teamNotFound reports a policy read refused because the team is not an active one of the
-// organization (contract C3: 403 PERMISSION_DENIED, reason TEAM_NOT_FOUND). The account
-// service gives that one answer for a missing, archived, deleted or other organization's
-// team, so a 403 to the organization's own sign-in says as much as the reason does.
+// organization (contract C3: 403 PERMISSION_DENIED, reason TEAM_NOT_FOUND): missing,
+// archived, deleted or another organization's. It reads the reason, never the bare
+// status: any other 403 says nothing of the team, so the team stays listed as unreadable.
 func teamNotFound(err error) bool {
 	apiErr, ok := errors.AsType[*api.Error](err)
-	return ok && apiErr.StatusCode == http.StatusForbidden
+	return ok && apiErr.StatusCode == http.StatusForbidden && apiErr.Reason == api.ReasonTeamNotFound
 }
 
 // teamLabel names a team for a message: its name and organization's, else their ids.
