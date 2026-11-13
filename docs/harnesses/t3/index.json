@@ -11,22 +11,50 @@
       "language": "typescript"
     },
     "changelog": "https://github.com/pingdotgg/t3code/releases",
-    "latest": "0.1.8",
-    "support": "untested",
-    "versions_tracked": 2,
+    "latest": "0.1.9",
+    "support": "supported",
+    "versions_tracked": 6,
     "first_tracked": "2026-10-02",
     "last_change": {
-      "from": "0.0.45",
-      "to": "0.1.8",
-      "at": "2026-11-10T05:19:19.197557181Z",
-      "released_at": "2026-11-09T22:48:39.205Z",
-      "changes": 3,
+      "from": "0.1.8",
+      "to": "0.1.9",
+      "at": "2026-11-13T14:02:26.572801989Z",
+      "released_at": "2026-11-11T11:35:24.455Z",
+      "changes": 2,
       "categories": {
-        "support": 3
+        "support": 2
       }
     }
   },
   "versions": [
+    {
+      "version": "0.1.9",
+      "released_at": "2026-11-11T11:35:24.455Z",
+      "captured_at": "2026-11-13T14:02:26.572801989Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "0.1.8",
+      "changes": 2,
+      "categories": {
+        "support": 2
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 2
+      },
+      "undocumented": 0,
+      "highlights": [
+        "Terma: Telemetry reaches the project through the local relay now passes on darwin/arm64",
+        "Terma support: untested → supported"
+      ],
+      "signing": null,
+      "attempted_at": "2026-11-13T14:02:26.572801989Z",
+      "attempts": 1
+    },
     {
       "version": "0.1.8",
       "released_at": "2026-11-09T22:48:39.205Z",
@@ -35,24 +63,92 @@
         "darwin/arm64"
       ],
       "support": "untested",
-      "previous": "0.0.45",
-      "changes": 3,
+      "previous": "0.1.7",
+      "changes": 2,
       "categories": {
-        "support": 3
+        "support": 2
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 1,
+        "informational": 0,
         "notable": 2
       },
       "undocumented": 0,
       "highlights": [
         "Terma: Telemetry reaches the project through the local relay now not run on darwin/arm64",
-        "Terma support: supported → untested",
-        "support.capabilities.relay.telemetry@darwin/arm64.why added"
+        "Terma support: supported → untested"
       ],
       "signing": null
+    },
+    {
+      "version": "0.1.7",
+      "released_at": "2026-11-04T06:41:30.507Z",
+      "captured_at": "2026-11-13T14:02:26.572801989Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "0.1.6",
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": 0,
+      "highlights": [],
+      "signing": null,
+      "attempted_at": "2026-11-13T14:02:26.572801989Z",
+      "attempts": 1
+    },
+    {
+      "version": "0.1.6",
+      "released_at": "2026-10-31T10:53:56.49Z",
+      "captured_at": "2026-11-13T14:02:26.572801989Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "0.1.5",
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": 0,
+      "highlights": [],
+      "signing": null,
+      "attempted_at": "2026-11-13T14:02:26.572801989Z",
+      "attempts": 1
+    },
+    {
+      "version": "0.1.5",
+      "released_at": "2026-10-29T13:12:42.48Z",
+      "captured_at": "2026-11-13T14:02:26.572801989Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "0.0.45",
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": 0,
+      "highlights": [],
+      "signing": null,
+      "attempted_at": "2026-11-13T14:02:26.572801989Z",
+      "attempts": 1
     },
     {
       "version": "0.0.45",

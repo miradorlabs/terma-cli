@@ -1,0 +1,443 @@
+{
+  "schema_version": 1,
+  "harness": "copilot",
+  "from": "1.0.110",
+  "to": "1.0.111",
+  "generated_at": "2026-11-13T14:02:26.572801989Z",
+  "source": null,
+  "changelog": {
+    "url": "https://github.com/github/copilot-cli/blob/main/changelog.md",
+    "text": "- Add regular expression support to enterprise-managed Shell, Bash, and PowerShell permission rules\n- Add --host-allow-session-creation to let remote clients create sessions on CLI hosts for one launch without changing saved settings\n- Refresh /usage premium request usage so percentages stay current.\n- Prevent duplicate MCP OAuth reconnects and keep servers in needs-auth after canceled authorization\n- Markdown tables containing a wide symbol followed by the text variation selector, such as ⌛︎, render with correctly aligned rows\n- The `footer.showCodeChanges` setting description now says it shows the lines added and removed by Copilot's file edits in this session, not pending changes\n- The `/usage` activity graph now fits narrow terminals by showing fewer weeks, instead of wrapping every day row in two\n- Shell output and custom status lines display correctly when terminal control sequences appear, without applying unintended text styles\n- /rewind with Conversation + files no longer counts, lists or reports as restored a file that later turns had already put back or deleted again\n- Interactive /plugin marketplace commands find repository-local marketplaces when the CLI starts in a subdirectory\n- Keep selection labels readable and rows aligned in /environments when using --screen-reader\n- /skills get without a skill name and the /mcp usage text name the get and remove verbs instead of the retired info and delete\n- /diff shows a clear notice for binary files instead of garbled text or an empty pane\n- The `/usage` activity graph hides its legend in narrow panes to prevent it from wrapping onto extra lines\n- The $ shell shortcut reports launch failures once with a clear reason, including when Ctrl+G opens the editor at the same time.\n- /mcp search installs registry servers with URL variables using the values you enter\n- Custom status lines render terminal colors and formatting correctly, without stray characters after color resets.\n- Hook approval dialogs show control characters in tool names and arguments as visible text instead of hiding or restyling them\n- /session delete-all, /session prune, and /session delete preserve sessions running in the background in the same window\n- Text that fits on one row stays on one row after resizing the terminal\n- In `/workflows`, a run's Agents list no longer runs off the bottom of a short terminal: the selected agent stays on screen, and a long phase title stays on one row\n- copilot plugin enable, disable, update and uninstall now fail and name config.json when it cannot be parsed, instead of reporting success without a change or that the plugin is not installed\n- `--no-color` preserves text styling while disabling colors, even when `FORCE_COLOR` is set\n- Pasted image paths attach correctly when you press Enter immediately after pasting in terminals that mark pasted input\n- Keep the selected /share action visible when navigation keys cannot move the selection in short terminals\n- MCP forms show validation errors immediately for answers edited in an external editor with Ctrl+G\n- Running `copilot --continue` with no previous session shows the welcome header and Getting started box.\n- Keep the Sessions tab responsive when dialogs open during navigation, and show pending dialogs where they can be answered\n- Keep the highlighted confirmation option visible in the Sessions tab and /environments on short terminals\n- Keep the /theme picker's title and border on screen in narrow terminals and beside the docked Sessions sidebar, dropping the preview instead\n- The /share screen keeps the selected action visible in narrow terminals\n- /ask and /btw show answers correctly beside the Sessions sidebar in narrow terminals\n- Keep the /tasks title and borders visible when the task list is longer than the terminal can display\n- `copilot -p \"/compact\" --silent` no longer prints the compaction result line to stdout, so `--silent` output stays limited to the agent's response\n- Keep the prompt, tab bar, and status line visible when typing a multi-line draft during the startup animation on short terminals\n- /diff shows staged renames under their new names, including edits made while renaming\n- With experimental dynamic workflows, a workflow's own agent can no longer start or resume workflow runs, so a workflow can no longer start copies of itself without limit when all tools are allowed.\n- With the high-contrast theme on a 16 or 256-colour terminal, the Sessions tab shows the status icon of the selected row instead of drawing it blue on blue\n- Follow-ups typed while the agent is working now run in the order they were typed; one that reached the session between two turns is no longer overtaken by follow-ups typed after it.\n- The /usage activity graph counts only the prompts you typed, not sub-agent or autopilot prompts, and its message total matches the days the graph draws\n- Pasted escape sequences no longer change text colours or hide text in search fields\n- copilot -p with --trust-folder, run from a subdirectory of a repository, now warns that the hooks at the repository root were not loaded and says how to load them\n- Custom status lines display non-ASCII characters correctly even when commands write them in pieces\n- Copying inline code from wrapped rows after resizing the terminal no longer includes extra non-breaking spaces.\n- Queued slash commands now show an error when they fail instead of disappearing silently\n- Prompts sent as a turn finishes now run without waiting for background agents to complete\n- Dragging the sessions divider or scrollbar now ends cleanly when the left mouse button is no longer held.\n- Allow your own scratch files under /tmp on macOS without path permission prompts unless --disallow-temp-dir is set\n- Re-attaching an image or document after switching models or compacting a session sends its content to the model\n- Show an error when /update cannot download a release instead of leaving the download progress message indefinitely\n- Sessions started with /new or from the Sessions tab can be controlled from GitHub when remote sessions are enabled\n- Expand ${COPILOT_PLUGIN_ROOT} in plugin hook working directories and environment values\n- Push-to-talk preserves dictated text when held Space key repeats pause and resume\n- OAuth sign-in for remote MCP servers works through proxies that require Kerberos (Negotiate) authentication\n- Show permission prompts, questions, and confirmations directly in the sub-agent view so you can respond without leaving it\n- Keep text after terminal control sequences visible in labels and output, and hide embedded image data\n- Search in /skills, /mcp, and /plugin matches visible text instead of words hidden inside terminal escape sequences\n- Clear the previous profile's routed model from the footer and custom status line when switching Copilot Fusion profiles\n- Prevent @ file mentions and /sandbox path completion from selecting outdated suggestions when typing quickly\n- The /sandbox Credentials tab counts masked environment variables separately from unmasked suggestions\n- /resume keeps session rows aligned and columns visible with --screen-reader, and announces unread status once\n- Show all rows of wrapped Japanese, Chinese, and Korean text without clipping the last row or leaving extra blank rows\n- Resizing the terminal during a text-selection drag preserves the clipboard instead of copying empty lines or unhighlighted text\n- Keep the @ file picker up to date when ignore files change above the working directory\n- Autopilot confirmation hides Assisted Permissions when disabled by administrator policy and explains why they are unavailable.\n- Keep /config view tabs and the selected view readable in screen-reader mode on narrow terminals\n- Exiting the CLI on macOS and Linux now stops attached background shells even when they ignore termination signals.\n- Sandboxed MCP startup errors identify refused filesystem operations even when the server prints a stack trace\n- /mcp token counts exclude tools deferred by client-side tool search\n- Preserve freshly pasted text when stashing or opening the external editor, and prevent Ctrl+D from exiting while a paste is pending\n- Prevent the # issue and pull request picker from selecting outdated results when typing quickly\n- /plugin Details shows repository-local plugins without a User scope label and keeps versions separate from descriptions\n- Workspace MCP servers resolve relative working directories from their config's directory level, including after /cd or when launching from a subdirectory\n- /mcp delete removes a server without restarting other connected MCP servers\n- Keep Sessions sidebar and shell shortcut hints readable in narrow terminals by hiding hints that do not fit\n- Queued Copilot Fusion routing-profile changes show an acknowledgement when the current turn ends, before the next prompt.\n- Keep /diff responsive with large untracked files and show untracked symlinks by their target paths instead of their contents\n- HTML exports and rich-text copies preserve generic types and placeholders written in angle brackets, such as Vec<String> and <file>\n- Allow image generation when settings.json is empty or contains only whitespace\n- Keep the current location highlighted and announced to screen readers in narrow /config views while the area list has focus.\n- Installing MCP servers from the registry with optional fields left blank now preserves server defaults instead of saving placeholder text\n- Show agent IDs in /subagents when custom agents share a name, so you can tell which agent you configure\n- Keep /ask and /btw question headers in plain text when pasting colored terminal output or control characters\n- Keep the terminal's own colors in editors opened with Ctrl+G and shells opened with $ when the CLI's theme changes\n- MCP registry installs preserve npm launch arguments when the server already includes an install confirmation flag\n- Keep text typed immediately after a paste separate, so pasted image paths attach correctly and text after long pastes remains editable\n- Keep /config view tabs intact and the selected area visible on narrow terminals\n- Editor shortcuts stay inactive while the CLI exits, keeping the terminal ready for the shell\n- Show MCP servers that return an empty authentication challenge in the /mcp auth picker\n- Pasting text into Ctrl+R history search ignores escape sequences so matches, colors, and cursor placement stay correct\n- Pasting colored text into /plugin, /skills, and /mcp search matches the visible text and preserves dashboard colors\n- Emoji stay readable under the cursor in /model search, and long /diff search queries scroll on one line\n- Long search queries in the Sessions tab and /resume wrap correctly and keep the cursor aligned with typed text.\n- /diff lists copied files correctly when Git copy detection is enabled and preserves files whose names end in spaces\n- Keep Copilot model access when account lookups are rate-limited\n- Keep the exit status of a collapsed failed shell row whole in narrow terminals, and show as much of the command description as fits beside it\n- Deleting a session through the SDK while one of its client tools is running now cancels that tool's handler, instead of leaving it running after the session is gone.\n- A GITHUB_ASKPASS helper that never answers no longer stalls startup for over five minutes; sign-in now fails after one helper timeout\n- After `/code` hands a session off to VS Code, resuming that session in the same window and switching back no longer brings back the notice that it is open in VS Code Chat\n- Keep Windows drive letters with their paths when wrapping command previews in approval dialogs\n- A config.json that cannot be read, such as one with an extra closing brace or one cut short by an interrupted write, is no longer replaced at startup by a file holding only firstLaunchAt; its trusted folders, plugins, marketplaces and other saved state stay in the file\n- MCP enable/disable and plugin commands work when settings.json is empty\n- A remote MCP server that refuses or closes the first connection at session start, for example while it is still starting, is retried as planned instead of staying failed for the rest of the session\n- With sidebar.hoverFocus off and sidebar.showCloseButton on, moving the mouse over a Sessions sidebar card no longer moves the selection onto it\n- Copying an answer with the mouse keeps the blank lines inside blockquotes\n- The \"Compacting conversation history\" counter keeps counting from when the compaction started after the queue manager is opened and closed, instead of restarting at 0\n- A plugin whose plugin.json location holds a named pipe or a link to a device such as /dev/zero no longer hangs or exhausts memory when skills, prompts or plugin lists load it; the file is skipped like an unreadable manifest\n- Shell tool results no longer keep terminal escape sequences or hyperlink targets when a sequence is split across two reads of the command's output, as happens with coloured output larger than one read\n- After /compact, the runtime no longer keeps a CPU core busy until the next event, and the session's live event stream no longer skips events that arrive after a compaction removed earlier ones\n- A permission_prompt notification hook no longer runs for a request that Assisted Permissions approves without asking\n- Adding or changing a repository's GitHub remote while the CLI is running is now picked up straight away, so `/pr` no longer keeps saying the repository is not connected to GitHub until the CLI restarts.\n- When an extension fails to load, its log now shows the full error report, including the file and line of a syntax error, the stack trace and any cause, instead of a single line.\n- The Sessions sidebar row of the session you are in shows it working for the whole of a running turn, and screen readers hear \"status working\" instead of \"status done\"\n- With Auto selected, the footer's context percentage and the status line's displayed_context_limit now use the window of the model Auto routed to, matching /context, instead of a fixed 200,000 tokens\n- The standalone CLI now re-extracts its cached package when cli-native.node has gone missing from it, instead of failing on every start with Native addon \"cli-native\" not found\n- A workflow run that a session filesystem SQLite provider committed but reported as postCommitAmbiguous now starts, instead of failing and leaving a pending run that cannot be cancelled or resumed\n- An extension prompt asking for many sensitive environment variables on a short terminal now keeps the first listed name and the count of the rest on screen instead of scrolling every name out of view\n- The CLI's selection copies inline code and color swatches without decorative padding when their background color is shown\n- Context from multiple userPromptSubmitted hooks now reaches the model instead of only the last hook's context\n- Show organization support links in policy guidance and managed settings notices\n- Indexed search becomes available sooner after restarting, and its enabled notice appears only when the index can serve searches."
+  },
+  "summary": {
+    "changes": 19,
+    "categories": {
+      "cli": 4,
+      "config": 14,
+      "storage": 1
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 19,
+      "notable": 0
+    },
+    "undocumented": 14
+  },
+  "changes": [
+    {
+      "id": "cli.commands.copilot.options.--allow-tool.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "copilot",
+        "options",
+        "--allow-tool",
+        "description"
+      ],
+      "title": "`copilot --allow-tool`: description changed (+229 −67 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Tools the CLI has permission to use; will not prompt for permission\n+Tools the CLI has permission to use; will not prompt for permission. Takes rules like 'shell(npm:*)' for every npm command or 'write' for all file edits. Rules last for this run. Run `copilot help permissions` for the rule syntax\n",
+      "stats": {
+        "added_chars": 229,
+        "removed_chars": 67
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.commands.copilot.options.--deny-tool.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "copilot",
+        "options",
+        "--deny-tool",
+        "description"
+      ],
+      "title": "`copilot --deny-tool`: description changed (+244 −77 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Tools the CLI does not have permission to use; will not prompt for permission\n+Tools the CLI does not have permission to use; will not prompt for permission. Takes rules like 'shell(git push)' or 'write(.env)'. Deny rules win over every allow, even --allow-all and --yolo. Run `copilot help permissions` for the rule syntax\n",
+      "stats": {
+        "added_chars": 244,
+        "removed_chars": 77
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.commands.copilot.options.--disallow-temp-dir.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "copilot",
+        "options",
+        "--disallow-temp-dir",
+        "description"
+      ],
+      "title": "`copilot --disallow-temp-dir`: description changed",
+      "impact": "informational",
+      "before": "Prevent automatic access to the system temporary directory",
+      "after": "Prevent automatic access to the system temporary directory (and your /tmp files on macOS)",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.--help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "--help"
+      ],
+      "title": "Full help text of `--help` changed (+524 −119 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -72,7 +72,9 @@\n           Allow access to all URLs without confirmation\n       --allow-tool [<tools>...]\n           Tools the CLI has permission to use; will not prompt for\n-          permission\n+          permission. Takes rules like 'shell(npm:*)' for every npm\n+          command or 'write' for all file edits. Rules last for this\n+          run. Run `copilot help permissions` for the rule syntax\n       --allow-url [<urls>...]\n           Allow access to specific URLs or domains\n       --assisted-approval\n@@ -109,7 +111,10 @@\n           Resume the most recent session\n       --deny-tool [<tools>...]\n           Tools the CLI does not have permission to use; will not\n-          prompt for permission\n+          prompt for permission. Takes rules like 'shell(git push)'\n+          or 'write(.env)'. Deny rules win over every allow, even\n+          --allow-all and --yolo. Run `copilot help permissions`\n+          for the rule syntax\n       --deny-url [<urls>...]\n           Deny access to specific URLs or domains, takes precedence\n           over --allow-url\n@@ -122,7 +127,7 @@\n       --disable-mcp-server <server-name>\n           Disable a specific MCP server (can be used multiple times)\n       --disallow-temp-dir\n-          Prevent automatic access to the system temporary directory\n+          Prevent automatic access to the system temporary directory (and your /tmp files on macOS)\n       --dynamic-retrieval <category=on|off>\n           Enable or disable embeddings-based dynamic retrieval per\n           category and persist the choice (category: skills).\n",
+      "stats": {
+        "added_chars": 524,
+        "removed_chars": 119
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.commandHistoryMaxSize.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "commandHistoryMaxSize",
+        "description"
+      ],
+      "title": "commandHistoryMaxSize description changed (+122 −97 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Maximum number of recent prompts kept for ctrl+r command-history search (1-1000). Defaults to 50.\n+Maximum number of recent prompts kept for up/down arrow recall and ctrl+r command-history search (1-1000). Defaults to 50.\n",
+      "stats": {
+        "added_chars": 122,
+        "removed_chars": 97
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.footer.showCodeChanges.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "footer.showCodeChanges",
+        "description"
+      ],
+      "title": "footer.showCodeChanges description changed (+268 −40 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Show pending code changes in the footer.\n+Show the lines added and removed by Copilot's file edits in this session (+N -M) in the footer. In a local session the counts add up over the whole session; in an attached relay session they are the host-reported net changes. They are not your uncommitted git changes.\n",
+      "stats": {
+        "added_chars": 268,
+        "removed_chars": 40
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.keepAlive.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "keepAlive",
+        "description"
+      ],
+      "title": "keepAlive description changed (+268 −66 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Prevent the system from sleeping during a session (on, off, busy).\n+Prevent the system from sleeping, from the start of every interactive run (/keep-alive changes it for the current run only). on keeps it awake for the whole run; busy only while the agent is working, so it can sleep between turns; off, the default, leaves sleep alone.\n",
+      "stats": {
+        "added_chars": 268,
+        "removed_chars": 66
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.permissions.defaultMode",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "permissions.defaultMode"
+      ],
+      "title": "New setting: permissions.defaultMode",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Enterprise-managed permission mode new sessions start in: manual, assisted or allow-all. It takes precedence over your defaultPermissionMode, but a mode chosen at launch (such as --allow-all) and resumed sessions keep theirs. An unrecognized value, or a mode the same policy disables, starts in manual; when several policy sources set it, the most restrictive wins.",
+        "enum": [
+          "manual",
+          "assisted",
+          "allow-all"
+        ],
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.permissions.limitTo",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "permissions.limitTo"
+      ],
+      "title": "New setting: permissions.limitTo",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Enterprise-managed allowlist of domains for the agent's URL fetches and for shell commands that name a URL: a request outside it is denied without a prompt, even if an allow rule matches. Entries are Domain(...) rules: Domain(example.com) admits only that host, Domain(*.example.com) also its subdomains. An invalid list blocks every domain.",
+        "type": "array"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.renderHexColors.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "renderHexColors",
+        "description"
+      ],
+      "title": "renderHexColors description changed (+246 −110 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Render standalone six-digit hex color codes (e.g. #FF0000), including those in inline code, as color swatches.\n+Render standalone six-digit hex color codes (e.g. #FF0000), including those in inline code, as color swatches. Swatches need a 24-bit (truecolor) terminal: in a 256- or 16-color terminal, or with NO_COLOR or --no-color, the codes stay plain text.\n",
+      "stats": {
+        "added_chars": 246,
+        "removed_chars": 110
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.sandbox.userPolicy.filesystem.deniedPaths.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "sandbox.userPolicy.filesystem.deniedPaths",
+        "description"
+      ],
+      "title": "sandbox.userPolicy.filesystem.deniedPaths description changed (+219 −108 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,4 +1,6 @@\n-Absolute paths sandboxed commands are denied access to, even if nested under a read/write or read-only path.\n+Paths sandboxed commands are denied access to, even if nested under a read/write or read-only path.\n+Write an entry as an absolute path, ~/...\n+for your home directory, or a path relative to the session's working directory.\n Entries can use environment variables as $VAR, ${VAR} or ${VAR:-default} (for example $HOME/.cache); an unset or empty one with no default is an error, not an empty path.\n Values come from Copilot's own environment, %VAR% is not expanded, and $$ is a literal $.\n /sandbox policy shows the expanded paths.\n",
+      "stats": {
+        "added_chars": 219,
+        "removed_chars": 108
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.sandbox.userPolicy.filesystem.enumeratePaths.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "sandbox.userPolicy.filesystem.enumeratePaths",
+        "description"
+      ],
+      "title": "sandbox.userPolicy.filesystem.enumeratePaths description changed (+478 −256 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,5 @@\n-Windows only: absolute directories sandboxed commands can list and query attributes of, without reading file contents (for example a drive root like C:\\). Ignored, with a log, on Windows builds without filesystem enumeration support and on other platforms.\n+Windows only: directories sandboxed commands can list and query attributes of, without reading file contents (for example a drive root like C:\\).\n+Ignored, with a log, on Windows builds without filesystem enumeration support and on other platforms.\n+Write an entry as an absolute path, ~/...\n+for your home directory, or a path relative to the session's working directory.\n+Entries can use environment variables as $VAR, ${VAR} or ${VAR:-default}, with the same rules as readwritePaths.\n",
+      "stats": {
+        "added_chars": 478,
+        "removed_chars": 256
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.sandbox.userPolicy.filesystem.readonlyPaths.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "sandbox.userPolicy.filesystem.readonlyPaths",
+        "description"
+      ],
+      "title": "sandbox.userPolicy.filesystem.readonlyPaths description changed (+171 −60 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,4 +1,6 @@\n-Absolute paths sandboxed commands can read but not write to.\n+Paths sandboxed commands can read but not write to.\n+Write an entry as an absolute path, ~/...\n+for your home directory, or a path relative to the session's working directory.\n Entries can use environment variables as $VAR, ${VAR} or ${VAR:-default} (for example $HOME/.cache); an unset or empty one with no default is an error, not an empty path, except that the host preserves an existing literal grant path.\n Values come from Copilot's own environment, %VAR% is not expanded, and $$ is a literal $.\n /sandbox policy shows the expanded paths.\n",
+      "stats": {
+        "added_chars": 171,
+        "removed_chars": 60
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.sandbox.userPolicy.filesystem.readwritePaths.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "sandbox.userPolicy.filesystem.readwritePaths",
+        "description"
+      ],
+      "title": "sandbox.userPolicy.filesystem.readwritePaths description changed (+172 −61 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,4 +1,6 @@\n-Absolute paths sandboxed commands can read from and write to.\n+Paths sandboxed commands can read from and write to.\n+Write an entry as an absolute path, ~/...\n+for your home directory, or a path relative to the session's working directory.\n Entries can use environment variables as $VAR, ${VAR} or ${VAR:-default} (for example $HOME/.cache); an unset or empty one with no default is an error, not an empty path, except that the host preserves an existing literal grant path.\n Values come from Copilot's own environment, %VAR% is not expanded, and $$ is a literal $.\n /sandbox policy shows the expanded paths.\n",
+      "stats": {
+        "added_chars": 172,
+        "removed_chars": 61
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.COMSPEC",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "COMSPEC"
+      ],
+      "title": "Environment variable no longer read: COMSPEC",
+      "impact": "informational",
+      "before": "COMSPEC",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.COPILOT_EDITOR",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "COPILOT_EDITOR"
+      ],
+      "title": "Environment variable no longer read: COPILOT_EDITOR",
+      "impact": "informational",
+      "before": "COPILOT_EDITOR",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.PATHEXT",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "PATHEXT"
+      ],
+      "title": "Environment variable no longer read: PATHEXT",
+      "impact": "informational",
+      "before": "PATHEXT",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.VSCODE_IPC_HOOK_CLI",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "VSCODE_IPC_HOOK_CLI"
+      ],
+      "title": "Environment variable no longer read: VSCODE_IPC_HOOK_CLI",
+      "impact": "informational",
+      "before": "VSCODE_IPC_HOOK_CLI",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "storage.logs.path",
+      "category": "storage",
+      "op": "changed",
+      "path": [
+        "storage",
+        "logs",
+        "path"
+      ],
+      "title": "On-disk logs path changed",
+      "impact": "informational",
+      "before": "<home>/.copilot/logs/process-<n>-<n>.log",
+      "after": "<home>/.copilot/logs/process-<n>-4003.log",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    }
+  ]
+}

@@ -3,8 +3,8 @@
   "harness": "copilot",
   "window": {
     "oldest": "1.0.105",
-    "newest": "1.0.110",
-    "builds": 6
+    "newest": "1.0.111",
+    "builds": 7
   },
   "items": {
     "cli.commands.copilot app": {
@@ -1728,8 +1728,8 @@
       "ranges": [
         {
           "since": "1.0.105",
-          "until": null,
-          "removed": null
+          "until": "1.0.110",
+          "removed": "1.0.111"
         }
       ],
       "since_bounded": false
@@ -2113,8 +2113,8 @@
       "ranges": [
         {
           "since": "1.0.105",
-          "until": null,
-          "removed": null
+          "until": "1.0.110",
+          "removed": "1.0.111"
         }
       ],
       "since_bounded": false
@@ -3521,8 +3521,8 @@
       "ranges": [
         {
           "since": "1.0.105",
-          "until": null,
-          "removed": null
+          "until": "1.0.110",
+          "removed": "1.0.111"
         }
       ],
       "since_bounded": false
@@ -3829,8 +3829,8 @@
       "ranges": [
         {
           "since": "1.0.105",
-          "until": null,
-          "removed": null
+          "until": "1.0.110",
+          "removed": "1.0.111"
         }
       ],
       "since_bounded": false
@@ -5122,6 +5122,17 @@
       ],
       "since_bounded": false
     },
+    "config.options.permissions.defaultMode": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.0.111",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.options.permissions.deny": {
       "kind": "setting",
       "ranges": [
@@ -5154,6 +5165,17 @@
         }
       ],
       "since_bounded": false
+    },
+    "config.options.permissions.limitTo": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.0.111",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
     },
     "config.options.pinnedPrompts": {
       "kind": "setting",

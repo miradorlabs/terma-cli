@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "harness": "t3",
+  "version": "0.1.5",
+  "platform": "",
+  "captured_at": "2026-11-13T14:02:26.572801989Z",
+  "capture": {
+    "partial": false,
+    "sections": {
+      "support": "2026-11-13T14:02:26.572801989Z"
+    },
+    "attempted_at": "2026-11-13T14:02:26.572801989Z",
+    "attempts": 1
+  },
+  "side_requests": null,
+  "support": {
+    "capabilities": [
+      {
+        "id": "relay.telemetry",
+        "label": "Telemetry reaches the project through the local relay",
+        "platform": "darwin/arm64",
+        "result": "pass"
+      }
+    ],
+    "status": "supported"
+  }
+}

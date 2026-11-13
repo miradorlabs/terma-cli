@@ -73,7 +73,7 @@
       "label": "The machine's heartbeat reaches the project's ingest"
     }
   ],
-  "generated_at": "2026-11-13T13:31:21Z",
+  "generated_at": "2026-11-13T14:02:25Z",
   "harnesses": [
     {
       "ID": "claude",
@@ -8316,6 +8316,61 @@
       "test": "TestRelayCodex/v0.169.0"
     },
     {
+      "harness": "copilot",
+      "version": "1.0.111",
+      "platform": "darwin/arm64",
+      "capability": "relay.content_allowed",
+      "result": "pass",
+      "last_run": "2026-11-13T14:00:15.990999Z",
+      "first_passed": "2026-11-13T14:00:15.990999Z",
+      "terma": "terma version dev",
+      "test": "TestRelayCopilot/v1.0.111/content"
+    },
+    {
+      "harness": "copilot",
+      "version": "1.0.111",
+      "platform": "darwin/arm64",
+      "capability": "relay.content_withheld",
+      "result": "pass",
+      "last_run": "2026-11-13T14:00:53.480928Z",
+      "first_passed": "2026-11-13T14:00:53.480928Z",
+      "terma": "terma version dev",
+      "test": "TestRelayCopilot/v1.0.111/withheld"
+    },
+    {
+      "harness": "copilot",
+      "version": "1.0.111",
+      "platform": "darwin/arm64",
+      "capability": "relay.only_opted_in",
+      "result": "pass",
+      "last_run": "2026-11-13T14:01:10.038039Z",
+      "first_passed": "2026-11-13T14:01:10.038039Z",
+      "terma": "terma version dev",
+      "test": "TestRelayCopilotOutsideARepository/v1.0.111"
+    },
+    {
+      "harness": "copilot",
+      "version": "1.0.111",
+      "platform": "darwin/arm64",
+      "capability": "relay.telemetry",
+      "result": "pass",
+      "last_run": "2026-11-13T14:00:53.481088Z",
+      "first_passed": "2026-11-13T14:00:53.481088Z",
+      "terma": "terma version dev",
+      "test": "TestRelayCopilot/v1.0.111"
+    },
+    {
+      "harness": "copilot",
+      "version": "1.0.111",
+      "platform": "darwin/arm64",
+      "capability": "relay.tools_no_token",
+      "result": "pass",
+      "last_run": "2026-11-13T14:01:28.087359Z",
+      "first_passed": "2026-11-13T14:01:28.087359Z",
+      "terma": "terma version dev",
+      "test": "TestRelayCopilotToolsGetNoExporter/v1.0.111"
+    },
+    {
       "harness": "dsh",
       "version": "0.2.0-rc.2",
       "platform": "darwin/arm64",
@@ -9893,33 +9948,33 @@
       "version": "0.1.5",
       "platform": "darwin/arm64",
       "capability": "relay.telemetry",
-      "result": "not run",
-      "last_run": "2026-10-31T04:45:26.371222Z",
+      "result": "pass",
+      "last_run": "2026-11-13T13:58:15.15363Z",
+      "first_passed": "2026-11-13T13:58:15.15363Z",
       "terma": "terma version dev",
-      "test": "TestRelayT3/installed-0.1.5",
-      "why": "the test driver can't drive this version yet (it no longer serves /api/orchestration)"
+      "test": "TestRelayT3/v0.1.5"
     },
     {
       "harness": "t3",
       "version": "0.1.6",
       "platform": "darwin/arm64",
       "capability": "relay.telemetry",
-      "result": "not run",
-      "last_run": "2026-11-04T04:39:38.793748Z",
+      "result": "pass",
+      "last_run": "2026-11-13T13:58:43.897224Z",
+      "first_passed": "2026-11-13T13:58:43.897224Z",
       "terma": "terma version dev",
-      "test": "TestRelayT3/installed-0.1.6",
-      "why": "the test driver can't drive this version yet (it no longer serves /api/orchestration)"
+      "test": "TestRelayT3/v0.1.6"
     },
     {
       "harness": "t3",
       "version": "0.1.7",
       "platform": "darwin/arm64",
       "capability": "relay.telemetry",
-      "result": "not run",
-      "last_run": "2026-11-09T04:42:35.70528Z",
+      "result": "pass",
+      "last_run": "2026-11-13T13:59:11.84843Z",
+      "first_passed": "2026-11-13T13:59:11.84843Z",
       "terma": "terma version dev",
-      "test": "TestRelayT3/installed-0.1.7",
-      "why": "the test driver can't drive this version yet (it no longer serves /api/orchestration)"
+      "test": "TestRelayT3/v0.1.7"
     },
     {
       "harness": "t3",
@@ -9937,11 +9992,11 @@
       "version": "0.1.9",
       "platform": "darwin/arm64",
       "capability": "relay.telemetry",
-      "result": "not run",
-      "last_run": "2026-11-13T04:59:00.011536Z",
+      "result": "pass",
+      "last_run": "2026-11-13T13:59:40.210858Z",
+      "first_passed": "2026-11-13T13:59:40.210858Z",
       "terma": "terma version dev",
-      "test": "TestRelayT3/installed-0.1.9",
-      "why": "the test driver can't drive this version yet (it no longer serves /api/orchestration)"
+      "test": "TestRelayT3/v0.1.9"
     }
   ]
 }

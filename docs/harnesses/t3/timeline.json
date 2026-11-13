@@ -3,8 +3,30 @@
   "harness": "t3",
   "steps": [
     {
+      "version": "0.1.9",
+      "previous": "0.1.8",
+      "changes": [
+        {
+          "id": "support.capabilities.relay.telemetry@darwin/arm64.result",
+          "category": "support",
+          "op": "changed",
+          "title": "Terma: Telemetry reaches the project through the local relay now passes on darwin/arm64",
+          "impact": "notable",
+          "documented": true
+        },
+        {
+          "id": "support.status",
+          "category": "support",
+          "op": "changed",
+          "title": "Terma support: untested → supported",
+          "impact": "notable",
+          "documented": false
+        }
+      ]
+    },
+    {
       "version": "0.1.8",
-      "previous": "0.0.45",
+      "previous": "0.1.7",
       "changes": [
         {
           "id": "support.capabilities.relay.telemetry@darwin/arm64.result",
@@ -15,14 +37,6 @@
           "documented": true
         },
         {
-          "id": "support.capabilities.relay.telemetry@darwin/arm64.why",
-          "category": "support",
-          "op": "added",
-          "title": "support.capabilities.relay.telemetry@darwin/arm64.why added",
-          "impact": "informational",
-          "documented": false
-        },
-        {
           "id": "support.status",
           "category": "support",
           "op": "changed",
@@ -31,6 +45,21 @@
           "documented": false
         }
       ]
+    },
+    {
+      "version": "0.1.7",
+      "previous": "0.1.6",
+      "changes": []
+    },
+    {
+      "version": "0.1.6",
+      "previous": "0.1.5",
+      "changes": []
+    },
+    {
+      "version": "0.1.5",
+      "previous": "0.0.45",
+      "changes": []
     }
   ]
 }

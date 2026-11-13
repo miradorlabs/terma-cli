@@ -3,8 +3,8 @@
   "harness": "t3",
   "window": {
     "oldest": "0.0.45",
-    "newest": "0.1.8",
-    "builds": 2
+    "newest": "0.1.9",
+    "builds": 6
   },
   "items": {}
 }

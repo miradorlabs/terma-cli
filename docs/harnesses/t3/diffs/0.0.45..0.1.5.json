@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "harness": "t3",
+  "from": "0.0.45",
+  "to": "0.1.5",
+  "generated_at": "2026-11-13T14:02:26.572801989Z",
+  "source": {
+    "compare": "https://github.com/pingdotgg/t3code/compare/v0.0.45...v0.1.5"
+  },
+  "changelog": {
+    "url": "https://github.com/pingdotgg/t3code/releases/tag/v0.1.5",
+    "text": "**v0.1.5** · 25 changes from 5 contributors\n\n## Highlights\nTurn a No project thread into a project. Use Claude and GPT models and thinking controls with Antigravity. Customize thread details, including usage limits. Switch all your installations between Stable and Nightly in one step.\n\n## Fixes\n- New threads avoid providers that just hit usage limits (#26234)\n- Guest links no longer expose file diffs (#26538)\n- Claude edits open as diffs, not raw JSON (#26529)\n- Fixed a desktop security vulnerability in Brotli decompression (#26348)\n- Undo notices no longer cover threads (#26874)\n- Antigravity file reads no longer show unrelated errors (#26910)\n- T3 starts on fresh Ubuntu servers without libatomic (#26912)\n- Update everything no longer unnecessarily waits for npm (#26917)\n- Antigravity file reads no longer keep spinning (#26928)\n- Copilot follow-ups no longer kill background agents (#26715)\n\n<details>\n<summary>Full changelog</summary>\n\n## What's Changed\n* fix(server,cursor,opencode): refresh provider usage when a turn hits its usage limit by @maria-rcks in https://github.com/pingdotgg/t3code/pull/26234\n* fix(web): keep tool groups collapsed after a usage-limit pause by @shivamhwp in https://github.com/pingdotgg/t3code/pull/24937\n* fix(mobile): photo-library PNGs no longer fail after resizing by @shivamhwp in https://github.com/pingdotgg/t3code/pull/26522\n* fix(server): guest links no longer return file diffs by @nexxeln in https://github.com/pingdotgg/t3code/pull/26538\n* fix(claude): Open diff shows Claude edits as a diff instead of raw JSON by @nexxeln in https://github.com/pingdotgg/t3code/pull/26529\n* chore: vouch nexxeln by @t3dotgg in https://github.com/pingdotgg/t3code/pull/26812\n* feat(web): Labs toggle keeps 5h, weekly, and context limits in view by @t3dotgg in https://github.com/pingdotgg/t3code/pull/26859\n* fix(desktop): bump Electron to 44.10.0 for the Node.js Brotli fix (CVE-2026-111497) by @nabettu in https://github.com/pingdotgg/t3code/pull/26348\n* chore: make agent mistakes fail early by @t3dotgg in https://github.com/pingdotgg/t3code/pull/26167\n* feat(marketing): hero shows four agents running at once by @t3dotgg in https://github.com/pingdotgg/t3code/pull/26875\n* fix(web): undo notice moves to the sidebar footer so it never covers a thread by @t3dotgg in https://github.com/pingdotgg/t3code/pull/26874\n* feat: turn a No project thread into a project by @t3dotgg in https://github.com/pingdotgg/t3code/pull/26767\n* feat(antigravity): Claude and GPT models, thinking levels, and diff edits by @t3dotgg in https://github.com/pingdotgg/t3code/pull/26876\n* feat(web): choose what the thread details card shows by @t3dotgg in https://github.com/pingdotgg/t3code/pull/26904\n* feat(updates): switch your whole fleet between Stable and Nightly in one step by @t3dotgg in https://github.com/pingdotgg/t3code/pull/26288\n* fix(antigravity): file reads no longer show unrelated errors by @t3dotgg in https://github.com/pingdotgg/t3code/pull/26910\n* feat(release): release notes and the update popover open with a short note by @t3dotgg in https://github.com/pingdotgg/t3code/pull/26893\n* fix(cli): t3 starts on a fresh Ubuntu server without libatomic by @t3dotgg in https://github.com/pingdotgg/t3code/pull/26912\n* fix(web): update everything no longer waits on npm for service hosts by @t3dotgg in https://github.com/pingdotgg/t3code/pull/26917\n* test(web): pin the npm wait floor for update everything by @t3dotgg in https://github.com/pingdotgg/t3code/pull/26921\n* fix(antigravity): served reads stop spinning and duplicate model names are labeled by @t3dotgg in https://github.com/pingdotgg/t3code/pull/26928\n* fix(server): queue Copilot follow-ups without killing background agents by @shivamhwp in https://github.com/pingdotgg/t3code/pull/26715\n* fix(web): Antigravity effort no longer shows a speedometer in the composer by @t3dotgg in https://github.com/pingdotgg/t3code/pull/26929\n* fix(release): Linux CLI archives build on runners without package docs by @t3dotgg in https://github.com/pingdotgg/t3code/pull/26932\n\n\n**Full Changelog**: https://github.com/pingdotgg/t3code/compare/v0.1.4...v0.1.5\n\n</details>"
+  },
+  "summary": {
+    "changes": 0,
+    "categories": {},
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 0,
+      "notable": 0
+    },
+    "undocumented": 0
+  },
+  "changes": []
+}

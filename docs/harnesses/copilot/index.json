@@ -7,24 +7,55 @@
     "homepage": "https://github.com/github/copilot-cli",
     "source": null,
     "changelog": "https://github.com/github/copilot-cli/blob/main/changelog.md",
-    "latest": "1.0.110",
-    "support": "untested",
-    "versions_tracked": 6,
+    "latest": "1.0.111",
+    "support": "supported",
+    "versions_tracked": 7,
     "first_tracked": "2026-10-28",
     "last_change": {
-      "from": "1.0.109",
-      "to": "1.0.110",
-      "at": "2026-11-13T05:13:29.306022914Z",
-      "released_at": "2026-11-12T22:59:46.318Z",
-      "changes": 15,
+      "from": "1.0.110",
+      "to": "1.0.111",
+      "at": "2026-11-13T14:02:26.572801989Z",
+      "released_at": "2026-11-13T13:42:41.197Z",
+      "changes": 19,
       "categories": {
-        "cli": 3,
-        "config": 10,
-        "tools": 2
+        "cli": 4,
+        "config": 14,
+        "storage": 1
       }
     }
   },
   "versions": [
+    {
+      "version": "1.0.111",
+      "released_at": "2026-11-13T13:42:41.197Z",
+      "captured_at": "2026-11-13T14:02:26.572801989Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "1.0.110",
+      "changes": 19,
+      "categories": {
+        "cli": 4,
+        "config": 14,
+        "storage": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 19,
+        "notable": 0
+      },
+      "undocumented": 14,
+      "highlights": [
+        "`copilot --allow-tool`: description changed (+229 −67 chars)",
+        "`copilot --deny-tool`: description changed (+244 −77 chars)",
+        "`copilot --disallow-temp-dir`: description changed"
+      ],
+      "signing": "valid",
+      "attempted_at": "2026-11-13T14:02:26.572801989Z",
+      "attempts": 1
+    },
     {
       "version": "1.0.110",
       "released_at": "2026-11-12T22:59:46.318Z",

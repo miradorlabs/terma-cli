@@ -3,6 +3,164 @@
   "harness": "copilot",
   "steps": [
     {
+      "version": "1.0.111",
+      "previous": "1.0.110",
+      "changes": [
+        {
+          "id": "cli.commands.copilot.options.--allow-tool.description",
+          "category": "cli",
+          "op": "changed",
+          "title": "`copilot --allow-tool`: description changed (+229 −67 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "cli.commands.copilot.options.--deny-tool.description",
+          "category": "cli",
+          "op": "changed",
+          "title": "`copilot --deny-tool`: description changed (+244 −77 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "cli.commands.copilot.options.--disallow-temp-dir.description",
+          "category": "cli",
+          "op": "changed",
+          "title": "`copilot --disallow-temp-dir`: description changed",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "cli.help.--help",
+          "category": "cli",
+          "op": "changed",
+          "title": "Full help text of `--help` changed (+524 −119 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.commandHistoryMaxSize.description",
+          "category": "config",
+          "op": "changed",
+          "title": "commandHistoryMaxSize description changed (+122 −97 chars)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.footer.showCodeChanges.description",
+          "category": "config",
+          "op": "changed",
+          "title": "footer.showCodeChanges description changed (+268 −40 chars)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.keepAlive.description",
+          "category": "config",
+          "op": "changed",
+          "title": "keepAlive description changed (+268 −66 chars)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.permissions.defaultMode",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: permissions.defaultMode",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.permissions.limitTo",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: permissions.limitTo",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.renderHexColors.description",
+          "category": "config",
+          "op": "changed",
+          "title": "renderHexColors description changed (+246 −110 chars)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.sandbox.userPolicy.filesystem.deniedPaths.description",
+          "category": "config",
+          "op": "changed",
+          "title": "sandbox.userPolicy.filesystem.deniedPaths description changed (+219 −108 chars)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.sandbox.userPolicy.filesystem.enumeratePaths.description",
+          "category": "config",
+          "op": "changed",
+          "title": "sandbox.userPolicy.filesystem.enumeratePaths description changed (+478 −256 chars)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.sandbox.userPolicy.filesystem.readonlyPaths.description",
+          "category": "config",
+          "op": "changed",
+          "title": "sandbox.userPolicy.filesystem.readonlyPaths description changed (+171 −60 chars)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.sandbox.userPolicy.filesystem.readwritePaths.description",
+          "category": "config",
+          "op": "changed",
+          "title": "sandbox.userPolicy.filesystem.readwritePaths description changed (+172 −61 chars)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.env_vars.COMSPEC",
+          "category": "config",
+          "op": "removed",
+          "title": "Environment variable no longer read: COMSPEC",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.env_vars.COPILOT_EDITOR",
+          "category": "config",
+          "op": "removed",
+          "title": "Environment variable no longer read: COPILOT_EDITOR",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.env_vars.PATHEXT",
+          "category": "config",
+          "op": "removed",
+          "title": "Environment variable no longer read: PATHEXT",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.env_vars.VSCODE_IPC_HOOK_CLI",
+          "category": "config",
+          "op": "removed",
+          "title": "Environment variable no longer read: VSCODE_IPC_HOOK_CLI",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "storage.logs.path",
+          "category": "storage",
+          "op": "changed",
+          "title": "On-disk logs path changed",
+          "impact": "informational",
+          "documented": true
+        }
+      ]
+    },
+    {
       "version": "1.0.110",
       "previous": "1.0.109",
       "changes": [

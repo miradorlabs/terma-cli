@@ -1,7 +1,40 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-13T13:31:22.631672064Z",
+  "generated_at": "2026-11-13T14:02:26.572801989Z",
   "versions": [
+    {
+      "harness": "copilot",
+      "name": "GitHub Copilot CLI",
+      "version": "1.0.111",
+      "released_at": "2026-11-13T13:42:41.197Z",
+      "captured_at": "2026-11-13T14:02:26.572801989Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "1.0.110",
+      "changes": 19,
+      "categories": {
+        "cli": 4,
+        "config": 14,
+        "storage": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 19,
+        "notable": 0
+      },
+      "undocumented": 14,
+      "highlights": [
+        "`copilot --allow-tool`: description changed (+229 −67 chars)",
+        "`copilot --deny-tool`: description changed (+244 −77 chars)",
+        "`copilot --disallow-temp-dir`: description changed"
+      ],
+      "signing": "valid",
+      "attempted_at": "2026-11-13T14:02:26.572801989Z",
+      "attempts": 1
+    },
     {
       "harness": "codex",
       "name": "Codex CLI",
@@ -252,6 +285,36 @@
         "New setting: features.incremental_tools_legacy_gcp"
       ],
       "signing": "valid"
+    },
+    {
+      "harness": "t3",
+      "name": "T3 Code",
+      "version": "0.1.9",
+      "released_at": "2026-11-11T11:35:24.455Z",
+      "captured_at": "2026-11-13T14:02:26.572801989Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "0.1.8",
+      "changes": 2,
+      "categories": {
+        "support": 2
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 2
+      },
+      "undocumented": 0,
+      "highlights": [
+        "Terma: Telemetry reaches the project through the local relay now passes on darwin/arm64",
+        "Terma support: untested → supported"
+      ],
+      "signing": null,
+      "attempted_at": "2026-11-13T14:02:26.572801989Z",
+      "attempts": 1
     },
     {
       "harness": "codex-desktop",
@@ -528,22 +591,21 @@
         "darwin/arm64"
       ],
       "support": "untested",
-      "previous": "0.0.45",
-      "changes": 3,
+      "previous": "0.1.7",
+      "changes": 2,
       "categories": {
-        "support": 3
+        "support": 2
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 1,
+        "informational": 0,
         "notable": 2
       },
       "undocumented": 0,
       "highlights": [
         "Terma: Telemetry reaches the project through the local relay now not run on darwin/arm64",
-        "Terma support: supported → untested",
-        "support.capabilities.relay.telemetry@darwin/arm64.why added"
+        "Terma support: supported → untested"
       ],
       "signing": null
     },
@@ -836,6 +898,31 @@
       "signing": null
     },
     {
+      "harness": "t3",
+      "name": "T3 Code",
+      "version": "0.1.7",
+      "released_at": "2026-11-04T06:41:30.507Z",
+      "captured_at": "2026-11-13T14:02:26.572801989Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "0.1.6",
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": 0,
+      "highlights": [],
+      "signing": null,
+      "attempted_at": "2026-11-13T14:02:26.572801989Z",
+      "attempts": 1
+    },
+    {
       "harness": "claude",
       "name": "Claude Code",
       "version": "2.1.318",
@@ -920,6 +1007,31 @@
       "undocumented": 0,
       "highlights": [],
       "signing": null
+    },
+    {
+      "harness": "t3",
+      "name": "T3 Code",
+      "version": "0.1.6",
+      "released_at": "2026-10-31T10:53:56.49Z",
+      "captured_at": "2026-11-13T14:02:26.572801989Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "0.1.5",
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": 0,
+      "highlights": [],
+      "signing": null,
+      "attempted_at": "2026-11-13T14:02:26.572801989Z",
+      "attempts": 1
     },
     {
       "harness": "claude",
@@ -1066,6 +1178,31 @@
       "undocumented": 0,
       "highlights": [],
       "signing": null
+    },
+    {
+      "harness": "t3",
+      "name": "T3 Code",
+      "version": "0.1.5",
+      "released_at": "2026-10-29T13:12:42.48Z",
+      "captured_at": "2026-11-13T14:02:26.572801989Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "0.0.45",
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": 0,
+      "highlights": [],
+      "signing": null,
+      "attempted_at": "2026-11-13T14:02:26.572801989Z",
+      "attempts": 1
     },
     {
       "harness": "opencode",
@@ -6036,171 +6173,6 @@
         "Behaviour: sandbox approval added",
         "Behaviour: sandbox model added",
         "Behaviour: sandbox provider added"
-      ],
-      "signing": "valid"
-    },
-    {
-      "harness": "codex",
-      "name": "Codex CLI",
-      "version": "0.141.0",
-      "released_at": "2026-06-18T04:45:39.921Z",
-      "captured_at": "2026-11-05T09:54:28.532441Z",
-      "platforms": [
-        "darwin/arm64",
-        "linux/amd64"
-      ],
-      "support": "untested",
-      "previous": "0.140.0",
-      "changes": 12,
-      "categories": {
-        "behavior": 8,
-        "config": 2,
-        "filesystem": 1,
-        "request": 1
-      },
-      "impact": {
-        "breaking": 0,
-        "degrading": 0,
-        "informational": 3,
-        "notable": 9
-      },
-      "undocumented": 1,
-      "highlights": [
-        "Beta dropped: terminal_resize_reflow",
-        "Behaviour: sandbox approval removed",
-        "Behaviour: sandbox model removed"
-      ],
-      "signing": "valid"
-    },
-    {
-      "harness": "codex",
-      "name": "Codex CLI",
-      "version": "0.140.0",
-      "released_at": "2026-06-15T21:09:21.79Z",
-      "captured_at": "2026-11-05T09:54:28.532441Z",
-      "platforms": [
-        "darwin/arm64",
-        "linux/amd64"
-      ],
-      "support": "untested",
-      "previous": "0.139.0",
-      "changes": 24,
-      "categories": {
-        "binary": 1,
-        "caching": 1,
-        "cli": 5,
-        "config": 6,
-        "filesystem": 2,
-        "prompt": 1,
-        "request": 4,
-        "tools": 4
-      },
-      "impact": {
-        "breaking": 0,
-        "degrading": 0,
-        "informational": 10,
-        "notable": 14
-      },
-      "undocumented": 11,
-      "highlights": [
-        "System prompt changed (+2195 −1221 chars)",
-        "create_goal tool description changed (+134 −122 chars)",
-        "create_goal tool parameter objective: description changed (+151 −164 chars)"
-      ],
-      "signing": "valid"
-    },
-    {
-      "harness": "codex",
-      "name": "Codex CLI",
-      "version": "0.139.0",
-      "released_at": "2026-06-09T20:17:25.855Z",
-      "captured_at": "2026-11-05T09:54:28.532441Z",
-      "platforms": [
-        "darwin/arm64",
-        "linux/amd64"
-      ],
-      "support": "untested",
-      "previous": "0.138.0",
-      "changes": 7,
-      "categories": {
-        "binary": 1,
-        "caching": 1,
-        "cli": 3,
-        "prompt": 1,
-        "request": 1
-      },
-      "impact": {
-        "breaking": 0,
-        "degrading": 0,
-        "informational": 4,
-        "notable": 3
-      },
-      "undocumented": 6,
-      "highlights": [
-        "System prompt changed (+742 −350 chars)",
-        "Caching across_turns.stable_prefix_chars: 7004 → 7442",
-        "Now sends identifier client_metadata.x-codex-window-id"
-      ],
-      "signing": "valid"
-    },
-    {
-      "harness": "codex",
-      "name": "Codex CLI",
-      "version": "0.138.0",
-      "released_at": "2026-06-08T23:03:39.681Z",
-      "captured_at": "2026-11-05T09:54:28.532441Z",
-      "platforms": [
-        "darwin/arm64",
-        "linux/amd64"
-      ],
-      "support": "untested",
-      "previous": "0.137.0",
-      "changes": 18,
-      "categories": {
-        "config": 18
-      },
-      "impact": {
-        "breaking": 0,
-        "degrading": 0,
-        "informational": 4,
-        "notable": 14
-      },
-      "undocumented": 14,
-      "highlights": [
-        "Type of features.code_mode: boolean → boolean|object",
-        "Setting no longer read: features.responses_websocket_response_processed",
-        "Setting model_reasoning_effort lost value none"
-      ],
-      "signing": "valid"
-    },
-    {
-      "harness": "codex",
-      "name": "Codex CLI",
-      "version": "0.137.0",
-      "released_at": "2026-06-04T01:41:31.275Z",
-      "captured_at": "2026-11-05T09:54:28.532441Z",
-      "platforms": [
-        "darwin/arm64",
-        "linux/amd64"
-      ],
-      "support": "untested",
-      "previous": "0.136.0",
-      "changes": 8,
-      "categories": {
-        "config": 3,
-        "filesystem": 5
-      },
-      "impact": {
-        "breaking": 0,
-        "degrading": 0,
-        "informational": 6,
-        "notable": 2
-      },
-      "undocumented": 7,
-      "highlights": [
-        "New setting: apps.<name>.approvals_reviewer",
-        "New command at turn: `bwrap --new-session --die-with-parent --ro-bind / / --dev /dev --bind <tmp> <tmp> --perms 555 --tmpf …` (linux/amd64)",
-        "New setting: features.local_thread_store_compression"
       ],
       "signing": "valid"
     }

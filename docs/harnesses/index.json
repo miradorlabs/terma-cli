@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-13T13:31:22.631672064Z",
+  "generated_at": "2026-11-13T14:02:26.572801989Z",
   "harnesses": [
     {
       "id": "claude",
@@ -110,20 +110,20 @@
       "homepage": "https://github.com/github/copilot-cli",
       "source": null,
       "changelog": "https://github.com/github/copilot-cli/blob/main/changelog.md",
-      "latest": "1.0.110",
-      "support": "untested",
-      "versions_tracked": 6,
+      "latest": "1.0.111",
+      "support": "supported",
+      "versions_tracked": 7,
       "first_tracked": "2026-10-28",
       "last_change": {
-        "from": "1.0.109",
-        "to": "1.0.110",
-        "at": "2026-11-13T05:13:29.306022914Z",
-        "released_at": "2026-11-12T22:59:46.318Z",
-        "changes": 15,
+        "from": "1.0.110",
+        "to": "1.0.111",
+        "at": "2026-11-13T14:02:26.572801989Z",
+        "released_at": "2026-11-13T13:42:41.197Z",
+        "changes": 19,
         "categories": {
-          "cli": 3,
-          "config": 10,
-          "tools": 2
+          "cli": 4,
+          "config": 14,
+          "storage": 1
         }
       }
     },
@@ -280,18 +280,18 @@
         "language": "typescript"
       },
       "changelog": "https://github.com/pingdotgg/t3code/releases",
-      "latest": "0.1.8",
-      "support": "untested",
-      "versions_tracked": 2,
+      "latest": "0.1.9",
+      "support": "supported",
+      "versions_tracked": 6,
       "first_tracked": "2026-10-02",
       "last_change": {
-        "from": "0.0.45",
-        "to": "0.1.8",
-        "at": "2026-11-10T05:19:19.197557181Z",
-        "released_at": "2026-11-09T22:48:39.205Z",
-        "changes": 3,
+        "from": "0.1.8",
+        "to": "0.1.9",
+        "at": "2026-11-13T14:02:26.572801989Z",
+        "released_at": "2026-11-11T11:35:24.455Z",
+        "changes": 2,
         "categories": {
-          "support": 3
+          "support": 2
         }
       }
     }
