@@ -1,38 +1,38 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-13T04:21:24.021969273Z",
+  "generated_at": "2026-11-13T05:13:29.306022914Z",
   "versions": [
     {
       "harness": "codex",
       "name": "Codex CLI",
       "version": "0.168.0",
       "released_at": "2026-11-13T04:00:31.594Z",
-      "captured_at": "2026-11-13T04:21:24.021969273Z",
+      "captured_at": "2026-11-13T05:13:29.306022914Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"
       ],
-      "support": "untested",
+      "support": "supported",
       "previous": "0.167.2",
-      "changes": 518,
+      "changes": 61,
       "categories": {
-        "cli": 6,
+        "cli": 5,
         "config": 37,
-        "filesystem": 8,
-        "telemetry": 466,
+        "filesystem": 2,
+        "telemetry": 16,
         "tools": 1
       },
       "impact": {
         "breaking": 0,
-        "degrading": 38,
-        "informational": 305,
-        "notable": 175
+        "degrading": 0,
+        "informational": 51,
+        "notable": 10
       },
-      "undocumented": 336,
+      "undocumented": 46,
       "highlights": [
-        "Telemetry surface no longer sent: logs/codex.api_request",
-        "Telemetry surface no longer sent: logs/codex.conversation_starts",
-        "Telemetry surface no longer sent: logs/codex.sse_event"
+        "exec tool description changed (+281 −862 chars)",
+        "Telemetry surfaces.traces/auth.parents.traces/codex.turn_input removed",
+        "Telemetry surfaces.traces/auth.parents.traces/model_client.stream_responses_api removed"
       ],
       "signing": "valid"
     },
@@ -94,23 +94,22 @@
       "name": "GitHub Copilot CLI",
       "version": "1.0.110",
       "released_at": "2026-11-12T22:59:46.318Z",
-      "captured_at": "2026-11-12T23:16:49.659858398Z",
+      "captured_at": "2026-11-13T05:13:29.306022914Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "untested",
       "previous": "1.0.109",
-      "changes": 16,
+      "changes": 15,
       "categories": {
         "cli": 3,
         "config": 10,
-        "storage": 1,
         "tools": 2
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 13,
+        "informational": 12,
         "notable": 3
       },
       "undocumented": 3,
@@ -126,14 +125,14 @@
       "name": "Claude Code",
       "version": "2.1.323",
       "released_at": "2026-11-12T20:29:28.626Z",
-      "captured_at": "2026-11-12T20:46:56.111817078Z",
+      "captured_at": "2026-11-13T05:13:29.306022914Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"
       ],
-      "support": "untested",
+      "support": "supported",
       "previous": "2.1.322",
-      "changes": 95,
+      "changes": 51,
       "categories": {
         "binary": 1,
         "cli": 7,
@@ -141,20 +140,19 @@
         "filesystem": 7,
         "hooks": 4,
         "network": 2,
-        "telemetry": 44,
         "tools": 4
       },
       "impact": {
         "breaking": 0,
-        "degrading": 20,
-        "informational": 48,
-        "notable": 27
+        "degrading": 0,
+        "informational": 30,
+        "notable": 21
       },
-      "undocumented": null,
+      "undocumented": 14,
       "highlights": [
-        "Telemetry surface no longer sent: logs/api_request",
-        "Telemetry surface no longer sent: logs/assistant_response",
-        "Telemetry surface no longer sent: logs/hook_execution_complete"
+        "Agent tool description changed (+81 −83 chars)",
+        "Skill tool description changed (+80 −80 chars)",
+        "ToolSearch tool description changed (+59 −60 chars)"
       ],
       "signing": "valid"
     },
@@ -195,28 +193,29 @@
       "name": "Codex CLI",
       "version": "0.167.2",
       "released_at": "2026-11-11T22:50:04.191Z",
-      "captured_at": "2026-11-12T15:48:45.504112256Z",
+      "captured_at": "2026-11-13T05:13:29.306022914Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"
       ],
       "support": "supported",
       "previous": "0.167.1",
-      "changes": 2,
+      "changes": 256,
       "categories": {
-        "cli": 1,
-        "config": 1
+        "config": 1,
+        "telemetry": 255
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 2,
+        "informational": 256,
         "notable": 0
       },
-      "undocumented": 1,
+      "undocumented": 255,
       "highlights": [
-        "Full help text of `completion -h` changed (+105 −0 chars)",
-        "New setting: features.incremental_tools_legacy_gcp"
+        "Telemetry export added",
+        "Telemetry surfaces.metrics/codex.api_request.monotonic added",
+        "Telemetry surfaces.metrics/codex.api_request.temporality added"
       ],
       "signing": "valid"
     },
@@ -309,26 +308,27 @@
       "name": "Gemini CLI",
       "version": "0.68.0",
       "released_at": "2026-11-10T21:22:49.277Z",
-      "captured_at": "2026-11-12T15:48:45.504112256Z",
+      "captured_at": "2026-11-13T05:13:29.306022914Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "supported",
       "previous": "0.67.0",
-      "changes": 6,
+      "changes": 38,
       "categories": {
         "config": 3,
         "hooks": 1,
         "request": 1,
-        "storage": 1
+        "storage": 1,
+        "telemetry": 32
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 2,
+        "informational": 34,
         "notable": 4
       },
-      "undocumented": 5,
+      "undocumented": 36,
       "highlights": [
         "Request endpoint changed",
         "Default of modelConfigs: {\"aliases\":{\"agent-history-provider-summarizer\":{\"modelCo… → {\"aliases\":{\"agent-history-provider-summarizer\":{\"modelCo…",
@@ -371,7 +371,7 @@
       "name": "Pi",
       "version": "1.5.2",
       "released_at": "2026-11-10T12:24:55.226Z",
-      "captured_at": "2026-11-12T05:15:55.281711967Z",
+      "captured_at": "2026-11-13T05:13:29.306022914Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -430,26 +430,29 @@
       "name": "Claude Code",
       "version": "2.1.322",
       "released_at": "2026-11-10T01:58:41.811Z",
-      "captured_at": "2026-11-12T15:48:45.504112256Z",
+      "captured_at": "2026-11-13T05:13:29.306022914Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"
       ],
       "support": "supported",
       "previous": "2.1.321",
-      "changes": 1,
+      "changes": 19,
       "categories": {
-        "config": 1
+        "config": 1,
+        "telemetry": 18
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 1,
+        "informational": 19,
         "notable": 0
       },
-      "undocumented": 1,
+      "undocumented": 19,
       "highlights": [
-        "fastMode description changed (+132 −72 chars)"
+        "Telemetry export added",
+        "Telemetry surfaces.metrics/claude_code.active_time.total.monotonic added",
+        "Telemetry surfaces.metrics/claude_code.active_time.total.temporality added"
       ],
       "signing": "valid"
     },
@@ -692,24 +695,24 @@
       ],
       "support": "supported",
       "previous": "0.166.0",
-      "changes": 27,
+      "changes": 28,
       "categories": {
         "cli": 6,
         "config": 12,
-        "filesystem": 8,
+        "filesystem": 9,
         "prompt": 1
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 21,
-        "notable": 6
+        "informational": 26,
+        "notable": 2
       },
-      "undocumented": 17,
+      "undocumented": 18,
       "highlights": [
         "Injected context changed (+47 −53 chars)",
         "New setting: model_providers.<name>.gateway_oauth.credentials_store",
-        "New command at turn: `/proc/self/exe --codex-run-as-process-setup <n> <n> pipe  <repo> <install>/codex codex-linux-sandbox …` (linux/amd64)"
+        "Description of `codex agents` changed"
       ],
       "signing": "valid"
     },
@@ -773,7 +776,7 @@
       "name": "DeepSeek Harness",
       "version": "0.2.2-rc.1",
       "released_at": "2026-11-04T09:20:32.31Z",
-      "captured_at": "2026-11-12T05:15:55.281711967Z",
+      "captured_at": "2026-11-13T05:13:29.306022914Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -1039,7 +1042,7 @@
       "name": "OpenCode",
       "version": "1.19.5",
       "released_at": "2026-10-28T06:17:11.1Z",
-      "captured_at": "2026-11-12T05:15:55.281711967Z",
+      "captured_at": "2026-11-13T05:13:29.306022914Z",
       "platforms": [
         "darwin/arm64"
       ],

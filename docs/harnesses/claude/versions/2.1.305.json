@@ -15765,6 +15765,7 @@
         "paths": [
           "/home/claude/.claude/remote/.oauth_token",
           "/home/claude/.claude/remote/.session_ingress_token",
+          "<claude-config>/.claude.json.tmp.<n>.<n>",
           "<repo>/.git/worktrees"
         ]
       }

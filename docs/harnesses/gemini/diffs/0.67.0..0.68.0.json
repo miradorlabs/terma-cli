@@ -3,7 +3,7 @@
   "harness": "gemini",
   "from": "0.67.0",
   "to": "0.68.0",
-  "generated_at": "2026-11-12T15:48:45.504112256Z",
+  "generated_at": "2026-11-13T05:13:29.306022914Z",
   "source": {
     "compare": "https://github.com/google-gemini/gemini-cli/compare/v0.67.0...v0.68.0"
   },
@@ -12,20 +12,21 @@
     "text": "## What's Changed\n* Changelog for v0.67.0-preview.0 by @gemini-cli-robot in https://github.com/google-gemini/gemini-cli/pull/29990\n* Changelog for v0.66.0 by @gemini-cli-robot in https://github.com/google-gemini/gemini-cli/pull/29992\n* docs(readme): clarify Gemini CLI scope, limitations, and tool landscape by @LyalinDotCom in https://github.com/google-gemini/gemini-cli/pull/29995\n* fix(cli): bound inline history re-render after terminal width changes by @jvargassanchez-dot in https://github.com/google-gemini/gemini-cli/pull/29904\n* fix(ui): handle surrogate pairs when truncating in sanitizeForDisplay by @diegogodinezr in https://github.com/google-gemini/gemini-cli/pull/29993\n* fix(core): make isWithinRoot case-insensitive on Windows by @duvanka-prasad in https://github.com/google-gemini/gemini-cli/pull/29999\n* fix(core): recognize dotted Gemini 3 models in supportsMultimodalFunctionResponse by @jesussamuel-byte in https://github.com/google-gemini/gemini-cli/pull/29982\n* feat(cli): add extension validation command and evaluation tests by @tadipavan in https://github.com/google-gemini/gemini-cli/pull/29980\n* fix(core): normalize leading slashes in file search query for @ autocomplete by @urielefrenvirtusa in https://github.com/google-gemini/gemini-cli/pull/29987\n* fix(vscode-ide-companion): register all extension disposables in context.subscriptions by @jvargassanchez-dot in https://github.com/google-gemini/gemini-cli/pull/29994\n* fix(core): list Auto in /model when dynamicModelConfiguration is enabled and preview access is disabled by @villahernandez-coder in https://github.com/google-gemini/gemini-cli/pull/29998\n* fix(core,cli): fix instances of incorrect \\n escape behavior by @ugorla-dev in https://github.com/google-gemini/gemini-cli/pull/29989\n* fix(core): use PowerShell CIM fallback for Windows IDE process lookup by @tadipavan in https://github.com/google-gemini/gemini-cli/pull/30006\n* fix(cli): surface 429 rate limit cool-down and countdown in loading indicator by @urielefrenvirtusa in https://github.com/google-gemini/gemini-cli/pull/30012\n* fix(cli): anchor .git suffix removal to end of repo URL by @diegogodinezr in https://github.com/google-gemini/gemini-cli/pull/30013\n* fix(ci,sdk): run SDK tests in PR CI and fix AgentLoopContext mock in session.test.ts by @duvanka-prasad in https://github.com/google-gemini/gemini-cli/pull/30023\n* fix(core): prevent $-pattern corruption in LLM prompt templates by @duvanka-prasad in https://github.com/google-gemini/gemini-cli/pull/30035\n* fix(cli): Fixes unexpected truncation and toggle behavior in Expandab… by @tadipavan in https://github.com/google-gemini/gemini-cli/pull/29965\n* refactor(cli): decouple ToolGroupMessage from internal type guards and payload structures by @ugorla-dev in https://github.com/google-gemini/gemini-cli/pull/30041\n* fix(core): gate background log stream initialization on execution lifecycle transition by @jesussamuel-byte in https://github.com/google-gemini/gemini-cli/pull/30031\n* fix(core): honor .git/info/exclude and core.excludesFile in shadow repo by @urielefrenvirtusa in https://github.com/google-gemini/gemini-cli/pull/30034\n* fix(core): flush pending SSE event buffer at stream EOF in CodeAssistServer by @tadipavan in https://github.com/google-gemini/gemini-cli/pull/30050\n* fix(core): handle Windows libuv zero-device stat reporting in readSecureFileBuffer by @jvargassanchez-dot in https://github.com/google-gemini/gemini-cli/pull/30044\n* fix(cli): serialize concurrent extension installs with per-extension lock (#29036) by @diegogodinezr in https://github.com/google-gemini/gemini-cli/pull/30039\n* fix(core): resolve symlinked paths canonically in GlobTool by @ugorla-dev in https://github.com/google-gemini/gemini-cli/pull/30042\n* fix(cli): add missing active and focus keys to custom theme ui schema by @villahernandez-coder in https://github.com/google-gemini/gemini-cli/pull/30032\n* fix(core,cli): preserve selected model across transient fallback, cancel, and rewind by @villahernandez-coder in https://github.com/google-gemini/gemini-cli/pull/30059\n* fix(core): prevent interrupted Whisper model downloads from being treated as installed by @tadipavan in https://github.com/google-gemini/gemini-cli/pull/30058\n* fix(cli): handle stream failures during extension release downloads by @duvanka-prasad in https://github.com/google-gemini/gemini-cli/pull/30100\n* fix(core): preserve explicit gemini-2.5-flash model in dynamic model resolution by @jesussamuel-byte in https://github.com/google-gemini/gemini-cli/pull/30057\n* fix(hooks): support SubagentStop event mapping and merge hook definitions by @diegogodinezr in https://github.com/google-gemini/gemini-cli/pull/30111\n* fix(cli): await history replay before responding to ACP session/load by @tadipavan in https://github.com/google-gemini/gemini-cli/pull/30112\n* fix(sandbox): supply --userns=keep-id for rootless podman by @diegogodinezr in https://github.com/google-gemini/gemini-cli/pull/30118\n\n\n**Full Changelog**: https://github.com/google-gemini/gemini-cli/compare/v0.67.0...v0.68.0"
   },
   "summary": {
-    "changes": 6,
+    "changes": 38,
     "categories": {
       "config": 3,
       "hooks": 1,
       "request": 1,
-      "storage": 1
+      "storage": 1,
+      "telemetry": 32
     },
     "impact": {
       "breaking": 0,
       "degrading": 0,
-      "informational": 2,
+      "informational": 34,
       "notable": 4
     },
-    "undocumented": 5
+    "undocumented": 36
   },
   "changes": [
     {
@@ -44,6 +45,1056 @@
       "terma": null,
       "source": null,
       "documented": false
+    },
+    {
+      "id": "telemetry.export",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "export"
+      ],
+      "title": "Telemetry export added",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "interval_batches": {
+          "logs": 1,
+          "metrics": 6
+        },
+        "interval_ms": {
+          "logs": 5000,
+          "metrics": 10000
+        },
+        "protocol": "http/json"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "telemetry.surfaces.metrics/gemini_cli.api.request.count.monotonic",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "metrics/gemini_cli.api.request.count",
+        "monotonic"
+      ],
+      "title": "Telemetry surfaces.metrics/gemini_cli.api.request.count.monotonic added",
+      "impact": "informational",
+      "before": null,
+      "after": true,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/core/src/telemetry/metrics.ts",
+            "line": 33,
+            "url": "https://github.com/google-gemini/gemini-cli/blob/v0.68.0/packages/core/src/telemetry/metrics.ts#L33"
+          },
+          {
+            "path": "packages/core/src/telemetry/metrics.ts",
+            "line": 123,
+            "url": "https://github.com/google-gemini/gemini-cli/blob/v0.68.0/packages/core/src/telemetry/metrics.ts#L123"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "telemetry.surfaces.metrics/gemini_cli.api.request.count.temporality",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "metrics/gemini_cli.api.request.count",
+        "temporality"
+      ],
+      "title": "Telemetry surfaces.metrics/gemini_cli.api.request.count.temporality added",
+      "impact": "informational",
+      "before": null,
+      "after": "cumulative",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/core/src/telemetry/metrics.ts",
+            "line": 33,
+            "url": "https://github.com/google-gemini/gemini-cli/blob/v0.68.0/packages/core/src/telemetry/metrics.ts#L33"
+          },
+          {
+            "path": "packages/core/src/telemetry/metrics.ts",
+            "line": 123,
+            "url": "https://github.com/google-gemini/gemini-cli/blob/v0.68.0/packages/core/src/telemetry/metrics.ts#L123"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "telemetry.surfaces.metrics/gemini_cli.api.request.count.type",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "metrics/gemini_cli.api.request.count",
+        "type"
+      ],
+      "title": "Telemetry surfaces.metrics/gemini_cli.api.request.count.type added",
+      "impact": "informational",
+      "before": null,
+      "after": "sum",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/core/src/telemetry/metrics.ts",
+            "line": 33,
+            "url": "https://github.com/google-gemini/gemini-cli/blob/v0.68.0/packages/core/src/telemetry/metrics.ts#L33"
+          },
+          {
+            "path": "packages/core/src/telemetry/metrics.ts",
+            "line": 123,
+            "url": "https://github.com/google-gemini/gemini-cli/blob/v0.68.0/packages/core/src/telemetry/metrics.ts#L123"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "telemetry.surfaces.metrics/gemini_cli.api.request.latency.temporality",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "metrics/gemini_cli.api.request.latency",
+        "temporality"
+      ],
+      "title": "Telemetry surfaces.metrics/gemini_cli.api.request.latency.temporality added",
+      "impact": "informational",
+      "before": null,
+      "after": "cumulative",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/core/src/telemetry/metrics.ts",
+            "line": 34,
+            "url": "https://github.com/google-gemini/gemini-cli/blob/v0.68.0/packages/core/src/telemetry/metrics.ts#L34"
+          },
+          {
+            "path": "packages/core/src/telemetry/metrics.ts",
+            "line": 406,
+            "url": "https://github.com/google-gemini/gemini-cli/blob/v0.68.0/packages/core/src/telemetry/metrics.ts#L406"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "telemetry.surfaces.metrics/gemini_cli.api.request.latency.type",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "metrics/gemini_cli.api.request.latency",
+        "type"
+      ],
+      "title": "Telemetry surfaces.metrics/gemini_cli.api.request.latency.type added",
+      "impact": "informational",
+      "before": null,
+      "after": "histogram",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/core/src/telemetry/metrics.ts",
+            "line": 34,
+            "url": "https://github.com/google-gemini/gemini-cli/blob/v0.68.0/packages/core/src/telemetry/metrics.ts#L34"
+          },
+          {
+            "path": "packages/core/src/telemetry/metrics.ts",
+            "line": 406,
+            "url": "https://github.com/google-gemini/gemini-cli/blob/v0.68.0/packages/core/src/telemetry/metrics.ts#L406"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "telemetry.surfaces.metrics/gemini_cli.api.request.latency.unit",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "metrics/gemini_cli.api.request.latency",
+        "unit"
+      ],
+      "title": "Telemetry surfaces.metrics/gemini_cli.api.request.latency.unit added",
+      "impact": "informational",
+      "before": null,
+      "after": "ms",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/core/src/telemetry/metrics.ts",
+            "line": 34,
+            "url": "https://github.com/google-gemini/gemini-cli/blob/v0.68.0/packages/core/src/telemetry/metrics.ts#L34"
+          },
+          {
+            "path": "packages/core/src/telemetry/metrics.ts",
+            "line": 406,
+            "url": "https://github.com/google-gemini/gemini-cli/blob/v0.68.0/packages/core/src/telemetry/metrics.ts#L406"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "telemetry.surfaces.metrics/gemini_cli.hook_call.count.monotonic",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "metrics/gemini_cli.hook_call.count",
+        "monotonic"
+      ],
+      "title": "Telemetry surfaces.metrics/gemini_cli.hook_call.count.monotonic added",
+      "impact": "informational",
+      "before": null,
+      "after": true,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/core/src/telemetry/metrics.ts",
+            "line": 48,
+            "url": "https://github.com/google-gemini/gemini-cli/blob/v0.68.0/packages/core/src/telemetry/metrics.ts#L48"
+          },
+          {
+            "path": "packages/core/src/telemetry/metrics.ts",
+            "line": 273,
+            "url": "https://github.com/google-gemini/gemini-cli/blob/v0.68.0/packages/core/src/telemetry/metrics.ts#L273"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "telemetry.surfaces.metrics/gemini_cli.hook_call.count.temporality",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "metrics/gemini_cli.hook_call.count",
+        "temporality"
+      ],
+      "title": "Telemetry surfaces.metrics/gemini_cli.hook_call.count.temporality added",
+      "impact": "informational",
+      "before": null,
+      "after": "cumulative",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/core/src/telemetry/metrics.ts",
+            "line": 48,
+            "url": "https://github.com/google-gemini/gemini-cli/blob/v0.68.0/packages/core/src/telemetry/metrics.ts#L48"
+          },
+          {
+            "path": "packages/core/src/telemetry/metrics.ts",
+            "line": 273,
+            "url": "https://github.com/google-gemini/gemini-cli/blob/v0.68.0/packages/core/src/telemetry/metrics.ts#L273"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "telemetry.surfaces.metrics/gemini_cli.hook_call.count.type",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "metrics/gemini_cli.hook_call.count",
+        "type"
+      ],
+      "title": "Telemetry surfaces.metrics/gemini_cli.hook_call.count.type added",
+      "impact": "informational",
+      "before": null,
+      "after": "sum",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/core/src/telemetry/metrics.ts",
+            "line": 48,
+            "url": "https://github.com/google-gemini/gemini-cli/blob/v0.68.0/packages/core/src/telemetry/metrics.ts#L48"
+          },
+          {
+            "path": "packages/core/src/telemetry/metrics.ts",
+            "line": 273,
+            "url": "https://github.com/google-gemini/gemini-cli/blob/v0.68.0/packages/core/src/telemetry/metrics.ts#L273"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "telemetry.surfaces.metrics/gemini_cli.hook_call.latency.temporality",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "metrics/gemini_cli.hook_call.latency",
+        "temporality"
+      ],
+      "title": "Telemetry surfaces.metrics/gemini_cli.hook_call.latency.temporality added",
+      "impact": "informational",
+      "before": null,
+      "after": "cumulative",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/core/src/telemetry/metrics.ts",
+            "line": 49,
+            "url": "https://github.com/google-gemini/gemini-cli/blob/v0.68.0/packages/core/src/telemetry/metrics.ts#L49"
+          },
+          {
+            "path": "packages/core/src/telemetry/metrics.ts",
+            "line": 496,
+            "url": "https://github.com/google-gemini/gemini-cli/blob/v0.68.0/packages/core/src/telemetry/metrics.ts#L496"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "telemetry.surfaces.metrics/gemini_cli.hook_call.latency.type",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "metrics/gemini_cli.hook_call.latency",
+        "type"
+      ],
+      "title": "Telemetry surfaces.metrics/gemini_cli.hook_call.latency.type added",
+      "impact": "informational",
+      "before": null,
+      "after": "histogram",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/core/src/telemetry/metrics.ts",
+            "line": 49,
+            "url": "https://github.com/google-gemini/gemini-cli/blob/v0.68.0/packages/core/src/telemetry/metrics.ts#L49"
+          },
+          {
+            "path": "packages/core/src/telemetry/metrics.ts",
+            "line": 496,
+            "url": "https://github.com/google-gemini/gemini-cli/blob/v0.68.0/packages/core/src/telemetry/metrics.ts#L496"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "telemetry.surfaces.metrics/gemini_cli.hook_call.latency.unit",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "metrics/gemini_cli.hook_call.latency",
+        "unit"
+      ],
+      "title": "Telemetry surfaces.metrics/gemini_cli.hook_call.latency.unit added",
+      "impact": "informational",
+      "before": null,
+      "after": "ms",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/core/src/telemetry/metrics.ts",
+            "line": 49,
+            "url": "https://github.com/google-gemini/gemini-cli/blob/v0.68.0/packages/core/src/telemetry/metrics.ts#L49"
+          },
+          {
+            "path": "packages/core/src/telemetry/metrics.ts",
+            "line": 496,
+            "url": "https://github.com/google-gemini/gemini-cli/blob/v0.68.0/packages/core/src/telemetry/metrics.ts#L496"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "telemetry.surfaces.metrics/gemini_cli.model_routing.latency.temporality",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "metrics/gemini_cli.model_routing.latency",
+        "temporality"
+      ],
+      "title": "Telemetry surfaces.metrics/gemini_cli.model_routing.latency.temporality added",
+      "impact": "informational",
+      "before": null,
+      "after": "cumulative",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/core/src/telemetry/metrics.ts",
+            "line": 44,
+            "url": "https://github.com/google-gemini/gemini-cli/blob/v0.68.0/packages/core/src/telemetry/metrics.ts#L44"
+          },
+          {
+            "path": "packages/core/src/telemetry/metrics.ts",
+            "line": 416,
+            "url": "https://github.com/google-gemini/gemini-cli/blob/v0.68.0/packages/core/src/telemetry/metrics.ts#L416"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "telemetry.surfaces.metrics/gemini_cli.model_routing.latency.type",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "metrics/gemini_cli.model_routing.latency",
+        "type"
+      ],
+      "title": "Telemetry surfaces.metrics/gemini_cli.model_routing.latency.type added",
+      "impact": "informational",
+      "before": null,
+      "after": "histogram",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/core/src/telemetry/metrics.ts",
+            "line": 44,
+            "url": "https://github.com/google-gemini/gemini-cli/blob/v0.68.0/packages/core/src/telemetry/metrics.ts#L44"
+          },
+          {
+            "path": "packages/core/src/telemetry/metrics.ts",
+            "line": 416,
+            "url": "https://github.com/google-gemini/gemini-cli/blob/v0.68.0/packages/core/src/telemetry/metrics.ts#L416"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "telemetry.surfaces.metrics/gemini_cli.model_routing.latency.unit",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "metrics/gemini_cli.model_routing.latency",
+        "unit"
+      ],
+      "title": "Telemetry surfaces.metrics/gemini_cli.model_routing.latency.unit added",
+      "impact": "informational",
+      "before": null,
+      "after": "ms",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/core/src/telemetry/metrics.ts",
+            "line": 44,
+            "url": "https://github.com/google-gemini/gemini-cli/blob/v0.68.0/packages/core/src/telemetry/metrics.ts#L44"
+          },
+          {
+            "path": "packages/core/src/telemetry/metrics.ts",
+            "line": 416,
+            "url": "https://github.com/google-gemini/gemini-cli/blob/v0.68.0/packages/core/src/telemetry/metrics.ts#L416"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "telemetry.surfaces.metrics/gemini_cli.session.count.monotonic",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "metrics/gemini_cli.session.count",
+        "monotonic"
+      ],
+      "title": "Telemetry surfaces.metrics/gemini_cli.session.count.monotonic added",
+      "impact": "informational",
+      "before": null,
+      "after": true,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/core/src/telemetry/metrics.ts",
+            "line": 36,
+            "url": "https://github.com/google-gemini/gemini-cli/blob/v0.68.0/packages/core/src/telemetry/metrics.ts#L36"
+          },
+          {
+            "path": "packages/core/src/telemetry/metrics.ts",
+            "line": 144,
+            "url": "https://github.com/google-gemini/gemini-cli/blob/v0.68.0/packages/core/src/telemetry/metrics.ts#L144"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "telemetry.surfaces.metrics/gemini_cli.session.count.temporality",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "metrics/gemini_cli.session.count",
+        "temporality"
+      ],
+      "title": "Telemetry surfaces.metrics/gemini_cli.session.count.temporality added",
+      "impact": "informational",
+      "before": null,
+      "after": "cumulative",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/core/src/telemetry/metrics.ts",
+            "line": 36,
+            "url": "https://github.com/google-gemini/gemini-cli/blob/v0.68.0/packages/core/src/telemetry/metrics.ts#L36"
+          },
+          {
+            "path": "packages/core/src/telemetry/metrics.ts",
+            "line": 144,
+            "url": "https://github.com/google-gemini/gemini-cli/blob/v0.68.0/packages/core/src/telemetry/metrics.ts#L144"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "telemetry.surfaces.metrics/gemini_cli.session.count.type",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "metrics/gemini_cli.session.count",
+        "type"
+      ],
+      "title": "Telemetry surfaces.metrics/gemini_cli.session.count.type added",
+      "impact": "informational",
+      "before": null,
+      "after": "sum",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/core/src/telemetry/metrics.ts",
+            "line": 36,
+            "url": "https://github.com/google-gemini/gemini-cli/blob/v0.68.0/packages/core/src/telemetry/metrics.ts#L36"
+          },
+          {
+            "path": "packages/core/src/telemetry/metrics.ts",
+            "line": 144,
+            "url": "https://github.com/google-gemini/gemini-cli/blob/v0.68.0/packages/core/src/telemetry/metrics.ts#L144"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "telemetry.surfaces.metrics/gemini_cli.startup.duration.temporality",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "metrics/gemini_cli.startup.duration",
+        "temporality"
+      ],
+      "title": "Telemetry surfaces.metrics/gemini_cli.startup.duration.temporality added",
+      "impact": "informational",
+      "before": null,
+      "after": "cumulative",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/core/src/telemetry/metrics.ts",
+            "line": 88,
+            "url": "https://github.com/google-gemini/gemini-cli/blob/v0.68.0/packages/core/src/telemetry/metrics.ts#L88"
+          },
+          {
+            "path": "packages/core/src/telemetry/metrics.ts",
+            "line": 580,
+            "url": "https://github.com/google-gemini/gemini-cli/blob/v0.68.0/packages/core/src/telemetry/metrics.ts#L580"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "telemetry.surfaces.metrics/gemini_cli.startup.duration.type",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "metrics/gemini_cli.startup.duration",
+        "type"
+      ],
+      "title": "Telemetry surfaces.metrics/gemini_cli.startup.duration.type added",
+      "impact": "informational",
+      "before": null,
+      "after": "histogram",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/core/src/telemetry/metrics.ts",
+            "line": 88,
+            "url": "https://github.com/google-gemini/gemini-cli/blob/v0.68.0/packages/core/src/telemetry/metrics.ts#L88"
+          },
+          {
+            "path": "packages/core/src/telemetry/metrics.ts",
+            "line": 580,
+            "url": "https://github.com/google-gemini/gemini-cli/blob/v0.68.0/packages/core/src/telemetry/metrics.ts#L580"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "telemetry.surfaces.metrics/gemini_cli.startup.duration.unit",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "metrics/gemini_cli.startup.duration",
+        "unit"
+      ],
+      "title": "Telemetry surfaces.metrics/gemini_cli.startup.duration.unit added",
+      "impact": "informational",
+      "before": null,
+      "after": "ms",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/core/src/telemetry/metrics.ts",
+            "line": 88,
+            "url": "https://github.com/google-gemini/gemini-cli/blob/v0.68.0/packages/core/src/telemetry/metrics.ts#L88"
+          },
+          {
+            "path": "packages/core/src/telemetry/metrics.ts",
+            "line": 580,
+            "url": "https://github.com/google-gemini/gemini-cli/blob/v0.68.0/packages/core/src/telemetry/metrics.ts#L580"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "telemetry.surfaces.metrics/gemini_cli.token.usage.monotonic",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "metrics/gemini_cli.token.usage",
+        "monotonic"
+      ],
+      "title": "Telemetry surfaces.metrics/gemini_cli.token.usage.monotonic added",
+      "impact": "informational",
+      "before": null,
+      "after": true,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/core/src/telemetry/metrics.ts",
+            "line": 35,
+            "url": "https://github.com/google-gemini/gemini-cli/blob/v0.68.0/packages/core/src/telemetry/metrics.ts#L35"
+          },
+          {
+            "path": "packages/core/src/telemetry/metrics.ts",
+            "line": 134,
+            "url": "https://github.com/google-gemini/gemini-cli/blob/v0.68.0/packages/core/src/telemetry/metrics.ts#L134"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "telemetry.surfaces.metrics/gemini_cli.token.usage.temporality",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "metrics/gemini_cli.token.usage",
+        "temporality"
+      ],
+      "title": "Telemetry surfaces.metrics/gemini_cli.token.usage.temporality added",
+      "impact": "informational",
+      "before": null,
+      "after": "cumulative",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/core/src/telemetry/metrics.ts",
+            "line": 35,
+            "url": "https://github.com/google-gemini/gemini-cli/blob/v0.68.0/packages/core/src/telemetry/metrics.ts#L35"
+          },
+          {
+            "path": "packages/core/src/telemetry/metrics.ts",
+            "line": 134,
+            "url": "https://github.com/google-gemini/gemini-cli/blob/v0.68.0/packages/core/src/telemetry/metrics.ts#L134"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "telemetry.surfaces.metrics/gemini_cli.token.usage.type",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "metrics/gemini_cli.token.usage",
+        "type"
+      ],
+      "title": "Telemetry surfaces.metrics/gemini_cli.token.usage.type added",
+      "impact": "informational",
+      "before": null,
+      "after": "sum",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/core/src/telemetry/metrics.ts",
+            "line": 35,
+            "url": "https://github.com/google-gemini/gemini-cli/blob/v0.68.0/packages/core/src/telemetry/metrics.ts#L35"
+          },
+          {
+            "path": "packages/core/src/telemetry/metrics.ts",
+            "line": 134,
+            "url": "https://github.com/google-gemini/gemini-cli/blob/v0.68.0/packages/core/src/telemetry/metrics.ts#L134"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "telemetry.surfaces.metrics/gen_ai.client.operation.duration.temporality",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "metrics/gen_ai.client.operation.duration",
+        "temporality"
+      ],
+      "title": "Telemetry surfaces.metrics/gen_ai.client.operation.duration.temporality added",
+      "impact": "informational",
+      "before": null,
+      "after": "cumulative",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/core/src/telemetry/metrics.ts",
+            "line": 85,
+            "url": "https://github.com/google-gemini/gemini-cli/blob/v0.68.0/packages/core/src/telemetry/metrics.ts#L85"
+          },
+          {
+            "path": "packages/core/src/telemetry/metrics.ts",
+            "line": 480,
+            "url": "https://github.com/google-gemini/gemini-cli/blob/v0.68.0/packages/core/src/telemetry/metrics.ts#L480"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "telemetry.surfaces.metrics/gen_ai.client.operation.duration.type",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "metrics/gen_ai.client.operation.duration",
+        "type"
+      ],
+      "title": "Telemetry surfaces.metrics/gen_ai.client.operation.duration.type added",
+      "impact": "informational",
+      "before": null,
+      "after": "histogram",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/core/src/telemetry/metrics.ts",
+            "line": 85,
+            "url": "https://github.com/google-gemini/gemini-cli/blob/v0.68.0/packages/core/src/telemetry/metrics.ts#L85"
+          },
+          {
+            "path": "packages/core/src/telemetry/metrics.ts",
+            "line": 480,
+            "url": "https://github.com/google-gemini/gemini-cli/blob/v0.68.0/packages/core/src/telemetry/metrics.ts#L480"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "telemetry.surfaces.metrics/gen_ai.client.operation.duration.unit",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "metrics/gen_ai.client.operation.duration",
+        "unit"
+      ],
+      "title": "Telemetry surfaces.metrics/gen_ai.client.operation.duration.unit added",
+      "impact": "informational",
+      "before": null,
+      "after": "s",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/core/src/telemetry/metrics.ts",
+            "line": 85,
+            "url": "https://github.com/google-gemini/gemini-cli/blob/v0.68.0/packages/core/src/telemetry/metrics.ts#L85"
+          },
+          {
+            "path": "packages/core/src/telemetry/metrics.ts",
+            "line": 480,
+            "url": "https://github.com/google-gemini/gemini-cli/blob/v0.68.0/packages/core/src/telemetry/metrics.ts#L480"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "telemetry.surfaces.metrics/gen_ai.client.token.usage.temporality",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "metrics/gen_ai.client.token.usage",
+        "temporality"
+      ],
+      "title": "Telemetry surfaces.metrics/gen_ai.client.token.usage.temporality added",
+      "impact": "informational",
+      "before": null,
+      "after": "cumulative",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/core/src/telemetry/metrics.ts",
+            "line": 84,
+            "url": "https://github.com/google-gemini/gemini-cli/blob/v0.68.0/packages/core/src/telemetry/metrics.ts#L84"
+          },
+          {
+            "path": "packages/core/src/telemetry/metrics.ts",
+            "line": 464,
+            "url": "https://github.com/google-gemini/gemini-cli/blob/v0.68.0/packages/core/src/telemetry/metrics.ts#L464"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "telemetry.surfaces.metrics/gen_ai.client.token.usage.type",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "metrics/gen_ai.client.token.usage",
+        "type"
+      ],
+      "title": "Telemetry surfaces.metrics/gen_ai.client.token.usage.type added",
+      "impact": "informational",
+      "before": null,
+      "after": "histogram",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/core/src/telemetry/metrics.ts",
+            "line": 84,
+            "url": "https://github.com/google-gemini/gemini-cli/blob/v0.68.0/packages/core/src/telemetry/metrics.ts#L84"
+          },
+          {
+            "path": "packages/core/src/telemetry/metrics.ts",
+            "line": 464,
+            "url": "https://github.com/google-gemini/gemini-cli/blob/v0.68.0/packages/core/src/telemetry/metrics.ts#L464"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "telemetry.surfaces.metrics/gen_ai.client.token.usage.unit",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "metrics/gen_ai.client.token.usage",
+        "unit"
+      ],
+      "title": "Telemetry surfaces.metrics/gen_ai.client.token.usage.unit added",
+      "impact": "informational",
+      "before": null,
+      "after": "token",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/core/src/telemetry/metrics.ts",
+            "line": 84,
+            "url": "https://github.com/google-gemini/gemini-cli/blob/v0.68.0/packages/core/src/telemetry/metrics.ts#L84"
+          },
+          {
+            "path": "packages/core/src/telemetry/metrics.ts",
+            "line": 464,
+            "url": "https://github.com/google-gemini/gemini-cli/blob/v0.68.0/packages/core/src/telemetry/metrics.ts#L464"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "telemetry.surfaces.traces/llm_call.root",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "traces/llm_call",
+        "root"
+      ],
+      "title": "Telemetry surfaces.traces/llm_call.root added",
+      "impact": "informational",
+      "before": null,
+      "after": true,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/core/src/telemetry/constants.ts",
+            "line": 33,
+            "url": "https://github.com/google-gemini/gemini-cli/blob/v0.68.0/packages/core/src/telemetry/constants.ts#L33"
+          },
+          {
+            "path": "packages/core/src/core/loggingContentGenerator.ts",
+            "line": 362,
+            "url": "https://github.com/google-gemini/gemini-cli/blob/v0.68.0/packages/core/src/core/loggingContentGenerator.ts#L362"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
     },
     {
       "id": "hooks.events.BeforeToolSelection.matcher",
@@ -2992,7 +4043,7 @@
       "title": "On-disk transcript path changed",
       "impact": "informational",
       "before": "<home>/.gemini<tmp><time>b<n>.jsonl",
-      "after": "<home>/.gemini<tmp><time>a23a0db.jsonl",
+      "after": "<home>/.gemini<tmp><time><n>d.jsonl",
       "text_diff": null,
       "terma": null,
       "source": null,

@@ -12,7 +12,7 @@
           "op": "changed",
           "title": "Agent tool description changed (+81 −83 chars)",
           "impact": "notable",
-          "documented": null
+          "documented": true
         },
         {
           "id": "tools.Skill.description",
@@ -20,7 +20,7 @@
           "op": "changed",
           "title": "Skill tool description changed (+80 −80 chars)",
           "impact": "notable",
-          "documented": null
+          "documented": true
         },
         {
           "id": "tools.ToolSearch.description",
@@ -28,7 +28,7 @@
           "op": "changed",
           "title": "ToolSearch tool description changed (+59 −60 chars)",
           "impact": "notable",
-          "documented": null
+          "documented": true
         },
         {
           "id": "tools.Workflow.description",
@@ -36,359 +36,7 @@
           "op": "changed",
           "title": "Workflow tool description changed (+245 −229 chars)",
           "impact": "notable",
-          "documented": null
-        },
-        {
-          "id": "telemetry.export",
-          "category": "telemetry",
-          "op": "added",
-          "title": "Telemetry export added",
-          "impact": "informational",
-          "documented": null
-        },
-        {
-          "id": "telemetry.surfaces.logs/api_request",
-          "category": "telemetry",
-          "op": "removed",
-          "title": "Telemetry surface no longer sent: logs/api_request",
-          "impact": "degrading",
-          "documented": null
-        },
-        {
-          "id": "telemetry.surfaces.logs/assistant_response",
-          "category": "telemetry",
-          "op": "removed",
-          "title": "Telemetry surface no longer sent: logs/assistant_response",
-          "impact": "degrading",
-          "documented": null
-        },
-        {
-          "id": "telemetry.surfaces.logs/hook_execution_complete",
-          "category": "telemetry",
-          "op": "removed",
-          "title": "Telemetry surface no longer sent: logs/hook_execution_complete",
-          "impact": "degrading",
-          "documented": null
-        },
-        {
-          "id": "telemetry.surfaces.logs/hook_execution_start",
-          "category": "telemetry",
-          "op": "removed",
-          "title": "Telemetry surface no longer sent: logs/hook_execution_start",
-          "impact": "degrading",
-          "documented": null
-        },
-        {
-          "id": "telemetry.surfaces.logs/hook_registered",
-          "category": "telemetry",
-          "op": "removed",
-          "title": "Telemetry surface no longer sent: logs/hook_registered",
-          "impact": "degrading",
-          "documented": null
-        },
-        {
-          "id": "telemetry.surfaces.logs/managed_settings_resolved",
-          "category": "telemetry",
-          "op": "removed",
-          "title": "Telemetry surface no longer sent: logs/managed_settings_resolved",
-          "impact": "degrading",
-          "documented": null
-        },
-        {
-          "id": "telemetry.surfaces.logs/permission_mode_changed",
-          "category": "telemetry",
-          "op": "removed",
-          "title": "Telemetry surface no longer sent: logs/permission_mode_changed",
-          "impact": "degrading",
-          "documented": null
-        },
-        {
-          "id": "telemetry.surfaces.logs/plugin_loaded",
-          "category": "telemetry",
-          "op": "removed",
-          "title": "Telemetry surface no longer sent: logs/plugin_loaded",
-          "impact": "degrading",
-          "documented": null
-        },
-        {
-          "id": "telemetry.surfaces.logs/subagent_completed",
-          "category": "telemetry",
-          "op": "removed",
-          "title": "Telemetry surface no longer sent: logs/subagent_completed",
-          "impact": "degrading",
-          "documented": null
-        },
-        {
-          "id": "telemetry.surfaces.logs/tool_decision",
-          "category": "telemetry",
-          "op": "removed",
-          "title": "Telemetry surface no longer sent: logs/tool_decision",
-          "impact": "degrading",
-          "documented": null
-        },
-        {
-          "id": "telemetry.surfaces.logs/tool_result",
-          "category": "telemetry",
-          "op": "removed",
-          "title": "Telemetry surface no longer sent: logs/tool_result",
-          "impact": "degrading",
-          "documented": null
-        },
-        {
-          "id": "telemetry.surfaces.logs/user_prompt",
-          "category": "telemetry",
-          "op": "removed",
-          "title": "Telemetry surface no longer sent: logs/user_prompt",
-          "impact": "degrading",
-          "documented": null
-        },
-        {
-          "id": "telemetry.surfaces.metrics/claude_code.active_time.total.keys",
-          "category": "telemetry",
-          "op": "removed",
-          "title": "Telemetry surfaces.metrics/claude_code.active_time.total.keys removed",
-          "impact": "notable",
-          "documented": null
-        },
-        {
-          "id": "telemetry.surfaces.metrics/claude_code.active_time.total.monotonic",
-          "category": "telemetry",
-          "op": "added",
-          "title": "Telemetry surfaces.metrics/claude_code.active_time.total.monotonic added",
-          "impact": "informational",
-          "documented": null
-        },
-        {
-          "id": "telemetry.surfaces.metrics/claude_code.active_time.total.temporality",
-          "category": "telemetry",
-          "op": "added",
-          "title": "Telemetry surfaces.metrics/claude_code.active_time.total.temporality added",
-          "impact": "informational",
-          "documented": null
-        },
-        {
-          "id": "telemetry.surfaces.metrics/claude_code.active_time.total.type",
-          "category": "telemetry",
-          "op": "added",
-          "title": "Telemetry surfaces.metrics/claude_code.active_time.total.type added",
-          "impact": "informational",
-          "documented": null
-        },
-        {
-          "id": "telemetry.surfaces.metrics/claude_code.active_time.total.unit",
-          "category": "telemetry",
-          "op": "added",
-          "title": "Telemetry surfaces.metrics/claude_code.active_time.total.unit added",
-          "impact": "informational",
-          "documented": null
-        },
-        {
-          "id": "telemetry.surfaces.metrics/claude_code.code_edit_tool.decision",
-          "category": "telemetry",
-          "op": "removed",
-          "title": "Telemetry surface no longer sent: metrics/claude_code.code_edit_tool.decision",
-          "impact": "degrading",
-          "documented": null
-        },
-        {
-          "id": "telemetry.surfaces.metrics/claude_code.cost.usage.keys",
-          "category": "telemetry",
-          "op": "removed",
-          "title": "Telemetry surfaces.metrics/claude_code.cost.usage.keys removed",
-          "impact": "notable",
-          "documented": null
-        },
-        {
-          "id": "telemetry.surfaces.metrics/claude_code.cost.usage.monotonic",
-          "category": "telemetry",
-          "op": "added",
-          "title": "Telemetry surfaces.metrics/claude_code.cost.usage.monotonic added",
-          "impact": "informational",
-          "documented": null
-        },
-        {
-          "id": "telemetry.surfaces.metrics/claude_code.cost.usage.temporality",
-          "category": "telemetry",
-          "op": "added",
-          "title": "Telemetry surfaces.metrics/claude_code.cost.usage.temporality added",
-          "impact": "informational",
-          "documented": null
-        },
-        {
-          "id": "telemetry.surfaces.metrics/claude_code.cost.usage.type",
-          "category": "telemetry",
-          "op": "added",
-          "title": "Telemetry surfaces.metrics/claude_code.cost.usage.type added",
-          "impact": "informational",
-          "documented": null
-        },
-        {
-          "id": "telemetry.surfaces.metrics/claude_code.cost.usage.unit",
-          "category": "telemetry",
-          "op": "added",
-          "title": "Telemetry surfaces.metrics/claude_code.cost.usage.unit added",
-          "impact": "informational",
-          "documented": null
-        },
-        {
-          "id": "telemetry.surfaces.metrics/claude_code.lines_of_code.count",
-          "category": "telemetry",
-          "op": "removed",
-          "title": "Telemetry surface no longer sent: metrics/claude_code.lines_of_code.count",
-          "impact": "degrading",
-          "documented": null
-        },
-        {
-          "id": "telemetry.surfaces.metrics/claude_code.session.count.keys",
-          "category": "telemetry",
-          "op": "removed",
-          "title": "Telemetry surfaces.metrics/claude_code.session.count.keys removed",
-          "impact": "notable",
-          "documented": null
-        },
-        {
-          "id": "telemetry.surfaces.metrics/claude_code.session.count.monotonic",
-          "category": "telemetry",
-          "op": "added",
-          "title": "Telemetry surfaces.metrics/claude_code.session.count.monotonic added",
-          "impact": "informational",
-          "documented": null
-        },
-        {
-          "id": "telemetry.surfaces.metrics/claude_code.session.count.temporality",
-          "category": "telemetry",
-          "op": "added",
-          "title": "Telemetry surfaces.metrics/claude_code.session.count.temporality added",
-          "impact": "informational",
-          "documented": null
-        },
-        {
-          "id": "telemetry.surfaces.metrics/claude_code.session.count.type",
-          "category": "telemetry",
-          "op": "added",
-          "title": "Telemetry surfaces.metrics/claude_code.session.count.type added",
-          "impact": "informational",
-          "documented": null
-        },
-        {
-          "id": "telemetry.surfaces.metrics/claude_code.token.usage.keys",
-          "category": "telemetry",
-          "op": "removed",
-          "title": "Telemetry surfaces.metrics/claude_code.token.usage.keys removed",
-          "impact": "notable",
-          "documented": null
-        },
-        {
-          "id": "telemetry.surfaces.metrics/claude_code.token.usage.monotonic",
-          "category": "telemetry",
-          "op": "added",
-          "title": "Telemetry surfaces.metrics/claude_code.token.usage.monotonic added",
-          "impact": "informational",
-          "documented": null
-        },
-        {
-          "id": "telemetry.surfaces.metrics/claude_code.token.usage.temporality",
-          "category": "telemetry",
-          "op": "added",
-          "title": "Telemetry surfaces.metrics/claude_code.token.usage.temporality added",
-          "impact": "informational",
-          "documented": null
-        },
-        {
-          "id": "telemetry.surfaces.metrics/claude_code.token.usage.type",
-          "category": "telemetry",
-          "op": "added",
-          "title": "Telemetry surfaces.metrics/claude_code.token.usage.type added",
-          "impact": "informational",
-          "documented": null
-        },
-        {
-          "id": "telemetry.surfaces.metrics/claude_code.token.usage.unit",
-          "category": "telemetry",
-          "op": "added",
-          "title": "Telemetry surfaces.metrics/claude_code.token.usage.unit added",
-          "impact": "informational",
-          "documented": null
-        },
-        {
-          "id": "telemetry.surfaces.resource",
-          "category": "telemetry",
-          "op": "removed",
-          "title": "Telemetry surface no longer sent: resource",
-          "impact": "degrading",
-          "documented": null
-        },
-        {
-          "id": "telemetry.surfaces.traces/claude_code.interaction.keys",
-          "category": "telemetry",
-          "op": "removed",
-          "title": "Telemetry surfaces.traces/claude_code.interaction.keys removed",
-          "impact": "notable",
-          "documented": null
-        },
-        {
-          "id": "telemetry.surfaces.traces/claude_code.interaction.root",
-          "category": "telemetry",
-          "op": "added",
-          "title": "Telemetry surfaces.traces/claude_code.interaction.root added",
-          "impact": "informational",
-          "documented": null
-        },
-        {
-          "id": "telemetry.surfaces.traces/claude_code.llm_request.keys",
-          "category": "telemetry",
-          "op": "removed",
-          "title": "Telemetry surfaces.traces/claude_code.llm_request.keys removed",
-          "impact": "notable",
-          "documented": null
-        },
-        {
-          "id": "telemetry.surfaces.traces/claude_code.llm_request.parent",
-          "category": "telemetry",
-          "op": "added",
-          "title": "Telemetry surfaces.traces/claude_code.llm_request.parent added",
-          "impact": "informational",
-          "documented": null
-        },
-        {
-          "id": "telemetry.surfaces.traces/claude_code.llm_request/events/gen_ai.request.attempt",
-          "category": "telemetry",
-          "op": "removed",
-          "title": "Telemetry surface no longer sent: traces/claude_code.llm_request/events/gen_ai.request.attempt",
-          "impact": "degrading",
-          "documented": null
-        },
-        {
-          "id": "telemetry.surfaces.traces/claude_code.tool",
-          "category": "telemetry",
-          "op": "removed",
-          "title": "Telemetry surface no longer sent: traces/claude_code.tool",
-          "impact": "degrading",
-          "documented": null
-        },
-        {
-          "id": "telemetry.surfaces.traces/claude_code.tool.blocked_on_user",
-          "category": "telemetry",
-          "op": "removed",
-          "title": "Telemetry surface no longer sent: traces/claude_code.tool.blocked_on_user",
-          "impact": "degrading",
-          "documented": null
-        },
-        {
-          "id": "telemetry.surfaces.traces/claude_code.tool.execution",
-          "category": "telemetry",
-          "op": "removed",
-          "title": "Telemetry surface no longer sent: traces/claude_code.tool.execution",
-          "impact": "degrading",
-          "documented": null
-        },
-        {
-          "id": "telemetry.surfaces.traces/claude_code.tool/events/tool.output",
-          "category": "telemetry",
-          "op": "removed",
-          "title": "Telemetry surface no longer sent: traces/claude_code.tool/events/tool.output",
-          "impact": "degrading",
-          "documented": null
+          "documented": true
         },
         {
           "id": "hooks.events.PermissionRequest.keys.permission_suggestions[].behavior",
@@ -396,7 +44,7 @@
           "op": "removed",
           "title": "PermissionRequest hook payload field permission_suggestions[].behavior removed",
           "impact": "notable",
-          "documented": null
+          "documented": true
         },
         {
           "id": "hooks.events.PermissionRequest.keys.permission_suggestions[].rules",
@@ -404,7 +52,7 @@
           "op": "removed",
           "title": "PermissionRequest hook payload field permission_suggestions[].rules removed",
           "impact": "notable",
-          "documented": null
+          "documented": true
         },
         {
           "id": "hooks.events.PermissionRequest.keys.permission_suggestions[].rules[].ruleContent",
@@ -412,7 +60,7 @@
           "op": "removed",
           "title": "PermissionRequest hook payload field permission_suggestions[].rules[].ruleContent removed",
           "impact": "notable",
-          "documented": null
+          "documented": true
         },
         {
           "id": "hooks.events.PermissionRequest.keys.permission_suggestions[].rules[].toolName",
@@ -420,7 +68,7 @@
           "op": "removed",
           "title": "PermissionRequest hook payload field permission_suggestions[].rules[].toolName removed",
           "impact": "notable",
-          "documented": null
+          "documented": true
         },
         {
           "id": "cli.commands.claude mcp #",
@@ -428,7 +76,7 @@
           "op": "removed",
           "title": "Command removed: `claude mcp #`",
           "impact": "notable",
-          "documented": null
+          "documented": true
         },
         {
           "id": "cli.commands.claude mcp Add",
@@ -436,7 +84,7 @@
           "op": "added",
           "title": "New command: `claude mcp Add`",
           "impact": "informational",
-          "documented": null
+          "documented": true
         },
         {
           "id": "cli.commands.claude mcp Examples:",
@@ -444,7 +92,7 @@
           "op": "removed",
           "title": "Command removed: `claude mcp Examples:`",
           "impact": "notable",
-          "documented": null
+          "documented": true
         },
         {
           "id": "cli.commands.claude mcp claude",
@@ -452,7 +100,7 @@
           "op": "removed",
           "title": "Command removed: `claude mcp claude`",
           "impact": "notable",
-          "documented": null
+          "documented": true
         },
         {
           "id": "cli.help.--help",
@@ -460,7 +108,7 @@
           "op": "changed",
           "title": "Full help text of `--help` changed (+300 −152 chars)",
           "impact": "informational",
-          "documented": null
+          "documented": true
         },
         {
           "id": "cli.help.mcp --help",
@@ -468,7 +116,7 @@
           "op": "changed",
           "title": "Full help text of `mcp --help` changed (+70 −559 chars)",
           "impact": "informational",
-          "documented": null
+          "documented": true
         },
         {
           "id": "cli.help.rm --help",
@@ -476,7 +124,7 @@
           "op": "changed",
           "title": "Full help text of `rm --help` changed (+185 −96 chars)",
           "impact": "informational",
-          "documented": null
+          "documented": true
         },
         {
           "id": "config.options.additionalMarketplaces.<name>.pluginDigests.description",
@@ -484,7 +132,7 @@
           "op": "changed",
           "title": "additionalMarketplaces.<name>.pluginDigests description changed (+320 −290 chars)",
           "impact": "informational",
-          "documented": null
+          "documented": true
         },
         {
           "id": "config.options.additionalMarketplaces.<name>.source.package.description",
@@ -492,7 +140,7 @@
           "op": "changed",
           "title": "additionalMarketplaces.<name>.source.package description changed (+218 −311 chars)",
           "impact": "informational",
-          "documented": null
+          "documented": true
         },
         {
           "id": "config.options.additionalMarketplaces.<name>.source.registry.description",
@@ -500,7 +148,7 @@
           "op": "changed",
           "title": "additionalMarketplaces.<name>.source.registry description changed (+267 −413 chars)",
           "impact": "informational",
-          "documented": null
+          "documented": true
         },
         {
           "id": "config.options.allowedMarketplaces[].package.description",
@@ -508,7 +156,7 @@
           "op": "changed",
           "title": "allowedMarketplaces[].package description changed (+218 −311 chars)",
           "impact": "informational",
-          "documented": null
+          "documented": true
         },
         {
           "id": "config.options.allowedMarketplaces[].registry.description",
@@ -516,7 +164,7 @@
           "op": "changed",
           "title": "allowedMarketplaces[].registry description changed (+267 −413 chars)",
           "impact": "informational",
-          "documented": null
+          "documented": true
         },
         {
           "id": "config.options.askUserQuestionTimeout.description",
@@ -524,7 +172,7 @@
           "op": "changed",
           "title": "askUserQuestionTimeout description changed (+662 −0 chars)",
           "impact": "informational",
-          "documented": null
+          "documented": true
         },
         {
           "id": "config.options.autoMode",
@@ -532,7 +180,7 @@
           "op": "removed",
           "title": "Setting no longer read: autoMode",
           "impact": "notable",
-          "documented": null
+          "documented": false
         },
         {
           "id": "config.options.axScreenReader",
@@ -540,7 +188,7 @@
           "op": "removed",
           "title": "Setting no longer read: axScreenReader",
           "impact": "notable",
-          "documented": null
+          "documented": false
         },
         {
           "id": "config.options.clawdFileProgressEnabled",
@@ -548,7 +196,7 @@
           "op": "added",
           "title": "New setting: clawdFileProgressEnabled",
           "impact": "informational",
-          "documented": null
+          "documented": false
         },
         {
           "id": "config.options.defaultView",
@@ -556,7 +204,7 @@
           "op": "removed",
           "title": "Setting no longer read: defaultView",
           "impact": "notable",
-          "documented": null
+          "documented": false
         },
         {
           "id": "config.options.disableDeepLinkRegistration",
@@ -564,7 +212,7 @@
           "op": "removed",
           "title": "Setting no longer read: disableDeepLinkRegistration",
           "impact": "notable",
-          "documented": null
+          "documented": false
         },
         {
           "id": "config.options.enabledPlugins.description",
@@ -572,7 +220,7 @@
           "op": "changed",
           "title": "enabledPlugins description changed (+90 −55 chars)",
           "impact": "informational",
-          "documented": null
+          "documented": true
         },
         {
           "id": "config.options.extraKnownMarketplaces.<name>.pluginDigests.description",
@@ -580,7 +228,7 @@
           "op": "changed",
           "title": "extraKnownMarketplaces.<name>.pluginDigests description changed (+320 −290 chars)",
           "impact": "informational",
-          "documented": null
+          "documented": true
         },
         {
           "id": "config.options.extraKnownMarketplaces.<name>.source.package.description",
@@ -588,7 +236,7 @@
           "op": "changed",
           "title": "extraKnownMarketplaces.<name>.source.package description changed (+218 −311 chars)",
           "impact": "informational",
-          "documented": null
+          "documented": true
         },
         {
           "id": "config.options.extraKnownMarketplaces.<name>.source.registry.description",
@@ -596,7 +244,7 @@
           "op": "changed",
           "title": "extraKnownMarketplaces.<name>.source.registry description changed (+267 −413 chars)",
           "impact": "informational",
-          "documented": null
+          "documented": true
         },
         {
           "id": "config.options.permissions.blockReadsOutsideWorkingDirectories.description",
@@ -604,7 +252,7 @@
           "op": "changed",
           "title": "permissions.blockReadsOutsideWorkingDirectories description changed (+417 −276 chars)",
           "impact": "informational",
-          "documented": null
+          "documented": true
         },
         {
           "id": "config.options.permissions.blockWritesOutsideWorkingDirectories.description",
@@ -612,7 +260,7 @@
           "op": "changed",
           "title": "permissions.blockWritesOutsideWorkingDirectories description changed (+566 −406 chars)",
           "impact": "informational",
-          "documented": null
+          "documented": true
         },
         {
           "id": "config.options.precomputeArmTokens",
@@ -620,7 +268,7 @@
           "op": "added",
           "title": "New setting: precomputeArmTokens",
           "impact": "informational",
-          "documented": null
+          "documented": false
         },
         {
           "id": "config.options.skipAutoPermissionPrompt",
@@ -628,7 +276,7 @@
           "op": "removed",
           "title": "Setting no longer read: skipAutoPermissionPrompt",
           "impact": "notable",
-          "documented": null
+          "documented": false
         },
         {
           "id": "config.options.strictKnownMarketplaces[].package.description",
@@ -636,7 +284,7 @@
           "op": "changed",
           "title": "strictKnownMarketplaces[].package description changed (+218 −311 chars)",
           "impact": "informational",
-          "documented": null
+          "documented": true
         },
         {
           "id": "config.options.strictKnownMarketplaces[].registry.description",
@@ -644,7 +292,7 @@
           "op": "changed",
           "title": "strictKnownMarketplaces[].registry description changed (+267 −413 chars)",
           "impact": "informational",
-          "documented": null
+          "documented": true
         },
         {
           "id": "config.options.subagentStatusLine.deprecated",
@@ -652,7 +300,7 @@
           "op": "changed",
           "title": "Setting subagentStatusLine deprecated",
           "impact": "notable",
-          "documented": null
+          "documented": true
         },
         {
           "id": "config.options.subagentStatusLine.description",
@@ -660,7 +308,7 @@
           "op": "changed",
           "title": "subagentStatusLine description changed (+80 −95 chars)",
           "impact": "informational",
-          "documented": null
+          "documented": true
         },
         {
           "id": "config.options.useAutoModeDuringPlan",
@@ -668,7 +316,7 @@
           "op": "removed",
           "title": "Setting no longer read: useAutoModeDuringPlan",
           "impact": "notable",
-          "documented": null
+          "documented": false
         },
         {
           "id": "config.options.voiceEnabled",
@@ -676,7 +324,7 @@
           "op": "removed",
           "title": "Setting no longer read: voiceEnabled",
           "impact": "notable",
-          "documented": null
+          "documented": false
         },
         {
           "id": "config.env_vars",
@@ -684,7 +332,7 @@
           "op": "changed",
           "title": "Environment variables: +27 −6",
           "impact": "informational",
-          "documented": null
+          "documented": false
         },
         {
           "id": "network.egress.GET api.anthropic.com/mcp-registry/v0/servers",
@@ -692,7 +340,7 @@
           "op": "removed",
           "title": "Network request no longer made: GET api.anthropic.com/mcp-registry/v0/servers",
           "impact": "notable",
-          "documented": null
+          "documented": true
         },
         {
           "id": "network.egress.GET api.anthropic.com/api/directory/server-urls",
@@ -700,7 +348,7 @@
           "op": "added",
           "title": "New network request: GET api.anthropic.com/api/directory/server-urls",
           "impact": "notable",
-          "documented": null
+          "documented": false
         },
         {
           "id": "filesystem.darwin/arm64.exec.rg --no-config --files --hidden <repo>.phases.turn",
@@ -708,7 +356,7 @@
           "op": "added",
           "title": "`rg --no-config --files --hidden <repo>` now also runs at turn (darwin/arm64)",
           "impact": "informational",
-          "documented": null
+          "documented": true
         },
         {
           "id": "filesystem.darwin/arm64.exec.rg --no-config --files --hidden <repo>.phases.startup",
@@ -716,7 +364,7 @@
           "op": "removed",
           "title": "`rg --no-config --files --hidden <repo>` no longer runs at startup (darwin/arm64)",
           "impact": "informational",
-          "documented": null
+          "documented": true
         },
         {
           "id": "filesystem.darwin/arm64.exec./bin/zsh -c source <claude-config>/shell-snapshots/snapshot-zsh-<n>-<id>.sh 2>/dev/null || true && \\builtin setopt NO_EXTENDED_GLOB NO_BARE_GLOB_QUAL NO_BRACE_CCL NO_MAGIC_EQUAL_SUBST 2>/dev/null || true && { \\builtin unalias -- 'which'; \\builtin unset -f -- 'which'; } >/dev/null 2>&1 || true && { \\builtin unalias -- 'unsetenv'; \\builtin unset -f -- 'unsetenv'; } >/dev/null 2>&1 || true && eval 'git status --short && git log --oneline -1' < /dev/null && pwd -P >| <tmp>/claude-<id>-cwd",
@@ -724,7 +372,7 @@
           "op": "changed",
           "title": "Command changed: `/bin/zsh -c source <claude-config>/shell-snapshots/snapshot-zsh-<n>-<id>.sh 2>/dev/null || true && \\ …` (+216 −173 chars) (darwin/arm64)",
           "impact": "informational",
-          "documented": null
+          "documented": false
         },
         {
           "id": "filesystem.linux/amd64.paths./home",
@@ -732,7 +380,7 @@
           "op": "added",
           "title": "Now checks /home (linux/amd64)",
           "impact": "informational",
-          "documented": null
+          "documented": true
         },
         {
           "id": "filesystem.linux/amd64.exec.rg --no-config --files --hidden <repo>.phases.turn",
@@ -740,7 +388,7 @@
           "op": "added",
           "title": "`rg --no-config --files --hidden <repo>` now also runs at turn (linux/amd64)",
           "impact": "informational",
-          "documented": null
+          "documented": true
         },
         {
           "id": "filesystem.linux/amd64.exec.rg --no-config --files --hidden <repo>.phases.startup",
@@ -748,7 +396,7 @@
           "op": "removed",
           "title": "`rg --no-config --files --hidden <repo>` no longer runs at startup (linux/amd64)",
           "impact": "informational",
-          "documented": null
+          "documented": true
         },
         {
           "id": "filesystem.linux/amd64.exec./bin/bash -c source <claude-config>/shell-snapshots/snapshot-bash-<n>-<id>.sh 2>/dev/null || true && \\builtin shopt -u extglob 2>/dev/null || true && { \\builtin unalias -- 'which'; \\builtin unset -f -- 'which'; } >/dev/null 2>&1 || true && { \\builtin unalias -- 'unsetenv'; \\builtin unset -f -- 'unsetenv'; } >/dev/null 2>&1 || true && eval 'git status --short && git log --oneline -1' < /dev/null && pwd -P >| <tmp>/claude-<id>-cwd",
@@ -756,7 +404,7 @@
           "op": "changed",
           "title": "Command changed: `/bin/bash -c source <claude-config>/shell-snapshots/snapshot-bash-<n>-<id>.sh 2>/dev/null || true && …` (+105 −96 chars) (linux/amd64)",
           "impact": "informational",
-          "documented": null
+          "documented": false
         },
         {
           "id": "binary.size_bytes",
@@ -764,7 +412,7 @@
           "op": "changed",
           "title": "Binary size: 323,702,464 → 344,369,984 bytes (323.7 MB → 344.4 MB)",
           "impact": "informational",
-          "documented": null
+          "documented": false
         }
       ]
     },
@@ -772,6 +420,150 @@
       "version": "2.1.322",
       "previous": "2.1.321",
       "changes": [
+        {
+          "id": "telemetry.export",
+          "category": "telemetry",
+          "op": "added",
+          "title": "Telemetry export added",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/claude_code.active_time.total.monotonic",
+          "category": "telemetry",
+          "op": "added",
+          "title": "Telemetry surfaces.metrics/claude_code.active_time.total.monotonic added",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/claude_code.active_time.total.temporality",
+          "category": "telemetry",
+          "op": "added",
+          "title": "Telemetry surfaces.metrics/claude_code.active_time.total.temporality added",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/claude_code.active_time.total.type",
+          "category": "telemetry",
+          "op": "added",
+          "title": "Telemetry surfaces.metrics/claude_code.active_time.total.type added",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/claude_code.active_time.total.unit",
+          "category": "telemetry",
+          "op": "added",
+          "title": "Telemetry surfaces.metrics/claude_code.active_time.total.unit added",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/claude_code.cost.usage.monotonic",
+          "category": "telemetry",
+          "op": "added",
+          "title": "Telemetry surfaces.metrics/claude_code.cost.usage.monotonic added",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/claude_code.cost.usage.temporality",
+          "category": "telemetry",
+          "op": "added",
+          "title": "Telemetry surfaces.metrics/claude_code.cost.usage.temporality added",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/claude_code.cost.usage.type",
+          "category": "telemetry",
+          "op": "added",
+          "title": "Telemetry surfaces.metrics/claude_code.cost.usage.type added",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/claude_code.cost.usage.unit",
+          "category": "telemetry",
+          "op": "added",
+          "title": "Telemetry surfaces.metrics/claude_code.cost.usage.unit added",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/claude_code.session.count.monotonic",
+          "category": "telemetry",
+          "op": "added",
+          "title": "Telemetry surfaces.metrics/claude_code.session.count.monotonic added",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/claude_code.session.count.temporality",
+          "category": "telemetry",
+          "op": "added",
+          "title": "Telemetry surfaces.metrics/claude_code.session.count.temporality added",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/claude_code.session.count.type",
+          "category": "telemetry",
+          "op": "added",
+          "title": "Telemetry surfaces.metrics/claude_code.session.count.type added",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/claude_code.token.usage.monotonic",
+          "category": "telemetry",
+          "op": "added",
+          "title": "Telemetry surfaces.metrics/claude_code.token.usage.monotonic added",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/claude_code.token.usage.temporality",
+          "category": "telemetry",
+          "op": "added",
+          "title": "Telemetry surfaces.metrics/claude_code.token.usage.temporality added",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/claude_code.token.usage.type",
+          "category": "telemetry",
+          "op": "added",
+          "title": "Telemetry surfaces.metrics/claude_code.token.usage.type added",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/claude_code.token.usage.unit",
+          "category": "telemetry",
+          "op": "added",
+          "title": "Telemetry surfaces.metrics/claude_code.token.usage.unit added",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/claude_code.interaction.root",
+          "category": "telemetry",
+          "op": "added",
+          "title": "Telemetry surfaces.traces/claude_code.interaction.root added",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/claude_code.llm_request.parent",
+          "category": "telemetry",
+          "op": "added",
+          "title": "Telemetry surfaces.traces/claude_code.llm_request.parent added",
+          "impact": "informational",
+          "documented": false
+        },
         {
           "id": "config.options.fastMode.description",
           "category": "config",

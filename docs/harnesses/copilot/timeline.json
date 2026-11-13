@@ -125,14 +125,6 @@
           "title": "Environment variable no longer read: PLAIN_DIFF",
           "impact": "informational",
           "documented": false
-        },
-        {
-          "id": "storage.logs.path",
-          "category": "storage",
-          "op": "changed",
-          "title": "On-disk logs path changed",
-          "impact": "informational",
-          "documented": true
         }
       ]
     },

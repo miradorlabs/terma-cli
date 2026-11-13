@@ -15767,6 +15767,7 @@
       "tracer": "eslogger",
       "unobserved": {
         "paths": [
+          "<claude-config>/.claude.json.tmp.<n>.<n>",
           "<repo>/.git/worktrees"
         ]
       }

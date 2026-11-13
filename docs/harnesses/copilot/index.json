@@ -14,13 +14,12 @@
     "last_change": {
       "from": "1.0.109",
       "to": "1.0.110",
-      "at": "2026-11-12T23:16:49.659858398Z",
+      "at": "2026-11-13T05:13:29.306022914Z",
       "released_at": "2026-11-12T22:59:46.318Z",
-      "changes": 16,
+      "changes": 15,
       "categories": {
         "cli": 3,
         "config": 10,
-        "storage": 1,
         "tools": 2
       }
     }
@@ -29,23 +28,22 @@
     {
       "version": "1.0.110",
       "released_at": "2026-11-12T22:59:46.318Z",
-      "captured_at": "2026-11-12T23:16:49.659858398Z",
+      "captured_at": "2026-11-13T05:13:29.306022914Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "untested",
       "previous": "1.0.109",
-      "changes": 16,
+      "changes": 15,
       "categories": {
         "cli": 3,
         "config": 10,
-        "storage": 1,
         "tools": 2
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 13,
+        "informational": 12,
         "notable": 3
       },
       "undocumented": 3,

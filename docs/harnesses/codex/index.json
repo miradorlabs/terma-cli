@@ -12,20 +12,20 @@
     },
     "changelog": "https://github.com/openai/codex/releases",
     "latest": "0.168.0",
-    "support": "untested",
+    "support": "supported",
     "versions_tracked": 104,
     "first_tracked": "2026-01-25",
     "last_change": {
       "from": "0.167.2",
       "to": "0.168.0",
-      "at": "2026-11-13T04:21:24.021969273Z",
+      "at": "2026-11-13T05:13:29.306022914Z",
       "released_at": "2026-11-13T04:00:31.594Z",
-      "changes": 518,
+      "changes": 61,
       "categories": {
-        "cli": 6,
+        "cli": 5,
         "config": 37,
-        "filesystem": 8,
-        "telemetry": 466,
+        "filesystem": 2,
+        "telemetry": 16,
         "tools": 1
       }
     }
@@ -34,60 +34,61 @@
     {
       "version": "0.168.0",
       "released_at": "2026-11-13T04:00:31.594Z",
-      "captured_at": "2026-11-13T04:21:24.021969273Z",
+      "captured_at": "2026-11-13T05:13:29.306022914Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"
       ],
-      "support": "untested",
+      "support": "supported",
       "previous": "0.167.2",
-      "changes": 518,
+      "changes": 61,
       "categories": {
-        "cli": 6,
+        "cli": 5,
         "config": 37,
-        "filesystem": 8,
-        "telemetry": 466,
+        "filesystem": 2,
+        "telemetry": 16,
         "tools": 1
       },
       "impact": {
         "breaking": 0,
-        "degrading": 38,
-        "informational": 305,
-        "notable": 175
+        "degrading": 0,
+        "informational": 51,
+        "notable": 10
       },
-      "undocumented": 336,
+      "undocumented": 46,
       "highlights": [
-        "Telemetry surface no longer sent: logs/codex.api_request",
-        "Telemetry surface no longer sent: logs/codex.conversation_starts",
-        "Telemetry surface no longer sent: logs/codex.sse_event"
+        "exec tool description changed (+281 −862 chars)",
+        "Telemetry surfaces.traces/auth.parents.traces/codex.turn_input removed",
+        "Telemetry surfaces.traces/auth.parents.traces/model_client.stream_responses_api removed"
       ],
       "signing": "valid"
     },
     {
       "version": "0.167.2",
       "released_at": "2026-11-11T22:50:04.191Z",
-      "captured_at": "2026-11-12T15:48:45.504112256Z",
+      "captured_at": "2026-11-13T05:13:29.306022914Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"
       ],
       "support": "supported",
       "previous": "0.167.1",
-      "changes": 2,
+      "changes": 256,
       "categories": {
-        "cli": 1,
-        "config": 1
+        "config": 1,
+        "telemetry": 255
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 2,
+        "informational": 256,
         "notable": 0
       },
-      "undocumented": 1,
+      "undocumented": 255,
       "highlights": [
-        "Full help text of `completion -h` changed (+105 −0 chars)",
-        "New setting: features.incremental_tools_legacy_gcp"
+        "Telemetry export added",
+        "Telemetry surfaces.metrics/codex.api_request.monotonic added",
+        "Telemetry surfaces.metrics/codex.api_request.temporality added"
       ],
       "signing": "valid"
     },
@@ -130,24 +131,24 @@
       ],
       "support": "supported",
       "previous": "0.166.0",
-      "changes": 27,
+      "changes": 28,
       "categories": {
         "cli": 6,
         "config": 12,
-        "filesystem": 8,
+        "filesystem": 9,
         "prompt": 1
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 21,
-        "notable": 6
+        "informational": 26,
+        "notable": 2
       },
-      "undocumented": 17,
+      "undocumented": 18,
       "highlights": [
         "Injected context changed (+47 −53 chars)",
         "New setting: model_providers.<name>.gateway_oauth.credentials_store",
-        "New command at turn: `/proc/self/exe --codex-run-as-process-setup <n> <n> pipe  <repo> <install>/codex codex-linux-sandbox …` (linux/amd64)"
+        "Description of `codex agents` changed"
       ],
       "signing": "valid"
     },

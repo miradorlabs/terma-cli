@@ -18447,6 +18447,7 @@
       "tracer": "eslogger",
       "unobserved": {
         "paths": [
+          "<claude-config>/.claude.json.tmp.<n>.<n>",
           "<claude-config>/telemetry/1p_failed_events.<uuid>.<uuid>.json"
         ]
       }

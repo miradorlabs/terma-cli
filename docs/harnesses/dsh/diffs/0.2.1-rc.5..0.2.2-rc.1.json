@@ -3,7 +3,7 @@
   "harness": "dsh",
   "from": "0.2.1-rc.5",
   "to": "0.2.2-rc.1",
-  "generated_at": "2026-11-12T05:15:55.281711967Z",
+  "generated_at": "2026-11-13T05:13:29.306022914Z",
   "source": {
     "compare": "https://github.com/deepseek-ai/deepseek-harness/compare/dsh-v0.2.1-rc.5...dsh-v0.2.2-rc.1"
   },
@@ -151,10 +151,10 @@
         "0",
         "time"
       ],
-      "title": "Model parameter dsh_session_log.events.0.time: 1793875310330 → 1794458749914",
+      "title": "Model parameter dsh_session_log.events.0.time: 1793875310330 → 1794544976739",
       "impact": "notable",
       "before": 1793875310330,
-      "after": 1794458749914,
+      "after": 1794544976739,
       "text_diff": null,
       "terma": null,
       "source": {
@@ -186,10 +186,10 @@
         "1",
         "time"
       ],
-      "title": "Model parameter dsh_session_log.events.1.time: 1793875310332 → 1794458749926",
+      "title": "Model parameter dsh_session_log.events.1.time: 1793875310332 → 1794544976740",
       "impact": "notable",
       "before": 1793875310332,
-      "after": 1794458749926,
+      "after": 1794544976740,
       "text_diff": null,
       "terma": null,
       "source": {
@@ -221,10 +221,10 @@
         "2",
         "time"
       ],
-      "title": "Model parameter dsh_session_log.events.2.time: 1793875310332 → 1794458749927",
+      "title": "Model parameter dsh_session_log.events.2.time: 1793875310332 → 1794544976741",
       "impact": "notable",
       "before": 1793875310332,
-      "after": 1794458749927,
+      "after": 1794544976741,
       "text_diff": null,
       "terma": null,
       "source": {
@@ -256,10 +256,10 @@
         "3",
         "time"
       ],
-      "title": "Model parameter dsh_session_log.events.3.time: 1793875310335 → 1794458749930",
+      "title": "Model parameter dsh_session_log.events.3.time: 1793875310335 → 1794544976741",
       "impact": "notable",
       "before": 1793875310335,
-      "after": 1794458749930,
+      "after": 1794544976741,
       "text_diff": null,
       "terma": null,
       "source": {
@@ -291,10 +291,10 @@
         "4",
         "time"
       ],
-      "title": "Model parameter dsh_session_log.events.4.time: 1793875310336 → 1794458749932",
+      "title": "Model parameter dsh_session_log.events.4.time: 1793875310336 → 1794544976742",
       "impact": "notable",
       "before": 1793875310336,
-      "after": 1794458749932,
+      "after": 1794544976742,
       "text_diff": null,
       "terma": null,
       "source": {
@@ -326,10 +326,10 @@
         "5",
         "time"
       ],
-      "title": "Model parameter dsh_session_log.events.5.time: 1793875310338 → 1794458749933",
+      "title": "Model parameter dsh_session_log.events.5.time: 1793875310338 → 1794544976742",
       "impact": "notable",
       "before": 1793875310338,
-      "after": 1794458749933,
+      "after": 1794544976742,
       "text_diff": null,
       "terma": null,
       "source": {
@@ -361,10 +361,10 @@
         "6",
         "time"
       ],
-      "title": "Model parameter dsh_session_log.events.6.time: 1793875310391 → 1794458750033",
+      "title": "Model parameter dsh_session_log.events.6.time: 1793875310391 → 1794544976768",
       "impact": "notable",
       "before": 1793875310391,
-      "after": 1794458750033,
+      "after": 1794544976768,
       "text_diff": null,
       "terma": null,
       "source": {
@@ -439,10 +439,10 @@
         "7",
         "time"
       ],
-      "title": "Model parameter dsh_session_log.events.7.time: 1793875310393 → 1794458750036",
+      "title": "Model parameter dsh_session_log.events.7.time: 1793875310393 → 1794544976770",
       "impact": "notable",
       "before": 1793875310393,
-      "after": 1794458750036,
+      "after": 1794544976770,
       "text_diff": null,
       "terma": null,
       "source": {
@@ -474,10 +474,10 @@
         "8",
         "time"
       ],
-      "title": "Model parameter dsh_session_log.events.8.time: 1793875310393 → 1794458750036",
+      "title": "Model parameter dsh_session_log.events.8.time: 1793875310393 → 1794544976771",
       "impact": "notable",
       "before": 1793875310393,
-      "after": 1794458750036,
+      "after": 1794544976771,
       "text_diff": null,
       "terma": null,
       "source": {
@@ -584,10 +584,10 @@
         "9",
         "time"
       ],
-      "title": "Model parameter dsh_session_log.events.9.time: 1793875310394 → 1794458750037",
+      "title": "Model parameter dsh_session_log.events.9.time: 1793875310394 → 1794544976772",
       "impact": "notable",
       "before": 1793875310394,
-      "after": 1794458750037,
+      "after": 1794544976772,
       "text_diff": null,
       "terma": null,
       "source": {
@@ -672,10 +672,10 @@
         "10",
         "time"
       ],
-      "title": "Model parameter dsh_session_log.events.10.time: 1793875310395 → 1794458750037",
+      "title": "Model parameter dsh_session_log.events.10.time: 1793875310395 → 1794544976772",
       "impact": "notable",
       "before": 1793875310395,
-      "after": 1794458750037,
+      "after": 1794544976772,
       "text_diff": null,
       "terma": null,
       "source": {
@@ -707,10 +707,10 @@
         "11",
         "time"
       ],
-      "title": "Model parameter dsh_session_log.events.11.time: 1793875310396 → 1794458750038",
+      "title": "Model parameter dsh_session_log.events.11.time: 1793875310396 → 1794544976773",
       "impact": "notable",
       "before": 1793875310396,
-      "after": 1794458750038,
+      "after": 1794544976773,
       "text_diff": null,
       "terma": null,
       "source": {
@@ -742,10 +742,10 @@
         "12",
         "time"
       ],
-      "title": "Model parameter dsh_session_log.events.12.time: 1793875310398 → 1794458750040",
+      "title": "Model parameter dsh_session_log.events.12.time: 1793875310398 → 1794544976775",
       "impact": "notable",
       "before": 1793875310398,
-      "after": 1794458750040,
+      "after": 1794544976775,
       "text_diff": null,
       "terma": null,
       "source": {
@@ -777,10 +777,10 @@
         "13",
         "time"
       ],
-      "title": "Model parameter dsh_session_log.events.13.time: 1793875310400 → 1794458750041",
+      "title": "Model parameter dsh_session_log.events.13.time: 1793875310400 → 1794544976777",
       "impact": "notable",
       "before": 1793875310400,
-      "after": 1794458750041,
+      "after": 1794544976777,
       "text_diff": null,
       "terma": null,
       "source": {
@@ -811,10 +811,10 @@
         "session",
         "createdAt"
       ],
-      "title": "Model parameter dsh_session_log.session.createdAt: 1793875310326 → 1794458749901",
+      "title": "Model parameter dsh_session_log.session.createdAt: 1793875310326 → 1794544976736",
       "impact": "notable",
       "before": 1793875310326,
-      "after": 1794458749901,
+      "after": 1794544976736,
       "text_diff": null,
       "terma": null,
       "source": {
