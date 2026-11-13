@@ -290,27 +290,26 @@
       ],
       "support": "supported",
       "previous": "0.162.1",
-      "changes": 263,
+      "changes": 70,
       "categories": {
         "binary": 1,
         "caching": 1,
-        "cli": 5,
+        "cli": 3,
         "config": 53,
         "filesystem": 4,
-        "prompt": 1,
-        "telemetry": 198
+        "telemetry": 8
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 255,
-        "notable": 8
+        "informational": 61,
+        "notable": 9
       },
-      "undocumented": 227,
+      "undocumented": 53,
       "highlights": [
-        "Injected context changed (+47 −53 chars)",
-        "Caching across_turns.stable_prefix_chars: 996 → 552",
-        "New setting: features.credential_masking"
+        "Caching across_turns.stable_prefix_chars: 999 → 552",
+        "Telemetry surfaces.traces/auth.parents.traces/load_with_cli_overrides removed",
+        "Telemetry surfaces.traces/load_with_cli_overrides.root removed"
       ],
       "signing": "valid",
       "attempted_at": "2026-11-13T13:31:22.631672064Z",
@@ -319,34 +318,35 @@
     {
       "version": "0.162.1",
       "released_at": "2026-10-09T19:50:30.512Z",
-      "captured_at": "2026-11-12T05:15:55.281711967Z",
+      "captured_at": "2026-11-13T14:03:31.446427386Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"
       ],
       "support": "supported",
       "previous": "0.162.0",
-      "changes": 2,
+      "changes": 1,
       "categories": {
-        "cli": 2
+        "telemetry": 1
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 2,
+        "informational": 1,
         "notable": 0
       },
-      "undocumented": 2,
+      "undocumented": 1,
       "highlights": [
-        "Description of `codex agents` changed",
-        "Full help text of `agents --help` changed (+88 −0 chars)"
+        "Telemetry surfaces.traces/auth.parents.traces/load_with_cli_overrides added"
       ],
-      "signing": "valid"
+      "signing": "valid",
+      "attempted_at": "2026-11-13T14:03:31.446427386Z",
+      "attempts": 2
     },
     {
       "version": "0.162.0",
       "released_at": "2026-10-08T19:01:18.07Z",
-      "captured_at": "2026-11-12T05:15:55.281711967Z",
+      "captured_at": "2026-11-13T14:03:31.446427386Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"
@@ -364,48 +364,53 @@
       },
       "impact": {
         "breaking": 0,
-        "degrading": 1,
-        "informational": 24,
+        "degrading": 0,
+        "informational": 25,
         "notable": 7
       },
-      "undocumented": 17,
+      "undocumented": 16,
       "highlights": [
-        "Telemetry surface no longer sent: traces/codex.turn_input/events/event otel/src/events/session_telemetry.rs",
         "System prompt changed (+201 −230 chars)",
-        "exec tool description changed (+3383 −0 chars)"
+        "exec tool description changed (+3383 −0 chars)",
+        "collaboration/spawn_agent tool parameter fork_turns: description changed (+126 −148 chars)"
       ],
-      "signing": "valid"
+      "signing": "valid",
+      "attempted_at": "2026-11-13T14:03:31.446427386Z",
+      "attempts": 2
     },
     {
       "version": "0.161.0",
       "released_at": "2026-10-07T16:04:02.844Z",
-      "captured_at": "2026-11-11T05:17:29.64320186Z",
+      "captured_at": "2026-11-13T14:03:31.446427386Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"
       ],
       "support": "supported",
       "previous": "0.160.1",
-      "changes": 22,
+      "changes": 25,
       "categories": {
         "binary": 1,
         "cli": 3,
         "config": 17,
-        "support": 1
+        "prompt": 1,
+        "support": 3
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
         "informational": 18,
-        "notable": 4
+        "notable": 7
       },
-      "undocumented": 12,
+      "undocumented": 13,
       "highlights": [
+        "Injected context changed (+47 −53 chars)",
         "New setting: features.api_key_cyber_access_programs",
-        "Default of tui.keymap: {\"agents\":{\"archive\":null,\"delete\":null,\"hide\":null,\"new_… → {\"agents\":{\"archive\":null,\"delete\":null,\"fork\":null,\"hide…",
-        "Default of tui.keymap.agents: {\"archive\":null,\"delete\":null,\"hide\":null,\"new_task\":null… → {\"archive\":null,\"delete\":null,\"fork\":null,\"hide\":null,\"ne…"
+        "Default of tui.keymap: {\"agents\":{\"archive\":null,\"delete\":null,\"hide\":null,\"new_… → {\"agents\":{\"archive\":null,\"delete\":null,\"fork\":null,\"hide…"
       ],
-      "signing": "valid"
+      "signing": "valid",
+      "attempted_at": "2026-11-13T14:03:31.446427386Z",
+      "attempts": 2
     },
     {
       "version": "0.160.1",
