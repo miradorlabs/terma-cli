@@ -101,11 +101,7 @@ func reportTeams(ui *setupUI, v teamsView) {
 			if !t.Selected {
 				continue
 			}
-			label := cmp.Or(t.Name, t.ID)
-			if o.Name != "" && o.Name != label {
-				label = o.Name + " " + label
-			}
-			ticked = append(ticked, label)
+			ticked = append(ticked, orgTeamLabel(o.Name, cmp.Or(t.Name, t.ID)))
 			if o.Type == "personal" {
 				ui.Caution("Personal", personalWords(t))
 			}
