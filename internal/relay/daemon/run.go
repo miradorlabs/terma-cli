@@ -326,6 +326,9 @@ func listen(dir, addr string) (net.Listener, error) {
 // record still queued names: in the relay's outbox, and in the spool. While either cannot
 // be read it prunes nothing, since a ledger pruned under a queued record would let it go.
 func pruneRuns(stateDir string, r *relay.Relay, now time.Time) {
+	if _, err := os.Stat(filepath.Join(stateDir, runs.Dir)); err != nil {
+		return // no ledger: a machine not migrated keeps none
+	}
 	queued, err := r.QueuedSessions()
 	if err != nil {
 		return
