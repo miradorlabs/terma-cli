@@ -108,12 +108,10 @@ func (t *Teams) state() (routing.State, *routing.Router, bool) {
 		return t.st, t.router, t.ok
 	}
 	t.loadedAt = now
-	st, found, err := routing.Load(t.cfg.StateDir, t.cfg.ProfileName)
+	// A crash in the middle of migrating collects nothing until the next start commits.
+	st, found, err := routing.LoadReady(t.cfg.StateDir, t.cfg.ProfileName)
 	switch {
 	case err != nil || !found:
-		t.ok = false
-	case st.Migration != nil && st.Migration.Phase != routing.Committed:
-		// A crash in the middle of migrating collects nothing until the next start commits.
 		t.ok = false
 	default:
 		if !t.ok || t.router == nil || st.Generation != t.st.Generation || !sameEnrollments(st, t.st) {

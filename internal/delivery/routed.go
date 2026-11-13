@@ -233,8 +233,8 @@ func (b *batchRoutes) profile(name string) *profileRoute {
 }
 
 func (c routeCache) load(stateDir, profile string) *profileRoute {
-	s, ok, err := routing.Load(stateDir, profile)
-	if err != nil || !ok || s.Migration != nil && s.Migration.Phase != routing.Committed {
+	s, ok, err := routing.LoadReady(stateDir, profile)
+	if err != nil || !ok {
 		delete(c, profile)
 		return nil
 	}

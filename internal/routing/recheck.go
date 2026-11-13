@@ -30,6 +30,11 @@ const (
 // the run ledger first (a run-attributed record of a run Mixed by its time is dropped),
 // and keeps it queued while its team's key is unavailable.
 func (r *Router) Recheck(d Destination, now time.Time) (Verdict, Decision) {
+	if !r.s.Ready() {
+		// The migration commits it, or a relay start finishes it: until then nothing is
+		// sent, and nothing queued is lost for it.
+		return Wait, Decision{Outcome: Drop, Reason: ReasonNotReady}
+	}
 	if d.EnrollmentID == "" || !r.s.Selected(d.EnrollmentID) {
 		return Discard, Decision{Outcome: Drop}
 	}

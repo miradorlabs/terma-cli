@@ -114,8 +114,8 @@ func (m *TeamKeyMinter) mintNow(team routing.Team) bool {
 // keyAllowed reports whether enrollment may hold a key now: selected in the profile's
 // committed routing state, and neither Suspended nor Refused.
 func keyAllowed(cfg *config.Config, enrollment string) bool {
-	st, ok, err := routing.Load(cfg.StateDir, cfg.ProfileName)
-	if err != nil || !ok || st.Migration != nil && st.Migration.Phase != routing.Committed {
+	st, ok, err := routing.LoadReady(cfg.StateDir, cfg.ProfileName)
+	if err != nil || !ok {
 		return false
 	}
 	t := team(st, enrollment)

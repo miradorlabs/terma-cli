@@ -144,3 +144,60 @@ func TestMigrationRecordIsStored(t *testing.T) {
 		t.Fatal("wrote an unknown migration phase")
 	}
 }
+
+// A state still Preparing sends nothing, whoever reads it: LoadReady reads it as no state,
+// and a Router over it drops every record, takes no unknown record for personal, and keeps
+// every queued record waiting. Committed, or set up afresh, it routes as usual.
+func TestAPreparingStateSendsNothing(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	var acme string
+	_, err := Create(dir, "default", func(s *State) error {
+		var err error
+		if acme, err = s.Select(team("acme", "acme-platform", "github.com/acme/*")); err != nil {
+			return err
+		}
+		must(t, s.Bind("github.com/acme", "acme", false))
+		s.Migration = &Migration{Phase: Preparing, Legacy: map[string]string{"acme-platform": acme}}
+		return nil
+	})
+	must(t, err)
+
+	raw, ok, err := Load(dir, "default")
+	if err != nil || !ok || raw.Ready() {
+		t.Fatalf("Load = ready %v, %v, %v", raw.Ready(), ok, err)
+	}
+	if _, ok, err := LoadReady(dir, "default"); ok || err != nil {
+		t.Fatalf("LoadReady read a Preparing state: %v, %v", ok, err)
+	}
+	r := NewRouter(raw)
+	for _, loc := range []Location{repo("github.com/acme/api"), {Kind: OutsideGit}, {Kind: Unknown}} {
+		if d := r.Route(loc, now); d.Outcome != Drop || d.Reason != ReasonNotReady || d.EnrollmentID != "" {
+			t.Errorf("Route(%+v) on a Preparing state = %+v", loc, d)
+		}
+	}
+	if v, _ := r.Recheck(Destination{EnrollmentID: acme, Location: repo("github.com/acme/api")}, now); v != Wait {
+		t.Errorf("Recheck on a Preparing state = %s, want it kept waiting", v)
+	}
+	solo := fixture(t, personal())
+	solo.Migration = &Migration{Phase: Preparing}
+	if UnknownToPersonal(*solo, now) {
+		t.Error("a Preparing state takes unknown records for personal")
+	}
+
+	_, err = Update(dir, "default", func(s *State) error {
+		s.Migration.Phase = Committed
+		return nil
+	})
+	must(t, err)
+	st, ok, err := LoadReady(dir, "default")
+	if err != nil || !ok || !st.Ready() {
+		t.Fatalf("LoadReady after the commit = %v, %v", ok, err)
+	}
+	if d := NewRouter(st).Route(repo("github.com/acme/api"), now); d.Outcome != Send || d.EnrollmentID != acme {
+		t.Fatalf("Route after the commit = %+v", d)
+	}
+	if fresh := fixture(t); !fresh.Ready() {
+		t.Fatal("a state set up afresh is not ready")
+	}
+}
