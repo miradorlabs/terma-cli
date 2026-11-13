@@ -21,7 +21,7 @@ import (
 // createTeamKey mints team's key with its organization's sign-in, named for this machine
 // and the team's enrollment, so the backend's reuse by name finds this machine's key for
 // this enrollment and no other. The relay calls it through daemon.MintTeamKey, which
-// serializes creation on the machine.
+// serializes creation on the machine; `terma teams` mints through the same path.
 func (app *App) createTeamKey(ctx context.Context, cfg *config.Config, team routing.Team) (string, error) {
 	cred, err := auth.LoadCredentialFor(cfg.Dir, cfg.ProfileName, team.OrganizationID)
 	if err != nil {
@@ -34,13 +34,18 @@ func (app *App) createTeamKey(ctx context.Context, cfg *config.Config, team rout
 		return "", err
 	}
 	key, _, err := client.CreateServerKey(ctx, team.TeamID, teamKeyName(team),
-		"Created by the terma relay, for a team selected on this machine")
+		"Created by terma, for a team selected on this machine")
 	return key, err
 }
 
-// teamKeyName names a team's key for this machine and the team's enrollment.
+// teamKeyName names a team's key for this machine and the team's enrollment. The backend
+// takes names of at most 128 bytes, so a long hostname is cut to leave the enrollment whole.
 func teamKeyName(team routing.Team) string {
-	return "terma-relay@" + hostname() + "/" + team.EnrollmentID
+	host := hostname()
+	if room := 128 - len("terma@/") - len(team.EnrollmentID); len(host) > room {
+		host = host[:max(room, 0)]
+	}
+	return "terma@" + host + "/" + team.EnrollmentID
 }
 
 // selectedTeamUser is teamUser on a migrated machine: the Mirador user signed in to team's
