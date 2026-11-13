@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-13T13:08:26.328461566Z",
+  "generated_at": "2026-11-13T13:31:22.631672064Z",
   "versions": [
     {
       "harness": "codex",
@@ -1125,22 +1125,23 @@
       ],
       "support": "supported",
       "previous": "0.164.0",
-      "changes": 207,
+      "changes": 12,
       "categories": {
         "config": 9,
-        "telemetry": 198
+        "prompt": 1,
+        "telemetry": 2
       },
       "impact": {
         "breaking": 0,
-        "degrading": 0,
-        "informational": 207,
-        "notable": 0
+        "degrading": 1,
+        "informational": 10,
+        "notable": 1
       },
-      "undocumented": 198,
+      "undocumented": 11,
       "highlights": [
-        "New telemetry surface: logs/codex.api_request (19 fields)",
-        "New telemetry surface: logs/codex.conversation_starts (19 fields)",
-        "New telemetry surface: logs/codex.sse_event (19 fields)"
+        "Telemetry surface no longer sent: traces/codex.turn_input/events/event otel/src/events/session_telemetry.rs",
+        "Injected context changed (+53 −47 chars)",
+        "New telemetry surface: traces/run_hooks_and_record_inputs/events/event otel/src/events/session_telemetry.rs (18 fields)"
       ],
       "signing": "valid"
     },
@@ -1249,34 +1250,36 @@
       "name": "Codex CLI",
       "version": "0.164.0",
       "released_at": "2026-10-23T04:52:29.24Z",
-      "captured_at": "2026-11-12T05:15:55.281711967Z",
+      "captured_at": "2026-11-13T13:31:22.631672064Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"
       ],
       "support": "supported",
       "previous": "0.163.0",
-      "changes": 89,
+      "changes": 94,
       "categories": {
         "behavior": 7,
         "binary": 1,
-        "cli": 18,
+        "cli": 14,
         "config": 59,
-        "filesystem": 4
+        "telemetry": 13
       },
       "impact": {
         "breaking": 0,
-        "degrading": 0,
-        "informational": 76,
+        "degrading": 1,
+        "informational": 80,
         "notable": 13
       },
-      "undocumented": 54,
+      "undocumented": 59,
       "highlights": [
+        "Telemetry surface no longer sent: traces/list_skills",
         "Behaviour: compaction tools changed: 0 → 11",
-        "Behaviour: subagents system 4 text changed",
-        "Behaviour: subagents system 6 added"
+        "Behaviour: subagents system 4 text changed"
       ],
-      "signing": "valid"
+      "signing": "valid",
+      "attempted_at": "2026-11-13T13:31:22.631672064Z",
+      "attempts": 2
     },
     {
       "harness": "claude",
@@ -1674,34 +1677,38 @@
       "name": "Codex CLI",
       "version": "0.163.0",
       "released_at": "2026-10-15T21:37:11.083Z",
-      "captured_at": "2026-11-12T05:15:55.281711967Z",
+      "captured_at": "2026-11-13T13:31:22.631672064Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"
       ],
       "support": "supported",
       "previous": "0.162.1",
-      "changes": 68,
+      "changes": 263,
       "categories": {
         "binary": 1,
         "caching": 1,
-        "cli": 9,
+        "cli": 5,
         "config": 53,
-        "filesystem": 4
+        "filesystem": 4,
+        "prompt": 1,
+        "telemetry": 198
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 61,
-        "notable": 7
+        "informational": 255,
+        "notable": 8
       },
-      "undocumented": 47,
+      "undocumented": 227,
       "highlights": [
+        "Injected context changed (+47 −53 chars)",
         "Caching across_turns.stable_prefix_chars: 996 → 552",
-        "New setting: features.credential_masking",
-        "New setting: features.guardian_trust_orchestrator_connectors"
+        "New setting: features.credential_masking"
       ],
-      "signing": "valid"
+      "signing": "valid",
+      "attempted_at": "2026-11-13T13:31:22.631672064Z",
+      "attempts": 2
     },
     {
       "harness": "opencode",
@@ -2534,11 +2541,11 @@
       ],
       "support": "untested",
       "previous": "0.159.0",
-      "changes": 12,
+      "changes": 15,
       "categories": {
         "behavior": 6,
         "cli": 2,
-        "filesystem": 1,
+        "filesystem": 4,
         "model": 1,
         "prompt": 1,
         "tools": 1
@@ -2546,10 +2553,10 @@
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 2,
-        "notable": 10
+        "informational": 6,
+        "notable": 9
       },
-      "undocumented": 7,
+      "undocumented": 10,
       "highlights": [
         "Default model: gpt-6-astra → gpt-6.1-sol",
         "System prompt changed (+451 −105 chars)",
