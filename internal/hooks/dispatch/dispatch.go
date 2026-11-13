@@ -51,7 +51,10 @@ type Deps struct {
 	// Claimed runs once a hook has claimed its session, with the checkout it claimed and
 	// the policy in force: the relay, and that repository's commit hooks.
 	Claimed func(cwd string, policy config.Policy)
-	Flush   func()
+	// ClaimedRouted runs in Claimed's place on a migrated machine, once routing sends or
+	// holds the checkout a hook placed its session in, with the profile's routing.
+	ClaimedRouted func(cwd string, routing *hookrun.Routing)
+	Flush         func()
 	// AwaitPush starts a detached hookrun.AwaitPush for a recorded push.
 	AwaitPush func(path string)
 }
@@ -62,6 +65,9 @@ type Profile struct {
 	Agents []string
 	// Policy is the collection policy, NoPolicy until one is validated.
 	Policy config.Policy
+	// Routing is the profile's routing on a migrated machine (config.Migrated), which
+	// decides in place of Team and Policy; nil on any other.
+	Routing *hookrun.Routing
 }
 
 // maxPayload bounds the copy of a payload kept to claim a session from.
@@ -82,7 +88,8 @@ func Run(ctx context.Context, d Deps, r Request) int {
 	if render, ok := d.Agents.Render(r.Event); ok {
 		p := d.Profile()
 		env := hookrun.Env{Now: time.Now(), Cwd: r.Cwd, Args: r.Args, Stdin: r.Stdin, Stdout: r.Stdout, Stderr: r.Stderr,
-			ConfigDir: d.ConfigDir, StateDir: d.StateDir, Version: r.Version, Debug: r.Debug, Flush: d.Flush, Policy: p.Policy, Team: p.Team}
+			ConfigDir: d.ConfigDir, StateDir: d.StateDir, Version: r.Version, Debug: r.Debug, Flush: d.Flush, Policy: p.Policy, Team: p.Team,
+			Routing: p.Routing}
 		if !r.HooksOff {
 			env.Spool = d.Spool()
 		}
@@ -135,6 +142,7 @@ func run(ctx context.Context, d Deps, r Request, handler agents.Handler, flush b
 		Policy:    p.Policy,
 		Team:      p.Team,
 		Agents:    p.Agents,
+		Routing:   p.Routing,
 	}
 	ctx, cancel := context.WithTimeout(ctx, handlerTimeout)
 	defer cancel()
@@ -144,7 +152,10 @@ func run(ctx context.Context, d Deps, r Request, handler agents.Handler, flush b
 			claimed, claimedIn = hookrun.ClaimFromPayload(ctx, env, s, tool), cmp.Or(s.Cwd, r.Cwd)
 		}
 	}
-	if claimed {
+	switch {
+	case claimed && p.Routing != nil && d.ClaimedRouted != nil:
+		d.ClaimedRouted(claimedIn, p.Routing)
+	case claimed:
 		d.Claimed(claimedIn, p.Policy)
 	}
 	if flush && env.Spool != nil && !flushed {
