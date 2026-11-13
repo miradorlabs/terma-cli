@@ -57,14 +57,28 @@ type Teams struct {
 	keyMu       sync.Mutex
 	lockedUntil time.Time
 	lockedErr   error
+
+	// users are who each organization's parts name, by organization and ingest, kept for
+	// userTTL: asking reads the keychain, and the relay resolves far more often.
+	userMu sync.Mutex
+	users  map[string]cachedUser
 }
+
+type cachedUser struct {
+	id string
+	at time.Time
+}
+
+// userTTL is how long a team's user stands: a sign-in as another user of the same
+// organization reaches the relay within it.
+const userTTL = 5 * time.Minute
 
 // NewTeams is the team router for cfg's profile.
 func NewTeams(cfg *config.Config, deps TeamsDeps) *Teams {
 	if deps.Now == nil {
 		deps.Now = time.Now
 	}
-	return &Teams{cfg: cfg, deps: deps}
+	return &Teams{cfg: cfg, deps: deps, users: map[string]cachedUser{}}
 }
 
 var _ relay.Router = (*Teams)(nil)
@@ -278,10 +292,25 @@ func (t *Teams) Resolve(enrollment, tool string) (relay.Policy, error) {
 		pol.IncludePrompts, pol.IncludeToolContent = false, false
 		pol.Signals = []string{}
 	}
-	if t.deps.User != nil {
-		pol.User = t.deps.User(*tm, endpoint)
-	}
+	pol.User = t.user(*tm, endpoint)
 	return pol, nil
+}
+
+// user is who parts sent to tm at endpoint name (TeamsDeps.User), asked at most once per
+// userTTL.
+func (t *Teams) user(tm routing.Team, endpoint string) string {
+	if t.deps.User == nil {
+		return ""
+	}
+	key := tm.OrganizationID + "\x00" + tm.AuthURL + "\x00" + endpoint
+	t.userMu.Lock()
+	defer t.userMu.Unlock()
+	if u, ok := t.users[key]; ok && time.Since(u.at) < userTTL {
+		return u.id
+	}
+	id := t.deps.User(tm, endpoint)
+	t.users[key] = cachedUser{id: id, at: time.Now()}
+	return id
 }
 
 // key is enrollment's key and its hosts; a locked keychain is asked again only after a while.
