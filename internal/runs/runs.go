@@ -86,15 +86,15 @@ func latest(ts ...time.Time) time.Time {
 type Reason string
 
 const (
-	// Crossed: the run touched another organization's checkout. A ledger written before
+	// Crossed is a run that touched another organization's checkout. A ledger written before
 	// reasons were recorded reads as this.
 	Crossed Reason = "crossed"
-	// UnknownReach: a shell command's reach could not be resolved.
+	// UnknownReach is a run with a shell command whose reach could not be resolved.
 	UnknownReach Reason = "unknown_reach"
-	// LocationBound: the run touched more locations than the ledger keeps for it.
+	// LocationBound is a run that touched more locations than the ledger keeps for it.
 	LocationBound Reason = "location_bound"
-	// Aside: the ledger was busy, so the crossing went to its sidecar (MarkAside), or its
-	// placement alone kept it; why it crossed is in the hook's log.
+	// Aside is a crossing made while the ledger was busy: its sidecar took it (MarkAside),
+	// or its mixed placement alone kept it. Why it crossed is in the hook's log.
 	Aside Reason = "aside"
 )
 

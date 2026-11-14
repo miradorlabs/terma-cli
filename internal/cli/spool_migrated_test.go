@@ -131,15 +131,16 @@ func TestAMigratedFlushNeverRefreshesTheProfilesPolicy(t *testing.T) {
 }
 
 // A migrated pass names each reason an event was held or dropped once, and a missing key
-// points at doctor, which names the team.
+// points at doctor, which names the team; what Mixed runs dropped, it counts by why.
 func TestDescribeFlushOnAMigratedMachine(t *testing.T) {
-	_, undelivered := describeFlush(delivery.Result{Migrated: true, Held: 6, Blocked: 3, Unrouted: 1, Discarded: 4, Mixed: 5})
+	_, undelivered := describeFlush(delivery.Result{Migrated: true, Held: 6, Blocked: 3, Unrouted: 1, Discarded: 4, Mixed: 5,
+		MixedBy: map[runs.Reason]int{runs.Crossed: 1, runs.UnknownReach: 4}})
 	want := []string{
 		"holding 2 for a team key (run `terma doctor`)",
 		"holding 3 until their team can send again (run `terma doctor`)",
 		"holding 1 until this machine's routing state can be read (run `terma doctor`)",
 		"dropped 4 their team no longer collects",
-		"dropped 5 because their session crossed organizations",
+		"dropped 5 because their session's run is Mixed (4 ran a shell command whose reach is not known, 1 crossed organizations)",
 	}
 	if strings.Join(undelivered, "|") != strings.Join(want, "|") {
 		t.Errorf("undelivered =\n  %q\nwant\n  %q", undelivered, want)
