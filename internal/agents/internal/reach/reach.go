@@ -49,6 +49,38 @@ func (s Spec) Of(input json.RawMessage, cwd string) []string {
 	return out
 }
 
+// Each agent's tools, by where their input names what a call reached.
+var (
+	// Copilot is the runtime's tools and VS Code's: read_file, list_dir, grep_search and
+	// run_in_terminal.
+	Copilot = Spec{
+		Paths:    []string{"path", "file_path", "filePath", "notebook_path", "dirPath", "directory"},
+		Commands: []string{"command"},
+		Dirs:     []string{"cwd"},
+	}
+	// Cursor is Read's and Grep's paths, and Shell's command, run in its working directory.
+	Cursor = Spec{
+		Paths:    []string{"target_file", "file_path", "path", "target_directory", "directory", "filePath"},
+		Commands: []string{"command"},
+		Dirs:     []string{"cwd", "working_directory"},
+	}
+	// Gemini is read_file, read_many_files, list_directory, glob, search_file_content and
+	// run_shell_command, whose directory is relative to the cwd.
+	Gemini = Spec{
+		Paths:    []string{"file_path", "absolute_path", "path", "dir_path", "paths"},
+		Commands: []string{"command"},
+		Dirs:     []string{"directory", "dir_path"},
+	}
+	// Antigravity is agy's own tools (view_file, list_dir, grep_search, find_by_name,
+	// run_command in its Cwd) and the vendor tools it exposes per model family.
+	Antigravity = Spec{
+		Paths: []string{"AbsolutePath", "DirectoryPath", "SearchPath", "SearchDirectory", "Directory", "File", "TargetFile",
+			"TargetDirectories", "target_file", "file_path", "path", "paths", "notebook_path", "dir_path"},
+		Commands: []string{"CommandLine", "command"},
+		Dirs:     []string{"Cwd", "cwd"},
+	}
+)
+
 // strings is raw as a string or an array of strings; nil for anything else.
 func strings(raw json.RawMessage) []string {
 	var one string

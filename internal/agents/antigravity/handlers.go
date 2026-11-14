@@ -164,16 +164,6 @@ func antigravityEditedPaths(in *antigravityHookInput) []string {
 	return out
 }
 
-// antigravityReach is where a read's, a search's or a shell command's arguments name what
-// it reached: agy's own tools (view_file, list_dir, grep_search, find_by_name, run_command
-// in its Cwd) and the vendor tools it exposes per model family.
-var antigravityReach = reach.Spec{
-	Paths: []string{"AbsolutePath", "DirectoryPath", "SearchPath", "SearchDirectory", "Directory", "File", "TargetFile",
-		"TargetDirectories", "target_file", "file_path", "path", "paths", "notebook_path", "dir_path"},
-	Commands: []string{"CommandLine", "command"},
-	Dirs:     []string{"Cwd", "cwd"},
-}
-
 // postToolUse records every tool step as a `terma.tool.call`, since agy has no other
 // export, and the file an edit changed. On a migrated machine a step that edits nothing,
 // a read, a search or a shell command, first classifies what it reached
@@ -190,7 +180,7 @@ func postToolUse(ctx context.Context, env hookrun.Env) error {
 	env.Cwd = in.cwd(env.Cwd)
 	var located *hookrun.Repo
 	if env.Routing != nil && in.ToolCall != nil && len(antigravityEditedPaths(in)) == 0 {
-		spec := antigravityReach
+		spec := reach.Antigravity
 		if in.ToolCall.Name == "str_replace_editor" {
 			spec.Commands = nil // its command is view, create or str_replace
 		}
