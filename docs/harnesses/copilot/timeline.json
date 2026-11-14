@@ -3,6 +3,28 @@
   "harness": "copilot",
   "steps": [
     {
+      "version": "1.0.112",
+      "previous": "1.0.111",
+      "changes": [
+        {
+          "id": "cli.help.help environment",
+          "category": "cli",
+          "op": "changed",
+          "title": "Full help text of `help environment` changed (+260 −0 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "storage.logs.path",
+          "category": "storage",
+          "op": "changed",
+          "title": "On-disk logs path changed",
+          "impact": "informational",
+          "documented": true
+        }
+      ]
+    },
+    {
       "version": "1.0.111",
       "previous": "1.0.110",
       "changes": [

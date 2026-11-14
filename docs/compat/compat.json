@@ -73,7 +73,7 @@
       "label": "The machine's heartbeat reaches the project's ingest"
     }
   ],
-  "generated_at": "2026-11-13T20:27:27Z",
+  "generated_at": "2026-11-14T00:39:47Z",
   "harnesses": [
     {
       "ID": "claude",
@@ -8985,6 +8985,61 @@
       "first_passed": "2026-11-13T14:01:28.087359Z",
       "terma": "terma version dev",
       "test": "TestRelayCopilotToolsGetNoExporter/v1.0.111"
+    },
+    {
+      "harness": "copilot",
+      "version": "1.0.112",
+      "platform": "darwin/arm64",
+      "capability": "relay.content_allowed",
+      "result": "pass",
+      "last_run": "2026-11-14T00:38:06.608382Z",
+      "first_passed": "2026-11-14T00:38:06.608382Z",
+      "terma": "terma version dev",
+      "test": "TestRelayCopilot/v1.0.112/content"
+    },
+    {
+      "harness": "copilot",
+      "version": "1.0.112",
+      "platform": "darwin/arm64",
+      "capability": "relay.content_withheld",
+      "result": "pass",
+      "last_run": "2026-11-14T00:38:33.535139Z",
+      "first_passed": "2026-11-14T00:38:33.535139Z",
+      "terma": "terma version dev",
+      "test": "TestRelayCopilot/v1.0.112/withheld"
+    },
+    {
+      "harness": "copilot",
+      "version": "1.0.112",
+      "platform": "darwin/arm64",
+      "capability": "relay.only_opted_in",
+      "result": "pass",
+      "last_run": "2026-11-14T00:38:48.252222Z",
+      "first_passed": "2026-11-14T00:38:48.252222Z",
+      "terma": "terma version dev",
+      "test": "TestRelayCopilotOutsideARepository/v1.0.112"
+    },
+    {
+      "harness": "copilot",
+      "version": "1.0.112",
+      "platform": "darwin/arm64",
+      "capability": "relay.telemetry",
+      "result": "pass",
+      "last_run": "2026-11-14T00:38:33.535197Z",
+      "first_passed": "2026-11-14T00:38:33.535197Z",
+      "terma": "terma version dev",
+      "test": "TestRelayCopilot/v1.0.112"
+    },
+    {
+      "harness": "copilot",
+      "version": "1.0.112",
+      "platform": "darwin/arm64",
+      "capability": "relay.tools_no_token",
+      "result": "pass",
+      "last_run": "2026-11-14T00:38:57.402535Z",
+      "first_passed": "2026-11-14T00:38:57.402535Z",
+      "terma": "terma version dev",
+      "test": "TestRelayCopilotToolsGetNoExporter/v1.0.112"
     },
     {
       "harness": "dsh",

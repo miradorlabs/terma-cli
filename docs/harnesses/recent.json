@@ -1,7 +1,39 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-13T22:02:06.249513357Z",
+  "generated_at": "2026-11-14T00:39:48.021427094Z",
   "versions": [
+    {
+      "harness": "copilot",
+      "name": "GitHub Copilot CLI",
+      "version": "1.0.112",
+      "released_at": "2026-11-13T23:59:41.114Z",
+      "captured_at": "2026-11-14T00:39:48.021427094Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "1.0.111",
+      "changes": 2,
+      "categories": {
+        "cli": 1,
+        "storage": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 2,
+        "notable": 0
+      },
+      "undocumented": 0,
+      "highlights": [
+        "Full help text of `help environment` changed (+260 −0 chars)",
+        "On-disk logs path changed"
+      ],
+      "signing": "valid",
+      "partial": true,
+      "attempted_at": "2026-11-14T00:39:48.021427094Z",
+      "attempts": 1
+    },
     {
       "harness": "claude-desktop",
       "name": "Claude Desktop (Code)",
@@ -6156,37 +6188,6 @@
         "Caching across_turns.breakpoints: [[]] → [[],[],[]]",
         "Caching across_turns.stable_prefix_chars: none → 674",
         "Caching across_turns.turns: 1 → 3"
-      ],
-      "signing": "valid"
-    },
-    {
-      "harness": "codex",
-      "name": "Codex CLI",
-      "version": "0.142.3",
-      "released_at": "2026-06-26T21:32:08.704Z",
-      "captured_at": "2026-11-05T09:54:28.532441Z",
-      "platforms": [
-        "darwin/arm64",
-        "linux/amd64"
-      ],
-      "support": "untested",
-      "previous": "0.142.2",
-      "changes": 11,
-      "categories": {
-        "behavior": 8,
-        "caching": 3
-      },
-      "impact": {
-        "breaking": 0,
-        "degrading": 0,
-        "informational": 0,
-        "notable": 11
-      },
-      "undocumented": 11,
-      "highlights": [
-        "Caching across_turns.breakpoints: [[],[],[]] → [[]]",
-        "Caching across_turns.stable_prefix_chars: 674 → none",
-        "Caching across_turns.turns: 3 → 1"
       ],
       "signing": "valid"
     }

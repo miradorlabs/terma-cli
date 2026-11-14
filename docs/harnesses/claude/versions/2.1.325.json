@@ -23946,7 +23946,7 @@
         "read": true
       },
       "CLAUDE_CODE_PLUGIN_DIR_WATCH": {
-        "description": "Controls whether Claude Code reloads a mod when the mod's files change. Reloading applies to a mod you load from a directory with `--plugin-dir`, and it's on by default in interactive sessions. Set to `1` to turn it on in non-interactive sessions as well, or `0` to turn it off in every session. Requires Claude Code v2.1.287 or later. See mod settings and environment variables",
+        "description": "Controls whether a mod reloads when its files change. By default, mods in skills directories reload in any session that takes more than one prompt, non-interactive included. Mods in `--plugin-dir` directories reload only in interactive terminal sessions. Set to `1` to reload them as skills-directory mods do, or `0` to turn reloading off everywhere. Requires Claude Code v2.1.287 or later",
         "read": true
       },
       "CLAUDE_CODE_PLUGIN_GIT_TIMEOUT_MS": {
@@ -24666,7 +24666,7 @@
         "read": false
       }
     },
-    "fetched_at": "2026-11-13T22:02:06.249513357Z",
+    "fetched_at": "2026-11-14T00:39:48.021427094Z",
     "settings": {
       "advisorModel": {
         "default": "unset, so the advisor is off",
@@ -24686,7 +24686,7 @@
       },
       "agentPushNotifEnabled": {
         "default": "`false`",
-        "description": "Allow Claude to send a push notification to your phone when it decides one is worth sending, for example when a long task finishes. In a local session, Claude can send one while Remote Control is connected. Appears in `/config` as **Push when Claude decides**. When you change it there, Claude Code also saves the value to your account.",
+        "description": "Allow Claude to send a push notification to your phone when it decides one is worth sending, for example when a long task finishes. In a local session, Claude can send one while Remote Control is connected. Appears in `/config` as **Push when Claude decides**.",
         "read": true,
         "scope": "Any file",
         "scope_note": "Claude Code also reads a value left in `~/.claude.json` by older versions.",
@@ -25621,12 +25621,12 @@
       },
       "minimumVersion": {
         "default": "unset, so updates can install any version the channel offers",
-        "description": "Keep background auto-updates and `claude update` from installing any version below this one, so moving to the `\"stable\"` channel doesn't downgrade you from a newer `\"latest\"` build. Claude Code writes this key for you when you choose to stay on your current version while switching channels in `/config`, and clears it when you switch back to `\"latest\"`.",
+        "description": "Keep background auto-updates and `claude update` from installing any version below the one you set. Claude Code writes this key for you when you choose to stay on your current version while switching channels in `/config`. Claude Code clears the key when you switch back to `\"latest\"` in `/config`.",
         "read": true,
         "scope": "Any file",
-        "scope_note": "Set it in managed settings to pin an organization-wide minimum that user and project settings can't lower.",
+        "scope_note": "Set this key in managed settings to pin an organization-wide minimum that user and project settings can't override.",
         "topic": "Updates and versioning",
-        "type": "string, a version number such as `\"2.1.100\"`; a value that isn't a valid version is ignored"
+        "type": "string, a version number such as `\"2.1.323\"`; a value that isn't a valid version is ignored"
       },
       "model": {
         "default": "unset, so Claude Code uses your account's default model",
@@ -26010,8 +26010,8 @@
         "type": "Boolean"
       },
       "sandbox.autoAllowBashIfSandboxed": {
-        "default": "`true`",
-        "description": "Let Claude Code run sandboxed Bash commands without a permission prompt. Commands that can't run in the sandbox still go through the regular permission flow, and `deny` rules and content-scoped `ask` rules such as `Bash(git push *)` still apply; a bare `Bash` ask rule is skipped for sandboxed commands. Set it to `false` to send sandboxed commands through the regular permission flow too, which the `/sandbox` **Mode** tab calls regular permissions mode.",
+        "default": "`false`. Before v2.1.324, the default was `true`",
+        "description": "Let Claude Code run sandboxed Bash commands without a permission prompt. Commands that can't run in the sandbox still go through the regular permission flow. `deny` rules and content-scoped `ask` rules such as `Bash(git push *)` still apply, but a bare `Bash` ask rule is skipped for sandboxed commands. To set it to `true` in managed settings, add it to the `sandbox` block of your highest-ranked managed source.",
         "read": true,
         "scope": "Any file",
         "topic": "Sandbox settings",
