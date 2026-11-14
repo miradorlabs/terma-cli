@@ -7,8 +7,9 @@
 # median exceeds the budget. It also times the hooks Claude Code runs around a tool call: the
 # post-tool-use hook after an edit, and the pre-tool-use hook before a read and a shell
 # command, which runs on nearly every tool call and which Claude Code waits on before the
-# call runs, held to the same budget. The first execution of a freshly written script pays
-# a one-time OS cost (macOS's exec policy check) that no commit after it sees.
+# call runs, held to the same budget, shell commands at the scan's bounds included. The
+# first execution of a freshly written script pays a one-time OS cost (macOS's exec policy
+# check) that no commit after it sees.
 set -eu
 BUDGET_MS="${TERMA_HOOK_BUDGET_MS:-50}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -45,6 +46,12 @@ machine() {
   git -C "$repo" worktree add -q "$tmp/wt"
   # What the Read and Bash hooks reach: a file in the other checkout of the repository.
   : > "$repo/NOTES.md"; : > "$tmp/wt/NOTES.md"
+  # What a shell command at the scan's bound reaches: a file in each of 255 folders.
+  i=0
+  while [ $i -lt 255 ]; do
+    for co in "$repo" "$tmp/wt"; do mkdir -p "$co/many/d$i"; : > "$co/many/d$i/x.go"; done
+    i=$((i + 1))
+  done
   now="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
   printf '{"active_profile":"default","profiles":{"default":{"team":"proj_bench"}}}' > "$TERMA_CONFIG_DIR/config.json"
   mkdir -p "$TERMA_STATE_DIR/policies"
@@ -106,7 +113,13 @@ bench() {
   tool_hook post-tool-use "Edit, $label" "$(printf '{"session_id":"%s","hook_event_name":"PostToolUse","tool_name":"Edit","tool_input":{"file_path":"%s/src/a.go"},"cwd":"%s"}' "$sid" "$dir" "$dir")"
   tool_hook pre-tool-use "Read, $label" "$(printf '{"session_id":"%s","hook_event_name":"PreToolUse","tool_name":"Read","tool_input":{"file_path":"%s/NOTES.md"},"cwd":"%s"}' "$sid" "$other" "$dir")" "$BUDGET_MS"
   tool_hook pre-tool-use "Bash, $label" "$(printf '{"session_id":"%s","hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"cd %s && cat NOTES.md src/a.go | grep -c bench > /dev/null; ls -la %s/src"},"cwd":"%s"}' "$sid" "$other" "$dir" "$dir")" "$BUDGET_MS"
+  # A shell command at the scan's bounds (hookrun's maxShellPlaces and maxShellLookups): a
+  # glob reaching 255 folders, and 4000 words that name nothing.
+  tool_hook pre-tool-use "Bash, 255 folders, $label" "$(printf '{"session_id":"%s","hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"ls many/*/x.go"},"cwd":"%s"}' "$sid" "$dir")" "$BUDGET_MS"
+  tool_hook pre-tool-use "Bash, 4000 words, $label" "$(printf '{"session_id":"%s","hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"echo%s"},"cwd":"%s"}' "$sid" "$WORDS" "$dir")" "$BUDGET_MS"
 }
+
+WORDS="$(i=0; while [ $i -lt 4000 ]; do printf ' w%d' $i; i=$((i + 1)); done)"
 
 machine single
 bench "$repo" checkout checkout "$tmp/wt"
