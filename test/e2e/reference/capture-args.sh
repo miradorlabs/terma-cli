@@ -8,19 +8,20 @@
 # judged by its own profile: one it recorded finished, whatever the other app did (a scenario
 # that recorded and failed leaves the build partial in refgen all the same).
 #
-# Every file is found by what it says, not by the folder it sits in: download-artifact unpacks
-# each artifact a pattern matches into a folder of its name, but the only one it matches into
-# <runs> itself.
+# Every file is found by what it says, wherever it sits under <runs>: download-artifact unpacks the
+# artifacts a pattern matches into folders of their names, but a single one into its download's
+# folder itself, so no folder names a job.
 #
-# capture-args.sh <runs>, where <runs> holds the jobs' artifacts; BUILDS is the detect job's lines
+# capture-args.sh <runs>, where <runs> holds the downloads' folders; BUILDS is the detect job's lines
 # (harness=version,…), CLAUDE_BUILDS and CODEX_BUILDS what the Linux job captured,
 # DESKTOP_CAPTURE the desktop job's result.
 set -euo pipefail
 
 runs=$1
 
-# all is every file named $1 under <runs>, read as one JSON array of their contents.
-all() { find "$runs" -name "$1" -exec cat {} + 2>/dev/null | jq -s . ; }
+# all is every file named $1 under <runs>, read as one JSON array of their contents: none where
+# <runs> holds nothing, or is not there.
+all() { { find "$runs" -name "$1" -exec cat {} + 2>/dev/null || true; } | jq -s . ; }
 
 # finished reports that a job's marker says its run got to its end: the macOS job of harness $2,
 # or the Linux job ($1 linux).
