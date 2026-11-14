@@ -49,7 +49,7 @@ type cursorHookInput struct {
 	ToolCallCount        json.RawMessage `json:"tool_call_count"`
 	ModifiedFiles        []string        `json:"modified_files"`
 	ToolName             string          `json:"tool_name"`
-	// ToolInput is read only to classify what a call reached (cursorReach), never recorded.
+	// ToolInput is read only to classify what a call reached (reach.Cursor), never recorded.
 	ToolInput   json.RawMessage `json:"tool_input"`
 	ToolUseID   string          `json:"tool_use_id"`
 	Duration    json.RawMessage `json:"duration"`

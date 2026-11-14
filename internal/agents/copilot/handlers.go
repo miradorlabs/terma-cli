@@ -68,15 +68,6 @@ func prompt(_ context.Context, env hookrun.Env) error {
 	return nil
 }
 
-// copilotReach is where a read's, a search's or a shell command's input names what it
-// reached, in the runtime's tools and VS Code's (read_file, list_dir, grep_search,
-// run_in_terminal).
-var copilotReach = reach.Spec{
-	Paths:    []string{"path", "file_path", "filePath", "notebook_path", "dirPath", "directory"},
-	Commands: []string{"command"},
-	Dirs:     []string{"cwd"},
-}
-
 // postToolUse records what an edit tool wrote. Any other call, a read, a search or a shell
 // command, only classifies what it reached (hookrun.Env.Classify), on a migrated machine
 // alone: Copilot's hooks give terma no call before it runs, so a crossing it makes is
@@ -86,7 +77,7 @@ func postToolUse(ctx context.Context, env hookrun.Env) error {
 	if ok && !editTools[in.ToolName] {
 		if env.Routing != nil {
 			env.Cwd = cmp.Or(in.Cwd, env.Cwd)
-			env.Classify(ctx, nil, session.Session{ID: in.SessionID, Tool: name}, copilotReach.Of(in.ToolInput, env.Cwd), nil)
+			env.Classify(ctx, nil, session.Session{ID: in.SessionID, Tool: name}, reach.Copilot.Of(in.ToolInput, env.Cwd), nil)
 		}
 		return nil
 	}

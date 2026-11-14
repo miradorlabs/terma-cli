@@ -18,15 +18,6 @@ type geminiHookInput struct {
 	ToolInput json.RawMessage `json:"tool_input"`
 }
 
-// geminiReach is where a read's, a search's or a shell command's input names what it
-// reached: read_file, read_many_files, list_directory, glob, search_file_content and
-// run_shell_command, whose directory is relative to the cwd.
-var geminiReach = reach.Spec{
-	Paths:    []string{"file_path", "absolute_path", "path", "dir_path", "paths"},
-	Commands: []string{"command"},
-	Dirs:     []string{"directory", "dir_path"},
-}
-
 const geminiTool = "gemini"
 
 var geminiEditTools = map[string]bool{"write_file": true, "replace": true, "edit": true}
@@ -77,7 +68,7 @@ func afterTool(ctx context.Context, env hookrun.Env) error {
 	if !geminiEditTools[in.ToolName] {
 		if env.Routing != nil {
 			env.Cwd = cmp.Or(in.Cwd, env.Cwd)
-			env.Classify(ctx, nil, session.Session{ID: in.SessionID, Tool: geminiTool}, geminiReach.Of(in.ToolInput, env.Cwd), nil)
+			env.Classify(ctx, nil, session.Session{ID: in.SessionID, Tool: geminiTool}, reach.Gemini.Of(in.ToolInput, env.Cwd), nil)
 		}
 		return nil
 	}

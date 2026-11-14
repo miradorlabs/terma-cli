@@ -11,14 +11,6 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
-// cursorReach is where a call's input names what it reached: Read's and Grep's paths, and
-// Shell's command, run in its working directory.
-var cursorReach = reach.Spec{
-	Paths:    []string{"target_file", "file_path", "path", "target_directory", "directory", "filePath"},
-	Commands: []string{"command"},
-	Dirs:     []string{"cwd", "working_directory"},
-}
-
 // postToolUse records one finished tool call: the generic pair is the one place a
 // tool_use_id and a duration arrive together. On a migrated machine it first classifies
 // what the call reached (hookrun.Env.Classify), a read's or a search's paths and a shell
@@ -44,7 +36,7 @@ func cursorToolCall(ctx context.Context, env hookrun.Env, hook string) error {
 	env.Cwd = in.cwd(env.Cwd)
 	var located *hookrun.Repo
 	if env.Routing != nil {
-		located = env.Classify(ctx, nil, session.Session{ID: in.id(), Tool: cursorTool}, cursorReach.Of(in.ToolInput, env.Cwd), nil)
+		located = env.Classify(ctx, nil, session.Session{ID: in.id(), Tool: cursorTool}, reach.Cursor.Of(in.ToolInput, env.Cwd), nil)
 	}
 	r, err := env.RepoAt(ctx, located)
 	if err != nil {
