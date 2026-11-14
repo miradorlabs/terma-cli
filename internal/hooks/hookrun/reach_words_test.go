@@ -72,6 +72,21 @@ func TestShellPathsTakeBareWordsThatNameSomethingThere(t *testing.T) {
 	})
 }
 
+// A cd's target may be a substitution: its words, which come first, are read as words of
+// their own, and the cd goes where the word holding them says, $(pwd) or the top level
+// included, or somewhere not known. A cd with no target, in a substitution or out of it,
+// goes home.
+func TestShellPathsReadACdToASubstitution(t *testing.T) {
+	t.Parallel()
+	m := newWordsMachine(t)
+	m.check(t, m.side, map[string][]string{
+		`cd "$(pwd)/../acme-api" && cat NOTES.md`: {m.api},
+		"cd `pwd`/../acme-api; ls":                {m.api},
+		`echo "$(cd)" && ls proj`:                 {m.home, filepath.Join(m.home, "proj")},
+		`cd "$(cd ..; pwd)"`:                      {m.parent, UnknownReach},
+	})
+}
+
 // The word in command position is the program to run, not a place the command reaches,
 // even with a slash or a part not resolved: the first word, each after ;, && or |, and each
 // after a word that keeps the command position (time, if, do). Its arguments are read as
@@ -139,6 +154,10 @@ func TestShellPathsCannotResolveIsUnknown(t *testing.T) {
 		"D=$(git rev-parse --show-prefix); cat $D/x",
 		"cat ${ACME%/*}/x",
 		"ls --dir=$UNSET/x",
+		`cd "$(cat p)" && cat NOTES.md`,
+		"pushd `cat p`; cat NOTES.md",
+		`cd -P "$(dirname "$(cat p)")" && ls`,
+		`x=$(cd "$(cat p)" && pwd)`,
 	} {
 		if got := m.paths(command, m.side); !slices.Contains(got, UnknownReach) {
 			t.Errorf("ShellPaths(%q) = %q, without UnknownReach", command, got)
