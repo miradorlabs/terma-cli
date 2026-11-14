@@ -37,8 +37,15 @@ func newWordsMachine(t *testing.T) wordsMachine {
 	return m
 }
 
+// paths is ShellPaths in m, UnknownReach without the command it names.
 func (m wordsMachine) paths(command, cwd string) []string {
-	return shellPaths(command, cwd, func(k string) (string, bool) { v, ok := m.env[k]; return v, ok })
+	got := shellPaths(command, cwd, func(k string) (string, bool) { v, ok := m.env[k]; return v, ok })
+	for i, p := range got {
+		if isUnknownReach(p) {
+			got[i] = UnknownReach
+		}
+	}
+	return got
 }
 
 func (m wordsMachine) check(t *testing.T, cwd string, cases map[string][]string) {
@@ -290,6 +297,23 @@ func TestShellPathsResolveTheGitTopLevel(t *testing.T) {
 	} {
 		if got := ShellPaths(command, in); !sameReach(got, want) {
 			t.Errorf("ShellPaths(%q) = %q, want %q", command, got, want)
+		}
+	}
+}
+
+// UnknownReach names the command it stands for by its first four words, at most 60
+// characters, for doctor: an assignment's or an option's value is left out.
+func TestUnknownReachNamesTheCommandByItsFirstWords(t *testing.T) {
+	t.Parallel()
+	for command, want := range map[string]string{
+		`cd "$(cat p)" && cat NOTES.md`:                 `cd "$(cat p)" && …`,
+		"cat $UNSET/x":                                  "cat $UNSET/x",
+		"TOKEN=s3cret curl --header=s3cret $UNSET/x -v": "TOKEN=… curl --header=… $UNSET/x …",
+		"cat /" + strings.Repeat("x", 80) + "/$UNSET/y": "cat /" + strings.Repeat("x", 55) + " …",
+	} {
+		got := ShellPaths(command, t.TempDir())
+		if len(got) == 0 || got[len(got)-1] != UnknownReach+"\x00"+want {
+			t.Errorf("ShellPaths(%q) = %q, want UnknownReach naming %q", command, got, want)
 		}
 	}
 }

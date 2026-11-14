@@ -21,6 +21,11 @@ import (
 )
 
 // mixed reports whether sessionID's current run is Mixed, in the ledger and in its claim.
+// why is why the run ledger says sessionID's current run is Mixed.
+func (m *routedMachine) why(sessionID string) runs.Why {
+	return runs.Read(m.stateDir, sessionID).Why(time.Time{})
+}
+
 func (m *routedMachine) mixed(sessionID string) (ledger, placement bool) {
 	_, ledger = runs.MixedAt(m.stateDir, sessionID, time.Time{})
 	c, ok := claim.Read(m.stateDir, sessionID, time.Now())
@@ -43,6 +48,9 @@ func TestATouchOfAnotherOrganizationsCheckoutMakesTheRunMixed(t *testing.T) {
 	m.hook().Touch(r, sessionOf(sid), "Edit", []string{filepath.Join(api, "main.go")}, nil)
 	if ledger, placement := m.mixed(sid); !ledger || !placement {
 		t.Fatalf("after the crossing: ledger Mixed %v, mixed placement %v", ledger, placement)
+	}
+	if why := m.why(sid); why != (runs.Why{Reason: runs.Crossed, Where: "github.com/acme/api"}) {
+		t.Errorf("the ledger says the run is Mixed for %+v", why)
 	}
 	touches := hookruntest.Named(m.spooled(), semconv.TermaFilesTouchedEvent)
 	if len(touches) != 1 || touches[0].Enrollment != hookruntest.Enrollment(t, st, "acme-platform") || !touches[0].OwnLocation ||
@@ -357,6 +365,9 @@ func TestARunPastTheLocationBoundTurnsMixed(t *testing.T) {
 	if ledger, placement := m.mixed(sid); !ledger || !placement {
 		t.Fatalf("past the bound: ledger Mixed %v, mixed placement %v", ledger, placement)
 	}
+	if why := m.why(sid); why.Reason != runs.LocationBound {
+		t.Errorf("the ledger says the run is Mixed for %+v", why)
+	}
 	if _, locs, _ := runs.Locations(m.stateDir, sid); len(locs) != maxRunLocations {
 		t.Errorf("the ledger keeps %d locations", len(locs))
 	}
@@ -419,7 +430,8 @@ func TestARefusedCrossingIsRecordedAside(t *testing.T) {
 	}
 	at := env.Time()
 	cur := env.currentRun(sid)
-	v := verdict{seen: []string{"github.com/acme/api"}, mixed: true, since: at, crossedWith: func([]string) bool { return true }}
+	v := verdict{seen: []string{"github.com/acme/api"}, mixed: true, since: at, why: runs.Why{Reason: runs.Crossed, Where: "github.com/acme/api"},
+		crossedWith: func([]string) (runs.Why, bool) { return runs.Why{Reason: runs.Crossed}, true }}
 	began := time.Now()
 	if !env.recordRun(sid, cur, v, at) {
 		t.Fatal("recordRun did not report the run Mixed")
@@ -445,7 +457,7 @@ func TestARefusedCrossingIsRecordedAside(t *testing.T) {
 		t.Fatalf("the next hook reads %+v", cur)
 	}
 	now := next.Time()
-	if !next.recordRun(sid, cur, next.decide(sid, cur, []routing.Location{{Kind: routing.Repository, Repository: "github.com/acme/api"}}, false, now), now) {
+	if !next.recordRun(sid, cur, next.decide(sid, cur, []routing.Location{{Kind: routing.Repository, Repository: "github.com/acme/api"}}, runs.Why{}, now), now) {
 		t.Fatal("the next hook's run is not Mixed")
 	}
 	if _, err := os.Stat(sidecar); !os.IsNotExist(err) {
@@ -456,6 +468,10 @@ func TestARefusedCrossingIsRecordedAside(t *testing.T) {
 	}
 	if from, mixed := runs.MixedAt(m.stateDir, sid, time.Time{}); !mixed || !from.Equal(at.UTC()) {
 		t.Errorf("after the fold the run reads Mixed %v from %v, want from %v", mixed, from, at.UTC())
+	}
+	// Recorded through the sidecar, the crossing's reason is Aside: why is in the hook's log.
+	if why := m.why(sid); why.Reason != runs.Aside {
+		t.Errorf("a crossing recorded aside reads %+v", why)
 	}
 }
 

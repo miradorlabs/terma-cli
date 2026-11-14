@@ -34,7 +34,7 @@ func (app *App) routingFacts(cfg *config.Config) *doctor.Routing {
 		Teams: names.Teams, Orgs: names.Orgs,
 		Key: app.teamKey,
 	}
-	r.MixedSessions, r.OlderMixed = runs.Mixed(app.stateDir, time.Now(), mixedRecent)
+	r.Mixed = runs.Mixed(app.stateDir, time.Now(), mixedRecent)
 	r.MixedDropped, r.Blocked = relayBlocked(app.stateDir)
 	if err == nil && ok && !st.Ready() {
 		r.Unfinished = "its keys and sign-ins are still moving"

@@ -155,7 +155,7 @@ func TestTeamsDropAMixedRunFirst(t *testing.T) {
 		t.Fatal(err)
 	}
 	mixedAt := start.Add(30 * time.Minute)
-	if err := runs.MarkMixed(cfg.StateDir, "s1", mixedAt); err != nil {
+	if err := runs.MarkMixed(cfg.StateDir, "s1", mixedAt, runs.Why{Reason: runs.Crossed}); err != nil {
 		t.Fatal(err)
 	}
 	got := teams.Route(relay.Record{Session: "s1", At: mixedAt.Add(time.Minute)})
@@ -203,7 +203,7 @@ func TestTeamsRecheckAQueuedEntry(t *testing.T) {
 	if _, err := runs.Start(cfg.StateDir, "s1", at.Add(-time.Hour)); err != nil {
 		t.Fatal(err)
 	}
-	if err := runs.MarkMixed(cfg.StateDir, "s1", at.Add(-time.Minute)); err != nil {
+	if err := runs.MarkMixed(cfg.StateDir, "s1", at.Add(-time.Minute), runs.Why{Reason: runs.Crossed}); err != nil {
 		t.Fatal(err)
 	}
 	if got := NewTeams(cfg, TeamsDeps{}).Recheck(q.Enrollment).Entry(q); got.Verdict != relay.Discard || got.Why != relay.WhyMixed {
@@ -241,7 +241,7 @@ func TestARecheckPassJudgesTheTeamOnceAndEachRunOnce(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if err := runs.MarkMixed(cfg.StateDir, "s2", at.Add(-time.Minute)); err != nil {
+	if err := runs.MarkMixed(cfg.StateDir, "s2", at.Add(-time.Minute), runs.Why{Reason: runs.Crossed}); err != nil {
 		t.Fatal(err)
 	}
 	pass := NewTeams(cfg, TeamsDeps{}).Recheck(ids["acme"])

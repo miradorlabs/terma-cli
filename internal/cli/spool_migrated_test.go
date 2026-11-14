@@ -162,7 +162,7 @@ func TestAFlushThatDropsOnlyByPolicySucceeds(t *testing.T) {
 		return spool.Event{Name: semconv.TermaToolCallEvent, SessionID: session, Time: time.Now(),
 			Repository: config.Repository{Origin: origin}, Profile: config.DefaultProfile, Enrollment: acme}
 	}
-	if err := runs.MarkMixed(testApp.stateDir, "crossed", time.Now().Add(-time.Minute)); err != nil {
+	if err := runs.MarkMixed(testApp.stateDir, "crossed", time.Now().Add(-time.Minute), runs.Why{Reason: runs.Crossed}); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.Append(event("s1", "github.com/acme/app"), event("s1", "github.com/dawson/side"), event("crossed", "github.com/acme/app")); err != nil {
@@ -172,7 +172,7 @@ func TestAFlushThatDropsOnlyByPolicySucceeds(t *testing.T) {
 	if err != nil {
 		t.Fatalf("a flush that dropped only by policy failed: %v\n%s", err, out)
 	}
-	if !strings.Contains(out, "dropped 1 their team no longer collects") || !strings.Contains(out, "dropped 1 because their session crossed organizations") {
+	if !strings.Contains(out, "dropped 1 their team no longer collects") || !strings.Contains(out, "dropped 1 because their session's run is Mixed (1 crossed organizations)") {
 		t.Fatalf("the report does not name both drops:\n%s", out)
 	}
 	if res := (delivery.Result{Discarded: 1, Mixed: 1}); res.Lost() {

@@ -55,7 +55,7 @@ func TestRouteReadsARunLedgerOncePerWindow(t *testing.T) {
 	if n := reads("s1"); n != 1 {
 		t.Fatalf("100 parts read the ledger %d times", n)
 	}
-	if err := runs.MarkMixed(stateDir, "s1", at.Add(-time.Minute)); err != nil {
+	if err := runs.MarkMixed(stateDir, "s1", at.Add(-time.Minute), runs.Why{Reason: runs.Crossed}); err != nil {
 		t.Fatal(err)
 	}
 	if v := teams.Recheck(queued.Enrollment).Entry(queued); v.Verdict != relay.Discard || v.Why != relay.WhyMixed {
@@ -104,7 +104,7 @@ func TestASlowLedgerReadNeverReplacesANewerOne(t *testing.T) {
 		done <- mixed
 	}()
 	<-inRead // the slow read found the run not Mixed
-	if err := runs.MarkMixed(stateDir, "s1", time.Now().Add(-time.Minute)); err != nil {
+	if err := runs.MarkMixed(stateDir, "s1", time.Now().Add(-time.Minute), runs.Why{Reason: runs.Crossed}); err != nil {
 		t.Fatal(err)
 	}
 	if _, mixed := teams.mixedAt("s1", time.Now()); !mixed {

@@ -186,7 +186,11 @@ input only for this (`agents/internal/reach`). A hook whose own location Route d
 the call touched, and that location, into the run ledger, and records and sends nothing
 else. `runs.Touch` returns the run's locations as it wrote them, so of two hooks of one run
 that each see half a crossing, the later sees it whole. The ledger alone says whether a run
-is Mixed. A crossing whose ledger write fails (its lock held past the hook's wait) goes to
+is Mixed, and why (`runs.Why`): it crossed into another organization's checkout, a shell
+command's reach is not known, it touched more locations than the ledger keeps, or the
+ledger was busy and its sidecar took the crossing; doctor names each recent Mixed run's
+reason and where (the checkout, or the command's first words), and a flush counts what it
+dropped by reason. A crossing whose ledger write fails (its lock held past the hook's wait) goes to
 the ledger's sidecar, `runs/<session>.mixed`, without the lock: a file per crossing that never
 expires, which every read takes for Mixed and the next hook that can lock the ledger folds
 in. A mixed placement neither backs is a crossing both of whose writes failed, and the run's

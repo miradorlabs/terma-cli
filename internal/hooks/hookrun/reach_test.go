@@ -115,7 +115,7 @@ func TestAShellCommandPastThePlaceBoundTurnsTheRunMixed(t *testing.T) {
 				}
 			}
 			paths := ShellPaths(strings.Join(words, " "), side)
-			if past := slices.Contains(paths, UnknownReach); past != (tc.places > maxShellPlaces) {
+			if past := slices.ContainsFunc(paths, isUnknownReach); past != (tc.places > maxShellPlaces) {
 				t.Fatalf("ShellPaths named UnknownReach %v for %d places", past, tc.places)
 			}
 			env := m.hook()

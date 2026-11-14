@@ -12,6 +12,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/gitx"
 	"github.com/miradorlabs/terma-cli/internal/project"
 	"github.com/miradorlabs/terma-cli/internal/routing"
+	"github.com/miradorlabs/terma-cli/internal/runs"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
 	"github.com/miradorlabs/terma-cli/internal/session"
 	"github.com/miradorlabs/terma-cli/internal/spool"
@@ -130,7 +131,7 @@ func (e Env) Report(r *Repo, sess session.Session, toolName string, paths []stri
 
 func (e Env) report(r *Repo, sess session.Session, toolName string, paths []string, extra map[string]any, confirmed bool) {
 	checkouts := e.checkouts(r, paths)
-	e.classifyTouches(r, sess, extra, checkouts, false)
+	e.classifyTouches(r, sess, extra, checkouts, runs.Why{})
 	for _, c := range checkouts {
 		if e.Routing != nil && !c.repo.Collected() {
 			continue // a checkout Route drops records nothing, but its touch was classified
@@ -162,7 +163,7 @@ func (e Env) report(r *Repo, sess session.Session, toolName string, paths []stri
 // them: a touch of another organization's checkout, or of one nobody collects but a pending
 // binding, makes the run Mixed, and so does a reach somewhere not known (unknown). A file
 // outside every checkout is not classified.
-func (e Env) classifyTouches(r *Repo, sess session.Session, extra map[string]any, touched []touched, unknown bool) {
+func (e Env) classifyTouches(r *Repo, sess session.Session, extra map[string]any, touched []touched, unknown runs.Why) {
 	if e.Routing == nil || r.dest == nil {
 		return
 	}
@@ -172,7 +173,7 @@ func (e Env) classifyTouches(r *Repo, sess session.Session, extra map[string]any
 			locs = append(locs, t.repo.dest.loc)
 		}
 	}
-	if len(locs) == 0 && !unknown {
+	if len(locs) == 0 && unknown.Reason == "" {
 		return
 	}
 	agent, _ := extra[semconv.TermaAgentIDKey].(string)

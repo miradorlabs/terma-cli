@@ -59,7 +59,7 @@ func TestPrune(t *testing.T) {
 	if _, mixed := MixedAt(dir, "agent-moved", t0); mixed {
 		t.Fatal("the re-pointed alias reads as Mixed")
 	}
-	must(t, MarkMixed(dir, "young", t0))
+	must(t, MarkMixed(dir, "young", t0, crossing))
 	if _, mixed := MixedAt(dir, "agent-moved", t0); !mixed {
 		t.Fatal("the re-pointed alias no longer reaches its session")
 	}
@@ -100,8 +100,8 @@ func TestPruneKeepsWhatIsActiveOrQueued(t *testing.T) {
 		start(t, dir, s, long)
 	}
 	must(t, Alias(dir, "queued-by-alias", "agent-q"))
-	must(t, MarkMixed(dir, "queued", long))
-	must(t, MarkMixed(dir, "crossed-lately", now.Add(-time.Hour)))
+	must(t, MarkMixed(dir, "queued", long, crossing))
+	must(t, MarkMixed(dir, "crossed-lately", now.Add(-time.Hour), crossing))
 	touch(t, dir, "touched-lately", "", []string{"github.com/acme/api"})
 	// Every file looks long untouched: what keeps one is what it records.
 	for _, s := range []string{"idle", "queued", "queued-by-alias", "crossed-lately", "touched-lately"} {
@@ -146,7 +146,7 @@ func TestPruneKeepsAMixedRunLonger(t *testing.T) {
 	long := now.Add(-Retention - 24*time.Hour)
 	for _, s := range []string{"mixed", "mixed-before"} {
 		start(t, dir, s, long.Add(-time.Hour))
-		must(t, MarkMixed(dir, s, long.Add(-time.Hour)))
+		must(t, MarkMixed(dir, s, long.Add(-time.Hour), crossing))
 	}
 	start(t, dir, "mixed-before", long)
 	for _, s := range []string{"mixed", "mixed-before"} {

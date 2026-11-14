@@ -81,16 +81,59 @@ func latest(ts ...time.Time) time.Time {
 	return out
 }
 
+// Reason is why a run turned Mixed, which doctor and a flush show, so that a run the scan
+// could not read can be told from one that crossed.
+type Reason string
+
+const (
+	// Crossed: the run touched another organization's checkout. A ledger written before
+	// reasons were recorded reads as this.
+	Crossed Reason = "crossed"
+	// UnknownReach: a shell command's reach could not be resolved.
+	UnknownReach Reason = "unknown_reach"
+	// LocationBound: the run touched more locations than the ledger keeps for it.
+	LocationBound Reason = "location_bound"
+	// Aside: the ledger was busy, so the crossing went to its sidecar (MarkAside), or its
+	// placement alone kept it; why it crossed is in the hook's log.
+	Aside Reason = "aside"
+)
+
+// Why is a Mixed mark's reason, and where it happened: for Crossed the checkout in another
+// organization, as the ledger records a location; for UnknownReach the command's first
+// words. Never a file's contents.
+type Why struct {
+	Reason Reason `json:"reason,omitempty"`
+	Where  string `json:"where,omitempty"`
+}
+
 // run is one run of a session.
 type run struct {
 	ID string `json:"id"`
 	// Started is when the run began; zero for a run first known by its crossing.
 	Started time.Time `json:"started"`
-	// MixedAt is when the run became Mixed; zero while it is not.
-	MixedAt time.Time `json:"mixed_at,omitzero"`
+	// MixedAt is when the run became Mixed; zero while it is not. MixedWhy is why, absent
+	// from a ledger written before reasons were recorded (why).
+	MixedAt  time.Time `json:"mixed_at,omitzero"`
+	MixedWhy Why       `json:"mixed_why,omitzero"`
 	// Locations are where the run was placed or seen touching (Touch), first seen first:
 	// normalised repository IDs, or the hooks' token for outside git. Only hooks read them.
 	Locations []string `json:"locations,omitempty"`
+}
+
+// why is why r turned Mixed: Crossed for a mark that records no reason.
+func (r run) why() Why {
+	if r.MixedWhy.Reason == "" {
+		return Why{Reason: Crossed, Where: r.MixedWhy.Where}
+	}
+	return r.MixedWhy
+}
+
+// mark makes r Mixed at at for why, unless it already is from no later: the earlier mark
+// wins, with its reason.
+func (r *run) mark(at time.Time, why Why) {
+	if at = at.UTC(); r.MixedAt.IsZero() || at.Before(r.MixedAt) {
+		r.MixedAt, r.MixedWhy = at, why
+	}
 }
 
 // Start records a new run of sessionID beginning at at (a session start or resume) and
@@ -134,9 +177,10 @@ func Alias(stateDir, sessionID, alias string) error {
 	})
 }
 
-// MarkMixed records that sessionID's current run became Mixed at at; an earlier time wins.
-// With no run recorded yet, it starts one that covers every earlier record.
-func MarkMixed(stateDir, sessionID string, at time.Time) error {
+// MarkMixed records that sessionID's current run became Mixed at at, for why; an earlier
+// time wins, with its reason. With no run recorded yet, it starts one that covers every
+// earlier record.
+func MarkMixed(stateDir, sessionID string, at time.Time, why Why) error {
 	id, err := newRunID()
 	if err != nil {
 		return err
@@ -145,10 +189,7 @@ func MarkMixed(stateDir, sessionID string, at time.Time) error {
 		if len(l.Runs) == 0 {
 			l.Runs = append(l.Runs, run{ID: id})
 		}
-		cur := &l.Runs[len(l.Runs)-1]
-		if at = at.UTC(); cur.MixedAt.IsZero() || at.Before(cur.MixedAt) {
-			cur.MixedAt = at
-		}
+		l.Runs[len(l.Runs)-1].mark(at, why)
 		l.active(at)
 	})
 }
@@ -243,6 +284,18 @@ func (s Snapshot) MixedAt(recordTime time.Time) (time.Time, bool) {
 	}
 	r := inForce(s.runs, recordTime)
 	return r.MixedAt, !r.MixedAt.IsZero()
+}
+
+// Why is why the run in force at recordTime is Mixed (MixedAt): zero for one that is not,
+// and for a ledger that cannot be read.
+func (s Snapshot) Why(recordTime time.Time) Why {
+	if s.unreadable || len(s.runs) == 0 {
+		return Why{}
+	}
+	if r := inForce(s.runs, recordTime); !r.MixedAt.IsZero() {
+		return r.why()
+	}
+	return Why{}
 }
 
 // Current is the run idOrAlias is in now, the latest to begin; false when none is recorded

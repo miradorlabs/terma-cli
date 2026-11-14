@@ -47,7 +47,7 @@ func TestRunsAndTheirCrossings(t *testing.T) {
 		t.Fatal("a run nothing marked is Mixed")
 	}
 	crossed := t0.Add(90 * time.Minute)
-	must(t, MarkMixed(dir, "sess", crossed))
+	must(t, MarkMixed(dir, "sess", crossed, crossing))
 
 	for _, c := range []struct {
 		name  string
@@ -84,12 +84,12 @@ func TestMixedOnlyTurnsOn(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	start(t, dir, "sess", t0)
-	must(t, MarkMixed(dir, "sess", t0.Add(10*time.Minute)))
-	must(t, MarkMixed(dir, "sess", t0.Add(20*time.Minute)))
+	must(t, MarkMixed(dir, "sess", t0.Add(10*time.Minute), crossing))
+	must(t, MarkMixed(dir, "sess", t0.Add(20*time.Minute), crossing))
 	if got, _ := mixedAt(t, dir, "sess", t0.Add(time.Hour)); !got.Equal(t0.Add(10 * time.Minute)) {
 		t.Fatalf("a later crossing moved the time to %v", got)
 	}
-	must(t, MarkMixed(dir, "sess", t0.Add(5*time.Minute)))
+	must(t, MarkMixed(dir, "sess", t0.Add(5*time.Minute), crossing))
 	if got, _ := mixedAt(t, dir, "sess", t0.Add(time.Hour)); !got.Equal(t0.Add(5 * time.Minute)) {
 		t.Fatalf("an earlier crossing left the time at %v", got)
 	}
@@ -109,7 +109,7 @@ func TestACrossingBeforeAnyStart(t *testing.T) {
 	if _, mixed := mixedAt(t, dir, "sess", t0); mixed {
 		t.Fatal("a session with no ledger is Mixed")
 	}
-	must(t, MarkMixed(dir, "sess", t0))
+	must(t, MarkMixed(dir, "sess", t0, crossing))
 	for _, at := range []time.Time{t0.Add(-24 * time.Hour), t0, {}} {
 		if got, mixed := mixedAt(t, dir, "sess", at); !mixed || !got.Equal(t0) {
 			t.Errorf("MixedAt(%v) = %v, %v", at, got, mixed)
@@ -129,7 +129,7 @@ func TestAliases(t *testing.T) {
 	if _, mixed := mixedAt(t, dir, "agent-1", t0.Add(time.Minute)); mixed {
 		t.Fatal("an alias of a clean run is Mixed")
 	}
-	must(t, MarkMixed(dir, "sess", t0.Add(time.Minute)))
+	must(t, MarkMixed(dir, "sess", t0.Add(time.Minute), crossing))
 	if got, mixed := mixedAt(t, dir, "agent-1", t0.Add(time.Hour)); !mixed || !got.Equal(t0.Add(time.Minute)) {
 		t.Fatalf("the alias's MixedAt = %v, %v", got, mixed)
 	}
@@ -154,8 +154,8 @@ func TestInvalidIDs(t *testing.T) {
 		if _, err := Start(dir, bad, t0); err == nil {
 			t.Errorf("Start(%q) succeeded", bad)
 		}
-		if err := MarkMixed(dir, bad, t0); err == nil {
-			t.Errorf("MarkMixed(%q) succeeded", bad)
+		if err := MarkMixed(dir, bad, t0, crossing); err == nil {
+			t.Errorf("MarkMixed(%q, crossing) succeeded", bad)
 		}
 		if err := Alias(dir, "sess", bad); err == nil {
 			t.Errorf("Alias(sess, %q) succeeded", bad)
@@ -193,7 +193,7 @@ func TestConcurrentWriters(t *testing.T) {
 		})
 	}
 	wg.Wait()
-	must(t, MarkMixed(dir, "sess", t0.Add(time.Hour)))
+	must(t, MarkMixed(dir, "sess", t0.Add(time.Hour), crossing))
 	b, err := os.ReadFile(filepath.Join(dir, Dir, "sess.json"))
 	must(t, err)
 	var l ledger
@@ -261,22 +261,25 @@ func TestMixedListsTheSessionsThatCrossed(t *testing.T) {
 	start(t, dir, "calm", t0)
 	start(t, dir, "crossed", t0)
 	must(t, Alias(dir, "crossed", "crossed-agent"))
-	must(t, MarkMixed(dir, "crossed", t0.Add(time.Minute)))
+	must(t, MarkMixed(dir, "crossed", t0.Add(time.Minute), crossing))
 	start(t, dir, "resumed", t0)
-	must(t, MarkMixed(dir, "resumed", t0.Add(time.Minute)))
+	must(t, MarkMixed(dir, "resumed", t0.Add(time.Minute), crossing))
 	start(t, dir, "resumed", t0.Add(time.Hour))
 	must(t, os.WriteFile(filepath.Join(dir, Dir, ".tmp-x.json"), []byte("{"), 0o600))
-	if got, older := Mixed(dir, t0.Add(2*time.Hour), 24*time.Hour); len(got) != 1 || got[0] != "crossed" || older != 0 {
-		t.Fatalf("Mixed = %v, %d older", got, older)
+	if got := Mixed(dir, t0.Add(2*time.Hour), 24*time.Hour); !slices.Equal(got, []MixedRun{{Session: "crossed", Why: crossing, Recent: true}}) {
+		t.Fatalf("Mixed = %+v", got)
 	}
-	if got, older := Mixed(t.TempDir(), t0, 24*time.Hour); got != nil || older != 0 {
-		t.Fatalf("Mixed with no ledger = %v, %d older", got, older)
+	if got := Mixed(t.TempDir(), t0, 24*time.Hour); got != nil {
+		t.Fatalf("Mixed with no ledger = %+v", got)
 	}
 	// Doctor names only the runs active lately, and counts the others.
-	if got, older := Mixed(dir, t0.Add(48*time.Hour), 24*time.Hour); len(got) != 0 || older != 1 {
-		t.Fatalf("a day later, Mixed = %v, %d older", got, older)
+	if got := Mixed(dir, t0.Add(48*time.Hour), 24*time.Hour); !slices.Equal(got, []MixedRun{{Session: "crossed", Why: crossing}}) {
+		t.Fatalf("a day later, Mixed = %+v", got)
 	}
 }
+
+// crossing is the reason a test marks a run Mixed for.
+var crossing = Why{Reason: Crossed}
 
 // touch is Touch, failing the test on an error, returning what the run records after it.
 func touch(t *testing.T, dir, sid, run string, locs []string) []string {
@@ -398,5 +401,40 @@ func TestATouchBeforeAnyRunStartsOne(t *testing.T) {
 	}
 	if _, mixed := mixedAt(t, dir, "sess", t0); mixed {
 		t.Fatal("a run only touched is Mixed")
+	}
+}
+
+// A Mixed mark records why, and an earlier mark wins with its reason. A ledger written
+// before reasons were recorded reads as Crossed; one that cannot be read, or a run that is
+// not Mixed, has none.
+func TestAMixedMarkRecordsWhy(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	start(t, dir, "s", t0)
+	unknown := Why{Reason: UnknownReach, Where: "cat $UNSET/x"}
+	if got := Read(dir, "s").Why(time.Time{}); got != (Why{}) {
+		t.Fatalf("a run not Mixed reads %+v", got)
+	}
+	must(t, MarkMixed(dir, "s", t0.Add(2*time.Minute), unknown))
+	must(t, MarkMixed(dir, "s", t0.Add(3*time.Minute), Why{Reason: LocationBound}))
+	if got := Read(dir, "s").Why(time.Time{}); got != unknown {
+		t.Fatalf("Why = %+v, want %+v", got, unknown)
+	}
+	must(t, MarkMixed(dir, "s", t0.Add(time.Minute), Why{Reason: Crossed, Where: "github.com/acme/api"}))
+	if got := Read(dir, "s").Why(time.Time{}); got != (Why{Reason: Crossed, Where: "github.com/acme/api"}) {
+		t.Fatalf("an earlier mark: Why = %+v", got)
+	}
+
+	old := `{"runs":[{"id":"r1","started":"2026-11-12T12:00:00Z","mixed_at":"2026-11-12T12:01:00Z"}]}`
+	must(t, os.WriteFile(filepath.Join(dir, Dir, "old.json"), []byte(old), 0o600))
+	if got := Read(dir, "old").Why(time.Time{}); got != (Why{Reason: Crossed}) {
+		t.Fatalf("a ledger from before reasons: Why = %+v", got)
+	}
+	if got := Mixed(dir, t0.Add(time.Hour), 24*time.Hour); len(got) != 2 || got[0].Why != (Why{Reason: Crossed}) || got[1].Why.Where != "github.com/acme/api" {
+		t.Fatalf("Mixed = %+v", got)
+	}
+	must(t, os.WriteFile(filepath.Join(dir, Dir, "bad.json"), []byte("{"), 0o600))
+	if got := Read(dir, "bad").Why(time.Time{}); got != (Why{}) {
+		t.Fatalf("an unreadable ledger: Why = %+v", got)
 	}
 }

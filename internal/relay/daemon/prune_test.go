@@ -28,7 +28,7 @@ func TestTheRelaysSweepPrunesTheLedgerOfWhatIsNotQueued(t *testing.T) {
 		if _, err := runs.Start(stateDir, s, long); err != nil {
 			t.Fatal(err)
 		}
-		if err := runs.MarkMixed(stateDir, s, long); err != nil {
+		if err := runs.MarkMixed(stateDir, s, long, runs.Why{Reason: runs.Crossed}); err != nil {
 			t.Fatal(err)
 		}
 		path := filepath.Join(stateDir, runs.Dir, s+".json")

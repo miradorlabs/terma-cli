@@ -23,8 +23,39 @@ const maxShellLookups = 4096
 // UnknownReach is a path Classify takes to say the call may have reached a checkout no path
 // names: a shell command reaching more places than ShellPaths returns, or a path-like word
 // whose expansion it cannot resolve. It is no path (it holds a NUL), and the run turns
-// Mixed, as for a checkout of an organization not known.
+// Mixed, as for a checkout of an organization not known. ShellPaths follows it with a NUL
+// and the command's first words (unknownReach), which the run ledger keeps as where.
 const UnknownReach = "\x00unknown"
+
+// unknownReach is UnknownReach naming command by its first words.
+func unknownReach(command string) string { return UnknownReach + "\x00" + firstWords(command) }
+
+// isUnknownReach reports whether p is UnknownReach, naming a command or not.
+func isUnknownReach(p string) bool { return strings.HasPrefix(p, UnknownReach) }
+
+// firstWords are command's first four words, at most 60 characters, an assignment's or an
+// option's value after its = left out: enough for doctor to name the command, and no more
+// of it on disk.
+func firstWords(command string) string {
+	words := strings.Fields(command)
+	more := len(words) > 4
+	if more {
+		words = words[:4]
+	}
+	for i, w := range words {
+		if name, _, ok := strings.Cut(w, "="); ok && name != "" {
+			words[i] = name + "=…"
+		}
+	}
+	s := strings.Join(words, " ")
+	if r := []rune(s); len(r) > 60 {
+		s, more = string(r[:60]), true
+	}
+	if more {
+		s += " …"
+	}
+	return s
+}
 
 // ShellPaths are the places a shell command may reach, for Classify: the folders of the
 // existing paths it names (a folder its own place, and a symlink's target's as well), with
@@ -69,7 +100,7 @@ func shellPaths(command, cwd string, env func(string) (string, bool)) []string {
 		}
 	}
 	if unknown {
-		out = append(out, UnknownReach)
+		out = append(out, unknownReach(command))
 	}
 	return out
 }

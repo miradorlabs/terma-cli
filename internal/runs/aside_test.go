@@ -34,7 +34,7 @@ func TestACrossingRecordedAsideReadsMixed(t *testing.T) {
 	held(t, dir, "s")
 	crossed := t0.Add(2 * time.Hour)
 	must(t, MarkAside(dir, "s", run, crossed))
-	if err := MarkMixed(dir, "s", crossed); err == nil {
+	if err := MarkMixed(dir, "s", crossed, crossing); err == nil {
 		t.Fatal("the ledger took a write through its held lock")
 	}
 
@@ -53,8 +53,8 @@ func TestACrossingRecordedAsideReadsMixed(t *testing.T) {
 	if !ok || p.Run != run || !p.MixedAt.Equal(crossed) || !p.Aside || !slices.Equal(p.Aliases, []string{"agent-1"}) {
 		t.Errorf("Locate = %+v, %v", p, ok)
 	}
-	if active, _ := Mixed(dir, crossed.Add(time.Hour), time.Hour*24); !slices.Equal(active, []string{"s"}) {
-		t.Errorf("doctor lists %v", active)
+	if got := Mixed(dir, crossed.Add(time.Hour), time.Hour*24); !slices.Equal(got, []MixedRun{{Session: "s", Why: Why{Reason: Aside}, Recent: true}}) {
+		t.Errorf("doctor lists %+v", got)
 	}
 }
 
@@ -134,7 +134,7 @@ func TestAFoldKeepsEveryMark(t *testing.T) {
 	if at, mixed := mixedAt(t, dir, "s", time.Time{}); !mixed || !at.Equal(t0.Add(time.Minute)) {
 		t.Errorf("before the last fold: Mixed %v from %v, want from the earliest mark", mixed, at)
 	}
-	must(t, MarkMixed(dir, "s", t0.Add(5*time.Hour)))
+	must(t, MarkMixed(dir, "s", t0.Add(5*time.Hour), crossing))
 	if !gone(filepath.Join(dir, Dir, "s.mixed")) {
 		t.Fatal("a locked edit left the sidecar")
 	}

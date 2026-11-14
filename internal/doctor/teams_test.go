@@ -8,6 +8,7 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/routing"
+	"github.com/miradorlabs/terma-cli/internal/runs"
 )
 
 const authURL = "https://auth.example"
@@ -74,13 +75,24 @@ func TestTeamsCheckFailsOnWhatBlocks(t *testing.T) {
 	}
 }
 
-// doctor shows what Mixed runs dropped.
+// doctor shows what Mixed runs dropped, how many each reason turned Mixed, and for each run
+// active lately why and where: the checkout it crossed into, or the command whose reach is
+// not known.
 func TestTeamsCheckAndRowsShowWhatMixedRunsDropped(t *testing.T) {
 	t.Parallel()
 	r := routed(t)
-	r.MixedSessions, r.MixedDropped = []string{"s-1"}, 7
+	r.Mixed = []runs.MixedRun{
+		{Session: "s-1", Why: runs.Why{Reason: runs.Crossed, Where: "github.com/acme/api"}, Recent: true},
+		{Session: "s-2", Why: runs.Why{Reason: runs.UnknownReach, Where: `cd "$(cat p)" && cat …`}, Recent: true},
+		{Session: "s-3", Why: runs.Why{Reason: runs.UnknownReach}, Recent: true},
+		{Session: "s-4", Why: runs.Why{Reason: runs.LocationBound}, Recent: true},
+		{Session: "s-5", Why: runs.Why{Reason: runs.Aside}, Recent: true},
+		{Session: "s-6", Recent: true},
+	}
+	r.MixedDropped = 7
 	c := TeamsCheck(r, time.Now())
-	if c.Status != Pass || !strings.Contains(c.Detail, "1 session run(s) crossed organizations") || !strings.Contains(c.Detail, "dropped 7 record(s)") {
+	if c.Status != Pass || !strings.Contains(c.Detail, "6 session run(s) Mixed, sending no telemetry until they resume: 2 ran a shell command whose reach is not known, 1 ") ||
+		!strings.Contains(c.Detail, "1 crossed organizations") || !strings.Contains(c.Detail, "dropped 7 record(s)") {
 		t.Fatalf("check = %+v", c)
 	}
 	rows := TeamRows(r, time.Now())
@@ -89,7 +101,13 @@ func TestTeamsCheckAndRowsShowWhatMixedRunsDropped(t *testing.T) {
 		text = append(text, row.Label+"|"+row.Value)
 	}
 	joined := strings.Join(text, "\n")
-	for _, want := range []string{"Teams|Acme Platform — active, key ter_srv_0123…: github.com/acme/*", "Bindings|github.com/acme → Acme", "Mixed|", "|session s-1"} {
+	for _, want := range []string{"Teams|Acme Platform — active, key ter_srv_0123…: github.com/acme/*", "Bindings|github.com/acme → Acme", "Mixed|",
+		"|session s-1 crossed organizations, into github.com/acme/api",
+		`|session s-2 ran a shell command whose reach is not known: cd "$(cat p)" && cat …`,
+		"|session s-3 ran a shell command whose reach is not known\n",
+		"|session s-4 touched more places than the run ledger keeps",
+		"|session s-5 crossed while the run ledger was busy",
+		"|session s-6 with a run ledger that cannot be read"} {
 		if !strings.Contains(joined, want) {
 			t.Errorf("rows lack %q:\n%s", want, joined)
 		}
@@ -101,8 +119,11 @@ func TestTeamsCheckAndRowsShowWhatMixedRunsDropped(t *testing.T) {
 func TestTeamsRowsCountOlderMixedRuns(t *testing.T) {
 	t.Parallel()
 	r := routed(t)
-	r.MixedSessions, r.OlderMixed = []string{"s-1"}, 3
-	if c := TeamsCheck(r, time.Now()); !strings.Contains(c.Detail, "4 session run(s) crossed organizations") || !strings.Contains(c.Detail, "3 idle for over a day") {
+	r.Mixed = []runs.MixedRun{{Session: "s-1", Why: runs.Why{Reason: runs.Crossed}, Recent: true}}
+	for _, s := range []string{"s-2", "s-3", "s-4"} {
+		r.Mixed = append(r.Mixed, runs.MixedRun{Session: s, Why: runs.Why{Reason: runs.Crossed}})
+	}
+	if c := TeamsCheck(r, time.Now()); !strings.Contains(c.Detail, "4 session run(s) Mixed") || !strings.Contains(c.Detail, "4 crossed organizations (3 idle for over a day)") {
 		t.Fatalf("check = %+v", c)
 	}
 	var sessions []string
@@ -111,7 +132,7 @@ func TestTeamsRowsCountOlderMixedRuns(t *testing.T) {
 			sessions = append(sessions, v)
 		}
 	}
-	if len(sessions) != 1 || sessions[0] != "s-1" {
+	if len(sessions) != 1 || sessions[0] != "s-1 crossed organizations" {
 		t.Fatalf("rows name sessions %v", sessions)
 	}
 }
