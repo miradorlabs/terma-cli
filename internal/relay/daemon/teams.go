@@ -47,7 +47,7 @@ type TeamsDeps struct {
 
 // Teams is the relay's Router on a migrated machine: it routes each record by where it ran
 // over the routing state of the profile its session's hooks used (routing.Router), which
-// its placement names, the active profile's for a record with none; checks its run in the
+// its placement names, the relay's start profile's for a record with none; checks its run in the
 // run ledger first; and gives each team's key from keys.v2.json alone. A profile switched
 // while the relay runs never routes a session its hooks placed under the other one. A
 // routing state that is missing, unreadable, or still being migrated sends nothing.
@@ -126,8 +126,8 @@ func (t *Teams) UnknownToPersonal() bool {
 	return pr.ok && routing.UnknownToPersonal(pr.st, t.deps.Now())
 }
 
-// Route decides where a record goes, under the profile its placement names (the active
-// one's for a record with none): dropped when its run was Mixed by its time, whatever its
+// Route decides where a record goes, under the profile its placement names (the relay's
+// start profile's for a record with none): dropped when its run was Mixed by its time, whatever its
 // placement says, and before any catch-all; else wherever routing.Router.Route sends or
 // holds its location.
 func (t *Teams) Route(rec relay.Record) relay.Routed {
@@ -246,7 +246,8 @@ func (t *Teams) Selected(enrollment string) bool {
 }
 
 // Legacy maps a part queued before the migration for project to its cutover enrollment
-// (routing.Migration.Legacy), by the location its claim named: it has no session run. While
+// (routing.Migration.Legacy) under the relay's start profile, by the location its claim
+// named: it has no session run, and no profile. While
 // the routing state cannot be read, as between the migration marking the machine migrated
 // and its commit, the part is mapped to no enrollment yet, and waits.
 func (t *Teams) Legacy(project string, repo config.Repository) (relay.Queued, bool) {

@@ -44,12 +44,14 @@ func (t *Teams) activeProfile() string {
 	return name
 }
 
-// route is profile's routing, the active profile's for "": its committed state, reread at
-// most once a second, with its configuration; the router is compiled again only for a new
-// generation.
+// route is profile's routing, the relay's start profile's for "" (a record whose placement
+// names none, a part queued before the migration): its committed state, reread at most once
+// a second, with its configuration; the router is compiled again only for a new generation.
+// The active profile may change while the relay runs, and never moves a record that does
+// not name it.
 func (t *Teams) route(profile string) profileRoute {
 	if profile == "" {
-		profile = t.activeProfile()
+		profile = t.cfg.ProfileName
 	}
 	now := time.Now()
 	t.mu.Lock()
@@ -94,39 +96,42 @@ func (t *Teams) profileConfig(name string) *config.Config {
 
 // owner is the routing of the profile that selects enrollment: where it was found last,
 // else the active profile, then every other profile config.json names, then any other
-// the relay has read. waits is set when it was found nowhere and a state that might select
-// it cannot be read now.
+// the relay has read. The last is tried before config.json is read, which a queue's every
+// recheck would otherwise pay for. waits is set when it was found nowhere and a state that
+// might select it cannot be read now.
 func (t *Teams) owner(enrollment string) (pr profileRoute, found, waits bool) {
 	t.mu.Lock()
 	last := t.owners[enrollment]
 	read := slices.Collect(maps.Keys(t.profiles))
 	t.mu.Unlock()
-	names := []string{}
-	if last != "" {
-		names = append(names, last)
-	}
-	names = append(names, t.activeProfile())
-	if f, err := config.LoadFile(t.cfg.Dir); err == nil {
-		names = append(names, slices.Sorted(maps.Keys(f.Profiles))...)
-	}
-	names = append(names, slices.Sorted(slices.Values(read))...)
 	tried := map[string]bool{}
-	for _, name := range names {
-		if tried[name] {
-			continue
+	try := func(names ...string) bool {
+		for _, name := range names {
+			if name == "" || tried[name] {
+				continue
+			}
+			tried[name] = true
+			if pr = t.route(name); !pr.ok {
+				waits = true
+				continue
+			}
+			if pr.st.Team(enrollment) != nil {
+				t.mu.Lock()
+				t.owners[enrollment] = name
+				t.mu.Unlock()
+				return true
+			}
 		}
-		tried[name] = true
-		pr := t.route(name)
-		if !pr.ok {
-			waits = true
-			continue
-		}
-		if pr.st.Team(enrollment) != nil {
-			t.mu.Lock()
-			t.owners[enrollment] = name
-			t.mu.Unlock()
-			return pr, true, false
-		}
+		return false
+	}
+	if try(last, t.activeProfile()) {
+		return pr, true, false
+	}
+	if f, err := config.LoadFile(t.cfg.Dir); err == nil && try(slices.Sorted(maps.Keys(f.Profiles))...) {
+		return pr, true, false
+	}
+	if try(slices.Sorted(slices.Values(read))...) {
+		return pr, true, false
 	}
 	return profileRoute{}, false, waits
 }

@@ -634,19 +634,25 @@ func TestAMigratedRelaySendsEachSessionToItsTeam(t *testing.T) {
 // switch of the active profile while it runs (terma config use) never sends a session
 // placed under the new profile with the old one's teams. Here the relay started under the
 // default profile, where Acme's checkouts go to Acme; client selects personal alone. A
-// record placed under client, one whose placement names no profile, and one with no
-// placement go by client once it is active; a session still placed under the default
-// profile goes on to its teams. Each enrollment is resolved and rechecked under its own
-// profile.
+// record placed under client goes by client once it is active; one whose placement names
+// no profile, one with no placement, and a session still placed under the default profile
+// go on by the relay's start profile, whichever is active. Each enrollment is resolved and
+// rechecked under its own profile.
 func TestASwitchOfProfileWhileTheRelayRunsRoutesByTheSessionsProfile(t *testing.T) {
 	cfg := migratedMachine(t)
-	work := selectTeams(t, cfg, true, func(s *routing.State) { _ = s.Bind("github.com/acme", orgAcme, false) })
+	work := selectTeams(t, cfg, true, func(s *routing.State) {
+		_ = s.Bind("github.com/acme", orgAcme, false)
+		s.Migration.Legacy = map[string]string{"legacy-project": s.Teams[0].EnrollmentID}
+	})
 	client := *cfg
 	client.ProfileName = "client"
 	if err := config.UpdateProfile(cfg.Dir, client.ProfileName, func(p *config.Profile) { p.Harnesses = []string{"claude"} }); err != nil {
 		t.Fatal(err)
 	}
-	other := selectTeams(t, &client, true, func(s *routing.State) { s.Deselect(s.Teams[0].EnrollmentID) })
+	other := selectTeams(t, &client, true, func(s *routing.State) {
+		s.Deselect(s.Teams[0].EnrollmentID)
+		s.Migration.Legacy = map[string]string{"legacy-project": s.Teams[0].EnrollmentID}
+	})
 	var active atomic.Value
 	active.Store(config.DefaultProfile)
 	teams := NewTeams(cfg, TeamsDeps{Active: func() string { return active.Load().(string) }})
@@ -659,12 +665,12 @@ func TestASwitchOfProfileWhileTheRelayRunsRoutesByTheSessionsProfile(t *testing.
 	if got := teams.Route(acme(config.DefaultProfile)); got.Outcome != relay.Send || got.Queued.Enrollment != work["acme"] {
 		t.Fatalf("before the switch: %+v", got)
 	}
+	unplaced := relay.Record{Session: "s2", At: time.Now()}
+	before := teams.Route(unplaced)
 
 	active.Store(client.ProfileName)
 	for name, rec := range map[string]relay.Record{
 		"placed under client":          acme(client.ProfileName),
-		"placed under no profile":      acme(""),
-		"with no placement":            {Session: "s2", At: time.Now()},
 		"outside git, placed under it": {Session: "s3", Placed: true, Placement: claim.Claim{Kind: claim.KindOutsideGit, Profile: client.ProfileName}, At: time.Now()},
 	} {
 		got := teams.Route(rec)
@@ -677,8 +683,20 @@ func TestASwitchOfProfileWhileTheRelayRunsRoutesByTheSessionsProfile(t *testing.
 			}
 		}
 	}
-	if got := teams.Route(acme(config.DefaultProfile)); got.Outcome != relay.Send || got.Queued.Enrollment != work["acme"] {
-		t.Errorf("a session still placed under the default profile: %+v", got)
+	for name, rec := range map[string]relay.Record{
+		"placed under the default profile": acme(config.DefaultProfile),
+		"placed under no profile":          acme(""),
+	} {
+		if got := teams.Route(rec); got.Outcome != relay.Send || got.Queued.Enrollment != work["acme"] {
+			t.Errorf("%s after the switch: %+v, want the start profile's Acme %s", name, got, work["acme"])
+		}
+	}
+	if got := teams.Route(unplaced); got.Outcome != before.Outcome || got.Why != before.Why || got.Queued.Enrollment != before.Queued.Enrollment {
+		t.Errorf("a record with no placement after the switch: %+v, want it routed as before, %+v", got, before)
+	}
+	// A part queued before the migration names no profile: the start profile maps it.
+	if q, mapped := teams.Legacy("legacy-project", config.Repository{}); !mapped || q.Enrollment != work["acme"] {
+		t.Errorf("Legacy after the switch = %+v, %v; want the start profile's %s", q, mapped, work["acme"])
 	}
 
 	for _, e := range []string{work["acme"], other["me"]} {
