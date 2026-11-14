@@ -156,15 +156,18 @@ func (sc *shellScan) spend() bool {
 	return true
 }
 
+// scan reads words in order. A cd or pushd waits for its target, the next word of its own
+// depth: a word inside a substitution comes before the word holding it, which is the
+// target, so it is read as any other word and leaves the cd waiting.
 func (sc *shellScan) scan(words []shellWord) {
-	cd := false
+	cd, cdDepth := false, 0
 	for i := 0; i < len(words); i++ {
 		if sc.unknown {
 			return // the run turns Mixed whatever else the command names
 		}
 		w := words[i]
 		text, plain := w.literalText()
-		if cd && w.command {
+		if cd && (w.depth < cdDepth || w.depth == cdDepth && w.command) {
 			// A cd with no target goes home.
 			cd = false
 			if home, ok := sc.lookup("HOME"); ok {
@@ -179,8 +182,10 @@ func (sc *shellScan) scan(words []shellWord) {
 		}
 		target := false
 		switch {
+		case cd && w.depth > cdDepth:
+			// Inside the substitution that makes the cd's target.
 		case w.command && plain && (text == "cd" || text == "pushd"):
-			cd = true
+			cd, cdDepth = true, w.depth
 			continue
 		case cd && plain && text == "-":
 			// Back where it was, which it already reached.
@@ -217,7 +222,7 @@ func (sc *shellScan) scan(words []shellWord) {
 func (sc *shellScan) loop(words []shellWord, i int) (int, bool) {
 	keyword := func(j int, kw string) bool {
 		text, plain := words[j].literalText()
-		return plain && text == kw && words[j].command && !words[j].body
+		return plain && text == kw && words[j].command && !words[j].body && words[j].depth == words[i].depth
 	}
 	if i+1 == len(words) {
 		return 0, false

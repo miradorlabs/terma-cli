@@ -17,6 +17,9 @@ type shellWord struct {
 	// body: the word is in a here-document's body, which a command reads as data unless it
 	// is a shell; only a word holding a slash may be a path there.
 	body bool
+	// depth is how many command substitutions the word is read inside. Their words come
+	// before the word that holds them, and never take a cd or pushd outside them.
+	depth int
 }
 
 // partKind is how a part of a shell word reads.
@@ -92,6 +95,8 @@ type scanner struct {
 	// escapes is whether a backslash escapes the next character, as in a POSIX shell; else
 	// it is literal, as in PowerShell and cmd, where it separates a Windows path.
 	escapes bool
+	// depth is how many command substitutions the scanner is inside.
+	depth int
 }
 
 // heredoc is a here-document still to be read: its delimiter, whether that was quoted (its
@@ -203,7 +208,7 @@ func (s *scanner) bodies() {
 			}
 			lines = append(lines, line)
 		}
-		body := &scanner{rs: []rune(strings.Join(lines, "\n")), body: s.body || !h.shell, literal: h.quoted && !h.shell, escapes: s.escapes}
+		body := &scanner{rs: []rune(strings.Join(lines, "\n")), body: s.body || !h.shell, literal: h.quoted && !h.shell, escapes: s.escapes, depth: s.depth}
 		body.commands(0)
 		s.words = append(s.words, body.words...)
 	}
@@ -211,7 +216,7 @@ func (s *scanner) bodies() {
 
 // word reads one word, up to whitespace, an operator, or closer.
 func (s *scanner) word(closer rune) shellWord {
-	w := shellWord{body: s.body}
+	w := shellWord{body: s.body, depth: s.depth}
 	add := func(kind partKind, text string) {
 		if n := len(w.parts); n > 0 && w.parts[n-1].kind == kind && kind != variable && kind != opaque {
 			w.parts[n-1].text += text
@@ -344,7 +349,9 @@ func (s *scanner) dollar(w *shellWord, add func(partKind, string)) {
 func (s *scanner) substitution(closer rune) wordPart {
 	start, body := s.i, s.body
 	s.body = false // a substitution runs, wherever it is
+	s.depth++
 	s.commands(closer)
+	s.depth--
 	s.body = body
 	switch strings.Join(strings.Fields(strings.TrimSuffix(string(s.rs[start:s.i]), string(closer))), " ") {
 	case "pwd", "pwd -L", "pwd -P":
