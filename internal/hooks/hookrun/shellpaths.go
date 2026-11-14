@@ -38,8 +38,9 @@ const UnknownReach = "\x00unknown"
 // An option's or assignment's value (--flag=X, -oX, NAME=X) counts as the word. A relative
 // word resolves against the cwd and against where an earlier cd or pushd went.
 //
-// Words are expanded first: $HOME, $PWD (and $(pwd)), $OLDPWD, an assignment earlier in the
-// command, and any other variable the hook's environment sets; a word with a wildcard
+// Words are expanded first: $HOME, $PWD (and $(pwd)), $OLDPWD, the checkout's root for
+// $(git rev-parse --show-toplevel), an assignment earlier in the command, a for loop's
+// variable (each of its words in turn), and any other variable the hook's environment sets; a word with a wildcard
 // (*, ? or [) to what it matches, each match reaching its folder. A word that may be a path
 // but whose expansion cannot be resolved (a command substitution's output, an unset
 // variable) is UnknownReach, as is a command past maxShellPlaces or maxShellLookups. It
@@ -157,16 +158,23 @@ func (sc *shellScan) spend() bool {
 
 func (sc *shellScan) scan(words []shellWord) {
 	cd := false
-	for _, w := range words {
+	for i := 0; i < len(words); i++ {
 		if sc.unknown {
 			return // the run turns Mixed whatever else the command names
 		}
+		w := words[i]
 		text, plain := w.literalText()
 		if cd && w.command {
 			// A cd with no target goes home.
 			cd = false
 			if home, ok := sc.lookup("HOME"); ok {
 				sc.word(shellWord{parts: []wordPart{{kind: quoted, text: home}}}, expansion{text: home, pattern: escapeGlob(home)}, true)
+			}
+		}
+		if w.command && plain && text == "for" {
+			if done, ok := sc.loop(words, i); ok {
+				i = done
+				continue
 			}
 		}
 		target := false
@@ -200,6 +208,68 @@ func (sc *shellScan) scan(words []shellWord) {
 		}
 		sc.word(w, x, target)
 	}
+}
+
+// loop reads the for loop at words[i], for NAME in WORDS; do BODY; done: its WORDS are
+// candidates as any command's, and BODY is read once for each, NAME bound to it in turn,
+// each pass a lookup (with no in, NAME is not known). It returns where the loop's done is;
+// false for words that are no such loop, read as written.
+func (sc *shellScan) loop(words []shellWord, i int) (int, bool) {
+	keyword := func(j int, kw string) bool {
+		text, plain := words[j].literalText()
+		return plain && text == kw && words[j].command && !words[j].body
+	}
+	if i+1 == len(words) {
+		return 0, false
+	}
+	name, plain := words[i+1].literalText()
+	if !plain || !isName(name) {
+		return 0, false
+	}
+	do, done, nested := -1, -1, 0
+	for j := i + 2; j < len(words) && done < 0; j++ {
+		switch {
+		case !keyword(j, "do") && !keyword(j, "done"):
+		case do < 0:
+			if keyword(j, "do") {
+				do = j
+			}
+		case keyword(j, "do"):
+			nested++
+		case nested > 0:
+			nested--
+		default:
+			done = j
+		}
+	}
+	if done < 0 {
+		return 0, false
+	}
+	list, body := words[i+2:do], words[do+1:done]
+	in := false
+	if len(list) > 0 {
+		text, plain := list[0].literalText()
+		if in = plain && text == "in"; in {
+			list = list[1:]
+		}
+	}
+	sc.scan(list)
+	pass := func(v *string) {
+		if sc.vars[name] = v; !sc.unknown && sc.spend() {
+			sc.scan(body)
+		}
+	}
+	if !in {
+		pass(nil)
+	}
+	for _, w := range list {
+		if x := sc.expand(w); x.unresolved {
+			pass(nil)
+		} else {
+			pass(&x.text)
+		}
+	}
+	return done, true
 }
 
 // word looks at one candidate word, x as expanded.

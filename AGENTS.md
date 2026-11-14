@@ -168,7 +168,8 @@ touches a checkout when it runs there, or when a tool call edits, reads or searc
 in it, or names one in a shell command (the folder of each path the command names that is
 there, a word without a slash included but never the command's name (the program to
 run, even `$(go env GOPATH)/bin/lint`), the nearest folder that is there above one that is not, as a new file a redirect creates, and every `cd`'s
-and `pushd`'s target, after expanding variables, `$(pwd)` and globs: `hookrun.ShellPaths`);
+and `pushd`'s target, after expanding variables, a `for` loop's variable (each of its
+words in turn), `$(pwd)`, `$(git rev-parse --show-toplevel)` and globs: `hookrun.ShellPaths`);
 a path through a symlink touches its target's checkout too. A command reaching more
 folders than are examined, each counted once however many of its words name it, or a path
 in it whose expansion cannot be resolved, touches an organization not known, and the run

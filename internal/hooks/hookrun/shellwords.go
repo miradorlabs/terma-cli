@@ -28,12 +28,17 @@ const (
 	// quoted is text from quotes or an escape, taken as it is.
 	quoted
 	// variable is a parameter expansion, $NAME or ${NAME}, text its name and fallback its
-	// ${NAME:-fallback}; $(pwd) and `pwd` are PWD.
+	// ${NAME:-fallback}; $(pwd) and `pwd` are PWD, and $(git rev-parse --show-toplevel)
+	// topLevel.
 	variable
 	// opaque is an expansion ShellPaths cannot resolve: a command substitution's output,
 	// arithmetic, a positional or special parameter, or a parameter's operator.
 	opaque
 )
+
+// topLevel is the variable $(git rev-parse --show-toplevel) reads: the root of the checkout
+// the command is in when it runs. No shell variable can be named so.
+const topLevel = "\x00toplevel"
 
 // wordPart is one part of a shell word.
 type wordPart struct {
@@ -334,16 +339,18 @@ func (s *scanner) dollar(w *shellWord, add func(partKind, string)) {
 }
 
 // substitution reads a command substitution up to closer, its words among the command's,
-// and is the part it makes of the word that holds it: PWD for $(pwd), else opaque.
+// and is the part it makes of the word that holds it: PWD for $(pwd), topLevel for
+// $(git rev-parse --show-toplevel), else opaque.
 func (s *scanner) substitution(closer rune) wordPart {
 	start, body := s.i, s.body
 	s.body = false // a substitution runs, wherever it is
 	s.commands(closer)
 	s.body = body
-	inner := strings.TrimSpace(strings.TrimSuffix(string(s.rs[start:s.i]), string(closer)))
-	switch inner {
+	switch strings.Join(strings.Fields(strings.TrimSuffix(string(s.rs[start:s.i]), string(closer))), " ") {
 	case "pwd", "pwd -L", "pwd -P":
 		return wordPart{kind: variable, text: "PWD"}
+	case "git rev-parse --show-toplevel":
+		return wordPart{kind: variable, text: topLevel}
 	}
 	return wordPart{kind: opaque}
 }

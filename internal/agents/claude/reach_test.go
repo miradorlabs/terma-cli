@@ -173,7 +173,7 @@ func TestRoutedClaudeShellCommandsReachingAcmeMakeTheRunMixed(t *testing.T) {
 		"a read inside a substitution":      {func(*reachMachine) string { return `echo "$(cat ../acme-api/NOTES.md)"` }, true},
 		"a relative path after a cd out":    {func(*reachMachine) string { return "cd .. && cat acme-api/NOTES.md" }, true},
 		"a folder named alone, from above":  {func(*reachMachine) string { return "cd .. && git -C acme-api log" }, true},
-		"an unresolved path":                {func(*reachMachine) string { return "cat $(git rev-parse --show-toplevel)/x" }, true},
+		"an unresolved path":                {func(*reachMachine) string { return "cat $(git rev-parse --show-prefix)/x" }, true},
 		// 257 folders, none of them in another checkout: past hookrun's bound, unknown.
 		"a command past the place bound": {func(m *reachMachine) string { return "ls" + manyPlaces(m.t, m.side, 257) }, true},
 		"a command at the place bound":   {func(m *reachMachine) string { return "ls" + manyPlaces(m.t, m.side, 256) }, false},
