@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+
+	"github.com/miradorlabs/terma-cli/internal/gitx"
 )
 
 // How ShellPaths reads a word: expanded where the command is, and what of it may be a path.
@@ -77,6 +79,12 @@ func (sc *shellScan) lookup(name string) (string, bool) {
 	switch name {
 	case "PWD":
 		return sc.dir, sc.dir != ""
+	case topLevel:
+		if sc.dir == "" {
+			return "", false
+		}
+		root, _, ok := gitx.LocateFS(sc.dir)
+		return root, ok
 	case "OLDPWD":
 		if sc.prev != "" {
 			return sc.prev, true

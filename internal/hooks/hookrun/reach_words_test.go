@@ -122,8 +122,9 @@ func TestShellPathsExpandVariables(t *testing.T) {
 }
 
 // A word that may be a path, holding a slash or a cd's target, whose expansion cannot be
-// resolved reaches somewhere not known: a command substitution's output, an unset variable,
-// a positional parameter, or an assignment from one of them.
+// resolved reaches somewhere not known: a command substitution's output (the top level
+// outside any checkout among them), an unset variable, a positional parameter, or an
+// assignment from one of them.
 func TestShellPathsCannotResolveIsUnknown(t *testing.T) {
 	t.Parallel()
 	m := newWordsMachine(t)
@@ -131,10 +132,11 @@ func TestShellPathsCannotResolveIsUnknown(t *testing.T) {
 		"cat $UNSET/NOTES.md",
 		`cat "${UNSET}/x"`,
 		"cd $UNSET && ls",
+		"cat $(git rev-parse --show-prefix)/NOTES.md",
+		"cat `git rev-parse --show-prefix`/NOTES.md",
 		"cat $(git rev-parse --show-toplevel)/NOTES.md",
-		"cat `git rev-parse --show-toplevel`/NOTES.md",
 		"cat $1/NOTES.md",
-		"D=$(git rev-parse --show-toplevel); cat $D/x",
+		"D=$(git rev-parse --show-prefix); cat $D/x",
 		"cat ${ACME%/*}/x",
 		"ls --dir=$UNSET/x",
 	} {
@@ -222,6 +224,55 @@ func TestShellPathsReadHereDocuments(t *testing.T) {
 		"cat <<'EOF'\nsee acme-api/new/x.md and a/b\nEOF":       nil,
 		"cat <<-EOF > side/out\n\tacme-api\n\tEOF\nls side/src": {m.side, filepath.Join(m.side, "src")},
 	})
+}
+
+// A for loop's variable is each of its words in turn, its body read once for each: a
+// loop over packages reaches each package's folder, and one over checkouts each checkout.
+// With no in, or over words not resolved, the variable is not known. Every pass is a
+// lookup, so loops nested past maxShellLookups passes reach somewhere not known.
+func TestShellPathsBindAForLoopsVariable(t *testing.T) {
+	t.Parallel()
+	m := newWordsMachine(t)
+	src := filepath.Join(m.side, "src")
+	m.check(t, m.side, map[string][]string{
+		"for d in ../acme-api ../side; do make -C $d; done":            {m.api, m.side},
+		"for pkg in a b; do go test ./src/$pkg/...; done":              {src},
+		"for f in NOTES.md; do cat ../acme-api/$f; done":               {m.api},
+		"for f in NOTES.md\ndo\n  cat ../acme-api/$f\ndone":            {m.api},
+		"for a in x y; do for b in 1 2; do echo src/$a/$b; done; done": {src},
+		"for d in a; do while true; do ls src/$d; done; done":          {src},
+		"for f in a; do echo $f; done; cat ../acme-api/$f/../NOTES.md": {m.api},
+	})
+	for _, command := range []string{"for x; do cat $x/y; done", "for d in $(ls); do cat $d/x; done", "for d in a; do cd $UNSET; done"} {
+		if got := m.paths(command, m.side); !slices.Contains(got, UnknownReach) {
+			t.Errorf("ShellPaths(%q) = %q, without UnknownReach", command, got)
+		}
+	}
+	many := strings.TrimSpace(strings.Repeat("w ", 70))
+	if got := m.paths("for a in "+many+"; do for b in "+many+"; do echo $a$b; done; done", m.side); !slices.Equal(got, []string{UnknownReach}) {
+		t.Errorf("70 by 70 passes: %q, want UnknownReach", got)
+	}
+}
+
+// $(git rev-parse --show-toplevel) is the root of the checkout the command is in when it
+// runs, where an earlier cd went included.
+func TestShellPathsResolveTheGitTopLevel(t *testing.T) {
+	t.Parallel()
+	parent, _ := filepath.EvalSymlinks(t.TempDir())
+	side, api := hookruntest.RepoIn(t, parent, "github.com/dawson/side"), hookruntest.RepoIn(t, parent, "github.com/acme/acme-api")
+	hookruntest.WriteFile(t, side, "internal/x.go", "package internal\n")
+	hookruntest.WriteFile(t, api, "NOTES.md", "acme\n")
+	in := filepath.Join(side, "internal")
+	for command, want := range map[string][]string{
+		"cat $(git rev-parse --show-toplevel)/go.mod":                       {side},
+		`cat "$(git rev-parse --show-toplevel)/../acme-api/NOTES.md"`:       {api},
+		"cd ../../acme-api && cat `git rev-parse --show-toplevel`/NOTES.md": {api},
+		"D=$(git  rev-parse  --show-toplevel)/internal; ls $D":              {in},
+	} {
+		if got := ShellPaths(command, in); !sameReach(got, want) {
+			t.Errorf("ShellPaths(%q) = %q, want %q", command, got, want)
+		}
+	}
 }
 
 // Accepted risk: a word with no slash whose expansion cannot be resolved counts for
