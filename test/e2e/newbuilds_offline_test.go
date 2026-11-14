@@ -212,6 +212,23 @@ func TestCaptureArgs(t *testing.T) {
 	if got := captureArgs(t, t.TempDir(), "BUILDS=claude-desktop=1.2.0", "DESKTOP_CAPTURE=success"); !slices.Equal(got, []string{"-attempted", "claude-desktop=1.2.0"}) {
 		t.Errorf("a desktop job that succeeded: %q", got)
 	}
+
+	// The markers capture-done.sh writes are the ones capture-args.sh reads: a run that wrote its
+	// compat.json finished, one that did not, did not.
+	done := func(t *testing.T, report string, args ...string) {
+		t.Helper()
+		if out, err := exec.Command("bash", append([]string{"reference/capture-done.sh", report}, args...)...).CombinedOutput(); err != nil {
+			t.Fatalf("capture-done.sh: %v\n%s", err, out)
+		}
+	}
+	runs = t.TempDir()
+	write(t, filepath.Join(runs, "captures", "capture-claude", "compat.json"), `[]`)
+	done(t, filepath.Join(runs, "captures", "capture-claude"), "macos", "claude")
+	done(t, filepath.Join(runs, "captures", "compat-linux"), "linux")
+	if got := captureArgs(t, runs, "BUILDS=claude=2.1.1", "CLAUDE_BUILDS=2.1.1"); !slices.Equal(got,
+		[]string{"-attempted", "claude=2.1.1", "-unfinished", "claude=2.1.1"}) {
+		t.Errorf("macOS finished, Linux not: %q", got)
+	}
 }
 
 // reference/capture-plan.sh: the detect job's outputs from the builds to capture, one job a
