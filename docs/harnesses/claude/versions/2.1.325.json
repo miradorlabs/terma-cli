@@ -23193,6 +23193,22 @@
         "description": "Microsoft Foundry resource name (for example, `my-resource`). Claude Code refuses a URL or host name. Required if `ANTHROPIC_FOUNDRY_BASE_URL` is not set (see Microsoft Foundry)",
         "read": true
       },
+      "ANTHROPIC_GOOGLE_CLOUD_BASE_URL": {
+        "description": "Override the Claude Models on Google Cloud (Anthropic managed) endpoint URL, for example when routing through an LLM gateway",
+        "read": true
+      },
+      "ANTHROPIC_GOOGLE_CLOUD_LOCATION": {
+        "description": "Google Cloud location that Claude Code puts in the Claude Models on Google Cloud (Anthropic managed) request URL. Defaults to `global`",
+        "read": true
+      },
+      "ANTHROPIC_GOOGLE_CLOUD_PROJECT": {
+        "description": "Google Cloud project ID for Claude Models on Google Cloud (Anthropic managed)",
+        "read": true
+      },
+      "ANTHROPIC_GOOGLE_CLOUD_WORKSPACE_ID": {
+        "description": "Workspace ID for Claude Models on Google Cloud (Anthropic managed). Required, unless you're on v2.1.307 or later and `ANTHROPIC_GOOGLE_CLOUD_BASE_URL` is set",
+        "read": true
+      },
       "ANTHROPIC_MODEL": {
         "description": "Name of the model setting to use (see Model Configuration)",
         "read": true
@@ -23574,7 +23590,7 @@
         "read": true
       },
       "CLAUDE_CODE_DISABLE_NONSTREAMING_FALLBACK": {
-        "description": "Set to `1` to disable the non-streaming fallback when a streaming request fails mid-stream. Streaming errors propagate to the retry layer instead. Useful when a proxy or gateway causes the fallback to produce duplicate tool execution",
+        "description": "Set to `1` to disable the non-streaming fallback when a streaming request fails mid-stream. Useful when a proxy or gateway causes the fallback to produce duplicate tool execution",
         "read": true
       },
       "CLAUDE_CODE_DISABLE_NOTIFICATION_PRESENCE_CHECK": {
@@ -23619,6 +23635,10 @@
       },
       "CLAUDE_CODE_DISABLE_ULTRAREVIEW_TRUST_CHECK": {
         "description": "Set to `1` so that `claude ultrareview` doesn't exit with `Error: Workspace not trusted` in a folder you haven't trusted when it can't ask you to trust it, such as in CI. Set it in the environment that launches Claude Code, not a settings `env` block, and only where every such run starts in a folder you trust. Runs that can ask still ask. Requires Claude Code v2.1.309 or later",
+        "read": true
+      },
+      "CLAUDE_CODE_DISABLE_ULTRATHINK": {
+        "description": "Set to `1` to turn the `ultrathink` keyword off. Requires Claude Code v2.1.316 or later",
         "read": true
       },
       "CLAUDE_CODE_DISABLE_UNKNOWN_MODEL_WINDOW_ENFORCEMENT": {
@@ -24085,6 +24105,10 @@
         "description": "Skip client-side authentication for Claude Platform on AWS, for gateways that sign requests themselves",
         "read": true
       },
+      "CLAUDE_CODE_SKIP_ANTHROPIC_GOOGLE_CLOUD_AUTH": {
+        "description": "Skip Google Cloud authentication for Claude Models on Google Cloud (Anthropic managed), for gateways that attach the credentials themselves",
+        "read": true
+      },
       "CLAUDE_CODE_SKIP_AWS_CRED_CACHE": {
         "description": "Set to `1` to turn off the in-process cache of credentials resolved from the AWS default credential provider chain, so Claude Code resolves the chain on every API request. With the cache off, an SSO-backed profile requests credentials from IAM Identity Center on every request. See credential caching and resolution timeout. Requires Claude Code v2.1.207 or later",
         "read": true
@@ -24199,6 +24223,10 @@
       },
       "CLAUDE_CODE_USE_ANTHROPIC_AWS": {
         "description": "Use Claude Platform on AWS",
+        "read": true
+      },
+      "CLAUDE_CODE_USE_ANTHROPIC_GOOGLE_CLOUD": {
+        "description": "Use Claude Models on Google Cloud (Anthropic managed)",
         "read": true
       },
       "CLAUDE_CODE_USE_BEDROCK": {
@@ -24666,7 +24694,7 @@
         "read": false
       }
     },
-    "fetched_at": "2026-11-14T13:01:01.831005195Z",
+    "fetched_at": "2026-11-14T19:18:11.642126269Z",
     "settings": {
       "advisorModel": {
         "default": "unset, so the advisor is off",
@@ -26761,10 +26789,6 @@
       "ANTHROPIC_API_HOST",
       "ANTHROPIC_ASSETS_HOST",
       "ANTHROPIC_CONFIG_DIR",
-      "ANTHROPIC_GOOGLE_CLOUD_BASE_URL",
-      "ANTHROPIC_GOOGLE_CLOUD_LOCATION",
-      "ANTHROPIC_GOOGLE_CLOUD_PROJECT",
-      "ANTHROPIC_GOOGLE_CLOUD_WORKSPACE_ID",
       "ANTHROPIC_LOG",
       "ANTHROPIC_TELEMETRY_GROUP",
       "ANTHROPIC_TIER_NAMES",
@@ -27065,7 +27089,6 @@
       "CLAUDE_CODE_DISABLE_SUBAGENT_HANDBACK",
       "CLAUDE_CODE_DISABLE_TRANSCRIPT_READ_AHEAD",
       "CLAUDE_CODE_DISABLE_TURN_HANDOFF",
-      "CLAUDE_CODE_DISABLE_ULTRATHINK",
       "CLAUDE_CODE_DISABLE_VITALS_EMITTER",
       "CLAUDE_CODE_DISABLE_WORKING_SYNC",
       "CLAUDE_CODE_DISABLE_WORKING_SYNC_WATCH",
@@ -27334,7 +27357,6 @@
       "CLAUDE_CODE_SIMULATE_PROXY_USAGE",
       "CLAUDE_CODE_SKILL_ATTRIBUTION",
       "CLAUDE_CODE_SKILL_PROPOSALS",
-      "CLAUDE_CODE_SKIP_ANTHROPIC_GOOGLE_CLOUD_AUTH",
       "CLAUDE_CODE_SKIP_MCP_DEBUG_LOG_FILES",
       "CLAUDE_CODE_SKIP_PLUGIN_LOCAL_MCP_SERVERS",
       "CLAUDE_CODE_SKIP_PLUGIN_MCP_BUNDLES",
@@ -27417,7 +27439,6 @@
       "CLAUDE_CODE_USER_DELEGATED_SESSION_ANY_CHECK_MODEL",
       "CLAUDE_CODE_USER_DELEGATED_SESSION_DIRECT_API",
       "CLAUDE_CODE_USER_EMAIL",
-      "CLAUDE_CODE_USE_ANTHROPIC_GOOGLE_CLOUD",
       "CLAUDE_CODE_USE_COWORK_PLUGINS",
       "CLAUDE_CODE_USE_GATEWAY",
       "CLAUDE_CODE_VOICE_FORWARD_INTERIMS_TYPED",
