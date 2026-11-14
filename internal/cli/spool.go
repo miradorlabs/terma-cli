@@ -161,7 +161,11 @@ func describeFlush(res delivery.Result) (delivered string, undelivered []string)
 		undelivered = append(undelivered, fmt.Sprintf("dropped %d their team no longer collects", res.Discarded))
 	}
 	if res.Mixed > 0 {
-		undelivered = append(undelivered, fmt.Sprintf("dropped %d because their session's run is Mixed (%s)", res.Mixed, doctor.ReasonCounts(res.MixedBy)))
+		s := fmt.Sprintf("dropped %d because their session's run is Mixed", res.Mixed)
+		if len(res.MixedBy) > 0 {
+			s += " (" + doctor.ReasonCounts(res.MixedBy) + ")"
+		}
+		undelivered = append(undelivered, s)
 	}
 	return delivered, undelivered
 }
