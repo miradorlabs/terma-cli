@@ -23542,7 +23542,7 @@
         "read": true
       },
       "CLAUDE_CODE_DISABLE_LEGACY_MODEL_REMAP": {
-        "description": "Set to `1` to prevent automatic remapping of Opus 4 and Opus 4.1 to the current Opus version on the Anthropic API. Use when you intentionally want to pin an older model. The remap does not run on Amazon Bedrock, Google Cloud's Agent Platform, or Microsoft Foundry",
+        "description": "Set to `1` to prevent automatic remapping of Opus 4 and Opus 4.1 to the current Opus version on the Anthropic API. The remap doesn't run on Amazon Bedrock, Google Cloud's Agent Platform, or Microsoft Foundry",
         "read": true
       },
       "CLAUDE_CODE_DISABLE_MCP_TASK_BACKGROUND": {
@@ -24666,7 +24666,7 @@
         "read": false
       }
     },
-    "fetched_at": "2026-11-14T00:39:48.021427094Z",
+    "fetched_at": "2026-11-14T05:23:00.000702822Z",
     "settings": {
       "advisorModel": {
         "default": "unset, so the advisor is off",

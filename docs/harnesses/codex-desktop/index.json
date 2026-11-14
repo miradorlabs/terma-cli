@@ -39,7 +39,9 @@
       },
       "undocumented": null,
       "highlights": [],
-      "signing": null
+      "signing": null,
+      "attempted_at": "2026-11-14T05:23:00.000702822Z",
+      "attempts": 2
     },
     {
       "version": "26.1106.51428",
@@ -60,7 +62,9 @@
       },
       "undocumented": null,
       "highlights": [],
-      "signing": null
+      "signing": null,
+      "attempted_at": "2026-11-14T05:23:00.000702822Z",
+      "attempts": 2
     },
     {
       "version": "26.1103.60933",

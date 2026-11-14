@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-14T00:39:48.021427094Z",
+  "generated_at": "2026-11-14T05:23:00.000702822Z",
   "versions": [
     {
       "harness": "copilot",
@@ -264,7 +264,9 @@
       },
       "undocumented": null,
       "highlights": [],
-      "signing": null
+      "signing": null,
+      "attempted_at": "2026-11-14T05:23:00.000702822Z",
+      "attempts": 2
     },
     {
       "harness": "claude-desktop",
@@ -474,7 +476,9 @@
       },
       "undocumented": null,
       "highlights": [],
-      "signing": null
+      "signing": null,
+      "attempted_at": "2026-11-14T05:23:00.000702822Z",
+      "attempts": 2
     },
     {
       "harness": "claude-desktop",

@@ -8,7 +8,9 @@
     "partial": false,
     "notes": [
       "Model requests were answered by a local fixture provider, not the vendor's API; nothing was sent to a model."
-    ]
+    ],
+    "attempted_at": "2026-11-14T05:23:00.000702822Z",
+    "attempts": 2
   },
   "side_requests": null
 }
