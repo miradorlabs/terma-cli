@@ -246,7 +246,7 @@ func TestARoutedSubagentIsAnAliasOfItsSession(t *testing.T) {
 	if c := m.claim(agent); c.Kind != claim.KindRepository || c.ProjectID != "" || c.Run != m.claim(sid).Run {
 		t.Errorf("subagent placement %+v", c)
 	}
-	if err := runs.MarkMixed(m.stateDir, sid, time.Now()); err != nil {
+	if err := runs.MarkMixed(m.stateDir, sid, time.Now(), runs.Why{Reason: runs.Crossed}); err != nil {
 		t.Fatal(err)
 	}
 	if _, mixed := runs.MixedAt(m.stateDir, agent, time.Now()); !mixed {

@@ -51,15 +51,16 @@ func (e Env) placeFor(r *Repo, ev spool.Event) {
 // place records that sessionID's run is at loc now, with c's checkout and processes, and
 // touched touched: c's placement under the session's ID and agentID's, or a mixed one.
 func (e Env) place(sessionID, agentID string, c claim.Claim, loc routing.Location, touched []routing.Location) {
-	e.judge(sessionID, agentID, c, append([]routing.Location{loc}, touched...), true, false)
+	e.judge(sessionID, agentID, c, append([]routing.Location{loc}, touched...), true, runs.Why{})
 }
 
 // judge classifies locs (where the run is, and what it touched) with the run's earlier
 // locations (decide), records the result in the run ledger (recordRun), and writes the
 // placement: c at locs[0] when placed, else only a mixed one (placeRun). A call that may
-// have reached somewhere not known (UnknownReach) turns the run Mixed. The ledger, with its
-// sidecar, decides Mixed, since delivery and the relay read only it.
-func (e Env) judge(sessionID, agentID string, c claim.Claim, locs []routing.Location, placed, unknown bool) {
+// have reached somewhere not known turns the run Mixed for unknown, its reason (UnknownReach)
+// when set. The ledger, with its sidecar, decides Mixed, since delivery and the relay read
+// only it.
+func (e Env) judge(sessionID, agentID string, c claim.Claim, locs []routing.Location, placed bool, unknown runs.Why) {
 	if !e.Routing.Usable() || !session.ValidID(sessionID) {
 		return
 	}
@@ -80,35 +81,52 @@ type verdict struct {
 	// maxRunLocations, where the ledger records no more.
 	seen []string
 	full bool
-	// mixed: the run is Mixed. since, when set, is when it turned Mixed, which the ledger
-	// does not record yet.
+	// mixed: the run is Mixed. since, when set, is when it turned Mixed, for why, which the
+	// ledger does not record yet.
 	mixed bool
 	since time.Time
+	why   runs.Why
 	// crossedWith classifies the hook's locations again with been, all the run's locations
-	// the ledger returns.
-	crossedWith func(been []string) bool
+	// the ledger returns, and says why they cross.
+	crossedWith func(been []string) (runs.Why, bool)
 }
 
 // decide classifies locs with where cur, the run, has been and its placement; unknown, a
-// reach somewhere not known, is a crossing. It writes nothing. A mixed placement the ledger does not back is a crossing both of whose writes
-// failed (recordRun): it is recorded again, from when the placement turned Mixed, while the
-// placement lasts.
-func (e Env) decide(sessionID string, cur ledgerRun, locs []routing.Location, unknown bool, now time.Time) verdict {
+// reach somewhere not known, is a crossing for its reason, after a crossing between two
+// organizations and the location bound, which say more. It writes nothing. A mixed
+// placement the ledger does not back is a crossing both of whose writes failed
+// (recordRun): it is recorded again, from when the placement turned Mixed, while the
+// placement lasts, its reason Aside.
+func (e Env) decide(sessionID string, cur ledgerRun, locs []routing.Location, unknown runs.Why, now time.Time) verdict {
 	rt := e.Routing
 	v := verdict{seen: newLocations(cur.locations, locs)}
 	// Past the bound the ledger cannot rule a crossing out, so the run turns Mixed.
 	v.full = len(cur.locations)+len(v.seen) > maxRunLocations
 	prev, havePrev := claim.Read(e.StateDir, sessionID, now)
-	v.crossedWith = func(been []string) bool {
-		return len(been) > maxRunLocations || rt.crossed(prev, havePrev, cur.id, locs, been, now)
+	v.crossedWith = func(been []string) (runs.Why, bool) {
+		if len(been) > maxRunLocations {
+			return runs.Why{Reason: runs.LocationBound}, true
+		}
+		return rt.crossing(prev, havePrev, cur.id, locs, been, now)
 	}
 	switch {
 	case !cur.mixedAt.IsZero():
 		v.mixed = true
+		return v
 	case havePrev && prev.Kind == claim.KindMixed && prev.Run == cur.id:
-		v.mixed, v.since = true, mixedSince(prev, now)
-	case unknown || v.full || rt.crossed(prev, havePrev, cur.id, locs, cur.locations, now):
-		v.mixed, v.since = true, now
+		v.mixed, v.since, v.why = true, mixedSince(prev, now), runs.Why{Reason: runs.Aside}
+		return v
+	}
+	why, crossed := rt.crossing(prev, havePrev, cur.id, locs, cur.locations, now)
+	switch {
+	case crossed:
+	case v.full:
+		why = runs.Why{Reason: runs.LocationBound}
+	default:
+		why = unknown
+	}
+	if why.Reason != "" {
+		v.mixed, v.since, v.why = true, now, why
 	}
 	return v
 }
@@ -123,7 +141,7 @@ func (e Env) recordRun(sessionID string, cur ledgerRun, v verdict, now time.Time
 	rt := e.Routing
 	mixed, recorded := v.mixed, true
 	if !v.since.IsZero() {
-		recorded = e.markMixed(sessionID, cur.id, v.since)
+		recorded = e.markMixed(sessionID, cur.id, v.since, v.why)
 	}
 	var seen []string
 	if !v.full {
@@ -150,9 +168,11 @@ func (e Env) recordRun(sessionID string, cur ledgerRun, v verdict, now time.Time
 	}
 	// Touch returns what other hooks recorded since this one read the ledger: of two hooks
 	// that each saw half a crossing, the later sees it whole.
-	if !mixed && len(merged) > len(cur.locations)+len(seen) && v.crossedWith(merged) {
-		mixed = true
-		e.markMixed(sessionID, cur.id, now)
+	if !mixed && len(merged) > len(cur.locations)+len(seen) {
+		if why, crossed := v.crossedWith(merged); crossed {
+			mixed = true
+			e.markMixed(sessionID, cur.id, now, why)
+		}
 	}
 	return mixed
 }
@@ -192,17 +212,18 @@ func (e Env) placeRun(sessionID, agentID string, c claim.Claim, mixed bool, now 
 	}
 }
 
-// markMixed records in the run ledger that sessionID's run run became Mixed at at, and
-// reports whether the ledger took it. One that cannot take it now gets it in its sidecar
-// (runs.MarkAside), without its lock: every read of the ledger takes that for Mixed, and it
-// never expires, as the mixed placement does.
-func (e Env) markMixed(sessionID, run string, at time.Time) bool {
-	err := runs.MarkMixed(e.StateDir, sessionID, at)
+// markMixed records in the run ledger that sessionID's run run became Mixed at at, for why,
+// and reports whether the ledger took it. One that cannot take it now gets it in its
+// sidecar (runs.MarkAside), without its lock, its reason Aside and why only in the hook's
+// log: every read of the ledger takes that for Mixed, and it never expires, as the mixed
+// placement does.
+func (e Env) markMixed(sessionID, run string, at time.Time, why runs.Why) bool {
+	err := runs.MarkMixed(e.StateDir, sessionID, at, why)
 	if err == nil {
 		e.Routing.marked(sessionID, run, at)
 		return true
 	}
-	e.Logf("mark run mixed: %v", err)
+	e.Logf("mark run mixed (%s %s): %v", why.Reason, why.Where, err)
 	if err := runs.MarkAside(e.StateDir, sessionID, run, at); err != nil {
 		e.Logf("mark run mixed aside: %v", err)
 		return false
@@ -220,28 +241,45 @@ func mixedSince(c claim.Claim, now time.Time) time.Time {
 	return now
 }
 
-// crossed reports whether any two of run's locations (locs, been from the ledger, and
-// prev's placements) belong to different organizations, each classified now.
-func (rt *Routing) crossed(prev claim.Claim, havePrev bool, run string, locs []routing.Location, been []string, now time.Time) bool {
-	locs = slices.Clone(locs)
+// crossing reports whether any two of run's locations (locs, been from the ledger, and
+// prev's placements) belong to different organizations, each classified now, and why: the
+// one of the two that crossed into where the run had been, one of locs before an earlier.
+func (rt *Routing) crossing(prev claim.Claim, havePrev bool, run string, locs []routing.Location, been []string, now time.Time) (runs.Why, bool) {
+	all := slices.Clone(locs)
 	if havePrev {
-		locs = append(locs, runLocations(prev, run)...)
+		all = append(all, runLocations(prev, run)...)
 	}
 	for _, l := range been {
-		locs = append(locs, fromLedger(l))
+		all = append(all, fromLedger(l))
 	}
-	classes := make([]organization, 0, len(locs))
-	for _, l := range locs {
+	classes := make([]organization, 0, len(all))
+	for _, l := range all {
 		classes = append(classes, rt.organizationOf(l, now))
 	}
 	for i, a := range classes {
-		for _, b := range classes[i+1:] {
-			if crosses(a, b) {
-				return true
+		for j := i + 1; j < len(classes); j++ {
+			if !crosses(a, classes[j]) {
+				continue
 			}
+			at := j
+			if j >= len(locs) && i < len(locs) {
+				at = i
+			}
+			return runs.Why{Reason: runs.Crossed, Where: placeName(all[at])}, true
 		}
 	}
-	return false
+	return runs.Why{}, false
+}
+
+// placeName is loc as doctor names it: its repository, or outside git.
+func placeName(loc routing.Location) string {
+	switch loc.Kind {
+	case routing.Repository:
+		return routing.Normalize(loc.Repository)
+	case routing.OutsideGit:
+		return "outside git"
+	}
+	return string(loc.Kind)
 }
 
 // runLocations are the locations of c's placements that belong to run. A legacy placement

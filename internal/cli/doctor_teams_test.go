@@ -27,7 +27,7 @@ func TestDoctorOnAMigratedMachineShowsTheTeamsAndFailsOnWhatIsPending(t *testing
 	if _, err := runs.Start(testApp.stateDir, session, time.Now().Add(-time.Hour)); err != nil {
 		t.Fatal(err)
 	}
-	if err := runs.MarkMixed(testApp.stateDir, session, time.Now().Add(-time.Minute)); err != nil {
+	if err := runs.MarkMixed(testApp.stateDir, session, time.Now().Add(-time.Minute), runs.Why{Reason: runs.UnknownReach, Where: `cd "$(cat p)" && …`}); err != nil {
 		t.Fatal(err)
 	}
 	dir := claim.Dir(testApp.stateDir)
@@ -49,7 +49,9 @@ func TestDoctorOnAMigratedMachineShowsTheTeamsAndFailsOnWhatIsPending(t *testing
 	}
 	for _, want := range []string{
 		"FAIL  teams", "github.com/acme/api is undecided", "terma teams --bind github.com/acme/api=" + orgA().ID,
-		"Undecided:", "session " + session, "dropped 5 record(s)", "4 record(s) for github.com/acme/api, undecided",
+		"Undecided:", "dropped 5 record(s)", "4 record(s) for github.com/acme/api, undecided",
+		"1 session run(s) Mixed, sending no telemetry until they resume: 1 ran a shell command whose reach is not known",
+		"session " + session + ` ran a shell command whose reach is not known: cd "$(cat p)" && …`,
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("doctor lacks %q:\n%s", want, out)

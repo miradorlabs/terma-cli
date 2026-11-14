@@ -57,8 +57,10 @@ type Result struct {
 	Blocked, Unrouted int
 	// Discarded were dropped by their recheck: their team no longer collects them, or, for
 	// an event queued before the migration, its project maps to no team. Mixed were dropped
-	// because their session run crossed organizations by their time.
+	// because their session's run was Mixed by their time, MixedBy counting them by why
+	// ("" for a run ledger that cannot be read).
 	Discarded, Mixed int
+	MixedBy          map[runs.Reason]int
 	Skipped          bool
 	Reason           spool.SkipReason
 	NextAttempt      time.Time

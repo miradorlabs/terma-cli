@@ -324,7 +324,7 @@ func TestAMixedRunDropsItsRunAttributedEvents(t *testing.T) {
 		t.Fatal(err)
 	}
 	crossed := began.Add(30 * time.Minute)
-	if err := runs.MarkMixed(m.state, "sess-1", crossed); err != nil {
+	if err := runs.MarkMixed(m.state, "sess-1", crossed, runs.Why{Reason: runs.Crossed}); err != nil {
 		t.Fatal(err)
 	}
 	if err := runs.Alias(m.state, "sess-1", "sub-1"); err != nil {
@@ -349,7 +349,7 @@ func TestAMixedRunDropsItsRunAttributedEvents(t *testing.T) {
 		at("own-content", "sess-1", crossed.Add(time.Minute), true),
 	)
 	res := m.flush(m.router())
-	if res.Sent != 2 || res.Mixed != 5 || m.pending() != 0 {
+	if res.Sent != 2 || res.Mixed != 5 || res.MixedBy[runs.Crossed] != 5 || m.pending() != 0 {
 		t.Fatalf("Flush = %+v, pending %d", res, m.pending())
 	}
 	_, body := host.sent()
@@ -440,7 +440,7 @@ func TestAPassReadsEachRunLedgerOnce(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	must(runs.MarkMixed(m.state, "sess-1", crossed))
+	must(runs.MarkMixed(m.state, "sess-1", crossed, runs.Why{Reason: runs.Crossed}))
 	must(runs.Alias(m.state, "sess-1", "sub-1"))
 	var queued []spool.Event
 	for i := range 2*spool.DefaultBatch + 50 {

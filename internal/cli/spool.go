@@ -13,6 +13,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/delivery"
+	"github.com/miradorlabs/terma-cli/internal/doctor"
 	"github.com/miradorlabs/terma-cli/internal/routing"
 
 	"github.com/spf13/cobra"
@@ -160,7 +161,7 @@ func describeFlush(res delivery.Result) (delivered string, undelivered []string)
 		undelivered = append(undelivered, fmt.Sprintf("dropped %d their team no longer collects", res.Discarded))
 	}
 	if res.Mixed > 0 {
-		undelivered = append(undelivered, fmt.Sprintf("dropped %d because their session crossed organizations", res.Mixed))
+		undelivered = append(undelivered, fmt.Sprintf("dropped %d because their session's run is Mixed (%s)", res.Mixed, doctor.ReasonCounts(res.MixedBy)))
 	}
 	return delivered, undelivered
 }

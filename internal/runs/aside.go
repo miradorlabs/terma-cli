@@ -47,7 +47,7 @@ type mark struct {
 const asideWrites = 3
 
 // MarkAside records in sessionID's sidecar, without the ledger's lock, that its run runID
-// became Mixed at at, for a crossing MarkMixed could not record. With no run ID (the ledger
+// became Mixed at at, for a crossing MarkMixed could not record; its reason is Aside. With no run ID (the ledger
 // names none) it names a new run that covers every earlier record, as MarkMixed would start.
 func MarkAside(stateDir, sessionID, runID string, at time.Time) error {
 	dir, err := asideDir(stateDir, sessionID)
@@ -93,9 +93,7 @@ func (a aside) apply(l *ledger) {
 		default:
 			i = len(l.Runs) - 1
 		}
-		if cur := &l.Runs[i]; cur.MixedAt.IsZero() || m.At.Before(cur.MixedAt) {
-			cur.MixedAt = m.At
-		}
+		l.Runs[i].mark(m.At, Why{Reason: Aside})
 		l.active(m.At)
 	}
 }

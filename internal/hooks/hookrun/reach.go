@@ -5,9 +5,11 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/routing"
+	"github.com/miradorlabs/terma-cli/internal/runs"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
 	"github.com/miradorlabs/terma-cli/internal/session"
 )
@@ -19,14 +21,20 @@ import (
 // Classify classifies, on a migrated machine, the checkouts that paths (files or folders,
 // absolute or relative to Cwd) reach, a symlink's target's as well as its own, with the
 // session's location r and the run's earlier locations (classifyTouches); UnknownReach among
-// paths turns the run Mixed. It writes no manifest and spools nothing. A nil r is located
+// paths turns the run Mixed, the ledger naming the command it follows. It writes no manifest and spools nothing. A nil r is located
 // here, with no store and nothing unparked: for a hook before its tool call runs, or in a
 // location Route drops, so a later hook still sees the crossing. It returns r, or the
 // checkout it located, for RepoAt; nil for none.
 func (e Env) Classify(ctx context.Context, r *Repo, sess session.Session, paths []string, extra map[string]any) *Repo {
-	unknown := slices.Contains(paths, UnknownReach)
-	paths = slices.DeleteFunc(slices.Clone(paths), func(p string) bool { return p == "" || p == UnknownReach })
-	if e.Routing == nil || !e.Routing.Usable() || len(paths) == 0 && !unknown || !session.ValidID(sess.ID) {
+	var unknown runs.Why
+	paths = slices.DeleteFunc(slices.Clone(paths), func(p string) bool {
+		if isUnknownReach(p) {
+			_, command, _ := strings.Cut(p[len(UnknownReach):], "\x00")
+			unknown = runs.Why{Reason: runs.UnknownReach, Where: command}
+		}
+		return p == "" || isUnknownReach(p)
+	})
+	if e.Routing == nil || !e.Routing.Usable() || len(paths) == 0 && unknown.Reason == "" || !session.ValidID(sess.ID) {
 		return r
 	}
 	if r == nil {
@@ -47,14 +55,14 @@ func (e Env) Classify(ctx context.Context, r *Repo, sess session.Session, paths 
 // Accepted risk: the hook's own location is not classified. Marking the run Mixed for it
 // would turn every session whose cwd was deleted Mixed. The run's earlier hooks recorded
 // where it ran, and the next hook that can locate its checkout classifies it.
-func (e Env) classifyUnlocated(sess session.Session, extra map[string]any, reached []touched, unknown bool) {
+func (e Env) classifyUnlocated(sess session.Session, extra map[string]any, reached []touched, unknown runs.Why) {
 	var locs []routing.Location
 	for _, t := range reached {
 		if t.repo.dest != nil {
 			locs = append(locs, t.repo.dest.loc)
 		}
 	}
-	if len(locs) == 0 && !unknown {
+	if len(locs) == 0 && unknown.Reason == "" {
 		return
 	}
 	agent, _ := extra[semconv.TermaAgentIDKey].(string)

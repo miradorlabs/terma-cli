@@ -73,7 +73,7 @@ func TestTeardownKeepsAMigratedMachineMigrated(t *testing.T) {
 	if _, err := runs.Start(stateDir, "live-session", mixedAt.Add(-time.Hour)); err != nil {
 		t.Fatal(err)
 	}
-	if err := runs.MarkMixed(stateDir, "live-session", mixedAt); err != nil {
+	if err := runs.MarkMixed(stateDir, "live-session", mixedAt, runs.Why{Reason: runs.Crossed}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := runs.Start(stateDir, "old-session", time.Now().Add(-20*24*time.Hour)); err != nil {

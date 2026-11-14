@@ -10,6 +10,7 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/gitx"
 	"github.com/miradorlabs/terma-cli/internal/routing"
+	"github.com/miradorlabs/terma-cli/internal/runs"
 )
 
 // Check keys of a machine that routes by teams.
@@ -33,12 +34,11 @@ type Routing struct {
 	Teams, Orgs map[string]string
 	// Key reports, masked, an enrollment's key on this machine: "" when it has none.
 	Key func(enrollmentID string) string
-	// MixedSessions are the sessions whose current run crossed organizations, and so sends
-	// no telemetry, active within the last day; OlderMixed counts the others the run
-	// ledger keeps. MixedDropped counts what the relay dropped from such runs.
-	MixedSessions []string
-	OlderMixed    int
-	MixedDropped  int
+	// Mixed are the sessions whose current run is Mixed, and so sends no telemetry, each
+	// with why and whether it was active within the last day (runs.Mixed). MixedDropped
+	// counts what the relay dropped from such runs.
+	Mixed        []runs.MixedRun
+	MixedDropped int
 	// Blocked counts what else the relay kept from leaving, as its last stop recorded it,
 	// by what blocked it: "pending:<binding>" for a binding still to decide and
 	// "team:<enrollment>" for a team that could not send.
@@ -121,7 +121,7 @@ func TeamsCheck(r Routing, now time.Time) Check {
 		fix = cmp.Or(fix, "terma teams --bind "+p.Key+"="+quoteWord(r.org(p.Organization))+" (or --refuse "+p.Key+")")
 	}
 	detail := strings.Join(parts, ", ")
-	if len(r.MixedSessions) > 0 || r.OlderMixed > 0 || r.MixedDropped > 0 {
+	if len(r.Mixed) > 0 || r.MixedDropped > 0 {
 		detail += "; " + MixedSummary(r)
 	}
 	switch {
@@ -133,14 +133,66 @@ func TeamsCheck(r Routing, now time.Time) Check {
 	return Check{Status: Pass, Detail: detail}
 }
 
-// MixedSummary says what runs that crossed organizations dropped.
+// MixedSummary says how many session runs are Mixed, by why, and what the relay dropped
+// from them.
 func MixedSummary(r Routing) string {
-	s := fmt.Sprintf("%d session run(s) crossed organizations and send no telemetry until they resume", len(r.MixedSessions)+r.OlderMixed)
-	if r.OlderMixed > 0 {
-		s += fmt.Sprintf(" (%d idle for over a day)", r.OlderMixed)
+	by, older := map[runs.Reason]int{}, 0
+	for _, m := range r.Mixed {
+		by[m.Why.Reason]++
+		if !m.Recent {
+			older++
+		}
+	}
+	s := fmt.Sprintf("%d session run(s) Mixed, sending no telemetry until they resume", len(r.Mixed))
+	if len(r.Mixed) > 0 {
+		s += ": " + ReasonCounts(by)
+	}
+	if older > 0 {
+		s += fmt.Sprintf(" (%d idle for over a day)", older)
 	}
 	if r.MixedDropped > 0 {
 		s += fmt.Sprintf("; the relay dropped %d record(s) from such runs", r.MixedDropped)
+	}
+	return s
+}
+
+// ReasonCounts says how many runs, or records of runs, each reason turned Mixed, the most
+// first: "2 crossed organizations, 1 ran a shell command whose reach is not known".
+func ReasonCounts(by map[runs.Reason]int) string {
+	reasons := slices.Collect(maps.Keys(by))
+	slices.SortFunc(reasons, func(a, b runs.Reason) int { return cmp.Or(by[b]-by[a], strings.Compare(string(a), string(b))) })
+	parts := make([]string, 0, len(reasons))
+	for _, r := range reasons {
+		parts = append(parts, fmt.Sprintf("%d %s", by[r], reasonWords(r)))
+	}
+	return strings.Join(parts, ", ")
+}
+
+// reasonWords says why a run turned Mixed; "" is a ledger that cannot be read.
+func reasonWords(r runs.Reason) string {
+	switch r {
+	case runs.Crossed:
+		return "crossed organizations"
+	case runs.UnknownReach:
+		return "ran a shell command whose reach is not known"
+	case runs.LocationBound:
+		return "touched more places than the run ledger keeps"
+	case runs.Aside:
+		return "crossed while the run ledger was busy"
+	}
+	return "with a run ledger that cannot be read"
+}
+
+// whyWords says why a run turned Mixed and where: the checkout it crossed into, or the
+// command whose reach is not known, by its first words.
+func whyWords(w runs.Why) string {
+	s := reasonWords(w.Reason)
+	switch {
+	case w.Where == "":
+	case w.Reason == runs.Crossed:
+		s += ", into " + w.Where
+	case w.Reason == runs.UnknownReach:
+		s += ": " + w.Where
 	}
 	return s
 }
@@ -281,10 +333,12 @@ func TeamRows(r Routing, now time.Time) []Row {
 	for _, p := range Pending(r.State) {
 		rows = append(rows, Row{"Undecided", p.Key + ", needed by " + p.Entry})
 	}
-	if len(r.MixedSessions) > 0 || r.OlderMixed > 0 || r.MixedDropped > 0 {
+	if len(r.Mixed) > 0 || r.MixedDropped > 0 {
 		rows = append(rows, Row{"Mixed", MixedSummary(r)})
-		for _, s := range r.MixedSessions {
-			rows = append(rows, Row{"", "session " + s})
+		for _, m := range r.Mixed {
+			if m.Recent {
+				rows = append(rows, Row{"", "session " + m.Session + " " + whyWords(m.Why)})
+			}
 		}
 	}
 	return append(rows, r.blockedRows()...)

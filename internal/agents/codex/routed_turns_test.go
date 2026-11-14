@@ -125,7 +125,7 @@ func TestACodexReplyAfterItsRunCrossedIsDroppedWhileItsFileEventGoes(t *testing.
 				t.Fatal(err)
 			}
 			if crossed {
-				if err := runs.MarkMixed(env.StateDir, replySession, began.Add(10*time.Minute)); err != nil {
+				if err := runs.MarkMixed(env.StateDir, replySession, began.Add(10*time.Minute), runs.Why{Reason: runs.Crossed}); err != nil {
 					t.Fatal(err)
 				}
 			}

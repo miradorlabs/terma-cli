@@ -57,6 +57,10 @@ func (p *pass) routed(ctx context.Context, events []spool.Event) ([]spool.Event,
 			res.Discarded++
 		case p.mixed(e):
 			res.Mixed++
+			if res.MixedBy == nil {
+				res.MixedBy = map[runs.Reason]int{}
+			}
+			res.MixedBy[p.ledgers[e.SessionID].Why(e.Time).Reason]++
 		case v == routing.Wait:
 			res.Blocked++
 			held = append(held, e)

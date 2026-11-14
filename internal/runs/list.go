@@ -10,14 +10,22 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/session"
 )
 
-// Mixed lists, sorted, for doctor, the sessions whose run in force at now is Mixed and that
-// were active within recent; older counts the rest the ledger keeps. A sidecar counts with
-// its ledger, or alone (MarkAside), and an unreadable ledger or sidecar counts as active and
-// Mixed, as MixedAt has it.
-func Mixed(stateDir string, now time.Time, recent time.Duration) (active []string, older int) {
+// MixedRun is a session whose run in force is Mixed, as doctor lists it: why, and whether
+// it was active within the recent window Mixed was asked for.
+type MixedRun struct {
+	Session string
+	Why     Why
+	Recent  bool
+}
+
+// Mixed lists, sorted by session, for doctor, the sessions whose run in force at now is
+// Mixed, each with why and whether it was active within recent. A sidecar counts with its
+// ledger, or alone (MarkAside), and an unreadable ledger or sidecar counts as recent and
+// Mixed, as MixedAt has it, with no reason.
+func Mixed(stateDir string, now time.Time, recent time.Duration) []MixedRun {
 	entries, err := os.ReadDir(filepath.Join(stateDir, Dir))
 	if err != nil {
-		return nil, 0
+		return nil
 	}
 	written := map[string]time.Time{}
 	for _, e := range entries {
@@ -31,23 +39,22 @@ func Mixed(stateDir string, now time.Time, recent time.Duration) (active []strin
 		}
 		written[id] = latest(written[id], at)
 	}
+	var out []MixedRun
 	for id, at := range written {
 		l, found, _, err := resolve(stateDir, id)
 		switch {
 		case err != nil:
-			active = append(active, id)
+			out = append(out, MixedRun{Session: id, Recent: true})
 			continue
-		case !found || len(l.Runs) == 0 || inForce(l.Runs, now).MixedAt.IsZero():
+		case !found || len(l.Runs) == 0:
 			continue
 		}
-		if now.Sub(l.lastActive(at)) <= recent {
-			active = append(active, id)
-		} else {
-			older++
+		if r := inForce(l.Runs, now); !r.MixedAt.IsZero() {
+			out = append(out, MixedRun{Session: id, Why: r.why(), Recent: now.Sub(l.lastActive(at)) <= recent})
 		}
 	}
-	slices.Sort(active)
-	return active, older
+	slices.SortFunc(out, func(a, b MixedRun) int { return strings.Compare(a.Session, b.Session) })
+	return out
 }
 
 // sessionOf is the session whose ledger or sidecar is named name; false for any other file.

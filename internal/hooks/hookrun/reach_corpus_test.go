@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
+	"github.com/miradorlabs/terma-cli/internal/runs"
 )
 
 // corpus is a personal checkout, side, beside Acme's, acme-api, in one folder: side has a
@@ -123,7 +124,7 @@ func corpusCrossing() map[string]string {
 // reachesAcme reports whether paths name Acme's checkout or somewhere not known.
 func (c corpus) reachesAcme(paths []string) bool {
 	return slices.ContainsFunc(paths, func(p string) bool {
-		return p == UnknownReach || p == c.api || strings.HasPrefix(p, c.api+string(filepath.Separator))
+		return isUnknownReach(p) || p == c.api || strings.HasPrefix(p, c.api+string(filepath.Separator))
 	})
 }
 
@@ -154,6 +155,17 @@ func TestRoutineAgentCommandsDoNotTurnTheRunMixed(t *testing.T) {
 				env.Classify(context.Background(), r, sessionOf(sid), paths, nil)
 				if ledger, placement := m.mixed(sid); ledger != set.mixed || placement != set.mixed {
 					t.Errorf("through Classify: ledger Mixed %v, mixed placement %v; want %v", ledger, placement, set.mixed)
+				}
+				// Doctor tells a crossing from a command it could not read.
+				want := runs.Why{}
+				switch {
+				case name == "cd to where a file says":
+					want = runs.Why{Reason: runs.UnknownReach, Where: `cd "$(cat p)" && …`}
+				case set.mixed:
+					want = runs.Why{Reason: runs.Crossed, Where: "github.com/acme/acme-api"}
+				}
+				if why := m.why(sid); why != want {
+					t.Errorf("the ledger says the run is Mixed for %+v, want %+v", why, want)
 				}
 			})
 		}
