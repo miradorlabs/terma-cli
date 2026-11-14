@@ -156,6 +156,14 @@ jobs:
         if: always()
         run: |
           if [ -f test/e2e/report/latest.md ]; then cat test/e2e/report/latest.md >> "$GITHUB_STEP_SUMMARY"; fi
+      # Whether the run got to its end (TestMain then writes compat.json), in a file that names the
+      # job: the publish job reads it wherever the artifact lands (capture-args.sh).
+      - name: Say whether the capture finished
+        if: always()
+        working-directory: test/e2e
+        env:
+          HARNESS: ${{ matrix.harness }}
+        run: reference/capture-done.sh report macos "$HARNESS"
       # The profiles, terma's verdict and the field census: one capture, published whole.
       - name: Upload the capture
         if: always()
@@ -168,6 +176,7 @@ jobs:
             test/e2e/report/notes.json
             test/e2e/report/fields.json
             test/e2e/report/census.json
+            test/e2e/report/capture.json
           if-no-files-found: ignore
           retention-days: 90
 
@@ -208,6 +217,10 @@ jobs:
           make machines HOST_ARCH=amd64 CLAUDE_VERSION=latest CODEX_VERSION=latest \
             MACHINE_CLAUDE_VERSIONS="${CLAUDE_BUILDS:-installed}" MACHINE_CODEX_VERSIONS="${CODEX_BUILDS:-installed}" \
             MACHINE_PROFILES="$(IFS='|'; echo "${profiles[*]}")"
+      - name: Say whether the capture finished
+        if: always()
+        working-directory: test/e2e
+        run: reference/capture-done.sh report/linux linux
       - name: Upload the contracts' rows
         if: always()
         uses: actions/upload-artifact@v7
@@ -216,6 +229,7 @@ jobs:
           path: |
             test/e2e/report/linux/compat.json
             test/e2e/report/linux/notes.json
+            test/e2e/report/linux/capture.json
           if-no-files-found: ignore
           retention-days: 30
       - name: Upload the profiles
@@ -305,17 +319,20 @@ jobs:
         with:
           go-version-file: test/e2e/go.mod
           cache-dependency-path: test/e2e/go.sum
-      # macOS's profiles and Linux's files profiles, each in a folder of its own.
+      # Every job's artifacts, a folder for each download: download-artifact unpacks the artifacts
+      # a pattern matches into folders of their names, but a single one into the path itself, so
+      # two downloads into one path could put two files of one name in one place. What is in them
+      # is found by what it says (find, capture-args.sh), not by its folder.
       - uses: actions/download-artifact@v8
         continue-on-error: true
         with:
           pattern: profiles-*
-          path: test/e2e/runs
+          path: test/e2e/runs/profiles
       - uses: actions/download-artifact@v8
         continue-on-error: true
         with:
           pattern: "{capture,compat}-*"
-          path: test/e2e/runs
+          path: test/e2e/runs/captures
       - name: Render the reference
         working-directory: test/e2e
         env:
