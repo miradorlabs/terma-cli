@@ -156,6 +156,18 @@ jobs:
         if: always()
         run: |
           if [ -f test/e2e/report/latest.md ]; then cat test/e2e/report/latest.md >> "$GITHUB_STEP_SUMMARY"; fi
+      # Whether the run got to its end (TestMain then writes compat.json), in a file that names the
+      # job: the publish job reads it wherever the artifact lands (capture-args.sh).
+      - name: Say whether the capture finished
+        if: always()
+        working-directory: test/e2e
+        env:
+          HARNESS: ${{ matrix.harness }}
+        run: |
+          mkdir -p report
+          finished=false
+          if [ -f report/compat.json ]; then finished=true; fi
+          jq -n --arg harness "$HARNESS" --argjson finished "$finished" '{job: "macos", harness: $harness, finished: $finished}' > report/capture.json
       # The profiles, terma's verdict and the field census: one capture, published whole.
       - name: Upload the capture
         if: always()
@@ -168,6 +180,7 @@ jobs:
             test/e2e/report/notes.json
             test/e2e/report/fields.json
             test/e2e/report/census.json
+            test/e2e/report/capture.json
           if-no-files-found: ignore
           retention-days: 90
 
@@ -208,6 +221,14 @@ jobs:
           make machines HOST_ARCH=amd64 CLAUDE_VERSION=latest CODEX_VERSION=latest \
             MACHINE_CLAUDE_VERSIONS="${CLAUDE_BUILDS:-installed}" MACHINE_CODEX_VERSIONS="${CODEX_BUILDS:-installed}" \
             MACHINE_PROFILES="$(IFS='|'; echo "${profiles[*]}")"
+      - name: Say whether the capture finished
+        if: always()
+        working-directory: test/e2e
+        run: |
+          mkdir -p report/linux
+          finished=false
+          if [ -f report/linux/compat.json ]; then finished=true; fi
+          jq -n --argjson finished "$finished" '{job: "linux", finished: $finished}' > report/linux/capture.json
       - name: Upload the contracts' rows
         if: always()
         uses: actions/upload-artifact@v7
@@ -216,6 +237,7 @@ jobs:
           path: |
             test/e2e/report/linux/compat.json
             test/e2e/report/linux/notes.json
+            test/e2e/report/linux/capture.json
           if-no-files-found: ignore
           retention-days: 30
       - name: Upload the profiles

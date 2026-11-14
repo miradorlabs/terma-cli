@@ -133,52 +133,84 @@ func TestNewBuilds(t *testing.T) {
 }
 
 // reference/capture-args.sh: every build a run set out to capture is attempted, and one whose job
-// wrote no compat.json (it did not finish), or whose desktop job failed, is unfinished.
+// did not say it finished (its capture.json), or whose desktop job failed before it recorded a
+// profile of it, is unfinished. Files are found by what they say: download-artifact unpacks one
+// artifact into <runs> itself and several into folders of their names.
 func TestCaptureArgs(t *testing.T) {
-	if _, err := exec.LookPath("bash"); err != nil {
-		t.Skip("no bash")
+	for _, tool := range []string{"bash", "jq"} {
+		if _, err := exec.LookPath(tool); err != nil {
+			t.Skipf("no %s", tool)
+		}
 	}
+	write := func(t *testing.T, path, content string) {
+		t.Helper()
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(content+"\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	captureArgs := func(t *testing.T, runs string, env ...string) []string {
+		t.Helper()
+		cmd := exec.Command("bash", "reference/capture-args.sh", runs)
+		cmd.Env = append(cmd.Environ(), env...)
+		out, err := cmd.Output()
+		if err != nil {
+			t.Fatalf("capture-args.sh: %v\n%s", err, out)
+		}
+		return strings.Fields(string(out))
+	}
+
+	// Several artifacts, each in a folder of its name.
 	runs := t.TempDir()
-	for _, job := range []string{"capture-claude", "capture-gemini"} {
-		if err := os.MkdirAll(filepath.Join(runs, job), 0o755); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(filepath.Join(runs, job, "compat.json"), []byte("[]\n"), 0o644); err != nil {
-			t.Fatal(err)
-		}
-	}
+	write(t, filepath.Join(runs, "capture-claude", "capture.json"), `{"job":"macos","harness":"claude","finished":true}`)
+	write(t, filepath.Join(runs, "capture-gemini", "capture.json"), `{"job":"macos","harness":"gemini","finished":true}`)
+	write(t, filepath.Join(runs, "capture-codex", "capture.json"), `{"job":"macos","harness":"codex","finished":false}`)
+	write(t, filepath.Join(runs, "compat-linux", "capture.json"), `{"job":"linux","finished":false}`)
 	// The desktop job failed for one app: the other's profile is there.
-	if err := os.MkdirAll(filepath.Join(runs, "profiles-desktop"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(runs, "profiles-desktop", "profiles.json"), []byte(`[{"harness":"codex-desktop","version":"26.1106.1"},{"harness":"claude-desktop","version":"1.1.0"}]`+"\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	cmd := exec.Command("bash", "reference/capture-args.sh", runs)
-	cmd.Env = append(cmd.Environ(), "BUILDS=claude=2.1.1\ngemini=0.9.0\ncodex=0.200.0\nclaude-desktop=1.1.0,1.2.0\ncodex-desktop=26.1106.1",
+	write(t, filepath.Join(runs, "profiles-desktop", "profiles.json"), `[{"harness":"codex-desktop","version":"26.1106.1"},{"harness":"claude-desktop","version":"1.1.0"}]`)
+	got := captureArgs(t, runs, "BUILDS=claude=2.1.1\ngemini=0.9.0\ncodex=0.200.0\nclaude-desktop=1.1.0,1.2.0\ncodex-desktop=26.1106.1",
 		"CLAUDE_BUILDS=2.1.1", "CODEX_BUILDS=0.200.0", "DESKTOP_CAPTURE=failure")
-	out, err := cmd.Output()
-	if err != nil {
-		t.Fatalf("capture-args.sh: %v\n%s", err, out)
-	}
-	got := strings.Split(strings.TrimSpace(string(out)), "\n")
 	want := []string{
 		"-attempted", "claude=2.1.1",
 		"-attempted", "gemini=0.9.0",
-		"-attempted", "codex=0.200.0", "-unfinished", "codex=0.200.0", // macOS wrote nothing
+		"-attempted", "codex=0.200.0", "-unfinished", "codex=0.200.0", // its run did not end
 		"-attempted", "claude-desktop=1.1.0,1.2.0", "-unfinished", "claude-desktop=1.2.0", // the desktop job failed, recording 1.1.0 alone
 		"-attempted", "codex-desktop=26.1106.1", // recorded beside it
-		"-unfinished", "claude=2.1.1", "-unfinished", "codex=0.200.0", // Linux wrote nothing
+		"-unfinished", "claude=2.1.1", "-unfinished", "codex=0.200.0", // Linux's run did not end
 	}
 	if !slices.Equal(got, want) {
-		t.Errorf("capture-args.sh =\n%s\nwant\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
+		t.Errorf("several artifacts: capture-args.sh =\n%s\nwant\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
 	}
 
+	// One artifact, unpacked into <runs> itself: Copilot's capture, whole.
+	runs = t.TempDir()
+	write(t, filepath.Join(runs, "capture.json"), `{"job":"macos","harness":"copilot","finished":true}`)
+	write(t, filepath.Join(runs, "compat.json"), `[]`)
+	if got := captureArgs(t, runs, "BUILDS=copilot=1.0.112"); !slices.Equal(got, []string{"-attempted", "copilot=1.0.112"}) {
+		t.Errorf("one artifact: %q", got)
+	}
+	// One that says nothing of its end, or nothing at all, did not finish.
+	for _, runs := range []string{t.TempDir(), func() string {
+		r := t.TempDir()
+		write(t, filepath.Join(r, "capture.json"), `{"job":"macos","harness":"copilot","finished":false}`)
+		return r
+	}()} {
+		if got := captureArgs(t, runs, "BUILDS=copilot=1.0.112"); !slices.Equal(got, []string{"-attempted", "copilot=1.0.112", "-unfinished", "copilot=1.0.112"}) {
+			t.Errorf("a run that did not end: %q", got)
+		}
+	}
+	// A desktop job that failed, alone: its profiles unpacked into <runs> itself.
+	runs = t.TempDir()
+	write(t, filepath.Join(runs, "profiles.json"), `[{"harness":"codex-desktop","version":"26.1111.1"}]`)
+	if got := captureArgs(t, runs, "BUILDS=codex-desktop=26.1106.1,26.1111.1", "DESKTOP_CAPTURE=failure"); !slices.Equal(got,
+		[]string{"-attempted", "codex-desktop=26.1106.1,26.1111.1", "-unfinished", "codex-desktop=26.1106.1"}) {
+		t.Errorf("a desktop job alone: %q", got)
+	}
 	// A desktop job that succeeded finished every app it ran.
-	cmd = exec.Command("bash", "reference/capture-args.sh", t.TempDir())
-	cmd.Env = append(cmd.Environ(), "BUILDS=claude-desktop=1.2.0", "DESKTOP_CAPTURE=success")
-	if out, err := cmd.Output(); err != nil || strings.TrimSpace(string(out)) != "-attempted\nclaude-desktop=1.2.0" {
-		t.Errorf("a desktop job that succeeded: %q, %v", out, err)
+	if got := captureArgs(t, t.TempDir(), "BUILDS=claude-desktop=1.2.0", "DESKTOP_CAPTURE=success"); !slices.Equal(got, []string{"-attempted", "claude-desktop=1.2.0"}) {
+		t.Errorf("a desktop job that succeeded: %q", got)
 	}
 }
 
