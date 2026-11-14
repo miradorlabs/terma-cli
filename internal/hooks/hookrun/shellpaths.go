@@ -30,8 +30,9 @@ const UnknownReach = "\x00unknown"
 // existing paths it names (a folder its own place, and a symlink's target's as well), with
 // UnknownReach when it may reach one it cannot name. Its candidates are each word that is
 // absolute, starts with ~/ or holds a /, every cd and pushd target, and each other word
-// but a command's name, which the shell looks up on PATH (a here-document's body read as
-// data has only its slashed words). A word naming nothing yet may be a file the command
+// but the command's name, the program to run, which is never a candidate, even with a
+// slash or a part not resolved ($(go env GOPATH)/bin/lint): a here-document's body read as
+// data has only its slashed words. A word naming nothing yet may be a file the command
 // creates (> new.md, touch, mkdir -p), so a slashed one reaches its nearest existing folder,
 // except in a here-document's body, which creates nothing; a cd to nowhere reaches nothing.
 // An option's or assignment's value (--flag=X, -oX, NAME=X) counts as the word. A relative
@@ -205,6 +206,8 @@ func (sc *shellScan) scan(words []shellWord) {
 func (sc *shellScan) word(w shellWord, x expansion, target bool) {
 	slashed := pathLike(x.text)
 	switch {
+	case w.command && !w.body && !target && !isAssignment(w):
+		return // the program to run, whatever it expands to: no place the command reaches
 	case x.text == "":
 		return
 	case x.unresolved:
@@ -213,7 +216,7 @@ func (sc *shellScan) word(w shellWord, x expansion, target bool) {
 		}
 		return
 	case !slashed && !target && (w.command || w.body):
-		return // a command's name, or a here-document's data
+		return // an assignment's value before the command, or a here-document's data
 	}
 	c := candidate{x.text, x.glob, sc.dir}
 	if sc.examined[c] {

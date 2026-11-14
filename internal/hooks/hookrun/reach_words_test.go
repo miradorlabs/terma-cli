@@ -72,6 +72,27 @@ func TestShellPathsTakeBareWordsThatNameSomethingThere(t *testing.T) {
 	})
 }
 
+// The word in command position is the program to run, not a place the command reaches,
+// even with a slash or a part not resolved: the first word, each after ;, && or |, and each
+// after a word that keeps the command position (time, if, do). Its arguments are read as
+// usual, and an assignment before it counts as any word does.
+func TestShellPathsNeverCountTheCommandWord(t *testing.T) {
+	t.Parallel()
+	m := newWordsMachine(t)
+	m.check(t, m.side, map[string][]string{
+		"$(go env GOPATH)/bin/golangci-lint run":                       nil,
+		"$UNSET/bin/tool && `which go`/../x run":                       nil,
+		"../acme-api/bin/tool --version":                               nil,
+		"time $(go env GOPATH)/bin/x ../acme-api":                      {m.api},
+		"ls src | $(go env GOPATH)/bin/x":                              {filepath.Join(m.side, "src")},
+		"D=../acme-api $(go env GOPATH)/bin/x":                         {m.api},
+		"if $(go env GOPATH)/bin/x; then cat ../acme-api/NOTES.md; fi": {m.api},
+	})
+	if got := m.paths("$(go env GOPATH)/bin/x $(git rev-parse --show-prefix)/y", m.side); !slices.Equal(got, []string{UnknownReach}) {
+		t.Errorf("an argument not resolved: %q, want UnknownReach", got)
+	}
+}
+
 // Words are expanded before they are read: $HOME and ${HOME}, $PWD and $(pwd) and `pwd` where
 // the command is, $OLDPWD where it was, $TMPDIR, any other variable the hook's environment
 // sets, and an assignment earlier in the command, whose value is a path too.

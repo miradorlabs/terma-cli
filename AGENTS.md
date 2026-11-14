@@ -166,8 +166,8 @@ agent's turn) included; only a file event, a commit or a push, which say where s
 happened and nothing else, keep their destination (`runs.Locational`). A run
 touches a checkout when it runs there, or when a tool call edits, reads or searches a path
 in it, or names one in a shell command (the folder of each path the command names that is
-there, a word without a slash included unless it names the command, the nearest folder
-that is there above one that is not, as a new file a redirect creates, and every `cd`'s
+there, a word without a slash included but never the command's name (the program to
+run, even `$(go env GOPATH)/bin/lint`), the nearest folder that is there above one that is not, as a new file a redirect creates, and every `cd`'s
 and `pushd`'s target, after expanding variables, `$(pwd)` and globs: `hookrun.ShellPaths`);
 a path through a symlink touches its target's checkout too. A command reaching more
 folders than are examined, each counted once however many of its words name it, or a path
