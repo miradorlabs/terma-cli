@@ -31,7 +31,12 @@ type claudeHookInput struct {
 	ToolInput           struct {
 		FilePath     string `json:"file_path"`
 		NotebookPath string `json:"notebook_path"`
-		Edits        []struct {
+		// Path is the directory or file Grep, Glob and LS search; Grep and Glob search the
+		// cwd without one.
+		Path string `json:"path"`
+		// Command is Bash's.
+		Command string `json:"command"`
+		Edits   []struct {
 			FilePath string `json:"file_path"`
 		} `json:"edits"`
 		// SubagentType is the Agent tool's; the task's description and prompt beside it are not decoded.
@@ -60,6 +65,11 @@ func sessionStart(ctx context.Context, env hookrun.Env) error {
 	if err != nil {
 		env.Logf("%v", err)
 		return nil
+	}
+	// A start, a resume or a clear begins a new run, wherever it is; a compaction continues
+	// the run it compacts.
+	if in.Source != "compact" {
+		env.StartRun(in.SessionID)
 	}
 	r, ok := env.Open(ctx, in.SessionID, in.Cwd)
 	if !ok {
@@ -111,36 +121,87 @@ func stop(ctx context.Context, env hookrun.Env) error {
 	return nil
 }
 
+// preToolUse classifies what a read, a search or a shell command is about to reach, before
+// it runs (hookrun.Env.Classify): a crossing it makes is marked before its own result is
+// exported, so that result is dropped with the rest of the run. It records and spools
+// nothing, prints nothing, since Claude Code reads a PreToolUse hook's output as a decision
+// on the call, and never fails the call. On a machine not migrated nothing is classified,
+// so it returns before reading its payload: neither it nor dispatch, which claims from what
+// a handler read, locates a repository or hands parked records on.
+func preToolUse(ctx context.Context, env hookrun.Env) error {
+	if env.Routing == nil {
+		return nil
+	}
+	in, err := readClaudeInput(env.Stdin)
+	if err != nil {
+		env.Logf("%v", err)
+		return nil
+	}
+	if !session.ValidID(in.SessionID) || !claudeReadsOnly(in.ToolName) {
+		return nil
+	}
+	env.Cwd = cmp.Or(in.Cwd, env.Cwd)
+	sess := session.Session{ID: in.SessionID, Tool: claudeTool, Model: in.Model}
+	env.Classify(ctx, nil, sess, reachedPaths(in, env.Cwd), hookrun.AgentAttrs(map[string]any{}, in.AgentID, in.AgentType))
+	return nil
+}
+
 func postToolUse(ctx context.Context, env hookrun.Env) error {
 	in, err := readClaudeInput(env.Stdin)
 	if err != nil {
 		env.Logf("%v", err)
 		return nil
 	}
-	if !session.ValidID(in.SessionID) {
+	// A read reaching here is classified before it ran (preToolUse), never taken for an edit.
+	if !session.ValidID(in.SessionID) || claudeReadsOnly(in.ToolName) {
 		return nil
 	}
 	env.Cwd = cmp.Or(in.Cwd, env.Cwd)
+	sess := session.Session{ID: in.SessionID, Tool: claudeTool, Model: in.Model}
+	// Inside a subagent the manifest stays the session's; the event names the agent.
+	attrs := hookrun.AgentAttrs(map[string]any{}, in.AgentID, in.AgentType)
 	r, err := env.Repo(ctx)
 	if err != nil {
+		// A location Route drops records nothing, but what the call edited still counts
+		// toward its run crossing organizations.
+		env.Classify(ctx, nil, sess, reachedPaths(in, env.Cwd), attrs)
 		return nil
 	}
 	if isClaudeAgentTool(in.ToolName) {
 		claudeSubagentCall(env, r, in)
 		return nil
 	}
-	paths := append([]string{in.ToolInput.FilePath, in.ToolInput.NotebookPath}, editPaths(in)...)
-	// Inside a subagent the manifest stays the session's; the event names the agent.
-	attrs := hookrun.AgentAttrs(map[string]any{}, in.AgentID, in.AgentType)
 	hookrun.BoundedAttr(attrs, semconv.GenAIToolCallIDKey, in.ToolUseID)
-	env.Touch(r, session.Session{ID: in.SessionID, Tool: claudeTool, Model: in.Model}, in.ToolName, paths, attrs)
+	env.Touch(r, sess, in.ToolName, editedPaths(in), attrs)
 	return nil
 }
 
-func editPaths(in *claudeHookInput) []string {
-	var out []string
+// claudeReadsOnly reports whether the tool named reads, searches or runs a shell command:
+// its paths only count toward a crossing, classified before it runs, and build no
+// manifest. Any other tool's paths are edits.
+func claudeReadsOnly(tool string) bool {
+	switch tool {
+	case "Read", "Grep", "Glob", "NotebookRead", "LS", "Bash":
+		return true
+	}
+	return false
+}
+
+// editedPaths are the files an edit tool names.
+func editedPaths(in *claudeHookInput) []string {
+	out := []string{in.ToolInput.FilePath, in.ToolInput.NotebookPath}
 	for _, e := range in.ToolInput.Edits {
 		out = append(out, e.FilePath)
 	}
 	return out
+}
+
+// reachedPaths are the files and directories the call reached: a shell command's paths
+// (hookrun.ShellPaths), else every path its input names. A search without a path searched
+// the cwd, the hook's own location, which is classified anyway.
+func reachedPaths(in *claudeHookInput, cwd string) []string {
+	if in.ToolName == "Bash" {
+		return hookrun.ShellPaths(in.ToolInput.Command, cwd)
+	}
+	return append(editedPaths(in), in.ToolInput.Path)
 }

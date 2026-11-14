@@ -16,6 +16,8 @@ import (
 // would wait on forever.
 type Tx struct {
 	dir string
+	// x is the credential index whose lock the transaction holds.
+	x credentialIndex
 	// after runs once the lock is released, because sweeping stale keychain items takes
 	// the lock again.
 	after []func()
@@ -42,12 +44,12 @@ func Locked(ctx context.Context, dir string, fn func(tx *Tx) error) error {
 		return fmt.Errorf("create config dir: %w", err)
 	}
 	ctx, cancel := context.WithTimeout(ctx, lockWait)
-	unlock, err := lockCredentialFile(ctx, config.CredentialsPath(dir))
+	x, unlock, err := lockIndex(ctx, dir)
 	cancel()
 	if err != nil {
 		return err
 	}
-	tx := &Tx{dir: dir}
+	tx := &Tx{dir: dir, x: x}
 	err = fn(tx)
 	unlock()
 	for _, f := range tx.after {
@@ -82,22 +84,22 @@ func (tx *Tx) Update(profile string, cred *Credential) error {
 		if old.present() && old.AccessToken != "" {
 			inFile = true
 		}
-		kept := keep(tx.dir, profile, cred, old, inFile)
+		kept := keep(tx.dir, tx.x, profile, cred, old, inFile)
 		unindexed = !old.present() && kept.AccessToken == ""
 		p.put(kept)
 		if p.Active == "" {
 			p.Active = cred.OrganizationID
 		}
 	})
-	tx.after = append(tx.after, func() { afterSave(tx.dir, profile, cred.OrganizationID, unindexed, err) })
+	tx.after = append(tx.after, func() { afterSave(tx.dir, tx.x, profile, cred.OrganizationID, unindexed, err) })
 	return err
 }
 
 func (tx *Tx) mutate(mutate func(credentialFile)) error {
-	file, err := loadCredentialFile(tx.dir)
+	file, err := loadCredentials(tx.dir, tx.x)
 	if err != nil {
 		return err
 	}
 	mutate(file)
-	return saveCredentialFile(config.CredentialsPath(tx.dir), file)
+	return saveCredentialFile(tx.x.path(tx.dir), file)
 }

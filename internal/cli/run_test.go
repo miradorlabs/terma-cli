@@ -16,6 +16,9 @@ type termaRun struct {
 	env    map[string]string
 	// stdin is what the command reads, the test's own stdin when nil.
 	stdin io.Reader
+	// stderr also sees what the command writes there, as it writes it: a fakeBrowser
+	// approving the link a sign-in prints.
+	stderr io.Writer
 }
 
 // within is a run bounded by d, a call because a composite literal cannot open an if.
@@ -42,6 +45,9 @@ func (r termaRun) exec(t *testing.T, args ...string) (stdout, stderr string, err
 	var out, errOut bytes.Buffer
 	root.SetOut(&out)
 	root.SetErr(&errOut)
+	if r.stderr != nil {
+		root.SetErr(io.MultiWriter(&errOut, r.stderr))
+	}
 	if r.stdin != nil {
 		root.SetIn(r.stdin)
 	}

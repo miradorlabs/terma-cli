@@ -11,6 +11,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/account/keystore"
 	"github.com/miradorlabs/terma-cli/internal/account/serverkey"
 	"github.com/miradorlabs/terma-cli/internal/config"
+	"github.com/miradorlabs/terma-cli/internal/routing"
 	"github.com/miradorlabs/terma-cli/internal/setup"
 	"github.com/miradorlabs/terma-cli/internal/ui/output"
 )
@@ -129,23 +130,35 @@ func (app *App) serverKeySignIn(ctx context.Context, cfg *config.Config, org org
 // its team's key, in place of every agent's own key for the team, which the relay would
 // otherwise go on exporting with, and then records the key's organization and team on
 // cfg's profile, marked as signed in with it. A key it cannot store leaves the secret
-// storage as it was.
+// storage as it was. On a machine routing by teams the key is filed where the migration
+// filed the profile's (routedServerKey), and keys.json is never written: an older terma
+// would send with a key there.
 func (app *App) keepServerKey(cfg *config.Config, insecure bool) error {
+	enrollment := ""
+	if config.Migrated(app.dir) {
+		var err error
+		if enrollment, err = app.routedServerKey(cfg); err != nil {
+			return err
+		}
+	}
 	// A current key the keychain will not give up cannot be compared with the new one, so
 	// the keystore would keep its hosts for it (recordHosts): refuse until it can be read.
-	if _, err := keystore.Get(app.dir, cfg.Team); err != nil {
+	if err := app.readServerKey(cfg, enrollment); err != nil {
 		return fmt.Errorf("read this team's current key (%w): unlock the system keychain, then run `terma setup` again", err)
 	}
 	was := config.InsecureStorage(app.dir)
 	if err := config.UpdateFile(app.dir, func(file *config.File) { file.InsecureStorage = insecure }); err != nil {
 		return err
 	}
-	if err := keystore.Set(app.dir, cfg.Team, cfg.APIKey, keystore.HostsOf(cfg)); err != nil {
+	enrollment, err := app.storeServerKey(cfg, enrollment)
+	if err != nil {
 		_ = config.UpdateFile(app.dir, func(file *config.File) { file.InsecureStorage = was })
 		return fmt.Errorf("store the server key: %w", err)
 	}
-	if err := keystore.DeleteHarnessKeys(app.dir, cfg.Team); err != nil {
-		return fmt.Errorf("store the server key: %w", err)
+	if enrollment == "" {
+		if err := keystore.DeleteHarnessKeys(app.dir, cfg.Team); err != nil {
+			return fmt.Errorf("store the server key: %w", err)
+		}
 	}
 	// A key an earlier setup kept elsewhere stays there on Set, and so does a login kept
 	// behind the key: move every secret to where secrets are now kept, as a browser sign-in
@@ -153,8 +166,10 @@ func (app *App) keepServerKey(cfg *config.Config, insecure bool) error {
 	if err := auth.Relocate(app.dir); err != nil {
 		return fmt.Errorf("move the sign-in credentials to where secrets are kept: %w", err)
 	}
-	if err := keystore.Relocate(app.dir); err != nil {
-		return fmt.Errorf("move the team keys to where secrets are kept: %w", err)
+	if enrollment == "" {
+		if err := keystore.Relocate(app.dir); err != nil {
+			return fmt.Errorf("move the team keys to where secrets are kept: %w", err)
+		}
 	}
 	// A key, or a login kept behind it, that no keychain would take stays in its file: record
 	// that, as settleSecrets does, so later writes go straight to the file rather than wait on
@@ -167,14 +182,65 @@ func (app *App) keepServerKey(cfg *config.Config, insecure bool) error {
 	return config.UpdateProfile(app.dir, cfg.ProfileName, func(p *config.Profile) { applyServerKey(p, cfg) })
 }
 
+// routedServerKey is the enrollment a server key of cfg's team is filed under on a machine
+// routing by teams: the one the migration gave the profile's team, under which it filed
+// the profile's key. A server key sends only for that team there, so a key of another
+// team, or for a profile with no routing state, is refused.
+func (app *App) routedServerKey(cfg *config.Config) (string, error) {
+	st, ok, err := routing.LoadReady(app.stateDir, cfg.ProfileName)
+	if err != nil {
+		return "", err
+	}
+	for _, t := range st.Teams {
+		if ok && t.TeamID == cfg.Team && t.OrganizationID == cfg.OrganizationID {
+			return t.EnrollmentID, nil
+		}
+	}
+	return "", fmt.Errorf("this machine routes by teams, and profile %s does not send to team %s: a server key can only replace the key of the team its profile sends to", cfg.ProfileName, cfg.Team)
+}
+
+// readServerKey reads the team's current key, from keys.v2.json under enrollment, or
+// keys.json without one, to tell whether the keychain will give it up.
+func (app *App) readServerKey(cfg *config.Config, enrollment string) error {
+	if enrollment != "" {
+		_, _, err := keystore.GetTeam(app.dir, enrollment)
+		return err
+	}
+	_, err := keystore.Get(app.dir, cfg.Team)
+	return err
+}
+
+// storeServerKey files cfg's server key as its team's, and returns the enrollment it filed
+// it under: in keys.v2.json under enrollment, the migration's place for it; without one,
+// in keys.json (keystore.SetLegacy), unless the machine was migrated since, when it goes
+// under the team's enrollment after all.
+func (app *App) storeServerKey(cfg *config.Config, enrollment string) (string, error) {
+	if enrollment == "" {
+		err := keystore.SetLegacy(app.dir, cfg.Team, cfg.APIKey, keystore.HostsOf(cfg))
+		if !errors.Is(err, keystore.ErrMigrated) {
+			return "", err
+		}
+		if enrollment, err = app.routedServerKey(cfg); err != nil {
+			return "", err
+		}
+	}
+	return enrollment, keystore.SetTeam(app.dir, enrollment, cfg.Team, cfg.APIKey, keystore.HostsOf(cfg))
+}
+
 // applyServerKey records a server key's organization and team, and the environment it
 // belongs to, as applyLogin does for a login, and marks the profile as signed in with it.
+// On a machine routing by teams the team stays the routing state's alone: the migration
+// cleared config.json's, under this lock, and one written back is one an older terma
+// collects for.
 func applyServerKey(p *config.Profile, cfg *config.Config) {
 	p.SelectOrganization(cfg.OrganizationID, "")
 	p.PinEnvironment(cfg.Environment)
+	p.ServerKeySignIn, p.ServerKeyAuthURL = true, cfg.AuthURL
+	if config.Migrated(cfg.Dir) {
+		return
+	}
 	if p.Team != cfg.Team {
 		p.TeamName = ""
 	}
 	p.Team = cfg.Team
-	p.ServerKeySignIn, p.ServerKeyAuthURL = true, cfg.AuthURL
 }

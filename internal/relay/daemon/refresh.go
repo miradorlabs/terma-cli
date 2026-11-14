@@ -15,6 +15,9 @@ type PolicyRefresher struct {
 	Teams    func() []string
 	// Fetched is when team's validated policy was fetched, zero when there is none.
 	Fetched func(team string) time.Time
+	// Every, set, is how long team waits after Fetched, and after each refresh, in place
+	// of Interval: a Refused team is rechecked once a day.
+	Every   func(team string) time.Duration
 	Refresh func(ctx context.Context, team string) error
 	// Now and After are the clock; time.Now and time.After when nil.
 	Now   func() time.Time
@@ -40,9 +43,10 @@ func (p *PolicyRefresher) Run(ctx context.Context) {
 		for _, team := range p.due() {
 			fetches.Go(func() {
 				_ = p.Refresh(ctx, team)
+				next := p.Now().Add(p.every(team))
 				p.mu.Lock()
 				p.inFlight[team] = false
-				p.next[team] = p.Now().Add(p.Interval)
+				p.next[team] = next
 				p.mu.Unlock()
 			})
 		}
@@ -67,7 +71,7 @@ func (p *PolicyRefresher) due() []string {
 		if !known {
 			next = now
 			if at := p.Fetched(team); !at.IsZero() {
-				next = at.Add(p.Interval)
+				next = at.Add(p.every(team))
 			}
 		}
 		if now.Before(next) {
@@ -78,4 +82,12 @@ func (p *PolicyRefresher) due() []string {
 		out = append(out, team)
 	}
 	return out
+}
+
+// every is how long team waits between refreshes.
+func (p *PolicyRefresher) every(team string) time.Duration {
+	if p.Every != nil {
+		return p.Every(team)
+	}
+	return p.Interval
 }

@@ -854,6 +854,10 @@ attributes:
           value: serve-failed
           brief: Its server failed.
           stability: development
+        - id: migration_unfinished
+          value: migration-unfinished
+          brief: Its move of the machine to routing by teams stopped part way; the next start finishes it.
+          stability: development
     stability: development
     brief: Why the relay stopped, on the heartbeat that says it is stopping.
   - key: terma.relay.heartbeat.counter

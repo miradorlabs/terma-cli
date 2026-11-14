@@ -12,6 +12,18 @@
         ]
       }
     ],
+    "PreToolUse": [
+      {
+        "matcher": "Read|Grep|Glob|NotebookRead|LS|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ -x '/usr/local/bin/terma' ] && '/usr/local/bin/terma' hook --user pre-tool-use || true",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
     "SessionEnd": [
       {
         "hooks": [

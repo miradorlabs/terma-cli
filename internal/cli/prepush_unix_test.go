@@ -9,7 +9,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/miradorlabs/terma-cli/internal/flock"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
+	"github.com/miradorlabs/terma-cli/internal/relay/claim"
+	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
 	"github.com/miradorlabs/terma-cli/internal/repohooks"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
 	"github.com/miradorlabs/terma-cli/internal/spool"
@@ -39,6 +42,13 @@ func TestARealPushIsReportedByTheInstalledHook(t *testing.T) {
 	gitOut(t, root, "push", "-q", "backup", "main")
 	admitHere(t, root, "team")
 	hookruntest.RelayOn(t, stateDir)
+	// No relay runs: one a hook starts would move this machine to routing by teams, and this
+	// is the git hooks of a machine that has not moved.
+	unlock, err := flock.TryLock(filepath.Join(claim.Dir(stateDir), daemon.LockFile))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer unlock()
 	if _, err := repohooks.Install(stateDir, bin, filepath.Join(root, ".git")); err != nil {
 		t.Fatal(err)
 	}

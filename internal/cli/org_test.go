@@ -49,13 +49,29 @@ type fakeAuth struct {
 	// account service does (403); policyBodies are each team's, over policyBody.
 	scopedPolicies bool
 	policyBodies   map[string]string
-	mu             sync.Mutex
-	verifiers      []string
-	revoked        []string
+	// goneTeams answer their policy read as a team archived since the listing does (403,
+	// TEAM_NOT_FOUND); forbiddenTeams with a 403 that names no reason; mintDown fails
+	// every key creation.
+	goneTeams      map[string]bool
+	forbiddenTeams map[string]bool
+	mintDown       bool
+	// projects are each organization's teams, over projectsIn; slow, when set, runs
+	// before a team listing or a policy read is answered.
+	projects map[string][]project
+	slow     func(r *http.Request)
+	// mintedNames are the names keys were created with.
+	mintedNames []string
+	mu          sync.Mutex
+	verifiers   []string
+	revoked     []string
 }
 
-// fakeGrant is who a delegated code signs in.
-type fakeGrant struct{ org, user string }
+// fakeGrant is who a delegated code signs in; browser marks a code the approval page
+// posted to the CLI's listener, which is redeemed only with that listener's port.
+type fakeGrant struct {
+	org, user string
+	browser   bool
+}
 
 // fakeToken is the access token the fake auth host takes for user in org: `ter_cli_<org>`
 // for its default user, u-1, else `ter_cli_<org>~<user>`.
@@ -88,7 +104,7 @@ func newFakeAuth(t *testing.T) *fakeAuth {
 			return
 		}
 		org, user := "", "u-1"
-		for _, o := range fakeOrgs {
+		for _, o := range append(slices.Clone(fakeOrgs), f.orgs...) {
 			if rest, ok := strings.CutPrefix(token, "ter_cli_"+o.ID); ok && (rest == "" || strings.HasPrefix(rest, "~")) {
 				org = o.ID
 				if rest != "" {
@@ -119,9 +135,19 @@ func newFakeAuth(t *testing.T) *fakeAuth {
 			}
 			_ = json.NewEncoder(w).Encode(listOrganizationsResponse{Organizations: orgs})
 		case "/v1/projects":
-			_ = json.NewEncoder(w).Encode(listProjectsResponse{Projects: projectsIn(org)})
+			if f.slow != nil {
+				f.slow(r)
+			}
+			projects, ok := f.projects[org]
+			if !ok {
+				projects = projectsIn(org)
+			}
+			_ = json.NewEncoder(w).Encode(listProjectsResponse{Projects: projects})
 		case "/v1/policy":
 			f.policies.Add(1)
+			if f.slow != nil {
+				f.slow(r)
+			}
 			if r.URL.Query().Get("project_id") == "" {
 				http.Error(w, "missing project_id", http.StatusBadRequest)
 				return
@@ -129,6 +155,16 @@ func newFakeAuth(t *testing.T) *fakeAuth {
 			if f.scopedPolicies && !slices.ContainsFunc(projectsIn(org), func(p project) bool { return p.ID == r.URL.Query().Get("project_id") }) {
 				w.WriteHeader(http.StatusForbidden)
 				fmt.Fprint(w, `{"code":"PERMISSION_DENIED","message":"no such team in this organization"}`)
+				return
+			}
+			if f.forbiddenTeams[r.URL.Query().Get("project_id")] {
+				w.WriteHeader(http.StatusForbidden)
+				fmt.Fprint(w, `{"error":{"code":"PERMISSION_DENIED","message":"forbidden"}}`)
+				return
+			}
+			if f.goneTeams[r.URL.Query().Get("project_id")] {
+				w.WriteHeader(http.StatusForbidden)
+				fmt.Fprint(w, `{"error":{"code":"PERMISSION_DENIED","message":"no active team with this id","reason":"TEAM_NOT_FOUND"}}`)
 				return
 			}
 			if body, ok := f.policyBodies[r.URL.Query().Get("project_id")]; ok {
@@ -148,6 +184,13 @@ func newFakeAuth(t *testing.T) *fakeAuth {
 			f.keysMint.Add(1)
 			var body createServerKeyRequestShape
 			_ = json.NewDecoder(r.Body).Decode(&body)
+			if f.mintDown {
+				http.Error(w, "unavailable", http.StatusServiceUnavailable)
+				return
+			}
+			f.mu.Lock()
+			f.mintedNames = append(f.mintedNames, body.Name)
+			f.mu.Unlock()
 			_ = json.NewEncoder(w).Encode(map[string]any{
 				"key":        "ter_srv_" + strings.ReplaceAll(body.ProjectID, "-", "")[:24],
 				"server_key": map[string]any{"id": "k-1", "project_id": body.ProjectID, "name": body.Name, "key_prefix": "ter_srv_"},
@@ -182,14 +225,14 @@ func (f *fakeAuth) serveToken(w http.ResponseWriter, r *http.Request) {
 	delete(f.grants, body.Code)
 	f.verifiers = append(f.verifiers, body.CodeVerifier)
 	f.mu.Unlock()
-	if !ok || body.RedirectPort == nil || *body.RedirectPort != 0 || body.CodeVerifier == "" {
+	if !ok || body.RedirectPort == nil || (*body.RedirectPort != 0) != grant.browser || body.CodeVerifier == "" {
 		w.WriteHeader(http.StatusUnauthorized)
 		fmt.Fprint(w, `{"error":{"code":"UNAUTHENTICATED","message":"invalid or expired credentials"}}`)
 		return
 	}
 	n := f.exchanges.Add(1)
 	name := ""
-	for _, o := range fakeOrgs {
+	for _, o := range append(slices.Clone(fakeOrgs), f.orgs...) {
 		if o.ID == grant.org {
 			name = o.Name
 		}
@@ -210,6 +253,16 @@ func (f *fakeAuth) grant(code, org, user string) {
 		f.grants = map[string]fakeGrant{}
 	}
 	f.grants[code] = fakeGrant{org: org, user: user}
+}
+
+// browserCode makes code one the approval page posts for org, signing in the default user.
+func (f *fakeAuth) browserCode(code, org string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.grants == nil {
+		f.grants = map[string]fakeGrant{}
+	}
+	f.grants[code] = fakeGrant{org: org, user: "u-1", browser: true}
 }
 
 // verifiersSent are the code verifiers the token endpoint was sent.

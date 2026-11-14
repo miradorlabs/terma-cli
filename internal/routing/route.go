@@ -66,6 +66,9 @@ const (
 	// ReasonBoundNotCollected: bound to an organization none of whose selected teams
 	// collects it.
 	ReasonBoundNotCollected Reason = "bound_not_collected"
+	// ReasonNotReady: the routing state is still Preparing (State.Ready), so nothing is
+	// sent until the migration commits it.
+	ReasonNotReady Reason = "not_ready"
 )
 
 // Decision is where Route sends a record, and why.
@@ -85,7 +88,9 @@ type Decision struct {
 }
 
 // Router routes against one routing state, each team's entries read once: a caller keeps
-// one per state it loads, and compiles a new one when it loads a new generation.
+// one per state it loads, and compiles a new one when it loads a new generation. A Router
+// over a state that is not Ready sends nothing: Route drops every record and Recheck keeps
+// every queued one waiting for the commit.
 type Router struct {
 	s     State
 	teams []compiled
@@ -142,6 +147,9 @@ func (r *Router) match(i int, repo string) (Entry, bool) {
 // binding; a team that cannot send holds what its last list matches instead of passing
 // it on; personal takes only what no organization is bound to.
 func (r *Router) Route(loc Location, now time.Time) Decision {
+	if !r.s.Ready() {
+		return Decision{Outcome: Drop, Reason: ReasonNotReady}
+	}
 	switch loc.Kind {
 	case Mixed:
 		return Decision{Outcome: Drop, Reason: ReasonMixed}
@@ -220,7 +228,7 @@ func (r *Router) personal(repo string, auth Authority, now time.Time) Decision {
 
 // UnknownToPersonal reports whether an unknown record arriving now may go to personal,
 // which the relay records on arrival (Location.Narrow).
-func UnknownToPersonal(s State, now time.Time) bool { return s.unknownToPersonal(now) }
+func UnknownToPersonal(s State, now time.Time) bool { return s.Ready() && s.unknownToPersonal(now) }
 
 // unknownToPersonal: personal is the only team, is Active and collects everything, and
 // nothing is bound to an organization the record could belong to.
@@ -248,5 +256,5 @@ func (r *Router) OrganizationOf(loc Location, now time.Time) (org string, pendin
 	case d.Outcome == Drop || d.EnrollmentID == "":
 		return "", false, false
 	}
-	return r.s.team(d.EnrollmentID).OrganizationID, false, true
+	return r.s.Team(d.EnrollmentID).OrganizationID, false, true
 }

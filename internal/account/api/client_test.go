@@ -433,10 +433,11 @@ func TestClient_StampsTheIssuingHostOnLogin(t *testing.T) {
 
 	client := NewAnonymous(srv.URL, "test")
 
-	cred, err := client.ExchangeCode(context.Background(), "mir_cod_x", "verifier", 54321)
+	res, err := client.ExchangeCode(context.Background(), "mir_cod_x", "verifier", 54321)
 	if err != nil {
 		t.Fatalf("ExchangeCode: %v", err)
 	}
+	cred := res.Credential
 	if cred.AuthURL != srv.URL {
 		t.Errorf("AuthURL = %q, want the host that minted it (%q)", cred.AuthURL, srv.URL)
 	}

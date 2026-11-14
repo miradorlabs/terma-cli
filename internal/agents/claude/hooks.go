@@ -18,6 +18,11 @@ var claudeHooks = []struct {
 	// Edits build the manifest; the Agent tool's response (Task in older builds) is the only place a
 	// subagent's model is named.
 	{"PostToolUse", "Edit|Write|MultiEdit|NotebookEdit|Agent|Task", "post-tool-use"},
+	// Reads, searches and shell commands only tell whether the run reached another
+	// organization's checkout (hookrun.Env.Classify), before the call runs, so its own result
+	// is exported after the crossing it makes; LS and NotebookRead are older builds' names.
+	// It must print nothing: Claude Code reads its output as a decision on the call.
+	{"PreToolUse", "Read|Grep|Glob|NotebookRead|LS|Bash", "pre-tool-use"},
 	{"Stop", "", "stop"},
 	{"StopFailure", "", "stop-failure"},
 	// The one hook before a turn exports anything, so the relay is up and the session claimed first.
@@ -48,6 +53,25 @@ func planClaude(root, path string, command func(event string) string, install bo
 		own = append(own, entry)
 	}
 	return hookmgr.MergeEventHooks(root, hookmgr.HooksFile{Path: path}, own, install)
+}
+
+// refreshUserHooks rewrites terma's machine-wide entries in the settings.json at path to this
+// build's, running the terma they already run: an upgrade that changes one (a matcher, say)
+// reaches the machine without a new setup. It never installs, so a file with none of terma's
+// entries is left as it is, and so is one whose entries run more than one terma, which only
+// setup can tell apart. It reports whether it rewrote the file.
+func refreshUserHooks(path string) (bool, error) {
+	termas, err := hookmgr.HookedTerma(path)
+	if err != nil || len(termas) != 1 {
+		return false, err
+	}
+	dir := filepath.Dir(path)
+	plan, err := planClaude(dir, filepath.Base(path), hookmgr.UserHookCommand(termas[0]), true)
+	if err != nil || plan.Empty() {
+		return false, err
+	}
+	// Often a dotfiles link: written through, as setup writes it.
+	return true, hookmgr.ApplyThroughLinks(dir, plan)
 }
 
 func managedSettings(command func(event string) string) ([]byte, error) {

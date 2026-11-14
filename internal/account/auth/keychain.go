@@ -11,6 +11,8 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/flock"
 )
 
+// itemName names v1's keychain item for profile's tokens for organizationID; see
+// credentialIndex.item for the index in use.
 func itemName(profile, organizationID string) string {
 	return "credential/" + profile + "/" + organizationID
 }
@@ -24,13 +26,13 @@ type tokenPair struct {
 // unreadable. Readers treat it as signed out. A writer must not: see Tx.LoadFor.
 var errTokensGone = fmt.Errorf("%w: the system keychain has no tokens for this sign-in", ErrNotLoggedIn)
 
-// hydrate reads from the keychain the tokens of a credential the file holds without them.
-// A keychain that cannot be reached is an error, never ErrNotLoggedIn.
-func hydrate(dir, profile string, c *Credential) error {
+// hydrate reads from x's keychain item the tokens of a credential x's file holds without
+// them. A keychain that cannot be reached is an error, never ErrNotLoggedIn.
+func hydrate(dir string, x credentialIndex, profile string, c *Credential) error {
 	if c.AccessToken != "" {
 		return nil
 	}
-	v, err := secret.Get(dir, itemName(profile, c.OrganizationID))
+	v, err := secret.Get(dir, x.item(profile, c.OrganizationID))
 	if errors.Is(err, secret.ErrNotFound) {
 		return errTokensGone
 	}
@@ -45,17 +47,17 @@ func hydrate(dir, profile string, c *Credential) error {
 	return nil
 }
 
-// keep stores cred's tokens in the keychain and returns the copy credentials.json holds.
+// keep stores cred's tokens in x's keychain item and returns the copy x's file holds.
 // With inFile, or when the keychain fails, the tokens stay in that copy instead. If the
 // keychain item may still hold older tokens, the copy marks it stale. That happens when
 // old kept its tokens there, or when a write timed out and may still land. sweepStale
 // removes a stale item once the file is on disk, never before.
-func keep(dir, profile string, cred, old *Credential, inFile bool) *Credential {
+func keep(dir string, x credentialIndex, profile string, cred, old *Credential, inFile bool) *Credential {
 	c := *cred
 	c.StaleKeychainItem = old.present() && (old.AccessToken == "" || old.StaleKeychainItem)
 	if !inFile {
 		pair, _ := json.Marshal(tokenPair{AccessToken: cred.AccessToken, RefreshToken: cred.RefreshToken})
-		err := secret.Set(dir, itemName(profile, cred.OrganizationID), string(pair))
+		err := secret.Set(dir, x.item(profile, cred.OrganizationID), string(pair))
 		if err == nil {
 			c.AccessToken, c.RefreshToken, c.StaleKeychainItem = "", "", false
 			return &c
@@ -68,14 +70,14 @@ func keep(dir, profile string, cred, old *Credential, inFile bool) *Credential {
 // sweepStale removes the keychain items marked stale, now that credentials.json holds
 // their tokens on disk, and clears the mark of each one it removes.
 func sweepStale(dir string) {
-	file, err := loadCredentialFile(dir)
+	file, err := loadCredentials(dir, indexOf(dir))
 	if err != nil || !file.anyStale() {
 		return
 	}
-	_ = mutateCredentialFile(dir, func(file credentialFile) {
+	_ = mutateCredentialFile(dir, func(x credentialIndex, file credentialFile) {
 		for profile, p := range file {
 			for _, c := range p.organizations() {
-				if c.StaleKeychainItem && c.AccessToken != "" && secret.Delete(dir, itemName(profile, c.OrganizationID)) == nil {
+				if c.StaleKeychainItem && c.AccessToken != "" && secret.Delete(dir, x.item(profile, c.OrganizationID)) == nil {
 					c.StaleKeychainItem = false
 				}
 			}
@@ -101,15 +103,15 @@ func (p *profileCredentials) organizations() map[string]*Credential {
 	return p.Organizations
 }
 
-// forget removes from the keychain the tokens of the credentials given, which the file
-// no longer indexes.
-func forget(dir, profile string, creds []*Credential) error {
+// forget removes from x's keychain items the tokens of the credentials given, which x's
+// file no longer indexes.
+func forget(dir string, x credentialIndex, profile string, creds []*Credential) error {
 	var errs []error
 	for _, c := range creds {
 		if c.AccessToken != "" && !c.StaleKeychainItem {
 			continue
 		}
-		if err := secret.Delete(dir, itemName(profile, c.OrganizationID)); err != nil {
+		if err := secret.Delete(dir, x.item(profile, c.OrganizationID)); err != nil {
 			errs = append(errs, err)
 		}
 	}
@@ -119,15 +121,15 @@ func forget(dir, profile string, creds []*Credential) error {
 	return nil
 }
 
-// afterSave finishes a write of organizationID's credential: once the file is on disk it
-// sweeps stale items; when the save failed, it takes back tokens the keychain gained for
-// a credential the file never indexed, which nothing could otherwise find.
-func afterSave(dir, profile, organizationID string, unindexed bool, err error) {
+// afterSave finishes a write of organizationID's credential to x: once the file is on
+// disk it sweeps stale items; when the save failed, it takes back tokens the keychain
+// gained for a credential the file never indexed, which nothing could otherwise find.
+func afterSave(dir string, x credentialIndex, profile, organizationID string, unindexed bool, err error) {
 	switch {
 	case err == nil:
 		sweepStale(dir)
 	case unindexed:
-		_ = secret.Delete(dir, itemName(profile, organizationID))
+		_ = secret.Delete(dir, x.item(profile, organizationID))
 	}
 }
 
@@ -137,7 +139,7 @@ func afterSave(dir, profile, organizationID string, unindexed bool, err error) {
 // own lock. A keychain write may wait a minute on a prompt, so one lock held through all
 // of them could keep other writers waiting past lockWait.
 func Relocate(dir string) error {
-	file, err := loadCredentialFile(dir)
+	file, err := loadCredentials(dir, indexOf(dir))
 	if err != nil || len(file) == 0 {
 		return err
 	}
@@ -161,26 +163,27 @@ const relocateYield = 10 * flock.PollMax
 
 // relocate is Relocate for one credential, as the file holds it once locked.
 func relocate(dir, profile, org string, inFile bool) error {
-	moved := false
-	err := mutateCredentialFile(dir, func(file credentialFile) {
+	moved, in := false, v1
+	err := mutateCredentialFile(dir, func(x credentialIndex, file credentialFile) {
+		in = x
 		p := file[profile]
 		c := p.organizations()[org]
 		switch {
 		case !c.present():
 		case !inFile && c.AccessToken != "":
-			kept := keep(dir, profile, c, c, false)
+			kept := keep(dir, x, profile, c, c, false)
 			p.Organizations[org] = kept
 			moved = kept.AccessToken == ""
 		case inFile && c.AccessToken == "":
 			indexed := *c
-			if hydrate(dir, profile, c) == nil {
-				p.Organizations[org] = keep(dir, profile, c, &indexed, true)
+			if hydrate(dir, x, profile, c) == nil {
+				p.Organizations[org] = keep(dir, x, profile, c, &indexed, true)
 			}
 		}
 	})
 	if err != nil && moved {
 		// The file still holds these tokens: the copy the keychain took would be lost track of.
-		_ = secret.Delete(dir, itemName(profile, org))
+		_ = secret.Delete(dir, in.item(profile, org))
 	}
 	return err
 }

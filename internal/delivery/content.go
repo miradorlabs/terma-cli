@@ -44,7 +44,13 @@ func (r Router) Outgoing(org config.Policy, projectID string, e spool.Event) (sp
 	if !r.Allowed(org, projectID, e) {
 		return spool.Event{}, false
 	}
-	prompts, toolContent := routing.EffectivePolicy(r.StateDir, org, projectID).Content()
+	return withhold(routing.EffectivePolicy(r.StateDir, org, projectID), e)
+}
+
+// withhold is e without the content pol withholds; false when an unclassified kind would
+// carry some of it.
+func withhold(pol config.Policy, e spool.Event) (spool.Event, bool) {
+	prompts, toolContent := pol.Content()
 	if prompts && toolContent {
 		return e, true
 	}

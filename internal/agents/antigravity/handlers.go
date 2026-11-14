@@ -9,6 +9,7 @@ import (
 	"os"
 	"strconv"
 
+	"github.com/miradorlabs/terma-cli/internal/agents/internal/reach"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
 	"github.com/miradorlabs/terma-cli/internal/session"
@@ -96,6 +97,13 @@ func preInvocation(ctx context.Context, env hookrun.Env) error {
 		return nil
 	}
 	env.Cwd = in.cwd(env.Cwd)
+	// A later turn, or a resumed conversation, was announced before: only a conversation's
+	// first step begins a run.
+	steps, _, stepsKnown := hookrun.JSONNumber(in.InitialNumSteps, true)
+	first := !stepsKnown || steps <= 1
+	if first {
+		env.StartRun(in.id())
+	}
 	r, err := env.Repo(ctx)
 	if err != nil {
 		env.Logf("not in a git repository: %v", err)
@@ -109,8 +117,7 @@ func preInvocation(ctx context.Context, env hookrun.Env) error {
 	}
 	env.SetActive(r, sess)
 	turn := beginAntigravityTurn(env, r, in)
-	// A later turn, or a resumed conversation, was announced before.
-	if steps, _, stepsKnown := hookrun.JSONNumber(in.InitialNumSteps, true); !stepsKnown || steps <= 1 {
+	if first {
 		env.PruneManifests(r, now)
 		env.EmitStart(r, sess, nil)
 	}
@@ -158,7 +165,11 @@ func antigravityEditedPaths(in *antigravityHookInput) []string {
 }
 
 // postToolUse records every tool step as a `terma.tool.call`, since agy has no other
-// export, and the file an edit changed; `toolCall.args` is opened only for that path.
+// export, and the file an edit changed. On a migrated machine a step that edits nothing,
+// a read, a search or a shell command, first classifies what it reached
+// (hookrun.Env.Classify): agy's hooks give terma no step before it runs, so a crossing is
+// marked once it has. `toolCall.args` is opened only for those paths, and nothing of it is
+// recorded.
 func postToolUse(ctx context.Context, env hookrun.Env) error {
 	defer antigravityAck(env)
 	in, err := readAntigravityInput(env.Stdin)
@@ -167,7 +178,15 @@ func postToolUse(ctx context.Context, env hookrun.Env) error {
 		return nil
 	}
 	env.Cwd = in.cwd(env.Cwd)
-	r, err := env.Repo(ctx)
+	var located *hookrun.Repo
+	if env.Routing != nil && in.ToolCall != nil && len(antigravityEditedPaths(in)) == 0 {
+		spec := reach.Antigravity
+		if in.ToolCall.Name == "str_replace_editor" {
+			spec.Commands = nil // its command is view, create or str_replace
+		}
+		located = env.Classify(ctx, nil, session.Session{ID: in.id(), Tool: antigravityTool, Model: in.ModelName}, spec.Of(in.ToolCall.Args, env.Cwd), nil)
+	}
+	r, err := env.RepoAt(ctx, located)
 	if err != nil {
 		return nil
 	}

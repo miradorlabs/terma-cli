@@ -14,12 +14,15 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/account/auth"
 	"github.com/miradorlabs/terma-cli/internal/account/keystore"
 	"github.com/miradorlabs/terma-cli/internal/account/secret"
 	"github.com/miradorlabs/terma-cli/internal/config"
+	"github.com/miradorlabs/terma-cli/internal/migrate"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
+	"github.com/miradorlabs/terma-cli/internal/routing"
 )
 
 // keyPolicy is the policy the auth host serves for the key's team.
@@ -493,5 +496,64 @@ func TestServerKeyProfileOnAnotherAuthHost(t *testing.T) {
 	}
 	if statusOut, _ := runTerma(t, "status"); !strings.Contains(statusOut, "server key set up against a different auth host") {
 		t.Errorf("status on another auth host:\n%s", statusOut)
+	}
+}
+
+// On a machine routing by teams, setup with a server key files it where the migration
+// filed the profile's: under its team's enrollment in keys.v2.json. keys.json, where an
+// older terma would send with it, is never written, and config.json gets no team back. A
+// key of a team the profile does not send to is refused, and changes no key.
+func TestServerKeySetupOnAMigratedMachineFilesTheKeyUnderItsEnrollment(t *testing.T) {
+	gateway, team := keySandbox(t)
+	setupWithKey(t)
+	m := testApp.relayMigration("")
+	m.FlushWait, m.Automatic = time.Second, true
+	if out, err := migrate.Run(t.Context(), *m); err != nil || out != migrate.Committed {
+		t.Fatalf("migrate = %s, %v", out, err)
+	}
+	st, ok, err := routing.LoadReady(testApp.stateDir, config.DefaultProfile)
+	if err != nil || !ok || len(st.Teams) != 1 || st.Teams[0].TeamID != team {
+		t.Fatalf("routing state = %+v, %v, %v", st, ok, err)
+	}
+	enrollment := st.Teams[0].EnrollmentID
+	if key, _, err := keystore.GetTeam(testApp.dir, enrollment); err != nil || key != testServerKey {
+		t.Fatalf("the migration filed %q, %v", key, err)
+	}
+	v1 := func() string {
+		b, err := os.ReadFile(keystore.FilePath(testApp.dir))
+		if err != nil && !errors.Is(err, fs.ErrNotExist) {
+			t.Fatal(err)
+		}
+		return string(b)
+	}
+	retired := v1()
+
+	t.Setenv("TERMA_API_KEY", rotatedKey)
+	setupWithKey(t)
+	if key, _, err := keystore.GetTeam(testApp.dir, enrollment); err != nil || key != rotatedKey {
+		t.Fatalf("the team's key = %q, %v; want the rotated one", key, err)
+	}
+	if now := v1(); now != retired {
+		t.Fatalf("setup wrote keys.json on a migrated machine:\n%s", now)
+	}
+	if key, err := keystore.Get(testApp.dir, team); err != nil || key != "" {
+		t.Fatalf("keys.json's key for the team = %q, %v", key, err)
+	}
+	file, err := config.LoadFile(testApp.dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p := file.Profiles[config.DefaultProfile]; p == nil || p.Team != "" || !p.ServerKeySignIn {
+		t.Fatalf("profile = %+v", p)
+	}
+
+	const otherKey = "ter_srv_00112233aabbccdd"
+	gateway.serverKeys[otherKey] = projectsIn(orgA().ID)[0].ID
+	t.Setenv("TERMA_API_KEY", otherKey)
+	if out, err := runTerma(t, "setup", "--yes", "--harness", "claude"); err == nil || !strings.Contains(out+err.Error(), "does not send to team") {
+		t.Fatalf("setup with another team's key: %v\n%s", err, out)
+	}
+	if key, _, err := keystore.GetTeam(testApp.dir, enrollment); err != nil || key != rotatedKey || v1() != retired {
+		t.Fatalf("a refused key changed the keys: %q, %v", key, err)
 	}
 }

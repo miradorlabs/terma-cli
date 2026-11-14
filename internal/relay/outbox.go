@@ -255,7 +255,9 @@ func (o outbox) routes() ([]route, error) {
 }
 
 type queued struct {
-	rt    route
+	rt route
+	// team is the enrollment queue of a part queued on a migrated machine; nil for a route's.
+	team  *teamRoute
 	e     entry
 	path  string
 	size  int64
@@ -276,14 +278,30 @@ func (r *Relay) sweepOutbox(now time.Time) map[route][]entry {
 			if err != nil {
 				continue
 			}
-			all = append(all, queued{rt, e, p, info.Size(), info.ModTime()})
+			all = append(all, queued{rt: rt, e: e, path: p, size: info.Size(), mtime: info.ModTime()})
+		}
+	}
+	teams, _ := o.teamRoutes()
+	for _, rt := range teams {
+		for _, e := range o.teamNames(rt) {
+			p := filepath.Join(o.teamDir(rt), e.name)
+			info, err := os.Stat(p)
+			if err != nil {
+				continue
+			}
+			all = append(all, queued{team: &rt, e: e, path: p, size: info.Size(), mtime: info.ModTime()})
 		}
 	}
 	slices.SortFunc(all, func(a, b queued) int { return strings.Compare(a.e.name, b.e.name) })
 	removed := map[route][]entry{}
+	teamRemoved := map[teamRoute][]entry{}
 	drop := func(q queued, why string) {
 		if os.Remove(q.path) == nil {
 			r.stats.dropped(q.e.signal, why, q.e.records)
+			if q.team != nil {
+				teamRemoved[*q.team] = append(teamRemoved[*q.team], q.e)
+				return
+			}
 			removed[q.rt] = append(removed[q.rt], q.e)
 		}
 	}
@@ -325,6 +343,15 @@ func (r *Relay) sweepOutbox(now time.Time) map[route][]entry {
 		deadTotal -= q.size
 	}
 	r.removeEmptyRoutes(routes)
+	for rt, gone := range teamRemoved {
+		r.mu.Lock()
+		s := r.teamSenders[rt]
+		r.mu.Unlock()
+		if s != nil {
+			s.forget(gone)
+		}
+	}
+	r.removeEmptyTeamRoutes(teams)
 	return removed
 }
 

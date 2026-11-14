@@ -33,6 +33,12 @@ internal/hooks/         `terma hook <event>`: dispatch, runtime (hookrun), hook-
 internal/relay/         the local relay daemon
 internal/spool/         the local queue hooks append to
 internal/delivery/      sends the spool to each project, from a detached flush
+internal/routing/       on a machine routing by teams, each profile's routing state (its
+                        teams, their policies and states, the bindings) and Route
+internal/runs/          the run ledger: each session's runs, and when one crossed organizations
+internal/migrate/       the relay's one-way move of the machine to routing by teams
+internal/account/       the platform's API (api), sign-ins (auth) and keys (keystore), their
+                        secrets in the system keychain (secret)
 internal/session/       session manifests and commit attribution
 internal/doctor/        `terma doctor` checks
 internal/setup/         `terma setup`; internal/globalmode/ writes the machine-wide hooks
@@ -84,8 +90,16 @@ setup changed: `config.json` (profiles and settings), `credentials.json`, `keys.
 credentials' secrets, sign-in tokens and server keys, live in the system keychain
 (`internal/account/secret`), as gh keeps its token: `credentials.json` and `keys.json`
 index them, and hold them only where there is no keychain or `--insecure-storage` asks.
-The state directory (`config.StateDir`) holds what terma writes as it runs: `relay/`,
-`spool/`, `policies/`, `agents/<agent>/` (each agent's hook state), `funding/`,
+On a machine routing by teams they are in `credentials.v2.json` and `keys.v2.json` instead,
+each team's key filed by its enrollment (keychain items
+`credential.v2/<profile>/<organization>` and `team-key/<enrollment>`), and
+`credentials.json` and `keys.json` are left empty; `credentials.v2.json` alone marks the
+machine migrated (`config.Migrated`), even once a routing state is lost. The state
+directory (`config.StateDir`) holds what terma writes as it runs: `relay/`, `spool/`,
+`policies/`, `routing/` (each profile's routing state), `runs/` (the run ledger),
+`team-names/` (the names `terma teams` last listed), `migration-blocked.json` (why the last
+relay start did not migrate), `migrating` (since when a relay has been migrating),
+`migration-opted-in` (when the developer opted in to routing by teams), `agents/<agent>/` (each agent's hook state), `funding/`,
 `workspaces/` (session stores for work begun outside git) and `update/`; a repository's
 session store is `.git/terma/`, which also keeps what a git hook in an agent's sandbox could
 not write to the state directory, until a hook outside the sandbox moves it there. Names
@@ -119,6 +133,74 @@ policy's default project, and the relay sends what no claim places there too, ex
 session an agent's hooks claim every one of (`shape.SessionKey.Claimed`): it waits for its
 claim, so a hidden side thread no hook claims stays here. What is held stays in memory,
 never on disk, and a stopping relay drops it.
+
+**Routing by teams.** All of the above is a machine routing by its profile's one team. A
+machine moves to routing by teams only once its developer opts in: `terma teams`, or `terma
+setup` on a machine never set up before, records it (`migrate.OptIn`). Until then a relay
+start leaves the machine as it is, and doctor says that `terma teams` turns it on;
+`migrateAutomatically` (`internal/cli`) moves every machine instead. The
+relay moves it to routing by teams once and for good (`internal/migrate`): only a relay
+does, beside itself once it listens, holding its own lock and the spool flush's, so nothing
+else sends meanwhile; the relay routes each record by the rules in force as it does, so it
+moves to the new ones at the commit. It checks that the agents' hooks run its own terma, and asks whether each team
+is a personal organization's with that profile's own sign-in; then it writes each profile's
+routing state in a Preparing phase, copies the keys and sign-ins into `keys.v2.json` and
+`credentials.v2.json`, empties `keys.json` and `credentials.json`, clears config.json's
+team, and commits. A start that cannot records why for doctor (`migrate.ReadBlock`), and
+the next tries again; until the commit, everything runs as before, and once it is made an
+older terma finds no team, key or sign-in, and collects nothing. On a migrated machine the
+profile's routing state (`routing/<profile>.json`) is the one store of the teams this
+machine sends to, each selection an enrollment with its last validated policy and state,
+and of the developer's bindings of owners and repositories to organizations: `terma teams`
+ticks and binds, and the relay refreshes each enrollment's policy with its own
+organization's sign-in. `routing.Router.Route` decides where every record goes, and a
+routing state the migration has not committed sends nothing (`routing.LoadReady`). Hooks
+route each location they record: a location-only placement for the session, naming the
+profile it was routed under, by whose routing state the relay routes the session's
+records, so a `terma config use` while the relay runs moves no session placed under the
+other; each spooled event with the destination Route gave it and never a project; and each session's runs in
+the run ledger (`runs/`, `internal/runs`), where a run that touches two organizations'
+checkouts turns Mixed and sends no telemetry until the session starts a new run. Mixed
+drops whatever carries content, a record that routes by a location of its own (an
+agent's turn) included; only a file event, a commit or a push, which say where something
+happened and nothing else, keep their destination (`runs.Locational`). A run
+touches a checkout when it runs there, or when a tool call edits, reads or searches a path
+in it, or names one in a shell command (the folder of each path the command names that is
+there, a word without a slash included but never the command's name (the program to
+run, even `$(go env GOPATH)/bin/lint`), the nearest folder that is there above one that is not, as a new file a redirect creates, and every `cd`'s
+and `pushd`'s target, after expanding variables, a `for` loop's variable (each of its
+words in turn), `$(pwd)`, `$(git rev-parse --show-toplevel)` and globs: `hookrun.ShellPaths`);
+a path through a symlink touches its target's checkout too. A command reaching more
+folders than are examined, each counted once however many of its words name it, or a path
+in it whose expansion cannot be resolved, touches an organization not known, and the run
+turns Mixed (`hookrun.UnknownReach`). An edit records and spools as it always has; a
+read, a search or a shell command only classifies (`hookrun.Env.Classify`): it writes no
+manifest and spools nothing, and on a machine not migrated it does nothing. Where the agent
+has a hook before the call, it classifies there, so that the call's own result is exported
+after the crossing it makes: Claude Code's PreToolUse and Codex's (shell calls). The others
+give terma no hook before a call that is not a permission gate, so a hook after it
+classifies, and a result exported before that hook runs may leave: Copilot's PostToolUse
+and Gemini's AfterTool (every tool), Cursor's postToolUse and postToolUseFailure (Read,
+Grep and Shell's input), and Antigravity's PostToolUse (every step); each reads a tool's
+input only for this (`agents/internal/reach`). A hook whose own location Route drops still classifies what
+the call touched, and that location, into the run ledger, and records and sends nothing
+else. `runs.Touch` returns the run's locations as it wrote them, so of two hooks of one run
+that each see half a crossing, the later sees it whole. The ledger alone says whether a run
+is Mixed, and why (`runs.Why`): it crossed into another organization's checkout, a shell
+command's reach is not known, it touched more locations than the ledger keeps, or the
+ledger was busy and its sidecar took the crossing; doctor names each recent Mixed run's
+reason and where (the checkout, or the command's first words), and a flush counts what it
+dropped by reason. A crossing whose ledger write fails (its lock held past the hook's wait) goes to
+the ledger's sidecar, `runs/<session>.mixed`, without the lock: a file per crossing that never
+expires, which every read takes for Mixed and the next hook that can lock the ledger folds
+in. A mixed placement neither backs is a crossing both of whose writes failed, and the run's
+next hook within the placement's lifetime records it again, from when the placement turned
+Mixed. The commit hooks are installed, and `prepare-commit-msg` stamps, only where Route sends the repository
+to a team whose policy turns `git_hooks` on. A record's destination never changes once
+routed: the relay queues each part for its enrollment, and the spool keeps each event's;
+both recheck it before sending (`routing.Router.Recheck`, then `runs.MixedAt`), and send it
+with that enrollment's own key from `keys.v2.json` alone, filtered by its team's content
+rules.
 
 ## Rules
 

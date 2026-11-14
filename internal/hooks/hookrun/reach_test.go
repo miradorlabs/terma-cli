@@ -1,0 +1,258 @@
+package hookrun
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"os"
+	"path/filepath"
+	"slices"
+	"strings"
+	"testing"
+
+	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
+	"github.com/miradorlabs/terma-cli/internal/relay/claim"
+)
+
+// A shell command's places are the folders of its absolute, ~/ and slashed words and every
+// cd's target, split at whitespace and the shell's operators outside quotes, resolved
+// against the cwd, where something is there: a folder is its own place, a file its
+// folder's. A word with nothing there may be a file the command creates, so it reaches the
+// nearest folder that is there: another checkout's for a new file there, the cwd's own for
+// a word that only looks like a path. A cd to nowhere goes nowhere.
+//
+// Some words are not paths whole: those inside a command substitution, $(...) or `...`,
+// quoted or not, and a subshell's, (...); an option's or an assignment's value (--flag=X,
+// -oX, NAME=X); and a relative path after a cd or a pushd, which resolves against where
+// that went as well as the cwd.
+func TestShellPathsAreTheWordsThatNameSomethingThere(t *testing.T) {
+	t.Parallel()
+	parent, _ := filepath.EvalSymlinks(t.TempDir())
+	cwd, api := filepath.Join(parent, "side"), filepath.Join(parent, "acme api")
+	for _, dir := range []string{filepath.Join(cwd, "src"), api} {
+		if err := os.MkdirAll(dir, 0o700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	notes := filepath.Join(api, "NOTES.md")
+	if err := os.WriteFile(notes, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	for command, want := range map[string][]string{
+		"echo x >> '" + notes + "'":          {api},
+		`cd "../acme api"&&ls`:               {api},
+		`cd ../acme\ api || ls src/`:         {api, filepath.Join(cwd, "src")},
+		"cat <'../acme api/NOTES.md'|wc -l":  {api},
+		"ls -la":                             nil,
+		"cd src; ls":                         {filepath.Join(cwd, "src")},
+		"cat '../acme api/MISSING.md'":       {api},
+		"curl https://example.com/a/b > out": {cwd},
+		"echo cd && true":                    nil,
+
+		"echo x > '../acme api/new.md'":         {api},
+		"mkdir -p '../acme api/a/b'":            {api},
+		"echo x > src/new.go":                   {filepath.Join(cwd, "src")},
+		"cd '../acme api/nowhere' && ls":        nil,
+		"cd .. && echo x > 'acme api/new.md'":   {parent, api, cwd},
+		"cd src && echo x > '../src/new.go'":    {filepath.Join(cwd, "src"), parent},
+		"echo x > '" + notes + "/not-a-folder'": nil,
+
+		"echo $(cat '../acme api/NOTES.md')":          {api},
+		"echo `cat ../acme\\ api/NOTES.md`":           {api},
+		`echo "$(cat '../acme api/NOTES.md')"`:        {api},
+		`echo "notes: $(cat "../acme api/NOTES.md")"`: {api},
+		`x="$(cd '../acme api' && pwd)"`:              {api},
+		"echo '$(cat ../acme\\ api/NOTES.md)'":        {cwd},
+		"(cd '../acme api')":                          {api},
+		"(cat '../acme api/NOTES.md')":                {api},
+		"grep --file='../acme api/NOTES.md' TODO":     {api},
+		"cc -I'../acme api' -o out.o x.c":             {api},
+		"cc -o'../acme api/NOTES.md' x.c":             {api},
+		"GIT_DIR='../acme api' git status":            {api},
+		"pushd src && ls":                             {filepath.Join(cwd, "src")},
+		"cd -P src":                                   {filepath.Join(cwd, "src")},
+		"cd .. && cat 'acme api/NOTES.md'":            {parent, api},
+		"(cd src) && cat '../acme api/NOTES.md'":      {filepath.Join(cwd, "src"), api},
+		"cat src/../../'acme api'/NOTES.md src":       {api, filepath.Join(cwd, "src")},
+	} {
+		if got := ShellPaths(command, cwd); !sameReach(got, want) {
+			t.Errorf("ShellPaths(%q) = %q, want %q", command, got, want)
+		}
+	}
+}
+
+// A command reaches its first maxShellPlaces places, each folder once however many of its
+// words name it, and one reaching more counts as reaching an unknown organization: Acme's
+// checkout among the first turns the run Mixed, and so does any command past the bound,
+// though none of its places is another checkout. Words naming files of one folder are one
+// place.
+func TestAShellCommandPastThePlaceBoundTurnsTheRunMixed(t *testing.T) {
+	t.Parallel()
+	st := acmeAndPersonalRepos(t)
+	side, api := hookruntest.RepoAt(t, "github.com/dawson/side"), hookruntest.RepoAt(t, "github.com/acme/api")
+	for i := range maxShellPlaces + 5 {
+		hookruntest.WriteFile(t, side, fmt.Sprintf("d%03d/a.go", i), "package d\n")
+		hookruntest.WriteFile(t, side, fmt.Sprintf("d%03d/b.go", i), "package d\n")
+	}
+	for _, tc := range []struct {
+		places int
+		acmeAt int // Acme's position among the places, from 0; -1 for none
+		mixed  bool
+	}{{maxShellPlaces, 0, true}, {maxShellPlaces, -1, false}, {maxShellPlaces + 1, -1, true}, {maxShellPlaces + 5, maxShellPlaces, true}} {
+		t.Run(fmt.Sprint(tc.places, tc.acmeAt), func(t *testing.T) {
+			t.Parallel()
+			m := newRoutedMachine(t, st)
+			sid := fmt.Sprintf("long-command-%d-%d", tc.places, tc.acmeAt)
+			r := startIn(t, m.hook(), sid, side)
+			words := []string{"ls"}
+			for i := range tc.places {
+				if i == tc.acmeAt {
+					// Quoted, as a shell needs a Windows path's backslashes.
+					words = append(words, "'"+api+"'")
+				} else {
+					// Two files of one folder, and a new one there: one place.
+					words = append(words, fmt.Sprintf("d%03d/a.go d%03d/b.go d%03d/new.go", i, i, i))
+				}
+			}
+			paths := ShellPaths(strings.Join(words, " "), side)
+			if past := slices.ContainsFunc(paths, isUnknownReach); past != (tc.places > maxShellPlaces) {
+				t.Fatalf("ShellPaths named UnknownReach %v for %d places", past, tc.places)
+			}
+			env := m.hook()
+			env.Cwd = side
+			env.Classify(context.Background(), r, sessionOf(sid), paths, nil)
+			if ledger, placement := m.mixed(sid); ledger != tc.mixed || placement != tc.mixed {
+				t.Fatalf("ledger Mixed %v, mixed placement %v; want %v", ledger, placement, tc.mixed)
+			}
+		})
+	}
+}
+
+// A hook whose own checkout cannot be located, its cwd deleted, still classifies what the
+// call reached against where the run has been: a read of Acme's checkout by a run placed
+// in personal's turns it Mixed. A reach that crosses nothing writes no placement.
+func TestAHookThatCannotLocateItsCheckoutStillClassifiesWhatItReached(t *testing.T) {
+	t.Parallel()
+	for name, tc := range map[string]struct {
+		origin string
+		mixed  bool
+	}{
+		"another organization's":  {"github.com/acme/api", true},
+		"the same organization's": {"github.com/dawson/web", false},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			m := newRoutedMachine(t, acmeAndPersonal(t))
+			side, other := hookruntest.RepoAt(t, "github.com/dawson/side"), hookruntest.RepoAt(t, tc.origin)
+			const sid = "deleted-cwd"
+			startIn(t, m.hook(), sid, side)
+			before := m.claim(sid)
+			env := m.hook()
+			env.Cwd = filepath.Join(t.TempDir(), "deleted")
+			if _, err := env.routeHere(context.Background()); err == nil {
+				t.Fatal("the deleted cwd was located")
+			}
+			env.Classify(context.Background(), nil, sessionOf(sid), []string{filepath.Join(other, "README")}, nil)
+			if ledger, placement := m.mixed(sid); ledger != tc.mixed || placement != tc.mixed {
+				t.Fatalf("ledger Mixed %v, mixed placement %v; want %v", ledger, placement, tc.mixed)
+			}
+			if c := m.claim(sid); !tc.mixed && !slices.EqualFunc(c.Placements, before.Placements, func(a, b claim.Placement) bool { return a.Kind == b.Kind && a.Repository == b.Repository }) {
+				t.Errorf("a hook that located nothing placed the session: %+v", c.Placements)
+			}
+		})
+	}
+}
+
+// A hook that classifies before it records locates its checkout once: RepoAt takes the
+// checkout Classify located and gives it its session store, and refuses one Route drops.
+func TestRepoAtTakesTheCheckoutClassifyLocated(t *testing.T) {
+	t.Parallel()
+	m := newRoutedMachine(t, acmeAndPersonalRepos(t))
+	ctx := context.Background()
+	for origin, collected := range map[string]bool{"github.com/dawson/side": true, "github.com/other/lib": false} {
+		root := hookruntest.RepoAt(t, origin)
+		env := m.hook()
+		env.Cwd = root
+		located := env.Classify(ctx, nil, sessionOf("located-once"), []string{filepath.Join(root, "README")}, nil)
+		if located == nil || located.Store != nil {
+			t.Fatalf("%s: Classify located %+v", origin, located)
+		}
+		r, err := env.RepoAt(ctx, located)
+		switch {
+		case collected && (err != nil || r != located || r.Store == nil):
+			t.Errorf("%s: RepoAt = %+v, %v; want the located checkout with its store", origin, r, err)
+		case !collected && !errors.Is(err, ErrNotAdmitted):
+			t.Errorf("%s: RepoAt = %+v, %v; want ErrNotAdmitted", origin, r, err)
+		}
+	}
+	env := m.hook()
+	if got := env.Classify(ctx, nil, sessionOf("located-once"), nil, nil); got != nil {
+		t.Errorf("Classify with nothing to classify located %+v", got)
+	}
+}
+
+// On Windows a backslash is the path separator, never an escape: an agent's shell command
+// (PowerShell or cmd) names C:\Users\... unquoted, and it is still a path.
+func TestAnUnquotedWindowsPathIsAPath(t *testing.T) {
+	t.Parallel()
+	if filepath.Separator != '\\' {
+		t.Skip("Windows paths")
+	}
+	dir := t.TempDir()
+	notes := filepath.Join(dir, "NOTES.md")
+	if err := os.WriteFile(notes, []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	for _, command := range []string{"cat " + notes, "Get-Content " + notes + " | Select-Object -First 5", `type "` + notes + `"`} {
+		if got := ShellPaths(command, dir); !slices.Contains(got, dir) {
+			t.Errorf("ShellPaths(%q) = %q, want %q among them", command, got, dir)
+		}
+	}
+}
+
+// sameReach reports whether ShellPaths found want. On Windows a command is also read with
+// backslashes literal (shellReadings), so it may find more: each path that reading adds
+// can only make a run Mixed, never miss one.
+func sameReach(got, want []string) bool {
+	if len(shellReadings()) == 1 {
+		return slices.Equal(got, want)
+	}
+	for _, p := range want {
+		if !slices.Contains(got, p) {
+			return false
+		}
+	}
+	return true
+}
+
+// Read with escapes off, as on Windows for PowerShell and cmd, a backslash stays in the
+// word; read with them on, as a POSIX shell, it escapes the next character. On Windows
+// ShellPaths takes both readings.
+func TestABackslashEscapesOnlyInAPOSIXReading(t *testing.T) {
+	t.Parallel()
+	words := func(command string, escapes bool) []string {
+		var out []string
+		for _, w := range shellWords(command, escapes) {
+			var b strings.Builder
+			for _, p := range w.parts {
+				b.WriteString(p.text)
+			}
+			out = append(out, b.String())
+		}
+		return out
+	}
+	for _, c := range []struct {
+		command string
+		escapes bool
+		want    []string
+	}{
+		{`cat C:\Users\me\NOTES.md`, false, []string{"cat", `C:\Users\me\NOTES.md`}},
+		{`cat ../acme\ api/NOTES.md`, true, []string{"cat", "../acme api/NOTES.md"}},
+		{`cat ../acme\ api/NOTES.md`, false, []string{"cat", `../acme\`, "api/NOTES.md"}},
+		{`cat "C:\Users\me\NOTES.md"`, false, []string{"cat", `C:\Users\me\NOTES.md`}},
+	} {
+		if got := words(c.command, c.escapes); !slices.Equal(got, c.want) {
+			t.Errorf("shellWords(%q, escapes %v) = %q, want %q", c.command, c.escapes, got, c.want)
+		}
+	}
+}

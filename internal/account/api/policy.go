@@ -13,8 +13,22 @@ import (
 
 // CollectionPolicy asks the account service what the signed-in organization collects from
 // this machine, with the developer's login or the team's own server key;
-// TERMA_POLICY_STUB is an offline test override.
+// TERMA_POLICY_STUB is an offline test override. It reads major 1 alone: a reader that
+// matches entries exactly would read a 2.x wildcard as a repository no origin names, and
+// collect less than the admin set, so it keeps its last validated policy instead.
 func (c *Client) CollectionPolicy(ctx context.Context) (config.Policy, error) {
+	return c.collectionPolicy(ctx, false)
+}
+
+// TeamPolicy is CollectionPolicy for a reader that routes by routing.ParseEntry, which
+// matches wildcards: it reads majors 1 and 2, and sets Wildcards on a 2.x policy, whose
+// entries alone may end in `/*` (C1: the backend stores each policy in the lowest major
+// that expresses it).
+func (c *Client) TeamPolicy(ctx context.Context) (config.Policy, error) {
+	return c.collectionPolicy(ctx, true)
+}
+
+func (c *Client) collectionPolicy(ctx context.Context, wildcards bool) (config.Policy, error) {
 	if err := ctx.Err(); err != nil {
 		return config.Policy{}, err
 	}
@@ -41,7 +55,7 @@ func (c *Client) CollectionPolicy(ctx context.Context) (config.Policy, error) {
 	if err := c.AuthGet(ctx, "/v1/policy", query, &response); err != nil {
 		return config.Policy{}, err
 	}
-	return response.collectionPolicy()
+	return response.collectionPolicy(wildcards)
 }
 
 // policyResponse uses pointers so a missing capture switch never reads as an authorization.
@@ -68,7 +82,8 @@ type policyResponse struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
-func (r policyResponse) collectionPolicy() (config.Policy, error) {
+// collectionPolicy reads the response as a policy, of major 1 alone unless wildcards.
+func (r policyResponse) collectionPolicy(wildcards bool) (config.Policy, error) {
 	// A team no admin has set a policy for admits no repository.
 	if r.Policy == nil {
 		p := config.DefaultPolicy()
@@ -81,15 +96,20 @@ func (r policyResponse) collectionPolicy() (config.Policy, error) {
 	// Only a major version a reader does not know makes a document unreadable; a minor
 	// one only adds fields it may ignore.
 	major, _, dotted := strings.Cut(r.Policy.Version, ".")
-	if !dotted || major != "1" || (t.Global == nil) == (t.PerRepository == nil) ||
+	known := major == "1" || wildcards && major == "2"
+	if !dotted || !known || (t.Global == nil) == (t.PerRepository == nil) ||
 		t.PerRepository != nil && t.PerRepository.Repositories == nil ||
 		c == nil || c.ExcludePrompts == nil || c.ExcludeToolContent == nil ||
 		r.Revision < 1 || r.UpdatedAt.IsZero() {
-		return config.Policy{}, fmt.Errorf("invalid collection policy: require a 1.x version, one collection mode, a repository list and complete capture rules")
+		versions := "a 1.x version"
+		if wildcards {
+			versions = "a 1.x or 2.x version"
+		}
+		return config.Policy{}, fmt.Errorf("invalid collection policy: require %s, one collection mode, a repository list and complete capture rules", versions)
 	}
 	p := config.Policy{Mode: config.ModeRepo, IncludePrompts: !*c.ExcludePrompts,
 		IncludeToolContent: !*c.ExcludeToolContent, GitHooks: t.GitHooks != nil && *t.GitHooks,
-		Revision: r.Revision, UpdatedAt: r.UpdatedAt, FetchedAt: time.Now().UTC()}
+		Revision: r.Revision, UpdatedAt: r.UpdatedAt, FetchedAt: time.Now().UTC(), Wildcards: major == "2"}
 	if t.Global != nil {
 		p.Mode = config.ModeGlobal
 	} else {
