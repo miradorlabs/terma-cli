@@ -3,6 +3,33 @@
   "id": "gemini-3.5-flash-lite",
   "steps": [
     {
+      "at": "2026-11-16T02:54:36.450664127Z",
+      "event": "changed",
+      "changes": [
+        {
+          "id": "docs/whats_new",
+          "category": "docs",
+          "op": "changed",
+          "path": [
+            "docs",
+            "whats_new"
+          ],
+          "title": "What's new page changed (+1330 −1270 chars)",
+          "impact": "informational",
+          "before": null,
+          "after": null,
+          "text_diff": "@@ -23,33 +23,33 @@\n \n {% tabs %}\n   {% tab title=\"Gemini 3.6 Flash\" %}\n-  1.   Install the skill:\n+  1. Install the skill:\n \n-  ```bash\n-  npx skills add google-gemini/gemini-skills --skill gemini-interactions-api --global\n-  ```\n+     ```bash\n+     npx skills add google-gemini/gemini-skills --skill gemini-interactions-api --global\n+     ```\n \n-  2.   Apply the skill:\n+  2. Apply the skill:\n \n-  ```bash\n-  /gemini-interactions-api migrate my app to Gemini 3.6 Flash\n-  ```\n+     ```bash\n+     /gemini-interactions-api migrate my app to Gemini 3.6 Flash\n+     ```\n \n \n   {% /tab %}\n \n   {% tab title=\"Gemini 3.5 Flash-Lite\" %}\n-  1.   Install the skill:\n+  1. Install the skill:\n \n-  ```bash\n-  npx skills add google-gemini/gemini-skills --skill gemini-interactions-api --global\n-  ```\n+     ```bash\n+     npx skills add google-gemini/gemini-skills --skill gemini-interactions-api --global\n+     ```\n \n-  2.   Apply the skill:\n+  2. Apply the skill:\n \n-  ```bash\n-  /gemini-interactions-api migrate my app to Gemini 3.5 Flash-Lite\n-  ```\n+     ```bash\n+     /gemini-interactions-api migrate my app to Gemini 3.5 Flash-Lite\n+     ```\n \n \n   {% /tab %}\n@@ -229,33 +229,33 @@\n \n {% tabs %}\n   {% tab title=\"Gemini 3.6 Flash\" %}\n-  1.   Install the skill:\n+  1. Install the skill:\n \n-  ```bash\n-  npx skills add google-gemini/gemini-skills --skill gemini-interactions-api --global\n-  ```\n+     ```bash\n+     npx skills add google-gemini/gemini-skills --skill gemini-interactions-api --global\n+     ```\n \n-  2.   Apply the skill:\n+  2. Apply the skill:\n \n-  ```bash\n-  /gemini-interactions-api migrate my app to Gemini 3.6 Flash\n-  ```\n+     ```bash\n+     /gemini-interactions-api migrate my app to Gemini 3.6 Flash\n+     ```\n \n \n   {% /tab %}\n \n   {% tab title=\"Gemini 3.5 Flash-Lite\" %}\n-  1.   Install the skill:\n+  1. Install the skill:\n \n-  ```bash\n-  npx skills add google-gemini/gemini-skills --skill gemini-interactions-api --global\n-  ```\n+     ```bash\n+     npx skills add google-gemini/gemini-skills --skill gemini-interactions-api --global\n+     ```\n \n-  2.   Apply the skill:\n+  2. Apply the skill:\n \n-  ```bash\n-  /gemini-interactions-api migrate my app to Gemini 3.5 Flash-Lite\n-  ```\n+     ```bash\n+     /gemini-interactions-api migrate my app to Gemini 3.5 Flash-Lite\n+     ```\n \n \n   {% /tab %}\n@@ -267,22 +267,24 @@\n * **Update Model ID:** Change your target model string to `gemini-3.6-flash`.\n * **Apply parameter updates:** Remove deprecated sampling parameters (`temperature`, `top_p`, `top_k`), `candidate_count` (unsupported in Gemini 3 and later), and prefilled model turns as detailed in [API changes and parameter updates](/docs/whats-new-gemini-3.6#api-changes-and-parameter-updates).\n * **Configure thinking level:** Replace `thinking_budget` with `thinking_level` (`\"medium\"` or `\"high\"`).\n-* **Audit function calling:**  * Place multimodal assets inside the response payload.\n+* **Audit function calling:**\n+  * Place multimodal assets inside the response payload.\n   * Format inline instructions using `\\n\\n`.\n   * If you see `Malformed_Function_Call` errors tied to pre-tool text, see [Workarounds for pre-tool text requirements](/docs/function-calling#workarounds-for-pre-tool-text-requirements).\n \n *   **Baseline Gemini 3.x requirements:** For SDK updates and thought signature\n-  preservation, see [Thought signatures](/docs/thinking#signatures).\n+    preservation, see [Thought signatures](/docs/thinking#signatures).\n \n ### Migrate to gemini-3.5-flash-lite  {% id=\"migrate-to-gemini-3-5-flash-lite\" %}\n \n * **Update Model ID:** Change your target model string to `gemini-3.5-flash-lite`.\n-* **Configure thinking effort level:**  * For high-volume extraction, routing, or classification: leave `thinking_level` at `\"minimal\"` (default) for maximum throughput.\n+* **Configure thinking effort level:**\n+  * For high-volume extraction, routing, or classification: leave `thinking_level` at `\"minimal\"` (default) for maximum throughput.\n   * For autonomous subagents with tool calls, code execution, or multi-step reasoning: set `thinking_level` to `\"medium\"` or `\"high\"` to prevent premature tool termination.\n \n * **Remove deprecated parameters and validate function calling:** Apply the [same rules as 3.6 Flash](/docs/whats-new-gemini-3.6#migrate-to-gemini-3-6-flash).\n *   **Baseline Gemini 3.x requirements:** Refer to\n-  [Thought signatures](/docs/thinking#signatures).\n+    [Thought signatures](/docs/thinking#signatures).\n \n ## Other models  {% id=\"other-models\" %}\n \n",
+          "stats": {
+            "added_chars": 1330,
+            "removed_chars": 1270
+          },
+          "terma": null,
+          "source": null,
+          "documented": null
+        }
+      ]
+    },
+    {
       "at": "2026-11-12T17:37:10.713435881Z",
       "event": "changed",
       "changes": [

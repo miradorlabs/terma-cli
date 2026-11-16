@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-13T18:38:14.685672051Z",
+  "generated_at": "2026-11-16T02:54:36.450664127Z",
   "vendors": [
     {
       "id": "anthropic",
@@ -69,7 +69,7 @@
       "reasoning": true,
       "harnesses": [],
       "last_change": {
-        "at": "2026-11-12T17:53:06.258113706Z",
+        "at": "2026-11-16T02:54:36.450664127Z",
         "changes": 1
       },
       "probed": false
@@ -343,7 +343,7 @@
       "reasoning": true,
       "harnesses": [],
       "last_change": {
-        "at": "2026-11-12T17:53:06.258113706Z",
+        "at": "2026-11-16T02:54:36.450664127Z",
         "changes": 1
       },
       "probed": false
@@ -442,7 +442,7 @@
       "reasoning": true,
       "harnesses": [],
       "last_change": {
-        "at": "2026-11-12T17:37:10.713435881Z",
+        "at": "2026-11-16T02:54:36.450664127Z",
         "changes": 1
       },
       "probed": false
@@ -463,7 +463,7 @@
       "reasoning": true,
       "harnesses": [],
       "last_change": {
-        "at": "2026-11-12T17:37:10.713435881Z",
+        "at": "2026-11-16T02:54:36.450664127Z",
         "changes": 1
       },
       "probed": false
@@ -642,7 +642,10 @@
       "knowledge_cutoff": "2025-01",
       "reasoning": true,
       "harnesses": [],
-      "last_change": null,
+      "last_change": {
+        "at": "2026-11-16T02:54:36.450664127Z",
+        "changes": 1
+      },
       "probed": false
     },
     {

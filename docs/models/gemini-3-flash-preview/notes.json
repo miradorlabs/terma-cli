@@ -10,17 +10,17 @@
     {
       "date": "2026-01-29",
       "url": "https://ai.google.dev/gemini-api/docs/changelog",
-      "text": "*   Launched support for the Computer Use tool in `gemini-3-pro-preview` and\n  `gemini-3-flash-preview`."
+      "text": "*   Launched support for the Computer Use tool in `gemini-3-pro-preview` and\n    `gemini-3-flash-preview`."
     },
     {
       "date": "2026-01-21",
       "url": "https://ai.google.dev/gemini-api/docs/changelog",
-      "text": "*     Changed the `latest` aliases:\n\n  *   `gemini-pro-latest` switched to `gemini-3-pro-preview`\n  *   `gemini-flash-latest` switched to `gemini-3-flash-preview`"
+      "text": "*   Changed the `latest` aliases:\n\n    *   `gemini-pro-latest` switched to `gemini-3-pro-preview`\n    *   `gemini-flash-latest` switched to `gemini-3-flash-preview`"
     },
     {
       "date": "2025-12-17",
       "url": "https://ai.google.dev/gemini-api/docs/changelog",
-      "text": "*     Launched Gemini 3 Flash Preview, `gemini-3-flash-preview`, delivering fast\n  frontier-class performance that rivals larger models at a fraction of the\n  cost. With upgraded visual and spatial reasoning, and agentic coding\n  capabilities. Read the documentation on some new features, including:\n\n  *   [Multimodal function responses](/docs/function-calling#multimodal)\n  *   [Code execution with images](/docs/code-execution#images)"
+      "text": "*   Launched Gemini 3 Flash Preview, `gemini-3-flash-preview`, delivering fast\n    frontier-class performance that rivals larger models at a fraction of the\n    cost. With upgraded visual and spatial reasoning, and agentic coding\n    capabilities. Read the documentation on some new features, including:\n\n    *   [Multimodal function responses](/docs/function-calling#multimodal)\n    *   [Code execution with images](/docs/code-execution#images)"
     }
   ],
   "changes": [

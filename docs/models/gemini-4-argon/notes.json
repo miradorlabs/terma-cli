@@ -17,7 +17,7 @@
     {
       "date": "2026-10-13",
       "url": "https://ai.google.dev/gemini-api/docs/changelog",
-      "text": "*     **Gemini 4 Argon (`gemini-4-argon`) generally available (GA)**: Released\n  [Gemini 4 Argon](/docs/models/gemini-4-argon) (`gemini-4-argon`), our most\n  capable model built for complex coding, agentic, math, and science tasks.\n\n  For API changes, pricing, and migration guidance, see\n  [What's new in Gemini 4 Argon](/docs/whats-new-gemini-4-argon)."
+      "text": "*   **Gemini 4 Argon (`gemini-4-argon`) generally available (GA)**: Released\n    [Gemini 4 Argon](/docs/models/gemini-4-argon) (`gemini-4-argon`), our most\n    capable model built for complex coding, agentic, math, and science tasks.\n\n    For API changes, pricing, and migration guidance, see\n    [What's new in Gemini 4 Argon](/docs/whats-new-gemini-4-argon)."
     }
   ],
   "changes": [],
