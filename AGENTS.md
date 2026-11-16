@@ -165,26 +165,46 @@ drops whatever carries content, a record that routes by a location of its own (a
 agent's turn) included; only a file event, a commit or a push, which say where something
 happened and nothing else, keep their destination (`runs.Locational`). A run
 touches a checkout when it runs there, or when a tool call edits, reads or searches a path
-in it, or names one in a shell command, parsed as bash does (mvdan.cc/sh): the folder of
-each path the command names that is there, a word without a slash included, but its name
-(the program to run, past wrappers such as `sudo`, `timeout 60`, `env A=1` and `uv run`)
-only as a path that is there, never one looked up on PATH; the nearest folder that is
-there above a slashed word that is not, as a new file; every `cd`'s and `pushd`'s target;
-the script of `bash -c` and the like and of a here-document fed to a shell, read as
-commands; the slashed words of `python -c` and the like, of any other here-document and of
-an argument holding spaces (`git commit -m "fix a/b"`), that are there; and each checkout
-below a folder outside any checkout that a recursive reader (`rg`, `grep -r`, `find` and
-the like) reads. Words are expanded first: braces, variables, a `for` loop's variable
-(each of its words in turn), `$(pwd)`, `$(git rev-parse --show-toplevel)`,
-`$(go env GOPATH)`, `$(mktemp)`, `$(dirname …)` and the like, and globs
+in it, or names one in a shell command. What a call reads it reads whole: a folder outside
+any checkout that a search reads (Grep's, Glob's, any agent's search keys) or a program
+reads reaches each checkout below it, a walk down at most four levels that skips trees known
+to hold none (the Go module cache, `node_modules`, `~/Library`, `/System`), and every tool's
+folder is read so by `hookrun.Env.Classify` unless the call says it reaches that folder
+alone (`hookrun.Alone`: LS's, a listing's key's, and a shell command's places, which its scan
+read below itself). A shell command is parsed as bash does
+(mvdan.cc/sh), and what it does not name is taken to reach: the folder of each path the
+command names that is there, a word without a slash included, but its name (the program to
+run, past wrappers such as `sudo`, `timeout 60`, `env A=1` and `uv run`) only as a path that
+is there, never one looked up on PATH; the fragments of every argument and assignment value,
+split at quotes, brackets, `:`, `@` and `=` (`-v ../x:/src`, `-d @../x`, `PYTHONPATH=.:../x`),
+those of prose (`git commit -m "fix a/b"`) only when slashed and there; the nearest folder
+that is there above a slashed word that is not, as a new file; every `cd`'s and `pushd`'s
+target, from `CDPATH` when the command sets it, and the folder `-C` names for `tar`, `make`
+and `git`; as commands, the script of a shell's `-c` wherever it is among a command's
+words, past any wrapper known or not (`direnv exec . bash -c`, `strace -f sh -c`, `su -c`),
+and of a here-document or `echo`'s or `printf`'s words fed to a shell, any other output a
+shell reads being not known (`curl … | sh`); the slashed words of `python -c` and the like
+and of any other here-document that are there; and below each folder a program's words name,
+or where it runs when they name nothing there (`pytest ..`, `cd .. && npx prettier .`),
+as deep as its depth option goes (`find -maxdepth`), unless it is known not to read below
+one (`ls` without `-R`, `git` but `git grep`, `cd`, `echo` and the like: the shallow table),
+and below the folder a zsh `**` glob reads. Words are expanded first: braces, variables, a
+`for` loop's variable (each of its words in turn), `$(pwd)`, `$(git rev-parse
+--show-toplevel)`, `$(go env GOPATH)`, `$(mktemp)`, `$(dirname …)` and the like, and globs
 (`hookrun.ShellPaths`). A command that does not parse runs up to its error, as a shell
-does: the statements before it are read as any are, and the rest as its words. A path
-through a symlink touches its target's checkout too. A command past the scan's bounds (the
-folders it reaches, each counted once however many of its words name it, and the work it
-does, the bytes it parses and expands included), or a path in it whose expansion cannot be
-resolved (a slashed word, a `cd`'s target, a folder option's value such as `git -C`),
-touches an organization not known, and the run turns Mixed
-(`hookrun.UnknownReach`). An edit records and spools as it always has; a
+does: the statements before it are read as any are, and the rest as its words, a command
+substitution among them not known. A path through a symlink touches its target's checkout
+too. A command or a search past the scan's bounds (the folders it reaches, each counted once
+however many of its words name it, and the work it does, the bytes it parses and expands
+and the entries a walk reads included, and 20 ms of wall-clock time), or a path in it whose
+expansion cannot be resolved (a slashed word, a `cd`'s target, a folder option's value such
+as `git -C`), touches an organization not known, and the run turns Mixed
+(`hookrun.UnknownReach`). Accepted, not followed: an interpreter's script beyond its
+slashed words (`os.chdir('..')`, `os.path.join('..', 'x')`, `Path('..').rglob()`), `xargs`
+given words by a producer not literal (`echo .. | xargs rg`), zsh's `cd old new`, a checkout
+under `~/Library` (iCloud Drive), and another agent's listing whose key a search shares
+(`path`), read as a search; a command cut off mid-prose turns Mixed on the word `cd`. An
+edit records and spools as it always has; a
 read, a search or a shell command only classifies (`hookrun.Env.Classify`): it writes no
 manifest and spools nothing, and on a machine not migrated it does nothing. Where the agent
 has a hook before the call, it classifies there, so that the call's own result is exported
