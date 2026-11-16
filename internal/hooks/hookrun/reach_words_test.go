@@ -458,3 +458,44 @@ func TestASymlinkReachesItsTarget(t *testing.T) {
 		t.Fatal("a link within its own checkout made the run Mixed")
 	}
 }
+
+// A script past the parser's bounds is not parsed (parsable): nested too deeply, an
+// expression too long, too many compound commands, pipes or lists, or too many words or
+// expansions. Quotes, comments and here-documents are lexed as the shell does, so a body
+// or a string that holds brackets or keywords counts for nothing, and one that closes a
+// context the parser keeps open hides nothing.
+func TestAScriptPastTheParsersBoundsIsNotParsed(t *testing.T) {
+	t.Parallel()
+	prose := strings.Repeat("if (a) for [b] while {c} case $d and don't (\n", 2000)
+	for src, want := range map[string]bool{
+		"cat > f <<'EOF'\n" + prose + "EOF\nls":                   true,
+		"cat > f <<EOF\n" + prose + "EOF\nls":                     true,
+		`git commit -m "` + strings.Repeat("if (a) ", 5000) + `"`: true,
+		"echo $((1+2)) [[ -f x ]] ${a:-b} `ls` $(ls)":             true,
+		strings.Repeat("(", maxShellNesting+1):                    false,
+		strings.Repeat("{ ", maxShellNesting+1):                   false,
+		strings.Repeat("$(", maxShellNesting+1):                   false,
+		strings.Repeat("if a; then ", maxShellNesting+1):          false,
+		strings.Repeat("a | ", maxShellNesting+1):                 false,
+		"echo $((" + strings.Repeat("!", maxShellExpr) + "1))":    false,
+		"echo ${a:" + strings.Repeat("!", maxShellExpr) + "1}":    false,
+		"a[" + strings.Repeat("!", maxShellExpr) + "1]=x":         false,
+		"let " + strings.Repeat("!", maxShellExpr+1):              false,
+		"echo" + strings.Repeat(" w", maxShellWords+1):            false,
+		"echo " + strings.Repeat("a$b", maxShellWords+1):          false,
+		// What a shell holds open, the lexing does too.
+		strings.Repeat(`$(echo ")" `, maxShellNesting+1):                 false,
+		strings.Repeat("$(case a in a) ", maxShellNesting+1):             false,
+		"${#x} # don't\n" + strings.Repeat("(", maxShellNesting+1):       false,
+		"cat <<'EOF'\nx\nEOF\n" + strings.Repeat("(", maxShellNesting+1): false,
+		strings.Repeat("$(cat <<EOF\n", maxShellNesting+1):               false,
+	} {
+		if got := parsable(src); got != want {
+			t.Errorf("parsable(%.50q…) = %v, want %v", src, got, want)
+		}
+	}
+	m := newWordsMachine(t)
+	if got := m.paths(strings.Repeat("(", 1<<19), m.side); !slices.Equal(got, []string{UnknownReach}) {
+		t.Errorf("half a megabyte of subshells: %q, want UnknownReach", got)
+	}
+}

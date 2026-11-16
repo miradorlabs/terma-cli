@@ -168,11 +168,12 @@ func scanShell(src, cwd string, env func(string) (string, bool)) (sc *scan) {
 	return sc
 }
 
-// script reads src, a shell script, one level deeper. One that does not parse (cut short,
-// or not a POSIX shell's) is read as its distinct words, each a lookup, split at
-// whitespace and operators, quotes dropped, their variables expanded.
+// script reads src, a shell script, one level deeper, once it is known to be within the
+// parser's bounds (parsable). One that does not parse (cut short, or not a POSIX shell's)
+// is read as its distinct words, each a lookup, split at whitespace and operators, quotes
+// dropped, their variables expanded.
 func (sc *scan) script(src string) {
-	if len(src) > maxShellBytes || sc.depth == maxShellDepth {
+	if len(src) > maxShellBytes || sc.depth == maxShellDepth || !parsable(src) {
 		sc.unknown = true
 		return
 	}
@@ -192,7 +193,9 @@ func (sc *scan) script(src string) {
 		if seen[w] = true; !sc.spend(1) {
 			return
 		}
-		if word, err := parser.Document(strings.NewReader(w)); err == nil {
+		if len(w) > maxShellExpr {
+			sc.candidate(w, 0) // too long to parse within the parser's bounds
+		} else if word, err := parser.Document(strings.NewReader(w)); err == nil {
 			sc.arg(word, 0)
 		} else {
 			sc.candidate(w, 0)
