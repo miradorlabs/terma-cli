@@ -71,13 +71,14 @@ machine() {
 median() { echo "$1" | tr ' ' '\n' | grep -v '^$' | sort -n | sed -n 4p; }
 
 # tool_hook <hook> <label> <payload> [budget]: times terma's <hook> hook on payload 7 times,
-# and fails when a budget is given and the median exceeds it.
+# and fails when a budget is given and the median exceeds it. A hook with nothing to do with
+# a long payload (on a machine not routing by teams, a shell command's) may not read it all.
 tool_hook() {
   ptimes=""
   i=0
   while [ $i -lt 7 ]; do
     start=$(ms)
-    printf '%s' "$3" | terma hook --user "$1"
+    printf '%s' "$3" 2>/dev/null | terma hook --user "$1"
     end=$(ms)
     ptimes="$ptimes $((end - start))"
     i=$((i + 1))
@@ -128,11 +129,22 @@ bench() {
   tool_hook pre-tool-use "Bash, deep glob, $label" "$(printf '{"session_id":"%s","hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"ls go/pkg/mod/*/*/*/*/*/*.go"},"cwd":"%s"}' "$sid" "$dir")" "$BUDGET_MS"
   tool_hook pre-tool-use "Bash, 3000x3000 loop, $label" "$(printf '{"session_id":"%s","hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"for a in %s; do for b in %s; do echo $a$b; done; done"},"cwd":"%s"}' "$sid" "$LOOP" "$LOOP" "$dir")" "$BUDGET_MS"
   tool_hook pre-tool-use "Bash, 1 MB, $label" "$(printf '{"session_id":"%s","hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"echo%s"},"cwd":"%s"}' "$sid" "$MEGA" "$dir")" "$BUDGET_MS"
+  # Commands far under maxShellBytes that expand past it: S set to 200 KB, then run as
+  # bash -c's script 2000 times, expanded in a here-document 2000 times, and echoed 2000
+  # times in one word.
+  for shape in "bash -c x2000:$BASHC" "here-document x2000:$HEREDOC" "one word x2000:$ECHO"; do
+    tool_hook pre-tool-use "Bash, \$S ${shape%%:*}, $label" "$(printf '{"session_id":"%s","hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"%s"},"cwd":"%s"}' "$sid" "${shape#*:}" "$dir")" "$BUDGET_MS"
+  done
 }
 
 WORDS="$(i=0; while [ $i -lt 4000 ]; do printf ' w%d' $i; i=$((i + 1)); done)"
 LOOP="$(awk 'BEGIN { for (i = 0; i < 3000; i++) printf "%sw%d", (i ? " " : ""), i }')"
 MEGA="$(awk 'BEGIN { for (i = 0; i < 140000; i++) printf " w%d", i }')"
+# Each a JSON string's text: \" a quote, \n a newline.
+SETS="S=$(awk 'BEGIN { for (i = 0; i < 200 * 1024; i++) printf "x" }'); "
+BASHC="$SETS$(awk 'BEGIN { for (i = 0; i < 2000; i++) printf "bash -c \\\"$S\\\"; " }')"
+HEREDOC="${SETS}cat <<EOF$(awk 'BEGIN { for (i = 0; i < 2000; i++) printf "\\n$S" }')\nEOF"
+ECHO="${SETS}echo \\\"$(awk 'BEGIN { for (i = 0; i < 2000; i++) printf "$S" }')\\\""
 
 machine single
 bench "$repo" checkout checkout "$tmp/wt"
