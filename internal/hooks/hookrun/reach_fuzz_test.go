@@ -63,8 +63,9 @@ func FuzzShellPaths(f *testing.F) {
 		if !parses(command) {
 			return
 		}
-		for _, variant := range []string{"(\n" + command + "\n)", "true && " + command, "direnv exec . bash -c " + quote(command)} {
-			if !parses(variant) {
+		for i, variant := range []string{"(\n" + command + "\n)", "true && " + command, "direnv exec . bash -c " + quote(command)} {
+			// A command ending in a backslash runs on past the newline, into the subshell's close.
+			if i == 0 && (len(command)-len(strings.TrimRight(command, `\`)))%2 == 1 || !parses(variant) {
 				continue
 			}
 			got := paths(variant)
