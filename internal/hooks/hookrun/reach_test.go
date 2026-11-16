@@ -238,6 +238,12 @@ func TestABackslashSeparatesOnlyInTheWindowsReading(t *testing.T) {
 		}
 	}
 	none := func(string) (string, bool) { return "", false }
+	// On Windows the path package itself separates at a backslash, so even the POSIX
+	// reading of a quoted backslash path reaches what it names there.
+	var posixQuoted []string
+	if filepath.Separator == '\\' {
+		posixQuoted = []string{api}
+	}
 	for _, c := range []struct {
 		command string
 		windows bool
@@ -245,7 +251,7 @@ func TestABackslashSeparatesOnlyInTheWindowsReading(t *testing.T) {
 	}{
 		{`cat ../acme\ api/NOTES.md`, false, []string{api}},
 		{`cat "..\acme api\NOTES.md"`, true, []string{api}},
-		{`cat "..\acme api\NOTES.md"`, false, nil},
+		{`cat "..\acme api\NOTES.md"`, false, posixQuoted},
 		{`type ..\side`, true, []string{cwd}},
 	} {
 		src := c.command
