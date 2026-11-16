@@ -14,7 +14,7 @@ import (
 
 // corpus is a personal checkout, side, beside Acme's, acme-api, in one folder: side has a
 // Go module's tree, 120 files in internal/cli and 45 in internal/hooks/hookrun among them,
-// and p, a file naming Acme's checkout.
+// and p, a file naming Acme's checkout; each has programs, x and scripts/dump.sh.
 type corpus struct {
 	side, api string
 }
@@ -30,7 +30,7 @@ func newCorpus(t *testing.T) corpus {
 		hookruntest.WriteFile(t, c.side, fmt.Sprintf("internal/hooks/hookrun/h%02d.go", i), "package hookrun\n")
 	}
 	for _, root := range []string{c.side, c.api} {
-		for _, rel := range []string{"internal/a/a.go", "internal/b/b.go", "internal/c/c.go", "tests/test_x.py", "Makefile", "go.mod", "package.json", "NOTES.md"} {
+		for _, rel := range []string{"internal/a/a.go", "internal/b/b.go", "internal/c/c.go", "tests/test_x.py", "Makefile", "go.mod", "package.json", "NOTES.md", "x", "scripts/dump.sh"} {
 			hookruntest.WriteFile(t, root, rel, "x\n")
 		}
 	}
@@ -92,11 +92,14 @@ func corpusFine() map[string]string {
 		"cd to the top level and make":  "cd \"$(git rev-parse --show-toplevel)\" && make",
 		"git add of 40 files":           "git add " + strings.Join(named, " "),
 		"echo of 50 bare words":         "echo " + strings.Repeat("word ", 50),
+		"rg TODO with DIR unset":        "rg TODO $DIR",
+		"a for loop over a glob":        "for f in *.go; do gofmt -l $f; done",
+		"git commit -m a heredoc":       "git commit -m \"$(cat <<'EOF'\nfix(hooks): read internal/cli and a/b\nEOF\n)\"",
 	}
 }
 
 // corpusCrossing are commands that reach Acme's checkout: each of corpusFine's rewritten to,
-// and one whose reach cannot be resolved.
+// others run there, and those whose reach cannot be resolved (corpusUnknown).
 func corpusCrossing() map[string]string {
 	return map[string]string{
 		"go test ./...":                 "go test ../acme-api/...",
@@ -118,7 +121,29 @@ func corpusCrossing() map[string]string {
 		"find and xargs":                "find ../acme-api -name '*.go' | xargs wc -l",
 		"cd to the top level and on":    "cd \"$(git rev-parse --show-toplevel)/../acme-api\" && make",
 		"cd to where a file says":       "cd \"$(cat p)\" && cat NOTES.md",
+		"a script there":                "../acme-api/scripts/dump.sh",
+		"a script there under nohup":    "nohup ../acme-api/scripts/dump.sh",
+		"a script there under exec":     "exec ../acme-api/scripts/dump.sh",
+		"a program there piped to":      "git status | ../acme-api/x",
+		"a program there after a cd":    "cd .. && acme-api/x",
+		"bash -c":                       `bash -c "cat ../acme-api/NOTES.md"`,
+		"sh -c with a cd":               `sh -c 'cd ../acme-api && ls'`,
+		"python3 -c":                    `python3 -c "open('../acme-api/NOTES.md')"`,
+		"node -e":                       `node -e "require('fs').readFileSync('../acme-api/NOTES.md')"`,
+		"git -C where a file says":      `git -C "$(cat p)" log`,
+		"make -C where a file says":     "make -C $(cat p)",
+		"braces naming checkouts":       "ls {../acme-api,.}",
+		"braces in a path":              "cat ../acme-{api,x}/NOTES.md",
+		"a here-document piped to sh":   "cat <<EOF | sh\ncd ../acme-api\nEOF",
 	}
+}
+
+// corpusUnknown are corpusCrossing's commands whose reach cannot be resolved, with the
+// first words the ledger names each by.
+var corpusUnknown = map[string]string{
+	"cd to where a file says":   `cd "$(cat p)" && …`,
+	"git -C where a file says":  `git -C "$(cat p)" …`,
+	"make -C where a file says": "make -C $(cat p)",
 }
 
 // reachesAcme reports whether paths name Acme's checkout or somewhere not known.
@@ -158,9 +183,9 @@ func TestRoutineAgentCommandsDoNotTurnTheRunMixed(t *testing.T) {
 				}
 				// Doctor tells a crossing from a command it could not read.
 				want := runs.Why{}
-				switch {
-				case name == "cd to where a file says":
-					want = runs.Why{Reason: runs.UnknownReach, Where: `cd "$(cat p)" && …`}
+				switch where, unknown := corpusUnknown[name]; {
+				case set.mixed && unknown:
+					want = runs.Why{Reason: runs.UnknownReach, Where: where}
 				case set.mixed:
 					want = runs.Why{Reason: runs.Crossed, Where: "github.com/acme/acme-api"}
 				}
