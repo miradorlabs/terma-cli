@@ -3,6 +3,33 @@
   "id": "gemini-4-argon",
   "steps": [
     {
+      "at": "2026-11-16T03:33:44.312533187Z",
+      "event": "changed",
+      "changes": [
+        {
+          "id": "docs/whats_new",
+          "category": "docs",
+          "op": "changed",
+          "path": [
+            "docs",
+            "whats_new"
+          ],
+          "title": "What's new page changed (+209 −209 chars)",
+          "impact": "informational",
+          "before": null,
+          "after": null,
+          "text_diff": "@@ -420,7 +420,8 @@\n \n Gemini 4 Argon is available at introductory pricing through November 30, 2026:\n \n-* **Input tokens:** $2.00 per 1M tokens ($4.00 starting December 1, 2026)  *   **Cached input tokens:** Implicit caching discounts cached input by 95%, to $0.10 per 1M tokens ($0.20 starting December 1, 2026).\n+* **Input tokens:** $2.00 per 1M tokens ($4.00 starting December 1, 2026)\n+  *   **Cached input tokens:** Implicit caching discounts cached input by 95%, to $0.10 per 1M tokens ($0.20 starting December 1, 2026).\n \n * **Output tokens, including thinking tokens:** $10.00 per 1M tokens ($20.00 starting December 1, 2026)\n \n",
+          "stats": {
+            "added_chars": 209,
+            "removed_chars": 209
+          },
+          "terma": null,
+          "source": null,
+          "documented": null
+        }
+      ]
+    },
+    {
       "at": "2026-11-12T17:37:10.713435881Z",
       "event": "changed",
       "changes": [
