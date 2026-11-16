@@ -9,6 +9,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
@@ -114,7 +115,7 @@ func TestAShellCommandPastThePlaceBoundTurnsTheRunMixed(t *testing.T) {
 					words = append(words, fmt.Sprintf("d%03d/a.go d%03d/b.go d%03d/new.go", i, i, i))
 				}
 			}
-			paths := ShellPaths(strings.Join(words, " "), side)
+			paths := shellPathsBy(strings.Join(words, " "), side, os.LookupEnv, time.Now().Add(time.Minute))
 			if past := slices.ContainsFunc(paths, isUnknownReach); past != (tc.places > maxShellPlaces) {
 				t.Fatalf("ShellPaths named UnknownReach %v for %d places", past, tc.places)
 			}

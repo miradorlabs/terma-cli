@@ -32,18 +32,20 @@ func FuzzShellPaths(f *testing.F) {
 	if info, ok := debug.ReadBuildInfo(); ok && slices.Contains(info.Settings, debug.BuildSetting{Key: "-race", Value: "true"}) {
 		limit *= 10
 	}
+	// A hook's deadline, as the test binary's is longer.
+	paths := func(command string) []string { return shellPathsBy(command, c.side, c.env, time.Now().Add(shellTime)) }
 	f.Fuzz(func(t *testing.T, command string) {
 		var before, after runtime.MemStats
 		runtime.ReadMemStats(&before)
 		start := time.Now()
-		c.paths(command)
+		paths(command)
 		took := time.Since(start)
 		runtime.ReadMemStats(&after)
 		// A run past the limit may have waited on another's (the fuzzer runs a worker on
 		// each core) or on the collector: the fastest of three is the command's own.
 		for retries := 2; took > limit && retries > 0; retries-- {
 			start = time.Now()
-			c.paths(command)
+			paths(command)
 			took = min(took, time.Since(start))
 		}
 		if took > limit {

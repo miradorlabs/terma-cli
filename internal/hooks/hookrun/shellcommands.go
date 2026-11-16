@@ -1,39 +1,40 @@
 package hookrun
 
 import (
-	"io/fs"
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 
 	"mvdan.cc/sh/v3/syntax"
-
-	"github.com/miradorlabs/terma-cli/internal/gitx"
 )
 
 // What ShellPaths knows of the commands it walks: those that run another (wrappers), run a
-// script an option gives (scripts) or read every file below a folder (readers), and the
-// options that take a folder or a value.
+// script an option gives (scripts) or are known not to read below a folder (shallow), and
+// the options that take a folder or a value.
 
 // wrapper is a command that runs the one its words name after its own: past its options,
 // those in values taking the next word as theirs, NAME=value words and operands words
 // (timeout's duration, flock's file). A chdir option's value is the folder it runs the
 // command in (env -C), a split option's is split into the command's first words (env -S),
 // and a shell option's is a shell script it runs (flock -c); a script wrapper runs its
-// words as one (watch). One with a sub is a wrapper only when that word follows it (uv run).
+// words as one (watch), or each as one of its own (hyperfine), and with a names option it
+// runs nothing (command -v). One with a sub is a wrapper only when that word follows it (uv
+// run).
 type wrapper struct {
-	sub                         string
-	values, chdir, split, shell []string
-	operands                    int
-	script                      bool
+	sub                                string
+	values, chdir, split, shell, names []string
+	operands                           int
+	script, each                       bool
 }
 
 // Commands by what they do with their words: wrappers run the command after their own;
 // scripts run a script an option gives (scriptOf); folderOptions take a folder, as the next
 // word or after their =, as -C does for dashC (for git only before its subcommand: git diff
 // -C finds copies); valueOptions are a command's options before its subcommand that take
-// the next word (git -c k=v log); readers read every file below a folder.
+// the next word (git -c k=v log); shallow programs read no folder below one they name, but
+// with an option or a subcommand that makes them (ls -R, git grep).
 var (
 	wrappers = map[string]wrapper{
 		"timeout":    {values: []string{"-s", "--signal", "-k", "--kill-after"}, operands: 1},
@@ -46,11 +47,12 @@ var (
 		"nohup":      {},
 		"exec":       {values: []string{"-a"}},
 		"time":       {values: []string{"-f", "--format", "-o", "--output"}},
-		"command":    {},
+		"command":    {names: []string{"-v", "-V"}},
 		"builtin":    {},
 		"caffeinate": {values: []string{"-t", "-w"}},
 		"xargs":      {values: []string{"-I", "-n", "-L", "-P", "-s", "-E", "-d", "-a", "--replace", "--max-args", "--max-lines", "--max-procs", "--max-chars", "--eof", "--delimiter", "--arg-file"}},
 		"watch":      {values: []string{"-n", "--interval"}, script: true},
+		"hyperfine":  {script: true, each: true},
 		"flock":      {values: []string{"-w", "--timeout", "-E", "--conflict-exit-code"}, shell: []string{"-c", "--command"}, operands: 1},
 		"uv":         {sub: "run", values: []string{"--with", "--python", "-p", "--project", "--directory", "--package", "--extra", "--group", "--env-file", "--index"}},
 		"poetry":     {sub: "run"},
@@ -62,7 +64,7 @@ var (
 	}
 	shellScript = script{letters: "c", words: []string{"--command"}, shell: true}
 	scripts     = map[string]script{
-		"bash": shellScript, "sh": shellScript, "zsh": shellScript, "dash": shellScript, "ksh": shellScript, "ash": shellScript, "fish": shellScript,
+		"bash": shellScript, "sh": shellScript, "zsh": shellScript, "dash": shellScript, "ksh": shellScript, "ash": shellScript, "fish": shellScript, "su": shellScript,
 		"python": {letters: "c"}, "pypy": {letters: "c"},
 		"node": {letters: "ep", words: []string{"--eval", "--print"}}, "nodejs": {letters: "ep", words: []string{"--eval", "--print"}},
 		"bun": {letters: "e", words: []string{"--eval", "--print"}}, "deno": {words: []string{"eval"}},
@@ -72,15 +74,19 @@ var (
 	dashC         = []string{"git", "make", "tar", "env"}
 	valueOptions  = map[string][]string{"git": {"-c", "--config-env", "--namespace", "--super-prefix"}}
 	grep          = reader{letters: "rR", words: []string{"--recursive", "--dereference-recursive", "--directories=recurse", "-d recurse"}}
-	readers       = map[string]reader{
-		"rg": {always: true}, "ag": {always: true}, "ack": {always: true}, "find": {always: true}, "fd": {always: true}, "tree": {always: true}, "rsync": {always: true},
+	shallow       = map[string]reader{
+		"ls": {letters: "R", words: []string{"--recursive"}}, "git": {sub: "grep"},
 		"grep": grep, "egrep": grep, "fgrep": grep, "zgrep": grep,
-		"ls":  {letters: "R", words: []string{"--recursive"}},
 		"cp":  {letters: "rRa", words: []string{"--recursive", "--archive"}},
 		"tar": {letters: "c", words: []string{"--create"}, bare: true},
 		"zip": {letters: "r", words: []string{"--recurse-paths"}},
-		"git": {sub: "grep", words: []string{"--no-index"}},
+		"cd":  {}, "pushd": {}, "popd": {}, "pwd": {}, "mkdir": {}, "rmdir": {}, "touch": {}, "mv": {}, "ln": {},
+		"stat": {}, "file": {}, "test": {}, "[": {}, "echo": {}, "printf": {}, "realpath": {}, "readlink": {},
+		"basename": {}, "dirname": {}, "which": {}, "command": {}, "true": {}, "false": {},
 	}
+	// depthOptions are the options whose value bounds how deep a program reads below a
+	// folder, besides -maxdepth and --max-depth (find, rg, du).
+	depthOptions = map[string]string{"fd": "-d", "tree": "-L"}
 )
 
 // script is how a program runs a script an option gives: the letters of its short options
@@ -105,32 +111,54 @@ func scriptOf(name string) (script, bool) {
 	return s, ok
 }
 
-// reader is a command that reads every file below each folder it names: always, or with one
-// of its options, a short one's letter in any cluster of them (grep -rn), with no dash in
-// its first word when bare (tar czf), or a word, an option's value included (-d recurse);
-// for one with a sub, only past that subcommand (git grep --no-index).
+// reader is a shallow program's options that make it read below each folder it names: a
+// short one's letter in any cluster of them (grep -rn), with no dash in its first word when
+// bare (tar czf), or a word, an option's value included (-d recurse); or its subcommand sub
+// (git grep).
 type reader struct {
 	letters, sub string
 	words        []string
-	always, bare bool
+	bare         bool
 }
 
 // recursive reports whether opt, followed by next, the first of the command's words when
 // first, makes r read below its folders.
 func (r reader) recursive(opt, next string, first bool) bool {
 	short := len(opt) > 1 && opt[0] == '-' && opt[1] != '-' || r.bare && first && opt != "" && opt[0] != '-'
-	return short && strings.ContainsAny(strings.TrimPrefix(opt, "-"), r.letters) ||
+	return short && r.letters != "" && strings.ContainsAny(strings.TrimPrefix(opt, "-"), r.letters) ||
 		slices.Contains(r.words, opt) || slices.Contains(r.words, opt+" "+next)
+}
+
+// shellAt is the index among args, a command's words past its program, of a shell given its
+// script with -c past its options (nix develop -c bash -c, strace -f /bin/zsh -lc), or -1.
+func shellAt(args []*syntax.Word) int {
+	for k, w := range args {
+		s, ok := scriptOf(programName(w))
+		if !ok || !s.shell {
+			continue
+		}
+		for _, o := range args[k+1:] {
+			if s.takes(o.Lit()) {
+				return k
+			}
+			if !strings.HasPrefix(o.Lit(), "-") {
+				break
+			}
+		}
+	}
+	return -1
 }
 
 // wrapped is a simple command's words past its wrappers: the wrappers' own (before) and the
 // role each plays there (a folder option's value, a target for the folder one runs the
 // command in, env -C's), a string one splits into the command's first words (split) or the
-// shell script one runs instead (script), and the command, its program first.
+// shell script one runs instead (script, each word one when each), and the command, its
+// program first.
 type wrapped struct {
 	before, script, command []*syntax.Word
 	roles                   []role
 	split                   *syntax.Word
+	each                    bool
 }
 
 // unwrap is args, a simple command's words, past its wrappers, however they nest (sudo
@@ -152,6 +180,8 @@ func unwrap(args []*syntax.Word) wrapped {
 			word, value := u.command[n], n+1 < len(u.command)
 			opt, lead := word.Lit(), leadingLit(word)
 			switch {
+			case slices.Contains(w.names, opt):
+				return u // command -v runs nothing
 			case opt == "--":
 				n++
 				roles = append(roles, program)
@@ -187,7 +217,7 @@ func unwrap(args []*syntax.Word) wrapped {
 		}
 		u.before, u.roles, u.command = append(u.before, u.command[:n]...), append(u.roles, roles...), u.command[n:]
 		if w.script {
-			u.script, u.command = u.command, nil
+			u.script, u.command, u.each = u.command, nil, w.each
 		}
 	}
 	return u
@@ -247,8 +277,112 @@ func folderValue(w *syntax.Word, dashCFolder bool) role {
 	return plain
 }
 
+// run reads a command past its wrappers: its program, then its arguments, a cd's or
+// pushd's target, a popd, an inline script (eval's, trap's, a shell's or an interpreter's,
+// a shell's -c script wherever it is among the words: strace -f bash -c) and a folder
+// option's value read as such. The words after -C (tar, make, git) are read from the folder
+// it names. Unless the program is known not to read below a folder (shallow), it reads below
+// each folder its words name, or where it runs when none names anything there (cd .. &&
+// pytest), as deep as its depth option allows (find -maxdepth).
+func (sc *scan) run(args []*syntax.Word) {
+	sc.arg(args[0], program)
+	name, args := programName(args[0]), args[1:]
+	switch name {
+	case "cd", "pushd":
+		sc.cd(args, name == "pushd")
+		return
+	case "popd":
+		if n := len(sc.pushed); n > 0 {
+			sc.prev, sc.dir, sc.pushed = sc.dir, sc.pushed[n-1], sc.pushed[:n-1]
+		}
+		return
+	case "eval":
+		sc.inline(args, true)
+		return
+	case "trap":
+		sc.inline(args[:min(len(args), 1)], true)
+		return
+	}
+	if k := shellAt(args); k >= 0 {
+		for _, w := range args[:k] {
+			sc.arg(w, plain)
+		}
+		sc.run(args[k:])
+		return
+	}
+	s, scripted := scriptOf(name)
+	r, isShallow := shallow[name]
+	deep, sub, levels := !isShallow, "", maxBelowDepth+2
+	outer, dir, prev, moved := sc.reads, sc.dir, sc.prev, false
+	sc.reads = &operands{}
+	defer func() {
+		if sc.reads = outer; moved {
+			sc.dir, sc.prev = dir, prev // -C's folder is the command's alone
+		}
+	}()
+	for j := 0; j < len(args); j++ {
+		opt, next, after := args[j].Lit(), j+1 < len(args), ""
+		if next {
+			after = args[j+1].Lit()
+		}
+		dashCFolder := slices.Contains(dashC, name) && (name != "git" || sub == "")
+		switch {
+		case next && scripted && s.takes(opt):
+			j++
+			sc.inline(args[j:j+1], s.shell)
+		case next && (slices.Contains(folderOptions, opt) || opt == "-C" && dashCFolder):
+			j++
+			sc.arg(args[j], folder)
+			if opt == "-C" && name != "env" {
+				moved = sc.into(args[j]) || moved
+			}
+		case next && sub == "" && slices.Contains(valueOptions[name], opt):
+			j++
+			sc.arg(args[j], plain)
+		case next && depthOption(name, opt):
+			j++
+			if n, err := strconv.Atoi(after); err == nil {
+				levels = n
+			}
+		default:
+			deep = deep || isShallow && r.recursive(opt, after, j == 0)
+			if v, ok := strings.CutPrefix(opt, "--max-depth="); ok {
+				if n, err := strconv.Atoi(v); err == nil {
+					levels = n
+				}
+			}
+			if sub == "" && !strings.HasPrefix(opt, "-") {
+				sub = opt
+			}
+			sc.arg(args[j], folderValue(args[j], dashCFolder))
+		}
+	}
+	deep = deep || isShallow && r.sub != "" && r.sub == sub
+	if !deep {
+		return
+	}
+	if !sc.reads.named && sc.dir != "" {
+		sc.reads.folders = append(sc.reads.folders, sc.dir)
+	}
+	for _, d := range sc.reads.folders {
+		sc.below(d, levels)
+	}
+}
+
+// into moves where the command is to the folder w names, a literal word, for the words
+// after it (tar -C .. acme-api), and reports whether it did.
+func (sc *scan) into(w *syntax.Word) bool {
+	if p, ok := sc.path(w.Lit(), sc.dir); ok && w.Lit() != "" && sc.spend(1) {
+		if info, err := os.Stat(p); err == nil && info.IsDir() {
+			sc.prev, sc.dir = sc.dir, p
+			return true
+		}
+	}
+	return false
+}
+
 // runsShell reports whether cmd runs a shell, past its wrappers, reading its commands from
-// its input: no -c.
+// its input: no -c, and no script file (bash -s and its arguments do).
 func runsShell(cmd syntax.Command) bool {
 	ce, ok := cmd.(*syntax.CallExpr)
 	if !ok || len(ce.Args) == 0 {
@@ -259,81 +393,16 @@ func runsShell(cmd syntax.Command) bool {
 		return false
 	}
 	s, ok := scriptOf(programName(u.command[0]))
-	return ok && s.shell && !slices.ContainsFunc(u.command[1:], func(w *syntax.Word) bool { return s.takes(w.Lit()) })
-}
-
-// maxBelowDepth bounds how far below a folder outside any checkout ShellPaths looks for the
-// checkouts a recursive reader of it reads.
-const maxBelowDepth = 4
-
-// recurse reaches the checkouts below each folder a recursive reader reads: those its
-// operands name, or where the command is when none names anything there (rg TODO).
-func (sc *scan) recurse(operands []*syntax.Word) {
-	var dirs []string
-	named := false
-	for _, w := range operands {
-		fields, err := sc.fields(w)
-		if err != nil {
-			continue
-		}
-		for _, f := range fields {
-			p, ok := sc.path(f, sc.dir)
-			if !ok || !sc.spend(1) {
-				continue
-			}
-			if info, err := os.Stat(p); err == nil {
-				named = true
-				if info.IsDir() {
-					dirs = append(dirs, p)
-				}
-			}
+	if !ok || !s.shell {
+		return false
+	}
+	for _, w := range u.command[1:] {
+		switch opt := w.Lit(); {
+		case opt == "-s":
+			return true
+		case s.takes(opt), !strings.HasPrefix(opt, "-") && !strings.HasPrefix(opt, "+"):
+			return false
 		}
 	}
-	if !named && sc.dir != "" {
-		dirs = append(dirs, sc.dir)
-	}
-	for _, dir := range dirs {
-		sc.below(dir)
-	}
-}
-
-// below reaches the checkouts below dir, a folder a recursive reader reads: none when dir is
-// in a checkout, which is its place (one nested in it is not looked for); else each checkout
-// a walk down at most maxBelowDepth levels finds, each folder it reads and each entry a
-// lookup. A walk that runs out of either reaches somewhere not known.
-func (sc *scan) below(dir string) {
-	c := candidate{dir, "", walked}
-	if _, seen := sc.examined[c]; seen || !sc.spend(1) {
-		return
-	}
-	sc.examined[c] = ""
-	if _, _, ok := gitx.LocateFS(dir); ok {
-		return
-	}
-	level := []string{dir}
-	for depth := 0; len(level) > 0 && !sc.unknown; depth++ {
-		var next []string
-		for _, d := range level {
-			for _, e := range sc.readDir(d) {
-				sub := filepath.Join(d, e.Name())
-				if e.Type()&fs.ModeSymlink != 0 {
-					if info, err := os.Stat(sub); err != nil || !info.IsDir() {
-						continue
-					}
-				} else if !e.IsDir() {
-					continue
-				}
-				if depth == maxBelowDepth || !sc.spend(1) {
-					sc.unknown = true
-					return
-				}
-				if _, err := os.Lstat(filepath.Join(sub, ".git")); err == nil {
-					sc.place(sub)
-					continue
-				}
-				next = append(next, sub)
-			}
-		}
-		level = next
-	}
+	return true
 }

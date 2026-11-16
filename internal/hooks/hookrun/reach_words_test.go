@@ -38,9 +38,11 @@ func newWordsMachine(t *testing.T) wordsMachine {
 	return m
 }
 
-// paths is ShellPaths in m, UnknownReach without the command it names.
+// paths is ShellPaths in m, UnknownReach without the command it names, given a minute: these
+// tests hold the scan to its other bounds, which a scan under a loaded test run may take
+// longer than maxShellTime to reach (TestShellPathsEndAtTheirDeadline holds it to a hook's).
 func (m wordsMachine) paths(command, cwd string) []string {
-	got := shellPaths(command, cwd, func(k string) (string, bool) { v, ok := m.env[k]; return v, ok })
+	got := shellPathsBy(command, cwd, func(k string) (string, bool) { v, ok := m.env[k]; return v, ok }, time.Now().Add(time.Minute))
 	for i, p := range got {
 		if isUnknownReach(p) {
 			got[i] = UnknownReach
@@ -305,7 +307,7 @@ func TestShellPathsReadInlineScriptsAndFolderOptions(t *testing.T) {
 		"coproc cat ../acme-api/NOTES.md":                 {m.api},
 		"git diff -C $(git merge-base HEAD main) -- src":  {src},
 		"pushd ../acme-api && popd && ls $PWD/src":        {m.api, src},
-		"cat <<'EOF' | grep x | sh\ncd ../acme-api\nEOF":  {m.api},
+		"cat <<'EOF' | grep x | sh\ncd ../acme-api\nEOF":  {m.api, UnknownReach},
 	})
 	for _, command := range []string{`bash -c "$CMD"`, `eval "$CMD"`, "git --git-dir=$(cat p) log", "tar -C $UNSET -xf x.tar", "env -C`cat p` make", "make --directory $(cat p)", "tar -xf x.tar -C $(cat p)"} {
 		if got := m.paths(command, m.side); !slices.Contains(got, UnknownReach) {
@@ -554,7 +556,7 @@ func TestShellPathsReachTheCheckoutsBelowARecursiveRead(t *testing.T) {
 		"grep -rn TODO ../acme-api/NOTES.md": {m.api},
 		"grep -n TODO ..":                    {m.parent},
 		"ls ..":                              {m.parent},
-		"git grep TODO ..":                   {m.parent},
+		"git grep TODO ..":                   append([]string{m.parent}, below...),
 		"find ../acme-api -name x":           {m.api},
 		"cd ../work && ls -R":                append([]string{filepath.Join(m.parent, "work")}, deep),
 	})

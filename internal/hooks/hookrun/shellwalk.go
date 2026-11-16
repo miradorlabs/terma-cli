@@ -1,6 +1,7 @@
 package hookrun
 
 import (
+	"path/filepath"
 	"slices"
 	"strings"
 
@@ -19,10 +20,11 @@ const (
 	target                  // a cd's target: where the command goes, unknown when not resolved
 	folder                  // a folder option's value (-C, --git-dir): unknown when not resolved
 	creates                 // a > target: when not there, its nearest folder
-	data                    // a here-document's word, or a fragment of an argument: only when slashed and there
-	slashedOnly             // an assignment's value, an inline script's word: only when slashed
+	data                    // a here-document's word, or a fragment of prose (an argument holding whitespace): only when slashed and there
+	part                    // a fragment of an argument holding none (-v ../x:/src): only when slashed and there, an operand
+	slashedOnly             // an assignment's value or a fragment of one, an inline script's word: only when slashed
 	globbed                 // a glob's pattern, once walked (a key of examined only)
-	walked                  // a folder a recursive reader reads, once walked (a key of examined only)
+	walked                  // a folder read below, once walked (a key of examined only)
 )
 
 // whole reports whether a word in role r is a path as written, never an option's or an
@@ -30,7 +32,7 @@ const (
 func (r role) whole() bool { return r == program || r == target }
 
 // needsSlash reports whether a word in role r names no path unless it is slashed.
-func (r role) needsSlash() bool { return r == program || r == data || r == slashedOnly }
+func (r role) needsSlash() bool { return r == program || r == data || r == part || r == slashedOnly }
 
 // mayCreate reports whether a word in role r that names nothing there may be a file the
 // command creates, which reaches the nearest folder above it: a > target, or a slashed word
@@ -43,7 +45,7 @@ func (r role) mayCreate(slashed bool) bool {
 // somewhere not known: a cd's target or a folder option's value always, any other that may
 // be a path (slashed) unless it is only run or read as data.
 func (r role) mustResolve(slashed bool) bool {
-	return r == target || r == folder || slashed && r != program && r != data
+	return r == target || r == folder || slashed && r != program && r != data && r != part
 }
 
 // stmts reads list in order; feeds is whether its output is a shell's input.
@@ -57,18 +59,22 @@ func (sc *scan) stmts(list []*syntax.Stmt, feeds bool) {
 }
 
 // stmt reads one statement, then its redirects: a here-document is commands when the
-// statement runs a shell, or its output is one's input (cat <<EOF | sh).
+// statement runs a shell, or its output is one's input (cat <<EOF | sh). Output a shell reads
+// is commands when it is echo's or printf's words or a here-document (feed); any other's is
+// not known (curl ... | sh).
 func (sc *scan) stmt(s *syntax.Stmt, feeds bool) {
 	switch c := s.Cmd.(type) {
 	case *syntax.CallExpr:
 		sc.call(c)
-	case *syntax.BinaryCmd:
-		pipe := c.Op == syntax.Pipe || c.Op == syntax.PipeAll
-		y := c.Y
-		for b, ok := y.Cmd.(*syntax.BinaryCmd); ok && b.Op == c.Op; b, ok = y.Cmd.(*syntax.BinaryCmd) {
-			y = b.Y // the pipeline's last command
+		if feeds {
+			sc.feed(c, s.Redirs)
 		}
-		sc.stmt(c.X, pipe && (feeds || runsShell(y.Cmd)))
+	case *syntax.BinaryCmd:
+		if c.Op == syntax.Pipe || c.Op == syntax.PipeAll {
+			sc.stmt(c.X, runsShell(c.Y.Cmd)) // a | b | c is (a | b) | c
+		} else {
+			sc.stmt(c.X, feeds)
+		}
 		sc.stmt(c.Y, feeds)
 	case *syntax.Subshell:
 		sc.subshell(func() { sc.stmts(c.Stmts, false) })
@@ -110,6 +116,11 @@ func (sc *scan) stmt(s *syntax.Stmt, feeds bool) {
 			return !ok
 		})
 	}
+	switch s.Cmd.(type) {
+	case *syntax.CallExpr, *syntax.BinaryCmd, *syntax.Block, *syntax.TimeClause:
+	default:
+		sc.unknown = sc.unknown || feeds // a loop's or a subshell's output, read as commands
+	}
 	for _, r := range s.Redirs {
 		sc.redirect(r, feeds || runsShell(s.Cmd))
 	}
@@ -120,6 +131,49 @@ func (sc *scan) subshell(f func()) {
 	dir, prev, pushed := sc.dir, sc.prev, slices.Clone(sc.pushed)
 	f()
 	sc.dir, sc.prev, sc.pushed = dir, prev, pushed
+}
+
+// feed reads the output of ce, with its redirects, as a shell's commands: the words echo or
+// printf writes, or its here-document, which its redirects read as commands; any other
+// command's output is not known.
+func (sc *scan) feed(ce *syntax.CallExpr, redirs []*syntax.Redirect) {
+	if slices.ContainsFunc(redirs, func(r *syntax.Redirect) bool {
+		return r.Op == syntax.Hdoc || r.Op == syntax.DashHdoc || r.Op == syntax.WordHdoc
+	}) {
+		return
+	}
+	u := unwrap(ce.Args)
+	if len(u.command) == 0 {
+		sc.unknown = true
+		return
+	}
+	switch words := u.command[1:]; programName(u.command[0]) {
+	case "echo":
+		for len(words) > 0 && strings.HasPrefix(words[0].Lit(), "-") {
+			words = words[1:]
+		}
+		sc.echoed(words, " ")
+	case "printf":
+		sc.echoed(words, "\n")
+	default:
+		sc.unknown = true
+	}
+}
+
+// echoed reads words, which echo or printf writes, each after the last with sep between
+// them, as a shell's commands, a \n among them a newline.
+func (sc *scan) echoed(words []*syntax.Word, sep string) {
+	var text []string
+	for _, w := range words {
+		fields, err := sc.fields(w)
+		if err != nil {
+			sc.unknown = true
+			return
+		}
+		text = append(text, fields...)
+	}
+	script := strings.ReplaceAll(strings.Join(text, sep), `\n`, "\n")
+	sc.subshell(func() { sc.script(script) })
 }
 
 // call reads a simple command: its assignments, its wrappers' words, each in its role, and
@@ -144,6 +198,10 @@ func (sc *scan) call(ce *syntax.CallExpr) {
 		switch {
 		case u.split != nil:
 			sc.splitScript(u.split, u.command)
+		case u.each:
+			for i := range u.script {
+				sc.inline(u.script[i:i+1], true)
+			}
 		case u.script != nil:
 			sc.inline(u.script, true)
 		case len(u.command) > 0:
@@ -184,66 +242,9 @@ func (sc *scan) splitScript(s *syntax.Word, rest []*syntax.Word) {
 	sc.subshell(func() { sc.script(text) })
 }
 
-// run reads a command past its wrappers: its program, then its arguments, a cd's or
-// pushd's target, a popd, an inline script (eval's, trap's, a shell's or an interpreter's)
-// and a folder option's value read as such, and below the folders a recursive reader reads.
-func (sc *scan) run(args []*syntax.Word) {
-	sc.arg(args[0], program)
-	name, args := programName(args[0]), args[1:]
-	switch name {
-	case "cd", "pushd":
-		sc.cd(args, name == "pushd")
-		return
-	case "popd":
-		if n := len(sc.pushed); n > 0 {
-			sc.prev, sc.dir, sc.pushed = sc.dir, sc.pushed[n-1], sc.pushed[:n-1]
-		}
-		return
-	case "eval":
-		sc.inline(args, true)
-		return
-	case "trap":
-		sc.inline(args[:min(len(args), 1)], true)
-		return
-	}
-	s, scripted := scriptOf(name)
-	r, isReader := readers[name]
-	recursive, sub := isReader && r.always, ""
-	var operands []*syntax.Word
-	for j := 0; j < len(args); j++ {
-		opt, next, after := args[j].Lit(), j+1 < len(args), ""
-		if next {
-			after = args[j+1].Lit()
-		}
-		dashCFolder := slices.Contains(dashC, name) && (name != "git" || len(operands) == 0)
-		switch {
-		case next && scripted && s.takes(opt):
-			j++
-			sc.inline(args[j:j+1], s.shell)
-		case next && (slices.Contains(folderOptions, opt) || opt == "-C" && dashCFolder):
-			j++
-			sc.arg(args[j], folder)
-		case next && len(operands) == 0 && slices.Contains(valueOptions[name], opt):
-			j++
-			sc.arg(args[j], plain)
-		default:
-			recursive = recursive || isReader && r.recursive(opt, after, j == 0)
-			if !strings.HasPrefix(opt, "-") {
-				if len(operands) == 0 {
-					sub = opt
-				}
-				operands = append(operands, args[j])
-			}
-			sc.arg(args[j], folderValue(args[j], dashCFolder))
-		}
-	}
-	if recursive && (r.sub == "" || r.sub == sub) {
-		sc.recurse(operands)
-	}
-}
-
 // cd reads a cd's or pushd's arguments: its target, past its options, is where the command
-// goes; a cd with none goes home, and - goes back to where it was, already reached.
+// goes, a relative one from each folder CDPATH names when the command sets it; a cd with
+// none goes home, and - goes back to where it was, already reached.
 func (sc *scan) cd(args []*syntax.Word, push bool) {
 	for len(args) > 0 && len(args[0].Lit()) > 1 && args[0].Lit()[0] == '-' {
 		args = args[1:]
@@ -255,6 +256,7 @@ func (sc *scan) cd(args []*syntax.Word, push bool) {
 			sc.prev, sc.dir = sc.dir, sc.prev
 		}
 	case len(args) > 0:
+		sc.cdpath(args[0])
 		sc.arg(args[0], target)
 	case !push:
 		if home, ok := sc.lookup("HOME"); ok {
@@ -263,6 +265,25 @@ func (sc *scan) cd(args []*syntax.Word, push bool) {
 	}
 	if push && sc.dir != from {
 		sc.pushed = append(sc.pushed, from)
+	}
+}
+
+// cdpath reaches the folders a cd's relative target w names from those the command's CDPATH
+// lists (CDPATH=.. cd acme-api), going to each that is there.
+func (sc *scan) cdpath(w *syntax.Word) {
+	cdpath := sc.vars["CDPATH"]
+	if cdpath == nil || *cdpath == "" {
+		return
+	}
+	fields, err := sc.fields(w)
+	if err != nil || len(fields) != 1 || filepath.IsAbs(fields[0]) || fields[0] == "." || fields[0] == ".." ||
+		strings.HasPrefix(fields[0], "./") || strings.HasPrefix(fields[0], "../") {
+		return
+	}
+	for _, d := range filepath.SplitList(*cdpath) {
+		if d != "" {
+			sc.candidate(filepath.Join(d, fields[0]), target)
+		}
 	}
 }
 

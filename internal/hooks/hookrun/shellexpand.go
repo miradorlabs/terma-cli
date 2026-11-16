@@ -188,6 +188,7 @@ func (sc *scan) arg(w *syntax.Word, r role) {
 	sc.substitutions(w)
 	if l := w.Lit(); l != "" && !strings.ContainsAny(l, `\~{*?[`) {
 		sc.candidate(l, r) // nothing to expand
+		sc.pieces(l, r)
 		return
 	}
 	for w, err := range sc.braces(w) {
@@ -199,12 +200,11 @@ func (sc *scan) arg(w *syntax.Word, r role) {
 }
 
 // expand reads w, a word with no braces left, in role r: a glob is what it matches, if
-// anything, else each field w expands to is a candidate, and an argument holding
-// whitespace (git commit -m "fix a/b") its fragments as data too. A word that cannot be
-// resolved is unknown when it may be a path.
+// anything, else each field w expands to is a candidate, and its pieces too. A word that
+// cannot be resolved is unknown when it may be a path.
 func (sc *scan) expand(w *syntax.Word, r role) {
 	if r != program && mayGlob(w) {
-		if pat, err := sc.pattern(w); err == nil && pattern.HasMeta(pat, 0) && sc.glob(pat) {
+		if pat, err := sc.pattern(w); err == nil && pattern.HasMeta(pat, 0) && sc.glob(pat, r) {
 			return
 		}
 	}
@@ -214,18 +214,32 @@ func (sc *scan) expand(w *syntax.Word, r role) {
 	}
 	for _, f := range fields {
 		sc.candidate(f, r)
-		if r == plain && strings.ContainsFunc(f, unicode.IsSpace) {
-			sc.fragments(f, data)
-		}
+		sc.pieces(f, r)
 	}
 }
 
-// glob reaches what pat matches from where the command is and from the cwd, walked a
-// segment at a time so that only the folders a wildcard is in are read (expand's own glob
-// reads each folder on the way, to see that it is there), each entry read and each match a
-// lookup: a match's folder, or a matched folder itself. False when nothing matches, and the
-// word is taken as written.
-func (sc *scan) glob(pat string) bool {
+// pieces reads the fragments of f, an argument (r plain) or an assignment's value (r
+// slashedOnly) as expanded, when it has any: prose's, holding whitespace (git commit -m "fix
+// a/b"), as data; else an argument's as parts (-v ../x:/src, -d @../x) and a value's each as a
+// value of its own (PYTHONPATH=.:../x).
+func (sc *scan) pieces(f string, r role) {
+	switch {
+	case r != plain && r != slashedOnly || !strings.ContainsFunc(f, isFragmentSeparator):
+	case strings.ContainsFunc(f, unicode.IsSpace):
+		sc.fragments(f, data)
+	case r == plain:
+		sc.fragments(f, part)
+	default:
+		sc.fragments(f, slashedOnly)
+	}
+}
+
+// glob reaches what pat, a word in role r, matches from where the command is and from the
+// cwd, walked a segment at a time so that only the folders a wildcard is in are read
+// (expand's own glob reads each folder on the way, to see that it is there), each entry read
+// and each match a lookup: a match's folder, or a matched folder itself, each an operand.
+// False when nothing matches, and the word is taken as written.
+func (sc *scan) glob(pat string, r role) bool {
 	segs := strings.Split(pat, "/")
 	if len(slices.DeleteFunc(slices.Clone(segs), func(s string) bool { return !pattern.HasMeta(s, 0) })) > maxGlobSegments {
 		sc.unknown = true
@@ -234,6 +248,9 @@ func (sc *scan) glob(pat string) bool {
 	dirs := []string{sc.dir, sc.cwd}
 	if root := segs[0]; root == "" || filepath.VolumeName(root) != "" {
 		dirs, segs = []string{root + string(filepath.Separator)}, segs[1:]
+	}
+	if slices.Contains(segs, "**") {
+		return sc.globstar(dirs, segs, r)
 	}
 	found := false
 	for _, dir := range dirs {
@@ -272,29 +289,11 @@ func (sc *scan) glob(pat string) bool {
 			if info, err := os.Lstat(m); err == nil {
 				found = true
 				sc.reachEntry(m, info)
+				sc.operand(m, info, r)
 			}
 		}
 	}
 	return found || sc.unknown
-}
-
-// readDir is what the folder dir holds, by name, each entry read a lookup: none past
-// maxShellLookups, which it reads no further than.
-func (sc *scan) readDir(dir string) []fs.DirEntry {
-	if !sc.spend(1) {
-		return nil
-	}
-	f, err := os.Open(dir)
-	if err != nil {
-		return nil
-	}
-	defer f.Close()
-	entries, _ := f.ReadDir(maxShellLookups - sc.lookups + 1)
-	if !sc.spend(len(entries)) {
-		return nil
-	}
-	slices.SortFunc(entries, func(a, b fs.DirEntry) int { return strings.Compare(a.Name(), b.Name()) })
-	return entries
 }
 
 // unescape is a glob's segment with no wildcard as the name it matches.
@@ -342,10 +341,33 @@ func slashed(w *syntax.Word) bool {
 	return found
 }
 
-// fragments are the words of text, a script's or a here-document's, split at whitespace,
-// quotes, parentheses and commas.
+// fragmentSeparators are the bytes besides whitespace that separate fragments.
+const fragmentSeparators = "'\"`()[]{}<>,;:@="
+
+// isFragmentSeparator reports whether r separates fragments.
+func isFragmentSeparator(r rune) bool {
+	return unicode.IsSpace(r) || strings.ContainsRune(fragmentSeparators, r)
+}
+
+// fragments are the words of text, a script's, a here-document's or an argument's, split at
+// whitespace, quotes, brackets, parentheses, commas, :, @ and =, but a drive's colon (C:\x).
 func fragments(text string) iter.Seq[string] {
-	return strings.FieldsFuncSeq(text, func(r rune) bool { return unicode.IsSpace(r) || strings.ContainsRune("'\"`(),;", r) })
+	return func(yield func(string) bool) {
+		start := -1
+		for i, r := range text + " " {
+			drive := r == ':' && start >= 0 && i == start+1 && i+1 < len(text) && (text[i+1] == '/' || text[i+1] == '\\') &&
+				unicode.IsLetter(rune(text[start]))
+			switch {
+			case isFragmentSeparator(r) && !drive:
+				if start >= 0 && !yield(text[start:i]) {
+					return
+				}
+				start = -1
+			case start < 0:
+				start = i
+			}
+		}
+	}
 }
 
 // shellValue is the part of the shell word w that may be a path: an option's value after
