@@ -12,6 +12,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
+	"github.com/miradorlabs/terma-cli/internal/routing"
 	"github.com/miradorlabs/terma-cli/internal/ui/output"
 )
 
@@ -32,6 +33,16 @@ type Env struct {
 	// Updates are the rows saying how this terma gets new releases and what it last
 	// installed by itself, among the context doctor prints first.
 	Updates []Row
+	// Routing is set on a machine that routes by teams (config.Migrated), and nil on one
+	// that still routes by its one team, which doctor checks as it always has.
+	Routing *Routing
+	// MigrationBlocked says why the last relay start did not move this machine to routing
+	// by teams, such as a second terma install its agents' hooks run; nil when nothing
+	// blocks it.
+	MigrationBlocked *MigrationBlock
+	// NotOptedIn: the machine routes by its one team, and its developer has not opted in
+	// to routing by teams, so no relay start moves it (migrate.OptIn).
+	NotOptedIn bool
 }
 
 // Probes reach the event spool and the platform's APIs for a run.
@@ -188,18 +199,25 @@ func Run(ctx context.Context, env Env, progress Progress) Report {
 	d := &run{ctx: ctx, env: env, cfg: cfg}
 	timed(KeyAuth, "signed in", d.signedIn)
 
+	if b := env.MigrationBlocked; env.Routing == nil && b != nil {
+		timed(KeyMigration, "routing by teams", func() Check { return MigrationCheck(*b) })
+	}
 	d.nonGit = env.RepoErr == nil && env.GitDir == ""
 	// The policy the hooks apply, so doctor never admits a repository they would not.
 	d.pol = cfg.Policy.InForce(cfg.OrganizationID, cfg.AuthURL)
-	timed(KeyProject, "repository collected", func() Check {
-		if env.RepoErr == nil && d.pol.Global() {
-			return unlessCaptureOff(d.pol, Check{Status: Pass, Detail: "every session, in global mode: " + GlobalDestination(cfg)})
-		}
-		c := RepositoryCheck(d.pol, TeamLabel(cfg), env.GitDir, env.RepoErr)
-		d.admitted = c.Status == Pass
-		return unlessCaptureOff(d.pol, c)
-	})
-	d.projectID = cmp.Or(cfg.ProjectID, cfg.Policy.TeamID)
+	if env.Routing != nil {
+		d.routedChecks(timed)
+	} else {
+		timed(KeyProject, "repository collected", func() Check {
+			if env.RepoErr == nil && d.pol.Global() {
+				return unlessCaptureOff(d.pol, Check{Status: Pass, Detail: "every session, in global mode: " + GlobalDestination(cfg)})
+			}
+			c := RepositoryCheck(d.pol, TeamLabel(cfg), env.GitDir, env.RepoErr)
+			d.admitted = c.Status == Pass
+			return unlessCaptureOff(d.pol, c)
+		})
+		d.projectID = cmp.Or(cfg.ProjectID, cfg.Policy.TeamID)
+	}
 
 	timed(KeyHooks, "commit hooks in effect", d.commitHooks)
 
@@ -231,6 +249,23 @@ type run struct {
 	nonGit    bool
 	admitted  bool
 	projectID string
+	// team is, on a machine that routes by teams, the one this repository's sessions go to.
+	team *routing.Team
+}
+
+// routedChecks are the teams and where this repository goes, on a machine that routes by
+// teams: what the hooks and the relay apply there instead of the profile's one policy.
+func (d *run) routedChecks(timed func(key, name string, fn func() Check)) {
+	r := *d.env.Routing
+	timed(KeyTeams, "teams", func() Check { return TeamsCheck(r, time.Now()) })
+	timed(KeyProject, "repository collected", func() Check {
+		c, team := RoutedRepository(r, d.env.GitDir, d.env.RepoErr, time.Now())
+		d.team, d.admitted = team, c.Status == Pass
+		if team != nil {
+			d.pol, d.projectID = team.Policy, team.TeamID
+		}
+		return c
+	})
 }
 
 // unlessCaptureOff keeps a passing collection check from reading as working while pol
@@ -299,6 +334,10 @@ func (d *run) commitHooks() Check {
 	}
 	now := time.Now()
 	verdict := JudgeCommitHooks(d.env.GitDir, d.pol, now)
+	if d.env.Routing != nil {
+		// Route already matched the repository: the team it goes to decides the hooks.
+		verdict = judgeCommitHooks(d.env.GitDir, d.team != nil && d.team.Policy.GitHooks, d.team != nil)
+	}
 	c := CommitHooksCheck(verdict)
 	// Only on the Off verdict: hooks installed under a policy since switched off still
 	// record and stamp, so recommending them there would be wrong. The → line on a skip is

@@ -166,14 +166,20 @@ func Local(ctx context.Context, env Env) (LocalReport, error) {
 }
 
 // Context is what `terma doctor` prints above its checks, which do not cover it: what this
-// machine collects, which backend it reports to, how it gets new releases (Env.Updates),
-// and the repository's work in progress.
+// machine collects, which backend it reports to, whether it may route by teams
+// (Env.NotOptedIn), how it gets new releases (Env.Updates), and the repository's work in
+// progress.
 func Context(env Env) []Row {
 	if env.Config == nil {
 		return nil
 	}
 	rows := append([]Row{{"Config", output.TildePath(env.ConfigDir)}, {"State", output.TildePath(env.StateDir)}},
 		machineRows(env.Config)...)
+	if env.Routing != nil {
+		rows = append(rows, TeamRows(*env.Routing, time.Now())...)
+	} else if env.NotOptedIn {
+		rows = append(rows, Row{"Routing", "by this profile's one team; `terma teams` turns on routing by teams"})
+	}
 	rows = append(rows, env.Updates...)
 	if env.RepoErr != nil {
 		return rows

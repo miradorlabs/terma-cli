@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -232,5 +233,91 @@ func TestSaveCredential_GivesUpOnAHungHolder(t *testing.T) {
 	}
 	if elapsed > lockWait+2*time.Second {
 		t.Fatalf("SaveCredential waited %v; want about %v", elapsed, lockWait)
+	}
+}
+
+// activeIn is the organization the profile's index in path marks active.
+func activeIn(t *testing.T, path, profile string) string {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var file credentialFile
+	if err := json.Unmarshal(data, &file); err != nil {
+		t.Fatal(err)
+	}
+	if file[profile] == nil {
+		return ""
+	}
+	return file[profile].Active
+}
+
+// A sign-in to several organizations saves each without activating it: the active
+// organization never changes, a profile with none keeps none, and each save returns the
+// session it displaced in its own organization only. ActivateCredential then makes one
+// active, and only one the profile holds. On a machine not migrated it all lands in
+// credentials.json; on a migrated one in credentials.v2.json alone.
+func TestSaveInactiveCredential(t *testing.T) {
+	t.Parallel()
+	for _, migrated := range []bool{false, true} {
+		dir := t.TempDir()
+		if migrated {
+			mustDo(t, os.WriteFile(config.CredentialsV2Path(dir), []byte("{}"), 0o600))
+		}
+		index := config.CredentialsPath(dir)
+		if migrated {
+			index = config.CredentialsV2Path(dir)
+		}
+
+		replaced, err := SaveInactiveCredential(dir, "default", orgCredential("org-p", "s-p"))
+		mustDo(t, err)
+		if replaced != nil || activeIn(t, index, "default") != "" {
+			t.Fatalf("migrated %v: a first inactive save replaced %+v and activated %q", migrated, replaced, activeIn(t, index, "default"))
+		}
+		if _, err := LoadCredential(dir, "default"); err != ErrNotLoggedIn {
+			t.Fatalf("migrated %v: a profile with no active organization reads as %v", migrated, err)
+		}
+		if cred, err := LoadCredentialFor(dir, "default", "org-p"); err != nil || cred.AccessToken != "ter_cli_org-p" {
+			t.Fatalf("migrated %v: the inactive sign-in = %+v, %v", migrated, cred, err)
+		}
+
+		_, err = SaveCredential(dir, "default", orgCredential("org-a", "s-a"))
+		mustDo(t, err)
+		for _, org := range []string{"org-b", "org-p"} {
+			replaced, err := SaveInactiveCredential(dir, "default", orgCredential(org, "s-"+org+"-2"))
+			mustDo(t, err)
+			if active := activeIn(t, index, "default"); active != "org-a" {
+				t.Fatalf("migrated %v: saving %s made %q active", migrated, org, active)
+			}
+			switch {
+			case org == "org-p" && (replaced == nil || replaced.SessionID != "s-p"):
+				t.Fatalf("migrated %v: org-p's displaced session = %+v, want s-p", migrated, replaced)
+			case org == "org-b" && replaced != nil:
+				t.Fatalf("migrated %v: a new organization displaced %+v", migrated, replaced)
+			}
+		}
+		// Saving the same session again displaces nothing to revoke.
+		if replaced, err := SaveInactiveCredential(dir, "default", orgCredential("org-b", "s-org-b-2")); err != nil || replaced != nil {
+			t.Fatalf("migrated %v: re-saving a session replaced %+v, %v", migrated, replaced, err)
+		}
+
+		if err := ActivateCredential(dir, "default", "org-c"); err != ErrNotLoggedIn {
+			t.Fatalf("migrated %v: activating an organization without a sign-in = %v", migrated, err)
+		}
+		mustDo(t, ActivateCredential(dir, "default", "org-p"))
+		if active, err := LoadCredential(dir, "default"); err != nil || active.OrganizationID != "org-p" || active.SessionID != "s-org-p-2" {
+			t.Fatalf("migrated %v: active after activating org-p = %+v, %v", migrated, active, err)
+		}
+		if creds, err := Credentials(dir, "default"); err != nil || len(creds) != 3 {
+			t.Fatalf("migrated %v: credentials = %d, %v", migrated, len(creds), err)
+		}
+		if migrated {
+			if _, err := os.Stat(config.CredentialsPath(dir)); err == nil {
+				t.Fatal("a migrated machine's inactive save wrote credentials.json")
+			}
+		} else if config.Migrated(dir) {
+			t.Fatal("an inactive save migrated the machine")
+		}
 	}
 }

@@ -455,3 +455,43 @@ func TestWritableReportsAnUnwritableSpool(t *testing.T) {
 		t.Fatal("a spool whose queue cannot be written must report an error")
 	}
 }
+
+// Sessions names the session of every queued event that has one, a line at a time,
+// skipping a line it cannot read, and stops once its context ends.
+func TestSessionsNamesEveryQueuedSession(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	s, err := Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Sessions(t.Context(), func(string) { t.Error("an empty spool named a session") }); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Append(Event{Name: "a", SessionID: "s1"}, Event{Name: "b"}, Event{Name: "c", SessionID: "s2"}); err != nil {
+		t.Fatal(err)
+	}
+	f, err := os.OpenFile(filepath.Join(dir, eventsFile), os.O_APPEND|os.O_WRONLY, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.WriteString("{not json\n"); err != nil {
+		t.Fatal(err)
+	}
+	_ = f.Close()
+	if err := s.Append(Event{Name: "d", SessionID: "s1"}); err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	if err := s.Sessions(t.Context(), func(id string) { got = append(got, id) }); err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(got, []string{"s1", "s2", "s1"}) {
+		t.Errorf("Sessions named %v", got)
+	}
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	if err := s.Sessions(ctx, func(string) {}); !errors.Is(err, context.Canceled) {
+		t.Errorf("a cancelled scan returned %v", err)
+	}
+}

@@ -33,6 +33,8 @@ type reply struct {
 	TraceID string
 	// At is when Codex recorded the message, not when the hook read it.
 	At time.Time
+	// Cwd is the working directory of the turn the message was said in.
+	Cwd string
 }
 
 // replyCursor holds no transcript text: an offset, an anchor that detects a rewritten
@@ -196,7 +198,7 @@ func codexReplyFrom(line []byte, cursor *replyCursor, sessionID string, maxText 
 	}
 	reply := reply{
 		ID: rec.Payload.ID, Text: full,
-		TurnID: cursor.TurnID, TraceID: cursor.TraceID, At: rec.Timestamp,
+		TurnID: cursor.TurnID, TraceID: cursor.TraceID, At: rec.Timestamp, Cwd: cursor.Cwd,
 	}
 	if !hookrun.EvidenceLabel.MatchString(reply.ID) {
 		reply.ID = fundingHash(sessionID + cursor.Identity + fmt.Sprint(cursor.Offset))

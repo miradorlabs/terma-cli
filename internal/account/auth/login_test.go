@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -21,20 +22,35 @@ type recordingExchanger struct {
 	port      int
 	delegated bool
 	err       error
+	// codes are every code exchanged, in order, and verifiers the verifier each was sent
+	// with; failing are codes whose exchange fails with their error.
+	codes     []string
+	verifiers []string
+	failing   map[string]error
 }
 
-func (r *recordingExchanger) ExchangeCode(_ context.Context, code, verifier string, port int) (*Credential, error) {
+// ExchangeCode signs in to organization org-<code>, named Org <code>.
+func (r *recordingExchanger) ExchangeCode(_ context.Context, code, verifier string, port int) (*LoginResult, error) {
 	r.code, r.verifier, r.port = code, verifier, port
+	r.codes, r.verifiers = append(r.codes, code), append(r.verifiers, verifier)
+	if err := r.failing[code]; err != nil {
+		return nil, err
+	}
 	if r.err != nil {
 		return nil, r.err
 	}
-	return &Credential{AccessToken: "mir_cli_test", ExpiresAt: time.Now().Add(time.Hour)}, nil
+	cred := &Credential{AccessToken: "mir_cli_test", ExpiresAt: time.Now().Add(time.Hour), OrganizationID: "org-" + code}
+	return &LoginResult{Credential: cred, OrganizationName: "Org " + code}, nil
 }
 
 // ExchangeDelegatedCode records a delegated exchange as port 0, the port it sends.
 func (r *recordingExchanger) ExchangeDelegatedCode(ctx context.Context, code, verifier string) (*Credential, error) {
 	r.delegated = true
-	return r.ExchangeCode(ctx, code, verifier, 0)
+	res, err := r.ExchangeCode(ctx, code, verifier, 0)
+	if err != nil {
+		return nil, err
+	}
+	return res.Credential, nil
 }
 
 // browser drives the login flow the way the approval page has so far: a GET with the code
@@ -73,18 +89,39 @@ func postBrowser(t *testing.T, authURL string, code string, overrideState string
 	return resp.StatusCode
 }
 
-// startLogin runs Login in the background and returns the URL it asks the browser to open.
-func startLogin(t *testing.T, exchanger TokenExchanger) (authURL string, done <-chan error) {
+// postCodes posts state and codes as the approval page posts every organization ticked:
+// one repeated code field each, in order. It returns the listener's status.
+func postCodes(t *testing.T, authURL string, codes ...string) int {
+	t.Helper()
+	port, state := portFrom(t, authURL)
+	resp, err := http.PostForm(fmt.Sprintf("http://127.0.0.1:%d/callback", port), url.Values{"code": codes, "state": {state}})
+	if err != nil {
+		t.Fatalf("callback request: %v", err)
+	}
+	defer resp.Body.Close()
+	_, _ = io.Copy(io.Discard, resp.Body)
+	return resp.StatusCode
+}
+
+// loginAll is LoginAll's outcome, from a background run.
+type loginAll struct {
+	signedIn []LoginResult
+	failed   []error
+	err      error
+}
+
+// startLoginAll runs LoginAll with opts in the background and returns the URL it asks the
+// browser to open.
+func startLoginAll(t *testing.T, exchanger TokenExchanger, opts LoginOptions) (authURL string, done <-chan loginAll) {
 	t.Helper()
 	capture := &urlCapture{ch: make(chan string, 1)}
-	errs := make(chan error, 1)
+	results := make(chan loginAll, 1)
+	opts.AppURL, opts.NoBrowser, opts.Out = "https://app.example.test", true, capture
 	go func() {
-		_, err := Login(context.Background(), exchanger, LoginOptions{
-			AppURL: "https://app.example.test", NoBrowser: true, Out: capture,
-		})
-		errs <- err
+		signedIn, failed, err := LoginAll(context.Background(), exchanger, opts)
+		results <- loginAll{signedIn, failed, err}
 	}()
-	return <-capture.ch, errs
+	return <-capture.ch, results
 }
 
 type urlCapture struct {
@@ -120,32 +157,18 @@ func extractURL(s string) string {
 	return rest[:end]
 }
 
-func TestLogin_ExchangesCodeWithTheVerifierAndPort(t *testing.T) {
+func TestLoginAll_ExchangesCodeWithTheVerifierAndPort(t *testing.T) {
 	t.Parallel()
 	exchanger := &recordingExchanger{}
-	capture := &urlCapture{ch: make(chan string, 1)}
-
-	done := make(chan error, 1)
-	var cred *Credential
-	go func() {
-		var err error
-		cred, err = Login(context.Background(), exchanger, LoginOptions{
-			AppURL:    "https://app.example.test",
-			Label:     "test-host",
-			NoBrowser: true,
-			Out:       capture,
-		})
-		done <- err
-	}()
-
-	authURL := <-capture.ch
+	authURL, done := startLoginAll(t, exchanger, LoginOptions{Label: "test-host"})
 	browser(t, authURL, "mir_cod_abc123", "")
 
-	if err := <-done; err != nil {
-		t.Fatalf("Login: %v", err)
+	res := <-done
+	if res.err != nil {
+		t.Fatalf("LoginAll: %v", res.err)
 	}
-	if cred == nil || cred.AccessToken != "mir_cli_test" {
-		t.Fatalf("expected the exchanged credential, got %+v", cred)
+	if len(res.signedIn) != 1 || res.signedIn[0].Credential.AccessToken != "mir_cli_test" {
+		t.Fatalf("expected the exchanged credential, got %+v", res.signedIn)
 	}
 	if exchanger.code != "mir_cod_abc123" {
 		t.Errorf("code = %q, want the one delivered to the callback", exchanger.code)
@@ -171,25 +194,14 @@ func TestLogin_ExchangesCodeWithTheVerifierAndPort(t *testing.T) {
 	}
 }
 
-func TestLogin_PropagatesExchangeFailure(t *testing.T) {
+func TestLoginAll_PropagatesExchangeFailure(t *testing.T) {
 	t.Parallel()
 	wantErr := errors.New("invalid or expired credentials")
 	exchanger := &recordingExchanger{err: wantErr}
-	capture := &urlCapture{ch: make(chan string, 1)}
+	authURL, done := startLoginAll(t, exchanger, LoginOptions{})
+	browser(t, authURL, "mir_cod_expired", "")
 
-	done := make(chan error, 1)
-	go func() {
-		_, err := Login(context.Background(), exchanger, LoginOptions{
-			AppURL:    "https://app.example.test",
-			NoBrowser: true,
-			Out:       capture,
-		})
-		done <- err
-	}()
-
-	browser(t, <-capture.ch, "mir_cod_expired", "")
-
-	if err := <-done; !errors.Is(err, wantErr) {
+	if err := (<-done).err; !errors.Is(err, wantErr) {
 		t.Fatalf("expected the exchange error to surface, got %v", err)
 	}
 }
@@ -269,21 +281,11 @@ func portFrom(t *testing.T, authURL string) (port int, state string) {
 	return p, parsed.Query().Get("state")
 }
 
-// TestLogin_RejectsCallbackFromAForeignHost refuses a DNS-rebinding page's callback.
-func TestLogin_RejectsCallbackFromAForeignHost(t *testing.T) {
+// TestLoginAll_RejectsCallbackFromAForeignHost refuses a DNS-rebinding page's callback.
+func TestLoginAll_RejectsCallbackFromAForeignHost(t *testing.T) {
 	t.Parallel()
 	exchanger := &recordingExchanger{}
-	capture := &urlCapture{ch: make(chan string, 1)}
-
-	done := make(chan error, 1)
-	go func() {
-		_, err := Login(context.Background(), exchanger, LoginOptions{
-			AppURL: "https://app.example.test", NoBrowser: true, Out: capture,
-		})
-		done <- err
-	}()
-
-	authURL := <-capture.ch
+	authURL, done := startLoginAll(t, exchanger, LoginOptions{})
 	port, state := portFrom(t, authURL)
 
 	resp := callbackWithHost(t, port, "evil.example.com:"+strconv.Itoa(port), "mir_cod_rebind", state)
@@ -296,65 +298,42 @@ func TestLogin_RejectsCallbackFromAForeignHost(t *testing.T) {
 	}
 
 	browser(t, authURL, "mir_cod_real", "")
-	if err := <-done; err != nil {
-		t.Fatalf("Login: %v", err)
+	if err := (<-done).err; err != nil {
+		t.Fatalf("LoginAll: %v", err)
 	}
 	if exchanger.code != "mir_cod_real" {
 		t.Errorf("code = %q, want the legitimate one", exchanger.code)
 	}
 }
 
-// TestLogin_WrongStateDoesNotCancelThePendingLogin proves a mismatched callback cannot deny the login.
-func TestLogin_WrongStateDoesNotCancelThePendingLogin(t *testing.T) {
+// TestLoginAll_WrongStateDoesNotCancelThePendingLogin proves a mismatched callback cannot deny the login.
+func TestLoginAll_WrongStateDoesNotCancelThePendingLogin(t *testing.T) {
 	t.Parallel()
 	exchanger := &recordingExchanger{}
-	capture := &urlCapture{ch: make(chan string, 1)}
-
-	done := make(chan error, 1)
-	go func() {
-		_, err := Login(context.Background(), exchanger, LoginOptions{
-			AppURL: "https://app.example.test", NoBrowser: true, Out: capture,
-		})
-		done <- err
-	}()
-
-	authURL := <-capture.ch
+	authURL, done := startLoginAll(t, exchanger, LoginOptions{})
 
 	for i := range 3 {
 		browser(t, authURL, fmt.Sprintf("mir_cod_attacker%d", i), "not-the-state-we-issued")
 	}
 	browser(t, authURL, "mir_cod_real", "")
 
-	if err := <-done; err != nil {
-		t.Fatalf("Login should survive hostile callbacks: %v", err)
+	if err := (<-done).err; err != nil {
+		t.Fatalf("LoginAll should survive hostile callbacks: %v", err)
 	}
 	if exchanger.code != "mir_cod_real" {
 		t.Errorf("code = %q, want the legitimate one — an attacker must not be able to divert or cancel the login", exchanger.code)
 	}
 }
 
-// TestLogin_HostileCallbacksAloneNeverAuthenticate proves mismatched callbacks alone fail closed
+// TestLoginAll_HostileCallbacksAloneNeverAuthenticate proves mismatched callbacks alone fail closed
 // on the timeout, having exchanged nothing.
-func TestLogin_HostileCallbacksAloneNeverAuthenticate(t *testing.T) {
+func TestLoginAll_HostileCallbacksAloneNeverAuthenticate(t *testing.T) {
 	t.Parallel()
 	exchanger := &recordingExchanger{}
-	capture := &urlCapture{ch: make(chan string, 1)}
-
-	done := make(chan error, 1)
-	go func() {
-		_, err := Login(context.Background(), exchanger, LoginOptions{
-			AppURL:    "https://app.example.test",
-			NoBrowser: true,
-			Out:       capture,
-			Timeout:   2 * time.Second,
-		})
-		done <- err
-	}()
-
-	authURL := <-capture.ch
+	authURL, done := startLoginAll(t, exchanger, LoginOptions{Timeout: 2 * time.Second})
 	browser(t, authURL, "mir_cod_attacker", "not-the-state-we-issued")
 
-	err := <-done
+	err := (<-done).err
 	if err == nil {
 		t.Fatal("expected the login to fail when only hostile callbacks arrive")
 	}
@@ -366,17 +345,17 @@ func TestLogin_HostileCallbacksAloneNeverAuthenticate(t *testing.T) {
 	}
 }
 
-// TestLogin_AcceptsAPostedCallback takes the code from a form POST, as the approval page sends it.
-func TestLogin_AcceptsAPostedCallback(t *testing.T) {
+// TestLoginAll_AcceptsAPostedCallback takes the code from a form POST, as the approval page sends it.
+func TestLoginAll_AcceptsAPostedCallback(t *testing.T) {
 	t.Parallel()
 	exchanger := &recordingExchanger{}
-	authURL, done := startLogin(t, exchanger)
+	authURL, done := startLoginAll(t, exchanger, LoginOptions{})
 
 	if status := postBrowser(t, authURL, "mir_cod_posted", ""); status != http.StatusOK {
 		t.Errorf("posted callback status = %d, want 200", status)
 	}
-	if err := <-done; err != nil {
-		t.Fatalf("Login: %v", err)
+	if err := (<-done).err; err != nil {
+		t.Fatalf("LoginAll: %v", err)
 	}
 	if exchanger.code != "mir_cod_posted" {
 		t.Errorf("code = %q, want the posted one", exchanger.code)
@@ -386,12 +365,12 @@ func TestLogin_AcceptsAPostedCallback(t *testing.T) {
 	}
 }
 
-// TestLogin_PostReadsOnlyItsBody proves a POST is answered from its form body: a code and state
+// TestLoginAll_PostReadsOnlyItsBody proves a POST is answered from its form body: a code and state
 // in its query are not read.
-func TestLogin_PostReadsOnlyItsBody(t *testing.T) {
+func TestLoginAll_PostReadsOnlyItsBody(t *testing.T) {
 	t.Parallel()
 	exchanger := &recordingExchanger{}
-	authURL, done := startLogin(t, exchanger)
+	authURL, done := startLoginAll(t, exchanger, LoginOptions{})
 	port, state := portFrom(t, authURL)
 
 	base := fmt.Sprintf("http://127.0.0.1:%d/callback", port)
@@ -423,19 +402,19 @@ func TestLogin_PostReadsOnlyItsBody(t *testing.T) {
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("a POST whose body is right should be accepted whatever its query says, got %d", resp.StatusCode)
 	}
-	if err := <-done; err != nil {
-		t.Fatalf("Login: %v", err)
+	if err := (<-done).err; err != nil {
+		t.Fatalf("LoginAll: %v", err)
 	}
 	if exchanger.code != "mir_cod_real" {
 		t.Errorf("code = %q, want the one in the posted body", exchanger.code)
 	}
 }
 
-// TestLogin_RejectsAPostedCallbackFromAForeignHost holds a POST to the same Host check as a GET.
-func TestLogin_RejectsAPostedCallbackFromAForeignHost(t *testing.T) {
+// TestLoginAll_RejectsAPostedCallbackFromAForeignHost holds a POST to the same Host check as a GET.
+func TestLoginAll_RejectsAPostedCallbackFromAForeignHost(t *testing.T) {
 	t.Parallel()
 	exchanger := &recordingExchanger{}
-	authURL, done := startLogin(t, exchanger)
+	authURL, done := startLoginAll(t, exchanger, LoginOptions{})
 	port, state := portFrom(t, authURL)
 
 	form := url.Values{"code": {"mir_cod_rebind"}, "state": {state}}
@@ -455,20 +434,20 @@ func TestLogin_RejectsAPostedCallbackFromAForeignHost(t *testing.T) {
 	}
 
 	postBrowser(t, authURL, "mir_cod_real", "")
-	if err := <-done; err != nil {
-		t.Fatalf("Login: %v", err)
+	if err := (<-done).err; err != nil {
+		t.Fatalf("LoginAll: %v", err)
 	}
 	if exchanger.code != "mir_cod_real" {
 		t.Errorf("code = %q, want the legitimate one", exchanger.code)
 	}
 }
 
-// TestLogin_RefusedCallbacksDoNotCancelThePendingLogin: a posted callback with the wrong state,
+// TestLoginAll_RefusedCallbacksDoNotCancelThePendingLogin: a posted callback with the wrong state,
 // an oversized body or another method is refused, and the login still completes.
-func TestLogin_RefusedCallbacksDoNotCancelThePendingLogin(t *testing.T) {
+func TestLoginAll_RefusedCallbacksDoNotCancelThePendingLogin(t *testing.T) {
 	t.Parallel()
 	exchanger := &recordingExchanger{}
-	authURL, done := startLogin(t, exchanger)
+	authURL, done := startLoginAll(t, exchanger, LoginOptions{})
 	port, state := portFrom(t, authURL)
 	callback := fmt.Sprintf("http://127.0.0.1:%d/callback", port)
 
@@ -505,10 +484,175 @@ func TestLogin_RefusedCallbacksDoNotCancelThePendingLogin(t *testing.T) {
 	}
 
 	postBrowser(t, authURL, "mir_cod_real", "")
-	if err := <-done; err != nil {
-		t.Fatalf("Login should survive refused callbacks: %v", err)
+	if err := (<-done).err; err != nil {
+		t.Fatalf("LoginAll should survive refused callbacks: %v", err)
 	}
 	if exchanger.code != "mir_cod_real" {
 		t.Errorf("code = %q, want the legitimate one", exchanger.code)
 	}
+}
+
+// One approval posts a code per organization ticked: every one is exchanged, in the page's
+// order, with the one verifier and the listener's port, and each sign-in keeps the name
+// its own exchange gave.
+func TestLoginAll_ExchangesEveryCode(t *testing.T) {
+	t.Parallel()
+	exchanger := &recordingExchanger{}
+	authURL, done := startLoginAll(t, exchanger, LoginOptions{})
+	if status := postCodes(t, authURL, "personal", "acme", "beta"); status != http.StatusOK {
+		t.Fatalf("callback status = %d, want 200", status)
+	}
+	res := <-done
+	if res.err != nil || len(res.failed) != 0 {
+		t.Fatalf("LoginAll: %v, failed %v", res.err, res.failed)
+	}
+	var got []string
+	for _, s := range res.signedIn {
+		got = append(got, s.Credential.OrganizationID+"="+s.OrganizationName)
+	}
+	if want := []string{"org-personal=Org personal", "org-acme=Org acme", "org-beta=Org beta"}; !slices.Equal(got, want) {
+		t.Fatalf("signed in to %v, want %v", got, want)
+	}
+	if !slices.Equal(exchanger.codes, []string{"personal", "acme", "beta"}) {
+		t.Fatalf("exchanged %v, want each code once, in order", exchanger.codes)
+	}
+	parsed, _ := url.Parse(authURL)
+	sum := sha256.Sum256([]byte(exchanger.verifiers[0]))
+	if want := base64.RawURLEncoding.EncodeToString(sum[:]); parsed.Query().Get("challenge") != want {
+		t.Error("the challenge is not the S256 hash of the verifier")
+	}
+	for _, v := range exchanger.verifiers {
+		if v != exchanger.verifiers[0] {
+			t.Fatalf("the codes were exchanged with different verifiers: %v", exchanger.verifiers)
+		}
+	}
+	if want, _ := portFrom(t, authURL); exchanger.port != want {
+		t.Errorf("exchanged port = %d, advertised %d", exchanger.port, want)
+	}
+}
+
+// A failed exchange leaves only its own organization without a sign-in: the ones after it
+// are still exchanged and kept, and the failure is returned beside them.
+func TestLoginAll_OneFailedExchangeKeepsTheOthers(t *testing.T) {
+	t.Parallel()
+	expired := errors.New("invalid or expired authorization code")
+	exchanger := &recordingExchanger{failing: map[string]error{"acme": expired}}
+	authURL, done := startLoginAll(t, exchanger, LoginOptions{})
+	postCodes(t, authURL, "personal", "acme", "beta")
+	res := <-done
+	if res.err != nil {
+		t.Fatalf("LoginAll: %v", res.err)
+	}
+	if len(res.signedIn) != 2 || res.signedIn[0].Credential.OrganizationID != "org-personal" || res.signedIn[1].Credential.OrganizationID != "org-beta" {
+		t.Fatalf("signed in = %+v, want personal and beta", res.signedIn)
+	}
+	if len(res.failed) != 1 || !errors.Is(res.failed[0], expired) {
+		t.Fatalf("failed = %v, want acme's error", res.failed)
+	}
+	if !slices.Equal(exchanger.codes, []string{"personal", "acme", "beta"}) {
+		t.Fatalf("exchanged %v: a failure stopped the rest", exchanger.codes)
+	}
+}
+
+// Only when every exchange fails does the sign-in fail, with the first error.
+func TestLoginAll_FailsWithTheFirstErrorWhenEveryExchangeFails(t *testing.T) {
+	t.Parallel()
+	first, second := errors.New("first refusal"), errors.New("second refusal")
+	exchanger := &recordingExchanger{failing: map[string]error{"acme": first, "beta": second}}
+	authURL, done := startLoginAll(t, exchanger, LoginOptions{})
+	postCodes(t, authURL, "acme", "beta")
+	res := <-done
+	if !errors.Is(res.err, first) || len(res.signedIn) != 0 || len(res.failed) != 2 {
+		t.Fatalf("LoginAll = %+v, want the first error", res)
+	}
+}
+
+// A callback carrying more codes than one approval may tick, or none, is refused as
+// malformed; the login still takes the right one after it.
+func TestLoginAll_RefusesMoreThanMaxCodesOrNone(t *testing.T) {
+	t.Parallel()
+	exchanger := &recordingExchanger{}
+	authURL, done := startLoginAll(t, exchanger, LoginOptions{})
+	many := make([]string, MaxCodes+1)
+	for i := range many {
+		many[i] = fmt.Sprintf("c%d", i)
+	}
+	if status := postCodes(t, authURL, many...); status != http.StatusBadRequest {
+		t.Errorf("%d codes: status = %d, want 400", len(many), status)
+	}
+	if status := postCodes(t, authURL); status != http.StatusBadRequest {
+		t.Errorf("no code: status = %d, want 400", status)
+	}
+	if status := postCodes(t, authURL, "acme", ""); status != http.StatusBadRequest {
+		t.Errorf("an empty code: status = %d, want 400", status)
+	}
+	if len(exchanger.codes) != 0 {
+		t.Fatalf("a refused callback's codes were exchanged: %v", exchanger.codes)
+	}
+	if status := postCodes(t, authURL, many[:MaxCodes]...); status != http.StatusOK {
+		t.Fatalf("%d codes: status = %d, want 200", MaxCodes, status)
+	}
+	if res := <-done; res.err != nil || len(res.signedIn) != MaxCodes {
+		t.Fatalf("LoginAll = %d signed in, %v", len(res.signedIn), res.err)
+	}
+}
+
+// A GET still carries one code, the way the page sent it before it posted: the first, and
+// only that one, is exchanged.
+func TestLoginAll_GetCarriesOneCode(t *testing.T) {
+	t.Parallel()
+	exchanger := &recordingExchanger{}
+	authURL, done := startLoginAll(t, exchanger, LoginOptions{})
+	port, state := portFrom(t, authURL)
+	resp, err := http.Get(fmt.Sprintf("http://127.0.0.1:%d/callback?code=first&code=second&state=%s", port, url.QueryEscape(state)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d", resp.StatusCode)
+	}
+	if res := <-done; res.err != nil || len(res.signedIn) != 1 || !slices.Equal(exchanger.codes, []string{"first"}) {
+		t.Fatalf("LoginAll = %+v, exchanged %v", res, exchanger.codes)
+	}
+}
+
+// Every link asks for one code per organization (codes=multiple). orgs pre-checks the
+// organizations named, at most MaxCodes of them, and none pre-checks every one.
+func TestBuildAuthorizeURL_AsksForEveryOrganizationsCode(t *testing.T) {
+	t.Parallel()
+	many := make([]string, MaxCodes+5)
+	for i := range many {
+		many[i] = fmt.Sprintf("org-%02d", i)
+	}
+	for _, tc := range []struct {
+		name     string
+		org      string
+		orgs     []string
+		wantOrg  string
+		wantOrgs string
+	}{
+		{name: "every organization"},
+		{name: "--org", org: "org-x", orgs: []string{"org-x"}, wantOrg: "org-x", wantOrgs: "org-x"},
+		{name: "several", orgs: []string{"org-a", "org-b"}, wantOrgs: "org-a,org-b"},
+		{name: "over the cap", orgs: many, wantOrgs: strings.Join(many[:MaxCodes], ",")},
+	} {
+		parsed, err := url.Parse(buildAuthorizeURL("https://app.example.test", "ch", "st", 4242, "host", tc.org, tc.orgs))
+		if err != nil {
+			t.Fatal(err)
+		}
+		q := parsed.Query()
+		if q.Get("codes") != "multiple" || q.Get("response_mode") != "form_post" {
+			t.Errorf("%s: codes = %q, response_mode = %q", tc.name, q.Get("codes"), q.Get("response_mode"))
+		}
+		if q.Get("org") != tc.wantOrg || q.Get("orgs") != tc.wantOrgs || q.Has("orgs") != (tc.wantOrgs != "") {
+			t.Errorf("%s: org = %q, orgs = %q; want %q, %q", tc.name, q.Get("org"), q.Get("orgs"), tc.wantOrg, tc.wantOrgs)
+		}
+	}
+	authURL, done := startLoginAll(t, &recordingExchanger{}, LoginOptions{Organization: "org-x", Organizations: []string{"org-x", "org-y"}})
+	if q, _ := url.Parse(authURL); q.Query().Get("orgs") != "org-x,org-y" || q.Query().Get("codes") != "multiple" {
+		t.Errorf("LoginAll's link = %s", authURL)
+	}
+	postCodes(t, authURL, "x")
+	<-done
 }

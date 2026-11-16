@@ -73,9 +73,12 @@ func readFunding(ctx context.Context, sessionID, transcript string, cursor quota
 		}
 		e.Attrs[semconv.TermaObservationStreamKey] = cursor.Stream
 		e.Attrs[semconv.TermaObservationIDKey] = fundingHash(sessionID + cursor.Stream + fmt.Sprint(offset) + e.Status)
-		// A gap in a withheld turn leaves, but not which turn it was.
+		// A gap in a withheld turn leaves, but not which turn it was, nor where it ran.
 		if cursor.TurnID != "" && cursor.Admitted {
 			e.Attrs[semconv.TermaTurnIDKey] = cursor.TurnID
+		}
+		if cursor.Admitted {
+			e.Cwd = cursor.Cwd
 		}
 		return emit(e)
 	}

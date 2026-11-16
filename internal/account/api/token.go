@@ -43,14 +43,11 @@ type tokenResponse struct {
 }
 
 // LoginResult is a completed sign-in, with the organization and user names to print.
-type LoginResult struct {
-	Credential       *auth.Credential
-	OrganizationName string
-	UserID           string
-}
+type LoginResult = auth.LoginResult
 
-// ExchangeCode implements auth.TokenExchanger.
-func (c *Client) ExchangeCode(ctx context.Context, code, verifier string, port int) (*auth.Credential, error) {
+// ExchangeCode implements auth.TokenExchanger: the sign-in, with the name of the
+// organization it is to, which the token response gives with each exchange.
+func (c *Client) ExchangeCode(ctx context.Context, code, verifier string, port int) (*auth.LoginResult, error) {
 	return c.exchangeCode(ctx, code, verifier, port)
 }
 
@@ -58,10 +55,14 @@ func (c *Client) ExchangeCode(ctx context.Context, code, verifier string, port i
 // for this process's challenge. No listener took it, so redirect_port is 0; the auth host
 // accepts 0 only for a code its own record says was delegated.
 func (c *Client) ExchangeDelegatedCode(ctx context.Context, code, verifier string) (*auth.Credential, error) {
-	return c.exchangeCode(ctx, code, verifier, 0)
+	res, err := c.exchangeCode(ctx, code, verifier, 0)
+	if err != nil {
+		return nil, err
+	}
+	return res.Credential, nil
 }
 
-func (c *Client) exchangeCode(ctx context.Context, code, verifier string, port int) (*auth.Credential, error) {
+func (c *Client) exchangeCode(ctx context.Context, code, verifier string, port int) (*auth.LoginResult, error) {
 	resp, err := c.postToken(ctx, tokenRequest{
 		GrantType:    "authorization_code",
 		Code:         code,
@@ -71,18 +72,19 @@ func (c *Client) exchangeCode(ctx context.Context, code, verifier string, port i
 	if err != nil {
 		return nil, err
 	}
-	cred := c.credentialFrom(resp)
-	c.mu.Lock()
-	c.lastLogin = &LoginResult{
-		Credential:       cred,
+	res := &auth.LoginResult{
+		Credential:       c.credentialFrom(resp),
 		OrganizationName: resp.Organization.Name,
 		UserID:           resp.User.ID,
 	}
+	c.mu.Lock()
+	c.lastLogin = res
 	c.mu.Unlock()
-	return cred, nil
+	return res, nil
 }
 
-// LastLogin returns the most recent exchange's result on this client.
+// LastLogin returns the most recent exchange's result on this client. A sign-in that
+// exchanges several codes reads each one's own result instead (ExchangeCode).
 func (c *Client) LastLogin() *LoginResult {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -100,7 +102,7 @@ func (c *Client) postToken(ctx context.Context, body tokenRequest) (*tokenRespon
 	if err := decode(resp, &out); err != nil {
 		var apiErr *Error
 		if errors.As(err, &apiErr) && apiErr.Unauthenticated() {
-			return nil, fmt.Errorf("%w: %s", auth.ErrNotLoggedIn, apiErr.Message)
+			return nil, &refusedError{msg: fmt.Sprintf("%s: %s", auth.ErrNotLoggedIn, apiErr.Message), refusal: apiErr}
 		}
 		return nil, err
 	}
@@ -109,6 +111,35 @@ func (c *Client) postToken(ctx context.Context, body tokenRequest) (*tokenRespon
 	}
 	return &out, nil
 }
+
+// refusedError is the token endpoint's 401: callers read it as auth.ErrNotLoggedIn, and
+// the gateway's structured refusal, its reason included, stays beneath it.
+type refusedError struct {
+	msg     string
+	refusal *Error
+}
+
+func (e *refusedError) Error() string { return e.msg }
+
+func (e *refusedError) Unwrap() []error { return []error{auth.ErrNotLoggedIn, e.refusal} }
+
+// RefreshError is a token refresh that failed: the request it was made for never went.
+// Err is the failure as the token endpoint gave it, so a refusal stays an *Error, with
+// its status and reason, beneath auth.ErrNotLoggedIn for a 401, and the context, a
+// refresh rather than the request, is this type: ORG_NOT_ACCESSIBLE means something only
+// here (policy.Classify).
+type RefreshError struct {
+	Err error
+}
+
+func (e *RefreshError) Error() string {
+	if errors.Is(e.Err, auth.ErrNotLoggedIn) {
+		return auth.ErrNotLoggedIn.Error() + ": session expired, run `terma setup`"
+	}
+	return e.Err.Error()
+}
+
+func (e *RefreshError) Unwrap() error { return e.Err }
 
 func (c *Client) credentialFrom(resp *tokenResponse) *auth.Credential {
 	cred := credentialFrom(resp)
@@ -265,10 +296,7 @@ func (c *Client) redeem(ctx context.Context, held, current *auth.Credential, red
 	}
 	resp, err := c.postToken(ctx, tokenRequest{GrantType: "refresh_token", RefreshToken: current.RefreshToken})
 	if err != nil {
-		if errors.Is(err, auth.ErrNotLoggedIn) {
-			return fmt.Errorf("%w: session expired, run `terma setup`", auth.ErrNotLoggedIn)
-		}
-		return err
+		return &RefreshError{Err: err}
 	}
 	cred := c.credentialFrom(resp)
 	// A refresh keeps the session, its user and its label.

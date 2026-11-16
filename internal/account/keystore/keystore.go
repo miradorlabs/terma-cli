@@ -1,7 +1,9 @@
 // Package keystore holds the project server keys the spool flushes with, keyed by project
 // so a flush can deliver for any repository on this machine. keys.json (0600) indexes them
 // with their hosts; each key lives in the system keychain (internal/account/secret), or in
-// the file itself where there is none or config.json asks for files.
+// the file itself where there is none or config.json asks for files. keys.v2.json, which
+// the migration to multi-org routing creates, indexes each enrollment's team key the same
+// way (GetTeam); older binaries never read it.
 package keystore
 
 import (
@@ -201,6 +203,14 @@ const lockWait = 5 * time.Second
 // update is the one way the file changes: unlocked, a concurrent install's rename
 // dropped the other's key.
 func update(dir string, edit func(f *file, inFile bool)) error {
+	return updateOr(dir, func(f *file, inFile bool) error {
+		edit(f, inFile)
+		return nil
+	})
+}
+
+// updateOr is update with an edit that may refuse: the file is then left as it was.
+func updateOr(dir string, edit func(f *file, inFile bool) error) error {
 	inFile := config.InsecureStorage(dir)
 	var added []string
 	err := flock.Locked(path(dir), lockWait, func() error {
@@ -208,8 +218,11 @@ func update(dir string, edit func(f *file, inFile bool)) error {
 		if err != nil {
 			return err
 		}
-		edit(f, inFile)
+		err = edit(f, inFile)
 		added = f.added
+		if err != nil {
+			return err
+		}
 		return save(dir, f)
 	})
 	if err != nil {

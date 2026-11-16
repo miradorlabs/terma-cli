@@ -50,7 +50,7 @@ func (e Env) CaptureObservation(ctx context.Context, r *Repo, o Observation) {
 	}
 	attrs[AttrProjectID] = r.ProjectID
 	raw, _ := json.Marshal(attrs)
-	hash := EvidenceID(string(raw))
+	hash := EvidenceID(string(raw) + r.routeSalt())
 	dir := filepath.Join(e.StateDir, o.StateDir)
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return
@@ -123,7 +123,9 @@ func (e Env) CaptureObservation(ctx context.Context, r *Repo, o Observation) {
 	state.LastHash, state.At = hash, e.Time()
 	attrs[semconv.TermaObservationStreamKey], attrs[semconv.TermaObservationSequenceKey] = state.Stream, state.Sequence
 	attrs[semconv.TermaObservationIDKey] = EvidenceID(fmt.Sprintf("%s\x00%s\x00%d", o.Tool, state.Stream, state.Sequence))
-	state.Pending = &spool.Event{Time: e.Time(), Name: semconv.TermaSessionObservationEvent, SessionID: o.SessionID, Repository: r.Repository, Attrs: attrs}
+	// Routed before it is checkpointed: a replay after a crash keeps the destination it had.
+	pending := e.Routed(r, spool.Event{Time: e.Time(), Name: semconv.TermaSessionObservationEvent, SessionID: o.SessionID, Repository: r.Repository, Attrs: attrs})
+	state.Pending = &pending
 	if err = write(); err != nil {
 		e.Logf("%s checkpoint: %v", o.Tool, err)
 		return

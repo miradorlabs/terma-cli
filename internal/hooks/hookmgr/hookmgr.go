@@ -50,17 +50,26 @@ func SystemCmd() string {
 // cmd /C splits at it. False for any other command, the managed one included, and for a
 // path one of the shells would rewrite.
 func WindowsHookCommand(cmdPath, command string) (string, bool) {
-	m := userHookParts.FindStringSubmatch(command)
-	if m == nil || m[1] != m[2] {
+	terma, event, ok := userHookTerma(command)
+	if !ok {
 		return "", false
 	}
-	terma := strings.ReplaceAll(m[1][1:len(m[1])-1], `'\''`, "'")
 	// cmdPath leads the line unquoted: a quoted one is a string to PowerShell, not a command.
 	if !shellSafe(terma) || !plainCommandPath.MatchString(cmdPath) {
 		return "", false
 	}
 	q := `"` + terma + `"`
-	return cmdPath + " /d /c if exist " + q + " " + q + " hook --user " + m[3] + " `& exit 0", true
+	return cmdPath + " /d /c if exist " + q + " " + q + " hook --user " + event + " `& exit 0", true
+}
+
+// userHookTerma takes a UserHookCommand line apart: the terma it runs, unquoted, and the
+// event; false for any other command, a managed one included.
+func userHookTerma(command string) (terma, event string, ok bool) {
+	m := userHookParts.FindStringSubmatch(command)
+	if m == nil || m[1] != m[2] {
+		return "", "", false
+	}
+	return strings.ReplaceAll(m[1][1:len(m[1])-1], `'\''`, "'"), m[3], true
 }
 
 // shellSafe reports whether path holds only characters PowerShell and cmd both pass on

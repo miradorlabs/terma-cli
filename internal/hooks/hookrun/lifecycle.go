@@ -11,6 +11,8 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/gitx"
 	"github.com/miradorlabs/terma-cli/internal/project"
+	"github.com/miradorlabs/terma-cli/internal/routing"
+	"github.com/miradorlabs/terma-cli/internal/runs"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
 	"github.com/miradorlabs/terma-cli/internal/session"
 	"github.com/miradorlabs/terma-cli/internal/spool"
@@ -128,7 +130,12 @@ func (e Env) Report(r *Repo, sess session.Session, toolName string, paths []stri
 }
 
 func (e Env) report(r *Repo, sess session.Session, toolName string, paths []string, extra map[string]any, confirmed bool) {
-	for _, c := range e.checkouts(r, paths) {
+	checkouts := e.checkouts(r, paths)
+	e.classifyTouches(r, sess, extra, checkouts, runs.Why{})
+	for _, c := range checkouts {
+		if e.Routing != nil && !c.repo.Collected() {
+			continue // a checkout Route drops records nothing, but its touch was classified
+		}
 		attrs := map[string]any{
 			semconv.GenAIMainAgentNameKey: sess.Tool, semconv.GenAIToolNameKey: toolName, semconv.TermaFilesPathsKey: c.files,
 		}
@@ -141,12 +148,38 @@ func (e Env) report(r *Repo, sess session.Session, toolName string, paths []stri
 			attrs[semconv.TermaCheckoutIDKey] = checkoutID(root)
 		}
 		ev := spool.Event{Name: semconv.TermaFilesTouchedEvent, SessionID: sess.ID, Attrs: attrs}
+		// A file event names its checkout: on a migrated machine it routes by it, its own
+		// location, whatever becomes of its run.
 		if c.repo == r {
-			e.EmitFor(r, ev)
+			e.emitFor(r, ev, true, true)
 		} else {
-			e.emit(e.stamp(c.repo, ev))
+			e.emit(e.stampFor(c.repo, ev, true, true))
 		}
 	}
+}
+
+// classifyTouches classifies, on a migrated machine, the checkouts among touched other than
+// r, the session's own, with r and the run's earlier locations before anything filters
+// them: a touch of another organization's checkout, or of one nobody collects but a pending
+// binding, makes the run Mixed, and so does a reach somewhere not known (unknown). A file
+// outside every checkout is not classified.
+func (e Env) classifyTouches(r *Repo, sess session.Session, extra map[string]any, touched []touched, unknown runs.Why) {
+	if e.Routing == nil || r.dest == nil {
+		return
+	}
+	var locs []routing.Location
+	for _, t := range touched {
+		if t.repo != r && t.repo.dest != nil {
+			locs = append(locs, t.repo.dest.loc)
+		}
+	}
+	if len(locs) == 0 && unknown.Reason == "" {
+		return
+	}
+	agent, _ := extra[semconv.TermaAgentIDKey].(string)
+	c := r.claim(sess.Tool)
+	c.Cwd, c.PIDs = e.workingDir(), claimPIDs()
+	e.judge(sess.ID, agent, c, append([]routing.Location{r.dest.loc}, locs...), true, unknown)
 }
 
 // touched is the files of one checkout, repo-relative, as a set.
@@ -198,14 +231,19 @@ func (e Env) checkouts(r *Repo, paths []string) []touched {
 
 // checkoutOf is the checkout holding dir, judged from the filesystem alone: r when dir is in
 // r or no checkout can be read there (an inherited GIT_DIR names r's), another one only if
-// the team policy admits it, else nil.
+// the team policy admits it, else nil. On a migrated machine every other checkout is
+// returned, with where routing sends what it records, so that a touch of one nobody
+// collects is classified too.
 func (e Env) checkoutOf(r *Repo, dir string) *Repo {
 	root, gitDir, ok := gitx.LocateFS(dir)
-	if !ok || samePath(root, r.Root) || samePath(gitDir, r.GitDir) {
+	if !ok || r != nil && (samePath(root, r.Root) || samePath(gitDir, r.GitDir)) {
 		return r
 	}
 	origin, remote := gitx.OriginFS(gitDir)
 	id := config.Repository{Origin: origin}
+	if e.Routing != nil {
+		return &Repo{Root: root, GitDir: gitDir, Repository: id, Remote: remote, dest: e.Routing.route(locationOf(gitDir, origin), e.Time())}
+	}
 	if !e.Policy.Admits(id) {
 		return nil
 	}

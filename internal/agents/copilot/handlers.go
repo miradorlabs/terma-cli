@@ -7,6 +7,7 @@ import (
 	"slices"
 
 	"github.com/miradorlabs/terma-cli/internal/agents/internal/applypatch"
+	"github.com/miradorlabs/terma-cli/internal/agents/internal/reach"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/session"
 )
@@ -51,6 +52,7 @@ func sessionStart(ctx context.Context, env hookrun.Env) error {
 		return nil
 	}
 	env.Cwd = cmp.Or(in.Cwd, env.Cwd)
+	env.StartRun(in.SessionID)
 	r, err := env.Repo(ctx)
 	if err != nil {
 		return nil
@@ -66,10 +68,21 @@ func prompt(_ context.Context, env hookrun.Env) error {
 	return nil
 }
 
+// postToolUse records what an edit tool wrote. Any other call, a read, a search or a shell
+// command, only classifies what it reached (hookrun.Env.Classify), on a migrated machine
+// alone: Copilot's hooks give terma no call before it runs, so a crossing it makes is
+// marked once it has run.
 func postToolUse(ctx context.Context, env hookrun.Env) error {
 	in, ok := readInput(env)
+	if ok && !editTools[in.ToolName] {
+		if env.Routing != nil {
+			env.Cwd = cmp.Or(in.Cwd, env.Cwd)
+			env.Classify(ctx, nil, session.Session{ID: in.SessionID, Tool: name}, reach.Copilot.Of(in.ToolInput, env.Cwd), nil)
+		}
+		return nil
+	}
 	// A result the runtime names as anything but a success wrote nothing.
-	if !ok || !editTools[in.ToolName] || in.ToolResult.ResultType != "" && in.ToolResult.ResultType != "success" {
+	if !ok || in.ToolResult.ResultType != "" && in.ToolResult.ResultType != "success" {
 		return nil
 	}
 	paths := editedPaths(in.ToolInput)

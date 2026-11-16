@@ -23,6 +23,11 @@ const RefreshInterval = time.Minute
 // Source fetches policies as one terma build.
 type Source struct {
 	Version string
+	// Wildcards reads a 2.x policy too (api.Client.TeamPolicy), for a machine whose relay
+	// moves it to routing by teams before it collects: a fresh setup. The move carries the
+	// policy over as fetched, and routing matches its wildcards. A machine that routes by
+	// its one team matches entries exactly, so it reads major 1 alone.
+	Wildcards bool
 }
 
 // Fetch asks cfg's organization for the collection policy of cfg's project: with the
@@ -86,7 +91,11 @@ func (s Source) FetchWithKey(ctx context.Context, cfg *config.Config, key string
 // fetch asks client for cfg's project's policy and stamps it with the login and team it
 // was fetched for.
 func (s Source) fetch(ctx context.Context, cfg *config.Config, client *api.Client) (config.Policy, error) {
-	pol, err := client.CollectionPolicy(ctx)
+	read := client.CollectionPolicy
+	if s.Wildcards {
+		read = client.TeamPolicy
+	}
+	pol, err := read(ctx)
 	if err != nil {
 		return config.Policy{}, fmt.Errorf("fetch the organization's collection policy: %w", err)
 	}

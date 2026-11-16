@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -17,9 +18,12 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
+	"github.com/miradorlabs/terma-cli/internal/migrate"
 	termaproject "github.com/miradorlabs/terma-cli/internal/project"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
+	"github.com/miradorlabs/terma-cli/internal/routing"
+	"github.com/miradorlabs/terma-cli/internal/runs"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
@@ -41,11 +45,12 @@ func (app *App) newTeardownCommand() *cobra.Command {
      events not yet delivered, and the teams' collection policies, which the next
      setup fetches again.
 
-Your sign-in is kept, so ` + "`terma setup`" + ` sets this machine up again in seconds,
-with the relay's token as it was: agents still running keep reporting without a restart.
---sign-out also revokes the sign-in, and the next setup mints a new token. On a
-machine set up with a server key, it stops the key being this machine's sign-in; the
-key itself is revoked in the Terma web app.`,
+Your sign-in, the teams' keys, the teams this machine sends to and the owners and
+repositories you bound are kept, so ` + "`terma setup`" + ` sets this machine up again in
+seconds, with the relay's token as it was: agents still running keep reporting
+without a restart. --sign-out also revokes the sign-in, and the next setup mints a
+new token. On a machine set up with a server key, it stops the key being this
+machine's sign-in; the key itself is revoked in the Terma web app.`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			// Refused before anything changes, so teardown never stops halfway.
@@ -147,13 +152,33 @@ func (app *App) undoSetup(ctx context.Context, out io.Writer, keepToken bool) er
 	return nil
 }
 
-// removeHookState removes what hooks kept per session, which only they would prune, and
-// the policies they ran under.
+// removeHookState removes what hooks kept per session, which only they would prune, the
+// policies they ran under, the records of why a relay start did not migrate the machine
+// and of a relay migrating it, which the next start writes again, the team names `terma
+// teams` last listed, which only label ids, and any routing state setup set aside as
+// unreadable (<profile>.json.unreadable).
+//
+// It keeps what the developer chose and signed in with, as it keeps config.json, the
+// sign-in and keys.json: each profile's routing state (routing.StatesDir), which alone
+// holds the teams selected, their states and the bindings, and is never rebuilt;
+// keys.v2.json; credentials.v2.json, which marks the machine migrated, so the next
+// setup finds it so rather than a fresh machine; and the developer's opt-in to routing by
+// teams (migrate.OptInFile), which a relay start still owes a machine not yet moved. The
+// run ledger (internal/runs) stays
+// too, pruned of what has expired: a run Mixed before teardown stays Mixed after the
+// next setup until its session starts a new run, which only the ledger remembers.
 func (app *App) removeHookState() error {
 	var errs []error
-	for _, name := range append(app.hookStateDirs(), hookrun.AgentsDir, termaproject.WorkspacesDir, spool.Dir, config.PoliciesDir) {
+	for _, name := range append(app.hookStateDirs(), hookrun.AgentsDir, termaproject.WorkspacesDir, spool.Dir, config.PoliciesDir, migrate.BlockFile, migrate.MigratingFile, teamNamesDir) {
 		errs = append(errs, os.RemoveAll(filepath.Join(app.stateDir, name)))
 	}
+	setAside, err := filepath.Glob(filepath.Join(app.stateDir, routing.StatesDir, "*.json.unreadable"))
+	errs = append(errs, err)
+	for _, path := range setAside {
+		errs = append(errs, os.Remove(path))
+	}
+	// The spool and the relay's outbox are gone: nothing queued names a session.
+	runs.Prune(context.Background(), app.stateDir, time.Now(), nil)
 	if err := errors.Join(errs...); err != nil {
 		return fmt.Errorf("remove the hooks' state: %w", err)
 	}

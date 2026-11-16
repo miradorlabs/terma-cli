@@ -4,6 +4,7 @@
 package spool
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -35,6 +36,25 @@ type Event struct {
 	// event to the repository list in force when it leaves. Local only.
 	Repository config.Repository `json:"repository,omitzero"`
 	Attrs      map[string]any    `json:"attrs,omitempty"`
+
+	// The destination multi-org routing gave the event when it was spooled, which is
+	// fixed: delivery rechecks it before sending and never routes the event again. An
+	// event without these is routed by attrs.project_id, as before. Local only.
+
+	// Profile is the profile whose routing state routed the event.
+	Profile string `json:"profile,omitempty"`
+	// Enrollment is the event's destination: the enrollment it is sent to, or the one
+	// whose team holds it.
+	Enrollment string `json:"enrollment,omitempty"`
+	// HoldKey is the pending binding holding the event, which is sent only if that binding
+	// is then bound to the holding team's organization.
+	HoldKey string `json:"hold_key,omitempty"`
+	// Run is the session run the event belongs to (internal/runs).
+	Run string `json:"run,omitempty"`
+	// OwnLocation is set when the event's location is its own, as a file event's checkout
+	// or the directory an agent's turn names is, rather than its run's. Its run turning
+	// Mixed still drops it unless it carries no content (runs.Locational).
+	OwnLocation bool `json:"own_location,omitempty"`
 }
 
 // ValidTraceID reports whether id is an OTel trace id: 32 lowercase hex digits, not all zero.
@@ -82,12 +102,17 @@ func (f SenderFunc) Send(ctx context.Context, events []Event) ([]Event, error) {
 // Dir is the spool's folder under the state directory.
 const Dir = "spool"
 
+// DeliveryLockFile is the lock, in Dir, every flush holds while it delivers: whoever holds
+// it knows no flush is sending, as the migration to multi-org routing must
+// (internal/migrate).
+const DeliveryLockFile = "delivery.lock"
+
 const (
 	eventsFile       = "events.jsonl"
 	backoffFile      = "next-attempt"
 	lastFlushFile    = "last-flush"
-	lockFile         = "flush.lock"    // shared by appends and queue rewrites
-	deliveryLockFile = "delivery.lock" // held only by flushers
+	lockFile         = "flush.lock" // shared by appends and queue rewrites
+	deliveryLockFile = DeliveryLockFile
 	// probeEventName is reserved for Writable's probe line, which never reaches a sender.
 	probeEventName = "terma-write-probe"
 	// MaxBytes bounds the spool; past it the next flush drops the oldest events.
@@ -207,6 +232,34 @@ func (s *Spool) Writable() error {
 		return err
 	}
 	return f.Sync()
+}
+
+// Sessions calls add with the session ID of every queued event that names one, a line at
+// a time, without the lock appends take, so no hook waits on it: an event appended
+// meanwhile may be missed. It stops with ctx's error once ctx is done.
+func (s *Spool) Sessions(ctx context.Context, add func(sessionID string)) error {
+	f, err := os.Open(s.path())
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	lines := bufio.NewScanner(f)
+	lines.Buffer(nil, MaxBytes)
+	for lines.Scan() {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		var e struct {
+			SessionID string `json:"session_id"`
+		}
+		if json.Unmarshal(lines.Bytes(), &e) == nil && e.SessionID != "" {
+			add(e.SessionID)
+		}
+	}
+	return lines.Err()
 }
 
 // Peek returns up to n queued events without consuming them.

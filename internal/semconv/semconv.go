@@ -419,6 +419,8 @@ const (
 	TermaRelayExitReasonUpdated = "updated"
 	// TermaRelayExitReasonServeFailed is terma.relay.exit.reason serve-failed: Its server failed.
 	TermaRelayExitReasonServeFailed = "serve-failed"
+	// TermaRelayExitReasonMigrationUnfinished is terma.relay.exit.reason migration-unfinished: Its move of the machine to routing by teams stopped part way; the next start finishes it.
+	TermaRelayExitReasonMigrationUnfinished = "migration-unfinished"
 	// TermaRelayHeartbeatReasonStart is terma.relay.heartbeat.reason start: The relay started.
 	TermaRelayHeartbeatReasonStart = "start"
 	// TermaRelayHeartbeatReasonInterval is terma.relay.heartbeat.reason interval: The heartbeat period passed.
