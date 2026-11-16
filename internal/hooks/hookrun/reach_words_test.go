@@ -667,3 +667,55 @@ func TestAScriptPastTheParsersBoundsIsNotParsed(t *testing.T) {
 		t.Errorf("half a megabyte of subshells: %q, want UnknownReach", got)
 	}
 }
+
+// deepTree is a tree outside any checkout five levels deep, each folder holding five, deeper
+// than a walk below a folder goes and wider than its lookups reach.
+func deepTree(t testing.TB) string {
+	t.Helper()
+	root, _ := filepath.EvalSymlinks(t.TempDir())
+	level := []string{root}
+	for range 5 {
+		var next []string
+		for _, dir := range level {
+			for i := range 5 {
+				next = append(next, filepath.Join(dir, fmt.Sprint("d", i)))
+			}
+		}
+		for _, dir := range next {
+			if err := os.MkdirAll(dir, 0o700); err != nil {
+				t.Fatal(err)
+			}
+		}
+		level = next
+	}
+	return root
+}
+
+// A scan ends at a hook's deadline (shellTime), its reach not known: a program reading below
+// a deep tree outside any checkout ends within about shellTime, and a scan whose deadline has
+// passed looks at nothing.
+func TestShellPathsEndAtTheirDeadline(t *testing.T) {
+	t.Parallel()
+	tree := deepTree(t)
+	command := "rg TODO " + filepath.ToSlash(tree)
+	start := time.Now()
+	got := shellPathsBy(command, tree, os.LookupEnv, start.Add(shellTime))
+	if took := time.Since(start); !slices.ContainsFunc(got, isUnknownReach) || took > 5*shellTime {
+		t.Errorf("ShellPaths(%q) = %q in %v, want UnknownReach within about %v", command, got, took, shellTime)
+	}
+	if sc := scanShell(command, tree, os.LookupEnv, work{deadline: time.Now().Add(-time.Second)}); !sc.unknown || sc.lookups != 0 {
+		t.Errorf("past its deadline: unknown %v after %d lookups", sc.unknown, sc.lookups)
+	}
+}
+
+// BenchmarkShellPathsBelowADeepTree times a program reading below deepTree, which ends at the
+// scan's bounds.
+func BenchmarkShellPathsBelowADeepTree(b *testing.B) {
+	tree := deepTree(b)
+	command := "rg TODO " + filepath.ToSlash(tree)
+	for b.Loop() {
+		if got := shellPaths(command, tree, os.LookupEnv); !slices.ContainsFunc(got, isUnknownReach) {
+			b.Fatalf("ShellPaths(%q) = %q, without UnknownReach", command, got)
+		}
+	}
+}

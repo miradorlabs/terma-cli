@@ -8,8 +8,8 @@
 # post-tool-use hook after an edit, and the pre-tool-use hook before a read and a shell
 # command, which runs on nearly every tool call and which Claude Code waits on before the
 # call runs, held to the same budget, shell commands at the scan's bounds and past them
-# included. The first execution of a freshly written script pays a one-time OS cost
-# (macOS's exec policy check) that no commit after it sees.
+# included, a walk below a deep tree among them. The first execution of a freshly written
+# script pays a one-time OS cost (macOS's exec policy check) that no commit after it sees.
 set -eu
 BUDGET_MS="${TERMA_HOOK_BUDGET_MS:-50}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -135,8 +135,16 @@ bench() {
   for shape in "bash -c x2000:$BASHC" "here-document x2000:$HEREDOC" "one word x2000:$ECHO"; do
     tool_hook pre-tool-use "Bash, \$S ${shape%%:*}, $label" "$(printf '{"session_id":"%s","hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"%s"},"cwd":"%s"}' "$sid" "${shape#*:}" "$dir")" "$BUDGET_MS"
   done
+  # A program reading below a deep tree outside any checkout, and a search of it: the walk
+  # ends at the scan's lookups or its deadline.
+  tool_hook pre-tool-use "Bash, below a deep tree, $label" "$(printf '{"session_id":"%s","hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"rg TODO %s"},"cwd":"%s"}' "$sid" "$TREE" "$dir")" "$BUDGET_MS"
+  tool_hook pre-tool-use "Grep, below a deep tree, $label" "$(printf '{"session_id":"%s","hook_event_name":"PreToolUse","tool_name":"Grep","tool_input":{"pattern":"TODO","path":"%s"},"cwd":"%s"}' "$sid" "$TREE" "$dir")" "$BUDGET_MS"
 }
 
+# A tree outside any checkout five levels deep, each folder holding five.
+TREE="$top/tree"
+mkdir -p "$TREE"
+awk 'BEGIN { for (i = 0; i < 3125; i++) printf "d%d/d%d/d%d/d%d/d%d\n", int(i / 625), int(i / 125) % 5, int(i / 25) % 5, int(i / 5) % 5, i % 5 }' | (cd "$TREE" && xargs mkdir -p)
 WORDS="$(i=0; while [ $i -lt 4000 ]; do printf ' w%d' $i; i=$((i + 1)); done)"
 LOOP="$(awk 'BEGIN { for (i = 0; i < 3000; i++) printf "%sw%d", (i ? " " : ""), i }')"
 MEGA="$(awk 'BEGIN { for (i = 0; i < 140000; i++) printf " w%d", i }')"
