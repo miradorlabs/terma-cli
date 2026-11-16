@@ -124,7 +124,8 @@ func shellPathsBy(command, cwd string, env func(string) (string, bool), deadline
 
 // readShell is what readings of command reach from cwd, done by deadline: the places any
 // finds, each once, and UnknownReach when any may reach one it cannot name. Each reading goes
-// on from the work those before it did: the scan's bounds are the command's.
+// on from the work those before it did, and the places they find together are bound by
+// maxShellPlaces: the scan's bounds are the command's.
 func readShell(command string, readings []string, cwd string, env func(string) (string, bool), deadline time.Time) []string {
 	var out []string
 	done := work{deadline: deadline}
@@ -137,6 +138,9 @@ func readShell(command string, readings []string, cwd string, env func(string) (
 				out = append(out, p)
 			}
 		}
+	}
+	if len(out) > maxShellPlaces {
+		out, unknown = out[:maxShellPlaces], true
 	}
 	if unknown {
 		out = append(out, unknownReach(command))

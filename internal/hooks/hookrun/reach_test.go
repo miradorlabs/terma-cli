@@ -334,6 +334,24 @@ func TestABackslashSeparatesOnlyInTheWindowsReading(t *testing.T) {
 	if sc := scanShell(src, cwd, none, work{bytes: maxShellBytes - len(src) + 1}); !sc.unknown {
 		t.Errorf("%q past the bytes left: %q, without UnknownReach", src, sc.out)
 	}
+	// So are the places it reaches: p\001 is p001 read as POSIX, and q\001 q/001 read as on
+	// Windows, each reading's within maxShellPlaces and both past it.
+	words := []string{"ls"}
+	for i := range maxShellPlaces/2 + 10 {
+		for _, dir := range []string{fmt.Sprintf("p%03d", i), fmt.Sprintf("q/%03d", i)} {
+			if err := os.MkdirAll(filepath.Join(cwd, dir), 0o700); err != nil {
+				t.Fatal(err)
+			}
+		}
+		words = append(words, fmt.Sprintf(`p\%03d q\%03d`, i, i))
+	}
+	command := strings.Join(words, " ")
+	for _, windows := range []bool{false, true} {
+		got := readShell(command, shellReadings(command, windows), cwd, none, time.Now().Add(time.Minute))
+		if unknown := slices.ContainsFunc(got, isUnknownReach); unknown != windows || len(got) > maxShellPlaces+1 {
+			t.Errorf("%d places, read as on Windows %v: somewhere not known %v", len(got), windows, unknown)
+		}
+	}
 }
 
 // Classify reads below each folder it is given, as a search does (the folder-below rule): a
