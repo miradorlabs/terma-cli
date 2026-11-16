@@ -84,10 +84,11 @@ func ShellPaths(command, cwd string) []string {
 // shellPaths is ShellPaths under env, the hook's environment.
 func shellPaths(command, cwd string, env func(string) (string, bool)) []string {
 	var out []string
+	var done work
 	unknown := false
 	for _, src := range shellReadings(command) {
-		sc := scanShell(src, cwd, env)
-		unknown = unknown || sc.unknown
+		sc := scanShell(src, cwd, env, done)
+		done, unknown = sc.work, unknown || sc.unknown
 		for _, p := range sc.out {
 			if !slices.Contains(out, p) {
 				out = append(out, p)
@@ -104,6 +105,8 @@ func shellPaths(command, cwd string, env func(string) (string, bool)) []string {
 // escape. On Windows an agent's shell may be Git Bash, which does, or PowerShell or cmd,
 // where it separates C:\Users\..., so a command holding a backslash is also read with each
 // a slash, and reaches what either reading finds: a path only one finds errs toward Mixed.
+// The second reading goes on from the work the first did: the scan's bounds are the
+// command's.
 func shellReadings(command string) []string {
 	if filepath.Separator == '\\' && strings.ContainsRune(command, '\\') {
 		return []string{command, windowsReading(command)}
@@ -117,21 +120,25 @@ func windowsReading(command string) string { return strings.ReplaceAll(command, 
 // scan is one reading of a command: where it is (dir, after its cds; prev before the last;
 // pushed, pushd's stack), its assignments (nil for a value not resolved), the script it is
 // reading and how deep, the places it reached in order, what it has looked at, and the work
-// it has done.
+// it and the readings before it have done.
 type scan struct {
-	cwd, dir, prev        string
-	pushed                []string
-	env                   func(string) (string, bool)
-	vars                  map[string]*string
-	cfg                   *expand.Config
-	src                   string
-	depth                 int
-	out                   []string
-	places                map[string]bool
-	examined              map[candidate]string
-	lookups, words, bytes int
-	unknown               bool
+	cwd, dir, prev string
+	pushed         []string
+	env            func(string) (string, bool)
+	vars           map[string]*string
+	cfg            *expand.Config
+	src            string
+	depth          int
+	out            []string
+	places         map[string]bool
+	examined       map[candidate]string
+	work
+	unknown bool
 }
+
+// work is what a scan has done, counted toward its bounds: the lookups it made, the words it
+// expanded and the bytes it parsed and expanded.
+type work struct{ lookups, words, bytes int }
 
 // candidate is a word as expanded, from where it was read and in what role, once looked at:
 // examined holds the folder it named from there, which a cd's target moves to each time.
@@ -140,9 +147,10 @@ type candidate struct {
 	r         role
 }
 
-// scanShell reads src, one reading of a command, from cwd.
-func scanShell(src, cwd string, env func(string) (string, bool)) (sc *scan) {
-	sc = &scan{cwd: cwd, dir: cwd, env: env, vars: map[string]*string{}, places: map[string]bool{}, examined: map[candidate]string{}}
+// scanShell reads src, one reading of a command, from cwd, the readings before it having
+// done done.
+func scanShell(src, cwd string, env func(string) (string, bool), done work) (sc *scan) {
+	sc = &scan{cwd: cwd, dir: cwd, env: env, vars: map[string]*string{}, places: map[string]bool{}, examined: map[candidate]string{}, work: done}
 	sc.cfg = sc.config()
 	defer func() {
 		if recover() != nil {

@@ -258,8 +258,17 @@ func TestABackslashSeparatesOnlyInTheWindowsReading(t *testing.T) {
 		if c.windows {
 			src = windowsReading(src)
 		}
-		if got := scanShell(src, cwd, none).out; !slices.Equal(got, c.want) {
+		if got := scanShell(src, cwd, none, work{}).out; !slices.Equal(got, c.want) {
 			t.Errorf("%q, Windows reading %v: %q, want %q", c.command, c.windows, got, c.want)
 		}
+	}
+	// The Windows reading goes on from the work the first did: the scan's bounds are the
+	// command's, however many readings it takes.
+	src := windowsReading(`type ..\side`)
+	if sc := scanShell(src, cwd, none, work{bytes: maxShellBytes - len(src)}); sc.unknown {
+		t.Errorf("%q with the bytes it parses left: unknown", src)
+	}
+	if sc := scanShell(src, cwd, none, work{bytes: maxShellBytes - len(src) + 1}); !sc.unknown {
+		t.Errorf("%q past the bytes left: %q, without UnknownReach", src, sc.out)
 	}
 }
