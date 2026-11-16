@@ -65,6 +65,7 @@ func TestTeamsCheckFailsOnWhatBlocks(t *testing.T) {
 	if err := r.State.Unbind("github.com/acme"); err != nil {
 		t.Fatal(err)
 	}
+	r.Pending = PendingKeys(r.State)
 	if c := TeamsCheck(r, now); c.Status != Fail || !strings.Contains(c.Detail, "github.com/acme is undecided") || !strings.Contains(c.Fix, "--bind github.com/acme=Acme") {
 		t.Errorf("pending = %+v", c)
 	}

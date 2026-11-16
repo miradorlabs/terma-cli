@@ -32,7 +32,7 @@ func (app *App) routingFacts(cfg *config.Config) *doctor.Routing {
 	r := &doctor.Routing{
 		State: st, Err: err, Missing: err == nil && !ok,
 		Teams: names.Teams, Orgs: names.Orgs,
-		Key: app.teamKey,
+		Key: app.teamKey, Pending: doctor.PendingKeys(st),
 	}
 	r.Mixed = runs.Mixed(app.stateDir, time.Now(), mixedRecent)
 	r.MixedDropped, r.Blocked = relayBlocked(app.stateDir)
