@@ -133,7 +133,7 @@ func parsable(src string) bool {
 			}
 			i += n - 1
 			push(c, n, i, n == 2 || c == '[')
-		case c == top:
+		case c == top && len(open) > 0: // a NUL is no context's close
 			open = open[:len(open)-1]
 		case c == '|' || c == '&' && next == '&':
 			links++
