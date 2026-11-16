@@ -144,12 +144,16 @@ func Search(dir string, globs ...string) []string {
 // searched is paths, each folder followed by the checkouts below it, from cwd, but a folder
 // alone (Alone): none when it is in a checkout, as ShellPaths reads below a folder a program
 // reads, within the same bounds and deadline, all the folders told; past them, UnknownReach
-// naming the folder.
+// naming the folder. A path no lookup may touch (remote: //host/share) is UnknownReach naming
+// it.
 func searched(paths []string, cwd string) []string {
 	var sc *scan
 	out := make([]string, 0, len(paths))
 	for _, p := range paths {
 		dir, alone := strings.CutPrefix(p, aloneMark)
+		if remote(dir, cwd) {
+			dir = unknownReach(dir)
+		}
 		if out = append(out, dir); alone || dir == "" || isUnknownReach(dir) {
 			continue
 		}

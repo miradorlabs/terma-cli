@@ -1,7 +1,6 @@
 package hookrun
 
 import (
-	"io/fs"
 	"os"
 	"path/filepath"
 	"slices"
@@ -70,7 +69,8 @@ func isUnknownReach(p string) bool { return strings.HasPrefix(p, UnknownReach) }
 // a word with no slash included when something is there and an option's or assignment's
 // value (--flag=X, -oX, NAME=X) as the word; the fragments of every argument and assignment
 // value, split at quotes, brackets, :, @, = and the like (-v ../x:/src, -d @../x,
-// PYTHONPATH=.:../x), those of prose (git commit -m "fix a/b") only when slashed and there;
+// PYTHONPATH=.:../x), those of prose (git commit -m "fix a/b") only when slashed and there,
+// a URL naming none but a file: URL its path (https://x/y names no //x/y: urlPath);
 // its name, past wrappers (sudo, timeout 60, env A=1, xargs, uv run: the wrappers table),
 // only as a path that is there (../other/x); its redirects' targets; its assignments'
 // slashed values; a cd's, pushd's and popd's move, CDPATH's included, which later words
@@ -93,11 +93,14 @@ func isUnknownReach(p string) bool { return strings.HasPrefix(p, UnknownReach) }
 // is, the few command substitutions whose output is known (outputs), and globs, walked a
 // segment at a time. A word whose expansion cannot be resolved (another command
 // substitution's output, an unset variable) is UnknownReach when it may be a path: it is
-// slashed, a cd's target, or a folder option's value (-C, --git-dir, --dir...). So is a
-// command past any of the scan's bounds or maxGlobSegments, or its deadline. A command that
-// does not parse runs up to its error, as bash and zsh do: the statements before it are read
-// as any are, and the rest as its words, a command substitution among them not known. A
-// word that only looks like a path counts: a false crossing errs toward Mixed, the safe way.
+// slashed, a cd's target, or a folder option's value (-C, --git-dir, --dir...). So is such a
+// word on another machine's share (//host/share, \\host\share), as no lookup touches a path
+// that starts with two separators, which Windows sends to the network (remote), but on the
+// share the command runs in; and so is a command past any of the scan's bounds or
+// maxGlobSegments, or its deadline. A command that does not parse runs up to its error, as
+// bash and zsh do: the statements before it are read as any are, and the rest as its words,
+// a command substitution among them not known. A word that only looks like a path counts: a
+// false crossing errs toward Mixed, the safe way.
 //
 // Accepted risks: a word with no slash whose expansion cannot be resolved, outside a cd or a
 // folder option (a loop over $(ls), rg TODO $DIR), counts for nothing: taking every such
@@ -324,121 +327,4 @@ func (sc *scan) charge(n int) bool {
 	}
 	sc.bytes += n
 	return true
-}
-
-// candidate looks at t, a word as expanded, in role r (resolve), once from each place in
-// each role, then moves where the command is when t is a cd's target that names a folder,
-// as often as it is named.
-func (sc *scan) candidate(t string, r role) {
-	if !r.whole() {
-		t = shellValue(t)
-	}
-	slashed := pathLike(t)
-	if t == "" || !slashed && r.needsSlash() {
-		return
-	}
-	c := candidate{t, sc.dir, r}
-	dir, seen := sc.examined[c]
-	if !seen {
-		if !sc.spend(1) {
-			return
-		}
-		dir = sc.resolve(t, r, slashed)
-		sc.examined[c] = dir
-	}
-	if r == target && dir != "" {
-		sc.prev, sc.dir = sc.dir, dir
-	}
-}
-
-// resolve reaches what t, a word in role r, names from where the command is and from the
-// cwd, as an earlier cd may have been in a branch not taken or a subshell, and returns the
-// folder it names from where the command is, if any. A word that names nothing reaches
-// nothing, but one that may be a new file reaches its nearest existing folder.
-func (sc *scan) resolve(t string, r role, slashed bool) string {
-	p, info := sc.reach(t, sc.dir)
-	var back string
-	var backInfo os.FileInfo
-	if sc.dir != sc.cwd {
-		back, backInfo = sc.reach(t, sc.cwd)
-	}
-	sc.operand(p, info, r)
-	sc.operand(back, backInfo, r)
-	if p == "" && back == "" && r.mayCreate(slashed) {
-		sc.reachNew(t, sc.dir)
-		if sc.dir != sc.cwd {
-			sc.reachNew(t, sc.cwd)
-		}
-	}
-	if info != nil && info.IsDir() {
-		return p
-	}
-	return ""
-}
-
-// reachEntry adds the place of p, which exists and Lstat described as info: a folder is its
-// own, anything else its folder's, and a symlink's target's place as well.
-func (sc *scan) reachEntry(p string, info fs.FileInfo) {
-	switch {
-	case info.IsDir():
-		sc.place(p)
-	case info.Mode()&fs.ModeSymlink != 0:
-		sc.place(filepath.Dir(p))
-		if target, err := filepath.EvalSymlinks(p); err == nil {
-			if t, err := os.Stat(target); err == nil && t.IsDir() {
-				sc.place(target)
-			} else {
-				sc.place(filepath.Dir(target))
-			}
-		}
-	default:
-		sc.place(filepath.Dir(p))
-	}
-}
-
-// reach adds the place of the path w names from dir when something is there, and returns
-// the path with what is there, a symlink followed.
-func (sc *scan) reach(w, dir string) (string, os.FileInfo) {
-	p, ok := sc.path(w, dir)
-	if !ok {
-		return "", nil
-	}
-	info, err := os.Lstat(p)
-	if err != nil {
-		return "", nil
-	}
-	sc.reachEntry(p, info)
-	if info.Mode()&fs.ModeSymlink != 0 {
-		if info, err = os.Stat(p); err != nil {
-			return p, nil
-		}
-	}
-	return p, info
-}
-
-// reachNew adds the nearest existing folder above the path w names from dir, where a file
-// the command creates would go; none when the nearest existing path is not a folder.
-func (sc *scan) reachNew(w, dir string) {
-	p, ok := sc.path(w, dir)
-	for dir := filepath.Dir(p); ok; dir = filepath.Dir(dir) {
-		if info, err := os.Stat(dir); err == nil {
-			if info.IsDir() {
-				sc.place(dir)
-			}
-			return
-		}
-		ok = filepath.Dir(dir) != dir
-	}
-}
-
-// path is the path the word w names from dir: ~ is the home directory.
-func (sc *scan) path(w, dir string) (string, bool) {
-	switch {
-	case w == "~" || strings.HasPrefix(w, "~/"):
-		home, ok := sc.lookup("HOME")
-		return filepath.Join(home, w[1:]), ok
-	case filepath.IsAbs(w):
-		return filepath.Clean(w), true
-	}
-	return filepath.Join(dir, w), dir != ""
 }

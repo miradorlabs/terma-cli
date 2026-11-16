@@ -83,6 +83,67 @@ func TestShellPathsAreTheWordsThatNameSomethingThere(t *testing.T) {
 	}
 }
 
+// A URL names no path on this machine: its host and path are no //host/path, which Windows
+// takes for another machine's (https://example.com/a is no \\example.com\a). A file: URL
+// names its path. A path that starts with two separators is never looked up, as Windows sends
+// it to the network, where a lookup may wait far past the hook's deadline: a share's
+// (//host/share) is a path not resolved, so somewhere not known where one counts (an
+// argument, a cd's target) and nothing where only one that is there does (prose); anything
+// else so written (// TODO) names none. Where //x is /x (Unix), each would name Acme's
+// checkout were it looked up. A path on the share the command runs in, which the hook reads
+// anyway, is looked up as any.
+func TestAURLOrAPathOnAnotherMachineIsNeverLookedUp(t *testing.T) {
+	t.Parallel()
+	parent, _ := filepath.EvalSymlinks(t.TempDir())
+	cwd, api := filepath.Join(parent, "side"), filepath.Join(parent, "acme-api")
+	for _, dir := range []string{cwd, api} {
+		if err := os.MkdirAll(dir, 0o700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(api, "NOTES.md"), nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	// Acme's checkout past its volume and leading slash: private/var/.../acme-api.
+	rel := strings.TrimLeft(filepath.ToSlash(strings.TrimPrefix(api, filepath.VolumeName(api))), "/")
+	for _, tc := range []struct {
+		command string
+		want    []string
+		unknown bool
+	}{
+		{"curl https://" + rel + "/NOTES.md", nil, false},
+		{"curl -fsSL https://" + rel + " > out", []string{cwd}, false},
+		{"docker run -e URL=git+ssh://" + rel + " alpine", nil, false},
+		{`node -e "fetch('https://` + rel + `')"`, nil, false},
+		{"cat file:///" + strings.TrimPrefix(filepath.ToSlash(api), "/") + "/NOTES.md", []string{api}, false},
+		{"cat //" + rel + "/NOTES.md", nil, true},
+		{"cd //" + rel + " && ls", nil, true},
+		{"ls //" + rel + "/*.md", nil, true},
+		{"cat <<EOF\nsee //" + rel + "\nEOF", nil, false},
+		{"rg -n '// TODO'", nil, false},
+	} {
+		got := ShellPaths(tc.command, cwd)
+		if unknown := slices.ContainsFunc(got, isUnknownReach); unknown != tc.unknown || !slices.Equal(slices.DeleteFunc(got, isUnknownReach), tc.want) {
+			t.Errorf("ShellPaths(%q) = %q, want %q, somewhere not known %v", tc.command, got, tc.want, tc.unknown)
+		}
+	}
+	for _, tc := range []struct {
+		path, cwd string
+		remote    bool
+	}{
+		{"//host/share/acme-api", cwd, true},
+		{"//host/share/acme-api", "//HOST/Share/side", false},
+		{"//host/other/acme-api", "//host/share/side", true},
+		{"// TODO", "// TODO", true},
+		{"/" + rel, cwd, false},
+		{"///" + rel, cwd, true},
+	} {
+		if got := remote(tc.path, tc.cwd); got != tc.remote {
+			t.Errorf("remote(%q, %q) = %v, want %v", tc.path, tc.cwd, got, tc.remote)
+		}
+	}
+}
+
 // A command reaches its first maxShellPlaces places, each folder once however many of its
 // words name it, and one reaching more counts as reaching an unknown organization: Acme's
 // checkout among the first turns the run Mixed, and so does any command past the bound,
@@ -296,6 +357,8 @@ func TestClassifyReadsBelowAFolderOutsideAnyCheckout(t *testing.T) {
 		"a glob above its checkout":  {Search(c.side, "../**/*.go"), crossed},
 		"Acme's checkout":            {Search(c.api), crossed},
 		"a tree past the walk":       {[]string{deep}, runs.Why{Reason: runs.UnknownReach, Where: firstWords(deep)}},
+		"a share's folder":           {[]string{"//host/share/acme-api"}, runs.Why{Reason: runs.UnknownReach, Where: firstWords("//host/share/acme-api")}},
+		"a share's folder, alone":    {Alone("//host/share/acme-api"), runs.Why{Reason: runs.UnknownReach, Where: firstWords("//host/share/acme-api")}},
 		"the folder above, alone":    {Alone(c.home), runs.Why{}},
 		"its own checkout":           {Search(c.side, "**/*.go"), runs.Why{}},
 	} {

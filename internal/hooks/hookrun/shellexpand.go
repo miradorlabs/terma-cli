@@ -240,6 +240,9 @@ func (sc *scan) pieces(f string, r role) {
 // and each match a lookup: a match's folder, or a matched folder itself, each an operand.
 // False when nothing matches, and the word is taken as written.
 func (sc *scan) glob(pat string, r role) bool {
+	if sc.away(pat, r) {
+		return true
+	}
 	segs := strings.Split(pat, "/")
 	if len(slices.DeleteFunc(slices.Clone(segs), func(s string) bool { return !pattern.HasMeta(s, 0) })) > maxGlobSegments {
 		sc.unknown = true
@@ -350,15 +353,17 @@ func isFragmentSeparator(r rune) bool {
 }
 
 // fragments are the words of text, a script's, a here-document's or an argument's, split at
-// whitespace, quotes, brackets, parentheses, commas, :, @ and =, but a drive's colon (C:\x).
+// whitespace, quotes, brackets, parentheses, commas, :, @ and =, but a drive's colon (C:\x)
+// and a URL's after its scheme (https://x, whose //x is no path).
 func fragments(text string) iter.Seq[string] {
 	return func(yield func(string) bool) {
 		start := -1
 		for i, r := range text + " " {
 			drive := r == ':' && start >= 0 && i == start+1 && i+1 < len(text) && (text[i+1] == '/' || text[i+1] == '\\') &&
 				unicode.IsLetter(rune(text[start]))
+			url := r == ':' && start >= 0 && strings.HasPrefix(text[i+1:], "//") && isScheme(text[start:i])
 			switch {
-			case isFragmentSeparator(r) && !drive:
+			case isFragmentSeparator(r) && !drive && !url:
 				if start >= 0 && !yield(text[start:i]) {
 					return
 				}

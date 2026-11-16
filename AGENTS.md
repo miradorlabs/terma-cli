@@ -177,7 +177,8 @@ command names that is there, a word without a slash included, but its name (the 
 run, past wrappers such as `sudo`, `timeout 60`, `env A=1` and `uv run`) only as a path that
 is there, never one looked up on PATH; the fragments of every argument and assignment value,
 split at quotes, brackets, `:`, `@` and `=` (`-v ../x:/src`, `-d @../x`, `PYTHONPATH=.:../x`),
-those of prose (`git commit -m "fix a/b"`) only when slashed and there; the nearest folder
+those of prose (`git commit -m "fix a/b"`) only when slashed and there, a URL naming none
+but a `file:` URL its path (`https://x/y` names no `//x/y`); the nearest folder
 that is there above a slashed word that is not, as a new file; every `cd`'s and `pushd`'s
 target, from `CDPATH` when the command sets it, and the folder `-C` names for `tar`, `make`
 and `git`; as commands, the script of a shell's `-c` wherever it is among a command's
@@ -199,11 +200,15 @@ however many of its words name it, and the work it does, the bytes it parses and
 and the entries a walk reads included, and 20 ms of wall-clock time), or a path in it whose
 expansion cannot be resolved (a slashed word, a `cd`'s target, a folder option's value such
 as `git -C`), touches an organization not known, and the run turns Mixed
-(`hookrun.UnknownReach`). Accepted, not followed: an interpreter's script beyond its
-slashed words (`os.chdir('..')`, `os.path.join('..', 'x')`, `Path('..').rglob()`), `xargs`
-given words by a producer not literal (`echo .. | xargs rg`), zsh's `cd old new`, a checkout
-under `~/Library` (iCloud Drive), and another agent's listing whose key a search shares
-(`path`), read as a search; a command cut off mid-prose turns Mixed on the word `cd`. An
+(`hookrun.UnknownReach`); so does any call's path on another machine's share
+(`//host/share`, `\\host\share`), as no lookup touches a path that starts with two
+separators, which Windows sends to the network, where it may wait far past the hook's
+deadline, but on the share the hook runs in. Accepted, not followed: an interpreter's
+script beyond its slashed words (`os.chdir('..')`, `os.path.join('..', 'x')`,
+`Path('..').rglob()`), `xargs` given words by a producer not literal (`echo .. | xargs rg`),
+zsh's `cd old new`, a checkout under `~/Library` (iCloud Drive), and another agent's
+listing whose key a search shares (`path`), read as a search; a command cut off mid-prose
+turns Mixed on the word `cd`. An
 edit records and spools as it always has; a
 read, a search or a shell command only classifies (`hookrun.Env.Classify`): it writes no
 manifest and spools nothing, and on a machine not migrated it does nothing. Where the agent
