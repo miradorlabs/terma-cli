@@ -20,14 +20,17 @@ import (
 // parses and expands, all told, each script charged before it is parsed and each word what
 // it may expand to before it is (size): a megabyte of short words parses in some 15ms, so
 // the bound is one, however the bytes are split among scripts (bash -c) and expansions;
-// maxShellDepth the scripts it reads inside each other. No command an agent runs comes near
-// them, and they keep a pathological one within the hook's budget.
+// maxShellDepth the scripts it reads inside each other; maxShellBraces the braces a word
+// holds, as expand takes time and memory that grow with their square to make each word of a
+// brace expansion (a word of 4000 took 400 MiB). No command an agent runs comes near them,
+// and they keep a pathological one within the hook's budget.
 const (
 	maxShellPlaces  = 256
 	maxShellLookups = 4096
 	maxShellWords   = 4 * maxShellLookups
 	maxShellBytes   = 1 << 20
 	maxShellDepth   = 4
+	maxShellBraces  = 16
 )
 
 // UnknownReach is a path Classify takes to say the call may have reached a checkout no path

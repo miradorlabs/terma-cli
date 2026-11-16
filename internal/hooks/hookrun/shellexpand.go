@@ -115,13 +115,53 @@ func (sc *scan) paramSize(pe *syntax.ParamExp) int {
 }
 
 // fields, document and pattern expand w as expand's functions of those names do, each once
-// the byte budget allows for what w may expand to (size); past it, w is not resolved and
-// the reach is not known.
+// the byte budget allows for what w may expand to (size), fields for each word its braces
+// make; past it, w is not resolved and the reach is not known.
 func (sc *scan) fields(w *syntax.Word) ([]string, error) {
-	if !sc.charge(sc.size(w)) {
-		return nil, errOpaque
+	var out []string
+	for b, err := range sc.braces(w) {
+		if err != nil || !sc.charge(sc.size(b)) {
+			return nil, errOpaque
+		}
+		f, err := expand.Fields(sc.cfg, b)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, f...)
 	}
-	return expand.Fields(sc.cfg, w)
+	return out, nil
+}
+
+// braces are the words w's braces make, each a lookup, or w itself when it holds none. Past
+// maxShellBraces or the scan's bounds they end in an error, and the reach is not known.
+func (sc *scan) braces(w *syntax.Word) iter.Seq2[*syntax.Word, error] {
+	return func(yield func(*syntax.Word, error) bool) {
+		n := 0
+		for _, p := range w.Parts {
+			if lit, ok := p.(*syntax.Lit); ok {
+				n += strings.Count(lit.Value, "{")
+			}
+		}
+		braced := *w // SplitBraces replaces its parts
+		switch {
+		case n > maxShellBraces:
+			sc.unknown = true
+			yield(nil, errOpaque)
+		case n == 0 || !syntax.SplitBraces(&braced):
+			yield(w, nil)
+		default:
+			for b, err := range expand.BracesSeq(sc.cfg, &braced) {
+				if err != nil || !sc.spend(1) {
+					sc.unknown = true
+					yield(nil, errOpaque)
+					return
+				}
+				if !yield(b, nil) {
+					return
+				}
+			}
+		}
+	}
 }
 
 func (sc *scan) document(w *syntax.Word) (string, error) {
@@ -139,7 +179,7 @@ func (sc *scan) pattern(w *syntax.Word) (string, error) {
 }
 
 // arg reads w, a word of a command in role r: its substitutions, which run first, then each
-// word its braces make, each a lookup.
+// word its braces make.
 func (sc *scan) arg(w *syntax.Word, r role) {
 	if sc.words++; sc.unknown || sc.words > maxShellWords {
 		sc.unknown = true
@@ -150,14 +190,8 @@ func (sc *scan) arg(w *syntax.Word, r role) {
 		sc.candidate(l, r) // nothing to expand
 		return
 	}
-	braced := *w // SplitBraces replaces its parts
-	if !syntax.SplitBraces(&braced) {
-		sc.expand(w, r)
-		return
-	}
-	for w, err := range expand.BracesSeq(sc.cfg, &braced) {
-		if err != nil || !sc.spend(1) {
-			sc.unknown = true
+	for w, err := range sc.braces(w) {
+		if err != nil {
 			return
 		}
 		sc.expand(w, r)
