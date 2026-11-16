@@ -112,7 +112,7 @@ func (v teamsView) row(org, team string) (orgRow, teamRow, bool) {
 
 // Listing (contract C4): every organization from one sign-in; a signed-in one's teams with
 // their entries; one without a sign-in says so; a team whose policy read says it is gone
-// (TEAM_NOT_FOUND) is hidden, and one refused for no reason stays listed as unreadable.
+// (PROJECT_NOT_FOUND) is hidden, and one refused for no reason stays listed as unreadable.
 func TestTeamsListsEveryOrganizationAndTheSignedInOnesTeams(t *testing.T) {
 	f := migratedMachine(t, nil, orgA())
 	f.goneTeams = map[string]bool{acmeWeb: true}
@@ -133,7 +133,7 @@ func TestTeamsListsEveryOrganizationAndTheSignedInOnesTeams(t *testing.T) {
 		t.Errorf("Acme API = %+v (listed %v)", api, ok)
 	}
 	if _, _, ok := v.row(orgA().ID, acmeWeb); ok {
-		t.Error("a team whose policy answers TEAM_NOT_FOUND is listed")
+		t.Error("a team whose policy answers PROJECT_NOT_FOUND is listed")
 	}
 	i := slices.IndexFunc(v.Organizations, func(o orgRow) bool { return o.ID == orgB().ID })
 	if i < 0 || v.Organizations[i].SignedIn || len(v.Organizations[i].Teams) != 0 || v.Organizations[i].Note != "sign in to see its teams" {

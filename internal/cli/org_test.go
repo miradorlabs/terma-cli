@@ -50,7 +50,7 @@ type fakeAuth struct {
 	scopedPolicies bool
 	policyBodies   map[string]string
 	// goneTeams answer their policy read as a team archived since the listing does (403,
-	// TEAM_NOT_FOUND); forbiddenTeams with a 403 that names no reason; mintDown fails
+	// PROJECT_NOT_FOUND); forbiddenTeams with a 403 that names no reason; mintDown fails
 	// every key creation.
 	goneTeams      map[string]bool
 	forbiddenTeams map[string]bool
@@ -164,7 +164,7 @@ func newFakeAuth(t *testing.T) *fakeAuth {
 			}
 			if f.goneTeams[r.URL.Query().Get("project_id")] {
 				w.WriteHeader(http.StatusForbidden)
-				fmt.Fprint(w, `{"error":{"code":"PERMISSION_DENIED","message":"no active team with this id","reason":"TEAM_NOT_FOUND"}}`)
+				fmt.Fprint(w, `{"error":{"code":"PERMISSION_DENIED","message":"no active team with this id","reason":"PROJECT_NOT_FOUND"}}`)
 				return
 			}
 			if body, ok := f.policyBodies[r.URL.Query().Get("project_id")]; ok {

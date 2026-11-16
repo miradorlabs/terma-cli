@@ -17,14 +17,14 @@ func TestParseErrorReadsTheReason(t *testing.T) {
 	t.Parallel()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusForbidden)
-		fmt.Fprint(w, `{"error":{"code":"PERMISSION_DENIED","reason":"TEAM_NOT_FOUND","message":"no such team"}}`)
+		fmt.Fprint(w, `{"error":{"code":"PERMISSION_DENIED","reason":"PROJECT_NOT_FOUND","message":"no such team"}}`)
 	}))
 	defer srv.Close()
 	c := newTestClient(t, srv.URL, liveCredential(), "team")
 	err := c.AuthGet(context.Background(), "/v1/policy", nil, &struct{}{})
 	var apiErr *Error
-	if !errors.As(err, &apiErr) || apiErr.StatusCode != http.StatusForbidden || apiErr.Reason != ReasonTeamNotFound {
-		t.Fatalf("err = %#v, want a 403 with TEAM_NOT_FOUND", err)
+	if !errors.As(err, &apiErr) || apiErr.StatusCode != http.StatusForbidden || apiErr.Reason != ReasonProjectNotFound {
+		t.Fatalf("err = %#v, want a 403 with PROJECT_NOT_FOUND", err)
 	}
 	if got := apiErr.Error(); got != "no such team (PERMISSION_DENIED)" {
 		t.Fatalf("message = %q", got)

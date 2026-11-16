@@ -101,7 +101,7 @@ func (s Source) RefreshTeam(ctx context.Context, cfg *config.Config, t routing.T
 // (contract C3):
 //
 //   - a token refresh refused with ORG_NOT_ACCESSIBLE: OrgAccessLost, the team Refused at once;
-//   - a 403 refusing the policy read with TEAM_NOT_FOUND: Terminal, suspending the team;
+//   - a 403 refusing the policy read with PROJECT_NOT_FOUND: Terminal, suspending the team;
 //   - any other 401, no sign-in for the organization, or one from another environment:
 //     SignIn, until the developer signs in again;
 //   - anything else (another 403, a 5xx, a 429, the network, a locked keychain, a team of
@@ -116,7 +116,7 @@ func Classify(err error) routing.ErrorClass {
 		return ""
 	case refreshing && errors.As(refresh.Err, &apiErr) && apiErr.Unauthenticated() && apiErr.Reason == api.ReasonOrgNotAccessible:
 		return routing.OrgAccessLost
-	case !refreshing && errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusForbidden && apiErr.Reason == api.ReasonTeamNotFound:
+	case !refreshing && errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusForbidden && apiErr.Reason == api.ReasonProjectNotFound:
 		return routing.Terminal
 	case errors.As(err, &apiErr) && apiErr.Unauthenticated(), errors.Is(err, auth.ErrNotLoggedIn), errors.As(err, &otherEnv):
 		return routing.SignIn

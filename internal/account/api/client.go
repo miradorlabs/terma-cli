@@ -40,9 +40,10 @@ type Error struct {
 
 // The refusal reasons terma acts on (AIP-193, error.reason).
 const (
-	// ReasonTeamNotFound: GET /v1/policy found no active team with that id in the
-	// organization, whether missing, archived, deleted or another organization's.
-	ReasonTeamNotFound = "TEAM_NOT_FOUND"
+	// ReasonProjectNotFound: GET /v1/policy found no active project (a team, in Terma) with
+	// that id in the organization, whether missing, archived, deleted or another
+	// organization's.
+	ReasonProjectNotFound = "PROJECT_NOT_FOUND"
 	// ReasonOrgNotAccessible: a token refresh was refused because the developer may no
 	// longer reach the organization (they left it, or it is suspended).
 	ReasonOrgNotAccessible = "ORG_NOT_ACCESSIBLE"

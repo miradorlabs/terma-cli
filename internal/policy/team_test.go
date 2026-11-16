@@ -30,7 +30,7 @@ func migrate(t *testing.T, cfg *config.Config) {
 func TestClassifyByStatusReasonAndContext(t *testing.T) {
 	t.Parallel()
 	refusal := func(status int, reason string) *api.Error {
-		return &api.Error{StatusCode: status, Reason: reason, Message: "ORG_NOT_ACCESSIBLE TEAM_NOT_FOUND"}
+		return &api.Error{StatusCode: status, Reason: reason, Message: "ORG_NOT_ACCESSIBLE PROJECT_NOT_FOUND"}
 	}
 	for _, tc := range []struct {
 		name string
@@ -39,8 +39,8 @@ func TestClassifyByStatusReasonAndContext(t *testing.T) {
 	}{
 		{"refresh refused, organization not accessible", &api.RefreshError{Err: refusal(401, api.ReasonOrgNotAccessible)}, routing.OrgAccessLost},
 		{"wrapped as a fetch", fmt.Errorf("fetch: %w", &api.RefreshError{Err: refusal(401, api.ReasonOrgNotAccessible)}), routing.OrgAccessLost},
-		{"policy read, team not found", fmt.Errorf("fetch: %w", refusal(403, api.ReasonTeamNotFound)), routing.Terminal},
-		{"team not found on a 404", refusal(404, api.ReasonTeamNotFound), routing.Transient},
+		{"policy read, team not found", fmt.Errorf("fetch: %w", refusal(403, api.ReasonProjectNotFound)), routing.Terminal},
+		{"team not found on a 404", refusal(404, api.ReasonProjectNotFound), routing.Transient},
 		{"organization not accessible outside a refresh", refusal(401, api.ReasonOrgNotAccessible), routing.SignIn},
 		{"organization not accessible on a 403", refusal(403, api.ReasonOrgNotAccessible), routing.Transient},
 		{"refresh refused without a reason", &api.RefreshError{Err: refusal(401, "")}, routing.SignIn},
