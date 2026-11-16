@@ -510,7 +510,7 @@ func TestAPartQueuedBeforeTheMigrationWaitsForItsCommit(t *testing.T) {
 	u := newUpstream(t)
 	f := newTeamFixture(t, u)
 	f.router.noState = true
-	f.router.legacy = map[string]Queued{"acme": {Enrollment: "e-acme", Project: "acme", Kind: "repository", Repository: "github.com/acme/api", Own: true}}
+	f.router.legacy = map[string]Queued{"acme": {Enrollment: "e-acme", Project: "acme", Kind: "repository", Repository: "github.com/acme/api"}}
 	c := claim.Claim{ProjectID: "acme", Repository: config.Repository{Origin: "github.com/acme/api"}}
 	if err := (outbox{dir: f.dir}).put(routeOf(c), c.Repository, newEntry(f.clock(), Logs, 1), mustMarshal(t, logsOf("A", 1))); err != nil {
 		t.Fatal(err)
