@@ -7,9 +7,9 @@
 # median exceeds the budget. It also times the hooks Claude Code runs around a tool call: the
 # post-tool-use hook after an edit, and the pre-tool-use hook before a read and a shell
 # command, which runs on nearly every tool call and which Claude Code waits on before the
-# call runs, held to the same budget, shell commands at the scan's bounds included. The
-# first execution of a freshly written script pays a one-time OS cost (macOS's exec policy
-# check) that no commit after it sees.
+# call runs, held to the same budget, shell commands at the scan's bounds and past them
+# included. The first execution of a freshly written script pays a one-time OS cost
+# (macOS's exec policy check) that no commit after it sees.
 set -eu
 BUDGET_MS="${TERMA_HOOK_BUDGET_MS:-50}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -51,6 +51,11 @@ machine() {
   while [ $i -lt 255 ]; do
     for co in "$repo" "$tmp/wt"; do mkdir -p "$co/many/d$i"; : > "$co/many/d$i/x.go"; done
     i=$((i + 1))
+  done
+  # What a deep glob would walk: a tree shaped like go/pkg/mod, 1024 folders five deep.
+  awk 'BEGIN { for (i = 0; i < 1024; i++) printf "go/pkg/mod/m%d/v%d/p%d/q%d/r%d\n", int(i / 256), int(i / 64) % 4, int(i / 16) % 4, int(i / 4) % 4, i % 4 }' > "$tmp/deep"
+  for co in "$repo" "$tmp/wt"; do
+    (cd "$co" && xargs mkdir -p < "$tmp/deep" && sed 's|$|/x.go|' "$tmp/deep" | xargs touch)
   done
   now="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
   printf '{"active_profile":"default","profiles":{"default":{"team":"proj_bench"}}}' > "$TERMA_CONFIG_DIR/config.json"
@@ -117,9 +122,17 @@ bench() {
   # glob reaching 255 folders, and 4000 words that name nothing.
   tool_hook pre-tool-use "Bash, 255 folders, $label" "$(printf '{"session_id":"%s","hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"ls many/*/x.go"},"cwd":"%s"}' "$sid" "$dir")" "$BUDGET_MS"
   tool_hook pre-tool-use "Bash, 4000 words, $label" "$(printf '{"session_id":"%s","hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"echo%s"},"cwd":"%s"}' "$sid" "$WORDS" "$dir")" "$BUDGET_MS"
+  # Shell commands past the scan's bounds, which it stops at: a glob with six wildcard
+  # segments over the go/pkg/mod tree, for loops nested 3000 by 3000, and a megabyte of words
+  # (just under maxShellBytes, so it is parsed). Last, as each turns the run Mixed.
+  tool_hook pre-tool-use "Bash, deep glob, $label" "$(printf '{"session_id":"%s","hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"ls go/pkg/mod/*/*/*/*/*/*.go"},"cwd":"%s"}' "$sid" "$dir")" "$BUDGET_MS"
+  tool_hook pre-tool-use "Bash, 3000x3000 loop, $label" "$(printf '{"session_id":"%s","hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"for a in %s; do for b in %s; do echo $a$b; done; done"},"cwd":"%s"}' "$sid" "$LOOP" "$LOOP" "$dir")" "$BUDGET_MS"
+  tool_hook pre-tool-use "Bash, 1 MB, $label" "$(printf '{"session_id":"%s","hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"echo%s"},"cwd":"%s"}' "$sid" "$MEGA" "$dir")" "$BUDGET_MS"
 }
 
 WORDS="$(i=0; while [ $i -lt 4000 ]; do printf ' w%d' $i; i=$((i + 1)); done)"
+LOOP="$(awk 'BEGIN { for (i = 0; i < 3000; i++) printf "%sw%d", (i ? " " : ""), i }')"
+MEGA="$(awk 'BEGIN { for (i = 0; i < 140000; i++) printf " w%d", i }')"
 
 machine single
 bench "$repo" checkout checkout "$tmp/wt"
