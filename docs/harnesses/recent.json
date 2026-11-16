@@ -1,7 +1,43 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-14T19:18:11.642126269Z",
+  "generated_at": "2026-11-16T19:07:19.580506123Z",
   "versions": [
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.326",
+      "released_at": "2026-11-16T18:43:39.005Z",
+      "captured_at": "2026-11-16T19:07:19.580506123Z",
+      "platforms": [
+        "darwin/arm64",
+        "linux/amd64"
+      ],
+      "support": "supported",
+      "previous": "2.1.325",
+      "changes": 66,
+      "categories": {
+        "cli": 36,
+        "config": 23,
+        "filesystem": 5,
+        "network": 1,
+        "tools": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 64,
+        "notable": 2
+      },
+      "undocumented": null,
+      "highlights": [
+        "Workflow tool parameter resumeFromRunId: description changed (+564 −251 chars)",
+        "New vendor telemetry event: tengu_startup_timing",
+        "`claude --add-dir`: description changed"
+      ],
+      "signing": "valid",
+      "attempted_at": "2026-11-16T19:07:19.580506123Z",
+      "attempts": 1
+    },
     {
       "harness": "copilot",
       "name": "GitHub Copilot CLI",
@@ -95,7 +131,7 @@
         "informational": 0,
         "notable": 12
       },
-      "undocumented": null,
+      "undocumented": 10,
       "highlights": [
         "Setting no longer read: description",
         "Setting no longer read: disabled",
@@ -1792,14 +1828,14 @@
       ],
       "support": "supported",
       "previous": "2.1.303",
-      "changes": 84,
+      "changes": 83,
       "categories": {
         "behavior": 12,
         "cli": 9,
         "config": 17,
         "filesystem": 2,
         "hooks": 11,
-        "network": 2,
+        "network": 1,
         "prompt": 17,
         "request": 1,
         "tools": 13
@@ -1808,7 +1844,7 @@
         "breaking": 0,
         "degrading": 0,
         "informational": 38,
-        "notable": 46
+        "notable": 45
       },
       "undocumented": 39,
       "highlights": [
@@ -6160,38 +6196,6 @@
         "Behaviour: compaction removed",
         "Behaviour: tool_output removed",
         "Command no longer run: `bwrap --new-session --die-with-parent --ro-bind / / --dev /dev --bind <tmp> <tmp> --perms 555 --tmpf …` (linux/amd64)"
-      ],
-      "signing": "valid"
-    },
-    {
-      "harness": "codex",
-      "name": "Codex CLI",
-      "version": "0.142.4",
-      "released_at": "2026-06-29T05:07:05.914Z",
-      "captured_at": "2026-11-05T09:54:28.532441Z",
-      "platforms": [
-        "darwin/arm64",
-        "linux/amd64"
-      ],
-      "support": "untested",
-      "previous": "0.142.3",
-      "changes": 5,
-      "categories": {
-        "behavior": 1,
-        "binary": 1,
-        "caching": 3
-      },
-      "impact": {
-        "breaking": 0,
-        "degrading": 0,
-        "informational": 1,
-        "notable": 4
-      },
-      "undocumented": 5,
-      "highlights": [
-        "Caching across_turns.breakpoints: [[]] → [[],[],[]]",
-        "Caching across_turns.stable_prefix_chars: none → 674",
-        "Caching across_turns.turns: 1 → 3"
       ],
       "signing": "valid"
     }

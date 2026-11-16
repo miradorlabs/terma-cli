@@ -3,6 +3,540 @@
   "harness": "claude",
   "steps": [
     {
+      "version": "2.1.326",
+      "previous": "2.1.325",
+      "changes": [
+        {
+          "id": "tools.Workflow.input_schema.properties.resumeFromRunId.description",
+          "category": "tools",
+          "op": "changed",
+          "title": "Workflow tool parameter resumeFromRunId: description changed (+564 −251 chars)",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "cli.commands.claude.options.--add-dir.description",
+          "category": "cli",
+          "op": "changed",
+          "title": "`claude --add-dir`: description changed",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "cli.commands.claude.options.--append-system-prompt.description",
+          "category": "cli",
+          "op": "changed",
+          "title": "`claude --append-system-prompt`: description changed",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "cli.commands.claude.options.--bare.description",
+          "category": "cli",
+          "op": "changed",
+          "title": "`claude --bare`: description changed (+365 −303 chars)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "cli.commands.claude.options.--brief.description",
+          "category": "cli",
+          "op": "changed",
+          "title": "`claude --brief`: description changed",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "cli.commands.claude.options.--chrome.description",
+          "category": "cli",
+          "op": "changed",
+          "title": "`claude --chrome`: description changed",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "cli.commands.claude.options.--fallback-model.description",
+          "category": "cli",
+          "op": "changed",
+          "title": "`claude --fallback-model`: description changed (+151 −208 chars)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "cli.commands.claude.options.--file.description",
+          "category": "cli",
+          "op": "changed",
+          "title": "`claude --file`: description changed",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "cli.commands.claude.options.--from-pr.description",
+          "category": "cli",
+          "op": "changed",
+          "title": "`claude --from-pr`: description changed",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "cli.commands.claude.options.--model.description",
+          "category": "cli",
+          "op": "changed",
+          "title": "`claude --model`: description changed (+124 −128 chars)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "cli.commands.claude.options.--no-chrome.description",
+          "category": "cli",
+          "op": "changed",
+          "title": "`claude --no-chrome`: description changed",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "cli.commands.claude.options.--no-session-persistence.description",
+          "category": "cli",
+          "op": "changed",
+          "title": "`claude --no-session-persistence`: description changed",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "cli.commands.claude.options.--prompt-suggestions.description",
+          "category": "cli",
+          "op": "changed",
+          "title": "`claude --prompt-suggestions`: description changed (+130 −129 chars)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "cli.commands.claude.options.--resume.description",
+          "category": "cli",
+          "op": "changed",
+          "title": "`claude --resume`: description changed",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "cli.commands.claude.options.--safe-mode.description",
+          "category": "cli",
+          "op": "changed",
+          "title": "`claude --safe-mode`: description changed (+77 −44 chars)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "cli.commands.claude.options.--settings.description",
+          "category": "cli",
+          "op": "changed",
+          "title": "`claude --settings`: description changed",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "cli.commands.claude.options.--tools.description",
+          "category": "cli",
+          "op": "changed",
+          "title": "`claude --tools`: description changed (+115 −168 chars)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "cli.commands.claude.options.--verbose.description",
+          "category": "cli",
+          "op": "changed",
+          "title": "`claude --verbose`: description changed",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "cli.commands.claude.options.--worktree.description",
+          "category": "cli",
+          "op": "changed",
+          "title": "`claude --worktree`: description changed",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "cli.commands.claude agents.options.--add-dir.description",
+          "category": "cli",
+          "op": "changed",
+          "title": "`claude agents --add-dir`: description changed",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "cli.commands.claude agents.options.--json.description",
+          "category": "cli",
+          "op": "changed",
+          "title": "`claude agents --json`: description changed",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "cli.commands.claude agents.options.--plugin-dir.description",
+          "category": "cli",
+          "op": "changed",
+          "title": "`claude agents --plugin-dir`: description changed (+126 −131 chars)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "cli.commands.claude auto-mode config.description",
+          "category": "cli",
+          "op": "changed",
+          "title": "Description of `claude auto-mode config` changed",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "cli.commands.claude auto-mode reset.description",
+          "category": "cli",
+          "op": "changed",
+          "title": "Description of `claude auto-mode reset` changed",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "cli.commands.claude import.options.--yes.description",
+          "category": "cli",
+          "op": "changed",
+          "title": "`claude import --yes`: description changed",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "cli.commands.claude install.description",
+          "category": "cli",
+          "op": "changed",
+          "title": "Description of `claude install` changed",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "cli.commands.claude install.options.--force.description",
+          "category": "cli",
+          "op": "changed",
+          "title": "`claude install --force`: description changed",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "cli.commands.claude purge.options.--all.description",
+          "category": "cli",
+          "op": "changed",
+          "title": "`claude purge --all`: description changed",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "cli.commands.claude purge.options.--interactive.description",
+          "category": "cli",
+          "op": "changed",
+          "title": "`claude purge --interactive`: description changed",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "cli.commands.claude ultrareview.options.--no-post.description",
+          "category": "cli",
+          "op": "changed",
+          "title": "`claude ultrareview --no-post`: description changed",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "cli.help.--help",
+          "category": "cli",
+          "op": "changed",
+          "title": "Full help text of `--help` changed (+3635 −3932 chars)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "cli.help.agents --help",
+          "category": "cli",
+          "op": "changed",
+          "title": "Full help text of `agents --help` changed (+512 −565 chars)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "cli.help.auto-mode --help",
+          "category": "cli",
+          "op": "changed",
+          "title": "Full help text of `auto-mode --help` changed (+265 −290 chars)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "cli.help.import --help",
+          "category": "cli",
+          "op": "changed",
+          "title": "Full help text of `import --help` changed (+72 −69 chars)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "cli.help.install --help",
+          "category": "cli",
+          "op": "changed",
+          "title": "Full help text of `install --help` changed (+152 −160 chars)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "cli.help.purge --help",
+          "category": "cli",
+          "op": "changed",
+          "title": "Full help text of `purge --help` changed (+128 −160 chars)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "cli.help.ultrareview --help",
+          "category": "cli",
+          "op": "changed",
+          "title": "Full help text of `ultrareview --help` changed (+70 −187 chars)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.options.allowedHttpHookUrls.description",
+          "category": "config",
+          "op": "changed",
+          "title": "allowedHttpHookUrls description changed (+202 −0 chars)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.options.disableArtifact.description",
+          "category": "config",
+          "op": "changed",
+          "title": "disableArtifact description changed (+100 −107 chars)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.options.enableArtifact.description",
+          "category": "config",
+          "op": "changed",
+          "title": "enableArtifact description changed (+184 −192 chars)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.options.httpHookAllowedEnvVars.description",
+          "category": "config",
+          "op": "changed",
+          "title": "httpHookAllowedEnvVars description changed (+479 −280 chars)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.options.subagentStatusLine.description",
+          "category": "config",
+          "op": "changed",
+          "title": "subagentStatusLine description changed (+163 −80 chars)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.env_vars.CLAUDE_CODE_ARTIFACT_LIVE_WATCH",
+          "category": "config",
+          "op": "added",
+          "title": "New environment variable: CLAUDE_CODE_ARTIFACT_LIVE_WATCH",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.env_vars.CLAUDE_CODE_CHILD_NOTES_DIR",
+          "category": "config",
+          "op": "added",
+          "title": "New environment variable: CLAUDE_CODE_CHILD_NOTES_DIR",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.env_vars.CLAUDE_CODE_DISABLE_EARLY_KEY_GUARD",
+          "category": "config",
+          "op": "added",
+          "title": "New environment variable: CLAUDE_CODE_DISABLE_EARLY_KEY_GUARD",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.env_vars.CLAUDE_CODE_DISABLE_MCP_INDEX_ROOM_COUNT",
+          "category": "config",
+          "op": "added",
+          "title": "New environment variable: CLAUDE_CODE_DISABLE_MCP_INDEX_ROOM_COUNT",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.env_vars.CLAUDE_CODE_DISABLE_POWERSHELL_ALIAS_SHADOW_CHECK",
+          "category": "config",
+          "op": "added",
+          "title": "New environment variable: CLAUDE_CODE_DISABLE_POWERSHELL_ALIAS_SHADOW_CHECK",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.env_vars.CLAUDE_CODE_FIRST_CALL_THINKING_TITLES",
+          "category": "config",
+          "op": "added",
+          "title": "New environment variable: CLAUDE_CODE_FIRST_CALL_THINKING_TITLES",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.env_vars.CLAUDE_CODE_HOST_OWNED_SPAWN_ENV",
+          "category": "config",
+          "op": "added",
+          "title": "New environment variable: CLAUDE_CODE_HOST_OWNED_SPAWN_ENV",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.env_vars.CLAUDE_CODE_LAUNCHED_BY_SESSION_IDS",
+          "category": "config",
+          "op": "added",
+          "title": "New environment variable: CLAUDE_CODE_LAUNCHED_BY_SESSION_IDS",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.env_vars.CLAUDE_CODE_MCP_PREWAIT_SERVERS_MS_BY_NAME",
+          "category": "config",
+          "op": "added",
+          "title": "New environment variable: CLAUDE_CODE_MCP_PREWAIT_SERVERS_MS_BY_NAME",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.env_vars.CLAUDE_CODE_NEW_RENDERER",
+          "category": "config",
+          "op": "added",
+          "title": "New environment variable: CLAUDE_CODE_NEW_RENDERER",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.env_vars.CLAUDE_CODE_OFF_PERSONS_MACHINE",
+          "category": "config",
+          "op": "added",
+          "title": "New environment variable: CLAUDE_CODE_OFF_PERSONS_MACHINE",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.env_vars.CLAUDE_CODE_REQUIRED_PLUGINS_HOLD",
+          "category": "config",
+          "op": "added",
+          "title": "New environment variable: CLAUDE_CODE_REQUIRED_PLUGINS_HOLD",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.env_vars.CLAUDE_CODE_SHOW_HIDDEN_CHARACTERS",
+          "category": "config",
+          "op": "added",
+          "title": "New environment variable: CLAUDE_CODE_SHOW_HIDDEN_CHARACTERS",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.env_vars.CLAUDE_CODE_TUI_ASKED",
+          "category": "config",
+          "op": "added",
+          "title": "New environment variable: CLAUDE_CODE_TUI_ASKED",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.env_vars.CLAUDE_CODE_WITHHOLD_PRODUCT_EVENTS",
+          "category": "config",
+          "op": "added",
+          "title": "New environment variable: CLAUDE_CODE_WITHHOLD_PRODUCT_EVENTS",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.env_vars.OTEL_RESOURCE_INCLUDE_HOST",
+          "category": "config",
+          "op": "added",
+          "title": "New environment variable: OTEL_RESOURCE_INCLUDE_HOST",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.env_vars.SELF_HOSTED_RUNNER_USE_ANTHROPIC_GH",
+          "category": "config",
+          "op": "added",
+          "title": "New environment variable: SELF_HOSTED_RUNNER_USE_ANTHROPIC_GH",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.env_vars.CLAUDE_CODE_DECSTBM",
+          "category": "config",
+          "op": "removed",
+          "title": "Environment variable no longer read: CLAUDE_CODE_DECSTBM",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_startup_timing",
+          "category": "network",
+          "op": "added",
+          "title": "New vendor telemetry event: tengu_startup_timing",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "filesystem.darwin/arm64.exec./bin/zsh -c -l SNAPSHOT_FILE=<claude-config>/shell-snapshots/snapshot-zsh-<n>-<id>.sh\n      # No user config file to source\n      \n\n      # First, create/clear the snapshot file\n      echo \"# Snapshot file\" >| \"$SNAPSHOT_FILE\"\n\n      # When this file is sourced, we first unalias to avoid conflicts\n      # This is necessary because aliases get \"frozen\" inside function definitions at definition time,\n      # which can cause unexpected behavior when functions use commands that conflict with aliases\n      echo \"# Unset all aliases to avoid conflicts with functions\" >> \"$SNAPSHOT_FILE\"\n      echo \"unalias -a 2>/dev/null || true\" >> \"$SNAPSHOT_FILE\"\n\n      \n\n      \n      cat >> \"$SNAPSHOT_FILE\" << 'CLAUDE_CODE_END_<id>'\n# Check for rg availability\nif ! hash rg 2>/dev/null && ! typeset -f rg >/dev/null 2>&1; then\n  function rg {\n  if [[ -x <install>/claude ]]; then\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=rg <install>/claude ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=rg <install>/claude ${1+\"$@\"}\n  else\n    (exec -a rg <install>/claude ${1+\"$@\"})\n  fi\n  elif [[ -x <home>/.local/bin/claude ]]; then\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=rg <home>/.local/bin/claude ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=rg <home>/.local/bin/claude ${1+\"$@\"}\n  else\n    (exec -a rg <home>/.local/bin/claude ${1+\"$@\"})\n  fi\n  else command rg ${1+\"$@\"}; fi\n}\nfi\n# Shadow find/grep with embedded bfs/ugrep\nunalias find 2>/dev/null || true\nunalias grep 2>/dev/null || true\nfunction find {\n  if [[ -x <install>/claude ]]; then\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=bfs <install>/claude -S dfs -regextype findutils-default ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=bfs <install>/claude -S dfs -regextype findutils-default ${1+\"$@\"}\n  else\n    (exec -a bfs <install>/claude -S dfs -regextype findutils-default ${1+\"$@\"})\n  fi\n  elif [[ -x <home>/.local/bin/claude ]]; then\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=bfs <home>/.local/bin/claude -S dfs -regextype findutils-default ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=bfs <home>/.local/bin/claude -S dfs -regextype findutils-default ${1+\"$@\"}\n  else\n    (exec -a bfs <home>/.local/bin/claude -S dfs -regextype findutils-default ${1+\"$@\"})\n  fi\n  else command find ${1+\"$@\"}; fi\n}\nfunction grep {\n  local _cc_a\n  for _cc_a in ${1+\"$@\"}; do\n    case \"$_cc_a\" in -*-filter*|-*-pager*|-*-view*|-*-format-open*|-*-config*|---*|-@*|-*-save-config*|-[Zz]*|-[!-]*[Zz]*|--null|--null-data) command grep ${1+\"$@\"}; return ;; esac\n  done\n  if [[ -x <install>/claude ]]; then\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=ugrep <install>/claude -G --ignore-files --hidden -I --encoding=UTF-8 --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=ugrep <install>/claude -G --ignore-files --hidden -I --encoding=UTF-8 --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"}\n  else\n    (exec -a ugrep <install>/claude -G --ignore-files --hidden -I --encoding=UTF-8 --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"})\n  fi\n  elif [[ -x <home>/.local/bin/claude ]]; then\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=ugrep <home>/.local/bin/claude -G --ignore-files --hidden -I --encoding=UTF-8 --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=ugrep <home>/.local/bin/claude -G --ignore-files --hidden -I --encoding=UTF-8 --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"}\n  else\n    (exec -a ugrep <home>/.local/bin/claude -G --ignore-files --hidden -I --encoding=UTF-8 --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"})\n  fi\n  else command grep ${1+\"$@\"}; fi\n}\n# Shadow pkill to refuse patterns matching the CLI process\nunalias pkill 2>/dev/null || true\nfunction pkill {\n  if [ -n \"${CLAUDE_PID:-}\" ] && [ -r \"/proc/${CLAUDE_PID}/comm\" ]; then\n    local _cc_skip=\"\" _cc_a\n    local -a _cc_probe=()\n    for _cc_a in ${1+\"$@\"}; do\n      if [ -n \"$_cc_skip\" ]; then _cc_skip=\"\"; continue; fi\n      case \"$_cc_a\" in\n        --signal) _cc_skip=1 ;;\n        --signal=*|-e|--echo) ;;\n        -[0-9]*) ;;\n        -[PUGOF]?*) _cc_probe+=(\"$_cc_a\") ;;\n        -[ABCDEFGHIJKLMNOPQRSTUVWXYZ][ABCDEFGHIJKLMNOPQRSTUVWXYZ0-9]*) ;;\n        *) _cc_probe+=(\"$_cc_a\") ;;\n      esac\n    done\n    if command pgrep ${_cc_probe[@]+\"${_cc_probe[@]}\"} 2>/dev/null | command grep -qx \"${CLAUDE_PID}\"; then\n      printf 'pkill: refusing to run — this pattern matches the Claude CLI process (PID %s). Narrow the pattern, or target your own children with `pkill -P $$ ...`.\\n' \"${CLAUDE_PID}\" >&2\n      return 1\n    fi\n  fi\n  command pkill ${1+\"$@\"}\n}\nexport PATH=<path>\nCLAUDE_CODE_END_<id>\n  \n\n      # Exit silently on success, only report errors\n      if [ ! -f \"$SNAPSHOT_FILE\" ]; then\n        echo \"Error: Snapshot file was not created at $SNAPSHOT_FILE\" >&2\n        exit 1\n      fi\n    ",
+          "category": "filesystem",
+          "op": "changed",
+          "title": "Command changed: `/bin/zsh -c -l SNAPSHOT_FILE=<claude-config>/shell-snapshots/snapshot-zsh-<n>-<id>.sh …` (+96 −0 chars) (darwin/arm64)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "filesystem.linux/amd64.paths.<repo>/.claude/rules",
+          "category": "filesystem",
+          "op": "removed",
+          "title": "No longer looks for <repo>/.claude/rules (linux/amd64)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "filesystem.linux/amd64.paths.<sandbox>/../.claude/rules",
+          "category": "filesystem",
+          "op": "removed",
+          "title": "No longer looks for <sandbox>/../.claude/rules (linux/amd64)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "filesystem.linux/amd64.paths.<sandbox>/.claude/rules",
+          "category": "filesystem",
+          "op": "removed",
+          "title": "No longer looks for <sandbox>/.claude/rules (linux/amd64)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "filesystem.linux/amd64.paths.<tmp>/.claude/rules",
+          "category": "filesystem",
+          "op": "removed",
+          "title": "No longer looks for <tmp>/.claude/rules (linux/amd64)",
+          "impact": "informational",
+          "documented": null
+        }
+      ]
+    },
+    {
       "version": "2.1.325",
       "previous": "2.1.324",
       "changes": [
@@ -12,7 +546,7 @@
           "op": "removed",
           "title": "Setting no longer read: description",
           "impact": "notable",
-          "documented": null
+          "documented": false
         },
         {
           "id": "config.options.disabled",
@@ -20,7 +554,7 @@
           "op": "removed",
           "title": "Setting no longer read: disabled",
           "impact": "notable",
-          "documented": null
+          "documented": true
         },
         {
           "id": "config.options.displayName",
@@ -28,7 +562,7 @@
           "op": "removed",
           "title": "Setting no longer read: displayName",
           "impact": "notable",
-          "documented": null
+          "documented": false
         },
         {
           "id": "config.options.promoListPrice",
@@ -36,7 +570,7 @@
           "op": "removed",
           "title": "Setting no longer read: promoListPrice",
           "impact": "notable",
-          "documented": null
+          "documented": false
         },
         {
           "id": "config.options.resolvedModel",
@@ -44,7 +578,7 @@
           "op": "removed",
           "title": "Setting no longer read: resolvedModel",
           "impact": "notable",
-          "documented": null
+          "documented": false
         },
         {
           "id": "config.options.supportedEffortLevels",
@@ -52,7 +586,7 @@
           "op": "removed",
           "title": "Setting no longer read: supportedEffortLevels",
           "impact": "notable",
-          "documented": null
+          "documented": false
         },
         {
           "id": "config.options.supportsAdaptiveThinking",
@@ -60,7 +594,7 @@
           "op": "removed",
           "title": "Setting no longer read: supportsAdaptiveThinking",
           "impact": "notable",
-          "documented": null
+          "documented": false
         },
         {
           "id": "config.options.supportsAutoMode",
@@ -68,7 +602,7 @@
           "op": "removed",
           "title": "Setting no longer read: supportsAutoMode",
           "impact": "notable",
-          "documented": null
+          "documented": false
         },
         {
           "id": "config.options.supportsEffort",
@@ -76,7 +610,7 @@
           "op": "removed",
           "title": "Setting no longer read: supportsEffort",
           "impact": "notable",
-          "documented": null
+          "documented": false
         },
         {
           "id": "config.options.supportsFastMode",
@@ -84,7 +618,7 @@
           "op": "removed",
           "title": "Setting no longer read: supportsFastMode",
           "impact": "notable",
-          "documented": null
+          "documented": false
         },
         {
           "id": "config.options.supportsThinkingOff",
@@ -92,7 +626,7 @@
           "op": "removed",
           "title": "Setting no longer read: supportsThinkingOff",
           "impact": "notable",
-          "documented": null
+          "documented": false
         },
         {
           "id": "config.options.value",
@@ -100,7 +634,7 @@
           "op": "removed",
           "title": "Setting no longer read: value",
           "impact": "notable",
-          "documented": null
+          "documented": true
         }
       ]
     },
@@ -4211,14 +4745,6 @@
           "category": "network",
           "op": "added",
           "title": "New vendor telemetry event: tengu_deferred_tools_pool_change",
-          "impact": "notable",
-          "documented": true
-        },
-        {
-          "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_headless_latency",
-          "category": "network",
-          "op": "removed",
-          "title": "Vendor telemetry event no longer sent: tengu_headless_latency",
           "impact": "notable",
           "documented": true
         },
