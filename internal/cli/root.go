@@ -27,6 +27,7 @@ import (
 	termaproject "github.com/miradorlabs/terma-cli/internal/project"
 	"github.com/miradorlabs/terma-cli/internal/selfupdate"
 	"github.com/miradorlabs/terma-cli/internal/ui/output"
+	"github.com/miradorlabs/terma-cli/internal/ui/prompt"
 	"github.com/miradorlabs/terma-cli/internal/ui/style"
 )
 
@@ -190,6 +191,9 @@ type App struct {
 	backgroundStep func(ctx context.Context, out io.Writer, argv ...string) error
 	// canAsk reports whether a person is at a terminal to answer questions.
 	canAsk func() bool
+	// runForm stands in for prompt.Run, drawing a checklist and reading its answer, where
+	// there is no terminal to draw on (tests); nil draws on the terminal.
+	runForm func(*prompt.Form) ([]prompt.Item, error)
 	// migrationBlocked says why the relay could not move this machine to routing by teams
 	// (two installs, say), from what the migration recorded (migrationBlockOf); nil when
 	// nothing blocks it.

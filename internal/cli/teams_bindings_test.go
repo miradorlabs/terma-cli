@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"fmt"
 	"slices"
 	"strings"
 	"testing"
@@ -50,8 +51,9 @@ func TestConflictsAreKeysMoreThanOneOrganizationNeeds(t *testing.T) {
 	}
 }
 
-// The form lists every need ticked, an exact-only team's owners unticked, and a conflict
-// in red as a pick-one that starts on deciding later.
+// The form lists every need ticked; an exact-only team's owner as a pick between its listed
+// repositories (the default) and the whole owner, which `a` cannot tick; and a conflict in
+// red as a pick-one that starts on deciding later.
 func TestBindingsFormTicksEveryNeedAndPutsConflictsInRed(t *testing.T) {
 	acme := needTick("org-a", "Acme", "github.com/acme/api", "github.com/acme/web", "github.com/shared/x")
 	beta := needTick("org-b", "Beta", "github.com/beta/*", "github.com/shared/x")
@@ -67,13 +69,20 @@ func TestBindingsFormTicksEveryNeedAndPutsConflictsInRed(t *testing.T) {
 		}
 		return out
 	}
-	if got := labels(func(it prompt.Item) bool { return it.Kind == prompt.Check && it.Selected }); !slices.Equal(got,
+	if got := labels(func(it prompt.Item) bool { return it.Kind == prompt.Check }); !slices.Equal(got,
 		[]string{"github.com/acme/api", "github.com/acme/web", "github.com/beta"}) {
-		t.Errorf("ticked by default: %v", got)
+		t.Errorf("checkboxes: %v", got)
 	}
-	if got := labels(func(it prompt.Item) bool { return it.Kind == prompt.Check && !it.Selected }); !slices.Equal(got,
-		[]string{"the whole owner github.com/acme"}) {
-		t.Errorf("offered unticked: %v (github.com/shared is needed by Beta too, so never offered whole)", got)
+	if got := labels(func(it prompt.Item) bool { return it.Kind == prompt.Check && !it.Selected }); len(got) != 0 {
+		t.Errorf("unticked by default: %v", got)
+	}
+	if got := labels(func(it prompt.Item) bool { return it.Kind == prompt.Radio && !it.Alert }); !slices.Equal(got,
+		[]string{"only the listed repositories under github.com/acme", "the whole owner github.com/acme"}) {
+		t.Errorf("the owner's pick: %v (github.com/shared is needed by Beta too, so never offered whole)", got)
+	}
+	if got := labels(func(it prompt.Item) bool { return it.Kind == prompt.Radio && !it.Alert && it.Selected }); !slices.Equal(got,
+		[]string{"only the listed repositories under github.com/acme"}) {
+		t.Errorf("the owner's pick starts on %v", got)
 	}
 	if got := labels(func(it prompt.Item) bool { return it.Alert }); !slices.Equal(got,
 		[]string{"bind github.com/shared/x to Acme", "bind github.com/shared/x to Beta", "github.com/shared/x: decide later"}) {
@@ -98,7 +107,7 @@ func TestBindingsFormTicksEveryNeedAndPutsConflictsInRed(t *testing.T) {
 		switch it.Label {
 		case "the whole owner github.com/acme", "bind github.com/shared/x to Beta":
 			answer[i].Selected = true
-		case "github.com/beta", "github.com/shared/x: decide later":
+		case "github.com/beta", "github.com/shared/x: decide later", "only the listed repositories under github.com/acme":
 			answer[i].Selected = false
 		}
 	}
@@ -111,6 +120,22 @@ func TestBindingsFormTicksEveryNeedAndPutsConflictsInRed(t *testing.T) {
 	}
 }
 
+// An owner's many listed repositories are one line, so a long policy fits a terminal.
+func TestBindingsFormCollapsesAnOwnersManyRepositories(t *testing.T) {
+	var repos []string
+	for i := range collapseAt + 2 {
+		repos = append(repos, fmt.Sprintf("github.com/acme/r%d", i))
+	}
+	needs := tickNeeds(routing.State{}, needTick("org-a", "Acme", repos...))
+	form, slots := bindingsForm(needs)
+	if len(form.Items) != 3 || form.Items[0].Label != fmt.Sprintf("github.com/acme: its %d listed repositories", collapseAt+2) {
+		t.Fatalf("items: %+v", form.Items)
+	}
+	if ops := formOps(needs, slots, form.Items); len(ops) != collapseAt+2 {
+		t.Errorf("the collapsed line binds %d repositories, want %d", len(ops), collapseAt+2)
+	}
+}
+
 // Without a terminal, --bind-all (and --yes) bind every need one organization has, and
 // leave a conflict to decide; never binding anything is the default.
 func TestDecideNeedsBindsAllButConflicts(t *testing.T) {
@@ -119,14 +144,14 @@ func TestDecideNeedsBindsAllButConflicts(t *testing.T) {
 	before := bindingNeed{key: "github.com/old/repo", org: "org-a", orgName: "Acme", entry: "github.com/old/repo"}
 	needs := append([]bindingNeed{before}, append(tickNeeds(routing.State{}, acme), tickNeeds(routing.State{}, beta)...)...)
 	for name, tc := range map[string]struct {
-		all, pending bool
-		want         []string
+		mode bindingMode
+		want []string
 	}{
-		"neither":    {false, false, nil},
-		"--yes":      {true, false, []string{"github.com/acme"}},
-		"--bind-all": {true, true, []string{"github.com/old/repo", "github.com/acme"}},
+		"neither":    {leavePending, nil},
+		"--yes":      {bindTicked, []string{"github.com/acme"}},
+		"--bind-all": {bindPending, []string{"github.com/old/repo", "github.com/acme"}},
 	} {
-		ops, err := decideNeeds(needs, false, tc.all, tc.pending)
+		ops, err := decideNeeds(needs, tc.mode, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -202,5 +227,128 @@ func TestTeamsYesLeavesAConflictToDecide(t *testing.T) {
 	}
 	if st := loadState(t); len(st.Bindings) != 0 || len(v.Pending) != 1 || !v.Pending[0].Conflict {
 		t.Errorf("bindings %+v, pending %+v", st.Bindings, v.Pending)
+	}
+}
+
+// wildcardBody is a 2.0 policy response listing entries, wildcards among them.
+func wildcardBody(entries ...string) string {
+	return strings.Replace(policyBody(entries...), `"version":"1.1"`, `"version":"2.0"`, 1)
+}
+
+// onTerminal makes `terma teams` ask, answering each checklist with answer.
+func onTerminal(t *testing.T, answer func(*prompt.Form) ([]prompt.Item, error)) {
+	t.Helper()
+	prevAsk, prevForm := testApp.canAsk, testApp.runForm
+	testApp.canAsk, testApp.runForm = func() bool { return true }, answer
+	t.Cleanup(func() { testApp.canAsk, testApp.runForm = prevAsk, prevForm })
+}
+
+// enter answers a checklist as drawn, as Enter does.
+func enter(f *prompt.Form) ([]prompt.Item, error) { return slices.Clone(f.Items), nil }
+
+// An owner one organization needs and a repository under it another needs are both bound,
+// the repository as an exception to the owner, whichever team is ticked first and whether
+// the owner's team was ticked before.
+func TestTeamsBindsAnOwnerAndARepositoryUnderItToTwoOrganizations(t *testing.T) {
+	for name, runs := range map[string][][]string{
+		"owner first":      {{"--select", "Acme API", "--select", "Beta Core", "--bind-all"}},
+		"repository first": {{"--select", "Beta Core", "--select", "Acme API", "--bind-all"}},
+		"with --yes":       {{"--select", "Acme API", "--select", "Beta Core", "--yes"}},
+		"owner earlier":    {{"--select", "Acme API"}, {"--select", "Beta Core", "--bind-all"}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			f := migratedMachine(t, nil, orgA(), orgB())
+			f.policyBodies[acmeAPI] = wildcardBody("github.com/acme/*")
+			f.policyBodies[betaCore] = policyBody("github.com/acme/api")
+			for _, args := range runs {
+				if _, out, err := teamsJSON(t, args...); err != nil {
+					t.Fatalf("teams %v: %v\n%s", args, err, out)
+				}
+			}
+			st := loadState(t)
+			if st.Bindings["github.com/acme"].Organization != orgA().ID || st.Bindings["github.com/acme/api"].Organization != orgB().ID {
+				t.Errorf("bindings = %+v", st.Bindings)
+			}
+		})
+	}
+}
+
+// A team unticked in the run needs nothing: --bind-all binds none of its keys, and a key it
+// shared with a team ticked in the same run is that team's alone.
+func TestTeamsBindAllSkipsATeamUntickedInTheSameRun(t *testing.T) {
+	f := migratedMachine(t, func(f *fakeAuth, s *routing.State) error {
+		_, err := s.Select(stateTeam(f, orgA().ID, acmeAPI, false, "github.com/acme/api", "github.com/shared/x"))
+		return err
+	}, orgA(), orgB())
+	f.policyBodies[betaCore] = policyBody("github.com/shared/x")
+	v, out, err := teamsJSON(t, "--deselect", "Acme API", "--select", "Beta Core", "--bind-all")
+	if err != nil {
+		t.Fatalf("teams: %v\n%s", err, out)
+	}
+	st := loadState(t)
+	if _, ok := st.Bindings["github.com/acme/api"]; ok {
+		t.Errorf("an unticked team's key was bound: %+v", st.Bindings)
+	}
+	if st.Bindings["github.com/shared/x"].Organization != orgB().ID || len(v.Pending) != 0 {
+		t.Errorf("bindings %+v, pending %+v: the shared key is Beta's alone", st.Bindings, v.Pending)
+	}
+}
+
+// On a terminal (never with --json), a flag's own decision is never asked again, and
+// --bind-all binds without asking; ticking with --select asks about what it ticked, and
+// Enter binds the defaults.
+func TestTeamsOnATerminalAsksOnlyWhatTheRunLeftOpen(t *testing.T) {
+	migratedMachine(t, func(f *fakeAuth, s *routing.State) error {
+		if _, err := s.Select(stateTeam(f, orgA().ID, acmeAPI, false, "github.com/acme/api")); err != nil {
+			return err
+		}
+		return s.Bind("github.com/acme/api", orgA().ID, false)
+	}, orgA(), orgB())
+	onTerminal(t, func(f *prompt.Form) ([]prompt.Item, error) {
+		t.Errorf("asked: %+v", f.Items)
+		return enter(f)
+	})
+	if out, err := runTerma(t, "teams", "--unbind", "github.com/acme/api"); err != nil {
+		t.Fatalf("teams --unbind: %v\n%s", err, out)
+	}
+	if _, ok := loadState(t).Bindings["github.com/acme/api"]; ok {
+		t.Fatal("--unbind was undone")
+	}
+	if out, err := runTerma(t, "teams", "--bind-all"); err != nil {
+		t.Fatalf("teams --bind-all: %v\n%s", err, out)
+	}
+	if loadState(t).Bindings["github.com/acme/api"].Organization != orgA().ID {
+		t.Fatal("--bind-all on a terminal did not bind")
+	}
+
+	asked := 0
+	onTerminal(t, func(f *prompt.Form) ([]prompt.Item, error) {
+		asked++
+		return enter(f)
+	})
+	if out, err := runTerma(t, "teams", "--select", "Beta Core"); err != nil {
+		t.Fatalf("teams --select: %v\n%s", err, out)
+	}
+	if asked != 1 || loadState(t).Bindings["github.com/beta/core"].Organization != orgB().ID {
+		t.Errorf("asked %d times, bindings %+v", asked, loadState(t).Bindings)
+	}
+}
+
+// Doctor names a conflict once, with every organization that needs it, and sends the
+// developer to pick rather than binding it to the first.
+func TestDoctorNamesAConflictOnce(t *testing.T) {
+	migratedMachine(t, func(f *fakeAuth, s *routing.State) error {
+		if _, err := s.Select(stateTeam(f, orgA().ID, acmeAPI, false, "github.com/shared/x")); err != nil {
+			return err
+		}
+		_, err := s.Select(stateTeam(f, orgB().ID, betaCore, false, "github.com/shared/x"))
+		return err
+	}, orgA(), orgB())
+	out, _ := runTerma(t, "doctor")
+	if n := strings.Count(out, "github.com/shared/x is needed by more than one organization"); n != 1 {
+		t.Errorf("the conflict is named %d times:\n%s", n, out)
+	}
+	if !strings.Contains(out, "terma teams, to pick whose github.com/shared/x is") || strings.Contains(out, "--bind github.com/shared/x=") {
+		t.Errorf("doctor's fix is not to pick:\n%s", out)
 	}
 }

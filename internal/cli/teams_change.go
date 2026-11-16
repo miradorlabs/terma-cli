@@ -16,6 +16,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/account/keystore"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/routing"
+	"github.com/miradorlabs/terma-cli/internal/ui/prompt"
 )
 
 // teamsChange is one run's changes, resolved against the routing state and the list.
@@ -37,7 +38,7 @@ func (app *App) applyTeams(cmd *cobra.Command, cfg *config.Config, st routing.St
 	names := loadTeamNames(app.stateDir, cfg.ProfileName)
 	ch := &teamsChange{released: map[string]bool{}}
 	// --yes takes every default, so it asks nothing even on a terminal.
-	ask := !f.json && !f.assumeYes && app.canAsk() && canPrompt()
+	ask := !f.json && !f.assumeYes && app.canAsk() && (app.runForm != nil || canPrompt())
 	var v teamsView
 	listed := false
 	list := func() teamsView {
@@ -66,13 +67,20 @@ func (app *App) applyTeams(cmd *cobra.Command, cfg *config.Config, st routing.St
 			ch.released[t.EnrollmentID] = group.release
 		}
 	}
-	// What the flags decide comes first, so a ticked team is asked only what is left.
+	// What the flags decide comes first, and the teams they untick are gone, so a ticked
+	// team is asked only what is left, and an unticked one needs nothing.
 	planned := st
 	planned.Bindings = maps.Clone(st.Bindings)
+	planned.Teams = slices.Clone(st.Teams)
+	flagged := map[string]bool{}
 	for _, op := range ch.ops {
 		if err := op.apply(&planned); err != nil {
 			return teamsView{}, err
 		}
+		flagged[op.key] = true
+	}
+	for _, t := range ch.untick {
+		planned.Deselect(t.EnrollmentID)
 	}
 	var needs []bindingNeed
 	for _, ref := range f.selects {
@@ -89,7 +97,8 @@ func (app *App) applyTeams(cmd *cobra.Command, cfg *config.Config, st routing.St
 	}
 	// Every undecided binding is decided together, so a key two organizations need is one
 	// question, never settled by whichever was ticked first.
-	if ask || f.bindAll || f.assumeYes {
+	mode := app.bindingMode(f, ask)
+	if mode.earlier() {
 		needs = append(pendingNeeds(planned, func(id string) string {
 			if n := names.Orgs[id]; n != "" {
 				return n
@@ -98,7 +107,8 @@ func (app *App) applyTeams(cmd *cobra.Command, cfg *config.Config, st routing.St
 			return lv.orgName(id)
 		}, func(id string) string { return names.Teams[id] }), needs...)
 	}
-	decided, err := decideNeeds(needs, ask, f.bindAll || f.assumeYes, f.bindAll || ask)
+	needs = slices.DeleteFunc(needs, func(n bindingNeed) bool { return flagged[n.key] })
+	decided, err := decideNeeds(needs, mode, app.form())
 	if err != nil {
 		return teamsView{}, err
 	}
@@ -336,4 +346,29 @@ func (v teamsView) unsignedOrgs() []string {
 		}
 	}
 	return out
+}
+
+// bindingMode is how this run decides the bindings left to decide: --bind-all binds them
+// even on a terminal; the checklist asks about every one; a terminal asks about what this
+// run ticks; --yes binds what it ticks; anything else leaves them to decide.
+func (app *App) bindingMode(f teamsFlags, ask bool) bindingMode {
+	switch {
+	case f.bindAll:
+		return bindPending
+	case ask && f.checklist:
+		return askPending
+	case ask:
+		return askTicked
+	case f.assumeYes:
+		return bindTicked
+	}
+	return leavePending
+}
+
+// form draws a checklist and reads its answer: prompt.Run unless runForm stands in.
+func (app *App) form() func(*prompt.Form) ([]prompt.Item, error) {
+	if app.runForm != nil {
+		return app.runForm
+	}
+	return prompt.Run
 }

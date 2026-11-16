@@ -23,23 +23,65 @@ type bindingNeed struct {
 	tick  *tick
 }
 
-// neededOp is a decision about a need, made with its tick when it has one, so a tick that
-// fails takes it back.
+// neededOp is a decision about needs, made with its tick when it has one, so a tick that
+// fails takes it back; a decision several ticks share is made with none.
 type neededOp struct {
 	op      bindingOp
 	orgName string
 	tick    *tick
 }
 
-// bindingSlot is what a line of the bindings form decides: a need's key (need), an owner
-// bound whole (owner), or a conflicting key bound to one organization (key, org; with no
-// org, left to decide).
+// bindingMode is how a run decides the bindings left to decide.
+type bindingMode int
+
+const (
+	// leavePending decides nothing: what an undecided entry matches is held.
+	leavePending bindingMode = iota
+	// bindTicked binds each key one organization needs, for the teams this run ticks (--yes).
+	bindTicked
+	// bindPending does the same for every key left to decide, earlier ones too (--bind-all).
+	bindPending
+	// askTicked shows the checklist for the teams this run ticks (--select on a terminal).
+	askTicked
+	// askPending shows it for every key left to decide (the `terma teams` checklist).
+	askPending
+)
+
+// asks reports whether m shows the checklist.
+func (m bindingMode) asks() bool { return m == askTicked || m == askPending }
+
+// earlier reports whether m decides the keys teams ticked before this run need too.
+func (m bindingMode) earlier() bool { return m == bindPending || m == askPending }
+
+// slotKind is what a line of the bindings checklist decides.
+type slotKind int
+
+const (
+	// slotKeys binds its needs' keys to their organization: one key, or an owner's listed
+	// repositories in one line when there are many.
+	slotKeys slotKind = iota
+	// slotListedOnly keeps an exact-only team's owner to its listed repositories (the default).
+	slotListedOnly
+	// slotWholeOwner binds that owner whole, in place of its listed repositories.
+	slotWholeOwner
+	// slotConflict binds a key more than one organization needs to one of them.
+	slotConflict
+	// slotLater leaves such a key to decide.
+	slotLater
+)
+
+// bindingSlot is one line of the bindings checklist.
 type bindingSlot struct {
-	need         int
+	kind         slotKind
+	needs        []int
 	owner, key   string
 	org, orgName string
 	tick         *tick
 }
+
+// collapseAt is how many of an owner's listed repositories one organization needs before
+// the checklist shows them as one line, so a long policy still fits on a terminal.
+const collapseAt = 8
 
 // conflictHeading heads the keys more than one organization needs.
 const conflictHeading = "Needed by more than one organization: pick one, or decide later"
@@ -100,26 +142,28 @@ func decisionFor(st routing.State, e routing.Entry) (string, bool) {
 // organizations and teams named by orgName and teamName.
 func pendingNeeds(st routing.State, orgName, teamName func(string) string) []bindingNeed {
 	var needs []bindingNeed
-	for _, p := range doctor.Pending(st) {
-		needs = append(needs, bindingNeed{key: p.Key, org: p.Organization, orgName: cmp.Or(orgName(p.Organization), p.Organization),
-			entry: p.Entry, teamName: cmp.Or(teamName(p.TeamID), p.TeamID)})
+	for _, k := range doctor.PendingKeys(st) {
+		for _, p := range k.Needs {
+			needs = append(needs, bindingNeed{key: p.Key, org: p.Organization, orgName: cmp.Or(orgName(p.Organization), p.Organization),
+				entry: p.Entry, teamName: cmp.Or(teamName(p.TeamID), p.TeamID)})
+		}
 	}
 	return needs
 }
 
-// listedBy says which team needs a key, and as what entry when that is not the key itself.
-func listedBy(key, entry, team string) string {
-	if team == "" {
-		return "needed by " + entry
+// teamEntry says which team lists a key, and as what entry when that is not the key itself.
+func teamEntry(key, entry, team string) string {
+	switch {
+	case team == "":
+		return entry
+	case entry == key:
+		return team
 	}
-	if entry == key {
-		return "listed by " + team
-	}
-	return "listed by " + team + " as " + entry
+	return team + " as " + entry
 }
 
-// conflicts are the keys more than one organization needs, each with its needs, in the
-// order needs first names them.
+// conflicts are the keys more than one organization needs, each with one need per
+// organization, in the order needs first names them.
 func conflicts(needs []bindingNeed) ([]string, map[string][]bindingNeed) {
 	by := map[string][]bindingNeed{}
 	var keys []string
@@ -141,51 +185,64 @@ func conflicts(needs []bindingNeed) ([]string, map[string][]bindingNeed) {
 	return keys, by
 }
 
-// decideNeeds decides needs. On a terminal (ask) the bindings form shows them all, ticked;
-// otherwise, with all, each key one organization needs is bound to it (an exact-only team's
-// listed repositories, not their owners), and a pending need from before this run only
-// with pending too. A conflict is never decided for the developer: it stays to decide.
-func decideNeeds(needs []bindingNeed, ask, all, pending bool) ([]neededOp, error) {
-	if len(needs) == 0 {
+// decideNeeds decides needs as mode says, the checklist drawn by run. A conflict is never
+// decided for the developer: it stays to decide unless they pick.
+func decideNeeds(needs []bindingNeed, mode bindingMode, run func(*prompt.Form) ([]prompt.Item, error)) ([]neededOp, error) {
+	if len(needs) == 0 || mode == leavePending {
 		return nil, nil
 	}
-	if ask {
-		return askNeeds(needs)
-	}
-	if !all {
-		return nil, nil
-	}
-	_, conflicted := conflicts(needs)
 	var ops []neededOp
-	for _, n := range needs {
-		if conflicted[n.key] != nil || (n.tick == nil && !pending) || slices.ContainsFunc(ops, func(o neededOp) bool { return o.op.key == n.key }) {
+	if mode.asks() {
+		form, slots := bindingsForm(needs)
+		result, err := run(form)
+		if errors.Is(err, prompt.ErrCancelled) {
+			return nil, errCancelled
+		}
+		if err != nil {
+			return nil, err
+		}
+		ops = formOps(needs, slots, result)
+	} else {
+		_, conflicted := conflicts(needs)
+		for _, n := range needs {
+			if conflicted[n.key] != nil || (n.tick == nil && !mode.earlier()) || slices.ContainsFunc(ops, func(o neededOp) bool { return o.op.key == n.key }) {
+				continue
+			}
+			ops = append(ops, neededOp{op: bindingOp{key: n.key, org: n.org}, orgName: n.orgName, tick: n.tick})
+		}
+	}
+	return withExceptions(ops), nil
+}
+
+// withExceptions marks each repository bound to one organization while its owner is bound
+// to another in the same decisions as an exception to the owner, which routing allows
+// (the repository's binding wins for it) only when asked for.
+func withExceptions(ops []neededOp) []neededOp {
+	for i, o := range ops {
+		owner := routing.Owner(o.op.key)
+		if owner == "" || owner == o.op.key {
 			continue
 		}
-		ops = append(ops, neededOp{op: bindingOp{key: n.key, org: n.org}, orgName: n.orgName, tick: n.tick})
+		if slices.ContainsFunc(ops, func(other neededOp) bool { return other.op.key == owner && other.op.org != o.op.org }) {
+			ops[i].op.override = true
+		}
 	}
-	return ops, nil
+	return ops
 }
 
-// askNeeds shows the bindings form and reads its answer.
-func askNeeds(needs []bindingNeed) ([]neededOp, error) {
-	form, slots := bindingsForm(needs)
-	result, err := prompt.Run(form)
-	if errors.Is(err, prompt.ErrCancelled) {
-		return nil, errCancelled
-	}
-	if err != nil {
-		return nil, err
-	}
-	return formOps(needs, slots, result), nil
-}
-
-// bindingsForm is every need as a line to tick: each organization's keys, ticked, with an
-// exact-only team's owners offered whole, unticked; then each key more than one organization
-// needs, in red, to bind to one of them or leave to decide, which it starts on.
+// bindingsForm is every need as a line: each organization's keys, ticked; an exact-only
+// team's owner as a pick between its listed repositories (the default) and the whole owner;
+// then, in red, each key more than one organization needs, to bind to one of them or leave
+// to decide, which it starts on.
 func bindingsForm(needs []bindingNeed) (*prompt.Form, []bindingSlot) {
 	form := &prompt.Form{Title: "Bind these to the organizations that need them; one left unticked waits, holding what it matches (`terma teams --refuse <key>` refuses one):"}
 	var slots []bindingSlot
+	add := func(it prompt.Item, s bindingSlot) {
+		form.Items = append(form.Items, it)
+		slots = append(slots, s)
+	}
 	conflictKeys, conflicted := conflicts(needs)
+	group := 0
 	var orgs []string
 	for _, n := range needs {
 		if conflicted[n.key] == nil && !slices.Contains(orgs, n.org) {
@@ -194,49 +251,84 @@ func bindingsForm(needs []bindingNeed) (*prompt.Form, []bindingSlot) {
 	}
 	for _, org := range orgs {
 		heading := ""
+		head := func(name string) string {
+			if heading != "" {
+				return ""
+			}
+			heading = name
+			return name
+		}
 		var owners []string
-		ownerTick, ownerName := map[string]*tick{}, map[string]string{}
+		listed := map[string][]int{}
 		for i, n := range needs {
-			if n.org != org || conflicted[n.key] != nil || slices.ContainsFunc(slots, func(s bindingSlot) bool { return s.need >= 0 && needs[s.need].key == n.key }) {
+			if n.org != org || conflicted[n.key] != nil || slices.ContainsFunc(listed[n.owner], func(j int) bool { return needs[j].key == n.key }) {
 				continue
 			}
-			if heading == "" {
-				heading = n.orgName
-				form.Items = append(form.Items, prompt.Item{Label: n.key, Detail: listedBy(n.key, n.entry, n.teamName), Kind: prompt.Check, Selected: true, Heading: heading})
-			} else {
-				form.Items = append(form.Items, prompt.Item{Label: n.key, Detail: listedBy(n.key, n.entry, n.teamName), Kind: prompt.Check, Selected: true})
-			}
-			slots = append(slots, bindingSlot{need: i})
-			if n.owner != "" && !slices.Contains(owners, n.owner) && !ownerShared(needs, n.owner, org) {
+			if n.owner != "" && !slices.Contains(owners, n.owner) {
 				owners = append(owners, n.owner)
-				ownerTick[n.owner], ownerName[n.owner] = n.tick, n.orgName
 			}
+			listed[n.owner] = append(listed[n.owner], i)
+		}
+		for i, n := range needs {
+			if !slices.Contains(listed[n.owner], i) || n.owner != "" && len(listed[n.owner]) > collapseAt {
+				continue
+			}
+			add(prompt.Item{Label: n.key, Detail: "listed by " + teamEntry(n.key, n.entry, n.teamName) + exceptionNote(needs, n),
+				Kind: prompt.Check, Selected: true, Heading: head(n.orgName)}, bindingSlot{kind: slotKeys, needs: []int{i}, org: n.org, orgName: n.orgName, tick: n.tick})
 		}
 		for _, o := range owners {
-			listed := 0
-			for _, n := range needs {
-				if n.org == org && n.owner == o {
-					listed++
-				}
+			ids := listed[o]
+			first := needs[ids[0]]
+			if len(ids) > collapseAt {
+				add(prompt.Item{Label: fmt.Sprintf("%s: its %d listed repositories", o, len(ids)), Detail: "listed by " + first.teamName,
+					Kind: prompt.Check, Selected: true, Heading: head(first.orgName)}, bindingSlot{kind: slotKeys, needs: ids, org: org, orgName: first.orgName, tick: sharedTick(needs, ids)})
 			}
-			form.Items = append(form.Items, prompt.Item{Label: "the whole owner " + o,
-				Detail: fmt.Sprintf("in place of the %d listed: every repository under it", listed), Kind: prompt.Check})
-			slots = append(slots, bindingSlot{need: -1, owner: o, org: org, orgName: ownerName[o], tick: ownerTick[o]})
+			if ownerShared(needs, o, org) {
+				continue
+			}
+			group++
+			add(prompt.Item{Label: "only the listed repositories under " + o, Detail: "the owner's others stay free: personal may collect them",
+				Kind: prompt.Radio, Group: group, Selected: true, Heading: head(first.orgName)}, bindingSlot{kind: slotListedOnly, owner: o, org: org})
+			add(prompt.Item{Label: "the whole owner " + o, Detail: "every repository under it belongs to " + first.orgName,
+				Kind: prompt.Radio, Group: group}, bindingSlot{kind: slotWholeOwner, needs: ids, owner: o, org: org, orgName: first.orgName, tick: sharedTick(needs, ids)})
 		}
 	}
 	heading := conflictHeading
-	for g, key := range conflictKeys {
+	for _, key := range conflictKeys {
+		group++
 		for _, n := range conflicted[key] {
-			form.Items = append(form.Items, prompt.Item{Label: "bind " + key + " to " + n.orgName, Detail: listedBy(n.key, n.entry, n.teamName),
-				Kind: prompt.Radio, Group: g + 1, Alert: true, Heading: heading})
+			add(prompt.Item{Label: "bind " + key + " to " + n.orgName, Detail: "listed by " + teamEntry(n.key, n.entry, n.teamName),
+				Kind: prompt.Radio, Group: group, Alert: true, Heading: heading}, bindingSlot{kind: slotConflict, key: key, org: n.org, orgName: n.orgName, tick: n.tick})
 			heading = ""
-			slots = append(slots, bindingSlot{need: -1, key: key, org: n.org, orgName: n.orgName, tick: n.tick})
 		}
-		form.Items = append(form.Items, prompt.Item{Label: key + ": decide later", Detail: "what it matches is held",
-			Kind: prompt.Radio, Group: g + 1, Selected: true, Alert: true})
-		slots = append(slots, bindingSlot{need: -1, key: key})
+		add(prompt.Item{Label: key + ": decide later", Detail: "what it matches is held", Kind: prompt.Radio, Group: group, Selected: true, Alert: true},
+			bindingSlot{kind: slotLater, key: key})
 	}
 	return form, slots
+}
+
+// exceptionNote says, for a repository whose owner another organization needs, that
+// binding it makes it an exception to that owner.
+func exceptionNote(needs []bindingNeed, n bindingNeed) string {
+	owner := routing.Owner(n.key)
+	if owner == "" || owner == n.key {
+		return ""
+	}
+	if i := slices.IndexFunc(needs, func(o bindingNeed) bool { return o.key == owner && o.org != n.org }); i >= 0 {
+		return "; an exception to " + owner + ", which " + needs[i].orgName + " needs"
+	}
+	return ""
+}
+
+// sharedTick is the tick every one of ids' needs belongs to, or nil when they span ticks.
+func sharedTick(needs []bindingNeed, ids []int) *tick {
+	t := needs[ids[0]].tick
+	for _, i := range ids[1:] {
+		if needs[i].tick != t {
+			return nil
+		}
+	}
+	return t
 }
 
 // ownerShared reports whether a need of an organization other than org names owner, as its
@@ -247,25 +339,29 @@ func ownerShared(needs []bindingNeed, owner, org string) bool {
 	})
 }
 
-// formOps are the decisions the bindings form's answer makes: a whole owner ticked binds it
-// in place of its listed repositories.
+// formOps are the decisions the checklist's answer makes: a whole owner picked binds it in
+// place of its listed repositories.
 func formOps(needs []bindingNeed, slots []bindingSlot, result []prompt.Item) []neededOp {
 	var ops []neededOp
 	whole := map[[2]string]bool{}
 	for k, s := range slots {
-		if s.owner != "" && result[k].Selected {
+		if s.kind == slotWholeOwner && result[k].Selected {
 			whole[[2]string{s.owner, s.org}] = true
 			ops = append(ops, neededOp{op: bindingOp{key: s.owner, org: s.org}, orgName: s.orgName, tick: s.tick})
 		}
 	}
 	for k, s := range slots {
-		switch {
-		case s.need >= 0:
-			n := needs[s.need]
-			if result[k].Selected && !whole[[2]string{n.owner, n.org}] {
-				ops = append(ops, neededOp{op: bindingOp{key: n.key, org: n.org}, orgName: n.orgName, tick: n.tick})
+		if !result[k].Selected {
+			continue
+		}
+		switch s.kind {
+		case slotKeys:
+			for _, i := range s.needs {
+				if n := needs[i]; !whole[[2]string{n.owner, n.org}] {
+					ops = append(ops, neededOp{op: bindingOp{key: n.key, org: n.org}, orgName: n.orgName, tick: n.tick})
+				}
 			}
-		case s.key != "" && s.org != "" && result[k].Selected:
+		case slotConflict:
 			ops = append(ops, neededOp{op: bindingOp{key: s.key, org: s.org}, orgName: s.orgName, tick: s.tick})
 		}
 	}

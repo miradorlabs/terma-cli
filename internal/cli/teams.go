@@ -33,6 +33,9 @@ type teamsFlags struct {
 	// bindAll binds every undecided binding one organization needs to it; a key more than
 	// one organization needs stays to decide.
 	bindAll bool
+	// checklist is a run the `terma teams` checklist made: it asks about every binding left
+	// to decide, not only what it ticked.
+	checklist bool
 }
 
 // changes reports whether f asks for any change.
@@ -237,7 +240,7 @@ func renderTeams(w io.Writer, v teamsView) {
 			var who, binds []string
 			for _, n := range pr.Organizations {
 				name := cmp.Or(n.Name, v.orgName(n.Organization), n.Organization)
-				who = append(who, name+" ("+strings.TrimPrefix(listedBy(pr.Key, n.Entry, n.TeamName), "listed by ")+")")
+				who = append(who, name+" ("+teamEntry(pr.Key, n.Entry, n.TeamName)+")")
 				binds = append(binds, "`terma teams --bind "+pr.Key+"="+quoteArg(name)+"`")
 			}
 			fmt.Fprintf(out, "  %s\n      %s\n", p.Fail("✗ "+pr.Key+": needed by more than one organization, "+joinAnd(who)),

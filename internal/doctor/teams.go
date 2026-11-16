@@ -116,7 +116,13 @@ func TeamsCheck(r Routing, now time.Time) Check {
 			}
 		}
 	}
-	for _, p := range Pending(r.State) {
+	for _, k := range PendingKeys(r.State) {
+		if k.Conflict() {
+			failing = append(failing, k.Key+" is needed by more than one organization ("+r.orgsOf(k)+"), so what it matches is held")
+			fix = cmp.Or(fix, "terma teams, to pick whose "+k.Key+" is")
+			continue
+		}
+		p := k.Needs[0]
 		failing = append(failing, p.Key+" is undecided, so what "+p.Entry+" matches is held")
 		fix = cmp.Or(fix, "terma teams --bind "+p.Key+"="+quoteWord(r.org(p.Organization))+" (or --refuse "+p.Key+")")
 	}
@@ -242,6 +248,41 @@ func Pending(st routing.State) []PendingBinding {
 	return out
 }
 
+// PendingKey is one key left to decide, with every organization whose entry needs it.
+type PendingKey struct {
+	Key   string
+	Needs []PendingBinding
+}
+
+// Conflict reports whether more than one organization needs the key: only the developer
+// can say whose it is.
+func (k PendingKey) Conflict() bool { return len(k.Needs) > 1 }
+
+// PendingKeys is Pending grouped by key, in the order Pending first names each.
+func PendingKeys(st routing.State) []PendingKey {
+	var out []PendingKey
+	for _, p := range Pending(st) {
+		if i := slices.IndexFunc(out, func(k PendingKey) bool { return k.Key == p.Key }); i >= 0 {
+			out[i].Needs = append(out[i].Needs, p)
+			continue
+		}
+		out = append(out, PendingKey{Key: p.Key, Needs: []PendingBinding{p}})
+	}
+	return out
+}
+
+// orgsOf names the organizations that need k, as a sentence lists them.
+func (r Routing) orgsOf(k PendingKey) string {
+	names := make([]string, 0, len(k.Needs))
+	for _, p := range k.Needs {
+		names = append(names, r.org(p.Organization))
+	}
+	if len(names) < 2 {
+		return strings.Join(names, "")
+	}
+	return strings.Join(names[:len(names)-1], ", ") + " and " + names[len(names)-1]
+}
+
 // decided reports whether a decision covers what e needs: its key's, or for an exact
 // entry its owner's, whichever organization it names.
 func decided(st routing.State, e routing.Entry) bool {
@@ -331,8 +372,12 @@ func TeamRows(r Routing, now time.Time) []Row {
 		rows = append(rows, Row{label, k + " → " + who})
 		label = ""
 	}
-	for _, p := range Pending(r.State) {
-		rows = append(rows, Row{"Undecided", p.Key + ", needed by " + p.Entry})
+	for _, k := range PendingKeys(r.State) {
+		if k.Conflict() {
+			rows = append(rows, Row{"Undecided", k.Key + ", needed by more than one organization: " + r.orgsOf(k)})
+			continue
+		}
+		rows = append(rows, Row{"Undecided", k.Key + ", needed by " + k.Needs[0].Entry})
 	}
 	if len(r.Mixed) > 0 || r.MixedDropped > 0 {
 		rows = append(rows, Row{"Mixed", MixedSummary(r)})

@@ -59,6 +59,7 @@ func (app *App) teamsChecklist(cmd *cobra.Command, cfg *config.Config, st routin
 	}
 	signedIn := false
 	ff := f
+	ff.checklist = true
 	for k, s := range slots {
 		if s.org < 0 {
 			if result[k].Selected {
