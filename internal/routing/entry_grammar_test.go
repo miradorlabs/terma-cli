@@ -5,6 +5,8 @@ import (
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/miradorlabs/terma-cli/internal/config"
 )
 
 // grammarCase is one row of testdata/entry_grammar.json, which the platform's account
@@ -40,16 +42,22 @@ func TestEntryGrammarSharedWithServer(t *testing.T) {
 		if !kinds[c.Server] || !kinds[c.CLI] {
 			t.Errorf("%q: server %q and cli %q must each be exact, wildcard or refused", c.Entry, c.Server, c.CLI)
 		}
-		if seen[c.Entry] {
+		// The server compares the entries it stores ignoring case, and the platform's integration
+		// test saves them in one policy: two stored rows that differ only in case are one.
+		dup := c.Entry
+		if c.Server != "refused" {
+			dup = "stored:" + strings.ToLower(c.Entry)
+		}
+		if seen[dup] {
 			t.Errorf("%q is listed twice", c.Entry)
 		}
-		seen[c.Entry] = true
+		seen[dup] = true
 		if got := reading(c.Entry, true); got != c.CLI {
 			t.Errorf("ParseEntry(%q) reads %s, the table says %s", c.Entry, got, c.CLI)
 		}
 		if !strings.Contains(c.Entry, "*") {
-			if got := reading(c.Entry, false); got != c.CLI {
-				t.Errorf("ParseEntry(%q) without wildcards reads %s, with them %s", c.Entry, got, c.CLI)
+			if got, with := reading(c.Entry, false), reading(c.Entry, true); got != with {
+				t.Errorf("ParseEntry(%q) without wildcards reads %s, with them %s", c.Entry, got, with)
 			}
 		}
 		if c.Server != "refused" && c.CLI == "refused" {
@@ -57,6 +65,18 @@ func TestEntryGrammarSharedWithServer(t *testing.T) {
 		}
 		if c.Server != "refused" && (c.Server == "wildcard") != (c.CLI == "wildcard") {
 			t.Errorf("%q: the server reads it as %s and the CLI as %s", c.Entry, c.Server, c.CLI)
+		}
+		// config.Policy.Admits still decides for the callers not yet on routing.Route: a stored
+		// exact entry admits the repository it names, and a wildcard, read as 1.x, admits nothing.
+		switch e, ok := ParseEntry(c.Entry, true); {
+		case c.Server == "exact" && ok:
+			if !(config.Policy{Mode: config.ModeRepo, Repositories: []string{c.Entry}}).Admits(config.Repository{Origin: e.key}) {
+				t.Errorf("Admits refuses %q, which the server stores", c.Entry)
+			}
+		case c.Server == "wildcard" && ok:
+			if (config.Policy{Mode: config.ModeRepo, Repositories: []string{c.Entry}}).Admits(config.Repository{Origin: e.key + "/any"}) {
+				t.Errorf("Admits takes %q as a wildcard without one", c.Entry)
+			}
 		}
 	}
 }

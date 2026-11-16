@@ -129,7 +129,8 @@ never on disk, and a stopping relay drops it.
   in `internal/agents/builtin`.
 - `internal/routing/testdata/entry_grammar.json` is a contract with the platform: which policy entries the account
   service stores and how `ParseEntry` reads them. The platform keeps a byte-identical copy and fails CI when it
-  differs, so change it here first, and release it before the server stores anything new.
+  differs, so change it here first. The server stores nothing a released CLI would refuse or read differently, except
+  under a new policy major, as 2.0 did for wildcards.
 - Wire names are contracts with other repositories, so never rename them: the commit
   trailers, hook event names, and every event and attribute terma sends. The Weaver
   registry in `semconv/registry` is their source of truth; `make semconv` renders
