@@ -1,94 +1,55 @@
 package hookrun
 
 import (
+	"errors"
+	"io"
+	"io/fs"
+	"iter"
 	"os"
 	"path/filepath"
-	"runtime"
+	"regexp"
+	"slices"
 	"strings"
+	"unicode"
+
+	"mvdan.cc/sh/v3/expand"
+	"mvdan.cc/sh/v3/pattern"
+	"mvdan.cc/sh/v3/syntax"
 
 	"github.com/miradorlabs/terma-cli/internal/gitx"
 )
 
-// How ShellPaths reads a word: expanded where the command is, and what of it may be a path.
+// How ShellPaths expands a word (mvdan.cc/sh/v3/expand) where the command is, and what of
+// it may be a path.
 
-// expansion is a shell word expanded: its text, the glob pattern it makes (its quoted
-// wildcards escaped), whether a wildcard in it is live, and whether some part could not be
-// resolved (each such part a NUL in text).
-type expansion struct {
-	text, pattern string
-	glob          bool
-	unresolved    bool
+// maxGlobSegments bounds the segments of a glob holding a wildcard: past it
+// (go/pkg/mod/*/*/*/*/*.go) a walk could read a whole tree, and the reach is not known.
+const maxGlobSegments = 3
+
+// errOpaque is an expansion ShellPaths cannot resolve: a command substitution's output.
+var errOpaque = errors.New("an expansion ShellPaths cannot resolve")
+
+// Get is the variable name where the command is now, for expand: unset when not known,
+// which expand (NoUnset) takes for an error unless the word gives a fallback (${X:-y}).
+func (sc *scan) Get(name string) expand.Variable {
+	if v, ok := sc.lookup(name); ok {
+		return expand.Variable{Set: true, Kind: expand.String, Str: v}
+	}
+	return expand.Variable{}
 }
 
-// unresolvedPart stands in text for a part that could not be resolved.
-const unresolvedPart = "\x00"
-
-// expand expands w where the command is now.
-func (sc *shellScan) expand(w shellWord) expansion {
-	var x expansion
-	var text, pattern strings.Builder
-	for _, p := range w.parts {
-		switch p.kind {
-		case literal:
-			text.WriteString(p.text)
-			pattern.WriteString(p.text)
-			x.glob = x.glob || strings.ContainsAny(p.text, "*?[")
-		case quoted:
-			text.WriteString(p.text)
-			pattern.WriteString(escapeGlob(p.text))
-		case variable:
-			v, ok := sc.lookup(p.text)
-			if p.fallback != nil && (!ok || v == "") {
-				v, ok = *p.fallback, true
-			}
-			if !ok {
-				x.unresolved = true
-				v = unresolvedPart
-			}
-			text.WriteString(v)
-			pattern.WriteString(escapeGlob(v))
-		case opaque:
-			x.unresolved = true
-			text.WriteString(unresolvedPart)
-		}
-	}
-	x.text, x.pattern = text.String(), pattern.String()
-	return x
-}
-
-// value is x as shellValue reads it: an option's or assignment's value.
-func (x expansion) value() expansion {
-	v := shellValue(x.text)
-	if v == x.text {
-		return x
-	}
-	cut := x.text[:len(x.text)-len(v)]
-	if rest, ok := strings.CutPrefix(x.pattern, cut); ok {
-		x.pattern = rest
-	} else {
-		x.pattern, x.glob = v, false // a wildcard escaped before the value: taken as written
-	}
-	x.text, x.unresolved = v, strings.Contains(v, unresolvedPart)
-	return x
-}
+// Each lists no variables: expand asks for each it expands.
+func (sc *scan) Each(func(string, expand.Variable) bool) {}
 
 // lookup is the value of the variable name where the command is now: PWD and OLDPWD as its
 // cds left them, an assignment earlier in the command, else the hook's environment, HOME
 // falling back to the home directory.
-func (sc *shellScan) lookup(name string) (string, bool) {
-	switch name {
-	case "PWD":
+func (sc *scan) lookup(name string) (string, bool) {
+	switch {
+	case name == "PWD":
 		return sc.dir, sc.dir != ""
-	case topLevel:
-		if sc.dir == "" {
-			return "", false
-		}
-		root, _, ok := gitx.LocateFS(sc.dir)
-		return root, ok
-	case "OLDPWD":
-		if sc.prev != "" {
-			return sc.prev, true
-		}
+	case name == "OLDPWD" && sc.prev != "":
+		return sc.prev, true
 	}
 	if v, ok := sc.vars[name]; ok {
 		if v == nil {
@@ -100,27 +61,211 @@ func (sc *shellScan) lookup(name string) (string, bool) {
 		return v, true
 	}
 	if name == "HOME" {
-		if home, err := os.UserHomeDir(); err == nil {
-			return home, true
-		}
+		home, err := os.UserHomeDir()
+		return home, err == nil
 	}
 	return "", false
 }
 
-// escapeGlob is s with its wildcards escaped for filepath.Match, which on Windows has no
-// escape: there they stay live.
-func escapeGlob(s string) string {
-	if runtime.GOOS == "windows" || !strings.ContainsAny(s, "*?[\\") {
-		return s
-	}
-	var b strings.Builder
-	for _, r := range s {
-		if strings.ContainsRune("*?[\\", r) {
-			b.WriteRune('\\')
+// substitute writes the output of the command substitution cs, for expand: where the
+// command is for $(pwd), the checkout's root there for $(git rev-parse --show-toplevel).
+// Any other's is not known.
+func (sc *scan) substitute(w io.Writer, cs *syntax.CmdSubst) error {
+	var words []string
+	if len(cs.Stmts) == 1 && len(cs.Stmts[0].Redirs) == 0 {
+		if ce, ok := cs.Stmts[0].Cmd.(*syntax.CallExpr); ok && len(ce.Assigns) == 0 {
+			for _, a := range ce.Args {
+				words = append(words, a.Lit())
+			}
 		}
-		b.WriteRune(r)
+	}
+	out, ok := "", false
+	switch strings.Join(words, " ") {
+	case "pwd", "pwd -L", "pwd -P":
+		out, ok = sc.dir, sc.dir != ""
+	case "git rev-parse --show-toplevel":
+		out, _, ok = gitx.LocateFS(sc.dir)
+	}
+	if !ok {
+		return errOpaque
+	}
+	_, err := io.WriteString(w, out)
+	return err
+}
+
+// opaqueProcess is a process substitution's path, for expand: not known.
+func opaqueProcess(*syntax.ProcSubst) (string, error) { return "", errOpaque }
+
+// arg reads w, a word of a command in role r: its substitutions, which run first, then each
+// word its braces make, each a lookup.
+func (sc *scan) arg(w *syntax.Word, r role) {
+	if sc.words++; sc.unknown || sc.words > maxShellWords {
+		sc.unknown = true
+		return
+	}
+	sc.substitutions(w)
+	if l := w.Lit(); l != "" && !strings.ContainsAny(l, `\~{*?[`) {
+		sc.candidate(l, r) // nothing to expand
+		return
+	}
+	braced := *w // SplitBraces replaces its parts
+	if !syntax.SplitBraces(&braced) {
+		sc.expand(w, r)
+		return
+	}
+	for w, err := range expand.BracesSeq(sc.cfg, &braced) {
+		if err != nil || !sc.spend(1) {
+			sc.unknown = true
+			return
+		}
+		sc.expand(w, r)
+	}
+}
+
+// expand reads w, a word with no braces left, in role r: a glob is what it matches, if
+// anything, else each field w expands to is a candidate. A word that cannot be resolved is
+// unknown when it may be a path.
+func (sc *scan) expand(w *syntax.Word, r role) {
+	if r&command == 0 && mayGlob(w) {
+		if pat, err := expand.Pattern(sc.cfg, w); err == nil && pattern.HasMeta(pat, 0) && sc.glob(pat) {
+			return
+		}
+	}
+	fields, err := expand.Fields(sc.cfg, w)
+	if err != nil && (r&(target|folder) != 0 || r&(command|data) == 0 && slashed(w)) {
+		sc.unknown = true
+	}
+	for _, f := range fields {
+		sc.candidate(f, r)
+	}
+}
+
+// glob reaches what pat matches from where the command is and from the cwd, walked a
+// segment at a time so that only the folders a wildcard is in are read (expand's own glob
+// reads each folder on the way, to see that it is there), each entry read and each match a
+// lookup: a match's folder, or a matched folder itself. False when nothing matches, and the
+// word is taken as written.
+func (sc *scan) glob(pat string) bool {
+	segs := strings.Split(pat, "/")
+	if len(slices.DeleteFunc(slices.Clone(segs), func(s string) bool { return !pattern.HasMeta(s, 0) })) > maxGlobSegments {
+		sc.unknown = true
+		return true
+	}
+	dirs := []string{sc.dir, sc.cwd}
+	if root := segs[0]; root == "" || filepath.VolumeName(root) != "" {
+		dirs, segs = []string{root + string(filepath.Separator)}, segs[1:]
+	}
+	found := false
+	for _, dir := range dirs {
+		c := candidate{pat, dir, glob}
+		if sc.examined[c] {
+			continue
+		}
+		sc.examined[c] = true
+		at := []string{dir}
+		for i, seg := range segs {
+			if !pattern.HasMeta(seg, 0) {
+				for j := range at {
+					at[j] = filepath.Join(at[j], unescape(seg))
+				}
+				continue
+			}
+			expr, err := pattern.Regexp(seg, pattern.Filenames|pattern.EntireString)
+			rx, err2 := regexp.Compile(expr)
+			if err != nil || err2 != nil {
+				return false
+			}
+			var next []string
+			for _, d := range at {
+				for _, e := range sc.readDir(d) {
+					if rx.MatchString(e.Name()) && (i == len(segs)-1 || e.IsDir() || e.Type()&fs.ModeSymlink != 0) {
+						next = append(next, filepath.Join(d, e.Name()))
+					}
+				}
+			}
+			at = next
+		}
+		for _, m := range at {
+			if !sc.spend(1) {
+				break
+			}
+			if info, err := os.Lstat(m); err == nil {
+				found = true
+				sc.reachEntry(m, info)
+			}
+		}
+	}
+	return found || sc.unknown
+}
+
+// readDir is what the folder dir holds, by name, each entry read a lookup: none past
+// maxShellLookups, which it reads no further than.
+func (sc *scan) readDir(dir string) []fs.DirEntry {
+	if !sc.spend(1) {
+		return nil
+	}
+	f, err := os.Open(dir)
+	if err != nil {
+		return nil
+	}
+	defer f.Close()
+	entries, _ := f.ReadDir(maxShellLookups - sc.lookups + 1)
+	if !sc.spend(len(entries)) {
+		return nil
+	}
+	slices.SortFunc(entries, func(a, b fs.DirEntry) int { return strings.Compare(a.Name(), b.Name()) })
+	return entries
+}
+
+// unescape is a glob's segment with no wildcard as the name it matches.
+func unescape(seg string) string {
+	var b strings.Builder
+	for i := 0; i < len(seg); i++ {
+		if seg[i] == '\\' && i+1 < len(seg) {
+			i++
+		}
+		b.WriteByte(seg[i])
 	}
 	return b.String()
+}
+
+// mayGlob reports whether w may hold a live wildcard: unquoted, as written or from a
+// variable's value.
+func mayGlob(w *syntax.Word) bool {
+	return slices.ContainsFunc(w.Parts, func(p syntax.WordPart) bool {
+		switch p := p.(type) {
+		case *syntax.Lit:
+			return strings.ContainsAny(p.Value, "*?[")
+		case *syntax.ParamExp, *syntax.ExtGlob:
+			return true
+		}
+		return false
+	})
+}
+
+// slashed reports whether w, as written, may name a path whatever its expansions hold: it
+// starts with ~, or holds a slash outside its substitutions.
+func slashed(w *syntax.Word) bool {
+	lead, ok := w.Parts[0].(*syntax.Lit)
+	found := ok && strings.HasPrefix(lead.Value, "~")
+	syntax.Walk(w, func(n syntax.Node) bool {
+		switch n := n.(type) {
+		case *syntax.Lit:
+			found = found || pathLike(n.Value)
+		case *syntax.SglQuoted:
+			found = found || pathLike(n.Value)
+		case *syntax.CmdSubst, *syntax.ProcSubst, *syntax.ArithmExp:
+			return false // a slash in there is the substitution's own
+		}
+		return !found
+	})
+	return found
+}
+
+// fragments are the words of text, a script's or a here-document's, split at whitespace,
+// quotes, parentheses and commas.
+func fragments(text string) iter.Seq[string] {
+	return strings.FieldsFuncSeq(text, func(r rune) bool { return unicode.IsSpace(r) || strings.ContainsRune("'\"`(),;", r) })
 }
 
 // shellValue is the part of the shell word w that may be a path: an option's value after
@@ -158,21 +303,4 @@ func isName(s string) bool {
 // backslash, or is absolute (C:\x). A quoted Windows path keeps its backslashes.
 func pathLike(w string) bool {
 	return strings.ContainsRune(w, '/') || strings.ContainsRune(w, filepath.Separator) || filepath.IsAbs(w)
-}
-
-// path is the path the shell word w names from dir: ~ is the home directory.
-func (sc *shellScan) path(w, dir string) (string, bool) {
-	switch {
-	case w == "~" || strings.HasPrefix(w, "~/"):
-		home, ok := sc.lookup("HOME")
-		if !ok {
-			return "", false
-		}
-		return filepath.Join(home, w[1:]), true
-	case filepath.IsAbs(w):
-		return filepath.Clean(w), true
-	case dir == "":
-		return "", false
-	}
-	return filepath.Join(dir, w), true
 }

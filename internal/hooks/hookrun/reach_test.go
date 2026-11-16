@@ -211,10 +211,10 @@ func TestAnUnquotedWindowsPathIsAPath(t *testing.T) {
 }
 
 // sameReach reports whether ShellPaths found want. On Windows a command is also read with
-// backslashes literal (shellReadings), so it may find more: each path that reading adds
-// can only make a run Mixed, never miss one.
+// backslashes as separators (shellReadings), so it may find more: each path that reading
+// adds can only make a run Mixed, never miss one.
 func sameReach(got, want []string) bool {
-	if len(shellReadings()) == 1 {
+	if len(shellReadings("")) == 1 {
 		return slices.Equal(got, want)
 	}
 	for _, p := range want {
@@ -225,34 +225,35 @@ func sameReach(got, want []string) bool {
 	return true
 }
 
-// Read with escapes off, as on Windows for PowerShell and cmd, a backslash stays in the
-// word; read with them on, as a POSIX shell, it escapes the next character. On Windows
-// ShellPaths takes both readings.
-func TestABackslashEscapesOnlyInAPOSIXReading(t *testing.T) {
+// A POSIX reading takes a backslash for an escape; the Windows reading, as PowerShell and
+// cmd do, for a separator, so a path written with backslashes reaches what it names there.
+// On Windows ShellPaths takes both readings.
+func TestABackslashSeparatesOnlyInTheWindowsReading(t *testing.T) {
 	t.Parallel()
-	words := func(command string, escapes bool) []string {
-		var out []string
-		for _, w := range shellWords(command, escapes) {
-			var b strings.Builder
-			for _, p := range w.parts {
-				b.WriteString(p.text)
-			}
-			out = append(out, b.String())
+	parent, _ := filepath.EvalSymlinks(t.TempDir())
+	cwd, api := filepath.Join(parent, "side"), filepath.Join(parent, "acme api")
+	for _, dir := range []string{cwd, api} {
+		if err := os.MkdirAll(dir, 0o700); err != nil {
+			t.Fatal(err)
 		}
-		return out
 	}
+	none := func(string) (string, bool) { return "", false }
 	for _, c := range []struct {
 		command string
-		escapes bool
+		windows bool
 		want    []string
 	}{
-		{`cat C:\Users\me\NOTES.md`, false, []string{"cat", `C:\Users\me\NOTES.md`}},
-		{`cat ../acme\ api/NOTES.md`, true, []string{"cat", "../acme api/NOTES.md"}},
-		{`cat ../acme\ api/NOTES.md`, false, []string{"cat", `../acme\`, "api/NOTES.md"}},
-		{`cat "C:\Users\me\NOTES.md"`, false, []string{"cat", `C:\Users\me\NOTES.md`}},
+		{`cat ../acme\ api/NOTES.md`, false, []string{api}},
+		{`cat "..\acme api\NOTES.md"`, true, []string{api}},
+		{`cat "..\acme api\NOTES.md"`, false, nil},
+		{`type ..\side`, true, []string{cwd}},
 	} {
-		if got := words(c.command, c.escapes); !slices.Equal(got, c.want) {
-			t.Errorf("shellWords(%q, escapes %v) = %q, want %q", c.command, c.escapes, got, c.want)
+		src := c.command
+		if c.windows {
+			src = windowsReading(src)
+		}
+		if got := scanShell(src, cwd, none).out; !slices.Equal(got, c.want) {
+			t.Errorf("%q, Windows reading %v: %q, want %q", c.command, c.windows, got, c.want)
 		}
 	}
 }

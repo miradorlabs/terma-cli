@@ -94,17 +94,21 @@ func TestShellPathsReadACdToASubstitution(t *testing.T) {
 	})
 }
 
-// The word in command position is the program to run, not a place the command reaches,
-// even with a slash or a part not resolved: the first word, each after ;, && or |, and each
-// after a word that keeps the command position (time, if, do). Its arguments are read as
-// usual, and an assignment before it counts as any word does.
-func TestShellPathsNeverCountTheCommandWord(t *testing.T) {
+// The word in command position is the program to run: a place the command reaches only
+// when it is a path that is there, never a word the shell looks up on PATH, one not
+// resolved, or a file not there, which the command cannot create. It is the first word,
+// each after ;, && or |, and each after a word that runs the next (time, nohup, exec). Its
+// arguments are read as usual, and an assignment before it counts as any word does.
+func TestShellPathsCountTheCommandWordOnlyAsAPathThere(t *testing.T) {
 	t.Parallel()
 	m := newWordsMachine(t)
 	m.check(t, m.side, map[string][]string{
 		"$(go env GOPATH)/bin/golangci-lint run":                       nil,
 		"$UNSET/bin/tool && `which go`/../x run":                       nil,
 		"../acme-api/bin/tool --version":                               nil,
+		"../acme-api/NOTES.md --version":                               {m.api},
+		"nohup ../acme-api/NOTES.md":                                   {m.api},
+		"ls src | ../acme-api/NOTES.md":                                {filepath.Join(m.side, "src"), m.api},
 		"time $(go env GOPATH)/bin/x ../acme-api":                      {m.api},
 		"ls src | $(go env GOPATH)/bin/x":                              {filepath.Join(m.side, "src")},
 		"D=../acme-api $(go env GOPATH)/bin/x":                         {m.api},
@@ -138,6 +142,7 @@ func TestShellPathsExpandVariables(t *testing.T) {
 		"D=../acme-api; ls $D":                       {m.api},
 		"D=../acme-api && cat $D/NOTES.md":           {m.api},
 		"ls ${UNSET:-../acme-api}":                   {m.api},
+		"cat ${ACME%/*}/acme-api/NOTES.md":           {m.api},
 		"cd ../acme-api && cd - && ls":               {m.api},
 		"cd ../acme-api; cd; ls proj":                {m.api, m.home, filepath.Join(m.home, "proj")},
 	})
@@ -159,7 +164,7 @@ func TestShellPathsCannotResolveIsUnknown(t *testing.T) {
 		"cat $(git rev-parse --show-toplevel)/NOTES.md",
 		"cat $1/NOTES.md",
 		"D=$(git rev-parse --show-prefix); cat $D/x",
-		"cat ${ACME%/*}/x",
+		"cat ${UNSET%/*}/x",
 		"ls --dir=$UNSET/x",
 		`cd "$(cat p)" && cat NOTES.md`,
 		"pushd `cat p`; cat NOTES.md",
@@ -229,6 +234,77 @@ func TestShellPathsPastTheLookupBoundIsUnknown(t *testing.T) {
 	}
 	if got := m.paths(words(maxShellLookups+1), m.side); !slices.Equal(got, []string{UnknownReach}) {
 		t.Errorf("%d words that name nothing: %q, want UnknownReach", maxShellLookups+1, got)
+	}
+}
+
+// Each of the scan's other bounds makes the reach not known past it: the words it expands,
+// the bytes it parses, the scripts it reads inside each other, the segments of a glob that
+// hold a wildcard, and the entries a glob reads. A command that does not parse is still
+// read, as its words.
+func TestShellPathsPastTheirOtherBoundsAreUnknown(t *testing.T) {
+	t.Parallel()
+	m := newWordsMachine(t)
+	big := filepath.Join(m.parent, "big")
+	if err := os.MkdirAll(big, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	for i := range maxShellLookups {
+		if err := os.WriteFile(filepath.Join(big, fmt.Sprint(i)), nil, 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// nest runs command in a shell, quoted, depth times.
+	nest := func(command string, depth int) string {
+		for range depth {
+			command = "sh -c '" + strings.ReplaceAll(command, "'", `'\''`) + "'"
+		}
+		return command
+	}
+	for command, unknown := range map[string]bool{
+		"echo" + strings.Repeat(" $U", maxShellWords-1):   false,
+		"echo" + strings.Repeat(" $U", maxShellWords):     true,
+		"echo " + strings.Repeat("x", maxShellBytes-5):    false,
+		"echo " + strings.Repeat("x", maxShellBytes):      true,
+		nest("cat ../acme-api/NOTES.md", maxShellDepth-1): false,
+		nest("cat ../acme-api/NOTES.md", maxShellDepth):   true,
+		"ls src/*/*/*":   false,
+		"ls src/*/*/*/*": true,
+		"ls ../big/*":    true,
+	} {
+		if got := m.paths(command, m.side); slices.Contains(got, UnknownReach) != unknown {
+			t.Errorf("ShellPaths(%.60q…) = %q, want UnknownReach %v", command, got, unknown)
+		}
+	}
+	m.check(t, m.side, map[string][]string{
+		`cat "../acme-api/NOTES.md`:                           {m.api},
+		`(cat $ACME/NOTES.md`:                                 {m.api},
+		nest("cat ../acme-api/NOTES.md", maxShellDepth-1):     {m.api},
+		"for a in 1 2 3; do for b in 1 2 3; do :; done; done": nil,
+	})
+}
+
+// A shell's script is read as commands, in a subshell: bash -c's, and a here-string's or a
+// here-document's fed to a shell; an interpreter's (python -c, node -e) for its slashed
+// words. A shell's script not resolved may do anything. A folder option's value (-C for
+// git, make, tar and env; --git-dir, --dir and the like) not resolved is not known either,
+// but another command's -C (grep's context) is no folder, and pushd's move ends at popd.
+func TestShellPathsReadInlineScriptsAndFolderOptions(t *testing.T) {
+	t.Parallel()
+	m := newWordsMachine(t)
+	src := filepath.Join(m.side, "src")
+	m.check(t, m.side, map[string][]string{
+		"bash -lc 'cd ../acme-api && ls'; ls $PWD/src":    {m.api, src},
+		`bash <<< "cat ../acme-api/NOTES.md"`:             {m.api},
+		`ruby -e "File.read('../acme-api/NOTES.md')"`:     {m.api},
+		"perl -ne 'print if $. < 3' ../acme-api/NOTES.md": {m.api},
+		"grep -C $N TODO src":                             {src},
+		"pushd ../acme-api && popd && ls $PWD/src":        {m.api, src},
+		"cat <<'EOF' | grep x | sh\ncd ../acme-api\nEOF":  {m.api},
+	})
+	for _, command := range []string{`bash -c "$CMD"`, "git --git-dir=$(cat p) log", "tar -C $UNSET -xf x.tar", "env -C`cat p` make", "make --directory $(cat p)"} {
+		if got := m.paths(command, m.side); !slices.Contains(got, UnknownReach) {
+			t.Errorf("ShellPaths(%q) = %q, without UnknownReach", command, got)
+		}
 	}
 }
 
@@ -302,13 +378,15 @@ func TestShellPathsResolveTheGitTopLevel(t *testing.T) {
 }
 
 // UnknownReach names the command it stands for by its first four words, at most 60
-// characters, for doctor: an assignment's or an option's value is left out.
+// characters, for doctor: an assignment's or an option's value is left out, after its = or
+// written against a one-letter option.
 func TestUnknownReachNamesTheCommandByItsFirstWords(t *testing.T) {
 	t.Parallel()
 	for command, want := range map[string]string{
 		`cd "$(cat p)" && cat NOTES.md`:                 `cd "$(cat p)" && …`,
 		"cat $UNSET/x":                                  "cat $UNSET/x",
 		"TOKEN=s3cret curl --header=s3cret $UNSET/x -v": "TOKEN=… curl --header=… $UNSET/x …",
+		"mysql -ps3cret -h db < $UNSET/x":               "mysql -p… -h db …",
 		"cat /" + strings.Repeat("x", 80) + "/$UNSET/y": "cat /" + strings.Repeat("x", 55) + " …",
 	} {
 		got := ShellPaths(command, t.TempDir())

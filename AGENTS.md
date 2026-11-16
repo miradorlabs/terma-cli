@@ -165,14 +165,19 @@ drops whatever carries content, a record that routes by a location of its own (a
 agent's turn) included; only a file event, a commit or a push, which say where something
 happened and nothing else, keep their destination (`runs.Locational`). A run
 touches a checkout when it runs there, or when a tool call edits, reads or searches a path
-in it, or names one in a shell command (the folder of each path the command names that is
-there, a word without a slash included but never the command's name (the program to
-run, even `$(go env GOPATH)/bin/lint`), the nearest folder that is there above one that is not, as a new file a redirect creates, and every `cd`'s
-and `pushd`'s target, after expanding variables, a `for` loop's variable (each of its
-words in turn), `$(pwd)`, `$(git rev-parse --show-toplevel)` and globs: `hookrun.ShellPaths`);
-a path through a symlink touches its target's checkout too. A command reaching more
-folders than are examined, each counted once however many of its words name it, or a path
-in it whose expansion cannot be resolved, touches an organization not known, and the run
+in it, or names one in a shell command, parsed as bash does (mvdan.cc/sh): the folder of
+each path the command names that is there, a word without a slash included, but its name
+(the program to run) only as a path that is there, never one looked up on PATH or
+`$(go env GOPATH)/bin/lint`; the nearest folder that is there above a slashed word that is
+not, as a new file; every `cd`'s and `pushd`'s target; the script of `bash -c` and of a
+here-document fed to a shell, read as commands; and the slashed words of `python -c` and
+the like, and of any other here-document, that are there. Words are expanded first:
+braces, variables, a `for` loop's variable (each of its words in turn), `$(pwd)`,
+`$(git rev-parse --show-toplevel)` and globs (`hookrun.ShellPaths`). A path through a
+symlink touches its target's checkout too. A command past the scan's bounds (the folders
+it reaches, each counted once however many of its words name it, and the work it does),
+or a path in it whose expansion cannot be resolved (a slashed word, a `cd`'s target, a
+folder option's value such as `git -C`), touches an organization not known, and the run
 turns Mixed (`hookrun.UnknownReach`). An edit records and spools as it always has; a
 read, a search or a shell command only classifies (`hookrun.Env.Classify`): it writes no
 manifest and spools nothing, and on a machine not migrated it does nothing. Where the agent
