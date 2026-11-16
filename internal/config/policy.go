@@ -97,6 +97,9 @@ type Policy struct {
 	// DefaultProjectID receives everything in global mode.
 	DefaultProjectID string    `json:"default_project_id,omitempty"`
 	FetchedAt        time.Time `json:"fetched_at"`
+	// Wildcards is set only on a policy whose schema major allows entries ending in `/*`.
+	// On any other policy such an entry is a literal repository, which matches nothing.
+	Wildcards bool `json:"wildcards,omitempty"`
 }
 
 // MaxPolicyAge is how long a validated policy governs collection without a successful

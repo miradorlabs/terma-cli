@@ -1,6 +1,8 @@
-// Package routing keeps each team's collection policy in the state directory
-// (config.PoliciesDir), the one copy hooks, doctor, the relay and delivery read; a
-// profile records only which team it selected.
+// Package routing decides where a record goes. Route walks a profile's routing state
+// (State: the selected teams, their last validated policies and the developer's
+// bindings) and sends each record to the first team allowed to collect it, personal
+// last. It also keeps each team's collection policy in the state directory
+// (config.PoliciesDir), the one copy hooks, doctor, the relay and delivery read today.
 package routing
 
 import (
