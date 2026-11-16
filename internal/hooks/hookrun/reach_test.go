@@ -13,6 +13,7 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
+	"github.com/miradorlabs/terma-cli/internal/runs"
 )
 
 // A shell command's places are the folders of its absolute, ~/ and slashed words and every
@@ -121,7 +122,7 @@ func TestAShellCommandPastThePlaceBoundTurnsTheRunMixed(t *testing.T) {
 			}
 			env := m.hook()
 			env.Cwd = side
-			env.Classify(context.Background(), r, sessionOf(sid), paths, nil)
+			env.Classify(context.Background(), r, sessionOf(sid), Alone(paths...), nil)
 			if ledger, placement := m.mixed(sid); ledger != tc.mixed || placement != tc.mixed {
 				t.Fatalf("ledger Mixed %v, mixed placement %v; want %v", ledger, placement, tc.mixed)
 			}
@@ -271,5 +272,49 @@ func TestABackslashSeparatesOnlyInTheWindowsReading(t *testing.T) {
 	}
 	if sc := scanShell(src, cwd, none, work{bytes: maxShellBytes - len(src) + 1}); !sc.unknown {
 		t.Errorf("%q past the bytes left: %q, without UnknownReach", src, sc.out)
+	}
+}
+
+// Classify reads below each folder it is given, as a search does (the folder-below rule): a
+// folder outside any checkout reaches each checkout below it, personal's and Acme's beside
+// each other turning the run Mixed, and so does the folder a glob names before its first
+// wildcard (../**/*.go). Past the walk's bounds the reach is not known, the ledger naming the
+// folder. A folder alone, a listing's or a shell command's place, reaches itself alone, and a
+// search of a checkout that checkout alone.
+func TestClassifyReadsBelowAFolderOutsideAnyCheckout(t *testing.T) {
+	t.Parallel()
+	c := newCorpus(t)
+	deep, _ := filepath.EvalSymlinks(t.TempDir())
+	hookruntest.WriteFile(t, deep, "a/b/c/d/e/f/x.go", "package f\n")
+	crossed := runs.Why{Reason: runs.Crossed, Where: "github.com/acme/acme-api"}
+	for name, tc := range map[string]struct {
+		paths []string
+		want  runs.Why
+	}{
+		"the folder above":           {[]string{c.home}, crossed},
+		"the folder above, relative": {[]string{".."}, crossed},
+		"a glob above its checkout":  {Search(c.side, "../**/*.go"), crossed},
+		"Acme's checkout":            {Search(c.api), crossed},
+		"a tree past the walk":       {[]string{deep}, runs.Why{Reason: runs.UnknownReach, Where: firstWords(deep)}},
+		"the folder above, alone":    {Alone(c.home), runs.Why{}},
+		"its own checkout":           {Search(c.side, "**/*.go"), runs.Why{}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			m := newRoutedMachine(t, acmeAndPersonalRepos(t))
+			sid := "below-" + strings.Map(func(r rune) rune {
+				if r < 'a' || r > 'z' {
+					return '-'
+				}
+				return r
+			}, strings.ToLower(name))
+			r := startIn(t, m.hook(), sid, c.side)
+			env := m.hook()
+			env.Cwd = c.side
+			env.Classify(context.Background(), r, sessionOf(sid), tc.paths, nil)
+			if why := m.why(sid); why != tc.want {
+				t.Errorf("the ledger says the run is Mixed for %+v, want %+v", why, tc.want)
+			}
+		})
 	}
 }

@@ -344,7 +344,7 @@ func codexShellPaths(in *codexHookInput, cwd string) []string {
 		Command string `json:"command"`
 	}
 	_ = json.Unmarshal(in.ToolInput, &input)
-	return hookrun.ShellPaths(input.Command, cwd)
+	return hookrun.Alone(hookrun.ShellPaths(input.Command, cwd)...)
 }
 
 // codexShellTool is the tool_name Codex gives every shell call (exec_command and the rest).

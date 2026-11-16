@@ -155,6 +155,38 @@ func TestRoutedClaudeReadsAndSearchesReachingAcmeMakeTheRunMixed(t *testing.T) {
 	}
 }
 
+// A search reads every file below its folder: Grep or Glob over the folder holding the
+// personal checkout and Acme's, by its path or by "..", or with a glob that climbs to it
+// (../**/*.go), has crossed, as has a search of Acme's checkout. A search of its own checkout
+// has not, nor has LS of the folder above, which lists it alone.
+func TestRoutedClaudeSearchesAboveTheCheckoutsMakeTheRunMixed(t *testing.T) {
+	for name, tc := range map[string]struct {
+		tool  string
+		input func(m *reachMachine) map[string]any
+		mixed bool
+	}{
+		"Grep of ..": {"Grep", func(*reachMachine) map[string]any { return map[string]any{"pattern": "TODO", "path": ".."} }, true},
+		"Grep of the folder above": {"Grep", func(m *reachMachine) map[string]any {
+			return map[string]any{"pattern": "TODO", "path": filepath.Dir(m.side)}
+		}, true},
+		"Grep, a glob above":       {"Grep", func(*reachMachine) map[string]any { return map[string]any{"pattern": "TODO", "glob": "../**/*.md"} }, true},
+		"Glob climbing above":      {"Glob", func(*reachMachine) map[string]any { return map[string]any{"pattern": "../**/*.go"} }, true},
+		"Grep of Acme's checkout":  {"Grep", func(m *reachMachine) map[string]any { return map[string]any{"pattern": "TODO", "path": m.api} }, true},
+		"Grep of its own checkout": {"Grep", func(*reachMachine) map[string]any { return map[string]any{"pattern": "TODO"} }, false},
+		"Glob in its own checkout": {"Glob", func(*reachMachine) map[string]any { return map[string]any{"pattern": "**/*.go"} }, false},
+		"LS of the folder above":   {"LS", func(m *reachMachine) map[string]any { return map[string]any{"path": filepath.Dir(m.side)} }, false},
+	} {
+		t.Run(name, func(t *testing.T) {
+			m := newReachMachine(t)
+			m.start(m.side)
+			m.tool(m.side, tc.tool, tc.input(m))
+			if got := m.mixed(); got != tc.mixed {
+				t.Fatalf("Mixed %v, want %v", got, tc.mixed)
+			}
+		})
+	}
+}
+
 // A shell command reaches the paths it names that are there, a command substitution's
 // included, and every cd's target, and a relative path after a cd resolves where it went.
 // A path not there yet, such as a new file a redirect creates, reaches the checkout it

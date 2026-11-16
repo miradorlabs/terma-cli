@@ -447,7 +447,7 @@ func TestASymlinkReachesItsTarget(t *testing.T) {
 			r := startIn(t, m.hook(), sid, side)
 			env := m.hook()
 			env.Cwd = side
-			env.Classify(context.Background(), r, sessionOf(sid), ShellPaths(command, side), nil)
+			env.Classify(context.Background(), r, sessionOf(sid), Alone(ShellPaths(command, side)...), nil)
 			if ledger, placement := m.mixed(sid); !ledger || !placement {
 				t.Fatalf("ledger Mixed %v, mixed placement %v", ledger, placement)
 			}
@@ -461,7 +461,7 @@ func TestASymlinkReachesItsTarget(t *testing.T) {
 	}
 	env := m.hook()
 	env.Cwd = side
-	env.Classify(context.Background(), r, sessionOf(sid), ShellPaths("cat readme.md", side), nil)
+	env.Classify(context.Background(), r, sessionOf(sid), Alone(ShellPaths("cat readme.md", side)...), nil)
 	if ledger, _ := m.mixed(sid); ledger {
 		t.Fatal("a link within its own checkout made the run Mixed")
 	}

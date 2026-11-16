@@ -306,7 +306,7 @@ func TestRoutineAgentCommandsDoNotTurnTheRunMixed(t *testing.T) {
 				r := startIn(t, m.hook(), sid, c.side)
 				env := m.hook()
 				env.Cwd = c.side
-				env.Classify(context.Background(), r, sessionOf(sid), paths, nil)
+				env.Classify(context.Background(), r, sessionOf(sid), Alone(paths...), nil)
 				if ledger, placement := m.mixed(sid); ledger != set.mixed || placement != set.mixed {
 					t.Errorf("through Classify: ledger Mixed %v, mixed placement %v; want %v", ledger, placement, set.mixed)
 				}

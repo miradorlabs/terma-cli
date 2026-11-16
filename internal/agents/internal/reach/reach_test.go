@@ -1,13 +1,21 @@
 package reach
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
 	"slices"
 	"testing"
+	"time"
 
+	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
+	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
+	"github.com/miradorlabs/terma-cli/internal/routing"
+	"github.com/miradorlabs/terma-cli/internal/runs"
+	"github.com/miradorlabs/terma-cli/internal/session"
+	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
 // call is a tool call's input and the paths Of reads from it.
@@ -51,20 +59,23 @@ func check(t *testing.T, spec Spec, cwd string, calls map[string]call) {
 	}
 }
 
-// Copilot's tools name a path under one of several keys; run_in_terminal names its command,
-// run in the cwd unless the call names a folder, which it reaches too.
+// Copilot's tools name a path under one of several keys, a folder read below but list_dir's,
+// and a glob a search matches; a search with a glob and no path searches the cwd.
+// run_in_terminal names its command, run in the cwd unless the call names a folder, which it
+// reaches too, alone, as each place the command reaches.
 func TestCopilotInputs(t *testing.T) {
 	t.Parallel()
 	cwd, sub := folder(t)
 	check(t, Copilot, cwd, map[string]call{
 		"read_file":                 {`{"filePath": "/x/a.go", "startLine": 1, "endLine": 9}`, []string{"/x/a.go"}},
 		"view":                      {`{"path": "sub/NOTES.md"}`, []string{"sub/NOTES.md"}},
-		"list_dir":                  {`{"dirPath": "sub"}`, []string{"sub"}},
-		"grep_search with no path":  {`{"query": "TODO", "includePattern": "*.go"}`, nil},
-		"run_in_terminal":           {`{"command": "cat NOTES.md", "explanation": "read", "isBackground": false}`, []string{cwd}},
-		"run_in_terminal in sub":    {`{"command": "cat NOTES.md ../NOTES.md", "cwd": "sub"}`, []string{sub, sub, cwd}},
+		"list_dir":                  {`{"dirPath": "sub"}`, hookrun.Alone("sub")},
+		"grep_search with no path":  {`{"query": "TODO", "includePattern": "*.go"}`, []string{cwd}},
+		"run_in_terminal":           {`{"command": "cat NOTES.md", "explanation": "read", "isBackground": false}`, hookrun.Alone(cwd)},
+		"run_in_terminal in sub":    {`{"command": "cat NOTES.md ../NOTES.md", "cwd": "sub"}`, hookrun.Alone(sub, sub, cwd)},
 		"a notebook":                {`{"notebook_path": "a.ipynb"}`, []string{"a.ipynb"}},
 		"a search in a directory":   {`{"pattern": "TODO", "directory": "sub"}`, []string{"sub"}},
+		"a glob above a folder":     {`{"pattern": "../**/*.go", "path": "sub"}`, []string{"sub", "."}},
 		"a shell command not known": {`{"command": "ls"}`, nil},
 	})
 }
@@ -79,15 +90,16 @@ func TestCursorInputs(t *testing.T) {
 		"Read, by file_path":    {`{"file_path": "/x/a.go"}`, []string{"/x/a.go"}},
 		"Grep":                  {`{"pattern": "TODO", "path": "sub", "glob": "*.go"}`, []string{"sub"}},
 		"list_dir":              {`{"target_directory": "sub"}`, []string{"sub"}},
-		"Shell":                 {`{"command": "cat NOTES.md"}`, []string{cwd}},
-		"Shell in a folder":     {`{"command": "cat ../NOTES.md", "working_directory": "sub"}`, []string{sub, cwd}},
-		"Shell in an absolute":  {`{"command": "cat NOTES.md", "cwd": ` + quoted(t, sub) + `}`, []string{sub, sub}},
+		"Shell":                 {`{"command": "cat NOTES.md"}`, hookrun.Alone(cwd)},
+		"Shell in a folder":     {`{"command": "cat ../NOTES.md", "working_directory": "sub"}`, hookrun.Alone(sub, cwd)},
+		"Shell in an absolute":  {`{"command": "cat NOTES.md", "cwd": ` + quoted(t, sub) + `}`, hookrun.Alone(sub, sub)},
 		"a search with no path": {`{"query": "how are runs routed"}`, nil},
 	})
 }
 
 // Gemini's read_many_files names an array of paths, list_directory a folder that is also
-// where it runs, and run_shell_command its command and a directory relative to the cwd.
+// where it runs, and run_shell_command its command and a directory relative to the cwd; a
+// search with no path searches the cwd.
 func TestGeminiInputs(t *testing.T) {
 	t.Parallel()
 	cwd, sub := folder(t)
@@ -95,11 +107,11 @@ func TestGeminiInputs(t *testing.T) {
 		"read_file":                     {`{"absolute_path": "/x/a.go"}`, []string{"/x/a.go"}},
 		"read_file, by file_path":       {`{"file_path": "/x/a.go"}`, []string{"/x/a.go"}},
 		"read_many_files":               {`{"paths": ["NOTES.md", "sub/NOTES.md"], "include": ["*.md"]}`, []string{"NOTES.md", "sub/NOTES.md"}},
-		"list_directory":                {`{"dir_path": "sub"}`, []string{"sub", sub}},
+		"list_directory":                {`{"dir_path": "sub"}`, append([]string{"sub"}, hookrun.Alone(sub)...)},
 		"glob":                          {`{"pattern": "*.go", "path": "sub"}`, []string{"sub"}},
-		"search_file_content, no path":  {`{"pattern": "TODO"}`, nil},
-		"run_shell_command":             {`{"command": "cat NOTES.md", "description": "read"}`, []string{cwd}},
-		"run_shell_command in a folder": {`{"command": "cat NOTES.md", "directory": "sub"}`, []string{sub, sub}},
+		"search_file_content, no path":  {`{"pattern": "TODO"}`, []string{cwd}},
+		"run_shell_command":             {`{"command": "cat NOTES.md", "description": "read"}`, hookrun.Alone(cwd)},
+		"run_shell_command in a folder": {`{"command": "cat NOTES.md", "directory": "sub"}`, hookrun.Alone(sub, sub)},
 	})
 }
 
@@ -110,13 +122,13 @@ func TestAntigravityInputs(t *testing.T) {
 	cwd, sub := folder(t)
 	check(t, Antigravity, cwd, map[string]call{
 		"view_file":           {`{"AbsolutePath": "/x/a.go", "StartLine": 1}`, []string{"/x/a.go"}},
-		"list_dir":            {`{"DirectoryPath": "/x"}`, []string{"/x"}},
+		"list_dir":            {`{"DirectoryPath": "/x"}`, hookrun.Alone("/x")},
 		"grep_search":         {`{"SearchPath": "/x", "Query": "TODO", "IsRegex": false}`, []string{"/x"}},
 		"find_by_name":        {`{"SearchDirectory": "/x", "Pattern": "*.go"}`, []string{"/x"}},
 		"codebase_search":     {`{"Query": "routing", "TargetDirectories": ["/x", "/y"]}`, []string{"/x", "/y"}},
-		"run_command":         {`{"CommandLine": "cat NOTES.md", "Cwd": "sub", "Blocking": true}`, []string{sub, sub}},
+		"run_command":         {`{"CommandLine": "cat NOTES.md", "Cwd": "sub", "Blocking": true}`, hookrun.Alone(sub, sub)},
 		"a vendor read":       {`{"file_path": "sub/NOTES.md"}`, []string{"sub/NOTES.md"}},
-		"a vendor shell call": {`{"command": "cat NOTES.md", "cwd": "sub"}`, []string{sub, sub}},
+		"a vendor shell call": {`{"command": "cat NOTES.md", "cwd": "sub"}`, hookrun.Alone(sub, sub)},
 	})
 }
 
@@ -136,5 +148,63 @@ func TestOfReadsOnlyWhatItKnows(t *testing.T) {
 	got := Copilot.Of(json.RawMessage(`{"command": "cat $(cat p)/x"}`), cwd)
 	if n := len(hookrun.UnknownReach); len(got) == 0 || len(got[len(got)-1]) < n || got[len(got)-1][:n] != hookrun.UnknownReach {
 		t.Errorf("a command not resolved: Of = %q, want UnknownReach last", got)
+	}
+}
+
+// crosses reports whether a call with input, made in side, a personal checkout beside Acme's,
+// turns the run Mixed once Classify reads what spec says it reached.
+func crosses(t *testing.T, spec Spec, input string) bool {
+	t.Helper()
+	parent, _ := filepath.EvalSymlinks(t.TempDir())
+	side := hookruntest.RepoIn(t, parent, "github.com/dawson/side")
+	hookruntest.RepoIn(t, parent, "github.com/acme/acme-api")
+	st := hookruntest.RoutingState(t, []routing.Team{
+		hookruntest.RoutedTeam("acme", "acme-platform", true, "github.com/acme/*"),
+		hookruntest.RoutedPersonal("github.com/dawson/*"),
+	}, map[string]string{"github.com/acme": "acme"})
+	sp, err := spool.Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	stateDir := t.TempDir()
+	env := hookrun.Env{StateDir: stateDir, ConfigDir: t.TempDir(), Now: time.Now(), Cwd: side, Spool: sp,
+		Policy: config.NoPolicy("", ""), Routing: hookrun.NewRouting(hookruntest.RoutedProfile, st)}
+	const sid = "search-session"
+	env.StartRun(sid)
+	env.Classify(context.Background(), nil, session.Session{ID: sid, Tool: "agent"}, spec.Of(json.RawMessage(input), side), nil)
+	_, mixed := runs.MixedAt(stateDir, sid, time.Time{})
+	return mixed
+}
+
+// Each agent's search of the folder above its checkout, by a folder its input names or a
+// glob that climbs to it, reads Acme's checkout beside it, and turns the run Mixed; a search
+// of its own checkout does not, nor does a listing of the folder above, which its key says it
+// lists alone.
+func TestEachAgentsSearchAboveTheCheckoutsCrosses(t *testing.T) {
+	t.Parallel()
+	for name, tc := range map[string]struct {
+		spec  Spec
+		input string
+		mixed bool
+	}{
+		"Copilot's grep":               {Copilot, `{"pattern": "TODO", "path": ".."}`, true},
+		"Copilot's glob":               {Copilot, `{"pattern": "../**/*.go"}`, true},
+		"Copilot's list_dir":           {Copilot, `{"dirPath": ".."}`, false},
+		"Copilot's grep of its own":    {Copilot, `{"pattern": "TODO", "path": "."}`, false},
+		"Cursor's Grep":                {Cursor, `{"pattern": "TODO", "path": ".."}`, true},
+		"Cursor's Grep, a glob above":  {Cursor, `{"pattern": "TODO", "glob": "../**/*.md"}`, true},
+		"Gemini's search_file_content": {Gemini, `{"pattern": "TODO", "dir_path": ".."}`, true},
+		"Gemini's glob":                {Gemini, `{"pattern": "../**/*.go"}`, true},
+		"Gemini's glob of its own":     {Gemini, `{"pattern": "**/*.go"}`, false},
+		"Antigravity's grep_search":    {Antigravity, `{"SearchPath": "..", "Query": "TODO"}`, true},
+		"Antigravity's find_by_name":   {Antigravity, `{"SearchDirectory": "..", "Pattern": "*.go"}`, true},
+		"Antigravity's list_dir":       {Antigravity, `{"DirectoryPath": ".."}`, false},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			if got := crosses(t, tc.spec, tc.input); got != tc.mixed {
+				t.Errorf("Mixed %v, want %v", got, tc.mixed)
+			}
+		})
 	}
 }

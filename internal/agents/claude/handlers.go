@@ -32,8 +32,11 @@ type claudeHookInput struct {
 		FilePath     string `json:"file_path"`
 		NotebookPath string `json:"notebook_path"`
 		// Path is the directory or file Grep, Glob and LS search; Grep and Glob search the
-		// cwd without one.
-		Path string `json:"path"`
+		// cwd without one. Pattern is Glob's glob (Grep's is a regular expression), and Glob
+		// Grep's.
+		Path    string `json:"path"`
+		Pattern string `json:"pattern"`
+		Glob    string `json:"glob"`
 		// Command is Bash's.
 		Command string `json:"command"`
 		Edits   []struct {
@@ -196,12 +199,20 @@ func editedPaths(in *claudeHookInput) []string {
 	return out
 }
 
-// reachedPaths are the files and directories the call reached: a shell command's paths
-// (hookrun.ShellPaths), else every path its input names. A search without a path searched
-// the cwd, the hook's own location, which is classified anyway.
+// reachedPaths are the files and directories the call reached, Classify reading below each
+// folder: a shell command's paths (hookrun.ShellPaths), the folders a search reads, the cwd
+// without a path, and its glob's literal prefix there (hookrun.Search: Grep's glob, Glob's
+// pattern), LS's folder alone, else every path its input names.
 func reachedPaths(in *claudeHookInput, cwd string) []string {
-	if in.ToolName == "Bash" {
-		return hookrun.ShellPaths(in.ToolInput.Command, cwd)
+	switch in.ToolName {
+	case "Bash":
+		return hookrun.Alone(hookrun.ShellPaths(in.ToolInput.Command, cwd)...)
+	case "Grep":
+		return hookrun.Search(cmp.Or(in.ToolInput.Path, cwd), in.ToolInput.Glob)
+	case "Glob":
+		return hookrun.Search(cmp.Or(in.ToolInput.Path, cwd), in.ToolInput.Pattern)
+	case "LS":
+		return hookrun.Alone(in.ToolInput.Path)
 	}
 	return append(editedPaths(in), in.ToolInput.Path)
 }
