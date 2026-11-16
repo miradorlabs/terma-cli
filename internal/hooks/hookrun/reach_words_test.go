@@ -283,11 +283,12 @@ func TestShellPathsPastTheirOtherBoundsAreUnknown(t *testing.T) {
 	})
 }
 
-// A shell's script is read as commands, in a subshell: bash -c's, and a here-string's or a
-// here-document's fed to a shell; an interpreter's (python -c, node -e) for its slashed
+// A shell's script is read as commands, in a subshell: bash -c's, eval's, trap's, and a
+// here-string's or a here-document's fed to a shell; an interpreter's (python -c, node -e) for its slashed
 // words. A shell's script not resolved may do anything. A folder option's value (-C for
 // git, make, tar and env; --git-dir, --dir and the like) not resolved is not known either,
-// but another command's -C (grep's context) is no folder, and pushd's move ends at popd.
+// but another command's -C (grep's context, git diff's copies) is no folder, and pushd's
+// move ends at popd.
 func TestShellPathsReadInlineScriptsAndFolderOptions(t *testing.T) {
 	t.Parallel()
 	m := newWordsMachine(t)
@@ -298,10 +299,14 @@ func TestShellPathsReadInlineScriptsAndFolderOptions(t *testing.T) {
 		`ruby -e "File.read('../acme-api/NOTES.md')"`:     {m.api},
 		"perl -ne 'print if $. < 3' ../acme-api/NOTES.md": {m.api},
 		"grep -C $N TODO src":                             {src},
+		"eval 'cat ../acme-api/NOTES.md'":                 {m.api},
+		"trap 'cat ../acme-api/NOTES.md' EXIT":            {m.api},
+		"coproc cat ../acme-api/NOTES.md":                 {m.api},
+		"git diff -C $(git merge-base HEAD main) -- src":  {src},
 		"pushd ../acme-api && popd && ls $PWD/src":        {m.api, src},
 		"cat <<'EOF' | grep x | sh\ncd ../acme-api\nEOF":  {m.api},
 	})
-	for _, command := range []string{`bash -c "$CMD"`, "git --git-dir=$(cat p) log", "tar -C $UNSET -xf x.tar", "env -C`cat p` make", "make --directory $(cat p)"} {
+	for _, command := range []string{`bash -c "$CMD"`, `eval "$CMD"`, "git --git-dir=$(cat p) log", "tar -C $UNSET -xf x.tar", "env -C`cat p` make", "make --directory $(cat p)", "tar -xf x.tar -C $(cat p)"} {
 		if got := m.paths(command, m.side); !slices.Contains(got, UnknownReach) {
 			t.Errorf("ShellPaths(%q) = %q, without UnknownReach", command, got)
 		}

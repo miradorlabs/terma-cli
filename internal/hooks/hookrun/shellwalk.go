@@ -27,7 +27,8 @@ const (
 
 // Commands by what they do with their words: runsNext run the command the next names;
 // shells run a script from -c or their input, interpreters from -c or -e; folderOptions
-// take a folder, as the next word or after their =, as -C does for dashC.
+// take a folder, as the next word or after their =, as -C does for dashC (for git only
+// before its subcommand: git diff -C finds copies).
 var (
 	runsNext      = []string{"nohup", "exec", "command", "builtin", "time", "nice"}
 	shells        = []string{"bash", "sh", "zsh", "dash", "ksh", "ash"}
@@ -89,6 +90,8 @@ func (sc *scan) stmt(s *syntax.Stmt, feeds bool) {
 		if c.Stmt != nil {
 			sc.stmt(c.Stmt, feeds)
 		}
+	case *syntax.CoprocClause:
+		sc.stmt(c.Stmt, false)
 	case *syntax.TestClause:
 		syntax.Walk(c.X, func(n syntax.Node) bool {
 			w, ok := n.(*syntax.Word)
@@ -111,7 +114,8 @@ func (sc *scan) subshell(f func()) {
 }
 
 // call reads a simple command: its assignments, its name, and its arguments, a cd's or
-// pushd's target, a popd, an inline script and a folder option's value read as such.
+// pushd's target, a popd, an inline script (eval's, trap's) and a folder option's value
+// read as such.
 func (sc *scan) call(ce *syntax.CallExpr) {
 	for _, a := range ce.Assigns {
 		sc.assign(a)
@@ -133,19 +137,30 @@ func (sc *scan) call(ce *syntax.CallExpr) {
 			sc.prev, sc.dir, sc.pushed = sc.dir, sc.pushed[n-1], sc.pushed[:n-1]
 		}
 		return
+	case "eval":
+		sc.inline(args, true)
+		return
+	case "trap":
+		sc.inline(args[:min(len(args), 1)], true)
+		return
 	}
 	shell, interpreter := slices.Contains(shells, name), slices.Contains(interpreters, name)
+	operands := 0
 	for j := 0; j < len(args); j++ {
 		opt, next := args[j].Lit(), j+1 < len(args)
+		dashCFolder := slices.Contains(dashC, name) && (name != "git" || operands == 0)
 		switch {
 		case next && (shell && scriptFlag(opt, "c") || interpreter && scriptFlag(opt, "ce")):
 			j++
-			sc.inline(args[j], shell)
-		case next && (slices.Contains(folderOptions, opt) || opt == "-C" && slices.Contains(dashC, name)):
+			sc.inline(args[j:j+1], shell)
+		case next && (slices.Contains(folderOptions, opt) || opt == "-C" && dashCFolder):
 			j++
 			sc.arg(args[j], folder)
 		default:
-			sc.arg(args[j], folderValue(name, args[j]))
+			if !strings.HasPrefix(opt, "-") {
+				operands++
+			}
+			sc.arg(args[j], folderValue(args[j], dashCFolder))
 		}
 	}
 }
@@ -171,11 +186,12 @@ func scriptFlag(opt, letters string) bool {
 		!strings.ContainsFunc(opt[1:], func(r rune) bool { return r < 'a' || r > 'z' })
 }
 
-// folderValue is folder for a word naming a folder after its option (--dir=x, -Cx), else 0.
-func folderValue(name string, w *syntax.Word) role {
+// folderValue is folder for a word naming a folder after its option (--dir=x, or -Cx where
+// -C takes a folder), else 0.
+func folderValue(w *syntax.Word, dashCFolder bool) role {
 	if lead, ok := w.Parts[0].(*syntax.Lit); ok {
 		opt, _, eq := strings.Cut(lead.Value, "=")
-		if eq && slices.Contains(folderOptions, opt) || strings.HasPrefix(opt, "-C") && w.Lit() != "-C" && slices.Contains(dashC, name) {
+		if eq && slices.Contains(folderOptions, opt) || dashCFolder && strings.HasPrefix(opt, "-C") && w.Lit() != "-C" {
 			return folder
 		}
 	}
@@ -318,20 +334,26 @@ func (sc *scan) body(text string, shell bool) {
 	}
 }
 
-// inline reads w, the script a shell or an interpreter runs from its arguments: a shell's
-// as commands, in a subshell, one not resolved unknown; an interpreter's slashed words.
-func (sc *scan) inline(w *syntax.Word, shell bool) {
-	sc.substitutions(w)
-	fields, err := expand.Fields(sc.cfg, w)
-	switch {
-	case err != nil:
-		sc.unknown = sc.unknown || shell || slashed(w)
-	case shell:
-		sc.subshell(func() { sc.script(strings.Join(fields, " ")) })
-	default:
-		for f := range fragments(strings.Join(fields, " ")) {
-			sc.candidate(f, slashedOnly)
+// inline reads words, the script a shell or an interpreter runs from its arguments: a
+// shell's as commands, in a subshell, one not resolved unknown; an interpreter's slashed
+// words.
+func (sc *scan) inline(words []*syntax.Word, shell bool) {
+	var script []string
+	for _, w := range words {
+		sc.substitutions(w)
+		fields, err := expand.Fields(sc.cfg, w)
+		if err != nil {
+			sc.unknown = sc.unknown || shell || slashed(w)
+			return
 		}
+		script = append(script, fields...)
+	}
+	if shell {
+		sc.subshell(func() { sc.script(strings.Join(script, " ")) })
+		return
+	}
+	for f := range fragments(strings.Join(script, " ")) {
+		sc.candidate(f, slashedOnly)
 	}
 }
 
