@@ -123,6 +123,11 @@ func TeamsCheck(r Routing, now time.Time) Check {
 			continue
 		}
 		p := k.Needs[0]
+		if k.Waits.Key != "" {
+			failing = append(failing, p.Key+" is undecided, so what "+p.Entry+" matches is held; binding it would also give "+k.Waits.Key+
+				", which "+r.org(k.Waits.Organization)+" needs, to "+r.org(p.Organization)+": decide that first")
+			continue
+		}
 		failing = append(failing, p.Key+" is undecided, so what "+p.Entry+" matches is held")
 		fix = cmp.Or(fix, "terma teams --bind "+p.Key+"="+quoteWord(r.org(p.Organization))+" (or --refuse "+p.Key+")")
 	}
@@ -233,25 +238,40 @@ type PendingBinding struct {
 // for each, a conflict only the developer can settle.
 func Pending(st routing.State) []PendingBinding {
 	var out []PendingBinding
+	seen := map[routing.Need]bool{}
 	for _, t := range st.Teams {
 		if t.Personal || t.Policy.Global() || t.Policy.Unset {
 			continue
 		}
 		for _, raw := range t.Policy.Repositories {
 			e, ok := routing.ParseEntry(raw, t.Policy.Wildcards)
-			if !ok || slices.ContainsFunc(out, func(p PendingBinding) bool { return p.Key == e.Key() && p.Organization == t.OrganizationID }) || decided(st, e) {
+			if !ok || seen[routing.Need{Key: e.Key(), Organization: t.OrganizationID}] || decided(st, e) {
 				continue
 			}
+			seen[routing.Need{Key: e.Key(), Organization: t.OrganizationID}] = true
 			out = append(out, PendingBinding{Key: e.Key(), Organization: t.OrganizationID, TeamID: t.TeamID, Entry: raw})
 		}
 	}
 	return out
 }
 
+// IndexPending indexes pending for the binding rules (routing.Needs).
+func IndexPending(pending []PendingBinding) routing.Needs {
+	needs := make([]routing.Need, 0, len(pending))
+	for _, p := range pending {
+		needs = append(needs, routing.Need{Key: p.Key, Organization: p.Organization})
+	}
+	return routing.IndexNeeds(needs)
+}
+
 // PendingKey is one key left to decide, with every organization whose entry needs it.
 type PendingKey struct {
 	Key   string
 	Needs []PendingBinding
+	// Waits is, for an owner one organization needs, a repository under it that another
+	// organization needs: binding the owner first would give that repository away, so it is
+	// decided first. Its Key is "" when there is none.
+	Waits routing.Need
 }
 
 // Conflict reports whether more than one organization needs the key: only the developer
@@ -260,15 +280,31 @@ func (k PendingKey) Conflict() bool { return len(k.Needs) > 1 }
 
 // PendingKeys is Pending grouped by key, in the order Pending first names each.
 func PendingKeys(st routing.State) []PendingKey {
+	pending := Pending(st)
+	ix := IndexPending(pending)
 	var out []PendingKey
-	for _, p := range Pending(st) {
-		if i := slices.IndexFunc(out, func(k PendingKey) bool { return k.Key == p.Key }); i >= 0 {
+	at := map[string]int{}
+	for _, p := range pending {
+		if i, ok := at[p.Key]; ok {
 			out[i].Needs = append(out[i].Needs, p)
 			continue
 		}
-		out = append(out, PendingKey{Key: p.Key, Needs: []PendingBinding{p}})
+		at[p.Key] = len(out)
+		k := PendingKey{Key: p.Key, Needs: []PendingBinding{p}}
+		if !ix.Conflict(p.Key) {
+			k.Waits, _ = ix.Settles(p.Key, p.Organization, nil)
+		}
+		out = append(out, k)
 	}
 	return out
+}
+
+// JoinAnd joins words as a sentence lists them: "a", "a and b", "a, b and c".
+func JoinAnd(words []string) string {
+	if len(words) < 2 {
+		return strings.Join(words, "")
+	}
+	return strings.Join(words[:len(words)-1], ", ") + " and " + words[len(words)-1]
 }
 
 // orgsOf names the organizations that need k, as a sentence lists them.
@@ -277,10 +313,7 @@ func (r Routing) orgsOf(k PendingKey) string {
 	for _, p := range k.Needs {
 		names = append(names, r.org(p.Organization))
 	}
-	if len(names) < 2 {
-		return strings.Join(names, "")
-	}
-	return strings.Join(names[:len(names)-1], ", ") + " and " + names[len(names)-1]
+	return JoinAnd(names)
 }
 
 // decided reports whether a decision covers what e needs: its key's, or for an exact
@@ -374,7 +407,11 @@ func TeamRows(r Routing, now time.Time) []Row {
 			rows = append(rows, Row{"Undecided", k.Key + ", needed by more than one organization: " + r.orgsOf(k)})
 			continue
 		}
-		rows = append(rows, Row{"Undecided", k.Key + ", needed by " + k.Needs[0].Entry})
+		row := k.Key + ", needed by " + k.Needs[0].Entry
+		if k.Waits.Key != "" {
+			row += "; decide " + k.Waits.Key + " first"
+		}
+		rows = append(rows, Row{"Undecided", row})
 	}
 	if len(r.Mixed) > 0 || r.MixedDropped > 0 {
 		rows = append(rows, Row{"Mixed", MixedSummary(r)})

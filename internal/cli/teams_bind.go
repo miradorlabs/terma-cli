@@ -10,14 +10,24 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/miradorlabs/terma-cli/internal/doctor"
 	"github.com/miradorlabs/terma-cli/internal/routing"
 )
 
 // resolveBindingFlags turns --bind, --refuse and --unbind into decisions. A repository
 // bound against its owner's decision names the conflict and asks first (--yes confirms it
-// without a terminal). Binding an owner lists the repository decisions under it, which the
-// developer keeps or removes.
+// without a terminal). Binding an owner that would give away a repository under it another
+// organization needs, which no flag of this run decides, asks the same way; then it lists
+// the repository decisions under it, which the developer keeps or removes.
 func resolveBindingFlags(cmd *cobra.Command, st routing.State, f teamsFlags, ask bool, names teamNames, list func() teamsView, ch *teamsChange) error {
+	pending := doctor.IndexPending(doctor.Pending(st))
+	flagged := map[string]bool{}
+	for _, raw := range append(slices.Clone(f.binds), f.refuses...) {
+		keyRaw, _, _ := strings.Cut(raw, "=")
+		if key, err := bindingKeyOf(keyRaw); err == nil {
+			flagged[key] = true
+		}
+	}
 	for _, raw := range f.binds {
 		keyRaw, orgRaw, ok := strings.Cut(raw, "=")
 		if !ok || strings.TrimSpace(keyRaw) == "" || strings.TrimSpace(orgRaw) == "" {
@@ -40,8 +50,17 @@ func resolveBindingFlags(cmd *cobra.Command, st routing.State, f teamsFlags, ask
 				}
 				op.override = true
 			}
-		} else if err := keepRepositoryDecisions(cmd, st, key, org, orgName, names, ask, ch); err != nil {
-			return err
+		} else {
+			if s, ok := pending.Settles(key, org, func(k string) bool { return flagged[k] }); ok {
+				question := key + " covers " + s.Key + ", which " + cmp.Or(names.Orgs[s.Organization], s.Organization) + " needs: bind " + key +
+					" to " + cmp.Or(orgName, org) + " and give it " + s.Key + " too?"
+				if err := confirmConflict(cmd, question, ask, f.assumeYes); err != nil {
+					return err
+				}
+			}
+			if err := keepRepositoryDecisions(cmd, st, key, org, orgName, names, ask, ch); err != nil {
+				return err
+			}
 		}
 		ch.ops = append(ch.ops, op)
 		ch.changes = append(ch.changes, describeOp(op, orgName))

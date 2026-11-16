@@ -87,6 +87,10 @@ type pendingRow struct {
 	Conflict bool `json:"conflict"`
 	// Organizations are every organization that needs the key, each with its entry.
 	Organizations []pendingNeed `json:"organizations"`
+	// WaitsFor is, for an owner, a repository under it another organization needs: binding
+	// the owner first would give that repository away, so it is decided first. Binding all
+	// leaves the owner to decide until it is.
+	WaitsFor string `json:"waits_for,omitempty"`
 }
 
 // pendingNeed is one organization that needs a pending key, and the entry that does.
@@ -292,7 +296,7 @@ func pendingBindings(st routing.State, orgName, teamName func(string) string) []
 	var out []pendingRow
 	for _, k := range doctor.PendingKeys(st) {
 		first := k.Needs[0]
-		row := pendingRow{Key: k.Key, Organization: first.Organization, TeamID: first.TeamID, Entry: first.Entry, Conflict: k.Conflict()}
+		row := pendingRow{Key: k.Key, Organization: first.Organization, TeamID: first.TeamID, Entry: first.Entry, Conflict: k.Conflict(), WaitsFor: k.Waits.Key}
 		for _, p := range k.Needs {
 			need := pendingNeed{Organization: p.Organization, TeamID: p.TeamID, Entry: p.Entry}
 			if orgName != nil {

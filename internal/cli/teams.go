@@ -11,6 +11,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/miradorlabs/terma-cli/internal/doctor"
 	"github.com/miradorlabs/terma-cli/internal/routing"
 	"github.com/miradorlabs/terma-cli/internal/ui/style"
 )
@@ -226,7 +227,12 @@ func renderTeams(w io.Writer, v teamsView) {
 		fmt.Fprintf(out, "\n%s\n", p.Bold("To decide (what these match is held until you do):"))
 		single := 0
 		for _, pr := range v.Pending {
-			if pr.Conflict {
+			switch {
+			case pr.Conflict:
+				continue
+			case pr.WaitsFor != "":
+				fmt.Fprintf(out, "  %s %s  needed by %s: decide %s first; binding %s now would give it away\n",
+					p.Warn("!"), pr.Key, pr.Entry, pr.WaitsFor, pr.Key)
 				continue
 			}
 			single++
@@ -243,21 +249,13 @@ func renderTeams(w io.Writer, v teamsView) {
 				who = append(who, name+" ("+teamEntry(pr.Key, n.Entry, n.TeamName)+")")
 				binds = append(binds, "`terma teams --bind "+pr.Key+"="+quoteArg(name)+"`")
 			}
-			fmt.Fprintf(out, "  %s\n      %s\n", p.Fail("✗ "+pr.Key+": needed by more than one organization, "+joinAnd(who)),
+			fmt.Fprintf(out, "  %s\n      %s\n", p.Fail("✗ "+pr.Key+": needed by more than one organization, "+doctor.JoinAnd(who)),
 				"pick one: "+strings.Join(binds, " or "))
 		}
 		if single > 0 {
 			fmt.Fprintf(out, "\n  Bind each to the one organization that needs it: `terma teams --bind-all`\n")
 		}
 	}
-}
-
-// joinAnd joins words as a sentence lists them: "a", "a and b", "a, b and c".
-func joinAnd(words []string) string {
-	if len(words) < 2 {
-		return strings.Join(words, "")
-	}
-	return strings.Join(words[:len(words)-1], ", ") + " and " + words[len(words)-1]
 }
 
 func orgTitle(o orgRow) string { return cmp.Or(o.Name, o.ID) }
