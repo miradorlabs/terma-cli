@@ -398,6 +398,7 @@ func TestUnknownReachNamesTheCommandByItsFirstWords(t *testing.T) {
 		"tool --api-key s3cret $UNSET/x":                     "tool --api-key … $UNSET/x",
 		"git clone https://me:s3cret@example.com/x $UNSET/y": "git clone https://…@example.com/x $UNSET/y",
 		"cat /" + strings.Repeat("x", 80) + "/$UNSET/y":      "cat /" + strings.Repeat("x", 55) + " …",
+		"redis-cli -a s3cret --rdb $UNSET/x":                 "redis-cli -a … --rdb …",
 	} {
 		got := ShellPaths(command, t.TempDir())
 		if len(got) == 0 || got[len(got)-1] != UnknownReach+"\x00"+want {

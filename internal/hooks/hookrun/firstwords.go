@@ -9,8 +9,8 @@ import (
 )
 
 // secretOptions are the options whose value, the next word, firstWords leaves out, as it does
-// that of any option whose name holds one of secretNames; userinfo is a URL's user and
-// password.
+// that of any option whose name holds one of secretNames, and of redis-cli -a; userinfo is a
+// URL's user and password.
 var (
 	secretOptions = []string{"-u", "--user", "-H", "--header", "-p", "--password"}
 	secretNames   = []string{"pass", "token", "secret", "key", "auth"}
@@ -47,7 +47,7 @@ func firstWords(command string) string {
 		}
 		words[i] = userinfo.ReplaceAllString(words[i], "://…@")
 		lower := strings.ToLower(w)
-		secret = slices.Contains(secretOptions, w) ||
+		secret = slices.Contains(secretOptions, w) || w == "-a" && strings.HasSuffix(words[0], "redis-cli") ||
 			strings.HasPrefix(w, "-") && slices.ContainsFunc(secretNames, func(n string) bool { return strings.Contains(lower, n) })
 	}
 	s, runes := strings.Join(words, " "), 0
