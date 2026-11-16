@@ -40,10 +40,11 @@ func (ix Needs) Organizations(key string) []string { return ix.orgs[key] }
 // Conflict reports whether more than one organization needs key.
 func (ix Needs) Conflict(key string) bool { return len(ix.orgs[key]) > 1 }
 
-// Settles is a need of another organization that binding key to org would settle against
-// it, ok false when there is none: a repository under key, an owner, that the other
-// organization needs and that decided, nil for none, does not say is decided with it. A
-// repository key settles nothing.
+// Settles finds a repository that binding the owner key to org would hand to org though
+// another organization needs it: Route gives a repository with no decision of its own to
+// its owner's organization. A repository that decided reports as decided (decided may be
+// nil) gets a decision of its own, so binding the owner takes nothing from it. ok is false
+// when there is no such repository, and always for a repository key.
 func (ix Needs) Settles(key, org string, decided func(key string) bool) (n Need, ok bool) {
 	for _, repo := range ix.under[key] {
 		if decided != nil && decided(repo) {
@@ -77,4 +78,42 @@ func (ix Needs) OwnerElsewhere(key, org string) (string, bool) {
 		return ix.orgs[o][i], true
 	}
 	return "", false
+}
+
+// OwnersTaking checks keys against s, the routing state a run leaves: each owner among them
+// bound to an organization that takes a repository another organization's entry needs.
+// Such a repository has no decision of its own, so Route decides it by its owner's
+// binding. Each owner maps to the first need it takes. It reads the bindings as Route
+// does, so it never disagrees with where a record goes; a repository key takes nothing.
+func (s State) OwnersTaking(keys []string) map[string]Need {
+	boundTo := map[string]string{}
+	for _, k := range keys {
+		if b, ok := s.Bindings[k]; ok && !b.Refused && isOwnerKey(k) {
+			boundTo[k] = b.Organization
+		}
+	}
+	taken := map[string]Need{}
+	if len(boundTo) == 0 {
+		return taken
+	}
+	for _, t := range s.Teams {
+		if t.Personal || t.Policy.Global() || t.Policy.Unset {
+			continue
+		}
+		for _, raw := range t.Policy.Repositories {
+			e, ok := ParseEntry(raw, t.Policy.Wildcards)
+			if !ok || e.wildcard {
+				continue
+			}
+			o := owner(e.key)
+			org, bound := boundTo[o]
+			if _, found := taken[o]; !bound || found || org == t.OrganizationID {
+				continue
+			}
+			if s.decided(e.key).Key == o {
+				taken[o] = Need{Key: e.key, Organization: t.OrganizationID}
+			}
+		}
+	}
+	return taken
 }

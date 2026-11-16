@@ -44,3 +44,38 @@ func TestNeedsRules(t *testing.T) {
 		t.Error("its own organization's owner makes no exception")
 	}
 }
+
+// An owner bound to one organization takes a repository under it that another organization
+// needs exactly while Route gives it the repository: while the repository has no decision
+// of its own. Its own organization's repositories, a repository key and a refused owner
+// take nothing.
+func TestOwnersTakingIsWhatRouteGivesTheOwner(t *testing.T) {
+	s := &State{Profile: "default"}
+	for _, tm := range []Team{team("acme", "web", "github.com/acme/*", "github.com/acme/own"),
+		team("beta", "core", "github.com/acme/api", "github.com/acme/web"), personal()} {
+		if _, err := s.Select(tm); err != nil {
+			t.Fatal(err)
+		}
+	}
+	must(t, s.Bind("github.com/acme", "acme", false))
+	keys := []string{"github.com/acme", "github.com/acme/own"}
+	if taken := s.OwnersTaking(keys); len(taken) != 1 || taken["github.com/acme"] != (Need{"github.com/acme/api", "beta"}) {
+		t.Fatalf("taken = %+v", taken)
+	}
+	if d := NewRouter(*s).Route(repo("https://github.com/acme/api"), now); d.Outcome != Send || s.Team(d.EnrollmentID).OrganizationID != "acme" {
+		t.Fatalf("Route sends github.com/acme/api to %+v, not to the owner's organization", d)
+	}
+	must(t, s.Bind("github.com/acme/api", "beta", true))
+	if n := s.OwnersTaking(keys)["github.com/acme"]; n.Key != "github.com/acme/web" {
+		t.Errorf("with github.com/acme/api decided, the owner takes %+v", n)
+	}
+	must(t, s.Refuse("github.com/acme/web"))
+	if taken := s.OwnersTaking(keys); len(taken) != 0 {
+		t.Errorf("every repository another organization needs is decided, yet %+v", taken)
+	}
+	must(t, s.Unbind("github.com/acme/web"))
+	must(t, s.Refuse("github.com/acme"))
+	if taken := s.OwnersTaking(keys); len(taken) != 0 {
+		t.Errorf("a refused owner takes %+v", taken)
+	}
+}
