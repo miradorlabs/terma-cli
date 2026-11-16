@@ -4,8 +4,11 @@ import (
 	"runtime"
 	"runtime/debug"
 	"slices"
+	"strings"
 	"testing"
 	"time"
+
+	"mvdan.cc/sh/v3/syntax"
 )
 
 // Bounds on what ShellPaths may take for any command, which its own bounds keep it within:
@@ -19,7 +22,10 @@ const (
 // Any command, however malformed, ShellPaths reads without panicking, within the hook's
 // budget of time and fuzzAlloc. The seeds are the corpus's commands, crossing and not, and
 // each of them run as timeout 60 bash -c's script; testdata/fuzz holds the inputs a run
-// found past the bounds, since fixed (a word of 4000 braces, maxShellBraces).
+// found failing, since fixed: a word of 4000 braces (maxShellBraces), a NUL (parsable) and a
+// # the parser takes for a comment inside a word (script). What a command that parses
+// reaches, it reaches run in a subshell, after true &&, and as the script of a shell behind a
+// wrapper not known (direnv exec . bash -c): each of its places, or somewhere not known.
 func FuzzShellPaths(f *testing.F) {
 	c := newCorpus(f)
 	for _, set := range []map[string]string{corpusFine(), corpusCrossing(c)} {
@@ -38,7 +44,7 @@ func FuzzShellPaths(f *testing.F) {
 		var before, after runtime.MemStats
 		runtime.ReadMemStats(&before)
 		start := time.Now()
-		paths(command)
+		places := paths(command)
 		took := time.Since(start)
 		runtime.ReadMemStats(&after)
 		// A run past the limit may have waited on another's (the fuzzer runs a worker on
@@ -54,5 +60,34 @@ func FuzzShellPaths(f *testing.F) {
 		if alloc := after.TotalAlloc - before.TotalAlloc; alloc > fuzzAlloc {
 			t.Errorf("ShellPaths(%.80q…) allocated %d MiB, past %d", command, alloc>>20, fuzzAlloc>>20)
 		}
+		if !parses(command) {
+			return
+		}
+		for _, variant := range []string{"(\n" + command + "\n)", "true && " + command, "direnv exec . bash -c " + quote(command)} {
+			if !parses(variant) {
+				continue
+			}
+			got := paths(variant)
+			if slices.ContainsFunc(got, isUnknownReach) {
+				continue
+			}
+			for _, p := range places {
+				if !isUnknownReach(p) && !slices.Contains(got, p) {
+					t.Errorf("ShellPaths(%.80q…) reaches %q, but not as %.120q: %q", command, p, variant, got)
+				}
+			}
+		}
 	})
 }
+
+// parses reports whether command parses as bash, within the parser's bounds.
+func parses(command string) bool {
+	if len(command) > maxShellBytes || !parsable(command) {
+		return false
+	}
+	_, err := syntax.NewParser(syntax.Variant(syntax.LangBash)).Parse(strings.NewReader(command), "")
+	return err == nil
+}
+
+// quote is s in single quotes, as a shell reads it back.
+func quote(s string) string { return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'" }
