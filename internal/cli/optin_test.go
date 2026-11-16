@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -137,6 +138,54 @@ func TestOnlyAFreshSetupOptsTheMachineIn(t *testing.T) {
 			}
 			if out, err := migrate.Run(context.Background(), *m); err != nil || out != want {
 				t.Fatalf("the relay's start after setup: migrate = %s, %v; want %s", out, err, want)
+			}
+		})
+	}
+}
+
+// A fresh setup reads a 2.x policy, whose entries may be wildcards: the relay it starts
+// moves the machine to routing by teams, which matches them, and the move carries the
+// policy over as fetched. Setup on a machine set up before, which still routes by its one
+// team and matches entries exactly, refuses it and says `terma teams` moves it.
+func TestAFreshSetupReadsAWildcardPolicy(t *testing.T) {
+	const wildcardPolicy = `{"policy":{"version":"2.0","terma":{"capture":{"exclude_prompts":false,"exclude_tool_content":false},"git_hooks":true,"per_repository":{"repositories":["github.com/acme/*"]}}},"revision":4,"updated_at":"2026-11-01T00:00:00Z"}`
+	for _, fresh := range []bool{true, false} {
+		t.Run(map[bool]string{true: "fresh", false: "set up before"}[fresh], func(t *testing.T) {
+			gateway := newFakeAuth(t)
+			authSandbox(t, gateway)
+			sandboxMachine(t)
+			t.Setenv("CODEX_HOME", t.TempDir())
+			t.Setenv("TERMA_POLICY_STUB", "")
+			gateway.orgs = []organization{{ID: orgB().ID, Name: orgB().Name, Type: "shared"}}
+			gateway.policyBody = wildcardPolicy
+			if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(gateway, orgB())); err != nil {
+				t.Fatal(err)
+			}
+			if !fresh {
+				if err := config.UpdateProfile(testApp.dir, config.DefaultProfile, func(p *config.Profile) {
+					p.OrganizationID, p.Harnesses = orgB().ID, []string{"codex"}
+				}); err != nil {
+					t.Fatal(err)
+				}
+			}
+			out, err := runTerma(t, "setup", "--harness", "codex")
+			if !fresh {
+				if err == nil || !strings.Contains(out+err.Error(), "run `terma teams`") {
+					t.Fatalf("setup on a machine set up before: %v\n%s", err, out)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("setup: %v\n%s", err, out)
+			}
+			m := testApp.relayMigration("")
+			m.FlushWait, m.Automatic = time.Second, false
+			if got, err := migrate.Run(context.Background(), *m); err != nil || got != migrate.Committed {
+				t.Fatalf("the relay's start after setup: migrate = %s, %v", got, err)
+			}
+			st := loadState(t)
+			if len(st.Teams) != 1 || !st.Teams[0].Policy.Wildcards || !slices.Equal(st.Teams[0].Policy.Repositories, []string{"github.com/acme/*"}) {
+				t.Fatalf("the routing state's team: %+v", st.Teams)
 			}
 		})
 	}

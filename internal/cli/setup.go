@@ -14,6 +14,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/globalmode"
 	"github.com/miradorlabs/terma-cli/internal/migrate"
+	"github.com/miradorlabs/terma-cli/internal/policy"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
 	"github.com/miradorlabs/terma-cli/internal/selfupdate"
@@ -201,7 +202,8 @@ func (app *App) runSetup(cmd *cobra.Command, f setupFlags) error {
 			team = name
 			return err
 		},
-		FetchPolicy: app.policies().Fetch,
+		// A fresh machine routes by teams from the relay's first start, so it reads wildcards.
+		FetchPolicy: policy.Source{Version: app.version, Wildcards: fresh}.Fetch,
 		StopRelay: func() {
 			if dir, err := daemon.Dir(app.stateDir); err == nil {
 				daemon.Stop(dir)

@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/url"
 	"strings"
@@ -96,6 +97,10 @@ func (r policyResponse) collectionPolicy(wildcards bool) (config.Policy, error) 
 	// Only a major version a reader does not know makes a document unreadable; a minor
 	// one only adds fields it may ignore.
 	major, _, dotted := strings.Cut(r.Policy.Version, ".")
+	if dotted && major == "2" && !wildcards {
+		return config.Policy{}, errors.New("the team's collection policy lists wildcard entries (version " + r.Policy.Version +
+			"), which this machine reads once it routes by teams: run `terma teams`")
+	}
 	known := major == "1" || wildcards && major == "2"
 	if !dotted || !known || (t.Global == nil) == (t.PerRepository == nil) ||
 		t.PerRepository != nil && t.PerRepository.Repositories == nil ||
