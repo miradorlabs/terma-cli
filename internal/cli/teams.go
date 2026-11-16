@@ -92,7 +92,7 @@ Without a terminal, change it with flags (each may repeat):
 	fl.BoolVar(&f.authorize, "authorize", false, "sign in first, in one approval, to the organizations without a sign-in here (20 at a time)")
 	fl.BoolVar(&f.json, "json", false, "print the list, and what changed, as JSON")
 	fl.BoolVar(&f.noBrowser, "no-browser", false, "print the sign-in URL instead of opening a browser")
-	fl.BoolVarP(&f.assumeYes, "yes", "y", false, "take each question's default: bind what a ticked team needs to its organization")
+	fl.BoolVarP(&f.assumeYes, "yes", "y", false, "take each question's default: bind what a ticked team needs to its organization; a key more than one organization needs stays to decide")
 	fl.BoolVar(&f.bindAll, "bind-all", false, "bind every undecided owner or repository that one organization needs to it; one more than one needs stays to decide")
 	return cmd
 }
@@ -137,7 +137,7 @@ func (app *App) runTeams(cmd *cobra.Command, f teamsFlags) error {
 		if v, err = app.applyTeams(cmd, cfg, st, f); err != nil {
 			return err
 		}
-	case !f.json && !f.authorize && app.canAsk() && canPrompt():
+	case !f.json && !f.authorize && app.canAsk() && (app.runForm != nil || canPrompt()):
 		if v, err = app.teamsChecklist(cmd, cfg, st, f); err != nil {
 			if errors.Is(err, errCancelled) {
 				fmt.Fprintln(cmd.OutOrStdout(), "Cancelled. Nothing was changed.")

@@ -21,7 +21,9 @@ import (
 
 // teamsChange is one run's changes, resolved against the routing state and the list.
 type teamsChange struct {
-	ops      []bindingOp
+	ops []bindingOp
+	// decided are the bindings this run decided for the teams that need them.
+	decided  []neededOp
 	untick   []routing.Team
 	released map[string]bool
 	ticks    []*tick
@@ -95,31 +97,23 @@ func (app *App) applyTeams(cmd *cobra.Command, cfg *config.Config, st routing.St
 		needs = append(needs, tickNeeds(planned, tk)...)
 		ch.ticks = append(ch.ticks, tk)
 	}
-	// Every undecided binding is decided together, so a key two organizations need is one
-	// question, never settled by whichever was ticked first.
+	// Every undecided binding is weighed together, earlier ones included, so a key two
+	// organizations need is one question, never settled by whichever was ticked last.
 	mode := app.bindingMode(f, ask)
-	if mode.earlier() {
-		needs = append(pendingNeeds(planned, func(id string) string {
-			if n := names.Orgs[id]; n != "" {
-				return n
-			}
-			lv := list()
-			return lv.orgName(id)
-		}, func(id string) string { return names.Teams[id] }), needs...)
-	}
+	needs = append(pendingNeeds(planned, func(id string) string {
+		if n := names.Orgs[id]; n != "" {
+			return n
+		}
+		lv := list()
+		return lv.orgName(id)
+	}, func(id string) string { return names.Teams[id] }), needs...)
 	needs = slices.DeleteFunc(needs, func(n bindingNeed) bool { return flagged[n.key] })
-	decided, err := decideNeeds(needs, mode, app.form())
+	decided, held, err := decideNeeds(needs, mode, app.form())
 	if err != nil {
 		return teamsView{}, err
 	}
-	for _, d := range decided {
-		if d.tick != nil {
-			d.tick.ops = append(d.tick.ops, d.op)
-			continue
-		}
-		ch.ops = append(ch.ops, d.op)
-		ch.changes = append(ch.changes, describeOp(d.op, d.orgName))
-	}
+	ch.decided = decided
+	ch.warnings = append(ch.warnings, held...)
 	next, err := routing.Update(app.stateDir, cfg.ProfileName, func(s *routing.State) error { return ch.write(s) })
 	if err != nil {
 		return teamsView{}, err
@@ -151,12 +145,12 @@ func (ch *teamsChange) write(s *routing.State) error {
 			return fmt.Errorf("team %s was unticked meanwhile", t.TeamID)
 		}
 	}
-	for _, tk := range ch.ticks {
-		for _, op := range tk.ops {
-			if err := op.apply(s); err != nil {
-				return err
-			}
+	for _, d := range ch.decided {
+		if err := d.op.apply(s); err != nil {
+			return err
 		}
+	}
+	for _, tk := range ch.ticks {
 		id, err := s.Select(tk.team)
 		if err != nil {
 			return err
@@ -166,33 +160,48 @@ func (ch *teamsChange) write(s *routing.State) error {
 	return nil
 }
 
-// finishTicks gives each ticked team its key, and takes one that gets none off again with
-// the decisions made for it, back to before. It returns the first failure.
+// finishTicks gives each ticked team its key, and takes one that gets none off again. A
+// decision of this run is undone with it only when every team that needed it failed and no
+// team ticked before needs it. It returns the first failure.
 func (app *App) finishTicks(cmd *cobra.Command, cfg *config.Config, before routing.State, ch *teamsChange) error {
 	var failed error
+	lost := map[*tick]bool{}
 	for _, tk := range ch.ticks {
 		err := app.mintTeamKey(cmd.Context(), cfg, tk)
 		if err == nil {
 			ch.changes = append(ch.changes, "ticked "+tickLabel(tk))
-			for _, op := range tk.ops {
-				ch.changes = append(ch.changes, describeOp(op, tk.orgName))
-			}
 			ch.warnings = append(ch.warnings, tk.notes...)
 			continue
 		}
-		_, undoErr := routing.Update(app.stateDir, cfg.ProfileName, func(s *routing.State) error {
-			s.Deselect(tk.enrollmentID)
-			for _, op := range tk.ops {
-				restoreBinding(s, before, op.key)
-			}
-			return nil
-		})
-		_ = keystore.DeleteTeam(app.dir, tk.enrollmentID)
+		lost[tk] = true
 		if failed == nil {
 			failed = fmt.Errorf("%s was not ticked: creating its key for this machine failed: %w", tickLabel(tk), err)
-			if undoErr != nil {
-				failed = errors.Join(failed, fmt.Errorf("untick it with `terma teams --deselect %s`: %w", tk.team.TeamID, undoErr))
-			}
+		}
+	}
+	var undo []string
+	for _, d := range ch.decided {
+		if !d.earlier && len(d.holders) > 0 && !slices.ContainsFunc(d.holders, func(tk *tick) bool { return !lost[tk] }) {
+			undo = append(undo, d.op.key)
+			continue
+		}
+		ch.changes = append(ch.changes, describeOp(d.op, d.orgName))
+	}
+	if len(lost) == 0 {
+		return failed
+	}
+	_, undoErr := routing.Update(app.stateDir, cfg.ProfileName, func(s *routing.State) error {
+		for tk := range lost {
+			s.Deselect(tk.enrollmentID)
+		}
+		for _, key := range undo {
+			restoreBinding(s, before, key)
+		}
+		return nil
+	})
+	for tk := range lost {
+		_ = keystore.DeleteTeam(app.dir, tk.enrollmentID)
+		if undoErr != nil {
+			failed = errors.Join(failed, fmt.Errorf("untick %s with `terma teams --deselect %s`: %w", tickLabel(tk), tk.team.TeamID, undoErr))
 		}
 	}
 	return failed

@@ -20,8 +20,6 @@ type tick struct {
 	orgName  string
 	teamName string
 	cred     *auth.Credential
-	// ops are the bindings the developer decided for it, made with it.
-	ops []bindingOp
 	// notes say what its policy needs that it will not collect, or what it collects nothing of.
 	notes []string
 	// enrollmentID is its enrollment once selected.

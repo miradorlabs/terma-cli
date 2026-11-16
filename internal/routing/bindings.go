@@ -140,3 +140,18 @@ func bindingKey(raw string) (string, error) {
 	}
 	return "", fmt.Errorf("%q is neither an owner (host/owner) nor a repository (host/owner/name)", raw)
 }
+
+// Decision is the developer's decision covering what e needs: its key's, or for an exact
+// entry its owner's, with the key it is kept under; ok is false when there is none.
+func (s State) Decision(e Entry) (key string, b Binding, ok bool) {
+	keys := []string{e.Key()}
+	if !e.wildcard {
+		keys = append(keys, owner(e.key))
+	}
+	for _, k := range keys {
+		if b, ok := s.Bindings[k]; ok {
+			return k, b, true
+		}
+	}
+	return "", Binding{}, false
+}

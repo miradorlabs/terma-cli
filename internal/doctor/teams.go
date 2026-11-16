@@ -286,11 +286,8 @@ func (r Routing) orgsOf(k PendingKey) string {
 // decided reports whether a decision covers what e needs: its key's, or for an exact
 // entry its owner's, whichever organization it names.
 func decided(st routing.State, e routing.Entry) bool {
-	if _, ok := st.Bindings[e.Key()]; ok {
-		return true
-	}
-	_, ok := st.Bindings[routing.Owner(e.Key())]
-	return !e.Wildcard() && ok
+	_, _, ok := st.Decision(e)
+	return ok
 }
 
 // RoutedRepository is where Route sends a session started in the working copy whose git

@@ -294,7 +294,12 @@ func TestAlertItemsAreDrawnRed(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer out.Close()
-	t.Setenv("NO_COLOR", "")
+	// Whatever runs the test (a coding agent's shell, say) must not turn colour off.
+	for _, kv := range os.Environ() {
+		if k, _, _ := strings.Cut(kv, "="); k != "PATH" && k != "HOME" {
+			t.Setenv(k, "")
+		}
+	}
 	t.Setenv("CLICOLOR_FORCE", "1")
 	var buf bytes.Buffer
 	f.render(&buf, style.For(out))

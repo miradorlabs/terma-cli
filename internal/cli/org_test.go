@@ -51,10 +51,11 @@ type fakeAuth struct {
 	policyBodies   map[string]string
 	// goneTeams answer their policy read as a team archived since the listing does (403,
 	// PROJECT_NOT_FOUND); forbiddenTeams with a 403 that names no reason; mintDown fails
-	// every key creation.
+	// every key creation, and mintDownFor one team's.
 	goneTeams      map[string]bool
 	forbiddenTeams map[string]bool
 	mintDown       bool
+	mintDownFor    map[string]bool
 	// projects are each organization's teams, over projectsIn; slow, when set, runs
 	// before a team listing or a policy read is answered.
 	projects map[string][]project
@@ -184,7 +185,7 @@ func newFakeAuth(t *testing.T) *fakeAuth {
 			f.keysMint.Add(1)
 			var body createServerKeyRequestShape
 			_ = json.NewDecoder(r.Body).Decode(&body)
-			if f.mintDown {
+			if f.mintDown || f.mintDownFor[body.ProjectID] {
 				http.Error(w, "unavailable", http.StatusServiceUnavailable)
 				return
 			}

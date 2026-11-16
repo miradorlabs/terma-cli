@@ -36,7 +36,7 @@ func TestNoColorAndAgentsDisableColour(t *testing.T) {
 	}
 }
 
-// CLICOLOR_FORCE colours output that is not a terminal, even under an agent; NO_COLOR still wins.
+// CLICOLOR_FORCE colours output that is not a terminal; NO_COLOR and an agent still win.
 func TestCliColorForceColoursAFileButNotOverNoColor(t *testing.T) {
 	f, err := os.CreateTemp(t.TempDir(), "out")
 	if err != nil {
@@ -44,11 +44,18 @@ func TestCliColorForceColoursAFileButNotOverNoColor(t *testing.T) {
 	}
 	defer f.Close()
 	t.Setenv("NO_COLOR", "")
+	for _, k := range agentEnvVars {
+		t.Setenv(k, "")
+	}
 	t.Setenv("CLICOLOR_FORCE", "1")
-	t.Setenv("CLAUDECODE", "1")
 	if !enabled(f) {
 		t.Fatal("CLICOLOR_FORCE must colour a file")
 	}
+	t.Setenv("CLAUDECODE", "1")
+	if enabled(f) {
+		t.Fatal("an agent reading the output must win over CLICOLOR_FORCE")
+	}
+	t.Setenv("CLAUDECODE", "")
 	t.Setenv("CLICOLOR_FORCE", "0")
 	if enabled(f) {
 		t.Fatal("CLICOLOR_FORCE=0 asks for nothing")

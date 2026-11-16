@@ -50,7 +50,7 @@ func teamsForm(v teamsView) (*prompt.Form, []checklistSlot) {
 func (app *App) teamsChecklist(cmd *cobra.Command, cfg *config.Config, st routing.State, f teamsFlags) (teamsView, error) {
 	v := app.listTeams(cmd.Context(), cfg, st)
 	form, slots := teamsForm(v)
-	result, err := prompt.Run(form)
+	result, err := app.form()(form)
 	if errors.Is(err, prompt.ErrCancelled) {
 		return teamsView{}, errCancelled
 	}
