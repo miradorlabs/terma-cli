@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
 )
@@ -376,7 +377,7 @@ func TestShellPathsResolveTheGitTopLevel(t *testing.T) {
 		"cd ../../acme-api && cat `git rev-parse --show-toplevel`/NOTES.md": {api},
 		"D=$(git  rev-parse  --show-toplevel)/internal; ls $D":              {in},
 	} {
-		if got := ShellPaths(command, in); !sameReach(got, want) {
+		if got := ShellPaths(command, in); !sameReach(command, got, want) {
 			t.Errorf("ShellPaths(%q) = %q, want %q", command, got, want)
 		}
 	}
@@ -460,6 +461,158 @@ func TestASymlinkReachesItsTarget(t *testing.T) {
 	env.Classify(context.Background(), r, sessionOf(sid), ShellPaths("cat readme.md", side), nil)
 	if ledger, _ := m.mixed(sid); ledger {
 		t.Fatal("a link within its own checkout made the run Mixed")
+	}
+}
+
+// A wrapper runs the command after its own words (wrappers): its options and their values,
+// NAME=value words and operands come first, nested wrappers too, and the command they run
+// is read as any is, a shell's or an interpreter's script included (python3.12 -c, deno
+// eval, php -r). env -C runs it in a folder of its own, env -S splits a string into its
+// first words, and watch and flock -c run a shell script.
+func TestShellPathsReadPastWrappers(t *testing.T) {
+	t.Parallel()
+	m := newWordsMachine(t)
+	src := filepath.Join(m.side, "src")
+	m.check(t, m.side, map[string][]string{
+		"timeout -s KILL 60 sh -c 'cat ../acme-api/NOTES.md'":            {m.api},
+		"sudo -u root timeout 5 env A=1 bash -c 'cd ../acme-api && ls'":  {m.api},
+		"nohup nice -n 5 ../acme-api/NOTES.md":                           {m.api},
+		"env -C ../acme-api cat NOTES.md; ls src":                        {m.api, src},
+		"env -C../acme-api make":                                         {m.api},
+		"env D=../acme-api bash -c 'ls $D'":                              {m.api},
+		"env -S 'cat ../acme-api/NOTES.md'":                              {m.api},
+		"watch -n 1 'cat ../acme-api/NOTES.md'":                          {m.api},
+		"flock lockfile -c 'cat ../acme-api/NOTES.md'":                   {m.api},
+		"ls | xargs -I {} sh -c 'cat ../acme-api/NOTES.md'":              {m.api},
+		"uv run --with x python3.12 -c \"open('../acme-api/NOTES.md')\"": {m.api},
+		"npm exec -- bash -c 'cd ../acme-api'":                           {m.api},
+		"bundle exec ruby -e \"File.read('../acme-api/NOTES.md')\"":      {m.api},
+		"deno eval \"Deno.readTextFileSync('../acme-api/NOTES.md')\"":    {m.api},
+		"php -r \"file_get_contents('../acme-api/NOTES.md');\"":          {m.api},
+		"perl -E 'say 1' ../acme-api/NOTES.md":                           {m.api},
+		"cat <<'EOF' | sudo bash\ncd ../acme-api\nEOF":                   {m.api},
+		"builtin cd ../acme-api && ls":                                   {m.api},
+		"git -c core.pager=cat -C ../acme-api log":                       {m.api},
+		"timeout 60 make test":                                           nil,
+		`git commit -m "fix ../foo"`:                                     {m.side},
+		`git commit -m "fix ../acme-api/NOTES.md"`:                       {m.side, m.api},
+		"cd .. && cd side && cd .. && cat acme-api/NOTES.md":             {m.parent, m.side, m.api},
+	})
+	for _, command := range []string{`git -c k=v -C "$(cat p)" log`, "env -C`cat p` make", "env -S \"$CMD\""} {
+		if got := m.paths(command, m.side); !slices.Contains(got, UnknownReach) {
+			t.Errorf("ShellPaths(%q) = %q, without UnknownReach", command, got)
+		}
+	}
+}
+
+// A command that does not parse runs up to its error, as bash and zsh do: the statements
+// before it are read as any are, a cd's move included, and the rest as its words from
+// where they left the command. A cd, pushd or popd in the rest goes somewhere not known.
+func TestShellPathsReadACommandThatDoesNotParseUpToItsError(t *testing.T) {
+	t.Parallel()
+	m := newWordsMachine(t)
+	src := filepath.Join(m.side, "src")
+	m.check(t, m.side, map[string][]string{
+		"ls src\ncat ../acme-api/NOTES.md\necho \"oops":       {src, m.api},
+		"cd ..\nfor f (*.go) print $f\ncat acme-api/NOTES.md": {m.parent, m.api},
+		"ls src\npushd ..\necho 'x":                           {src, m.parent},
+		"cd .. && cat acme-api/NOTES.md; echo $((":            {m.parent, m.api},
+	})
+	for _, command := range []string{"cd ../acme-api && echo \"oops", "echo 'x\npopd", "ls (\npushd ../acme-api"} {
+		if got := m.paths(command, m.side); !slices.Contains(got, UnknownReach) {
+			t.Errorf("ShellPaths(%q) = %q, without UnknownReach", command, got)
+		}
+	}
+}
+
+// A recursive reader (rg, find, grep -r, ls -R, cp -r, tar c, git grep --no-index...) of a
+// folder outside any checkout reaches each checkout below it, at most maxBelowDepth levels
+// down, from the folders it names or where the command is when it names none there. Past
+// that depth, or the lookup bound, the reach is not known. A reader of a folder in a
+// checkout reaches that checkout alone, and one of a file, or that is not recursive, only
+// what it names.
+func TestShellPathsReachTheCheckoutsBelowARecursiveRead(t *testing.T) {
+	t.Parallel()
+	m := newWordsMachine(t)
+	deep, elsewhere := filepath.Join(m.parent, "work", "x", "y", "deep"), t.TempDir()
+	for _, dir := range []string{filepath.Join(m.side, ".git"), filepath.Join(m.api, ".git"), filepath.Join(deep, ".git"), filepath.Join(elsewhere, "far", "a", "b", "c", "d", "e")} {
+		if err := os.MkdirAll(dir, 0o700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	below := []string{m.api, m.side, deep}
+	m.check(t, m.side, map[string][]string{
+		"rg -n TODO ..":                      append([]string{m.parent}, below...),
+		"cd .. && rg TODO":                   append([]string{m.parent}, below...),
+		"grep -rn secret ~/../":              append([]string{m.parent}, below...),
+		`find .. -exec cat {} \;`:            append([]string{m.parent}, below...),
+		"grep -d recurse TODO ..":            append([]string{m.parent}, below...),
+		"tar czf out.tgz ..":                 append([]string{m.parent}, below...),
+		"git grep --no-index TODO ..":        append([]string{m.parent}, below...),
+		"rg TODO":                            nil,
+		"grep -rn TODO ../acme-api/NOTES.md": {m.api},
+		"grep -n TODO ..":                    {m.parent},
+		"ls ..":                              {m.parent},
+		"git grep TODO ..":                   {m.parent},
+		"find ../acme-api -name x":           {m.api},
+		"cd ../work && ls -R":                append([]string{filepath.Join(m.parent, "work")}, deep),
+	})
+	for i := range maxShellLookups {
+		if err := os.MkdirAll(filepath.Join(elsewhere, "big", fmt.Sprint(i)), 0o700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	at := filepath.ToSlash(elsewhere)
+	for _, command := range []string{"rg TODO " + at + "/far", "grep -r TODO " + at + "/big"} {
+		if got := m.paths(command, m.side); !slices.Contains(got, UnknownReach) {
+			t.Errorf("ShellPaths(%q) = %q, without UnknownReach", command, got)
+		}
+	}
+}
+
+// The output of a few command substitutions is known where the command is: mktemp's new
+// folder in the temporary folder, Go's folders, and what dirname, basename, realpath and
+// readlink -f make of their operand. mktemp given a folder is not known.
+func TestShellPathsKnowSomeSubstitutions(t *testing.T) {
+	t.Parallel()
+	m := newWordsMachine(t)
+	m.check(t, m.side, map[string][]string{
+		`cat "$(dirname ../acme-api/NOTES.md)/NOTES.md"`: {m.api},
+		"cat $(dirname $ACME/)/acme-api/NOTES.md":        {m.api},
+		`cd "$(realpath ../acme-api)" && ls`:             {m.api},
+		`cd "$(readlink -f ../acme-api)"`:                {m.api},
+		"t=$(mktemp -d) && cp x $t/":                     {filepath.Join(m.parent, "tmp")},
+		"ls $(go env GOPATH)/bin":                        {m.home},
+		"ls $(go env GOMODCACHE)/x":                      {m.home},
+	})
+	m.check(t, m.parent, map[string][]string{"ls $(basename $ACME)": {m.api}})
+	if got := m.paths("t=$(mktemp -p ../acme-api) && cp x $t/", m.side); !slices.Contains(got, UnknownReach) {
+		t.Errorf("mktemp -p: %q, without UnknownReach", got)
+	}
+}
+
+// The scan parses and expands at most maxShellBytes, all told, each word charged what it
+// may expand to before it is: a script run again and again, a here-document or a word that
+// repeats a long variable, or replacements that multiply one, reach somewhere not known at
+// once rather than costing gigabytes.
+func TestShellPathsChargeWhatTheyExpand(t *testing.T) {
+	t.Parallel()
+	m := newWordsMachine(t)
+	m.env["S"] = strings.Repeat("a", 200<<10)
+	for command, unknown := range map[string]bool{
+		`echo "$S"`:                            false,
+		strings.Repeat(`bash -c "$S"; `, 2000): true,
+		"cat <<EOF\n" + strings.Repeat("$S", 2000) + "\nEOF":                            true,
+		`echo "` + strings.Repeat("$S", 2000) + `"`:                                     true,
+		"T=aaaaaaaaaa; U=${T//a/$T}; V=${U//a/$U}; W=${V//a/$V}; X=${W//a/$W}; echo $X": true,
+	} {
+		start := time.Now()
+		if got := m.paths(command, m.side); slices.Contains(got, UnknownReach) != unknown {
+			t.Errorf("ShellPaths(%.40q…) = %.80q, want UnknownReach %v", command, got, unknown)
+		}
+		if took := time.Since(start); took > time.Second {
+			t.Errorf("ShellPaths(%.40q…) took %v", command, took)
+		}
 	}
 }
 

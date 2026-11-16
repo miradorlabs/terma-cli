@@ -60,7 +60,7 @@ func CheckoutID(root string) string {
 }
 
 // WriteFile writes content to rel under root, creating its directories.
-func WriteFile(t *testing.T, root, rel, content string) {
+func WriteFile(t testing.TB, root, rel, content string) {
 	t.Helper()
 	path := filepath.Join(root, filepath.FromSlash(rel))
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {

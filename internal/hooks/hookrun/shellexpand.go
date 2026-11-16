@@ -2,7 +2,6 @@ package hookrun
 
 import (
 	"errors"
-	"io"
 	"io/fs"
 	"iter"
 	"os"
@@ -15,8 +14,6 @@ import (
 	"mvdan.cc/sh/v3/expand"
 	"mvdan.cc/sh/v3/pattern"
 	"mvdan.cc/sh/v3/syntax"
-
-	"github.com/miradorlabs/terma-cli/internal/gitx"
 )
 
 // How ShellPaths expands a word (mvdan.cc/sh/v3/expand) where the command is, and what of
@@ -67,34 +64,79 @@ func (sc *scan) lookup(name string) (string, bool) {
 	return "", false
 }
 
-// substitute writes the output of the command substitution cs, for expand: where the
-// command is for $(pwd), the checkout's root there for $(git rev-parse --show-toplevel).
-// Any other's is not known.
-func (sc *scan) substitute(w io.Writer, cs *syntax.CmdSubst) error {
-	var words []string
-	if len(cs.Stmts) == 1 && len(cs.Stmts[0].Redirs) == 0 {
-		if ce, ok := cs.Stmts[0].Cmd.(*syntax.CallExpr); ok && len(ce.Assigns) == 0 {
-			for _, a := range ce.Args {
-				words = append(words, a.Lit())
-			}
+// substitutionSize bounds what a command substitution ShellPaths knows writes (a path), or
+// an arithmetic expansion.
+const substitutionSize = 4096
+
+// size bounds the bytes w may expand to, before it is: its literal text, each variable's
+// value, a pattern replacement's as if each of its bytes were replaced, a fallback's word,
+// and each substitution's output. A size past maxShellBytes is maxShellBytes+1.
+func (sc *scan) size(w *syntax.Word) int {
+	n := 0
+	syntax.Walk(w, func(node syntax.Node) bool {
+		switch x := node.(type) {
+		case *syntax.Lit:
+			n += len(x.Value)
+		case *syntax.SglQuoted:
+			n += len(x.Value)
+		case *syntax.ParamExp:
+			n += sc.paramSize(x)
+			return false
+		case *syntax.CmdSubst, *syntax.ProcSubst, *syntax.ArithmExp:
+			n += substitutionSize
+			return false
 		}
-	}
-	out, ok := "", false
-	switch strings.Join(words, " ") {
-	case "pwd", "pwd -L", "pwd -P":
-		out, ok = sc.dir, sc.dir != ""
-	case "git rev-parse --show-toplevel":
-		out, _, ok = gitx.LocateFS(sc.dir)
-	}
-	if !ok {
-		return errOpaque
-	}
-	_, err := io.WriteString(w, out)
-	return err
+		return n <= maxShellBytes
+	})
+	return min(n, maxShellBytes+1)
 }
 
-// opaqueProcess is a process substitution's path, for expand: not known.
-func opaqueProcess(*syntax.ProcSubst) (string, error) { return "", errOpaque }
+// paramSize bounds the bytes the parameter expansion pe may expand to (size).
+func (sc *scan) paramSize(pe *syntax.ParamExp) int {
+	var v string
+	if pe.Param != nil {
+		v, _ = sc.lookup(pe.Param.Value)
+		if pe.Excl {
+			v, _ = sc.lookup(v) // ${!name}: the variable name holds the name of
+		}
+	}
+	n := len(v)
+	if pe.Repl != nil && pe.Repl.With != nil {
+		if with := sc.size(pe.Repl.With); n > 0 && with >= (maxShellBytes+1)/n {
+			n = maxShellBytes + 1
+		} else {
+			n *= 1 + with
+		}
+	}
+	if pe.Exp != nil && pe.Exp.Word != nil {
+		n += sc.size(pe.Exp.Word)
+	}
+	return min(n, maxShellBytes+1)
+}
+
+// fields, document and pattern expand w as expand's functions of those names do, each once
+// the byte budget allows for what w may expand to (size); past it, w is not resolved and
+// the reach is not known.
+func (sc *scan) fields(w *syntax.Word) ([]string, error) {
+	if !sc.charge(sc.size(w)) {
+		return nil, errOpaque
+	}
+	return expand.Fields(sc.cfg, w)
+}
+
+func (sc *scan) document(w *syntax.Word) (string, error) {
+	if !sc.charge(sc.size(w)) {
+		return "", errOpaque
+	}
+	return expand.Document(sc.cfg, w)
+}
+
+func (sc *scan) pattern(w *syntax.Word) (string, error) {
+	if !sc.charge(sc.size(w)) {
+		return "", errOpaque
+	}
+	return expand.Pattern(sc.cfg, w)
+}
 
 // arg reads w, a word of a command in role r: its substitutions, which run first, then each
 // word its braces make, each a lookup.
@@ -123,20 +165,24 @@ func (sc *scan) arg(w *syntax.Word, r role) {
 }
 
 // expand reads w, a word with no braces left, in role r: a glob is what it matches, if
-// anything, else each field w expands to is a candidate. A word that cannot be resolved is
-// unknown when it may be a path.
+// anything, else each field w expands to is a candidate, and an argument holding
+// whitespace (git commit -m "fix a/b") its fragments as data too. A word that cannot be
+// resolved is unknown when it may be a path.
 func (sc *scan) expand(w *syntax.Word, r role) {
-	if r&command == 0 && mayGlob(w) {
-		if pat, err := expand.Pattern(sc.cfg, w); err == nil && pattern.HasMeta(pat, 0) && sc.glob(pat) {
+	if r != program && mayGlob(w) {
+		if pat, err := sc.pattern(w); err == nil && pattern.HasMeta(pat, 0) && sc.glob(pat) {
 			return
 		}
 	}
-	fields, err := expand.Fields(sc.cfg, w)
-	if err != nil && (r&(target|folder) != 0 || r&(command|data) == 0 && slashed(w)) {
+	fields, err := sc.fields(w)
+	if err != nil && r.mustResolve(slashed(w)) {
 		sc.unknown = true
 	}
 	for _, f := range fields {
 		sc.candidate(f, r)
+		if r == plain && strings.ContainsFunc(f, unicode.IsSpace) {
+			sc.fragments(f, data)
+		}
 	}
 }
 
@@ -157,11 +203,11 @@ func (sc *scan) glob(pat string) bool {
 	}
 	found := false
 	for _, dir := range dirs {
-		c := candidate{pat, dir, glob}
-		if sc.examined[c] {
+		c := candidate{pat, dir, globbed}
+		if _, seen := sc.examined[c]; seen {
 			continue
 		}
-		sc.examined[c] = true
+		sc.examined[c] = ""
 		at := []string{dir}
 		for i, seg := range segs {
 			if !pattern.HasMeta(seg, 0) {

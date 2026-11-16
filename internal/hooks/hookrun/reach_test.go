@@ -75,7 +75,7 @@ func TestShellPathsAreTheWordsThatNameSomethingThere(t *testing.T) {
 		"(cd src) && cat '../acme api/NOTES.md'":      {filepath.Join(cwd, "src"), api},
 		"cat src/../../'acme api'/NOTES.md src":       {api, filepath.Join(cwd, "src")},
 	} {
-		if got := ShellPaths(command, cwd); !sameReach(got, want) {
+		if got := ShellPaths(command, cwd); !sameReach(command, got, want) {
 			t.Errorf("ShellPaths(%q) = %q, want %q", command, got, want)
 		}
 	}
@@ -210,11 +210,11 @@ func TestAnUnquotedWindowsPathIsAPath(t *testing.T) {
 	}
 }
 
-// sameReach reports whether ShellPaths found want. On Windows a command is also read with
-// backslashes as separators (shellReadings), so it may find more: each path that reading
-// adds can only make a run Mixed, never miss one.
-func sameReach(got, want []string) bool {
-	if len(shellReadings("")) == 1 {
+// sameReach reports whether ShellPaths found want for command. On Windows a command
+// holding a backslash is also read with backslashes as separators (shellReadings), so it may
+// find more: each path that reading adds can only make a run Mixed, never miss one.
+func sameReach(command string, got, want []string) bool {
+	if len(shellReadings(command)) == 1 {
 		return slices.Equal(got, want)
 	}
 	for _, p := range want {

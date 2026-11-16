@@ -3,6 +3,7 @@ package hookrun
 import (
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -12,17 +13,18 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/runs"
 )
 
-// corpus is a personal checkout, side, beside Acme's, acme-api, in one folder: side has a
-// Go module's tree, 120 files in internal/cli and 45 in internal/hooks/hookrun among them,
-// and p, a file naming Acme's checkout; each has programs, x and scripts/dump.sh.
+// corpus is a personal checkout, side, beside Acme's, acme-api, in one folder, the home
+// folder: side has a Go module's tree, 120 files in internal/cli and 45 in
+// internal/hooks/hookrun among them, and p, a file naming Acme's checkout; each has
+// programs, x and scripts/dump.sh.
 type corpus struct {
-	side, api string
+	home, side, api string
 }
 
-func newCorpus(t *testing.T) corpus {
+func newCorpus(t testing.TB) corpus {
 	t.Helper()
 	parent, _ := filepath.EvalSymlinks(t.TempDir())
-	c := corpus{side: hookruntest.RepoIn(t, parent, "github.com/dawson/side"), api: hookruntest.RepoIn(t, parent, "github.com/acme/acme-api")}
+	c := corpus{home: parent, side: hookruntest.RepoIn(t, parent, "github.com/dawson/side"), api: hookruntest.RepoIn(t, parent, "github.com/acme/acme-api")}
 	for i := range 120 {
 		hookruntest.WriteFile(t, c.side, fmt.Sprintf("internal/cli/f%03d.go", i), "package cli\n")
 	}
@@ -36,6 +38,16 @@ func newCorpus(t *testing.T) corpus {
 	}
 	hookruntest.WriteFile(t, c.side, "p", "../acme-api\n")
 	return c
+}
+
+// paths is ShellPaths from side, with the corpus's folder for the home folder.
+func (c corpus) paths(command string) []string {
+	return shellPaths(command, c.side, func(k string) (string, bool) {
+		if k == "HOME" {
+			return c.home, true
+		}
+		return os.LookupEnv(k)
+	})
 }
 
 // applyPatch is a patch sent through the shell, as an agent sends one, of about size bytes:
@@ -95,12 +107,18 @@ func corpusFine() map[string]string {
 		"rg TODO with DIR unset":        "rg TODO $DIR",
 		"a for loop over a glob":        "for f in *.go; do gofmt -l $f; done",
 		"git commit -m a heredoc":       "git commit -m \"$(cat <<'EOF'\nfix(hooks): read internal/cli and a/b\nEOF\n)\"",
+		"PATH with GOPATH's bin":        "export PATH=$PATH:$(go env GOPATH)/bin",
+		"a temporary folder":            "tmp=$(mktemp -d)",
+		"a message naming no path":      `git commit -m "fix ../foo"`,
+		"ls of the folder above":        "ls ..",
+		"git -c":                        "git -c core.pager=cat log",
 	}
 }
 
 // corpusCrossing are commands that reach Acme's checkout: each of corpusFine's rewritten to,
 // others run there, and those whose reach cannot be resolved (corpusUnknown).
-func corpusCrossing() map[string]string {
+func corpusCrossing(c corpus) map[string]string {
+	abs := filepath.ToSlash(c.api)
 	return map[string]string{
 		"go test ./...":                 "go test ../acme-api/...",
 		"go test ./internal/...":        "go test ../acme-api/internal/...",
@@ -135,7 +153,34 @@ func corpusCrossing() map[string]string {
 		"braces naming checkouts":       "ls {../acme-api,.}",
 		"braces in a path":              "cat ../acme-{api,x}/NOTES.md",
 		"a here-document piped to sh":   "cat <<EOF | sh\ncd ../acme-api\nEOF",
+		// Under a wrapper, the script's path relative or absolute.
+		"timeout, bash -c":          "timeout 60 bash -c 'cd ../acme-api && go test ./...'",
+		"timeout, bash -c absolute": "timeout 60 bash -c 'cd " + abs + " && go test ./...'",
+		"env, bash -c":              "env FOO=1 bash -c 'cat ../acme-api/NOTES.md'",
+		"sudo, bash -c absolute":    "sudo bash -c 'cat " + abs + "/NOTES.md'",
+		"nice, bash -c":             "nice -n 10 bash -c 'cat ../acme-api/NOTES.md'",
+		"xargs, sh -c":              "ls | xargs sh -c 'cat ../acme-api/NOTES.md'",
+		"uv run python -c":          `uv run python -c "open('../acme-api/NOTES.md')"`,
+		"python3.12 -c absolute":    `python3.12 -c "open('` + abs + `/NOTES.md')"`,
+		"wrappers nested":           "sudo timeout 5 env A=1 bash -c 'cat ../acme-api/NOTES.md'",
+		// A command that does not parse runs up to its error.
+		"cut short after a cd":  "cd ..\ncat acme-api/NOTES.md\necho \"oops",
+		"a zsh line after a cd": "cd ..\nfor f (*.go) print $f\ncat acme-api/NOTES.md",
+		// A cd back to where the command has been goes there again.
+		"cd back and on":         "cd .. && cd side && cd .. && cd acme-api && cat NOTES.md",
+		"cd as a subshell did":   "(cd .. && ls); cd .. && cat acme-api/NOTES.md",
+		"pushd as before a popd": "pushd .. && ls && popd && pushd .. && cat acme-api/NOTES.md",
+		// A recursive reader of a folder above the checkouts.
+		"rg of the folder above":   "rg -n TODO ..",
+		"grep -r of home":          "grep -rn secret ~/",
+		"find of the folder above": `find .. -exec cat {} \;`,
+		"rg after a cd":            "cd .. && rg TODO",
 	}
+}
+
+// underTimeout is command run as timeout 60 bash -c's script.
+func underTimeout(command string) string {
+	return "timeout 60 bash -c '" + strings.ReplaceAll(command, "'", `'\''`) + "'"
 }
 
 // corpusUnknown are corpusCrossing's commands whose reach cannot be resolved, with the
@@ -156,24 +201,34 @@ func (c corpus) reachesAcme(paths []string) bool {
 // Commands agents really run in a personal checkout beside Acme's, none of them touching
 // Acme's, never turn the run Mixed: neither the scan finds Acme's checkout or a reach not
 // known, nor does Classify mark the run. Each rewritten to reach Acme's checkout, or to
-// reach somewhere the scan cannot resolve, does both.
+// reach somewhere the scan cannot resolve, does both, and so does each of those run as
+// timeout 60 bash -c's script.
 func TestRoutineAgentCommandsDoNotTurnTheRunMixed(t *testing.T) {
 	t.Parallel()
 	c := newCorpus(t)
 	m := newRoutedMachine(t, acmeAndPersonalRepos(t))
+	crossing, wrappedCrossing := corpusCrossing(c), map[string]string{}
+	for name, command := range crossing {
+		wrappedCrossing[name] = underTimeout(command)
+	}
 	for _, set := range []struct {
 		name     string
 		commands map[string]string
 		mixed    bool
-	}{{"fine", corpusFine(), false}, {"crossing", corpusCrossing(), true}} {
+	}{{"fine", corpusFine(), false}, {"crossing", crossing, true}, {"wrapped", wrappedCrossing, true}} {
 		for name, command := range set.commands {
 			t.Run(set.name+"/"+name, func(t *testing.T) {
 				t.Parallel()
-				paths := ShellPaths(command, c.side)
+				paths := c.paths(command)
 				if got := c.reachesAcme(paths); got != set.mixed {
 					t.Errorf("ShellPaths reaches Acme or somewhere not known: %v, want %v (%d paths: %.400q)", got, set.mixed, len(paths), paths)
 				}
-				sid := "corpus-" + set.name + "-" + strings.NewReplacer(" ", "-", "/", "-").Replace(name)
+				sid := "corpus-" + set.name + "-" + strings.Map(func(r rune) rune {
+					if r < 'a' || r > 'z' {
+						return '-'
+					}
+					return r
+				}, strings.ToLower(name))
 				r := startIn(t, m.hook(), sid, c.side)
 				env := m.hook()
 				env.Cwd = c.side
@@ -184,6 +239,8 @@ func TestRoutineAgentCommandsDoNotTurnTheRunMixed(t *testing.T) {
 				// Doctor tells a crossing from a command it could not read.
 				want := runs.Why{}
 				switch where, unknown := corpusUnknown[name]; {
+				case set.mixed && unknown && set.name == "wrapped":
+					want = runs.Why{Reason: runs.UnknownReach, Where: firstWords(command)}
 				case set.mixed && unknown:
 					want = runs.Why{Reason: runs.UnknownReach, Where: where}
 				case set.mixed:
