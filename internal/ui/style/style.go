@@ -57,6 +57,11 @@ func enabled(f *os.File) bool {
 	if AgentMode() {
 		return false
 	}
+	// CLICOLOR_FORCE colours output that is not a terminal, as other tools take it; NO_COLOR
+	// and a coding agent reading the output still win.
+	if v := os.Getenv("CLICOLOR_FORCE"); v != "" && v != "0" {
+		return true
+	}
 	return term.IsTerminal(int(f.Fd()))
 }
 

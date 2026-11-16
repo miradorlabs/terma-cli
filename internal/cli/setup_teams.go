@@ -119,11 +119,17 @@ func reportTeams(ui *setupUI, v teamsView) {
 	}
 	if len(v.Pending) > 0 {
 		keys := make([]string, 0, len(v.Pending))
+		bindable := false
 		for _, p := range v.Pending {
 			keys = append(keys, p.Key)
+			bindable = bindable || !p.Conflict && p.WaitsFor == ""
 		}
 		ui.Warn("Bindings", "undecided, so what they match is held: "+strings.Join(keys, ", "))
-		ui.Then("Run `terma teams` to decide which organization each belongs to.")
+		if bindable {
+			ui.Then("Run `terma teams --bind-all` to bind each to the organization that needs it, or `terma teams` to choose.")
+		} else {
+			ui.Then("Run `terma teams` to choose whose each one is.")
+		}
 	}
 }
 

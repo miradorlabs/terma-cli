@@ -75,11 +75,30 @@ type bindingRow struct {
 	Refused      bool   `json:"refused,omitempty"`
 }
 
-// pendingRow is a binding left to decide, and the entry that needs it.
+// pendingRow is a binding left to decide, and the entry that needs it: the first, when
+// more than one organization needs the key.
 type pendingRow struct {
 	Key          string `json:"key"`
 	Organization string `json:"organization"`
 	TeamID       string `json:"team_id"`
+	Entry        string `json:"entry"`
+	// Conflict is a key more than one ticked organization needs: only the developer can say
+	// whose it is, so binding all of them leaves it to decide.
+	Conflict bool `json:"conflict"`
+	// Organizations are every organization that needs the key, each with its entry.
+	Organizations []pendingNeed `json:"organizations"`
+	// WaitsFor is, for an owner, a repository under it another organization needs: binding
+	// the owner first would give that repository away, so it is decided first. Binding all
+	// leaves the owner to decide until it is.
+	WaitsFor string `json:"waits_for,omitempty"`
+}
+
+// pendingNeed is one organization that needs a pending key, and the entry that does.
+type pendingNeed struct {
+	Organization string `json:"organization"`
+	Name         string `json:"name,omitempty"`
+	TeamID       string `json:"team_id"`
+	TeamName     string `json:"team_name,omitempty"`
 	Entry        string `json:"entry"`
 }
 
@@ -230,7 +249,8 @@ func (v *teamsView) mergeState(st routing.State, names teamNames, now time.Time)
 		v.Bindings = append(v.Bindings, bindingRow{Key: k, Organization: b.Organization, Refused: b.Refused,
 			Name: cmp.Or(names.Orgs[b.Organization], v.orgName(b.Organization))})
 	}
-	v.Pending = pendingBindings(st)
+	v.Pending = pendingBindings(st, func(id string) string { return cmp.Or(names.Orgs[id], v.orgName(id)) },
+		func(id string) string { return names.Teams[id] })
 	// Personal is always last.
 	slices.SortStableFunc(v.Organizations, func(a, b orgRow) int {
 		return boolOrder(a.Type == "personal", b.Type == "personal")
@@ -269,11 +289,19 @@ func (v *teamsView) orgName(id string) string {
 }
 
 // pendingBindings are the bindings a ticked organization's entry needs that no decision
-// covers, each once: Route holds what such an entry matches until the developer decides.
-func pendingBindings(st routing.State) []pendingRow {
+// covers, each key once with every organization that needs it (doctor.PendingKeys), named
+// by orgName and teamName: Route holds what such an entry matches until the developer
+// decides.
+func pendingBindings(st routing.State, orgName, teamName func(string) string) []pendingRow {
 	var out []pendingRow
-	for _, p := range doctor.Pending(st) {
-		out = append(out, pendingRow{Key: p.Key, Organization: p.Organization, TeamID: p.TeamID, Entry: p.Entry})
+	for _, k := range doctor.PendingKeys(st) {
+		first := k.Needs[0]
+		row := pendingRow{Key: k.Key, Organization: first.Organization, TeamID: first.TeamID, Entry: first.Entry, Conflict: k.Conflict(), WaitsFor: k.Waits.Key}
+		for _, p := range k.Needs {
+			row.Organizations = append(row.Organizations, pendingNeed{Organization: p.Organization, TeamID: p.TeamID, Entry: p.Entry,
+				Name: orgName(p.Organization), TeamName: teamName(p.TeamID)})
+		}
+		out = append(out, row)
 	}
 	return out
 }

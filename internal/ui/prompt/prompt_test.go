@@ -2,6 +2,7 @@ package prompt
 
 import (
 	"bytes"
+	"os"
 	"strings"
 	"testing"
 
@@ -282,5 +283,35 @@ func TestChoiceRendersAList(t *testing.T) {
 	}
 	if !strings.Contains(out, "❯ Acme API    (current)") {
 		t.Fatalf("the cursor should rest on the current item:\n%s", out)
+	}
+}
+
+// An alert item's label is drawn red, and plain without colour.
+func TestAlertItemsAreDrawnRed(t *testing.T) {
+	f := &Form{Title: "t", Items: []Item{{Label: "calm"}, {Label: "conflict", Kind: Radio, Alert: true, Selected: true}}}
+	out, err := os.CreateTemp(t.TempDir(), "out")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer out.Close()
+	// Whatever runs the test (a coding agent's shell, say) must not turn colour off.
+	for _, kv := range os.Environ() {
+		if k, _, _ := strings.Cut(kv, "="); k != "PATH" && k != "HOME" {
+			t.Setenv(k, "")
+		}
+	}
+	t.Setenv("CLICOLOR_FORCE", "1")
+	var buf bytes.Buffer
+	f.render(&buf, style.For(out))
+	if red := style.For(out).Fail("conflict"); !strings.Contains(buf.String(), red) {
+		t.Fatalf("the alert label is not red:\n%q", buf.String())
+	}
+	if strings.Contains(buf.String(), style.For(out).Fail("calm")) {
+		t.Fatal("a plain item is drawn red")
+	}
+	buf.Reset()
+	f.render(&buf, style.Plain())
+	if ansiSGR.MatchString(buf.String()) {
+		t.Fatalf("a plain palette drew colour:\n%q", buf.String())
 	}
 }

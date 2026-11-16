@@ -10,14 +10,32 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/miradorlabs/terma-cli/internal/doctor"
 	"github.com/miradorlabs/terma-cli/internal/routing"
 )
 
 // resolveBindingFlags turns --bind, --refuse and --unbind into decisions. A repository
 // bound against its owner's decision names the conflict and asks first (--yes confirms it
-// without a terminal). Binding an owner lists the repository decisions under it, which the
-// developer keeps or removes.
+// without a terminal). Binding an owner that would give away a repository under it another
+// organization needs, which no flag of this run decides, asks the same way; then it lists
+// the repository decisions under it, which the developer keeps or removes. Both weigh the
+// state this run's --unbinds leave.
 func resolveBindingFlags(cmd *cobra.Command, st routing.State, f teamsFlags, ask bool, names teamNames, list func() teamsView, ch *teamsChange) error {
+	unbound := st
+	unbound.Bindings = maps.Clone(st.Bindings)
+	for _, raw := range f.unbinds {
+		if key, err := bindingKeyOf(raw); err == nil {
+			delete(unbound.Bindings, key)
+		}
+	}
+	pending := doctor.IndexPending(doctor.Pending(unbound))
+	flagged := map[string]bool{}
+	for _, raw := range append(slices.Clone(f.binds), f.refuses...) {
+		keyRaw, _, _ := strings.Cut(raw, "=")
+		if key, err := bindingKeyOf(keyRaw); err == nil {
+			flagged[key] = true
+		}
+	}
 	for _, raw := range f.binds {
 		keyRaw, orgRaw, ok := strings.Cut(raw, "=")
 		if !ok || strings.TrimSpace(keyRaw) == "" || strings.TrimSpace(orgRaw) == "" {
@@ -40,8 +58,17 @@ func resolveBindingFlags(cmd *cobra.Command, st routing.State, f teamsFlags, ask
 				}
 				op.override = true
 			}
-		} else if err := keepRepositoryDecisions(cmd, st, key, org, orgName, names, ask, ch); err != nil {
-			return err
+		} else {
+			if s, ok := pending.Settles(key, org, func(k string) bool { return flagged[k] }); ok {
+				question := key + " covers " + s.Key + ", which " + cmp.Or(names.Orgs[s.Organization], s.Organization) + " needs: bind " + key +
+					" to " + cmp.Or(orgName, org) + " and give it " + s.Key + " too?"
+				if err := confirmConflict(cmd, question, ask, f.assumeYes); err != nil {
+					return err
+				}
+			}
+			if err := keepRepositoryDecisions(cmd, unbound, key, org, orgName, names, ask, ch); err != nil {
+				return err
+			}
 		}
 		ch.ops = append(ch.ops, op)
 		ch.changes = append(ch.changes, describeOp(op, orgName))
@@ -64,11 +91,8 @@ func resolveBindingFlags(cmd *cobra.Command, st routing.State, f teamsFlags, ask
 			return fmt.Errorf("%s has no decision to remove", key)
 		}
 		ch.ops = append(ch.ops, bindingOp{key: key})
-		after := st
-		after.Bindings = maps.Clone(st.Bindings)
-		delete(after.Bindings, key)
 		what := "free: personal may collect it"
-		if pendingKey(after, key) {
+		if pending.Organizations(key) != nil {
 			what = "pending: a ticked organization's entry needs it, so what it matches is held until you decide"
 		}
 		ch.changes = append(ch.changes, "unbound "+key+"; it is now "+what)
@@ -87,16 +111,6 @@ func bindingKeyOf(raw string) (string, error) {
 		return k, nil
 	}
 	return "", fmt.Errorf("%q is neither an owner nor a repository", raw)
-}
-
-// pendingKey reports whether a ticked organization's entry needs key with no decision in st.
-func pendingKey(st routing.State, key string) bool {
-	for _, p := range pendingBindings(st) {
-		if p.Key == key {
-			return true
-		}
-	}
-	return false
 }
 
 // bindingWords says what b decides, naming its organization.

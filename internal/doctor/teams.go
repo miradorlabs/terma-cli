@@ -39,6 +39,9 @@ type Routing struct {
 	// counts what the relay dropped from such runs.
 	Mixed        []runs.MixedRun
 	MixedDropped int
+	// Pending are the keys left to decide, PendingKeys(State), worked out once for the check
+	// and the rows that both name them.
+	Pending []PendingKey
 	// Blocked counts what else the relay kept from leaving, as its last stop recorded it,
 	// by what blocked it: "pending:<binding>" for a binding still to decide and
 	// "team:<enrollment>" for a team that could not send.
@@ -116,7 +119,18 @@ func TeamsCheck(r Routing, now time.Time) Check {
 			}
 		}
 	}
-	for _, p := range Pending(r.State) {
+	for _, k := range r.Pending {
+		if k.Conflict() {
+			failing = append(failing, k.Key+" is needed by more than one organization ("+r.orgsOf(k)+"), so what it matches is held")
+			fix = cmp.Or(fix, "terma teams, to pick whose "+k.Key+" is")
+			continue
+		}
+		p := k.Needs[0]
+		if k.Waits.Key != "" {
+			failing = append(failing, p.Key+" is undecided, so what "+p.Entry+" matches is held; binding it would also give "+k.Waits.Key+
+				", which "+r.org(k.Waits.Organization)+" needs, to "+r.org(p.Organization)+": decide that first")
+			continue
+		}
 		failing = append(failing, p.Key+" is undecided, so what "+p.Entry+" matches is held")
 		fix = cmp.Or(fix, "terma teams --bind "+p.Key+"="+quoteWord(r.org(p.Organization))+" (or --refuse "+p.Key+")")
 	}
@@ -217,38 +231,13 @@ func refusalWords(c routing.ErrorClass) string {
 	return "its refreshes were refused"
 }
 
-// PendingBinding is a binding a ticked organization's entry needs that no one decided.
-type PendingBinding struct {
-	Key, Organization, TeamID, Entry string
-}
-
-// Pending lists the bindings st's ticked organizations' entries need with no decision
-// covering them, each once.
-func Pending(st routing.State) []PendingBinding {
-	var out []PendingBinding
-	for _, t := range st.Teams {
-		if t.Personal || t.Policy.Global() || t.Policy.Unset {
-			continue
-		}
-		for _, raw := range t.Policy.Repositories {
-			e, ok := routing.ParseEntry(raw, t.Policy.Wildcards)
-			if !ok || slices.ContainsFunc(out, func(p PendingBinding) bool { return p.Key == e.Key() }) || decided(st, e) {
-				continue
-			}
-			out = append(out, PendingBinding{Key: e.Key(), Organization: t.OrganizationID, TeamID: t.TeamID, Entry: raw})
-		}
+// orgsOf names the organizations that need k, as a sentence lists them.
+func (r Routing) orgsOf(k PendingKey) string {
+	names := make([]string, 0, len(k.Needs))
+	for _, p := range k.Needs {
+		names = append(names, r.org(p.Organization))
 	}
-	return out
-}
-
-// decided reports whether a decision covers what e needs: its key's, or for an exact
-// entry its owner's, whichever organization it names.
-func decided(st routing.State, e routing.Entry) bool {
-	if _, ok := st.Bindings[e.Key()]; ok {
-		return true
-	}
-	_, ok := st.Bindings[routing.Owner(e.Key())]
-	return !e.Wildcard() && ok
+	return JoinAnd(names)
 }
 
 // RoutedRepository is where Route sends a session started in the working copy whose git
@@ -330,8 +319,16 @@ func TeamRows(r Routing, now time.Time) []Row {
 		rows = append(rows, Row{label, k + " → " + who})
 		label = ""
 	}
-	for _, p := range Pending(r.State) {
-		rows = append(rows, Row{"Undecided", p.Key + ", needed by " + p.Entry})
+	for _, k := range r.Pending {
+		if k.Conflict() {
+			rows = append(rows, Row{"Undecided", k.Key + ", needed by more than one organization: " + r.orgsOf(k)})
+			continue
+		}
+		row := k.Key + ", needed by " + k.Needs[0].Entry
+		if k.Waits.Key != "" {
+			row += "; decide " + k.Waits.Key + " first"
+		}
+		rows = append(rows, Row{"Undecided", row})
 	}
 	if len(r.Mixed) > 0 || r.MixedDropped > 0 {
 		rows = append(rows, Row{"Mixed", MixedSummary(r)})
