@@ -592,9 +592,10 @@ func TestShellPathsKnowSomeSubstitutions(t *testing.T) {
 }
 
 // The scan parses and expands at most maxShellBytes, all told, each word charged what it
-// may expand to before it is: a script run again and again, a here-document or a word that
-// repeats a long variable, or replacements that multiply one, reach somewhere not known at
-// once rather than costing gigabytes.
+// may expand to before it is, each word of a brace expansion too: a script run again and
+// again, a here-document or a word that repeats a long variable, replacements that multiply
+// one, or braces that do, reach somewhere not known at once rather than costing gigabytes.
+// So does a word holding more than maxShellBraces braces.
 func TestShellPathsChargeWhatTheyExpand(t *testing.T) {
 	t.Parallel()
 	m := newWordsMachine(t)
@@ -605,6 +606,13 @@ func TestShellPathsChargeWhatTheyExpand(t *testing.T) {
 		"cat <<EOF\n" + strings.Repeat("$S", 2000) + "\nEOF":                            true,
 		`echo "` + strings.Repeat("$S", 2000) + `"`:                                     true,
 		"T=aaaaaaaaaa; U=${T//a/$T}; V=${U//a/$U}; W=${V//a/$V}; X=${W//a/$W}; echo $X": true,
+		`bash -c {1..16000}"$S"`:                                                        true,
+		`cat <<<{1..16000}"$S"`:                                                         true,
+		"ls {a,b}/{c,d} f{,.bak} {1..3}":                                                false,
+		"echo " + strings.Repeat("{", maxShellBraces):                                   false,
+		"echo " + strings.Repeat("{", maxShellBraces+1):                                 true,
+		"echo " + strings.Repeat("{", 4000):                                             true,
+		"echo " + strings.Repeat("{a,b}", 1024):                                         true,
 	} {
 		start := time.Now()
 		if got := m.paths(command, m.side); slices.Contains(got, UnknownReach) != unknown {
