@@ -119,10 +119,17 @@ func shellPaths(command, cwd string, env func(string) (string, bool)) []string {
 
 // shellPathsBy is shellPaths, done by deadline.
 func shellPathsBy(command, cwd string, env func(string) (string, bool), deadline time.Time) []string {
+	return readShell(command, shellReadings(command, windowsShells), cwd, env, deadline)
+}
+
+// readShell is what readings of command reach from cwd, done by deadline: the places any
+// finds, each once, and UnknownReach when any may reach one it cannot name. Each reading goes
+// on from the work those before it did: the scan's bounds are the command's.
+func readShell(command string, readings []string, cwd string, env func(string) (string, bool), deadline time.Time) []string {
 	var out []string
 	done := work{deadline: deadline}
 	unknown := false
-	for _, src := range shellReadings(command) {
+	for _, src := range readings {
 		sc := scanShell(src, cwd, env, done)
 		done, unknown = sc.work, unknown || sc.unknown
 		for _, p := range sc.out {
@@ -137,14 +144,17 @@ func shellPathsBy(command, cwd string, env func(string) (string, bool), deadline
 	return out
 }
 
-// shellReadings are the ways a command is read. A POSIX shell takes a backslash for an
-// escape. On Windows an agent's shell may be Git Bash, which does, or PowerShell or cmd,
-// where it separates C:\Users\..., so a command holding a backslash is also read with each
-// a slash, and reaches what either reading finds: a path only one finds errs toward Mixed.
-// The second reading goes on from the work the first did: the scan's bounds are the
-// command's.
-func shellReadings(command string) []string {
-	if filepath.Separator == '\\' && strings.ContainsRune(command, '\\') {
+// windowsShells is whether an agent's shell may be PowerShell or cmd (shellReadings): on
+// Windows.
+const windowsShells = filepath.Separator == '\\'
+
+// shellReadings are the ways a command is read, where an agent's shell may be PowerShell or
+// cmd (windows). A POSIX shell takes a backslash for an escape. On Windows an agent's shell
+// may be Git Bash, which does, or PowerShell or cmd, where it separates C:\Users\..., so a
+// command holding a backslash is also read with each a slash, and reaches what either
+// reading finds: a path only one finds errs toward Mixed.
+func shellReadings(command string, windows bool) []string {
+	if windows && strings.ContainsRune(command, '\\') {
 		return []string{command, windowsReading(command)}
 	}
 	return []string{command}

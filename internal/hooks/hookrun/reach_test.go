@@ -277,7 +277,7 @@ func TestAnUnquotedWindowsPathIsAPath(t *testing.T) {
 // holding a backslash is also read with backslashes as separators (shellReadings), so it may
 // find more: each path that reading adds can only make a run Mixed, never miss one.
 func sameReach(command string, got, want []string) bool {
-	if len(shellReadings(command)) == 1 {
+	if len(shellReadings(command, windowsShells)) == 1 {
 		return slices.Equal(got, want)
 	}
 	for _, p := range want {
