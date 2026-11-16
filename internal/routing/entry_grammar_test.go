@@ -34,7 +34,16 @@ func TestEntryGrammarSharedWithServer(t *testing.T) {
 	if len(table.Cases) == 0 {
 		t.Fatal("the table has no cases")
 	}
+	kinds := map[string]bool{"exact": true, "wildcard": true, "refused": true}
+	seen := map[string]bool{}
 	for _, c := range table.Cases {
+		if !kinds[c.Server] || !kinds[c.CLI] {
+			t.Errorf("%q: server %q and cli %q must each be exact, wildcard or refused", c.Entry, c.Server, c.CLI)
+		}
+		if seen[c.Entry] {
+			t.Errorf("%q is listed twice", c.Entry)
+		}
+		seen[c.Entry] = true
 		if got := reading(c.Entry, true); got != c.CLI {
 			t.Errorf("ParseEntry(%q) reads %s, the table says %s", c.Entry, got, c.CLI)
 		}
