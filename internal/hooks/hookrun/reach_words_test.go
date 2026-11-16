@@ -388,11 +388,15 @@ func TestShellPathsResolveTheGitTopLevel(t *testing.T) {
 func TestUnknownReachNamesTheCommandByItsFirstWords(t *testing.T) {
 	t.Parallel()
 	for command, want := range map[string]string{
-		`cd "$(cat p)" && cat NOTES.md`:                 `cd "$(cat p)" && …`,
-		"cat $UNSET/x":                                  "cat $UNSET/x",
-		"TOKEN=s3cret curl --header=s3cret $UNSET/x -v": "TOKEN=… curl --header=… $UNSET/x …",
-		"mysql -ps3cret -h db < $UNSET/x":               "mysql -p… -h db …",
-		"cat /" + strings.Repeat("x", 80) + "/$UNSET/y": "cat /" + strings.Repeat("x", 55) + " …",
+		`cd "$(cat p)" && cat NOTES.md`:                      `cd "$(cat p)" && cat …`,
+		"cat $UNSET/x":                                       "cat $UNSET/x",
+		"TOKEN=s3cret curl --header=s3cret $UNSET/x -v":      "TOKEN=… curl --header=… $UNSET/x …",
+		"mysql -ps3cret -h db < $UNSET/x":                    "mysql -p… -h db …",
+		"curl -u admin:s3cret $UNSET/x":                      "curl -u … $UNSET/x",
+		`curl -H "Authorization: Bearer s3cret" $UNSET/x`:    "curl -H … $UNSET/x",
+		"tool --api-key s3cret $UNSET/x":                     "tool --api-key … $UNSET/x",
+		"git clone https://me:s3cret@example.com/x $UNSET/y": "git clone https://…@example.com/x $UNSET/y",
+		"cat /" + strings.Repeat("x", 80) + "/$UNSET/y":      "cat /" + strings.Repeat("x", 55) + " …",
 	} {
 		got := ShellPaths(command, t.TempDir())
 		if len(got) == 0 || got[len(got)-1] != UnknownReach+"\x00"+want {

@@ -141,8 +141,8 @@ func corpusCrossing() map[string]string {
 // corpusUnknown are corpusCrossing's commands whose reach cannot be resolved, with the
 // first words the ledger names each by.
 var corpusUnknown = map[string]string{
-	"cd to where a file says":   `cd "$(cat p)" && …`,
-	"git -C where a file says":  `git -C "$(cat p)" …`,
+	"cd to where a file says":   `cd "$(cat p)" && cat …`,
+	"git -C where a file says":  `git -C "$(cat p)" log`,
 	"make -C where a file says": "make -C $(cat p)",
 }
 
