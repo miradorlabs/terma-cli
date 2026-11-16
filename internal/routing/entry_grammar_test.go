@@ -3,20 +3,23 @@ package routing
 import (
 	"encoding/json"
 	"os"
+	"strings"
 	"testing"
 )
 
 // grammarCase is one row of testdata/entry_grammar.json, which the platform's account
-// service tests too: whether the server stores the entry, and how ParseEntry reads it.
+// service tests too: how the server stores the entry, and how ParseEntry reads it, each
+// exact, wildcard or refused.
 type grammarCase struct {
 	Entry  string `json:"entry"`
-	Server bool   `json:"server"`
+	Server string `json:"server"`
 	CLI    string `json:"cli"`
 }
 
 // TestEntryGrammarSharedWithServer reads every entry of the table the account service
-// shares: ParseEntry's reading is the table's, and nothing the server stores is refused
-// or read as a different kind of entry here.
+// shares. ParseEntry's reading is the table's, with wildcards on and, for an entry with no
+// `*`, off too, as a 1.x policy is read. The contract holds between the two columns:
+// nothing the server stores is refused here, and it is a wildcard to both or to neither.
 func TestEntryGrammarSharedWithServer(t *testing.T) {
 	raw, err := os.ReadFile("testdata/entry_grammar.json")
 	if err != nil {
@@ -32,27 +35,32 @@ func TestEntryGrammarSharedWithServer(t *testing.T) {
 		t.Fatal("the table has no cases")
 	}
 	for _, c := range table.Cases {
-		got := "refused"
-		if e, ok := ParseEntry(c.Entry, true); ok {
-			got = "exact"
-			if e.Wildcard() {
-				got = "wildcard"
-			}
-		}
-		if got != c.CLI {
+		if got := reading(c.Entry, true); got != c.CLI {
 			t.Errorf("ParseEntry(%q) reads %s, the table says %s", c.Entry, got, c.CLI)
 		}
-		if c.Server && c.CLI == "refused" {
+		if !strings.Contains(c.Entry, "*") {
+			if got := reading(c.Entry, false); got != c.CLI {
+				t.Errorf("ParseEntry(%q) without wildcards reads %s, with them %s", c.Entry, got, c.CLI)
+			}
+		}
+		if c.Server != "refused" && c.CLI == "refused" {
 			t.Errorf("%q: the server stores it, so the CLI must read it", c.Entry)
 		}
-		if c.Server && (c.CLI == "wildcard") != serverWildcard(c.Entry) {
-			t.Errorf("%q: the server and the CLI disagree on whether it is a wildcard", c.Entry)
+		if c.Server != "refused" && (c.Server == "wildcard") != (c.CLI == "wildcard") {
+			t.Errorf("%q: the server reads it as %s and the CLI as %s", c.Entry, c.Server, c.CLI)
 		}
 	}
 }
 
-// serverWildcard is the account service's wildcard test on an entry it stores: a whole
-// last `/*` segment.
-func serverWildcard(entry string) bool {
-	return len(entry) >= 2 && entry[len(entry)-2:] == "/*"
+// reading is how ParseEntry reads an entry: exact, wildcard or refused.
+func reading(entry string, wildcards bool) string {
+	e, ok := ParseEntry(entry, wildcards)
+	switch {
+	case !ok:
+		return "refused"
+	case e.Wildcard():
+		return "wildcard"
+	default:
+		return "exact"
+	}
 }
