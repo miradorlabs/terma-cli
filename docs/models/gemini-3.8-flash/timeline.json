@@ -3,6 +3,33 @@
   "id": "gemini-3.8-flash",
   "steps": [
     {
+      "at": "2026-11-16T03:18:15.820502535Z",
+      "event": "changed",
+      "changes": [
+        {
+          "id": "docs/whats_new",
+          "category": "docs",
+          "op": "changed",
+          "path": [
+            "docs",
+            "whats_new"
+          ],
+          "title": "What's new page changed (+85 −85 chars)",
+          "impact": "informational",
+          "before": null,
+          "after": null,
+          "text_diff": "@@ -451,8 +451,7 @@\n * **Apply Gemini 3 API parameter changes:** Remove deprecated sampling parameters (`temperature`, `top_p`, `top_k`), `candidate_count` (unsupported in Gemini 3 and later), and prefilled model turns.\n See [Gemini 3.6 API changes and parameter updates](/docs/whats-new-gemini-3.6#api-changes-and-parameter-updates).\n * **Enforce turn validation rules:** Standardize multi-turn conversations on server-side `previous_interaction_id` and remove prefilled model turns.\n-* **Audit function calling:**\n-  * Place multimodal assets inside the response payload.\n+* **Audit function calling:**  * Place multimodal assets inside the response payload.\n   * Format inline instructions using `\\n\\n`.\n   * If you see `Malformed_Function_Call` errors tied to pre-tool text, see [Workarounds for pre-tool text requirements](/docs/function-calling#workarounds-for-pre-tool-text-requirements).\n   * Only if using generateContent API: Ensure all `FunctionResponse` objects include `call_id` and `name`.\n",
+          "stats": {
+            "added_chars": 85,
+            "removed_chars": 85
+          },
+          "terma": null,
+          "source": null,
+          "documented": null
+        }
+      ]
+    },
+    {
       "at": "2026-11-16T02:54:36.450664127Z",
       "event": "changed",
       "changes": [

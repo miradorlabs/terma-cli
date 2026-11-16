@@ -18,7 +18,7 @@
     {
       "date": "2026-11-10",
       "url": "https://ai.google.dev/gemini-api/docs/changelog",
-      "text": "*   **Gemini 4 Carbon (`gemini-4-carbon`) generally available (GA)**: Released\n    [Gemini 4 Carbon](/docs/models/gemini-4-carbon) (`gemini-4-carbon`), our\n    most capable reasoning model built for sustained agentic coding, multimodal\n    knowledge work, scientific reasoning, and cybersecurity defense, available\n    at introductory [pricing](/docs/pricing#gemini-4-carbon) of $2.00 per 1M\n    input tokens and $10.00 per 1M output tokens through November 30, 2026. See\n    [What's new in Gemini 4 Carbon](/docs/whats-new-gemini-4-carbon) to get started."
+      "text": "*   **Gemini 4 Carbon (`gemini-4-carbon`) generally available (GA)**: Released\n  [Gemini 4 Carbon](/docs/models/gemini-4-carbon) (`gemini-4-carbon`), our\n  most capable reasoning model built for sustained agentic coding, multimodal\n  knowledge work, scientific reasoning, and cybersecurity defense, available\n  at introductory [pricing](/docs/pricing#gemini-4-carbon) of $2.00 per 1M\n  input tokens and $10.00 per 1M output tokens through November 30, 2026. See\n  [What's new in Gemini 4 Carbon](/docs/whats-new-gemini-4-carbon) to get started."
     }
   ],
   "changes": [],
