@@ -40,6 +40,8 @@ type Item struct {
 	Reason   string
 	// Heading is a section title printed above this item.
 	Heading string
+	// Alert draws the label red, for a choice that needs the developer's attention.
+	Alert bool
 }
 
 // Form is the model: a title, its items, and where the cursor is.
@@ -328,6 +330,9 @@ func (f *Form) render(w io.Writer, p style.Palette) int {
 			cursor = brand("❯") + " "
 		}
 		label := it.Label + strings.Repeat(" ", width-len([]rune(it.Label)))
+		if it.Alert && !it.Disabled {
+			label = p.Fail(label)
+		}
 		if f.Choice {
 			if i == f.cursor && !it.Disabled {
 				label = brand(label)

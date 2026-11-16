@@ -74,6 +74,7 @@ func (app *App) applyTeams(cmd *cobra.Command, cfg *config.Config, st routing.St
 			return teamsView{}, err
 		}
 	}
+	var needs []bindingNeed
 	for _, ref := range f.selects {
 		o, t, err := unselectedTeam(list(), ref)
 		if err != nil {
@@ -83,13 +84,31 @@ func (app *App) applyTeams(cmd *cobra.Command, cfg *config.Config, st routing.St
 		if err != nil {
 			return teamsView{}, err
 		}
-		if err := decideBindings(planned, tk, tickAsker{cmd: cmd, ask: ask, assumeYes: f.assumeYes}); err != nil {
-			return teamsView{}, err
-		}
-		for _, op := range tk.ops {
-			_ = op.apply(&planned)
-		}
+		needs = append(needs, tickNeeds(planned, tk)...)
 		ch.ticks = append(ch.ticks, tk)
+	}
+	// Every undecided binding is decided together, so a key two organizations need is one
+	// question, never settled by whichever was ticked first.
+	if ask || f.bindAll || f.assumeYes {
+		needs = append(pendingNeeds(planned, func(id string) string {
+			if n := names.Orgs[id]; n != "" {
+				return n
+			}
+			lv := list()
+			return lv.orgName(id)
+		}, func(id string) string { return names.Teams[id] }), needs...)
+	}
+	decided, err := decideNeeds(needs, ask, f.bindAll || f.assumeYes, f.bindAll || ask)
+	if err != nil {
+		return teamsView{}, err
+	}
+	for _, d := range decided {
+		if d.tick != nil {
+			d.tick.ops = append(d.tick.ops, d.op)
+			continue
+		}
+		ch.ops = append(ch.ops, d.op)
+		ch.changes = append(ch.changes, describeOp(d.op, d.orgName))
 	}
 	next, err := routing.Update(app.stateDir, cfg.ProfileName, func(s *routing.State) error { return ch.write(s) })
 	if err != nil {

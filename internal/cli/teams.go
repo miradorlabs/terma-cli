@@ -30,11 +30,14 @@ type teamsFlags struct {
 	// assumeYes takes every question's default answer: a binding a ticked team needs is
 	// made to its organization, and a decision against an owner's is made as asked.
 	assumeYes bool
+	// bindAll binds every undecided binding one organization needs to it; a key more than
+	// one organization needs stays to decide.
+	bindAll bool
 }
 
 // changes reports whether f asks for any change.
 func (f teamsFlags) changes() bool {
-	return len(f.selects)+len(f.deselects)+len(f.releases)+len(f.binds)+len(f.refuses)+len(f.unbinds) > 0
+	return f.bindAll || len(f.selects)+len(f.deselects)+len(f.releases)+len(f.binds)+len(f.refuses)+len(f.unbinds) > 0
 }
 
 func (app *App) newTeamsCommand() *cobra.Command {
@@ -47,8 +50,10 @@ telemetry to. Each team shows what its policy collects, so you see what you agre
 before you tick it. An organization's teams are listed once this machine has a sign-in
 there: --authorize signs in to every one without, in one approval, and --org to one.
 
-Ticking a team signs in to its organization if needed, fetches its policy, creates its
-key for this machine and asks you to decide each binding its policy needs. A binding says
+Ticking a team signs in to its organization if needed, fetches its policy and creates its
+key for this machine. Then every binding left to decide is listed at once, ticked: untick
+one to leave it waiting, and pick whose a key is when more than one organization needs it,
+shown in red. A binding says
 which organization an owner (github.com/acme) or a repository belongs to on this
 machine: only that organization collects it, and personal never does. Bindings outlive
 unticking: what stays bound to an organization collects nowhere until you unbind it.
@@ -64,6 +69,9 @@ Without a terminal, change it with flags (each may repeat):
   --bind <owner-or-repository>=<org>    bind it to an organization
   --refuse <owner-or-repository>        refuse it to every organization
   --unbind <owner-or-repository>        remove the decision
+  --bind-all                            bind every undecided owner or repository to the one
+                                        organization that needs it; one more than one needs
+                                        stays to decide
   --authorize                           sign in to the organizations without a sign-in here,
                                         20 per approval
   --json                                print the list as JSON`,
@@ -82,6 +90,7 @@ Without a terminal, change it with flags (each may repeat):
 	fl.BoolVar(&f.json, "json", false, "print the list, and what changed, as JSON")
 	fl.BoolVar(&f.noBrowser, "no-browser", false, "print the sign-in URL instead of opening a browser")
 	fl.BoolVarP(&f.assumeYes, "yes", "y", false, "take each question's default: bind what a ticked team needs to its organization")
+	fl.BoolVar(&f.bindAll, "bind-all", false, "bind every undecided owner or repository that one organization needs to it; one more than one needs stays to decide")
 	return cmd
 }
 
@@ -212,11 +221,40 @@ func renderTeams(w io.Writer, v teamsView) {
 	}
 	if len(v.Pending) > 0 {
 		fmt.Fprintf(out, "\n%s\n", p.Bold("To decide (what these match is held until you do):"))
+		single := 0
 		for _, pr := range v.Pending {
+			if pr.Conflict {
+				continue
+			}
+			single++
 			fmt.Fprintf(out, "  %s %s  needed by %s: `terma teams --bind %s=%s` or `terma teams --refuse %s`\n",
 				p.Warn("!"), pr.Key, pr.Entry, pr.Key, quoteArg(cmp.Or(v.orgName(pr.Organization), pr.Organization)), pr.Key)
 		}
+		for _, pr := range v.Pending {
+			if !pr.Conflict {
+				continue
+			}
+			var who, binds []string
+			for _, n := range pr.Organizations {
+				name := cmp.Or(n.Name, v.orgName(n.Organization), n.Organization)
+				who = append(who, name+" ("+strings.TrimPrefix(listedBy(pr.Key, n.Entry, n.TeamName), "listed by ")+")")
+				binds = append(binds, "`terma teams --bind "+pr.Key+"="+quoteArg(name)+"`")
+			}
+			fmt.Fprintf(out, "  %s\n      %s\n", p.Fail("✗ "+pr.Key+": needed by more than one organization, "+joinAnd(who)),
+				"pick one: "+strings.Join(binds, " or "))
+		}
+		if single > 0 {
+			fmt.Fprintf(out, "\n  Bind each to the one organization that needs it: `terma teams --bind-all`\n")
+		}
 	}
+}
+
+// joinAnd joins words as a sentence lists them: "a", "a and b", "a, b and c".
+func joinAnd(words []string) string {
+	if len(words) < 2 {
+		return strings.Join(words, "")
+	}
+	return strings.Join(words[:len(words)-1], ", ") + " and " + words[len(words)-1]
 }
 
 func orgTitle(o orgRow) string { return cmp.Or(o.Name, o.ID) }

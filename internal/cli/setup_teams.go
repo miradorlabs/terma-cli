@@ -123,7 +123,7 @@ func reportTeams(ui *setupUI, v teamsView) {
 			keys = append(keys, p.Key)
 		}
 		ui.Warn("Bindings", "undecided, so what they match is held: "+strings.Join(keys, ", "))
-		ui.Then("Run `terma teams` to decide which organization each belongs to.")
+		ui.Then("Run `terma teams --bind-all` to bind each to the organization that needs it, or `terma teams` to choose.")
 	}
 }
 

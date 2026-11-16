@@ -84,7 +84,8 @@ func (app *App) teamsChecklist(cmd *cobra.Command, cfg *config.Config, st routin
 		}
 		return app.teamsChecklist(cmd, cfg, st, f)
 	}
-	if !ff.changes() {
+	// Bindings left to decide are asked even with no team ticked or unticked.
+	if !ff.changes() && len(v.Pending) == 0 {
 		return v, nil
 	}
 	return app.applyTeams(cmd, cfg, st, ff)

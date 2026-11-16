@@ -54,6 +54,10 @@ func enabled(f *os.File) bool {
 	if os.Getenv("NO_COLOR") != "" || os.Getenv("TERM") == "dumb" {
 		return false
 	}
+	// CLICOLOR_FORCE colours output that is not a terminal, as other tools take it; NO_COLOR still wins.
+	if v := os.Getenv("CLICOLOR_FORCE"); v != "" && v != "0" {
+		return true
+	}
 	if AgentMode() {
 		return false
 	}

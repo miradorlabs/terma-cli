@@ -223,7 +223,8 @@ type PendingBinding struct {
 }
 
 // Pending lists the bindings st's ticked organizations' entries need with no decision
-// covering them, each once.
+// covering them, once per key and organization: a key two organizations need is listed
+// for each, a conflict only the developer can settle.
 func Pending(st routing.State) []PendingBinding {
 	var out []PendingBinding
 	for _, t := range st.Teams {
@@ -232,7 +233,7 @@ func Pending(st routing.State) []PendingBinding {
 		}
 		for _, raw := range t.Policy.Repositories {
 			e, ok := routing.ParseEntry(raw, t.Policy.Wildcards)
-			if !ok || slices.ContainsFunc(out, func(p PendingBinding) bool { return p.Key == e.Key() }) || decided(st, e) {
+			if !ok || slices.ContainsFunc(out, func(p PendingBinding) bool { return p.Key == e.Key() && p.Organization == t.OrganizationID }) || decided(st, e) {
 				continue
 			}
 			out = append(out, PendingBinding{Key: e.Key(), Organization: t.OrganizationID, TeamID: t.TeamID, Entry: raw})

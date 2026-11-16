@@ -91,7 +91,7 @@ func bindingKeyOf(raw string) (string, error) {
 
 // pendingKey reports whether a ticked organization's entry needs key with no decision in st.
 func pendingKey(st routing.State, key string) bool {
-	for _, p := range pendingBindings(st) {
+	for _, p := range pendingBindings(st, nil, nil) {
 		if p.Key == key {
 			return true
 		}
