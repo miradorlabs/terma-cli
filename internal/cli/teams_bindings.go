@@ -3,7 +3,6 @@ package cli
 import (
 	"cmp"
 	"errors"
-	"fmt"
 	"slices"
 
 	"github.com/miradorlabs/terma-cli/internal/doctor"
@@ -14,13 +13,18 @@ import (
 // bindingNeed is a binding a ticked organization's entry needs that no decision covers: for
 // a team ticked in this run (tick), or for one ticked before (tick nil).
 type bindingNeed struct {
-	key, org, orgName, entry string
+	routing.Need
+	orgName, entry string
 	// teamName is the team whose policy lists the entry.
 	teamName string
 	// owner is the owner of a repository a team lists among exact entries only: it may be
 	// bound whole in place of its listed repositories.
 	owner string
 	tick  *tick
+	// flagged: one of this run's flags decided or unbound the key. It is neither asked nor
+	// decided again, but it still counts for the rules, so nothing decided beside it takes
+	// it unseen.
+	flagged bool
 }
 
 // neededOp is a decision about a key, with every team in this run that needs it (holders)
@@ -56,7 +60,7 @@ func (m bindingMode) asks() bool { return m == askTicked || m == askPending }
 func (m bindingMode) earlier() bool { return m == bindPending || m == askPending }
 
 // decision is one key bound to one organization by this run.
-type decision struct{ key, org string }
+type decision routing.Need
 
 // tickNeeds are the bindings tk's policy needs with no decision in st. An entry under an
 // owner decided otherwise is skipped, and said in tk's notes.
@@ -86,7 +90,8 @@ func tickNeeds(st routing.State, tk *tick) []bindingNeed {
 	}
 	needs := make([]bindingNeed, 0, len(entries))
 	for _, e := range entries {
-		n := bindingNeed{key: e.Key(), org: t.OrganizationID, orgName: cmp.Or(tk.orgName, t.OrganizationID), entry: e.Raw, teamName: tk.teamName, tick: tk}
+		n := bindingNeed{Need: routing.Need{Key: e.Key(), Organization: t.OrganizationID}, orgName: cmp.Or(tk.orgName, t.OrganizationID),
+			entry: e.Raw, teamName: tk.teamName, tick: tk}
 		if exactOnly {
 			n.owner = routing.Owner(e.Key())
 		}
@@ -108,7 +113,7 @@ func pendingNeeds(st routing.State, orgName, teamName func(string) string) []bin
 	}
 	var needs []bindingNeed
 	for _, p := range doctor.Pending(st) {
-		n := bindingNeed{key: p.Key, org: p.Organization, orgName: cmp.Or(orgName(p.Organization), p.Organization),
+		n := bindingNeed{Need: routing.Need{Key: p.Key, Organization: p.Organization}, orgName: cmp.Or(orgName(p.Organization), p.Organization),
 			entry: p.Entry, teamName: cmp.Or(teamName(p.TeamID), p.TeamID)}
 		if exactOnly[p.TeamID] {
 			n.owner = routing.Owner(p.Key)
@@ -133,7 +138,7 @@ func teamEntry(key, entry, team string) string {
 func indexNeeds(needs []bindingNeed) routing.Needs {
 	out := make([]routing.Need, 0, len(needs))
 	for _, n := range needs {
-		out = append(out, routing.Need{Key: n.key, Organization: n.org})
+		out = append(out, n.Need)
 	}
 	return routing.IndexNeeds(out)
 }
@@ -145,14 +150,14 @@ func conflicts(needs []bindingNeed, ix routing.Needs) ([]string, map[string][]bi
 	by := map[string][]bindingNeed{}
 	seen := map[routing.Need]bool{}
 	for _, n := range needs {
-		if !ix.Conflict(n.key) || seen[routing.Need{Key: n.key, Organization: n.org}] {
+		if !ix.Conflict(n.Key) || seen[n.Need] {
 			continue
 		}
-		seen[routing.Need{Key: n.key, Organization: n.org}] = true
-		if by[n.key] == nil {
-			keys = append(keys, n.key)
+		seen[n.Need] = true
+		if by[n.Key] == nil {
+			keys = append(keys, n.Key)
 		}
-		by[n.key] = append(by[n.key], n)
+		by[n.Key] = append(by[n.Key], n)
 	}
 	return keys, by
 }
@@ -161,110 +166,101 @@ func conflicts(needs []bindingNeed, ix routing.Needs) ([]string, map[string][]bi
 func orgNames(needs []bindingNeed) map[string]string {
 	names := map[string]string{}
 	for _, n := range needs {
-		if _, ok := names[n.org]; !ok {
-			names[n.org] = n.orgName
+		if _, ok := names[n.Organization]; !ok {
+			names[n.Organization] = n.orgName
 		}
 	}
 	return names
 }
 
-// decideNeeds decides all, every binding left to decide, as mode says, the checklist drawn
-// by run. Conflicts are found across all of them, whatever mode decides. A conflict is
-// never decided for the developer, and an owner whose binding would give another
-// organization's need under it away waits until that is decided: held says which.
-func decideNeeds(all []bindingNeed, mode bindingMode, run func(*prompt.Form) ([]prompt.Item, error)) (ops []neededOp, held []string, err error) {
-	if len(all) == 0 || mode == leavePending {
-		return nil, nil, nil
+// decideNeeds decides pending, every binding left to decide, as mode says, the checklist
+// drawn by run. The rules weigh all of pending, whatever mode asks about or decides; a
+// flagged need is neither asked about nor decided. A conflict is never decided for the
+// developer. An owner decided here that would take another organization's repository left
+// undecided is held once the decisions are written (teamsChange.holdOwners).
+func decideNeeds(pending []bindingNeed, mode bindingMode, run func(*prompt.Form) ([]prompt.Item, error)) ([]neededOp, error) {
+	if len(pending) == 0 || mode == leavePending {
+		return nil, nil
 	}
-	ix := indexNeeds(all)
-	names := orgNames(all)
+	rules := indexNeeds(pending)
 	// What a run that ticks asks about: its own needs, and a team ticked before's need that
 	// one of them would settle: the same key (a conflict), or its owner, for another
 	// organization. So it is decided in the same form, never given away unseen.
 	tickedBy := map[string][]string{}
-	for _, n := range all {
-		if n.tick != nil {
-			tickedBy[n.key] = append(tickedBy[n.key], n.org)
+	for _, n := range pending {
+		if n.tick != nil && !n.flagged {
+			tickedBy[n.Key] = append(tickedBy[n.Key], n.Organization)
 		}
 	}
 	elsewhere := func(key, org string) bool {
 		return slices.ContainsFunc(tickedBy[key], func(o string) bool { return o != org })
 	}
-	shown := slices.DeleteFunc(slices.Clone(all), func(n bindingNeed) bool {
-		if n.tick != nil || mode.earlier() {
+	asked := slices.DeleteFunc(slices.Clone(pending), func(n bindingNeed) bool {
+		switch {
+		case n.flagged:
+			return true
+		case n.tick != nil || mode.earlier():
 			return false
 		}
-		sharedKey := ix.Conflict(n.key) && len(tickedBy[n.key]) > 0
-		return !sharedKey && !elsewhere(routing.Owner(n.key), n.org)
+		sharedKey := rules.Conflict(n.Key) && len(tickedBy[n.Key]) > 0
+		return !sharedKey && !elsewhere(routing.Owner(n.Key), n.Organization)
 	})
-	var order []decision
+	var decisions []decision
+	var replaced map[decision][]decision
 	if mode.asks() {
-		form, slots := bindingsForm(shown, all, ix)
+		form, slots := bindingsForm(asked, pending, rules)
 		if len(form.Items) == 0 {
-			return nil, nil, nil
+			return nil, nil
 		}
 		result, err := run(form)
 		if errors.Is(err, prompt.ErrCancelled) {
-			return nil, nil, errCancelled
+			return nil, errCancelled
 		}
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
-		order = formDecisions(shown, slots, result)
+		decisions, replaced = formDecisions(asked, slots, result)
 	} else {
 		seen := map[decision]bool{}
-		for _, n := range shown {
-			d := decision{n.key, n.org}
-			if ix.Conflict(n.key) || (n.tick == nil && !mode.earlier()) || seen[d] {
+		for _, n := range asked {
+			d := decision(n.Need)
+			if rules.Conflict(n.Key) || (n.tick == nil && !mode.earlier()) || seen[d] {
 				continue
 			}
 			seen[d] = true
-			order = append(order, d)
+			decisions = append(decisions, d)
 		}
 	}
-	decided := make(map[string]bool, len(order))
-	for _, d := range order {
-		decided[d.key] = true
-	}
-	kept := order[:0:0]
-	for _, d := range order {
-		if s, ok := ix.Settles(d.key, d.org, func(k string) bool { return decided[k] }); ok {
-			held = append(held, fmt.Sprintf("%s is left to decide: binding it to %s would also give it %s, which %s needs; decide that first",
-				d.key, cmp.Or(names[d.org], d.org), s.Key, cmp.Or(names[s.Organization], s.Organization)))
-			continue
-		}
-		kept = append(kept, d)
-	}
-	return withHolders(all, kept, names), held, nil
+	return withHolders(pending, decisions, replaced, orgNames(pending)), nil
 }
 
-// withHolders makes each decision an op with every need in all it decides: those of the
-// same organization for its key, or for an owner bound whole, under it. A repository bound
-// while its owner is bound to another organization is an exception to the owner, which
-// routing allows only when asked for.
-func withHolders(all []bindingNeed, decided []decision, names map[string]string) []neededOp {
+// withHolders makes each decision an op with every need in pending it decides: those of its
+// key and organization, and for an owner picked whole, those of the repository decisions
+// it was picked in place of (replaced). A repository bound while its owner is bound to
+// another organization is an exception to the owner, which routing allows only when asked
+// for.
+func withHolders(pending []bindingNeed, decisions []decision, replaced map[decision][]decision, names map[string]string) []neededOp {
 	by := map[decision][]bindingNeed{}
-	for _, n := range all {
-		by[decision{n.key, n.org}] = append(by[decision{n.key, n.org}], n)
-		if n.owner != "" {
-			by[decision{n.owner, n.org}] = append(by[decision{n.owner, n.org}], n)
-		}
+	for _, n := range pending {
+		by[decision(n.Need)] = append(by[decision(n.Need)], n)
 	}
-	orgOf := make(map[string]string, len(decided))
-	for _, d := range decided {
-		orgOf[d.key] = d.org
+	orgOf := make(map[string]string, len(decisions))
+	for _, d := range decisions {
+		orgOf[d.Key] = d.Organization
 	}
-	ops := make([]neededOp, 0, len(decided))
-	for _, d := range decided {
-		op := neededOp{op: bindingOp{key: d.key, org: d.org}, orgName: cmp.Or(names[d.org], d.org)}
-		for _, n := range by[d] {
-			if n.tick == nil {
-				op.earlier = true
-			} else if !slices.Contains(op.holders, n.tick) {
-				op.holders = append(op.holders, n.tick)
+	ops := make([]neededOp, 0, len(decisions))
+	for _, d := range decisions {
+		op := neededOp{op: bindingOp{key: d.Key, org: d.Organization}, orgName: cmp.Or(names[d.Organization], d.Organization)}
+		for _, k := range append([]decision{d}, replaced[d]...) {
+			for _, n := range by[k] {
+				if n.tick == nil {
+					op.earlier = true
+				} else if !slices.Contains(op.holders, n.tick) {
+					op.holders = append(op.holders, n.tick)
+				}
 			}
 		}
-		if org, ok := orgOf[routing.Owner(d.key)]; ok && org != d.org {
+		if org, ok := orgOf[routing.Owner(d.Key)]; ok && org != d.Organization {
 			op.op.override = true
 		}
 		ops = append(ops, op)

@@ -40,35 +40,36 @@ const collapseAt = 8
 // conflictHeading heads the keys more than one organization needs.
 const conflictHeading = "Needed by more than one organization: pick one, or decide later"
 
-// bindingsForm is shown, the needs a run asks about, as lines: each organization's keys,
+// bindingsForm is asked, the needs a run asks about, as lines: each organization's keys,
 // ticked, except an owner whose binding would give away another organization's need under
 // it that the form's defaults leave undecided, in red and unticked; an exact-only team's
 // owner with two or more listed repositories as a pick between them (the default) and the
 // whole owner; then, in red, each key more than one organization needs, to bind to one of
-// them or leave to decide, which it starts on. all is every need left to decide, indexed
-// by ix, for the conflicts and owners shown ones touch.
-func bindingsForm(shown, all []bindingNeed, ix routing.Needs) (*prompt.Form, []bindingSlot) {
+// them or leave to decide, which it starts on. pending is every need left to decide,
+// indexed by rules, for the conflicts and owners the asked ones touch.
+func bindingsForm(asked, pending []bindingNeed, rules routing.Needs) (*prompt.Form, []bindingSlot) {
 	form := &prompt.Form{Title: "Bind these to the organizations that need them; one left unticked waits, holding what it matches (`terma teams --refuse <key>` refuses one):"}
 	var slots []bindingSlot
 	add := func(it prompt.Item, s bindingSlot) {
 		form.Items = append(form.Items, it)
 		slots = append(slots, s)
 	}
-	names := orgNames(all)
-	conflictKeys, conflicted := conflicts(all, ix)
-	// What Enter decides: every shown key no other organization needs.
+	names := orgNames(pending)
+	conflictKeys, conflicted := conflicts(pending, rules)
+	// What Enter decides: every asked key no other organization needs, grouped by
+	// organization in the order first asked.
 	defaults := map[string]bool{}
 	var orgs []string
-	seenOrg := map[string]bool{}
-	for _, n := range shown {
-		if ix.Conflict(n.key) {
+	byOrg := map[string][]int{}
+	for i, n := range asked {
+		if rules.Conflict(n.Key) {
 			continue
 		}
-		defaults[n.key] = true
-		if !seenOrg[n.org] {
-			seenOrg[n.org] = true
-			orgs = append(orgs, n.org)
+		defaults[n.Key] = true
+		if byOrg[n.Organization] == nil {
+			orgs = append(orgs, n.Organization)
 		}
+		byOrg[n.Organization] = append(byOrg[n.Organization], i)
 	}
 	group := 0
 	for _, org := range orgs {
@@ -85,13 +86,14 @@ func bindingsForm(shown, all []bindingNeed, ix routing.Needs) (*prompt.Form, []b
 		seen := map[string]bool{}
 		byOwner := map[string][]int{}
 		var owners []string
-		for i, n := range shown {
-			if n.org != org || ix.Conflict(n.key) || seen[n.key] {
+		for _, i := range byOrg[org] {
+			n := asked[i]
+			if seen[n.Key] {
 				continue
 			}
-			seen[n.key] = true
+			seen[n.Key] = true
 			keys = append(keys, i)
-			if o := routing.Owner(n.key); o != "" {
+			if o := routing.Owner(n.Key); o != "" {
 				if byOwner[o] == nil {
 					owners = append(owners, o)
 				}
@@ -99,13 +101,13 @@ func bindingsForm(shown, all []bindingNeed, ix routing.Needs) (*prompt.Form, []b
 			}
 		}
 		for _, i := range keys {
-			n := shown[i]
-			if o := routing.Owner(n.key); o != "" && len(byOwner[o]) > collapseAt {
+			n := asked[i]
+			if o := routing.Owner(n.Key); o != "" && len(byOwner[o]) > collapseAt {
 				continue
 			}
-			item := prompt.Item{Label: n.key, Detail: "listed by " + teamEntry(n.key, n.entry, n.teamName) + exceptionNote(ix, names, n),
+			item := prompt.Item{Label: n.Key, Detail: "listed by " + teamEntry(n.Key, n.entry, n.teamName) + exceptionNote(rules, names, n),
 				Kind: prompt.Check, Selected: true, Heading: head(n.orgName)}
-			if s, ok := ix.Settles(n.key, org, func(k string) bool { return defaults[k] }); ok {
+			if s, ok := rules.Settles(n.Key, org, func(k string) bool { return defaults[k] }); ok {
 				item.Selected, item.Alert = false, true
 				item.Detail = "binding it gives " + s.Key + ", which " + cmp.Or(names[s.Organization], s.Organization) + " needs, to " + n.orgName + ": decide that first"
 			}
@@ -113,12 +115,12 @@ func bindingsForm(shown, all []bindingNeed, ix routing.Needs) (*prompt.Form, []b
 		}
 		for _, o := range owners {
 			ids := byOwner[o]
-			first := shown[ids[0]]
+			first := asked[ids[0]]
 			if len(ids) > collapseAt {
 				add(prompt.Item{Label: fmt.Sprintf("%s: its %d listed repositories", o, len(ids)), Detail: "listed by " + first.teamName,
 					Kind: prompt.Check, Selected: true, Heading: head(first.orgName)}, bindingSlot{kind: slotKeys, needs: ids, org: org})
 			}
-			if first.owner == "" || len(ids) < 2 || ix.Shared(o, org) {
+			if first.owner == "" || len(ids) < 2 || rules.Shared(o, org) {
 				continue
 			}
 			group++
@@ -128,19 +130,19 @@ func bindingsForm(shown, all []bindingNeed, ix routing.Needs) (*prompt.Form, []b
 				Kind: prompt.Radio, Group: group}, bindingSlot{kind: slotWholeOwner, needs: ids, owner: o, org: org})
 		}
 	}
-	shownKeys := make(map[string]bool, len(shown))
-	for _, n := range shown {
-		shownKeys[n.key] = true
+	askedKeys := make(map[string]bool, len(asked))
+	for _, n := range asked {
+		askedKeys[n.Key] = true
 	}
 	heading := conflictHeading
 	for _, key := range conflictKeys {
-		if !shownKeys[key] {
+		if !askedKeys[key] {
 			continue
 		}
 		group++
 		for _, n := range conflicted[key] {
-			add(prompt.Item{Label: "bind " + key + " to " + n.orgName, Detail: "listed by " + teamEntry(n.key, n.entry, n.teamName),
-				Kind: prompt.Radio, Group: group, Alert: true, Heading: heading}, bindingSlot{kind: slotConflict, key: key, org: n.org})
+			add(prompt.Item{Label: "bind " + key + " to " + n.orgName, Detail: "listed by " + teamEntry(n.Key, n.entry, n.teamName),
+				Kind: prompt.Radio, Group: group, Alert: true, Heading: heading}, bindingSlot{kind: slotConflict, key: key, org: n.Organization})
 			heading = ""
 		}
 		add(prompt.Item{Label: key + ": decide later", Detail: "what it matches is held", Kind: prompt.Radio, Group: group, Selected: true, Alert: true},
@@ -152,21 +154,22 @@ func bindingsForm(shown, all []bindingNeed, ix routing.Needs) (*prompt.Form, []b
 // exceptionNote says, for a repository whose owner another organization needs, that
 // binding it makes it an exception to that owner.
 func exceptionNote(ix routing.Needs, names map[string]string, n bindingNeed) string {
-	if org, ok := ix.OwnerElsewhere(n.key, n.org); ok {
-		return "; an exception to " + routing.Owner(n.key) + ", which " + cmp.Or(names[org], org) + " needs"
+	if org, ok := ix.OwnerElsewhere(n.Key, n.Organization); ok {
+		return "; an exception to " + routing.Owner(n.Key) + ", which " + cmp.Or(names[org], org) + " needs"
 	}
 	return ""
 }
 
-// formDecisions are the bindings the checklist's answer makes: a whole owner picked binds
-// it in place of its listed repositories.
-func formDecisions(shown []bindingNeed, slots []bindingSlot, result []prompt.Item) []decision {
-	var out []decision
+// formDecisions are the bindings the checklist's answer makes. A whole owner picked binds
+// it in place of the repository decisions its organization's ticked lines under it make:
+// replaced says which, for each, so the teams that needed those hold the owner.
+func formDecisions(asked []bindingNeed, slots []bindingSlot, result []prompt.Item) (decisions []decision, replaced map[decision][]decision) {
+	replaced = map[decision][]decision{}
 	whole, seen := map[decision]bool{}, map[decision]bool{}
 	for k, s := range slots {
-		if s.kind == slotWholeOwner && result[k].Selected {
-			whole[decision{s.owner, s.org}], seen[decision{s.owner, s.org}] = true, true
-			out = append(out, decision{s.owner, s.org})
+		if d := (decision{Key: s.owner, Organization: s.org}); s.kind == slotWholeOwner && result[k].Selected {
+			whole[d], seen[d] = true, true
+			decisions = append(decisions, d)
 		}
 	}
 	for k, s := range slots {
@@ -176,15 +179,20 @@ func formDecisions(shown []bindingNeed, slots []bindingSlot, result []prompt.Ite
 		switch s.kind {
 		case slotKeys:
 			for _, i := range s.needs {
-				n := shown[i]
-				if d := (decision{n.key, n.org}); !whole[decision{routing.Owner(n.key), n.org}] && !seen[d] {
-					seen[d] = true
-					out = append(out, d)
+				d := decision(asked[i].Need)
+				if seen[d] {
+					continue
 				}
+				seen[d] = true
+				if o := (decision{Key: routing.Owner(d.Key), Organization: d.Organization}); whole[o] {
+					replaced[o] = append(replaced[o], d)
+					continue
+				}
+				decisions = append(decisions, d)
 			}
 		case slotConflict:
-			out = append(out, decision{s.key, s.org})
+			decisions = append(decisions, decision{Key: s.key, Organization: s.org})
 		}
 	}
-	return out
+	return decisions, replaced
 }

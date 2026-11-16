@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/miradorlabs/terma-cli/internal/config"
+	"github.com/miradorlabs/terma-cli/internal/doctor"
 	"github.com/miradorlabs/terma-cli/internal/routing"
 	"github.com/miradorlabs/terma-cli/internal/ui/prompt"
 )
@@ -96,13 +97,13 @@ func TestBindingsFormTicksEveryNeedAndPutsConflictsInRed(t *testing.T) {
 	keys := func(ds []decision) []string {
 		var out []string
 		for _, d := range ds {
-			out = append(out, d.key+"="+d.org)
+			out = append(out, d.Key+"="+d.Organization)
 		}
 		return out
 	}
 	answer := slices.Clone(form.Items)
-	if got := keys(formDecisions(needs, slots, answer)); !slices.Equal(got, []string{"github.com/acme/api=org-a", "github.com/acme/web=org-a", "github.com/beta=org-b"}) {
-		t.Errorf("the defaults bind %v", got)
+	if got, _ := formDecisions(needs, slots, answer); !slices.Equal(keys(got), []string{"github.com/acme/api=org-a", "github.com/acme/web=org-a", "github.com/beta=org-b"}) {
+		t.Errorf("the defaults bind %v", keys(got))
 	}
 	for i, it := range answer {
 		switch it.Label {
@@ -112,11 +113,14 @@ func TestBindingsFormTicksEveryNeedAndPutsConflictsInRed(t *testing.T) {
 			answer[i].Selected = false
 		}
 	}
-	decided := formDecisions(needs, slots, answer)
+	decided, replaced := formDecisions(needs, slots, answer)
 	if got := keys(decided); !slices.Equal(got, []string{"github.com/acme=org-a", "github.com/shared/x=org-b"}) {
 		t.Errorf("the whole owner, Beta for the conflict and github.com/beta left: %v", got)
 	}
-	if ops := withHolders(needs, decided, orgNames(needs)); !slices.Equal(ops[0].holders, []*tick{acme}) || !slices.Equal(ops[1].holders, []*tick{beta}) {
+	if got := keys(replaced[decided[0]]); !slices.Equal(got, []string{"github.com/acme/api=org-a", "github.com/acme/web=org-a"}) {
+		t.Errorf("the whole owner replaced %v", got)
+	}
+	if ops := withHolders(needs, decided, replaced, orgNames(needs)); !slices.Equal(ops[0].holders, []*tick{acme}) || !slices.Equal(ops[1].holders, []*tick{beta}) {
 		t.Error("a decision is not held by the ticks that need it")
 	}
 }
@@ -132,7 +136,7 @@ func TestBindingsFormCollapsesAnOwnersManyRepositories(t *testing.T) {
 	if len(form.Items) != 3 || form.Items[0].Label != fmt.Sprintf("github.com/acme: its %d listed repositories", collapseAt+2) {
 		t.Fatalf("items: %+v", form.Items)
 	}
-	if ds := formDecisions(needs, slots, form.Items); len(ds) != collapseAt+2 {
+	if ds, _ := formDecisions(needs, slots, form.Items); len(ds) != collapseAt+2 {
 		t.Errorf("the collapsed line binds %d repositories, want %d", len(ds), collapseAt+2)
 	}
 }
@@ -142,7 +146,7 @@ func TestBindingsFormCollapsesAnOwnersManyRepositories(t *testing.T) {
 func TestDecideNeedsBindsAllButConflicts(t *testing.T) {
 	acme := needTick("org-a", "Acme", "github.com/acme/*", "github.com/shared/x")
 	beta := needTick("org-b", "Beta", "github.com/shared/x")
-	before := bindingNeed{key: "github.com/old/repo", org: "org-a", orgName: "Acme", entry: "github.com/old/repo"}
+	before := bindingNeed{Need: routing.Need{Key: "github.com/old/repo", Organization: "org-a"}, orgName: "Acme", entry: "github.com/old/repo"}
 	needs := append([]bindingNeed{before}, append(tickNeeds(routing.State{}, acme), tickNeeds(routing.State{}, beta)...)...)
 	for name, tc := range map[string]struct {
 		mode bindingMode
@@ -152,7 +156,7 @@ func TestDecideNeedsBindsAllButConflicts(t *testing.T) {
 		"--yes":      {bindTicked, []string{"github.com/acme"}},
 		"--bind-all": {bindPending, []string{"github.com/old/repo", "github.com/acme"}},
 	} {
-		ops, _, err := decideNeeds(needs, tc.mode, nil)
+		ops, err := decideNeeds(needs, tc.mode, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -459,6 +463,166 @@ func TestTeamsFailedTicksUndoOnlyWhatNoTeamStillNeeds(t *testing.T) {
 	})
 }
 
+// orgC is a third organization, with a team ticked before the run.
+const (
+	orgC     = "cccccccc-3333-4333-8333-333333333333"
+	orgCTeam = "cccccccc-0000-4000-8000-000000000001"
+)
+
+// pendingFor reports whether key is left to decide for org in st.
+func pendingFor(st routing.State, key, org string) bool {
+	return slices.ContainsFunc(doctor.Pending(st), func(p doctor.PendingBinding) bool { return p.Key == key && p.Organization == org })
+}
+
+// A repository an --unbind leaves undecided is never handed to its owner by what the same
+// run binds: --bind-all and --yes leave the owner to decide and say why, the checklist
+// shows the owner in red, and --bind on the owner asks.
+func TestAnUnboundRepositoryIsNeverHandedToItsOwner(t *testing.T) {
+	betaHasAPI := func(f *fakeAuth, s *routing.State) error {
+		if _, err := s.Select(stateTeam(f, orgB().ID, betaCore, false, "github.com/acme/api")); err != nil {
+			return err
+		}
+		return s.Bind("github.com/acme/api", orgB().ID, false)
+	}
+	acmeTicked := func(f *fakeAuth, s *routing.State) error {
+		web := stateTeam(f, orgA().ID, acmeWeb, false, "github.com/acme/*")
+		web.Policy.Wildcards = true
+		if _, err := s.Select(web); err != nil {
+			return err
+		}
+		return betaHasAPI(f, s)
+	}
+	leftToDecide := func(t *testing.T, out string) {
+		t.Helper()
+		st := loadState(t)
+		if len(st.Bindings) != 0 || !pendingFor(st, "github.com/acme/api", orgB().ID) || !pendingFor(st, "github.com/acme", orgA().ID) {
+			t.Errorf("bindings %+v, pending %+v: the owner would take github.com/acme/api from Beta", st.Bindings, doctor.Pending(st))
+		}
+		if out != "" && !strings.Contains(out, "github.com/acme is left to decide: binding it to Acme would also give it github.com/acme/api, which "+orgB().Name+" needs") {
+			t.Errorf("not said:\n%s", out)
+		}
+	}
+	t.Run("--bind-all", func(t *testing.T) {
+		migratedMachine(t, acmeTicked, orgA(), orgB())
+		out, err := runTerma(t, "teams", "--unbind", "github.com/acme/api", "--bind-all")
+		if err != nil {
+			t.Fatalf("teams: %v\n%s", err, out)
+		}
+		leftToDecide(t, out)
+	})
+	t.Run("--yes", func(t *testing.T) {
+		f := migratedMachine(t, betaHasAPI, orgA(), orgB())
+		f.policyBodies[acmeWeb] = wildcardBody("github.com/acme/*")
+		out, err := runTerma(t, "teams", "--unbind", "github.com/acme/api", "--select", "Acme Web", "--yes")
+		if err != nil {
+			t.Fatalf("teams: %v\n%s", err, out)
+		}
+		leftToDecide(t, out)
+	})
+	t.Run("the checklist", func(t *testing.T) {
+		f := migratedMachine(t, betaHasAPI, orgA(), orgB())
+		f.policyBodies[acmeWeb] = wildcardBody("github.com/acme/*")
+		var red []string
+		onTerminal(t, func(form *prompt.Form) ([]prompt.Item, error) {
+			for _, it := range form.Items {
+				if it.Alert && !it.Selected {
+					red = append(red, it.Label)
+				}
+			}
+			return enter(form)
+		})
+		if out, err := runTerma(t, "teams", "--unbind", "github.com/acme/api", "--select", "Acme Web"); err != nil {
+			t.Fatalf("teams: %v\n%s", err, out)
+		}
+		if !slices.Equal(red, []string{"github.com/acme"}) {
+			t.Errorf("unticked in red: %v", red)
+		}
+		leftToDecide(t, "")
+	})
+	t.Run("--bind the owner", func(t *testing.T) {
+		migratedMachine(t, acmeTicked, orgA(), orgB())
+		out, err := runTerma(t, "teams", "--unbind", "github.com/acme/api", "--bind", "github.com/acme=Acme")
+		if err == nil || !strings.Contains(err.Error(), "github.com/acme covers github.com/acme/api, which ") || !strings.Contains(err.Error(), "Pass --yes") {
+			t.Errorf("--bind did not ask: %v\n%s", err, out)
+		}
+		if st := loadState(t); st.Bindings["github.com/acme/api"].Organization != orgB().ID || len(st.Bindings) != 1 {
+			t.Errorf("bindings = %+v, want them as they were", st.Bindings)
+		}
+	})
+}
+
+// A whole owner picked in place of its organization's listed repositories stays bound when
+// the exact-only team it was offered for fails to tick, while another team of the same
+// organization that needed a repository under it ticks.
+func TestUndoingAFailedTickKeepsAWholeOwnerATickedTeamNeeds(t *testing.T) {
+	f := migratedMachine(t, nil, orgA())
+	f.policyBodies[acmeWeb] = policyBody("github.com/acme/a")
+	f.policyBodies[acmeAPI] = wildcardBody("github.com/other/*", "github.com/acme/c")
+	f.mintDownFor = map[string]bool{acmeWeb: true}
+	offered := false
+	onTerminal(t, func(form *prompt.Form) ([]prompt.Item, error) {
+		out := slices.Clone(form.Items)
+		for i := range out {
+			switch out[i].Label {
+			case "the whole owner github.com/acme":
+				out[i].Selected, offered = true, true
+			case "only the listed repositories under github.com/acme":
+				out[i].Selected = false
+			}
+		}
+		return out, nil
+	})
+	out, err := runTerma(t, "teams", "--select", "Acme Web", "--select", "Acme API")
+	if err == nil || !offered {
+		t.Fatalf("Acme Web's key creation did not fail (%v), or the whole owner was not offered (%v):\n%s", err, offered, out)
+	}
+	st := loadState(t)
+	if len(st.Teams) != 1 || st.Teams[0].TeamID != acmeAPI {
+		t.Fatalf("ticked: %+v", st.Teams)
+	}
+	if st.Bindings["github.com/acme"].Organization != orgA().ID || pendingFor(st, "github.com/acme/c", orgA().ID) {
+		t.Errorf("bindings %+v, pending %+v: Acme API's github.com/acme/c lost the owner that covered it", st.Bindings, doctor.Pending(st))
+	}
+}
+
+// An owner bound beside a repository decision under it is unbound again when a failed tick
+// undoes that decision and the owner would then take the repository from an organization
+// ticked before: it is left to decide, and the failure says so.
+func TestUndoingAFailedTickUnbindsAnOwnerThatWouldNowTakeARepository(t *testing.T) {
+	f := migratedMachine(t, func(f *fakeAuth, s *routing.State) error {
+		_, err := s.Select(stateTeam(f, orgC, orgCTeam, false, "github.com/acme/api"))
+		return err
+	}, orgA(), orgB())
+	f.policyBodies[acmeWeb] = wildcardBody("github.com/acme/*")
+	f.policyBodies[betaCore] = policyBody("github.com/acme/api")
+	f.mintDownFor = map[string]bool{betaCore: true}
+	var picked []string
+	onTerminal(t, func(form *prompt.Form) ([]prompt.Item, error) {
+		out := slices.Clone(form.Items)
+		for i := range out {
+			switch out[i].Label {
+			case "github.com/acme", "bind github.com/acme/api to " + orgB().Name:
+				out[i].Selected = true
+				picked = append(picked, out[i].Label)
+			case "github.com/acme/api: decide later":
+				out[i].Selected = false
+			}
+		}
+		return out, nil
+	})
+	out, err := runTerma(t, "teams", "--select", "Acme Web", "--select", "Beta Core")
+	if len(picked) != 2 || err == nil {
+		t.Fatalf("picked %v, err %v:\n%s", picked, err, out)
+	}
+	if !strings.Contains(err.Error(), "github.com/acme is left to decide: binding it to Acme would also give it github.com/acme/api, which "+orgC+" needs") {
+		t.Errorf("the failure does not say the owner was held: %v", err)
+	}
+	st := loadState(t)
+	if len(st.Bindings) != 0 || !pendingFor(st, "github.com/acme/api", orgC) || !pendingFor(st, "github.com/acme", orgA().ID) {
+		t.Errorf("bindings %+v, pending %+v: with Beta's pick undone, the owner takes github.com/acme/api", st.Bindings, doctor.Pending(st))
+	}
+}
+
 // The `terma teams` checklist asks about every key left to decide, earlier ones too, after
 // its team list, and Enter binds them.
 func TestTeamsChecklistAsksAboutEveryKeyLeftToDecide(t *testing.T) {
@@ -608,26 +772,47 @@ func TestAnOwnerThatWouldGiveARepositoryAwayWaitsForIt(t *testing.T) {
 }
 
 // Deciding scales with the needs, not their square: two organizations of 5,000
-// repositories each, under 50 owners, bound all at once or drawn as a form.
+// repositories each, under 50 owners, bound all at once or drawn as a form; and checking
+// the state written, with every owner bound to the other organization, so each takes one.
 func BenchmarkDecideNeeds(b *testing.B) {
 	var all []bindingNeed
+	var written routing.State
 	for _, org := range []string{"org-a", "org-b"} {
 		repos := make([]string, 0, 5000)
 		for i := range 5000 {
 			repos = append(repos, fmt.Sprintf("github.com/%s-%d/r%d", org, i%50, i))
 		}
-		all = append(all, tickNeeds(routing.State{}, needTick(org, org, repos...))...)
+		tk := needTick(org, org, repos...)
+		all = append(all, tickNeeds(routing.State{}, tk)...)
+		written.Teams = append(written.Teams, tk.team)
 	}
+	written.Bindings = map[string]routing.Binding{}
+	keys := make([]string, 0, len(all))
+	for _, n := range all {
+		owner := routing.Owner(n.Key)
+		if _, ok := written.Bindings[owner]; !ok {
+			written.Bindings[owner] = routing.Binding{Organization: map[string]string{"org-a": "org-b", "org-b": "org-a"}[n.Organization]}
+			keys = append(keys, owner)
+		}
+		keys = append(keys, n.Key)
+	}
+	b.Run("check", func(b *testing.B) {
+		for b.Loop() {
+			if taken := written.OwnersTaking(keys); len(taken) != 100 {
+				b.Fatalf("%d owners take a repository, want 100", len(taken))
+			}
+		}
+	})
 	b.Run("bind-all", func(b *testing.B) {
 		for b.Loop() {
-			if _, _, err := decideNeeds(all, bindPending, nil); err != nil {
+			if _, err := decideNeeds(all, bindPending, nil); err != nil {
 				b.Fatal(err)
 			}
 		}
 	})
 	b.Run("form", func(b *testing.B) {
 		for b.Loop() {
-			if _, _, err := decideNeeds(all, askPending, enter); err != nil {
+			if _, err := decideNeeds(all, askPending, enter); err != nil {
 				b.Fatal(err)
 			}
 		}

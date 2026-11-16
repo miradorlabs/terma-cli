@@ -22,8 +22,10 @@ import (
 // teamsChange is one run's changes, resolved against the routing state and the list.
 type teamsChange struct {
 	ops []bindingOp
-	// decided are the bindings this run decided for the teams that need them.
+	// decided are the bindings this run decided for the teams that need them, and orgNames
+	// the names of the organizations their needs name.
 	decided  []neededOp
+	orgNames map[string]string
 	untick   []routing.Team
 	released map[string]bool
 	ticks    []*tick
@@ -34,7 +36,9 @@ type teamsChange struct {
 // applyTeams makes f's changes as one routing-state write: the decisions first, then the
 // unticked and released teams, then the ticked ones, each ready before the lock is taken.
 // A ticked team gets its key once it has its enrollment; one that cannot is taken off
-// again, with what was decided for it, so a failed tick changes nothing.
+// again, with what was decided for it, so a failed tick changes nothing. Both writes check
+// their result: an owner this run decided never takes another organization's repository
+// that is left undecided.
 func (app *App) applyTeams(cmd *cobra.Command, cfg *config.Config, st routing.State, f teamsFlags) (teamsView, error) {
 	ctx := cmd.Context()
 	names := loadTeamNames(app.stateDir, cfg.ProfileName)
@@ -107,14 +111,17 @@ func (app *App) applyTeams(cmd *cobra.Command, cfg *config.Config, st routing.St
 		lv := list()
 		return lv.orgName(id)
 	}, func(id string) string { return names.Teams[id] }), needs...)
-	needs = slices.DeleteFunc(needs, func(n bindingNeed) bool { return flagged[n.key] })
-	decided, held, err := decideNeeds(needs, mode, app.form())
+	// A key this run's flags decided or unbound is not asked or decided again, but it still
+	// counts for the rules, so an owner beside it waits for it.
+	for i := range needs {
+		needs[i].flagged = flagged[needs[i].Key]
+	}
+	decided, err := decideNeeds(needs, mode, app.form())
 	if err != nil {
 		return teamsView{}, err
 	}
-	ch.decided = decided
-	ch.warnings = append(ch.warnings, held...)
-	next, err := routing.Update(app.stateDir, cfg.ProfileName, func(s *routing.State) error { return ch.write(s) })
+	ch.decided, ch.orgNames = decided, orgNames(needs)
+	next, err := routing.Update(app.stateDir, cfg.ProfileName, ch.write)
 	if err != nil {
 		return teamsView{}, err
 	}
@@ -133,7 +140,9 @@ func (app *App) applyTeams(cmd *cobra.Command, cfg *config.Config, st routing.St
 	return v, failed
 }
 
-// write makes ch on s: the decisions, then the unticked teams, then the ticked ones.
+// write makes ch on s: the flags' decisions, then the unticked teams, then the decisions
+// for the teams that need them, then the ticked teams; then it holds any owner decided
+// that would take what it must not (holdOwners).
 func (ch *teamsChange) write(s *routing.State) error {
 	for _, op := range ch.ops {
 		if err := op.apply(s); err != nil {
@@ -145,6 +154,7 @@ func (ch *teamsChange) write(s *routing.State) error {
 			return fmt.Errorf("team %s was unticked meanwhile", t.TeamID)
 		}
 	}
+	before := maps.Clone(s.Bindings)
 	for _, d := range ch.decided {
 		if err := d.op.apply(s); err != nil {
 			return err
@@ -157,12 +167,44 @@ func (ch *teamsChange) write(s *routing.State) error {
 		}
 		tk.enrollmentID = id
 	}
+	var held []string
+	ch.decided, held = ch.holdOwners(s, ch.decided, before)
+	ch.warnings = append(ch.warnings, held...)
 	return nil
+}
+
+// holdOwners checks s, as a run leaves it: each owner among decided that takes a
+// repository another organization needs with no decision of its own
+// (routing.State.OwnersTaking) goes back to what before had. It returns the decisions that
+// stand, and why each owner it held is left to decide.
+func (ch *teamsChange) holdOwners(s *routing.State, decided []neededOp, before map[string]routing.Binding) (stand []neededOp, held []string) {
+	keys := make([]string, 0, len(decided))
+	for _, d := range decided {
+		keys = append(keys, d.op.key)
+	}
+	taken := s.OwnersTaking(keys)
+	if len(taken) == 0 {
+		return decided, nil
+	}
+	stand = make([]neededOp, 0, len(decided))
+	for _, d := range decided {
+		n, ok := taken[d.op.key]
+		if !ok {
+			stand = append(stand, d)
+			continue
+		}
+		restoreBinding(s, before, d.op.key)
+		held = append(held, fmt.Sprintf("%s is left to decide: binding it to %s would also give it %s, which %s needs; decide that first",
+			d.op.key, d.orgName, n.Key, cmp.Or(ch.orgNames[n.Organization], n.Organization)))
+	}
+	return stand, held
 }
 
 // finishTicks gives each ticked team its key, and takes one that gets none off again. A
 // decision of this run is undone with it only when every team that needed it failed and no
-// team ticked before needs it. It returns the first failure.
+// team ticked before needs it; then the result is checked again, since an owner left
+// standing may have relied on a decision undone (holdOwners). It returns the first
+// failure, with any owner that check held.
 func (app *App) finishTicks(cmd *cobra.Command, cfg *config.Config, before routing.State, ch *teamsChange) error {
 	var failed error
 	lost := map[*tick]bool{}
@@ -178,39 +220,51 @@ func (app *App) finishTicks(cmd *cobra.Command, cfg *config.Config, before routi
 			failed = fmt.Errorf("%s was not ticked: creating its key for this machine failed: %w", tickLabel(tk), err)
 		}
 	}
-	var undo []string
-	for _, d := range ch.decided {
-		if !d.earlier && len(d.holders) > 0 && !slices.ContainsFunc(d.holders, func(tk *tick) bool { return !lost[tk] }) {
-			undo = append(undo, d.op.key)
-			continue
+	if len(lost) > 0 {
+		var undo []string
+		stand := make([]neededOp, 0, len(ch.decided))
+		for _, d := range ch.decided {
+			if !d.earlier && len(d.holders) > 0 && !slices.ContainsFunc(d.holders, func(tk *tick) bool { return !lost[tk] }) {
+				undo = append(undo, d.op.key)
+				continue
+			}
+			stand = append(stand, d)
 		}
-		ch.changes = append(ch.changes, describeOp(d.op, d.orgName))
-	}
-	if len(lost) == 0 {
-		return failed
-	}
-	_, undoErr := routing.Update(app.stateDir, cfg.ProfileName, func(s *routing.State) error {
+		ch.decided = stand
+		var held []string
+		_, undoErr := routing.Update(app.stateDir, cfg.ProfileName, func(s *routing.State) error {
+			for tk := range lost {
+				s.Deselect(tk.enrollmentID)
+			}
+			for _, key := range undo {
+				restoreBinding(s, before.Bindings, key)
+			}
+			ch.decided, held = ch.holdOwners(s, stand, before.Bindings)
+			return nil
+		})
 		for tk := range lost {
-			s.Deselect(tk.enrollmentID)
+			_ = keystore.DeleteTeam(app.dir, tk.enrollmentID)
+			if undoErr != nil {
+				failed = errors.Join(failed, fmt.Errorf("untick %s with `terma teams --deselect %s`: %w", tickLabel(tk), tk.team.TeamID, undoErr))
+			}
 		}
-		for _, key := range undo {
-			restoreBinding(s, before, key)
+		// A failed run prints its error alone, so an owner held with the ticks is said there.
+		if undoErr == nil {
+			for _, h := range held {
+				failed = errors.Join(failed, errors.New(h))
+			}
 		}
-		return nil
-	})
-	for tk := range lost {
-		_ = keystore.DeleteTeam(app.dir, tk.enrollmentID)
-		if undoErr != nil {
-			failed = errors.Join(failed, fmt.Errorf("untick %s with `terma teams --deselect %s`: %w", tickLabel(tk), tk.team.TeamID, undoErr))
-		}
+	}
+	for _, d := range ch.decided {
+		ch.changes = append(ch.changes, describeOp(d.op, d.orgName))
 	}
 	return failed
 }
 
-// restoreBinding puts key's decision in s back to what it was in before.
-func restoreBinding(s *routing.State, before routing.State, key string) {
+// restoreBinding puts key's decision in s back to what before had.
+func restoreBinding(s *routing.State, before map[string]routing.Binding, key string) {
 	key = routing.Normalize(key)
-	if b, ok := before.Bindings[key]; ok {
+	if b, ok := before[key]; ok {
 		if s.Bindings == nil {
 			s.Bindings = map[string]routing.Binding{}
 		}
