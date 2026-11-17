@@ -13677,6 +13677,23 @@
               "role": "side_request"
             }
           ]
+        },
+        "1.19.6": {
+          "captured_at": "2026-11-17T07:32:44.935765621Z",
+          "captured": true,
+          "uses": [
+            {
+              "model": "m",
+              "role": "default",
+              "params": {
+                "tool_choice": "auto"
+              }
+            },
+            {
+              "model": "m",
+              "role": "side_request"
+            }
+          ]
         }
       }
     },
