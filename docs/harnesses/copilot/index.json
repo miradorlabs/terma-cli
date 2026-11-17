@@ -7,23 +7,56 @@
     "homepage": "https://github.com/github/copilot-cli",
     "source": null,
     "changelog": "https://github.com/github/copilot-cli/blob/main/changelog.md",
-    "latest": "1.0.112",
+    "latest": "1.0.113",
     "support": "supported",
-    "versions_tracked": 8,
+    "versions_tracked": 9,
     "first_tracked": "2026-10-28",
     "last_change": {
-      "from": "1.0.111",
-      "to": "1.0.112",
-      "at": "2026-11-14T19:18:11.642126269Z",
-      "released_at": "2026-11-13T23:59:41.114Z",
-      "changes": 2,
+      "from": "1.0.112",
+      "to": "1.0.113",
+      "at": "2026-11-17T16:47:38.091291406Z",
+      "released_at": "2026-11-17T16:36:19.934Z",
+      "changes": 4,
       "categories": {
-        "cli": 1,
+        "cli": 2,
+        "config": 1,
         "storage": 1
       }
     }
   },
   "versions": [
+    {
+      "version": "1.0.113",
+      "released_at": "2026-11-17T16:36:19.934Z",
+      "captured_at": "2026-11-17T16:47:38.091291406Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "1.0.112",
+      "changes": 4,
+      "categories": {
+        "cli": 2,
+        "config": 1,
+        "storage": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 4,
+        "notable": 0
+      },
+      "undocumented": 4,
+      "highlights": [
+        "`copilot --extension-sdk-path`: description changed (+160 −157 chars)",
+        "Full help text of `--help` changed (+67 −64 chars)",
+        "New environment variable: COPILOT_SDK_DEFAULT_CONNECTION"
+      ],
+      "signing": "valid",
+      "partial": true,
+      "attempted_at": "2026-11-17T16:47:38.091291406Z",
+      "attempts": 1
+    },
     {
       "version": "1.0.112",
       "released_at": "2026-11-13T23:59:41.114Z",

@@ -1,0 +1,112 @@
+{
+  "schema_version": 1,
+  "harness": "copilot",
+  "from": "1.0.112",
+  "to": "1.0.113",
+  "generated_at": "2026-11-17T16:47:38.091291406Z",
+  "source": null,
+  "changelog": {
+    "url": "https://github.com/github/copilot-cli/blob/main/changelog.md",
+    "text": "- Administrators can disable built-in Browser Use with the managed setting features.browserUse, including in running sessions."
+  },
+  "summary": {
+    "changes": 4,
+    "categories": {
+      "cli": 2,
+      "config": 1,
+      "storage": 1
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 4,
+      "notable": 0
+    },
+    "undocumented": 4
+  },
+  "changes": [
+    {
+      "id": "cli.commands.copilot.options.--extension-sdk-path.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "copilot",
+        "options",
+        "--extension-sdk-path",
+        "description"
+      ],
+      "title": "`copilot --extension-sdk-path`: description changed (+160 −157 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Override the bundled @github/copilot-sdk injected into extension subprocesses with a local `copilot-sdk/` folder. Invalid paths fall back to the bundled SDK.\n+Override the bundled @microsoft/copilot-sdk injected into extension subprocesses with a local `copilot-sdk/` folder. Invalid paths fall back to the bundled SDK.\n",
+      "stats": {
+        "added_chars": 160,
+        "removed_chars": 157
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "cli.help.--help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "--help"
+      ],
+      "title": "Full help text of `--help` changed (+67 −64 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -146,7 +146,7 @@\n       --experimental\n           Enable experimental features\n       --extension-sdk-path <directory>\n-          Override the bundled @github/copilot-sdk injected into\n+          Override the bundled @microsoft/copilot-sdk injected into\n           extension subprocesses with a local `copilot-sdk/` folder.\n           Invalid paths fall back to the bundled SDK.\n       --fleet\n",
+      "stats": {
+        "added_chars": 67,
+        "removed_chars": 64
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.COPILOT_SDK_DEFAULT_CONNECTION",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "COPILOT_SDK_DEFAULT_CONNECTION"
+      ],
+      "title": "New environment variable: COPILOT_SDK_DEFAULT_CONNECTION",
+      "impact": "informational",
+      "before": null,
+      "after": "COPILOT_SDK_DEFAULT_CONNECTION",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "storage.logs.path",
+      "category": "storage",
+      "op": "changed",
+      "path": [
+        "storage",
+        "logs",
+        "path"
+      ],
+      "title": "On-disk logs path changed",
+      "impact": "informational",
+      "before": "<home>/.copilot/logs/process-<n>-7095.log",
+      "after": "<home>/.copilot/logs/process-<n>-4522.log",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    }
+  ]
+}

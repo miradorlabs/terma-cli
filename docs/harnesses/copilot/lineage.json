@@ -3,8 +3,8 @@
   "harness": "copilot",
   "window": {
     "oldest": "1.0.105",
-    "newest": "1.0.112",
-    "builds": 8
+    "newest": "1.0.113",
+    "builds": 9
   },
   "items": {
     "cli.commands.copilot app": {
@@ -2580,6 +2580,17 @@
         }
       ],
       "since_bounded": false
+    },
+    "config.env_vars.COPILOT_SDK_DEFAULT_CONNECTION": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.0.113",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
     },
     "config.env_vars.COPILOT_SDK_PATH": {
       "kind": "env_var",

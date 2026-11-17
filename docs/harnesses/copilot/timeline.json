@@ -3,6 +3,44 @@
   "harness": "copilot",
   "steps": [
     {
+      "version": "1.0.113",
+      "previous": "1.0.112",
+      "changes": [
+        {
+          "id": "cli.commands.copilot.options.--extension-sdk-path.description",
+          "category": "cli",
+          "op": "changed",
+          "title": "`copilot --extension-sdk-path`: description changed (+160 −157 chars)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "cli.help.--help",
+          "category": "cli",
+          "op": "changed",
+          "title": "Full help text of `--help` changed (+67 −64 chars)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.env_vars.COPILOT_SDK_DEFAULT_CONNECTION",
+          "category": "config",
+          "op": "added",
+          "title": "New environment variable: COPILOT_SDK_DEFAULT_CONNECTION",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "storage.logs.path",
+          "category": "storage",
+          "op": "changed",
+          "title": "On-disk logs path changed",
+          "impact": "informational",
+          "documented": false
+        }
+      ]
+    },
+    {
       "version": "1.0.112",
       "previous": "1.0.111",
       "changes": [

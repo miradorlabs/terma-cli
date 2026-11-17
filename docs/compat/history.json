@@ -9169,6 +9169,61 @@
     "test": "TestRelayCopilotToolsGetNoExporter/v1.0.112"
   },
   {
+    "harness": "copilot",
+    "version": "1.0.113",
+    "platform": "darwin/arm64",
+    "capability": "relay.content_allowed",
+    "result": "pass",
+    "last_run": "2026-11-17T16:45:41.351515Z",
+    "first_passed": "2026-11-17T16:45:41.351515Z",
+    "terma": "terma version dev",
+    "test": "TestRelayCopilot/v1.0.113/content"
+  },
+  {
+    "harness": "copilot",
+    "version": "1.0.113",
+    "platform": "darwin/arm64",
+    "capability": "relay.content_withheld",
+    "result": "pass",
+    "last_run": "2026-11-17T16:46:07.857718Z",
+    "first_passed": "2026-11-17T16:46:07.857718Z",
+    "terma": "terma version dev",
+    "test": "TestRelayCopilot/v1.0.113/withheld"
+  },
+  {
+    "harness": "copilot",
+    "version": "1.0.113",
+    "platform": "darwin/arm64",
+    "capability": "relay.only_opted_in",
+    "result": "pass",
+    "last_run": "2026-11-17T16:46:24.803592Z",
+    "first_passed": "2026-11-17T16:46:24.803592Z",
+    "terma": "terma version dev",
+    "test": "TestRelayCopilotOutsideARepository/v1.0.113"
+  },
+  {
+    "harness": "copilot",
+    "version": "1.0.113",
+    "platform": "darwin/arm64",
+    "capability": "relay.telemetry",
+    "result": "pass",
+    "last_run": "2026-11-17T16:46:07.85849Z",
+    "first_passed": "2026-11-17T16:46:07.85849Z",
+    "terma": "terma version dev",
+    "test": "TestRelayCopilot/v1.0.113"
+  },
+  {
+    "harness": "copilot",
+    "version": "1.0.113",
+    "platform": "darwin/arm64",
+    "capability": "relay.tools_no_token",
+    "result": "pass",
+    "last_run": "2026-11-17T16:46:36.212Z",
+    "first_passed": "2026-11-17T16:46:36.212Z",
+    "terma": "terma version dev",
+    "test": "TestRelayCopilotToolsGetNoExporter/v1.0.113"
+  },
+  {
     "harness": "dsh",
     "version": "0.2.0-rc.2",
     "platform": "darwin/arm64",

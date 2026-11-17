@@ -1,7 +1,41 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-17T15:33:55.626260276Z",
+  "generated_at": "2026-11-17T16:47:38.091291406Z",
   "versions": [
+    {
+      "harness": "copilot",
+      "name": "GitHub Copilot CLI",
+      "version": "1.0.113",
+      "released_at": "2026-11-17T16:36:19.934Z",
+      "captured_at": "2026-11-17T16:47:38.091291406Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "1.0.112",
+      "changes": 4,
+      "categories": {
+        "cli": 2,
+        "config": 1,
+        "storage": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 4,
+        "notable": 0
+      },
+      "undocumented": 4,
+      "highlights": [
+        "`copilot --extension-sdk-path`: description changed (+160 −157 chars)",
+        "Full help text of `--help` changed (+67 −64 chars)",
+        "New environment variable: COPILOT_SDK_DEFAULT_CONNECTION"
+      ],
+      "signing": "valid",
+      "partial": true,
+      "attempted_at": "2026-11-17T16:47:38.091291406Z",
+      "attempts": 1
+    },
     {
       "harness": "claude-desktop",
       "name": "Claude Desktop (Code)",
@@ -6158,38 +6192,6 @@
         "ScheduleWakeup tool description changed (+230 −200 chars)",
         "New environment variable: CLAUDE_CODE_3P_PROBE_WROTE_OPUS_DEFAULT",
         "New environment variable: CLAUDE_CODE_3P_PROBE_WROTE_SONNET_DEFAULT"
-      ],
-      "signing": "valid"
-    },
-    {
-      "harness": "codex",
-      "name": "Codex CLI",
-      "version": "0.144.1",
-      "released_at": "2026-07-09T23:05:40.041Z",
-      "captured_at": "2026-11-05T09:54:28.532441Z",
-      "platforms": [
-        "darwin/arm64",
-        "linux/amd64"
-      ],
-      "support": "untested",
-      "previous": "0.144.0",
-      "changes": 13,
-      "categories": {
-        "behavior": 9,
-        "caching": 1,
-        "filesystem": 3
-      },
-      "impact": {
-        "breaking": 0,
-        "degrading": 0,
-        "informational": 0,
-        "notable": 13
-      },
-      "undocumented": 13,
-      "highlights": [
-        "Caching across_turns: none → {\"breakpoints\":[[],[],[]],\"stable_cache_key\":true,\"stable…",
-        "Behaviour: compaction added",
-        "Behaviour: sandbox approval removed"
       ],
       "signing": "valid"
     }
