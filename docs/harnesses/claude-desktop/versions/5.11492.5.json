@@ -12785,7 +12785,10 @@
               "properties"
             ]
           }
-        }
+        },
+        "unobserved": [
+          "desktop_main_event_loop_stall"
+        ]
       }
     }
   },

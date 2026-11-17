@@ -1,0 +1,1890 @@
+{
+  "schema_version": 1,
+  "harness": "claude-desktop",
+  "from": "5.11492.5",
+  "to": "6.6395.0",
+  "generated_at": "2026-11-17T15:33:55.626260276Z",
+  "source": null,
+  "changelog": null,
+  "summary": {
+    "changes": 89,
+    "categories": {
+      "binary": 3,
+      "cli": 43,
+      "config": 23,
+      "prompt": 3,
+      "request": 1,
+      "side_requests": 5,
+      "tools": 11
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 62,
+      "notable": 27
+    },
+    "undocumented": null
+  },
+  "changes": [
+    {
+      "id": "prompt.context.2.text",
+      "category": "prompt",
+      "op": "changed",
+      "path": [
+        "prompt",
+        "context",
+        "2",
+        "text"
+      ],
+      "title": "Injected context changed (+2003 −2000 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -7,8 +7,8 @@\n If the task cannot be finished with what you were given, do what you can and tell the user plainly what is missing instead of finding another way to it; that report is a complete answer.\n \n How the sandbox is configured in this session:\n-Filesystem: {\"read\":{\"denyOnly\":[\"<claude-config>/seed-admin\",\"<claude-config>/daemon\",\"<claude-config>/file-history\",\"<tmp>\",\"<claude-config>/bridge-spawn\",\"<tmp>\",\"<claude-config>/ide\"],\"allowWithinDeny\":[]},\"write\":{\"allowOnly\":[\"/dev/stdout\",\"/dev/stderr\",\"/dev/null\",\"/dev/tty\",\"/dev/dtracehelper\",\"/dev/autofs_nowait\",\"<tmp>\",\"<tmp>\",\"<home>/.npm/_logs\",\"<claude-config>/debug\",\".\",\"$TMPDIR\"],\"denyWithinAllow\":[\"<claude-config>/settings.json\",\"<repo>/.claude/settings.json\",\"<repo>/.claude/settings.local.json\",\"<tmp>\",\"/Library/Application Support/ClaudeCode/managed-settings.json\",\"/Library/Application Support/ClaudeCode/managed-settings.d\",\"<repo>/.claude/skills\",\"<repo>/.claude/hooks\",\"<claude-config>/local\",\"<repo>/.claude/.cc-writes\",\"<claude-config>/.cc-writes\",\"<claude-config>/jobs\",\"<claude-config>/seed-admin\",\"<claude-config>/daemon\",\"<claude-config>/file-history\",\"<tmp>\",\"<claude-config>/bridge-spawn\",\"<tmp>\",\"<claude-config>/shell-snapshots\",\"<claude-config>/session-env\",\"<claude-config>/plugins\",\"<claude-config>/hooks\",\"<claude-config>/skills\",\"<claude-config>/workflows\",\"<claude-config>/commands\",\"<claude-config>/agents\",\"<claude-config>/routines\",\"<claude-config>/rules\",\"<claude-config>/output-styles\",\"<claude-config>/scheduled_tasks.json\",\"<claude-config>/launch.json\",\"<claude-config>/CLAUDE.md\",\"<claude-config>/projects\",\"<claude-config>/daemon.json\",\"<claude-config>/policy-limits.json\",\"<claude-config>/policy-limits.json.signature.json\",\"<claude-config>/policy-limits.json.signature-iat.json\",\"<claude-config>/policy-limits.json.stamp.json\",\"<claude-config>/backups\",\"<claude-config>/loop.md\",\"<claude-config>/cowork_plugins\",\"<claude-config>/dev-mods\",\"<tmp><repo-slug>/<uuid>/tasks\",\"<tmp>\",\"<app-data>/local-agent-mode-sessions/skills-plugin/<uuid>/<uuid>\",\"<claude-config>/mcp-skill-archives\",\"<claude-config>/mcp-discovery-cache\",\"<claude-config>/shares\",\"<claude-config>/todos\",\"<claude-config>/statsig\",\"...\n-and 183 more (truncated for prompt size)\"]}}\n+Filesystem: {\"read\":{\"denyOnly\":[\"<claude-config>/seed-admin\",\"<claude-config>/daemon\",\"<claude-config>/file-history\",\"<tmp>\",\"<claude-config>/bridge-spawn\",\"<tmp>\",\"<claude-config>/ide\"],\"allowWithinDeny\":[]},\"write\":{\"allowOnly\":[\"/dev/stdout\",\"/dev/stderr\",\"/dev/null\",\"/dev/tty\",\"/dev/dtracehelper\",\"/dev/autofs_nowait\",\"<tmp>\",\"<tmp>\",\"<home>/.npm/_logs\",\"<claude-config>/debug\",\".\",\"$TMPDIR\"],\"denyWithinAllow\":[\"<claude-config>/settings.json\",\"<repo>/.claude/settings.json\",\"<repo>/.claude/settings.local.json\",\"<tmp>\",\"/Library/Application Support/ClaudeCode/managed-settings.json\",\"/Library/Application Support/ClaudeCode/managed-settings.d\",\"<repo>/.claude/skills\",\"<repo>/.claude/hooks\",\"<claude-config>/local\",\"<repo>/.claude/.cc-writes\",\"<claude-config>/.cc-writes\",\"<claude-config>/jobs\",\"<claude-config>/seed-admin\",\"<claude-config>/daemon\",\"<claude-config>/file-history\",\"<tmp>\",\"<claude-config>/bridge-spawn\",\"<claude-config>/child-logs\",\"<tmp>\",\"<claude-config>/shell-snapshots\",\"<claude-config>/session-env\",\"<claude-config>/plugins\",\"<claude-config>/hooks\",\"<claude-config>/skills\",\"<claude-config>/workflows\",\"<claude-config>/commands\",\"<claude-config>/agents\",\"<claude-config>/routines\",\"<claude-config>/rules\",\"<claude-config>/output-styles\",\"<claude-config>/scheduled_tasks.json\",\"<claude-config>/launch.json\",\"<claude-config>/CLAUDE.md\",\"<claude-config>/projects\",\"<claude-config>/daemon.json\",\"<claude-config>/policy-limits.json\",\"<claude-config>/policy-limits.json.signature.json\",\"<claude-config>/policy-limits.json.signature-iat.json\",\"<claude-config>/policy-limits.json.stamp.json\",\"<claude-config>/backups\",\"<claude-config>/loop.md\",\"<claude-config>/cowork_plugins\",\"<claude-config>/dev-mods\",\"<tmp><repo-slug>/<uuid>/tasks\",\"<tmp>\",\"<app-data>/local-agent-mode-sessions/skills-plugin/<uuid>/<uuid>\",\"<claude-config>/mcp-skill-archives\",\"<claude-config>/mcp-discovery-cache\",\"<claude-config>/shares\",\"<claude-config>/todos\",\"...\n+and 189 more (truncated for prompt size)\"]}}\n \n  - The `dangerouslyDisableSandbox` parameter is disabled in this session's configuration; setting it does not take a command out of the sandbox.\n  - If a command the task needs fails on a sandbox restriction, tell the user which restriction it hit; changing the sandbox settings is their decision, not yours.\n",
+      "stats": {
+        "added_chars": 2003,
+        "removed_chars": 2000
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "prompt.system.0.text",
+      "category": "prompt",
+      "op": "changed",
+      "path": [
+        "prompt",
+        "system",
+        "0",
+        "text"
+      ],
+      "title": "System prompt changed",
+      "impact": "notable",
+      "before": "x-anthropic-billing-header: cc_version=2.1.325.c15; cc_entrypoint=claude-desktop-3p;",
+      "after": "x-anthropic-billing-header: cc_version=2.1.326.0cd; cc_entrypoint=claude-desktop-3p;",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "prompt.system.2.text",
+      "category": "prompt",
+      "op": "changed",
+      "path": [
+        "prompt",
+        "system",
+        "2",
+        "text"
+      ],
+      "title": "System prompt changed (+421 −928 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -92,7 +92,7 @@\n Point to the app's own UI if any (e.g., model selection), else to `claude` in a terminal or to its settings files.\n \n \n-To show the user this session's diff, a file at a line, or its terminal, PR, tasks, plan or browser pane, use `mcp__ccd_view__show_pane` instead of describing it.\n+To show the user this session's diff, a file at a line, or its terminal, tasks, plan or browser pane, use `mcp__ccd_view__show_pane` instead of describing it.\n \n \n Link a Terminal panel tab whenever you point the user at one, so they can open it with a click: [the tab's title](#terminal/<tab_id>), using the tab_id a terminal tool or an attached terminal snippet gave you, never one you made up.\n@@ -123,7 +123,7 @@\n Where this session has no worktree, a new session may share this session's folder, so each brief adds: if you are working in <this folder's path> itself, touch only this step's files, commit nothing, switch no branch.\n These cards are the one exception to what a session and \"own_initiative\" are for (in this prompt and in the tool's description) and to how many cards a turn may show; they need no title line or chapter mark.\n Then begin your step at once: do not wait for an answer.\n-Right before you begin a step you proposed, call `mcp__ccd_session__dismiss_task` with its task_id: skip the step only if the result says it was started or is being started and the user has not told you to do it here; otherwise, do it here.\n+Right before you begin a step you proposed, call `mcp__ccd_session__dismiss_task` with its task_id: skip the step only if the result is \"Not withdrawn\", or says it was started or is being started and the user has not told you to do it here; otherwise, do it here.\n A skipped step stays pending on your task list.\n If you skipped a step, then once your own steps are done, check `mcp__ccd_session_mgmt__list_sessions` {\"linked\": true}.\n If a skipped step's session is running or starting, say so in one line with what is left, and end your turn (the app continues you once no session started from this one is working).\n@@ -171,10 +171,6 @@\n \n \n To show sessions side by side (split view), the user can drag a session from the sidebar to where they want it in the window or right-click it and choose Open in → Split view, or, for a session you started, you can do it for them with `mcp__ccd_window__open_session_in`.\n-\n-\n-When this session runs in a worktree the app made for it, bring its branch up to date with the base branch (for merge conflicts, or because you need its latest commits) by calling the ccd_host `sync_with_base_branch` tool instead of running `git merge` or `git pull` yourself: the app fetches and merges on the host, where the repository's sandbox-protected files can be written; resolve any conflicts it reports, then commit and push.\n-In any other checkout the app does not merge for you; merge the base branch yourself there.\n \n \n The desktop app may send this session `<ci-monitor-event>` messages about a pull request it is watching.\n",
+      "stats": {
+        "added_chars": 421,
+        "removed_chars": 928
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "tools.ExitWorktree.description",
+      "category": "tools",
+      "op": "changed",
+      "path": [
+        "tools",
+        "ExitWorktree",
+        "description"
+      ],
+      "title": "ExitWorktree tool description changed (+351 −126 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -18,10 +18,11 @@\n \n - `action` (required): `\"keep\"` or `\"remove\"`\n   - `\"keep\"` — leave the worktree directory and branch intact on disk. Use this if the user wants to come back to the work later, or if there are changes to preserve.\n-  - `\"remove\"` — delete the worktree directory and its branch. Use this for a clean exit when the work is done or abandoned.\n+  - `\"remove\"` — delete the worktree directory, and its branch too unless a hook made the worktree or git refuses the delete. Use this for a clean exit when the work is done or abandoned.\n - `discard_changes` (optional, default false): only meaningful with `action: \"remove\"`.\n If the worktree has uncommitted files or commits not on the original branch, the tool will REFUSE to remove it unless this is set to `true`.\n If the tool returns an error listing changes, confirm with the user before re-invoking with `discard_changes: true`.\n+The tool also refuses while a task may be running in the worktree: wait for the task, or ask the user before stopping it, then call the tool again, or use `keep`.\n \n ## Behavior\n \n",
+      "stats": {
+        "added_chars": 351,
+        "removed_chars": 126
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "tools.ExitWorktree.input_schema.properties.action.description",
+      "category": "tools",
+      "op": "changed",
+      "path": [
+        "tools",
+        "ExitWorktree",
+        "input_schema",
+        "properties",
+        "action",
+        "description"
+      ],
+      "title": "ExitWorktree tool parameter action: description changed (+131 −69 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-\"keep\" leaves the worktree and branch on disk; \"remove\" deletes both.\n+\"keep\" leaves the worktree and branch on disk; \"remove\" deletes the worktree and, unless a hook made it or git refuses, its branch.\n",
+      "stats": {
+        "added_chars": 131,
+        "removed_chars": 69
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "tools.ExitWorktree.input_schema.properties.discard_changes.description",
+      "category": "tools",
+      "op": "changed",
+      "path": [
+        "tools",
+        "ExitWorktree",
+        "input_schema",
+        "properties",
+        "discard_changes",
+        "description"
+      ],
+      "title": "ExitWorktree tool parameter discard_changes: description changed (+253 −143 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Required true when action is \"remove\" and the worktree has uncommitted files or unmerged commits. The tool will refuse and list them otherwise.\n+Required true when action is \"remove\" and the worktree has uncommitted files or unmerged commits. The tool will refuse and list them otherwise. It also removes the worktree under any task still running there, so set it only after the user has confirmed.\n",
+      "stats": {
+        "added_chars": 253,
+        "removed_chars": 143
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "tools.Monitor.description",
+      "category": "tools",
+      "op": "changed",
+      "path": [
+        "tools",
+        "Monitor",
+        "description"
+      ],
+      "title": "Monitor tool description changed (+49 −46 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -13,7 +13,7 @@\n   tail -f /var/log/app.log | grep --line-buffered \"ERROR\"\n \n   # Each file change is an event\n-  inotifywait -m --format '%e %f' /watched/dir\n+  inotifywait -m -q --format '%e %f' /watched/dir\n \n   # Poll GitHub for new PR comments and emit one line per new comment\n   last=$(date -u +%Y-%m-%dT%H:%M:%SZ)\n",
+      "stats": {
+        "added_chars": 49,
+        "removed_chars": 46
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "tools.Workflow.input_schema.properties.resumeFromRunId.description",
+      "category": "tools",
+      "op": "changed",
+      "path": [
+        "tools",
+        "Workflow",
+        "input_schema",
+        "properties",
+        "resumeFromRunId",
+        "description"
+      ],
+      "title": "Workflow tool parameter resumeFromRunId: description changed (+564 −251 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,5 @@\n-Run ID of a prior Workflow invocation to resume from. Completed agent() calls with unchanged (prompt, opts) return their cached results instantly; only edited or new calls re-run. Same-session only. Stop the prior run first (TaskStop) before resuming.\n+Run ID of a prior Workflow invocation to resume from.\n+The cache is positional: agent() calls replay from cache up to the first call that failed, no longer matches the earlier run (edited, added, removed or reordered) or never started in it; that call and every call after it run again, even when their own (prompt, opts) are unchanged.\n+A call a usage limit refused, or one still running when the run stopped, usually runs again without ending reuse: finished calls after it still come from cache.\n+Same-session only.\n+Stop the prior run first (TaskStop) before resuming.\n",
+      "stats": {
+        "added_chars": 564,
+        "removed_chars": 251
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "tools.mcp__ccd_host__sync_with_base_branch",
+      "category": "tools",
+      "op": "removed",
+      "path": [
+        "tools",
+        "mcp__ccd_host__sync_with_base_branch"
+      ],
+      "title": "Tool removed: mcp__ccd_host__sync_with_base_branch",
+      "impact": "notable",
+      "before": {
+        "description": "Bring this session's branch up to date with its base branch: the app fetches the base from `origin` and merges it into the branch checked out in this session's worktree, running git on the host, outside your sandbox, which cannot write the repository's protected paths (`.claude/hooks`, `.claude/skills`, `.mcp.json` and the like) that such a merge often touches. Use it instead of `git merge`/`git pull` whenever you need the base branch's latest commits, e.g. to resolve a pull request's merge conflicts.\n\n`base` defaults to the base the app knows for this session (its open pull request's base, else the branch the worktree was cut from); you may name that branch or the repository's default branch, nothing else. A session that also holds a worktree for an extra folder of another repository merges into the worktree your current directory is in, or the one `folder` names (either path the workspace note shows for that folder, or the folder's last segment when only one of the session's folders ends in it); the base is then that repository's. Sandbox-protected files are brought in only from the repository's default branch; any other base merges only when it leaves those files alone, and a protected file both this branch and the base changed is left for a person (the call refuses). Nothing is pushed. Outcomes: merged (a merge commit or fast-forward; run the project's checks, then push), up to date, or conflicts: the merge is then left in progress with the conflicted files listed for you to resolve, `git add` and `git commit --no-edit` (protected files this branch only had an older upstream copy of are already taken from the base). `abort: true` abandons a merge left in progress instead. It refuses rather than touch uncommitted changes, another git operation in progress, files the repository routes through a content filter (git-lfs, git-crypt), a fork checkout whose origin is not the pull request's repository, or a session without its own worktree; merge yourself in those cases. In default mode the user approves each call on a card; in auto mode the app's classifier decides.",
+        "input_schema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "properties": {
+            "_consent": {
+              "description": "Set by the app. Never set this yourself.",
+              "type": "string"
+            },
+            "abort": {
+              "description": "true to abandon a merge this tool left in progress (git merge --abort) instead of merging.",
+              "type": "boolean"
+            },
+            "base": {
+              "description": "The base branch to merge, when the session's own isn't the one you need: its pull request's base, the branch the worktree was cut from, or the repository's default branch.",
+              "type": "string"
+            },
+            "folder": {
+              "description": "Which of this session's worktrees to act on, when it holds one for an extra folder of another repository: either path the workspace note shows for that folder, or its last segment when only one of the session's folders ends in it; the session's own folder names its own worktree. Default: the worktree your current directory is in, else the session's own.",
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "name": "mcp__ccd_host__sync_with_base_branch",
+        "sha256": "8c518115b5736657f25123f92f466e37f6b222f07a21e1b7d12d330bd8d075a6"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "tools.mcp__ccd_session__dismiss_task.description",
+      "category": "tools",
+      "op": "changed",
+      "path": [
+        "tools",
+        "mcp__ccd_session__dismiss_task",
+        "description"
+      ],
+      "title": "mcp__ccd_session__dismiss_task tool description changed (+96 −0 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -2,3 +2,5 @@\n \n Call this when it went stale: the work was done here after all (by you or the user), it turned out unnecessary, or you proposed a better-scoped replacement (propose the new one first, then dismiss the old task_id).\n A card the user answered has already left, \"Do it here\" included, so it needs no call.\n+\n+Read the result before you start the task anew or do it here: after \"Not withdrawn\", do neither.\n",
+      "stats": {
+        "added_chars": 96,
+        "removed_chars": 0
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "tools.mcp__ccd_session_mgmt__get_session.description",
+      "category": "tools",
+      "op": "changed",
+      "path": [
+        "tools",
+        "mcp__ccd_session_mgmt__get_session",
+        "description"
+      ],
+      "title": "mcp__ccd_session_mgmt__get_session tool description changed (+1161 −1171 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,6 +1,6 @@\n Get detailed metadata for a single CCD session by ID, or for this session with \"self\".\n \n-Returns the same fields as a list_sessions entry (including the sidebar `group` and `pinned`, which the ccd_sidebar tools change when available, `link` and `remoteControlActive`) plus creation time, model, effort, permission mode (`permissionMode`, reported for this session and sessions this session started only), fast mode (`fastMode`: the state the session last reported — on, off or cooldown — and, when something blocks it, why; omitted until its process has reported), output style (`outputStyle`: the style its process last reported, \"default\" for none; like `permissionMode` reported for this session and sessions this session started only, and omitted until the process has reported — set_session_output_style changes it), worktree/branch info, whether the session is remote, scheduled-task linkage, agent, `remoteControlState` (\"on\", \"off\", \"connecting\", or \"unavailable\" where the app cannot bridge that session) with `startedViaRemoteControl` when a phone or claude.ai started the session (its Remote Control switch is then locked), and — for a session started from another — `parentSessionId` with `detached` (true once it was moved to top level).\n+Returns the same fields as a list_sessions entry (including the sidebar `group` and `pinned`, which the ccd_sidebar tools change when available, `link` and `remoteControlActive`) plus creation time, model, effort, permission mode (`permissionMode`, reported for this session and sessions this session started only), fast mode (`fastMode`: on, off or cooldown, as its process last reported or a later acknowledged switch left it, and why if blocked; omitted until then), output style (`outputStyle`: the style its process last reported, \"default\" for none; like `permissionMode` reported for this session and sessions this session started only, and omitted until the process has reported — set_session_output_style changes it), worktree/branch info, whether the session is remote, scheduled-task linkage, agent, `remoteControlState` (\"on\", \"off\", \"connecting\", or \"unavailable\" where the app cannot bridge that session) with `startedViaRemoteControl` when a phone or claude.ai started the session (its Remote Control switch is then locked), and — for a session started from another — `parentSessionId` with `detached` (true once it was moved to top level).\n Metadata only — no conversation content (use list_events for that).\n Use this when you have a session_id and want its full configuration without re-listing everything, or to learn this session's own title, permission mode, sidebar group or link.\n \n",
+      "stats": {
+        "added_chars": 1161,
+        "removed_chars": 1171
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "tools.mcp__ccd_view__close_pane.input_schema.properties.pane.enum.pr",
+      "category": "tools",
+      "op": "removed",
+      "path": [
+        "tools",
+        "mcp__ccd_view__close_pane",
+        "input_schema",
+        "properties",
+        "pane",
+        "enum",
+        "pr"
+      ],
+      "title": "mcp__ccd_view__close_pane tool parameter pane: enum.pr removed",
+      "impact": "notable",
+      "before": "pr",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "tools.mcp__ccd_view__show_pane.description",
+      "category": "tools",
+      "op": "changed",
+      "path": [
+        "tools",
+        "mcp__ccd_view__show_pane",
+        "description"
+      ],
+      "title": "mcp__ccd_view__show_pane tool description changed (+459 −494 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,6 +1,6 @@\n Show one of this session's side panes in the user's view of the Claude desktop app, beside the conversation.\n \n-Panes: \"diff\" (the session's changes; optional `path` scrolls to that file, `diff_scope` picks all branch changes, uncommitted changes only, or one commit), \"file\" (`path` opens that file in the Files pane at `line`; must be inside the session's working directory or a folder the user granted), \"terminal\" (optional `tab_id` switches to that open tab), \"pr\" (the session's pull request), \"tasks\" (background tasks), \"plan\", \"preview\" (the Browser pane, once this session has a page open in it).\n+Panes: \"diff\" (the session's changes; optional `path` scrolls to that file, `diff_scope` picks all branch changes, uncommitted changes only, or one commit), \"file\" (`path` opens that file in the Files pane at `line`; must be inside the session's working directory or a folder the user granted), \"terminal\" (optional `tab_id` switches to that open tab), \"tasks\" (background tasks), \"plan\", \"preview\" (the Browser pane, once this session has a page open in it).\n A page in a hidden Browser pane runs as a background page: animation may not run at all, and on some systems timers slow down once you haven't touched the page for a while.\n Showing the pane with that page's tab in front helps only while the Claude window is itself in view (not minimized or covered by another app), so don't rely on timing or performance numbers from the page unless the user is watching it.\n \n",
+      "stats": {
+        "added_chars": 459,
+        "removed_chars": 494
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "tools.mcp__ccd_view__show_pane.input_schema.properties.pane.enum.pr",
+      "category": "tools",
+      "op": "removed",
+      "path": [
+        "tools",
+        "mcp__ccd_view__show_pane",
+        "input_schema",
+        "properties",
+        "pane",
+        "enum",
+        "pr"
+      ],
+      "title": "mcp__ccd_view__show_pane tool parameter pane: enum.pr removed",
+      "impact": "notable",
+      "before": "pr",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "request.headers.user-agent",
+      "category": "request",
+      "op": "changed",
+      "path": [
+        "request",
+        "headers",
+        "user-agent"
+      ],
+      "title": "Header user-agent: claude-cli/2.1.325 (external, claude-desktop-3p, agent-sd… → claude-cli/2.1.326 (external, claude-desktop-3p, agent-sd…",
+      "impact": "informational",
+      "before": "claude-cli/2.1.325 (external, claude-desktop-3p, agent-sdk/0.3.325)",
+      "after": "claude-cli/2.1.326 (external, claude-desktop-3p, agent-sdk/0.3.326)",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "side_requests.POST /v1/messages/count_tokens claude-opus-5-5.tools",
+      "category": "side_requests",
+      "op": "changed",
+      "path": [
+        "side_requests",
+        "POST /v1/messages/count_tokens claude-opus-5-5",
+        "tools"
+      ],
+      "title": "Side request POST /v1/messages/count_tokens claude-opus-5-5 tools changed",
+      "impact": "notable",
+      "before": 14,
+      "after": 84,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "side_requests.POST /v1/messages/count_tokens claude-opus-5-5.tools",
+      "category": "side_requests",
+      "op": "changed",
+      "path": [
+        "side_requests",
+        "POST /v1/messages/count_tokens claude-opus-5-5",
+        "tools"
+      ],
+      "title": "Side request POST /v1/messages/count_tokens claude-opus-5-5 tools changed",
+      "impact": "notable",
+      "before": 14,
+      "after": 84,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "side_requests.POST /v1/messages/count_tokens claude-opus-5-5.tools",
+      "category": "side_requests",
+      "op": "changed",
+      "path": [
+        "side_requests",
+        "POST /v1/messages/count_tokens claude-opus-5-5",
+        "tools"
+      ],
+      "title": "Side request POST /v1/messages/count_tokens claude-opus-5-5 tools changed",
+      "impact": "notable",
+      "before": 14,
+      "after": 84,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "side_requests.POST /v1/messages/count_tokens claude-opus-5-5.tools",
+      "category": "side_requests",
+      "op": "changed",
+      "path": [
+        "side_requests",
+        "POST /v1/messages/count_tokens claude-opus-5-5",
+        "tools"
+      ],
+      "title": "Side request POST /v1/messages/count_tokens claude-opus-5-5 tools changed",
+      "impact": "notable",
+      "before": 14,
+      "after": 84,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "side_requests.POST /v1/messages/count_tokens claude-opus-5-5.tools",
+      "category": "side_requests",
+      "op": "changed",
+      "path": [
+        "side_requests",
+        "POST /v1/messages/count_tokens claude-opus-5-5",
+        "tools"
+      ],
+      "title": "Side request POST /v1/messages/count_tokens claude-opus-5-5 tools changed",
+      "impact": "notable",
+      "before": 14,
+      "after": 84,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "cli.commands.claude.options.--add-dir.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "claude",
+        "options",
+        "--add-dir",
+        "description"
+      ],
+      "title": "`claude --add-dir`: description changed",
+      "impact": "informational",
+      "before": "Additional directories to allow tool access to",
+      "after": "More directories Claude can access",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "cli.commands.claude.options.--append-system-prompt.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "claude",
+        "options",
+        "--append-system-prompt",
+        "description"
+      ],
+      "title": "`claude --append-system-prompt`: description changed",
+      "impact": "informational",
+      "before": "Append a system prompt to the default system prompt",
+      "after": "Add text to the end of the default system prompt",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "cli.commands.claude.options.--bare.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "claude",
+        "options",
+        "--bare",
+        "description"
+      ],
+      "title": "`claude --bare`: description changed (+365 −303 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,6 +1,6 @@\n-Minimal mode: skip hooks (those defined in settings and by installed plugins; features built into Claude Code are unaffected), LSP, plugin sync, attribution, auto-memory, background prefetches, keychain reads, and CLAUDE.md auto-discovery.\n+Minimal mode: skip hooks (those defined in settings and by installed plugins; features built into Claude Code and the hooks of your organization's managed plugins are unaffected), LSP, plugin sync, attribution, auto-memory, background prefetches, keychain reads, and CLAUDE.md auto-discovery.\n Sets CLAUDE_CODE_SIMPLE=1.\n Anthropic auth is strictly ANTHROPIC_API_KEY or apiKeyHelper via --settings (OAuth and keychain are never read).\n-3P providers (Bedrock/Vertex/Foundry) use their own credentials.\n+Third-party providers (Bedrock/Vertex/Foundry) use their own credentials.\n Skills still resolve via /skill-name.\n Explicitly provide context via: --system-prompt[-file], --append-system-prompt[-file], --add-dir (CLAUDE.md dirs), --mcp-config, --settings, --agents, --plugin-dir.\n",
+      "stats": {
+        "added_chars": 365,
+        "removed_chars": 303
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "cli.commands.claude.options.--brief.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "claude",
+        "options",
+        "--brief",
+        "description"
+      ],
+      "title": "`claude --brief`: description changed",
+      "impact": "informational",
+      "before": "Enable SendUserMessage tool for agent-to-user communication",
+      "after": "Turn on the SendUserMessage tool, which Claude uses to message you",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "cli.commands.claude.options.--chrome.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "claude",
+        "options",
+        "--chrome",
+        "description"
+      ],
+      "title": "`claude --chrome`: description changed",
+      "impact": "informational",
+      "before": "Enable Claude in Chrome integration",
+      "after": "Turn on Claude in Chrome",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "cli.commands.claude.options.--fallback-model.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "claude",
+        "options",
+        "--fallback-model",
+        "description"
+      ],
+      "title": "`claude --fallback-model`: description changed (+151 −208 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Enable automatic fallback to specified model(s) when the default model is overloaded or not available. Accepts a comma-separated list to try each in order. Re-tries the primary at the start of each user turn.\n+Models to fall back to when the main model is busy or unavailable (comma-separated, in order). The main model is tried again at the start of each turn.\n",
+      "stats": {
+        "added_chars": 151,
+        "removed_chars": 208
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "cli.commands.claude.options.--file.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "claude",
+        "options",
+        "--file",
+        "description"
+      ],
+      "title": "`claude --file`: description changed",
+      "impact": "informational",
+      "before": "File resources to download at startup. Format: file_id:relative_path (e.g., --file file_abc:doc.txt file_def:img.png)",
+      "after": "Files to download at startup. Format: file_id:relative_path (e.g., --file file_abc:doc.txt file_def:img.png)",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "cli.commands.claude.options.--from-pr.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "claude",
+        "options",
+        "--from-pr",
+        "description"
+      ],
+      "title": "`claude --from-pr`: description changed",
+      "impact": "informational",
+      "before": "Resume a session linked to a PR by PR number/URL, or open interactive picker with optional search term",
+      "after": "Resume a session linked to a PR by number or URL, or pick from a list (optionally with a search term)",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "cli.commands.claude.options.--model.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "claude",
+        "options",
+        "--model",
+        "description"
+      ],
+      "title": "`claude --model`: description changed (+124 −128 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Model for the current session. Provide an alias for the latest model (e.g. 'fable', 'opus', or 'sonnet') or a model's full name.\n+Model for the current session. Use an alias for the latest model (e.g. 'fable', 'opus', or 'sonnet') or a model's full name.\n",
+      "stats": {
+        "added_chars": 124,
+        "removed_chars": 128
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "cli.commands.claude.options.--no-chrome.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "claude",
+        "options",
+        "--no-chrome",
+        "description"
+      ],
+      "title": "`claude --no-chrome`: description changed",
+      "impact": "informational",
+      "before": "Disable Claude in Chrome integration",
+      "after": "Turn off Claude in Chrome",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "cli.commands.claude.options.--no-session-persistence.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "claude",
+        "options",
+        "--no-session-persistence",
+        "description"
+      ],
+      "title": "`claude --no-session-persistence`: description changed",
+      "impact": "informational",
+      "before": "Disable session persistence - sessions will not be saved to disk and cannot be resumed (only works with --print)",
+      "after": "Don't save sessions to disk; they can't be resumed (only works with --print)",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "cli.commands.claude.options.--prompt-suggestions.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "claude",
+        "options",
+        "--prompt-suggestions",
+        "description"
+      ],
+      "title": "`claude --prompt-suggestions`: description changed (+130 −129 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Enable prompt suggestions. In print/SDK mode, emits a prompt_suggestion message after each turn with a predicted next user prompt\n+Turn on prompt suggestions. In print/SDK mode, sends a prompt_suggestion message after each turn with a predicted next user prompt\n",
+      "stats": {
+        "added_chars": 130,
+        "removed_chars": 129
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "cli.commands.claude.options.--resume.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "claude",
+        "options",
+        "--resume",
+        "description"
+      ],
+      "title": "`claude --resume`: description changed",
+      "impact": "informational",
+      "before": "Resume a conversation by session ID or name, or open interactive picker with optional search term",
+      "after": "Resume a conversation by session ID or name, or pick from a list (optionally with a search term)",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "cli.commands.claude.options.--safe-mode.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "claude",
+        "options",
+        "--safe-mode",
+        "description"
+      ],
+      "title": "`claude --safe-mode`: description changed (+77 −44 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,4 +1,4 @@\n Start with all customizations (CLAUDE.md, skills, installed plugins, hooks, MCP servers, custom commands and agents, output styles, workflows, custom themes, keybindings, and more) disabled — useful for troubleshooting a broken configuration.\n-Admin-managed (policy) settings still apply.\n+Admin-managed (policy) settings and the hooks of managed plugins still apply.\n Auth, model selection, built-in tools and plugins, and permissions work normally.\n Sets CLAUDE_CODE_SAFE_MODE=1.\n",
+      "stats": {
+        "added_chars": 77,
+        "removed_chars": 44
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "cli.commands.claude.options.--settings.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "claude",
+        "options",
+        "--settings",
+        "description"
+      ],
+      "title": "`claude --settings`: description changed",
+      "impact": "informational",
+      "before": "Path to a settings JSON file or a JSON string to load additional settings from",
+      "after": "Settings file or JSON string to load more settings from",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "cli.commands.claude.options.--tools.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "claude",
+        "options",
+        "--tools",
+        "description"
+      ],
+      "title": "`claude --tools`: description changed (+115 −168 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Specify the list of available tools from the built-in set. Use \"\" to disable all tools, \"default\" to use the default set, or specify tool names (e.g. \"Bash,Edit,Read\").\n+Built-in tools to make available: \"\" for none, \"default\" for the default set, or tool names (e.g. \"Bash,Edit,Read\")\n",
+      "stats": {
+        "added_chars": 115,
+        "removed_chars": 168
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "cli.commands.claude.options.--verbose.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "claude",
+        "options",
+        "--verbose",
+        "description"
+      ],
+      "title": "`claude --verbose`: description changed",
+      "impact": "informational",
+      "before": "Override verbose mode setting from config",
+      "after": "Override the verbose setting",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "cli.commands.claude.options.--worktree.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "claude",
+        "options",
+        "--worktree",
+        "description"
+      ],
+      "title": "`claude --worktree`: description changed",
+      "impact": "informational",
+      "before": "Create a new git worktree for this session (optionally specify a name)",
+      "after": "Create a git worktree for this session (optionally named)",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "cli.commands.claude agents.options.--add-dir.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "claude agents",
+        "options",
+        "--add-dir",
+        "description"
+      ],
+      "title": "`claude agents --add-dir`: description changed",
+      "impact": "informational",
+      "before": "Additional directory to allow tool access to in dispatched sessions (repeatable)",
+      "after": "Another directory Claude can access in dispatched sessions (repeatable)",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "cli.commands.claude agents.options.--json.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "claude agents",
+        "options",
+        "--json",
+        "description"
+      ],
+      "title": "`claude agents --json`: description changed",
+      "impact": "informational",
+      "before": "Print active sessions (interactive and background) as a JSON array and exit (for scripting; does not require a TTY)",
+      "after": "Print active sessions (interactive and background) as a JSON array and exit (for scripts; works without a terminal)",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "cli.commands.claude agents.options.--plugin-dir.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "claude agents",
+        "options",
+        "--plugin-dir",
+        "description"
+      ],
+      "title": "`claude agents --plugin-dir`: description changed (+126 −131 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Load plugins from specified directory for the agent view and dispatched sessions; a folder of plugins loads each child (repeatable)\n+Load plugins from this directory for the agent view and dispatched sessions; a folder of plugins loads each child (repeatable)\n",
+      "stats": {
+        "added_chars": 126,
+        "removed_chars": 131
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "cli.commands.claude auto-mode config.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "claude auto-mode config",
+        "description"
+      ],
+      "title": "Description of `claude auto-mode config` changed",
+      "impact": "informational",
+      "before": "Print the effective auto mode config as JSON: your settings where set, defaults otherwise",
+      "after": "Print the auto mode config in use as JSON: your settings where set, defaults otherwise",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "cli.commands.claude auto-mode reset.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "claude auto-mode reset",
+        "description"
+      ],
+      "title": "Description of `claude auto-mode reset` changed",
+      "impact": "informational",
+      "before": "Reset auto mode configuration to the shipped defaults by removing the autoMode section from your user settings file",
+      "after": "Reset auto mode to its defaults by removing the autoMode section from your user settings file",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "cli.commands.claude import.options.--yes.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "claude import",
+        "options",
+        "--yes",
+        "description"
+      ],
+      "title": "`claude import --yes`: description changed",
+      "impact": "informational",
+      "before": "Skip the interactive picker. On headless surfaces, pass --yes=<digest> from the `/import` preview.",
+      "after": "Skip the interactive picker. In non-interactive mode, pass --yes=<digest> from the `/import` preview.",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "cli.commands.claude install.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "claude install",
+        "description"
+      ],
+      "title": "Description of `claude install` changed",
+      "impact": "informational",
+      "before": "Install Claude Code native build. Use [target] to specify version (stable, latest, or specific version)",
+      "after": "Install the Claude Code native build. Use [target] to pick a version (stable, latest, or a version number)",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "cli.commands.claude install.options.--force.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "claude install",
+        "options",
+        "--force",
+        "description"
+      ],
+      "title": "`claude install --force`: description changed",
+      "impact": "informational",
+      "before": "Force installation even if already installed",
+      "after": "Install even if already installed",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "cli.commands.claude purge.options.--all.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "claude purge",
+        "options",
+        "--all",
+        "description"
+      ],
+      "title": "`claude purge --all`: description changed",
+      "impact": "informational",
+      "before": "Purge state for every project (mutually exclusive with [path])",
+      "after": "Delete data for every project (can't be used with [path])",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "cli.commands.claude purge.options.--interactive.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "claude purge",
+        "options",
+        "--interactive",
+        "description"
+      ],
+      "title": "`claude purge --interactive`: description changed",
+      "impact": "informational",
+      "before": "Prompt for each item before deleting",
+      "after": "Ask before deleting each item",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "cli.commands.claude ultrareview.options.--no-post.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "claude ultrareview",
+        "options",
+        "--no-post",
+        "description"
+      ],
+      "title": "`claude ultrareview --no-post`: description changed",
+      "impact": "informational",
+      "before": "Do not post the findings to the PR (the default; accepted for parity with the /ultrareview and /code-review ultra flags)",
+      "after": "Don't post the findings to the PR (the default)",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "cli.help.--help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "--help"
+      ],
+      "title": "Full help text of `--help` changed (+3635 −3932 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -7,8 +7,7 @@\n   prompt                                Your prompt\n \n Options:\n-  --add-dir <directories...>            Additional directories to allow tool\n-                                        access to\n+  --add-dir <directories...>            More directories Claude can access\n   --agent <agent>                       Agent for the current session. Overrides\n                                         the 'agent' setting.\n   --agents <json-or-file>               JSON object defining custom agents, or\n@@ -23,7 +22,7 @@\n   --allowedTools, --allowed-tools <tools...>\n       Comma or space-separated list of tool names to allow (e.g. \"Bash(git *)\n       Edit\")\n-  --append-system-prompt <prompt>       Append a system prompt to the default\n+  --append-system-prompt <prompt>       Add text to the end of the default\n                                         system prompt\n   --autocompact <auto|tokens>           Auto-compact window size (auto, or\n                                         100k–1M tokens)\n@@ -40,27 +39,29 @@\n                                         the session is already running\n   --bare                                Minimal mode: skip hooks (those defined\n                                         in settings and by installed plugins;\n-                                        features built into Claude Code are\n-                                        unaffected), LSP, plugin sync,\n-                                        attribution, auto-memory, background\n-                                        prefetches, keychain reads, and\n-                                        CLAUDE.md auto-discovery. Sets\n+                                        features built into Claude Code and the\n+                                        hooks of your organization's managed\n+                                        plugins are unaffected), LSP, plugin\n+                                        sync, attribution, auto-memory,\n+                                        background prefetches, keychain reads,\n+                                        and CLAUDE.md auto-discovery. Sets\n                                         CLAUDE_CODE_SIMPLE=1. Anthropic auth is\n                                         strictly ANTHROPIC_API_KEY or\n                                         apiKeyHelper via --settings (OAuth and\n-                                        keychain are never read). 3P providers\n-                                        (Bedrock/Vertex/Foundry) use their own\n-                                        credentials. Skills still resolve via\n-                                        /skill-name. Explicitly provide context\n-                                        via: --system-prompt[-file],\n+                                        keychain are never read). Third-party\n+                                        providers (Bedrock/Vertex/Foundry) use\n+                                        their own credentials. Skills still\n+                                        resolve via /skill-name. Explicitly\n+                                        provide context via:\n+                                        --system-prompt[-file],\n                                         --append-system-prompt[-file], --add-dir\n                                         (CLAUDE.md dirs), --mcp-config,\n                                         --settings, --agents, --plugin-dir.\n   --betas <betas...>                    Beta headers to include in API requests\n                                         (API key users only)\n-  --brief                               Enable SendUserMessage tool for\n-                                        agent-to-user communication\n-  --chrome                              Enable Claude in Chrome integration\n+  --brief                               Turn on the SendUserMessage tool, which\n+                                        Claude uses to message you\n+  --chrome                              Turn on Claude in Chrome\n   --cloud [description|session_id|url]  Create a cloud session with the given\n                                         description, or attach to an existing\n                                         one by session ID or claude.ai/code URL\n@@ -91,16 +92,14 @@\n       the system prompt into the first user message. Improves cross-user\n       prompt-cache reuse. Only applies with the default system prompt (ignored\n       with --system-prompt). (default: false)\n-  --fallback-model <model>              Enable automatic fallback to specified\n-                                        model(s) when the default model is\n-                                        overloaded or not available. Accepts a\n-                                        comma-separated list to try each in\n-                                        order. Re-tries the primary at the start\n-                                        of each user turn.\n-  --file <specs...>                     File resources to download at startup.\n-                                        Format: file_id:relative_path (e.g.,\n-                                        --file file_abc:doc.txt\n-                                        file_def:img.png)\n+  --fallback-model <model>              Models to fall back to when the main\n+                                        model is busy or unavailable\n+                                        (comma-separated, in order). The main\n+                                        model is tried again at the start of\n+                                        each turn.\n+  --file <specs...>                     Files to download at startup. Format:\n+                                        file_id:relative_path (e.g., --file\n+                                        file_abc:doc.txt file_def:img.png)\n   --fork-session                        When resuming, create a new session ID\n                                         instead of reusing the original (use\n                                         with --resume or --continue)\n@@ -108,9 +107,9 @@\n                                         blocks as assistant/user messages with\n                                         parent_tool_use_id set (only works with\n                                         --print and --output-format=stream-json)\n-  --from-pr [value]                     Resume a session linked to a PR by PR\n-                                        number/URL, or open interactive picker\n-                                        with optional search term\n+  --from-pr [value]                     Resume a session linked to a PR by\n+                                        number or URL, or pick from a list\n+                                        (optionally with a search term)\n   -h, --help                            Display help for command\n   --ide                                 Automatically connect to IDE on startup\n                                         if exactly one valid IDE is available\n@@ -132,17 +131,16 @@\n                                         calls (only works with --print)\n   --mcp-config <configs...>             Load MCP servers from JSON files or\n                                         strings (space-separated)\n-  --model <model>                       Model for the current session. Provide\n-                                        an alias for the latest model (e.g.\n+  --model <model>                       Model for the current session. Use an\n+                                        alias for the latest model (e.g.\n                                         'fable', 'opus', or 'sonnet') or a\n                                         model's full name.\n   -n, --name <name>                     Set a display name for this session\n                                         (shown in the prompt box, /resume\n                                         picker, and terminal title)\n-  --no-chrome                           Disable Claude in Chrome integration\n-  --no-session-persistence              Disable session persistence - sessions\n-                                        will not be saved to disk and cannot be\n-                                        resumed (only works with --print)\n+  --no-chrome                           Turn off Claude in Chrome\n+  --no-session-persistence              Don't save sessions to disk; they can't\n+                                        be resumed (only works with --print)\n   --output-format <format>              Output format (only works with --print):\n                                         \"text\" (default), \"json\" (single\n                                         result), or \"stream-json\" (realtime\n@@ -178,8 +176,8 @@\n                                         that fail validation are silently\n                                         ignored in this mode (no error dialog is\n                                         shown).\n-  --prompt-suggestions [value]          Enable prompt suggestions. In print/SDK\n-                                        mode, emits a prompt_suggestion message\n+  --prompt-suggestions [value]          Turn on prompt suggestions. In print/SDK\n+                                        mode, sends a prompt_suggestion message\n                                         after each turn with a predicted next\n                                         user prompt (choices: \"true\", \"false\",\n                                         \"1\", \"0\", \"yes\", \"no\", \"on\", \"off\",\n@@ -208,8 +206,8 @@\n                                         settings, git and tool-configuration\n                                         files.\n   -r, --resume [value]                  Resume a conversation by session ID or\n-                                        name, or open interactive picker with\n-                                        optional search term\n+                                        name, or pick from a list (optionally\n+                                        with a search term)\n   --safe-mode                           Start with all customizations\n                                         (CLAUDE.md, skills, installed plugins,\n                                         hooks, MCP servers, custom commands and\n@@ -217,7 +215,8 @@\n                                         themes, keybindings, and more) disabled\n                                         — useful for troubleshooting a broken\n                                         configuration. Admin-managed (policy)\n-                                        settings still apply. Auth, model\n+                                        settings and the hooks of managed\n+                                        plugins still apply. Auth, model\n                                         selection, built-in tools and plugins,\n                                         and permissions work normally. Sets\n                                         CLAUDE_CODE_SAFE_MODE=1.\n@@ -225,8 +224,8 @@\n                                         conversation (must be a valid UUID)\n   --setting-sources <sources>           Comma-separated list of setting sources\n                                         to load (user, project, local).\n-  --settings <file-or-json>             Path to a settings JSON file or a JSON\n-                                        string to load additional settings from\n+  --settings <file-or-json>             Settings file or JSON string to load\n+                                        more settings from\n   --strict-mcp-config                   Only use MCP servers from --mcp-config,\n                                         ignoring all other MCP configurations\n   --system-prompt <prompt>              System prompt to use for the session\n@@ -252,16 +251,13 @@\n                                         (requires --worktree). Uses iTerm2\n                                         native panes when available; use\n                                         --tmux=classic for traditional tmux.\n-  --tools <tools...>                    Specify the list of available tools from\n-                                        the built-in set. Use \"\" to disable all\n-                                        tools, \"default\" to use the default set,\n-                                        or specify tool names (e.g.\n-                                        \"Bash,Edit,Read\").\n-  --verbose                             Override verbose mode setting from\n-                                        config\n+  --tools <tools...>                    Built-in tools to make available: \"\" for\n+                                        none, \"default\" for the default set, or\n+                                        tool names (e.g. \"Bash,Edit,Read\")\n+  --verbose                             Override the verbose setting\n   -v, --version                         Output the version number\n-  -w, --worktree [name]                 Create a new git worktree for this\n-                                        session (optionally specify a name)\n+  -w, --worktree [name]                 Create a git worktree for this session\n+                                        (optionally named)\n \n Commands:\n   agents [options]                      Manage background agents\n@@ -281,9 +277,9 @@\n                                         gateway\n   import [options] [source]             Import config from another AI coding\n                                         agent into Claude Code\n-  install [options] [target]            Install Claude Code native build. Use\n-                                        [target] to specify version (stable,\n-                                        latest, or specific version)\n+  install [options] [target]            Install the Claude Code native build.\n+                                        Use [target] to pick a version (stable,\n+                                        latest, or a version number)\n   logs <id|name>                        Print a background session's recent\n                                         terminal output\n   mcp                                   Configure and manage MCP servers\n",
+      "stats": {
+        "added_chars": 3635,
+        "removed_chars": 3932
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "cli.help.agents --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "agents --help"
+      ],
+      "title": "Full help text of `agents --help` changed (+512 −565 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -3,9 +3,8 @@\n Manage background agents\n \n Options:\n-  --add-dir <directory>                 Additional directory to allow tool\n-                                        access to in dispatched sessions\n-                                        (repeatable)\n+  --add-dir <directory>                 Another directory Claude can access in\n+                                        dispatched sessions (repeatable)\n   --agent <agent>                       Default agent for sessions dispatched\n                                         from agent view. Overrides the 'agent'\n                                         setting.\n@@ -23,17 +22,17 @@\n   -h, --help                            Display help for command\n   --json                                Print active sessions (interactive and\n                                         background) as a JSON array and exit\n-                                        (for scripting; does not require a TTY)\n+                                        (for scripts; works without a terminal)\n   --mcp-config <config>                 MCP server configuration to apply to\n                                         dispatched sessions (repeatable)\n   --model <model>                       Default model for sessions dispatched\n                                         from agent view\n   --permission-mode <mode>              Default permission mode for sessions\n                                         dispatched from agent view\n-  --plugin-dir <path>                   Load plugins from specified directory\n-                                        for the agent view and dispatched\n-                                        sessions; a folder of plugins loads each\n-                                        child (repeatable)\n+  --plugin-dir <path>                   Load plugins from this directory for the\n+                                        agent view and dispatched sessions; a\n+                                        folder of plugins loads each child\n+                                        (repeatable)\n   --restricted                          Start dispatched sessions in restricted\n                                         mode\n   --setting-sources <sources>           Comma-separated list of setting sources\n",
+      "stats": {
+        "added_chars": 512,
+        "removed_chars": 565
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "cli.help.auto-mode --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "auto-mode --help"
+      ],
+      "title": "Full help text of `auto-mode --help` changed (+265 −290 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -6,12 +6,12 @@\n   -h, --help          Display help for command\n \n Commands:\n-  config              Print the effective auto mode config as JSON: your\n-                      settings where set, defaults otherwise\n+  config              Print the auto mode config in use as JSON: your settings\n+                      where set, defaults otherwise\n   critique [options]  Get AI feedback on your custom auto mode rules\n   defaults [options]  Print the default auto mode environment, allow, soft_deny,\n                       and hard_deny rules as JSON\n   help [command]      display help for command\n-  reset [options]     Reset auto mode configuration to the shipped defaults by\n-                      removing the autoMode section from your user settings file\n+  reset [options]     Reset auto mode to its defaults by removing the autoMode\n+                      section from your user settings file\n \n",
+      "stats": {
+        "added_chars": 265,
+        "removed_chars": 290
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "cli.help.import --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "import --help"
+      ],
+      "title": "Full help text of `import --help` changed (+72 −69 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -8,6 +8,6 @@\n Options:\n   --dry-run   Show what would be imported without writing anything\n   -h, --help  Display help for command\n-  --yes       Skip the interactive picker. On headless surfaces, pass\n+  --yes       Skip the interactive picker. In non-interactive mode, pass\n               --yes=<digest> from the `/import` preview.\n \n",
+      "stats": {
+        "added_chars": 72,
+        "removed_chars": 69
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "cli.help.install --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "install --help"
+      ],
+      "title": "Full help text of `install --help` changed (+152 −160 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,9 +1,9 @@\n Usage: claude install [options] [target]\n \n-Install Claude Code native build. Use [target] to specify version (stable,\n-latest, or specific version)\n+Install the Claude Code native build. Use [target] to pick a version (stable,\n+latest, or a version number)\n \n Options:\n-  --force     Force installation even if already installed\n+  --force     Install even if already installed\n   -h, --help  Display help for command\n \n",
+      "stats": {
+        "added_chars": 152,
+        "removed_chars": 160
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "cli.help.purge --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "purge --help"
+      ],
+      "title": "Full help text of `purge --help` changed (+128 −160 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -4,10 +4,9 @@\n entry in ~/.claude.json) from this computer only\n \n Options:\n-  --all              Purge state for every project (mutually exclusive with\n-                     [path])\n+  --all              Delete data for every project (can't be used with [path])\n   --dry-run          List what would be deleted without deleting anything\n   -h, --help         Display help for command\n-  -i, --interactive  Prompt for each item before deleting\n+  -i, --interactive  Ask before deleting each item\n   -y, --yes          Skip confirmation prompt\n \n",
+      "stats": {
+        "added_chars": 128,
+        "removed_chars": 160
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "cli.help.ultrareview --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "ultrareview --help"
+      ],
+      "title": "Full help text of `ultrareview --help` changed (+70 −187 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -7,9 +7,7 @@\n   -h, --help           Display help for command\n   --json               Print the raw bugs.json payload instead of formatted\n                        findings\n-  --no-post            Do not post the findings to the PR (the default; accepted\n-                       for parity with the /ultrareview and /code-review ultra\n-                       flags)\n+  --no-post            Don't post the findings to the PR (the default)\n   --post               Post the finished review's findings to the PR as you (PR\n                        targets only; one plain comment, not a review)\n   --timeout <minutes>  Maximum minutes to wait for the review to finish\n",
+      "stats": {
+        "added_chars": 70,
+        "removed_chars": 187
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "cli.launch.argv.{\"disableClaudeAiConnectors\":true,\"permissions\":{\"allow\":[],\"deny\":[\"Edit(//**/local-agent-mode-?e???on?/**)\"]},\"sandbox\":{\"network\":{\"allowedDomains\":[],\"allowManagedDomainsOnly\":true},\"enabled\":true,\"allowUnsandboxedCommands\":false,\"filesystem\":{\"denyWrite\":[\"<app-data>/local-agent-mode-sessions\",\"/System/Volumes/Data<app-data>/local-agent-mode-sessions\"]}}}",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "launch",
+        "argv",
+        "{\"disableClaudeAiConnectors\":true,\"permissions\":{\"allow\":[],\"deny\":[\"Edit(//**/local-agent-mode-?e???on?/**)\"]},\"sandbox\":{\"network\":{\"allowedDomains\":[],\"allowManagedDomainsOnly\":true},\"enabled\":true,\"allowUnsandboxedCommands\":false,\"filesystem\":{\"denyWrite\":[\"<app-data>/local-agent-mode-sessions\",\"/System/Volumes/Data<app-data>/local-agent-mode-sessions\"]}}}"
+      ],
+      "title": "The app now starts its agent with `{\"disableClaudeAiConnectors\":true,\"permissions\":{\"allow\":…`",
+      "impact": "notable",
+      "before": null,
+      "after": "{\"disableClaudeAiConnectors\":true,\"permissions\":{\"allow\":[],\"deny\":[\"Edit(//**/local-agent-mode-?e???on?/**)\"]},\"sandbox\":{\"network\":{\"allowedDomains\":[],\"allowManagedDomainsOnly\":true},\"enabled\":true,\"allowUnsandboxedCommands\":false,\"filesystem\":{\"denyWrite\":[\"<app-data>/local-agent-mode-sessions\",\"/System/Volumes/Data<app-data>/local-agent-mode-sessions\"]}}}",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "cli.launch.argv.{\"disableClaudeAiConnectors\":true,\"permissions\":{\"allow\":[]},\"sandbox\":{\"network\":{\"allowedDomains\":[],\"allowManagedDomainsOnly\":true},\"enabled\":true,\"allowUnsandboxedCommands\":false}}",
+      "category": "cli",
+      "op": "removed",
+      "path": [
+        "cli",
+        "launch",
+        "argv",
+        "{\"disableClaudeAiConnectors\":true,\"permissions\":{\"allow\":[]},\"sandbox\":{\"network\":{\"allowedDomains\":[],\"allowManagedDomainsOnly\":true},\"enabled\":true,\"allowUnsandboxedCommands\":false}}"
+      ],
+      "title": "The app no longer starts its agent with `{\"disableClaudeAiConnectors\":true,\"permissions\":{\"allow\":…`",
+      "impact": "notable",
+      "before": "{\"disableClaudeAiConnectors\":true,\"permissions\":{\"allow\":[]},\"sandbox\":{\"network\":{\"allowedDomains\":[],\"allowManagedDomainsOnly\":true},\"enabled\":true,\"allowUnsandboxedCommands\":false}}",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "cli.launch.env_values.BAGGAGE",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "launch",
+        "env_values",
+        "BAGGAGE"
+      ],
+      "title": "The app's agent's BAGGAGE: none → none",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-sentry-environment=production,sentry-release=Claude%405.11492.5,sentry-public_key=<hex>,sentry-trace_id=<hex>,sentry-org_id=1158394\n+sentry-environment=production,sentry-release=Claude%406.6395.0,sentry-public_key=<hex>,sentry-trace_id=<hex>,sentry-org_id=1158394\n",
+      "stats": {
+        "added_chars": 130,
+        "removed_chars": 131
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "cli.launch.env_values.CLAUDE_AGENT_SDK_VERSION",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "launch",
+        "env_values",
+        "CLAUDE_AGENT_SDK_VERSION"
+      ],
+      "title": "The app's agent's CLAUDE_AGENT_SDK_VERSION: 0.3.325 → 0.3.326",
+      "impact": "notable",
+      "before": "0.3.325",
+      "after": "0.3.326",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "cli.launch.env_values.SENTRY-TRACE",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "launch",
+        "env_values",
+        "SENTRY-TRACE"
+      ],
+      "title": "The app's agent's SENTRY-TRACE: <hex>-a31d37f06a47f780 → <hex>-acc147bf9d67b8a1",
+      "impact": "notable",
+      "before": "<hex>-a31d37f06a47f780",
+      "after": "<hex>-acc147bf9d67b8a1",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "cli.launch.parents.<app>/Contents/Helpers/disclaimer --pgroup -- <agent> --output-format stream-json --verbose --input-format stream-json --effort=medium --model=claude-opus-5-5 --permission-prompt-tool=stdio --allowedTools=mcp__computer-use,mcp__ccd_session__spawn_task,mcp__ccd_session__dismiss_task,mcp__ccd_session__mark_chapter,mcp__ccd_session_mgmt__list_sessions,mcp__ccd_session_mgmt__get_session,mcp__ccd_session_mgmt__get_usage,mcp__ccd_host__get_storage_usage,mcp__ccd_session_mgmt__set_session_title,mcp__ccd_session_mgmt__send_message,mcp__ccd_session_mgmt__detach_session,mcp__ccd_sidebar__list_groups,mcp__ccd_sidebar__create_group,mcp__ccd_sidebar__set_view,mcp__ccd_sidebar__list_sections,mcp__ccd_sidebar__create_section,mcp__ccd_turn__wrap_up,mcp__ccd_turn__update_plan,mcp__ccd_session_mgmt__search_session_transcripts,mcp__ccd_session_mgmt__list_events,mcp__ccd_session_mgmt__export_transcript,mcp__scheduled-tasks__list_task_runs,mcp__ccd_session__read_widget_context,mcp__ccd_session__list_start_targets,mcp__ccd_view__show_pane,mcp__ccd_view__close_pane,mcp__ccd_view__get_layout,mcp__ccd_view__set_transcript_view,mcp__ccd_settings__get_settings,mcp__ccd_pr__get_status,mcp__ccd_window__open_session_in,mcp__ccd_window__close_split,mcp__ccd_window__set_sidebar_collapsed,mcp__ccd_window__get_window_layout --disallowedTools=SubscribePR,Edit(//**/ccd-*h.501),Edit(//**/ccd-*h.501/**) --setting-sources=user,project,local --permission-mode=auto --include-partial-messages --await-initialize --managed-settings {\"disableClaudeAiConnectors\":true,\"permissions\":{\"allow\":[],\"deny\":[\"Edit(//**/local-agent-mode-?e???on?/**)\"]},\"sandbox\":{\"network\":{\"allowedDomains\":[],\"allowManagedDomainsOnly\":true},\"enabled\":true,\"allowUnsandboxedCommands\":false,\"filesystem\":{\"denyWrite\":[\"<app-data>/local-agent-mode-sessions\",\"/System/Volumes/Data<app-data>/local-agent-mode-sessions\"]}}} --thinking-display omitted --replay-user-messages --settings {\"deniedMcpServers\":[{\"serverName\":\"Claude Browser\"},{\"serverName\":\"Claude Code Android Emulator\"},{\"serverName\":\"Claude Code iOS Simulator\"},{\"serverName\":\"Claude Preview\"},{\"serverName\":\"Claude_Browser\"},{\"serverName\":\"Claude_Code_Android_Emulator\"},{\"serverName\":\"Claude_Code_iOS_Simulator\"},{\"serverName\":\"Claude_Preview\"},{\"serverName\":\"Claude_for_Chrome\"},{\"serverName\":\"Framebuffer\"},{\"serverName\":\"Window Halo\"},{\"serverName\":\"Window_Halo\"},{\"serverName\":\"ccd_connectors\"},{\"serverName\":\"ccd_directory\"},{\"serverName\":\"ccd_host\"},{\"serverName\":\"ccd_pr\"},{\"serverName\":\"ccd_session\"},{\"serverName\":\"ccd_session_mgmt\"},{\"serverName\":\"ccd_settings\"},{\"serverName\":\"ccd_sidebar\"},{\"serverName\":\"ccd_turn\"},{\"serverName\":\"ccd_view\"},{\"serverName\":\"ccd_window\"},{\"serverName\":\"claude-in-chrome\"},{\"serverName\":\"claude_browser\"},{\"serverName\":\"claude_code_android_emulator\"},{\"serverName\":\"claude_code_ios_simulator\"},{\"serverName\":\"claude_for_chrome\"},{\"serverName\":\"claude_in_chrome\"},{\"serverName\":\"claude_preview\"},{\"serverName\":\"computer-use\"},{\"serverName\":\"computer_use\"},{\"serverName\":\"cowork\"},{\"serverName\":\"cowork-onboarding\"},{\"serverName\":\"cowork_onboarding\"},{\"serverName\":\"dev-debug\"},{\"serverName\":\"dev_debug\"},{\"serverName\":\"dispatch\"},{\"serverName\":\"framebuffer\"},{\"serverName\":\"mcp-registry\"},{\"serverName\":\"mcp_registry\"},{\"serverName\":\"plugins\"},{\"serverName\":\"remote-devices\"},{\"serverName\":\"remote_devices\"},{\"serverName\":\"scheduled-tasks\"},{\"serverName\":\"scheduled_tasks\"},{\"serverName\":\"session_info\"},{\"serverName\":\"skills\"},{\"serverName\":\"window_halo\"}],\"env\":{\"CLAUDE_CODE_MAX_CONTEXT_TOKENS\":\"200000\"},\"sandbox\":{\"filesystem\":{\"denyWrite\":[\"<tmp>\",\"/System/Volumes/Data<tmp>\",\"<tmp>/ccd-ssh.501\",\"/System/Volumes/Data<tmp>/ccd-ssh.501\",\"<tmp>\",\"/System/Volumes/Data<tmp>\",\"<tmp>\",\"/System/Volumes/Data<tmp>\"]}}}",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "launch",
+        "parents",
+        "<app>/Contents/Helpers/disclaimer --pgroup -- <agent> --output-format stream-json --verbose --input-format stream-json --effort=medium --model=claude-opus-5-5 --permission-prompt-tool=stdio --allowedTools=mcp__computer-use,mcp__ccd_session__spawn_task,mcp__ccd_session__dismiss_task,mcp__ccd_session__mark_chapter,mcp__ccd_session_mgmt__list_sessions,mcp__ccd_session_mgmt__get_session,mcp__ccd_session_mgmt__get_usage,mcp__ccd_host__get_storage_usage,mcp__ccd_session_mgmt__set_session_title,mcp__ccd_session_mgmt__send_message,mcp__ccd_session_mgmt__detach_session,mcp__ccd_sidebar__list_groups,mcp__ccd_sidebar__create_group,mcp__ccd_sidebar__set_view,mcp__ccd_sidebar__list_sections,mcp__ccd_sidebar__create_section,mcp__ccd_turn__wrap_up,mcp__ccd_turn__update_plan,mcp__ccd_session_mgmt__search_session_transcripts,mcp__ccd_session_mgmt__list_events,mcp__ccd_session_mgmt__export_transcript,mcp__scheduled-tasks__list_task_runs,mcp__ccd_session__read_widget_context,mcp__ccd_session__list_start_targets,mcp__ccd_view__show_pane,mcp__ccd_view__close_pane,mcp__ccd_view__get_layout,mcp__ccd_view__set_transcript_view,mcp__ccd_settings__get_settings,mcp__ccd_pr__get_status,mcp__ccd_window__open_session_in,mcp__ccd_window__close_split,mcp__ccd_window__set_sidebar_collapsed,mcp__ccd_window__get_window_layout --disallowedTools=SubscribePR,Edit(//**/ccd-*h.501),Edit(//**/ccd-*h.501/**) --setting-sources=user,project,local --permission-mode=auto --include-partial-messages --await-initialize --managed-settings {\"disableClaudeAiConnectors\":true,\"permissions\":{\"allow\":[],\"deny\":[\"Edit(//**/local-agent-mode-?e???on?/**)\"]},\"sandbox\":{\"network\":{\"allowedDomains\":[],\"allowManagedDomainsOnly\":true},\"enabled\":true,\"allowUnsandboxedCommands\":false,\"filesystem\":{\"denyWrite\":[\"<app-data>/local-agent-mode-sessions\",\"/System/Volumes/Data<app-data>/local-agent-mode-sessions\"]}}} --thinking-display omitted --replay-user-messages --settings {\"deniedMcpServers\":[{\"serverName\":\"Claude Browser\"},{\"serverName\":\"Claude Code Android Emulator\"},{\"serverName\":\"Claude Code iOS Simulator\"},{\"serverName\":\"Claude Preview\"},{\"serverName\":\"Claude_Browser\"},{\"serverName\":\"Claude_Code_Android_Emulator\"},{\"serverName\":\"Claude_Code_iOS_Simulator\"},{\"serverName\":\"Claude_Preview\"},{\"serverName\":\"Claude_for_Chrome\"},{\"serverName\":\"Framebuffer\"},{\"serverName\":\"Window Halo\"},{\"serverName\":\"Window_Halo\"},{\"serverName\":\"ccd_connectors\"},{\"serverName\":\"ccd_directory\"},{\"serverName\":\"ccd_host\"},{\"serverName\":\"ccd_pr\"},{\"serverName\":\"ccd_session\"},{\"serverName\":\"ccd_session_mgmt\"},{\"serverName\":\"ccd_settings\"},{\"serverName\":\"ccd_sidebar\"},{\"serverName\":\"ccd_turn\"},{\"serverName\":\"ccd_view\"},{\"serverName\":\"ccd_window\"},{\"serverName\":\"claude-in-chrome\"},{\"serverName\":\"claude_browser\"},{\"serverName\":\"claude_code_android_emulator\"},{\"serverName\":\"claude_code_ios_simulator\"},{\"serverName\":\"claude_for_chrome\"},{\"serverName\":\"claude_in_chrome\"},{\"serverName\":\"claude_preview\"},{\"serverName\":\"computer-use\"},{\"serverName\":\"computer_use\"},{\"serverName\":\"cowork\"},{\"serverName\":\"cowork-onboarding\"},{\"serverName\":\"cowork_onboarding\"},{\"serverName\":\"dev-debug\"},{\"serverName\":\"dev_debug\"},{\"serverName\":\"dispatch\"},{\"serverName\":\"framebuffer\"},{\"serverName\":\"mcp-registry\"},{\"serverName\":\"mcp_registry\"},{\"serverName\":\"plugins\"},{\"serverName\":\"remote-devices\"},{\"serverName\":\"remote_devices\"},{\"serverName\":\"scheduled-tasks\"},{\"serverName\":\"scheduled_tasks\"},{\"serverName\":\"session_info\"},{\"serverName\":\"skills\"},{\"serverName\":\"window_halo\"}],\"env\":{\"CLAUDE_CODE_MAX_CONTEXT_TOKENS\":\"200000\"},\"sandbox\":{\"filesystem\":{\"denyWrite\":[\"<tmp>\",\"/System/Volumes/Data<tmp>\",\"<tmp>/ccd-ssh.501\",\"/System/Volumes/Data<tmp>/ccd-ssh.501\",\"<tmp>\",\"/System/Volumes/Data<tmp>\",\"<tmp>\",\"/System/Volumes/Data<tmp>\"]}}}"
+      ],
+      "title": "The processes between the app and its agent added",
+      "impact": "notable",
+      "before": null,
+      "after": "<app>/Contents/Helpers/disclaimer --pgroup -- <agent> --output-format stream-json --verbose --input-format stream-json --effort=medium --model=claude-opus-5-5 --permission-prompt-tool=stdio --allowedTools=mcp__computer-use,mcp__ccd_session__spawn_task,mcp__ccd_session__dismiss_task,mcp__ccd_session__mark_chapter,mcp__ccd_session_mgmt__list_sessions,mcp__ccd_session_mgmt__get_session,mcp__ccd_session_mgmt__get_usage,mcp__ccd_host__get_storage_usage,mcp__ccd_session_mgmt__set_session_title,mcp__ccd_session_mgmt__send_message,mcp__ccd_session_mgmt__detach_session,mcp__ccd_sidebar__list_groups,mcp__ccd_sidebar__create_group,mcp__ccd_sidebar__set_view,mcp__ccd_sidebar__list_sections,mcp__ccd_sidebar__create_section,mcp__ccd_turn__wrap_up,mcp__ccd_turn__update_plan,mcp__ccd_session_mgmt__search_session_transcripts,mcp__ccd_session_mgmt__list_events,mcp__ccd_session_mgmt__export_transcript,mcp__scheduled-tasks__list_task_runs,mcp__ccd_session__read_widget_context,mcp__ccd_session__list_start_targets,mcp__ccd_view__show_pane,mcp__ccd_view__close_pane,mcp__ccd_view__get_layout,mcp__ccd_view__set_transcript_view,mcp__ccd_settings__get_settings,mcp__ccd_pr__get_status,mcp__ccd_window__open_session_in,mcp__ccd_window__close_split,mcp__ccd_window__set_sidebar_collapsed,mcp__ccd_window__get_window_layout --disallowedTools=SubscribePR,Edit(//**/ccd-*h.501),Edit(//**/ccd-*h.501/**) --setting-sources=user,project,local --permission-mode=auto --include-partial-messages --await-initialize --managed-settings {\"disableClaudeAiConnectors\":true,\"permissions\":{\"allow\":[],\"deny\":[\"Edit(//**/local-agent-mode-?e???on?/**)\"]},\"sandbox\":{\"network\":{\"allowedDomains\":[],\"allowManagedDomainsOnly\":true},\"enabled\":true,\"allowUnsandboxedCommands\":false,\"filesystem\":{\"denyWrite\":[\"<app-data>/local-agent-mode-sessions\",\"/System/Volumes/Data<app-data>/local-agent-mode-sessions\"]}}} --thinking-display omitted --replay-user-messages --settings {\"deniedMcpServers\":[{\"serverName\":\"Claude Browser\"},{\"serverName\":\"Claude Code Android Emulator\"},{\"serverName\":\"Claude Code iOS Simulator\"},{\"serverName\":\"Claude Preview\"},{\"serverName\":\"Claude_Browser\"},{\"serverName\":\"Claude_Code_Android_Emulator\"},{\"serverName\":\"Claude_Code_iOS_Simulator\"},{\"serverName\":\"Claude_Preview\"},{\"serverName\":\"Claude_for_Chrome\"},{\"serverName\":\"Framebuffer\"},{\"serverName\":\"Window Halo\"},{\"serverName\":\"Window_Halo\"},{\"serverName\":\"ccd_connectors\"},{\"serverName\":\"ccd_directory\"},{\"serverName\":\"ccd_host\"},{\"serverName\":\"ccd_pr\"},{\"serverName\":\"ccd_session\"},{\"serverName\":\"ccd_session_mgmt\"},{\"serverName\":\"ccd_settings\"},{\"serverName\":\"ccd_sidebar\"},{\"serverName\":\"ccd_turn\"},{\"serverName\":\"ccd_view\"},{\"serverName\":\"ccd_window\"},{\"serverName\":\"claude-in-chrome\"},{\"serverName\":\"claude_browser\"},{\"serverName\":\"claude_code_android_emulator\"},{\"serverName\":\"claude_code_ios_simulator\"},{\"serverName\":\"claude_for_chrome\"},{\"serverName\":\"claude_in_chrome\"},{\"serverName\":\"claude_preview\"},{\"serverName\":\"computer-use\"},{\"serverName\":\"computer_use\"},{\"serverName\":\"cowork\"},{\"serverName\":\"cowork-onboarding\"},{\"serverName\":\"cowork_onboarding\"},{\"serverName\":\"dev-debug\"},{\"serverName\":\"dev_debug\"},{\"serverName\":\"dispatch\"},{\"serverName\":\"framebuffer\"},{\"serverName\":\"mcp-registry\"},{\"serverName\":\"mcp_registry\"},{\"serverName\":\"plugins\"},{\"serverName\":\"remote-devices\"},{\"serverName\":\"remote_devices\"},{\"serverName\":\"scheduled-tasks\"},{\"serverName\":\"scheduled_tasks\"},{\"serverName\":\"session_info\"},{\"serverName\":\"skills\"},{\"serverName\":\"window_halo\"}],\"env\":{\"CLAUDE_CODE_MAX_CONTEXT_TOKENS\":\"200000\"},\"sandbox\":{\"filesystem\":{\"denyWrite\":[\"<tmp>\",\"/System/Volumes/Data<tmp>\",\"<tmp>/ccd-ssh.501\",\"/System/Volumes/Data<tmp>/ccd-ssh.501\",\"<tmp>\",\"/System/Volumes/Data<tmp>\",\"<tmp>\",\"/System/Volumes/Data<tmp>\"]}}}",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "cli.launch.parents.<app>/Contents/Helpers/disclaimer --pgroup -- <agent> --output-format stream-json --verbose --input-format stream-json --effort=medium --model=claude-opus-5-5 --permission-prompt-tool=stdio --allowedTools=mcp__computer-use,mcp__ccd_session__spawn_task,mcp__ccd_session__dismiss_task,mcp__ccd_session__mark_chapter,mcp__ccd_session_mgmt__list_sessions,mcp__ccd_session_mgmt__get_session,mcp__ccd_session_mgmt__get_usage,mcp__ccd_host__get_storage_usage,mcp__ccd_session_mgmt__set_session_title,mcp__ccd_session_mgmt__send_message,mcp__ccd_session_mgmt__detach_session,mcp__ccd_sidebar__list_groups,mcp__ccd_sidebar__create_group,mcp__ccd_sidebar__set_view,mcp__ccd_sidebar__list_sections,mcp__ccd_sidebar__create_section,mcp__ccd_turn__wrap_up,mcp__ccd_turn__update_plan,mcp__ccd_session_mgmt__search_session_transcripts,mcp__ccd_session_mgmt__list_events,mcp__ccd_session_mgmt__export_transcript,mcp__scheduled-tasks__list_task_runs,mcp__ccd_session__read_widget_context,mcp__ccd_session__list_start_targets,mcp__ccd_view__show_pane,mcp__ccd_view__close_pane,mcp__ccd_view__get_layout,mcp__ccd_view__set_transcript_view,mcp__ccd_settings__get_settings,mcp__ccd_pr__get_status,mcp__ccd_window__open_session_in,mcp__ccd_window__close_split,mcp__ccd_window__set_sidebar_collapsed,mcp__ccd_window__get_window_layout --disallowedTools=SubscribePR,Edit(//**/ccd-*h.501),Edit(//**/ccd-*h.501/**) --setting-sources=user,project,local --permission-mode=auto --include-partial-messages --await-initialize --managed-settings {\"disableClaudeAiConnectors\":true,\"permissions\":{\"allow\":[]},\"sandbox\":{\"network\":{\"allowedDomains\":[],\"allowManagedDomainsOnly\":true},\"enabled\":true,\"allowUnsandboxedCommands\":false}} --thinking-display omitted --replay-user-messages --settings {\"deniedMcpServers\":[{\"serverName\":\"Claude Browser\"},{\"serverName\":\"Claude Code Android Emulator\"},{\"serverName\":\"Claude Code iOS Simulator\"},{\"serverName\":\"Claude Preview\"},{\"serverName\":\"Claude_Browser\"},{\"serverName\":\"Claude_Code_Android_Emulator\"},{\"serverName\":\"Claude_Code_iOS_Simulator\"},{\"serverName\":\"Claude_Preview\"},{\"serverName\":\"Claude_for_Chrome\"},{\"serverName\":\"Framebuffer\"},{\"serverName\":\"Window Halo\"},{\"serverName\":\"Window_Halo\"},{\"serverName\":\"ccd_connectors\"},{\"serverName\":\"ccd_directory\"},{\"serverName\":\"ccd_host\"},{\"serverName\":\"ccd_pr\"},{\"serverName\":\"ccd_session\"},{\"serverName\":\"ccd_session_mgmt\"},{\"serverName\":\"ccd_settings\"},{\"serverName\":\"ccd_sidebar\"},{\"serverName\":\"ccd_turn\"},{\"serverName\":\"ccd_view\"},{\"serverName\":\"ccd_window\"},{\"serverName\":\"claude-in-chrome\"},{\"serverName\":\"claude_browser\"},{\"serverName\":\"claude_code_android_emulator\"},{\"serverName\":\"claude_code_ios_simulator\"},{\"serverName\":\"claude_for_chrome\"},{\"serverName\":\"claude_in_chrome\"},{\"serverName\":\"claude_preview\"},{\"serverName\":\"computer-use\"},{\"serverName\":\"computer_use\"},{\"serverName\":\"cowork\"},{\"serverName\":\"cowork-onboarding\"},{\"serverName\":\"cowork_onboarding\"},{\"serverName\":\"dev-debug\"},{\"serverName\":\"dev_debug\"},{\"serverName\":\"dispatch\"},{\"serverName\":\"framebuffer\"},{\"serverName\":\"mcp-registry\"},{\"serverName\":\"mcp_registry\"},{\"serverName\":\"plugins\"},{\"serverName\":\"remote-devices\"},{\"serverName\":\"remote_devices\"},{\"serverName\":\"scheduled-tasks\"},{\"serverName\":\"scheduled_tasks\"},{\"serverName\":\"session_info\"},{\"serverName\":\"skills\"},{\"serverName\":\"window_halo\"}],\"env\":{\"CLAUDE_CODE_MAX_CONTEXT_TOKENS\":\"200000\"},\"sandbox\":{\"filesystem\":{\"denyWrite\":[\"<tmp>\",\"/System/Volumes/Data<tmp>\",\"<tmp>/ccd-ssh.501\",\"/System/Volumes/Data<tmp>/ccd-ssh.501\",\"<tmp>\",\"/System/Volumes/Data<tmp>\",\"<tmp>\",\"/System/Volumes/Data<tmp>\"]}}}",
+      "category": "cli",
+      "op": "removed",
+      "path": [
+        "cli",
+        "launch",
+        "parents",
+        "<app>/Contents/Helpers/disclaimer --pgroup -- <agent> --output-format stream-json --verbose --input-format stream-json --effort=medium --model=claude-opus-5-5 --permission-prompt-tool=stdio --allowedTools=mcp__computer-use,mcp__ccd_session__spawn_task,mcp__ccd_session__dismiss_task,mcp__ccd_session__mark_chapter,mcp__ccd_session_mgmt__list_sessions,mcp__ccd_session_mgmt__get_session,mcp__ccd_session_mgmt__get_usage,mcp__ccd_host__get_storage_usage,mcp__ccd_session_mgmt__set_session_title,mcp__ccd_session_mgmt__send_message,mcp__ccd_session_mgmt__detach_session,mcp__ccd_sidebar__list_groups,mcp__ccd_sidebar__create_group,mcp__ccd_sidebar__set_view,mcp__ccd_sidebar__list_sections,mcp__ccd_sidebar__create_section,mcp__ccd_turn__wrap_up,mcp__ccd_turn__update_plan,mcp__ccd_session_mgmt__search_session_transcripts,mcp__ccd_session_mgmt__list_events,mcp__ccd_session_mgmt__export_transcript,mcp__scheduled-tasks__list_task_runs,mcp__ccd_session__read_widget_context,mcp__ccd_session__list_start_targets,mcp__ccd_view__show_pane,mcp__ccd_view__close_pane,mcp__ccd_view__get_layout,mcp__ccd_view__set_transcript_view,mcp__ccd_settings__get_settings,mcp__ccd_pr__get_status,mcp__ccd_window__open_session_in,mcp__ccd_window__close_split,mcp__ccd_window__set_sidebar_collapsed,mcp__ccd_window__get_window_layout --disallowedTools=SubscribePR,Edit(//**/ccd-*h.501),Edit(//**/ccd-*h.501/**) --setting-sources=user,project,local --permission-mode=auto --include-partial-messages --await-initialize --managed-settings {\"disableClaudeAiConnectors\":true,\"permissions\":{\"allow\":[]},\"sandbox\":{\"network\":{\"allowedDomains\":[],\"allowManagedDomainsOnly\":true},\"enabled\":true,\"allowUnsandboxedCommands\":false}} --thinking-display omitted --replay-user-messages --settings {\"deniedMcpServers\":[{\"serverName\":\"Claude Browser\"},{\"serverName\":\"Claude Code Android Emulator\"},{\"serverName\":\"Claude Code iOS Simulator\"},{\"serverName\":\"Claude Preview\"},{\"serverName\":\"Claude_Browser\"},{\"serverName\":\"Claude_Code_Android_Emulator\"},{\"serverName\":\"Claude_Code_iOS_Simulator\"},{\"serverName\":\"Claude_Preview\"},{\"serverName\":\"Claude_for_Chrome\"},{\"serverName\":\"Framebuffer\"},{\"serverName\":\"Window Halo\"},{\"serverName\":\"Window_Halo\"},{\"serverName\":\"ccd_connectors\"},{\"serverName\":\"ccd_directory\"},{\"serverName\":\"ccd_host\"},{\"serverName\":\"ccd_pr\"},{\"serverName\":\"ccd_session\"},{\"serverName\":\"ccd_session_mgmt\"},{\"serverName\":\"ccd_settings\"},{\"serverName\":\"ccd_sidebar\"},{\"serverName\":\"ccd_turn\"},{\"serverName\":\"ccd_view\"},{\"serverName\":\"ccd_window\"},{\"serverName\":\"claude-in-chrome\"},{\"serverName\":\"claude_browser\"},{\"serverName\":\"claude_code_android_emulator\"},{\"serverName\":\"claude_code_ios_simulator\"},{\"serverName\":\"claude_for_chrome\"},{\"serverName\":\"claude_in_chrome\"},{\"serverName\":\"claude_preview\"},{\"serverName\":\"computer-use\"},{\"serverName\":\"computer_use\"},{\"serverName\":\"cowork\"},{\"serverName\":\"cowork-onboarding\"},{\"serverName\":\"cowork_onboarding\"},{\"serverName\":\"dev-debug\"},{\"serverName\":\"dev_debug\"},{\"serverName\":\"dispatch\"},{\"serverName\":\"framebuffer\"},{\"serverName\":\"mcp-registry\"},{\"serverName\":\"mcp_registry\"},{\"serverName\":\"plugins\"},{\"serverName\":\"remote-devices\"},{\"serverName\":\"remote_devices\"},{\"serverName\":\"scheduled-tasks\"},{\"serverName\":\"scheduled_tasks\"},{\"serverName\":\"session_info\"},{\"serverName\":\"skills\"},{\"serverName\":\"window_halo\"}],\"env\":{\"CLAUDE_CODE_MAX_CONTEXT_TOKENS\":\"200000\"},\"sandbox\":{\"filesystem\":{\"denyWrite\":[\"<tmp>\",\"/System/Volumes/Data<tmp>\",\"<tmp>/ccd-ssh.501\",\"/System/Volumes/Data<tmp>/ccd-ssh.501\",\"<tmp>\",\"/System/Volumes/Data<tmp>\",\"<tmp>\",\"/System/Volumes/Data<tmp>\"]}}}"
+      ],
+      "title": "The processes between the app and its agent removed",
+      "impact": "notable",
+      "before": "<app>/Contents/Helpers/disclaimer --pgroup -- <agent> --output-format stream-json --verbose --input-format stream-json --effort=medium --model=claude-opus-5-5 --permission-prompt-tool=stdio --allowedTools=mcp__computer-use,mcp__ccd_session__spawn_task,mcp__ccd_session__dismiss_task,mcp__ccd_session__mark_chapter,mcp__ccd_session_mgmt__list_sessions,mcp__ccd_session_mgmt__get_session,mcp__ccd_session_mgmt__get_usage,mcp__ccd_host__get_storage_usage,mcp__ccd_session_mgmt__set_session_title,mcp__ccd_session_mgmt__send_message,mcp__ccd_session_mgmt__detach_session,mcp__ccd_sidebar__list_groups,mcp__ccd_sidebar__create_group,mcp__ccd_sidebar__set_view,mcp__ccd_sidebar__list_sections,mcp__ccd_sidebar__create_section,mcp__ccd_turn__wrap_up,mcp__ccd_turn__update_plan,mcp__ccd_session_mgmt__search_session_transcripts,mcp__ccd_session_mgmt__list_events,mcp__ccd_session_mgmt__export_transcript,mcp__scheduled-tasks__list_task_runs,mcp__ccd_session__read_widget_context,mcp__ccd_session__list_start_targets,mcp__ccd_view__show_pane,mcp__ccd_view__close_pane,mcp__ccd_view__get_layout,mcp__ccd_view__set_transcript_view,mcp__ccd_settings__get_settings,mcp__ccd_pr__get_status,mcp__ccd_window__open_session_in,mcp__ccd_window__close_split,mcp__ccd_window__set_sidebar_collapsed,mcp__ccd_window__get_window_layout --disallowedTools=SubscribePR,Edit(//**/ccd-*h.501),Edit(//**/ccd-*h.501/**) --setting-sources=user,project,local --permission-mode=auto --include-partial-messages --await-initialize --managed-settings {\"disableClaudeAiConnectors\":true,\"permissions\":{\"allow\":[]},\"sandbox\":{\"network\":{\"allowedDomains\":[],\"allowManagedDomainsOnly\":true},\"enabled\":true,\"allowUnsandboxedCommands\":false}} --thinking-display omitted --replay-user-messages --settings {\"deniedMcpServers\":[{\"serverName\":\"Claude Browser\"},{\"serverName\":\"Claude Code Android Emulator\"},{\"serverName\":\"Claude Code iOS Simulator\"},{\"serverName\":\"Claude Preview\"},{\"serverName\":\"Claude_Browser\"},{\"serverName\":\"Claude_Code_Android_Emulator\"},{\"serverName\":\"Claude_Code_iOS_Simulator\"},{\"serverName\":\"Claude_Preview\"},{\"serverName\":\"Claude_for_Chrome\"},{\"serverName\":\"Framebuffer\"},{\"serverName\":\"Window Halo\"},{\"serverName\":\"Window_Halo\"},{\"serverName\":\"ccd_connectors\"},{\"serverName\":\"ccd_directory\"},{\"serverName\":\"ccd_host\"},{\"serverName\":\"ccd_pr\"},{\"serverName\":\"ccd_session\"},{\"serverName\":\"ccd_session_mgmt\"},{\"serverName\":\"ccd_settings\"},{\"serverName\":\"ccd_sidebar\"},{\"serverName\":\"ccd_turn\"},{\"serverName\":\"ccd_view\"},{\"serverName\":\"ccd_window\"},{\"serverName\":\"claude-in-chrome\"},{\"serverName\":\"claude_browser\"},{\"serverName\":\"claude_code_android_emulator\"},{\"serverName\":\"claude_code_ios_simulator\"},{\"serverName\":\"claude_for_chrome\"},{\"serverName\":\"claude_in_chrome\"},{\"serverName\":\"claude_preview\"},{\"serverName\":\"computer-use\"},{\"serverName\":\"computer_use\"},{\"serverName\":\"cowork\"},{\"serverName\":\"cowork-onboarding\"},{\"serverName\":\"cowork_onboarding\"},{\"serverName\":\"dev-debug\"},{\"serverName\":\"dev_debug\"},{\"serverName\":\"dispatch\"},{\"serverName\":\"framebuffer\"},{\"serverName\":\"mcp-registry\"},{\"serverName\":\"mcp_registry\"},{\"serverName\":\"plugins\"},{\"serverName\":\"remote-devices\"},{\"serverName\":\"remote_devices\"},{\"serverName\":\"scheduled-tasks\"},{\"serverName\":\"scheduled_tasks\"},{\"serverName\":\"session_info\"},{\"serverName\":\"skills\"},{\"serverName\":\"window_halo\"}],\"env\":{\"CLAUDE_CODE_MAX_CONTEXT_TOKENS\":\"200000\"},\"sandbox\":{\"filesystem\":{\"denyWrite\":[\"<tmp>\",\"/System/Volumes/Data<tmp>\",\"<tmp>/ccd-ssh.501\",\"/System/Volumes/Data<tmp>/ccd-ssh.501\",\"<tmp>\",\"/System/Volumes/Data<tmp>\",\"<tmp>\",\"/System/Volumes/Data<tmp>\"]}}}",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.allowedHttpHookUrls.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "allowedHttpHookUrls",
+        "description"
+      ],
+      "title": "allowedHttpHookUrls description changed (+202 −0 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -5,3 +5,4 @@\n If undefined, all URLs are allowed.\n If empty array, no HTTP hooks are allowed.\n Arrays merge across settings sources (same semantics as allowedMcpServers).\n+Where managed settings do not set this list, a list in any other settings file does not apply to hooks that managed settings define, or that come from a plugin they enable from a local folder they name.\n",
+      "stats": {
+        "added_chars": 202,
+        "removed_chars": 0
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.disableArtifact.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "disableArtifact",
+        "description"
+      ],
+      "title": "disableArtifact description changed (+100 −107 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Deprecated: use enableArtifact: false. Still honored — true disables the Artifact tool; false is ignored.\n+Deprecated: use enableArtifact: false. Still honored — true turns Artifacts off; false is ignored.\n",
+      "stats": {
+        "added_chars": 100,
+        "removed_chars": 107
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.enableArtifact.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "enableArtifact",
+        "description"
+      ],
+      "title": "enableArtifact description changed (+184 −192 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Turn the Artifact tool on or off. Off in any of managed, --settings, or user settings wins; project and local settings can only turn it off. Unset defaults to on once the feature is available.\n+Turn Artifacts on or off. Off in any of managed, --settings, or user settings wins; project and local settings can only turn it off. Unset defaults to on once the feature is available.\n",
+      "stats": {
+        "added_chars": 184,
+        "removed_chars": 192
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.httpHookAllowedEnvVars.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "httpHookAllowedEnvVars",
+        "description"
+      ],
+      "title": "httpHookAllowedEnvVars description changed (+479 −280 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,5 @@\n-Allowlist of environment variable names HTTP hooks may interpolate into headers. When set, each hook's effective allowedEnvVars is the intersection with this list. If undefined, no restriction is applied. Arrays merge across settings sources (same semantics as allowedMcpServers).\n+Allowlist of environment variable names HTTP hooks may interpolate into headers.\n+When set, each hook's effective allowedEnvVars is the intersection with this list.\n+If undefined, no restriction is applied.\n+Arrays merge across settings sources (same semantics as allowedMcpServers).\n+Where managed settings do not set this list, a list in any other settings file does not apply to hooks that managed settings define, or that come from a plugin they enable from a local folder they name.\n",
+      "stats": {
+        "added_chars": 479,
+        "removed_chars": 280
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.subagentStatusLine.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "subagentStatusLine",
+        "description"
+      ],
+      "title": "subagentStatusLine description changed (+163 −80 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Deprecated: no longer has any effect. Subagent rows always use the default look.\n+Deprecated: still works, and will stop working in a future release. Custom per-subagent status line shown in the agent panel; receives row context as JSON on stdin\n",
+      "stats": {
+        "added_chars": 163,
+        "removed_chars": 80
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_ARTIFACT_LIVE_WATCH",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_ARTIFACT_LIVE_WATCH"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_ARTIFACT_LIVE_WATCH",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_ARTIFACT_LIVE_WATCH",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_CHILD_NOTES_DIR",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_CHILD_NOTES_DIR"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_CHILD_NOTES_DIR",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_CHILD_NOTES_DIR",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_DISABLE_EARLY_KEY_GUARD",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_DISABLE_EARLY_KEY_GUARD"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_DISABLE_EARLY_KEY_GUARD",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_DISABLE_EARLY_KEY_GUARD",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_DISABLE_MCP_INDEX_ROOM_COUNT",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_DISABLE_MCP_INDEX_ROOM_COUNT"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_DISABLE_MCP_INDEX_ROOM_COUNT",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_DISABLE_MCP_INDEX_ROOM_COUNT",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_DISABLE_POWERSHELL_ALIAS_SHADOW_CHECK",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_DISABLE_POWERSHELL_ALIAS_SHADOW_CHECK"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_DISABLE_POWERSHELL_ALIAS_SHADOW_CHECK",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_DISABLE_POWERSHELL_ALIAS_SHADOW_CHECK",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_FIRST_CALL_THINKING_TITLES",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_FIRST_CALL_THINKING_TITLES"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_FIRST_CALL_THINKING_TITLES",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_FIRST_CALL_THINKING_TITLES",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_HOST_OWNED_SPAWN_ENV",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_HOST_OWNED_SPAWN_ENV"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_HOST_OWNED_SPAWN_ENV",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_HOST_OWNED_SPAWN_ENV",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_LAUNCHED_BY_SESSION_IDS",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_LAUNCHED_BY_SESSION_IDS"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_LAUNCHED_BY_SESSION_IDS",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_LAUNCHED_BY_SESSION_IDS",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_MCP_PREWAIT_SERVERS_MS_BY_NAME",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_MCP_PREWAIT_SERVERS_MS_BY_NAME"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_MCP_PREWAIT_SERVERS_MS_BY_NAME",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_MCP_PREWAIT_SERVERS_MS_BY_NAME",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_NEW_RENDERER",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_NEW_RENDERER"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_NEW_RENDERER",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_NEW_RENDERER",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_OFF_PERSONS_MACHINE",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_OFF_PERSONS_MACHINE"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_OFF_PERSONS_MACHINE",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_OFF_PERSONS_MACHINE",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_REQUIRED_PLUGINS_HOLD",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_REQUIRED_PLUGINS_HOLD"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_REQUIRED_PLUGINS_HOLD",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_REQUIRED_PLUGINS_HOLD",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_SHOW_HIDDEN_CHARACTERS",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_SHOW_HIDDEN_CHARACTERS"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_SHOW_HIDDEN_CHARACTERS",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_SHOW_HIDDEN_CHARACTERS",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_TUI_ASKED",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_TUI_ASKED"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_TUI_ASKED",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_TUI_ASKED",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_WITHHOLD_PRODUCT_EVENTS",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_WITHHOLD_PRODUCT_EVENTS"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_WITHHOLD_PRODUCT_EVENTS",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_WITHHOLD_PRODUCT_EVENTS",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.OTEL_RESOURCE_INCLUDE_HOST",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "OTEL_RESOURCE_INCLUDE_HOST"
+      ],
+      "title": "New environment variable: OTEL_RESOURCE_INCLUDE_HOST",
+      "impact": "informational",
+      "before": null,
+      "after": "OTEL_RESOURCE_INCLUDE_HOST",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.SELF_HOSTED_RUNNER_USE_ANTHROPIC_GH",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "SELF_HOSTED_RUNNER_USE_ANTHROPIC_GH"
+      ],
+      "title": "New environment variable: SELF_HOSTED_RUNNER_USE_ANTHROPIC_GH",
+      "impact": "informational",
+      "before": null,
+      "after": "SELF_HOSTED_RUNNER_USE_ANTHROPIC_GH",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_DECSTBM",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_DECSTBM"
+      ],
+      "title": "Environment variable no longer read: CLAUDE_CODE_DECSTBM",
+      "impact": "informational",
+      "before": "CLAUDE_CODE_DECSTBM",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "binary.agent.download",
+      "category": "binary",
+      "op": "changed",
+      "path": [
+        "binary",
+        "agent",
+        "download"
+      ],
+      "title": "Binary agent.download: https://downloads.claude.ai/claude-code-releases/2.1.325/… → https://downloads.claude.ai/claude-code-releases/2.1.326/…",
+      "impact": "informational",
+      "before": "https://downloads.claude.ai/claude-code-releases/2.1.325/darwin-arm64/claude.app.tar.zst",
+      "after": "https://downloads.claude.ai/claude-code-releases/2.1.326/darwin-arm64/claude.app.tar.zst",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "binary.agent.sdk",
+      "category": "binary",
+      "op": "changed",
+      "path": [
+        "binary",
+        "agent",
+        "sdk"
+      ],
+      "title": "Binary agent.sdk: @anthropic-ai/claude-agent-sdk 0.3.325 → @anthropic-ai/claude-agent-sdk 0.3.326",
+      "impact": "informational",
+      "before": "@anthropic-ai/claude-agent-sdk 0.3.325",
+      "after": "@anthropic-ai/claude-agent-sdk 0.3.326",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "binary.agent.version",
+      "category": "binary",
+      "op": "changed",
+      "path": [
+        "binary",
+        "agent",
+        "version"
+      ],
+      "title": "Runs its agent's build 2.1.326 (was 2.1.325)",
+      "impact": "notable",
+      "before": "2.1.325",
+      "after": "2.1.326",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    }
+  ]
+}

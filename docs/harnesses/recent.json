@@ -1,7 +1,44 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-17T14:30:14.088945144Z",
+  "generated_at": "2026-11-17T15:33:55.626260276Z",
   "versions": [
+    {
+      "harness": "claude-desktop",
+      "name": "Claude Desktop (Code)",
+      "version": "6.6395.0",
+      "released_at": "2026-11-17T12:59:03.909Z",
+      "captured_at": "2026-11-17T15:33:55.626260276Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "5.11492.5",
+      "changes": 89,
+      "categories": {
+        "binary": 3,
+        "cli": 43,
+        "config": 23,
+        "prompt": 3,
+        "request": 1,
+        "side_requests": 5,
+        "tools": 11
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 62,
+        "notable": 27
+      },
+      "undocumented": null,
+      "highlights": [
+        "Injected context changed (+2003 −2000 chars)",
+        "System prompt changed",
+        "System prompt changed (+421 −928 chars)"
+      ],
+      "signing": "valid",
+      "attempted_at": "2026-11-17T15:33:55.626260276Z",
+      "attempts": 1
+    },
     {
       "harness": "opencode",
       "name": "OpenCode",
@@ -6153,44 +6190,6 @@
         "Caching across_turns: none → {\"breakpoints\":[[],[],[]],\"stable_cache_key\":true,\"stable…",
         "Behaviour: compaction added",
         "Behaviour: sandbox approval removed"
-      ],
-      "signing": "valid"
-    },
-    {
-      "harness": "codex",
-      "name": "Codex CLI",
-      "version": "0.144.0",
-      "released_at": "2026-07-09T16:50:26.998Z",
-      "captured_at": "2026-11-05T09:54:28.532441Z",
-      "platforms": [
-        "darwin/arm64",
-        "linux/amd64"
-      ],
-      "support": "untested",
-      "previous": "0.143.0",
-      "changes": 81,
-      "categories": {
-        "behavior": 3,
-        "caching": 1,
-        "config": 6,
-        "filesystem": 32,
-        "hooks": 10,
-        "model": 4,
-        "prompt": 4,
-        "request": 3,
-        "tools": 18
-      },
-      "impact": {
-        "breaking": 0,
-        "degrading": 0,
-        "informational": 51,
-        "notable": 30
-      },
-      "undocumented": 68,
-      "highlights": [
-        "Default model: gpt-5.5 → gpt-5.6-sol",
-        "Model parameter parallel_tool_calls: true → false",
-        "Model parameter reasoning.context: none → all_turns"
       ],
       "signing": "valid"
     }
