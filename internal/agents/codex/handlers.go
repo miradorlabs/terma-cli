@@ -79,6 +79,7 @@ func notifyHook(ctx context.Context, env hookrun.Env) error {
 	captureCodexFunding(ctx, env, r, turn)
 	captureCodexDesktopActivity(ctx, env, r, turn)
 	captureCodexTitle(ctx, env, r, turn, captureCodexReplies(ctx, env, r, turn))
+	captureCodexSkillMentions(ctx, env, r, turn)
 	// Not announce: notify fires every turn and does not age out manifests.
 	sess := env.NewSession(r, id, codexTool, n.Model)
 	env.SetActive(r, sess)
@@ -168,7 +169,7 @@ func consumePayload(env hookrun.Env) error {
 }
 
 // stop withdraws the claims of calls that wrote nothing, then drains the thread's quota,
-// replies and name before starting delivery.
+// replies, name and $name skills before starting delivery.
 func stop(ctx context.Context, env hookrun.Env) error {
 	in, err := readCodexHookInput(env.Stdin)
 	if err != nil {
@@ -184,6 +185,7 @@ func stop(ctx context.Context, env hookrun.Env) error {
 	captureCodexFunding(ctx, env, r, in)
 	captureCodexDesktopActivity(ctx, env, r, in)
 	captureCodexTitle(ctx, env, r, in, captureCodexReplies(ctx, env, r, in))
+	captureCodexSkillMentions(ctx, env, r, in)
 	return nil
 }
 
@@ -203,13 +205,14 @@ func sessionEnd(ctx context.Context, env hookrun.Env) error {
 	captureCodexFunding(ctx, env, r, in)
 	captureCodexDesktopActivity(ctx, env, r, in)
 	captureCodexTitle(ctx, env, r, in, captureCodexReplies(ctx, env, r, in))
+	captureCodexSkillMentions(ctx, env, r, in)
 	env.EndSession(r, in.SessionID, codexTool)
 	return nil
 }
 
 // postToolUse adds the files a call's patch or shell command wrote to the manifest; Codex
-// has no file-edit event. It also drains replies and the thread's name: a Desktop voice turn
-// can run for hours before its Stop.
+// has no file-edit event. It also drains replies and the thread's name, since a Desktop voice
+// turn can run for hours before its Stop, and reports the skills a shell call read.
 func postToolUse(ctx context.Context, env hookrun.Env) error {
 	in, err := readCodexHookInput(env.Stdin)
 	if err != nil {
@@ -227,6 +230,7 @@ func postToolUse(ctx context.Context, env hookrun.Env) error {
 	captureCodexFunding(ctx, env, r, in)
 	captureCodexDesktopActivity(ctx, env, r, in)
 	captureCodexTitle(ctx, env, r, in, captureCodexReplies(ctx, env, r, in))
+	captureCodexSkillReads(env, r, in)
 	candidates, commits := codexEditedPaths(in, env.Cwd)
 	if len(candidates) == 0 {
 		return nil
