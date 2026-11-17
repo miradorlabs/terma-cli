@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-17T16:47:38.091291406Z",
+  "generated_at": "2026-11-17T20:01:02.637827166Z",
   "versions": [
     {
       "harness": "copilot",
@@ -78,7 +78,7 @@
       "name": "OpenCode",
       "version": "1.19.6",
       "released_at": "2026-11-17T07:22:20.263Z",
-      "captured_at": "2026-11-17T13:47:15.766100973Z",
+      "captured_at": "2026-11-17T20:01:02.637827166Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -100,12 +100,12 @@
       "highlights": [
         "System prompt changed (+31 −31 chars)",
         "Behaviour: tool_output kept_lines count changed: 1999 → 2000",
-        "Behaviour: tool_output kept_lines first changed: 12565 → 0"
+        "Behaviour: tool_output kept_lines first changed: 12565 → 364"
       ],
       "signing": null,
       "partial": true,
-      "attempted_at": "2026-11-17T13:47:15.766100973Z",
-      "attempts": 2
+      "attempted_at": "2026-11-17T20:01:02.637827166Z",
+      "attempts": 3
     },
     {
       "harness": "t3",

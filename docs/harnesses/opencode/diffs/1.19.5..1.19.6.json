@@ -3,7 +3,7 @@
   "harness": "opencode",
   "from": "1.19.5",
   "to": "1.19.6",
-  "generated_at": "2026-11-17T13:47:15.766100973Z",
+  "generated_at": "2026-11-17T20:01:02.637827166Z",
   "source": {
     "compare": "https://github.com/anomalyco/opencode/compare/v1.19.5...v1.19.6"
   },
@@ -79,10 +79,10 @@
         "kept_lines",
         "first"
       ],
-      "title": "Behaviour: tool_output kept_lines first changed: 12565 → 0",
+      "title": "Behaviour: tool_output kept_lines first changed: 12565 → 364",
       "impact": "notable",
       "before": 12565,
-      "after": 0,
+      "after": 364,
       "text_diff": null,
       "terma": null,
       "source": null,
@@ -98,10 +98,10 @@
         "kept_lines",
         "last"
       ],
-      "title": "Behaviour: tool_output kept_lines last changed: 14563 → 10922",
+      "title": "Behaviour: tool_output kept_lines last changed: 14563 → 3640",
       "impact": "notable",
       "before": 14563,
-      "after": 10922,
+      "after": 3640,
       "text_diff": null,
       "terma": null,
       "source": null,
@@ -119,10 +119,10 @@
         "--cwd",
         "default"
       ],
-      "title": "Default of `opencode acp --cwd`: <tmp> ressv1.19.52028492095/010 → <tmp> ressv1.19.639110832/008",
+      "title": "Default of `opencode acp --cwd`: <tmp> ressv1.19.52028492095/010 → <tmp> ressv1.19.6151440195/010",
       "impact": "notable",
       "before": "<tmp> ressv1.19.52028492095/010",
-      "after": "<tmp> ressv1.19.639110832/008",
+      "after": "<tmp> ressv1.19.6151440195/010",
       "text_diff": null,
       "terma": null,
       "source": {
@@ -155,7 +155,7 @@
       "impact": "informational",
       "before": null,
       "after": null,
-      "text_diff": "@@ -17,4 +17,4 @@\n       --cors         additional domains to allow for CORS                      [array] [default: []]\n       --cwd          working directory\n   [string] [default: \"<tmp>\n-                                                                         ressv1.19.52028492095/010\"]\n+                                                                           ressv1.19.639110832/008\"]\n",
+      "text_diff": "@@ -17,4 +17,4 @@\n       --cors         additional domains to allow for CORS                      [array] [default: []]\n       --cwd          working directory\n   [string] [default: \"<tmp>\n-                                                                         ressv1.19.52028492095/010\"]\n+                                                                          ressv1.19.6151440195/010\"]\n",
       "stats": {
         "added_chars": 100,
         "removed_chars": 100
@@ -177,7 +177,7 @@
       "impact": "informational",
       "before": null,
       "after": null,
-      "text_diff": "@@ -17,4 +17,4 @@\n       --cors         additional domains to allow for CORS                      [array] [default: []]\n       --cwd          working directory\n   [string] [default: \"<tmp>\n-                                                                         ressv1.19.52028492095/014\"]\n+                                                                           ressv1.19.639110832/016\"]\n",
+      "text_diff": "@@ -17,4 +17,4 @@\n       --cors         additional domains to allow for CORS                      [array] [default: []]\n       --cwd          working directory\n   [string] [default: \"<tmp>\n-                                                                         ressv1.19.52028492095/014\"]\n+                                                                          ressv1.19.6151440195/011\"]\n",
       "stats": {
         "added_chars": 100,
         "removed_chars": 100

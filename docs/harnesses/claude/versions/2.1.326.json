@@ -24048,7 +24048,7 @@
         "read": true
       },
       "CLAUDE_CODE_SIMPLE": {
-        "description": "Set to `1` to run with a minimal system prompt and only the Bash, file read, and file edit tools. MCP tools from `--mcp-config` are still available. Disables auto-discovery of hooks, skills, custom commands, subagents, installed plugins, MCP servers, auto memory, and CLAUDE.md. Skills in a directory you pass with `--add-dir` still load. OAuth tokens and keychain credentials are not read, so Anthropic authentication must come from `ANTHROPIC_API_KEY` or an `apiKeyHelper` in `--settings`. Equivalent to passing `--bare`",
+        "description": "Set to `1` to run with a minimal system prompt and the Bash, file read, and file edit tools. MCP tools from `--mcp-config` are still available. OAuth tokens and keychain credentials aren't read, so for the Anthropic API, set `ANTHROPIC_API_KEY` or an `apiKeyHelper` in `--settings`. Equivalent to passing `--bare`",
         "read": true
       },
       "CLAUDE_CODE_SIMPLE_SYSTEM_PROMPT": {
@@ -24648,7 +24648,7 @@
         "read": false
       }
     },
-    "fetched_at": "2026-11-17T16:47:38.091291406Z",
+    "fetched_at": "2026-11-17T20:01:02.637827166Z",
     "settings": {
       "advisorModel": {
         "default": "unset, so the advisor is off",
@@ -24726,7 +24726,7 @@
       },
       "allowedHttpHookUrls": {
         "default": "unset, so any URL is allowed",
-        "description": "Limit which URLs HTTP hooks can target. When you define this key, Claude Code runs an HTTP hook only if its URL matches one of the patterns and blocks the rest without running them; an empty array blocks every HTTP hook.",
+        "description": "Limit which URLs HTTP hooks can target. Set this key in managed settings to cover hooks your organization deploys, or in any settings file to cover other hooks. Claude Code runs a covered hook only if its URL matches a pattern in the list merged across settings files.",
         "read": true,
         "scope": "Any file",
         "scope_note": "Arrays merge across settings files.",
@@ -24875,7 +24875,7 @@
       },
       "autoMode": {
         "default": "unset, so the classifier uses only its built-in rules",
-        "description": "Add your own rules to what the auto mode classifier blocks and allows. Use it to tell the classifier which repos, buckets, and domains your organization trusts, so it stops blocking routine internal operations. The classifier ships with built-in allow and deny rules. Include the literal string `\"$defaults\"` in an array to keep those built-in rules at that position and add yours around them; leave it out to replace them with yours.",
+        "description": "Add your own rules to what the auto mode classifier blocks and allows. Use it to tell the classifier which repos, buckets, and domains your organization trusts, so it stops blocking routine internal operations. The classifier has built-in allow and deny rules. Include the literal string `\"$defaults\"` in every array you set, so your rules add to the built-in ones. If you leave it out, your rules can replace them.",
         "read": true,
         "scope": "User or managed",
         "topic": "Permission settings",
@@ -25493,7 +25493,7 @@
       },
       "httpHookAllowedEnvVars": {
         "default": "unset, so each hook's own `allowedEnvVars` list applies",
-        "description": "An HTTP hook can put the value of an environment variable into a request header, for example an `Authorization: Bearer $HOOK_TOKEN` header, but only for variables the hook lists in its own `allowedEnvVars`. This key sets an outer limit on that list for every HTTP hook: a hook can use a variable only if both its own `allowedEnvVars` and this key name it. Use it to stop a hook from reading a secret it shouldn't, even when the hook's definition asks for it.",
+        "description": "An HTTP hook can put the value of an environment variable into a request header, for example an `Authorization: Bearer $HOOK_TOKEN` header, but only for variables the hook lists in its own `allowedEnvVars`.",
         "read": true,
         "scope": "Any file",
         "scope_note": "Arrays merge across settings files.",

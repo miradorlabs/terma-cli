@@ -18,7 +18,7 @@
     "last_change": {
       "from": "1.19.5",
       "to": "1.19.6",
-      "at": "2026-11-17T13:47:15.766100973Z",
+      "at": "2026-11-17T20:01:02.637827166Z",
       "released_at": "2026-11-17T07:22:20.263Z",
       "changes": 7,
       "categories": {
@@ -32,7 +32,7 @@
     {
       "version": "1.19.6",
       "released_at": "2026-11-17T07:22:20.263Z",
-      "captured_at": "2026-11-17T13:47:15.766100973Z",
+      "captured_at": "2026-11-17T20:01:02.637827166Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -54,12 +54,12 @@
       "highlights": [
         "System prompt changed (+31 −31 chars)",
         "Behaviour: tool_output kept_lines count changed: 1999 → 2000",
-        "Behaviour: tool_output kept_lines first changed: 12565 → 0"
+        "Behaviour: tool_output kept_lines first changed: 12565 → 364"
       ],
       "signing": null,
       "partial": true,
-      "attempted_at": "2026-11-17T13:47:15.766100973Z",
-      "attempts": 2
+      "attempted_at": "2026-11-17T20:01:02.637827166Z",
+      "attempts": 3
     },
     {
       "version": "1.19.5",
