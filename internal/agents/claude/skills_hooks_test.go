@@ -120,3 +120,31 @@ func TestStopReportsNoSkillUsedWhereTheTeamDoesNotCollect(t *testing.T) {
 		t.Errorf("what the session did where the team does not collect left: %+v", events)
 	}
 }
+
+// A listing saved while the team collected its checkout is not read again once the policy
+// drops that checkout: a same-named skill used in another collected checkout takes its
+// description from its own file.
+func TestStopLeavesOutAListingSavedWhereTheTeamNoLongerCollects(t *testing.T) {
+	env := newFundingEnv(t)
+	first, second := env.Cwd, hookruntest.InitRepo(t)
+	hookruntest.WriteFile(t, second, ".claude/skills/shared/SKILL.md", "---\nname: shared\ndescription: From the second checkout's file.\n---\n")
+	path := transcript(t, t.TempDir(), `{"type":"attachment","cwd":`+jsonString(first)+`,"attachment":{"type":"skill_listing","content":"- shared: Listed in the first checkout.","names":["shared"]}}`)
+	stopClaude(t, env, path) // saves the listing's offset: the first checkout is collected
+
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := filepath.Join(second, ".claude", "skills", "shared")
+	_, err = f.WriteString(`{"type":"assistant","cwd":` + jsonString(second) + `,"message":{"content":[{"type":"tool_use","id":"toolu_1","name":"Skill","input":{"skill":"shared"}}]}}` + "\n" +
+		`{"type":"user","isMeta":true,"cwd":` + jsonString(second) + `,"sourceToolUseID":"toolu_1","message":{"content":[{"type":"text","text":` + jsonString(claudeSkillBaseDir+dir+"\n\n"+skillBody) + `}]}}` + "\n")
+	if err != nil || f.Close() != nil {
+		t.Fatal(err)
+	}
+	env.Cwd, env.Policy = second, hookruntest.Admitting(second) // the policy drops the first
+	stopClaude(t, env, path)
+	events := hookruntest.Named(hookruntest.Spooled(t, env.Spool), semconv.TermaSkillDefinitionEvent)
+	if len(events) != 1 || events[0].Attrs[semconv.TermaSkillNameKey] != "shared" || events[0].Attrs[semconv.TermaSkillDescriptionKey] != "From the second checkout's file." {
+		t.Fatalf("spooled %+v", events)
+	}
+}

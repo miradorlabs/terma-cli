@@ -47,21 +47,22 @@ func captureClaudeSkills(ctx context.Context, e hookrun.Env, r *hookrun.Repo, se
 	}
 	// Each record is judged by where the session ran when it was written, once per directory.
 	judged := map[string]bool{}
-	uses, next, err := readClaudeSkillUses(transcript, cur, func(cwd string) bool {
+	admits := func(cwd string) bool {
 		ok, seen := judged[cwd]
 		if !seen {
 			ok = cwd != "" && e.Admits(ctx, cwd)
 			judged[cwd] = ok
 		}
 		return ok
-	})
+	}
+	uses, next, err := readClaudeSkillUses(transcript, cur, admits)
 	if err != nil {
 		e.Logf("skills: %v", err)
 		return
 	}
 	var skills []hookrun.Skill
 	if len(uses) > 0 {
-		skills = claudeSkills(e, r, uses, readClaudeSkillListings(transcript, next.Listings))
+		skills = claudeSkills(e, r, uses, readClaudeSkillListings(transcript, next.Listings, admits))
 	}
 	attrs := map[string]any{semconv.GenAIMainAgentNameKey: claudeTool, semconv.TermaEvidenceSourceKey: sourceClaudeTranscript}
 	// Unsent skills stay past the stored cursor, for the next stop.
