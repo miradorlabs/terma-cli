@@ -1,7 +1,33 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-16T19:07:19.580506123Z",
+  "generated_at": "2026-11-17T01:58:38.572849875Z",
   "versions": [
+    {
+      "harness": "t3",
+      "name": "T3 Code",
+      "version": "0.1.10",
+      "released_at": "2026-11-17T01:45:41.892Z",
+      "captured_at": "2026-11-17T01:58:38.572849875Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "0.1.9",
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": 0,
+      "highlights": [],
+      "signing": null,
+      "partial": true,
+      "attempted_at": "2026-11-17T01:58:38.572849875Z",
+      "attempts": 1
+    },
     {
       "harness": "claude",
       "name": "Claude Code",
@@ -6165,37 +6191,6 @@
         "Behaviour: compaction added",
         "Behaviour: tool_output added",
         "Flag removed: `codex sandbox --permissions-profile`"
-      ],
-      "signing": "valid"
-    },
-    {
-      "harness": "codex",
-      "name": "Codex CLI",
-      "version": "0.142.5",
-      "released_at": "2026-07-01T01:18:19.998Z",
-      "captured_at": "2026-11-05T09:54:28.532441Z",
-      "platforms": [
-        "darwin/arm64",
-        "linux/amd64"
-      ],
-      "support": "untested",
-      "previous": "0.142.4",
-      "changes": 5,
-      "categories": {
-        "behavior": 2,
-        "filesystem": 3
-      },
-      "impact": {
-        "breaking": 0,
-        "degrading": 0,
-        "informational": 3,
-        "notable": 2
-      },
-      "undocumented": 5,
-      "highlights": [
-        "Behaviour: compaction removed",
-        "Behaviour: tool_output removed",
-        "Command no longer run: `bwrap --new-session --die-with-parent --ro-bind / / --dev /dev --bind <tmp> <tmp> --perms 555 --tmpf …` (linux/amd64)"
       ],
       "signing": "valid"
     }

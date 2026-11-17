@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-16T19:07:19.580506123Z",
+  "generated_at": "2026-11-17T01:58:38.572849875Z",
   "harnesses": [
     {
       "id": "claude",
@@ -284,19 +284,17 @@
         "language": "typescript"
       },
       "changelog": "https://github.com/pingdotgg/t3code/releases",
-      "latest": "0.1.9",
+      "latest": "0.1.10",
       "support": "supported",
-      "versions_tracked": 6,
+      "versions_tracked": 7,
       "first_tracked": "2026-10-02",
       "last_change": {
-        "from": "0.1.8",
-        "to": "0.1.9",
-        "at": "2026-11-13T14:02:26.572801989Z",
-        "released_at": "2026-11-11T11:35:24.455Z",
-        "changes": 2,
-        "categories": {
-          "support": 2
-        }
+        "from": "0.1.9",
+        "to": "0.1.10",
+        "at": "2026-11-17T01:58:38.572849875Z",
+        "released_at": "2026-11-17T01:45:41.892Z",
+        "changes": 0,
+        "categories": {}
       }
     }
   ]

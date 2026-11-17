@@ -23792,7 +23792,7 @@
         "read": true
       },
       "CLAUDE_CODE_MAX_OUTPUT_TOKENS": {
-        "description": "Set the maximum number of output tokens for most requests. Defaults and caps vary by model; see max output tokens. Claude Code lowers a value above a model's cap to the cap. For a model ID Claude Code can't resolve to a model it knows, the default is 32000 and the cap is 128000. Increasing this value reduces the effective context window available before auto-compaction triggers",
+        "description": "Set the maximum number of output tokens for most requests. Defaults and caps vary by model; see max output tokens. Claude Code lowers a value above a model's cap to the cap. For a model ID Claude Code can't resolve to a model it knows, the default is 32000 and the cap is 128000",
         "read": true
       },
       "CLAUDE_CODE_MAX_RETRIES": {
@@ -24648,7 +24648,7 @@
         "read": false
       }
     },
-    "fetched_at": "2026-11-16T19:07:19.580506123Z",
+    "fetched_at": "2026-11-17T01:58:38.572849875Z",
     "settings": {
       "advisorModel": {
         "default": "unset, so the advisor is off",
@@ -24892,7 +24892,7 @@
       },
       "autoScrollEnabled": {
         "default": "`true`",
-        "description": "Follow new output to the bottom of the conversation in fullscreen rendering. Turn it off to stay where you scrolled while Claude keeps working; permission prompts still scroll into view.",
+        "description": "Follow new output to the bottom of the conversation in fullscreen rendering.",
         "read": true,
         "scope": "Any file",
         "topic": "Interface and terminal",
@@ -26495,7 +26495,6 @@
         "description": "Turn off the download of the plugins enabled for your claude.ai account. Claude Code downloads them into `~/.claude/plugins/synced/` at the start of terminal sessions where you sign in with your claude.ai account and in Cowork sessions, and loads each one as `<name>@synced`. Set `false` to stop that download and stop loading the plugins it already synced. Claude Code honors only `false`: `true` is the same as unset and doesn't turn syncing on where it's otherwise off. Requires Claude Code v2.1.273 or later.",
         "read": true,
         "scope": "User, local, or managed",
-        "scope_note": "A repository can't turn it off for you.",
         "topic": "Plugins and skills",
         "type": "Boolean"
       },
@@ -26504,7 +26503,6 @@
         "description": "Turn off the download of the skills enabled for your claude.ai account. Claude Code downloads them into `~/.claude/skills/synced/` in terminal sessions where you sign in with your claude.ai account, interactive or non-interactive, and in Cowork and cloud sessions. Set `false` to stop that download and stop loading the skills it already synced. Claude Code honors only `false`: `true` is the same as unset and doesn't turn syncing on where it's otherwise off.",
         "read": true,
         "scope": "User, local, or managed",
-        "scope_note": "A repository can't turn it off for you.",
         "topic": "Plugins and skills",
         "type": "Boolean"
       },
@@ -26602,7 +26600,6 @@
         "description": "Choose whether Claude Code uses the auto mode classifier to review shell commands in plan mode. With the default `true`, the classifier reviews each command during planning when auto mode is available and you see no prompt, except for critical-path removals. Set `false` to get a permission prompt for every command outside the built-in read-only set. Appears in `/config` as **Use auto mode during plan**.",
         "read": true,
         "scope": "User, local, or managed",
-        "scope_note": "A repository can't turn it off for you.",
         "topic": "Permission settings",
         "type": "Boolean"
       },

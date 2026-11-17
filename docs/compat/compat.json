@@ -73,7 +73,7 @@
       "label": "The machine's heartbeat reaches the project's ingest"
     }
   ],
-  "generated_at": "2026-11-16T19:07:18Z",
+  "generated_at": "2026-11-17T01:58:37Z",
   "harnesses": [
     {
       "ID": "claude",
@@ -10833,6 +10833,17 @@
       "terma": "terma version dev",
       "test": "TestRelayT3/installed-0.1.0",
       "why": "the test driver can't drive this version yet (it no longer serves /api/orchestration)"
+    },
+    {
+      "harness": "t3",
+      "version": "0.1.10",
+      "platform": "darwin/arm64",
+      "capability": "relay.telemetry",
+      "result": "pass",
+      "last_run": "2026-11-17T01:58:00.168797Z",
+      "first_passed": "2026-11-17T01:58:00.168797Z",
+      "terma": "terma version dev",
+      "test": "TestRelayT3/v0.1.10"
     },
     {
       "harness": "t3",

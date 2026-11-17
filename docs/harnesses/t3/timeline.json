@@ -3,6 +3,11 @@
   "harness": "t3",
   "steps": [
     {
+      "version": "0.1.10",
+      "previous": "0.1.9",
+      "changes": []
+    },
+    {
       "version": "0.1.9",
       "previous": "0.1.8",
       "changes": [
