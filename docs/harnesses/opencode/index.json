@@ -18,10 +18,11 @@
     "last_change": {
       "from": "1.19.5",
       "to": "1.19.6",
-      "at": "2026-11-17T07:32:44.935765621Z",
+      "at": "2026-11-17T13:47:15.766100973Z",
       "released_at": "2026-11-17T07:22:20.263Z",
-      "changes": 4,
+      "changes": 7,
       "categories": {
+        "behavior": 3,
         "cli": 3,
         "prompt": 1
       }
@@ -31,14 +32,15 @@
     {
       "version": "1.19.6",
       "released_at": "2026-11-17T07:22:20.263Z",
-      "captured_at": "2026-11-17T07:32:44.935765621Z",
+      "captured_at": "2026-11-17T13:47:15.766100973Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "supported",
       "previous": "1.19.5",
-      "changes": 4,
+      "changes": 7,
       "categories": {
+        "behavior": 3,
         "cli": 3,
         "prompt": 1
       },
@@ -46,18 +48,18 @@
         "breaking": 0,
         "degrading": 0,
         "informational": 2,
-        "notable": 2
+        "notable": 5
       },
-      "undocumented": 4,
+      "undocumented": 7,
       "highlights": [
         "System prompt changed (+31 −31 chars)",
-        "Default of `opencode acp --cwd`: <tmp> ressv1.19.52028492095/010 → <tmp> ressv1.19.63172274372/006",
-        "Full help text of `acp --help` changed (+100 −100 chars)"
+        "Behaviour: tool_output kept_lines count changed: 1999 → 2000",
+        "Behaviour: tool_output kept_lines first changed: 12565 → 0"
       ],
       "signing": null,
       "partial": true,
-      "attempted_at": "2026-11-17T07:32:44.935765621Z",
-      "attempts": 1
+      "attempted_at": "2026-11-17T13:47:15.766100973Z",
+      "attempts": 2
     },
     {
       "version": "1.19.5",

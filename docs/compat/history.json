@@ -10362,7 +10362,7 @@
     "platform": "darwin/arm64",
     "capability": "relay.content_allowed",
     "result": "pass",
-    "last_run": "2026-11-17T07:30:09.057801Z",
+    "last_run": "2026-11-17T13:44:46.676562Z",
     "first_passed": "2026-11-17T07:30:09.057801Z",
     "terma": "terma version dev",
     "test": "TestRelayOpenCode/v1.19.6/content"
@@ -10373,7 +10373,7 @@
     "platform": "darwin/arm64",
     "capability": "relay.content_withheld",
     "result": "pass",
-    "last_run": "2026-11-17T07:30:23.452726Z",
+    "last_run": "2026-11-17T13:45:00.275993Z",
     "first_passed": "2026-11-17T07:30:23.452726Z",
     "terma": "terma version dev",
     "test": "TestRelayOpenCode/v1.19.6/withheld"
@@ -10384,7 +10384,7 @@
     "platform": "darwin/arm64",
     "capability": "relay.equivalent",
     "result": "pass",
-    "last_run": "2026-11-17T07:31:51.742157Z",
+    "last_run": "2026-11-17T13:46:24.786721Z",
     "first_passed": "2026-11-17T07:31:51.742157Z",
     "terma": "terma version dev",
     "test": "TestRelayWorkloadsOpenCode/v1.19.6"
@@ -10395,7 +10395,7 @@
     "platform": "darwin/arm64",
     "capability": "relay.only_opted_in",
     "result": "pass",
-    "last_run": "2026-11-17T07:30:44.704703Z",
+    "last_run": "2026-11-17T13:45:20.840981Z",
     "first_passed": "2026-11-17T07:30:44.704703Z",
     "terma": "terma version dev",
     "test": "TestRelayOpenCodeNegative/v1.19.6"
@@ -10406,7 +10406,7 @@
     "platform": "darwin/arm64",
     "capability": "relay.telemetry",
     "result": "pass",
-    "last_run": "2026-11-17T07:30:23.453066Z",
+    "last_run": "2026-11-17T13:45:00.276248Z",
     "first_passed": "2026-11-17T07:30:23.453066Z",
     "terma": "terma version dev",
     "test": "TestRelayOpenCode/v1.19.6"

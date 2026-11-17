@@ -3,7 +3,7 @@
   "harness": "opencode",
   "version": "1.19.6",
   "platform": "darwin/arm64",
-  "captured_at": "2026-11-17T07:32:44.935765621Z",
+  "captured_at": "2026-11-17T13:47:15.766100973Z",
   "capture": {
     "command": [
       "opencode",
@@ -20,10 +20,10 @@
       "Part of this build's capture did not finish; the frequent check tries it again, up to four attempts."
     ],
     "sections": {
-      "behavior": "2026-11-17T07:32:44.935765621Z",
+      "behavior": "2026-11-17T13:47:15.766100973Z",
       "binary": "2026-11-17T07:32:44.935765621Z",
       "caching": "2026-11-17T07:32:44.935765621Z",
-      "cli": "2026-11-17T07:32:44.935765621Z",
+      "cli": "2026-11-17T13:47:15.766100973Z",
       "config": "2026-11-17T07:32:44.935765621Z",
       "model": "2026-11-17T07:32:44.935765621Z",
       "network": "2026-11-17T07:32:44.935765621Z",
@@ -35,8 +35,8 @@
       "telemetry": "2026-11-17T07:32:44.935765621Z",
       "tools": "2026-11-17T07:32:44.935765621Z"
     },
-    "attempted_at": "2026-11-17T07:32:44.935765621Z",
-    "attempts": 1,
+    "attempted_at": "2026-11-17T13:47:15.766100973Z",
+    "attempts": 2,
     "announced_at": "2026-11-17T07:32:44.935765621Z"
   },
   "model": {
@@ -416,10 +416,10 @@
         "429": {
           "attempts": 5,
           "backoff_ms": [
-            1568,
-            467,
-            1561,
-            459
+            2020,
+            155,
+            1848,
+            217
           ],
           "failed": 3,
           "failed_first": 3,
@@ -429,11 +429,12 @@
           "succeeded": true
         },
         "500": {
-          "attempts": 4,
+          "attempts": 5,
           "backoff_ms": [
-            1403,
-            609,
-            1413
+            2011,
+            12,
+            1994,
+            47
           ],
           "failed": 3,
           "failed_first": 3,
@@ -448,11 +449,11 @@
       "bytes": 450000,
       "command": "seq -f 'TERMA-LINE-%06g' 1 25000",
       "kept_lines": {
-        "count": 1999,
-        "first": 12565,
-        "last": 14563
+        "count": 2000,
+        "first": 0,
+        "last": 10922
       },
-      "limit_chars": 36112,
+      "limit_chars": 36114,
       "line": "TERMA-LINE-%06d",
       "lines": 25000,
       "marker": "...output truncated..."
@@ -820,7 +821,7 @@
             ]
           },
           "--cwd": {
-            "default": "<tmp> ressv1.19.63172274372/006",
+            "default": "<tmp> ressv1.19.639110832/008",
             "description": "working directory [string]",
             "names": [
               "--cwd"
@@ -2351,8 +2352,8 @@
     },
     "help": {
       "--help": "⠀                                ▄     \n█▀▀█ █▀▀█ █▀▀█ █▀▀▄ █▀▀▀ █▀▀█ █▀▀█ █▀▀█\n█  █ █  █ █▀▀▀ █  █ █    █  █ █  █ █▀▀▀\n▀▀▀▀ █▀▀▀ ▀▀▀▀ ▀  ▀ ▀▀▀▀ ▀▀▀▀ ▀▀▀▀ ▀▀▀▀\n\nCommands:\n  opencode completion          generate shell completion script\n  opencode acp                 start ACP (Agent Client Protocol) server\n  opencode mcp                 manage MCP (Model Context Protocol) servers\n  opencode [project]           start opencode tui                                          [default]\n  opencode attach <url>        attach to a running opencode server\n  opencode run [message..]     run opencode with a message\n  opencode debug               debugging and troubleshooting tools\n  opencode providers           manage AI providers and credentials                   [aliases: auth]\n  opencode agent               manage agents\n  opencode upgrade [target]    upgrade opencode to the latest or a specific version\n  opencode uninstall           uninstall opencode and remove all related files\n  opencode serve               starts a headless opencode server\n  opencode web                 start opencode server and open web interface\n  opencode models [provider]   list all available models\n  opencode stats               show token usage and cost statistics\n  opencode export [sessionID]  export session data as JSON\n  opencode import <file>       import session data from JSON file\n  opencode github              manage GitHub agent\n  opencode pr <number>         fetch and checkout a GitHub PR branch, then run opencode\n  opencode session             manage sessions\n  opencode plugin <module>     install plugin and update config                      [aliases: plug]\n  opencode db                  database tools\n\nPositionals:\n  project  path to start opencode in                                                        [string]\n\nOptions:\n  -h, --help          show help                                                            [boolean]\n  -v, --version       show version number                                                  [boolean]\n      --print-logs    print logs to stderr                                                 [boolean]\n      --log-level     log level                 [string] [choices: \"DEBUG\", \"INFO\", \"WARN\", \"ERROR\"]\n      --pure          run without external plugins                                         [boolean]\n      --port          port to listen on                                        [number] [default: 0]\n      --hostname      hostname to listen on                          [string] [default: \"127.0.0.1\"]\n      --mdns          enable mDNS service discovery (defaults hostname to 0.0.0.0)\n                                                                          [boolean] [default: false]\n      --mdns-domain   custom domain name for mDNS service (default: opencode.local)\n                                                                [string] [default: \"opencode.local\"]\n      --cors          additional domains to allow for CORS                     [array] [default: []]\n  -m, --model         model to use in the format of provider/model                          [string]\n  -c, --continue      continue the last session                                            [boolean]\n  -s, --session       session id to continue                                                [string]\n      --fork          fork the session when continuing (use with --continue or --session)  [boolean]\n      --prompt        prompt to use                                                         [string]\n      --agent         agent to use                                                          [string]\n      --auto          auto-approve permissions that are not explicitly denied (dangerous!)\n                                                                          [boolean] [default: false]\n      --mini          start the minimal interactive interface             [boolean] [default: false]\n      --no-replay     disable mini session history replay on resume and after resize       [boolean]\n      --replay-limit  cap visible mini replay to the newest N messages                      [number]\n",
-      "acp --help": "opencode acp\n\nstart ACP (Agent Client Protocol) server\n\nOptions:\n  -h, --help         show help                                                             [boolean]\n  -v, --version      show version number                                                   [boolean]\n      --print-logs   print logs to stderr                                                  [boolean]\n      --log-level    log level                  [string] [choices: \"DEBUG\", \"INFO\", \"WARN\", \"ERROR\"]\n      --pure         run without external plugins                                          [boolean]\n      --port         port to listen on                                         [number] [default: 0]\n      --hostname     hostname to listen on                           [string] [default: \"127.0.0.1\"]\n      --mdns         enable mDNS service discovery (defaults hostname to 0.0.0.0)\n                                                                          [boolean] [default: false]\n      --mdns-domain  custom domain name for mDNS service (default: opencode.local)\n                                                                [string] [default: \"opencode.local\"]\n      --cors         additional domains to allow for CORS                      [array] [default: []]\n      --cwd          working directory\n  [string] [default: \"<tmp>\n                                                                         ressv1.19.63172274372/006\"]",
-      "acp -h": "opencode acp\n\nstart ACP (Agent Client Protocol) server\n\nOptions:\n  -h, --help         show help                                                             [boolean]\n  -v, --version      show version number                                                   [boolean]\n      --print-logs   print logs to stderr                                                  [boolean]\n      --log-level    log level                  [string] [choices: \"DEBUG\", \"INFO\", \"WARN\", \"ERROR\"]\n      --pure         run without external plugins                                          [boolean]\n      --port         port to listen on                                         [number] [default: 0]\n      --hostname     hostname to listen on                           [string] [default: \"127.0.0.1\"]\n      --mdns         enable mDNS service discovery (defaults hostname to 0.0.0.0)\n                                                                          [boolean] [default: false]\n      --mdns-domain  custom domain name for mDNS service (default: opencode.local)\n                                                                [string] [default: \"opencode.local\"]\n      --cors         additional domains to allow for CORS                      [array] [default: []]\n      --cwd          working directory\n  [string] [default: \"<tmp>\n                                                                         ressv1.19.63172274372/013\"]",
+      "acp --help": "opencode acp\n\nstart ACP (Agent Client Protocol) server\n\nOptions:\n  -h, --help         show help                                                             [boolean]\n  -v, --version      show version number                                                   [boolean]\n      --print-logs   print logs to stderr                                                  [boolean]\n      --log-level    log level                  [string] [choices: \"DEBUG\", \"INFO\", \"WARN\", \"ERROR\"]\n      --pure         run without external plugins                                          [boolean]\n      --port         port to listen on                                         [number] [default: 0]\n      --hostname     hostname to listen on                           [string] [default: \"127.0.0.1\"]\n      --mdns         enable mDNS service discovery (defaults hostname to 0.0.0.0)\n                                                                          [boolean] [default: false]\n      --mdns-domain  custom domain name for mDNS service (default: opencode.local)\n                                                                [string] [default: \"opencode.local\"]\n      --cors         additional domains to allow for CORS                      [array] [default: []]\n      --cwd          working directory\n  [string] [default: \"<tmp>\n                                                                           ressv1.19.639110832/008\"]",
+      "acp -h": "opencode acp\n\nstart ACP (Agent Client Protocol) server\n\nOptions:\n  -h, --help         show help                                                             [boolean]\n  -v, --version      show version number                                                   [boolean]\n      --print-logs   print logs to stderr                                                  [boolean]\n      --log-level    log level                  [string] [choices: \"DEBUG\", \"INFO\", \"WARN\", \"ERROR\"]\n      --pure         run without external plugins                                          [boolean]\n      --port         port to listen on                                         [number] [default: 0]\n      --hostname     hostname to listen on                           [string] [default: \"127.0.0.1\"]\n      --mdns         enable mDNS service discovery (defaults hostname to 0.0.0.0)\n                                                                          [boolean] [default: false]\n      --mdns-domain  custom domain name for mDNS service (default: opencode.local)\n                                                                [string] [default: \"opencode.local\"]\n      --cors         additional domains to allow for CORS                      [array] [default: []]\n      --cwd          working directory\n  [string] [default: \"<tmp>\n                                                                           ressv1.19.639110832/016\"]",
       "agent --help": "opencode agent\n\nmanage agents\n\nCommands:\n  opencode agent create  create a new agent\n  opencode agent list    list all available agents\n\nOptions:\n  -h, --help        show help                                                              [boolean]\n  -v, --version     show version number                                                    [boolean]\n      --print-logs  print logs to stderr                                                   [boolean]\n      --log-level   log level                   [string] [choices: \"DEBUG\", \"INFO\", \"WARN\", \"ERROR\"]\n      --pure        run without external plugins                                           [boolean]",
       "attach --help": "opencode attach <url>\n\nattach to a running opencode server\n\nPositionals:\n  url  http://<local>                                                     [string] [required]\n\nOptions:\n  -h, --help          show help                                                            [boolean]\n  -v, --version       show version number                                                  [boolean]\n      --print-logs    print logs to stderr                                                 [boolean]\n      --log-level     log level                 [string] [choices: \"DEBUG\", \"INFO\", \"WARN\", \"ERROR\"]\n      --pure          run without external plugins                                         [boolean]\n      --dir           directory to run in                                                   [string]\n  -c, --continue      continue the last session                                            [boolean]\n  -s, --session       session id to continue                                                [string]\n      --fork          fork the session when continuing (use with --continue or --session)  [boolean]\n  -p, --password      basic auth password (defaults to OPENCODE_SERVER_PASSWORD)            [string]\n  -u, --username      basic auth username (defaults to OPENCODE_SERVER_USERNAME or 'opencode')\n                                                                                            [string]\n      --mini          start the minimal interactive interface             [boolean] [default: false]\n      --no-replay     disable mini session history replay on resume and after resize       [boolean]\n      --replay-limit  cap visible mini replay to the newest N messages                      [number]",
       "completion --help": "⠀                                ▄     \n█▀▀█ █▀▀█ █▀▀█ █▀▀▄ █▀▀▀ █▀▀█ █▀▀█ █▀▀█\n█  █ █  █ █▀▀▀ █  █ █    █  █ █  █ █▀▀▀\n▀▀▀▀ █▀▀▀ ▀▀▀▀ ▀  ▀ ▀▀▀▀ ▀▀▀▀ ▀▀▀▀ ▀▀▀▀\n\nCommands:\n  opencode completion          generate shell completion script\n  opencode acp                 start ACP (Agent Client Protocol) server\n  opencode mcp                 manage MCP (Model Context Protocol) servers\n  opencode [project]           start opencode tui                                          [default]\n  opencode attach <url>        attach to a running opencode server\n  opencode run [message..]     run opencode with a message\n  opencode debug               debugging and troubleshooting tools\n  opencode providers           manage AI providers and credentials                   [aliases: auth]\n  opencode agent               manage agents\n  opencode upgrade [target]    upgrade opencode to the latest or a specific version\n  opencode uninstall           uninstall opencode and remove all related files\n  opencode serve               starts a headless opencode server\n  opencode web                 start opencode server and open web interface\n  opencode models [provider]   list all available models\n  opencode stats               show token usage and cost statistics\n  opencode export [sessionID]  export session data as JSON\n  opencode import <file>       import session data from JSON file\n  opencode github              manage GitHub agent\n  opencode pr <number>         fetch and checkout a GitHub PR branch, then run opencode\n  opencode session             manage sessions\n  opencode plugin <module>     install plugin and update config                      [aliases: plug]\n  opencode db                  database tools\n\nPositionals:\n  project  path to start opencode in                                                        [string]\n\nOptions:\n  -h, --help          show help                                                            [boolean]\n  -v, --version       show version number                                                  [boolean]\n      --print-logs    print logs to stderr                                                 [boolean]\n      --log-level     log level                 [string] [choices: \"DEBUG\", \"INFO\", \"WARN\", \"ERROR\"]\n      --pure          run without external plugins                                         [boolean]\n      --port          port to listen on                                        [number] [default: 0]\n      --hostname      hostname to listen on                          [string] [default: \"127.0.0.1\"]\n      --mdns          enable mDNS service discovery (defaults hostname to 0.0.0.0)\n                                                                          [boolean] [default: false]\n      --mdns-domain   custom domain name for mDNS service (default: opencode.local)\n                                                                [string] [default: \"opencode.local\"]\n      --cors          additional domains to allow for CORS                     [array] [default: []]\n  -m, --model         model to use in the format of provider/model                          [string]\n  -c, --continue      continue the last session                                            [boolean]\n  -s, --session       session id to continue                                                [string]\n      --fork          fork the session when continuing (use with --continue or --session)  [boolean]\n      --prompt        prompt to use                                                         [string]\n      --agent         agent to use                                                          [string]\n      --auto          auto-approve permissions that are not explicitly denied (dangerous!)\n                                                                          [boolean] [default: false]\n      --mini          start the minimal interactive interface             [boolean] [default: false]\n      --no-replay     disable mini session history replay on resume and after resize       [boolean]\n      --replay-limit  cap visible mini replay to the newest N messages                      [number]\n\n[exit status 1]",

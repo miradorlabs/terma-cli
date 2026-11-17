@@ -3,7 +3,7 @@
   "harness": "opencode",
   "from": "1.19.5",
   "to": "1.19.6",
-  "generated_at": "2026-11-17T07:32:44.935765621Z",
+  "generated_at": "2026-11-17T13:47:15.766100973Z",
   "source": {
     "compare": "https://github.com/anomalyco/opencode/compare/v1.19.5...v1.19.6"
   },
@@ -12,8 +12,9 @@
     "text": "## Desktop\n\n### Improvements\n- OpenCode 1 now offers the upgrade to OpenCode 2.0. OpenCode 2 downloads in the background and installs only when you choose: Restart to upgrade, Upgrade on quit, or Later. Your sessions, projects, and settings are kept. Plugins made for OpenCode 1 need an update.\n\n## Core\n\n### Bugfixes\n- Sessions with many images no longer send oversized requests. When the images in a session's history pass 25 MiB, the oldest are replaced with a placeholder.\n- A provider error for a request body that is too large now starts compaction and a retry instead of failing the turn."
   },
   "summary": {
-    "changes": 4,
+    "changes": 7,
     "categories": {
+      "behavior": 3,
       "cli": 3,
       "prompt": 1
     },
@@ -21,9 +22,9 @@
       "breaking": 0,
       "degrading": 0,
       "informational": 2,
-      "notable": 2
+      "notable": 5
     },
-    "undocumented": 4
+    "undocumented": 7
   },
   "changes": [
     {
@@ -50,6 +51,63 @@
       "documented": false
     },
     {
+      "id": "behavior.tool_output.kept_lines.count",
+      "category": "behavior",
+      "op": "changed",
+      "path": [
+        "behavior",
+        "tool_output",
+        "kept_lines",
+        "count"
+      ],
+      "title": "Behaviour: tool_output kept_lines count changed: 1999 → 2000",
+      "impact": "notable",
+      "before": 1999,
+      "after": 2000,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "behavior.tool_output.kept_lines.first",
+      "category": "behavior",
+      "op": "changed",
+      "path": [
+        "behavior",
+        "tool_output",
+        "kept_lines",
+        "first"
+      ],
+      "title": "Behaviour: tool_output kept_lines first changed: 12565 → 0",
+      "impact": "notable",
+      "before": 12565,
+      "after": 0,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "behavior.tool_output.kept_lines.last",
+      "category": "behavior",
+      "op": "changed",
+      "path": [
+        "behavior",
+        "tool_output",
+        "kept_lines",
+        "last"
+      ],
+      "title": "Behaviour: tool_output kept_lines last changed: 14563 → 10922",
+      "impact": "notable",
+      "before": 14563,
+      "after": 10922,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
       "id": "cli.commands.opencode acp.options.--cwd.default",
       "category": "cli",
       "op": "changed",
@@ -61,10 +119,10 @@
         "--cwd",
         "default"
       ],
-      "title": "Default of `opencode acp --cwd`: <tmp> ressv1.19.52028492095/010 → <tmp> ressv1.19.63172274372/006",
+      "title": "Default of `opencode acp --cwd`: <tmp> ressv1.19.52028492095/010 → <tmp> ressv1.19.639110832/008",
       "impact": "notable",
       "before": "<tmp> ressv1.19.52028492095/010",
-      "after": "<tmp> ressv1.19.63172274372/006",
+      "after": "<tmp> ressv1.19.639110832/008",
       "text_diff": null,
       "terma": null,
       "source": {
@@ -97,7 +155,7 @@
       "impact": "informational",
       "before": null,
       "after": null,
-      "text_diff": "@@ -17,4 +17,4 @@\n       --cors         additional domains to allow for CORS                      [array] [default: []]\n       --cwd          working directory\n   [string] [default: \"<tmp>\n-                                                                         ressv1.19.52028492095/010\"]\n+                                                                         ressv1.19.63172274372/006\"]\n",
+      "text_diff": "@@ -17,4 +17,4 @@\n       --cors         additional domains to allow for CORS                      [array] [default: []]\n       --cwd          working directory\n   [string] [default: \"<tmp>\n-                                                                         ressv1.19.52028492095/010\"]\n+                                                                           ressv1.19.639110832/008\"]\n",
       "stats": {
         "added_chars": 100,
         "removed_chars": 100
@@ -119,7 +177,7 @@
       "impact": "informational",
       "before": null,
       "after": null,
-      "text_diff": "@@ -17,4 +17,4 @@\n       --cors         additional domains to allow for CORS                      [array] [default: []]\n       --cwd          working directory\n   [string] [default: \"<tmp>\n-                                                                         ressv1.19.52028492095/014\"]\n+                                                                         ressv1.19.63172274372/013\"]\n",
+      "text_diff": "@@ -17,4 +17,4 @@\n       --cors         additional domains to allow for CORS                      [array] [default: []]\n       --cwd          working directory\n   [string] [default: \"<tmp>\n-                                                                         ressv1.19.52028492095/014\"]\n+                                                                           ressv1.19.639110832/016\"]\n",
       "stats": {
         "added_chars": 100,
         "removed_chars": 100
