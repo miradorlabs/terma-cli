@@ -100,7 +100,7 @@ func TestReadClaudeSkillListingsMergesInOrder(t *testing.T) {
 	}
 	path := transcript(t, t.TempDir(), lines...)
 	offsets := []int64{0, int64(len(lines[0]) + 1), int64(len(lines[0]) + len(lines[1]) + 2)}
-	got := readClaudeSkillListings(path, offsets)
+	got := readClaudeSkillListings(path, offsets, everywhere)
 	for n, w := range map[string]string{"a": "Second.", "b": "Whole.", "c": "Now listed."} {
 		if got[n].Description != w {
 			t.Errorf("%s = %q, want %q", n, got[n].Description, w)
@@ -141,7 +141,7 @@ func TestReadClaudeSkillUsesOnTheFixture(t *testing.T) {
 	if info, _ := os.Stat(path); cur.Offset != info.Size() || len(cur.Listings) != 2 {
 		t.Errorf("cursor = %+v, want the file's end and its two listings", cur)
 	}
-	listed := readClaudeSkillListings(path, cur.Listings)
+	listed := readClaudeSkillListings(path, cur.Listings, everywhere)
 	if !listed["late"].whole() || listed["deploy"].Description != "" || !listed["capped"].Shortened || !strings.Contains(listed["claude-api"].Description, "\nSKIP only") {
 		t.Errorf("listings = %+v", listed)
 	}

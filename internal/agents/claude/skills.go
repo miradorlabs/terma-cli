@@ -291,8 +291,10 @@ func listingEntry(content, name string, from int) int {
 }
 
 // readClaudeSkillListings merges the listings at the transcript's offsets, in order: a whole
-// description beats a missing or shortened one, and among whole ones the later wins.
-func readClaudeSkillListings(path string, offsets []int64) map[string]claudeListed {
+// description beats a missing or shortened one, and among whole ones the later wins. A
+// listing is judged again where it was written, as admits stands now: one saved in a
+// checkout the team has since stopped collecting is left out.
+func readClaudeSkillListings(path string, offsets []int64, admits func(cwd string) bool) map[string]claudeListed {
 	out := map[string]claudeListed{}
 	f, err := os.Open(path)
 	if err != nil {
@@ -305,7 +307,7 @@ func readClaudeSkillListings(path string, offsets []int64) map[string]claudeList
 			continue
 		}
 		var rec claudeSkillRecord
-		if json.Unmarshal(line, &rec) != nil || rec.Attachment.Type != "skill_listing" {
+		if json.Unmarshal(line, &rec) != nil || rec.Attachment.Type != "skill_listing" || !admits(rec.Cwd) {
 			continue
 		}
 		for n, l := range parseSkillListing(rec.Attachment.Content, rec.Attachment.Names) {
