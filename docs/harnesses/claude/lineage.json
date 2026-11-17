@@ -3,8 +3,8 @@
   "harness": "claude",
   "window": {
     "oldest": "2.1.206",
-    "newest": "2.1.326",
-    "builds": 107
+    "newest": "2.1.327",
+    "builds": 108
   },
   "items": {
     "cli.commands.claude agents": {
@@ -5606,8 +5606,8 @@
       "ranges": [
         {
           "since": "2.1.319",
-          "until": null,
-          "removed": null
+          "until": "2.1.326",
+          "removed": "2.1.327"
         }
       ],
       "since_bounded": true
@@ -5628,8 +5628,8 @@
       "ranges": [
         {
           "since": "2.1.317",
-          "until": null,
-          "removed": null
+          "until": "2.1.326",
+          "removed": "2.1.327"
         }
       ],
       "since_bounded": true
@@ -5848,8 +5848,8 @@
       "ranges": [
         {
           "since": "2.1.305",
-          "until": null,
-          "removed": null
+          "until": "2.1.326",
+          "removed": "2.1.327"
         }
       ],
       "since_bounded": true
@@ -6178,6 +6178,17 @@
       "ranges": [
         {
           "since": "2.1.323",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.env_vars.CLAUDE_CODE_DESKTOP_RESULT_FIRST": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "2.1.327",
           "until": null,
           "removed": null
         }
@@ -6800,6 +6811,17 @@
       ],
       "since_bounded": true
     },
+    "config.env_vars.CLAUDE_CODE_DISABLE_LAYOUT_CHECK": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "2.1.327",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.env_vars.CLAUDE_CODE_DISABLE_LEGACY_MODEL_REMAP": {
       "kind": "env_var",
       "ranges": [
@@ -7163,6 +7185,17 @@
       ],
       "since_bounded": true
     },
+    "config.env_vars.CLAUDE_CODE_DISABLE_PROXY_SCHEME_REPAIR": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "2.1.327",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.env_vars.CLAUDE_CODE_DISABLE_QUIET_BACKGROUND_WAIT": {
       "kind": "env_var",
       "ranges": [
@@ -7212,6 +7245,17 @@
       "ranges": [
         {
           "since": "2.1.315",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.env_vars.CLAUDE_CODE_DISABLE_SHELL_HEAD_START": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "2.1.327",
           "until": null,
           "removed": null
         }
@@ -8785,6 +8829,17 @@
       ],
       "since_bounded": true
     },
+    "config.env_vars.CLAUDE_CODE_HOST_AUTH_ASK_AT_START": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "2.1.327",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.env_vars.CLAUDE_CODE_HOST_AUTH_ENV_VAR": {
       "kind": "env_var",
       "ranges": [
@@ -9203,6 +9258,17 @@
       ],
       "since_bounded": true
     },
+    "config.env_vars.CLAUDE_CODE_LAUNCHER_RUNS_API_KEY_HELPER": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "2.1.327",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.env_vars.CLAUDE_CODE_LEGACY_BUNDLE": {
       "kind": "env_var",
       "ranges": [
@@ -9582,6 +9648,17 @@
       "ranges": [
         {
           "since": "2.1.299",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.env_vars.CLAUDE_CODE_MCP_SERVE_MACHINE_PLUGINS": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "2.1.327",
           "until": null,
           "removed": null
         }
@@ -10286,8 +10363,8 @@
       "ranges": [
         {
           "since": "2.1.317",
-          "until": null,
-          "removed": null
+          "until": "2.1.326",
+          "removed": "2.1.327"
         }
       ],
       "since_bounded": true
@@ -11457,6 +11534,17 @@
       ],
       "since_bounded": true
     },
+    "config.env_vars.CLAUDE_CODE_RUNNER_MODEL_SOCKET": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "2.1.327",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.env_vars.CLAUDE_CODE_RUSTLING_PIXEL": {
       "kind": "env_var",
       "ranges": [
@@ -12183,13 +12271,24 @@
       ],
       "since_bounded": true
     },
+    "config.env_vars.CLAUDE_CODE_SPARE_DEFER_ALL_MCP": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "2.1.327",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.env_vars.CLAUDE_CODE_SPARE_KEEPS_BOOT_SESSION_ID": {
       "kind": "env_var",
       "ranges": [
         {
           "since": "2.1.318",
-          "until": null,
-          "removed": null
+          "until": "2.1.326",
+          "removed": "2.1.327"
         }
       ],
       "since_bounded": true
@@ -12342,8 +12441,8 @@
       "ranges": [
         {
           "since": "2.1.318",
-          "until": null,
-          "removed": null
+          "until": "2.1.326",
+          "removed": "2.1.327"
         }
       ],
       "since_bounded": true
@@ -14388,8 +14487,8 @@
       "ranges": [
         {
           "since": "2.1.282",
-          "until": null,
-          "removed": null
+          "until": "2.1.326",
+          "removed": "2.1.327"
         }
       ],
       "since_bounded": true
@@ -17584,6 +17683,39 @@
       ],
       "since_bounded": true
     },
+    "config.env_vars.SELF_HOSTED_RUNNER_NESTED_MODEL_ACCESS": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "2.1.327",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.env_vars.SELF_HOSTED_RUNNER_NESTED_MODEL_ALLOW": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "2.1.327",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.env_vars.SELF_HOSTED_RUNNER_NESTED_MODEL_CALL_BUDGET": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "2.1.327",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.env_vars.SELF_HOSTED_RUNNER_POOL_SECRET": {
       "kind": "env_var",
       "ranges": [
@@ -19069,6 +19201,17 @@
       ],
       "since_bounded": false
     },
+    "config.options.allowNestedModelAccessUnderForceLogin": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.327",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.options.allowedChannelPlugins": {
       "kind": "setting",
       "ranges": [
@@ -20070,6 +20213,72 @@
       ],
       "since_bounded": false
     },
+    "config.options.autoCompactOfferAnswer": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.327",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.autoCompactOfferAnswer.at": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.327",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.autoCompactOfferAnswer.choice": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.327",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.autoCompactOfferAnswer.model": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.327",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.autoCompactOfferAnswer.tokens": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.327",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.autoCompactRaisedForLoad": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.327",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.options.autoCompactWindow": {
       "kind": "setting",
       "ranges": [
@@ -20141,8 +20350,8 @@
       "ranges": [
         {
           "since": "2.1.206",
-          "until": null,
-          "removed": null
+          "until": "2.1.326",
+          "removed": "2.1.327"
         }
       ],
       "since_bounded": false
@@ -20295,8 +20504,8 @@
       "ranges": [
         {
           "since": "2.1.206",
-          "until": null,
-          "removed": null
+          "until": "2.1.326",
+          "removed": "2.1.327"
         }
       ],
       "since_bounded": false
@@ -21120,8 +21329,8 @@
       "ranges": [
         {
           "since": "2.1.206",
-          "until": null,
-          "removed": null
+          "until": "2.1.326",
+          "removed": "2.1.327"
         }
       ],
       "since_bounded": false
@@ -21351,8 +21560,8 @@
       "ranges": [
         {
           "since": "2.1.206",
-          "until": null,
-          "removed": null
+          "until": "2.1.326",
+          "removed": "2.1.327"
         }
       ],
       "since_bounded": false
@@ -27456,8 +27665,8 @@
       "ranges": [
         {
           "since": "2.1.206",
-          "until": null,
-          "removed": null
+          "until": "2.1.326",
+          "removed": "2.1.327"
         }
       ],
       "since_bounded": false
@@ -29205,8 +29414,8 @@
       "ranges": [
         {
           "since": "2.1.206",
-          "until": null,
-          "removed": null
+          "until": "2.1.326",
+          "removed": "2.1.327"
         }
       ],
       "since_bounded": false
@@ -29392,8 +29601,8 @@
       "ranges": [
         {
           "since": "2.1.206",
-          "until": null,
-          "removed": null
+          "until": "2.1.326",
+          "removed": "2.1.327"
         }
       ],
       "since_bounded": false

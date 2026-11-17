@@ -1,7 +1,44 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-17T20:01:02.637827166Z",
+  "generated_at": "2026-11-17T20:55:17.06204267Z",
   "versions": [
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.327",
+      "released_at": "2026-11-17T20:33:19.976Z",
+      "captured_at": "2026-11-17T20:55:17.06204267Z",
+      "platforms": [
+        "darwin/arm64",
+        "linux/amd64"
+      ],
+      "support": "supported",
+      "previous": "2.1.326",
+      "changes": 85,
+      "categories": {
+        "cli": 4,
+        "config": 35,
+        "filesystem": 9,
+        "hooks": 32,
+        "network": 2,
+        "tools": 3
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 72,
+        "notable": 13
+      },
+      "undocumented": null,
+      "highlights": [
+        "Bash tool description changed (+175 −0 chars)",
+        "ListAgents tool description changed (+151 −0 chars)",
+        "ListAgents tool parameter cursor added"
+      ],
+      "signing": "valid",
+      "attempted_at": "2026-11-17T20:55:17.06204267Z",
+      "attempts": 1
+    },
     {
       "harness": "copilot",
       "name": "GitHub Copilot CLI",
@@ -129,9 +166,8 @@
       "undocumented": 0,
       "highlights": [],
       "signing": null,
-      "partial": true,
-      "attempted_at": "2026-11-17T14:30:14.088945144Z",
-      "attempts": 3
+      "attempted_at": "2026-11-17T20:55:17.06204267Z",
+      "attempts": 4
     },
     {
       "harness": "claude",
@@ -6160,38 +6196,6 @@
         "Caching across_turns: {\"breakpoints\":[[],[],[]],\"stable_cache_key\":true,\"stable… → none",
         "Behaviour: sandbox approval added",
         "Behaviour: sandbox model added"
-      ],
-      "signing": "valid"
-    },
-    {
-      "harness": "claude",
-      "name": "Claude Code",
-      "version": "2.1.207",
-      "released_at": "2026-07-10T22:25:09.43Z",
-      "captured_at": "2026-11-05T09:54:28.532441Z",
-      "platforms": [
-        "darwin/arm64",
-        "linux/amd64"
-      ],
-      "support": "untested",
-      "previous": "2.1.206",
-      "changes": 13,
-      "categories": {
-        "config": 10,
-        "filesystem": 2,
-        "tools": 1
-      },
-      "impact": {
-        "breaking": 0,
-        "degrading": 0,
-        "informational": 12,
-        "notable": 1
-      },
-      "undocumented": 12,
-      "highlights": [
-        "ScheduleWakeup tool description changed (+230 −200 chars)",
-        "New environment variable: CLAUDE_CODE_3P_PROBE_WROTE_OPUS_DEFAULT",
-        "New environment variable: CLAUDE_CODE_3P_PROBE_WROTE_SONNET_DEFAULT"
       ],
       "signing": "valid"
     }

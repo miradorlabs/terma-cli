@@ -1,0 +1,1848 @@
+{
+  "schema_version": 1,
+  "harness": "claude",
+  "from": "2.1.326",
+  "to": "2.1.327",
+  "generated_at": "2026-11-17T20:55:17.06204267Z",
+  "source": null,
+  "changelog": null,
+  "summary": {
+    "changes": 85,
+    "categories": {
+      "cli": 4,
+      "config": 35,
+      "filesystem": 9,
+      "hooks": 32,
+      "network": 2,
+      "tools": 3
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 72,
+      "notable": 13
+    },
+    "undocumented": null
+  },
+  "changes": [
+    {
+      "id": "tools.Bash.description",
+      "category": "tools",
+      "op": "changed",
+      "path": [
+        "tools",
+        "Bash",
+        "description"
+      ],
+      "title": "Bash tool description changed (+175 −0 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -18,4 +18,5 @@\n - Use the `gh` CLI for GitHub operations (PRs, issues, API).\n - GitHub notifies the owner of any `@name` written in a PR, issue, or comment. Write a bare `@name` only for a real login you mean to notify. Put roles, placeholders, and code (`@human`, `@reviewer`, `@types/node`) in backticks or drop the `@`, even when copied from project files.\n - Commit or push only when the user asks. If on the default branch, branch first.\n+- Do not commit files that likely contain secrets (.env, credentials.json, .claude/settings.local.json, etc). Warn the user if they specifically request to commit those files.\n - End git commit messages and PR bodies with the attribution lines given in the conversation's system-reminder, when one is present.\n",
+      "stats": {
+        "added_chars": 175,
+        "removed_chars": 0
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "tools.ListAgents.description",
+      "category": "tools",
+      "op": "changed",
+      "path": [
+        "tools",
+        "ListAgents",
+        "description"
+      ],
+      "title": "ListAgents tool description changed (+151 −0 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,3 +1,4 @@\n Lists agents you can SendMessage to — in-process subagents you spawned, the teammates on your team, other local Claude sessions on this machine, your Claude sessions running in the cloud (when this session has cloud access; a cloud session receives your message but cannot message any session back yet — do not ask it to reply, read its answer in its own transcript), and (when Remote Control is connected here) your account's other sessions — Remote Control sessions on other machines and cloud sessions, each row labeled by kind.\n Names are the address: send with `SendMessage({to: \"<name>\", message: \"...\"})`, copying the name exactly as a row prints it.\n Append a row's ` [ref]` only when the bare name is not enough — two rows share it, or an error asks you to disambiguate.\n+A long listing comes in pages: for the next one, pass the `cursor` its last line gives — not needed to message a session whose name you already know.\n",
+      "stats": {
+        "added_chars": 151,
+        "removed_chars": 0
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "tools.ListAgents.input_schema.properties.cursor",
+      "category": "tools",
+      "op": "added",
+      "path": [
+        "tools",
+        "ListAgents",
+        "input_schema",
+        "properties",
+        "cursor"
+      ],
+      "title": "ListAgents tool parameter cursor added",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "description": "The cursor the last line of a long listing gave, for its next page. Omit to list from the start.",
+        "maxLength": 256,
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "hooks.events.ConfigChange.env.CLAUDE_CODE_CHILD_NOTES_DIR",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "ConfigChange",
+        "env",
+        "CLAUDE_CODE_CHILD_NOTES_DIR"
+      ],
+      "title": "ConfigChange hook environment variable CLAUDE_CODE_CHILD_NOTES_DIR added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_CHILD_NOTES_DIR",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "hooks.events.CwdChanged.env.CLAUDE_CODE_CHILD_NOTES_DIR",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "CwdChanged",
+        "env",
+        "CLAUDE_CODE_CHILD_NOTES_DIR"
+      ],
+      "title": "CwdChanged hook environment variable CLAUDE_CODE_CHILD_NOTES_DIR added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_CHILD_NOTES_DIR",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "hooks.events.Elicitation.env.CLAUDE_CODE_CHILD_NOTES_DIR",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "Elicitation",
+        "env",
+        "CLAUDE_CODE_CHILD_NOTES_DIR"
+      ],
+      "title": "Elicitation hook environment variable CLAUDE_CODE_CHILD_NOTES_DIR added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_CHILD_NOTES_DIR",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "hooks.events.ElicitationResult.env.CLAUDE_CODE_CHILD_NOTES_DIR",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "ElicitationResult",
+        "env",
+        "CLAUDE_CODE_CHILD_NOTES_DIR"
+      ],
+      "title": "ElicitationResult hook environment variable CLAUDE_CODE_CHILD_NOTES_DIR added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_CHILD_NOTES_DIR",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "hooks.events.FileChanged.env.CLAUDE_CODE_CHILD_NOTES_DIR",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "FileChanged",
+        "env",
+        "CLAUDE_CODE_CHILD_NOTES_DIR"
+      ],
+      "title": "FileChanged hook environment variable CLAUDE_CODE_CHILD_NOTES_DIR added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_CHILD_NOTES_DIR",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "hooks.events.InstructionsLoaded.env.CLAUDE_CODE_CHILD_NOTES_DIR",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "InstructionsLoaded",
+        "env",
+        "CLAUDE_CODE_CHILD_NOTES_DIR"
+      ],
+      "title": "InstructionsLoaded hook environment variable CLAUDE_CODE_CHILD_NOTES_DIR added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_CHILD_NOTES_DIR",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "hooks.events.MessageDisplay.env.CLAUDE_CODE_CHILD_NOTES_DIR",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "MessageDisplay",
+        "env",
+        "CLAUDE_CODE_CHILD_NOTES_DIR"
+      ],
+      "title": "MessageDisplay hook environment variable CLAUDE_CODE_CHILD_NOTES_DIR added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_CHILD_NOTES_DIR",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "hooks.events.Notification.env.CLAUDE_CODE_CHILD_NOTES_DIR",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "Notification",
+        "env",
+        "CLAUDE_CODE_CHILD_NOTES_DIR"
+      ],
+      "title": "Notification hook environment variable CLAUDE_CODE_CHILD_NOTES_DIR added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_CHILD_NOTES_DIR",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "hooks.events.PermissionDenied.env.CLAUDE_CODE_CHILD_NOTES_DIR",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "PermissionDenied",
+        "env",
+        "CLAUDE_CODE_CHILD_NOTES_DIR"
+      ],
+      "title": "PermissionDenied hook environment variable CLAUDE_CODE_CHILD_NOTES_DIR added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_CHILD_NOTES_DIR",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "hooks.events.PermissionRequest.env.CLAUDE_CODE_CHILD_NOTES_DIR",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "PermissionRequest",
+        "env",
+        "CLAUDE_CODE_CHILD_NOTES_DIR"
+      ],
+      "title": "PermissionRequest hook environment variable CLAUDE_CODE_CHILD_NOTES_DIR added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_CHILD_NOTES_DIR",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "hooks.events.PostCompact.env.CLAUDE_CODE_CHILD_NOTES_DIR",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "PostCompact",
+        "env",
+        "CLAUDE_CODE_CHILD_NOTES_DIR"
+      ],
+      "title": "PostCompact hook environment variable CLAUDE_CODE_CHILD_NOTES_DIR added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_CHILD_NOTES_DIR",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "hooks.events.PostModelSwitch.env.CLAUDE_CODE_CHILD_NOTES_DIR",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "PostModelSwitch",
+        "env",
+        "CLAUDE_CODE_CHILD_NOTES_DIR"
+      ],
+      "title": "PostModelSwitch hook environment variable CLAUDE_CODE_CHILD_NOTES_DIR added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_CHILD_NOTES_DIR",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "hooks.events.PostToolBatch.env.CLAUDE_CODE_CHILD_NOTES_DIR",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "PostToolBatch",
+        "env",
+        "CLAUDE_CODE_CHILD_NOTES_DIR"
+      ],
+      "title": "PostToolBatch hook environment variable CLAUDE_CODE_CHILD_NOTES_DIR added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_CHILD_NOTES_DIR",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "hooks.events.PostToolUse.env.CLAUDE_CODE_CHILD_NOTES_DIR",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "PostToolUse",
+        "env",
+        "CLAUDE_CODE_CHILD_NOTES_DIR"
+      ],
+      "title": "PostToolUse hook environment variable CLAUDE_CODE_CHILD_NOTES_DIR added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_CHILD_NOTES_DIR",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "hooks.events.PostToolUseFailure.env.CLAUDE_CODE_CHILD_NOTES_DIR",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "PostToolUseFailure",
+        "env",
+        "CLAUDE_CODE_CHILD_NOTES_DIR"
+      ],
+      "title": "PostToolUseFailure hook environment variable CLAUDE_CODE_CHILD_NOTES_DIR added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_CHILD_NOTES_DIR",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "hooks.events.PreCompact.env.CLAUDE_CODE_CHILD_NOTES_DIR",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "PreCompact",
+        "env",
+        "CLAUDE_CODE_CHILD_NOTES_DIR"
+      ],
+      "title": "PreCompact hook environment variable CLAUDE_CODE_CHILD_NOTES_DIR added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_CHILD_NOTES_DIR",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "hooks.events.PreModelSwitch.env.CLAUDE_CODE_CHILD_NOTES_DIR",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "PreModelSwitch",
+        "env",
+        "CLAUDE_CODE_CHILD_NOTES_DIR"
+      ],
+      "title": "PreModelSwitch hook environment variable CLAUDE_CODE_CHILD_NOTES_DIR added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_CHILD_NOTES_DIR",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "hooks.events.PreToolUse.env.CLAUDE_CODE_CHILD_NOTES_DIR",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "PreToolUse",
+        "env",
+        "CLAUDE_CODE_CHILD_NOTES_DIR"
+      ],
+      "title": "PreToolUse hook environment variable CLAUDE_CODE_CHILD_NOTES_DIR added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_CHILD_NOTES_DIR",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "hooks.events.SessionEnd.env.CLAUDE_CODE_CHILD_NOTES_DIR",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "SessionEnd",
+        "env",
+        "CLAUDE_CODE_CHILD_NOTES_DIR"
+      ],
+      "title": "SessionEnd hook environment variable CLAUDE_CODE_CHILD_NOTES_DIR added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_CHILD_NOTES_DIR",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "hooks.events.SessionStart.env.CLAUDE_CODE_CHILD_NOTES_DIR",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "SessionStart",
+        "env",
+        "CLAUDE_CODE_CHILD_NOTES_DIR"
+      ],
+      "title": "SessionStart hook environment variable CLAUDE_CODE_CHILD_NOTES_DIR added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_CHILD_NOTES_DIR",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "hooks.events.Setup.env.CLAUDE_CODE_CHILD_NOTES_DIR",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "Setup",
+        "env",
+        "CLAUDE_CODE_CHILD_NOTES_DIR"
+      ],
+      "title": "Setup hook environment variable CLAUDE_CODE_CHILD_NOTES_DIR added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_CHILD_NOTES_DIR",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "hooks.events.Stop.env.CLAUDE_CODE_CHILD_NOTES_DIR",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "Stop",
+        "env",
+        "CLAUDE_CODE_CHILD_NOTES_DIR"
+      ],
+      "title": "Stop hook environment variable CLAUDE_CODE_CHILD_NOTES_DIR added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_CHILD_NOTES_DIR",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "hooks.events.StopFailure.env.CLAUDE_CODE_CHILD_NOTES_DIR",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "StopFailure",
+        "env",
+        "CLAUDE_CODE_CHILD_NOTES_DIR"
+      ],
+      "title": "StopFailure hook environment variable CLAUDE_CODE_CHILD_NOTES_DIR added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_CHILD_NOTES_DIR",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "hooks.events.SubagentStart.env.CLAUDE_CODE_CHILD_NOTES_DIR",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "SubagentStart",
+        "env",
+        "CLAUDE_CODE_CHILD_NOTES_DIR"
+      ],
+      "title": "SubagentStart hook environment variable CLAUDE_CODE_CHILD_NOTES_DIR added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_CHILD_NOTES_DIR",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "hooks.events.SubagentStop.env.CLAUDE_CODE_CHILD_NOTES_DIR",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "SubagentStop",
+        "env",
+        "CLAUDE_CODE_CHILD_NOTES_DIR"
+      ],
+      "title": "SubagentStop hook environment variable CLAUDE_CODE_CHILD_NOTES_DIR added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_CHILD_NOTES_DIR",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "hooks.events.TaskCompleted.env.CLAUDE_CODE_CHILD_NOTES_DIR",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "TaskCompleted",
+        "env",
+        "CLAUDE_CODE_CHILD_NOTES_DIR"
+      ],
+      "title": "TaskCompleted hook environment variable CLAUDE_CODE_CHILD_NOTES_DIR added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_CHILD_NOTES_DIR",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "hooks.events.TaskCreated.env.CLAUDE_CODE_CHILD_NOTES_DIR",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "TaskCreated",
+        "env",
+        "CLAUDE_CODE_CHILD_NOTES_DIR"
+      ],
+      "title": "TaskCreated hook environment variable CLAUDE_CODE_CHILD_NOTES_DIR added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_CHILD_NOTES_DIR",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "hooks.events.TeammateIdle.env.CLAUDE_CODE_CHILD_NOTES_DIR",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "TeammateIdle",
+        "env",
+        "CLAUDE_CODE_CHILD_NOTES_DIR"
+      ],
+      "title": "TeammateIdle hook environment variable CLAUDE_CODE_CHILD_NOTES_DIR added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_CHILD_NOTES_DIR",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "hooks.events.UserPromptExpansion.env.CLAUDE_CODE_CHILD_NOTES_DIR",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "UserPromptExpansion",
+        "env",
+        "CLAUDE_CODE_CHILD_NOTES_DIR"
+      ],
+      "title": "UserPromptExpansion hook environment variable CLAUDE_CODE_CHILD_NOTES_DIR added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_CHILD_NOTES_DIR",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "hooks.events.UserPromptSubmit.env.CLAUDE_CODE_CHILD_NOTES_DIR",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "UserPromptSubmit",
+        "env",
+        "CLAUDE_CODE_CHILD_NOTES_DIR"
+      ],
+      "title": "UserPromptSubmit hook environment variable CLAUDE_CODE_CHILD_NOTES_DIR added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_CHILD_NOTES_DIR",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "hooks.events.WorktreeCreate.env.CLAUDE_CODE_CHILD_NOTES_DIR",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "WorktreeCreate",
+        "env",
+        "CLAUDE_CODE_CHILD_NOTES_DIR"
+      ],
+      "title": "WorktreeCreate hook environment variable CLAUDE_CODE_CHILD_NOTES_DIR added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_CHILD_NOTES_DIR",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "hooks.events.WorktreeRemove.env.CLAUDE_CODE_CHILD_NOTES_DIR",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "events",
+        "WorktreeRemove",
+        "env",
+        "CLAUDE_CODE_CHILD_NOTES_DIR"
+      ],
+      "title": "WorktreeRemove hook environment variable CLAUDE_CODE_CHILD_NOTES_DIR added",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_CHILD_NOTES_DIR",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "cli.commands.claude.options.--autocompact.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "claude",
+        "options",
+        "--autocompact",
+        "description"
+      ],
+      "title": "`claude --autocompact`: description changed",
+      "impact": "informational",
+      "before": "Auto-compact window size (auto, or 100k–1M tokens)",
+      "after": "Auto-compact window size (auto, or at least 100k tokens)",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "cli.commands.claude mcp add-json.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "claude mcp add-json",
+        "description"
+      ],
+      "title": "Description of `claude mcp add-json` changed",
+      "impact": "informational",
+      "before": "Add an MCP server (stdio, SSE, HTTP, or WebSocket) with a JSON string",
+      "after": "Add an MCP server (stdio, SSE, HTTP, or WebSocket) with a JSON string, or - to read it from stdin",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "cli.help.--help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "--help"
+      ],
+      "title": "Full help text of `--help` changed (+135 −131 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -24,8 +24,8 @@\n       Edit\")\n   --append-system-prompt <prompt>       Add text to the end of the default\n                                         system prompt\n-  --autocompact <auto|tokens>           Auto-compact window size (auto, or\n-                                        100k–1M tokens)\n+  --autocompact <auto|tokens>           Auto-compact window size (auto, or at\n+                                        least 100k tokens)\n   --ax-screen-reader                    Render screen-reader friendly output\n                                         (flat text, no decorative borders or\n                                         animations).\n",
+      "stats": {
+        "added_chars": 135,
+        "removed_chars": 131
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "cli.help.mcp --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "mcp --help"
+      ],
+      "title": "Full help text of `mcp --help` changed (+136 −69 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -11,7 +11,8 @@\n   add-from-claude-desktop [options]     Import MCP servers from Claude Desktop\n                                         (Mac and WSL only)\n   add-json [options] <name> <json>      Add an MCP server (stdio, SSE, HTTP, or\n-                                        WebSocket) with a JSON string\n+                                        WebSocket) with a JSON string, or - to\n+                                        read it from stdin\n   get <name>                            Get details about an MCP server.\n                                         Unapproved .mcp.json servers are shown\n                                         as ⏸ Pending approval and not connected\n",
+      "stats": {
+        "added_chars": 136,
+        "removed_chars": 69
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.additionalMarketplaces.<name>.pluginDigests.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "additionalMarketplaces.<name>.pluginDigests",
+        "description"
+      ],
+      "title": "additionalMarketplaces.<name>.pluginDigests description changed (+176 −220 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Deprecated and ignored: settings that hold it still load. A plugin takes the organization tier when managed settings enable it, declare its marketplace with a remote source and list it in prependPlugins or appendPlugins.\n+Deprecated and ignored: settings that hold it still load. A plugin takes the organization tier when managed settings enable it and declare its marketplace with a remote source.\n",
+      "stats": {
+        "added_chars": 176,
+        "removed_chars": 220
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.allowNestedModelAccessUnderForceLogin",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "allowNestedModelAccessUnderForceLogin"
+      ],
+      "title": "New setting: allowNestedModelAccessUnderForceLogin",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "description": "Self-hosted runner hosts only. Set to true to let a Claude Code started by a runner session's command use the runner's model access (--nested-model-access) when this machine's managed settings set forceLoginOrgUUID or forceLoginMethod. It asks the runner which organization the session owner's sign-in belongs to, and stops if the pin does not permit it or the runner does not answer. Without this key it is left signed out. Any program on the machine can pretend to be the runner, so with this key the pin is not a security boundary: set it on runner hosts only, never in a profile that reaches people's own computers. Honored only from this machine's own administrator sources (MDM, the managed settings file, or a policy helper that they name); ignored in server-managed, user, project, local and --settings sources.",
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.attributionProject.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "attributionProject",
+        "description"
+      ],
+      "title": "attributionProject description changed (+341 −165 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,6 +1,7 @@\n The claude.ai Project this session names for your organization's usage reports: the Project's ID, starting with \"claude_proj_\" or \"chan_\", or the UUID of a \"claude_proj_\" Project.\n An empty string names none and stops lower-precedence files from naming one; the organization default still applies.\n-Sent only when Claude Code uses your claude.ai login, connects directly to the Anthropic API, is not in a cloud session, and CLAUDE_CODE_ATTRIBUTION_HEADER is not 0.\n+A Project is sent only when Claude Code uses your claude.ai login, connects directly to the Anthropic API, is not in a cloud session, and CLAUDE_CODE_ATTRIBUTION_HEADER is not 0.\n CLAUDE_CODE_ATTRIBUTION_PROJECT takes precedence over it.\n Set in managed settings, it overrides people's own settings files.\n A project's .claude/settings.json and settings.local.json count only once the folder is trusted; for runs in a folder nobody has trusted, such as CI, use CLAUDE_CODE_ATTRIBUTION_PROJECT.\n+Behind a Claude apps gateway that reports usage by group, name one of your groups instead, such as \"payments\"; CLAUDE_CODE_ATTRIBUTION_HEADER does not affect that.\n",
+      "stats": {
+        "added_chars": 341,
+        "removed_chars": 165
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.attributionProjectPolicy.default.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "attributionProjectPolicy.default",
+        "description"
+      ],
+      "title": "attributionProjectPolicy.default description changed (+265 −185 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-The Project used when neither CLAUDE_CODE_ATTRIBUTION_PROJECT nor attributionProject names one: its ID, starting with \"claude_proj_\" or \"chan_\", or the UUID of a \"claude_proj_\" Project.\n+The Project used when neither CLAUDE_CODE_ATTRIBUTION_PROJECT nor attributionProject names one: its ID, starting with \"claude_proj_\" or \"chan_\", or the UUID of a \"claude_proj_\" Project. Behind a Claude apps gateway that reports usage by group, a group name instead.\n",
+      "stats": {
+        "added_chars": 265,
+        "removed_chars": 185
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.autoCompactOfferAnswer",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "autoCompactOfferAnswer"
+      ],
+      "title": "New setting: autoCompactOfferAnswer",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "@internal Read from the flag settings only, in Claude Desktop's Code tab: the person's answer to the app's offer of a lower auto-compact window, which Claude Code records on this computer. `tokens` is the window they chose or kept, and `at` is when they answered (epoch ms)",
+        "type": "object"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.autoCompactRaisedForLoad",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "autoCompactRaisedForLoad"
+      ],
+      "title": "New setting: autoCompactRaisedForLoad",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "@internal Read from the flag settings only, in Claude Desktop's Code tab: true lets a conversation compact at twice what is still in each request after a summary (system prompt, tools, instruction files), where that is above its auto-compact threshold.",
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.autoMode",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "autoMode"
+      ],
+      "title": "Setting no longer read: autoMode",
+      "impact": "notable",
+      "before": {
+        "description": "Auto mode classifier prompt customization",
+        "type": "object"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.axScreenReader",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "axScreenReader"
+      ],
+      "title": "Setting no longer read: axScreenReader",
+      "impact": "notable",
+      "before": {
+        "description": "Render screen-reader friendly output (flat text, no decorative borders or animations). Overridden by the CLAUDE_AX_SCREEN_READER env var and the --ax-screen-reader CLI flag. Ignored in project and local settings.",
+        "type": "boolean"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.defaultView",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "defaultView"
+      ],
+      "title": "Setting no longer read: defaultView",
+      "impact": "notable",
+      "before": {
+        "description": "Default transcript view: chat (SendUserMessage checkpoints only) or transcript (full)",
+        "enum": [
+          "chat",
+          "transcript"
+        ],
+        "type": "string"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.disableDeepLinkRegistration",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "disableDeepLinkRegistration"
+      ],
+      "title": "Setting no longer read: disableDeepLinkRegistration",
+      "impact": "notable",
+      "before": {
+        "description": "Prevent claude-cli:// protocol handler registration with the OS",
+        "enum": [
+          "disable"
+        ],
+        "type": "string"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.extraKnownMarketplaces.<name>.pluginDigests.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "extraKnownMarketplaces.<name>.pluginDigests",
+        "description"
+      ],
+      "title": "extraKnownMarketplaces.<name>.pluginDigests description changed (+176 −220 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Deprecated and ignored: settings that hold it still load. A plugin takes the organization tier when managed settings enable it, declare its marketplace with a remote source and list it in prependPlugins or appendPlugins.\n+Deprecated and ignored: settings that hold it still load. A plugin takes the organization tier when managed settings enable it and declare its marketplace with a remote source.\n",
+      "stats": {
+        "added_chars": 176,
+        "removed_chars": 220
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.modelSettings.<name>.autoCompactWindow.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "modelSettings.<name>.autoCompactWindow",
+        "description"
+      ],
+      "title": "modelSettings.<name>.autoCompactWindow description changed (+110 −112 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,4 +1,4 @@\n-Auto-compact window for this model, in tokens (100000 to 1000000), or \"auto\" for the window tuned for the model.\n+Auto-compact window for this model, in tokens (at least 100000), or \"auto\" for the window tuned for the model.\n Within one settings file it replaces the top-level autoCompactWindow for the model.\n /autocompact saves here.\n The canonical model name as key also matches its dated, [1m], Bedrock and Vertex spellings.\n",
+      "stats": {
+        "added_chars": 110,
+        "removed_chars": 112
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.prependPlugins.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "prependPlugins",
+        "description"
+      ],
+      "title": "prependPlugins description changed (+250 −312 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,5 +1,5 @@\n Managed plugins (plugin@marketplace ids that managed enabledPlugins sets true) whose hooks run first, outermost, in the listed order: the first id listed sees every event before any other plugin and every result after it.\n-Managed plugins read in place from a local folder managed settings name, and not listed here or in appendPlugins, follow the listed ones; user, project and marketplace plugins come after those, with a managed plugin from a remote marketplace that neither key lists; then appendPlugins; then the built-in plugins.\n+Managed plugins from a local folder or a remote marketplace managed settings name, and not listed here or in appendPlugins, follow the listed ones; user, project and marketplace plugins come after those; then appendPlugins; then the built-in plugins.\n The bundled cc-plugin-sec-default@builtin seats itself outermost (on a machine with managed settings and for Team and Enterprise organizations) unless this list is set, in which case list it where it should sit or leave it out.\n Name it there as sec-default@builtin, the id every release reads, for as long as any machine in the organization may run a release from before its rename; a release that knows the new id reads either.\n Any other id that is not an enabled managed plugin is skipped; an id listed in both keys is prepended.\n",
+      "stats": {
+        "added_chars": 250,
+        "removed_chars": 312
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.skipAutoPermissionPrompt",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "skipAutoPermissionPrompt"
+      ],
+      "title": "Setting no longer read: skipAutoPermissionPrompt",
+      "impact": "notable",
+      "before": {
+        "description": "Whether the user has accepted the auto mode opt-in dialog",
+        "type": "boolean"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.useAutoModeDuringPlan",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "useAutoModeDuringPlan"
+      ],
+      "title": "Setting no longer read: useAutoModeDuringPlan",
+      "impact": "notable",
+      "before": {
+        "description": "Whether plan mode uses auto mode semantics when auto mode is available (default: true)",
+        "type": "boolean"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.voiceEnabled",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "voiceEnabled"
+      ],
+      "title": "Setting no longer read: voiceEnabled",
+      "impact": "notable",
+      "before": {
+        "description": "Enable voice mode (hold-to-talk dictation)",
+        "type": "boolean"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_DESKTOP_RESULT_FIRST",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_DESKTOP_RESULT_FIRST"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_DESKTOP_RESULT_FIRST",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_DESKTOP_RESULT_FIRST",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_DISABLE_LAYOUT_CHECK",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_DISABLE_LAYOUT_CHECK"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_DISABLE_LAYOUT_CHECK",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_DISABLE_LAYOUT_CHECK",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_DISABLE_PROXY_SCHEME_REPAIR",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_DISABLE_PROXY_SCHEME_REPAIR"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_DISABLE_PROXY_SCHEME_REPAIR",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_DISABLE_PROXY_SCHEME_REPAIR",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_DISABLE_SHELL_HEAD_START",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_DISABLE_SHELL_HEAD_START"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_DISABLE_SHELL_HEAD_START",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_DISABLE_SHELL_HEAD_START",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_HOST_AUTH_ASK_AT_START",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_HOST_AUTH_ASK_AT_START"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_HOST_AUTH_ASK_AT_START",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_HOST_AUTH_ASK_AT_START",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_LAUNCHER_RUNS_API_KEY_HELPER",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_LAUNCHER_RUNS_API_KEY_HELPER"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_LAUNCHER_RUNS_API_KEY_HELPER",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_LAUNCHER_RUNS_API_KEY_HELPER",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_MCP_SERVE_MACHINE_PLUGINS",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_MCP_SERVE_MACHINE_PLUGINS"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_MCP_SERVE_MACHINE_PLUGINS",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_MCP_SERVE_MACHINE_PLUGINS",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_RUNNER_MODEL_SOCKET",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_RUNNER_MODEL_SOCKET"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_RUNNER_MODEL_SOCKET",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_RUNNER_MODEL_SOCKET",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_SPARE_DEFER_ALL_MCP",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_SPARE_DEFER_ALL_MCP"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_SPARE_DEFER_ALL_MCP",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_SPARE_DEFER_ALL_MCP",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.SELF_HOSTED_RUNNER_NESTED_MODEL_ACCESS",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "SELF_HOSTED_RUNNER_NESTED_MODEL_ACCESS"
+      ],
+      "title": "New environment variable: SELF_HOSTED_RUNNER_NESTED_MODEL_ACCESS",
+      "impact": "informational",
+      "before": null,
+      "after": "SELF_HOSTED_RUNNER_NESTED_MODEL_ACCESS",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.SELF_HOSTED_RUNNER_NESTED_MODEL_ALLOW",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "SELF_HOSTED_RUNNER_NESTED_MODEL_ALLOW"
+      ],
+      "title": "New environment variable: SELF_HOSTED_RUNNER_NESTED_MODEL_ALLOW",
+      "impact": "informational",
+      "before": null,
+      "after": "SELF_HOSTED_RUNNER_NESTED_MODEL_ALLOW",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.SELF_HOSTED_RUNNER_NESTED_MODEL_CALL_BUDGET",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "SELF_HOSTED_RUNNER_NESTED_MODEL_CALL_BUDGET"
+      ],
+      "title": "New environment variable: SELF_HOSTED_RUNNER_NESTED_MODEL_CALL_BUDGET",
+      "impact": "informational",
+      "before": null,
+      "after": "SELF_HOSTED_RUNNER_NESTED_MODEL_CALL_BUDGET",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_CCR_SKIP_HYDRATE_ON_CURRENT_TIP",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_CCR_SKIP_HYDRATE_ON_CURRENT_TIP"
+      ],
+      "title": "Environment variable no longer read: CLAUDE_CODE_CCR_SKIP_HYDRATE_ON_CURRENT_TIP",
+      "impact": "informational",
+      "before": "CLAUDE_CODE_CCR_SKIP_HYDRATE_ON_CURRENT_TIP",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_CCR_SLOW_SKILLS_WATCH",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_CCR_SLOW_SKILLS_WATCH"
+      ],
+      "title": "Environment variable no longer read: CLAUDE_CODE_CCR_SLOW_SKILLS_WATCH",
+      "impact": "informational",
+      "before": "CLAUDE_CODE_CCR_SLOW_SKILLS_WATCH",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_CONSENT_POINTERLESS",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_CONSENT_POINTERLESS"
+      ],
+      "title": "Environment variable no longer read: CLAUDE_CODE_CONSENT_POINTERLESS",
+      "impact": "informational",
+      "before": "CLAUDE_CODE_CONSENT_POINTERLESS",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_PLAIN_DELTA_TAKE_AT_SOURCE",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_PLAIN_DELTA_TAKE_AT_SOURCE"
+      ],
+      "title": "Environment variable no longer read: CLAUDE_CODE_PLAIN_DELTA_TAKE_AT_SOURCE",
+      "impact": "informational",
+      "before": "CLAUDE_CODE_PLAIN_DELTA_TAKE_AT_SOURCE",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_SPARE_KEEPS_BOOT_SESSION_ID",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_SPARE_KEEPS_BOOT_SESSION_ID"
+      ],
+      "title": "Environment variable no longer read: CLAUDE_CODE_SPARE_KEEPS_BOOT_SESSION_ID",
+      "impact": "informational",
+      "before": "CLAUDE_CODE_SPARE_KEEPS_BOOT_SESSION_ID",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_STREAM_TIMER_SLACK_MS",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_STREAM_TIMER_SLACK_MS"
+      ],
+      "title": "Environment variable no longer read: CLAUDE_CODE_STREAM_TIMER_SLACK_MS",
+      "impact": "informational",
+      "before": "CLAUDE_CODE_STREAM_TIMER_SLACK_MS",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.CLAUDE_TEST_NO_OPEN",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_TEST_NO_OPEN"
+      ],
+      "title": "Environment variable no longer read: CLAUDE_TEST_NO_OPEN",
+      "impact": "informational",
+      "before": "CLAUDE_TEST_NO_OPEN",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_headless_latency",
+      "category": "network",
+      "op": "removed",
+      "path": [
+        "network",
+        "telemetry",
+        "POST api.anthropic.com/api/event_logging/v2/batch",
+        "events",
+        "tengu_headless_latency"
+      ],
+      "title": "Vendor telemetry event no longer sent: tengu_headless_latency",
+      "impact": "notable",
+      "before": {
+        "count": 2,
+        "fields": [
+          "additional_metadata",
+          "betas",
+          "client_timestamp",
+          "client_type",
+          "device_id",
+          "entrypoint",
+          "env",
+          "env.arch",
+          "env.build_time",
+          "env.deployment_environment",
+          "env.is_ci",
+          "env.is_claubbit",
+          "env.is_claude_ai_auth",
+          "env.is_claude_code_action",
+          "env.is_claude_code_remote",
+          "env.is_conductor",
+          "env.is_github_action",
+          "env.is_local_agent_mode",
+          "env.is_running_with_bun",
+          "env.node_version",
+          "env.package_managers",
+          "env.platform",
+          "env.platform_raw",
+          "env.runtimes",
+          "env.shell",
+          "env.terminal",
+          "env.vcs",
+          "env.version",
+          "env.version_base",
+          "event_id",
+          "event_name",
+          "is_interactive",
+          "model",
+          "process",
+          "rh",
+          "session_id",
+          "user_type"
+        ]
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_startup_timing",
+      "category": "network",
+      "op": "removed",
+      "path": [
+        "network",
+        "telemetry",
+        "POST api.anthropic.com/api/event_logging/v2/batch",
+        "events",
+        "tengu_startup_timing"
+      ],
+      "title": "Vendor telemetry event no longer sent: tengu_startup_timing",
+      "impact": "notable",
+      "before": {
+        "count": 1,
+        "fields": [
+          "additional_metadata",
+          "betas",
+          "client_timestamp",
+          "client_type",
+          "device_id",
+          "entrypoint",
+          "env",
+          "env.arch",
+          "env.build_time",
+          "env.deployment_environment",
+          "env.is_ci",
+          "env.is_claubbit",
+          "env.is_claude_ai_auth",
+          "env.is_claude_code_action",
+          "env.is_claude_code_remote",
+          "env.is_conductor",
+          "env.is_github_action",
+          "env.is_local_agent_mode",
+          "env.is_running_with_bun",
+          "env.node_version",
+          "env.package_managers",
+          "env.platform",
+          "env.platform_raw",
+          "env.runtimes",
+          "env.shell",
+          "env.terminal",
+          "env.vcs",
+          "env.version",
+          "env.version_base",
+          "event_id",
+          "event_name",
+          "is_interactive",
+          "model",
+          "process",
+          "rh",
+          "session_id",
+          "user_type"
+        ]
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "filesystem.darwin/arm64.exec.git -c core.askPass= -c protocol.ext.allow=never -c core.alternateRefsCommand=f() { git --git-dir=\"$1\" for-each-ref --format='%(objectname)'; }; f -c submodule.recurse=false -c log.showSignature=false -c format.pretty=medium -c gc.auto=0 -c maintenance.auto=false -c diff.autoRefreshIndex=false -c hook.applypatch-msg.enabled=false -c hook.pre-applypatch.enabled=false -c hook.post-applypatch.enabled=false -c hook.pre-commit.enabled=false -c hook.pre-merge-commit.enabled=false -c hook.prepare-commit-msg.enabled=false -c hook.commit-msg.enabled=false -c hook.post-commit.enabled=false -c hook.pre-rebase.enabled=false -c hook.post-checkout.enabled=false -c hook.post-merge.enabled=false -c hook.pre-push.enabled=false -c hook.pre-receive.enabled=false -c hook.update.enabled=false -c hook.proc-receive.enabled=false -c hook.post-receive.enabled=false -c hook.post-update.enabled=false -c hook.reference-transaction.enabled=false -c hook.push-to-checkout.enabled=false -c hook.pre-auto-gc.enabled=false -c hook.post-rewrite.enabled=false -c hook.sendemail-validate.enabled=false -c hook.fsmonitor-watchman.enabled=false -c hook.p4-changelist.enabled=false -c hook.p4-prepare-changelist.enabled=false -c hook.p4-post-changelist.enabled=false -c hook.p4-pre-submit.enabled=false -c hook.post-index-change.enabled=false -c core.hooksPath=/dev/null -c core.fsmonitor= remote get-url origin.phases.turn",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "darwin/arm64",
+        "exec",
+        "git -c core.askPass= -c protocol.ext.allow=never -c core.alternateRefsCommand=f() { git --git-dir=\"$1\" for-each-ref --format='%(objectname)'; }; f -c submodule.recurse=false -c log.showSignature=false -c format.pretty=medium -c gc.auto=0 -c maintenance.auto=false -c diff.autoRefreshIndex=false -c hook.applypatch-msg.enabled=false -c hook.pre-applypatch.enabled=false -c hook.post-applypatch.enabled=false -c hook.pre-commit.enabled=false -c hook.pre-merge-commit.enabled=false -c hook.prepare-commit-msg.enabled=false -c hook.commit-msg.enabled=false -c hook.post-commit.enabled=false -c hook.pre-rebase.enabled=false -c hook.post-checkout.enabled=false -c hook.post-merge.enabled=false -c hook.pre-push.enabled=false -c hook.pre-receive.enabled=false -c hook.update.enabled=false -c hook.proc-receive.enabled=false -c hook.post-receive.enabled=false -c hook.post-update.enabled=false -c hook.reference-transaction.enabled=false -c hook.push-to-checkout.enabled=false -c hook.pre-auto-gc.enabled=false -c hook.post-rewrite.enabled=false -c hook.sendemail-validate.enabled=false -c hook.fsmonitor-watchman.enabled=false -c hook.p4-changelist.enabled=false -c hook.p4-prepare-changelist.enabled=false -c hook.p4-post-changelist.enabled=false -c hook.p4-pre-submit.enabled=false -c hook.post-index-change.enabled=false -c core.hooksPath=/dev/null -c core.fsmonitor= remote get-url origin",
+        "phases",
+        "turn"
+      ],
+      "title": "`git -c core.askPass= -c protocol.ext.allow=never -c core.alternateRefsCommand=f() { git --git-dir=\"$ …` now also runs at turn (darwin/arm64)",
+      "impact": "informational",
+      "before": null,
+      "after": "turn",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "filesystem.darwin/arm64.exec.git -c core.askPass= -c protocol.ext.allow=never -c core.alternateRefsCommand=f() { git --git-dir=\"$1\" for-each-ref --format='%(objectname)'; }; f -c submodule.recurse=false -c log.showSignature=false -c format.pretty=medium -c gc.auto=0 -c maintenance.auto=false -c diff.autoRefreshIndex=false -c hook.applypatch-msg.enabled=false -c hook.pre-applypatch.enabled=false -c hook.post-applypatch.enabled=false -c hook.pre-commit.enabled=false -c hook.pre-merge-commit.enabled=false -c hook.prepare-commit-msg.enabled=false -c hook.commit-msg.enabled=false -c hook.post-commit.enabled=false -c hook.pre-rebase.enabled=false -c hook.post-checkout.enabled=false -c hook.post-merge.enabled=false -c hook.pre-push.enabled=false -c hook.pre-receive.enabled=false -c hook.update.enabled=false -c hook.proc-receive.enabled=false -c hook.post-receive.enabled=false -c hook.post-update.enabled=false -c hook.reference-transaction.enabled=false -c hook.push-to-checkout.enabled=false -c hook.pre-auto-gc.enabled=false -c hook.post-rewrite.enabled=false -c hook.sendemail-validate.enabled=false -c hook.fsmonitor-watchman.enabled=false -c hook.p4-changelist.enabled=false -c hook.p4-prepare-changelist.enabled=false -c hook.p4-post-changelist.enabled=false -c hook.p4-pre-submit.enabled=false -c hook.post-index-change.enabled=false -c core.hooksPath=/dev/null -c core.fsmonitor= remote get-url origin.phases.startup",
+      "category": "filesystem",
+      "op": "removed",
+      "path": [
+        "filesystem",
+        "darwin/arm64",
+        "exec",
+        "git -c core.askPass= -c protocol.ext.allow=never -c core.alternateRefsCommand=f() { git --git-dir=\"$1\" for-each-ref --format='%(objectname)'; }; f -c submodule.recurse=false -c log.showSignature=false -c format.pretty=medium -c gc.auto=0 -c maintenance.auto=false -c diff.autoRefreshIndex=false -c hook.applypatch-msg.enabled=false -c hook.pre-applypatch.enabled=false -c hook.post-applypatch.enabled=false -c hook.pre-commit.enabled=false -c hook.pre-merge-commit.enabled=false -c hook.prepare-commit-msg.enabled=false -c hook.commit-msg.enabled=false -c hook.post-commit.enabled=false -c hook.pre-rebase.enabled=false -c hook.post-checkout.enabled=false -c hook.post-merge.enabled=false -c hook.pre-push.enabled=false -c hook.pre-receive.enabled=false -c hook.update.enabled=false -c hook.proc-receive.enabled=false -c hook.post-receive.enabled=false -c hook.post-update.enabled=false -c hook.reference-transaction.enabled=false -c hook.push-to-checkout.enabled=false -c hook.pre-auto-gc.enabled=false -c hook.post-rewrite.enabled=false -c hook.sendemail-validate.enabled=false -c hook.fsmonitor-watchman.enabled=false -c hook.p4-changelist.enabled=false -c hook.p4-prepare-changelist.enabled=false -c hook.p4-post-changelist.enabled=false -c hook.p4-pre-submit.enabled=false -c hook.post-index-change.enabled=false -c core.hooksPath=/dev/null -c core.fsmonitor= remote get-url origin",
+        "phases",
+        "startup"
+      ],
+      "title": "`git -c core.askPass= -c protocol.ext.allow=never -c core.alternateRefsCommand=f() { git --git-dir=\"$ …` no longer runs at startup (darwin/arm64)",
+      "impact": "informational",
+      "before": "startup",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "filesystem.darwin/arm64.exec./bin/zsh -c -l SNAPSHOT_FILE=<claude-config>/shell-snapshots/snapshot-zsh-<n>-<id>.sh\n      \n      # No user config file to source\n      \n\n      # First, create/clear the snapshot file\n      echo \"# Snapshot file\" >| \"$SNAPSHOT_FILE\"\n\n      # When this file is sourced, we first unalias to avoid conflicts\n      # This is necessary because aliases get \"frozen\" inside function definitions at definition time,\n      # which can cause unexpected behavior when functions use commands that conflict with aliases\n      echo \"# Unset all aliases to avoid conflicts with functions\" >> \"$SNAPSHOT_FILE\"\n      echo \"unalias -a 2>/dev/null || true\" >> \"$SNAPSHOT_FILE\"\n\n      \n\n      \n      cat >> \"$SNAPSHOT_FILE\" << 'CLAUDE_CODE_END_<id>'\n# Check for rg availability\nif ! hash rg 2>/dev/null && ! typeset -f rg >/dev/null 2>&1; then\n  function rg {\n  if [[ -x <install>/claude ]]; then\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=rg <install>/claude ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=rg <install>/claude ${1+\"$@\"}\n  else\n    (exec -a rg <install>/claude ${1+\"$@\"})\n  fi\n  elif [[ -x <home>/.local/bin/claude ]]; then\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=rg <home>/.local/bin/claude ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=rg <home>/.local/bin/claude ${1+\"$@\"}\n  else\n    (exec -a rg <home>/.local/bin/claude ${1+\"$@\"})\n  fi\n  else command rg ${1+\"$@\"}; fi\n}\nfi\n# Shadow find/grep with embedded bfs/ugrep\nunalias find 2>/dev/null || true\nunalias grep 2>/dev/null || true\nfunction find {\n  if [[ -x <install>/claude ]]; then\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=bfs <install>/claude -S dfs -regextype findutils-default ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=bfs <install>/claude -S dfs -regextype findutils-default ${1+\"$@\"}\n  else\n    (exec -a bfs <install>/claude -S dfs -regextype findutils-default ${1+\"$@\"})\n  fi\n  elif [[ -x <home>/.local/bin/claude ]]; then\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=bfs <home>/.local/bin/claude -S dfs -regextype findutils-default ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=bfs <home>/.local/bin/claude -S dfs -regextype findutils-default ${1+\"$@\"}\n  else\n    (exec -a bfs <home>/.local/bin/claude -S dfs -regextype findutils-default ${1+\"$@\"})\n  fi\n  else command find ${1+\"$@\"}; fi\n}\nfunction grep {\n  local _cc_a\n  for _cc_a in ${1+\"$@\"}; do\n    case \"$_cc_a\" in -*-filter*|-*-pager*|-*-view*|-*-format-open*|-*-config*|---*|-@*|-*-save-config*|-[Zz]*|-[!-]*[Zz]*|--null|--null-data) command grep ${1+\"$@\"}; return ;; esac\n  done\n  if [[ -x <install>/claude ]]; then\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=ugrep <install>/claude -G --ignore-files --hidden -I --encoding=UTF-8 --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=ugrep <install>/claude -G --ignore-files --hidden -I --encoding=UTF-8 --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"}\n  else\n    (exec -a ugrep <install>/claude -G --ignore-files --hidden -I --encoding=UTF-8 --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"})\n  fi\n  elif [[ -x <home>/.local/bin/claude ]]; then\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=ugrep <home>/.local/bin/claude -G --ignore-files --hidden -I --encoding=UTF-8 --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=ugrep <home>/.local/bin/claude -G --ignore-files --hidden -I --encoding=UTF-8 --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"}\n  else\n    (exec -a ugrep <home>/.local/bin/claude -G --ignore-files --hidden -I --encoding=UTF-8 --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"})\n  fi\n  else command grep ${1+\"$@\"}; fi\n}\n# Shadow pkill to refuse patterns matching the CLI process\nunalias pkill 2>/dev/null || true\nfunction pkill {\n  if [ -n \"${CLAUDE_PID:-}\" ] && [ -r \"/proc/${CLAUDE_PID}/comm\" ]; then\n    local _cc_skip=\"\" _cc_a\n    local -a _cc_probe=()\n    for _cc_a in ${1+\"$@\"}; do\n      if [ -n \"$_cc_skip\" ]; then _cc_skip=\"\"; continue; fi\n      case \"$_cc_a\" in\n        --signal) _cc_skip=1 ;;\n        --signal=*|-e|--echo) ;;\n        -[0-9]*) ;;\n        -[PUGOF]?*) _cc_probe+=(\"$_cc_a\") ;;\n        -[ABCDEFGHIJKLMNOPQRSTUVWXYZ][ABCDEFGHIJKLMNOPQRSTUVWXYZ0-9]*) ;;\n        *) _cc_probe+=(\"$_cc_a\") ;;\n      esac\n    done\n    if command pgrep ${_cc_probe[@]+\"${_cc_probe[@]}\"} 2>/dev/null | command grep -qx \"${CLAUDE_PID}\"; then\n      printf 'pkill: refusing to run — this pattern matches the Claude CLI process (PID %s). Narrow the pattern, or target your own children with `pkill -P $$ ...`.\\n' \"${CLAUDE_PID}\" >&2\n      return 1\n    fi\n  fi\n  command pkill ${1+\"$@\"}\n}\nexport PATH=<path>\nCLAUDE_CODE_END_<id>\n  \n\n      # Exit silently on success, only report errors\n      if [ ! -f \"$SNAPSHOT_FILE\" ]; then\n        echo \"Error: Snapshot file was not created at $SNAPSHOT_FILE\" >&2\n        exit 1\n      fi\n    ",
+      "category": "filesystem",
+      "op": "changed",
+      "path": [
+        "filesystem",
+        "darwin/arm64",
+        "exec",
+        "/bin/zsh -c -l SNAPSHOT_FILE=<claude-config>/shell-snapshots/snapshot-zsh-<n>-<id>.sh\n      \n      # No user config file to source\n      \n\n      # First, create/clear the snapshot file\n      echo \"# Snapshot file\" >| \"$SNAPSHOT_FILE\"\n\n      # When this file is sourced, we first unalias to avoid conflicts\n      # This is necessary because aliases get \"frozen\" inside function definitions at definition time,\n      # which can cause unexpected behavior when functions use commands that conflict with aliases\n      echo \"# Unset all aliases to avoid conflicts with functions\" >> \"$SNAPSHOT_FILE\"\n      echo \"unalias -a 2>/dev/null || true\" >> \"$SNAPSHOT_FILE\"\n\n      \n\n      \n      cat >> \"$SNAPSHOT_FILE\" << 'CLAUDE_CODE_END_<id>'\n# Check for rg availability\nif ! hash rg 2>/dev/null && ! typeset -f rg >/dev/null 2>&1; then\n  function rg {\n  if [[ -x <install>/claude ]]; then\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=rg <install>/claude ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=rg <install>/claude ${1+\"$@\"}\n  else\n    (exec -a rg <install>/claude ${1+\"$@\"})\n  fi\n  elif [[ -x <home>/.local/bin/claude ]]; then\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=rg <home>/.local/bin/claude ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=rg <home>/.local/bin/claude ${1+\"$@\"}\n  else\n    (exec -a rg <home>/.local/bin/claude ${1+\"$@\"})\n  fi\n  else command rg ${1+\"$@\"}; fi\n}\nfi\n# Shadow find/grep with embedded bfs/ugrep\nunalias find 2>/dev/null || true\nunalias grep 2>/dev/null || true\nfunction find {\n  if [[ -x <install>/claude ]]; then\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=bfs <install>/claude -S dfs -regextype findutils-default ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=bfs <install>/claude -S dfs -regextype findutils-default ${1+\"$@\"}\n  else\n    (exec -a bfs <install>/claude -S dfs -regextype findutils-default ${1+\"$@\"})\n  fi\n  elif [[ -x <home>/.local/bin/claude ]]; then\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=bfs <home>/.local/bin/claude -S dfs -regextype findutils-default ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=bfs <home>/.local/bin/claude -S dfs -regextype findutils-default ${1+\"$@\"}\n  else\n    (exec -a bfs <home>/.local/bin/claude -S dfs -regextype findutils-default ${1+\"$@\"})\n  fi\n  else command find ${1+\"$@\"}; fi\n}\nfunction grep {\n  local _cc_a\n  for _cc_a in ${1+\"$@\"}; do\n    case \"$_cc_a\" in -*-filter*|-*-pager*|-*-view*|-*-format-open*|-*-config*|---*|-@*|-*-save-config*|-[Zz]*|-[!-]*[Zz]*|--null|--null-data) command grep ${1+\"$@\"}; return ;; esac\n  done\n  if [[ -x <install>/claude ]]; then\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=ugrep <install>/claude -G --ignore-files --hidden -I --encoding=UTF-8 --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=ugrep <install>/claude -G --ignore-files --hidden -I --encoding=UTF-8 --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"}\n  else\n    (exec -a ugrep <install>/claude -G --ignore-files --hidden -I --encoding=UTF-8 --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"})\n  fi\n  elif [[ -x <home>/.local/bin/claude ]]; then\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=ugrep <home>/.local/bin/claude -G --ignore-files --hidden -I --encoding=UTF-8 --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=ugrep <home>/.local/bin/claude -G --ignore-files --hidden -I --encoding=UTF-8 --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"}\n  else\n    (exec -a ugrep <home>/.local/bin/claude -G --ignore-files --hidden -I --encoding=UTF-8 --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"})\n  fi\n  else command grep ${1+\"$@\"}; fi\n}\n# Shadow pkill to refuse patterns matching the CLI process\nunalias pkill 2>/dev/null || true\nfunction pkill {\n  if [ -n \"${CLAUDE_PID:-}\" ] && [ -r \"/proc/${CLAUDE_PID}/comm\" ]; then\n    local _cc_skip=\"\" _cc_a\n    local -a _cc_probe=()\n    for _cc_a in ${1+\"$@\"}; do\n      if [ -n \"$_cc_skip\" ]; then _cc_skip=\"\"; continue; fi\n      case \"$_cc_a\" in\n        --signal) _cc_skip=1 ;;\n        --signal=*|-e|--echo) ;;\n        -[0-9]*) ;;\n        -[PUGOF]?*) _cc_probe+=(\"$_cc_a\") ;;\n        -[ABCDEFGHIJKLMNOPQRSTUVWXYZ][ABCDEFGHIJKLMNOPQRSTUVWXYZ0-9]*) ;;\n        *) _cc_probe+=(\"$_cc_a\") ;;\n      esac\n    done\n    if command pgrep ${_cc_probe[@]+\"${_cc_probe[@]}\"} 2>/dev/null | command grep -qx \"${CLAUDE_PID}\"; then\n      printf 'pkill: refusing to run — this pattern matches the Claude CLI process (PID %s). Narrow the pattern, or target your own children with `pkill -P $$ ...`.\\n' \"${CLAUDE_PID}\" >&2\n      return 1\n    fi\n  fi\n  command pkill ${1+\"$@\"}\n}\nexport PATH=<path>\nCLAUDE_CODE_END_<id>\n  \n\n      # Exit silently on success, only report errors\n      if [ ! -f \"$SNAPSHOT_FILE\" ]; then\n        echo \"Error: Snapshot file was not created at $SNAPSHOT_FILE\" >&2\n        exit 1\n      fi\n    "
+      ],
+      "title": "Command changed: `/bin/zsh -c -l SNAPSHOT_FILE=<claude-config>/shell-snapshots/snapshot-zsh-<n>-<id>.sh …` (+6 −0 chars) (darwin/arm64)",
+      "impact": "informational",
+      "before": "/bin/zsh -c -l SNAPSHOT_FILE=<claude-config>/shell-snapshots/snapshot-zsh-<n>-<id>.sh\n      # No user config file to source\n      \n\n      # First, create/clear the snapshot file\n      echo \"# Snapshot file\" >| \"$SNAPSHOT_FILE\"\n\n      # When this file is sourced, we first unalias to avoid conflicts\n      # This is necessary because aliases get \"frozen\" inside function definitions at definition time,\n      # which can cause unexpected behavior when functions use commands that conflict with aliases\n      echo \"# Unset all aliases to avoid conflicts with functions\" >> \"$SNAPSHOT_FILE\"\n      echo \"unalias -a 2>/dev/null || true\" >> \"$SNAPSHOT_FILE\"\n\n      \n\n      \n      cat >> \"$SNAPSHOT_FILE\" << 'CLAUDE_CODE_END_<id>'\n# Check for rg availability\nif ! hash rg 2>/dev/null && ! typeset -f rg >/dev/null 2>&1; then\n  function rg {\n  if [[ -x <install>/claude ]]; then\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=rg <install>/claude ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=rg <install>/claude ${1+\"$@\"}\n  else\n    (exec -a rg <install>/claude ${1+\"$@\"})\n  fi\n  elif [[ -x <home>/.local/bin/claude ]]; then\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=rg <home>/.local/bin/claude ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=rg <home>/.local/bin/claude ${1+\"$@\"}\n  else\n    (exec -a rg <home>/.local/bin/claude ${1+\"$@\"})\n  fi\n  else command rg ${1+\"$@\"}; fi\n}\nfi\n# Shadow find/grep with embedded bfs/ugrep\nunalias find 2>/dev/null || true\nunalias grep 2>/dev/null || true\nfunction find {\n  if [[ -x <install>/claude ]]; then\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=bfs <install>/claude -S dfs -regextype findutils-default ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=bfs <install>/claude -S dfs -regextype findutils-default ${1+\"$@\"}\n  else\n    (exec -a bfs <install>/claude -S dfs -regextype findutils-default ${1+\"$@\"})\n  fi\n  elif [[ -x <home>/.local/bin/claude ]]; then\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=bfs <home>/.local/bin/claude -S dfs -regextype findutils-default ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=bfs <home>/.local/bin/claude -S dfs -regextype findutils-default ${1+\"$@\"}\n  else\n    (exec -a bfs <home>/.local/bin/claude -S dfs -regextype findutils-default ${1+\"$@\"})\n  fi\n  else command find ${1+\"$@\"}; fi\n}\nfunction grep {\n  local _cc_a\n  for _cc_a in ${1+\"$@\"}; do\n    case \"$_cc_a\" in -*-filter*|-*-pager*|-*-view*|-*-format-open*|-*-config*|---*|-@*|-*-save-config*|-[Zz]*|-[!-]*[Zz]*|--null|--null-data) command grep ${1+\"$@\"}; return ;; esac\n  done\n  if [[ -x <install>/claude ]]; then\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=ugrep <install>/claude -G --ignore-files --hidden -I --encoding=UTF-8 --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=ugrep <install>/claude -G --ignore-files --hidden -I --encoding=UTF-8 --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"}\n  else\n    (exec -a ugrep <install>/claude -G --ignore-files --hidden -I --encoding=UTF-8 --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"})\n  fi\n  elif [[ -x <home>/.local/bin/claude ]]; then\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=ugrep <home>/.local/bin/claude -G --ignore-files --hidden -I --encoding=UTF-8 --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=ugrep <home>/.local/bin/claude -G --ignore-files --hidden -I --encoding=UTF-8 --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"}\n  else\n    (exec -a ugrep <home>/.local/bin/claude -G --ignore-files --hidden -I --encoding=UTF-8 --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"})\n  fi\n  else command grep ${1+\"$@\"}; fi\n}\n# Shadow pkill to refuse patterns matching the CLI process\nunalias pkill 2>/dev/null || true\nfunction pkill {\n  if [ -n \"${CLAUDE_PID:-}\" ] && [ -r \"/proc/${CLAUDE_PID}/comm\" ]; then\n    local _cc_skip=\"\" _cc_a\n    local -a _cc_probe=()\n    for _cc_a in ${1+\"$@\"}; do\n      if [ -n \"$_cc_skip\" ]; then _cc_skip=\"\"; continue; fi\n      case \"$_cc_a\" in\n        --signal) _cc_skip=1 ;;\n        --signal=*|-e|--echo) ;;\n        -[0-9]*) ;;\n        -[PUGOF]?*) _cc_probe+=(\"$_cc_a\") ;;\n        -[ABCDEFGHIJKLMNOPQRSTUVWXYZ][ABCDEFGHIJKLMNOPQRSTUVWXYZ0-9]*) ;;\n        *) _cc_probe+=(\"$_cc_a\") ;;\n      esac\n    done\n    if command pgrep ${_cc_probe[@]+\"${_cc_probe[@]}\"} 2>/dev/null | command grep -qx \"${CLAUDE_PID}\"; then\n      printf 'pkill: refusing to run — this pattern matches the Claude CLI process (PID %s). Narrow the pattern, or target your own children with `pkill -P $$ ...`.\\n' \"${CLAUDE_PID}\" >&2\n      return 1\n    fi\n  fi\n  command pkill ${1+\"$@\"}\n}\nexport PATH=<path>\nCLAUDE_CODE_END_<id>\n  \n\n      # Exit silently on success, only report errors\n      if [ ! -f \"$SNAPSHOT_FILE\" ]; then\n        echo \"Error: Snapshot file was not created at $SNAPSHOT_FILE\" >&2\n        exit 1\n      fi\n    ",
+      "after": "/bin/zsh -c -l SNAPSHOT_FILE=<claude-config>/shell-snapshots/snapshot-zsh-<n>-<id>.sh\n      \n      # No user config file to source\n      \n\n      # First, create/clear the snapshot file\n      echo \"# Snapshot file\" >| \"$SNAPSHOT_FILE\"\n\n      # When this file is sourced, we first unalias to avoid conflicts\n      # This is necessary because aliases get \"frozen\" inside function definitions at definition time,\n      # which can cause unexpected behavior when functions use commands that conflict with aliases\n      echo \"# Unset all aliases to avoid conflicts with functions\" >> \"$SNAPSHOT_FILE\"\n      echo \"unalias -a 2>/dev/null || true\" >> \"$SNAPSHOT_FILE\"\n\n      \n\n      \n      cat >> \"$SNAPSHOT_FILE\" << 'CLAUDE_CODE_END_<id>'\n# Check for rg availability\nif ! hash rg 2>/dev/null && ! typeset -f rg >/dev/null 2>&1; then\n  function rg {\n  if [[ -x <install>/claude ]]; then\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=rg <install>/claude ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=rg <install>/claude ${1+\"$@\"}\n  else\n    (exec -a rg <install>/claude ${1+\"$@\"})\n  fi\n  elif [[ -x <home>/.local/bin/claude ]]; then\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=rg <home>/.local/bin/claude ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=rg <home>/.local/bin/claude ${1+\"$@\"}\n  else\n    (exec -a rg <home>/.local/bin/claude ${1+\"$@\"})\n  fi\n  else command rg ${1+\"$@\"}; fi\n}\nfi\n# Shadow find/grep with embedded bfs/ugrep\nunalias find 2>/dev/null || true\nunalias grep 2>/dev/null || true\nfunction find {\n  if [[ -x <install>/claude ]]; then\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=bfs <install>/claude -S dfs -regextype findutils-default ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=bfs <install>/claude -S dfs -regextype findutils-default ${1+\"$@\"}\n  else\n    (exec -a bfs <install>/claude -S dfs -regextype findutils-default ${1+\"$@\"})\n  fi\n  elif [[ -x <home>/.local/bin/claude ]]; then\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=bfs <home>/.local/bin/claude -S dfs -regextype findutils-default ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=bfs <home>/.local/bin/claude -S dfs -regextype findutils-default ${1+\"$@\"}\n  else\n    (exec -a bfs <home>/.local/bin/claude -S dfs -regextype findutils-default ${1+\"$@\"})\n  fi\n  else command find ${1+\"$@\"}; fi\n}\nfunction grep {\n  local _cc_a\n  for _cc_a in ${1+\"$@\"}; do\n    case \"$_cc_a\" in -*-filter*|-*-pager*|-*-view*|-*-format-open*|-*-config*|---*|-@*|-*-save-config*|-[Zz]*|-[!-]*[Zz]*|--null|--null-data) command grep ${1+\"$@\"}; return ;; esac\n  done\n  if [[ -x <install>/claude ]]; then\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=ugrep <install>/claude -G --ignore-files --hidden -I --encoding=UTF-8 --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=ugrep <install>/claude -G --ignore-files --hidden -I --encoding=UTF-8 --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"}\n  else\n    (exec -a ugrep <install>/claude -G --ignore-files --hidden -I --encoding=UTF-8 --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"})\n  fi\n  elif [[ -x <home>/.local/bin/claude ]]; then\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=ugrep <home>/.local/bin/claude -G --ignore-files --hidden -I --encoding=UTF-8 --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=ugrep <home>/.local/bin/claude -G --ignore-files --hidden -I --encoding=UTF-8 --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"}\n  else\n    (exec -a ugrep <home>/.local/bin/claude -G --ignore-files --hidden -I --encoding=UTF-8 --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"})\n  fi\n  else command grep ${1+\"$@\"}; fi\n}\n# Shadow pkill to refuse patterns matching the CLI process\nunalias pkill 2>/dev/null || true\nfunction pkill {\n  if [ -n \"${CLAUDE_PID:-}\" ] && [ -r \"/proc/${CLAUDE_PID}/comm\" ]; then\n    local _cc_skip=\"\" _cc_a\n    local -a _cc_probe=()\n    for _cc_a in ${1+\"$@\"}; do\n      if [ -n \"$_cc_skip\" ]; then _cc_skip=\"\"; continue; fi\n      case \"$_cc_a\" in\n        --signal) _cc_skip=1 ;;\n        --signal=*|-e|--echo) ;;\n        -[0-9]*) ;;\n        -[PUGOF]?*) _cc_probe+=(\"$_cc_a\") ;;\n        -[ABCDEFGHIJKLMNOPQRSTUVWXYZ][ABCDEFGHIJKLMNOPQRSTUVWXYZ0-9]*) ;;\n        *) _cc_probe+=(\"$_cc_a\") ;;\n      esac\n    done\n    if command pgrep ${_cc_probe[@]+\"${_cc_probe[@]}\"} 2>/dev/null | command grep -qx \"${CLAUDE_PID}\"; then\n      printf 'pkill: refusing to run — this pattern matches the Claude CLI process (PID %s). Narrow the pattern, or target your own children with `pkill -P $$ ...`.\\n' \"${CLAUDE_PID}\" >&2\n      return 1\n    fi\n  fi\n  command pkill ${1+\"$@\"}\n}\nexport PATH=<path>\nCLAUDE_CODE_END_<id>\n  \n\n      # Exit silently on success, only report errors\n      if [ ! -f \"$SNAPSHOT_FILE\" ]; then\n        echo \"Error: Snapshot file was not created at $SNAPSHOT_FILE\" >&2\n        exit 1\n      fi\n    ",
+      "text_diff": "@@ -1,6 +1,7 @@\n /bin/zsh\n -c\n -l SNAPSHOT_FILE=<claude-config>/shell-snapshots/snapshot-zsh-<n>-<id>.sh\n+      \n       # No user config file to source\n       \n \n",
+      "stats": {
+        "added_chars": 6,
+        "removed_chars": 0
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<claude-config>/debug",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<claude-config>/debug"
+      ],
+      "title": "Now looks for <claude-config>/debug (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "ops": [
+          "probe"
+        ],
+        "phases": [
+          "startup"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<claude-config>/plugins/data/cc-plugin-claude-test-builtin",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<claude-config>/plugins/data/cc-plugin-claude-test-builtin"
+      ],
+      "title": "Now looks for <claude-config>/plugins/data/cc-plugin-claude-test-builtin (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "ops": [
+          "probe"
+        ],
+        "phases": [
+          "startup"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<claude-config>/plugins/data/claude-test-builtin",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<claude-config>/plugins/data/claude-test-builtin"
+      ],
+      "title": "Now looks for <claude-config>/plugins/data/claude-test-builtin (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "ops": [
+          "probe"
+        ],
+        "phases": [
+          "startup"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "filesystem.linux/amd64.exec./usr/bin/git -c core.askPass= -c protocol.ext.allow=never -c core.alternateRefsCommand=f() { git --git-dir=\"$1\" for-each-ref --format='%(objectname)'; }; f -c submodule.recurse=false -c log.showSignature=false -c format.pretty=medium -c gc.auto=0 -c maintenance.auto=false -c diff.autoRefreshIndex=false -c hook.applypatch-msg.enabled=false -c hook.pre-applypatch.enabled=false -c hook.post-applypatch.enabled=false -c hook.pre-commit.enabled=false -c hook.pre-merge-commit.enabled=false -c hook.prepare-commit-msg.enabled=false -c hook.commit-msg.enabled=false -c hook.post-commit.enabled=false -c hook.pre-rebase.enabled=false -c hook.post-checkout.enabled=false -c hook.post-merge.enabled=false -c hook.pre-push.enabled=false -c hook.pre-receive.enabled=false -c hook.update.enabled=false -c hook.proc-receive.enabled=false -c hook.post-receive.enabled=false -c hook.post-update.enabled=false -c hook.reference-transaction.enabled=false -c hook.push-to-checkout.enabled=false -c hook.pre-auto-gc.enabled=false -c hook.post-rewrite.enabled=false -c hook.sendemail-validate.enabled=false -c hook.fsmonitor-watchman.enabled=false -c hook.p4-changelist.enabled=false -c hook.p4-prepare-changelist.enabled=false -c hook.p4-post-changelist.enabled=false -c hook.p4-pre-submit.enabled=false -c hook.post-index-change.enabled=false -c core.hooksPath=/dev/null -c core.fsmonitor= remote get-url origin.phases.turn",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "exec",
+        "/usr/bin/git -c core.askPass= -c protocol.ext.allow=never -c core.alternateRefsCommand=f() { git --git-dir=\"$1\" for-each-ref --format='%(objectname)'; }; f -c submodule.recurse=false -c log.showSignature=false -c format.pretty=medium -c gc.auto=0 -c maintenance.auto=false -c diff.autoRefreshIndex=false -c hook.applypatch-msg.enabled=false -c hook.pre-applypatch.enabled=false -c hook.post-applypatch.enabled=false -c hook.pre-commit.enabled=false -c hook.pre-merge-commit.enabled=false -c hook.prepare-commit-msg.enabled=false -c hook.commit-msg.enabled=false -c hook.post-commit.enabled=false -c hook.pre-rebase.enabled=false -c hook.post-checkout.enabled=false -c hook.post-merge.enabled=false -c hook.pre-push.enabled=false -c hook.pre-receive.enabled=false -c hook.update.enabled=false -c hook.proc-receive.enabled=false -c hook.post-receive.enabled=false -c hook.post-update.enabled=false -c hook.reference-transaction.enabled=false -c hook.push-to-checkout.enabled=false -c hook.pre-auto-gc.enabled=false -c hook.post-rewrite.enabled=false -c hook.sendemail-validate.enabled=false -c hook.fsmonitor-watchman.enabled=false -c hook.p4-changelist.enabled=false -c hook.p4-prepare-changelist.enabled=false -c hook.p4-post-changelist.enabled=false -c hook.p4-pre-submit.enabled=false -c hook.post-index-change.enabled=false -c core.hooksPath=/dev/null -c core.fsmonitor= remote get-url origin",
+        "phases",
+        "turn"
+      ],
+      "title": "`/usr/bin/git -c core.askPass= -c protocol.ext.allow=never -c core.alternateRefsCommand=f() { git --g …` now also runs at turn (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": "turn",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "filesystem.linux/amd64.exec./usr/bin/git -c core.askPass= -c protocol.ext.allow=never -c core.alternateRefsCommand=f() { git --git-dir=\"$1\" for-each-ref --format='%(objectname)'; }; f -c submodule.recurse=false -c log.showSignature=false -c format.pretty=medium -c gc.auto=0 -c maintenance.auto=false -c diff.autoRefreshIndex=false -c hook.applypatch-msg.enabled=false -c hook.pre-applypatch.enabled=false -c hook.post-applypatch.enabled=false -c hook.pre-commit.enabled=false -c hook.pre-merge-commit.enabled=false -c hook.prepare-commit-msg.enabled=false -c hook.commit-msg.enabled=false -c hook.post-commit.enabled=false -c hook.pre-rebase.enabled=false -c hook.post-checkout.enabled=false -c hook.post-merge.enabled=false -c hook.pre-push.enabled=false -c hook.pre-receive.enabled=false -c hook.update.enabled=false -c hook.proc-receive.enabled=false -c hook.post-receive.enabled=false -c hook.post-update.enabled=false -c hook.reference-transaction.enabled=false -c hook.push-to-checkout.enabled=false -c hook.pre-auto-gc.enabled=false -c hook.post-rewrite.enabled=false -c hook.sendemail-validate.enabled=false -c hook.fsmonitor-watchman.enabled=false -c hook.p4-changelist.enabled=false -c hook.p4-prepare-changelist.enabled=false -c hook.p4-post-changelist.enabled=false -c hook.p4-pre-submit.enabled=false -c hook.post-index-change.enabled=false -c core.hooksPath=/dev/null -c core.fsmonitor= remote get-url origin.phases.startup",
+      "category": "filesystem",
+      "op": "removed",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "exec",
+        "/usr/bin/git -c core.askPass= -c protocol.ext.allow=never -c core.alternateRefsCommand=f() { git --git-dir=\"$1\" for-each-ref --format='%(objectname)'; }; f -c submodule.recurse=false -c log.showSignature=false -c format.pretty=medium -c gc.auto=0 -c maintenance.auto=false -c diff.autoRefreshIndex=false -c hook.applypatch-msg.enabled=false -c hook.pre-applypatch.enabled=false -c hook.post-applypatch.enabled=false -c hook.pre-commit.enabled=false -c hook.pre-merge-commit.enabled=false -c hook.prepare-commit-msg.enabled=false -c hook.commit-msg.enabled=false -c hook.post-commit.enabled=false -c hook.pre-rebase.enabled=false -c hook.post-checkout.enabled=false -c hook.post-merge.enabled=false -c hook.pre-push.enabled=false -c hook.pre-receive.enabled=false -c hook.update.enabled=false -c hook.proc-receive.enabled=false -c hook.post-receive.enabled=false -c hook.post-update.enabled=false -c hook.reference-transaction.enabled=false -c hook.push-to-checkout.enabled=false -c hook.pre-auto-gc.enabled=false -c hook.post-rewrite.enabled=false -c hook.sendemail-validate.enabled=false -c hook.fsmonitor-watchman.enabled=false -c hook.p4-changelist.enabled=false -c hook.p4-prepare-changelist.enabled=false -c hook.p4-post-changelist.enabled=false -c hook.p4-pre-submit.enabled=false -c hook.post-index-change.enabled=false -c core.hooksPath=/dev/null -c core.fsmonitor= remote get-url origin",
+        "phases",
+        "startup"
+      ],
+      "title": "`/usr/bin/git -c core.askPass= -c protocol.ext.allow=never -c core.alternateRefsCommand=f() { git --g …` no longer runs at startup (linux/amd64)",
+      "impact": "informational",
+      "before": "startup",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "filesystem.linux/amd64.exec./bin/bash -c -l SNAPSHOT_FILE=<claude-config>/shell-snapshots/snapshot-bash-<n>-<id>.sh\n      \n      # No user config file to source\n      \n\n      # First, create/clear the snapshot file\n      echo \"# Snapshot file\" >| \"$SNAPSHOT_FILE\"\n\n      # When this file is sourced, we first unalias to avoid conflicts\n      # This is necessary because aliases get \"frozen\" inside function definitions at definition time,\n…",
+      "category": "filesystem",
+      "op": "changed",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "exec",
+        "/bin/bash -c -l SNAPSHOT_FILE=<claude-config>/shell-snapshots/snapshot-bash-<n>-<id>.sh\n      \n      # No user config file to source\n      \n\n      # First, create/clear the snapshot file\n      echo \"# Snapshot file\" >| \"$SNAPSHOT_FILE\"\n\n      # When this file is sourced, we first unalias to avoid conflicts\n      # This is necessary because aliases get \"frozen\" inside function definitions at definition time,\n…"
+      ],
+      "title": "Command changed: `/bin/bash -c -l SNAPSHOT_FILE=<claude-config>/shell-snapshots/snapshot-bash-<n>-<id>.sh …` (+6 −0 chars) (linux/amd64)",
+      "impact": "informational",
+      "before": "/bin/bash -c -l SNAPSHOT_FILE=<claude-config>/shell-snapshots/snapshot-bash-<n>-<id>.sh\n      # No user config file to source\n      \n\n      # First, create/clear the snapshot file\n      echo \"# Snapshot file\" >| \"$SNAPSHOT_FILE\"\n\n      # When this file is sourced, we first unalias to avoid conflicts\n      # This is necessary because aliases get \"frozen\" inside function definitions at definition time,\n…",
+      "after": "/bin/bash -c -l SNAPSHOT_FILE=<claude-config>/shell-snapshots/snapshot-bash-<n>-<id>.sh\n      \n      # No user config file to source\n      \n\n      # First, create/clear the snapshot file\n      echo \"# Snapshot file\" >| \"$SNAPSHOT_FILE\"\n\n      # When this file is sourced, we first unalias to avoid conflicts\n      # This is necessary because aliases get \"frozen\" inside function definitions at definition time,\n…",
+      "text_diff": "@@ -1,6 +1,7 @@\n /bin/bash\n -c\n -l SNAPSHOT_FILE=<claude-config>/shell-snapshots/snapshot-bash-<n>-<id>.sh\n+      \n       # No user config file to source\n       \n \n",
+      "stats": {
+        "added_chars": 6,
+        "removed_chars": 0
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    }
+  ]
+}
