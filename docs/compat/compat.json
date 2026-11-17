@@ -73,7 +73,7 @@
       "label": "The machine's heartbeat reaches the project's ingest"
     }
   ],
-  "generated_at": "2026-11-17T22:53:15Z",
+  "generated_at": "2026-11-17T23:02:22Z",
   "harnesses": [
     {
       "ID": "claude",
@@ -9729,7 +9729,7 @@
       "platform": "darwin/arm64",
       "capability": "relay.content_allowed",
       "result": "pass",
-      "last_run": "2026-11-17T16:45:41.351515Z",
+      "last_run": "2026-11-17T23:00:22.973282Z",
       "first_passed": "2026-11-17T16:45:41.351515Z",
       "terma": "terma version dev",
       "test": "TestRelayCopilot/v1.0.113/content"
@@ -9740,7 +9740,7 @@
       "platform": "darwin/arm64",
       "capability": "relay.content_withheld",
       "result": "pass",
-      "last_run": "2026-11-17T16:46:07.857718Z",
+      "last_run": "2026-11-17T23:00:55.294318Z",
       "first_passed": "2026-11-17T16:46:07.857718Z",
       "terma": "terma version dev",
       "test": "TestRelayCopilot/v1.0.113/withheld"
@@ -9751,7 +9751,7 @@
       "platform": "darwin/arm64",
       "capability": "relay.only_opted_in",
       "result": "pass",
-      "last_run": "2026-11-17T16:46:24.803592Z",
+      "last_run": "2026-11-17T23:01:12.093818Z",
       "first_passed": "2026-11-17T16:46:24.803592Z",
       "terma": "terma version dev",
       "test": "TestRelayCopilotOutsideARepository/v1.0.113"
@@ -9762,7 +9762,7 @@
       "platform": "darwin/arm64",
       "capability": "relay.telemetry",
       "result": "pass",
-      "last_run": "2026-11-17T16:46:07.85849Z",
+      "last_run": "2026-11-17T23:00:55.294581Z",
       "first_passed": "2026-11-17T16:46:07.85849Z",
       "terma": "terma version dev",
       "test": "TestRelayCopilot/v1.0.113"
@@ -9773,7 +9773,7 @@
       "platform": "darwin/arm64",
       "capability": "relay.tools_no_token",
       "result": "pass",
-      "last_run": "2026-11-17T16:46:36.212Z",
+      "last_run": "2026-11-17T23:01:29.215128Z",
       "first_passed": "2026-11-17T16:46:36.212Z",
       "terma": "terma version dev",
       "test": "TestRelayCopilotToolsGetNoExporter/v1.0.113"
