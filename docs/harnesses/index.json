@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-17T01:58:38.572849875Z",
+  "generated_at": "2026-11-17T07:32:44.935765621Z",
   "harnesses": [
     {
       "id": "claude",
@@ -236,17 +236,20 @@
         "language": "typescript"
       },
       "changelog": "https://github.com/anomalyco/opencode/releases",
-      "latest": "1.19.5",
+      "latest": "1.19.6",
       "support": "supported",
-      "versions_tracked": 8,
+      "versions_tracked": 9,
       "first_tracked": "2026-09-30",
       "last_change": {
-        "from": "1.19.4",
-        "to": "1.19.5",
-        "at": "2026-11-13T05:13:29.306022914Z",
-        "released_at": "2026-10-28T06:17:11.1Z",
-        "changes": 0,
-        "categories": {}
+        "from": "1.19.5",
+        "to": "1.19.6",
+        "at": "2026-11-17T07:32:44.935765621Z",
+        "released_at": "2026-11-17T07:22:20.263Z",
+        "changes": 4,
+        "categories": {
+          "cli": 3,
+          "prompt": 1
+        }
       }
     },
     {

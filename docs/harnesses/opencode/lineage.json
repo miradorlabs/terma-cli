@@ -3,8 +3,8 @@
   "harness": "opencode",
   "window": {
     "oldest": "1.18.34",
-    "newest": "1.19.5",
-    "builds": 8
+    "newest": "1.19.6",
+    "builds": 9
   },
   "items": {
     "cli.commands.opencode acp": {

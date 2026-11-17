@@ -29,6 +29,10 @@
     "1.19.5": {
       "url": "https://github.com/anomalyco/opencode/releases/tag/v1.19.5",
       "text": "## Core\r\n\r\n### Bugfixes\r\n- Failed TUI worker requests now return an error instead of leaving the caller hanging. (@Nowaker)\r\n\r\n**Thank you to 1 community contributor:**\r\n- @Nowaker:\r\n  - fix(opencode): answer a failed TUI worker request instead of hanging (#54936)"
+    },
+    "1.19.6": {
+      "url": "https://github.com/anomalyco/opencode/releases/tag/v1.19.6",
+      "text": "## Desktop\n\n### Improvements\n- OpenCode 1 now offers the upgrade to OpenCode 2.0. OpenCode 2 downloads in the background and installs only when you choose: Restart to upgrade, Upgrade on quit, or Later. Your sessions, projects, and settings are kept. Plugins made for OpenCode 1 need an update.\n\n## Core\n\n### Bugfixes\n- Sessions with many images no longer send oversized requests. When the images in a session's history pass 25 MiB, the oldest are replaced with a placeholder.\n- A provider error for a request body that is too large now starts compaction and a retry instead of failing the turn."
     }
   }
 }

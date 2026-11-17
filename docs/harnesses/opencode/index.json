@@ -11,20 +11,54 @@
       "language": "typescript"
     },
     "changelog": "https://github.com/anomalyco/opencode/releases",
-    "latest": "1.19.5",
+    "latest": "1.19.6",
     "support": "supported",
-    "versions_tracked": 8,
+    "versions_tracked": 9,
     "first_tracked": "2026-09-30",
     "last_change": {
-      "from": "1.19.4",
-      "to": "1.19.5",
-      "at": "2026-11-13T05:13:29.306022914Z",
-      "released_at": "2026-10-28T06:17:11.1Z",
-      "changes": 0,
-      "categories": {}
+      "from": "1.19.5",
+      "to": "1.19.6",
+      "at": "2026-11-17T07:32:44.935765621Z",
+      "released_at": "2026-11-17T07:22:20.263Z",
+      "changes": 4,
+      "categories": {
+        "cli": 3,
+        "prompt": 1
+      }
     }
   },
   "versions": [
+    {
+      "version": "1.19.6",
+      "released_at": "2026-11-17T07:22:20.263Z",
+      "captured_at": "2026-11-17T07:32:44.935765621Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "1.19.5",
+      "changes": 4,
+      "categories": {
+        "cli": 3,
+        "prompt": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 2,
+        "notable": 2
+      },
+      "undocumented": 4,
+      "highlights": [
+        "System prompt changed (+31 −31 chars)",
+        "Default of `opencode acp --cwd`: <tmp> ressv1.19.52028492095/010 → <tmp> ressv1.19.63172274372/006",
+        "Full help text of `acp --help` changed (+100 −100 chars)"
+      ],
+      "signing": null,
+      "partial": true,
+      "attempted_at": "2026-11-17T07:32:44.935765621Z",
+      "attempts": 1
+    },
     {
       "version": "1.19.5",
       "released_at": "2026-10-28T06:17:11.1Z",

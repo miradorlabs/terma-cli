@@ -3,6 +3,44 @@
   "harness": "opencode",
   "steps": [
     {
+      "version": "1.19.6",
+      "previous": "1.19.5",
+      "changes": [
+        {
+          "id": "prompt.system.0.text",
+          "category": "prompt",
+          "op": "changed",
+          "title": "System prompt changed (+31 −31 chars)",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "cli.commands.opencode acp.options.--cwd.default",
+          "category": "cli",
+          "op": "changed",
+          "title": "Default of `opencode acp --cwd`: <tmp> ressv1.19.52028492095/010 → <tmp> ressv1.19.63172274372/006",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "cli.help.acp --help",
+          "category": "cli",
+          "op": "changed",
+          "title": "Full help text of `acp --help` changed (+100 −100 chars)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "cli.help.acp -h",
+          "category": "cli",
+          "op": "changed",
+          "title": "Full help text of `acp -h` changed (+100 −100 chars)",
+          "impact": "informational",
+          "documented": false
+        }
+      ]
+    },
+    {
       "version": "1.19.5",
       "previous": "1.19.4",
       "changes": []

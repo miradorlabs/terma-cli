@@ -1,0 +1,132 @@
+{
+  "schema_version": 1,
+  "harness": "opencode",
+  "from": "1.19.5",
+  "to": "1.19.6",
+  "generated_at": "2026-11-17T07:32:44.935765621Z",
+  "source": {
+    "compare": "https://github.com/anomalyco/opencode/compare/v1.19.5...v1.19.6"
+  },
+  "changelog": {
+    "url": "https://github.com/anomalyco/opencode/releases/tag/v1.19.6",
+    "text": "## Desktop\n\n### Improvements\n- OpenCode 1 now offers the upgrade to OpenCode 2.0. OpenCode 2 downloads in the background and installs only when you choose: Restart to upgrade, Upgrade on quit, or Later. Your sessions, projects, and settings are kept. Plugins made for OpenCode 1 need an update.\n\n## Core\n\n### Bugfixes\n- Sessions with many images no longer send oversized requests. When the images in a session's history pass 25 MiB, the oldest are replaced with a placeholder.\n- A provider error for a request body that is too large now starts compaction and a retry instead of failing the turn."
+  },
+  "summary": {
+    "changes": 4,
+    "categories": {
+      "cli": 3,
+      "prompt": 1
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 2,
+      "notable": 2
+    },
+    "undocumented": 4
+  },
+  "changes": [
+    {
+      "id": "prompt.system.0.text",
+      "category": "prompt",
+      "op": "changed",
+      "path": [
+        "prompt",
+        "system",
+        "0",
+        "text"
+      ],
+      "title": "System prompt changed (+31 −31 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -117,7 +117,7 @@\n   Workspace root folder: <repo>\n   Is directory a git repo: yes\n   Platform: darwin\n-  Today's date: Fri Nov 13 2026\n+  Today's date: Tue Nov 17 2026\n </env>\n Skills provide specialized instructions and workflows for specific tasks.\n Use the skill tool to load a skill when a task matches its description.\n",
+      "stats": {
+        "added_chars": 31,
+        "removed_chars": 31
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "cli.commands.opencode acp.options.--cwd.default",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "opencode acp",
+        "options",
+        "--cwd",
+        "default"
+      ],
+      "title": "Default of `opencode acp --cwd`: <tmp> ressv1.19.52028492095/010 → <tmp> ressv1.19.63172274372/006",
+      "impact": "notable",
+      "before": "<tmp> ressv1.19.52028492095/010",
+      "after": "<tmp> ressv1.19.63172274372/006",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/opencode/src/cli/cmd/acp.ts",
+            "line": 10,
+            "url": "https://github.com/anomalyco/opencode/blob/v1.19.6/packages/opencode/src/cli/cmd/acp.ts#L10"
+          },
+          {
+            "path": "packages/opencode/src/cli/cmd/acp.ts",
+            "line": 23,
+            "url": "https://github.com/anomalyco/opencode/blob/v1.19.6/packages/opencode/src/cli/cmd/acp.ts#L23"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "cli.help.acp --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "acp --help"
+      ],
+      "title": "Full help text of `acp --help` changed (+100 −100 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -17,4 +17,4 @@\n       --cors         additional domains to allow for CORS                      [array] [default: []]\n       --cwd          working directory\n   [string] [default: \"<tmp>\n-                                                                         ressv1.19.52028492095/010\"]\n+                                                                         ressv1.19.63172274372/006\"]\n",
+      "stats": {
+        "added_chars": 100,
+        "removed_chars": 100
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "cli.help.acp -h",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "acp -h"
+      ],
+      "title": "Full help text of `acp -h` changed (+100 −100 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -17,4 +17,4 @@\n       --cors         additional domains to allow for CORS                      [array] [default: []]\n       --cwd          working directory\n   [string] [default: \"<tmp>\n-                                                                         ressv1.19.52028492095/014\"]\n+                                                                         ressv1.19.63172274372/013\"]\n",
+      "stats": {
+        "added_chars": 100,
+        "removed_chars": 100
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    }
+  ]
+}

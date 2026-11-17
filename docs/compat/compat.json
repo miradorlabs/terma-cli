@@ -73,7 +73,7 @@
       "label": "The machine's heartbeat reaches the project's ingest"
     }
   ],
-  "generated_at": "2026-11-17T01:58:37Z",
+  "generated_at": "2026-11-17T07:32:43Z",
   "harnesses": [
     {
       "ID": "claude",
@@ -10481,6 +10481,61 @@
       "first_passed": "2026-10-29T04:42:48.496682Z",
       "terma": "terma version dev",
       "test": "TestRelayOpenCode/v1.19.5"
+    },
+    {
+      "harness": "opencode",
+      "version": "1.19.6",
+      "platform": "darwin/arm64",
+      "capability": "relay.content_allowed",
+      "result": "pass",
+      "last_run": "2026-11-17T07:30:09.057801Z",
+      "first_passed": "2026-11-17T07:30:09.057801Z",
+      "terma": "terma version dev",
+      "test": "TestRelayOpenCode/v1.19.6/content"
+    },
+    {
+      "harness": "opencode",
+      "version": "1.19.6",
+      "platform": "darwin/arm64",
+      "capability": "relay.content_withheld",
+      "result": "pass",
+      "last_run": "2026-11-17T07:30:23.452726Z",
+      "first_passed": "2026-11-17T07:30:23.452726Z",
+      "terma": "terma version dev",
+      "test": "TestRelayOpenCode/v1.19.6/withheld"
+    },
+    {
+      "harness": "opencode",
+      "version": "1.19.6",
+      "platform": "darwin/arm64",
+      "capability": "relay.equivalent",
+      "result": "pass",
+      "last_run": "2026-11-17T07:31:51.742157Z",
+      "first_passed": "2026-11-17T07:31:51.742157Z",
+      "terma": "terma version dev",
+      "test": "TestRelayWorkloadsOpenCode/v1.19.6"
+    },
+    {
+      "harness": "opencode",
+      "version": "1.19.6",
+      "platform": "darwin/arm64",
+      "capability": "relay.only_opted_in",
+      "result": "pass",
+      "last_run": "2026-11-17T07:30:44.704703Z",
+      "first_passed": "2026-11-17T07:30:44.704703Z",
+      "terma": "terma version dev",
+      "test": "TestRelayOpenCodeNegative/v1.19.6"
+    },
+    {
+      "harness": "opencode",
+      "version": "1.19.6",
+      "platform": "darwin/arm64",
+      "capability": "relay.telemetry",
+      "result": "pass",
+      "last_run": "2026-11-17T07:30:23.453066Z",
+      "first_passed": "2026-11-17T07:30:23.453066Z",
+      "terma": "terma version dev",
+      "test": "TestRelayOpenCode/v1.19.6"
     },
     {
       "harness": "pi",

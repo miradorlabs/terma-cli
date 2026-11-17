@@ -1,7 +1,40 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-17T01:58:38.572849875Z",
+  "generated_at": "2026-11-17T07:32:44.935765621Z",
   "versions": [
+    {
+      "harness": "opencode",
+      "name": "OpenCode",
+      "version": "1.19.6",
+      "released_at": "2026-11-17T07:22:20.263Z",
+      "captured_at": "2026-11-17T07:32:44.935765621Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "1.19.5",
+      "changes": 4,
+      "categories": {
+        "cli": 3,
+        "prompt": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 2,
+        "notable": 2
+      },
+      "undocumented": 4,
+      "highlights": [
+        "System prompt changed (+31 −31 chars)",
+        "Default of `opencode acp --cwd`: <tmp> ressv1.19.52028492095/010 → <tmp> ressv1.19.63172274372/006",
+        "Full help text of `acp --help` changed (+100 −100 chars)"
+      ],
+      "signing": null,
+      "partial": true,
+      "attempted_at": "2026-11-17T07:32:44.935765621Z",
+      "attempts": 1
+    },
     {
       "harness": "t3",
       "name": "T3 Code",
@@ -6157,40 +6190,6 @@
         "Default model: gpt-5.5 → gpt-5.6-sol",
         "Model parameter parallel_tool_calls: true → false",
         "Model parameter reasoning.context: none → all_turns"
-      ],
-      "signing": "valid"
-    },
-    {
-      "harness": "codex",
-      "name": "Codex CLI",
-      "version": "0.143.0",
-      "released_at": "2026-07-08T01:34:38.318Z",
-      "captured_at": "2026-11-05T09:54:28.532441Z",
-      "platforms": [
-        "darwin/arm64",
-        "linux/amd64"
-      ],
-      "support": "untested",
-      "previous": "0.142.5",
-      "changes": 44,
-      "categories": {
-        "behavior": 2,
-        "binary": 2,
-        "cli": 19,
-        "config": 13,
-        "filesystem": 8
-      },
-      "impact": {
-        "breaking": 0,
-        "degrading": 0,
-        "informational": 36,
-        "notable": 8
-      },
-      "undocumented": 21,
-      "highlights": [
-        "Behaviour: compaction added",
-        "Behaviour: tool_output added",
-        "Flag removed: `codex sandbox --permissions-profile`"
       ],
       "signing": "valid"
     }
