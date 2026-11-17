@@ -92,3 +92,31 @@ func TestStopSpoolsNoSkillWhileThePolicyWithholds(t *testing.T) {
 		}
 	}
 }
+
+// A session that moved into a collected checkout reports only what it used there: a skill
+// it used, and the listing it was given, where the team does not collect stay on the machine.
+func TestStopReportsNoSkillUsedWhereTheTeamDoesNotCollect(t *testing.T) {
+	env := newFundingEnv(t)
+	other := hookruntest.InitRepo(t) // a repository the policy does not list
+	hookruntest.WriteFile(t, other, ".claude/skills/secret/SKILL.md", "---\nname: secret\ndescription: From the other checkout.\n---\n")
+	hookruntest.WriteFile(t, env.Cwd, ".claude/skills/shared/SKILL.md", "---\nname: shared\ndescription: From the file.\n---\n")
+	call := func(cwd, id, skill string) []string {
+		dir := filepath.Join(cwd, ".claude", "skills", skill)
+		return []string{
+			`{"type":"assistant","cwd":` + jsonString(cwd) + `,"message":{"content":[{"type":"tool_use","id":"` + id + `","name":"Skill","input":{"skill":"` + skill + `"}}]}}`,
+			`{"type":"user","isMeta":true,"cwd":` + jsonString(cwd) + `,"sourceToolUseID":"` + id + `","message":{"content":[{"type":"text","text":` + jsonString(claudeSkillBaseDir+dir+"\n\n"+skillBody) + `}]}}`,
+		}
+	}
+	lines := []string{`{"type":"attachment","cwd":` + jsonString(other) + `,"attachment":{"type":"skill_listing","content":"- secret: Private to the other checkout.\n- shared: Listed in the other checkout.","names":["secret","shared"]}}`}
+	lines = append(lines, call(other, "toolu_1", "secret")...)
+	lines = append(lines, call(env.Cwd, "toolu_2", "shared")...)
+	stopClaude(t, env, transcript(t, t.TempDir(), lines...))
+	events := hookruntest.Named(hookruntest.Spooled(t, env.Spool), semconv.TermaSkillDefinitionEvent)
+	if len(events) != 1 || events[0].Attrs[semconv.TermaSkillNameKey] != "shared" || events[0].Attrs[semconv.TermaSkillDescriptionKey] != "From the file." ||
+		events[0].Attrs[semconv.TermaSkillOriginKey] != semconv.TermaSkillOriginRepository {
+		t.Fatalf("spooled %+v", events)
+	}
+	if strings.Contains(fmt.Sprint(events), "other checkout") {
+		t.Errorf("what the session did where the team does not collect left: %+v", events)
+	}
+}

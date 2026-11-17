@@ -40,9 +40,9 @@ var skillRecordMarks = [][]byte{
 }
 
 // readRolloutSkills emits the path of each $name skill the rollout records from the cursor
-// on, in turns the team collects, reading at most 1 MiB and 128 skills per call; the caller
-// spools each before persisting the cursor.
-func readRolloutSkills(ctx context.Context, sessionID, transcript string, cursor skillCursor, admits func(cwd string) bool, emit func(path string) error) (skillCursor, string, error) {
+// on, in turns the team collects, with the directory its turn ran in, reading at most 1 MiB
+// and 128 skills per call; the caller spools each before persisting the cursor.
+func readRolloutSkills(ctx context.Context, sessionID, transcript string, cursor skillCursor, admits func(cwd string) bool, emit func(path, cwd string) error) (skillCursor, string, error) {
 	f, status := openCodexRollout(ctx, sessionID, transcript)
 	if f == nil {
 		return cursor, status, nil
@@ -103,7 +103,7 @@ func readRolloutSkills(ctx context.Context, sessionID, transcript string, cursor
 		if cursor.Skipping {
 			cursor.Skipping = false
 		} else if path, ok := codexSkillPathFrom(line, &cursor, admits); ok && cursor.Admitted {
-			if err := emit(path); err != nil {
+			if err := emit(path, cursor.Cwd); err != nil {
 				return checkpoint("append_failed", err)
 			}
 			emitted++

@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/miradorlabs/terma-cli/internal/gitx"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
 	"github.com/miradorlabs/terma-cli/internal/session"
@@ -74,10 +75,24 @@ func captureCodexSkillMentions(ctx context.Context, e hookrun.Env, r *hookrun.Re
 	ctx, cancel := context.WithTimeout(ctx, codexCaptureTimeout)
 	defer cancel()
 	admits := turnAdmission(ctx, e)
+	// A resumed thread's earlier turns may have run in another collected checkout: a skill is
+	// judged against the checkout its own turn ran in, where a repository's skills are found.
+	// Its definition is still placed with this hook's checkout, which the session is claimed for.
+	turnRepos := map[string]*hookrun.Repo{e.Cwd: r}
+	turnRepo := func(cwd string) *hookrun.Repo {
+		if _, seen := turnRepos[cwd]; !seen {
+			root, _, ok := gitx.LocateFS(cwd)
+			if !ok {
+				root = cwd
+			}
+			turnRepos[cwd] = &hookrun.Repo{Root: root}
+		}
+		return turnRepos[cwd]
+	}
 	for {
 		var skills []hookrun.Skill
-		next, status, err := readRolloutSkills(ctx, rollout, in.TranscriptPath, cursor, admits, func(p string) error {
-			if s, ok := codexSkill(e, r, p); ok {
+		next, status, err := readRolloutSkills(ctx, rollout, in.TranscriptPath, cursor, admits, func(p, cwd string) error {
+			if s, ok := codexSkill(e, turnRepo(cwd), p); ok {
 				skills = append(skills, s)
 			}
 			return nil
