@@ -47,8 +47,10 @@ type claudeSkillCursor struct {
 
 // claudeSkillRecord is the subset of a transcript record that says a skill was listed, called or loaded.
 type claudeSkillRecord struct {
-	Type            string `json:"type"`
-	IsMeta          bool   `json:"isMeta"`
+	Type   string `json:"type"`
+	IsMeta bool   `json:"isMeta"`
+	// Cwd is where the session ran when the record was written.
+	Cwd             string `json:"cwd"`
 	SourceToolUseID string `json:"sourceToolUseID"`
 	Attachment      struct {
 		Type    string   `json:"type"`
@@ -73,8 +75,17 @@ type claudeContentPart struct {
 
 // readClaudeSkillUses returns the skills used in the transcript's whole lines from the
 // cursor on, and the cursor after them, which also notes the listings it passed. A transcript
-// shorter than the cursor is a new file: it is read from the start.
-func readClaudeSkillUses(path string, cur claudeSkillCursor) ([]claudeSkillUse, claudeSkillCursor, error) {
+// shorter than the cursor is a new file: it is read from the start. Only a record written
+// where admits says the team collects counts, use or listing: a session that moved into a
+// collected checkout still holds what it did before, and that stays on the machine.
+//
+// Accepted risk: a Skill call read before Claude Code wrote its base-directory record is
+// reported without its directory, so without the origin, link or file's description, and
+// not again this session. It takes a hook between the two records of one turn, and the
+// transcript does not say a record is still to come: a built-in skill writes none, so
+// holding the cursor back would stall on those. Upgrade path: keep the open call ids in
+// the cursor and report a call once its record, or the turn's end, is read.
+func readClaudeSkillUses(path string, cur claudeSkillCursor, admits func(cwd string) bool) ([]claudeSkillUse, claudeSkillCursor, error) {
 	f, err := os.Open(path)
 	if errors.Is(err, os.ErrNotExist) {
 		return nil, cur, nil
@@ -110,7 +121,7 @@ func readClaudeSkillUses(path string, cur claudeSkillCursor) ([]claudeSkillUse, 
 			continue
 		}
 		var rec claudeSkillRecord
-		if json.Unmarshal(line, &rec) != nil {
+		if json.Unmarshal(line, &rec) != nil || !admits(rec.Cwd) {
 			continue
 		}
 		if rec.Type == "attachment" && rec.Attachment.Type == "skill_listing" {

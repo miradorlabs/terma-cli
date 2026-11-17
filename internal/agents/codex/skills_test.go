@@ -19,31 +19,35 @@ import (
 // literally; a search, a listing or an expanded operand reads none.
 func TestShellSkillReads(t *testing.T) {
 	t.Parallel()
+	cwd, elsewhere := t.TempDir(), t.TempDir()
+	// A Windows path goes into a POSIX command quoted, with forward slashes.
+	abs := "'" + filepath.ToSlash(elsewhere) + "'"
+	in := func(root, p string) []string { return []string{filepath.Join(root, filepath.FromSlash(p))} }
 	for _, tc := range []struct {
 		command string
 		want    []string
 	}{
-		{"cat a b/SKILL.md", []string{"/w/b/SKILL.md"}},
-		{"sed -n '1,250p' x/SKILL.md; wc -l x/SKILL.md", []string{"/w/x/SKILL.md"}},
-		{"cat x/SKILL.md && head -n 20 x/SKILL.md", []string{"/w/x/SKILL.md"}},
-		{"cat /abs/skills/y/SKILL.md", []string{"/abs/skills/y/SKILL.md"}},
-		{"cd /repo && nl -ba .agents/skills/z/SKILL.md", []string{"/repo/.agents/skills/z/SKILL.md"}},
-		{"(cd /elsewhere) && cat z/SKILL.md", []string{"/w/z/SKILL.md"}},
+		{"cat a b/SKILL.md", in(cwd, "b/SKILL.md")},
+		{"sed -n '1,250p' x/SKILL.md; wc -l x/SKILL.md", in(cwd, "x/SKILL.md")},
+		{"cat x/SKILL.md && head -n 20 x/SKILL.md", in(cwd, "x/SKILL.md")},
+		{"cat " + abs + "/skills/y/SKILL.md", in(elsewhere, "skills/y/SKILL.md")},
+		{"cd " + abs + " && nl -ba .agents/skills/z/SKILL.md", in(elsewhere, ".agents/skills/z/SKILL.md")},
+		{"(cd " + abs + ") && cat z/SKILL.md", in(cwd, "z/SKILL.md")},
 		{"cd \"$DIR\" && cat z/SKILL.md", nil},
-		{"command cat ./skills/../skills/q/SKILL.md", []string{"/w/skills/q/SKILL.md"}},
+		{"command cat ./skills/../skills/q/SKILL.md", in(cwd, "skills/q/SKILL.md")},
 		{"cat x/SKILL.md.bak x/NOTSKILL.md", nil},
 		{"sed -i 's/old/new/' x/SKILL.md", nil},
 		{"sed -Ei.bak 's/old/new/' x/SKILL.md", nil},
 		{"sed --in-place=.bak 's/old/new/' x/SKILL.md", nil},
 		{"sed -I '' 's/old/new/' x/SKILL.md", nil},
 		{"sed 's/old/new/' -i x/SKILL.md", nil},
-		{"sed -ne/skill/p x/SKILL.md", []string{"/w/x/SKILL.md"}},
-		{"sed -n -e'/description:/p' x/SKILL.md", []string{"/w/x/SKILL.md"}},
-		{"sed -n -e -i x/SKILL.md", []string{"/w/x/SKILL.md"}},
-		{"sed -n 1,20p -- x/SKILL.md", []string{"/w/x/SKILL.md"}},
+		{"sed -ne/skill/p x/SKILL.md", in(cwd, "x/SKILL.md")},
+		{"sed -n -e'/description:/p' x/SKILL.md", in(cwd, "x/SKILL.md")},
+		{"sed -n -e -i x/SKILL.md", in(cwd, "x/SKILL.md")},
+		{"sed -n 1,20p -- x/SKILL.md", in(cwd, "x/SKILL.md")},
 		{"sed -l -i '' 's/old/new/' x/SKILL.md", nil},
 		{"sed --expression s/old/new/ -i x/SKILL.md", nil},
-		{"sed -n --expression -i x/SKILL.md", []string{"/w/x/SKILL.md"}},
+		{"sed -n --expression -i x/SKILL.md", in(cwd, "x/SKILL.md")},
 		{"rg --files -g SKILL.md", nil},
 		{"find . -name SKILL.md", nil},
 		{"rg -n foo x/SKILL.md", nil},
@@ -53,7 +57,7 @@ func TestShellSkillReads(t *testing.T) {
 		{"f() { cat x/SKILL.md; }", nil},
 		{"cat 'unterminated", nil},
 	} {
-		if got := shellSkillReads(tc.command, "/w"); !slices.Equal(got, tc.want) {
+		if got := shellSkillReads(tc.command, cwd); !slices.Equal(got, tc.want) {
 			t.Errorf("%q: %v, want %v", tc.command, got, tc.want)
 		}
 	}
@@ -134,9 +138,11 @@ func TestPostToolUseReportsTheSkillsAShellCallRead(t *testing.T) {
 	hookruntest.WriteFile(t, home, "skills/.system/sys/SKILL.md", "---\nname: sys\ndescription: Built in.\n---\n")
 	hookruntest.WriteFile(t, env.Cwd, ".agents/skills/hello-codex/SKILL.md", "---\nname: hello-codex\ndescription: Repository.\n---\n")
 	hookruntest.WriteFile(t, env.Cwd, ".claude/skills/other/SKILL.md", "---\nname: other\n---\n")
-	readSkill(t, env, "sed -n '1,200p' "+filepath.Join(home, "skills", "mine", "SKILL.md"))
+	// A Windows path goes into a POSIX command quoted, with forward slashes.
+	quoted := func(elem ...string) string { return "'" + filepath.ToSlash(filepath.Join(elem...)) + "'" }
+	readSkill(t, env, "sed -n '1,200p' "+quoted(home, "skills", "mine", "SKILL.md"))
 	readSkill(t, env, "cat .agents/skills/hello-codex/SKILL.md .claude/skills/other/SKILL.md")
-	readSkill(t, env, "cat "+filepath.Join(home, "skills", ".system", "sys", "SKILL.md"))
+	readSkill(t, env, "cat "+quoted(home, "skills", ".system", "sys", "SKILL.md"))
 	readSkill(t, env, "head -n 5 .agents/skills/hello-codex/SKILL.md")
 	events := hookruntest.Named(hookruntest.Spooled(t, env.Spool), semconv.TermaSkillDefinitionEvent)
 	var got []string
@@ -216,6 +222,22 @@ func TestStopReportsTheRolloutsNamedSkills(t *testing.T) {
 	stopSkillSession(t, elsewhere, skillRollout(t, elsewhere, other))
 	if events := hookruntest.Named(hookruntest.Spooled(t, elsewhere.Spool), semconv.TermaSkillDefinitionEvent); len(events) != 0 {
 		t.Errorf("a turn the team does not collect reported %+v", events)
+	}
+}
+
+// A thread resumed in a second collected checkout still reports a $name skill of the
+// checkout its turn ran in: the skill is a repository's there, and its link names that one.
+func TestStopReportsANamedSkillOfTheCheckoutItsTurnRanIn(t *testing.T) {
+	env := codexSkillEnv(t)
+	first := env.Cwd
+	path := skillRollout(t, env, first)
+	env.Cwd = hookruntest.InitRepo(t)
+	env.Policy.Repositories = append(env.Policy.Repositories, "github.com/acme/"+filepath.Base(env.Cwd))
+	stopSkillSession(t, env, path)
+	events := hookruntest.Named(hookruntest.Spooled(t, env.Spool), semconv.TermaSkillDefinitionEvent)
+	if len(events) != 1 || events[0].Attrs[semconv.TermaSkillNameKey] != "hello-codex" || events[0].Attrs[semconv.TermaSkillOriginKey] != semconv.TermaSkillOriginRepository ||
+		events[0].Attrs[semconv.TermaSkillRepositoryURLKey] != "https://github.com/acme/"+filepath.Base(first) || events[0].Attrs[semconv.TermaSkillPathKey] != ".agents/skills/hello-codex/SKILL.md" {
+		t.Fatalf("spooled %+v", events)
 	}
 }
 

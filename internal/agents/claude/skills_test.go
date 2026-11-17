@@ -12,6 +12,9 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/semconv"
 )
 
+// everywhere admits a record wherever it was written.
+func everywhere(string) bool { return true }
+
 // skillFixture is the recorded transcript with its placeholders filled: the session's
 // repository, Claude Code's config directory and the temporary folder bundled skills unpack to.
 func skillFixture(t *testing.T, repo, claudeDir, tmp string) string {
@@ -76,7 +79,7 @@ func TestReadClaudeSkillUsesKeepsTheFirstListing(t *testing.T) {
 	for i := range lines {
 		lines[i] = listing
 	}
-	_, cur, err := readClaudeSkillUses(transcript(t, t.TempDir(), lines...), claudeSkillCursor{})
+	_, cur, err := readClaudeSkillUses(transcript(t, t.TempDir(), lines...), claudeSkillCursor{}, everywhere)
 	last := int64((len(lines) - 1) * (len(listing) + 1))
 	if err != nil || len(cur.Listings) != claudeSkillListingsKept || cur.Listings[0] != 0 || cur.Listings[len(cur.Listings)-1] != last {
 		t.Errorf("listings = %v, %v", cur.Listings, err)
@@ -111,7 +114,7 @@ func TestReadClaudeSkillUsesOnTheFixture(t *testing.T) {
 	t.Parallel()
 	repo, claudeDir, tmp := t.TempDir(), t.TempDir(), t.TempDir()
 	path := skillFixture(t, repo, claudeDir, tmp)
-	uses, cur, err := readClaudeSkillUses(path, claudeSkillCursor{})
+	uses, cur, err := readClaudeSkillUses(path, claudeSkillCursor{}, everywhere)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -142,7 +145,7 @@ func TestReadClaudeSkillUsesOnTheFixture(t *testing.T) {
 	if !listed["late"].whole() || listed["deploy"].Description != "" || !listed["capped"].Shortened || !strings.Contains(listed["claude-api"].Description, "\nSKIP only") {
 		t.Errorf("listings = %+v", listed)
 	}
-	if again, _, err := readClaudeSkillUses(path, cur); err != nil || len(again) != 0 {
+	if again, _, err := readClaudeSkillUses(path, cur, everywhere); err != nil || len(again) != 0 {
 		t.Errorf("a second read from the cursor gave %+v, %v", again, err)
 	}
 }

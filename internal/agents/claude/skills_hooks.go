@@ -1,6 +1,7 @@
 package claude
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -24,7 +25,7 @@ var (
 // the session used since the last read, when a turn stops or fails or the session ends. A
 // definition is content of both kinds, so nothing is read while the team's policy withholds
 // either.
-func captureClaudeSkills(e hookrun.Env, r *hookrun.Repo, sessionID, transcript string) {
+func captureClaudeSkills(ctx context.Context, e hookrun.Env, r *hookrun.Repo, sessionID, transcript string) {
 	if transcript == "" || e.Spool == nil || !session.ValidID(sessionID) || !e.SkillsCollected() {
 		return
 	}
@@ -44,7 +45,16 @@ func captureClaudeSkills(e hookrun.Env, r *hookrun.Repo, sessionID, transcript s
 	if readErr == nil && json.Unmarshal(b, &cur) != nil {
 		cur = claudeSkillCursor{}
 	}
-	uses, next, err := readClaudeSkillUses(transcript, cur)
+	// Each record is judged by where the session ran when it was written, once per directory.
+	judged := map[string]bool{}
+	uses, next, err := readClaudeSkillUses(transcript, cur, func(cwd string) bool {
+		ok, seen := judged[cwd]
+		if !seen {
+			ok = cwd != "" && e.Admits(ctx, cwd)
+			judged[cwd] = ok
+		}
+		return ok
+	})
 	if err != nil {
 		e.Logf("skills: %v", err)
 		return

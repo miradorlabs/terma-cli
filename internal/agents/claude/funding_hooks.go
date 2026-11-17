@@ -152,7 +152,7 @@ func stopFailure(ctx context.Context, env hookrun.Env) error {
 		markLimit(env, in.SessionID)
 	}
 	captureClaudeCallResponses(env, r, in.SessionID, in.TranscriptPath)
-	captureClaudeSkills(env, r, in.SessionID, in.TranscriptPath)
+	captureClaudeSkills(ctx, env, r, in.SessionID, in.TranscriptPath)
 	return nil
 }
 
