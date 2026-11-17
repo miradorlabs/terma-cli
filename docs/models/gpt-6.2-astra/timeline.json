@@ -3,6 +3,141 @@
   "id": "gpt-6.2-astra",
   "steps": [
     {
+      "at": "2026-11-17T18:17:00.623975271Z",
+      "event": "changed",
+      "changes": [
+        {
+          "id": "facts/default_effort",
+          "category": "facts",
+          "op": "added",
+          "path": [
+            "facts",
+            "default_effort"
+          ],
+          "title": "Default effort: now medium",
+          "impact": "notable",
+          "before": null,
+          "after": "medium",
+          "text_diff": null,
+          "terma": null,
+          "source": null,
+          "documented": null
+        },
+        {
+          "id": "facts/description",
+          "category": "facts",
+          "op": "changed",
+          "path": [
+            "facts",
+            "description"
+          ],
+          "title": "Description: A frontier reasoning model for coding and professional work. → Our most capable model for your hardest projects, from start to finish.",
+          "impact": "notable",
+          "before": "A frontier reasoning model for coding and professional work.",
+          "after": "Our most capable model for your hardest projects, from start to finish.",
+          "text_diff": null,
+          "terma": null,
+          "source": null,
+          "documented": null
+        },
+        {
+          "id": "facts/open_weights",
+          "category": "facts",
+          "op": "added",
+          "path": [
+            "facts",
+            "open_weights"
+          ],
+          "title": "Open weights: now no",
+          "impact": "notable",
+          "before": null,
+          "after": false,
+          "text_diff": null,
+          "terma": null,
+          "source": null,
+          "documented": null
+        },
+        {
+          "id": "facts/reasoning_efforts",
+          "category": "facts",
+          "op": "added",
+          "path": [
+            "facts",
+            "reasoning_efforts"
+          ],
+          "title": "Reasoning effort: now low, medium, high, xhigh, max",
+          "impact": "notable",
+          "before": null,
+          "after": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ],
+          "text_diff": null,
+          "terma": null,
+          "source": null,
+          "documented": null
+        },
+        {
+          "id": "facts/released_at",
+          "category": "facts",
+          "op": "added",
+          "path": [
+            "facts",
+            "released_at"
+          ],
+          "title": "Release date: now 2026-11-17",
+          "impact": "notable",
+          "before": null,
+          "after": "2026-11-17",
+          "text_diff": null,
+          "terma": null,
+          "source": null,
+          "documented": null
+        },
+        {
+          "id": "facts/sampling_parameters",
+          "category": "facts",
+          "op": "added",
+          "path": [
+            "facts",
+            "sampling_parameters"
+          ],
+          "title": "Sampling parameters: now no",
+          "impact": "notable",
+          "before": null,
+          "after": false,
+          "text_diff": null,
+          "terma": null,
+          "source": null,
+          "documented": null
+        },
+        {
+          "id": "docs/overview",
+          "category": "docs",
+          "op": "changed",
+          "path": [
+            "docs",
+            "overview"
+          ],
+          "title": "Model page changed (+73 −62 chars)",
+          "impact": "informational",
+          "before": null,
+          "after": null,
+          "text_diff": "@@ -2,7 +2,7 @@\n \n > For the complete documentation index, see [llms.txt](/llms.txt). Markdown versions of documentation pages are available by appending `.md` to the page URL.\n \n-> A frontier reasoning model for coding and professional work.\n+> Our most capable model for your hardest projects, from start to finish.\n \n Model ID: `gpt-6.2-astra`\n \n",
+          "stats": {
+            "added_chars": 73,
+            "removed_chars": 62
+          },
+          "terma": null,
+          "source": null,
+          "documented": null
+        }
+      ]
+    },
+    {
       "at": "2026-11-17T17:52:19.903341675Z",
       "event": "listed",
       "changes": []

@@ -1,7 +1,33 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-17T17:52:19.903341675Z",
+  "generated_at": "2026-11-17T18:17:00.623975271Z",
   "events": [
+    {
+      "at": "2026-11-17T18:17:00.623975271Z",
+      "model": "gpt-6.2-sol",
+      "vendor": "openai",
+      "name": "GPT-6.2 Sol",
+      "event": "changed",
+      "changes": 7,
+      "highlights": [
+        "Default effort: now medium",
+        "Description: A reasoning model for text, images, and tool use. → Our go-to model for everyday work, from coding to powering agents at scale.",
+        "Open weights: now no"
+      ]
+    },
+    {
+      "at": "2026-11-17T18:17:00.623975271Z",
+      "model": "gpt-6.2-astra",
+      "vendor": "openai",
+      "name": "GPT-6.2 Astra",
+      "event": "changed",
+      "changes": 7,
+      "highlights": [
+        "Default effort: now medium",
+        "Description: A frontier reasoning model for coding and professional work. → Our most capable model for your hardest projects, from start to finish.",
+        "Open weights: now no"
+      ]
+    },
     {
       "at": "2026-11-17T17:52:19.903341675Z",
       "model": "gpt-6.2-sol",

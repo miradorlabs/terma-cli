@@ -8,7 +8,8 @@
   "listed": true,
   "facts": {
     "context_window": 1050000,
-    "description": "A frontier reasoning model for coding and professional work.",
+    "default_effort": "medium",
+    "description": "Our most capable model for your hardest projects, from start to finish.",
     "endpoints": [
       "v1/chat/completions",
       "v1/responses",
@@ -31,10 +32,20 @@
     "max_input": 922000,
     "max_output": 128000,
     "name": "GPT-6.2 Astra",
+    "open_weights": false,
     "output_modalities": [
       "text"
     ],
     "reasoning": true,
+    "reasoning_efforts": [
+      "low",
+      "medium",
+      "high",
+      "xhigh",
+      "max"
+    ],
+    "released_at": "2026-11-17",
+    "sampling_parameters": false,
     "structured_outputs": true,
     "tool_calling": true,
     "tools": [
@@ -56,10 +67,15 @@
   },
   "provenance": {
     "context_window": {
-      "openai-docs": 1050000
+      "models.dev": 1050000,
+      "openai-docs": 1050000,
+      "openrouter": 1050000
+    },
+    "default_effort": {
+      "openrouter": "medium"
     },
     "description": {
-      "openai-docs": "A frontier reasoning model for coding and professional work."
+      "openai-docs": "Our most capable model for your hardest projects, from start to finish."
     },
     "endpoints": {
       "openai-docs": [
@@ -80,36 +96,88 @@
       ]
     },
     "input_modalities": {
+      "models.dev": [
+        "text",
+        "image",
+        "pdf"
+      ],
       "openai-docs": [
         "text",
         "image"
+      ],
+      "openrouter": [
+        "file",
+        "image",
+        "text"
       ]
     },
     "knowledge_cutoff": {
+      "models.dev": "2026-05-18",
       "openai-docs": "2026-05-18"
     },
     "max_input": {
+      "models.dev": 922000,
       "openai-docs": 922000
     },
     "max_output": {
-      "openai-docs": 128000
+      "models.dev": 128000,
+      "openai-docs": 128000,
+      "openrouter": 128000
     },
     "name": {
-      "openai-docs": "GPT-6.2 Astra"
+      "models.dev": "GPT-6.2 Astra",
+      "openai-docs": "GPT-6.2 Astra",
+      "openrouter": "GPT-6.2 Astra"
+    },
+    "open_weights": {
+      "models.dev": false
     },
     "output_modalities": {
+      "models.dev": [
+        "text"
+      ],
       "openai-docs": [
+        "text"
+      ],
+      "openrouter": [
         "text"
       ]
     },
     "reasoning": {
-      "openai-docs": true
+      "models.dev": true,
+      "openai-docs": true,
+      "openrouter": true
+    },
+    "reasoning_efforts": {
+      "models.dev": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "openrouter": [
+        "max",
+        "xhigh",
+        "high",
+        "medium",
+        "low"
+      ]
+    },
+    "released_at": {
+      "models.dev": "2026-11-17"
+    },
+    "sampling_parameters": {
+      "models.dev": false
     },
     "structured_outputs": {
+      "models.dev": true,
       "openai-docs": true
     },
     "tool_calling": {
-      "openai-docs": true
+      "models.dev": true,
+      "openai-docs": true,
+      "openrouter": true
     },
     "tools": {
       "openai-docs": [
@@ -134,13 +202,15 @@
   },
   "disagreements": [],
   "sources": {
-    "openai-docs": "https://developers.openai.com/api/docs/models/gpt-6.2-astra"
+    "models.dev": "https://models.dev",
+    "openai-docs": "https://developers.openai.com/api/docs/models/gpt-6.2-astra",
+    "openrouter": "https://openrouter.ai/openai/gpt-6.2-astra"
   },
   "docs": {
     "overview": {
       "title": "Model page",
       "url": "https://developers.openai.com/api/docs/models/gpt-6.2-astra",
-      "text": "# GPT-6.2 Astra\n\n> For the complete documentation index, see [llms.txt](/llms.txt). Markdown versions of documentation pages are available by appending `.md` to the page URL.\n\n> A frontier reasoning model for coding and professional work.\n\nModel ID: `gpt-6.2-astra`\n\nGPT-6.2 Astra can build and revise software, use a computer, and work with documents.\nIt accepts text and images and responds with text.\nIn the Responses API, use the [Multi-agent beta](/api/docs/guides/responses-multi-agent) to delegate work to subagents.\n\nThe API rejects requests that set reasoning effort to `none`.\n\nThe Responses API supports [discounted background completion windows](/api/docs/guides/background#use-discounted-completion-windows) in public beta.\n\n## Model details\n\n- Input modalities: text, image\n- Output modalities: text\n- Unsupported modalities: audio, video\n- 1,050,000 context window\n- Maximum input tokens: 922,000\n- 128,000 max output tokens\n- May 18, 2026 knowledge cutoff\n- Reasoning token support\n\n## Pricing\n\nPrices are per 1M tokens. See the [pricing page](/api/docs/pricing) for processing tiers and billing details.\n\n### Text tokens\n\n| Metric | Price | Unit |\n| --- | ---: | --- |\n| Input | $8 | 1M tokens |\n| Cached input | $0.4 | 1M tokens |\n| Cache writes | $10 | 1M tokens |\n| Output | $40 | 1M tokens |\n\n- The cache write price is for 30 minutes of retention. A 12-hour cache write costs $20 per million tokens for short-context requests at Standard pricing.\n- For requests with more than 272K input tokens, input and cache rates double and output costs 1.5 times the short-context rate for the full request.\n- Batch costs 50% of Standard rates. Fast mode costs twice the Standard rate for the same context length.\n- Ultrafast costs 3 times the Standard rate through February 28, 2027, and 6 times the Standard rate starting March 1, 2027 (Pacific time).\n\n## Endpoints\n\n| Endpoint | Route | Support |\n| --- | --- | --- |\n| Chat Completions | `v1/chat/completions` | Supported |\n| Responses | `v1/responses` | Supported |\n| Realtime | `v1/realtime` | Not supported |\n| Assistants | `v1/assistants` | Not supported |\n| Batch | `v1/batch` | Supported |\n| Fine-tuning | `v1/fine-tuning` | Not supported |\n| Image generation | `v1/images/generations` | Not supported |\n| Videos | `v1/videos` | Not supported |\n| Image edit | `v1/images/edits` | Not supported |\n| Speech generation | `v1/audio/speech` | Not supported |\n| Transcription | `v1/audio/transcriptions` | Not supported |\n| Translation | `v1/audio/translations` | Not supported |\n\n## Supported features\n\n- streaming\n- structured_outputs\n- function_calling\n- file_search\n- image_input\n- web_search\n- prompt_caching\n\n## Unsupported features\n\n- fine_tuning\n- predicted_outputs\n\n## Supported tools\n\nTools supported by this model when using the Responses API.\n\n- web_search\n- file_search\n- image_generation\n- code_interpreter\n- hosted_shell\n- apply_patch\n- skills\n- computer_use\n- mcp\n- tool_search\n\n## Model IDs\n\n- `gpt-6.2-astra`\n\n## Rate limits\n\nRate limits ensure fair and reliable access to the API by placing specific caps on requests, tokens, audio duration, or other usage within a given time period. Your usage tier determines how high these limits are set and automatically increases as you send more requests and spend more on the API.\n\n### Standard\n\n| Tier | RPM | TPM |\n| --- | ---: | ---: |\n| Build | 5,000 | 1,000,000 |\n| Launch | 10,000 | 4,000,000 |\n| Grow | 15,000 | 40,000,000 |\n"
+      "text": "# GPT-6.2 Astra\n\n> For the complete documentation index, see [llms.txt](/llms.txt). Markdown versions of documentation pages are available by appending `.md` to the page URL.\n\n> Our most capable model for your hardest projects, from start to finish.\n\nModel ID: `gpt-6.2-astra`\n\nGPT-6.2 Astra can build and revise software, use a computer, and work with documents.\nIt accepts text and images and responds with text.\nIn the Responses API, use the [Multi-agent beta](/api/docs/guides/responses-multi-agent) to delegate work to subagents.\n\nThe API rejects requests that set reasoning effort to `none`.\n\nThe Responses API supports [discounted background completion windows](/api/docs/guides/background#use-discounted-completion-windows) in public beta.\n\n## Model details\n\n- Input modalities: text, image\n- Output modalities: text\n- Unsupported modalities: audio, video\n- 1,050,000 context window\n- Maximum input tokens: 922,000\n- 128,000 max output tokens\n- May 18, 2026 knowledge cutoff\n- Reasoning token support\n\n## Pricing\n\nPrices are per 1M tokens. See the [pricing page](/api/docs/pricing) for processing tiers and billing details.\n\n### Text tokens\n\n| Metric | Price | Unit |\n| --- | ---: | --- |\n| Input | $8 | 1M tokens |\n| Cached input | $0.4 | 1M tokens |\n| Cache writes | $10 | 1M tokens |\n| Output | $40 | 1M tokens |\n\n- The cache write price is for 30 minutes of retention. A 12-hour cache write costs $20 per million tokens for short-context requests at Standard pricing.\n- For requests with more than 272K input tokens, input and cache rates double and output costs 1.5 times the short-context rate for the full request.\n- Batch costs 50% of Standard rates. Fast mode costs twice the Standard rate for the same context length.\n- Ultrafast costs 3 times the Standard rate through February 28, 2027, and 6 times the Standard rate starting March 1, 2027 (Pacific time).\n\n## Endpoints\n\n| Endpoint | Route | Support |\n| --- | --- | --- |\n| Chat Completions | `v1/chat/completions` | Supported |\n| Responses | `v1/responses` | Supported |\n| Realtime | `v1/realtime` | Not supported |\n| Assistants | `v1/assistants` | Not supported |\n| Batch | `v1/batch` | Supported |\n| Fine-tuning | `v1/fine-tuning` | Not supported |\n| Image generation | `v1/images/generations` | Not supported |\n| Videos | `v1/videos` | Not supported |\n| Image edit | `v1/images/edits` | Not supported |\n| Speech generation | `v1/audio/speech` | Not supported |\n| Transcription | `v1/audio/transcriptions` | Not supported |\n| Translation | `v1/audio/translations` | Not supported |\n\n## Supported features\n\n- streaming\n- structured_outputs\n- function_calling\n- file_search\n- image_input\n- web_search\n- prompt_caching\n\n## Unsupported features\n\n- fine_tuning\n- predicted_outputs\n\n## Supported tools\n\nTools supported by this model when using the Responses API.\n\n- web_search\n- file_search\n- image_generation\n- code_interpreter\n- hosted_shell\n- apply_patch\n- skills\n- computer_use\n- mcp\n- tool_search\n\n## Model IDs\n\n- `gpt-6.2-astra`\n\n## Rate limits\n\nRate limits ensure fair and reliable access to the API by placing specific caps on requests, tokens, audio duration, or other usage within a given time period. Your usage tier determines how high these limits are set and automatically increases as you send more requests and spend more on the API.\n\n### Standard\n\n| Tier | RPM | TPM |\n| --- | ---: | ---: |\n| Build | 5,000 | 1,000,000 |\n| Launch | 10,000 | 4,000,000 |\n| Grow | 15,000 | 40,000,000 |\n"
     }
   },
   "api": null,

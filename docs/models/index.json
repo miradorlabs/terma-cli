@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-17T17:52:19.903341675Z",
+  "generated_at": "2026-11-17T18:17:00.623975271Z",
   "vendors": [
     {
       "id": "anthropic",
@@ -32,6 +32,48 @@
     }
   ],
   "models": [
+    {
+      "id": "gpt-6.2-astra",
+      "vendor": "openai",
+      "name": "GPT-6.2 Astra",
+      "family": "gpt-astra",
+      "status": null,
+      "released_at": "2026-11-17",
+      "first_seen": "2026-11-17T17:52:19.903341675Z",
+      "predecessor": "gpt-6-astra",
+      "successor": null,
+      "context_window": 1050000,
+      "max_output": 128000,
+      "knowledge_cutoff": "2026-05-18",
+      "reasoning": true,
+      "harnesses": [],
+      "last_change": {
+        "at": "2026-11-17T18:17:00.623975271Z",
+        "changes": 7
+      },
+      "probed": false
+    },
+    {
+      "id": "gpt-6.2-sol",
+      "vendor": "openai",
+      "name": "GPT-6.2 Sol",
+      "family": "gpt-sol",
+      "status": null,
+      "released_at": "2026-11-17",
+      "first_seen": "2026-11-17T17:52:19.903341675Z",
+      "predecessor": "gpt-6.1-sol",
+      "successor": null,
+      "context_window": 1050000,
+      "max_output": 128000,
+      "knowledge_cutoff": "2026-06-01",
+      "reasoning": true,
+      "harnesses": [],
+      "last_change": {
+        "at": "2026-11-17T18:17:00.623975271Z",
+        "changes": 7
+      },
+      "probed": false
+    },
     {
       "id": "gemini-4-hydrogen",
       "vendor": "google",
@@ -1398,42 +1440,6 @@
         "at": "2026-11-12T22:38:32.071670157Z",
         "changes": 2
       },
-      "probed": false
-    },
-    {
-      "id": "gpt-6.2-astra",
-      "vendor": "openai",
-      "name": "GPT-6.2 Astra",
-      "family": "gpt-astra",
-      "status": null,
-      "released_at": null,
-      "first_seen": "2026-11-17T17:52:19.903341675Z",
-      "predecessor": "gpt-6-astra",
-      "successor": null,
-      "context_window": 1050000,
-      "max_output": 128000,
-      "knowledge_cutoff": "2026-05-18",
-      "reasoning": true,
-      "harnesses": [],
-      "last_change": null,
-      "probed": false
-    },
-    {
-      "id": "gpt-6.2-sol",
-      "vendor": "openai",
-      "name": "GPT-6.2 Sol",
-      "family": "gpt-sol",
-      "status": null,
-      "released_at": null,
-      "first_seen": "2026-11-17T17:52:19.903341675Z",
-      "predecessor": "gpt-6.1-sol",
-      "successor": null,
-      "context_window": 1050000,
-      "max_output": 128000,
-      "knowledge_cutoff": "2026-06-01",
-      "reasoning": true,
-      "harnesses": [],
-      "last_change": null,
       "probed": false
     },
     {
