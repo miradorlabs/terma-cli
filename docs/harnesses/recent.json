@@ -1,7 +1,33 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-17T20:55:17.06204267Z",
+  "generated_at": "2026-11-17T22:19:59.283537558Z",
   "versions": [
+    {
+      "harness": "codex-desktop",
+      "name": "Codex app",
+      "version": "26.1111.71025",
+      "released_at": "2026-11-17T22:01:36Z",
+      "captured_at": "2026-11-17T22:19:59.283537558Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "26.1111.21308",
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": null,
+      "highlights": [],
+      "signing": null,
+      "partial": true,
+      "attempted_at": "2026-11-17T22:19:59.283537558Z",
+      "attempts": 1
+    },
     {
       "harness": "claude",
       "name": "Claude Code",
@@ -6164,38 +6190,6 @@
         "Caching across_turns: none → {\"breakpoints\":[[],[],[]],\"stable_cache_key\":true,\"stable…",
         "Behaviour: sandbox removed",
         "Full help text of `exec-server -h` changed (+0 −105 chars)"
-      ],
-      "signing": "valid"
-    },
-    {
-      "harness": "codex",
-      "name": "Codex CLI",
-      "version": "0.144.2",
-      "released_at": "2026-07-13T04:42:46.19Z",
-      "captured_at": "2026-11-05T09:54:28.532441Z",
-      "platforms": [
-        "darwin/arm64",
-        "linux/amd64"
-      ],
-      "support": "untested",
-      "previous": "0.144.1",
-      "changes": 10,
-      "categories": {
-        "behavior": 8,
-        "caching": 1,
-        "cli": 1
-      },
-      "impact": {
-        "breaking": 0,
-        "degrading": 0,
-        "informational": 1,
-        "notable": 9
-      },
-      "undocumented": 10,
-      "highlights": [
-        "Caching across_turns: {\"breakpoints\":[[],[],[]],\"stable_cache_key\":true,\"stable… → none",
-        "Behaviour: sandbox approval added",
-        "Behaviour: sandbox model added"
       ],
       "signing": "valid"
     }

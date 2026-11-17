@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-17T20:55:17.06204267Z",
+  "generated_at": "2026-11-17T22:19:59.283537558Z",
   "harnesses": [
     {
       "id": "claude",
@@ -94,15 +94,15 @@
       "vendor": "OpenAI",
       "homepage": "https://openai.com/codex",
       "source": null,
-      "latest": "26.1111.21308",
+      "latest": "26.1111.71025",
       "support": "untested",
-      "versions_tracked": 4,
+      "versions_tracked": 5,
       "first_tracked": "2026-11-04",
       "last_change": {
-        "from": "26.1106.51428",
-        "to": "26.1111.21308",
-        "at": "2026-11-13T02:23:09.350488615Z",
-        "released_at": "2026-11-13T01:59:16Z",
+        "from": "26.1111.21308",
+        "to": "26.1111.71025",
+        "at": "2026-11-17T22:19:59.283537558Z",
+        "released_at": "2026-11-17T22:01:36Z",
         "changes": 0,
         "categories": {}
       }
