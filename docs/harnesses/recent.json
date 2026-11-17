@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-17T13:47:15.766100973Z",
+  "generated_at": "2026-11-17T14:30:14.088945144Z",
   "versions": [
     {
       "harness": "opencode",
@@ -59,8 +59,8 @@
       "highlights": [],
       "signing": null,
       "partial": true,
-      "attempted_at": "2026-11-17T08:23:21.696655396Z",
-      "attempts": 2
+      "attempted_at": "2026-11-17T14:30:14.088945144Z",
+      "attempts": 3
     },
     {
       "harness": "claude",
