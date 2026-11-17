@@ -1,7 +1,33 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-17T18:17:00.623975271Z",
+  "generated_at": "2026-11-17T23:12:13.967477009Z",
   "events": [
+    {
+      "at": "2026-11-17T23:12:13.967477009Z",
+      "model": "gpt-6.2-sol",
+      "vendor": "openai",
+      "name": "GPT-6.2 Sol",
+      "event": "changed",
+      "changes": 3,
+      "highlights": [
+        "Codex CLI uses it as its compaction model",
+        "Codex CLI uses it as its default model",
+        "Codex CLI uses it as its subagents' model"
+      ]
+    },
+    {
+      "at": "2026-11-17T23:12:13.967477009Z",
+      "model": "gpt-6.1-sol",
+      "vendor": "openai",
+      "name": "GPT-6.1 Sol",
+      "event": "changed",
+      "changes": 3,
+      "highlights": [
+        "Codex CLI stopped using it as its compaction model",
+        "Codex CLI stopped using it as its default model",
+        "Codex CLI stopped using it as its subagents' model"
+      ]
+    },
     {
       "at": "2026-11-17T18:17:00.623975271Z",
       "model": "gpt-6.2-sol",

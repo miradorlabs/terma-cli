@@ -248,7 +248,7 @@
       "first": "0.159.1",
       "last": "0.169.0",
       "builds": 17,
-      "current": true,
+      "current": false,
       "params": {
         "include": [
           "reasoning.encrypted_content"
@@ -271,7 +271,7 @@
       "first": "0.159.1",
       "last": "0.169.0",
       "builds": 16,
-      "current": true
+      "current": false
     },
     {
       "harness": "codex",
@@ -280,7 +280,7 @@
       "first": "0.159.1",
       "last": "0.169.0",
       "builds": 17,
-      "current": true
+      "current": false
     },
     {
       "harness": "codex-desktop",

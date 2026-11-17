@@ -3,6 +3,69 @@
   "id": "gpt-6.2-sol",
   "steps": [
     {
+      "at": "2026-11-17T23:12:13.967477009Z",
+      "event": "changed",
+      "changes": [
+        {
+          "id": "harnesses/codex/compaction",
+          "category": "harnesses",
+          "op": "added",
+          "path": [
+            "harnesses",
+            "codex/compaction"
+          ],
+          "title": "Codex CLI uses it as its compaction model",
+          "impact": "notable",
+          "before": null,
+          "after": {
+            "current": true
+          },
+          "text_diff": null,
+          "terma": null,
+          "source": null,
+          "documented": null
+        },
+        {
+          "id": "harnesses/codex/default",
+          "category": "harnesses",
+          "op": "added",
+          "path": [
+            "harnesses",
+            "codex/default"
+          ],
+          "title": "Codex CLI uses it as its default model",
+          "impact": "notable",
+          "before": null,
+          "after": {
+            "current": true
+          },
+          "text_diff": null,
+          "terma": null,
+          "source": null,
+          "documented": null
+        },
+        {
+          "id": "harnesses/codex/subagents",
+          "category": "harnesses",
+          "op": "added",
+          "path": [
+            "harnesses",
+            "codex/subagents"
+          ],
+          "title": "Codex CLI uses it as its subagents' model",
+          "impact": "notable",
+          "before": null,
+          "after": {
+            "current": true
+          },
+          "text_diff": null,
+          "terma": null,
+          "source": null,
+          "documented": null
+        }
+      ]
+    },
+    {
       "at": "2026-11-17T18:17:00.623975271Z",
       "event": "changed",
       "changes": [

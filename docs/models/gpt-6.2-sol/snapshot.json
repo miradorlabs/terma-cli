@@ -214,5 +214,47 @@
     }
   },
   "api": null,
-  "harnesses": []
+  "harnesses": [
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "role": "default",
+      "first": "0.169.1",
+      "last": "0.169.1",
+      "builds": 1,
+      "current": true,
+      "params": {
+        "include": [
+          "reasoning.encrypted_content"
+        ],
+        "parallel_tool_calls": false,
+        "reasoning": {
+          "context": "all_turns",
+          "effort": "low"
+        },
+        "text": {
+          "verbosity": "low"
+        },
+        "tool_choice": "auto"
+      }
+    },
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "role": "subagents",
+      "first": "0.169.1",
+      "last": "0.169.1",
+      "builds": 1,
+      "current": true
+    },
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "role": "compaction",
+      "first": "0.169.1",
+      "last": "0.169.1",
+      "builds": 1,
+      "current": true
+    }
+  ]
 }
