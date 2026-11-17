@@ -267,6 +267,20 @@ const (
 	TermaSessionParentIDKey = "terma.session.parent.id"
 	// TermaSessionTitleKey is terma.session.title: The name the agent gave the session.
 	TermaSessionTitleKey = "terma.session.title"
+	// TermaSkillDescriptionKey is terma.skill.description: The skill's own description, whole; never the skill's body.
+	TermaSkillDescriptionKey = "terma.skill.description"
+	// TermaSkillMarketplaceNameKey is terma.skill.marketplace.name: The marketplace the skill's plugin was installed from.
+	TermaSkillMarketplaceNameKey = "terma.skill.marketplace.name"
+	// TermaSkillNameKey is terma.skill.name: The skill's name as the agent itself reports it, case kept.
+	TermaSkillNameKey = "terma.skill.name"
+	// TermaSkillOriginKey is terma.skill.origin: Where the agent found the skill.
+	TermaSkillOriginKey = "terma.skill.origin"
+	// TermaSkillPathKey is terma.skill.path: The path of the skill's file relative to terma.skill.repository.url, with forward slashes.
+	TermaSkillPathKey = "terma.skill.path"
+	// TermaSkillPluginNameKey is terma.skill.plugin.name: The plugin that brings the skill.
+	TermaSkillPluginNameKey = "terma.skill.plugin.name"
+	// TermaSkillRepositoryURLKey is terma.skill.repository.url: The https URL of the repository that holds the skill's file, without credentials.
+	TermaSkillRepositoryURLKey = "terma.skill.repository.url"
 	// TermaSpendControlReachedKey is terma.spend_control.reached: Whether the account reached its spend control.
 	TermaSpendControlReachedKey = "terma.spend_control.reached"
 	// TermaStepIndexKey is terma.step.index: The step's index in its conversation, which only grows.
@@ -355,6 +369,8 @@ const (
 	TermaSessionStartEvent = "terma.session.start"
 	// TermaSessionTitleEvent is terma.session.title: The name an agent gave a session; a rename is a new event. Content as a whole.
 	TermaSessionTitleEvent = "terma.session.title"
+	// TermaSkillDefinitionEvent is terma.skill.definition: What a skill the session used is and where it is held, once per skill per session. Content as a whole: sent only while the team's policy collects prompts and tool content.
+	TermaSkillDefinitionEvent = "terma.skill.definition"
 	// TermaSubagentCallEvent is terma.subagent.call: The parent's view of the tool call that launched a subagent; it says nothing of spend.
 	TermaSubagentCallEvent = "terma.subagent.call"
 	// TermaSubagentEndEvent is terma.subagent.end: A subagent's run, or one of its turns, ended.
@@ -433,6 +449,16 @@ const (
 	TermaRelayLaunchHook = "hook"
 	// TermaRelayLaunchManual is terma.relay.launch manual: A developer started it from the command line.
 	TermaRelayLaunchManual = "manual"
+	// TermaSkillOriginPersonal is terma.skill.origin personal: The developer's own skills, for every project.
+	TermaSkillOriginPersonal = "personal"
+	// TermaSkillOriginRepository is terma.skill.origin repository: Skills a repository holds for whoever works in it.
+	TermaSkillOriginRepository = "repository"
+	// TermaSkillOriginPlugin is terma.skill.origin plugin: Skills an installed plugin brings.
+	TermaSkillOriginPlugin = "plugin"
+	// TermaSkillOriginBuiltin is terma.skill.origin builtin: Skills the agent ships with.
+	TermaSkillOriginBuiltin = "builtin"
+	// TermaSkillOriginManaged is terma.skill.origin managed: Skills an administrator installed for every user of the machine.
+	TermaSkillOriginManaged = "managed"
 	// TermaUpdateAutoOn is terma.update.auto on: The relay installs each new release by itself.
 	TermaUpdateAutoOn = "on"
 	// TermaUpdateAutoOff is terma.update.auto off: It could, but automatic updates are off (`terma update --auto off`, or CI or TERMA_NO_UPDATE_CHECK=1 in the relay's environment).

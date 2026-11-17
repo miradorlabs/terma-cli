@@ -625,6 +625,42 @@ events:
       - ref: terma.response.service_tier
       - ref: terma.response.inference_geo
 
+  - name: terma.skill.definition
+    stability: development
+    requirement_level: recommended
+    brief: >
+      What a skill the session used is and where it is held, once per skill per session.
+      Content as a whole: sent only while the team's policy collects prompts and tool content.
+    attributes:
+      - ref: session.id
+        requirement_level: required
+      - ref: gen_ai.main_agent.name
+        requirement_level: required
+      - ref: terma.evidence.source
+        requirement_level: required
+      - ref: terma.skill.name
+        requirement_level: required
+      - ref: terma.skill.description
+        requirement_level:
+          conditionally_required: When the agent's listing or the skill's file gives one within the bound.
+      - ref: terma.skill.origin
+        requirement_level:
+          conditionally_required: When where the agent found the skill can be told.
+      - ref: terma.skill.plugin.name
+        requirement_level:
+          conditionally_required: For a plugin's skill.
+      - ref: terma.skill.marketplace.name
+        requirement_level:
+          conditionally_required: For a plugin's skill.
+      - ref: terma.skill.repository.url
+        requirement_level:
+          conditionally_required: >-
+            With terma.skill.path, when the skill's file is held in a repository the team's
+            policy collects or in a plugin's GitHub marketplace.
+      - ref: terma.skill.path
+        requirement_level:
+          conditionally_required: With terma.skill.repository.url.
+
   - name: terma.relay.heartbeat
     stability: development
     requirement_level: recommended
