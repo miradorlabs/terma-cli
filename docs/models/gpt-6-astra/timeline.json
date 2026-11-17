@@ -3,6 +3,50 @@
   "id": "gpt-6-astra",
   "steps": [
     {
+      "at": "2026-11-17T17:52:19.903341675Z",
+      "event": "changed",
+      "changes": [
+        {
+          "id": "facts/description",
+          "category": "facts",
+          "op": "changed",
+          "path": [
+            "facts",
+            "description"
+          ],
+          "title": "Description: Our most capable model for the most demanding work. → A reasoning model for complex coding and professional work.",
+          "impact": "notable",
+          "before": "Our most capable model for the most demanding work.",
+          "after": "A reasoning model for complex coding and professional work.",
+          "text_diff": null,
+          "terma": null,
+          "source": null,
+          "documented": null
+        },
+        {
+          "id": "docs/overview",
+          "category": "docs",
+          "op": "changed",
+          "path": [
+            "docs",
+            "overview"
+          ],
+          "title": "Model page changed (+154 −203 chars)",
+          "impact": "informational",
+          "before": null,
+          "after": null,
+          "text_diff": "@@ -2,12 +2,11 @@\n \n > For the complete documentation index, see [llms.txt](/llms.txt). Markdown versions of documentation pages are available by appending `.md` to the page URL.\n \n-> Our most capable model for the most demanding work.\n+> A reasoning model for complex coding and professional work.\n \n Model ID: `gpt-6-astra`\n \n-GPT-6 Astra is our most capable model for the most demanding work.\n-Use it for complex reasoning, coding, computer use, research, and document creation.\n+Use GPT-6 Astra for complex reasoning, coding, computer use, research, and document creation.\n `reasoning.effort` supports `low`, `medium`, `high`, `xhigh`, and `max`.\n \n Get started with GPT-6 Astra using the [model guide](/api/docs/guides/latest-model?model=gpt-6-astra).\n",
+          "stats": {
+            "added_chars": 154,
+            "removed_chars": 203
+          },
+          "terma": null,
+          "source": null,
+          "documented": null
+        }
+      ]
+    },
+    {
       "at": "2026-11-11T14:15:45.0307666Z",
       "event": "listed",
       "changes": []

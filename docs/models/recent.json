@@ -1,7 +1,37 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-16T15:44:39.622171458Z",
+  "generated_at": "2026-11-17T17:52:19.903341675Z",
   "events": [
+    {
+      "at": "2026-11-17T17:52:19.903341675Z",
+      "model": "gpt-6.2-sol",
+      "vendor": "openai",
+      "name": "GPT-6.2 Sol",
+      "event": "listed",
+      "changes": 0,
+      "highlights": []
+    },
+    {
+      "at": "2026-11-17T17:52:19.903341675Z",
+      "model": "gpt-6.2-astra",
+      "vendor": "openai",
+      "name": "GPT-6.2 Astra",
+      "event": "listed",
+      "changes": 0,
+      "highlights": []
+    },
+    {
+      "at": "2026-11-17T17:52:19.903341675Z",
+      "model": "gpt-6-astra",
+      "vendor": "openai",
+      "name": "GPT-6 Astra",
+      "event": "changed",
+      "changes": 2,
+      "highlights": [
+        "Description: Our most capable model for the most demanding work. → A reasoning model for complex coding and professional work.",
+        "Model page changed (+154 −203 chars)"
+      ]
+    },
     {
       "at": "2026-11-13T07:14:48.993418816Z",
       "model": "gpt-6.1-terra",

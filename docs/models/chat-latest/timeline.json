@@ -3,6 +3,33 @@
   "id": "chat-latest",
   "steps": [
     {
+      "at": "2026-11-17T17:52:19.903341675Z",
+      "event": "changed",
+      "changes": [
+        {
+          "id": "docs/overview",
+          "category": "docs",
+          "op": "changed",
+          "path": [
+            "docs",
+            "overview"
+          ],
+          "title": "Model page changed (+226 −222 chars)",
+          "impact": "informational",
+          "before": null,
+          "after": null,
+          "text_diff": "@@ -7,7 +7,7 @@\n Model ID: `chat-latest`\n \n chat-latest points to the latest Instant model currently used in ChatGPT.\n-We recommend leveraging [GPT-6 Astra](/api/docs/models/gpt-6-astra) for production API usage. Learn more on the [Model guidance](/api/docs/guides/latest-model) page. The underlying model snapshot will be regularly updated.\n+We recommend leveraging [GPT-6.2 Astra](/api/docs/models/gpt-6.2-astra) for production API usage. Learn more on the [Model guidance](/api/docs/guides/latest-model) page. The underlying model snapshot will be regularly updated.\n \n ## Model details\n \n",
+          "stats": {
+            "added_chars": 226,
+            "removed_chars": 222
+          },
+          "terma": null,
+          "source": null,
+          "documented": null
+        }
+      ]
+    },
+    {
       "at": "2026-11-11T14:15:45.0307666Z",
       "event": "listed",
       "changes": []

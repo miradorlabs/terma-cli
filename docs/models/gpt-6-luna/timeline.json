@@ -3,6 +3,33 @@
   "id": "gpt-6-luna",
   "steps": [
     {
+      "at": "2026-11-17T17:52:19.903341675Z",
+      "event": "changed",
+      "changes": [
+        {
+          "id": "docs/overview",
+          "category": "docs",
+          "op": "changed",
+          "path": [
+            "docs",
+            "overview"
+          ],
+          "title": "Model page changed (+148 −0 chars)",
+          "impact": "informational",
+          "before": null,
+          "after": null,
+          "text_diff": "@@ -14,6 +14,8 @@\n EU data residency is available with Standard, Fast, Flex, and Batch processing.\n See [data residency eligibility](/api/docs/guides/data-residency#which-models-and-features-are-eligible-for-data-residency).\n \n+The Responses API supports [discounted background completion windows](/api/docs/guides/background#use-discounted-completion-windows) in public beta.\n+\n ## Model details\n \n - Default snapshot: `gpt-6-luna`\n",
+          "stats": {
+            "added_chars": 148,
+            "removed_chars": 0
+          },
+          "terma": null,
+          "source": null,
+          "documented": null
+        }
+      ]
+    },
+    {
       "at": "2026-11-13T17:52:47.748337193Z",
       "event": "changed",
       "changes": [

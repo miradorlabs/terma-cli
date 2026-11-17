@@ -3,6 +3,33 @@
   "id": "gpt-6.1-terra",
   "steps": [
     {
+      "at": "2026-11-17T17:52:19.903341675Z",
+      "event": "changed",
+      "changes": [
+        {
+          "id": "docs/overview",
+          "category": "docs",
+          "op": "changed",
+          "path": [
+            "docs",
+            "overview"
+          ],
+          "title": "Model page changed (+148 −0 chars)",
+          "impact": "informational",
+          "before": null,
+          "after": null,
+          "text_diff": "@@ -17,6 +17,8 @@\n See the [GPT-6 guide](/api/docs/guides/latest-model?model=gpt-6-astra#gpt-61-terra)\n for prompting and migration guidance.\n \n+The Responses API supports [discounted background completion windows](/api/docs/guides/background#use-discounted-completion-windows) in public beta.\n+\n ## Model details\n \n - Default snapshot: `gpt-6.1-terra`\n",
+          "stats": {
+            "added_chars": 148,
+            "removed_chars": 0
+          },
+          "terma": null,
+          "source": null,
+          "documented": null
+        }
+      ]
+    },
+    {
       "at": "2026-11-13T07:14:48.993418816Z",
       "event": "changed",
       "changes": [
