@@ -3,6 +3,132 @@
   "harness": "codex",
   "steps": [
     {
+      "version": "0.169.1",
+      "previous": "0.169.0",
+      "changes": [
+        {
+          "id": "model.default",
+          "category": "model",
+          "op": "changed",
+          "title": "Default model: gpt-6.1-sol → gpt-6.2-sol",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "prompt.system.0.text",
+          "category": "prompt",
+          "op": "changed",
+          "title": "System prompt changed (+16794 −12654 chars)",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "prompt.system.3.text",
+          "category": "prompt",
+          "op": "changed",
+          "title": "System prompt changed (+134 −0 chars)",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "tools.collaboration/spawn_agent.description",
+          "category": "tools",
+          "op": "changed",
+          "title": "collaboration/spawn_agent tool description changed (+851 −749 chars)",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "tools.send_message_to_user_async",
+          "category": "tools",
+          "op": "added",
+          "title": "New tool: send_message_to_user_async",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "behavior.compaction.model",
+          "category": "behavior",
+          "op": "changed",
+          "title": "Behaviour: compaction model changed: \"gpt-6.1-sol\" → \"gpt-6.2-sol\"",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "behavior.compaction.tools",
+          "category": "behavior",
+          "op": "changed",
+          "title": "Behaviour: compaction tools changed: 11 → 12",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "behavior.sandbox.model",
+          "category": "behavior",
+          "op": "changed",
+          "title": "Behaviour: sandbox model changed: \"gpt-6.1-sol\" → \"gpt-6.2-sol\"",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "behavior.sandbox.models.gpt-6.2-sol",
+          "category": "behavior",
+          "op": "added",
+          "title": "Behaviour: sandbox models gpt-6.2-sol added",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "behavior.sandbox.models.gpt-6.1-sol",
+          "category": "behavior",
+          "op": "removed",
+          "title": "Behaviour: sandbox models gpt-6.1-sol removed",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "behavior.subagents.model",
+          "category": "behavior",
+          "op": "changed",
+          "title": "Behaviour: subagents model changed: \"gpt-6.1-sol\" → \"gpt-6.2-sol\"",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "behavior.subagents.system.0.text",
+          "category": "behavior",
+          "op": "changed",
+          "title": "Behaviour: subagents system 0 text changed",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "behavior.subagents.system.3.text",
+          "category": "behavior",
+          "op": "changed",
+          "title": "Behaviour: subagents system 3 text changed",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "behavior.subagents.system.8.text",
+          "category": "behavior",
+          "op": "changed",
+          "title": "Behaviour: subagents system 8 text changed",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "behavior.subagents.tools.send_message_to_user_async",
+          "category": "behavior",
+          "op": "added",
+          "title": "Behaviour: subagents tools send_message_to_user_async added",
+          "impact": "notable",
+          "documented": false
+        }
+      ]
+    },
+    {
       "version": "0.169.0",
       "previous": "0.168.0",
       "changes": [

@@ -73,7 +73,7 @@
       "label": "The machine's heartbeat reaches the project's ingest"
     }
   ],
-  "generated_at": "2026-11-17T20:55:15Z",
+  "generated_at": "2026-11-17T22:53:15Z",
   "harnesses": [
     {
       "ID": "claude",
@@ -6959,10 +6959,10 @@
       "platform": "linux/amd64",
       "capability": "global.commits",
       "result": "pass",
-      "last_run": "2026-11-16T18:59:11.158608386Z",
+      "last_run": "2026-11-17T22:43:59.171168518Z",
       "first_passed": "2026-11-16T18:59:11.158608386Z",
       "terma": "terma version dev",
-      "test": "TestGlobalModeClaude/v2.1.326"
+      "test": "TestGlobalModeClaude/installed-2.1.326"
     },
     {
       "harness": "claude",
@@ -6970,10 +6970,10 @@
       "platform": "linux/amd64",
       "capability": "global.placement",
       "result": "pass",
-      "last_run": "2026-11-16T18:59:11.158609408Z",
+      "last_run": "2026-11-17T22:43:59.17117001Z",
       "first_passed": "2026-11-16T18:59:11.158609408Z",
       "terma": "terma version dev",
-      "test": "TestGlobalModeClaude/v2.1.326"
+      "test": "TestGlobalModeClaude/installed-2.1.326"
     },
     {
       "harness": "claude",
@@ -6981,10 +6981,10 @@
       "platform": "linux/amd64",
       "capability": "relay.content_allowed",
       "result": "pass",
-      "last_run": "2026-11-16T18:59:23.495969506Z",
+      "last_run": "2026-11-17T22:44:15.60554861Z",
       "first_passed": "2026-11-16T18:59:23.495969506Z",
       "terma": "terma version dev",
-      "test": "TestRelayClaude/v2.1.326/content"
+      "test": "TestRelayClaude/installed-2.1.326/content"
     },
     {
       "harness": "claude",
@@ -6992,10 +6992,10 @@
       "platform": "linux/amd64",
       "capability": "relay.content_withheld",
       "result": "pass",
-      "last_run": "2026-11-16T18:59:25.10541513Z",
+      "last_run": "2026-11-17T22:44:16.934511211Z",
       "first_passed": "2026-11-16T18:59:25.10541513Z",
       "terma": "terma version dev",
-      "test": "TestRelayClaude/v2.1.326/withheld"
+      "test": "TestRelayClaude/installed-2.1.326/withheld"
     },
     {
       "harness": "claude",
@@ -7003,10 +7003,10 @@
       "platform": "linux/amd64",
       "capability": "relay.only_opted_in",
       "result": "pass",
-      "last_run": "2026-11-16T19:00:19.470229834Z",
+      "last_run": "2026-11-17T22:45:11.885874859Z",
       "first_passed": "2026-11-16T19:00:19.470229834Z",
       "terma": "terma version dev",
-      "test": "TestRelayNegativeControls/v2.1.326"
+      "test": "TestRelayNegativeControls/installed-2.1.326"
     },
     {
       "harness": "claude",
@@ -7014,10 +7014,10 @@
       "platform": "linux/amd64",
       "capability": "relay.resumed_elsewhere",
       "result": "pass",
-      "last_run": "2026-11-16T19:00:30.065881418Z",
+      "last_run": "2026-11-17T22:45:22.081627914Z",
       "first_passed": "2026-11-16T19:00:30.065881418Z",
       "terma": "terma version dev",
-      "test": "TestRelayResumedElsewhere/v2.1.326"
+      "test": "TestRelayResumedElsewhere/installed-2.1.326"
     },
     {
       "harness": "claude",
@@ -7025,10 +7025,10 @@
       "platform": "linux/amd64",
       "capability": "relay.telemetry",
       "result": "pass",
-      "last_run": "2026-11-16T18:59:25.105432131Z",
+      "last_run": "2026-11-17T22:44:16.934533303Z",
       "first_passed": "2026-11-16T18:59:25.105432131Z",
       "terma": "terma version dev",
-      "test": "TestRelayClaude/v2.1.326"
+      "test": "TestRelayClaude/installed-2.1.326"
     },
     {
       "harness": "claude",
@@ -7535,6 +7535,28 @@
       "first_passed": "2026-11-13T13:01:47.333988Z",
       "terma": "terma version dev",
       "test": "TestRelayCodexDesktopResumedElsewhere/v0.169.0"
+    },
+    {
+      "harness": "codex-desktop",
+      "version": "0.169.1",
+      "platform": "darwin/arm64",
+      "capability": "relay.desktop",
+      "result": "pass",
+      "last_run": "2026-11-17T22:46:19.446412Z",
+      "first_passed": "2026-11-17T22:46:19.446412Z",
+      "terma": "terma version dev",
+      "test": "TestRelayCodexDesktop/v0.169.1"
+    },
+    {
+      "harness": "codex-desktop",
+      "version": "0.169.1",
+      "platform": "darwin/arm64",
+      "capability": "relay.resumed_elsewhere",
+      "result": "pass",
+      "last_run": "2026-11-17T22:46:34.119619Z",
+      "first_passed": "2026-11-17T22:46:34.119619Z",
+      "terma": "terma version dev",
+      "test": "TestRelayCodexDesktopResumedElsewhere/v0.169.1"
     },
     {
       "harness": "codex",
@@ -9436,6 +9458,160 @@
       "first_passed": "2026-11-13T12:59:59.714844743Z",
       "terma": "terma version dev",
       "test": "TestRelayCodex/installed-0.169.0"
+    },
+    {
+      "harness": "codex",
+      "version": "0.169.1",
+      "platform": "darwin/arm64",
+      "capability": "global.placement",
+      "result": "pass",
+      "last_run": "2026-11-17T22:43:10.52146Z",
+      "first_passed": "2026-11-17T22:43:10.52146Z",
+      "terma": "terma version dev",
+      "test": "TestGlobalModeCodex/v0.169.1"
+    },
+    {
+      "harness": "codex",
+      "version": "0.169.1",
+      "platform": "darwin/arm64",
+      "capability": "relay.cold_start",
+      "result": "pass",
+      "last_run": "2026-11-17T22:50:08.696303Z",
+      "first_passed": "2026-11-17T22:50:08.696303Z",
+      "terma": "terma version dev",
+      "test": "TestRelayCodexColdStart/v0.169.1"
+    },
+    {
+      "harness": "codex",
+      "version": "0.169.1",
+      "platform": "darwin/arm64",
+      "capability": "relay.content_allowed",
+      "result": "pass",
+      "last_run": "2026-11-17T22:49:42.270158Z",
+      "first_passed": "2026-11-17T22:49:42.270158Z",
+      "terma": "terma version dev",
+      "test": "TestRelayCodex/v0.169.1/content"
+    },
+    {
+      "harness": "codex",
+      "version": "0.169.1",
+      "platform": "darwin/arm64",
+      "capability": "relay.content_withheld",
+      "result": "pass",
+      "last_run": "2026-11-17T22:49:55.765802Z",
+      "first_passed": "2026-11-17T22:49:55.765802Z",
+      "terma": "terma version dev",
+      "test": "TestRelayCodex/v0.169.1/withheld"
+    },
+    {
+      "harness": "codex",
+      "version": "0.169.1",
+      "platform": "darwin/arm64",
+      "capability": "relay.daemon",
+      "result": "pass",
+      "last_run": "2026-11-17T22:47:21.894178Z",
+      "first_passed": "2026-11-17T22:47:21.894178Z",
+      "terma": "terma version dev",
+      "test": "TestRelayCodexDaemonTUI/v0.169.1"
+    },
+    {
+      "harness": "codex",
+      "version": "0.169.1",
+      "platform": "darwin/arm64",
+      "capability": "relay.equivalent",
+      "result": "pass",
+      "last_run": "2026-11-17T22:52:11.091388Z",
+      "first_passed": "2026-11-17T22:52:11.091388Z",
+      "terma": "terma version dev",
+      "test": "TestRelayWorkloadsCodex/v0.169.1"
+    },
+    {
+      "harness": "codex",
+      "version": "0.169.1",
+      "platform": "darwin/arm64",
+      "capability": "relay.replaced_mid_turn",
+      "result": "pass",
+      "last_run": "2026-11-17T22:49:29.122701Z",
+      "first_passed": "2026-11-17T22:49:29.122701Z",
+      "terma": "terma version dev",
+      "test": "TestRelayCodexMidTurn/v0.169.1/hook/replaced"
+    },
+    {
+      "harness": "codex",
+      "version": "0.169.1",
+      "platform": "darwin/arm64",
+      "capability": "relay.resumed_elsewhere",
+      "result": "pass",
+      "last_run": "2026-11-17T22:47:51.568133Z",
+      "first_passed": "2026-11-17T22:47:51.568133Z",
+      "terma": "terma version dev",
+      "test": "TestRelayCodexResumedElsewhere/v0.169.1"
+    },
+    {
+      "harness": "codex",
+      "version": "0.169.1",
+      "platform": "darwin/arm64",
+      "capability": "relay.telemetry",
+      "result": "pass",
+      "last_run": "2026-11-17T22:49:55.765876Z",
+      "first_passed": "2026-11-17T22:49:55.765876Z",
+      "terma": "terma version dev",
+      "test": "TestRelayCodex/v0.169.1"
+    },
+    {
+      "harness": "codex",
+      "version": "0.169.1",
+      "platform": "linux/amd64",
+      "capability": "global.managed",
+      "result": "pass",
+      "last_run": "2026-11-17T22:44:11.974839067Z",
+      "first_passed": "2026-11-17T22:44:11.974839067Z",
+      "terma": "terma version dev",
+      "test": "TestGlobalModeManagedConfig/v0.169.1"
+    },
+    {
+      "harness": "codex",
+      "version": "0.169.1",
+      "platform": "linux/amd64",
+      "capability": "global.placement",
+      "result": "pass",
+      "last_run": "2026-11-17T22:44:08.989460421Z",
+      "first_passed": "2026-11-17T22:44:08.989460421Z",
+      "terma": "terma version dev",
+      "test": "TestGlobalModeCodex/v0.169.1"
+    },
+    {
+      "harness": "codex",
+      "version": "0.169.1",
+      "platform": "linux/amd64",
+      "capability": "relay.content_allowed",
+      "result": "pass",
+      "last_run": "2026-11-17T22:44:29.385129806Z",
+      "first_passed": "2026-11-17T22:44:29.385129806Z",
+      "terma": "terma version dev",
+      "test": "TestRelayCodex/v0.169.1/content"
+    },
+    {
+      "harness": "codex",
+      "version": "0.169.1",
+      "platform": "linux/amd64",
+      "capability": "relay.content_withheld",
+      "result": "pass",
+      "last_run": "2026-11-17T22:44:42.124976879Z",
+      "first_passed": "2026-11-17T22:44:42.124976879Z",
+      "terma": "terma version dev",
+      "test": "TestRelayCodex/v0.169.1/withheld"
+    },
+    {
+      "harness": "codex",
+      "version": "0.169.1",
+      "platform": "linux/amd64",
+      "capability": "relay.telemetry",
+      "result": "pass",
+      "last_run": "2026-11-17T22:44:42.124997469Z",
+      "first_passed": "2026-11-17T22:44:42.124997469Z",
+      "terma": "terma version dev",
+      "test": "TestRelayCodex/v0.169.1"
     },
     {
       "harness": "copilot",

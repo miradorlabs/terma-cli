@@ -73268,7 +73268,15 @@
         "listening": {},
         "unix": {}
       },
-      "tracer": "eslogger"
+      "tracer": "eslogger",
+      "unobserved": {
+        "paths": [
+          "<home>/Library",
+          "<home>/Library/Logs",
+          "<home>/Library/Logs/CoreSimulator",
+          "<home>/Library/Logs/CoreSimulator/CoreSimulator.com.apple.dt.xcodebuild.log"
+        ]
+      }
     },
     "linux/amd64": {
       "decoys": {

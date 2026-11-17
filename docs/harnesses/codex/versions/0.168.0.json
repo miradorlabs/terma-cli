@@ -29060,6 +29060,10 @@
           "sh -c <xcode>/usr/bin/xcodebuild -sdk <xcode>/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk -find git 2> /dev/null"
         ],
         "paths": [
+          "<home>/Library",
+          "<home>/Library/Logs",
+          "<home>/Library/Logs/CoreSimulator",
+          "<home>/Library/Logs/CoreSimulator/CoreSimulator.com.apple.dt.xcodebuild.log",
           "<repo>/@rpath",
           "<repo>/@rpath/AppStoreService.framework/Versions/A",
           "<repo>/@rpath/AppStoreService.framework/Versions/A/AppStoreService",

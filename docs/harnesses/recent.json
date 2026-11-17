@@ -1,7 +1,42 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-17T22:19:59.283537558Z",
+  "generated_at": "2026-11-17T22:53:16.748029703Z",
   "versions": [
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "version": "0.169.1",
+      "released_at": "2026-11-17T22:26:21.61Z",
+      "captured_at": "2026-11-17T22:53:16.748029703Z",
+      "platforms": [
+        "darwin/arm64",
+        "linux/amd64"
+      ],
+      "support": "supported",
+      "previous": "0.169.0",
+      "changes": 15,
+      "categories": {
+        "behavior": 10,
+        "model": 1,
+        "prompt": 2,
+        "tools": 2
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 15
+      },
+      "undocumented": 15,
+      "highlights": [
+        "Default model: gpt-6.1-sol → gpt-6.2-sol",
+        "System prompt changed (+16794 −12654 chars)",
+        "System prompt changed (+134 −0 chars)"
+      ],
+      "signing": "valid",
+      "attempted_at": "2026-11-17T22:53:16.748029703Z",
+      "attempts": 1
+    },
     {
       "harness": "codex-desktop",
       "name": "Codex app",
@@ -6157,39 +6192,6 @@
         "Interactive system prompt changed (+359 −0 chars)",
         "System prompt changed (+359 −0 chars)",
         "Full help text of `auto-mode --help` changed (+80 −80 chars)"
-      ],
-      "signing": "valid"
-    },
-    {
-      "harness": "codex",
-      "name": "Codex CLI",
-      "version": "0.144.3",
-      "released_at": "2026-07-13T06:15:20.67Z",
-      "captured_at": "2026-11-05T09:54:28.532441Z",
-      "platforms": [
-        "darwin/arm64",
-        "linux/amd64"
-      ],
-      "support": "untested",
-      "previous": "0.144.2",
-      "changes": 4,
-      "categories": {
-        "behavior": 1,
-        "caching": 1,
-        "cli": 1,
-        "filesystem": 1
-      },
-      "impact": {
-        "breaking": 0,
-        "degrading": 0,
-        "informational": 2,
-        "notable": 2
-      },
-      "undocumented": 4,
-      "highlights": [
-        "Caching across_turns: none → {\"breakpoints\":[[],[],[]],\"stable_cache_key\":true,\"stable…",
-        "Behaviour: sandbox removed",
-        "Full help text of `exec-server -h` changed (+0 −105 chars)"
       ],
       "signing": "valid"
     }
