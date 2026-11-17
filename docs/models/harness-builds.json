@@ -11072,6 +11072,24 @@
               }
             }
           ]
+        },
+        "1.0.113": {
+          "captured_at": "2026-11-17T16:47:38.091291406Z",
+          "captured": true,
+          "uses": [
+            {
+              "model": "claude-sonnet-4.5",
+              "role": "default",
+              "params": {
+                "temperature": 1,
+                "thinking": {
+                  "budget_tokens": 1024,
+                  "display": "summarized",
+                  "type": "enabled"
+                }
+              }
+            }
+          ]
         }
       }
     },
