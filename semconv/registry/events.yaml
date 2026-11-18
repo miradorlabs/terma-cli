@@ -655,11 +655,14 @@ events:
       - ref: terma.skill.repository.url
         requirement_level:
           conditionally_required: >-
-            With terma.skill.path, when the skill's file is held in a repository the team's
-            policy collects or in a plugin's GitHub marketplace.
+            When the skill's file is held in a repository the team's policy collects, with
+            terma.skill.path; for a plugin's skill whose marketplace is a GitHub repository,
+            with terma.skill.path where the file's place in it is known.
       - ref: terma.skill.path
         requirement_level:
-          conditionally_required: With terma.skill.repository.url.
+          conditionally_required: >-
+            With terma.skill.repository.url, when the file's place in that repository is
+            known.
 
   - name: terma.relay.heartbeat
     stability: development

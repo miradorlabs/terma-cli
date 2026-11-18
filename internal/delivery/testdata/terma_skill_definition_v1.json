@@ -175,6 +175,138 @@
               "severityNumber": 9,
               "severityText": "INFO",
               "timeUnixNano": "1794927249000000000"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "session.id",
+                  "value": {
+                    "stringValue": "00000000-0000-4000-8000-00000000c1a0"
+                  }
+                },
+                {
+                  "key": "gen_ai.main_agent.name",
+                  "value": {
+                    "stringValue": "claude-code"
+                  }
+                },
+                {
+                  "key": "terma.evidence.source",
+                  "value": {
+                    "stringValue": "claude_transcript"
+                  }
+                },
+                {
+                  "key": "terma.skill.marketplace.name",
+                  "value": {
+                    "stringValue": "claude-code-plugins"
+                  }
+                },
+                {
+                  "key": "terma.skill.name",
+                  "value": {
+                    "stringValue": "plugin-dev:skill-development"
+                  }
+                },
+                {
+                  "key": "terma.skill.origin",
+                  "value": {
+                    "stringValue": "plugin"
+                  }
+                },
+                {
+                  "key": "terma.skill.plugin.name",
+                  "value": {
+                    "stringValue": "plugin-dev"
+                  }
+                },
+                {
+                  "key": "terma.skill.repository.url",
+                  "value": {
+                    "stringValue": "https://github.com/anthropics/claude-code"
+                  }
+                },
+                {
+                  "key": "vcs.repository.url.full",
+                  "value": {
+                    "stringValue": "https://github.com/acme/widgets"
+                  }
+                }
+              ],
+              "body": {
+                "stringValue": "terma.skill.definition"
+              },
+              "eventName": "terma.skill.definition",
+              "observedTimeUnixNano": "1794927250000000000",
+              "severityNumber": 9,
+              "severityText": "INFO",
+              "timeUnixNano": "1794927250000000000"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "session.id",
+                  "value": {
+                    "stringValue": "019947ab-1234-7000-8000-123456789abc"
+                  }
+                },
+                {
+                  "key": "gen_ai.main_agent.name",
+                  "value": {
+                    "stringValue": "codex"
+                  }
+                },
+                {
+                  "key": "terma.evidence.source",
+                  "value": {
+                    "stringValue": "codex_rollout"
+                  }
+                },
+                {
+                  "key": "terma.skill.description",
+                  "value": {
+                    "stringValue": "Drafts release notes from merged pull requests."
+                  }
+                },
+                {
+                  "key": "terma.skill.marketplace.name",
+                  "value": {
+                    "stringValue": "acme-tools"
+                  }
+                },
+                {
+                  "key": "terma.skill.name",
+                  "value": {
+                    "stringValue": "tools:release-notes"
+                  }
+                },
+                {
+                  "key": "terma.skill.origin",
+                  "value": {
+                    "stringValue": "plugin"
+                  }
+                },
+                {
+                  "key": "terma.skill.plugin.name",
+                  "value": {
+                    "stringValue": "tools"
+                  }
+                },
+                {
+                  "key": "vcs.repository.url.full",
+                  "value": {
+                    "stringValue": "https://github.com/acme/widgets"
+                  }
+                }
+              ],
+              "body": {
+                "stringValue": "terma.skill.definition"
+              },
+              "eventName": "terma.skill.definition",
+              "observedTimeUnixNano": "1794927251000000000",
+              "severityNumber": 9,
+              "severityText": "INFO",
+              "timeUnixNano": "1794927251000000000"
             }
           ],
           "scope": {

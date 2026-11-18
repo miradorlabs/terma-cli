@@ -98,9 +98,11 @@ func repositorySkill(dir, root string) bool {
 }
 
 // pluginLink is where a plugin's skill file is held when its marketplace is a GitHub
-// repository: that repository, and the file's path in it, the plugin's source directory joined
-// with file, the skill's path in the plugin. Only a file the marketplace's checkout holds is
-// linked, so the path is the one the repository has.
+// repository: that repository, and the file's path in it when that is established, the
+// plugin's source directory joined with file, the skill's path in the plugin. A path is given
+// only for a file the marketplace's checkout holds, so it is the one the repository has; a
+// plugin held elsewhere (a source given as an object), or one the checkout does not show,
+// gets the repository alone.
 func (roots claudeSkillRoots) pluginLink(marketplace, plugin, file string) (repositoryURL, filePath string) {
 	plugins := filepath.Join(roots.Config, "plugins")
 	known, status := hookrun.ReadEvidenceJSON(filepath.Join(plugins, "known_marketplaces.json"))
@@ -117,33 +119,34 @@ func (roots claudeSkillRoots) pluginLink(marketplace, plugin, file string) (repo
 		slices.ContainsFunc(strings.Split(entry.Source.Repo, "/"), func(seg string) bool { return strings.Trim(seg, ".") == "" }) {
 		return "", ""
 	}
+	repositoryURL = "https://github.com/" + entry.Source.Repo
 	checkout := filepath.Join(plugins, "marketplaces", marketplace)
 	manifest, status := hookrun.ReadEvidenceJSON(filepath.Join(checkout, ".claude-plugin", "marketplace.json"))
 	if status != hookrun.StatusPresent {
-		return "", ""
+		return repositoryURL, ""
 	}
 	var listed []struct {
 		Name   string          `json:"name"`
 		Source json.RawMessage `json:"source"`
 	}
 	if json.Unmarshal(manifest["plugins"], &listed) != nil {
-		return "", ""
+		return repositoryURL, ""
 	}
 	for _, p := range listed {
 		var source string
-		// A source given as an object is a plugin held elsewhere: no link.
+		// A source given as an object is a plugin held elsewhere: no path.
 		if p.Name != plugin || json.Unmarshal(p.Source, &source) != nil {
 			continue
 		}
 		source = path.Clean(strings.TrimPrefix(source, "./"))
 		rel := path.Join(source, file)
 		if strings.HasPrefix(source, "/") || source == ".." || strings.HasPrefix(source, "../") || strings.Contains(source, `\`) {
-			return "", ""
+			return repositoryURL, ""
 		}
 		if st, err := os.Lstat(filepath.Join(checkout, filepath.FromSlash(rel))); err != nil || !st.Mode().IsRegular() {
-			return "", ""
+			return repositoryURL, ""
 		}
-		return "https://github.com/" + entry.Source.Repo, rel
+		return repositoryURL, rel
 	}
-	return "", ""
+	return repositoryURL, ""
 }

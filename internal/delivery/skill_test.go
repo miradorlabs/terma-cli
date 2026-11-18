@@ -52,28 +52,33 @@ func TestOutgoingSendsASkillDefinitionOnlyWhole(t *testing.T) {
 
 // A queued definition loses the place of its skill's file once the policy no longer collects
 // the repository that place names, the session's own still collected; a plugin's skill keeps
-// its marketplace, which no policy lists.
+// its marketplace, which no policy lists, also when it names no path.
 func TestOutgoingDropsASkillLinkThePolicyNoLongerAdmits(t *testing.T) {
 	t.Parallel()
 	pol := config.Policy{Mode: config.ModeRepo, Repositories: listed, IncludePrompts: true, IncludeToolContent: true}
 	for _, tc := range []struct {
 		name, origin, url string
-		linked            bool
+		noPath, linked    bool
 	}{
-		{"own", semconv.TermaSkillOriginRepository, "https://github.com/acme/app", true},
-		{"own-by-case", semconv.TermaSkillOriginRepository, "https://github.com/Acme/App", true},
-		{"dropped", semconv.TermaSkillOriginPersonal, "https://github.com/acme/dotfiles", false},
-		{"plugin", semconv.TermaSkillOriginPlugin, "https://github.com/acme/agent-plugins", true},
+		{"own", semconv.TermaSkillOriginRepository, "https://github.com/acme/app", false, true},
+		{"own-by-case", semconv.TermaSkillOriginRepository, "https://github.com/Acme/App", false, true},
+		{"dropped", semconv.TermaSkillOriginPersonal, "https://github.com/acme/dotfiles", false, false},
+		{"plugin", semconv.TermaSkillOriginPlugin, "https://github.com/acme/agent-plugins", false, true},
+		{"plugin-url-alone", semconv.TermaSkillOriginPlugin, "https://github.com/acme/agent-plugins", true, true},
+		{"dropped-url-alone", semconv.TermaSkillOriginPersonal, "https://github.com/acme/dotfiles", true, false},
 	} {
 		ev := skillDefinition()
 		ev.Attrs[semconv.TermaSkillOriginKey], ev.Attrs[semconv.TermaSkillRepositoryURLKey] = tc.origin, tc.url
+		if tc.noPath {
+			delete(ev.Attrs, semconv.TermaSkillPathKey)
+		}
 		out, ok := (Router{ConfigDir: t.TempDir()}).Outgoing(pol, "p1", ev)
 		_, hasURL := out.Attrs[semconv.TermaSkillRepositoryURLKey]
 		_, hasPath := out.Attrs[semconv.TermaSkillPathKey]
-		if !ok || hasURL != tc.linked || hasPath != tc.linked || out.Attrs[semconv.TermaSkillNameKey] != "deploy" {
+		if !ok || hasURL != tc.linked || hasPath != (tc.linked && !tc.noPath) || out.Attrs[semconv.TermaSkillNameKey] != "deploy" {
 			t.Errorf("%s: %+v, %v", tc.name, out.Attrs, ok)
 		}
-		if ev.Attrs[semconv.TermaSkillPathKey] == nil {
+		if ev.Attrs[semconv.TermaSkillRepositoryURLKey] == nil {
 			t.Errorf("%s: the queued event was changed", tc.name)
 		}
 	}
@@ -129,6 +134,19 @@ func TestSkillDefinitionWireContract(t *testing.T) {
 			semconv.TermaSkillNameKey: "hello-codex", semconv.TermaSkillDescriptionKey: "Replies with a fixed greeting. Use when the user asks for the hello-codex greeting.",
 			semconv.TermaSkillOriginKey:        semconv.TermaSkillOriginRepository,
 			semconv.TermaSkillRepositoryURLKey: "https://github.com/acme/widgets", semconv.TermaSkillPathKey: ".agents/skills/hello-codex/SKILL.md",
+		}},
+		// A plugin whose marketplace repository is known, but not its file's place in it.
+		{Time: at.Add(2 * time.Second), Repository: widgets, Name: semconv.TermaSkillDefinitionEvent, SessionID: "00000000-0000-4000-8000-00000000c1a0", Attrs: map[string]any{
+			hookrun.AttrProjectID: "proj_acme", semconv.GenAIMainAgentNameKey: "claude-code", semconv.TermaEvidenceSourceKey: "claude_transcript",
+			semconv.TermaSkillNameKey: "plugin-dev:skill-development", semconv.TermaSkillOriginKey: semconv.TermaSkillOriginPlugin,
+			semconv.TermaSkillPluginNameKey: "plugin-dev", semconv.TermaSkillMarketplaceNameKey: "claude-code-plugins",
+			semconv.TermaSkillRepositoryURLKey: "https://github.com/anthropics/claude-code",
+		}},
+		// A Codex $name plugin skill under the name Codex recorded.
+		{Time: at.Add(3 * time.Second), Repository: widgets, Name: semconv.TermaSkillDefinitionEvent, SessionID: "019947ab-1234-7000-8000-123456789abc", Attrs: map[string]any{
+			hookrun.AttrProjectID: "proj_acme", semconv.GenAIMainAgentNameKey: "codex", semconv.TermaEvidenceSourceKey: "codex_rollout",
+			semconv.TermaSkillNameKey: "tools:release-notes", semconv.TermaSkillDescriptionKey: "Drafts release notes from merged pull requests.",
+			semconv.TermaSkillOriginKey: semconv.TermaSkillOriginPlugin, semconv.TermaSkillPluginNameKey: "tools", semconv.TermaSkillMarketplaceNameKey: "acme-tools",
 		}},
 	}
 	sender := &otlpSender{Endpoint: srv.URL, APIKey: "k", ProjectID: "proj_acme", Version: "1.2.3", HTTP: srv.Client()}

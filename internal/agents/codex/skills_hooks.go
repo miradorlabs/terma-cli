@@ -40,7 +40,7 @@ func captureCodexSkillReads(e hookrun.Env, r *hookrun.Repo, in *codexHookInput) 
 	}
 	var skills []hookrun.Skill
 	for _, p := range shellSkillReads(input.Command, e.Cwd) {
-		if s, ok := codexSkill(e, r, p); ok {
+		if s, ok := codexSkill(e, r, p, ""); ok {
 			skills = append(skills, s)
 		}
 	}
@@ -91,8 +91,8 @@ func captureCodexSkillMentions(ctx context.Context, e hookrun.Env, r *hookrun.Re
 	}
 	for {
 		var skills []hookrun.Skill
-		next, status, err := readRolloutSkills(ctx, rollout, in.TranscriptPath, cursor, admits, func(p, cwd string) error {
-			if s, ok := codexSkill(e, turnRepo(cwd), p); ok {
+		next, status, err := readRolloutSkills(ctx, rollout, in.TranscriptPath, cursor, admits, func(name, p, cwd string) error {
+			if s, ok := codexSkill(e, turnRepo(cwd), p, name); ok {
 				skills = append(skills, s)
 			}
 			return nil

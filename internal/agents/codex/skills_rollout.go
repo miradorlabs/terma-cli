@@ -39,10 +39,10 @@ var skillRecordMarks = [][]byte{
 	[]byte("task_started"), []byte("turn_started"), []byte(codexSkillInstructions),
 }
 
-// readRolloutSkills emits the path of each $name skill the rollout records from the cursor
-// on, in turns the team collects, with the directory its turn ran in, reading at most 1 MiB
+// readRolloutSkills emits the name and path of each $name skill the rollout records from the
+// cursor on, in turns the team collects, with the directory its turn ran in, reading at most 1 MiB
 // and 128 skills per call; the caller spools each before persisting the cursor.
-func readRolloutSkills(ctx context.Context, sessionID, transcript string, cursor skillCursor, admits func(cwd string) bool, emit func(path, cwd string) error) (skillCursor, string, error) {
+func readRolloutSkills(ctx context.Context, sessionID, transcript string, cursor skillCursor, admits func(cwd string) bool, emit func(name, path, cwd string) error) (skillCursor, string, error) {
 	f, status := openCodexRollout(ctx, sessionID, transcript)
 	if f == nil {
 		return cursor, status, nil
@@ -102,8 +102,8 @@ func readRolloutSkills(ctx context.Context, sessionID, transcript string, cursor
 		}
 		if cursor.Skipping {
 			cursor.Skipping = false
-		} else if path, ok := codexSkillPathFrom(line, &cursor, admits); ok && cursor.Admitted {
-			if err := emit(path, cursor.Cwd); err != nil {
+		} else if name, path, ok := codexSkillPathFrom(line, &cursor, admits); ok && cursor.Admitted {
+			if err := emit(name, path, cursor.Cwd); err != nil {
 				return checkpoint("append_failed", err)
 			}
 			emitted++
@@ -117,11 +117,11 @@ func readRolloutSkills(ctx context.Context, sessionID, transcript string, cursor
 	return checkpoint("caught_up", nil)
 }
 
-// codexSkillPathFrom follows the record's turn, and returns the SKILL.md path a $name
-// skill's message names; nothing else of the message is kept.
-func codexSkillPathFrom(line []byte, cursor *skillCursor, admits func(string) bool) (string, bool) {
+// codexSkillPathFrom follows the record's turn, and returns the name and SKILL.md path a
+// $name skill's message names; nothing else of the message is kept.
+func codexSkillPathFrom(line []byte, cursor *skillCursor, admits func(string) bool) (name, path string, ok bool) {
 	if !slices.ContainsFunc(skillRecordMarks, func(m []byte) bool { return bytes.Contains(line, m) }) {
-		return "", false
+		return "", "", false
 	}
 	var rec struct {
 		Type    string `json:"type"`
@@ -137,28 +137,29 @@ func codexSkillPathFrom(line []byte, cursor *skillCursor, admits func(string) bo
 		} `json:"payload"`
 	}
 	if json.Unmarshal(line, &rec) != nil {
-		return "", false
+		return "", "", false
 	}
 	cursor.track(admits, rec.Type, rec.Payload.Type, rec.Payload.turnFields)
 	p := rec.Payload
 	if rec.Type != "response_item" || p.Type != "message" || p.Role != "user" || !slices.Contains(p.Metadata.Kinds, codexSkillInstructions) {
-		return "", false
+		return "", "", false
 	}
 	var content []struct {
 		Text string `json:"text"`
 	}
 	if json.Unmarshal(p.Content, &content) != nil || len(content) == 0 || !strings.HasPrefix(content[0].Text, codexSkillHead) {
-		return "", false
+		return "", "", false
 	}
 	// <skill>, <name>…</name>, then <path>…</path>.
 	lines := strings.SplitN(content[0].Text, "\n", 4)
 	if len(lines) < 3 {
-		return "", false
+		return "", "", false
 	}
-	path, ok := strings.CutPrefix(lines[2], "<path>")
+	name, named := strings.CutSuffix(strings.TrimPrefix(lines[1], "<name>"), "</name>")
+	path, ok = strings.CutPrefix(lines[2], "<path>")
 	path, closed := strings.CutSuffix(path, "</path>")
-	if !ok || !closed || !filepath.IsAbs(path) {
-		return "", false
+	if !named || name == "" || !ok || !closed || !filepath.IsAbs(path) {
+		return "", "", false
 	}
-	return filepath.Clean(path), true
+	return name, filepath.Clean(path), true
 }

@@ -1,6 +1,7 @@
 package codex
 
 import (
+	"cmp"
 	"os"
 	"path/filepath"
 	"slices"
@@ -125,13 +126,15 @@ func codexRoots() codexSkillRoots {
 
 // codexSkill is the skill whose SKILL.md is at path, when Codex counts it as one: a file
 // under one of its skill roots, judged from the path as read, before its symlinks are
-// resolved, with frontmatter. Codex names a skill by its frontmatter's name, else its
-// folder's, a plugin's prefixed with the plugin's.
-func codexSkill(e hookrun.Env, r *hookrun.Repo, path string) (hookrun.Skill, bool) {
-	return codexRoots().skill(e, r, path)
+// resolved, with frontmatter. recorded is the name Codex gave it, "" for a shell read.
+func codexSkill(e hookrun.Env, r *hookrun.Repo, path, recorded string) (hookrun.Skill, bool) {
+	return codexRoots().skill(e, r, path, recorded)
 }
 
-func (roots codexSkillRoots) skill(e hookrun.Env, r *hookrun.Repo, path string) (hookrun.Skill, bool) {
+// skill is codexSkill on these roots. A skill Codex recorded is one, under the name it
+// recorded, though its path, which Codex resolved, lies under no root: a personal skill
+// linked from a personal root keeps that origin, any other has none.
+func (roots codexSkillRoots) skill(e hookrun.Env, r *hookrun.Repo, path, recorded string) (hookrun.Skill, bool) {
 	var s hookrun.Skill
 	below := func(root string, elem ...string) bool {
 		_, ok := hookrun.PathBelow(path, root, elem...)
@@ -158,8 +161,10 @@ func (roots codexSkillRoots) skill(e hookrun.Env, r *hookrun.Repo, path string) 
 		s.Origin = semconv.TermaSkillOriginManaged
 	case r != nil && repositorySkill(path, r.Root):
 		s.Origin, link = semconv.TermaSkillOriginRepository, true
-	default:
+	case recorded == "":
 		return s, false
+	case roots.linkedPersonal(path):
+		s.Origin, link = semconv.TermaSkillOriginPersonal, true
 	}
 	if filepath.Base(path) != codexSkillFile {
 		return s, false
@@ -168,18 +173,59 @@ func (roots codexSkillRoots) skill(e hookrun.Env, r *hookrun.Repo, path string) 
 	if !ok {
 		return s, false
 	}
-	s.Name = fm.Name
+	s.Name = recorded
 	if s.Name == "" {
-		s.Name = filepath.Base(filepath.Dir(path))
-	}
-	if s.Plugin != "" {
-		s.Name = s.Plugin + ":" + s.Name
+		// Accepted risk: a skill the model read with a shell command is named from its
+		// frontmatter, else its folder, with the plugin's prefix only in the plugin cache's
+		// layout, so one Codex qualifies differently (under a nested plugin manifest) does not
+		// join its uses. Upgrade path: Codex reporting the name with the read.
+		s.Name = cmp.Or(fm.Name, filepath.Base(filepath.Dir(path)))
+		if s.Plugin != "" {
+			s.Name = s.Plugin + ":" + s.Name
+		}
 	}
 	s.Description = fm.Description
 	if link {
 		s.RepositoryURL, s.Path = e.SkillLink(path)
 	}
 	return s, true
+}
+
+// codexPersonalEntriesRead bounds the entries of a personal root read to find a link.
+const codexPersonalEntriesRead = 512
+
+// linkedPersonal reports whether path is in, or is, the folder a direct child of a personal
+// root links to: Codex records a skill's path with its links resolved, so one kept in a
+// dotfiles checkout lies under no root.
+func (roots codexSkillRoots) linkedPersonal(path string) bool {
+	if resolved, err := filepath.EvalSymlinks(path); err == nil {
+		path = resolved
+	}
+	for _, root := range []string{filepath.Join(roots.Home, "skills"), filepath.Join(roots.User, ".agents", "skills")} {
+		if !filepath.IsAbs(root) {
+			continue // no Home or User
+		}
+		// Stat first: opening a root that is no directory (a FIFO) could block the hook.
+		if st, err := os.Stat(root); err != nil || !st.IsDir() {
+			continue
+		}
+		f, err := os.Open(root)
+		if err != nil {
+			continue
+		}
+		entries, _ := f.ReadDir(codexPersonalEntriesRead)
+		_ = f.Close()
+		for _, ent := range entries {
+			if ent.Name() == ".system" {
+				continue
+			}
+			target, err := filepath.EvalSymlinks(filepath.Join(root, ent.Name()))
+			if rel, relErr := filepath.Rel(target, path); err == nil && relErr == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) && !filepath.IsAbs(rel) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // repositorySkill reports whether path lies in a .agents/skills or .codex/skills directory of
