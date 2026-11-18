@@ -3,6 +3,33 @@
   "id": "gemini-3.5-flash-lite",
   "steps": [
     {
+      "at": "2026-11-18T20:37:18.20454344Z",
+      "event": "changed",
+      "changes": [
+        {
+          "id": "docs/whats_new",
+          "category": "docs",
+          "op": "changed",
+          "path": [
+            "docs",
+            "whats_new"
+          ],
+          "title": "What's new page changed (+50 −0 chars)",
+          "impact": "informational",
+          "before": null,
+          "after": null,
+          "text_diff": "@@ -290,6 +290,7 @@\n \n *   [Choosing a model](/docs/choosing-a-model)\n *   [Latest Gemini models](/docs/latest-model)\n+*   [Gemini 4 Neon](/docs/whats-new-gemini-4-neon)\n *   [Gemini 4 Hydrogen](/docs/whats-new-gemini-4-hydrogen)\n *   [Gemini 4 Carbon](/docs/whats-new-gemini-4-carbon)\n *   [Gemini 4 Argon](/docs/whats-new-gemini-4-argon)\n",
+          "stats": {
+            "added_chars": 50,
+            "removed_chars": 0
+          },
+          "terma": null,
+          "source": null,
+          "documented": null
+        }
+      ]
+    },
+    {
       "at": "2026-11-18T09:52:12.835975143Z",
       "event": "changed",
       "changes": [

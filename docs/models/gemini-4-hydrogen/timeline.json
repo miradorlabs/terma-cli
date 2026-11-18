@@ -3,6 +3,54 @@
   "id": "gemini-4-hydrogen",
   "steps": [
     {
+      "at": "2026-11-18T20:37:18.20454344Z",
+      "event": "changed",
+      "changes": [
+        {
+          "id": "docs/overview",
+          "category": "docs",
+          "op": "changed",
+          "path": [
+            "docs",
+            "overview"
+          ],
+          "title": "Model page changed (+198 −199 chars)",
+          "impact": "informational",
+          "before": null,
+          "after": null,
+          "text_diff": "@@ -12,7 +12,7 @@\n ## Documentation  {% id=\"documentation\" %}\n \n Visit the [What's new in Gemini 4 Hydrogen](/docs/whats-new-gemini-4-hydrogen) page\n-for full coverage of features, API changes from Gemini 3.8 Flash, and migration guidance, or read [Choosing a model](/docs/choosing-a-model) to compare Hydrogen against Carbon, Argon, and Flash-Lite.\n+for full coverage of features, API changes from Gemini 3.8 Flash, and migration guidance, or read [Choosing a model](/docs/choosing-a-model) to compare Hydrogen against Carbon, Neon, and Flash-Lite.\n \n ## gemini-4-hydrogen  {% id=\"gemini-4-hydrogen\" %}\n \n",
+          "stats": {
+            "added_chars": 198,
+            "removed_chars": 199
+          },
+          "terma": null,
+          "source": null,
+          "documented": null
+        },
+        {
+          "id": "docs/whats_new",
+          "category": "docs",
+          "op": "changed",
+          "path": [
+            "docs",
+            "whats_new"
+          ],
+          "title": "What's new page changed (+1550 −1378 chars)",
+          "impact": "informational",
+          "before": null,
+          "after": null,
+          "text_diff": "@@ -8,7 +8,7 @@\n Gemini 4 Hydrogen (`gemini-4-hydrogen`) brings cutting-edge intelligence to everyone, with speed and efficiency for everyday coding and agentic workflows.\n \n Gemini 4 Hydrogen is available on both the free and paid tiers in Google AI Studio and the Gemini API (across both GenerateContent and the Interactions API).\n-Like [Gemini 4 Carbon](/docs/whats-new-gemini-4-carbon) and [Gemini 4 Argon](/docs/whats-new-gemini-4-argon), it features a unified 1M-token context window and long decode up to 1M tokens.\n+Like the other Gemini 4 models ([Gemini 4 Carbon](/docs/whats-new-gemini-4-carbon) and [Gemini 4 Neon](/docs/whats-new-gemini-4-neon)), it features a unified 1M-token context window and long decode up to 1M tokens.\n It also adds a fourth thinking level, [`xhigh`](/docs/thinking#understanding-thinking-levels), alongside `low`, `medium`, and the default `high`.\n \n {% card-grid %}\n@@ -88,15 +88,15 @@\n * **Fast agentic execution:** Writes cleaner code, cuts fabricated claims by more than 5x compared to [Gemini 3.8 Flash](/docs/whats-new-gemini-3.8) by flagging missing context instead of guessing, batches read and search tool calls in parallel, and better adapts when tool calls fail.\n * **Four configurable thinking levels:** Supports `low`, `medium`, `high` (default), and a new `xhigh` level, giving you finer control over latency and cost and deeper reasoning when tasks need it.\n See the [thinking levels](/docs/whats-new-gemini-4-hydrogen#understanding-thinking-levels) section for details.\n-* **Built for multi-model orchestration:** Works standalone for coding and agentic work, or pairs with Carbon and Argon to power parallel worker and verifier agents at lower latency without driving up token cost.\n+* **Built for multi-model orchestration:** Works standalone for coding and agentic work, or pairs with Carbon and Neon to power parallel worker and verifier agents at lower latency without driving up token cost.\n * **Stronger multimodal reasoning:** Reads and synthesizes tables, charts, dense PDFs, images, audio, and video with higher accuracy, and uses [agentic video understanding](/docs/video-understanding#agentic-video-understanding) to inspect specific frames and visual details.\n * **Unified 1M context window and long decode:** Input, thinking, and output tokens share one 1,048,576-token window. Responses can run past 64K up to 1M tokens using background execution or client-side continuation. See [Long decode](/docs/long-decode).\n * **Default model for Managed Agents:** The [Antigravity agent](/docs/antigravity-agent) now uses Gemini 4 Hydrogen (`gemini-4-hydrogen`) by default.\n \n-## Choosing between Hydrogen, Carbon, Argon, and other models  {% id=\"choosing-between-models\" %}\n+## Choosing between Hydrogen, Carbon, Neon, and other models  {% id=\"choosing-between-models\" %}\n \n Gemini 4 Hydrogen is our default general-purpose model for everyday coding, interactive web apps, tool-using agents, multimodal document workflows, and parallel subagent execution, and is the recommended upgrade from [Gemini 3.8 Flash](/docs/whats-new-gemini-3.8) and earlier Gemini 3 and 2.5 models.\n-Use [Gemini 4 Carbon](/docs/whats-new-gemini-4-carbon) for hard architecture, debugging, science, and security verification, or [Gemini 4 Argon](/docs/whats-new-gemini-4-argon) for advanced long-horizon reasoning with lower token spend than Carbon.\n+Use [Gemini 4 Carbon](/docs/whats-new-gemini-4-carbon) for hard architecture, debugging, science, and security verification, or [Gemini 4 Neon](/docs/whats-new-gemini-4-neon) for frontier-level intelligence with fast end-to-end task completion across complex software engineering, knowledge work, and science workflows.\n Keep [Gemini 3.5 Flash-Lite](/docs/whats-new-gemini-3.6) for high-volume classification, routing, and sub-second latency targets.\n \n You can also pair Carbon and Hydrogen in one workflow by having Carbon plan system interfaces or resolve hard roadblocks and delegating code edits, parallel subagent tasks, and test runs to Hydrogen.\n@@ -403,13 +403,13 @@\n * **Use background execution for outputs past 64K:** Set `background` to `true` and `max_output_tokens` above 65,536 for responses longer than 64K tokens (or use client-side continuation in the latest SDKs).\n * **Review token billing estimates:** We count and bill every token the model processes, including thinking tokens and internal grounding system instructions and function declarations.\n \n-### Migrate from or pair with Gemini 4 Carbon and Argon  {% id=\"migrate-from-gemini-4-argon\" %}\n+### Migrate from or pair with other Gemini 4 models  {% id=\"migrate-from-gemini-4-argon\" %}\n \n-If you run `gemini-4-carbon` or `gemini-4-argon` today, adding or switching to `gemini-4-hydrogen` requires no request schema changes:\n+If you run `gemini-4-carbon`, `gemini-4-neon`, or `gemini-4-argon` today, adding or switching to `gemini-4-hydrogen` requires no request schema changes:\n \n * **Update model ID:** Set `model` to `gemini-4-hydrogen` for standalone requests or subagent turns.\n-* **Check default thinking level:** Hydrogen defaults to `high` and supports `xhigh`, whereas Carbon and Argon default to `medium` and cap at `high`. Set `thinking_level` when you want `medium` or `xhigh` behavior.\n-* **64K non-streaming hops:** Hydrogen supports up to 65,536 tokens per non-streaming hop across REST and SDK calls, compared to 32,768 tokens per non-streaming REST hop on Carbon and Argon.\n+* **Check default thinking level:** Hydrogen and Neon default to `high` and support `xhigh`, whereas Carbon and Argon default to `medium` and cap at `high`. Set `thinking_level` when you want `medium` or `xhigh` behavior.\n+* **64K non-streaming hops:** Hydrogen and Neon support up to 65,536 tokens per non-streaming hop across REST and SDK calls, compared to 32,768 tokens per non-streaming REST hop on Carbon and Argon.\n * **Switch models across turns:** Route planning turns to `gemini-4-carbon` and execution turns to `gemini-4-hydrogen` in one multi-turn session using `previous_interaction_id` (see [Pair models in multi-step workflows](/docs/choosing-a-model#pair-models), or preserve [thought steps in stateless mode](/docs/thinking#stateless-mode); see [multi-turn model compatibility](/docs/interactions-overview#limitations)).\n \n ## Pricing  {% id=\"pricing\" %}\n@@ -432,6 +432,7 @@\n * [Latest Gemini models](/docs/latest-model)\n * [Gemini 4 Carbon](/docs/whats-new-gemini-4-carbon)\n * [Gemini 4 Argon](/docs/whats-new-gemini-4-argon)\n+* [Gemini 4 Neon](/docs/whats-new-gemini-4-neon)\n * [Gemini 3.8 Flash](/docs/whats-new-gemini-3.8)\n * [Gemini 3.6 Flash and 3.5 Flash-Lite](/docs/whats-new-gemini-3.6)\n * [See all models](/docs/models)\n",
+          "stats": {
+            "added_chars": 1550,
+            "removed_chars": 1378
+          },
+          "terma": null,
+          "source": null,
+          "documented": null
+        }
+      ]
+    },
+    {
       "at": "2026-11-18T09:52:12.835975143Z",
       "event": "changed",
       "changes": [

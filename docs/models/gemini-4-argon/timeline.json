@@ -3,6 +3,54 @@
   "id": "gemini-4-argon",
   "steps": [
     {
+      "at": "2026-11-18T20:37:18.20454344Z",
+      "event": "changed",
+      "changes": [
+        {
+          "id": "docs/overview",
+          "category": "docs",
+          "op": "changed",
+          "path": [
+            "docs",
+            "overview"
+          ],
+          "title": "Model page changed (+134 −156 chars)",
+          "impact": "informational",
+          "before": null,
+          "after": null,
+          "text_diff": "@@ -14,7 +14,7 @@\n ## Documentation  {% id=\"documentation\" %}\n \n Visit the [What's new in Gemini 4 Argon](/docs/whats-new-gemini-4-argon) page\n-for full coverage of features and API changes, or read [Choosing a model](/docs/choosing-a-model) to compare Argon against Carbon, Hydrogen, and Flash-Lite.\n+for full coverage of features and API changes, or read [Choosing a model](/docs/choosing-a-model) to compare our latest Gemini models.\n \n ## gemini-4-argon  {% id=\"gemini-4-argon\" %}\n \n",
+          "stats": {
+            "added_chars": 134,
+            "removed_chars": 156
+          },
+          "terma": null,
+          "source": null,
+          "documented": null
+        },
+        {
+          "id": "docs/whats_new",
+          "category": "docs",
+          "op": "changed",
+          "path": [
+            "docs",
+            "whats_new"
+          ],
+          "title": "What's new page changed (+48 −0 chars)",
+          "impact": "informational",
+          "before": null,
+          "after": null,
+          "text_diff": "@@ -437,6 +437,7 @@\n \n * [Choosing a model](/docs/choosing-a-model)\n * [Latest Gemini models](/docs/latest-model)\n+* [Gemini 4 Neon](/docs/whats-new-gemini-4-neon)\n * [Gemini 4 Hydrogen](/docs/whats-new-gemini-4-hydrogen)\n * [Gemini 4 Carbon](/docs/whats-new-gemini-4-carbon)\n * [Gemini 3.8 Flash](/docs/whats-new-gemini-3.8)\n",
+          "stats": {
+            "added_chars": 48,
+            "removed_chars": 0
+          },
+          "terma": null,
+          "source": null,
+          "documented": null
+        }
+      ]
+    },
+    {
       "at": "2026-11-18T09:52:12.835975143Z",
       "event": "changed",
       "changes": [

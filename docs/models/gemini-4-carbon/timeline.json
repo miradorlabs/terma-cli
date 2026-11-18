@@ -3,6 +3,54 @@
   "id": "gemini-4-carbon",
   "steps": [
     {
+      "at": "2026-11-18T20:37:18.20454344Z",
+      "event": "changed",
+      "changes": [
+        {
+          "id": "docs/overview",
+          "category": "docs",
+          "op": "changed",
+          "path": [
+            "docs",
+            "overview"
+          ],
+          "title": "Model page changed (+176 −177 chars)",
+          "impact": "informational",
+          "before": null,
+          "after": null,
+          "text_diff": "@@ -12,7 +12,7 @@\n ## Documentation  {% id=\"documentation\" %}\n \n Visit the [What's new in Gemini 4 Carbon](/docs/whats-new-gemini-4-carbon) page\n-for full coverage of features, API changes, and migration guidance, or read [Choosing a model](/docs/choosing-a-model) to compare Carbon against Argon, Hydrogen, and Flash-Lite.\n+for full coverage of features, API changes, and migration guidance, or read [Choosing a model](/docs/choosing-a-model) to compare Carbon against Neon, Hydrogen, and Flash-Lite.\n \n ## gemini-4-carbon  {% id=\"gemini-4-carbon\" %}\n \n",
+          "stats": {
+            "added_chars": 176,
+            "removed_chars": 177
+          },
+          "terma": null,
+          "source": null,
+          "documented": null
+        },
+        {
+          "id": "docs/whats_new",
+          "category": "docs",
+          "op": "changed",
+          "path": [
+            "docs",
+            "whats_new"
+          ],
+          "title": "What's new page changed (+1178 −1197 chars)",
+          "impact": "informational",
+          "before": null,
+          "after": null,
+          "text_diff": "@@ -20,7 +20,7 @@\n \n {% /card-grid %}\n \n-This guide explains what's new in Gemini 4 Carbon, how to choose between Carbon and Argon, API changes, code examples, and migration guidance.\n+This guide explains what's new in Gemini 4 Carbon, how to choose between Gemini 4 models, API changes, code examples, and migration guidance.\n \n ## New model  {% id=\"new-model\" %}\n \n@@ -95,20 +95,16 @@\n * **Unified 1M context window and long decode:** Input, thinking, and output tokens share one 1,048,576-token window, and a single response can now go past 64K tokens, up to 1M tokens minus your input. See [Long decode](/docs/long-decode).\n * **Supported in Managed Agents:** The [Antigravity agent](/docs/antigravity-agent) in Gemini Managed Agents now supports `gemini-4-carbon`.\n \n-## Choosing between Carbon, Argon, and other models  {% id=\"choosing-between-models\" %}\n+## Choosing between Carbon, Neon, Hydrogen, and other models  {% id=\"choosing-between-models\" %}\n \n-Gemini 4 Carbon and [Gemini 4 Argon](/docs/whats-new-gemini-4-argon) share the same 1M unified context window, built-in tools, and per-token pricing. The main difference is how many thinking tokens each model spends per turn:\n+Gemini 4 Carbon, [Gemini 4 Neon](/docs/whats-new-gemini-4-neon), and [Gemini 4 Hydrogen](/docs/whats-new-gemini-4-hydrogen) share the same 1M unified context window, long decode architecture, and built-in tools:\n \n * **Gemini 4 Carbon (`gemini-4-carbon`):** Built for tasks that push the limits of reasoning depth.\n-Carbon spends more thinking tokens per turn to explore thoroughly and verify its work, which increases per-turn token use and latency compared to Argon.\n+Carbon spends more thinking tokens per turn to explore thoroughly and verify its work, which increases per-turn token use and latency.\n Use it for complex root-cause debugging, architectural design, dense multimodal synthesis, scientific proofs, and security auditing.\n-\n-* **Gemini 4 Argon (`gemini-4-argon`):** Our efficient Gemini 4 frontier reasoning model, ideal for most advanced software engineering and knowledge work tasks.\n-It delivers Gemini 4 intelligence with faster responses and lower token spend per turn compared to Carbon on interactive coding, day-to-day feature work, and fast production loops.\n-\n+* **Gemini 4 Neon (`gemini-4-neon`):** Brings frontier-level intelligence with fast end-to-end task completion ($3.00 / $15.00 per 1M tokens, paid tier only) across complex software engineering, knowledge work, and science workflows.\n * **Gemini 4 Hydrogen (`gemini-4-hydrogen`):** Fast and cost-efficient ($1.50 / $7.50 per 1M tokens, plus a Free tier) for everyday coding, interactive apps, multimodal documents, and parallel subagent execution.\n \n-\n For side-by-side comparisons and multi-model orchestration examples, see [Choosing a model](/docs/choosing-a-model) and [Latest Gemini models](/docs/latest-model#compare-models).\n \n ## Understanding thinking levels  {% id=\"understanding-thinking-levels\" %}\n@@ -411,7 +407,7 @@\n \n * **Update model ID:** Change your model string from `gemini-4-argon` to `gemini-4-carbon`.\n * **Account for longer thinking:** Carbon spends more thinking tokens per turn than Argon on complex tasks. Keep `thinking_level` at `medium` (default) unless a workload needs `high`, and make sure your `max_output_tokens` and HTTP timeouts allow for longer reasoning passes.\n-* **Keep Argon where speed matters:** Retain [`gemini-4-argon`](/docs/whats-new-gemini-4-argon) when you want faster responses and lower token spend per turn compared to Carbon on interactive coding, day-to-day feature work, and fast production loops.\n+* **Use Neon or Hydrogen where speed matters:** Use [`gemini-4-neon`](/docs/whats-new-gemini-4-neon) for complex software engineering, knowledge work, and science workflows with faster end-to-end task completion, or [`gemini-4-hydrogen`](/docs/whats-new-gemini-4-hydrogen) for everyday coding and interactive loops.\n \n ### Migrate from Gemini 3 and earlier  {% id=\"migrate-to-gemini-4-carbon\" %}\n \n@@ -444,6 +440,7 @@\n \n * [Choosing a model](/docs/choosing-a-model)\n * [Latest Gemini models](/docs/latest-model)\n+* [Gemini 4 Neon](/docs/whats-new-gemini-4-neon)\n * [Gemini 4 Hydrogen](/docs/whats-new-gemini-4-hydrogen)\n * [Gemini 4 Argon](/docs/whats-new-gemini-4-argon)\n * [Gemini 3.8 Flash](/docs/whats-new-gemini-3.8)\n",
+          "stats": {
+            "added_chars": 1178,
+            "removed_chars": 1197
+          },
+          "terma": null,
+          "source": null,
+          "documented": null
+        }
+      ]
+    },
+    {
       "at": "2026-11-18T09:52:12.835975143Z",
       "event": "changed",
       "changes": [

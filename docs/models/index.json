@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-18T15:13:08.657184156Z",
+  "generated_at": "2026-11-18T20:37:18.20454344Z",
   "vendors": [
     {
       "id": "anthropic",
@@ -21,7 +21,7 @@
       "name": "Google",
       "docs": "https://ai.google.dev/gemini-api/docs/models",
       "changelog": "https://ai.google.dev/gemini-api/docs/changelog",
-      "models": 17
+      "models": 18
     },
     {
       "id": "xai",
@@ -32,6 +32,24 @@
     }
   ],
   "models": [
+    {
+      "id": "gemini-4-neon",
+      "vendor": "google",
+      "name": "Gemini 4 Neon",
+      "family": "gemini-neon",
+      "status": "active",
+      "released_at": "2026-11-18",
+      "first_seen": "2026-11-18T20:37:18.20454344Z",
+      "predecessor": null,
+      "successor": null,
+      "context_window": 1048576,
+      "max_output": 65536,
+      "knowledge_cutoff": null,
+      "reasoning": true,
+      "harnesses": [],
+      "last_change": null,
+      "probed": false
+    },
     {
       "id": "gpt-6.2-astra",
       "vendor": "openai",
@@ -92,7 +110,7 @@
       "reasoning": true,
       "harnesses": [],
       "last_change": {
-        "at": "2026-11-18T09:52:12.835975143Z",
+        "at": "2026-11-18T20:37:18.20454344Z",
         "changes": 2
       },
       "probed": false
@@ -113,7 +131,7 @@
       "reasoning": true,
       "harnesses": [],
       "last_change": {
-        "at": "2026-11-18T09:52:12.835975143Z",
+        "at": "2026-11-18T20:37:18.20454344Z",
         "changes": 2
       },
       "probed": false
@@ -197,7 +215,7 @@
       "reasoning": true,
       "harnesses": [],
       "last_change": {
-        "at": "2026-11-18T09:52:12.835975143Z",
+        "at": "2026-11-18T20:37:18.20454344Z",
         "changes": 2
       },
       "probed": false
@@ -392,7 +410,7 @@
       "reasoning": true,
       "harnesses": [],
       "last_change": {
-        "at": "2026-11-18T09:52:12.835975143Z",
+        "at": "2026-11-18T20:37:18.20454344Z",
         "changes": 1
       },
       "probed": false
@@ -491,7 +509,7 @@
       "reasoning": true,
       "harnesses": [],
       "last_change": {
-        "at": "2026-11-18T09:52:12.835975143Z",
+        "at": "2026-11-18T20:37:18.20454344Z",
         "changes": 1
       },
       "probed": false
@@ -512,7 +530,7 @@
       "reasoning": true,
       "harnesses": [],
       "last_change": {
-        "at": "2026-11-18T09:52:12.835975143Z",
+        "at": "2026-11-18T20:37:18.20454344Z",
         "changes": 1
       },
       "probed": false

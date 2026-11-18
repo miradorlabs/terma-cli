@@ -1,7 +1,16 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-18T15:13:08.657184156Z",
+  "generated_at": "2026-11-18T20:37:18.20454344Z",
   "events": [
+    {
+      "at": "2026-11-18T20:37:18.20454344Z",
+      "model": "gemini-4-neon",
+      "vendor": "google",
+      "name": "Gemini 4 Neon",
+      "event": "listed",
+      "changes": 0,
+      "highlights": []
+    },
     {
       "at": "2026-11-17T23:12:13.967477009Z",
       "model": "gpt-6.2-sol",
