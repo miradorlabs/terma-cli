@@ -11960,7 +11960,10 @@
               "user_type"
             ]
           }
-        }
+        },
+        "unobserved": [
+          "tengu_attachment_compute_duration"
+        ]
       },
       "POST claude.ai/api/event_logging/v2/batch": {
         "events": {

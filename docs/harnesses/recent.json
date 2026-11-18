@@ -1,7 +1,39 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-18T18:45:51.459376046Z",
+  "generated_at": "2026-11-18T19:02:44.287552859Z",
   "versions": [
+    {
+      "harness": "claude-desktop",
+      "name": "Claude Desktop (Code)",
+      "version": "6.6395.1",
+      "released_at": "2026-11-18T17:40:14.269Z",
+      "captured_at": "2026-11-18T19:02:44.287552859Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "6.6395.0",
+      "changes": 7,
+      "categories": {
+        "cli": 2,
+        "side_requests": 5
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 7
+      },
+      "undocumented": null,
+      "highlights": [
+        "Side request POST /v1/messages/count_tokens claude-opus-5-5 tools changed",
+        "Side request POST /v1/messages/count_tokens claude-opus-5-5 tools changed",
+        "Side request POST /v1/messages/count_tokens claude-opus-5-5 tools changed"
+      ],
+      "signing": "valid",
+      "attempted_at": "2026-11-18T19:02:44.287552859Z",
+      "attempts": 1
+    },
     {
       "harness": "copilot",
       "name": "GitHub Copilot CLI",
@@ -6163,37 +6195,6 @@
         "New vendor telemetry event: tengu_headless_latency",
         "New vendor telemetry event: tengu_retention_sweep",
         "New setting: processWrapper"
-      ],
-      "signing": "valid"
-    },
-    {
-      "harness": "codex",
-      "name": "Codex CLI",
-      "version": "0.144.4",
-      "released_at": "2026-07-14T05:10:51.485Z",
-      "captured_at": "2026-11-05T09:54:28.532441Z",
-      "platforms": [
-        "darwin/arm64",
-        "linux/amd64"
-      ],
-      "support": "untested",
-      "previous": "0.144.3",
-      "changes": 4,
-      "categories": {
-        "behavior": 3,
-        "filesystem": 1
-      },
-      "impact": {
-        "breaking": 0,
-        "degrading": 0,
-        "informational": 1,
-        "notable": 3
-      },
-      "undocumented": 4,
-      "highlights": [
-        "Behaviour: compaction removed",
-        "Behaviour: sandbox added",
-        "Behaviour: tool_output removed"
       ],
       "signing": "valid"
     }

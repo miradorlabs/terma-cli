@@ -1,0 +1,157 @@
+{
+  "schema_version": 1,
+  "harness": "claude-desktop",
+  "from": "6.6395.0",
+  "to": "6.6395.1",
+  "generated_at": "2026-11-18T19:02:44.287552859Z",
+  "source": null,
+  "changelog": null,
+  "summary": {
+    "changes": 7,
+    "categories": {
+      "cli": 2,
+      "side_requests": 5
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 0,
+      "notable": 7
+    },
+    "undocumented": null
+  },
+  "changes": [
+    {
+      "id": "side_requests.POST /v1/messages/count_tokens claude-opus-5-5.tools",
+      "category": "side_requests",
+      "op": "changed",
+      "path": [
+        "side_requests",
+        "POST /v1/messages/count_tokens claude-opus-5-5",
+        "tools"
+      ],
+      "title": "Side request POST /v1/messages/count_tokens claude-opus-5-5 tools changed",
+      "impact": "notable",
+      "before": 84,
+      "after": 14,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "side_requests.POST /v1/messages/count_tokens claude-opus-5-5.tools",
+      "category": "side_requests",
+      "op": "changed",
+      "path": [
+        "side_requests",
+        "POST /v1/messages/count_tokens claude-opus-5-5",
+        "tools"
+      ],
+      "title": "Side request POST /v1/messages/count_tokens claude-opus-5-5 tools changed",
+      "impact": "notable",
+      "before": 84,
+      "after": 14,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "side_requests.POST /v1/messages/count_tokens claude-opus-5-5.tools",
+      "category": "side_requests",
+      "op": "changed",
+      "path": [
+        "side_requests",
+        "POST /v1/messages/count_tokens claude-opus-5-5",
+        "tools"
+      ],
+      "title": "Side request POST /v1/messages/count_tokens claude-opus-5-5 tools changed",
+      "impact": "notable",
+      "before": 84,
+      "after": 14,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "side_requests.POST /v1/messages/count_tokens claude-opus-5-5.tools",
+      "category": "side_requests",
+      "op": "changed",
+      "path": [
+        "side_requests",
+        "POST /v1/messages/count_tokens claude-opus-5-5",
+        "tools"
+      ],
+      "title": "Side request POST /v1/messages/count_tokens claude-opus-5-5 tools changed",
+      "impact": "notable",
+      "before": 84,
+      "after": 14,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "side_requests.POST /v1/messages/count_tokens claude-opus-5-5.tools",
+      "category": "side_requests",
+      "op": "changed",
+      "path": [
+        "side_requests",
+        "POST /v1/messages/count_tokens claude-opus-5-5",
+        "tools"
+      ],
+      "title": "Side request POST /v1/messages/count_tokens claude-opus-5-5 tools changed",
+      "impact": "notable",
+      "before": 84,
+      "after": 14,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "cli.launch.env_values.BAGGAGE",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "launch",
+        "env_values",
+        "BAGGAGE"
+      ],
+      "title": "The app's agent's BAGGAGE: none → none",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-sentry-environment=production,sentry-release=Claude%406.6395.0,sentry-public_key=<hex>,sentry-trace_id=<hex>,sentry-org_id=1158394\n+sentry-environment=production,sentry-release=Claude%406.6395.1,sentry-public_key=<hex>,sentry-trace_id=<hex>,sentry-org_id=1158394\n",
+      "stats": {
+        "added_chars": 130,
+        "removed_chars": 130
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "cli.launch.env_values.SENTRY-TRACE",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "launch",
+        "env_values",
+        "SENTRY-TRACE"
+      ],
+      "title": "The app's agent's SENTRY-TRACE: <hex>-acc147bf9d67b8a1 → <hex>-a6ef6c3ae578c78b",
+      "impact": "notable",
+      "before": "<hex>-acc147bf9d67b8a1",
+      "after": "<hex>-a6ef6c3ae578c78b",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    }
+  ]
+}
