@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -40,7 +41,8 @@ func skillSession(t *testing.T) (hookrun.Env, string) {
 
 // Each skill the session used leaves once, with where it is held and nothing of its body. A
 // skill with a file takes its description from that file, whatever the listing says; one with
-// none (dataviz, claude-api) takes the listing's. /compact and the failed call are no skills.
+// none (dataviz, unpacked with no SKILL.md, and claude-api, with no directory) is reported
+// without one. /compact and the failed call are no skills.
 func TestStopSpoolsEachSkillTheSessionUsedOnce(t *testing.T) {
 	env, path := skillSession(t)
 	stopClaude(t, env, path)
@@ -54,8 +56,8 @@ func TestStopSpoolsEachSkillTheSessionUsedOnce(t *testing.T) {
 			semconv.TermaSkillRepositoryURLKey: "https://github.com/acme/agent-plugins", semconv.TermaSkillPathKey: "plugins/tools/skills/release-notes/SKILL.md"},
 		{semconv.TermaSkillNameKey: "hello-skill", semconv.TermaSkillDescriptionKey: "From the file, not the listing.",
 			semconv.TermaSkillOriginKey: "repository", semconv.TermaSkillRepositoryURLKey: repoURL, semconv.TermaSkillPathKey: ".claude/skills/hello-skill/SKILL.md"},
-		{semconv.TermaSkillNameKey: "dataviz", semconv.TermaSkillDescriptionKey: "Use this skill whenever you are about to create a chart.", semconv.TermaSkillOriginKey: "builtin"},
-		{semconv.TermaSkillNameKey: "claude-api", semconv.TermaSkillDescriptionKey: "Reference for the Claude API.\nTRIGGER — read first, before you answer.\nSKIP only when another provider is being worked on."},
+		{semconv.TermaSkillNameKey: "dataviz", semconv.TermaSkillOriginKey: "builtin"},
+		{semconv.TermaSkillNameKey: "claude-api"},
 		{semconv.TermaSkillNameKey: "deploy", semconv.TermaSkillDescriptionKey: "Ships the build. - Before a release.", semconv.TermaSkillOriginKey: "personal"},
 		{semconv.TermaSkillNameKey: "capped", semconv.TermaSkillDescriptionKey: capped,
 			semconv.TermaSkillOriginKey: "repository", semconv.TermaSkillRepositoryURLKey: repoURL, semconv.TermaSkillPathKey: ".claude/skills/capped/SKILL.md"},
@@ -94,7 +96,9 @@ func TestStopSpoolsNoSkillWhileThePolicyWithholds(t *testing.T) {
 }
 
 // A session that moved into a collected checkout reports only what it used there: a skill
-// it used, and the listing it was given, where the team does not collect stay on the machine.
+// it used where the team does not collect stays on the machine. A listing written there still
+// says which names are skills, since a name leaves only through a use: a built-in it names and
+// the session used in the collected checkout is reported, by its name alone.
 func TestStopReportsNoSkillUsedWhereTheTeamDoesNotCollect(t *testing.T) {
 	env := newFundingEnv(t)
 	other := hookruntest.InitRepo(t) // a repository the policy does not list
@@ -107,139 +111,121 @@ func TestStopReportsNoSkillUsedWhereTheTeamDoesNotCollect(t *testing.T) {
 			`{"type":"user","isMeta":true,"cwd":` + jsonString(cwd) + `,"sourceToolUseID":"` + id + `","message":{"content":[{"type":"text","text":` + jsonString(claudeSkillBaseDir+dir+"\n\n"+skillBody) + `}]}}`,
 		}
 	}
-	lines := []string{`{"type":"attachment","cwd":` + jsonString(other) + `,"attachment":{"type":"skill_listing","content":"- secret: Private to the other checkout.\n- shared: Listed in the other checkout.","names":["secret","shared"]}}`}
+	lines := []string{`{"type":"attachment","cwd":` + jsonString(other) + `,"attachment":{"type":"skill_listing","content":"- secret: Private to the other checkout.\n- shared: Listed in the other checkout.\n- built-in: Listed in the other checkout.","names":["secret","shared","built-in"]}}`}
 	lines = append(lines, call(other, "toolu_1", "secret")...)
 	lines = append(lines, call(env.Cwd, "toolu_2", "shared")...)
+	lines = append(lines, `{"type":"assistant","cwd":`+jsonString(env.Cwd)+`,"message":{"content":[{"type":"tool_use","id":"toolu_3","name":"Skill","input":{"skill":"built-in"}}]}}`)
 	stopClaude(t, env, transcript(t, t.TempDir(), lines...))
 	events := hookruntest.Named(hookruntest.Spooled(t, env.Spool), semconv.TermaSkillDefinitionEvent)
-	if len(events) != 1 || events[0].Attrs[semconv.TermaSkillNameKey] != "shared" || events[0].Attrs[semconv.TermaSkillDescriptionKey] != "From the file." ||
+	if len(events) != 2 || events[0].Attrs[semconv.TermaSkillNameKey] != "shared" || events[0].Attrs[semconv.TermaSkillDescriptionKey] != "From the file." ||
 		events[0].Attrs[semconv.TermaSkillOriginKey] != semconv.TermaSkillOriginRepository {
 		t.Fatalf("spooled %+v", events)
+	}
+	if b := events[1].Attrs; b[semconv.TermaSkillNameKey] != "built-in" || b[semconv.TermaSkillDescriptionKey] != nil || b[semconv.TermaSkillOriginKey] != nil {
+		t.Errorf("the built-in: %+v", b)
 	}
 	if strings.Contains(fmt.Sprint(events), "other checkout") {
 		t.Errorf("what the session did where the team does not collect left: %+v", events)
 	}
 }
 
-// A listing saved while the team collected its checkout is not read again once the policy
-// drops that checkout: a same-named skill used in another collected checkout takes its
-// description from its own file.
-func TestStopLeavesOutAListingSavedWhereTheTeamNoLongerCollects(t *testing.T) {
+// A skill used in a collected checkout takes its description from its own file, whatever a
+// listing written in another checkout, since dropped by the policy, said of it; and a skill
+// with no directory that only that listing named is still reported, by its name alone.
+func TestStopDescribesASkillFromItsFileWhateverAListingElsewhereSaid(t *testing.T) {
 	env := newFundingEnv(t)
 	first, second := env.Cwd, hookruntest.InitRepo(t)
 	hookruntest.WriteFile(t, second, ".claude/skills/shared/SKILL.md", "---\nname: shared\ndescription: From the second checkout's file.\n---\n")
-	path := transcript(t, t.TempDir(), `{"type":"attachment","cwd":`+jsonString(first)+`,"attachment":{"type":"skill_listing","content":"- shared: Listed in the first checkout.","names":["shared"]}}`)
-	stopClaude(t, env, path) // saves the listing's offset: the first checkout is collected
+	path := transcript(t, t.TempDir(), `{"type":"attachment","cwd":`+jsonString(first)+
+		`,"attachment":{"type":"skill_listing","content":"- shared: Listed in the first checkout.\n- built-in: Listed in the first checkout.","names":["shared","built-in"]}}`)
+	stopClaude(t, env, path) // saves the listing's offset
 
 	f, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0o600)
 	if err != nil {
 		t.Fatal(err)
 	}
-	dir := filepath.Join(second, ".claude", "skills", "shared")
-	_, err = f.WriteString(`{"type":"assistant","cwd":` + jsonString(second) + `,"message":{"content":[{"type":"tool_use","id":"toolu_1","name":"Skill","input":{"skill":"shared"}}]}}` + "\n" +
-		`{"type":"user","isMeta":true,"cwd":` + jsonString(second) + `,"sourceToolUseID":"toolu_1","message":{"content":[{"type":"text","text":` + jsonString(claudeSkillBaseDir+dir+"\n\n"+skillBody) + `}]}}` + "\n")
+	cwd, dir := jsonString(second), filepath.Join(second, ".claude", "skills", "shared")
+	_, err = f.WriteString(`{"type":"assistant","cwd":` + cwd + `,"message":{"content":[{"type":"tool_use","id":"toolu_1","name":"Skill","input":{"skill":"shared"}}]}}` + "\n" +
+		`{"type":"user","isMeta":true,"cwd":` + cwd + `,"sourceToolUseID":"toolu_1","message":{"content":[{"type":"text","text":` + jsonString(claudeSkillBaseDir+dir+"\n\n"+skillBody) + `}]}}` + "\n" +
+		`{"type":"assistant","cwd":` + cwd + `,"message":{"content":[{"type":"tool_use","id":"toolu_2","name":"Skill","input":{"skill":"built-in"}}]}}` + "\n" +
+		`{"type":"user","isMeta":true,"cwd":` + cwd + `,"sourceToolUseID":"toolu_2","message":{"content":[{"type":"text","text":` + jsonString("# Built-in\n\n"+skillBody) + `}]}}` + "\n")
 	if err != nil || f.Close() != nil {
 		t.Fatal(err)
 	}
 	env.Cwd, env.Policy = second, hookruntest.Admitting(second) // the policy drops the first
 	stopClaude(t, env, path)
 	events := hookruntest.Named(hookruntest.Spooled(t, env.Spool), semconv.TermaSkillDefinitionEvent)
-	if len(events) != 1 || events[0].Attrs[semconv.TermaSkillNameKey] != "shared" || events[0].Attrs[semconv.TermaSkillDescriptionKey] != "From the second checkout's file." {
+	if len(events) != 2 || events[0].Attrs[semconv.TermaSkillNameKey] != "shared" || events[0].Attrs[semconv.TermaSkillDescriptionKey] != "From the second checkout's file." ||
+		events[1].Attrs[semconv.TermaSkillNameKey] != "built-in" || events[1].Attrs[semconv.TermaSkillDescriptionKey] != nil || events[1].Attrs[semconv.TermaSkillOriginKey] != nil {
 		t.Fatalf("spooled %+v", events)
+	}
+	if s := fmt.Sprint(events); strings.Contains(s, "first checkout") || strings.Contains(s, skillBody) {
+		t.Errorf("a listing's description or a body left: %+v", events)
 	}
 }
 
-// Claude Code lists a skill or command with no description in its frontmatter by its body's
-// first line: that never leaves. A skill's file decides where it is read; elsewhere the
-// listing's description leaves only when the loaded text shows it is not the body's.
-func TestStopSendsNoDescriptionMadeFromASkillsBody(t *testing.T) {
+// A description leaves only when it is read from the frontmatter of the skill's own file.
+// Every listing entry here carries a canary: a file with no description, no frontmatter, an
+// unclosed one or none that can be read, a command and a built-in with no directory are all
+// reported with no description, and no canary leaves.
+func TestStopSendsADescriptionOnlyFromTheSkillsOwnFile(t *testing.T) {
+	const canary = "LISTING-CANARY"
 	env := newFundingEnv(t)
 	cwd := jsonString(env.Cwd)
-	long := "BODY-CANARY-LONG " + strings.Repeat("a long first line ", 10)
-	files := map[string]string{
-		"qa-nodesc":  "---\nname: qa-nodesc\n---\n\nBODY-CANARY-NODESC this first line.\n",
-		"qa-heading": "---\nname: qa-heading\nwhen_to_use: Never.\n---\n\n# BODY-CANARY-HEADING\n",
-		"qa-long":    "---\nname: qa-long\n---\n" + long + "\n",
-		"qa-nofm":    "BODY-CANARY-NOFM no frontmatter at all.\n",
-		"qa-stale":   "---\nname: qa-stale\ndescription: Open <name> & go.\n---\n\nBODY-CANARY-STALE the line listed before the file had a description.\n",
+	skillDir := func(n string) string { return filepath.Join(env.Cwd, ".claude", "skills", n) }
+	for n, file := range map[string]string{
+		"qa-file":     "---\nname: qa-file\ndescription: From the file.\n---\n\n" + skillBody + "\n",
+		"qa-nodesc":   "---\nname: qa-nodesc\n---\n\n" + skillBody + "\n",
+		"qa-nofm":     skillBody + " with no frontmatter.\n",
+		"qa-unclosed": "---\nname: qa-unclosed\ndescription: " + canary + " in a block never closed.\n\n" + skillBody + "\n",
+	} {
+		hookruntest.WriteFile(t, env.Cwd, ".claude/skills/"+n+"/SKILL.md", file)
 	}
-	for n, body := range files {
-		hookruntest.WriteFile(t, env.Cwd, ".claude/skills/"+n+"/SKILL.md", body)
+	// A SKILL.md that is a directory cannot be read as a file.
+	if err := os.MkdirAll(filepath.Join(skillDir("qa-unreadable"), "SKILL.md"), 0o700); err != nil {
+		t.Fatal(err)
 	}
-	bodies := map[string]string{
-		"qa-nodesc":  "BODY-CANARY-NODESC this first line.\n",
-		"qa-heading": "# BODY-CANARY-HEADING\n",
-		"qa-long":    long + "\n",
-		"qa-nofm":    "BODY-CANARY-NOFM no frontmatter at all.\n",
-		"qa-stale":   "BODY-CANARY-STALE the line listed before the file had a description.\n",
-	}
-	cutLong, _ := claudeOpening(long)
-	entries := []struct{ name, description string }{
-		{"qa-nodesc", "BODY-CANARY-NODESC this first line."},
-		{"qa-heading", "BODY-CANARY-HEADING - Never."},
-		{"qa-long", cutLong + "..."},
-		{"qa-stale", "BODY-CANARY-STALE the line listed before the file had a description."},
-		{"qa-angle", "BODY-CANARY-ANGLE review &lt;target&gt; & report it"},
-		{"qa-gap", "BODY-CANARY-GAP a command whose text is not the next record."},
-		{"qa-headed", "Deploy the app to &lt;staging&gt;."},
-		{"qa-nofm", "BODY-CANARY-NOFM no frontmatter at all."},
-		{"qa-cmd", "BODY-CANARY-CMD the command's first line."},
-		{"qa-args", "BODY-CANARY-ARGS run with $ARGUMENTS"},
-		{"qa-real", "Runs the real thing."},
-		{"qa-unread", "Listed, but its text was never read."},
-	}
+	withDir := []string{"qa-file", "qa-nodesc", "qa-nofm", "qa-unclosed", "qa-unreadable"}
+	names := append(slices.Clone(withDir), "qa-cmd", "qa-builtin")
 	var listing []string
-	var names []string
-	for _, en := range entries {
-		listing = append(listing, "- "+en.name+": "+en.description)
-		names = append(names, en.name)
+	for _, n := range names {
+		listing = append(listing, "- "+n+": "+canary+" for "+n+".")
 	}
 	lines := []string{`{"type":"attachment","cwd":` + cwd + `,"attachment":{"type":"skill_listing","content":` + jsonString(strings.Join(listing, "\n")) +
 		`,"names":["` + strings.Join(names, `","`) + `"]}}`}
-	for i, n := range []string{"qa-nodesc", "qa-heading", "qa-long", "qa-nofm", "qa-stale"} {
-		id := fmt.Sprintf("toolu_%d", i)
-		dir := filepath.Join(env.Cwd, ".claude", "skills", n)
-		lines = append(lines,
-			`{"type":"assistant","cwd":`+cwd+`,"message":{"content":[{"type":"tool_use","id":"`+id+`","name":"Skill","input":{"skill":"`+n+`"}}]}}`,
-			`{"type":"user","isMeta":true,"cwd":`+cwd+`,"sourceToolUseID":"`+id+`","message":{"content":[{"type":"text","text":`+jsonString(claudeSkillBaseDir+dir+"\n\n"+bodies[n])+`}]}}`)
+	call := func(id, n, text string) []string {
+		return []string{
+			`{"type":"assistant","cwd":` + cwd + `,"message":{"content":[{"type":"tool_use","id":"` + id + `","name":"Skill","input":{"skill":"` + n + `"}}]}}`,
+			`{"type":"user","isMeta":true,"cwd":` + cwd + `,"sourceToolUseID":"` + id + `","message":{"content":[{"type":"text","text":` + jsonString(text) + `}]}}`,
+		}
 	}
-	for n, text := range map[string]string{
-		"qa-cmd":  "BODY-CANARY-CMD the command's first line.\nMore of it.\n",
-		"qa-args": "BODY-CANARY-ARGS run with v2\n",
-		"qa-real": "BODY-CANARY-REAL a body unlike its description.\n",
-		// Claude Code lists angle brackets as entities.
-		"qa-angle": "BODY-CANARY-ANGLE review <target> & report it\n",
-		// A description that only starts with the body's heading is the author's.
-		"qa-headed": "# Deploy\n\nBODY-CANARY-HEADED steps.\n",
-	} {
-		lines = append(lines,
-			`{"type":"user","cwd":`+cwd+`,"message":{"content":"<command-message>`+n+`</command-message>\n<command-name>/`+n+`</command-name>"}}`,
-			`{"type":"user","isMeta":true,"cwd":`+cwd+`,"message":{"content":[{"type":"text","text":`+jsonString(text)+`}]}}`)
+	for i, n := range withDir {
+		lines = append(lines, call(fmt.Sprintf("toolu_%d", i), n, claudeSkillBaseDir+skillDir(n)+"\n\n"+skillBody)...)
 	}
-	// A later record that names no call (a pasted image) is not the command's text.
 	lines = append(lines,
-		`{"type":"user","cwd":`+cwd+`,"message":{"content":"<command-message>qa-gap</command-message>\n<command-name>/qa-gap</command-name>"}}`,
-		`{"type":"system","cwd":`+cwd+`}`,
-		`{"type":"user","isMeta":true,"cwd":`+cwd+`,"message":{"content":[{"type":"text","text":"[Image: source: /tmp/shot.png]"}]}}`)
-	lines = append(lines, `{"type":"assistant","cwd":`+cwd+`,"message":{"content":[{"type":"tool_use","id":"toolu_9","name":"Skill","input":{"skill":"qa-unread"}}]}}`)
+		`{"type":"user","cwd":`+cwd+`,"message":{"content":"<command-message>qa-cmd</command-message>\n<command-name>/qa-cmd</command-name>"}}`,
+		`{"type":"user","isMeta":true,"cwd":`+cwd+`,"message":{"content":[{"type":"text","text":`+jsonString(skillBody+" the command's text.\n")+`}]}}`)
+	lines = append(lines, call("toolu_9", "qa-builtin", "# Built-in\n\n"+skillBody)...)
 	stopClaude(t, env, transcript(t, t.TempDir(), lines...))
 
 	events := hookruntest.Named(hookruntest.Spooled(t, env.Spool), semconv.TermaSkillDefinitionEvent)
 	got := map[string]any{}
 	for _, ev := range events {
 		got[ev.Attrs[semconv.TermaSkillNameKey].(string)] = ev.Attrs[semconv.TermaSkillDescriptionKey]
-		if strings.Contains(fmt.Sprint(ev.Attrs), "BODY-CANARY") {
-			t.Errorf("a skill's body left: %+v", ev.Attrs)
+		if s := fmt.Sprint(ev.Attrs); strings.Contains(s, canary) || strings.Contains(s, skillBody) {
+			t.Errorf("a listing's description or a body left: %+v", ev.Attrs)
 		}
 	}
-	if len(got) != len(entries) {
-		t.Fatalf("spooled %d definitions, want %d: %+v", len(got), len(entries), events)
+	if len(got) != len(names) {
+		t.Fatalf("spooled %d definitions, want %d: %+v", len(got), len(names), events)
 	}
-	sent := map[string]any{"qa-real": "Runs the real thing.", "qa-stale": "Open <name> & go.", "qa-headed": "Deploy the app to <staging>."}
-	for _, en := range entries {
-		want := sent[en.name]
-		if got[en.name] != want {
-			t.Errorf("%s: description %q, want %v", en.name, got[en.name], want)
+	for _, n := range names {
+		var want any
+		if n == "qa-file" {
+			want = "From the file."
+		}
+		if got[n] != want {
+			t.Errorf("%s: description %v, want %v", n, got[n], want)
 		}
 	}
 }
@@ -262,5 +248,18 @@ func TestStopReportsOnlyTheHooksOwnDirectoryUnderGitDir(t *testing.T) {
 	events := hookruntest.Named(hookruntest.Spooled(t, env.Spool), semconv.TermaSkillDefinitionEvent)
 	if len(events) != 1 || events[0].Attrs[semconv.TermaSkillNameKey] != "here" {
 		t.Fatalf("spooled %+v", events)
+	}
+}
+
+// A Skill call Claude Code refused (an unknown skill) used none, though a listing names it.
+func TestStopReportsNoSkillWhoseCallFailed(t *testing.T) {
+	env := newFundingEnv(t)
+	cwd := jsonString(env.Cwd)
+	stopClaude(t, env, transcript(t, t.TempDir(),
+		`{"type":"attachment","cwd":`+cwd+`,"attachment":{"type":"skill_listing","content":"- gone: Listed once.","names":["gone"]}}`,
+		`{"type":"assistant","cwd":`+cwd+`,"message":{"content":[{"type":"tool_use","id":"toolu_1","name":"Skill","input":{"skill":"gone"}}]}}`,
+		`{"type":"user","cwd":`+cwd+`,"message":{"content":[{"type":"tool_result","tool_use_id":"toolu_1","is_error":true,"content":"<tool_use_error>Unknown skill: gone</tool_use_error>"}]}}`))
+	if events := hookruntest.Named(hookruntest.Spooled(t, env.Spool), semconv.TermaSkillDefinitionEvent); len(events) != 0 {
+		t.Errorf("spooled %+v", events)
 	}
 }

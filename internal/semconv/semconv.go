@@ -281,7 +281,7 @@ const (
 	TermaSkillPathKey = "terma.skill.path"
 	// TermaSkillPluginNameKey is terma.skill.plugin.name: The plugin that brings the skill.
 	TermaSkillPluginNameKey = "terma.skill.plugin.name"
-	// TermaSkillRepositoryURLKey is terma.skill.repository.url: The https URL of the repository that holds the skill's file, without credentials.
+	// TermaSkillRepositoryURLKey is terma.skill.repository.url: The https URL, without credentials, of the repository the skill's file is held in, or for a plugin's skill the GitHub repository of the marketplace it was installed from.
 	TermaSkillRepositoryURLKey = "terma.skill.repository.url"
 	// TermaSpendControlReachedKey is terma.spend_control.reached: Whether the account reached its spend control.
 	TermaSpendControlReachedKey = "terma.spend_control.reached"

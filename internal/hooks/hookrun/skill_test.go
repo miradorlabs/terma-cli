@@ -194,11 +194,18 @@ func TestSkillLinkNamesOnlyACollectedCheckout(t *testing.T) {
 	}
 }
 
-// A skill's frontmatter is read as YAML, or line by line where YAML refuses a plain value
-// holding ": ", with whitespace collapsed; anything else gives none.
+// A skill's frontmatter is read as YAML alone: its name, description and when_to_use, each
+// only where YAML gives a string. A block YAML refuses, or one the read cuts before it
+// closes, gives nothing, so no text from another key's value, a comment or the body is taken
+// for a description.
 func TestReadSkillFrontmatter(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
+	// A block that runs on, as valid YAML, to a "---" exactly where the read stops: closed
+	// when the file ends there, cut when it goes on ("---example").
+	head := "---\nname: x\ndescription: CUT-TEXT\n"
+	pad := "#" + strings.Repeat("x", skillFileLimit-3-len(head)-2) + "\n"
+	none := SkillFrontmatter{}
 	for _, tc := range []struct {
 		name, content string
 		want          SkillFrontmatter
@@ -206,16 +213,33 @@ func TestReadSkillFrontmatter(t *testing.T) {
 	}{
 		{"plain", "---\nname: deploy\ndescription: Ships the build.\n---\nbody\n", SkillFrontmatter{Name: "deploy", Description: "Ships the build."}, true},
 		{"quoted", "---\nname: \"deploy\"\ndescription: 'Ships   the build.'\nwhen_to_use: \"Before a release.\"\n---\n", SkillFrontmatter{Name: "deploy", Description: "Ships the build.", WhenToUse: "Before a release."}, true},
-		{"block", "---\nname: multi\ndescription: |\n  First line.\n  Second line.\nwhen-to-use: >\n  When testing.\n---\n", SkillFrontmatter{Name: "multi", Description: "First line. Second line.", WhenToUse: "When testing."}, true},
-		{"repair", "---\nname: aws\ndescription: Build for AWS: ECS and Lambda\n---\n", SkillFrontmatter{Name: "aws", Description: "Build for AWS: ECS and Lambda"}, true},
-		{"repair-continued", "---\nname: aws\ndescription: Build for AWS: ECS\n  and also Lambda\n---\n", SkillFrontmatter{Name: "aws"}, true},
-		{"repair-continued-after-blank", "---\nname: aws\ndescription: Build for AWS: ECS\n\n  # a comment\n  and also Lambda\nwhen_to_use: a: b\n---\n", SkillFrontmatter{Name: "aws", WhenToUse: "a: b"}, true},
-		{"repair-open-quote", "---\nname: aws\ndescription: \"Build for AWS: ECS\nwhen_to_use: a: b\n---\n", SkillFrontmatter{Name: "aws", WhenToUse: "a: b"}, true},
+		{"block", "---\nname: multi\ndescription: |\n  First line.\n  Second line.\nwhen_to_use: >\n  When testing.\n---\n", SkillFrontmatter{Name: "multi", Description: "First line. Second line.", WhenToUse: "When testing."}, true},
+		{"inline-comment", "---\nname: x\ndescription: foo # note\n---\n", SkillFrontmatter{Name: "x", Description: "foo"}, true},
+		{"comment-value", "---\nname: x\ndescription: # editor note\n---\n", SkillFrontmatter{Name: "x"}, true},
+		{"not-a-string", "---\nname: x\ndescription: 42\nwhen_to_use: [a, b]\n---\n", SkillFrontmatter{Name: "x"}, true},
+		{"hyphen-alias", "---\nname: x\ndescription: Ships builds.\nwhen-to-use: Friday\n---\n", SkillFrontmatter{Name: "x", Description: "Ships builds."}, true},
+		{"quote-spans-lines", "---\nname: x\nargument-hint: \"first line of the hint\ndescription: TEXT-FROM-HINT\nend of hint\"\n---\n", SkillFrontmatter{Name: "x"}, true},
 		{"crlf", "---\r\nname: win\r\ndescription: Windows lines.\r\n---\r\n", SkillFrontmatter{Name: "win", Description: "Windows lines."}, true},
 		{"no-name", "---\ndescription: Folder named.\n---\n", SkillFrontmatter{Description: "Folder named."}, true},
-		{"none", "# Deploy\n\nname: deploy\n", SkillFrontmatter{}, false},
-		{"unclosed", "---\nname: deploy\n", SkillFrontmatter{}, false},
-		{"over-bound", "---\nname: big\ndescription: " + strings.Repeat("x", skillFileLimit) + "\n---\n", SkillFrontmatter{}, false},
+		// Blocks YAML refuses give nothing, whatever a line of them looks like.
+		{"unquoted-colon", "---\nname: aws\ndescription: Build for AWS: ECS and Lambda\n---\n", none, false},
+		{"other-key-quote", "---\nname: x\nargument-hint: \"first line of the hint\ndescription: TEXT-FROM-HINT\nend of hint\"\nbad: a: b\n---\n", none, false},
+		{"other-key-overwrite", "---\nname: x\ndescription: Real.\nargument-hint: 'first\ndescription: TEXT-FROM-HINT\nend'\nbad: a: b\n---\n", none, false},
+		{"other-key-flow", "---\nname: x\ntags: [one,\ndescription: TEXT-FROM-FLOW\n]\nbad: a: b\n---\n", none, false},
+		{"comment-refused", "---\nname: probe\ndescription: # editor note\nother: a: b\n---\n", none, false},
+		{"inline-comment-refused", "---\nname: x\ndescription: foo # note\nbad: a: b\n---\n", none, false},
+		{"duplicate-key", "---\nname: x\nname: y\ndescription: Real.\n---\n", none, false},
+		// A mistyped close runs the block into the body, which YAML refuses: neither the
+		// real description nor the body's is taken, as the reader cannot tell where the
+		// author meant the frontmatter to end.
+		{"mistyped-close", "---\nname: x\ndescription: Real.\n----\n\n# Body\n\nExample:\ndescription: BODY-TEXT\n---\nmore\n", none, false},
+		// YAML ends a document at "...", so the body after it is not read.
+		{"dots-close", "---\nname: x\ndescription: Real.\n...\n\n# Body\n\nExample:\ndescription: BODY-TEXT\n---\nmore\n", SkillFrontmatter{Name: "x", Description: "Real."}, true},
+		{"none", "# Deploy\n\nname: deploy\n", none, false},
+		{"unclosed", "---\nname: deploy\n", none, false},
+		{"over-bound", "---\nname: big\ndescription: " + strings.Repeat("x", skillFileLimit) + "\n---\n", none, false},
+		{"cut-at-bound", head + pad + "---example\nmore\n", none, false},
+		{"ends-at-bound", head + pad + "---", SkillFrontmatter{Name: "x", Description: "CUT-TEXT"}, true},
 		{"long-body", "---\nname: long\n---\n" + strings.Repeat("body\n", skillFileLimit), SkillFrontmatter{Name: "long"}, true},
 	} {
 		path := filepath.Join(dir, tc.name+".md")
@@ -226,6 +250,9 @@ func TestReadSkillFrontmatter(t *testing.T) {
 		if got != tc.want || ok != tc.ok {
 			t.Errorf("%s: %+v, %v; want %+v, %v", tc.name, got, ok, tc.want, tc.ok)
 		}
+	}
+	if n := len(head + pad + "---"); n != skillFileLimit {
+		t.Fatalf("the bound's fixture is %d bytes, want %d", n, skillFileLimit)
 	}
 	if _, ok := ReadSkillFrontmatter(dir); ok {
 		t.Error("a directory read as a skill")

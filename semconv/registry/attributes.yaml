@@ -275,11 +275,13 @@ attributes:
   - key: terma.skill.repository.url
     type: string
     stability: development
-    brief: The https URL of the repository that holds the skill's file, without credentials.
+    brief: >
+      The https URL, without credentials, of the repository the skill's file is held in, or for
+      a plugin's skill the GitHub repository of the marketplace it was installed from.
     note: >
-      Sent with terma.skill.path, or alone for a plugin whose marketplace repository is known
-      but whose file's place in it is not; only for a repository the team's policy collects or
-      a plugin's public marketplace repository. The file may be untracked there.
+      Sent with terma.skill.path, or alone for a plugin's skill whose file's place in that
+      repository is not known. For a skill that is not a plugin's, only a repository the team's
+      policy collects; the file may be untracked there.
     examples: ["https://github.com/acme/agent-plugins"]
     annotations:
       content: tool

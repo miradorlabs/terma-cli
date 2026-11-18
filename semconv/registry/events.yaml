@@ -645,7 +645,7 @@ events:
         requirement_level: required
       - ref: terma.skill.description
         requirement_level:
-          conditionally_required: When the agent's listing or the skill's file gives one within the bound.
+          conditionally_required: When the skill's own file gives one within the bound.
       - ref: terma.skill.origin
         requirement_level:
           conditionally_required: When where the agent found the skill can be told.
