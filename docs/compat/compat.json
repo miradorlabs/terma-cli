@@ -73,7 +73,7 @@
       "label": "The machine's heartbeat reaches the project's ingest"
     }
   ],
-  "generated_at": "2026-11-18T06:30:46Z",
+  "generated_at": "2026-11-18T11:32:23Z",
   "harnesses": [
     {
       "ID": "claude",
@@ -9905,7 +9905,7 @@
       "platform": "darwin/arm64",
       "capability": "relay.content_allowed",
       "result": "pass",
-      "last_run": "2026-11-18T05:19:55.442036Z",
+      "last_run": "2026-11-18T11:30:27.602805Z",
       "first_passed": "2026-11-17T16:45:41.351515Z",
       "terma": "terma version dev",
       "test": "TestRelayCopilot/v1.0.113/content"
@@ -9916,7 +9916,7 @@
       "platform": "darwin/arm64",
       "capability": "relay.content_withheld",
       "result": "pass",
-      "last_run": "2026-11-18T05:20:22.605729Z",
+      "last_run": "2026-11-18T11:30:57.277601Z",
       "first_passed": "2026-11-17T16:46:07.857718Z",
       "terma": "terma version dev",
       "test": "TestRelayCopilot/v1.0.113/withheld"
@@ -9927,7 +9927,7 @@
       "platform": "darwin/arm64",
       "capability": "relay.only_opted_in",
       "result": "pass",
-      "last_run": "2026-11-18T05:20:36.398947Z",
+      "last_run": "2026-11-18T11:31:14.619493Z",
       "first_passed": "2026-11-17T16:46:24.803592Z",
       "terma": "terma version dev",
       "test": "TestRelayCopilotOutsideARepository/v1.0.113"
@@ -9938,7 +9938,7 @@
       "platform": "darwin/arm64",
       "capability": "relay.telemetry",
       "result": "pass",
-      "last_run": "2026-11-18T05:20:22.605799Z",
+      "last_run": "2026-11-18T11:30:57.277671Z",
       "first_passed": "2026-11-17T16:46:07.85849Z",
       "terma": "terma version dev",
       "test": "TestRelayCopilot/v1.0.113"
@@ -9949,7 +9949,7 @@
       "platform": "darwin/arm64",
       "capability": "relay.tools_no_token",
       "result": "pass",
-      "last_run": "2026-11-18T05:20:46.212867Z",
+      "last_run": "2026-11-18T11:31:27.109267Z",
       "first_passed": "2026-11-17T16:46:36.212Z",
       "terma": "terma version dev",
       "test": "TestRelayCopilotToolsGetNoExporter/v1.0.113"
