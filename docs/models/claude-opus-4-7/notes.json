@@ -4,7 +4,7 @@
   "predecessor": "claude-opus-4-6",
   "whats_new": null,
   "vendor_highlights": [
-    "We’ve launched Claude Opus 4.7, our most capable model for complex reasoning and agentic coding, at the same $5 / $25 USD per MTok pricing as Opus 4.6. See…",
+    "We’ve launched Claude Opus 4.7, our most capable model for complex reasoning and agentic coding, at the same $5 / $25 USD per MTok pricing as Claude Opus 4.6.…",
     "Claude in Amazon Bedrock is now open to all Amazon Bedrock customers.",
     "We’ve launched task budgets in beta on Claude Opus 4.7. Give Claude an advisory token budget for a full agentic loop (thinking, tool calls, tool results, and…",
     "Claude Opus 4.7 supports high-resolution image input, raising the maximum image resolution from 1,568 to 2,576 pixels on the long edge for improved performance…",
@@ -79,7 +79,7 @@
     {
       "date": "2026-04-16",
       "url": "https://platform.claude.com/docs/en/release-notes/api",
-      "text": "* We’ve launched [Claude Opus 4.7](https://www.anthropic.com/news/claude-opus-4-7), our most capable model for complex reasoning and agentic coding, at the same $5 / $25 USD per MTok pricing as Opus 4.6. See [What’s new in Claude Opus 4.7](https://platform.claude.com/docs/en/about-claude/models/whats-new-claude-4-7) for capability improvements, new features, and the updated tokenizer. Opus 4.7 includes API breaking changes versus Opus 4.6; see the [migration guide](https://platform.claude.com/docs/en/about-claude/models/migration-guide) before upgrading."
+      "text": "* We’ve [launched Claude Opus 4.7](https://www.anthropic.com/news/claude-opus-4-7), our most capable model for complex reasoning and agentic coding, at the same $5 / $25 USD per MTok pricing as Claude Opus 4.6. See [Claude Opus 4.7](https://platform.claude.com/docs/en/models/opus-4-7/overview) for its specifications. Opus 4.7 includes an updated tokenizer and API breaking changes versus Opus 4.6; see [Migration guides](https://platform.claude.com/docs/en/about-claude/models/migration-guide) before upgrading."
     },
     {
       "date": "2026-04-16",

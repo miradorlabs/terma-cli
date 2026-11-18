@@ -40,6 +40,11 @@
       "text": "* We’ve retired the 1M token context window beta (`context-1m-2025-08-07`) for Claude Sonnet 4.5 and Claude Sonnet 4. The beta header now has no effect on these models, and requests exceeding the standard 200k-token context window return an error. To use the 1M context window, migrate to [Claude Sonnet 4.6](https://platform.claude.com/docs/en/models/overview#latest-models-comparison) or [Claude Opus 4.6](https://platform.claude.com/docs/en/models/overview#latest-models-comparison), where it’s included at standard pricing with no beta header required."
     },
     {
+      "date": "2026-04-16",
+      "url": "https://platform.claude.com/docs/en/release-notes/api",
+      "text": "* We’ve [launched Claude Opus 4.7](https://www.anthropic.com/news/claude-opus-4-7), our most capable model for complex reasoning and agentic coding, at the same $5 / $25 USD per MTok pricing as Claude Opus 4.6. See [Claude Opus 4.7](https://platform.claude.com/docs/en/models/opus-4-7/overview) for its specifications. Opus 4.7 includes an updated tokenizer and API breaking changes versus Opus 4.6; see [Migration guides](https://platform.claude.com/docs/en/about-claude/models/migration-guide) before upgrading."
+    },
+    {
       "date": "2026-03-30",
       "url": "https://platform.claude.com/docs/en/release-notes/api",
       "text": "* We’ve raised the `max_tokens` cap to [300k on the Message Batches API](https://platform.claude.com/docs/en/build-with-claude/batch-processing#extended-output-beta) for Claude Opus 4.6 and Sonnet 4.6. Include the `output-300k-2026-03-24` beta header to generate longer single-turn outputs for long-form content, structured data, and large code generation tasks."
@@ -55,9 +60,14 @@
       "text": "* The [1M token context window](https://platform.claude.com/docs/en/build-with-claude/context-windows) is out of beta for Claude Opus 4.6 and Sonnet 4.6, at standard pricing. Requests over 200k tokens work automatically for these models with no beta header required. The 1M token context window remains in beta for Claude Sonnet 4.5 and Sonnet 4."
     },
     {
+      "date": "2026-02-07",
+      "url": "https://platform.claude.com/docs/en/release-notes/api",
+      "text": "* We’ve launched [fast mode](https://platform.claude.com/docs/en/build-with-claude/fast-mode) in research preview for Claude Opus 4.6, providing significantly faster output token generation through the `speed` parameter. Fast mode is up to 2.5x as fast at premium pricing. Interested customers should join the [fast mode waitlist](https://claude.com/fast-mode)."
+    },
+    {
       "date": "2026-02-05",
       "url": "https://platform.claude.com/docs/en/release-notes/api",
-      "text": "* We’ve [launched Claude Opus 4.6](https://www.anthropic.com/news/claude-opus-4-6), our most intelligent model for complex agentic tasks and long-horizon work. Opus 4.6 recommends [adaptive thinking](https://platform.claude.com/docs/en/build-with-claude/thinking) (`thinking: {type: \"adaptive\"}`); manual thinking (`type: \"enabled\"` with `budget_tokens`) is deprecated. Opus 4.6 does not support prefilling assistant messages. Learn more in [What’s new in Claude 4.6](https://platform.claude.com/docs/en/about-claude/models/whats-new-claude-4-6)."
+      "text": "* We’ve [launched Claude Opus 4.6](https://www.anthropic.com/news/claude-opus-4-6), our most intelligent model for complex agentic tasks and long-horizon work. For Opus 4.6, we recommend [adaptive thinking](https://platform.claude.com/docs/en/build-with-claude/thinking) (`thinking: {type: \"adaptive\"}`); manual thinking (`type: \"enabled\"` with `budget_tokens`) is deprecated. Opus 4.6 does not support prefilling assistant messages. Learn more in [Claude Opus 4.6](https://platform.claude.com/docs/en/models/opus-4-6/overview)."
     },
     {
       "date": "2026-02-05",

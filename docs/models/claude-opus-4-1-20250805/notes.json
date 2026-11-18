@@ -25,7 +25,7 @@
     {
       "date": "2025-08-05",
       "url": "https://platform.claude.com/docs/en/release-notes/api",
-      "text": "* We’ve launched [Claude Opus 4.1](https://www.anthropic.com/news/claude-opus-4-1), an incremental update to Claude Opus 4 with enhanced capabilities and performance improvements. Opus 4.1 does not allow both `temperature` and `top_p` parameters to be specified. Use only one. Learn more in [Models overview](https://platform.claude.com/docs/en/models/overview)."
+      "text": "* We’ve launched [Claude Opus 4.1](https://www.anthropic.com/news/claude-opus-4-1), an incremental update to Claude Opus 4 with enhanced capabilities and performance improvements. On Opus 4.1, you can specify `temperature` or `top_p`, but not both. Learn more in [Models overview](https://platform.claude.com/docs/en/models/overview)."
     }
   ],
   "changes": [],

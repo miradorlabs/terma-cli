@@ -50,7 +50,7 @@
     {
       "date": "2025-09-29",
       "url": "https://platform.claude.com/docs/en/release-notes/api",
-      "text": "* We’ve launched [Claude Sonnet 4.5](https://www.anthropic.com/news/claude-sonnet-4-5), our best model for complex agents and coding, with the highest intelligence across most tasks. Learn more in the [models overview](https://platform.claude.com/docs/en/models/overview)."
+      "text": "* We’ve launched [Claude Sonnet 4.5](https://www.anthropic.com/news/claude-sonnet-4-5), our best model for complex agents and coding, with the highest intelligence across most tasks. Learn more in [Models overview](https://platform.claude.com/docs/en/models/overview)."
     },
     {
       "date": "2025-08-13",

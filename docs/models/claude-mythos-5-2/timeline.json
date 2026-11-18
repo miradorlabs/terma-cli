@@ -3,6 +3,33 @@
   "id": "claude-mythos-5-2",
   "steps": [
     {
+      "at": "2026-11-18T15:13:08.657184156Z",
+      "event": "changed",
+      "changes": [
+        {
+          "id": "docs/whats_new",
+          "category": "docs",
+          "op": "changed",
+          "path": [
+            "docs",
+            "whats_new"
+          ],
+          "title": "What's new page changed (+247 −248 chars)",
+          "impact": "informational",
+          "before": null,
+          "after": null,
+          "text_diff": "@@ -284,7 +284,7 @@\n 4.\n **Update the advisor.** If you use the advisor tool with Claude Fable 5.2 as the executor, set the advisor’s `model` to `claude-fable-5-2` or `claude-mythos-5-2`.\n See [A Claude Fable 5.2 executor needs a Claude Fable 5.2 or Claude Mythos 5.2 advisor](https://platform.claude.com/docs/en/models/fable-5-2/whats-new-fable-5-2#advisor-tool-pairs).\n-5. **Re-run your evals.** Include an effort sweep that starts at the default, `high`. See [Recommended effort levels for Claude Fable 5.2](https://platform.claude.com/docs/en/build-with-claude/effort#recommended-effort-levels-for-claude-fable-5-2).\n+5. **Rerun your evals.** Include an effort sweep that starts at the default, `high`. See [Recommended effort levels for Claude Fable 5.2](https://platform.claude.com/docs/en/build-with-claude/effort#recommended-effort-levels-for-claude-fable-5-2).\n \n See the [Claude Fable 5.2 and Claude Mythos 5.2 migration guide](https://platform.claude.com/docs/en/models/fable-5-2/migration-guide) for step-by-step instructions, including from Claude Mythos 5.1 and from Claude Opus models.\n For model-specific prompting patterns, see [Prompting Claude Fable 5.2](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5-2).\n",
+          "stats": {
+            "added_chars": 247,
+            "removed_chars": 248
+          },
+          "terma": null,
+          "source": null,
+          "documented": null
+        }
+      ]
+    },
+    {
       "at": "2026-11-12T15:52:35.859355299Z",
       "event": "changed",
       "changes": [
