@@ -103,7 +103,7 @@ func TestCodexSkillByRoot(t *testing.T) {
 		{"elsewhere", write(t.TempDir(), "skills/x/SKILL.md", "name: x\n"), hookrun.Skill{}, false},
 		{"missing", filepath.Join(roots.Home, "skills", "gone", "SKILL.md"), hookrun.Skill{}, false},
 	} {
-		got, ok := roots.skill(env, r, tc.path)
+		got, ok := roots.skill(env, r, tc.path, "")
 		if ok != tc.ok || ok && got != tc.want {
 			t.Errorf("%s: %+v, %v; want %+v, %v", tc.name, got, ok, tc.want, tc.ok)
 		}
@@ -172,17 +172,32 @@ func TestPostToolUseReportsTheSkillsAShellCallRead(t *testing.T) {
 // turnDir, its skill in the session's repository.
 func skillRollout(t *testing.T, env hookrun.Env, turnDir string) string {
 	t.Helper()
+	return namedSkillRollout(t, env, turnDir, "", "")
+}
+
+// namedSkillRollout is skillRollout with the skill's record naming name at path; "" keeps
+// the recording's.
+func namedSkillRollout(t *testing.T, env hookrun.Env, turnDir, name, path string) string {
+	t.Helper()
 	data, err := os.ReadFile(filepath.Join("testdata", "codex_rollout_skill.jsonl"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	text := strings.ReplaceAll(string(data), `"cwd":"{{REPO}}"`, `"cwd":"`+hookruntest.InJSON(turnDir)+`"`)
+	text := string(data)
+	if name != "" {
+		const recorded = `<name>hello-codex</name>\n<path>{{REPO}}/.agents/skills/hello-codex/SKILL.md</path>`
+		if !strings.Contains(text, recorded) {
+			t.Fatal("the recording's skill record changed")
+		}
+		text = strings.Replace(text, recorded, `<name>`+hookruntest.InJSON(name)+`</name>\n<path>`+hookruntest.InJSON(path)+`</path>`, 1)
+	}
+	text = strings.ReplaceAll(text, `"cwd":"{{REPO}}"`, `"cwd":"`+hookruntest.InJSON(turnDir)+`"`)
 	text = strings.NewReplacer("{{ID}}", testCodexID, "{{REPO}}", hookruntest.InJSON(env.Cwd), "{{CODEX_HOME}}", hookruntest.InJSON(os.Getenv("CODEX_HOME"))).Replace(text)
-	path := filepath.Join(os.Getenv("CODEX_HOME"), "sessions", "2026", "11", "17", "rollout-2026-11-17T14-48-36-"+testCodexID+".jsonl")
-	hookruntest.WriteFile(t, filepath.Dir(path), filepath.Base(path), text)
+	rollout := filepath.Join(os.Getenv("CODEX_HOME"), "sessions", "2026", "11", "17", "rollout-2026-11-17T14-48-36-"+testCodexID+".jsonl")
+	hookruntest.WriteFile(t, filepath.Dir(rollout), filepath.Base(rollout), text)
 	hookruntest.WriteFile(t, env.Cwd, ".agents/skills/hello-codex/SKILL.md",
 		"---\nname: hello-codex\ndescription: Replies with a fixed greeting. Use when the user asks for the hello-codex greeting.\n---\n\nReply with exactly: HELLO-FROM-CODEX-SKILL\n")
-	return path
+	return rollout
 }
 
 func stopSkillSession(t *testing.T, env hookrun.Env, path string) {
@@ -249,4 +264,83 @@ func TestStopReportsNoNamedSkillWhileThePolicyWithholds(t *testing.T) {
 	if events := hookruntest.Named(hookruntest.Spooled(t, env.Spool), semconv.TermaSkillDefinitionEvent); len(events) != 0 {
 		t.Errorf("spooled %+v", events)
 	}
+}
+
+// A $name skill goes under the name Codex recorded, as qualified as Codex made it, and is
+// reported though its path, which Codex resolved, lies under no root: a personal skill linked
+// from a personal root keeps that origin and its link; any other has neither. A shell read of
+// such a path is no skill.
+func TestStopReportsANamedSkillUnderItsRecordedName(t *testing.T) {
+	// spooled stops a session whose rollout records name at path, and returns the one
+	// definition it spools.
+	spooled := func(t *testing.T, env hookrun.Env, name, path string) map[string]any {
+		t.Helper()
+		stopSkillSession(t, env, namedSkillRollout(t, env, env.Cwd, name, path))
+		events := hookruntest.Named(hookruntest.Spooled(t, env.Spool), semconv.TermaSkillDefinitionEvent)
+		if len(events) != 1 {
+			t.Fatalf("spooled %d definitions, want 1: %+v", len(events), events)
+		}
+		return events[0].Attrs
+	}
+	check := func(t *testing.T, got, want map[string]any) {
+		t.Helper()
+		for _, k := range []string{semconv.TermaSkillNameKey, semconv.TermaSkillDescriptionKey, semconv.TermaSkillOriginKey,
+			semconv.TermaSkillPluginNameKey, semconv.TermaSkillMarketplaceNameKey, semconv.TermaSkillRepositoryURLKey, semconv.TermaSkillPathKey} {
+			if got[k] != want[k] {
+				t.Errorf("%s = %v, want %v", k, got[k], want[k])
+			}
+		}
+	}
+	// outside is a skill in a collected checkout that is no root of Codex's, with its path
+	// as Codex records it, links resolved.
+	outside := func(t *testing.T, env *hookrun.Env, rel string) (repo, path string) {
+		t.Helper()
+		repo = hookruntest.InitRepo(t)
+		env.Policy.Repositories = append(env.Policy.Repositories, "github.com/acme/"+filepath.Base(repo))
+		hookruntest.WriteFile(t, repo, rel, "---\nname: dotfile\ndescription: Kept in dotfiles.\n---\nbody\n")
+		path, err := filepath.EvalSymlinks(filepath.Join(repo, filepath.FromSlash(rel)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return repo, path
+	}
+
+	t.Run("namespaced", func(t *testing.T) {
+		env := codexSkillEnv(t)
+		got := spooled(t, env, "tools:hello-codex", filepath.Join(env.Cwd, ".agents", "skills", "hello-codex", "SKILL.md"))
+		check(t, got, map[string]any{
+			semconv.TermaSkillNameKey: "tools:hello-codex", semconv.TermaSkillOriginKey: semconv.TermaSkillOriginRepository,
+			semconv.TermaSkillDescriptionKey:   "Replies with a fixed greeting. Use when the user asks for the hello-codex greeting.",
+			semconv.TermaSkillRepositoryURLKey: "https://github.com/acme/" + filepath.Base(env.Cwd), semconv.TermaSkillPathKey: ".agents/skills/hello-codex/SKILL.md",
+		})
+	})
+
+	t.Run("linked-from-a-personal-root", func(t *testing.T) {
+		env := codexSkillEnv(t)
+		repo, path := outside(t, &env, "skills/dotfile/SKILL.md")
+		personal := filepath.Join(os.Getenv("CODEX_HOME"), "skills")
+		if err := os.MkdirAll(personal, 0o700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Symlink(filepath.Join(repo, "skills", "dotfile"), filepath.Join(personal, "linked")); err != nil {
+			t.Skipf("symlinks: %v", err)
+		}
+		check(t, spooled(t, env, "linked", path), map[string]any{
+			semconv.TermaSkillNameKey: "linked", semconv.TermaSkillOriginKey: semconv.TermaSkillOriginPersonal, semconv.TermaSkillDescriptionKey: "Kept in dotfiles.",
+			semconv.TermaSkillRepositoryURLKey: "https://github.com/acme/" + filepath.Base(repo), semconv.TermaSkillPathKey: "skills/dotfile/SKILL.md",
+		})
+	})
+
+	t.Run("linked-from-nowhere", func(t *testing.T) {
+		env := codexSkillEnv(t)
+		_, path := outside(t, &env, "stray/SKILL.md")
+		check(t, spooled(t, env, "stray", path), map[string]any{semconv.TermaSkillNameKey: "stray", semconv.TermaSkillDescriptionKey: "Kept in dotfiles."})
+
+		read := codexSkillEnv(t)
+		_, path = outside(t, &read, "stray/SKILL.md")
+		readSkill(t, read, "cat '"+filepath.ToSlash(path)+"'")
+		if events := hookruntest.Named(hookruntest.Spooled(t, read.Spool), semconv.TermaSkillDefinitionEvent); len(events) != 0 {
+			t.Errorf("a shell read outside every root reported %+v", events)
+		}
+	})
 }

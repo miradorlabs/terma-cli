@@ -130,10 +130,16 @@ func TestReadClaudeSkillUsesOnTheFixture(t *testing.T) {
 		{Name: "no-such-skill", toolUseID: "toolu_07NOPE"},
 		{Name: "late", Dir: filepath.Join(repo, ".claude", "skills", "late"), slash: true},
 	}
+	// Each loaded text's opening, "" for a use with none.
+	openings := []string{"Release notes", "Reply with exactly: HELLO-FROM-SKILL", "", "Data Visualization", "Claude API", "Deploy",
+		skillBody, "Reply with exactly: HELLO-FROM-SKILL", "", skillBody}
 	if len(uses) != len(want) {
 		t.Fatalf("read %d uses, want %d: %+v", len(uses), len(want), uses)
 	}
 	for i := range want {
+		if uses[i].opening != openings[i] || uses[i].loaded != (openings[i] != "") {
+			t.Errorf("use %d: loaded %v, opening %q, want %q", i, uses[i].loaded, uses[i].opening, openings[i])
+		}
 		if filepath.FromSlash(uses[i].Dir) != want[i].Dir || uses[i].Name != want[i].Name || uses[i].toolUseID != want[i].toolUseID || uses[i].slash != want[i].slash {
 			t.Errorf("use %d = %+v, want %+v", i, uses[i], want[i])
 		}
@@ -151,7 +157,8 @@ func TestReadClaudeSkillUsesOnTheFixture(t *testing.T) {
 }
 
 // A skill's origin comes from where it loaded, and only a file a collected checkout or a
-// plugin's GitHub marketplace holds says where it is held.
+// plugin's GitHub marketplace holds says where it is held: a plugin's marketplace repository
+// is given though the file's place in it is not established.
 func TestClaudeSkillSource(t *testing.T) {
 	t.Parallel()
 	session, shared, private := hookruntest.InitRepo(t), hookruntest.InitRepo(t), hookruntest.InitRepo(t)
@@ -184,9 +191,11 @@ func TestClaudeSkillSource(t *testing.T) {
 			Origin: semconv.TermaSkillOriginPlugin, Plugin: "tools", Marketplace: "acme-tools",
 			RepositoryURL: "https://github.com/acme/agent-plugins", Path: "plugins/tools/skills/release-notes/SKILL.md"}},
 		{"plugin-not-in-checkout", filepath.Join(plugins, "cache", "acme-tools", "tools", "1.2.0", "skills", "other"), hookrun.Skill{
-			Origin: semconv.TermaSkillOriginPlugin, Plugin: "tools", Marketplace: "acme-tools"}},
+			Origin: semconv.TermaSkillOriginPlugin, Plugin: "tools", Marketplace: "acme-tools", RepositoryURL: "https://github.com/acme/agent-plugins"}},
 		{"plugin-object-source", filepath.Join(plugins, "cache", "acme-tools", "remote", "2.0.0", "skills", "x"), hookrun.Skill{
-			Origin: semconv.TermaSkillOriginPlugin, Plugin: "remote", Marketplace: "acme-tools"}},
+			Origin: semconv.TermaSkillOriginPlugin, Plugin: "remote", Marketplace: "acme-tools", RepositoryURL: "https://github.com/acme/agent-plugins"}},
+		{"plugin-unlisted", filepath.Join(plugins, "cache", "acme-tools", "gone", "1.0.0", "skills", "x"), hookrun.Skill{
+			Origin: semconv.TermaSkillOriginPlugin, Plugin: "gone", Marketplace: "acme-tools", RepositoryURL: "https://github.com/acme/agent-plugins"}},
 		{"plugin-local-marketplace", filepath.Join(plugins, "cache", "local", "kit", "0.1.0", "skills", "y"), hookrun.Skill{
 			Origin: semconv.TermaSkillOriginPlugin, Plugin: "kit", Marketplace: "local"}},
 		{"personal-in-admitted", filepath.Join(personal, "shared"), hookrun.Skill{
@@ -202,6 +211,65 @@ func TestClaudeSkillSource(t *testing.T) {
 	} {
 		if got := roots.source(env, r, tc.dir); got != tc.want {
 			t.Errorf("%s: %+v, want %+v", tc.name, got, tc.want)
+		}
+	}
+}
+
+// A body's opening is the description Claude Code makes of it: the first non-empty line,
+// trimmed, without a heading marker, given up to Claude Code's cut when past 100 UTF-16 code
+// units, without a character the cut splits.
+func TestClaudeOpening(t *testing.T) {
+	t.Parallel()
+	hundred := strings.Repeat("x", 100)
+	for _, tc := range []struct {
+		body, want string
+		cut        bool
+	}{
+		{"\n\n  First line.  \nSecond.", "First line.", false},
+		{"# qa-nodesc\n\nBody.", "qa-nodesc", false},
+		{"### Deep heading", "Deep heading", false},
+		{"#NoSpace", "#NoSpace", false},
+		{"#  ", "#", false},
+		{hundred, hundred, false},
+		{hundred + "y", strings.Repeat("x", 97), true},
+		{strings.Repeat("é", 101), strings.Repeat("é", 97), true},
+		{strings.Repeat("😀", 51), strings.Repeat("😀", 48), true},
+		{strings.Repeat("x", 96) + "😀 and a tail", strings.Repeat("x", 96), true},
+		{"", "", false},
+		{"\n  \n", "", false},
+	} {
+		if got, cut := claudeOpening(tc.body); got != tc.want || cut != tc.cut {
+			t.Errorf("claudeOpening(%q) = %q, %v; want %q, %v", tc.body, got, cut, tc.want, tc.cut)
+		}
+	}
+}
+
+// A listing's description is the body's when it is the body's opening, alone or before the
+// when_to_use Claude Code adds, however Claude Code escaped or cut it, or holds what Claude
+// Code fills in the loaded text only. One that only starts like the opening is its own.
+func TestBodyDerived(t *testing.T) {
+	t.Parallel()
+	long := strings.Repeat("x", 96)
+	for _, tc := range []struct {
+		description, opening string
+		cut, want            bool
+	}{
+		{"BODY line", "BODY line", false, true},
+		{"BODY line - When to use.", "BODY line", false, true},
+		{"BODY - line - When - to use.", "BODY - line", false, true},
+		{"Review <target> & report it", "Review <target> & report it", false, true},
+		{"Review  target, report it!", "Review <target> & report it", false, true},
+		{long + "\uFFFD...", long, true, true},
+		{long + "x... - When to use.", long, true, true},
+		{"Uses $ARGUMENTS", "Uses v2", false, true},
+		{"Runs !`date`", "Runs Tue", false, true},
+		{"Deploy the app to staging.", "Deploy", false, false},
+		{"A real description.", "Body line", false, false},
+		{"A real description.", "", false, false},
+		{"A real description.", "---", false, false},
+	} {
+		if got := bodyDerived(tc.description, tc.opening, tc.cut); got != tc.want {
+			t.Errorf("bodyDerived(%q, %q, %v) = %v, want %v", tc.description, tc.opening, tc.cut, got, tc.want)
 		}
 	}
 }

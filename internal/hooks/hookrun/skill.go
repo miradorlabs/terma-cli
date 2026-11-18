@@ -36,7 +36,9 @@ const skillLockWait = time.Second
 // is held. Every field but Name may be empty.
 type Skill struct {
 	Name, Description, Origin, Plugin, Marketplace string
-	// RepositoryURL and Path say where the skill's file is held: both or neither.
+	// RepositoryURL is the repository the skill's file is held in, and Path the file's place
+	// in it: a path never goes without a URL, and a URL goes alone for a plugin whose
+	// marketplace repository is known but whose file's place in it is not.
 	RepositoryURL, Path string
 }
 
@@ -57,6 +59,12 @@ func (e Env) SkillsCollected() bool {
 // yet, keeping which it has under stateDir. attrs are the agent's own (its name, where the
 // skill was read). It reports false when a new skill could not be spooled, so a caller holds
 // its cursor back; true otherwise, also when the policy withholds and nothing is spooled.
+//
+// Accepted risk: a definition is queued under r, the checkout its hook ran in, though a
+// session resumed from another collected checkout may have used the skill there; if the
+// policy drops that other checkout before the queue is flushed, delivery, which judges r,
+// still sends the definition (a link to the dropped checkout is removed). Upgrade path: queue
+// each definition under the checkout it was used in.
 func SpoolSkills(e Env, r *Repo, stateDir, sessionID string, attrs map[string]any, skills []Skill) bool {
 	if !e.SkillsCollected() || len(skills) == 0 {
 		return true
@@ -116,7 +124,8 @@ var skillOrigins = []string{
 }
 
 // skillAttrs is what of s may leave, nil when its name cannot: the description only whole,
-// the origin only from the registry's list, and the file's place only when it is shareable.
+// the origin only from the registry's list, and where the file is held only as a shareable
+// URL and path together, or for a plugin with no path the URL alone.
 func skillAttrs(s Skill) map[string]any {
 	if s.Name == "" || len(s.Name) > maxAttrLen || !utf8.ValidString(s.Name) {
 		return nil
@@ -133,20 +142,31 @@ func skillAttrs(s Skill) map[string]any {
 			BoundedAttr(out, k, v)
 		}
 	}
-	if shareableSkillLink(s.RepositoryURL, s.Path) {
-		out[semconv.TermaSkillRepositoryURLKey], out[semconv.TermaSkillPathKey] = s.RepositoryURL, s.Path
+	if shareableSkillURL(s.RepositoryURL) {
+		switch {
+		case shareableSkillPath(s.Path):
+			out[semconv.TermaSkillRepositoryURLKey], out[semconv.TermaSkillPathKey] = s.RepositoryURL, s.Path
+		case s.Path == "" && s.Origin == semconv.TermaSkillOriginPlugin:
+			out[semconv.TermaSkillRepositoryURLKey] = s.RepositoryURL
+		}
 	}
 	return out
 }
 
-// shareableSkillLink reports whether a skill's place may leave: an https URL with no
-// credentials, and a path relative to it that cannot name a file on this machine.
-func shareableSkillLink(rawURL, path string) bool {
-	if rawURL == "" || path == "" || len(rawURL) > maxAttrLen || len(path) > maxAttrLen || !utf8.ValidString(rawURL) || !utf8.ValidString(path) {
+// shareableSkillURL reports whether a skill's repository may leave: an https URL with no
+// credentials.
+func shareableSkillURL(rawURL string) bool {
+	if rawURL == "" || len(rawURL) > maxAttrLen || !utf8.ValidString(rawURL) {
 		return false
 	}
 	u, err := url.Parse(rawURL)
-	if err != nil || u.Scheme != "https" || u.Host == "" || u.User != nil || u.Opaque != "" || u.RawQuery != "" || u.Fragment != "" {
+	return err == nil && u.Scheme == "https" && u.Host != "" && u.User == nil && u.Opaque == "" && u.RawQuery == "" && u.Fragment == ""
+}
+
+// shareableSkillPath reports whether a skill file's place in its repository may leave: a
+// relative path that cannot name a file on this machine.
+func shareableSkillPath(path string) bool {
+	if path == "" || len(path) > maxAttrLen || !utf8.ValidString(path) {
 		return false
 	}
 	if strings.HasPrefix(path, "~") || strings.Contains(path, `\`) || len(path) >= 2 && path[1] == ':' {

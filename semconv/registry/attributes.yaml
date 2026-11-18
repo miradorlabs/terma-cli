@@ -277,8 +277,9 @@ attributes:
     stability: development
     brief: The https URL of the repository that holds the skill's file, without credentials.
     note: >
-      Sent only together with terma.skill.path, and only for a repository the team's policy
-      collects or a plugin's public marketplace repository. The file may be untracked there.
+      Sent with terma.skill.path, or alone for a plugin whose marketplace repository is known
+      but whose file's place in it is not; only for a repository the team's policy collects or
+      a plugin's public marketplace repository. The file may be untracked there.
     examples: ["https://github.com/acme/agent-plugins"]
     annotations:
       content: tool
@@ -287,8 +288,8 @@ attributes:
     stability: development
     brief: The path of the skill's file relative to terma.skill.repository.url, with forward slashes.
     note: >
-      Sent only together with terma.skill.repository.url: never an absolute or home-folder
-      path, never one with a `..` segment.
+      Sent only with terma.skill.repository.url: never an absolute or home-folder path, never
+      one with a `..` segment.
     examples: ["plugins/tools/skills/release-notes/SKILL.md"]
     annotations:
       content: tool

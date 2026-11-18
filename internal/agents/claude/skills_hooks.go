@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"unicode"
 
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
@@ -50,7 +51,9 @@ func captureClaudeSkills(ctx context.Context, e hookrun.Env, r *hookrun.Repo, se
 	admits := func(cwd string) bool {
 		ok, seen := judged[cwd]
 		if !seen {
-			ok = cwd != "" && e.Admits(ctx, cwd)
+			// With GIT_DIR set every directory reads as that one checkout, so only the
+			// hook's own is judged; what was written anywhere else stays here.
+			ok = cwd != "" && (os.Getenv("GIT_DIR") == "" || cwd == e.Cwd) && e.Admits(ctx, cwd)
 			judged[cwd] = ok
 		}
 		return ok
@@ -81,17 +84,32 @@ func captureClaudeSkills(ctx context.Context, e hookrun.Env, r *hookrun.Repo, se
 
 // claudeSkills is each skill used, once, with its description and where it is held. A name
 // neither listed nor loaded from a directory is no skill: a built-in command, or a call
-// that failed. The listing's description is the skill's own when whole; else the skill's
-// file gives it, composed as Claude Code composes the listing's.
+// that failed.
+//
+// Claude Code lists a skill whose frontmatter has no description with its body's first line,
+// which must not leave. So where the skill's file is read, the file alone speaks: its
+// description, composed with when_to_use as Claude Code composes the listing's, or none.
+// Where no file is read (a built-in, a command file, which names no directory), the
+// listing's goes only when whole and told apart from the loaded text's first line.
+//
+// Accepted risk: a skill with no file read whose loaded text is not in this transcript (one
+// that runs in a subagent's own) sends no description; and telling a listing entry from a
+// body's first line follows how Claude Code makes and escapes one today, so a build that
+// changes it may send a command's first line. Upgrade path: Claude Code saying in its
+// listing whether the author wrote the description.
 func claudeSkills(e hookrun.Env, r *hookrun.Repo, uses []claudeSkillUse, listed map[string]claudeListed) []hookrun.Skill {
 	var names []string
 	dirs := map[string]string{}
+	loaded := map[string]claudeSkillUse{}
 	for _, u := range uses {
 		if !slices.Contains(names, u.Name) {
 			names = append(names, u.Name)
 		}
 		if dirs[u.Name] == "" && filepath.IsAbs(u.Dir) {
 			dirs[u.Name] = u.Dir
+		}
+		if _, ok := loaded[u.Name]; !ok && u.loaded {
+			loaded[u.Name] = u
 		}
 	}
 	var out []hookrun.Skill
@@ -106,15 +124,59 @@ func claudeSkills(e hookrun.Env, r *hookrun.Repo, uses []claudeSkillUse, listed 
 			s = claudeSkillSource(e, r, dir)
 		}
 		s.Name = n
+		fm, inFile := hookrun.SkillFrontmatter{}, false
+		if dir != "" {
+			fm, inFile = hookrun.ReadSkillFrontmatter(filepath.Join(dir, claudeSkillFile))
+		}
+		u, read := loaded[n]
 		switch {
-		case l.whole():
-			s.Description = l.Description
-		case dir != "":
-			if fm, ok := hookrun.ReadSkillFrontmatter(filepath.Join(dir, claudeSkillFile)); ok {
+		case inFile:
+			if fm.Description != "" {
 				s.Description = strings.Join(slices.DeleteFunc([]string{fm.Description, fm.WhenToUse}, func(v string) bool { return v == "" }), " - ")
 			}
+		case l.whole() && read && !bodyDerived(l.Description, u.opening, u.cut):
+			s.Description = l.Description
 		}
 		out = append(out, s)
 	}
 	return out
+}
+
+// bodyDerived reports whether a listing's description may be the one Claude Code made from
+// a body whose loaded text opens with opening (cut: Claude Code cut it there). The two are
+// compared by their letters and digits, since Claude Code escapes and respaces what it lists:
+// the description is the opening, alone or before the " - " and when_to_use Claude Code adds,
+// or starts with a cut one. One holding `$` or "!`" may be the body's too: Claude Code fills
+// arguments and runs commands in the loaded text, not the listing, so they cannot be compared.
+func bodyDerived(description, opening string, cut bool) bool {
+	if strings.Contains(description, "$") || strings.Contains(description, "!`") {
+		return true
+	}
+	o := lettersAndDigits(opening)
+	if o == "" {
+		return false
+	}
+	if cut {
+		return strings.HasPrefix(lettersAndDigits(description), o)
+	}
+	for part := description; ; {
+		if lettersAndDigits(part) == o {
+			return true
+		}
+		i := strings.LastIndex(part, " - ")
+		if i < 0 {
+			return false
+		}
+		part = part[:i]
+	}
+}
+
+// lettersAndDigits is s's letters and digits, lowercased.
+func lettersAndDigits(s string) string {
+	return strings.Map(func(r rune) rune {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) {
+			return unicode.ToLower(r)
+		}
+		return -1
+	}, s)
 }

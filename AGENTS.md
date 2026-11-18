@@ -137,10 +137,11 @@ where it is held (`hookrun.SpoolSkills`, once per skill per session). Claude Cod
 from its transcript at a turn's end: the listing it gives the model, the model's `Skill`
 calls and a person's `/name`, each with the directory it loaded from. Codex's come from the
 shell call that prints a `SKILL.md` under one of Codex's skill roots, and from the rollout's
-record of a `$name` skill. A description leaves, never a skill's body, and a link only to a
-repository the policy collects or a plugin's GitHub marketplace. A definition is content of
-both kinds: hooks spool none, and delivery drops a queued one, unless the policy collects
-prompts and tool content.
+record of a `$name` skill, which goes under the name Codex recorded. A description leaves,
+never a skill's body, nor a description Claude Code made from the body's first line; a link
+leaves only to a repository the policy collects or, for a plugin, its GitHub marketplace,
+with the file's path where it is known. A definition is content of both kinds: hooks spool
+none, and delivery drops a queued one, unless the policy collects prompts and tool content.
 
 ### Lanes, ownership, and loss accounting
 

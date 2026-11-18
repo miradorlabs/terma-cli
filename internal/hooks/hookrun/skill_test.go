@@ -62,39 +62,44 @@ func TestSpoolSkillsSendsADescriptionOnlyWhole(t *testing.T) {
 	}
 }
 
-// A skill's place leaves only as an https URL with no credentials and a path relative to it,
-// both or neither; an origin outside the registry's list is left out.
+// A skill's repository leaves only as an https URL with no credentials, and its file's path
+// only with it, relative to it; an origin outside the registry's list is left out.
 func TestSpoolSkillsSendsOnlyAShareableLink(t *testing.T) {
 	t.Parallel()
 	const goodURL, goodPath = "https://github.com/acme/widgets", ".agents/skills/x/SKILL.md"
+	const plugin = semconv.TermaSkillOriginPlugin
 	for _, tc := range []struct {
-		name, url, path string
-		linked          bool
+		name, origin, url, path string
+		withURL, withPath       bool
 	}{
-		{"both", goodURL, goodPath, true},
-		{"url-alone", goodURL, "", false},
-		{"path-alone", "", goodPath, false},
-		{"absolute", goodURL, "/home/dev/.agents/skills/x/SKILL.md", false},
-		{"home", goodURL, "~/.agents/skills/x/SKILL.md", false},
-		{"dotdot", goodURL, "skills/../../etc/passwd", false},
-		{"backslash", goodURL, `skills\x\SKILL.md`, false},
-		{"drive", goodURL, "C:/skills/x/SKILL.md", false},
-		{"http", "http://github.com/acme/widgets", goodPath, false},
-		{"userinfo", "https://token@github.com/acme/widgets", goodPath, false},
-		{"no-host", "https:///acme/widgets", goodPath, false},
+		{"both", "", goodURL, goodPath, true, true},
+		{"plugin-both", plugin, goodURL, goodPath, true, true},
+		{"plugin-url-alone", plugin, goodURL, "", true, false},
+		{"url-alone", "", goodURL, "", false, false},
+		{"personal-url-alone", semconv.TermaSkillOriginPersonal, goodURL, "", false, false},
+		{"path-alone", plugin, "", goodPath, false, false},
+		{"absolute", "", goodURL, "/home/dev/.agents/skills/x/SKILL.md", false, false},
+		{"home", "", goodURL, "~/.agents/skills/x/SKILL.md", false, false},
+		{"dotdot", "", goodURL, "skills/../../etc/passwd", false, false},
+		{"backslash", "", goodURL, `skills\x\SKILL.md`, false, false},
+		{"drive", "", goodURL, "C:/skills/x/SKILL.md", false, false},
+		{"plugin-absolute", plugin, goodURL, "/home/dev/plugins/x/SKILL.md", false, false},
+		{"http", plugin, "http://github.com/acme/widgets", goodPath, false, false},
+		{"userinfo", plugin, "https://token@github.com/acme/widgets", "", false, false},
+		{"no-host", "", "https:///acme/widgets", goodPath, false, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			out := skillAttrs(Skill{Name: "x", Origin: "elsewhere", RepositoryURL: tc.url, Path: tc.path})
+			out := skillAttrs(Skill{Name: "x", Origin: tc.origin, RepositoryURL: tc.url, Path: tc.path})
 			_, hasURL := out[semconv.TermaSkillRepositoryURLKey]
 			_, hasPath := out[semconv.TermaSkillPathKey]
-			if hasURL != tc.linked || hasPath != tc.linked {
-				t.Errorf("url %q path %q: attrs %+v", tc.url, tc.path, out)
-			}
-			if _, ok := out[semconv.TermaSkillOriginKey]; ok {
-				t.Errorf("an unknown origin was sent: %+v", out)
+			if hasURL != tc.withURL || hasPath != tc.withPath {
+				t.Errorf("origin %q url %q path %q: attrs %+v", tc.origin, tc.url, tc.path, out)
 			}
 		})
+	}
+	if out := skillAttrs(Skill{Name: "x", Origin: "elsewhere"}); out[semconv.TermaSkillOriginKey] != nil {
+		t.Errorf("an unknown origin was sent: %+v", out)
 	}
 }
 
