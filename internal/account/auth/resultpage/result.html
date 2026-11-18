@@ -5,7 +5,8 @@
 <meta name="color-scheme" content="light dark">
 <title>Terma CLI</title>
 <style>
-{{.FontFace}}
+{{font-face}}
+/* Colors: terma-frontend's src/styles/tokens.css, light (:root) and dark ([data-theme="dark"]). */
 :root {
   --bg: #ffffff;
   --text: #131316;
@@ -54,6 +55,7 @@ h1 { margin: 0; text-align: center; font-size: 20px; font-weight: 600; line-heig
 .success svg { color: var(--success); }
 .error { background: var(--error-soft); border-color: color-mix(in srgb, var(--error) 25%, transparent); }
 .error svg { color: var(--error); }
+.success .icon-error, .error .icon-success { display: none; }
 </style>
 <main>
   <svg class="mark" width="36" height="36" viewBox="0 0 24 24" fill="#8b6cff" aria-hidden="true">
@@ -62,13 +64,11 @@ h1 { margin: 0; text-align: center; font-size: 20px; font-weight: 600; line-heig
     <rect x="2" y="13" width="9" height="9" rx="2.4" opacity=".35"/>
     <rect x="13" y="13" width="9" height="9" rx="2.4"/>
   </svg>
-  <h1>{{.Heading}}</h1>
-  {{if .OK}}<p class="note success" role="status">
-    <svg width="16" height="16" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M173.66,98.34a8,8,0,0,1,0,11.32l-56,56a8,8,0,0,1-11.32,0l-24-24a8,8,0,0,1,11.32-11.32L112,148.69l50.34-50.35A8,8,0,0,1,173.66,98.34ZM232,128A104,104,0,1,1,128,24,104.11,104.11,0,0,1,232,128Zm-16,0a88,88,0,1,0-88,88A88.1,88.1,0,0,0,216,128Z"/></svg>
-    <span>{{.Detail}}</span>
-  </p>{{else}}<p class="note error" role="alert">
-    <svg width="16" height="16" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M165.66,101.66,139.31,128l26.35,26.34a8,8,0,0,1-11.32,11.32L128,139.31l-26.34,26.35a8,8,0,0,1-11.32-11.32L116.69,128,90.34,101.66a8,8,0,0,1,11.32-11.32L128,116.69l26.34-26.35a8,8,0,0,1,11.32,11.32ZM232,128A104,104,0,1,1,128,24,104.11,104.11,0,0,1,232,128Zm-16,0a88,88,0,1,0-88,88A88.1,88.1,0,0,0,216,128Z"/></svg>
-    <span>{{.Detail}}</span>
-  </p>{{end}}
+  <h1>{{heading}}</h1>
+  <p class="note {{tone}}" role="{{role}}">
+    <svg class="icon-success" width="16" height="16" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M173.66,98.34a8,8,0,0,1,0,11.32l-56,56a8,8,0,0,1-11.32,0l-24-24a8,8,0,0,1,11.32-11.32L112,148.69l50.34-50.35A8,8,0,0,1,173.66,98.34ZM232,128A104,104,0,1,1,128,24,104.11,104.11,0,0,1,232,128Zm-16,0a88,88,0,1,0-88,88A88.1,88.1,0,0,0,216,128Z"/></svg>
+    <svg class="icon-error" width="16" height="16" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M165.66,101.66,139.31,128l26.35,26.34a8,8,0,0,1-11.32,11.32L128,139.31l-26.34,26.35a8,8,0,0,1-11.32-11.32L116.69,128,90.34,101.66a8,8,0,0,1,11.32-11.32L128,116.69l26.34-26.35a8,8,0,0,1,11.32,11.32ZM232,128A104,104,0,1,1,128,24,104.11,104.11,0,0,1,232,128Zm-16,0a88,88,0,1,0-88,88A88.1,88.1,0,0,0,216,128Z"/></svg>
+    <span>{{detail}}</span>
+  </p>
 </main>
 </html>

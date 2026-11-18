@@ -5,6 +5,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -47,6 +48,31 @@ func TestNoSourceFileOutgrowsItsJob(t *testing.T) {
 		})
 		if err != nil {
 			t.Fatal(err)
+		}
+	}
+}
+
+// templates are the engines whose execution looks methods up by name through reflection. A binary that can run one
+// keeps every exported method of every reachable type, because the linker can no longer tell which are unused: one
+// html/template page once made terma 3 MB (22%) larger. Fill a page with strings.Replacer and html.EscapeString.
+var templates = []string{"html/template", "text/template"}
+
+// TestNoTemplateEngine keeps template engines out of the binary: no package of terma's imports one, and html/template
+// is not linked at all, even through a dependency. text/template is linked through cobra, which executes it only for a
+// custom template (SetHelpTemplate and the like), so a call to one of those would bring the cost back unseen here.
+func TestNoTemplateEngine(t *testing.T) {
+	t.Parallel()
+	for _, p := range listPackages(t) {
+		if !within(p.ImportPath, "cmd") && !within(p.ImportPath, "internal") {
+			continue
+		}
+		for _, imp := range p.Imports {
+			if slices.Contains(templates, imp) {
+				t.Errorf("%s imports %s: it keeps every method in the binary; fill the page with strings.Replacer", p.ImportPath, imp)
+			}
+		}
+		if slices.Contains(p.Deps, "html/template") && !slices.Contains(p.Imports, "html/template") {
+			t.Errorf("%s links html/template through a dependency: it keeps every method in the binary", p.ImportPath)
 		}
 	}
 }

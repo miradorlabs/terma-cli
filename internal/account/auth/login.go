@@ -94,14 +94,14 @@ func Login(ctx context.Context, exchanger TokenExchanger, opts LoginOptions) (*C
 		// Ignore a mismatched callback rather than abort: anything that guesses the port
 		// could otherwise deny the login.
 		if subtle.ConstantTimeCompare([]byte(gotState), []byte(state)) != 1 {
-			writeResultPage(w, http.StatusBadRequest, "Authorization failed", "This request did not match the login your terminal started.")
+			writeAuthFailed(w, "This request did not match the login your terminal started.")
 			return
 		}
 		if code == "" {
-			writeResultPage(w, http.StatusBadRequest, "Authorization failed", "No authorization code was returned.")
+			writeAuthFailed(w, "No authorization code was returned.")
 			return
 		}
-		writeResultPage(w, http.StatusOK, "You're signed in", "You can close this tab and return to your terminal.")
+		writeSignedIn(w)
 		results <- callback{code: code}
 	})
 
@@ -160,7 +160,7 @@ func callbackParams(w http.ResponseWriter, r *http.Request) (state, code string,
 	case http.MethodPost:
 		r.Body = http.MaxBytesReader(w, r.Body, maxCallbackBody)
 		if err := r.ParseForm(); err != nil {
-			writeResultPage(w, http.StatusBadRequest, "Authorization failed", "The authorization response could not be read.")
+			writeAuthFailed(w, "The authorization response could not be read.")
 			return "", "", false
 		}
 		return r.PostForm.Get("state"), r.PostForm.Get("code"), true
