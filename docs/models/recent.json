@@ -1,7 +1,20 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-18T21:12:25.46010765Z",
+  "generated_at": "2026-11-18T22:12:38.632505618Z",
   "events": [
+    {
+      "at": "2026-11-18T22:12:38.632505618Z",
+      "model": "gemini-4-neon",
+      "vendor": "google",
+      "name": "Gemini 4 Neon",
+      "event": "changed",
+      "changes": 3,
+      "highlights": [
+        "Knowledge cutoff: now 2026-03",
+        "Open weights: now no",
+        "Sampling parameters: now yes"
+      ]
+    },
     {
       "at": "2026-11-18T21:12:25.46010765Z",
       "model": "gemini-4-neon",
