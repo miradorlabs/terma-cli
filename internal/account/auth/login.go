@@ -229,19 +229,3 @@ func openBrowser(target string) error {
 	}
 	return cmd.Start()
 }
-
-func writeResultPage(w http.ResponseWriter, status int, heading, detail string) {
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.WriteHeader(status)
-	fmt.Fprintf(w, `<!doctype html>
-<meta charset="utf-8">
-<title>Terma CLI</title>
-<style>
-  body { font-family: ui-sans-serif, system-ui, sans-serif; display: grid; place-items: center; min-height: 100vh; margin: 0; background: #0b0d10; color: #e6e8eb; }
-  main { text-align: center; max-width: 26rem; padding: 2rem; }
-  h1 { font-size: 1.25rem; margin: 0 0 .5rem; }
-  p { margin: 0; color: #9aa3ad; line-height: 1.5; }
-</style>
-<main><h1>%s</h1><p>%s</p></main>
-`, heading, detail)
-}
