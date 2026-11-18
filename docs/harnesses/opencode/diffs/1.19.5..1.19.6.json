@@ -3,7 +3,7 @@
   "harness": "opencode",
   "from": "1.19.5",
   "to": "1.19.6",
-  "generated_at": "2026-11-17T20:01:02.637827166Z",
+  "generated_at": "2026-11-18T02:26:01.524949909Z",
   "source": {
     "compare": "https://github.com/anomalyco/opencode/compare/v1.19.5...v1.19.6"
   },
@@ -41,7 +41,7 @@
       "impact": "notable",
       "before": null,
       "after": null,
-      "text_diff": "@@ -117,7 +117,7 @@\n   Workspace root folder: <repo>\n   Is directory a git repo: yes\n   Platform: darwin\n-  Today's date: Fri Nov 13 2026\n+  Today's date: Tue Nov 17 2026\n </env>\n Skills provide specialized instructions and workflows for specific tasks.\n Use the skill tool to load a skill when a task matches its description.\n",
+      "text_diff": "@@ -117,7 +117,7 @@\n   Workspace root folder: <repo>\n   Is directory a git repo: yes\n   Platform: darwin\n-  Today's date: Fri Nov 13 2026\n+  Today's date: Wed Nov 18 2026\n </env>\n Skills provide specialized instructions and workflows for specific tasks.\n Use the skill tool to load a skill when a task matches its description.\n",
       "stats": {
         "added_chars": 31,
         "removed_chars": 31
@@ -79,10 +79,10 @@
         "kept_lines",
         "first"
       ],
-      "title": "Behaviour: tool_output kept_lines first changed: 12565 → 364",
+      "title": "Behaviour: tool_output kept_lines first changed: 12565 → 7",
       "impact": "notable",
       "before": 12565,
-      "after": 364,
+      "after": 7,
       "text_diff": null,
       "terma": null,
       "source": null,
@@ -98,10 +98,10 @@
         "kept_lines",
         "last"
       ],
-      "title": "Behaviour: tool_output kept_lines last changed: 14563 → 3640",
+      "title": "Behaviour: tool_output kept_lines last changed: 14563 → 7281",
       "impact": "notable",
       "before": 14563,
-      "after": 3640,
+      "after": 7281,
       "text_diff": null,
       "terma": null,
       "source": null,
@@ -119,10 +119,10 @@
         "--cwd",
         "default"
       ],
-      "title": "Default of `opencode acp --cwd`: <tmp> ressv1.19.52028492095/010 → <tmp> ressv1.19.6151440195/010",
+      "title": "Default of `opencode acp --cwd`: <tmp> ressv1.19.52028492095/010 → <tmp> ressv1.19.61008169649/008",
       "impact": "notable",
       "before": "<tmp> ressv1.19.52028492095/010",
-      "after": "<tmp> ressv1.19.6151440195/010",
+      "after": "<tmp> ressv1.19.61008169649/008",
       "text_diff": null,
       "terma": null,
       "source": {
@@ -155,7 +155,7 @@
       "impact": "informational",
       "before": null,
       "after": null,
-      "text_diff": "@@ -17,4 +17,4 @@\n       --cors         additional domains to allow for CORS                      [array] [default: []]\n       --cwd          working directory\n   [string] [default: \"<tmp>\n-                                                                         ressv1.19.52028492095/010\"]\n+                                                                          ressv1.19.6151440195/010\"]\n",
+      "text_diff": "@@ -17,4 +17,4 @@\n       --cors         additional domains to allow for CORS                      [array] [default: []]\n       --cwd          working directory\n   [string] [default: \"<tmp>\n-                                                                         ressv1.19.52028492095/010\"]\n+                                                                         ressv1.19.61008169649/008\"]\n",
       "stats": {
         "added_chars": 100,
         "removed_chars": 100
@@ -177,7 +177,7 @@
       "impact": "informational",
       "before": null,
       "after": null,
-      "text_diff": "@@ -17,4 +17,4 @@\n       --cors         additional domains to allow for CORS                      [array] [default: []]\n       --cwd          working directory\n   [string] [default: \"<tmp>\n-                                                                         ressv1.19.52028492095/014\"]\n+                                                                          ressv1.19.6151440195/011\"]\n",
+      "text_diff": "@@ -17,4 +17,4 @@\n       --cors         additional domains to allow for CORS                      [array] [default: []]\n       --cwd          working directory\n   [string] [default: \"<tmp>\n-                                                                         ressv1.19.52028492095/014\"]\n+                                                                         ressv1.19.61008169649/011\"]\n",
       "stats": {
         "added_chars": 100,
         "removed_chars": 100

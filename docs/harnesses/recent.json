@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-17T23:02:23.367358199Z",
+  "generated_at": "2026-11-18T02:26:01.524949909Z",
   "versions": [
     {
       "harness": "codex",
@@ -176,7 +176,7 @@
       "name": "OpenCode",
       "version": "1.19.6",
       "released_at": "2026-11-17T07:22:20.263Z",
-      "captured_at": "2026-11-17T20:01:02.637827166Z",
+      "captured_at": "2026-11-18T02:26:01.524949909Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -198,12 +198,12 @@
       "highlights": [
         "System prompt changed (+31 −31 chars)",
         "Behaviour: tool_output kept_lines count changed: 1999 → 2000",
-        "Behaviour: tool_output kept_lines first changed: 12565 → 364"
+        "Behaviour: tool_output kept_lines first changed: 12565 → 7"
       ],
       "signing": null,
       "partial": true,
-      "attempted_at": "2026-11-17T20:01:02.637827166Z",
-      "attempts": 3
+      "attempted_at": "2026-11-18T02:26:01.524949909Z",
+      "attempts": 4
     },
     {
       "harness": "t3",

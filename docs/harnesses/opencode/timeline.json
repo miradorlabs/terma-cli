@@ -26,7 +26,7 @@
           "id": "behavior.tool_output.kept_lines.first",
           "category": "behavior",
           "op": "changed",
-          "title": "Behaviour: tool_output kept_lines first changed: 12565 → 364",
+          "title": "Behaviour: tool_output kept_lines first changed: 12565 → 7",
           "impact": "notable",
           "documented": false
         },
@@ -34,7 +34,7 @@
           "id": "behavior.tool_output.kept_lines.last",
           "category": "behavior",
           "op": "changed",
-          "title": "Behaviour: tool_output kept_lines last changed: 14563 → 3640",
+          "title": "Behaviour: tool_output kept_lines last changed: 14563 → 7281",
           "impact": "notable",
           "documented": false
         },
@@ -42,7 +42,7 @@
           "id": "cli.commands.opencode acp.options.--cwd.default",
           "category": "cli",
           "op": "changed",
-          "title": "Default of `opencode acp --cwd`: <tmp> ressv1.19.52028492095/010 → <tmp> ressv1.19.6151440195/010",
+          "title": "Default of `opencode acp --cwd`: <tmp> ressv1.19.52028492095/010 → <tmp> ressv1.19.61008169649/008",
           "impact": "notable",
           "documented": false
         },
