@@ -44,6 +44,9 @@ archives:
     files:
       - README.md
       - LICENSE*
+      # The sign-in page embeds the Outfit font (internal/account/auth/resultpage), so its license ships too.
+      - src: internal/account/auth/resultpage/OFL.txt
+        dst: OFL-Outfit.txt
 
 checksum:
   name_template: "checksums.txt"
