@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "harness": "copilot",
+  "from": "1.0.113",
+  "to": "1.0.114",
+  "generated_at": "2026-11-18T06:30:47.699685619Z",
+  "source": null,
+  "changelog": {
+    "url": "https://github.com/github/copilot-cli/blob/main/changelog.md",
+    "text": "Fixes and changes"
+  },
+  "summary": {
+    "changes": 1,
+    "categories": {
+      "storage": 1
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 1,
+      "notable": 0
+    },
+    "undocumented": 1
+  },
+  "changes": [
+    {
+      "id": "storage.logs.path",
+      "category": "storage",
+      "op": "changed",
+      "path": [
+        "storage",
+        "logs",
+        "path"
+      ],
+      "title": "On-disk logs path changed",
+      "impact": "informational",
+      "before": "<home>/.copilot/logs/process-<n>-<n>.log",
+      "after": "<home>/.copilot/logs/process-<n>-5034.log",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    }
+  ]
+}

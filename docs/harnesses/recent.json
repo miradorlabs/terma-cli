@@ -1,7 +1,37 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-18T05:21:36.707903502Z",
+  "generated_at": "2026-11-18T06:30:47.699685619Z",
   "versions": [
+    {
+      "harness": "copilot",
+      "name": "GitHub Copilot CLI",
+      "version": "1.0.114",
+      "released_at": "2026-11-18T06:00:58.966Z",
+      "captured_at": "2026-11-18T06:30:47.699685619Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "1.0.113",
+      "changes": 1,
+      "categories": {
+        "storage": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 1,
+        "notable": 0
+      },
+      "undocumented": 1,
+      "highlights": [
+        "On-disk logs path changed"
+      ],
+      "signing": "valid",
+      "partial": true,
+      "attempted_at": "2026-11-18T06:30:47.699685619Z",
+      "attempts": 1
+    },
     {
       "harness": "codex",
       "name": "Codex CLI",
@@ -6164,34 +6194,6 @@
         "Behaviour: compaction removed",
         "Behaviour: sandbox added",
         "Behaviour: tool_output removed"
-      ],
-      "signing": "valid"
-    },
-    {
-      "harness": "claude",
-      "name": "Claude Code",
-      "version": "2.1.209",
-      "released_at": "2026-07-14T04:45:37.792Z",
-      "captured_at": "2026-11-05T09:54:28.532441Z",
-      "platforms": [
-        "darwin/arm64",
-        "linux/amd64"
-      ],
-      "support": "untested",
-      "previous": "2.1.208",
-      "changes": 1,
-      "categories": {
-        "config": 1
-      },
-      "impact": {
-        "breaking": 0,
-        "degrading": 0,
-        "informational": 1,
-        "notable": 0
-      },
-      "undocumented": 1,
-      "highlights": [
-        "New environment variable: CLAUDE_CODE_ARTIFACT_MCP"
       ],
       "signing": "valid"
     }

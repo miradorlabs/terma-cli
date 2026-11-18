@@ -33,6 +33,10 @@
     "1.0.113": {
       "url": "https://github.com/github/copilot-cli/blob/main/changelog.md",
       "text": "- Administrators can disable built-in Browser Use with the managed setting features.browserUse, including in running sessions."
+    },
+    "1.0.114": {
+      "url": "https://github.com/github/copilot-cli/blob/main/changelog.md",
+      "text": "Fixes and changes"
     }
   }
 }
