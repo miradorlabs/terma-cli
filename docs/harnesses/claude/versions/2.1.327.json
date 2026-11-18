@@ -23160,7 +23160,7 @@
         "read": false
       },
       "ANTHROPIC_FEDERATION_RULE_ID": {
-        "description": "Federation rule ID for Workload Identity Federation. When you set it together with `ANTHROPIC_ORGANIZATION_ID`, Claude Code selects federation credentials, which rank above your `/login` credential. See authentication precedence",
+        "description": "Federation rule ID for Workload Identity Federation. Set it together with `ANTHROPIC_ORGANIZATION_ID`. See authentication precedence",
         "read": true
       },
       "ANTHROPIC_FOUNDRY_API_KEY": {
@@ -23356,7 +23356,7 @@
         "read": false
       },
       "CLAUDE_CODE_AUTO_COMPACT_WINDOW": {
-        "description": "Set the auto-compact window, how full the context gets before compaction, from `100000` to `1000000` tokens. Suffixed values such as `200k` require v2.1.304 or later. For precedence over the other ways to set the window and the effect on the status line's `used_percentage`, see Set the auto-compact window",
+        "description": "Set the auto-compact window, which is how full the context gets before compaction, to a token count of `100000` or more. Suffixed values such as `200k` require v2.1.304 or later. For precedence over the other ways to set the window and the effect on the status line's `used_percentage`, see Set the auto-compact window",
         "read": true
       },
       "CLAUDE_CODE_AUTO_CONNECT_IDE": {
@@ -23599,6 +23599,10 @@
         "description": "Set to `1` to turn off the PowerShell tool check that denies the `cmd` built-ins `rd`, `rmdir`, `del`, and `erase` on a system path, such as a drive root or your home directory. Claude Code ignores this variable in a settings file's `env` block. Requires Claude Code v2.1.283 or later",
         "read": true
       },
+      "CLAUDE_CODE_DISABLE_PROXY_SCHEME_REPAIR": {
+        "description": "Set to `1` to have Claude Code stop at startup on a plain `host:port` in `HTTPS_PROXY` or `https_proxy` even when it starts with no terminal. Claude Code ignores it in project and local settings. Requires Claude Code v2.1.327 or later",
+        "read": true
+      },
       "CLAUDE_CODE_DISABLE_REFUSAL_FALLBACK": {
         "description": "Set to `1` to turn off the automatic model switch when a safety classifier flags a request, the behavior the `switchModelsOnFlag` setting controls",
         "read": true
@@ -23620,7 +23624,7 @@
         "read": true
       },
       "CLAUDE_CODE_DISABLE_ULTRAREVIEW_TRUST_CHECK": {
-        "description": "Set to `1` so that `claude ultrareview` doesn't exit with `Error: Workspace not trusted` in a folder you haven't trusted when it can't ask you to trust it, such as in CI. Set it in the environment that launches Claude Code, not a settings `env` block, and only where every such run starts in a folder you trust. Runs that can ask still ask. Requires Claude Code v2.1.309 or later",
+        "description": "Set to `1` so `claude ultrareview` doesn't exit with `Error: Workspace not trusted` when run without a terminal or with `CI=true`. `claude ultrareview` still asks when it can. From v2.1.314, the variable also skips the trust check in `/ultrareview` and `/code-review ultra`. Set it in the launch environment, not a settings `env` block, and only where every review starts in a folder you trust. Requires Claude Code v2.1.309 or later",
         "read": true
       },
       "CLAUDE_CODE_DISABLE_ULTRATHINK": {
@@ -24139,6 +24143,10 @@
         "description": "Maximum number of consecutive times a Stop or SubagentStop hook may block the turn from ending before Claude Code overrides it and ends the turn anyway (default: 8). Set to `0` to disable the cap. Raise this if your hook legitimately needs more iterations to resolve",
         "read": true
       },
+      "CLAUDE_CODE_STRICT_INLINE_SHELL_RM_PROMPT": {
+        "description": "Set to `1` to flag more of the `-c` scripts that Claude Code can't check, including ones that name neither `rm` nor `rmdir`. Set it in the environment that launches Claude Code, not a settings `env` block. Has no effect when `CLAUDE_CODE_DISABLE_INLINE_SHELL_RM_PROMPT` is `1`. Requires Claude Code v2.1.299 or later",
+        "read": true
+      },
       "CLAUDE_CODE_SUBAGENT_MODEL": {
         "description": "The default model for subagents, agent team teammates, and workflow agents that aren't assigned a model another way. Accepts an alias such as `haiku` or a full model name. Two sources take precedence over it: a model Claude passes when it spawns the agent, and a `model` field in the agent's definition, including `inherit`. To change that, set `CLAUDE_CODE_SUBAGENT_MODEL_FORCE`. See Choose a model for the full order. Setting it to `inherit` is the same as leaving it unset. Before v2.1.251, this variable overrode both the per-invocation model and the definition's `model` field",
         "read": true
@@ -24583,6 +24591,10 @@
         "description": "Set to `true` to include Claude Code version in metric and event attributes (default: excluded). See Monitoring",
         "read": false
       },
+      "OTEL_RESOURCE_INCLUDE_HOST": {
+        "description": "Set to `1` to add the machine's name and ID to OpenTelemetry resource attributes as `host.name` and `host.id` (default: excluded). Set it in your shell, user settings, or managed settings. Ignored in project and local settings. Requires Claude Code v2.1.326 or later. See Identify the machine a session ran on",
+        "read": true
+      },
       "SLASH_COMMAND_TOOL_CHAR_BUDGET": {
         "description": "Override the character budget for skill metadata shown to the Skill tool. The budget scales dynamically at 1% of the context window, with a fallback of 8,000 characters. Legacy name kept for backwards compatibility",
         "read": true
@@ -24680,7 +24692,7 @@
         "read": false
       }
     },
-    "fetched_at": "2026-11-18T19:02:44.287552859Z",
+    "fetched_at": "2026-11-18T23:02:31.539074481Z",
     "settings": {
       "advisorModel": {
         "default": "unset, so the advisor is off",
@@ -24862,7 +24874,7 @@
         "read": true,
         "scope": "Any file",
         "topic": "Memory and context",
-        "type": "number of tokens, from `100000` to `1000000`. Claude Code caps the value at your model's context window; the models overview lists each model's window"
+        "type": "number of tokens, at least `100000`. Claude Code caps the value at your model's context window; the models overview lists each model's window"
       },
       "autoConnectIde": {
         "default": "`false`",
@@ -27066,7 +27078,6 @@
       "CLAUDE_CODE_DISABLE_POWERSHELL_ALIAS_SHADOW_CHECK",
       "CLAUDE_CODE_DISABLE_PRECOMPACT_SKIP",
       "CLAUDE_CODE_DISABLE_PROACTIVITY",
-      "CLAUDE_CODE_DISABLE_PROXY_SCHEME_REPAIR",
       "CLAUDE_CODE_DISABLE_QUIET_BACKGROUND_WAIT",
       "CLAUDE_CODE_DISABLE_REFUSAL_RETRY",
       "CLAUDE_CODE_DISABLE_RESUME_LOAD_GOODBYE_SKIP",
@@ -27378,7 +27389,6 @@
       "CLAUDE_CODE_STREAM_EVENT_HOLD_MS",
       "CLAUDE_CODE_STREAM_EVENT_MAX_LINE_BYTES",
       "CLAUDE_CODE_STREAM_EVENT_NO_SUBSCRIBER_HOLD_MS",
-      "CLAUDE_CODE_STRICT_INLINE_SHELL_RM_PROMPT",
       "CLAUDE_CODE_SUBAGENT_CACHE_EVICT",
       "CLAUDE_CODE_SUBAGENT_CONFIG_WARNING",
       "CLAUDE_CODE_SUBAGENT_EFFORT",
@@ -27649,7 +27659,6 @@
       "OTEL_METRICS_EXPORTER",
       "OTEL_METRIC_EXPORT_INTERVAL",
       "OTEL_RESOURCE_ATTRIBUTES",
-      "OTEL_RESOURCE_INCLUDE_HOST",
       "OTEL_SPAN_ATTRIBUTE_VALUE_LENGTH_LIMIT",
       "OTEL_STATUS_CODE_VALUE_ERROR",
       "OTEL_STATUS_CODE_VALUE_OK",
