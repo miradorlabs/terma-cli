@@ -3,6 +3,54 @@
   "id": "gemini-4-hydrogen",
   "steps": [
     {
+      "at": "2026-11-18T09:52:12.835975143Z",
+      "event": "changed",
+      "changes": [
+        {
+          "id": "docs/overview",
+          "category": "docs",
+          "op": "changed",
+          "path": [
+            "docs",
+            "overview"
+          ],
+          "title": "Model page changed (+199 −89 chars)",
+          "impact": "informational",
+          "before": null,
+          "after": null,
+          "text_diff": "@@ -12,7 +12,7 @@\n ## Documentation  {% id=\"documentation\" %}\n \n Visit the [What's new in Gemini 4 Hydrogen](/docs/whats-new-gemini-4-hydrogen) page\n-for full coverage of features, API changes from Gemini 3.8 Flash, and migration guidance.\n+for full coverage of features, API changes from Gemini 3.8 Flash, and migration guidance, or read [Choosing a model](/docs/choosing-a-model) to compare Hydrogen against Carbon, Argon, and Flash-Lite.\n \n ## gemini-4-hydrogen  {% id=\"gemini-4-hydrogen\" %}\n \n",
+          "stats": {
+            "added_chars": 199,
+            "removed_chars": 89
+          },
+          "terma": null,
+          "source": null,
+          "documented": null
+        },
+        {
+          "id": "docs/whats_new",
+          "category": "docs",
+          "op": "changed",
+          "path": [
+            "docs",
+            "whats_new"
+          ],
+          "title": "What's new page changed (+1477 −1851 chars)",
+          "impact": "informational",
+          "before": null,
+          "after": null,
+          "text_diff": "@@ -95,16 +95,12 @@\n \n ## Choosing between Hydrogen, Carbon, Argon, and other models  {% id=\"choosing-between-models\" %}\n \n-Gemini 4 Hydrogen, [Gemini 4 Argon](/docs/whats-new-gemini-4-argon), and [Gemini 4 Carbon](/docs/whats-new-gemini-4-carbon) share the same 1M unified context window, long decode architecture, and built-in tools. Pick the model that matches your reasoning depth, latency, and cost target:\n-\n-* **Gemini 4 Hydrogen (`gemini-4-hydrogen`):** Fast and efficient while handling complex agentic workflows, at $1.50 per 1M input tokens and $7.50 per 1M output tokens.\n-Use it for everyday coding, interactive web apps, tool-using agents, multimodal document workflows, and parallel subagent execution.\n-**Recommended upgrade from Gemini 3.8 Flash and earlier Gemini 3 and 2.5 models.**\n-* **Gemini 4 Carbon (`gemini-4-carbon`):** Our strongest frontier model. Carbon spends more thinking tokens per turn to test hypotheses and verify edge cases on hard architecture, debugging, science, and security audits.\n-* **Gemini 4 Argon (`gemini-4-argon`):** Use Argon when you want a model that can handle the majority of advanced long-horizon tasks with lower token use than Carbon.\n-* **Gemini 3.5 Flash-Lite (`gemini-3.5-flash-lite`):** Our fastest, lowest-cost model. Keep Flash-Lite for high-volume classification, routing, and sub-second latency targets.\n+Gemini 4 Hydrogen is our default general-purpose model for everyday coding, interactive web apps, tool-using agents, multimodal document workflows, and parallel subagent execution, and is the recommended upgrade from [Gemini 3.8 Flash](/docs/whats-new-gemini-3.8) and earlier Gemini 3 and 2.5 models.\n+Use [Gemini 4 Carbon](/docs/whats-new-gemini-4-carbon) for hard architecture, debugging, science, and security verification, or [Gemini 4 Argon](/docs/whats-new-gemini-4-argon) for advanced long-horizon reasoning with lower token spend than Carbon.\n+Keep [Gemini 3.5 Flash-Lite](/docs/whats-new-gemini-3.6) for high-volume classification, routing, and sub-second latency targets.\n \n-You can also pair Carbon and Hydrogen in one workflow. Have Carbon plan system interfaces or resolve hard roadblocks, then delegate code edits, parallel subagent tasks, and test runs to Hydrogen. For a full comparison, see [Latest Gemini models](/docs/latest-model#compare-models).\n+You can also pair Carbon and Hydrogen in one workflow by having Carbon plan system interfaces or resolve hard roadblocks and delegating code edits, parallel subagent tasks, and test runs to Hydrogen.\n+For side-by-side comparisons, specialized model recommendations, and multi-model code examples, see [Choosing a model](/docs/choosing-a-model).\n \n ## Understanding thinking levels  {% id=\"understanding-thinking-levels\" %}\n \n@@ -414,7 +410,7 @@\n * **Update model ID:** Set `model` to `gemini-4-hydrogen` for standalone requests or subagent turns.\n * **Check default thinking level:** Hydrogen defaults to `high` and supports `xhigh`, whereas Carbon and Argon default to `medium` and cap at `high`. Set `thinking_level` when you want `medium` or `xhigh` behavior.\n * **64K non-streaming hops:** Hydrogen supports up to 65,536 tokens per non-streaming hop across REST and SDK calls, compared to 32,768 tokens per non-streaming REST hop on Carbon and Argon.\n-* **Switch models across turns:** Route planning turns to `gemini-4-carbon` and execution turns to `gemini-4-hydrogen` in one multi-turn session using `previous_interaction_id` (or by preserving [thought steps in stateless mode](/docs/thinking#stateless-mode); see [multi-turn model compatibility](/docs/interactions-overview#limitations)).\n+* **Switch models across turns:** Route planning turns to `gemini-4-carbon` and execution turns to `gemini-4-hydrogen` in one multi-turn session using `previous_interaction_id` (see [Pair models in multi-step workflows](/docs/choosing-a-model#pair-models), or preserve [thought steps in stateless mode](/docs/thinking#stateless-mode); see [multi-turn model compatibility](/docs/interactions-overview#limitations)).\n \n ## Pricing  {% id=\"pricing\" %}\n \n@@ -432,6 +428,7 @@\n \n ## Other models  {% id=\"other-models\" %}\n \n+* [Choosing a model](/docs/choosing-a-model)\n * [Latest Gemini models](/docs/latest-model)\n * [Gemini 4 Carbon](/docs/whats-new-gemini-4-carbon)\n * [Gemini 4 Argon](/docs/whats-new-gemini-4-argon)\n",
+          "stats": {
+            "added_chars": 1477,
+            "removed_chars": 1851
+          },
+          "terma": null,
+          "source": null,
+          "documented": null
+        }
+      ]
+    },
+    {
       "at": "2026-11-16T14:58:16.292875039Z",
       "event": "changed",
       "changes": [

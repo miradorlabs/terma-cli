@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-17T23:12:13.967477009Z",
+  "generated_at": "2026-11-18T09:52:12.835975143Z",
   "vendors": [
     {
       "id": "anthropic",
@@ -92,8 +92,8 @@
       "reasoning": true,
       "harnesses": [],
       "last_change": {
-        "at": "2026-11-16T14:58:16.292875039Z",
-        "changes": 1
+        "at": "2026-11-18T09:52:12.835975143Z",
+        "changes": 2
       },
       "probed": false
     },
@@ -113,8 +113,8 @@
       "reasoning": true,
       "harnesses": [],
       "last_change": {
-        "at": "2026-11-16T14:58:16.292875039Z",
-        "changes": 1
+        "at": "2026-11-18T09:52:12.835975143Z",
+        "changes": 2
       },
       "probed": false
     },
@@ -197,8 +197,8 @@
       "reasoning": true,
       "harnesses": [],
       "last_change": {
-        "at": "2026-11-16T15:44:39.622171458Z",
-        "changes": 1
+        "at": "2026-11-18T09:52:12.835975143Z",
+        "changes": 2
       },
       "probed": false
     },
@@ -392,8 +392,8 @@
       "reasoning": true,
       "harnesses": [],
       "last_change": {
-        "at": "2026-11-16T14:58:16.292875039Z",
-        "changes": 2
+        "at": "2026-11-18T09:52:12.835975143Z",
+        "changes": 1
       },
       "probed": false
     },
@@ -491,7 +491,7 @@
       "reasoning": true,
       "harnesses": [],
       "last_change": {
-        "at": "2026-11-16T15:44:39.622171458Z",
+        "at": "2026-11-18T09:52:12.835975143Z",
         "changes": 1
       },
       "probed": false
@@ -512,8 +512,8 @@
       "reasoning": true,
       "harnesses": [],
       "last_change": {
-        "at": "2026-11-16T14:58:16.292875039Z",
-        "changes": 2
+        "at": "2026-11-18T09:52:12.835975143Z",
+        "changes": 1
       },
       "probed": false
     },

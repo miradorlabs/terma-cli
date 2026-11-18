@@ -3,6 +3,54 @@
   "id": "gemini-4-carbon",
   "steps": [
     {
+      "at": "2026-11-18T09:52:12.835975143Z",
+      "event": "changed",
+      "changes": [
+        {
+          "id": "docs/overview",
+          "category": "docs",
+          "op": "changed",
+          "path": [
+            "docs",
+            "overview"
+          ],
+          "title": "Model page changed (+177 −67 chars)",
+          "impact": "informational",
+          "before": null,
+          "after": null,
+          "text_diff": "@@ -12,7 +12,7 @@\n ## Documentation  {% id=\"documentation\" %}\n \n Visit the [What's new in Gemini 4 Carbon](/docs/whats-new-gemini-4-carbon) page\n-for full coverage of features, API changes, and migration guidance.\n+for full coverage of features, API changes, and migration guidance, or read [Choosing a model](/docs/choosing-a-model) to compare Carbon against Argon, Hydrogen, and Flash-Lite.\n \n ## gemini-4-carbon  {% id=\"gemini-4-carbon\" %}\n \n",
+          "stats": {
+            "added_chars": 177,
+            "removed_chars": 67
+          },
+          "terma": null,
+          "source": null,
+          "documented": null
+        },
+        {
+          "id": "docs/whats_new",
+          "category": "docs",
+          "op": "changed",
+          "path": [
+            "docs",
+            "whats_new"
+          ],
+          "title": "What's new page changed (+434 −100 chars)",
+          "impact": "informational",
+          "before": null,
+          "after": null,
+          "text_diff": "@@ -102,11 +102,15 @@\n * **Gemini 4 Carbon (`gemini-4-carbon`):** Built for tasks that push the limits of reasoning depth.\n Carbon spends more thinking tokens per turn to explore thoroughly and verify its work, which increases per-turn token use and latency compared to Argon.\n Use it for complex root-cause debugging, architectural design, dense multimodal synthesis, scientific proofs, and security auditing.\n+\n * **Gemini 4 Argon (`gemini-4-argon`):** Our efficient Gemini 4 frontier reasoning model, ideal for most advanced software engineering and knowledge work tasks.\n It delivers Gemini 4 intelligence with faster responses and lower token spend per turn compared to Carbon on interactive coding, day-to-day feature work, and fast production loops.\n \n-For more guidance on model selection, see [Latest Gemini models](/docs/latest-model#compare-models).\n+* **Gemini 4 Hydrogen (`gemini-4-hydrogen`):** Fast and cost-efficient ($1.50 / $7.50 per 1M tokens, plus a Free tier) for everyday coding, interactive apps, multimodal documents, and parallel subagent execution.\n \n+\n+For side-by-side comparisons and multi-model orchestration examples, see [Choosing a model](/docs/choosing-a-model) and [Latest Gemini models](/docs/latest-model#compare-models).\n+\n ## Understanding thinking levels  {% id=\"understanding-thinking-levels\" %}\n \n The [thinking level](/docs/thinking) is your main control over quality, latency, and token use in Gemini 4 Carbon:\n@@ -438,6 +442,7 @@\n \n ## Other models  {% id=\"other-models\" %}\n \n+* [Choosing a model](/docs/choosing-a-model)\n * [Latest Gemini models](/docs/latest-model)\n * [Gemini 4 Hydrogen](/docs/whats-new-gemini-4-hydrogen)\n * [Gemini 4 Argon](/docs/whats-new-gemini-4-argon)\n",
+          "stats": {
+            "added_chars": 434,
+            "removed_chars": 100
+          },
+          "terma": null,
+          "source": null,
+          "documented": null
+        }
+      ]
+    },
+    {
       "at": "2026-11-16T14:58:16.292875039Z",
       "event": "changed",
       "changes": [
