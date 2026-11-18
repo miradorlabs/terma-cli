@@ -11074,7 +11074,16 @@
       "wslInheritsWindowsSettings",
       "xaaIdp"
     ],
-    "source": "the settings schema its bundle declares (zod, read from minified code)"
+    "source": "the settings schema its bundle declares (zod, read from minified code)",
+    "unobserved": [
+      "autoMode",
+      "axScreenReader",
+      "defaultView",
+      "disableDeepLinkRegistration",
+      "skipAutoPermissionPrompt",
+      "useAutoModeDuringPlan",
+      "voiceEnabled"
+    ]
   },
   "network": {
     "egress": [

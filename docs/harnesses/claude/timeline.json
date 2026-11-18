@@ -3,6 +3,1196 @@
   "harness": "claude",
   "steps": [
     {
+      "version": "2.1.328",
+      "previous": "2.1.327",
+      "changes": [
+        {
+          "id": "prompt.context.2.text",
+          "category": "prompt",
+          "op": "changed",
+          "title": "Injected context changed (+453 −376 chars)",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "prompt.interactive.context.2.text",
+          "category": "prompt",
+          "op": "changed",
+          "title": "Interactive session's injected context changed (+453 −376 chars)",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "tools.ListAgents.description",
+          "category": "tools",
+          "op": "changed",
+          "title": "ListAgents tool description changed (+1042 −537 chars)",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "tools.ReportFindings.input_schema.properties.findings.items.properties.severity",
+          "category": "tools",
+          "op": "added",
+          "title": "ReportFindings tool parameter findings: items.properties.severity added",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "tools.ReportFindings.input_schema.properties.findings.items.properties.summary.description",
+          "category": "tools",
+          "op": "changed",
+          "title": "ReportFindings tool parameter findings: items.properties.summary.description changed",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.allowManagedMcpServersOnly.description",
+          "category": "config",
+          "op": "changed",
+          "title": "allowManagedMcpServersOnly description changed (+328 −273 chars)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.options.allowedMcpServers.description",
+          "category": "config",
+          "op": "changed",
+          "title": "allowedMcpServers description changed (+252 −0 chars)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.options.askUserQuestionTimeout.enum.60s",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting askUserQuestionTimeout lost value 60s",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.askUserQuestionTimeout.enum.5m",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting askUserQuestionTimeout lost value 5m",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.askUserQuestionTimeout.enum.10m",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting askUserQuestionTimeout lost value 10m",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.askUserQuestionTimeout.enum.never",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting askUserQuestionTimeout lost value never",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.autoCompactOfferAnswer.choice.enum.accept",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting autoCompactOfferAnswer.choice lost value accept",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.autoCompactOfferAnswer.choice.enum.keep",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting autoCompactOfferAnswer.choice lost value keep",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.autoCompactOfferAnswer.choice.enum.undo",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting autoCompactOfferAnswer.choice lost value undo",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.autoUpdatesChannel.enum.latest",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting autoUpdatesChannel lost value latest",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.autoUpdatesChannel.enum.stable",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting autoUpdatesChannel lost value stable",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.autoUpdatesChannel.enum.rc",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting autoUpdatesChannel lost value rc",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.availableModels.description",
+          "category": "config",
+          "op": "changed",
+          "title": "availableModels description changed (+219 −0 chars)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.options.availableModelsMatch.enum.prefix",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting availableModelsMatch lost value prefix",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.availableModelsMatch.enum.exact",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting availableModelsMatch lost value exact",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.crossSessionInbound.enum.accept",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting crossSessionInbound lost value accept",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.crossSessionInbound.enum.hold",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting crossSessionInbound lost value hold",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.crossSessionInbound.enum.refuse",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting crossSessionInbound lost value refuse",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.daemonColdStart.enum.transient",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting daemonColdStart lost value transient",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.daemonColdStart.enum.ask",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting daemonColdStart lost value ask",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.defaultShell.enum.bash",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting defaultShell lost value bash",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.defaultShell.enum.powershell",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting defaultShell lost value powershell",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.deniedMcpServers.description",
+          "category": "config",
+          "op": "changed",
+          "title": "deniedMcpServers description changed (+476 −241 chars)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.options.dialogExpiry.enum.60s",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting dialogExpiry lost value 60s",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.dialogExpiry.enum.5m",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting dialogExpiry lost value 5m",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.dialogExpiry.enum.10m",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting dialogExpiry lost value 10m",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.dialogExpiry.enum.never",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting dialogExpiry lost value never",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.disableAutoMode.enum.disable",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting disableAutoMode lost value disable",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.editorMode.enum.normal",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting editorMode lost value normal",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.editorMode.enum.vim",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting editorMode lost value vim",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.effortLevel.enum.low",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting effortLevel lost value low",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.effortLevel.enum.medium",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting effortLevel lost value medium",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.effortLevel.enum.high",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting effortLevel lost value high",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.effortLevel.enum.xhigh",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting effortLevel lost value xhigh",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.feedbackDrafts.enum.notify",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting feedbackDrafts lost value notify",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.feedbackDrafts.enum.quiet",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting feedbackDrafts lost value quiet",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.feedbackDrafts.enum.off",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting feedbackDrafts lost value off",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.forceLoginMethod.enum.claudeai",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting forceLoginMethod lost value claudeai",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.forceLoginMethod.enum.console",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting forceLoginMethod lost value console",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.forceLoginMethod.enum.gateway",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting forceLoginMethod lost value gateway",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.keybindingFlavor.enum.classic",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting keybindingFlavor lost value classic",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.keybindingFlavor.enum.readline",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting keybindingFlavor lost value readline",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.managedSourcesBehavior.enum.first-wins",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting managedSourcesBehavior lost value first-wins",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.managedSourcesBehavior.enum.merge",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting managedSourcesBehavior lost value merge",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.maxEffortLevel.enum.low",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting maxEffortLevel lost value low",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.maxEffortLevel.enum.medium",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting maxEffortLevel lost value medium",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.maxEffortLevel.enum.high",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting maxEffortLevel lost value high",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.maxEffortLevel.enum.xhigh",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting maxEffortLevel lost value xhigh",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.maxEffortLevel.enum.max",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting maxEffortLevel lost value max",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.modelProposedGoals.enum.auto",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting modelProposedGoals lost value auto",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.modelProposedGoals.enum.alwaysAsk",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting modelProposedGoals lost value alwaysAsk",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.modelProposedGoals.enum.disabled",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting modelProposedGoals lost value disabled",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.parentSettingsBehavior.enum.first-wins",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting parentSettingsBehavior lost value first-wins",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.parentSettingsBehavior.enum.merge",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting parentSettingsBehavior lost value merge",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.permissions.defaultMode.enum.acceptEdits",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting permissions.defaultMode lost value acceptEdits",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.permissions.defaultMode.enum.auto",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting permissions.defaultMode lost value auto",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.permissions.defaultMode.enum.bypassPermissions",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting permissions.defaultMode lost value bypassPermissions",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.permissions.defaultMode.enum.default",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting permissions.defaultMode lost value default",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.permissions.defaultMode.enum.dontAsk",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting permissions.defaultMode lost value dontAsk",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.permissions.defaultMode.enum.plan",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting permissions.defaultMode lost value plan",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.permissions.disableAutoMode.enum.disable",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting permissions.disableAutoMode lost value disable",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.permissions.disableBypassPermissionsMode.enum.disable",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting permissions.disableBypassPermissionsMode lost value disable",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.policyHelper.path.description",
+          "category": "config",
+          "op": "changed",
+          "title": "policyHelper.path description changed (+0 −38 chars)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.options.policyHelper.refreshIntervalMs.enum.0",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting policyHelper.refreshIntervalMs lost value 0",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.preferredNotifChannel.enum.auto",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting preferredNotifChannel lost value auto",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.preferredNotifChannel.enum.iterm2",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting preferredNotifChannel lost value iterm2",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.preferredNotifChannel.enum.terminal_bell",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting preferredNotifChannel lost value terminal_bell",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.preferredNotifChannel.enum.iterm2_with_bell",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting preferredNotifChannel lost value iterm2_with_bell",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.preferredNotifChannel.enum.kitty",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting preferredNotifChannel lost value kitty",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.preferredNotifChannel.enum.ghostty",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting preferredNotifChannel lost value ghostty",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.preferredNotifChannel.enum.notifications_disabled",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting preferredNotifChannel lost value notifications_disabled",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.promptCacheTtl.enum.5m",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting promptCacheTtl lost value 5m",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.promptCacheTtl.enum.1h",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting promptCacheTtl lost value 1h",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.remoteControl.shareHostProfile.enum.off",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting remoteControl.shareHostProfile lost value off",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.remoteControl.shareHostProfile.enum.basic",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting remoteControl.shareHostProfile lost value basic",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.remoteControl.shareHostProfile.enum.full",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting remoteControl.shareHostProfile lost value full",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.remoteMessageReceipts",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: remoteMessageReceipts",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.options.sandbox.windows.backend.enum.sandboxuser",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting sandbox.windows.backend lost value sandboxuser",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.sandbox.windows.backend.enum.mxc",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting sandbox.windows.backend lost value mxc",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.spinnerVerbs.mode.enum.append",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting spinnerVerbs.mode lost value append",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.spinnerVerbs.mode.enum.replace",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting spinnerVerbs.mode lost value replace",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.subagentPromptCacheTtl.enum.5m",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting subagentPromptCacheTtl lost value 5m",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.subagentPromptCacheTtl.enum.1h",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting subagentPromptCacheTtl lost value 1h",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.teammateMode.enum.auto",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting teammateMode lost value auto",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.teammateMode.enum.tmux",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting teammateMode lost value tmux",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.teammateMode.enum.iterm2",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting teammateMode lost value iterm2",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.teammateMode.enum.in-process",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting teammateMode lost value in-process",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.theme.enum.auto",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting theme lost value auto",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.theme.enum.dark",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting theme lost value dark",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.theme.enum.light",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting theme lost value light",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.theme.enum.light-daltonized",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting theme lost value light-daltonized",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.theme.enum.dark-daltonized",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting theme lost value dark-daltonized",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.theme.enum.light-ansi",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting theme lost value light-ansi",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.theme.enum.dark-ansi",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting theme lost value dark-ansi",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.timeFormat.enum.auto",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting timeFormat lost value auto",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.timeFormat.enum.12-hour",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting timeFormat lost value 12-hour",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.timeFormat.enum.24-hour",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting timeFormat lost value 24-hour",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.timeFormat.enum.24-hour-utc",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting timeFormat lost value 24-hour-utc",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.totalTokensReminder.enum.off",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting totalTokensReminder lost value off",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.totalTokensReminder.enum.infinite",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting totalTokensReminder lost value infinite",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.totalTokensReminder.enum.fixed",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting totalTokensReminder lost value fixed",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.totalTokensReminder.enum.countdown",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting totalTokensReminder lost value countdown",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.totalTokensReminder.enum.padded-countdown",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting totalTokensReminder lost value padded-countdown",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.tui.enum.default",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting tui lost value default",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.tui.enum.fullscreen",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting tui lost value fullscreen",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.viewMode.enum.default",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting viewMode lost value default",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.viewMode.enum.verbose",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting viewMode lost value verbose",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.viewMode.enum.focus",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting viewMode lost value focus",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.voice.mode.enum.hold",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting voice.mode lost value hold",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.voice.mode.enum.tap",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting voice.mode lost value tap",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.workflowSizeGuideline.enum.unrestricted",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting workflowSizeGuideline lost value unrestricted",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.workflowSizeGuideline.enum.small",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting workflowSizeGuideline lost value small",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.workflowSizeGuideline.enum.medium",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting workflowSizeGuideline lost value medium",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.workflowSizeGuideline.enum.large",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting workflowSizeGuideline lost value large",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.worktree.baseRef.enum.fresh",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting worktree.baseRef lost value fresh",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.worktree.baseRef.enum.head",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting worktree.baseRef lost value head",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.worktree.bgIsolation.enum.worktree",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting worktree.bgIsolation lost value worktree",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.worktree.bgIsolation.enum.none",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting worktree.bgIsolation lost value none",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.env_vars.CLAUDECODE",
+          "category": "config",
+          "op": "added",
+          "title": "New environment variable: CLAUDECODE",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.env_vars.CLAUDE_CODE_CCR_AFFINITY_KEY",
+          "category": "config",
+          "op": "added",
+          "title": "New environment variable: CLAUDE_CODE_CCR_AFFINITY_KEY",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.env_vars.CLAUDE_CODE_DISABLE_DEFERRED_TOOL_RESUME",
+          "category": "config",
+          "op": "added",
+          "title": "New environment variable: CLAUDE_CODE_DISABLE_DEFERRED_TOOL_RESUME",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.env_vars.CLAUDE_CODE_HOST_CHECKED_FOLDER",
+          "category": "config",
+          "op": "added",
+          "title": "New environment variable: CLAUDE_CODE_HOST_CHECKED_FOLDER",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.env_vars.CLAUDE_CODE_PEPPY_STARLIGHT",
+          "category": "config",
+          "op": "added",
+          "title": "New environment variable: CLAUDE_CODE_PEPPY_STARLIGHT",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.env_vars.CLAUDE_CODE_RELAUNCH_SANDBOX_HOLD",
+          "category": "config",
+          "op": "added",
+          "title": "New environment variable: CLAUDE_CODE_RELAUNCH_SANDBOX_HOLD",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.env_vars.CLAUDE_CODE_REMOTE_TOOLS_DESKTOP_APP_HOST",
+          "category": "config",
+          "op": "added",
+          "title": "New environment variable: CLAUDE_CODE_REMOTE_TOOLS_DESKTOP_APP_HOST",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.env_vars.CLAUDE_CODE_THINKING_RESUMPTION",
+          "category": "config",
+          "op": "added",
+          "title": "New environment variable: CLAUDE_CODE_THINKING_RESUMPTION",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.env_vars.SELF_HOSTED_RUNNER_REPOSITORY_FOLDER",
+          "category": "config",
+          "op": "added",
+          "title": "New environment variable: SELF_HOSTED_RUNNER_REPOSITORY_FOLDER",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.env_vars.CLAUDE_CODE_CCR_FOLD_FIRST_TURN_RESCAN",
+          "category": "config",
+          "op": "removed",
+          "title": "Environment variable no longer read: CLAUDE_CODE_CCR_FOLD_FIRST_TURN_RESCAN",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.env_vars.CLAUDE_CODE_CCR_SKIP_NEEDLESS_STARTUP_READS",
+          "category": "config",
+          "op": "removed",
+          "title": "Environment variable no longer read: CLAUDE_CODE_CCR_SKIP_NEEDLESS_STARTUP_READS",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.env_vars.GRACEFUL_FS_PLATFORM",
+          "category": "config",
+          "op": "removed",
+          "title": "Environment variable no longer read: GRACEFUL_FS_PLATFORM",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.env_vars.TEMP",
+          "category": "config",
+          "op": "removed",
+          "title": "Environment variable no longer read: TEMP",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.env_vars.TEST_GRACEFUL_FS_GLOBAL_PATCH",
+          "category": "config",
+          "op": "removed",
+          "title": "Environment variable no longer read: TEST_GRACEFUL_FS_GLOBAL_PATCH",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.env_vars.TMP",
+          "category": "config",
+          "op": "removed",
+          "title": "Environment variable no longer read: TMP",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "filesystem.darwin/arm64.exec./bin/zsh -c source <claude-config>/shell-snapshots/snapshot-zsh-<n>-<id>.sh 2>/dev/null || true && \\builtin setopt NO_EXTENDED_GLOB NO_BARE_GLOB_QUAL NO_BRACE_CCL NO_MAGIC_EQUAL_SUBST NO_EQUALS 2>/dev/null || true && { \\builtin unalias -- 'which'; \\builtin unset -f -- 'which'; } >/dev/null 2>&1 || true && { \\builtin unalias -- 'unsetenv'; \\builtin unset -f -- 'unsetenv'; } >/dev/null 2>&1 || true && eval 'git status --short && git log --oneline -1' < /dev/null && pwd -P >| <tmp>/claude-<id>-cwd",
+          "category": "filesystem",
+          "op": "changed",
+          "title": "Command changed: `/bin/zsh -c source <claude-config>/shell-snapshots/snapshot-zsh-<n>-<id>.sh 2>/dev/null || true && \\ …` (+226 −216 chars) (darwin/arm64)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "filesystem.darwin/arm64.exec.sh -c uname -s\nuname -r\nuname -m\nfor c in npm yarn pnpm; do command -v \"$c\" >/dev/null 2>&1 && printf \"%s,\" \"$c\"; done; echo\nfor c in bun deno node; do command -v \"$c\" >/dev/null 2>&1 && printf \"%s,\" \"$c\"; done; echo",
+          "category": "filesystem",
+          "op": "removed",
+          "title": "Command no longer run: `sh -c uname -s …` (darwin/arm64)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "filesystem.darwin/arm64.exec.uname -m",
+          "category": "filesystem",
+          "op": "removed",
+          "title": "Command no longer run: `uname -m` (darwin/arm64)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "filesystem.darwin/arm64.exec.uname -r",
+          "category": "filesystem",
+          "op": "removed",
+          "title": "Command no longer run: `uname -r` (darwin/arm64)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "filesystem.darwin/arm64.exec.uname -s",
+          "category": "filesystem",
+          "op": "removed",
+          "title": "Command no longer run: `uname -s` (darwin/arm64)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "filesystem.linux/amd64.exec.sh -c uname -s\nuname -r\nuname -m\nfor c in npm yarn pnpm; do command -v \"$c\" >/dev/null 2>&1 && printf \"%s,\" \"$c\"; done; echo\nfor c in bun deno node; do command -v \"$c\" >/dev/null 2>&1 && printf \"%s,\" \"$c\"; done; echo",
+          "category": "filesystem",
+          "op": "removed",
+          "title": "Command no longer run: `sh -c uname -s …` (linux/amd64)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "filesystem.linux/amd64.exec.uname -m",
+          "category": "filesystem",
+          "op": "removed",
+          "title": "Command no longer run: `uname -m` (linux/amd64)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "filesystem.linux/amd64.exec.uname -r",
+          "category": "filesystem",
+          "op": "removed",
+          "title": "Command no longer run: `uname -r` (linux/amd64)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "filesystem.linux/amd64.exec.uname -s",
+          "category": "filesystem",
+          "op": "removed",
+          "title": "Command no longer run: `uname -s` (linux/amd64)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "filesystem.linux/amd64.lookups.sh",
+          "category": "filesystem",
+          "op": "removed",
+          "title": "No longer looks for the program sh on the PATH (linux/amd64)",
+          "impact": "informational",
+          "documented": null
+        }
+      ]
+    },
+    {
       "version": "2.1.327",
       "previous": "2.1.326",
       "changes": [
@@ -12,7 +1202,7 @@
           "op": "changed",
           "title": "Bash tool description changed (+175 −0 chars)",
           "impact": "notable",
-          "documented": null
+          "documented": true
         },
         {
           "id": "tools.ListAgents.description",
@@ -20,7 +1210,7 @@
           "op": "changed",
           "title": "ListAgents tool description changed (+151 −0 chars)",
           "impact": "notable",
-          "documented": null
+          "documented": true
         },
         {
           "id": "tools.ListAgents.input_schema.properties.cursor",
@@ -28,7 +1218,7 @@
           "op": "added",
           "title": "ListAgents tool parameter cursor added",
           "impact": "notable",
-          "documented": null
+          "documented": true
         },
         {
           "id": "hooks.events.ConfigChange.env.CLAUDE_CODE_CHILD_NOTES_DIR",
@@ -36,7 +1226,7 @@
           "op": "added",
           "title": "ConfigChange hook environment variable CLAUDE_CODE_CHILD_NOTES_DIR added",
           "impact": "informational",
-          "documented": null
+          "documented": false
         },
         {
           "id": "hooks.events.CwdChanged.env.CLAUDE_CODE_CHILD_NOTES_DIR",
@@ -44,7 +1234,7 @@
           "op": "added",
           "title": "CwdChanged hook environment variable CLAUDE_CODE_CHILD_NOTES_DIR added",
           "impact": "informational",
-          "documented": null
+          "documented": true
         },
         {
           "id": "hooks.events.Elicitation.env.CLAUDE_CODE_CHILD_NOTES_DIR",
@@ -52,7 +1242,7 @@
           "op": "added",
           "title": "Elicitation hook environment variable CLAUDE_CODE_CHILD_NOTES_DIR added",
           "impact": "informational",
-          "documented": null
+          "documented": true
         },
         {
           "id": "hooks.events.ElicitationResult.env.CLAUDE_CODE_CHILD_NOTES_DIR",
@@ -60,7 +1250,7 @@
           "op": "added",
           "title": "ElicitationResult hook environment variable CLAUDE_CODE_CHILD_NOTES_DIR added",
           "impact": "informational",
-          "documented": null
+          "documented": false
         },
         {
           "id": "hooks.events.FileChanged.env.CLAUDE_CODE_CHILD_NOTES_DIR",
@@ -68,7 +1258,7 @@
           "op": "added",
           "title": "FileChanged hook environment variable CLAUDE_CODE_CHILD_NOTES_DIR added",
           "impact": "informational",
-          "documented": null
+          "documented": true
         },
         {
           "id": "hooks.events.InstructionsLoaded.env.CLAUDE_CODE_CHILD_NOTES_DIR",
@@ -76,7 +1266,7 @@
           "op": "added",
           "title": "InstructionsLoaded hook environment variable CLAUDE_CODE_CHILD_NOTES_DIR added",
           "impact": "informational",
-          "documented": null
+          "documented": false
         },
         {
           "id": "hooks.events.MessageDisplay.env.CLAUDE_CODE_CHILD_NOTES_DIR",
@@ -84,7 +1274,7 @@
           "op": "added",
           "title": "MessageDisplay hook environment variable CLAUDE_CODE_CHILD_NOTES_DIR added",
           "impact": "informational",
-          "documented": null
+          "documented": false
         },
         {
           "id": "hooks.events.Notification.env.CLAUDE_CODE_CHILD_NOTES_DIR",
@@ -92,7 +1282,7 @@
           "op": "added",
           "title": "Notification hook environment variable CLAUDE_CODE_CHILD_NOTES_DIR added",
           "impact": "informational",
-          "documented": null
+          "documented": true
         },
         {
           "id": "hooks.events.PermissionDenied.env.CLAUDE_CODE_CHILD_NOTES_DIR",
@@ -100,7 +1290,7 @@
           "op": "added",
           "title": "PermissionDenied hook environment variable CLAUDE_CODE_CHILD_NOTES_DIR added",
           "impact": "informational",
-          "documented": null
+          "documented": false
         },
         {
           "id": "hooks.events.PermissionRequest.env.CLAUDE_CODE_CHILD_NOTES_DIR",
@@ -108,7 +1298,7 @@
           "op": "added",
           "title": "PermissionRequest hook environment variable CLAUDE_CODE_CHILD_NOTES_DIR added",
           "impact": "informational",
-          "documented": null
+          "documented": false
         },
         {
           "id": "hooks.events.PostCompact.env.CLAUDE_CODE_CHILD_NOTES_DIR",
@@ -116,7 +1306,7 @@
           "op": "added",
           "title": "PostCompact hook environment variable CLAUDE_CODE_CHILD_NOTES_DIR added",
           "impact": "informational",
-          "documented": null
+          "documented": false
         },
         {
           "id": "hooks.events.PostModelSwitch.env.CLAUDE_CODE_CHILD_NOTES_DIR",
@@ -124,7 +1314,7 @@
           "op": "added",
           "title": "PostModelSwitch hook environment variable CLAUDE_CODE_CHILD_NOTES_DIR added",
           "impact": "informational",
-          "documented": null
+          "documented": false
         },
         {
           "id": "hooks.events.PostToolBatch.env.CLAUDE_CODE_CHILD_NOTES_DIR",
@@ -132,7 +1322,7 @@
           "op": "added",
           "title": "PostToolBatch hook environment variable CLAUDE_CODE_CHILD_NOTES_DIR added",
           "impact": "informational",
-          "documented": null
+          "documented": false
         },
         {
           "id": "hooks.events.PostToolUse.env.CLAUDE_CODE_CHILD_NOTES_DIR",
@@ -140,7 +1330,7 @@
           "op": "added",
           "title": "PostToolUse hook environment variable CLAUDE_CODE_CHILD_NOTES_DIR added",
           "impact": "informational",
-          "documented": null
+          "documented": true
         },
         {
           "id": "hooks.events.PostToolUseFailure.env.CLAUDE_CODE_CHILD_NOTES_DIR",
@@ -148,7 +1338,7 @@
           "op": "added",
           "title": "PostToolUseFailure hook environment variable CLAUDE_CODE_CHILD_NOTES_DIR added",
           "impact": "informational",
-          "documented": null
+          "documented": false
         },
         {
           "id": "hooks.events.PreCompact.env.CLAUDE_CODE_CHILD_NOTES_DIR",
@@ -156,7 +1346,7 @@
           "op": "added",
           "title": "PreCompact hook environment variable CLAUDE_CODE_CHILD_NOTES_DIR added",
           "impact": "informational",
-          "documented": null
+          "documented": false
         },
         {
           "id": "hooks.events.PreModelSwitch.env.CLAUDE_CODE_CHILD_NOTES_DIR",
@@ -164,7 +1354,7 @@
           "op": "added",
           "title": "PreModelSwitch hook environment variable CLAUDE_CODE_CHILD_NOTES_DIR added",
           "impact": "informational",
-          "documented": null
+          "documented": false
         },
         {
           "id": "hooks.events.PreToolUse.env.CLAUDE_CODE_CHILD_NOTES_DIR",
@@ -172,7 +1362,7 @@
           "op": "added",
           "title": "PreToolUse hook environment variable CLAUDE_CODE_CHILD_NOTES_DIR added",
           "impact": "informational",
-          "documented": null
+          "documented": true
         },
         {
           "id": "hooks.events.SessionEnd.env.CLAUDE_CODE_CHILD_NOTES_DIR",
@@ -180,7 +1370,7 @@
           "op": "added",
           "title": "SessionEnd hook environment variable CLAUDE_CODE_CHILD_NOTES_DIR added",
           "impact": "informational",
-          "documented": null
+          "documented": true
         },
         {
           "id": "hooks.events.SessionStart.env.CLAUDE_CODE_CHILD_NOTES_DIR",
@@ -188,7 +1378,7 @@
           "op": "added",
           "title": "SessionStart hook environment variable CLAUDE_CODE_CHILD_NOTES_DIR added",
           "impact": "informational",
-          "documented": null
+          "documented": false
         },
         {
           "id": "hooks.events.Setup.env.CLAUDE_CODE_CHILD_NOTES_DIR",
@@ -196,7 +1386,7 @@
           "op": "added",
           "title": "Setup hook environment variable CLAUDE_CODE_CHILD_NOTES_DIR added",
           "impact": "informational",
-          "documented": null
+          "documented": true
         },
         {
           "id": "hooks.events.Stop.env.CLAUDE_CODE_CHILD_NOTES_DIR",
@@ -204,7 +1394,7 @@
           "op": "added",
           "title": "Stop hook environment variable CLAUDE_CODE_CHILD_NOTES_DIR added",
           "impact": "informational",
-          "documented": null
+          "documented": true
         },
         {
           "id": "hooks.events.StopFailure.env.CLAUDE_CODE_CHILD_NOTES_DIR",
@@ -212,7 +1402,7 @@
           "op": "added",
           "title": "StopFailure hook environment variable CLAUDE_CODE_CHILD_NOTES_DIR added",
           "impact": "informational",
-          "documented": null
+          "documented": false
         },
         {
           "id": "hooks.events.SubagentStart.env.CLAUDE_CODE_CHILD_NOTES_DIR",
@@ -220,7 +1410,7 @@
           "op": "added",
           "title": "SubagentStart hook environment variable CLAUDE_CODE_CHILD_NOTES_DIR added",
           "impact": "informational",
-          "documented": null
+          "documented": false
         },
         {
           "id": "hooks.events.SubagentStop.env.CLAUDE_CODE_CHILD_NOTES_DIR",
@@ -228,7 +1418,7 @@
           "op": "added",
           "title": "SubagentStop hook environment variable CLAUDE_CODE_CHILD_NOTES_DIR added",
           "impact": "informational",
-          "documented": null
+          "documented": true
         },
         {
           "id": "hooks.events.TaskCompleted.env.CLAUDE_CODE_CHILD_NOTES_DIR",
@@ -236,7 +1426,7 @@
           "op": "added",
           "title": "TaskCompleted hook environment variable CLAUDE_CODE_CHILD_NOTES_DIR added",
           "impact": "informational",
-          "documented": null
+          "documented": false
         },
         {
           "id": "hooks.events.TaskCreated.env.CLAUDE_CODE_CHILD_NOTES_DIR",
@@ -244,7 +1434,7 @@
           "op": "added",
           "title": "TaskCreated hook environment variable CLAUDE_CODE_CHILD_NOTES_DIR added",
           "impact": "informational",
-          "documented": null
+          "documented": false
         },
         {
           "id": "hooks.events.TeammateIdle.env.CLAUDE_CODE_CHILD_NOTES_DIR",
@@ -252,7 +1442,7 @@
           "op": "added",
           "title": "TeammateIdle hook environment variable CLAUDE_CODE_CHILD_NOTES_DIR added",
           "impact": "informational",
-          "documented": null
+          "documented": false
         },
         {
           "id": "hooks.events.UserPromptExpansion.env.CLAUDE_CODE_CHILD_NOTES_DIR",
@@ -260,7 +1450,7 @@
           "op": "added",
           "title": "UserPromptExpansion hook environment variable CLAUDE_CODE_CHILD_NOTES_DIR added",
           "impact": "informational",
-          "documented": null
+          "documented": false
         },
         {
           "id": "hooks.events.UserPromptSubmit.env.CLAUDE_CODE_CHILD_NOTES_DIR",
@@ -268,7 +1458,7 @@
           "op": "added",
           "title": "UserPromptSubmit hook environment variable CLAUDE_CODE_CHILD_NOTES_DIR added",
           "impact": "informational",
-          "documented": null
+          "documented": true
         },
         {
           "id": "hooks.events.WorktreeCreate.env.CLAUDE_CODE_CHILD_NOTES_DIR",
@@ -276,7 +1466,7 @@
           "op": "added",
           "title": "WorktreeCreate hook environment variable CLAUDE_CODE_CHILD_NOTES_DIR added",
           "impact": "informational",
-          "documented": null
+          "documented": false
         },
         {
           "id": "hooks.events.WorktreeRemove.env.CLAUDE_CODE_CHILD_NOTES_DIR",
@@ -284,7 +1474,7 @@
           "op": "added",
           "title": "WorktreeRemove hook environment variable CLAUDE_CODE_CHILD_NOTES_DIR added",
           "impact": "informational",
-          "documented": null
+          "documented": false
         },
         {
           "id": "cli.commands.claude.options.--autocompact.description",
@@ -292,7 +1482,7 @@
           "op": "changed",
           "title": "`claude --autocompact`: description changed",
           "impact": "informational",
-          "documented": null
+          "documented": true
         },
         {
           "id": "cli.commands.claude mcp add-json.description",
@@ -300,7 +1490,7 @@
           "op": "changed",
           "title": "Description of `claude mcp add-json` changed",
           "impact": "informational",
-          "documented": null
+          "documented": true
         },
         {
           "id": "cli.help.--help",
@@ -308,7 +1498,7 @@
           "op": "changed",
           "title": "Full help text of `--help` changed (+135 −131 chars)",
           "impact": "informational",
-          "documented": null
+          "documented": true
         },
         {
           "id": "cli.help.mcp --help",
@@ -316,7 +1506,7 @@
           "op": "changed",
           "title": "Full help text of `mcp --help` changed (+136 −69 chars)",
           "impact": "informational",
-          "documented": null
+          "documented": true
         },
         {
           "id": "config.options.additionalMarketplaces.<name>.pluginDigests.description",
@@ -324,7 +1514,7 @@
           "op": "changed",
           "title": "additionalMarketplaces.<name>.pluginDigests description changed (+176 −220 chars)",
           "impact": "informational",
-          "documented": null
+          "documented": true
         },
         {
           "id": "config.options.allowNestedModelAccessUnderForceLogin",
@@ -332,7 +1522,7 @@
           "op": "added",
           "title": "New setting: allowNestedModelAccessUnderForceLogin",
           "impact": "notable",
-          "documented": null
+          "documented": false
         },
         {
           "id": "config.options.attributionProject.description",
@@ -340,7 +1530,7 @@
           "op": "changed",
           "title": "attributionProject description changed (+341 −165 chars)",
           "impact": "informational",
-          "documented": null
+          "documented": true
         },
         {
           "id": "config.options.attributionProjectPolicy.default.description",
@@ -348,7 +1538,7 @@
           "op": "changed",
           "title": "attributionProjectPolicy.default description changed (+265 −185 chars)",
           "impact": "informational",
-          "documented": null
+          "documented": true
         },
         {
           "id": "config.options.autoCompactOfferAnswer",
@@ -356,7 +1546,7 @@
           "op": "added",
           "title": "New setting: autoCompactOfferAnswer",
           "impact": "informational",
-          "documented": null
+          "documented": false
         },
         {
           "id": "config.options.autoCompactRaisedForLoad",
@@ -364,39 +1554,7 @@
           "op": "added",
           "title": "New setting: autoCompactRaisedForLoad",
           "impact": "informational",
-          "documented": null
-        },
-        {
-          "id": "config.options.autoMode",
-          "category": "config",
-          "op": "removed",
-          "title": "Setting no longer read: autoMode",
-          "impact": "notable",
-          "documented": null
-        },
-        {
-          "id": "config.options.axScreenReader",
-          "category": "config",
-          "op": "removed",
-          "title": "Setting no longer read: axScreenReader",
-          "impact": "notable",
-          "documented": null
-        },
-        {
-          "id": "config.options.defaultView",
-          "category": "config",
-          "op": "removed",
-          "title": "Setting no longer read: defaultView",
-          "impact": "notable",
-          "documented": null
-        },
-        {
-          "id": "config.options.disableDeepLinkRegistration",
-          "category": "config",
-          "op": "removed",
-          "title": "Setting no longer read: disableDeepLinkRegistration",
-          "impact": "notable",
-          "documented": null
+          "documented": false
         },
         {
           "id": "config.options.extraKnownMarketplaces.<name>.pluginDigests.description",
@@ -404,7 +1562,7 @@
           "op": "changed",
           "title": "extraKnownMarketplaces.<name>.pluginDigests description changed (+176 −220 chars)",
           "impact": "informational",
-          "documented": null
+          "documented": true
         },
         {
           "id": "config.options.modelSettings.<name>.autoCompactWindow.description",
@@ -412,7 +1570,7 @@
           "op": "changed",
           "title": "modelSettings.<name>.autoCompactWindow description changed (+110 −112 chars)",
           "impact": "informational",
-          "documented": null
+          "documented": true
         },
         {
           "id": "config.options.prependPlugins.description",
@@ -420,31 +1578,7 @@
           "op": "changed",
           "title": "prependPlugins description changed (+250 −312 chars)",
           "impact": "informational",
-          "documented": null
-        },
-        {
-          "id": "config.options.skipAutoPermissionPrompt",
-          "category": "config",
-          "op": "removed",
-          "title": "Setting no longer read: skipAutoPermissionPrompt",
-          "impact": "notable",
-          "documented": null
-        },
-        {
-          "id": "config.options.useAutoModeDuringPlan",
-          "category": "config",
-          "op": "removed",
-          "title": "Setting no longer read: useAutoModeDuringPlan",
-          "impact": "notable",
-          "documented": null
-        },
-        {
-          "id": "config.options.voiceEnabled",
-          "category": "config",
-          "op": "removed",
-          "title": "Setting no longer read: voiceEnabled",
-          "impact": "notable",
-          "documented": null
+          "documented": true
         },
         {
           "id": "config.env_vars.CLAUDE_CODE_DESKTOP_RESULT_FIRST",
@@ -452,7 +1586,7 @@
           "op": "added",
           "title": "New environment variable: CLAUDE_CODE_DESKTOP_RESULT_FIRST",
           "impact": "informational",
-          "documented": null
+          "documented": false
         },
         {
           "id": "config.env_vars.CLAUDE_CODE_DISABLE_LAYOUT_CHECK",
@@ -460,7 +1594,7 @@
           "op": "added",
           "title": "New environment variable: CLAUDE_CODE_DISABLE_LAYOUT_CHECK",
           "impact": "informational",
-          "documented": null
+          "documented": false
         },
         {
           "id": "config.env_vars.CLAUDE_CODE_DISABLE_PROXY_SCHEME_REPAIR",
@@ -468,7 +1602,7 @@
           "op": "added",
           "title": "New environment variable: CLAUDE_CODE_DISABLE_PROXY_SCHEME_REPAIR",
           "impact": "informational",
-          "documented": null
+          "documented": false
         },
         {
           "id": "config.env_vars.CLAUDE_CODE_DISABLE_SHELL_HEAD_START",
@@ -476,7 +1610,7 @@
           "op": "added",
           "title": "New environment variable: CLAUDE_CODE_DISABLE_SHELL_HEAD_START",
           "impact": "informational",
-          "documented": null
+          "documented": true
         },
         {
           "id": "config.env_vars.CLAUDE_CODE_HOST_AUTH_ASK_AT_START",
@@ -484,7 +1618,7 @@
           "op": "added",
           "title": "New environment variable: CLAUDE_CODE_HOST_AUTH_ASK_AT_START",
           "impact": "informational",
-          "documented": null
+          "documented": false
         },
         {
           "id": "config.env_vars.CLAUDE_CODE_LAUNCHER_RUNS_API_KEY_HELPER",
@@ -492,7 +1626,7 @@
           "op": "added",
           "title": "New environment variable: CLAUDE_CODE_LAUNCHER_RUNS_API_KEY_HELPER",
           "impact": "informational",
-          "documented": null
+          "documented": false
         },
         {
           "id": "config.env_vars.CLAUDE_CODE_MCP_SERVE_MACHINE_PLUGINS",
@@ -500,7 +1634,7 @@
           "op": "added",
           "title": "New environment variable: CLAUDE_CODE_MCP_SERVE_MACHINE_PLUGINS",
           "impact": "informational",
-          "documented": null
+          "documented": false
         },
         {
           "id": "config.env_vars.CLAUDE_CODE_RUNNER_MODEL_SOCKET",
@@ -508,7 +1642,7 @@
           "op": "added",
           "title": "New environment variable: CLAUDE_CODE_RUNNER_MODEL_SOCKET",
           "impact": "informational",
-          "documented": null
+          "documented": false
         },
         {
           "id": "config.env_vars.CLAUDE_CODE_SPARE_DEFER_ALL_MCP",
@@ -516,7 +1650,7 @@
           "op": "added",
           "title": "New environment variable: CLAUDE_CODE_SPARE_DEFER_ALL_MCP",
           "impact": "informational",
-          "documented": null
+          "documented": false
         },
         {
           "id": "config.env_vars.SELF_HOSTED_RUNNER_NESTED_MODEL_ACCESS",
@@ -524,7 +1658,7 @@
           "op": "added",
           "title": "New environment variable: SELF_HOSTED_RUNNER_NESTED_MODEL_ACCESS",
           "impact": "informational",
-          "documented": null
+          "documented": false
         },
         {
           "id": "config.env_vars.SELF_HOSTED_RUNNER_NESTED_MODEL_ALLOW",
@@ -532,7 +1666,7 @@
           "op": "added",
           "title": "New environment variable: SELF_HOSTED_RUNNER_NESTED_MODEL_ALLOW",
           "impact": "informational",
-          "documented": null
+          "documented": false
         },
         {
           "id": "config.env_vars.SELF_HOSTED_RUNNER_NESTED_MODEL_CALL_BUDGET",
@@ -540,7 +1674,7 @@
           "op": "added",
           "title": "New environment variable: SELF_HOSTED_RUNNER_NESTED_MODEL_CALL_BUDGET",
           "impact": "informational",
-          "documented": null
+          "documented": false
         },
         {
           "id": "config.env_vars.CLAUDE_CODE_CCR_SKIP_HYDRATE_ON_CURRENT_TIP",
@@ -548,7 +1682,7 @@
           "op": "removed",
           "title": "Environment variable no longer read: CLAUDE_CODE_CCR_SKIP_HYDRATE_ON_CURRENT_TIP",
           "impact": "informational",
-          "documented": null
+          "documented": false
         },
         {
           "id": "config.env_vars.CLAUDE_CODE_CCR_SLOW_SKILLS_WATCH",
@@ -556,7 +1690,7 @@
           "op": "removed",
           "title": "Environment variable no longer read: CLAUDE_CODE_CCR_SLOW_SKILLS_WATCH",
           "impact": "informational",
-          "documented": null
+          "documented": false
         },
         {
           "id": "config.env_vars.CLAUDE_CODE_CONSENT_POINTERLESS",
@@ -564,7 +1698,7 @@
           "op": "removed",
           "title": "Environment variable no longer read: CLAUDE_CODE_CONSENT_POINTERLESS",
           "impact": "informational",
-          "documented": null
+          "documented": false
         },
         {
           "id": "config.env_vars.CLAUDE_CODE_PLAIN_DELTA_TAKE_AT_SOURCE",
@@ -572,7 +1706,7 @@
           "op": "removed",
           "title": "Environment variable no longer read: CLAUDE_CODE_PLAIN_DELTA_TAKE_AT_SOURCE",
           "impact": "informational",
-          "documented": null
+          "documented": false
         },
         {
           "id": "config.env_vars.CLAUDE_CODE_SPARE_KEEPS_BOOT_SESSION_ID",
@@ -580,7 +1714,7 @@
           "op": "removed",
           "title": "Environment variable no longer read: CLAUDE_CODE_SPARE_KEEPS_BOOT_SESSION_ID",
           "impact": "informational",
-          "documented": null
+          "documented": false
         },
         {
           "id": "config.env_vars.CLAUDE_CODE_STREAM_TIMER_SLACK_MS",
@@ -588,7 +1722,7 @@
           "op": "removed",
           "title": "Environment variable no longer read: CLAUDE_CODE_STREAM_TIMER_SLACK_MS",
           "impact": "informational",
-          "documented": null
+          "documented": false
         },
         {
           "id": "config.env_vars.CLAUDE_TEST_NO_OPEN",
@@ -596,7 +1730,7 @@
           "op": "removed",
           "title": "Environment variable no longer read: CLAUDE_TEST_NO_OPEN",
           "impact": "informational",
-          "documented": null
+          "documented": false
         },
         {
           "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_headless_latency",
@@ -604,7 +1738,7 @@
           "op": "removed",
           "title": "Vendor telemetry event no longer sent: tengu_headless_latency",
           "impact": "notable",
-          "documented": null
+          "documented": true
         },
         {
           "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_startup_timing",
@@ -612,7 +1746,7 @@
           "op": "removed",
           "title": "Vendor telemetry event no longer sent: tengu_startup_timing",
           "impact": "notable",
-          "documented": null
+          "documented": true
         },
         {
           "id": "filesystem.darwin/arm64.exec.git -c core.askPass= -c protocol.ext.allow=never -c core.alternateRefsCommand=f() { git --git-dir=\"$1\" for-each-ref --format='%(objectname)'; }; f -c submodule.recurse=false -c log.showSignature=false -c format.pretty=medium -c gc.auto=0 -c maintenance.auto=false -c diff.autoRefreshIndex=false -c hook.applypatch-msg.enabled=false -c hook.pre-applypatch.enabled=false -c hook.post-applypatch.enabled=false -c hook.pre-commit.enabled=false -c hook.pre-merge-commit.enabled=false -c hook.prepare-commit-msg.enabled=false -c hook.commit-msg.enabled=false -c hook.post-commit.enabled=false -c hook.pre-rebase.enabled=false -c hook.post-checkout.enabled=false -c hook.post-merge.enabled=false -c hook.pre-push.enabled=false -c hook.pre-receive.enabled=false -c hook.update.enabled=false -c hook.proc-receive.enabled=false -c hook.post-receive.enabled=false -c hook.post-update.enabled=false -c hook.reference-transaction.enabled=false -c hook.push-to-checkout.enabled=false -c hook.pre-auto-gc.enabled=false -c hook.post-rewrite.enabled=false -c hook.sendemail-validate.enabled=false -c hook.fsmonitor-watchman.enabled=false -c hook.p4-changelist.enabled=false -c hook.p4-prepare-changelist.enabled=false -c hook.p4-post-changelist.enabled=false -c hook.p4-pre-submit.enabled=false -c hook.post-index-change.enabled=false -c core.hooksPath=/dev/null -c core.fsmonitor= remote get-url origin.phases.turn",
@@ -620,7 +1754,7 @@
           "op": "added",
           "title": "`git -c core.askPass= -c protocol.ext.allow=never -c core.alternateRefsCommand=f() { git --git-dir=\"$ …` now also runs at turn (darwin/arm64)",
           "impact": "informational",
-          "documented": null
+          "documented": true
         },
         {
           "id": "filesystem.darwin/arm64.exec.git -c core.askPass= -c protocol.ext.allow=never -c core.alternateRefsCommand=f() { git --git-dir=\"$1\" for-each-ref --format='%(objectname)'; }; f -c submodule.recurse=false -c log.showSignature=false -c format.pretty=medium -c gc.auto=0 -c maintenance.auto=false -c diff.autoRefreshIndex=false -c hook.applypatch-msg.enabled=false -c hook.pre-applypatch.enabled=false -c hook.post-applypatch.enabled=false -c hook.pre-commit.enabled=false -c hook.pre-merge-commit.enabled=false -c hook.prepare-commit-msg.enabled=false -c hook.commit-msg.enabled=false -c hook.post-commit.enabled=false -c hook.pre-rebase.enabled=false -c hook.post-checkout.enabled=false -c hook.post-merge.enabled=false -c hook.pre-push.enabled=false -c hook.pre-receive.enabled=false -c hook.update.enabled=false -c hook.proc-receive.enabled=false -c hook.post-receive.enabled=false -c hook.post-update.enabled=false -c hook.reference-transaction.enabled=false -c hook.push-to-checkout.enabled=false -c hook.pre-auto-gc.enabled=false -c hook.post-rewrite.enabled=false -c hook.sendemail-validate.enabled=false -c hook.fsmonitor-watchman.enabled=false -c hook.p4-changelist.enabled=false -c hook.p4-prepare-changelist.enabled=false -c hook.p4-post-changelist.enabled=false -c hook.p4-pre-submit.enabled=false -c hook.post-index-change.enabled=false -c core.hooksPath=/dev/null -c core.fsmonitor= remote get-url origin.phases.startup",
@@ -628,7 +1762,7 @@
           "op": "removed",
           "title": "`git -c core.askPass= -c protocol.ext.allow=never -c core.alternateRefsCommand=f() { git --git-dir=\"$ …` no longer runs at startup (darwin/arm64)",
           "impact": "informational",
-          "documented": null
+          "documented": true
         },
         {
           "id": "filesystem.darwin/arm64.exec./bin/zsh -c -l SNAPSHOT_FILE=<claude-config>/shell-snapshots/snapshot-zsh-<n>-<id>.sh\n      \n      # No user config file to source\n      \n\n      # First, create/clear the snapshot file\n      echo \"# Snapshot file\" >| \"$SNAPSHOT_FILE\"\n\n      # When this file is sourced, we first unalias to avoid conflicts\n      # This is necessary because aliases get \"frozen\" inside function definitions at definition time,\n      # which can cause unexpected behavior when functions use commands that conflict with aliases\n      echo \"# Unset all aliases to avoid conflicts with functions\" >> \"$SNAPSHOT_FILE\"\n      echo \"unalias -a 2>/dev/null || true\" >> \"$SNAPSHOT_FILE\"\n\n      \n\n      \n      cat >> \"$SNAPSHOT_FILE\" << 'CLAUDE_CODE_END_<id>'\n# Check for rg availability\nif ! hash rg 2>/dev/null && ! typeset -f rg >/dev/null 2>&1; then\n  function rg {\n  if [[ -x <install>/claude ]]; then\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=rg <install>/claude ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=rg <install>/claude ${1+\"$@\"}\n  else\n    (exec -a rg <install>/claude ${1+\"$@\"})\n  fi\n  elif [[ -x <home>/.local/bin/claude ]]; then\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=rg <home>/.local/bin/claude ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=rg <home>/.local/bin/claude ${1+\"$@\"}\n  else\n    (exec -a rg <home>/.local/bin/claude ${1+\"$@\"})\n  fi\n  else command rg ${1+\"$@\"}; fi\n}\nfi\n# Shadow find/grep with embedded bfs/ugrep\nunalias find 2>/dev/null || true\nunalias grep 2>/dev/null || true\nfunction find {\n  if [[ -x <install>/claude ]]; then\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=bfs <install>/claude -S dfs -regextype findutils-default ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=bfs <install>/claude -S dfs -regextype findutils-default ${1+\"$@\"}\n  else\n    (exec -a bfs <install>/claude -S dfs -regextype findutils-default ${1+\"$@\"})\n  fi\n  elif [[ -x <home>/.local/bin/claude ]]; then\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=bfs <home>/.local/bin/claude -S dfs -regextype findutils-default ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=bfs <home>/.local/bin/claude -S dfs -regextype findutils-default ${1+\"$@\"}\n  else\n    (exec -a bfs <home>/.local/bin/claude -S dfs -regextype findutils-default ${1+\"$@\"})\n  fi\n  else command find ${1+\"$@\"}; fi\n}\nfunction grep {\n  local _cc_a\n  for _cc_a in ${1+\"$@\"}; do\n    case \"$_cc_a\" in -*-filter*|-*-pager*|-*-view*|-*-format-open*|-*-config*|---*|-@*|-*-save-config*|-[Zz]*|-[!-]*[Zz]*|--null|--null-data) command grep ${1+\"$@\"}; return ;; esac\n  done\n  if [[ -x <install>/claude ]]; then\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=ugrep <install>/claude -G --ignore-files --hidden -I --encoding=UTF-8 --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=ugrep <install>/claude -G --ignore-files --hidden -I --encoding=UTF-8 --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"}\n  else\n    (exec -a ugrep <install>/claude -G --ignore-files --hidden -I --encoding=UTF-8 --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"})\n  fi\n  elif [[ -x <home>/.local/bin/claude ]]; then\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=ugrep <home>/.local/bin/claude -G --ignore-files --hidden -I --encoding=UTF-8 --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=ugrep <home>/.local/bin/claude -G --ignore-files --hidden -I --encoding=UTF-8 --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"}\n  else\n    (exec -a ugrep <home>/.local/bin/claude -G --ignore-files --hidden -I --encoding=UTF-8 --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"})\n  fi\n  else command grep ${1+\"$@\"}; fi\n}\n# Shadow pkill to refuse patterns matching the CLI process\nunalias pkill 2>/dev/null || true\nfunction pkill {\n  if [ -n \"${CLAUDE_PID:-}\" ] && [ -r \"/proc/${CLAUDE_PID}/comm\" ]; then\n    local _cc_skip=\"\" _cc_a\n    local -a _cc_probe=()\n    for _cc_a in ${1+\"$@\"}; do\n      if [ -n \"$_cc_skip\" ]; then _cc_skip=\"\"; continue; fi\n      case \"$_cc_a\" in\n        --signal) _cc_skip=1 ;;\n        --signal=*|-e|--echo) ;;\n        -[0-9]*) ;;\n        -[PUGOF]?*) _cc_probe+=(\"$_cc_a\") ;;\n        -[ABCDEFGHIJKLMNOPQRSTUVWXYZ][ABCDEFGHIJKLMNOPQRSTUVWXYZ0-9]*) ;;\n        *) _cc_probe+=(\"$_cc_a\") ;;\n      esac\n    done\n    if command pgrep ${_cc_probe[@]+\"${_cc_probe[@]}\"} 2>/dev/null | command grep -qx \"${CLAUDE_PID}\"; then\n      printf 'pkill: refusing to run — this pattern matches the Claude CLI process (PID %s). Narrow the pattern, or target your own children with `pkill -P $$ ...`.\\n' \"${CLAUDE_PID}\" >&2\n      return 1\n    fi\n  fi\n  command pkill ${1+\"$@\"}\n}\nexport PATH=<path>\nCLAUDE_CODE_END_<id>\n  \n\n      # Exit silently on success, only report errors\n      if [ ! -f \"$SNAPSHOT_FILE\" ]; then\n        echo \"Error: Snapshot file was not created at $SNAPSHOT_FILE\" >&2\n        exit 1\n      fi\n    ",
@@ -636,7 +1770,7 @@
           "op": "changed",
           "title": "Command changed: `/bin/zsh -c -l SNAPSHOT_FILE=<claude-config>/shell-snapshots/snapshot-zsh-<n>-<id>.sh …` (+6 −0 chars) (darwin/arm64)",
           "impact": "informational",
-          "documented": null
+          "documented": false
         },
         {
           "id": "filesystem.linux/amd64.paths.<claude-config>/debug",
@@ -644,7 +1778,7 @@
           "op": "added",
           "title": "Now looks for <claude-config>/debug (linux/amd64)",
           "impact": "informational",
-          "documented": null
+          "documented": false
         },
         {
           "id": "filesystem.linux/amd64.paths.<claude-config>/plugins/data/cc-plugin-claude-test-builtin",
@@ -652,7 +1786,7 @@
           "op": "added",
           "title": "Now looks for <claude-config>/plugins/data/cc-plugin-claude-test-builtin (linux/amd64)",
           "impact": "informational",
-          "documented": null
+          "documented": false
         },
         {
           "id": "filesystem.linux/amd64.paths.<claude-config>/plugins/data/claude-test-builtin",
@@ -660,7 +1794,7 @@
           "op": "added",
           "title": "Now looks for <claude-config>/plugins/data/claude-test-builtin (linux/amd64)",
           "impact": "informational",
-          "documented": null
+          "documented": false
         },
         {
           "id": "filesystem.linux/amd64.exec./usr/bin/git -c core.askPass= -c protocol.ext.allow=never -c core.alternateRefsCommand=f() { git --git-dir=\"$1\" for-each-ref --format='%(objectname)'; }; f -c submodule.recurse=false -c log.showSignature=false -c format.pretty=medium -c gc.auto=0 -c maintenance.auto=false -c diff.autoRefreshIndex=false -c hook.applypatch-msg.enabled=false -c hook.pre-applypatch.enabled=false -c hook.post-applypatch.enabled=false -c hook.pre-commit.enabled=false -c hook.pre-merge-commit.enabled=false -c hook.prepare-commit-msg.enabled=false -c hook.commit-msg.enabled=false -c hook.post-commit.enabled=false -c hook.pre-rebase.enabled=false -c hook.post-checkout.enabled=false -c hook.post-merge.enabled=false -c hook.pre-push.enabled=false -c hook.pre-receive.enabled=false -c hook.update.enabled=false -c hook.proc-receive.enabled=false -c hook.post-receive.enabled=false -c hook.post-update.enabled=false -c hook.reference-transaction.enabled=false -c hook.push-to-checkout.enabled=false -c hook.pre-auto-gc.enabled=false -c hook.post-rewrite.enabled=false -c hook.sendemail-validate.enabled=false -c hook.fsmonitor-watchman.enabled=false -c hook.p4-changelist.enabled=false -c hook.p4-prepare-changelist.enabled=false -c hook.p4-post-changelist.enabled=false -c hook.p4-pre-submit.enabled=false -c hook.post-index-change.enabled=false -c core.hooksPath=/dev/null -c core.fsmonitor= remote get-url origin.phases.turn",
@@ -668,7 +1802,7 @@
           "op": "added",
           "title": "`/usr/bin/git -c core.askPass= -c protocol.ext.allow=never -c core.alternateRefsCommand=f() { git --g …` now also runs at turn (linux/amd64)",
           "impact": "informational",
-          "documented": null
+          "documented": true
         },
         {
           "id": "filesystem.linux/amd64.exec./usr/bin/git -c core.askPass= -c protocol.ext.allow=never -c core.alternateRefsCommand=f() { git --git-dir=\"$1\" for-each-ref --format='%(objectname)'; }; f -c submodule.recurse=false -c log.showSignature=false -c format.pretty=medium -c gc.auto=0 -c maintenance.auto=false -c diff.autoRefreshIndex=false -c hook.applypatch-msg.enabled=false -c hook.pre-applypatch.enabled=false -c hook.post-applypatch.enabled=false -c hook.pre-commit.enabled=false -c hook.pre-merge-commit.enabled=false -c hook.prepare-commit-msg.enabled=false -c hook.commit-msg.enabled=false -c hook.post-commit.enabled=false -c hook.pre-rebase.enabled=false -c hook.post-checkout.enabled=false -c hook.post-merge.enabled=false -c hook.pre-push.enabled=false -c hook.pre-receive.enabled=false -c hook.update.enabled=false -c hook.proc-receive.enabled=false -c hook.post-receive.enabled=false -c hook.post-update.enabled=false -c hook.reference-transaction.enabled=false -c hook.push-to-checkout.enabled=false -c hook.pre-auto-gc.enabled=false -c hook.post-rewrite.enabled=false -c hook.sendemail-validate.enabled=false -c hook.fsmonitor-watchman.enabled=false -c hook.p4-changelist.enabled=false -c hook.p4-prepare-changelist.enabled=false -c hook.p4-post-changelist.enabled=false -c hook.p4-pre-submit.enabled=false -c hook.post-index-change.enabled=false -c core.hooksPath=/dev/null -c core.fsmonitor= remote get-url origin.phases.startup",
@@ -676,7 +1810,7 @@
           "op": "removed",
           "title": "`/usr/bin/git -c core.askPass= -c protocol.ext.allow=never -c core.alternateRefsCommand=f() { git --g …` no longer runs at startup (linux/amd64)",
           "impact": "informational",
-          "documented": null
+          "documented": true
         },
         {
           "id": "filesystem.linux/amd64.exec./bin/bash -c -l SNAPSHOT_FILE=<claude-config>/shell-snapshots/snapshot-bash-<n>-<id>.sh\n      \n      # No user config file to source\n      \n\n      # First, create/clear the snapshot file\n      echo \"# Snapshot file\" >| \"$SNAPSHOT_FILE\"\n\n      # When this file is sourced, we first unalias to avoid conflicts\n      # This is necessary because aliases get \"frozen\" inside function definitions at definition time,\n…",
@@ -684,7 +1818,7 @@
           "op": "changed",
           "title": "Command changed: `/bin/bash -c -l SNAPSHOT_FILE=<claude-config>/shell-snapshots/snapshot-bash-<n>-<id>.sh …` (+6 −0 chars) (linux/amd64)",
           "impact": "informational",
-          "documented": null
+          "documented": false
         }
       ]
     },

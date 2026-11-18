@@ -1,7 +1,42 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-18T23:02:31.539074481Z",
+  "generated_at": "2026-11-18T23:27:42.359139401Z",
   "versions": [
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.328",
+      "released_at": "2026-11-18T23:09:39.159Z",
+      "captured_at": "2026-11-18T23:27:42.359139401Z",
+      "platforms": [
+        "darwin/arm64",
+        "linux/amd64"
+      ],
+      "support": "supported",
+      "previous": "2.1.327",
+      "changes": 148,
+      "categories": {
+        "config": 133,
+        "filesystem": 10,
+        "prompt": 2,
+        "tools": 3
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 31,
+        "notable": 117
+      },
+      "undocumented": null,
+      "highlights": [
+        "Injected context changed (+453 −376 chars)",
+        "Interactive session's injected context changed (+453 −376 chars)",
+        "ListAgents tool description changed (+1042 −537 chars)"
+      ],
+      "signing": "valid",
+      "attempted_at": "2026-11-18T23:27:42.359139401Z",
+      "attempts": 1
+    },
     {
       "harness": "codex-desktop",
       "name": "Codex app",
@@ -196,10 +231,10 @@
       ],
       "support": "supported",
       "previous": "2.1.326",
-      "changes": 85,
+      "changes": 78,
       "categories": {
         "cli": 4,
-        "config": 35,
+        "config": 28,
         "filesystem": 9,
         "hooks": 32,
         "network": 2,
@@ -209,9 +244,9 @@
         "breaking": 0,
         "degrading": 0,
         "informational": 72,
-        "notable": 13
+        "notable": 6
       },
-      "undocumented": null,
+      "undocumented": 47,
       "highlights": [
         "Bash tool description changed (+175 −0 chars)",
         "ListAgents tool description changed (+151 −0 chars)",
@@ -6157,38 +6192,6 @@
         "Caching across_turns: {\"breakpoints\":[[],[],[]],\"stable_cache_key\":true,\"stable… → none",
         "Behaviour: compaction added",
         "Behaviour: sandbox approval removed"
-      ],
-      "signing": "valid"
-    },
-    {
-      "harness": "claude",
-      "name": "Claude Code",
-      "version": "2.1.211",
-      "released_at": "2026-07-15T19:24:07.013Z",
-      "captured_at": "2026-11-05T09:54:28.532441Z",
-      "platforms": [
-        "darwin/arm64",
-        "linux/amd64"
-      ],
-      "support": "untested",
-      "previous": "2.1.210",
-      "changes": 7,
-      "categories": {
-        "cli": 2,
-        "config": 4,
-        "tools": 1
-      },
-      "impact": {
-        "breaking": 0,
-        "degrading": 0,
-        "informational": 6,
-        "notable": 1
-      },
-      "undocumented": 4,
-      "highlights": [
-        "Agent tool description changed (+428 −300 chars)",
-        "New flag `claude --forward-subagent-text`",
-        "Full help text of `--help` changed (+311 −0 chars)"
       ],
       "signing": "valid"
     }

@@ -7,27 +7,58 @@
     "homepage": "https://claude.com/claude-code",
     "source": null,
     "changelog": "https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md",
-    "latest": "2.1.327",
+    "latest": "2.1.328",
     "support": "supported",
-    "versions_tracked": 108,
+    "versions_tracked": 109,
     "first_tracked": "2026-07-09",
     "last_change": {
-      "from": "2.1.326",
-      "to": "2.1.327",
-      "at": "2026-11-17T20:55:17.06204267Z",
-      "released_at": "2026-11-17T20:33:19.976Z",
-      "changes": 85,
+      "from": "2.1.327",
+      "to": "2.1.328",
+      "at": "2026-11-18T23:27:42.359139401Z",
+      "released_at": "2026-11-18T23:09:39.159Z",
+      "changes": 148,
       "categories": {
-        "cli": 4,
-        "config": 35,
-        "filesystem": 9,
-        "hooks": 32,
-        "network": 2,
+        "config": 133,
+        "filesystem": 10,
+        "prompt": 2,
         "tools": 3
       }
     }
   },
   "versions": [
+    {
+      "version": "2.1.328",
+      "released_at": "2026-11-18T23:09:39.159Z",
+      "captured_at": "2026-11-18T23:27:42.359139401Z",
+      "platforms": [
+        "darwin/arm64",
+        "linux/amd64"
+      ],
+      "support": "supported",
+      "previous": "2.1.327",
+      "changes": 148,
+      "categories": {
+        "config": 133,
+        "filesystem": 10,
+        "prompt": 2,
+        "tools": 3
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 31,
+        "notable": 117
+      },
+      "undocumented": null,
+      "highlights": [
+        "Injected context changed (+453 −376 chars)",
+        "Interactive session's injected context changed (+453 −376 chars)",
+        "ListAgents tool description changed (+1042 −537 chars)"
+      ],
+      "signing": "valid",
+      "attempted_at": "2026-11-18T23:27:42.359139401Z",
+      "attempts": 1
+    },
     {
       "version": "2.1.327",
       "released_at": "2026-11-17T20:33:19.976Z",
@@ -38,10 +69,10 @@
       ],
       "support": "supported",
       "previous": "2.1.326",
-      "changes": 85,
+      "changes": 78,
       "categories": {
         "cli": 4,
-        "config": 35,
+        "config": 28,
         "filesystem": 9,
         "hooks": 32,
         "network": 2,
@@ -51,9 +82,9 @@
         "breaking": 0,
         "degrading": 0,
         "informational": 72,
-        "notable": 13
+        "notable": 6
       },
-      "undocumented": null,
+      "undocumented": 47,
       "highlights": [
         "Bash tool description changed (+175 −0 chars)",
         "ListAgents tool description changed (+151 −0 chars)",
