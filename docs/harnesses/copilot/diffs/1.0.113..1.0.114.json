@@ -3,7 +3,7 @@
   "harness": "copilot",
   "from": "1.0.113",
   "to": "1.0.114",
-  "generated_at": "2026-11-18T11:32:24.109988376Z",
+  "generated_at": "2026-11-18T12:38:49.373277901Z",
   "source": null,
   "changelog": {
     "url": "https://github.com/github/copilot-cli/blob/main/changelog.md",
@@ -35,7 +35,7 @@
       "title": "On-disk logs path changed",
       "impact": "informational",
       "before": "<home>/.copilot/logs/process-<n>-4417.log",
-      "after": "<home>/.copilot/logs/process-<n>-5034.log",
+      "after": "<home>/.copilot/logs/process-<n>-4242.log",
       "text_diff": null,
       "terma": null,
       "source": null,

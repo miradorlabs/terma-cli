@@ -3,7 +3,7 @@
   "harness": "copilot",
   "version": "1.0.114",
   "platform": "darwin/arm64",
-  "captured_at": "2026-11-18T06:30:47.699685619Z",
+  "captured_at": "2026-11-18T12:38:49.373277901Z",
   "capture": {
     "command": [
       "copilot",
@@ -16,24 +16,24 @@
       "Part of this build's capture did not finish; the frequent check tries it again, up to four attempts."
     ],
     "sections": {
-      "behavior": "2026-11-18T06:30:47.699685619Z",
-      "binary": "2026-11-18T06:30:47.699685619Z",
+      "behavior": "2026-11-18T12:38:49.373277901Z",
+      "binary": "2026-11-18T12:38:49.373277901Z",
       "caching": "2026-11-18T06:30:47.699685619Z",
       "cli": "2026-11-18T06:30:47.699685619Z",
       "config": "2026-11-18T06:30:47.699685619Z",
-      "hooks": "2026-11-18T06:30:47.699685619Z",
+      "hooks": "2026-11-18T12:38:49.373277901Z",
       "model": "2026-11-18T06:30:47.699685619Z",
       "network": "2026-11-18T06:30:47.699685619Z",
       "prompt": "2026-11-18T06:30:47.699685619Z",
       "request": "2026-11-18T06:30:47.699685619Z",
       "side_requests": "2026-11-18T06:30:47.699685619Z",
-      "storage": "2026-11-18T06:30:47.699685619Z",
+      "storage": "2026-11-18T12:38:49.373277901Z",
       "support": "2026-11-18T06:30:47.699685619Z",
       "telemetry": "2026-11-18T06:30:47.699685619Z",
       "tools": "2026-11-18T06:30:47.699685619Z"
     },
-    "attempted_at": "2026-11-18T06:30:47.699685619Z",
-    "attempts": 1,
+    "attempted_at": "2026-11-18T12:38:49.373277901Z",
+    "attempts": 2,
     "announced_at": "2026-11-18T06:30:47.699685619Z"
   },
   "model": {
@@ -920,9 +920,9 @@
         "429": {
           "attempts": 4,
           "backoff_ms": [
-            2250,
-            2057,
-            2406
+            2132,
+            2028,
+            2399
           ],
           "failed": 3,
           "failed_first": 3,
@@ -934,9 +934,9 @@
         "529": {
           "attempts": 4,
           "backoff_ms": [
-            2083,
-            2215,
-            2384
+            2127,
+            2238,
+            2118
           ],
           "failed": 3,
           "failed_first": 3,
@@ -1073,7 +1073,7 @@
           "sessionId": "<uuid>",
           "stopReason": "end_turn",
           "stop_hook_active": false,
-          "timestamp": 1794983171670,
+          "timestamp": 1795005267526,
           "transcriptPath": "<home>/.copilot/session-state/<uuid>/events.jsonl"
         },
         "fired": true,
@@ -1136,7 +1136,7 @@
           "hookName": "permissionRequest",
           "permissionSuggestions": [],
           "sessionId": "<uuid>",
-          "timestamp": 1794983171571,
+          "timestamp": 1795005267446,
           "toolInput": {
             "command": "printf hooks-ok"
           },
@@ -1204,7 +1204,7 @@
         "example": {
           "cwd": "<repo>",
           "sessionId": "<uuid>",
-          "timestamp": 1794983171604,
+          "timestamp": 1795005267472,
           "toolArgs": {
             "command": "printf hooks-ok",
             "description": "Print a marker"
@@ -1285,7 +1285,7 @@
           "cwd": "<repo>",
           "error": "Path does not exist",
           "sessionId": "<uuid>",
-          "timestamp": 1794983171646,
+          "timestamp": 1795005267506,
           "toolArgs": {
             "path": "<repo>/missing.txt"
           },
@@ -1354,7 +1354,7 @@
         "example": {
           "cwd": "<repo>",
           "sessionId": "<uuid>",
-          "timestamp": 1794983171525,
+          "timestamp": 1795005267412,
           "toolArgs": {
             "command": "printf hooks-ok",
             "description": "Print a marker"
@@ -1427,7 +1427,7 @@
           "cwd": "<repo>",
           "reason": "complete",
           "sessionId": "<uuid>",
-          "timestamp": 1794983171687
+          "timestamp": 1795005267542
         },
         "fired": true,
         "keys": [
@@ -1485,7 +1485,7 @@
           "initialPrompt": "<prompt>",
           "sessionId": "<uuid>",
           "source": "new",
-          "timestamp": 1794983171421
+          "timestamp": 1795005267333
         },
         "fired": true,
         "keys": [
@@ -1544,7 +1544,7 @@
           "cwd": "<repo>",
           "prompt": "<prompt>",
           "sessionId": "<uuid>",
-          "timestamp": 1794983171449
+          "timestamp": 1795005267355
         },
         "fired": true,
         "keys": [
@@ -1601,7 +1601,7 @@
           "cwd": "<repo>",
           "prompt": "<prompt>",
           "sessionId": "<uuid>",
-          "timestamp": 1794983171469,
+          "timestamp": 1795005267370,
           "transformedPrompt": "<current_datetime><timestamp></current_datetime>\n\n<prompt>"
         },
         "fired": true,
@@ -4807,7 +4807,7 @@
     "logs": {
       "files": 1,
       "format": "text",
-      "path": "<home>/.copilot/logs/process-<n>-5034.log"
+      "path": "<home>/.copilot/logs/process-<n>-4242.log"
     },
     "session-store": {
       "files": 3,
@@ -5036,7 +5036,7 @@
         "sha256": "0ceff8812d4d172f7f565c34522f7c44975f8e42dcb1329d29a153c5cb250a67",
         "subject": "Developer ID Application: GitHub (VEKTX9H2N7)"
       },
-      "checked_at": "2026-11-18T06:28:22.103508Z",
+      "checked_at": "2026-11-18T12:36:30.076301Z",
       "format": "developer-id",
       "hardened_runtime": true,
       "identifier": "copilot",
