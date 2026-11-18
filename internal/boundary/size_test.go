@@ -57,11 +57,13 @@ func TestNoSourceFileOutgrowsItsJob(t *testing.T) {
 // html/template page once made terma 3 MB (22%) larger. Fill a page with strings.Replacer and html.EscapeString.
 var templates = []string{"html/template", "text/template"}
 
-// TestNoTemplateEngine keeps template engines out of the binary: no package of terma's imports one, and html/template
-// is not linked at all, even through a dependency. text/template is linked through cobra, which executes it only for a
-// custom template (SetHelpTemplate and the like), so a call to one of those would bring the cost back unseen here.
+// TestNoTemplateEngine keeps template engines out of the binary: no package of terma's imports one, and the
+// terma binary does not link html/template at all, even through a dependency. text/template is linked through
+// cobra, which executes it only for a custom template (SetHelpTemplate and the like), so a call to one of those
+// would bring the cost back unseen here.
 func TestNoTemplateEngine(t *testing.T) {
 	t.Parallel()
+	binary := false
 	for _, p := range listPackages(t) {
 		if !within(p.ImportPath, "cmd") && !within(p.ImportPath, "internal") {
 			continue
@@ -71,8 +73,14 @@ func TestNoTemplateEngine(t *testing.T) {
 				t.Errorf("%s imports %s: it keeps every method in the binary; fill the page with strings.Replacer", p.ImportPath, imp)
 			}
 		}
-		if slices.Contains(p.Deps, "html/template") && !slices.Contains(p.Imports, "html/template") {
-			t.Errorf("%s links html/template through a dependency: it keeps every method in the binary", p.ImportPath)
+		if p.ImportPath == module+"/cmd/terma" {
+			binary = true
+			if slices.Contains(p.Deps, "html/template") {
+				t.Errorf("terma links html/template: it keeps every method in the binary; find what brings it with go mod why html/template")
+			}
 		}
+	}
+	if !binary {
+		t.Fatal("cmd/terma was not listed: point this test at the binary's package")
 	}
 }

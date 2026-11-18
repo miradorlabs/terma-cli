@@ -36,29 +36,44 @@ var outfitFontFace = sync.OnceValue(func() string {
 }`
 })
 
-const resultPageCSP = "default-src 'none'; style-src 'unsafe-inline'; font-src data:; frame-ancestors 'none'"
+const resultPageCSP = "default-src 'none'; style-src 'unsafe-inline'; font-src data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+
+// outcome is how a callback ended, as the page shows it: its status, the note's tone (a CSS class) and ARIA role, and
+// the heading.
+type outcome struct {
+	status              int
+	tone, role, heading string
+}
+
+var (
+	signedIn   = outcome{http.StatusOK, "success", "status", "You're signed in"}
+	authFailed = outcome{http.StatusBadRequest, "error", "alert", "Authorization failed"}
+)
 
 // writeSignedIn answers the callback that carried this login's code.
 func writeSignedIn(w http.ResponseWriter) {
-	writeResultPage(w, http.StatusOK, "success", "status", "You're signed in", "You can close this tab and return to your terminal.")
+	writeResultPage(w, signedIn, "You can close this tab and return to your terminal.")
 }
 
 // writeAuthFailed answers a callback the login cannot use, saying why.
 func writeAuthFailed(w http.ResponseWriter, detail string) {
-	writeResultPage(w, http.StatusBadRequest, "error", "alert", "Authorization failed", detail)
+	writeResultPage(w, authFailed, detail)
 }
 
 // writeResultPage fills the page. A Replacer makes one pass, so text that looks like a placeholder is never filled.
-func writeResultPage(w http.ResponseWriter, status int, tone, role, heading, detail string) {
+func writeResultPage(w http.ResponseWriter, o outcome, detail string) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Content-Security-Policy", resultPageCSP)
 	w.Header().Set("Cache-Control", "no-store")
-	w.WriteHeader(status)
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	// The callback URL carries the code and state; nothing on the page links out, and this keeps it so.
+	w.Header().Set("Referrer-Policy", "no-referrer")
+	w.WriteHeader(o.status)
 	page := strings.NewReplacer(
 		"{{font-face}}", outfitFontFace(),
-		"{{tone}}", tone,
-		"{{role}}", role,
-		"{{heading}}", html.EscapeString(heading),
+		"{{tone}}", o.tone,
+		"{{role}}", o.role,
+		"{{heading}}", html.EscapeString(o.heading),
 		"{{detail}}", html.EscapeString(detail),
 	).Replace(resultPageHTML)
 	_, _ = io.WriteString(w, page)

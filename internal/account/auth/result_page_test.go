@@ -46,8 +46,10 @@ func TestResultPage_SuccessAndFailure(t *testing.T) {
 		}
 		for header, want := range map[string]string{
 			"Content-Type":            "text/html; charset=utf-8",
-			"Content-Security-Policy": resultPageCSP,
+			"Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; font-src data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
 			"Cache-Control":           "no-store",
+			"X-Content-Type-Options":  "nosniff",
+			"Referrer-Policy":         "no-referrer",
 		} {
 			if got := rec.Header().Get(header); got != want {
 				t.Errorf("%s: %s = %q, want %q", tc.name, header, got, want)
