@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-18T20:37:18.20454344Z",
+  "generated_at": "2026-11-18T21:12:25.46010765Z",
   "vendors": [
     {
       "id": "anthropic",
@@ -47,7 +47,10 @@
       "knowledge_cutoff": null,
       "reasoning": true,
       "harnesses": [],
-      "last_change": null,
+      "last_change": {
+        "at": "2026-11-18T21:12:25.46010765Z",
+        "changes": 2
+      },
       "probed": false
     },
     {
@@ -152,7 +155,7 @@
       "reasoning": true,
       "harnesses": [],
       "last_change": {
-        "at": "2026-11-18T15:13:08.657184156Z",
+        "at": "2026-11-18T21:12:25.46010765Z",
         "changes": 1
       },
       "probed": true
@@ -173,7 +176,7 @@
       "reasoning": true,
       "harnesses": [],
       "last_change": {
-        "at": "2026-11-18T15:13:08.657184156Z",
+        "at": "2026-11-18T21:12:25.46010765Z",
         "changes": 1
       },
       "probed": false
@@ -350,7 +353,7 @@
         "claude-desktop"
       ],
       "last_change": {
-        "at": "2026-11-12T15:52:35.859355299Z",
+        "at": "2026-11-18T21:12:25.46010765Z",
         "changes": 1
       },
       "probed": true

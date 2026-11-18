@@ -3,6 +3,33 @@
   "id": "claude-mythos-5-2",
   "steps": [
     {
+      "at": "2026-11-18T21:12:25.46010765Z",
+      "event": "changed",
+      "changes": [
+        {
+          "id": "docs/whats_new",
+          "category": "docs",
+          "op": "changed",
+          "path": [
+            "docs",
+            "whats_new"
+          ],
+          "title": "What's new page changed (+249 −267 chars)",
+          "impact": "informational",
+          "before": null,
+          "after": null,
+          "text_diff": "@@ -139,7 +139,7 @@\n [Fast mode](https://platform.claude.com/docs/en/build-with-claude/fast-mode) is available for Claude Fable 5.2 in Messages API requests on the Claude API, [Claude Models on Google Cloud (Anthropic managed)](https://platform.claude.com/docs/en/build-with-claude/claude-models-on-google-cloud/anthropic-managed), [Claude Models on Google Cloud (Google managed)](https://platform.claude.com/docs/en/build-with-claude/claude-models-on-google-cloud/google-managed), and [Claude in Microsoft Foundry](https://platform.claude.com/docs/en/build-with-claude/claude-in-microsoft-foundry).\n On Claude in Microsoft Foundry, it’s available for deployments hosted on Anthropic, with its own model ID, `claude-fable-5-2-fast`.\n \n-Fast mode is also available for Claude Mythos 5.2 in Messages API requests on the Claude API. [Availability of fast mode](https://platform.claude.com/docs/en/build-with-claude/fast-mode#feature-availability) lists every platform where Claude Mythos 5.2 has fast mode.\n+Fast mode is also available for Claude Mythos 5.2 in Messages API requests. [Availability of fast mode](https://platform.claude.com/docs/en/build-with-claude/fast-mode#feature-availability) lists every platform where Claude Mythos 5.2 has fast mode.\n \n ### Thinking blocks stay with the account that produced them\n \n",
+          "stats": {
+            "added_chars": 249,
+            "removed_chars": 267
+          },
+          "terma": null,
+          "source": null,
+          "documented": null
+        }
+      ]
+    },
+    {
       "at": "2026-11-18T15:13:08.657184156Z",
       "event": "changed",
       "changes": [

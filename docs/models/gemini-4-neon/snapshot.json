@@ -8,6 +8,7 @@
   "listed": true,
   "facts": {
     "context_window": 1048576,
+    "default_effort": "medium",
     "description": "Gemini 4 Neon (gemini-4-neon) brings frontier-level intelligence with fast end-to-end task completion across complex software engineering, knowledge work, and science workflows, featuring a unified 1M-token context window and long decode up to 1M tokens.",
     "features": [
       "agentic video understanding",
@@ -35,6 +36,12 @@
       "text"
     ],
     "reasoning": true,
+    "reasoning_efforts": [
+      "xhigh",
+      "high",
+      "medium",
+      "low"
+    ],
     "released_at": "2026-11-18",
     "snapshots": [
       "gemini-4-neon"
@@ -50,7 +57,11 @@
   },
   "provenance": {
     "context_window": {
-      "google-docs": 1048576
+      "google-docs": 1048576,
+      "openrouter": 1048576
+    },
+    "default_effort": {
+      "openrouter": "medium"
     },
     "description": {
       "google-docs": "Gemini 4 Neon (gemini-4-neon) brings frontier-level intelligence with fast end-to-end task completion across complex software engineering, knowledge work, and science workflows, featuring a unified 1M-token context window and long decode up to 1M tokens."
@@ -77,21 +88,42 @@
         "video",
         "audio",
         "pdf"
+      ],
+      "openrouter": [
+        "audio",
+        "file",
+        "image",
+        "text",
+        "video"
       ]
     },
     "max_output": {
-      "google-docs": 65536
+      "google-docs": 65536,
+      "openrouter": 65536
     },
     "name": {
-      "google-docs": "Gemini 4 Neon"
+      "google-docs": "Gemini 4 Neon",
+      "openrouter": "Gemini 4 Neon"
     },
     "output_modalities": {
       "google-docs": [
         "text"
+      ],
+      "openrouter": [
+        "text"
       ]
     },
     "reasoning": {
-      "google-docs": true
+      "google-docs": true,
+      "openrouter": true
+    },
+    "reasoning_efforts": {
+      "openrouter": [
+        "xhigh",
+        "high",
+        "medium",
+        "low"
+      ]
     },
     "released_at": {
       "google-docs": "2026-11-18"
@@ -108,7 +140,8 @@
       "google-docs": true
     },
     "tool_calling": {
-      "google-docs": true
+      "google-docs": true,
+      "openrouter": true
     },
     "unsupported_features": {
       "google-docs": [
@@ -120,7 +153,8 @@
   },
   "disagreements": [],
   "sources": {
-    "google-docs": "https://ai.google.dev/gemini-api/docs/models/gemini-4-neon"
+    "google-docs": "https://ai.google.dev/gemini-api/docs/models/gemini-4-neon",
+    "openrouter": "https://openrouter.ai/google/gemini-4-neon"
   },
   "docs": {
     "overview": {

@@ -1,7 +1,19 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-18T20:37:18.20454344Z",
+  "generated_at": "2026-11-18T21:12:25.46010765Z",
   "events": [
+    {
+      "at": "2026-11-18T21:12:25.46010765Z",
+      "model": "gemini-4-neon",
+      "vendor": "google",
+      "name": "Gemini 4 Neon",
+      "event": "changed",
+      "changes": 2,
+      "highlights": [
+        "Default effort: now medium",
+        "Reasoning effort: now xhigh, high, medium, low"
+      ]
+    },
     {
       "at": "2026-11-18T20:37:18.20454344Z",
       "model": "gemini-4-neon",

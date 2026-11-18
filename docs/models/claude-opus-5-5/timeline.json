@@ -3,6 +3,33 @@
   "id": "claude-opus-5-5",
   "steps": [
     {
+      "at": "2026-11-18T21:12:25.46010765Z",
+      "event": "changed",
+      "changes": [
+        {
+          "id": "docs/overview",
+          "category": "docs",
+          "op": "changed",
+          "path": [
+            "docs",
+            "overview"
+          ],
+          "title": "Model page changed (+58 −71 chars)",
+          "impact": "informational",
+          "before": null,
+          "after": null,
+          "text_diff": "@@ -110,7 +110,7 @@\n   </Card>\n \n   <Card title=\"Fast mode\" icon=\"lightning\" href=\"https://platform.claude.com/docs/en/build-with-claude/fast-mode\">\n-    Lower-latency Claude Opus 5.5 on the Claude API, priced separately.\n+    Faster output from Claude Opus 5.5 at premium pricing.\n   </Card>\n </CardGroup>\n \n",
+          "stats": {
+            "added_chars": 58,
+            "removed_chars": 71
+          },
+          "terma": null,
+          "source": null,
+          "documented": null
+        }
+      ]
+    },
+    {
       "at": "2026-11-12T15:52:35.859355299Z",
       "event": "changed",
       "changes": [
