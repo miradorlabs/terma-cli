@@ -10702,6 +10702,38 @@
             }
           ]
         },
+        "0.170.0": {
+          "captured_at": "2026-11-18T04:07:23.351960273Z",
+          "captured": true,
+          "uses": [
+            {
+              "model": "gpt-6.2-sol",
+              "role": "default",
+              "params": {
+                "include": [
+                  "reasoning.encrypted_content"
+                ],
+                "parallel_tool_calls": false,
+                "reasoning": {
+                  "context": "all_turns",
+                  "effort": "low"
+                },
+                "text": {
+                  "verbosity": "low"
+                },
+                "tool_choice": "auto"
+              }
+            },
+            {
+              "model": "gpt-6.2-sol",
+              "role": "compaction"
+            },
+            {
+              "model": "gpt-6.2-sol",
+              "role": "subagents"
+            }
+          ]
+        },
         "0.90.0": {
           "captured_at": "2026-11-05T09:54:28.532441Z",
           "captured": true,
