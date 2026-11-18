@@ -3,6 +3,44 @@
   "harness": "codex",
   "steps": [
     {
+      "version": "0.170.0",
+      "previous": "0.169.1",
+      "changes": [
+        {
+          "id": "telemetry.surfaces.metrics/codex.responses.reasoning_replay",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: metrics/codex.responses.reasoning_replay (6 fields)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.features.multi_environment_mcp",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: features.multi_environment_mcp",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.otel.headers_helper",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: otel.headers_helper",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.otel.headers_helper_refresh_interval_ms",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: otel.headers_helper_refresh_interval_ms",
+          "impact": "informational",
+          "documented": false
+        }
+      ]
+    },
+    {
       "version": "0.169.1",
       "previous": "0.169.0",
       "changes": [

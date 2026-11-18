@@ -1,7 +1,40 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-18T02:26:01.524949909Z",
+  "generated_at": "2026-11-18T04:07:23.351960273Z",
   "versions": [
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "version": "0.170.0",
+      "released_at": "2026-11-18T03:45:45.798Z",
+      "captured_at": "2026-11-18T04:07:23.351960273Z",
+      "platforms": [
+        "darwin/arm64",
+        "linux/amd64"
+      ],
+      "support": "supported",
+      "previous": "0.169.1",
+      "changes": 4,
+      "categories": {
+        "config": 3,
+        "telemetry": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 4,
+        "notable": 0
+      },
+      "undocumented": 2,
+      "highlights": [
+        "New telemetry surface: metrics/codex.responses.reasoning_replay (6 fields)",
+        "New setting: features.multi_environment_mcp",
+        "New setting: otel.headers_helper"
+      ],
+      "signing": "valid",
+      "attempted_at": "2026-11-18T04:07:23.351960273Z",
+      "attempts": 1
+    },
     {
       "harness": "codex",
       "name": "Codex CLI",
@@ -6159,39 +6192,6 @@
       "undocumented": 1,
       "highlights": [
         "New environment variable: CLAUDE_CODE_ARTIFACT_MCP"
-      ],
-      "signing": "valid"
-    },
-    {
-      "harness": "claude",
-      "name": "Claude Code",
-      "version": "2.1.208",
-      "released_at": "2026-07-13T21:31:27.921Z",
-      "captured_at": "2026-11-05T09:54:28.532441Z",
-      "platforms": [
-        "darwin/arm64",
-        "linux/amd64"
-      ],
-      "support": "untested",
-      "previous": "2.1.207",
-      "changes": 14,
-      "categories": {
-        "cli": 1,
-        "config": 9,
-        "filesystem": 2,
-        "prompt": 2
-      },
-      "impact": {
-        "breaking": 0,
-        "degrading": 0,
-        "informational": 12,
-        "notable": 2
-      },
-      "undocumented": 12,
-      "highlights": [
-        "Interactive system prompt changed (+359 −0 chars)",
-        "System prompt changed (+359 −0 chars)",
-        "Full help text of `auto-mode --help` changed (+80 −80 chars)"
       ],
       "signing": "valid"
     }
