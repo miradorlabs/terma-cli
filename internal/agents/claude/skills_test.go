@@ -30,47 +30,6 @@ func skillFixture(t *testing.T, repo, claudeDir, tmp string) string {
 	return filepath.Join(dir, titleSession+".jsonl")
 }
 
-// A listing's entries are found by name, so a description may span lines or look like an
-// entry itself; one the listing dropped or cut is not whole.
-func TestParseSkillListing(t *testing.T) {
-	t.Parallel()
-	content := "- deploy\n" +
-		"- multi: First line: with a colon.\n- not-a-name: yes\nthird line.\n" +
-		"- capped: Too long to list whole…\n" +
-		"- shown (Shown Name): With a display name.\n" +
-		"- deploy-extra: Its name begins with another's."
-	got := parseSkillListing(content, []string{"deploy", "multi", "capped", "shown", "deploy-extra", "missing"})
-	want := map[string]claudeListed{
-		"deploy":       {},
-		"multi":        {Description: "First line: with a colon.\n- not-a-name: yes\nthird line."},
-		"capped":       {Description: "Too long to list whole…", Shortened: true},
-		"shown":        {Description: "With a display name."},
-		"deploy-extra": {Description: "Its name begins with another's."},
-	}
-	if len(got) != len(want) {
-		t.Errorf("parsed %d entries, want %d: %+v", len(got), len(want), got)
-	}
-	for n, w := range want {
-		if got[n] != w {
-			t.Errorf("%s = %+v, want %+v", n, got[n], w)
-		}
-	}
-}
-
-// A description holding a line that reads as the next skill's entry leaves both entries'
-// edges unsure, so neither description counts as whole; a name that spans lines has no entry.
-func TestParseSkillListingDoubtsAnEntryItCannotBound(t *testing.T) {
-	t.Parallel()
-	got := parseSkillListing("- a: First line.\n- b: looks like b's entry\n- b: The real one.\n- c: Clear.", []string{"a", "b", "c"})
-	if got["a"].whole() || got["b"].whole() || !got["c"].whole() || got["c"].Description != "Clear." {
-		t.Errorf("entries = %+v", got)
-	}
-	got = parseSkillListing("- x\n- y: Y.", []string{"x\n- y", "y"})
-	if _, ok := got["x\n- y"]; ok || got["y"].Description != "Y." {
-		t.Errorf("entries = %+v", got)
-	}
-}
-
 // A cursor past its bound of listings keeps the session's first, whole one.
 func TestReadClaudeSkillUsesKeepsTheFirstListing(t *testing.T) {
 	t.Parallel()
@@ -86,25 +45,23 @@ func TestReadClaudeSkillUsesKeepsTheFirstListing(t *testing.T) {
 	}
 }
 
-// A later listing replaces an entry when it holds the whole description, never with a
-// dropped or cut one.
-func TestReadClaudeSkillListingsMergesInOrder(t *testing.T) {
+// The listings at the saved offsets give the names they hold, together; a record at an
+// offset that is no listing gives none.
+func TestReadClaudeSkillListingsGivesTheirNames(t *testing.T) {
 	t.Parallel()
-	listing := func(content string, names ...string) string {
-		return `{"type":"attachment","attachment":{"type":"skill_listing","content":` + jsonString(content) + `,"names":["` + strings.Join(names, `","`) + `"]}}`
+	listing := func(names ...string) string {
+		return `{"type":"attachment","attachment":{"type":"skill_listing","content":"- whatever it says","names":["` + strings.Join(names, `","`) + `"]}}`
 	}
 	lines := []string{
-		listing("- a: First.\n- b: Whole.\n- c", "a", "b", "c"),
-		listing("- a: Second.\n- b: Cut…\n- c: Now listed.", "a", "b", "c"),
+		listing("a", "b"),
+		listing("c"),
 		`{"type":"user","message":{"content":"not a listing"}}`,
 	}
 	path := transcript(t, t.TempDir(), lines...)
 	offsets := []int64{0, int64(len(lines[0]) + 1), int64(len(lines[0]) + len(lines[1]) + 2)}
-	got := readClaudeSkillListings(path, offsets, everywhere)
-	for n, w := range map[string]string{"a": "Second.", "b": "Whole.", "c": "Now listed."} {
-		if got[n].Description != w {
-			t.Errorf("%s = %q, want %q", n, got[n].Description, w)
-		}
+	got := readClaudeSkillListings(path, offsets)
+	if len(got) != 3 || !got["a"] || !got["b"] || !got["c"] {
+		t.Errorf("names = %v", got)
 	}
 }
 
@@ -127,19 +84,13 @@ func TestReadClaudeSkillUsesOnTheFixture(t *testing.T) {
 		{Name: "deploy", Dir: filepath.Join(claudeDir, "skills", "deploy"), toolUseID: "toolu_04DEPLOY"},
 		{Name: "capped", Dir: filepath.Join(repo, ".claude", "skills", "capped"), toolUseID: "toolu_05CAPPED"},
 		{Name: "hello-skill", Dir: filepath.Join(repo, ".claude", "skills", "hello-skill"), toolUseID: "toolu_06AGAIN"},
-		{Name: "no-such-skill", toolUseID: "toolu_07NOPE"},
+		// no-such-skill's call came back as an error, so it used none.
 		{Name: "late", Dir: filepath.Join(repo, ".claude", "skills", "late"), slash: true},
 	}
-	// Each loaded text's opening, "" for a use with none.
-	openings := []string{"Release notes", "Reply with exactly: HELLO-FROM-SKILL", "", "Data Visualization", "Claude API", "Deploy",
-		skillBody, "Reply with exactly: HELLO-FROM-SKILL", "", skillBody}
 	if len(uses) != len(want) {
 		t.Fatalf("read %d uses, want %d: %+v", len(uses), len(want), uses)
 	}
 	for i := range want {
-		if uses[i].opening != openings[i] || uses[i].loaded != (openings[i] != "") {
-			t.Errorf("use %d: loaded %v, opening %q, want %q", i, uses[i].loaded, uses[i].opening, openings[i])
-		}
 		if filepath.FromSlash(uses[i].Dir) != want[i].Dir || uses[i].Name != want[i].Name || uses[i].toolUseID != want[i].toolUseID || uses[i].slash != want[i].slash {
 			t.Errorf("use %d = %+v, want %+v", i, uses[i], want[i])
 		}
@@ -147,9 +98,9 @@ func TestReadClaudeSkillUsesOnTheFixture(t *testing.T) {
 	if info, _ := os.Stat(path); cur.Offset != info.Size() || len(cur.Listings) != 2 {
 		t.Errorf("cursor = %+v, want the file's end and its two listings", cur)
 	}
-	listed := readClaudeSkillListings(path, cur.Listings, everywhere)
-	if !listed["late"].whole() || listed["deploy"].Description != "" || !listed["capped"].Shortened || !strings.Contains(listed["claude-api"].Description, "\nSKIP only") {
-		t.Errorf("listings = %+v", listed)
+	listed := readClaudeSkillListings(path, cur.Listings)
+	if !listed["late"] || !listed["deploy"] || !listed["claude-api"] || listed["compact"] || listed["no-such-skill"] {
+		t.Errorf("listings = %v", listed)
 	}
 	if again, _, err := readClaudeSkillUses(path, cur, everywhere); err != nil || len(again) != 0 {
 		t.Errorf("a second read from the cursor gave %+v, %v", again, err)
@@ -215,61 +166,32 @@ func TestClaudeSkillSource(t *testing.T) {
 	}
 }
 
-// A body's opening is the description Claude Code makes of it: the first non-empty line,
-// trimmed, without a heading marker, given up to Claude Code's cut when past 100 UTF-16 code
-// units, without a character the cut splits.
-func TestClaudeOpening(t *testing.T) {
+// A base-directory record that names no call goes to the last use, and only when that use is
+// a command: never to an earlier command, nor to a Skill call.
+func TestSkillUsesBindAnUnnamedDirectoryOnlyToTheLastCommand(t *testing.T) {
 	t.Parallel()
-	hundred := strings.Repeat("x", 100)
-	for _, tc := range []struct {
-		body, want string
-		cut        bool
-	}{
-		{"\n\n  First line.  \nSecond.", "First line.", false},
-		{"# qa-nodesc\n\nBody.", "qa-nodesc", false},
-		{"### Deep heading", "Deep heading", false},
-		{"#NoSpace", "#NoSpace", false},
-		{"#  ", "#", false},
-		{hundred, hundred, false},
-		{hundred + "y", strings.Repeat("x", 97), true},
-		{strings.Repeat("é", 101), strings.Repeat("é", 97), true},
-		{strings.Repeat("😀", 51), strings.Repeat("😀", 48), true},
-		{strings.Repeat("x", 96) + "😀 and a tail", strings.Repeat("x", 96), true},
-		{"", "", false},
-		{"\n  \n", "", false},
-	} {
-		if got, cut := claudeOpening(tc.body); got != tc.want || cut != tc.cut {
-			t.Errorf("claudeOpening(%q) = %q, %v; want %q, %v", tc.body, got, cut, tc.want, tc.cut)
-		}
+	command := func(name string) string {
+		return `{"type":"user","message":{"content":"<command-message>` + name + `</command-message>\n<command-name>/` + name + `</command-name>"}}`
 	}
-}
-
-// A listing's description is the body's when it is the body's opening, alone or before the
-// when_to_use Claude Code adds, however Claude Code escaped or cut it, or holds what Claude
-// Code fills in the loaded text only. One that only starts like the opening is its own.
-func TestBodyDerived(t *testing.T) {
-	t.Parallel()
-	long := strings.Repeat("x", 96)
+	call := `{"type":"assistant","message":{"content":[{"type":"tool_use","id":"toolu_1","name":"Skill","input":{"skill":"called"}}]}}`
+	loaded := `{"type":"user","isMeta":true,"message":{"content":[{"type":"text","text":` + jsonString(claudeSkillBaseDir+"/skills/x\n\nbody") + `}]}}`
 	for _, tc := range []struct {
-		description, opening string
-		cut, want            bool
+		name  string
+		lines []string
+		dirs  map[string]string
 	}{
-		{"BODY line", "BODY line", false, true},
-		{"BODY line - When to use.", "BODY line", false, true},
-		{"BODY - line - When - to use.", "BODY - line", false, true},
-		{"Review <target> & report it", "Review <target> & report it", false, true},
-		{"Review  target, report it!", "Review <target> & report it", false, true},
-		{long + "\uFFFD...", long, true, true},
-		{long + "x... - When to use.", long, true, true},
-		{"Uses $ARGUMENTS", "Uses v2", false, true},
-		{"Runs !`date`", "Runs Tue", false, true},
-		{"Deploy the app to staging.", "Deploy", false, false},
-		{"A real description.", "Body line", false, false},
-		{"A real description.", "", false, false},
-		{"A real description.", "---", false, false},
+		{"after its command", []string{command("deploy"), loaded}, map[string]string{"deploy": "/skills/x"}},
+		{"after a Skill call", []string{command("compact"), call, loaded}, map[string]string{"compact": "", "called": ""}},
+		{"after a later command", []string{command("deploy"), command("compact"), loaded}, map[string]string{"deploy": "", "compact": "/skills/x"}},
 	} {
-		if got := bodyDerived(tc.description, tc.opening, tc.cut); got != tc.want {
-			t.Errorf("bodyDerived(%q, %q, %v) = %v, want %v", tc.description, tc.opening, tc.cut, got, tc.want)
+		uses, _, err := readClaudeSkillUses(transcript(t, t.TempDir(), tc.lines...), claudeSkillCursor{}, everywhere)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, u := range uses {
+			if u.Dir != tc.dirs[u.Name] {
+				t.Errorf("%s: %s took directory %q, want %q", tc.name, u.Name, u.Dir, tc.dirs[u.Name])
+			}
 		}
 	}
 }

@@ -103,6 +103,11 @@ func repositorySkill(dir, root string) bool {
 // only for a file the marketplace's checkout holds, so it is the one the repository has; a
 // plugin held elsewhere (a source given as an object), or one the checkout does not show,
 // gets the repository alone.
+//
+// Accepted risk: the marketplace's owner/repo is sent whether that repository is public or
+// private, as it was when a path went with it; linking a plugin to its marketplace is the
+// product owner's decision. Upgrade path: an admission list for marketplaces in the team's
+// policy.
 func (roots claudeSkillRoots) pluginLink(marketplace, plugin, file string) (repositoryURL, filePath string) {
 	plugins := filepath.Join(roots.Config, "plugins")
 	known, status := hookrun.ReadEvidenceJSON(filepath.Join(plugins, "known_marketplaces.json"))

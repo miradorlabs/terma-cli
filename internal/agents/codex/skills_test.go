@@ -91,8 +91,11 @@ func TestCodexSkillByRoot(t *testing.T) {
 			hookrun.Skill{Name: "kit:go", Description: "Go.", Origin: semconv.TermaSkillOriginPlugin, Plugin: "kit", Marketplace: "acme"}, true},
 		{"managed", write(roots.Managed, "policy/SKILL.md", "name: policy\n"),
 			hookrun.Skill{Name: "policy", Origin: semconv.TermaSkillOriginManaged}, true},
-		{"repository-agents", write(repo, ".agents/skills/hello/SKILL.md", "name: hello\ndescription: Build for AWS: ECS\n"),
+		{"repository-agents", write(repo, ".agents/skills/hello/SKILL.md", "name: hello\ndescription: \"Build for AWS: ECS\"\n"),
 			hookrun.Skill{Name: "hello", Description: "Build for AWS: ECS", Origin: semconv.TermaSkillOriginRepository, RepositoryURL: repoURL, Path: ".agents/skills/hello/SKILL.md"}, true},
+		// Frontmatter YAML refuses (an unquoted ": ") names nothing that can be trusted, so
+		// the skill is not reported, though Codex repairs and loads it.
+		{"yaml-refused", write(repo, ".agents/skills/aws/SKILL.md", "name: aws\ndescription: Build for AWS: ECS\n"), hookrun.Skill{}, false},
 		{"repository-codex", write(repo, "sub/.codex/skills/deep/SKILL.md", "name: deep\n"),
 			hookrun.Skill{Name: "deep", Origin: semconv.TermaSkillOriginRepository, RepositoryURL: repoURL, Path: "sub/.codex/skills/deep/SKILL.md"}, true},
 		{"claude-skills", write(repo, ".claude/skills/c/SKILL.md", "name: c\n"), hookrun.Skill{}, false},
@@ -253,6 +256,26 @@ func TestStopReportsANamedSkillOfTheCheckoutItsTurnRanIn(t *testing.T) {
 	if len(events) != 1 || events[0].Attrs[semconv.TermaSkillNameKey] != "hello-codex" || events[0].Attrs[semconv.TermaSkillOriginKey] != semconv.TermaSkillOriginRepository ||
 		events[0].Attrs[semconv.TermaSkillRepositoryURLKey] != "https://github.com/acme/"+filepath.Base(first) || events[0].Attrs[semconv.TermaSkillPathKey] != ".agents/skills/hello-codex/SKILL.md" {
 		t.Fatalf("spooled %+v", events)
+	}
+}
+
+// With GIT_DIR set every directory reads as that one checkout, so a $name skill is reported
+// only from a turn that ran in the hook's own directory.
+func TestStopReportsOnlyTheHooksOwnDirectoryUnderGitDir(t *testing.T) {
+	for _, here := range []bool{false, true} {
+		t.Run(map[bool]string{false: "elsewhere", true: "here"}[here], func(t *testing.T) {
+			env := codexSkillEnv(t)
+			turnDir := hookruntest.InitRepo(t) // a repository the policy does not list
+			if here {
+				turnDir = env.Cwd
+			}
+			t.Setenv("GIT_DIR", filepath.Join(env.Cwd, ".git"))
+			stopSkillSession(t, env, skillRollout(t, env, turnDir))
+			events := hookruntest.Named(hookruntest.Spooled(t, env.Spool), semconv.TermaSkillDefinitionEvent)
+			if here && (len(events) != 1 || events[0].Attrs[semconv.TermaSkillNameKey] != "hello-codex") || !here && len(events) != 0 {
+				t.Errorf("spooled %+v", events)
+			}
+		})
 	}
 }
 

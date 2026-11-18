@@ -123,14 +123,16 @@ never on disk, and a stopping relay drops it.
 **Skills.** For each skill a Claude Code or Codex session uses, a hook spools one
 `terma.skill.definition`: the skill's name as the agent reports it, its description, and
 where it is held (`hookrun.SpoolSkills`, once per skill per session). Claude Code's come
-from its transcript at a turn's end: the listing it gives the model, the model's `Skill`
-calls and a person's `/name`, each with the directory it loaded from. Codex's come from the
-shell call that prints a `SKILL.md` under one of Codex's skill roots, and from the rollout's
-record of a `$name` skill, which goes under the name Codex recorded. A description leaves,
-never a skill's body, nor a description Claude Code made from the body's first line; a link
-leaves only to a repository the policy collects or, for a plugin, its GitHub marketplace,
-with the file's path where it is known. A definition is content of both kinds: hooks spool
-none, and delivery drops a queued one, unless the policy collects prompts and tool content.
+from its transcript at a turn's end: the model's `Skill` calls and a person's `/name`, each
+with the directory it loaded from, and the listing it gives the model, which only tells
+which names are skills. Codex's come from the shell call that prints a `SKILL.md` under one
+of Codex's skill roots, and from the rollout's record of a `$name` skill, which goes under
+the name Codex recorded. A description is read from the frontmatter of the skill's own
+file, and only where YAML accepts it, never from a listing or a skill's body, so a Claude
+Code built-in with no directory, or a command file, is reported without one. A link leaves
+only to a repository the policy collects or, for a plugin, its GitHub marketplace, with the
+file's path where it is known. A definition is content of both kinds: hooks spool none, and
+delivery drops a queued one, unless the policy collects prompts and tool content.
 
 ## Rules
 
