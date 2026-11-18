@@ -9,8 +9,8 @@
     "notes": [
       "Part of this build's capture did not finish; the frequent check tries it again, up to four attempts."
     ],
-    "attempted_at": "2026-11-18T04:33:50.151896497Z",
-    "attempts": 2,
+    "attempted_at": "2026-11-18T10:47:12.048894185Z",
+    "attempts": 3,
     "announced_at": "2026-11-17T22:19:59.283537558Z"
   },
   "side_requests": null
