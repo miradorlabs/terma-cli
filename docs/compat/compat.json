@@ -73,7 +73,7 @@
       "label": "The machine's heartbeat reaches the project's ingest"
     }
   ],
-  "generated_at": "2026-11-19T08:26:05Z",
+  "generated_at": "2026-11-19T12:26:25Z",
   "harnesses": [
     {
       "ID": "claude",
@@ -10488,7 +10488,7 @@
       "platform": "darwin/arm64",
       "capability": "relay.content_allowed",
       "result": "pass",
-      "last_run": "2026-11-19T05:59:34.474136Z",
+      "last_run": "2026-11-19T12:25:32.342896Z",
       "first_passed": "2026-11-19T05:59:34.474136Z",
       "terma": "terma version dev",
       "test": "TestRelayDsh/v0.2.2-rc.5/content"
@@ -10499,7 +10499,7 @@
       "platform": "darwin/arm64",
       "capability": "relay.content_withheld",
       "result": "pass",
-      "last_run": "2026-11-19T05:59:37.985562Z",
+      "last_run": "2026-11-19T12:25:35.489433Z",
       "first_passed": "2026-11-19T05:59:37.985562Z",
       "terma": "terma version dev",
       "test": "TestRelayDsh/v0.2.2-rc.5/withheld"
@@ -10510,7 +10510,7 @@
       "platform": "darwin/arm64",
       "capability": "relay.equivalent",
       "result": "pass",
-      "last_run": "2026-11-19T05:59:30.980006Z",
+      "last_run": "2026-11-19T12:25:29.186126Z",
       "first_passed": "2026-11-19T05:59:30.980006Z",
       "terma": "terma version dev",
       "test": "TestRelayWorkloadsDsh/v0.2.2-rc.5"
@@ -10521,7 +10521,7 @@
       "platform": "darwin/arm64",
       "capability": "relay.only_opted_in",
       "result": "pass",
-      "last_run": "2026-11-19T05:59:49.357514Z",
+      "last_run": "2026-11-19T12:25:46.50558Z",
       "first_passed": "2026-11-19T05:59:49.357514Z",
       "terma": "terma version dev",
       "test": "TestRelayDshOutsideARepository/v0.2.2-rc.5"
@@ -10532,7 +10532,7 @@
       "platform": "darwin/arm64",
       "capability": "relay.telemetry",
       "result": "pass",
-      "last_run": "2026-11-19T05:59:37.985592Z",
+      "last_run": "2026-11-19T12:25:35.489448Z",
       "first_passed": "2026-11-19T05:59:37.985592Z",
       "terma": "terma version dev",
       "test": "TestRelayDsh/v0.2.2-rc.5"

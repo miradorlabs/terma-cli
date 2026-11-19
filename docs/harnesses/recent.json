@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-19T11:31:23.812123372Z",
+  "generated_at": "2026-11-19T12:26:26.287960053Z",
   "versions": [
     {
       "harness": "gemini",
@@ -134,7 +134,7 @@
       "name": "DeepSeek Harness",
       "version": "0.2.2-rc.5",
       "released_at": "2026-11-18T13:17:23.604Z",
-      "captured_at": "2026-11-19T06:00:39.813684832Z",
+      "captured_at": "2026-11-19T12:26:26.287960053Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -159,12 +159,12 @@
       "highlights": [
         "Model parameter dsh_plugin_packages.packages.@deepseek-ai/dsh-agent-team: none → {\"name\":\"@deepseek-ai/dsh-agent-team\",\"version\":\"\\u003cve…",
         "Model parameter dsh_plugin_packages.packages.@deepseek-ai/dsh-tool-agent-team: none → {\"name\":\"@deepseek-ai/dsh-tool-agent-team\",\"version\":\"\\u0…",
-        "Model parameter dsh_session_log.events.0.time: 1794544976739 → 1795067915760"
+        "Model parameter dsh_session_log.events.0.time: 1794544976739 → 1795091076590"
       ],
       "signing": null,
       "partial": true,
-      "attempted_at": "2026-11-19T06:00:39.813684832Z",
-      "attempts": 1
+      "attempted_at": "2026-11-19T12:26:26.287960053Z",
+      "attempts": 2
     },
     {
       "harness": "copilot",
