@@ -11,25 +11,54 @@
       "language": "typescript"
     },
     "changelog": "https://github.com/google-gemini/gemini-cli/releases",
-    "latest": "0.68.0",
+    "latest": "0.69.0",
     "support": "supported",
-    "versions_tracked": 8,
+    "versions_tracked": 9,
     "first_tracked": "2026-09-24",
     "last_change": {
-      "from": "0.67.0",
-      "to": "0.68.0",
-      "at": "2026-11-13T09:01:26.428937767Z",
-      "released_at": "2026-11-10T21:22:49.277Z",
-      "changes": 6,
+      "from": "0.68.0",
+      "to": "0.69.0",
+      "at": "2026-11-19T02:02:08.158629553Z",
+      "released_at": "2026-11-19T01:51:24.317Z",
+      "changes": 8,
       "categories": {
-        "config": 3,
-        "hooks": 1,
-        "request": 1,
+        "config": 7,
         "storage": 1
       }
     }
   },
   "versions": [
+    {
+      "version": "0.69.0",
+      "released_at": "2026-11-19T01:51:24.317Z",
+      "captured_at": "2026-11-19T02:02:08.158629553Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "0.68.0",
+      "changes": 8,
+      "categories": {
+        "config": 7,
+        "storage": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 8,
+        "notable": 0
+      },
+      "undocumented": 5,
+      "highlights": [
+        "New setting: model.requestTimeoutMs",
+        "New environment variable: ALL_PROXY",
+        "New environment variable: GEMINI_API_HEADERS_TIMEOUT_MS"
+      ],
+      "signing": null,
+      "partial": true,
+      "attempted_at": "2026-11-19T02:02:08.158629553Z",
+      "attempts": 1
+    },
     {
       "version": "0.68.0",
       "released_at": "2026-11-10T21:22:49.277Z",

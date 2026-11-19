@@ -1,0 +1,260 @@
+{
+  "schema_version": 1,
+  "harness": "gemini",
+  "from": "0.68.0",
+  "to": "0.69.0",
+  "generated_at": "2026-11-19T02:02:08.158629553Z",
+  "source": {
+    "compare": "https://github.com/google-gemini/gemini-cli/compare/v0.68.0...v0.69.0"
+  },
+  "changelog": {
+    "url": "https://github.com/google-gemini/gemini-cli/releases/tag/v0.69.0",
+    "text": "## What's Changed\n* fix(core,cli): preserve literal `$` characters during template placeholder replacement by @jesussamuel-byte in https://github.com/google-gemini/gemini-cli/pull/30136\n* feat(cli): add /stats heatmap subcommand for daily token usage by @jvargassanchez-dot in https://github.com/google-gemini/gemini-cli/pull/30135\n* fix(core): prevent __GCLI_EXPAND_TARGET__ env collision in expandEnvVars by @villahernandez-coder in https://github.com/google-gemini/gemini-cli/pull/30138\n* chore(release): bump version to 0.69.0-nightly.20261104.g89e9d25d6 by @gemini-cli-robot in https://github.com/google-gemini/gemini-cli/pull/30140\n* fix(cli): serialize AnsiOutput to text content in ACP tool call updates by @diegogodinezr in https://github.com/google-gemini/gemini-cli/pull/30141\n* Changelog for v0.67.0 by @gemini-cli-robot in https://github.com/google-gemini/gemini-cli/pull/30145\n* Changelog for v0.68.0-preview.0 by @gemini-cli-robot in https://github.com/google-gemini/gemini-cli/pull/30146\n* fix(core): fix Windows PowerShell substitution false positives and policy handling by @duvanka-prasad in https://github.com/google-gemini/gemini-cli/pull/30110\n* fix(cli): preserve leading and trailing whitespace in @file references by @duvanka-prasad in https://github.com/google-gemini/gemini-cli/pull/30150\n* fix(core): prevent thoughtSignature-only turns and preserve multimodal tool responses  by @tadipavan in https://github.com/google-gemini/gemini-cli/pull/30153\n* fix(cli): wait for piped stdin EOF and avoid destroying process.stdin by @villahernandez-coder in https://github.com/google-gemini/gemini-cli/pull/30163\n* fix(cli): preserve pending tool confirmation when escaping editor selection by @jvargassanchez-dot in https://github.com/google-gemini/gemini-cli/pull/30147\n* feat(cli): support standalone theme.json configuration for custom themes by @jesussamuel-byte in https://github.com/google-gemini/gemini-cli/pull/30119\n* fix(cli): normalize error payloads in headless CLI formatting by @jvargassanchez-dot in https://github.com/google-gemini/gemini-cli/pull/30117\n* fix(core): require path-separator boundary in tildeifyPath by @villahernandez-coder in https://github.com/google-gemini/gemini-cli/pull/30124\n* fix(cli): validate model names and support direct arguments in /model command by @jesussamuel-byte in https://github.com/google-gemini/gemini-cli/pull/30137\n* fix(cli): handle file watcher errors and permit FSEvents in macOS permissive sandbox by @diegogodinezr in https://github.com/google-gemini/gemini-cli/pull/30143\n* fix(core): bound multi-part tool outputs and evict older multimodal inlineData by @tadipavan in https://github.com/google-gemini/gemini-cli/pull/30180\n* fix(vscode): eliminate barrel import bundle bloat and redundant setContext calls by @ugorla-dev in https://github.com/google-gemini/gemini-cli/pull/30181\n* fix(acp): handle mid-stream retries to prevent text concatenation by @urielefrenvirtusa in https://github.com/google-gemini/gemini-cli/pull/30165\n* fix(core,cli): prevent silent multi-minute loading hangs on network failures by @villahernandez-coder in https://github.com/google-gemini/gemini-cli/pull/30182\n* fix(core,cli): prevent terminal model-turn 400s on resume and main-thread JSONL freezes by @villahernandez-coder in https://github.com/google-gemini/gemini-cli/pull/30186\n* fix(core): prevent multi-hour quota retries and notify ACP client on retry attempts by @urielefrenvirtusa in https://github.com/google-gemini/gemini-cli/pull/30187\n* fix(core): close orphan /dev/ptmx master FD leaked on macOS PTY spawn by @ugorla-dev in https://github.com/google-gemini/gemini-cli/pull/30184\n* fix(core,cli): allow overriding 60s API headers timeout across all auth modes (`model.requestTimeoutMs` / `GEMINI_API_HEADERS_TIMEOUT_MS`) by @jesussamuel-byte in https://github.com/google-gemini/gemini-cli/pull/30183\n* fix(cli): use isSubpath for theme file home-directory check by @duvanka-prasad in https://github.com/google-gemini/gemini-cli/pull/30160\n* fix(cli): resolve folder trust before entering the macOS Seatbelt sandbox by @diegogodinezr in https://github.com/google-gemini/gemini-cli/pull/30164\n* fix(cli,core): kill child processes, record cancelled tools, and preserve signal exit code on headless abort by @duvanka-prasad in https://github.com/google-gemini/gemini-cli/pull/30204\n* fix(cli): prevent recursive interactive gemini sessions in shell mode by @jvargassanchez-dot in https://github.com/google-gemini/gemini-cli/pull/30185\n* fix(core): reject MessageBus.request() immediately when publish fails by @luisfelipe-alt in https://github.com/google-gemini/gemini-cli/pull/30189\n* fix(core): ensure read-many-files only inlines explicitly requested binary assets (#29045) by @urielefrenvirtusa in https://github.com/google-gemini/gemini-cli/pull/30211\n* fix(core): recognize TortoiseGitPlink as PuTTY-family SSH client (#29917) by @urielefrenvirtusa in https://github.com/google-gemini/gemini-cli/pull/30214\n* fix(core): prevent PDF inlineData and telemetry buffer memory retention by @tadipavan in https://github.com/google-gemini/gemini-cli/pull/30217\n\n\n**Full Changelog**: https://github.com/google-gemini/gemini-cli/compare/v0.68.0...v0.69.0"
+  },
+  "summary": {
+    "changes": 8,
+    "categories": {
+      "config": 7,
+      "storage": 1
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 8,
+      "notable": 0
+    },
+    "undocumented": 5
+  },
+  "changes": [
+    {
+      "id": "config.options.model.requestTimeoutMs",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "model.requestTimeoutMs"
+      ],
+      "title": "New setting: model.requestTimeoutMs",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "How long to wait, in milliseconds, for the API to start responding before a request is aborted and retried. Defaults to 60000. Raise this if long-thinking requests are timing out.",
+        "type": "number"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/cli/src/config/config.ts",
+            "line": 1120,
+            "url": "https://github.com/google-gemini/gemini-cli/blob/v0.69.0/packages/cli/src/config/config.ts#L1120"
+          },
+          {
+            "path": "packages/cli/src/config/settingsSchema.ts",
+            "line": 1094,
+            "url": "https://github.com/google-gemini/gemini-cli/blob/v0.69.0/packages/cli/src/config/settingsSchema.ts#L1094"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.env_vars.ALL_PROXY",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "ALL_PROXY"
+      ],
+      "title": "New environment variable: ALL_PROXY",
+      "impact": "informational",
+      "before": null,
+      "after": "ALL_PROXY",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/cli/src/config/config.ts",
+            "line": 1113,
+            "url": "https://github.com/google-gemini/gemini-cli/blob/v0.69.0/packages/cli/src/config/config.ts#L1113"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.GEMINI_API_HEADERS_TIMEOUT_MS",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "GEMINI_API_HEADERS_TIMEOUT_MS"
+      ],
+      "title": "New environment variable: GEMINI_API_HEADERS_TIMEOUT_MS",
+      "impact": "informational",
+      "before": null,
+      "after": "GEMINI_API_HEADERS_TIMEOUT_MS",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/core/src/config/config.ts",
+            "line": 3694,
+            "url": "https://github.com/google-gemini/gemini-cli/blob/v0.69.0/packages/core/src/config/config.ts#L3694"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.env_vars.GEMINI_CLI_IN_SHELL",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "GEMINI_CLI_IN_SHELL"
+      ],
+      "title": "New environment variable: GEMINI_CLI_IN_SHELL",
+      "impact": "informational",
+      "before": null,
+      "after": "GEMINI_CLI_IN_SHELL",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/core/src/utils/shell-utils.ts",
+            "line": 60,
+            "url": "https://github.com/google-gemini/gemini-cli/blob/v0.69.0/packages/core/src/utils/shell-utils.ts#L60"
+          },
+          {
+            "path": "packages/cli/src/config/config.ts",
+            "line": 588,
+            "url": "https://github.com/google-gemini/gemini-cli/blob/v0.69.0/packages/cli/src/config/config.ts#L588"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.GEMINI_CLI_NESTED_SESSION",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "GEMINI_CLI_NESTED_SESSION"
+      ],
+      "title": "New environment variable: GEMINI_CLI_NESTED_SESSION",
+      "impact": "informational",
+      "before": null,
+      "after": "GEMINI_CLI_NESTED_SESSION",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/core/src/utils/shell-utils.ts",
+            "line": 62,
+            "url": "https://github.com/google-gemini/gemini-cli/blob/v0.69.0/packages/core/src/utils/shell-utils.ts#L62"
+          },
+          {
+            "path": "packages/cli/src/config/config.ts",
+            "line": 589,
+            "url": "https://github.com/google-gemini/gemini-cli/blob/v0.69.0/packages/cli/src/config/config.ts#L589"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.XDG_CONFIG_HOME",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "XDG_CONFIG_HOME"
+      ],
+      "title": "New environment variable: XDG_CONFIG_HOME",
+      "impact": "informational",
+      "before": null,
+      "after": "XDG_CONFIG_HOME",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/cli/src/ui/themes/theme-manager.ts",
+            "line": 236,
+            "url": "https://github.com/google-gemini/gemini-cli/blob/v0.69.0/packages/cli/src/ui/themes/theme-manager.ts#L236"
+          },
+          {
+            "path": "packages/cli/src/ui/themes/theme-manager.ts",
+            "line": 341,
+            "url": "https://github.com/google-gemini/gemini-cli/blob/v0.69.0/packages/cli/src/ui/themes/theme-manager.ts#L341"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.all_proxy",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "all_proxy"
+      ],
+      "title": "New environment variable: all_proxy",
+      "impact": "informational",
+      "before": null,
+      "after": "all_proxy",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/cli/src/config/config.ts",
+            "line": 1114,
+            "url": "https://github.com/google-gemini/gemini-cli/blob/v0.69.0/packages/cli/src/config/config.ts#L1114"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "storage.transcript.path",
+      "category": "storage",
+      "op": "changed",
+      "path": [
+        "storage",
+        "transcript",
+        "path"
+      ],
+      "title": "On-disk transcript path changed",
+      "impact": "informational",
+      "before": "<home>/.gemini<tmp><time><n>d.jsonl",
+      "after": "<home>/.gemini<tmp><time>b5da90.jsonl",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    }
+  ]
+}

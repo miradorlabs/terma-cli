@@ -1,7 +1,40 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-19T00:59:04.402925628Z",
+  "generated_at": "2026-11-19T02:02:08.158629553Z",
   "versions": [
+    {
+      "harness": "gemini",
+      "name": "Gemini CLI",
+      "version": "0.69.0",
+      "released_at": "2026-11-19T01:51:24.317Z",
+      "captured_at": "2026-11-19T02:02:08.158629553Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "0.68.0",
+      "changes": 8,
+      "categories": {
+        "config": 7,
+        "storage": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 8,
+        "notable": 0
+      },
+      "undocumented": 5,
+      "highlights": [
+        "New setting: model.requestTimeoutMs",
+        "New environment variable: ALL_PROXY",
+        "New environment variable: GEMINI_API_HEADERS_TIMEOUT_MS"
+      ],
+      "signing": null,
+      "partial": true,
+      "attempted_at": "2026-11-19T02:02:08.158629553Z",
+      "attempts": 1
+    },
     {
       "harness": "claude",
       "name": "Claude Code",
@@ -6160,38 +6193,6 @@
         "Injected context added",
         "Interactive session's injected context added",
         "ReportFindings tool parameter findings: items.properties.short_summary added"
-      ],
-      "signing": "valid"
-    },
-    {
-      "harness": "codex",
-      "name": "Codex CLI",
-      "version": "0.144.5",
-      "released_at": "2026-07-16T02:57:51.857Z",
-      "captured_at": "2026-11-05T09:54:28.532441Z",
-      "platforms": [
-        "darwin/arm64",
-        "linux/amd64"
-      ],
-      "support": "untested",
-      "previous": "0.144.4",
-      "changes": 14,
-      "categories": {
-        "behavior": 10,
-        "caching": 1,
-        "filesystem": 3
-      },
-      "impact": {
-        "breaking": 0,
-        "degrading": 0,
-        "informational": 3,
-        "notable": 11
-      },
-      "undocumented": 14,
-      "highlights": [
-        "Caching across_turns: {\"breakpoints\":[[],[],[]],\"stable_cache_key\":true,\"stable… → none",
-        "Behaviour: compaction added",
-        "Behaviour: sandbox approval removed"
       ],
       "signing": "valid"
     }

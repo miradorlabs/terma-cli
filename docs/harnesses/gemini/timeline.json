@@ -3,6 +3,76 @@
   "harness": "gemini",
   "steps": [
     {
+      "version": "0.69.0",
+      "previous": "0.68.0",
+      "changes": [
+        {
+          "id": "config.options.model.requestTimeoutMs",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: model.requestTimeoutMs",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.env_vars.ALL_PROXY",
+          "category": "config",
+          "op": "added",
+          "title": "New environment variable: ALL_PROXY",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.env_vars.GEMINI_API_HEADERS_TIMEOUT_MS",
+          "category": "config",
+          "op": "added",
+          "title": "New environment variable: GEMINI_API_HEADERS_TIMEOUT_MS",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.env_vars.GEMINI_CLI_IN_SHELL",
+          "category": "config",
+          "op": "added",
+          "title": "New environment variable: GEMINI_CLI_IN_SHELL",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.env_vars.GEMINI_CLI_NESTED_SESSION",
+          "category": "config",
+          "op": "added",
+          "title": "New environment variable: GEMINI_CLI_NESTED_SESSION",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.env_vars.XDG_CONFIG_HOME",
+          "category": "config",
+          "op": "added",
+          "title": "New environment variable: XDG_CONFIG_HOME",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.env_vars.all_proxy",
+          "category": "config",
+          "op": "added",
+          "title": "New environment variable: all_proxy",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "storage.transcript.path",
+          "category": "storage",
+          "op": "changed",
+          "title": "On-disk transcript path changed",
+          "impact": "informational",
+          "documented": true
+        }
+      ]
+    },
+    {
       "version": "0.68.0",
       "previous": "0.67.0",
       "changes": [

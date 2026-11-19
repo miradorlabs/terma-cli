@@ -3,8 +3,8 @@
   "harness": "gemini",
   "window": {
     "oldest": "0.61.0",
-    "newest": "0.68.0",
-    "builds": 8
+    "newest": "0.69.0",
+    "builds": 9
   },
   "items": {
     "cli.commands.gemini extensions": {
@@ -612,6 +612,17 @@
       ],
       "since_bounded": false
     },
+    "config.env_vars.ALL_PROXY": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.69.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.env_vars.ANTIGRAVITY_CLI_ALIAS": {
       "kind": "env_var",
       "ranges": [
@@ -887,6 +898,17 @@
       ],
       "since_bounded": false
     },
+    "config.env_vars.GEMINI_API_HEADERS_TIMEOUT_MS": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.69.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.env_vars.GEMINI_API_KEY": {
       "kind": "env_var",
       "ranges": [
@@ -1051,6 +1073,28 @@
         }
       ],
       "since_bounded": false
+    },
+    "config.env_vars.GEMINI_CLI_IN_SHELL": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.69.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.env_vars.GEMINI_CLI_NESTED_SESSION": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.69.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
     },
     "config.env_vars.GEMINI_CLI_NO_RELAUNCH": {
       "kind": "env_var",
@@ -2273,6 +2317,17 @@
       ],
       "since_bounded": false
     },
+    "config.env_vars.XDG_CONFIG_HOME": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.69.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.env_vars.XDG_SESSION_TYPE": {
       "kind": "env_var",
       "ranges": [
@@ -2305,6 +2360,17 @@
         }
       ],
       "since_bounded": false
+    },
+    "config.env_vars.all_proxy": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.69.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
     },
     "config.env_vars.http_proxy": {
       "kind": "env_var",
@@ -5330,6 +5396,17 @@
         }
       ],
       "since_bounded": false
+    },
+    "config.options.model.requestTimeoutMs": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.69.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
     },
     "config.options.model.skipNextSpeakerCheck": {
       "kind": "setting",

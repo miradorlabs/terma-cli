@@ -73,7 +73,7 @@
       "label": "The machine's heartbeat reaches the project's ingest"
     }
   ],
-  "generated_at": "2026-11-19T00:59:03Z",
+  "generated_at": "2026-11-19T02:02:06Z",
   "harnesses": [
     {
       "ID": "claude",
@@ -11009,6 +11009,72 @@
       "first_passed": "2026-11-11T04:59:39.706904Z",
       "terma": "terma version dev",
       "test": "TestRelayGeminiToolsGetNoExporter/v0.68.0"
+    },
+    {
+      "harness": "gemini",
+      "version": "0.69.0",
+      "platform": "darwin/arm64",
+      "capability": "relay.content_allowed",
+      "result": "pass",
+      "last_run": "2026-11-19T02:00:58.340819Z",
+      "first_passed": "2026-11-19T02:00:58.340819Z",
+      "terma": "terma version dev",
+      "test": "TestRelayGemini/v0.69.0/content"
+    },
+    {
+      "harness": "gemini",
+      "version": "0.69.0",
+      "platform": "darwin/arm64",
+      "capability": "relay.content_withheld",
+      "result": "pass",
+      "last_run": "2026-11-19T02:01:05.024231Z",
+      "first_passed": "2026-11-19T02:01:05.024231Z",
+      "terma": "terma version dev",
+      "test": "TestRelayGemini/v0.69.0/withheld"
+    },
+    {
+      "harness": "gemini",
+      "version": "0.69.0",
+      "platform": "darwin/arm64",
+      "capability": "relay.equivalent",
+      "result": "pass",
+      "last_run": "2026-11-19T02:00:52.420954Z",
+      "first_passed": "2026-11-19T02:00:52.420954Z",
+      "terma": "terma version dev",
+      "test": "TestRelayWorkloadsGemini/v0.69.0"
+    },
+    {
+      "harness": "gemini",
+      "version": "0.69.0",
+      "platform": "darwin/arm64",
+      "capability": "relay.only_opted_in",
+      "result": "pass",
+      "last_run": "2026-11-19T02:01:16.126812Z",
+      "first_passed": "2026-11-19T02:01:16.126812Z",
+      "terma": "terma version dev",
+      "test": "TestRelayGeminiOutsideARepository/v0.69.0"
+    },
+    {
+      "harness": "gemini",
+      "version": "0.69.0",
+      "platform": "darwin/arm64",
+      "capability": "relay.telemetry",
+      "result": "pass",
+      "last_run": "2026-11-19T02:01:05.02428Z",
+      "first_passed": "2026-11-19T02:01:05.02428Z",
+      "terma": "terma version dev",
+      "test": "TestRelayGemini/v0.69.0"
+    },
+    {
+      "harness": "gemini",
+      "version": "0.69.0",
+      "platform": "darwin/arm64",
+      "capability": "relay.tools_no_token",
+      "result": "pass",
+      "last_run": "2026-11-19T02:01:20.175154Z",
+      "first_passed": "2026-11-19T02:01:20.175154Z",
+      "terma": "terma version dev",
+      "test": "TestRelayGeminiToolsGetNoExporter/v0.69.0"
     },
     {
       "harness": "opencode",
