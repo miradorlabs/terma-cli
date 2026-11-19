@@ -2,8 +2,13 @@ package relay
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"maps"
+	"net/http"
+	"net/http/httptest"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -60,7 +65,7 @@ func TestHeartbeatCarriesCountersAndLaunch(t *testing.T) {
 	var beats []*logspb.LogsData
 	r := newRelay(Options{Dir: t.TempDir(), Token: token, Lookup: f.lookup, Now: f.clock, Version: "v9.9.9", Launch: semconv.TermaRelayLaunchHook,
 		HeartbeatEvery: time.Minute,
-		HeartbeatSend: func(_ context.Context, b *logspb.LogsData) error {
+		HeartbeatSend: func(_ context.Context, b *logspb.LogsData, _ HeartbeatTarget) error {
 			mu.Lock()
 			beats = append(beats, b)
 			mu.Unlock()
@@ -122,7 +127,7 @@ func TestStopHeartbeat(t *testing.T) {
 	var beats []*logspb.LogsData
 	r := newRelay(Options{Dir: t.TempDir(), Token: token, Lookup: f.lookup, Now: f.clock, Version: "v9.9.9",
 		HeartbeatEvery: time.Hour,
-		HeartbeatSend: func(_ context.Context, b *logspb.LogsData) error {
+		HeartbeatSend: func(_ context.Context, b *logspb.LogsData, _ HeartbeatTarget) error {
 			mu.Lock()
 			beats = append(beats, b)
 			mu.Unlock()
@@ -168,7 +173,7 @@ func TestHeartbeatCountersAreOneRecord(t *testing.T) {
 	var beats []*logspb.LogsData
 	r := newRelay(Options{Dir: t.TempDir(), Token: token,
 		HeartbeatEvery: time.Hour,
-		HeartbeatSend: func(_ context.Context, b *logspb.LogsData) error {
+		HeartbeatSend: func(_ context.Context, b *logspb.LogsData, _ HeartbeatTarget) error {
 			mu.Lock()
 			beats = append(beats, b)
 			mu.Unlock()
@@ -201,7 +206,7 @@ func TestHeartbeatCountersWhileABeatIsInFlight(t *testing.T) {
 	var beats []*logspb.LogsData
 	inFlight, release := make(chan struct{}), make(chan struct{})
 	r := newRelay(Options{Dir: t.TempDir(), Token: token,
-		HeartbeatSend: func(_ context.Context, b *logspb.LogsData) error {
+		HeartbeatSend: func(_ context.Context, b *logspb.LogsData, _ HeartbeatTarget) error {
 			mu.Lock()
 			first := len(beats) == 0
 			beats = append(beats, b)
@@ -242,7 +247,7 @@ func TestHeartbeatCountersSurviveAFailedBeat(t *testing.T) {
 	var beats []*logspb.LogsData
 	fail := true
 	r := newRelay(Options{Dir: t.TempDir(), Token: token,
-		HeartbeatSend: func(_ context.Context, b *logspb.LogsData) error {
+		HeartbeatSend: func(_ context.Context, b *logspb.LogsData, _ HeartbeatTarget) error {
 			if fail {
 				return errors.New("offline")
 			}
@@ -276,7 +281,10 @@ func TestHeartbeatSendsUnclassifiedNamesOnlyAsATotal(t *testing.T) {
 	t.Parallel()
 	var beats []*logspb.LogsData
 	r := newRelay(Options{Dir: t.TempDir(), Token: token,
-		HeartbeatSend: func(_ context.Context, b *logspb.LogsData) error { beats = append(beats, b); return nil }})
+		HeartbeatSend: func(_ context.Context, b *logspb.LogsData, _ HeartbeatTarget) error {
+			beats = append(beats, b)
+			return nil
+		}})
 	r.stats.unclassified("customer.secret-project", 2)
 	r.stats.unclassified("resource/customer.other", 3)
 	r.stats.received("logs", 4)
@@ -320,7 +328,7 @@ func TestNameHeartbeatUserNamesTheRecord(t *testing.T) {
 	for _, user := range []string{"", "user-a"} {
 		var beat *logspb.LogsData
 		r := newRelay(Options{Dir: t.TempDir(), Token: token,
-			HeartbeatSend: func(_ context.Context, b *logspb.LogsData) error { beat = b; return nil }})
+			HeartbeatSend: func(_ context.Context, b *logspb.LogsData, _ HeartbeatTarget) error { beat = b; return nil }})
 		if err := r.heartbeat(context.Background(), semconv.TermaRelayHeartbeatReasonInterval, ""); err != nil {
 			t.Fatal(err)
 		}
@@ -363,7 +371,10 @@ func TestHeartbeatCarriesInstallMethodAndAskedUpdateAutoEachBeat(t *testing.T) {
 			asked++
 			return auto
 		},
-		HeartbeatSend: func(_ context.Context, b *logspb.LogsData) error { beats = append(beats, b); return nil }})
+		HeartbeatSend: func(_ context.Context, b *logspb.LogsData, _ HeartbeatTarget) error {
+			beats = append(beats, b)
+			return nil
+		}})
 	if err := r.heartbeat(context.Background(), semconv.TermaRelayHeartbeatReasonStart, ""); err != nil {
 		t.Fatal(err)
 	}
@@ -391,7 +402,7 @@ func TestHeartbeatCarriesInstallMethodAndAskedUpdateAutoEachBeat(t *testing.T) {
 	// A relay told neither, as in tests, sends neither.
 	var bare *logspb.LogsData
 	r = newRelay(Options{Dir: t.TempDir(), Token: token,
-		HeartbeatSend: func(_ context.Context, b *logspb.LogsData) error { bare = b; return nil }})
+		HeartbeatSend: func(_ context.Context, b *logspb.LogsData, _ HeartbeatTarget) error { bare = b; return nil }})
 	if err := r.heartbeat(context.Background(), semconv.TermaRelayHeartbeatReasonInterval, ""); err != nil {
 		t.Fatal(err)
 	}
@@ -400,3 +411,70 @@ func TestHeartbeatCarriesInstallMethodAndAskedUpdateAutoEachBeat(t *testing.T) {
 		t.Errorf("a relay told neither sent one: %v", bare)
 	}
 }
+
+// A beat asked for over /heartbeat with a team carries its target to HeartbeatSend, and none
+// of the relay's counters; its answer names the team back, delivered or not, and says what
+// kept a failed one from the platform. Only one that left counts as a failed heartbeat.
+func TestTheHeartbeatEndpointCarriesItsTarget(t *testing.T) {
+	t.Parallel()
+	var targets []HeartbeatTarget
+	var counted []bool
+	var fail error
+	r := newRelay(Options{Dir: t.TempDir(), Token: token, HeartbeatEvery: time.Hour,
+		HeartbeatSend: func(_ context.Context, b *logspb.LogsData, target HeartbeatTarget) error {
+			targets = append(targets, target)
+			counted = append(counted, len(beatCounters(b.ResourceLogs[0].ScopeLogs[0].LogRecords[0])) > 0)
+			return fail
+		}})
+	beat := func(query string) (int, HeartbeatAnswer) {
+		r.stats.add("dropped.unclaimed.logs", 1)
+		req := httptest.NewRequest(http.MethodPost, "/heartbeat?"+query, nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+		rec := httptest.NewRecorder()
+		r.Handler().ServeHTTP(rec, req)
+		var answer HeartbeatAnswer
+		if err := json.NewDecoder(rec.Body).Decode(&answer); err != nil {
+			t.Fatal(err)
+		}
+		return rec.Code, answer
+	}
+	if code, answer := beat("reason=doctor&team=p1&endpoint=https%3A%2F%2Fotlp.example"); code != http.StatusOK || answer != (HeartbeatAnswer{Team: "p1"}) {
+		t.Fatalf("beat for a team = %d %+v", code, answer)
+	}
+	if code, answer := beat("reason=setup"); code != http.StatusOK || answer != (HeartbeatAnswer{}) {
+		t.Fatalf("beat = %d %+v", code, answer)
+	}
+	if want := []HeartbeatTarget{{Team: "p1", Endpoint: "https://otlp.example"}, {}}; !slices.Equal(targets, want) {
+		t.Fatalf("targets = %+v, want %+v", targets, want)
+	}
+	if want := []bool{false, true}; !slices.Equal(counted, want) {
+		t.Fatalf("beats carried counters %v, want only the untargeted one", counted)
+	}
+	for _, tc := range []struct {
+		err        error
+		code       string
+		keyRefused bool
+	}{
+		{&DeliveryError{Err: keyRefusal{}}, HeartbeatUndelivered, true},
+		{&DeliveryError{Err: errors.New("connection refused")}, HeartbeatUndelivered, false},
+		{fmt.Errorf("%w: https://a, not https://b", ErrElsewhere), HeartbeatElsewhere, false},
+		{ErrNoKey, HeartbeatNoKey, false},
+		{errors.New("the keychain is locked"), HeartbeatUnsent, false},
+	} {
+		fail = tc.err
+		failed := r.stats.Snapshot().Counters["heartbeats_failed"]
+		code, answer := beat("reason=doctor&team=p1")
+		if code != http.StatusBadGateway || answer.Team != "p1" || answer.Code != tc.code || answer.KeyRefused != tc.keyRefused || answer.Error != tc.err.Error() {
+			t.Errorf("%v: %d %+v", tc.err, code, answer)
+		}
+		// Only a beat that left counts as a failed heartbeat.
+		if counted, tried := r.stats.Snapshot().Counters["heartbeats_failed"]-failed, tc.code == HeartbeatUndelivered; (counted == 1) != tried {
+			t.Errorf("%v: counted %d failed heartbeats", tc.err, counted)
+		}
+	}
+}
+
+type keyRefusal struct{}
+
+func (keyRefusal) Error() string    { return "otlp ingest returned 401" }
+func (keyRefusal) KeyRefused() bool { return true }

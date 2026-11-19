@@ -41,7 +41,7 @@ type Deps struct {
 	// CreateKey mints a project's key under cfg's sign-in.
 	CreateKey func(ctx context.Context, cfg *config.Config, projectID string) (string, error)
 	// SendHeartbeat delivers a heartbeat with a project's key.
-	SendHeartbeat func(ctx context.Context, beat *logspb.LogsData) error
+	SendHeartbeat func(ctx context.Context, beat *logspb.LogsData, target relay.HeartbeatTarget) error
 	// HookPolicy is the organization's policy as a hook reads it.
 	HookPolicy func() config.Policy
 	// LoadConfig is the configuration as the command line resolves it.

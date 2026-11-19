@@ -118,9 +118,10 @@ func arrayOf[T any](items []T) *otlpValues {
 	return &otlpValues{Values: values}
 }
 
-// newHTTPClient refuses redirects: Go keeps the Authorization header on a same-host
-// https→http downgrade, which would send the server key in cleartext.
-func newHTTPClient() *http.Client {
+// NewHTTPClient is the client for anything sent to an ingest with a server key. It refuses
+// redirects: Go keeps the Authorization header on a same-host https→http downgrade, which
+// would send the key in cleartext, and a POST redirected to a GET proves no delivery.
+func NewHTTPClient() *http.Client {
 	return &http.Client{
 		Timeout: sendTimeout,
 		CheckRedirect: func(req *http.Request, _ []*http.Request) error {
@@ -183,7 +184,7 @@ func (o *otlpSender) send(ctx context.Context, events []spool.Event) error {
 	}
 	client := o.HTTP
 	if client == nil {
-		client = newHTTPClient()
+		client = NewHTTPClient()
 	}
 	ctx, cancel := context.WithTimeout(ctx, sendTimeout)
 	defer cancel()
@@ -213,6 +214,9 @@ type IngestError struct {
 }
 
 func (e *IngestError) Error() string {
+	if e.Detail == "" {
+		return fmt.Sprintf("otlp ingest returned %d", e.Status)
+	}
 	return fmt.Sprintf("otlp ingest returned %d: %s", e.Status, e.Detail)
 }
 
