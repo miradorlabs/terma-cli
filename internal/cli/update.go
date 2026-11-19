@@ -135,7 +135,8 @@ func updatesSummary(install selfupdate.Install, auto bool) string {
 
 // Update phase bounds; a package manager may update its taps first, which takes minutes.
 // The refresh may restart the relay's service, which waits for the old relay to stop
-// (service.RestartWait), and has a minute for the rest of its work.
+// (service.RestartWait, the longest stop wait on any platform), and has a minute for the
+// rest of its work.
 const (
 	downloadTimeout = 2 * time.Minute
 	upgradeTimeout  = selfupdate.UpgradeTimeout

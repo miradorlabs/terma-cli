@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -205,7 +206,7 @@ func (m Manager) Install(ctx context.Context) (string, error) {
 		for _, domain := range launchdDomains() {
 			// Only a job bootout unloaded can still be exiting.
 			wait := time.Duration(0)
-			if _, err := run(ctx, "launchctl", "bootout", domain+"/"+m.Name); err == nil {
+			if _, err := runFor(ctx, stopTimeout, "launchctl", "bootout", domain+"/"+m.Name); err == nil {
 				wait = bootoutWait
 			}
 			out, err := bootstrap(ctx, domain, path, wait)
@@ -219,14 +220,14 @@ func (m Manager) Install(ctx context.Context) (string, error) {
 		if err := config.WriteFileAtomic(path, []byte(def), 0o644); err != nil {
 			return "", err
 		}
-		if out, err := run(ctx, "systemctl", "--user", "daemon-reload"); err != nil {
+		if out, err := systemctl(ctx, "daemon-reload"); err != nil {
 			return "", fmt.Errorf("systemctl --user daemon-reload: %w: %s", err, out)
 		}
-		if out, err := run(ctx, "systemctl", "--user", "enable", m.Name+".service"); err != nil {
+		if out, err := systemctl(ctx, "enable", m.Name+".service"); err != nil {
 			return "", fmt.Errorf("systemctl --user enable: %w: %s", err, out)
 		}
 		// Not start: a relay StopRelay just stopped would wait out RestartSec.
-		if out, err := run(ctx, "systemctl", "--user", "restart", m.Name+".service"); err != nil {
+		if out, err := systemctl(ctx, "restart", m.Name+".service"); err != nil {
 			return "", fmt.Errorf("systemctl --user restart: %w: %s", err, out)
 		}
 		return path, nil
@@ -271,11 +272,11 @@ func (m Manager) start(ctx context.Context, stopped bool) error {
 		}
 		return lastErr
 	case "linux":
-		if _, err := run(ctx, "systemctl", "--user", "is-active", "--quiet", m.Name+".service"); err == nil && !stopped {
+		if _, err := systemctl(ctx, "is-active", "--quiet", m.Name+".service"); err == nil && !stopped {
 			return nil
 		}
 		// Not start: a unit whose relay exited waits out RestartSec.
-		if out, err := run(ctx, "systemctl", "--user", "restart", m.Name+".service"); err != nil {
+		if out, err := systemctl(ctx, "restart", m.Name+".service"); err != nil {
 			return fmt.Errorf("systemctl --user restart: %w: %s", err, out)
 		}
 		return nil
@@ -297,10 +298,10 @@ func (m Manager) Remove(ctx context.Context) (bool, error) {
 	switch runtime.GOOS {
 	case "darwin":
 		for _, domain := range launchdDomains() {
-			_, _ = run(ctx, "launchctl", "bootout", domain+"/"+m.Name)
+			_, _ = runFor(ctx, stopTimeout, "launchctl", "bootout", domain+"/"+m.Name)
 		}
 	case "linux":
-		_, _ = run(ctx, "systemctl", "--user", "disable", "--now", m.Name+".service")
+		_, _ = systemctl(ctx, "disable", "--now", m.Name+".service")
 	case "windows":
 		return true, m.removeWindows(path)
 	}
@@ -308,16 +309,44 @@ func (m Manager) Remove(ctx context.Context) (bool, error) {
 		return false, err
 	}
 	if runtime.GOOS == "linux" {
-		_, _ = run(ctx, "systemctl", "--user", "daemon-reload")
+		_, _ = systemctl(ctx, "daemon-reload")
 	}
 	return true, nil
 }
 
-func run(ctx context.Context, name string, args ...string) (string, error) {
-	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
-	defer cancel()
+// commandTimeout bounds a service-manager command that returns at once. One that stops the
+// relay and may wait for it (systemctl restart, stop, disable --now; launchctl bootout) has
+// stopTimeout: the definitions give the relay StopWindow to stop, and a relay finishing a
+// token refresh takes that long.
+const (
+	commandTimeout = 20 * time.Second
+	stopTimeout    = RestartWait
+)
+
+// command runs a service-manager command; tests replace it.
+var command = func(ctx context.Context, name string, args ...string) (string, error) {
 	out, err := exec.CommandContext(ctx, name, args...).CombinedOutput()
 	return strings.TrimSpace(string(out)), err
+}
+
+func run(ctx context.Context, name string, args ...string) (string, error) {
+	return runFor(ctx, commandTimeout, name, args...)
+}
+
+func runFor(ctx context.Context, timeout time.Duration, name string, args ...string) (string, error) {
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	return command(ctx, name, args...)
+}
+
+// systemctl runs `systemctl --user args...`, waiting stopTimeout for a command that stops the
+// relay or may (--now also matches enable --now, which only waits longer for nothing).
+func systemctl(ctx context.Context, args ...string) (string, error) {
+	timeout := commandTimeout
+	if slices.Contains(args, "restart") || slices.Contains(args, "stop") || slices.Contains(args, "--now") {
+		timeout = stopTimeout
+	}
+	return runFor(ctx, timeout, "systemctl", append([]string{"--user"}, args...)...)
 }
 
 // bootoutWait outlasts the agent's exit timeout (StopWindow), after which launchd kills the
