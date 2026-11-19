@@ -74,6 +74,7 @@ func (app *App) hookDeps() dispatch.Deps {
 		},
 		Flush:     spawnFlush,
 		AwaitPush: func(path string) { spawnDetached("spool", "await-push", path) },
+		Notifier:  app.notifier,
 	}
 }
 
@@ -85,7 +86,8 @@ func (app *App) hookProfile() dispatch.Profile {
 	if err != nil {
 		return dispatch.Profile{Policy: config.NoPolicy("", "")}
 	}
-	return dispatch.Profile{Team: cfg.Policy.TeamID, Agents: cfg.Harnesses, Policy: cfg.Policy.InForce(cfg.OrganizationID, cfg.AuthURL)}
+	return dispatch.Profile{Team: cfg.Policy.TeamID, Agents: cfg.Harnesses, Policy: cfg.Policy.InForce(cfg.OrganizationID, cfg.AuthURL),
+		Notifications: cfg.DesktopNotifications}
 }
 
 // hookPolicy is the collection policy while it is validated and fresh, else NoPolicy.

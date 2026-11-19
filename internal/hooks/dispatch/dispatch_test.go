@@ -241,3 +241,39 @@ func TestRunHandsOnTheClaimedCheckout(t *testing.T) {
 		t.Fatalf("policy = %+v, want the profile's", policy)
 	}
 }
+
+// noticing is fake whose render hook records whether it was handed a notifier.
+type noticing struct {
+	fake
+	handed *[]bool
+}
+
+func (n noticing) Renders() map[string]agents.RenderHandler {
+	return map[string]agents.RenderHandler{"fake-line": func(_ context.Context, env hookrun.Env) int {
+		*n.handed = append(*n.handed, env.Notifier != nil)
+		return 0
+	}}
+}
+
+type silent struct{}
+
+func (silent) Notify(string) {}
+
+// A hook is handed the notifier only while the developer has desktop notifications on, and
+// hooks are on.
+func TestRunHandsTheNotifierOnlyWhileNotificationsAreOn(t *testing.T) {
+	t.Parallel()
+	h := newHarness(t)
+	var handed []bool
+	h.deps.Agents, h.deps.Notifier = agents.New(noticing{ran: &h.ran, handed: &handed}), silent{}
+	for _, on := range []bool{false, true} {
+		h.deps.Profile = func() Profile { return Profile{Policy: config.Policy{Mode: config.ModeRepo}, Notifications: on} }
+		Run(context.Background(), h.deps, request("fake-line"))
+	}
+	off := request("fake-line")
+	off.HooksOff = true
+	Run(context.Background(), h.deps, off)
+	if len(handed) != 3 || handed[0] || !handed[1] || handed[2] {
+		t.Fatalf("handed a notifier %v, want only with notifications and hooks on", handed)
+	}
+}

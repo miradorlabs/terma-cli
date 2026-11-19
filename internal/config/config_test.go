@@ -81,6 +81,28 @@ func TestLoad_FallsBackToDefaultsWithNoConfigFile(t *testing.T) {
 	}
 }
 
+// Desktop notifications are on until the installation's config turns them off.
+func TestLoad_DesktopNotificationsAreOnUnlessSetFalse(t *testing.T) {
+	t.Parallel()
+	off := false
+	for _, tc := range []struct {
+		file *File
+		want bool
+	}{
+		{nil, true},
+		{&File{}, true},
+		{&File{DesktopNotifications: &off}, false},
+	} {
+		cfg, err := Load(seedConfig(t, tc.file), t.TempDir(), Overrides{})
+		if err != nil {
+			t.Fatalf("Load: %v", err)
+		}
+		if cfg.DesktopNotifications != tc.want {
+			t.Errorf("%+v: DesktopNotifications = %v, want %v", tc.file, cfg.DesktopNotifications, tc.want)
+		}
+	}
+}
+
 func TestLoad_TrimsTrailingSlashFromURLs(t *testing.T) {
 	t.Parallel()
 	dir := seedConfig(t, nil)

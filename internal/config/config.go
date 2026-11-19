@@ -86,6 +86,11 @@ type File struct {
 	// AutoUpdate replaces terma with each new release, unless set false: then terma only
 	// says one is out. Unset is on.
 	AutoUpdate *bool `json:"auto_update,omitempty"`
+	// DesktopNotifications shows live findings, such as a window running out before it
+	// resets, as desktop notifications, unless set false. Unset is on.
+	// Accepted risk: on by default, a developer can get a popup they did not want before they
+	// know this switch exists. The upgrade path is a team policy switch that sets the default.
+	DesktopNotifications *bool `json:"desktop_notifications,omitempty"`
 	// InsecureStorage keeps new secrets in the config directory's files rather than the
 	// system keychain: `terma setup --insecure-storage`, or a setup that found no keychain
 	// to use. Each setup decides it afresh.
@@ -137,6 +142,9 @@ type Config struct {
 	// APIKey is a server key from TERMA_API_KEY that replaces the login credential;
 	// json:"-" keeps it out of `-o json`.
 	APIKey string `json:"-"`
+
+	// DesktopNotifications is the installation's File.DesktopNotifications, unset as on.
+	DesktopNotifications bool
 }
 
 // Overrides are the flag values that win over everything else.
@@ -194,6 +202,8 @@ func Load(dir, stateDir string, o Overrides) (*Config, error) {
 		ServerKeyAuthURL:   profile.ServerKeyAuthURL,
 		Policy:             DefaultPolicy(),
 		APIKey:             strings.TrimSpace(os.Getenv("TERMA_API_KEY")),
+
+		DesktopNotifications: file.DesktopNotifications == nil || *file.DesktopNotifications,
 	}
 	switch stored, ok, err := ReadPolicy(stateDir, profile.Team); {
 	case err != nil || ok && !stored.AppliesTo(cfg.OrganizationID, cfg.AuthURL):
