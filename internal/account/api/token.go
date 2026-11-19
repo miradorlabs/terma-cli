@@ -124,19 +124,18 @@ func (c *Client) postToken(ctx context.Context, body tokenRequest) (*tokenRespon
 			return nil, refusalError{fmt.Errorf("%w: %s", auth.ErrNotLoggedIn, apiErr.Message)}
 		case apiErr.Unauthenticated():
 			return nil, fmt.Errorf("%w: %s", auth.ErrNotLoggedIn, apiErr.Message)
-		case apiErr.StatusCode == http.StatusServiceUnavailable:
-			// Nothing spent. The auth gateway answers 503 UNAVAILABLE when the account
-			// service could not be reached (gRPC Unavailable); a failure after the
-			// rotation committed is 500 INTERNAL. A 503 without that envelope comes from a
-			// hop in front of the gateway with no backend to send it to: one that lost
-			// its backend mid-request answers 502 or 504, which stay unknown below.
+		case apiErr.StatusCode == http.StatusServiceUnavailable && apiErr.Code == "UNAVAILABLE":
+			// Nothing spent: the auth gateway's own answer when the account service could not
+			// be reached (gRPC Unavailable); a failure after the rotation committed is 500
+			// INTERNAL. Any other 503 stays unknown below: the GKE load balancer in front of
+			// the gateway can answer a bare 502 or 503 after the rotation committed, as when
+			// the gateway's pod is killed mid-request.
 			//
 			// The risk taken: a gRPC connection that breaks after the account service
-			// committed the rotation also surfaces as Unavailable (an outage, or an
-			// account pod stopped hard mid-call in a rollout), and so does a proxy that
-			// reports an upstream reset as 503. That needs the break to fall after the
-			// commit and before the answer, and it ends the session family only if a
-			// later refresh then sends the spent token after the server's grace.
+			// committed the rotation also surfaces as Unavailable (an outage, or an account
+			// pod stopped hard mid-call in a rollout). That needs the break to fall after the
+			// commit and before the answer, and it ends the session family only if a later
+			// refresh then sends the spent token after the server's grace.
 			return nil, err
 		case apiErr.StatusCode >= 500:
 			return nil, unsettledError{err}

@@ -11,8 +11,9 @@ import (
 )
 
 // unsettledError is a token exchange whose outcome this client never learned: the
-// request was sent and no answer came, a 5xx other than 503 did, or a success without a
-// usable pair. The server may still have spent the token it was sent.
+// request was sent and no answer came, a 5xx other than the auth gateway's 503
+// UNAVAILABLE did, or a success without a usable pair. The server may still have spent
+// the token it was sent.
 type unsettledError struct{ error }
 
 func (e unsettledError) Unwrap() error { return e.error }
@@ -187,7 +188,7 @@ func (c *Client) markUnsettled(current *auth.Credential, first time.Time, tx *au
 // expireUnsettled marks current's refresh token as never to be sent again
 // (auth.UnsettledExpired): its budget is spent, or its mark is in the future. This
 // client's verdict is set first and stands whatever the wall clock does next, so this
-// process never sends the token again even when the store's write fails. That write fails
+// client never sends the token again even when the store's write fails. That write fails
 // only when credentials.json cannot be written, and the error says so: the store then
 // keeps the mark it had, which, if it was in the future, another process takes as in
 // budget once the wall clock reaches it.

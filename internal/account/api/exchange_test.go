@@ -123,6 +123,45 @@ func TestClient_AKilledRefreshIsResentWithinItsBudget(t *testing.T) {
 	}
 }
 
+// A mark another process left in budget, as one killed with its refresh outstanding
+// does, makes the outcome unknown from the first answer on: that process's send may have
+// rotated the pair. So the gateway's refusal is sent once more, as a lost race may draw
+// it, and its 503 UNAVAILABLE does not settle the exchange, which spent nothing of this
+// send but says nothing of the earlier one. Either way the answer after it is saved.
+func TestClient_AnInheritedUnknownOutcomeIsNotSettledByTheFirstAnswer(t *testing.T) {
+	t.Parallel()
+	for name, first := range map[string]func(http.ResponseWriter){
+		"401 UNAUTHENTICATED": func(w http.ResponseWriter) { gatewayError(w, http.StatusUnauthorized, "UNAUTHENTICATED") },
+		"503 UNAVAILABLE":     func(w http.ResponseWriter) { gatewayError(w, http.StatusServiceUnavailable, "UNAVAILABLE") },
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			var n atomic.Int32
+			log, srv := newTokenLog(t, func(w http.ResponseWriter) {
+				if n.Add(1) == 1 {
+					first(w)
+					return
+				}
+				rotatedPair(w)
+			})
+			client := newTestClient(t, srv.URL, expired(), "")
+			quickRetries(client, 20)
+			markStored(t, client, time.Now().Round(0).Add(-testUnit))
+
+			if err := client.Refresh(context.Background()); err != nil {
+				t.Fatalf("Refresh: %v", err)
+			}
+			if want := []string{"mir_clr_stale", "mir_clr_stale"}; !slices.Equal(log.tokens(), want) {
+				t.Errorf("refresh tokens sent = %q, want %q: the same token again", log.tokens(), want)
+			}
+			wantRotatedPair(t, client)
+			if mark := storedFor(t, client).RefreshUnsettledAt; !mark.IsZero() {
+				t.Errorf("stored mark = %v, want none on the saved pair", mark)
+			}
+		})
+	}
+}
+
 // A token whose refresh got no answer longer ago than the budget is never sent: the
 // server no longer forgives it. Neither is one marked in the future, after the wall clock
 // went back, even once the clock comes round to its mark again: the verdict is final. The

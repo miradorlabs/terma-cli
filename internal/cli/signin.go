@@ -173,7 +173,7 @@ func (app *App) signIn(cmd *cobra.Command, cfg *config.Config, opts signInOption
 }
 
 // storeLogin keeps a new sign-in and makes it the profile's. It replaces only its own
-// organization's stored sign-in, which is then ended; the other organizations' stay
+// organization's stored sign-in, normally ended (best effort); the other organizations' stay
 // stored. A sign-in that cannot be stored is ended too, so it does not linger on the web.
 func (app *App) storeLogin(ctx context.Context, cfg *config.Config, cred *auth.Credential, orgName string) error {
 	replaced, err := auth.SaveCredential(app.dir, cfg.ProfileName, cred)

@@ -587,6 +587,38 @@ func TestClient_ASupersededSessionSendsNothing(t *testing.T) {
 	}
 }
 
+// A superseded session is reported expired only when a refresh was due. A refusal of an
+// access token other than its own, while its own has not expired, asks for no refresh:
+// the client keeps its pair and is not told it was signed out.
+func TestClient_ASupersededSessionWithNothingDueIsLeftAlone(t *testing.T) {
+	t.Parallel()
+	log, srv := newTokenLog(t, func(w http.ResponseWriter) { rotatedPair(w) })
+	live := &auth.Credential{AccessToken: "mir_cli_live", RefreshToken: "mir_clr_live", SessionID: "session-1",
+		ExpiresAt: time.Now().Add(time.Hour)}
+	client := newTestClient(t, srv.URL, live, "")
+	signedIn := &auth.Credential{AccessToken: "mir_cli_new", RefreshToken: "mir_clr_new", SessionID: "session-new",
+		ExpiresAt: time.Now().Add(time.Hour), OrganizationID: "org-test", AuthURL: srv.URL}
+	if _, err := auth.SaveCredential(client.dir, config.DefaultProfile, signedIn); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := client.RefreshRefused(context.Background(), TokenSHA256("mir_cli_before")); err != nil {
+		t.Fatalf("RefreshRefused of another token = %v, want nil", err)
+	}
+	if err := client.RefreshRefused(context.Background(), TokenSHA256("mir_cli_live")); !errors.Is(err, errSessionExpired) {
+		t.Fatalf("RefreshRefused of its own token = %v, want the session expired", err)
+	}
+	if got := log.tokens(); len(got) != 0 {
+		t.Errorf("refresh tokens sent = %q, want none", got)
+	}
+	if got := client.Credential().AccessToken; got != "mir_cli_live" {
+		t.Errorf("client access token = %q, want its own", got)
+	}
+	if stored := storedFor(t, client); stored.RefreshToken != "mir_clr_new" {
+		t.Errorf("stored %q; want the new sign-in untouched", stored.RefreshToken)
+	}
+}
+
 // Under the lock the stored pair decides, not the one held: read without the lock, that
 // can pair a rotation's tokens with the expiry before it, while another process's write
 // has reached the keychain and not yet credentials.json. Neither refresh may rotate a
@@ -869,9 +901,11 @@ func TestClient_RefreshOutlivesTheCallersContext(t *testing.T) {
 	wantRotatedPair(t, client)
 }
 
-// A refresh whose answer never arrives, or arrives as a server error other than 503, may
-// still have rotated the pair. It is sent again with the same refresh token, which the
-// server forgives that soon after spending it, and the answer to the retry is saved.
+// A refresh whose answer never arrives, or arrives as a server error other than the auth
+// gateway's 503 UNAVAILABLE, may still have rotated the pair: a bare 503 can come from the
+// load balancer in front of the gateway after the rotation committed. It is sent again
+// with the same refresh token, which the server forgives that soon after spending it, and
+// the answer to the retry is saved.
 func TestClient_RetriesARefreshWithAnUnknownOutcome(t *testing.T) {
 	t.Parallel()
 	for name, fail := range map[string]func(t *testing.T, w http.ResponseWriter){
@@ -883,9 +917,13 @@ func TestClient_RetriesARefreshWithAnUnknownOutcome(t *testing.T) {
 			}
 			_ = conn.Close()
 		},
-		"500": func(_ *testing.T, w http.ResponseWriter) { gatewayError(w, http.StatusInternalServerError, "INTERNAL") },
-		"502": func(_ *testing.T, w http.ResponseWriter) { w.WriteHeader(http.StatusBadGateway) },
-		"504": func(_ *testing.T, w http.ResponseWriter) { w.WriteHeader(http.StatusGatewayTimeout) },
+		"500":      func(_ *testing.T, w http.ResponseWriter) { gatewayError(w, http.StatusInternalServerError, "INTERNAL") },
+		"502":      func(_ *testing.T, w http.ResponseWriter) { w.WriteHeader(http.StatusBadGateway) },
+		"504":      func(_ *testing.T, w http.ResponseWriter) { w.WriteHeader(http.StatusGatewayTimeout) },
+		"bare 503": func(_ *testing.T, w http.ResponseWriter) { w.WriteHeader(http.StatusServiceUnavailable) },
+		"503 INTERNAL": func(_ *testing.T, w http.ResponseWriter) {
+			gatewayError(w, http.StatusServiceUnavailable, "INTERNAL")
+		},
 		"truncated 200": func(t *testing.T, w http.ResponseWriter) {
 			conn, buf, err := http.NewResponseController(w).Hijack()
 			if err != nil {
@@ -1050,6 +1088,7 @@ func TestClient_ARefusalAfterAnUnknownOutcomeIsSentAgain(t *testing.T) {
 		{"forbidden twice after", []int{http.StatusBadGateway, http.StatusForbidden, http.StatusForbidden}, true, true},
 		{"unavailable after", []int{http.StatusBadGateway, http.StatusServiceUnavailable, http.StatusServiceUnavailable}, true, true},
 		{"bare 503 after", []int{http.StatusBadGateway, bare503, bare503}, true, true},
+		{"bare 503 throughout", []int{bare503, bare503, bare503}, true, true},
 		{"unavailable, then answered", []int{http.StatusBadGateway, http.StatusServiceUnavailable, http.StatusOK}, false, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -1164,9 +1203,10 @@ func refusingDials(refuse func(n int32) bool) (*http.Transport, *atomic.Int32) {
 }
 
 // A refresh the server cannot have spent is not sent again: a 429, which the gateway
-// turns away before the account service runs, a 503, which says the account service
-// could not be reached, or a request that never left the machine. Its mark goes, nothing
-// is removed, and the caller is not told it was signed out.
+// turns away before the account service runs, the gateway's 503 UNAVAILABLE, which says
+// the account service could not be reached, or a request that never left the machine.
+// A bare 503 is not among them (TestClient_RetriesARefreshWithAnUnknownOutcome). Its
+// mark goes, nothing is removed, and the caller is not told it was signed out.
 func TestClient_ARefreshNothingSpentIsNotRetried(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct {
@@ -1177,7 +1217,6 @@ func TestClient_ARefreshNothingSpentIsNotRetried(t *testing.T) {
 		{"429", false, func(w http.ResponseWriter) { gatewayError(w, http.StatusTooManyRequests, "RESOURCE_EXHAUSTED") }},
 		{"connection refused", true, nil},
 		{"503 UNAVAILABLE", false, func(w http.ResponseWriter) { gatewayError(w, http.StatusServiceUnavailable, "UNAVAILABLE") }},
-		{"bare 503", false, func(w http.ResponseWriter) { w.WriteHeader(http.StatusServiceUnavailable) }},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
