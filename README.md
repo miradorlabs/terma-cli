@@ -309,6 +309,15 @@ outside git, a repository with no `origin`, or an `origin` that is a local path 
 empty; a longer path matches a longer `origin` path exactly (GitLab subgroups). An empty
 list admits nothing.
 
+An entry ending in `/*` collects every repository under that prefix on that host:
+`github.com/acme/*` admits `github.com/acme/api` and every other repository of acme on
+github.com, but not `github.com/acme` itself or `github.com/acmeco/api`; after a GitLab
+subgroup, `gitlab.com/acme/platform/*` admits every repository below that subgroup. The
+`*` is a whole last segment after at least a host and an owner, so `github.com/*` and
+`github.com/acme/terma-*` collect nothing. A list that holds one makes the team's policy
+2.x, which a terma from before wildcards refuses: it keeps the last policy it read for up
+to seven days, then collects nothing until updated (`terma update`).
+
 So a clone in any folder, a subdirectory of it, and a worktree of it at
 `.claude/worktrees/fix-1` are all collected by `github.com/acme/api` when origin is
 `git@github.com:acme/api.git` or `https://github.com/acme/api`; a fork whose origin is

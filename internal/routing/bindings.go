@@ -3,6 +3,8 @@ package routing
 import (
 	"errors"
 	"fmt"
+
+	"github.com/miradorlabs/terma-cli/internal/config"
 )
 
 // Binding is the developer's decision about an owner or a repository: bound to one
@@ -44,7 +46,7 @@ type Authority struct {
 // selected teams' entries, never storing it, so an organization adding an entry never
 // shadows a decision the developer made.
 func (s State) decided(repo string) Authority {
-	for _, key := range []string{repo, owner(repo)} {
+	for _, key := range []string{repo, Owner(repo)} {
 		if b, ok := s.Bindings[key]; ok {
 			if b.Refused {
 				return Authority{Kind: RefusedAll, Key: key}
@@ -59,8 +61,8 @@ func (s State) decided(repo string) Authority {
 // wildcard; its repository's, or its owner's, for an exact entry.
 func (s State) consents(e Entry, org string) bool {
 	keys := []string{e.Key()}
-	if !e.wildcard {
-		keys = append(keys, owner(e.key))
+	if !e.Wildcard() {
+		keys = append(keys, Owner(e.Key()))
 	}
 	for _, key := range keys {
 		if b, ok := s.Bindings[key]; ok && !b.Refused && b.Organization == org {
@@ -96,8 +98,8 @@ func (s *State) Bind(key, organization string, override bool) error {
 	if n := len(s.Teams); n > 0 && s.Teams[n-1].Personal && s.Teams[n-1].OrganizationID == organization {
 		return errors.New("nothing is bound to the personal organization: it collects what no organization is bound to")
 	}
-	if b, ok := s.Bindings[owner(key)]; ok && validRepo(key) && !override && (b.Refused || b.Organization != organization) {
-		return fmt.Errorf("%s is under %s, which is decided otherwise", key, owner(key))
+	if b, ok := s.Bindings[Owner(key)]; ok && config.IsRepositoryKey(key) && !override && (b.Refused || b.Organization != organization) {
+		return fmt.Errorf("%s is under %s, which is decided otherwise", key, Owner(key))
 	}
 	s.set(key, Binding{Organization: organization})
 	return nil
@@ -135,7 +137,7 @@ func (s *State) set(key string, b Binding) {
 // any form Normalize reads; a wildcard is never one, and an empty segment, a query or a
 // fragment is refused rather than folded away.
 func bindingKey(raw string) (string, error) {
-	if key := Normalize(raw); !reinterpreted(raw) && (isOwnerKey(key) || validRepo(key)) {
+	if key := Normalize(raw); !config.Reinterpreted(raw) && (config.IsOwnerKey(key) || config.IsRepositoryKey(key)) {
 		return key, nil
 	}
 	return "", fmt.Errorf("%q is neither an owner (host/owner) nor a repository (host/owner/name)", raw)

@@ -5,6 +5,8 @@ import (
 	"maps"
 	"slices"
 	"time"
+
+	"github.com/miradorlabs/terma-cli/internal/config"
 )
 
 // LocationKind is what is known about where a record ran.
@@ -110,13 +112,13 @@ func NewRouter(s State) *Router {
 				e, ok := ParseEntry(raw, t.Policy.Wildcards)
 				switch {
 				case !ok:
-				case e.wildcard:
+				case e.Wildcard():
 					c.wild = append(c.wild, e)
-				case c.exact[e.key].Raw == "":
-					c.exact[e.key] = e
+				case c.exact[e.Key()].Raw == "":
+					c.exact[e.Key()] = e
 				}
 			}
-			slices.SortStableFunc(c.wild, func(a, b Entry) int { return cmp.Compare(b.fixed, a.fixed) })
+			slices.SortStableFunc(c.wild, func(a, b Entry) int { return cmp.Compare(b.Fixed(), a.Fixed()) })
 		}
 		r.teams[i] = c
 	}
@@ -129,7 +131,7 @@ func (r *Router) match(i int, repo string) (Entry, bool) {
 		return e, true
 	}
 	for _, e := range r.teams[i].wild {
-		if e.matches(repo) {
+		if e.Matches(repo) {
 			return e, true
 		}
 	}
@@ -148,7 +150,7 @@ func (r *Router) Route(loc Location, now time.Time) Decision {
 	case OutsideGit:
 		return r.personal("", Authority{Kind: Free}, now)
 	case Repository:
-		if repo := Normalize(loc.Repository); validRepo(repo) {
+		if repo := Normalize(loc.Repository); config.IsRepositoryKey(repo) {
 			return r.repository(repo, now)
 		}
 		loc.Narrow = true
@@ -235,7 +237,7 @@ func (s State) unknownToPersonal(now time.Time) bool {
 // organization a run can share, so it reports pending. False when nothing collects or
 // binds it, and for a repository that names no repository, as Route holds it.
 func (r *Router) OrganizationOf(loc Location, now time.Time) (org string, pending, ok bool) {
-	if repo := Normalize(loc.Repository); loc.Kind == Repository && validRepo(repo) {
+	if repo := Normalize(loc.Repository); loc.Kind == Repository && config.IsRepositoryKey(repo) {
 		if a := r.s.decided(repo); a.Kind == Bound {
 			return a.Organization, false, true
 		}

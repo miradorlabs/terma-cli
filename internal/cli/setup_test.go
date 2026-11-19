@@ -214,6 +214,35 @@ func TestSetupAndDoctorSayWhenTheTeamHasNoPolicy(t *testing.T) {
 	}
 }
 
+// A team policy whose list holds a wildcard is stored as 2.x: setup on a fresh machine (the
+// desktop's connect step runs the same setup) reads it, says a wildcard collects every
+// repository under its owner, and keeps it marked so hooks and the relay admit by it.
+func TestSetupReadsAWildcardPolicy(t *testing.T) {
+	gateway := newFakeAuth(t)
+	gateway.policyBody = `{"policy":{"version":"2.0","terma":{"capture":{"exclude_prompts":false,"exclude_tool_content":false},"git_hooks":true,"per_repository":{"repositories":["github.com/Acme/*","github.com/other/api"]}}},"revision":4,"updated_at":"2026-11-19T00:00:00Z"}`
+	authSandbox(t, gateway)
+	sandboxMachine(t)
+	t.Setenv("CODEX_HOME", t.TempDir())
+	t.Setenv("TERMA_POLICY_STUB", "")
+	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(gateway, orgB())); err != nil {
+		t.Fatal(err)
+	}
+	out, err := runTerma(t, "setup", "--harness", "codex")
+	if err != nil {
+		t.Fatalf("setup: %v\n%s", err, out)
+	}
+	if want := "Collects      sessions in the team's repositories (every repository under github.com/Acme, github.com/other/api)"; !strings.Contains(out, want) {
+		t.Errorf("setup output lacks %q:\n%s", want, out)
+	}
+	loaded, err := testApp.loadConfig()
+	if err != nil || !loaded.Policy.Wildcards || loaded.Policy.Revision != 4 {
+		t.Fatalf("stored policy = %+v, %v; want the 2.0 policy, marked Wildcards", loaded.Policy, err)
+	}
+	if !loaded.Policy.Admits(config.Repository{Origin: "github.com/acme/web"}) || loaded.Policy.Admits(config.Repository{Origin: "github.com/someone/web"}) {
+		t.Errorf("the stored policy does not admit by its wildcard: %+v", loaded.Policy)
+	}
+}
+
 func TestHarnessSelectionComingSoon(t *testing.T) {
 	chosen := map[string]bool{}
 	for _, name := range testApp.agents.Names() {
