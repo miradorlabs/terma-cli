@@ -13845,7 +13845,7 @@
           ]
         },
         "0.2.2-rc.5": {
-          "captured_at": "2026-11-19T12:26:26.287960053Z",
+          "captured_at": "2026-11-19T18:36:41.812993134Z",
           "captured": true,
           "uses": [
             {
@@ -14225,7 +14225,7 @@
                         "preset": "workspace-write"
                       },
                       "seq": 0,
-                      "time": 1795091076590,
+                      "time": 1795113264405,
                       "type": "permission/preset"
                     },
                     {
@@ -14233,7 +14233,7 @@
                         "mode": "workspace-write"
                       },
                       "seq": 1,
-                      "time": 1795091076591,
+                      "time": 1795113264406,
                       "type": "sandbox/mode"
                     },
                     {
@@ -14241,7 +14241,7 @@
                         "policy": "ask"
                       },
                       "seq": 2,
-                      "time": 1795091076591,
+                      "time": 1795113264407,
                       "type": "approval/policy"
                     },
                     {
@@ -14265,7 +14265,7 @@
                         "target": "next-turn"
                       },
                       "seq": 3,
-                      "time": 1795091076592,
+                      "time": 1795113264408,
                       "type": "agent/inbox/spliced"
                     },
                     {
@@ -14273,7 +14273,7 @@
                         "turn": 1
                       },
                       "seq": 4,
-                      "time": 1795091076593,
+                      "time": 1795113264408,
                       "type": "turn/start"
                     },
                     {
@@ -14284,7 +14284,7 @@
                         "target": "next-turn"
                       },
                       "seq": 5,
-                      "time": 1795091076593,
+                      "time": 1795113264408,
                       "type": "agent/inbox/spliced"
                     },
                     {
@@ -14293,7 +14293,7 @@
                         "turn": 1
                       },
                       "seq": 6,
-                      "time": 1795091076635,
+                      "time": 1795113264443,
                       "type": "step/start"
                     },
                     {
@@ -14316,7 +14316,7 @@
                       },
                       "seq": 7,
                       "surfaceOp": "append",
-                      "time": 1795091076637,
+                      "time": 1795113264450,
                       "type": "system/message"
                     },
                     {
@@ -14335,7 +14335,7 @@
                       },
                       "seq": 8,
                       "surfaceOp": "append",
-                      "time": 1795091076637,
+                      "time": 1795113264451,
                       "type": "user/message"
                     },
                     {
@@ -14373,7 +14373,7 @@
                       },
                       "seq": 9,
                       "surfaceOp": "append",
-                      "time": 1795091076638,
+                      "time": 1795113264459,
                       "type": "user/message"
                     },
                     {
@@ -15005,7 +15005,7 @@
                         "reason": "initial"
                       },
                       "seq": 10,
-                      "time": 1795091076639,
+                      "time": 1795113264462,
                       "type": "request/header"
                     },
                     {
@@ -15016,7 +15016,7 @@
                         "systemPromptUpdate": "in-history"
                       },
                       "seq": 11,
-                      "time": 1795091076640,
+                      "time": 1795113264466,
                       "type": "request/context"
                     },
                     {
@@ -15030,7 +15030,7 @@
                         "title": "<prompt>"
                       },
                       "seq": 12,
-                      "time": 1795091076642,
+                      "time": 1795113264476,
                       "type": "session/title"
                     },
                     {
@@ -15063,12 +15063,12 @@
                         "titleProvider": "session-title-first-prompt-llm"
                       },
                       "seq": 13,
-                      "time": 1795091076643,
+                      "time": 1795113264482,
                       "type": "session/title-llm-request"
                     }
                   ],
                   "session": {
-                    "createdAt": 1795091076587,
+                    "createdAt": 1795113264400,
                     "cwd": "<repo>",
                     "id": "session-<uuid>",
                     "version": 4
