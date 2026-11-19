@@ -16,7 +16,7 @@ import (
 // Native points an agent's own OTLP exporter at the relay with all content; the relay
 // withholds it per the team's policy.
 func Native(h harness.Harness, cfg agents.RelayConfig) (agents.RelayResult, error) {
-	return agents.RelayResult{}, h.Connect(harness.Exporter{Endpoint: cfg.Endpoint, APIKey: cfg.Token, Signals: harness.AllSignals}, true)
+	return agents.RelayResult{}, h.Connect(harness.Exporter{Endpoint: cfg.Endpoint, APIKey: cfg.Token, Signals: harness.AllSignals, HookCommand: cfg.HookCommand}, true)
 }
 
 // Unnative undoes Native, restoring the agent's own exporter settings from its journal,

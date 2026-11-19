@@ -15,7 +15,7 @@ import (
 // A machine refresh carries on past an agent that fails, and names it.
 func TestTheMachineRefreshCarriesOnPastAFailure(t *testing.T) {
 	t.Parallel()
-	r := Refresher{Version: "v1.2.3", Agents: agents.New(
+	r := Refresher{Version: "v1.2.3", Terma: termaAt, Agents: agents.New(
 		agentstest.Refreshing{Agent: agentstest.Agent{ID: "broken"}, Err: errors.New("permission denied")},
 		agentstest.Refreshing{Agent: agentstest.Agent{ID: "fine"}, Path: "/home/dev/.fine/settings.json"},
 		agentstest.Refreshing{Agent: agentstest.Agent{ID: "current"}},
@@ -33,11 +33,11 @@ func TestTheMachineRefreshCarriesOnPastAFailure(t *testing.T) {
 func TestAnUpgradeRefreshesOnceAndRetriesAFailure(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	failing := Refresher{StateDir: dir, Version: "v3.0.0", Agents: agents.New(agentstest.Refreshing{Agent: agentstest.Agent{ID: "a"}, Err: errors.New("busy")})}
+	failing := Refresher{StateDir: dir, Version: "v3.0.0", Terma: termaAt, Agents: agents.New(agentstest.Refreshing{Agent: agentstest.Agent{ID: "a"}, Err: errors.New("busy")})}
 	if up, err := failing.AfterUpgrade(t.Context()); !up.Due || err == nil {
 		t.Fatalf("AfterUpgrade = %+v, %v", up, err)
 	}
-	fine := Refresher{StateDir: dir, Version: "v3.0.0", Agents: agents.New(agentstest.Refreshing{Agent: agentstest.Agent{ID: "a"}, Path: "/x"})}
+	fine := Refresher{StateDir: dir, Version: "v3.0.0", Terma: termaAt, Agents: agents.New(agentstest.Refreshing{Agent: agentstest.Agent{ID: "a"}, Path: "/x"})}
 	if up, err := fine.AfterUpgrade(t.Context()); !up.Due || err != nil || len(up.Changed) != 1 {
 		t.Fatalf("the retry = %+v, %v", up, err)
 	}
@@ -51,14 +51,14 @@ func TestAnUpgradeRefreshesOnceAndRetriesAFailure(t *testing.T) {
 func TestARefreshRecordsTheBuildOnlyWhenNothingFailed(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	failing := Refresher{StateDir: dir, Version: "v4.0.0", Agents: agents.New(agentstest.Refreshing{Agent: agentstest.Agent{ID: "a"}, Err: errors.New("busy")})}
+	failing := Refresher{StateDir: dir, Version: "v4.0.0", Terma: termaAt, Agents: agents.New(agentstest.Refreshing{Agent: agentstest.Agent{ID: "a"}, Err: errors.New("busy")})}
 	if _, err := failing.Run(t.Context()); err == nil {
 		t.Fatal("Run did not report the failure")
 	}
 	if !selfupdate.NeedsRefresh(dir, "v4.0.0") {
 		t.Fatal("a failed refresh was recorded")
 	}
-	fine := Refresher{StateDir: dir, Version: "v4.0.0", Agents: agents.New(agentstest.Refreshing{Agent: agentstest.Agent{ID: "a"}, Path: "/x"})}
+	fine := Refresher{StateDir: dir, Version: "v4.0.0", Terma: termaAt, Agents: agents.New(agentstest.Refreshing{Agent: agentstest.Agent{ID: "a"}, Path: "/x"})}
 	if changed, err := fine.Run(t.Context()); err != nil || len(changed) != 1 {
 		t.Fatalf("Run = %v, %v", changed, err)
 	}
@@ -73,13 +73,13 @@ func TestARefreshRewritesAStaleRelayService(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	calls := 0
-	stale := Refresher{StateDir: dir, Version: "v5.0.0", Agents: agents.New(agentstest.Refreshing{Agent: agentstest.Agent{ID: "a"}, Path: "/x"}),
+	stale := Refresher{StateDir: dir, Version: "v5.0.0", Terma: termaAt, Agents: agents.New(agentstest.Refreshing{Agent: agentstest.Agent{ID: "a"}, Path: "/x"}),
 		RelayService: func(context.Context) (string, bool, error) { calls++; return "/svc.plist", true, nil }}
 	changed, err := stale.Run(t.Context())
 	if err != nil || calls != 1 || !slices.Equal(changed, []string{"/x", "/svc.plist"}) {
 		t.Fatalf("Run = %v, %v after %d service refreshes", changed, err, calls)
 	}
-	current := Refresher{StateDir: dir, Version: "v5.0.0", Agents: agents.New(agentstest.Agent{ID: "a"}),
+	current := Refresher{StateDir: dir, Version: "v5.0.0", Terma: termaAt, Agents: agents.New(agentstest.Agent{ID: "a"}),
 		RelayService: func(context.Context) (string, bool, error) { return "/svc.plist", false, nil }}
 	if changed, err := current.Run(t.Context()); err != nil || len(changed) != 0 {
 		t.Fatalf("a current service was reported refreshed: %v, %v", changed, err)
@@ -91,7 +91,7 @@ func TestARefreshRewritesAStaleRelayService(t *testing.T) {
 func TestAFailedRelayServiceRefreshIsRetried(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	broken := Refresher{StateDir: dir, Version: "v6.0.0", Agents: agents.New(agentstest.Refreshing{Agent: agentstest.Agent{ID: "a"}, Path: "/x"}),
+	broken := Refresher{StateDir: dir, Version: "v6.0.0", Terma: termaAt, Agents: agents.New(agentstest.Refreshing{Agent: agentstest.Agent{ID: "a"}, Path: "/x"}),
 		RelayService: func(context.Context) (string, bool, error) {
 			return "", false, errors.New("launchctl bootstrap: denied")
 		}}
@@ -106,5 +106,35 @@ func TestAFailedRelayServiceRefreshIsRetried(t *testing.T) {
 	fixed.RelayService = func(context.Context) (string, bool, error) { return "/svc.plist", true, nil }
 	if up, err := fixed.AfterUpgrade(t.Context()); err != nil || !slices.Contains(up.Changed, "/svc.plist") {
 		t.Fatalf("the retry = %+v, %v", up, err)
+	}
+}
+
+// termaAt is where the refreshed files run terma.
+func termaAt() (string, error) { return "/usr/local/bin/terma", nil }
+
+// pathRecorder is a refreshing agent that records the terma path it was handed.
+type pathRecorder struct {
+	agentstest.Agent
+	got *string
+}
+
+func (p pathRecorder) RefreshMachine(terma string) (string, bool, error) {
+	*p.got = terma
+	return "", false, nil
+}
+
+// Every agent's files are rewritten to run terma at the path the refresh names, and a
+// refresh that cannot name one rewrites nothing.
+func TestARefreshHandsTheAgentsTermasPath(t *testing.T) {
+	t.Parallel()
+	var got string
+	r := Refresher{Version: "v7.0.0", Terma: termaAt, Agents: agents.New(pathRecorder{Agent: agentstest.Agent{ID: "a"}, got: &got})}
+	if _, err := r.Machine(); err != nil || got != "/usr/local/bin/terma" {
+		t.Fatalf("Machine: terma %q, err %v", got, err)
+	}
+	got = ""
+	r.Terma = func() (string, error) { return "", errors.New("no executable") }
+	if _, err := r.Machine(); err == nil || got != "" {
+		t.Fatalf("Machine without terma's path: terma %q, err %v", got, err)
 	}
 }
