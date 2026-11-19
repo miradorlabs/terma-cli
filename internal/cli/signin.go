@@ -181,11 +181,8 @@ func (app *App) storeLogin(ctx context.Context, cfg *config.Config, cred *auth.C
 		_ = app.revokeSession(ctx, cfg, cred)
 		return err
 	}
-	// Best-effort, and silent: the superseded session may already be dead, often why the
-	// user is here. One whose access token has expired, or expires within a minute, is
-	// not revoked either: the store now holds the new sign-in, so its refresh token is
-	// never sent again (the client's session expired error). It stays listed on the server
-	// until its refresh token expires, unused.
+	// Best-effort and silent: the superseded session may already be dead. One whose access token
+	// has (nearly) expired isn't revoked: its refresh token is never sent again, so it idles out.
 	if replaced != nil {
 		_ = app.revokeSession(ctx, cfg, replaced)
 	}
