@@ -1,7 +1,39 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-19T20:47:56.991304754Z",
+  "generated_at": "2026-11-19T21:21:27.014767978Z",
   "versions": [
+    {
+      "harness": "gemini",
+      "name": "Gemini CLI",
+      "version": "0.70.0",
+      "released_at": "2026-11-19T21:13:43.733Z",
+      "captured_at": "2026-11-19T21:21:27.014767978Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "0.69.0",
+      "changes": 2,
+      "categories": {
+        "request": 1,
+        "storage": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 2,
+        "notable": 0
+      },
+      "undocumented": 1,
+      "highlights": [
+        "Header x-goog-api-client: google-genai-sdk/1.30.0 gl-node/v24.22.2 → google-genai-sdk/1.30.0 gl-node/v24.22.3",
+        "On-disk transcript path changed"
+      ],
+      "signing": null,
+      "partial": true,
+      "attempted_at": "2026-11-19T21:21:27.014767978Z",
+      "attempts": 1
+    },
     {
       "harness": "claude",
       "name": "Claude Code",
@@ -6173,30 +6205,6 @@
         "Behaviour: compaction removed",
         "Behaviour: sandbox approval added"
       ],
-      "signing": "valid"
-    },
-    {
-      "harness": "claude",
-      "name": "Claude Code",
-      "version": "2.1.214",
-      "released_at": "2026-07-18T00:13:41.661Z",
-      "captured_at": "2026-11-05T09:54:28.532441Z",
-      "platforms": [
-        "darwin/arm64",
-        "linux/amd64"
-      ],
-      "support": "untested",
-      "previous": "2.1.213",
-      "changes": 0,
-      "categories": {},
-      "impact": {
-        "breaking": 0,
-        "degrading": 0,
-        "informational": 0,
-        "notable": 0
-      },
-      "undocumented": 0,
-      "highlights": [],
       "signing": "valid"
     }
   ]

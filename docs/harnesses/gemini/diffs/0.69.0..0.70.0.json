@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "harness": "gemini",
+  "from": "0.69.0",
+  "to": "0.70.0",
+  "generated_at": "2026-11-19T21:21:27.014767978Z",
+  "source": {
+    "compare": "https://github.com/google-gemini/gemini-cli/compare/v0.69.0...v0.70.0"
+  },
+  "changelog": {
+    "url": "https://github.com/google-gemini/gemini-cli/releases/tag/v0.70.0",
+    "text": "## What's Changed\n* Changelog for v0.69.0-preview.0 by @gemini-cli-robot in https://github.com/google-gemini/gemini-cli/pull/30222\n* Changelog for v0.68.0 by @gemini-cli-robot in https://github.com/google-gemini/gemini-cli/pull/30224\n* chore(release): bump version to 0.70.0-nightly.20261110.g1603e9bab by @gemini-cli-robot in https://github.com/google-gemini/gemini-cli/pull/30223\n* test(cli): remove redundant lowercase restart test in AdminSettingsChangedDialog by @luisfelipe-alt in https://github.com/google-gemini/gemini-cli/pull/30221\n* fix(cli): preserve Unicode prompts and strip ANSI fragments in session previews (#29915) by @urielefrenvirtusa in https://github.com/google-gemini/gemini-cli/pull/30220\n* fix(cli): preserve selected worktree across authentication restarts (#30078) by @duvanka-prasad in https://github.com/google-gemini/gemini-cli/pull/30176\n* fix(core): preserve interrupted placeholder after empty model responses to tool turns by @tadipavan in https://github.com/google-gemini/gemini-cli/pull/30228\n* fix(cli): apply default in ${VAR:-default} when variable is set but empty by @urielefrenvirtusa in https://github.com/google-gemini/gemini-cli/pull/30250\n* fix(core): scale undici bodyTimeout when request timeout exceeds 300s default by @tadipavan in https://github.com/google-gemini/gemini-cli/pull/30258\n* fix(core,cli): report accurate output token limits in models list by @tadipavan in https://github.com/google-gemini/gemini-cli/pull/30253\n* fix(cli): restore workspace directories only after resumeChat succeeds by @urielefrenvirtusa in https://github.com/google-gemini/gemini-cli/pull/30259\n* fix(core,cli): scope foreground retry status to active main prompt and current model policy by @tadipavan in https://github.com/google-gemini/gemini-cli/pull/30266\n* fix(cli): initialize auth capabilities and deduplicate options when listing models by @tadipavan in https://github.com/google-gemini/gemini-cli/pull/30271\n* fix(cli): skip system MCP servers with insecure command permissions by @elberthc-byte in https://github.com/google-gemini/gemini-cli/pull/30283\n* refactor(core): use re2js for linear-time policy argsPattern evaluation by @diegogodinezr in https://github.com/google-gemini/gemini-cli/pull/30282\n* chore(deps): update workspace dependencies and sandbox runtime packages by @DavidAPierce in https://github.com/google-gemini/gemini-cli/pull/30321\n* fix(cli): disclose canonical link path and default consent prompt to no by @jvargassanchez-dot in https://github.com/google-gemini/gemini-cli/pull/30289\n* fix(cli): detect local git clone from CLI path instead of cwd by @tadipavan in https://github.com/google-gemini/gemini-cli/pull/30315\n* fix(ide): use per-user discovery directory and atomic port file writes by @villahernandez-coder in https://github.com/google-gemini/gemini-cli/pull/30340\n* ci: pre-pull triage image and clear Docker login in dedup workflows by @diegogodinezr in https://github.com/google-gemini/gemini-cli/pull/30342\n* fix(core): keep ASK_USER for shell commands with unresolved expansion by @luisfelipe-alt in https://github.com/google-gemini/gemini-cli/pull/30338\n* fix(core): match commandPrefix and commandRegex rules against the top-level command argument by @luisfelipe-alt in https://github.com/google-gemini/gemini-cli/pull/30355\n* chore(deps): adjust workspace dependency pins and update simple-git by @DavidAPierce in https://github.com/google-gemini/gemini-cli/pull/30356\n\n\n**Full Changelog**: https://github.com/google-gemini/gemini-cli/compare/v0.69.0...v0.70.0"
+  },
+  "summary": {
+    "changes": 2,
+    "categories": {
+      "request": 1,
+      "storage": 1
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 2,
+      "notable": 0
+    },
+    "undocumented": 1
+  },
+  "changes": [
+    {
+      "id": "request.headers.x-goog-api-client",
+      "category": "request",
+      "op": "changed",
+      "path": [
+        "request",
+        "headers",
+        "x-goog-api-client"
+      ],
+      "title": "Header x-goog-api-client: google-genai-sdk/1.30.0 gl-node/v24.22.2 → google-genai-sdk/1.30.0 gl-node/v24.22.3",
+      "impact": "informational",
+      "before": "google-genai-sdk/1.30.0 gl-node/v24.22.2",
+      "after": "google-genai-sdk/1.30.0 gl-node/v24.22.3",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "storage.transcript.path",
+      "category": "storage",
+      "op": "changed",
+      "path": [
+        "storage",
+        "transcript",
+        "path"
+      ],
+      "title": "On-disk transcript path changed",
+      "impact": "informational",
+      "before": "<home>/.gemini<tmp><time>a<n>.jsonl",
+      "after": "<home>/.gemini<tmp><time>67f72f.jsonl",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    }
+  ]
+}
