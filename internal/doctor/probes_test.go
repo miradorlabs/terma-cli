@@ -208,6 +208,35 @@ func TestTheBackendCheckTellsThisProjectFromAnother(t *testing.T) {
 	}
 }
 
+// An image that did not finish uploading is the uplink, not the host, and images leave in
+// the background: the check warns for one, this team's or another's, and never fails.
+func TestTheBackendCheckWarnsForAStalledImage(t *testing.T) {
+	t.Parallel()
+	keys := Keys(func(string, string) string { return "ter_srv_…" })
+	at := time.Now().Add(time.Minute)
+	for _, project := range []string{"p1", "p2"} {
+		for _, stalled := range []bool{true, false} {
+			images := ImageQueue{Queued: 1, Windows: map[string]time.Time{project: at}, Stalled: map[string]bool{project: stalled}}
+			p := Probes{Keys: keys, Endpoint: func(string) string { return "https://otlp.example" },
+				Deliver: func(context.Context) (Delivery, error) {
+					return Delivery{Sent: 1, Delivered: "1 event", Images: images}, nil
+				}}
+			c := BackendCheck(t.Context(), p, "p1")
+			whose := "one of this team's images"
+			if project != "p1" {
+				whose = "one of another team's (p2) images"
+			}
+			want := whose + " was not delivered"
+			if stalled {
+				want = whose + " did not finish uploading"
+			}
+			if c.Status != Warn || !strings.Contains(c.Detail, want) {
+				t.Errorf("%s's images, stalled %v: %+v", project, stalled, c)
+			}
+		}
+	}
+}
+
 // status says what doctor would, from local state alone.
 func TestStatusSaysWhatDoctorWould(t *testing.T) {
 	t.Parallel()

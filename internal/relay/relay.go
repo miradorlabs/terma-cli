@@ -104,6 +104,19 @@ type Options struct {
 	// by itself, sent on its record as terma.update.auto: the developer can turn automatic
 	// updates on or off while the relay runs.
 	UpdateAuto func() string
+	// Accepted, set, is told of each export the relay accepted, as it is answered; it must
+	// not block. The image sender wakes on it: an agent's export is how its turn ends.
+	Accepted func()
+	// Halt, set, stops work beside the engine (the image sender) if it is between two pieces
+	// of it, and reports whether it did: an idle exit, a quiesce and making way ask it last,
+	// once nothing else keeps the relay, and wait while it says no. final says the relay
+	// goes whatever happens (a restart, making way): the work then starts nothing new, and
+	// stops at the end of the piece under way. Nil always halts. It runs under the relay's
+	// lock: it must neither block nor call the relay.
+	Halt func(final bool) bool
+	// Resume, set, undoes a final halt the relay asked for and then did not stop for (an
+	// export came, or a part was held): the work goes on. Under the relay's lock, as Halt.
+	Resume func()
 	// Logf, when set, is told why each part that could not leave was dropped (TERMA_RELAY_DEBUG=1).
 	Logf func(format string, args ...any)
 	// Warnf, when set, is told what an operator should see whatever the debug setting: a
@@ -133,8 +146,11 @@ type Relay struct {
 	lastSeen  time.Time
 	// inflight counts the exports being read and routed; refusing, set by Quiesce, answers
 	// each new one 503 so its exporter sends it again, to the next relay.
-	inflight   int
-	refusing   bool
+	inflight int
+	refusing bool
+	// haltAsked says a final halt was asked of the work beside the engine and not yet
+	// resumed (finalHalt, resume).
+	haltAsked  bool
 	wg         sync.WaitGroup
 	sendCtx    context.Context
 	cancelSend context.CancelFunc
@@ -331,6 +347,9 @@ func (r *Relay) export(w http.ResponseWriter, req *http.Request, s Signal) {
 			p.session = procKey(pid)
 		}
 		r.route(p)
+	}
+	if r.opts.Accepted != nil {
+		r.opts.Accepted()
 	}
 	// An empty success response is valid OTLP in either encoding.
 	if isJSON {

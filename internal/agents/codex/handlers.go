@@ -78,6 +78,7 @@ func notifyHook(ctx context.Context, env hookrun.Env) error {
 	turn := &codexHookInput{SessionID: id, Cwd: n.Cwd, Model: n.Model, TurnID: n.TurnID}
 	captureCodexFunding(ctx, env, r, turn)
 	captureCodexDesktopActivity(ctx, env, r, turn)
+	captureCodexImages(ctx, env, r, turn)
 	captureCodexTitle(ctx, env, r, turn, captureCodexReplies(ctx, env, r, turn))
 	// Not announce: notify fires every turn and does not age out manifests.
 	sess := env.NewSession(r, id, codexTool, n.Model)
@@ -183,6 +184,7 @@ func stop(ctx context.Context, env hookrun.Env) error {
 	settleExpected(env, r, in.SessionID)
 	captureCodexFunding(ctx, env, r, in)
 	captureCodexDesktopActivity(ctx, env, r, in)
+	captureCodexImages(ctx, env, r, in)
 	captureCodexTitle(ctx, env, r, in, captureCodexReplies(ctx, env, r, in))
 	return nil
 }
@@ -202,6 +204,7 @@ func sessionEnd(ctx context.Context, env hookrun.Env) error {
 	// The end is spooled after the evidence.
 	captureCodexFunding(ctx, env, r, in)
 	captureCodexDesktopActivity(ctx, env, r, in)
+	captureCodexImages(ctx, env, r, in)
 	captureCodexTitle(ctx, env, r, in, captureCodexReplies(ctx, env, r, in))
 	env.EndSession(r, in.SessionID, codexTool)
 	return nil
@@ -226,6 +229,7 @@ func postToolUse(ctx context.Context, env hookrun.Env) error {
 	}
 	captureCodexFunding(ctx, env, r, in)
 	captureCodexDesktopActivity(ctx, env, r, in)
+	captureCodexImages(ctx, env, r, in)
 	captureCodexTitle(ctx, env, r, in, captureCodexReplies(ctx, env, r, in))
 	candidates, commits := codexEditedPaths(in, env.Cwd)
 	if len(candidates) == 0 {

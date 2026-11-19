@@ -142,10 +142,18 @@ func (s *Spool) Flush(ctx context.Context, sender Sender, opts FlushOptions) Res
 				return res
 			}
 		}
-		// One atomic rewrite acknowledges the batch and requeues; if cancelled, the batch replays.
+		// One atomic rewrite acknowledges the batch and requeues; if cancelled, the batch
+		// replays. A pass that only ran out of time still acknowledges what was sent: a batch
+		// that replays resends what already went, and holds up everything queued behind it.
 		requeue := slices.Concat(held, undelivered)
 		if batchResult.Consumed > 0 {
-			if err := s.ackBatch(ctx, batchResult.Consumed, batchResult.Prefix, requeue); err != nil {
+			ackCtx, cancel := ctx, context.CancelFunc(func() {})
+			if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+				ackCtx, cancel = context.WithTimeout(context.WithoutCancel(ctx), ackTimeout)
+			}
+			err := s.ackBatch(ackCtx, batchResult.Consumed, batchResult.Prefix, requeue)
+			cancel()
+			if err != nil {
 				return stop(err)
 			}
 		}

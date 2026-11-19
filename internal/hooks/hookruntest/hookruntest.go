@@ -122,6 +122,43 @@ func Project(t *testing.T) (root, stateDir string, sp *spool.Spool) {
 	return root, t.TempDir(), sp
 }
 
+// Spool is a private spool, such as the image lane's beside Project's.
+func Spool(t *testing.T) *spool.Spool {
+	t.Helper()
+	sp, err := spool.Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	return sp
+}
+
+// Queue is a private image queue, such as the image lane's beside Project's spool.
+func Queue(t *testing.T) *spool.Queue {
+	t.Helper()
+	q, err := spool.OpenQueue(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	return q
+}
+
+// Queued takes every event q holds, in order, as Spooled does a spool's.
+func Queued(t *testing.T, q *spool.Queue) []spool.Event {
+	t.Helper()
+	pending, _, _, err := q.Read(context.Background(), spooledAsOf)
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	if err := q.Remove(pending...); err != nil {
+		t.Fatalf("remove: %v", err)
+	}
+	events := make([]spool.Event, len(pending))
+	for i, p := range pending {
+		events[i] = p.Event
+	}
+	return events
+}
+
 // Named is the events called name, in order.
 func Named(events []spool.Event, name string) []spool.Event {
 	var out []spool.Event

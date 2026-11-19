@@ -391,3 +391,97 @@ func runsThis(t *testing.T, yes bool) {
 	serviceRunsThis = func(string) bool { return yes }
 	t.Cleanup(func() { serviceRunsThis = was })
 }
+
+// A relay asked to make way while an image is on its way waits for it: the image would be
+// sent again whole by the next relay.
+func TestAReplacedRelayWaitsForAnUpload(t *testing.T) {
+	stateDir, dir, _ := setUpRelay(t)
+	c := runConfig(stateDir, 0, nil)
+	var uploading atomic.Bool
+	uploading.Store(true)
+	asked := make(chan struct{}, 1)
+	c.Engine.Halt = func(bool) bool {
+		select {
+		case asked <- struct{}{}:
+		default:
+		}
+		return !uploading.Load()
+	}
+	r := startRun(t, c)
+	awaitRecord(t, r, dir)
+	askToMakeWay(t, dir)
+	// Once the relay has asked the work beside it to halt and been told no, it must not go.
+	select {
+	case <-asked:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the relay never asked the work beside it to halt")
+	}
+	select {
+	case <-r.done:
+		t.Fatalf("the relay stepped aside mid-upload: %+v", r.res)
+	default:
+	}
+	uploading.Store(false)
+	select {
+	case <-r.done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the relay kept running once the upload was over")
+	}
+	if !r.res.Replaced {
+		t.Fatalf("Run = %+v, want Replaced", r.res)
+	}
+}
+
+// A relay asked to make way halts the work beside it before it goes.
+func TestAReplacedRelayHaltsItsWork(t *testing.T) {
+	stateDir, dir, _ := setUpRelay(t)
+	c := runConfig(stateDir, 0, nil)
+	var halted atomic.Bool
+	c.Engine.Halt = func(final bool) bool { halted.Store(final); return true }
+	r := startRun(t, c)
+	awaitRecord(t, r, dir)
+	askToMakeWay(t, dir)
+	select {
+	case <-r.done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the relay did not make way")
+	}
+	if !halted.Load() || !r.res.Replaced {
+		t.Fatalf("Run = %+v, halted for good %v", r.res, halted.Load())
+	}
+}
+
+// An idle relay waits for an image on its way before it exits.
+func TestAnIdleRelayWaitsForAnUpload(t *testing.T) {
+	stateDir, dir, _ := setUpRelay(t)
+	c := runConfig(stateDir, time.Millisecond, nil)
+	var uploading atomic.Bool
+	uploading.Store(true)
+	asked := make(chan struct{}, 1)
+	c.Engine.Halt = func(bool) bool {
+		select {
+		case asked <- struct{}{}:
+		default:
+		}
+		return !uploading.Load()
+	}
+	r := startRun(t, c)
+	awaitRecord(t, r, dir)
+	// Once the relay has asked the work beside it to halt and been told no, it must not go.
+	select {
+	case <-asked:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the relay never asked the work beside it to halt")
+	}
+	select {
+	case <-r.done:
+		t.Fatalf("the relay idled out mid-upload: %+v", r.res)
+	default:
+	}
+	uploading.Store(false)
+	select {
+	case <-r.done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the relay kept running once the upload was over")
+	}
+}

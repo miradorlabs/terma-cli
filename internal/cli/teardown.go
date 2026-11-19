@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -18,6 +19,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	termaproject "github.com/miradorlabs/terma-cli/internal/project"
+	"github.com/miradorlabs/terma-cli/internal/promptimage"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
 	"github.com/miradorlabs/terma-cli/internal/spool"
@@ -147,17 +149,72 @@ func (app *App) undoSetup(ctx context.Context, out io.Writer, keepToken bool) er
 	return nil
 }
 
-// removeHookState removes what hooks kept per session, which only they would prune, and
-// the policies they ran under.
+// removeHookState removes what hooks kept per session, which only they would prune, what
+// they queued, the images among it, and the policies they ran under.
 func (app *App) removeHookState() error {
+	names := append(app.hookStateDirs(), hookrun.AgentsDir, termaproject.WorkspacesDir, spool.Dir, config.PoliciesDir)
+	// An image still being sent keeps its queue and bytes: removing them under the sender
+	// would let it write the queue back. Teardown's warning says to run it again.
+	sending := app.discardImages()
+	switch {
+	case sending == nil:
+		names = append(names, spool.ImageDir, promptimage.DirName)
+	case errors.Is(sending, errImageBytesKept):
+		// The queue was emptied: only the bytes are left, for the next teardown.
+		names = append(names, spool.ImageDir)
+	}
 	var errs []error
-	for _, name := range append(app.hookStateDirs(), hookrun.AgentsDir, termaproject.WorkspacesDir, spool.Dir, config.PoliciesDir) {
+	for _, name := range names {
 		errs = append(errs, os.RemoveAll(filepath.Join(app.stateDir, name)))
 	}
 	if err := errors.Join(errs...); err != nil {
 		return fmt.Errorf("remove the hooks' state: %w", err)
 	}
-	return nil
+	switch {
+	case sending == nil:
+		return nil
+	case errors.Is(sending, context.DeadlineExceeded):
+		return errors.New("an image is still being sent, so its queue is kept")
+	case errors.Is(sending, errImageBytesKept):
+		return sending
+	default:
+		return fmt.Errorf("the image queue is kept: %w", sending)
+	}
+}
+
+// errImageBytesKept is an emptied image queue whose images' bytes could not all be removed.
+var errImageBytesKept = errors.New("the images' bytes were not all removed")
+
+// defaultImageSendWait is how long teardown waits for an image being sent.
+const defaultImageSendWait = 10 * time.Second
+
+// discardImages empties the image queue and removes the images' bytes once no image is being
+// sent, waiting briefly for one that is: the relay has stopped, cutting its upload off, but a
+// manual `terma spool flush --images` stops before its next image only, and Windows keeps the
+// image queue while its lock is open. Both go under the queue's delivery lock, so a flush
+// waiting for it finds nothing left to send. It says when an image is still uploading after
+// the wait.
+func (app *App) discardImages() error {
+	dir := filepath.Join(app.stateDir, spool.ImageDir)
+	if _, err := os.Stat(dir); err != nil {
+		return nil
+	}
+	s, err := spool.OpenQueue(dir)
+	if err != nil {
+		return nil
+	}
+	wait := app.imageSendWait
+	if wait == 0 {
+		wait = defaultImageSendWait
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), wait)
+	defer cancel()
+	return s.Discard(ctx, func() error {
+		if err := os.RemoveAll(filepath.Join(app.stateDir, promptimage.DirName)); err != nil {
+			return fmt.Errorf("%w: %w", errImageBytesKept, err)
+		}
+		return nil
+	})
 }
 
 // retireRelayToken removes the relay's token, keeping it for this sign-in when keep.
