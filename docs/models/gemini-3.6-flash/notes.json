@@ -33,6 +33,24 @@
   ],
   "changes": [
     {
+      "id": "facts/features/tool retrieval",
+      "category": "facts",
+      "op": "added",
+      "path": [
+        "facts",
+        "features",
+        "tool retrieval"
+      ],
+      "title": "Feature added: tool retrieval",
+      "impact": "notable",
+      "before": null,
+      "after": "tool retrieval",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
       "id": "facts/knowledge_cutoff",
       "category": "facts",
       "op": "changed",
@@ -51,6 +69,7 @@
     }
   ],
   "highlights": [
+    "Feature added: tool retrieval",
     "Knowledge cutoff: 2025-01 → 2026-03"
   ]
 }

@@ -1,7 +1,43 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-19T03:28:01.177600021Z",
+  "generated_at": "2026-11-19T18:16:55.34160588Z",
   "events": [
+    {
+      "at": "2026-11-19T18:16:55.34160588Z",
+      "model": "gemini-4-argon",
+      "vendor": "google",
+      "name": "Gemini 4 Argon",
+      "event": "changed",
+      "changes": 2,
+      "highlights": [
+        "Feature added: tool retrieval",
+        "Model page changed (+132 −0 chars)"
+      ]
+    },
+    {
+      "at": "2026-11-19T18:16:55.34160588Z",
+      "model": "gemini-3.8-flash",
+      "vendor": "google",
+      "name": "Gemini 3.8 Flash",
+      "event": "changed",
+      "changes": 2,
+      "highlights": [
+        "Feature added: tool retrieval",
+        "Model page changed (+132 −0 chars)"
+      ]
+    },
+    {
+      "at": "2026-11-19T18:16:55.34160588Z",
+      "model": "gemini-3.6-flash",
+      "vendor": "google",
+      "name": "Gemini 3.6 Flash",
+      "event": "changed",
+      "changes": 2,
+      "highlights": [
+        "Feature added: tool retrieval",
+        "Model page changed (+132 −0 chars)"
+      ]
+    },
     {
       "at": "2026-11-19T03:28:01.177600021Z",
       "model": "claude-mythos-5-1",
