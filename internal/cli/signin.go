@@ -214,13 +214,25 @@ func (app *App) reuseStoredSessionIf(ctx context.Context, cfg *config.Config, wa
 	if err != nil || cred.CheckEnvironment(cfg.AuthURL) != nil || cred.RefreshToken == "" {
 		return nil, false, nil
 	}
-
-	verified, identity, err := app.verifyCredential(ctx, cfg, cred)
-	if errors.Is(err, auth.ErrNotLoggedIn) {
-		_ = auth.DeleteCredentialFor(app.dir, cfg.ProfileName, cred.OrganizationID)
+	// A refresh of it went unanswered too long ago to send its token again: whoami may
+	// still take its access token, but it could never be refreshed. A new sign-in replaces it.
+	if api.RefreshLost(cred) {
 		return nil, false, nil
 	}
-	if err != nil {
+
+	verified, identity, err := app.verifyCredential(ctx, cfg, cred)
+	switch {
+	case api.RefreshUnsettled(err):
+		// Its token may still be alive: left for the fresh sign-in to replace.
+		return nil, false, nil
+	case errors.Is(err, auth.ErrNotLoggedIn):
+		// Removed only while the store still holds the pair that was refused: one another
+		// process has rotated in since, or a new sign-in, stays.
+		_ = auth.Locked(ctx, app.dir, func(tx *auth.Tx) error {
+			return tx.DeleteFor(cfg.ProfileName, cred.OrganizationID, cred.RefreshToken)
+		})
+		return nil, false, nil
+	case err != nil:
 		return nil, false, err
 	}
 	if accept != nil && !accept(verified, identity) {

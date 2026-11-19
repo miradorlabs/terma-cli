@@ -8,6 +8,8 @@ package auth
 
 import (
 	"cmp"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -43,10 +45,38 @@ type Credential struct {
 	// StaleKeychainItem marks a credential kept in the file while its earlier tokens may
 	// still sit in the keychain, which could not remove them then; sign-out tries again.
 	StaleKeychainItem bool `json:"stale_keychain_item,omitempty"`
-	// RefreshUnsettledAt is when a refresh of this pair was first sent whose answer never
-	// came: the server may have spent RefreshToken then. Zero when none was lost. It is no
-	// secret, so credentials.json keeps it with the keychain's tokens; a new pair has none.
+	// RefreshUnsettledAt is when a refresh of this pair was first sent whose answer has not
+	// come: the server may have spent RefreshToken then. Zero when none is outstanding, and
+	// UnsettledExpired once it may never be sent again. It is no secret, so credentials.json
+	// keeps it beside the keychain's tokens; a new pair has none. Read it with
+	// UnsettledSince, which checks that it is about this pair's refresh token.
 	RefreshUnsettledAt time.Time `json:"refresh_unsettled_at,omitzero"`
+	// RefreshUnsettledFor names the refresh token RefreshUnsettledAt is about, by its
+	// SHA-256 in hex. A save whose keychain write landed and whose credentials.json write
+	// did not leaves the mark beside tokens it is not about, and then it does not count.
+	RefreshUnsettledFor string `json:"refresh_unsettled_for,omitempty"`
+}
+
+// UnsettledExpired is the mark of a refresh token that may never be sent again: one whose
+// refresh went unanswered past its budget, or whose mark was found in the future after the
+// wall clock went back. It is earlier than every real mark, so it is never in budget again,
+// whatever the clock does next, and no later mark replaces it (Tx.MarkUnsettled).
+var UnsettledExpired = time.Unix(1, 0).UTC()
+
+// UnsettledSince is when a refresh of c's refresh token was first sent without an answer,
+// or zero when none is outstanding, or the mark is about another token.
+func (c *Credential) UnsettledSince() time.Time {
+	if c.RefreshUnsettledAt.IsZero() || c.RefreshUnsettledFor != TokenSHA256(c.RefreshToken) {
+		return time.Time{}
+	}
+	return c.RefreshUnsettledAt
+}
+
+// TokenSHA256 is how a token is named where the token itself must not appear: its
+// SHA-256, in lowercase hex.
+func TokenSHA256(token string) string {
+	sum := sha256.Sum256([]byte(token))
+	return hex.EncodeToString(sum[:])
 }
 
 // ErrWrongEnvironment reports a credential issued by a different auth host than the

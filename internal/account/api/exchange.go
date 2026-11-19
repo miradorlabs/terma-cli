@@ -5,23 +5,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net"
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/account/auth"
 )
 
-// unsent reports whether err is a request that never left this machine: its connection
-// was never made, so the server cannot have spent the token in it.
-func unsent(err error) bool {
-	var dnsErr *net.DNSError
-	var opErr *net.OpError
-	return errors.As(err, &dnsErr) || errors.As(err, &opErr) && opErr.Op == "dial"
-}
-
-// unspentError is a token exchange the server cannot have spent the token in: the request
-// never left this machine, or the gateway turned it away (429). It ends an exchange only
-// when no attempt before it has an unknown outcome.
+// unspentError is a token exchange the server cannot have spent the token in: no
+// connection to it was ever made (a DNS, dial, TLS or proxy failure), so nothing was
+// written, or the gateway turned it away (429). It ends an exchange only when no attempt
+// before it has an unknown outcome.
 type unspentError struct{ error }
 
 func (e unspentError) Unwrap() error { return e.error }
@@ -58,18 +50,20 @@ var errSessionExpired = fmt.Errorf("%w: session expired, run `terma setup`", aut
 //   - Once an attempt's outcome is unknown, the token is sent again until the budget is
 //     spent, not a fixed number of times: a mark left past the budget asks for a new
 //     sign-in (errRefreshUnsettled), so a few seconds of server errors must not leave one.
-//     The pauses between attempts (refreshPause) start short and double.
+//     The pauses between attempts (Client.pause) start short and double.
 const RefreshBudget = 40 * time.Second
 
-// refreshPause is the pause after attempt n (from 0): 1 s, then doubling up to 8 s.
-func refreshPause(n int) time.Duration { return time.Second << min(n, 3) }
+// pause is the pause after attempt n (from 0): 1 s, then doubling up to 8 s. A Client's
+// pauseUnit replaces the second in tests.
+func (c *Client) pause(n int) time.Duration { return cmp.Or(c.pauseUnit, time.Second) << min(n, 3) }
 
 // errRefreshUnsettled is a stored refresh token whose last refresh got no answer longer
-// than RefreshBudget ago. The server may have spent it, and forgives it no longer: sent,
-// it would revoke the whole family of sign-ins it belongs to, Terma Desktop's included.
-// So it is not sent, and the refresh does not remove the credential either, since it may
-// be alive; `terma setup` replaces it. If it is alive, the developer signs in again for
-// nothing; if it is not, that saves every session.
+// than RefreshBudget ago, or whose mark is in the future (the wall clock went back). The
+// server may have spent it, and forgives it no longer: sent, it would revoke the whole
+// family of sign-ins it belongs to, Terma Desktop's included. So it is not sent, and the
+// refresh does not remove the credential either, since it may be alive; `terma setup`
+// replaces it. If it is alive, the developer signs in again for nothing; if it is not,
+// that saves every session.
 var errRefreshUnsettled = fmt.Errorf("%w: the answer to this sign-in's last refresh was lost, and sending its token again "+
 	"could end every Terma sign-in on this machine: run `terma setup`", auth.ErrNotLoggedIn)
 
@@ -85,11 +79,26 @@ func (c *Client) wallNow() time.Time {
 	return time.Now().Round(0)
 }
 
-// inBudget reports whether a token first sent at first may still be sent again. A wall
-// clock that has gone back says nothing about how long ago that was, so it may not.
-func (c *Client) inBudget(first time.Time) bool {
-	elapsed := c.wallNow().Sub(first)
-	return elapsed >= 0 && elapsed <= c.budget()
+// inBudget reports whether a token first sent at first may still be sent again.
+func (c *Client) inBudget(first time.Time) bool { return inBudget(c.wallNow(), first, c.budget()) }
+
+// inBudget reports whether, at now, a token first sent at first may still be sent again
+// within budget. A wall clock that has gone back says nothing about how long ago that
+// was, so it may not.
+func inBudget(now, first time.Time, budget time.Duration) bool {
+	elapsed := now.Sub(first)
+	return elapsed >= 0 && elapsed <= budget
+}
+
+// RefreshUnsettled reports whether err is a refresh that did not send its token because the
+// answer to an earlier one was lost (errRefreshUnsettled): the token may still be alive.
+func RefreshUnsettled(err error) bool { return errors.Is(err, errRefreshUnsettled) }
+
+// RefreshLost reports whether cred's refresh token may have been spent by a refresh whose
+// answer never came, too long ago to send it again: the sign-in must be made anew.
+func RefreshLost(cred *auth.Credential) bool {
+	at := cred.UnsettledSince()
+	return !at.IsZero() && !inBudget(time.Now().Round(0), at, RefreshBudget)
 }
 
 // exchangeRefreshToken redeems refreshToken, first sent at first. unknown says an earlier
@@ -135,7 +144,7 @@ func (c *Client) exchangeRefreshToken(ctx context.Context, refreshToken string, 
 			return nil, err
 		}
 		unknown, lastRefused = true, refused
-		pause := time.NewTimer(refreshPause(attempt))
+		pause := time.NewTimer(c.pause(attempt))
 		select {
 		case <-pause.C:
 		case <-ctx.Done():
@@ -151,21 +160,12 @@ type unsettledMark struct {
 	at           time.Time
 }
 
-// withoutMark is cred without its mark, which only a read under the credential lock may
-// trust: refresh reads the store's anew, and the client keeps its own (Client.unsettled).
-func withoutMark(cred *auth.Credential) *auth.Credential {
-	if cred == nil || cred.RefreshUnsettledAt.IsZero() {
-		return cred
-	}
-	bare := *cred
-	bare.RefreshUnsettledAt = time.Time{}
-	return &bare
-}
-
 // unsettledSince is when current's refresh token was first sent without an answer, as
-// current (read under the lock) or this client's own mark has it: the earlier of the two.
+// current's own mark or this client's has it: the earlier of the two. current is the pair
+// read under the credential lock, or, for a session the store no longer holds, the one
+// this client was given; a mark read without the lock elsewhere is never consulted.
 func (c *Client) unsettledSince(current *auth.Credential) time.Time {
-	at := current.RefreshUnsettledAt
+	at := current.UnsettledSince()
 	c.mu.Lock()
 	mine := c.unsettled
 	c.mu.Unlock()
@@ -176,38 +176,68 @@ func (c *Client) unsettledSince(current *auth.Credential) time.Time {
 }
 
 // markUnsettled records that current's refresh token, first sent at first, has no answer
-// yet: on the client's credential while it still holds that token, and on tx's while it
-// does (Tx.MarkUnsettled), so every process that later takes the token knows. An earlier
-// mark stays, and replaces a later one.
-func (c *Client) markUnsettled(current *auth.Credential, first time.Time, tx *auth.Tx) {
-	c.setUnsettled(current.RefreshToken, func(at time.Time) bool { return at.IsZero() || first.Before(at) }, first)
+// yet: in tx (Tx.MarkUnsettled, a write to credentials.json alone, since current was
+// loaded under the same lock), so every process that later takes the token knows, and
+// then in this client. A mark the store did not take is not kept here either: the token
+// is not sent, so nothing is outstanding.
+func (c *Client) markUnsettled(current *auth.Credential, first time.Time, tx *auth.Tx) error {
 	if tx != nil {
-		// Best effort: unmarked, the next refresh sends the token afresh, as before.
-		_ = tx.MarkUnsettled(c.profile, current.OrganizationID, current.RefreshToken, first)
+		if err := tx.MarkUnsettled(c.profile, current.OrganizationID, current.RefreshToken, first); err != nil {
+			return err
+		}
+	}
+	c.markOwn(current.RefreshToken, first)
+	return nil
+}
+
+// expireUnsettled marks current's refresh token as never to be sent again
+// (auth.UnsettledExpired): its budget is spent, or its mark is in the future. This
+// client's verdict is set first and stands whatever the wall clock does next, so this
+// process never sends the token again even when the store's write fails. That write fails
+// only when credentials.json cannot be written, and the error says so: the store then
+// keeps the mark it had, which, if it was in the future, another process takes as in
+// budget once the wall clock reaches it.
+func (c *Client) expireUnsettled(current *auth.Credential, tx *auth.Tx) error {
+	c.markOwn(current.RefreshToken, auth.UnsettledExpired)
+	if tx == nil {
+		return nil
+	}
+	if err := tx.ExpireUnsettled(c.profile, current.OrganizationID, current.RefreshToken); err != nil {
+		return fmt.Errorf("record that the refresh token may not be sent again: %w", err)
+	}
+	return nil
+}
+
+// markOwn sets this client's mark of refreshToken to at, unless it has an earlier one.
+func (c *Client) markOwn(refreshToken string, at time.Time) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if mine := c.unsettled; mine.refreshToken != refreshToken || mine.at.IsZero() || at.Before(mine.at) {
+		c.unsettled = unsettledMark{refreshToken: refreshToken, at: at}
 	}
 }
 
 // clearUnsettled takes back markUnsettled(current, first, tx) once an answer shows the
-// server spent nothing.
+// server spent nothing. Any other mark stays.
 func (c *Client) clearUnsettled(current *auth.Credential, first time.Time, tx *auth.Tx) {
-	c.setUnsettled(current.RefreshToken, first.Equal, time.Time{})
+	c.mu.Lock()
+	if mine := c.unsettled; mine.refreshToken == current.RefreshToken && mine.at.Equal(first) {
+		c.unsettled = unsettledMark{}
+	}
+	c.mu.Unlock()
 	if tx != nil {
+		// Best effort: left, the mark costs one sign-in more once its budget is past.
 		_ = tx.ClearUnsettled(c.profile, current.OrganizationID, current.RefreshToken, first)
 	}
 }
 
-// setUnsettled sets the client's own mark of refreshToken to to, while the mark it has
-// for that token (zero for another) is one from accepts.
-func (c *Client) setUnsettled(refreshToken string, from func(time.Time) bool, to time.Time) {
+// settled forgets this client's mark of refreshToken, which an answer has settled.
+func (c *Client) settled(refreshToken string) {
 	c.mu.Lock()
-	defer c.mu.Unlock()
-	var at time.Time
 	if c.unsettled.refreshToken == refreshToken {
-		at = c.unsettled.at
+		c.unsettled = unsettledMark{}
 	}
-	if from(at) {
-		c.unsettled = unsettledMark{refreshToken: refreshToken, at: to}
-	}
+	c.mu.Unlock()
 }
 
 // stillUnknown is err, the last answer of an exchange an earlier attempt of which has an

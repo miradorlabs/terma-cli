@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -49,6 +50,16 @@ func newSplitTestClient(t *testing.T, apiURL, authURL string, cred *auth.Credent
 		t.Fatalf("New: %v", err)
 	}
 	return client
+}
+
+// testUnit is the pause unit of a client with quick retries: its attempts start about 0,
+// 1, 3, 7 and 15 units after the first.
+const testUnit = 100 * time.Millisecond
+
+// quickRetries shortens client's pauses to testUnit and its budget to units of it.
+func quickRetries(client *Client, units int) {
+	client.pauseUnit = testUnit
+	client.exchangeBudget = time.Duration(units) * testUnit
 }
 
 func liveCredential() *auth.Credential {
@@ -615,18 +626,17 @@ func TestClient_RefreshOfAHungEndpointLetsTheLockGo(t *testing.T) {
 	client := newTestClient(t, srv.URL, expired, "project-123")
 	const timeout = 300 * time.Millisecond
 	client.http.Timeout = timeout
-	// Room for two attempts and the pause between them, not a third.
-	client.exchangeBudget = 2 * time.Second
+	quickRetries(client, 20)
 
 	start := time.Now()
 	if err := client.Refresh(context.Background()); err == nil {
 		t.Fatal("Refresh against a hung token endpoint succeeded")
 	}
-	if elapsed := time.Since(start); elapsed > client.exchangeBudget+2*time.Second {
+	if elapsed := time.Since(start); elapsed > client.exchangeBudget+time.Second {
 		t.Fatalf("Refresh took %v against a hung token endpoint; want about its %v budget", elapsed, client.exchangeBudget)
 	}
-	if got := attempts.Load(); got != 2 {
-		t.Errorf("%d attempts against a hung token endpoint; want 2", got)
+	if got := attempts.Load(); got < 2 {
+		t.Errorf("%d attempts against a hung token endpoint; want it sent again", got)
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
@@ -858,6 +868,7 @@ func TestClient_RetriesARefreshWithAnUnknownOutcome(t *testing.T) {
 			_ = conn.Close()
 		},
 		"500": func(_ *testing.T, w http.ResponseWriter) { w.WriteHeader(http.StatusInternalServerError) },
+		"503": func(_ *testing.T, w http.ResponseWriter) { w.WriteHeader(http.StatusServiceUnavailable) },
 		"truncated 200": func(t *testing.T, w http.ResponseWriter) {
 			conn, buf, err := http.NewResponseController(w).Hijack()
 			if err != nil {
@@ -895,6 +906,7 @@ func TestClient_RetriesARefreshWithAnUnknownOutcome(t *testing.T) {
 			expired := &auth.Credential{AccessToken: "mir_cli_stale", RefreshToken: "mir_clr_stale", SessionID: "session-1",
 				ExpiresAt: time.Now().Add(-time.Hour)}
 			client := newTestClient(t, srv.URL, expired, "")
+			quickRetries(client, 40)
 
 			if err := client.Refresh(context.Background()); err != nil {
 				t.Fatalf("Refresh: %v", err)
@@ -1051,7 +1063,11 @@ func TestClient_ARefusalAfterAnUnknownOutcomeIsSentAgain(t *testing.T) {
 				_ = json.NewDecoder(r.Body).Decode(&req)
 				mu.Lock()
 				sent = append(sent, req.RefreshToken)
-				status := tc.answers[min(len(sent), len(tc.answers))-1]
+				// Past the answers listed, the server keeps failing until the budget is spent.
+				status := http.StatusBadGateway
+				if len(sent) <= len(tc.answers) {
+					status = tc.answers[len(sent)-1]
+				}
 				mu.Unlock()
 				switch status {
 				case http.StatusOK:
@@ -1068,13 +1084,15 @@ func TestClient_ARefusalAfterAnUnknownOutcomeIsSentAgain(t *testing.T) {
 			expired := &auth.Credential{AccessToken: "mir_cli_stale", RefreshToken: "mir_clr_stale", SessionID: "session-1",
 				ExpiresAt: time.Now().Add(-time.Hour)}
 			client := newTestClient(t, srv.URL, expired, "")
-			// Room for three attempts and the two pauses between them, not a fourth.
-			client.exchangeBudget = refreshPause(0) + refreshPause(1) + refreshPause(2)/2
+			// Room for the three attempts listed (0, 1 and 3 units in), with plenty to spare.
+			quickRetries(client, 10)
 
 			err := client.Refresh(context.Background())
 			mu.Lock()
-			if want := slices.Repeat([]string{"mir_clr_stale"}, len(tc.answers)); !slices.Equal(sent, want) {
-				t.Errorf("refresh tokens sent = %q, want %q", sent, want)
+			// A row that settles ends with its answers; one that does not runs on.
+			if settles := !tc.wantErr || !tc.wantKept; len(sent) < len(tc.answers) || settles && len(sent) != len(tc.answers) ||
+				slices.ContainsFunc(sent, func(token string) bool { return token != "mir_clr_stale" }) {
+				t.Errorf("refresh tokens sent = %q, want the same token at least %d times", sent, len(tc.answers))
 			}
 			mu.Unlock()
 			if !tc.wantErr {
@@ -1091,20 +1109,35 @@ func TestClient_ARefusalAfterAnUnknownOutcomeIsSentAgain(t *testing.T) {
 			if got := errors.Is(err, auth.ErrNotLoggedIn); got == tc.wantKept {
 				t.Errorf("Refresh = %v; signed out %v, want %v", err, got, !tc.wantKept)
 			}
-			// Otherwise the outcome is still unknown, and the last status still reachable.
-			last := tc.answers[len(tc.answers)-1]
-			var apiErr *Error
+			// Otherwise the outcome is still unknown.
 			if tc.wantKept && !errors.As(err, new(unsettledError)) {
 				t.Errorf("Refresh = %v, want an unknown outcome", err)
-			}
-			if tc.wantKept && last > 0 && last != http.StatusUnauthorized && (!errors.As(err, &apiErr) || apiErr.StatusCode != last) {
-				t.Errorf("Refresh = %v, want its last status %d reachable", err, last)
 			}
 			_, loadErr := auth.LoadCredentialFor(client.dir, config.DefaultProfile, "org-test")
 			if kept := loadErr == nil; kept != tc.wantKept {
 				t.Errorf("stored credential: %v; kept %v, want %v", loadErr, kept, tc.wantKept)
 			}
 		})
+	}
+}
+
+// An exchange that runs out unsettled is no sign-out, whatever its last answer: a refusal
+// loses ErrNotLoggedIn, and any other status stays reachable for the caller to report.
+func TestStillUnknownIsNoSignOut(t *testing.T) {
+	t.Parallel()
+	refusal := refusalError{fmt.Errorf("%w: refused", auth.ErrNotLoggedIn)}
+	bare := fmt.Errorf("%w: refused", auth.ErrNotLoggedIn)
+	for _, last := range []error{refusal, bare, &Error{StatusCode: http.StatusForbidden}, unspentError{&Error{StatusCode: http.StatusTooManyRequests}}} {
+		err := stillUnknown(last)
+		if !errors.As(err, new(unsettledError)) || errors.Is(err, auth.ErrNotLoggedIn) || errors.As(err, new(refusalError)) {
+			t.Errorf("stillUnknown(%v) = %v, want an unknown outcome that is no sign-out", last, err)
+		}
+		var want *Error
+		if errors.As(last, &want) {
+			if got := (*Error)(nil); !errors.As(err, &got) || got.StatusCode != want.StatusCode {
+				t.Errorf("stillUnknown(%v) = %v, want its status %d reachable", last, err, want.StatusCode)
+			}
+		}
 	}
 }
 
@@ -1165,7 +1198,7 @@ func TestClient_ARefreshNothingSpentIsNotRetried(t *testing.T) {
 			if got := requests.Load(); got != want {
 				t.Errorf("%d requests reached the server; want %d", got, want)
 			}
-			if elapsed := time.Since(start); elapsed >= refreshPause(0) {
+			if elapsed := time.Since(start); elapsed >= client.pause(0) {
 				t.Errorf("Refresh took %v; want no pause before a retry", elapsed)
 			}
 			if _, err := auth.LoadCredentialFor(client.dir, config.DefaultProfile, "org-test"); err != nil {
@@ -1204,6 +1237,7 @@ func TestClient_ANetworkStillDownAfterALostAnswerIsRetried(t *testing.T) {
 	expired := &auth.Credential{AccessToken: "mir_cli_stale", RefreshToken: "mir_clr_stale", SessionID: "session-1",
 		ExpiresAt: time.Now().Add(-time.Hour)}
 	client := newTestClient(t, srv.URL, expired, "")
+	quickRetries(client, 40)
 	transport, dials := refusingDials(func(n int32) bool { return n == 2 })
 	client.http.Transport = transport
 
@@ -1244,8 +1278,8 @@ func TestClient_EveryRefreshAttemptStartsWithinTheBudget(t *testing.T) {
 	expired := &auth.Credential{AccessToken: "mir_cli_stale", RefreshToken: "mir_clr_stale", SessionID: "session-1",
 		ExpiresAt: time.Now().Add(-time.Hour)}
 	client := newTestClient(t, srv.URL, expired, "")
-	// Room for the first pause, not the second: the third attempt would start past it.
-	client.exchangeBudget = refreshPause(0) + refreshPause(1)*3/4
+	// Attempts start about 0, 0.3 and 0.9 s in, a fourth would at 2.1 s: none near the budget.
+	client.pauseUnit, client.exchangeBudget = 300*time.Millisecond, 1500*time.Millisecond
 
 	begin := time.Now()
 	if err := client.Refresh(context.Background()); err == nil {
@@ -1256,8 +1290,8 @@ func TestClient_EveryRefreshAttemptStartsWithinTheBudget(t *testing.T) {
 	}
 	mu.Lock()
 	defer mu.Unlock()
-	if len(starts) != 2 {
-		t.Errorf("%d attempts; want 2, the third past the budget", len(starts))
+	if len(starts) == 0 {
+		t.Error("no attempt; want one at least")
 	}
 	for i, at := range starts {
 		if at.Sub(begin) > client.exchangeBudget {

@@ -301,4 +301,8 @@ func TestRelayStopWindowCoversARefresh(t *testing.T) {
 	if want := api.RefreshBudget + 20*time.Second; service.StopWindow < want {
 		t.Fatalf("service.StopWindow = %v; want at least %v, a refresh's budget and its save", service.StopWindow, want)
 	}
+	// `terma update --refresh` may restart the service, waiting for the relay to stop.
+	if want := service.RestartWait + 30*time.Second; refreshTimeout < want {
+		t.Fatalf("refreshTimeout = %v; want at least %v, the relay's restart and the refresh's own work", refreshTimeout, want)
+	}
 }

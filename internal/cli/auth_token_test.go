@@ -1,12 +1,14 @@
 package cli
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -365,6 +367,117 @@ func TestAuthToken_ErrorCodes(t *testing.T) {
 			t.Errorf("err = %v, stdout %s; want unavailable", err, stdout)
 		}
 	})
+}
+
+// A setup run again does not reuse a stored session whose refresh went unanswered past its
+// budget, even while whoami still takes its access token: it could never be refreshed, so
+// setup signs in anew, and the new sign-in replaces it.
+func TestReuseStoredSessionSkipsALostRefresh(t *testing.T) {
+	srv := newTokenServer(t)
+	dir := signInForToken(t, srv, time.Now().Add(time.Hour), grantTeam)
+	cfg, err := testApp.loadConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	stored, err := auth.LoadCredential(dir, config.DefaultProfile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res, ok, err := testApp.reuseStoredSession(t.Context(), cfg, orgRef{}); err != nil || !ok {
+		t.Fatalf("reuseStoredSession before the lost refresh = %v, %v, %v; want it reused", res, ok, err)
+	}
+	if err := auth.Locked(t.Context(), dir, func(tx *auth.Tx) error {
+		return tx.ExpireUnsettled(config.DefaultProfile, stored.OrganizationID, stored.RefreshToken)
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	if res, ok, err := testApp.reuseStoredSession(t.Context(), cfg, orgRef{}); err != nil || ok {
+		t.Fatalf("reuseStoredSession = %v, %v, %v; want a fresh sign-in", res, ok, err)
+	}
+}
+
+// A stored session whoami refuses is removed only while the store still holds the pair
+// that was refused: a new sign-in another process stored meanwhile stays.
+func TestReuseStoredSessionKeepsASignInStoredSinceARefusal(t *testing.T) {
+	srv := newTokenServer(t)
+	dir := signInForToken(t, srv, time.Now().Add(time.Hour), grantTeam)
+	cfg, err := testApp.loadConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var signIn sync.Once
+	srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/v1/whoami" {
+			signIn.Do(func() {
+				if err := auth.UpdateCredential(dir, config.DefaultProfile, &auth.Credential{
+					AccessToken: "mir_cli_new", RefreshToken: "mir_clr_new", ExpiresAt: time.Now().Add(time.Hour), SessionID: "session-2",
+					AuthURL: srv.URL, OrganizationID: grantOrg, UserID: "user-1",
+				}); err != nil {
+					t.Error(err)
+				}
+			})
+		}
+		unauthorized(w)
+	})
+
+	if res, ok, err := testApp.reuseStoredSession(t.Context(), cfg, orgRef{}); err != nil || ok {
+		t.Fatalf("reuseStoredSession = %v, %v, %v; want a fresh sign-in", res, ok, err)
+	}
+	stored, err := auth.LoadCredential(dir, config.DefaultProfile)
+	if err != nil {
+		t.Fatalf("the sign-in stored meanwhile is gone: %v", err)
+	}
+	if stored.RefreshToken != "mir_clr_new" {
+		t.Fatalf("stored refresh token = %q, want the new sign-in's", stored.RefreshToken)
+	}
+}
+
+// A stored session whose refresh is found lost only as whoami's refusal sends it is left
+// stored: its token may still be alive, and the fresh sign-in setup makes replaces it.
+func TestReuseStoredSessionKeepsALostRefreshFoundLate(t *testing.T) {
+	srv := newTokenServer(t)
+	dir := signInForToken(t, srv, time.Now().Add(time.Hour), grantTeam)
+	cfg, err := testApp.loadConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	held, err := auth.LoadCredential(dir, config.DefaultProfile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var lose sync.Once
+	var sent atomic.Int32
+	srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/v1/auth/cli/token" {
+			sent.Add(1)
+		}
+		if r.URL.Path == "/v1/whoami" {
+			// Another process's refresh of it went unanswered past its budget meanwhile.
+			lose.Do(func() {
+				if err := auth.Locked(context.Background(), dir, func(tx *auth.Tx) error {
+					return tx.ExpireUnsettled(config.DefaultProfile, held.OrganizationID, held.RefreshToken)
+				}); err != nil {
+					t.Error(err)
+				}
+			})
+		}
+		unauthorized(w)
+	})
+
+	if res, ok, err := testApp.reuseStoredSession(t.Context(), cfg, orgRef{}); err != nil || ok {
+		t.Fatalf("reuseStoredSession = %v, %v, %v; want a fresh sign-in", res, ok, err)
+	}
+	stored, err := auth.LoadCredential(dir, config.DefaultProfile)
+	if err != nil {
+		t.Fatalf("the credential with the lost refresh was removed: %v", err)
+	}
+	if stored.RefreshToken != held.RefreshToken || !api.RefreshLost(stored) {
+		t.Fatalf("stored = %q, lost = %v; want it kept, marked lost", stored.RefreshToken, api.RefreshLost(stored))
+	}
+	if n := sent.Load(); n != 0 {
+		t.Fatalf("the lost refresh token was sent %d times", n)
+	}
 }
 
 // A setup run again, reusing the stored session, must not write back the pair it read

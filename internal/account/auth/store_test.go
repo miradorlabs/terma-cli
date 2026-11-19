@@ -159,7 +159,7 @@ func TestTx_MarkUnsettledMarksOnlyTheVersionItNames(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		return cred.RefreshUnsettledAt
+		return cred.UnsettledSince()
 	}
 	first := time.Now().Round(0).Add(-time.Minute).Truncate(time.Second)
 
@@ -183,11 +183,33 @@ func TestTx_MarkUnsettledMarksOnlyTheVersionItNames(t *testing.T) {
 	if got := marked(); !got.Equal(earlier) {
 		t.Fatalf("mark = %v after clearing another mark; want %v kept", got, earlier)
 	}
+	if err := lockedWrite(dir, func(tx *Tx) error { return tx.ExpireUnsettled("default", "org-a", "ter_clr_org-a") }); err != nil {
+		t.Fatal(err)
+	}
+	mark("ter_clr_org-a", time.Now())
+	if got := marked(); !got.Equal(UnsettledExpired) {
+		t.Fatalf("mark = %v after a later mark; want it expired for good", got)
+	}
 	if err := UpdateCredential(dir, "default", orgCredential("org-a", "s-a")); err != nil {
 		t.Fatal(err)
 	}
 	if got := marked(); !got.IsZero() {
 		t.Errorf("mark = %v after a new pair; want none", got)
+	}
+}
+
+// A mark counts only beside the refresh token it is about. A save whose keychain write
+// landed and whose credentials.json write did not leaves it beside another.
+func TestCredential_AMarkCountsOnlyForItsToken(t *testing.T) {
+	t.Parallel()
+	at := time.Now().Round(0)
+	cred := &Credential{RefreshToken: "ter_clr_a", RefreshUnsettledAt: at, RefreshUnsettledFor: TokenSHA256("ter_clr_a")}
+	if got := cred.UnsettledSince(); !got.Equal(at) {
+		t.Errorf("UnsettledSince = %v, want %v", got, at)
+	}
+	cred.RefreshToken = "ter_clr_b"
+	if got := cred.UnsettledSince(); !got.IsZero() {
+		t.Errorf("UnsettledSince beside another token = %v, want none", got)
 	}
 }
 

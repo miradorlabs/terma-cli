@@ -26,7 +26,7 @@ type Tx struct {
 //
 //   - a refresh holds it through one exchange and at most two keychain writes: the pair it
 //     holds and the pair it gets. The exchange, its retries included, ends within 40 s
-//     (api's RefreshBudget);
+//     (api's RefreshBudget); its marks (MarkUnsettled) add credentials.json writes;
 //   - every other holder keeps it through one keychain write and a few deletes;
 //   - Relocate takes it once per credential, never across all of them.
 var lockWait = 2*secret.WriteTimeout + time.Minute
@@ -122,37 +122,60 @@ func (tx *Tx) DeleteFor(profile, organizationID, refreshToken string) error {
 	})
 }
 
-// MarkUnsettled records on organizationID's credential that a refresh of it, first sent
-// at at, has no answer yet (Credential.RefreshUnsettledAt). It marks only the version it
-// names, while the stored refresh token is still refreshToken. An earlier mark stays, and
-// a later one gives way: the first send is the one the server's grace runs from.
+// MarkUnsettled records on organizationID's credential that a refresh of refreshToken,
+// first sent at at, has no answer yet (Credential.RefreshUnsettledAt). An earlier mark of
+// refreshToken stays, and a later one gives way: the first send is the one the server's
+// grace runs from.
+//
+// It reads and writes credentials.json alone, never the keychain: the caller loaded
+// refreshToken in this transaction (LoadFor), and nothing else changes the store while it
+// holds the lock. The mark names its token (RefreshUnsettledFor), so one written beside
+// another token, as when saving a rotation failed half way, counts for nothing. The entry
+// gone, it writes nothing; it fails only when credentials.json cannot be read or written.
 func (tx *Tx) MarkUnsettled(profile, organizationID, refreshToken string, at time.Time) error {
-	return tx.setUnsettled(profile, organizationID, refreshToken, func(old time.Time) bool { return old.IsZero() || at.Before(old) }, at)
+	sum := TokenSHA256(refreshToken)
+	return tx.mutateEntry(profile, organizationID, refreshToken, func(c *Credential) bool {
+		if c.RefreshUnsettledFor == sum && !c.RefreshUnsettledAt.IsZero() && !at.Before(c.RefreshUnsettledAt) {
+			return false
+		}
+		c.RefreshUnsettledAt, c.RefreshUnsettledFor = at, sum
+		return true
+	})
 }
 
-// ClearUnsettled takes back MarkUnsettled's mark at at, on the version it names, once an
-// answer shows the server spent nothing.
+// ExpireUnsettled marks refreshToken as never to be sent again (UnsettledExpired), as
+// MarkUnsettled does.
+func (tx *Tx) ExpireUnsettled(profile, organizationID, refreshToken string) error {
+	return tx.MarkUnsettled(profile, organizationID, refreshToken, UnsettledExpired)
+}
+
+// ClearUnsettled takes back MarkUnsettled's mark at at, of refreshToken, once an answer
+// shows the server spent nothing. Any other mark stays. Like MarkUnsettled it touches
+// credentials.json alone.
 func (tx *Tx) ClearUnsettled(profile, organizationID, refreshToken string, at time.Time) error {
-	return tx.setUnsettled(profile, organizationID, refreshToken, at.Equal, time.Time{})
+	sum := TokenSHA256(refreshToken)
+	return tx.mutateEntry(profile, organizationID, refreshToken, func(c *Credential) bool {
+		if c.RefreshUnsettledFor != sum || !c.RefreshUnsettledAt.Equal(at) {
+			return false
+		}
+		c.RefreshUnsettledAt, c.RefreshUnsettledFor = time.Time{}, ""
+		return true
+	})
 }
 
-// setUnsettled sets the stored credential's mark to to, while the stored refresh token is
-// refreshToken and its mark is one from accepts.
-func (tx *Tx) setUnsettled(profile, organizationID, refreshToken string, from func(time.Time) bool, to time.Time) error {
-	stored, err := tx.LoadFor(profile, organizationID)
-	switch {
-	case errors.Is(err, ErrNotLoggedIn):
-		return nil
-	case err != nil:
+// mutateEntry applies change to organizationID's entry in credentials.json, and writes the
+// file when change reports it changed something. An entry gone, or one that keeps its
+// tokens in the file and holds another refresh token than refreshToken, is left as it is.
+func (tx *Tx) mutateEntry(profile, organizationID, refreshToken string, change func(*Credential) bool) error {
+	file, err := loadCredentialFile(tx.dir)
+	if err != nil {
 		return err
-	case stored.RefreshToken != refreshToken || !from(stored.RefreshUnsettledAt):
+	}
+	c := file[profile].organizations()[organizationID]
+	if !c.present() || c.RefreshToken != "" && c.RefreshToken != refreshToken || !change(c) {
 		return nil
 	}
-	return tx.mutate(func(file credentialFile) {
-		if c := file[profile].organizations()[organizationID]; c.present() {
-			c.RefreshUnsettledAt = to
-		}
-	})
+	return saveCredentialFile(config.CredentialsPath(tx.dir), file)
 }
 
 func (tx *Tx) mutate(mutate func(credentialFile)) error {

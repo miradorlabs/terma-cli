@@ -20,6 +20,13 @@ import (
 // the supervisor waits this long.
 const StopWindow = time.Minute
 
+// RestartWait is the longest Install waits for the relay it replaces to stop: StopWindow,
+// and the moments the service manager takes to notice. Before that, StopRelay may wait up
+// to 10 s for a hook-started relay to exit, ahead of the bootout. Whatever restarts the
+// service must allow both: refreshTimeout in internal/cli is RestartWait and a minute,
+// which covers StopRelay's 10 s.
+const RestartWait = StopWindow + 5*time.Second
+
 // Launchd renders a relay agent that restarts only after an unsuccessful exit.
 func Launchd(label, exe, logPath string, env map[string]string) string {
 	esc := html.EscapeString

@@ -102,9 +102,11 @@ type Client struct {
 	// now, when set, replaces time.Now, so a test can move the wall clock.
 	now func() time.Time
 	// unsettled is this client's own mark of a refresh it sent without an answer
-	// (markUnsettled). credential carries none: one read without the credential lock may
-	// be gone by the time this client takes it.
+	// (markUnsettled), which counts with the mark of the pair a refresh reads under the
+	// credential lock (unsettledSince).
 	unsettled unsettledMark
+	// pauseUnit, when set, replaces the second the pauses between attempts are made of.
+	pauseUnit time.Duration
 	// refreshing is a one-slot semaphore for this process's token exchanges. The
 	// credential lock serializes them across processes.
 	refreshing chan struct{}
@@ -155,7 +157,7 @@ func New(cfg *config.Config, opts Options) (*Client, error) {
 	if err := cred.CheckEnvironment(c.authURL); err != nil {
 		return nil, err
 	}
-	c.credential = withoutMark(cred)
+	c.credential = cred
 	return c, nil
 }
 

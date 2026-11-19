@@ -22,7 +22,7 @@ const runKeyPath = `Software\Microsoft\Windows\CurrentVersion\Run`
 
 // supervisorWait covers a supervisor noticing its launcher changed (a second) and the
 // relay's grace, StopWindow, before the supervisor kills it.
-const supervisorWait = StopWindow + 5*time.Second
+const supervisorWait = RestartWait
 
 func (m Manager) installWindows(path string) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {

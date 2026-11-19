@@ -6,6 +6,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -24,7 +25,9 @@ import (
 // A rotation the store failed to take leaves it holding the refresh token the server
 // spent. Every later refresh must redeem the client's own live token, never take the
 // stored one back: the server's reuse detection would revoke the session. Saves fail once,
-// then twice in a row, before the store takes the pair again.
+// then twice in a row, before the store takes the pair again. The store turns read-only
+// as the first exchange reaches the server, after its token was marked, and stays so for
+// every failing save.
 func TestClient_KeepsARotationTheStoreMissed(t *testing.T) {
 	t.Parallel()
 	for _, failures := range []int{1, 2} {
@@ -40,6 +43,7 @@ func testFailedSaves(t *testing.T, failures int) {
 	spent := map[string]bool{}
 	revoked := false
 	n := 0
+	dir := t.TempDir()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var req tokenRequest
 		_ = json.NewDecoder(r.Body).Decode(&req)
@@ -54,6 +58,12 @@ func testFailedSaves(t *testing.T, failures int) {
 		}
 		spent[req.RefreshToken] = true
 		n++
+		if n == 1 {
+			// A read-only directory: the store keeps the spent token through every save.
+			if err := os.Chmod(dir, 0o500); err != nil {
+				t.Error(err)
+			}
+		}
 		// Each pair is already within the expiry skew, so every Refresh redeems again.
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"access_token": fmt.Sprintf("mir_cli_%d", n), "refresh_token": fmt.Sprintf("mir_clr_%d", n), "expires_in": 30,
@@ -66,8 +76,14 @@ func testFailedSaves(t *testing.T, failures int) {
 		defer mu.Unlock()
 		return revoked
 	}
+	writable := func() {
+		t.Helper()
+		if err := os.Chmod(dir, 0o700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Cleanup(func() { _ = os.Chmod(dir, 0o700) })
 
-	dir := t.TempDir()
 	// Tokens in credentials.json, where a failed write leaves the spent pair.
 	if err := config.UpdateFile(dir, func(f *config.File) { f.InsecureStorage = true }); err != nil {
 		t.Fatal(err)
@@ -81,11 +97,6 @@ func testFailedSaves(t *testing.T, failures int) {
 		t.Fatal(err)
 	}
 
-	// A read-only directory: the store keeps mir_clr_0 through every failed save.
-	if err := os.Chmod(dir, 0o500); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = os.Chmod(dir, 0o700) })
 	for i := 1; i <= failures; i++ {
 		if err := client.Refresh(context.Background()); err == nil {
 			t.Fatalf("refresh %d stored its pair in a read-only directory", i)
@@ -98,9 +109,7 @@ func testFailedSaves(t *testing.T, failures int) {
 		}
 	}
 
-	if err := os.Chmod(dir, 0o700); err != nil {
-		t.Fatal(err)
-	}
+	writable()
 	if err := client.Refresh(context.Background()); err != nil {
 		t.Fatalf("refresh once the store is writable: %v", err)
 	}
@@ -114,6 +123,118 @@ func testFailedSaves(t *testing.T, failures int) {
 	want := fmt.Sprintf("mir_clr_%d", failures+1)
 	if got := client.Credential().RefreshToken; stored.RefreshToken != want || got != want {
 		t.Errorf("stored %q, client %q; want both the live %q", stored.RefreshToken, got, want)
+	}
+}
+
+// A refresh token that cannot be marked before it is sent is not sent: were its answer
+// lost, nothing would say the server may have spent it. Nor is it remembered as sent: once
+// the store takes marks again, well past the budget, it is sent as a fresh refresh.
+func TestClient_AnUnmarkableRefreshIsNotSent(t *testing.T) {
+	t.Parallel()
+	var requests atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests.Add(1)
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"access_token": "mir_cli_1", "refresh_token": "mir_clr_1", "expires_in": 3600,
+			"session_id": "session-1", "organization": map[string]string{"id": "org-test"},
+		})
+	}))
+	defer srv.Close()
+	dir := t.TempDir()
+	if err := config.UpdateFile(dir, func(f *config.File) { f.InsecureStorage = true }); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := auth.SaveCredential(dir, config.DefaultProfile, &auth.Credential{AccessToken: "mir_cli_0", RefreshToken: "mir_clr_0",
+		SessionID: "session-1", OrganizationID: "org-test", AuthURL: srv.URL, ExpiresAt: time.Now().Add(-time.Hour)}); err != nil {
+		t.Fatal(err)
+	}
+	client, err := New(&config.Config{Dir: dir, ProfileName: config.DefaultProfile, APIURL: srv.URL, AuthURL: srv.URL}, Options{Version: "test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(dir, 0o500); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(dir, 0o700) })
+
+	if err := client.Refresh(context.Background()); err == nil || errors.As(err, new(unsettledError)) {
+		t.Fatalf("Refresh = %v, want the mark's failure", err)
+	}
+	if n := requests.Load(); n != 0 {
+		t.Errorf("%d requests sent without a mark; want none", n)
+	}
+
+	if err := os.Chmod(dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	client.now = func() time.Time { return time.Now().Add(2 * RefreshBudget) }
+	if err := client.Refresh(context.Background()); err != nil {
+		t.Fatalf("Refresh once the store takes marks: %v", err)
+	}
+	if n := requests.Load(); n != 1 {
+		t.Errorf("%d requests; want the token sent once", n)
+	}
+}
+
+// A refresh that finds its token's mark in the future (the wall clock went back) expires
+// it. When credentials.json cannot take that, the refresh fails all the same, and this
+// client keeps its verdict: once the store is writable and the clock has come round to
+// the stored mark, which then looks in budget, this process still never sends the token.
+func TestClient_AFailedExpireStillNeverSends(t *testing.T) {
+	t.Parallel()
+	var requests atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests.Add(1)
+		w.WriteHeader(http.StatusBadGateway)
+	}))
+	defer srv.Close()
+	dir := t.TempDir()
+	if err := config.UpdateFile(dir, func(f *config.File) { f.InsecureStorage = true }); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := auth.SaveCredential(dir, config.DefaultProfile, &auth.Credential{AccessToken: "mir_cli_0", RefreshToken: "mir_clr_0",
+		SessionID: "session-1", OrganizationID: "org-test", AuthURL: srv.URL, ExpiresAt: time.Now().Add(-time.Hour)}); err != nil {
+		t.Fatal(err)
+	}
+	start := time.Now().Round(0)
+	future := start.Add(time.Minute)
+	if err := auth.Locked(context.Background(), dir, func(tx *auth.Tx) error {
+		return tx.MarkUnsettled(config.DefaultProfile, "org-test", "mir_clr_0", future)
+	}); err != nil {
+		t.Fatal(err)
+	}
+	client, err := New(&config.Config{Dir: dir, ProfileName: config.DefaultProfile, APIURL: srv.URL, AuthURL: srv.URL}, Options{Version: "test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	client.pauseUnit = time.Millisecond
+	client.now = func() time.Time { return start }
+	if err := os.Chmod(dir, 0o500); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(dir, 0o700) })
+
+	err = client.Refresh(context.Background())
+	if !errors.Is(err, errRefreshUnsettled) || !strings.Contains(err.Error(), "may not be sent again") {
+		t.Fatalf("Refresh = %v, want errRefreshUnsettled and the failed write", err)
+	}
+
+	if err := os.Chmod(dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	stored, err := auth.LoadCredential(dir, config.DefaultProfile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := stored.UnsettledSince(); !got.Equal(future) {
+		t.Fatalf("stored mark = %v, want the future one the failed write left", got)
+	}
+	client.now = func() time.Time { return future.Add(time.Second) }
+	if err := client.Refresh(context.Background()); !errors.Is(err, errRefreshUnsettled) {
+		t.Fatalf("Refresh with the stored mark in budget = %v, want errRefreshUnsettled", err)
+	}
+	if n := requests.Load(); n != 0 {
+		t.Errorf("%d requests sent; want the token never sent", n)
 	}
 }
 

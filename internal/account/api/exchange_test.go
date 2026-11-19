@@ -57,29 +57,37 @@ func storedFor(t *testing.T, client *Client) *auth.Credential {
 	return cred
 }
 
-// A refresh whose answer never came marks the stored credential with its first send. A
-// second process within the budget sends the same token again and stores the answer,
-// which has no mark.
-func TestClient_AnUnsettledRefreshIsMarkedAndResentWithinItsBudget(t *testing.T) {
+// expired is a credential whose access token has expired, so a Refresh redeems.
+func expired() *auth.Credential {
+	return &auth.Credential{AccessToken: "mir_cli_stale", RefreshToken: "mir_clr_stale", SessionID: "session-1",
+		ExpiresAt: time.Now().Add(-time.Hour)}
+}
+
+// markStored marks the stored credential's refresh token as sent at at without an answer.
+func markStored(t *testing.T, client *Client, at time.Time) {
+	t.Helper()
+	if err := auth.Locked(context.Background(), client.dir, func(tx *auth.Tx) error {
+		return tx.MarkUnsettled(config.DefaultProfile, "org-test", "mir_clr_stale", at)
+	}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// A refresh that runs out of budget without an answer leaves its token expired for good,
+// so no process sends it again.
+func TestClient_AnUnsettledRefreshExpiresItsToken(t *testing.T) {
 	t.Parallel()
 	log, srv := newTokenLog(t, badGateway)
-	expired := &auth.Credential{AccessToken: "mir_cli_stale", RefreshToken: "mir_clr_stale", SessionID: "session-1",
-		ExpiresAt: time.Now().Add(-time.Hour)}
-	client := newTestClient(t, srv.URL, expired, "")
-	// One pause fits in this budget, so the exchange gives up after two attempts.
-	client.exchangeBudget = refreshPause(0) + refreshPause(1)*3/4
+	client := newTestClient(t, srv.URL, expired(), "")
+	quickRetries(client, 10)
 
-	before := time.Now().Round(0)
 	if err := client.Refresh(context.Background()); !errors.As(err, new(unsettledError)) {
 		t.Fatalf("Refresh = %v, want an unknown outcome", err)
 	}
-	mark := storedFor(t, client).RefreshUnsettledAt
-	if mark.Before(before.Truncate(time.Second)) || mark.After(time.Now()) {
-		t.Fatalf("stored mark = %v, want the first send, at about %v", mark, before)
+	if mark := storedFor(t, client).UnsettledSince(); !mark.Equal(auth.UnsettledExpired) {
+		t.Fatalf("stored mark = %v, want it expired", mark)
 	}
-	if got := client.unsettledSince(client.Credential()); !got.Equal(mark) {
-		t.Errorf("client mark = %v, want the stored %v", got, mark)
-	}
+	sent := len(log.tokens())
 
 	log.answer.Store(func(w http.ResponseWriter) { rotatedPair(w) })
 	other, err := New(&config.Config{Dir: client.dir, ProfileName: config.DefaultProfile, APIURL: srv.URL, AuthURL: srv.URL},
@@ -87,50 +95,82 @@ func TestClient_AnUnsettledRefreshIsMarkedAndResentWithinItsBudget(t *testing.T)
 	if err != nil {
 		t.Fatal(err)
 	}
-	other.exchangeBudget = client.exchangeBudget * 10
-	if err := other.Refresh(context.Background()); err != nil {
-		t.Fatalf("second process's Refresh: %v", err)
+	if err := other.Refresh(context.Background()); !errors.Is(err, errRefreshUnsettled) {
+		t.Fatalf("second process's Refresh = %v, want a sign-in to redo", err)
 	}
-	if want := []string{"mir_clr_stale", "mir_clr_stale", "mir_clr_stale"}; !slices.Equal(log.tokens(), want) {
+	if got := len(log.tokens()); got != sent {
+		t.Errorf("%d refresh tokens sent after the budget; want none", got-sent)
+	}
+}
+
+// A process killed with its refresh unanswered leaves its mark. Another process within the
+// budget sends the same token again and stores the answer, which has no mark.
+func TestClient_AKilledRefreshIsResentWithinItsBudget(t *testing.T) {
+	t.Parallel()
+	log, srv := newTokenLog(t, func(w http.ResponseWriter) { rotatedPair(w) })
+	client := newTestClient(t, srv.URL, expired(), "")
+	markStored(t, client, time.Now().Round(0).Add(-time.Second))
+
+	if err := client.Refresh(context.Background()); err != nil {
+		t.Fatalf("Refresh: %v", err)
+	}
+	if want := []string{"mir_clr_stale"}; !slices.Equal(log.tokens(), want) {
 		t.Errorf("refresh tokens sent = %q, want %q", log.tokens(), want)
 	}
-	stored := storedFor(t, other)
+	stored := storedFor(t, client)
 	if stored.RefreshToken != "mir_clr_rotated" || !stored.RefreshUnsettledAt.IsZero() {
 		t.Errorf("stored %q marked %v; want the rotated pair, unmarked", stored.RefreshToken, stored.RefreshUnsettledAt)
 	}
 }
 
 // A token whose refresh got no answer longer ago than the budget is never sent: the
-// server no longer forgives it. The credential stays, since it may be alive.
+// server no longer forgives it. Neither is one marked in the future, after the wall clock
+// went back, even once the clock comes round to its mark again: the verdict is final. The
+// credential stays, since it may be alive.
 func TestClient_AnUnsettledRefreshPastItsBudgetSendsNothing(t *testing.T) {
 	t.Parallel()
-	for name, mark := range map[string]time.Time{
-		"past the budget": time.Now().Add(-2 * RefreshBudget),
-		"in the future":   time.Now().Add(time.Hour),
+	for name, mark := range map[string]time.Duration{
+		"past the budget": -2 * RefreshBudget,
+		"in the future":   time.Hour,
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			log, srv := newTokenLog(t, func(w http.ResponseWriter) { rotatedPair(w) })
-			expired := &auth.Credential{AccessToken: "mir_cli_stale", RefreshToken: "mir_clr_stale", SessionID: "session-1",
-				ExpiresAt: time.Now().Add(-time.Hour), RefreshUnsettledAt: mark.Round(0)}
-			client := newTestClient(t, srv.URL, expired, "")
+			client := newTestClient(t, srv.URL, expired(), "")
+			at := time.Now().Round(0).Add(mark)
+			markStored(t, client, at)
 
 			err := client.Refresh(context.Background())
 			if !errors.Is(err, auth.ErrNotLoggedIn) || !strings.Contains(err.Error(), "run `terma setup`") {
 				t.Fatalf("Refresh = %v, want a sign-in to redo", err)
 			}
+			stored := storedFor(t, client)
+			if stored.RefreshToken != "mir_clr_stale" || !stored.UnsettledSince().Equal(auth.UnsettledExpired) {
+				t.Errorf("stored %q marked %v; want the credential kept, expired", stored.RefreshToken, stored.UnsettledSince())
+			}
+
+			// The wall clock comes round to the mark: still nothing is sent, by this
+			// process or another.
+			again, err := New(&config.Config{Dir: client.dir, ProfileName: config.DefaultProfile, APIURL: srv.URL, AuthURL: srv.URL},
+				Options{Version: "test"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, c := range []*Client{client, again} {
+				c.now = func() time.Time { return at.Add(5 * time.Second) }
+				if err := c.Refresh(context.Background()); !errors.Is(err, errRefreshUnsettled) {
+					t.Errorf("Refresh at the mark = %v, want a sign-in to redo", err)
+				}
+			}
 			if got := log.tokens(); len(got) != 0 {
 				t.Errorf("refresh tokens sent = %q, want none", got)
-			}
-			if stored := storedFor(t, client); stored.RefreshToken != "mir_clr_stale" {
-				t.Errorf("stored %q, want the credential kept", stored.RefreshToken)
 			}
 		})
 	}
 }
 
 // The budget runs on the wall clock. A Mac asleep between two attempts stops Go's
-// monotonic clock, not the server's grace: the resend is not sent, and the token is marked.
+// monotonic clock, not the server's grace: the resend is not sent, and the token expires.
 func TestClient_AWallClockJumpStopsTheResend(t *testing.T) {
 	t.Parallel()
 	var asleep atomic.Bool
@@ -142,6 +182,7 @@ func TestClient_AWallClockJumpStopsTheResend(t *testing.T) {
 	expired := &auth.Credential{AccessToken: "mir_cli_stale", RefreshToken: "mir_clr_stale", SessionID: "session-1",
 		ExpiresAt: time.Now().Add(-time.Hour)}
 	client := newTestClient(t, srv.URL, expired, "")
+	client.pauseUnit = testUnit
 	start := time.Now().Round(0)
 	client.now = func() time.Time {
 		if asleep.Load() {
@@ -156,8 +197,8 @@ func TestClient_AWallClockJumpStopsTheResend(t *testing.T) {
 	if got := log.tokens(); len(got) != 1 {
 		t.Errorf("refresh tokens sent = %q, want the first only", got)
 	}
-	if mark := storedFor(t, client).RefreshUnsettledAt; !mark.Equal(start) {
-		t.Errorf("stored mark = %v, want the first send, %v", mark, start)
+	if mark := storedFor(t, client).UnsettledSince(); !mark.Equal(auth.UnsettledExpired) {
+		t.Errorf("stored mark = %v, want it expired", mark)
 	}
 }
 
@@ -208,7 +249,9 @@ func TestClient_ARefreshKeepsToItsOwnMark(t *testing.T) {
 		ExpiresAt: time.Now().Add(-time.Hour)}
 	client := newTestClient(t, srv.URL, expired, "")
 	mark := time.Now().Round(0).Add(-2 * RefreshBudget)
-	client.setUnsettled("mir_clr_stale", time.Time.IsZero, mark)
+	if err := client.markUnsettled(&auth.Credential{RefreshToken: "mir_clr_stale"}, mark, nil); err != nil {
+		t.Fatal(err)
+	}
 
 	if err := client.Refresh(context.Background()); !errors.Is(err, errRefreshUnsettled) {
 		t.Fatalf("Refresh = %v, want a sign-in to redo", err)
@@ -216,12 +259,12 @@ func TestClient_ARefreshKeepsToItsOwnMark(t *testing.T) {
 	if got := log.tokens(); len(got) != 0 {
 		t.Errorf("refresh tokens sent = %q, want none", got)
 	}
-	if got := storedFor(t, client).RefreshUnsettledAt; !got.Equal(mark) {
-		t.Errorf("stored mark = %v, want the client's %v put back", got, mark)
+	if got := storedFor(t, client).UnsettledSince(); !got.Equal(auth.UnsettledExpired) {
+		t.Errorf("stored mark = %v, want the client's verdict put back, expired", got)
 	}
 }
 
-// Server errors for a few seconds do not end an exchange whose outcome is unknown: it
+// Server errors for a while do not end an exchange whose outcome is unknown: it
 // sends the token again until its budget is spent, so an answer that comes in time is
 // saved and leaves no mark asking for a new sign-in.
 func TestClient_ABurstOfServerErrorsLeavesNoMark(t *testing.T) {
@@ -237,8 +280,8 @@ func TestClient_ABurstOfServerErrorsLeavesNoMark(t *testing.T) {
 	expired := &auth.Credential{AccessToken: "mir_cli_stale", RefreshToken: "mir_clr_stale", SessionID: "session-1",
 		ExpiresAt: time.Now().Add(-time.Hour)}
 	client := newTestClient(t, srv.URL, expired, "")
-	// Room for a fourth attempt, after pauses of 1, 2 and 4 s.
-	client.exchangeBudget = refreshPause(0) + refreshPause(1) + refreshPause(2) + 2*time.Second
+	// Room for a fourth attempt, 7 units in, with plenty to spare.
+	quickRetries(client, 20)
 
 	if err := client.Refresh(context.Background()); err != nil {
 		t.Fatalf("Refresh: %v", err)
@@ -291,5 +334,87 @@ func TestClient_AMarkReadWithoutTheLockIsNotTrusted(t *testing.T) {
 	}
 	if mark := storedFor(t, loaded).RefreshUnsettledAt; !mark.IsZero() {
 		t.Errorf("stored mark = %v, want none", mark)
+	}
+}
+
+// A refresh whose TLS handshake fails, as on a captive portal whose certificate the client
+// does not trust, never had a connection and sent nothing: it is not sent again and leaves
+// no mark. A 503 came over a connection, so its outcome is unknown and it is sent again
+// (TestClient_RetriesARefreshWithAnUnknownOutcome).
+func TestClient_ATLSFailureSpentNothing(t *testing.T) {
+	t.Parallel()
+	var requests atomic.Int32
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests.Add(1)
+		rotatedPair(w)
+	}))
+	defer srv.Close()
+	// The client does not trust the test server's certificate.
+	client := newTestClient(t, srv.URL, expired(), "")
+
+	start := time.Now()
+	err := client.Refresh(context.Background())
+	if err == nil || errors.Is(err, auth.ErrNotLoggedIn) || errors.As(err, new(unsettledError)) {
+		t.Fatalf("Refresh = %v, want a plain error", err)
+	}
+	if elapsed := time.Since(start); elapsed >= client.pause(0) {
+		t.Errorf("Refresh took %v; want no pause before a retry", elapsed)
+	}
+	if n := requests.Load(); n != 0 {
+		t.Errorf("%d requests reached the server", n)
+	}
+	if mark := storedFor(t, client).RefreshUnsettledAt; !mark.IsZero() {
+		t.Errorf("stored mark = %v, want none", mark)
+	}
+}
+
+// A process that loaded the credential before another removed it, on the server's
+// refusal, sends nothing: the store no longer holds the session.
+func TestClient_ARemovedCredentialIsNotSentByAnotherProcess(t *testing.T) {
+	t.Parallel()
+	log, srv := newTokenLog(t, func(w http.ResponseWriter) { gatewayError(w, http.StatusUnauthorized, "UNAUTHENTICATED") })
+	first := newTestClient(t, srv.URL, expired(), "")
+	second, err := New(&config.Config{Dir: first.dir, ProfileName: config.DefaultProfile, APIURL: srv.URL, AuthURL: srv.URL},
+		Options{Version: "test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := first.Refresh(context.Background()); !errors.Is(err, auth.ErrNotLoggedIn) {
+		t.Fatalf("first Refresh = %v, want the session expired", err)
+	}
+	if err := second.Refresh(context.Background()); !errors.Is(err, auth.ErrNotLoggedIn) {
+		t.Fatalf("second Refresh = %v, want the session expired", err)
+	}
+	if got := log.tokens(); len(got) != 1 {
+		t.Errorf("refresh tokens sent = %q, want the first process's only", got)
+	}
+}
+
+// A session the store no longer holds, because the developer signed in again, is still
+// rotated in memory so it can be revoked, but the mark it was handed holds: past its
+// budget, its token is not sent.
+func TestClient_ASupersededSessionKeepsToItsMark(t *testing.T) {
+	t.Parallel()
+	log, srv := newTokenLog(t, func(w http.ResponseWriter) { rotatedPair(w) })
+	client := newTestClient(t, srv.URL, expired(), "")
+	old := storedFor(t, client)
+	old.RefreshUnsettledAt, old.RefreshUnsettledFor = time.Now().Round(0).Add(-2*RefreshBudget), TokenSHA256(old.RefreshToken)
+	signedIn := &auth.Credential{AccessToken: "mir_cli_new", RefreshToken: "mir_clr_new", SessionID: "session-new",
+		ExpiresAt: time.Now().Add(time.Hour), OrganizationID: "org-test", AuthURL: srv.URL}
+	if _, err := auth.SaveCredential(client.dir, config.DefaultProfile, signedIn); err != nil {
+		t.Fatal(err)
+	}
+	replaced, err := New(&config.Config{Dir: client.dir, ProfileName: config.DefaultProfile, APIURL: srv.URL, AuthURL: srv.URL},
+		Options{Version: "test", Credential: old})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := replaced.Refresh(context.Background()); !errors.Is(err, errRefreshUnsettled) {
+		t.Fatalf("Refresh = %v, want a sign-in to redo", err)
+	}
+	if got := log.tokens(); len(got) != 0 {
+		t.Errorf("refresh tokens sent = %q, want none", got)
 	}
 }

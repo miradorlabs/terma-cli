@@ -322,7 +322,7 @@ func run(ctx context.Context, name string, args ...string) (string, error) {
 
 // bootoutWait outlasts the agent's exit timeout (StopWindow), after which launchd kills the
 // relay bootout stopped.
-const bootoutWait = StopWindow + 5*time.Second
+const bootoutWait = RestartWait
 
 // bootstrap loads the agent in domain, retrying for up to wait while it fails with an I/O
 // error (5): bootout returns before the relay it stopped has exited, and until then the job
