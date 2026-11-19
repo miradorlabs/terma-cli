@@ -14,6 +14,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"sort"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -24,11 +26,81 @@ import (
 // the plugin calls rather than the harness.
 
 // OpenCodeBinaries resolves the OpenCode builds to test (TERMA_E2E_OPENCODE_VERSIONS,
-// the same spec as Claude's and Codex's).
+// the same spec as Claude's and Codex's). OpenCode 1 and OpenCode 2 are released as two
+// npm packages with two plugin APIs, so "lastN" and "checked" pick from each major on its
+// own: the spec tests both, not just whichever released last.
 func OpenCodeBinaries(t *testing.T) []Binary {
 	t.Helper()
-	return resolve(t, "opencode", os.Getenv("TERMA_E2E_OPENCODE_VERSIONS"), func() ([]string, error) { return npmReleases("opencode-ai") }, ensureOpenCode)
+	spec := os.Getenv("TERMA_E2E_OPENCODE_VERSIONS")
+	if spec == "" {
+		spec = "installed,last3"
+	}
+	var out []Binary
+	seen := map[string]bool{}
+	for i, line := range opencodeLines {
+		lineSpec := spec
+		if i > 0 {
+			// The installed build and the named ones are resolved once, by the first line.
+			lineSpec = releaseParts(spec)
+		}
+		if lineSpec == "" {
+			continue
+		}
+		list := func() ([]string, error) { return opencodeReleases(line.pkg, line.major) }
+		for _, b := range resolve(t, "opencode", lineSpec, list, ensureOpenCode) {
+			if !seen[b.Version] {
+				seen[b.Version] = true
+				out = append(out, b)
+			}
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return versionLess(out[i].Version, out[j].Version) })
+	return out
 }
+
+// opencodeLines are OpenCode's majors, each the npm package that releases it.
+var opencodeLines = []struct {
+	pkg   string
+	major int
+}{{"opencode-ai", 1}, {"@opencode/cli", 2}}
+
+// opencodeReleases are pkg's releases of major.
+func opencodeReleases(pkg string, major int) ([]string, error) {
+	all, err := npmReleases(pkg)
+	if err != nil {
+		return nil, err
+	}
+	var out []string
+	for _, v := range all {
+		if opencodeMajor(v) == major {
+			out = append(out, v)
+		}
+	}
+	return out, nil
+}
+
+// releaseParts is a version spec's "lastN" and "checked" parts alone.
+func releaseParts(spec string) string {
+	var parts []string
+	for part := range strings.SplitSeq(spec, ",") {
+		part = strings.TrimSpace(part)
+		if strings.HasPrefix(part, "last") || part == "checked" {
+			parts = append(parts, part)
+		}
+	}
+	return strings.Join(parts, ",")
+}
+
+// opencodeMajor is a version's major number, 0 when it has none.
+func opencodeMajor(version string) int {
+	major, _, _ := strings.Cut(version, ".")
+	n, _ := strconv.Atoi(major)
+	return n
+}
+
+// opencode2 reports whether b runs OpenCode 2: a background server per user, a
+// `providers` config, and `--standalone` for a run whose server is its own.
+func opencode2(b Binary) bool { return opencodeMajor(b.Version) >= 2 }
 
 func forEachOpenCode(t *testing.T, run func(t *testing.T, b Binary, newest bool)) {
 	t.Helper()
@@ -44,10 +116,16 @@ func forEachOpenCode(t *testing.T, run func(t *testing.T, b Binary, newest bool)
 	}
 }
 
-// opencodePlatform is the npm package holding this machine's native binary.
-func opencodePlatform() string {
+// opencodeTarball is the npm tarball holding this machine's native binary of version:
+// opencode-<platform> for OpenCode 1, @opencode/cli-<platform> for OpenCode 2.
+func opencodeTarball(version string) string {
 	arch := map[string]string{"amd64": "x64", "arm64": "arm64"}[runtime.GOARCH]
-	return "opencode-" + runtime.GOOS + "-" + arch
+	if opencodeMajor(version) >= 2 {
+		name := "cli-" + runtime.GOOS + "-" + arch
+		return fmt.Sprintf("https://registry.npmjs.org/@opencode/%s/-/%s-%s.tgz", name, name, version)
+	}
+	pkg := "opencode-" + runtime.GOOS + "-" + arch
+	return fmt.Sprintf("https://registry.npmjs.org/%s/-/%s-%s.tgz", pkg, pkg, version)
 }
 
 func ensureOpenCode(version string) (string, error) {
@@ -56,8 +134,7 @@ func ensureOpenCode(version string) (string, error) {
 	if _, err := os.Stat(path); err == nil {
 		return abs(path), nil
 	}
-	pkg := opencodePlatform()
-	url := fmt.Sprintf("https://registry.npmjs.org/%s/-/%s-%s.tgz", pkg, pkg, version)
+	url := opencodeTarball(version)
 	data, err := fetch(url)
 	if err != nil {
 		return "", err
@@ -115,9 +192,9 @@ func openAIChatProvider(calls *atomic.Int32) http.Handler {
 	})
 }
 
-// UseOpenCodeProvider points the sandbox's OpenCode at an OpenAI-compatible
+// UseOpenCodeProvider points the sandbox's OpenCode b at an OpenAI-compatible
 // endpoint, as its only model.
-func (sb *Sandbox) UseOpenCodeProvider(url string) {
+func (sb *Sandbox) UseOpenCodeProvider(b Binary, url string) {
 	cfg := map[string]any{
 		"$schema": "https://opencode.ai/config.json",
 		"provider": map[string]any{"fake": map[string]any{
@@ -128,6 +205,18 @@ func (sb *Sandbox) UseOpenCodeProvider(url string) {
 		"model": "fake/m", "autoupdate": false, "share": "disabled",
 		// Headless runs must never stop to ask.
 		"permission": map[string]any{"bash": "allow", "edit": "allow", "webfetch": "allow"},
+	}
+	if opencode2(b) {
+		// OpenCode 2's own shape; its runs pass --auto rather than naming permissions.
+		cfg = map[string]any{
+			"$schema": "https://opencode.ai/config.json",
+			"providers": map[string]any{"fake": map[string]any{
+				"name": "Fake", "package": "@opencode/ai/providers/openai-compatible",
+				"settings": map[string]any{"baseURL": url + "/v1", "apiKey": "synthetic"},
+				"models":   map[string]any{"m": map[string]any{"name": "m"}},
+			}},
+			"model": "fake/m", "autoupdate": false,
+		}
 	}
 	data, _ := json.MarshalIndent(cfg, "", "  ")
 	sb.writeAbs(filepath.Join(sb.Home, ".config", "opencode", "opencode.json"), string(data)+"\n")
@@ -165,6 +254,12 @@ func (sb *Sandbox) OpenCodeRun(b Binary, dir, session, prompt string) string {
 	t := sb.T
 	t.Helper()
 	args := []string{"run", "--format", "json", "--dir", dir}
+	if opencode2(b) {
+		// OpenCode 2 has no --dir: a run works where it starts. --standalone gives it a
+		// server of its own, rather than the user's shared background one, which would
+		// outlive the sandbox and hold whichever environment started it.
+		args = []string{"run", "--standalone", "--auto", "--format", "json"}
+	}
 	if session != "" {
 		args = append(args, "--session", session)
 	}
