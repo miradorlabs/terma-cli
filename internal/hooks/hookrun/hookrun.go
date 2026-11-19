@@ -5,10 +5,8 @@
 package hookrun
 
 import (
-	"bytes"
 	"cmp"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -178,68 +176,6 @@ func (e Env) resolve(ctx context.Context) (*Repo, error) {
 		r.ProjectID = e.Policy.DefaultProjectID
 	}
 	return r, nil
-}
-
-// parking is where a git hook in an agent's sandbox parks what the state directory refused:
-// the repository's git directory, which the sandbox lets it write, even where the session
-// store is a workspace's under the state directory.
-func (r *Repo) parking() *session.Store {
-	return session.Open(filepath.Join(r.GitDir, project.GitStoreDir))
-}
-
-// What a git hook run in an agent's sandbox could not write to the state directory waits in
-// the repository's git directory, which it can write, under these names.
-const (
-	parkedEvents = "events"
-	parkedPushes = "pushes"
-)
-
-// park keeps v, which the state directory refused, in the repository's git directory under name;
-// the next hook there that reaches the state directory unparks it.
-func (e Env) park(r *Repo, name string, v any) bool {
-	if r == nil || r.GitDir == "" {
-		return false // a folder outside git keeps its store in the state directory too
-	}
-	line, err := json.Marshal(v)
-	if err == nil {
-		err = r.parking().Park(name, append(line, '\n'))
-	}
-	if err != nil {
-		e.Logf("park %s: %v", name, err)
-		return false
-	}
-	return true
-}
-
-// unpark hands on what sandboxed hooks parked in r's git directory: events to the spool, in
-// one append, then a flush, and pushes to AwaitPush.
-func (e Env) unpark(r *Repo) {
-	if r.GitDir == "" {
-		return
-	}
-	e.unparkPushes(r)
-	if e.Spool == nil {
-		return
-	}
-	moved := false
-	err := r.parking().Unpark(parkedEvents, func(lines []byte) error {
-		var events []spool.Event
-		for line := range bytes.Lines(lines) {
-			var ev spool.Event
-			if json.Unmarshal(line, &ev) == nil {
-				events = append(events, ev)
-			}
-		}
-		moved = len(events) > 0
-		return e.Spool.Append(events...)
-	})
-	if err != nil {
-		e.Logf("unpark events: %v", err)
-		return
-	}
-	if moved && e.Flush != nil {
-		e.Flush()
-	}
 }
 
 // Admits reports whether the team policy collects the working copy at dir, judged as Repo
