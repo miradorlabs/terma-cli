@@ -1,39 +1,40 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-19T06:00:39.813684832Z",
+  "generated_at": "2026-11-19T08:26:06.660240128Z",
   "versions": [
     {
       "harness": "gemini",
       "name": "Gemini CLI",
       "version": "0.69.0",
       "released_at": "2026-11-19T01:51:24.317Z",
-      "captured_at": "2026-11-19T02:02:08.158629553Z",
+      "captured_at": "2026-11-19T08:26:06.660240128Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "supported",
       "previous": "0.68.0",
-      "changes": 8,
+      "changes": 9,
       "categories": {
         "config": 7,
+        "request": 1,
         "storage": 1
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 8,
+        "informational": 9,
         "notable": 0
       },
-      "undocumented": 5,
+      "undocumented": 6,
       "highlights": [
+        "Header x-goog-api-client: google-genai-sdk/1.30.0 gl-node/v24.22.2 → google-genai-sdk/1.30.0 gl-node/v24.22.3",
         "New setting: model.requestTimeoutMs",
-        "New environment variable: ALL_PROXY",
-        "New environment variable: GEMINI_API_HEADERS_TIMEOUT_MS"
+        "New environment variable: ALL_PROXY"
       ],
       "signing": null,
       "partial": true,
-      "attempted_at": "2026-11-19T02:02:08.158629553Z",
-      "attempts": 1
+      "attempted_at": "2026-11-19T08:26:06.660240128Z",
+      "attempts": 2
     },
     {
       "harness": "claude",

@@ -10945,7 +10945,7 @@
     "platform": "darwin/arm64",
     "capability": "relay.content_allowed",
     "result": "pass",
-    "last_run": "2026-11-19T02:00:58.340819Z",
+    "last_run": "2026-11-19T08:25:01.996913Z",
     "first_passed": "2026-11-19T02:00:58.340819Z",
     "terma": "terma version dev",
     "test": "TestRelayGemini/v0.69.0/content"
@@ -10956,7 +10956,7 @@
     "platform": "darwin/arm64",
     "capability": "relay.content_withheld",
     "result": "pass",
-    "last_run": "2026-11-19T02:01:05.024231Z",
+    "last_run": "2026-11-19T08:25:07.624294Z",
     "first_passed": "2026-11-19T02:01:05.024231Z",
     "terma": "terma version dev",
     "test": "TestRelayGemini/v0.69.0/withheld"
@@ -10967,7 +10967,7 @@
     "platform": "darwin/arm64",
     "capability": "relay.equivalent",
     "result": "pass",
-    "last_run": "2026-11-19T02:00:52.420954Z",
+    "last_run": "2026-11-19T08:24:55.977058Z",
     "first_passed": "2026-11-19T02:00:52.420954Z",
     "terma": "terma version dev",
     "test": "TestRelayWorkloadsGemini/v0.69.0"
@@ -10978,7 +10978,7 @@
     "platform": "darwin/arm64",
     "capability": "relay.only_opted_in",
     "result": "pass",
-    "last_run": "2026-11-19T02:01:16.126812Z",
+    "last_run": "2026-11-19T08:25:18.374128Z",
     "first_passed": "2026-11-19T02:01:16.126812Z",
     "terma": "terma version dev",
     "test": "TestRelayGeminiOutsideARepository/v0.69.0"
@@ -10989,7 +10989,7 @@
     "platform": "darwin/arm64",
     "capability": "relay.telemetry",
     "result": "pass",
-    "last_run": "2026-11-19T02:01:05.02428Z",
+    "last_run": "2026-11-19T08:25:07.624333Z",
     "first_passed": "2026-11-19T02:01:05.02428Z",
     "terma": "terma version dev",
     "test": "TestRelayGemini/v0.69.0"
@@ -11000,7 +11000,7 @@
     "platform": "darwin/arm64",
     "capability": "relay.tools_no_token",
     "result": "pass",
-    "last_run": "2026-11-19T02:01:20.175154Z",
+    "last_run": "2026-11-19T08:25:21.754737Z",
     "first_passed": "2026-11-19T02:01:20.175154Z",
     "terma": "terma version dev",
     "test": "TestRelayGeminiToolsGetNoExporter/v0.69.0"
