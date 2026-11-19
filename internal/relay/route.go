@@ -147,7 +147,9 @@ func (r *Relay) deliverAttributed(c claim.Claim, pol Policy, p *part, how attrib
 	if r.opts.Version != "" {
 		stamp(p, semconv.TermaVersionKey, r.opts.Version)
 	}
-	stampCheckout(p, r.ranIn(c, p, how), pol.IncludeToolContent)
+	ran := r.ranIn(c, p, how)
+	stampCheckout(p, ran, pol.IncludeToolContent)
+	stampCredential(p, ran)
 	nameUser(p, pol)
 	if how.how != "" {
 		stamp(p, semconv.TermaRelayAttributionKey, how.how)
@@ -161,9 +163,9 @@ func (r *Relay) deliverAttributed(c claim.Claim, pol Policy, p *part, how attrib
 }
 
 // ranIn is the claim naming where the part's session ran, its Root the working tree and its
-// Cwd the directory: the placing claim, or, where global mode's catch-all placed the part
-// without either, its session's own claim for the same project. Its checkout is empty when no
-// hook has named one.
+// Cwd the directory, and the credential it runs on: the placing claim, or, where global mode's
+// catch-all placed the part without either, its session's own claim for the same project. Its
+// checkout is empty when no hook has named one.
 func (r *Relay) ranIn(c claim.Claim, p *part, how attribution) claim.Claim {
 	if c.Root != "" || c.Cwd != "" || how.how != semconv.TermaRelayAttributionCatchAll {
 		return c
