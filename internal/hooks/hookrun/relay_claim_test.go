@@ -248,3 +248,28 @@ func TestCommitHooksKeepTheAgentsDirectory(t *testing.T) {
 		t.Errorf("after the commit hooks: claim root %q, cwd %q, %v; want %q, %q", c.Root, c.Cwd, ok, tree, dir)
 	}
 }
+
+// A session's end marks its claim ended and keeps it, for what the agent sends as it exits.
+func TestSessionEndMarksTheClaimEnded(t *testing.T) {
+	t.Parallel()
+	stateDir := t.TempDir()
+	root := hookruntest.InitRepo(t)
+	sp, _ := spool.Open(t.TempDir())
+	env := func(stdin string) Env {
+		return Env{StateDir: stateDir, Now: time.Now(), Cwd: root, Stdin: strings.NewReader(stdin), Spool: sp, Policy: hookruntest.Admitting(root), Team: "project-a"}
+	}
+	const sid = "claude-session-end-1"
+	payload := `{"session_id":"` + sid + `","cwd":"` + hookruntest.InJSON(root) + `","model":"m"}`
+	if err := startSession(context.Background(), env(payload)); err != nil {
+		t.Fatal(err)
+	}
+	if c, ok := claim.Read(stateDir, sid, time.Now()); !ok || !c.EndedAt.IsZero() {
+		t.Fatalf("running session's claim = %+v, %v; want it claimed, not ended", c, ok)
+	}
+	if err := endSession(context.Background(), env(payload)); err != nil {
+		t.Fatal(err)
+	}
+	if c, ok := claim.Read(stateDir, sid, time.Now()); !ok || c.ProjectID != "project-a" || c.EndedAt.IsZero() {
+		t.Fatalf("ended session's claim = %+v, %v; want it kept and ended", c, ok)
+	}
+}
