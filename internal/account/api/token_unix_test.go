@@ -12,6 +12,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"os/exec"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -19,6 +20,7 @@ import (
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/account/auth"
+	"github.com/miradorlabs/terma-cli/internal/account/secret"
 	"github.com/miradorlabs/terma-cli/internal/config"
 )
 
@@ -123,6 +125,58 @@ func testFailedSaves(t *testing.T, failures int) {
 	want := fmt.Sprintf("mir_clr_%d", failures+1)
 	if got := client.Credential().RefreshToken; stored.RefreshToken != want || got != want {
 		t.Errorf("stored %q, client %q; want both the live %q", stored.RefreshToken, got, want)
+	}
+}
+
+// A store that failed to take a rotation, with tokens in the keychain, still holds the
+// spent token. The client's live token, which the store does not hold, is marked in this
+// client alone, never in a store that cannot even take its pair: so it is still sent, and
+// the session moves on, while the store stays read-only.
+func TestClient_ALiveTokenTheStoreMissedIsMarkedHereAlone(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	var n atomic.Int32
+	log, srv := newTokenLog(t, func(w http.ResponseWriter) {
+		i := n.Add(1)
+		if i == 1 {
+			// From the first answer on, neither the keychain nor credentials.json takes a
+			// pair, so the store keeps the spent mir_clr_0.
+			secret.RefuseForTest(t, dir, "credential/")
+			if err := os.Chmod(dir, 0o500); err != nil {
+				t.Error(err)
+			}
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"access_token": fmt.Sprintf("mir_cli_%d", i), "refresh_token": fmt.Sprintf("mir_clr_%d", i), "expires_in": 30,
+			"session_id": "session-1", "organization": map[string]string{"id": "org-test"},
+		})
+	})
+	t.Cleanup(func() { _ = os.Chmod(dir, 0o700) })
+	if _, err := auth.SaveCredential(dir, config.DefaultProfile, &auth.Credential{AccessToken: "mir_cli_0", RefreshToken: "mir_clr_0",
+		SessionID: "session-1", OrganizationID: "org-test", AuthURL: srv.URL, ExpiresAt: time.Now().Add(-time.Hour)}); err != nil {
+		t.Fatal(err)
+	}
+	client, err := New(&config.Config{Dir: dir, ProfileName: config.DefaultProfile, APIURL: srv.URL, AuthURL: srv.URL}, Options{Version: "test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := client.Refresh(context.Background()); err == nil {
+		t.Fatal("first Refresh stored its pair in a read-only store")
+	}
+	if got := storedFor(t, client).RefreshToken; got != "mir_clr_0" {
+		t.Fatalf("stored refresh token = %q, want the spent mir_clr_0 kept", got)
+	}
+
+	err = client.Refresh(context.Background())
+	if err == nil || strings.Contains(err.Error(), "before sending it") {
+		t.Fatalf("second Refresh = %v, want the live token sent and its pair not stored", err)
+	}
+	if want := []string{"mir_clr_0", "mir_clr_1"}; !slices.Equal(log.tokens(), want) {
+		t.Errorf("refresh tokens sent = %q, want %q", log.tokens(), want)
+	}
+	if got := client.Credential().RefreshToken; got != "mir_clr_2" {
+		t.Errorf("client refresh token = %q, want the live mir_clr_2", got)
 	}
 }
 

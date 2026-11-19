@@ -10,17 +10,9 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/account/auth"
 )
 
-// unspentError is a token exchange the server cannot have spent the token in: no
-// connection to it was ever made (a DNS, dial, TLS or proxy failure), so nothing was
-// written, or the gateway turned it away (429). It ends an exchange only when no attempt
-// before it has an unknown outcome.
-type unspentError struct{ error }
-
-func (e unspentError) Unwrap() error { return e.error }
-
 // unsettledError is a token exchange whose outcome this client never learned: the
-// request was sent and no answer came, a 5xx did, or a success without a usable pair. The
-// server may still have spent the token it was sent.
+// request was sent and no answer came, a 5xx other than 503 did, or a success without a
+// usable pair. The server may still have spent the token it was sent.
 type unsettledError struct{ error }
 
 func (e unsettledError) Unwrap() error { return e.error }
@@ -105,13 +97,14 @@ func RefreshLost(cred *auth.Credential) bool {
 // exchange of it, maybe another process's, got no answer.
 //
 // Until an attempt's outcome is unknown (unsettledError), the first answer is final: a
-// refusal, or an attempt that spent nothing (unspentError), ends the exchange at once.
-// Once one is unknown, the same token is sent again until an answer settles it: a pair,
-// or the auth gateway's refusal twice in a row. Nothing else can. The server answers a
-// refresh that lost a race to another rotation of the session with a refusal too, and the
-// unknown attempt may be that rotation, committed late; sent once more, the token is the
-// one it spent, which the server forgives. An exchange that runs out unsettled is no
-// sign-out: the session may be alive, and must not be removed.
+// refusal, or any other failure, which spent nothing (postToken), ends the exchange at
+// once. Once one is unknown, the same token is sent again until an answer settles it: a
+// pair, or the auth gateway's refusal twice in a row. Nothing else can, a 503 or a 429
+// included. The server answers a refresh that lost a race to another rotation of the
+// session with a refusal too, and the unknown attempt may be that rotation, committed
+// late; sent once more, the token is the one it spent, which the server forgives. An
+// exchange that runs out unsettled is no sign-out: the session may be alive, and must not
+// be removed.
 //
 // It runs to the end whether or not ctx does: the server may rotate the pair after a
 // caller gives up, and that pair must reach the store. So a caller's deadline, a relay's
@@ -162,8 +155,9 @@ type unsettledMark struct {
 
 // unsettledSince is when current's refresh token was first sent without an answer, as
 // current's own mark or this client's has it: the earlier of the two. current is the pair
-// read under the credential lock, or, for a session the store no longer holds, the one
-// this client was given; a mark read without the lock elsewhere is never consulted.
+// read under the credential lock, or one only this client holds (a rotation the store
+// missed, or a client without a profile); a mark read without the lock elsewhere is
+// never consulted.
 func (c *Client) unsettledSince(current *auth.Credential) time.Time {
 	at := current.UnsettledSince()
 	c.mu.Lock()

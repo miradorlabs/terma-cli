@@ -204,13 +204,15 @@ func TestClient_AWallClockJumpStopsTheResend(t *testing.T) {
 
 // The mark is written before the token is sent, so a process killed with the answer
 // outstanding leaves it too. An answer that settles the exchange takes it away: a pair
-// replaces the marked one, and a definite refusal to refresh shows nothing was spent.
+// replaces the marked one, and a definite refusal to refresh, or a 503, shows nothing
+// was spent.
 func TestClient_TheMarkPrecedesTheSendAndGoesWithAnAnswer(t *testing.T) {
 	t.Parallel()
 	for name, answer := range map[string]func(http.ResponseWriter){
 		"pair": func(w http.ResponseWriter) { rotatedPair(w) },
 		"403":  func(w http.ResponseWriter) { gatewayError(w, http.StatusForbidden, "PERMISSION_DENIED") },
 		"429":  func(w http.ResponseWriter) { gatewayError(w, http.StatusTooManyRequests, "RESOURCE_EXHAUSTED") },
+		"503":  func(w http.ResponseWriter) { gatewayError(w, http.StatusServiceUnavailable, "UNAVAILABLE") },
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
@@ -339,7 +341,7 @@ func TestClient_AMarkReadWithoutTheLockIsNotTrusted(t *testing.T) {
 
 // A refresh whose TLS handshake fails, as on a captive portal whose certificate the client
 // does not trust, never had a connection and sent nothing: it is not sent again and leaves
-// no mark. A 503 came over a connection, so its outcome is unknown and it is sent again
+// no mark. A 502 came over a connection, so its outcome is unknown and it is sent again
 // (TestClient_RetriesARefreshWithAnUnknownOutcome).
 func TestClient_ATLSFailureSpentNothing(t *testing.T) {
 	t.Parallel()
@@ -388,33 +390,5 @@ func TestClient_ARemovedCredentialIsNotSentByAnotherProcess(t *testing.T) {
 	}
 	if got := log.tokens(); len(got) != 1 {
 		t.Errorf("refresh tokens sent = %q, want the first process's only", got)
-	}
-}
-
-// A session the store no longer holds, because the developer signed in again, is still
-// rotated in memory so it can be revoked, but the mark it was handed holds: past its
-// budget, its token is not sent.
-func TestClient_ASupersededSessionKeepsToItsMark(t *testing.T) {
-	t.Parallel()
-	log, srv := newTokenLog(t, func(w http.ResponseWriter) { rotatedPair(w) })
-	client := newTestClient(t, srv.URL, expired(), "")
-	old := storedFor(t, client)
-	old.RefreshUnsettledAt, old.RefreshUnsettledFor = time.Now().Round(0).Add(-2*RefreshBudget), TokenSHA256(old.RefreshToken)
-	signedIn := &auth.Credential{AccessToken: "mir_cli_new", RefreshToken: "mir_clr_new", SessionID: "session-new",
-		ExpiresAt: time.Now().Add(time.Hour), OrganizationID: "org-test", AuthURL: srv.URL}
-	if _, err := auth.SaveCredential(client.dir, config.DefaultProfile, signedIn); err != nil {
-		t.Fatal(err)
-	}
-	replaced, err := New(&config.Config{Dir: client.dir, ProfileName: config.DefaultProfile, APIURL: srv.URL, AuthURL: srv.URL},
-		Options{Version: "test", Credential: old})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if err := replaced.Refresh(context.Background()); !errors.Is(err, errRefreshUnsettled) {
-		t.Fatalf("Refresh = %v, want a sign-in to redo", err)
-	}
-	if got := log.tokens(); len(got) != 0 {
-		t.Errorf("refresh tokens sent = %q, want none", got)
 	}
 }

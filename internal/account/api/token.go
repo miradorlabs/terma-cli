@@ -102,10 +102,12 @@ func (c *Client) postToken(ctx context.Context, body tokenRequest) (*tokenRespon
 	if err != nil {
 		return nil, err
 	}
+	// Every failure that is not an unsettledError spent nothing: the server answered, and
+	// not with a pair, or the request never reached it.
 	resp, err := c.http.Do(req)
 	switch {
 	case err != nil && !connected.Load():
-		return nil, unspentError{fmt.Errorf("%s %s: %w", http.MethodPost, tokenPath, err)}
+		return nil, fmt.Errorf("%s %s: %w", http.MethodPost, tokenPath, err)
 	case err != nil:
 		return nil, unsettledError{fmt.Errorf("%s %s: %w", http.MethodPost, tokenPath, err)}
 	}
@@ -122,12 +124,25 @@ func (c *Client) postToken(ctx context.Context, body tokenRequest) (*tokenRespon
 			return nil, refusalError{fmt.Errorf("%w: %s", auth.ErrNotLoggedIn, apiErr.Message)}
 		case apiErr.Unauthenticated():
 			return nil, fmt.Errorf("%w: %s", auth.ErrNotLoggedIn, apiErr.Message)
+		case apiErr.StatusCode == http.StatusServiceUnavailable:
+			// Nothing spent. The auth gateway answers 503 UNAVAILABLE when the account
+			// service could not be reached (gRPC Unavailable); a failure after the
+			// rotation committed is 500 INTERNAL. A 503 without that envelope comes from a
+			// hop in front of the gateway with no backend to send it to: one that lost
+			// its backend mid-request answers 502 or 504, which stay unknown below.
+			//
+			// The risk taken: a gRPC connection that breaks after the account service
+			// committed the rotation also surfaces as Unavailable (an outage, or an
+			// account pod stopped hard mid-call in a rollout), and so does a proxy that
+			// reports an upstream reset as 503. That needs the break to fall after the
+			// commit and before the answer, and it ends the session family only if a
+			// later refresh then sends the spent token after the server's grace.
+			return nil, err
 		case apiErr.StatusCode >= 500:
 			return nil, unsettledError{err}
-		case apiErr.StatusCode == http.StatusTooManyRequests:
-			// The gateway turns it away before the account service runs.
-			return nil, unspentError{err}
 		}
+		// A 429 (the gateway turns it away before the account service runs), and any
+		// other 4xx: nothing spent.
 		return nil, err
 	}
 	// A success all the same, so the server may have spent the token. Half a pair is no
@@ -241,6 +256,7 @@ type redeemFunc func(held, current *auth.Credential) bool
 // every step runs under the credential lock:
 //
 //   - reload the stored pair;
+//   - send nothing if it is another sign-in's, which replaced this client's session;
 //   - take it if another process has already rotated past this client's pair;
 //   - redeem only if redeem still asks for it;
 //   - save the new pair before the lock is released.
@@ -265,11 +281,14 @@ func (c *Client) refresh(ctx context.Context, redeem redeemFunc) error {
 		switch {
 		case err == nil && sameSession(stored, held):
 		case err == nil:
-			// The developer signed in again since this client loaded its pair, and the
-			// sign-in normally revokes this session (revokeSession, best effort): rotate it
-			// in memory only. The marks this client was given and made, and its refusals,
-			// still hold.
-			return c.redeem(ctx, held, held, redeem, nil, nil)
+			// The developer signed in again since this client loaded its pair, which the
+			// sign-in replaced. Its token is never sent: no process could store the pair it
+			// got, nor see a mark of it, so a lost answer would leave nothing to stop
+			// another send after the server's grace.
+			if !redeem(held, held) {
+				return nil
+			}
+			return errSessionExpired
 		case errors.Is(err, auth.ErrNotLoggedIn):
 			// Signed out, or removed when the server refused it: never sent again.
 			return errSessionExpired
@@ -281,7 +300,9 @@ func (c *Client) refresh(ctx context.Context, redeem redeemFunc) error {
 			// rotation failed. Keep the client's own live pair and try to save it now.
 			// While the store does not take it, held's token is known to this client
 			// alone: its marks stay here, and a mark in the store, which names no token
-			// it can check against the keychain, would replace the spent token's.
+			// it can check against the keychain, would replace the spent token's. Both
+			// write credentials.json, so a store that just failed to take held would
+			// most likely refuse its mark too, and the live token would not be sent.
 			marks := tx
 			if c.save(tx, held, "") != nil {
 				marks = nil
