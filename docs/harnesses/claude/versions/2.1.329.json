@@ -22449,6 +22449,10 @@
         "description": "Set to `1` to turn off the `auto` and `bypassPermissions` time limit and denials on critical-path removals. These removals then go to the classifier in `auto` mode, and get an untimed prompt in `bypassPermissions` mode wherever Claude Code can show one. Set it in the environment that launches Claude Code, since Claude Code ignores a copy delivered through a settings `env` block. Requires Claude Code v2.1.281 or later",
         "read": true
       },
+      "CLAUDE_CODE_DISABLE_DEFERRED_TOOL_RESUME": {
+        "description": "Set to `1` to skip a deferred tool call when you resume or continue with `-p`. Claude can still repeat the call. Ignored in a settings `env` block. Requires Claude Code v2.1.328 or later",
+        "read": true
+      },
       "CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS": {
         "description": "Set to `1` to strip pre-release `anthropic-beta` request headers, the body fields that pair with them, and beta tool-schema fields such as `defer_loading` and `eager_input_streaming` from API requests. Use this when a proxy gateway rejects requests with an `Unexpected value(s)` error for the `anthropic-beta` header or an `Extra inputs are not permitted` error. Disable pre-release capabilities lists what the variable removes, including MCP tool search, and what Claude Code keeps sending",
         "read": true
@@ -23634,7 +23638,7 @@
         "read": false
       }
     },
-    "fetched_at": "2026-11-19T18:54:17.774774449Z",
+    "fetched_at": "2026-11-19T20:47:56.991304754Z",
     "settings": {
       "advisorModel": {
         "default": "unset, so the advisor is off",
@@ -24145,7 +24149,7 @@
       },
       "disableBrowserExternalNavigation": {
         "default": "unset, so external browsing is on",
-        "description": "Turn off external browsing in the desktop app's Browser pane for people and Claude alike. Localhost dev server previews keep working. HTML previews in SSH and WSL sessions still open, but they don't run scripts. The desktop app reads this key; the terminal CLI ignores it.",
+        "description": "Turn off external browsing in the desktop app's Browser pane for people and Claude alike. Localhost dev server previews keep working. The Browser pane's HTML previews in SSH and WSL sessions still open, but they don't run scripts. The desktop app reads this key; the terminal CLI ignores it.",
         "read": false,
         "scope": "Managed",
         "topic": "Tools",
@@ -24202,7 +24206,7 @@
       },
       "disableRemoteControl": {
         "default": "`false`",
-        "description": "Turn off Remote Control: Claude Code then refuses `claude remote-control`, the `--remote-control` flag, auto-start, and the in-session toggle, and reports that your organization's policy disabled it. Place it in managed settings for per-device MDM enforcement.",
+        "description": "Turn off Remote Control: Claude Code then refuses `claude remote-control`, the `--remote-control` flag, auto-start, and the in-session toggle. Place it in managed settings for per-device MDM enforcement.",
         "read": true,
         "scope": "Any file",
         "topic": "Remote, desktop, and notifications",
@@ -24210,7 +24214,7 @@
       },
       "disableRemotePreviewScripts": {
         "default": "unset, so the key has no effect",
-        "description": "Keep scripts from running when people preview an HTML file from an SSH or WSL session in the desktop app. External browsing in the Browser pane is unaffected.",
+        "description": "Keep scripts from running when people preview an HTML file in the desktop app's Browser pane from an SSH or WSL session. External browsing in that pane is unaffected.",
         "read": false,
         "scope": "Managed",
         "scope_note": "The desktop app doesn't read the key from the remote machine or the WSL distribution.",
@@ -25989,7 +25993,6 @@
       "CLAUDE_CODE_DISABLE_AWAITING_USER_IDLE",
       "CLAUDE_CODE_DISABLE_CLAUDE_API_SKILL",
       "CLAUDE_CODE_DISABLE_CLAUDE_CODE_SKILL",
-      "CLAUDE_CODE_DISABLE_DEFERRED_TOOL_RESUME",
       "CLAUDE_CODE_DISABLE_EARLY_KEY_GUARD",
       "CLAUDE_CODE_DISABLE_EMPTY_CLASSIC_DISPATCH_SKIP",
       "CLAUDE_CODE_DISABLE_EXPLORE_INHERIT_CAP",
