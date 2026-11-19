@@ -1,7 +1,31 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-18T22:12:38.632505618Z",
+  "generated_at": "2026-11-19T03:28:01.177600021Z",
   "events": [
+    {
+      "at": "2026-11-19T03:28:01.177600021Z",
+      "model": "claude-mythos-5-1",
+      "vendor": "anthropic",
+      "name": "Claude Mythos 5.1",
+      "event": "changed",
+      "changes": 2,
+      "highlights": [
+        "Platform id added: Claude Models on Google Cloud (Anthropic managed)",
+        "Model page changed (+4942 −3780 chars)"
+      ]
+    },
+    {
+      "at": "2026-11-19T03:28:01.177600021Z",
+      "model": "claude-mythos-5",
+      "vendor": "anthropic",
+      "name": "Claude Mythos 5",
+      "event": "changed",
+      "changes": 2,
+      "highlights": [
+        "Platform id added: Claude Models on Google Cloud (Anthropic managed)",
+        "Model page changed (+4928 −3768 chars)"
+      ]
+    },
     {
       "at": "2026-11-18T22:12:38.632505618Z",
       "model": "gemini-4-neon",
