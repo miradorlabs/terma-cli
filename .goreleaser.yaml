@@ -19,6 +19,9 @@ builds:
     flags:
       - -mod=readonly
       - -trimpath
+    # A release leaves out what only development and tests read (internal/config's
+    # policystub_release.go); internal/boundary checks every build here sets it.
+    tags: [release]
     goos: [darwin, linux, windows]
     goarch: [amd64, arm64]
     # The version is the git tag so `terma version` matches the release someone
