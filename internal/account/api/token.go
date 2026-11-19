@@ -413,7 +413,7 @@ func (c *Client) refused(current *auth.Credential, tx *auth.Tx) error {
 	if tx != nil {
 		_ = tx.DeleteFor(c.profile, current.OrganizationID, current.RefreshToken)
 	}
-	return errSessionExpired
+	return errRefused
 }
 
 // wasRefused reports whether the server refused refreshToken.

@@ -166,6 +166,11 @@ func (tx *Tx) ClearUnsettled(profile, organizationID, refreshToken string, at ti
 // mutateEntry applies change to organizationID's entry in credentials.json, and writes the
 // file when change reports it changed something. An entry gone, or one that keeps its
 // tokens in the file and holds another refresh token than refreshToken, is left as it is.
+//
+// An entry whose tokens are in the keychain is not compared with refreshToken at all. That
+// is safe only because every caller loaded refreshToken (LoadFor) or saved it (Update) in
+// this same transaction, so nothing can have replaced it. A caller that did not must not
+// use it.
 func (tx *Tx) mutateEntry(profile, organizationID, refreshToken string, change func(*Credential) bool) error {
 	file, err := loadCredentialFile(tx.dir)
 	if err != nil {

@@ -431,3 +431,40 @@ func TestClient_ARemovedCredentialIsNotSentByAnotherProcess(t *testing.T) {
 		t.Errorf("refresh tokens sent = %q, want the first process's only", got)
 	}
 }
+
+// Refused is true only for the auth gateway's own refusal of the refresh token: a bare
+// 401 from some other hop, or a session another sign-in replaced, is no refusal of it.
+func TestRefusedIsOnlyTheGatewaysRefusal(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name       string
+		answer     func(http.ResponseWriter)
+		superseded bool
+		want       bool
+	}{
+		{name: "the gateway's refusal", want: true, answer: func(w http.ResponseWriter) {
+			w.WriteHeader(http.StatusUnauthorized)
+			_, _ = w.Write([]byte(`{"error":{"code":"UNAUTHENTICATED","message":"invalid or expired CLI token"}}`))
+		}},
+		{name: "a bare 401", answer: func(w http.ResponseWriter) { http.Error(w, "Unauthorized", http.StatusUnauthorized) }},
+		{name: "a session another sign-in replaced", superseded: true, answer: rotatedPair},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			_, srv := newTokenLog(t, tc.answer)
+			client := newTestClient(t, srv.URL, &auth.Credential{AccessToken: "mir_cli_old", RefreshToken: "mir_clr_old",
+				SessionID: "session-1", ExpiresAt: time.Now().Add(-time.Minute)}, "")
+			if tc.superseded {
+				if err := auth.UpdateCredential(client.dir, config.DefaultProfile, &auth.Credential{AccessToken: "mir_cli_new",
+					RefreshToken: "mir_clr_new", SessionID: "session-2", ExpiresAt: time.Now().Add(time.Hour),
+					OrganizationID: "org-test", AuthURL: srv.URL}); err != nil {
+					t.Fatal(err)
+				}
+			}
+			err := client.Refresh(context.Background())
+			if !errors.Is(err, auth.ErrNotLoggedIn) || Refused(err) != tc.want {
+				t.Fatalf("Refresh = %v, Refused = %v; want ErrNotLoggedIn, Refused %v", err, Refused(err), tc.want)
+			}
+		})
+	}
+}

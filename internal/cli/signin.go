@@ -223,15 +223,16 @@ func (app *App) reuseStoredSessionIf(ctx context.Context, cfg *config.Config, wa
 
 	verified, identity, err := app.verifyCredential(ctx, cfg, cred)
 	switch {
-	case api.RefreshUnsettled(err):
-		// Its token may still be alive: left for the fresh sign-in to replace.
-		return nil, false, nil
-	case errors.Is(err, auth.ErrNotLoggedIn):
-		// Removed only while the store still holds the pair that was refused: one another
-		// process has rotated in since, or a new sign-in, stays.
+	case api.Refused(err):
+		// Removed only while the store still holds the refused pair: one another process
+		// has rotated in since, or a new sign-in, stays.
 		_ = auth.Locked(ctx, app.dir, func(tx *auth.Tx) error {
 			return tx.DeleteFor(cfg.ProfileName, cred.OrganizationID, cred.RefreshToken)
 		})
+		return nil, false, nil
+	case errors.Is(err, auth.ErrNotLoggedIn):
+		// Not the gateway's refusal (a lost refresh, a proxy's 401): its token may be alive,
+		// so it is kept for the fresh sign-in to replace.
 		return nil, false, nil
 	case err != nil:
 		return nil, false, err
