@@ -1,7 +1,20 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-19T18:16:55.34160588Z",
+  "generated_at": "2026-11-19T20:14:41.124663295Z",
   "events": [
+    {
+      "at": "2026-11-19T20:14:41.124663295Z",
+      "model": "grok-build-0.1",
+      "vendor": "xai",
+      "name": "Grok Build 0.1",
+      "event": "unlisted",
+      "changes": 6,
+      "highlights": [
+        "No longer listed by its vendor",
+        "Batch API: no longer stated (was no)",
+        "Description: no longer stated (was SpaceXSI's intelligent coding model for agentic software, engineering, and workflow tasks.)"
+      ]
+    },
     {
       "at": "2026-11-19T18:16:55.34160588Z",
       "model": "gemini-4-argon",
