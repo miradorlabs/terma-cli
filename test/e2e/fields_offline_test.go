@@ -198,6 +198,46 @@ echo '[{"class": "unclassified", "kept": []}]'
 	}
 }
 
+// A key on a span event is written with the event's name, which the surface alone cannot give:
+// a span's name may itself read like a span event's surface.
+func TestCensusNamesTheSpanEvent(t *testing.T) {
+	const event = "event otel/src/events/session_telemetry.rs"
+	fieldsMu.Lock()
+	clear(fieldSeen)
+	fieldSeen[fieldID{"codex", "0.165.0", "traces/run_hooks/events/" + event, "slug"}] = &seenField{kinds: map[string]bool{KindText: true}, query: classQuery{Site: "event", Event: event, Key: "slug"}}
+	fieldSeen[fieldID{"codex", "0.165.0", "traces/GET /v1/events/x", "http.method"}] = &seenField{kinds: map[string]bool{KindText: true}, query: classQuery{Site: "record", Key: "http.method"}}
+	fieldsMu.Unlock()
+	t.Cleanup(func() { fieldsMu.Lock(); clear(fieldSeen); fieldsMu.Unlock() })
+	dir := t.TempDir()
+	terma := filepath.Join(dir, "terma")
+	script := `#!/bin/sh
+[ "$1" = --version ] && { echo "terma 9.9.9"; exit 0; }
+cat >/dev/null
+echo '[{"class": "safe"}, {"class": "safe"}]'
+`
+	if err := os.WriteFile(terma, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := WriteFields(dir, terma); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(filepath.Join(dir, "fields.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var rows []FieldRow
+	if err := json.Unmarshal(data, &rows); err != nil {
+		t.Fatal(err)
+	}
+	events := map[string]string{}
+	for _, r := range rows {
+		events[r.Surface] = r.Event
+	}
+	if len(rows) != 2 || events["traces/run_hooks/events/"+event] != event || events["traces/GET /v1/events/x"] != "" {
+		t.Errorf("census = %+v", rows)
+	}
+}
+
 // What the census scenarios ran is written beside the census, whatever became of it: a
 // scenario that ran is a run, a skipped one is not.
 func TestCensusRunsAreWrittenBesideTheCensus(t *testing.T) {

@@ -44,6 +44,9 @@ type FieldEntry struct {
 	Harness string `json:"harness"`
 	Surface string `json:"surface"`
 	Key     string `json:"key"`
+	// Event is the span event's name, for a key on one (e2e.FieldRow.Event); an entry filed
+	// before rows carried it has it once a census sees the key again.
+	Event string `json:"event,omitempty"`
 	// Class is what the relay of the latest run that saw it does with it.
 	Class string   `json:"class"`
 	Kinds []string `json:"kinds"`
@@ -100,6 +103,9 @@ func mergeFields(cat *Catalog, rows []e2e.FieldRow, partial map[string]bool) {
 			f = &FieldEntry{Harness: r.Harness, Surface: r.Surface, Key: r.Key, FirstSeen: r.Version, Kinds: slices.Clone(r.Kinds), Class: r.Class, Kept: slices.Clone(r.Kept)}
 			added = append(added, f)
 			fields[e.id()] = f
+		}
+		if r.Event != "" {
+			f.Event = r.Event
 		}
 		if f.FirstSeen == "" || versionLess(r.Version, f.FirstSeen) {
 			f.FirstSeen = r.Version

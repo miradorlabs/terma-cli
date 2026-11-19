@@ -53,6 +53,7 @@ func (h HarnessDrift) headline() string {
 		{len(h.NewSurfaces), "new surface", "new surfaces"}, {len(h.Added), "new field", "new fields"},
 		{len(h.Removed), "removed field", "removed fields"},
 		{len(h.Unseen), "surface no longer sent", "surfaces no longer sent"},
+		{len(h.Moved), "span event moved", "span events moved"},
 		{len(h.Withheld), "newly withheld field", "newly withheld fields"},
 	} {
 		switch {
@@ -243,6 +244,14 @@ func goneLines(ss []GoneSurface, d detail) []string {
 	return listed(out)
 }
 
+func movedLines(ms []MovedEvent) []string {
+	var out []string
+	for _, m := range ms {
+		out = append(out, fmt.Sprintf("`%s` (%s): from span `%s` to `%s`", m.Event, plural(m.Keys, "key"), m.From, m.To))
+	}
+	return listed(out)
+}
+
 // section is one titled list of what a harness's change says; sign is "+" or "-" for a list
 // of what came or went, whose lines are signed as a diff signs them and take no bullet.
 type section struct {
@@ -258,6 +267,7 @@ func (h HarnessDrift) sections(d detail) []section {
 		{"New fields", changeLines(h.Added, "+", true, d), "+"},
 		{"Removed fields", changeLines(h.Removed, "-", true, d), "-"},
 		{"Surfaces no longer sent", goneLines(h.Unseen, d), "-"},
+		{"Span events on another span, keys unchanged", movedLines(h.Moved), ""},
 		{"Newly withheld by the relay, unclassified", changeLines(h.Withheld, "", false, d), ""},
 	}
 }
