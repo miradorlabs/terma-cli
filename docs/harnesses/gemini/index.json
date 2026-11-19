@@ -18,12 +18,11 @@
     "last_change": {
       "from": "0.68.0",
       "to": "0.69.0",
-      "at": "2026-11-19T08:26:06.660240128Z",
+      "at": "2026-11-19T14:31:18.751636658Z",
       "released_at": "2026-11-19T01:51:24.317Z",
-      "changes": 9,
+      "changes": 8,
       "categories": {
         "config": 7,
-        "request": 1,
         "storage": 1
       }
     }
@@ -32,34 +31,33 @@
     {
       "version": "0.69.0",
       "released_at": "2026-11-19T01:51:24.317Z",
-      "captured_at": "2026-11-19T08:26:06.660240128Z",
+      "captured_at": "2026-11-19T14:31:18.751636658Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "supported",
       "previous": "0.68.0",
-      "changes": 9,
+      "changes": 8,
       "categories": {
         "config": 7,
-        "request": 1,
         "storage": 1
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 9,
+        "informational": 8,
         "notable": 0
       },
-      "undocumented": 6,
+      "undocumented": 5,
       "highlights": [
-        "Header x-goog-api-client: google-genai-sdk/1.30.0 gl-node/v24.22.2 → google-genai-sdk/1.30.0 gl-node/v24.22.3",
         "New setting: model.requestTimeoutMs",
-        "New environment variable: ALL_PROXY"
+        "New environment variable: ALL_PROXY",
+        "New environment variable: GEMINI_API_HEADERS_TIMEOUT_MS"
       ],
       "signing": null,
       "partial": true,
-      "attempted_at": "2026-11-19T08:26:06.660240128Z",
-      "attempts": 2
+      "attempted_at": "2026-11-19T14:31:18.751636658Z",
+      "attempts": 3
     },
     {
       "version": "0.68.0",

@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-19T12:26:26.287960053Z",
+  "generated_at": "2026-11-19T14:31:18.751636658Z",
   "harnesses": [
     {
       "id": "claude",
@@ -166,12 +166,11 @@
       "last_change": {
         "from": "0.68.0",
         "to": "0.69.0",
-        "at": "2026-11-19T08:26:06.660240128Z",
+        "at": "2026-11-19T14:31:18.751636658Z",
         "released_at": "2026-11-19T01:51:24.317Z",
-        "changes": 9,
+        "changes": 8,
         "categories": {
           "config": 7,
-          "request": 1,
           "storage": 1
         }
       }
