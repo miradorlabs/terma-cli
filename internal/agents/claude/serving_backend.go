@@ -1,0 +1,75 @@
+package claude
+
+import (
+	"cmp"
+	"slices"
+
+	"github.com/miradorlabs/terma-cli/internal/agents/internal/servinghost"
+	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
+	"github.com/miradorlabs/terma-cli/internal/semconv"
+)
+
+// servingBackend names who serves the session's calls, as terma.serving.backend's value, from
+// the route Claude Code was configured with; "" when it cannot tell.
+func servingBackend(repoRoot string) string {
+	f := readFunding(repoRoot)
+	// A settings file that cannot be read may hide a cloud switch, a gateway or a key.
+	if f.route.unreadable {
+		return ""
+	}
+	return routeBackend(f.route.lookup, f.route.helper || f.Status == hookrun.StatusPresent)
+}
+
+// routeBackend maps Claude Code's route to the closed set: a gateway its switch selects, by
+// ANTHROPIC_BASE_URL's host; a cloud provider's switch, by its own base URL's host when one is
+// set; else ANTHROPIC_BASE_URL's host; else Anthropic when a first-party credential is visible
+// (a key, a token, or storedCredential: an apiKeyHelper or the stored login).
+func routeBackend(lookup func(string) string, storedCredential bool) string {
+	base := lookup("ANTHROPIC_BASE_URL")
+	// The gateway switch outranks every cloud switch, and needs a base URL.
+	if isOn(lookup("CLAUDE_CODE_USE_GATEWAY")) && base != "" {
+		return baseURLBackend(base)
+	}
+	if c, ok := cloudRoute(lookup); ok {
+		own := lookup(c.baseURLVar)
+		if own == "" {
+			return c.backend
+		}
+		// Another provider's host is as foreign to this route as a gateway's.
+		switch kind, ok := servinghost.Of(own); {
+		case !ok:
+			return ""
+		case slices.Contains(c.own, kind):
+			return c.backend
+		}
+		return semconv.TermaServingBackendPrivate
+	}
+	if base != "" {
+		return baseURLBackend(base)
+	}
+	if storedCredential || firstPartyKey(lookup) {
+		return semconv.TermaServingBackendAnthropic
+	}
+	return ""
+}
+
+// claudeHostBackends are the backends serving Claude's API from each kind of host.
+var claudeHostBackends = map[servinghost.Kind]string{
+	servinghost.Anthropic:            semconv.TermaServingBackendAnthropic,
+	servinghost.Bedrock:              semconv.TermaServingBackendAwsBedrock,
+	servinghost.Vertex:               semconv.TermaServingBackendGoogleVertex,
+	servinghost.Azure:                semconv.TermaServingBackendAzureFoundry,
+	servinghost.AnthropicAWS:         semconv.TermaServingBackendAnthropicAws,
+	servinghost.AnthropicGoogleCloud: semconv.TermaServingBackendAnthropicGoogleCloud,
+}
+
+// baseURLBackend is the backend serving raw's host; any other host (a gateway, a proxy, a
+// local server) is private. A URL with no host is "", and so is a Private Service Connect
+// host, which serves Vertex AI and Claude Platform on Google Cloud alike.
+func baseURLBackend(raw string) string {
+	kind, ok := servinghost.Of(raw)
+	if !ok || kind == servinghost.GooglePSC {
+		return ""
+	}
+	return cmp.Or(claudeHostBackends[kind], semconv.TermaServingBackendPrivate)
+}
