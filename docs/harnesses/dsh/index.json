@@ -11,27 +11,62 @@
       "language": "typescript"
     },
     "changelog": "https://github.com/deepseek-ai/deepseek-harness/releases",
-    "latest": "0.2.2-rc.1",
+    "latest": "0.2.2-rc.5",
     "support": "supported",
-    "versions_tracked": 4,
+    "versions_tracked": 5,
     "first_tracked": "2026-09-29",
     "last_change": {
-      "from": "0.2.1-rc.5",
-      "to": "0.2.2-rc.1",
-      "at": "2026-11-13T05:13:29.306022914Z",
-      "released_at": "2026-11-04T09:20:32.31Z",
-      "changes": 116,
+      "from": "0.2.2-rc.1",
+      "to": "0.2.2-rc.5",
+      "at": "2026-11-19T06:00:39.813684832Z",
+      "released_at": "2026-11-18T13:17:23.604Z",
+      "changes": 218,
       "categories": {
         "binary": 1,
-        "cli": 4,
-        "config": 86,
-        "model": 22,
+        "config": 162,
+        "model": 36,
         "prompt": 2,
-        "tools": 1
+        "request": 1,
+        "tools": 16
       }
     }
   },
   "versions": [
+    {
+      "version": "0.2.2-rc.5",
+      "released_at": "2026-11-18T13:17:23.604Z",
+      "captured_at": "2026-11-19T06:00:39.813684832Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "0.2.2-rc.1",
+      "changes": 218,
+      "categories": {
+        "binary": 1,
+        "config": 162,
+        "model": 36,
+        "prompt": 2,
+        "request": 1,
+        "tools": 16
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 106,
+        "notable": 112
+      },
+      "undocumented": 218,
+      "highlights": [
+        "Model parameter dsh_plugin_packages.packages.@deepseek-ai/dsh-agent-team: none → {\"name\":\"@deepseek-ai/dsh-agent-team\",\"version\":\"\\u003cve…",
+        "Model parameter dsh_plugin_packages.packages.@deepseek-ai/dsh-tool-agent-team: none → {\"name\":\"@deepseek-ai/dsh-tool-agent-team\",\"version\":\"\\u0…",
+        "Model parameter dsh_session_log.events.0.time: 1794544976739 → 1795067915760"
+      ],
+      "signing": null,
+      "partial": true,
+      "attempted_at": "2026-11-19T06:00:39.813684832Z",
+      "attempts": 1
+    },
     {
       "version": "0.2.2-rc.1",
       "released_at": "2026-11-04T09:20:32.31Z",

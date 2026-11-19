@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-19T05:21:58.105840683Z",
+  "generated_at": "2026-11-19T06:00:39.813684832Z",
   "versions": [
     {
       "harness": "gemini",
@@ -126,6 +126,43 @@
       ],
       "signing": "valid",
       "attempted_at": "2026-11-18T19:02:44.287552859Z",
+      "attempts": 1
+    },
+    {
+      "harness": "dsh",
+      "name": "DeepSeek Harness",
+      "version": "0.2.2-rc.5",
+      "released_at": "2026-11-18T13:17:23.604Z",
+      "captured_at": "2026-11-19T06:00:39.813684832Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "0.2.2-rc.1",
+      "changes": 218,
+      "categories": {
+        "binary": 1,
+        "config": 162,
+        "model": 36,
+        "prompt": 2,
+        "request": 1,
+        "tools": 16
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 106,
+        "notable": 112
+      },
+      "undocumented": 218,
+      "highlights": [
+        "Model parameter dsh_plugin_packages.packages.@deepseek-ai/dsh-agent-team: none → {\"name\":\"@deepseek-ai/dsh-agent-team\",\"version\":\"\\u003cve…",
+        "Model parameter dsh_plugin_packages.packages.@deepseek-ai/dsh-tool-agent-team: none → {\"name\":\"@deepseek-ai/dsh-tool-agent-team\",\"version\":\"\\u0…",
+        "Model parameter dsh_session_log.events.0.time: 1794544976739 → 1795067915760"
+      ],
+      "signing": null,
+      "partial": true,
+      "attempted_at": "2026-11-19T06:00:39.813684832Z",
       "attempts": 1
     },
     {
@@ -6158,41 +6195,6 @@
         "ConfigChange hook environment variable CLAUDE_PID added",
         "CwdChanged hook environment variable CLAUDE_PID added",
         "Elicitation hook environment variable CLAUDE_PID added"
-      ],
-      "signing": "valid"
-    },
-    {
-      "harness": "claude",
-      "name": "Claude Code",
-      "version": "2.1.212",
-      "released_at": "2026-07-16T19:20:24.324Z",
-      "captured_at": "2026-11-05T09:54:28.532441Z",
-      "platforms": [
-        "darwin/arm64",
-        "linux/amd64"
-      ],
-      "support": "untested",
-      "previous": "2.1.211",
-      "changes": 32,
-      "categories": {
-        "caching": 4,
-        "cli": 4,
-        "config": 2,
-        "filesystem": 19,
-        "prompt": 2,
-        "tools": 1
-      },
-      "impact": {
-        "breaking": 0,
-        "degrading": 0,
-        "informational": 25,
-        "notable": 7
-      },
-      "undocumented": 26,
-      "highlights": [
-        "Injected context added",
-        "Interactive session's injected context added",
-        "ReportFindings tool parameter findings: items.properties.short_summary added"
       ],
       "signing": "valid"
     }

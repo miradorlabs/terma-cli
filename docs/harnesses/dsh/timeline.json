@@ -3,6 +3,1756 @@
   "harness": "dsh",
   "steps": [
     {
+      "version": "0.2.2-rc.5",
+      "previous": "0.2.2-rc.1",
+      "changes": [
+        {
+          "id": "model.params.dsh_plugin_packages.packages.@deepseek-ai/dsh-agent-team",
+          "category": "model",
+          "op": "added",
+          "title": "Model parameter dsh_plugin_packages.packages.@deepseek-ai/dsh-agent-team: none → {\"name\":\"@deepseek-ai/dsh-agent-team\",\"version\":\"\\u003cve…",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "model.params.dsh_plugin_packages.packages.@deepseek-ai/dsh-tool-agent-team",
+          "category": "model",
+          "op": "added",
+          "title": "Model parameter dsh_plugin_packages.packages.@deepseek-ai/dsh-tool-agent-team: none → {\"name\":\"@deepseek-ai/dsh-tool-agent-team\",\"version\":\"\\u0…",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "model.params.dsh_session_log.events.0.time",
+          "category": "model",
+          "op": "changed",
+          "title": "Model parameter dsh_session_log.events.0.time: 1794544976739 → 1795067915760",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "model.params.dsh_session_log.events.1.time",
+          "category": "model",
+          "op": "changed",
+          "title": "Model parameter dsh_session_log.events.1.time: 1794544976740 → 1795067915762",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "model.params.dsh_session_log.events.2.time",
+          "category": "model",
+          "op": "changed",
+          "title": "Model parameter dsh_session_log.events.2.time: 1794544976741 → 1795067915762",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "model.params.dsh_session_log.events.3.time",
+          "category": "model",
+          "op": "changed",
+          "title": "Model parameter dsh_session_log.events.3.time: 1794544976741 → 1795067915764",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "model.params.dsh_session_log.events.4.time",
+          "category": "model",
+          "op": "changed",
+          "title": "Model parameter dsh_session_log.events.4.time: 1794544976742 → 1795067915764",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "model.params.dsh_session_log.events.5.time",
+          "category": "model",
+          "op": "changed",
+          "title": "Model parameter dsh_session_log.events.5.time: 1794544976742 → 1795067915765",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "model.params.dsh_session_log.events.6.time",
+          "category": "model",
+          "op": "changed",
+          "title": "Model parameter dsh_session_log.events.6.time: 1794544976768 → 1795067915810",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "model.params.dsh_session_log.events.7.data.message.content.0.text",
+          "category": "model",
+          "op": "changed",
+          "title": "Model parameter dsh_session_log.events.7.data.message.content.0.text: none → none",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "model.params.dsh_session_log.events.7.time",
+          "category": "model",
+          "op": "changed",
+          "title": "Model parameter dsh_session_log.events.7.time: 1794544976770 → 1795067915812",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "model.params.dsh_session_log.events.8.time",
+          "category": "model",
+          "op": "changed",
+          "title": "Model parameter dsh_session_log.events.8.time: 1794544976771 → 1795067915813",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "model.params.dsh_session_log.events.9.data.content.0.text",
+          "category": "model",
+          "op": "changed",
+          "title": "Model parameter dsh_session_log.events.9.data.content.0.text: none → none",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "model.params.dsh_session_log.events.9.data.source.sections.subagent:identity",
+          "category": "model",
+          "op": "added",
+          "title": "Model parameter dsh_session_log.events.9.data.source.sections.subagent:identity: none → {\"name\":\"subagent:identity\",\"text\":\"You are the root agen…",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "model.params.dsh_session_log.events.9.time",
+          "category": "model",
+          "op": "changed",
+          "title": "Model parameter dsh_session_log.events.9.time: 1794544976772 → 1795067915813",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "model.params.dsh_session_log.events.10.data.header.tools.interrupt_agent",
+          "category": "model",
+          "op": "removed",
+          "title": "Model parameter dsh_session_log.events.10.data.header.tools.interrupt_agent: {\"description\":\"Ask a subagent to stop its current work. … → none",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "model.params.dsh_session_log.events.10.data.header.tools.list_agents.description",
+          "category": "model",
+          "op": "changed",
+          "title": "Model parameter dsh_session_log.events.10.data.header.tools.list_agents.description: none → none",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "model.params.dsh_session_log.events.10.data.header.tools.list_agents.parameters.properties.scope",
+          "category": "model",
+          "op": "removed",
+          "title": "Model parameter dsh_session_log.events.10.data.header.tools.list_agents.parameters.properties.scope: {\"description\":\"children (default) lists direct children,… → none",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "model.params.dsh_session_log.events.10.data.header.tools.send_message.description",
+          "category": "model",
+          "op": "changed",
+          "title": "Model parameter dsh_session_log.events.10.data.header.tools.send_message.description: none → none",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "model.params.dsh_session_log.events.10.data.header.tools.send_message.parameters.properties.agent",
+          "category": "model",
+          "op": "added",
+          "title": "Model parameter dsh_session_log.events.10.data.header.tools.send_message.parameters.properties.agent: none → {\"description\":\"The name of another agent in your subagen…",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "model.params.dsh_session_log.events.10.data.header.tools.send_message.parameters.properties.agent_id",
+          "category": "model",
+          "op": "removed",
+          "title": "Model parameter dsh_session_log.events.10.data.header.tools.send_message.parameters.properties.agent_id: {\"description\":\"The agent id of your direct continuable c… → none",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "model.params.dsh_session_log.events.10.data.header.tools.send_message.parameters.required.agent",
+          "category": "model",
+          "op": "added",
+          "title": "Model parameter dsh_session_log.events.10.data.header.tools.send_message.parameters.required.agent: none → agent",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "model.params.dsh_session_log.events.10.data.header.tools.send_message.parameters.required.agent_id",
+          "category": "model",
+          "op": "removed",
+          "title": "Model parameter dsh_session_log.events.10.data.header.tools.send_message.parameters.required.agent_id: agent_id → none",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "model.params.dsh_session_log.events.10.data.header.tools.subagent.description",
+          "category": "model",
+          "op": "changed",
+          "title": "Model parameter dsh_session_log.events.10.data.header.tools.subagent.description: none → none",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "model.params.dsh_session_log.events.10.data.header.tools.subagent.parameters.properties.description.description",
+          "category": "model",
+          "op": "changed",
+          "title": "Model parameter dsh_session_log.events.10.data.header.tools.subagent.parameters.properties.description.description: A short (3-5 word) description of the delegated task, for… → A short (3-5 word) description of the delegated task, for…",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "model.params.dsh_session_log.events.10.data.header.tools.subagent.parameters.properties.name",
+          "category": "model",
+          "op": "added",
+          "title": "Model parameter dsh_session_log.events.10.data.header.tools.subagent.parameters.properties.name: none → {\"description\":\"Optional short name for the subagent, uni…",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "model.params.dsh_session_log.events.10.data.header.tools.subagent_fork.description",
+          "category": "model",
+          "op": "changed",
+          "title": "Model parameter dsh_session_log.events.10.data.header.tools.subagent_fork.description: none → none",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "model.params.dsh_session_log.events.10.data.header.tools.subagent_fork.parameters.properties.description.description",
+          "category": "model",
+          "op": "changed",
+          "title": "Model parameter dsh_session_log.events.10.data.header.tools.subagent_fork.parameters.properties.description.description: A short (3-5 word) description of the delegated task, for… → A short (3-5 word) description of the delegated task, for…",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "model.params.dsh_session_log.events.10.data.header.tools.subagent_fork.parameters.properties.name",
+          "category": "model",
+          "op": "added",
+          "title": "Model parameter dsh_session_log.events.10.data.header.tools.subagent_fork.parameters.properties.name: none → {\"description\":\"Optional short name for the subagent, uni…",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "model.params.dsh_session_log.events.10.data.header.tools.web_search.parameters.properties.queries.description",
+          "category": "model",
+          "op": "changed",
+          "title": "Model parameter dsh_session_log.events.10.data.header.tools.web_search.parameters.properties.queries.description: 1–4 search queries; their results are merged. → 1–10 search queries; their results are merged.",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "model.params.dsh_session_log.events.10.data.header.tools.wait_agent",
+          "category": "model",
+          "op": "added",
+          "title": "Model parameter dsh_session_log.events.10.data.header.tools.wait_agent: none → {\"description\":\"Wait for input at your next step, includi…",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "model.params.dsh_session_log.events.10.time",
+          "category": "model",
+          "op": "changed",
+          "title": "Model parameter dsh_session_log.events.10.time: 1794544976772 → 1795067915814",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "model.params.dsh_session_log.events.11.time",
+          "category": "model",
+          "op": "changed",
+          "title": "Model parameter dsh_session_log.events.11.time: 1794544976773 → 1795067915815",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "model.params.dsh_session_log.events.12.time",
+          "category": "model",
+          "op": "changed",
+          "title": "Model parameter dsh_session_log.events.12.time: 1794544976775 → 1795067915817",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "model.params.dsh_session_log.events.13.time",
+          "category": "model",
+          "op": "changed",
+          "title": "Model parameter dsh_session_log.events.13.time: 1794544976777 → 1795067915819",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "model.params.dsh_session_log.session.createdAt",
+          "category": "model",
+          "op": "changed",
+          "title": "Model parameter dsh_session_log.session.createdAt: 1794544976736 → 1795067915755",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "prompt.context.0.text",
+          "category": "prompt",
+          "op": "changed",
+          "title": "Injected context changed (+290 −84 chars)",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "prompt.system.0.text",
+          "category": "prompt",
+          "op": "changed",
+          "title": "System prompt changed (+749 −395 chars)",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "tools.interrupt_agent",
+          "category": "tools",
+          "op": "removed",
+          "title": "Tool removed: interrupt_agent",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "tools.list_agents.description",
+          "category": "tools",
+          "op": "changed",
+          "title": "list_agents tool description changed (+706 −276 chars)",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "tools.list_agents.input_schema.properties.scope",
+          "category": "tools",
+          "op": "removed",
+          "title": "list_agents tool parameter scope removed",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "tools.send_message.description",
+          "category": "tools",
+          "op": "changed",
+          "title": "send_message tool description changed (+145 −169 chars)",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "tools.send_message.input_schema.properties.agent",
+          "category": "tools",
+          "op": "added",
+          "title": "send_message tool parameter agent added",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "tools.send_message.input_schema.properties.agent_id",
+          "category": "tools",
+          "op": "removed",
+          "title": "send_message tool parameter agent_id removed",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "tools.send_message.input_schema.required.agent",
+          "category": "tools",
+          "op": "added",
+          "title": "send_message tool parameters added",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "tools.send_message.input_schema.required.agent_id",
+          "category": "tools",
+          "op": "removed",
+          "title": "send_message tool parameters removed",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "tools.subagent.description",
+          "category": "tools",
+          "op": "changed",
+          "title": "subagent tool description changed (+370 −263 chars)",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "tools.subagent.input_schema.properties.description.description",
+          "category": "tools",
+          "op": "changed",
+          "title": "subagent tool parameter description: description changed",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "tools.subagent.input_schema.properties.name",
+          "category": "tools",
+          "op": "added",
+          "title": "subagent tool parameter name added",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "tools.subagent_fork.description",
+          "category": "tools",
+          "op": "changed",
+          "title": "subagent_fork tool description changed (+370 −263 chars)",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "tools.subagent_fork.input_schema.properties.description.description",
+          "category": "tools",
+          "op": "changed",
+          "title": "subagent_fork tool parameter description: description changed",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "tools.subagent_fork.input_schema.properties.name",
+          "category": "tools",
+          "op": "added",
+          "title": "subagent_fork tool parameter name added",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "tools.web_search.input_schema.properties.queries.description",
+          "category": "tools",
+          "op": "changed",
+          "title": "web_search tool parameter queries: description changed",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "tools.wait_agent",
+          "category": "tools",
+          "op": "added",
+          "title": "New tool: wait_agent",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "request.headers.user-agent",
+          "category": "request",
+          "op": "changed",
+          "title": "Header user-agent: deepseek-harness/<version> (+https://github.com/deepseek-… → deepseek-harness/<version> (+https://github.com/deepseek-…",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-agent-team",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-agent-team",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-api-workspace-files.description",
+          "category": "config",
+          "op": "changed",
+          "title": "dsh-api-workspace-files description changed (+56 −43 chars)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-client-ui-account-notifications",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-client-ui-account-notifications",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-client-ui-account-notifications.notificationPollIntervalMs",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-client-ui-account-notifications.notificationPollIntervalMs",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-deepseek-account",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-deepseek-account",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-deepseek-account-platform",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting no longer read: dsh-deepseek-account-platform",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-deepseek-account-platform.accountRequestHeaders",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting no longer read: dsh-deepseek-account-platform.accountRequestHeaders",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-deepseek-account-platform.allowLoopbackHttp",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting no longer read: dsh-deepseek-account-platform.allowLoopbackHttp",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-deepseek-account-platform.attemptTimeoutMs",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting no longer read: dsh-deepseek-account-platform.attemptTimeoutMs",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-deepseek-account-platform.balanceTimeoutMs",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting no longer read: dsh-deepseek-account-platform.balanceTimeoutMs",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-deepseek-account-platform.desktopPlatform",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting no longer read: dsh-deepseek-account-platform.desktopPlatform",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-deepseek-account-platform.embeddedPageDist",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting no longer read: dsh-deepseek-account-platform.embeddedPageDist",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-deepseek-account-platform.inferenceOrigin",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting no longer read: dsh-deepseek-account-platform.inferenceOrigin",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-deepseek-account-platform.logoutMaxRetries",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting no longer read: dsh-deepseek-account-platform.logoutMaxRetries",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-deepseek-account-platform.logoutRetryDelayMs",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting no longer read: dsh-deepseek-account-platform.logoutRetryDelayMs",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-deepseek-account-platform.platformOrigin",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting no longer read: dsh-deepseek-account-platform.platformOrigin",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-deepseek-account-platform.requestHeaders",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting no longer read: dsh-deepseek-account-platform.requestHeaders",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-deepseek-account-platform.requestTimeoutMs",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting no longer read: dsh-deepseek-account-platform.requestTimeoutMs",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-deepseek-account-platform.rewriteBrowserOrigin",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting no longer read: dsh-deepseek-account-platform.rewriteBrowserOrigin",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-deepseek-account.accountRequestHeaders",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-deepseek-account.accountRequestHeaders",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-deepseek-account.allowLoopbackHttp",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-deepseek-account.allowLoopbackHttp",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-deepseek-account.attemptTimeoutMs",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-deepseek-account.attemptTimeoutMs",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-deepseek-account.balanceTimeoutMs",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-deepseek-account.balanceTimeoutMs",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-deepseek-account.desktopPlatform",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-deepseek-account.desktopPlatform",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-deepseek-account.embeddedPageDist",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-deepseek-account.embeddedPageDist",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-deepseek-account.harnessOrigin",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-deepseek-account.harnessOrigin",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-deepseek-account.inferenceOrigin",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-deepseek-account.inferenceOrigin",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-deepseek-account.logoutMaxRetries",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-deepseek-account.logoutMaxRetries",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-deepseek-account.logoutRetryDelayMs",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-deepseek-account.logoutRetryDelayMs",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-deepseek-account.platformOrigin",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-deepseek-account.platformOrigin",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-deepseek-account.requestHeaders",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-deepseek-account.requestHeaders",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-deepseek-account.requestTimeoutMs",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-deepseek-account.requestTimeoutMs",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-deepseek-account.rewriteBrowserOrigin",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-deepseek-account.rewriteBrowserOrigin",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-deepseek-chat-import",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-deepseek-chat-import",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-deepseek-chat-import.maxEntryBytes",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-deepseek-chat-import.maxEntryBytes",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-deepseek-chat-import.maxSessions",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-deepseek-chat-import.maxSessions",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-deepseek-chat-import.maxTitleBytes",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-deepseek-chat-import.maxTitleBytes",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-deepseek-chat-import.maxUploadBytes",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-deepseek-chat-import.maxUploadBytes",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-experimental-agent-team",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting no longer read: dsh-experimental-agent-team",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-experimental-browser-use-stagehand-native.extensionId",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting no longer read: dsh-experimental-browser-use-stagehand-native.extensionId",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-experimental-client-ui-forge.interfacePaths",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-experimental-client-ui-forge.interfacePaths",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-experimental-client-ui-forge.maxBranches.description",
+          "category": "config",
+          "op": "changed",
+          "title": "dsh-experimental-client-ui-forge.maxBranches description changed (+125 −45 chars)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-experimental-client-ui-forge.maxCachedReviewBytes",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-experimental-client-ui-forge.maxCachedReviewBytes",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-experimental-client-ui-forge.maxCommits",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-experimental-client-ui-forge.maxCommits",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-experimental-client-ui-forge.maxDiffBytes.description",
+          "category": "config",
+          "op": "changed",
+          "title": "dsh-experimental-client-ui-forge.maxDiffBytes description changed (+87 −61 chars)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-experimental-client-ui-forge.reviewRefreshMs",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-experimental-client-ui-forge.reviewRefreshMs",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-experimental-client-ui-forge.testPaths",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-experimental-client-ui-forge.testPaths",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-experimental-cua-macos.description",
+          "category": "config",
+          "op": "changed",
+          "title": "dsh-experimental-cua-macos description changed (+97 −75 chars)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-experimental-cua-macos.sourceSigning",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-experimental-cua-macos.sourceSigning",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-experimental-forge-github.maxCommits",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-experimental-forge-github.maxCommits",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-experimental-forge-github.maxOutputBytes.description",
+          "category": "config",
+          "op": "changed",
+          "title": "dsh-experimental-forge-github.maxOutputBytes description changed (+112 −97 chars)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-experimental-forge-github.maxReviewThreads",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-experimental-forge-github.maxReviewThreads",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-experimental-forge-github.maxViewedFiles",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-experimental-forge-github.maxViewedFiles",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-experimental-tool-agent-team",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting no longer read: dsh-experimental-tool-agent-team",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-experimental-worktree.description",
+          "category": "config",
+          "op": "changed",
+          "title": "dsh-experimental-worktree description changed (+108 −80 chars)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-experimental-worktree.maxOutputBytes.description",
+          "category": "config",
+          "op": "changed",
+          "title": "dsh-experimental-worktree.maxOutputBytes description changed (+185 −52 chars)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-experimental-worktree.retainOnArchive",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-experimental-worktree.retainOnArchive",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-mcp-client.closeTimeoutMs",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-mcp-client.closeTimeoutMs",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-mcp-client.expandTemplates",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-mcp-client.expandTemplates",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-mcp-client.serverName.description",
+          "category": "config",
+          "op": "changed",
+          "title": "dsh-mcp-client.serverName description changed (+209 −179 chars)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-mcp-client.startupTimeoutMs",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-mcp-client.startupTimeoutMs",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-mcp-manager",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-mcp-manager",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-mcp-manager.servers",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-mcp-manager.servers",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-office-kit",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-office-kit",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-office-kit.fontDirectories",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-office-kit.fontDirectories",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-office-kit.fontFallbacks",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-office-kit.fontFallbacks",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-office-kit.maxArchiveEntries",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-office-kit.maxArchiveEntries",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-office-kit.maxBackgroundConversions",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-office-kit.maxBackgroundConversions",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-office-kit.maxCachedBytes",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-office-kit.maxCachedBytes",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-office-kit.maxCachedEntries",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-office-kit.maxCachedEntries",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-office-kit.maxConcurrentConversions",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-office-kit.maxConcurrentConversions",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-office-kit.maxFontFileBytes",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-office-kit.maxFontFileBytes",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-office-kit.maxFontFiles",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-office-kit.maxFontFiles",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-office-kit.maxImageResolution",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-office-kit.maxImageResolution",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-office-kit.maxInputBytes",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-office-kit.maxInputBytes",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-office-kit.maxLoadedFontBytes",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-office-kit.maxLoadedFontBytes",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-office-kit.maxOutputBytes",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-office-kit.maxOutputBytes",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-office-kit.maxOutputStoreBytes",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-office-kit.maxOutputStoreBytes",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-office-kit.maxQueuedJobs",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-office-kit.maxQueuedJobs",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-office-kit.maxReaders",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-office-kit.maxReaders",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-office-kit.maxSourceBytes",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-office-kit.maxSourceBytes",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-office-kit.maxSourceEntries",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-office-kit.maxSourceEntries",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-office-kit.maxUncompressedBytes",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-office-kit.maxUncompressedBytes",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-office-kit.outputDirectory",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-office-kit.outputDirectory",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-office-kit.outputRetentionMs",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-office-kit.outputRetentionMs",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-office-kit.timeoutMs",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-office-kit.timeoutMs",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-office-to-pdf",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting no longer read: dsh-office-to-pdf",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-office-to-pdf.fontDirectories",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting no longer read: dsh-office-to-pdf.fontDirectories",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-office-to-pdf.fontFallbacks",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting no longer read: dsh-office-to-pdf.fontFallbacks",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-office-to-pdf.maxArchiveEntries",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting no longer read: dsh-office-to-pdf.maxArchiveEntries",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-office-to-pdf.maxBackgroundConversions",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting no longer read: dsh-office-to-pdf.maxBackgroundConversions",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-office-to-pdf.maxCachedBytes",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting no longer read: dsh-office-to-pdf.maxCachedBytes",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-office-to-pdf.maxCachedEntries",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting no longer read: dsh-office-to-pdf.maxCachedEntries",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-office-to-pdf.maxConcurrentConversions",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting no longer read: dsh-office-to-pdf.maxConcurrentConversions",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-office-to-pdf.maxFontFileBytes",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting no longer read: dsh-office-to-pdf.maxFontFileBytes",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-office-to-pdf.maxFontFiles",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting no longer read: dsh-office-to-pdf.maxFontFiles",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-office-to-pdf.maxImageResolution",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting no longer read: dsh-office-to-pdf.maxImageResolution",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-office-to-pdf.maxInputBytes",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting no longer read: dsh-office-to-pdf.maxInputBytes",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-office-to-pdf.maxLoadedFontBytes",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting no longer read: dsh-office-to-pdf.maxLoadedFontBytes",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-office-to-pdf.maxOutputBytes",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting no longer read: dsh-office-to-pdf.maxOutputBytes",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-office-to-pdf.maxQueuedJobs",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting no longer read: dsh-office-to-pdf.maxQueuedJobs",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-office-to-pdf.maxReaders",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting no longer read: dsh-office-to-pdf.maxReaders",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-office-to-pdf.maxSourceBytes",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting no longer read: dsh-office-to-pdf.maxSourceBytes",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-office-to-pdf.maxSourceEntries",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting no longer read: dsh-office-to-pdf.maxSourceEntries",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-office-to-pdf.maxUncompressedBytes",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting no longer read: dsh-office-to-pdf.maxUncompressedBytes",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-office-to-pdf.timeoutMs",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting no longer read: dsh-office-to-pdf.timeoutMs",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-ptc-runtime-node.stopGraceMs",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-ptc-runtime-node.stopGraceMs",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-sandbox-policy.additionalWritableRoots.description",
+          "category": "config",
+          "op": "changed",
+          "title": "dsh-sandbox-policy.additionalWritableRoots description changed (+72 −0 chars)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-skill-office.description",
+          "category": "config",
+          "op": "changed",
+          "title": "dsh-skill-office description changed (+42 −31 chars)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-skill-office.assetRoot",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting no longer read: dsh-skill-office.assetRoot",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-skill-office.cli",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting no longer read: dsh-skill-office.cli",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-skill-office.node",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting no longer read: dsh-skill-office.node",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-skill-office.pythonEnvironment",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-skill-office.pythonEnvironment",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-terminal-panel",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-terminal-panel",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-terminal-panel.backendType",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-terminal-panel.backendType",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-terminal-panel.cols",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-terminal-panel.cols",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-terminal-panel.environment",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-terminal-panel.environment",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-terminal-panel.idleSilenceMs",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-terminal-panel.idleSilenceMs",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-terminal-panel.maxReadBytes",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-terminal-panel.maxReadBytes",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-terminal-panel.preferredShells",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-terminal-panel.preferredShells",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-terminal-panel.probeIntervalMs",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-terminal-panel.probeIntervalMs",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-terminal-panel.promptSilenceMs",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-terminal-panel.promptSilenceMs",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-terminal-panel.readUserTerminals",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-terminal-panel.readUserTerminals",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-terminal-panel.rows",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-terminal-panel.rows",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-terminal-panel.startupSilenceMs",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-terminal-panel.startupSilenceMs",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-terminal-panel.startupTimeoutMs",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-terminal-panel.startupTimeoutMs",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-terminal-panel.timeoutMs",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-terminal-panel.timeoutMs",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-tool-executor-ptc.maxSubCallsPerMinute",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-tool-executor-ptc.maxSubCallsPerMinute",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-tool-office",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-tool-office",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-tool-office.activationSkills",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-tool-office.activationSkills",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-tool-office.maxImageBytes",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-tool-office.maxImageBytes",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-tool-office.maxImageDimension",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-tool-office.maxImageDimension",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-tool-office.maxImagePixels",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-tool-office.maxImagePixels",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-tool-office.maxImages",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-tool-office.maxImages",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-tool-subagent-control",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-tool-subagent-control",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-tool-subagent-control.interrupt",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-tool-subagent-control.interrupt",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-tool-web.searchMaxQueries.description",
+          "category": "config",
+          "op": "changed",
+          "title": "dsh-tool-web.searchMaxQueries description changed (+73 −57 chars)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-tool-web.searchMaxResults.description",
+          "category": "config",
+          "op": "changed",
+          "title": "dsh-tool-web.searchMaxResults description changed (+73 −57 chars)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-web-deepseek-api.description",
+          "category": "config",
+          "op": "changed",
+          "title": "dsh-web-deepseek-api description changed (+283 −0 chars)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-web-deepseek-api.apiKey",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting no longer read: dsh-web-deepseek-api.apiKey",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-web-deepseek-api.apiKeyEnv",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting no longer read: dsh-web-deepseek-api.apiKeyEnv",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-web-deepseek-api.baseURL",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting no longer read: dsh-web-deepseek-api.baseURL",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-web-deepseek-api.fetchApiKeyEnv",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-web-deepseek-api.fetchApiKeyEnv",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-web-deepseek-api.fetchBaseURL",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-web-deepseek-api.fetchBaseURL",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-web-deepseek-api.fetchBilling",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-web-deepseek-api.fetchBilling",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-web-deepseek-api.searchApiKeyEnv",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-web-deepseek-api.searchApiKeyEnv",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-web-deepseek-api.searchBaseURL",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-web-deepseek-api.searchBaseURL",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-web-deepseek-api.searchBilling",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-web-deepseek-api.searchBilling",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-web-deepseek-api.searchRequestsPerSecond",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: dsh-web-deepseek-api.searchRequestsPerSecond",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-web-search-exa",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting no longer read: dsh-web-search-exa",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-web-search-exa.apiKey",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting no longer read: dsh-web-search-exa.apiKey",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-web-search-exa.baseURL",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting no longer read: dsh-web-search-exa.baseURL",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-web-search-exa.highlightsPerResult",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting no longer read: dsh-web-search-exa.highlightsPerResult",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-web-search-exa.numResults",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting no longer read: dsh-web-search-exa.numResults",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-web-search-exa.searchType",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting no longer read: dsh-web-search-exa.searchType",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-web-search-perplexity",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting no longer read: dsh-web-search-perplexity",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-web-search-perplexity.apiKey",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting no longer read: dsh-web-search-perplexity.apiKey",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-web-search-perplexity.baseURL",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting no longer read: dsh-web-search-perplexity.baseURL",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-web-search-perplexity.maxTokens",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting no longer read: dsh-web-search-perplexity.maxTokens",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-web-search-perplexity.model",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting no longer read: dsh-web-search-perplexity.model",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "config.options.dsh-web-search-perplexity.searchRecency",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting no longer read: dsh-web-search-perplexity.searchRecency",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "config.env_vars.DSH_USER_AGENT_SUFFIX",
+          "category": "config",
+          "op": "added",
+          "title": "New environment variable: DSH_USER_AGENT_SUFFIX",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "binary.size_bytes",
+          "category": "binary",
+          "op": "changed",
+          "title": "Binary size: 76,416 → 6,230,712 bytes (76.4 KB → 6.2 MB)",
+          "impact": "informational",
+          "documented": false
+        }
+      ]
+    },
+    {
       "version": "0.2.2-rc.1",
       "previous": "0.2.1-rc.5",
       "changes": [

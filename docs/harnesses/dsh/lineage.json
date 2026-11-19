@@ -3,8 +3,8 @@
   "harness": "dsh",
   "window": {
     "oldest": "0.2.0-rc.2",
-    "newest": "0.2.2-rc.1",
-    "builds": 4
+    "newest": "0.2.2-rc.5",
+    "builds": 5
   },
   "items": {
     "cli.commands.dsh headless": {
@@ -314,6 +314,17 @@
         }
       ],
       "since_bounded": false
+    },
+    "config.env_vars.DSH_USER_AGENT_SUFFIX": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.5",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
     },
     "config.env_vars.DSH_WEB_FETCH_PROVIDER": {
       "kind": "env_var",
@@ -677,6 +688,17 @@
         }
       ],
       "since_bounded": false
+    },
+    "config.options.dsh-agent-team": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.5",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
     },
     "config.options.dsh-agent-tool-presentation": {
       "kind": "setting",
@@ -1150,6 +1172,28 @@
         }
       ],
       "since_bounded": false
+    },
+    "config.options.dsh-client-ui-account-notifications": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.5",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-client-ui-account-notifications.notificationPollIntervalMs": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.5",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
     },
     "config.options.dsh-client-ui-plugin-manager": {
       "kind": "setting",
@@ -1690,13 +1734,24 @@
       ],
       "since_bounded": false
     },
+    "config.options.dsh-deepseek-account": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.5",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.options.dsh-deepseek-account-platform": {
       "kind": "setting",
       "ranges": [
         {
           "since": "0.2.1-rc.5",
-          "until": null,
-          "removed": null
+          "until": "0.2.2-rc.1",
+          "removed": "0.2.2-rc.5"
         }
       ],
       "since_bounded": false
@@ -1706,8 +1761,8 @@
       "ranges": [
         {
           "since": "0.2.1-rc.5",
-          "until": null,
-          "removed": null
+          "until": "0.2.2-rc.1",
+          "removed": "0.2.2-rc.5"
         }
       ],
       "since_bounded": false
@@ -1717,8 +1772,8 @@
       "ranges": [
         {
           "since": "0.2.1-rc.5",
-          "until": null,
-          "removed": null
+          "until": "0.2.2-rc.1",
+          "removed": "0.2.2-rc.5"
         }
       ],
       "since_bounded": false
@@ -1728,8 +1783,8 @@
       "ranges": [
         {
           "since": "0.2.1-rc.5",
-          "until": null,
-          "removed": null
+          "until": "0.2.2-rc.1",
+          "removed": "0.2.2-rc.5"
         }
       ],
       "since_bounded": false
@@ -1739,8 +1794,8 @@
       "ranges": [
         {
           "since": "0.2.1-rc.5",
-          "until": null,
-          "removed": null
+          "until": "0.2.2-rc.1",
+          "removed": "0.2.2-rc.5"
         }
       ],
       "since_bounded": false
@@ -1750,8 +1805,8 @@
       "ranges": [
         {
           "since": "0.2.1-rc.5",
-          "until": null,
-          "removed": null
+          "until": "0.2.2-rc.1",
+          "removed": "0.2.2-rc.5"
         }
       ],
       "since_bounded": false
@@ -1761,8 +1816,8 @@
       "ranges": [
         {
           "since": "0.2.1-rc.5",
-          "until": null,
-          "removed": null
+          "until": "0.2.2-rc.1",
+          "removed": "0.2.2-rc.5"
         }
       ],
       "since_bounded": false
@@ -1772,8 +1827,8 @@
       "ranges": [
         {
           "since": "0.2.1-rc.5",
-          "until": null,
-          "removed": null
+          "until": "0.2.2-rc.1",
+          "removed": "0.2.2-rc.5"
         }
       ],
       "since_bounded": false
@@ -1783,8 +1838,8 @@
       "ranges": [
         {
           "since": "0.2.1-rc.5",
-          "until": null,
-          "removed": null
+          "until": "0.2.2-rc.1",
+          "removed": "0.2.2-rc.5"
         }
       ],
       "since_bounded": false
@@ -1794,8 +1849,8 @@
       "ranges": [
         {
           "since": "0.2.1-rc.5",
-          "until": null,
-          "removed": null
+          "until": "0.2.2-rc.1",
+          "removed": "0.2.2-rc.5"
         }
       ],
       "since_bounded": false
@@ -1805,8 +1860,8 @@
       "ranges": [
         {
           "since": "0.2.1-rc.5",
-          "until": null,
-          "removed": null
+          "until": "0.2.2-rc.1",
+          "removed": "0.2.2-rc.5"
         }
       ],
       "since_bounded": false
@@ -1816,8 +1871,8 @@
       "ranges": [
         {
           "since": "0.2.1-rc.5",
-          "until": null,
-          "removed": null
+          "until": "0.2.2-rc.1",
+          "removed": "0.2.2-rc.5"
         }
       ],
       "since_bounded": false
@@ -1827,8 +1882,8 @@
       "ranges": [
         {
           "since": "0.2.1-rc.5",
-          "until": null,
-          "removed": null
+          "until": "0.2.2-rc.1",
+          "removed": "0.2.2-rc.5"
         }
       ],
       "since_bounded": false
@@ -1838,19 +1893,228 @@
       "ranges": [
         {
           "since": "0.2.1-rc.5",
+          "until": "0.2.2-rc.1",
+          "removed": "0.2.2-rc.5"
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.dsh-deepseek-account.accountRequestHeaders": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.5",
           "until": null,
           "removed": null
         }
       ],
-      "since_bounded": false
+      "since_bounded": true
+    },
+    "config.options.dsh-deepseek-account.allowLoopbackHttp": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.5",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-deepseek-account.attemptTimeoutMs": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.5",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-deepseek-account.balanceTimeoutMs": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.5",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-deepseek-account.desktopPlatform": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.5",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-deepseek-account.embeddedPageDist": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.5",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-deepseek-account.harnessOrigin": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.5",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-deepseek-account.inferenceOrigin": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.5",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-deepseek-account.logoutMaxRetries": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.5",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-deepseek-account.logoutRetryDelayMs": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.5",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-deepseek-account.platformOrigin": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.5",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-deepseek-account.requestHeaders": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.5",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-deepseek-account.requestTimeoutMs": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.5",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-deepseek-account.rewriteBrowserOrigin": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.5",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-deepseek-chat-import": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.5",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-deepseek-chat-import.maxEntryBytes": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.5",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-deepseek-chat-import.maxSessions": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.5",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-deepseek-chat-import.maxTitleBytes": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.5",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-deepseek-chat-import.maxUploadBytes": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.5",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
     },
     "config.options.dsh-experimental-agent-team": {
       "kind": "setting",
       "ranges": [
         {
           "since": "0.2.1-rc.5",
-          "until": null,
-          "removed": null
+          "until": "0.2.2-rc.1",
+          "removed": "0.2.2-rc.5"
         }
       ],
       "since_bounded": false
@@ -1926,8 +2190,8 @@
       "ranges": [
         {
           "since": "0.2.1-rc.5",
-          "until": null,
-          "removed": null
+          "until": "0.2.2-rc.1",
+          "removed": "0.2.2-rc.5"
         }
       ],
       "since_bounded": false
@@ -2141,6 +2405,17 @@
       ],
       "since_bounded": true
     },
+    "config.options.dsh-experimental-client-ui-forge.interfacePaths": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.5",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.options.dsh-experimental-client-ui-forge.maxBranches": {
       "kind": "setting",
       "ranges": [
@@ -2157,6 +2432,28 @@
       "ranges": [
         {
           "since": "0.2.2-rc.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-experimental-client-ui-forge.maxCachedReviewBytes": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.5",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-experimental-client-ui-forge.maxCommits": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.5",
           "until": null,
           "removed": null
         }
@@ -2201,6 +2498,28 @@
       "ranges": [
         {
           "since": "0.2.2-rc.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-experimental-client-ui-forge.reviewRefreshMs": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.5",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-experimental-client-ui-forge.testPaths": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.5",
           "until": null,
           "removed": null
         }
@@ -2295,6 +2614,17 @@
       ],
       "since_bounded": true
     },
+    "config.options.dsh-experimental-cua-macos.sourceSigning": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.5",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.options.dsh-experimental-forge": {
       "kind": "setting",
       "ranges": [
@@ -2339,11 +2669,44 @@
       ],
       "since_bounded": true
     },
+    "config.options.dsh-experimental-forge-github.maxCommits": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.5",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.options.dsh-experimental-forge-github.maxOutputBytes": {
       "kind": "setting",
       "ranges": [
         {
           "since": "0.2.2-rc.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-experimental-forge-github.maxReviewThreads": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.5",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-experimental-forge-github.maxViewedFiles": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.5",
           "until": null,
           "removed": null
         }
@@ -2927,8 +3290,8 @@
       "ranges": [
         {
           "since": "0.2.1-rc.5",
-          "until": null,
-          "removed": null
+          "until": "0.2.2-rc.1",
+          "removed": "0.2.2-rc.5"
         }
       ],
       "since_bounded": false
@@ -3141,6 +3504,17 @@
         }
       ],
       "since_bounded": false
+    },
+    "config.options.dsh-experimental-worktree.retainOnArchive": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.5",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
     },
     "config.options.dsh-experimental-worktree.timeoutMs": {
       "kind": "setting",
@@ -3989,6 +4363,17 @@
       ],
       "since_bounded": false
     },
+    "config.options.dsh-mcp-client.closeTimeoutMs": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.5",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.options.dsh-mcp-client.command": {
       "kind": "setting",
       "ranges": [
@@ -4021,6 +4406,17 @@
         }
       ],
       "since_bounded": false
+    },
+    "config.options.dsh-mcp-client.expandTemplates": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.5",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
     },
     "config.options.dsh-mcp-client.failOnStartupError": {
       "kind": "setting",
@@ -4066,6 +4462,17 @@
       ],
       "since_bounded": false
     },
+    "config.options.dsh-mcp-client.startupTimeoutMs": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.5",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.options.dsh-mcp-client.toolCallTimeoutMs": {
       "kind": "setting",
       "ranges": [
@@ -4088,6 +4495,28 @@
       ],
       "since_bounded": false
     },
+    "config.options.dsh-mcp-manager": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.5",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-mcp-manager.servers": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.5",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.options.dsh-message-feedback": {
       "kind": "setting",
       "ranges": [
@@ -4099,13 +4528,266 @@
       ],
       "since_bounded": false
     },
+    "config.options.dsh-office-kit": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.5",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-office-kit.fontDirectories": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.5",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-office-kit.fontFallbacks": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.5",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-office-kit.maxArchiveEntries": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.5",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-office-kit.maxBackgroundConversions": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.5",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-office-kit.maxCachedBytes": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.5",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-office-kit.maxCachedEntries": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.5",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-office-kit.maxConcurrentConversions": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.5",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-office-kit.maxFontFileBytes": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.5",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-office-kit.maxFontFiles": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.5",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-office-kit.maxImageResolution": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.5",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-office-kit.maxInputBytes": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.5",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-office-kit.maxLoadedFontBytes": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.5",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-office-kit.maxOutputBytes": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.5",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-office-kit.maxOutputStoreBytes": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.5",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-office-kit.maxQueuedJobs": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.5",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-office-kit.maxReaders": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.5",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-office-kit.maxSourceBytes": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.5",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-office-kit.maxSourceEntries": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.5",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-office-kit.maxUncompressedBytes": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.5",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-office-kit.outputDirectory": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.5",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-office-kit.outputRetentionMs": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.5",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-office-kit.timeoutMs": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.5",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.options.dsh-office-to-pdf": {
       "kind": "setting",
       "ranges": [
         {
           "since": "0.2.1-rc.5",
-          "until": null,
-          "removed": null
+          "until": "0.2.2-rc.1",
+          "removed": "0.2.2-rc.5"
         }
       ],
       "since_bounded": false
@@ -4115,8 +4797,8 @@
       "ranges": [
         {
           "since": "0.2.1-rc.5",
-          "until": null,
-          "removed": null
+          "until": "0.2.2-rc.1",
+          "removed": "0.2.2-rc.5"
         }
       ],
       "since_bounded": false
@@ -4126,8 +4808,8 @@
       "ranges": [
         {
           "since": "0.2.1-rc.5",
-          "until": null,
-          "removed": null
+          "until": "0.2.2-rc.1",
+          "removed": "0.2.2-rc.5"
         }
       ],
       "since_bounded": false
@@ -4137,8 +4819,8 @@
       "ranges": [
         {
           "since": "0.2.1-rc.5",
-          "until": null,
-          "removed": null
+          "until": "0.2.2-rc.1",
+          "removed": "0.2.2-rc.5"
         }
       ],
       "since_bounded": false
@@ -4148,8 +4830,8 @@
       "ranges": [
         {
           "since": "0.2.1-rc.5",
-          "until": null,
-          "removed": null
+          "until": "0.2.2-rc.1",
+          "removed": "0.2.2-rc.5"
         }
       ],
       "since_bounded": false
@@ -4159,8 +4841,8 @@
       "ranges": [
         {
           "since": "0.2.1-rc.5",
-          "until": null,
-          "removed": null
+          "until": "0.2.2-rc.1",
+          "removed": "0.2.2-rc.5"
         }
       ],
       "since_bounded": false
@@ -4170,8 +4852,8 @@
       "ranges": [
         {
           "since": "0.2.1-rc.5",
-          "until": null,
-          "removed": null
+          "until": "0.2.2-rc.1",
+          "removed": "0.2.2-rc.5"
         }
       ],
       "since_bounded": false
@@ -4181,8 +4863,8 @@
       "ranges": [
         {
           "since": "0.2.1-rc.5",
-          "until": null,
-          "removed": null
+          "until": "0.2.2-rc.1",
+          "removed": "0.2.2-rc.5"
         }
       ],
       "since_bounded": false
@@ -4192,8 +4874,8 @@
       "ranges": [
         {
           "since": "0.2.1-rc.5",
-          "until": null,
-          "removed": null
+          "until": "0.2.2-rc.1",
+          "removed": "0.2.2-rc.5"
         }
       ],
       "since_bounded": false
@@ -4203,8 +4885,8 @@
       "ranges": [
         {
           "since": "0.2.1-rc.5",
-          "until": null,
-          "removed": null
+          "until": "0.2.2-rc.1",
+          "removed": "0.2.2-rc.5"
         }
       ],
       "since_bounded": false
@@ -4214,8 +4896,8 @@
       "ranges": [
         {
           "since": "0.2.1-rc.5",
-          "until": null,
-          "removed": null
+          "until": "0.2.2-rc.1",
+          "removed": "0.2.2-rc.5"
         }
       ],
       "since_bounded": false
@@ -4225,8 +4907,8 @@
       "ranges": [
         {
           "since": "0.2.1-rc.5",
-          "until": null,
-          "removed": null
+          "until": "0.2.2-rc.1",
+          "removed": "0.2.2-rc.5"
         }
       ],
       "since_bounded": false
@@ -4236,8 +4918,8 @@
       "ranges": [
         {
           "since": "0.2.1-rc.5",
-          "until": null,
-          "removed": null
+          "until": "0.2.2-rc.1",
+          "removed": "0.2.2-rc.5"
         }
       ],
       "since_bounded": false
@@ -4247,8 +4929,8 @@
       "ranges": [
         {
           "since": "0.2.1-rc.5",
-          "until": null,
-          "removed": null
+          "until": "0.2.2-rc.1",
+          "removed": "0.2.2-rc.5"
         }
       ],
       "since_bounded": false
@@ -4258,8 +4940,8 @@
       "ranges": [
         {
           "since": "0.2.1-rc.5",
-          "until": null,
-          "removed": null
+          "until": "0.2.2-rc.1",
+          "removed": "0.2.2-rc.5"
         }
       ],
       "since_bounded": false
@@ -4269,8 +4951,8 @@
       "ranges": [
         {
           "since": "0.2.1-rc.5",
-          "until": null,
-          "removed": null
+          "until": "0.2.2-rc.1",
+          "removed": "0.2.2-rc.5"
         }
       ],
       "since_bounded": false
@@ -4280,8 +4962,8 @@
       "ranges": [
         {
           "since": "0.2.1-rc.5",
-          "until": null,
-          "removed": null
+          "until": "0.2.2-rc.1",
+          "removed": "0.2.2-rc.5"
         }
       ],
       "since_bounded": false
@@ -4291,8 +4973,8 @@
       "ranges": [
         {
           "since": "0.2.1-rc.5",
-          "until": null,
-          "removed": null
+          "until": "0.2.2-rc.1",
+          "removed": "0.2.2-rc.5"
         }
       ],
       "since_bounded": false
@@ -4302,8 +4984,8 @@
       "ranges": [
         {
           "since": "0.2.1-rc.5",
-          "until": null,
-          "removed": null
+          "until": "0.2.2-rc.1",
+          "removed": "0.2.2-rc.5"
         }
       ],
       "since_bounded": false
@@ -4313,8 +4995,8 @@
       "ranges": [
         {
           "since": "0.2.1-rc.5",
-          "until": null,
-          "removed": null
+          "until": "0.2.2-rc.1",
+          "removed": "0.2.2-rc.5"
         }
       ],
       "since_bounded": false
@@ -4874,6 +5556,17 @@
       "ranges": [
         {
           "since": "0.2.2-rc.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-ptc-runtime-node.stopGraceMs": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.5",
           "until": null,
           "removed": null
         }
@@ -5809,8 +6502,8 @@
       "ranges": [
         {
           "since": "0.2.1-rc.5",
-          "until": null,
-          "removed": null
+          "until": "0.2.2-rc.1",
+          "removed": "0.2.2-rc.5"
         }
       ],
       "since_bounded": false
@@ -5820,8 +6513,8 @@
       "ranges": [
         {
           "since": "0.2.1-rc.5",
-          "until": null,
-          "removed": null
+          "until": "0.2.2-rc.1",
+          "removed": "0.2.2-rc.5"
         }
       ],
       "since_bounded": false
@@ -5831,11 +6524,22 @@
       "ranges": [
         {
           "since": "0.2.1-rc.5",
+          "until": "0.2.2-rc.1",
+          "removed": "0.2.2-rc.5"
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.dsh-skill-office.pythonEnvironment": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.5",
           "until": null,
           "removed": null
         }
       ],
-      "since_bounded": false
+      "since_bounded": true
     },
     "config.options.dsh-spill-local": {
       "kind": "setting",
@@ -6783,6 +7487,160 @@
       ],
       "since_bounded": false
     },
+    "config.options.dsh-terminal-panel": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.5",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-terminal-panel.backendType": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.5",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-terminal-panel.cols": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.5",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-terminal-panel.environment": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.5",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-terminal-panel.idleSilenceMs": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.5",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-terminal-panel.maxReadBytes": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.5",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-terminal-panel.preferredShells": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.5",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-terminal-panel.probeIntervalMs": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.5",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-terminal-panel.promptSilenceMs": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.5",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-terminal-panel.readUserTerminals": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.5",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-terminal-panel.rows": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.5",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-terminal-panel.startupSilenceMs": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.5",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-terminal-panel.startupTimeoutMs": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.5",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-terminal-panel.timeoutMs": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.5",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.options.dsh-time-context": {
       "kind": "setting",
       "ranges": [
@@ -6975,6 +7833,17 @@
       "ranges": [
         {
           "since": "0.2.2-rc.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-tool-executor-ptc.maxSubCallsPerMinute": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.5",
           "until": null,
           "removed": null
         }
@@ -7333,6 +8202,72 @@
       ],
       "since_bounded": false
     },
+    "config.options.dsh-tool-office": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.5",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-tool-office.activationSkills": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.5",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-tool-office.maxImageBytes": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.5",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-tool-office.maxImageDimension": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.5",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-tool-office.maxImagePixels": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.5",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-tool-office.maxImages": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.5",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.options.dsh-tool-present": {
       "kind": "setting",
       "ranges": [
@@ -7596,6 +8531,28 @@
         }
       ],
       "since_bounded": false
+    },
+    "config.options.dsh-tool-subagent-control": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.5",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-tool-subagent-control.interrupt": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.5",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
     },
     "config.options.dsh-tool-subagent.agentOptions": {
       "kind": "setting",
@@ -8031,8 +8988,8 @@
       "ranges": [
         {
           "since": "0.2.1-rc.5",
-          "until": null,
-          "removed": null
+          "until": "0.2.2-rc.1",
+          "removed": "0.2.2-rc.5"
         }
       ],
       "since_bounded": false
@@ -8042,8 +8999,8 @@
       "ranges": [
         {
           "since": "0.2.1-rc.5",
-          "until": null,
-          "removed": null
+          "until": "0.2.2-rc.1",
+          "removed": "0.2.2-rc.5"
         }
       ],
       "since_bounded": false
@@ -8053,8 +9010,8 @@
       "ranges": [
         {
           "since": "0.2.1-rc.5",
-          "until": null,
-          "removed": null
+          "until": "0.2.2-rc.1",
+          "removed": "0.2.2-rc.5"
         }
       ],
       "since_bounded": false
@@ -8069,6 +9026,83 @@
         }
       ],
       "since_bounded": false
+    },
+    "config.options.dsh-web-deepseek-api.fetchApiKeyEnv": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.5",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-web-deepseek-api.fetchBaseURL": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.5",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-web-deepseek-api.fetchBilling": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.5",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-web-deepseek-api.searchApiKeyEnv": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.5",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-web-deepseek-api.searchBaseURL": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.5",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-web-deepseek-api.searchBilling": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.5",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.dsh-web-deepseek-api.searchRequestsPerSecond": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "0.2.2-rc.5",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
     },
     "config.options.dsh-web-deepseek-api.sendOriginalQuestion": {
       "kind": "setting",
@@ -8240,8 +9274,8 @@
       "ranges": [
         {
           "since": "0.2.1-rc.5",
-          "until": null,
-          "removed": null
+          "until": "0.2.2-rc.1",
+          "removed": "0.2.2-rc.5"
         }
       ],
       "since_bounded": false
@@ -8251,8 +9285,8 @@
       "ranges": [
         {
           "since": "0.2.1-rc.5",
-          "until": null,
-          "removed": null
+          "until": "0.2.2-rc.1",
+          "removed": "0.2.2-rc.5"
         }
       ],
       "since_bounded": false
@@ -8262,8 +9296,8 @@
       "ranges": [
         {
           "since": "0.2.1-rc.5",
-          "until": null,
-          "removed": null
+          "until": "0.2.2-rc.1",
+          "removed": "0.2.2-rc.5"
         }
       ],
       "since_bounded": false
@@ -8273,8 +9307,8 @@
       "ranges": [
         {
           "since": "0.2.1-rc.5",
-          "until": null,
-          "removed": null
+          "until": "0.2.2-rc.1",
+          "removed": "0.2.2-rc.5"
         }
       ],
       "since_bounded": false
@@ -8284,8 +9318,8 @@
       "ranges": [
         {
           "since": "0.2.1-rc.5",
-          "until": null,
-          "removed": null
+          "until": "0.2.2-rc.1",
+          "removed": "0.2.2-rc.5"
         }
       ],
       "since_bounded": false
@@ -8295,8 +9329,8 @@
       "ranges": [
         {
           "since": "0.2.1-rc.5",
-          "until": null,
-          "removed": null
+          "until": "0.2.2-rc.1",
+          "removed": "0.2.2-rc.5"
         }
       ],
       "since_bounded": false
@@ -8306,8 +9340,8 @@
       "ranges": [
         {
           "since": "0.2.1-rc.5",
-          "until": null,
-          "removed": null
+          "until": "0.2.2-rc.1",
+          "removed": "0.2.2-rc.5"
         }
       ],
       "since_bounded": false
@@ -8317,8 +9351,8 @@
       "ranges": [
         {
           "since": "0.2.1-rc.5",
-          "until": null,
-          "removed": null
+          "until": "0.2.2-rc.1",
+          "removed": "0.2.2-rc.5"
         }
       ],
       "since_bounded": false
@@ -8328,8 +9362,8 @@
       "ranges": [
         {
           "since": "0.2.1-rc.5",
-          "until": null,
-          "removed": null
+          "until": "0.2.2-rc.1",
+          "removed": "0.2.2-rc.5"
         }
       ],
       "since_bounded": false
@@ -8339,8 +9373,8 @@
       "ranges": [
         {
           "since": "0.2.1-rc.5",
-          "until": null,
-          "removed": null
+          "until": "0.2.2-rc.1",
+          "removed": "0.2.2-rc.5"
         }
       ],
       "since_bounded": false
@@ -8350,8 +9384,8 @@
       "ranges": [
         {
           "since": "0.2.1-rc.5",
-          "until": null,
-          "removed": null
+          "until": "0.2.2-rc.1",
+          "removed": "0.2.2-rc.5"
         }
       ],
       "since_bounded": false
@@ -8361,8 +9395,8 @@
       "ranges": [
         {
           "since": "0.2.1-rc.5",
-          "until": null,
-          "removed": null
+          "until": "0.2.2-rc.1",
+          "removed": "0.2.2-rc.5"
         }
       ],
       "since_bounded": false

@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-19T05:21:58.105840683Z",
+  "generated_at": "2026-11-19T06:00:39.813684832Z",
   "harnesses": [
     {
       "id": "claude",
@@ -128,23 +128,23 @@
         "language": "typescript"
       },
       "changelog": "https://github.com/deepseek-ai/deepseek-harness/releases",
-      "latest": "0.2.2-rc.1",
+      "latest": "0.2.2-rc.5",
       "support": "supported",
-      "versions_tracked": 4,
+      "versions_tracked": 5,
       "first_tracked": "2026-09-29",
       "last_change": {
-        "from": "0.2.1-rc.5",
-        "to": "0.2.2-rc.1",
-        "at": "2026-11-13T05:13:29.306022914Z",
-        "released_at": "2026-11-04T09:20:32.31Z",
-        "changes": 116,
+        "from": "0.2.2-rc.1",
+        "to": "0.2.2-rc.5",
+        "at": "2026-11-19T06:00:39.813684832Z",
+        "released_at": "2026-11-18T13:17:23.604Z",
+        "changes": 218,
         "categories": {
           "binary": 1,
-          "cli": 4,
-          "config": 86,
-          "model": 22,
+          "config": 162,
+          "model": 36,
           "prompt": 2,
-          "tools": 1
+          "request": 1,
+          "tools": 16
         }
       }
     },
