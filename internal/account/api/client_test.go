@@ -5,12 +5,14 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"testing"
 	"time"
 
@@ -859,6 +861,20 @@ func TestClient_RetriesARefreshWithAnUnknownOutcome(t *testing.T) {
 			_ = conn.Close()
 		},
 		"500": func(_ *testing.T, w http.ResponseWriter) { w.WriteHeader(http.StatusInternalServerError) },
+		"truncated 200": func(t *testing.T, w http.ResponseWriter) {
+			conn, buf, err := http.NewResponseController(w).Hijack()
+			if err != nil {
+				t.Errorf("hijack: %v", err)
+				return
+			}
+			_, _ = buf.WriteString("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 500\r\n\r\n{\"access_tok")
+			_ = buf.Flush()
+			_ = conn.Close()
+		},
+		"200 without a pair": func(_ *testing.T, w http.ResponseWriter) { _, _ = w.Write([]byte(`{}`)) },
+		"200 without a refresh token": func(_ *testing.T, w http.ResponseWriter) {
+			_, _ = w.Write([]byte(`{"access_token":"mir_cli_half","expires_in":3600}`))
+		},
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
@@ -1007,10 +1023,14 @@ func TestClient_ARefusedSupersededSessionRemovesNothing(t *testing.T) {
 	}
 }
 
+// bare401 stands for a 401 without the auth gateway's envelope, from some other hop.
+const bare401 = -http.StatusUnauthorized
+
 // A refusal right after an unknown outcome may be the server's answer to a refresh that
 // lost a race to the attempt before, which rotated the pair late. The token is sent once
-// more, and the server forgives it as the one that rotation spent. A second refusal in a
-// row is final.
+// more, and the server forgives it as the one that rotation spent. Only the gateway's
+// refusal twice in a row settles it: anything else is sent again, and an exchange that
+// runs out unsettled is no sign-out.
 func TestClient_ARefusalAfterAnUnknownOutcomeIsSentAgain(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct {
@@ -1022,6 +1042,12 @@ func TestClient_ARefusalAfterAnUnknownOutcomeIsSentAgain(t *testing.T) {
 		{"lost race", []int{http.StatusBadGateway, http.StatusUnauthorized, http.StatusOK}, false, true},
 		{"refused twice", []int{http.StatusBadGateway, http.StatusUnauthorized, http.StatusUnauthorized}, true, false},
 		{"refused last", []int{http.StatusBadGateway, http.StatusBadGateway, http.StatusUnauthorized}, true, true},
+		{"bare 401 between", []int{http.StatusBadGateway, bare401, http.StatusUnauthorized}, true, true},
+		{"bare 401s", []int{http.StatusBadGateway, bare401, bare401}, true, true},
+		{"too many after", []int{http.StatusBadGateway, http.StatusTooManyRequests, http.StatusTooManyRequests}, true, true},
+		{"too many, then answered", []int{http.StatusBadGateway, http.StatusTooManyRequests, http.StatusOK}, false, true},
+		{"forbidden after", []int{http.StatusBadGateway, http.StatusForbidden, http.StatusOK}, false, true},
+		{"forbidden twice after", []int{http.StatusBadGateway, http.StatusForbidden, http.StatusForbidden}, true, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
@@ -1039,6 +1065,8 @@ func TestClient_ARefusalAfterAnUnknownOutcomeIsSentAgain(t *testing.T) {
 					rotatedPair(w)
 				case http.StatusUnauthorized:
 					gatewayError(w, status, "UNAUTHENTICATED")
+				case bare401:
+					w.WriteHeader(http.StatusUnauthorized)
 				default:
 					w.WriteHeader(status)
 				}
@@ -1068,10 +1096,177 @@ func TestClient_ARefusalAfterAnUnknownOutcomeIsSentAgain(t *testing.T) {
 			if got := errors.Is(err, auth.ErrNotLoggedIn); got == tc.wantKept {
 				t.Errorf("Refresh = %v; signed out %v, want %v", err, got, !tc.wantKept)
 			}
+			// Otherwise the outcome is still unknown, and the last status still reachable.
+			last := tc.answers[len(tc.answers)-1]
+			var apiErr *Error
+			if tc.wantKept && !errors.As(err, new(unsettledError)) {
+				t.Errorf("Refresh = %v, want an unknown outcome", err)
+			}
+			if tc.wantKept && last > 0 && last != http.StatusUnauthorized && (!errors.As(err, &apiErr) || apiErr.StatusCode != last) {
+				t.Errorf("Refresh = %v, want its last status %d reachable", err, last)
+			}
 			_, loadErr := auth.LoadCredentialFor(client.dir, config.DefaultProfile, "org-test")
 			if kept := loadErr == nil; kept != tc.wantKept {
 				t.Errorf("stored credential: %v; kept %v, want %v", loadErr, kept, tc.wantKept)
 			}
 		})
+	}
+}
+
+// refusingDials is a transport whose dial n (from 1) fails, as a closed port's would,
+// while refuse(n) says so. It counts every dial.
+func refusingDials(refuse func(n int32) bool) (*http.Transport, *atomic.Int32) {
+	var dials atomic.Int32
+	var dialer net.Dialer
+	return &http.Transport{
+		DisableKeepAlives: true,
+		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+			if refuse(dials.Add(1)) {
+				return nil, &net.OpError{Op: "dial", Net: network, Err: syscall.ECONNREFUSED}
+			}
+			return dialer.DialContext(ctx, network, addr)
+		},
+	}, &dials
+}
+
+// A refresh the server cannot have spent is not sent again: a 429, which the gateway
+// turns away before the account service runs, or a request that never left the machine.
+// Nothing is removed, and the caller is not told it was signed out.
+func TestClient_ARefreshNothingSpentIsNotRetried(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name        string
+		refuseDials bool
+	}{
+		{"429", false},
+		{"connection refused", true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			var requests atomic.Int32
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				requests.Add(1)
+				gatewayError(w, http.StatusTooManyRequests, "RESOURCE_EXHAUSTED")
+			}))
+			defer srv.Close()
+			expired := &auth.Credential{AccessToken: "mir_cli_stale", RefreshToken: "mir_clr_stale", SessionID: "session-1",
+				ExpiresAt: time.Now().Add(-time.Hour)}
+			client := newTestClient(t, srv.URL, expired, "")
+			transport, dials := refusingDials(func(int32) bool { return tc.refuseDials })
+			client.http.Transport = transport
+
+			start := time.Now()
+			err := client.Refresh(context.Background())
+			if err == nil || errors.Is(err, auth.ErrNotLoggedIn) || errors.As(err, new(unsettledError)) {
+				t.Fatalf("Refresh = %v, want a plain error", err)
+			}
+			if n := dials.Load(); n != 1 {
+				t.Errorf("%d attempts; want 1", n)
+			}
+			want := int32(1)
+			if tc.refuseDials {
+				want = 0
+			}
+			if got := requests.Load(); got != want {
+				t.Errorf("%d requests reached the server; want %d", got, want)
+			}
+			if elapsed := time.Since(start); elapsed >= refreshPauses[0] {
+				t.Errorf("Refresh took %v; want no pause before a retry", elapsed)
+			}
+			if _, err := auth.LoadCredentialFor(client.dir, config.DefaultProfile, "org-test"); err != nil {
+				t.Errorf("stored credential: %v, want it kept", err)
+			}
+		})
+	}
+}
+
+// An attempt that spent nothing does not end an exchange whose attempt before it may have
+// rotated the pair: only a later attempt, inside the grace, can still bring that pair home.
+func TestClient_ANetworkStillDownAfterALostAnswerIsRetried(t *testing.T) {
+	t.Parallel()
+	var mu sync.Mutex
+	var sent []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req tokenRequest
+		_ = json.NewDecoder(r.Body).Decode(&req)
+		mu.Lock()
+		sent = append(sent, req.RefreshToken)
+		first := len(sent) == 1
+		mu.Unlock()
+		if first {
+			// The server rotated the pair, and the connection dropped before its answer.
+			conn, _, err := http.NewResponseController(w).Hijack()
+			if err != nil {
+				t.Errorf("hijack: %v", err)
+				return
+			}
+			_ = conn.Close()
+			return
+		}
+		rotatedPair(w)
+	}))
+	defer srv.Close()
+	expired := &auth.Credential{AccessToken: "mir_cli_stale", RefreshToken: "mir_clr_stale", SessionID: "session-1",
+		ExpiresAt: time.Now().Add(-time.Hour)}
+	client := newTestClient(t, srv.URL, expired, "")
+	transport, dials := refusingDials(func(n int32) bool { return n == 2 })
+	client.http.Transport = transport
+
+	if err := client.Refresh(context.Background()); err != nil {
+		t.Fatalf("Refresh: %v", err)
+	}
+	if n := dials.Load(); n != 3 {
+		t.Errorf("%d attempts; want 3: dropped, refused, answered", n)
+	}
+	mu.Lock()
+	if want := []string{"mir_clr_stale", "mir_clr_stale"}; !slices.Equal(sent, want) {
+		t.Errorf("refresh tokens the server saw = %q, want %q", sent, want)
+	}
+	mu.Unlock()
+	wantRotatedPair(t, client)
+}
+
+// The server forgives a resent refresh token only within refreshRetryGrace (60 s in
+// mirador-platform's cli_session_refresh.go) of spending it, and the first attempt may be
+// the one that spent it. Every attempt must start inside the budget, and the budget must
+// stay well inside the grace.
+func TestClient_EveryRefreshAttemptStartsWithinTheBudget(t *testing.T) {
+	t.Parallel()
+	const grace = 60 * time.Second
+	if refreshBudget > grace-15*time.Second {
+		t.Fatalf("refreshBudget = %v; want at most %v, well inside the server's %v grace", refreshBudget, grace-15*time.Second, grace)
+	}
+
+	var mu sync.Mutex
+	var starts []time.Time
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		starts = append(starts, time.Now())
+		mu.Unlock()
+		w.WriteHeader(http.StatusBadGateway)
+	}))
+	defer srv.Close()
+	expired := &auth.Credential{AccessToken: "mir_cli_stale", RefreshToken: "mir_clr_stale", SessionID: "session-1",
+		ExpiresAt: time.Now().Add(-time.Hour)}
+	client := newTestClient(t, srv.URL, expired, "")
+	// Room for the first pause, not the second: the third attempt would start past it.
+	client.exchangeBudget = refreshPauses[0] + refreshPauses[1]/2
+
+	begin := time.Now()
+	if err := client.Refresh(context.Background()); err == nil {
+		t.Fatal("Refresh against a failing token endpoint succeeded")
+	}
+	if elapsed := time.Since(begin); elapsed > client.exchangeBudget+time.Second {
+		t.Errorf("Refresh took %v; want it to end with its %v budget", elapsed, client.exchangeBudget)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if len(starts) != 2 {
+		t.Errorf("%d attempts; want 2, the third past the budget", len(starts))
+	}
+	for i, at := range starts {
+		if at.Sub(begin) > client.exchangeBudget {
+			t.Errorf("attempt %d started %v in, past the %v budget", i+1, at.Sub(begin), client.exchangeBudget)
+		}
 	}
 }

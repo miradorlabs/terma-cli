@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"slices"
 	"strings"
@@ -95,7 +96,10 @@ func (c *Client) postToken(ctx context.Context, body tokenRequest) (*tokenRespon
 		return nil, err
 	}
 	resp, err := c.http.Do(req)
-	if err != nil {
+	switch {
+	case err != nil && unsent(err):
+		return nil, unspentError{fmt.Errorf("%s %s: %w", http.MethodPost, tokenPath, err)}
+	case err != nil:
 		return nil, unsettledError{fmt.Errorf("%s %s: %w", http.MethodPost, tokenPath, err)}
 	}
 	defer resp.Body.Close()
@@ -105,26 +109,48 @@ func (c *Client) postToken(ctx context.Context, body tokenRequest) (*tokenRespon
 		var apiErr *Error
 		switch {
 		case !errors.As(err, &apiErr):
-			// An answer that said yes, cut off or garbled on the way: its pair is lost.
+			// A success cut off or garbled on the way: its pair is lost.
 			return nil, unsettledError{err}
 		case apiErr.Unauthenticated() && apiErr.Code == "UNAUTHENTICATED":
 			return nil, refusalError{fmt.Errorf("%w: %s", auth.ErrNotLoggedIn, apiErr.Message)}
 		case apiErr.Unauthenticated():
 			return nil, fmt.Errorf("%w: %s", auth.ErrNotLoggedIn, apiErr.Message)
-		case apiErr.StatusCode >= 500 || apiErr.StatusCode == http.StatusTooManyRequests:
+		case apiErr.StatusCode >= 500:
 			return nil, unsettledError{err}
+		case apiErr.StatusCode == http.StatusTooManyRequests:
+			// The gateway turns it away before the account service runs.
+			return nil, unspentError{err}
 		}
 		return nil, err
 	}
+	// A success all the same, so the server may have spent the token.
 	if out.AccessToken == "" {
-		return nil, errors.New("token endpoint returned no access token")
+		return nil, unsettledError{errors.New("token endpoint returned no access token")}
+	}
+	if body.GrantType == "refresh_token" && out.RefreshToken == "" {
+		return nil, unsettledError{errors.New("token endpoint returned no refresh token")}
 	}
 	return &out, nil
 }
 
-// unsettledError is a token exchange whose outcome this client never learned: no answer
-// came, a 5xx or 429 did, or a success whose body could not be read. The server may still
-// have spent the token it was sent.
+// unsent reports whether err is a request that never left this machine: its connection
+// was never made, so the server cannot have spent the token in it.
+func unsent(err error) bool {
+	var dnsErr *net.DNSError
+	var opErr *net.OpError
+	return errors.As(err, &dnsErr) || errors.As(err, &opErr) && opErr.Op == "dial"
+}
+
+// unspentError is a token exchange the server cannot have spent the token in: the request
+// never left this machine, or the gateway turned it away (429). It ends an exchange only
+// when no attempt before it has an unknown outcome.
+type unspentError struct{ error }
+
+func (e unspentError) Unwrap() error { return e.error }
+
+// unsettledError is a token exchange whose outcome this client never learned: the
+// request was sent and no answer came, a 5xx did, or a success without a usable pair. The
+// server may still have spent the token it was sent.
 type unsettledError struct{ error }
 
 func (e unsettledError) Unwrap() error { return e.error }
@@ -146,48 +172,66 @@ var errSessionExpired = fmt.Errorf("%w: session expired, run `terma setup`", aut
 //
 //   - refreshBudget bounds every attempt and pause together. 40 s leaves the last attempt
 //     20 s inside the grace, and keeps the lock holder within auth's lockWait: 40 s plus
-//     two keychain writes.
+//     two keychain writes. A Client's exchangeBudget replaces it in tests.
 //   - refreshPauses come before the second and third attempts, short enough that a hung
 //     first attempt (the 30 s request timeout) still leaves time for a second.
 const refreshBudget = 40 * time.Second
 
 var refreshPauses = [...]time.Duration{time.Second, 2 * time.Second}
 
-// exchangeRefreshToken redeems refreshToken, sending it again while the outcome is
-// unknown (unsettledError). A refusal is final, except right after an unknown outcome: the
-// server answers a refresh that lost a race to another rotation of the session with a
-// refusal too, and the attempt before may be that rotation, committed late. Sent once more,
-// the token is the one that rotation spent, which the server forgives. A refusal right
-// after a refusal is final.
+// exchangeRefreshToken redeems refreshToken. Until an attempt's outcome is unknown
+// (unsettledError), the first answer is final: a refusal, or an attempt that spent nothing
+// (unspentError), ends the exchange at once.
+//
+// Once one is unknown, the same token is sent again until an answer settles it: a pair,
+// or the auth gateway's refusal twice in a row. Nothing else can. The server answers a
+// refresh that lost a race to another rotation of the session with a refusal too, and the
+// unknown attempt may be that rotation, committed late; sent once more, the token is the
+// one it spent, which the server forgives. An exchange that runs out unsettled is no
+// sign-out: the session may be alive, and must not be removed.
 //
 // It runs to the end whether or not ctx does: the server may rotate the pair after a
 // caller gives up, and that pair must reach the store. So a caller's deadline, a relay's
 // shutdown included, no longer bounds a refresh already sent; refreshBudget does.
 func (c *Client) exchangeRefreshToken(ctx context.Context, refreshToken string) (*tokenResponse, error) {
-	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), refreshBudget)
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), cmp.Or(c.exchangeBudget, refreshBudget))
 	defer cancel()
-	for attempt, lastUnsettled := 0, false; ; attempt++ {
+	unknown, lastRefused := false, false
+	for attempt := 0; ; attempt++ {
 		resp, err := c.postToken(ctx, tokenRequest{GrantType: "refresh_token", RefreshToken: refreshToken})
-		unsettled := errors.As(err, new(unsettledError))
+		refused := errors.As(err, new(refusalError))
 		switch {
-		case unsettled:
-		case lastUnsettled && errors.Is(err, auth.ErrNotLoggedIn):
-			// Not ErrNotLoggedIn any more: the session may be alive, and must not be removed.
-			err = unsettledError{errors.New("the token endpoint refused a refresh it may have made: " + err.Error())}
-		default:
-			return resp, err
-		}
-		lastUnsettled = unsettled
-		if attempt == len(refreshPauses) {
+		case err == nil:
+			return resp, nil
+		case !unknown && !errors.As(err, new(unsettledError)):
 			return nil, err
+		case refused && lastRefused:
+			return nil, err
+		}
+		unknown, lastRefused = true, refused
+		if attempt == len(refreshPauses) {
+			return nil, stillUnknown(err)
 		}
 		pause := time.NewTimer(refreshPauses[attempt])
 		select {
 		case <-pause.C:
 		case <-ctx.Done():
 			pause.Stop()
-			return nil, err
+			return nil, stillUnknown(err)
 		}
+	}
+}
+
+// stillUnknown is err, the last answer of an exchange an earlier attempt of which has an
+// unknown outcome, as an unsettledError that is no sign-out.
+func stillUnknown(err error) error {
+	switch {
+	case errors.As(err, new(unsettledError)):
+		return err
+	case errors.Is(err, auth.ErrNotLoggedIn):
+		return unsettledError{errors.New("an earlier attempt may have refreshed the session: " + err.Error())}
+	default:
+		return unsettledError{fmt.Errorf("an earlier attempt may have refreshed the session: %w", err)}
 	}
 }
 
@@ -399,8 +443,9 @@ func (c *Client) spent(refreshToken string) bool {
 }
 
 // refused records that the server refused current's refresh token, and removes current
-// from tx while tx still stores it. A removal that fails is tried again at the next
-// refresh, which ends here too.
+// from tx while tx still stores it. If the file entry stays, this client's next refresh
+// ends here too and tries again. A keychain item left once the entry is gone is read by
+// nothing, and the next sign-in to the organization overwrites it.
 func (c *Client) refused(current *auth.Credential, tx *auth.Tx) error {
 	c.mu.Lock()
 	c.refusedToken = current.RefreshToken

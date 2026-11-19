@@ -97,6 +97,8 @@ type Client struct {
 	unsaved []string
 	// refusedToken is the refresh token the server last refused, which is never sent again.
 	refusedToken string
+	// exchangeBudget, when set, replaces refreshBudget, so a test need not wait 40 s.
+	exchangeBudget time.Duration
 	// refreshing is a one-slot semaphore for this process's token exchanges. The
 	// credential lock serializes them across processes.
 	refreshing chan struct{}
