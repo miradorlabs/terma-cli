@@ -233,7 +233,7 @@ func (s State) check() error {
 		seen[t.EnrollmentID] = true
 	}
 	for key, b := range s.Bindings {
-		if key != Normalize(key) || !isOwnerKey(key) && !validRepo(key) {
+		if key != Normalize(key) || !config.IsOwnerKey(key) && !config.IsRepositoryKey(key) {
 			return fmt.Errorf("binding %q is not a normalised owner or repository", key)
 		}
 		if b.Refused == (b.Organization != "") {

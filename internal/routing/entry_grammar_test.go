@@ -5,6 +5,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/config"
 )
@@ -66,18 +67,7 @@ func TestEntryGrammarSharedWithServer(t *testing.T) {
 		if c.Server != "refused" && (c.Server == "wildcard") != (c.CLI == "wildcard") {
 			t.Errorf("%q: the server reads it as %s and the CLI as %s", c.Entry, c.Server, c.CLI)
 		}
-		// config.Policy.Admits still decides for the callers not yet on routing.Route: a stored
-		// exact entry admits the repository it names, and a wildcard, read as 1.x, admits nothing.
-		switch e, ok := ParseEntry(c.Entry, true); {
-		case c.Server == "exact" && ok:
-			if !(config.Policy{Mode: config.ModeRepo, Repositories: []string{c.Entry}}).Admits(config.Repository{Origin: e.key}) {
-				t.Errorf("Admits refuses %q, which the server stores", c.Entry)
-			}
-		case c.Server == "wildcard" && ok:
-			if (config.Policy{Mode: config.ModeRepo, Repositories: []string{c.Entry}}).Admits(config.Repository{Origin: e.key + "/any"}) {
-				t.Errorf("Admits takes %q as a wildcard without one", c.Entry)
-			}
-		}
+		admits(t, c)
 	}
 }
 
@@ -91,5 +81,40 @@ func reading(entry string, wildcards bool) string {
 		return "wildcard"
 	default:
 		return "exact"
+	}
+}
+
+// admits checks c's row through config.Policy.Admits, which decides collection on every
+// path today, with one validated policy listing the entry alone. As 2.x reads it, the
+// table's reading: an exact entry admits the repository it names, a wildcard every
+// repository under its prefix and not the prefix itself, and a refused entry leaves a
+// list that admits nothing. As 1.x reads it, an entry with a `*` is a literal repository
+// no origin names, and any other reads as under 2.x.
+func admits(t *testing.T, c grammarCase) {
+	t.Helper()
+	for _, wildcards := range []bool{true, false} {
+		p := config.Policy{Mode: config.ModeRepo, Repositories: []string{c.Entry}, Wildcards: wildcards,
+			TeamID: "team", FetchedAt: time.Now()}
+		admitted := func(origin string) bool { return p.Admits(config.Repository{Origin: origin}) }
+		e, _ := ParseEntry(c.Entry, wildcards)
+		prefix := Normalize(strings.TrimSuffix(strings.TrimSpace(c.Entry), "/*"))
+		switch {
+		case !wildcards && strings.Contains(c.Entry, "*"):
+			if admitted(prefix+"/any") || admitted(prefix) || admitted(Normalize(c.Entry)) {
+				t.Errorf("%q: a 1.x policy admits a repository by it", c.Entry)
+			}
+		case c.CLI == "refused":
+			if !p.AdmitsNone() || admitted(Normalize(c.Entry)) {
+				t.Errorf("%q (wildcards %v): refused, but Admits takes it", c.Entry, wildcards)
+			}
+		case c.CLI == "exact":
+			if !admitted(e.Key()) || admitted(e.Key()+"/more") {
+				t.Errorf("%q (wildcards %v): Admits does not take it as exactly %s", c.Entry, wildcards, e.Key())
+			}
+		default:
+			if !admitted(prefix+"/any") || !admitted(prefix+"/any/deeper") || admitted(prefix) {
+				t.Errorf("%q: Admits does not take it as every repository under %s", c.Entry, prefix)
+			}
+		}
 	}
 }

@@ -79,17 +79,21 @@ func (r policyResponse) collectionPolicy() (config.Policy, error) {
 	t := r.Policy.Terma
 	c := t.Capture
 	// Only a major version a reader does not know makes a document unreadable; a minor
-	// one only adds fields it may ignore.
+	// one only adds fields it may ignore. 2.x is 1.x whose entries may also end in `/*`
+	// (config.ParseEntry): the server stores a policy in the lowest major that holds it.
 	major, _, dotted := strings.Cut(r.Policy.Version, ".")
-	if !dotted || major != "1" || (t.Global == nil) == (t.PerRepository == nil) ||
+	if !dotted || major != "1" && major != "2" {
+		return config.Policy{}, fmt.Errorf("policy version %q is newer than this terma reads: update terma (`terma update`)", r.Policy.Version)
+	}
+	if (t.Global == nil) == (t.PerRepository == nil) ||
 		t.PerRepository != nil && t.PerRepository.Repositories == nil ||
 		c == nil || c.ExcludePrompts == nil || c.ExcludeToolContent == nil ||
 		r.Revision < 1 || r.UpdatedAt.IsZero() {
-		return config.Policy{}, fmt.Errorf("invalid collection policy: require a 1.x version, one collection mode, a repository list and complete capture rules")
+		return config.Policy{}, fmt.Errorf("invalid collection policy: require one collection mode, a repository list and complete capture rules")
 	}
 	p := config.Policy{Mode: config.ModeRepo, IncludePrompts: !*c.ExcludePrompts,
 		IncludeToolContent: !*c.ExcludeToolContent, GitHooks: t.GitHooks != nil && *t.GitHooks,
-		Revision: r.Revision, UpdatedAt: r.UpdatedAt, FetchedAt: time.Now().UTC()}
+		Revision: r.Revision, UpdatedAt: r.UpdatedAt, FetchedAt: time.Now().UTC(), Wildcards: major == "2"}
 	if t.Global != nil {
 		p.Mode = config.ModeGlobal
 	} else {

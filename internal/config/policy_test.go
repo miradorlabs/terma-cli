@@ -82,6 +82,18 @@ func TestPolicyInForceAndAdmitsNone(t *testing.T) {
 	if !blank.AdmitsNone() || global.AdmitsNone() {
 		t.Fatal("AdmitsNone misjudged a blank list or global mode")
 	}
+	// A 2.x wildcard is a usable entry; one on a host alone is not, under either major.
+	wild := fetched
+	wild.Repositories, wild.Wildcards = []string{"github.com/acme/*"}, true
+	hostOnly := wild
+	hostOnly.Repositories = []string{"github.com/*"}
+	if wild.AdmitsNone() || !hostOnly.AdmitsNone() {
+		t.Fatal("AdmitsNone misjudged a 2.x wildcard list")
+	}
+	hostOnly.Wildcards = false
+	if !hostOnly.AdmitsNone() {
+		t.Fatal("AdmitsNone took a 1.x host wildcard as usable")
+	}
 }
 
 // A validated policy is stale PolicyStaleAfter after its fetch; one never validated is not.

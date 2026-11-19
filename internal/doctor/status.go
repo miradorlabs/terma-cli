@@ -321,7 +321,11 @@ func shipment(st harness.Status) string {
 
 // PolicySummary is what a collection policy collects, in one line.
 func PolicySummary(p config.Policy) string {
-	scope := "sessions in the team's repositories (" + strings.Join(p.Repositories, ", ") + ")"
+	entries := make([]string, len(p.Repositories))
+	for i, raw := range p.Repositories {
+		entries[i] = entryLabel(p, raw)
+	}
+	scope := "sessions in the team's repositories (" + strings.Join(entries, ", ") + ")"
 	switch {
 	case p.Global():
 		scope = "every session on this machine"
@@ -339,4 +343,13 @@ func PolicySummary(p config.Policy) string {
 		return scope + ", with tool content, without prompts"
 	}
 	return scope + ", without prompts or tool content"
+}
+
+// entryLabel is how an entry of p's list reads: a wildcard as every repository under its
+// prefix, as the web app words it, any other entry as listed.
+func entryLabel(p config.Policy, raw string) string {
+	if e, ok := config.ParseEntry(raw, p.Wildcards); ok && e.Wildcard() {
+		return "every repository under " + strings.TrimSuffix(strings.TrimSpace(raw), "/*")
+	}
+	return raw
 }

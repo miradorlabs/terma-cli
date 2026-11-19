@@ -122,6 +122,58 @@ func TestCollectionPolicyDev(t *testing.T) {
 	t.Logf("dev policy parsed: mode=%s revision=%d include_prompts=%t include_tool_content=%t", p.Mode, p.Revision, p.IncludePrompts, p.IncludeToolContent)
 }
 
+// A 2.x policy is 1.x whose entries may end in `/*`: it is read, marked Wildcards, and a
+// wildcard then admits every repository under its owner. The same entry on a 1.x policy
+// is a literal repository no origin names. A major this build does not know is refused,
+// saying to update terma.
+func TestCollectionPolicyReadsMajorTwoWithWildcards(t *testing.T) {
+	t.Setenv("TERMA_POLICY_STUB", "")
+	for _, tt := range []struct {
+		version   string
+		wildcards bool
+		refused   bool
+	}{
+		{"1.1", false, false},
+		{"2.0", true, false},
+		{"2.3", true, false},
+		{"3.0", false, true},
+	} {
+		t.Run(tt.version, func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				fmt.Fprintf(w, `{"policy":{"version":%q,"terma":{%s,"per_repository":{"repositories":["github.com/Acme/*","gitlab.com/acme/platform/*","github.com/other/api"]}}},"revision":3,"updated_at":"2026-11-19T12:00:00Z"}`, tt.version, testCapture)
+			}))
+			defer srv.Close()
+			c := newTestClient(t, srv.URL, liveCredential(), "team")
+			p, err := c.CollectionPolicy(context.Background())
+			if tt.refused {
+				if err == nil || !strings.Contains(err.Error(), "newer than this terma reads: update terma") {
+					t.Fatalf("version %s: policy=%+v error=%v, want a refusal saying to update terma", tt.version, p, err)
+				}
+				return
+			}
+			if err != nil || p.Wildcards != tt.wildcards || p.Revision != 3 || len(p.Repositories) != 3 {
+				t.Fatalf("version %s: policy=%+v error=%v", tt.version, p, err)
+			}
+			for origin, want := range map[string]bool{
+				"github.com/acme/api":              tt.wildcards,
+				"github.com/ACME/web":              tt.wildcards,
+				"gitlab.com/acme/platform/api":     tt.wildcards,
+				"gitlab.com/acme/platform/sub/api": tt.wildcards,
+				"github.com/other/api":             true,
+				"github.com/acme":                  false,
+				"github.com/acme/*":                false,
+				"github.com/acmeco/api":            false,
+				"gitlab.com/acme/api":              false,
+				"github.example.com/acme/api":      false,
+			} {
+				if got := p.Admits(config.Repository{Origin: origin}); got != want {
+					t.Errorf("version %s: Admits(%s) = %v, want %v", tt.version, origin, got, want)
+				}
+			}
+		})
+	}
+}
+
 // A minor version only adds fields, so 1.1 is read like 1.0 and carries git_hooks.
 func TestCollectionPolicyMinorVersionAndGitHooks(t *testing.T) {
 	t.Setenv("TERMA_POLICY_STUB", "")
@@ -175,7 +227,9 @@ func TestCollectionPolicyMissingInvalidAndUnavailable(t *testing.T) {
 		{"unset", `{}`, 200, false},
 		{"null", `{"policy":null}`, 200, false},
 		{"empty document", `{"policy":{}}`, 200, true},
-		{"unknown version", strings.Replace(valid, `"1.0"`, `"2.0"`, 1), 200, true},
+		{"unknown version", strings.Replace(valid, `"1.0"`, `"3.0"`, 1), 200, true},
+		{"wildcard version without a minor", strings.Replace(valid, `"1.0"`, `"2"`, 1), 200, true},
+		{"incomplete wildcard version", strings.Replace(strings.Replace(valid, `"1.0"`, `"2.0"`, 1), `,"global":{}`, "", 1), 200, true},
 		{"version without a minor", strings.Replace(valid, `"1.0"`, `"1"`, 1), 200, true},
 		{"empty version", strings.Replace(valid, `"1.0"`, `""`, 1), 200, true},
 		{"missing capture switch", strings.Replace(valid, `"exclude_prompts":true,`, "", 1), 200, true},
