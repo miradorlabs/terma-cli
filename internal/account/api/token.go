@@ -90,17 +90,29 @@ func (c *Client) LastLogin() *LoginResult {
 }
 
 func (c *Client) postToken(ctx context.Context, body tokenRequest) (*tokenResponse, error) {
-	resp, err := c.attempt(ctx, authHost, http.MethodPost, tokenPath, nil, nil, body)
+	req, err := c.newRequest(ctx, authHost, http.MethodPost, tokenPath, nil, nil, body)
 	if err != nil {
 		return nil, err
+	}
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return nil, unsettledError{fmt.Errorf("%s %s: %w", http.MethodPost, tokenPath, err)}
 	}
 	defer resp.Body.Close()
 
 	var out tokenResponse
 	if err := decode(resp, &out); err != nil {
 		var apiErr *Error
-		if errors.As(err, &apiErr) && apiErr.Unauthenticated() {
+		switch {
+		case !errors.As(err, &apiErr):
+			// An answer that said yes, cut off or garbled on the way: its pair is lost.
+			return nil, unsettledError{err}
+		case apiErr.Unauthenticated() && apiErr.Code == "UNAUTHENTICATED":
+			return nil, refusalError{fmt.Errorf("%w: %s", auth.ErrNotLoggedIn, apiErr.Message)}
+		case apiErr.Unauthenticated():
 			return nil, fmt.Errorf("%w: %s", auth.ErrNotLoggedIn, apiErr.Message)
+		case apiErr.StatusCode >= 500 || apiErr.StatusCode == http.StatusTooManyRequests:
+			return nil, unsettledError{err}
 		}
 		return nil, err
 	}
@@ -108,6 +120,75 @@ func (c *Client) postToken(ctx context.Context, body tokenRequest) (*tokenRespon
 		return nil, errors.New("token endpoint returned no access token")
 	}
 	return &out, nil
+}
+
+// unsettledError is a token exchange whose outcome this client never learned: no answer
+// came, a 5xx or 429 did, or a success whose body could not be read. The server may still
+// have spent the token it was sent.
+type unsettledError struct{ error }
+
+func (e unsettledError) Unwrap() error { return e.error }
+
+// refusalError is the auth gateway's own refusal of a token: a 401 in its envelope. A 401
+// without it may come from some other hop, and says nothing about the session.
+type refusalError struct{ error }
+
+func (e refusalError) Unwrap() error { return e.error }
+
+// errSessionExpired is a refresh the server refused.
+var errSessionExpired = fmt.Errorf("%w: session expired, run `terma setup`", auth.ErrNotLoggedIn)
+
+// The server rotates the refresh token on every refresh, and revokes the session when a
+// spent one comes back, except the one it spent last, within 60 s of spending it
+// (refreshRetryGrace in mirador-platform's cli_session_refresh.go). So a refresh whose
+// answer was lost sends the same token again, and every attempt must start within those
+// 60 s. The rotation it repeats was committed after the first attempt was sent.
+//
+//   - refreshBudget bounds every attempt and pause together. 40 s leaves the last attempt
+//     20 s inside the grace, and keeps the lock holder within auth's lockWait: 40 s plus
+//     two keychain writes.
+//   - refreshPauses come before the second and third attempts, short enough that a hung
+//     first attempt (the 30 s request timeout) still leaves time for a second.
+const refreshBudget = 40 * time.Second
+
+var refreshPauses = [...]time.Duration{time.Second, 2 * time.Second}
+
+// exchangeRefreshToken redeems refreshToken, sending it again while the outcome is
+// unknown (unsettledError). A refusal is final, except right after an unknown outcome: the
+// server answers a refresh that lost a race to another rotation of the session with a
+// refusal too, and the attempt before may be that rotation, committed late. Sent once more,
+// the token is the one that rotation spent, which the server forgives. A refusal right
+// after a refusal is final.
+//
+// It runs to the end whether or not ctx does: the server may rotate the pair after a
+// caller gives up, and that pair must reach the store. So a caller's deadline, a relay's
+// shutdown included, no longer bounds a refresh already sent; refreshBudget does.
+func (c *Client) exchangeRefreshToken(ctx context.Context, refreshToken string) (*tokenResponse, error) {
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), refreshBudget)
+	defer cancel()
+	for attempt, lastUnsettled := 0, false; ; attempt++ {
+		resp, err := c.postToken(ctx, tokenRequest{GrantType: "refresh_token", RefreshToken: refreshToken})
+		unsettled := errors.As(err, new(unsettledError))
+		switch {
+		case unsettled:
+		case lastUnsettled && errors.Is(err, auth.ErrNotLoggedIn):
+			// Not ErrNotLoggedIn any more: the session may be alive, and must not be removed.
+			err = unsettledError{errors.New("the token endpoint refused a refresh it may have made: " + err.Error())}
+		default:
+			return resp, err
+		}
+		lastUnsettled = unsettled
+		if attempt == len(refreshPauses) {
+			return nil, err
+		}
+		pause := time.NewTimer(refreshPauses[attempt])
+		select {
+		case <-pause.C:
+		case <-ctx.Done():
+			pause.Stop()
+			return nil, err
+		}
+	}
 }
 
 func (c *Client) credentialFrom(resp *tokenResponse) *auth.Credential {
@@ -218,7 +299,8 @@ type redeemFunc func(held, current *auth.Credential) bool
 //   - save the new pair before the lock is released.
 //
 // The lock is held through the exchange and the keychain writes. So the wait for it is
-// auth's lockWait, which is longer than the request timeout.
+// auth's lockWait, which is longer than the exchange's refreshBudget. The waits for the
+// refresh slot and the lock follow ctx; the exchange and the save, once begun, do not.
 //
 // Call it in this process's refresh slot (lockRefresh).
 func (c *Client) refresh(ctx context.Context, redeem redeemFunc) error {
@@ -258,16 +340,23 @@ func (c *Client) refresh(ctx context.Context, redeem redeemFunc) error {
 }
 
 // redeem exchanges current's refresh token if redeem asks, and saves the new pair in tx
-// when there is one.
+// when there is one. A token the auth gateway refused is never sent again. When tx still stores
+// it, it is removed there too, so no process that reads the store afterwards sends it.
 func (c *Client) redeem(ctx context.Context, held, current *auth.Credential, redeem redeemFunc, tx *auth.Tx) error {
 	if !redeem(held, current) {
 		return nil
 	}
-	resp, err := c.postToken(ctx, tokenRequest{GrantType: "refresh_token", RefreshToken: current.RefreshToken})
+	if c.wasRefused(current.RefreshToken) {
+		return c.refused(current, tx)
+	}
+	resp, err := c.exchangeRefreshToken(ctx, current.RefreshToken)
+	switch {
+	case errors.As(err, new(refusalError)):
+		return c.refused(current, tx)
+	case errors.Is(err, auth.ErrNotLoggedIn):
+		return errSessionExpired
+	}
 	if err != nil {
-		if errors.Is(err, auth.ErrNotLoggedIn) {
-			return fmt.Errorf("%w: session expired, run `terma setup`", auth.ErrNotLoggedIn)
-		}
 		return err
 	}
 	cred := c.credentialFrom(resp)
@@ -307,6 +396,26 @@ func (c *Client) spent(refreshToken string) bool {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return slices.Contains(c.unsaved, refreshToken)
+}
+
+// refused records that the server refused current's refresh token, and removes current
+// from tx while tx still stores it. A removal that fails is tried again at the next
+// refresh, which ends here too.
+func (c *Client) refused(current *auth.Credential, tx *auth.Tx) error {
+	c.mu.Lock()
+	c.refusedToken = current.RefreshToken
+	c.mu.Unlock()
+	if tx != nil {
+		_ = tx.DeleteFor(c.profile, current.OrganizationID, current.RefreshToken)
+	}
+	return errSessionExpired
+}
+
+// wasRefused reports whether the server refused refreshToken.
+func (c *Client) wasRefused(refreshToken string) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.refusedToken != "" && c.refusedToken == refreshToken
 }
 
 // replace makes cred the client's credential.

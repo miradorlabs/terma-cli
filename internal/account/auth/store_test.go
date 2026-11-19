@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -8,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/miradorlabs/terma-cli/internal/account/secret"
 	"github.com/miradorlabs/terma-cli/internal/config"
 )
 
@@ -89,6 +91,44 @@ func TestDeleteCredential_RemovesOnlyTheNamedProfile(t *testing.T) {
 	}
 	if _, err := LoadCredential(dir, "personal"); err != nil {
 		t.Errorf("personal profile should survive deleting work: %v", err)
+	}
+}
+
+// Tx.DeleteFor removes a credential only at the version it names: one rotated since stays.
+// The version it names goes, keychain item included, and no other organization becomes
+// active in its place.
+func TestTx_DeleteForRemovesOnlyTheVersionItNames(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	for _, org := range []string{"org-b", "org-a"} {
+		if _, err := SaveCredential(dir, "default", orgCredential(org, "s-"+org)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	deleteFor := func(refreshToken string) {
+		t.Helper()
+		if err := lockedWrite(dir, func(tx *Tx) error { return tx.DeleteFor("default", "org-a", refreshToken) }); err != nil {
+			t.Fatalf("DeleteFor(%q): %v", refreshToken, err)
+		}
+	}
+
+	deleteFor("ter_clr_spent")
+	if cred, err := LoadCredentialFor(dir, "default", "org-a"); err != nil || cred.RefreshToken != "ter_clr_org-a" {
+		t.Fatalf("after deleting another version: %+v, %v; want the credential kept", cred, err)
+	}
+
+	deleteFor("ter_clr_org-a")
+	if _, err := LoadCredentialFor(dir, "default", "org-a"); err != ErrNotLoggedIn {
+		t.Errorf("org-a after deleting its version: %v, want it gone", err)
+	}
+	if _, err := secret.Get(dir, itemName("default", "org-a")); !errors.Is(err, secret.ErrNotFound) {
+		t.Errorf("org-a's keychain item: %v, want it gone", err)
+	}
+	if active, err := LoadCredential(dir, "default"); err != ErrNotLoggedIn {
+		t.Errorf("active = %+v, %v; want signed out, not moved to org-b", active, err)
+	}
+	if _, err := LoadCredentialFor(dir, "default", "org-b"); err != nil {
+		t.Errorf("org-b: %v, want it kept", err)
 	}
 }
 

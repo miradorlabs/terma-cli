@@ -24,8 +24,9 @@ type Tx struct {
 // lockWait bounds every wait for the credential lock. A holder that hangs then costs the
 // waiter an error, not a stall. It is longer than a healthy holder keeps the lock:
 //
-//   - a refresh holds it through one exchange (30 s by default) and at most two keychain
-//     writes: the pair it holds and the pair it gets;
+//   - a refresh holds it through one exchange and at most two keychain writes: the pair it
+//     holds and the pair it gets. The exchange, its retries included, ends within 40 s
+//     (api's refreshBudget);
 //   - every other holder keeps it through one keychain write and a few deletes;
 //   - Relocate takes it once per credential, never across all of them.
 var lockWait = 2*secret.WriteTimeout + time.Minute
@@ -91,6 +92,39 @@ func (tx *Tx) Update(profile string, cred *Credential) error {
 	})
 	tx.after = append(tx.after, func() { afterSave(tx.dir, profile, cred.OrganizationID, unindexed, err) })
 	return err
+}
+
+// DeleteFor is DeleteCredentialFor inside the transaction, for one version of the
+// credential: it removes organizationID's credential only while its refresh token is still
+// refreshToken. One another process has rotated since, or a new sign-in, stays. Unlike
+// DeleteCredentialFor it makes no other organization active: the developer is signed out
+// of this one, not moved to another. The keychain item goes before the lock is released,
+// so a sign-in that takes the lock next cannot lose its tokens to this delete.
+func (tx *Tx) DeleteFor(profile, organizationID, refreshToken string) error {
+	stored, err := tx.LoadFor(profile, organizationID)
+	switch {
+	case errors.Is(err, ErrNotLoggedIn):
+		return nil
+	case err != nil:
+		return err
+	case stored.RefreshToken != refreshToken:
+		return nil
+	}
+	var gone []*Credential
+	err = tx.mutate(func(file credentialFile) {
+		p := file[profile]
+		if p == nil {
+			return
+		}
+		if c := p.Organizations[organizationID]; c.present() {
+			gone = append(gone, c)
+		}
+		delete(p.Organizations, organizationID)
+	})
+	if err != nil {
+		return err
+	}
+	return forget(tx.dir, profile, gone)
 }
 
 func (tx *Tx) mutate(mutate func(credentialFile)) error {

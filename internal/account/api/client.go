@@ -95,6 +95,8 @@ type Client struct {
 	// unsaved holds the refresh tokens this client spent since its last successful save.
 	// A store that still holds one of them is behind this client.
 	unsaved []string
+	// refusedToken is the refresh token the server last refused, which is never sent again.
+	refusedToken string
 	// refreshing is a one-slot semaphore for this process's token exchanges. The
 	// credential lock serializes them across processes.
 	refreshing chan struct{}
