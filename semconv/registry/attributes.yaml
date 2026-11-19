@@ -68,6 +68,21 @@ attributes:
     stability: development
     brief: Where the provider says it ran the call, in its own spelling.
     examples: ["global", "us"]
+  - key: terma.model.fallback.model
+    type: string
+    stability: development
+    brief: The model the agent moved the session to, in its own spelling.
+    examples: ["claude-opus-4-8"]
+  - key: terma.model.fallback.trigger
+    type: string
+    stability: development
+    brief: What made the agent move the session to another model, in its own word.
+    examples: ["refusal"]
+  - key: terma.refusal.category
+    type: string
+    stability: development
+    brief: The category the API gave for refusing a call, in its own spelling.
+    examples: ["cyber"]
 
   # Operations.
   - key: terma.operation.status
