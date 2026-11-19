@@ -1,6 +1,8 @@
 package relay
 
 import (
+	"cmp"
+	"slices"
 	"strings"
 	"time"
 
@@ -171,6 +173,72 @@ func (r *Relay) sweep() {
 			r.deliverAttributed(rel.c, rel.pol, rel.p, rel.how)
 		}
 	}
+}
+
+// Waiting is a held key's parts of one signal from one sender, with why they cannot leave
+// yet: what the /held endpoint lists, so a test that waited in vain can say what for.
+// Reason is empty for parts the next sweep releases.
+type Waiting struct {
+	Key     string    `json:"key"`
+	Session string    `json:"session,omitempty"`
+	Signal  Signal    `json:"signal"`
+	PID     int       `json:"pid"`
+	Reason  string    `json:"reason"`
+	Parts   int       `json:"parts"`
+	Records int       `json:"records"`
+	Oldest  time.Time `json:"oldest"`
+	// ClaimPIDs are the processes the session's claim names, when it has one.
+	ClaimPIDs []int `json:"claim_pids,omitempty"`
+}
+
+// Held lists what the hold keeps, decided as the sweep would decide it now.
+func (r *Relay) Held() []Waiting {
+	r.deliverMu.Lock()
+	defer r.deliverMu.Unlock()
+	r.mu.Lock()
+	held := make(map[string][]heldPart, len(r.held))
+	for k, parts := range r.held {
+		held[k] = slices.Clone(parts)
+	}
+	r.mu.Unlock()
+	type group struct {
+		key    string
+		signal Signal
+		pid    int
+		reason string
+	}
+	byGroup := map[group]*Waiting{}
+	for key, parts := range held {
+		session := r.sessionFor(key)
+		var claimPIDs []int
+		if session != "" {
+			if c, ok := r.lookup(session); ok {
+				claimPIDs = c.PIDs
+			}
+		}
+		for _, h := range parts {
+			_, _, why, _, _ := r.decide(key, h.p.pid, h.p.at, h.p.narrow, h.p.claimed)
+			g := group{key, h.p.signal, h.p.pid, why}
+			w := byGroup[g]
+			if w == nil {
+				w = &Waiting{Key: key, Session: session, Signal: h.p.signal, PID: h.p.pid, Reason: why, Oldest: h.at, ClaimPIDs: claimPIDs}
+				byGroup[g] = w
+			}
+			w.Parts++
+			w.Records += h.p.records
+			if h.at.Before(w.Oldest) {
+				w.Oldest = h.at
+			}
+		}
+	}
+	out := make([]Waiting, 0, len(byGroup))
+	for _, w := range byGroup {
+		out = append(out, *w)
+	}
+	slices.SortFunc(out, func(a, b Waiting) int {
+		return cmp.Or(strings.Compare(a.Key, b.Key), strings.Compare(string(a.Signal), string(b.Signal)), cmp.Compare(a.PID, b.PID), strings.Compare(a.Reason, b.Reason))
+	})
+	return out
 }
 
 func (r *Relay) learnTrace(traceID, session string, claimed bool) {

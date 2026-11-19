@@ -2,6 +2,7 @@ package e2e
 
 import (
 	"encoding/json"
+	"fmt"
 	"net"
 	"net/http"
 	"os"
@@ -327,6 +328,52 @@ func (sb *Sandbox) relayStatsLive() (map[string]int, bool) {
 		return nil, false
 	}
 	return snap.Counters, true
+}
+
+// RelayHeld is what the running relay holds and why (its /held endpoint), one line per
+// key, signal, sender and reason; nil when no relay answers.
+func (sb *Sandbox) RelayHeld() []string {
+	if sb.relayAddr == "" {
+		return nil
+	}
+	req, _ := http.NewRequest(http.MethodGet, "http://"+sb.relayAddr+"/held", nil)
+	req.Header.Set("Authorization", "Bearer "+sb.relayToken())
+	resp, err := (&http.Client{Timeout: 5 * time.Second}).Do(req)
+	if err != nil {
+		return nil
+	}
+	defer resp.Body.Close()
+	var held []struct {
+		Key       string    `json:"key"`
+		Session   string    `json:"session"`
+		Signal    string    `json:"signal"`
+		PID       int       `json:"pid"`
+		Reason    string    `json:"reason"`
+		Parts     int       `json:"parts"`
+		Records   int       `json:"records"`
+		Oldest    time.Time `json:"oldest"`
+		ClaimPIDs []int     `json:"claim_pids"`
+	}
+	if resp.StatusCode != http.StatusOK || json.NewDecoder(resp.Body).Decode(&held) != nil {
+		return nil
+	}
+	lines := make([]string, 0, len(held))
+	for _, h := range held {
+		reason := h.Reason
+		if reason == "" {
+			reason = "released at the next sweep"
+		}
+		line := fmt.Sprintf("%s %s from pid %d: %d records in %d parts, oldest %s ago: %s",
+			h.Key, h.Signal, h.PID, h.Records, h.Parts, time.Since(h.Oldest).Round(time.Second), reason)
+		if h.Session != "" && h.Session != h.Key {
+			line += "; trace named by session " + h.Session
+		}
+		if len(h.ClaimPIDs) > 0 {
+			line += fmt.Sprintf("; claim names pids %v", h.ClaimPIDs)
+		}
+		lines = append(lines, line)
+	}
+	return lines
 }
 
 // RelayStats are the relay's counters: live while it runs, else those it left.
