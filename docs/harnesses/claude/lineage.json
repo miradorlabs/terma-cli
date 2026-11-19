@@ -3,8 +3,8 @@
   "harness": "claude",
   "window": {
     "oldest": "2.1.206",
-    "newest": "2.1.328",
-    "builds": 109
+    "newest": "2.1.329",
+    "builds": 110
   },
   "items": {
     "cli.commands.claude agents": {
@@ -3263,8 +3263,8 @@
       "ranges": [
         {
           "since": "2.1.206",
-          "until": null,
-          "removed": null
+          "until": "2.1.328",
+          "removed": "2.1.329"
         }
       ],
       "since_bounded": false
@@ -3274,8 +3274,8 @@
       "ranges": [
         {
           "since": "2.1.206",
-          "until": null,
-          "removed": null
+          "until": "2.1.328",
+          "removed": "2.1.329"
         }
       ],
       "since_bounded": false
@@ -5688,6 +5688,17 @@
         }
       ],
       "since_bounded": false
+    },
+    "config.env_vars.CLAUDE_CODE_CFC_REFUSED": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "2.1.329",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
     },
     "config.env_vars.CLAUDE_CODE_CHILD_NOTES_DIR": {
       "kind": "env_var",
@@ -8939,6 +8950,17 @@
       ],
       "since_bounded": true
     },
+    "config.env_vars.CLAUDE_CODE_HOST_HYBRID_ORGANIZATION_UUID": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "2.1.329",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.env_vars.CLAUDE_CODE_HOST_OWNED_CONFIG_DIR": {
       "kind": "env_var",
       "ranges": [
@@ -9010,6 +9032,17 @@
       "ranges": [
         {
           "since": "2.1.317",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.env_vars.CLAUDE_CODE_HOST_SHOWS_CONNECTION_NOTICE": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "2.1.329",
           "until": null,
           "removed": null
         }
@@ -9318,6 +9351,17 @@
       "ranges": [
         {
           "since": "2.1.242",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.env_vars.CLAUDE_CODE_LINKED_SPINDLE": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "2.1.329",
           "until": null,
           "removed": null
         }
@@ -10897,6 +10941,17 @@
       ],
       "since_bounded": false
     },
+    "config.env_vars.CLAUDE_CODE_QUEUED_NOTIFICATIONS_BY_POLL": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "2.1.329",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.env_vars.CLAUDE_CODE_RATE_LIMIT_TIER": {
       "kind": "env_var",
       "ranges": [
@@ -11325,6 +11380,17 @@
       ],
       "since_bounded": false
     },
+    "config.env_vars.CLAUDE_CODE_REPORT_REPO_PROVENANCE": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "2.1.329",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.env_vars.CLAUDE_CODE_REPO_CHECKOUTS": {
       "kind": "env_var",
       "ranges": [
@@ -11688,6 +11754,17 @@
       ],
       "since_bounded": true
     },
+    "config.env_vars.CLAUDE_CODE_SCRATCHPAD_DIR": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "2.1.329",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.env_vars.CLAUDE_CODE_SCRIPT_CAPS": {
       "kind": "env_var",
       "ranges": [
@@ -11792,6 +11869,28 @@
       "ranges": [
         {
           "since": "2.1.212",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.env_vars.CLAUDE_CODE_SERVED_PATHS": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "2.1.329",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.env_vars.CLAUDE_CODE_SERVED_SCHEMA_VERSION": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "2.1.329",
           "until": null,
           "removed": null
         }
@@ -12914,8 +13013,8 @@
       "ranges": [
         {
           "since": "2.1.239",
-          "until": null,
-          "removed": null
+          "until": "2.1.328",
+          "removed": "2.1.329"
         }
       ],
       "since_bounded": true
@@ -12925,8 +13024,8 @@
       "ranges": [
         {
           "since": "2.1.206",
-          "until": null,
-          "removed": null
+          "until": "2.1.328",
+          "removed": "2.1.329"
         }
       ],
       "since_bounded": false
@@ -13266,8 +13365,8 @@
       "ranges": [
         {
           "since": "2.1.206",
-          "until": null,
-          "removed": null
+          "until": "2.1.328",
+          "removed": "2.1.329"
         }
       ],
       "since_bounded": false
@@ -13288,8 +13387,8 @@
       "ranges": [
         {
           "since": "2.1.224",
-          "until": null,
-          "removed": null
+          "until": "2.1.328",
+          "removed": "2.1.329"
         }
       ],
       "since_bounded": true
@@ -13552,6 +13651,17 @@
       "ranges": [
         {
           "since": "2.1.268",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.env_vars.CLAUDE_CODE_WEBFETCH_MCP_TOOL": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "2.1.329",
           "until": null,
           "removed": null
         }
@@ -14355,6 +14465,17 @@
       "ranges": [
         {
           "since": "2.1.319",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.env_vars.CLAUDE_RUNNER_DISABLE_START_HEARTBEATS": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "2.1.329",
           "until": null,
           "removed": null
         }
@@ -17914,6 +18035,17 @@
       ],
       "since_bounded": true
     },
+    "config.env_vars.SELF_HOSTED_RUNNER_SKIP_AGENT_PROXY_CHECK": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "2.1.329",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.env_vars.SELF_HOSTED_RUNNER_STARTUP_TIMEOUT_MS": {
       "kind": "env_var",
       "ranges": [
@@ -18141,6 +18273,11 @@
           "since": "2.1.206",
           "until": "2.1.211",
           "removed": "2.1.212"
+        },
+        {
+          "since": "2.1.329",
+          "until": null,
+          "removed": null
         }
       ],
       "since_bounded": false
@@ -18893,6 +19030,17 @@
       ],
       "since_bounded": false
     },
+    "config.options.additionalDirectoryConfigRoots": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.329",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.options.additionalMarketplaces": {
       "kind": "setting",
       "ranges": [
@@ -19377,6 +19525,28 @@
       ],
       "since_bounded": false
     },
+    "config.options.allowedChannelPlugins.storageDir": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.329",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.allowedChannelPlugins.storagePath": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.329",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
     "config.options.allowedChannelPlugins[].marketplace": {
       "kind": "setting",
       "ranges": [
@@ -19421,6 +19591,28 @@
       ],
       "since_bounded": false
     },
+    "config.options.allowedHttpHookUrls.storageDir": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.329",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.allowedHttpHookUrls.storagePath": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.329",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
     "config.options.allowedMarketplaces": {
       "kind": "setting",
       "ranges": [
@@ -19431,6 +19623,28 @@
         }
       ],
       "since_bounded": true
+    },
+    "config.options.allowedMarketplaces.storageDir": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.329",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.allowedMarketplaces.storagePath": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.329",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
     },
     "config.options.allowedMarketplaces[].headers": {
       "kind": "setting",
@@ -20268,6 +20482,28 @@
       ],
       "since_bounded": true
     },
+    "config.options.appendPlugins.storageDir": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.329",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.appendPlugins.storagePath": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.329",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
     "config.options.askUserQuestionTimeout": {
       "kind": "setting",
       "ranges": [
@@ -20713,6 +20949,28 @@
       "ranges": [
         {
           "since": "2.1.206",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.blockedMarketplaces.storageDir": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.329",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.blockedMarketplaces.storagePath": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.329",
           "until": null,
           "removed": null
         }
@@ -21412,6 +21670,28 @@
       ],
       "since_bounded": false
     },
+    "config.options.claudeMdExcludes.storageDir": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.329",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.claudeMdExcludes.storagePath": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.329",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
     "config.options.clawdFileProgressEnabled": {
       "kind": "setting",
       "ranges": [
@@ -21461,6 +21741,28 @@
       "ranges": [
         {
           "since": "2.1.246",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.companyAnnouncements.storageDir": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.329",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.companyAnnouncements.storagePath": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.329",
           "until": null,
           "removed": null
         }
@@ -21650,6 +21952,17 @@
           "since": "2.1.305",
           "until": "2.1.324",
           "removed": "2.1.325"
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.desktopMcpServersListScope": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.329",
+          "until": null,
+          "removed": null
         }
       ],
       "since_bounded": true
@@ -22611,6 +22924,28 @@
       ],
       "since_bounded": false
     },
+    "config.options.footerLinksRegexes.storageDir": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.329",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.footerLinksRegexes.storagePath": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.329",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
     "config.options.footerLinksRegexes[].label": {
       "kind": "setting",
       "ranges": [
@@ -22720,6 +23055,28 @@
         }
       ],
       "since_bounded": true
+    },
+    "config.options.gatewayInternalNetworks.storageDir": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.329",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.gatewayInternalNetworks.storagePath": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.329",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
     },
     "config.options.gcpAuthRefresh": {
       "kind": "setting",
@@ -23056,6 +23413,28 @@
       "ranges": [
         {
           "since": "2.1.246",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.httpHookAllowedEnvVars.storageDir": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.329",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.httpHookAllowedEnvVars.storagePath": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.329",
           "until": null,
           "removed": null
         }
@@ -24723,6 +25102,17 @@
       ],
       "since_bounded": false
     },
+    "config.options.permissions.workingDirectoriesExclude": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.329",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
     "config.options.plansDirectory": {
       "kind": "setting",
       "ranges": [
@@ -25174,6 +25564,28 @@
       ],
       "since_bounded": false
     },
+    "config.options.pluginSuggestionMarketplaces.storageDir": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.329",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.pluginSuggestionMarketplaces.storagePath": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.329",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
     "config.options.pluginTrustMessage": {
       "kind": "setting",
       "ranges": [
@@ -25404,6 +25816,28 @@
         }
       ],
       "since_bounded": true
+    },
+    "config.options.prependPlugins.storageDir": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.329",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.prependPlugins.storagePath": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.329",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
     },
     "config.options.processWrapper": {
       "kind": "setting",
@@ -28221,6 +28655,28 @@
       ],
       "since_bounded": false
     },
+    "config.options.spinnerVerbs.verbs.storageDir": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.329",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.spinnerVerbs.verbs.storagePath": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.329",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
     "config.options.sshConfigs": {
       "kind": "setting",
       "ranges": [
@@ -28347,6 +28803,28 @@
       "ranges": [
         {
           "since": "2.1.246",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.sshConfigs.storageDir": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.329",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.sshConfigs.storagePath": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.329",
           "until": null,
           "removed": null
         }
@@ -28523,6 +29001,28 @@
       "ranges": [
         {
           "since": "2.1.206",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.strictKnownMarketplaces.storageDir": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.329",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.strictKnownMarketplaces.storagePath": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.329",
           "until": null,
           "removed": null
         }

@@ -1,7 +1,41 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-19T18:36:41.812993134Z",
+  "generated_at": "2026-11-19T18:54:17.774774449Z",
   "versions": [
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.329",
+      "released_at": "2026-11-19T18:40:25.219Z",
+      "captured_at": "2026-11-19T18:54:17.774774449Z",
+      "platforms": [
+        "darwin/arm64",
+        "linux/amd64"
+      ],
+      "support": "supported",
+      "previous": "2.1.328",
+      "changes": 30,
+      "categories": {
+        "cli": 3,
+        "config": 25,
+        "filesystem": 2
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 28,
+        "notable": 2
+      },
+      "undocumented": null,
+      "highlights": [
+        "Setting statusLine.type lost value command",
+        "Setting subagentStatusLine.type lost value command",
+        "`claude --name`: description changed (+130 −97 chars)"
+      ],
+      "signing": "valid",
+      "attempted_at": "2026-11-19T18:54:17.774774449Z",
+      "attempts": 1
+    },
     {
       "harness": "gemini",
       "name": "Gemini CLI",
@@ -60,7 +94,7 @@
         "informational": 31,
         "notable": 117
       },
-      "undocumented": null,
+      "undocumented": 97,
       "highlights": [
         "Injected context changed (+453 −376 chars)",
         "Interactive session's injected context changed (+453 −376 chars)",
@@ -6163,39 +6197,6 @@
       },
       "undocumented": 0,
       "highlights": [],
-      "signing": "valid"
-    },
-    {
-      "harness": "claude",
-      "name": "Claude Code",
-      "version": "2.1.213",
-      "released_at": "2026-07-17T22:26:26.753Z",
-      "captured_at": "2026-11-05T09:54:28.532441Z",
-      "platforms": [
-        "darwin/arm64",
-        "linux/amd64"
-      ],
-      "support": "untested",
-      "previous": "2.1.212",
-      "changes": 50,
-      "categories": {
-        "cli": 3,
-        "config": 17,
-        "filesystem": 1,
-        "hooks": 29
-      },
-      "impact": {
-        "breaking": 0,
-        "degrading": 0,
-        "informational": 50,
-        "notable": 0
-      },
-      "undocumented": null,
-      "highlights": [
-        "ConfigChange hook environment variable CLAUDE_PID added",
-        "CwdChanged hook environment variable CLAUDE_PID added",
-        "Elicitation hook environment variable CLAUDE_PID added"
-      ],
       "signing": "valid"
     }
   ]

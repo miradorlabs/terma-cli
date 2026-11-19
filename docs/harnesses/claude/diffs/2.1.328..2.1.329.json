@@ -1,0 +1,615 @@
+{
+  "schema_version": 1,
+  "harness": "claude",
+  "from": "2.1.328",
+  "to": "2.1.329",
+  "generated_at": "2026-11-19T18:54:17.774774449Z",
+  "source": null,
+  "changelog": null,
+  "summary": {
+    "changes": 30,
+    "categories": {
+      "cli": 3,
+      "config": 25,
+      "filesystem": 2
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 28,
+      "notable": 2
+    },
+    "undocumented": null
+  },
+  "changes": [
+    {
+      "id": "cli.commands.claude.options.--name.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "claude",
+        "options",
+        "--name",
+        "description"
+      ],
+      "title": "`claude --name`: description changed (+130 −97 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Set a display name for this session (shown in the prompt box, /resume picker, and terminal title)\n+Set a display name for this session (shown in the prompt box, /resume picker, and terminal title). Also names a new cloud session.\n",
+      "stats": {
+        "added_chars": 130,
+        "removed_chars": 97
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "cli.commands.claude.options.--restricted.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "claude",
+        "options",
+        "--restricted",
+        "description"
+      ],
+      "title": "`claude --restricted`: description changed (+261 −226 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,2 +1,2 @@\n Restricted mode: removes the built-in tools that run commands or code (Bash, PowerShell and the other code-running tools) and WebFetch unless --tools names them, and ignores user, project and local settings files (managed settings and --settings still apply; add --strict-mcp-config to skip MCP servers too).\n-Also confines the file tools to the working directories (--add-dir included), refuses bypassPermissions, and lets only a person or the configured permission handler approve writes to settings, git and tool-configuration files.\n+Also starts no plugin language servers, confines the file tools to the working directories (--add-dir included), refuses bypassPermissions, and lets only a person or the configured permission handler approve writes to settings, git and tool-configuration files.\n",
+      "stats": {
+        "added_chars": 261,
+        "removed_chars": 226
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "cli.help.--help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "--help"
+      ],
+      "title": "Full help text of `--help` changed (+364 −218 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -137,7 +137,8 @@\n                                         model's full name.\n   -n, --name <name>                     Set a display name for this session\n                                         (shown in the prompt box, /resume\n-                                        picker, and terminal title)\n+                                        picker, and terminal title). Also names\n+                                        a new cloud session.\n   --no-chrome                           Turn off Claude in Chrome\n   --no-session-persistence              Don't save sessions to disk; they can't\n                                         be resumed (only works with --print)\n@@ -198,8 +199,9 @@\n                                         local settings files (managed settings\n                                         and --settings still apply; add\n                                         --strict-mcp-config to skip MCP servers\n-                                        too). Also confines the file tools to\n-                                        the working directories (--add-dir\n+                                        too). Also starts no plugin language\n+                                        servers, confines the file tools to the\n+                                        working directories (--add-dir\n                                         included), refuses bypassPermissions,\n                                         and lets only a person or the configured\n                                         permission handler approve writes to\n",
+      "stats": {
+        "added_chars": 364,
+        "removed_chars": 218
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.additionalDirectoryConfigRoots",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "additionalDirectoryConfigRoots"
+      ],
+      "title": "New setting: additionalDirectoryConfigRoots",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "@internal For the program that starts Claude Code only: read from --settings and from settings that program sends while the session runs; ignored in settings files. Maps an added folder (--add-dir, or a claim's additional_directories) by its absolute path, also matched by its real path, to the absolute path of the checkout whose .claude skills, commands, agents and plugin settings that folder then reads instead of its own; file access stays with the folder. Full contract, with when to send it and what makes a root unusable: apps/cli/docs/desktop-host-contract.md, entry additionalDirectoryConfigRoots."
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.desktopMcpServersListScope",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "desktopMcpServersListScope"
+      ],
+      "title": "New setting: desktopMcpServersListScope",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Claude desktop app only. Where your allow list and deny list apply to MCP servers added in the Claude desktop app. \"code\" (default): Your allow list also governs MCP servers added in the Claude desktop app, in Code tab sessions and the Artifact pane. \"all\": Your allow list and your deny list also govern MCP servers added in the Claude desktop app, in every tab (including Chat and Cowork). \"off\": Your allow list doesn't govern MCP servers added in the Claude desktop app. Read only from managed settings. Any other value counts as `all`. Where sources are merged or mixed, `off` counts as `all`. Leave the key out, or set it only in the managed source that holds your list. `deniedMcpServers` applies in Code tab sessions and the Artifact pane with every value, and in every tab with `all`. MCP servers sent to SSH hosts are not governed by these lists in this release. The Claude Code CLI reads nothing from this key, but written alone in a higher managed source it makes that source lead, and Claude Code skips the managed sources beneath it. Write it only beside the list it scopes."
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.maxEffortLevel.enum.$ZodCatch",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "maxEffortLevel",
+        "enum",
+        "$ZodCatch"
+      ],
+      "title": "Setting maxEffortLevel gained value $ZodCatch",
+      "impact": "informational",
+      "before": null,
+      "after": "$ZodCatch",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.sandbox.windows.backend.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "sandbox.windows.backend",
+        "description"
+      ],
+      "title": "sandbox.windows.backend description changed (+560 −668 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,6 +1,7 @@\n Windows only: how sandboxed commands are confined.\n-\"sandboxuser\" (default) runs them as the dedicated sandbox account that the sandbox set-up creates.\n+There is no default: until it is set, sandboxed commands are refused.\n+\"sandboxuser\" runs them as the dedicated sandbox account that the sandbox set-up creates.\n \"mxc\" runs them in a Microsoft eXecution Container (BaseContainer) through the MXC SDK, with no install step; experimental.\n-Claude Code ignores \"mxc\" and uses the sandbox account, with a note in /sandbox, when this build lacks the MXC SDK, when a higher settings tier or another managed source sets network.tlsTerminate, or when an administrator requires the sandbox or locks reads (filesystem.allowManagedReadPathsOnly) unless managed settings picked \"mxc\" and no other managed source sets network.allowManagedDomainsOnly.\n-On \"mxc\" only the PowerShell tool is enabled and Bash commands are refused (MXC cannot run Git Bash yet); network.tlsTerminate and network.allowLocalBinding do not apply.\n+Managed settings decide over --settings, and --settings over user settings.\n+On \"mxc\" only the PowerShell tool is enabled and Bash commands are refused (MXC cannot run Git Bash yet); network.allowLocalBinding does not apply, and sandboxed commands are refused while network.tlsTerminate is set, or while managed settings lock reads (filesystem.allowManagedReadPathsOnly) without picking \"mxc\" themselves.\n Read from user, managed/policy or --settings settings only; a value in ${…} is ignored.\n",
+      "stats": {
+        "added_chars": 560,
+        "removed_chars": 668
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.statusLine.type.enum.command",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "statusLine.type",
+        "enum",
+        "command"
+      ],
+      "title": "Setting statusLine.type lost value command",
+      "impact": "notable",
+      "before": "command",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.subagentStatusLine.type.enum.command",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "subagentStatusLine.type",
+        "enum",
+        "command"
+      ],
+      "title": "Setting subagentStatusLine.type lost value command",
+      "impact": "notable",
+      "before": "command",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_CFC_REFUSED",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_CFC_REFUSED"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_CFC_REFUSED",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_CFC_REFUSED",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_HOST_HYBRID_ORGANIZATION_UUID",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_HOST_HYBRID_ORGANIZATION_UUID"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_HOST_HYBRID_ORGANIZATION_UUID",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_HOST_HYBRID_ORGANIZATION_UUID",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_HOST_SHOWS_CONNECTION_NOTICE",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_HOST_SHOWS_CONNECTION_NOTICE"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_HOST_SHOWS_CONNECTION_NOTICE",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_HOST_SHOWS_CONNECTION_NOTICE",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_LINKED_SPINDLE",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_LINKED_SPINDLE"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_LINKED_SPINDLE",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_LINKED_SPINDLE",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_QUEUED_NOTIFICATIONS_BY_POLL",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_QUEUED_NOTIFICATIONS_BY_POLL"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_QUEUED_NOTIFICATIONS_BY_POLL",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_QUEUED_NOTIFICATIONS_BY_POLL",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_REPORT_REPO_PROVENANCE",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_REPORT_REPO_PROVENANCE"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_REPORT_REPO_PROVENANCE",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_REPORT_REPO_PROVENANCE",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_SCRATCHPAD_DIR",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_SCRATCHPAD_DIR"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_SCRATCHPAD_DIR",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_SCRATCHPAD_DIR",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_SERVED_PATHS",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_SERVED_PATHS"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_SERVED_PATHS",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_SERVED_PATHS",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_SERVED_SCHEMA_VERSION",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_SERVED_SCHEMA_VERSION"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_SERVED_SCHEMA_VERSION",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_SERVED_SCHEMA_VERSION",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_WEBFETCH_MCP_TOOL",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_WEBFETCH_MCP_TOOL"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_WEBFETCH_MCP_TOOL",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_WEBFETCH_MCP_TOOL",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.CLAUDE_RUNNER_DISABLE_START_HEARTBEATS",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_RUNNER_DISABLE_START_HEARTBEATS"
+      ],
+      "title": "New environment variable: CLAUDE_RUNNER_DISABLE_START_HEARTBEATS",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_RUNNER_DISABLE_START_HEARTBEATS",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.SELF_HOSTED_RUNNER_SKIP_AGENT_PROXY_CHECK",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "SELF_HOSTED_RUNNER_SKIP_AGENT_PROXY_CHECK"
+      ],
+      "title": "New environment variable: SELF_HOSTED_RUNNER_SKIP_AGENT_PROXY_CHECK",
+      "impact": "informational",
+      "before": null,
+      "after": "SELF_HOSTED_RUNNER_SKIP_AGENT_PROXY_CHECK",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.SYSTEMROOT",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "SYSTEMROOT"
+      ],
+      "title": "New environment variable: SYSTEMROOT",
+      "impact": "informational",
+      "before": null,
+      "after": "SYSTEMROOT",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.CHOKIDAR_INTERVAL",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "CHOKIDAR_INTERVAL"
+      ],
+      "title": "Environment variable no longer read: CHOKIDAR_INTERVAL",
+      "impact": "informational",
+      "before": "CHOKIDAR_INTERVAL",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.CHOKIDAR_USEPOLLING",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "CHOKIDAR_USEPOLLING"
+      ],
+      "title": "Environment variable no longer read: CHOKIDAR_USEPOLLING",
+      "impact": "informational",
+      "before": "CHOKIDAR_USEPOLLING",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_TEST_ALLOW_REAL_NETWORK",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_TEST_ALLOW_REAL_NETWORK"
+      ],
+      "title": "Environment variable no longer read: CLAUDE_CODE_TEST_ALLOW_REAL_NETWORK",
+      "impact": "informational",
+      "before": "CLAUDE_CODE_TEST_ALLOW_REAL_NETWORK",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_TEST_FIXTURES_ROOT",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_TEST_FIXTURES_ROOT"
+      ],
+      "title": "Environment variable no longer read: CLAUDE_CODE_TEST_FIXTURES_ROOT",
+      "impact": "informational",
+      "before": "CLAUDE_CODE_TEST_FIXTURES_ROOT",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_ULTRAREVIEW_PREFLIGHT_FIXTURE",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_ULTRAREVIEW_PREFLIGHT_FIXTURE"
+      ],
+      "title": "Environment variable no longer read: CLAUDE_CODE_ULTRAREVIEW_PREFLIGHT_FIXTURE",
+      "impact": "informational",
+      "before": "CLAUDE_CODE_ULTRAREVIEW_PREFLIGHT_FIXTURE",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_ULTRAREVIEW_QUOTA_FIXTURE",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_ULTRAREVIEW_QUOTA_FIXTURE"
+      ],
+      "title": "Environment variable no longer read: CLAUDE_CODE_ULTRAREVIEW_QUOTA_FIXTURE",
+      "impact": "informational",
+      "before": "CLAUDE_CODE_ULTRAREVIEW_QUOTA_FIXTURE",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<claude-config>/state",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<claude-config>/state"
+      ],
+      "title": "Now looks for <claude-config>/state (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "ops": [
+          "probe"
+        ],
+        "phases": [
+          "turn"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<claude-config>/state/hybrid-settings.json",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<claude-config>/state/hybrid-settings.json"
+      ],
+      "title": "Now looks for <claude-config>/state/hybrid-settings.json (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "ops": [
+          "probe"
+        ],
+        "phases": [
+          "startup"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    }
+  ]
+}

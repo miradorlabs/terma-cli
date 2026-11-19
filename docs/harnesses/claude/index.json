@@ -7,25 +7,56 @@
     "homepage": "https://claude.com/claude-code",
     "source": null,
     "changelog": "https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md",
-    "latest": "2.1.328",
+    "latest": "2.1.329",
     "support": "supported",
-    "versions_tracked": 109,
+    "versions_tracked": 110,
     "first_tracked": "2026-07-09",
     "last_change": {
-      "from": "2.1.327",
-      "to": "2.1.328",
-      "at": "2026-11-18T23:27:42.359139401Z",
-      "released_at": "2026-11-18T23:09:39.159Z",
-      "changes": 148,
+      "from": "2.1.328",
+      "to": "2.1.329",
+      "at": "2026-11-19T18:54:17.774774449Z",
+      "released_at": "2026-11-19T18:40:25.219Z",
+      "changes": 30,
       "categories": {
-        "config": 133,
-        "filesystem": 10,
-        "prompt": 2,
-        "tools": 3
+        "cli": 3,
+        "config": 25,
+        "filesystem": 2
       }
     }
   },
   "versions": [
+    {
+      "version": "2.1.329",
+      "released_at": "2026-11-19T18:40:25.219Z",
+      "captured_at": "2026-11-19T18:54:17.774774449Z",
+      "platforms": [
+        "darwin/arm64",
+        "linux/amd64"
+      ],
+      "support": "supported",
+      "previous": "2.1.328",
+      "changes": 30,
+      "categories": {
+        "cli": 3,
+        "config": 25,
+        "filesystem": 2
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 28,
+        "notable": 2
+      },
+      "undocumented": null,
+      "highlights": [
+        "Setting statusLine.type lost value command",
+        "Setting subagentStatusLine.type lost value command",
+        "`claude --name`: description changed (+130 −97 chars)"
+      ],
+      "signing": "valid",
+      "attempted_at": "2026-11-19T18:54:17.774774449Z",
+      "attempts": 1
+    },
     {
       "version": "2.1.328",
       "released_at": "2026-11-18T23:09:39.159Z",
@@ -49,7 +80,7 @@
         "informational": 31,
         "notable": 117
       },
-      "undocumented": null,
+      "undocumented": 97,
       "highlights": [
         "Injected context changed (+453 −376 chars)",
         "Interactive session's injected context changed (+453 −376 chars)",

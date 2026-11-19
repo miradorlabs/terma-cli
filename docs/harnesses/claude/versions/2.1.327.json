@@ -18838,7 +18838,12 @@
           }
         }
       },
-      "tracer": "eslogger"
+      "tracer": "eslogger",
+      "unobserved": {
+        "paths": [
+          "<claude-config>/telemetry/1p_failed_events.<uuid>.<uuid>.json"
+        ]
+      }
     },
     "linux/amd64": {
       "decoys": {
