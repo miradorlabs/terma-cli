@@ -16,9 +16,10 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
-// assistantRecord is a final transcript record for one of a call's content blocks.
-func assistantRecord(requestID, at string, thinking int) string {
-	return `{"type":"assistant","requestId":"` + requestID + `","timestamp":"` + at + `","effort":"high",` +
+// assistantRecord is a final transcript record, made in cwd, for one of a call's content blocks.
+func assistantRecord(cwd, requestID, at string, thinking int) string {
+	b, _ := json.Marshal(cwd)
+	return `{"type":"assistant","requestId":"` + requestID + `","cwd":` + string(b) + `,"timestamp":"` + at + `","effort":"high",` +
 		`"message":{"model":"claude-opus-5-5","stop_reason":"tool_use","content":[],"usage":{"output_tokens":1308,` +
 		`"service_tier":"standard","inference_geo":"global","output_tokens_details":{"thinking_tokens":` + strconv.Itoa(thinking) + `}}}}`
 }
@@ -68,9 +69,9 @@ func TestReadCallResponsesKeepsEachCallsLastFinalRecord(t *testing.T) {
 	path := transcript(t, t.TempDir(),
 		`{"type":"user","message":{"content":"hi"}}`,
 		`{"type":"assistant","requestId":"req_a","timestamp":"2026-10-28T03:31:44Z","message":{"model":"claude-opus-5-5","stop_reason":null,"usage":{"output_tokens":243,"output_tokens_details":{"thinking_tokens":40}}}}`,
-		assistantRecord("req_a", "2026-10-28T03:31:45.100Z", 76),
-		assistantRecord("req_a", "2026-10-28T03:31:46.200Z", 76),
-		assistantRecord("req_b", "2026-10-28T03:31:50Z", 0),
+		assistantRecord("", "req_a", "2026-10-28T03:31:45.100Z", 76),
+		assistantRecord("", "req_a", "2026-10-28T03:31:46.200Z", 76),
+		assistantRecord("", "req_b", "2026-10-28T03:31:50Z", 0),
 	)
 	calls, offset, err := readCallResponses(path, 0)
 	if err != nil {
@@ -97,7 +98,7 @@ func TestReadCallResponsesKeepsEachCallsLastFinalRecord(t *testing.T) {
 // label an earlier final record gave.
 func TestReadCallResponsesToleratesSpacingAndOmittedLabels(t *testing.T) {
 	path := transcript(t, t.TempDir(),
-		assistantRecord("req_a", "2026-10-28T03:31:45Z", 76),
+		assistantRecord("", "req_a", "2026-10-28T03:31:45Z", 76),
 		`{"type": "assistant", "requestId": "req_a", "message": {"model": "claude-opus-5-5", "stop_reason": "tool_use", "usage": {"output_tokens": 1308}}}`,
 	)
 	calls, _, err := readCallResponses(path, 0)
@@ -133,13 +134,13 @@ func TestReadCallResponsesWithoutAThinkingCount(t *testing.T) {
 
 // Reading resumes after the last whole line; a line still being written waits for the next read.
 func TestReadCallResponsesResumesAfterTheLastWholeLine(t *testing.T) {
-	path := transcript(t, t.TempDir(), assistantRecord("req_a", "2026-10-28T03:31:45Z", 5))
+	path := transcript(t, t.TempDir(), assistantRecord("", "req_a", "2026-10-28T03:31:45Z", 5))
 	first, offset, err := readCallResponses(path, 0)
 	if err != nil || len(first) != 1 {
 		t.Fatalf("first read: %+v, %v", first, err)
 	}
-	partial := assistantRecord("req_c", "2026-10-28T03:31:47Z", 20)[:20]
-	appendTranscript(t, path, assistantRecord("req_b", "2026-10-28T03:31:46Z", 0)+"\n"+partial)
+	partial := assistantRecord("", "req_c", "2026-10-28T03:31:47Z", 20)[:20]
+	appendTranscript(t, path, assistantRecord("", "req_b", "2026-10-28T03:31:46Z", 0)+"\n"+partial)
 	second, next, err := readCallResponses(path, offset)
 	if err != nil {
 		t.Fatal(err)
@@ -154,7 +155,7 @@ func TestReadCallResponsesResumesAfterTheLastWholeLine(t *testing.T) {
 
 // A transcript shorter than the stored offset is read from its start.
 func TestReadCallResponsesRestartsAShorterTranscript(t *testing.T) {
-	path := transcript(t, t.TempDir(), assistantRecord("req_a", "2026-10-28T03:31:45Z", 5))
+	path := transcript(t, t.TempDir(), assistantRecord("", "req_a", "2026-10-28T03:31:45Z", 5))
 	calls, _, err := readCallResponses(path, 1<<20)
 	if err != nil || len(calls) != 1 {
 		t.Fatalf("got %+v, %v; want req_a", calls, err)
@@ -165,7 +166,7 @@ func TestReadCallResponsesRestartsAShorterTranscript(t *testing.T) {
 // only the calls recorded since.
 func TestClaudeStopSpoolsEachCallsResponseOnce(t *testing.T) {
 	env := titleEnv(t)
-	path := transcript(t, t.TempDir(), assistantRecord("req_a", "2026-10-28T03:31:45Z", 76))
+	path := transcript(t, t.TempDir(), assistantRecord(env.Cwd, "req_a", "2026-10-28T03:31:45Z", 76))
 	stopClaude(t, env, path)
 	got := spooledResponses(t, env.Spool)
 	if len(got) != 1 {
@@ -192,7 +193,7 @@ func TestClaudeStopSpoolsEachCallsResponseOnce(t *testing.T) {
 		t.Errorf("response timed %v, want the call's first record", e.Time)
 	}
 
-	appendTranscript(t, path, assistantRecord("req_b", "2026-10-28T03:32:00Z", 12)+"\n")
+	appendTranscript(t, path, assistantRecord(env.Cwd, "req_b", "2026-10-28T03:32:00Z", 12)+"\n")
 	stopClaude(t, env, path)
 	got = spooledResponses(t, env.Spool)
 	if len(got) != 1 || got[0].Attrs[semconv.TermaModelCallIDKey] != "req_b" {
@@ -204,7 +205,7 @@ func TestClaudeStopSpoolsEachCallsResponseOnce(t *testing.T) {
 func TestClaudeStopSendsNoResponsesWithoutConsent(t *testing.T) {
 	env := titleEnv(t)
 	env.Agents = nil
-	path := transcript(t, t.TempDir(), assistantRecord("req_a", "2026-10-28T03:31:45Z", 76))
+	path := transcript(t, t.TempDir(), assistantRecord(env.Cwd, "req_a", "2026-10-28T03:31:45Z", 76))
 	stopClaude(t, env, path)
 	if got := spooledResponses(t, env.Spool); len(got) != 0 {
 		t.Fatalf("expected no responses, got %+v", got)
@@ -216,7 +217,7 @@ func TestClaudeSubagentStopSpoolsItsResponses(t *testing.T) {
 	env := titleEnv(t)
 	ctx := context.Background()
 	agentPath := filepath.Join(t.TempDir(), "agent-a44816aa66a297cdd.jsonl")
-	hookruntest.WriteFile(t, filepath.Dir(agentPath), filepath.Base(agentPath), assistantRecord("req_sub", "2026-10-28T03:31:45Z", 300)+"\n")
+	hookruntest.WriteFile(t, filepath.Dir(agentPath), filepath.Base(agentPath), assistantRecord(env.Cwd, "req_sub", "2026-10-28T03:31:45Z", 300)+"\n")
 	common := `"session_id":"` + titleSession + `","cwd":"` + env.Cwd + `","agent_id":"a44816aa66a297cdd","agent_type":"Explore"`
 	env.Stdin = strings.NewReader(`{` + common + `,"hook_event_name":"SubagentStart"}`)
 	if err := subagentStart(ctx, env); err != nil {
@@ -242,7 +243,7 @@ func TestClaudeStopSendsAStreamingCallOnceItIsFinal(t *testing.T) {
 	if got := spooledResponses(t, env.Spool); len(got) != 0 {
 		t.Fatalf("a streaming call was sent: %+v", got)
 	}
-	appendTranscript(t, path, assistantRecord("req_a", "2026-10-28T03:31:45Z", 76)+"\n")
+	appendTranscript(t, path, assistantRecord(env.Cwd, "req_a", "2026-10-28T03:31:45Z", 76)+"\n")
 	stopClaude(t, env, path)
 	got := spooledResponses(t, env.Spool)
 	if len(got) != 1 || got[0].Attrs[semconv.TermaModelCallIDKey] != "req_a" || got[0].Attrs[semconv.GenAIUsageReasoningOutputTokensKey] != float64(76) {
@@ -255,7 +256,7 @@ func TestClaudeStopSendsAStreamingCallOnceItIsFinal(t *testing.T) {
 func TestClaudeStopFailureSendsTheTurnsCompletedCalls(t *testing.T) {
 	env := titleEnv(t)
 	path := transcript(t, t.TempDir(),
-		assistantRecord("req_a", "2026-10-28T03:31:45Z", 76),
+		assistantRecord(env.Cwd, "req_a", "2026-10-28T03:31:45Z", 76),
 		`{"type":"assistant","sessionId":"`+titleSession+`","timestamp":"2026-10-28T03:31:50Z","isApiErrorMessage":true,"error":"server_error","message":{"model":"<synthetic>","stop_reason":"stop_sequence","usage":{"output_tokens":0}}}`,
 	)
 	runClaudeHook(t, env, stopFailure, map[string]any{"transcript_path": path, "hook_event_name": "StopFailure", "error": "server_error"})
@@ -279,10 +280,33 @@ func TestClaudeSessionEndSendsACallFinishedAfterStop(t *testing.T) {
 	if got := spooledResponses(t, env.Spool); len(got) != 0 {
 		t.Fatalf("a streaming call was sent: %+v", got)
 	}
-	appendTranscript(t, path, assistantRecord("req_a", "2026-10-28T03:31:45Z", 76)+"\n")
+	appendTranscript(t, path, assistantRecord(env.Cwd, "req_a", "2026-10-28T03:31:45Z", 76)+"\n")
 	runClaudeHook(t, env, sessionEnd, map[string]any{"transcript_path": path, "hook_event_name": "SessionEnd"})
 	got := spooledResponses(t, env.Spool)
 	if len(got) != 1 || got[0].Attrs[semconv.TermaModelCallIDKey] != "req_a" || got[0].Attrs[semconv.GenAIUsageReasoningOutputTokensKey] != float64(76) {
 		t.Fatalf("got %+v, want req_a with its final count at the session's end", got)
+	}
+}
+
+// A session moved into a listed repository, or resumed there, still holds calls made before
+// elsewhere: a call made where the team does not collect stays on the machine, as does one
+// whose record names no directory, and the read moves past them.
+func TestClaudeCallResponsesStayHomeWhereTheTeamDoesNotCollect(t *testing.T) {
+	env := titleEnv(t)
+	// Hooks run in the session's directory: a record naming none must not be judged by it.
+	t.Chdir(env.Cwd)
+	path := transcript(t, t.TempDir(),
+		assistantRecord(t.TempDir(), "req_home", "2026-10-28T03:31:40Z", 1),
+		assistantRecord("", "req_none", "2026-10-28T03:31:42Z", 2),
+		assistantRecord(env.Cwd, "req_listed", "2026-10-28T03:31:45Z", 3),
+	)
+	stopClaude(t, env, path)
+	got := spooledResponses(t, env.Spool)
+	if len(got) != 1 || got[0].Attrs[semconv.TermaModelCallIDKey] != "req_listed" {
+		t.Fatalf("got %+v, want req_listed alone", got)
+	}
+	stopClaude(t, env, path)
+	if again := spooledResponses(t, env.Spool); len(again) != 0 {
+		t.Fatalf("a second stop sent %+v", again)
 	}
 }

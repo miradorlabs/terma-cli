@@ -82,10 +82,10 @@ func sessionEnd(ctx context.Context, env hookrun.Env) error {
 	if !ok {
 		return nil
 	}
-	limitFromTranscript(env, r, in)
+	limitFromTranscript(ctx, env, r, in)
 	// A turn's last response can reach the transcript after its Stop read it, and an interrupted
 	// turn has no Stop.
-	captureClaudeCallResponses(env, r, in.SessionID, in.TranscriptPath)
+	captureClaudeCallResponses(ctx, env, r, in.SessionID, in.TranscriptPath)
 	env.EndSession(r, in.SessionID, claudeTool)
 	// A /rename after the last turn ends no turn.
 	captureClaudeTitle(env, r, in)
@@ -107,7 +107,7 @@ func stop(ctx context.Context, env hookrun.Env) error {
 	}
 	captureClaudeAccount(env, r, in)
 	captureClaudeTitle(env, r, in)
-	captureClaudeCallResponses(env, r, in.SessionID, in.TranscriptPath)
+	captureClaudeCallResponses(ctx, env, r, in.SessionID, in.TranscriptPath)
 	return nil
 }
 

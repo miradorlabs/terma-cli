@@ -371,15 +371,35 @@ func limitRun(t *testing.T, env hookrun.Env, transcript, kind string, hooks ...f
 	return limits
 }
 
+// The session's end reports its last unreported API error made where the team collects: one
+// after it, made elsewhere, stays on the machine and does not hide it.
+func TestSessionEndReportsTheLastErrorMadeWhereTheTeamCollects(t *testing.T) {
+	env := newFundingEnv(t)
+	apiErrorIn := func(cwd string, at time.Time, kind string) string {
+		b, _ := json.Marshal(map[string]any{"type": "assistant", "sessionId": "funding-session", "cwd": cwd, "timestamp": at,
+			"isApiErrorMessage": true, "error": kind})
+		return string(b)
+	}
+	dir := t.TempDir()
+	path := filepath.Join(dir, "funding-session.jsonl")
+	hookruntest.WriteFile(t, dir, "funding-session.jsonl", apiErrorIn(env.Cwd, env.Now.Add(-2*time.Second), "rate_limit")+"\n"+
+		apiErrorIn(t.TempDir(), env.Now.Add(-time.Second), "overloaded")+"\n")
+	got := limitRun(t, env, path, "", sessionEnd)
+	if len(got) != 1 || got[0].Attrs[semconv.ErrorTypeKey] != "rate_limit" {
+		t.Fatalf("reported %+v, want the listed repository's rate_limit", got)
+	}
+}
+
 // A headless run's StopFailure can die before it reports; the session's end reports the
 // transcript's API error once, and never one StopFailure already reported.
 func TestSessionEndReportsAnUnreportedLimit(t *testing.T) {
-	apiError := func(at time.Time, kind string) string {
-		b, _ := json.Marshal(map[string]any{"type": "assistant", "sessionId": "funding-session", "timestamp": at,
+	env := newFundingEnv(t)
+	apiErrorIn := func(cwd string, at time.Time, kind string) string {
+		b, _ := json.Marshal(map[string]any{"type": "assistant", "sessionId": "funding-session", "cwd": cwd, "timestamp": at,
 			"isApiErrorMessage": true, "apiErrorStatus": 429, "error": kind, "message": map[string]any{"content": "secret"}})
 		return string(b)
 	}
-	env := newFundingEnv(t)
+	apiError := func(at time.Time, kind string) string { return apiErrorIn(env.Cwd, at, kind) }
 	dir := t.TempDir()
 	path := filepath.Join(dir, "funding-session.jsonl")
 	write := func(lines ...string) {
@@ -390,6 +410,12 @@ func TestSessionEndReportsAnUnreportedLimit(t *testing.T) {
 		`{"type":"assistant","sessionId":"another-session","timestamp":"2026-01-01T00:00:00Z","isApiErrorMessage":true,"error":"rate_limit"}`)
 	if got := limitRun(t, env, path, "", sessionEnd); len(got) != 0 {
 		t.Fatalf("no API error of the session's, yet %+v", got)
+	}
+
+	// An error from before the session moved into a listed repository stays on the machine.
+	write(apiErrorIn(t.TempDir(), env.Now.Add(-time.Second), "overloaded"))
+	if got := limitRun(t, env, path, "", sessionEnd); len(got) != 0 {
+		t.Fatalf("an error where the team does not collect was reported: %+v", got)
 	}
 
 	// A session resumed after the sweep may have lost its marker.
