@@ -37,13 +37,14 @@ func (p Policy) Admits(r Repository) bool {
 }
 
 // AdmitsNone reports whether p admits no repository at all: not validated, or repository
-// mode with no entry ParseEntry reads.
+// mode with no entry that can name one. A 1.x entry with a `*`, such as `github.com/acme/*`,
+// reads as a literal no origin has, so it counts for nothing.
 func (p Policy) AdmitsNone() bool {
 	if !p.Validated() {
 		return true
 	}
 	return !p.Global() && !slices.ContainsFunc(p.Repositories, func(raw string) bool {
-		_, ok := ParseEntry(raw, p.Wildcards)
-		return ok
+		e, ok := ParseEntry(raw, p.Wildcards)
+		return ok && (e.Wildcard() || IsRepositoryKey(e.Key()))
 	})
 }

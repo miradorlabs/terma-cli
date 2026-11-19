@@ -94,6 +94,16 @@ func TestPolicyInForceAndAdmitsNone(t *testing.T) {
 	if !hostOnly.AdmitsNone() {
 		t.Fatal("AdmitsNone took a 1.x host wildcard as usable")
 	}
+	// On 1.x, an entry with a `*` is a literal no origin names, so it is no usable entry.
+	legacy := fetched
+	legacy.Repositories = []string{"github.com/acme/*", "github.com/acme/terma-*"}
+	if !legacy.AdmitsNone() {
+		t.Fatal("AdmitsNone took 1.x literals with a * as usable")
+	}
+	legacy.Wildcards = true
+	if legacy.AdmitsNone() {
+		t.Fatal("AdmitsNone refused a 2.x wildcard beside a refused entry")
+	}
 }
 
 // A validated policy is stale PolicyStaleAfter after its fetch; one never validated is not.

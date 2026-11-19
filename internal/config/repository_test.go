@@ -39,6 +39,7 @@ func TestPolicyAdmits(t *testing.T) {
 		{"an exact 2.x entry is still exact", wild, Repository{Origin: "github.com/solo/api"}, true},
 		{"a 1.x entry ending in /* is a literal that names no repository", literal, Repository{Origin: "github.com/acme/web"}, false},
 		{"a 1.x entry ending in /* does not admit an origin spelled with *", literal, Repository{Origin: "github.com/acme/*"}, false},
+		{"a clone URL entry reads as the repository it names", Policy{Mode: ModeRepo, Repositories: []string{"https://github.com/acme/clone.git"}}, Repository{Origin: "github.com/acme/clone"}, true},
 	} {
 		if got := tc.pol.Admits(tc.repo); got != tc.want {
 			t.Errorf("%s: Admits(%+v) = %v", tc.name, tc.repo, got)
