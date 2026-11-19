@@ -433,7 +433,8 @@ func TestClient_ARemovedCredentialIsNotSentByAnotherProcess(t *testing.T) {
 }
 
 // Refused is true only for the auth gateway's own refusal of the refresh token: a bare
-// 401 from some other hop, or a session another sign-in replaced, is no refusal of it.
+// 401 from some other hop, or a session another sign-in replaced, is no refusal of it. A
+// bare 401 is no sign-out either: it says nothing about the session.
 func TestRefusedIsOnlyTheGatewaysRefusal(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct {
@@ -441,13 +442,14 @@ func TestRefusedIsOnlyTheGatewaysRefusal(t *testing.T) {
 		answer     func(http.ResponseWriter)
 		superseded bool
 		want       bool
+		signedOut  bool
 	}{
-		{name: "the gateway's refusal", want: true, answer: func(w http.ResponseWriter) {
+		{name: "the gateway's refusal", want: true, signedOut: true, answer: func(w http.ResponseWriter) {
 			w.WriteHeader(http.StatusUnauthorized)
 			_, _ = w.Write([]byte(`{"error":{"code":"UNAUTHENTICATED","message":"invalid or expired CLI token"}}`))
 		}},
 		{name: "a bare 401", answer: func(w http.ResponseWriter) { http.Error(w, "Unauthorized", http.StatusUnauthorized) }},
-		{name: "a session another sign-in replaced", superseded: true, answer: rotatedPair},
+		{name: "a session another sign-in replaced", superseded: true, signedOut: true, answer: rotatedPair},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
@@ -462,8 +464,8 @@ func TestRefusedIsOnlyTheGatewaysRefusal(t *testing.T) {
 				}
 			}
 			err := client.Refresh(context.Background())
-			if !errors.Is(err, auth.ErrNotLoggedIn) || Refused(err) != tc.want {
-				t.Fatalf("Refresh = %v, Refused = %v; want ErrNotLoggedIn, Refused %v", err, Refused(err), tc.want)
+			if err == nil || errors.Is(err, auth.ErrNotLoggedIn) != tc.signedOut || Refused(err) != tc.want {
+				t.Fatalf("Refresh = %v, Refused = %v; want ErrNotLoggedIn %v, Refused %v", err, Refused(err), tc.signedOut, tc.want)
 			}
 		})
 	}

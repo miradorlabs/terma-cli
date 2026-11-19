@@ -120,6 +120,9 @@ func (s *tokenServer) state() (access, refresh string, redemptions, fails int, r
 	return s.access, s.refresh, s.redemptions, s.fails, s.revoked
 }
 
+// bare401 is a 401 without the auth gateway's envelope, as a proxy in the way may answer.
+func bare401(w http.ResponseWriter) { http.Error(w, "Unauthorized", http.StatusUnauthorized) }
+
 func unauthorized(w http.ResponseWriter) {
 	w.WriteHeader(http.StatusUnauthorized)
 	_, _ = w.Write([]byte(`{"error":{"code":"UNAUTHENTICATED","message":"invalid or expired CLI token"}}`))
@@ -359,6 +362,25 @@ func TestAuthToken_ErrorCodes(t *testing.T) {
 		stdout, _, err := termaRun{}.exec(t, "auth", "token", "--json")
 		assertTokenError(t, stdout, err, "no_team")
 	})
+	// A bare 401 on the refresh, as a proxy in the way may answer, says nothing about the
+	// session: worth trying again, and the sign-in is kept, its refresh unmarked.
+	t.Run("unavailable after a bare 401", func(t *testing.T) {
+		srv := newTokenServer(t)
+		dir := signInForToken(t, srv, time.Now().Add(-time.Minute), grantTeam)
+		srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path == "/v1/auth/cli/token" {
+				bare401(w)
+				return
+			}
+			srv.serve(w, r)
+		})
+		stdout, _, err := termaRun{}.exec(t, "auth", "token", "--json")
+		assertTokenFailure(t, stdout, err, "unavailable", "try again")
+		stored, err := auth.LoadCredential(dir, config.DefaultProfile)
+		if err != nil || stored.RefreshToken != "mir_clr_0" || !stored.UnsettledSince().IsZero() {
+			t.Fatalf("stored = %v, %v; want the sign-in kept, unmarked", stored, err)
+		}
+	})
 	t.Run("unavailable", func(t *testing.T) {
 		srv := newTokenServer(t)
 		signInForToken(t, srv, time.Now().Add(-time.Minute), grantTeam)
@@ -435,9 +457,11 @@ func TestReuseStoredSessionKeepsASignInStoredSinceARefusal(t *testing.T) {
 }
 
 // Setup removes a stored session only when the auth gateway itself refuses its refresh
-// token. A bare 401 on the refresh, as a proxy in the way may answer, says nothing about
-// the session: it is kept, and the fresh sign-in replaces it. The client's refresh removes
-// a refused one itself; setup's own removal is the backup for when that one fails.
+// token, and signs in anew. A bare 401 on the refresh, as a proxy in the way may answer,
+// says nothing about the session: it is kept, and setup fails with the proxy's answer
+// rather than open a browser for a sign-in the proxy would turn away too. The client's
+// refresh removes a refused one itself; setup's own removal is the backup for when that
+// one fails.
 func TestReuseStoredSessionRemovesOnlyARefusedRefresh(t *testing.T) {
 	for _, tc := range []struct {
 		name    string
@@ -445,7 +469,7 @@ func TestReuseStoredSessionRemovesOnlyARefusedRefresh(t *testing.T) {
 		removed bool
 	}{
 		{"the gateway's refusal", unauthorized, true},
-		{"a bare 401", func(w http.ResponseWriter) { http.Error(w, "Unauthorized", http.StatusUnauthorized) }, false},
+		{"a bare 401", bare401, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			srv := newTokenServer(t)
@@ -463,8 +487,14 @@ func TestReuseStoredSessionRemovesOnlyARefusedRefresh(t *testing.T) {
 				srv.serve(w, r)
 			})
 
-			if res, ok, err := testApp.reuseStoredSession(t.Context(), cfg, orgRef{}); err != nil || ok {
-				t.Fatalf("reuseStoredSession = %v, %v, %v; want a fresh sign-in", res, ok, err)
+			res, ok, err := testApp.reuseStoredSession(t.Context(), cfg, orgRef{})
+			switch {
+			case ok:
+				t.Fatalf("reuseStoredSession = %v, %v, %v; want no reuse", res, ok, err)
+			case tc.removed && err != nil:
+				t.Fatalf("reuseStoredSession = %v; want a fresh sign-in", err)
+			case !tc.removed && (err == nil || !strings.Contains(err.Error(), "without the auth gateway's refusal")):
+				t.Fatalf("reuseStoredSession = %v; want the bare 401 reported", err)
 			}
 			stored, err := auth.LoadCredential(dir, config.DefaultProfile)
 			switch {

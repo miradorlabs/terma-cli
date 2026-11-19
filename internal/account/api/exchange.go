@@ -32,8 +32,8 @@ var errSessionExpired = fmt.Errorf("%w: session expired, run `terma setup`", aut
 var errRefused = fmt.Errorf("%w", errSessionExpired)
 
 // Refused reports whether err is the auth gateway's own refusal of a refresh token: the
-// sign-in is over. Any other ErrNotLoggedIn, a bare 401 from some other hop or an access
-// token refused once, says nothing about whether the refresh token is alive.
+// sign-in is over. Any other ErrNotLoggedIn, or an access token refused once, says nothing
+// about whether the refresh token is alive; a bare 401 on a refresh is no ErrNotLoggedIn.
 func Refused(err error) bool { return errors.Is(err, errRefused) }
 
 // RefreshBudget bounds how long a refresh token may be sent again after it was first sent,

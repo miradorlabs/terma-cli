@@ -1030,10 +1030,14 @@ func TestClient_ARefusedRefreshIsFinal(t *testing.T) {
 				if tc.status != http.StatusUnauthorized {
 					return
 				}
-				// A 401 from some other hop is still a sign-out to the caller, but not a
-				// refusal of the token, which the next refresh sends again.
-				if !errors.Is(err, auth.ErrNotLoggedIn) {
-					t.Errorf("Refresh = %v, want the session expired", err)
+				// A 401 from some other hop is no sign-out and no refusal of the token: it
+				// spent nothing, so its mark is cleared, and the next refresh sends it again.
+				if errors.Is(err, auth.ErrNotLoggedIn) || Refused(err) || errors.As(err, new(*Error)) {
+					t.Errorf("Refresh = %v, want a failure that is no sign-out", err)
+				}
+				if stored, _ := auth.LoadCredentialFor(client.dir, config.DefaultProfile, "org-test"); stored.RefreshToken != "mir_clr_stale" ||
+					!stored.UnsettledSince().IsZero() {
+					t.Errorf("stored = %q, mark %v; want it kept unmarked", stored.RefreshToken, stored.UnsettledSince())
 				}
 				_ = client.Refresh(context.Background())
 				if n := redemptions.Load(); n != 2 {
@@ -1082,6 +1086,7 @@ func TestClient_ARefusalAfterAnUnknownOutcomeIsSentAgain(t *testing.T) {
 		{"refused last", []int{http.StatusBadGateway, http.StatusBadGateway, http.StatusUnauthorized}, true, true},
 		{"bare 401 between", []int{http.StatusBadGateway, bare401, http.StatusUnauthorized}, true, true},
 		{"bare 401s", []int{http.StatusBadGateway, bare401, bare401}, true, true},
+		{"bare 401, then answered", []int{http.StatusBadGateway, bare401, http.StatusOK}, false, true},
 		{"too many after", []int{http.StatusBadGateway, http.StatusTooManyRequests, http.StatusTooManyRequests}, true, true},
 		{"too many, then answered", []int{http.StatusBadGateway, http.StatusTooManyRequests, http.StatusOK}, false, true},
 		{"forbidden after", []int{http.StatusBadGateway, http.StatusForbidden, http.StatusOK}, false, true},
@@ -1171,7 +1176,7 @@ func TestClient_ARefusalAfterAnUnknownOutcomeIsSentAgain(t *testing.T) {
 func TestStillUnknownIsNoSignOut(t *testing.T) {
 	t.Parallel()
 	refusal := refusalError{fmt.Errorf("%w: refused", auth.ErrNotLoggedIn)}
-	bare := fmt.Errorf("%w: refused", auth.ErrNotLoggedIn)
+	bare := errors.New("the token endpoint answered 401 without the auth gateway's refusal: Unauthorized (status 401)")
 	for _, last := range []error{refusal, bare, &Error{StatusCode: http.StatusForbidden}, &Error{StatusCode: http.StatusTooManyRequests}} {
 		err := stillUnknown(last)
 		if !errors.As(err, new(unsettledError)) || errors.Is(err, auth.ErrNotLoggedIn) || errors.As(err, new(refusalError)) {

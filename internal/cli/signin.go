@@ -231,8 +231,8 @@ func (app *App) reuseStoredSessionIf(ctx context.Context, cfg *config.Config, wa
 		})
 		return nil, false, nil
 	case errors.Is(err, auth.ErrNotLoggedIn):
-		// Not the gateway's refusal (a lost refresh, a proxy's 401): its token may be alive,
-		// so it is kept for the fresh sign-in to replace.
+		// Not the gateway's refusal (a lost refresh, a sign-in replaced since): its token may
+		// be alive, so it is kept for the fresh sign-in to replace. A proxy's 401 fails below.
 		return nil, false, nil
 	case err != nil:
 		return nil, false, err

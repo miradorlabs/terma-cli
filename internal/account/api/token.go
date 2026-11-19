@@ -122,6 +122,9 @@ func (c *Client) postToken(ctx context.Context, body tokenRequest) (*tokenRespon
 			return nil, unsettledError{err}
 		case apiErr.Unauthenticated() && apiErr.Code == "UNAUTHENTICATED":
 			return nil, refusalError{fmt.Errorf("%w: %s", auth.ErrNotLoggedIn, apiErr.Message)}
+		case apiErr.Unauthenticated() && body.GrantType == "refresh_token":
+			// No gateway envelope, maybe a proxy's: no sign-out, so apiErr is not wrapped.
+			return nil, fmt.Errorf("the token endpoint answered 401 without the auth gateway's refusal: %s", apiErr.Error())
 		case apiErr.Unauthenticated():
 			return nil, fmt.Errorf("%w: %s", auth.ErrNotLoggedIn, apiErr.Message)
 		case apiErr.StatusCode == http.StatusServiceUnavailable && apiErr.Code == "UNAVAILABLE":
@@ -140,8 +143,7 @@ func (c *Client) postToken(ctx context.Context, body tokenRequest) (*tokenRespon
 		case apiErr.StatusCode >= 500:
 			return nil, unsettledError{err}
 		}
-		// A 429 (the gateway turns it away before the account service runs), and any
-		// other 4xx: nothing spent.
+		// A 429 (turned away before the account service runs), or any other 4xx: nothing spent.
 		return nil, err
 	}
 	// A success all the same, so the server may have spent the token. Half a pair is no

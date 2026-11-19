@@ -3,12 +3,15 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"reflect"
 	"testing"
+
+	"github.com/miradorlabs/terma-cli/internal/account/auth"
 )
 
 // tokenBodies serves the token endpoint and returns the JSON bodies it was sent.
@@ -120,6 +123,26 @@ func TestExchangeCodeRefusesHalfAPair(t *testing.T) {
 			}
 			if got := client.LastLogin(); got != nil {
 				t.Errorf("LastLogin = %+v, want none", got)
+			}
+		})
+	}
+}
+
+// A code the auth host turns away with a 401 is no sign-in, with or without the gateway's
+// envelope: only the refresh grant reads a bare 401 as something other than ErrNotLoggedIn.
+func TestExchangeCodeReadsEvery401AsNotLoggedIn(t *testing.T) {
+	t.Parallel()
+	for name, answer := range map[string]func(http.ResponseWriter){
+		"the gateway's": func(w http.ResponseWriter) { gatewayError(w, http.StatusUnauthorized, "UNAUTHENTICATED") },
+		"a bare one":    func(w http.ResponseWriter) { http.Error(w, "Unauthorized", http.StatusUnauthorized) },
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { answer(w) }))
+			t.Cleanup(srv.Close)
+			_, err := NewAnonymous(srv.URL, "test").ExchangeCode(context.Background(), "code", "verifier", 8080)
+			if !errors.Is(err, auth.ErrNotLoggedIn) {
+				t.Errorf("ExchangeCode = %v, want ErrNotLoggedIn", err)
 			}
 		})
 	}
