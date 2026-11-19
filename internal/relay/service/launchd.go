@@ -6,8 +6,19 @@ import (
 	"html"
 	"maps"
 	"slices"
+	"strconv"
 	"strings"
+	"time"
 )
+
+// StopWindow is how long the relay may take to stop before its service manager kills it.
+// A token refresh the relay has sent runs to the end so its new pair reaches the store:
+// api.RefreshBudget, 40 s, then the save, which is quick unless the keychain waits on a
+// prompt. Killed sooner, the relay leaves the token stored marked as maybe spent, and the
+// next refresh after the budget asks for a new sign-in instead of sending it. launchd's
+// default is 20 s and systemd's may be lowered, so both definitions name it; on Windows
+// the supervisor waits this long.
+const StopWindow = time.Minute
 
 // Launchd renders a relay agent that restarts only after an unsuccessful exit.
 func Launchd(label, exe, logPath string, env map[string]string) string {
@@ -32,6 +43,7 @@ func Launchd(label, exe, logPath string, env map[string]string) string {
   <key>RunAtLoad</key><true/>
   <key>KeepAlive</key><dict><key>SuccessfulExit</key><false/></dict>
   <key>ThrottleInterval</key><integer>5</integer>
+  <key>ExitTimeOut</key><integer>` + strconv.Itoa(int(StopWindow/time.Second)) + `</integer>
   <key>ProcessType</key><string>Background</string>
   <key>StandardOutPath</key><string>` + esc(logPath) + `</string>
   <key>StandardErrorPath</key><string>` + esc(logPath) + `</string>

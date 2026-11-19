@@ -97,8 +97,14 @@ type Client struct {
 	unsaved []string
 	// refusedToken is the refresh token the server last refused, which is never sent again.
 	refusedToken string
-	// exchangeBudget, when set, replaces refreshBudget, so a test need not wait 40 s.
+	// exchangeBudget, when set, replaces RefreshBudget, so a test need not wait 40 s.
 	exchangeBudget time.Duration
+	// now, when set, replaces time.Now, so a test can move the wall clock.
+	now func() time.Time
+	// unsettled is this client's own mark of a refresh it sent without an answer
+	// (markUnsettled). credential carries none: one read without the credential lock may
+	// be gone by the time this client takes it.
+	unsettled unsettledMark
 	// refreshing is a one-slot semaphore for this process's token exchanges. The
 	// credential lock serializes them across processes.
 	refreshing chan struct{}
@@ -149,7 +155,7 @@ func New(cfg *config.Config, opts Options) (*Client, error) {
 	if err := cred.CheckEnvironment(c.authURL); err != nil {
 		return nil, err
 	}
-	c.credential = cred
+	c.credential = withoutMark(cred)
 	return c, nil
 }
 

@@ -1,7 +1,6 @@
 package auth
 
 import (
-	"errors"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -95,8 +94,8 @@ func TestDeleteCredential_RemovesOnlyTheNamedProfile(t *testing.T) {
 }
 
 // Tx.DeleteFor removes a credential only at the version it names: one rotated since stays.
-// The version it names goes, keychain item included, and no other organization becomes
-// active in its place.
+// The version it names goes, and no other organization becomes active in its place. Its
+// keychain item stays for the next sign-in to overwrite: nothing reads it once unindexed.
 func TestTx_DeleteForRemovesOnlyTheVersionItNames(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
@@ -121,14 +120,74 @@ func TestTx_DeleteForRemovesOnlyTheVersionItNames(t *testing.T) {
 	if _, err := LoadCredentialFor(dir, "default", "org-a"); err != ErrNotLoggedIn {
 		t.Errorf("org-a after deleting its version: %v, want it gone", err)
 	}
-	if _, err := secret.Get(dir, itemName("default", "org-a")); !errors.Is(err, secret.ErrNotFound) {
-		t.Errorf("org-a's keychain item: %v, want it gone", err)
+	if _, err := secret.Get(dir, itemName("default", "org-a")); err != nil {
+		t.Errorf("org-a's keychain item: %v, want it left", err)
 	}
 	if active, err := LoadCredential(dir, "default"); err != ErrNotLoggedIn {
 		t.Errorf("active = %+v, %v; want signed out, not moved to org-b", active, err)
 	}
 	if _, err := LoadCredentialFor(dir, "default", "org-b"); err != nil {
 		t.Errorf("org-b: %v, want it kept", err)
+	}
+	signedIn := orgCredential("org-a", "s-new")
+	signedIn.AccessToken, signedIn.RefreshToken = "ter_cli_new", "ter_clr_new"
+	if _, err := SaveCredential(dir, "default", signedIn); err != nil {
+		t.Fatal(err)
+	}
+	if cred, err := LoadCredentialFor(dir, "default", "org-a"); err != nil || cred.RefreshToken != "ter_clr_new" {
+		t.Errorf("org-a after a new sign-in: %+v, %v; want its tokens", cred, err)
+	}
+}
+
+// Tx.MarkUnsettled marks only the version it names, keeps the first mark, and the mark
+// lives in credentials.json beside the keychain's tokens until a new pair replaces it.
+func TestTx_MarkUnsettledMarksOnlyTheVersionItNames(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	if _, err := SaveCredential(dir, "default", orgCredential("org-a", "s-a")); err != nil {
+		t.Fatal(err)
+	}
+	mark := func(refreshToken string, at time.Time) {
+		t.Helper()
+		if err := lockedWrite(dir, func(tx *Tx) error { return tx.MarkUnsettled("default", "org-a", refreshToken, at) }); err != nil {
+			t.Fatalf("MarkUnsettled(%q): %v", refreshToken, err)
+		}
+	}
+	marked := func() time.Time {
+		t.Helper()
+		cred, err := LoadCredentialFor(dir, "default", "org-a")
+		if err != nil {
+			t.Fatal(err)
+		}
+		return cred.RefreshUnsettledAt
+	}
+	first := time.Now().Round(0).Add(-time.Minute).Truncate(time.Second)
+
+	mark("ter_clr_rotated", first)
+	if got := marked(); !got.IsZero() {
+		t.Fatalf("marked %v for another version; want no mark", got)
+	}
+	mark("ter_clr_org-a", first)
+	mark("ter_clr_org-a", first.Add(30*time.Second))
+	if got := marked(); !got.Equal(first) {
+		t.Fatalf("mark = %v, want the first, %v", got, first)
+	}
+	earlier := first.Add(-10 * time.Second)
+	mark("ter_clr_org-a", earlier)
+	if got := marked(); !got.Equal(earlier) {
+		t.Fatalf("mark = %v, want the earlier %v", got, earlier)
+	}
+	if err := lockedWrite(dir, func(tx *Tx) error { return tx.ClearUnsettled("default", "org-a", "ter_clr_org-a", first) }); err != nil {
+		t.Fatal(err)
+	}
+	if got := marked(); !got.Equal(earlier) {
+		t.Fatalf("mark = %v after clearing another mark; want %v kept", got, earlier)
+	}
+	if err := UpdateCredential(dir, "default", orgCredential("org-a", "s-a")); err != nil {
+		t.Fatal(err)
+	}
+	if got := marked(); !got.IsZero() {
+		t.Errorf("mark = %v after a new pair; want none", got)
 	}
 }
 

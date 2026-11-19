@@ -43,6 +43,10 @@ type Credential struct {
 	// StaleKeychainItem marks a credential kept in the file while its earlier tokens may
 	// still sit in the keychain, which could not remove them then; sign-out tries again.
 	StaleKeychainItem bool `json:"stale_keychain_item,omitempty"`
+	// RefreshUnsettledAt is when a refresh of this pair was first sent whose answer never
+	// came: the server may have spent RefreshToken then. Zero when none was lost. It is no
+	// secret, so credentials.json keeps it with the keychain's tokens; a new pair has none.
+	RefreshUnsettledAt time.Time `json:"refresh_unsettled_at,omitzero"`
 }
 
 // ErrWrongEnvironment reports a credential issued by a different auth host than the

@@ -99,3 +99,28 @@ func TestRefreshBodyHasNoRedirectPort(t *testing.T) {
 		t.Fatalf("refresh body = %s, want %s", got, want)
 	}
 }
+
+// A code exchange answered with half a pair is no sign-in: without a refresh token the
+// session could not be kept past its first hour.
+func TestExchangeCodeRefusesHalfAPair(t *testing.T) {
+	t.Parallel()
+	for name, answer := range map[string]map[string]any{
+		"no access token":  {"refresh_token": "mir_clr_x", "expires_in": 3600},
+		"no refresh token": {"access_token": "mir_cli_x", "expires_in": 3600},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				_ = json.NewEncoder(w).Encode(answer)
+			}))
+			defer srv.Close()
+			client := NewAnonymous(srv.URL, "test")
+			if cred, err := client.ExchangeCode(context.Background(), "the-code", "v1", 5555); err == nil {
+				t.Fatalf("ExchangeCode = %+v, want an error", cred)
+			}
+			if got := client.LastLogin(); got != nil {
+				t.Errorf("LastLogin = %+v, want none", got)
+			}
+		})
+	}
+}

@@ -7,7 +7,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"net"
 	"net/http"
 	"slices"
 	"strings"
@@ -123,116 +122,15 @@ func (c *Client) postToken(ctx context.Context, body tokenRequest) (*tokenRespon
 		}
 		return nil, err
 	}
-	// A success all the same, so the server may have spent the token.
-	if out.AccessToken == "" {
+	// A success all the same, so the server may have spent the token. Half a pair is no
+	// sign-in: one without a refresh token could not refresh, and would replace one that can.
+	switch {
+	case out.AccessToken == "":
 		return nil, unsettledError{errors.New("token endpoint returned no access token")}
-	}
-	if body.GrantType == "refresh_token" && out.RefreshToken == "" {
+	case out.RefreshToken == "":
 		return nil, unsettledError{errors.New("token endpoint returned no refresh token")}
 	}
 	return &out, nil
-}
-
-// unsent reports whether err is a request that never left this machine: its connection
-// was never made, so the server cannot have spent the token in it.
-func unsent(err error) bool {
-	var dnsErr *net.DNSError
-	var opErr *net.OpError
-	return errors.As(err, &dnsErr) || errors.As(err, &opErr) && opErr.Op == "dial"
-}
-
-// unspentError is a token exchange the server cannot have spent the token in: the request
-// never left this machine, or the gateway turned it away (429). It ends an exchange only
-// when no attempt before it has an unknown outcome.
-type unspentError struct{ error }
-
-func (e unspentError) Unwrap() error { return e.error }
-
-// unsettledError is a token exchange whose outcome this client never learned: the
-// request was sent and no answer came, a 5xx did, or a success without a usable pair. The
-// server may still have spent the token it was sent.
-type unsettledError struct{ error }
-
-func (e unsettledError) Unwrap() error { return e.error }
-
-// refusalError is the auth gateway's own refusal of a token: a 401 in its envelope. A 401
-// without it may come from some other hop, and says nothing about the session.
-type refusalError struct{ error }
-
-func (e refusalError) Unwrap() error { return e.error }
-
-// errSessionExpired is a refresh the server refused.
-var errSessionExpired = fmt.Errorf("%w: session expired, run `terma setup`", auth.ErrNotLoggedIn)
-
-// The server rotates the refresh token on every refresh, and revokes the session when a
-// spent one comes back, except the one it spent last, within 60 s of spending it
-// (refreshRetryGrace in mirador-platform's cli_session_refresh.go). So a refresh whose
-// answer was lost sends the same token again, and every attempt must start within those
-// 60 s. The rotation it repeats was committed after the first attempt was sent.
-//
-//   - refreshBudget bounds every attempt and pause together. 40 s leaves the last attempt
-//     20 s inside the grace, and keeps the lock holder within auth's lockWait: 40 s plus
-//     two keychain writes. A Client's exchangeBudget replaces it in tests.
-//   - refreshPauses come before the second and third attempts, short enough that a hung
-//     first attempt (the 30 s request timeout) still leaves time for a second.
-const refreshBudget = 40 * time.Second
-
-var refreshPauses = [...]time.Duration{time.Second, 2 * time.Second}
-
-// exchangeRefreshToken redeems refreshToken. Until an attempt's outcome is unknown
-// (unsettledError), the first answer is final: a refusal, or an attempt that spent nothing
-// (unspentError), ends the exchange at once.
-//
-// Once one is unknown, the same token is sent again until an answer settles it: a pair,
-// or the auth gateway's refusal twice in a row. Nothing else can. The server answers a
-// refresh that lost a race to another rotation of the session with a refusal too, and the
-// unknown attempt may be that rotation, committed late; sent once more, the token is the
-// one it spent, which the server forgives. An exchange that runs out unsettled is no
-// sign-out: the session may be alive, and must not be removed.
-//
-// It runs to the end whether or not ctx does: the server may rotate the pair after a
-// caller gives up, and that pair must reach the store. So a caller's deadline, a relay's
-// shutdown included, no longer bounds a refresh already sent; refreshBudget does.
-func (c *Client) exchangeRefreshToken(ctx context.Context, refreshToken string) (*tokenResponse, error) {
-	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), cmp.Or(c.exchangeBudget, refreshBudget))
-	defer cancel()
-	unknown, lastRefused := false, false
-	for attempt := 0; ; attempt++ {
-		resp, err := c.postToken(ctx, tokenRequest{GrantType: "refresh_token", RefreshToken: refreshToken})
-		refused := errors.As(err, new(refusalError))
-		switch {
-		case err == nil:
-			return resp, nil
-		case !unknown && !errors.As(err, new(unsettledError)):
-			return nil, err
-		case refused && lastRefused:
-			return nil, err
-		}
-		unknown, lastRefused = true, refused
-		if attempt == len(refreshPauses) {
-			return nil, stillUnknown(err)
-		}
-		pause := time.NewTimer(refreshPauses[attempt])
-		select {
-		case <-pause.C:
-		case <-ctx.Done():
-			pause.Stop()
-			return nil, stillUnknown(err)
-		}
-	}
-}
-
-// stillUnknown is err, the last answer of an exchange an earlier attempt of which has an
-// unknown outcome, as an unsettledError that is no sign-out.
-func stillUnknown(err error) error {
-	switch {
-	case errors.As(err, new(unsettledError)):
-		return err
-	case errors.Is(err, auth.ErrNotLoggedIn):
-		return unsettledError{errors.New("an earlier attempt may have refreshed the session: " + err.Error())}
-	default:
-		return unsettledError{fmt.Errorf("an earlier attempt may have refreshed the session: %w", err)}
-	}
 }
 
 func (c *Client) credentialFrom(resp *tokenResponse) *auth.Credential {
@@ -343,7 +241,7 @@ type redeemFunc func(held, current *auth.Credential) bool
 //   - save the new pair before the lock is released.
 //
 // The lock is held through the exchange and the keychain writes. So the wait for it is
-// auth's lockWait, which is longer than the exchange's refreshBudget. The waits for the
+// auth's lockWait, which is longer than the exchange's RefreshBudget. The waits for the
 // refresh slot and the lock follow ctx; the exchange and the save, once begun, do not.
 //
 // Call it in this process's refresh slot (lockRefresh).
@@ -385,7 +283,9 @@ func (c *Client) refresh(ctx context.Context, redeem redeemFunc) error {
 
 // redeem exchanges current's refresh token if redeem asks, and saves the new pair in tx
 // when there is one. A token the auth gateway refused is never sent again. When tx still stores
-// it, it is removed there too, so no process that reads the store afterwards sends it.
+// it, it is removed there too, so no process that reads the store afterwards sends it. A
+// token whose refresh got no answer is marked so (markUnsettled), and sent again only
+// within the budget of its first send.
 func (c *Client) redeem(ctx context.Context, held, current *auth.Credential, redeem redeemFunc, tx *auth.Tx) error {
 	if !redeem(held, current) {
 		return nil
@@ -393,14 +293,32 @@ func (c *Client) redeem(ctx context.Context, held, current *auth.Credential, red
 	if c.wasRefused(current.RefreshToken) {
 		return c.refused(current, tx)
 	}
-	resp, err := c.exchangeRefreshToken(ctx, current.RefreshToken)
+	first, unknown := c.unsettledSince(current), true
 	switch {
+	case first.IsZero():
+		first, unknown = c.wallNow(), false
+	case !c.inBudget(first):
+		// The store may have lost the mark this client keeps: put it back for the others.
+		c.markUnsettled(current, first, tx)
+		return errRefreshUnsettled
+	}
+	// Marked before it is sent, so a process killed with the answer outstanding leaves the
+	// mark too. A pair saved, or the credential removed, takes the mark with it.
+	c.markUnsettled(current, first, tx)
+	resp, err := c.exchangeRefreshToken(ctx, current.RefreshToken, first, unknown)
+	switch {
+	case errors.As(err, new(unsettledError)):
+		return err
 	case errors.As(err, new(refusalError)):
 		return c.refused(current, tx)
+	case err != nil && !unknown:
+		// A first answer that settles it without a pair: the server spent nothing.
+		c.clearUnsettled(current, first, tx)
+	}
+	switch {
 	case errors.Is(err, auth.ErrNotLoggedIn):
 		return errSessionExpired
-	}
-	if err != nil {
+	case err != nil:
 		return err
 	}
 	cred := c.credentialFrom(resp)
@@ -409,8 +327,9 @@ func (c *Client) redeem(ctx context.Context, held, current *auth.Credential, red
 	cred.UserID = cmp.Or(cred.UserID, current.UserID)
 	cred.Label = current.Label
 	// The server has spent current's refresh token, so this pair is the session's only
-	// live one. Hold it before trying to store it.
+	// live one. Hold it before trying to store it. The answer settles current's mark.
 	c.replace(cred)
+	c.setUnsettled(current.RefreshToken, func(time.Time) bool { return true }, time.Time{})
 	if tx == nil {
 		return nil
 	}
@@ -443,9 +362,9 @@ func (c *Client) spent(refreshToken string) bool {
 }
 
 // refused records that the server refused current's refresh token, and removes current
-// from tx while tx still stores it. If the file entry stays, this client's next refresh
-// ends here too and tries again. A keychain item left once the entry is gone is read by
-// nothing, and the next sign-in to the organization overwrites it.
+// from tx while tx still stores it. A removal that fails is tried again at this client's
+// next refresh, which ends here too. The keychain item stays (Tx.DeleteFor): read by
+// nothing once its entry is gone, until the next sign-in overwrites it.
 func (c *Client) refused(current *auth.Credential, tx *auth.Tx) error {
 	c.mu.Lock()
 	c.refusedToken = current.RefreshToken
@@ -466,7 +385,7 @@ func (c *Client) wasRefused(refreshToken string) bool {
 // replace makes cred the client's credential.
 func (c *Client) replace(cred *auth.Credential) {
 	c.mu.Lock()
-	c.credential = cred
+	c.credential = withoutMark(cred)
 	c.tokenGen++
 	c.mu.Unlock()
 }

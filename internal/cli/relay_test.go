@@ -9,10 +9,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/miradorlabs/terma-cli/internal/account/api"
 	"github.com/miradorlabs/terma-cli/internal/doctor"
 	"github.com/miradorlabs/terma-cli/internal/flock"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
+	"github.com/miradorlabs/terma-cli/internal/relay/service"
 )
 
 func freeAddr(t *testing.T) string {
@@ -286,5 +288,17 @@ func disconnect(t *testing.T, agent string) {
 	t.Helper()
 	if _, err := harnessOf(t, agent).Disconnect(); err != nil {
 		t.Fatalf("disconnect %s: %v", agent, err)
+	}
+}
+
+// The relay's service gives it time to finish a token refresh it has sent, and to save
+// the pair. The save is quick unless the keychain waits on a prompt, so this is a best
+// effort: a relay killed sooner leaves the token marked as maybe spent, which no refresh
+// sends past its budget. The relay cannot import the API client, so the two are held
+// together here.
+func TestRelayStopWindowCoversARefresh(t *testing.T) {
+	t.Parallel()
+	if want := api.RefreshBudget + 20*time.Second; service.StopWindow < want {
+		t.Fatalf("service.StopWindow = %v; want at least %v, a refresh's budget and its save", service.StopWindow, want)
 	}
 }

@@ -595,9 +595,8 @@ func TestClient_DecidesFromTheStoredPair(t *testing.T) {
 	}
 }
 
-// A token endpoint that never answers holds the credential lock no longer than its
-// attempts' request timeouts and the pauses between them: the refresh fails, and the next
-// writer takes the lock at once.
+// A token endpoint that never answers holds the credential lock no longer than the
+// exchange's budget: the refresh fails, and the next writer takes the lock at once.
 func TestClient_RefreshOfAHungEndpointLetsTheLockGo(t *testing.T) {
 	t.Parallel()
 	hung := make(chan struct{})
@@ -616,20 +615,18 @@ func TestClient_RefreshOfAHungEndpointLetsTheLockGo(t *testing.T) {
 	client := newTestClient(t, srv.URL, expired, "project-123")
 	const timeout = 300 * time.Millisecond
 	client.http.Timeout = timeout
+	// Room for two attempts and the pause between them, not a third.
+	client.exchangeBudget = 2 * time.Second
 
 	start := time.Now()
 	if err := client.Refresh(context.Background()); err == nil {
 		t.Fatal("Refresh against a hung token endpoint succeeded")
 	}
-	limit := time.Duration(len(refreshPauses)+1) * timeout
-	for _, pause := range refreshPauses {
-		limit += pause
+	if elapsed := time.Since(start); elapsed > client.exchangeBudget+2*time.Second {
+		t.Fatalf("Refresh took %v against a hung token endpoint; want about its %v budget", elapsed, client.exchangeBudget)
 	}
-	if elapsed := time.Since(start); elapsed > limit+2*time.Second {
-		t.Fatalf("Refresh took %v against a hung token endpoint; want about its attempts' %v", elapsed, limit)
-	}
-	if got, want := attempts.Load(), int32(len(refreshPauses)+1); got != want {
-		t.Errorf("%d attempts against a hung token endpoint; want %d", got, want)
+	if got := attempts.Load(); got != 2 {
+		t.Errorf("%d attempts against a hung token endpoint; want 2", got)
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
@@ -919,9 +916,9 @@ func gatewayError(w http.ResponseWriter, status int, code string) {
 }
 
 // A refresh the server refuses outright is final: it is not sent again, and a refused
-// session is removed from the store, keychain item included, so no terma process sends
-// its token again. Only the auth gateway's own 401 removes it: a 401 from some other hop,
-// a 403 or a 400 leaves the credential stored.
+// session is removed from the store, so no terma process sends its token again. Only the
+// auth gateway's own 401 removes it: a 401 from some other hop, a 403 or a 400 leaves the
+// credential stored.
 func TestClient_ARefusedRefreshIsFinal(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct {
@@ -959,10 +956,9 @@ func TestClient_ARefusedRefreshIsFinal(t *testing.T) {
 				t.Fatalf("%d redemptions; want 1, never retried", n)
 			}
 			_, loadErr := auth.LoadCredentialFor(client.dir, config.DefaultProfile, "org-test")
-			_, itemErr := secret.Get(client.dir, "credential/"+config.DefaultProfile+"/org-test")
 			if !tc.wantRemoved {
-				if loadErr != nil || itemErr != nil {
-					t.Fatalf("stored credential: %v, keychain item: %v; want both kept", loadErr, itemErr)
+				if loadErr != nil {
+					t.Fatalf("stored credential: %v; want it kept", loadErr)
 				}
 				if tc.status != http.StatusUnauthorized {
 					return
@@ -983,9 +979,6 @@ func TestClient_ARefusedRefreshIsFinal(t *testing.T) {
 			}
 			if !errors.Is(loadErr, auth.ErrNotLoggedIn) {
 				t.Errorf("LoadCredentialFor = %v, want the refused credential gone", loadErr)
-			}
-			if !errors.Is(itemErr, secret.ErrNotFound) {
-				t.Errorf("keychain item: %v, want it gone", itemErr)
 			}
 			if err := client.Refresh(context.Background()); !errors.Is(err, auth.ErrNotLoggedIn) {
 				t.Errorf("second Refresh = %v, want the session expired", err)
@@ -1075,6 +1068,8 @@ func TestClient_ARefusalAfterAnUnknownOutcomeIsSentAgain(t *testing.T) {
 			expired := &auth.Credential{AccessToken: "mir_cli_stale", RefreshToken: "mir_clr_stale", SessionID: "session-1",
 				ExpiresAt: time.Now().Add(-time.Hour)}
 			client := newTestClient(t, srv.URL, expired, "")
+			// Room for three attempts and the two pauses between them, not a fourth.
+			client.exchangeBudget = refreshPause(0) + refreshPause(1) + refreshPause(2)/2
 
 			err := client.Refresh(context.Background())
 			mu.Lock()
@@ -1170,7 +1165,7 @@ func TestClient_ARefreshNothingSpentIsNotRetried(t *testing.T) {
 			if got := requests.Load(); got != want {
 				t.Errorf("%d requests reached the server; want %d", got, want)
 			}
-			if elapsed := time.Since(start); elapsed >= refreshPauses[0] {
+			if elapsed := time.Since(start); elapsed >= refreshPause(0) {
 				t.Errorf("Refresh took %v; want no pause before a retry", elapsed)
 			}
 			if _, err := auth.LoadCredentialFor(client.dir, config.DefaultProfile, "org-test"); err != nil {
@@ -1233,8 +1228,8 @@ func TestClient_ANetworkStillDownAfterALostAnswerIsRetried(t *testing.T) {
 func TestClient_EveryRefreshAttemptStartsWithinTheBudget(t *testing.T) {
 	t.Parallel()
 	const grace = 60 * time.Second
-	if refreshBudget > grace-15*time.Second {
-		t.Fatalf("refreshBudget = %v; want at most %v, well inside the server's %v grace", refreshBudget, grace-15*time.Second, grace)
+	if RefreshBudget > grace-15*time.Second {
+		t.Fatalf("RefreshBudget = %v; want at most %v, well inside the server's %v grace", RefreshBudget, grace-15*time.Second, grace)
 	}
 
 	var mu sync.Mutex
@@ -1250,7 +1245,7 @@ func TestClient_EveryRefreshAttemptStartsWithinTheBudget(t *testing.T) {
 		ExpiresAt: time.Now().Add(-time.Hour)}
 	client := newTestClient(t, srv.URL, expired, "")
 	// Room for the first pause, not the second: the third attempt would start past it.
-	client.exchangeBudget = refreshPauses[0] + refreshPauses[1]/2
+	client.exchangeBudget = refreshPause(0) + refreshPause(1)*3/4
 
 	begin := time.Now()
 	if err := client.Refresh(context.Background()); err == nil {
