@@ -2,10 +2,13 @@ package hermes
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/fs"
 	"os"
+	"path/filepath"
+	"strconv"
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/agents/internal/relayexport"
@@ -44,4 +47,26 @@ func (Agent) UnconfigureRelay(ctx context.Context, _ string) (agents.RelayResult
 	return result, err
 }
 
-var _ agents.RelayExporter = Agent{}
+// RefreshMachine rewrites terma's Hermes plugin in this build's template.
+func (Agent) RefreshMachine() (string, bool, error) {
+	dir, err := pluginDir()
+	if err != nil {
+		return "", false, err
+	}
+	path := filepath.Join(dir, "__init__.py")
+	changed, err := relayexport.Refresh(path, "CONFIG_JSON = ", "  # terma:config", func(raw string) (string, bool) {
+		var cfg pluginConfig
+		data, err := strconv.Unquote(raw)
+		if err != nil || json.Unmarshal([]byte(data), &cfg) != nil || cfg.Endpoint == "" {
+			return "", false
+		}
+		text, err := renderPlugin(cfg)
+		return text, err == nil
+	})
+	return path, changed, err
+}
+
+var (
+	_ agents.RelayExporter    = Agent{}
+	_ agents.MachineRefresher = Agent{}
+)
