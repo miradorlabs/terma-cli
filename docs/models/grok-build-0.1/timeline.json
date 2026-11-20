@@ -3,6 +3,28 @@
   "id": "grok-build-0.1",
   "steps": [
     {
+      "at": "2026-11-20T15:23:41.365958418Z",
+      "event": "listed",
+      "changes": [
+        {
+          "id": "listed",
+          "category": "listed",
+          "op": "changed",
+          "path": [
+            "listed"
+          ],
+          "title": "Listed by its vendor again",
+          "impact": "notable",
+          "before": false,
+          "after": true,
+          "text_diff": null,
+          "terma": null,
+          "source": null,
+          "documented": null
+        }
+      ]
+    },
+    {
       "at": "2026-11-20T00:50:00.476672983Z",
       "event": "changed",
       "changes": [

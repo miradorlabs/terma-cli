@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-20T12:52:41.662173791Z",
+  "generated_at": "2026-11-20T15:23:41.365958418Z",
   "vendors": [
     {
       "id": "anthropic",
@@ -1508,7 +1508,7 @@
       "vendor": "xai",
       "name": "grok-build-0.1",
       "family": "grok-build",
-      "status": "unlisted",
+      "status": null,
       "released_at": null,
       "first_seen": "2026-11-11T14:15:45.0307666Z",
       "predecessor": null,
@@ -1519,8 +1519,8 @@
       "reasoning": null,
       "harnesses": [],
       "last_change": {
-        "at": "2026-11-20T00:50:00.476672983Z",
-        "changes": 11
+        "at": "2026-11-20T15:23:41.365958418Z",
+        "changes": 1
       },
       "probed": false
     }
