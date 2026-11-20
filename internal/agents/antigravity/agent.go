@@ -10,8 +10,9 @@ import (
 )
 
 // Agent is Google's Antigravity CLI (`agy`), with machine-wide hooks in agy's global
-// customization root, ~/.gemini/config/hooks.json.
-type Agent struct{}
+// customization root, ~/.gemini/config/hooks.json, and its status line in agy's settings;
+// ConfigDir is terma's, where setup records what it replaced there.
+type Agent struct{ ConfigDir string }
 
 func (Agent) Name() string        { return "antigravity" }
 func (Agent) DisplayName() string { return "Antigravity" }
@@ -58,6 +59,17 @@ func (a Agent) WhenHooksOff() map[string]agents.Handler {
 	return off
 }
 
+// Renders is the wrapped statusLine command; the renderer has its own deadline.
+func (Agent) Renders() map[string]agents.RenderHandler {
+	return map[string]agents.RenderHandler{antigravityStatusLineEvent: func(ctx context.Context, env hookrun.Env) int {
+		renderer, err := statusLineRenderer(env.ConfigDir)
+		if err != nil {
+			env.Logf("status line record: %v", err)
+		}
+		return antigravityStatusLine(ctx, env, renderer, "")
+	}}
+}
+
 // PayloadSession reads agy's protojson payload; the directory comes from it, since the
 // hook runs in the folder holding hooks.json.
 func (Agent) PayloadSession(payload []byte) (hookrun.PayloadSession, bool) {
@@ -71,7 +83,7 @@ func (Agent) PayloadSession(payload []byte) (hookrun.PayloadSession, bool) {
 // Coverage is how completely terma supports the agent.
 func (Agent) Coverage() (attribution, telemetry agents.CapabilitySupport) {
 	return agents.CapabilitySupport{Level: agents.SupportPartial, Note: "files its file tools write; a file a shell command writes is not recorded"},
-		agents.CapabilitySupport{Level: agents.SupportPartial, Note: "hooks only: model, turns, every tool step and termination; no token counts, plan, quota, cost or tool durations — agy has no OTLP export"}
+		agents.CapabilitySupport{Level: agents.SupportPartial, Note: "hooks and its transcript, no OTLP export: each model call's tokens (thinking not counted apart), every turn and tool step; plan, quota and account from the status line, interactive sessions only; no cost or tool durations"}
 }
 
 var (
@@ -84,7 +96,11 @@ var (
 	_ agents.OffSwitched      = Agent{}
 	_ agents.VersionReporter  = Agent{}
 	_ agents.MachineRefresher = Agent{}
+	_ agents.StatusLiner      = Agent{}
+	_ agents.Renderer         = Agent{}
 )
 
 // StateDirs are the directories its hooks keep state in.
-func (Agent) StateDirs() []string { return []string{antigravityObservationDir, antigravityTurnDir, antigravityCallDir} }
+func (Agent) StateDirs() []string {
+	return []string{antigravityObservationDir, antigravityTurnDir, antigravityCallDir, antigravityStatusLineDir}
+}
