@@ -16,6 +16,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/account/api"
 	"github.com/miradorlabs/terma-cli/internal/account/auth"
 	"github.com/miradorlabs/terma-cli/internal/account/keystore"
+	"github.com/miradorlabs/terma-cli/internal/account/secret"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/ui/output"
 )
@@ -206,14 +207,24 @@ func serverKeyTeams(dir string) []string {
 }
 
 // sessionCheck decides, once the auth host has verified a stored credential, whether it
-// may be reused; whoami is the host's answer about it.
-type sessionCheck func(verified *auth.Credential, whoami identityResponse) bool
+// may be reused, before anything is recorded; whoami is the host's answer about it. An
+// error refuses the sign-in and stops setup.
+type sessionCheck func(verified *auth.Credential, whoami identityResponse) (bool, error)
+
+// errKeychainLocked is a stored sign-in the system keychain will not give up now: a new one
+// could not replace it, so setup stops before a browser sign-in or a grant is spent.
+var errKeychainLocked = errors.New("the system keychain holding your sign-in is locked or unavailable: unlock it (on macOS over SSH, `security unlock-keychain`) and run `terma setup` again, or pass --insecure-storage to keep credentials in a file")
 
 // reuseStoredSession returns the profile's stored sign-in once the auth host has verified
 // it, and accept, when not nil, takes it; ok false means open the browser. A sign-in the
 // host refuses is forgotten, so it is not tried again; one accept refuses stays stored.
 func (app *App) reuseStoredSession(ctx context.Context, cfg *config.Config, accept sessionCheck) (*auth.Credential, bool, error) {
 	cred, err := auth.LoadCredential(app.dir, cfg.ProfileName)
+	if secret.IsUnavailable(err) && !config.InsecureStorage(app.dir) {
+		// Its tokens can't be read, so a new sign-in kept in the keychain could not replace
+		// them (saveReplacing): stop before the browser, or a grant, is spent on one.
+		return nil, false, errKeychainLocked
+	}
 	if err != nil || cred.CheckEnvironment(cfg.AuthURL) != nil || cred.RefreshToken == "" {
 		return nil, false, nil
 	}
@@ -225,8 +236,10 @@ func (app *App) reuseStoredSession(ctx context.Context, cfg *config.Config, acce
 	if err != nil {
 		return nil, false, err
 	}
-	if accept != nil && !accept(verified, identity) {
-		return nil, false, nil
+	if accept != nil {
+		if ok, err := accept(verified, identity); err != nil || !ok {
+			return nil, false, err
+		}
 	}
 	// Kept where a sign-in would keep it now, so running setup again moves the tokens.
 	if err := auth.Relocate(app.dir); err != nil {

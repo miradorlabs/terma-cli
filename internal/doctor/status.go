@@ -44,7 +44,10 @@ func Local(ctx context.Context, env Env) (LocalReport, error) {
 		authOK = false
 		add("Account", "not signed in — run `terma setup`")
 	default:
-		if cred, err := p.Credential(); err == nil && cred.Locked {
+		if cred, err := p.Credential(); err == nil && cred.SignInAfterUpdate {
+			authOK = false
+			add("Account", "not signed in — terma was updated and now signs in once per person: run `terma setup`")
+		} else if err == nil && cred.Locked {
 			authOK = false
 			add("Account", "credentials unreadable: the system keychain is locked or unavailable")
 		} else if err != nil && cfg.ServerKeySignIn {

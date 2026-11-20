@@ -3,6 +3,7 @@ package cli
 import (
 	"bytes"
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -141,5 +142,33 @@ func TestAFailedSignInKeepsTheStorageChoice(t *testing.T) {
 	}
 	if file, _ := config.LoadFile(testApp.dir); file.InsecureStorage {
 		t.Fatal("a setup whose sign-in failed changed where secrets are kept")
+	}
+}
+
+// A stored sign-in the keychain won't give up stops setup before the browser, with how to
+// recover: a new sign-in could not replace it. Kept in a file (--insecure-storage), it goes on.
+func TestALockedKeychainStopsSetupBeforeTheBrowser(t *testing.T) {
+	f := newFakeAuth(t)
+	authSandbox(t, f)
+	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(f)); err != nil {
+		t.Fatal(err)
+	}
+	if auth.StoredInFile(testApp.dir, config.DefaultProfile) {
+		t.Skip("no keychain to keep the tokens in")
+	}
+	secret.FailForTest(t, testApp.dir)
+	cfg, err := testApp.loadConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok, err := testApp.reuseStoredSession(t.Context(), cfg, nil); ok || !errors.Is(err, errKeychainLocked) ||
+		!strings.Contains(err.Error(), "--insecure-storage") || !strings.Contains(err.Error(), "unlock") {
+		t.Fatalf("reuse = %v, %v; want setup stopped with how to recover", ok, err)
+	}
+	if err := config.UpdateFile(testApp.dir, func(file *config.File) { file.InsecureStorage = true }); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok, err := testApp.reuseStoredSession(t.Context(), cfg, nil); ok || err != nil {
+		t.Fatalf("with --insecure-storage, reuse = %v, %v; want the browser opened", ok, err)
 	}
 }

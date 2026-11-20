@@ -495,3 +495,24 @@ func TestDoctorReportsOutboxLosses(t *testing.T) {
 		t.Fatalf("an old loss still shows: %+v", c)
 	}
 }
+
+// terma status says, as doctor does, that an updated machine is signed out until its person
+// signs in once, never that it is signed in.
+func TestStatusSaysAnUpdateNeedsASignIn(t *testing.T) {
+	t.Parallel()
+	e := env(t, Probes{Credential: func() (Credential, error) { return Credential{SignInAfterUpdate: true}, nil },
+		Spool: func() SpoolState { return SpoolState{} }})
+	rep, err := Local(t.Context(), e)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, row := range rep.Rows {
+		if row.Label == "Account" {
+			if !strings.Contains(row.Value, "terma was updated") || strings.Contains(row.Value, "signed in in") {
+				t.Fatalf("Account = %q", row.Value)
+			}
+			return
+		}
+	}
+	t.Fatal("no Account row")
+}

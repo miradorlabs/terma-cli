@@ -246,6 +246,30 @@ func TestDesktopGrantChecksTheOrganizationBeforeAnnouncingReuse(t *testing.T) {
 	}
 }
 
+// A reuse the grant refuses for --org changes nothing: a profile set up with a server key,
+// with a person's sign-in behind it, stays set up with the key.
+func TestARefusedReuseLeavesTheProfileAlone(t *testing.T) {
+	gateway := grantSandbox(t)
+	gateway.orgs = []organization{orgA()}
+	storeSignIn(t, gateway, deskUser)
+	if err := config.UpdateProfile(testApp.dir, config.DefaultProfile, func(p *config.Profile) {
+		p.ServerKeySignIn, p.ServerKeyAuthURL = true, gateway.srv.URL
+	}); err != nil {
+		t.Fatal(err)
+	}
+	stdout, _, err := desktopSetup(t, identityLine(deskUser, personalOrg().ID), personalOrg().ID, personalTeam())
+	if code := grantFailure(t, stdout, err); code != auth.GrantBadInput {
+		t.Fatalf("code = %s, want %s", code, auth.GrantBadInput)
+	}
+	file, err := config.LoadFile(testApp.dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p := file.Profiles[config.DefaultProfile]; p == nil || !p.ServerKeySignIn || p.ServerKeyAuthURL != gateway.srv.URL {
+		t.Fatalf("profile = %+v; a refused grant changed it", p)
+	}
+}
+
 // An id spelled in uppercase is the same user: Terma's ids are lowercase, so the desktop's
 // identity is read without regard to case and the stored sign-in is still reused.
 func TestDesktopGrantReadsIdsWithoutRegardToCase(t *testing.T) {
