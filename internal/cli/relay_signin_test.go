@@ -165,3 +165,32 @@ func TestAccountDoesNotWaitOnTheClient(t *testing.T) {
 		t.Fatal("Account waited on the client lock")
 	}
 }
+
+// A refusal for a token the same session has rotated since still retires that session: two
+// routes may race a send against another's refresh.
+func TestARetirementCountsAfterTheSessionRotated(t *testing.T) {
+	f := newFakeAuth(t)
+	authSandbox(t, f)
+	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(f)); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := testApp.loadConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	src := testApp.signInSource(cfg)
+	mine := auth.AccountKey(f.srv.URL, "u-1")
+	sent, err := src.Token(t.Context(), mine)
+	if err != nil || sent == "" {
+		t.Fatalf("token = %q, %v", sent, err)
+	}
+	// The session sent an earlier token before another route's refresh rotated it.
+	src.mu.Lock()
+	session := src.client.Credential().SessionID
+	src.mu.Unlock()
+	src.handedOut("an-earlier-token", session)
+	src.Retired("an-earlier-token")
+	if !auth.Retired(testApp.dir, config.DefaultProfile) {
+		t.Fatal("the session that sent the refused token was not retired after it rotated")
+	}
+}

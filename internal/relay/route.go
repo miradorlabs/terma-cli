@@ -130,7 +130,13 @@ func (r *Relay) route(p *part) {
 			return
 		}
 	}
-	r.hold(p)
+	// A part already known to be a team's, waiting for its policy, is held pinned to that
+	// claim from the start: evicted before any sweep, it is still counted as that team's.
+	var pin *claim.Claim
+	if why == whyNoKey && c.ProjectID != "" {
+		pin = &c
+	}
+	r.hold(p, pin, how)
 }
 
 // deliverAttributed applies the content policy, stamps the project and enqueues. deliverMu is held.

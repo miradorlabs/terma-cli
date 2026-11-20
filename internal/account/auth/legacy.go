@@ -205,18 +205,37 @@ func UnreadableLegacyRecord(stateDir string) LegacyRecord {
 }
 
 // LegacyOwnership is whose an older terma's backlog is, for the relay and delivery to
-// judge: the record when one was kept; while an older terma's sign-ins are still on the
-// machine with no record, what was bound to no account up to their file's last write is
-// named by no one; a record that can't be read, as UnreadableLegacyRecord.
+// judge: the record when one was kept. While an older terma's sign-ins are still on the
+// machine with no record (set up with a server key before this terma retired them), the
+// record is written now, the first time this terma looks: everything bound to no account
+// until now was the older terma's, and counts as its sign-ins' account, or no one's. A
+// record that can't be written leaves every such entry, up to now, named by no one. A
+// record that can't be read is as UnreadableLegacyRecord.
 func LegacyOwnership(dir, stateDir string) (LegacyRecord, error) {
 	rec, err := ReadLegacyRecord(stateDir)
-	if err != nil || !rec.RetiredAt.IsZero() {
+	if err != nil || !rec.RetiredAt.IsZero() || !HasLegacySignIns(dir) {
 		return rec, err
 	}
-	if info, err := os.Stat(config.LegacyCredentialsPath(dir)); err == nil {
-		return LegacyRecord{Account: LegacyAccountAmbiguous, RetiredAt: info.ModTime().UTC()}, nil
+	now := time.Now()
+	nameless := LegacyRecord{Account: LegacyAccountAmbiguous, RetiredAt: now.UTC()}
+	signIns, err := LegacySignIns(dir, false)
+	switch {
+	case err != nil:
+		// Read again next time; meanwhile everything up to now is no one's.
+		return nameless, nil
+	case len(signIns) == 0:
+		// A file naming no sign-in names no one, and that is recorded too: a boundary kept
+		// at now would hold everything bound to no account, a server key's, forever.
+		if config.WriteJSON(filepath.Join(stateDir, LegacyRecordFile), nameless, 0o600) != nil {
+			return nameless, nil
+		}
+	case RecordLegacy(stateDir, signIns, now) != nil:
+		return nameless, nil
 	}
-	return rec, nil
+	if written, err := ReadLegacyRecord(stateDir); err == nil && !written.RetiredAt.IsZero() {
+		return written, nil
+	}
+	return nameless, nil
 }
 
 // ReadLegacyRecord is what RecordLegacy kept, the zero record when nothing was.

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"slices"
 	"sync"
 	"time"
 
@@ -22,6 +23,9 @@ type signInSource struct {
 
 	mu     sync.Mutex
 	client *api.Client
+	// sent are the access tokens Token handed out lately, each with its session: a refusal
+	// that arrives after the session rotated its token still names that session.
+	sent []sentToken
 	// accountMu guards the account cache alone, apart from mu, which a client's creation
 	// holds across a keychain read: an export must never wait on a keychain prompt.
 	accountMu sync.Mutex
@@ -30,6 +34,25 @@ type signInSource struct {
 	// change either file at any moment.
 	account      string
 	accountFiles [2]os.FileInfo
+}
+
+type sentToken struct{ token, session string }
+
+// maxSentTokens bounds the tokens remembered: a send's answer comes within its timeout,
+// and a session rotates its token about hourly.
+const maxSentTokens = 16
+
+// handedOut remembers token as session's. s.mu is not held.
+func (s *signInSource) handedOut(token, session string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if i := slices.IndexFunc(s.sent, func(t sentToken) bool { return t.token == token }); i >= 0 {
+		return
+	}
+	s.sent = append(s.sent, sentToken{token, session})
+	if len(s.sent) > maxSentTokens {
+		s.sent = s.sent[len(s.sent)-maxSentTokens:]
+	}
 }
 
 func (app *App) signInSource(cfg *config.Config) *signInSource {
@@ -107,6 +130,7 @@ func (s *signInSource) Token(ctx context.Context, account string) (string, error
 	if held.SessionID != ident.SessionID || auth.AccountKey(held.AuthURL, held.UserID) != account || !held.RetiredAt.IsZero() {
 		return "", nil
 	}
+	s.handedOut(held.AccessToken, held.SessionID)
 	return held.AccessToken, nil
 }
 
@@ -147,13 +171,18 @@ func (s *signInSource) Refused(ctx context.Context, token string) {
 func (s *signInSource) Retired(token string) {
 	s.mu.Lock()
 	client := s.client
+	session := ""
+	if i := slices.IndexFunc(s.sent, func(t sentToken) bool { return t.token == token }); i >= 0 {
+		session = s.sent[i].session
+	}
 	s.mu.Unlock()
 	if client == nil {
 		return
 	}
+	// The session that sent token, even if it has rotated since; never a sign-in made since.
 	// Marked on the client too: a store that can't take the mark must not have Token hand
-	// out the refused token again.
-	if held := client.Credential(); held.AccessToken == token {
+	// out a token of the retired session again.
+	if held := client.Credential(); held.AccessToken == token || session != "" && held.SessionID == session {
 		client.MarkRetired()
 	}
 }

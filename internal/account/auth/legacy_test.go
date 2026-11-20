@@ -212,8 +212,10 @@ func TestForgetLegacy_FileHeldSignInsNeedNoKeychain(t *testing.T) {
 }
 
 // While an older terma's sign-ins are on the machine with no record of them (set up with a
-// server key first, which records nothing), what was bound to no account up to their file's
-// last write is named by no one, so no server key sends it; a record, once kept, decides.
+// server key first, which records nothing), the record is written the first time this
+// terma looks: what was bound to no account until then is theirs, and the boundary never
+// moves after. With nothing to record it from, everything bound to no account until now is
+// named by no one.
 func TestLegacyOwnership_WithoutARecord(t *testing.T) {
 	t.Parallel()
 	dir, stateDir := t.TempDir(), t.TempDir()
@@ -223,17 +225,29 @@ func TestLegacyOwnership_WithoutARecord(t *testing.T) {
 	if err := os.WriteFile(config.LegacyCredentialsPath(dir), []byte(`{}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	written := time.Now().Add(-time.Hour)
-	if err := os.Chtimes(config.LegacyCredentialsPath(dir), written, written); err != nil {
+	nameless, err := LegacyOwnership(dir, stateDir)
+	if err != nil || nameless.Account != LegacyAccountAmbiguous || time.Since(nameless.RetiredAt).Abs() > time.Minute {
+		t.Fatalf("older sign-ins naming no one: %+v, %v; want everything until now named by no one", nameless, err)
+	}
+	// Recorded too, so the boundary stays: what a server key collects after is its own.
+	if again, err := LegacyOwnership(dir, stateDir); err != nil || !again.RetiredAt.Equal(nameless.RetiredAt) {
+		t.Fatalf("second look: %+v, %v; want the boundary recorded at %v", again, err, nameless.RetiredAt)
+	}
+	stateDir = t.TempDir()
+	data := `{"default": {"organizations": {"o": {"session_id": "s", "auth_url": "https://auth.example.test", "organization_id": "o", "user_id": "u"}}}}`
+	if err := os.WriteFile(config.LegacyCredentialsPath(dir), []byte(data), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if rec, err := LegacyOwnership(dir, stateDir); err != nil || rec.Account != LegacyAccountAmbiguous || rec.RetiredAt.Sub(written).Abs() > time.Second {
-		t.Fatalf("older sign-ins, no record: %+v, %v; want them named by no one up to %v", rec, err, written)
+	first, err := LegacyOwnership(dir, stateDir)
+	if err != nil || first.Account != AccountKey("https://auth.example.test", "u") || first.RetiredAt.IsZero() {
+		t.Fatalf("first look: %+v, %v; want the older sign-ins' account, recorded", first, err)
 	}
-	if err := RecordLegacy(stateDir, []LegacySignIn{{SessionID: "s", UserID: "u", AuthURL: "https://auth.example.test"}}, time.Now()); err != nil {
+	// The older terma rewriting its file later moves nothing.
+	later := time.Now().Add(time.Hour)
+	if err := os.Chtimes(config.LegacyCredentialsPath(dir), later, later); err != nil {
 		t.Fatal(err)
 	}
-	if rec, err := LegacyOwnership(dir, stateDir); err != nil || rec.Account != AccountKey("https://auth.example.test", "u") {
-		t.Fatalf("with a record: %+v, %v", rec, err)
+	if again, err := LegacyOwnership(dir, stateDir); err != nil || !again.RetiredAt.Equal(first.RetiredAt) {
+		t.Fatalf("second look: %+v, %v; want the boundary recorded at the first, %v", again, err, first.RetiredAt)
 	}
 }

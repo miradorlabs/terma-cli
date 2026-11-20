@@ -677,3 +677,29 @@ func TestAnUpdateNeedNotWaitForTheHold(t *testing.T) {
 		t.Fatal("QuiesceDroppingHold waited for the hold")
 	}
 }
+
+// A part known to be a team's is pinned as it enters the hold: one the full hold can't
+// take, or evicts before any sweep, is counted where doctor reads losses.
+func TestATeamsPartLostBeforeAnySweepIsCounted(t *testing.T) {
+	t.Parallel()
+	f := newFixture()
+	dir := t.TempDir()
+	r := newRelay(Options{Dir: dir, Token: token, Hold: time.Minute, Lookup: f.lookup, Now: f.clock,
+		Resolve: func(claim.Claim) (Policy, error) { return Policy{}, ErrNoKey }})
+	srv := httptest.NewServer(r.Handler())
+	t.Cleanup(srv.Close)
+	postProto(t, srv, "/v1/logs", logsOf("D", 1))
+	r.mu.Lock()
+	pinned := len(r.held["D"]) == 1 && r.held["D"][0].pinned != nil
+	r.mu.Unlock()
+	if !pinned {
+		t.Fatal("a team's part entered the hold unpinned")
+	}
+	// One too large for the hold, refused as it arrives.
+	big := &part{signal: Logs, session: "D", msg: logsOf("D", 1), records: maxHeld + 1}
+	r.hold(big, &claim.Claim{ProjectID: "p3"}, attribution{})
+	r.sweep()
+	if l, err := ReadOutboxLosses(dir); err != nil || l.Held != maxHeld+1 {
+		t.Fatalf("losses = %+v, %v; want the refused part counted", l, err)
+	}
+}

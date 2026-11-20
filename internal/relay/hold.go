@@ -38,22 +38,28 @@ type traceSession struct {
 	at      time.Time
 }
 
-func (r *Relay) hold(p *part) {
+func (r *Relay) hold(p *part, pin *claim.Claim, how attribution) {
 	size := proto.Size(p.msg)
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if p.records > maxHeld || size > maxHeldBytes {
+	refuse := func() {
 		r.stats.dropped(p.signal, "unclaimed_overflow", p.records)
+		if pin != nil {
+			r.heldLost += p.records // a team's part, lost: counted where doctor reads losses
+		}
+	}
+	if p.records > maxHeld || size > maxHeldBytes {
+		refuse()
 		return
 	}
 	// Evict the oldest rather than refuse the newcomer, the likeliest to be claimed soon.
 	for r.heldN+p.records > maxHeld || r.heldBytes+size > maxHeldBytes {
 		if !r.evictOldestLocked() {
-			r.stats.dropped(p.signal, "unclaimed_overflow", p.records)
+			refuse()
 			return
 		}
 	}
-	r.held[p.session] = append(r.held[p.session], heldPart{p: p, at: r.opts.Now(), size: size})
+	r.held[p.session] = append(r.held[p.session], heldPart{p: p, at: r.opts.Now(), size: size, pinned: pin, pinnedHow: how})
 	r.heldN += p.records
 	r.heldBytes += size
 	r.stats.add("held_parts", 1)
