@@ -3,6 +3,33 @@
   "id": "claude-haiku-5-5",
   "steps": [
     {
+      "at": "2026-11-20T22:37:46.135098265Z",
+      "event": "changed",
+      "changes": [
+        {
+          "id": "docs/whats_new",
+          "category": "docs",
+          "op": "changed",
+          "path": [
+            "docs",
+            "whats_new"
+          ],
+          "title": "What's new page changed (+303 −236 chars)",
+          "impact": "informational",
+          "before": null,
+          "after": null,
+          "text_diff": "@@ -25,7 +25,10 @@\n Long prompts are billed at higher prices; see [Long context pricing](https://platform.claude.com/docs/en/about-claude/pricing#long-context-pricing).\n |\n | [Browser use tool](https://platform.claude.com/docs/en/agents-and-tools/tool-use/browser-use-tool) | New | None. |\n-| [Safety classifiers can decline a request](https://platform.claude.com/docs/en/build-with-claude/refusals-and-fallback#refusal-response) | New | Handle `stop_reason: \"refusal\"` in your client. Server-side fallback isn’t available. |\n+| [Safety classifiers can decline a request](https://platform.claude.com/docs/en/build-with-claude/refusals-and-fallback#refusal-response) | New | Handle `stop_reason: \"refusal\"` in your client.\n+Server-side fallback isn’t available.\n+Remove prompt instructions that ask the model to write its reasoning.\n+|\n | [Manual extended thinking returns an error](https://platform.claude.com/docs/en/models/haiku-5-5/migration-guide#configure-thinking) | Breaking | Replace `budget_tokens` with adaptive thinking. |\n | [Sampling parameters can return an error](https://platform.claude.com/docs/en/models/haiku-5-5/migration-guide#remove-sampling-parameters) | Breaking | Omit `temperature`, `top_p`, and `top_k`. |\n | [Assistant message prefill returns an error](https://platform.claude.com/docs/en/models/haiku-5-5/migration-guide#replace-assistant-prefill) | Breaking | End `messages` with a user turn. |\n",
+          "stats": {
+            "added_chars": 303,
+            "removed_chars": 236
+          },
+          "terma": null,
+          "source": null,
+          "documented": null
+        }
+      ]
+    },
+    {
       "at": "2026-11-20T19:23:57.807121456Z",
       "event": "changed",
       "changes": [

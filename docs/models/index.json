@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-20T19:23:57.807121456Z",
+  "generated_at": "2026-11-20T22:37:46.135098265Z",
   "vendors": [
     {
       "id": "anthropic",
@@ -242,8 +242,8 @@
         "claude-desktop"
       ],
       "last_change": {
-        "at": "2026-11-20T19:23:57.807121456Z",
-        "changes": 2
+        "at": "2026-11-20T22:37:46.135098265Z",
+        "changes": 1
       },
       "probed": true
     },
