@@ -27,6 +27,7 @@ var errTokensGone = fmt.Errorf("%w: the system keychain has no tokens for this s
 // A keychain that cannot be reached is an error, never ErrNotLoggedIn.
 func hydrate(dir, profile string, c *Credential) error {
 	if c.AccessToken != "" {
+		c.dropForeignMark()
 		return nil
 	}
 	v, err := secret.Get(dir, itemName(profile))
@@ -41,6 +42,7 @@ func hydrate(dir, profile string, c *Credential) error {
 		return errTokensGone
 	}
 	c.AccessToken, c.RefreshToken = pair.AccessToken, pair.RefreshToken
+	c.dropForeignMark()
 	return nil
 }
 

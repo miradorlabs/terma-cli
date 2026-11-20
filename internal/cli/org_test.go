@@ -335,6 +335,39 @@ func TestRevokeSendsTheTokenOnlyToTheConfiguredHost(t *testing.T) {
 	}
 }
 
+// After an update, a person's command says why nothing is signed in: the sign-ins the
+// older terma kept are retired. Setup, which signs in, and a signed-in machine say nothing.
+func TestAnUpdatedMachineIsToldToSignIn(t *testing.T) {
+	f := newFakeAuth(t)
+	authSandbox(t, f)
+	if err := os.WriteFile(config.LegacyCredentialsPath(testApp.dir), []byte(`{}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	notice := func(name string) string {
+		var out bytes.Buffer
+		cmd := &cobra.Command{Use: name}
+		cmd.SetErr(&out)
+		testApp.tellSignInAfterUpdate(cmd, true)
+		return out.String()
+	}
+	if got := notice("status"); !strings.Contains(got, "terma was updated") {
+		t.Fatalf("notice = %q, want it to say the update needs a sign-in", got)
+	}
+	if got := notice("setup"); got != "" {
+		t.Fatalf("setup repeated the notice: %q", got)
+	}
+	// A command that fails for want of a sign-in, which skips the notice, says it instead.
+	if got := testApp.notSignedIn(); !strings.Contains(got, "terma was updated") {
+		t.Fatalf("not signed in = %q, want it to say the update needs a sign-in", got)
+	}
+	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(f)); err != nil {
+		t.Fatal(err)
+	}
+	if got := notice("status"); got != "" {
+		t.Fatalf("a signed-in machine was told to sign in: %q", got)
+	}
+}
+
 // `terma teardown --sign-out` revokes the session server-side and forgets it.
 func TestSignOutRevokesTheSession(t *testing.T) {
 	f := newFakeAuth(t)

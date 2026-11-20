@@ -21,8 +21,11 @@ import (
 //   - 5xx, 408, or no answer: something may have rotated without being returned. Retry
 //     with the same token, after Retry-After, until refreshAttemptBudget after the first
 //     attempt; past it the sign-in ends rather than present a spent token after the grace.
-//     A Retry-After that would end past the budget ends it at once, deliberately: no send
-//     may land after the grace.
+//     A Retry-After that would end past the budget is cut short, so one last retry still
+//     starts a margin before the budget ends, inside the grace.
+//   - After an attempt in doubt, an answer that rotated nothing (a 429, a bare 401, a
+//     request that never connected) is retried the same way: the doubt stays, and a later
+//     answer may still return the rotation.
 //   - 401 in the auth gateway's envelope: the session is over, and the stored pair goes,
 //     compare-and-set on its refresh token. A bare 401, maybe a proxy's, spent nothing.
 //
@@ -106,21 +109,24 @@ func (c *Client) redeem(ctx context.Context, held, current *auth.Credential, red
 			superseded = true
 		case refreshInDoubt:
 			clean = false
-			if !withinBudget(first, wait) {
+			wait, ok := retryWait(first, wait)
+			if !ok {
 				return c.endSignIn(tx, current)
 			}
 			time.Sleep(wait)
 		default:
 			// Answered, or never sent, before anything rotated. After an earlier attempt in
 			// doubt, one held back past the budget ends the sign-in, as the next would, and
-			// one that never connected is tried again within the budget: a later answer may
-			// still return the rotation.
+			// one that may pass on a retry is tried again within the budget: a later answer
+			// may still return the rotation.
 			if !clean && errors.Is(err, errPastBudget) {
 				return c.endSignIn(tx, current)
 			}
-			if !clean && notSent(err) && withinBudget(first, defaultRetryAfter) {
-				time.Sleep(defaultRetryAfter)
-				continue
+			if !clean && retryable(err) {
+				if wait, ok := retryWait(first, cmp.Or(retryAfterOf(err), defaultRetryAfter)); ok {
+					time.Sleep(wait)
+					continue
+				}
 			}
 			return c.settle(tx, current, clean, err)
 		}
@@ -134,6 +140,34 @@ func (c *Client) redeem(ctx context.Context, held, current *auth.Credential, red
 func withinBudget(first time.Time, wait time.Duration) bool {
 	elapsed := time.Since(first)
 	return elapsed >= 0 && elapsed+wait <= refreshAttemptBudget
+}
+
+// retryWait is how long to wait before retrying a refresh first sent at first, wanting
+// wait: cut short so the retry starts a margin (a tenth of the budget) before the budget
+// ends; false when no retry can start by then.
+func retryWait(first time.Time, wait time.Duration) (time.Duration, bool) {
+	margin := refreshAttemptBudget / 10
+	elapsed := time.Since(first)
+	left := refreshAttemptBudget - margin - elapsed
+	if elapsed < 0 || left <= 0 {
+		return 0, false
+	}
+	return min(wait, left), true
+}
+
+// retryable reports whether a refresh answered without a rotation may pass on a retry: one
+// that never connected, a 429, or a bare 401, maybe a proxy's.
+func retryable(err error) bool {
+	apiErr, isAPI := errors.AsType[*Error](err)
+	return notSent(err) || errors.As(err, new(bare401Error)) || isAPI && apiErr.StatusCode == http.StatusTooManyRequests
+}
+
+// retryAfterOf is the wait err's answer named, 0 for none.
+func retryAfterOf(err error) time.Duration {
+	if apiErr, ok := errors.AsType[*Error](err); ok {
+		return apiErr.RetryAfter
+	}
+	return 0
 }
 
 // What a refresh's answer says of the token it presented.
@@ -199,7 +233,7 @@ func (c *Client) markInDoubt(tx *auth.Tx, current *auth.Credential, since time.T
 	if tx == nil || current.RefreshInDoubtSince.Equal(since) {
 		return current, nil
 	}
-	if err := tx.MarkRefreshInDoubt(c.profile, current.SessionID, since); err != nil {
+	if err := tx.MarkRefreshInDoubt(c.profile, current.SessionID, current.RefreshToken, since); err != nil {
 		return current, fmt.Errorf("record the refresh before sending it: %w", err)
 	}
 	marked := *current

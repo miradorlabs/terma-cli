@@ -60,15 +60,13 @@ func (app *App) signInWithGrant(cmd *cobra.Command, cfg *config.Config, orgID st
 	sameDesktop := func(verified *auth.Credential, whoami identityResponse) bool {
 		return strings.EqualFold(cmp.Or(whoami.UserID, verified.UserID), desktop.UserID)
 	}
-	cred, ok, err := app.reuseStoredSession(ctx, cfg, sameDesktop)
+	cred, reused, err := app.reuseStoredSession(ctx, cfg, sameDesktop)
 	if err != nil {
 		return nil, err
 	}
-	if ok {
-		if err := auth.WriteGrantReused(out); err != nil {
-			return nil, err
-		}
-	} else {
+	// A reused sign-in is announced only once --org is checked below, so stdout says
+	// {"reused":true} or {"error":…}, never both.
+	if !reused {
 		installation, err := config.InstallationID(app.dir)
 		if err != nil {
 			return nil, err
@@ -107,10 +105,18 @@ func (app *App) signInWithGrant(cmd *cobra.Command, cfg *config.Config, orgID st
 	}
 	// The list reads the account service's own records, so an organization it leaves out is
 	// not the user's, not merely unconfirmed. Any other failure is no bad input.
-	if _, err := app.chooseOrganization(ctx, cfg, cred, orgRef{ID: orgID}, nil); errors.Is(err, errNotYourOrganization) {
+	switch _, err := app.chooseOrganization(ctx, cfg, cred, orgRef{ID: orgID}, nil); {
+	case errors.Is(err, errNotYourOrganization):
 		return nil, &auth.GrantError{Code: auth.GrantBadInput, Message: "--org is not an organization the signed-in user belongs to", Err: err}
-	} else if err != nil {
+	case errors.Is(err, errNoOrganization):
+		return nil, &auth.GrantError{Code: auth.GrantBadInput, Message: "the signed-in user belongs to no Terma organization yet", Err: err}
+	case err != nil:
 		return nil, err
+	}
+	if reused {
+		if err := auth.WriteGrantReused(out); err != nil {
+			return nil, err
+		}
 	}
 	return app.loadConfig()
 }

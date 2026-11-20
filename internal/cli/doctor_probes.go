@@ -67,6 +67,9 @@ func (app *App) doctorProbes(cfg *config.Config) doctor.Probes {
 			if secret.IsUnavailable(err) {
 				return doctor.Credential{Locked: true}, nil
 			}
+			if errors.Is(err, auth.ErrNotLoggedIn) && auth.HasLegacySignIns(app.dir) {
+				return doctor.Credential{SignInAfterUpdate: true}, nil
+			}
 			if err != nil {
 				return doctor.Credential{}, err
 			}

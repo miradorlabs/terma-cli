@@ -570,31 +570,56 @@ func TestTheRefreshIsMarkedBeforeItIsSent(t *testing.T) {
 	}
 }
 
-// An answer that rotated nothing clears the mark only when no attempt before it may have
-// rotated: a 503 and then a 429 leave the token in doubt.
-func TestALaterCleanAnswerKeepsAnEarlierDoubt(t *testing.T) {
-	shortRetries(t, 10*time.Second, 10*time.Millisecond)
-	script := &refreshScript{answers: []string{"503", "429"}}
-	c := expiredClient(t, script)
-	if err := c.Refresh(context.Background()); err == nil {
-		t.Fatal("a 429 was taken for a rotation")
-	}
-	if got := storedPair(t, c); got.RefreshInDoubtSince.IsZero() {
-		t.Fatal("the 429 cleared the doubt the 503 left")
+// After an attempt in doubt, an answer that rotated nothing (a 429, a bare 401) is retried
+// within the budget, keeping the doubt meanwhile: a later answer may still return the
+// rotation, rather than the next process ending a healthy sign-in.
+func TestARefreshInDoubtRetriesPastAnAnswerThatRotatedNothing(t *testing.T) {
+	for _, answer := range []string{"429", "401 bare"} {
+		t.Run(answer, func(t *testing.T) {
+			shortRetries(t, 10*time.Second, 10*time.Millisecond)
+			script := &refreshScript{answers: []string{"503", answer, "ok"}}
+			c := expiredClient(t, script)
+			var doubt time.Time
+			script.onAnswer = func(n int) {
+				if n == 2 {
+					cred, _ := auth.LoadCredential(c.dir, config.DefaultProfile)
+					doubt = cred.RefreshInDoubtSince
+				}
+			}
+			if err := c.Refresh(context.Background()); err != nil {
+				t.Fatalf("refresh: %v", err)
+			}
+			if doubt.IsZero() {
+				t.Fatalf("the %s cleared the doubt the 503 left", answer)
+			}
+			if got := storedPair(t, c); got.RefreshToken != "refresh-3" || !got.RefreshInDoubtSince.IsZero() {
+				t.Fatalf("stored %+v, want the rotation with no doubt left", got)
+			}
+		})
 	}
 }
 
-// A wait that would end past the budget sends nothing more: the next send could present a
-// spent token after the server's grace.
-func TestAWaitPastTheBudgetSendsNothing(t *testing.T) {
+// A Retry-After longer than the budget left is cut short, so one last retry starts a
+// margin before the budget ends, inside the server's grace, and a brief outage survives.
+func TestALongRetryAfterIsCutToTheBudget(t *testing.T) {
 	shortRetries(t, 500*time.Millisecond, 10*time.Millisecond)
 	script := &refreshScript{answers: []string{"503", "ok"}} // Retry-After: 1 s, past the budget
 	c := expiredClient(t, script)
-	if err := c.Refresh(context.Background()); !errors.Is(err, auth.ErrNotLoggedIn) {
-		t.Fatalf("err = %v, want the sign-in ended", err)
+	start := time.Now()
+	var second time.Duration
+	script.onAnswer = func(n int) {
+		if n == 1 {
+			second = time.Since(start)
+		}
 	}
-	if sent := script.sent(); len(sent) != 1 {
-		t.Fatalf("presented %v, want the one attempt", sent)
+	if err := c.Refresh(context.Background()); err != nil {
+		t.Fatalf("refresh: %v", err)
+	}
+	if sent := script.sent(); len(sent) != 2 || sent[1] != "refresh-0" {
+		t.Fatalf("presented %v, want refresh-0 again", sent)
+	}
+	if second > 500*time.Millisecond {
+		t.Fatalf("the retry started %v after the first, past the budget", second)
 	}
 }
 
@@ -603,7 +628,7 @@ func TestAMarkForAnotherSessionIsRefused(t *testing.T) {
 	script := &refreshScript{}
 	c := expiredClient(t, script)
 	err := auth.Locked(context.Background(), c.dir, func(tx *auth.Tx) error {
-		return tx.MarkRefreshInDoubt(config.DefaultProfile, "another-session", time.Now())
+		return tx.MarkRefreshInDoubt(config.DefaultProfile, "another-session", "refresh-0", time.Now())
 	})
 	if err == nil {
 		t.Fatal("a mark for another session was taken")

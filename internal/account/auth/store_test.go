@@ -168,8 +168,23 @@ func TestDeleteCredentialIf_DeletesOnlyTheCallersSignIn(t *testing.T) {
 	if _, err := LoadCredential(dir, config.DefaultProfile); err != ErrNotLoggedIn {
 		t.Fatalf("the matching sign-in survived: %v", err)
 	}
+	// The keychain item stays: a delete that timed out could land after the lock and take
+	// a new sign-in's tokens. The next sign-in overwrites it.
+	if _, err := secret.Get(dir, itemName(config.DefaultProfile)); err != nil {
+		t.Fatalf("an automatic removal touched the keychain: %v", err)
+	}
+	if _, err := SaveCredential(dir, config.DefaultProfile, sessionCredential("s2")); err != nil {
+		t.Fatal(err)
+	}
+	if cred, err := LoadCredential(dir, config.DefaultProfile); err != nil || cred.RefreshToken != "refresh-s2" {
+		t.Fatalf("the next sign-in = %+v, %v; want s2's tokens", cred, err)
+	}
+	// Signing out removes the item.
+	if err := Locked(t.Context(), dir, func(tx *Tx) error { return tx.SignOutIf(config.DefaultProfile, "refresh-s2") }); err != nil {
+		t.Fatal(err)
+	}
 	if _, err := secret.Get(dir, itemName(config.DefaultProfile)); !errors.Is(err, secret.ErrNotFound) {
-		t.Fatalf("the keychain item outlived the sign-in: %v", err)
+		t.Fatalf("the keychain item outlived sign-out: %v", err)
 	}
 
 	if err := DeleteCredentialIf(dir, "never-existed", "refresh-s1"); err != nil {
@@ -253,5 +268,32 @@ func TestSaveCredential_GivesUpOnAHungHolder(t *testing.T) {
 	}
 	if elapsed > lockWait+2*time.Second {
 		t.Fatalf("SaveCredential waited %v; want about %v", elapsed, lockWait)
+	}
+}
+
+// A refresh mark counts only beside the refresh token it was recorded for: one the file
+// kept while the keychain took a newer pair is not the newer pair's.
+func TestARefreshMarkCountsOnlyForItsToken(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	if _, err := SaveCredential(dir, config.DefaultProfile, sessionCredential("s1")); err != nil {
+		t.Fatal(err)
+	}
+	since := time.Now().Add(-time.Minute).UTC()
+	mark := func(token string) {
+		t.Helper()
+		if err := Locked(t.Context(), dir, func(tx *Tx) error {
+			return tx.MarkRefreshInDoubt(config.DefaultProfile, "s1", token, since)
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	mark("refresh-s1")
+	if cred, err := LoadCredential(dir, config.DefaultProfile); err != nil || !cred.RefreshInDoubtSince.Equal(since) {
+		t.Fatalf("LoadCredential = %+v, %v; want the mark for its token", cred, err)
+	}
+	mark("an-older-token")
+	if cred, err := LoadCredential(dir, config.DefaultProfile); err != nil || !cred.RefreshInDoubtSince.IsZero() {
+		t.Fatalf("LoadCredential = %+v, %v; want no mark beside another token", cred, err)
 	}
 }
