@@ -8,6 +8,11 @@
   ],
   "changelog": [
     {
+      "date": "2026-11",
+      "url": "https://docs.x.ai/docs/release-notes",
+      "text": "### grok-build-0.1 end of life\n\n`grok-build-0.1` reached end of life on November 19, 2026 and is no longer served on the API."
+    },
+    {
       "date": "2026-05",
       "url": "https://docs.x.ai/docs/release-notes",
       "text": "### Grok Build 0.1\n\nSpaceXSI's coding model, trained specifically for agentic coding workflows. Currently in early access.\n\nThe model slug is [`grok-build-0.1`](/developers/models/grok-build-0.1)."
