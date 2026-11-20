@@ -166,15 +166,23 @@ func (tx *Tx) saveReplacing(profile string, cred *Credential, inFile bool) (repl
 	// overwritten is the sign-in whose keychain item the new tokens replaced: a file that
 	// then fails to save still indexes it, so its tokens go back.
 	var overwritten *Credential
-	err = tx.mutate(func(file credentialFile) {
+	var unread error
+	err = tx.mutateIf(func(file credentialFile) bool {
 		// Read before the new tokens overwrite the keychain item.
 		old := file.get(profile)
 		var indexed *Credential
 		if old != nil {
 			copied := *old
 			indexed = &copied
-			if hydrate(dir, profile, old) == nil {
+			switch err := hydrate(dir, profile, old); {
+			case err == nil:
 				replaced = old
+			case !errors.Is(err, errTokensGone) && !inFile && old.SessionID != cred.SessionID:
+				// The keychain did not answer: its item may still hold the only copy of
+				// another live session's tokens, which the new ones must not overwrite
+				// unread. (Kept in the file, the new ones overwrite nothing.)
+				unread = err
+				return false
 			}
 		}
 		kept := keep(dir, profile, cred, indexed, inFile)
@@ -183,7 +191,11 @@ func (tx *Tx) saveReplacing(profile string, cred *Credential, inFile bool) (repl
 			overwritten = replaced
 		}
 		file[profile] = kept
+		return true
 	})
+	if err == nil && unread != nil {
+		err = fmt.Errorf("read the sign-in it replaces from the system keychain: %w", unread)
+	}
 	if err != nil && overwritten != nil {
 		pair, _ := json.Marshal(tokenPair{AccessToken: overwritten.AccessToken, RefreshToken: overwritten.RefreshToken})
 		_ = secret.Set(dir, itemName(profile), string(pair))
