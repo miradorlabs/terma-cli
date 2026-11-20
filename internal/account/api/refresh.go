@@ -74,7 +74,8 @@ func (c *Client) redeem(ctx context.Context, held, current *auth.Credential, red
 		current = marked
 		// The whole attempt, its dial and handshake too, ends with the budget.
 		attempt, cancel := context.WithDeadline(exchange, first.Add(refreshAttemptBudget))
-		resp, err := c.postToken(attempt, tokenRequest{GrantType: "refresh_token", RefreshToken: current.RefreshToken})
+		inBudget := func() bool { return time.Since(first) <= refreshAttemptBudget }
+		resp, err := c.postToken(attempt, inBudget, tokenRequest{GrantType: "refresh_token", RefreshToken: current.RefreshToken})
 		cancel()
 		switch kind, wait := classifyRefresh(err); kind {
 		case refreshRotated:
@@ -109,7 +110,17 @@ func (c *Client) redeem(ctx context.Context, held, current *auth.Credential, red
 			}
 			time.Sleep(wait)
 		default:
-			// Answered, or never sent, before anything rotated.
+			// Answered, or never sent, before anything rotated. After an earlier attempt in
+			// doubt, one held back past the budget ends the sign-in, as the next would, and
+			// one that never connected is tried again within the budget: a later answer may
+			// still return the rotation.
+			if !clean && errors.Is(err, errPastBudget) {
+				return c.endSignIn(tx, current)
+			}
+			if !clean && notSent(err) && time.Since(first)+defaultRetryAfter <= refreshAttemptBudget {
+				time.Sleep(defaultRetryAfter)
+				continue
+			}
 			return c.settle(tx, current, clean, err)
 		}
 	}
@@ -140,6 +151,8 @@ func classifyRefresh(err error) (kind int, wait time.Duration) {
 		return refreshSuperseded, 0
 	case isAPI && (apiErr.StatusCode >= 500 || apiErr.StatusCode == http.StatusRequestTimeout):
 		return refreshInDoubt, cmp.Or(apiErr.RetryAfter, defaultRetryAfter)
+	case errors.Is(err, errPastBudget):
+		return refreshUnspent, 0
 	case isAPI && apiErr.Unauthenticated():
 		// A bare 401 (postToken wraps the gateway's own as ErrNotLoggedIn, above).
 		return refreshUnspent, 0
@@ -160,8 +173,12 @@ func (c *Client) settle(tx *auth.Tx, current *auth.Credential, clean bool, err e
 }
 
 // notSent reports whether err failed a request before any of it reached the server: no
-// address, or no connection. Such a refresh rotated nothing, so it is safe to try later.
+// address, or no connection (a TLS or proxy failure included). Such a refresh rotated
+// nothing, so it is safe to try later.
 func notSent(err error) bool {
+	if _, ok := errors.AsType[notConnectedError](err); ok {
+		return true
+	}
 	if _, ok := errors.AsType[*net.DNSError](err); ok {
 		return true
 	}

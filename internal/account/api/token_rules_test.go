@@ -392,6 +392,79 @@ func TestABare401KeepsTheSignIn(t *testing.T) {
 	}
 }
 
+// A refresh that fails before any connection is made, as on a TLS failure (a captive
+// portal's certificate), sent nothing: the sign-in stays, and nothing is left in doubt.
+func TestATLSFailureLeavesNothingInDoubt(t *testing.T) {
+	shortRetries(t, 0, time.Millisecond)
+	script := &refreshScript{}
+	srv := httptest.NewTLSServer(http.HandlerFunc(script.serve))
+	t.Cleanup(srv.Close)
+	c := newTestClient(t, srv.URL, &auth.Credential{AccessToken: "access-0", RefreshToken: "refresh-0",
+		ExpiresAt: time.Now().Add(-time.Hour)}, "")
+	err := c.Refresh(context.Background())
+	if err == nil || errors.Is(err, auth.ErrNotLoggedIn) {
+		t.Fatalf("refresh = %v, want a plain error", err)
+	}
+	if sent := script.sent(); len(sent) != 0 {
+		t.Fatalf("presented %v through a failed handshake", sent)
+	}
+	if got := storedPair(t, c); got.RefreshToken != "refresh-0" || !got.RefreshInDoubtSince.IsZero() {
+		t.Fatalf("stored %+v, want the pair kept with no doubt", got)
+	}
+}
+
+// A refresh in doubt keeps trying within the budget when a retry fails before it connects:
+// a later answer may still return the rotation.
+func TestARetryThatCannotConnectKeepsTrying(t *testing.T) {
+	shortRetries(t, 10*time.Second, 10*time.Millisecond)
+	script := &refreshScript{answers: []string{"503", "ok"}}
+	c := expiredClient(t, script)
+	var calls atomic.Int32
+	base := c.http.Transport
+	if base == nil {
+		base = http.DefaultTransport
+	}
+	c.http.Transport = roundTripFunc(func(r *http.Request) (*http.Response, error) {
+		if r.URL.Path == tokenPath && calls.Add(1) == 2 {
+			return nil, errors.New("tls: failed to verify certificate")
+		}
+		return base.RoundTrip(r)
+	})
+	if err := c.Refresh(context.Background()); err != nil {
+		t.Fatalf("refresh: %v", err)
+	}
+	if calls.Load() != 3 {
+		t.Fatalf("%d attempts, want 3", calls.Load())
+	}
+	if got := storedPair(t, c); got.RefreshToken != "refresh-2" || !got.RefreshInDoubtSince.IsZero() {
+		t.Fatalf("stored %+v, want the rotation with no doubt left", got)
+	}
+}
+
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
+
+// A body the guard holds back never carries the token: the request fails as past the
+// budget, and the server reads no refresh token.
+func TestATokenHeldBackPastTheBudgetIsNotSent(t *testing.T) {
+	script := &refreshScript{}
+	c := expiredClient(t, script)
+	_, err := c.postToken(context.Background(), func() bool { return false },
+		tokenRequest{GrantType: "refresh_token", RefreshToken: "refresh-0"})
+	if !errors.Is(err, errPastBudget) {
+		t.Fatalf("postToken = %v, want held back", err)
+	}
+	for _, sent := range script.sent() {
+		if sent != "" {
+			t.Fatalf("the server read %q", sent)
+		}
+	}
+	if kind, _ := classifyRefresh(err); kind != refreshUnspent {
+		t.Fatalf("a held-back refresh classified %d, want unspent", kind)
+	}
+}
+
 // The mark is stored before the token leaves, so a process killed mid-request leaves it.
 func TestTheRefreshIsMarkedBeforeItIsSent(t *testing.T) {
 	script := &refreshScript{}

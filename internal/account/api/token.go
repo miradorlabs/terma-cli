@@ -7,7 +7,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"net/http"
 	"slices"
 	"strings"
 	"time"
@@ -81,7 +80,7 @@ func (c *Client) exchangeCode(ctx context.Context, code, verifier string, port i
 	if c.installationID == "" {
 		return nil, errors.New("signing in needs this installation's id")
 	}
-	resp, err := c.postToken(ctx, tokenRequest{
+	resp, err := c.postToken(ctx, nil, tokenRequest{
 		GrantType:      "authorization_code",
 		Code:           code,
 		CodeVerifier:   verifier,
@@ -96,35 +95,6 @@ func (c *Client) exchangeCode(ctx context.Context, code, verifier string, port i
 		return nil, err
 	}
 	return c.credentialFrom(resp), nil
-}
-
-func (c *Client) postToken(ctx context.Context, body tokenRequest) (*tokenResponse, error) {
-	resp, err := c.attemptAs(ctx, authHost, http.MethodPost, tokenPath, body, false)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	var out tokenResponse
-	if err := decode(resp, &out); err != nil {
-		apiErr, ok := errors.AsType[*Error](err)
-		switch {
-		case ok && apiErr.SignInRetired():
-			return nil, fmt.Errorf("%w: %w: %w", auth.ErrSignInRetired, auth.ErrNotLoggedIn, apiErr)
-		case !ok || !apiErr.Unauthenticated():
-		case body.GrantType == "refresh_token" && apiErr.Code != "UNAUTHENTICATED":
-			// A 401 without the auth gateway's envelope, maybe a proxy's, says nothing of
-			// the session: no sign-out, so apiErr is not wrapped.
-			return nil, fmt.Errorf("the token endpoint answered 401 without the auth gateway's refusal: %w", apiErr)
-		default:
-			return nil, fmt.Errorf("%w: %w", auth.ErrNotLoggedIn, apiErr)
-		}
-		return nil, err
-	}
-	if out.AccessToken == "" || out.RefreshToken == "" || out.SessionID == "" {
-		return nil, errors.New("token endpoint returned an incomplete sign-in")
-	}
-	return &out, nil
 }
 
 func (c *Client) credentialFrom(resp *tokenResponse) *auth.Credential {
