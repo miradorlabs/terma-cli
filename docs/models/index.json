@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-19T20:14:41.124663295Z",
+  "generated_at": "2026-11-20T00:50:00.476672983Z",
   "vendors": [
     {
       "id": "anthropic",
@@ -776,27 +776,6 @@
       "probed": false
     },
     {
-      "id": "grok-build-0.1",
-      "vendor": "xai",
-      "name": "Grok Build 0.1",
-      "family": "grok-build",
-      "status": "unlisted",
-      "released_at": "2026-04-16",
-      "first_seen": "2026-11-11T14:15:45.0307666Z",
-      "predecessor": null,
-      "successor": null,
-      "context_window": 256000,
-      "max_output": 256000,
-      "knowledge_cutoff": null,
-      "reasoning": true,
-      "harnesses": [],
-      "last_change": {
-        "at": "2026-11-19T20:14:41.124663295Z",
-        "changes": 6
-      },
-      "probed": false
-    },
-    {
       "id": "claude-opus-4-7",
       "vendor": "anthropic",
       "name": "Claude Opus 4.7",
@@ -1504,6 +1483,27 @@
       "reasoning": true,
       "harnesses": [],
       "last_change": null,
+      "probed": false
+    },
+    {
+      "id": "grok-build-0.1",
+      "vendor": "xai",
+      "name": "grok-build-0.1",
+      "family": "grok-build",
+      "status": "unlisted",
+      "released_at": null,
+      "first_seen": "2026-11-11T14:15:45.0307666Z",
+      "predecessor": null,
+      "successor": null,
+      "context_window": null,
+      "max_output": null,
+      "knowledge_cutoff": null,
+      "reasoning": null,
+      "harnesses": [],
+      "last_change": {
+        "at": "2026-11-20T00:50:00.476672983Z",
+        "changes": 11
+      },
       "probed": false
     }
   ]

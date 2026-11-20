@@ -2,74 +2,14 @@
   "schema_version": 1,
   "id": "grok-build-0.1",
   "vendor": "xai",
-  "name": "Grok Build 0.1",
+  "name": "grok-build-0.1",
   "family": "grok-build",
   "first_seen": "2026-11-11T14:15:45.0307666Z",
   "listed": false,
-  "facts": {
-    "context_window": 256000,
-    "input_modalities": [
-      "text",
-      "image",
-      "pdf"
-    ],
-    "max_output": 256000,
-    "name": "Grok Build 0.1",
-    "open_weights": false,
-    "output_modalities": [
-      "text"
-    ],
-    "reasoning": true,
-    "released_at": "2026-04-16",
-    "sampling_parameters": true,
-    "structured_outputs": true,
-    "tool_calling": true
-  },
-  "provenance": {
-    "context_window": {
-      "models.dev": 256000
-    },
-    "input_modalities": {
-      "models.dev": [
-        "text",
-        "image",
-        "pdf"
-      ]
-    },
-    "max_output": {
-      "models.dev": 256000
-    },
-    "name": {
-      "models.dev": "Grok Build 0.1"
-    },
-    "open_weights": {
-      "models.dev": false
-    },
-    "output_modalities": {
-      "models.dev": [
-        "text"
-      ]
-    },
-    "reasoning": {
-      "models.dev": true
-    },
-    "released_at": {
-      "models.dev": "2026-04-16"
-    },
-    "sampling_parameters": {
-      "models.dev": true
-    },
-    "structured_outputs": {
-      "models.dev": true
-    },
-    "tool_calling": {
-      "models.dev": true
-    }
-  },
+  "facts": {},
+  "provenance": {},
   "disagreements": [],
-  "sources": {
-    "models.dev": "https://models.dev"
-  },
+  "sources": {},
   "docs": {},
   "api": null,
   "harnesses": []

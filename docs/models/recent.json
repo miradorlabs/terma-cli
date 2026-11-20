@@ -1,7 +1,20 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-19T20:14:41.124663295Z",
+  "generated_at": "2026-11-20T00:50:00.476672983Z",
   "events": [
+    {
+      "at": "2026-11-20T00:50:00.476672983Z",
+      "model": "grok-build-0.1",
+      "vendor": "xai",
+      "name": "grok-build-0.1",
+      "event": "changed",
+      "changes": 11,
+      "highlights": [
+        "Context window: no longer stated (was 256K)",
+        "Input: no longer stated (was text, image, pdf)",
+        "Max output: no longer stated (was 256K)"
+      ]
+    },
     {
       "at": "2026-11-19T20:14:41.124663295Z",
       "model": "grok-build-0.1",

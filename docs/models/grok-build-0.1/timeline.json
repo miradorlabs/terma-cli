@@ -3,6 +3,205 @@
   "id": "grok-build-0.1",
   "steps": [
     {
+      "at": "2026-11-20T00:50:00.476672983Z",
+      "event": "changed",
+      "changes": [
+        {
+          "id": "facts/context_window",
+          "category": "facts",
+          "op": "removed",
+          "path": [
+            "facts",
+            "context_window"
+          ],
+          "title": "Context window: no longer stated (was 256K)",
+          "impact": "notable",
+          "before": 256000,
+          "after": null,
+          "text_diff": null,
+          "terma": null,
+          "source": null,
+          "documented": null
+        },
+        {
+          "id": "facts/input_modalities",
+          "category": "facts",
+          "op": "removed",
+          "path": [
+            "facts",
+            "input_modalities"
+          ],
+          "title": "Input: no longer stated (was text, image, pdf)",
+          "impact": "notable",
+          "before": [
+            "text",
+            "image",
+            "pdf"
+          ],
+          "after": null,
+          "text_diff": null,
+          "terma": null,
+          "source": null,
+          "documented": null
+        },
+        {
+          "id": "facts/max_output",
+          "category": "facts",
+          "op": "removed",
+          "path": [
+            "facts",
+            "max_output"
+          ],
+          "title": "Max output: no longer stated (was 256K)",
+          "impact": "notable",
+          "before": 256000,
+          "after": null,
+          "text_diff": null,
+          "terma": null,
+          "source": null,
+          "documented": null
+        },
+        {
+          "id": "facts/name",
+          "category": "facts",
+          "op": "removed",
+          "path": [
+            "facts",
+            "name"
+          ],
+          "title": "Name: no longer stated (was Grok Build 0.1)",
+          "impact": "notable",
+          "before": "Grok Build 0.1",
+          "after": null,
+          "text_diff": null,
+          "terma": null,
+          "source": null,
+          "documented": null
+        },
+        {
+          "id": "facts/open_weights",
+          "category": "facts",
+          "op": "removed",
+          "path": [
+            "facts",
+            "open_weights"
+          ],
+          "title": "Open weights: no longer stated (was no)",
+          "impact": "notable",
+          "before": false,
+          "after": null,
+          "text_diff": null,
+          "terma": null,
+          "source": null,
+          "documented": null
+        },
+        {
+          "id": "facts/output_modalities",
+          "category": "facts",
+          "op": "removed",
+          "path": [
+            "facts",
+            "output_modalities"
+          ],
+          "title": "Output: no longer stated (was text)",
+          "impact": "notable",
+          "before": [
+            "text"
+          ],
+          "after": null,
+          "text_diff": null,
+          "terma": null,
+          "source": null,
+          "documented": null
+        },
+        {
+          "id": "facts/reasoning",
+          "category": "facts",
+          "op": "removed",
+          "path": [
+            "facts",
+            "reasoning"
+          ],
+          "title": "Reasoning: no longer stated (was yes)",
+          "impact": "notable",
+          "before": true,
+          "after": null,
+          "text_diff": null,
+          "terma": null,
+          "source": null,
+          "documented": null
+        },
+        {
+          "id": "facts/released_at",
+          "category": "facts",
+          "op": "removed",
+          "path": [
+            "facts",
+            "released_at"
+          ],
+          "title": "Release date: no longer stated (was 2026-04-16)",
+          "impact": "notable",
+          "before": "2026-04-16",
+          "after": null,
+          "text_diff": null,
+          "terma": null,
+          "source": null,
+          "documented": null
+        },
+        {
+          "id": "facts/sampling_parameters",
+          "category": "facts",
+          "op": "removed",
+          "path": [
+            "facts",
+            "sampling_parameters"
+          ],
+          "title": "Sampling parameters: no longer stated (was yes)",
+          "impact": "notable",
+          "before": true,
+          "after": null,
+          "text_diff": null,
+          "terma": null,
+          "source": null,
+          "documented": null
+        },
+        {
+          "id": "facts/structured_outputs",
+          "category": "facts",
+          "op": "removed",
+          "path": [
+            "facts",
+            "structured_outputs"
+          ],
+          "title": "Structured outputs: no longer stated (was yes)",
+          "impact": "notable",
+          "before": true,
+          "after": null,
+          "text_diff": null,
+          "terma": null,
+          "source": null,
+          "documented": null
+        },
+        {
+          "id": "facts/tool_calling",
+          "category": "facts",
+          "op": "removed",
+          "path": [
+            "facts",
+            "tool_calling"
+          ],
+          "title": "Tool calling: no longer stated (was yes)",
+          "impact": "notable",
+          "before": true,
+          "after": null,
+          "text_diff": null,
+          "terma": null,
+          "source": null,
+          "documented": null
+        }
+      ]
+    },
+    {
       "at": "2026-11-19T20:14:41.124663295Z",
       "event": "unlisted",
       "changes": [
