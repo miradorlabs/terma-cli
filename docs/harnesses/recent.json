@@ -1,7 +1,33 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-20T01:33:28.418772035Z",
+  "generated_at": "2026-11-20T02:00:44.025484206Z",
   "versions": [
+    {
+      "harness": "codex-desktop",
+      "name": "Codex app",
+      "version": "26.1117.31558",
+      "released_at": "2026-11-20T01:45:31Z",
+      "captured_at": "2026-11-20T02:00:44.025484206Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "26.1111.71704",
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": null,
+      "highlights": [],
+      "signing": null,
+      "partial": true,
+      "attempted_at": "2026-11-20T02:00:44.025484206Z",
+      "attempts": 1
+    },
     {
       "harness": "codex",
       "name": "Codex CLI",
@@ -6188,37 +6214,6 @@
         "System prompt changed (+511 −462 chars)",
         "System prompt changed (+338 −0 chars)",
         "System prompt changed (+271 −186 chars)"
-      ],
-      "signing": "valid"
-    },
-    {
-      "harness": "claude",
-      "name": "Claude Code",
-      "version": "2.1.216",
-      "released_at": "2026-07-20T20:19:37.447Z",
-      "captured_at": "2026-11-05T09:54:28.532441Z",
-      "platforms": [
-        "darwin/arm64",
-        "linux/amd64"
-      ],
-      "support": "untested",
-      "previous": "2.1.215",
-      "changes": 4,
-      "categories": {
-        "config": 3,
-        "tools": 1
-      },
-      "impact": {
-        "breaking": 0,
-        "degrading": 0,
-        "informational": 3,
-        "notable": 1
-      },
-      "undocumented": 3,
-      "highlights": [
-        "Skill tool description changed (+1237 −1692 chars)",
-        "New environment variable: CLAUDE_CODE_FLEETVIEW_SIMPLE",
-        "Environment variable no longer read: CLAUDE_CODE_OWNERSHIP_FRAME"
       ],
       "signing": "valid"
     }
