@@ -1,7 +1,20 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-20T02:38:22.359893397Z",
+  "generated_at": "2026-11-20T02:52:25.234075432Z",
   "events": [
+    {
+      "at": "2026-11-20T02:52:25.234075432Z",
+      "model": "grok-4.20-0309-reasoning",
+      "vendor": "xai",
+      "name": "Grok 4.20",
+      "event": "changed",
+      "changes": 6,
+      "highlights": [
+        "Batch API: now yes",
+        "Description: now Grok 4.20 is a high-performance model with industry-leading speed and agentic tool calling capabilities. It combines the lowest hallucination rate on the market with strict prompt adherence, delivering consistently precise and truthful responses.",
+        "Input removed: pdf"
+      ]
+    },
     {
       "at": "2026-11-20T02:38:22.359893397Z",
       "model": "grok-4.6",
