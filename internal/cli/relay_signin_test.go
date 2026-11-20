@@ -46,3 +46,47 @@ func TestTheSignInSourceSendsOnlyAsItsOwnAccount(t *testing.T) {
 		t.Fatalf("a server-key profile has account %q", got)
 	}
 }
+
+// The account follows a sign-in another process changes at once, with no window in which
+// a part arriving is bound to the account before: a switch to another person, a switch to
+// a server key and a sign-out each show at the next part.
+func TestTheSignInSourceFollowsASwitchAtOnce(t *testing.T) {
+	f := newFakeAuth(t)
+	authSandbox(t, f)
+	cfg, err := testApp.loadConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(f)); err != nil {
+		t.Fatal(err)
+	}
+	src := testApp.signInSource(cfg)
+	if got := src.Account(); got != auth.AccountKey(f.srv.URL, "u-1") {
+		t.Fatalf("account = %q, want u-1's", got)
+	}
+	if got := src.Account(); got != auth.AccountKey(f.srv.URL, "u-1") {
+		t.Fatalf("cached account = %q, want u-1's", got)
+	}
+	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSessionOf(f, "u-2")); err != nil {
+		t.Fatal(err)
+	}
+	if got := src.Account(); got != auth.AccountKey(f.srv.URL, "u-2") {
+		t.Fatalf("after a switch, account = %q, want u-2's", got)
+	}
+	serverKeyProfile(t)
+	if got := src.Account(); got != "" {
+		t.Fatalf("after a switch to a server key, account = %q", got)
+	}
+	if err := config.UpdateProfile(testApp.dir, config.DefaultProfile, func(p *config.Profile) { p.ServerKeySignIn = false }); err != nil {
+		t.Fatal(err)
+	}
+	if got := src.Account(); got != auth.AccountKey(f.srv.URL, "u-2") {
+		t.Fatalf("back on the sign-in, account = %q, want u-2's", got)
+	}
+	if err := auth.DeleteCredential(testApp.dir, config.DefaultProfile); err != nil {
+		t.Fatal(err)
+	}
+	if got := src.Account(); got != "" {
+		t.Fatalf("after a sign-out, account = %q", got)
+	}
+}

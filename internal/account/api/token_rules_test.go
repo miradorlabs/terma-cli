@@ -474,6 +474,17 @@ func TestARetiredSignInIsMarked(t *testing.T) {
 	if !auth.Retired(c.dir, config.DefaultProfile) {
 		t.Fatal("the stored sign-in was not marked retired")
 	}
+	if got := storedPair(t, c); !got.RefreshInDoubtSince.IsZero() {
+		t.Fatal("a retired answer, which rotated nothing, left the refresh in doubt")
+	}
+	// Past the budget, the retired sign-in is still stored, and nothing is sent again.
+	shortRetries(t, 0, time.Millisecond)
+	if err := c.Refresh(context.Background()); !errors.Is(err, auth.ErrSignInRetired) {
+		t.Fatalf("a second refresh = %v, want retired", err)
+	}
+	if !auth.Retired(c.dir, config.DefaultProfile) {
+		t.Fatal("the retired sign-in was deleted")
+	}
 }
 
 // Any other request a gateway refuses as SIGN_IN_RETIRED marks it too.

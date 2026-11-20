@@ -135,7 +135,8 @@ that account's own token, never in another person's name; it ages out with the o
 team's policy cannot be read yet waits in memory as long as the outbox would keep it, and
 one a stopping relay drops is counted there too. A server key sends only what no person's
 sign-in collected; what a server-key profile collected is no person's, and leaves only
-under a server key.
+under a server key, so a profile switched from a server key to a person's sign-in leaves
+it to age out.
 
 ## Rules
 

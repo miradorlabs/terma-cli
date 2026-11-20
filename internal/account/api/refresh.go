@@ -38,6 +38,11 @@ func (c *Client) redeem(ctx context.Context, held, current *auth.Credential, red
 	if !redeem(held, current) {
 		return nil
 	}
+	// A retired sign-in is never presented again, nor ended: its record is what doctor
+	// and status read to say that updating terma and signing in fixes it.
+	if !current.RetiredAt.IsZero() {
+		return fmt.Errorf("%w: %w", auth.ErrSignInRetired, auth.ErrNotLoggedIn)
+	}
 	first := current.RefreshInDoubtSince
 	if !first.IsZero() && time.Since(first) > refreshAttemptBudget {
 		return c.endSignIn(tx, current)
@@ -78,7 +83,7 @@ func (c *Client) redeem(ctx context.Context, held, current *auth.Credential, red
 			if tx != nil {
 				_ = tx.MarkRetired(c.profile, current.RefreshToken)
 			}
-			return err
+			return c.settle(tx, current, clean, err)
 		case refreshOver:
 			if tx != nil {
 				_ = tx.DeleteIf(c.profile, current.RefreshToken)

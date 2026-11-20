@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"errors"
+	"os"
 	"sync"
 	"time"
 
@@ -21,9 +22,11 @@ type signInSource struct {
 
 	mu     sync.Mutex
 	client *api.Client
-	// account caches Account for a second: the relay asks at every part it accepts.
-	account   string
-	accountAt time.Time
+	// account caches Account while the files it was read from are unchanged: the relay asks
+	// at every part it accepts, and another process (setup, a sign-in or sign-out) may
+	// change either file at any moment.
+	account      string
+	accountFiles [2]os.FileInfo
 }
 
 func (app *App) signInSource(cfg *config.Config) *signInSource {
@@ -35,10 +38,11 @@ func (app *App) signInSource(cfg *config.Config) *signInSource {
 func (s *signInSource) Account() string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if time.Since(s.accountAt) < time.Second {
+	files := [2]os.FileInfo{statOrNil(config.Path(s.cfg.Dir)), statOrNil(config.CredentialsPath(s.cfg.Dir))}
+	if unchanged(s.accountFiles[0], files[0]) && unchanged(s.accountFiles[1], files[1]) {
 		return s.account
 	}
-	s.account, s.accountAt = "", time.Now()
+	s.account, s.accountFiles = "", files
 	if file, err := config.LoadFile(s.cfg.Dir); err == nil {
 		if p := file.Profiles[s.cfg.ProfileName]; p != nil && p.ServerKeySignIn {
 			return ""
@@ -46,6 +50,26 @@ func (s *signInSource) Account() string {
 	}
 	s.account = auth.Account(s.cfg.Dir, s.cfg.ProfileName, s.cfg.AuthURL)
 	return s.account
+}
+
+func statOrNil(path string) os.FileInfo {
+	info, err := os.Stat(path)
+	if err != nil {
+		return nil
+	}
+	// On Windows the file's identity is read at the first SameFile, not at Stat: read it
+	// now, or a later comparison would read the file that replaced this one.
+	os.SameFile(info, info)
+	return info
+}
+
+// unchanged reports whether a file read before as was is as it is now: both absent, or
+// the same file (each write replaces it by rename) with the same time and size.
+func unchanged(was, now os.FileInfo) bool {
+	if was == nil || now == nil {
+		return was == nil && now == nil
+	}
+	return os.SameFile(was, now) && was.ModTime().Equal(now.ModTime()) && was.Size() == now.Size()
 }
 
 // Token is a fresh access token of the sign-in whose account key is account: "" with no
