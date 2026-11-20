@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -138,5 +139,80 @@ func TestClient_RefreshGivesUpOnAHungHolder(t *testing.T) {
 	}
 	if n := redemptions.Load(); n != 0 {
 		t.Fatalf("%d redemptions without the lock; want none", n)
+	}
+}
+
+// A rotation the store failed to take, after it recorded the refresh, leaves it holding the
+// refresh token the server spent. The client keeps the live pair, and no later refresh
+// presents the spent one: the server's reuse detection would revoke the session. Once the
+// store takes writes again, the live pair is saved and rotates as usual.
+func TestClient_KeepsARotationTheStoreMissed(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	var mu sync.Mutex
+	spent := map[string]bool{}
+	revoked, n := false, 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req tokenRequest
+		_ = json.NewDecoder(r.Body).Decode(&req)
+		mu.Lock()
+		defer mu.Unlock()
+		if spent[req.RefreshToken] {
+			revoked = true
+		}
+		if revoked {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		spent[req.RefreshToken] = true
+		n++
+		if n == 1 {
+			// The store took the mark; it takes nothing more until the test lets it.
+			_ = os.Chmod(dir, 0o500)
+		}
+		// Each pair is already within the expiry skew, so every Refresh redeems again.
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"access_token": fmt.Sprintf("mir_cli_%d", n), "refresh_token": fmt.Sprintf("mir_clr_%d", n), "expires_in": 30,
+			"session_id": "session-1",
+		})
+	}))
+	defer srv.Close()
+	t.Cleanup(func() { _ = os.Chmod(dir, 0o700) })
+	if err := config.UpdateFile(dir, func(f *config.File) { f.InsecureStorage = true }); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := auth.SaveCredential(dir, config.DefaultProfile, &auth.Credential{AccessToken: "mir_cli_0", RefreshToken: "mir_clr_0",
+		SessionID: "session-1", AuthURL: srv.URL, ExpiresAt: time.Now().Add(-time.Hour)}); err != nil {
+		t.Fatal(err)
+	}
+	client, err := New(&config.Config{Dir: dir, ProfileName: config.DefaultProfile, APIURL: srv.URL, AuthURL: srv.URL}, Options{Version: "test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := client.Refresh(context.Background()); err == nil {
+		t.Fatal("the rotation was stored in a read-only directory")
+	}
+	if got := client.Credential().RefreshToken; got != "mir_clr_1" {
+		t.Fatalf("the client holds %q, want the live mir_clr_1", got)
+	}
+	// Still read-only: nothing more is sent, since nothing can be recorded.
+	if err := client.Refresh(context.Background()); err == nil {
+		t.Fatal("a refresh went out unrecorded")
+	}
+	if err := os.Chmod(dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := client.Refresh(context.Background()); err != nil {
+		t.Fatalf("refresh once the store is writable: %v", err)
+	}
+	mu.Lock()
+	wasRevoked := revoked
+	mu.Unlock()
+	if wasRevoked {
+		t.Fatal("a refresh presented the spent token and the session was revoked")
+	}
+	stored, err := auth.LoadCredential(dir, config.DefaultProfile)
+	if err != nil || stored.RefreshToken != "mir_clr_2" || client.Credential().RefreshToken != "mir_clr_2" {
+		t.Fatalf("stored %+v, %v; want the live mir_clr_2 stored and held", stored, err)
 	}
 }

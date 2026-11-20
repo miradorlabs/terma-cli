@@ -207,8 +207,8 @@ func (app *App) signOut(cmd *cobra.Command) error {
 		err = tx.DeleteIf(cfg.ProfileName, cred.RefreshToken)
 		// Revoked only once the store no longer lists it: a copy still stored is one a
 		// refresh may spend after the lock, and revoking a spent token is reuse.
-		if still, lerr := auth.LoadIdentity(app.dir, cfg.ProfileName); lerr == nil && still.SessionID == cred.SessionID ||
-			lerr != nil && !errors.Is(lerr, auth.ErrNotLoggedIn) {
+		if still, lerr := auth.LoadIdentity(app.dir, cfg.ProfileName); (lerr == nil && still.SessionID == cred.SessionID) ||
+			(lerr != nil && !errors.Is(lerr, auth.ErrNotLoggedIn)) {
 			cred = nil
 		}
 		return err

@@ -174,7 +174,7 @@ func (app *App) retireLegacySessions(ctx context.Context, authURL string) {
 		revokeCtx, cancel := context.WithTimeout(ctx, legacyRevokeWait)
 		var wg sync.WaitGroup
 		for _, s := range signIns {
-			if s.AccessToken != "" && s.AuthURL == authURL {
+			if s.AccessToken != "" && sameHost(s.AuthURL, authURL) {
 				wg.Go(func() { _ = api.RevokeLegacySession(revokeCtx, s.AuthURL, app.version, s.AccessToken) })
 			}
 		}
