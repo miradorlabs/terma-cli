@@ -7,6 +7,14 @@
       "previous": "0.69.0",
       "changes": [
         {
+          "id": "request.headers.x-goog-api-client",
+          "category": "request",
+          "op": "changed",
+          "title": "Header x-goog-api-client: google-genai-sdk/1.30.0 gl-node/v24.22.2 → google-genai-sdk/1.30.0 gl-node/v24.22.3",
+          "impact": "informational",
+          "documented": false
+        },
+        {
           "id": "network.telemetry.POST play.googleapis.com/log.events.api_request",
           "category": "network",
           "op": "added",

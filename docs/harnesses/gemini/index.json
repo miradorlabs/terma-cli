@@ -18,11 +18,12 @@
     "last_change": {
       "from": "0.69.0",
       "to": "0.70.0",
-      "at": "2026-11-20T03:36:38.599830342Z",
+      "at": "2026-11-20T09:48:02.575412737Z",
       "released_at": "2026-11-19T21:13:43.733Z",
-      "changes": 8,
+      "changes": 9,
       "categories": {
         "network": 7,
+        "request": 1,
         "storage": 1
       }
     }
@@ -31,24 +32,25 @@
     {
       "version": "0.70.0",
       "released_at": "2026-11-19T21:13:43.733Z",
-      "captured_at": "2026-11-20T03:36:38.599830342Z",
+      "captured_at": "2026-11-20T09:48:02.575412737Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "supported",
       "previous": "0.69.0",
-      "changes": 8,
+      "changes": 9,
       "categories": {
         "network": 7,
+        "request": 1,
         "storage": 1
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 1,
+        "informational": 2,
         "notable": 7
       },
-      "undocumented": 7,
+      "undocumented": 8,
       "highlights": [
         "New vendor telemetry event: api_request",
         "New vendor telemetry event: api_response",
@@ -56,8 +58,8 @@
       ],
       "signing": null,
       "partial": true,
-      "attempted_at": "2026-11-20T03:36:38.599830342Z",
-      "attempts": 2
+      "attempted_at": "2026-11-20T09:48:02.575412737Z",
+      "attempts": 3
     },
     {
       "version": "0.69.0",
