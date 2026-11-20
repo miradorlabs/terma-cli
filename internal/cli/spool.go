@@ -196,9 +196,11 @@ func (app *App) flushSpool(ctx context.Context, force bool, minInterval time.Dur
 	}
 	r := app.delivery()
 	r.SignIn = app.signInSource(cfg)
-	if rec, err := auth.ReadLegacyRecord(app.stateDir); err == nil {
-		r.LegacyAccount, r.LegacyBefore = rec.Account, rec.RetiredAt
+	rec, err := auth.ReadLegacyRecord(app.stateDir)
+	if err != nil {
+		rec = auth.UnreadableLegacyRecord(app.stateDir)
 	}
+	r.LegacyAccount, r.LegacyBefore = rec.Account, rec.RetiredAt
 	// A hook that found the policy stale started this flush to refresh it (hookrun refreshPolicy).
 	if cfg.Policy.Stale(time.Now()) {
 		r.Policy = refreshOnce(ctx, cfg, cfg.Policy.Team(), r.Policy)

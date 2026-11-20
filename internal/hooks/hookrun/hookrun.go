@@ -234,6 +234,9 @@ func (e Env) unpark(r *Repo) {
 			}
 		}
 		moved = len(events) > 0
+		// Bound, unlike a checkpointed observation (AppendAsCollected): a parked event
+		// carries the account its sandboxed hook could read, and one that could read none
+		// was collected under the sign-in in place, which unparks it moments later.
 		return e.Spool.Append(events...)
 	})
 	if err != nil {

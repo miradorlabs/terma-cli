@@ -181,7 +181,7 @@ func sendHeartbeat(ctx context.Context, endpoint, bearer, team string, beat *log
 	if team != "" {
 		req.Header.Set(relay.ProjectHeader, team)
 	}
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := heartbeatClient.Do(req)
 	if err != nil {
 		return err
 	}
@@ -191,4 +191,13 @@ func sendHeartbeat(ctx context.Context, endpoint, bearer, team string, beat *log
 		return &heartbeatError{status: resp.StatusCode, reason: sendas.Reason(body)}
 	}
 	return nil
+}
+
+// heartbeatClient refuses redirects, as the OTLP sender does: Go keeps the Authorization
+// header on a same-host https→http downgrade, which would send the person's token in
+// cleartext.
+var heartbeatClient = &http.Client{
+	CheckRedirect: func(req *http.Request, _ []*http.Request) error {
+		return fmt.Errorf("refusing to follow redirect to %s: the OTLP endpoint does not redirect heartbeats", req.URL.Redacted())
+	},
 }

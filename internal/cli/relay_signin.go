@@ -170,16 +170,19 @@ func (app *App) bindRelay(engine *relay.Options, cfg *config.Config) {
 }
 
 // cachedLegacyRecord reads the legacy record at most once a second: the relay asks for it
-// for every queued entry from before user tokens.
+// for every queued entry from before user tokens. A read that fails keeps the last record
+// read, or with none, names no one (auth.UnreadableLegacyRecord), never no record.
 func cachedLegacyRecord(stateDir string) func() auth.LegacyRecord {
 	var mu sync.Mutex
-	var rec auth.LegacyRecord
+	rec := auth.UnreadableLegacyRecord(stateDir)
 	var at time.Time
 	return func() auth.LegacyRecord {
 		mu.Lock()
 		defer mu.Unlock()
 		if time.Since(at) > time.Second {
-			rec, _ = auth.ReadLegacyRecord(stateDir)
+			if read, err := auth.ReadLegacyRecord(stateDir); err == nil {
+				rec = read
+			}
 			at = time.Now()
 		}
 		return rec

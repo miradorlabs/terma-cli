@@ -4,6 +4,7 @@ import (
 	"errors"
 	"io/fs"
 	"os"
+	"path/filepath"
 	"slices"
 	"testing"
 	"time"
@@ -168,5 +169,23 @@ func TestRecordLegacy_Account(t *testing.T) {
 				t.Fatalf("account = %q, %v; want %q", rec.Account, err, tc.want)
 			}
 		})
+	}
+}
+
+// A record that can't be read is not taken for none: a later retirement keeps it, rather
+// than give an older terma's backlog the new sign-ins' account.
+func TestRecordLegacy_KeepsAnUnreadableRecord(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	path := filepath.Join(dir, LegacyRecordFile)
+	if err := os.WriteFile(path, []byte("{"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	signIns := []LegacySignIn{{SessionID: "s", UserID: "u", AuthURL: "https://auth.example.test"}}
+	if err := RecordLegacy(dir, signIns, time.Now()); err == nil {
+		t.Fatal("an unreadable record was replaced")
+	}
+	if data, _ := os.ReadFile(path); string(data) != "{" {
+		t.Fatalf("record = %q", data)
 	}
 }

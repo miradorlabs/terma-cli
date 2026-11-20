@@ -154,7 +154,12 @@ func RecordLegacy(stateDir string, signIns []LegacySignIn, now time.Time) error 
 	if len(signIns) == 0 {
 		return nil
 	}
-	rec, _ := ReadLegacyRecord(stateDir)
+	// A record that can't be read is not taken for none: this retirement is not the first,
+	// and the account it kept must not be replaced.
+	rec, err := ReadLegacyRecord(stateDir)
+	if err != nil {
+		return err
+	}
 	fresh := rec.RetiredAt.IsZero()
 	if fresh {
 		rec.RetiredAt = now.UTC()
@@ -175,6 +180,19 @@ func RecordLegacy(stateDir string, signIns []LegacySignIn, now time.Time) error 
 		}
 	}
 	return config.WriteJSON(filepath.Join(stateDir, LegacyRecordFile), rec, 0o600)
+}
+
+// UnreadableLegacyRecord stands in for stateDir's record when it exists but can't be
+// read: an entry bound to no account counts as named by no one if it arrived before the
+// record was last written, which is no earlier than the retirement. So a server key sends
+// none of an older terma's backlog, and still sends what it collects after. With no time
+// for the record either, every such entry counts as named by no one.
+func UnreadableLegacyRecord(stateDir string) LegacyRecord {
+	rec := LegacyRecord{Account: LegacyAccountAmbiguous, RetiredAt: time.Date(9999, 1, 1, 0, 0, 0, 0, time.UTC)}
+	if info, err := os.Stat(filepath.Join(stateDir, LegacyRecordFile)); err == nil {
+		rec.RetiredAt = info.ModTime().UTC()
+	}
+	return rec
 }
 
 // ReadLegacyRecord is what RecordLegacy kept, the zero record when nothing was.

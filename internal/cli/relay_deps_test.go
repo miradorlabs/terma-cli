@@ -5,7 +5,10 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -192,5 +195,62 @@ func TestARetiredHeartbeatMarksTheSignIn(t *testing.T) {
 	}
 	if !auth.Retired(testApp.dir, config.DefaultProfile) {
 		t.Fatal("the retired sign-in was not marked")
+	}
+}
+
+// A heartbeat carries the person's token, so it follows no redirect: Go would keep the
+// Authorization header on a same-host https→http downgrade.
+func TestAHeartbeatFollowsNoRedirect(t *testing.T) {
+	var followed atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/elsewhere" {
+			followed.Add(1)
+			return
+		}
+		http.Redirect(w, r, "/elsewhere", http.StatusTemporaryRedirect)
+	}))
+	t.Cleanup(srv.Close)
+	if err := sendHeartbeat(t.Context(), srv.URL, "user-token", "team", &logspb.LogsData{}); err == nil {
+		t.Fatal("a redirected heartbeat counted as sent")
+	}
+	if n := followed.Load(); n != 0 {
+		t.Fatalf("the heartbeat followed a redirect %d times", n)
+	}
+}
+
+// The relay never reads an unreadable legacy record as no record: before one is read it
+// names no one, and after, a failed read keeps the last one.
+func TestAnUnreadableLegacyRecordNamesNoOne(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, auth.LegacyRecordFile)
+	if err := os.MkdirAll(filepath.Join(path, "x"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	written := time.Now().Add(-time.Hour)
+	if err := os.Chtimes(path, written, written); err != nil {
+		t.Fatal(err)
+	}
+	// Named by no one up to when the record was written; what a server key collects after
+	// is its own.
+	if got := cachedLegacyRecord(dir)(); got.Account != auth.LegacyAccountAmbiguous || got.RetiredAt.Sub(written).Abs() > time.Second {
+		t.Fatalf("unreadable record = %+v; want one naming no one up to %v", got, written)
+	}
+	if err := os.RemoveAll(path); err != nil {
+		t.Fatal(err)
+	}
+	if err := auth.RecordLegacy(dir, []auth.LegacySignIn{{SessionID: "s", UserID: "u", AuthURL: "https://auth.example"}}, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	legacy := cachedLegacyRecord(dir)
+	good := legacy()
+	if good.Account != auth.AccountKey("https://auth.example", "u") {
+		t.Fatalf("record = %+v", good)
+	}
+	if err := os.WriteFile(path, []byte("{"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(1100 * time.Millisecond)
+	if got := legacy(); got.Account != good.Account {
+		t.Fatalf("after a failed read, record = %+v; want the last one read", got)
 	}
 }
