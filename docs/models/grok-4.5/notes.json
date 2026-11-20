@@ -55,24 +55,6 @@
       "documented": null
     },
     {
-      "id": "facts/input_modalities/pdf",
-      "category": "facts",
-      "op": "added",
-      "path": [
-        "facts",
-        "input_modalities",
-        "pdf"
-      ],
-      "title": "Input added: pdf",
-      "impact": "notable",
-      "before": null,
-      "after": "pdf",
-      "text_diff": null,
-      "terma": null,
-      "source": null,
-      "documented": null
-    },
-    {
       "id": "facts/max_output",
       "category": "facts",
       "op": "changed",
@@ -106,13 +88,31 @@
       "terma": null,
       "source": null,
       "documented": null
+    },
+    {
+      "id": "facts/regions/eu-west-1",
+      "category": "facts",
+      "op": "removed",
+      "path": [
+        "facts",
+        "regions",
+        "eu-west-1"
+      ],
+      "title": "Region removed: eu-west-1",
+      "impact": "notable",
+      "before": "eu-west-1",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
     }
   ],
   "highlights": [
     "Context window: 1M → 500K",
     "Default effort: low → high",
-    "Input added: pdf",
     "Max output: 30K → 500K",
-    "Reasoning effort removed: none"
+    "Reasoning effort removed: none",
+    "Region removed: eu-west-1"
   ]
 }
