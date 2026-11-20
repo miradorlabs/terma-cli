@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/account/api"
+	"github.com/miradorlabs/terma-cli/internal/account/secret"
 	"github.com/miradorlabs/terma-cli/internal/doctor"
 	"github.com/miradorlabs/terma-cli/internal/flock"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
@@ -291,15 +292,15 @@ func disconnect(t *testing.T, agent string) {
 	}
 }
 
-// The relay's service gives it time to finish a token refresh it has sent, and to save
-// the pair. The save is quick unless the keychain waits on a prompt, so this is a best
-// effort: a relay killed sooner leaves the token marked as maybe spent, which no refresh
-// sends past its budget. The relay cannot import the API client, so the two are held
-// together here.
+// The relay's service gives it time to finish a token refresh it has begun, and to save
+// the pair it gets: the exchange's budget and the two keychain writes a refresh may make
+// under the credential lock, each of which can wait out secret.WriteTimeout on a prompt.
+// A relay killed sooner may lose a pair the server rotated to. The relay cannot import
+// the API client, so the two are held together here.
 func TestRelayStopWindowCoversARefresh(t *testing.T) {
 	t.Parallel()
-	if want := api.RefreshBudget + 20*time.Second; service.StopWindow < want {
-		t.Fatalf("service.StopWindow = %v; want at least %v, a refresh's budget and its save", service.StopWindow, want)
+	if want := api.RefreshBudget + 2*secret.WriteTimeout; service.StopWindow < want {
+		t.Fatalf("service.StopWindow = %v; want at least %v, a refresh's budget and its keychain writes", service.StopWindow, want)
 	}
 	// `terma update --refresh` may restart the service, waiting for the relay to stop:
 	// RestartWait is the longest stop wait on every platform (internal/relay/service pins

@@ -5,11 +5,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/http"
-	"net/http/httptrace"
 	"slices"
 	"strings"
-	"sync/atomic"
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/account/auth"
@@ -67,7 +64,7 @@ func (c *Client) exchangeCode(ctx context.Context, code, verifier string, port i
 		Code:         code,
 		CodeVerifier: verifier,
 		RedirectPort: &port,
-	})
+	}, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -87,74 +84,6 @@ func (c *Client) LastLogin() *LoginResult {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return c.lastLogin
-}
-
-func (c *Client) postToken(ctx context.Context, body tokenRequest) (*tokenResponse, error) {
-	// Whether a connection was ever made is whether anything can have been written: a
-	// DNS, dial, TLS or proxy failure (a captive portal's certificate) comes before it.
-	// It stays true once set: a transport that retries a written POST must not read as
-	// "nothing sent".
-	var connected atomic.Bool
-	ctx = httptrace.WithClientTrace(ctx, &httptrace.ClientTrace{
-		GotConn: func(httptrace.GotConnInfo) { connected.Store(true) },
-	})
-	req, err := c.newRequest(ctx, authHost, http.MethodPost, tokenPath, nil, nil, body)
-	if err != nil {
-		return nil, err
-	}
-	// Every failure that is not an unsettledError spent nothing: the server answered, and
-	// not with a pair, or the request never reached it.
-	resp, err := c.http.Do(req)
-	switch {
-	case err != nil && !connected.Load():
-		return nil, fmt.Errorf("%s %s: %w", http.MethodPost, tokenPath, err)
-	case err != nil:
-		return nil, unsettledError{fmt.Errorf("%s %s: %w", http.MethodPost, tokenPath, err)}
-	}
-	defer resp.Body.Close()
-
-	var out tokenResponse
-	if err := decode(resp, &out); err != nil {
-		var apiErr *Error
-		switch {
-		case !errors.As(err, &apiErr):
-			// A success cut off or garbled on the way: its pair is lost.
-			return nil, unsettledError{err}
-		case apiErr.Unauthenticated() && apiErr.Code == "UNAUTHENTICATED":
-			return nil, refusalError{fmt.Errorf("%w: %s", auth.ErrNotLoggedIn, apiErr.Message)}
-		case apiErr.Unauthenticated() && body.GrantType == "refresh_token":
-			// No gateway envelope, maybe a proxy's: no sign-out, so apiErr is not wrapped.
-			return nil, fmt.Errorf("the token endpoint answered 401 without the auth gateway's refusal: %s", apiErr.Error())
-		case apiErr.Unauthenticated():
-			return nil, fmt.Errorf("%w: %s", auth.ErrNotLoggedIn, apiErr.Message)
-		case apiErr.StatusCode == http.StatusServiceUnavailable && apiErr.Code == "UNAVAILABLE":
-			// Nothing spent: the auth gateway's own answer when the account service could not
-			// be reached (gRPC Unavailable); a failure after the rotation committed is 500
-			// INTERNAL. Any other 503 stays unknown below: the GKE load balancer in front of
-			// the gateway can answer a bare 502 or 503 after the rotation committed, as when
-			// the gateway's pod is killed mid-request.
-			//
-			// The risk taken: a gRPC connection that breaks after the account service
-			// committed the rotation also surfaces as Unavailable (an outage, or an account
-			// pod stopped hard mid-call in a rollout). That needs the break to fall after the
-			// commit and before the answer, and it ends the session family only if a later
-			// refresh then sends the spent token after the server's grace.
-			return nil, err
-		case apiErr.StatusCode >= 500:
-			return nil, unsettledError{err}
-		}
-		// A 429 (turned away before the account service runs), or any other 4xx: nothing spent.
-		return nil, err
-	}
-	// A success all the same, so the server may have spent the token. Half a pair is no
-	// sign-in: one without a refresh token could not refresh, and would replace one that can.
-	switch {
-	case out.AccessToken == "":
-		return nil, unsettledError{errors.New("token endpoint returned no access token")}
-	case out.RefreshToken == "":
-		return nil, unsettledError{errors.New("token endpoint returned no refresh token")}
-	}
-	return &out, nil
 }
 
 func (c *Client) credentialFrom(resp *tokenResponse) *auth.Credential {
@@ -299,14 +228,33 @@ func (c *Client) refresh(ctx context.Context, redeem redeemFunc) error {
 		if c.spent(stored.RefreshToken) {
 			// The store still holds a token this client spent, because saving its
 			// rotation failed. Keep the client's own live pair and try to save it now.
-			// While the store does not take it, held's token is known to this client
-			// alone: its marks stay here, and a mark in the store, which names no token
-			// it can check against the keychain, would replace the spent token's. Both
-			// write credentials.json, so a store that just failed to take held would
-			// most likely refuse its mark too, and the live token would not be sent.
+			//
+			// A held token this client has marked (a refresh of it got no answer) is not
+			// saved at all until a pair that settles it replaces it. Saved, it would be
+			// readable before its mark: the keychain takes the tokens first, and a
+			// credentials.json write that then fails leaves them under the spent token's
+			// mark, which does not count for them. Another process could then send it after
+			// the server's grace. The store keeps the spent token, marked when it was sent.
+			//
+			// Where the marks of held's token go depends on what the store gives now. A
+			// save that failed may have failed half way, the keychain taking held's tokens
+			// and credentials.json not: then the store gives held's token, and its marks
+			// must be in the store before it is sent, like any stored token's (a mark that
+			// cannot be written stops the send). Only while the store still gives the spent
+			// token is held's known to this client alone, and its marks stay here: a mark in
+			// the store would name a token the store does not give.
 			marks := tx
-			if c.save(tx, held, "") != nil {
+			switch {
+			case c.ownMark(held.RefreshToken):
 				marks = nil
+			case c.save(tx, held, "") != nil:
+				now, err := tx.LoadFor(c.profile, held.OrganizationID)
+				if err != nil {
+					return err
+				}
+				if now.RefreshToken != held.RefreshToken {
+					marks = nil
+				}
 			}
 			return c.redeem(ctx, held, held, redeem, tx, marks)
 		}

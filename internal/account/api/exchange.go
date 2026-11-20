@@ -46,9 +46,10 @@ func Refused(err error) bool { return errors.Is(err, errRefused) }
 // 60 s of the first. The rotation it repeats was committed after the first was sent.
 //
 //   - 40 s leaves the last attempt 20 s inside the grace, and keeps the lock holder within
-//     auth's lockWait: 40 s plus two keychain writes. It also bounds how long a refresh
-//     already sent keeps a process from exiting, so the relay's service gives it that long
-//     to stop (service.StopWindow). A Client's exchangeBudget replaces it in tests.
+//     auth's lockWait: 40 s plus two keychain writes. With those writes it also bounds how
+//     long a refresh already begun keeps a process from exiting, so the relay's service
+//     gives it that long to stop (service.StopWindow). Every attempt checks it again as
+//     its token is written (postToken). A Client's exchangeBudget replaces it in tests.
 //   - Once an attempt's outcome is unknown, the token is sent again until the budget is
 //     spent, not a fixed number of times: a mark left past the budget asks for a new
 //     sign-in (errRefreshUnsettled), so a few seconds of server errors must not leave one.
@@ -130,19 +131,25 @@ func (c *Client) exchangeRefreshToken(ctx context.Context, refreshToken string, 
 		case c.inBudget(first):
 		case !unknown:
 			// Nothing was sent, so nothing can have been spent.
-			return nil, errors.New("refresh not sent: the wall clock moved past its budget")
+			return nil, errPastBudget
 		default:
 			// An earlier send, maybe another process's, still has no answer.
 			return nil, stillUnknown(cmp.Or(err, context.DeadlineExceeded))
 		}
 		var resp *tokenResponse
-		resp, err = c.postToken(ctx, tokenRequest{GrantType: "refresh_token", RefreshToken: refreshToken})
+		// Checked again as the token is written (postToken): the wait for a connection can
+		// take the wall clock past the budget after the check above.
+		resp, err = c.postToken(ctx, tokenRequest{GrantType: "refresh_token", RefreshToken: refreshToken},
+			func() bool { return c.inBudget(first) })
 		refused := errors.As(err, new(refusalError))
 		switch {
 		case err == nil:
 			return resp, nil
 		case !unknown && !errors.As(err, new(unsettledError)):
 			return nil, err
+		case errors.Is(err, errPastBudget):
+			// This attempt sent nothing, and no later one may: the earlier is still unknown.
+			return nil, stillUnknown(err)
 		case refused && lastRefused:
 			return nil, err
 		}
@@ -233,6 +240,14 @@ func (c *Client) clearUnsettled(current *auth.Credential, first time.Time, tx *a
 		// Best effort: left, the mark costs one sign-in more once its budget is past.
 		_ = tx.ClearUnsettled(c.profile, current.OrganizationID, current.RefreshToken, first)
 	}
+}
+
+// ownMark reports whether this client has its own mark of refreshToken: a refresh of it
+// sent without an answer, maybe expired.
+func (c *Client) ownMark(refreshToken string) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.unsettled.refreshToken == refreshToken && !c.unsettled.at.IsZero()
 }
 
 // settled forgets this client's mark of refreshToken, which an answer has settled.

@@ -456,6 +456,43 @@ func TestReuseStoredSessionKeepsASignInStoredSinceARefusal(t *testing.T) {
 	}
 }
 
+// A stored session another process removes after whoami verified it, as one does on the
+// gateway's refusal of its refresh token, is not restored by setup's resave: setup signs
+// in anew instead.
+func TestReuseStoredSessionDoesNotRestoreACredentialRemovedSinceItWasVerified(t *testing.T) {
+	srv := newTokenServer(t)
+	dir := signInForToken(t, srv, time.Now().Add(time.Hour), grantTeam)
+	cfg, err := testApp.loadConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	held, err := auth.LoadCredential(dir, config.DefaultProfile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var remove sync.Once
+	srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/v1/whoami" {
+			// Verified, and removed by another process before setup saves it again.
+			remove.Do(func() {
+				if err := auth.Locked(context.Background(), dir, func(tx *auth.Tx) error {
+					return tx.DeleteFor(config.DefaultProfile, held.OrganizationID, held.RefreshToken)
+				}); err != nil {
+					t.Error(err)
+				}
+			})
+		}
+		srv.serve(w, r)
+	})
+
+	if res, ok, err := testApp.reuseStoredSession(t.Context(), cfg, orgRef{}); err != nil || ok {
+		t.Fatalf("reuseStoredSession = %v, %v, %v; want a fresh sign-in", res, ok, err)
+	}
+	if stored, err := auth.LoadCredential(dir, config.DefaultProfile); !errors.Is(err, auth.ErrNotLoggedIn) {
+		t.Fatalf("LoadCredential = %v, %v; want the removed credential left removed", stored, err)
+	}
+}
+
 // Setup removes a stored session only when the auth gateway itself refuses its refresh
 // token, and signs in anew. A bare 401 on the refresh, as a proxy in the way may answer,
 // says nothing about the session: it is kept, and setup fails with the proxy's answer

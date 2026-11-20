@@ -292,21 +292,27 @@ func (tx *Tx) saveReplacing(profile string, cred *Credential) (replaced *Credent
 // process may have rotated the pair or signed in again since, and writing back the older
 // pair would give the next refresh a spent refresh token. It returns the credential as
 // saved.
+//
+// An entry gone since is not restored: ErrNotLoggedIn. Another process may have removed
+// it on the server's refusal of its refresh token (Tx.DeleteFor), and cred may hold that
+// token.
 func ResaveCredential(dir, profile string, cred *Credential) (*Credential, error) {
-	saved := cred
+	var saved *Credential
 	err := lockedWrite(dir, func(tx *Tx) error {
-		switch stored, err := tx.LoadFor(profile, cred.OrganizationID); {
-		case err == nil:
-			stored.UserEmail = cmp.Or(stored.UserEmail, cred.UserEmail)
-			stored.UserID = cmp.Or(stored.UserID, cred.UserID)
-			saved = stored
-		case !errors.Is(err, ErrNotLoggedIn):
-			// Unreadable is not absent: what is stored may be newer than cred.
+		stored, err := tx.LoadFor(profile, cred.OrganizationID)
+		if err != nil {
+			// Absent, or unreadable, which is not absent: what is stored may be newer than cred.
 			return err
 		}
+		stored.UserEmail = cmp.Or(stored.UserEmail, cred.UserEmail)
+		stored.UserID = cmp.Or(stored.UserID, cred.UserID)
+		saved = stored
 		return tx.save(profile, saved)
 	})
-	return saved, err
+	if err != nil {
+		return nil, err
+	}
+	return saved, nil
 }
 
 // UpdateCredential persists a refreshed credential without changing which organization

@@ -180,6 +180,137 @@ func TestClient_ALiveTokenTheStoreMissedIsMarkedHereAlone(t *testing.T) {
 	}
 }
 
+// A rotation the store missed leaves the client's live pair in this process alone. When a
+// refresh of that pair then goes unanswered, its mark is this client's alone too. Once the
+// store takes writes again, a call that sends nothing must not publish the pair without
+// its mark: a fresh process would read its token as never sent, and send it after the
+// server's grace. The store keeps the spent token, whose own mark it still has, and a fresh
+// process past the budget sends nothing.
+func TestClient_AMarkedPairTheStoreMissedIsNotPublishedWithoutItsMark(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	var n atomic.Int32
+	log, srv := newTokenLog(t, func(w http.ResponseWriter) {
+		if n.Add(1) > 1 {
+			badGateway(w)
+			return
+		}
+		// From the first answer on, credentials.json takes no write.
+		if err := os.Chmod(dir, 0o500); err != nil {
+			t.Error(err)
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"access_token": "mir_cli_1", "refresh_token": "mir_clr_1", "expires_in": 3600,
+			"session_id": "session-1", "organization": map[string]string{"id": "org-test"},
+		})
+	})
+	t.Cleanup(func() { _ = os.Chmod(dir, 0o700) })
+	if err := config.UpdateFile(dir, func(f *config.File) { f.InsecureStorage = true }); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := auth.SaveCredential(dir, config.DefaultProfile, &auth.Credential{AccessToken: "mir_cli_0", RefreshToken: "mir_clr_0",
+		SessionID: "session-1", OrganizationID: "org-test", AuthURL: srv.URL, ExpiresAt: time.Now().Add(-time.Hour)}); err != nil {
+		t.Fatal(err)
+	}
+	cfg := &config.Config{Dir: dir, ProfileName: config.DefaultProfile, APIURL: srv.URL, AuthURL: srv.URL}
+	client, err := New(cfg, Options{Version: "test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	quickRetries(client, 5)
+
+	if err := client.Refresh(context.Background()); err == nil {
+		t.Fatal("first Refresh stored its pair in a read-only store")
+	}
+	if err := client.RefreshRefused(context.Background(), TokenSHA256("mir_cli_1")); !errors.As(err, new(unsettledError)) {
+		t.Fatalf("refresh of the live pair = %v, want an unknown outcome", err)
+	}
+	if err := os.Chmod(dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	// Nothing is due: the stored pair is not the refused one, and the held one is live.
+	if err := client.RefreshRefused(context.Background(), TokenSHA256("mir_cli_other")); err != nil {
+		t.Fatalf("Refresh with nothing to redeem = %v", err)
+	}
+
+	stored, err := auth.LoadCredential(dir, config.DefaultProfile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if stored.RefreshToken == "mir_clr_1" && stored.UnsettledSince().IsZero() {
+		t.Fatal("the store holds the live pair without the mark of its unanswered refresh")
+	}
+	sent := len(log.tokens())
+	fresh, err := New(cfg, Options{Version: "test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	fresh.now = func() time.Time { return time.Now().Add(2 * RefreshBudget) }
+	if err := fresh.RefreshRefused(context.Background(), TokenSHA256(stored.AccessToken)); !errors.Is(err, errRefreshUnsettled) {
+		t.Errorf("fresh process's refresh = %v, want a sign-in to redo", err)
+	}
+	if got := log.tokens()[sent:]; len(got) != 0 {
+		t.Errorf("fresh process sent %q; want nothing", got)
+	}
+}
+
+// A save of the live pair that fails half way, the keychain taking its tokens and
+// credentials.json not, leaves the store giving the live token under the spent token's
+// mark, which does not count for it. Its refresh must then be marked in the store before
+// it is sent, as any stored token's is: credentials.json still takes no write, so the
+// token is not sent at all, and no process can later read it as never sent.
+func TestClient_ALiveTokenTheKeychainTookIsMarkedInTheStore(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	var n atomic.Int32
+	var unlock atomic.Value // func()
+	log, srv := newTokenLog(t, func(w http.ResponseWriter) {
+		if n.Add(1) > 1 {
+			badGateway(w)
+			return
+		}
+		// The first rotation reaches neither the keychain nor credentials.json.
+		unlock.Store(secret.FailForTest(t, dir))
+		if err := os.Chmod(dir, 0o500); err != nil {
+			t.Error(err)
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"access_token": "mir_cli_1", "refresh_token": "mir_clr_1", "expires_in": 30,
+			"session_id": "session-1", "organization": map[string]string{"id": "org-test"},
+		})
+	})
+	t.Cleanup(func() { _ = os.Chmod(dir, 0o700) })
+	if _, err := auth.SaveCredential(dir, config.DefaultProfile, &auth.Credential{AccessToken: "mir_cli_0", RefreshToken: "mir_clr_0",
+		SessionID: "session-1", OrganizationID: "org-test", AuthURL: srv.URL, ExpiresAt: time.Now().Add(-time.Hour)}); err != nil {
+		t.Fatal(err)
+	}
+	client, err := New(&config.Config{Dir: dir, ProfileName: config.DefaultProfile, APIURL: srv.URL, AuthURL: srv.URL}, Options{Version: "test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	quickRetries(client, 5)
+
+	if err := client.Refresh(context.Background()); err == nil {
+		t.Fatal("first Refresh stored its pair in a store that takes nothing")
+	}
+	// The keychain takes writes again; credentials.json still does not.
+	unlock.Load().(func())()
+	if got := storedFor(t, client).RefreshToken; got != "mir_clr_0" {
+		t.Fatalf("stored refresh token = %q, want the spent mir_clr_0 kept", got)
+	}
+
+	err = client.Refresh(context.Background())
+	if err == nil || !strings.Contains(err.Error(), "before sending it") {
+		t.Fatalf("second Refresh = %v, want the live token not sent, its mark not written", err)
+	}
+	if got := storedFor(t, client).RefreshToken; got != "mir_clr_1" {
+		t.Fatalf("stored refresh token = %q, want the live mir_clr_1 the keychain took", got)
+	}
+	if want := []string{"mir_clr_0"}; !slices.Equal(log.tokens(), want) {
+		t.Errorf("refresh tokens sent = %q, want %q", log.tokens(), want)
+	}
+}
+
 // A refresh token that cannot be marked before it is sent is not sent: were its answer
 // lost, nothing would say the server may have spent it. Nor is it remembered as sent: once
 // the store takes marks again, well past the budget, it is sent as a fresh refresh.

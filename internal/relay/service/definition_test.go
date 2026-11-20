@@ -14,7 +14,7 @@ func TestDefinitions(t *testing.T) {
 	env := map[string]string{"TERMA_CONFIG_DIR": "/tmp/a & b", "TERMA_ENV": "dev"}
 	plist := Launchd("ai.terma.relay.x", "/opt/terma/bin/terma", "/tmp/log", env)
 	for _, want := range []string{"<string>relay</string><string>run</string><string>--service</string><string>--idle</string><string>0</string>", "<key>KeepAlive</key><dict><key>SuccessfulExit</key><false/></dict>", "/tmp/a &amp; b",
-		"<key>ExitTimeOut</key><integer>60</integer>"} {
+		"<key>ExitTimeOut</key><integer>180</integer>"} {
 		if !strings.Contains(plist, want) {
 			t.Errorf("plist lacks %q:\n%s", want, plist)
 		}
@@ -27,7 +27,7 @@ func TestDefinitions(t *testing.T) {
 		}
 	}
 	unit := Systemd("/opt/terma/bin/terma", env)
-	for _, want := range []string{`ExecStart="/opt/terma/bin/terma" relay run --service --idle 0 --quiet`, `Environment="TERMA_CONFIG_DIR=/tmp/a & b"`, "Restart=on-failure", "TimeoutStopSec=60\n"} {
+	for _, want := range []string{`ExecStart="/opt/terma/bin/terma" relay run --service --idle 0 --quiet`, `Environment="TERMA_CONFIG_DIR=/tmp/a & b"`, "Restart=on-failure", "TimeoutStopSec=180\n"} {
 		if !strings.Contains(unit, want) {
 			t.Errorf("unit lacks %q:\n%s", want, unit)
 		}

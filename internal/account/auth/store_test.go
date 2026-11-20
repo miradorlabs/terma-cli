@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -353,5 +354,29 @@ func TestSaveCredential_GivesUpOnAHungHolder(t *testing.T) {
 	}
 	if elapsed > lockWait+2*time.Second {
 		t.Fatalf("SaveCredential waited %v; want about %v", elapsed, lockWait)
+	}
+}
+
+// ResaveCredential does not restore an entry removed since cred was read: another process
+// may have removed it on the server's refusal of its refresh token.
+func TestResaveCredential_DoesNotRestoreARemovedEntry(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	if err := config.UpdateFile(dir, func(f *config.File) { f.InsecureStorage = true }); err != nil {
+		t.Fatal(err)
+	}
+	cred := &Credential{AccessToken: "ter_cli_a", RefreshToken: "ter_clr_a", OrganizationID: "org-a", ExpiresAt: time.Now().Add(time.Hour)}
+	if _, err := SaveCredential(dir, "default", cred); err != nil {
+		t.Fatal(err)
+	}
+	if err := lockedWrite(dir, func(tx *Tx) error { return tx.DeleteFor("default", "org-a", "ter_clr_a") }); err != nil {
+		t.Fatal(err)
+	}
+
+	if saved, err := ResaveCredential(dir, "default", cred); !errors.Is(err, ErrNotLoggedIn) || saved != nil {
+		t.Fatalf("ResaveCredential = %v, %v; want ErrNotLoggedIn", saved, err)
+	}
+	if got, err := LoadCredentialFor(dir, "default", "org-a"); !errors.Is(err, ErrNotLoggedIn) {
+		t.Fatalf("LoadCredentialFor = %v, %v; want the entry left removed", got, err)
 	}
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"slices"
@@ -466,6 +467,73 @@ func TestRefusedIsOnlyTheGatewaysRefusal(t *testing.T) {
 			err := client.Refresh(context.Background())
 			if err == nil || errors.Is(err, auth.ErrNotLoggedIn) != tc.signedOut || Refused(err) != tc.want {
 				t.Fatalf("Refresh = %v, Refused = %v; want ErrNotLoggedIn %v, Refused %v", err, Refused(err), tc.signedOut, tc.want)
+			}
+		})
+	}
+}
+
+// The budget is checked again as the token is written, not only before the request: a
+// dial that a Mac sleeps through can outlast the server's grace. The wall clock jumps an
+// hour while an attempt waits for its connection, and the token in that request never
+// reaches the endpoint. After a lost answer the outcome stays unknown and the token
+// expires; on a first attempt nothing was sent, so nothing is marked.
+func TestClient_AWallClockJumpDuringTheDialStopsTheSend(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name     string
+		jumpDial int32
+		sent     int
+	}{
+		{"after a lost answer", 2, 1},
+		{"on the first attempt", 1, 0},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			log, srv := newTokenLog(t, badGateway)
+			client := newTestClient(t, srv.URL, expired(), "")
+			client.pauseUnit = testUnit
+			start := time.Now().Round(0)
+			var asleep atomic.Bool
+			client.now = func() time.Time {
+				if asleep.Load() {
+					return start.Add(time.Hour)
+				}
+				return start
+			}
+			var dials atomic.Int32
+			var dialer net.Dialer
+			client.http.Transport = &http.Transport{
+				DisableKeepAlives: true,
+				DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+					if dials.Add(1) == tc.jumpDial {
+						asleep.Store(true)
+					}
+					return dialer.DialContext(ctx, network, addr)
+				},
+			}
+
+			err := client.Refresh(context.Background())
+			if n := dials.Load(); n != tc.jumpDial {
+				t.Errorf("%d dials; want %d, the last the one the clock jumped in", n, tc.jumpDial)
+			}
+			if got := slices.DeleteFunc(log.tokens(), func(s string) bool { return s == "" }); len(got) != tc.sent {
+				t.Errorf("refresh tokens that reached the endpoint = %q, want %d", got, tc.sent)
+			}
+			stored := storedFor(t, client)
+			if tc.sent == 0 {
+				if err == nil || errors.Is(err, auth.ErrNotLoggedIn) || errors.As(err, new(unsettledError)) || !errors.Is(err, errPastBudget) {
+					t.Fatalf("Refresh = %v, want the token held back, nothing spent", err)
+				}
+				if stored.RefreshToken != "mir_clr_stale" || !stored.RefreshUnsettledAt.IsZero() {
+					t.Errorf("stored %q marked %v; want the same pair, unmarked", stored.RefreshToken, stored.RefreshUnsettledAt)
+				}
+				return
+			}
+			if !errors.As(err, new(unsettledError)) {
+				t.Fatalf("Refresh = %v, want an unknown outcome", err)
+			}
+			if mark := stored.UnsettledSince(); !mark.Equal(auth.UnsettledExpired) {
+				t.Errorf("stored mark = %v, want it expired", mark)
 			}
 		})
 	}
