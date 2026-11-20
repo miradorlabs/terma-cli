@@ -59,7 +59,9 @@ attributes:
     type: string
     stability: development
     brief: The model call the event is about, in the agent's own id.
-    note: Claude Code's is the API request id its telemetry reports as request_id.
+    note: >
+      Claude Code's is the API request id its telemetry reports as request_id; Antigravity's,
+      which names no call, is step-N for the transcript step N that recorded it.
     examples: ["req_011CgSuPsrmoVLyK2MFya1S9"]
   - key: terma.response.service_tier
     type: string
@@ -154,7 +156,7 @@ attributes:
     note: >
       Each agent has its own: claude_account, claude_statusline, claude_stop_failure,
       claude_transcript, codex_rollout, codex_hook, codex_session_index, copilot_workspace,
-      cursor_hook and antigravity_hook.
+      cursor_hook, antigravity_hook, antigravity_transcript and antigravity_statusline.
     examples: ["codex_rollout", "cursor_hook"]
   - key: terma.evidence.status
     type: string
@@ -348,7 +350,8 @@ attributes:
     brief: An opaque id for one person's seat in a shared account.
     note: >
       The hex SHA-256 of the account scope, a NUL byte and user.email; it stands in for an
-      email the team's policy withholds.
+      email the team's policy withholds. Antigravity names no account, so its scope is
+      google.
   - key: terma.account.status
     type: string
     stability: development
@@ -442,6 +445,15 @@ attributes:
     type: int
     stability: development
     brief: When the secondary window resets, in Unix seconds.
+  - key: terma.rate_limit.buckets
+    type: any
+    stability: development
+    brief: The provider's quota buckets, each under the provider's own id.
+    note: >
+      An array of maps, in id order, of id, the provider's bucket id copied verbatim (such as
+      Antigravity's gemini-weekly); remaining_fraction, from 0 to 1, or remaining_amount,
+      the provider's remaining count as text; resets_at, in Unix seconds; and disabled,
+      when the provider says the bucket is off. A key the provider did not report is absent.
   - key: terma.rate_limit.reached_type
     type: string
     stability: development

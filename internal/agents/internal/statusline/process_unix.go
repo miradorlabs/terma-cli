@@ -1,6 +1,6 @@
 //go:build unix
 
-package claude
+package statusline
 
 import (
 	"os"
@@ -9,16 +9,16 @@ import (
 	"syscall"
 )
 
-func configureRendererProcess(cmd *exec.Cmd) {
+func configureProcess(cmd *exec.Cmd) {
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	// CommandContext kills only the shell; grandchildren would hold stdout open.
 	cmd.Cancel = func() error { return syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL) }
 	// A descendant in its own session can outlive the group kill, so pipe draining is bounded too.
-	cmd.WaitDelay = rendererPipeDrain
+	cmd.WaitDelay = pipeDrain
 }
 
-func forwardRendererSignals(cmd *exec.Cmd, exited <-chan struct{}) {
-	// Claude Code cancels an in-flight status line by terminating it; pass that to the group.
+func forwardSignals(cmd *exec.Cmd, exited <-chan struct{}) {
+	// An agent cancels an in-flight status line by terminating it; pass that to the group.
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGTERM, syscall.SIGINT, syscall.SIGHUP)
 	go func() {
@@ -33,7 +33,7 @@ func forwardRendererSignals(cmd *exec.Cmd, exited <-chan struct{}) {
 	}()
 }
 
-func rendererSignalExitCode(exit *exec.ExitError) int {
+func signalExitCode(exit *exec.ExitError) int {
 	if st, ok := exit.Sys().(syscall.WaitStatus); ok && st.Signaled() {
 		return 128 + int(st.Signal())
 	}

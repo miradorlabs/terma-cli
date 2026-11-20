@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
+	"github.com/miradorlabs/terma-cli/internal/agents/internal/statusline"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/flock"
 	"github.com/miradorlabs/terma-cli/internal/harness"
@@ -41,13 +42,9 @@ func statusLineCommand(previous string) string {
 	// /bin/sh by absolute path: the fallback runs precisely when the PATH is not what it was.
 	fallback := "exit 0"
 	if strings.TrimSpace(previous) != "" {
-		fallback = "exec /bin/sh -c " + shellSingleQuote(previous)
+		fallback = "exec /bin/sh -c " + statusline.Quote(previous)
 	}
 	return "command -v terma >/dev/null 2>&1 && exec " + statusLineMarker + " || " + fallback
-}
-
-func shellSingleQuote(s string) string {
-	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
 }
 
 // isStatusLineCommand recognizes the installed guard and direct invocations, never a substring:
