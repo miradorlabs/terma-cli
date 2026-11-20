@@ -384,6 +384,10 @@ func TestABare401KeepsTheSignIn(t *testing.T) {
 	if err == nil || errors.Is(err, auth.ErrNotLoggedIn) {
 		t.Fatalf("refresh = %v, want a plain error", err)
 	}
+	// `terma auth token` reads an *Error's 401 as signed out.
+	if _, ok := errors.AsType[*Error](err); ok {
+		t.Fatalf("a bare 401 reads as the auth host's answer: %v", err)
+	}
 	if got := storedPair(t, c); got.RefreshToken != "refresh-0" || !got.RefreshInDoubtSince.IsZero() {
 		t.Fatalf("stored %+v, want the pair kept with no doubt", got)
 	}
@@ -462,6 +466,86 @@ func TestATokenHeldBackPastTheBudgetIsNotSent(t *testing.T) {
 	}
 	if kind, _ := classifyRefresh(err); kind != refreshUnspent {
 		t.Fatalf("a held-back refresh classified %d, want unspent", kind)
+	}
+}
+
+// A mark recorded in the future (the clock went back since) is past the budget: how long
+// ago the token left is unknown, so it is never presented again.
+func TestAMarkInTheFutureIsPastTheBudget(t *testing.T) {
+	script := &refreshScript{}
+	srv := httptest.NewServer(http.HandlerFunc(script.serve))
+	t.Cleanup(srv.Close)
+	c := newTestClient(t, srv.URL, &auth.Credential{AccessToken: "access-0", RefreshToken: "refresh-0",
+		ExpiresAt: time.Now().Add(-time.Hour), RefreshInDoubtSince: time.Now().Add(10 * time.Minute).UTC()}, "")
+	if err := c.Refresh(context.Background()); !errors.Is(err, auth.ErrNotLoggedIn) {
+		t.Fatalf("refresh = %v, want the sign-in over", err)
+	}
+	if sent := script.sent(); len(sent) != 0 {
+		t.Fatalf("presented %v under a mark from the future", sent)
+	}
+}
+
+// A refused token this client could not remove from the store is still never presented
+// again by it.
+func TestARefusedTokenIsNotPresentedAgain(t *testing.T) {
+	script := &refreshScript{answers: []string{"401", "ok"}}
+	c := expiredClient(t, script)
+	if err := c.Refresh(context.Background()); !errors.Is(err, auth.ErrNotLoggedIn) {
+		t.Fatalf("refresh = %v, want the sign-in over", err)
+	}
+	// As if the removal had failed: the store holds the refused pair again.
+	if _, err := auth.SaveCredential(c.dir, config.DefaultProfile, &auth.Credential{AccessToken: "access-0",
+		RefreshToken: "refresh-0", ExpiresAt: time.Now().Add(-time.Hour), SessionID: "session-test", AuthURL: c.authURL}); err != nil {
+		t.Fatal(err)
+	}
+	if err := c.Refresh(context.Background()); !errors.Is(err, auth.ErrNotLoggedIn) {
+		t.Fatalf("a second refresh = %v, want the sign-in over", err)
+	}
+	if sent := script.sent(); len(sent) != 1 {
+		t.Fatalf("presented %v, want the refused token once", sent)
+	}
+	if _, err := auth.LoadCredential(c.dir, config.DefaultProfile); !errors.Is(err, auth.ErrNotLoggedIn) {
+		t.Fatalf("the refused pair is still stored (%v)", err)
+	}
+}
+
+// When the store missed a rotation and still can't take the live pair, nothing is sent:
+// the refresh could not be recorded. The store's spent token is marked past every budget,
+// so another process ends the sign-in rather than present it.
+func TestASpentStoredTokenIsNeverPresented(t *testing.T) {
+	script := &refreshScript{}
+	c := expiredClient(t, script)
+	// The store takes the mark, but not the pairs: a write that fails alone, as a
+	// transient failure would.
+	update := updateCredential
+	updateCredential = func(*auth.Tx, string, *auth.Credential) error { return errors.New("disk full") }
+	t.Cleanup(func() { updateCredential = update })
+	if err := c.Refresh(context.Background()); err == nil {
+		t.Fatal("the rotation was stored by a store that fails")
+	}
+	if got := c.Credential().RefreshToken; got != "refresh-1" {
+		t.Fatalf("the client holds %q, want the live refresh-1", got)
+	}
+	always := func(_, _ *auth.Credential) bool { return true }
+	if err := c.refresh(context.Background(), always); err == nil {
+		t.Fatal("a refresh went out with the store unable to keep the pair")
+	}
+	if sent := script.sent(); len(sent) != 1 {
+		t.Fatalf("presented %v, want only the first refresh", sent)
+	}
+	stored := storedPair(t, c)
+	if stored.RefreshToken != "refresh-0" || stored.RefreshInDoubtSince.IsZero() || withinBudget(stored.RefreshInDoubtSince, 0) {
+		t.Fatalf("stored %+v, want the spent token marked past the budget", stored)
+	}
+	other, err := New(&config.Config{Dir: c.dir, ProfileName: config.DefaultProfile, APIURL: c.authURL, AuthURL: c.authURL}, Options{Version: "test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := other.refresh(context.Background(), always); !errors.Is(err, auth.ErrNotLoggedIn) {
+		t.Fatalf("another process's refresh = %v, want the sign-in over", err)
+	}
+	if sent := script.sent(); len(sent) != 1 {
+		t.Fatalf("another process presented %v", sent)
 	}
 }
 

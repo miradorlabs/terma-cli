@@ -38,8 +38,16 @@ func (c *Client) redeem(ctx context.Context, held, current *auth.Credential, red
 	if !redeem(held, current) {
 		return nil
 	}
+	// The gateway refused this token: it is never presented again, and its removal is
+	// tried again, compare-and-set as the first time.
+	if c.wasRefused(current.RefreshToken) {
+		if tx != nil {
+			_ = tx.DeleteIf(c.profile, current.RefreshToken)
+		}
+		return errSessionExpired
+	}
 	first := current.RefreshInDoubtSince
-	if !first.IsZero() && time.Since(first) > refreshAttemptBudget {
+	if !first.IsZero() && !withinBudget(first, 0) {
 		return c.endSignIn(tx, current)
 	}
 	// clean is whether no attempt so far may have rotated: only then may the mark go.
@@ -56,7 +64,7 @@ func (c *Client) redeem(ctx context.Context, held, current *auth.Credential, red
 	}
 	exchange := context.WithoutCancel(ctx)
 	for {
-		if !clean && time.Since(first) > refreshAttemptBudget {
+		if !clean && !withinBudget(first, 0) {
 			return c.endSignIn(tx, current)
 		}
 		// Unrecorded, the token does not leave: a process that died after the server
@@ -69,13 +77,16 @@ func (c *Client) redeem(ctx context.Context, held, current *auth.Credential, red
 		current = marked
 		// The whole attempt, its dial and handshake too, ends with the budget.
 		attempt, cancel := context.WithDeadline(exchange, first.Add(refreshAttemptBudget))
-		inBudget := func() bool { return time.Since(first) <= refreshAttemptBudget }
+		inBudget := func() bool { return withinBudget(first, 0) }
 		resp, err := c.postToken(attempt, inBudget, tokenRequest{GrantType: "refresh_token", RefreshToken: current.RefreshToken})
 		cancel()
 		switch kind, wait := classifyRefresh(err); kind {
 		case refreshRotated:
 			return c.keepRotation(tx, current, c.credentialFrom(resp))
 		case refreshOver:
+			// Remembered first: should the store not take the removal, this client still
+			// never presents the token again.
+			c.refuse(current.RefreshToken)
 			if tx != nil {
 				_ = tx.DeleteIf(c.profile, current.RefreshToken)
 			}
@@ -89,13 +100,13 @@ func (c *Client) redeem(ctx context.Context, held, current *auth.Credential, red
 					return nil
 				}
 			}
-			if superseded || time.Since(first) > refreshAttemptBudget {
+			if superseded || !withinBudget(first, 0) {
 				return c.endSignIn(tx, current)
 			}
 			superseded = true
 		case refreshInDoubt:
 			clean = false
-			if time.Since(first)+wait > refreshAttemptBudget {
+			if !withinBudget(first, wait) {
 				return c.endSignIn(tx, current)
 			}
 			time.Sleep(wait)
@@ -107,13 +118,22 @@ func (c *Client) redeem(ctx context.Context, held, current *auth.Credential, red
 			if !clean && errors.Is(err, errPastBudget) {
 				return c.endSignIn(tx, current)
 			}
-			if !clean && notSent(err) && time.Since(first)+defaultRetryAfter <= refreshAttemptBudget {
+			if !clean && notSent(err) && withinBudget(first, defaultRetryAfter) {
 				time.Sleep(defaultRetryAfter)
 				continue
 			}
 			return c.settle(tx, current, clean, err)
 		}
 	}
+}
+
+// withinBudget reports whether a send after wait more still starts within the budget of a
+// refresh first sent at first, on the wall clock. A first in the future (the clock went
+// back since it was recorded) is past the budget: how long ago the token really left is
+// unknown, and presenting it after the server's grace revokes the whole family.
+func withinBudget(first time.Time, wait time.Duration) bool {
+	elapsed := time.Since(first)
+	return elapsed >= 0 && elapsed+wait <= refreshAttemptBudget
 }
 
 // What a refresh's answer says of the token it presented.
@@ -140,8 +160,8 @@ func classifyRefresh(err error) (kind int, wait time.Duration) {
 		return refreshInDoubt, cmp.Or(apiErr.RetryAfter, defaultRetryAfter)
 	case errors.Is(err, errPastBudget):
 		return refreshUnspent, 0
-	case isAPI && apiErr.Unauthenticated():
-		// A bare 401 (postToken wraps the gateway's own as ErrNotLoggedIn, above).
+	case errors.As(err, new(bare401Error)):
+		// A 401 without the gateway's envelope never reached the auth host's verdict.
 		return refreshUnspent, 0
 	case !isAPI && !notSent(err):
 		return refreshInDoubt, defaultRetryAfter

@@ -37,6 +37,18 @@ var refreshAttemptBudget = RefreshBudget
 // defaultRetryAfter is the wait before retrying a 503 that named none.
 var defaultRetryAfter = 5 * time.Second
 
+// updateCredential stores a refreshed pair; a test can make it fail alone.
+var updateCredential = func(tx *auth.Tx, profile string, cred *auth.Credential) error {
+	return tx.Update(profile, cred)
+}
+
+// spentLongAgo is the in-doubt mark of a stored token known to be spent: past every
+// budget, so any process ends the sign-in rather than present it.
+var spentLongAgo = time.Unix(1, 0).UTC()
+
+// errSessionExpired is a refresh token the auth gateway refused.
+var errSessionExpired = fmt.Errorf("%w: session expired, run `terma setup`", auth.ErrNotLoggedIn)
+
 // errSignInAgain is a refresh the server will not, or can no longer safely, complete.
 var errSignInAgain = fmt.Errorf("%w: the sign-in could not be renewed; run `terma setup` to sign in again", auth.ErrNotLoggedIn)
 
@@ -228,7 +240,13 @@ func (c *Client) refresh(ctx context.Context, redeem redeemFunc) error {
 		if c.spent(stored.RefreshToken) {
 			// The store still holds a token this client spent, because saving its
 			// rotation failed. Keep the client's own live pair and try to save it now.
-			_ = c.save(tx, held, "")
+			if err := c.save(tx, held, ""); err != nil {
+				// The store still can't take it, so a refresh of the held pair could not
+				// be recorded: nothing is sent. The stored record holds a spent token:
+				// mark it past every budget, so no process presents it.
+				_ = tx.MarkRefreshInDoubt(c.profile, stored.SessionID, spentLongAgo)
+				return fmt.Errorf("save the refreshed credential before refreshing it again: %w", err)
+			}
 			return c.redeem(ctx, held, held, redeem, tx)
 		}
 		// Decide from the stored pair, not the held one. The held one was read without the
@@ -272,7 +290,7 @@ func (c *Client) endSignIn(tx *auth.Tx, current *auth.Credential) error {
 // save stores cred and keeps unsaved in step. spent is the refresh token cred replaced,
 // or "" when cred replaced nothing.
 func (c *Client) save(tx *auth.Tx, cred *auth.Credential, spent string) error {
-	err := tx.Update(c.profile, cred)
+	err := updateCredential(tx, c.profile, cred)
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	switch {
@@ -282,6 +300,20 @@ func (c *Client) save(tx *auth.Tx, cred *auth.Credential, spent string) error {
 		c.unsaved = append(c.unsaved, spent)
 	}
 	return err
+}
+
+// refuse remembers refreshToken as one the auth gateway refused.
+func (c *Client) refuse(refreshToken string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.refused = refreshToken
+}
+
+// wasRefused reports whether the auth gateway refused refreshToken to this client.
+func (c *Client) wasRefused(refreshToken string) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.refused != "" && c.refused == refreshToken
 }
 
 // spent reports whether refreshToken is one this client spent but could not save past.

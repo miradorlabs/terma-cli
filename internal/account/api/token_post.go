@@ -23,6 +23,15 @@ type notConnectedError struct{ error }
 
 func (e notConnectedError) Unwrap() error { return e.error }
 
+// bare401Error is a refresh answered 401 without the auth gateway's envelope, maybe by a
+// proxy: it says nothing of the session, so it signs no one out. It does not unwrap to the
+// *Error, which callers would read as the session refused.
+type bare401Error struct{ apiErr *Error }
+
+func (e bare401Error) Error() string {
+	return "the token endpoint answered 401 without the auth gateway's refusal: " + e.apiErr.Error()
+}
+
 // postToken sends body to the token endpoint, with no bearer. mayBeSent, when not nil, is
 // asked once more when the transport first reads the body, which alone carries a refresh
 // token: a dial, a TLS handshake or a wait for a connection can outlast the budget after
@@ -64,9 +73,7 @@ func (c *Client) postToken(ctx context.Context, mayBeSent func() bool, body toke
 		switch {
 		case !ok || !apiErr.Unauthenticated():
 		case body.GrantType == "refresh_token" && apiErr.Code != "UNAUTHENTICATED":
-			// A 401 without the auth gateway's envelope, maybe a proxy's, says nothing of
-			// the session: no sign-out, so apiErr is not wrapped.
-			return nil, fmt.Errorf("the token endpoint answered 401 without the auth gateway's refusal: %w", apiErr)
+			return nil, bare401Error{apiErr}
 		default:
 			return nil, fmt.Errorf("%w: %w", auth.ErrNotLoggedIn, apiErr)
 		}
