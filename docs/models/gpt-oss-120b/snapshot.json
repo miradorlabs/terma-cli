@@ -87,7 +87,7 @@
     },
     "max_output": {
       "openai-docs": 131072,
-      "openrouter": 65536
+      "openrouter": 117964
     },
     "name": {
       "openai-docs": "gpt-oss-120b",

@@ -27,28 +27,20 @@
   },
   "provenance": {
     "context_window": {
-      "models.dev": 256000,
-      "openrouter": 256000
+      "models.dev": 256000
     },
     "input_modalities": {
       "models.dev": [
         "text",
         "image",
         "pdf"
-      ],
-      "openrouter": [
-        "text",
-        "image",
-        "file"
       ]
     },
     "max_output": {
-      "models.dev": 256000,
-      "openrouter": 230400
+      "models.dev": 256000
     },
     "name": {
-      "models.dev": "Grok Build 0.1",
-      "openrouter": "Grok Build 0.1"
+      "models.dev": "Grok Build 0.1"
     },
     "open_weights": {
       "models.dev": false
@@ -56,14 +48,10 @@
     "output_modalities": {
       "models.dev": [
         "text"
-      ],
-      "openrouter": [
-        "text"
       ]
     },
     "reasoning": {
-      "models.dev": true,
-      "openrouter": true
+      "models.dev": true
     },
     "released_at": {
       "models.dev": "2026-04-16"
@@ -75,16 +63,12 @@
       "models.dev": true
     },
     "tool_calling": {
-      "models.dev": true,
-      "openrouter": true
+      "models.dev": true
     }
   },
-  "disagreements": [
-    "max_output"
-  ],
+  "disagreements": [],
   "sources": {
-    "models.dev": "https://models.dev",
-    "openrouter": "https://openrouter.ai/x-ai/grok-build-0.1"
+    "models.dev": "https://models.dev"
   },
   "docs": {},
   "api": null,
