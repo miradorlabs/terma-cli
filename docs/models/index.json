@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-20T02:52:25.234075432Z",
+  "generated_at": "2026-11-20T11:12:30.269836729Z",
   "vendors": [
     {
       "id": "anthropic",
@@ -883,7 +883,7 @@
     {
       "id": "grok-4.20-multi-agent-0309",
       "vendor": "xai",
-      "name": "Grok 4.20 Multi-Agent Beta",
+      "name": "Grok 4.20 Multi-Agent",
       "family": "grok-multi-agent",
       "status": null,
       "released_at": "2026-03-09",
@@ -895,7 +895,10 @@
       "knowledge_cutoff": null,
       "reasoning": true,
       "harnesses": [],
-      "last_change": null,
+      "last_change": {
+        "at": "2026-11-20T11:12:30.269836729Z",
+        "changes": 7
+      },
       "probed": false
     },
     {

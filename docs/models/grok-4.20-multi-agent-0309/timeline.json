@@ -3,6 +3,135 @@
   "id": "grok-4.20-multi-agent-0309",
   "steps": [
     {
+      "at": "2026-11-20T11:12:30.269836729Z",
+      "event": "changed",
+      "changes": [
+        {
+          "id": "facts/batch",
+          "category": "facts",
+          "op": "removed",
+          "path": [
+            "facts",
+            "batch"
+          ],
+          "title": "Batch API: no longer stated (was yes)",
+          "impact": "notable",
+          "before": true,
+          "after": null,
+          "text_diff": null,
+          "terma": null,
+          "source": null,
+          "documented": null
+        },
+        {
+          "id": "facts/description",
+          "category": "facts",
+          "op": "removed",
+          "path": [
+            "facts",
+            "description"
+          ],
+          "title": "Description: no longer stated (was Multiple agents collaborate in parallel to perform deep research tasks.)",
+          "impact": "notable",
+          "before": "Multiple agents collaborate in parallel to perform deep research tasks.",
+          "after": null,
+          "text_diff": null,
+          "terma": null,
+          "source": null,
+          "documented": null
+        },
+        {
+          "id": "facts/input_modalities/pdf",
+          "category": "facts",
+          "op": "added",
+          "path": [
+            "facts",
+            "input_modalities",
+            "pdf"
+          ],
+          "title": "Input added: pdf",
+          "impact": "notable",
+          "before": null,
+          "after": "pdf",
+          "text_diff": null,
+          "terma": null,
+          "source": null,
+          "documented": null
+        },
+        {
+          "id": "facts/name",
+          "category": "facts",
+          "op": "changed",
+          "path": [
+            "facts",
+            "name"
+          ],
+          "title": "Name: Grok 4.20 Multi-Agent Beta → Grok 4.20 Multi-Agent",
+          "impact": "notable",
+          "before": "Grok 4.20 Multi-Agent Beta",
+          "after": "Grok 4.20 Multi-Agent",
+          "text_diff": null,
+          "terma": null,
+          "source": null,
+          "documented": null
+        },
+        {
+          "id": "facts/regions",
+          "category": "facts",
+          "op": "removed",
+          "path": [
+            "facts",
+            "regions"
+          ],
+          "title": "Region: no longer stated (was us-east-1, us-west-2)",
+          "impact": "notable",
+          "before": [
+            "us-east-1",
+            "us-west-2"
+          ],
+          "after": null,
+          "text_diff": null,
+          "terma": null,
+          "source": null,
+          "documented": null
+        },
+        {
+          "id": "facts/tool_calling",
+          "category": "facts",
+          "op": "changed",
+          "path": [
+            "facts",
+            "tool_calling"
+          ],
+          "title": "Tool calling: yes → no",
+          "impact": "notable",
+          "before": true,
+          "after": false,
+          "text_diff": null,
+          "terma": null,
+          "source": null,
+          "documented": null
+        },
+        {
+          "id": "docs/overview",
+          "category": "docs",
+          "op": "removed",
+          "path": [
+            "docs",
+            "overview"
+          ],
+          "title": "Model page taken down",
+          "impact": "informational",
+          "before": "# Grok 4.20 Multi-Agent Beta\n\nMultiple agents collaborate in parallel to perform deep research tasks.\n\n## At a glance\n\n- **Modalities:** text, image → text\n- **Context window:** 1,000,000 tokens\n- **Model name:** `grok-4.20-multi-agent-0309`\n- **Aliases:** `grok-4.20-multi-agent`, `grok-4.20-multi-agent-latest`, `grok-4.20-multi-agent-beta-latest`, `grok-4.20-multi-agent-experimental-beta-0304`, `grok-4.20-multi-agent-experimental-beta-latest`, `grok-4.20-multi-agent-beta-0309`\n- **Batch API:** Supported\n\n## Capabilities\n\n- **Function calling:** Yes\n- **Structured outputs:** Yes\n- **Reasoning:** Yes\n\n## Pricing\n\n| Type | < 200k prompt tokens (per 1M tokens) | ≥ 200k prompt tokens (per 1M tokens) |\n| --- | --- | --- |\n| Input | $1.25 | $2.50 |\n| Cached input | $0.20 | $0.40 |\n| Output | $2.50 | $5.00 |\n\nRequests whose prompt reaches 200k tokens are billed at the higher rate for all tokens in the request.\n\n[Batch API](/developers/advanced-api-usage/batch-api) requests are billed at a 20% discount to standard rates.\n\n## Rate limits\n\n| Limit | Value |\n| --- | --- |\n| Requests per second | 9 |\n| Tokens per minute | 2,500,000 |\n\n## Regions\n\nAvailable in: us-east-1, us-west-2\n",
+          "after": null,
+          "text_diff": null,
+          "terma": null,
+          "source": null,
+          "documented": null
+        }
+      ]
+    },
+    {
       "at": "2026-11-11T14:15:45.0307666Z",
       "event": "listed",
       "changes": []

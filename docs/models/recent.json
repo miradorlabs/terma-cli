@@ -1,7 +1,20 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-20T02:52:25.234075432Z",
+  "generated_at": "2026-11-20T11:12:30.269836729Z",
   "events": [
+    {
+      "at": "2026-11-20T11:12:30.269836729Z",
+      "model": "grok-4.20-multi-agent-0309",
+      "vendor": "xai",
+      "name": "Grok 4.20 Multi-Agent",
+      "event": "changed",
+      "changes": 7,
+      "highlights": [
+        "Batch API: no longer stated (was yes)",
+        "Description: no longer stated (was Multiple agents collaborate in parallel to perform deep research tasks.)",
+        "Input added: pdf"
+      ]
+    },
     {
       "at": "2026-11-20T02:52:25.234075432Z",
       "model": "grok-4.20-0309-reasoning",
