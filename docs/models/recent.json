@@ -1,7 +1,59 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-20T11:12:30.269836729Z",
+  "generated_at": "2026-11-20T11:23:47.518756641Z",
   "events": [
+    {
+      "at": "2026-11-20T11:23:47.518756641Z",
+      "model": "grok-4.7",
+      "vendor": "xai",
+      "name": "Grok 4.7",
+      "event": "changed",
+      "changes": 5,
+      "highlights": [
+        "Batch API: no longer stated (was yes)",
+        "Description: no longer stated (was SpaceXSI's frontier model for coding, agentic tasks, and knowledge work.)",
+        "Input added: pdf"
+      ]
+    },
+    {
+      "at": "2026-11-20T11:23:47.518756641Z",
+      "model": "grok-4.5",
+      "vendor": "xai",
+      "name": "Grok 4.5",
+      "event": "changed",
+      "changes": 5,
+      "highlights": [
+        "Batch API: no longer stated (was yes)",
+        "Description: no longer stated (was SpaceXSI's intelligent coding model for agentic software, engineering, and workflow tasks. Trained in SpaceXSI's data centers in Memphis with new datasets spanning science, engineering, and math.)",
+        "Input added: pdf"
+      ]
+    },
+    {
+      "at": "2026-11-20T11:23:47.518756641Z",
+      "model": "grok-4.20-multi-agent-0309",
+      "vendor": "xai",
+      "name": "Grok 4.20 Multi-Agent Beta",
+      "event": "changed",
+      "changes": 7,
+      "highlights": [
+        "Batch API: now yes",
+        "Description: now Multiple agents collaborate in parallel to perform deep research tasks.",
+        "Input removed: pdf"
+      ]
+    },
+    {
+      "at": "2026-11-20T11:23:47.518756641Z",
+      "model": "grok-4.20-0309-reasoning",
+      "vendor": "xai",
+      "name": "Grok 4.20 (Reasoning)",
+      "event": "changed",
+      "changes": 6,
+      "highlights": [
+        "Batch API: no longer stated (was yes)",
+        "Description: no longer stated (was Grok 4.20 is a high-performance model with industry-leading speed and agentic tool calling capabilities. It combines the lowest hallucination rate on the market with strict prompt adherence, delivering consistently precise and truthful responses.)",
+        "Input added: pdf"
+      ]
+    },
     {
       "at": "2026-11-20T11:12:30.269836729Z",
       "model": "grok-4.20-multi-agent-0309",

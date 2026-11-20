@@ -3,6 +3,102 @@
   "id": "grok-4.7",
   "steps": [
     {
+      "at": "2026-11-20T11:23:47.518756641Z",
+      "event": "changed",
+      "changes": [
+        {
+          "id": "facts/batch",
+          "category": "facts",
+          "op": "removed",
+          "path": [
+            "facts",
+            "batch"
+          ],
+          "title": "Batch API: no longer stated (was yes)",
+          "impact": "notable",
+          "before": true,
+          "after": null,
+          "text_diff": null,
+          "terma": null,
+          "source": null,
+          "documented": null
+        },
+        {
+          "id": "facts/description",
+          "category": "facts",
+          "op": "removed",
+          "path": [
+            "facts",
+            "description"
+          ],
+          "title": "Description: no longer stated (was SpaceXSI's frontier model for coding, agentic tasks, and knowledge work.)",
+          "impact": "notable",
+          "before": "SpaceXSI's frontier model for coding, agentic tasks, and knowledge work.",
+          "after": null,
+          "text_diff": null,
+          "terma": null,
+          "source": null,
+          "documented": null
+        },
+        {
+          "id": "facts/input_modalities/pdf",
+          "category": "facts",
+          "op": "added",
+          "path": [
+            "facts",
+            "input_modalities",
+            "pdf"
+          ],
+          "title": "Input added: pdf",
+          "impact": "notable",
+          "before": null,
+          "after": "pdf",
+          "text_diff": null,
+          "terma": null,
+          "source": null,
+          "documented": null
+        },
+        {
+          "id": "facts/regions",
+          "category": "facts",
+          "op": "removed",
+          "path": [
+            "facts",
+            "regions"
+          ],
+          "title": "Region: no longer stated (was us-east-1, us-west-2, us-central-1)",
+          "impact": "notable",
+          "before": [
+            "us-east-1",
+            "us-west-2",
+            "us-central-1"
+          ],
+          "after": null,
+          "text_diff": null,
+          "terma": null,
+          "source": null,
+          "documented": null
+        },
+        {
+          "id": "docs/overview",
+          "category": "docs",
+          "op": "removed",
+          "path": [
+            "docs",
+            "overview"
+          ],
+          "title": "Model page taken down",
+          "impact": "informational",
+          "before": "# Grok 4.7\n\nSpaceXSI's frontier model for coding, agentic tasks, and knowledge work.\n\n## At a glance\n\n- **Modalities:** text, image → text\n- **Context window:** 500,000 tokens\n- **Model name:** `grok-4.7`\n- **Batch API:** Supported\n\n## Capabilities\n\n- **Function calling:** Yes\n- **Structured outputs:** Yes\n- **Reasoning:** Yes\n- **Reasoning efforts (supported):** `low`, `medium`, `high`, `xhigh`\n- **Reasoning efforts (default):** `high`\n\n## Pricing\n\n| Type | < 200k prompt tokens (per 1M tokens) | ≥ 200k prompt tokens (per 1M tokens) |\n| --- | --- | --- |\n| Input | $2.00 | $4.00 |\n| Cached input | $0.50 | $1.00 |\n| Output | $6.00 | $12.00 |\n\nRequests whose prompt reaches 200k tokens are billed at the higher rate for all tokens in the request.\n\n[Batch API](/developers/advanced-api-usage/batch-api) requests are billed at a 20% discount to standard rates.\n\n## Rate limits\n\n| Limit | Value |\n| --- | --- |\n| Requests per second | 150 |\n| Tokens per minute | 50,000,000 |\n\n## Regions\n\nAvailable in: us-east-1, us-west-2, us-central-1\n",
+          "after": null,
+          "text_diff": null,
+          "terma": null,
+          "source": null,
+          "documented": null
+        }
+      ]
+    },
+    {
       "at": "2026-11-11T14:15:45.0307666Z",
       "event": "listed",
       "changes": []

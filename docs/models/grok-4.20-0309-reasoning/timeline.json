@@ -3,6 +3,118 @@
   "id": "grok-4.20-0309-reasoning",
   "steps": [
     {
+      "at": "2026-11-20T11:23:47.518756641Z",
+      "event": "changed",
+      "changes": [
+        {
+          "id": "facts/batch",
+          "category": "facts",
+          "op": "removed",
+          "path": [
+            "facts",
+            "batch"
+          ],
+          "title": "Batch API: no longer stated (was yes)",
+          "impact": "notable",
+          "before": true,
+          "after": null,
+          "text_diff": null,
+          "terma": null,
+          "source": null,
+          "documented": null
+        },
+        {
+          "id": "facts/description",
+          "category": "facts",
+          "op": "removed",
+          "path": [
+            "facts",
+            "description"
+          ],
+          "title": "Description: no longer stated (was Grok 4.20 is a high-performance model with industry-leading speed and agentic tool calling capabilities. It combines the lowest hallucination rate on the market with strict prompt adherence, delivering consistently precise and truthful responses.)",
+          "impact": "notable",
+          "before": "Grok 4.20 is a high-performance model with industry-leading speed and agentic tool calling capabilities. It combines the lowest hallucination rate on the market with strict prompt adherence, delivering consistently precise and truthful responses.",
+          "after": null,
+          "text_diff": null,
+          "terma": null,
+          "source": null,
+          "documented": null
+        },
+        {
+          "id": "facts/input_modalities/pdf",
+          "category": "facts",
+          "op": "added",
+          "path": [
+            "facts",
+            "input_modalities",
+            "pdf"
+          ],
+          "title": "Input added: pdf",
+          "impact": "notable",
+          "before": null,
+          "after": "pdf",
+          "text_diff": null,
+          "terma": null,
+          "source": null,
+          "documented": null
+        },
+        {
+          "id": "facts/name",
+          "category": "facts",
+          "op": "changed",
+          "path": [
+            "facts",
+            "name"
+          ],
+          "title": "Name: Grok 4.20 → Grok 4.20 (Reasoning)",
+          "impact": "notable",
+          "before": "Grok 4.20",
+          "after": "Grok 4.20 (Reasoning)",
+          "text_diff": null,
+          "terma": null,
+          "source": null,
+          "documented": null
+        },
+        {
+          "id": "facts/regions",
+          "category": "facts",
+          "op": "removed",
+          "path": [
+            "facts",
+            "regions"
+          ],
+          "title": "Region: no longer stated (was us-east-1, us-west-2)",
+          "impact": "notable",
+          "before": [
+            "us-east-1",
+            "us-west-2"
+          ],
+          "after": null,
+          "text_diff": null,
+          "terma": null,
+          "source": null,
+          "documented": null
+        },
+        {
+          "id": "docs/overview",
+          "category": "docs",
+          "op": "removed",
+          "path": [
+            "docs",
+            "overview"
+          ],
+          "title": "Model page taken down",
+          "impact": "informational",
+          "before": "# Grok 4.20\n\nGrok 4.20 is a high-performance model with industry-leading speed and agentic tool calling capabilities. It combines the lowest hallucination rate on the market with strict prompt adherence, delivering consistently precise and truthful responses.\n\n## At a glance\n\n- **Modalities:** text, image → text\n- **Context window:** 1,000,000 tokens\n- **Model name:** `grok-4.20-0309-reasoning`\n- **Aliases:** `grok-4.20-reasoning-latest`, `grok-4.20`, `grok-4.20-reasoning`, `grok-4.20-0309`, `grok-4.20-beta-0309-reasoning`, `grok-4.20-beta`, `grok-4.20-beta-0309`, `grok-4.20-beta-latest`, `grok-4.20-beta-latest-reasoning`, `grok-4.20-beta-reasoning`, `grok-4.20-experimental-beta-0304-reasoning`, `grok-4.20-experimental-beta-0304`, `grok-4.20-experimental-beta-reasoning-latest`, `grok-4.20-experimental-beta-latest`, `grok-4.20-reasoning-gv2`\n- **Batch API:** Supported\n\n## Capabilities\n\n- **Function calling:** Yes\n- **Structured outputs:** Yes\n- **Reasoning:** Yes\n\n## Pricing\n\n| Type | < 200k prompt tokens (per 1M tokens) | ≥ 200k prompt tokens (per 1M tokens) |\n| --- | --- | --- |\n| Input | $1.25 | $2.50 |\n| Cached input | $0.20 | $0.40 |\n| Output | $2.50 | $5.00 |\n\nRequests whose prompt reaches 200k tokens are billed at the higher rate for all tokens in the request.\n\n[Batch API](/developers/advanced-api-usage/batch-api) requests are billed at a 20% discount to standard rates.\n\n## Rate limits\n\n| Limit | Value |\n| --- | --- |\n| Requests per second | 37 |\n| Tokens per minute | 10,000,000 |\n\n## Regions\n\nAvailable in: us-east-1, us-west-2\n",
+          "after": null,
+          "text_diff": null,
+          "terma": null,
+          "source": null,
+          "documented": null
+        }
+      ]
+    },
+    {
       "at": "2026-11-20T02:52:25.234075432Z",
       "event": "changed",
       "changes": [

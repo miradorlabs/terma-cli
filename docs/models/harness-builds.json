@@ -15718,6 +15718,16 @@
               "role": "default"
             }
           ]
+        },
+        "1.6.0": {
+          "captured_at": "2026-11-20T11:17:38.159845069Z",
+          "captured": true,
+          "uses": [
+            {
+              "model": "m",
+              "role": "default"
+            }
+          ]
         }
       }
     },
