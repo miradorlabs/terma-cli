@@ -106,6 +106,7 @@ func preInvocation(ctx context.Context, env hookrun.Env) error {
 	r, err := env.Repo(ctx)
 	if err != nil {
 		env.Logf("not in a git repository: %v", err)
+		captureAntigravityCalls(ctx, env, nil, in)
 		return nil
 	}
 	id := in.id()
@@ -180,6 +181,8 @@ func postToolUse(ctx context.Context, env hookrun.Env) error {
 	env.Cwd = in.cwd(env.Cwd)
 	r, err := env.Repo(ctx)
 	if err != nil {
+		// Not collected here: read past its calls, so none leaves later.
+		captureAntigravityCalls(ctx, env, nil, in)
 		return nil
 	}
 	id := in.id()
@@ -255,6 +258,8 @@ func antigravityObserve(ctx context.Context, env hookrun.Env, hook string) error
 	env.Cwd = in.cwd(env.Cwd)
 	r, err := env.Repo(ctx)
 	if err != nil {
+		// Not collected here: read past its calls, so none leaves later.
+		captureAntigravityCalls(ctx, env, nil, in)
 		return nil
 	}
 	if hook == "Stop" {

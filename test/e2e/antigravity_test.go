@@ -363,6 +363,18 @@ func checkAntigravityCalls(t *testing.T, sb *Sandbox, transcript, conversation s
 			t.Errorf("%s delivered %d times", id, n)
 		}
 	}
+	// A call's turn, read from the transcript, is the turn agy's hooks name.
+	hookTurns := map[string]bool{}
+	for _, l := range sb.Receiver.Logs() {
+		if l.Attrs["session.id"] == conversation && l.EventName != "terma.model_call" && l.Attrs["terma.turn.id"] != "" {
+			hookTurns[l.Attrs["terma.turn.id"]] = true
+		}
+	}
+	for _, l := range sb.Receiver.Logs() {
+		if l.EventName == "terma.model_call" && l.Attrs["session.id"] == conversation && !hookTurns[l.Attrs["terma.turn.id"]] {
+			t.Errorf("%s is in %q, a turn no hook named (%v)", l.Attrs["terma.model_call.id"], l.Attrs["terma.turn.id"], hookTurns)
+		}
+	}
 	for id := range want {
 		if got[id] == 0 {
 			t.Errorf("%s (in the transcript) was never delivered", id)

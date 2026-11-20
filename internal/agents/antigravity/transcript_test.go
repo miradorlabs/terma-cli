@@ -300,3 +300,39 @@ func norm(v any) any {
 	}
 	return v
 }
+
+// A conversation's calls made where the team's policy collects nothing never leave, even
+// once it goes on in a repository that is collected.
+func TestAntigravityCallsOutsideCollectionNeverLeave(t *testing.T) {
+	g := newTranscriptRig(t, turnsConversation, "transcript_turns.jsonl")
+	g.write(7)
+	excluded := hookruntest.InitRepo(t)
+	payload := `{"conversationId":"` + g.id + `","cwd":"` + excluded + `","transcriptPath":"` + g.transcript + `","executionNum":0,"fullyIdle":true}`
+	env := hookrun.Env{StateDir: g.stateDir, Now: time.Now(), Cwd: excluded, Policy: hookruntest.Admitting(g.root), Stdin: strings.NewReader(payload), Stdout: &bytes.Buffer{}, Spool: g.sp, Version: "test"}
+	if err := stop(context.Background(), env); err != nil {
+		t.Fatal(err)
+	}
+	if got := g.drain(); len(got) != 0 {
+		t.Fatalf("an excluded repository's hook spooled %v", got)
+	}
+	g.write(12)
+	g.hook(stop, `"executionNum":1,"fullyIdle":true,"terminationReason":"NO_TOOL_CALL"`)
+	if s := strings.Join(callSteps(g.drain()[semconv.TermaModelCallEvent]), ","); s != "step-9,step-11" {
+		t.Fatalf("in the collected repository, sent %s", s)
+	}
+}
+
+// Tool output that quotes invoke_subagent's result links nothing.
+func TestAntigravityQuotedSubagentResultLinksNothing(t *testing.T) {
+	g := newTranscriptRig(t, parentConversation, "transcript_subagent_parent.jsonl")
+	// The fixture's subagent result, as the output of a command that printed it.
+	quoted := g.lines[2]
+	g.lines = []string{g.lines[0],
+		`{"step_index":1,"source":"MODEL","type":"PLANNER_RESPONSE","status":"DONE","created_at":"2026-11-20T17:40:11Z","model":"gemini-3.8-flash-high","input_tokens":10,"cache_read_tokens":0,"output_tokens":1,"tool_calls":[{"name":"run_command","args":{}}]}`,
+		quoted}
+	g.write(3)
+	g.hook(stop, `"executionNum":0,"fullyIdle":true,"terminationReason":"NO_TOOL_CALL"`)
+	if starts := g.drain()[semconv.TermaSessionStartEvent]; len(starts) != 0 {
+		t.Fatalf("a quoted result linked a subagent: %v", starts)
+	}
+}

@@ -221,7 +221,9 @@ func Run(ctx context.Context, env Env, progress Progress) Report {
 	timed(KeyHarness, "agent exporting to Terma", func() Check { return unlessCaptureOff(d.pol, d.agentsExporting()) })
 
 	for _, a := range StatusLineAgents(env.Agents) {
-		if a.Installed(ctx) {
+		// Only an agent the developer chose has a status line terma should have wrapped.
+		chosen := len(cfg.Harnesses) == 0 || slices.ContainsFunc(agents.Selections(a), func(s string) bool { return slices.Contains(cfg.Harnesses, s) })
+		if chosen && env.Agents.IsSupported(a.Name()) && a.Installed(ctx) {
 			timed(KeyStatusLine, a.DisplayName()+" status line", func() Check { return d.statusLine(a) })
 		}
 	}

@@ -177,15 +177,24 @@ func TestAntigravityStatusLineReplacedIsLeftAlone(t *testing.T) {
 	}
 }
 
-func TestAntigravityStatusLineRefreshRewritesAnOlderCommand(t *testing.T) {
-	a, path := statusLineHome(t)
-	writeSettings(t, path, agySettings)
+// olderInstall makes the file what an older terma wrote: its command, and a record of it.
+func olderInstall(t *testing.T, a Agent, path string) {
+	t.Helper()
 	if _, err := a.InstallStatusLine(); err != nil {
 		t.Fatal(err)
 	}
 	b, _ := os.ReadFile(path)
 	old := strings.Replace(string(b), "|| exit 0", "|| true", 1)
 	writeSettings(t, path, old)
+	if err := a.updateStatusLineRecords(func(recs map[string]*antigravityStatusLineRecordEntry) { recs[path].After = hashBytes([]byte(old)) }); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestAntigravityStatusLineRefreshRewritesAnOlderCommand(t *testing.T) {
+	a, path := statusLineHome(t)
+	writeSettings(t, path, agySettings)
+	olderInstall(t, a, path)
 	if _, changed, err := a.RefreshMachine(); err != nil || !changed {
 		t.Fatalf("refresh: %v %v", changed, err)
 	}
@@ -200,6 +209,36 @@ func TestAntigravityStatusLineRefreshRewritesAnOlderCommand(t *testing.T) {
 	}
 	if b, _ := os.ReadFile(path); string(b) != agySettings {
 		t.Fatalf("not restored after refresh:\n%s", b)
+	}
+}
+
+// A refresh after something else changed the file never lets teardown put the old file
+// back over that change.
+func TestAntigravityStatusLineRefreshKeepsOtherChanges(t *testing.T) {
+	a, path := statusLineHome(t)
+	writeSettings(t, path, agySettings)
+	olderInstall(t, a, path)
+	b, _ := os.ReadFile(path)
+	writeSettings(t, path, strings.Replace(string(b), `"/home/dev/repo"`, `"/home/dev/repo", "/home/dev/new"`, 1))
+	if _, changed, err := a.RefreshMachine(); err != nil || !changed {
+		t.Fatalf("refresh: %v %v", changed, err)
+	}
+	if _, err := a.RemoveStatusLine(); err != nil {
+		t.Fatal(err)
+	}
+	b, _ = os.ReadFile(path)
+	if !strings.Contains(string(b), "/home/dev/new") || strings.Contains(string(b), "statusLine") {
+		t.Fatalf("teardown after refresh:\n%s", b)
+	}
+}
+
+// Teardown runs for every agent: an agy settings file terma never wrapped, even a broken
+// one, is left alone and stops nothing.
+func TestAntigravityStatusLineTeardownIgnoresAFileItNeverWrapped(t *testing.T) {
+	a, path := statusLineHome(t)
+	writeSettings(t, path, `{"statusLine": "not an object"`)
+	if restored, err := a.RemoveStatusLine(); err != nil || restored {
+		t.Fatalf("remove: %v %v", restored, err)
 	}
 }
 

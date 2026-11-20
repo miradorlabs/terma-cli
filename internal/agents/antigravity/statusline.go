@@ -242,8 +242,13 @@ func (a Agent) refreshStatusLine() (string, bool, error) {
 		return path, false, err
 	}
 	after := s.pack()
-	// A file put back whole would undo this rewrite: from now on, the member alone is.
-	rec.After = hashBytes(after)
+	if hashBytes(s.data) == rec.After {
+		// Nothing else changed the file since setup: it can still be put back whole.
+		rec.After = hashBytes(after)
+	} else {
+		// Something did: teardown puts back the statusLine member alone.
+		rec.After, rec.Before = "", nil
+	}
 	if err := a.updateStatusLineRecords(func(recs map[string]*antigravityStatusLineRecordEntry) { recs[path] = rec }); err != nil {
 		return path, false, err
 	}
@@ -262,10 +267,17 @@ func (a Agent) RemoveStatusLine() (bool, error) {
 		return false, err
 	}
 	s, err := loadAntigravitySettings(path)
+	if err != nil && rec == nil {
+		// Teardown runs this for every agent: a file terma never wrapped is not its to judge.
+		return false, nil
+	}
 	if err != nil {
 		return false, err
 	}
 	cur, err := parseAntigravityStatusLine(s.raw(antigravityStatusLineKey))
+	if err != nil && rec == nil {
+		return false, nil
+	}
 	if err != nil {
 		return false, fmt.Errorf("%s: %w", path, err)
 	}
