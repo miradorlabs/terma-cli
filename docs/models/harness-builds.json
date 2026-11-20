@@ -10731,7 +10731,7 @@
           ]
         },
         "0.167.2": {
-          "captured_at": "2026-11-13T09:01:26.428937767Z",
+          "captured_at": "2026-11-20T01:10:01.695546758Z",
           "captured": true,
           "uses": [
             {
@@ -10860,6 +10860,38 @@
         },
         "0.170.0": {
           "captured_at": "2026-11-18T04:07:23.351960273Z",
+          "captured": true,
+          "uses": [
+            {
+              "model": "gpt-6.2-sol",
+              "role": "default",
+              "params": {
+                "include": [
+                  "reasoning.encrypted_content"
+                ],
+                "parallel_tool_calls": false,
+                "reasoning": {
+                  "context": "all_turns",
+                  "effort": "low"
+                },
+                "text": {
+                  "verbosity": "low"
+                },
+                "tool_choice": "auto"
+              }
+            },
+            {
+              "model": "gpt-6.2-sol",
+              "role": "compaction"
+            },
+            {
+              "model": "gpt-6.2-sol",
+              "role": "subagents"
+            }
+          ]
+        },
+        "0.171.0": {
+          "captured_at": "2026-11-20T01:10:01.695546758Z",
           "captured": true,
           "uses": [
             {
@@ -13910,7 +13942,7 @@
           ]
         },
         "0.2.2-rc.5": {
-          "captured_at": "2026-11-19T18:36:41.812993134Z",
+          "captured_at": "2026-11-20T00:57:03.022869442Z",
           "captured": true,
           "uses": [
             {
@@ -14290,7 +14322,7 @@
                         "preset": "workspace-write"
                       },
                       "seq": 0,
-                      "time": 1795113264405,
+                      "time": 1795136086455,
                       "type": "permission/preset"
                     },
                     {
@@ -14298,7 +14330,7 @@
                         "mode": "workspace-write"
                       },
                       "seq": 1,
-                      "time": 1795113264406,
+                      "time": 1795136086457,
                       "type": "sandbox/mode"
                     },
                     {
@@ -14306,7 +14338,7 @@
                         "policy": "ask"
                       },
                       "seq": 2,
-                      "time": 1795113264407,
+                      "time": 1795136086457,
                       "type": "approval/policy"
                     },
                     {
@@ -14330,7 +14362,7 @@
                         "target": "next-turn"
                       },
                       "seq": 3,
-                      "time": 1795113264408,
+                      "time": 1795136086458,
                       "type": "agent/inbox/spliced"
                     },
                     {
@@ -14338,7 +14370,7 @@
                         "turn": 1
                       },
                       "seq": 4,
-                      "time": 1795113264408,
+                      "time": 1795136086459,
                       "type": "turn/start"
                     },
                     {
@@ -14349,7 +14381,7 @@
                         "target": "next-turn"
                       },
                       "seq": 5,
-                      "time": 1795113264408,
+                      "time": 1795136086459,
                       "type": "agent/inbox/spliced"
                     },
                     {
@@ -14358,7 +14390,7 @@
                         "turn": 1
                       },
                       "seq": 6,
-                      "time": 1795113264443,
+                      "time": 1795136086501,
                       "type": "step/start"
                     },
                     {
@@ -14381,7 +14413,7 @@
                       },
                       "seq": 7,
                       "surfaceOp": "append",
-                      "time": 1795113264450,
+                      "time": 1795136086503,
                       "type": "system/message"
                     },
                     {
@@ -14400,7 +14432,7 @@
                       },
                       "seq": 8,
                       "surfaceOp": "append",
-                      "time": 1795113264451,
+                      "time": 1795136086503,
                       "type": "user/message"
                     },
                     {
@@ -14438,7 +14470,7 @@
                       },
                       "seq": 9,
                       "surfaceOp": "append",
-                      "time": 1795113264459,
+                      "time": 1795136086504,
                       "type": "user/message"
                     },
                     {
@@ -15070,7 +15102,7 @@
                         "reason": "initial"
                       },
                       "seq": 10,
-                      "time": 1795113264462,
+                      "time": 1795136086505,
                       "type": "request/header"
                     },
                     {
@@ -15081,7 +15113,7 @@
                         "systemPromptUpdate": "in-history"
                       },
                       "seq": 11,
-                      "time": 1795113264466,
+                      "time": 1795136086506,
                       "type": "request/context"
                     },
                     {
@@ -15095,7 +15127,7 @@
                         "title": "<prompt>"
                       },
                       "seq": 12,
-                      "time": 1795113264476,
+                      "time": 1795136086507,
                       "type": "session/title"
                     },
                     {
@@ -15128,12 +15160,12 @@
                         "titleProvider": "session-title-first-prompt-llm"
                       },
                       "seq": 13,
-                      "time": 1795113264482,
+                      "time": 1795136086509,
                       "type": "session/title-llm-request"
                     }
                   ],
                   "session": {
-                    "createdAt": 1795113264400,
+                    "createdAt": 1795136086450,
                     "cwd": "<repo>",
                     "id": "session-<uuid>",
                     "version": 4
