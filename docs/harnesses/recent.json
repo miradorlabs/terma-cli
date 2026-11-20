@@ -1,7 +1,40 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-20T17:30:26.655586344Z",
+  "generated_at": "2026-11-20T19:39:16.85026872Z",
   "versions": [
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.330",
+      "released_at": "2026-11-20T19:16:01.07Z",
+      "captured_at": "2026-11-20T19:39:16.85026872Z",
+      "platforms": [
+        "darwin/arm64",
+        "linux/amd64"
+      ],
+      "support": "supported",
+      "previous": "2.1.329",
+      "changes": 30,
+      "categories": {
+        "config": 22,
+        "filesystem": 8
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 29,
+        "notable": 1
+      },
+      "undocumented": null,
+      "highlights": [
+        "Setting maxEffortLevel lost value $ZodCatch",
+        "deniedMcpServers.serverUrl description changed (+232 −98 chars)",
+        "New setting: disableDirectMcpSkills"
+      ],
+      "signing": "valid",
+      "attempted_at": "2026-11-20T19:39:16.85026872Z",
+      "attempts": 1
+    },
     {
       "harness": "pi",
       "name": "Pi",
@@ -6175,39 +6208,6 @@
         "Model alias \"opus\": claude-opus-4-8 → claude-opus-5",
         "Model alias \"opus[1m]\": claude-opus-4-8 → claude-opus-5",
         "Default model: claude-opus-4-8 → claude-opus-5"
-      ],
-      "signing": "valid"
-    },
-    {
-      "harness": "claude",
-      "name": "Claude Code",
-      "version": "2.1.218",
-      "released_at": "2026-07-22T19:55:32.144Z",
-      "captured_at": "2026-11-05T09:54:28.532441Z",
-      "platforms": [
-        "darwin/arm64",
-        "linux/amd64"
-      ],
-      "support": "untested",
-      "previous": "2.1.217",
-      "changes": 13,
-      "categories": {
-        "config": 8,
-        "filesystem": 2,
-        "prompt": 2,
-        "tools": 1
-      },
-      "impact": {
-        "breaking": 0,
-        "degrading": 0,
-        "informational": 10,
-        "notable": 3
-      },
-      "undocumented": 12,
-      "highlights": [
-        "Injected context changed (+0 −488 chars)",
-        "Interactive session's injected context changed (+0 −488 chars)",
-        "Skill tool description changed (+174 −0 chars)"
       ],
       "signing": "valid"
     }

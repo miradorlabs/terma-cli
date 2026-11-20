@@ -3,8 +3,8 @@
   "harness": "claude",
   "window": {
     "oldest": "2.1.206",
-    "newest": "2.1.329",
-    "builds": 110
+    "newest": "2.1.330",
+    "builds": 111
   },
   "items": {
     "cli.commands.claude agents": {
@@ -2498,8 +2498,8 @@
       "ranges": [
         {
           "since": "2.1.206",
-          "until": null,
-          "removed": null
+          "until": "2.1.329",
+          "removed": "2.1.330"
         }
       ],
       "since_bounded": false
@@ -2564,8 +2564,8 @@
       "ranges": [
         {
           "since": "2.1.206",
-          "until": null,
-          "removed": null
+          "until": "2.1.329",
+          "removed": "2.1.330"
         }
       ],
       "since_bounded": false
@@ -2976,8 +2976,8 @@
       "ranges": [
         {
           "since": "2.1.206",
-          "until": null,
-          "removed": null
+          "until": "2.1.329",
+          "removed": "2.1.330"
         }
       ],
       "since_bounded": false
@@ -2987,8 +2987,8 @@
       "ranges": [
         {
           "since": "2.1.206",
-          "until": null,
-          "removed": null
+          "until": "2.1.329",
+          "removed": "2.1.330"
         }
       ],
       "since_bounded": false
@@ -3389,6 +3389,17 @@
         }
       ],
       "since_bounded": false
+    },
+    "config.env_vars.CLAUDE_AI_AUTHORIZE_URL": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "2.1.330",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
     },
     "config.env_vars.CLAUDE_AI_HOST": {
       "kind": "env_var",
@@ -5997,6 +6008,17 @@
       ],
       "since_bounded": true
     },
+    "config.env_vars.CLAUDE_CODE_COWORK_SHELL_CHECK": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "2.1.330",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.env_vars.CLAUDE_CODE_COZY_TEAPOT": {
       "kind": "env_var",
       "ranges": [
@@ -7251,6 +7273,17 @@
       ],
       "since_bounded": true
     },
+    "config.env_vars.CLAUDE_CODE_DISABLE_REDIRECT_DENY_RECHECK": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "2.1.330",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.env_vars.CLAUDE_CODE_DISABLE_REFUSAL_FALLBACK": {
       "kind": "env_var",
       "ranges": [
@@ -8488,6 +8521,17 @@
       ],
       "since_bounded": false
     },
+    "config.env_vars.CLAUDE_CODE_FULL_SIGN_IN_LINK": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "2.1.330",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.env_vars.CLAUDE_CODE_GATEWAY_HINT_HEADERS": {
       "kind": "env_var",
       "ranges": [
@@ -8862,6 +8906,17 @@
       ],
       "since_bounded": true
     },
+    "config.env_vars.CLAUDE_CODE_HOST_ALLOW_RESETS_DENIAL_STREAK": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "2.1.330",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.env_vars.CLAUDE_CODE_HOST_ARTIFACT_TYPE_COMMANDS": {
       "kind": "env_var",
       "ranges": [
@@ -8999,6 +9054,17 @@
       "ranges": [
         {
           "since": "2.1.285",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.env_vars.CLAUDE_CODE_HOST_READS_NO_BASH_EDIT_DIFF": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "2.1.330",
           "until": null,
           "removed": null
         }
@@ -9940,6 +10006,17 @@
       ],
       "since_bounded": true
     },
+    "config.env_vars.CLAUDE_CODE_MODEL_NOBODY_CHOSE": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "2.1.330",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.env_vars.CLAUDE_CODE_MORNING_BRIEF_PROMPT": {
       "kind": "env_var",
       "ranges": [
@@ -10809,6 +10886,17 @@
       ],
       "since_bounded": true
     },
+    "config.env_vars.CLAUDE_CODE_PROJECTS_FEATURE_FLAGS": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "2.1.330",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.env_vars.CLAUDE_CODE_PROJECTS_SESSION": {
       "kind": "env_var",
       "ranges": [
@@ -10984,6 +11072,17 @@
         }
       ],
       "since_bounded": false
+    },
+    "config.env_vars.CLAUDE_CODE_RELAUNCH_BYPASS_SWITCH": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "2.1.330",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
     },
     "config.env_vars.CLAUDE_CODE_RELAUNCH_HOME_TRUST": {
       "kind": "env_var",
@@ -11682,6 +11781,17 @@
       "ranges": [
         {
           "since": "2.1.327",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.env_vars.CLAUDE_CODE_RUNNER_START_NOTES": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "2.1.330",
           "until": null,
           "removed": null
         }
@@ -12523,6 +12633,17 @@
         }
       ],
       "since_bounded": false
+    },
+    "config.env_vars.CLAUDE_CODE_STARTER_MAY_HOLD_CONNECTOR_FILE": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "2.1.330",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
     },
     "config.env_vars.CLAUDE_CODE_STARTUP_FAILURE_RESULTS": {
       "kind": "env_var",
@@ -14553,6 +14674,17 @@
       "ranges": [
         {
           "since": "2.1.242",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.env_vars.CLAUDE_RUNNER_START_FOLDER": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "2.1.330",
           "until": null,
           "removed": null
         }
@@ -18051,6 +18183,17 @@
       "ranges": [
         {
           "since": "2.1.224",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.env_vars.SELF_HOSTED_RUNNER_START_DIR": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "2.1.330",
           "until": null,
           "removed": null
         }
@@ -22088,6 +22231,17 @@
       ],
       "since_bounded": false
     },
+    "config.options.disableDirectMcpSkills": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.330",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.options.disableRemoteControl": {
       "kind": "setting",
       "ranges": [
@@ -25520,6 +25674,105 @@
       ],
       "since_bounded": false
     },
+    "config.options.pluginConfigs.array": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.330",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.pluginConfigs.array.unit": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.330",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.pluginConfigs.array.verb": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.330",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.pluginConfigs.file": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.330",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.pluginConfigs.file.unit": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.330",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.pluginConfigs.file.verb": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.330",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.pluginConfigs.map": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.330",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.pluginConfigs.map.unit": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.330",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.pluginConfigs.map.verb": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.330",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
     "config.options.pluginConfigs.mcpServers": {
       "kind": "setting",
       "ranges": [
@@ -25536,6 +25789,72 @@
       "ranges": [
         {
           "since": "2.1.242",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.pluginConfigs.set": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.330",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.pluginConfigs.set.unit": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.330",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.pluginConfigs.set.verb": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.330",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.pluginConfigs.string": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.330",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.pluginConfigs.string.unit": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.330",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.pluginConfigs.string.verb": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.330",
           "until": null,
           "removed": null
         }

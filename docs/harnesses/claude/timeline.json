@@ -3,6 +3,252 @@
   "harness": "claude",
   "steps": [
     {
+      "version": "2.1.330",
+      "previous": "2.1.329",
+      "changes": [
+        {
+          "id": "config.options.deniedMcpServers.serverUrl.description",
+          "category": "config",
+          "op": "changed",
+          "title": "deniedMcpServers.serverUrl description changed (+232 −98 chars)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.options.disableDirectMcpSkills",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: disableDirectMcpSkills",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.options.maxEffortLevel.enum.$ZodCatch",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting maxEffortLevel lost value $ZodCatch",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.statusLine.type.enum.command",
+          "category": "config",
+          "op": "added",
+          "title": "Setting statusLine.type gained value command",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.options.subagentStatusLine.type.enum.command",
+          "category": "config",
+          "op": "added",
+          "title": "Setting subagentStatusLine.type gained value command",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.env_vars.CLAUDE_AI_AUTHORIZE_URL",
+          "category": "config",
+          "op": "added",
+          "title": "New environment variable: CLAUDE_AI_AUTHORIZE_URL",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.env_vars.CLAUDE_CODE_COWORK_SHELL_CHECK",
+          "category": "config",
+          "op": "added",
+          "title": "New environment variable: CLAUDE_CODE_COWORK_SHELL_CHECK",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.env_vars.CLAUDE_CODE_DISABLE_REDIRECT_DENY_RECHECK",
+          "category": "config",
+          "op": "added",
+          "title": "New environment variable: CLAUDE_CODE_DISABLE_REDIRECT_DENY_RECHECK",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.env_vars.CLAUDE_CODE_FULL_SIGN_IN_LINK",
+          "category": "config",
+          "op": "added",
+          "title": "New environment variable: CLAUDE_CODE_FULL_SIGN_IN_LINK",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.env_vars.CLAUDE_CODE_HOST_ALLOW_RESETS_DENIAL_STREAK",
+          "category": "config",
+          "op": "added",
+          "title": "New environment variable: CLAUDE_CODE_HOST_ALLOW_RESETS_DENIAL_STREAK",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.env_vars.CLAUDE_CODE_HOST_READS_NO_BASH_EDIT_DIFF",
+          "category": "config",
+          "op": "added",
+          "title": "New environment variable: CLAUDE_CODE_HOST_READS_NO_BASH_EDIT_DIFF",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.env_vars.CLAUDE_CODE_MODEL_NOBODY_CHOSE",
+          "category": "config",
+          "op": "added",
+          "title": "New environment variable: CLAUDE_CODE_MODEL_NOBODY_CHOSE",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.env_vars.CLAUDE_CODE_PROJECTS_FEATURE_FLAGS",
+          "category": "config",
+          "op": "added",
+          "title": "New environment variable: CLAUDE_CODE_PROJECTS_FEATURE_FLAGS",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.env_vars.CLAUDE_CODE_RELAUNCH_BYPASS_SWITCH",
+          "category": "config",
+          "op": "added",
+          "title": "New environment variable: CLAUDE_CODE_RELAUNCH_BYPASS_SWITCH",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.env_vars.CLAUDE_CODE_RUNNER_START_NOTES",
+          "category": "config",
+          "op": "added",
+          "title": "New environment variable: CLAUDE_CODE_RUNNER_START_NOTES",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.env_vars.CLAUDE_CODE_STARTER_MAY_HOLD_CONNECTOR_FILE",
+          "category": "config",
+          "op": "added",
+          "title": "New environment variable: CLAUDE_CODE_STARTER_MAY_HOLD_CONNECTOR_FILE",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.env_vars.CLAUDE_RUNNER_START_FOLDER",
+          "category": "config",
+          "op": "added",
+          "title": "New environment variable: CLAUDE_RUNNER_START_FOLDER",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.env_vars.SELF_HOSTED_RUNNER_START_DIR",
+          "category": "config",
+          "op": "added",
+          "title": "New environment variable: SELF_HOSTED_RUNNER_START_DIR",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.env_vars.API_FORCE_IDLE_TIMEOUT",
+          "category": "config",
+          "op": "removed",
+          "title": "Environment variable no longer read: API_FORCE_IDLE_TIMEOUT",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.env_vars.AWS_BEARER_TOKEN_BEDROCK",
+          "category": "config",
+          "op": "removed",
+          "title": "Environment variable no longer read: AWS_BEARER_TOKEN_BEDROCK",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.env_vars.BROWSER",
+          "category": "config",
+          "op": "removed",
+          "title": "Environment variable no longer read: BROWSER",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.env_vars.BUF_BIGINT_DISABLE",
+          "category": "config",
+          "op": "removed",
+          "title": "Environment variable no longer read: BUF_BIGINT_DISABLE",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "filesystem.darwin/arm64.exec.git -c core.askPass= -c protocol.ext.allow=never -c core.alternateRefsCommand=f() { git --git-dir=\"$1\" for-each-ref --format='%(objectname)'; }; f -c submodule.recurse=false -c log.showSignature=false -c format.pretty=medium -c gc.auto=0 -c maintenance.auto=false -c diff.autoRefreshIndex=false -c hook.applypatch-msg.enabled=false -c hook.pre-applypatch.enabled=false -c hook.post-applypatch.enabled=false -c hook.pre-commit.enabled=false -c hook.pre-merge-commit.enabled=false -c hook.prepare-commit-msg.enabled=false -c hook.commit-msg.enabled=false -c hook.post-commit.enabled=false -c hook.pre-rebase.enabled=false -c hook.post-checkout.enabled=false -c hook.post-merge.enabled=false -c hook.pre-push.enabled=false -c hook.pre-receive.enabled=false -c hook.update.enabled=false -c hook.proc-receive.enabled=false -c hook.post-receive.enabled=false -c hook.post-update.enabled=false -c hook.reference-transaction.enabled=false -c hook.push-to-checkout.enabled=false -c hook.pre-auto-gc.enabled=false -c hook.post-rewrite.enabled=false -c hook.sendemail-validate.enabled=false -c hook.fsmonitor-watchman.enabled=false -c hook.p4-changelist.enabled=false -c hook.p4-prepare-changelist.enabled=false -c hook.p4-post-changelist.enabled=false -c hook.p4-pre-submit.enabled=false -c hook.post-index-change.enabled=false -c core.hooksPath=/dev/null -c core.fsmonitor= remote get-url origin.phases.startup",
+          "category": "filesystem",
+          "op": "added",
+          "title": "`git -c core.askPass= -c protocol.ext.allow=never -c core.alternateRefsCommand=f() { git --git-dir=\"$ …` now also runs at startup (darwin/arm64)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "filesystem.darwin/arm64.exec.git -c core.askPass= -c protocol.ext.allow=never -c core.alternateRefsCommand=f() { git --git-dir=\"$1\" for-each-ref --format='%(objectname)'; }; f -c submodule.recurse=false -c log.showSignature=false -c format.pretty=medium -c gc.auto=0 -c maintenance.auto=false -c diff.autoRefreshIndex=false -c hook.applypatch-msg.enabled=false -c hook.pre-applypatch.enabled=false -c hook.post-applypatch.enabled=false -c hook.pre-commit.enabled=false -c hook.pre-merge-commit.enabled=false -c hook.prepare-commit-msg.enabled=false -c hook.commit-msg.enabled=false -c hook.post-commit.enabled=false -c hook.pre-rebase.enabled=false -c hook.post-checkout.enabled=false -c hook.post-merge.enabled=false -c hook.pre-push.enabled=false -c hook.pre-receive.enabled=false -c hook.update.enabled=false -c hook.proc-receive.enabled=false -c hook.post-receive.enabled=false -c hook.post-update.enabled=false -c hook.reference-transaction.enabled=false -c hook.push-to-checkout.enabled=false -c hook.pre-auto-gc.enabled=false -c hook.post-rewrite.enabled=false -c hook.sendemail-validate.enabled=false -c hook.fsmonitor-watchman.enabled=false -c hook.p4-changelist.enabled=false -c hook.p4-prepare-changelist.enabled=false -c hook.p4-post-changelist.enabled=false -c hook.p4-pre-submit.enabled=false -c hook.post-index-change.enabled=false -c core.hooksPath=/dev/null -c core.fsmonitor= remote get-url origin.phases.turn",
+          "category": "filesystem",
+          "op": "removed",
+          "title": "`git -c core.askPass= -c protocol.ext.allow=never -c core.alternateRefsCommand=f() { git --git-dir=\"$ …` no longer runs at turn (darwin/arm64)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "filesystem.darwin/arm64.exec./bin/zsh -c -l SNAPSHOT_FILE=<claude-config>/shell-snapshots/snapshot-zsh-<n>-<id>.sh\n      \n      # No user config file to source\n      \n      \n\n      # First, create/clear the snapshot file\n      echo \"# Snapshot file\" >| \"$SNAPSHOT_FILE\"\n\n      # When this file is sourced, we first unalias to avoid conflicts\n      # This is necessary because aliases get \"frozen\" inside function definitions at definition time,\n      # which can cause unexpected behavior when functions use commands that conflict with aliases\n      echo \"# Unset all aliases to avoid conflicts with functions\" >> \"$SNAPSHOT_FILE\"\n      echo \"unalias -a 2>/dev/null || true\" >> \"$SNAPSHOT_FILE\"\n\n      \n\n      \n      cat >> \"$SNAPSHOT_FILE\" << 'CLAUDE_CODE_END_<id>'\n# Check for rg availability\nif ! hash rg 2>/dev/null && ! typeset -f rg >/dev/null 2>&1; then\n  function rg {\n  if [[ -x <install>/claude ]]; then\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=rg <install>/claude ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=rg <install>/claude ${1+\"$@\"}\n  else\n    (exec -a rg <install>/claude ${1+\"$@\"})\n  fi\n  elif [[ -x <home>/.local/bin/claude ]]; then\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=rg <home>/.local/bin/claude ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=rg <home>/.local/bin/claude ${1+\"$@\"}\n  else\n    (exec -a rg <home>/.local/bin/claude ${1+\"$@\"})\n  fi\n  else command rg ${1+\"$@\"}; fi\n}\nfi\n# Shadow find/grep with embedded bfs/ugrep\nunalias find 2>/dev/null || true\nunalias grep 2>/dev/null || true\nfunction find {\n  if [[ -x <install>/claude ]]; then\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=bfs <install>/claude -S dfs -regextype findutils-default ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=bfs <install>/claude -S dfs -regextype findutils-default ${1+\"$@\"}\n  else\n    (exec -a bfs <install>/claude -S dfs -regextype findutils-default ${1+\"$@\"})\n  fi\n  elif [[ -x <home>/.local/bin/claude ]]; then\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=bfs <home>/.local/bin/claude -S dfs -regextype findutils-default ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=bfs <home>/.local/bin/claude -S dfs -regextype findutils-default ${1+\"$@\"}\n  else\n    (exec -a bfs <home>/.local/bin/claude -S dfs -regextype findutils-default ${1+\"$@\"})\n  fi\n  else command find ${1+\"$@\"}; fi\n}\nfunction grep {\n  local _cc_a\n  for _cc_a in ${1+\"$@\"}; do\n    case \"$_cc_a\" in -*-filter*|-*-pager*|-*-view*|-*-format-open*|-*-config*|---*|-@*|-*-save-config*|-[Zz]*|-[!-]*[Zz]*|--null|--null-data) command grep ${1+\"$@\"}; return ;; esac\n  done\n  if [[ -x <install>/claude ]]; then\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=ugrep <install>/claude -G --ignore-files --hidden -I --encoding=UTF-8 --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=ugrep <install>/claude -G --ignore-files --hidden -I --encoding=UTF-8 --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"}\n  else\n    (exec -a ugrep <install>/claude -G --ignore-files --hidden -I --encoding=UTF-8 --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"})\n  fi\n  elif [[ -x <home>/.local/bin/claude ]]; then\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=ugrep <home>/.local/bin/claude -G --ignore-files --hidden -I --encoding=UTF-8 --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=ugrep <home>/.local/bin/claude -G --ignore-files --hidden -I --encoding=UTF-8 --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"}\n  else\n    (exec -a ugrep <home>/.local/bin/claude -G --ignore-files --hidden -I --encoding=UTF-8 --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"})\n  fi\n  else command grep ${1+\"$@\"}; fi\n}\n# Shadow pkill to refuse patterns matching the CLI process\nunalias pkill 2>/dev/null || true\nfunction pkill {\n  if [ -n \"${CLAUDE_PID:-}\" ] && [ -r \"/proc/${CLAUDE_PID}/comm\" ]; then\n    local _cc_skip=\"\" _cc_a\n    local -a _cc_probe=()\n    for _cc_a in ${1+\"$@\"}; do\n      if [ -n \"$_cc_skip\" ]; then _cc_skip=\"\"; continue; fi\n      case \"$_cc_a\" in\n        --signal) _cc_skip=1 ;;\n        --signal=*|-e|--echo) ;;\n        -[0-9]*) ;;\n        -[PUGOF]?*) _cc_probe+=(\"$_cc_a\") ;;\n        -[ABCDEFGHIJKLMNOPQRSTUVWXYZ][ABCDEFGHIJKLMNOPQRSTUVWXYZ0-9]*) ;;\n        *) _cc_probe+=(\"$_cc_a\") ;;\n      esac\n    done\n    if command pgrep ${_cc_probe[@]+\"${_cc_probe[@]}\"} 2>/dev/null | command grep -qx \"${CLAUDE_PID}\"; then\n      printf 'pkill: refusing to run — this pattern matches the Claude CLI process (PID %s). Narrow the pattern, or target your own children with `pkill -P $$ ...`.\\n' \"${CLAUDE_PID}\" >&2\n      return 1\n    fi\n  fi\n  command pkill ${1+\"$@\"}\n}\nexport PATH=<path>\nCLAUDE_CODE_END_<id>\n  \n\n      # Exit silently on success, only report errors\n      if [ ! -f \"$SNAPSHOT_FILE\" ]; then\n        echo \"Error: Snapshot file was not created at $SNAPSHOT_FILE\" >&2\n        exit 1\n      fi\n    ",
+          "category": "filesystem",
+          "op": "changed",
+          "title": "Command changed: `/bin/zsh -c -l SNAPSHOT_FILE=<claude-config>/shell-snapshots/snapshot-zsh-<n>-<id>.sh …` (+6 −0 chars) (darwin/arm64)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "filesystem.linux/amd64.paths.<claude-config>/cache",
+          "category": "filesystem",
+          "op": "added",
+          "title": "Now looks for <claude-config>/cache (linux/amd64)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "filesystem.linux/amd64.paths.<claude-config>/cache/model-catalog",
+          "category": "filesystem",
+          "op": "added",
+          "title": "Now looks for <claude-config>/cache/model-catalog (linux/amd64)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "filesystem.linux/amd64.paths.<home>/.claude/cache",
+          "category": "filesystem",
+          "op": "added",
+          "title": "Now looks for ~/.claude/cache (linux/amd64)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "filesystem.linux/amd64.paths.<home>/.claude/cache/model-catalog",
+          "category": "filesystem",
+          "op": "added",
+          "title": "Now looks for ~/.claude/cache/model-catalog (linux/amd64)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "filesystem.linux/amd64.exec./bin/bash -c -l SNAPSHOT_FILE=<claude-config>/shell-snapshots/snapshot-bash-<n>-<id>.sh\n      \n      # No user config file to source\n      \n      \n\n      # First, create/clear the snapshot file\n      echo \"# Snapshot file\" >| \"$SNAPSHOT_FILE\"\n\n      # When this file is sourced, we first unalias to avoid conflicts\n      # This is necessary because aliases get \"frozen\" inside function definitions at definition time,\n…",
+          "category": "filesystem",
+          "op": "changed",
+          "title": "Command changed: `/bin/bash -c -l SNAPSHOT_FILE=<claude-config>/shell-snapshots/snapshot-bash-<n>-<id>.sh …` (+6 −0 chars) (linux/amd64)",
+          "impact": "informational",
+          "documented": null
+        }
+      ]
+    },
+    {
       "version": "2.1.329",
       "previous": "2.1.328",
       "changes": [
