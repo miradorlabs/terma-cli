@@ -194,7 +194,17 @@ func (s *signInSource) Retired(token string) {
 func (app *App) bindRelay(engine *relay.Options, cfg *config.Config) {
 	engine.SignIn = app.signInSource(cfg)
 	engine.Installation = func() string { return config.StoredInstallationID(app.dir) }
-	legacy := cachedLegacyRecord(app.dir, app.stateDir)
+	legacy := cachedLegacyRecord(app.dir, app.stateDir, func() bool {
+		file, err := config.LoadFile(app.dir)
+		if err != nil {
+			return false // unread, no record is written: what has no owner waits
+		}
+		p := file.Profiles[cfg.ProfileName]
+		return p != nil && p.ServerKeySignIn
+	})
+	// Looked at now, before any export arrives: a first look records the older sign-ins'
+	// boundary (auth.LegacyOwnership), which what the relay accepts from now on is after.
+	legacy()
 	engine.Legacy = func() (string, time.Time) {
 		rec := legacy()
 		return rec.Account, rec.RetiredAt
@@ -210,7 +220,7 @@ func (app *App) bindRelay(engine *relay.Options, cfg *config.Config) {
 // cachedLegacyRecord reads the legacy record at most once a second: the relay asks for it
 // for every queued entry from before user tokens. A read that fails keeps the last record
 // read, or with none, names no one (auth.UnreadableLegacyRecord), never no record.
-func cachedLegacyRecord(dir, stateDir string) func() auth.LegacyRecord {
+func cachedLegacyRecord(dir, stateDir string, serverKey func() bool) func() auth.LegacyRecord {
 	var mu sync.Mutex
 	rec := auth.UnreadableLegacyRecord(stateDir)
 	var at time.Time
@@ -218,7 +228,7 @@ func cachedLegacyRecord(dir, stateDir string) func() auth.LegacyRecord {
 		mu.Lock()
 		defer mu.Unlock()
 		if time.Since(at) > time.Second {
-			if read, err := auth.LegacyOwnership(dir, stateDir); err == nil {
+			if read, err := auth.LegacyOwnership(dir, stateDir, serverKey()); err == nil {
 				rec = read
 			}
 			at = time.Now()

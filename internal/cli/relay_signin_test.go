@@ -2,6 +2,8 @@ package cli
 
 import (
 	"github.com/miradorlabs/terma-cli/internal/doctor"
+	"github.com/miradorlabs/terma-cli/internal/relay"
+	"os"
 	"testing"
 	"time"
 
@@ -192,5 +194,48 @@ func TestARetirementCountsAfterTheSessionRotated(t *testing.T) {
 	src.Retired("an-earlier-token")
 	if !auth.Retired(testApp.dir, config.DefaultProfile) {
 		t.Fatal("the session that sent the refused token was not retired after it rotated")
+	}
+}
+
+// On a server-key profile the relay records the older sign-ins' boundary as it binds,
+// before any export arrives: what it accepts after is the key's own.
+func TestTheRelayRecordsTheLegacyBoundaryAsItBinds(t *testing.T) {
+	f := newFakeAuth(t)
+	authSandbox(t, f)
+	data := `{"default": {"organizations": {"o": {"session_id": "s", "auth_url": "https://auth.example.test", "organization_id": "o", "user_id": "u"}}}}`
+	if err := os.WriteFile(config.LegacyCredentialsPath(testApp.dir), []byte(data), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	serverKeyProfile(t)
+	cfg, err := testApp.loadConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	before := time.Now()
+	testApp.bindRelay(&relay.Options{}, cfg)
+	rec, err := auth.ReadLegacyRecord(testApp.stateDir)
+	if err != nil || rec.RetiredAt.IsZero() || rec.RetiredAt.Before(before.Add(-time.Second)) {
+		t.Fatalf("record = %+v, %v; want it written as the relay bound", rec, err)
+	}
+}
+
+// A config.json that can't be read never stops the relay's legacy look: no record is
+// written, and the relay goes on.
+func TestAnUnreadableConfigLeavesTheLegacyLookAlone(t *testing.T) {
+	f := newFakeAuth(t)
+	authSandbox(t, f)
+	if err := os.WriteFile(config.LegacyCredentialsPath(testApp.dir), []byte(`{}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := testApp.loadConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(config.Path(testApp.dir), []byte("{"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	testApp.bindRelay(&relay.Options{}, cfg)
+	if rec, err := auth.ReadLegacyRecord(testApp.stateDir); err != nil || !rec.RetiredAt.IsZero() {
+		t.Fatalf("record = %+v, %v; want none written", rec, err)
 	}
 }

@@ -205,31 +205,28 @@ func UnreadableLegacyRecord(stateDir string) LegacyRecord {
 }
 
 // LegacyOwnership is whose an older terma's backlog is, for the relay and delivery to
-// judge: the record when one was kept. While an older terma's sign-ins are still on the
-// machine with no record (set up with a server key before this terma retired them), the
-// record is written now, the first time this terma looks: everything bound to no account
-// until now was the older terma's, and counts as its sign-ins' account, or no one's. A
-// record that can't be written leaves every such entry, up to now, named by no one. A
-// record that can't be read is as UnreadableLegacyRecord.
-func LegacyOwnership(dir, stateDir string) (LegacyRecord, error) {
+// judge: the record when one was kept. With older sign-ins still on the machine and no
+// record, a profile set up with a server key (serverKey) records one now, the first time
+// this terma looks (the relay looks as it starts, before any export): everything bound to
+// no account until now is named by no one, for good, so the key sends only what it
+// collects after, and no later sign-in sends what the key collected. On a person's
+// profile nothing is recorded: what is bound to no account waits for the retirement at
+// their sign-in. A record that can't be written leaves every such entry, up to now, named
+// by no one. A record that can't be read is as UnreadableLegacyRecord.
+func LegacyOwnership(dir, stateDir string, serverKey bool) (LegacyRecord, error) {
 	rec, err := ReadLegacyRecord(stateDir)
-	if err != nil || !rec.RetiredAt.IsZero() || !HasLegacySignIns(dir) {
+	if err != nil || !rec.RetiredAt.IsZero() || !serverKey || !HasLegacySignIns(dir) {
 		return rec, err
 	}
-	now := time.Now()
-	nameless := LegacyRecord{Account: LegacyAccountAmbiguous, RetiredAt: now.UTC()}
-	signIns, err := LegacySignIns(dir, false)
-	switch {
-	case err != nil:
-		// Read again next time; meanwhile everything up to now is no one's.
-		return nameless, nil
-	case len(signIns) == 0:
-		// A file naming no sign-in names no one, and that is recorded too: a boundary kept
-		// at now would hold everything bound to no account, a server key's, forever.
-		if config.WriteJSON(filepath.Join(stateDir, LegacyRecordFile), nameless, 0o600) != nil {
-			return nameless, nil
+	nameless := LegacyRecord{Account: LegacyAccountAmbiguous, RetiredAt: time.Now().UTC()}
+	if signIns, err := LegacySignIns(dir, false); err == nil {
+		for _, s := range signIns {
+			if s.SessionID != "" {
+				nameless.SessionIDs = append(nameless.SessionIDs, s.SessionID)
+			}
 		}
-	case RecordLegacy(stateDir, signIns, now) != nil:
+	}
+	if config.WriteJSON(filepath.Join(stateDir, LegacyRecordFile), nameless, 0o600) != nil {
 		return nameless, nil
 	}
 	if written, err := ReadLegacyRecord(stateDir); err == nil && !written.RetiredAt.IsZero() {

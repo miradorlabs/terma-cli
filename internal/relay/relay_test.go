@@ -703,3 +703,70 @@ func TestATeamsPartLostBeforeAnySweepIsCounted(t *testing.T) {
 		t.Fatalf("losses = %+v, %v; want the refused part counted", l, err)
 	}
 }
+
+// A part held only to keep order behind one waiting for its team's policy is pinned too:
+// lost before a sweep, it is counted as that team's.
+func TestAFollowerHeldForOrderIsPinned(t *testing.T) {
+	t.Parallel()
+	u := newUpstream(t)
+	f := newFixture()
+	var mu sync.Mutex
+	readable := false
+	r := newRelay(Options{Dir: t.TempDir(), Token: token, Hold: time.Minute, Lookup: f.lookup, Now: f.clock,
+		Resolve: func(c claim.Claim) (Policy, error) {
+			mu.Lock()
+			defer mu.Unlock()
+			if !readable {
+				return Policy{}, ErrNoKey
+			}
+			return Policy{Endpoint: u.srv.URL, Key: "key-p3"}, nil
+		}})
+	srv := httptest.NewServer(r.Handler())
+	t.Cleanup(srv.Close)
+	postProto(t, srv, "/v1/logs", logsOf("D", 1))
+	mu.Lock()
+	readable = true
+	mu.Unlock()
+	postProto(t, srv, "/v1/logs", logsOf("D", 1))
+	r.mu.Lock()
+	held := append([]heldPart(nil), r.held["D"]...)
+	r.mu.Unlock()
+	if len(held) != 2 || held[1].pinned == nil {
+		t.Fatalf("held %d parts, the follower pinned: %v", len(held), len(held) == 2 && held[1].pinned != nil)
+	}
+}
+
+// A follower placed by global mode's catch-all is not pinned: global mode is decided again
+// at every sweep, and switched off it must send nothing under the catch-all.
+func TestAFollowerPlacedByTheCatchAllIsNotPinned(t *testing.T) {
+	t.Parallel()
+	u := newUpstream(t)
+	f := newFixture()
+	var mu sync.Mutex
+	readable := false
+	r := newRelay(Options{Dir: t.TempDir(), Token: token, Hold: time.Minute, Lookup: f.lookup, Now: f.clock,
+		CatchAll: func() (claim.Claim, bool) { return claim.Claim{ProjectID: "global"}, true },
+		Resolve: func(c claim.Claim) (Policy, error) {
+			mu.Lock()
+			defer mu.Unlock()
+			if !readable {
+				return Policy{}, ErrNoKey
+			}
+			return Policy{Endpoint: u.srv.URL, Key: "key-global"}, nil
+		}})
+	srv := httptest.NewServer(r.Handler())
+	t.Cleanup(srv.Close)
+	postProto(t, srv, "/v1/logs", logsOf("Z", 1))
+	mu.Lock()
+	readable = true
+	mu.Unlock()
+	postProto(t, srv, "/v1/logs", logsOf("Z", 1))
+	r.mu.Lock()
+	held := append([]heldPart(nil), r.held["Z"]...)
+	r.mu.Unlock()
+	for i, h := range held {
+		if h.pinned != nil {
+			t.Fatalf("held part %d is pinned to the catch-all %q", i, h.pinned.ProjectID)
+		}
+	}
+}

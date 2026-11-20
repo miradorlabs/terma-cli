@@ -200,7 +200,7 @@ func (app *App) flushSpool(ctx context.Context, force bool, minInterval time.Dur
 	}
 	r := app.delivery()
 	r.SignIn = app.signInSource(cfg)
-	rec, err := auth.LegacyOwnership(app.dir, app.stateDir)
+	rec, err := auth.LegacyOwnership(app.dir, app.stateDir, cfg.ServerKeySignIn)
 	if err != nil {
 		rec = auth.UnreadableLegacyRecord(app.stateDir)
 	}
