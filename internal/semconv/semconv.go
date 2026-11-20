@@ -33,6 +33,12 @@ const (
 	GenAIToolNameKey = "gen_ai.tool.name"
 	// GenAIToolTypeKey is gen_ai.tool.type: Type of the tool utilized by the agent
 	GenAIToolTypeKey = "gen_ai.tool.type"
+	// GenAIUsageCacheReadInputTokensKey is gen_ai.usage.cache_read.input_tokens: The number of input tokens served from a provider-managed cache.
+	GenAIUsageCacheReadInputTokensKey = "gen_ai.usage.cache_read.input_tokens"
+	// GenAIUsageInputTokensKey is gen_ai.usage.input_tokens: The number of tokens used in the GenAI input (prompt).
+	GenAIUsageInputTokensKey = "gen_ai.usage.input_tokens"
+	// GenAIUsageOutputTokensKey is gen_ai.usage.output_tokens: The number of tokens used in the GenAI response (completion).
+	GenAIUsageOutputTokensKey = "gen_ai.usage.output_tokens"
 	// GenAIUsageReasoningOutputTokensKey is gen_ai.usage.reasoning.output_tokens: The number of output tokens used for reasoning (e.g. chain-of-thought, extended thinking).
 	GenAIUsageReasoningOutputTokensKey = "gen_ai.usage.reasoning.output_tokens"
 	// HostNameKey is host.name: Name of the host. On UNIX systems, it may contain what the hostname command returns, or the fully qualified hostname, or another name specified by the user.
@@ -213,6 +219,8 @@ const (
 	TermaPushStatusKey = "terma.push.status"
 	// TermaQuotaStatusKey is terma.quota.status: Whether the record carries the session's quota.
 	TermaQuotaStatusKey = "terma.quota.status"
+	// TermaRateLimitBucketsKey is terma.rate_limit.buckets: The provider's quota buckets, each under the provider's own id.
+	TermaRateLimitBucketsKey = "terma.rate_limit.buckets"
 	// TermaRateLimitFiveHourResetsAtKey is terma.rate_limit.five_hour.resets_at: When the five-hour window resets, in Unix seconds.
 	TermaRateLimitFiveHourResetsAtKey = "terma.rate_limit.five_hour.resets_at"
 	// TermaRateLimitFiveHourUsedPercentKey is terma.rate_limit.five_hour.used_percent: How much of the five-hour window is used, from 0 to 100.
@@ -333,6 +341,8 @@ const (
 	TermaCompactionEvent = "terma.compaction"
 	// TermaFilesTouchedEvent is terma.files.touched: A session wrote files in the repository.
 	TermaFilesTouchedEvent = "terma.files.touched"
+	// TermaModelCallEvent is terma.model_call: One model call of an agent without an export, as its transcript recorded it, keyed on its call id.
+	TermaModelCallEvent = "terma.model_call"
 	// TermaModelCallResponseEvent is terma.model_call.response: What the API answered for one model call, as the agent recorded it and its telemetry does not say.
 	TermaModelCallResponseEvent = "terma.model_call.response"
 	// TermaPushEvent is terma.push: A branch was pushed, one event per branch the push updated.

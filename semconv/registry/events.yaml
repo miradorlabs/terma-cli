@@ -308,6 +308,7 @@ events:
       - ref: terma.credits.present
       - ref: terma.credits.unlimited
       - ref: terma.credits.balance
+      - ref: terma.rate_limit.buckets
 
   - name: terma.session.account
     stability: development
@@ -330,6 +331,8 @@ events:
       - ref: terma.account.organization.rate_limit_tier
       - ref: terma.account.billing_type
       - ref: terma.account.extra_usage.enabled
+      - ref: terma.account.plan_type
+      - ref: terma.account.seat.id
       - ref: user.email
         note: Only when the cached login is the session's credential; withheld whenever the team's policy withholds prompts or tool content.
 
@@ -624,6 +627,39 @@ events:
           conditionally_required: When the agent recorded the count.
       - ref: terma.response.service_tier
       - ref: terma.response.inference_geo
+
+  - name: terma.model_call
+    stability: development
+    requirement_level: recommended
+    brief: One model call of an agent without an export, as its transcript recorded it, keyed on its call id.
+    note: >
+      Its counts are the call's own, never a snapshot, and gen_ai.usage.input_tokens
+      includes the cache reads gen_ai.usage.cache_read.input_tokens names, as OpenTelemetry
+      counts them. An agent that does not count thinking apart from output sends no
+      gen_ai.usage.reasoning.output_tokens, and terma.usage.status partial, rather than a
+      zero.
+    attributes:
+      - ref: session.id
+        requirement_level: required
+      - ref: gen_ai.main_agent.name
+        requirement_level: required
+      - ref: terma.evidence.source
+        requirement_level: required
+      - ref: terma.model_call.id
+        requirement_level: required
+      - ref: terma.usage.status
+        requirement_level: required
+      - ref: terma.step.index
+      - ref: terma.turn.id
+      - ref: gen_ai.request.model
+        note: The model the agent recorded for the call, its effort suffix included.
+      - ref: gen_ai.usage.input_tokens
+        note: Every input token, the cache reads included.
+      - ref: gen_ai.usage.cache_read.input_tokens
+      - ref: gen_ai.usage.output_tokens
+        note: Thinking included, where the agent does not count it apart.
+      - ref: terma.operation.status
+        note: completed or error.
 
   - name: terma.relay.heartbeat
     stability: development
