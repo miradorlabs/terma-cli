@@ -37,8 +37,12 @@ test('extracts a real archive through paths with apostrophes and shell character
   const archivePath = path.join(options.root, asset);
   fs.writeFileSync(source, 'fixture binary');
   if (windows) {
+    // .NET's ZipFile, as install.js uses, so the test does not depend on which Archive
+    // module the inherited PSModulePath loads either.
     execFileSync('powershell', ['-NoProfile', '-NonInteractive', '-Command',
-      "$ErrorActionPreference = 'Stop'; Compress-Archive -LiteralPath $env:TEST_SOURCE -DestinationPath $env:TEST_ARCHIVE"], {
+      "$ErrorActionPreference = 'Stop'; Add-Type -AssemblyName System.IO.Compression, System.IO.Compression.FileSystem; " +
+      "$zip = [System.IO.Compression.ZipFile]::Open($env:TEST_ARCHIVE, 'Create'); " +
+      "try { [void][System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, $env:TEST_SOURCE, 'terma.exe') } finally { $zip.Dispose() }"], {
       env: { ...process.env, TEST_SOURCE: source, TEST_ARCHIVE: archivePath },
     });
   } else {
