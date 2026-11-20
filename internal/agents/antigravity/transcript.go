@@ -11,6 +11,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -57,20 +58,29 @@ type antigravityCallState struct {
 	Step int64 `json:"step"`
 	// Turn is the turn of the last prompt read, for the calls after it.
 	Turn string `json:"turn,omitempty"`
+	// Subagent is set while the results read belong to a call that ran invoke_subagent.
+	Subagent bool `json:"subagent,omitempty"`
 }
 
 // antigravityStep is the part of a transcript line terma reads.
 type antigravityStep struct {
-	StepIndex       *int64          `json:"step_index"`
-	Type            string          `json:"type"`
-	Status          string          `json:"status"`
-	CreatedAt       string          `json:"created_at"`
-	Model           string          `json:"model"`
-	InputTokens     json.RawMessage `json:"input_tokens"`
-	CacheReadTokens json.RawMessage `json:"cache_read_tokens"`
-	OutputTokens    json.RawMessage `json:"output_tokens"`
+	StepIndex       *int64                `json:"step_index"`
+	Type            string                `json:"type"`
+	Status          string                `json:"status"`
+	CreatedAt       string                `json:"created_at"`
+	Model           string                `json:"model"`
+	InputTokens     json.RawMessage       `json:"input_tokens"`
+	CacheReadTokens json.RawMessage       `json:"cache_read_tokens"`
+	OutputTokens    json.RawMessage       `json:"output_tokens"`
+	ToolCalls       []antigravityToolCall `json:"tool_calls"`
 	// Content is read only on an invoke_subagent result, for the child's id.
 	Content string `json:"content"`
+	// subagentResult is set on a result of a call that ran invoke_subagent.
+	subagentResult bool
+}
+
+type antigravityToolCall struct {
+	Name string `json:"name"`
 }
 
 // antigravityTranscript is the hook's transcriptPath when it is the conversation's own
@@ -100,11 +110,13 @@ func antigravityTranscript(in *antigravityHookInput) string {
 
 // captureAntigravityCalls sends each model call, and each subagent the conversation
 // opened, that the transcript recorded since the last read. It reports whether it read
-// the transcript, so the hook's observation says usage travels apart.
+// the transcript, so the hook's observation says usage travels apart. With no repository,
+// a hook the team's policy does not collect, it reads past those calls and sends none:
+// a call made there never leaves, even once the conversation moves somewhere collected.
 func captureAntigravityCalls(ctx context.Context, e hookrun.Env, r *hookrun.Repo, in *antigravityHookInput) bool {
 	transcript := antigravityTranscript(in)
 	id := in.id()
-	if transcript == "" || e.Spool == nil || !session.ValidID(id) {
+	if transcript == "" || (r != nil && e.Spool == nil) || !session.ValidID(id) {
 		return false
 	}
 	dir := filepath.Join(e.StateDir, antigravityCallDir)
@@ -126,11 +138,19 @@ func captureAntigravityCalls(ctx context.Context, e hookrun.Env, r *hookrun.Repo
 		last = antigravityCallState{Step: -1}
 	}
 	next, err := readAntigravitySteps(transcript, last, func(s antigravityStep, turn string) bool {
+		if ctx.Err() != nil {
+			// Out of time: what was sent is saved, the rest goes with the next hook.
+			return false
+		}
+		if r == nil {
+			return true
+		}
 		switch s.Type {
 		case "PLANNER_RESPONSE":
 			return e.EmitFor(r, antigravityCallEvent(id, s, turn))
 		case "GENERIC":
-			if child := antigravitySubagent(s.Content); child != "" && child != id {
+			// Only invoke_subagent's result names a child; other output could quote one.
+			if child := antigravitySubagent(s.Content); s.subagentResult && child != "" && child != id {
 				// The child's own hooks name no parent: its session start, again, does.
 				return e.EmitFor(r, spool.Event{Name: semconv.TermaSessionStartEvent, SessionID: child, Attrs: map[string]any{
 					semconv.GenAIMainAgentNameKey: antigravityTool, semconv.TermaSessionParentIDKey: id,
@@ -243,8 +263,9 @@ func readAntigravitySteps(path string, last antigravityCallState, emit func(anti
 	}
 	state := last
 	if state.Offset > info.Size() || antigravityTail(f, state.Offset) != state.Tail {
-		// Rewritten (compaction) or replaced: read again from the start; Step keeps what was sent.
-		state.Offset, state.Turn = 0, ""
+		// Rewritten (compaction) or replaced: read again from the start; Step keeps what
+		// was sent, and Turn the turn until a prompt the rewrite kept names it again.
+		state.Offset = 0
 	}
 	if _, err := f.Seek(state.Offset, io.SeekStart); err != nil {
 		return last, err
@@ -261,7 +282,7 @@ func readAntigravitySteps(path string, last antigravityCallState, emit func(anti
 			return state, err
 		}
 		if !bytes.Contains(line, []byte(`"PLANNER_RESPONSE"`)) && !bytes.Contains(line, []byte(`"USER_INPUT"`)) &&
-			!bytes.Contains(line, []byte(antigravitySubagentMarker)) {
+			(!state.Subagent || !bytes.Contains(line, []byte(antigravitySubagentMarker))) {
 			state.Offset += int64(len(line))
 			continue
 		}
@@ -271,6 +292,14 @@ func readAntigravitySteps(path string, last antigravityCallState, emit func(anti
 			continue
 		}
 		step := *s.StepIndex
+		s.subagentResult = state.Subagent
+		switch s.Type {
+		case "USER_INPUT":
+			state.Subagent = false
+		case "PLANNER_RESPONSE":
+			// Its results follow it, one line per call.
+			state.Subagent = slices.ContainsFunc(s.ToolCalls, func(c antigravityToolCall) bool { return c.Name == "invoke_subagent" })
+		}
 		switch {
 		case s.Type == "USER_INPUT":
 			// agy's turn starts with the prompt's step counted: initialNumSteps, its turn id.

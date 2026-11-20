@@ -11,11 +11,17 @@ import (
 )
 
 // setupStatusLine wraps the status line, a global setting, of each agent the developer chose
-// that has one.
+// that has one, and puts back the one terma wrapped for an agent no longer chosen, as its
+// hooks are taken out.
 func (app *App) setupStatusLine(errOut io.Writer, ui *setupUI, names []string) {
 	lines := doctor.StatusLineAgents(app.agents)
 	for _, a := range lines {
 		if !slices.Contains(names, a.Name()) {
+			if restored, err := a.RemoveStatusLine(); err != nil {
+				fmt.Fprintf(errOut, "Warning: could not restore %s's status line: %v\n", a.DisplayName(), err)
+			} else if restored {
+				ui.OK(a.DisplayName()+" status line", "restored to what it was before terma")
+			}
 			continue
 		}
 		label := "Status line"

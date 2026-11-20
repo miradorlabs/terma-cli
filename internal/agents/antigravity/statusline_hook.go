@@ -257,7 +257,7 @@ func captureAntigravitySeat(e hookrun.Env, p *antigravityStatusLinePayload) bool
 	if r.ProjectID != "" {
 		attrs[hookrun.AttrProjectID] = r.ProjectID
 	}
-	if err := e.Spool.Append(spool.Event{Time: now, Name: semconv.TermaSessionQuotaEvent, SessionID: id, Repository: r.Repository, Attrs: attrs}); err != nil {
+	if err := e.Spool.Append(spool.Event{Time: now, Name: semconv.TermaSessionQuotaEvent, SessionID: id, Repository: r.Repository, Global: e.Policy.Global(), Attrs: attrs}); err != nil {
 		e.Logf("antigravity quota append: %v", err)
 		return false
 	}
