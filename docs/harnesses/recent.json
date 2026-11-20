@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-20T01:10:01.695546758Z",
+  "generated_at": "2026-11-20T01:33:28.418772035Z",
   "versions": [
     {
       "harness": "codex",
@@ -36,6 +36,45 @@
       ],
       "signing": "valid",
       "attempted_at": "2026-11-20T01:10:01.695546758Z",
+      "attempts": 1
+    },
+    {
+      "harness": "claude-desktop",
+      "name": "Claude Desktop (Code)",
+      "version": "6.28899.2",
+      "released_at": "2026-11-19T23:28:43.083Z",
+      "captured_at": "2026-11-20T01:33:28.418772035Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "6.6395.1",
+      "changes": 170,
+      "categories": {
+        "binary": 3,
+        "cli": 20,
+        "config": 125,
+        "hooks": 4,
+        "model": 1,
+        "prompt": 3,
+        "request": 3,
+        "side_requests": 5,
+        "tools": 6
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 24,
+        "notable": 146
+      },
+      "undocumented": null,
+      "highlights": [
+        "Model parameter safeguards added",
+        "Injected context changed (+2441 −2335 chars)",
+        "System prompt changed"
+      ],
+      "signing": "valid",
+      "attempted_at": "2026-11-20T01:33:28.418772035Z",
       "attempts": 1
     },
     {
@@ -6180,37 +6219,6 @@
         "Skill tool description changed (+1237 −1692 chars)",
         "New environment variable: CLAUDE_CODE_FLEETVIEW_SIMPLE",
         "Environment variable no longer read: CLAUDE_CODE_OWNERSHIP_FRAME"
-      ],
-      "signing": "valid"
-    },
-    {
-      "harness": "claude",
-      "name": "Claude Code",
-      "version": "2.1.215",
-      "released_at": "2026-07-19T00:53:37.17Z",
-      "captured_at": "2026-11-05T09:54:28.532441Z",
-      "platforms": [
-        "darwin/arm64",
-        "linux/amd64"
-      ],
-      "support": "untested",
-      "previous": "2.1.214",
-      "changes": 5,
-      "categories": {
-        "config": 3,
-        "prompt": 2
-      },
-      "impact": {
-        "breaking": 0,
-        "degrading": 0,
-        "informational": 3,
-        "notable": 2
-      },
-      "undocumented": 5,
-      "highlights": [
-        "Injected context changed (+0 −826 chars)",
-        "Interactive session's injected context changed (+0 −826 chars)",
-        "New environment variable: CLAUDE_CODE_GAULT_KESTREL"
       ],
       "signing": "valid"
     }

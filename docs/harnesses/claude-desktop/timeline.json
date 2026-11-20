@@ -3,6 +3,1372 @@
   "harness": "claude-desktop",
   "steps": [
     {
+      "version": "6.28899.2",
+      "previous": "6.6395.1",
+      "changes": [
+        {
+          "id": "model.params.safeguards",
+          "category": "model",
+          "op": "added",
+          "title": "Model parameter safeguards added",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "prompt.context.2.text",
+          "category": "prompt",
+          "op": "changed",
+          "title": "Injected context changed (+2441 −2335 chars)",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "prompt.system.0.text",
+          "category": "prompt",
+          "op": "changed",
+          "title": "System prompt changed",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "prompt.system.2.text",
+          "category": "prompt",
+          "op": "changed",
+          "title": "System prompt changed (+2765 −378 chars)",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "tools.Bash.description",
+          "category": "tools",
+          "op": "changed",
+          "title": "Bash tool description changed (+175 −0 chars)",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "tools.ListAgents.description",
+          "category": "tools",
+          "op": "changed",
+          "title": "ListAgents tool description changed (+1193 −537 chars)",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "tools.ListAgents.input_schema.properties.cursor",
+          "category": "tools",
+          "op": "added",
+          "title": "ListAgents tool parameter cursor added",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "tools.ReportFindings.input_schema.properties.findings.items.properties.severity",
+          "category": "tools",
+          "op": "added",
+          "title": "ReportFindings tool parameter findings: items.properties.severity added",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "tools.ReportFindings.input_schema.properties.findings.items.properties.summary.description",
+          "category": "tools",
+          "op": "changed",
+          "title": "ReportFindings tool parameter findings: items.properties.summary.description changed",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "tools.SendMessage.description",
+          "category": "tools",
+          "op": "changed",
+          "title": "SendMessage tool description changed (+1476 −977 chars)",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "request.betas.dangerous-tool-use-2026-09-03",
+          "category": "request",
+          "op": "added",
+          "title": "New beta: dangerous-tool-use-2026-09-03",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "request.body_keys.safeguards",
+          "category": "request",
+          "op": "added",
+          "title": "Request field safeguards added",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "request.headers.user-agent",
+          "category": "request",
+          "op": "changed",
+          "title": "Header user-agent: claude-cli/2.1.326 (external, claude-desktop-3p, agent-sd… → claude-cli/2.1.328 (external, claude-desktop-3p, agent-sd…",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "side_requests.POST /v1/messages/count_tokens claude-opus-5-5.tools",
+          "category": "side_requests",
+          "op": "changed",
+          "title": "Side request POST /v1/messages/count_tokens claude-opus-5-5 tools changed",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "side_requests.POST /v1/messages/count_tokens claude-opus-5-5.tools",
+          "category": "side_requests",
+          "op": "changed",
+          "title": "Side request POST /v1/messages/count_tokens claude-opus-5-5 tools changed",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "side_requests.POST /v1/messages/count_tokens claude-opus-5-5.tools",
+          "category": "side_requests",
+          "op": "changed",
+          "title": "Side request POST /v1/messages/count_tokens claude-opus-5-5 tools changed",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "side_requests.POST /v1/messages/count_tokens claude-opus-5-5.tools",
+          "category": "side_requests",
+          "op": "changed",
+          "title": "Side request POST /v1/messages/count_tokens claude-opus-5-5 tools changed",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "side_requests.POST /v1/messages/count_tokens claude-opus-5-5.tools",
+          "category": "side_requests",
+          "op": "changed",
+          "title": "Side request POST /v1/messages/count_tokens claude-opus-5-5 tools changed",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "hooks.events.MessageDisplay.env.CLAUDE_CODE_CHILD_NOTES_DIR",
+          "category": "hooks",
+          "op": "added",
+          "title": "MessageDisplay hook environment variable CLAUDE_CODE_CHILD_NOTES_DIR added",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "hooks.events.SessionStart.env.CLAUDE_CODE_CHILD_NOTES_DIR",
+          "category": "hooks",
+          "op": "added",
+          "title": "SessionStart hook environment variable CLAUDE_CODE_CHILD_NOTES_DIR added",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "hooks.events.Stop.env.CLAUDE_CODE_CHILD_NOTES_DIR",
+          "category": "hooks",
+          "op": "added",
+          "title": "Stop hook environment variable CLAUDE_CODE_CHILD_NOTES_DIR added",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "hooks.events.UserPromptSubmit.env.CLAUDE_CODE_CHILD_NOTES_DIR",
+          "category": "hooks",
+          "op": "added",
+          "title": "UserPromptSubmit hook environment variable CLAUDE_CODE_CHILD_NOTES_DIR added",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "cli.commands.claude.options.--autocompact.description",
+          "category": "cli",
+          "op": "changed",
+          "title": "`claude --autocompact`: description changed",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "cli.commands.claude mcp add-json.description",
+          "category": "cli",
+          "op": "changed",
+          "title": "Description of `claude mcp add-json` changed",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "cli.help.--help",
+          "category": "cli",
+          "op": "changed",
+          "title": "Full help text of `--help` changed (+135 −131 chars)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "cli.help.mcp --help",
+          "category": "cli",
+          "op": "changed",
+          "title": "Full help text of `mcp --help` changed (+136 −69 chars)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "cli.launch.env.CLAUDE_CHROME_CLASSIFIER_FLOOR",
+          "category": "cli",
+          "op": "added",
+          "title": "The app now sets its agent's CLAUDE_CHROME_CLASSIFIER_FLOOR",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "cli.launch.env.CLAUDE_CODE_DESKTOP_RESULT_FIRST",
+          "category": "cli",
+          "op": "added",
+          "title": "The app now sets its agent's CLAUDE_CODE_DESKTOP_RESULT_FIRST",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "cli.launch.env.CLAUDE_CODE_LANTERN_PRISM",
+          "category": "cli",
+          "op": "added",
+          "title": "The app now sets its agent's CLAUDE_CODE_LANTERN_PRISM",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "cli.launch.env.CLAUDE_CODE_SDK_READS_STARTUP_MARKS",
+          "category": "cli",
+          "op": "added",
+          "title": "The app now sets its agent's CLAUDE_CODE_SDK_READS_STARTUP_MARKS",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "cli.launch.env.CLAUDE_CODE_SILENT_TURN_REMINDER_TEXT",
+          "category": "cli",
+          "op": "added",
+          "title": "The app now sets its agent's CLAUDE_CODE_SILENT_TURN_REMINDER_TEXT",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "cli.launch.env.CLAUDE_CODE_CLASSIFIER_SUMMARY",
+          "category": "cli",
+          "op": "removed",
+          "title": "The app no longer sets its agent's CLAUDE_CODE_CLASSIFIER_SUMMARY",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "cli.launch.env_values.BAGGAGE",
+          "category": "cli",
+          "op": "changed",
+          "title": "The app's agent's BAGGAGE: none → none",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "cli.launch.env_values.CLAUDE_AGENT_SDK_VERSION",
+          "category": "cli",
+          "op": "changed",
+          "title": "The app's agent's CLAUDE_AGENT_SDK_VERSION: 0.3.326 → 0.3.328",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "cli.launch.env_values.CLAUDE_CHROME_CLASSIFIER_FLOOR",
+          "category": "cli",
+          "op": "added",
+          "title": "The app's agent's CLAUDE_CHROME_CLASSIFIER_FLOOR: none → 1",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "cli.launch.env_values.CLAUDE_CODE_AUTO_MODE_SERVER",
+          "category": "cli",
+          "op": "changed",
+          "title": "The app's agent's CLAUDE_CODE_AUTO_MODE_SERVER: 0 → 1",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "cli.launch.env_values.CLAUDE_CODE_CLASSIFIER_SUMMARY",
+          "category": "cli",
+          "op": "removed",
+          "title": "The app's agent's CLAUDE_CODE_CLASSIFIER_SUMMARY: 0 → none",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "cli.launch.env_values.CLAUDE_CODE_DESKTOP_RESULT_FIRST",
+          "category": "cli",
+          "op": "added",
+          "title": "The app's agent's CLAUDE_CODE_DESKTOP_RESULT_FIRST: none → 1",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "cli.launch.env_values.CLAUDE_CODE_LANTERN_PRISM",
+          "category": "cli",
+          "op": "added",
+          "title": "The app's agent's CLAUDE_CODE_LANTERN_PRISM: none → 1",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "cli.launch.env_values.CLAUDE_CODE_SDK_READS_STARTUP_MARKS",
+          "category": "cli",
+          "op": "added",
+          "title": "The app's agent's CLAUDE_CODE_SDK_READS_STARTUP_MARKS: none → 1",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "cli.launch.env_values.CLAUDE_CODE_SILENT_TURN_REMINDER_TEXT",
+          "category": "cli",
+          "op": "added",
+          "title": "The app's agent's CLAUDE_CODE_SILENT_TURN_REMINDER_TEXT: none → The user hasn't heard from you in a while — say in a fe…",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "cli.launch.env_values.SENTRY-TRACE",
+          "category": "cli",
+          "op": "changed",
+          "title": "The app's agent's SENTRY-TRACE: <hex>-a6ef6c3ae578c78b → <hex>-a6466bbeebaf1c8e",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.allowManagedMcpServersOnly.description",
+          "category": "config",
+          "op": "changed",
+          "title": "allowManagedMcpServersOnly description changed (+328 −273 chars)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.options.allowNestedModelAccessUnderForceLogin",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: allowNestedModelAccessUnderForceLogin",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.allowedMcpServers.description",
+          "category": "config",
+          "op": "changed",
+          "title": "allowedMcpServers description changed (+252 −0 chars)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.options.askUserQuestionTimeout.enum.60s",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting askUserQuestionTimeout lost value 60s",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.askUserQuestionTimeout.enum.5m",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting askUserQuestionTimeout lost value 5m",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.askUserQuestionTimeout.enum.10m",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting askUserQuestionTimeout lost value 10m",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.askUserQuestionTimeout.enum.never",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting askUserQuestionTimeout lost value never",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.attributionProject.description",
+          "category": "config",
+          "op": "changed",
+          "title": "attributionProject description changed (+341 −165 chars)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.options.attributionProjectPolicy.default.description",
+          "category": "config",
+          "op": "changed",
+          "title": "attributionProjectPolicy.default description changed (+265 −185 chars)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.options.autoCompactOfferAnswer",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: autoCompactOfferAnswer",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.options.autoCompactRaisedForLoad",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: autoCompactRaisedForLoad",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.options.autoUpdatesChannel.enum.latest",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting autoUpdatesChannel lost value latest",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.autoUpdatesChannel.enum.stable",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting autoUpdatesChannel lost value stable",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.autoUpdatesChannel.enum.rc",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting autoUpdatesChannel lost value rc",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.availableModels.description",
+          "category": "config",
+          "op": "changed",
+          "title": "availableModels description changed (+219 −0 chars)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.options.availableModelsMatch.enum.prefix",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting availableModelsMatch lost value prefix",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.availableModelsMatch.enum.exact",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting availableModelsMatch lost value exact",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.crossSessionInbound.enum.accept",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting crossSessionInbound lost value accept",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.crossSessionInbound.enum.hold",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting crossSessionInbound lost value hold",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.crossSessionInbound.enum.refuse",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting crossSessionInbound lost value refuse",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.daemonColdStart.enum.transient",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting daemonColdStart lost value transient",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.daemonColdStart.enum.ask",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting daemonColdStart lost value ask",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.defaultShell.enum.bash",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting defaultShell lost value bash",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.defaultShell.enum.powershell",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting defaultShell lost value powershell",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.defaultView.enum.chat",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting defaultView lost value chat",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.defaultView.enum.transcript",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting defaultView lost value transcript",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.deniedMcpServers.description",
+          "category": "config",
+          "op": "changed",
+          "title": "deniedMcpServers description changed (+476 −241 chars)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.options.dialogExpiry.enum.60s",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting dialogExpiry lost value 60s",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.dialogExpiry.enum.5m",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting dialogExpiry lost value 5m",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.dialogExpiry.enum.10m",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting dialogExpiry lost value 10m",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.dialogExpiry.enum.never",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting dialogExpiry lost value never",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.disableAutoMode.enum.disable",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting disableAutoMode lost value disable",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.disableDeepLinkRegistration.enum.disable",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting disableDeepLinkRegistration lost value disable",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.editorMode.enum.normal",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting editorMode lost value normal",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.editorMode.enum.vim",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting editorMode lost value vim",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.effortLevel.enum.low",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting effortLevel lost value low",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.effortLevel.enum.medium",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting effortLevel lost value medium",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.effortLevel.enum.high",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting effortLevel lost value high",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.effortLevel.enum.xhigh",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting effortLevel lost value xhigh",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.feedbackDrafts.enum.notify",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting feedbackDrafts lost value notify",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.feedbackDrafts.enum.quiet",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting feedbackDrafts lost value quiet",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.feedbackDrafts.enum.off",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting feedbackDrafts lost value off",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.forceLoginMethod.enum.claudeai",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting forceLoginMethod lost value claudeai",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.forceLoginMethod.enum.console",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting forceLoginMethod lost value console",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.forceLoginMethod.enum.gateway",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting forceLoginMethod lost value gateway",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.keybindingFlavor.enum.classic",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting keybindingFlavor lost value classic",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.keybindingFlavor.enum.readline",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting keybindingFlavor lost value readline",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.managedSourcesBehavior.enum.first-wins",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting managedSourcesBehavior lost value first-wins",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.managedSourcesBehavior.enum.merge",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting managedSourcesBehavior lost value merge",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.maxEffortLevel.enum.low",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting maxEffortLevel lost value low",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.maxEffortLevel.enum.medium",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting maxEffortLevel lost value medium",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.maxEffortLevel.enum.high",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting maxEffortLevel lost value high",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.maxEffortLevel.enum.xhigh",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting maxEffortLevel lost value xhigh",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.maxEffortLevel.enum.max",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting maxEffortLevel lost value max",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.modelProposedGoals.enum.auto",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting modelProposedGoals lost value auto",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.modelProposedGoals.enum.alwaysAsk",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting modelProposedGoals lost value alwaysAsk",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.modelProposedGoals.enum.disabled",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting modelProposedGoals lost value disabled",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.parentSettingsBehavior.enum.first-wins",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting parentSettingsBehavior lost value first-wins",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.parentSettingsBehavior.enum.merge",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting parentSettingsBehavior lost value merge",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.permissions.defaultMode.enum.acceptEdits",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting permissions.defaultMode lost value acceptEdits",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.permissions.defaultMode.enum.auto",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting permissions.defaultMode lost value auto",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.permissions.defaultMode.enum.bypassPermissions",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting permissions.defaultMode lost value bypassPermissions",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.permissions.defaultMode.enum.default",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting permissions.defaultMode lost value default",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.permissions.defaultMode.enum.dontAsk",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting permissions.defaultMode lost value dontAsk",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.permissions.defaultMode.enum.plan",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting permissions.defaultMode lost value plan",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.permissions.disableAutoMode.enum.disable",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting permissions.disableAutoMode lost value disable",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.permissions.disableBypassPermissionsMode.enum.disable",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting permissions.disableBypassPermissionsMode lost value disable",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.policyHelper.path.description",
+          "category": "config",
+          "op": "changed",
+          "title": "policyHelper.path description changed (+0 −38 chars)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.options.policyHelper.refreshIntervalMs.enum.0",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting policyHelper.refreshIntervalMs lost value 0",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.preferredNotifChannel.enum.auto",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting preferredNotifChannel lost value auto",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.preferredNotifChannel.enum.iterm2",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting preferredNotifChannel lost value iterm2",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.preferredNotifChannel.enum.terminal_bell",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting preferredNotifChannel lost value terminal_bell",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.preferredNotifChannel.enum.iterm2_with_bell",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting preferredNotifChannel lost value iterm2_with_bell",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.preferredNotifChannel.enum.kitty",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting preferredNotifChannel lost value kitty",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.preferredNotifChannel.enum.ghostty",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting preferredNotifChannel lost value ghostty",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.preferredNotifChannel.enum.notifications_disabled",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting preferredNotifChannel lost value notifications_disabled",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.prependPlugins.description",
+          "category": "config",
+          "op": "changed",
+          "title": "prependPlugins description changed (+250 −312 chars)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.options.promptCacheTtl.enum.5m",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting promptCacheTtl lost value 5m",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.promptCacheTtl.enum.1h",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting promptCacheTtl lost value 1h",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.remoteControl.shareHostProfile.enum.off",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting remoteControl.shareHostProfile lost value off",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.remoteControl.shareHostProfile.enum.basic",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting remoteControl.shareHostProfile lost value basic",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.remoteControl.shareHostProfile.enum.full",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting remoteControl.shareHostProfile lost value full",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.remoteMessageReceipts",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: remoteMessageReceipts",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.options.sandbox.windows.backend.enum.sandboxuser",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting sandbox.windows.backend lost value sandboxuser",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.sandbox.windows.backend.enum.mxc",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting sandbox.windows.backend lost value mxc",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.spinnerVerbs.mode.enum.append",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting spinnerVerbs.mode lost value append",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.spinnerVerbs.mode.enum.replace",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting spinnerVerbs.mode lost value replace",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.subagentPromptCacheTtl.enum.5m",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting subagentPromptCacheTtl lost value 5m",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.subagentPromptCacheTtl.enum.1h",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting subagentPromptCacheTtl lost value 1h",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.teammateMode.enum.auto",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting teammateMode lost value auto",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.teammateMode.enum.tmux",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting teammateMode lost value tmux",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.teammateMode.enum.iterm2",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting teammateMode lost value iterm2",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.teammateMode.enum.in-process",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting teammateMode lost value in-process",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.theme.enum.auto",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting theme lost value auto",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.theme.enum.dark",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting theme lost value dark",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.theme.enum.light",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting theme lost value light",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.theme.enum.light-daltonized",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting theme lost value light-daltonized",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.theme.enum.dark-daltonized",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting theme lost value dark-daltonized",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.theme.enum.light-ansi",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting theme lost value light-ansi",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.theme.enum.dark-ansi",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting theme lost value dark-ansi",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.timeFormat.enum.auto",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting timeFormat lost value auto",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.timeFormat.enum.12-hour",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting timeFormat lost value 12-hour",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.timeFormat.enum.24-hour",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting timeFormat lost value 24-hour",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.timeFormat.enum.24-hour-utc",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting timeFormat lost value 24-hour-utc",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.totalTokensReminder.enum.off",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting totalTokensReminder lost value off",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.totalTokensReminder.enum.infinite",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting totalTokensReminder lost value infinite",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.totalTokensReminder.enum.fixed",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting totalTokensReminder lost value fixed",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.totalTokensReminder.enum.countdown",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting totalTokensReminder lost value countdown",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.totalTokensReminder.enum.padded-countdown",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting totalTokensReminder lost value padded-countdown",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.tui.enum.default",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting tui lost value default",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.tui.enum.fullscreen",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting tui lost value fullscreen",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.viewMode.enum.default",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting viewMode lost value default",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.viewMode.enum.verbose",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting viewMode lost value verbose",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.viewMode.enum.focus",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting viewMode lost value focus",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.voice.mode.enum.hold",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting voice.mode lost value hold",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.voice.mode.enum.tap",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting voice.mode lost value tap",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.workflowSizeGuideline.enum.unrestricted",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting workflowSizeGuideline lost value unrestricted",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.workflowSizeGuideline.enum.small",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting workflowSizeGuideline lost value small",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.workflowSizeGuideline.enum.medium",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting workflowSizeGuideline lost value medium",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.workflowSizeGuideline.enum.large",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting workflowSizeGuideline lost value large",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.worktree.baseRef.enum.fresh",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting worktree.baseRef lost value fresh",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.worktree.baseRef.enum.head",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting worktree.baseRef lost value head",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.worktree.bgIsolation.enum.worktree",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting worktree.bgIsolation lost value worktree",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.worktree.bgIsolation.enum.none",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting worktree.bgIsolation lost value none",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.env_vars",
+          "category": "config",
+          "op": "changed",
+          "title": "Environment variables: +21 −13",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "binary.agent.download",
+          "category": "binary",
+          "op": "changed",
+          "title": "Binary agent.download: https://downloads.claude.ai/claude-code-releases/2.1.326/… → https://downloads.claude.ai/claude-code-releases/2.1.328/…",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "binary.agent.sdk",
+          "category": "binary",
+          "op": "changed",
+          "title": "Binary agent.sdk: @anthropic-ai/claude-agent-sdk 0.3.326 → @anthropic-ai/claude-agent-sdk 0.3.328",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "binary.agent.version",
+          "category": "binary",
+          "op": "changed",
+          "title": "Runs its agent's build 2.1.328 (was 2.1.326)",
+          "impact": "notable",
+          "documented": null
+        }
+      ]
+    },
+    {
       "version": "6.6395.1",
       "previous": "6.6395.0",
       "changes": [
