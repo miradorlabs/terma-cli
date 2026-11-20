@@ -7,11 +7,59 @@
       "previous": "0.69.0",
       "changes": [
         {
-          "id": "request.headers.x-goog-api-client",
-          "category": "request",
-          "op": "changed",
-          "title": "Header x-goog-api-client: google-genai-sdk/1.30.0 gl-node/v24.22.2 → google-genai-sdk/1.30.0 gl-node/v24.22.3",
-          "impact": "informational",
+          "id": "network.telemetry.POST play.googleapis.com/log.events.api_request",
+          "category": "network",
+          "op": "added",
+          "title": "New vendor telemetry event: api_request",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "network.telemetry.POST play.googleapis.com/log.events.api_response",
+          "category": "network",
+          "op": "added",
+          "title": "New vendor telemetry event: api_response",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "network.telemetry.POST play.googleapis.com/log.events.hook_call",
+          "category": "network",
+          "op": "added",
+          "title": "New vendor telemetry event: hook_call",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "network.telemetry.POST play.googleapis.com/log.events.model_routing",
+          "category": "network",
+          "op": "added",
+          "title": "New vendor telemetry event: model_routing",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "network.telemetry.POST play.googleapis.com/log.events.new_prompt",
+          "category": "network",
+          "op": "added",
+          "title": "New vendor telemetry event: new_prompt",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "network.telemetry.POST play.googleapis.com/log.events.start_session",
+          "category": "network",
+          "op": "added",
+          "title": "New vendor telemetry event: start_session",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "network.telemetry.POST play.googleapis.com/log.events.startup_stats",
+          "category": "network",
+          "op": "added",
+          "title": "New vendor telemetry event: startup_stats",
+          "impact": "notable",
           "documented": false
         },
         {

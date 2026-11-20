@@ -18,11 +18,11 @@
     "last_change": {
       "from": "0.69.0",
       "to": "0.70.0",
-      "at": "2026-11-19T21:21:27.014767978Z",
+      "at": "2026-11-20T03:36:38.599830342Z",
       "released_at": "2026-11-19T21:13:43.733Z",
-      "changes": 2,
+      "changes": 8,
       "categories": {
-        "request": 1,
+        "network": 7,
         "storage": 1
       }
     }
@@ -31,32 +31,33 @@
     {
       "version": "0.70.0",
       "released_at": "2026-11-19T21:13:43.733Z",
-      "captured_at": "2026-11-19T21:21:27.014767978Z",
+      "captured_at": "2026-11-20T03:36:38.599830342Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "supported",
       "previous": "0.69.0",
-      "changes": 2,
+      "changes": 8,
       "categories": {
-        "request": 1,
+        "network": 7,
         "storage": 1
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 2,
-        "notable": 0
+        "informational": 1,
+        "notable": 7
       },
-      "undocumented": 1,
+      "undocumented": 7,
       "highlights": [
-        "Header x-goog-api-client: google-genai-sdk/1.30.0 gl-node/v24.22.2 → google-genai-sdk/1.30.0 gl-node/v24.22.3",
-        "On-disk transcript path changed"
+        "New vendor telemetry event: api_request",
+        "New vendor telemetry event: api_response",
+        "New vendor telemetry event: hook_call"
       ],
       "signing": null,
       "partial": true,
-      "attempted_at": "2026-11-19T21:21:27.014767978Z",
-      "attempts": 1
+      "attempted_at": "2026-11-20T03:36:38.599830342Z",
+      "attempts": 2
     },
     {
       "version": "0.69.0",
