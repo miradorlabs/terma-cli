@@ -438,11 +438,24 @@ Antigravity's `agy` has no telemetry export, so nothing of it passes the relay. 
 one named hook, `terma`, to `~/.gemini/config/hooks.json`, which every `agy` session loads,
 and leaves the file's other hooks as they are. Those hooks report the model, each turn,
 each tool step (its name and whether it failed, never its arguments) and how the turn
-ended, and the files `agy`'s own file tools write are stamped on your commits. `agy`
-reports no token counts or cost, and runs no hook after a turn you cancel, so what that
-turn did is sent with the next turn's. On Windows, setup lists Antigravity as Coming Soon: `agy` runs
-its hooks with `cmd` there, and terma's hook command for it has been checked only on macOS
-and Linux.
+ended, and the files `agy`'s own file tools write are stamped on your commits. Each hook
+also reads the conversation's transcript and sends every model call written since the last
+one: its model and its input, cache-read and output tokens. `agy` does not count thinking
+apart from output, or cache writes, so neither is sent; there is no cost, which the
+platform estimates from list prices. `agy` runs no hook after a turn you cancel, so that
+turn's calls and steps go with the next turn's. A subagent is its own conversation, linked
+to the one that opened it.
+
+Setup also puts `terma hook antigravity-statusline` in `statusLine` in
+`~/.gemini/antigravity-cli/settings.json`. Its payload is the only place `agy` names your
+plan, its quota buckets and the account's email, which terma sends as they change. Your
+own status line keeps running behind it; without one, terma's draws nothing and `agy`'s
+built-in line stays. `terma teardown` puts the file back as it was, or only the
+`statusLine` entry when something else has changed the file since. `agy` runs a status line
+only in its interactive CLI: an `agy -p` session reports no plan or quota.
+
+On Windows, setup lists Antigravity as Coming Soon: `agy` runs its hooks with `cmd` there,
+and terma's hook command for it has been checked only on macOS and Linux.
 
 `terma setup` runs the relay as a per-user background service, so it is up before any
 agent starts; with `--relay-service off`, hooks start it on demand. `terma update`

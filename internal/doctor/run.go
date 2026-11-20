@@ -209,8 +209,12 @@ func Run(ctx context.Context, env Env, progress Progress) Report {
 
 	timed(KeyHarness, "agent exporting to Terma", func() Check { return unlessCaptureOff(d.pol, d.agentsExporting()) })
 
-	if a, ok := StatusLineAgent(env.Agents); ok && a.Installed(ctx) {
-		timed(KeyStatusLine, a.DisplayName()+" status line", d.statusLine)
+	for _, a := range StatusLineAgents(env.Agents) {
+		// Only an agent the developer chose has a status line terma should have wrapped.
+		chosen := len(cfg.Harnesses) == 0 || slices.ContainsFunc(agents.Selections(a), func(s string) bool { return slices.Contains(cfg.Harnesses, s) })
+		if chosen && env.Agents.IsSupported(a.Name()) && a.Installed(ctx) {
+			timed(KeyStatusLine, a.DisplayName()+" status line", func() Check { return d.statusLine(a) })
+		}
 	}
 
 	timed(KeySpool, "event spool", d.eventSpool)
@@ -317,12 +321,12 @@ func (d *run) agentsExporting() Check {
 	return HarnessCheck(d.env.Agents, verdicts, d.cfg.OTLPURL, d.projectID, d.admitted)
 }
 
-func (d *run) statusLine() Check {
+func (d *run) statusLine(a agents.StatusLiner) Check {
 	repoRoot := ""
 	if d.env.RepoErr == nil {
 		repoRoot = d.env.Root
 	}
-	return StatusLineCheck(JudgeStatusLine(d.env.Agents, repoRoot))
+	return StatusLineCheck(JudgeStatusLine(a, repoRoot))
 }
 
 func (d *run) eventSpool() Check {

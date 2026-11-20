@@ -104,29 +104,23 @@ type StatusLineVerdict struct {
 	Err       error
 	Overrides []string
 	Renderer  string
+	// Stacked means the agent's own line stays, under nothing of terma's.
+	Stacked bool
 }
 
-// StatusLineAgent is the agent whose status line terma wraps.
-func StatusLineAgent(reg *agents.Registry) (agents.StatusLiner, bool) {
-	s := reg.With[agents.StatusLiner]()
-	if len(s) == 0 {
-		return nil, false
-	}
-	return s[0], true
+// StatusLineAgents are the agents whose status line terma wraps.
+func StatusLineAgents(reg *agents.Registry) []agents.StatusLiner {
+	return reg.With[agents.StatusLiner]()
 }
 
-// JudgeStatusLine judges the status line terma wraps, as seen from repoRoot.
-func JudgeStatusLine(reg *agents.Registry, repoRoot string) StatusLineVerdict {
-	s, ok := StatusLineAgent(reg)
-	if !ok {
-		return StatusLineVerdict{}
-	}
+// JudgeStatusLine judges the status line terma wraps for s, as seen from repoRoot.
+func JudgeStatusLine(s agents.StatusLiner, repoRoot string) StatusLineVerdict {
 	return ClassifyStatusLine(s.StatusLineState(repoRoot))
 }
 
 // ClassifyStatusLine judges a status line from its state.
 func ClassifyStatusLine(st agents.StatusLineState, err error) StatusLineVerdict {
-	v := StatusLineVerdict{Err: err, Overrides: st.Overrides, Renderer: st.Renderer}
+	v := StatusLineVerdict{Err: err, Overrides: st.Overrides, Renderer: st.Renderer, Stacked: st.Stacked}
 	switch {
 	case err != nil:
 		v.Capture = StatusLineUnknown

@@ -29,6 +29,8 @@ type antigravityHookInput struct {
 	WorkspacePaths []string `json:"workspacePaths"`
 	Cwd            string   `json:"cwd"`
 	ModelName      string   `json:"modelName"`
+	// TranscriptPath is the conversation's transcript_full.jsonl (agy 1.5+).
+	TranscriptPath string `json:"transcriptPath"`
 	// Error is failure text; only its presence is recorded, since the text is content.
 	Error string `json:"error"`
 	// PostToolUse.
@@ -104,6 +106,7 @@ func preInvocation(ctx context.Context, env hookrun.Env) error {
 	r, err := env.Repo(ctx)
 	if err != nil {
 		env.Logf("not in a git repository: %v", err)
+		antigravitySkipCalls(ctx, env, in, err)
 		return nil
 	}
 	id := in.id()
@@ -119,9 +122,11 @@ func preInvocation(ctx context.Context, env hookrun.Env) error {
 		env.PruneManifests(r, now)
 		env.EmitStart(r, sess, nil)
 	}
+	// A cancelled turn ran no hook after it: its calls go now.
+	read := captureAntigravityCalls(ctx, env, r, in)
 	env.CaptureObservation(ctx, r, hookrun.Observation{
 		Tool: antigravityTool, Source: sourceAntigravityHook, StateDir: antigravityObservationDir,
-		SessionID: id, Hook: "PreInvocation", TurnID: turn, Attrs: antigravityObservationAttrs(in, "PreInvocation", turn),
+		SessionID: id, Hook: "PreInvocation", TurnID: turn, Attrs: antigravityObservationAttrs(in, "PreInvocation", turn, read),
 	})
 	return nil
 }
@@ -176,6 +181,7 @@ func postToolUse(ctx context.Context, env hookrun.Env) error {
 	env.Cwd = in.cwd(env.Cwd)
 	r, err := env.Repo(ctx)
 	if err != nil {
+		antigravitySkipCalls(ctx, env, in, err)
 		return nil
 	}
 	id := in.id()
@@ -184,6 +190,7 @@ func postToolUse(ctx context.Context, env hookrun.Env) error {
 	if called {
 		env.EmitFor(r, spool.Event{Name: semconv.TermaToolCallEvent, SessionID: id, Attrs: call})
 	}
+	captureAntigravityCalls(ctx, env, r, in)
 
 	// A failed edit changed nothing. No toolCall yields no paths, so this guard also makes
 	// in.ToolCall safe below.
@@ -230,8 +237,8 @@ func antigravityToolCallAttrs(in *antigravityHookInput, turn string) (map[string
 	return a, true
 }
 
-// postInvocation and stop record the turn's shape as observations: evidence of activity,
-// never usage, since agy reports no token counts.
+// postInvocation and stop record the turn's shape as observations, and send the calls
+// the transcript recorded since the last hook, each as a terma.model_call.
 func postInvocation(ctx context.Context, env hookrun.Env) error {
 	return antigravityObserve(ctx, env, "PostInvocation")
 }
@@ -250,6 +257,7 @@ func antigravityObserve(ctx context.Context, env hookrun.Env, hook string) error
 	env.Cwd = in.cwd(env.Cwd)
 	r, err := env.Repo(ctx)
 	if err != nil {
+		antigravitySkipCalls(ctx, env, in, err)
 		return nil
 	}
 	if hook == "Stop" {
@@ -261,17 +269,25 @@ func antigravityObserve(ctx context.Context, env hookrun.Env, hook string) error
 		}
 	}
 	turn := antigravityTurnID(env, r, in.id())
+	read := captureAntigravityCalls(ctx, env, r, in)
 	env.CaptureObservation(ctx, r, hookrun.Observation{
 		Tool: antigravityTool, Source: sourceAntigravityHook, StateDir: antigravityObservationDir,
-		SessionID: in.id(), Hook: hook, TurnID: turn, Attrs: antigravityObservationAttrs(in, hook, turn),
+		SessionID: in.id(), Hook: hook, TurnID: turn, Attrs: antigravityObservationAttrs(in, hook, turn, read),
 	})
 	return nil
 }
 
-func antigravityObservationAttrs(in *antigravityHookInput, hook, turn string) map[string]any {
+// antigravityObservationAttrs is a hook's observation. A hook carries no plan, quota or
+// account (the status line does), and no token counts: when the hook read the transcript,
+// the calls carry them as terma.model_call, so the observation makes no claim about usage;
+// when it could not, its usage is unavailable.
+func antigravityObservationAttrs(in *antigravityHookInput, hook, turn string, callsRead bool) map[string]any {
 	a := hookrun.EvidenceAttrs(antigravityTool, sourceAntigravityHook, hook)
-	for _, k := range []string{semconv.TermaUsageStatusKey, semconv.TermaFundingStatusKey, semconv.TermaQuotaStatusKey, semconv.TermaAccountStatusKey} {
+	for _, k := range []string{semconv.TermaFundingStatusKey, semconv.TermaQuotaStatusKey, semconv.TermaAccountStatusKey} {
 		a[k] = hookrun.StatusUnavailable
+	}
+	if !callsRead {
+		a[semconv.TermaUsageStatusKey] = hookrun.StatusUnavailable
 	}
 	hookrun.BoundedAttr(a, semconv.GenAIRequestModelKey, in.ModelName)
 	if turn != "" {
@@ -298,4 +314,13 @@ func antigravityObservationAttrs(in *antigravityHookInput, hook, turn string) ma
 		}
 	}
 	return a
+}
+
+// antigravitySkipCalls reads past the conversation's calls when the team's policy does
+// not collect where the hook ran, so none leaves later from somewhere it does; any other
+// failure leaves them for the next hook.
+func antigravitySkipCalls(ctx context.Context, env hookrun.Env, in *antigravityHookInput, err error) {
+	if errors.Is(err, hookrun.ErrNotAdmitted) {
+		captureAntigravityCalls(ctx, env, nil, in)
+	}
 }
