@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-20T07:43:58.837191222Z",
+  "generated_at": "2026-11-20T08:25:25.932865112Z",
   "versions": [
     {
       "harness": "t3",
@@ -51,8 +51,8 @@
       "highlights": [],
       "signing": null,
       "partial": true,
-      "attempted_at": "2026-11-20T02:00:44.025484206Z",
-      "attempts": 1
+      "attempted_at": "2026-11-20T08:25:25.932865112Z",
+      "attempts": 2
     },
     {
       "harness": "codex",
