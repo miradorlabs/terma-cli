@@ -130,13 +130,18 @@ const LegacyReportWindow = 30 * 24 * time.Hour
 // LegacyRecord is what a sign-in kept of the per-organization sign-ins it retired: their
 // session ids, which the heartbeat reports for LegacyReportWindow so the platform matches
 // this installation to the machine they stood for, and the account they all belonged to,
-// whose name what an older terma queued may still leave under. Account is "" when they
-// named no single person and environment.
+// whose name what an older terma queued may still leave under. Account is
+// LegacyAccountAmbiguous when they named no single person and environment.
 type LegacyRecord struct {
 	SessionIDs []string  `json:"session_ids,omitempty"`
 	Account    string    `json:"account,omitempty"`
 	RetiredAt  time.Time `json:"retired_at"`
 }
+
+// LegacyAccountAmbiguous is the account of retired sign-ins that named more than one
+// person or environment, or none: what an older terma queued then was collected by
+// people, but no one sign-in may send it, and neither may a server key. It ages out.
+const LegacyAccountAmbiguous = "ambiguous"
 
 // Recent reports whether the record's sessions are still reported at now.
 func (r LegacyRecord) Recent(now time.Time) bool {
@@ -161,9 +166,12 @@ func RecordLegacy(stateDir string, signIns []LegacySignIn, now time.Time) error 
 		}
 		accounts[AccountKey(s.AuthURL, s.UserID)] = true
 	}
-	if fresh && len(accounts) == 1 {
-		for a := range accounts {
-			rec.Account = a
+	if fresh {
+		rec.Account = LegacyAccountAmbiguous
+		if len(accounts) == 1 {
+			for a := range accounts {
+				rec.Account = cmp.Or(a, LegacyAccountAmbiguous)
+			}
 		}
 	}
 	return config.WriteJSON(filepath.Join(stateDir, LegacyRecordFile), rec, 0o600)

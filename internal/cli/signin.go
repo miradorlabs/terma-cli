@@ -165,10 +165,15 @@ func (app *App) retireOlderSignIns(ctx context.Context, authURL string) {
 // the auth host this profile is configured for: credentials.json names hosts, and a
 // tampered one must not lead a keychain-held token elsewhere; another environment's
 // sessions are forgotten unrevoked, to expire. Their ids are kept for the heartbeat and
-// their account for what was queued under them (auth.RecordLegacy).
+// their account for what was queued under them (auth.RecordLegacy); unless that record
+// can't be written, when they stay for the next sign-in to retire.
 func (app *App) retireLegacySessions(ctx context.Context, authURL string) {
 	if signIns, err := auth.LegacySignIns(app.dir, true); err == nil {
-		_ = auth.RecordLegacy(app.stateDir, signIns, time.Now())
+		// The record is the only account what an older terma queued has once its sign-ins
+		// are gone: without it, keep them, and the next sign-in tries again.
+		if err := auth.RecordLegacy(app.stateDir, signIns, time.Now()); err != nil {
+			return
+		}
 		revokeCtx, cancel := context.WithTimeout(ctx, legacyRevokeWait)
 		var wg sync.WaitGroup
 		for _, s := range signIns {

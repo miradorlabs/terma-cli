@@ -44,7 +44,7 @@ type Router struct {
 	// LegacyAccount is the account an older terma's retired sign-ins belonged to, and
 	// LegacyBefore when they were retired: an event bound to no account queued before then
 	// leaves under it; one queued after, with no sign-in in place, under none, and ages
-	// out. "" leaves such events to a server key.
+	// out. "" leaves such events to a server key; auth.LegacyAccountAmbiguous, to none.
 	LegacyAccount string
 	LegacyBefore  time.Time
 }

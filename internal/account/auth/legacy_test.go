@@ -6,6 +6,7 @@ import (
 	"os"
 	"slices"
 	"testing"
+	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/account/secret"
 	"github.com/miradorlabs/terma-cli/internal/config"
@@ -132,5 +133,40 @@ func TestForgetLegacy_KeepsTheFileWhenTheKeychainFails(t *testing.T) {
 	}
 	if !HasLegacySignIns(dir) {
 		t.Fatal("credentials.json went while its keychain items stayed")
+	}
+}
+
+// The record keeps the account the retired sign-ins all belonged to. Sign-ins of more than
+// one person, or of no known user, name no one: their backlog is held from every sign-in
+// and every server key.
+func TestRecordLegacy_Account(t *testing.T) {
+	t.Parallel()
+	const host = "https://auth.example.test"
+	of := func(users ...string) []LegacySignIn {
+		var signIns []LegacySignIn
+		for i, u := range users {
+			signIns = append(signIns, LegacySignIn{SessionID: "s-" + string(rune('a'+i)), UserID: u, AuthURL: host})
+		}
+		return signIns
+	}
+	for name, tc := range map[string]struct {
+		signIns []LegacySignIn
+		want    string
+	}{
+		"one person":     {of("user-1", "user-1"), AccountKey(host, "user-1")},
+		"two people":     {of("user-1", "user-2"), LegacyAccountAmbiguous},
+		"an unknown one": {of(""), LegacyAccountAmbiguous},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			dir := t.TempDir()
+			if err := RecordLegacy(dir, tc.signIns, time.Now()); err != nil {
+				t.Fatal(err)
+			}
+			rec, err := ReadLegacyRecord(dir)
+			if err != nil || rec.Account != tc.want {
+				t.Fatalf("account = %q, %v; want %q", rec.Account, err, tc.want)
+			}
+		})
 	}
 }

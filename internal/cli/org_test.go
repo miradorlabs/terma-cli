@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -299,6 +300,44 @@ func TestStoreLoginRetiresAnOlderTermasSignIns(t *testing.T) {
 	}
 	if key, _ := keystore.Get(testApp.dir, kept); key == "" {
 		t.Fatal("a server key a profile signed in with should stay")
+	}
+}
+
+// Retiring an older terma's sign-ins waits for their record: it is the only account what
+// that terma queued keeps once they are gone, so when it can't be written they stay, unrevoked,
+// for the next sign-in to retire.
+func TestAnUnrecordedRetirementKeepsTheOlderSignIns(t *testing.T) {
+	f := newFakeAuth(t)
+	authSandbox(t, f)
+	if err := config.UpdateFile(testApp.dir, func(file *config.File) { file.InsecureStorage = true }); err != nil {
+		t.Fatal(err)
+	}
+	legacyA := legacyTokenPrefix + orgA().ID
+	legacy := map[string]any{"default": map[string]any{"active": orgA().ID, "organizations": map[string]any{
+		orgA().ID: map[string]any{"access_token": legacyA, "session_id": "old-a", "auth_url": f.srv.URL, "organization_id": orgA().ID, "user_id": "u-1"},
+	}}}
+	data, _ := json.Marshal(legacy)
+	if err := os.WriteFile(config.LegacyCredentialsPath(testApp.dir), data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	// A directory where the record goes: writing it fails.
+	record := filepath.Join(testApp.stateDir, auth.LegacyRecordFile)
+	if err := os.MkdirAll(filepath.Join(record, "x"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.RemoveAll(record) })
+	cfg, err := testApp.loadConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := testApp.storeLogin(context.Background(), cfg, storedSession(f)); err != nil {
+		t.Fatal(err)
+	}
+	if !auth.HasLegacySignIns(testApp.dir) {
+		t.Fatal("the older sign-ins were deleted with no record of whose they were")
+	}
+	if got := f.legacyRevokedTokens(); len(got) != 0 {
+		t.Fatalf("revoked %d older sessions before recording them", len(got))
 	}
 }
 
