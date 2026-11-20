@@ -213,7 +213,7 @@ func (tx *Tx) saveReplacing(profile string, cred *Credential, inFile bool) (repl
 		err = fmt.Errorf("read the sign-in it replaces from the system keychain: %w", unread)
 	}
 	if err != nil && overwritten != nil {
-		pair, _ := json.Marshal(tokenPair{AccessToken: overwritten.AccessToken, RefreshToken: overwritten.RefreshToken})
+		pair, _ := json.Marshal(tokenPair{AccessToken: overwritten.AccessToken, RefreshToken: overwritten.RefreshToken, SessionID: overwritten.SessionID})
 		_ = secret.Set(dir, itemName(profile), string(pair))
 	}
 	tx.after = append(tx.after, func() { afterSave(dir, profile, unindexed, err) })

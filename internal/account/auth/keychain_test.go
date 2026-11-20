@@ -411,3 +411,24 @@ func TestAFailedReplacementRestoresTheOldTokens(t *testing.T) {
 		t.Fatalf("loaded %+v, %v; want the old sign-in with its own tokens", got, err)
 	}
 }
+
+// A read that finds one session's index beside another session's tokens, as a read between
+// a sign-in's keychain write and its file write would, takes no tokens: never one
+// session's identity with another's tokens.
+func TestAnIndexNeverPairsWithAnotherSessionsTokens(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	if _, err := SaveCredential(dir, config.DefaultProfile, sessionCredential("a")); err != nil {
+		t.Fatal(err)
+	}
+	if StoredInFile(dir, config.DefaultProfile) {
+		t.Skip("no keychain to keep the tokens in")
+	}
+	// The next sign-in's tokens are in the keychain; its index is not written yet.
+	if err := secret.Set(dir, itemName(config.DefaultProfile), `{"access_token":"access-b","refresh_token":"refresh-b","session_id":"b"}`); err != nil {
+		t.Fatal(err)
+	}
+	if cred, err := LoadCredential(dir, config.DefaultProfile); !errors.Is(err, ErrNotLoggedIn) {
+		t.Fatalf("LoadCredential = %+v, %v; want no tokens for session a", cred, err)
+	}
+}
