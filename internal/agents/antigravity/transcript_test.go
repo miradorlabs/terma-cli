@@ -336,3 +336,58 @@ func TestAntigravityQuotedSubagentResultLinksNothing(t *testing.T) {
 		t.Fatalf("a quoted result linked a subagent: %v", starts)
 	}
 }
+
+// A call that asks for a subagent and another tool: only invoke_subagent's own result
+// links a child, whatever the other tool's output quotes.
+func TestAntigravitySubagentLinkIsTheInvokeSubagentResult(t *testing.T) {
+	g := newTranscriptRig(t, parentConversation, "transcript_subagent_parent.jsonl")
+	other := strings.ReplaceAll(strings.Replace(g.lines[2], `"step_index":2`, `"step_index":3`, 1), childConversation, turnsConversation)
+	g.lines = []string{g.lines[0],
+		`{"step_index":1,"source":"MODEL","type":"PLANNER_RESPONSE","status":"DONE","created_at":"2026-11-20T17:40:11Z","model":"gemini-3.8-flash-high","input_tokens":10,"cache_read_tokens":0,"output_tokens":1,"tool_calls":[{"name":"invoke_subagent","args":{}},{"name":"run_command","args":{}}]}`,
+		g.lines[2], other}
+	g.write(4)
+	g.hook(stop, `"executionNum":0,"fullyIdle":true,"terminationReason":"NO_TOOL_CALL"`)
+	starts := g.drain()[semconv.TermaSessionStartEvent]
+	if len(starts) != 1 || starts[0].SessionID != childConversation {
+		t.Fatalf("links: %v", starts)
+	}
+}
+
+// A turn cancelled where the policy collects nothing: its call, written after the last
+// hook there, still never leaves once the conversation goes on somewhere collected.
+func TestAntigravityExcludedTurnsCancelledCallNeverLeaves(t *testing.T) {
+	g := newTranscriptRig(t, turnsConversation, "transcript_turns.jsonl")
+	g.write(18) // turn 18's prompt, before its call
+	excluded := hookruntest.InitRepo(t)
+	payload := `{"conversationId":"` + g.id + `","cwd":"` + excluded + `","transcriptPath":"` + g.transcript + `","initialNumSteps":18,"invocationNum":0}`
+	env := hookrun.Env{StateDir: g.stateDir, Now: time.Now(), Cwd: excluded, Policy: hookruntest.Admitting(g.root), Stdin: strings.NewReader(payload), Stdout: &bytes.Buffer{}, Spool: g.sp, Version: "test"}
+	if err := preInvocation(context.Background(), env); err != nil {
+		t.Fatal(err)
+	}
+	g.drain()
+	// The call lands, the turn is cancelled, and the next prompt comes in a collected repository.
+	g.lines = append(g.lines, `{"step_index":21,"source":"USER_EXPLICIT","type":"USER_INPUT","status":"DONE","created_at":"2026-11-20T16:55:00Z","content":"<scrubbed>"}`,
+		`{"step_index":22,"source":"MODEL","type":"PLANNER_RESPONSE","status":"DONE","created_at":"2026-11-20T16:55:01Z","model":"gemini-3.8-flash-low","input_tokens":5,"cache_read_tokens":0,"output_tokens":1}`)
+	g.write(len(g.lines))
+	g.hook(stop, `"executionNum":0,"fullyIdle":true,"terminationReason":"NO_TOOL_CALL"`)
+	if s := strings.Join(callSteps(g.drain()[semconv.TermaModelCallEvent]), ","); s != "step-22" {
+		t.Fatalf("sent %s, want the collected turn's call alone", s)
+	}
+}
+
+// A rewrite that keeps only an older prompt never moves the turn back.
+func TestAntigravityRewriteNeverMovesTheTurnBack(t *testing.T) {
+	g := newTranscriptRig(t, turnsConversation, "transcript_turns.jsonl")
+	g.write(13) // up to turn 13's prompt
+	g.hook(stop, `"executionNum":0,"fullyIdle":true,"terminationReason":"NO_TOOL_CALL"`)
+	g.drain()
+	// Turn 8's prompt kept, turn 13's dropped, a new call of turn 13 after it.
+	g.lines = append([]string{}, g.lines[7], g.lines[9], g.lines[11],
+		`{"step_index":14,"source":"MODEL","type":"PLANNER_RESPONSE","status":"DONE","created_at":"2026-11-20T16:52:00Z","model":"gemini-3.8-flash-low","input_tokens":5,"cache_read_tokens":0,"output_tokens":1}`)
+	g.write(len(g.lines))
+	g.hook(stop, `"executionNum":1,"fullyIdle":true,"terminationReason":"NO_TOOL_CALL"`)
+	calls := g.drain()[semconv.TermaModelCallEvent]
+	if len(calls) != 1 || calls[0].Attrs[semconv.TermaTurnIDKey] != "turn-13" {
+		t.Fatalf("calls %v", calls)
+	}
+}

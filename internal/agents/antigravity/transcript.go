@@ -11,7 +11,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -58,8 +57,12 @@ type antigravityCallState struct {
 	Step int64 `json:"step"`
 	// Turn is the turn of the last prompt read, for the calls after it.
 	Turn string `json:"turn,omitempty"`
-	// Subagent is set while the results read belong to a call that ran invoke_subagent.
-	Subagent bool `json:"subagent,omitempty"`
+	// Results names the tools of the last call whose results are still to be read: they
+	// follow it in order, one line each.
+	Results []string `json:"results,omitempty"`
+	// Excluded is the turn a hook the team's policy does not collect last read in: its
+	// calls never leave, those a cancel left for a later hook included.
+	Excluded string `json:"excluded,omitempty"`
 }
 
 // antigravityStep is the part of a transcript line terma reads.
@@ -75,7 +78,7 @@ type antigravityStep struct {
 	ToolCalls       []antigravityToolCall `json:"tool_calls"`
 	// Content is read only on an invoke_subagent result, for the child's id.
 	Content string `json:"content"`
-	// subagentResult is set on a result of a call that ran invoke_subagent.
+	// subagentResult is set on the result of an invoke_subagent call.
 	subagentResult bool
 }
 
@@ -137,13 +140,14 @@ func captureAntigravityCalls(ctx context.Context, e hookrun.Env, r *hookrun.Repo
 	if readErr == nil && json.Unmarshal(b, &last) != nil {
 		last = antigravityCallState{Step: -1}
 	}
+	before, _ := json.Marshal(last)
 	next, err := readAntigravitySteps(transcript, last, func(s antigravityStep, turn string) bool {
+		if r == nil || turn != "" && turn == last.Excluded {
+			return true
+		}
 		if ctx.Err() != nil {
 			// Out of time: what was sent is saved, the rest goes with the next hook.
 			return false
-		}
-		if r == nil {
-			return true
 		}
 		switch s.Type {
 		case "PLANNER_RESPONSE":
@@ -162,11 +166,12 @@ func captureAntigravityCalls(ctx context.Context, e hookrun.Env, r *hookrun.Repo
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		e.Logf("antigravity transcript: %v", err)
 	}
-	if next != last {
-		if b, err := json.Marshal(next); err == nil {
-			if err := hookrun.WriteState(path, b); err != nil {
-				e.Logf("antigravity calls state: %v", err)
-			}
+	if r == nil && err == nil {
+		next.Excluded = next.Turn
+	}
+	if b, err := json.Marshal(next); err == nil && !bytes.Equal(b, before) {
+		if err := hookrun.WriteState(path, b); err != nil {
+			e.Logf("antigravity calls state: %v", err)
 		}
 	}
 	if os.IsNotExist(readErr) {
@@ -282,7 +287,7 @@ func readAntigravitySteps(path string, last antigravityCallState, emit func(anti
 			return state, err
 		}
 		if !bytes.Contains(line, []byte(`"PLANNER_RESPONSE"`)) && !bytes.Contains(line, []byte(`"USER_INPUT"`)) &&
-			(!state.Subagent || !bytes.Contains(line, []byte(antigravitySubagentMarker))) {
+			(len(state.Results) == 0 || !bytes.Contains(line, []byte(`"GENERIC"`))) {
 			state.Offset += int64(len(line))
 			continue
 		}
@@ -292,29 +297,50 @@ func readAntigravitySteps(path string, last antigravityCallState, emit func(anti
 			continue
 		}
 		step := *s.StepIndex
-		s.subagentResult = state.Subagent
+		// What the line moves on, kept only once it is read: a line emit refuses is read again.
+		results := state.Results
 		switch s.Type {
 		case "USER_INPUT":
-			state.Subagent = false
+			results = nil
 		case "PLANNER_RESPONSE":
-			// Its results follow it, one line per call.
-			state.Subagent = slices.ContainsFunc(s.ToolCalls, func(c antigravityToolCall) bool { return c.Name == "invoke_subagent" })
+			results = nil
+			for _, c := range s.ToolCalls {
+				results = append(results, c.Name)
+			}
+		case "GENERIC":
+			if len(results) > 0 {
+				s.subagentResult = results[0] == "invoke_subagent"
+				results = results[1:]
+			}
 		}
 		switch {
 		case s.Type == "USER_INPUT":
 			// agy's turn starts with the prompt's step counted: initialNumSteps, its turn id.
-			state.Turn = "turn-" + strconv.FormatInt(step+1, 10)
+			// A rewrite that kept only an older prompt never moves it back.
+			if step+1 > antigravityTurnNumber(state.Turn) {
+				state.Turn = "turn-" + strconv.FormatInt(step+1, 10)
+			}
 		case step <= state.Step:
 			// Sent before a rewrite.
-		case s.Type == "PLANNER_RESPONSE" || s.Type == "GENERIC":
+		case s.Type == "PLANNER_RESPONSE" || s.subagentResult:
 			if !emit(s, state.Turn) {
 				state.Tail = antigravityTail(f, state.Offset)
 				return state, nil
 			}
 			state.Step = step
 		}
+		state.Results = results
 		state.Offset += int64(len(line))
 	}
+}
+
+// antigravityTurnNumber is the number in a turn id, -1 for none.
+func antigravityTurnNumber(turn string) int64 {
+	n, err := strconv.ParseInt(strings.TrimPrefix(turn, "turn-"), 10, 64)
+	if err != nil || !strings.HasPrefix(turn, "turn-") {
+		return -1
+	}
+	return n
 }
 
 // antigravityTail hashes up to antigravityTailLen bytes of f before offset.
