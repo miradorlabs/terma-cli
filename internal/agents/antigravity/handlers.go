@@ -106,7 +106,7 @@ func preInvocation(ctx context.Context, env hookrun.Env) error {
 	r, err := env.Repo(ctx)
 	if err != nil {
 		env.Logf("not in a git repository: %v", err)
-		captureAntigravityCalls(ctx, env, nil, in)
+		antigravitySkipCalls(ctx, env, in, err)
 		return nil
 	}
 	id := in.id()
@@ -181,8 +181,7 @@ func postToolUse(ctx context.Context, env hookrun.Env) error {
 	env.Cwd = in.cwd(env.Cwd)
 	r, err := env.Repo(ctx)
 	if err != nil {
-		// Not collected here: read past its calls, so none leaves later.
-		captureAntigravityCalls(ctx, env, nil, in)
+		antigravitySkipCalls(ctx, env, in, err)
 		return nil
 	}
 	id := in.id()
@@ -258,8 +257,7 @@ func antigravityObserve(ctx context.Context, env hookrun.Env, hook string) error
 	env.Cwd = in.cwd(env.Cwd)
 	r, err := env.Repo(ctx)
 	if err != nil {
-		// Not collected here: read past its calls, so none leaves later.
-		captureAntigravityCalls(ctx, env, nil, in)
+		antigravitySkipCalls(ctx, env, in, err)
 		return nil
 	}
 	if hook == "Stop" {
@@ -316,4 +314,13 @@ func antigravityObservationAttrs(in *antigravityHookInput, hook, turn string, ca
 		}
 	}
 	return a
+}
+
+// antigravitySkipCalls reads past the conversation's calls when the team's policy does
+// not collect where the hook ran, so none leaves later from somewhere it does; any other
+// failure leaves them for the next hook.
+func antigravitySkipCalls(ctx context.Context, env hookrun.Env, in *antigravityHookInput, err error) {
+	if errors.Is(err, hookrun.ErrNotAdmitted) {
+		captureAntigravityCalls(ctx, env, nil, in)
+	}
 }
