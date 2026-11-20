@@ -118,10 +118,13 @@ func oneLog(session string) []byte {
 }
 
 // queue writes a part into dir's outbox under account, as an earlier relay left it.
-func queue(t *testing.T, dir, account string) {
+func queue(t *testing.T, dir, account string) { t.Helper(); queueAt(t, dir, account, time.Now()) }
+
+// queueAt is queue for a part that arrived at.
+func queueAt(t *testing.T, dir, account string, at time.Time) {
 	t.Helper()
 	rt := routeOf(account, claim.Claim{ProjectID: "p1"})
-	if err := (outbox{dir: dir}).put(rt, claim.Claim{}.Repository, newEntry(time.Now(), Logs, 1), oneLog("old")); err != nil {
+	if err := (outbox{dir: dir}).put(rt, claim.Claim{}.Repository, newEntry(at, Logs, 1), oneLog("old")); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -312,14 +315,18 @@ func TestOnlyABacklogFromBeforeRetirementCountsAsTheOlderSignIns(t *testing.T) {
 }
 
 // A profile set up with a server key sends only what no person's sign-in collected: a
-// person's bound backlog is never sent with the key.
+// person's bound backlog, or an older terma's that counts as its retired sign-ins', is
+// never sent with the key.
 func TestAServerKeyNeverSendsAPersonsBacklog(t *testing.T) {
 	t.Parallel()
 	u := newSignInUpstream(t)
 	dir := t.TempDir()
-	queue(t, dir, accountA)
-	queue(t, dir, "")
+	retired := time.Now()
+	queueAt(t, dir, accountA, retired.Add(-time.Minute))
+	queueAt(t, dir, "", retired.Add(-time.Minute)) // an older terma's: the retired sign-ins'
+	queueAt(t, dir, "", retired.Add(time.Minute))  // after the retirement: no person's
 	r := newRelay(Options{Dir: dir, Token: token, SignIn: &testSignIn{},
+		Legacy: func() (string, time.Time) { return accountB, retired },
 		Resolve: func(claim.Claim) (Policy, error) {
 			return Policy{Endpoint: u.srv.URL, Key: "server-key", IncludePrompts: true, IncludeToolContent: true}, nil
 		}})
@@ -330,7 +337,7 @@ func TestAServerKeyNeverSendsAPersonsBacklog(t *testing.T) {
 	waitFor(t, func() bool { return len(u.requests()) == 1 })
 	time.Sleep(100 * time.Millisecond)
 	if got := u.requests(); len(got) != 1 || got[0] != "Bearer server-key " {
-		t.Fatalf("sent %q, want only the unbound part, with the key", got)
+		t.Fatalf("sent %q, want only the part no person collected, with the key", got)
 	}
 }
 

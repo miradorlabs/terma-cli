@@ -116,9 +116,26 @@ func (r *Relay) owner(rt route, e entry) string {
 	return ""
 }
 
-// mayLeave keeps of entries, in arrival order, those that may be sent now: only under the
-// account that collected them, while its sign-in is the one in place.
-func (r *Relay) mayLeave(rt route, entries []entry) []entry {
+// mayLeave keeps of entries, in arrival order, those that may be sent now: with a sign-in,
+// only under the account that collected them while its sign-in is the one in place; with
+// a server key (serverKey), only those no person's sign-in collected, the older sign-ins'
+// backlog included.
+//
+// Under a sign-in it keeps the leading run, so a route's parts leave in arrival order: a
+// route's entries share one owner, but for an older terma's backlog, which comes first.
+// Under a server key it keeps every entry of the batch no person collected, so that
+// backlog, which never leaves that way, holds up nothing behind it in the same batch; one
+// longer than a batch holds the route until it ages out.
+func (r *Relay) mayLeave(rt route, entries []entry, serverKey bool) []entry {
+	if serverKey {
+		var out []entry
+		for _, e := range entries {
+			if r.owner(rt, e) == "" {
+				out = append(out, e)
+			}
+		}
+		return out
+	}
 	now := r.account()
 	for i, e := range entries {
 		if owner := r.owner(rt, e); owner == "" || owner != now {
@@ -185,11 +202,8 @@ func (s *sender) loop() {
 		pol, ok := s.r.resolve(c)
 		// Another person's or environment's backlog waits for its own sign-in, and ages out;
 		// a server key sends only what no person's sign-in collected.
-		switch {
-		case ok && pol.Key != "" && s.route.account != "":
-			ok = false
-		case ok && pol.Key == "":
-			if entries = s.r.mayLeave(s.route, entries); len(entries) == 0 {
+		if ok {
+			if entries = s.r.mayLeave(s.route, entries, pol.Key != ""); len(entries) == 0 {
 				ok = false
 			}
 		}

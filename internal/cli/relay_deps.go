@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"slices"
 	"strings"
@@ -21,6 +22,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/relay"
 	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
 	"github.com/miradorlabs/terma-cli/internal/relay/shape"
+	"github.com/miradorlabs/terma-cli/internal/sendas"
 )
 
 // relayDeps are what the relay reaches through the command line.
@@ -62,7 +64,9 @@ func (app *App) relayHeartbeatSend(ctx context.Context, beat *logspb.LogsData) e
 		return err
 	}
 	selected := cmp.Or(cfg.Policy.TeamID, cfg.Policy.DefaultProjectID, cfg.ProjectID)
-	if !cfg.ServerKeySignIn && cfg.APIKey == "" {
+	// The profile decides, as for the relay, the hooks and delivery: TERMA_API_KEY is setup's
+	// input, recorded as the profile's server-key sign-in.
+	if !cfg.ServerKeySignIn {
 		return app.signedInHeartbeat(ctx, cfg, selected, beat)
 	}
 	others := keystore.CollectionProjects(app.dir)
@@ -142,14 +146,22 @@ func (app *App) signedInHeartbeat(ctx context.Context, cfg *config.Config, team 
 	endpoint := app.delivery().Endpoint(cfg, team)
 	relay.NameHeartbeatUser(beat, app.teamUser(cfg, team, endpoint))
 	err = sendHeartbeat(ctx, endpoint, token, team, beat)
-	if ingest, ok := errors.AsType[*heartbeatError](err); ok && ingest.status == http.StatusUnauthorized {
-		src.Refused(ctx, token)
+	if refusal, ok := errors.AsType[*heartbeatError](err); ok {
+		switch {
+		case refusal.status == http.StatusUnauthorized:
+			src.Refused(ctx, token)
+		case refusal.reason == sendas.ReasonSignInRetired:
+			src.Retired()
+		}
 	}
 	return err
 }
 
-// heartbeatError is the ingest's refusal of a beat.
-type heartbeatError struct{ status int }
+// heartbeatError is the ingest's refusal of a beat, with the reason a user token's carries.
+type heartbeatError struct {
+	status int
+	reason string
+}
 
 func (e *heartbeatError) Error() string { return fmt.Sprintf("the ingest answered HTTP %d", e.status) }
 
@@ -175,7 +187,8 @@ func sendHeartbeat(ctx context.Context, endpoint, bearer, team string, beat *log
 	}
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode/100 != 2 {
-		return &heartbeatError{status: resp.StatusCode}
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 64<<10))
+		return &heartbeatError{status: resp.StatusCode, reason: sendas.Reason(body)}
 	}
 	return nil
 }

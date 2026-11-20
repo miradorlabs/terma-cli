@@ -192,15 +192,18 @@ func TestAServerKeyNeverSendsAPersonsEvents(t *testing.T) {
 	if err := keystore.Set(dir, "p1", testKey, keystore.Hosts{}); err != nil {
 		t.Fatal(err)
 	}
-	s := spoolOf(t, eventFor("p1", "a-persons", "aaaaaaaaaaaaaaaa"), eventFor("p1", "unbound", ""))
-	r := signInRouter(&fakeSignIn{}, "")
+	old := eventFor("p1", "older-termas", "")
+	old.Time = time.Now().Add(-2 * time.Hour)
+	s := spoolOf(t, eventFor("p1", "a-persons", "aaaaaaaaaaaaaaaa"), old, eventFor("p1", "unbound", ""))
+	r := signInRouter(&fakeSignIn{}, "bbbbbbbbbbbbbbbb")
+	r.LegacyBefore = time.Now().Add(-time.Hour)
 	r.ConfigDir = dir
 	res := r.Flush(t.Context(), s, &config.Config{OTLPURL: srv.URL, ServerKeySignIn: true}, true, 0)
-	if res.Sent != 1 || res.Held != 1 {
+	if res.Sent != 1 || res.Held != 2 {
 		t.Fatalf("Flush = %+v", res)
 	}
 	for _, req := range sent() {
-		if strings.Contains(req.body, "a-persons") {
+		if strings.Contains(req.body, "a-persons") || strings.Contains(req.body, "older-termas") {
 			t.Fatal("a person's event left with the server key")
 		}
 	}

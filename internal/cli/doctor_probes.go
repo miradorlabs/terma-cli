@@ -83,7 +83,7 @@ func (app *App) doctorProbes(cfg *config.Config) doctor.Probes {
 // a person's profile, their sign-in, for every team; on one set up with a server key, the
 // keys in this machine's keystore.
 func (app *App) deliveryCredential(cfg *config.Config) doctor.Keys {
-	if cfg.ServerKeySignIn || cfg.APIKey != "" {
+	if cfg.ServerKeySignIn {
 		return app.storedKeys
 	}
 	return func(string, string) string {

@@ -132,7 +132,7 @@ func (r Router) Flush(ctx context.Context, s *spool.Spool, cfg *config.Config, f
 			}
 			// Another person's or environment's events wait for their own sign-in; a server key
 			// sends only what no person's sign-in collected.
-			if serverKey && e.Account != "" || !serverKey && (account == "" || r.owner(e) != account) {
+			if owner := r.owner(e); serverKey && owner != "" || !serverKey && (account == "" || owner != account) {
 				held = append(held, e)
 				continue
 			}
