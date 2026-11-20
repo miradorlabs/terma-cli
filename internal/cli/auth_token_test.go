@@ -1,12 +1,15 @@
 package cli
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -116,6 +119,9 @@ func (s *tokenServer) state() (access, refresh string, redemptions, fails int, r
 	defer s.mu.Unlock()
 	return s.access, s.refresh, s.redemptions, s.fails, s.revoked
 }
+
+// bare401 is a 401 without the auth gateway's envelope, as a proxy in the way may answer.
+func bare401(w http.ResponseWriter) { http.Error(w, "Unauthorized", http.StatusUnauthorized) }
 
 func unauthorized(w http.ResponseWriter) {
 	w.WriteHeader(http.StatusUnauthorized)
@@ -356,6 +362,25 @@ func TestAuthToken_ErrorCodes(t *testing.T) {
 		stdout, _, err := termaRun{}.exec(t, "auth", "token", "--json")
 		assertTokenError(t, stdout, err, "no_team")
 	})
+	// A bare 401 on the refresh, as a proxy in the way may answer, says nothing about the
+	// session: worth trying again, and the sign-in is kept, its refresh unmarked.
+	t.Run("unavailable after a bare 401", func(t *testing.T) {
+		srv := newTokenServer(t)
+		dir := signInForToken(t, srv, time.Now().Add(-time.Minute), grantTeam)
+		srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path == "/v1/auth/cli/token" {
+				bare401(w)
+				return
+			}
+			srv.serve(w, r)
+		})
+		stdout, _, err := termaRun{}.exec(t, "auth", "token", "--json")
+		assertTokenFailure(t, stdout, err, "unavailable", "try again")
+		stored, err := auth.LoadCredential(dir, config.DefaultProfile)
+		if err != nil || stored.RefreshToken != "mir_clr_0" || !stored.UnsettledSince().IsZero() {
+			t.Fatalf("stored = %v, %v; want the sign-in kept, unmarked", stored, err)
+		}
+	})
 	t.Run("unavailable", func(t *testing.T) {
 		srv := newTokenServer(t)
 		signInForToken(t, srv, time.Now().Add(-time.Minute), grantTeam)
@@ -365,6 +390,239 @@ func TestAuthToken_ErrorCodes(t *testing.T) {
 			t.Errorf("err = %v, stdout %s; want unavailable", err, stdout)
 		}
 	})
+}
+
+// A setup run again does not reuse a stored session whose refresh went unanswered past its
+// budget, even while whoami still takes its access token: it could never be refreshed, so
+// setup signs in anew, and the new sign-in replaces it.
+func TestReuseStoredSessionSkipsALostRefresh(t *testing.T) {
+	srv := newTokenServer(t)
+	dir := signInForToken(t, srv, time.Now().Add(time.Hour), grantTeam)
+	cfg, err := testApp.loadConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	stored, err := auth.LoadCredential(dir, config.DefaultProfile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res, ok, err := testApp.reuseStoredSession(t.Context(), cfg, orgRef{}); err != nil || !ok {
+		t.Fatalf("reuseStoredSession before the lost refresh = %v, %v, %v; want it reused", res, ok, err)
+	}
+	if err := auth.Locked(t.Context(), dir, func(tx *auth.Tx) error {
+		return tx.ExpireUnsettled(config.DefaultProfile, stored.OrganizationID, stored.RefreshToken)
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	if res, ok, err := testApp.reuseStoredSession(t.Context(), cfg, orgRef{}); err != nil || ok {
+		t.Fatalf("reuseStoredSession = %v, %v, %v; want a fresh sign-in", res, ok, err)
+	}
+}
+
+// A stored session whoami refuses is removed only while the store still holds the pair
+// that was refused: a new sign-in another process stored meanwhile stays.
+func TestReuseStoredSessionKeepsASignInStoredSinceARefusal(t *testing.T) {
+	srv := newTokenServer(t)
+	dir := signInForToken(t, srv, time.Now().Add(time.Hour), grantTeam)
+	cfg, err := testApp.loadConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var signIn sync.Once
+	srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/v1/whoami" {
+			signIn.Do(func() {
+				if err := auth.UpdateCredential(dir, config.DefaultProfile, &auth.Credential{
+					AccessToken: "mir_cli_new", RefreshToken: "mir_clr_new", ExpiresAt: time.Now().Add(time.Hour), SessionID: "session-2",
+					AuthURL: srv.URL, OrganizationID: grantOrg, UserID: "user-1",
+				}); err != nil {
+					t.Error(err)
+				}
+			})
+		}
+		unauthorized(w)
+	})
+
+	if res, ok, err := testApp.reuseStoredSession(t.Context(), cfg, orgRef{}); err != nil || ok {
+		t.Fatalf("reuseStoredSession = %v, %v, %v; want a fresh sign-in", res, ok, err)
+	}
+	stored, err := auth.LoadCredential(dir, config.DefaultProfile)
+	if err != nil {
+		t.Fatalf("the sign-in stored meanwhile is gone: %v", err)
+	}
+	if stored.RefreshToken != "mir_clr_new" {
+		t.Fatalf("stored refresh token = %q, want the new sign-in's", stored.RefreshToken)
+	}
+}
+
+// A stored session another process removes after whoami verified it, as one does on the
+// gateway's refusal of its refresh token, is not restored by setup's resave: setup signs
+// in anew instead.
+func TestReuseStoredSessionDoesNotRestoreACredentialRemovedSinceItWasVerified(t *testing.T) {
+	srv := newTokenServer(t)
+	dir := signInForToken(t, srv, time.Now().Add(time.Hour), grantTeam)
+	cfg, err := testApp.loadConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	held, err := auth.LoadCredential(dir, config.DefaultProfile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var remove sync.Once
+	srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/v1/whoami" {
+			// Verified, and removed by another process before setup saves it again.
+			remove.Do(func() {
+				if err := auth.Locked(context.Background(), dir, func(tx *auth.Tx) error {
+					return tx.DeleteFor(config.DefaultProfile, held.OrganizationID, held.RefreshToken)
+				}); err != nil {
+					t.Error(err)
+				}
+			})
+		}
+		srv.serve(w, r)
+	})
+
+	if res, ok, err := testApp.reuseStoredSession(t.Context(), cfg, orgRef{}); err != nil || ok {
+		t.Fatalf("reuseStoredSession = %v, %v, %v; want a fresh sign-in", res, ok, err)
+	}
+	if stored, err := auth.LoadCredential(dir, config.DefaultProfile); !errors.Is(err, auth.ErrNotLoggedIn) {
+		t.Fatalf("LoadCredential = %v, %v; want the removed credential left removed", stored, err)
+	}
+}
+
+// Setup removes a stored session only when the auth gateway itself refuses its refresh
+// token, and signs in anew. A bare 401 on the refresh, as a proxy in the way may answer,
+// says nothing about the session: it is kept, and setup fails with the proxy's answer
+// rather than open a browser for a sign-in the proxy would turn away too. The client's
+// refresh removes a refused one itself; setup's own removal is the backup for when that
+// one fails.
+func TestReuseStoredSessionRemovesOnlyARefusedRefresh(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		answer  func(http.ResponseWriter)
+		removed bool
+	}{
+		{"the gateway's refusal", unauthorized, true},
+		{"a bare 401", bare401, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			srv := newTokenServer(t)
+			// Expired, so whoami is preceded by a refresh.
+			dir := signInForToken(t, srv, time.Now().Add(-time.Minute), grantTeam)
+			cfg, err := testApp.loadConfig()
+			if err != nil {
+				t.Fatal(err)
+			}
+			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path == "/v1/auth/cli/token" {
+					tc.answer(w)
+					return
+				}
+				srv.serve(w, r)
+			})
+
+			res, ok, err := testApp.reuseStoredSession(t.Context(), cfg, orgRef{})
+			switch {
+			case ok:
+				t.Fatalf("reuseStoredSession = %v, %v, %v; want no reuse", res, ok, err)
+			case tc.removed && err != nil:
+				t.Fatalf("reuseStoredSession = %v; want a fresh sign-in", err)
+			case !tc.removed && (err == nil || !strings.Contains(err.Error(), "without the auth gateway's refusal")):
+				t.Fatalf("reuseStoredSession = %v; want the bare 401 reported", err)
+			}
+			stored, err := auth.LoadCredential(dir, config.DefaultProfile)
+			switch {
+			case tc.removed && !errors.Is(err, auth.ErrNotLoggedIn):
+				t.Fatalf("LoadCredential = %v, %v; want the refused sign-in removed", stored, err)
+			case !tc.removed && err != nil:
+				t.Fatalf("the sign-in a bare 401 met was removed: %v", err)
+			case !tc.removed && (stored.RefreshToken != "mir_clr_0" || api.RefreshLost(stored)):
+				t.Fatalf("stored = %q, lost = %v; want it kept as it was", stored.RefreshToken, api.RefreshLost(stored))
+			}
+		})
+	}
+}
+
+// An access token whoami refuses once is no refusal of the session: the client refreshes
+// and asks again, and setup reuses the rotated pair.
+func TestReuseStoredSessionRefreshesPastARefusedAccessToken(t *testing.T) {
+	srv := newTokenServer(t)
+	dir := signInForToken(t, srv, time.Now().Add(time.Hour), grantTeam)
+	cfg, err := testApp.loadConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var refuse sync.Once
+	srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		refused := false
+		if r.URL.Path == "/v1/whoami" {
+			refuse.Do(func() { refused = true })
+		}
+		if refused {
+			unauthorized(w)
+			return
+		}
+		srv.serve(w, r)
+	})
+
+	res, ok, err := testApp.reuseStoredSession(t.Context(), cfg, orgRef{})
+	if err != nil || !ok {
+		t.Fatalf("reuseStoredSession = %v, %v, %v; want it reused", res, ok, err)
+	}
+	stored, err := auth.LoadCredential(dir, config.DefaultProfile)
+	if err != nil || stored.RefreshToken != "mir_clr_1" {
+		t.Fatalf("stored = %v, %v; want the rotated pair, mir_clr_1", stored, err)
+	}
+}
+
+// A stored session whose refresh is found lost only as whoami's refusal sends it is left
+// stored: its token may still be alive, and the fresh sign-in setup makes replaces it.
+func TestReuseStoredSessionKeepsALostRefreshFoundLate(t *testing.T) {
+	srv := newTokenServer(t)
+	dir := signInForToken(t, srv, time.Now().Add(time.Hour), grantTeam)
+	cfg, err := testApp.loadConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	held, err := auth.LoadCredential(dir, config.DefaultProfile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var lose sync.Once
+	var sent atomic.Int32
+	srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/v1/auth/cli/token" {
+			sent.Add(1)
+		}
+		if r.URL.Path == "/v1/whoami" {
+			// Another process's refresh of it went unanswered past its budget meanwhile.
+			lose.Do(func() {
+				if err := auth.Locked(context.Background(), dir, func(tx *auth.Tx) error {
+					return tx.ExpireUnsettled(config.DefaultProfile, held.OrganizationID, held.RefreshToken)
+				}); err != nil {
+					t.Error(err)
+				}
+			})
+		}
+		unauthorized(w)
+	})
+
+	if res, ok, err := testApp.reuseStoredSession(t.Context(), cfg, orgRef{}); err != nil || ok {
+		t.Fatalf("reuseStoredSession = %v, %v, %v; want a fresh sign-in", res, ok, err)
+	}
+	stored, err := auth.LoadCredential(dir, config.DefaultProfile)
+	if err != nil {
+		t.Fatalf("the credential with the lost refresh was removed: %v", err)
+	}
+	if stored.RefreshToken != held.RefreshToken || !api.RefreshLost(stored) {
+		t.Fatalf("stored = %q, lost = %v; want it kept, marked lost", stored.RefreshToken, api.RefreshLost(stored))
+	}
+	if n := sent.Load(); n != 0 {
+		t.Fatalf("the lost refresh token was sent %d times", n)
+	}
 }
 
 // A setup run again, reusing the stored session, must not write back the pair it read
