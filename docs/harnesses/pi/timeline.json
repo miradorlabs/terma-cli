@@ -7,6 +7,14 @@
       "previous": "1.5.2",
       "changes": [
         {
+          "id": "request.headers.user-agent",
+          "category": "request",
+          "op": "changed",
+          "title": "Header user-agent: pi/<version> (darwin; node/v24.22.2; arm64) → pi/<version> (darwin; node/v24.22.3; arm64)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
           "id": "request.headers.x-stainless-package-version",
           "category": "request",
           "op": "changed",

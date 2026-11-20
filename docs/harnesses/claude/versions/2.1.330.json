@@ -22765,6 +22765,10 @@
         "description": "Set to `1` to emit subagent text and thinking blocks in `claude -p --output-format stream-json` output, the same behavior as the `--forward-subagent-text` flag. Use the variable when a harness invokes `claude` and can't pass the flag itself. Unlike the flag, which exits with an error outside non-interactive mode with stream-json output, the variable is ignored there so that nested invocations keep working when it's set process-wide. Requires Claude Code v2.1.211 or later",
         "read": true
       },
+      "CLAUDE_CODE_FULL_SIGN_IN_LINK": {
+        "description": "Set to `1` to print the full claude.ai login URL instead of a short one. Use it when the short URL shows an error or your script reads values from the URL. Set it in your shell or user settings. Requires Claude Code v2.1.330 or later",
+        "read": true
+      },
       "CLAUDE_CODE_GATEWAY_HINT_HEADERS": {
         "description": "Set to `1` to send the gateway hint headers, such as `x-claude-code-request-class` and `x-claude-code-compaction`, on a custom proxy or a third-party provider such as Amazon Bedrock or Claude Platform on AWS. Set to `0` to stop sending them on every connection, including a direct connection to the Anthropic API, where Claude Code sends them by default. Requires Claude Code v2.1.273 or later",
         "read": true
@@ -23706,7 +23710,7 @@
         "read": false
       }
     },
-    "fetched_at": "2026-11-20T23:02:11.327285931Z",
+    "fetched_at": "2026-11-20T23:48:14.51485671Z",
     "settings": {
       "advisorModel": {
         "default": "unset, so the advisor is off",
@@ -24507,7 +24511,7 @@
       },
       "forceLoginOrgUUID": {
         "default": "unset, so any organization can log in",
-        "description": "From a managed source, require claude.ai account logins to belong to one Anthropic organization, given as a single UUID, or to any of several organizations, given as an array. From any settings file, Claude Code also uses a single UUID to pre-select that organization during a claude.ai or Claude Console login, and pre-selects nothing for an array. If you set the key in any settings file, Claude Code also stops offering the keyless Console sign-in in the sessions that file applies to and creates an API key instead.",
+        "description": "From a managed source, require claude.ai account logins to belong to one Anthropic organization, given as a single UUID, or to any of several organizations, given as an array. From any settings file, Claude Code also uses a single UUID to pre-select that organization during a claude.ai or Claude Console login, and pre-selects nothing for an array.",
         "read": true,
         "scope": "Any file",
         "scope_note": "In a settings file that isn't a managed source, Claude Code doesn't check which organization a login belongs to, and a single UUID pre-selects the organization during login.",
@@ -26158,7 +26162,6 @@
       "CLAUDE_CODE_FORWARD_USER_INTENT",
       "CLAUDE_CODE_FRAME_TIMING_LOG",
       "CLAUDE_CODE_FRAME_TIMING_SAMPLE_EVERY",
-      "CLAUDE_CODE_FULL_SIGN_IN_LINK",
       "CLAUDE_CODE_GATEWAY_TOKEN_FILE_DESCRIPTOR",
       "CLAUDE_CODE_GB_DISK_CACHE_WHEN_TELEMETRY_OFF",
       "CLAUDE_CODE_GIT_CHECK_ONLY_IN_REPOSITORY",

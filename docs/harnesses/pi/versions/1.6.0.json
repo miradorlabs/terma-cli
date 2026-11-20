@@ -3,7 +3,7 @@
   "harness": "pi",
   "version": "1.6.0",
   "platform": "darwin/arm64",
-  "captured_at": "2026-11-20T17:30:26.655586344Z",
+  "captured_at": "2026-11-20T23:48:14.51485671Z",
   "capture": {
     "command": [
       "pi",
@@ -18,22 +18,22 @@
       "Part of this build's capture did not finish; the frequent check tries it again, up to four attempts."
     ],
     "sections": {
-      "behavior": "2026-11-20T17:30:26.655586344Z",
+      "behavior": "2026-11-20T23:48:14.51485671Z",
       "binary": "2026-11-20T11:17:38.159845069Z",
       "caching": "2026-11-20T11:17:38.159845069Z",
       "cli": "2026-11-20T11:17:38.159845069Z",
       "config": "2026-11-20T11:17:38.159845069Z",
       "model": "2026-11-20T11:17:38.159845069Z",
       "prompt": "2026-11-20T11:17:38.159845069Z",
-      "request": "2026-11-20T17:30:26.655586344Z",
+      "request": "2026-11-20T23:48:14.51485671Z",
       "side_requests": "2026-11-20T11:17:38.159845069Z",
       "storage": "2026-11-20T11:17:38.159845069Z",
       "support": "2026-11-20T11:17:38.159845069Z",
       "telemetry": "2026-11-20T11:17:38.159845069Z",
       "tools": "2026-11-20T11:17:38.159845069Z"
     },
-    "attempted_at": "2026-11-20T17:30:26.655586344Z",
-    "attempts": 2,
+    "attempted_at": "2026-11-20T23:48:14.51485671Z",
+    "attempts": 3,
     "announced_at": "2026-11-20T11:17:38.159845069Z"
   },
   "model": {
@@ -192,7 +192,7 @@
       "accept-language": "*",
       "authorization": "[redacted]",
       "sec-fetch-mode": "cors",
-      "user-agent": "pi/<version> (darwin; node/v24.22.2; arm64)",
+      "user-agent": "pi/<version> (darwin; node/v24.22.3; arm64)",
       "x-stainless-lang": "js",
       "x-stainless-package-version": "7.59.0",
       "x-stainless-runtime": "node"
@@ -210,9 +210,9 @@
         "429": {
           "attempts": 4,
           "backoff_ms": [
-            2022,
-            4028,
-            8035
+            2021,
+            4013,
+            8008
           ],
           "failed": 3,
           "failed_first": 3,
@@ -224,9 +224,9 @@
         "500": {
           "attempts": 4,
           "backoff_ms": [
-            2028,
-            4038,
-            8023
+            2020,
+            4013,
+            8009
           ],
           "failed": 3,
           "failed_first": 3,

@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "harness": "claude-desktop",
+  "from": "6.28899.2",
+  "to": "6.28899.6",
+  "generated_at": "2026-11-20T23:48:14.51485671Z",
+  "source": null,
+  "changelog": null,
+  "summary": {
+    "changes": 0,
+    "categories": {},
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 0,
+      "notable": 0
+    },
+    "undocumented": null
+  },
+  "changes": []
+}

@@ -3,6 +3,11 @@
   "harness": "claude-desktop",
   "steps": [
     {
+      "version": "6.28899.6",
+      "previous": "6.28899.2",
+      "changes": []
+    },
+    {
       "version": "6.28899.2",
       "previous": "6.6395.1",
       "changes": [

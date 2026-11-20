@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-20T23:02:11.327285931Z",
+  "generated_at": "2026-11-20T23:48:14.51485671Z",
   "versions": [
     {
       "harness": "codex-desktop",
@@ -26,6 +26,30 @@
       "signing": null,
       "partial": true,
       "attempted_at": "2026-11-20T23:02:11.327285931Z",
+      "attempts": 1
+    },
+    {
+      "harness": "claude-desktop",
+      "name": "Claude Desktop (Code)",
+      "version": "6.28899.6",
+      "released_at": "2026-11-20T22:21:45.581Z",
+      "captured_at": "2026-11-20T23:48:14.51485671Z",
+      "platforms": [],
+      "support": "untested",
+      "previous": "6.28899.2",
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": null,
+      "highlights": [],
+      "signing": null,
+      "partial": true,
+      "attempted_at": "2026-11-20T23:48:14.51485671Z",
       "attempts": 1
     },
     {
@@ -66,34 +90,34 @@
       "name": "Pi",
       "version": "1.6.0",
       "released_at": "2026-11-20T11:09:15.529Z",
-      "captured_at": "2026-11-20T17:30:26.655586344Z",
+      "captured_at": "2026-11-20T23:48:14.51485671Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "supported",
       "previous": "1.5.2",
-      "changes": 6,
+      "changes": 7,
       "categories": {
         "binary": 3,
         "cli": 2,
-        "request": 1
+        "request": 2
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 6,
+        "informational": 7,
         "notable": 0
       },
-      "undocumented": 3,
+      "undocumented": 4,
       "highlights": [
+        "Header user-agent: pi/<version> (darwin; node/v24.22.2; arm64) → pi/<version> (darwin; node/v24.22.3; arm64)",
         "Header x-stainless-package-version: 7.19.0 → 7.59.0",
-        "Description of `pi` changed",
-        "Full help text of `--help` changed (+355 −158 chars)"
+        "Description of `pi` changed"
       ],
       "signing": null,
       "partial": true,
-      "attempted_at": "2026-11-20T17:30:26.655586344Z",
-      "attempts": 2
+      "attempted_at": "2026-11-20T23:48:14.51485671Z",
+      "attempts": 3
     },
     {
       "harness": "t3",
@@ -6174,30 +6198,6 @@
         "Behaviour: compaction added",
         "Behaviour: subagents removed"
       ],
-      "signing": "valid"
-    },
-    {
-      "harness": "claude",
-      "name": "Claude Code",
-      "version": "2.1.220",
-      "released_at": "2026-07-24T23:11:21.821Z",
-      "captured_at": "2026-11-05T09:54:28.532441Z",
-      "platforms": [
-        "darwin/arm64",
-        "linux/amd64"
-      ],
-      "support": "untested",
-      "previous": "2.1.219",
-      "changes": 0,
-      "categories": {},
-      "impact": {
-        "breaking": 0,
-        "degrading": 0,
-        "informational": 0,
-        "notable": 0
-      },
-      "undocumented": 0,
-      "highlights": [],
       "signing": "valid"
     }
   ]

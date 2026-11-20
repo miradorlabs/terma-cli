@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "harness": "claude-desktop",
+  "version": "6.28899.6",
+  "platform": "",
+  "captured_at": "2026-11-20T23:48:14.51485671Z",
+  "capture": {
+    "partial": true,
+    "notes": [
+      "This build's capture failed; the frequent check tries it again, up to four attempts."
+    ],
+    "attempted_at": "2026-11-20T23:48:14.51485671Z",
+    "attempts": 1,
+    "announced_at": "2026-11-20T23:48:14.51485671Z"
+  },
+  "side_requests": null
+}
