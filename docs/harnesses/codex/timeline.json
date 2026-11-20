@@ -3,6 +3,620 @@
   "harness": "codex",
   "steps": [
     {
+      "version": "0.171.0",
+      "previous": "0.170.0",
+      "changes": [
+        {
+          "id": "tools.exec.description",
+          "category": "tools",
+          "op": "changed",
+          "title": "exec tool description changed (+50 −85 chars)",
+          "impact": "notable",
+          "documented": true
+        },
+        {
+          "id": "tools.collaboration/spawn_agent.description",
+          "category": "tools",
+          "op": "changed",
+          "title": "collaboration/spawn_agent tool description changed (+848 −0 chars)",
+          "impact": "notable",
+          "documented": true
+        },
+        {
+          "id": "telemetry.surfaces.traces/built_tools.load_discoverable_tools",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/built_tools.load_discoverable_tools",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/plugins_for_config.parents.traces/prepare_tool_recommendations",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surfaces.traces/plugins_for_config.parents.traces/prepare_tool_recommendations removed",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/plugins_for_config.parents.traces/record_context_updates_and_set_reference_context_item",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surfaces.traces/plugins_for_config.parents.traces/record_context_updates_and_set_reference_context_item removed",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/prepare_tool_recommendations",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/prepare_tool_recommendations",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/record_conversation_items.parent",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surfaces.traces/record_conversation_items.parent removed",
+          "impact": "notable",
+          "documented": true
+        },
+        {
+          "id": "telemetry.surfaces.traces/record_conversation_items.parents",
+          "category": "telemetry",
+          "op": "added",
+          "title": "Telemetry surfaces.traces/record_conversation_items.parents added",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/send_raw_response_items.parents.traces/handle_output_item_done",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surfaces.traces/send_raw_response_items.parents.traces/handle_output_item_done removed",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/try_run_sampling_request/events/event otel/src/events/session_telemetry.rs",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/try_run_sampling_request/events/event otel/src/events/session_telemetry.rs",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "cli.commands.codex exec.options.--remote",
+          "category": "cli",
+          "op": "added",
+          "title": "New flag `codex exec --remote`",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "cli.commands.codex exec.options.--remote-auth-token-env",
+          "category": "cli",
+          "op": "added",
+          "title": "New flag `codex exec --remote-auth-token-env`",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "cli.commands.codex exec-server.options.--linux-sandbox-transparent-tcp",
+          "category": "cli",
+          "op": "added",
+          "title": "New flag `codex exec-server --linux-sandbox-transparent-tcp`",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "cli.commands.codex exec-server.options.--tcp-upstream-proxy",
+          "category": "cli",
+          "op": "added",
+          "title": "New flag `codex exec-server --tcp-upstream-proxy`",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "cli.help.exec --help",
+          "category": "cli",
+          "op": "changed",
+          "title": "Full help text of `exec --help` changed (+178 −0 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "cli.help.exec -h",
+          "category": "cli",
+          "op": "changed",
+          "title": "Full help text of `exec -h` changed (+178 −0 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "cli.help.exec-server --help",
+          "category": "cli",
+          "op": "changed",
+          "title": "Full help text of `exec-server --help` changed (+225 −0 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "cli.help.exec-server -h",
+          "category": "cli",
+          "op": "changed",
+          "title": "Full help text of `exec-server -h` changed (+225 −0 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.code_mode",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: code_mode",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.code_mode.heartbeat_interval_s",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: code_mode.heartbeat_interval_s",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.features.catalog_apps_instructions",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: features.catalog_apps_instructions",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.features.file_backed_tool_audio",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: features.file_backed_tool_audio",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.features.guardian_nested_approval_context",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: features.guardian_nested_approval_context",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "config.options.features.guardianv2.async_elastic_budgeting",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: features.guardianv2.async_elastic_budgeting",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.features.guardianv2.async_elastic_sections",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: features.guardianv2.async_elastic_sections",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.features.guardianv2.async_elastic_sections.<name>",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: features.guardianv2.async_elastic_sections.<name>",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.features.mcp_shared_repl_cwd",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: features.mcp_shared_repl_cwd",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.features.multi_agent_v2.interrupt_at_item_boundary",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: features.multi_agent_v2.interrupt_at_item_boundary",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.features.network_proxy.transparent_tcp",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: features.network_proxy.transparent_tcp",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.features.per_environment_context",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: features.per_environment_context",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.features.restored_history_prewarm",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: features.restored_history_prewarm",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.features.rollout_budget.limit_budget",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: features.rollout_budget.limit_budget",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.features.rollout_budget.limit_tokens.description",
+          "category": "config",
+          "op": "changed",
+          "title": "features.rollout_budget.limit_tokens description changed (+72 −0 chars)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.features.rollout_budget.reminder_at_context_start",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: features.rollout_budget.reminder_at_context_start",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.features.safe_image_decoder",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: features.safe_image_decoder",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.features.token_budget.context_window_as_tool_output",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: features.token_budget.context_window_as_tool_output",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.features.utc_environment_date",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: features.utc_environment_date",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.marketplaces.<name>.auto_update",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: marketplaces.<name>.auto_update",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.responses",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: responses",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.responses.process_mode",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: responses.process_mode",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.rollout_trace",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: rollout_trace",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.rollout_trace.max_bytes",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: rollout_trace.max_bytes",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.rollout_trace.max_payload_bytes",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: rollout_trace.max_payload_bytes",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.tui.keymap.default",
+          "category": "config",
+          "op": "changed",
+          "title": "Default of tui.keymap: {\"agents\":{\"archive\":null,\"delete\":null,\"fork\":null,\"hide… → {\"agents\":{\"archive\":null,\"delete\":null,\"fork\":null,\"hide…",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "config.options.tui.keymap.composer.default",
+          "category": "config",
+          "op": "changed",
+          "title": "Default of tui.keymap.composer: {\"history_search_next\":null,\"history_search_previous\":nul… → {\"history_search_next\":null,\"history_search_previous\":nul…",
+          "impact": "notable",
+          "documented": true
+        },
+        {
+          "id": "config.options.tui.keymap.composer.redo",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: tui.keymap.composer.redo",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.tui.keymap.composer.undo",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: tui.keymap.composer.undo",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.tui.keymap.global.default",
+          "category": "config",
+          "op": "changed",
+          "title": "Default of tui.keymap.global: {\"change_host\":null,\"clear_terminal\":null,\"close_sidebar_… → {\"change_host\":null,\"choose_cloud_environment\":null,\"clea…",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "config.options.tui.keymap.global.choose_cloud_environment",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: tui.keymap.global.choose_cloud_environment",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.tui.keymap.pager.default",
+          "category": "config",
+          "op": "changed",
+          "title": "Default of tui.keymap.pager: {\"close\":null,\"close_transcript\":null,\"find\":null,\"half_p… → {\"close\":null,\"close_transcript\":null,\"find\":null,\"half_p…",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "config.options.tui.keymap.pager.mark_markdown",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: tui.keymap.pager.mark_markdown",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.tui.status_line_provider",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: tui.status_line_provider",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.tui.status_line_provider.server",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: tui.status_line_provider.server",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.tui.status_line_provider.tool",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: tui.status_line_provider.tool",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.env_vars.OPENAI_IDENTITY_TOKEN_SOURCE",
+          "category": "config",
+          "op": "added",
+          "title": "New environment variable: OPENAI_IDENTITY_TOKEN_SOURCE",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.env_vars.OPENAI_SPIFFE_AUDIENCE",
+          "category": "config",
+          "op": "added",
+          "title": "New environment variable: OPENAI_SPIFFE_AUDIENCE",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.env_vars.OPENAI_SPIFFE_ID",
+          "category": "config",
+          "op": "added",
+          "title": "New environment variable: OPENAI_SPIFFE_ID",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.env_vars.SPIFFE_ENDPOINT_SOCKET",
+          "category": "config",
+          "op": "added",
+          "title": "New environment variable: SPIFFE_ENDPOINT_SOCKET",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "filesystem.darwin/arm64.exec.git -c safe.bareRepository=explicit -c core.hooksPath=/dev/null -c core.fsmonitor=false status --porcelain=v2 --branch --no-ahead-behind --ignore-submodules=dirty",
+          "category": "filesystem",
+          "op": "changed",
+          "title": "Command changed: `git -c safe.bareRepository=explicit -c core.hooksPath=/dev/null -c core.fsmonitor=false status --por …` (+39 −11 chars) (darwin/arm64)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "filesystem.darwin/arm64.exec.git -c safe.bareRepository=explicit -c core.hooksPath=/dev/null -c core.fsmonitor=false config --null --get-regexp ^(remote\\.|url\\.)",
+          "category": "filesystem",
+          "op": "added",
+          "title": "New command at startup and exit: `git -c safe.bareRepository=explicit -c core.hooksPath=/dev/null -c core.fsmonitor=false config --nul …` (darwin/arm64)",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "filesystem.darwin/arm64.exec.git -c safe.bareRepository=explicit -c core.hooksPath=/dev/null -c core.fsmonitor=false remote -v",
+          "category": "filesystem",
+          "op": "removed",
+          "title": "Command no longer run: `git -c safe.bareRepository=explicit -c core.hooksPath=/dev/null -c core.fsmonitor=false remote -v` (darwin/arm64)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "filesystem.darwin/arm64.exec.git -c safe.bareRepository=explicit -c core.hooksPath=/dev/null -c core.fsmonitor=false rev-parse --verify --quiet HEAD",
+          "category": "filesystem",
+          "op": "added",
+          "title": "New command at startup and exit: `git -c safe.bareRepository=explicit -c core.hooksPath=/dev/null -c core.fsmonitor=false rev-parse -- …` (darwin/arm64)",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "filesystem.linux/amd64.paths.<codex-home>/skills/.system/create-statusline",
+          "category": "filesystem",
+          "op": "added",
+          "title": "Now creates <codex-home>/skills/.system/create-statusline (linux/amd64)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "filesystem.linux/amd64.paths.<codex-home>/skills/.system/create-statusline/SKILL.md",
+          "category": "filesystem",
+          "op": "added",
+          "title": "Now writes <codex-home>/skills/.system/create-statusline/SKILL.md (linux/amd64)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "filesystem.linux/amd64.paths.<codex-home>/skills/.system/create-statusline/agents",
+          "category": "filesystem",
+          "op": "added",
+          "title": "Now creates <codex-home>/skills/.system/create-statusline/agents (linux/amd64)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "filesystem.linux/amd64.paths.<codex-home>/skills/.system/create-statusline/agents/openai.yaml",
+          "category": "filesystem",
+          "op": "added",
+          "title": "Now writes <codex-home>/skills/.system/create-statusline/agents/openai.yaml (linux/amd64)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "filesystem.linux/amd64.paths.<codex-home>/skills/.system/create-statusline/assets",
+          "category": "filesystem",
+          "op": "added",
+          "title": "Now creates <codex-home>/skills/.system/create-statusline/assets (linux/amd64)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "filesystem.linux/amd64.paths.<codex-home>/skills/.system/create-statusline/assets/statusline.py",
+          "category": "filesystem",
+          "op": "added",
+          "title": "Now writes <codex-home>/skills/.system/create-statusline/assets/statusline.py (linux/amd64)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "filesystem.linux/amd64.paths.<codex-home>/skills/.system/create-statusline/references",
+          "category": "filesystem",
+          "op": "added",
+          "title": "Now creates <codex-home>/skills/.system/create-statusline/references (linux/amd64)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "filesystem.linux/amd64.paths.<codex-home>/skills/.system/create-statusline/references/statusline.d.ts",
+          "category": "filesystem",
+          "op": "added",
+          "title": "Now writes <codex-home>/skills/.system/create-statusline/references/statusline.d.ts (linux/amd64)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "filesystem.linux/amd64.paths.<codex-home>/skills/.system/create-statusline/scripts",
+          "category": "filesystem",
+          "op": "added",
+          "title": "Now looks for <codex-home>/skills/.system/create-statusline/scripts (linux/amd64)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "filesystem.linux/amd64.exec.git -c safe.bareRepository=explicit -c core.hooksPath=/dev/null -c core.fsmonitor=false rev-parse HEAD.phases.exit",
+          "category": "filesystem",
+          "op": "removed",
+          "title": "`git -c safe.bareRepository=explicit -c core.hooksPath=/dev/null -c core.fsmonitor=false rev-parse HE …` no longer runs at exit (linux/amd64)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "filesystem.linux/amd64.exec.git -c safe.bareRepository=explicit -c core.hooksPath=/dev/null -c core.fsmonitor=false status --porcelain=v2 --branch --no-ahead-behind --ignore-submodules=dirty",
+          "category": "filesystem",
+          "op": "changed",
+          "title": "Command changed: `git -c safe.bareRepository=explicit -c core.hooksPath=/dev/null -c core.fsmonitor=false status --por …` (+39 −11 chars) (linux/amd64)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "filesystem.linux/amd64.exec.git -c safe.bareRepository=explicit -c core.hooksPath=/dev/null -c core.fsmonitor=false config --null --get-regexp ^(remote\\.|url\\.)",
+          "category": "filesystem",
+          "op": "added",
+          "title": "New command at startup and exit: `git -c safe.bareRepository=explicit -c core.hooksPath=/dev/null -c core.fsmonitor=false config --nul …` (linux/amd64)",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "filesystem.linux/amd64.exec.git -c safe.bareRepository=explicit -c core.hooksPath=/dev/null -c core.fsmonitor=false remote -v",
+          "category": "filesystem",
+          "op": "removed",
+          "title": "Command no longer run: `git -c safe.bareRepository=explicit -c core.hooksPath=/dev/null -c core.fsmonitor=false remote -v` (linux/amd64)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "filesystem.linux/amd64.exec.git -c safe.bareRepository=explicit -c core.hooksPath=/dev/null -c core.fsmonitor=false rev-parse --verify --quiet HEAD",
+          "category": "filesystem",
+          "op": "added",
+          "title": "New command at startup and exit: `git -c safe.bareRepository=explicit -c core.hooksPath=/dev/null -c core.fsmonitor=false rev-parse -- …` (linux/amd64)",
+          "impact": "notable",
+          "documented": false
+        }
+      ]
+    },
+    {
       "version": "0.170.0",
       "previous": "0.169.1",
       "changes": [
@@ -521,10 +1135,82 @@
           "documented": true
         },
         {
-          "id": "telemetry.surfaces.logs/codex.conversation_starts.keys.config.legacy_multi_agent_disabled_sources",
+          "id": "telemetry.surfaces.logs/codex.api_request",
           "category": "telemetry",
           "op": "added",
-          "title": "New telemetry field: config.legacy_multi_agent_disabled_sources on logs/codex.conversation_starts",
+          "title": "New telemetry surface: logs/codex.api_request (19 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.logs/codex.conversation_starts",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: logs/codex.conversation_starts (20 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.logs/codex.sse_event",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: logs/codex.sse_event (19 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.logs/codex.startup_phase",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: logs/codex.startup_phase (12 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.logs/codex.tool_decision",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: logs/codex.tool_decision (14 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.logs/codex.tool_result",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: logs/codex.tool_result (21 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.logs/codex.turn_ttft",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: logs/codex.turn_ttft (10 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.logs/codex.user_prompt",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: logs/codex.user_prompt (11 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.api_request",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: metrics/codex.api_request (7 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.api_request.duration_ms",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: metrics/codex.api_request.duration_ms (7 fields)",
           "impact": "informational",
           "documented": false
         },
@@ -543,6 +1229,102 @@
           "title": "New telemetry surface: metrics/codex.auth.selection.duration (3 fields)",
           "impact": "informational",
           "documented": true
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.auth_storage.duration",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: metrics/codex.auth_storage.duration (11 fields)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.auth_storage.operation",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: metrics/codex.auth_storage.operation (11 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.cloud_config_bundle.load",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: metrics/codex.cloud_config_bundle.load (3 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.conversation.turn.count",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: metrics/codex.conversation.turn.count (5 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.db.backfill",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: metrics/codex.db.backfill (1 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.db.backfill.duration_ms",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: metrics/codex.db.backfill.duration_ms (1 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.feature.state",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: metrics/codex.feature.state (7 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.guardian.turn.blocking_ms",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: metrics/codex.guardian.turn.blocking_ms (6 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.hooks.run",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: metrics/codex.hooks.run (10 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.hooks.run.duration_ms",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: metrics/codex.hooks.run.duration_ms (10 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.mcp.binding_catalog.raw_definition_json_bytes",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: metrics/codex.mcp.binding_catalog.raw_definition_json_bytes (1 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.process.start",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: metrics/codex.process.start (1 fields)",
+          "impact": "informational",
+          "documented": false
         },
         {
           "id": "telemetry.surfaces.metrics/codex.rollout.persistence.append",
@@ -577,74 +1359,1458 @@
           "documented": false
         },
         {
-          "id": "telemetry.surfaces.traces/auth.parents.traces/codex.turn_input",
+          "id": "telemetry.surfaces.metrics/codex.rollout_compression.materialize",
           "category": "telemetry",
-          "op": "removed",
-          "title": "Telemetry surfaces.traces/auth.parents.traces/codex.turn_input removed",
-          "impact": "notable",
-          "documented": true
-        },
-        {
-          "id": "telemetry.surfaces.traces/auth.parents.traces/model_client.stream_responses_api",
-          "category": "telemetry",
-          "op": "removed",
-          "title": "Telemetry surfaces.traces/auth.parents.traces/model_client.stream_responses_api removed",
-          "impact": "notable",
+          "op": "added",
+          "title": "New telemetry surface: metrics/codex.rollout_compression.materialize (1 fields)",
+          "impact": "informational",
           "documented": false
         },
         {
-          "id": "telemetry.surfaces.traces/environments.snapshot.parents.traces/run_turn",
+          "id": "telemetry.surfaces.metrics/codex.rollout_compression.read",
           "category": "telemetry",
           "op": "added",
-          "title": "Telemetry surfaces.traces/environments.snapshot.parents.traces/run_turn added",
+          "title": "New telemetry surface: metrics/codex.rollout_compression.read (6 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.rollout_compression.read.io_duration_ms",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: metrics/codex.rollout_compression.read.io_duration_ms (6 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.sandbox_integrity.check",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: metrics/codex.sandbox_integrity.check (9 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.sandbox_integrity.duration_ms",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: metrics/codex.sandbox_integrity.duration_ms (2 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.sandbox_integrity.preparation_ms",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: metrics/codex.sandbox_integrity.preparation_ms (3 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.shell_snapshot",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: metrics/codex.shell_snapshot (7 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.shell_snapshot.command",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: metrics/codex.shell_snapshot.command (8 fields)",
           "impact": "informational",
           "documented": true
         },
         {
-          "id": "telemetry.surfaces.traces/load_with_cli_overrides.parents.traces/turn/start",
+          "id": "telemetry.surfaces.metrics/codex.shell_snapshot.duration_ms",
           "category": "telemetry",
-          "op": "removed",
-          "title": "Telemetry surfaces.traces/load_with_cli_overrides.parents.traces/turn/start removed",
-          "impact": "notable",
+          "op": "added",
+          "title": "New telemetry surface: metrics/codex.shell_snapshot.duration_ms (7 fields)",
+          "impact": "informational",
           "documented": false
         },
         {
-          "id": "telemetry.surfaces.traces/record_conversation_items.parent",
+          "id": "telemetry.surfaces.metrics/codex.shell_snapshot.wait_ms",
           "category": "telemetry",
           "op": "added",
-          "title": "Telemetry surfaces.traces/record_conversation_items.parent added",
+          "title": "New telemetry surface: metrics/codex.shell_snapshot.wait_ms (8 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.skills.catalog.entries",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: metrics/codex.skills.catalog.entries (7 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.skills.shadow_selection",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: metrics/codex.skills.shadow_selection (5 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.skills.shadow_selection.catalog_entries",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: metrics/codex.skills.shadow_selection.catalog_entries (5 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.skills.shadow_selection.duration_ms",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: metrics/codex.skills.shadow_selection.duration_ms (5 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.skills.shadow_selection.query_terms",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: metrics/codex.skills.shadow_selection.query_terms (5 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.skills.shadow_selection.reduction_bps",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: metrics/codex.skills.shadow_selection.reduction_bps (5 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.skills.shadow_selection.selected_entries",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: metrics/codex.skills.shadow_selection.selected_entries (5 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.sqlite.init.count",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: metrics/codex.sqlite.init.count (5 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.sqlite.init.duration_ms",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: metrics/codex.sqlite.init.duration_ms (5 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.sse_event",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: metrics/codex.sse_event (7 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.sse_event.duration_ms",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: metrics/codex.sse_event.duration_ms (7 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.startup.phase.duration_ms",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: metrics/codex.startup.phase.duration_ms (7 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.thread.skills.description_truncated_chars",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: metrics/codex.thread.skills.description_truncated_chars (6 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.thread.skills.enabled_total",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: metrics/codex.thread.skills.enabled_total (6 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.thread.skills.kept_total",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: metrics/codex.thread.skills.kept_total (6 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.thread.skills.truncated",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: metrics/codex.thread.skills.truncated (6 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.thread.started",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: metrics/codex.thread.started (7 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.thread_history.sqlite_projection",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: metrics/codex.thread_history.sqlite_projection (1 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.tool.call",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: metrics/codex.tool.call (11 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.tool.call.duration_ms",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: metrics/codex.tool.call.duration_ms (11 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.tool.unified_exec",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: metrics/codex.tool.unified_exec (6 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.tools.registered",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: metrics/codex.tools.registered (8 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.turn.e2e_duration_ms",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: metrics/codex.turn.e2e_duration_ms (5 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.turn.memory",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: metrics/codex.turn.memory (9 fields)",
           "impact": "informational",
           "documented": true
         },
         {
-          "id": "telemetry.surfaces.traces/record_conversation_items.parents",
-          "category": "telemetry",
-          "op": "removed",
-          "title": "Telemetry surfaces.traces/record_conversation_items.parents removed",
-          "impact": "notable",
-          "documented": false
-        },
-        {
-          "id": "telemetry.surfaces.traces/send_raw_response_items.parents.traces/handle_output_item_done",
+          "id": "telemetry.surfaces.metrics/codex.turn.network_proxy",
           "category": "telemetry",
           "op": "added",
-          "title": "Telemetry surfaces.traces/send_raw_response_items.parents.traces/handle_output_item_done added",
+          "title": "New telemetry surface: metrics/codex.turn.network_proxy (7 fields)",
           "impact": "informational",
           "documented": false
         },
         {
-          "id": "telemetry.surfaces.traces/session_init/events/event otel/src/events/session_telemetry.rs.keys.config.legacy_multi_agent_disabled_sources",
+          "id": "telemetry.surfaces.metrics/codex.turn.token_usage",
           "category": "telemetry",
           "op": "added",
-          "title": "New telemetry field: config.legacy_multi_agent_disabled_sources on traces/session_init/events/event otel/src/events/session_telemetry.rs",
+          "title": "New telemetry surface: metrics/codex.turn.token_usage (7 fields)",
           "impact": "informational",
           "documented": false
         },
         {
-          "id": "telemetry.surfaces.traces/session_task.turn/events/codex.turn_profile.keys.critical_path_status",
+          "id": "telemetry.surfaces.metrics/codex.turn.tool.call",
           "category": "telemetry",
           "op": "added",
-          "title": "New telemetry field: critical_path_status on traces/session_task.turn/events/codex.turn_profile",
+          "title": "New telemetry surface: metrics/codex.turn.tool.call (6 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.turn.ttfm.duration_ms",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: metrics/codex.turn.ttfm.duration_ms (5 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.turn.ttft.duration_ms",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: metrics/codex.turn.ttft.duration_ms (5 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.turn.unified_exec.running_processes",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: metrics/codex.turn.unified_exec.running_processes (5 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.resource",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: resource (9 fields)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "telemetry.surfaces.traces/add_collaboration_tools",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/add_collaboration_tools (9 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/add_core_tool_sources",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/add_core_tool_sources (9 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/add_core_utility_tools",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/add_core_utility_tools (9 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/add_mcp_resource_tools",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/add_mcp_resource_tools (9 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/add_shell_tools",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/add_shell_tools (9 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/agents_md.discover",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/agents_md.discover (9 fields)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "telemetry.surfaces.traces/agents_md.load",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/agents_md.load (10 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/agents_md.refresh",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/agents_md.refresh (9 fields)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "telemetry.surfaces.traces/app_server.serialized_request_queue",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/app_server.serialized_request_queue (10 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/app_server.thread_start.attach_listener",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/app_server.thread_start.attach_listener (10 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/app_server.thread_start.config_snapshot",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/app_server.thread_start.config_snapshot (9 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/app_server.thread_start.create_thread",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/app_server.thread_start.create_thread (10 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/app_server.thread_start.notify_started",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/app_server.thread_start.notify_started (9 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/app_server.thread_start.resolve_status",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/app_server.thread_start.resolve_status (9 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/app_server.thread_start.send_response",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/app_server.thread_start.send_response (9 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/app_server.thread_start.upsert_thread",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/app_server.thread_start.upsert_thread (9 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/append_dynamic_tool_runtimes",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/append_dynamic_tool_runtimes (10 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/append_items",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/append_items (10 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/append_mcp_tools",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/append_mcp_tools (9 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/auth",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/auth (9 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/build_extension_turn_input_items",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/build_extension_turn_input_items (10 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/build_model_visible_specs",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/build_model_visible_specs (9 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/build_prompt",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/build_prompt (9 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/build_skill_outcome",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/build_skill_outcome (9 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/build_skills_and_plugins",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/build_skills_and_plugins (9 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/build_tool_call",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/build_tool_call (9 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/build_tool_router",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/build_tool_router (9 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/built_tools",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/built_tools (12 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/capability_roots.resolve",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/capability_roots.resolve (9 fields)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "telemetry.surfaces.traces/capability_roots.snapshot_for_step",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/capability_roots.snapshot_for_step (10 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/capture_binding_with_metadata",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/capture_binding_with_metadata (9 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/codex.exec",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/codex.exec (10 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/codex.hooks.command",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/codex.hooks.command (17 fields)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "telemetry.surfaces.traces/codex.process.spawn",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/codex.process.spawn (9 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/codex.sampling",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/codex.sampling (12 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/codex.tool_blocking",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/codex.tool_blocking (12 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/codex.turn_input",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/codex.turn_input (11 fields)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "telemetry.surfaces.traces/collect_explicit_skill_mentions",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/collect_explicit_skill_mentions (11 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/consume_startup_prewarm_for_regular_turn",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/consume_startup_prewarm_for_regular_turn (9 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/dispatch_tool_call_with_state",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/dispatch_tool_call_with_state (9 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/dispatch_tool_call_with_state/events/event otel/src/tool_result.rs",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/dispatch_tool_call_with_state/events/event otel/src/tool_result.rs (26 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/drain_in_flight",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/drain_in_flight (9 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/emit_turn_start_lifecycle",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/emit_turn_start_lifecycle (11 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/endpoint_session.stream_encoded_json_with",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/endpoint_session.stream_encoded_json_with (11 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/endpoint_session.stream_encoded_json_with/events/event otel/src/events/session_telemetry.rs",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/endpoint_session.stream_encoded_json_with/events/event otel/src/events/session_telemetry.rs (24 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/environments.resolve",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/environments.resolve (12 fields)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "telemetry.surfaces.traces/environments.snapshot",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/environments.snapshot (11 fields)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "telemetry.surfaces.traces/environments.wait_until_ready",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/environments.wait_until_ready (10 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/exec_command",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/exec_command (17 fields)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "telemetry.surfaces.traces/exec_command/events/codex.tool_result_ready",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/exec_command/events/codex.tool_result_ready (13 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/exec_server.environment.wait_until_ready",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/exec_server.environment.wait_until_ready (10 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/extension_tool_executors",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/extension_tool_executors (9 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/finalize_tool_router",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/finalize_tool_router (9 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/flush_assistant_text_segments_all",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/flush_assistant_text_segments_all (9 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/flush_assistant_text_segments_for_item",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/flush_assistant_text_segments_for_item (9 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/fs.get_metadata",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/fs.get_metadata (10 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/fs.read_file",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/fs.read_file (10 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/get_default_model",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/get_default_model (12 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/get_model_info",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/get_model_info (10 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/guardian_scoring_observation",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/guardian_scoring_observation (13 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/handle_output_item_done",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/handle_output_item_done (9 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/handle_output_item_done/events/codex.tool_call_received",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/handle_output_item_done/events/codex.tool_call_received (12 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/handle_responses",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/handle_responses (19 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/handle_tool_call",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/handle_tool_call (9 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/handle_tool_call_with_source",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/handle_tool_call_with_source (9 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/hosted_model_tool_specs",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/hosted_model_tool_specs (9 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/initialize",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/initialize (17 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/instructions.load",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/instructions.load (10 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/list_models",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/list_models (10 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/load",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/load (9 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/load_skill_prompts",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/load_skill_prompts (10 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/load_with_cli_overrides",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/load_with_cli_overrides (9 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/mcp.runtime.refresh",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/mcp.runtime.refresh (9 fields)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "telemetry.surfaces.traces/mcp.runtime.refresh_if_dirty",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/mcp.runtime.refresh_if_dirty (9 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/mcp.runtime.refresh_wait",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/mcp.runtime.refresh_wait (9 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/mcp.runtime.resolve_for_step",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/mcp.runtime.resolve_for_step (10 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/mcp.runtime_config.project_for_step",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/mcp.runtime_config.project_for_step (9 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/merge_connector_selection",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/merge_connector_selection (10 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/merge_into_namespaces",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/merge_into_namespaces (10 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/model_client.stream_responses_api",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/model_client.stream_responses_api (15 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/op.dispatch.shutdown",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/op.dispatch.shutdown (11 fields)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "telemetry.surfaces.traces/op.dispatch.turn_input",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/op.dispatch.turn_input (11 fields)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "telemetry.surfaces.traces/persist_rollout_items",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/persist_rollout_items (10 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/plugins_for_config",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/plugins_for_config (10 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/realtime_conversation.running_state",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/realtime_conversation.running_state (9 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/receiving",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/receiving (9 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/receiving_stream",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/receiving_stream (9 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/record_context_updates_and_set_reference_context_item",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/record_context_updates_and_set_reference_context_item (9 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/record_conversation_items",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/record_conversation_items (10 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/regular_task.prepare_run_turn",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/regular_task.prepare_run_turn (9 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/render_available_skills",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/render_available_skills (10 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/responses.stream_request",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/responses.stream_request (12 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/run_hooks_and_record_inputs",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/run_hooks_and_record_inputs (9 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/run_hooks_and_record_inputs/events/event otel/src/events/session_telemetry.rs",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/run_hooks_and_record_inputs/events/event otel/src/events/session_telemetry.rs (18 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/run_legacy_after_agent_hook",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/run_legacy_after_agent_hook (9 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/run_pending_session_start_hooks",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/run_pending_session_start_hooks (9 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/run_pre_sampling_compact",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/run_pre_sampling_compact (9 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/run_sampling_request",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/run_sampling_request (12 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/run_session_end_hooks",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/run_session_end_hooks (9 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/run_turn",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/run_turn (11 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/run_turn.collect_post_sampling_state",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/run_turn.collect_post_sampling_state (9 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/run_turn.prepare_sampling_request_input",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/run_turn.prepare_sampling_request_input (9 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/run_turn_stop_hooks",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/run_turn_stop_hooks (9 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/send_raw_response_items",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/send_raw_response_items (10 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/session.flush_rollout",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/session.flush_rollout (9 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/session_init",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/session_init (9 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/session_init.auth_mcp",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/session_init.auth_mcp (9 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/session_init.mcp_manager_init",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/session_init.mcp_manager_init (9 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/session_init.plugin_skill_warmup",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/session_init.plugin_skill_warmup (9 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/session_init.required_mcp_wait",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/session_init.required_mcp_wait (10 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/session_init.state_db",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/session_init.state_db (10 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/session_init.thread_name_lookup",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/session_init.thread_name_lookup (9 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/session_init.thread_persistence",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/session_init.thread_persistence (10 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/session_init/events/event otel/src/events/session_telemetry.rs",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/session_init/events/event otel/src/events/session_telemetry.rs (25 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/session_loop",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/session_loop (10 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/session_task.run",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/session_task.run (9 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/session_task.turn",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/session_task.turn (19 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/session_task.turn/events/codex.turn_profile",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/session_task.turn/events/codex.turn_profile (11 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/set_previous_turn_settings",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/set_previous_turn_settings (9 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/shell_snapshot",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/shell_snapshot (10 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/skills.executor.refresh_executor_catalog",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/skills.executor.refresh_executor_catalog (10 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/skills.shadow_selection.rank",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/skills.shadow_selection.rank (10 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/skills_for_config",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/skills_for_config (9 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/step_context.capture",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/step_context.capture (9 fields)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "telemetry.surfaces.traces/stream_request",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/stream_request (9 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/thread/items/list",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/thread/items/list (17 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/thread/start",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/thread/start (17 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/thread/start/events/event otel/src/events/session_telemetry.rs",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/thread/start/events/event otel/src/events/session_telemetry.rs (17 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/thread/unsubscribe",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/thread/unsubscribe (17 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/thread_spawn",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/thread_spawn (9 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/tool_dispatch.parallel_lock",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/tool_dispatch.parallel_lock (9 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/track_turn_resolved_config_analytics",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/track_turn_resolved_config_analytics (10 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/try_run_sampling_request",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/try_run_sampling_request (11 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/turn/start",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/turn/start (18 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/turn_context.build",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/turn_context.build (10 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/turn_context.make",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/turn_context.make (9 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/turn_diff_display_roots",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/turn_diff_display_roots (9 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/unified_exec.collect_output",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/unified_exec.collect_output (13 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/unified_exec.exec_command",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/unified_exec.exec_command (15 fields)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "telemetry.surfaces.traces/unified_exec.open_session",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/unified_exec.open_session (10 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/world_state.build",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/world_state.build (9 fields)",
           "impact": "informational",
           "documented": false
         },
@@ -990,6 +3156,1638 @@
       "version": "0.167.2",
       "previous": "0.167.1",
       "changes": [
+        {
+          "id": "telemetry.surfaces.logs/codex.api_request",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: logs/codex.api_request",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.logs/codex.conversation_starts",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: logs/codex.conversation_starts",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.logs/codex.sse_event",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: logs/codex.sse_event",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.logs/codex.startup_phase",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: logs/codex.startup_phase",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.logs/codex.tool_decision",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: logs/codex.tool_decision",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.logs/codex.tool_result",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: logs/codex.tool_result",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.logs/codex.turn_ttft",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: logs/codex.turn_ttft",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.logs/codex.user_prompt",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: logs/codex.user_prompt",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.api_request",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: metrics/codex.api_request",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.api_request.duration_ms",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: metrics/codex.api_request.duration_ms",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.auth_storage.duration",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: metrics/codex.auth_storage.duration",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.auth_storage.operation",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: metrics/codex.auth_storage.operation",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.cloud_config_bundle.load",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: metrics/codex.cloud_config_bundle.load",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.conversation.turn.count",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: metrics/codex.conversation.turn.count",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.db.backfill",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: metrics/codex.db.backfill",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.db.backfill.duration_ms",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: metrics/codex.db.backfill.duration_ms",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.feature.state",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: metrics/codex.feature.state",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.guardian.turn.blocking_ms",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: metrics/codex.guardian.turn.blocking_ms",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.hooks.run",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: metrics/codex.hooks.run",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.hooks.run.duration_ms",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: metrics/codex.hooks.run.duration_ms",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.mcp.binding_catalog.raw_definition_json_bytes",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: metrics/codex.mcp.binding_catalog.raw_definition_json_bytes",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.process.start",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: metrics/codex.process.start",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.rollout_compression.materialize",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: metrics/codex.rollout_compression.materialize",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.rollout_compression.read",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: metrics/codex.rollout_compression.read",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.rollout_compression.read.io_duration_ms",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: metrics/codex.rollout_compression.read.io_duration_ms",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.sandbox_integrity.check",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: metrics/codex.sandbox_integrity.check",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.sandbox_integrity.duration_ms",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: metrics/codex.sandbox_integrity.duration_ms",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.sandbox_integrity.preparation_ms",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: metrics/codex.sandbox_integrity.preparation_ms",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.shell_snapshot",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: metrics/codex.shell_snapshot",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.shell_snapshot.command",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: metrics/codex.shell_snapshot.command",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.shell_snapshot.duration_ms",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: metrics/codex.shell_snapshot.duration_ms",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.shell_snapshot.wait_ms",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: metrics/codex.shell_snapshot.wait_ms",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.skills.catalog.entries",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: metrics/codex.skills.catalog.entries",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.skills.shadow_selection",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: metrics/codex.skills.shadow_selection",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.skills.shadow_selection.catalog_entries",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: metrics/codex.skills.shadow_selection.catalog_entries",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.skills.shadow_selection.duration_ms",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: metrics/codex.skills.shadow_selection.duration_ms",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.skills.shadow_selection.query_terms",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: metrics/codex.skills.shadow_selection.query_terms",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.skills.shadow_selection.reduction_bps",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: metrics/codex.skills.shadow_selection.reduction_bps",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.skills.shadow_selection.selected_entries",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: metrics/codex.skills.shadow_selection.selected_entries",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.sqlite.init.count",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: metrics/codex.sqlite.init.count",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.sqlite.init.duration_ms",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: metrics/codex.sqlite.init.duration_ms",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.sse_event",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: metrics/codex.sse_event",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.sse_event.duration_ms",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: metrics/codex.sse_event.duration_ms",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.startup.phase.duration_ms",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: metrics/codex.startup.phase.duration_ms",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.thread.skills.description_truncated_chars",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: metrics/codex.thread.skills.description_truncated_chars",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.thread.skills.enabled_total",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: metrics/codex.thread.skills.enabled_total",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.thread.skills.kept_total",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: metrics/codex.thread.skills.kept_total",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.thread.skills.truncated",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: metrics/codex.thread.skills.truncated",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.thread.started",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: metrics/codex.thread.started",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.thread_history.sqlite_projection",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: metrics/codex.thread_history.sqlite_projection",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.tool.call",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: metrics/codex.tool.call",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.tool.call.duration_ms",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: metrics/codex.tool.call.duration_ms",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.tool.unified_exec",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: metrics/codex.tool.unified_exec",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.tools.registered",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: metrics/codex.tools.registered",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.turn.e2e_duration_ms",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: metrics/codex.turn.e2e_duration_ms",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.turn.memory",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: metrics/codex.turn.memory",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.turn.network_proxy",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: metrics/codex.turn.network_proxy",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.turn.token_usage",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: metrics/codex.turn.token_usage",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.turn.tool.call",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: metrics/codex.turn.tool.call",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.turn.ttfm.duration_ms",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: metrics/codex.turn.ttfm.duration_ms",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.turn.ttft.duration_ms",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: metrics/codex.turn.ttft.duration_ms",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.turn.unified_exec.running_processes",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: metrics/codex.turn.unified_exec.running_processes",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.resource",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: resource",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/add_collaboration_tools",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/add_collaboration_tools",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/add_core_tool_sources",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/add_core_tool_sources",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/add_core_utility_tools",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/add_core_utility_tools",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/add_mcp_resource_tools",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/add_mcp_resource_tools",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/add_shell_tools",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/add_shell_tools",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/agents_md.discover",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/agents_md.discover",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/agents_md.load",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/agents_md.load",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/agents_md.refresh",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/agents_md.refresh",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/app_server.serialized_request_queue",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/app_server.serialized_request_queue",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/app_server.thread_start.attach_listener",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/app_server.thread_start.attach_listener",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/app_server.thread_start.config_snapshot",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/app_server.thread_start.config_snapshot",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/app_server.thread_start.create_thread",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/app_server.thread_start.create_thread",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/app_server.thread_start.notify_started",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/app_server.thread_start.notify_started",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/app_server.thread_start.resolve_status",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/app_server.thread_start.resolve_status",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/app_server.thread_start.send_response",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/app_server.thread_start.send_response",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/app_server.thread_start.upsert_thread",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/app_server.thread_start.upsert_thread",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/append_dynamic_tool_runtimes",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/append_dynamic_tool_runtimes",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/append_items",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/append_items",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/append_mcp_tools",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/append_mcp_tools",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/auth",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/auth",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/build_extension_turn_input_items",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/build_extension_turn_input_items",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/build_model_visible_specs",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/build_model_visible_specs",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/build_prompt",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/build_prompt",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/build_skill_outcome",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/build_skill_outcome",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/build_skills_and_plugins",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/build_skills_and_plugins",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/build_tool_call",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/build_tool_call",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/build_tool_router",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/build_tool_router",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/built_tools",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/built_tools",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/capability_roots.resolve",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/capability_roots.resolve",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/capability_roots.snapshot_for_step",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/capability_roots.snapshot_for_step",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/capture_binding_with_metadata",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/capture_binding_with_metadata",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/codex.exec",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/codex.exec",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/codex.hooks.command",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/codex.hooks.command",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/codex.process.spawn",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/codex.process.spawn",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/codex.sampling",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/codex.sampling",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/codex.tool_blocking",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/codex.tool_blocking",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/codex.turn_input",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/codex.turn_input",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/collect_explicit_skill_mentions",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/collect_explicit_skill_mentions",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/consume_startup_prewarm_for_regular_turn",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/consume_startup_prewarm_for_regular_turn",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/dispatch_tool_call_with_state",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/dispatch_tool_call_with_state",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/dispatch_tool_call_with_state/events/event otel/src/tool_result.rs",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/dispatch_tool_call_with_state/events/event otel/src/tool_result.rs",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/drain_in_flight",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/drain_in_flight",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/emit_turn_start_lifecycle",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/emit_turn_start_lifecycle",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/endpoint_session.stream_encoded_json_with",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/endpoint_session.stream_encoded_json_with",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/endpoint_session.stream_encoded_json_with/events/event otel/src/events/session_telemetry.rs",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/endpoint_session.stream_encoded_json_with/events/event otel/src/events/session_telemetry.rs",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/environments.resolve",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/environments.resolve",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/environments.snapshot",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/environments.snapshot",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/environments.wait_until_ready",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/environments.wait_until_ready",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/exec_command",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/exec_command",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/exec_command/events/codex.tool_result_ready",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/exec_command/events/codex.tool_result_ready",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/exec_server.environment.wait_until_ready",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/exec_server.environment.wait_until_ready",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/extension_tool_executors",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/extension_tool_executors",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/finalize_tool_router",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/finalize_tool_router",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/flush_assistant_text_segments_all",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/flush_assistant_text_segments_all",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/flush_assistant_text_segments_for_item",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/flush_assistant_text_segments_for_item",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/fs.get_metadata",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/fs.get_metadata",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/fs.read_file",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/fs.read_file",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/get_default_model",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/get_default_model",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/get_model_info",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/get_model_info",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/guardian_scoring_observation",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/guardian_scoring_observation",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/handle_output_item_done",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/handle_output_item_done",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/handle_output_item_done/events/codex.tool_call_received",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/handle_output_item_done/events/codex.tool_call_received",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/handle_responses",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/handle_responses",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/handle_tool_call",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/handle_tool_call",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/handle_tool_call_with_source",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/handle_tool_call_with_source",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/hosted_model_tool_specs",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/hosted_model_tool_specs",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/initialize",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/initialize",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/instructions.load",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/instructions.load",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/list_models",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/list_models",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/load",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/load",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/load_skill_prompts",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/load_skill_prompts",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/load_with_cli_overrides",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/load_with_cli_overrides",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/mcp.runtime.refresh",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/mcp.runtime.refresh",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/mcp.runtime.refresh_if_dirty",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/mcp.runtime.refresh_if_dirty",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/mcp.runtime.refresh_wait",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/mcp.runtime.refresh_wait",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/mcp.runtime.resolve_for_step",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/mcp.runtime.resolve_for_step",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/mcp.runtime_config.project_for_step",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/mcp.runtime_config.project_for_step",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/merge_connector_selection",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/merge_connector_selection",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/merge_into_namespaces",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/merge_into_namespaces",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/model_client.stream_responses_api",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/model_client.stream_responses_api",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/op.dispatch.shutdown",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/op.dispatch.shutdown",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/op.dispatch.turn_input",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/op.dispatch.turn_input",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/persist_rollout_items",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/persist_rollout_items",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/plugins_for_config",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/plugins_for_config",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/realtime_conversation.running_state",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/realtime_conversation.running_state",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/receiving",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/receiving",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/receiving_stream",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/receiving_stream",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/record_context_updates_and_set_reference_context_item",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/record_context_updates_and_set_reference_context_item",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/record_conversation_items",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/record_conversation_items",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/regular_task.prepare_run_turn",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/regular_task.prepare_run_turn",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/render_available_skills",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/render_available_skills",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/responses.stream_request",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/responses.stream_request",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/run_hooks_and_record_inputs",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/run_hooks_and_record_inputs",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/run_hooks_and_record_inputs/events/event otel/src/events/session_telemetry.rs",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/run_hooks_and_record_inputs/events/event otel/src/events/session_telemetry.rs",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/run_legacy_after_agent_hook",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/run_legacy_after_agent_hook",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/run_pending_session_start_hooks",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/run_pending_session_start_hooks",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/run_pre_sampling_compact",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/run_pre_sampling_compact",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/run_sampling_request",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/run_sampling_request",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/run_session_end_hooks",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/run_session_end_hooks",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/run_turn",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/run_turn",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/run_turn.collect_post_sampling_state",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/run_turn.collect_post_sampling_state",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/run_turn.prepare_sampling_request_input",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/run_turn.prepare_sampling_request_input",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/run_turn_stop_hooks",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/run_turn_stop_hooks",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/send_raw_response_items",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/send_raw_response_items",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/session.flush_rollout",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/session.flush_rollout",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/session_init",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/session_init",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/session_init.auth_mcp",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/session_init.auth_mcp",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/session_init.mcp_manager_init",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/session_init.mcp_manager_init",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/session_init.plugin_skill_warmup",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/session_init.plugin_skill_warmup",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/session_init.required_mcp_wait",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/session_init.required_mcp_wait",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/session_init.state_db",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/session_init.state_db",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/session_init.thread_name_lookup",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/session_init.thread_name_lookup",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/session_init.thread_persistence",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/session_init.thread_persistence",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/session_init/events/event otel/src/events/session_telemetry.rs",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/session_init/events/event otel/src/events/session_telemetry.rs",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/session_loop",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/session_loop",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/session_task.run",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/session_task.run",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/session_task.turn",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/session_task.turn",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/session_task.turn/events/codex.turn_profile",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/session_task.turn/events/codex.turn_profile",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/set_previous_turn_settings",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/set_previous_turn_settings",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/shell_snapshot",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/shell_snapshot",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/skills.executor.refresh_executor_catalog",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/skills.executor.refresh_executor_catalog",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/skills.shadow_selection.rank",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/skills.shadow_selection.rank",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/skills_for_config",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/skills_for_config",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/step_context.capture",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/step_context.capture",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/stream_request",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/stream_request",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/thread/items/list",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/thread/items/list",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/thread/start",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/thread/start",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/thread/start/events/event otel/src/events/session_telemetry.rs",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/thread/start/events/event otel/src/events/session_telemetry.rs",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/thread/unsubscribe",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/thread/unsubscribe",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/thread_spawn",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/thread_spawn",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/tool_dispatch.parallel_lock",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/tool_dispatch.parallel_lock",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/track_turn_resolved_config_analytics",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/track_turn_resolved_config_analytics",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/try_run_sampling_request",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/try_run_sampling_request",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/turn/start",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/turn/start",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/turn_context.build",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/turn_context.build",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/turn_context.make",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/turn_context.make",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/turn_diff_display_roots",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/turn_diff_display_roots",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/unified_exec.collect_output",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/unified_exec.collect_output",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/unified_exec.exec_command",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/unified_exec.exec_command",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/unified_exec.open_session",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/unified_exec.open_session",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/world_state.build",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: traces/world_state.build",
+          "impact": "degrading",
+          "documented": false
+        },
         {
           "id": "config.options.features.incremental_tools_legacy_gcp",
           "category": "config",

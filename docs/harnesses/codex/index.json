@@ -11,23 +11,60 @@
       "language": "rust"
     },
     "changelog": "https://github.com/openai/codex/releases",
-    "latest": "0.170.0",
+    "latest": "0.171.0",
     "support": "supported",
-    "versions_tracked": 107,
+    "versions_tracked": 108,
     "first_tracked": "2026-01-25",
     "last_change": {
-      "from": "0.169.1",
-      "to": "0.170.0",
-      "at": "2026-11-18T04:07:23.351960273Z",
-      "released_at": "2026-11-18T03:45:45.798Z",
-      "changes": 4,
+      "from": "0.170.0",
+      "to": "0.171.0",
+      "at": "2026-11-20T01:10:01.695546758Z",
+      "released_at": "2026-11-20T00:51:29.762Z",
+      "changes": 76,
       "categories": {
-        "config": 3,
-        "telemetry": 1
+        "cli": 8,
+        "config": 40,
+        "filesystem": 18,
+        "telemetry": 8,
+        "tools": 2
       }
     }
   },
   "versions": [
+    {
+      "version": "0.171.0",
+      "released_at": "2026-11-20T00:51:29.762Z",
+      "captured_at": "2026-11-20T01:10:01.695546758Z",
+      "platforms": [
+        "darwin/arm64",
+        "linux/amd64"
+      ],
+      "support": "supported",
+      "previous": "0.170.0",
+      "changes": 76,
+      "categories": {
+        "cli": 8,
+        "config": 40,
+        "filesystem": 18,
+        "telemetry": 8,
+        "tools": 2
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 3,
+        "informational": 58,
+        "notable": 15
+      },
+      "undocumented": 53,
+      "highlights": [
+        "Telemetry surface no longer sent: traces/built_tools.load_discoverable_tools",
+        "Telemetry surface no longer sent: traces/prepare_tool_recommendations",
+        "Telemetry surface no longer sent: traces/try_run_sampling_request/events/event otel/src/events/session_telemetry.rs"
+      ],
+      "signing": "valid",
+      "attempted_at": "2026-11-20T01:10:01.695546758Z",
+      "attempts": 1
+    },
     {
       "version": "0.170.0",
       "released_at": "2026-11-18T03:45:45.798Z",
@@ -138,50 +175,53 @@
       ],
       "support": "supported",
       "previous": "0.167.2",
-      "changes": 59,
+      "changes": 253,
       "categories": {
         "cli": 5,
         "config": 37,
-        "telemetry": 16,
+        "telemetry": 210,
         "tools": 1
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 49,
-        "notable": 10
+        "informational": 247,
+        "notable": 6
       },
-      "undocumented": 44,
+      "undocumented": 224,
       "highlights": [
         "exec tool description changed (+281 −862 chars)",
-        "Telemetry surfaces.traces/auth.parents.traces/codex.turn_input removed",
-        "Telemetry surfaces.traces/auth.parents.traces/model_client.stream_responses_api removed"
+        "New setting: features.hosted_search_policy",
+        "Setting no longer read: features.incremental_tools_legacy"
       ],
       "signing": "valid"
     },
     {
       "version": "0.167.2",
       "released_at": "2026-11-11T22:50:04.191Z",
-      "captured_at": "2026-11-13T09:01:26.428937767Z",
+      "captured_at": "2026-11-20T01:10:01.695546758Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"
       ],
       "support": "supported",
       "previous": "0.167.1",
-      "changes": 1,
+      "changes": 205,
       "categories": {
-        "config": 1
+        "config": 1,
+        "telemetry": 204
       },
       "impact": {
         "breaking": 0,
-        "degrading": 0,
+        "degrading": 204,
         "informational": 1,
         "notable": 0
       },
-      "undocumented": 0,
+      "undocumented": 204,
       "highlights": [
-        "New setting: features.incremental_tools_legacy_gcp"
+        "Telemetry surface no longer sent: logs/codex.api_request",
+        "Telemetry surface no longer sent: logs/codex.conversation_starts",
+        "Telemetry surface no longer sent: logs/codex.sse_event"
       ],
       "signing": "valid"
     },

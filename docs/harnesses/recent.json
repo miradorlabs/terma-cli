@@ -1,7 +1,43 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-20T00:57:03.022869442Z",
+  "generated_at": "2026-11-20T01:10:01.695546758Z",
   "versions": [
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "version": "0.171.0",
+      "released_at": "2026-11-20T00:51:29.762Z",
+      "captured_at": "2026-11-20T01:10:01.695546758Z",
+      "platforms": [
+        "darwin/arm64",
+        "linux/amd64"
+      ],
+      "support": "supported",
+      "previous": "0.170.0",
+      "changes": 76,
+      "categories": {
+        "cli": 8,
+        "config": 40,
+        "filesystem": 18,
+        "telemetry": 8,
+        "tools": 2
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 3,
+        "informational": 58,
+        "notable": 15
+      },
+      "undocumented": 53,
+      "highlights": [
+        "Telemetry surface no longer sent: traces/built_tools.load_discoverable_tools",
+        "Telemetry surface no longer sent: traces/prepare_tool_recommendations",
+        "Telemetry surface no longer sent: traces/try_run_sampling_request/events/event otel/src/events/session_telemetry.rs"
+      ],
+      "signing": "valid",
+      "attempted_at": "2026-11-20T01:10:01.695546758Z",
+      "attempts": 1
+    },
     {
       "harness": "gemini",
       "name": "Gemini CLI",
@@ -778,24 +814,24 @@
       ],
       "support": "supported",
       "previous": "0.167.2",
-      "changes": 59,
+      "changes": 253,
       "categories": {
         "cli": 5,
         "config": 37,
-        "telemetry": 16,
+        "telemetry": 210,
         "tools": 1
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 49,
-        "notable": 10
+        "informational": 247,
+        "notable": 6
       },
-      "undocumented": 44,
+      "undocumented": 224,
       "highlights": [
         "exec tool description changed (+281 −862 chars)",
-        "Telemetry surfaces.traces/auth.parents.traces/codex.turn_input removed",
-        "Telemetry surfaces.traces/auth.parents.traces/model_client.stream_responses_api removed"
+        "New setting: features.hosted_search_policy",
+        "Setting no longer read: features.incremental_tools_legacy"
       ],
       "signing": "valid"
     },
@@ -958,26 +994,29 @@
       "name": "Codex CLI",
       "version": "0.167.2",
       "released_at": "2026-11-11T22:50:04.191Z",
-      "captured_at": "2026-11-13T09:01:26.428937767Z",
+      "captured_at": "2026-11-20T01:10:01.695546758Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"
       ],
       "support": "supported",
       "previous": "0.167.1",
-      "changes": 1,
+      "changes": 205,
       "categories": {
-        "config": 1
+        "config": 1,
+        "telemetry": 204
       },
       "impact": {
         "breaking": 0,
-        "degrading": 0,
+        "degrading": 204,
         "informational": 1,
         "notable": 0
       },
-      "undocumented": 0,
+      "undocumented": 204,
       "highlights": [
-        "New setting: features.incremental_tools_legacy_gcp"
+        "Telemetry surface no longer sent: logs/codex.api_request",
+        "Telemetry surface no longer sent: logs/codex.conversation_starts",
+        "Telemetry surface no longer sent: logs/codex.sse_event"
       ],
       "signing": "valid"
     },
@@ -6172,38 +6211,6 @@
         "Injected context changed (+0 −826 chars)",
         "Interactive session's injected context changed (+0 −826 chars)",
         "New environment variable: CLAUDE_CODE_GAULT_KESTREL"
-      ],
-      "signing": "valid"
-    },
-    {
-      "harness": "codex",
-      "name": "Codex CLI",
-      "version": "0.144.6",
-      "released_at": "2026-07-18T13:54:50.572Z",
-      "captured_at": "2026-11-05T09:54:28.532441Z",
-      "platforms": [
-        "darwin/arm64",
-        "linux/amd64"
-      ],
-      "support": "untested",
-      "previous": "0.144.5",
-      "changes": 15,
-      "categories": {
-        "behavior": 11,
-        "filesystem": 3,
-        "prompt": 1
-      },
-      "impact": {
-        "breaking": 0,
-        "degrading": 0,
-        "informational": 3,
-        "notable": 12
-      },
-      "undocumented": 14,
-      "highlights": [
-        "System prompt changed (+2122 −705 chars)",
-        "Behaviour: compaction removed",
-        "Behaviour: sandbox approval added"
       ],
       "signing": "valid"
     }
