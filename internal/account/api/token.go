@@ -7,7 +7,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"net"
 	"net/http"
 	"slices"
 	"strings"
@@ -256,118 +255,6 @@ func (c *Client) refresh(ctx context.Context, redeem redeemFunc) error {
 		}
 		return c.redeem(ctx, held, stored, redeem, tx)
 	})
-}
-
-// redeem exchanges current's refresh token if redeem asks, and saves the new pair in tx
-// when there is one. It follows the server's rules for an answer that is not a new pair:
-//
-//   - 409 REFRESH_SUPERSEDED: a concurrent refresh of the same token won. Re-read the
-//     stored pair and take it when its refresh token changed; otherwise retry once at
-//     once, within the grace, and a second 409 ends the sign-in.
-//   - 503, or no answer: nothing may have rotated, or the rotation was lost. The store
-//     records when the refresh came into doubt, so every process keeps to one budget. A
-//     503 is retried here with the same token after Retry-After; no answer is left to the
-//     next attempt. Past refreshAttemptBudget after the first attempt the sign-in ends.
-//   - 401: the session is over.
-func (c *Client) redeem(ctx context.Context, held, current *auth.Credential, redeem redeemFunc, tx *auth.Tx) error {
-	if !redeem(held, current) {
-		return nil
-	}
-	first := current.RefreshInDoubtSince
-	if !first.IsZero() && time.Since(first) > refreshAttemptBudget {
-		return c.endSignIn(tx, current)
-	}
-	// clean is whether no attempt so far may have rotated: only then may the mark go.
-	clean := first.IsZero()
-	if clean {
-		first = time.Now()
-		// Recorded before the token leaves: a process killed mid-request leaves the next one
-		// the budget, not a token it would present as fresh after the grace.
-		current = c.markInDoubt(tx, current, first)
-	}
-	superseded := false
-	for {
-		resp, err := c.postToken(ctx, tokenRequest{GrantType: "refresh_token", RefreshToken: current.RefreshToken})
-		if err == nil {
-			return c.keepRotation(tx, current, c.credentialFrom(resp))
-		}
-		if errors.Is(err, auth.ErrNotLoggedIn) {
-			return fmt.Errorf("%w: session expired, run `terma setup`", err)
-		}
-		apiErr, _ := errors.AsType[*Error](err)
-		inDoubt := apiErr == nil && !notSent(err) || apiErr != nil && apiErr.StatusCode >= 500
-		if inDoubt || apiErr != nil && apiErr.Superseded() {
-			clean = false
-		} else if clean {
-			// Answered before anything rotated, and nothing before it did: the token is as
-			// good as before.
-			current = c.markInDoubt(tx, current, time.Time{})
-		}
-		if ctx.Err() != nil {
-			return err
-		}
-		switch {
-		case apiErr != nil && apiErr.Superseded():
-			if tx != nil {
-				if stored, loadErr := tx.Load(c.profile); loadErr == nil && stored.SessionID == current.SessionID &&
-					stored.RefreshToken != current.RefreshToken {
-					c.replace(stored)
-					return nil
-				}
-			}
-			if superseded || time.Since(first) > refreshAttemptBudget {
-				return c.endSignIn(tx, current)
-			}
-			superseded = true
-		case inDoubt && apiErr == nil:
-			// No answer: the next attempt, here or in another process, retries within the
-			// budget the stored mark keeps.
-			return err
-		case inDoubt:
-			wait := defaultRetryAfter
-			if apiErr != nil && apiErr.RetryAfter > 0 {
-				wait = apiErr.RetryAfter
-			}
-			if time.Since(first)+wait > refreshAttemptBudget {
-				return c.endSignIn(tx, current)
-			}
-			timer := time.NewTimer(wait)
-			select {
-			case <-ctx.Done():
-				timer.Stop()
-				return err
-			case <-timer.C:
-			}
-		default:
-			// A 400 or 429 is answered before anything rotates, and a request that never
-			// left rotated nothing either.
-			return err
-		}
-	}
-}
-
-// notSent reports whether err failed a request before any of it reached the server: no
-// address, or no connection. Such a refresh rotated nothing, so it is safe to try later.
-func notSent(err error) bool {
-	if _, ok := errors.AsType[*net.DNSError](err); ok {
-		return true
-	}
-	opErr, ok := errors.AsType[*net.OpError](err)
-	return ok && opErr.Op == "dial"
-}
-
-// markInDoubt stores current with since as when its refresh came into doubt (zero: not in
-// doubt), and returns it as stored; with no store, or when the write fails, current as it was.
-func (c *Client) markInDoubt(tx *auth.Tx, current *auth.Credential, since time.Time) *auth.Credential {
-	if tx == nil || current.RefreshInDoubtSince.Equal(since) {
-		return current
-	}
-	marked := *current
-	marked.RefreshInDoubtSince = since
-	if tx.Update(c.profile, &marked) != nil {
-		return current
-	}
-	return &marked
 }
 
 // keepRotation holds and stores the new pair a refresh of current returned.

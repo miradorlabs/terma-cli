@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -159,20 +160,25 @@ func (app *App) retireOlderSignIns(ctx context.Context) {
 }
 
 // retireLegacySessions revokes, best-effort, and deletes the per-organization sessions an
-// older terma signed in.
+// older terma signed in: all at once, within one deadline, so an unreachable auth host
+// delays a sign-in by seconds, not seconds per organization.
 func (app *App) retireLegacySessions(ctx context.Context) {
 	if signIns, err := auth.LegacySignIns(app.dir, true); err == nil {
+		revokeCtx, cancel := context.WithTimeout(ctx, legacyRevokeWait)
+		var wg sync.WaitGroup
 		for _, s := range signIns {
-			if s.AccessToken == "" || s.AuthURL == "" {
-				continue
+			if s.AccessToken != "" && s.AuthURL != "" {
+				wg.Go(func() { _ = api.RevokeLegacySession(revokeCtx, s.AuthURL, app.version, s.AccessToken) })
 			}
-			revokeCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
-			_ = api.RevokeLegacySession(revokeCtx, s.AuthURL, app.version, s.AccessToken)
-			cancel()
 		}
+		wg.Wait()
+		cancel()
 	}
 	_ = auth.ForgetLegacy(app.dir)
 }
+
+// legacyRevokeWait bounds the best-effort revokes of an older terma's sessions.
+const legacyRevokeWait = 5 * time.Second
 
 // serverKeyTeams are the teams whose server key a profile signed in with.
 func serverKeyTeams(dir string) []string {
@@ -262,7 +268,9 @@ func (app *App) chooseOrganization(ctx context.Context, cfg *config.Config, cred
 	kept := 0
 	switch {
 	case !want.empty():
-		org, err = matchOrganization(orgs, want.String())
+		if org, err = matchOrganization(orgs, want.String()); errors.As(err, new(noMatchError)) {
+			err = fmt.Errorf("%w: %w", errNotYourOrganization, err)
+		}
 	case len(orgs) == 1:
 		org = &orgs[0]
 	case ask != nil:
@@ -277,6 +285,10 @@ func (app *App) chooseOrganization(ctx context.Context, cfg *config.Config, cred
 	}
 	return kept, config.UpdateProfile(app.dir, cfg.ProfileName, func(p *config.Profile) { p.SelectOrganization(org.ID, org.Name) })
 }
+
+// errNotYourOrganization is an --org the person's organizations, as the account service
+// lists them, do not include.
+var errNotYourOrganization = errors.New("not one of your organizations")
 
 func fetchOrganizations(ctx context.Context, client *api.Client) ([]organization, error) {
 	var resp listOrganizationsResponse

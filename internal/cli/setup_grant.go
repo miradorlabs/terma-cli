@@ -92,13 +92,12 @@ func (app *App) signInWithGrant(cmd *cobra.Command, cfg *config.Config, orgID st
 	if cfg, err = app.loadConfig(); err != nil {
 		return nil, err
 	}
-	if _, err := app.chooseOrganization(ctx, cfg, cred, orgRef{ID: orgID}, nil); err != nil {
-		if _, unreachable := errors.AsType[*api.Error](err); unreachable {
-			return nil, err
-		}
-		// The list reads the account service's own records, so an organization it leaves
-		// out is not the user's, not merely unconfirmed.
+	// The list reads the account service's own records, so an organization it leaves out is
+	// not the user's, not merely unconfirmed. Any other failure is no bad input.
+	if _, err := app.chooseOrganization(ctx, cfg, cred, orgRef{ID: orgID}, nil); errors.Is(err, errNotYourOrganization) {
 		return nil, &auth.GrantError{Code: auth.GrantBadInput, Message: "--org is not an organization the signed-in user belongs to", Err: err}
+	} else if err != nil {
+		return nil, err
 	}
 	return app.loadConfig()
 }

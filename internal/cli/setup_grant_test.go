@@ -381,3 +381,19 @@ func s256(verifier string) string {
 	sum := sha256.Sum256([]byte(verifier))
 	return base64.RawURLEncoding.EncodeToString(sum[:])
 }
+
+// Only an --org the person's organizations leave out is bad input from the desktop: an
+// account with none at all, or an organization list that cannot be read, fails as setup
+// fails, without grant_bad_input, and chooses nothing.
+func TestDesktopGrantDoesNotBlameTheDesktopForAnOutage(t *testing.T) {
+	gateway := grantSandbox(t)
+	gateway.orgs = []organization{}
+	gateway.grant("c1", deskUser)
+	stdout, _, err := desktopSetup(t, identityLine(deskUser, personalOrg().ID)+`{"code":"c1"}`+"\n", personalOrg().ID, personalTeam())
+	if err == nil || strings.Contains(stdout, auth.GrantBadInput) {
+		t.Fatalf("err = %v, stdout:\n%s", err, stdout)
+	}
+	if org, _, _ := selected(t); org != "" {
+		t.Fatalf("an organization was chosen: %s", org)
+	}
+}

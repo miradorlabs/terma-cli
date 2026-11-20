@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -278,10 +279,10 @@ func TestErrorReasons(t *testing.T) {
 	unavailable := &Error{StatusCode: http.StatusServiceUnavailable, Reason: ReasonAuthorizationUnavailable}
 	gone := &Error{StatusCode: http.StatusForbidden, Reason: ReasonOrgNotAccessible}
 	denied := &Error{StatusCode: http.StatusForbidden}
-	if !unavailable.Retryable() || unavailable.OrgNotAccessible() {
-		t.Error("AUTHORIZATION_UNAVAILABLE is retryable and says nothing about access")
+	if unavailable.OrgNotAccessible() {
+		t.Error("AUTHORIZATION_UNAVAILABLE says nothing about access")
 	}
-	if !gone.OrgNotAccessible() || gone.Retryable() {
+	if !gone.OrgNotAccessible() {
 		t.Error("ORG_NOT_ACCESSIBLE is the loss of access")
 	}
 	if denied.OrgNotAccessible() {
@@ -290,14 +291,13 @@ func TestErrorReasons(t *testing.T) {
 }
 
 // A refresh whose answer is lost (the connection cut after the request went out) may have
-// rotated: the stored pair says so, and the next client retries the same token within the
-// budget rather than treat it as fresh.
-func TestALostRefreshAnswerLeavesTheRefreshInDoubt(t *testing.T) {
-	var cut atomic.Bool
-	cut.Store(true)
+// rotated: it is retried with the same token, within the grace, as a 503 is.
+func TestALostRefreshAnswerIsRetried(t *testing.T) {
+	shortRetries(t, 10*time.Second, 10*time.Millisecond)
+	var cuts atomic.Int32
 	script := &refreshScript{}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if cut.Load() && r.URL.Path == tokenPath {
+		if r.URL.Path == tokenPath && cuts.Add(1) == 1 {
 			conn, _, _ := w.(http.Hijacker).Hijack()
 			_ = conn.Close()
 			return
@@ -307,24 +307,31 @@ func TestALostRefreshAnswerLeavesTheRefreshInDoubt(t *testing.T) {
 	t.Cleanup(srv.Close)
 	c := newTestClient(t, srv.URL, &auth.Credential{AccessToken: "access-0", RefreshToken: "refresh-0",
 		ExpiresAt: time.Now().Add(-time.Hour)}, "")
-	if err := c.Refresh(context.Background()); err == nil || errors.Is(err, auth.ErrNotLoggedIn) {
-		t.Fatalf("err = %v, want the lost answer, the sign-in kept", err)
-	}
-	marked := storedPair(t, c)
-	if marked.RefreshInDoubtSince.IsZero() || marked.RefreshToken != "refresh-0" {
-		t.Fatalf("stored %+v, want refresh-0 marked in doubt", marked)
-	}
-	cut.Store(false)
-	next := newTestClient(t, srv.URL, marked, "")
-	next.dir = c.dir
-	if err := next.Refresh(context.Background()); err != nil {
+	if err := c.Refresh(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	if sent := script.sent(); len(sent) != 1 || sent[0] != "refresh-0" {
-		t.Fatalf("presented %v, want the same token once more", sent)
+	if sent := script.sent(); len(sent) != 1 || sent[0] != "refresh-0" || cuts.Load() != 2 {
+		t.Fatalf("presented %v after %d attempts, want refresh-0 again after the cut", sent, cuts.Load())
+	}
+	if got := storedPair(t, c); got.RefreshToken != "refresh-1" || !got.RefreshInDoubtSince.IsZero() {
+		t.Fatalf("stored %+v, want the rotation with no doubt left", got)
+	}
+}
+
+// A caller that has gone sends nothing, and leaves nothing in doubt.
+func TestAnEndedCallerSendsNothing(t *testing.T) {
+	script := &refreshScript{}
+	c := expiredClient(t, script)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if err := c.refresh(ctx, func(_, current *auth.Credential) bool { return true }); err == nil {
+		t.Fatal("an ended caller's refresh succeeded")
+	}
+	if sent := script.sent(); len(sent) != 0 {
+		t.Fatalf("presented %v", sent)
 	}
 	if got := storedPair(t, c); !got.RefreshInDoubtSince.IsZero() {
-		t.Fatal("the mark outlived the rotation it was for")
+		t.Fatal("an unsent refresh left a mark")
 	}
 }
 
@@ -360,5 +367,35 @@ func TestALaterCleanAnswerKeepsAnEarlierDoubt(t *testing.T) {
 	}
 	if got := storedPair(t, c); got.RefreshInDoubtSince.IsZero() {
 		t.Fatal("the 429 cleared the doubt the 503 left")
+	}
+}
+
+// A wait that would end past the budget sends nothing more: the next send could present a
+// spent token after the server's grace.
+func TestAWaitPastTheBudgetSendsNothing(t *testing.T) {
+	shortRetries(t, 500*time.Millisecond, 10*time.Millisecond)
+	script := &refreshScript{answers: []string{"503", "ok"}} // Retry-After: 1 s, past the budget
+	c := expiredClient(t, script)
+	if err := c.Refresh(context.Background()); !errors.Is(err, auth.ErrNotLoggedIn) {
+		t.Fatalf("err = %v, want the sign-in ended", err)
+	}
+	if sent := script.sent(); len(sent) != 1 {
+		t.Fatalf("presented %v, want the one attempt", sent)
+	}
+}
+
+// A mark names its session: one for a session no longer stored is refused.
+func TestAMarkForAnotherSessionIsRefused(t *testing.T) {
+	script := &refreshScript{}
+	c := expiredClient(t, script)
+	err := auth.Locked(context.Background(), c.dir, func(tx *auth.Tx) error {
+		return tx.MarkRefreshInDoubt(config.DefaultProfile, "another-session", time.Now())
+	})
+	if err == nil {
+		t.Fatal("a mark for another session was taken")
+	}
+	data, _ := os.ReadFile(config.CredentialsPath(c.dir))
+	if strings.Contains(string(data), "refresh_in_doubt_since") {
+		t.Fatal("another session's mark reached the file")
 	}
 }

@@ -596,9 +596,10 @@ func TestClient_DecidesFromTheStoredPair(t *testing.T) {
 }
 
 // A token endpoint that never answers holds the credential lock no longer than the
-// request timeout: the refresh fails, and the next writer takes the lock at once.
+// refresh's budget of retries: the refresh ends the sign-in, and the next writer takes the
+// lock at once.
 func TestClient_RefreshOfAHungEndpointLetsTheLockGo(t *testing.T) {
-	t.Parallel()
+	shortRetries(t, time.Second, 100*time.Millisecond)
 	hung := make(chan struct{})
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		select {
@@ -618,8 +619,8 @@ func TestClient_RefreshOfAHungEndpointLetsTheLockGo(t *testing.T) {
 	if err := client.Refresh(context.Background()); err == nil {
 		t.Fatal("Refresh against a hung token endpoint succeeded")
 	}
-	if elapsed := time.Since(start); elapsed > timeout+2*time.Second {
-		t.Fatalf("Refresh took %v against a hung token endpoint; want about its %v request timeout", elapsed, timeout)
+	if elapsed := time.Since(start); elapsed > refreshAttemptBudget+timeout+2*time.Second {
+		t.Fatalf("Refresh took %v against a hung token endpoint; want about its %v budget", elapsed, refreshAttemptBudget)
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()

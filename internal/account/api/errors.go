@@ -33,8 +33,6 @@ const (
 	ReasonAuthorizationUnavailable = "AUTHORIZATION_UNAVAILABLE"
 	// ReasonRefreshSuperseded: a concurrent refresh of the same token won.
 	ReasonRefreshSuperseded = "REFRESH_SUPERSEDED"
-	// ReasonSignInRetired: the sign-in is of a kind the server no longer accepts.
-	ReasonSignInRetired = "SIGN_IN_RETIRED"
 )
 
 // OrgNotAccessible reports whether the person has lost access to the organization.
@@ -42,19 +40,10 @@ func (e *Error) OrgNotAccessible() bool {
 	return e.StatusCode == http.StatusForbidden && e.Reason == ReasonOrgNotAccessible
 }
 
-// Retryable reports whether the answer says nothing about access: try again later.
-func (e *Error) Retryable() bool {
-	return e.StatusCode == http.StatusServiceUnavailable || e.StatusCode == http.StatusTooManyRequests ||
-		e.Reason == ReasonAuthorizationUnavailable
-}
-
 // Superseded reports whether a refresh lost to a concurrent one of the same token.
 func (e *Error) Superseded() bool {
 	return e.StatusCode == http.StatusConflict && e.Reason == ReasonRefreshSuperseded
 }
-
-// SignInRetired reports whether the server no longer accepts this kind of sign-in.
-func (e *Error) SignInRetired() bool { return e.Reason == ReasonSignInRetired }
 
 func (e *Error) Error() string {
 	msg := e.Message

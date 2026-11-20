@@ -283,7 +283,11 @@ func TestStoreLoginRetiresAnOlderTermasSignIns(t *testing.T) {
 	if err := testApp.storeLogin(context.Background(), cfg, storedSession(f)); err != nil {
 		t.Fatal(err)
 	}
-	if got := f.legacyRevokedTokens(); !slices.Equal(got, []string{legacyA, legacyB}) {
+	got := f.legacyRevokedTokens()
+	slices.Sort(got)
+	want := []string{legacyA, legacyB}
+	slices.Sort(want)
+	if !slices.Equal(got, want) {
 		t.Fatalf("revoked %d older sessions, want both, each with its own token", len(got))
 	}
 	if auth.HasLegacySignIns(testApp.dir) {

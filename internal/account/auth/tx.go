@@ -24,9 +24,10 @@ type Tx struct {
 // lockWait bounds every wait for the credential lock. A holder that hangs then costs the
 // waiter an error, not a stall. It is longer than a healthy holder keeps the lock:
 //
-//   - a refresh holds it through its exchanges, retried after a 503 for up to 50 s after the
-//     first, plus one more (30 s by default), and at most three keychain writes: the pair
-//     it holds, the mark of a refresh in doubt, and the pair it gets;
+//   - a refresh holds it through its exchanges, retried after a 503 or a lost answer for up
+//     to 50 s after the first, each sent within that budget, and at most two keychain
+//     writes: the pair it holds and the pair it gets (the mark of a refresh in doubt goes
+//     to the file alone);
 //   - every other holder keeps it through one keychain write and a few deletes;
 //   - Relocate takes it once per profile, never across all of them.
 var lockWait = 3*secret.WriteTimeout + 2*time.Minute
@@ -64,10 +65,14 @@ func Locked(ctx context.Context, dir string, fn func(tx *Tx) error) error {
 func (tx *Tx) Load(profile string) (*Credential, error) {
 	cred, err := LoadCredential(tx.dir, profile)
 	if errors.Is(err, errTokensGone) {
-		return nil, errors.New("user-credentials.json lists this sign-in, but its tokens could not be read from the system keychain")
+		return nil, ErrTokensUnreadable
 	}
 	return cred, err
 }
+
+// ErrTokensUnreadable is a sign-in user-credentials.json lists whose tokens the keychain
+// does not hold, perhaps only for a moment: no sign-out, but nothing a writer may act on.
+var ErrTokensUnreadable = errors.New("user-credentials.json lists this sign-in, but its tokens could not be read from the system keychain")
 
 // Update is UpdateCredential inside the transaction.
 func (tx *Tx) Update(profile string, cred *Credential) error {
@@ -83,6 +88,22 @@ func (tx *Tx) Update(profile string, cred *Credential) error {
 		file[profile] = kept
 	})
 	tx.after = append(tx.after, func() { afterSave(tx.dir, profile, unindexed, err) })
+	return err
+}
+
+// MarkRefreshInDoubt records on the profile's stored sign-in of session when a refresh of
+// its refresh token came into doubt; the zero time clears it. It edits
+// user-credentials.json alone, never the keychain, whose item holds the same tokens.
+func (tx *Tx) MarkRefreshInDoubt(profile, session string, since time.Time) error {
+	found := false
+	err := tx.mutate(func(file credentialFile) {
+		if c := file.get(profile); c != nil && c.SessionID == session {
+			c.RefreshInDoubtSince, found = since, true
+		}
+	})
+	if err == nil && !found {
+		return errors.New("the stored sign-in is no longer this session")
+	}
 	return err
 }
 
