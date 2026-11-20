@@ -33,8 +33,7 @@ func (app *App) connectMachineRelay(ctx context.Context, agents []string, relayS
 	if err := app.releaseDeselected(ctx, targets, r); err != nil {
 		return err
 	}
-	// An agent with hooks alone (Antigravity) still needs the token: without it every hook
-	// is off.
+	// An agent with hooks alone still needs the token: without it every hook is off.
 	if len(agents) == 0 {
 		return nil
 	}
