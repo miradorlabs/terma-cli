@@ -94,10 +94,6 @@ func (app *App) signIn(cmd *cobra.Command, cfg *config.Config, opts signInOption
 	if cred, ok, err := app.reuseStoredSession(ctx, cfg, nil); err != nil {
 		return nil, err
 	} else if ok {
-		// A first retirement the keychain or the network cut short is tried again.
-		if auth.HasLegacySignIns(app.dir) {
-			app.retireOlderSignIns(ctx, cfg.AuthURL)
-		}
 		return cred, nil
 	}
 
@@ -231,13 +227,23 @@ func (app *App) reuseStoredSession(ctx context.Context, cfg *config.Config, acce
 	if err := auth.Relocate(app.dir); err != nil {
 		return nil, false, err
 	}
-	// Another process may have rotated the pair since it was read: take the stored one.
-	if stored, err := auth.LoadCredential(app.dir, cfg.ProfileName); err == nil && stored.SessionID == verified.SessionID {
+	// Another process may have rotated the pair since it was read: take the stored one. One
+	// that signed in again since replaced this session, which is over: never set up with it.
+	switch stored, err := auth.LoadCredential(app.dir, cfg.ProfileName); {
+	case err != nil:
+		return nil, false, err
+	case stored.SessionID != verified.SessionID:
+		return nil, false, errors.New("this machine signed in again while setup ran: run `terma setup` again")
+	default:
 		verified = stored
 	}
 	verified.UserEmail = cmp.Or(identity.Email, verified.UserEmail)
 	if err := config.UpdateProfile(app.dir, cfg.ProfileName, func(p *config.Profile) { applyLogin(p, cfg) }); err != nil {
 		return nil, false, err
+	}
+	// A first retirement the keychain or the network cut short is tried again.
+	if auth.HasLegacySignIns(app.dir) {
+		app.retireOlderSignIns(ctx, cfg.AuthURL)
 	}
 	return verified, true, nil
 }

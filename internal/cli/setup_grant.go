@@ -2,6 +2,7 @@ package cli
 
 import (
 	"cmp"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -84,6 +85,18 @@ func (app *App) signInWithGrant(cmd *cobra.Command, cfg *config.Config, orgID st
 				Message: "the code signed in another user than Terma Desktop's"}
 		}
 		cred.Label = auth.DesktopLabel()
+		// --org is checked before the new sign-in replaces any stored one: a grant refused for
+		// it keeps nothing, and ends what it made.
+		// The pair as the check left it: a 401 there rotates it, and the one it spent must
+		// never be stored or revoked.
+		if cred, err = app.checkGrantOrganization(ctx, cfg, cred, orgID); err != nil {
+			// Ended only when the check was answered: after a failure, a refresh it tried may
+			// have left the token spent, and revoking a spent token ends the whole family.
+			if _, refused := errors.AsType[*auth.GrantError](err); refused {
+				_ = app.revokeSession(ctx, cfg, cred)
+			}
+			return nil, err
+		}
 		// Another user's stored sign-in is replaced and ended.
 		if err := app.storeLogin(ctx, cfg, cred); err != nil {
 			return nil, err
@@ -100,6 +113,32 @@ func (app *App) signInWithGrant(cmd *cobra.Command, cfg *config.Config, orgID st
 		return nil, err
 	}
 	return app.loadConfig()
+}
+
+// checkGrantOrganization refuses, as bad input, an --org the signed-in user does not belong
+// to, judged with cred before it is stored. It returns the pair as the check left it, which
+// a refresh on a 401 may have rotated: the one it spent is never to be used again.
+func (app *App) checkGrantOrganization(ctx context.Context, cfg *config.Config, cred *auth.Credential, orgID string) (*auth.Credential, error) {
+	unstored := *cfg
+	unstored.ProfileName = "" // read with cred alone: nothing is stored or refreshed into the profile yet
+	client, err := api.New(&unstored, api.Options{Version: app.version, Credential: cred})
+	if err != nil {
+		return cred, err
+	}
+	orgs, err := fetchOrganizations(ctx, client)
+	held := client.Credential()
+	switch {
+	case err != nil:
+		return held, err
+	case len(orgs) == 0:
+		return held, errors.New("you belong to no Terma organization yet: create or join one in the Terma app, then run `terma setup` again")
+	}
+	if _, err := matchOrganization(orgs, orgID); errors.As(err, new(noMatchError)) {
+		return held, &auth.GrantError{Code: auth.GrantBadInput, Message: "--org is not an organization the signed-in user belongs to", Err: err}
+	} else if err != nil {
+		return held, err
+	}
+	return held, nil
 }
 
 // writeGrantFailure prints a failed grant as `terma auth token` prints its failures: the

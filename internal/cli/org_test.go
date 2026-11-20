@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"net/http"
 	"os"
 	"slices"
 	"strings"
@@ -382,5 +383,32 @@ func TestReusingASignInRetiresWhatIsLeftOfAnOlderTerma(t *testing.T) {
 	}
 	if auth.HasLegacySignIns(testApp.dir) {
 		t.Fatal("the older sign-ins should be deleted")
+	}
+}
+
+// A sign-in another setup stored while this one verified the stored session ends the reuse:
+// the session it verified is over, and setting up with it would mix two people's.
+func TestReuseRefusesASessionReplacedMeanwhile(t *testing.T) {
+	f := newFakeAuth(t)
+	authSandbox(t, f)
+	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(f)); err != nil {
+		t.Fatal(err)
+	}
+	inner := f.srv.Config.Handler
+	f.srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/v1/whoami" {
+			other := storedSessionOf(f, "u-2")
+			if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, other); err != nil {
+				t.Error(err)
+			}
+		}
+		inner.ServeHTTP(w, r)
+	})
+	cfg, err := testApp.loadConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok, err := testApp.reuseStoredSession(t.Context(), cfg, nil); ok || err == nil || !strings.Contains(err.Error(), "signed in again") {
+		t.Fatalf("reuse = %v, %v; want it refused", ok, err)
 	}
 }

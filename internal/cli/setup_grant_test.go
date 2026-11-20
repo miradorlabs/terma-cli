@@ -287,8 +287,11 @@ func TestDesktopGrantRefusesAnOrganizationOfSomeoneElse(t *testing.T) {
 	if code := grantFailure(t, stdout, err); code != auth.GrantBadInput {
 		t.Fatalf("code = %s, want %s", code, auth.GrantBadInput)
 	}
-	if org, _, _ := selected(t); org != "" {
-		t.Fatalf("an organization of someone else's was chosen: %s", org)
+	if org, _, n := selected(t); org != "" || n != 0 {
+		t.Fatalf("an organization of someone else's was chosen (%s), or the refused sign-in kept (%d)", org, n)
+	}
+	if gateway.revokes.Load() != 1 {
+		t.Fatalf("%d revokes; want the refused grant's session ended", gateway.revokes.Load())
 	}
 }
 
