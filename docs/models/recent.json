@@ -1,7 +1,19 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-20T12:41:24.916039967Z",
+  "generated_at": "2026-11-20T12:52:41.662173791Z",
   "events": [
+    {
+      "at": "2026-11-20T12:52:41.662173791Z",
+      "model": "gemini-4-hydrogen",
+      "vendor": "google",
+      "name": "Gemini 4 Hydrogen",
+      "event": "changed",
+      "changes": 2,
+      "highlights": [
+        "Feature added: tool retrieval",
+        "Model page changed (+132 −0 chars)"
+      ]
+    },
     {
       "at": "2026-11-20T12:41:24.916039967Z",
       "model": "gemini-4-neon",
