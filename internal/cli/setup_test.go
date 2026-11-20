@@ -249,7 +249,11 @@ func TestHarnessSelectionComingSoon(t *testing.T) {
 		chosen[name] = true
 	}
 	form := testApp.harnessSelectionForm(context.Background(), chosen)
-	wantOrder := []string{"claude", "codex", "copilot", "cursor", "opencode", "omp", "pi", "hermes", "gemini", "dsh", "antigravity"}
+	wantOrder := []string{"claude", "codex", "copilot", "antigravity", "cursor", "opencode", "omp", "pi", "hermes", "gemini", "dsh"}
+	if !testApp.agents.IsSupported("antigravity") {
+		// Coming Soon on Windows: last, in registry order.
+		wantOrder = append(slices.Delete(wantOrder, 3, 4), "antigravity")
+	}
 	if len(form.Items) != len(wantOrder) {
 		t.Fatalf("picker has %d items, want %d", len(form.Items), len(wantOrder))
 	}
@@ -274,7 +278,7 @@ func TestHarnessSelectionComingSoon(t *testing.T) {
 }
 
 func TestHarnessSelectionFlags(t *testing.T) {
-	for _, name := range []string{"cursor", "opencode", "antigravity"} {
+	for _, name := range []string{"cursor", "opencode"} {
 		t.Run(name, func(t *testing.T) {
 			cmd := &cobra.Command{}
 			cfg := &config.Config{}
@@ -286,6 +290,14 @@ func TestHarnessSelectionFlags(t *testing.T) {
 	got, err := testApp.parseAgentList("codex,claude,codex")
 	if err != nil || !slices.Equal(got, []string{"claude", "codex"}) {
 		t.Fatalf("available selection = %v, %v", got, err)
+	}
+	got, err = testApp.chooseHarnesses(&cobra.Command{}, &config.Config{}, setupFlags{harnesses: "antigravity,claude"})
+	if !testApp.agents.IsSupported("antigravity") {
+		if err == nil || !strings.Contains(err.Error(), "Coming Soon") {
+			t.Fatalf("antigravity on Windows: %v, %v", got, err)
+		}
+	} else if err != nil || !slices.Equal(got, []string{"claude", "antigravity"}) {
+		t.Fatalf("antigravity selection = %v, %v", got, err)
 	}
 }
 
@@ -306,7 +318,11 @@ func TestHarnessSelectionFiltersSavedAgents(t *testing.T) {
 				}
 			}
 		}
+		// Antigravity is not on the emptied PATH, so only a saved choice keeps it.
 		wantSetup := slices.Clone(wantInstalled)
+		if slices.Contains(saved, "antigravity") && testApp.agents.IsSupported("antigravity") {
+			wantSetup = append(wantSetup, "antigravity")
+		}
 		got, err := testApp.chooseHarnesses(cmd, cfg, setupFlags{assumeYes: true})
 		if err != nil || !slices.Equal(got, wantSetup) {
 			t.Fatalf("setup selection = %v, %v; want %v", got, err, wantSetup)
@@ -339,6 +355,30 @@ func TestSetupRecordsTheRelayEnvironment(t *testing.T) {
 		if env[k] != os.Getenv(k) {
 			t.Errorf("recorded %s=%q, setup ran with %q", k, env[k], os.Getenv(k))
 		}
+	}
+}
+
+// Antigravity exports nothing to the relay, but hooks run only while the relay's token
+// exists: setup with it alone still mints the token, and writes agy's hooks.
+func TestSetupWithAntigravityAloneTurnsHooksOn(t *testing.T) {
+	if !testApp.agents.IsSupported("antigravity") {
+		t.Skip("Antigravity is Coming Soon on Windows")
+	}
+	gateway := newFakeAuth(t)
+	authSandbox(t, gateway)
+	sandboxMachine(t)
+	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(gateway, orgA())); err != nil {
+		t.Fatal(err)
+	}
+	if out, err := runTerma(t, "setup", "--harness", "antigravity"); err != nil {
+		t.Fatalf("setup: %v\n%s", err, out)
+	}
+	if !claim.Enabled(testApp.stateDir) {
+		t.Fatal("setup left no relay token, so every hook is off")
+	}
+	hooks, err := os.ReadFile(filepath.Join(os.Getenv("HOME"), ".gemini", "config", "hooks.json"))
+	if err != nil || !strings.Contains(string(hooks), "hook --user antigravity-stop") {
+		t.Fatalf("agy hooks = %s, %v", hooks, err)
 	}
 }
 

@@ -33,7 +33,8 @@ func (app *App) connectMachineRelay(ctx context.Context, agents []string, relayS
 	if err := app.releaseDeselected(ctx, targets, r); err != nil {
 		return err
 	}
-	if len(targets) == 0 {
+	// An agent with hooks alone still needs the token: without it every hook is off.
+	if len(agents) == 0 {
 		return nil
 	}
 	dir, err := daemon.Dir(app.stateDir)

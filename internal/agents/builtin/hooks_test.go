@@ -161,6 +161,8 @@ func TestUserHooksInstallIdempotentlyAndRemoveCleanly(t *testing.T) {
 		"codex":   `{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"say done"}]}]}}`,
 		"cursor":  `{"version":1,"hooks":{"stop":[{"command":"say done"}]}}`,
 		"copilot": `{"version":1,"hooks":{"Stop":[{"type":"command","bash":"say done"}]}}`,
+		// agy names each hook at the top level.
+		"antigravity": `{"notify":{"Stop":[{"type":"command","command":"say done"}]}}`,
 	}
 	for _, a := range reg.With[agents.UserHooks]() {
 		t.Run(a.Name(), func(t *testing.T) {

@@ -7,7 +7,8 @@
 
 The `terma` cli connects coding agents to [Terma](https://terma.ai), then stamps the commits
 they produce so agent spend can be traced to shipped code. It supports **Claude Code**
-(CLI and Desktop), **Codex** (CLI and Desktop) and **GitHub Copilot** (CLI and VS Code).
+(CLI and Desktop), **Codex** (CLI and Desktop), **GitHub Copilot** (CLI and VS Code) and
+**Antigravity** (the `agy` CLI, on macOS and Linux).
 
 ## Get started
 
@@ -248,7 +249,7 @@ before it restarts, and otherwise your next terma command runs it. On the latest
 Every question `terma setup` asks has a flag:
 
 ```bash
-terma setup --org acme --team platform --harness claude,codex,copilot --yes
+terma setup --org acme --team platform --harness claude,codex,copilot,antigravity --yes
 ```
 
 - `--org <name-or-id>` signs in to that organization. Without it, setup asks when you
@@ -256,7 +257,7 @@ terma setup --org acme --team platform --harness claude,codex,copilot --yes
 - `--team <name-or-id>` sets up that team; without it, setup asks when your organization
   has several teams, with the one you chose before as the default, else takes the only
   one; when it cannot ask (`--yes` or no terminal), it keeps the team you chose before.
-- `--harness <agents>` records those agents (`claude`, `codex`, `copilot`); with `--yes` or no
+- `--harness <agents>` records those agents (`claude`, `codex`, `copilot`, `antigravity`); with `--yes` or no
   terminal and no `--harness`, setup records the agents recorded before and every
   supported agent installed on this machine.
 - `--yes` skips the browser prompt and the organization and agents questions. The team
@@ -432,6 +433,16 @@ it is, and a `copilot` started another way (a script, an absolute path, an edito
 still claimed by its hooks but exports nothing. `TERMA_SHELL_LAUNCHERS=0` keeps the
 function out of your startup files. Copilot reports token counts and AI credits, not a
 cost, and a file one of its shell commands writes is not attributed to its session.
+
+Antigravity's `agy` has no telemetry export, so nothing of it passes the relay. Setup adds
+one named hook, `terma`, to `~/.gemini/config/hooks.json`, which every `agy` session loads,
+and leaves the file's other hooks as they are. Those hooks report the model, each turn,
+each tool step (its name and whether it failed, never its arguments) and how the turn
+ended, and the files `agy`'s own file tools write are stamped on your commits. `agy`
+reports no token counts or cost, and runs no hook after a turn you cancel, so what that
+turn did is sent with the next turn's. On Windows, setup lists Antigravity as Coming Soon: `agy` runs
+its hooks with `cmd` there, and terma's hook command for it has been checked only on macOS
+and Linux.
 
 `terma setup` runs the relay as a per-user background service, so it is up before any
 agent starts; with `--relay-service off`, hooks start it on demand. `terma update`

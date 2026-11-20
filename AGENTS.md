@@ -3,8 +3,9 @@
 This file provides guidance to coding agents (Claude Code, Codex and others) when working
 with code in this repository.
 
-`terma` is a Go CLI that connects coding agents (Claude Code, Codex, GitHub Copilot) to
-Terma and stamps the commits they produce with the agent session that wrote them.
+`terma` is a Go CLI that connects coding agents (Claude Code, Codex, GitHub Copilot,
+Antigravity) to Terma and stamps the commits they produce with the agent session that
+wrote them.
 
 ## Commands
 
