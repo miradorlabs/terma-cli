@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -50,6 +51,26 @@ func TestAntigravityRealLogin(t *testing.T) {
 		t.Skip("this machine's agy already runs terma's hooks; every event would be recorded twice")
 	}
 	model := cmp.Or(os.Getenv("TERMA_E2E_AGY_MODEL"), "gemini-3.8-flash-low")
+	// agy keeps its sign-in, and the folders it trusts, in the developer's own settings; the
+	// trust prompt below adds the scratch repository there. The file is put back byte for
+	// byte, after agy has exited (cleanups run last-registered first), and checked.
+	agySettings := filepath.Join(home, ".gemini", "antigravity-cli", "settings.json")
+	original, originalErr := os.ReadFile(agySettings)
+	t.Cleanup(func() {
+		if originalErr != nil {
+			if !os.IsNotExist(originalErr) {
+				t.Errorf("could not read %s before the test: %v", agySettings, originalErr)
+				return
+			}
+			_ = os.Remove(agySettings)
+		} else if err := os.WriteFile(agySettings, original, 0o600); err != nil {
+			t.Errorf("restore %s: %v", agySettings, err)
+		}
+		after, err := os.ReadFile(agySettings)
+		if (originalErr == nil) != (err == nil) || !bytes.Equal(after, original) {
+			t.Errorf("%s is not as it was before the test", agySettings)
+		}
+	})
 
 	sb := New(t, Isolated)
 	sb.SetupAgents = append(sb.SetupAgents, "antigravity")
@@ -64,6 +85,12 @@ func TestAntigravityRealLogin(t *testing.T) {
 	}
 	sb.write(".agents/hooks.json", string(written))
 	sb.write(".git/info/exclude", ".agents/\n")
+	// Setup wrapped agy's status line in the sandbox home's settings; the interactive run
+	// below loads that file with --settings, which agy never saves.
+	statusSettings := filepath.Join(sb.Home, ".gemini", "antigravity-cli", "settings.json")
+	if b, err := os.ReadFile(statusSettings); err != nil || !strings.Contains(string(b), "terma hook antigravity-statusline") {
+		t.Fatalf("terma setup wrote no agy status line: %v\n%s", err, b)
+	}
 
 	t.Cleanup(func() {
 		dir := os.Getenv("TERMA_E2E_AGY_CAPTURE")
@@ -152,7 +179,7 @@ func TestAntigravityRealLogin(t *testing.T) {
 	if completed < 3 {
 		t.Errorf("want a Stop per completed turn, got %d", completed)
 	}
-	terminal, err := Start(sb.Repo, env, 40, 140, binary, "--conversation", conversation, "--model", model, "--dangerously-skip-permissions")
+	terminal, err := Start(sb.Repo, env, 40, 140, binary, "--conversation", conversation, "--model", model, "--dangerously-skip-permissions", "--settings", statusSettings)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -176,24 +203,29 @@ func TestAntigravityRealLogin(t *testing.T) {
 		_ = terminal.Send("\x1b")
 		time.Sleep(time.Second)
 	}
-	invocations := len(sb.HookPayloads("antigravity-pre-invocation"))
-	// agy moves a shell command to the background after five seconds and ends the turn,
-	// so the cancel lands on the model's reply instead.
-	if err := terminal.Type("Write a 1500-word essay on the history of lighthouses. Do not use any tools."); err != nil {
+	// Cancelled while a command runs: the call that asked for it is in the transcript, and
+	// no hook has read it, so it can only go with the conversation's next hook. agy moves a
+	// command to the background after five seconds, so the command takes four.
+	transcript := filepath.Join(home, ".gemini", "antigravity-cli", "brain", conversation, ".system_generated", "logs", "transcript_full.jsonl")
+	prompts, _ := antigravityToolCallPending(transcript, -1)
+	if err := terminal.Type("Run the shell command `sleep 4`, then reply with the word done."); err != nil {
 		t.Fatal(err)
 	}
-	var began time.Time
+	var asked time.Time
 	cancelled, escaped := "", false
 	for deadline := time.Now().Add(60 * time.Second); time.Now().Before(deadline) && cancelled == ""; time.Sleep(250 * time.Millisecond) {
-		if began.IsZero() && len(sb.HookPayloads("antigravity-pre-invocation")) > invocations {
-			began = time.Now()
+		if _, pending := antigravityToolCallPending(transcript, prompts); asked.IsZero() && pending {
+			asked = time.Now()
 		}
-		// While the model is answering.
-		if !escaped && !began.IsZero() && time.Since(began) > 1500*time.Millisecond {
+		// While the command runs.
+		if !escaped && !asked.IsZero() && time.Since(asked) > time.Second {
 			escaped = terminal.Send("\x1b") == nil
 		}
 		if stops := sb.HookPayloads("antigravity-stop"); len(stops) > completed {
 			cancelled, _ = stops[len(stops)-1]["terminationReason"].(string)
+		}
+		if escaped && time.Since(asked) > 15*time.Second {
+			break
 		}
 	}
 	if !escaped || !strings.Contains(terminal.Text(), "Interrupted") {
@@ -207,6 +239,12 @@ func TestAntigravityRealLogin(t *testing.T) {
 	default:
 		t.Errorf("a cancelled turn's Stop says %q", cancelled)
 	}
+
+	// The cancelled turn's calls wait for the conversation's next hook: one more turn.
+	_ = terminal.Close("/quit", 10*time.Second)
+	run("Reply with just the word OK. Use no tools.", conversation)
+	checkAntigravityCalls(t, sb, filepath.Join(home, ".gemini", "antigravity-cli", "brain", conversation, ".system_generated", "logs", "transcript_full.jsonl"), conversation)
+	checkAntigravitySeat(t, sb, conversation)
 
 	starts := sb.Delivered("terma.session.start", conversation, 30*time.Second)
 	if len(starts) == 0 {
@@ -236,4 +274,133 @@ func TestAntigravityRealLogin(t *testing.T) {
 	if len(sb.Delivered("terma.commit.stamped", "", 10*time.Second)) == 0 {
 		t.Errorf("no terma.commit.stamped delivered")
 	}
+}
+
+// checkAntigravityCalls holds every model call agy's transcript recorded to one
+// terma.model_call, sent once, with the transcript's counts: input with the cache reads.
+func checkAntigravityCalls(t *testing.T, sb *Sandbox, transcript, conversation string) {
+	t.Helper()
+	data, err := os.ReadFile(transcript)
+	if err != nil {
+		t.Fatalf("agy's transcript: %v", err)
+	}
+	type call struct{ model, input, cache, output string }
+	want := map[string]call{}
+	var prompts, calls []int
+	for line := range bytes.Lines(data) {
+		var s struct {
+			Step  int    `json:"step_index"`
+			Type  string `json:"type"`
+			Model string `json:"model"`
+			In    int    `json:"input_tokens"`
+			Cache int    `json:"cache_read_tokens"`
+			Out   int    `json:"output_tokens"`
+		}
+		if json.Unmarshal(line, &s) != nil {
+			continue
+		}
+		switch s.Type {
+		case "USER_INPUT":
+			prompts = append(prompts, s.Step)
+		case "PLANNER_RESPONSE":
+			calls = append(calls, s.Step)
+			want["step-"+strconv.Itoa(s.Step)] = call{s.Model, strconv.Itoa(s.In + s.Cache), strconv.Itoa(s.Cache), strconv.Itoa(s.Out)}
+		}
+	}
+	// The cancelled turn is the one before the last prompt: its first call follows its prompt.
+	cancelledStep := ""
+	if len(prompts) >= 2 {
+		for _, step := range calls {
+			if step > prompts[len(prompts)-2] && step < prompts[len(prompts)-1] {
+				cancelledStep = "step-" + strconv.Itoa(step)
+				break
+			}
+		}
+	}
+	var got map[string]int
+	deadline := time.Now().Add(30 * time.Second)
+	for {
+		got = map[string]int{}
+		for _, l := range sb.Receiver.Logs() {
+			if l.EventName != "terma.model_call" || l.Attrs["session.id"] != conversation {
+				continue
+			}
+			id := l.Attrs["terma.model_call.id"]
+			got[id]++
+			w, ok := want[id]
+			if got[id] > 1 || !ok {
+				continue
+			}
+			if l.Attrs["gen_ai.request.model"] != w.model || l.Attrs["gen_ai.usage.input_tokens"] != w.input ||
+				l.Attrs["gen_ai.usage.cache_read.input_tokens"] != w.cache || l.Attrs["gen_ai.usage.output_tokens"] != w.output ||
+				l.Attrs["terma.usage.status"] != "partial" || l.Attrs["terma.evidence.source"] != "antigravity_transcript" {
+				t.Errorf("%s = %v, want %+v", id, l.Attrs, w)
+			}
+			if _, ok := l.Attrs["gen_ai.usage.reasoning.output_tokens"]; ok {
+				t.Errorf("%s carries a reasoning count agy never gave", id)
+			}
+		}
+		if len(got) >= len(want) || time.Now().After(deadline) {
+			break
+		}
+		time.Sleep(500 * time.Millisecond)
+	}
+	for id, n := range got {
+		if n != 1 {
+			t.Errorf("%s delivered %d times", id, n)
+		}
+	}
+	for id := range want {
+		if got[id] == 0 {
+			t.Errorf("%s (in the transcript) was never delivered", id)
+		}
+	}
+	t.Logf("model calls: %d in the transcript, %d delivered; the cancelled turn's first: %q", len(want), len(got), cancelledStep)
+	if cancelledStep == "" {
+		t.Errorf("the cancelled turn recorded no call to recover")
+	}
+}
+
+// checkAntigravitySeat holds the status line to have reported the plan, its quota
+// buckets and the account.
+func checkAntigravitySeat(t *testing.T, sb *Sandbox, conversation string) {
+	t.Helper()
+	quota := sb.Delivered("terma.session.quota", conversation, 30*time.Second)
+	if len(quota) == 0 {
+		t.Fatal("no terma.session.quota from agy's status line")
+	}
+	q := quota[len(quota)-1].Attrs
+	if q["terma.account.plan_type"] == "" || !strings.HasPrefix(q["terma.rate_limit.buckets"], "[{") || q["terma.evidence.source"] != "antigravity_statusline" {
+		t.Errorf("quota: %v", q)
+	}
+	t.Logf("plan %q, buckets %s", q["terma.account.plan_type"], q["terma.rate_limit.buckets"])
+	account := sb.Delivered("terma.session.account", conversation, 10*time.Second)
+	if len(account) == 0 || account[0].Attrs["terma.account.seat.id"] == "" {
+		t.Errorf("account: %v", account)
+	}
+}
+
+// antigravityToolCallPending counts the transcript's prompts and reports whether a prompt
+// after the first `after` of them has a model call that asked for a tool.
+func antigravityToolCallPending(transcript string, after int) (prompts int, pending bool) {
+	data, err := os.ReadFile(transcript)
+	if err != nil {
+		return 0, false
+	}
+	for line := range bytes.Lines(data) {
+		var s struct {
+			Type      string            `json:"type"`
+			ToolCalls []json.RawMessage `json:"tool_calls"`
+		}
+		if json.Unmarshal(line, &s) != nil {
+			continue
+		}
+		switch {
+		case s.Type == "USER_INPUT":
+			prompts++
+		case s.Type == "PLANNER_RESPONSE" && len(s.ToolCalls) > 0 && after >= 0 && prompts > after:
+			pending = true
+		}
+	}
+	return prompts, pending
 }
