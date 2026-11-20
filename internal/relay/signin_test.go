@@ -188,15 +188,16 @@ func TestARefusedTokenIsRotatedAndThePartKept(t *testing.T) {
 	srv := httptest.NewServer(r.Handler())
 	defer srv.Close()
 	post(t, srv, "/v1/logs", oneLog("new"), "application/x-protobuf", token, false)
-	waitFor(t, func() bool { return len(u.requests()) == 2 })
+	// The relay counts the part once it reads the 200, after the upstream has seen it.
+	waitFor(t, func() bool { return r.Stats().Snapshot().Counters["forwarded.logs"] == 1 })
+	if n := len(u.requests()); n != 2 {
+		t.Fatalf("%d requests, want the refused one and its retry", n)
+	}
 	signIn.mu.Lock()
 	refused := append([]string(nil), signIn.refused...)
 	signIn.mu.Unlock()
 	if len(refused) != 1 || refused[0] != "token-"+accountA {
 		t.Fatalf("refused = %v", refused)
-	}
-	if c := r.Stats().Snapshot().Counters; c["forwarded.logs"] != 1 {
-		t.Fatalf("stats = %v", c)
 	}
 }
 
