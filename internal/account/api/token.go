@@ -3,11 +3,8 @@ package api
 import (
 	"cmp"
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"fmt"
-	"net/http"
 	"slices"
 	"strings"
 	"time"
@@ -67,7 +64,7 @@ func (c *Client) exchangeCode(ctx context.Context, code, verifier string, port i
 		Code:         code,
 		CodeVerifier: verifier,
 		RedirectPort: &port,
-	})
+	}, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -87,27 +84,6 @@ func (c *Client) LastLogin() *LoginResult {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return c.lastLogin
-}
-
-func (c *Client) postToken(ctx context.Context, body tokenRequest) (*tokenResponse, error) {
-	resp, err := c.attempt(ctx, authHost, http.MethodPost, tokenPath, nil, nil, body)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	var out tokenResponse
-	if err := decode(resp, &out); err != nil {
-		var apiErr *Error
-		if errors.As(err, &apiErr) && apiErr.Unauthenticated() {
-			return nil, fmt.Errorf("%w: %s", auth.ErrNotLoggedIn, apiErr.Message)
-		}
-		return nil, err
-	}
-	if out.AccessToken == "" {
-		return nil, errors.New("token endpoint returned no access token")
-	}
-	return &out, nil
 }
 
 func (c *Client) credentialFrom(resp *tokenResponse) *auth.Credential {
@@ -199,10 +175,7 @@ func (c *Client) RefreshRefused(ctx context.Context, refusedSHA256 string) error
 
 // TokenSHA256 is how a token is named where the token itself must not appear: its
 // SHA-256, in lowercase hex.
-func TokenSHA256(token string) string {
-	sum := sha256.Sum256([]byte(token))
-	return hex.EncodeToString(sum[:])
-}
+func TokenSHA256(token string) string { return auth.TokenSHA256(token) }
 
 // redeemFunc decides whether to redeem the refresh token. held is the credential this
 // client had. current is the pair as it stands now, which another process may have rotated.
@@ -213,12 +186,14 @@ type redeemFunc func(held, current *auth.Credential) bool
 // every step runs under the credential lock:
 //
 //   - reload the stored pair;
+//   - send nothing if it is another sign-in's, which replaced this client's session;
 //   - take it if another process has already rotated past this client's pair;
 //   - redeem only if redeem still asks for it;
 //   - save the new pair before the lock is released.
 //
 // The lock is held through the exchange and the keychain writes. So the wait for it is
-// auth's lockWait, which is longer than the request timeout.
+// auth's lockWait, which is longer than the exchange's RefreshBudget. The waits for the
+// refresh slot and the lock follow ctx; the exchange and the save, once begun, do not.
 //
 // Call it in this process's refresh slot (lockRefresh).
 func (c *Client) refresh(ctx context.Context, redeem redeemFunc) error {
@@ -229,45 +204,112 @@ func (c *Client) refresh(ctx context.Context, redeem redeemFunc) error {
 		return auth.ErrNotLoggedIn
 	}
 	if c.profile == "" {
-		return c.redeem(ctx, held, held, redeem, nil)
+		return c.redeem(ctx, held, held, redeem, nil, nil)
 	}
 	return auth.Locked(ctx, c.dir, func(tx *auth.Tx) error {
 		stored, err := tx.LoadFor(c.profile, held.OrganizationID)
 		switch {
 		case err == nil && sameSession(stored, held):
-		case err == nil || errors.Is(err, auth.ErrNotLoggedIn):
-			// The developer signed out, or signed in again, since this client loaded its
-			// pair. This session is no longer the stored one: rotate it in memory only.
-			return c.redeem(ctx, held, held, redeem, nil)
+		case err == nil:
+			// The developer signed in again since this client loaded its pair, which the
+			// sign-in replaced. Its token is never sent: no process could store the pair it
+			// got, nor see a mark of it, so a lost answer would leave nothing to stop
+			// another send after the server's grace.
+			if !redeem(held, held) {
+				return nil
+			}
+			return errSessionExpired
+		case errors.Is(err, auth.ErrNotLoggedIn):
+			// Signed out, or removed when the server refused it: never sent again.
+			return errSessionExpired
 		default:
 			return err
 		}
 		if c.spent(stored.RefreshToken) {
 			// The store still holds a token this client spent, because saving its
 			// rotation failed. Keep the client's own live pair and try to save it now.
-			_ = c.save(tx, held, "")
-			return c.redeem(ctx, held, held, redeem, tx)
+			//
+			// A held token this client has marked (a refresh of it got no answer) is not
+			// saved at all until a pair that settles it replaces it. Saved, it would be
+			// readable before its mark: the keychain takes the tokens first, and a
+			// credentials.json write that then fails leaves them under the spent token's
+			// mark, which does not count for them. Another process could then send it after
+			// the server's grace. The store keeps the spent token, marked when it was sent.
+			//
+			// Where the marks of held's token go depends on what the store gives now. A
+			// save that failed may have failed half way, the keychain taking held's tokens
+			// and credentials.json not: then the store gives held's token, and its marks
+			// must be in the store before it is sent, like any stored token's (a mark that
+			// cannot be written stops the send). Only while the store still gives the spent
+			// token is held's known to this client alone, and its marks stay here: a mark in
+			// the store would name a token the store does not give.
+			marks := tx
+			switch {
+			case c.ownMark(held.RefreshToken):
+				marks = nil
+			case c.save(tx, held, "") != nil:
+				now, err := tx.LoadFor(c.profile, held.OrganizationID)
+				if err != nil {
+					return err
+				}
+				if now.RefreshToken != held.RefreshToken {
+					marks = nil
+				}
+			}
+			return c.redeem(ctx, held, held, redeem, tx, marks)
 		}
 		// Decide from the stored pair, not the held one. The held one was read without the
 		// lock, and may pair a rotation's tokens with the expiry from before it.
 		if !samePair(stored, held) {
 			c.replace(stored)
 		}
-		return c.redeem(ctx, held, stored, redeem, tx)
+		return c.redeem(ctx, held, stored, redeem, tx, tx)
 	})
 }
 
 // redeem exchanges current's refresh token if redeem asks, and saves the new pair in tx
-// when there is one.
-func (c *Client) redeem(ctx context.Context, held, current *auth.Credential, redeem redeemFunc, tx *auth.Tx) error {
+// when there is one. A token the auth gateway refused is never sent again. When tx still
+// stores it, it is removed there too, so no process that reads the store afterwards sends
+// it. A token whose refresh got no answer is marked so (markUnsettled), and sent again
+// only within the budget of its first send. marks is where those marks go: tx while the
+// store holds current's refresh token, and nil when only this client knows it.
+func (c *Client) redeem(ctx context.Context, held, current *auth.Credential, redeem redeemFunc, tx, marks *auth.Tx) error {
 	if !redeem(held, current) {
 		return nil
 	}
-	resp, err := c.postToken(ctx, tokenRequest{GrantType: "refresh_token", RefreshToken: current.RefreshToken})
-	if err != nil {
-		if errors.Is(err, auth.ErrNotLoggedIn) {
-			return fmt.Errorf("%w: session expired, run `terma setup`", auth.ErrNotLoggedIn)
-		}
+	if c.wasRefused(current.RefreshToken) {
+		return c.refused(current, tx)
+	}
+	first, unknown := c.unsettledSince(current), true
+	switch {
+	case first.IsZero():
+		first, unknown = c.wallNow(), false
+	case !c.inBudget(first):
+		// Past its budget, or in the future: expired for good, so a wall clock that comes
+		// round to the mark again never reopens it, and for the others too.
+		return errors.Join(errRefreshUnsettled, c.expireUnsettled(current, marks))
+	}
+	// Marked before it is sent, so a process killed with the answer outstanding leaves the
+	// mark too. A pair saved, or the credential removed, takes the mark with it. A token
+	// that cannot be marked is not sent: if its answer were lost, nothing would say so.
+	if err := c.markUnsettled(current, first, marks); err != nil {
+		return fmt.Errorf("record the refresh before sending it: %w", err)
+	}
+	resp, err := c.exchangeRefreshToken(ctx, current.RefreshToken, first, unknown)
+	switch {
+	case errors.As(err, new(unsettledError)):
+		// It ran until its budget was spent: no process may send the token again.
+		return errors.Join(err, c.expireUnsettled(current, marks))
+	case errors.As(err, new(refusalError)):
+		return c.refused(current, tx)
+	case err != nil && !unknown:
+		// A first answer that settles it without a pair: the server spent nothing.
+		c.clearUnsettled(current, first, marks)
+	}
+	switch {
+	case errors.Is(err, auth.ErrNotLoggedIn):
+		return errSessionExpired
+	case err != nil:
 		return err
 	}
 	cred := c.credentialFrom(resp)
@@ -276,8 +318,9 @@ func (c *Client) redeem(ctx context.Context, held, current *auth.Credential, red
 	cred.UserID = cmp.Or(cred.UserID, current.UserID)
 	cred.Label = current.Label
 	// The server has spent current's refresh token, so this pair is the session's only
-	// live one. Hold it before trying to store it.
+	// live one. Hold it before trying to store it. The answer settles current's mark.
 	c.replace(cred)
+	c.settled(current.RefreshToken)
 	if tx == nil {
 		return nil
 	}
@@ -307,6 +350,27 @@ func (c *Client) spent(refreshToken string) bool {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return slices.Contains(c.unsaved, refreshToken)
+}
+
+// refused records that the server refused current's refresh token, and removes current
+// from tx while tx still stores it. A removal that fails is tried again at this client's
+// next refresh, which ends here too. The keychain item stays (Tx.DeleteFor): read by
+// nothing once its entry is gone, until the next sign-in overwrites it.
+func (c *Client) refused(current *auth.Credential, tx *auth.Tx) error {
+	c.mu.Lock()
+	c.refusedToken = current.RefreshToken
+	c.mu.Unlock()
+	if tx != nil {
+		_ = tx.DeleteFor(c.profile, current.OrganizationID, current.RefreshToken)
+	}
+	return errRefused
+}
+
+// wasRefused reports whether the server refused refreshToken.
+func (c *Client) wasRefused(refreshToken string) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.refusedToken != "" && c.refusedToken == refreshToken
 }
 
 // replace makes cred the client's credential.

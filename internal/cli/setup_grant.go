@@ -88,8 +88,8 @@ func (app *App) signInWithGrant(cmd *cobra.Command, cfg *config.Config, orgID st
 	if result := client.LastLogin(); result != nil {
 		orgName = result.OrganizationName
 	}
-	// Another user's stored sign-in for this organization is replaced and ended; the other
-	// organizations' stay stored for a switch back.
+	// Another user's stored sign-in for this organization is replaced, and normally ended
+	// (best effort); the other organizations' stay stored for a switch back.
 	if err := app.storeLogin(ctx, cfg, cred, orgName); err != nil {
 		return nil, err
 	}

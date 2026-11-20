@@ -4,12 +4,16 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"slices"
 	"strings"
+	"sync"
 	"sync/atomic"
+	"syscall"
 	"testing"
 	"time"
 
@@ -46,6 +50,16 @@ func newSplitTestClient(t *testing.T, apiURL, authURL string, cred *auth.Credent
 		t.Fatalf("New: %v", err)
 	}
 	return client
+}
+
+// testUnit is the pause unit of a client with quick retries: its attempts start about 0,
+// 1, 3, 7 and 15 units after the first.
+const testUnit = 100 * time.Millisecond
+
+// quickRetries shortens client's pauses to testUnit and its budget to units of it.
+func quickRetries(client *Client, units int) {
+	client.pauseUnit = testUnit
+	client.exchangeBudget = time.Duration(units) * testUnit
 }
 
 func liveCredential() *auth.Credential {
@@ -521,39 +535,87 @@ func TestClient_TakesAPairAnotherProcessRotated(t *testing.T) {
 	}
 }
 
-// A session the store no longer holds (one a sign-in replaced, being revoked) still
-// refreshes, but its pair never overwrites the stored one.
-func TestClient_RefreshOfASupersededSessionStoresNothing(t *testing.T) {
+// A session the store no longer holds, because the developer signed in again, is never
+// refreshed: its token is not sent, whether or not the server would take it, and the new
+// sign-in stays as it is.
+func TestClient_ASupersededSessionSendsNothing(t *testing.T) {
 	t.Parallel()
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == tokenPath {
-			_ = json.NewEncoder(w).Encode(map[string]any{
-				"access_token": "mir_cli_old_rotated", "refresh_token": "mir_clr_old_rotated", "expires_in": 3600,
-				"session_id": "session-old", "organization": map[string]string{"id": "org-test"},
-			})
-			return
-		}
-		w.Write([]byte(`{}`))
-	}))
-	defer srv.Close()
-	old := &auth.Credential{AccessToken: "mir_cli_old", RefreshToken: "mir_clr_old", SessionID: "session-old",
-		ExpiresAt: time.Now().Add(-time.Hour)}
-	client := newTestClient(t, srv.URL, old, "")
+	for _, tc := range []struct {
+		name   string
+		answer func(http.ResponseWriter)
+		marked bool
+	}{
+		{"server would rotate it", func(w http.ResponseWriter) { rotatedPair(w) }, false},
+		{"server would refuse it", func(w http.ResponseWriter) { gatewayError(w, http.StatusUnauthorized, "UNAUTHENTICATED") }, false},
+		{"its mark is past the budget", func(w http.ResponseWriter) { rotatedPair(w) }, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			log, srv := newTokenLog(t, tc.answer)
+			client := newTestClient(t, srv.URL, expired(), "")
+			old := storedFor(t, client)
+			if tc.marked {
+				old.RefreshUnsettledAt, old.RefreshUnsettledFor = time.Now().Round(0).Add(-2*RefreshBudget), TokenSHA256(old.RefreshToken)
+			}
+			signedIn := &auth.Credential{AccessToken: "mir_cli_new", RefreshToken: "mir_clr_new", SessionID: "session-new",
+				ExpiresAt: time.Now().Add(time.Hour), OrganizationID: "org-test", AuthURL: srv.URL}
+			if _, err := auth.SaveCredential(client.dir, config.DefaultProfile, signedIn); err != nil {
+				t.Fatal(err)
+			}
+			replaced, err := New(&config.Config{Dir: client.dir, ProfileName: config.DefaultProfile, APIURL: srv.URL, AuthURL: srv.URL},
+				Options{Version: "test", Credential: old})
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if err := replaced.Get(context.Background(), "/v1/identity", nil, &struct{}{}); !errors.Is(err, errSessionExpired) {
+				t.Fatalf("Get = %v, want the session expired", err)
+			}
+			if err := replaced.RevokeSession(context.Background()); !errors.Is(err, errSessionExpired) {
+				t.Fatalf("RevokeSession = %v, want the session expired", err)
+			}
+			if got := log.tokens(); len(got) != 0 {
+				t.Errorf("requests = %q, want none", got)
+			}
+			if got := replaced.Credential().RefreshToken; got != "mir_clr_stale" {
+				t.Errorf("client refresh token = %q, want its own, unrotated", got)
+			}
+			if stored := storedFor(t, client); stored.RefreshToken != "mir_clr_new" || !stored.RefreshUnsettledAt.IsZero() {
+				t.Errorf("stored %q marked %v; want the new sign-in untouched", stored.RefreshToken, stored.RefreshUnsettledAt)
+			}
+		})
+	}
+}
+
+// A superseded session is reported expired only when a refresh was due. A refusal of an
+// access token other than its own, while its own has not expired, asks for no refresh:
+// the client keeps its pair and is not told it was signed out.
+func TestClient_ASupersededSessionWithNothingDueIsLeftAlone(t *testing.T) {
+	t.Parallel()
+	log, srv := newTokenLog(t, func(w http.ResponseWriter) { rotatedPair(w) })
+	live := &auth.Credential{AccessToken: "mir_cli_live", RefreshToken: "mir_clr_live", SessionID: "session-1",
+		ExpiresAt: time.Now().Add(time.Hour)}
+	client := newTestClient(t, srv.URL, live, "")
 	signedIn := &auth.Credential{AccessToken: "mir_cli_new", RefreshToken: "mir_clr_new", SessionID: "session-new",
 		ExpiresAt: time.Now().Add(time.Hour), OrganizationID: "org-test", AuthURL: srv.URL}
 	if _, err := auth.SaveCredential(client.dir, config.DefaultProfile, signedIn); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := client.Get(context.Background(), "/v1/identity", nil, &struct{}{}); err != nil {
-		t.Fatalf("Get: %v", err)
+	if err := client.RefreshRefused(context.Background(), TokenSHA256("mir_cli_before")); err != nil {
+		t.Fatalf("RefreshRefused of another token = %v, want nil", err)
 	}
-	if got := client.Credential().AccessToken; got != "mir_cli_old_rotated" {
-		t.Errorf("client token = %q, want its own session rotated", got)
+	if err := client.RefreshRefused(context.Background(), TokenSHA256("mir_cli_live")); !errors.Is(err, errSessionExpired) {
+		t.Fatalf("RefreshRefused of its own token = %v, want the session expired", err)
 	}
-	stored, err := auth.LoadCredential(client.dir, config.DefaultProfile)
-	if err != nil || stored.RefreshToken != "mir_clr_new" {
-		t.Fatalf("stored = %+v, %v; want the new sign-in untouched", stored, err)
+	if got := log.tokens(); len(got) != 0 {
+		t.Errorf("refresh tokens sent = %q, want none", got)
+	}
+	if got := client.Credential().AccessToken; got != "mir_cli_live" {
+		t.Errorf("client access token = %q, want its own", got)
+	}
+	if stored := storedFor(t, client); stored.RefreshToken != "mir_clr_new" {
+		t.Errorf("stored %q; want the new sign-in untouched", stored.RefreshToken)
 	}
 }
 
@@ -593,11 +655,13 @@ func TestClient_DecidesFromTheStoredPair(t *testing.T) {
 }
 
 // A token endpoint that never answers holds the credential lock no longer than the
-// request timeout: the refresh fails, and the next writer takes the lock at once.
+// exchange's budget: the refresh fails, and the next writer takes the lock at once.
 func TestClient_RefreshOfAHungEndpointLetsTheLockGo(t *testing.T) {
 	t.Parallel()
 	hung := make(chan struct{})
+	var attempts atomic.Int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attempts.Add(1)
 		select {
 		case <-hung:
 		case <-r.Context().Done():
@@ -610,13 +674,17 @@ func TestClient_RefreshOfAHungEndpointLetsTheLockGo(t *testing.T) {
 	client := newTestClient(t, srv.URL, expired, "project-123")
 	const timeout = 300 * time.Millisecond
 	client.http.Timeout = timeout
+	quickRetries(client, 20)
 
 	start := time.Now()
 	if err := client.Refresh(context.Background()); err == nil {
 		t.Fatal("Refresh against a hung token endpoint succeeded")
 	}
-	if elapsed := time.Since(start); elapsed > timeout+2*time.Second {
-		t.Fatalf("Refresh took %v against a hung token endpoint; want about its %v request timeout", elapsed, timeout)
+	if elapsed := time.Since(start); elapsed > client.exchangeBudget+time.Second {
+		t.Fatalf("Refresh took %v against a hung token endpoint; want about its %v budget", elapsed, client.exchangeBudget)
+	}
+	if got := attempts.Load(); got < 2 {
+		t.Errorf("%d attempts against a hung token endpoint; want it sent again", got)
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
@@ -778,5 +846,517 @@ func TestClient_RefreshRefusesAnIndexedCredentialWithoutTokens(t *testing.T) {
 	}
 	if got := client.Credential().RefreshToken; got != "mir_clr_stale" {
 		t.Errorf("client refresh token = %q, want its pair untouched", got)
+	}
+}
+
+// rotatedPair is a token endpoint's answer to a refresh of session-1.
+func rotatedPair(w http.ResponseWriter) {
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"access_token": "mir_cli_rotated", "refresh_token": "mir_clr_rotated", "expires_in": 3600,
+		"session_id": "session-1", "organization": map[string]string{"id": "org-test"},
+	})
+}
+
+// wantRotatedPair fails t unless both the client and the store hold the rotated pair.
+func wantRotatedPair(t *testing.T, client *Client) {
+	t.Helper()
+	if got := client.Credential().RefreshToken; got != "mir_clr_rotated" {
+		t.Errorf("client refresh token = %q, want the rotated one", got)
+	}
+	stored, err := auth.LoadCredentialFor(client.dir, config.DefaultProfile, "org-test")
+	if err != nil {
+		t.Fatalf("LoadCredentialFor: %v", err)
+	}
+	if stored.RefreshToken != "mir_clr_rotated" {
+		t.Errorf("stored refresh token = %q, want the rotated one", stored.RefreshToken)
+	}
+}
+
+// A caller that gives up while its refresh is on the wire does not lose the rotation: the
+// server has spent the old token, so the new pair is saved and held all the same.
+func TestClient_RefreshOutlivesTheCallersContext(t *testing.T) {
+	t.Parallel()
+	arrived, answer := make(chan struct{}), make(chan struct{})
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		close(arrived)
+		<-answer
+		rotatedPair(w)
+	}))
+	defer srv.Close()
+	expired := &auth.Credential{AccessToken: "mir_cli_stale", RefreshToken: "mir_clr_stale", SessionID: "session-1",
+		ExpiresAt: time.Now().Add(-time.Hour)}
+	client := newTestClient(t, srv.URL, expired, "")
+
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() { done <- client.Refresh(ctx) }()
+	<-arrived
+	cancel()
+	// Long enough for a request that followed ctx to have given up.
+	time.Sleep(100 * time.Millisecond)
+	close(answer)
+	if err := <-done; err != nil {
+		t.Fatalf("Refresh: %v", err)
+	}
+	wantRotatedPair(t, client)
+}
+
+// A refresh whose answer never arrives, or arrives as a server error other than the auth
+// gateway's 503 UNAVAILABLE, may still have rotated the pair: a bare 503 can come from the
+// load balancer in front of the gateway after the rotation committed. It is sent again
+// with the same refresh token, which the server forgives that soon after spending it, and
+// the answer to the retry is saved.
+func TestClient_RetriesARefreshWithAnUnknownOutcome(t *testing.T) {
+	t.Parallel()
+	for name, fail := range map[string]func(t *testing.T, w http.ResponseWriter){
+		"dropped connection": func(t *testing.T, w http.ResponseWriter) {
+			conn, _, err := http.NewResponseController(w).Hijack()
+			if err != nil {
+				t.Errorf("hijack: %v", err)
+				return
+			}
+			_ = conn.Close()
+		},
+		"500":      func(_ *testing.T, w http.ResponseWriter) { gatewayError(w, http.StatusInternalServerError, "INTERNAL") },
+		"502":      func(_ *testing.T, w http.ResponseWriter) { w.WriteHeader(http.StatusBadGateway) },
+		"504":      func(_ *testing.T, w http.ResponseWriter) { w.WriteHeader(http.StatusGatewayTimeout) },
+		"bare 503": func(_ *testing.T, w http.ResponseWriter) { w.WriteHeader(http.StatusServiceUnavailable) },
+		"503 INTERNAL": func(_ *testing.T, w http.ResponseWriter) {
+			gatewayError(w, http.StatusServiceUnavailable, "INTERNAL")
+		},
+		"truncated 200": func(t *testing.T, w http.ResponseWriter) {
+			conn, buf, err := http.NewResponseController(w).Hijack()
+			if err != nil {
+				t.Errorf("hijack: %v", err)
+				return
+			}
+			_, _ = buf.WriteString("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 500\r\n\r\n{\"access_tok")
+			_ = buf.Flush()
+			_ = conn.Close()
+		},
+		"200 without a pair": func(_ *testing.T, w http.ResponseWriter) { _, _ = w.Write([]byte(`{}`)) },
+		"200 without a refresh token": func(_ *testing.T, w http.ResponseWriter) {
+			_, _ = w.Write([]byte(`{"access_token":"mir_cli_half","expires_in":3600}`))
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			var mu sync.Mutex
+			var sent []string
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				var req tokenRequest
+				_ = json.NewDecoder(r.Body).Decode(&req)
+				mu.Lock()
+				sent = append(sent, req.RefreshToken)
+				first := len(sent) == 1
+				mu.Unlock()
+				// The server has rotated the pair either way; only the first answer is lost.
+				if first {
+					fail(t, w)
+					return
+				}
+				rotatedPair(w)
+			}))
+			defer srv.Close()
+			expired := &auth.Credential{AccessToken: "mir_cli_stale", RefreshToken: "mir_clr_stale", SessionID: "session-1",
+				ExpiresAt: time.Now().Add(-time.Hour)}
+			client := newTestClient(t, srv.URL, expired, "")
+			quickRetries(client, 40)
+
+			if err := client.Refresh(context.Background()); err != nil {
+				t.Fatalf("Refresh: %v", err)
+			}
+			mu.Lock()
+			defer mu.Unlock()
+			if want := []string{"mir_clr_stale", "mir_clr_stale"}; !slices.Equal(sent, want) {
+				t.Errorf("refresh tokens sent = %q, want %q: the same token again", sent, want)
+			}
+			wantRotatedPair(t, client)
+		})
+	}
+}
+
+// gatewayError answers as the auth gateway does when it refuses a request.
+func gatewayError(w http.ResponseWriter, status int, code string) {
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(map[string]any{"error": map[string]string{"code": code, "message": "refused"}})
+}
+
+// A refresh the server refuses outright is final: it is not sent again, and a refused
+// session is removed from the store, so no terma process sends its token again. Only the
+// auth gateway's own 401 removes it: a 401 from some other hop, a 403 or a 400 leaves the
+// credential stored.
+func TestClient_ARefusedRefreshIsFinal(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name        string
+		status      int
+		code        string
+		wantRemoved bool
+	}{
+		{"gateway 401", http.StatusUnauthorized, "UNAUTHENTICATED", true},
+		{"bare 401", http.StatusUnauthorized, "", false},
+		{"403", http.StatusForbidden, "PERMISSION_DENIED", false},
+		{"400", http.StatusBadRequest, "INVALID_ARGUMENT", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			var redemptions atomic.Int32
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				redemptions.Add(1)
+				if tc.code == "" {
+					w.WriteHeader(tc.status)
+					return
+				}
+				gatewayError(w, tc.status, tc.code)
+			}))
+			defer srv.Close()
+			expired := &auth.Credential{AccessToken: "mir_cli_stale", RefreshToken: "mir_clr_stale", SessionID: "session-1",
+				ExpiresAt: time.Now().Add(-time.Hour)}
+			client := newTestClient(t, srv.URL, expired, "")
+
+			err := client.Refresh(context.Background())
+			if err == nil {
+				t.Fatal("a refused Refresh succeeded")
+			}
+			if n := redemptions.Load(); n != 1 {
+				t.Fatalf("%d redemptions; want 1, never retried", n)
+			}
+			_, loadErr := auth.LoadCredentialFor(client.dir, config.DefaultProfile, "org-test")
+			if !tc.wantRemoved {
+				if loadErr != nil {
+					t.Fatalf("stored credential: %v; want it kept", loadErr)
+				}
+				if tc.status != http.StatusUnauthorized {
+					return
+				}
+				// A 401 from some other hop is no sign-out and no refusal of the token: it
+				// spent nothing, so its mark is cleared, and the next refresh sends it again.
+				if errors.Is(err, auth.ErrNotLoggedIn) || Refused(err) || errors.As(err, new(*Error)) {
+					t.Errorf("Refresh = %v, want a failure that is no sign-out", err)
+				}
+				if stored, _ := auth.LoadCredentialFor(client.dir, config.DefaultProfile, "org-test"); stored.RefreshToken != "mir_clr_stale" ||
+					!stored.UnsettledSince().IsZero() {
+					t.Errorf("stored = %q, mark %v; want it kept unmarked", stored.RefreshToken, stored.UnsettledSince())
+				}
+				_ = client.Refresh(context.Background())
+				if n := redemptions.Load(); n != 2 {
+					t.Errorf("%d redemptions after a second Refresh; want 2", n)
+				}
+				return
+			}
+			if !errors.Is(err, auth.ErrNotLoggedIn) || !strings.Contains(err.Error(), "session expired, run `terma setup`") {
+				t.Errorf("Refresh = %v, want the session expired", err)
+			}
+			if !errors.Is(loadErr, auth.ErrNotLoggedIn) {
+				t.Errorf("LoadCredentialFor = %v, want the refused credential gone", loadErr)
+			}
+			if err := client.Refresh(context.Background()); !errors.Is(err, auth.ErrNotLoggedIn) {
+				t.Errorf("second Refresh = %v, want the session expired", err)
+			}
+			if n := redemptions.Load(); n != 1 {
+				t.Errorf("%d redemptions after a second Refresh; want the refused token never sent again", n)
+			}
+		})
+	}
+}
+
+// bare401 and bare503 stand for a 401 and a 503 without the auth gateway's envelope,
+// from some other hop.
+const (
+	bare401 = -http.StatusUnauthorized
+	bare503 = -http.StatusServiceUnavailable
+)
+
+// A refusal right after an unknown outcome may be the server's answer to a refresh that
+// lost a race to the attempt before, which rotated the pair late. The token is sent once
+// more, and the server forgives it as the one that rotation spent. Only the gateway's
+// refusal twice in a row settles it: anything else is sent again, and an exchange that
+// runs out unsettled is no sign-out.
+func TestClient_ARefusalAfterAnUnknownOutcomeIsSentAgain(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name     string
+		answers  []int
+		wantErr  bool
+		wantKept bool
+	}{
+		{"lost race", []int{http.StatusBadGateway, http.StatusUnauthorized, http.StatusOK}, false, true},
+		{"refused twice", []int{http.StatusBadGateway, http.StatusUnauthorized, http.StatusUnauthorized}, true, false},
+		{"refused last", []int{http.StatusBadGateway, http.StatusBadGateway, http.StatusUnauthorized}, true, true},
+		{"bare 401 between", []int{http.StatusBadGateway, bare401, http.StatusUnauthorized}, true, true},
+		{"bare 401s", []int{http.StatusBadGateway, bare401, bare401}, true, true},
+		{"bare 401, then answered", []int{http.StatusBadGateway, bare401, http.StatusOK}, false, true},
+		{"too many after", []int{http.StatusBadGateway, http.StatusTooManyRequests, http.StatusTooManyRequests}, true, true},
+		{"too many, then answered", []int{http.StatusBadGateway, http.StatusTooManyRequests, http.StatusOK}, false, true},
+		{"forbidden after", []int{http.StatusBadGateway, http.StatusForbidden, http.StatusOK}, false, true},
+		{"forbidden twice after", []int{http.StatusBadGateway, http.StatusForbidden, http.StatusForbidden}, true, true},
+		{"unavailable after", []int{http.StatusBadGateway, http.StatusServiceUnavailable, http.StatusServiceUnavailable}, true, true},
+		{"bare 503 after", []int{http.StatusBadGateway, bare503, bare503}, true, true},
+		{"bare 503 throughout", []int{bare503, bare503, bare503}, true, true},
+		{"unavailable, then answered", []int{http.StatusBadGateway, http.StatusServiceUnavailable, http.StatusOK}, false, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			var mu sync.Mutex
+			var sent []string
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				var req tokenRequest
+				_ = json.NewDecoder(r.Body).Decode(&req)
+				mu.Lock()
+				sent = append(sent, req.RefreshToken)
+				// Past the answers listed, the server keeps failing until the budget is spent.
+				status := http.StatusBadGateway
+				if len(sent) <= len(tc.answers) {
+					status = tc.answers[len(sent)-1]
+				}
+				mu.Unlock()
+				switch status {
+				case http.StatusOK:
+					rotatedPair(w)
+				case http.StatusUnauthorized:
+					gatewayError(w, status, "UNAUTHENTICATED")
+				case bare401:
+					w.WriteHeader(http.StatusUnauthorized)
+				case http.StatusServiceUnavailable:
+					gatewayError(w, status, "UNAVAILABLE")
+				case bare503:
+					w.WriteHeader(http.StatusServiceUnavailable)
+				default:
+					w.WriteHeader(status)
+				}
+			}))
+			defer srv.Close()
+			expired := &auth.Credential{AccessToken: "mir_cli_stale", RefreshToken: "mir_clr_stale", SessionID: "session-1",
+				ExpiresAt: time.Now().Add(-time.Hour)}
+			client := newTestClient(t, srv.URL, expired, "")
+			// Room for the three attempts listed (0, 1 and 3 units in), with plenty to spare.
+			quickRetries(client, 10)
+
+			err := client.Refresh(context.Background())
+			mu.Lock()
+			// A row that settles ends with its answers; one that does not runs on.
+			if settles := !tc.wantErr || !tc.wantKept; len(sent) < len(tc.answers) || settles && len(sent) != len(tc.answers) ||
+				slices.ContainsFunc(sent, func(token string) bool { return token != "mir_clr_stale" }) {
+				t.Errorf("refresh tokens sent = %q, want the same token at least %d times", sent, len(tc.answers))
+			}
+			mu.Unlock()
+			if !tc.wantErr {
+				if err != nil {
+					t.Fatalf("Refresh: %v", err)
+				}
+				wantRotatedPair(t, client)
+				return
+			}
+			if err == nil {
+				t.Fatal("Refresh succeeded")
+			}
+			// Only a final refusal is a sign-out; one that may be a lost race is not.
+			if got := errors.Is(err, auth.ErrNotLoggedIn); got == tc.wantKept {
+				t.Errorf("Refresh = %v; signed out %v, want %v", err, got, !tc.wantKept)
+			}
+			// Otherwise the outcome is still unknown.
+			if tc.wantKept && !errors.As(err, new(unsettledError)) {
+				t.Errorf("Refresh = %v, want an unknown outcome", err)
+			}
+			stored, loadErr := auth.LoadCredentialFor(client.dir, config.DefaultProfile, "org-test")
+			if kept := loadErr == nil; kept != tc.wantKept {
+				t.Errorf("stored credential: %v; kept %v, want %v", loadErr, kept, tc.wantKept)
+			}
+			// Run out unsettled, the token is never sent again.
+			if loadErr == nil && !stored.UnsettledSince().Equal(auth.UnsettledExpired) {
+				t.Errorf("stored mark = %v, want it expired", stored.UnsettledSince())
+			}
+		})
+	}
+}
+
+// An exchange that runs out unsettled is no sign-out, whatever its last answer: a refusal
+// loses ErrNotLoggedIn, and any other status stays reachable for the caller to report.
+func TestStillUnknownIsNoSignOut(t *testing.T) {
+	t.Parallel()
+	refusal := refusalError{fmt.Errorf("%w: refused", auth.ErrNotLoggedIn)}
+	bare := errors.New("the token endpoint answered 401 without the auth gateway's refusal: Unauthorized (status 401)")
+	for _, last := range []error{refusal, bare, &Error{StatusCode: http.StatusForbidden}, &Error{StatusCode: http.StatusTooManyRequests}} {
+		err := stillUnknown(last)
+		if !errors.As(err, new(unsettledError)) || errors.Is(err, auth.ErrNotLoggedIn) || errors.As(err, new(refusalError)) {
+			t.Errorf("stillUnknown(%v) = %v, want an unknown outcome that is no sign-out", last, err)
+		}
+		var want *Error
+		if errors.As(last, &want) {
+			if got := (*Error)(nil); !errors.As(err, &got) || got.StatusCode != want.StatusCode {
+				t.Errorf("stillUnknown(%v) = %v, want its status %d reachable", last, err, want.StatusCode)
+			}
+		}
+	}
+}
+
+// refusingDials is a transport whose dial n (from 1) fails, as a closed port's would,
+// while refuse(n) says so. It counts every dial.
+func refusingDials(refuse func(n int32) bool) (*http.Transport, *atomic.Int32) {
+	var dials atomic.Int32
+	var dialer net.Dialer
+	return &http.Transport{
+		DisableKeepAlives: true,
+		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+			if refuse(dials.Add(1)) {
+				return nil, &net.OpError{Op: "dial", Net: network, Err: syscall.ECONNREFUSED}
+			}
+			return dialer.DialContext(ctx, network, addr)
+		},
+	}, &dials
+}
+
+// A refresh the server cannot have spent is not sent again: a 429, which the gateway
+// turns away before the account service runs, the gateway's 503 UNAVAILABLE, which says
+// the account service could not be reached, or a request that never left the machine.
+// A bare 503 is not among them (TestClient_RetriesARefreshWithAnUnknownOutcome). Its
+// mark goes, nothing is removed, and the caller is not told it was signed out.
+func TestClient_ARefreshNothingSpentIsNotRetried(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name        string
+		refuseDials bool
+		answer      func(http.ResponseWriter)
+	}{
+		{"429", false, func(w http.ResponseWriter) { gatewayError(w, http.StatusTooManyRequests, "RESOURCE_EXHAUSTED") }},
+		{"connection refused", true, nil},
+		{"503 UNAVAILABLE", false, func(w http.ResponseWriter) { gatewayError(w, http.StatusServiceUnavailable, "UNAVAILABLE") }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			var requests atomic.Int32
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				requests.Add(1)
+				tc.answer(w)
+			}))
+			defer srv.Close()
+			expired := &auth.Credential{AccessToken: "mir_cli_stale", RefreshToken: "mir_clr_stale", SessionID: "session-1",
+				ExpiresAt: time.Now().Add(-time.Hour)}
+			client := newTestClient(t, srv.URL, expired, "")
+			transport, dials := refusingDials(func(int32) bool { return tc.refuseDials })
+			client.http.Transport = transport
+
+			start := time.Now()
+			err := client.Refresh(context.Background())
+			if err == nil || errors.Is(err, auth.ErrNotLoggedIn) || errors.As(err, new(unsettledError)) {
+				t.Fatalf("Refresh = %v, want a plain error", err)
+			}
+			if n := dials.Load(); n != 1 {
+				t.Errorf("%d attempts; want 1", n)
+			}
+			want := int32(1)
+			if tc.refuseDials {
+				want = 0
+			}
+			if got := requests.Load(); got != want {
+				t.Errorf("%d requests reached the server; want %d", got, want)
+			}
+			if elapsed := time.Since(start); elapsed >= client.pause(0) {
+				t.Errorf("Refresh took %v; want no pause before a retry", elapsed)
+			}
+			stored, err := auth.LoadCredentialFor(client.dir, config.DefaultProfile, "org-test")
+			switch {
+			case err != nil:
+				t.Errorf("stored credential: %v, want it kept", err)
+			case stored.RefreshToken != "mir_clr_stale" || !stored.RefreshUnsettledAt.IsZero():
+				t.Errorf("stored %q marked %v; want the same pair, unmarked", stored.RefreshToken, stored.RefreshUnsettledAt)
+			}
+			if mark := client.unsettledSince(&auth.Credential{RefreshToken: "mir_clr_stale"}); !mark.IsZero() {
+				t.Errorf("client mark = %v; want none", mark)
+			}
+		})
+	}
+}
+
+// An attempt that spent nothing does not end an exchange whose attempt before it may have
+// rotated the pair: only a later attempt, inside the grace, can still bring that pair home.
+func TestClient_ANetworkStillDownAfterALostAnswerIsRetried(t *testing.T) {
+	t.Parallel()
+	var mu sync.Mutex
+	var sent []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req tokenRequest
+		_ = json.NewDecoder(r.Body).Decode(&req)
+		mu.Lock()
+		sent = append(sent, req.RefreshToken)
+		first := len(sent) == 1
+		mu.Unlock()
+		if first {
+			// The server rotated the pair, and the connection dropped before its answer.
+			conn, _, err := http.NewResponseController(w).Hijack()
+			if err != nil {
+				t.Errorf("hijack: %v", err)
+				return
+			}
+			_ = conn.Close()
+			return
+		}
+		rotatedPair(w)
+	}))
+	defer srv.Close()
+	expired := &auth.Credential{AccessToken: "mir_cli_stale", RefreshToken: "mir_clr_stale", SessionID: "session-1",
+		ExpiresAt: time.Now().Add(-time.Hour)}
+	client := newTestClient(t, srv.URL, expired, "")
+	quickRetries(client, 40)
+	transport, dials := refusingDials(func(n int32) bool { return n == 2 })
+	client.http.Transport = transport
+
+	if err := client.Refresh(context.Background()); err != nil {
+		t.Fatalf("Refresh: %v", err)
+	}
+	if n := dials.Load(); n != 3 {
+		t.Errorf("%d attempts; want 3: dropped, refused, answered", n)
+	}
+	mu.Lock()
+	if want := []string{"mir_clr_stale", "mir_clr_stale"}; !slices.Equal(sent, want) {
+		t.Errorf("refresh tokens the server saw = %q, want %q", sent, want)
+	}
+	mu.Unlock()
+	wantRotatedPair(t, client)
+}
+
+// The server forgives a resent refresh token only within refreshRetryGrace (60 s in
+// mirador-platform's cli_session_refresh.go) of spending it, and the first attempt may be
+// the one that spent it. Every attempt must start inside the budget, and the budget must
+// stay well inside the grace.
+func TestClient_EveryRefreshAttemptStartsWithinTheBudget(t *testing.T) {
+	t.Parallel()
+	const grace = 60 * time.Second
+	if RefreshBudget > grace-15*time.Second {
+		t.Fatalf("RefreshBudget = %v; want at most %v, well inside the server's %v grace", RefreshBudget, grace-15*time.Second, grace)
+	}
+
+	var mu sync.Mutex
+	var starts []time.Time
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		starts = append(starts, time.Now())
+		mu.Unlock()
+		w.WriteHeader(http.StatusBadGateway)
+	}))
+	defer srv.Close()
+	expired := &auth.Credential{AccessToken: "mir_cli_stale", RefreshToken: "mir_clr_stale", SessionID: "session-1",
+		ExpiresAt: time.Now().Add(-time.Hour)}
+	client := newTestClient(t, srv.URL, expired, "")
+	// Attempts start about 0, 0.3 and 0.9 s in, a fourth would at 2.1 s: none near the budget.
+	client.pauseUnit, client.exchangeBudget = 300*time.Millisecond, 1500*time.Millisecond
+
+	begin := time.Now()
+	if err := client.Refresh(context.Background()); err == nil {
+		t.Fatal("Refresh against a failing token endpoint succeeded")
+	}
+	if elapsed := time.Since(begin); elapsed > client.exchangeBudget+time.Second {
+		t.Errorf("Refresh took %v; want it to end with its %v budget", elapsed, client.exchangeBudget)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if len(starts) == 0 {
+		t.Error("no attempt; want one at least")
+	}
+	for i, at := range starts {
+		if at.Sub(begin) > client.exchangeBudget {
+			t.Errorf("attempt %d started %v in, past the %v budget", i+1, at.Sub(begin), client.exchangeBudget)
+		}
 	}
 }

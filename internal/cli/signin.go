@@ -12,9 +12,7 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/account/api"
 	"github.com/miradorlabs/terma-cli/internal/account/auth"
-	"github.com/miradorlabs/terma-cli/internal/account/keystore"
 	"github.com/miradorlabs/terma-cli/internal/config"
-	"github.com/miradorlabs/terma-cli/internal/ui/output"
 )
 
 type orgRef struct {
@@ -173,7 +171,7 @@ func (app *App) signIn(cmd *cobra.Command, cfg *config.Config, opts signInOption
 }
 
 // storeLogin keeps a new sign-in and makes it the profile's. It replaces only its own
-// organization's stored sign-in, which is then ended; the other organizations' stay
+// organization's stored sign-in, normally ended (best effort); the other organizations' stay
 // stored. A sign-in that cannot be stored is ended too, so it does not linger on the web.
 func (app *App) storeLogin(ctx context.Context, cfg *config.Config, cred *auth.Credential, orgName string) error {
 	replaced, err := auth.SaveCredential(app.dir, cfg.ProfileName, cred)
@@ -181,7 +179,8 @@ func (app *App) storeLogin(ctx context.Context, cfg *config.Config, cred *auth.C
 		_ = app.revokeSession(ctx, cfg, cred)
 		return err
 	}
-	// Best-effort: the superseded session may already be dead, often why the user is here.
+	// Best-effort and silent: the superseded session may already be dead. One whose access token
+	// has (nearly) expired isn't revoked: its refresh token is never sent again, so it idles out.
 	if replaced != nil {
 		_ = app.revokeSession(ctx, cfg, replaced)
 	}
@@ -214,13 +213,26 @@ func (app *App) reuseStoredSessionIf(ctx context.Context, cfg *config.Config, wa
 	if err != nil || cred.CheckEnvironment(cfg.AuthURL) != nil || cred.RefreshToken == "" {
 		return nil, false, nil
 	}
-
-	verified, identity, err := app.verifyCredential(ctx, cfg, cred)
-	if errors.Is(err, auth.ErrNotLoggedIn) {
-		_ = auth.DeleteCredentialFor(app.dir, cfg.ProfileName, cred.OrganizationID)
+	// A refresh of it went unanswered too long ago to send its token again: whoami may
+	// still take its access token, but it could never be refreshed. A new sign-in replaces it.
+	if api.RefreshLost(cred) {
 		return nil, false, nil
 	}
-	if err != nil {
+
+	verified, identity, err := app.verifyCredential(ctx, cfg, cred)
+	switch {
+	case api.Refused(err):
+		// Removed only while the store still holds the refused pair: one another process
+		// has rotated in since, or a new sign-in, stays.
+		_ = auth.Locked(ctx, app.dir, func(tx *auth.Tx) error {
+			return tx.DeleteFor(cfg.ProfileName, cred.OrganizationID, cred.RefreshToken)
+		})
+		return nil, false, nil
+	case errors.Is(err, auth.ErrNotLoggedIn):
+		// Not the gateway's refusal (a lost refresh, a sign-in replaced since): its token may
+		// be alive, so it is kept for the fresh sign-in to replace. A proxy's 401 fails below.
+		return nil, false, nil
+	case err != nil:
 		return nil, false, err
 	}
 	if accept != nil && !accept(verified, identity) {
@@ -232,7 +244,12 @@ func (app *App) reuseStoredSessionIf(ctx context.Context, cfg *config.Config, wa
 	// Saved as a sign-in would, so running setup again moves the tokens to where they now
 	// belong; but keeping whatever pair another process rotated in since it was read.
 	verified, err = auth.ResaveCredential(app.dir, cfg.ProfileName, verified)
-	if err != nil {
+	switch {
+	case errors.Is(err, auth.ErrNotLoggedIn):
+		// Removed since it was verified, as another process does on the gateway's refusal of
+		// its refresh token: not restored, and a fresh sign-in replaces it.
+		return nil, false, nil
+	case err != nil:
 		return nil, false, err
 	}
 	orgName := ""
@@ -390,47 +407,4 @@ type keyPermissions struct {
 	Read   bool `json:"read"`
 	Write  bool `json:"write"`
 	Ingest bool `json:"ingest"`
-}
-
-// reportCredentialStore says where signing in kept the credentials, as gh does.
-func reportCredentialStore(ui *setupUI, cfg *config.Config, insecure bool) {
-	file := output.TildePath(config.CredentialsPath(cfg.Dir))
-	switch {
-	case !auth.StoredInFile(cfg.Dir, cfg.ProfileName):
-		ui.Summary("Credentials", "in the system keychain")
-	case insecure:
-		ui.Summary("Credentials", "in plain text in "+file+" (--insecure-storage)")
-	default:
-		ui.Caution("Credentials", "in plain text in "+file+": no system keychain could be used")
-	}
-}
-
-// settleSecrets keeps every secret with the sign-in: a sign-in that fell back to the file
-// records that, so the relay's background writes go straight there rather than wait on a
-// keychain setup could not use, and every other credential and key moves to where
-// secrets now live.
-func (app *App) settleSecrets(ui *setupUI, cfg *config.Config, insecure bool) {
-	if !insecure && auth.StoredInFile(cfg.Dir, cfg.ProfileName) {
-		if err := config.UpdateFile(cfg.Dir, func(f *config.File) { f.InsecureStorage = true }); err != nil {
-			fmt.Fprintf(ui.Detail(), "  could not record the plain-text fallback: %v\n", err)
-		}
-	}
-	if err := auth.Relocate(cfg.Dir); err != nil {
-		fmt.Fprintf(ui.Detail(), "  could not move the other organizations' credentials: %v\n", err)
-	}
-	if err := keystore.Relocate(cfg.Dir); err != nil {
-		fmt.Fprintf(ui.Detail(), "  could not move the team keys: %v\n", err)
-	}
-}
-
-// signedInAs is who the sign-in left this profile as: the email and organization.
-func signedInAs(cfg *config.Config) string {
-	who := "signed in"
-	if cred, err := auth.LoadIdentity(cfg.Dir, cfg.ProfileName); err == nil && cred.UserEmail != "" {
-		who = cred.UserEmail
-	}
-	if org := cmp.Or(cfg.OrganizationName, cfg.OrganizationID); org != "" {
-		who += " (" + org + ")"
-	}
-	return who
 }
