@@ -270,6 +270,23 @@ func TestARefusedReuseLeavesTheProfileAlone(t *testing.T) {
 	}
 }
 
+// A reused grant records the organization it checked, listing them once: a second listing
+// could answer otherwise after the reuse recorded the sign-in.
+func TestAReusedGrantListsTheOrganizationsOnce(t *testing.T) {
+	gateway := grantSandbox(t)
+	storeSignIn(t, gateway, deskUser)
+	stdout, stderr, err := desktopSetup(t, identityLine(deskUser, personalOrg().ID), personalOrg().ID, personalTeam())
+	if err != nil {
+		t.Fatalf("setup: %v\n%s%s", err, stdout, stderr)
+	}
+	if n := gateway.orgLists.Load(); n != 1 {
+		t.Fatalf("listed the organizations %d times, want once", n)
+	}
+	if org, _, _ := selected(t); org != personalOrg().ID {
+		t.Fatalf("organization = %q, want the one checked", org)
+	}
+}
+
 // An id spelled in uppercase is the same user: Terma's ids are lowercase, so the desktop's
 // identity is read without regard to case and the stored sign-in is still reused.
 func TestDesktopGrantReadsIdsWithoutRegardToCase(t *testing.T) {
