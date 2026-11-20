@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-20T15:38:20.327053739Z",
+  "generated_at": "2026-11-20T19:23:57.807121456Z",
   "vendors": [
     {
       "id": "anthropic",
@@ -155,8 +155,8 @@
       "reasoning": true,
       "harnesses": [],
       "last_change": {
-        "at": "2026-11-18T21:12:25.46010765Z",
-        "changes": 1
+        "at": "2026-11-20T19:23:57.807121456Z",
+        "changes": 2
       },
       "probed": true
     },
@@ -176,8 +176,8 @@
       "reasoning": true,
       "harnesses": [],
       "last_change": {
-        "at": "2026-11-18T21:12:25.46010765Z",
-        "changes": 1
+        "at": "2026-11-20T19:23:57.807121456Z",
+        "changes": 2
       },
       "probed": false
     },
@@ -241,7 +241,10 @@
         "claude",
         "claude-desktop"
       ],
-      "last_change": null,
+      "last_change": {
+        "at": "2026-11-20T19:23:57.807121456Z",
+        "changes": 2
+      },
       "probed": true
     },
     {
@@ -285,8 +288,8 @@
         "claude"
       ],
       "last_change": {
-        "at": "2026-11-12T15:52:35.859355299Z",
-        "changes": 1
+        "at": "2026-11-20T19:23:57.807121456Z",
+        "changes": 2
       },
       "probed": true
     },
@@ -353,8 +356,8 @@
         "claude-desktop"
       ],
       "last_change": {
-        "at": "2026-11-18T21:12:25.46010765Z",
-        "changes": 1
+        "at": "2026-11-20T19:23:57.807121456Z",
+        "changes": 2
       },
       "probed": true
     },
@@ -437,8 +440,8 @@
       "reasoning": true,
       "harnesses": [],
       "last_change": {
-        "at": "2026-11-19T03:28:01.177600021Z",
-        "changes": 2
+        "at": "2026-11-20T19:23:57.807121456Z",
+        "changes": 1
       },
       "probed": false
     },
@@ -458,7 +461,7 @@
       "reasoning": true,
       "harnesses": [],
       "last_change": {
-        "at": "2026-11-11T17:23:42.167641842Z",
+        "at": "2026-11-20T19:23:57.807121456Z",
         "changes": 1
       },
       "probed": true
@@ -499,7 +502,10 @@
       "knowledge_cutoff": "2026-05",
       "reasoning": true,
       "harnesses": [],
-      "last_change": null,
+      "last_change": {
+        "at": "2026-11-20T19:23:57.807121456Z",
+        "changes": 1
+      },
       "probed": true
     },
     {
@@ -643,7 +649,10 @@
       "knowledge_cutoff": "2026-01",
       "reasoning": true,
       "harnesses": [],
-      "last_change": null,
+      "last_change": {
+        "at": "2026-11-20T19:23:57.807121456Z",
+        "changes": 1
+      },
       "probed": true
     },
     {
@@ -662,8 +671,8 @@
       "reasoning": true,
       "harnesses": [],
       "last_change": {
-        "at": "2026-11-19T03:28:01.177600021Z",
-        "changes": 2
+        "at": "2026-11-20T19:23:57.807121456Z",
+        "changes": 1
       },
       "probed": false
     },
@@ -683,7 +692,7 @@
       "reasoning": true,
       "harnesses": [],
       "last_change": {
-        "at": "2026-11-11T17:23:42.167641842Z",
+        "at": "2026-11-20T19:23:57.807121456Z",
         "changes": 1
       },
       "probed": true
@@ -703,7 +712,10 @@
       "knowledge_cutoff": "2026-01",
       "reasoning": true,
       "harnesses": [],
-      "last_change": null,
+      "last_change": {
+        "at": "2026-11-20T19:23:57.807121456Z",
+        "changes": 1
+      },
       "probed": true
     },
     {
@@ -802,7 +814,10 @@
       "knowledge_cutoff": "2026-01",
       "reasoning": true,
       "harnesses": [],
-      "last_change": null,
+      "last_change": {
+        "at": "2026-11-20T19:23:57.807121456Z",
+        "changes": 1
+      },
       "probed": true
     },
     {
@@ -1004,8 +1019,8 @@
       "reasoning": true,
       "harnesses": [],
       "last_change": {
-        "at": "2026-11-11T17:23:42.167641842Z",
-        "changes": 3
+        "at": "2026-11-20T19:23:57.807121456Z",
+        "changes": 1
       },
       "probed": true
     },
@@ -1025,8 +1040,8 @@
       "reasoning": true,
       "harnesses": [],
       "last_change": {
-        "at": "2026-11-11T17:23:42.167641842Z",
-        "changes": 3
+        "at": "2026-11-20T19:23:57.807121456Z",
+        "changes": 1
       },
       "probed": true
     },
@@ -1106,8 +1121,8 @@
       "reasoning": true,
       "harnesses": [],
       "last_change": {
-        "at": "2026-11-11T17:23:42.167641842Z",
-        "changes": 3
+        "at": "2026-11-20T19:23:57.807121456Z",
+        "changes": 1
       },
       "probed": true
     },
@@ -1148,8 +1163,8 @@
       "reasoning": true,
       "harnesses": [],
       "last_change": {
-        "at": "2026-11-11T17:23:42.167641842Z",
-        "changes": 3
+        "at": "2026-11-20T19:23:57.807121456Z",
+        "changes": 1
       },
       "probed": true
     },
@@ -1171,8 +1186,8 @@
         "copilot"
       ],
       "last_change": {
-        "at": "2026-11-11T17:23:42.167641842Z",
-        "changes": 3
+        "at": "2026-11-20T19:23:57.807121456Z",
+        "changes": 1
       },
       "probed": true
     },
