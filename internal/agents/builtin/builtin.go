@@ -26,7 +26,7 @@ func Agents(configDir string) *agents.Registry { return agentsOn(configDir, runt
 // agy runs a hook there with cmd, and its hooks are checked only with the POSIX command.
 func agentsOn(configDir, goos string) *agents.Registry {
 	claudeCode, codexCLI := claude.Agent{ConfigDir: configDir}, codex.Agent{ConfigDir: configDir}
-	githubCopilot, agy := copilot.Agent{ConfigDir: configDir}, antigravity.Agent{}
+	githubCopilot, agy := copilot.Agent{ConfigDir: configDir}, antigravity.Agent{ConfigDir: configDir}
 	supported := []agents.Agent{claudeCode, codexCLI, githubCopilot}
 	if goos != "windows" {
 		supported = append(supported, agy)

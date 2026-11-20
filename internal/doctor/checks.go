@@ -104,6 +104,9 @@ func StatusLineCheck(v StatusLineVerdict) Check {
 	case StatusLineBehind:
 		return Check{Status: Pass, Detail: "capturing plan usage; " + output.SanitizeTerminal(v.Renderer) + " runs behind it"}
 	case StatusLineDefault:
+		if v.Stacked {
+			return Check{Status: Pass, Detail: "capturing plan usage; the agent's own line is unchanged"}
+		}
 		return Check{Status: Pass, Detail: "capturing plan usage (terma's default line)"}
 	case StatusLineReplaced:
 		return Check{Status: Warn, Detail: "replaced by your own status line since terma wrapped it; plan usage is not captured", Fix: "terma setup"}

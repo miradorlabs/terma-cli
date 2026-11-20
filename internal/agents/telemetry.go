@@ -89,6 +89,8 @@ type StatusLineState struct {
 	Installed  bool
 	// Renderer is the previous command terma passes through ("" when none).
 	Renderer string
+	// Stacked means terma's command draws nothing and the agent's built-in line stays.
+	Stacked bool
 	// Replaced means terma wrapped this file once and the developer has since replaced it.
 	Replaced bool
 	// Overrides lists settings files that outrank this one with a status line of their own.
