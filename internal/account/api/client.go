@@ -295,20 +295,29 @@ func (c *Client) retired() bool {
 	return c.credential != nil && !c.credential.RetiredAt.IsZero()
 }
 
+// MarkRetired is markRetired, for a refusal another sender read: an ingest's.
+func (c *Client) MarkRetired() { c.markRetired() }
+
 // markRetired records, on the pair this client holds and on the stored sign-in while it is
 // still that one, that a server refused it as retired.
 func (c *Client) markRetired() {
+	cred := c.retireHeld()
+	if c.profile != "" && cred != nil && cred.RefreshToken != "" {
+		_ = auth.MarkRetired(c.dir, c.profile, cred.RefreshToken)
+	}
+}
+
+// retireHeld marks the pair this client holds retired, and returns it as it was.
+func (c *Client) retireHeld() *auth.Credential {
 	c.mu.Lock()
+	defer c.mu.Unlock()
 	cred := c.credential
 	if cred != nil && cred.RetiredAt.IsZero() {
 		marked := *cred
 		marked.RetiredAt = time.Now().UTC()
 		c.credential = &marked
 	}
-	c.mu.Unlock()
-	if c.profile != "" && cred != nil && cred.RefreshToken != "" {
-		_ = auth.MarkRetired(c.dir, c.profile, cred.RefreshToken)
-	}
+	return cred
 }
 
 func (c *Client) attempt(ctx context.Context, h host, method, path string, query url.Values, headers http.Header, body any) (*http.Response, error) {

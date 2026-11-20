@@ -405,7 +405,9 @@ func watch(ctx context.Context, r *relay.Relay, stateDir string, idle time.Durat
 			if time.Since(upgraded) >= updatePauseWait {
 				quiet = 0
 			}
-			if r.Quiesce(quiet) {
+			// The hold is waited for no longer than a replaced relay waits for it: parts that
+			// wait for a policy the update itself may fix must not keep it from taking over.
+			if r.Quiesce(quiet) || time.Since(upgraded) >= replacedMaxWait && r.QuiesceDroppingHold(quiet) {
 				if installed.Replaced {
 					return stopUpdatedByAnother, installed.Installed, nil
 				}

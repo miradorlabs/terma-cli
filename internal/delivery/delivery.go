@@ -239,7 +239,7 @@ func (r Router) refused(ctx context.Context, serverKey bool, token string, err e
 	case ingest.Status == http.StatusUnauthorized:
 		r.SignIn.Refused(ctx, token)
 	case ingest.Retired():
-		r.SignIn.Retired()
+		r.SignIn.Retired(token)
 	}
 }
 
@@ -266,10 +266,12 @@ func (r Router) consented(e spool.Event, global bool) bool {
 	return r.Consent != nil && r.Consent(tool, hookrun.ConsentFor(r.ConfigDir, global))
 }
 
-// Endpoint is a project's ingest host: a pinned one, else the one its key was stored with,
-// since only its environment accepts the key, then the profile's.
+// Endpoint is a project's ingest host: a pinned one, else, under a server key, the one the
+// key was stored with, since only its environment accepts the key, then the profile's. A
+// person's token goes only to the profile's own host: keys.json is shared by the profiles,
+// and a host another profile stored for the team is none of this sign-in's.
 func (r Router) Endpoint(cfg *config.Config, projectID string) string {
-	if r.OTLPPinned {
+	if r.OTLPPinned || !cfg.ServerKeySignIn {
 		return cfg.OTLPURL
 	}
 	if h, ok := keystore.HostsFor(r.ConfigDir, projectID); ok && h.OTLP != "" {

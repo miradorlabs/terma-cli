@@ -60,6 +60,13 @@ func TestEachProjectGoesToItsKeysOwnEnvironment(t *testing.T) {
 	if pinned.Endpoint(cfg, "keyed") != cfg.OTLPURL {
 		t.Fatal("a pinned host was not used for every project")
 	}
+	// A person's token goes only to the profile's own host, never one keys.json filed for the
+	// team under another profile's server key.
+	person := *cfg
+	person.ServerKeySignIn = false
+	if got := r.Endpoint(&person, "keyed"); got != person.OTLPURL {
+		t.Fatalf("a sign-in's endpoint = %s, want the profile's %s", got, person.OTLPURL)
+	}
 }
 
 // A reply or a thread's name leaves only when its agent consents; with no one to ask, or

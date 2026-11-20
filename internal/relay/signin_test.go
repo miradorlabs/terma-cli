@@ -55,7 +55,7 @@ func (s *testSignIn) Refused(_ context.Context, token string) {
 	s.mu.Unlock()
 }
 
-func (s *testSignIn) Retired() {
+func (s *testSignIn) Retired(string) {
 	s.mu.Lock()
 	s.retired = true
 	s.mu.Unlock()

@@ -190,12 +190,12 @@ func TestSpoolFlushDeliversUnderTheProjectKey(t *testing.T) {
 
 // describeFlush gives one clause per reason, in a fixed order, and none for a quiet pass.
 func TestDescribeFlushNamesEveryReasonOnce(t *testing.T) {
-	delivered, undelivered := describeFlush(delivery.Result{Sent: 1})
+	delivered, undelivered := describeFlush(delivery.Result{Sent: 1}, "terma setup")
 	if delivered != "1 event" || len(undelivered) != 0 {
 		t.Fatalf("a clean pass = %q, %q", delivered, undelivered)
 	}
 
-	delivered, undelivered = describeFlush(delivery.Result{Sent: 2, Held: 3, Expired: 4, Pruned: 5, Unroutable: 6, Dropped: 7})
+	delivered, undelivered = describeFlush(delivery.Result{Sent: 2, Held: 3, Expired: 4, Pruned: 5, Unroutable: 6, Dropped: 7}, "terma setup")
 	if delivered != "2 events" {
 		t.Errorf("delivered = %q", delivered)
 	}

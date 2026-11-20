@@ -210,3 +210,30 @@ func TestForgetLegacy_FileHeldSignInsNeedNoKeychain(t *testing.T) {
 		t.Fatal("credentials.json outlived the retirement")
 	}
 }
+
+// While an older terma's sign-ins are on the machine with no record of them (set up with a
+// server key first, which records nothing), what was bound to no account up to their file's
+// last write is named by no one, so no server key sends it; a record, once kept, decides.
+func TestLegacyOwnership_WithoutARecord(t *testing.T) {
+	t.Parallel()
+	dir, stateDir := t.TempDir(), t.TempDir()
+	if rec, err := LegacyOwnership(dir, stateDir); err != nil || rec.Account != "" || !rec.RetiredAt.IsZero() {
+		t.Fatalf("no older sign-ins: %+v, %v; want no record", rec, err)
+	}
+	if err := os.WriteFile(config.LegacyCredentialsPath(dir), []byte(`{}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	written := time.Now().Add(-time.Hour)
+	if err := os.Chtimes(config.LegacyCredentialsPath(dir), written, written); err != nil {
+		t.Fatal(err)
+	}
+	if rec, err := LegacyOwnership(dir, stateDir); err != nil || rec.Account != LegacyAccountAmbiguous || rec.RetiredAt.Sub(written).Abs() > time.Second {
+		t.Fatalf("older sign-ins, no record: %+v, %v; want them named by no one up to %v", rec, err, written)
+	}
+	if err := RecordLegacy(stateDir, []LegacySignIn{{SessionID: "s", UserID: "u", AuthURL: "https://auth.example.test"}}, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if rec, err := LegacyOwnership(dir, stateDir); err != nil || rec.Account != AccountKey("https://auth.example.test", "u") {
+		t.Fatalf("with a record: %+v, %v", rec, err)
+	}
+}

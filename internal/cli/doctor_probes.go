@@ -50,7 +50,7 @@ func (app *App) doctorProbes(cfg *config.Config) doctor.Probes {
 				return doctor.Delivery{}, err
 			}
 			d := doctor.Delivery{Sent: res.Sent, Err: res.Err, Endpoints: res.Endpoints}
-			d.Delivered, d.Undelivered = describeFlush(res)
+			d.Delivered, d.Undelivered = describeFlush(res, app.signInFix(cfg))
 			for _, f := range res.Failures {
 				ingest, refused := errors.AsType[*delivery.IngestError](f.Err)
 				d.Failures = append(d.Failures, doctor.Failure{ProjectID: f.ProjectID, Endpoint: f.Endpoint, Err: f.Err,
@@ -78,7 +78,8 @@ func (app *App) doctorProbes(cfg *config.Config) doctor.Probes {
 				OtherEnvironment: cred.CheckEnvironment(cfg.AuthURL) != nil, InFile: auth.StoredInFile(app.dir, cfg.ProfileName),
 				ViaDesktop: cred.ViaDesktop(), Retired: !cred.RetiredAt.IsZero()}, nil
 		},
-		Keys: app.deliveryCredential(cfg),
+		Keys:      app.deliveryCredential(cfg),
+		SignInFix: app.signInFix(cfg),
 	}
 }
 
@@ -90,11 +91,21 @@ func (app *App) deliveryCredential(cfg *config.Config) doctor.Keys {
 		return app.storedKeys
 	}
 	return func(string, string) string {
-		if auth.Account(cfg.Dir, cfg.ProfileName, cfg.AuthURL) == "" {
+		// A retired sign-in sends nothing: only a newer terma, signed in again, does.
+		if auth.Account(cfg.Dir, cfg.ProfileName, cfg.AuthURL) == "" || auth.Retired(cfg.Dir, cfg.ProfileName) {
 			return ""
 		}
 		return "your sign-in"
 	}
+}
+
+// signInFix is what makes cfg's profile send where nothing may: a retired sign-in's fix,
+// else `terma setup`.
+func (app *App) signInFix(cfg *config.Config) string {
+	if !cfg.ServerKeySignIn && auth.Retired(cfg.Dir, cfg.ProfileName) {
+		return doctor.RetiredFix
+	}
+	return "terma setup"
 }
 
 // serverKeyCredential is what a profile set up with a server key signs in with: its team's

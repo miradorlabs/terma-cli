@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/miradorlabs/terma-cli/internal/account/auth"
 	"github.com/miradorlabs/terma-cli/internal/account/keystore"
 	"github.com/miradorlabs/terma-cli/internal/account/secret"
 	"github.com/miradorlabs/terma-cli/internal/config"
@@ -106,6 +107,9 @@ func Resolver(cfg *config.Config, r ResolverDeps) func(claim.Claim) (relay.Polic
 		pol.Endpoint, pol.Key = r.Endpoint(c.ProjectID), key
 		if r.User != nil {
 			pol.User = r.User(c.ProjectID, pol.Endpoint)
+			if pol.User != "" {
+				pol.UserAccount = auth.AccountKey(cfg.AuthURL, pol.User)
+			}
 		}
 		return pol, nil
 	}

@@ -47,7 +47,13 @@ type Probes struct {
 	Credential func() (Credential, error)
 	// Keys are the delivery keys stored on this machine.
 	Keys Keys
+	// SignInFix is what makes this machine's sign-in send, where nothing may: "" is
+	// `terma setup`; a retired sign-in's is RetiredFix.
+	SignInFix string
 }
+
+// signInFix is p.SignInFix, `terma setup` by default.
+func (p Probes) signInFix() string { return cmp.Or(p.SignInFix, "terma setup") }
 
 // Credential is the signed-in developer as doctor needs them.
 type Credential struct {
@@ -337,7 +343,7 @@ func (d *run) commitHooks() Check {
 
 func (d *run) agentsExporting() Check {
 	if claim.Enabled(d.env.StateDir) {
-		return RelayCheck(d.env.Agents, d.env.Probes.Relay(), d.env.Probes.Keys, d.projectID, d.cfg.Environment, d.cfg.Harnesses)
+		return RelayCheck(d.env.Agents, d.env.Probes.Relay(), d.env.Probes.Keys, d.projectID, d.cfg.Environment, d.cfg.Harnesses, d.env.Probes.signInFix())
 	}
 	verdicts := JudgeHarnesses(d.ctx, d.env.Agents, d.cfg.OTLPURL, d.projectID, d.env.Root)
 	return HarnessCheck(d.env.Agents, verdicts, d.cfg.OTLPURL, d.projectID, d.admitted)
@@ -362,7 +368,7 @@ func (d *run) eventSpool() Check {
 		return Check{Status: Fail, Detail: "events cannot be written to the spool: " + s.WriteErr.Error(), Fix: "check permissions and free space on " + output.TildePath(d.env.StateDir)}
 	}
 	if d.projectID != "" && !d.env.Probes.Keys.has("", d.projectID) {
-		return Check{Status: Fail, Detail: fmt.Sprintf("%d queued; nothing on this machine may send them to %s: no sign-in, nor a team key", n, cmp.Or(d.cfg.ProjectName, d.projectID)), Fix: "terma setup"}
+		return Check{Status: Fail, Detail: fmt.Sprintf("%d queued; nothing on this machine may send them to %s: no sign-in, nor a team key", n, cmp.Or(d.cfg.ProjectName, d.projectID)), Fix: d.env.Probes.signInFix()}
 	}
 	return Check{Status: Pass, Detail: fmt.Sprintf("%d queued, spool writable", n)}
 }
@@ -370,7 +376,7 @@ func (d *run) eventSpool() Check {
 // BackendCheck flushes every project's queued events; a flush the backend accepts is the proof.
 func BackendCheck(ctx context.Context, p Probes, projectID string) Check {
 	if projectID != "" && !p.Keys.has("", projectID) {
-		return Check{Status: Skip, Detail: "no sign-in or team key on this machine; nothing can be delivered", Fix: "terma setup"}
+		return Check{Status: Skip, Detail: "no sign-in or team key on this machine; nothing can be delivered", Fix: p.signInFix()}
 	}
 	res, err := p.Deliver(ctx)
 	if err != nil {

@@ -67,7 +67,7 @@ func (s *sender) send(ctx context.Context, pol Policy, first entry, body []byte)
 		// out what never leaves.
 		reason := sendas.Reason(answer)
 		if reason == sendas.ReasonSignInRetired {
-			s.r.opts.SignIn.Retired()
+			s.r.opts.SignIn.Retired(bearer)
 		}
 		return retry, refusedBackoff, fmt.Sprintf("HTTP 403 %s: the sign-in may not send to this team", reason), 0
 	case code == http.StatusUnauthorized || code == http.StatusForbidden:

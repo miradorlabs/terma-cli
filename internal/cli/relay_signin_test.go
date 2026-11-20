@@ -1,7 +1,9 @@
 package cli
 
 import (
+	"github.com/miradorlabs/terma-cli/internal/doctor"
 	"testing"
+	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/account/auth"
 	"github.com/miradorlabs/terma-cli/internal/config"
@@ -88,5 +90,78 @@ func TestTheSignInSourceFollowsASwitchAtOnce(t *testing.T) {
 	}
 	if got := src.Account(); got != "" {
 		t.Fatalf("after a sign-out, account = %q", got)
+	}
+}
+
+// A retired sign-in is no credential doctor or status may call "your sign-in", and what
+// they say fixes it is a newer terma, signed in again.
+func TestARetiredSignInSendsNothingDoctorCounts(t *testing.T) {
+	f := newFakeAuth(t)
+	authSandbox(t, f)
+	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(f)); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := testApp.loadConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := testApp.deliveryCredential(cfg)("", "p1"); got != "your sign-in" {
+		t.Fatalf("a working sign-in reads %q", got)
+	}
+	if err := auth.MarkRetired(testApp.dir, config.DefaultProfile, ""); err != nil {
+		t.Fatal(err)
+	}
+	if got := testApp.deliveryCredential(cfg)("", "p1"); got != "" {
+		t.Fatalf("a retired sign-in reads %q, want none", got)
+	}
+	if got := testApp.signInFix(cfg); got != doctor.RetiredFix {
+		t.Fatalf("fix = %q, want %q", got, doctor.RetiredFix)
+	}
+}
+
+// A retirement marks the sign-in that sent the refused token, never one made since: another
+// route's send may already hold the new sign-in's client.
+func TestARetirementMarksOnlyTheSignInThatSent(t *testing.T) {
+	f := newFakeAuth(t)
+	authSandbox(t, f)
+	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSessionOf(f, "u-2")); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := testApp.loadConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	src := testApp.signInSource(cfg)
+	mine := auth.AccountKey(f.srv.URL, "u-2")
+	if token, err := src.Token(t.Context(), mine); err != nil || token == "" {
+		t.Fatalf("token = %q, %v", token, err)
+	}
+	src.Retired(fakeUserToken("u-1")) // the old session's answer, arriving late
+	if auth.Retired(testApp.dir, config.DefaultProfile) {
+		t.Fatal("the new sign-in was retired for the old one's refusal")
+	}
+	src.Retired(fakeUserToken("u-2"))
+	if !auth.Retired(testApp.dir, config.DefaultProfile) {
+		t.Fatal("the sign-in that sent the refused token was not retired")
+	}
+}
+
+// Account never waits on the client lock, which a keychain read may hold for a prompt.
+func TestAccountDoesNotWaitOnTheClient(t *testing.T) {
+	f := newFakeAuth(t)
+	authSandbox(t, f)
+	cfg, err := testApp.loadConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	src := testApp.signInSource(cfg)
+	src.mu.Lock()
+	defer src.mu.Unlock()
+	done := make(chan struct{})
+	go func() { src.Account(); close(done) }()
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("Account waited on the client lock")
 	}
 }

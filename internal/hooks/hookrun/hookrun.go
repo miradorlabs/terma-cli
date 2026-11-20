@@ -79,13 +79,23 @@ func (e Env) Logf(format string, args ...any) {
 }
 
 func (e Env) emit(ev spool.Event) bool {
+	return e.emitWith(ev, e.Spool.Append)
+}
+
+// emitAsCollected is emit for an event recorded earlier with the account it was collected
+// under, "" for none: appended later, maybe once someone else signed in, it keeps that.
+func (e Env) emitAsCollected(ev spool.Event) bool {
+	return e.emitWith(ev, e.Spool.AppendAsCollected)
+}
+
+func (e Env) emitWith(ev spool.Event, appendEvents func(...spool.Event) error) bool {
 	if e.Spool == nil {
 		return false
 	}
 	if ev.Time.IsZero() {
 		ev.Time = e.Time()
 	}
-	if err := e.Spool.Append(ev); err != nil {
+	if err := appendEvents(ev); err != nil {
 		e.Logf("spool append failed: %v", err)
 		return false
 	}

@@ -28,8 +28,9 @@ type SignIn interface {
 	Token(ctx context.Context, account string) (string, error)
 	// Refused says a server refused token as unknown or expired: rotate it.
 	Refused(ctx context.Context, token string)
-	// Retired says a server refused the sign-in as retired (SIGN_IN_RETIRED).
-	Retired()
+	// Retired says a server refused token's sign-in as retired (SIGN_IN_RETIRED): the
+	// sign-in that sent it, never one stored since.
+	Retired(token string)
 }
 
 // errorInfoType ends the type URL of a google.rpc.ErrorInfo detail.

@@ -46,7 +46,7 @@ func (f *fakeSignIn) Refused(_ context.Context, token string) {
 	f.refused = append(f.refused, token)
 }
 
-func (f *fakeSignIn) Retired() { f.retired = true }
+func (f *fakeSignIn) Retired(string) { f.retired = true }
 
 // sentRequest is what the ingest received.
 type sentRequest struct{ auth, project, body string }

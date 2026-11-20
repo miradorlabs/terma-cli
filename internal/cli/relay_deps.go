@@ -151,7 +151,7 @@ func (app *App) signedInHeartbeat(ctx context.Context, cfg *config.Config, team 
 		case refusal.status == http.StatusUnauthorized:
 			src.Refused(ctx, token)
 		case refusal.reason == sendas.ReasonSignInRetired:
-			src.Retired()
+			src.Retired(token)
 		}
 	}
 	return err

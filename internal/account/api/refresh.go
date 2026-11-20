@@ -92,6 +92,8 @@ func (c *Client) redeem(ctx context.Context, held, current *auth.Credential, red
 		case refreshRotated:
 			return c.keepRotation(tx, current, c.credentialFrom(resp))
 		case refreshRetired:
+			// Held retired too: the access token it still holds must not be presented again.
+			c.retireHeld()
 			if tx != nil {
 				_ = tx.MarkRetired(c.profile, current.RefreshToken)
 			}

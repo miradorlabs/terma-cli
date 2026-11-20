@@ -97,6 +97,15 @@ func TestDoctorSaysAnUpdateNeedsASignIn(t *testing.T) {
 	}
 }
 
+// Where nothing may send, the fix is the one the probes name: a retired sign-in's, not setup.
+func TestNothingToSendNamesTheSignInsFix(t *testing.T) {
+	t.Parallel()
+	p := Probes{Keys: func(string, string) string { return "" }, SignInFix: RetiredFix}
+	if c := BackendCheck(t.Context(), p, "p1"); c.Fix != RetiredFix {
+		t.Fatalf("backend check = %+v, want the fix %q", c, RetiredFix)
+	}
+}
+
 // A locked keychain is not a missing sign-in: doctor says which, and says where a working
 // credential is kept.
 func TestDoctorTellsALockedKeychainFromNoSignIn(t *testing.T) {

@@ -656,6 +656,9 @@ func TestARetiredSignInIsMarked(t *testing.T) {
 	if !auth.Retired(c.dir, config.DefaultProfile) {
 		t.Fatal("the stored sign-in was not marked retired")
 	}
+	if c.Credential().RetiredAt.IsZero() {
+		t.Fatal("the client still holds the retired pair as live: its access token would be presented again")
+	}
 	if got := storedPair(t, c); !got.RefreshInDoubtSince.IsZero() {
 		t.Fatal("a retired answer, which rotated nothing, left the refresh in doubt")
 	}

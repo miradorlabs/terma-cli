@@ -232,7 +232,7 @@ func TestAnUnreadableLegacyRecordNamesNoOne(t *testing.T) {
 	}
 	// Named by no one up to when the record was written; what a server key collects after
 	// is its own.
-	if got := cachedLegacyRecord(dir)(); got.Account != auth.LegacyAccountAmbiguous || got.RetiredAt.Sub(written).Abs() > time.Second {
+	if got := cachedLegacyRecord(t.TempDir(), dir)(); got.Account != auth.LegacyAccountAmbiguous || got.RetiredAt.Sub(written).Abs() > time.Second {
 		t.Fatalf("unreadable record = %+v; want one naming no one up to %v", got, written)
 	}
 	if err := os.RemoveAll(path); err != nil {
@@ -241,7 +241,7 @@ func TestAnUnreadableLegacyRecordNamesNoOne(t *testing.T) {
 	if err := auth.RecordLegacy(dir, []auth.LegacySignIn{{SessionID: "s", UserID: "u", AuthURL: "https://auth.example"}}, time.Now()); err != nil {
 		t.Fatal(err)
 	}
-	legacy := cachedLegacyRecord(dir)
+	legacy := cachedLegacyRecord(t.TempDir(), dir)
 	good := legacy()
 	if good.Account != auth.AccountKey("https://auth.example", "u") {
 		t.Fatalf("record = %+v", good)

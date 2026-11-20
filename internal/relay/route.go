@@ -68,6 +68,9 @@ func (r *Relay) decide(key string, pid int, at time.Time, narrow, claimed bool) 
 			if why == whyNotCollected {
 				return claim.Claim{}, Policy{}, why, false, attribution{}
 			}
+			if why == whyNoKey {
+				return c, Policy{}, why, false, how
+			}
 		}
 		return claim.Claim{}, Policy{}, whyNoTrace, false, attribution{}
 	}
@@ -91,9 +94,16 @@ func (r *Relay) decideClaimed(session string, pid int, at time.Time, narrow bool
 	if c.ProjectID == "" {
 		return claim.Claim{}, Policy{}, whyNotCollected, false
 	}
+	return r.placePinned(c, narrow)
+}
+
+// placePinned places a part under the placement c of its claim, as decideClaimed does once
+// it has found it, or one the part kept after its claim expired. whyNoKey keeps c: the part
+// is that team's, waiting for its policy.
+func (r *Relay) placePinned(c claim.Claim, narrow bool) (claim.Claim, Policy, string, bool) {
 	pol, ok := r.resolve(c)
 	if !ok {
-		return claim.Claim{}, Policy{}, whyNoKey, false
+		return c, Policy{}, whyNoKey, false
 	}
 	if narrow && !pol.RequireClaim {
 		return claim.Claim{}, Policy{}, whyWidened, false

@@ -204,6 +204,21 @@ func UnreadableLegacyRecord(stateDir string) LegacyRecord {
 	return rec
 }
 
+// LegacyOwnership is whose an older terma's backlog is, for the relay and delivery to
+// judge: the record when one was kept; while an older terma's sign-ins are still on the
+// machine with no record, what was bound to no account up to their file's last write is
+// named by no one; a record that can't be read, as UnreadableLegacyRecord.
+func LegacyOwnership(dir, stateDir string) (LegacyRecord, error) {
+	rec, err := ReadLegacyRecord(stateDir)
+	if err != nil || !rec.RetiredAt.IsZero() {
+		return rec, err
+	}
+	if info, err := os.Stat(config.LegacyCredentialsPath(dir)); err == nil {
+		return LegacyRecord{Account: LegacyAccountAmbiguous, RetiredAt: info.ModTime().UTC()}, nil
+	}
+	return rec, nil
+}
+
 // ReadLegacyRecord is what RecordLegacy kept, the zero record when nothing was.
 func ReadLegacyRecord(stateDir string) (LegacyRecord, error) {
 	var rec LegacyRecord

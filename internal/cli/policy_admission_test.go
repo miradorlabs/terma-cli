@@ -97,7 +97,7 @@ func TestRelayAdmissionStopsGlobalCoverageWithStaleCatchAll(t *testing.T) {
 		selectPolicy(t, pol)
 	}
 	save()
-	cfg.Policy = pol
+	cfg.Policy, cfg.ServerKeySignIn = pol, true
 	if err := keystore.Set(testApp.dir, "team", policyTestKey, keystore.Hosts{OTLP: upstream.URL}); err != nil {
 		t.Fatal(err)
 	}

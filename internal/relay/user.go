@@ -12,7 +12,7 @@ var userSafeKeys = []string{semconv.TermaUserIDKey}
 // any policy, on the resource alone (withhold). Run after the content policy.
 func nameUser(p *part, pol Policy) {
 	unstamp(p, semconv.TermaUserIDKey)
-	if pol.User != "" {
+	if pol.User != "" && (p.account == "" || p.account == pol.UserAccount) {
 		stamp(p, semconv.TermaUserIDKey, pol.User)
 	}
 }

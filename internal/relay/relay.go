@@ -56,6 +56,9 @@ type Policy struct {
 	Unadmitted bool
 	// User is the Mirador user every part sent under this policy names, by id; "" names no one.
 	User string
+	// UserAccount is User's account key (auth.AccountKey): a part bound to another account
+	// names no one, so the user it names is never another than the sign-in it leaves with.
+	UserAccount string
 }
 
 // ErrNoKey is Resolve's answer for a project this machine holds no key for; its parts wait, then drop.
@@ -150,9 +153,11 @@ type Relay struct {
 	// deliverMu keeps a session's parts in arrival order; taken before mu, never after.
 	deliverMu sync.Mutex
 
-	mu        sync.Mutex
-	held      map[string][]heldPart
-	heldN     int
+	mu    sync.Mutex
+	held  map[string][]heldPart
+	heldN int
+	// heldLost counts a team's parts evicted from a full hold since the last sweep.
+	heldLost  int
 	heldBytes int
 	traces    map[string]traceSession
 	procs     map[int]*procState // sender pid → the sessions it named, and whether it exited

@@ -59,6 +59,9 @@ func (app *App) useServerKey(s *setup.Steps, ui *setupUI, org orgRef, team *stri
 		if err != nil {
 			return config.Policy{}, err
 		}
+		// An older terma's sign-ins are retired here too, and recorded first: the record is
+		// the only account what that terma queued keeps, which a server key must not send.
+		app.retireLegacySessions(ctx, cfg.AuthURL)
 		return pol, nil
 	}
 	s.SpoolKey = func(_ context.Context, cfg *config.Config) {

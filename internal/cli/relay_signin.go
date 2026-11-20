@@ -22,6 +22,9 @@ type signInSource struct {
 
 	mu     sync.Mutex
 	client *api.Client
+	// accountMu guards the account cache alone, apart from mu, which a client's creation
+	// holds across a keychain read: an export must never wait on a keychain prompt.
+	accountMu sync.Mutex
 	// account caches Account while the files it was read from are unchanged: the relay asks
 	// at every part it accepts, and another process (setup, a sign-in or sign-out) may
 	// change either file at any moment.
@@ -36,8 +39,8 @@ func (app *App) signInSource(cfg *config.Config) *signInSource {
 // Account is the account key of the profile's sign-in for its environment; "" when it is
 // signed out, or set up with a server key, which is no one's.
 func (s *signInSource) Account() string {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.accountMu.Lock()
+	defer s.accountMu.Unlock()
 	files := [2]os.FileInfo{statOrNil(config.Path(s.cfg.Dir)), statOrNil(config.CredentialsPath(s.cfg.Dir))}
 	if unchanged(s.accountFiles[0], files[0]) && unchanged(s.accountFiles[1], files[1]) {
 		return s.account
@@ -101,7 +104,7 @@ func (s *signInSource) Token(ctx context.Context, account string) (string, error
 	}
 	// The pair the client holds is the session account names, never one stored since.
 	held := client.Credential()
-	if held.SessionID != ident.SessionID || auth.AccountKey(held.AuthURL, held.UserID) != account {
+	if held.SessionID != ident.SessionID || auth.AccountKey(held.AuthURL, held.UserID) != account || !held.RetiredAt.IsZero() {
 		return "", nil
 	}
 	return held.AccessToken, nil
@@ -138,14 +141,20 @@ func (s *signInSource) Refused(ctx context.Context, token string) {
 	}
 }
 
-// Retired records that a server refused the sign-in as retired, on the sign-in that was
-// sent: only while it is still the one stored.
-func (s *signInSource) Retired() {
+// Retired records that a server refused token's sign-in as retired: on the sign-in that
+// sent it, while it is still the one stored. A sign-in made since, which another route's
+// send may already hold, is not the one refused.
+func (s *signInSource) Retired(token string) {
 	s.mu.Lock()
 	client := s.client
 	s.mu.Unlock()
-	if client != nil {
-		_ = auth.MarkRetired(s.cfg.Dir, s.cfg.ProfileName, client.Credential().RefreshToken)
+	if client == nil {
+		return
+	}
+	// Marked on the client too: a store that can't take the mark must not have Token hand
+	// out the refused token again.
+	if held := client.Credential(); held.AccessToken == token {
+		client.MarkRetired()
 	}
 }
 
@@ -156,7 +165,7 @@ func (s *signInSource) Retired() {
 func (app *App) bindRelay(engine *relay.Options, cfg *config.Config) {
 	engine.SignIn = app.signInSource(cfg)
 	engine.Installation = func() string { return config.StoredInstallationID(app.dir) }
-	legacy := cachedLegacyRecord(app.stateDir)
+	legacy := cachedLegacyRecord(app.dir, app.stateDir)
 	engine.Legacy = func() (string, time.Time) {
 		rec := legacy()
 		return rec.Account, rec.RetiredAt
@@ -172,7 +181,7 @@ func (app *App) bindRelay(engine *relay.Options, cfg *config.Config) {
 // cachedLegacyRecord reads the legacy record at most once a second: the relay asks for it
 // for every queued entry from before user tokens. A read that fails keeps the last record
 // read, or with none, names no one (auth.UnreadableLegacyRecord), never no record.
-func cachedLegacyRecord(stateDir string) func() auth.LegacyRecord {
+func cachedLegacyRecord(dir, stateDir string) func() auth.LegacyRecord {
 	var mu sync.Mutex
 	rec := auth.UnreadableLegacyRecord(stateDir)
 	var at time.Time
@@ -180,7 +189,7 @@ func cachedLegacyRecord(stateDir string) func() auth.LegacyRecord {
 		mu.Lock()
 		defer mu.Unlock()
 		if time.Since(at) > time.Second {
-			if read, err := auth.ReadLegacyRecord(stateDir); err == nil {
+			if read, err := auth.LegacyOwnership(dir, stateDir); err == nil {
 				rec = read
 			}
 			at = time.Now()

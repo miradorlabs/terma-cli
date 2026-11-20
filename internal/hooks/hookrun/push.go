@@ -294,7 +294,7 @@ func reportPush(ctx context.Context, env Env, path string, rec pushRecord) {
 		if ref.Reported {
 			continue
 		}
-		if ev, ok := pushEvent(ctx, env, rec, i, ref, exited); ok && env.emit(ev) {
+		if ev, ok := pushEvent(ctx, env, rec, i, ref, exited); ok && env.emitAsCollected(ev) {
 			emitted, rec.Refs[i].Reported = true, true
 		} else {
 			failed = true

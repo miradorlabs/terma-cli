@@ -1,6 +1,7 @@
 package hookrun
 
 import (
+	"cmp"
 	"context"
 	"os"
 	"os/exec"
@@ -316,6 +317,39 @@ func TestSweepReportsAnAbandonedPush(t *testing.T) {
 	}
 	if _, err := os.Stat(recorded); err == nil {
 		t.Error("the swept record was left behind")
+	}
+}
+
+// A push keeps the account it was recorded under, or none: reported by a sweep after
+// someone else signed in, it never leaves under them.
+func TestASweptPushKeepsTheAccountItWasRecordedUnder(t *testing.T) {
+	for _, recordedAs := range []string{"account-a", ""} {
+		t.Run("recorded as "+cmp.Or(recordedAs, "none"), func(t *testing.T) {
+			defer func(f func() int) { gitPushPID = f }(gitPushPID)
+			p := newPushRepo(t)
+			p.git("commit", "-q", "--allow-empty", "-m", "more")
+			head := p.sha("HEAD")
+			gitPushPID = func() int { return 0 }
+			var recorded string
+			env := Env{StateDir: p.stateDir, Now: time.Now(), Cwd: p.root, Args: []string{"backup", p.remote},
+				Stdin: strings.NewReader(pushLine("refs/heads/main", head, "refs/heads/main", p.sha("backup/main")) + "\n"), Spool: p.sp,
+				Team: p.team, Policy: hookruntest.Admitting(p.root), AwaitPush: func(path string) { recorded = path }, Account: recordedAs}
+			if err := PrePush(context.Background(), env); err != nil {
+				t.Fatal(err)
+			}
+			old := time.Now().Add(-pushAbandoned - time.Minute)
+			if err := os.Chtimes(recorded, old, old); err != nil {
+				t.Fatal(err)
+			}
+			// Someone else is signed in when the sweep reports it.
+			env.Account = "account-b"
+			p.sp.Bind("account-b")
+			SweepPushes(context.Background(), env)
+			events := hookruntest.Named(hookruntest.Spooled(t, p.sp), semconv.TermaPushEvent)
+			if len(events) != 1 || events[0].Account != recordedAs {
+				t.Fatalf("pushes %+v; want one under %q", events, recordedAs)
+			}
+		})
 	}
 }
 

@@ -63,3 +63,25 @@ func TestQueuedPartKeepsItsUserUnderAStricterPolicy(t *testing.T) {
 		t.Errorf("the queued part left naming %q, want user-a", got)
 	}
 }
+
+// A part names the policy's user only when it was bound to that user's account, or to none:
+// one that arrived under another person, and is placed after a switch, names no one, so its
+// terma.user.id is never another than the sign-in it leaves with.
+func TestAPartNamesOnlyItsOwnAccountsUser(t *testing.T) {
+	t.Parallel()
+	pol := Policy{User: "user-b", UserAccount: "account-b"}
+	for account, want := range map[string]string{"account-b": "user-b", "": "user-b", "account-a": ""} {
+		m := logsOf("A", 1)
+		p := &part{msg: m, account: account}
+		nameUser(p, pol)
+		got := ""
+		for _, a := range m.ResourceLogs[0].Resource.GetAttributes() {
+			if a.Key == semconv.TermaUserIDKey {
+				got = a.Value.GetStringValue()
+			}
+		}
+		if got != want {
+			t.Errorf("a part bound to %q names %q, want %q", account, got, want)
+		}
+	}
+}

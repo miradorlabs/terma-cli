@@ -95,7 +95,11 @@ The exit status distinguishes the outcomes a script needs apart:
 				fmt.Fprintf(out, "Skipped: backing off until %s after an earlier failure (use --force to retry now).\n", res.NextAttempt.Local().Format(time.Kitchen))
 				return exitWith(ExitBackoff)
 			}
-			delivered, undelivered := describeFlush(res)
+			fix := "terma setup"
+			if cfg, err := app.loadConfig(); err == nil {
+				fix = app.signInFix(cfg)
+			}
+			delivered, undelivered := describeFlush(res, fix)
 			fmt.Fprintf(out, "Flushed %s.\n", strings.Join(append([]string{delivered}, undelivered...), ", "))
 			if res.Err != nil {
 				return res.Err
@@ -115,10 +119,10 @@ The exit status distinguishes the outcomes a script needs apart:
 
 // describeFlush words a flush pass: what was delivered, then one clause per reason an
 // event was not; `terma spool flush` and doctor share it so they agree on the terms.
-func describeFlush(res delivery.Result) (delivered string, undelivered []string) {
+func describeFlush(res delivery.Result, signInFix string) (delivered string, undelivered []string) {
 	delivered = fmt.Sprintf("%d event%s", res.Sent, plural(res.Sent))
 	if res.Held > 0 {
-		undelivered = append(undelivered, fmt.Sprintf("holding %d for a sign-in that may send them (run `terma setup`)", res.Held))
+		undelivered = append(undelivered, fmt.Sprintf("holding %d for a sign-in that may send them (run `%s`)", res.Held, signInFix))
 	}
 	if res.Failed > 0 {
 		undelivered = append(undelivered, fmt.Sprintf("keeping %d queued after a failed delivery", res.Failed))
@@ -196,7 +200,7 @@ func (app *App) flushSpool(ctx context.Context, force bool, minInterval time.Dur
 	}
 	r := app.delivery()
 	r.SignIn = app.signInSource(cfg)
-	rec, err := auth.ReadLegacyRecord(app.stateDir)
+	rec, err := auth.LegacyOwnership(app.dir, app.stateDir)
 	if err != nil {
 		rec = auth.UnreadableLegacyRecord(app.stateDir)
 	}
