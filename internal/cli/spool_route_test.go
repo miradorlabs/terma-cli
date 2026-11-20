@@ -53,12 +53,24 @@ func (h *ingestHost) keysSeen() []string {
 }
 
 // routingSandbox gives a test its own config dir and a profile host no one listens on, so
-// ignoring a key's own host fails fast.
+// ignoring a key's own host fails fast. Its profile is set up with server keys: only those
+// carry a host of their own.
 func routingSandbox(t *testing.T) {
 	t.Helper()
 	useConfigDir(t, t.TempDir())
 	t.Setenv("TERMA_OTLP_URL", "")
-	if err := config.UpdateProfile(testApp.dir, config.DefaultProfile, func(p *config.Profile) { p.OTLPURL = "http://127.0.0.1:1" }); err != nil {
+	if err := config.UpdateProfile(testApp.dir, config.DefaultProfile, func(p *config.Profile) {
+		p.OTLPURL, p.ServerKeySignIn = "http://127.0.0.1:1", true
+	}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// serverKeyProfile marks the profile as set up with a server key, which sends the spool
+// with the keys the keystore holds.
+func serverKeyProfile(t *testing.T) {
+	t.Helper()
+	if err := config.UpdateProfile(testApp.dir, config.DefaultProfile, func(p *config.Profile) { p.ServerKeySignIn = true }); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -210,6 +222,7 @@ func TestSpoolFlushOverrideWinsOverTheKeysHost(t *testing.T) {
 	useConfigDir(t, t.TempDir())
 	override := newIngestHost(t, "ter_srv_prod")
 	t.Setenv("TERMA_OTLP_URL", override.URL)
+	serverKeyProfile(t)
 	routeProject(t, routeProdProject, "ter_srv_prod", "http://127.0.0.1:1")
 	appendEvent(t, spoolForTest(t), routeProdProject, time.Now())
 

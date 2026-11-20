@@ -176,8 +176,8 @@ func TestOutboxJanitorRemovesEmptyRoutes(t *testing.T) {
 	dir := t.TempDir()
 	o := outbox{dir}
 	repo := config.Repository{Origin: "github.com/acme/web"}
-	done := routeOf(claim.Claim{ProjectID: "p1", Tool: "codex", Repository: repo})
-	busy := routeOf(claim.Claim{ProjectID: "p2", Tool: "codex", Repository: repo})
+	done := routeOf("", claim.Claim{ProjectID: "p1", Tool: "codex", Repository: repo})
+	busy := routeOf("", claim.Claim{ProjectID: "p2", Tool: "codex", Repository: repo})
 	for _, rt := range []route{done, busy} {
 		if err := o.put(rt, repo, newEntry(time.Now(), Logs, 1), []byte("x")); err != nil {
 			t.Fatal(err)
@@ -209,11 +209,11 @@ func TestOutboxRouteKeepsItsRepository(t *testing.T) {
 	t.Parallel()
 	o := outbox{t.TempDir()}
 	repo := config.Repository{Origin: "github.com/acme/web"}
-	rt := routeOf(claim.Claim{ProjectID: "p1", Tool: "codex", Repository: repo})
+	rt := routeOf("", claim.Claim{ProjectID: "p1", Tool: "codex", Repository: repo})
 	if rt.repo == noRepo || !validRoute(rt) {
 		t.Fatalf("routeOf gave %v", rt)
 	}
-	if routeOf(claim.Claim{ProjectID: "p1"}).repo != noRepo {
+	if routeOf("", claim.Claim{ProjectID: "p1"}).repo != noRepo {
 		t.Fatal("no repository did not route to noRepo")
 	}
 	e := newEntry(time.Now(), Logs, 1)

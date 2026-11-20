@@ -103,6 +103,9 @@ func (c *Client) postToken(ctx context.Context, body tokenRequest) (*tokenRespon
 
 	var out tokenResponse
 	if err := decode(resp, &out); err != nil {
+		if apiErr, ok := errors.AsType[*Error](err); ok && apiErr.SignInRetired() {
+			return nil, fmt.Errorf("%w: %w: %w", auth.ErrSignInRetired, auth.ErrNotLoggedIn, apiErr)
+		}
 		if apiErr, ok := errors.AsType[*Error](err); ok && apiErr.Unauthenticated() {
 			return nil, fmt.Errorf("%w: %w", auth.ErrNotLoggedIn, apiErr)
 		}

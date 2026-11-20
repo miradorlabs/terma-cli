@@ -279,6 +279,10 @@ func (app *App) Execute() int {
 		}
 		errOut := style.Highlight(os.Stderr)
 		label := style.For(os.Stderr).Fail("Error:")
+		if errors.Is(err, auth.ErrSignInRetired) {
+			fmt.Fprintf(errOut, "%s %v\n", label, auth.ErrSignInRetired)
+			return 1
+		}
 		if errors.Is(err, auth.ErrNotLoggedIn) {
 			fmt.Fprintf(errOut, "%s not signed in. Run `terma setup`.\n", label)
 			return 1

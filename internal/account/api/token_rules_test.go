@@ -399,3 +399,39 @@ func TestAMarkForAnotherSessionIsRefused(t *testing.T) {
 		t.Fatal("another session's mark reached the file")
 	}
 }
+
+// A refresh refused as SIGN_IN_RETIRED marks the stored sign-in, for doctor, and reads as
+// both signed out and retired.
+func TestARetiredSignInIsMarked(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+		w.Write([]byte(`{"error":{"code":"UNAUTHENTICATED","reason":"SIGN_IN_RETIRED","message":"retired"}}`))
+	}))
+	t.Cleanup(srv.Close)
+	c := newTestClient(t, srv.URL, &auth.Credential{AccessToken: "access-0", RefreshToken: "refresh-0",
+		ExpiresAt: time.Now().Add(-time.Hour)}, "")
+	err := c.Refresh(context.Background())
+	if !errors.Is(err, auth.ErrSignInRetired) || !errors.Is(err, auth.ErrNotLoggedIn) {
+		t.Fatalf("err = %v, want retired and signed out", err)
+	}
+	if !auth.Retired(c.dir, config.DefaultProfile) {
+		t.Fatal("the stored sign-in was not marked retired")
+	}
+}
+
+// Any other request a gateway refuses as SIGN_IN_RETIRED marks it too.
+func TestARetiredAnswerElsewhereMarksTheSignIn(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusForbidden)
+		w.Write([]byte(`{"error":{"code":"PERMISSION_DENIED","reason":"SIGN_IN_RETIRED","message":"retired"}}`))
+	}))
+	t.Cleanup(srv.Close)
+	c := newTestClient(t, srv.URL, &auth.Credential{AccessToken: "access-0", RefreshToken: "refresh-0",
+		ExpiresAt: time.Now().Add(time.Hour)}, "")
+	if err := c.AuthGet(context.Background(), "/v1/organizations", nil, nil); !errors.Is(err, auth.ErrSignInRetired) {
+		t.Fatalf("err = %v", err)
+	}
+	if !auth.Retired(c.dir, config.DefaultProfile) {
+		t.Fatal("the stored sign-in was not marked retired")
+	}
+}

@@ -246,7 +246,7 @@ func RelayCheck(reg *agents.Registry, relay Relay, keys Keys, projectID, env str
 	case projectID == "":
 		return Check{Status: Warn, Detail: "local relay on " + addr + " (" + state + "); no team is chosen, so no session is forwarded", Fix: "terma setup"}
 	case !keys.has("", projectID) && !slices.ContainsFunc(reg.With[agents.RelayExporter](), func(e agents.RelayExporter) bool { return keys.has(e.Name(), projectID) }):
-		return Check{Status: Warn, Detail: "local relay on " + addr + " (" + state + "); no key for this team on this machine, so its sessions are dropped", Fix: "terma setup"}
+		return Check{Status: Warn, Detail: "local relay on " + addr + " (" + state + "); no sign-in or key for this team on this machine, so its sessions wait", Fix: "terma setup"}
 	}
 	return Check{Status: Pass, Detail: "through the local relay on " + addr + " (" + state + "); it forwards the sessions your team's policy collects"}
 }

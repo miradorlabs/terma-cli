@@ -455,3 +455,24 @@ func TestWritableReportsAnUnwritableSpool(t *testing.T) {
 		t.Fatal("a spool whose queue cannot be written must report an error")
 	}
 }
+
+// A bound spool stamps the sign-in's account on what it appends, unless an event names one.
+func TestBindStampsTheAccount(t *testing.T) {
+	t.Parallel()
+	s, err := Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.Bind("aaaaaaaaaaaaaaaa")
+	if err := s.Append(Event{Name: "bound"}, Event{Name: "own", Account: "bbbbbbbbbbbbbbbb"}); err != nil {
+		t.Fatal(err)
+	}
+	var got []Event
+	s.Flush(t.Context(), SenderFunc(func(_ context.Context, events []Event) ([]Event, error) {
+		got = append(got, events...)
+		return nil, nil
+	}), FlushOptions{Force: true})
+	if len(got) != 2 || got[0].Account != "aaaaaaaaaaaaaaaa" || got[1].Account != "bbbbbbbbbbbbbbbb" {
+		t.Fatalf("events = %+v", got)
+	}
+}

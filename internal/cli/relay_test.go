@@ -138,7 +138,7 @@ func TestRelayDoctorCheck(t *testing.T) {
 	if c := doctor.RelayCheck(testApp.agents, testApp.relayFacts(), testApp.storedKeys, "", "", nil); c.Status != doctor.Warn || !strings.Contains(c.Detail, "no team is chosen") {
 		t.Fatalf("no team: %+v", c)
 	}
-	if c := doctor.RelayCheck(testApp.agents, testApp.relayFacts(), testApp.storedKeys, "proj_x", "", nil); c.Status != doctor.Warn || !strings.Contains(c.Detail, "no key") {
+	if c := doctor.RelayCheck(testApp.agents, testApp.relayFacts(), testApp.storedKeys, "proj_x", "", nil); c.Status != doctor.Warn || !strings.Contains(c.Detail, "no sign-in or key") {
 		t.Fatalf("no key: %+v", c)
 	}
 	keys := `{"keys":{"proj_x":"ter_srv_1"}}`

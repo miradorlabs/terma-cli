@@ -45,6 +45,9 @@ type Deps struct {
 	LoadConfig func() (*config.Config, error)
 	// RefreshPolicy fetches and stores cfg's project's policy.
 	RefreshPolicy func(ctx context.Context, cfg *config.Config) error
+	// Bind gives the relay cfg's sign-in to send with, and what it binds queued parts to;
+	// nil sends only with a server key.
+	Bind func(opts *relay.Options, cfg *config.Config)
 }
 
 // Settings are the relay's timings: TERMA_RELAY_HOLD and TERMA_RELAY_HEARTBEAT shorten
@@ -81,6 +84,9 @@ func (d Deps) Engine(ctx context.Context, stateDir string, cfg *config.Config, s
 		Lookup:   func(sessionID string, now time.Time) (claim.Claim, bool) { return claim.Read(stateDir, sessionID, now) },
 		CatchAll: d.CatchAll(), HeartbeatSend: d.SendHeartbeat, HeartbeatEvery: s.Heartbeat,
 		PeerPID: procinfo.FindSender, ProcessAlive: procinfo.Alive, ClaimCacheTTL: time.Second, PolicyCacheTTL: time.Second}
+	if d.Bind != nil {
+		d.Bind(&opts, cfg)
+	}
 	if s.Debug && logw != nil {
 		opts.Logf = func(f string, a ...any) { fmt.Fprintf(logw, time.Now().Format("15:04:05.000 ")+f+"\n", a...) }
 	}

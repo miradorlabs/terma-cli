@@ -39,9 +39,12 @@ const DefaultTraceHold = 30 * time.Minute
 // maxBody bounds one export request, decompressed.
 const maxBody = 16 << 20
 
-// Policy is how a claimed session's telemetry leaves the machine: where, with which key, and what content.
+// Policy is how a claimed session's telemetry leaves the machine: where, with which
+// credential, and what content.
 type Policy struct {
-	Endpoint           string
+	Endpoint string
+	// Key is the team's server key a profile was set up with; "" sends with the person's
+	// sign-in (Options.SignIn), naming the team in the request's X-Mirador-Project.
 	Key                string
 	IncludePrompts     bool
 	IncludeToolContent bool
@@ -57,6 +60,24 @@ type Policy struct {
 // ErrNoKey is Resolve's answer for a project this machine holds no key for; its parts wait, then drop.
 var ErrNoKey = errors.New("no key for this team on this machine")
 
+// SignIn is the person's sign-in the relay sends with, as it stands at each send: the
+// developer can sign in, out or as someone else while the relay runs.
+type SignIn interface {
+	// Account is the account key (auth.AccountKey) of the sign-in now, "" with none.
+	Account() string
+	// Token is a fresh access token of the sign-in whose account key is account: "" with no
+	// error when that sign-in cannot send now (signed out, another person's, retired), an
+	// error for what a retry may fix.
+	Token(ctx context.Context, account string) (string, error)
+	// Refused says a server refused token as unknown or expired: rotate it.
+	Refused(ctx context.Context, token string)
+	// Retired says a server refused the sign-in as retired (SIGN_IN_RETIRED).
+	Retired()
+}
+
+// ProjectHeader names the team a part sent with a user token goes to.
+const ProjectHeader = "X-Mirador-Project"
+
 // Options configure a relay.
 type Options struct {
 	// Correlators and Capturers say how each agent's records name their session and carry content.
@@ -71,6 +92,17 @@ type Options struct {
 	Lookup func(sessionID string, now time.Time) (claim.Claim, bool)
 	// Resolve turns a claim into a Policy, or ErrNoKey.
 	Resolve func(c claim.Claim) (Policy, error)
+	// SignIn is who parts without a server key are sent as; none leave without it. A part
+	// is queued under the account of the sign-in when it arrives, and leaves only while
+	// that sign-in is the one in place, so a backlog never goes out in another person's
+	// name or to another environment; it ages out of the outbox meanwhile.
+	SignIn SignIn
+	// Legacy is, read again as it is needed, the account an older terma's retired sign-ins
+	// belonged to and when they were retired: a part bound to no account that arrived
+	// before then leaves under that account; one that arrived after, with no sign-in in
+	// place, under none, and ages out. Nil, or an account of "", leaves such parts to a
+	// server key.
+	Legacy func() (account string, retiredAt time.Time)
 	// CatchAll, in global mode, is where a part whose hold ran out unplaced goes instead of being dropped.
 	CatchAll func() (claim.Claim, bool)
 	// HeartbeatSend, set, turns the heartbeat on; HeartbeatEvery is its period.
@@ -100,6 +132,13 @@ type Options struct {
 	// InstallMethod is how this terma was installed, on the heartbeat's resource as
 	// terma.install.method; "" sends none.
 	InstallMethod string
+	// Installation is, asked at every heartbeat, this installation's stable id, on its
+	// resource as terma.installation.id; nil or "" sends none.
+	Installation func() string
+	// LegacySessionIDs are, asked at every heartbeat, the sessions of the per-organization
+	// sign-ins an older terma kept here, while recent: on its resource as
+	// terma.legacy_session_ids.
+	LegacySessionIDs func() []string
 	// UpdateAuto, set, is asked at every heartbeat whether this terma installs new releases
 	// by itself, sent on its record as terma.update.auto: the developer can turn automatic
 	// updates on or off while the relay runs.
@@ -310,8 +349,9 @@ func (r *Relay) export(w http.ResponseWriter, req *http.Request, s Signal) {
 	pid := r.senderPID(req)
 	_, global := r.catchAll()
 	narrow := r.opts.CatchAll != nil && !global
+	account := r.account()
 	for _, p := range parts {
-		p.pid, p.narrow = pid, narrow
+		p.pid, p.narrow, p.account = pid, narrow, account
 		p.at = earliest(p.msg)
 		r.stats.received(s, p.records)
 		if p.session != "" && !strings.HasPrefix(p.session, tracePrefix) {

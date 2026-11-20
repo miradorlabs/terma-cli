@@ -59,7 +59,7 @@ func (r *Relay) resolve(c claim.Claim) (Policy, bool) {
 		}
 	}
 	pol, err := r.opts.Resolve(c)
-	ok := err == nil && pol.Endpoint != "" && pol.Key != ""
+	ok := err == nil && pol.Endpoint != "" && (pol.Key != "" || r.opts.SignIn != nil)
 	if r.opts.PolicyCacheTTL > 0 {
 		r.cache.mu.Lock()
 		r.cache.policies[key] = cachedPolicy{pol, ok, now}

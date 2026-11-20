@@ -47,6 +47,9 @@ type Credential struct {
 	// the whole family, so no process presents it again once refreshAttemptBudget has
 	// passed: the sign-in is over instead. Zero when no refresh is in doubt.
 	RefreshInDoubtSince time.Time `json:"refresh_in_doubt_since,omitzero"`
+	// RetiredAt is when a server refused this sign-in as retired (SIGN_IN_RETIRED): only a
+	// newer terma, signed in again, replaces it. Zero while it is accepted.
+	RetiredAt time.Time `json:"retired_at,omitzero"`
 	// StaleKeychainItem marks a credential kept in the file while its earlier tokens may
 	// still sit in the keychain, which could not remove them then; sign-out tries again.
 	StaleKeychainItem bool `json:"stale_keychain_item,omitempty"`

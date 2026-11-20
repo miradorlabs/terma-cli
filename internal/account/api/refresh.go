@@ -67,6 +67,11 @@ func (c *Client) redeem(ctx context.Context, held, current *auth.Credential, red
 		switch kind, wait := classifyRefresh(err); kind {
 		case refreshRotated:
 			return c.keepRotation(tx, current, c.credentialFrom(resp))
+		case refreshRetired:
+			if tx != nil {
+				_ = tx.MarkRetired(c.profile, current.RefreshToken)
+			}
+			return err
 		case refreshOver:
 			return fmt.Errorf("%w: session expired, run `terma setup`", err)
 		case refreshSuperseded:
@@ -108,6 +113,7 @@ func (c *Client) redeem(ctx context.Context, held, current *auth.Credential, red
 const (
 	refreshRotated    = iota // a new pair
 	refreshOver              // 401: the session is over
+	refreshRetired           // SIGN_IN_RETIRED: only a newer terma, signed in again, sends again
 	refreshSuperseded        // 409: a concurrent refresh of the token won
 	refreshInDoubt           // a 5xx or no answer: it may have rotated
 	refreshUnspent           // anything else, or a request that never left: nothing rotated
@@ -120,6 +126,8 @@ func classifyRefresh(err error) (kind int, wait time.Duration) {
 	switch {
 	case err == nil:
 		return refreshRotated, 0
+	case errors.Is(err, auth.ErrSignInRetired):
+		return refreshRetired, 0
 	case errors.Is(err, auth.ErrNotLoggedIn):
 		return refreshOver, 0
 	case isAPI && apiErr.Superseded():

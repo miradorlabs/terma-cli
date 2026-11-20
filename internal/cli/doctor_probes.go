@@ -15,6 +15,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/delivery"
 	"github.com/miradorlabs/terma-cli/internal/doctor"
+	"github.com/miradorlabs/terma-cli/internal/relay"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
 	"github.com/miradorlabs/terma-cli/internal/relay/service"
@@ -72,9 +73,24 @@ func (app *App) doctorProbes(cfg *config.Config) doctor.Probes {
 			}
 			return doctor.Credential{Email: cred.UserEmail, OrganizationID: cfg.OrganizationID,
 				OtherEnvironment: cred.CheckEnvironment(cfg.AuthURL) != nil, InFile: auth.StoredInFile(app.dir, cfg.ProfileName),
-				ViaDesktop: cred.ViaDesktop()}, nil
+				ViaDesktop: cred.ViaDesktop(), Retired: !cred.RetiredAt.IsZero()}, nil
 		},
-		Keys: app.storedKeys,
+		Keys: app.deliveryCredential(cfg),
+	}
+}
+
+// deliveryCredential says, for doctor and status, what a team's telemetry is sent with: on
+// a person's profile, their sign-in, for every team; on one set up with a server key, the
+// keys in this machine's keystore.
+func (app *App) deliveryCredential(cfg *config.Config) doctor.Keys {
+	if cfg.ServerKeySignIn || cfg.APIKey != "" {
+		return app.storedKeys
+	}
+	return func(string, string) string {
+		if auth.Account(cfg.Dir, cfg.ProfileName, cfg.AuthURL) == "" {
+			return ""
+		}
+		return "your sign-in"
 	}
 }
 
@@ -105,6 +121,9 @@ func (app *App) relayFacts() doctor.Relay {
 	if info, ok := daemon.RunningRelay(dir); ok {
 		r.Environment, r.HookStarted = info.Environment, info.Launch != daemon.LaunchService
 		r.Version, r.Earlier = info.Version, selfupdate.Newer(info.Version, app.version)
+	}
+	if losses, err := relay.ReadOutboxLosses(filepath.Join(dir, relay.OutboxDir)); err == nil {
+		r.OutboxFull, r.OutboxExpired, r.OutboxHeld, r.OutboxLossAt = losses.Full, losses.Expired, losses.Held, losses.Last
 	}
 	if service.Supported() {
 		state := daemon.CheckService(app.stateDir)

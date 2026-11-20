@@ -65,7 +65,7 @@ func TestEveryEventLeavesNamingItsRepository(t *testing.T) {
 		Policy:  func(context.Context, *config.Config, string) (config.Policy, error) { return pol, nil },
 		Consent: func(string, hookrun.Consent) bool { return true },
 	}
-	if res := r.Flush(t.Context(), s, &config.Config{OTLPURL: srv.URL}, true, 0); res.Sent != 8 || res.Err != nil {
+	if res := r.Flush(t.Context(), s, &config.Config{OTLPURL: srv.URL, ServerKeySignIn: true}, true, 0); res.Sent != 8 || res.Err != nil {
 		t.Fatalf("Flush = %+v", res)
 	}
 	var payload struct {

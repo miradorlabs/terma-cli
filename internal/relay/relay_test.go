@@ -298,8 +298,16 @@ func TestRelayRoutesLogsPerClaimedSession(t *testing.T) {
 			f.mu.Unlock()
 			r.sweep()
 			c = r.Stats().Snapshot().Counters
-			if c["dropped.no_key.logs"] != 1 || c["dropped.unclaimed_expired.logs"] != 1 {
+			// The unclaimed part goes; the claimed one whose team has no key or policy here waits.
+			if c["dropped.no_key.logs"] != 0 || c["dropped.unclaimed_expired.logs"] != 1 {
 				t.Fatalf("after the hold: %v", c)
+			}
+			f.mu.Lock()
+			f.now = f.now.Add(maxOutboxAge)
+			f.mu.Unlock()
+			r.sweep()
+			if c = r.Stats().Snapshot().Counters; c["dropped.no_key.logs"] != 1 {
+				t.Fatalf("after the outbox's age: %v", c)
 			}
 		})
 	}
@@ -377,6 +385,15 @@ func TestRelayHoldReleasesOrExpires(t *testing.T) {
 	if c["dropped.unclaimed_expired.logs"] != 1 || c["forwarded.logs"] != 4 {
 		t.Fatalf("stats = %v", c)
 	}
+	// A claimed part with no key or policy to leave under is still held, as long as the
+	// outbox would keep it.
+	if _, ok := r.Idle(); ok {
+		t.Fatal("a held claimed part let the relay go idle")
+	}
+	f.mu.Lock()
+	f.now = f.now.Add(maxOutboxAge)
+	f.mu.Unlock()
+	r.sweep()
 	// The sender marks itself done just after the counter moves.
 	waitFor(t, func() bool { idle, ok := r.Idle(); return ok && idle >= 0 })
 }

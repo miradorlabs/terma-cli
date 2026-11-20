@@ -28,8 +28,12 @@ type RelayOptions struct {
 	Service ServiceManager
 	// Hold overrides how long unclaimed records wait (TERMA_RELAY_HOLD).
 	Hold time.Duration
-	// NoKey leaves the machine without a key for the project: set up, but never
-	// opted in here.
+	// ServerKey sets the profile up with a server key (server_key_sign_in), which the
+	// relay sends with from keys.json, naming no team; without it the profile is the
+	// signed-in person's, sending with their access token and the claimed team.
+	ServerKey bool
+	// NoKey is a server-key profile (ServerKey) without a key for the project: set up,
+	// but never opted in here.
 	NoKey bool
 	// Content is the team's collection policy, which the account fixture serves:
 	// prompts and tool content through, or both withheld. Only the policy decides
@@ -42,7 +46,6 @@ func (sb *Sandbox) UseRelay(o RelayOptions) {
 	t := sb.T
 	t.Helper()
 	acct := sb.StartAccount()
-	acct.denyMints.Store(o.NoKey)
 	if acct.withholdContent.Swap(!o.Content) != !o.Content {
 		// The team's policy changed since setup fetched it: set up again, as a developer would.
 		sb.Setup(nil, "--team", sb.ProjectID, "--harness", sb.setupList())
@@ -58,15 +61,18 @@ func (sb *Sandbox) UseRelay(o RelayOptions) {
 	if o.Hold > 0 {
 		sb.ExtraEnv = append(sb.ExtraEnv, "TERMA_RELAY_HOLD="+o.Hold.String())
 	}
-	// Setup obtained a hook-delivery key from the account fixture. A no-key
-	// negative control must remove it as well as refuse any subsequent key mint.
-	projectKeys := map[string]string{}
-	if !o.NoKey {
-		projectKeys[sb.ProjectID] = liveKey
-	}
-	keys, _ := json.Marshal(map[string]any{"keys": projectKeys})
-	if err := os.WriteFile(filepath.Join(sb.TermaConfig, "keys.json"), keys, 0o600); err != nil {
-		t.Fatal(err)
+	if o.ServerKey || o.NoKey {
+		// A profile set up with a server key sends with keys.json's key for the team; the
+		// no-key control holds none.
+		projectKeys := map[string]string{}
+		if !o.NoKey {
+			projectKeys[sb.ProjectID] = liveKey
+		}
+		keys, _ := json.Marshal(map[string]any{"keys": projectKeys})
+		if err := os.WriteFile(filepath.Join(sb.TermaConfig, "keys.json"), keys, 0o600); err != nil {
+			t.Fatal(err)
+		}
+		sb.editProfile("default", func(p map[string]any) { p["server_key_sign_in"] = true })
 	}
 	// The relay withholds a claimed session of an agent the developer did not choose, and
 	// setup records only the agents it offers (the rest are Coming Soon): the profile

@@ -118,8 +118,10 @@ func TestCodexSubscriptionSession(t *testing.T) {
 		Note("codex/auth_mode", "ChatGPT login reports auth_mode="+first.Attrs["auth_mode"])
 		CheckKeys(t, "codex/response_completed", first.Attrs, newest)
 		CheckKeys(t, "codex/resource", first.Resource, newest)
-		if auths := sb.Receiver.Authorizations(); len(auths) == 0 || auths[0] != "Bearer "+liveKey {
-			t.Errorf("exports not authorised with the live key: %v", auths)
+		// The agent's exports carry the live key; the spool's delivery, the person's sign-in.
+		if exports := sb.Receiver.Requests(); !slices.ContainsFunc(exports, func(r ExportRequest) bool { return r.Authorization == "Bearer "+liveKey }) ||
+			slices.ContainsFunc(exports, func(r ExportRequest) bool { return !exportAuthorized(r) }) {
+			t.Errorf("exports not authorised with the live key or the person's sign-in: %v", sb.Receiver.Authorizations())
 		}
 
 		// Production collection: the hook must deliver plan evidence itself.

@@ -168,9 +168,11 @@ func (app *App) retireOlderSignIns(ctx context.Context, authURL string) {
 // delays a sign-in by seconds, not seconds per organization. A token goes only to authURL,
 // the auth host this profile is configured for: credentials.json names hosts, and a
 // tampered one must not lead a keychain-held token elsewhere; another environment's
-// sessions are forgotten unrevoked, to expire.
+// sessions are forgotten unrevoked, to expire. Their ids are kept for the heartbeat and
+// their account for what was queued under them (auth.RecordLegacy).
 func (app *App) retireLegacySessions(ctx context.Context, authURL string) {
 	if signIns, err := auth.LegacySignIns(app.dir, true); err == nil {
+		_ = auth.RecordLegacy(app.stateDir, signIns, time.Now())
 		revokeCtx, cancel := context.WithTimeout(ctx, legacyRevokeWait)
 		var wg sync.WaitGroup
 		for _, s := range signIns {

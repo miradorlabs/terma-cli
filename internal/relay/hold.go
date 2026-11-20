@@ -125,9 +125,15 @@ func (r *Relay) sweep() {
 		for _, h := range parts {
 			c, pol, why, ok, how := r.decide(key, h.p.pid, h.p.at, h.p.narrow, h.p.claimed)
 			limit := hold
-			if h.p.start && why == whyUnclaimed {
+			switch {
+			case h.p.start && why == whyUnclaimed:
 				// A conversation start waits for the thread's first turn.
 				limit = max(hold, r.opts.TraceHold)
+			case why == whyNoKey:
+				// Claimed for a team whose policy cannot be read now (a refresh the sign-in's
+				// remediation blocks): kept as long as the outbox keeps parts, within the
+				// hold's bounds, and placed once the policy is back.
+				limit = max(hold, maxOutboxAge)
 			}
 			if !ok && !h.p.narrow && !h.p.claimed && why != whyNoKey && now.Sub(h.at) >= limit {
 				if cc, cok := r.catchAll(); cok {

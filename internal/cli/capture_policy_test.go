@@ -48,8 +48,8 @@ func TestPolicyRefreshFiltersAlreadyQueuedReplies(t *testing.T) {
 			fmt.Fprintf(w, `{"policy":{"version":"1.0","terma":{"per_repository":{"repositories":["github.com/acme/app"]},"capture":{"exclude_prompts":%t,"exclude_tool_content":false}}},"revision":%d,"updated_at":"2026-09-30T12:27:05Z"}`, revision.Load() > 1, revision.Load())
 			return
 		}
-		if r.Header.Get("Authorization") != "Bearer "+policyTestKey {
-			t.Error("export did not use team key")
+		if r.Header.Get("Authorization") != "Bearer developer-policy-token" || r.Header.Get(relay.ProjectHeader) != "team" {
+			t.Error("export did not use the developer's sign-in, naming the team")
 		}
 		b, _ := io.ReadAll(r.Body)
 		arrived <- b
@@ -77,7 +77,8 @@ func TestPolicyRefreshFiltersAlreadyQueuedReplies(t *testing.T) {
 		if name != "terma.commit" {
 			attrs["text"] = "PRIVATE_CONTENT"
 		}
-		if err := s.Append(spool.Event{Time: time.Now(), Name: name, Repository: appRepo, Attrs: attrs}); err != nil {
+		account := auth.AccountKey(srv.URL, "u-1")
+		if err := s.Append(spool.Event{Time: time.Now(), Name: name, Repository: appRepo, Account: account, Attrs: attrs}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -127,7 +128,7 @@ func TestRelayRespectsHarnessSelection(t *testing.T) {
 			if err := keystore.Set(testApp.dir, "team", policyTestKey, keystore.Hosts{OTLP: host.URL}); err != nil {
 				t.Fatal(err)
 			}
-			cfg := &config.Config{Dir: testApp.dir, StateDir: testApp.stateDir, Policy: config.DefaultPolicy(), OTLPURL: host.URL, Harnesses: []string{test.harness}}
+			cfg := &config.Config{Dir: testApp.dir, StateDir: testApp.stateDir, Policy: config.DefaultPolicy(), OTLPURL: host.URL, Harnesses: []string{test.harness}, ServerKeySignIn: true}
 			cfg.Policy.Repositories = []string{appRepo.Origin}
 			r := newTestRelay(relay.Options{Token: "test-token", Dir: t.TempDir(), Resolve: testApp.relayDeps().Resolver(cfg), Lookup: func(string, time.Time) (claim.Claim, bool) {
 				return claim.Claim{ProjectID: "team", Tool: test.tool, Repository: appRepo}, true
@@ -202,7 +203,7 @@ func TestQueuedRelayExportsRespectHarnessDeselection(t *testing.T) {
 		t.Helper()
 		pol := config.DefaultPolicy()
 		pol.TeamID, pol.FetchedAt, pol.Repositories = "team", time.Now(), []string{appRepo.Origin}
-		if err := config.UpdateProfile(testApp.dir, config.DefaultProfile, func(p *config.Profile) { p.Harnesses = agents }); err != nil {
+		if err := config.UpdateProfile(testApp.dir, config.DefaultProfile, func(p *config.Profile) { p.Harnesses, p.ServerKeySignIn = agents, true }); err != nil {
 			t.Fatal(err)
 		}
 		selectPolicy(t, pol)

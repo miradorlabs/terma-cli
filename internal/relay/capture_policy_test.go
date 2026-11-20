@@ -106,7 +106,7 @@ func TestQueuedExportsRecheckTheRepository(t *testing.T) {
 			t.Fatal(err)
 		}
 		c := claim.Claim{ProjectID: "team", Tool: "codex", Repository: repo}
-		if err := r.outbox.put(routeOf(c), repo, newEntry(time.Now(), Logs, 1), body); err != nil {
+		if err := r.outbox.put(routeOf("", c), repo, newEntry(time.Now(), Logs, 1), body); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -121,7 +121,7 @@ func TestQueuedExportsRecheckTheRepository(t *testing.T) {
 	if body, _ := got.Load().(string); !strings.Contains(body, "session-kept") || strings.Contains(body, "session-removed") {
 		t.Fatalf("upstream got %q, want only the kept repository's part", body)
 	}
-	if entries, _ := r.outbox.list(routeOf(claim.Claim{ProjectID: "team", Tool: "codex", Repository: removed})); len(entries) != 0 {
+	if entries, _ := r.outbox.list(routeOf("", claim.Claim{ProjectID: "team", Tool: "codex", Repository: removed})); len(entries) != 0 {
 		t.Fatalf("the removed repository's part stayed queued: %v", entries)
 	}
 }

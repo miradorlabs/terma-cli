@@ -64,7 +64,13 @@ type Credential struct {
 	// ViaDesktop is a login Terma Desktop delegated to this CLI (its label ends
 	// auth.Credential.ViaDesktop), not one approved in the browser.
 	ViaDesktop bool
+	// Retired is a login a server refused as retired (SIGN_IN_RETIRED): only a newer terma,
+	// signed in again, sends again.
+	Retired bool
 }
+
+// RetiredFix is what makes a retired sign-in send again.
+const RetiredFix = "terma update && terma login"
 
 // Origin says how a developer's login was made: ", signed in through Terma Desktop" for
 // one the desktop delegated, "" for a browser sign-in or a server key.
@@ -112,6 +118,11 @@ type Relay struct {
 	// ServiceInstalled says a relay service is installed; ServiceCurrent that it is the one
 	// this terma would install, in the environment install recorded.
 	ServiceInstalled, ServiceCurrent bool
+	// OutboxFull and OutboxExpired count the records the relay's outbox dropped because it
+	// was full or they waited past its age, and OutboxHeld the claimed ones a stopping relay
+	// dropped from memory, since the outbox was made; OutboxLossAt is the last.
+	OutboxFull, OutboxExpired, OutboxHeld int
+	OutboxLossAt                          time.Time
 }
 
 // SpoolState is the event queue as a run finds it.
@@ -208,6 +219,10 @@ func Run(ctx context.Context, env Env, progress Progress) Report {
 	}
 
 	timed(KeyHarness, "agent exporting to Terma", func() Check { return unlessCaptureOff(d.pol, d.agentsExporting()) })
+	// Only a recent loss: one older than the outbox keeps parts is history.
+	if r := relayFacts(env.Probes); r.OutboxFull+r.OutboxExpired+r.OutboxHeld > 0 && time.Since(r.OutboxLossAt) < OutboxLossWindow {
+		timed(KeyOutbox, "relay outbox", func() Check { return OutboxCheck(r) })
+	}
 
 	if a, ok := StatusLineAgent(env.Agents); ok && a.Installed(ctx) {
 		timed(KeyStatusLine, a.DisplayName()+" status line", d.statusLine)
@@ -271,6 +286,10 @@ func (d *run) signedIn() Check {
 	}
 	if cred.OtherEnvironment {
 		return Check{Status: Fail, Detail: "signed in against a different environment", Fix: "terma setup"}
+	}
+	if cred.Retired {
+		return Check{Status: Fail, Detail: "Terma no longer accepts this sign-in: update terma and run `terma login`; until then nothing is sent, and what is queued waits",
+			Fix: RetiredFix}
 	}
 	who, storage := cmp.Or(cred.Email, "your account"), cred.Origin()+", credentials "+cred.Storage()
 	if cred.ServerKey != "" {
@@ -336,7 +355,7 @@ func (d *run) eventSpool() Check {
 		return Check{Status: Fail, Detail: "events cannot be written to the spool: " + s.WriteErr.Error(), Fix: "check permissions and free space on " + output.TildePath(d.env.StateDir)}
 	}
 	if d.projectID != "" && !d.env.Probes.Keys.has("", d.projectID) {
-		return Check{Status: Fail, Detail: fmt.Sprintf("%d queued; no team key stored for %s", n, cmp.Or(d.cfg.ProjectName, d.projectID)), Fix: "terma setup"}
+		return Check{Status: Fail, Detail: fmt.Sprintf("%d queued; nothing on this machine may send them to %s: no sign-in, nor a team key", n, cmp.Or(d.cfg.ProjectName, d.projectID)), Fix: "terma setup"}
 	}
 	return Check{Status: Pass, Detail: fmt.Sprintf("%d queued, spool writable", n)}
 }
@@ -344,7 +363,7 @@ func (d *run) eventSpool() Check {
 // BackendCheck flushes every project's queued events; a flush the backend accepts is the proof.
 func BackendCheck(ctx context.Context, p Probes, projectID string) Check {
 	if projectID != "" && !p.Keys.has("", projectID) {
-		return Check{Status: Skip, Detail: "no team key on this machine; nothing can be delivered", Fix: "terma setup"}
+		return Check{Status: Skip, Detail: "no sign-in or team key on this machine; nothing can be delivered", Fix: "terma setup"}
 	}
 	res, err := p.Deliver(ctx)
 	if err != nil {

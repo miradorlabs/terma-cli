@@ -28,20 +28,22 @@ type ResolverDeps struct {
 	User func(projectID, endpoint string) string
 }
 
-// Resolver turns a claim into a Policy: the project's ingest host, the claiming agent's key
-// (else the spool key, while the parts wait for one), and relay.CapturePolicy.
+// Resolver turns a claim into a Policy: the project's ingest host, relay.CapturePolicy, and
+// for a profile set up with a server key, that key (the claiming agent's, else the team's).
+// A person's profile names no key: the relay sends with their sign-in.
 func Resolver(cfg *config.Config, r ResolverDeps) func(claim.Claim) (relay.Policy, error) {
 	var mu sync.Mutex
 	var lockedUntil time.Time
 	var lockedErr error
-	return func(c claim.Claim) (relay.Policy, error) {
+	// teamKey is a server-key profile's key for c: the claiming agent's, else the team's.
+	teamKey := func(c claim.Claim) (string, error) {
 		// A locked keychain is asked again only after a while: on Linux every ask can raise
 		// an unlock prompt, and the relay resolves far more often than a person can answer.
 		mu.Lock()
 		if time.Now().Before(lockedUntil) {
 			err := lockedErr
 			mu.Unlock()
-			return relay.Policy{}, err
+			return "", err
 		}
 		mu.Unlock()
 		key, err := keystore.GetFor(cfg.Dir, r.AgentName(c.Tool), c.ProjectID)
@@ -55,12 +57,15 @@ func Resolver(cfg *config.Config, r ResolverDeps) func(claim.Claim) (relay.Polic
 				mu.Unlock()
 			}
 			// Not ErrNoKey: a key the keychain will not give up now is not minted again.
-			return relay.Policy{}, err
+			return "", err
 		}
 		if key == "" {
-			return relay.Policy{}, relay.ErrNoKey
+			return "", relay.ErrNoKey
 		}
-		org, chosen := cfg.Policy, cfg.Harnesses
+		return key, nil
+	}
+	return func(c claim.Claim) (relay.Policy, error) {
+		org, chosen, serverKey := cfg.Policy, cfg.Harnesses, cfg.ServerKeySignIn
 		// Reread the profile's team and its policy so a refreshed policy also governs queued exports.
 		if file, err := config.LoadFile(cfg.Dir); err != nil {
 			return relay.Policy{}, err
@@ -68,7 +73,7 @@ func Resolver(cfg *config.Config, r ResolverDeps) func(claim.Claim) (relay.Polic
 			// The startup policy would outlive a sign-out or a removed profile.
 			return relay.Policy{}, errors.New("profile removed; restart the relay")
 		} else if p != nil {
-			chosen = p.Harnesses
+			chosen, serverKey = p.Harnesses, p.ServerKeySignIn
 			if p.OrganizationID != cfg.OrganizationID {
 				return relay.Policy{}, errors.New("organization changed; restart the relay")
 			}
@@ -76,6 +81,15 @@ func Resolver(cfg *config.Config, r ResolverDeps) func(claim.Claim) (relay.Polic
 				org = config.NoPolicy(cfg.OrganizationID, cfg.AuthURL)
 			} else {
 				org = stored
+			}
+		}
+		key := ""
+		if serverKey {
+			// A profile set up with a server key sends with it; a person's sends with their
+			// sign-in (relay.Options.SignIn).
+			var err error
+			if key, err = teamKey(c); err != nil {
+				return relay.Policy{}, err
 			}
 		}
 		globalPrimary := org.Global() && (org.TeamID == "" || org.TeamID == c.ProjectID)

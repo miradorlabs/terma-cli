@@ -43,7 +43,7 @@ func TestEachProjectGoesToItsKeysOwnEnvironment(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cfg := &config.Config{OTLPURL: prod.OTLPURL, APIURL: prod.APIURL}
+	cfg := &config.Config{OTLPURL: prod.OTLPURL, APIURL: prod.APIURL, ServerKeySignIn: true}
 	if err := keystore.Set(dir, "keyed", testKey, keystore.Hosts{OTLP: "https://otlp.keyed", API: "https://api.keyed"}); err != nil {
 		t.Fatal(err)
 	}
@@ -134,7 +134,7 @@ func TestAProjectWithoutAPolicyOrAKeyKeepsItsEvents(t *testing.T) {
 		}
 		return config.Policy{Mode: config.ModeRepo, Repositories: listed}, nil
 	}}
-	res := r.Flush(t.Context(), s, &config.Config{}, true, 0)
+	res := r.Flush(t.Context(), s, &config.Config{ServerKeySignIn: true}, true, 0)
 	if res.Sent != 0 || res.Held != 2 || res.Unroutable != 1 || res.Err != nil {
 		t.Fatalf("Flush = %+v", res)
 	}
@@ -169,7 +169,7 @@ func TestContentSpooledUnderAnOlderPolicyLeavesWithoutIt(t *testing.T) {
 	}
 	tightened := config.Policy{Mode: config.ModeRepo, Repositories: listed, TeamID: "p1", FetchedAt: time.Now()}
 	r := Router{ConfigDir: dir, OTLPPinned: true, Policy: func(context.Context, *config.Config, string) (config.Policy, error) { return tightened, nil }}
-	res := r.Flush(t.Context(), s, &config.Config{OTLPURL: srv.URL}, true, 0)
+	res := r.Flush(t.Context(), s, &config.Config{OTLPURL: srv.URL, ServerKeySignIn: true}, true, 0)
 	if res.Sent != 3 || res.Err != nil {
 		t.Fatalf("Flush = %+v", res)
 	}
@@ -352,7 +352,7 @@ func TestALockedKeychainKeepsEventsQueued(t *testing.T) {
 	}
 	pol := config.Policy{Mode: config.ModeRepo, Repositories: listed, TeamID: "p1", FetchedAt: time.Now()}
 	r := Router{ConfigDir: dir, OTLPPinned: true, Policy: func(context.Context, *config.Config, string) (config.Policy, error) { return pol, nil }}
-	res := r.Flush(t.Context(), s, &config.Config{OTLPURL: srv.URL}, true, 0)
+	res := r.Flush(t.Context(), s, &config.Config{OTLPURL: srv.URL, ServerKeySignIn: true}, true, 0)
 	if sent != 0 || res.Sent != 0 || !secret.IsUnavailable(res.Err) {
 		t.Fatalf("Flush = %+v, sent %d; want nothing sent and the keychain named", res, sent)
 	}
@@ -433,7 +433,7 @@ func TestHookEventsNameTheUser(t *testing.T) {
 			}
 			return ""
 		}}
-	if res := r.Flush(t.Context(), s, &config.Config{OTLPURL: srv.URL}, true, 0); res.Sent != 2 || res.Err != nil {
+	if res := r.Flush(t.Context(), s, &config.Config{OTLPURL: srv.URL, ServerKeySignIn: true}, true, 0); res.Sent != 2 || res.Err != nil {
 		t.Fatalf("Flush = %+v", res)
 	}
 	if want := []string{"p1@" + srv.URL, "p2@" + srv.URL}; !slices.Equal(asked, want) {

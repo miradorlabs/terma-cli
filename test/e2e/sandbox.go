@@ -151,8 +151,9 @@ func (sb *Sandbox) setupList() string {
 }
 
 const (
-	// liveKey is the server key the agents and the spool export with: a syntactically
-	// valid key the receiver accepts without checking. Nothing mints anything.
+	// liveKey is the key the agents' own exporters, and a profile set up with a server
+	// key, export with: a syntactically valid key the receiver accepts without checking. A
+	// person's profile sends with their sign-in (personBearer) instead.
 	liveKey = "ter_srv_00000000000000000000000000000000"
 )
 
@@ -300,33 +301,12 @@ func (sb *Sandbox) Delivered(name, session string, timeout time.Duration) []LogR
 	})
 }
 
-// useLiveKey files liveKey as the project's key, which the spool's flushes deliver with,
-// in place of the one setup had the account fixture mint.
-func (sb *Sandbox) useLiveKey() {
-	sb.T.Helper()
-	path := filepath.Join(sb.TermaConfig, "keys.json")
-	doc := map[string]any{}
-	if data, err := os.ReadFile(path); err == nil {
-		_ = json.Unmarshal(data, &doc)
-	}
-	keys, _ := doc["keys"].(map[string]any)
-	if keys == nil {
-		keys = map[string]any{}
-	}
-	keys[sb.ProjectID] = liveKey
-	doc["keys"] = keys
-	data, _ := json.MarshalIndent(doc, "", "  ")
-	if err := os.WriteFile(path, data, 0o600); err != nil {
-		sb.T.Fatal(err)
-	}
-}
-
 // RouteClaude points Claude Code at the team's project the way `terma setup` does for a
 // developer: its user-level exporter at the local relay, which forwards the sessions the
 // hooks claim in an admitted repository to the receiver, standing in for Terma. With
 // ExcludeContent the team's policy, which the account fixture serves, withholds prompts
 // and tool content. The account fixture supplies the developer login the relay fetches
-// that policy with. UseRelay files the receiver's key.
+// that policy with, and the relay sends with.
 func (sb *Sandbox) RouteClaude() {
 	sb.T.Helper()
 	if sb.Mode != Isolated {

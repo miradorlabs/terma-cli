@@ -8,8 +8,10 @@ import (
 	"time"
 )
 
-// The relay's heartbeat is a log record sent to the project's ingest with the project's
-// key, every period, naming terma's version, the machine and the signed-in user.
+// The relay's heartbeat is a log record sent to the selected team's ingest with the
+// person's sign-in, naming the team, every period, naming terma's version, the machine,
+// this installation and the signed-in user. No older terma's sign-in was retired here,
+// so it names no legacy sessions.
 func TestRelayHeartbeat(t *testing.T) {
 	forEachClaude(t, func(t *testing.T, b Binary, _ bool) {
 		ProvesAll(t, b, "relay.heartbeat")
@@ -29,6 +31,15 @@ func TestRelayHeartbeat(t *testing.T) {
 			t.Fatal("no heartbeat reached the project's ingest")
 		}
 		beat := beats[0]
+		if beat.Authorization != personBearer() || beat.Project != sb.ProjectID {
+			t.Errorf("heartbeat sent with %q naming team %q, want the person's sign-in naming %s", beat.Authorization, beat.Project, sb.ProjectID)
+		}
+		if beat.Resource["terma.installation.id"] != accountInstallation {
+			t.Errorf("heartbeat resource terma.installation.id = %q, want %s: %v", beat.Resource["terma.installation.id"], accountInstallation, beat.Resource)
+		}
+		if _, ok := beat.Resource["terma.legacy_session_ids"]; ok {
+			t.Errorf("heartbeat names legacy sessions no sign-in retired: %v", beat.Resource)
+		}
 		if beat.Resource["service.name"] != "terma-relay" || beat.Resource["service.version"] == "" || beat.Resource["terma.schema.version"] != "2" {
 			t.Errorf("heartbeat resource %v", beat.Resource)
 		}

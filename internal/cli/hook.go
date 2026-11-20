@@ -9,6 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/miradorlabs/terma-cli/internal/account/auth"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/hooks/dispatch"
 	"github.com/miradorlabs/terma-cli/internal/procinfo"
@@ -85,7 +86,11 @@ func (app *App) hookProfile() dispatch.Profile {
 	if err != nil {
 		return dispatch.Profile{Policy: config.NoPolicy("", "")}
 	}
-	return dispatch.Profile{Team: cfg.Policy.TeamID, Agents: cfg.Harnesses, Policy: cfg.Policy.InForce(cfg.OrganizationID, cfg.AuthURL)}
+	p := dispatch.Profile{Team: cfg.Policy.TeamID, Agents: cfg.Harnesses, Policy: cfg.Policy.InForce(cfg.OrganizationID, cfg.AuthURL)}
+	if !cfg.ServerKeySignIn {
+		p.Account = auth.Account(cfg.Dir, cfg.ProfileName, cfg.AuthURL)
+	}
+	return p
 }
 
 // hookPolicy is the collection policy while it is validated and fresh, else NoPolicy.

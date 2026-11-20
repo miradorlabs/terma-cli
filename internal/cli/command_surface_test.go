@@ -214,7 +214,9 @@ func TestMessagesNameOnlyPrimaryCommands(t *testing.T) {
 			named := append(namedCommand.FindAllStringSubmatch(line, -1), unquotedCommand.FindAllStringSubmatch(line, -1)...)
 			for _, m := range named {
 				// `terma hook` is named to say what agents and git run, never as advice.
-				if !slices.Contains(primaryCommands, m[1]) && m[1] != "hook" {
+				// `terma login` is setup's alias, which a retired sign-in's fix names, as the
+				// onboarding emails and the platform's remediation do.
+				if !slices.Contains(primaryCommands, m[1]) && m[1] != "hook" && m[1] != "login" {
 					t.Errorf("%s:%d tells someone to run `terma %s`, which is not one of %v: %s", rel, i+1, m[1], primaryCommands, strings.TrimSpace(line))
 				}
 			}

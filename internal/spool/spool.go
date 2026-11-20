@@ -34,7 +34,11 @@ type Event struct {
 	// Repository is the working copy as admission names it, so delivery holds a queued
 	// event to the repository list in force when it leaves. Local only.
 	Repository config.Repository `json:"repository,omitzero"`
-	Attrs      map[string]any    `json:"attrs,omitempty"`
+	// Account is the account key (auth.AccountKey) of the sign-in the event was collected
+	// under, so it leaves under that sign-in only; "" when none was, as for an event an
+	// older terma queued. Local only.
+	Account string         `json:"account,omitempty"`
+	Attrs   map[string]any `json:"attrs,omitempty"`
 }
 
 // ValidTraceID reports whether id is an OTel trace id: 32 lowercase hex digits, not all zero.
@@ -109,7 +113,13 @@ const (
 // Spool is one queue directory.
 type Spool struct {
 	dir string
+	// account binds what this Spool appends to a sign-in (Bind).
+	account string
 }
+
+// Bind has every event this Spool appends without an account carry account: the sign-in
+// collecting it.
+func (s *Spool) Bind(account string) { s.account = account }
 
 // Open addresses (and creates) the spool directory.
 func Open(dir string) (*Spool, error) {
@@ -134,6 +144,9 @@ func (s *Spool) AppendContext(ctx context.Context, events ...Event) error {
 	for _, e := range events {
 		if e.Time.IsZero() {
 			e.Time = time.Now()
+		}
+		if e.Account == "" {
+			e.Account = s.account
 		}
 		line, err := json.Marshal(e)
 		if err != nil {

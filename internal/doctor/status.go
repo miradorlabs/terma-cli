@@ -138,9 +138,9 @@ func Local(ctx context.Context, env Env) (LocalReport, error) {
 			}
 			if projectID != "" {
 				if key := keyOf(p.Keys, projectID); key != "" {
-					line += ", key " + key
+					line += ", sent with " + key
 				} else {
-					line += ", no team key (run `terma setup`)"
+					line += ", no sign-in or team key (run `terma setup`)"
 					backendOK = false
 				}
 			}

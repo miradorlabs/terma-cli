@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"slices"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/semconv"
@@ -23,7 +24,9 @@ type otlpSender struct {
 	Endpoint  string
 	APIKey    string
 	ProjectID string
-	Version   string
+	// NameProject sends ProjectID as X-Mirador-Project: a user token names its team.
+	NameProject bool
+	Version     string
 	// UserID, set, names the Mirador user on the resource as terma.user.id, as the relay does.
 	UserID string
 	HTTP   *http.Client
@@ -31,10 +34,12 @@ type otlpSender struct {
 
 const (
 	otlpLogsPath = "/v1/logs"
-	serviceName  = "terma-cli"
-	sendTimeout  = 15 * time.Second
-	severityInfo = 9
-	severityText = "INFO"
+	// projectHeader names the team a user token's events go to.
+	projectHeader = "X-Mirador-Project"
+	serviceName   = "terma-cli"
+	sendTimeout   = 15 * time.Second
+	severityInfo  = 9
+	severityText  = "INFO"
 )
 
 type otlpAttr struct {
@@ -136,7 +141,7 @@ func (o *otlpSender) Send(ctx context.Context, events []spool.Event) ([]spool.Ev
 
 func (o *otlpSender) send(ctx context.Context, events []spool.Event) error {
 	if o.Endpoint == "" || o.APIKey == "" {
-		return fmt.Errorf("spool flush needs an OTLP endpoint and a team key — run `terma setup`")
+		return fmt.Errorf("spool flush needs an OTLP endpoint and a sign-in — run `terma setup`")
 	}
 	records := make([]map[string]any, 0, len(events))
 	for _, e := range events {
@@ -193,6 +198,9 @@ func (o *otlpSender) send(ctx context.Context, events []spool.Event) error {
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+o.APIKey)
+	if o.NameProject {
+		req.Header.Set(projectHeader, o.ProjectID)
+	}
 	req.Header.Set("User-Agent", serviceName+"/"+o.Version)
 	resp, err := client.Do(req)
 	if err != nil {
@@ -214,6 +222,12 @@ type IngestError struct {
 
 func (e *IngestError) Error() string {
 	return fmt.Sprintf("otlp ingest returned %d: %s", e.Status, e.Detail)
+}
+
+// Retired reports whether the host refused the sign-in as retired (SIGN_IN_RETIRED), in
+// the google.rpc.Status a user token's refusal carries.
+func (e *IngestError) Retired() bool {
+	return e.Status == http.StatusForbidden && strings.Contains(e.Detail, "SIGN_IN_RETIRED")
 }
 
 // KeyRefused reports whether the host rejected the credential rather than the request.

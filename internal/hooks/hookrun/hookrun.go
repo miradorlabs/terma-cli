@@ -53,6 +53,9 @@ type Env struct {
 	AwaitPush func(path string)
 	// Policy is the organization's collection policy; global mode places every session in its DefaultProjectID.
 	Policy config.Policy
+	// Account is the account key of the sign-in in place, stamped on every event this hook
+	// queues, parked ones included, so it leaves under that sign-in only.
+	Account string
 	// Team is the developer's team from setup, which claims every session they run in a
 	// collected repository, whatever the policy's state.
 	Team string
@@ -275,9 +278,13 @@ func (e Env) EmitFor(r *Repo, ev spool.Event) bool {
 	return e.emit(ev) || e.park(r, parkedEvents, ev)
 }
 
-// stamp names the event's repository, for delivery's admission, and its project.
+// stamp names the event's repository, for delivery's admission, its project and the
+// account that collected it.
 func (e Env) stamp(r *Repo, ev spool.Event) spool.Event {
 	ev.Global = e.Policy.Global()
+	if ev.Account == "" {
+		ev.Account = e.Account
+	}
 	if r != nil {
 		ev.Repository = r.Repository
 	}

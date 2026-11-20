@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"cmp"
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"slices"
@@ -37,6 +38,7 @@ func (app *App) relayDeps() daemon.Deps {
 		HookPolicy:    app.hookPolicy,
 		LoadConfig:    app.loadConfig,
 		RefreshPolicy: pols.Refresh,
+		Bind:          app.bindRelay,
 	}
 }
 
@@ -50,15 +52,19 @@ func (app *App) globalMode() globalmode.Machine {
 	return globalmode.Machine{ConfigDir: app.dir, Agents: app.agents, Terma: app.hookExecutable, ManagedRoot: app.managedRoot}
 }
 
-// relayHeartbeatSend delivers a heartbeat to a project's ingest with that project's key: the
-// selected team's, else any project's held here; with none, nothing is sent. It sends
-// once, so the user teamUser names never rides on to another key.
+// relayHeartbeatSend delivers a heartbeat to the selected team's ingest with the person's
+// sign-in, naming the team; on a profile set up with a server key, with the selected
+// team's key, else any project's held here. With neither, nothing is sent. It sends once,
+// so the user teamUser names never rides on to another key.
 func (app *App) relayHeartbeatSend(ctx context.Context, beat *logspb.LogsData) error {
 	cfg, err := config.Load(app.dir, app.stateDir, config.Overrides{})
 	if err != nil {
 		return err
 	}
 	selected := cmp.Or(cfg.Policy.TeamID, cfg.Policy.DefaultProjectID, cfg.ProjectID)
+	if !cfg.ServerKeySignIn && cfg.APIKey == "" {
+		return app.signedInHeartbeat(ctx, cfg, selected, beat)
+	}
 	others := keystore.CollectionProjects(app.dir)
 	slices.Sort(others)
 	for _, projectID := range append([]string{selected}, others...) {
@@ -69,7 +75,7 @@ func (app *App) relayHeartbeatSend(ctx context.Context, beat *logspb.LogsData) e
 		if projectID != "" && key != "" {
 			endpoint := app.delivery().Endpoint(cfg, projectID)
 			relay.NameHeartbeatUser(beat, app.teamUser(cfg, projectID, endpoint))
-			return sendHeartbeat(ctx, endpoint, key, beat)
+			return sendHeartbeat(ctx, endpoint, key, "", beat)
 		}
 	}
 	return relay.ErrNoKey
@@ -119,7 +125,37 @@ func signedInUser(cfg *config.Config) string {
 	return cred.UserID
 }
 
-func sendHeartbeat(ctx context.Context, endpoint, key string, beat *logspb.LogsData) error {
+// signedInHeartbeat sends beat to team's ingest with the person's sign-in, naming the team.
+func (app *App) signedInHeartbeat(ctx context.Context, cfg *config.Config, team string, beat *logspb.LogsData) error {
+	src := app.signInSource(cfg)
+	account := src.Account()
+	if team == "" || account == "" {
+		return relay.ErrNoKey
+	}
+	token, err := src.Token(ctx, account)
+	if err != nil {
+		return err
+	}
+	if token == "" {
+		return relay.ErrNoKey // signed out, retired, or another person's: no beat goes
+	}
+	endpoint := app.delivery().Endpoint(cfg, team)
+	relay.NameHeartbeatUser(beat, app.teamUser(cfg, team, endpoint))
+	err = sendHeartbeat(ctx, endpoint, token, team, beat)
+	if ingest, ok := errors.AsType[*heartbeatError](err); ok && ingest.status == http.StatusUnauthorized {
+		src.Refused(ctx, token)
+	}
+	return err
+}
+
+// heartbeatError is the ingest's refusal of a beat.
+type heartbeatError struct{ status int }
+
+func (e *heartbeatError) Error() string { return fmt.Sprintf("the ingest answered HTTP %d", e.status) }
+
+// sendHeartbeat posts beat to endpoint with bearer, naming team for a user token ("" for a
+// server key, whose grant fixes it).
+func sendHeartbeat(ctx context.Context, endpoint, bearer, team string, beat *logspb.LogsData) error {
 	body, err := proto.Marshal(beat)
 	if err != nil {
 		return err
@@ -129,14 +165,17 @@ func sendHeartbeat(ctx context.Context, endpoint, key string, beat *logspb.LogsD
 		return err
 	}
 	req.Header.Set("Content-Type", "application/x-protobuf")
-	req.Header.Set("Authorization", "Bearer "+key)
+	req.Header.Set("Authorization", "Bearer "+bearer)
+	if team != "" {
+		req.Header.Set(relay.ProjectHeader, team)
+	}
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return err
 	}
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode/100 != 2 {
-		return fmt.Errorf("the ingest answered HTTP %d", resp.StatusCode)
+		return &heartbeatError{status: resp.StatusCode}
 	}
 	return nil
 }

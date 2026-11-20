@@ -7,7 +7,9 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"path/filepath"
 	"slices"
+	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/account/secret"
 	"github.com/miradorlabs/terma-cli/internal/config"
@@ -116,4 +118,66 @@ func ForgetLegacy(dir string) error {
 	}
 	_ = os.Remove(path + ".lock")
 	return nil
+}
+
+// LegacyRecordFile is, in the state directory, what the first sign-in on user tokens kept of
+// the sign-ins it retired.
+const LegacyRecordFile = "legacy-sign-ins.json"
+
+// LegacyReportWindow is how long the heartbeat reports the retired sessions.
+const LegacyReportWindow = 30 * 24 * time.Hour
+
+// LegacyRecord is what a sign-in kept of the per-organization sign-ins it retired: their
+// session ids, which the heartbeat reports for LegacyReportWindow so the platform matches
+// this installation to the machine they stood for, and the account they all belonged to,
+// whose name what an older terma queued may still leave under. Account is "" when they
+// named no single person and environment.
+type LegacyRecord struct {
+	SessionIDs []string  `json:"session_ids,omitempty"`
+	Account    string    `json:"account,omitempty"`
+	RetiredAt  time.Time `json:"retired_at"`
+}
+
+// Recent reports whether the record's sessions are still reported at now.
+func (r LegacyRecord) Recent(now time.Time) bool {
+	return !r.RetiredAt.IsZero() && now.Sub(r.RetiredAt) < LegacyReportWindow
+}
+
+// RecordLegacy keeps, under the state directory stateDir, what signIns were: the first
+// retirement's record stands, so a later one only adds session ids.
+func RecordLegacy(stateDir string, signIns []LegacySignIn, now time.Time) error {
+	if len(signIns) == 0 {
+		return nil
+	}
+	rec, _ := ReadLegacyRecord(stateDir)
+	fresh := rec.RetiredAt.IsZero()
+	if fresh {
+		rec.RetiredAt = now.UTC()
+	}
+	accounts := map[string]bool{}
+	for _, s := range signIns {
+		if s.SessionID != "" && !slices.Contains(rec.SessionIDs, s.SessionID) {
+			rec.SessionIDs = append(rec.SessionIDs, s.SessionID)
+		}
+		accounts[AccountKey(s.AuthURL, s.UserID)] = true
+	}
+	if fresh && len(accounts) == 1 {
+		for a := range accounts {
+			rec.Account = a
+		}
+	}
+	return config.WriteJSON(filepath.Join(stateDir, LegacyRecordFile), rec, 0o600)
+}
+
+// ReadLegacyRecord is what RecordLegacy kept, the zero record when nothing was.
+func ReadLegacyRecord(stateDir string) (LegacyRecord, error) {
+	var rec LegacyRecord
+	data, err := os.ReadFile(filepath.Join(stateDir, LegacyRecordFile))
+	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return rec, nil
+		}
+		return rec, err
+	}
+	return rec, json.Unmarshal(data, &rec)
 }

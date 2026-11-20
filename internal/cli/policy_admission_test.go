@@ -91,7 +91,7 @@ func TestRelayAdmissionStopsGlobalCoverageWithStaleCatchAll(t *testing.T) {
 	pol.Revision, pol.FetchedAt = 1, time.Now()
 	save := func() {
 		t.Helper()
-		if err := config.UpdateProfile(testApp.dir, cfg.ProfileName, func(p *config.Profile) { p.OrganizationID = cfg.OrganizationID }); err != nil {
+		if err := config.UpdateProfile(testApp.dir, cfg.ProfileName, func(p *config.Profile) { p.OrganizationID, p.ServerKeySignIn = cfg.OrganizationID, true }); err != nil {
 			t.Fatal(err)
 		}
 		selectPolicy(t, pol)

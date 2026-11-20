@@ -270,7 +270,23 @@ func (c *Client) do(ctx context.Context, h host, method, path string, query url.
 	defer resp.Body.Close()
 
 	meta := &Meta{StatusCode: resp.StatusCode, ETag: resp.Header.Get("ETag")}
-	return meta, decode(resp, out)
+	err = decode(resp, out)
+	if apiErr, ok := errors.AsType[*Error](err); ok && apiErr.SignInRetired() {
+		c.markRetired()
+		return meta, fmt.Errorf("%w: %w", auth.ErrSignInRetired, err)
+	}
+	return meta, err
+}
+
+// markRetired records on the stored sign-in, while it is still the one this client holds,
+// that a server refused it as retired.
+func (c *Client) markRetired() {
+	c.mu.Lock()
+	cred := c.credential
+	c.mu.Unlock()
+	if c.profile != "" && cred != nil && cred.RefreshToken != "" {
+		_ = auth.MarkRetired(c.dir, c.profile, cred.RefreshToken)
+	}
 }
 
 func (c *Client) attempt(ctx context.Context, h host, method, path string, query url.Values, headers http.Header, body any) (*http.Response, error) {

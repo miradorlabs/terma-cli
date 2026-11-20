@@ -43,6 +43,9 @@ type part struct {
 	narrow bool
 	// claimed marks a part named by a Claimed session key: only its session's claim may send it.
 	claimed bool
+	// account is the account key of the sign-in in place when the part arrived, which it
+	// leaves under, however long it is held first.
+	account string
 }
 
 // sessionOf is the first session key, by rank, on the record's attributes, then its

@@ -22,7 +22,7 @@ const (
 	whyNoTrace        = "no_session_trace"   // a span of a trace no record has named yet
 	whyUnclaimed      = "unclaimed_expired"  // no hook in a collected repository claimed the session
 	whyProcess        = "uncovered_process"  // claimed, but by other processes: resumed elsewhere
-	whyNoKey          = "no_key"             // claimed, but this machine holds no key for the project
+	whyNoKey          = "no_key"             // claimed, but its team has no policy (or key) here to send under yet
 	whyAmbiguous      = "ambiguous_process"  // no session named; its process named more than one session
 	whyProcessIdle    = "no_session_process" // no session named; its process has named none
 	whyProcessRunning = "process_running"    // no session named; attributed only once its process exits
