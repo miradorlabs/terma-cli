@@ -1,7 +1,33 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-20T20:46:19.099421817Z",
+  "generated_at": "2026-11-20T23:02:11.327285931Z",
   "versions": [
+    {
+      "harness": "codex-desktop",
+      "name": "Codex app",
+      "version": "26.1117.41037",
+      "released_at": "2026-11-20T22:47:19Z",
+      "captured_at": "2026-11-20T23:02:11.327285931Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "26.1117.31558",
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": null,
+      "highlights": [],
+      "signing": null,
+      "partial": true,
+      "attempted_at": "2026-11-20T23:02:11.327285931Z",
+      "attempts": 1
+    },
     {
       "harness": "claude",
       "name": "Claude Code",
@@ -6172,43 +6198,6 @@
       },
       "undocumented": 0,
       "highlights": [],
-      "signing": "valid"
-    },
-    {
-      "harness": "claude",
-      "name": "Claude Code",
-      "version": "2.1.219",
-      "released_at": "2026-07-24T16:11:49.832Z",
-      "captured_at": "2026-11-05T09:54:28.532441Z",
-      "platforms": [
-        "darwin/arm64",
-        "linux/amd64"
-      ],
-      "support": "untested",
-      "previous": "2.1.218",
-      "changes": 23,
-      "categories": {
-        "behavior": 3,
-        "config": 4,
-        "hooks": 1,
-        "model": 5,
-        "network": 2,
-        "prompt": 4,
-        "request": 1,
-        "tools": 3
-      },
-      "impact": {
-        "breaking": 0,
-        "degrading": 0,
-        "informational": 4,
-        "notable": 19
-      },
-      "undocumented": 11,
-      "highlights": [
-        "Model alias \"opus\": claude-opus-4-8 → claude-opus-5",
-        "Model alias \"opus[1m]\": claude-opus-4-8 → claude-opus-5",
-        "Default model: claude-opus-4-8 → claude-opus-5"
-      ],
       "signing": "valid"
     }
   ]

@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "harness": "codex-desktop",
+  "version": "26.1117.41037",
+  "platform": "darwin/arm64",
+  "captured_at": "2026-11-20T23:02:11.327285931Z",
+  "capture": {
+    "partial": true,
+    "notes": [
+      "Part of this build's capture did not finish; the frequent check tries it again, up to four attempts."
+    ],
+    "attempted_at": "2026-11-20T23:02:11.327285931Z",
+    "attempts": 1,
+    "announced_at": "2026-11-20T23:02:11.327285931Z"
+  },
+  "side_requests": null
+}

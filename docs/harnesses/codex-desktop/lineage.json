@@ -3,8 +3,8 @@
   "harness": "codex-desktop",
   "window": {
     "oldest": "26.1029.70936",
-    "newest": "26.1117.31558",
-    "builds": 7
+    "newest": "26.1117.41037",
+    "builds": 8
   },
   "items": {
     "cli.commands.codex-desktop agents": {

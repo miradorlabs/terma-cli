@@ -6,20 +6,44 @@
     "vendor": "OpenAI",
     "homepage": "https://openai.com/codex",
     "source": null,
-    "latest": "26.1117.31558",
+    "latest": "26.1117.41037",
     "support": "untested",
-    "versions_tracked": 7,
+    "versions_tracked": 8,
     "first_tracked": "2026-11-04",
     "last_change": {
-      "from": "26.1111.71704",
-      "to": "26.1117.31558",
-      "at": "2026-11-20T02:00:44.025484206Z",
-      "released_at": "2026-11-20T01:45:31Z",
+      "from": "26.1117.31558",
+      "to": "26.1117.41037",
+      "at": "2026-11-20T23:02:11.327285931Z",
+      "released_at": "2026-11-20T22:47:19Z",
       "changes": 0,
       "categories": {}
     }
   },
   "versions": [
+    {
+      "version": "26.1117.41037",
+      "released_at": "2026-11-20T22:47:19Z",
+      "captured_at": "2026-11-20T23:02:11.327285931Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "26.1117.31558",
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": null,
+      "highlights": [],
+      "signing": null,
+      "partial": true,
+      "attempted_at": "2026-11-20T23:02:11.327285931Z",
+      "attempts": 1
+    },
     {
       "version": "26.1117.31558",
       "released_at": "2026-11-20T01:45:31Z",
