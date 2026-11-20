@@ -32,7 +32,7 @@ jobs:
     runs-on: ${{ matrix.runner || matrix.os }}
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v7
         with:
           node-version: 18
       - run: npm test --prefix npm
@@ -212,7 +212,7 @@ jobs:
         run: go build -o test/e2e/bin/terma ./cmd/terma
       # Pi has no exporter; terma's extension is one, tested only on the installed
       # build (test/e2e/pi.go).
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
       - name: Install Pi and T3 Code
