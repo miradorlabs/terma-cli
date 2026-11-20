@@ -20,7 +20,7 @@ import (
 // keep records do so under terma's config directory configDir.
 func Agents(configDir string) *agents.Registry {
 	claudeCode, codexCLI := claude.Agent{ConfigDir: configDir}, codex.Agent{ConfigDir: configDir}
-	githubCopilot, ompAgent := copilot.Agent{ConfigDir: configDir}, omp.Agent{ConfigDir: configDir}
+	githubCopilot, ompAgent, agy := copilot.Agent{ConfigDir: configDir}, omp.Agent{ConfigDir: configDir}, antigravity.Agent{}
 	return agents.New(
 		claudeCode,
 		cursor.Agent{},
@@ -32,6 +32,6 @@ func Agents(configDir string) *agents.Registry {
 		hermes.Agent{},
 		gemini.Agent{},
 		dsh.Agent{},
-		antigravity.Agent{},
-	).Support(claudeCode, codexCLI, githubCopilot, ompAgent)
+		agy,
+	).Support(claudeCode, codexCLI, githubCopilot, ompAgent, agy)
 }

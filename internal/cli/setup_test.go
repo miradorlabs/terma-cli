@@ -236,7 +236,7 @@ func TestHarnessSelectionComingSoon(t *testing.T) {
 		chosen[name] = true
 	}
 	form := testApp.harnessSelectionForm(context.Background(), chosen)
-	wantOrder := []string{"claude", "codex", "copilot", "omp", "cursor", "opencode", "pi", "hermes", "gemini", "dsh", "antigravity"}
+	wantOrder := []string{"claude", "codex", "copilot", "omp", "antigravity", "cursor", "opencode", "pi", "hermes", "gemini", "dsh"}
 	if len(form.Items) != len(wantOrder) {
 		t.Fatalf("picker has %d items, want %d", len(form.Items), len(wantOrder))
 	}
@@ -267,7 +267,7 @@ func TestHarnessSelectionComingSoon(t *testing.T) {
 }
 
 func TestHarnessSelectionFlags(t *testing.T) {
-	for _, name := range []string{"cursor", "opencode", "antigravity"} {
+	for _, name := range []string{"cursor", "opencode"} {
 		t.Run(name, func(t *testing.T) {
 			cmd := &cobra.Command{}
 			cfg := &config.Config{}
@@ -282,6 +282,10 @@ func TestHarnessSelectionFlags(t *testing.T) {
 	}
 	if got, err := testApp.chooseHarnesses(&cobra.Command{}, &config.Config{}, setupFlags{harnesses: "omp,claude"}); err != nil || !slices.Equal(got, []string{"claude", "omp"}) {
 		t.Fatalf("--harness omp,claude = %v, %v", got, err)
+	}
+	got, err = testApp.chooseHarnesses(&cobra.Command{}, &config.Config{}, setupFlags{harnesses: "antigravity,claude"})
+	if err != nil || !slices.Equal(got, []string{"claude", "antigravity"}) {
+		t.Fatalf("antigravity selection = %v, %v", got, err)
 	}
 }
 
@@ -302,7 +306,11 @@ func TestHarnessSelectionFiltersSavedAgents(t *testing.T) {
 				}
 			}
 		}
+		// Antigravity is not on the emptied PATH, so only a saved choice keeps it.
 		wantSetup := slices.Clone(wantInstalled)
+		if slices.Contains(saved, "antigravity") {
+			wantSetup = append(wantSetup, "antigravity")
+		}
 		got, err := testApp.chooseHarnesses(cmd, cfg, setupFlags{assumeYes: true})
 		if err != nil || !slices.Equal(got, wantSetup) {
 			t.Fatalf("setup selection = %v, %v; want %v", got, err, wantSetup)
