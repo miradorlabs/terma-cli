@@ -1,7 +1,20 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-20T15:23:41.365958418Z",
+  "generated_at": "2026-11-20T15:38:20.327053739Z",
   "events": [
+    {
+      "at": "2026-11-20T15:38:20.327053739Z",
+      "model": "grok-build-0.1",
+      "vendor": "xai",
+      "name": "Grok Build 0.1",
+      "event": "changed",
+      "changes": 13,
+      "highlights": [
+        "Batch API: now no",
+        "Context window: now 500K",
+        "Default effort: now high"
+      ]
+    },
     {
       "at": "2026-11-20T15:23:41.365958418Z",
       "model": "grok-build-0.1",
