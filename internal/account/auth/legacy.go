@@ -248,13 +248,15 @@ func LegacyOwnership(dir, stateDir string, serverKey bool) (LegacyRecord, error)
 // RecordNoOne keeps, under stateDir, that the sign-ins an older terma left name no one
 // whole (a file that parses to none, or not cleanly): what that terma queued until now is
 // no one's. The sessions that could be read, signIns, are kept for the heartbeat all the
-// same. A record already kept stands.
+// same. A record already kept stands, and gains those sessions.
 func RecordNoOne(stateDir string, signIns []LegacySignIn, now time.Time) error {
 	rec, err := ReadLegacyRecord(stateDir)
-	if err != nil || !rec.RetiredAt.IsZero() {
+	if err != nil {
 		return err
 	}
-	rec = LegacyRecord{Account: LegacyAccountAmbiguous, RetiredAt: now.UTC()}
+	if rec.RetiredAt.IsZero() {
+		rec = LegacyRecord{Account: LegacyAccountAmbiguous, RetiredAt: now.UTC()}
+	}
 	for _, s := range signIns {
 		if s.SessionID != "" && !slices.Contains(rec.SessionIDs, s.SessionID) {
 			rec.SessionIDs = append(rec.SessionIDs, s.SessionID)

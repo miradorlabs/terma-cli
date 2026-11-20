@@ -262,3 +262,21 @@ func TestLegacySignIns_APartlyBrokenFileNamesNoOne(t *testing.T) {
 		t.Fatalf("LegacySignIns = %+v, %v; want the readable one", signIns, err)
 	}
 }
+
+// A record already kept stands when the older sign-ins are retired as no one's, and gains
+// the sessions that could be read, for the heartbeat.
+func TestRecordNoOne_KeepsARecordAndAddsItsSessions(t *testing.T) {
+	t.Parallel()
+	stateDir := t.TempDir()
+	first := time.Now().Add(-time.Hour).UTC()
+	if err := RecordNoOne(stateDir, nil, first); err != nil {
+		t.Fatal(err)
+	}
+	if err := RecordNoOne(stateDir, []LegacySignIn{{SessionID: "s-a"}}, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	rec, err := ReadLegacyRecord(stateDir)
+	if err != nil || !rec.RetiredAt.Equal(first) || rec.Account != LegacyAccountAmbiguous || len(rec.SessionIDs) != 1 || rec.SessionIDs[0] != "s-a" {
+		t.Fatalf("record = %+v, %v; want the first boundary with s-a added", rec, err)
+	}
+}
