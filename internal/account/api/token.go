@@ -22,14 +22,18 @@ const (
 	legacyRevokePath = "/v1/auth/cli/revoke"
 )
 
-// refreshAttemptBudget is how long after the first attempt a refresh that got no clear
+// RefreshBudget is how long after the first attempt a refresh that got no clear
 // answer (a 503, or no response) is retried. The server may have rotated the pair without
 // returning it, and it forgives a retry of the spent token for only 60 seconds; after
 // that, presenting it is reuse, which revokes the whole family, this machine's and any
 // Terma Desktop session it was delegated from. So past the budget the sign-in is over.
-//
-// Variables, so tests can shorten them.
-var refreshAttemptBudget = 50 * time.Second
+// The relay's service gives a stopping relay at least this long
+// (internal/cli's TestRelayStopWindowCoversARefresh).
+const RefreshBudget = 50 * time.Second
+
+// refreshAttemptBudget is RefreshBudget, and the waits below, as variables so tests can
+// shorten them.
+var refreshAttemptBudget = RefreshBudget
 
 // defaultRetryAfter is the wait before retrying a 503 that named none.
 var defaultRetryAfter = 5 * time.Second
@@ -103,10 +107,16 @@ func (c *Client) postToken(ctx context.Context, body tokenRequest) (*tokenRespon
 
 	var out tokenResponse
 	if err := decode(resp, &out); err != nil {
-		if apiErr, ok := errors.AsType[*Error](err); ok && apiErr.SignInRetired() {
+		apiErr, ok := errors.AsType[*Error](err)
+		switch {
+		case ok && apiErr.SignInRetired():
 			return nil, fmt.Errorf("%w: %w: %w", auth.ErrSignInRetired, auth.ErrNotLoggedIn, apiErr)
-		}
-		if apiErr, ok := errors.AsType[*Error](err); ok && apiErr.Unauthenticated() {
+		case !ok || !apiErr.Unauthenticated():
+		case body.GrantType == "refresh_token" && apiErr.Code != "UNAUTHENTICATED":
+			// A 401 without the auth gateway's envelope, maybe a proxy's, says nothing of
+			// the session: no sign-out, so apiErr is not wrapped.
+			return nil, fmt.Errorf("the token endpoint answered 401 without the auth gateway's refusal: %w", apiErr)
+		default:
 			return nil, fmt.Errorf("%w: %w", auth.ErrNotLoggedIn, apiErr)
 		}
 		return nil, err

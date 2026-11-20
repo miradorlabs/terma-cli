@@ -94,10 +94,14 @@ function installArchive(archive, asset, { vendor = VENDOR, tmpRoot = os.tmpdir()
     fs.writeFileSync(archivePath, archive, { flag: 'wx', mode: 0o600 });
     if (asset.endsWith('.zip')) {
       // PowerShell ships with every supported Windows; no zip library needed.
-      // Expand-Archive has no single-member selector. Extract into the private
-      // directory, then validate and copy only terma.exe into the installation.
+      // It calls .NET's ZipFile, not Expand-Archive: started from PowerShell 7, Windows
+      // PowerShell inherits its PSModulePath and loads PowerShell 7's Archive module,
+      // whose Expand-Archive needs an ExtractToDirectory overload .NET Framework lacks.
+      // Extract into the private directory, then validate and copy only terma.exe
+      // into the installation.
       run('powershell', ['-NoProfile', '-NonInteractive', '-Command',
-        "$ErrorActionPreference = 'Stop'; Expand-Archive -LiteralPath $env:TERMA_ARCHIVE_PATH -DestinationPath $env:TERMA_EXTRACT_DIR -Force"], {
+        "$ErrorActionPreference = 'Stop'; Add-Type -AssemblyName System.IO.Compression.FileSystem; " +
+        '[System.IO.Compression.ZipFile]::ExtractToDirectory($env:TERMA_ARCHIVE_PATH, $env:TERMA_EXTRACT_DIR)'], {
         stdio: CHILD_STDIO,
         env: { ...process.env, TERMA_ARCHIVE_PATH: archivePath, TERMA_EXTRACT_DIR: extracted },
       });
