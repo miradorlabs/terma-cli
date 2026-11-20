@@ -451,8 +451,8 @@
       "role": "alias",
       "label": "haiku",
       "first": "2.1.293",
-      "last": "2.1.329",
-      "builds": 33,
+      "last": "2.1.330",
+      "builds": 34,
       "current": true
     },
     {
