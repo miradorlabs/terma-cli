@@ -94,6 +94,10 @@ func (app *App) signIn(cmd *cobra.Command, cfg *config.Config, opts signInOption
 	if cred, ok, err := app.reuseStoredSession(ctx, cfg, nil); err != nil {
 		return nil, err
 	} else if ok {
+		// A first retirement the keychain or the network cut short is tried again.
+		if auth.HasLegacySignIns(app.dir) {
+			app.retireOlderSignIns(ctx, cfg.AuthURL)
+		}
 		return cred, nil
 	}
 
@@ -147,27 +151,30 @@ func (app *App) storeLogin(ctx context.Context, cfg *config.Config, cred *auth.C
 		return err
 	}
 	// After applyLogin: a profile that leaves its server key for a sign-in keeps it no more.
-	app.retireOlderSignIns(ctx)
+	app.retireOlderSignIns(ctx, cfg.AuthURL)
 	return nil
 }
 
 // retireOlderSignIns ends and deletes what an older terma signed this machine in with:
 // its per-organization sessions, revoked best-effort with their own tokens, and the team
 // keys it minted with them. A server key a profile was set up with (TERMA_API_KEY) stays.
-func (app *App) retireOlderSignIns(ctx context.Context) {
-	app.retireLegacySessions(ctx)
+func (app *App) retireOlderSignIns(ctx context.Context, authURL string) {
+	app.retireLegacySessions(ctx, authURL)
 	_ = keystore.RetainOnly(app.dir, serverKeyTeams(app.dir))
 }
 
 // retireLegacySessions revokes, best-effort, and deletes the per-organization sessions an
 // older terma signed in: all at once, within one deadline, so an unreachable auth host
-// delays a sign-in by seconds, not seconds per organization.
-func (app *App) retireLegacySessions(ctx context.Context) {
+// delays a sign-in by seconds, not seconds per organization. A token goes only to authURL,
+// the auth host this profile is configured for: credentials.json names hosts, and a
+// tampered one must not lead a keychain-held token elsewhere; another environment's
+// sessions are forgotten unrevoked, to expire.
+func (app *App) retireLegacySessions(ctx context.Context, authURL string) {
 	if signIns, err := auth.LegacySignIns(app.dir, true); err == nil {
 		revokeCtx, cancel := context.WithTimeout(ctx, legacyRevokeWait)
 		var wg sync.WaitGroup
 		for _, s := range signIns {
-			if s.AccessToken != "" && s.AuthURL != "" {
+			if s.AccessToken != "" && s.AuthURL == authURL {
 				wg.Go(func() { _ = api.RevokeLegacySession(revokeCtx, s.AuthURL, app.version, s.AccessToken) })
 			}
 		}

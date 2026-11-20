@@ -353,3 +353,34 @@ func TestSignOutNeverPresentsATokenInDoubt(t *testing.T) {
 		t.Fatalf("the sign-in should be gone: %v", err)
 	}
 }
+
+// A retirement cut short is tried again when the stored sign-in is reused; an older
+// session filed for another auth host is forgotten unrevoked, its token sent nowhere.
+func TestReusingASignInRetiresWhatIsLeftOfAnOlderTerma(t *testing.T) {
+	f := newFakeAuth(t)
+	authSandbox(t, f)
+	if err := config.UpdateFile(testApp.dir, func(file *config.File) { file.InsecureStorage = true }); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(f)); err != nil {
+		t.Fatal(err)
+	}
+	here, elsewhere := legacyTokenPrefix+"here", legacyTokenPrefix+"elsewhere"
+	legacy := map[string]any{"default": map[string]any{"organizations": map[string]any{
+		orgA().ID: map[string]any{"access_token": here, "session_id": "old-a", "auth_url": f.srv.URL, "organization_id": orgA().ID},
+		orgB().ID: map[string]any{"access_token": elsewhere, "session_id": "old-b", "auth_url": "https://auth.elsewhere.example", "organization_id": orgB().ID},
+	}}}
+	data, _ := json.Marshal(legacy)
+	if err := os.WriteFile(config.LegacyCredentialsPath(testApp.dir), data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, out, err := signInHere(t, signInOptions{noBrowser: true}, 10*time.Second); err != nil {
+		t.Fatalf("sign-in: %v\n%s", err, out)
+	}
+	if got := f.legacyRevokedTokens(); !slices.Equal(got, []string{here}) {
+		t.Fatalf("revoked %d older sessions, want only the configured host's", len(got))
+	}
+	if auth.HasLegacySignIns(testApp.dir) {
+		t.Fatal("the older sign-ins should be deleted")
+	}
+}

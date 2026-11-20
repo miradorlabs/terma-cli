@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/http"
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/account/auth"
@@ -17,9 +18,11 @@ import (
 //   - 409 REFRESH_SUPERSEDED: a concurrent refresh of the same token won. Re-read the
 //     stored pair and take it when its refresh token changed; otherwise retry once at
 //     once, within the grace, and a second 409 ends the sign-in.
-//   - 503, or no answer: something may have rotated without being returned. Retry with
-//     the same token, after Retry-After, until refreshAttemptBudget after the first
+//   - 5xx, 408, or no answer: something may have rotated without being returned. Retry
+//     with the same token, after Retry-After, until refreshAttemptBudget after the first
 //     attempt; past it the sign-in ends rather than present a spent token after the grace.
+//     A Retry-After that would end past the budget ends it at once, deliberately: no send
+//     may land after the grace.
 //   - 401: the session is over.
 //
 // The store records when the refresh came into doubt before the token first leaves, so a
@@ -49,9 +52,14 @@ func (c *Client) redeem(ctx context.Context, held, current *auth.Credential, red
 		if !clean && time.Since(first) > refreshAttemptBudget {
 			return c.endSignIn(tx, current)
 		}
-		// Best-effort: a store that cannot take the mark cannot take the rotated pair either,
-		// and the client keeps that in memory (unsaved) rather than stop working.
-		current = c.markInDoubt(tx, current, first)
+		// Unrecorded, the token does not leave: a process that died after the server
+		// rotated it would leave the next one a spent token it took for fresh, whose
+		// presentation after the grace revokes the whole family.
+		marked, err := c.markInDoubt(tx, current, first)
+		if err != nil {
+			return err
+		}
+		current = marked
 		// The whole attempt, its dial and handshake too, ends with the budget.
 		attempt, cancel := context.WithDeadline(ctx, first.Add(refreshAttemptBudget))
 		resp, err := c.postToken(attempt, tokenRequest{GrantType: "refresh_token", RefreshToken: current.RefreshToken})
@@ -116,7 +124,7 @@ func classifyRefresh(err error) (kind int, wait time.Duration) {
 		return refreshOver, 0
 	case isAPI && apiErr.Superseded():
 		return refreshSuperseded, 0
-	case isAPI && apiErr.StatusCode >= 500:
+	case isAPI && (apiErr.StatusCode >= 500 || apiErr.StatusCode == http.StatusRequestTimeout):
 		return refreshInDoubt, cmp.Or(apiErr.RetryAfter, defaultRetryAfter)
 	case !isAPI && !notSent(err):
 		return refreshInDoubt, defaultRetryAfter
@@ -129,7 +137,7 @@ func classifyRefresh(err error) (kind int, wait time.Duration) {
 // have rotated.
 func (c *Client) settle(tx *auth.Tx, current *auth.Credential, clean bool, err error) error {
 	if clean {
-		c.markInDoubt(tx, current, time.Time{})
+		_, _ = c.markInDoubt(tx, current, time.Time{})
 	}
 	return err
 }
@@ -145,16 +153,15 @@ func notSent(err error) bool {
 }
 
 // markInDoubt records, in the store, since as when current's refresh came into doubt (zero:
-// not in doubt), and returns current so marked; with no store, or when the write fails,
-// current as it was.
-func (c *Client) markInDoubt(tx *auth.Tx, current *auth.Credential, since time.Time) *auth.Credential {
+// not in doubt), and returns current so marked; with no store there is nothing to record.
+func (c *Client) markInDoubt(tx *auth.Tx, current *auth.Credential, since time.Time) (*auth.Credential, error) {
 	if tx == nil || current.RefreshInDoubtSince.Equal(since) {
-		return current
+		return current, nil
 	}
-	if tx.MarkRefreshInDoubt(c.profile, current.SessionID, since) != nil {
-		return current
+	if err := tx.MarkRefreshInDoubt(c.profile, current.SessionID, since); err != nil {
+		return current, fmt.Errorf("record the refresh before sending it: %w", err)
 	}
 	marked := *current
 	marked.RefreshInDoubtSince = since
-	return &marked
+	return &marked, nil
 }
