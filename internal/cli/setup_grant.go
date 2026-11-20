@@ -57,8 +57,18 @@ func (app *App) signInWithGrant(cmd *cobra.Command, cfg *config.Config, orgID st
 	}
 	// The user is the one the auth host answers for. Ids compare without regard to case,
 	// as ReadGrantIdentity reads them.
-	sameDesktop := func(verified *auth.Credential, whoami identityResponse) bool {
-		return strings.EqualFold(cmp.Or(whoami.UserID, verified.UserID), desktop.UserID)
+	// The desktop's user's sign-in is reused only for an --org that user belongs to, checked
+	// before the reuse records anything: a refused grant changes nothing.
+	sameDesktop := func(verified *auth.Credential, whoami identityResponse) (bool, error) {
+		if !strings.EqualFold(cmp.Or(whoami.UserID, verified.UserID), desktop.UserID) {
+			return false, nil
+		}
+		client, err := api.New(cfg, api.Options{Version: app.version, Credential: verified})
+		if err != nil {
+			return false, err
+		}
+		orgs, err := fetchOrganizations(ctx, client)
+		return err == nil, grantOrganizationError(orgs, err, orgID)
 	}
 	cred, reused, err := app.reuseStoredSession(ctx, cfg, sameDesktop)
 	if err != nil {
@@ -132,19 +142,25 @@ func (app *App) checkGrantOrganization(ctx context.Context, cfg *config.Config, 
 		return cred, err
 	}
 	orgs, err := fetchOrganizations(ctx, client)
-	held := client.Credential()
+	return client.Credential(), grantOrganizationError(orgs, err, orgID)
+}
+
+// grantOrganizationError judges --org against the organizations the signed-in user's
+// sign-in lists (or the error listing them): one they don't belong to, or none at all, is
+// the desktop's bad input.
+func grantOrganizationError(orgs []organization, err error, orgID string) error {
 	switch {
 	case err != nil:
-		return held, err
+		return err
 	case len(orgs) == 0:
-		return held, &auth.GrantError{Code: auth.GrantBadInput, Message: "the signed-in user belongs to no Terma organization yet"}
+		return &auth.GrantError{Code: auth.GrantBadInput, Message: "the signed-in user belongs to no Terma organization yet"}
 	}
 	if _, err := matchOrganization(orgs, orgID); errors.As(err, new(noMatchError)) {
-		return held, &auth.GrantError{Code: auth.GrantBadInput, Message: "--org is not an organization the signed-in user belongs to", Err: err}
+		return &auth.GrantError{Code: auth.GrantBadInput, Message: "--org is not an organization the signed-in user belongs to", Err: err}
 	} else if err != nil {
-		return held, err
+		return err
 	}
-	return held, nil
+	return nil
 }
 
 // writeGrantFailure prints a failed grant as `terma auth token` prints its failures: the
