@@ -28,7 +28,12 @@ func OutboxCheck(r Relay) Check {
 	if !r.OutboxLossAt.IsZero() {
 		detail += "; the last at " + r.OutboxLossAt.Local().Format("2006-01-02 15:04")
 	}
-	return Check{Status: Warn, Detail: detail, Fix: "terma setup"}
+	// Sends that failed for long are this machine's to fix; a stopped relay's held parts are not.
+	fix := ""
+	if r.OutboxFull+r.OutboxExpired > 0 {
+		fix = "terma setup"
+	}
+	return Check{Status: Warn, Detail: detail, Fix: fix}
 }
 
 // relayFacts is the relay's state, the zero one when there is no probe.

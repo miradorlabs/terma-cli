@@ -10,9 +10,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/miradorlabs/terma-cli/internal/account/keystore"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
+	"github.com/miradorlabs/terma-cli/internal/sendas"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
@@ -56,7 +58,7 @@ func recordingIngest(t *testing.T, status int) (*httptest.Server, func() []sentR
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		b, _ := io.ReadAll(r.Body)
 		mu.Lock()
-		got = append(got, sentRequest{r.Header.Get("Authorization"), r.Header.Get(projectHeader), string(b)})
+		got = append(got, sentRequest{r.Header.Get("Authorization"), r.Header.Get(sendas.ProjectHeader), string(b)})
 		mu.Unlock()
 		w.WriteHeader(status)
 	}))
@@ -178,6 +180,28 @@ func TestARefusedTokenIsRotatedAndKeepsTheEvents(t *testing.T) {
 		}
 		if signIn.retired != tc.retired {
 			t.Fatalf("%d: retired = %v", tc.status, signIn.retired)
+		}
+	}
+}
+
+// A profile set up with a server key sends only events no person's sign-in collected.
+func TestAServerKeyNeverSendsAPersonsEvents(t *testing.T) {
+	t.Parallel()
+	srv, sent := recordingIngest(t, http.StatusOK)
+	dir := t.TempDir()
+	if err := keystore.Set(dir, "p1", testKey, keystore.Hosts{}); err != nil {
+		t.Fatal(err)
+	}
+	s := spoolOf(t, eventFor("p1", "a-persons", "aaaaaaaaaaaaaaaa"), eventFor("p1", "unbound", ""))
+	r := signInRouter(&fakeSignIn{}, "")
+	r.ConfigDir = dir
+	res := r.Flush(t.Context(), s, &config.Config{OTLPURL: srv.URL, ServerKeySignIn: true}, true, 0)
+	if res.Sent != 1 || res.Held != 1 {
+		t.Fatalf("Flush = %+v", res)
+	}
+	for _, req := range sent() {
+		if strings.Contains(req.body, "a-persons") {
+			t.Fatal("a person's event left with the server key")
 		}
 	}
 }

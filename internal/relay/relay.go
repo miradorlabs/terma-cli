@@ -28,6 +28,7 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/relay/shape"
+	"github.com/miradorlabs/terma-cli/internal/sendas"
 )
 
 // DefaultHold is how long a part that cannot leave yet waits, covering a first export that races its hook.
@@ -60,23 +61,11 @@ type Policy struct {
 // ErrNoKey is Resolve's answer for a project this machine holds no key for; its parts wait, then drop.
 var ErrNoKey = errors.New("no key for this team on this machine")
 
-// SignIn is the person's sign-in the relay sends with, as it stands at each send: the
-// developer can sign in, out or as someone else while the relay runs.
-type SignIn interface {
-	// Account is the account key (auth.AccountKey) of the sign-in now, "" with none.
-	Account() string
-	// Token is a fresh access token of the sign-in whose account key is account: "" with no
-	// error when that sign-in cannot send now (signed out, another person's, retired), an
-	// error for what a retry may fix.
-	Token(ctx context.Context, account string) (string, error)
-	// Refused says a server refused token as unknown or expired: rotate it.
-	Refused(ctx context.Context, token string)
-	// Retired says a server refused the sign-in as retired (SIGN_IN_RETIRED).
-	Retired()
-}
+// SignIn is the person's sign-in the relay sends with (sendas.SignIn).
+type SignIn = sendas.SignIn
 
 // ProjectHeader names the team a part sent with a user token goes to.
-const ProjectHeader = "X-Mirador-Project"
+const ProjectHeader = sendas.ProjectHeader
 
 // Options configure a relay.
 type Options struct {

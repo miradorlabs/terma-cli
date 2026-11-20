@@ -12,7 +12,6 @@ import (
 
 	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
 	logspb "go.opentelemetry.io/proto/otlp/logs/v1"
-	"google.golang.org/protobuf/encoding/protowire"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
@@ -198,32 +197,6 @@ func TestARefusedTokenIsRotatedAndThePartKept(t *testing.T) {
 	}
 }
 
-// The otel gateway's refusal of a user token is a google.rpc.Status, protobuf for the
-// relay's protobuf requests and JSON otherwise; its ErrorInfo's reason is read from both.
-func TestStatusReason(t *testing.T) {
-	t.Parallel()
-	info := protowire.AppendTag(nil, 1, protowire.BytesType)
-	info = protowire.AppendString(info, "SIGN_IN_RETIRED")
-	anyMsg := protowire.AppendTag(nil, 1, protowire.BytesType)
-	anyMsg = protowire.AppendString(anyMsg, "type.googleapis.com/google.rpc.ErrorInfo")
-	anyMsg = protowire.AppendTag(anyMsg, 2, protowire.BytesType)
-	anyMsg = protowire.AppendBytes(anyMsg, info)
-	status := protowire.AppendTag(nil, 1, protowire.VarintType)
-	status = protowire.AppendVarint(status, 7)
-	status = protowire.AppendTag(status, 3, protowire.BytesType)
-	status = protowire.AppendBytes(status, anyMsg)
-	if got := statusReason(status); got != "SIGN_IN_RETIRED" {
-		t.Fatalf("protobuf: %q", got)
-	}
-	jsonStatus := []byte(`{"code":7,"message":"m","details":[{"@type":"type.googleapis.com/google.rpc.ErrorInfo","reason":"ORG_NOT_ACCESSIBLE","domain":"gateway"}]}`)
-	if got := statusReason(jsonStatus); got != "ORG_NOT_ACCESSIBLE" {
-		t.Fatalf("JSON: %q", got)
-	}
-	if got := statusReason([]byte(`{"code":"x","message":"an API key's refusal"}`)); got != "" {
-		t.Fatalf("no reason: %q", got)
-	}
-}
-
 // What the outbox drops for room or age is counted where doctor reads it.
 func TestOutboxLossesAreRecorded(t *testing.T) {
 	t.Parallel()
@@ -335,5 +308,44 @@ func TestOnlyABacklogFromBeforeRetirementCountsAsTheOlderSignIns(t *testing.T) {
 	time.Sleep(200 * time.Millisecond)
 	if got := u.requests(); len(got) != 0 {
 		t.Fatalf("sent %q: a part from after the retirement left as the older sign-ins'", got)
+	}
+}
+
+// A profile set up with a server key sends only what no person's sign-in collected: a
+// person's bound backlog is never sent with the key.
+func TestAServerKeyNeverSendsAPersonsBacklog(t *testing.T) {
+	t.Parallel()
+	u := newSignInUpstream(t)
+	dir := t.TempDir()
+	queue(t, dir, accountA)
+	queue(t, dir, "")
+	r := newRelay(Options{Dir: dir, Token: token, SignIn: &testSignIn{},
+		Resolve: func(claim.Claim) (Policy, error) {
+			return Policy{Endpoint: u.srv.URL, Key: "server-key", IncludePrompts: true, IncludeToolContent: true}, nil
+		}})
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() { r.Run(ctx); close(done) }()
+	t.Cleanup(func() { cancel(); <-done })
+	waitFor(t, func() bool { return len(u.requests()) == 1 })
+	time.Sleep(100 * time.Millisecond)
+	if got := u.requests(); len(got) != 1 || got[0] != "Bearer server-key " {
+		t.Fatalf("sent %q, want only the unbound part, with the key", got)
+	}
+}
+
+// Losses are counted from the first one after a quiet window: older counts start over.
+func TestOutboxLossesStartOverAfterAQuietWindow(t *testing.T) {
+	t.Parallel()
+	o := outbox{dir: t.TempDir()}
+	start := time.Now()
+	o.recordLosses(3, 0, start)
+	o.recordLosses(0, 1, start.Add(time.Hour))
+	if l, _ := ReadOutboxLosses(o.dir); l.Full != 3 || l.Expired != 1 {
+		t.Fatalf("losses = %+v, want both counted", l)
+	}
+	o.recordLosses(0, 2, start.Add(lossWindow+2*time.Hour))
+	if l, _ := ReadOutboxLosses(o.dir); l.Full != 0 || l.Expired != 2 {
+		t.Fatalf("losses = %+v, want only the new loss", l)
 	}
 }

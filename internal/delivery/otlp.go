@@ -10,10 +10,10 @@ import (
 	"net/http"
 	"slices"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/semconv"
+	"github.com/miradorlabs/terma-cli/internal/sendas"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
@@ -34,12 +34,10 @@ type otlpSender struct {
 
 const (
 	otlpLogsPath = "/v1/logs"
-	// projectHeader names the team a user token's events go to.
-	projectHeader = "X-Mirador-Project"
-	serviceName   = "terma-cli"
-	sendTimeout   = 15 * time.Second
-	severityInfo  = 9
-	severityText  = "INFO"
+	serviceName  = "terma-cli"
+	sendTimeout  = 15 * time.Second
+	severityInfo = 9
+	severityText = "INFO"
 )
 
 type otlpAttr struct {
@@ -199,7 +197,7 @@ func (o *otlpSender) send(ctx context.Context, events []spool.Event) error {
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+o.APIKey)
 	if o.NameProject {
-		req.Header.Set(projectHeader, o.ProjectID)
+		req.Header.Set(sendas.ProjectHeader, o.ProjectID)
 	}
 	req.Header.Set("User-Agent", serviceName+"/"+o.Version)
 	resp, err := client.Do(req)
@@ -208,8 +206,12 @@ func (o *otlpSender) send(ctx context.Context, events []spool.Event) error {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		detail, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
-		return &IngestError{Status: resp.StatusCode, Detail: string(bytes.TrimSpace(detail))}
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 64<<10))
+		detail := bytes.TrimSpace(body)
+		if len(detail) > 512 {
+			detail = detail[:512]
+		}
+		return &IngestError{Status: resp.StatusCode, Detail: string(detail), Reason: sendas.Reason(body)}
 	}
 	return nil
 }
@@ -218,6 +220,8 @@ func (o *otlpSender) send(ctx context.Context, events []spool.Event) error {
 type IngestError struct {
 	Status int
 	Detail string
+	// Reason is the google.rpc.ErrorInfo reason a user token's refusal carries, "" for none.
+	Reason string
 }
 
 func (e *IngestError) Error() string {
@@ -226,9 +230,7 @@ func (e *IngestError) Error() string {
 
 // Retired reports whether the host refused the sign-in as retired (SIGN_IN_RETIRED), in
 // the google.rpc.Status a user token's refusal carries.
-func (e *IngestError) Retired() bool {
-	return e.Status == http.StatusForbidden && strings.Contains(e.Detail, "SIGN_IN_RETIRED")
-}
+func (e *IngestError) Retired() bool { return e.Reason == sendas.ReasonSignInRetired }
 
 // KeyRefused reports whether the host rejected the credential rather than the request.
 func (e *IngestError) KeyRefused() bool {

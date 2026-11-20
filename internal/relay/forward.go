@@ -183,8 +183,12 @@ func (s *sender) loop() {
 			continue
 		}
 		pol, ok := s.r.resolve(c)
-		// Another person's or environment's backlog waits for its own sign-in, and ages out.
-		if ok && pol.Key == "" {
+		// Another person's or environment's backlog waits for its own sign-in, and ages out;
+		// a server key sends only what no person's sign-in collected.
+		switch {
+		case ok && pol.Key != "" && s.route.account != "":
+			ok = false
+		case ok && pol.Key == "":
 			if entries = s.r.mayLeave(s.route, entries); len(entries) == 0 {
 				ok = false
 			}

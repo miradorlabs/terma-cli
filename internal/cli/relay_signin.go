@@ -132,14 +132,32 @@ func (s *signInSource) Retired() {
 func (app *App) bindRelay(engine *relay.Options, cfg *config.Config) {
 	engine.SignIn = app.signInSource(cfg)
 	engine.Installation = func() string { return config.StoredInstallationID(app.dir) }
+	legacy := cachedLegacyRecord(app.stateDir)
 	engine.Legacy = func() (string, time.Time) {
-		rec, _ := auth.ReadLegacyRecord(app.stateDir)
+		rec := legacy()
 		return rec.Account, rec.RetiredAt
 	}
 	engine.LegacySessionIDs = func() []string {
-		if rec, err := auth.ReadLegacyRecord(app.stateDir); err == nil && rec.Recent(time.Now()) {
+		if rec := legacy(); rec.Recent(time.Now()) {
 			return rec.SessionIDs
 		}
 		return nil
+	}
+}
+
+// cachedLegacyRecord reads the legacy record at most once a second: the relay asks for it
+// for every queued entry from before user tokens.
+func cachedLegacyRecord(stateDir string) func() auth.LegacyRecord {
+	var mu sync.Mutex
+	var rec auth.LegacyRecord
+	var at time.Time
+	return func() auth.LegacyRecord {
+		mu.Lock()
+		defer mu.Unlock()
+		if time.Since(at) > time.Second {
+			rec, _ = auth.ReadLegacyRecord(stateDir)
+			at = time.Now()
+		}
+		return rec
 	}
 }

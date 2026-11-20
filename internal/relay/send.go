@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"google.golang.org/protobuf/encoding/protowire"
+
+	"github.com/miradorlabs/terma-cli/internal/sendas"
 )
 
 // send delivers one request and classifies the answer: 401, 403 and 404 are configuration fixed
@@ -63,8 +65,8 @@ func (s *sender) send(ctx context.Context, pol Policy, first entry, body []byte)
 		// Only ORG_NOT_ACCESSIBLE is a lost membership, and even then nothing is dropped:
 		// a membership granted back is refused until it is published, and the outbox ages
 		// out what never leaves.
-		reason := statusReason(answer)
-		if reason == reasonSignInRetired {
+		reason := sendas.Reason(answer)
+		if reason == sendas.ReasonSignInRetired {
 			s.r.opts.SignIn.Retired()
 		}
 		return retry, refusedBackoff, fmt.Sprintf("HTTP 403 %s: the sign-in may not send to this team", reason), 0

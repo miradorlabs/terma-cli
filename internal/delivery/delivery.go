@@ -17,6 +17,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/routing"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
+	"github.com/miradorlabs/terma-cli/internal/sendas"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
@@ -48,14 +49,8 @@ type Router struct {
 	LegacyBefore  time.Time
 }
 
-// SignIn is the person's sign-in delivery sends with (relay.SignIn's shape). Token answers
-// "" with no error when the sign-in cannot send now: what waits for it is held.
-type SignIn interface {
-	Account() string
-	Token(ctx context.Context, account string) (string, error)
-	Refused(ctx context.Context, token string)
-	Retired()
-}
+// SignIn is the person's sign-in delivery sends with (sendas.SignIn).
+type SignIn = sendas.SignIn
 
 // owner is the account an event leaves under, "" for none.
 func (r Router) owner(e spool.Event) string {
@@ -105,7 +100,7 @@ func (r Router) Flush(ctx context.Context, s *spool.Spool, cfg *config.Config, f
 	failed := map[string]bool{}
 	waiting := map[string]bool{}
 	accepted := map[string]bool{}
-	serverKey := cfg.ServerKeySignIn || cfg.APIKey != ""
+	serverKey := cfg.ServerKeySignIn
 	account := ""
 	if !serverKey && r.SignIn != nil {
 		account = r.SignIn.Account()
@@ -135,8 +130,9 @@ func (r Router) Flush(ctx context.Context, s *spool.Spool, cfg *config.Config, f
 				held = append(held, e)
 				continue
 			}
-			// Another person's or environment's events wait for their own sign-in.
-			if !serverKey && (account == "" || r.owner(e) != account) {
+			// Another person's or environment's events wait for their own sign-in; a server key
+			// sends only what no person's sign-in collected.
+			if serverKey && e.Account != "" || !serverKey && (account == "" || r.owner(e) != account) {
 				held = append(held, e)
 				continue
 			}
