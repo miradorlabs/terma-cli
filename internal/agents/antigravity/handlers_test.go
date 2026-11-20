@@ -409,6 +409,9 @@ func TestAntigravity1513ConversationThroughMachineWideHooks(t *testing.T) {
 	run(preInvocation, antigravity1513Payload(root, "PreInvocation", `"initialNumSteps":6,"invocationNum":0`))
 	hookruntest.WriteFile(t, root, "agy-live.txt", "second turn\n")
 	run(postToolUse, antigravity1513Payload(root, "PostToolUse", `"error":"","stepIdx":8,"toolCall":{"args":{"Path":"`+file+`","Replacement":"second turn","Target":"first turn"},"id":"call_7055438953673328586","name":"edit_file"}`))
+	// An edit that fails changes nothing, so it claims no file.
+	hookruntest.WriteFile(t, root, "other.txt", "mine\n")
+	run(postToolUse, antigravity1513Payload(root, "PostToolUse", `"error":"target content not found","stepIdx":11,"toolCall":{"args":{"Path":"`+filepath.Join(root, "other.txt")+`","Replacement":"x","Target":"absent"},"id":"call_2","name":"edit_file"}`))
 	run(postToolUse, antigravity1513Payload(root, "PostToolUse", `"error":"file does not exist","stepIdx":13,"toolCall":{"args":{"Path":"`+filepath.Join(root, "missing-agy-file.txt")+`"},"id":"call_3430319919917972303","name":"read_file"}`))
 
 	var calls []string
@@ -435,7 +438,7 @@ func TestAntigravity1513ConversationThroughMachineWideHooks(t *testing.T) {
 			}
 		}
 	}
-	want := []string{"write_file/step-2/turn-1/completed", "run_command/step-3/turn-1/completed", "edit_file/step-8/turn-6/completed", "read_file/step-13/turn-6/error"}
+	want := []string{"write_file/step-2/turn-1/completed", "run_command/step-3/turn-1/completed", "edit_file/step-8/turn-6/completed", "edit_file/step-11/turn-6/error", "read_file/step-13/turn-6/error"}
 	if strings.Join(calls, " ") != strings.Join(want, " ") {
 		t.Errorf("tool calls\n got %v\nwant %v", calls, want)
 	}

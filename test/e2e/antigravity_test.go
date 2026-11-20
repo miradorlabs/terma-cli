@@ -2,6 +2,7 @@ package e2e
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"encoding/json"
 	"os"
@@ -23,8 +24,10 @@ import (
 // mid-command. agy has no API-key route the suite can supply, so it runs on the
 // developer's own sign-in (TERMA_E2E_AGY_REAL_LOGIN=1) and its own home; setup's hooks,
 // written into the sandbox home, are loaded from the scratch repository's
-// .agents/hooks.json, which agy reads beside the global one. TERMA_E2E_AGY_CAPTURE names a
-// private folder for the delivered OTLP logs and the hook payloads.
+// .agents/hooks.json, which agy reads beside the global one. So the global file's
+// location is not exercised here, nor a hook run outside the repository (the unit tests
+// cover that). TERMA_E2E_AGY_CAPTURE names a private folder for the delivered OTLP logs
+// and the hook payloads.
 func TestAntigravityRealLogin(t *testing.T) {
 	track(t)
 	if !Enabled() {
@@ -34,7 +37,7 @@ func TestAntigravityRealLogin(t *testing.T) {
 		Record(t.Name(), "not run", "needs a signed-in agy (TERMA_E2E_AGY_REAL_LOGIN=1)")
 		t.Skip("needs a signed-in agy (TERMA_E2E_AGY_REAL_LOGIN=1)")
 	}
-	binary, err := exec.LookPath(cmpOr(os.Getenv("TERMA_E2E_AGY_BINARY"), "agy"))
+	binary, err := exec.LookPath(cmp.Or(os.Getenv("TERMA_E2E_AGY_BINARY"), "agy"))
 	if err != nil {
 		t.Skip("agy is not installed")
 	}
@@ -42,7 +45,11 @@ func TestAntigravityRealLogin(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	model := cmpOr(os.Getenv("TERMA_E2E_AGY_MODEL"), "gemini-3.8-flash-low")
+	// The developer's own terma hooks would run too, against the sandbox's config.
+	if b, err := os.ReadFile(filepath.Join(home, ".gemini", "config", "hooks.json")); err == nil && strings.Contains(string(b), "hook --user antigravity-") {
+		t.Skip("this machine's agy already runs terma's hooks; every event would be recorded twice")
+	}
+	model := cmp.Or(os.Getenv("TERMA_E2E_AGY_MODEL"), "gemini-3.8-flash-low")
 
 	sb := New(t, Isolated)
 	sb.SetupAgents = append(sb.SetupAgents, "antigravity")
@@ -122,7 +129,7 @@ func TestAntigravityRealLogin(t *testing.T) {
 		if err != nil || out.ConversationID == "" {
 			t.Fatalf("agy -p failed: %v\n%s", err, tail(stderr.String(), 2000))
 		}
-		return cmpOr(out.ConversationID, conversation)
+		return cmp.Or(out.ConversationID, conversation)
 	}
 
 	conversation := run("Create a file named agy-live.txt containing exactly the text: first turn. Use your file writing tool. "+
@@ -229,11 +236,4 @@ func TestAntigravityRealLogin(t *testing.T) {
 	if len(sb.Delivered("terma.commit.stamped", "", 10*time.Second)) == 0 {
 		t.Errorf("no terma.commit.stamped delivered")
 	}
-}
-
-func cmpOr(a, b string) string {
-	if a != "" {
-		return a
-	}
-	return b
 }
