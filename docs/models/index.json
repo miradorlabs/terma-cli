@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-20T02:28:32.417345904Z",
+  "generated_at": "2026-11-20T02:38:22.359893397Z",
   "vendors": [
     {
       "id": "anthropic",
@@ -476,7 +476,7 @@
       "reasoning": true,
       "harnesses": [],
       "last_change": {
-        "at": "2026-11-20T02:28:32.417345904Z",
+        "at": "2026-11-20T02:38:22.359893397Z",
         "changes": 5
       },
       "probed": false
@@ -862,7 +862,7 @@
     {
       "id": "grok-4.20-0309-reasoning",
       "vendor": "xai",
-      "name": "Grok 4.20",
+      "name": "Grok 4.20 (Reasoning)",
       "family": "grok-reasoning",
       "status": null,
       "released_at": "2026-03-09",
@@ -874,7 +874,10 @@
       "knowledge_cutoff": null,
       "reasoning": true,
       "harnesses": [],
-      "last_change": null,
+      "last_change": {
+        "at": "2026-11-20T02:38:22.359893397Z",
+        "changes": 6
+      },
       "probed": false
     },
     {
