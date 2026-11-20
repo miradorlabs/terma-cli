@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-20T09:48:02.575412737Z",
+  "generated_at": "2026-11-20T11:17:38.159845069Z",
   "harnesses": [
     {
       "id": "claude",
@@ -258,17 +258,21 @@
         "language": "typescript"
       },
       "changelog": "https://github.com/earendil-works/pi/releases",
-      "latest": "1.5.2",
+      "latest": "1.6.0",
       "support": "supported",
-      "versions_tracked": 6,
+      "versions_tracked": 7,
       "first_tracked": "2026-10-12",
       "last_change": {
-        "from": "1.5.1",
-        "to": "1.5.2",
-        "at": "2026-11-13T05:13:29.306022914Z",
-        "released_at": "2026-11-10T12:24:55.226Z",
-        "changes": 0,
-        "categories": {}
+        "from": "1.5.2",
+        "to": "1.6.0",
+        "at": "2026-11-20T11:17:38.159845069Z",
+        "released_at": "2026-11-20T11:09:15.529Z",
+        "changes": 7,
+        "categories": {
+          "binary": 3,
+          "cli": 2,
+          "request": 2
+        }
       }
     },
     {

@@ -1,0 +1,199 @@
+{
+  "schema_version": 1,
+  "harness": "pi",
+  "from": "1.5.2",
+  "to": "1.6.0",
+  "generated_at": "2026-11-20T11:17:38.159845069Z",
+  "source": {
+    "compare": "https://github.com/earendil-works/pi/compare/v1.5.2...v1.6.0"
+  },
+  "changelog": null,
+  "summary": {
+    "changes": 7,
+    "categories": {
+      "binary": 3,
+      "cli": 2,
+      "request": 2
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 7,
+      "notable": 0
+    },
+    "undocumented": null
+  },
+  "changes": [
+    {
+      "id": "request.headers.user-agent",
+      "category": "request",
+      "op": "changed",
+      "path": [
+        "request",
+        "headers",
+        "user-agent"
+      ],
+      "title": "Header user-agent: pi/<version> (darwin; node/v24.22.2; arm64) → pi/<version> (darwin; node/v24.22.3; arm64)",
+      "impact": "informational",
+      "before": "pi/<version> (darwin; node/v24.22.2; arm64)",
+      "after": "pi/<version> (darwin; node/v24.22.3; arm64)",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/ai/src/api/anthropic-messages.ts",
+            "line": 1303,
+            "url": "https://github.com/earendil-works/pi/blob/v1.6.0/packages/ai/src/api/anthropic-messages.ts#L1303"
+          }
+        ],
+        "gone": false
+      },
+      "documented": null
+    },
+    {
+      "id": "request.headers.x-stainless-package-version",
+      "category": "request",
+      "op": "changed",
+      "path": [
+        "request",
+        "headers",
+        "x-stainless-package-version"
+      ],
+      "title": "Header x-stainless-package-version: 7.19.0 → 7.59.0",
+      "impact": "informational",
+      "before": "7.19.0",
+      "after": "7.59.0",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "cli.commands.pi.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "pi",
+        "description"
+      ],
+      "title": "Description of `pi` changed",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,2 +1,2 @@\n pi - AI coding assistant with read, bash, edit, write tools pi [options] [--] [@files...] [messages...] # Print a provider API key for an external client pi auth print-api-key --provider openai # Print an OAuth bearer token for an external client (refreshes if expired) pi auth print-bearer-token --provider openai-codex # Interactive mode pi # Interactive mode with initial prompt pi \"List all .ts files in src/\" # Include files in initial message pi @prompt.md @image.png \"What color is the sky?\" # Non-interactive mode (process and exit) pi -p \"List all .ts files in src/\" # Prompt beginning with a dash pi -p -- \"- Summarize these points\" # Multiple messages (interactive) pi \"Read package.json\" \"What dependencies do we have?\" # Continue previous session pi --continue \"What did we discuss?\" # Start a named session pi --name \"Refactor auth module\" # Use different model pi --provider openai --model gpt-4o-mini \"Help me refactor this code\" # Use model with provider prefix (no --provider needed) pi --model openai/gpt-4o \"Help me refactor this code\" # Use model with thinking level shorthand pi --model sonnet:high \"Solve this complex problem\" # Limit model cycling to specific models pi --models claude-sonnet,claude-haiku,gpt-4o # Limit to a specific provider with glob pattern pi --models \"github-copilot/*\" # Cycle models with fixed thinking levels pi --models sonnet:high,haiku:low # Start with a specific thinking level pi --thinking high \"Solve this complex problem\" # Read-only mode (no file modifications possible) pi --tools read,grep,find,ls -p \"Review the code in src/\" # Add codemode to the default tools pi --tools +codemode # Codemode with only the tools of one MCP server pi --tools read,bash,codemode,'mcp__radius__*' # Disable one tool while keeping the rest available pi --exclude-tools ask_question # Export a session file to HTML pi --export ~/.pi/agent/sessions/--path--/session.jsonl pi --export session.jsonl output.html ANTHROPIC_AUTH_TOKEN             - Anthropic bearer auth token ANTHROPIC_API_KEY                - Anthropic Claude API key ANTHROPIC_OAUTH_TOKEN            - Anthropic OAuth token (alternative to API key) ANT_LING_API_KEY                 - Ant Ling API key OPENAI_API_KEY                   - OpenAI GPT API key AZURE_OPENAI_API_KEY             - Azure OpenAI API key AZURE_OPENAI_BASE_URL            - Azure OpenAI/Cognitive Services base URL (e.g.\n-https://{resource}.openai.azure.com) AZURE_OPENAI_RESOURCE_NAME       - Azure OpenAI resource name (alternative to base URL) AZURE_OPENAI_API_VERSION         - Azure OpenAI API version (default: v1) AZURE_OPENAI_DEPLOYMENT_NAME_MAP - Azure OpenAI model=deployment map (comma-separated) DEEPSEEK_API_KEY                 - DeepSeek API key NVIDIA_API_KEY                   - NVIDIA NIM API key GEMINI_API_KEY                   - Google Gemini API key GROQ_API_KEY                     - Groq API key CEREBRAS_API_KEY                 - Cerebras API key XAI_API_KEY                      - xAI Grok API key FIREWORKS_API_KEY                - Fireworks API key TOGETHER_API_KEY                 - Together AI API key BASETEN_API_KEY                  - Baseten API key OPENROUTER_API_KEY               - OpenRouter API key AI_GATEWAY_API_KEY               - Vercel AI Gateway API key ZAI_API_KEY                      - ZAI Coding Plan API key (Global) ZAI_CODING_CN_API_KEY            - ZAI Coding Plan API key (China) MISTRAL_API_KEY                  - Mistral API key MINIMAX_API_KEY                  - MiniMax API key MOONSHOT_API_KEY                 - Moonshot AI API key OPENCODE_API_KEY                 - OpenCode Zen/OpenCode Go API key KIMI_API_KEY                     - Kimi For Coding API key META_API_KEY                     - Meta Model API key CLOUDFLARE_API_KEY               - Cloudflare API token (Workers AI and AI Gateway) CLOUDFLARE_ACCOUNT_ID            - Cloudflare account id (required for both) CLOUDFLARE_GATEWAY_ID            - Cloudflare AI Gateway slug (required for AI Gateway) QWEN_TOKEN_PLAN_API_KEY          - Qwen Token Plan API key (international region) QWEN_TOKEN_PLAN_CN_API_KEY       - Qwen Token Plan API key (China region) XIAOMI_API_KEY                   - Xiaomi MiMo API key (api.xiaomimimo.com billing) XIAOMI_TOKEN_PLAN_CN_API_KEY     - Xiaomi MiMo Token Plan API key (China region) XIAOMI_TOKEN_PLAN_AMS_API_KEY    - Xiaomi MiMo Token Plan API key (Amsterdam region) XIAOMI_TOKEN_PLAN_SGP_API_KEY    - Xiaomi MiMo Token Plan API key (Singapore region) AWS_PROFILE                      - AWS profile for Amazon Bedrock AWS_ACCESS_KEY_ID                - AWS access key for Amazon Bedrock AWS_SECRET_ACCESS_KEY            - AWS secret key for Amazon Bedrock AWS_BEARER_TOKEN_BEDROCK         - Bedrock API key (bearer token) AWS_REGION                       - AWS region for Amazon Bedrock (e.g., us-east-1) PI_CODING_AGENT_DIR              - Config directory (default: ~/.pi/agent) PI_CODING_AGENT_SESSION_DIR      - Session storage directory (overridden by --session-dir) PI_PACKAGE_DIR                   - Override package directory (for Nix/Guix store paths) PI_OFFLINE                       - Disable startup network operations when set to 1/true/yes PI_SELF_UPDATE_COMMAND           - Command pi update runs to update pi itself ({packageName}, {version}, {installSpec}) PI_TELEMETRY                     - Override install telemetry when set to 1/true/yes or 0/false/no PI_SHARE_VIEWER_URL              - Base URL for /share command (default: https://pi.dev/session/) Built-in Tool Names: read       - Read file contents bash       - Execute bash commands powershell - Execute PowerShell commands on Windows edit       - Edit files with find/replace write      - Write files (creates/overwrites) grep       - Search file contents (read-only, off by default) find       - Find files by glob pattern (read-only, off by default) ls         - List directory contents (read-only, off by default)\n+https://{resource}.openai.azure.com) AZURE_OPENAI_RESOURCE_NAME       - Azure OpenAI resource name (alternative to base URL) AZURE_OPENAI_API_VERSION         - Azure OpenAI API version (default: v1) AZURE_OPENAI_DEPLOYMENT_NAME_MAP - Azure OpenAI model=deployment map (comma-separated) DEEPSEEK_API_KEY                 - DeepSeek API key NVIDIA_API_KEY                   - NVIDIA NIM API key GEMINI_API_KEY                   - Google Gemini API key GROQ_API_KEY                     - Groq API key CEREBRAS_API_KEY                 - Cerebras API key XAI_API_KEY                      - xAI Grok API key FIREWORKS_API_KEY                - Fireworks API key TOGETHER_API_KEY                 - Together AI API key BASETEN_API_KEY                  - Baseten API key OPENROUTER_API_KEY               - OpenRouter API key AI_GATEWAY_API_KEY               - Vercel AI Gateway API key ZAI_API_KEY                      - ZAI Coding Plan API key (Global) ZAI_CODING_CN_API_KEY            - ZAI Coding Plan API key (China) MISTRAL_API_KEY                  - Mistral API key MINIMAX_API_KEY                  - MiniMax API key MOONSHOT_API_KEY                 - Moonshot AI API key OPENCODE_API_KEY                 - OpenCode Zen/OpenCode Go API key KIMI_API_KEY                     - Kimi For Coding API key META_API_KEY                     - Meta Model API key CLOUDFLARE_API_KEY               - Cloudflare API token (Workers AI and AI Gateway) CLOUDFLARE_ACCOUNT_ID            - Cloudflare account id (required for both) CLOUDFLARE_GATEWAY_ID            - Cloudflare AI Gateway slug (required for AI Gateway) QWEN_TOKEN_PLAN_TEAM_API_KEY     - Qwen Token Plan Team API key (international region) QWEN_TOKEN_PLAN_TEAM_CN_API_KEY  - Qwen Token Plan Team API key (China region) QWEN_TOKEN_PLAN_INDIVIDUAL_API_KEY - Qwen Token Plan Individual API key (international region) QWEN_TOKEN_PLAN_INDIVIDUAL_CN_API_KEY - Qwen Token Plan Individual API key (China region) XIAOMI_API_KEY                   - Xiaomi MiMo API key (api.xiaomimimo.com billing) XIAOMI_TOKEN_PLAN_CN_API_KEY     - Xiaomi MiMo Token Plan API key (China region) XIAOMI_TOKEN_PLAN_AMS_API_KEY    - Xiaomi MiMo Token Plan API key (Amsterdam region) XIAOMI_TOKEN_PLAN_SGP_API_KEY    - Xiaomi MiMo Token Plan API key (Singapore region) AWS_PROFILE                      - AWS profile for Amazon Bedrock AWS_ACCESS_KEY_ID                - AWS access key for Amazon Bedrock AWS_SECRET_ACCESS_KEY            - AWS secret key for Amazon Bedrock AWS_BEARER_TOKEN_BEDROCK         - Bedrock API key (bearer token) AWS_REGION                       - AWS region for Amazon Bedrock (e.g., us-east-1) PI_CODING_AGENT_DIR              - Config directory (default: ~/.pi/agent) PI_CODING_AGENT_SESSION_DIR      - Session storage directory (overridden by --session-dir) PI_PACKAGE_DIR                   - Override package directory (for Nix/Guix store paths) PI_OFFLINE                       - Disable startup network operations when set to 1/true/yes PI_SELF_UPDATE_COMMAND           - Command pi update runs to update pi itself ({packageName}, {version}, {installSpec}) PI_TELEMETRY                     - Override install telemetry when set to 1/true/yes or 0/false/no PI_SHARE_VIEWER_URL              - Base URL for /share command (default: https://pi.dev/session/) Built-in Tool Names: read       - Read file contents bash       - Execute bash commands powershell - Execute PowerShell commands on Windows edit       - Edit files with find/replace write      - Write files (creates/overwrites) grep       - Search file contents (read-only, off by default) find       - Find files by glob pattern (read-only, off by default) ls         - List directory contents (read-only, off by default)\n",
+      "stats": {
+        "added_chars": 3723,
+        "removed_chars": 3528
+      },
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/coding-agent/src/cli/args.ts",
+            "line": 426,
+            "url": "https://github.com/earendil-works/pi/blob/v1.6.0/packages/coding-agent/src/cli/args.ts#L426-L480"
+          },
+          {
+            "path": "packages/ai/src/providers/qwen-token-plan-individual.ts",
+            "line": 9,
+            "url": "https://github.com/earendil-works/pi/blob/v1.6.0/packages/ai/src/providers/qwen-token-plan-individual.ts#L9-L12"
+          }
+        ],
+        "gone": false
+      },
+      "documented": null
+    },
+    {
+      "id": "cli.help.--help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "--help"
+      ],
+      "title": "Full help text of `--help` changed (+355 −158 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -165,8 +165,10 @@\n   CLOUDFLARE_API_KEY               - Cloudflare API token (Workers AI and AI Gateway)\n   CLOUDFLARE_ACCOUNT_ID            - Cloudflare account id (required for both)\n   CLOUDFLARE_GATEWAY_ID            - Cloudflare AI Gateway slug (required for AI Gateway)\n-  QWEN_TOKEN_PLAN_API_KEY          - Qwen Token Plan API key (international region)\n-  QWEN_TOKEN_PLAN_CN_API_KEY       - Qwen Token Plan API key (China region)\n+  QWEN_TOKEN_PLAN_TEAM_API_KEY     - Qwen Token Plan Team API key (international region)\n+  QWEN_TOKEN_PLAN_TEAM_CN_API_KEY  - Qwen Token Plan Team API key (China region)\n+  QWEN_TOKEN_PLAN_INDIVIDUAL_API_KEY - Qwen Token Plan Individual API key (international region)\n+  QWEN_TOKEN_PLAN_INDIVIDUAL_CN_API_KEY - Qwen Token Plan Individual API key (China region)\n   XIAOMI_API_KEY                   - Xiaomi MiMo API key (api.xiaomimimo.com billing)\n   XIAOMI_TOKEN_PLAN_CN_API_KEY     - Xiaomi MiMo Token Plan API key (China region)\n   XIAOMI_TOKEN_PLAN_AMS_API_KEY    - Xiaomi MiMo Token Plan API key (Amsterdam region)\n",
+      "stats": {
+        "added_chars": 355,
+        "removed_chars": 158
+      },
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/coding-agent/src/cli/args.ts",
+            "line": 451,
+            "url": "https://github.com/earendil-works/pi/blob/v1.6.0/packages/coding-agent/src/cli/args.ts#L451-L454"
+          },
+          {
+            "path": "packages/ai/src/providers/qwen-token-plan-individual.ts",
+            "line": 9,
+            "url": "https://github.com/earendil-works/pi/blob/v1.6.0/packages/ai/src/providers/qwen-token-plan-individual.ts#L9-L12"
+          }
+        ],
+        "gone": false
+      },
+      "documented": null
+    },
+    {
+      "id": "binary.sdk.@google/genai",
+      "category": "binary",
+      "op": "changed",
+      "path": [
+        "binary",
+        "sdk",
+        "@google/genai"
+      ],
+      "title": "Binary sdk.@google/genai: 2.21.0 → 2.32.0",
+      "impact": "informational",
+      "before": "2.21.0",
+      "after": "2.32.0",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "binary.sdk.openai",
+      "category": "binary",
+      "op": "changed",
+      "path": [
+        "binary",
+        "sdk",
+        "openai"
+      ],
+      "title": "Binary sdk.openai: 7.19.0 → 7.59.0",
+      "impact": "informational",
+      "before": "7.19.0",
+      "after": "7.59.0",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "binary.size_bytes",
+      "category": "binary",
+      "op": "changed",
+      "path": [
+        "binary",
+        "size_bytes"
+      ],
+      "title": "Binary size: 115,260,216 → 24,815,212 bytes (115.3 MB → 24.8 MB)",
+      "impact": "informational",
+      "before": 115260216,
+      "after": 24815212,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    }
+  ]
+}

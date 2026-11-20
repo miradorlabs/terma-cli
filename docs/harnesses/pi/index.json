@@ -11,20 +11,56 @@
       "language": "typescript"
     },
     "changelog": "https://github.com/earendil-works/pi/releases",
-    "latest": "1.5.2",
+    "latest": "1.6.0",
     "support": "supported",
-    "versions_tracked": 6,
+    "versions_tracked": 7,
     "first_tracked": "2026-10-12",
     "last_change": {
-      "from": "1.5.1",
-      "to": "1.5.2",
-      "at": "2026-11-13T05:13:29.306022914Z",
-      "released_at": "2026-11-10T12:24:55.226Z",
-      "changes": 0,
-      "categories": {}
+      "from": "1.5.2",
+      "to": "1.6.0",
+      "at": "2026-11-20T11:17:38.159845069Z",
+      "released_at": "2026-11-20T11:09:15.529Z",
+      "changes": 7,
+      "categories": {
+        "binary": 3,
+        "cli": 2,
+        "request": 2
+      }
     }
   },
   "versions": [
+    {
+      "version": "1.6.0",
+      "released_at": "2026-11-20T11:09:15.529Z",
+      "captured_at": "2026-11-20T11:17:38.159845069Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "1.5.2",
+      "changes": 7,
+      "categories": {
+        "binary": 3,
+        "cli": 2,
+        "request": 2
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 7,
+        "notable": 0
+      },
+      "undocumented": null,
+      "highlights": [
+        "Header user-agent: pi/<version> (darwin; node/v24.22.2; arm64) → pi/<version> (darwin; node/v24.22.3; arm64)",
+        "Header x-stainless-package-version: 7.19.0 → 7.59.0",
+        "Description of `pi` changed"
+      ],
+      "signing": null,
+      "partial": true,
+      "attempted_at": "2026-11-20T11:17:38.159845069Z",
+      "attempts": 1
+    },
     {
       "version": "1.5.2",
       "released_at": "2026-11-10T12:24:55.226Z",
