@@ -385,18 +385,33 @@ func s256(verifier string) string {
 	return base64.RawURLEncoding.EncodeToString(sum[:])
 }
 
-// Only an --org the person's organizations leave out is bad input from the desktop: an
-// account with none at all, or an organization list that cannot be read, fails as setup
-// fails, without grant_bad_input, and chooses nothing.
+// An organization list that cannot be read is no bad input from the desktop: the run fails
+// as setup fails, without grant_bad_input, keeps nothing, and ends nothing, since the
+// check may have spent the token.
 func TestDesktopGrantDoesNotBlameTheDesktopForAnOutage(t *testing.T) {
 	gateway := grantSandbox(t)
-	gateway.orgs = []organization{}
+	gateway.orgsDown = true
 	gateway.grant("c1", deskUser)
 	stdout, _, err := desktopSetup(t, identityLine(deskUser, personalOrg().ID)+`{"code":"c1"}`+"\n", personalOrg().ID, personalTeam())
 	if err == nil || strings.Contains(stdout, auth.GrantBadInput) {
 		t.Fatalf("err = %v, stdout:\n%s", err, stdout)
 	}
-	if org, _, _ := selected(t); org != "" {
-		t.Fatalf("an organization was chosen: %s", org)
+	if org, _, n := selected(t); org != "" || n != 0 || gateway.revokes.Load() != 0 {
+		t.Fatalf("org %q, %d sign-ins, %d revokes; want nothing chosen, kept or ended", org, n, gateway.revokes.Load())
+	}
+}
+
+// A user with no organization at all is refused as the desktop's bad input, and the session
+// the grant made is ended.
+func TestDesktopGrantRefusesAUserWithNoOrganization(t *testing.T) {
+	gateway := grantSandbox(t)
+	gateway.orgs = []organization{}
+	gateway.grant("c1", deskUser)
+	stdout, _, err := desktopSetup(t, identityLine(deskUser, personalOrg().ID)+`{"code":"c1"}`+"\n", personalOrg().ID, personalTeam())
+	if code := grantFailure(t, stdout, err); code != auth.GrantBadInput {
+		t.Fatalf("code = %s, want %s", code, auth.GrantBadInput)
+	}
+	if _, _, n := selected(t); n != 0 || gateway.revokes.Load() != 1 {
+		t.Fatalf("%d sign-ins kept, %d revokes; want none kept and the grant's session ended", n, gateway.revokes.Load())
 	}
 }

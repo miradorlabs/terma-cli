@@ -17,6 +17,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/miradorlabs/terma-cli/internal/account/secret"
 	"github.com/miradorlabs/terma-cli/internal/config"
 )
 
@@ -159,6 +160,9 @@ func SaveCredential(dir, profile string, cred *Credential) (replaced *Credential
 func (tx *Tx) saveReplacing(profile string, cred *Credential, inFile bool) (replaced *Credential, err error) {
 	dir := tx.dir
 	var unindexed bool
+	// overwritten is the sign-in whose keychain item the new tokens replaced: a file that
+	// then fails to save still indexes it, so its tokens go back.
+	var overwritten *Credential
 	err = tx.mutate(func(file credentialFile) {
 		// Read before the new tokens overwrite the keychain item.
 		old := file.get(profile)
@@ -172,8 +176,15 @@ func (tx *Tx) saveReplacing(profile string, cred *Credential, inFile bool) (repl
 		}
 		kept := keep(dir, profile, cred, indexed, inFile)
 		unindexed = old == nil && kept.AccessToken == ""
+		if replaced != nil && indexed.AccessToken == "" {
+			overwritten = replaced
+		}
 		file[profile] = kept
 	})
+	if err != nil && overwritten != nil {
+		pair, _ := json.Marshal(tokenPair{AccessToken: overwritten.AccessToken, RefreshToken: overwritten.RefreshToken})
+		_ = secret.Set(dir, itemName(profile), string(pair))
+	}
 	tx.after = append(tx.after, func() { afterSave(dir, profile, unindexed, err) })
 	return replaced, err
 }
