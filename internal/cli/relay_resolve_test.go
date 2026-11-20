@@ -12,16 +12,15 @@ import (
 
 const mintedKey = "ter_srv_minted0123456789abcdefghijklmnopqrstuv"
 
-// A claimed project without a key here is minted one; with a key, the organization's
-// policy decides content.
-func TestRelayResolverMintsAndCapsContent(t *testing.T) {
+// A claimed project without a key here waits for one, which nothing mints; with a key,
+// the organization's policy decides content.
+func TestRelayResolverCapsContent(t *testing.T) {
 	useConfigDir(t, t.TempDir())
 	cfg := &config.Config{Dir: testApp.dir, OTLPURL: "https://otel.example", Policy: config.DefaultPolicy(), Harnesses: []string{"codex"}}
-	var asked []string
-	resolve := testApp.relayDeps().Resolver(cfg, func(p string) { asked = append(asked, p) })
+	resolve := testApp.relayDeps().Resolver(cfg)
 	c := claim.Claim{ProjectID: "p1", Tool: "codex"}
-	if _, err := resolve(c); !errors.Is(err, relay.ErrNoKey) || len(asked) != 1 || asked[0] != "p1" {
-		t.Fatalf("keyless: err %v, asked %v", err, asked)
+	if _, err := resolve(c); !errors.Is(err, relay.ErrNoKey) {
+		t.Fatalf("keyless: err %v", err)
 	}
 	if err := keystore.Set(testApp.dir, "p1", mintedKey, keystore.HostsOf(cfg)); err != nil {
 		t.Fatal(err)

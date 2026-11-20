@@ -18,8 +18,6 @@ const keychainRetry = 30 * time.Second
 
 // ResolverDeps is what a Resolver asks of the CLI.
 type ResolverDeps struct {
-	// Mint asks for a claimed project's missing key; nil when none may be minted.
-	Mint func(projectID string)
 	// AgentName names the agent behind a tool label, which its key is kept under.
 	AgentName func(tool string) string
 	// RelayTargets names the agents among the developer's choices that send through the relay.
@@ -31,9 +29,8 @@ type ResolverDeps struct {
 }
 
 // Resolver turns a claim into a Policy: the project's ingest host, the claiming agent's key
-// (else the spool key, else a background mint while the parts wait), and relay.CapturePolicy.
+// (else the spool key, while the parts wait for one), and relay.CapturePolicy.
 func Resolver(cfg *config.Config, r ResolverDeps) func(claim.Claim) (relay.Policy, error) {
-	mint := r.Mint
 	var mu sync.Mutex
 	var lockedUntil time.Time
 	var lockedErr error
@@ -61,9 +58,6 @@ func Resolver(cfg *config.Config, r ResolverDeps) func(claim.Claim) (relay.Polic
 			return relay.Policy{}, err
 		}
 		if key == "" {
-			if mint != nil {
-				mint(c.ProjectID)
-			}
 			return relay.Policy{}, relay.ErrNoKey
 		}
 		org, chosen := cfg.Policy, cfg.Harnesses

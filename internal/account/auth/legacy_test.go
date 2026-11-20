@@ -1,0 +1,157 @@
+package auth
+
+import (
+	"errors"
+	"io/fs"
+	"os"
+	"slices"
+	"testing"
+
+	"github.com/miradorlabs/terma-cli/internal/account/secret"
+	"github.com/miradorlabs/terma-cli/internal/config"
+)
+
+// writeLegacy leaves what an older terma kept: work's org-a sign-in with its token in
+// credentials.json, and default's org-a and org-b sign-ins with theirs in the keychain.
+func writeLegacy(t *testing.T, dir string) {
+	t.Helper()
+	data := `{
+  "work": {"active": "org-a", "organizations": {
+    "org-a": {"access_token": "access-work-a", "session_id": "s-work-a", "auth_url": "https://auth.example.test", "organization_id": "org-a", "user_id": "user-1"}
+  }},
+  "default": {"active": "org-b", "organizations": {
+    "org-b": {"session_id": "s-default-b", "auth_url": "https://auth.example.test", "organization_id": "org-b", "user_id": "user-1"},
+    "org-a": {"session_id": "s-default-a", "auth_url": "https://auth.example.test", "organization_id": "org-a", "user_id": "user-1"}
+  }}
+}`
+	if err := os.WriteFile(config.LegacyCredentialsPath(dir), []byte(data), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(config.LegacyCredentialsPath(dir)+".lock", nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	for _, org := range []string{"org-a", "org-b"} {
+		pair := `{"access_token":"access-default-` + org + `","refresh_token":"refresh-default-` + org + `"}`
+		if err := secret.Set(dir, legacyItemName(config.DefaultProfile, org), pair); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+// LegacySignIns lists every sign-in credentials.json indexes, ordered by profile then
+// organization, with tokens read from the file or, when asked, the keychain.
+func TestLegacySignIns_ReadsFileAndKeychainTokens(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	writeLegacy(t, dir)
+
+	signIns, err := LegacySignIns(dir, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []LegacySignIn{
+		{Profile: "default", OrganizationID: "org-a", SessionID: "s-default-a", UserID: "user-1", AuthURL: "https://auth.example.test", AccessToken: "access-default-org-a"},
+		{Profile: "default", OrganizationID: "org-b", SessionID: "s-default-b", UserID: "user-1", AuthURL: "https://auth.example.test", AccessToken: "access-default-org-b"},
+		{Profile: "work", OrganizationID: "org-a", SessionID: "s-work-a", UserID: "user-1", AuthURL: "https://auth.example.test", AccessToken: "access-work-a", inFile: true},
+	}
+	if !slices.Equal(signIns, want) {
+		t.Fatalf("LegacySignIns(tokens) =\n%+v\nwant\n%+v", signIns, want)
+	}
+
+	signIns, err = LegacySignIns(dir, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := range want[:2] {
+		want[i].AccessToken = ""
+	}
+	if !slices.Equal(signIns, want) {
+		t.Fatalf("LegacySignIns(no tokens) =\n%+v\nwant\n%+v", signIns, want)
+	}
+}
+
+// With no credentials.json there is nothing to list or forget.
+func TestLegacySignIns_NoFile(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	if HasLegacySignIns(dir) {
+		t.Fatal("HasLegacySignIns = true with no credentials.json")
+	}
+	if signIns, err := LegacySignIns(dir, true); err != nil || signIns != nil {
+		t.Fatalf("LegacySignIns = %+v, %v; want none", signIns, err)
+	}
+	if err := ForgetLegacy(dir); err != nil {
+		t.Fatalf("ForgetLegacy = %v; want a no-op", err)
+	}
+}
+
+// ForgetLegacy deletes every keychain item credentials.json names, then the file and its
+// lock, and leaves the current sign-in alone.
+func TestForgetLegacy_DeletesItemsFileAndLock(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	if _, err := SaveCredential(dir, config.DefaultProfile, sessionCredential("s1")); err != nil {
+		t.Fatal(err)
+	}
+	writeLegacy(t, dir)
+	if !HasLegacySignIns(dir) {
+		t.Fatal("HasLegacySignIns = false with credentials.json present")
+	}
+
+	if err := ForgetLegacy(dir); err != nil {
+		t.Fatal(err)
+	}
+	for _, org := range []string{"org-a", "org-b"} {
+		if _, err := secret.Get(dir, legacyItemName(config.DefaultProfile, org)); !errors.Is(err, secret.ErrNotFound) {
+			t.Fatalf("the older sign-in's item for %s outlived ForgetLegacy: %v", org, err)
+		}
+	}
+	for _, path := range []string{config.LegacyCredentialsPath(dir), config.LegacyCredentialsPath(dir) + ".lock"} {
+		if _, err := os.Stat(path); !errors.Is(err, fs.ErrNotExist) {
+			t.Fatalf("%s outlived ForgetLegacy: %v", path, err)
+		}
+	}
+	if HasLegacySignIns(dir) {
+		t.Fatal("HasLegacySignIns = true after ForgetLegacy")
+	}
+	if cred, err := LoadCredential(dir, config.DefaultProfile); err != nil || cred.SessionID != "s1" {
+		t.Fatalf("ForgetLegacy touched the current sign-in: %+v, %v", cred, err)
+	}
+}
+
+// A keychain that will not give up the older items keeps credentials.json, so a later
+// sign-in tries again.
+func TestForgetLegacy_KeepsTheFileWhenTheKeychainFails(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	writeLegacy(t, dir)
+	secret.FailForTest(t, dir)
+
+	if err := ForgetLegacy(dir); err == nil {
+		t.Fatal("ForgetLegacy reported success with the keychain locked")
+	}
+	if !HasLegacySignIns(dir) {
+		t.Fatal("credentials.json went while its keychain items stayed")
+	}
+}
+
+// Sign-ins an older terma kept in the file with no keychain are forgotten without one: the
+// keychain has no item of theirs to remove, so its failing keeps nothing.
+func TestForgetLegacy_FileHeldSignInsNeedNoKeychain(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	data := `{"default": {"active": "org-a", "organizations": {
+    "org-a": {"access_token": "access-a", "session_id": "s-a", "auth_url": "https://auth.example.test", "organization_id": "org-a", "user_id": "user-1"},
+    "org-b": {"access_token": "access-b", "session_id": "s-b", "auth_url": "https://auth.example.test", "organization_id": "org-b", "user_id": "user-1"}
+  }}}`
+	if err := os.WriteFile(config.LegacyCredentialsPath(dir), []byte(data), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	secret.FailForTest(t, dir)
+	if err := ForgetLegacy(dir); err != nil {
+		t.Fatalf("ForgetLegacy: %v", err)
+	}
+	if HasLegacySignIns(dir) {
+		t.Fatal("credentials.json outlived the retirement")
+	}
+}

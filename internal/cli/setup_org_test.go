@@ -19,11 +19,7 @@ func TestSetupWithoutATerminalSaysItKeptOneOfSeveralOrganizations(t *testing.T) 
 	authSandbox(t, gateway)
 	sandboxMachine(t)
 	t.Setenv("CODEX_HOME", t.TempDir())
-	for _, o := range []organization{orgB(), orgA()} {
-		if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(gateway, o)); err != nil {
-			t.Fatal(err)
-		}
-	}
+	signInTo(t, gateway, orgA())
 	out, err := runTerma(t, "setup", "--harness", "codex")
 	if err != nil {
 		t.Fatalf("setup: %v\n%s", err, out)
@@ -32,13 +28,24 @@ func TestSetupWithoutATerminalSaysItKeptOneOfSeveralOrganizations(t *testing.T) 
 	if !strings.Contains(out, want) {
 		t.Fatalf("setup did not say it kept one of several organizations (%d listings):\n%s", gateway.orgLists.Load(), out)
 	}
-	if active, _ := auth.LoadCredential(testApp.dir, config.DefaultProfile); active == nil || active.OrganizationID != orgA().ID {
-		t.Fatalf("Acme should still be active: %+v", active)
+	if org, _, _ := selected(t); org != orgA().ID {
+		t.Fatalf("Acme should still be chosen: %s", org)
 	}
 }
 
-// setup asks which organization only when the stored sign-in's user belongs to several and
-// --org named none; the answer, or the current one, is what stays signed in.
+// signInTo stores u-1's sign-in with org chosen, as an earlier setup would have left them.
+func signInTo(t *testing.T, f *fakeAuth, org organization) {
+	t.Helper()
+	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(f)); err != nil {
+		t.Fatal(err)
+	}
+	if err := config.UpdateProfile(testApp.dir, config.DefaultProfile, func(p *config.Profile) { p.SelectOrganization(org.ID, org.Name) }); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// setup asks which organization only when the person belongs to several and --org named
+// none; the answer, or the current one, is what the profile keeps. One sign-in serves all.
 func TestSetupSignInChoosesAmongSeveralOrganizations(t *testing.T) {
 	pickB := func(orgs []organization, _ string) (*organization, error) { return &orgs[1], nil }
 	keep := func(orgs []organization, current string) (*organization, error) {
@@ -66,11 +73,7 @@ func TestSetupSignInChoosesAmongSeveralOrganizations(t *testing.T) {
 			gateway := newFakeAuth(t)
 			gateway.orgs = tc.orgs
 			authSandbox(t, gateway)
-			for _, o := range []organization{orgB(), orgA()} {
-				if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(gateway, o)); err != nil {
-					t.Fatal(err)
-				}
-			}
+			signInTo(t, gateway, orgA())
 			cfg, err := testApp.loadConfig()
 			if err != nil {
 				t.Fatal(err)
@@ -110,9 +113,6 @@ func TestSetupSignInChoosesAmongSeveralOrganizations(t *testing.T) {
 			if got.OrganizationID != tc.wantActive.ID || got.OrganizationName != tc.wantActive.Name {
 				t.Errorf("config organization = %s %q, want %s", got.OrganizationID, got.OrganizationName, tc.wantActive.Name)
 			}
-			if active, _ := auth.LoadCredential(testApp.dir, config.DefaultProfile); active == nil || active.OrganizationID != tc.wantActive.ID {
-				t.Errorf("active credential %+v, want %s", active, tc.wantActive.Name)
-			}
 		})
 	}
 }
@@ -124,7 +124,7 @@ func TestSetupStoppedAtTheOrganizationStepKeepsTheCredentialWhereItWas(t *testin
 	gateway.orgsDown = true
 	authSandbox(t, gateway)
 	sandboxMachine(t)
-	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(gateway, orgA())); err != nil {
+	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(gateway)); err != nil {
 		t.Fatal(err)
 	}
 	if auth.StoredInFile(testApp.dir, config.DefaultProfile) {

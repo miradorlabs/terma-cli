@@ -13,10 +13,10 @@ import (
 
 // StopWindow is how long the relay may take to stop before its service manager kills it.
 // A token refresh the relay has begun runs to the end so its new pair reaches the store.
-// It holds the credential lock through its exchange, api.RefreshBudget (40 s), and at most
+// It holds the credential lock through its exchange, api.RefreshBudget (50 s), and at most
 // two keychain writes, secret.WriteTimeout (a minute) each, which a keychain waiting on a
 // prompt can take: the pair it holds, when the store missed it, and the pair it gets. So
-// 160 s, and 20 s more for the credentials.json writes and the relay's own shutdown.
+// 170 s, and 10 s more for the user-credentials.json writes and the relay's own shutdown.
 // Killed sooner, the relay may lose a pair the server has rotated to, and the token stored,
 // marked as maybe spent, asks for a new sign-in once the budget is past. launchd's default
 // is 20 s and systemd's may be lowered, so both definitions name it; on Windows the

@@ -14,6 +14,9 @@ import (
 )
 
 // A policy from another organization or environment, or none validated yet, grants nothing.
+// mintedKey is a team key an older terma minted, joined at run time for the secrets gate.
+var mintedKey = "ter_srv_" + "minted0123456789abcdefghijklmnopqrstuv"
+
 func TestResolverGrantsOnlyAValidatedPolicyOfThisLogin(t *testing.T) {
 	const org, auth = "org_a", "https://auth.example"
 	fetched := time.Now()
@@ -79,18 +82,17 @@ func TestResolverGrantsNothingOnceTheProfileIsGone(t *testing.T) {
 }
 
 // A key the keychain will not give up now holds its parts back without minting another.
-func TestResolverMintsNothingWhileTheKeychainIsLocked(t *testing.T) {
+func TestResolverTellsALockedKeychainFromAMissingKey(t *testing.T) {
 	configDir := t.TempDir()
 	cfg := &config.Config{Dir: configDir, ProfileName: "default"}
 	if err := keystore.Set(configDir, "p1", mintedKey, keystore.HostsOf(cfg)); err != nil {
 		t.Fatal(err)
 	}
 	secret.FailForTest(t, configDir)
-	minted := false
-	resolve := Resolver(cfg, ResolverDeps{Mint: func(string) { minted = true }, AgentName: func(string) string { return "" }, Endpoint: func(string) string { return "https://otel.example" }, RelayTargets: func(s []string) []string { return s }})
+	resolve := Resolver(cfg, ResolverDeps{AgentName: func(string) string { return "" }, Endpoint: func(string) string { return "https://otel.example" }, RelayTargets: func(s []string) []string { return s }})
 	_, err := resolve(claim.Claim{ProjectID: "p1"})
-	if !secret.IsUnavailable(err) || errors.Is(err, relay.ErrNoKey) || minted {
-		t.Fatalf("resolve = %v, minted %v; want the keychain unavailable and no mint", err, minted)
+	if !secret.IsUnavailable(err) || errors.Is(err, relay.ErrNoKey) {
+		t.Fatalf("resolve = %v; want the keychain unavailable, which is no missing key", err)
 	}
 }
 

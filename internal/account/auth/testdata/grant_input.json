@@ -116,9 +116,20 @@
       "error": "grant_bad_input"
     },
     {
-      "name": "an identity without an organization",
+      "name": "an identity without an organization, as a desktop on user sessions writes it",
       "stdin": [
-        "{\"user_id\":\"33333333-3333-4333-8333-333333333333\"}"
+        "{\"user_id\":\"33333333-3333-4333-8333-333333333333\"}",
+        "{\"code\":\"the-code\"}"
+      ],
+      "stdout": [
+        "request"
+      ],
+      "exchanged": "the-code"
+    },
+    {
+      "name": "an identity whose organization is not a UUID",
+      "stdin": [
+        "{\"user_id\":\"33333333-3333-4333-8333-333333333333\",\"org_id\":\"personal\"}"
       ],
       "stdout": [],
       "error": "grant_bad_input"

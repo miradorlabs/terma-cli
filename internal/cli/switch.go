@@ -27,8 +27,8 @@ func (app *App) newSwitchCommand() *cobra.Command {
 		Long: `Signs this machine out, then runs ` + "`terma setup`" + ` again, so you can sign in as any
 account and choose its organization and team:
 
-  1. Revokes this machine's sign-in, every organization's, as ` + "`terma teardown --sign-out`" + `
-     does, and stops the relay, which runs on that sign-in.
+  1. Revokes this machine's sign-in, as ` + "`terma teardown --sign-out`" + ` does, and stops
+     the relay, which runs on that sign-in.
   2. Forgets the organization and team setup chose, so setup asks for them again.
   3. Runs setup: sign in in the browser, then choose the organization, the team and your
      agents. Your agents' hooks stay in place throughout.

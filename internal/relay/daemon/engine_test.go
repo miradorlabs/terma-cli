@@ -50,15 +50,11 @@ func TestSettingsComeFromTheEnvironment(t *testing.T) {
 	}
 }
 
-// Assembling the relay reaches nothing: no key is minted and no policy fetched until the
-// relay runs and a claim asks.
+// Assembling the relay reaches nothing: no policy is fetched until the relay runs and a
+// claim asks.
 func TestTheEngineStartsNothing(t *testing.T) {
 	t.Parallel()
 	d := Deps{
-		CreateKey: func(context.Context, *config.Config, string) (string, error) {
-			t.Fatal("minted while assembling")
-			return "", nil
-		},
 		RefreshPolicy: func(context.Context, *config.Config) error { t.Fatal("fetched while assembling"); return nil },
 		HookPolicy:    func() config.Policy { return config.Policy{} },
 	}

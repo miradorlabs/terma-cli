@@ -105,7 +105,7 @@ func TestFetchUsesTheProfilesCredential(t *testing.T) {
 	defer srv.Close()
 	cfg := setUp(t, "")
 	cfg.AuthURL = srv.URL
-	if _, err := auth.SaveCredential(cfg.Dir, cfg.ProfileName, &auth.Credential{AccessToken: "ter_cli_login", AuthURL: srv.URL, OrganizationID: org, ExpiresAt: time.Now().Add(time.Hour)}); err != nil {
+	if _, err := auth.SaveCredential(cfg.Dir, cfg.ProfileName, &auth.Credential{AccessToken: "ter_cli_login", AuthURL: srv.URL, SessionID: "s-1", UserID: "u-1", ExpiresAt: time.Now().Add(time.Hour)}); err != nil {
 		t.Fatal(err)
 	}
 	if err := keystore.Set(cfg.Dir, team, "ter_srv_team", keystore.Hosts{}); err != nil {
@@ -144,7 +144,7 @@ func TestFetchUsesTheProfilesCredential(t *testing.T) {
 func TestFetchWithoutTheServerKeyNamesSetup(t *testing.T) {
 	cfg := setUp(t, "")
 	cfg.ServerKeySignIn, cfg.ServerKeyAuthURL, cfg.Team = true, cfg.AuthURL, team
-	if _, err := auth.SaveCredential(cfg.Dir, cfg.ProfileName, &auth.Credential{AccessToken: "a", AuthURL: authURL, OrganizationID: org, ExpiresAt: time.Now().Add(time.Hour)}); err != nil {
+	if _, err := auth.SaveCredential(cfg.Dir, cfg.ProfileName, &auth.Credential{AccessToken: "a", AuthURL: authURL, SessionID: "s-1", UserID: "u-1", ExpiresAt: time.Now().Add(time.Hour)}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := (Source{}).Fetch(t.Context(), cfg); err == nil || !strings.Contains(err.Error(), "no server key") || !strings.Contains(err.Error(), "terma setup") {
@@ -176,13 +176,15 @@ func TestFetchWithAServerKeyRefusesAnotherTeam(t *testing.T) {
 	}
 }
 
-// A login from another organization fetches nothing for this one.
-func TestFetchRefusesAnotherOrganizationsLogin(t *testing.T) {
+// With no organization chosen, a sign-in fetches nothing: every policy it stores is stamped
+// with the organization setup chose.
+func TestFetchNeedsAnOrganization(t *testing.T) {
 	cfg := setUp(t, "")
-	if _, err := auth.SaveCredential(cfg.Dir, cfg.ProfileName, &auth.Credential{AccessToken: "a", AuthURL: authURL, OrganizationID: "org_b", ExpiresAt: time.Now().Add(time.Hour)}); err != nil {
+	cfg.OrganizationID = ""
+	if _, err := auth.SaveCredential(cfg.Dir, cfg.ProfileName, &auth.Credential{AccessToken: "a", AuthURL: authURL, SessionID: "s-1", UserID: "u-1", ExpiresAt: time.Now().Add(time.Hour)}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := (Source{}).Fetch(t.Context(), cfg); err == nil || !strings.Contains(err.Error(), "another organization") {
+	if _, err := (Source{}).Fetch(t.Context(), cfg); err == nil || !strings.Contains(err.Error(), "terma setup") {
 		t.Fatalf("Fetch = %v", err)
 	}
 }

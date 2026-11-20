@@ -6,13 +6,19 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/spf13/cobra"
 
 	"github.com/miradorlabs/terma-cli/internal/account/api"
 	"github.com/miradorlabs/terma-cli/internal/account/auth"
+	"github.com/miradorlabs/terma-cli/internal/account/keystore"
+	"github.com/miradorlabs/terma-cli/internal/account/secret"
 	"github.com/miradorlabs/terma-cli/internal/config"
+	"github.com/miradorlabs/terma-cli/internal/ui/output"
 )
 
 type orgRef struct {
@@ -36,68 +42,34 @@ func parseOrgRef(arg string) orgRef {
 
 func (r orgRef) empty() bool { return r.ID == "" && r.Name == "" }
 
-func (r orgRef) matches(id, name string) bool {
-	if r.ID != "" {
-		return r.ID == id
-	}
-	return r.Name != "" && strings.EqualFold(r.Name, name)
-}
-
-// hint is what the browser page is told to preselect.
-func (r orgRef) hint() string { return cmp.Or(r.ID, r.Name) }
-
 func (r orgRef) String() string { return cmp.Or(r.Name, r.ID) }
 
 type signInOptions struct {
-	// org empty means whichever is active, or whatever the user picks in the browser.
+	// org is --org: the organization to set up; empty keeps the one chosen before, or asks.
 	org                orgRef
 	noBrowser          bool
 	pauseBeforeBrowser bool
 }
 
-type signInResult struct {
-	cred    *auth.Credential
-	orgName string
-	reused  bool
-}
-
 // orgAsker picks one of orgs, current marked; nil keeps the current one without asking.
 type orgAsker func(orgs []organization, current string) (*organization, error)
 
-// setupSignIn signs in to opts.org, else to the stored sign-in's organization, asking
-// first when its user belongs to several; a browser sign-in chose one on the page. The
-// count is how many organizations the current one was kept among without asking.
+// setupSignIn signs this machine in, reusing its stored sign-in when it still works, then
+// chooses the organization setup works in: --org, else the one chosen before, asking
+// first when the person belongs to several. The count is how many organizations the
+// current one was kept among without asking.
 func (app *App) setupSignIn(cmd *cobra.Command, cfg *config.Config, opts signInOptions, ask orgAsker) (*config.Config, int, error) {
-	res, err := app.signIn(cmd, cfg, opts)
+	cred, err := app.signIn(cmd, cfg, opts)
 	if err != nil {
 		return nil, 0, err
 	}
-	kept := 0
-	if res.reused && opts.org.empty() {
-		client, err := api.New(cfg, api.Options{Version: app.version, Credential: res.cred})
-		if err != nil {
-			return nil, 0, err
-		}
-		orgs, err := fetchOrganizations(cmd.Context(), client)
-		if err != nil {
-			return nil, 0, fmt.Errorf("list your organizations: %w", err)
-		}
-		switch {
-		case len(orgs) < 2:
-		case ask == nil:
-			kept = len(orgs)
-		default:
-			org, err := ask(orgs, res.cred.OrganizationID)
-			if err != nil {
-				return nil, 0, err
-			}
-			if org.ID != res.cred.OrganizationID {
-				opts.org = orgRef{ID: org.ID, Name: org.Name}
-				if _, err := app.signIn(cmd, cfg, opts); err != nil {
-					return nil, 0, err
-				}
-			}
-		}
+	cfg, err = app.loadConfig()
+	if err != nil {
+		return nil, 0, err
+	}
+	kept, err := app.chooseOrganization(cmd.Context(), cfg, cred, opts.org, ask)
+	if err != nil {
+		return nil, 0, err
 	}
 	cfg, err = app.loadConfig()
 	return cfg, kept, err
@@ -113,29 +85,17 @@ func askOrganization(cmd *cobra.Command, assumeYes bool) orgAsker {
 	}
 }
 
-// signIn is the one way a command obtains a credential: a stored session verified
+// signIn is the one way a command obtains a credential: the stored sign-in verified
 // against the auth host, else the browser.
-func (app *App) signIn(cmd *cobra.Command, cfg *config.Config, opts signInOptions) (*signInResult, error) {
+func (app *App) signIn(cmd *cobra.Command, cfg *config.Config, opts signInOptions) (*auth.Credential, error) {
 	if cfg.APIKey != "" {
 		return nil, errors.New("TERMA_API_KEY is set — unset it to sign in as a user, or keep using the server key")
 	}
 	ctx := cmd.Context()
-	errOut := cmd.ErrOrStderr()
-
-	want := opts.org
-	// A name must become an id to find a stored credential; without a working
-	// credential to list organizations, the browser page resolves the name.
-	if want.ID == "" && want.Name != "" {
-		if org, err := app.resolveOrganization(ctx, cfg, want); err == nil {
-			want = orgRef{ID: org.ID, Name: org.Name}
-		} else if !errors.Is(err, errNoWorkingCredential) {
-			return nil, err
-		}
-	}
-	if res, ok, err := app.reuseStoredSession(ctx, cfg, want); err != nil {
+	if cred, ok, err := app.reuseStoredSession(ctx, cfg, nil); err != nil {
 		return nil, err
 	} else if ok {
-		return res, nil
+		return cred, nil
 	}
 
 	if opts.pauseBeforeBrowser && !opts.noBrowser && canPrompt() {
@@ -143,135 +103,164 @@ func (app *App) signIn(cmd *cobra.Command, cfg *config.Config, opts signInOption
 			return nil, err
 		}
 	}
-
-	client := api.NewAnonymous(cfg.AuthURL, app.version)
+	installation, err := config.InstallationID(app.dir)
+	if err != nil {
+		return nil, err
+	}
+	client := api.NewSignIn(cfg.AuthURL, app.version, installation)
 	cred, err := auth.Login(ctx, client, auth.LoginOptions{
-		AppURL:       cfg.AppURL,
-		Label:        auth.DefaultLabel(),
-		Organization: want.hint(),
-		NoBrowser:    opts.noBrowser,
-		Out:          errOut,
+		AppURL:    cfg.AppURL,
+		Label:     auth.DefaultLabel(),
+		NoBrowser: opts.noBrowser,
+		Out:       cmd.ErrOrStderr(),
 	})
 	if err != nil {
 		return nil, err
 	}
-	orgName := ""
-	if result := client.LastLogin(); result != nil {
-		orgName = result.OrganizationName
-	}
-	if !want.empty() && !want.matches(cred.OrganizationID, orgName) {
-		fmt.Fprintf(errOut, "Note: you approved %s in the browser rather than %s. Signed in to %s.\n",
-			cmp.Or(orgName, cred.OrganizationID), want, cmp.Or(orgName, cred.OrganizationID))
-	}
-
-	if err := app.storeLogin(ctx, cfg, cred, orgName); err != nil {
+	if err := app.storeLogin(ctx, cfg, cred); err != nil {
 		return nil, err
 	}
-	return &signInResult{cred: cred, orgName: orgName}, nil
+	return cred, nil
 }
 
-// storeLogin keeps a new sign-in and makes it the profile's. It replaces only its own
-// organization's stored sign-in, normally ended (best effort); the other organizations' stay
-// stored. A sign-in that cannot be stored is ended too, so it does not linger on the web.
-func (app *App) storeLogin(ctx context.Context, cfg *config.Config, cred *auth.Credential, orgName string) error {
+// storeLogin keeps a new sign-in as the profile's, then ends the session it replaced: a
+// machine keeps one, and storing first means a crash in between leaves the old one live
+// but unused, never the machine signed out. A sign-in that cannot be stored is ended too,
+// so it does not linger on the web. An older terma's sign-ins and the team keys it minted
+// go with it. Another person's sign-in leaves no organization or team chosen behind.
+func (app *App) storeLogin(ctx context.Context, cfg *config.Config, cred *auth.Credential) error {
 	replaced, err := auth.SaveCredential(app.dir, cfg.ProfileName, cred)
 	if err != nil {
 		_ = app.revokeSession(ctx, cfg, cred)
 		return err
 	}
-	// Best-effort and silent: the superseded session may already be dead. One whose access token
-	// has (nearly) expired isn't revoked: its refresh token is never sent again, so it idles out.
+	// Best-effort: the superseded session may already be dead, often why the user is here.
+	// No process presents its token any more (a refresh rotates only the stored session).
 	if replaced != nil {
 		_ = app.revokeSession(ctx, cfg, replaced)
 	}
-	return config.UpdateProfile(app.dir, cfg.ProfileName, func(p *config.Profile) { applyLogin(p, cfg, cred, orgName) })
+	if err := config.UpdateProfile(app.dir, cfg.ProfileName, func(p *config.Profile) {
+		if replaced != nil && replaced.UserID != cred.UserID {
+			p.SelectOrganization("", "")
+		}
+		applyLogin(p, cfg)
+	}); err != nil {
+		return err
+	}
+	// After applyLogin: a profile that leaves its server key for a sign-in keeps it no more.
+	app.retireOlderSignIns(ctx, cfg.AuthURL)
+	return nil
 }
 
-// reuseStoredSession drops a dead credential so it is not tried again; ok false means
-// open the browser.
-func (app *App) reuseStoredSession(ctx context.Context, cfg *config.Config, want orgRef) (*signInResult, bool, error) {
-	return app.reuseStoredSessionIf(ctx, cfg, want, nil)
+// retireOlderSignIns ends and deletes what an older terma signed this machine in with:
+// its per-organization sessions, revoked best-effort with their own tokens, and the team
+// keys it minted with them. A server key a profile was set up with (TERMA_API_KEY) stays.
+func (app *App) retireOlderSignIns(ctx context.Context, authURL string) {
+	app.retireLegacySessions(ctx, authURL)
+	_ = keystore.RetainOnly(app.dir, serverKeyTeams(app.dir))
+}
+
+// retireLegacySessions revokes, best-effort, and deletes the per-organization sessions an
+// older terma signed in: all at once, within one deadline, so an unreachable auth host
+// delays a sign-in by seconds, not seconds per organization. A token goes only to authURL,
+// the auth host this profile is configured for: credentials.json names hosts, and a
+// tampered one must not lead a keychain-held token elsewhere; another environment's
+// sessions are forgotten unrevoked, to expire.
+func (app *App) retireLegacySessions(ctx context.Context, authURL string) {
+	if signIns, err := auth.LegacySignIns(app.dir, true); err == nil {
+		revokeCtx, cancel := context.WithTimeout(ctx, legacyRevokeWait)
+		var wg sync.WaitGroup
+		for _, s := range signIns {
+			if s.AccessToken != "" && sameHost(s.AuthURL, authURL) {
+				wg.Go(func() { _ = api.RevokeLegacySession(revokeCtx, s.AuthURL, app.version, s.AccessToken) })
+			}
+		}
+		wg.Wait()
+		cancel()
+	}
+	_ = auth.ForgetLegacy(app.dir)
+}
+
+// legacyRevokeWait bounds the best-effort revokes of an older terma's sessions.
+const legacyRevokeWait = 5 * time.Second
+
+// serverKeyTeams are the teams whose server key a profile signed in with.
+func serverKeyTeams(dir string) []string {
+	file, err := config.LoadFile(dir)
+	if err != nil {
+		return nil
+	}
+	var teams []string
+	for _, p := range file.Profiles {
+		if p != nil && p.ServerKeySignIn && p.Team != "" {
+			teams = append(teams, p.Team)
+		}
+	}
+	return teams
 }
 
 // sessionCheck decides, once the auth host has verified a stored credential, whether it
-// may be reused; whoami is the host's answer about it.
-type sessionCheck func(verified *auth.Credential, whoami identityResponse) bool
+// may be reused, before anything is recorded; whoami is the host's answer about it. An
+// error refuses the sign-in and stops setup.
+type sessionCheck func(verified *auth.Credential, whoami identityResponse) (bool, error)
 
-// reuseStoredSessionIf is reuseStoredSession for a credential accept, when not nil, takes;
-// one it refuses is left stored and inactive, and ok is false.
-func (app *App) reuseStoredSessionIf(ctx context.Context, cfg *config.Config, want orgRef, accept sessionCheck) (*signInResult, bool, error) {
-	var cred *auth.Credential
-	var err error
-	switch {
-	case want.ID != "":
-		cred, err = auth.LoadCredentialFor(app.dir, cfg.ProfileName, want.ID)
-	case want.Name != "":
-		return nil, false, nil
-	default:
-		cred, err = auth.LoadCredential(app.dir, cfg.ProfileName)
+// errKeychainLocked is a stored sign-in the system keychain will not give up now: a new one
+// could not replace it, so setup stops before a browser sign-in or a grant is spent.
+var errKeychainLocked = errors.New("the system keychain holding your sign-in is locked or unavailable: unlock it (on macOS over SSH, `security unlock-keychain`) and run `terma setup` again, or pass --insecure-storage to keep credentials in a file")
+
+// reuseStoredSession returns the profile's stored sign-in once the auth host has verified
+// it, and accept, when not nil, takes it; ok false means open the browser. A sign-in the
+// host refuses is forgotten, so it is not tried again; one accept refuses stays stored.
+func (app *App) reuseStoredSession(ctx context.Context, cfg *config.Config, accept sessionCheck) (*auth.Credential, bool, error) {
+	cred, err := auth.LoadCredential(app.dir, cfg.ProfileName)
+	if secret.IsUnavailable(err) && !config.InsecureStorage(app.dir) {
+		// Its tokens can't be read, so a new sign-in kept in the keychain could not replace
+		// them (saveReplacing): stop before the browser, or a grant, is spent on one.
+		return nil, false, errKeychainLocked
 	}
 	if err != nil || cred.CheckEnvironment(cfg.AuthURL) != nil || cred.RefreshToken == "" {
 		return nil, false, nil
 	}
-	// A refresh of it went unanswered too long ago to send its token again: whoami may
-	// still take its access token, but it could never be refreshed. A new sign-in replaces it.
-	if api.RefreshLost(cred) {
-		return nil, false, nil
-	}
-
 	verified, identity, err := app.verifyCredential(ctx, cfg, cred)
-	switch {
-	case api.Refused(err):
-		// Removed only while the store still holds the refused pair: one another process
-		// has rotated in since, or a new sign-in, stays.
-		_ = auth.Locked(ctx, app.dir, func(tx *auth.Tx) error {
-			return tx.DeleteFor(cfg.ProfileName, cred.OrganizationID, cred.RefreshToken)
-		})
+	if errors.Is(err, auth.ErrNotLoggedIn) {
+		_ = auth.DeleteCredentialIf(app.dir, cfg.ProfileName, cred.RefreshToken)
 		return nil, false, nil
-	case errors.Is(err, auth.ErrNotLoggedIn):
-		// Not the gateway's refusal (a lost refresh, a sign-in replaced since): its token may
-		// be alive, so it is kept for the fresh sign-in to replace. A proxy's 401 fails below.
-		return nil, false, nil
-	case err != nil:
+	}
+	if err != nil {
 		return nil, false, err
 	}
-	if accept != nil && !accept(verified, identity) {
-		return nil, false, nil
-	}
-	// A credential saved before terma kept the email and user id learns them from whoami.
-	verified.UserEmail = cmp.Or(verified.UserEmail, identity.Email)
-	verified.UserID = cmp.Or(verified.UserID, identity.UserID)
-	// Saved as a sign-in would, so running setup again moves the tokens to where they now
-	// belong; but keeping whatever pair another process rotated in since it was read.
-	verified, err = auth.ResaveCredential(app.dir, cfg.ProfileName, verified)
-	switch {
-	case errors.Is(err, auth.ErrNotLoggedIn):
-		// Removed since it was verified, as another process does on the gateway's refusal of
-		// its refresh token: not restored, and a fresh sign-in replaces it.
-		return nil, false, nil
-	case err != nil:
-		return nil, false, err
-	}
-	orgName := ""
-	if want.ID == verified.OrganizationID {
-		orgName = want.Name
-	}
-	if orgName == "" && cfg.OrganizationID == verified.OrganizationID {
-		orgName = cfg.OrganizationName
-	}
-	if orgName == "" {
-		if org, err := app.lookupOrganization(ctx, cfg, verified, verified.OrganizationID); err == nil {
-			orgName = org.Name
+	if accept != nil {
+		if ok, err := accept(verified, identity); err != nil || !ok {
+			return nil, false, err
 		}
 	}
-	if err := config.UpdateProfile(app.dir, cfg.ProfileName, func(p *config.Profile) { applyLogin(p, cfg, verified, orgName) }); err != nil {
+	// Kept where a sign-in would keep it now, so running setup again moves the tokens.
+	if err := auth.Relocate(app.dir); err != nil {
 		return nil, false, err
 	}
-	return &signInResult{cred: verified, orgName: orgName, reused: true}, true, nil
+	// Another process may have rotated the pair since it was read: take the stored one. One
+	// that signed in again since replaced this session, which is over: never set up with it.
+	switch stored, err := auth.LoadCredential(app.dir, cfg.ProfileName); {
+	case err != nil:
+		return nil, false, err
+	case stored.SessionID != verified.SessionID:
+		return nil, false, errors.New("this machine signed in again while setup ran: run `terma setup` again")
+	default:
+		verified = stored
+	}
+	verified.UserEmail = cmp.Or(identity.Email, verified.UserEmail)
+	if err := config.UpdateProfile(app.dir, cfg.ProfileName, func(p *config.Profile) { applyLogin(p, cfg) }); err != nil {
+		return nil, false, err
+	}
+	// A first retirement the keychain or the network cut short is tried again.
+	if auth.HasLegacySignIns(app.dir) {
+		app.retireOlderSignIns(ctx, cfg.AuthURL)
+	}
+	return verified, true, nil
 }
 
 // verifyCredential returns the credential as it now stands: possibly a rotated pair,
-// already persisted for its organization.
+// already stored.
 func (app *App) verifyCredential(ctx context.Context, cfg *config.Config, cred *auth.Credential) (*auth.Credential, identityResponse, error) {
 	client, err := api.New(cfg, api.Options{Version: app.version, Credential: cred})
 	if err != nil {
@@ -281,42 +270,54 @@ func (app *App) verifyCredential(ctx context.Context, cfg *config.Config, cred *
 	if err := client.AuthGet(ctx, "/v1/whoami", nil, &identity); err != nil {
 		return nil, identityResponse{}, err
 	}
-	current := client.Credential()
-	if current.OrganizationID == "" {
-		current.OrganizationID = identity.OrganizationID
-	}
-	return current, identity, nil
+	return client.Credential(), identity, nil
 }
 
-var errNoWorkingCredential = errors.New("no working credential")
+// errNoOrganization is a sign-in of someone who belongs to no organization yet.
+var errNoOrganization = errors.New("you belong to no Terma organization yet: create or join one in the Terma app, then run `terma setup` again")
 
-func (app *App) workingClient(ctx context.Context, cfg *config.Config) (*api.Client, error) {
-	if cfg.APIKey != "" {
-		return app.newClient(cfg)
-	}
-	creds, err := auth.Credentials(app.dir, cfg.ProfileName)
+// chooseOrganization records the organization setup works in, among the person's: want
+// (--org), else the profile's current one when ask is nil or it is their only one, else
+// their only one, else ask's pick. kept is how many the current one was kept among without
+// asking. Only an organization the person's sign-in lists is ever recorded.
+func (app *App) chooseOrganization(ctx context.Context, cfg *config.Config, cred *auth.Credential, want orgRef, ask orgAsker) (int, error) {
+	client, err := api.New(cfg, api.Options{Version: app.version, Credential: cred})
 	if err != nil {
-		return nil, err
+		return 0, err
 	}
-	for _, cred := range creds {
-		if cred.CheckEnvironment(cfg.AuthURL) != nil {
-			continue
-		}
-		client, err := api.New(cfg, api.Options{Version: app.version, Credential: cred})
-		if err != nil {
-			continue
-		}
-		var identity identityResponse
-		if err := client.AuthGet(ctx, "/v1/whoami", nil, &identity); err != nil {
-			if errors.Is(err, auth.ErrNotLoggedIn) {
-				continue
-			}
-			return nil, err
-		}
-		return client, nil
+	orgs, err := fetchOrganizations(ctx, client)
+	if err != nil {
+		return 0, fmt.Errorf("list your organizations: %w", err)
 	}
-	return nil, errNoWorkingCredential
+	if len(orgs) == 0 {
+		return 0, errNoOrganization
+	}
+	current := slices.IndexFunc(orgs, func(o organization) bool { return o.ID == cfg.OrganizationID })
+	var org *organization
+	kept := 0
+	switch {
+	case !want.empty():
+		if org, err = matchOrganization(orgs, want.String()); errors.As(err, new(noMatchError)) {
+			err = fmt.Errorf("%w: %w", errNotYourOrganization, err)
+		}
+	case len(orgs) == 1:
+		org = &orgs[0]
+	case ask != nil:
+		org, err = ask(orgs, cfg.OrganizationID)
+	case current >= 0:
+		org, kept = &orgs[current], len(orgs)
+	default:
+		return 0, fmt.Errorf("you belong to %d organizations: pass --org to choose one", len(orgs))
+	}
+	if err != nil {
+		return 0, err
+	}
+	return kept, config.UpdateProfile(app.dir, cfg.ProfileName, func(p *config.Profile) { p.SelectOrganization(org.ID, org.Name) })
 }
+
+// errNotYourOrganization is an --org the person's organizations, as the account service
+// lists them, do not include.
+var errNotYourOrganization = errors.New("not one of your organizations")
 
 func fetchOrganizations(ctx context.Context, client *api.Client) ([]organization, error) {
 	var resp listOrganizationsResponse
@@ -326,53 +327,37 @@ func fetchOrganizations(ctx context.Context, client *api.Client) ([]organization
 	return resp.Organizations, nil
 }
 
-func (app *App) resolveOrganization(ctx context.Context, cfg *config.Config, ref orgRef) (*organization, error) {
-	client, err := app.workingClient(ctx, cfg)
-	if err != nil {
-		return nil, err
-	}
-	orgs, err := fetchOrganizations(ctx, client)
-	if err != nil {
-		return nil, err
-	}
-	return matchOrganization(orgs, ref.String())
-}
-
-func (app *App) lookupOrganization(ctx context.Context, cfg *config.Config, cred *auth.Credential, id string) (*organization, error) {
-	client, err := api.New(cfg, api.Options{Version: app.version, Credential: cred})
-	if err != nil {
-		return nil, err
-	}
-	orgs, err := fetchOrganizations(ctx, client)
-	if err != nil {
-		return nil, err
-	}
-	for i := range orgs {
-		if orgs[i].ID == id {
-			return &orgs[i], nil
-		}
-	}
-	return nil, fmt.Errorf("organization %s not found", id)
-}
-
 func matchOrganization(orgs []organization, query string) (*organization, error) {
 	return organizationKind.match(orgs, query)
 }
 
+// errRefreshInDoubt is a session left unrevoked because its refresh token may be spent.
+var errRefreshInDoubt = errors.New("a refresh of this session got no answer, so its refresh token may be spent; it is left to expire")
+
+// revokeSession ends cred's session at the auth host this profile is configured for, the
+// one that issued it: best-effort, and the caller forgets cred whatever the answer. A token
+// a refresh may have spent is never sent: presenting a spent token is reuse, which revokes
+// the whole family. Nor is one to any other host: user-credentials.json names its host,
+// and a tampered one must not lead a keychain-held token elsewhere, so another
+// environment's session is left to expire.
 func (app *App) revokeSession(ctx context.Context, cfg *config.Config, cred *auth.Credential) error {
-	client, err := api.New(cfg, api.Options{Version: app.version, Credential: cred})
-	if err != nil {
-		return err
+	if cred.RefreshToken == "" {
+		return nil
 	}
-	return client.RevokeSession(ctx)
+	if !cred.RefreshInDoubtSince.IsZero() {
+		return errRefreshInDoubt
+	}
+	if err := cred.CheckEnvironment(cfg.AuthURL); err != nil {
+		return fmt.Errorf("the session was not revoked, and is left to expire: %w", err)
+	}
+	_, err := api.RevokeRefreshToken(ctx, cfg.AuthURL, app.version, cred.RefreshToken)
+	return err
 }
 
-// applyLogin records only the account scope, and the environment the credential belongs
-// to: hooks and the flushes they start run without TERMA_ENV, and would otherwise resolve
-// to production and hold every event. Project selection belongs to repositories. The
-// login is the profile's credential from then on, not a server key setup stored.
-func applyLogin(p *config.Profile, cfg *config.Config, cred *auth.Credential, orgName string) {
-	p.SelectOrganization(cred.OrganizationID, orgName)
+// applyLogin records the environment the credential belongs to: hooks and the flushes they
+// start run without TERMA_ENV, and would otherwise resolve to production and hold every
+// event. The login is the profile's credential from then on, not a server key setup stored.
+func applyLogin(p *config.Profile, cfg *config.Config) {
 	p.PinEnvironment(cfg.Environment)
 	p.ServerKeySignIn, p.ServerKeyAuthURL = false, ""
 }
@@ -398,7 +383,7 @@ type identityResponse struct {
 	AuthType       string `json:"auth_type"`
 	UserID         string `json:"user_id"`
 	Email          string `json:"email"`
-	// Permissions are a server key's; nil for a CLI token.
+	// Permissions are a server key's; nil for a user token.
 	Permissions *keyPermissions `json:"permissions,omitempty"`
 }
 
@@ -407,4 +392,47 @@ type keyPermissions struct {
 	Read   bool `json:"read"`
 	Write  bool `json:"write"`
 	Ingest bool `json:"ingest"`
+}
+
+// reportCredentialStore says where signing in kept the credentials, as gh does.
+func reportCredentialStore(ui *setupUI, cfg *config.Config, insecure bool) {
+	file := output.TildePath(config.CredentialsPath(cfg.Dir))
+	switch {
+	case !auth.StoredInFile(cfg.Dir, cfg.ProfileName):
+		ui.Summary("Credentials", "in the system keychain")
+	case insecure:
+		ui.Summary("Credentials", "in plain text in "+file+" (--insecure-storage)")
+	default:
+		ui.Caution("Credentials", "in plain text in "+file+": no system keychain could be used")
+	}
+}
+
+// settleSecrets keeps every secret with the sign-in: a sign-in that fell back to the file
+// records that, so the relay's background writes go straight there rather than wait on a
+// keychain setup could not use, and every other credential and key moves to where
+// secrets now live.
+func (app *App) settleSecrets(ui *setupUI, cfg *config.Config, insecure bool) {
+	if !insecure && auth.StoredInFile(cfg.Dir, cfg.ProfileName) {
+		if err := config.UpdateFile(cfg.Dir, func(f *config.File) { f.InsecureStorage = true }); err != nil {
+			fmt.Fprintf(ui.Detail(), "  could not record the plain-text fallback: %v\n", err)
+		}
+	}
+	if err := auth.Relocate(cfg.Dir); err != nil {
+		fmt.Fprintf(ui.Detail(), "  could not move the other profiles' credentials: %v\n", err)
+	}
+	if err := keystore.Relocate(cfg.Dir); err != nil {
+		fmt.Fprintf(ui.Detail(), "  could not move the team keys: %v\n", err)
+	}
+}
+
+// signedInAs is who the sign-in left this profile as: the email and organization.
+func signedInAs(cfg *config.Config) string {
+	who := "signed in"
+	if cred, err := auth.LoadIdentity(cfg.Dir, cfg.ProfileName); err == nil && cred.UserEmail != "" {
+		who = cred.UserEmail
+	}
+	if org := cmp.Or(cfg.OrganizationName, cfg.OrganizationID); org != "" {
+		who += " (" + org + ")"
+	}
+	return who
 }

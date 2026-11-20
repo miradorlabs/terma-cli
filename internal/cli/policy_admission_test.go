@@ -102,7 +102,7 @@ func TestRelayAdmissionStopsGlobalCoverageWithStaleCatchAll(t *testing.T) {
 		t.Fatal(err)
 	}
 	r := newTestRelay(relay.Options{Token: "token", Dir: t.TempDir(), Hold: 30 * time.Millisecond, TraceHold: 30 * time.Millisecond,
-		CatchAll: testApp.relayDeps().CatchAll(), Resolve: testApp.relayDeps().Resolver(cfg, nil), PolicyCacheTTL: time.Second})
+		CatchAll: testApp.relayDeps().CatchAll(), Resolve: testApp.relayDeps().Resolver(cfg), PolicyCacheTTL: time.Second})
 	ctx, cancel := context.WithCancel(t.Context())
 	done := make(chan struct{})
 	go func() { r.Run(ctx); close(done) }()

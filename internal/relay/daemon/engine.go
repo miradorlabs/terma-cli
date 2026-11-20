@@ -11,7 +11,6 @@ import (
 
 	logspb "go.opentelemetry.io/proto/otlp/logs/v1"
 
-	"github.com/miradorlabs/terma-cli/internal/account/auth"
 	"github.com/miradorlabs/terma-cli/internal/account/keystore"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/procinfo"
@@ -38,8 +37,6 @@ type Deps struct {
 	Endpoint func(cfg *config.Config, projectID string) string
 	// User is who parts sent to projectID at endpoint name under cfg's profile, by Mirador user id.
 	User func(cfg *config.Config, projectID, endpoint string) string
-	// CreateKey mints a project's key under cfg's sign-in.
-	CreateKey func(ctx context.Context, cfg *config.Config, projectID string) (string, error)
 	// SendHeartbeat delivers a heartbeat with a project's key.
 	SendHeartbeat func(ctx context.Context, beat *logspb.LogsData) error
 	// HookPolicy is the organization's policy as a hook reads it.
@@ -69,25 +66,18 @@ func SettingsFromEnv() Settings {
 	return s
 }
 
-// Prepare makes cfg the configuration a relay routes with: the signed-in organization,
-// and no capture until the first successful policy fetch.
+// Prepare makes cfg the configuration a relay routes with: no capture until the first
+// successful policy fetch.
 func Prepare(cfg *config.Config) {
-	if cfg.OrganizationID == "" && config.PolicyStub() == "" {
-		if cred, err := auth.LoadIdentity(cfg.Dir, cfg.ProfileName); err == nil && cred.CheckEnvironment(cfg.AuthURL) == nil {
-			cfg.OrganizationID = cred.OrganizationID
-		}
-	}
 	if !cfg.Policy.Validated() {
 		cfg.Policy = config.NoPolicy(cfg.OrganizationID, cfg.AuthURL)
 	}
 }
 
-// Engine is the relay's options for this machine. It starts nothing: the minter works
-// only when a claim asks for a key, until ctx ends.
+// Engine is the relay's options for this machine. It starts nothing.
 func (d Deps) Engine(ctx context.Context, stateDir string, cfg *config.Config, s Settings, logw io.Writer) relay.Options {
-	minter := NewKeyMinter(ctx, cfg, d.CreateKey)
 	opts := relay.Options{Correlators: d.Correlators, Capturers: d.Capturers,
-		Hold: s.Hold, Dir: filepath.Join(claim.Dir(stateDir), relay.OutboxDir), Resolve: d.Resolver(cfg, minter.Mint), Version: d.Version,
+		Hold: s.Hold, Dir: filepath.Join(claim.Dir(stateDir), relay.OutboxDir), Resolve: d.Resolver(cfg), Version: d.Version,
 		Lookup:   func(sessionID string, now time.Time) (claim.Claim, bool) { return claim.Read(stateDir, sessionID, now) },
 		CatchAll: d.CatchAll(), HeartbeatSend: d.SendHeartbeat, HeartbeatEvery: s.Heartbeat,
 		PeerPID: procinfo.FindSender, ProcessAlive: procinfo.Alive, ClaimCacheTTL: time.Second, PolicyCacheTTL: time.Second}
@@ -97,9 +87,9 @@ func (d Deps) Engine(ctx context.Context, stateDir string, cfg *config.Config, s
 	return opts
 }
 
-// Resolver turns a claim into its session's policy, minting a missing key with mint.
-func (d Deps) Resolver(cfg *config.Config, mint func(projectID string)) func(claim.Claim) (relay.Policy, error) {
-	return Resolver(cfg, ResolverDeps{Mint: mint, AgentName: d.AgentName, RelayTargets: d.RelayTargets,
+// Resolver turns a claim into its session's policy.
+func (d Deps) Resolver(cfg *config.Config) func(claim.Claim) (relay.Policy, error) {
+	return Resolver(cfg, ResolverDeps{AgentName: d.AgentName, RelayTargets: d.RelayTargets,
 		Endpoint: func(projectID string) string { return d.Endpoint(cfg, projectID) },
 		User:     func(projectID, endpoint string) string { return d.User(cfg, projectID, endpoint) }})
 }

@@ -129,7 +129,7 @@ func TestRelayRespectsHarnessSelection(t *testing.T) {
 			}
 			cfg := &config.Config{Dir: testApp.dir, StateDir: testApp.stateDir, Policy: config.DefaultPolicy(), OTLPURL: host.URL, Harnesses: []string{test.harness}}
 			cfg.Policy.Repositories = []string{appRepo.Origin}
-			r := newTestRelay(relay.Options{Token: "test-token", Dir: t.TempDir(), Resolve: testApp.relayDeps().Resolver(cfg, nil), Lookup: func(string, time.Time) (claim.Claim, bool) {
+			r := newTestRelay(relay.Options{Token: "test-token", Dir: t.TempDir(), Resolve: testApp.relayDeps().Resolver(cfg), Lookup: func(string, time.Time) (claim.Claim, bool) {
 				return claim.Claim{ProjectID: "team", Tool: test.tool, Repository: appRepo}, true
 			}})
 			ctx, cancel := context.WithCancel(t.Context())
@@ -210,7 +210,7 @@ func TestQueuedRelayExportsRespectHarnessDeselection(t *testing.T) {
 	choose("codex")
 	dir := t.TempDir()
 	cfg := &config.Config{Dir: testApp.dir, StateDir: testApp.stateDir, ProfileName: config.DefaultProfile, Policy: config.DefaultPolicy(), OTLPURL: host.URL}
-	r := newTestRelay(relay.Options{Token: "test-token", Dir: dir, Resolve: testApp.relayDeps().Resolver(cfg, nil), Lookup: func(string, time.Time) (claim.Claim, bool) {
+	r := newTestRelay(relay.Options{Token: "test-token", Dir: dir, Resolve: testApp.relayDeps().Resolver(cfg), Lookup: func(string, time.Time) (claim.Claim, bool) {
 		return claim.Claim{ProjectID: "team", Tool: "codex", Repository: appRepo}, true
 	}})
 	ctx, cancel := context.WithCancel(t.Context())
@@ -264,7 +264,7 @@ func TestQueuedRelayExportsRespectHarnessDeselection(t *testing.T) {
 
 func seedPolicyLogin(t *testing.T, authURL string) {
 	t.Helper()
-	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, &auth.Credential{AccessToken: "developer-policy-token", OrganizationID: "org-test", AuthURL: authURL, ExpiresAt: time.Now().Add(time.Hour)}); err != nil {
+	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, &auth.Credential{AccessToken: "developer-policy-token", SessionID: "s-policy", UserID: "u-1", AuthURL: authURL, ExpiresAt: time.Now().Add(time.Hour)}); err != nil {
 		t.Fatal(err)
 	}
 	if err := config.UpdateProfile(testApp.dir, config.DefaultProfile, func(p *config.Profile) { p.OrganizationID = "org-test" }); err != nil {
@@ -500,7 +500,7 @@ func TestEveryReaderSeesTheStoredPolicy(t *testing.T) {
 	if !testApp.hookProfile().Policy.Expired(time.Now()) || !testApp.hookPolicy().CollectsNothing {
 		t.Fatal("the hooks see a policy that has not expired")
 	}
-	if got, err := testApp.relayDeps().Resolver(cfg, nil)(claim.Claim{ProjectID: "team", Tool: "codex", Repository: appRepo}); err == nil && (got.IncludePrompts || len(got.Signals) > 0) {
+	if got, err := testApp.relayDeps().Resolver(cfg)(claim.Claim{ProjectID: "team", Tool: "codex", Repository: appRepo}); err == nil && (got.IncludePrompts || len(got.Signals) > 0) {
 		t.Fatalf("the relay granted %+v", got)
 	}
 	stored, err := testApp.loadConfig()

@@ -3,6 +3,8 @@ package api
 import (
 	"cmp"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"slices"
@@ -12,15 +14,52 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/account/auth"
 )
 
-const tokenPath = "/v1/auth/cli/token"
+const (
+	tokenPath  = "/v1/auth/user/token"
+	revokePath = "/v1/auth/user/revoke"
+	// legacyRevokePath ends a session an older terma signed in, with its access token.
+	legacyRevokePath = "/v1/auth/cli/revoke"
+)
+
+// RefreshBudget is how long after the first attempt a refresh that got no clear
+// answer (a 503, or no response) is retried. The server may have rotated the pair without
+// returning it, and it forgives a retry of the spent token for only 60 seconds; after
+// that, presenting it is reuse, which revokes the whole family, this machine's and any
+// Terma Desktop session it was delegated from. So past the budget the sign-in is over.
+// The relay's service gives a stopping relay at least this long
+// (internal/cli's TestRelayStopWindowCoversARefresh).
+const RefreshBudget = 50 * time.Second
+
+// refreshAttemptBudget is RefreshBudget, and the waits below, as variables so tests can
+// shorten them.
+var refreshAttemptBudget = RefreshBudget
+
+// defaultRetryAfter is the wait before retrying a 503 that named none.
+var defaultRetryAfter = 5 * time.Second
+
+// updateCredential stores a refreshed pair; a test can make it fail alone.
+var updateCredential = func(tx *auth.Tx, profile string, cred *auth.Credential) error {
+	return tx.Update(profile, cred)
+}
+
+// spentLongAgo is the in-doubt mark of a stored token known to be spent: past every
+// budget, so any process ends the sign-in rather than present it.
+var spentLongAgo = time.Unix(1, 0).UTC()
+
+// errSessionExpired is a refresh token the auth gateway refused.
+var errSessionExpired = fmt.Errorf("%w: session expired, run `terma setup`", auth.ErrNotLoggedIn)
+
+// errSignInAgain is a refresh the server will not, or can no longer safely, complete.
+var errSignInAgain = fmt.Errorf("%w: the sign-in could not be renewed; run `terma setup` to sign in again", auth.ErrNotLoggedIn)
 
 type tokenRequest struct {
 	GrantType    string `json:"grant_type"`
 	Code         string `json:"code,omitempty"`
 	CodeVerifier string `json:"code_verifier,omitempty"`
 	// RedirectPort is a pointer so a delegated code's 0 is sent, and a refresh sends none.
-	RedirectPort *int   `json:"redirect_port,omitempty"`
-	RefreshToken string `json:"refresh_token,omitempty"`
+	RedirectPort   *int   `json:"redirect_port,omitempty"`
+	InstallationID string `json:"installation_id,omitempty"`
+	RefreshToken   string `json:"refresh_token,omitempty"`
 }
 
 type tokenResponse struct {
@@ -29,21 +68,11 @@ type tokenResponse struct {
 	TokenType    string `json:"token_type"`
 	ExpiresIn    int    `json:"expires_in"`
 	SessionID    string `json:"session_id"`
-	Organization struct {
-		ID   string `json:"id"`
-		Name string `json:"name"`
-	} `json:"organization"`
-	User struct {
+	FamilyID     string `json:"family_id"`
+	User         struct {
 		ID    string `json:"id"`
 		Email string `json:"email"`
 	} `json:"user"`
-}
-
-// LoginResult is a completed sign-in, with the organization and user names to print.
-type LoginResult struct {
-	Credential       *auth.Credential
-	OrganizationName string
-	UserID           string
 }
 
 // ExchangeCode implements auth.TokenExchanger.
@@ -51,56 +80,45 @@ func (c *Client) ExchangeCode(ctx context.Context, code, verifier string, port i
 	return c.exchangeCode(ctx, code, verifier, port)
 }
 
-// ExchangeDelegatedCode implements auth.TokenExchanger for a code Terma Desktop obtained
-// for this process's challenge. No listener took it, so redirect_port is 0; the auth host
-// accepts 0 only for a code its own record says was delegated.
+// ExchangeDelegatedCode implements auth.TokenExchanger for a code Terma Desktop delegated
+// from its own user session for this process's challenge. No listener took it, so
+// redirect_port is 0; the auth host accepts 0 only for a code its own record says was
+// delegated.
 func (c *Client) ExchangeDelegatedCode(ctx context.Context, code, verifier string) (*auth.Credential, error) {
 	return c.exchangeCode(ctx, code, verifier, 0)
 }
 
 func (c *Client) exchangeCode(ctx context.Context, code, verifier string, port int) (*auth.Credential, error) {
-	resp, err := c.postToken(ctx, tokenRequest{
-		GrantType:    "authorization_code",
-		Code:         code,
-		CodeVerifier: verifier,
-		RedirectPort: &port,
-	}, nil)
+	if c.installationID == "" {
+		return nil, errors.New("signing in needs this installation's id")
+	}
+	resp, err := c.postToken(ctx, nil, tokenRequest{
+		GrantType:      "authorization_code",
+		Code:           code,
+		CodeVerifier:   verifier,
+		RedirectPort:   &port,
+		InstallationID: c.installationID,
+	})
 	if err != nil {
+		// A session may have been made whose answer was lost: nothing here can take it up.
+		if apiErr, ok := errors.AsType[*Error](err); ok && (apiErr.Superseded() || apiErr.StatusCode >= 500) {
+			return nil, fmt.Errorf("the sign-in did not complete (%w): run `terma setup` again", err)
+		}
 		return nil, err
 	}
-	cred := c.credentialFrom(resp)
-	c.mu.Lock()
-	c.lastLogin = &LoginResult{
-		Credential:       cred,
-		OrganizationName: resp.Organization.Name,
-		UserID:           resp.User.ID,
-	}
-	c.mu.Unlock()
-	return cred, nil
-}
-
-// LastLogin returns the most recent exchange's result on this client.
-func (c *Client) LastLogin() *LoginResult {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	return c.lastLogin
+	return c.credentialFrom(resp), nil
 }
 
 func (c *Client) credentialFrom(resp *tokenResponse) *auth.Credential {
-	cred := credentialFrom(resp)
-	cred.AuthURL = c.authURL
-	return cred
-}
-
-func credentialFrom(resp *tokenResponse) *auth.Credential {
 	return &auth.Credential{
-		AccessToken:    resp.AccessToken,
-		RefreshToken:   resp.RefreshToken,
-		ExpiresAt:      time.Now().Add(time.Duration(resp.ExpiresIn) * time.Second),
-		SessionID:      resp.SessionID,
-		OrganizationID: resp.Organization.ID,
-		UserEmail:      resp.User.Email,
-		UserID:         resp.User.ID,
+		AccessToken:  resp.AccessToken,
+		RefreshToken: resp.RefreshToken,
+		ExpiresAt:    time.Now().Add(time.Duration(resp.ExpiresIn) * time.Second),
+		SessionID:    resp.SessionID,
+		FamilyID:     resp.FamilyID,
+		AuthURL:      c.authURL,
+		UserEmail:    resp.User.Email,
+		UserID:       resp.User.ID,
 	}
 }
 
@@ -175,25 +193,26 @@ func (c *Client) RefreshRefused(ctx context.Context, refusedSHA256 string) error
 
 // TokenSHA256 is how a token is named where the token itself must not appear: its
 // SHA-256, in lowercase hex.
-func TokenSHA256(token string) string { return auth.TokenSHA256(token) }
+func TokenSHA256(token string) string {
+	sum := sha256.Sum256([]byte(token))
+	return hex.EncodeToString(sum[:])
+}
 
 // redeemFunc decides whether to redeem the refresh token. held is the credential this
 // client had. current is the pair as it stands now, which another process may have rotated.
 type redeemFunc func(held, current *auth.Credential) bool
 
 // refresh brings the token pair up to date as one transaction across terma processes.
-// The server revokes the whole session if a rotated refresh token is redeemed twice, so
-// every step runs under the credential lock:
+// The server revokes the whole session family if a rotated refresh token is redeemed
+// again after its 60-second grace, so every step runs under the credential lock:
 //
 //   - reload the stored pair;
-//   - send nothing if it is another sign-in's, which replaced this client's session;
 //   - take it if another process has already rotated past this client's pair;
 //   - redeem only if redeem still asks for it;
 //   - save the new pair before the lock is released.
 //
-// The lock is held through the exchange and the keychain writes. So the wait for it is
-// auth's lockWait, which is longer than the exchange's RefreshBudget. The waits for the
-// refresh slot and the lock follow ctx; the exchange and the save, once begun, do not.
+// The lock is held through the exchange, its retries and the keychain writes. So the wait
+// for it is auth's lockWait, which is longer than refreshAttemptBudget.
 //
 // Call it in this process's refresh slot (lockRefresh).
 func (c *Client) refresh(ctx context.Context, redeem redeemFunc) error {
@@ -204,123 +223,52 @@ func (c *Client) refresh(ctx context.Context, redeem redeemFunc) error {
 		return auth.ErrNotLoggedIn
 	}
 	if c.profile == "" {
-		return c.redeem(ctx, held, held, redeem, nil, nil)
+		return c.redeem(ctx, held, held, redeem, nil)
 	}
 	return auth.Locked(ctx, c.dir, func(tx *auth.Tx) error {
-		stored, err := tx.LoadFor(c.profile, held.OrganizationID)
+		stored, err := tx.Load(c.profile)
 		switch {
-		case err == nil && sameSession(stored, held):
-		case err == nil:
-			// The developer signed in again since this client loaded its pair, which the
-			// sign-in replaced. Its token is never sent: no process could store the pair it
-			// got, nor see a mark of it, so a lost answer would leave nothing to stop
-			// another send after the server's grace.
-			if !redeem(held, held) {
-				return nil
-			}
-			return errSessionExpired
-		case errors.Is(err, auth.ErrNotLoggedIn):
-			// Signed out, or removed when the server refused it: never sent again.
-			return errSessionExpired
+		case err == nil && stored.SessionID == held.SessionID:
+		case err == nil || errors.Is(err, auth.ErrNotLoggedIn):
+			// The developer signed out, or signed in again, since this client loaded its
+			// pair. A machine keeps one session: this one is over, and its token is never
+			// presented again, since signing in again revokes it with that token.
+			return fmt.Errorf("%w: this machine signed out or in again since", auth.ErrNotLoggedIn)
 		default:
 			return err
 		}
 		if c.spent(stored.RefreshToken) {
 			// The store still holds a token this client spent, because saving its
 			// rotation failed. Keep the client's own live pair and try to save it now.
-			//
-			// A held token this client has marked (a refresh of it got no answer) is not
-			// saved at all until a pair that settles it replaces it. Saved, it would be
-			// readable before its mark: the keychain takes the tokens first, and a
-			// credentials.json write that then fails leaves them under the spent token's
-			// mark, which does not count for them. Another process could then send it after
-			// the server's grace. The store keeps the spent token, marked when it was sent.
-			//
-			// Where the marks of held's token go depends on what the store gives now. A
-			// save that failed may have failed half way, the keychain taking held's tokens
-			// and credentials.json not: then the store gives held's token, and its marks
-			// must be in the store before it is sent, like any stored token's (a mark that
-			// cannot be written stops the send). Only while the store still gives the spent
-			// token is held's known to this client alone, and its marks stay here: a mark in
-			// the store would name a token the store does not give.
-			marks := tx
-			switch {
-			case c.ownMark(held.RefreshToken):
-				marks = nil
-			case c.save(tx, held, "") != nil:
-				now, err := tx.LoadFor(c.profile, held.OrganizationID)
-				if err != nil {
-					return err
-				}
-				if now.RefreshToken != held.RefreshToken {
-					marks = nil
-				}
+			if err := c.save(tx, held, ""); err != nil {
+				// The store still can't take it, so a refresh of the held pair could not
+				// be recorded: nothing is sent. The stored record holds a spent token:
+				// mark it past every budget, so no process presents it.
+				_ = tx.MarkRefreshInDoubt(c.profile, stored.SessionID, stored.RefreshToken, spentLongAgo)
+				return fmt.Errorf("save the refreshed credential before refreshing it again: %w", err)
 			}
-			return c.redeem(ctx, held, held, redeem, tx, marks)
+			return c.redeem(ctx, held, held, redeem, tx)
 		}
 		// Decide from the stored pair, not the held one. The held one was read without the
 		// lock, and may pair a rotation's tokens with the expiry from before it.
 		if !samePair(stored, held) {
 			c.replace(stored)
 		}
-		return c.redeem(ctx, held, stored, redeem, tx, tx)
+		return c.redeem(ctx, held, stored, redeem, tx)
 	})
 }
 
-// redeem exchanges current's refresh token if redeem asks, and saves the new pair in tx
-// when there is one. A token the auth gateway refused is never sent again. When tx still
-// stores it, it is removed there too, so no process that reads the store afterwards sends
-// it. A token whose refresh got no answer is marked so (markUnsettled), and sent again
-// only within the budget of its first send. marks is where those marks go: tx while the
-// store holds current's refresh token, and nil when only this client knows it.
-func (c *Client) redeem(ctx context.Context, held, current *auth.Credential, redeem redeemFunc, tx, marks *auth.Tx) error {
-	if !redeem(held, current) {
-		return nil
-	}
-	if c.wasRefused(current.RefreshToken) {
-		return c.refused(current, tx)
-	}
-	first, unknown := c.unsettledSince(current), true
-	switch {
-	case first.IsZero():
-		first, unknown = c.wallNow(), false
-	case !c.inBudget(first):
-		// Past its budget, or in the future: expired for good, so a wall clock that comes
-		// round to the mark again never reopens it, and for the others too.
-		return errors.Join(errRefreshUnsettled, c.expireUnsettled(current, marks))
-	}
-	// Marked before it is sent, so a process killed with the answer outstanding leaves the
-	// mark too. A pair saved, or the credential removed, takes the mark with it. A token
-	// that cannot be marked is not sent: if its answer were lost, nothing would say so.
-	if err := c.markUnsettled(current, first, marks); err != nil {
-		return fmt.Errorf("record the refresh before sending it: %w", err)
-	}
-	resp, err := c.exchangeRefreshToken(ctx, current.RefreshToken, first, unknown)
-	switch {
-	case errors.As(err, new(unsettledError)):
-		// It ran until its budget was spent: no process may send the token again.
-		return errors.Join(err, c.expireUnsettled(current, marks))
-	case errors.As(err, new(refusalError)):
-		return c.refused(current, tx)
-	case err != nil && !unknown:
-		// A first answer that settles it without a pair: the server spent nothing.
-		c.clearUnsettled(current, first, marks)
-	}
-	switch {
-	case errors.Is(err, auth.ErrNotLoggedIn):
-		return errSessionExpired
-	case err != nil:
-		return err
-	}
-	cred := c.credentialFrom(resp)
+// keepRotation holds and stores the new pair a refresh of current returned.
+func (c *Client) keepRotation(tx *auth.Tx, current, cred *auth.Credential) error {
 	// A refresh keeps the session, its user and its label.
 	cred.SessionID = cmp.Or(cred.SessionID, current.SessionID)
+	cred.FamilyID = cmp.Or(cred.FamilyID, current.FamilyID)
 	cred.UserID = cmp.Or(cred.UserID, current.UserID)
+	cred.UserEmail = cmp.Or(cred.UserEmail, current.UserEmail)
 	cred.Label = current.Label
 	// The server has spent current's refresh token, so this pair is the session's only
-	// live one. Hold it before trying to store it. The answer settles current's mark.
+	// live one. Hold it before trying to store it.
 	c.replace(cred)
-	c.settled(current.RefreshToken)
 	if tx == nil {
 		return nil
 	}
@@ -330,10 +278,19 @@ func (c *Client) redeem(ctx context.Context, held, current *auth.Credential, red
 	return nil
 }
 
+// endSignIn gives up on current's refresh token, which must never be presented again, and
+// forgets it while it is still the stored one.
+func (c *Client) endSignIn(tx *auth.Tx, current *auth.Credential) error {
+	if tx != nil {
+		_ = tx.DeleteIf(c.profile, current.RefreshToken)
+	}
+	return errSignInAgain
+}
+
 // save stores cred and keeps unsaved in step. spent is the refresh token cred replaced,
 // or "" when cred replaced nothing.
 func (c *Client) save(tx *auth.Tx, cred *auth.Credential, spent string) error {
-	err := tx.Update(c.profile, cred)
+	err := updateCredential(tx, c.profile, cred)
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	switch {
@@ -345,32 +302,25 @@ func (c *Client) save(tx *auth.Tx, cred *auth.Credential, spent string) error {
 	return err
 }
 
+// refuse remembers refreshToken as one the auth gateway refused.
+func (c *Client) refuse(refreshToken string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.refused = refreshToken
+}
+
+// wasRefused reports whether the auth gateway refused refreshToken to this client.
+func (c *Client) wasRefused(refreshToken string) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.refused != "" && c.refused == refreshToken
+}
+
 // spent reports whether refreshToken is one this client spent but could not save past.
 func (c *Client) spent(refreshToken string) bool {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return slices.Contains(c.unsaved, refreshToken)
-}
-
-// refused records that the server refused current's refresh token, and removes current
-// from tx while tx still stores it. A removal that fails is tried again at this client's
-// next refresh, which ends here too. The keychain item stays (Tx.DeleteFor): read by
-// nothing once its entry is gone, until the next sign-in overwrites it.
-func (c *Client) refused(current *auth.Credential, tx *auth.Tx) error {
-	c.mu.Lock()
-	c.refusedToken = current.RefreshToken
-	c.mu.Unlock()
-	if tx != nil {
-		_ = tx.DeleteFor(c.profile, current.OrganizationID, current.RefreshToken)
-	}
-	return errRefused
-}
-
-// wasRefused reports whether the server refused refreshToken.
-func (c *Client) wasRefused(refreshToken string) bool {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	return c.refusedToken != "" && c.refusedToken == refreshToken
 }
 
 // replace makes cred the client's credential.
@@ -384,15 +334,4 @@ func (c *Client) replace(cred *auth.Credential) {
 // samePair reports whether two credentials hold the same tokens and expiry.
 func samePair(a, b *auth.Credential) bool {
 	return a.AccessToken == b.AccessToken && a.RefreshToken == b.RefreshToken && a.ExpiresAt.Equal(b.ExpiresAt)
-}
-
-// sameSession reports whether two credentials belong to one sign-in, possibly rotated.
-// A credential saved before sessions had ids has no session id, and matches any.
-func sameSession(a, b *auth.Credential) bool {
-	return a.SessionID == "" || b.SessionID == "" || a.SessionID == b.SessionID
-}
-
-// RevokeSession ends the calling session server-side.
-func (c *Client) RevokeSession(ctx context.Context) error {
-	return c.AuthPost(ctx, "/v1/auth/cli/revoke", nil, nil)
 }

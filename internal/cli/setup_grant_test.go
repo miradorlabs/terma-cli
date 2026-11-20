@@ -56,12 +56,10 @@ func firstLine(t *testing.T, stdout string) map[string]any {
 	return v
 }
 
-// storeSignIn stores a sign-in of user's for org, as an earlier setup would have.
-func storeSignIn(t *testing.T, f *fakeAuth, org organization, user string) {
+// storeSignIn stores a sign-in of user's, as an earlier setup would have.
+func storeSignIn(t *testing.T, f *fakeAuth, user string) {
 	t.Helper()
-	cred := storedSession(f, org)
-	cred.AccessToken, cred.UserID = fakeToken(org.ID, user), user
-	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, cred); err != nil {
+	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSessionOf(f, user)); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -144,8 +142,8 @@ func desktopLines(t *testing.T) map[string]string {
 	return lines
 }
 
-// The desktop's identity names the organization it delegates for, which must be --org; the
-// failure is the line the desktop's fixture pins.
+// The desktop's identity, when it names an organization, must name --org; the failure is
+// the line the desktop's fixture pins.
 func TestDesktopGrantIdentityForAnotherOrganizationIsBadInput(t *testing.T) {
 	gateway := grantSandbox(t)
 	stdout, _, err := desktopSetup(t, identityLine(deskUser, orgA().ID), personalOrg().ID, personalTeam())
@@ -161,7 +159,7 @@ func TestDesktopGrantIdentityForAnotherOrganizationIsBadInput(t *testing.T) {
 // of setup runs as ever. Nothing secret is printed, and the session says where it came from.
 func TestDesktopGrantSignsInAndSetsUp(t *testing.T) {
 	gateway := grantSandbox(t)
-	gateway.grant("the-delegated-code", personalOrg().ID, deskUser)
+	gateway.grant("the-delegated-code", deskUser)
 	stdout, stderr, err := desktopSetup(t, identityLine(deskUser, personalOrg().ID)+`{"code":"the-delegated-code"}`+"\n",
 		personalOrg().ID, personalTeam())
 	if err != nil {
@@ -176,8 +174,11 @@ func TestDesktopGrantSignsInAndSetsUp(t *testing.T) {
 	if gateway.exchanges.Load() != 1 || len(verifiers) != 1 || s256(verifiers[0]) != challenge {
 		t.Fatalf("the code must be redeemed once with the verifier of the challenge printed (%d exchanges)", gateway.exchanges.Load())
 	}
+	if installations := gateway.installationsSent(); len(installations) != 1 || installations[0] != config.StoredInstallationID(testApp.dir) {
+		t.Fatalf("the exchange must name this installation: %v", installations)
+	}
 	cred, err := auth.LoadCredential(testApp.dir, config.DefaultProfile)
-	if err != nil || cred.OrganizationID != personalOrg().ID || cred.UserID != deskUser || cred.Label != auth.DesktopLabel() {
+	if err != nil || cred.UserID != deskUser || cred.Label != auth.DesktopLabel() {
 		t.Fatalf("stored sign-in = %+v, %v", cred, err)
 	}
 	cfg, err := testApp.loadConfig()
@@ -195,17 +196,17 @@ func TestDesktopGrantSignsInAndSetsUp(t *testing.T) {
 	}
 	// Task 4's redaction check: the code, the verifier and the tokens never leave.
 	for name, secret := range map[string]string{"code": "the-delegated-code", "verifier": verifiers[0],
-		"access token": fakeToken(personalOrg().ID, deskUser), "refresh token": "ter_clr_granted_1"} {
+		"access token": fakeUserToken(deskUser), "refresh token": refreshTokenPrefix + "granted_1"} {
 		if strings.Contains(stdout, secret) || strings.Contains(stderr, secret) {
 			t.Errorf("the %s reached the output:\n%s\n%s", name, stdout, stderr)
 		}
 	}
 }
 
-// A stored sign-in for the same user and organization is reused: no grant, no exchange.
+// A stored sign-in of the same user is reused: no grant, no exchange.
 func TestDesktopGrantReusesTheSameUsersSignIn(t *testing.T) {
 	gateway := grantSandbox(t)
-	storeSignIn(t, gateway, personalOrg(), deskUser)
+	storeSignIn(t, gateway, deskUser)
 	stdout, stderr, err := desktopSetup(t, identityLine(deskUser, personalOrg().ID), personalOrg().ID, personalTeam())
 	if err != nil {
 		t.Fatalf("setup: %v\n%s%s", err, stdout, stderr)
@@ -226,12 +227,72 @@ func TestDesktopGrantReusesTheSameUsersSignIn(t *testing.T) {
 	}
 }
 
+// A reused sign-in is announced only once --org is checked: refused, stdout carries the
+// {"error": …} line and no {"reused":true}, as a fresh code's refusal does.
+func TestDesktopGrantChecksTheOrganizationBeforeAnnouncingReuse(t *testing.T) {
+	for name, orgs := range map[string][]organization{"someone else's": {orgA()}, "none": {}} {
+		t.Run(name, func(t *testing.T) {
+			gateway := grantSandbox(t)
+			gateway.orgs = orgs
+			storeSignIn(t, gateway, deskUser)
+			stdout, _, err := desktopSetup(t, identityLine(deskUser, personalOrg().ID), personalOrg().ID, personalTeam())
+			if code := grantFailure(t, stdout, err); code != auth.GrantBadInput {
+				t.Fatalf("code = %s, want %s", code, auth.GrantBadInput)
+			}
+			if strings.Contains(stdout, "reused") {
+				t.Fatalf("a refused reuse was announced:\n%s", stdout)
+			}
+		})
+	}
+}
+
+// A reuse the grant refuses for --org changes nothing: a profile set up with a server key,
+// with a person's sign-in behind it, stays set up with the key.
+func TestARefusedReuseLeavesTheProfileAlone(t *testing.T) {
+	gateway := grantSandbox(t)
+	gateway.orgs = []organization{orgA()}
+	storeSignIn(t, gateway, deskUser)
+	if err := config.UpdateProfile(testApp.dir, config.DefaultProfile, func(p *config.Profile) {
+		p.ServerKeySignIn, p.ServerKeyAuthURL = true, gateway.srv.URL
+	}); err != nil {
+		t.Fatal(err)
+	}
+	stdout, _, err := desktopSetup(t, identityLine(deskUser, personalOrg().ID), personalOrg().ID, personalTeam())
+	if code := grantFailure(t, stdout, err); code != auth.GrantBadInput {
+		t.Fatalf("code = %s, want %s", code, auth.GrantBadInput)
+	}
+	file, err := config.LoadFile(testApp.dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p := file.Profiles[config.DefaultProfile]; p == nil || !p.ServerKeySignIn || p.ServerKeyAuthURL != gateway.srv.URL {
+		t.Fatalf("profile = %+v; a refused grant changed it", p)
+	}
+}
+
+// A reused grant records the organization it checked, listing them once: a second listing
+// could answer otherwise after the reuse recorded the sign-in.
+func TestAReusedGrantListsTheOrganizationsOnce(t *testing.T) {
+	gateway := grantSandbox(t)
+	storeSignIn(t, gateway, deskUser)
+	stdout, stderr, err := desktopSetup(t, identityLine(deskUser, personalOrg().ID), personalOrg().ID, personalTeam())
+	if err != nil {
+		t.Fatalf("setup: %v\n%s%s", err, stdout, stderr)
+	}
+	if n := gateway.orgLists.Load(); n != 1 {
+		t.Fatalf("listed the organizations %d times, want once", n)
+	}
+	if org, _, _ := selected(t); org != personalOrg().ID {
+		t.Fatalf("organization = %q, want the one checked", org)
+	}
+}
+
 // An id spelled in uppercase is the same user: Terma's ids are lowercase, so the desktop's
 // identity is read without regard to case and the stored sign-in is still reused.
 func TestDesktopGrantReadsIdsWithoutRegardToCase(t *testing.T) {
 	gateway := grantSandbox(t)
 	const user = "abcdef01-2345-4678-89ab-cdef01234567"
-	storeSignIn(t, gateway, personalOrg(), user)
+	storeSignIn(t, gateway, user)
 	stdout, stderr, err := desktopSetup(t, identityLine(strings.ToUpper(user), personalOrg().ID), personalOrg().ID, personalTeam())
 	if err != nil {
 		t.Fatalf("setup: %v\n%s%s", err, stdout, stderr)
@@ -242,49 +303,63 @@ func TestDesktopGrantReadsIdsWithoutRegardToCase(t *testing.T) {
 	}
 }
 
-// A sign-in of another user's, or only for another organization, is never reused: the
-// desktop is asked for a grant. The same organization's is replaced and ended; another
-// organization's stays stored.
+// Another user's sign-in is never reused: the desktop is asked for a grant, and the
+// stored sign-in is replaced and ended.
 func TestDesktopGrantAsksWhenTheStoredSignInIsSomeoneElses(t *testing.T) {
-	for _, tc := range []struct {
-		name        string
-		stored      organization
-		wantEnded   bool
-		wantSignIns int
-	}{
-		{"same organization, another user", personalOrg(), true, 1},
-		{"another organization", orgA(), false, 2},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			gateway := grantSandbox(t)
-			storeSignIn(t, gateway, tc.stored, "u-1")
-			gateway.grant("c1", personalOrg().ID, deskUser)
-			stdout, stderr, err := desktopSetup(t, identityLine(deskUser, personalOrg().ID)+`{"code":"c1"}`+"\n", personalOrg().ID, personalTeam())
-			if err != nil {
-				t.Fatalf("setup: %v\n%s%s", err, stdout, stderr)
-			}
-			if _, ok := firstLine(t, stdout)["challenge"]; !ok || gateway.exchanges.Load() != 1 {
-				t.Fatalf("want a grant, got:\n%s", stdout)
-			}
-			ended := slices.Contains(gateway.revokedTokens(), fakeToken(tc.stored.ID, "u-1"))
-			if ended != tc.wantEnded {
-				t.Fatalf("the stored sign-in ended = %v, want %v", ended, tc.wantEnded)
-			}
-			if _, _, n := selected(t); n != tc.wantSignIns {
-				t.Fatalf("%d sign-ins stored, want %d", n, tc.wantSignIns)
-			}
-			if active, _ := auth.LoadCredential(testApp.dir, config.DefaultProfile); active == nil || active.UserID != deskUser {
-				t.Fatalf("active sign-in = %+v, want the desktop user's", active)
-			}
-		})
+	gateway := grantSandbox(t)
+	storeSignIn(t, gateway, "u-1")
+	gateway.grant("c1", deskUser)
+	stdout, stderr, err := desktopSetup(t, identityLine(deskUser, personalOrg().ID)+`{"code":"c1"}`+"\n", personalOrg().ID, personalTeam())
+	if err != nil {
+		t.Fatalf("setup: %v\n%s%s", err, stdout, stderr)
+	}
+	if _, ok := firstLine(t, stdout)["challenge"]; !ok || gateway.exchanges.Load() != 1 {
+		t.Fatalf("want a grant, got:\n%s", stdout)
+	}
+	if !slices.Contains(gateway.revokedTokens(), storedSessionOf(gateway, "u-1").RefreshToken) {
+		t.Fatal("the other user's stored sign-in must be ended")
+	}
+	if active, _ := auth.LoadCredential(testApp.dir, config.DefaultProfile); active == nil || active.UserID != deskUser {
+		t.Fatalf("active sign-in = %+v, want the desktop user's", active)
 	}
 }
 
-// A code that signs in someone else than the desktop's user and organization is never
-// kept: it is ended, and the run fails with grant_identity_mismatch.
+// A desktop that names no organization on stdin, as one on user sessions does, is taken
+// at --org.
+func TestDesktopGrantTakesAnIdentityWithoutAnOrganization(t *testing.T) {
+	gateway := grantSandbox(t)
+	gateway.grant("c1", deskUser)
+	stdout, stderr, err := desktopSetup(t, `{"user_id":"`+deskUser+`"}`+"\n"+`{"code":"c1"}`+"\n", personalOrg().ID, personalTeam())
+	if err != nil {
+		t.Fatalf("setup: %v\n%s%s", err, stdout, stderr)
+	}
+	if org, team, n := selected(t); org != personalOrg().ID || team != personalTeam() || n != 1 {
+		t.Fatalf("org %s team %s, %d sign-ins", org, team, n)
+	}
+}
+
+// --org must be an organization the signed-in user belongs to.
+func TestDesktopGrantRefusesAnOrganizationOfSomeoneElse(t *testing.T) {
+	gateway := grantSandbox(t)
+	gateway.orgs = []organization{orgA()}
+	gateway.grant("c1", deskUser)
+	stdout, _, err := desktopSetup(t, identityLine(deskUser, personalOrg().ID)+`{"code":"c1"}`+"\n", personalOrg().ID, personalTeam())
+	if code := grantFailure(t, stdout, err); code != auth.GrantBadInput {
+		t.Fatalf("code = %s, want %s", code, auth.GrantBadInput)
+	}
+	if org, _, n := selected(t); org != "" || n != 0 {
+		t.Fatalf("an organization of someone else's was chosen (%s), or the refused sign-in kept (%d)", org, n)
+	}
+	if gateway.revokes.Load() != 1 {
+		t.Fatalf("%d revokes; want the refused grant's session ended", gateway.revokes.Load())
+	}
+}
+
+// A code that signs in someone else than the desktop's user is never kept: it is ended,
+// and the run fails with grant_identity_mismatch.
 func TestDesktopGrantKeepsNoSignInForAnotherIdentity(t *testing.T) {
 	gateway := grantSandbox(t)
-	gateway.grant("c1", personalOrg().ID, "44444444-4444-4444-8444-444444444444")
+	gateway.grant("c1", "44444444-4444-4444-8444-444444444444")
 	stdout, _, err := desktopSetup(t, identityLine(deskUser, personalOrg().ID)+`{"code":"c1"}`+"\n", personalOrg().ID, personalTeam())
 	if code := grantFailure(t, stdout, err); code != auth.GrantIdentityMismatch {
 		t.Fatalf("code = %s, want %s", code, auth.GrantIdentityMismatch)
@@ -330,22 +405,19 @@ func TestDesktopGrantFailures(t *testing.T) {
 	}
 }
 
-// Switching from the desktop: to a SHARED organization by grant, to Personal by another, and
-// back to the SHARED one, which reuses the sign-in kept for it. Both stay stored.
+// Switching from the desktop: to a SHARED organization by grant, then to Personal and
+// back, each reusing the one sign-in, which reads both.
 func TestDesktopGrantSwitchesOrganizationsAndBack(t *testing.T) {
 	gateway := grantSandbox(t)
-	gateway.grant("to-team", orgA().ID, deskUser)
-	gateway.grant("to-personal", personalOrg().ID, deskUser)
+	gateway.grant("to-team", deskUser)
 	for _, step := range []struct {
-		org          organization
-		team, code   string
-		wantReused   bool
-		wantSignIns  int
-		wantExchange int32
+		org        organization
+		team, code string
+		wantReused bool
 	}{
-		{orgA(), teamOrgTeam(), "to-team", false, 1, 1},
-		{personalOrg(), personalTeam(), "to-personal", false, 2, 2},
-		{orgA(), teamOrgTeam(), "", true, 2, 2},
+		{orgA(), teamOrgTeam(), "to-team", false},
+		{personalOrg(), personalTeam(), "", true},
+		{orgA(), teamOrgTeam(), "", true},
 	} {
 		stdin := identityLine(deskUser, step.org.ID)
 		if step.code != "" {
@@ -359,16 +431,47 @@ func TestDesktopGrantSwitchesOrganizationsAndBack(t *testing.T) {
 			t.Fatalf("setup for %s: reused = %v, want %v\n%s", step.org.Name, reused, step.wantReused, stdout)
 		}
 		org, team, n := selected(t)
-		if org != step.org.ID || team != step.team || n != step.wantSignIns || gateway.exchanges.Load() != step.wantExchange {
+		if org != step.org.ID || team != step.team || n != 1 || gateway.exchanges.Load() != 1 {
 			t.Fatalf("after %s: org %s team %s, %d sign-ins, %d exchanges", step.org.Name, org, team, n, gateway.exchanges.Load())
 		}
 	}
 	if gateway.revokes.Load() != 0 {
-		t.Fatalf("switching ended %d sign-ins; each organization's stays", gateway.revokes.Load())
+		t.Fatalf("switching ended %d sign-ins; the one sign-in serves every organization", gateway.revokes.Load())
 	}
 }
 
 func s256(verifier string) string {
 	sum := sha256.Sum256([]byte(verifier))
 	return base64.RawURLEncoding.EncodeToString(sum[:])
+}
+
+// An organization list that cannot be read is no bad input from the desktop: the run fails
+// as setup fails, without grant_bad_input, keeps nothing, and ends nothing, since the
+// check may have spent the token.
+func TestDesktopGrantDoesNotBlameTheDesktopForAnOutage(t *testing.T) {
+	gateway := grantSandbox(t)
+	gateway.orgsDown = true
+	gateway.grant("c1", deskUser)
+	stdout, _, err := desktopSetup(t, identityLine(deskUser, personalOrg().ID)+`{"code":"c1"}`+"\n", personalOrg().ID, personalTeam())
+	if err == nil || strings.Contains(stdout, auth.GrantBadInput) {
+		t.Fatalf("err = %v, stdout:\n%s", err, stdout)
+	}
+	if org, _, n := selected(t); org != "" || n != 0 || gateway.revokes.Load() != 0 {
+		t.Fatalf("org %q, %d sign-ins, %d revokes; want nothing chosen, kept or ended", org, n, gateway.revokes.Load())
+	}
+}
+
+// A user with no organization at all is refused as the desktop's bad input, and the session
+// the grant made is ended.
+func TestDesktopGrantRefusesAUserWithNoOrganization(t *testing.T) {
+	gateway := grantSandbox(t)
+	gateway.orgs = []organization{}
+	gateway.grant("c1", deskUser)
+	stdout, _, err := desktopSetup(t, identityLine(deskUser, personalOrg().ID)+`{"code":"c1"}`+"\n", personalOrg().ID, personalTeam())
+	if code := grantFailure(t, stdout, err); code != auth.GrantBadInput {
+		t.Fatalf("code = %s, want %s", code, auth.GrantBadInput)
+	}
+	if _, _, n := selected(t); n != 0 || gateway.revokes.Load() != 1 {
+		t.Fatalf("%d sign-ins kept, %d revokes; want none kept and the grant's session ended", n, gateway.revokes.Load())
+	}
 }
