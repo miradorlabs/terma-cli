@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -455,6 +456,28 @@ func TestReusingASignInRetiresWhatIsLeftOfAnOlderTerma(t *testing.T) {
 	}
 	if auth.HasLegacySignIns(testApp.dir) {
 		t.Fatal("the older sign-ins should be deleted")
+	}
+}
+
+// A retired sign-in is not reused: `terma login` forgets it and opens the browser, rather
+// than fail on it until its token expires.
+func TestReuseForgetsARetiredSignIn(t *testing.T) {
+	f := newFakeAuth(t)
+	authSandbox(t, f)
+	retired := storedSession(f)
+	retired.RetiredAt = time.Now().UTC()
+	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, retired); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := testApp.loadConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cred, ok, err := testApp.reuseStoredSession(t.Context(), cfg, nil); ok || err != nil || cred != nil {
+		t.Fatalf("reuse = %v, %v; want the browser opened", ok, err)
+	}
+	if _, err := auth.LoadCredential(testApp.dir, config.DefaultProfile); !errors.Is(err, auth.ErrNotLoggedIn) {
+		t.Fatalf("the retired sign-in is still stored (%v)", err)
 	}
 }
 

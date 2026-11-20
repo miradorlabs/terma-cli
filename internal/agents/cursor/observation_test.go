@@ -211,6 +211,54 @@ func TestCursorFailedAppendIsRecoveredBeforeNextTurn(t *testing.T) {
 	}
 }
 
+// A checkpointed observation keeps the account that collected it: retried after someone
+// else signed in, it still leaves only under its own.
+func TestCursorPendingKeepsItsAccount(t *testing.T) {
+	env := testEnv(t)
+	badDir := t.TempDir()
+	badSpool, err := spool.Open(badDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = os.Mkdir(filepath.Join(badDir, "events.jsonl"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	failed := env
+	failed.Spool, failed.Account = badSpool, "account-a"
+	cursorRun(t, failed, "stop", "turn-a", nil)
+	env.Account = "account-b"
+	env.Spool.Bind("account-b")
+	cursorRun(t, env, "stop", "turn-b", nil)
+	evs := cursorObservations(t, env.Spool)
+	if len(evs) != 2 || evs[0].Account != "account-a" || evs[1].Account != "account-b" {
+		t.Fatalf("accounts %q, %q; want the pending one under account-a", evs[0].Account, evs[1].Account)
+	}
+}
+
+// One collected under no account (a server key's, or signed out) keeps none: retried once a
+// person has signed in, it is still not theirs.
+func TestCursorPendingOfNoAccountStaysUnbound(t *testing.T) {
+	env := testEnv(t)
+	badDir := t.TempDir()
+	badSpool, err := spool.Open(badDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = os.Mkdir(filepath.Join(badDir, "events.jsonl"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	failed := env
+	failed.Spool, failed.Account = badSpool, ""
+	cursorRun(t, failed, "stop", "turn-a", nil)
+	env.Account = "account-b"
+	env.Spool.Bind("account-b")
+	cursorRun(t, env, "stop", "turn-b", nil)
+	evs := cursorObservations(t, env.Spool)
+	if len(evs) != 2 || evs[0].Account != "" || evs[1].Account != "account-b" {
+		t.Fatalf("accounts %q, %q; want the pending one under none", evs[0].Account, evs[1].Account)
+	}
+}
+
 func TestCursorCorruptCheckpointStartsNewStream(t *testing.T) {
 	t.Parallel()
 	env := testEnv(t)

@@ -644,9 +644,12 @@ func TestARetiredSignInIsMarked(t *testing.T) {
 	}
 }
 
-// Any other request a gateway refuses as SIGN_IN_RETIRED marks it too.
+// Any other request a gateway refuses as SIGN_IN_RETIRED marks it too, and the client
+// sends nothing more with it: the retired sign-in reads as signed out.
 func TestARetiredAnswerElsewhereMarksTheSignIn(t *testing.T) {
+	var requests atomic.Int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests.Add(1)
 		w.WriteHeader(http.StatusForbidden)
 		w.Write([]byte(`{"error":{"code":"PERMISSION_DENIED","reason":"SIGN_IN_RETIRED","message":"retired"}}`))
 	}))
@@ -658,5 +661,12 @@ func TestARetiredAnswerElsewhereMarksTheSignIn(t *testing.T) {
 	}
 	if !auth.Retired(c.dir, config.DefaultProfile) {
 		t.Fatal("the stored sign-in was not marked retired")
+	}
+	err := c.AuthGet(context.Background(), "/v1/organizations", nil, nil)
+	if !errors.Is(err, auth.ErrSignInRetired) || !errors.Is(err, auth.ErrNotLoggedIn) {
+		t.Fatalf("a second request = %v, want retired and signed out", err)
+	}
+	if n := requests.Load(); n != 1 {
+		t.Fatalf("%d requests: the retired token was presented again", n)
 	}
 }

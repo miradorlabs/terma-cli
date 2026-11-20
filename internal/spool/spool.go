@@ -140,12 +140,23 @@ func (s *Spool) Append(events ...Event) error {
 // AppendContext observes caller cancellation and caps lock waits even when the
 // caller has no deadline. An error means no event was queued.
 func (s *Spool) AppendContext(ctx context.Context, events ...Event) error {
+	return s.appendEvents(ctx, true, events)
+}
+
+// AppendAsCollected is Append for events that already carry the account they were
+// collected under, "" for none: a checkpointed event appended again later keeps it,
+// whoever the Spool is bound to by then.
+func (s *Spool) AppendAsCollected(events ...Event) error {
+	return s.appendEvents(context.Background(), false, events)
+}
+
+func (s *Spool) appendEvents(ctx context.Context, bind bool, events []Event) error {
 	var lines []byte
 	for _, e := range events {
 		if e.Time.IsZero() {
 			e.Time = time.Now()
 		}
-		if e.Account == "" {
+		if bind && e.Account == "" {
 			e.Account = s.account
 		}
 		line, err := json.Marshal(e)

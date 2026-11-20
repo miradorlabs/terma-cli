@@ -245,6 +245,10 @@ func (c *Client) AuthPost(ctx context.Context, path string, body, out any) error
 }
 
 func (c *Client) do(ctx context.Context, h host, method, path string, query url.Values, headers http.Header, body, out any) (*Meta, error) {
+	// A retired sign-in is never presented again: only signing in anew sends again.
+	if c.retired() {
+		return nil, errRetired
+	}
 	if err := c.refreshIfNeeded(ctx); err != nil {
 		return nil, err
 	}
@@ -275,16 +279,32 @@ func (c *Client) do(ctx context.Context, h host, method, path string, query url.
 	err = decode(resp, out)
 	if apiErr, ok := errors.AsType[*Error](err); ok && apiErr.SignInRetired() {
 		c.markRetired()
-		return meta, fmt.Errorf("%w: %w", auth.ErrSignInRetired, err)
+		return meta, fmt.Errorf("%w: %w", errRetired, err)
 	}
 	return meta, err
 }
 
-// markRetired records on the stored sign-in, while it is still the one this client holds,
-// that a server refused it as retired.
+// errRetired is a request a server refused, or this client would not send, because the
+// sign-in is retired. It reads as signed out too, so a sign-in replaces it.
+var errRetired = fmt.Errorf("%w: %w", auth.ErrSignInRetired, auth.ErrNotLoggedIn)
+
+// retired reports whether the sign-in this client holds is retired.
+func (c *Client) retired() bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.credential != nil && !c.credential.RetiredAt.IsZero()
+}
+
+// markRetired records, on the pair this client holds and on the stored sign-in while it is
+// still that one, that a server refused it as retired.
 func (c *Client) markRetired() {
 	c.mu.Lock()
 	cred := c.credential
+	if cred != nil && cred.RetiredAt.IsZero() {
+		marked := *cred
+		marked.RetiredAt = time.Now().UTC()
+		c.credential = &marked
+	}
 	c.mu.Unlock()
 	if c.profile != "" && cred != nil && cred.RefreshToken != "" {
 		_ = auth.MarkRetired(c.dir, c.profile, cred.RefreshToken)

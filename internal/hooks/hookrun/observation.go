@@ -105,7 +105,7 @@ func (e Env) CaptureObservation(ctx context.Context, r *Repo, o Observation) {
 		return WriteState(path, b)
 	}
 	if state.Pending != nil {
-		if err = e.Spool.Append(*state.Pending); err != nil {
+		if err = e.Spool.AppendAsCollected(*state.Pending); err != nil {
 			e.Logf("%s pending append: %v", o.Tool, err)
 			return
 		}
@@ -123,12 +123,15 @@ func (e Env) CaptureObservation(ctx context.Context, r *Repo, o Observation) {
 	state.LastHash, state.At = hash, e.Time()
 	attrs[semconv.TermaObservationStreamKey], attrs[semconv.TermaObservationSequenceKey] = state.Stream, state.Sequence
 	attrs[semconv.TermaObservationIDKey] = EvidenceID(fmt.Sprintf("%s\x00%s\x00%d", o.Tool, state.Stream, state.Sequence))
-	state.Pending = &spool.Event{Time: e.Time(), Name: semconv.TermaSessionObservationEvent, SessionID: o.SessionID, Repository: r.Repository, Attrs: attrs}
+	// Bound before the checkpoint, and appended as collected: a failed append is retried
+	// later, maybe once someone else has signed in, and must still leave only under the
+	// account that collected it, or none.
+	state.Pending = &spool.Event{Time: e.Time(), Name: semconv.TermaSessionObservationEvent, SessionID: o.SessionID, Repository: r.Repository, Attrs: attrs, Account: e.Account}
 	if err = write(); err != nil {
 		e.Logf("%s checkpoint: %v", o.Tool, err)
 		return
 	}
-	if err = e.Spool.Append(*state.Pending); err != nil {
+	if err = e.Spool.AppendAsCollected(*state.Pending); err != nil {
 		e.Logf("%s observation append: %v", o.Tool, err)
 		return
 	}
