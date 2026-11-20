@@ -97,8 +97,8 @@ function installArchive(archive, asset, { vendor = VENDOR, tmpRoot = os.tmpdir()
       // It calls .NET's ZipFile, not Expand-Archive: started from PowerShell 7, Windows
       // PowerShell inherits its PSModulePath and loads PowerShell 7's Archive module,
       // whose Expand-Archive needs an ExtractToDirectory overload .NET Framework lacks.
-      // ZipFile has no single-member selector. Extract into the private directory,
-      // then validate and copy only terma.exe into the installation.
+      // Extract into the private directory, then validate and copy only terma.exe
+      // into the installation.
       run('powershell', ['-NoProfile', '-NonInteractive', '-Command',
         "$ErrorActionPreference = 'Stop'; Add-Type -AssemblyName System.IO.Compression.FileSystem; " +
         '[System.IO.Compression.ZipFile]::ExtractToDirectory($env:TERMA_ARCHIVE_PATH, $env:TERMA_EXTRACT_DIR)'], {
