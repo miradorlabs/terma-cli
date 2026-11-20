@@ -131,7 +131,7 @@ func (app *App) checkGrantOrganization(ctx context.Context, cfg *config.Config, 
 	case err != nil:
 		return held, err
 	case len(orgs) == 0:
-		return held, errors.New("you belong to no Terma organization yet: create or join one in the Terma app, then run `terma setup` again")
+		return held, &auth.GrantError{Code: auth.GrantBadInput, Message: "the signed-in user belongs to no Terma organization yet"}
 	}
 	if _, err := matchOrganization(orgs, orgID); errors.As(err, new(noMatchError)) {
 		return held, &auth.GrantError{Code: auth.GrantBadInput, Message: "--org is not an organization the signed-in user belongs to", Err: err}

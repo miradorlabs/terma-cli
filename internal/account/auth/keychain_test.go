@@ -386,3 +386,38 @@ func TestADelayedRelocationKeepsItsMark(t *testing.T) {
 		t.Fatalf("a delayed relocation must keep the tokens in the file and mark the item:\n%s", credentialsFile(t, dir))
 	}
 }
+
+// A sign-in that replaces another in the keychain, and whose file then fails to save, puts
+// the old tokens back: the file still indexes the old sign-in.
+func TestAFailedReplacementRestoresTheOldTokens(t *testing.T) {
+	dir := t.TempDir()
+	old := sessionCredential("old")
+	if _, err := SaveCredential(dir, config.DefaultProfile, old); err != nil {
+		t.Fatal(err)
+	}
+	if StoredInFile(dir, config.DefaultProfile) {
+		t.Skip("no keychain to keep the tokens in")
+	}
+	// A directory entry where the file goes: the atomic rename over it fails.
+	path := config.CredentialsPath(dir)
+	data, _ := os.ReadFile(path)
+	if err := os.Remove(path); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(path, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := SaveCredential(dir, config.DefaultProfile, sessionCredential("new")); err == nil {
+		t.Fatal("a save over a directory succeeded")
+	}
+	if err := os.Remove(path); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	got, err := LoadCredential(dir, config.DefaultProfile)
+	if err != nil || got.SessionID != "old" || got.AccessToken != old.AccessToken {
+		t.Fatalf("loaded %+v, %v; want the old sign-in with its own tokens", got, err)
+	}
+}
