@@ -1,7 +1,31 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-20T11:38:30.987288166Z",
+  "generated_at": "2026-11-20T12:41:24.916039967Z",
   "events": [
+    {
+      "at": "2026-11-20T12:41:24.916039967Z",
+      "model": "gemini-4-neon",
+      "vendor": "google",
+      "name": "Gemini 4 Neon",
+      "event": "changed",
+      "changes": 2,
+      "highlights": [
+        "Feature added: tool retrieval",
+        "Model page changed (+132 −0 chars)"
+      ]
+    },
+    {
+      "at": "2026-11-20T12:41:24.916039967Z",
+      "model": "gemini-4-carbon",
+      "vendor": "google",
+      "name": "Gemini 4 Carbon",
+      "event": "changed",
+      "changes": 2,
+      "highlights": [
+        "Feature added: tool retrieval",
+        "Model page changed (+132 −0 chars)"
+      ]
+    },
     {
       "at": "2026-11-20T11:38:30.987288166Z",
       "model": "grok-4.7",
