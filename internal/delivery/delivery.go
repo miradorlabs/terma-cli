@@ -54,7 +54,7 @@ type SignIn = sendas.SignIn
 
 // owner is the account an event leaves under, "" for none.
 func (r Router) owner(e spool.Event) string {
-	if e.Account == "" && e.Time.Before(r.LegacyBefore) {
+	if e.Account == "" && !e.NoPerson && e.Time.Before(r.LegacyBefore) {
 		return r.LegacyAccount
 	}
 	return e.Account

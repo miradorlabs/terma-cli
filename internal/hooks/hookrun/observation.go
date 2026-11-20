@@ -126,7 +126,7 @@ func (e Env) CaptureObservation(ctx context.Context, r *Repo, o Observation) {
 	// Bound before the checkpoint, and appended as collected: a failed append is retried
 	// later, maybe once someone else has signed in, and must still leave only under the
 	// account that collected it, or none.
-	state.Pending = &spool.Event{Time: e.Time(), Name: semconv.TermaSessionObservationEvent, SessionID: o.SessionID, Repository: r.Repository, Attrs: attrs, Account: e.Account}
+	state.Pending = &spool.Event{Time: e.Time(), Name: semconv.TermaSessionObservationEvent, SessionID: o.SessionID, Repository: r.Repository, Attrs: attrs, Account: e.Account, NoPerson: e.Account == "" && e.ServerKey}
 	if err = write(); err != nil {
 		e.Logf("%s checkpoint: %v", o.Tool, err)
 		return

@@ -56,6 +56,9 @@ type Env struct {
 	// Account is the account key of the sign-in in place, stamped on every event this hook
 	// queues, parked ones included, so it leaves under that sign-in only.
 	Account string
+	// ServerKey is that the profile is set up with a server key: what the hook queues is
+	// no person's (spool.Event.NoPerson).
+	ServerKey bool
 	// Team is the developer's team from setup, which claims every session they run in a
 	// collected repository, whatever the policy's state.
 	Team string
@@ -244,10 +247,26 @@ func (e Env) unpark(r *Repo) {
 			}
 		}
 		moved = len(events) > 0
-		// Bound, unlike a checkpointed observation (AppendAsCollected): a parked event
-		// carries the account its sandboxed hook could read, and one that could read none
-		// was collected under the sign-in in place, which unparks it moments later.
-		return e.Spool.Append(events...)
+		// A parked event that names its account, or no person (a server key's), keeps it.
+		// One its sandboxed hook could read neither for is bound: it was collected under the
+		// sign-in in place, which unparks it moments later.
+		var collected, unknown []spool.Event
+		for _, ev := range events {
+			if ev.Account != "" || ev.NoPerson {
+				collected = append(collected, ev)
+			} else {
+				unknown = append(unknown, ev)
+			}
+		}
+		if len(collected) > 0 {
+			if err := e.Spool.AppendAsCollected(collected...); err != nil {
+				return err
+			}
+		}
+		if len(unknown) > 0 {
+			return e.Spool.Append(unknown...)
+		}
+		return nil
 	})
 	if err != nil {
 		e.Logf("unpark events: %v", err)
@@ -298,6 +317,7 @@ func (e Env) stamp(r *Repo, ev spool.Event) spool.Event {
 	if ev.Account == "" {
 		ev.Account = e.Account
 	}
+	ev.NoPerson = ev.NoPerson || ev.Account == "" && e.ServerKey
 	if r != nil {
 		ev.Repository = r.Repository
 	}

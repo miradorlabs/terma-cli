@@ -172,7 +172,12 @@ func (app *App) retireLegacySessions(ctx context.Context, authURL string) {
 	if signIns, err := auth.LegacySignIns(app.dir, true); err == nil {
 		// The record is the only account what an older terma queued has once its sign-ins
 		// are gone: without it, keep them, and the next sign-in tries again.
-		if err := auth.RecordLegacy(app.stateDir, signIns, time.Now()); err != nil {
+		record := auth.RecordLegacy(app.stateDir, signIns, time.Now())
+		if len(signIns) == 0 && auth.HasLegacySignIns(app.dir) {
+			// A file that names no sign-in that can be read names no one, and says so.
+			record = auth.RecordNoOne(app.stateDir, time.Now())
+		}
+		if record != nil {
 			return
 		}
 		revokeCtx, cancel := context.WithTimeout(ctx, legacyRevokeWait)

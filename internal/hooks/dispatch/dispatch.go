@@ -65,6 +65,8 @@ type Profile struct {
 	// Account is the account key of the sign-in in place, which what the hook queues is
 	// bound to; "" with none, or under a server key.
 	Account string
+	// ServerKey is a profile set up with a server key: what the hook queues is no person's.
+	ServerKey bool
 }
 
 // maxPayload bounds the copy of a payload kept to claim a session from.
@@ -86,7 +88,7 @@ func Run(ctx context.Context, d Deps, r Request) int {
 		p := d.Profile()
 		env := hookrun.Env{Now: time.Now(), Cwd: r.Cwd, Args: r.Args, Stdin: r.Stdin, Stdout: r.Stdout, Stderr: r.Stderr,
 			ConfigDir: d.ConfigDir, StateDir: d.StateDir, Version: r.Version, Debug: r.Debug, Flush: d.Flush, Policy: p.Policy, Team: p.Team,
-			Account: p.Account}
+			Account: p.Account, ServerKey: p.ServerKey}
 		if !r.HooksOff {
 			env.Spool = bound(d.Spool(), p.Account)
 		}
@@ -140,6 +142,7 @@ func run(ctx context.Context, d Deps, r Request, handler agents.Handler, flush b
 		Team:      p.Team,
 		Agents:    p.Agents,
 		Account:   p.Account,
+		ServerKey: p.ServerKey,
 	}
 	ctx, cancel := context.WithTimeout(ctx, handlerTimeout)
 	defer cancel()

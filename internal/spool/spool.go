@@ -37,8 +37,11 @@ type Event struct {
 	// Account is the account key (auth.AccountKey) of the sign-in the event was collected
 	// under, so it leaves under that sign-in only; "" when none was, as for an event an
 	// older terma queued. Local only.
-	Account string         `json:"account,omitempty"`
-	Attrs   map[string]any `json:"attrs,omitempty"`
+	Account string `json:"account,omitempty"`
+	// NoPerson marks an event collected under a server key: no person's, so its empty
+	// Account is final, never bound to a sign-in later (AppendAsCollected). Local only.
+	NoPerson bool           `json:"no_person,omitempty"`
+	Attrs    map[string]any `json:"attrs,omitempty"`
 }
 
 // ValidTraceID reports whether id is an OTel trace id: 32 lowercase hex digits, not all zero.
@@ -156,7 +159,7 @@ func (s *Spool) appendEvents(ctx context.Context, bind bool, events []Event) err
 		if e.Time.IsZero() {
 			e.Time = time.Now()
 		}
-		if bind && e.Account == "" {
+		if bind && e.Account == "" && !e.NoPerson {
 			e.Account = s.account
 		}
 		line, err := json.Marshal(e)

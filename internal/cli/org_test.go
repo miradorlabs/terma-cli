@@ -408,6 +408,29 @@ func TestAnUpdatedMachineIsToldToSignIn(t *testing.T) {
 	}
 }
 
+// An older terma's file that names no sign-in that can be read is retired with a record
+// that names no one: what that terma queued is no server key's to send later.
+func TestAnUnreadableOlderFileIsRetiredAsNoOnes(t *testing.T) {
+	f := newFakeAuth(t)
+	authSandbox(t, f)
+	if err := os.WriteFile(config.LegacyCredentialsPath(testApp.dir), []byte("not json"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := testApp.loadConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := testApp.storeLogin(context.Background(), cfg, storedSession(f)); err != nil {
+		t.Fatal(err)
+	}
+	if auth.HasLegacySignIns(testApp.dir) {
+		t.Fatal("the older file outlived the sign-in")
+	}
+	if rec, err := auth.ReadLegacyRecord(testApp.stateDir); err != nil || rec.Account != auth.LegacyAccountAmbiguous || rec.RetiredAt.IsZero() {
+		t.Fatalf("record = %+v, %v; want one naming no one", rec, err)
+	}
+}
+
 // `terma teardown --sign-out` revokes the session server-side and forgets it.
 func TestSignOutRevokesTheSession(t *testing.T) {
 	f := newFakeAuth(t)

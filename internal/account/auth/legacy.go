@@ -235,6 +235,17 @@ func LegacyOwnership(dir, stateDir string, serverKey bool) (LegacyRecord, error)
 	return nameless, nil
 }
 
+// RecordNoOne keeps, under stateDir, that the sign-ins an older terma left named no one
+// that can be read (a file that parses to none): what that terma queued until now is no
+// one's. A record already kept stands.
+func RecordNoOne(stateDir string, now time.Time) error {
+	rec, err := ReadLegacyRecord(stateDir)
+	if err != nil || !rec.RetiredAt.IsZero() {
+		return err
+	}
+	return config.WriteJSON(filepath.Join(stateDir, LegacyRecordFile), LegacyRecord{Account: LegacyAccountAmbiguous, RetiredAt: now.UTC()}, 0o600)
+}
+
 // ReadLegacyRecord is what RecordLegacy kept, the zero record when nothing was.
 func ReadLegacyRecord(stateDir string) (LegacyRecord, error) {
 	var rec LegacyRecord

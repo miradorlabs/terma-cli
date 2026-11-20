@@ -87,7 +87,7 @@ func (app *App) hookProfile() dispatch.Profile {
 		return dispatch.Profile{Policy: config.NoPolicy("", "")}
 	}
 	p := dispatch.Profile{Team: cfg.Policy.TeamID, Agents: cfg.Harnesses, Policy: cfg.Policy.InForce(cfg.OrganizationID, cfg.AuthURL)}
-	if !cfg.ServerKeySignIn {
+	if p.ServerKey = cfg.ServerKeySignIn; !p.ServerKey {
 		p.Account = auth.Account(cfg.Dir, cfg.ProfileName, cfg.AuthURL)
 	}
 	return p

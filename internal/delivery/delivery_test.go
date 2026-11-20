@@ -456,3 +456,17 @@ func TestHookEventsNameTheUser(t *testing.T) {
 		}
 	}
 }
+
+// An event a server key collected is no person's: never counted as an older terma's
+// backlog, whatever its time.
+func TestANoPersonEventIsNeverTheOlderTermas(t *testing.T) {
+	t.Parallel()
+	r := Router{LegacyAccount: "older", LegacyBefore: time.Now()}
+	past := time.Now().Add(-time.Hour)
+	if got := r.owner(spool.Event{Time: past}); got != "older" {
+		t.Fatalf("an unbound event from before = %q, want the older account", got)
+	}
+	if got := r.owner(spool.Event{Time: past, NoPerson: true}); got != "" {
+		t.Fatalf("a server key's event = %q, want no one's", got)
+	}
+}
