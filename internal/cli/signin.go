@@ -318,9 +318,12 @@ func matchOrganization(orgs []organization, query string) (*organization, error)
 // errRefreshInDoubt is a session left unrevoked because its refresh token may be spent.
 var errRefreshInDoubt = errors.New("a refresh of this session got no answer, so its refresh token may be spent; it is left to expire")
 
-// revokeSession ends cred's session at the auth host that issued it: best-effort, and the
-// caller forgets cred whatever the answer. A token a refresh may have spent is never sent:
-// presenting a spent token is reuse, which revokes the whole family.
+// revokeSession ends cred's session at the auth host this profile is configured for, the
+// one that issued it: best-effort, and the caller forgets cred whatever the answer. A token
+// a refresh may have spent is never sent: presenting a spent token is reuse, which revokes
+// the whole family. Nor is one to any other host: user-credentials.json names its host,
+// and a tampered one must not lead a keychain-held token elsewhere, so another
+// environment's session is left to expire.
 func (app *App) revokeSession(ctx context.Context, cfg *config.Config, cred *auth.Credential) error {
 	if cred.RefreshToken == "" {
 		return nil
@@ -328,7 +331,10 @@ func (app *App) revokeSession(ctx context.Context, cfg *config.Config, cred *aut
 	if !cred.RefreshInDoubtSince.IsZero() {
 		return errRefreshInDoubt
 	}
-	_, err := api.RevokeRefreshToken(ctx, cmp.Or(cred.AuthURL, cfg.AuthURL), app.version, cred.RefreshToken)
+	if err := cred.CheckEnvironment(cfg.AuthURL); err != nil {
+		return fmt.Errorf("the session was not revoked, and is left to expire: %w", err)
+	}
+	_, err := api.RevokeRefreshToken(ctx, cfg.AuthURL, app.version, cred.RefreshToken)
 	return err
 }
 

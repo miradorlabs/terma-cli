@@ -5,9 +5,11 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"slices"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -299,6 +301,37 @@ func TestStoreLoginRetiresAnOlderTermasSignIns(t *testing.T) {
 	}
 	if key, _ := keystore.Get(testApp.dir, kept); key == "" {
 		t.Fatal("a server key a profile signed in with should stay")
+	}
+}
+
+// A session's refresh token is revoked only at the auth host this profile is configured
+// for: a credential naming another host, as a tampered file might, sends it nowhere.
+func TestRevokeSendsTheTokenOnlyToTheConfiguredHost(t *testing.T) {
+	f := newFakeAuth(t)
+	authSandbox(t, f)
+	var elsewhere atomic.Int32
+	other := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		elsewhere.Add(1)
+		w.Write([]byte(`{"enforcement":"ENFORCED"}`))
+	}))
+	t.Cleanup(other.Close)
+	cfg, err := testApp.loadConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	cred := storedSession(f)
+	cred.AuthURL = other.URL
+	if err := testApp.revokeSession(context.Background(), cfg, cred); err == nil {
+		t.Fatal("a session from another host was revoked")
+	}
+	if n := elsewhere.Load(); n != 0 {
+		t.Fatalf("the refresh token went to another host %d times", n)
+	}
+	if err := testApp.revokeSession(context.Background(), cfg, storedSession(f)); err != nil {
+		t.Fatalf("revoke at the configured host: %v", err)
+	}
+	if got := f.revokedTokens(); len(got) != 1 {
+		t.Fatalf("revoked %d at the configured host, want 1", len(got))
 	}
 }
 
