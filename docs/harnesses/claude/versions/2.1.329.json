@@ -22566,7 +22566,7 @@
         "read": true
       },
       "CLAUDE_CODE_DISABLE_THINKING": {
-        "description": "Set to `1` to omit the `thinking` parameter from API requests entirely. This is a compatibility option for proxies and gateways that reject the parameter. On models that think by default, omitting the parameter means the model may still think. To explicitly disable extended thinking on the Anthropic API, use `MAX_THINKING_TOKENS=0` instead. Neither variable turns thinking off on Opus 5.5, Sonnet 5.5, Haiku 5.5, or the Fable models, which can't have thinking turned off. On third-party providers, `MAX_THINKING_TOKENS=0` likewise omits the parameter, so the two variables behave the same there",
+        "description": "Set to `1` to omit the `thinking` parameter from the API requests for the main conversation's turns, subagent turns, and the compaction summary. This is a compatibility option for proxies and gateways that reject the parameter. On models that think by default, the model may still think. To explicitly disable extended thinking on the Anthropic API, use `MAX_THINKING_TOKENS=0` instead. See where you can't turn thinking off",
         "read": true
       },
       "CLAUDE_CODE_DISABLE_ULTRAREVIEW_TRUST_CHECK": {
@@ -22759,6 +22759,10 @@
       },
       "CLAUDE_CODE_IDLE_COMPACT_MIN_TOKENS": {
         "description": "Context size, in tokens, at which idle compaction applies to a conversation (default: `200000`). Accepts a positive whole number, and anything else is ignored. Values below `100000` are raised to `100000`, the lowest threshold. Idle compaction is on by default for conversations that meet its conditions. To turn it off, set `idleCompaction` to `false`. Requires Claude Code v2.1.290 or later",
+        "read": true
+      },
+      "CLAUDE_CODE_LOOP_KEEPALIVE": {
+        "description": "Set to `1` to run one extra iteration of an interactive self-paced `/loop` when its second or later iteration ends with nothing scheduled",
         "read": true
       },
       "CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS": {
@@ -23091,6 +23095,14 @@
       },
       "CLAUDE_CODE_STRICT_INLINE_SHELL_RM_PROMPT": {
         "description": "Set to `1` to flag more of the `-c` scripts that Claude Code can't check, including ones that name neither `rm` nor `rmdir`. Set it in the environment that launches Claude Code, not a settings `env` block. Has no effect when `CLAUDE_CODE_DISABLE_INLINE_SHELL_RM_PROMPT` is `1`. Requires Claude Code v2.1.299 or later",
+        "read": true
+      },
+      "CLAUDE_CODE_SUBAGENT_EFFORT": {
+        "description": "The default effort level for subagents and workflow agents: `low`, `medium`, `high`, `xhigh`, or `max`. It doesn't apply to forks, forked skills, or teammates. Requires Claude Code v2.1.315 or later",
+        "read": true
+      },
+      "CLAUDE_CODE_SUBAGENT_HISTORY": {
+        "description": "Set to `0` to remove the `/tasks` row where you reopen subagents that have ended",
         "read": true
       },
       "CLAUDE_CODE_SUBAGENT_MODEL": {
@@ -23638,7 +23650,7 @@
         "read": false
       }
     },
-    "fetched_at": "2026-11-19T21:21:27.014767978Z",
+    "fetched_at": "2026-11-20T00:57:03.022869442Z",
     "settings": {
       "advisorModel": {
         "default": "unset, so the advisor is off",
@@ -23657,7 +23669,7 @@
         "type": "string, the name of a built-in or custom agent"
       },
       "agentPushNotifEnabled": {
-        "default": "`false`",
+        "default": "unset, so Claude Code uses the value saved to your account, or `false` if none is saved",
         "description": "Allow Claude to send a push notification to your phone when it decides one is worth sending, for example when a long task finishes. In a local session, Claude can send one while Remote Control is connected. Appears in `/config` as **Push when Claude decides**.",
         "read": true,
         "scope": "Any file",
@@ -23724,11 +23736,11 @@
         "type": "array of URL patterns, with `*` as a wildcard"
       },
       "allowedMcpServers": {
-        "default": "unset, so every server is allowed; an empty array blocks every server users add",
+        "default": "unset, so every server is allowed; an empty merged list blocks every server users add",
         "description": "Allowlist the MCP servers people can add. Claude Code blocks any server that doesn't match an entry wherever it's defined, including plugin servers, servers a user passes with `--mcp-config`, and servers from claude.ai.",
         "read": true,
         "scope": "Any file",
-        "scope_note": "Entries from every file merge into one allowlist unless `allowManagedMcpServersOnly` is set. Deploy it in managed settings to enforce it.",
+        "scope_note": "For servers users add, entries from every file merge into one allowlist unless `allowManagedMcpServersOnly` is set. To keep users from adding entries, deploy both keys in managed settings.",
         "topic": "MCP",
         "type": "array of objects, each with exactly one key. Use `serverName`, a string limited to letters, numbers, hyphens, and underscores; `serverCommand`, an array of the command and its arguments matched exactly; or `serverUrl`, a URL pattern with `*` wildcards"
       },
@@ -23800,7 +23812,7 @@
       },
       "attribution.sessionUrl": {
         "default": "`true`",
-        "description": "Choose whether Claude Code appends the claude.ai session link when it commits or opens a pull request from a cloud or Remote Control session. Claude Code adds the link as a `Claude-Session` trailer on commits and as a link in pull request descriptions. Set it to `false` to omit the link.",
+        "description": "Choose whether Claude Code tells Claude to add the claude.ai session link to commits and pull requests from a cloud or Remote Control session. The setting covers a `Claude-Session` trailer on commits and a URL in pull request descriptions. Set it to `false` to omit the link.",
         "read": false,
         "scope": "Any file",
         "topic": "Git and attribution",
@@ -24279,7 +24291,7 @@
         "type": "Boolean"
       },
       "enableAllProjectMcpServers": {
-        "default": "unset, so Claude Code asks you to approve each server",
+        "default": "unset, so interactive terminal sessions ask the same way",
         "description": "Approve every MCP server defined in project `.mcp.json` files without a prompt. Claude Code writes this key to `.claude/settings.local.json` when you choose to approve all servers in the approval dialog.",
         "read": true,
         "scope": "Any file",
@@ -24515,7 +24527,7 @@
         "type": "Boolean"
       },
       "inputNeededNotifEnabled": {
-        "default": "`false`",
+        "default": "unset, so Claude Code uses the value saved to your account",
         "description": "Get a push notification on your phone when a permission prompt or question is waiting for your input. In a local session, Claude Code sends these only while Remote Control is connected. Appears in `/config` as **Push when actions required**.",
         "read": true,
         "scope": "Any file",
@@ -24660,7 +24672,7 @@
       },
       "parentSettingsBehavior": {
         "default": "`\"first-wins\"`",
-        "description": "Choose whether Claude Code applies managed settings supplied by an embedding host process, such as the Agent SDK or an IDE extension, when an admin-deployed managed tier is also present. With `\"first-wins\"`, Claude Code drops the host-supplied settings; with `\"merge\"`, it applies them under the admin tier through a restrictive-only filter. Set `\"merge\"` when a host needs to pass its own restrictions to the sessions it launches, for example Claude Desktop delivering a gateway's egress allowlist.",
+        "description": "Choose whether Claude Code applies managed settings supplied by an embedding host process, such as the Agent SDK or an IDE extension, when an admin-deployed managed tier is also present. Set `\"merge\"` when a host needs to pass its own restrictions to the sessions it launches, for example Claude Desktop delivering a gateway's egress allowlist.",
         "read": true,
         "scope": "Managed",
         "scope_note": "Claude Code reads it from the highest-priority admin-controlled managed source.",
@@ -26151,7 +26163,6 @@
       "CLAUDE_CODE_LAUNCHER_RUNS_API_KEY_HELPER",
       "CLAUDE_CODE_LEGACY_BUNDLE",
       "CLAUDE_CODE_LINKED_SPINDLE",
-      "CLAUDE_CODE_LOOP_KEEPALIVE",
       "CLAUDE_CODE_LOOP_PERSISTENT",
       "CLAUDE_CODE_MAIN_REPLY_HOLD_MS",
       "CLAUDE_CODE_MANAGED_CONFIG_PREFETCH",
@@ -26347,8 +26358,6 @@
       "CLAUDE_CODE_STREAM_EVENT_NO_SUBSCRIBER_HOLD_MS",
       "CLAUDE_CODE_SUBAGENT_CACHE_EVICT",
       "CLAUDE_CODE_SUBAGENT_CONFIG_WARNING",
-      "CLAUDE_CODE_SUBAGENT_EFFORT",
-      "CLAUDE_CODE_SUBAGENT_HISTORY",
       "CLAUDE_CODE_SUBAGENT_PROMPT_SNAPSHOT",
       "CLAUDE_CODE_SUBSCRIPTION_TYPE",
       "CLAUDE_CODE_SUPERVISED",
