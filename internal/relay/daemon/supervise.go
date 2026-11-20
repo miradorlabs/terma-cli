@@ -4,6 +4,8 @@ import (
 	"context"
 	"os/exec"
 	"time"
+
+	"github.com/miradorlabs/terma-cli/internal/relay/service"
 )
 
 // Windows' Run key starts a program once, at logon, so `terma relay supervise` restarts the
@@ -71,7 +73,7 @@ func (sv Supervisor) watch(ctx context.Context, cmd *exec.Cmd, done <-chan error
 		sv.Stop()
 		select {
 		case <-done:
-		case <-time.After(15 * time.Second):
+		case <-time.After(service.StopWindow):
 			_ = cmd.Process.Kill()
 			<-done
 		}

@@ -28,6 +28,11 @@ import (
 // The store records when the refresh came into doubt before the token first leaves, so a
 // process killed mid-request leaves the next one the same budget; the mark goes again only
 // on an answer that rotated nothing.
+//
+// The exchange outlives its caller: a heartbeat's deadline or a Ctrl-C after the server
+// rotated the pair would otherwise lose the rotation. A caller already gone sends
+// nothing; once the token leaves, the sends, retries and save run within the budget
+// whatever the caller does.
 func (c *Client) redeem(ctx context.Context, held, current *auth.Credential, redeem redeemFunc, tx *auth.Tx) error {
 	if !redeem(held, current) {
 		return nil
@@ -44,11 +49,12 @@ func (c *Client) redeem(ctx context.Context, held, current *auth.Credential, red
 		first = time.Now().Round(0)
 	}
 	superseded := false
+	// Nothing leaves for a caller that has gone.
+	if err := ctx.Err(); err != nil {
+		return c.settle(tx, current, clean, err)
+	}
+	exchange := context.WithoutCancel(ctx)
 	for {
-		// Nothing leaves for a caller that has gone, nor past the budget.
-		if err := ctx.Err(); err != nil {
-			return c.settle(tx, current, clean, err)
-		}
 		if !clean && time.Since(first) > refreshAttemptBudget {
 			return c.endSignIn(tx, current)
 		}
@@ -61,7 +67,7 @@ func (c *Client) redeem(ctx context.Context, held, current *auth.Credential, red
 		}
 		current = marked
 		// The whole attempt, its dial and handshake too, ends with the budget.
-		attempt, cancel := context.WithDeadline(ctx, first.Add(refreshAttemptBudget))
+		attempt, cancel := context.WithDeadline(exchange, first.Add(refreshAttemptBudget))
 		resp, err := c.postToken(attempt, tokenRequest{GrantType: "refresh_token", RefreshToken: current.RefreshToken})
 		cancel()
 		switch kind, wait := classifyRefresh(err); kind {
@@ -84,19 +90,10 @@ func (c *Client) redeem(ctx context.Context, held, current *auth.Credential, red
 			superseded = true
 		case refreshInDoubt:
 			clean = false
-			if ctx.Err() != nil {
-				return err
-			}
 			if time.Since(first)+wait > refreshAttemptBudget {
 				return c.endSignIn(tx, current)
 			}
-			timer := time.NewTimer(wait)
-			select {
-			case <-ctx.Done():
-				timer.Stop()
-				return err
-			case <-timer.C:
-			}
+			time.Sleep(wait)
 		default:
 			// Answered, or never sent, before anything rotated.
 			return c.settle(tx, current, clean, err)

@@ -22,14 +22,18 @@ const (
 	legacyRevokePath = "/v1/auth/cli/revoke"
 )
 
-// refreshAttemptBudget is how long after the first attempt a refresh that got no clear
+// RefreshBudget is how long after the first attempt a refresh that got no clear
 // answer (a 503, or no response) is retried. The server may have rotated the pair without
 // returning it, and it forgives a retry of the spent token for only 60 seconds; after
 // that, presenting it is reuse, which revokes the whole family, this machine's and any
 // Terma Desktop session it was delegated from. So past the budget the sign-in is over.
-//
-// Variables, so tests can shorten them.
-var refreshAttemptBudget = 50 * time.Second
+// The relay's service gives a stopping relay at least this long
+// (internal/cli's TestRelayStopWindowCoversARefresh).
+const RefreshBudget = 50 * time.Second
+
+// refreshAttemptBudget is RefreshBudget, and the waits below, as variables so tests can
+// shorten them.
+var refreshAttemptBudget = RefreshBudget
 
 // defaultRetryAfter is the wait before retrying a 503 that named none.
 var defaultRetryAfter = 5 * time.Second

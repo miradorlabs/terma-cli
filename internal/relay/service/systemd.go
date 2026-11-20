@@ -5,6 +5,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // Systemd renders a user service with the supplied configuration environment.
@@ -15,6 +16,8 @@ func Systemd(exe string, env map[string]string) string {
 	for _, k := range slices.Sorted(maps.Keys(env)) {
 		b.WriteString("Environment=" + strconv.Quote(k+"="+env[k]) + "\n")
 	}
-	b.WriteString("Restart=on-failure\nRestartSec=5\n\n[Install]\nWantedBy=default.target\n")
+	b.WriteString("Restart=on-failure\nRestartSec=5\n")
+	b.WriteString("TimeoutStopSec=" + strconv.Itoa(int(StopWindow/time.Second)) + "\n")
+	b.WriteString("\n[Install]\nWantedBy=default.target\n")
 	return b.String()
 }

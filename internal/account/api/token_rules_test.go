@@ -335,6 +335,29 @@ func TestAnEndedCallerSendsNothing(t *testing.T) {
 	}
 }
 
+// A caller that goes once its token has left does not lose the rotation: the exchange
+// outlives it, retries a lost answer within the budget, and saves the new pair.
+func TestARotationOutlivesItsCaller(t *testing.T) {
+	shortRetries(t, 10*time.Second, 10*time.Millisecond)
+	script := &refreshScript{answers: []string{"503", "ok"}}
+	c := expiredClient(t, script)
+	ctx, cancel := context.WithCancel(context.Background())
+	script.onAnswer = func(n int) {
+		if n == 0 {
+			cancel()
+		}
+	}
+	if err := c.refresh(ctx, func(_, current *auth.Credential) bool { return true }); err != nil {
+		t.Fatalf("refresh: %v", err)
+	}
+	if sent := script.sent(); len(sent) != 2 || sent[1] != "refresh-0" {
+		t.Fatalf("presented %v, want refresh-0 again after the caller went", sent)
+	}
+	if got := storedPair(t, c); got.RefreshToken != "refresh-2" || !got.RefreshInDoubtSince.IsZero() {
+		t.Fatalf("stored %+v, want the rotation with no doubt left", got)
+	}
+}
+
 // The mark is stored before the token leaves, so a process killed mid-request leaves it.
 func TestTheRefreshIsMarkedBeforeItIsSent(t *testing.T) {
 	script := &refreshScript{}
