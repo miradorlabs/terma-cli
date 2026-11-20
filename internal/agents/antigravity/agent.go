@@ -9,8 +9,8 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 )
 
-// Agent is Google's Antigravity CLI (`agy`), with hooks in .agents/hooks.json, wired by
-// default where the repository already carries one of agy's customization directories.
+// Agent is Google's Antigravity CLI (`agy`), with machine-wide hooks in agy's global
+// customization root, ~/.gemini/config/hooks.json.
 type Agent struct{}
 
 func (Agent) Name() string        { return "antigravity" }
@@ -30,27 +30,20 @@ func (Agent) Events() map[string]agents.Handler {
 
 func (Agent) FlushAfter() []string { return []string{"antigravity-stop"} }
 
-// PayloadSession reads agy's protojson payload; the workspace comes from it, since the
-// hook runs in <repo>/.agents.
+// PayloadSession reads agy's protojson payload; the directory comes from it, since the
+// hook runs in the folder holding hooks.json.
 func (Agent) PayloadSession(payload []byte) (hookrun.PayloadSession, bool) {
-	var in struct {
-		ConversationID string   `json:"conversationId"`
-		WorkspacePaths []string `json:"workspacePaths"`
-	}
+	var in antigravityHookInput
 	if json.Unmarshal(payload, &in) != nil || in.ConversationID == "" {
 		return hookrun.PayloadSession{}, false
 	}
-	s := hookrun.PayloadSession{ID: in.ConversationID}
-	if len(in.WorkspacePaths) > 0 {
-		s.Cwd = in.WorkspacePaths[0]
-	}
-	return s, true
+	return hookrun.PayloadSession{ID: in.ConversationID, Cwd: in.cwd("")}, true
 }
 
 // Coverage is how completely terma supports the agent.
 func (Agent) Coverage() (attribution, telemetry agents.CapabilitySupport) {
 	return agents.CapabilitySupport{Level: agents.SupportFull},
-		agents.CapabilitySupport{Level: agents.SupportPartial, Note: "hooks only: model, turns, every tool step and termination; no token counts, plan, quota, cost or tool durations — agy has no OTLP export; backend mapping of tool calls pending"}
+		agents.CapabilitySupport{Level: agents.SupportPartial, Note: "hooks only: model, turns, every tool step and termination; no token counts, plan, quota, cost or tool durations — agy has no OTLP export"}
 }
 
 var (
@@ -58,6 +51,7 @@ var (
 	_ agents.StateKeeper   = Agent{}
 	_ agents.Agent         = Agent{}
 	_ agents.PayloadReader = Agent{}
+	_ agents.UserHooks     = Agent{}
 )
 
 // StateDirs are the directories its hooks keep state in.

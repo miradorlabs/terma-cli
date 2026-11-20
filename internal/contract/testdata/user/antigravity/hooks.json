@@ -1,0 +1,37 @@
+{
+  "terma": {
+    "PostInvocation": [
+      {
+        "type": "command",
+        "command": "[ -x '/usr/local/bin/terma' ] && '/usr/local/bin/terma' hook --user antigravity-post-invocation || true",
+        "timeout": 10
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ -x '/usr/local/bin/terma' ] && '/usr/local/bin/terma' hook --user antigravity-post-tool-use || true",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PreInvocation": [
+      {
+        "type": "command",
+        "command": "[ -x '/usr/local/bin/terma' ] && '/usr/local/bin/terma' hook --user antigravity-pre-invocation || true",
+        "timeout": 10
+      }
+    ],
+    "Stop": [
+      {
+        "type": "command",
+        "command": "[ -x '/usr/local/bin/terma' ] && '/usr/local/bin/terma' hook --user antigravity-stop || true",
+        "timeout": 10
+      }
+    ]
+  }
+}
