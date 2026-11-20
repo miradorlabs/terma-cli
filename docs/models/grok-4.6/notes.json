@@ -15,18 +15,18 @@
   ],
   "changes": [
     {
-      "id": "facts/regions/us-central-1",
+      "id": "facts/input_modalities/pdf",
       "category": "facts",
       "op": "added",
       "path": [
         "facts",
-        "regions",
-        "us-central-1"
+        "input_modalities",
+        "pdf"
       ],
-      "title": "Region added: us-central-1",
+      "title": "Input added: pdf",
       "impact": "notable",
       "before": null,
-      "after": "us-central-1",
+      "after": "pdf",
       "text_diff": null,
       "terma": null,
       "source": null,
@@ -34,6 +34,6 @@
     }
   ],
   "highlights": [
-    "Region added: us-central-1"
+    "Input added: pdf"
   ]
 }
