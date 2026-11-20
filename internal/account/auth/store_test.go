@@ -125,6 +125,27 @@ func TestSaveCredential_ReturnsTheReplacedSession(t *testing.T) {
 	}
 }
 
+// A sign-in is not stored over one whose keychain item could not be read: that item may
+// hold the only copy of a live session's tokens. Once the keychain answers, the new one is.
+func TestSaveCredential_RefusesToReplaceAnUnreadSignIn(t *testing.T) {
+	dir := t.TempDir()
+	if _, err := SaveCredential(dir, config.DefaultProfile, sessionCredential("s1")); err != nil {
+		t.Fatal(err)
+	}
+	unlock := secret.TimeOutForTest(t, dir)
+	if _, err := SaveCredential(dir, config.DefaultProfile, sessionCredential("s2")); err == nil {
+		t.Fatal("a sign-in replaced one the keychain could not read")
+	}
+	unlock()
+	if cred, err := LoadCredential(dir, config.DefaultProfile); err != nil || cred.SessionID != "s1" || cred.RefreshToken != "refresh-s1" {
+		t.Fatalf("LoadCredential = %+v, %v; want session s1 with its tokens", cred, err)
+	}
+	replaced, err := SaveCredential(dir, config.DefaultProfile, sessionCredential("s2"))
+	if err != nil || replaced == nil || replaced.SessionID != "s1" {
+		t.Fatalf("once the keychain answers: replaced %+v, %v; want s1", replaced, err)
+	}
+}
+
 // DeleteCredentialIf forgets the sign-in only while it still holds the caller's refresh
 // token: one another process stored since stays.
 func TestDeleteCredentialIf_DeletesOnlyTheCallersSignIn(t *testing.T) {

@@ -26,9 +26,23 @@ const RetiredTokenFile = "retired-relay-token.json"
 type retiredToken struct {
 	Token string `json:"token"`
 	// Account is the sign-in it served (Identity).
-	Account   string    `json:"account"`
-	AuthURL   string    `json:"auth_url"`
-	RetiredAt time.Time `json:"retired_at"`
+	Account string `json:"account"`
+	// OrganizationID is what an earlier terma kept instead of Account: the organization
+	// of the sign-in it served.
+	OrganizationID string    `json:"organization_id,omitempty"`
+	AuthURL        string    `json:"auth_url"`
+	RetiredAt      time.Time `json:"retired_at"`
+}
+
+// owner is the sign-in r served. An earlier terma's names only an organization, so it
+// counts as that organization's server key, whatever signed in then: as the earlier terma
+// did, it is revived for that key. A person's sign-in now names the person, which no
+// organization matches.
+func (r retiredToken) owner() string {
+	if r.Account == "" && r.OrganizationID != "" {
+		return "organization:" + r.OrganizationID
+	}
+	return r.Account
 }
 
 // Identity is the sign-in a relay token serves: the person cfg's profile is signed in as,
@@ -79,7 +93,7 @@ func ReviveToken(stateDir, account, authURL string) (string, bool) {
 		return "", false
 	}
 	var r retiredToken
-	ok := json.Unmarshal(data, &r) == nil && account != "" && r.Account == account && r.AuthURL == authURL &&
+	ok := json.Unmarshal(data, &r) == nil && account != "" && r.owner() == account && r.AuthURL == authURL &&
 		r.Token != "" && !strings.ContainsAny(r.Token, " \t\r\n/")
 	if !ok {
 		_ = os.Remove(retired)

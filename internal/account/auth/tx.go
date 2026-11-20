@@ -108,10 +108,17 @@ func (tx *Tx) MarkRefreshInDoubt(profile, session string, since time.Time) error
 }
 
 func (tx *Tx) mutate(mutate func(credentialFile)) error {
+	return tx.mutateIf(func(file credentialFile) bool { mutate(file); return true })
+}
+
+// mutateIf is mutate whose change is saved only when it reports true.
+func (tx *Tx) mutateIf(mutate func(credentialFile) bool) error {
 	file, err := loadCredentialFile(tx.dir)
 	if err != nil {
 		return err
 	}
-	mutate(file)
+	if !mutate(file) {
+		return nil
+	}
 	return saveCredentialFile(config.CredentialsPath(tx.dir), file)
 }
