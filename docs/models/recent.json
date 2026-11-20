@@ -1,7 +1,33 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-20T01:52:27.223516077Z",
+  "generated_at": "2026-11-20T02:18:31.552923494Z",
   "events": [
+    {
+      "at": "2026-11-20T02:18:31.552923494Z",
+      "model": "grok-4.6",
+      "vendor": "xai",
+      "name": "Grok 4.6",
+      "event": "changed",
+      "changes": 5,
+      "highlights": [
+        "Batch API: now yes",
+        "Description: now SpaceXSI's frontier model for coding, agentic tasks, and knowledge work.",
+        "Input removed: pdf"
+      ]
+    },
+    {
+      "at": "2026-11-20T02:18:31.552923494Z",
+      "model": "grok-4.3",
+      "vendor": "xai",
+      "name": "Grok 4.3",
+      "event": "changed",
+      "changes": 5,
+      "highlights": [
+        "Batch API: no longer stated (was yes)",
+        "Description: no longer stated (was Fast, reliable model with strong tool calling and instruction following capabilities.)",
+        "Input added: pdf"
+      ]
+    },
     {
       "at": "2026-11-20T01:52:27.223516077Z",
       "model": "grok-4.6",
