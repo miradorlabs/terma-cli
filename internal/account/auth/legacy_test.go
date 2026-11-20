@@ -244,3 +244,21 @@ func TestLegacyOwnership_WithoutARecord(t *testing.T) {
 		t.Fatalf("after a sign-in: %+v, %v; want the server key's boundary kept", rec, err)
 	}
 }
+
+// A file that doesn't parse whole is not read whole: one readable profile beside a broken
+// one is not taken for the whole backlog's person, but it is still listed for cleanup.
+func TestLegacySignIns_APartlyBrokenFileNamesNoOne(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	data := `{"default": {"organizations": {"o": {"session_id": "s", "auth_url": "https://auth.example.test", "user_id": "u"}}}, "work": {"organizations": "not a map"}}`
+	if err := os.WriteFile(config.LegacyCredentialsPath(dir), []byte(data), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if LegacyParsedWhole(dir) {
+		t.Fatal("a partly broken file read whole")
+	}
+	// What can be read is still listed, to be revoked and forgotten.
+	if signIns, err := LegacySignIns(dir, false); err != nil || len(signIns) != 1 {
+		t.Fatalf("LegacySignIns = %+v, %v; want the readable one", signIns, err)
+	}
+}

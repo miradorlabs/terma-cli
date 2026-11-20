@@ -90,7 +90,7 @@ func Run(ctx context.Context, d Deps, r Request) int {
 			ConfigDir: d.ConfigDir, StateDir: d.StateDir, Version: r.Version, Debug: r.Debug, Flush: d.Flush, Policy: p.Policy, Team: p.Team,
 			Account: p.Account, ServerKey: p.ServerKey}
 		if !r.HooksOff {
-			env.Spool = bound(d.Spool(), p.Account)
+			env.Spool = bound(d.Spool(), p)
 		}
 		return render(ctx, env)
 	}
@@ -137,7 +137,7 @@ func run(ctx context.Context, d Deps, r Request, handler agents.Handler, flush b
 		StateDir:  d.StateDir,
 		Version:   r.Version,
 		Debug:     r.Debug,
-		Spool:     bound(d.Spool(), p.Account),
+		Spool:     bound(d.Spool(), p),
 		Policy:    p.Policy,
 		Team:      p.Team,
 		Agents:    p.Agents,
@@ -177,9 +177,13 @@ func (b *boundedBuffer) Write(p []byte) (int, error) {
 func (b *boundedBuffer) Bytes() []byte { return b.buf }
 
 // bound is s binding what it queues to account, the sign-in collecting it; nil stays nil.
-func bound(s *spool.Spool, account string) *spool.Spool {
-	if s != nil {
-		s.Bind(account)
+func bound(s *spool.Spool, p Profile) *spool.Spool {
+	switch {
+	case s == nil:
+	case p.ServerKey:
+		s.BindNoPerson()
+	default:
+		s.Bind(p.Account)
 	}
 	return s
 }

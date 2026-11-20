@@ -63,7 +63,8 @@ func LegacySignIns(dir string, tokens bool) ([]LegacySignIn, error) {
 		return nil, fmt.Errorf("read the older sign-ins: %w", err)
 	}
 	var file legacyFile
-	// An unreadable file is still one to delete.
+	// An unreadable file is still one to delete, and what can be read of it is still
+	// revoked and forgotten; whose its backlog is, LegacyParsedWhole says.
 	_ = json.Unmarshal(data, &file)
 	var out []LegacySignIn
 	for profile, p := range file {
@@ -91,6 +92,15 @@ func LegacySignIns(dir string, tokens bool) ([]LegacySignIn, error) {
 		return cmp.Or(cmp.Compare(a.Profile, b.Profile), cmp.Compare(a.OrganizationID, b.OrganizationID))
 	})
 	return out, nil
+}
+
+// LegacyParsedWhole reports whether the sign-ins an older terma left under dir read whole:
+// a file that doesn't (one profile readable beside a broken one) names no one its backlog
+// may be taken for.
+func LegacyParsedWhole(dir string) bool {
+	data, err := os.ReadFile(config.LegacyCredentialsPath(dir))
+	var file legacyFile
+	return err == nil && json.Unmarshal(data, &file) == nil
 }
 
 // HasLegacySignIns reports whether an older terma left sign-ins under dir.

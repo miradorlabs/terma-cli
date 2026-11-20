@@ -28,7 +28,7 @@ func TestUnparkingKeepsTheAccountsEventsWereCollectedUnder(t *testing.T) {
 		}
 	}
 	sp.Bind("account-b")
-	Env{Spool: sp}.unpark(r)
+	Env{Spool: sp, Account: "account-b"}.unpark(r)
 	got := map[string]string{}
 	for _, ev := range hookruntest.Spooled(t, sp) {
 		got[ev.Name] = ev.Account

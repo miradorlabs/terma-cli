@@ -431,6 +431,37 @@ func TestAnUnreadableOlderFileIsRetiredAsNoOnes(t *testing.T) {
 	}
 }
 
+// An older file that doesn't read whole is retired as no one's, but what could be read of it
+// is still revoked: its sessions don't stay live with nothing pointing at them.
+func TestAPartlyBrokenOlderFileIsRetiredAsNoOnes(t *testing.T) {
+	f := newFakeAuth(t)
+	authSandbox(t, f)
+	if err := config.UpdateFile(testApp.dir, func(file *config.File) { file.InsecureStorage = true }); err != nil {
+		t.Fatal(err)
+	}
+	legacyA := legacyTokenPrefix + orgA().ID
+	data := `{"default": {"organizations": {"` + orgA().ID + `": {"access_token": "` + legacyA + `", "session_id": "old-a", "auth_url": "` + f.srv.URL + `", "organization_id": "` + orgA().ID + `", "user_id": "u-1"}}}, "work": {"organizations": "not a map"}}`
+	if err := os.WriteFile(config.LegacyCredentialsPath(testApp.dir), []byte(data), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := testApp.loadConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := testApp.storeLogin(context.Background(), cfg, storedSession(f)); err != nil {
+		t.Fatal(err)
+	}
+	if got := f.legacyRevokedTokens(); len(got) != 1 || got[0] != legacyA {
+		t.Fatalf("revoked %d older sessions, want the readable one", len(got))
+	}
+	if rec, err := auth.ReadLegacyRecord(testApp.stateDir); err != nil || rec.Account != auth.LegacyAccountAmbiguous {
+		t.Fatalf("record = %+v, %v; want one naming no one", rec, err)
+	}
+	if auth.HasLegacySignIns(testApp.dir) {
+		t.Fatal("the older file outlived the sign-in")
+	}
+}
+
 // `terma teardown --sign-out` revokes the session server-side and forgets it.
 func TestSignOutRevokesTheSession(t *testing.T) {
 	f := newFakeAuth(t)

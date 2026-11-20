@@ -116,13 +116,19 @@ const (
 // Spool is one queue directory.
 type Spool struct {
 	dir string
-	// account binds what this Spool appends to a sign-in (Bind).
-	account string
+	// account binds what this Spool appends to a sign-in (Bind); noPerson marks it no
+	// person's instead (BindNoPerson).
+	account  string
+	noPerson bool
 }
 
 // Bind has every event this Spool appends without an account carry account: the sign-in
 // collecting it.
-func (s *Spool) Bind(account string) { s.account = account }
+func (s *Spool) Bind(account string) { s.account, s.noPerson = account, false }
+
+// BindNoPerson has every event this Spool appends without an account marked no person's
+// (Event.NoPerson): collected under a server key, whichever path appends it.
+func (s *Spool) BindNoPerson() { s.account, s.noPerson = "", true }
 
 // Open addresses (and creates) the spool directory.
 func Open(dir string) (*Spool, error) {
@@ -160,7 +166,7 @@ func (s *Spool) appendEvents(ctx context.Context, bind bool, events []Event) err
 			e.Time = time.Now()
 		}
 		if bind && e.Account == "" && !e.NoPerson {
-			e.Account = s.account
+			e.Account, e.NoPerson = s.account, s.noPerson
 		}
 		line, err := json.Marshal(e)
 		if err != nil {

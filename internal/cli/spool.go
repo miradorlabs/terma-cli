@@ -52,7 +52,15 @@ func (app *App) newSpoolAwaitPushCommand() *cobra.Command {
 func (app *App) pushEnv() hookrun.Env {
 	env := hookrun.Env{StateDir: app.stateDir, ConfigDir: app.dir, Spool: app.openSpool(), Flush: spawnFlush,
 		Stderr: os.Stderr, Debug: os.Getenv("TERMA_DEBUG") != ""}
-	if cfg, err := app.loadConfig(); err == nil && !cfg.ServerKeySignIn {
+	cfg, err := app.loadConfig()
+	switch {
+	case err != nil:
+	case cfg.ServerKeySignIn:
+		env.ServerKey = true
+		if env.Spool != nil {
+			env.Spool.BindNoPerson()
+		}
+	default:
 		env.Account = auth.Account(cfg.Dir, cfg.ProfileName, cfg.AuthURL)
 		if env.Spool != nil {
 			env.Spool.Bind(env.Account)

@@ -250,23 +250,14 @@ func (e Env) unpark(r *Repo) {
 		// A parked event that names its account, or no person (a server key's), keeps it.
 		// One its sandboxed hook could read neither for is bound: it was collected under the
 		// sign-in in place, which unparks it moments later.
-		var collected, unknown []spool.Event
-		for _, ev := range events {
-			if ev.Account != "" || ev.NoPerson {
-				collected = append(collected, ev)
-			} else {
-				unknown = append(unknown, ev)
+		// Resolved here, then appended in one write: a part appended alone would be
+		// appended again, as the parked file stays, when the rest fails.
+		for i, ev := range events {
+			if ev.Account == "" && !ev.NoPerson {
+				events[i].Account, events[i].NoPerson = e.Account, e.Account == "" && e.ServerKey
 			}
 		}
-		if len(collected) > 0 {
-			if err := e.Spool.AppendAsCollected(collected...); err != nil {
-				return err
-			}
-		}
-		if len(unknown) > 0 {
-			return e.Spool.Append(unknown...)
-		}
-		return nil
+		return e.Spool.AppendAsCollected(events...)
 	})
 	if err != nil {
 		e.Logf("unpark events: %v", err)
