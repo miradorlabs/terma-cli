@@ -344,6 +344,27 @@ func TestSetupRecordsTheRelayEnvironment(t *testing.T) {
 	}
 }
 
+// Antigravity exports nothing to the relay, but hooks run only while the relay's token
+// exists: setup with it alone still mints the token, and writes agy's hooks.
+func TestSetupWithAntigravityAloneTurnsHooksOn(t *testing.T) {
+	gateway := newFakeAuth(t)
+	authSandbox(t, gateway)
+	sandboxMachine(t)
+	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(gateway, orgA())); err != nil {
+		t.Fatal(err)
+	}
+	if out, err := runTerma(t, "setup", "--harness", "antigravity"); err != nil {
+		t.Fatalf("setup: %v\n%s", err, out)
+	}
+	if !claim.Enabled(testApp.stateDir) {
+		t.Fatal("setup left no relay token, so every hook is off")
+	}
+	hooks, err := os.ReadFile(filepath.Join(os.Getenv("HOME"), ".gemini", "config", "hooks.json"))
+	if err != nil || !strings.Contains(string(hooks), "hook --user antigravity-stop") {
+		t.Fatalf("agy hooks = %s, %v", hooks, err)
+	}
+}
+
 // Setup leaves an agent it was not asked for and never configured alone, even when its config does not parse.
 func TestSetupLeavesAnUnconfiguredAgentsConfigAlone(t *testing.T) {
 	gateway := newFakeAuth(t)

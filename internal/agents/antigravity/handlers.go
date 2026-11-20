@@ -185,9 +185,10 @@ func postToolUse(ctx context.Context, env hookrun.Env) error {
 		env.EmitFor(r, spool.Event{Name: semconv.TermaToolCallEvent, SessionID: id, Attrs: call})
 	}
 
-	// No toolCall yields no paths, so this guard also makes in.ToolCall safe below.
+	// A failed edit changed nothing. No toolCall yields no paths, so this guard also makes
+	// in.ToolCall safe below.
 	files := antigravityEditedPaths(in)
-	if len(files) == 0 {
+	if len(files) == 0 || in.Error != "" {
 		return nil
 	}
 	// The step's terma.tool.call ids: this is what that call changed, not a second call.
