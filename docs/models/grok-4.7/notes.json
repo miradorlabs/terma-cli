@@ -21,6 +21,24 @@
   ],
   "changes": [
     {
+      "id": "facts/input_modalities/pdf",
+      "category": "facts",
+      "op": "removed",
+      "path": [
+        "facts",
+        "input_modalities",
+        "pdf"
+      ],
+      "title": "Input removed: pdf",
+      "impact": "notable",
+      "before": "pdf",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
       "id": "facts/knowledge_cutoff",
       "category": "facts",
       "op": "changed",
@@ -39,6 +57,7 @@
     }
   ],
   "highlights": [
+    "Input removed: pdf",
     "Knowledge cutoff: 2026-02-01 → 2026-05"
   ]
 }
