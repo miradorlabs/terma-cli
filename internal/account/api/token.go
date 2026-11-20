@@ -244,7 +244,7 @@ func (c *Client) refresh(ctx context.Context, redeem redeemFunc) error {
 				// The store still can't take it, so a refresh of the held pair could not
 				// be recorded: nothing is sent. The stored record holds a spent token:
 				// mark it past every budget, so no process presents it.
-				_ = tx.MarkRefreshInDoubt(c.profile, stored.SessionID, spentLongAgo)
+				_ = tx.MarkRefreshInDoubt(c.profile, stored.SessionID, stored.RefreshToken, spentLongAgo)
 				return fmt.Errorf("save the refreshed credential before refreshing it again: %w", err)
 			}
 			return c.redeem(ctx, held, held, redeem, tx)

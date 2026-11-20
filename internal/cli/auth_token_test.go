@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"sync"
 	"testing"
@@ -319,6 +320,18 @@ func TestAuthToken_ErrorCodes(t *testing.T) {
 		}
 		stdout, _, err := termaRun{}.exec(t, "auth", "token", "--json")
 		assertTokenError(t, stdout, err, "signed_out")
+	})
+	t.Run("updated from per-organization sign-ins", func(t *testing.T) {
+		srv := newTokenServer(t)
+		dir := signInForToken(t, srv, time.Now().Add(time.Hour), grantTeam)
+		if err := auth.DeleteCredential(dir, config.DefaultProfile); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(config.LegacyCredentialsPath(dir), []byte(`{}`), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		stdout, _, err := termaRun{}.exec(t, "auth", "token", "--json")
+		assertTokenFailure(t, stdout, err, "signed_out", "terma was updated")
 	})
 	t.Run("server key", func(t *testing.T) {
 		srv := newTokenServer(t)

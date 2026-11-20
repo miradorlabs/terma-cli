@@ -27,6 +27,11 @@ func (app *App) newAuthCommand() *cobra.Command {
 	return cmd
 }
 
+// signInAfterUpdate is what a machine an older terma signed in says once updated: its
+// per-organization sign-ins are retired, and nothing is signed in until the person signs
+// in once.
+const signInAfterUpdate = "terma was updated and now signs in once per person: run `terma setup` to sign in again"
+
 // The error codes `terma auth token` reports, a contract with the terma-mcp bridge.
 const (
 	tokenSignedOut   = "signed_out"
@@ -141,6 +146,10 @@ func (app *App) authToken(ctx context.Context, refusedSHA256 string) (*tokenGran
 			Message: "terma is signed in with a team's server key, which cannot be used for the MCP: run `terma setup` to sign in as yourself"}
 	}
 	client, err := api.New(cfg, api.Options{Version: app.version})
+	if errors.Is(err, auth.ErrNotLoggedIn) && auth.HasLegacySignIns(app.dir) {
+		// The bridge knows signed_out; the message says why.
+		return nil, &tokenFailure{Code: tokenSignedOut, Message: signInAfterUpdate}
+	}
 	if failure := tokenFailureOf(err, false); failure != nil {
 		return nil, failure
 	}

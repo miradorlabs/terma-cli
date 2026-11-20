@@ -227,6 +227,25 @@ func TestDesktopGrantReusesTheSameUsersSignIn(t *testing.T) {
 	}
 }
 
+// A reused sign-in is announced only once --org is checked: refused, stdout carries the
+// {"error": …} line and no {"reused":true}, as a fresh code's refusal does.
+func TestDesktopGrantChecksTheOrganizationBeforeAnnouncingReuse(t *testing.T) {
+	for name, orgs := range map[string][]organization{"someone else's": {orgA()}, "none": {}} {
+		t.Run(name, func(t *testing.T) {
+			gateway := grantSandbox(t)
+			gateway.orgs = orgs
+			storeSignIn(t, gateway, deskUser)
+			stdout, _, err := desktopSetup(t, identityLine(deskUser, personalOrg().ID), personalOrg().ID, personalTeam())
+			if code := grantFailure(t, stdout, err); code != auth.GrantBadInput {
+				t.Fatalf("code = %s, want %s", code, auth.GrantBadInput)
+			}
+			if strings.Contains(stdout, "reused") {
+				t.Fatalf("a refused reuse was announced:\n%s", stdout)
+			}
+		})
+	}
+}
+
 // An id spelled in uppercase is the same user: Terma's ids are lowercase, so the desktop's
 // identity is read without regard to case and the stored sign-in is still reused.
 func TestDesktopGrantReadsIdsWithoutRegardToCase(t *testing.T) {

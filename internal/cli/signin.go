@@ -267,6 +267,9 @@ func (app *App) verifyCredential(ctx context.Context, cfg *config.Config, cred *
 	return client.Credential(), identity, nil
 }
 
+// errNoOrganization is a sign-in of someone who belongs to no organization yet.
+var errNoOrganization = errors.New("you belong to no Terma organization yet: create or join one in the Terma app, then run `terma setup` again")
+
 // chooseOrganization records the organization setup works in, among the person's: want
 // (--org), else the profile's current one when ask is nil or it is their only one, else
 // their only one, else ask's pick. kept is how many the current one was kept among without
@@ -281,7 +284,7 @@ func (app *App) chooseOrganization(ctx context.Context, cfg *config.Config, cred
 		return 0, fmt.Errorf("list your organizations: %w", err)
 	}
 	if len(orgs) == 0 {
-		return 0, errors.New("you belong to no Terma organization yet: create or join one in the Terma app, then run `terma setup` again")
+		return 0, errNoOrganization
 	}
 	current := slices.IndexFunc(orgs, func(o organization) bool { return o.ID == cfg.OrganizationID })
 	var org *organization

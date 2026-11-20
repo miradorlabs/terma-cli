@@ -28,14 +28,18 @@ type LegacySignIn struct {
 	AuthURL        string
 	// AccessToken is "" when its keychain item is gone or could not be read.
 	AccessToken string
+	// inFile is that credentials.json holds the tokens, and no keychain item may: an
+	// older terma with no keychain kept them there.
+	inFile bool
 }
 
 type legacyCredential struct {
-	AccessToken    string `json:"access_token,omitempty"`
-	SessionID      string `json:"session_id,omitempty"`
-	AuthURL        string `json:"auth_url,omitempty"`
-	OrganizationID string `json:"organization_id,omitempty"`
-	UserID         string `json:"user_id,omitempty"`
+	AccessToken       string `json:"access_token,omitempty"`
+	StaleKeychainItem bool   `json:"stale_keychain_item,omitempty"`
+	SessionID         string `json:"session_id,omitempty"`
+	AuthURL           string `json:"auth_url,omitempty"`
+	OrganizationID    string `json:"organization_id,omitempty"`
+	UserID            string `json:"user_id,omitempty"`
 }
 
 type legacyFile map[string]*struct {
@@ -71,7 +75,7 @@ func LegacySignIns(dir string, tokens bool) ([]LegacySignIn, error) {
 				continue
 			}
 			s := LegacySignIn{Profile: profile, OrganizationID: org, SessionID: c.SessionID, UserID: c.UserID,
-				AuthURL: c.AuthURL, AccessToken: c.AccessToken}
+				AuthURL: c.AuthURL, AccessToken: c.AccessToken, inFile: c.AccessToken != "" && !c.StaleKeychainItem}
 			if tokens && s.AccessToken == "" {
 				if v, err := secret.Get(dir, legacyItemName(profile, org)); err == nil {
 					var pair tokenPair
@@ -97,7 +101,9 @@ func HasLegacySignIns(dir string) bool {
 
 // ForgetLegacy deletes the sign-ins an older terma left: every keychain item
 // credentials.json names, then the file and its lock. A keychain item that cannot be
-// removed is reported, and the file stays so a later sign-in tries again.
+// removed is reported, and the file stays so a later sign-in tries again. A sign-in the
+// file holds the tokens of has no item to remove, as forget judges it, so a machine with
+// no keychain loses its older sign-ins too.
 func ForgetLegacy(dir string) error {
 	signIns, err := LegacySignIns(dir, false)
 	if err != nil {
@@ -105,6 +111,9 @@ func ForgetLegacy(dir string) error {
 	}
 	var errs []error
 	for _, s := range signIns {
+		if s.inFile {
+			continue
+		}
 		if err := secret.Delete(dir, legacyItemName(s.Profile, s.OrganizationID)); err != nil {
 			errs = append(errs, err)
 		}

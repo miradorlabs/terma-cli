@@ -54,7 +54,7 @@ func TestLegacySignIns_ReadsFileAndKeychainTokens(t *testing.T) {
 	want := []LegacySignIn{
 		{Profile: "default", OrganizationID: "org-a", SessionID: "s-default-a", UserID: "user-1", AuthURL: "https://auth.example.test", AccessToken: "access-default-org-a"},
 		{Profile: "default", OrganizationID: "org-b", SessionID: "s-default-b", UserID: "user-1", AuthURL: "https://auth.example.test", AccessToken: "access-default-org-b"},
-		{Profile: "work", OrganizationID: "org-a", SessionID: "s-work-a", UserID: "user-1", AuthURL: "https://auth.example.test", AccessToken: "access-work-a"},
+		{Profile: "work", OrganizationID: "org-a", SessionID: "s-work-a", UserID: "user-1", AuthURL: "https://auth.example.test", AccessToken: "access-work-a", inFile: true},
 	}
 	if !slices.Equal(signIns, want) {
 		t.Fatalf("LegacySignIns(tokens) =\n%+v\nwant\n%+v", signIns, want)
@@ -187,5 +187,26 @@ func TestRecordLegacy_KeepsAnUnreadableRecord(t *testing.T) {
 	}
 	if data, _ := os.ReadFile(path); string(data) != "{" {
 		t.Fatalf("record = %q", data)
+	}
+}
+
+// Sign-ins an older terma kept in the file with no keychain are forgotten without one: the
+// keychain has no item of theirs to remove, so its failing keeps nothing.
+func TestForgetLegacy_FileHeldSignInsNeedNoKeychain(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	data := `{"default": {"active": "org-a", "organizations": {
+    "org-a": {"access_token": "access-a", "session_id": "s-a", "auth_url": "https://auth.example.test", "organization_id": "org-a", "user_id": "user-1"},
+    "org-b": {"access_token": "access-b", "session_id": "s-b", "auth_url": "https://auth.example.test", "organization_id": "org-b", "user_id": "user-1"}
+  }}}`
+	if err := os.WriteFile(config.LegacyCredentialsPath(dir), []byte(data), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	secret.FailForTest(t, dir)
+	if err := ForgetLegacy(dir); err != nil {
+		t.Fatalf("ForgetLegacy: %v", err)
+	}
+	if HasLegacySignIns(dir) {
+		t.Fatal("credentials.json outlived the retirement")
 	}
 }

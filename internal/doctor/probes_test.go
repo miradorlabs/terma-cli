@@ -86,6 +86,17 @@ func TestDoctorJudgesTheSignInFromItsProbe(t *testing.T) {
 	}
 }
 
+// A machine an older terma signed in, updated and not signed in since, is told why it is
+// signed out: the update retired its sign-ins.
+func TestDoctorSaysAnUpdateNeedsASignIn(t *testing.T) {
+	t.Parallel()
+	updated := func() (Credential, error) { return Credential{SignInAfterUpdate: true}, nil }
+	c := check(Run(t.Context(), env(t, Probes{Credential: updated, Spool: func() SpoolState { return SpoolState{} }}), Progress{}), KeyAuth)
+	if c.Status != Fail || !strings.Contains(c.Detail, "updated") || c.Fix != "terma setup" {
+		t.Fatalf("signed in = %+v", c)
+	}
+}
+
 // A locked keychain is not a missing sign-in: doctor says which, and says where a working
 // credential is kept.
 func TestDoctorTellsALockedKeychainFromNoSignIn(t *testing.T) {

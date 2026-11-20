@@ -10,6 +10,8 @@
 package auth
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -51,9 +53,26 @@ type Credential struct {
 	// RetiredAt is when a server refused this sign-in as retired (SIGN_IN_RETIRED): only a
 	// newer terma, signed in again, replaces it. Zero while it is accepted.
 	RetiredAt time.Time `json:"retired_at,omitzero"`
+	// RefreshInDoubtFor is the SHA-256, in hex, of the refresh token RefreshInDoubtSince
+	// was recorded for. A mark beside another token (a rotation the keychain took and the
+	// file then missed) is not that token's, and is read as none. "" (a mark from before
+	// it) counts for whatever token is stored.
+	RefreshInDoubtFor string `json:"refresh_in_doubt_for,omitempty"`
 	// StaleKeychainItem marks a credential kept in the file while its earlier tokens may
 	// still sit in the keychain, which could not remove them then; sign-out tries again.
 	StaleKeychainItem bool `json:"stale_keychain_item,omitempty"`
+}
+
+// dropForeignMark forgets a refresh mark recorded for another refresh token than c's.
+func (c *Credential) dropForeignMark() {
+	if c.RefreshInDoubtFor != "" && c.RefreshInDoubtFor != tokenHash(c.RefreshToken) {
+		c.RefreshInDoubtSince, c.RefreshInDoubtFor = time.Time{}, ""
+	}
+}
+
+func tokenHash(token string) string {
+	sum := sha256.Sum256([]byte(token))
+	return hex.EncodeToString(sum[:])
 }
 
 // ErrWrongEnvironment reports a credential issued by a different auth host than the
@@ -197,7 +216,7 @@ func (tx *Tx) saveReplacing(profile string, cred *Credential, inFile bool) (repl
 		err = fmt.Errorf("read the sign-in it replaces from the system keychain: %w", unread)
 	}
 	if err != nil && overwritten != nil {
-		pair, _ := json.Marshal(tokenPair{AccessToken: overwritten.AccessToken, RefreshToken: overwritten.RefreshToken})
+		pair, _ := json.Marshal(tokenPair{AccessToken: overwritten.AccessToken, RefreshToken: overwritten.RefreshToken, SessionID: overwritten.SessionID})
 		_ = secret.Set(dir, itemName(profile), string(pair))
 	}
 	tx.after = append(tx.after, func() { afterSave(dir, profile, unindexed, err) })
@@ -230,25 +249,41 @@ func DeleteCredentialIf(dir, profile, refreshToken string) error {
 	return lockedWrite(dir, func(tx *Tx) error { return tx.DeleteIf(profile, refreshToken) })
 }
 
-// DeleteIf is DeleteCredentialIf inside the transaction.
+// DeleteIf is DeleteCredentialIf inside the transaction. It removes the sign-in from
+// user-credentials.json alone, as v0.3.1's DeleteFor did: a keychain delete that timed out
+// can still land after the lock is released, and would then remove the tokens a new
+// sign-in just wrote under the same item name. The item left is overwritten by the next
+// sign-in to the keychain. Signing out, which means to remove it, uses SignOutIf.
 func (tx *Tx) DeleteIf(profile, refreshToken string) error {
-	stored, err := tx.Load(profile)
-	switch {
-	case errors.Is(err, ErrNotLoggedIn):
-		return nil
-	case err != nil:
-		return err
-	case stored.RefreshToken != refreshToken:
-		return nil
-	}
-	var gone *Credential
-	if err := tx.mutate(func(file credentialFile) {
-		gone = file.get(profile)
-		delete(file, profile)
-	}); err != nil {
+	_, err := tx.deleteIf(profile, refreshToken)
+	return err
+}
+
+// SignOutIf is DeleteIf for signing out: the sign-in's keychain item goes too.
+func (tx *Tx) SignOutIf(profile, refreshToken string) error {
+	gone, err := tx.deleteIf(profile, refreshToken)
+	if err != nil {
 		return err
 	}
 	return forget(tx.dir, profile, gone)
+}
+
+func (tx *Tx) deleteIf(profile, refreshToken string) (*Credential, error) {
+	stored, err := tx.Load(profile)
+	switch {
+	case errors.Is(err, ErrNotLoggedIn):
+		return nil, nil
+	case err != nil:
+		return nil, err
+	case stored.RefreshToken != refreshToken:
+		return nil, nil
+	}
+	var gone *Credential
+	err = tx.mutate(func(file credentialFile) {
+		gone = file.get(profile)
+		delete(file, profile)
+	})
+	return gone, err
 }
 
 // mutateCredentialFile runs mutate under a cross-process lock: unlocked, a second
@@ -282,5 +317,8 @@ func saveCredentialFile(path string, file credentialFile) error {
 		return err
 	}
 	// 0600: this file may hold live access and refresh tokens.
-	return config.WriteFileAtomic(path, append(data, '\n'), 0o600)
+	return writeCredentialFile(path, append(data, '\n'), 0o600)
 }
+
+// writeCredentialFile writes user-credentials.json; a test can make it fail alone.
+var writeCredentialFile = config.WriteFileAtomic

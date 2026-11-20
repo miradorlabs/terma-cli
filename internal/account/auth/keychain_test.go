@@ -398,26 +398,37 @@ func TestAFailedReplacementRestoresTheOldTokens(t *testing.T) {
 	if StoredInFile(dir, config.DefaultProfile) {
 		t.Skip("no keychain to keep the tokens in")
 	}
-	// A directory entry where the file goes: the atomic rename over it fails.
-	path := config.CredentialsPath(dir)
-	data, _ := os.ReadFile(path)
-	if err := os.Remove(path); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Mkdir(path, 0o700); err != nil {
-		t.Fatal(err)
-	}
+	// The file is read, the new tokens go to the keychain, and then the file's write fails.
+	write := writeCredentialFile
+	writeCredentialFile = func(string, []byte, os.FileMode) error { return errors.New("disk full") }
+	t.Cleanup(func() { writeCredentialFile = write })
 	if _, err := SaveCredential(dir, config.DefaultProfile, sessionCredential("new")); err == nil {
-		t.Fatal("a save over a directory succeeded")
+		t.Fatal("a save whose file write failed succeeded")
 	}
-	if err := os.Remove(path); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(path, data, 0o600); err != nil {
-		t.Fatal(err)
-	}
+	writeCredentialFile = write
 	got, err := LoadCredential(dir, config.DefaultProfile)
 	if err != nil || got.SessionID != "old" || got.AccessToken != old.AccessToken {
 		t.Fatalf("loaded %+v, %v; want the old sign-in with its own tokens", got, err)
+	}
+}
+
+// A read that finds one session's index beside another session's tokens, as a read between
+// a sign-in's keychain write and its file write would, takes no tokens: never one
+// session's identity with another's tokens.
+func TestAnIndexNeverPairsWithAnotherSessionsTokens(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	if _, err := SaveCredential(dir, config.DefaultProfile, sessionCredential("a")); err != nil {
+		t.Fatal(err)
+	}
+	if StoredInFile(dir, config.DefaultProfile) {
+		t.Skip("no keychain to keep the tokens in")
+	}
+	// The next sign-in's tokens are in the keychain; its index is not written yet.
+	if err := secret.Set(dir, itemName(config.DefaultProfile), `{"access_token":"access-b","refresh_token":"refresh-b","session_id":"b"}`); err != nil {
+		t.Fatal(err)
+	}
+	if cred, err := LoadCredential(dir, config.DefaultProfile); !errors.Is(err, ErrNotLoggedIn) {
+		t.Fatalf("LoadCredential = %+v, %v; want no tokens for session a", cred, err)
 	}
 }

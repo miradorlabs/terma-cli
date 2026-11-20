@@ -17,6 +17,10 @@ func itemName(profile string) string {
 type tokenPair struct {
 	AccessToken  string `json:"access_token"`
 	RefreshToken string `json:"refresh_token"`
+	// SessionID names the session the tokens are: the file that indexes them is written
+	// after the item, so a read between the two writes must not pair one session's index
+	// with another's tokens. "" (an item from before it) is taken for the indexed one.
+	SessionID string `json:"session_id,omitempty"`
 }
 
 // errTokensGone means the file indexes a credential whose keychain item is missing or
@@ -27,6 +31,7 @@ var errTokensGone = fmt.Errorf("%w: the system keychain has no tokens for this s
 // A keychain that cannot be reached is an error, never ErrNotLoggedIn.
 func hydrate(dir, profile string, c *Credential) error {
 	if c.AccessToken != "" {
+		c.dropForeignMark()
 		return nil
 	}
 	v, err := secret.Get(dir, itemName(profile))
@@ -37,10 +42,12 @@ func hydrate(dir, profile string, c *Credential) error {
 		return err
 	}
 	var pair tokenPair
-	if json.Unmarshal([]byte(v), &pair) != nil || pair.AccessToken == "" {
+	if json.Unmarshal([]byte(v), &pair) != nil || pair.AccessToken == "" ||
+		pair.SessionID != "" && pair.SessionID != c.SessionID {
 		return errTokensGone
 	}
 	c.AccessToken, c.RefreshToken = pair.AccessToken, pair.RefreshToken
+	c.dropForeignMark()
 	return nil
 }
 
@@ -53,7 +60,7 @@ func keep(dir, profile string, cred, old *Credential, inFile bool) *Credential {
 	c := *cred
 	c.StaleKeychainItem = old.present() && (old.AccessToken == "" || old.StaleKeychainItem)
 	if !inFile {
-		pair, _ := json.Marshal(tokenPair{AccessToken: cred.AccessToken, RefreshToken: cred.RefreshToken})
+		pair, _ := json.Marshal(tokenPair{AccessToken: cred.AccessToken, RefreshToken: cred.RefreshToken, SessionID: cred.SessionID})
 		err := secret.Set(dir, itemName(profile), string(pair))
 		if err == nil {
 			c.AccessToken, c.RefreshToken, c.StaleKeychainItem = "", "", false

@@ -92,13 +92,16 @@ func (tx *Tx) Update(profile string, cred *Credential) error {
 }
 
 // MarkRefreshInDoubt records on the profile's stored sign-in of session when a refresh of
-// its refresh token came into doubt; the zero time clears it. It edits
+// refreshToken came into doubt, and for which token; the zero time clears it. It edits
 // user-credentials.json alone, never the keychain, whose item holds the same tokens.
-func (tx *Tx) MarkRefreshInDoubt(profile, session string, since time.Time) error {
+func (tx *Tx) MarkRefreshInDoubt(profile, session, refreshToken string, since time.Time) error {
 	found := false
 	err := tx.mutate(func(file credentialFile) {
 		if c := file.get(profile); c != nil && c.SessionID == session {
-			c.RefreshInDoubtSince, found = since, true
+			c.RefreshInDoubtSince, c.RefreshInDoubtFor, found = since, "", true
+			if !since.IsZero() {
+				c.RefreshInDoubtFor = tokenHash(refreshToken)
+			}
 		}
 	})
 	if err == nil && !found {
