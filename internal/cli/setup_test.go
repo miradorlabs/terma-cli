@@ -237,6 +237,10 @@ func TestHarnessSelectionComingSoon(t *testing.T) {
 	}
 	form := testApp.harnessSelectionForm(context.Background(), chosen)
 	wantOrder := []string{"claude", "codex", "copilot", "omp", "antigravity", "cursor", "opencode", "pi", "hermes", "gemini", "dsh"}
+	if !testApp.agents.IsSupported("antigravity") {
+		// Coming Soon on Windows: last, in registry order.
+		wantOrder = append(slices.Delete(wantOrder, 4, 5), "antigravity")
+	}
 	if len(form.Items) != len(wantOrder) {
 		t.Fatalf("picker has %d items, want %d", len(form.Items), len(wantOrder))
 	}
@@ -284,7 +288,11 @@ func TestHarnessSelectionFlags(t *testing.T) {
 		t.Fatalf("--harness omp,claude = %v, %v", got, err)
 	}
 	got, err = testApp.chooseHarnesses(&cobra.Command{}, &config.Config{}, setupFlags{harnesses: "antigravity,claude"})
-	if err != nil || !slices.Equal(got, []string{"claude", "antigravity"}) {
+	if !testApp.agents.IsSupported("antigravity") {
+		if err == nil || !strings.Contains(err.Error(), "Coming Soon") {
+			t.Fatalf("antigravity on Windows: %v, %v", got, err)
+		}
+	} else if err != nil || !slices.Equal(got, []string{"claude", "antigravity"}) {
 		t.Fatalf("antigravity selection = %v, %v", got, err)
 	}
 }
@@ -308,7 +316,7 @@ func TestHarnessSelectionFiltersSavedAgents(t *testing.T) {
 		}
 		// Antigravity is not on the emptied PATH, so only a saved choice keeps it.
 		wantSetup := slices.Clone(wantInstalled)
-		if slices.Contains(saved, "antigravity") {
+		if slices.Contains(saved, "antigravity") && testApp.agents.IsSupported("antigravity") {
 			wantSetup = append(wantSetup, "antigravity")
 		}
 		got, err := testApp.chooseHarnesses(cmd, cfg, setupFlags{assumeYes: true})
@@ -347,12 +355,13 @@ func TestSetupRecordsTheRelayEnvironment(t *testing.T) {
 // Antigravity exports nothing to the relay, but hooks run only while the relay's token
 // exists: setup with it alone still mints the token, and writes agy's hooks.
 func TestSetupWithAntigravityAloneTurnsHooksOn(t *testing.T) {
+	if !testApp.agents.IsSupported("antigravity") {
+		t.Skip("Antigravity is Coming Soon on Windows")
+	}
 	gateway := newFakeAuth(t)
 	authSandbox(t, gateway)
 	sandboxMachine(t)
-	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(gateway, orgA())); err != nil {
-		t.Fatal(err)
-	}
+	signInTo(t, gateway, orgA())
 	if out, err := runTerma(t, "setup", "--harness", "antigravity"); err != nil {
 		t.Fatalf("setup: %v\n%s", err, out)
 	}

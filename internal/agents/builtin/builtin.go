@@ -2,6 +2,8 @@
 package builtin
 
 import (
+	"runtime"
+
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/agents/antigravity"
 	"github.com/miradorlabs/terma-cli/internal/agents/claude"
@@ -18,9 +20,17 @@ import (
 
 // Agents is every agent terma knows in install order, and the supported ones; those that
 // keep records do so under terma's config directory configDir.
-func Agents(configDir string) *agents.Registry {
+func Agents(configDir string) *agents.Registry { return agentsOn(configDir, runtime.GOOS) }
+
+// agentsOn is Agents on the operating system goos. Antigravity is Coming Soon on Windows:
+// agy runs a hook there with cmd, and its hooks are checked only with the POSIX command.
+func agentsOn(configDir, goos string) *agents.Registry {
 	claudeCode, codexCLI := claude.Agent{ConfigDir: configDir}, codex.Agent{ConfigDir: configDir}
 	githubCopilot, ompAgent, agy := copilot.Agent{ConfigDir: configDir}, omp.Agent{ConfigDir: configDir}, antigravity.Agent{}
+	supported := []agents.Agent{claudeCode, codexCLI, githubCopilot, ompAgent}
+	if goos != "windows" {
+		supported = append(supported, agy)
+	}
 	return agents.New(
 		claudeCode,
 		cursor.Agent{},
@@ -33,5 +43,5 @@ func Agents(configDir string) *agents.Registry {
 		gemini.Agent{},
 		dsh.Agent{},
 		agy,
-	).Support(claudeCode, codexCLI, githubCopilot, ompAgent, agy)
+	).Support(supported...)
 }

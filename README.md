@@ -8,7 +8,7 @@
 The `terma` cli connects coding agents to [Terma](https://terma.ai), then stamps the commits
 they produce so agent spend can be traced to shipped code. It supports **Claude Code**
 (CLI and Desktop), **Codex** (CLI and Desktop), **GitHub Copilot** (CLI and VS Code),
-**[OMP](https://github.com/can1357/oh-my-pi)** and **Antigravity** (the `agy` CLI).
+**[OMP](https://github.com/can1357/oh-my-pi)** and **Antigravity** (the `agy` CLI, on macOS and Linux).
 
 ## Get started
 
@@ -474,7 +474,9 @@ and leaves the file's other hooks as they are. Those hooks report the model, eac
 each tool step (its name and whether it failed, never its arguments) and how the turn
 ended, and the files `agy`'s own file tools write are stamped on your commits. `agy`
 reports no token counts or cost, and runs no hook after a turn you cancel, so what that
-turn did is sent with the next turn's.
+turn did is sent with the next turn's. On Windows, setup lists Antigravity as Coming Soon: `agy` runs
+its hooks with `cmd` there, and terma's hook command for it has been checked only on macOS
+and Linux.
 
 `terma setup` runs the relay as a per-user background service, so it is up before any
 agent starts; with `--relay-service off`, hooks start it on demand. `terma update`
