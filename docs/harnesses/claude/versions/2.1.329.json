@@ -22426,7 +22426,7 @@
         "read": true
       },
       "CLAUDE_CODE_DISABLE_BG_STABLE_PATH": {
-        "description": "On macOS with the native installer, set to `1` to run each background session's host process from the installed binary, not `~/.local/share/claude/ClaudeCode.app`. macOS may then ask again for permissions such as folder access, including after each update. Set it in the `env` block of user settings, a managed settings file, or an MDM policy, not your shell. To remove `ClaudeCode.app`, delete it yourself. Requires Claude Code v2.1.295 or later",
+        "description": "On macOS with the native installer, set to `1` to run each background session's host process from the installed binary, not `~/.local/share/claude/ClaudeCode.app`. macOS may then ask again for permissions such as folder access, including after each update. Set it in the `env` block of user settings, a managed settings file, or an MDM policy, not your shell. Requires Claude Code v2.1.295 or later",
         "read": true
       },
       "CLAUDE_CODE_DISABLE_BUNDLED_SKILLS": {
@@ -23650,7 +23650,7 @@
         "read": false
       }
     },
-    "fetched_at": "2026-11-20T16:01:28.225877704Z",
+    "fetched_at": "2026-11-20T17:30:26.655586344Z",
     "settings": {
       "advisorModel": {
         "default": "unset, so the advisor is off",

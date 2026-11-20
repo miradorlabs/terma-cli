@@ -1,40 +1,40 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-20T16:01:28.225877704Z",
+  "generated_at": "2026-11-20T17:30:26.655586344Z",
   "versions": [
     {
       "harness": "pi",
       "name": "Pi",
       "version": "1.6.0",
       "released_at": "2026-11-20T11:09:15.529Z",
-      "captured_at": "2026-11-20T11:17:38.159845069Z",
+      "captured_at": "2026-11-20T17:30:26.655586344Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "supported",
       "previous": "1.5.2",
-      "changes": 7,
+      "changes": 6,
       "categories": {
         "binary": 3,
         "cli": 2,
-        "request": 2
+        "request": 1
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 7,
+        "informational": 6,
         "notable": 0
       },
-      "undocumented": null,
+      "undocumented": 3,
       "highlights": [
-        "Header user-agent: pi/<version> (darwin; node/v24.22.2; arm64) → pi/<version> (darwin; node/v24.22.3; arm64)",
         "Header x-stainless-package-version: 7.19.0 → 7.59.0",
-        "Description of `pi` changed"
+        "Description of `pi` changed",
+        "Full help text of `--help` changed (+355 −158 chars)"
       ],
       "signing": null,
       "partial": true,
-      "attempted_at": "2026-11-20T11:17:38.159845069Z",
-      "attempts": 1
+      "attempted_at": "2026-11-20T17:30:26.655586344Z",
+      "attempts": 2
     },
     {
       "harness": "t3",
