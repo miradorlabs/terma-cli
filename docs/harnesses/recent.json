@@ -1,7 +1,33 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-20T03:36:38.599830342Z",
+  "generated_at": "2026-11-20T07:43:58.837191222Z",
   "versions": [
+    {
+      "harness": "t3",
+      "name": "T3 Code",
+      "version": "0.1.11",
+      "released_at": "2026-11-20T07:39:50.651Z",
+      "captured_at": "2026-11-20T07:43:58.837191222Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "0.1.10",
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": 0,
+      "highlights": [],
+      "signing": null,
+      "partial": true,
+      "attempted_at": "2026-11-20T07:43:58.837191222Z",
+      "attempts": 1
+    },
     {
       "harness": "codex-desktop",
       "name": "Codex app",
@@ -6179,42 +6205,6 @@
         "Workflow tool description changed (+188 −173 chars)",
         "Behaviour: compaction outcome changed: \"compacted\" → \"refused\"",
         "Behaviour: compaction reason added"
-      ],
-      "signing": "valid"
-    },
-    {
-      "harness": "codex",
-      "name": "Codex CLI",
-      "version": "0.145.0",
-      "released_at": "2026-07-21T18:24:11.494Z",
-      "captured_at": "2026-11-05T09:54:28.532441Z",
-      "platforms": [
-        "darwin/arm64",
-        "linux/amd64"
-      ],
-      "support": "untested",
-      "previous": "0.144.6",
-      "changes": 101,
-      "categories": {
-        "behavior": 4,
-        "cli": 6,
-        "config": 38,
-        "filesystem": 45,
-        "hooks": 1,
-        "prompt": 3,
-        "tools": 4
-      },
-      "impact": {
-        "breaking": 0,
-        "degrading": 0,
-        "informational": 85,
-        "notable": 16
-      },
-      "undocumented": 72,
-      "highlights": [
-        "System prompt changed (+511 −462 chars)",
-        "System prompt changed (+338 −0 chars)",
-        "System prompt changed (+271 −186 chars)"
       ],
       "signing": "valid"
     }
