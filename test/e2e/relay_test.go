@@ -431,7 +431,9 @@ func TestRelayNegativeControls(t *testing.T) {
 			track(t)
 			t.Setenv("ANTHROPIC_API_KEY", "synthetic-telemetry-key")
 			sb := New(t, Isolated, WithClaude(b))
-			sb.UseRelay(RelayOptions{Start: true, Hold: hold, NoKey: true})
+			// Only a profile set up with a server key can lack one: a person's sends with
+			// their sign-in.
+			sb.UseRelay(RelayOptions{Start: true, Hold: hold, ServerKey: true, NoKey: true})
 			run(t, sb)
 			expectNothing(t, sb, "no_key")
 		})
@@ -514,8 +516,9 @@ func TestRelayLateClaim(t *testing.T) {
 	})
 }
 
-// reached maps each session that reached upstream to the keys it was sent with and
-// the projects on its resources.
+// reached maps each session that reached upstream to the keys it was sent with, the
+// teams their X-Mirador-Project headers named ("team " for none) and the projects on its
+// resources.
 func reached(r *Receiver) map[string]map[string]bool {
 	out := map[string]map[string]bool{}
 	note := func(session, what string) {
@@ -540,6 +543,7 @@ func reached(r *Receiver) map[string]map[string]bool {
 						a := flatten(lr.Attributes)
 						s := a["session.id"] + a["conversation.id"]
 						note(s, "key "+req.Authorization)
+						note(s, "team "+req.Project)
 						note(s, "project "+res["mirador.project.id"])
 					}
 				}
@@ -551,6 +555,7 @@ func reached(r *Receiver) map[string]map[string]bool {
 					for _, sp := range ss.Spans {
 						a := flatten(sp.Attributes)
 						note(a["session.id"], "key "+req.Authorization)
+						note(a["session.id"], "team "+req.Project)
 						note(a["session.id"], "project "+res["mirador.project.id"])
 					}
 				}
@@ -560,9 +565,30 @@ func reached(r *Receiver) map[string]map[string]bool {
 	return out
 }
 
+// checkSentAsPerson fails t for any export that reached the receiver other than with the
+// signed-in person's access token naming team: a person's profile never sends with a key.
+func (sb *Sandbox) checkSentAsPerson(t *testing.T, team string) {
+	t.Helper()
+	reqs := sb.Receiver.Requests()
+	if len(reqs) == 0 {
+		t.Error("nothing reached the ingest")
+	}
+	for _, r := range reqs {
+		if r.Authorization != personBearer() || r.Project != team {
+			t.Errorf("%s reached the ingest with %q naming team %q, want the person's sign-in naming %s", r.Path, r.Authorization, r.Project, team)
+		}
+	}
+}
+
+// asPerson is how reached records a session sent only with the signed-in person's access
+// token, naming team in the header and on the resource.
+func asPerson(team string) map[string]bool {
+	return map[string]bool{"key " + personBearer(): true, "team " + team: true, "project " + team: true}
+}
+
 // Two opted-in projects and a personal session at once, through one relay: each
-// project's session reaches only that project, with only that project's key, and the
-// personal one reaches nothing.
+// project's session reaches only that project, sent with the person's sign-in naming
+// only that team, and the personal one reaches nothing.
 func TestRelayConcurrentProjects(t *testing.T) {
 	forEachClaude(t, func(t *testing.T, b Binary, _ bool) {
 		ProvesAll(t, b, "relay.concurrent_projects")
@@ -571,7 +597,7 @@ func TestRelayConcurrentProjects(t *testing.T) {
 		// Both teams list both repositories; which team a session's hooks claim it for is
 		// the profile they run under.
 		sb := New(t, Isolated, WithClaude(b), WithRepositories("github.com/acme/repo", "github.com/acme/other"))
-		const otherProject, otherKey = "proj_other", "ter_srv_111111111111111111111111"
+		const otherProject = "proj_other"
 		other := filepath.Join(sb.Dir, "other")
 		personal := filepath.Join(sb.Dir, "personal")
 		for _, d := range []string{other, personal} {
@@ -587,8 +613,6 @@ func TestRelayConcurrentProjects(t *testing.T) {
 		otherEnv := []string{"TERMA_PROFILE=other"}
 		sb.Setup(otherEnv, "--team", otherProject, "--harness", setupHarnesses)
 		sb.UseRelay(RelayOptions{Start: true, Hold: 5 * time.Second})
-		keys, _ := json.Marshal(map[string]any{"keys": map[string]string{sb.ProjectID: liveKey, otherProject: otherKey}})
-		sb.writeAbs(filepath.Join(sb.TermaConfig, "keys.json"), string(keys))
 
 		var calls atomic.Int32
 		provider := httptest.NewServer(claudeTelemetryProvider(&calls))
@@ -613,8 +637,8 @@ func TestRelayConcurrentProjects(t *testing.T) {
 		}
 		wg.Wait()
 		want := map[string]map[string]bool{
-			sids["live"]:  {"key Bearer " + liveKey: true, "project " + sb.ProjectID: true},
-			sids["other"]: {"key Bearer " + otherKey: true, "project " + otherProject: true},
+			sids["live"]:  asPerson(sb.ProjectID),
+			sids["other"]: asPerson(otherProject),
 		}
 		deadline := time.Now().Add(45 * time.Second)
 		var got map[string]map[string]bool

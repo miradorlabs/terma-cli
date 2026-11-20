@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/miradorlabs/terma-cli/internal/account/auth"
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/delivery"
@@ -49,8 +50,23 @@ func (app *App) newSpoolAwaitPushCommand() *cobra.Command {
 
 // pushEnv is what reporting a push needs: the spool, and a flush once it is spooled.
 func (app *App) pushEnv() hookrun.Env {
-	return hookrun.Env{StateDir: app.stateDir, ConfigDir: app.dir, Spool: app.openSpool(), Flush: spawnFlush,
+	env := hookrun.Env{StateDir: app.stateDir, ConfigDir: app.dir, Spool: app.openSpool(), Flush: spawnFlush,
 		Stderr: os.Stderr, Debug: os.Getenv("TERMA_DEBUG") != ""}
+	cfg, err := app.loadConfig()
+	switch {
+	case err != nil:
+	case cfg.ServerKeySignIn:
+		env.ServerKey = true
+		if env.Spool != nil {
+			env.Spool.BindNoPerson()
+		}
+	default:
+		env.Account = auth.Account(cfg.Dir, cfg.ProfileName, cfg.AuthURL)
+		if env.Spool != nil {
+			env.Spool.Bind(env.Account)
+		}
+	}
+	return env
 }
 
 func (app *App) newSpoolFlushCommand() *cobra.Command {
@@ -67,7 +83,7 @@ The exit status distinguishes the outcomes a script needs apart:
   1  delivery failed for at least one team; its events stay queued and that
      team backs off on its own, while every other team's are delivered
   2  nothing was attempted: an earlier failure's retry window is open (--force overrides)
-  3  the pass ran but left work: events held for a team key or waiting out
+  3  the pass ran but left work: events held for a sign-in or a key, or waiting out
      their team's retry window (--force overrides), or given up on for age,
      disk pressure, or being unreadable`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
@@ -87,7 +103,11 @@ The exit status distinguishes the outcomes a script needs apart:
 				fmt.Fprintf(out, "Skipped: backing off until %s after an earlier failure (use --force to retry now).\n", res.NextAttempt.Local().Format(time.Kitchen))
 				return exitWith(ExitBackoff)
 			}
-			delivered, undelivered := describeFlush(res)
+			fix := "terma setup"
+			if cfg, err := app.loadConfig(); err == nil {
+				fix = app.signInFix(cfg)
+			}
+			delivered, undelivered := describeFlush(res, fix)
 			fmt.Fprintf(out, "Flushed %s.\n", strings.Join(append([]string{delivered}, undelivered...), ", "))
 			if res.Err != nil {
 				return res.Err
@@ -107,10 +127,10 @@ The exit status distinguishes the outcomes a script needs apart:
 
 // describeFlush words a flush pass: what was delivered, then one clause per reason an
 // event was not; `terma spool flush` and doctor share it so they agree on the terms.
-func describeFlush(res delivery.Result) (delivered string, undelivered []string) {
+func describeFlush(res delivery.Result, signInFix string) (delivered string, undelivered []string) {
 	delivered = fmt.Sprintf("%d event%s", res.Sent, plural(res.Sent))
 	if res.Held > 0 {
-		undelivered = append(undelivered, fmt.Sprintf("holding %d for a team key (run `terma setup`)", res.Held))
+		undelivered = append(undelivered, fmt.Sprintf("holding %d for a sign-in that may send them (run `%s`)", res.Held, signInFix))
 	}
 	if res.Failed > 0 {
 		undelivered = append(undelivered, fmt.Sprintf("keeping %d queued after a failed delivery", res.Failed))
@@ -187,6 +207,12 @@ func (app *App) flushSpool(ctx context.Context, force bool, minInterval time.Dur
 		return delivery.Result{}, err
 	}
 	r := app.delivery()
+	r.SignIn = app.signInSource(cfg)
+	rec, err := auth.LegacyOwnership(app.dir, app.stateDir, cfg.ServerKeySignIn)
+	if err != nil {
+		rec = auth.UnreadableLegacyRecord(app.stateDir)
+	}
+	r.LegacyAccount, r.LegacyBefore = rec.Account, rec.RetiredAt
 	// A hook that found the policy stale started this flush to refresh it (hookrun refreshPolicy).
 	if cfg.Policy.Stale(time.Now()) {
 		r.Policy = refreshOnce(ctx, cfg, cfg.Policy.Team(), r.Policy)

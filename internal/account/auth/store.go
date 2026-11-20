@@ -50,6 +50,9 @@ type Credential struct {
 	// the whole family, so no process presents it again once refreshAttemptBudget has
 	// passed: the sign-in is over instead. Zero when no refresh is in doubt.
 	RefreshInDoubtSince time.Time `json:"refresh_in_doubt_since,omitzero"`
+	// RetiredAt is when a server refused this sign-in as retired (SIGN_IN_RETIRED): only a
+	// newer terma, signed in again, replaces it. Zero while it is accepted.
+	RetiredAt time.Time `json:"retired_at,omitzero"`
 	// RefreshInDoubtFor is the SHA-256, in hex, of the refresh token RefreshInDoubtSince
 	// was recorded for. A mark beside another token (a rotation the keychain took and the
 	// file then missed) is not that token's, and is read as none. "" (a mark from before

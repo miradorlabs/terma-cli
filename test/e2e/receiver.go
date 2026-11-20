@@ -53,6 +53,10 @@ type LogRecord struct {
 	Body      string
 	Attrs     map[string]string
 	Resource  map[string]string
+	// Authorization and Project are the headers of the export that carried the record:
+	// its bearer and, for a person's sign-in, the team it names (X-Mirador-Project).
+	Authorization string
+	Project       string
 }
 
 // Span is one OTLP span, flattened.
@@ -71,13 +75,19 @@ type Metric struct {
 	Resource map[string]string
 }
 
-// ExportRequest ties authorization to each signal, including rejected requests.
+// ExportRequest ties authorization to each signal, including rejected requests. Project
+// is its X-Mirador-Project header: the team a person's sign-in sends to, "" from a server
+// key or an agent's own exporter.
 type ExportRequest struct {
 	Path          string
 	Authorization string
+	Project       string
 	Payload       proto.Message
 	DecodeError   error
 }
+
+// projectHeader names the team an export made with a person's sign-in is for.
+const projectHeader = "X-Mirador-Project"
 
 // StartReceiver listens on a loopback port for the test's lifetime.
 func StartReceiver(t *testing.T) *Receiver {
@@ -112,7 +122,7 @@ func (r *Receiver) read(req *http.Request, msg proto.Message) error {
 	}
 	r.mu.Lock()
 	r.auth = append(r.auth, req.Header.Get("Authorization"))
-	r.requests = append(r.requests, ExportRequest{Path: req.URL.Path, Authorization: req.Header.Get("Authorization"), Payload: msg, DecodeError: err})
+	r.requests = append(r.requests, ExportRequest{Path: req.URL.Path, Authorization: req.Header.Get("Authorization"), Project: req.Header.Get(projectHeader), Payload: msg, DecodeError: err})
 	r.mu.Unlock()
 	return err
 }
@@ -137,7 +147,8 @@ func (r *Receiver) handleLogs(w http.ResponseWriter, req *http.Request) {
 					trace = hex.EncodeToString(lr.GetTraceId())
 				}
 				r.logs = append(r.logs, LogRecord{Proto: lr, Time: at, Scope: sl.GetScope().GetName(), EventName: lr.GetEventName(), TraceID: trace,
-					Body: anyString(lr.GetBody()), Attrs: flatten(lr.GetAttributes()), Resource: res})
+					Body: anyString(lr.GetBody()), Attrs: flatten(lr.GetAttributes()), Resource: res,
+					Authorization: req.Header.Get("Authorization"), Project: req.Header.Get(projectHeader)})
 			}
 		}
 	}

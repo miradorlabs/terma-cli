@@ -97,6 +97,15 @@ func TestDoctorSaysAnUpdateNeedsASignIn(t *testing.T) {
 	}
 }
 
+// Where nothing may send, the fix is the one the probes name: a retired sign-in's, not setup.
+func TestNothingToSendNamesTheSignInsFix(t *testing.T) {
+	t.Parallel()
+	p := Probes{Keys: func(string, string) string { return "" }, SignInFix: RetiredFix}
+	if c := BackendCheck(t.Context(), p, "p1"); c.Fix != RetiredFix {
+		t.Fatalf("backend check = %+v, want the fix %q", c, RetiredFix)
+	}
+}
+
 // A locked keychain is not a missing sign-in: doctor says which, and says where a working
 // credential is kept.
 func TestDoctorTellsALockedKeychainFromNoSignIn(t *testing.T) {
@@ -187,7 +196,7 @@ func TestDoctorJudgesTheSpoolFromItsProbes(t *testing.T) {
 		detail string
 	}{
 		"unwritable": {SpoolState{Open: true, WriteErr: errors.New("read-only file system")}, keyed, Fail, "cannot be written"},
-		"keyless":    {SpoolState{Open: true, Queued: 3}, nil, Fail, "no team key"},
+		"keyless":    {SpoolState{Open: true, Queued: 3}, nil, Fail, "no sign-in, nor a team key"},
 		"closed":     {SpoolState{}, keyed, Fail, "cannot open"},
 		"healthy":    {SpoolState{Open: true, Queued: 3}, keyed, Pass, "3 queued"},
 	} {
@@ -233,7 +242,7 @@ func TestStatusSaysWhatDoctorWould(t *testing.T) {
 		rows[r.Label] = r.Value
 	}
 	if !strings.Contains(rows["Account"], "not signed in") || !strings.Contains(rows["Repository"], "github.com/acme/one is in the team's repositories") ||
-		!strings.Contains(rows["Spool"], "2 event(s) queued, no team key") {
+		!strings.Contains(rows["Spool"], "2 event(s) queued, no sign-in or team key") {
 		t.Fatalf("rows = %v", rows)
 	}
 	fixes := map[string]bool{}
@@ -452,6 +461,38 @@ func TestCaptureOffWarnsTheCollectionChecks(t *testing.T) {
 				t.Fatalf("status reports capture off = %v, checks %+v", off, local.Checks)
 			}
 		})
+	}
+}
+
+// A sign-in a server refused as retired fails, naming what fixes it: a newer terma, signed
+// in again.
+func TestDoctorFailsARetiredSignIn(t *testing.T) {
+	retired := func() (Credential, error) { return Credential{Email: "dev@example.com", Retired: true}, nil }
+	c := check(Run(t.Context(), env(t, Probes{Credential: retired, Spool: func() SpoolState { return SpoolState{} }}), Progress{}), KeyAuth)
+	if c.Status != Fail || c.Fix != RetiredFix || !strings.Contains(c.Detail, "update terma and run `terma login`") {
+		t.Fatalf("check = %+v", c)
+	}
+}
+
+// What the relay's outbox dropped for room or age is reported; nothing else adds the row.
+func TestDoctorReportsOutboxLosses(t *testing.T) {
+	quiet := env(t, Probes{Credential: signedIn, Spool: func() SpoolState { return SpoolState{} }})
+	if c := check(Run(t.Context(), quiet, Progress{}), KeyOutbox); c.Key != "missing" {
+		t.Fatalf("a row with no loss: %+v", c)
+	}
+	lossy := env(t, Probes{Credential: signedIn, Spool: func() SpoolState { return SpoolState{} },
+		Relay: func() Relay { return Relay{OutboxFull: 3, OutboxExpired: 2, OutboxLossAt: time.Now()} }})
+	c := check(Run(t.Context(), lossy, Progress{}), KeyOutbox)
+	if c.Status != Warn || !strings.Contains(c.Detail, "3 because the outbox was full") || !strings.Contains(c.Detail, "2 older than it keeps them") {
+		t.Fatalf("check = %+v", c)
+	}
+	// A loss older than the outbox keeps parts is history.
+	old := env(t, Probes{Credential: signedIn, Spool: func() SpoolState { return SpoolState{} },
+		Relay: func() Relay {
+			return Relay{OutboxExpired: 2, OutboxLossAt: time.Now().Add(-OutboxLossWindow - time.Hour)}
+		}})
+	if c := check(Run(t.Context(), old, Progress{}), KeyOutbox); c.Key != "missing" {
+		t.Fatalf("an old loss still shows: %+v", c)
 	}
 }
 

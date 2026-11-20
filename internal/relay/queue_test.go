@@ -79,7 +79,7 @@ func TestRecoverOutboxWaitsForAnEnqueueInProgress(t *testing.T) {
 	t.Parallel()
 	r := newRelay(Options{Dir: t.TempDir(), Token: token})
 	c := claim.Claim{ProjectID: "p1"}
-	rt := routeOf(c)
+	rt := routeOf("", c)
 	body, _ := proto.Marshal(logsOf("S", 1))
 	left := newEntry(time.Unix(1_800_000_000, 0), Logs, 1)
 	if err := r.outbox.put(rt, c.Repository, left, body); err != nil {

@@ -4,8 +4,10 @@ import (
 	"errors"
 	"io/fs"
 	"os"
+	"path/filepath"
 	"slices"
 	"testing"
+	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/account/secret"
 	"github.com/miradorlabs/terma-cli/internal/config"
@@ -135,6 +137,59 @@ func TestForgetLegacy_KeepsTheFileWhenTheKeychainFails(t *testing.T) {
 	}
 }
 
+// The record keeps the account the retired sign-ins all belonged to. Sign-ins of more than
+// one person, or of no known user, name no one: their backlog is held from every sign-in
+// and every server key.
+func TestRecordLegacy_Account(t *testing.T) {
+	t.Parallel()
+	const host = "https://auth.example.test"
+	of := func(users ...string) []LegacySignIn {
+		var signIns []LegacySignIn
+		for i, u := range users {
+			signIns = append(signIns, LegacySignIn{SessionID: "s-" + string(rune('a'+i)), UserID: u, AuthURL: host})
+		}
+		return signIns
+	}
+	for name, tc := range map[string]struct {
+		signIns []LegacySignIn
+		want    string
+	}{
+		"one person":     {of("user-1", "user-1"), AccountKey(host, "user-1")},
+		"two people":     {of("user-1", "user-2"), LegacyAccountAmbiguous},
+		"an unknown one": {of(""), LegacyAccountAmbiguous},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			dir := t.TempDir()
+			if err := RecordLegacy(dir, tc.signIns, time.Now()); err != nil {
+				t.Fatal(err)
+			}
+			rec, err := ReadLegacyRecord(dir)
+			if err != nil || rec.Account != tc.want {
+				t.Fatalf("account = %q, %v; want %q", rec.Account, err, tc.want)
+			}
+		})
+	}
+}
+
+// A record that can't be read is not taken for none: a later retirement keeps it, rather
+// than give an older terma's backlog the new sign-ins' account.
+func TestRecordLegacy_KeepsAnUnreadableRecord(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	path := filepath.Join(dir, LegacyRecordFile)
+	if err := os.WriteFile(path, []byte("{"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	signIns := []LegacySignIn{{SessionID: "s", UserID: "u", AuthURL: "https://auth.example.test"}}
+	if err := RecordLegacy(dir, signIns, time.Now()); err == nil {
+		t.Fatal("an unreadable record was replaced")
+	}
+	if data, _ := os.ReadFile(path); string(data) != "{" {
+		t.Fatalf("record = %q", data)
+	}
+}
+
 // Sign-ins an older terma kept in the file with no keychain are forgotten without one: the
 // keychain has no item of theirs to remove, so its failing keeps nothing.
 func TestForgetLegacy_FileHeldSignInsNeedNoKeychain(t *testing.T) {
@@ -153,5 +208,75 @@ func TestForgetLegacy_FileHeldSignInsNeedNoKeychain(t *testing.T) {
 	}
 	if HasLegacySignIns(dir) {
 		t.Fatal("credentials.json outlived the retirement")
+	}
+}
+
+// With older sign-ins on the machine and no record, a server-key profile records one at
+// its first look: everything bound to no account until then is no one's, for good, so a
+// later sign-in, even as the older sign-ins' person, never sends what the key collected. A
+// person's profile records nothing: its backlog waits for the retirement at sign-in.
+func TestLegacyOwnership_WithoutARecord(t *testing.T) {
+	t.Parallel()
+	dir, stateDir := t.TempDir(), t.TempDir()
+	if rec, err := LegacyOwnership(dir, stateDir, true); err != nil || !rec.RetiredAt.IsZero() {
+		t.Fatalf("no older sign-ins: %+v, %v; want no record", rec, err)
+	}
+	data := `{"default": {"organizations": {"o": {"session_id": "s", "auth_url": "https://auth.example.test", "organization_id": "o", "user_id": "u"}}}}`
+	if err := os.WriteFile(config.LegacyCredentialsPath(dir), []byte(data), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if rec, err := LegacyOwnership(dir, stateDir, false); err != nil || !rec.RetiredAt.IsZero() {
+		t.Fatalf("a person's profile: %+v, %v; want nothing recorded", rec, err)
+	}
+	first, err := LegacyOwnership(dir, stateDir, true)
+	if err != nil || first.Account != LegacyAccountAmbiguous || first.RetiredAt.IsZero() {
+		t.Fatalf("a server key's first look: %+v, %v; want everything until now named by no one", first, err)
+	}
+	// The older person signs in later: the boundary and its no one stay.
+	signIns, err := LegacySignIns(dir, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := RecordLegacy(stateDir, signIns, first.RetiredAt.Add(2*time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	if rec, err := ReadLegacyRecord(stateDir); err != nil || !rec.RetiredAt.Equal(first.RetiredAt) || rec.Account != LegacyAccountAmbiguous {
+		t.Fatalf("after a sign-in: %+v, %v; want the server key's boundary kept", rec, err)
+	}
+}
+
+// A file that doesn't parse whole is not read whole: one readable profile beside a broken
+// one is not taken for the whole backlog's person, but it is still listed for cleanup.
+func TestLegacySignIns_APartlyBrokenFileNamesNoOne(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	data := `{"default": {"organizations": {"o": {"session_id": "s", "auth_url": "https://auth.example.test", "user_id": "u"}}}, "work": {"organizations": "not a map"}}`
+	if err := os.WriteFile(config.LegacyCredentialsPath(dir), []byte(data), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if LegacyParsedWhole(dir) {
+		t.Fatal("a partly broken file read whole")
+	}
+	// What can be read is still listed, to be revoked and forgotten.
+	if signIns, err := LegacySignIns(dir, false); err != nil || len(signIns) != 1 {
+		t.Fatalf("LegacySignIns = %+v, %v; want the readable one", signIns, err)
+	}
+}
+
+// A record already kept stands when the older sign-ins are retired as no one's, and gains
+// the sessions that could be read, for the heartbeat.
+func TestRecordNoOne_KeepsARecordAndAddsItsSessions(t *testing.T) {
+	t.Parallel()
+	stateDir := t.TempDir()
+	first := time.Now().Add(-time.Hour).UTC()
+	if err := RecordNoOne(stateDir, nil, first); err != nil {
+		t.Fatal(err)
+	}
+	if err := RecordNoOne(stateDir, []LegacySignIn{{SessionID: "s-a"}}, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	rec, err := ReadLegacyRecord(stateDir)
+	if err != nil || !rec.RetiredAt.Equal(first) || rec.Account != LegacyAccountAmbiguous || len(rec.SessionIDs) != 1 || rec.SessionIDs[0] != "s-a" {
+		t.Fatalf("record = %+v, %v; want the first boundary with s-a added", rec, err)
 	}
 }

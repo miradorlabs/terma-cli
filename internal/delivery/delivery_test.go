@@ -43,7 +43,7 @@ func TestEachProjectGoesToItsKeysOwnEnvironment(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cfg := &config.Config{OTLPURL: prod.OTLPURL, APIURL: prod.APIURL}
+	cfg := &config.Config{OTLPURL: prod.OTLPURL, APIURL: prod.APIURL, ServerKeySignIn: true}
 	if err := keystore.Set(dir, "keyed", testKey, keystore.Hosts{OTLP: "https://otlp.keyed", API: "https://api.keyed"}); err != nil {
 		t.Fatal(err)
 	}
@@ -59,6 +59,13 @@ func TestEachProjectGoesToItsKeysOwnEnvironment(t *testing.T) {
 	pinned := Router{ConfigDir: dir, OTLPPinned: true}
 	if pinned.Endpoint(cfg, "keyed") != cfg.OTLPURL {
 		t.Fatal("a pinned host was not used for every project")
+	}
+	// A person's token goes only to the profile's own host, never one keys.json filed for the
+	// team under another profile's server key.
+	person := *cfg
+	person.ServerKeySignIn = false
+	if got := r.Endpoint(&person, "keyed"); got != person.OTLPURL {
+		t.Fatalf("a sign-in's endpoint = %s, want the profile's %s", got, person.OTLPURL)
 	}
 }
 
@@ -134,7 +141,7 @@ func TestAProjectWithoutAPolicyOrAKeyKeepsItsEvents(t *testing.T) {
 		}
 		return config.Policy{Mode: config.ModeRepo, Repositories: listed}, nil
 	}}
-	res := r.Flush(t.Context(), s, &config.Config{}, true, 0)
+	res := r.Flush(t.Context(), s, &config.Config{ServerKeySignIn: true}, true, 0)
 	if res.Sent != 0 || res.Held != 2 || res.Unroutable != 1 || res.Err != nil {
 		t.Fatalf("Flush = %+v", res)
 	}
@@ -169,7 +176,7 @@ func TestContentSpooledUnderAnOlderPolicyLeavesWithoutIt(t *testing.T) {
 	}
 	tightened := config.Policy{Mode: config.ModeRepo, Repositories: listed, TeamID: "p1", FetchedAt: time.Now()}
 	r := Router{ConfigDir: dir, OTLPPinned: true, Policy: func(context.Context, *config.Config, string) (config.Policy, error) { return tightened, nil }}
-	res := r.Flush(t.Context(), s, &config.Config{OTLPURL: srv.URL}, true, 0)
+	res := r.Flush(t.Context(), s, &config.Config{OTLPURL: srv.URL, ServerKeySignIn: true}, true, 0)
 	if res.Sent != 3 || res.Err != nil {
 		t.Fatalf("Flush = %+v", res)
 	}
@@ -352,7 +359,7 @@ func TestALockedKeychainKeepsEventsQueued(t *testing.T) {
 	}
 	pol := config.Policy{Mode: config.ModeRepo, Repositories: listed, TeamID: "p1", FetchedAt: time.Now()}
 	r := Router{ConfigDir: dir, OTLPPinned: true, Policy: func(context.Context, *config.Config, string) (config.Policy, error) { return pol, nil }}
-	res := r.Flush(t.Context(), s, &config.Config{OTLPURL: srv.URL}, true, 0)
+	res := r.Flush(t.Context(), s, &config.Config{OTLPURL: srv.URL, ServerKeySignIn: true}, true, 0)
 	if sent != 0 || res.Sent != 0 || !secret.IsUnavailable(res.Err) {
 		t.Fatalf("Flush = %+v, sent %d; want nothing sent and the keychain named", res, sent)
 	}
@@ -433,7 +440,7 @@ func TestHookEventsNameTheUser(t *testing.T) {
 			}
 			return ""
 		}}
-	if res := r.Flush(t.Context(), s, &config.Config{OTLPURL: srv.URL}, true, 0); res.Sent != 2 || res.Err != nil {
+	if res := r.Flush(t.Context(), s, &config.Config{OTLPURL: srv.URL, ServerKeySignIn: true}, true, 0); res.Sent != 2 || res.Err != nil {
 		t.Fatalf("Flush = %+v", res)
 	}
 	if want := []string{"p1@" + srv.URL, "p2@" + srv.URL}; !slices.Equal(asked, want) {
@@ -447,5 +454,19 @@ func TestHookEventsNameTheUser(t *testing.T) {
 		case strings.Contains(body, "s-p2") && strings.Contains(body, semconv.TermaUserIDKey):
 			t.Errorf("p2's events named a user:\n%s", body)
 		}
+	}
+}
+
+// An event a server key collected is no person's: never counted as an older terma's
+// backlog, whatever its time.
+func TestANoPersonEventIsNeverTheOlderTermas(t *testing.T) {
+	t.Parallel()
+	r := Router{LegacyAccount: "older", LegacyBefore: time.Now()}
+	past := time.Now().Add(-time.Hour)
+	if got := r.owner(spool.Event{Time: past}); got != "older" {
+		t.Fatalf("an unbound event from before = %q, want the older account", got)
+	}
+	if got := r.owner(spool.Event{Time: past, NoPerson: true}); got != "" {
+		t.Fatalf("a server key's event = %q, want no one's", got)
 	}
 }

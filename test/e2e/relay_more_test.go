@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -74,7 +75,7 @@ func TestRelayLinkedWorktree(t *testing.T) {
 			time.Sleep(time.Second)
 		}
 		got := reached(sb.Receiver)[sid]
-		if !got["project "+sb.ProjectID] || !got["key Bearer "+liveKey] || len(got) != 2 {
+		if !maps.Equal(got, asPerson(sb.ProjectID)) {
 			t.Errorf("a linked worktree's session reached upstream as %v", got)
 		}
 		sb.StopRelay()

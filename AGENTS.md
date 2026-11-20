@@ -92,6 +92,8 @@ next sign-in, and the team keys it minted are deleted from this machine (a user 
 cannot revoke them; an admin can, in the web app).
 The state directory (`config.StateDir`) holds what terma writes as it runs: `relay/`,
 `spool/`, `policies/`, `agents/<agent>/` (each agent's hook state), `funding/`,
+`legacy-sign-ins.json` (what the first sign-in on user tokens kept of an older terma's
+retired sign-ins: their session ids and account),
 `workspaces/` (session stores for work begun outside git) and `update/`; a repository's
 session store is `.git/terma/`, which also keeps what a git hook in an agent's sandbox could
 not write to the state directory, until a hook outside the sandbox moves it there. Names
@@ -110,8 +112,9 @@ starts it through `terma launch <agent>`, which adds the exporter to that one pr
 environment, and the real command as it was once terma is gone. A hook in a collected repository
 claims its session for the developer's team, naming the repository. The relay forwards
 only claimed sessions, only from the processes the claim names, and only while the policy
-still lists the claim's repository. It sends them with the team's key and applies the team's
-collection policy: agents export all content to it, and the policy alone decides what
+still lists the claim's repository. It sends them with the person's sign-in, a user token,
+naming the team in `X-Mirador-Project` (a profile set up with a server key sends with that
+key instead), and applies the team's collection policy: agents export all content to it, and the policy alone decides what
 leaves (`config.Policy.Content`). The claim also names the checkout the hook ran in, which
 the relay stamps on the session's records (`stampCheckout`): its origin, branch and whether
 it is a linked worktree under any policy (`vcs.*`, `terma.repository.worktree.linked`), and
@@ -124,7 +127,24 @@ machine: it admits every repository, a hook outside git claims its session for t
 policy's default project, and the relay sends what no claim places there too, except a
 session an agent's hooks claim every one of (`shape.SessionKey.Claimed`): it waits for its
 claim, so a hidden side thread no hook claims stays here. What is held stays in memory,
-never on disk, and a stopping relay drops it.
+never on disk, and a stopping relay drops it. What leaves is bound to the account (a hash
+of the auth host and the user) of the sign-in in place when it arrived: the relay's
+outbox keeps it under `@<account>/`, spool events carry `account`, and it leaves only with
+that account's own token, never in another person's name; it ages out with the outbox
+(14 days), whose `losses.json` counts what it dropped for doctor. A claimed part whose
+team's policy cannot be read yet waits in memory as long as the outbox would keep it, and
+one a stopping relay drops is counted there too. A server key sends only what no person's
+sign-in collected; what a server-key profile collected is no person's, and leaves only
+under a server key, so a profile switched from a server key to a person's sign-in leaves
+it to age out. A spool event is in one of three cases: it names an account (`account`),
+and leaves only under that sign-in; it is no person's (`no_person`, collected under a
+server key: the hook's spool is bound with `BindNoPerson`), and leaves only under a server
+key; or neither (an older terma's, or a sandboxed hook's that couldn't read the sign-in).
+Only that last case is ever bound later, to whatever the appending spool is bound to
+(`Spool.Append`, and unparking): the hook's account, or no person under a server key.
+Every replay of a recorded event (`AppendAsCollected`) keeps what it says. An event with
+neither from before `legacy-sign-ins.json`'s `retired_at` counts as the account that record
+names, which is no one when it is ambiguous; one from after leaves only under a server key.
 
 ## Rules
 

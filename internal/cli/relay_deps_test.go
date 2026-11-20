@@ -5,7 +5,10 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -15,21 +18,17 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/account/auth"
 	"github.com/miradorlabs/terma-cli/internal/account/keystore"
 	"github.com/miradorlabs/terma-cli/internal/config"
+	"github.com/miradorlabs/terma-cli/internal/relay"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
 )
 
-// Only a beat that goes with the key of the team whose validated policy the login fetched names
-// the signed-in user, unpinned too: a beat that falls back to another key held here, goes with a
-// key TERMA_TEAM_ID alone picked, to another environment's ingest or with a key another
-// deployment's API host filed, names no one, and so does one sent while the login is another
-// organization's.
-func TestHeartbeatNamesTheUserOnlyWithTheTeamKey(t *testing.T) {
-	var sent []string // "<key>=<terma.user.id>" per beat the ingest accepted
+// On a person's profile a beat goes with the sign-in's token to the selected team's ingest,
+// naming the team; it names the signed-in user only for the team whose validated policy the
+// profile fetched, at the profile's own ingest. With no team selected nothing is sent, and
+// nothing goes with a team key held here.
+func TestHeartbeatGoesWithTheSignIn(t *testing.T) {
+	var sent []string // "<bearer> <team>=<terma.user.id>" per beat
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/v1/logs" {
-			http.Error(w, "refused", http.StatusForbidden) // the team's key cannot be minted
-			return
-		}
 		body, _ := io.ReadAll(r.Body)
 		var beat logspb.LogsData
 		if err := proto.Unmarshal(body, &beat); err != nil {
@@ -41,70 +40,65 @@ func TestHeartbeatNamesTheUserOnlyWithTheTeamKey(t *testing.T) {
 				user = kv.Value.GetStringValue()
 			}
 		}
-		sent = append(sent, strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")+"="+user)
+		sent = append(sent, r.Header.Get("Authorization")+" "+r.Header.Get(relay.ProjectHeader)+"="+user)
 	}))
 	defer srv.Close()
 	f := &fakeAuth{srv: srv}
 	authSandbox(t, f)
-	signIn := func(org, user string) {
-		t.Helper()
-		if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, &auth.Credential{AccessToken: "ter_cli_" + org,
-			RefreshToken: "ter_clr_" + org, ExpiresAt: time.Now().Add(time.Hour), AuthURL: srv.URL, SessionID: "s-" + org, UserID: user}); err != nil {
-			t.Fatal(err)
-		}
-	}
-	signIn("org-a", "user-a")
-	if err := config.UpdateProfile(testApp.dir, config.DefaultProfile, func(p *config.Profile) { p.SelectOrganization("org-a", "A") }); err != nil {
+	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(f)); err != nil {
 		t.Fatal(err)
 	}
-	selectPolicy(t, config.Policy{Mode: config.ModeRepo, TeamID: "team", Revision: 1, FetchedAt: time.Now()})
-	hosts := keystore.Hosts{OTLP: srv.URL, API: srv.URL}
-	if err := keystore.Set(testApp.dir, "elsewhere", "ter_srv_elsewhere", hosts); err != nil {
+	if err := keystore.Set(testApp.dir, "team", "ter_srv_team", keystore.Hosts{OTLP: srv.URL}); err != nil {
 		t.Fatal(err)
 	}
 	beat := func() *logspb.LogsData {
 		return &logspb.LogsData{ResourceLogs: []*logspb.ResourceLogs{{ScopeLogs: []*logspb.ScopeLogs{{LogRecords: []*logspb.LogRecord{{}}}}}}}
 	}
-	send := func() {
-		t.Helper()
-		if err := testApp.relayHeartbeatSend(context.Background(), beat()); err != nil {
-			t.Fatal(err)
-		}
+	if err := testApp.relayHeartbeatSend(context.Background(), beat()); err == nil {
+		t.Fatal("a beat with no team selected was sent")
 	}
-	send() // the team has no key and cannot be minted one: the beat falls back
+	selectPolicy(t, config.Policy{Mode: config.ModeRepo, TeamID: "team", Revision: 1, FetchedAt: time.Now()})
+	if err := testApp.relayHeartbeatSend(context.Background(), beat()); err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"Bearer " + fakeUserToken("u-1") + " team=u-1"}
+	if strings.Join(sent, " ") != strings.Join(want, " ") {
+		t.Fatalf("beats sent %q, want %q", sent, want)
+	}
+	if err := auth.DeleteCredential(testApp.dir, config.DefaultProfile); err != nil {
+		t.Fatal(err)
+	}
+	if err := testApp.relayHeartbeatSend(context.Background(), beat()); err == nil || len(sent) != 1 {
+		t.Fatalf("a signed-out profile sent a beat: %v, %q", err, sent)
+	}
+}
+
+// On a profile set up with a server key, a beat goes with the selected team's key, else
+// another key held here, and names no one: a key is no person's.
+func TestServerKeyHeartbeatNamesNoOne(t *testing.T) {
+	var sent []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		sent = append(sent, strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")+" "+r.Header.Get(relay.ProjectHeader))
+	}))
+	defer srv.Close()
+	authSandbox(t, &fakeAuth{srv: srv})
+	serverKeyProfile(t)
+	hosts := keystore.Hosts{OTLP: srv.URL, API: srv.URL}
+	if err := keystore.Set(testApp.dir, "elsewhere", "ter_srv_elsewhere", hosts); err != nil {
+		t.Fatal(err)
+	}
+	beat := &logspb.LogsData{ResourceLogs: []*logspb.ResourceLogs{{ScopeLogs: []*logspb.ScopeLogs{{LogRecords: []*logspb.LogRecord{{}}}}}}}
+	if err := testApp.relayHeartbeatSend(context.Background(), beat); err != nil {
+		t.Fatal(err)
+	}
 	if err := keystore.Set(testApp.dir, "team", "ter_srv_team", hosts); err != nil {
 		t.Fatal(err)
 	}
-	send()
-	signIn("org-b", "user-b") // another person signed in: the one sign-in is theirs, whatever the organization
-	send()
-	signIn("org-a", "user-a")
-	// No team selected, so no validated policy: TERMA_TEAM_ID alone picks the key.
-	if err := config.UpdateProfile(testApp.dir, config.DefaultProfile, func(p *config.Profile) { p.Team = "" }); err != nil {
-		t.Fatal(err)
-	}
-	t.Setenv("TERMA_TEAM_ID", "elsewhere")
-	send()
-	t.Setenv("TERMA_TEAM_ID", "")
 	selectPolicy(t, config.Policy{Mode: config.ModeRepo, TeamID: "team", Revision: 1, FetchedAt: time.Now()})
-	// Unpinned, the profile's ingest is its environment's, while the team's key was filed with
-	// this test ingest's hosts: another environment's, so the beat goes there naming no one.
-	t.Setenv("TERMA_OTLP_URL", "")
-	send()
-	// The profile's own ingest is the one the team's key was filed with: named.
-	if err := config.UpdateProfile(testApp.dir, config.DefaultProfile, func(p *config.Profile) { p.OTLPURL = srv.URL }); err != nil {
+	if err := testApp.relayHeartbeatSend(context.Background(), beat); err != nil {
 		t.Fatal(err)
 	}
-	send()
-	// Another deployment sharing that ingest, by its API host, filed the next team's key.
-	if err := keystore.Set(testApp.dir, "team2", "ter_srv_team2", keystore.Hosts{OTLP: srv.URL, API: "https://api.other.example"}); err != nil {
-		t.Fatal(err)
-	}
-	selectPolicy(t, config.Policy{Mode: config.ModeRepo, TeamID: "team2", Revision: 1, FetchedAt: time.Now()})
-	send()
-	want := []string{"ter_srv_elsewhere=", "ter_srv_team=user-a", "ter_srv_team=user-b", "ter_srv_elsewhere=", "ter_srv_team=",
-		"ter_srv_team=user-a", "ter_srv_team2="}
-	if strings.Join(sent, " ") != strings.Join(want, " ") {
+	if want := []string{"ter_srv_elsewhere ", "ter_srv_team "}; strings.Join(sent, "|") != strings.Join(want, "|") {
 		t.Fatalf("beats sent %q, want %q", sent, want)
 	}
 }
@@ -177,5 +171,86 @@ func TestRelayUserFollowsTheHeartbeatsRule(t *testing.T) {
 	}
 	if got := testApp.relayUser(relay, "team", srv.URL); got != "" {
 		t.Errorf("set up with a server key, named %q", got)
+	}
+}
+
+// A heartbeat refused as SIGN_IN_RETIRED marks the sign-in, so an idle machine's doctor says
+// what fixes it.
+func TestARetiredHeartbeatMarksTheSignIn(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = io.WriteString(w, `{"code":7,"message":"retired","details":[{"@type":"type.googleapis.com/google.rpc.ErrorInfo","reason":"SIGN_IN_RETIRED"}]}`)
+	}))
+	defer srv.Close()
+	f := &fakeAuth{srv: srv}
+	authSandbox(t, f)
+	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(f)); err != nil {
+		t.Fatal(err)
+	}
+	selectPolicy(t, config.Policy{Mode: config.ModeRepo, TeamID: "team", Revision: 1, FetchedAt: time.Now()})
+	beat := &logspb.LogsData{ResourceLogs: []*logspb.ResourceLogs{{ScopeLogs: []*logspb.ScopeLogs{{LogRecords: []*logspb.LogRecord{{}}}}}}}
+	if err := testApp.relayHeartbeatSend(context.Background(), beat); err == nil {
+		t.Fatal("a refused beat was taken")
+	}
+	if !auth.Retired(testApp.dir, config.DefaultProfile) {
+		t.Fatal("the retired sign-in was not marked")
+	}
+}
+
+// A heartbeat carries the person's token, so it follows no redirect: Go would keep the
+// Authorization header on a same-host https→http downgrade.
+func TestAHeartbeatFollowsNoRedirect(t *testing.T) {
+	var followed atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/elsewhere" {
+			followed.Add(1)
+			return
+		}
+		http.Redirect(w, r, "/elsewhere", http.StatusTemporaryRedirect)
+	}))
+	t.Cleanup(srv.Close)
+	if err := sendHeartbeat(t.Context(), srv.URL, "user-token", "team", &logspb.LogsData{}); err == nil {
+		t.Fatal("a redirected heartbeat counted as sent")
+	}
+	if n := followed.Load(); n != 0 {
+		t.Fatalf("the heartbeat followed a redirect %d times", n)
+	}
+}
+
+// The relay never reads an unreadable legacy record as no record: before one is read it
+// names no one, and after, a failed read keeps the last one.
+func TestAnUnreadableLegacyRecordNamesNoOne(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, auth.LegacyRecordFile)
+	if err := os.MkdirAll(filepath.Join(path, "x"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	written := time.Now().Add(-time.Hour)
+	if err := os.Chtimes(path, written, written); err != nil {
+		t.Fatal(err)
+	}
+	// Named by no one up to when the record was written; what a server key collects after
+	// is its own.
+	if got := cachedLegacyRecord(t.TempDir(), dir, func() bool { return false })(); got.Account != auth.LegacyAccountAmbiguous || got.RetiredAt.Sub(written).Abs() > time.Second {
+		t.Fatalf("unreadable record = %+v; want one naming no one up to %v", got, written)
+	}
+	if err := os.RemoveAll(path); err != nil {
+		t.Fatal(err)
+	}
+	if err := auth.RecordLegacy(dir, []auth.LegacySignIn{{SessionID: "s", UserID: "u", AuthURL: "https://auth.example"}}, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	legacy := cachedLegacyRecord(t.TempDir(), dir, func() bool { return false })
+	good := legacy()
+	if good.Account != auth.AccountKey("https://auth.example", "u") {
+		t.Fatalf("record = %+v", good)
+	}
+	if err := os.WriteFile(path, []byte("{"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(1100 * time.Millisecond)
+	if got := legacy(); got.Account != good.Account {
+		t.Fatalf("after a failed read, record = %+v; want the last one read", got)
 	}
 }

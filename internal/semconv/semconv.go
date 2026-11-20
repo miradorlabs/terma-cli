@@ -139,10 +139,14 @@ const (
 	TermaHookEventKey = "terma.hook.event"
 	// TermaInstallMethodKey is terma.install.method: How the relay's terma was installed, which says how it gets new releases.
 	TermaInstallMethodKey = "terma.install.method"
+	// TermaInstallationIDKey is terma.installation.id: This terma installation's stable id, a random UUID kept with its configuration and sent at every sign-in.
+	TermaInstallationIDKey = "terma.installation.id"
 	// TermaInvocationInitialStepsKey is terma.invocation.initial_steps: How many steps the conversation held when the invocation began.
 	TermaInvocationInitialStepsKey = "terma.invocation.initial_steps"
 	// TermaInvocationNumberKey is terma.invocation.number: The agent's invocation counter.
 	TermaInvocationNumberKey = "terma.invocation.number"
+	// TermaLegacySessionIDsKey is terma.legacy_session_ids: The session ids of the per-organization sign-ins an older terma kept on this machine, which the user token replaced.
+	TermaLegacySessionIDsKey = "terma.legacy_session_ids"
 	// TermaLoopCountKey is terma.loop.count: How many agent loops the run took.
 	TermaLoopCountKey = "terma.loop.count"
 	// TermaMainAgentVersionKey is terma.main_agent.version: The version of the agent named by gen_ai.main_agent.name.

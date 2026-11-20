@@ -87,6 +87,12 @@ attribute_groups:
       - ref: terma.install.method
         requirement_level:
           conditionally_required: Unless the relay cannot find its own binary.
+      - ref: terma.installation.id
+        requirement_level:
+          conditionally_required: Once this installation has made its id, at its first sign-in.
+      - ref: terma.legacy_session_ids
+        requirement_level:
+          conditionally_required: For 30 days after a sign-in retired an older terma's per-organization sign-ins.
 
 events:
   - name: terma.session.start

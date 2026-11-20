@@ -1,5 +1,6 @@
-// Package delivery sends the hook spool to Terma: each project's events with its own key
-// to its own environment's host, under the policy in force when they leave.
+// Package delivery sends the hook spool to Terma: each project's events with the person's
+// sign-in, naming the team, or with a server key a profile was set up with, under the
+// policy in force when they leave.
 package delivery
 
 import (
@@ -7,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"net/http"
 	"slices"
 	"time"
 
@@ -15,6 +17,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/routing"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
+	"github.com/miradorlabs/terma-cli/internal/sendas"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
@@ -34,6 +37,27 @@ type Router struct {
 	// User is who events sent to projectID at endpoint name, by Mirador user id, asked as they
 	// are flushed, as the relay asks as it accepts a part; "" or a nil User names no one.
 	User func(cfg *config.Config, projectID, endpoint string) string
+	// SignIn is who events are sent as, on a profile not set up with a server key: each only
+	// under the account it was collected under (spool.Event.Account), else held until it
+	// ages out. Nil sends nothing that way.
+	SignIn SignIn
+	// LegacyAccount is the account an older terma's retired sign-ins belonged to, and
+	// LegacyBefore when they were retired: an event bound to no account queued before then
+	// leaves under it; one queued after, with no sign-in in place, under none, and ages
+	// out. "" leaves such events to a server key; auth.LegacyAccountAmbiguous, to none.
+	LegacyAccount string
+	LegacyBefore  time.Time
+}
+
+// SignIn is the person's sign-in delivery sends with (sendas.SignIn).
+type SignIn = sendas.SignIn
+
+// owner is the account an event leaves under, "" for none.
+func (r Router) owner(e spool.Event) string {
+	if e.Account == "" && !e.NoPerson && e.Time.Before(r.LegacyBefore) {
+		return r.LegacyAccount
+	}
+	return e.Account
 }
 
 // Result summarizes one delivery pass; its counters are disjoint, one per reason.
@@ -76,6 +100,11 @@ func (r Router) Flush(ctx context.Context, s *spool.Spool, cfg *config.Config, f
 	failed := map[string]bool{}
 	waiting := map[string]bool{}
 	accepted := map[string]bool{}
+	serverKey := cfg.ServerKeySignIn
+	account := ""
+	if !serverKey && r.SignIn != nil {
+		account = r.SignIn.Account()
+	}
 	router := spool.SenderFunc(func(ctx context.Context, events []spool.Event) ([]spool.Event, error) {
 		byProject := map[string][]spool.Event{}
 		var held []spool.Event
@@ -101,6 +130,12 @@ func (r Router) Flush(ctx context.Context, s *spool.Spool, cfg *config.Config, f
 				held = append(held, e)
 				continue
 			}
+			// Another person's or environment's events wait for their own sign-in; a server key
+			// sends only what no person's sign-in collected.
+			if owner := r.owner(e); serverKey && owner != "" || !serverKey && (account == "" || owner != account) {
+				held = append(held, e)
+				continue
+			}
 			out, ok := r.Outgoing(pol, id, e)
 			if !ok {
 				res.Withheld++
@@ -112,15 +147,16 @@ func (r Router) Flush(ctx context.Context, s *spool.Spool, cfg *config.Config, f
 		var errs []error
 		for _, id := range slices.Sorted(maps.Keys(byProject)) {
 			batch := byProject[id]
-			key, err := keystore.Get(r.ConfigDir, id)
+			key, err := r.credential(ctx, serverKey, account, id)
 			if err != nil {
-				// The keychain is locked or out of reach: retry as for a refused send.
+				// The keychain is locked or the auth host out of reach: retry as for a
+				// refused send.
 				errs = append(errs, fmt.Errorf("%s: %w", id, err))
 				undelivered = append(undelivered, batch...)
 				continue
 			}
 			if key == "" {
-				// No key yet; MaxAge already dropped anything too old to wait.
+				// No key or sign-in yet; MaxAge already dropped anything too old to wait.
 				held = append(held, batch...)
 				continue
 			}
@@ -138,11 +174,12 @@ func (r Router) Flush(ctx context.Context, s *spool.Spool, cfg *config.Config, f
 				continue
 			}
 			endpoint := r.Endpoint(cfg, id)
-			sender := &otlpSender{Endpoint: endpoint, APIKey: key, ProjectID: id, Version: r.Version}
+			sender := &otlpSender{Endpoint: endpoint, APIKey: key, ProjectID: id, NameProject: !serverKey, Version: r.Version}
 			if r.User != nil {
 				sender.UserID = r.User(cfg, id, endpoint)
 			}
 			if _, err := sender.Send(ctx, wire(batch)); err != nil {
+				r.refused(ctx, serverKey, key, err)
 				failed[id] = true
 				f := Failure{ProjectID: id, Endpoint: endpoint, Err: err}
 				// A pass cut short by its own deadline learned nothing about the host.
@@ -178,6 +215,34 @@ func (r Router) Flush(ctx context.Context, s *spool.Spool, cfg *config.Config, f
 	return res
 }
 
+// credential is what projectID's events are sent with: a server key a profile was set up
+// with, else a fresh token of the sign-in account names. "" with no error holds them: no
+// key, no sign-in, or another person's.
+func (r Router) credential(ctx context.Context, serverKey bool, account, projectID string) (string, error) {
+	if serverKey {
+		return keystore.Get(r.ConfigDir, projectID)
+	}
+	if r.SignIn == nil || account == "" {
+		return "", nil
+	}
+	return r.SignIn.Token(ctx, account)
+}
+
+// refused tells the sign-in what a failed send says of it: a token to rotate, or a
+// sign-in retired.
+func (r Router) refused(ctx context.Context, serverKey bool, token string, err error) {
+	ingest, ok := errors.AsType[*IngestError](err)
+	if serverKey || r.SignIn == nil || !ok {
+		return
+	}
+	switch {
+	case ingest.Status == http.StatusUnauthorized:
+		r.SignIn.Refused(ctx, token)
+	case ingest.Retired():
+		r.SignIn.Retired(token)
+	}
+}
+
 // Allowed rechecks the policy ceiling on every delivery, since hook events bypass the
 // relay and may predate a tightened policy: an event from a repository the list no longer
 // names, a reply or a thread's name the policy's prompts-off withholds, sends nothing. Outgoing removes the
@@ -201,10 +266,12 @@ func (r Router) consented(e spool.Event, global bool) bool {
 	return r.Consent != nil && r.Consent(tool, hookrun.ConsentFor(r.ConfigDir, global))
 }
 
-// Endpoint is a project's ingest host: a pinned one, else the one its key was stored with,
-// since only its environment accepts the key, then the profile's.
+// Endpoint is a project's ingest host: a pinned one, else, under a server key, the one the
+// key was stored with, since only its environment accepts the key, then the profile's. A
+// person's token goes only to the profile's own host: keys.json is shared by the profiles,
+// and a host another profile stored for the team is none of this sign-in's.
 func (r Router) Endpoint(cfg *config.Config, projectID string) string {
-	if r.OTLPPinned {
+	if r.OTLPPinned || !cfg.ServerKeySignIn {
 		return cfg.OTLPURL
 	}
 	if h, ok := keystore.HostsFor(r.ConfigDir, projectID); ok && h.OTLP != "" {

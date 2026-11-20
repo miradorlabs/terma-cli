@@ -47,7 +47,14 @@ func TestTelemetryEveryExportNeedsAuthorization(t *testing.T) {
 	checkExportRequests(t, e)
 	e.requests[2].Authorization = "Bearer wrong"
 	mustReject(t, "wrong/missing authorization", func(r contractReporter) { checkExportRequests(r, e) })
+	// A person's sign-in names the team it sends to.
+	e.requests[2].Authorization = personBearer()
+	mustReject(t, "wrong/missing authorization", func(r contractReporter) { checkExportRequests(r, e) })
+	e.requests[2].Project = "proj_live"
+	checkExportRequests(t, e)
 	e.requests[2].Authorization = "Bearer " + liveKey
+	mustReject(t, "wrong/missing authorization", func(r contractReporter) { checkExportRequests(r, e) })
+	e.requests[2].Project = ""
 	e.requests[2].DecodeError = fmt.Errorf("malformed")
 	mustReject(t, "invalid OTLP", func(r contractReporter) { checkExportRequests(r, e) })
 }

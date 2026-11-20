@@ -148,6 +148,24 @@ func TestSetupWithAServerKey(t *testing.T) {
 	}
 }
 
+// Setup with a server key retires an older terma's sign-ins too, recording first whose
+// they were: what that terma queued is no server key's to send.
+func TestServerKeySetupRetiresAnOlderTermasSignIns(t *testing.T) {
+	keySandbox(t)
+	data := `{"default": {"active": "o", "organizations": {"o": {"access_token": "old", "session_id": "s-old", "auth_url": "https://auth.example.test", "organization_id": "o", "user_id": "u-1"}}}}`
+	if err := os.WriteFile(config.LegacyCredentialsPath(testApp.dir), []byte(data), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	setupWithKey(t)
+	if auth.HasLegacySignIns(testApp.dir) {
+		t.Fatal("the older sign-ins outlived setup with a server key")
+	}
+	rec, err := auth.ReadLegacyRecord(testApp.stateDir)
+	if err != nil || rec.Account != auth.AccountKey("https://auth.example.test", "u-1") || rec.RetiredAt.IsZero() {
+		t.Fatalf("legacy record = %+v, %v; want the older sign-ins' account", rec, err)
+	}
+}
+
 // teardown --sign-out signs a machine set up with a server key out: doctor and status stop
 // counting the key as its sign-in, the output says the key itself is revoked in the web
 // app, and a browser login left behind the key is revoked and deleted too.

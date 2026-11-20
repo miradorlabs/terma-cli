@@ -34,7 +34,14 @@ type Event struct {
 	// Repository is the working copy as admission names it, so delivery holds a queued
 	// event to the repository list in force when it leaves. Local only.
 	Repository config.Repository `json:"repository,omitzero"`
-	Attrs      map[string]any    `json:"attrs,omitempty"`
+	// Account is the account key (auth.AccountKey) of the sign-in the event was collected
+	// under, so it leaves under that sign-in only; "" when none was, as for an event an
+	// older terma queued. Local only.
+	Account string `json:"account,omitempty"`
+	// NoPerson marks an event collected under a server key: no person's, so its empty
+	// Account is final, never bound to a sign-in later (AppendAsCollected). Local only.
+	NoPerson bool           `json:"no_person,omitempty"`
+	Attrs    map[string]any `json:"attrs,omitempty"`
 }
 
 // ValidTraceID reports whether id is an OTel trace id: 32 lowercase hex digits, not all zero.
@@ -109,7 +116,19 @@ const (
 // Spool is one queue directory.
 type Spool struct {
 	dir string
+	// account binds what this Spool appends to a sign-in (Bind); noPerson marks it no
+	// person's instead (BindNoPerson).
+	account  string
+	noPerson bool
 }
+
+// Bind has every event this Spool appends without an account carry account: the sign-in
+// collecting it.
+func (s *Spool) Bind(account string) { s.account, s.noPerson = account, false }
+
+// BindNoPerson has every event this Spool appends without an account marked no person's
+// (Event.NoPerson): collected under a server key, whichever path appends it.
+func (s *Spool) BindNoPerson() { s.account, s.noPerson = "", true }
 
 // Open addresses (and creates) the spool directory.
 func Open(dir string) (*Spool, error) {
@@ -130,10 +149,24 @@ func (s *Spool) Append(events ...Event) error {
 // AppendContext observes caller cancellation and caps lock waits even when the
 // caller has no deadline. An error means no event was queued.
 func (s *Spool) AppendContext(ctx context.Context, events ...Event) error {
+	return s.appendEvents(ctx, true, events)
+}
+
+// AppendAsCollected is Append for events that already carry the account they were
+// collected under, "" for none: a checkpointed event appended again later keeps it,
+// whoever the Spool is bound to by then.
+func (s *Spool) AppendAsCollected(events ...Event) error {
+	return s.appendEvents(context.Background(), false, events)
+}
+
+func (s *Spool) appendEvents(ctx context.Context, bind bool, events []Event) error {
 	var lines []byte
 	for _, e := range events {
 		if e.Time.IsZero() {
 			e.Time = time.Now()
+		}
+		if bind && e.Account == "" && !e.NoPerson {
+			e.Account, e.NoPerson = s.account, s.noPerson
 		}
 		line, err := json.Marshal(e)
 		if err != nil {

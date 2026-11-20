@@ -53,6 +53,12 @@ type Env struct {
 	AwaitPush func(path string)
 	// Policy is the organization's collection policy; global mode places every session in its DefaultProjectID.
 	Policy config.Policy
+	// Account is the account key of the sign-in in place, stamped on every event this hook
+	// queues, parked ones included, so it leaves under that sign-in only.
+	Account string
+	// ServerKey is that the profile is set up with a server key: what the hook queues is
+	// no person's (spool.Event.NoPerson).
+	ServerKey bool
 	// Team is the developer's team from setup, which claims every session they run in a
 	// collected repository, whatever the policy's state.
 	Team string
@@ -76,13 +82,23 @@ func (e Env) Logf(format string, args ...any) {
 }
 
 func (e Env) emit(ev spool.Event) bool {
+	return e.emitWith(ev, e.Spool.Append)
+}
+
+// emitAsCollected is emit for an event recorded earlier with the account it was collected
+// under, "" for none: appended later, maybe once someone else signed in, it keeps that.
+func (e Env) emitAsCollected(ev spool.Event) bool {
+	return e.emitWith(ev, e.Spool.AppendAsCollected)
+}
+
+func (e Env) emitWith(ev spool.Event, appendEvents func(...spool.Event) error) bool {
 	if e.Spool == nil {
 		return false
 	}
 	if ev.Time.IsZero() {
 		ev.Time = e.Time()
 	}
-	if err := e.Spool.Append(ev); err != nil {
+	if err := appendEvents(ev); err != nil {
 		e.Logf("spool append failed: %v", err)
 		return false
 	}
@@ -231,7 +247,17 @@ func (e Env) unpark(r *Repo) {
 			}
 		}
 		moved = len(events) > 0
-		return e.Spool.Append(events...)
+		// A parked event that names its account, or no person (a server key's), keeps it.
+		// One its sandboxed hook could read neither for is bound: it was collected under the
+		// sign-in in place, which unparks it moments later.
+		// Resolved here, then appended in one write: a part appended alone would be
+		// appended again, as the parked file stays, when the rest fails.
+		for i, ev := range events {
+			if ev.Account == "" && !ev.NoPerson {
+				events[i].Account, events[i].NoPerson = e.Account, e.Account == "" && e.ServerKey
+			}
+		}
+		return e.Spool.AppendAsCollected(events...)
 	})
 	if err != nil {
 		e.Logf("unpark events: %v", err)
@@ -275,9 +301,14 @@ func (e Env) EmitFor(r *Repo, ev spool.Event) bool {
 	return e.emit(ev) || e.park(r, parkedEvents, ev)
 }
 
-// stamp names the event's repository, for delivery's admission, and its project.
+// stamp names the event's repository, for delivery's admission, its project and the
+// account that collected it.
 func (e Env) stamp(r *Repo, ev spool.Event) spool.Event {
 	ev.Global = e.Policy.Global()
+	if ev.Account == "" {
+		ev.Account = e.Account
+	}
+	ev.NoPerson = ev.NoPerson || ev.Account == "" && e.ServerKey
 	if r != nil {
 		ev.Repository = r.Repository
 	}

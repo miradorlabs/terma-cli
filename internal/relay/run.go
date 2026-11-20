@@ -78,11 +78,20 @@ func (r *Relay) dropHeldAtExit() {
 	clear(r.held)
 	r.heldN, r.heldBytes = 0, 0
 	r.mu.Unlock()
+	r.mu.Lock()
+	claimedLost := r.heldLost
+	r.heldLost = 0
+	r.mu.Unlock()
+	defer func() { r.outbox.recordHeldLosses(claimedLost, r.opts.Now()) }()
 	for key, parts := range held {
 		for _, h := range parts {
 			_, _, why, ok, _ := r.decide(key, h.p.pid, h.p.at, h.p.narrow, h.p.claimed)
 			if ok {
 				why = "claimed"
+			}
+			// A claimed part that waited for its team's policy is the developer's work, lost.
+			if ok || why == whyNoKey || h.pinned != nil {
+				claimedLost += h.p.records
 			}
 			r.stats.dropped(h.p.signal, why+"_at_exit", h.p.records)
 			if r.opts.Logf != nil {
@@ -115,10 +124,17 @@ func (r *Relay) Holding() bool {
 // held, no export is being read or routed, and none has arrived for quiet, it answers every
 // later export 503, which an exporter sends again, to the next relay, and reports true. What
 // is queued is on disk, so it does not count.
-func (r *Relay) Quiesce(quiet time.Duration) bool {
+func (r *Relay) Quiesce(quiet time.Duration) bool { return r.quiesce(quiet, false) }
+
+// QuiesceDroppingHold is Quiesce for a relay that may wait no longer for its hold: what it
+// holds is dropped at exit, and counted as lost (dropHeldAtExit). An update that fixes what
+// holds them, a retired sign-in's, must not wait on them.
+func (r *Relay) QuiesceDroppingHold(quiet time.Duration) bool { return r.quiesce(quiet, true) }
+
+func (r *Relay) quiesce(quiet time.Duration, dropHold bool) bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if r.heldN > 0 || r.inflight > 0 || r.opts.Now().Sub(r.lastSeen) < quiet {
+	if (r.heldN > 0 && !dropHold) || r.inflight > 0 || r.opts.Now().Sub(r.lastSeen) < quiet {
 		return false
 	}
 	r.refusing = true

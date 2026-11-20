@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/miradorlabs/terma-cli/internal/account/auth"
 	"github.com/miradorlabs/terma-cli/internal/account/keystore"
 	"github.com/miradorlabs/terma-cli/internal/delivery"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
@@ -44,7 +45,11 @@ func acceptingOTLP(t *testing.T) {
 
 func appendEvent(t *testing.T, s *spool.Spool, projectID string, at time.Time) {
 	t.Helper()
+	// Bound to the sign-in in place, as a hook's append is.
 	e := spool.Event{Name: "terma.commit", Time: at, Repository: appRepo}
+	if cfg, err := testApp.loadConfig(); err == nil && !cfg.ServerKeySignIn {
+		e.Account = auth.Account(cfg.Dir, cfg.ProfileName, cfg.AuthURL)
+	}
 	if projectID != "" {
 		e.Attrs = map[string]any{hookrun.AttrProjectID: projectID}
 	}
@@ -88,7 +93,7 @@ func TestFlushSpoolHoldsEventsAndReportsIncomplete(t *testing.T) {
 	if !ok || code != ExitIncomplete {
 		t.Fatalf("held events should report incomplete: err=%v code=%d ok=%v\n%s", err, code, ok, out)
 	}
-	if !strings.Contains(out, "holding 1 for a team key") {
+	if !strings.Contains(out, "holding 1 for a sign-in that may send them") {
 		t.Fatalf("the report should name what is held:\n%s", out)
 	}
 	if n, _, _ := s.Pending(); n != 1 {
@@ -129,6 +134,7 @@ func TestSpoolFlushReportsBackoffAsExitCode(t *testing.T) {
 func TestSpoolFlushThrottleIsNotAnError(t *testing.T) {
 	useConfigDir(t, t.TempDir())
 	acceptingOTLP(t)
+	serverKeyProfile(t)
 	if err := keystore.Set(testApp.dir, spoolTestProject, "ter_srv_test", keystore.Hosts{}); err != nil {
 		t.Fatal(err)
 	}
@@ -148,7 +154,8 @@ func TestSpoolFlushThrottleIsNotAnError(t *testing.T) {
 	}
 }
 
-// Every queued event reaches the backend under the project's key, and the command exits 0.
+// On a profile set up with a server key, every queued event reaches the backend under the
+// project's key, and the command exits 0.
 func TestSpoolFlushDeliversUnderTheProjectKey(t *testing.T) {
 	useConfigDir(t, t.TempDir())
 	auth := make(chan string, 4)
@@ -158,6 +165,7 @@ func TestSpoolFlushDeliversUnderTheProjectKey(t *testing.T) {
 	}))
 	t.Cleanup(srv.Close)
 	t.Setenv("TERMA_OTLP_URL", srv.URL)
+	serverKeyProfile(t)
 	if err := keystore.Set(testApp.dir, spoolTestProject, "ter_srv_test", keystore.Hosts{}); err != nil {
 		t.Fatal(err)
 	}
@@ -182,17 +190,17 @@ func TestSpoolFlushDeliversUnderTheProjectKey(t *testing.T) {
 
 // describeFlush gives one clause per reason, in a fixed order, and none for a quiet pass.
 func TestDescribeFlushNamesEveryReasonOnce(t *testing.T) {
-	delivered, undelivered := describeFlush(delivery.Result{Sent: 1})
+	delivered, undelivered := describeFlush(delivery.Result{Sent: 1}, "terma setup")
 	if delivered != "1 event" || len(undelivered) != 0 {
 		t.Fatalf("a clean pass = %q, %q", delivered, undelivered)
 	}
 
-	delivered, undelivered = describeFlush(delivery.Result{Sent: 2, Held: 3, Expired: 4, Pruned: 5, Unroutable: 6, Dropped: 7})
+	delivered, undelivered = describeFlush(delivery.Result{Sent: 2, Held: 3, Expired: 4, Pruned: 5, Unroutable: 6, Dropped: 7}, "terma setup")
 	if delivered != "2 events" {
 		t.Errorf("delivered = %q", delivered)
 	}
 	want := []string{
-		"holding 3 for a team key (run `terma setup`)",
+		"holding 3 for a sign-in that may send them (run `terma setup`)",
 		"expired 4 past the spool's age limit",
 		"pruned 5 to stay under the size limit",
 		"dropped 6 with no team id",

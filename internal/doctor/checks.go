@@ -182,7 +182,7 @@ func HarnessCheck(reg *agents.Registry, verdicts []HarnessVerdict, otlpURL, proj
 // RelayCheck is doctor's "agent exporting to Terma" through the local relay: its address
 // is free, it delivers to env (this profile's environment), the developer's agents send to
 // it, its service is this terma's, and the team is chosen and keyed.
-func RelayCheck(reg *agents.Registry, relay Relay, keys Keys, projectID, env string, selected []string) Check {
+func RelayCheck(reg *agents.Registry, relay Relay, keys Keys, projectID, env string, selected []string, signInFix string) Check {
 	addr, running := relay.Addr, relay.Running
 	if !running && relay.Squatted {
 		return Check{Status: Fail, Detail: "another process is listening on " + addr + " and receives the agents' telemetry",
@@ -246,7 +246,7 @@ func RelayCheck(reg *agents.Registry, relay Relay, keys Keys, projectID, env str
 	case projectID == "":
 		return Check{Status: Warn, Detail: "local relay on " + addr + " (" + state + "); no team is chosen, so no session is forwarded", Fix: "terma setup"}
 	case !keys.has("", projectID) && !slices.ContainsFunc(reg.With[agents.RelayExporter](), func(e agents.RelayExporter) bool { return keys.has(e.Name(), projectID) }):
-		return Check{Status: Warn, Detail: "local relay on " + addr + " (" + state + "); no key for this team on this machine, so its sessions are dropped", Fix: "terma setup"}
+		return Check{Status: Warn, Detail: "local relay on " + addr + " (" + state + "); no sign-in or key for this team on this machine, so its sessions wait", Fix: signInFix}
 	}
 	return Check{Status: Pass, Detail: "through the local relay on " + addr + " (" + state + "); it forwards the sessions your team's policy collects"}
 }

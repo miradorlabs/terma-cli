@@ -22,7 +22,7 @@ const (
 	whyNoTrace        = "no_session_trace"   // a span of a trace no record has named yet
 	whyUnclaimed      = "unclaimed_expired"  // no hook in a collected repository claimed the session
 	whyProcess        = "uncovered_process"  // claimed, but by other processes: resumed elsewhere
-	whyNoKey          = "no_key"             // claimed, but this machine holds no key for the project
+	whyNoKey          = "no_key"             // claimed, but its team has no policy (or key) here to send under yet
 	whyAmbiguous      = "ambiguous_process"  // no session named; its process named more than one session
 	whyProcessIdle    = "no_session_process" // no session named; its process has named none
 	whyProcessRunning = "process_running"    // no session named; attributed only once its process exits
@@ -68,6 +68,9 @@ func (r *Relay) decide(key string, pid int, at time.Time, narrow, claimed bool) 
 			if why == whyNotCollected {
 				return claim.Claim{}, Policy{}, why, false, attribution{}
 			}
+			if why == whyNoKey {
+				return c, Policy{}, why, false, how
+			}
 		}
 		return claim.Claim{}, Policy{}, whyNoTrace, false, attribution{}
 	}
@@ -91,9 +94,16 @@ func (r *Relay) decideClaimed(session string, pid int, at time.Time, narrow bool
 	if c.ProjectID == "" {
 		return claim.Claim{}, Policy{}, whyNotCollected, false
 	}
+	return r.placePinned(c, narrow)
+}
+
+// placePinned places a part under the placement c of its claim, as decideClaimed does once
+// it has found it, or one the part kept after its claim expired. whyNoKey keeps c: the part
+// is that team's, waiting for its policy.
+func (r *Relay) placePinned(c claim.Claim, narrow bool) (claim.Claim, Policy, string, bool) {
 	pol, ok := r.resolve(c)
 	if !ok {
-		return claim.Claim{}, Policy{}, whyNoKey, false
+		return c, Policy{}, whyNoKey, false
 	}
 	if narrow && !pol.RequireClaim {
 		return claim.Claim{}, Policy{}, whyWidened, false
@@ -120,7 +130,15 @@ func (r *Relay) route(p *part) {
 			return
 		}
 	}
-	r.hold(p)
+	// A part already known to be a team's, waiting for its policy, is held pinned to that
+	// claim from the start: evicted before any sweep, it is still counted as that team's.
+	// So is one claimed and placeable but held behind it, to keep arrival order; never a
+	// catch-all placement, which global mode decides again at every sweep.
+	var pin *claim.Claim
+	if (why == whyNoKey || ok && how.how != semconv.TermaRelayAttributionCatchAll) && c.ProjectID != "" {
+		pin = &c
+	}
+	r.hold(p, pin, how)
 }
 
 // deliverAttributed applies the content policy, stamps the project and enqueues. deliverMu is held.

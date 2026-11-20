@@ -53,7 +53,8 @@ func TestResolverGrantsOnlyAValidatedPolicyOfThisLogin(t *testing.T) {
 			resolve := Resolver(cfg, ResolverDeps{AgentName: func(string) string { return "" }, Endpoint: func(string) string { return "https://otel.example" }, RelayTargets: func(s []string) []string { return s }})
 			pol, err := resolve(claim.Claim{ProjectID: "p1"})
 			if tc.ok {
-				if err != nil || !pol.IncludePrompts || pol.Key != mintedKey {
+				// A person's profile names no key: the relay sends with the sign-in.
+				if err != nil || !pol.IncludePrompts || pol.Key != "" {
 					t.Fatalf("a validated policy was not applied: %+v, %v", pol, err)
 				}
 				return
@@ -82,9 +83,13 @@ func TestResolverGrantsNothingOnceTheProfileIsGone(t *testing.T) {
 }
 
 // A key the keychain will not give up now holds its parts back without minting another.
+// A profile set up with a server key tells a locked keychain from a missing key.
 func TestResolverTellsALockedKeychainFromAMissingKey(t *testing.T) {
 	configDir := t.TempDir()
-	cfg := &config.Config{Dir: configDir, ProfileName: "default"}
+	cfg := &config.Config{Dir: configDir, ProfileName: "default", ServerKeySignIn: true}
+	if err := config.UpdateProfile(configDir, cfg.ProfileName, func(p *config.Profile) { p.ServerKeySignIn, p.Team = true, "p1" }); err != nil {
+		t.Fatal(err)
+	}
 	if err := keystore.Set(configDir, "p1", mintedKey, keystore.HostsOf(cfg)); err != nil {
 		t.Fatal(err)
 	}
@@ -100,7 +105,10 @@ func TestResolverTellsALockedKeychainFromAMissingKey(t *testing.T) {
 // unlock prompt. Unlocked meanwhile, it is still answered from the last refusal.
 func TestResolverWaitsBeforeAskingALockedKeychainAgain(t *testing.T) {
 	configDir := t.TempDir()
-	cfg := &config.Config{Dir: configDir, ProfileName: "default"}
+	cfg := &config.Config{Dir: configDir, ProfileName: "default", ServerKeySignIn: true}
+	if err := config.UpdateProfile(configDir, cfg.ProfileName, func(p *config.Profile) { p.ServerKeySignIn, p.Team = true, "p1" }); err != nil {
+		t.Fatal(err)
+	}
 	if err := keystore.Set(configDir, "p1", mintedKey, keystore.HostsOf(cfg)); err != nil {
 		t.Fatal(err)
 	}

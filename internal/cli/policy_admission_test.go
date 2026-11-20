@@ -91,13 +91,13 @@ func TestRelayAdmissionStopsGlobalCoverageWithStaleCatchAll(t *testing.T) {
 	pol.Revision, pol.FetchedAt = 1, time.Now()
 	save := func() {
 		t.Helper()
-		if err := config.UpdateProfile(testApp.dir, cfg.ProfileName, func(p *config.Profile) { p.OrganizationID = cfg.OrganizationID }); err != nil {
+		if err := config.UpdateProfile(testApp.dir, cfg.ProfileName, func(p *config.Profile) { p.OrganizationID, p.ServerKeySignIn = cfg.OrganizationID, true }); err != nil {
 			t.Fatal(err)
 		}
 		selectPolicy(t, pol)
 	}
 	save()
-	cfg.Policy = pol
+	cfg.Policy, cfg.ServerKeySignIn = pol, true
 	if err := keystore.Set(testApp.dir, "team", policyTestKey, keystore.Hosts{OTLP: upstream.URL}); err != nil {
 		t.Fatal(err)
 	}

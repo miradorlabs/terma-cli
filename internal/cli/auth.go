@@ -203,6 +203,9 @@ func tokenFailureOf(err error, exchanged bool) *tokenFailure {
 	if wrongEnv, ok := errors.AsType[*auth.ErrWrongEnvironment](err); ok {
 		return &tokenFailure{Code: tokenSignedOut, Message: wrongEnv.Error()}
 	}
+	if errors.Is(err, auth.ErrSignInRetired) {
+		return &tokenFailure{Code: tokenSignedOut, Message: auth.ErrSignInRetired.Error(), cause: err}
+	}
 	// A 401 here is final: the client has already refreshed and retried once.
 	apiErr, isAPIErr := errors.AsType[*api.Error](err)
 	if errors.Is(err, auth.ErrNotLoggedIn) || isAPIErr && apiErr.Unauthenticated() {

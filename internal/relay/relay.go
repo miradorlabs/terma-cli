@@ -28,6 +28,7 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/relay/shape"
+	"github.com/miradorlabs/terma-cli/internal/sendas"
 )
 
 // DefaultHold is how long a part that cannot leave yet waits, covering a first export that races its hook.
@@ -39,9 +40,12 @@ const DefaultTraceHold = 30 * time.Minute
 // maxBody bounds one export request, decompressed.
 const maxBody = 16 << 20
 
-// Policy is how a claimed session's telemetry leaves the machine: where, with which key, and what content.
+// Policy is how a claimed session's telemetry leaves the machine: where, with which
+// credential, and what content.
 type Policy struct {
-	Endpoint           string
+	Endpoint string
+	// Key is the team's server key a profile was set up with; "" sends with the person's
+	// sign-in (Options.SignIn), naming the team in the request's X-Mirador-Project.
 	Key                string
 	IncludePrompts     bool
 	IncludeToolContent bool
@@ -52,10 +56,19 @@ type Policy struct {
 	Unadmitted bool
 	// User is the Mirador user every part sent under this policy names, by id; "" names no one.
 	User string
+	// UserAccount is User's account key (auth.AccountKey): a part bound to another account
+	// names no one, so the user it names is never another than the sign-in it leaves with.
+	UserAccount string
 }
 
 // ErrNoKey is Resolve's answer for a project this machine holds no key for; its parts wait, then drop.
 var ErrNoKey = errors.New("no key for this team on this machine")
+
+// SignIn is the person's sign-in the relay sends with (sendas.SignIn).
+type SignIn = sendas.SignIn
+
+// ProjectHeader names the team a part sent with a user token goes to.
+const ProjectHeader = sendas.ProjectHeader
 
 // Options configure a relay.
 type Options struct {
@@ -71,6 +84,17 @@ type Options struct {
 	Lookup func(sessionID string, now time.Time) (claim.Claim, bool)
 	// Resolve turns a claim into a Policy, or ErrNoKey.
 	Resolve func(c claim.Claim) (Policy, error)
+	// SignIn is who parts without a server key are sent as; none leave without it. A part
+	// is queued under the account of the sign-in when it arrives, and leaves only while
+	// that sign-in is the one in place, so a backlog never goes out in another person's
+	// name or to another environment; it ages out of the outbox meanwhile.
+	SignIn SignIn
+	// Legacy is, read again as it is needed, the account an older terma's retired sign-ins
+	// belonged to and when they were retired: a part bound to no account that arrived
+	// before then leaves under that account; one that arrived after, with no sign-in in
+	// place, under none, and ages out. Nil, or an account of "", leaves such parts to a
+	// server key.
+	Legacy func() (account string, retiredAt time.Time)
 	// CatchAll, in global mode, is where a part whose hold ran out unplaced goes instead of being dropped.
 	CatchAll func() (claim.Claim, bool)
 	// HeartbeatSend, set, turns the heartbeat on; HeartbeatEvery is its period.
@@ -100,6 +124,13 @@ type Options struct {
 	// InstallMethod is how this terma was installed, on the heartbeat's resource as
 	// terma.install.method; "" sends none.
 	InstallMethod string
+	// Installation is, asked at every heartbeat, this installation's stable id, on its
+	// resource as terma.installation.id; nil or "" sends none.
+	Installation func() string
+	// LegacySessionIDs are, asked at every heartbeat, the sessions of the per-organization
+	// sign-ins an older terma kept here, while recent: on its resource as
+	// terma.legacy_session_ids.
+	LegacySessionIDs func() []string
 	// UpdateAuto, set, is asked at every heartbeat whether this terma installs new releases
 	// by itself, sent on its record as terma.update.auto: the developer can turn automatic
 	// updates on or off while the relay runs.
@@ -122,9 +153,11 @@ type Relay struct {
 	// deliverMu keeps a session's parts in arrival order; taken before mu, never after.
 	deliverMu sync.Mutex
 
-	mu        sync.Mutex
-	held      map[string][]heldPart
-	heldN     int
+	mu    sync.Mutex
+	held  map[string][]heldPart
+	heldN int
+	// heldLost counts a team's parts evicted from a full hold since the last sweep.
+	heldLost  int
 	heldBytes int
 	traces    map[string]traceSession
 	procs     map[int]*procState // sender pid → the sessions it named, and whether it exited
@@ -310,8 +343,9 @@ func (r *Relay) export(w http.ResponseWriter, req *http.Request, s Signal) {
 	pid := r.senderPID(req)
 	_, global := r.catchAll()
 	narrow := r.opts.CatchAll != nil && !global
+	account := r.account()
 	for _, p := range parts {
-		p.pid, p.narrow = pid, narrow
+		p.pid, p.narrow, p.account = pid, narrow, account
 		p.at = earliest(p.msg)
 		r.stats.received(s, p.records)
 		if p.session != "" && !strings.HasPrefix(p.session, tracePrefix) {

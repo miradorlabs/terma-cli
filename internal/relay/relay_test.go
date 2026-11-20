@@ -298,8 +298,16 @@ func TestRelayRoutesLogsPerClaimedSession(t *testing.T) {
 			f.mu.Unlock()
 			r.sweep()
 			c = r.Stats().Snapshot().Counters
-			if c["dropped.no_key.logs"] != 1 || c["dropped.unclaimed_expired.logs"] != 1 {
+			// The unclaimed part goes; the claimed one whose team has no key or policy here waits.
+			if c["dropped.no_key.logs"] != 0 || c["dropped.unclaimed_expired.logs"] != 1 {
 				t.Fatalf("after the hold: %v", c)
+			}
+			f.mu.Lock()
+			f.now = f.now.Add(maxOutboxAge)
+			f.mu.Unlock()
+			r.sweep()
+			if c = r.Stats().Snapshot().Counters; c["dropped.no_key.logs"] != 1 {
+				t.Fatalf("after the outbox's age: %v", c)
 			}
 		})
 	}
@@ -377,6 +385,15 @@ func TestRelayHoldReleasesOrExpires(t *testing.T) {
 	if c["dropped.unclaimed_expired.logs"] != 1 || c["forwarded.logs"] != 4 {
 		t.Fatalf("stats = %v", c)
 	}
+	// A claimed part with no key or policy to leave under is still held, as long as the
+	// outbox would keep it.
+	if _, ok := r.Idle(); ok {
+		t.Fatal("a held claimed part let the relay go idle")
+	}
+	f.mu.Lock()
+	f.now = f.now.Add(maxOutboxAge)
+	f.mu.Unlock()
+	r.sweep()
 	// The sender marks itself done just after the counter moves.
 	waitFor(t, func() bool { idle, ok := r.Idle(); return ok && idle >= 0 })
 }
@@ -571,5 +588,185 @@ func TestRelayRefusedKeyIsRetriedNotDropped(t *testing.T) {
 	}
 	if n := countFiles(t, r.opts.Dir); n != 2 {
 		t.Fatalf("outbox holds %d parts, want the two projects' 2", n)
+	}
+}
+
+// A part claimed for a team whose policy can't be read keeps that claim: the claim file
+// expires long before the part may, and it is still placed by it once the policy is back.
+// Dropped for age, it is counted where doctor reads the outbox's losses.
+func TestAPartWaitingForItsPolicyOutlivesItsClaim(t *testing.T) {
+	t.Parallel()
+	u := newUpstream(t)
+	f := newFixture()
+	dir := t.TempDir()
+	var mu sync.Mutex
+	readable := false
+	r := newRelay(Options{Dir: dir, Token: token, Hold: time.Minute, Lookup: f.lookup, Now: f.clock,
+		Resolve: func(c claim.Claim) (Policy, error) {
+			mu.Lock()
+			defer mu.Unlock()
+			if c.ProjectID != "p3" || !readable {
+				return Policy{}, ErrNoKey
+			}
+			return Policy{Endpoint: u.srv.URL, Key: "key-p3"}, nil
+		}})
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() { r.Run(ctx); close(done) }()
+	t.Cleanup(func() { cancel(); <-done })
+	srv := httptest.NewServer(r.Handler())
+	t.Cleanup(srv.Close)
+	time.Sleep(10 * time.Millisecond)
+
+	postProto(t, srv, "/v1/logs", logsOf("D", 1))
+	waitForCounters(t, r, func(c map[string]int) bool { return c["held_parts"] == 1 })
+	r.sweep()
+	// The claim expires and is pruned; hours pass.
+	f.mu.Lock()
+	delete(f.claims, "D")
+	f.now = f.now.Add(5 * time.Hour)
+	f.mu.Unlock()
+	r.sweep()
+	if c := r.Stats().Snapshot().Counters; c["dropped.unclaimed_expired.logs"] != 0 || !r.Holding() {
+		t.Fatalf("a team's part dropped with its claim: %v", c)
+	}
+	mu.Lock()
+	readable = true
+	mu.Unlock()
+	r.cache.expire(f.clock().Add(time.Hour))
+	r.sweep()
+	waitForCounters(t, r, func(c map[string]int) bool { return c["forwarded.logs"] == 1 })
+
+	// Another that ages out waiting is a loss doctor reports.
+	mu.Lock()
+	readable = false
+	mu.Unlock()
+	f.mu.Lock()
+	f.claims["D"] = claim.Claim{ProjectID: "p3"}
+	f.mu.Unlock()
+	r.cache.expire(f.clock().Add(2 * time.Hour))
+	postProto(t, srv, "/v1/logs", logsOf("D", 1))
+	waitForCounters(t, r, func(c map[string]int) bool { return c["held_parts"] == 2 })
+	r.sweep()
+	f.mu.Lock()
+	f.now = f.now.Add(maxOutboxAge + time.Hour)
+	f.mu.Unlock()
+	r.sweep()
+	if l, err := ReadOutboxLosses(dir); err != nil || l.Held != 1 {
+		t.Fatalf("losses = %+v, %v; want the aged-out part counted", l, err)
+	}
+}
+
+// An update waits for the hold only so long: QuiesceDroppingHold quiesces a relay that
+// holds parts, which it then drops and counts at exit.
+func TestAnUpdateNeedNotWaitForTheHold(t *testing.T) {
+	t.Parallel()
+	f := newFixture()
+	r := newRelay(Options{Dir: t.TempDir(), Token: token, Hold: time.Minute, Lookup: f.lookup, Now: f.clock,
+		Resolve: func(claim.Claim) (Policy, error) { return Policy{}, ErrNoKey }})
+	srv := httptest.NewServer(r.Handler())
+	t.Cleanup(srv.Close)
+	postProto(t, srv, "/v1/logs", logsOf("D", 1))
+	f.mu.Lock()
+	f.now = f.now.Add(time.Minute)
+	f.mu.Unlock()
+	if r.Quiesce(0) {
+		t.Fatal("a relay that holds parts quiesced")
+	}
+	if !r.QuiesceDroppingHold(0) {
+		t.Fatal("QuiesceDroppingHold waited for the hold")
+	}
+}
+
+// A part known to be a team's is pinned as it enters the hold: one the full hold can't
+// take, or evicts before any sweep, is counted where doctor reads losses.
+func TestATeamsPartLostBeforeAnySweepIsCounted(t *testing.T) {
+	t.Parallel()
+	f := newFixture()
+	dir := t.TempDir()
+	r := newRelay(Options{Dir: dir, Token: token, Hold: time.Minute, Lookup: f.lookup, Now: f.clock,
+		Resolve: func(claim.Claim) (Policy, error) { return Policy{}, ErrNoKey }})
+	srv := httptest.NewServer(r.Handler())
+	t.Cleanup(srv.Close)
+	postProto(t, srv, "/v1/logs", logsOf("D", 1))
+	r.mu.Lock()
+	pinned := len(r.held["D"]) == 1 && r.held["D"][0].pinned != nil
+	r.mu.Unlock()
+	if !pinned {
+		t.Fatal("a team's part entered the hold unpinned")
+	}
+	// One too large for the hold, refused as it arrives.
+	big := &part{signal: Logs, session: "D", msg: logsOf("D", 1), records: maxHeld + 1}
+	r.hold(big, &claim.Claim{ProjectID: "p3"}, attribution{})
+	r.sweep()
+	if l, err := ReadOutboxLosses(dir); err != nil || l.Held != maxHeld+1 {
+		t.Fatalf("losses = %+v, %v; want the refused part counted", l, err)
+	}
+}
+
+// A part held only to keep order behind one waiting for its team's policy is pinned too:
+// lost before a sweep, it is counted as that team's.
+func TestAFollowerHeldForOrderIsPinned(t *testing.T) {
+	t.Parallel()
+	u := newUpstream(t)
+	f := newFixture()
+	var mu sync.Mutex
+	readable := false
+	r := newRelay(Options{Dir: t.TempDir(), Token: token, Hold: time.Minute, Lookup: f.lookup, Now: f.clock,
+		Resolve: func(c claim.Claim) (Policy, error) {
+			mu.Lock()
+			defer mu.Unlock()
+			if !readable {
+				return Policy{}, ErrNoKey
+			}
+			return Policy{Endpoint: u.srv.URL, Key: "key-p3"}, nil
+		}})
+	srv := httptest.NewServer(r.Handler())
+	t.Cleanup(srv.Close)
+	postProto(t, srv, "/v1/logs", logsOf("D", 1))
+	mu.Lock()
+	readable = true
+	mu.Unlock()
+	postProto(t, srv, "/v1/logs", logsOf("D", 1))
+	r.mu.Lock()
+	held := append([]heldPart(nil), r.held["D"]...)
+	r.mu.Unlock()
+	if len(held) != 2 || held[1].pinned == nil {
+		t.Fatalf("held %d parts, the follower pinned: %v", len(held), len(held) == 2 && held[1].pinned != nil)
+	}
+}
+
+// A follower placed by global mode's catch-all is not pinned: global mode is decided again
+// at every sweep, and switched off it must send nothing under the catch-all.
+func TestAFollowerPlacedByTheCatchAllIsNotPinned(t *testing.T) {
+	t.Parallel()
+	u := newUpstream(t)
+	f := newFixture()
+	var mu sync.Mutex
+	readable := false
+	r := newRelay(Options{Dir: t.TempDir(), Token: token, Hold: time.Minute, Lookup: f.lookup, Now: f.clock,
+		CatchAll: func() (claim.Claim, bool) { return claim.Claim{ProjectID: "global"}, true },
+		Resolve: func(c claim.Claim) (Policy, error) {
+			mu.Lock()
+			defer mu.Unlock()
+			if !readable {
+				return Policy{}, ErrNoKey
+			}
+			return Policy{Endpoint: u.srv.URL, Key: "key-global"}, nil
+		}})
+	srv := httptest.NewServer(r.Handler())
+	t.Cleanup(srv.Close)
+	postProto(t, srv, "/v1/logs", logsOf("Z", 1))
+	mu.Lock()
+	readable = true
+	mu.Unlock()
+	postProto(t, srv, "/v1/logs", logsOf("Z", 1))
+	r.mu.Lock()
+	held := append([]heldPart(nil), r.held["Z"]...)
+	r.mu.Unlock()
+	for i, h := range held {
+		if h.pinned != nil {
+			t.Fatalf("held part %d is pinned to the catch-all %q", i, h.pinned.ProjectID)
+		}
 	}
 }

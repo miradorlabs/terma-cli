@@ -455,3 +455,52 @@ func TestWritableReportsAnUnwritableSpool(t *testing.T) {
 		t.Fatal("a spool whose queue cannot be written must report an error")
 	}
 }
+
+// A bound spool stamps the sign-in's account on what it appends, unless an event names one.
+func TestBindStampsTheAccount(t *testing.T) {
+	t.Parallel()
+	s, err := Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.Bind("aaaaaaaaaaaaaaaa")
+	if err := s.Append(Event{Name: "bound"}, Event{Name: "own", Account: "bbbbbbbbbbbbbbbb"}); err != nil {
+		t.Fatal(err)
+	}
+	var got []Event
+	s.Flush(t.Context(), SenderFunc(func(_ context.Context, events []Event) ([]Event, error) {
+		got = append(got, events...)
+		return nil, nil
+	}), FlushOptions{Force: true})
+	if len(got) != 2 || got[0].Account != "aaaaaaaaaaaaaaaa" || got[1].Account != "bbbbbbbbbbbbbbbb" {
+		t.Fatalf("events = %+v", got)
+	}
+}
+
+// A spool bound to no person marks what it appends without an account as no person's,
+// whichever path appends it, and never binds it to a sign-in later.
+func TestASpoolBoundToNoPersonMarksItsEvents(t *testing.T) {
+	t.Parallel()
+	s, err := Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.BindNoPerson()
+	if err := s.Append(Event{Name: "server-key"}, Event{Name: "a-persons", Account: "account-a"}); err != nil {
+		t.Fatal(err)
+	}
+	s.Bind("account-b")
+	evs, err := s.Peek(10)
+	if err != nil || len(evs) != 2 {
+		t.Fatalf("peek = %v, %v", evs, err)
+	}
+	if evs[0].Account != "" || !evs[0].NoPerson || evs[1].Account != "account-a" || evs[1].NoPerson {
+		t.Fatalf("events = %+v", evs)
+	}
+	if err := s.Append(evs[0]); err != nil {
+		t.Fatal(err)
+	}
+	if again, _ := s.Peek(10); again[2].Account != "" {
+		t.Fatalf("a no-person event was bound later: %+v", again[2])
+	}
+}
