@@ -24,34 +24,39 @@ import (
 const RetiredTokenFile = "retired-relay-token.json"
 
 type retiredToken struct {
-	Token          string    `json:"token"`
-	OrganizationID string    `json:"organization_id"`
-	AuthURL        string    `json:"auth_url"`
-	RetiredAt      time.Time `json:"retired_at"`
+	Token string `json:"token"`
+	// Account is the sign-in it served (Identity).
+	Account   string    `json:"account"`
+	AuthURL   string    `json:"auth_url"`
+	RetiredAt time.Time `json:"retired_at"`
 }
 
-// Identity is the sign-in a relay token serves: cfg's organization, as the relay resolves
-// it (Prepare), and its auth service.
-func Identity(cfg *config.Config) (org, authURL string) {
-	org = cfg.OrganizationID
-	if org == "" {
-		if cred, err := auth.LoadIdentity(cfg.Dir, cfg.ProfileName); err == nil && cred.CheckEnvironment(cfg.AuthURL) == nil {
-			org = cred.OrganizationID
+// Identity is the sign-in a relay token serves: the person cfg's profile is signed in as,
+// or the organization of the server key it was set up with; and its auth service.
+func Identity(cfg *config.Config) (account, authURL string) {
+	switch {
+	case cfg.ServerKeySignIn:
+		if cfg.OrganizationID != "" {
+			account = "organization:" + cfg.OrganizationID
+		}
+	default:
+		if cred, err := auth.LoadIdentity(cfg.Dir, cfg.ProfileName); err == nil && cred.CheckEnvironment(cfg.AuthURL) == nil && cred.UserID != "" {
+			account = "user:" + cred.UserID
 		}
 	}
-	return org, cfg.AuthURL
+	return account, cfg.AuthURL
 }
 
 // RetireToken removes the relay's token under the state directory stateDir, keeping it
-// aside for org at authURL; without an organization it is only removed. With no token there
+// aside for account at authURL; without an account it is only removed. With no token there
 // is nothing to do.
-func RetireToken(stateDir, org, authURL string) error {
+func RetireToken(stateDir, account, authURL string) error {
 	token, err := Token(stateDir)
 	if err != nil {
 		return nil
 	}
-	if org != "" && authURL != "" && token != "" {
-		data, err := json.Marshal(retiredToken{Token: token, OrganizationID: org, AuthURL: authURL, RetiredAt: time.Now().UTC()})
+	if account != "" && authURL != "" && token != "" {
+		data, err := json.Marshal(retiredToken{Token: token, Account: account, AuthURL: authURL, RetiredAt: time.Now().UTC()})
 		if err != nil {
 			return err
 		}
@@ -65,16 +70,16 @@ func RetireToken(stateDir, org, authURL string) error {
 	return nil
 }
 
-// ReviveToken restores the token RetireToken kept for org at authURL as the relay's, and
-// returns it. A token kept for another sign-in is discarded, never restored.
-func ReviveToken(stateDir, org, authURL string) (string, bool) {
+// ReviveToken restores the token RetireToken kept for account at authURL as the relay's,
+// and returns it. A token kept for another sign-in is discarded, never restored.
+func ReviveToken(stateDir, account, authURL string) (string, bool) {
 	retired := filepath.Join(stateDir, RetiredTokenFile)
 	data, err := os.ReadFile(retired)
 	if err != nil {
 		return "", false
 	}
 	var r retiredToken
-	ok := json.Unmarshal(data, &r) == nil && org != "" && r.OrganizationID == org && r.AuthURL == authURL &&
+	ok := json.Unmarshal(data, &r) == nil && account != "" && r.Account == account && r.AuthURL == authURL &&
 		r.Token != "" && !strings.ContainsAny(r.Token, " \t\r\n/")
 	if !ok {
 		_ = os.Remove(retired)

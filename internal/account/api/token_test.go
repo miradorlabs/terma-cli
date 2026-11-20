@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -28,18 +29,21 @@ func tokenBodies(t *testing.T) (*Client, *[]map[string]any) {
 		bodies = append(bodies, body)
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"access_token": "mir_cli_x", "refresh_token": "mir_clr_x", "token_type": "Bearer", "expires_in": 3600,
-			"session_id": "s-1", "organization": map[string]string{"id": "org-1", "name": "Personal"},
+			"session_id": "s-1", "family_id": "f-1",
 			"user": map[string]string{"id": "user-1", "email": "dev@example.com"},
 		})
 	}))
 	t.Cleanup(srv.Close)
-	return NewAnonymous(srv.URL, "test"), &bodies
+	return NewSignIn(srv.URL, "test", testInstallation), &bodies
 }
+
+const testInstallation = "c2d7a4b1-0e2f-4a6b-9c1d-2e3f4a5b6c7d"
 
 // A delegated code is redeemed at the same endpoint as a browser one, with redirect_port 0
 // sent, not left out: the auth host tells the two apart by its own record of the code, and
 // takes 0 only for a delegated one. The body is terma-desktop's shared/fixtures/auth.json
-// tokenRequests.delegated, copied beside the grant's lines.
+// tokenRequests.delegated, copied beside the grant's lines, plus the installation's id,
+// which every exchange of a user session carries.
 func TestExchangeDelegatedCodeSendsRedirectPortZero(t *testing.T) {
 	t.Parallel()
 	raw, err := os.ReadFile("../auth/testdata/delegated_grant.json")
@@ -63,15 +67,21 @@ func TestExchangeDelegatedCodeSendsRedirectPortZero(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := pinned.Body
-	if len(want) == 0 || len(*bodies) != 1 || !reflect.DeepEqual((*bodies)[0], want) {
+	want := maps.Clone(pinned.Body)
+	want["installation_id"] = testInstallation
+	if len(pinned.Body) == 0 || len(*bodies) != 1 || !reflect.DeepEqual((*bodies)[0], want) {
 		t.Fatalf("token bodies = %v, want %v", *bodies, want)
 	}
-	if cred.OrganizationID != "org-1" || cred.UserID != "user-1" || cred.SessionID != "s-1" || cred.AuthURL == "" {
+	if cred.UserID != "user-1" || cred.SessionID != "s-1" || cred.FamilyID != "f-1" || cred.AuthURL == "" {
 		t.Fatalf("credential = %+v", cred)
 	}
-	if got := client.LastLogin(); got == nil || got.OrganizationName != "Personal" {
-		t.Fatalf("LastLogin = %+v, want the organization's name", got)
+}
+
+// Signing in needs the installation's id: a code exchanged without one is never sent.
+func TestExchangeNeedsTheInstallation(t *testing.T) {
+	t.Parallel()
+	if _, err := NewAnonymous("http://127.0.0.1:1", "test").ExchangeCode(context.Background(), "c", "v", 5555); err == nil {
+		t.Fatal("an exchange without an installation id was sent")
 	}
 }
 
@@ -82,7 +92,8 @@ func TestExchangeCodeSendsTheListenersPort(t *testing.T) {
 	if _, err := client.ExchangeCode(context.Background(), "the-code", "v1", 5555); err != nil {
 		t.Fatal(err)
 	}
-	want := map[string]any{"grant_type": "authorization_code", "code": "the-code", "code_verifier": "v1", "redirect_port": float64(5555)}
+	want := map[string]any{"grant_type": "authorization_code", "code": "the-code", "code_verifier": "v1", "redirect_port": float64(5555),
+		"installation_id": testInstallation}
 	if len(*bodies) != 1 || !reflect.DeepEqual((*bodies)[0], want) {
 		t.Fatalf("token bodies = %v, want %v", *bodies, want)
 	}

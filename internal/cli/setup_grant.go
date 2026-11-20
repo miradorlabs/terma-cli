@@ -37,10 +37,10 @@ func (app *App) checkDesktopGrant(f setupFlags) error {
 }
 
 // signInWithGrant is setup's sign-in under --desktop-grant: Terma Desktop writes who it is
-// signed in as on stdin; a stored sign-in of this CLI's for that same user and organization
-// is reused, else the desktop delegates one to this CLI's own PKCE challenge
-// (auth.LoginWithGrant). A sign-in for another user or organization is never kept.
-// orgID is --org, which the desktop's organization must be.
+// signed in as on stdin; this CLI's stored sign-in of that same user is reused, else the
+// desktop delegates a user session of its own to this CLI's PKCE challenge
+// (auth.LoginWithGrant). A sign-in of another user is never kept. Then the organization
+// is --org, which must be one the user belongs to, and the desktop's when it names one.
 func (app *App) signInWithGrant(cmd *cobra.Command, cfg *config.Config, orgID string) (*config.Config, error) {
 	ctx := cmd.Context()
 	in, out := cmd.InOrStdin(), cmd.OutOrStdout()
@@ -51,47 +51,54 @@ func (app *App) signInWithGrant(cmd *cobra.Command, cfg *config.Config, orgID st
 	if err != nil {
 		return nil, err
 	}
-	if !strings.EqualFold(desktop.OrgID, orgID) {
+	if desktop.OrgID != "" && !strings.EqualFold(desktop.OrgID, orgID) {
 		return nil, &auth.GrantError{Code: auth.GrantBadInput, Message: "org_id does not match --org"}
 	}
-
-	// The user is the one the auth host answers for: whoami fills it for a credential saved
-	// before terma kept it. The organization must be the desktop's both as the host answers
-	// and as stored. Ids compare without regard to case, as ReadGrantIdentity reads them.
+	// The user is the one the auth host answers for. Ids compare without regard to case,
+	// as ReadGrantIdentity reads them.
 	sameDesktop := func(verified *auth.Credential, whoami identityResponse) bool {
-		return strings.EqualFold(cmp.Or(whoami.UserID, verified.UserID), desktop.UserID) &&
-			strings.EqualFold(cmp.Or(whoami.OrganizationID, verified.OrganizationID), desktop.OrgID) &&
-			strings.EqualFold(verified.OrganizationID, desktop.OrgID)
+		return strings.EqualFold(cmp.Or(whoami.UserID, verified.UserID), desktop.UserID)
 	}
-	if _, ok, err := app.reuseStoredSessionIf(ctx, cfg, orgRef{ID: desktop.OrgID}, sameDesktop); err != nil {
-		return nil, err
-	} else if ok {
-		if err := auth.WriteGrantReused(out); err != nil {
-			return nil, err
-		}
-		return app.loadConfig()
-	}
-
-	client := api.NewAnonymous(cfg.AuthURL, app.version)
-	cred, err := auth.LoginWithGrant(ctx, client, auth.GrantOptions{Label: auth.DesktopLabel(), In: in, Out: out})
+	cred, ok, err := app.reuseStoredSession(ctx, cfg, sameDesktop)
 	if err != nil {
 		return nil, err
 	}
-	if !strings.EqualFold(cred.UserID, desktop.UserID) || !strings.EqualFold(cred.OrganizationID, desktop.OrgID) {
-		// Never kept, and best-effort ended, so it does not linger on the web.
-		_ = app.revokeSession(ctx, cfg, cred)
-		return nil, &auth.GrantError{Code: auth.GrantIdentityMismatch,
-			Message: "the code signed in another user or organization than Terma Desktop's"}
+	if ok {
+		if err := auth.WriteGrantReused(out); err != nil {
+			return nil, err
+		}
+	} else {
+		installation, err := config.InstallationID(app.dir)
+		if err != nil {
+			return nil, err
+		}
+		client := api.NewSignIn(cfg.AuthURL, app.version, installation)
+		cred, err = auth.LoginWithGrant(ctx, client, auth.GrantOptions{Label: auth.DesktopLabel(), In: in, Out: out})
+		if err != nil {
+			return nil, err
+		}
+		if !strings.EqualFold(cred.UserID, desktop.UserID) {
+			// Never kept, and best-effort ended, so it does not linger on the web.
+			_ = app.revokeSession(ctx, cfg, cred)
+			return nil, &auth.GrantError{Code: auth.GrantIdentityMismatch,
+				Message: "the code signed in another user than Terma Desktop's"}
+		}
+		cred.Label = auth.DesktopLabel()
+		// Another user's stored sign-in is replaced and ended.
+		if err := app.storeLogin(ctx, cfg, cred); err != nil {
+			return nil, err
+		}
 	}
-	cred.Label = auth.DesktopLabel()
-	orgName := ""
-	if result := client.LastLogin(); result != nil {
-		orgName = result.OrganizationName
-	}
-	// Another user's stored sign-in for this organization is replaced and ended; the other
-	// organizations' stay stored for a switch back.
-	if err := app.storeLogin(ctx, cfg, cred, orgName); err != nil {
+	if cfg, err = app.loadConfig(); err != nil {
 		return nil, err
+	}
+	if _, err := app.chooseOrganization(ctx, cfg, cred, orgRef{ID: orgID}, nil); err != nil {
+		if _, unreachable := errors.AsType[*api.Error](err); unreachable {
+			return nil, err
+		}
+		// The list reads the account service's own records, so an organization it leaves
+		// out is not the user's, not merely unconfirmed.
+		return nil, &auth.GrantError{Code: auth.GrantBadInput, Message: "--org is not an organization the signed-in user belongs to", Err: err}
 	}
 	return app.loadConfig()
 }

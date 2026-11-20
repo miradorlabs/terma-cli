@@ -48,7 +48,7 @@ func newTokenServer(t *testing.T) *tokenServer {
 }
 
 func (s *tokenServer) serve(w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path == "/v1/auth/cli/token" {
+	if r.URL.Path == "/v1/auth/user/token" {
 		s.redeem(w, r)
 		return
 	}
@@ -62,12 +62,16 @@ func (s *tokenServer) serve(w http.ResponseWriter, r *http.Request) {
 	}
 	switch r.URL.Path {
 	case "/v1/projects":
+		if r.URL.Query().Get("organization_id") != grantOrg {
+			http.Error(w, "a user token names the organization", http.StatusBadRequest)
+			return
+		}
 		_ = json.NewEncoder(w).Encode(map[string]any{"projects": []map[string]string{
 			{"id": grantTeam, "name": "Platform", "organization_id": grantOrg},
 			{"id": "33333333-3333-4333-8333-333333333333", "name": "Growth", "organization_id": grantOrg},
 		}})
 	case "/v1/whoami":
-		_ = json.NewEncoder(w).Encode(map[string]string{"organization_id": grantOrg, "user_id": "user-1", "email": "dev@example.com"})
+		_ = json.NewEncoder(w).Encode(map[string]string{"organization_id": "", "auth_type": "user_token", "user_id": "user-1", "email": "dev@example.com"})
 	case "/v1/organizations":
 		_ = json.NewEncoder(w).Encode(map[string]any{"organizations": []map[string]string{{"id": grantOrg, "name": "Acme"}}})
 	default:
@@ -97,7 +101,7 @@ func (s *tokenServer) redeem(w http.ResponseWriter, r *http.Request) {
 	s.access, s.refresh = fmt.Sprintf("mir_cli_%d", s.redemptions), fmt.Sprintf("mir_clr_%d", s.redemptions)
 	_ = json.NewEncoder(w).Encode(map[string]any{
 		"access_token": s.access, "refresh_token": s.refresh, "token_type": "Bearer", "expires_in": 3600,
-		"session_id": "session-1", "organization": map[string]string{"id": grantOrg, "name": "Acme"},
+		"session_id": "session-1", "family_id": "session-1",
 		"user": map[string]string{"id": "user-1", "email": "dev@example.com"},
 	})
 }
@@ -124,7 +128,7 @@ func unauthorized(w http.ResponseWriter) {
 
 // signInForToken points the commands at srv and stores the server's current pair as the
 // profile's sign-in, expiring at expires, with team chosen. The tokens are kept in
-// credentials.json, which a built terma reads as this test does; the keychain it would
+// user-credentials.json, which a built terma reads as this test does; the keychain it would
 // use is the developer's own.
 func signInForToken(t *testing.T, srv *tokenServer, expires time.Time, team string) (dir string) {
 	t.Helper()
@@ -146,7 +150,7 @@ func signInForToken(t *testing.T, srv *tokenServer, expires time.Time, team stri
 	access, refresh, _, _, _ := srv.state()
 	if _, err := auth.SaveCredential(dir, config.DefaultProfile, &auth.Credential{
 		AccessToken: access, RefreshToken: refresh, ExpiresAt: expires, SessionID: "session-1",
-		AuthURL: srv.URL, OrganizationID: grantOrg, UserID: "user-1",
+		AuthURL: srv.URL, UserID: "user-1",
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -389,7 +393,7 @@ func TestReuseStoredSessionKeepsAPairRotatedSince(t *testing.T) {
 			access, refresh, _, _, _ := srv.state()
 			if err := auth.UpdateCredential(dir, config.DefaultProfile, &auth.Credential{
 				AccessToken: access, RefreshToken: refresh, ExpiresAt: time.Now().Add(time.Hour), SessionID: "session-1",
-				AuthURL: srv.URL, OrganizationID: grantOrg, UserID: "user-1",
+				AuthURL: srv.URL, UserID: "user-1",
 			}); err != nil {
 				t.Error(err)
 			}
@@ -399,7 +403,7 @@ func TestReuseStoredSessionKeepsAPairRotatedSince(t *testing.T) {
 		srv.serve(w, r)
 	})
 
-	res, ok, err := testApp.reuseStoredSession(t.Context(), cfg, orgRef{})
+	res, ok, err := testApp.reuseStoredSession(t.Context(), cfg, nil)
 	if err != nil || !ok {
 		t.Fatalf("reuseStoredSession = %v, %v", ok, err)
 	}
@@ -407,11 +411,8 @@ func TestReuseStoredSessionKeepsAPairRotatedSince(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if stored.RefreshToken != "mir_clr_1" || res.cred.RefreshToken != "mir_clr_1" {
-		t.Fatalf("stored %q, returned %q; want the pair rotated since, mir_clr_1", stored.RefreshToken, res.cred.RefreshToken)
-	}
-	if stored.UserEmail != "dev@example.com" {
-		t.Errorf("stored email = %q, want what whoami taught setup kept", stored.UserEmail)
+	if stored.RefreshToken != "mir_clr_1" || res.RefreshToken != "mir_clr_1" {
+		t.Fatalf("stored %q, returned %q; want the pair rotated since, mir_clr_1", stored.RefreshToken, res.RefreshToken)
 	}
 
 	// The refresh token stored is the live one: redeeming it rotates, and revokes nothing.

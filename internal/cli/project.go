@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/url"
 	"slices"
 
 	"github.com/spf13/cobra"
@@ -26,9 +27,15 @@ type listProjectsResponse struct {
 	Projects []project `json:"projects"`
 }
 
-func fetchProjects(ctx context.Context, client *api.Client) ([]project, error) {
+// fetchProjects lists organizationID's teams: a user token names the organization, which
+// a server key, bound to its own, ignores.
+func fetchProjects(ctx context.Context, client *api.Client, organizationID string) ([]project, error) {
+	var query url.Values
+	if organizationID != "" {
+		query = url.Values{"organization_id": {organizationID}}
+	}
 	var resp listProjectsResponse
-	if err := client.AuthGet(ctx, "/v1/projects", nil, &resp); err != nil {
+	if err := client.AuthGet(ctx, "/v1/projects", query, &resp); err != nil {
 		return nil, err
 	}
 	return resp.Projects, nil
@@ -37,8 +44,8 @@ func fetchProjects(ctx context.Context, client *api.Client) ([]project, error) {
 var errNoProjects = errors.New("no teams in this organization yet — create one in the Terma app")
 
 // availableProjects fetches the organization's projects, failing with errNoProjects when empty.
-func availableProjects(ctx context.Context, client *api.Client) ([]project, error) {
-	projects, err := fetchProjects(ctx, client)
+func availableProjects(ctx context.Context, client *api.Client, organizationID string) ([]project, error) {
+	projects, err := fetchProjects(ctx, client, organizationID)
 	if err != nil {
 		return nil, err
 	}
@@ -89,7 +96,7 @@ func (app *App) selectPolicyTeam(cmd *cobra.Command, cfg *config.Config, ask boo
 	if err != nil {
 		return "", err
 	}
-	projects, err := availableProjects(cmd.Context(), client)
+	projects, err := availableProjects(cmd.Context(), client, cfg.OrganizationID)
 	if err != nil {
 		return "", err
 	}

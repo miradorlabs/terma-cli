@@ -70,7 +70,7 @@ func (app *App) doctorProbes(cfg *config.Config) doctor.Probes {
 			if err != nil {
 				return doctor.Credential{}, err
 			}
-			return doctor.Credential{Email: cred.UserEmail, OrganizationID: cred.OrganizationID,
+			return doctor.Credential{Email: cred.UserEmail, OrganizationID: cfg.OrganizationID,
 				OtherEnvironment: cred.CheckEnvironment(cfg.AuthURL) != nil, InFile: auth.StoredInFile(app.dir, cfg.ProfileName),
 				ViaDesktop: cred.ViaDesktop()}, nil
 		},

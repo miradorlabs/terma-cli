@@ -24,11 +24,12 @@ type Tx struct {
 // lockWait bounds every wait for the credential lock. A holder that hangs then costs the
 // waiter an error, not a stall. It is longer than a healthy holder keeps the lock:
 //
-//   - a refresh holds it through one exchange (30 s by default) and at most two keychain
-//     writes: the pair it holds and the pair it gets;
+//   - a refresh holds it through its exchanges, retried after a 503 for up to 50 s after the
+//     first, plus one more (30 s by default), and at most three keychain writes: the pair
+//     it holds, the mark of a refresh in doubt, and the pair it gets;
 //   - every other holder keeps it through one keychain write and a few deletes;
-//   - Relocate takes it once per credential, never across all of them.
-var lockWait = 2*secret.WriteTimeout + time.Minute
+//   - Relocate takes it once per profile, never across all of them.
+var lockWait = 3*secret.WriteTimeout + 2*time.Minute
 
 // lockedWrite is Locked for a write that has no deadline of its own.
 func lockedWrite(dir string, fn func(tx *Tx) error) error {
@@ -56,14 +57,14 @@ func Locked(ctx context.Context, dir string, fn func(tx *Tx) error) error {
 	return err
 }
 
-// LoadFor is LoadCredentialFor inside the transaction, with one difference. A credential
-// the file indexes but whose tokens cannot be read is an error, not ErrNotLoggedIn. The
-// item may be missing only for a moment, and a writer that took it for signed out could
-// leave a spent refresh token in the store.
-func (tx *Tx) LoadFor(profile, organizationID string) (*Credential, error) {
-	cred, err := LoadCredentialFor(tx.dir, profile, organizationID)
+// Load is LoadCredential inside the transaction, with one difference. A sign-in the file
+// indexes but whose tokens cannot be read is an error, not ErrNotLoggedIn. The item may be
+// missing only for a moment, and a writer that took it for signed out could leave a spent
+// refresh token in the store.
+func (tx *Tx) Load(profile string) (*Credential, error) {
+	cred, err := LoadCredential(tx.dir, profile)
 	if errors.Is(err, errTokensGone) {
-		return nil, errors.New("credentials.json lists this sign-in, but its tokens could not be read from the system keychain")
+		return nil, errors.New("user-credentials.json lists this sign-in, but its tokens could not be read from the system keychain")
 	}
 	return cred, err
 }
@@ -73,23 +74,15 @@ func (tx *Tx) Update(profile string, cred *Credential) error {
 	inFile := config.InsecureStorage(tx.dir)
 	var unindexed bool
 	err := tx.mutate(func(file credentialFile) {
-		p := file[profile]
-		if p == nil {
-			p = &profileCredentials{}
-			file[profile] = p
-		}
-		old := p.Organizations[cred.OrganizationID]
-		if old.present() && old.AccessToken != "" {
+		old := file.get(profile)
+		if old != nil && old.AccessToken != "" {
 			inFile = true
 		}
 		kept := keep(tx.dir, profile, cred, old, inFile)
-		unindexed = !old.present() && kept.AccessToken == ""
-		p.put(kept)
-		if p.Active == "" {
-			p.Active = cred.OrganizationID
-		}
+		unindexed = old == nil && kept.AccessToken == ""
+		file[profile] = kept
 	})
-	tx.after = append(tx.after, func() { afterSave(tx.dir, profile, cred.OrganizationID, unindexed, err) })
+	tx.after = append(tx.after, func() { afterSave(tx.dir, profile, unindexed, err) })
 	return err
 }
 

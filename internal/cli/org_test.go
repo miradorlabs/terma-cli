@@ -4,271 +4,18 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
-	"net/http"
-	"net/http/httptest"
+	"os"
 	"slices"
 	"strings"
-	"sync"
-	"sync/atomic"
 	"testing"
 	"time"
 
-	"github.com/miradorlabs/terma-cli/internal/account/auth"
-	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/spf13/cobra"
+
+	"github.com/miradorlabs/terma-cli/internal/account/auth"
+	"github.com/miradorlabs/terma-cli/internal/account/keystore"
+	"github.com/miradorlabs/terma-cli/internal/config"
 )
-
-// fakeAuth is an auth host with two organizations and one user; `ter_cli_<org>` is a live
-// token for that organization, and it counts what the CLI does.
-type fakeAuth struct {
-	srv        *httptest.Server
-	revokes    atomic.Int32
-	whoamis    atomic.Int32
-	keysMint   atomic.Int32
-	deadToken  string
-	policyBody string
-	policies   atomic.Int32
-	orgLists   atomic.Int32
-	// orgs is what /v1/organizations lists, fakeOrgs when nil.
-	orgs []organization
-	// orgsDown fails /v1/organizations.
-	orgsDown bool
-	// serverKeys are live team server keys, each to its team (serveServerKey).
-	serverKeys map[string]string
-	// keyPolicies counts the policies read with a server key.
-	keyPolicies atomic.Int32
-	// keyPermissions are what whoami says a server key may do: Ingest alone for a key not
-	// listed, nothing at all for one listed as nil.
-	keyPermissions map[string]map[string]bool
-	// grants are the delegated codes /v1/auth/cli/token redeems, each once, for the
-	// session it signs in (fakeGrant); verifiers are the code verifiers it was sent.
-	grants    map[string]fakeGrant
-	exchanges atomic.Int32
-	// scopedPolicies refuses a team's policy to a login of another organization, as the
-	// account service does (403); policyBodies are each team's, over policyBody.
-	scopedPolicies bool
-	policyBodies   map[string]string
-	mu             sync.Mutex
-	verifiers      []string
-	revoked        []string
-}
-
-// fakeGrant is who a delegated code signs in.
-type fakeGrant struct{ org, user string }
-
-// fakeToken is the access token the fake auth host takes for user in org: `ter_cli_<org>`
-// for its default user, u-1, else `ter_cli_<org>~<user>`.
-func fakeToken(org, user string) string {
-	if user == "" || user == "u-1" {
-		return "ter_cli_" + org
-	}
-	return "ter_cli_" + org + "~" + user
-}
-
-var fakeOrgs = []organization{
-	{ID: "11111111-1111-4111-8111-111111111111", Name: "Acme", Role: "admin"},
-	{ID: "22222222-2222-4222-8222-222222222222", Name: "Beta Labs", Role: "member"},
-}
-
-func orgA() organization { return fakeOrgs[0] }
-func orgB() organization { return fakeOrgs[1] }
-
-func newFakeAuth(t *testing.T) *fakeAuth {
-	t.Helper()
-	f := &fakeAuth{}
-	f.srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		token := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
-		if _, ok := f.serverKeys[token]; ok {
-			f.serveServerKey(w, r, token)
-			return
-		}
-		if r.URL.Path == "/v1/auth/cli/token" {
-			f.serveToken(w, r)
-			return
-		}
-		org, user := "", "u-1"
-		for _, o := range fakeOrgs {
-			if rest, ok := strings.CutPrefix(token, "ter_cli_"+o.ID); ok && (rest == "" || strings.HasPrefix(rest, "~")) {
-				org = o.ID
-				if rest != "" {
-					user = strings.TrimPrefix(rest, "~")
-				}
-			}
-		}
-		if org == "" || token == f.deadToken {
-			w.WriteHeader(http.StatusUnauthorized)
-			fmt.Fprint(w, `{"code":"UNAUTHENTICATED","message":"invalid token"}`)
-			return
-		}
-		switch r.URL.Path {
-		case "/v1/whoami":
-			f.whoamis.Add(1)
-			_ = json.NewEncoder(w).Encode(map[string]any{
-				"organization_id": org, "auth_type": "cli_token", "user_id": user, "email": "dev@example.com",
-			})
-		case "/v1/organizations":
-			f.orgLists.Add(1)
-			if f.orgsDown {
-				http.Error(w, "unavailable", http.StatusServiceUnavailable)
-				return
-			}
-			orgs := f.orgs
-			if orgs == nil {
-				orgs = fakeOrgs
-			}
-			_ = json.NewEncoder(w).Encode(listOrganizationsResponse{Organizations: orgs})
-		case "/v1/projects":
-			_ = json.NewEncoder(w).Encode(listProjectsResponse{Projects: projectsIn(org)})
-		case "/v1/policy":
-			f.policies.Add(1)
-			if r.URL.Query().Get("project_id") == "" {
-				http.Error(w, "missing project_id", http.StatusBadRequest)
-				return
-			}
-			if f.scopedPolicies && !slices.ContainsFunc(projectsIn(org), func(p project) bool { return p.ID == r.URL.Query().Get("project_id") }) {
-				w.WriteHeader(http.StatusForbidden)
-				fmt.Fprint(w, `{"code":"PERMISSION_DENIED","message":"no such team in this organization"}`)
-				return
-			}
-			if body, ok := f.policyBodies[r.URL.Query().Get("project_id")]; ok {
-				fmt.Fprint(w, body)
-			} else if f.policyBody != "" {
-				fmt.Fprint(w, f.policyBody)
-			} else {
-				fmt.Fprint(w, `{"policy":null}`)
-			}
-		case "/v1/auth/cli/revoke":
-			f.revokes.Add(1)
-			f.mu.Lock()
-			f.revoked = append(f.revoked, token)
-			f.mu.Unlock()
-			fmt.Fprint(w, `{}`)
-		case "/v1/api-keys/server":
-			f.keysMint.Add(1)
-			var body createServerKeyRequestShape
-			_ = json.NewDecoder(r.Body).Decode(&body)
-			_ = json.NewEncoder(w).Encode(map[string]any{
-				"key":        "ter_srv_" + strings.ReplaceAll(body.ProjectID, "-", "")[:24],
-				"server_key": map[string]any{"id": "k-1", "project_id": body.ProjectID, "name": body.Name, "key_prefix": "ter_srv_"},
-			})
-		default:
-			http.NotFound(w, r)
-		}
-	}))
-	t.Cleanup(f.srv.Close)
-	return f
-}
-
-// serveToken redeems a delegated code, once, as /v1/auth/cli/token does: only with
-// redirect_port 0, and only for a code it delegated. Every refusal is the auth gateway's
-// one 401 UNAUTHENTICATED, in its envelope.
-func (f *fakeAuth) serveToken(w http.ResponseWriter, r *http.Request) {
-	var body struct {
-		GrantType    string `json:"grant_type"`
-		Code         string `json:"code"`
-		CodeVerifier string `json:"code_verifier"`
-		RedirectPort *int   `json:"redirect_port"`
-	}
-	_ = json.NewDecoder(r.Body).Decode(&body)
-	if body.GrantType != "authorization_code" {
-		// Refreshes are refused, as every token here is for good or dead.
-		w.WriteHeader(http.StatusUnauthorized)
-		fmt.Fprint(w, `{"error":{"code":"UNAUTHENTICATED","message":"invalid or expired credentials"}}`)
-		return
-	}
-	f.mu.Lock()
-	grant, ok := f.grants[body.Code]
-	delete(f.grants, body.Code)
-	f.verifiers = append(f.verifiers, body.CodeVerifier)
-	f.mu.Unlock()
-	if !ok || body.RedirectPort == nil || *body.RedirectPort != 0 || body.CodeVerifier == "" {
-		w.WriteHeader(http.StatusUnauthorized)
-		fmt.Fprint(w, `{"error":{"code":"UNAUTHENTICATED","message":"invalid or expired credentials"}}`)
-		return
-	}
-	n := f.exchanges.Add(1)
-	name := ""
-	for _, o := range fakeOrgs {
-		if o.ID == grant.org {
-			name = o.Name
-		}
-	}
-	_ = json.NewEncoder(w).Encode(map[string]any{
-		"access_token": fakeToken(grant.org, grant.user), "refresh_token": fmt.Sprintf("ter_clr_granted_%d", n),
-		"token_type": "Bearer", "expires_in": 3600, "session_id": fmt.Sprintf("s-granted-%d", n),
-		"organization": map[string]string{"id": grant.org, "name": name},
-		"user":         map[string]string{"id": grant.user, "email": "dev@example.com"},
-	})
-}
-
-// grant makes code a delegated code for user in org.
-func (f *fakeAuth) grant(code, org, user string) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	if f.grants == nil {
-		f.grants = map[string]fakeGrant{}
-	}
-	f.grants[code] = fakeGrant{org: org, user: user}
-}
-
-// verifiersSent are the code verifiers the token endpoint was sent.
-func (f *fakeAuth) verifiersSent() []string {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	return append([]string(nil), f.verifiers...)
-}
-
-// revokedTokens are the access tokens of the sessions ended so far.
-func (f *fakeAuth) revokedTokens() []string {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	return append([]string(nil), f.revoked...)
-}
-
-type createServerKeyRequestShape struct {
-	ProjectID string `json:"project_id"`
-	Name      string `json:"name"`
-}
-
-// Acme has two projects, so a picker would be needed; Beta Labs one.
-func projectsIn(org string) []project {
-	switch org {
-	case orgA().ID:
-		return []project{
-			{ID: "aaaaaaaa-0000-4000-8000-000000000001", Name: "Acme Web", OrganizationID: org},
-			{ID: "aaaaaaaa-0000-4000-8000-000000000002", Name: "Acme API", OrganizationID: org},
-		}
-	case orgB().ID:
-		return []project{{ID: "bbbbbbbb-0000-4000-8000-000000000001", Name: "Beta Core", OrganizationID: org}}
-	}
-	return nil
-}
-
-func authSandbox(t *testing.T, f *fakeAuth) {
-	t.Helper()
-	useConfigDir(t, t.TempDir())
-	t.Setenv("TERMA_API_URL", f.srv.URL)
-	t.Setenv("TERMA_AUTH_URL", f.srv.URL)
-	t.Setenv("TERMA_APP_URL", f.srv.URL)
-	t.Setenv("TERMA_OTLP_URL", f.srv.URL)
-	t.Setenv("TERMA_API_KEY", "")
-	t.Setenv("TERMA_ENV", "")
-	t.Setenv("TERMA_PROFILE", "")
-	t.Chdir(t.TempDir())
-}
-
-func storedSession(f *fakeAuth, org organization) *auth.Credential {
-	return &auth.Credential{
-		AccessToken:    "ter_cli_" + org.ID,
-		RefreshToken:   "ter_clr_" + org.ID,
-		ExpiresAt:      time.Now().Add(time.Hour),
-		SessionID:      "s-" + org.ID[:8],
-		AuthURL:        f.srv.URL,
-		OrganizationID: org.ID,
-		UserEmail:      "dev@example.com",
-	}
-}
 
 func TestParseOrgRef(t *testing.T) {
 	if ref := parseOrgRef(orgA().ID); ref.ID != orgA().ID || ref.Name != "" {
@@ -276,9 +23,6 @@ func TestParseOrgRef(t *testing.T) {
 	}
 	if ref := parseOrgRef("  Acme "); ref.Name != "Acme" || ref.ID != "" {
 		t.Fatalf("anything else is a name: %+v", ref)
-	}
-	if !parseOrgRef("acme").matches(orgA().ID, "Acme") || parseOrgRef("acme").matches(orgB().ID, "Beta Labs") {
-		t.Fatal("names match case-insensitively and nothing else")
 	}
 	if !parseOrgRef("").empty() {
 		t.Fatal("blank is empty")
@@ -325,7 +69,7 @@ func TestOrganizationTypeNamesThePersonalWorkspace(t *testing.T) {
 
 // signInHere runs the sign-in `terma setup` starts with, under a deadline that cuts a
 // browser handoff short; it returns what it printed.
-func signInHere(t *testing.T, opts signInOptions, wait time.Duration) (*signInResult, string, error) {
+func signInHere(t *testing.T, opts signInOptions, wait time.Duration) (*auth.Credential, string, error) {
 	t.Helper()
 	cfg, err := testApp.loadConfig()
 	if err != nil {
@@ -339,117 +83,226 @@ func signInHere(t *testing.T, opts signInOptions, wait time.Duration) (*signInRe
 	cmd.SetOut(&out)
 	cmd.SetErr(&out)
 	cmd.SetIn(strings.NewReader(""))
-	res, err := testApp.signIn(cmd, cfg, opts)
-	return res, out.String(), err
+	cred, err := testApp.signIn(cmd, cfg, opts)
+	return cred, out.String(), err
+}
+
+// chooseHere runs setup's organization choice for the stored sign-in, asking with ask.
+func chooseHere(t *testing.T, want orgRef, ask orgAsker) (int, error) {
+	t.Helper()
+	cfg, err := testApp.loadConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	cred, err := auth.LoadCredential(testApp.dir, config.DefaultProfile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return testApp.chooseOrganization(context.Background(), cfg, cred, want, ask)
 }
 
 // A working stored session is verified and reused; no browser opens.
 func TestSignInReusesAWorkingSession(t *testing.T) {
 	f := newFakeAuth(t)
 	authSandbox(t, f)
-	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(f, orgA())); err != nil {
+	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(f)); err != nil {
 		t.Fatal(err)
 	}
 
-	res, out, err := signInHere(t, signInOptions{noBrowser: true}, 10*time.Second)
+	cred, out, err := signInHere(t, signInOptions{noBrowser: true}, 10*time.Second)
 	if err != nil {
 		t.Fatalf("sign-in: %v\n%s", err, out)
 	}
-	if !res.reused || strings.Contains(out, "Open this URL") {
+	if cred.UserID != "u-1" || strings.Contains(out, "Open this URL") {
 		t.Fatalf("sign-in should reuse the stored session without a browser:\n%s", out)
 	}
 	if f.whoamis.Load() != 1 {
 		t.Fatalf("the session should be verified exactly once, got %d whoami calls", f.whoamis.Load())
 	}
-	file, _ := config.LoadFile(testApp.dir)
-	if p := file.Profiles[config.DefaultProfile]; p == nil || p.OrganizationID != orgA().ID {
-		t.Fatalf("profile should record the organization: %+v", file.Profiles)
-	}
-	// A session stored before the user's id was kept gains it from whoami.
-	if cred, err := auth.LoadIdentity(testApp.dir, config.DefaultProfile); err != nil || cred.UserID != "u-1" {
-		t.Fatalf("the reused session's user id = %v, %v; want whoami's u-1", cred, err)
-	}
 }
 
-// `terma setup --org` switches between stored sessions by name or id without a browser,
-// and selects no team.
-func TestSignInWithOrgSwitchesBetweenStoredSessions(t *testing.T) {
+// The one sign-in reads every organization: --org picks one by name or id, with no browser
+// and no second sign-in, and selects no team.
+func TestChooseOrganizationWithOneSignIn(t *testing.T) {
 	f := newFakeAuth(t)
 	authSandbox(t, f)
-	for _, o := range fakeOrgs {
-		if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(f, o)); err != nil {
-			t.Fatal(err)
-		}
-	}
-	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(f, orgA())); err != nil {
+	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(f)); err != nil {
 		t.Fatal(err)
 	}
-	if err := config.UpdateProfile(testApp.dir, config.DefaultProfile, func(p *config.Profile) {
-		p.SelectOrganization(orgA().ID, "Acme")
-	}); err != nil {
-		t.Fatal(err)
-	}
-
 	for _, step := range []struct {
 		ref  string
 		want organization
 	}{{"beta labs", orgB()}, {"beta", orgB()}, {orgA().ID, orgA()}} {
-		res, out, err := signInHere(t, signInOptions{org: parseOrgRef(step.ref), noBrowser: true}, 10*time.Second)
-		if err != nil {
-			t.Fatalf("--org %s: %v\n%s", step.ref, err, out)
-		}
-		if !res.reused || strings.Contains(out, "Open this URL") {
-			t.Fatalf("--org %s should reuse the stored session:\n%s", step.ref, out)
-		}
-		active, err := auth.LoadCredential(testApp.dir, config.DefaultProfile)
-		if err != nil || active.OrganizationID != step.want.ID {
-			t.Fatalf("--org %s: active credential %+v, %v; want %s", step.ref, active, err, step.want.Name)
+		if _, err := chooseHere(t, parseOrgRef(step.ref), nil); err != nil {
+			t.Fatalf("--org %s: %v", step.ref, err)
 		}
 		file, _ := config.LoadFile(testApp.dir)
-		if p := file.Profiles[config.DefaultProfile]; p.OrganizationID != step.want.ID {
+		if p := file.Profiles[config.DefaultProfile]; p.OrganizationID != step.want.ID || p.Team != "" {
 			t.Fatalf("--org %s: profile %+v", step.ref, p)
 		}
 	}
+	if f.exchanges.Load() != 0 || f.revokes.Load() != 0 {
+		t.Fatalf("choosing an organization signed in again: %d exchanges, %d revokes", f.exchanges.Load(), f.revokes.Load())
+	}
+
+	// With no --org and no question to ask, the one chosen before is kept among the person's.
+	kept, err := chooseHere(t, orgRef{}, nil)
+	if err != nil || kept != 2 {
+		t.Fatalf("kept = %d, %v; want the current one kept among 2", kept, err)
+	}
+	// With none chosen, several organizations need --org or a question.
+	if err := config.UpdateProfile(testApp.dir, config.DefaultProfile, func(p *config.Profile) { p.SelectOrganization("", "") }); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := chooseHere(t, orgRef{}, nil); err == nil || !strings.Contains(err.Error(), "pass --org") {
+		t.Fatalf("no organization chosen among two: %v", err)
+	}
+	asked := false
+	if _, err := chooseHere(t, orgRef{}, func(orgs []organization, _ string) (*organization, error) {
+		asked = true
+		return &orgs[1], nil
+	}); err != nil || !asked {
+		t.Fatalf("a terminal is asked: %v, asked %v", err, asked)
+	}
+	if file, _ := config.LoadFile(testApp.dir); file.Profiles[config.DefaultProfile].OrganizationID != orgB().ID {
+		t.Fatal("the organization picked is recorded")
+	}
 }
 
-// A session the server no longer honours is dropped and the switch falls through to the
-// browser; the other organization's session is untouched.
+// A retryable answer listing the organizations is an error that changes nothing: it never
+// reads as the person having none.
+func TestChooseOrganizationKeepsTheChoiceWhenUnavailable(t *testing.T) {
+	f := newFakeAuth(t)
+	authSandbox(t, f)
+	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(f)); err != nil {
+		t.Fatal(err)
+	}
+	if err := config.UpdateProfile(testApp.dir, config.DefaultProfile, func(p *config.Profile) {
+		p.SelectOrganization(orgA().ID, "Acme")
+		p.Team = projectsIn(orgA().ID)[0].ID
+	}); err != nil {
+		t.Fatal(err)
+	}
+	f.orgsDown = true
+	if _, err := chooseHere(t, orgRef{}, nil); err == nil {
+		t.Fatal("an unavailable organization list must be an error")
+	}
+	if p := mustProfile(t); p.OrganizationID != orgA().ID || p.Team == "" {
+		t.Fatalf("a retryable answer dropped the choice: %+v", p)
+	}
+}
+
+func mustProfile(t *testing.T) *config.Profile {
+	t.Helper()
+	file, err := config.LoadFile(testApp.dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return file.Profiles[config.DefaultProfile]
+}
+
+// A session the server no longer honours is forgotten and the sign-in falls through to
+// the browser, whose link asks for a user session and names no organization.
 func TestSignInDropsADeadSession(t *testing.T) {
 	f := newFakeAuth(t)
 	authSandbox(t, f)
-	for _, o := range fakeOrgs {
-		if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(f, o)); err != nil {
-			t.Fatal(err)
-		}
-	}
-	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(f, orgA())); err != nil {
+	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(f)); err != nil {
 		t.Fatal(err)
 	}
-	f.deadToken = "ter_cli_" + orgB().ID
+	f.deadToken = fakeUserToken("u-1")
 
 	_, out, err := signInHere(t, signInOptions{org: parseOrgRef("Beta Labs"), noBrowser: true}, 2*time.Second)
 	if err == nil {
 		t.Fatalf("a dead session should fall through to the browser, which the deadline cuts short:\n%s", out)
 	}
-	if !strings.Contains(out, "Open this URL") {
-		t.Fatalf("the browser handoff should have started:\n%s", out)
+	if !strings.Contains(out, "Open this URL") || !strings.Contains(out, "protocol=user") || strings.Contains(out, "org=") {
+		t.Fatalf("the browser handoff should have started for a user session:\n%s", out)
 	}
-	if _, err := auth.LoadCredentialFor(testApp.dir, config.DefaultProfile, orgB().ID); err != auth.ErrNotLoggedIn {
-		t.Fatalf("the dead Beta Labs session should be forgotten, got %v", err)
-	}
-	if active, _ := auth.LoadCredential(testApp.dir, config.DefaultProfile); active == nil || active.OrganizationID != orgA().ID {
-		t.Fatalf("Acme should still be active: %+v", active)
+	if _, err := auth.LoadCredential(testApp.dir, config.DefaultProfile); err != auth.ErrNotLoggedIn {
+		t.Fatalf("the dead session should be forgotten, got %v", err)
 	}
 }
 
-// `terma teardown --sign-out` revokes every stored session server-side.
-func TestSignOutRevokesEveryStoredSession(t *testing.T) {
+// A new sign-in is stored before the session it replaces is ended: one session per
+// machine, and a crash in between leaves this machine signed in.
+func TestStoreLoginEndsTheReplacedSessionAfterStoring(t *testing.T) {
 	f := newFakeAuth(t)
 	authSandbox(t, f)
-	for _, o := range fakeOrgs {
-		if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(f, o)); err != nil {
+	old := storedSession(f)
+	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, old); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := testApp.loadConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	fresh := storedSession(f)
+	fresh.RefreshToken, fresh.SessionID = refreshTokenPrefix+"fresh", "s-fresh"
+	if err := testApp.storeLogin(context.Background(), cfg, fresh); err != nil {
+		t.Fatal(err)
+	}
+	if got := f.revokedTokens(); len(got) != 1 || got[0] != old.RefreshToken {
+		t.Fatalf("revoked %d tokens, want the replaced session's refresh token alone", len(got))
+	}
+	if stored, err := auth.LoadCredential(testApp.dir, config.DefaultProfile); err != nil || stored.SessionID != "s-fresh" {
+		t.Fatalf("stored %+v, %v; want the new sign-in", stored, err)
+	}
+}
+
+// Signing in retires what an older terma signed in with: each organization's session is
+// revoked with its own token and forgotten, and the team keys it minted go, but a server
+// key a profile was set up with stays.
+func TestStoreLoginRetiresAnOlderTermasSignIns(t *testing.T) {
+	f := newFakeAuth(t)
+	authSandbox(t, f)
+	if err := config.UpdateFile(testApp.dir, func(file *config.File) { file.InsecureStorage = true }); err != nil {
+		t.Fatal(err)
+	}
+	legacyA, legacyB := legacyTokenPrefix+orgA().ID, legacyTokenPrefix+orgB().ID
+	legacy := map[string]any{"default": map[string]any{"active": orgA().ID, "organizations": map[string]any{
+		orgA().ID: map[string]any{"access_token": legacyA, "session_id": "old-a", "auth_url": f.srv.URL, "organization_id": orgA().ID},
+		orgB().ID: map[string]any{"access_token": legacyB, "session_id": "old-b", "auth_url": f.srv.URL, "organization_id": orgB().ID},
+	}}}
+	data, _ := json.Marshal(legacy)
+	if err := os.WriteFile(config.LegacyCredentialsPath(testApp.dir), data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	minted, kept := projectsIn(orgA().ID)[0].ID, projectsIn(orgB().ID)[0].ID
+	for _, team := range []string{minted, kept} {
+		if err := keystore.Set(testApp.dir, team, testServerKey, keystore.Hosts{}); err != nil {
 			t.Fatal(err)
 		}
+	}
+	if err := config.UpdateProfile(testApp.dir, "headless", func(p *config.Profile) { p.ServerKeySignIn, p.Team = true, kept }); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := testApp.loadConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := testApp.storeLogin(context.Background(), cfg, storedSession(f)); err != nil {
+		t.Fatal(err)
+	}
+	if got := f.legacyRevokedTokens(); !slices.Equal(got, []string{legacyA, legacyB}) {
+		t.Fatalf("revoked %d older sessions, want both, each with its own token", len(got))
+	}
+	if auth.HasLegacySignIns(testApp.dir) {
+		t.Fatal("the older sign-ins should be deleted")
+	}
+	if key, _ := keystore.Get(testApp.dir, minted); key != "" {
+		t.Fatal("a team key an older terma minted should be deleted")
+	}
+	if key, _ := keystore.Get(testApp.dir, kept); key == "" {
+		t.Fatal("a server key a profile signed in with should stay")
+	}
+}
+
+// `terma teardown --sign-out` revokes the session server-side and forgets it.
+func TestSignOutRevokesTheSession(t *testing.T) {
+	f := newFakeAuth(t)
+	authSandbox(t, f)
+	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(f)); err != nil {
+		t.Fatal(err)
 	}
 	var out bytes.Buffer
 	cmd := &cobra.Command{}
@@ -459,13 +312,40 @@ func TestSignOutRevokesEveryStoredSession(t *testing.T) {
 	if err := testApp.signOut(cmd); err != nil {
 		t.Fatalf("sign out: %v\n%s", err, &out)
 	}
-	if !strings.Contains(out.String(), "Signed out of 2 organizations") {
-		t.Fatalf("sign-out should say how many sessions it ended:\n%s", &out)
+	if !strings.Contains(out.String(), "Signed out.") {
+		t.Fatalf("sign-out should say so:\n%s", &out)
 	}
-	if got := f.revokes.Load(); got != 2 {
-		t.Fatalf("every stored session must be revoked server-side, got %d revokes", got)
+	if got := f.revokedTokens(); len(got) != 1 || got[0] != storedSession(f).RefreshToken {
+		t.Fatalf("the session must be revoked server-side with its refresh token, got %d revokes", len(got))
 	}
-	if creds, _ := auth.Credentials(testApp.dir, config.DefaultProfile); len(creds) != 0 {
-		t.Fatalf("credentials should be gone: %+v", creds)
+	if _, err := auth.LoadCredential(testApp.dir, config.DefaultProfile); err != auth.ErrNotLoggedIn {
+		t.Fatalf("the sign-in should be gone: %v", err)
+	}
+}
+
+// A sign-in whose last refresh got no answer may hold a spent refresh token: signing out
+// sends it nowhere, since a spent token at revoke is reuse and ends the whole family, and
+// still forgets it.
+func TestSignOutNeverPresentsATokenInDoubt(t *testing.T) {
+	f := newFakeAuth(t)
+	authSandbox(t, f)
+	cred := storedSession(f)
+	cred.RefreshInDoubtSince = time.Now()
+	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, cred); err != nil {
+		t.Fatal(err)
+	}
+	var out bytes.Buffer
+	cmd := &cobra.Command{}
+	cmd.SetContext(context.Background())
+	cmd.SetOut(&out)
+	cmd.SetErr(&out)
+	if err := testApp.signOut(cmd); err != nil {
+		t.Fatalf("sign out: %v\n%s", err, &out)
+	}
+	if f.revokes.Load() != 0 || !strings.Contains(out.String(), "left to expire") {
+		t.Fatalf("%d revokes; output:\n%s", f.revokes.Load(), &out)
+	}
+	if _, err := auth.LoadCredential(testApp.dir, config.DefaultProfile); err != auth.ErrNotLoggedIn {
+		t.Fatalf("the sign-in should be gone: %v", err)
 	}
 }

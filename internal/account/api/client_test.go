@@ -28,8 +28,8 @@ func newSplitTestClient(t *testing.T, apiURL, authURL string, cred *auth.Credent
 	t.Helper()
 	dir := t.TempDir()
 	cred.AuthURL = authURL
-	if cred.OrganizationID == "" {
-		cred.OrganizationID = "org-test"
+	if cred.SessionID == "" {
+		cred.SessionID = "session-test"
 	}
 
 	if _, err := auth.SaveCredential(dir, config.DefaultProfile, cred); err != nil {
@@ -50,10 +50,10 @@ func newSplitTestClient(t *testing.T, apiURL, authURL string, cred *auth.Credent
 
 func liveCredential() *auth.Credential {
 	return &auth.Credential{
-		AccessToken:    "mir_cli_live",
-		OrganizationID: "org-test",
-		RefreshToken:   "mir_clr_live",
-		ExpiresAt:      time.Now().Add(time.Hour),
+		AccessToken:  "mir_cli_live",
+		SessionID:    "session-test",
+		RefreshToken: "mir_clr_live",
+		ExpiresAt:    time.Now().Add(time.Hour),
 	}
 }
 
@@ -123,7 +123,7 @@ func TestClient_RefreshesExpiredTokenBeforeRequesting(t *testing.T) {
 				"refresh_token": "mir_clr_rotated",
 				"token_type":    "Bearer",
 				"expires_in":    3600,
-				"organization":  map[string]string{"id": "org-1", "name": "Acme"},
+				"session_id":    "session-test",
 				"user":          map[string]string{"id": "user-1"},
 			})
 			return
@@ -137,10 +137,10 @@ func TestClient_RefreshesExpiredTokenBeforeRequesting(t *testing.T) {
 	defer srv.Close()
 
 	expired := &auth.Credential{
-		AccessToken:    "mir_cli_stale",
-		OrganizationID: "org-1",
-		RefreshToken:   "mir_clr_stale",
-		ExpiresAt:      time.Now().Add(-time.Hour),
+		AccessToken:  "mir_cli_stale",
+		SessionID:    "session-test",
+		RefreshToken: "mir_clr_stale",
+		ExpiresAt:    time.Now().Add(-time.Hour),
 	}
 	client := newTestClient(t, srv.URL, expired, "project-123")
 
@@ -177,14 +177,14 @@ func TestClient_RefreshKeepsTheSessionsUserAndLabel(t *testing.T) {
 			_ = json.NewEncoder(w).Encode(map[string]any{
 				"access_token": "mir_cli_rotated", "refresh_token": "mir_clr_rotated",
 				"token_type": "Bearer", "expires_in": 3600,
-				"organization": map[string]string{"id": "org-1"},
+				"session_id": "session-test",
 			})
 			return
 		}
 		w.Write([]byte(`{}`))
 	}))
 	defer srv.Close()
-	expired := &auth.Credential{AccessToken: "mir_cli_stale", OrganizationID: "org-1", RefreshToken: "mir_clr_stale",
+	expired := &auth.Credential{AccessToken: "mir_cli_stale", SessionID: "session-test", RefreshToken: "mir_clr_stale",
 		ExpiresAt: time.Now().Add(-time.Hour), UserID: "user-1", Label: "laptop" + auth.DesktopLabelSuffix}
 	client := newTestClient(t, srv.URL, expired, "project-123")
 	if err := client.Get(context.Background(), "/v1/identity", nil, &struct{}{}); err != nil {
@@ -210,7 +210,7 @@ func TestClient_RetriesOnceAfterUnexpected401(t *testing.T) {
 				"refresh_token": "mir_clr_rotated",
 				"token_type":    "Bearer",
 				"expires_in":    3600,
-				"organization":  map[string]string{"id": "org-1"},
+				"session_id":    "session-test",
 			})
 			return
 		}
@@ -318,7 +318,7 @@ func TestClient_RoutesCredentialCallsToTheAuthHost(t *testing.T) {
 				"refresh_token": "mir_clr_rotated",
 				"token_type":    "Bearer",
 				"expires_in":    3600,
-				"organization":  map[string]string{"id": "org-1"},
+				"session_id":    "session-test",
 			})
 			return
 		}
@@ -425,13 +425,13 @@ func TestClient_StampsTheIssuingHostOnLogin(t *testing.T) {
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"access_token": "mir_cli_x", "refresh_token": "mir_clr_x",
 			"token_type": "Bearer", "expires_in": 3600,
-			"organization": map[string]string{"id": "org-1"},
-			"user":         map[string]string{"id": "user-1", "email": "dev@example.com"},
+			"session_id": "session-test",
+			"user":       map[string]string{"id": "user-1", "email": "dev@example.com"},
 		})
 	}))
 	defer srv.Close()
 
-	client := NewAnonymous(srv.URL, "test")
+	client := NewSignIn(srv.URL, "test", testInstallation)
 
 	cred, err := client.ExchangeCode(context.Background(), "mir_cod_x", "verifier", 54321)
 	if err != nil {
@@ -521,15 +521,18 @@ func TestClient_TakesAPairAnotherProcessRotated(t *testing.T) {
 	}
 }
 
-// A session the store no longer holds (one a sign-in replaced, being revoked) still
-// refreshes, but its pair never overwrites the stored one.
+// A session the store no longer holds (one a sign-in replaced, being revoked with its
+// refresh token) is over: its token is never presented again, which would race the revoke
+// into reuse, and the stored sign-in stays untouched.
 func TestClient_RefreshOfASupersededSessionStoresNothing(t *testing.T) {
 	t.Parallel()
+	var redemptions atomic.Int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == tokenPath {
+			redemptions.Add(1)
 			_ = json.NewEncoder(w).Encode(map[string]any{
 				"access_token": "mir_cli_old_rotated", "refresh_token": "mir_clr_old_rotated", "expires_in": 3600,
-				"session_id": "session-old", "organization": map[string]string{"id": "org-test"},
+				"session_id": "session-old",
 			})
 			return
 		}
@@ -540,16 +543,16 @@ func TestClient_RefreshOfASupersededSessionStoresNothing(t *testing.T) {
 		ExpiresAt: time.Now().Add(-time.Hour)}
 	client := newTestClient(t, srv.URL, old, "")
 	signedIn := &auth.Credential{AccessToken: "mir_cli_new", RefreshToken: "mir_clr_new", SessionID: "session-new",
-		ExpiresAt: time.Now().Add(time.Hour), OrganizationID: "org-test", AuthURL: srv.URL}
+		ExpiresAt: time.Now().Add(time.Hour), AuthURL: srv.URL}
 	if _, err := auth.SaveCredential(client.dir, config.DefaultProfile, signedIn); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := client.Get(context.Background(), "/v1/identity", nil, &struct{}{}); err != nil {
-		t.Fatalf("Get: %v", err)
+	if err := client.Get(context.Background(), "/v1/identity", nil, &struct{}{}); !errors.Is(err, auth.ErrNotLoggedIn) {
+		t.Fatalf("Get = %v, want the replaced session over", err)
 	}
-	if got := client.Credential().AccessToken; got != "mir_cli_old_rotated" {
-		t.Errorf("client token = %q, want its own session rotated", got)
+	if got := redemptions.Load(); got != 0 {
+		t.Errorf("redemptions = %d, want none", got)
 	}
 	stored, err := auth.LoadCredential(client.dir, config.DefaultProfile)
 	if err != nil || stored.RefreshToken != "mir_clr_new" {
@@ -633,7 +636,7 @@ func TestClient_RefreshWaitsOutAHolderPastTheRequestTimeout(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"access_token": "mir_cli_rotated", "refresh_token": "mir_clr_rotated",
-			"token_type": "Bearer", "expires_in": 3600,
+			"token_type": "Bearer", "expires_in": 3600, "session_id": "session-1",
 		})
 	}))
 	defer srv.Close()
@@ -663,35 +666,6 @@ func TestClient_RefreshWaitsOutAHolderPastTheRequestTimeout(t *testing.T) {
 	}
 }
 
-// A credential saved before sessions had ids matches any session. So a client holding one
-// takes a fresh sign-in's pair from the store rather than redeeming its own legacy token.
-func TestClient_ALegacyCredentialTakesAFreshSignIn(t *testing.T) {
-	t.Parallel()
-	var redemptions atomic.Int32
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		redemptions.Add(1)
-		w.WriteHeader(http.StatusUnauthorized)
-	}))
-	defer srv.Close()
-	legacy := &auth.Credential{AccessToken: "mir_cli_legacy", RefreshToken: "mir_clr_legacy", ExpiresAt: time.Now().Add(-time.Hour)}
-	client := newTestClient(t, srv.URL, legacy, "")
-	fresh := &auth.Credential{AccessToken: "mir_cli_fresh", RefreshToken: "mir_clr_fresh", SessionID: "session-new",
-		ExpiresAt: time.Now().Add(time.Hour), OrganizationID: "org-test", AuthURL: srv.URL}
-	if _, err := auth.SaveCredential(client.dir, config.DefaultProfile, fresh); err != nil {
-		t.Fatal(err)
-	}
-
-	if err := client.Refresh(context.Background()); err != nil {
-		t.Fatalf("Refresh: %v", err)
-	}
-	if got := redemptions.Load(); got != 0 {
-		t.Errorf("redemptions = %d, want none: the fresh sign-in has not expired", got)
-	}
-	if got := client.Credential().RefreshToken; got != "mir_clr_fresh" {
-		t.Errorf("client refresh token = %q, want the fresh sign-in's", got)
-	}
-}
-
 // A caller waits for this process's refresh slot only as long as its own context allows.
 // A sibling that holds the slot while it waits minutes for the credential lock must not
 // hold it up.
@@ -699,7 +673,7 @@ func TestClient_RefreshWaitFollowsTheCallersContext(t *testing.T) {
 	t.Parallel()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewEncoder(w).Encode(map[string]any{
-			"access_token": "mir_cli_rotated", "refresh_token": "mir_clr_rotated", "expires_in": 3600,
+			"access_token": "mir_cli_rotated", "refresh_token": "mir_clr_rotated", "expires_in": 3600, "session_id": "session-1",
 		})
 	}))
 	defer srv.Close()
@@ -764,8 +738,8 @@ func TestClient_RefreshRefusesAnIndexedCredentialWithoutTokens(t *testing.T) {
 	expired := &auth.Credential{AccessToken: "mir_cli_stale", RefreshToken: "mir_clr_stale", SessionID: "session-1",
 		ExpiresAt: time.Now().Add(-time.Hour)}
 	client := newTestClient(t, srv.URL, expired, "")
-	// The keychain item auth keeps for the default profile's org-test credential.
-	if err := secret.Delete(client.dir, "credential/"+config.DefaultProfile+"/org-test"); err != nil {
+	// The keychain item auth keeps for the default profile's sign-in.
+	if err := secret.Delete(client.dir, "user-credential/"+config.DefaultProfile); err != nil {
 		t.Fatalf("the credential's keychain item: %v", err)
 	}
 

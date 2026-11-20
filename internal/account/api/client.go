@@ -27,52 +27,6 @@ const (
 	maxPlainErrorLen = 200
 )
 
-// Error is a structured failure from the gateway; its Message names the fix.
-type Error struct {
-	StatusCode int
-	Code       string
-	Message    string
-	RequestID  string
-}
-
-func (e *Error) Error() string {
-	msg := e.Message
-	// The shared gateway's remedies name its original CLI; give terma's commands instead.
-	if e.Code == "INVALID_ARGUMENT" && strings.Contains(msg, "missing X-Mirador-Project header") {
-		msg = "no team selected — run `terma setup` or pass --team"
-	}
-	msg = gatewayRemedies.Replace(msg)
-	switch {
-	case msg == "" && e.StatusCode != 0:
-		msg = fmt.Sprintf("request failed with status %d", e.StatusCode)
-	case msg == "":
-		msg = "request failed"
-	case e.Code == "" && e.StatusCode != 0:
-		// No envelope: the status is the only other thing known about the failure.
-		msg = fmt.Sprintf("%s (status %d)", msg, e.StatusCode)
-	}
-	var detail []string
-	if e.Code != "" {
-		detail = append(detail, e.Code)
-	}
-	if e.RequestID != "" {
-		detail = append(detail, "request_id="+e.RequestID)
-	}
-	if len(detail) == 0 {
-		return msg
-	}
-	return fmt.Sprintf("%s (%s)", msg, strings.Join(detail, ", "))
-}
-
-// gatewayRemedies renames the commands the shared gateway's messages recommend.
-var gatewayRemedies = strings.NewReplacer(
-	"`mirador login`", "`terma setup`",
-	"`mirador project list`", "`terma setup`",
-)
-
-// Unauthenticated reports whether the credential itself was rejected.
-func (e *Error) Unauthenticated() bool { return e.StatusCode == http.StatusUnauthorized }
-
 // Client talks to the API gateway as the signed-in developer or a server key; an
 // unexpected 401 gets one refresh and one retry, and a second is a real logout.
 type Client struct {
@@ -85,10 +39,11 @@ type Client struct {
 	dir     string
 	profile string
 	apiKey  string
+	// installationID is sent with a sign-in's code exchange.
+	installationID string
 
 	mu         sync.Mutex
 	credential *auth.Credential
-	lastLogin  *LoginResult
 	// tokenGen counts credential replacements, so a 401 that raced another goroutine's
 	// refresh retries with its token instead of redeeming the refresh token twice.
 	tokenGen uint64
@@ -107,8 +62,7 @@ type Options struct {
 	Version   string
 	ProjectID string
 	Timeout   time.Duration
-	// Credential, when set, replaces the profile's active one, so a command can try
-	// another organization's credential before activating it.
+	// Credential, when set, replaces the profile's stored one.
 	Credential *auth.Credential
 }
 
@@ -149,7 +103,7 @@ func New(cfg *config.Config, opts Options) (*Client, error) {
 	return c, nil
 }
 
-// NewAnonymous builds a credential-less client for the auth host's minting endpoints.
+// NewAnonymous builds a credential-less client for the auth host's public endpoints.
 func NewAnonymous(authURL, version string) *Client {
 	return &Client{
 		authURL:    strings.TrimRight(authURL, "/"),
@@ -157,6 +111,14 @@ func NewAnonymous(authURL, version string) *Client {
 		version:    version,
 		refreshing: make(chan struct{}, 1),
 	}
+}
+
+// NewSignIn builds the credential-less client a sign-in exchanges its code with, for the
+// installation installationID (config.InstallationID).
+func NewSignIn(authURL, version, installationID string) *Client {
+	c := NewAnonymous(authURL, version)
+	c.installationID = installationID
+	return c
 }
 
 // newHTTPClient refuses redirects: on a 307/308 Go replays the body (a code, verifier
@@ -316,6 +278,23 @@ func (c *Client) attempt(ctx context.Context, h host, method, path string, query
 	if err != nil {
 		return nil, err
 	}
+	return c.send(req, method, path)
+}
+
+// attemptAs is attempt for a request whose body is its credential (a code or a refresh
+// token): it carries the client's own only when withCredential asks.
+func (c *Client) attemptAs(ctx context.Context, h host, method, path string, body any, withCredential bool) (*http.Response, error) {
+	req, err := c.newRequest(ctx, h, method, path, nil, nil, body)
+	if err != nil {
+		return nil, err
+	}
+	if !withCredential {
+		req.Header.Del("Authorization")
+	}
+	return c.send(req, method, path)
+}
+
+func (c *Client) send(req *http.Request, method, path string) (*http.Response, error) {
 	resp, err := c.http.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("%s %s: %w", method, path, err)
@@ -385,38 +364,6 @@ func decode(resp *http.Response, out any) error {
 		return fmt.Errorf("decode response: %w", err)
 	}
 	return nil
-}
-
-func parseError(resp *http.Response) error {
-	body, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
-
-	var envelope struct {
-		Error struct {
-			Code    string           `json:"code"`
-			Message string           `json:"message"`
-			Details []map[string]any `json:"details"`
-		} `json:"error"`
-	}
-	apiErr := &Error{StatusCode: resp.StatusCode}
-	if json.Unmarshal(body, &envelope) == nil && envelope.Error.Message != "" {
-		apiErr.Code = envelope.Error.Code
-		apiErr.Message = envelope.Error.Message
-		for _, detail := range envelope.Error.Details {
-			if id, ok := detail["request_id"].(string); ok {
-				apiErr.RequestID = id
-			}
-		}
-		return apiErr
-	}
-	// Not the gateway's envelope: keep a proxy's first line, bounded.
-	apiErr.Message, _, _ = strings.Cut(strings.TrimSpace(string(body)), "\n")
-	if len(apiErr.Message) > maxPlainErrorLen {
-		apiErr.Message = apiErr.Message[:maxPlainErrorLen] + "…"
-	}
-	if apiErr.Message == "" || strings.HasPrefix(apiErr.Message, "<") {
-		apiErr.Message = http.StatusText(resp.StatusCode)
-	}
-	return apiErr
 }
 
 func firstNonEmpty(values ...string) string {

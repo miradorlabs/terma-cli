@@ -145,7 +145,7 @@ func (app *App) authToken(ctx context.Context, refusedSHA256 string) (*tokenGran
 		return nil, failure
 	}
 	teamID := cmp.Or(cfg.ProjectID, cfg.Team)
-	if teamID == "" {
+	if teamID == "" || cfg.OrganizationID == "" {
 		return nil, &tokenFailure{Code: tokenNoTeam, Message: "no Terma team is chosen: run `terma setup` to choose one"}
 	}
 
@@ -157,7 +157,11 @@ func (app *App) authToken(ctx context.Context, refusedSHA256 string) (*tokenGran
 	if failure := tokenFailureOf(err, true); failure != nil {
 		return nil, failure
 	}
-	projects, err := fetchProjects(ctx, client)
+	projects, err := fetchProjects(ctx, client, cfg.OrganizationID)
+	if apiErr, ok := errors.AsType[*api.Error](err); ok && apiErr.OrgNotAccessible() {
+		return nil, &tokenFailure{Code: tokenNoTeam,
+			Message: "you no longer have access to the organization chosen at setup: run `terma setup` to choose another", cause: err}
+	}
 	if failure := tokenFailureOf(err, true); failure != nil {
 		return nil, failure
 	}
@@ -174,7 +178,7 @@ func (app *App) authToken(ctx context.Context, refusedSHA256 string) (*tokenGran
 	return &tokenGrant{
 		AccessToken:    cred.AccessToken,
 		ExpiresAt:      cred.ExpiresAt.UTC().Format(time.RFC3339),
-		OrganizationID: cred.OrganizationID,
+		OrganizationID: cfg.OrganizationID,
 		TeamID:         teamID,
 		Teams:          teams,
 		MCPURL:         cfg.MCPURL,

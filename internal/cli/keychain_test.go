@@ -24,12 +24,10 @@ func TestSetupSaysWhereTheCredentialsAre(t *testing.T) {
 	authSandbox(t, gateway)
 	sandboxMachine(t)
 	t.Setenv("CODEX_HOME", t.TempDir())
-	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(gateway, orgA())); err != nil {
-		t.Fatal(err)
-	}
+	signInTo(t, gateway, orgA())
 	tokens := func() bool {
 		data, err := os.ReadFile(config.CredentialsPath(testApp.dir))
-		return err == nil && strings.Contains(string(data), "ter_cli_")
+		return err == nil && strings.Contains(string(data), userTokenPrefix)
 	}
 
 	out, err := runTerma(t, "setup", "--harness", "codex", "--insecure-storage")
@@ -51,9 +49,7 @@ func TestSetupWithoutAKeychainFallsBackToTheFile(t *testing.T) {
 	sandboxMachine(t)
 	t.Setenv("CODEX_HOME", t.TempDir())
 	secret.FailForTest(t, testApp.dir)
-	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(gateway, orgA())); err != nil {
-		t.Fatal(err)
-	}
+	signInTo(t, gateway, orgA())
 	out, err := runTerma(t, "setup", "--harness", "codex")
 	if err != nil || !strings.Contains(out, "! Credentials   in plain text in") || !strings.Contains(out, "no system keychain could be used") {
 		t.Fatalf("setup must flag the plain-text fallback: %v\n%s", err, out)
@@ -71,9 +67,7 @@ func TestSetupMovesTeamKeysToTheKeychain(t *testing.T) {
 	authSandbox(t, gateway)
 	sandboxMachine(t)
 	t.Setenv("CODEX_HOME", t.TempDir())
-	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(gateway, orgA())); err != nil {
-		t.Fatal(err)
-	}
+	signInTo(t, gateway, orgA())
 	unlock := secret.FailForTest(t, testApp.dir)
 	if err := keystore.Set(testApp.dir, "earlier-team", "ter_srv_0123456789abcdef", keystore.Hosts{}); err != nil {
 		t.Fatal(err)
@@ -95,21 +89,20 @@ func TestSetupMovesTeamKeysToTheKeychain(t *testing.T) {
 func TestSignOutWithALockedKeychain(t *testing.T) {
 	f := newFakeAuth(t)
 	authSandbox(t, f)
-	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(f, orgA())); err != nil {
-		t.Fatal(err)
-	}
-	secret.FailForTest(t, testApp.dir)
+	signInTo(t, f, orgA())
+	unlock := secret.FailForTest(t, testApp.dir)
 	var out bytes.Buffer
 	cmd := &cobra.Command{}
 	cmd.SetContext(context.Background())
 	cmd.SetOut(&out)
 	cmd.SetErr(&out)
 	err := testApp.signOut(cmd)
-	if err == nil || !strings.Contains(err.Error(), "signed out, but") || !strings.Contains(out.String(), "could not read the sessions to revoke") {
+	if err == nil || !strings.Contains(err.Error(), "signed out, but") || !strings.Contains(out.String(), "could not read the session to revoke") {
 		t.Fatalf("sign out = %v\n%s", err, &out)
 	}
-	if creds, err := auth.Credentials(testApp.dir, config.DefaultProfile); err != nil || len(creds) != 0 {
-		t.Fatalf("the credential outlived sign-out: %+v, %v", creds, err)
+	unlock()
+	if cred, err := auth.LoadIdentity(testApp.dir, config.DefaultProfile); err != auth.ErrNotLoggedIn {
+		t.Fatalf("the credential outlived sign-out: %+v, %v", cred, err)
 	}
 }
 

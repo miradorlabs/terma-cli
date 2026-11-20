@@ -1,12 +1,10 @@
 package auth
 
 import (
-	"context"
 	"errors"
 	"os"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/account/secret"
 	"github.com/miradorlabs/terma-cli/internal/config"
@@ -21,27 +19,32 @@ func credentialsFile(t *testing.T, dir string) string {
 	return string(data)
 }
 
+// rotated is session's sign-in after a refresh.
+func rotated(session string) *Credential {
+	c := sessionCredential(session)
+	c.AccessToken, c.RefreshToken = "access-rotated", "refresh-rotated"
+	return c
+}
+
 // Signing in puts the tokens in the keychain and only the index in the file, and a
 // refresh keeps them there.
 func TestTokensLiveInTheKeychain(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	if _, err := SaveCredential(dir, config.DefaultProfile, orgCredential("org-a", "s1")); err != nil {
+	if _, err := SaveCredential(dir, config.DefaultProfile, sessionCredential("s1")); err != nil {
 		t.Fatal(err)
 	}
-	refreshed := orgCredential("org-a", "s1")
-	refreshed.AccessToken, refreshed.RefreshToken = "ter_cli_rotated", "ter_clr_rotated"
-	if err := UpdateCredential(dir, config.DefaultProfile, refreshed); err != nil {
+	if err := UpdateCredential(dir, config.DefaultProfile, rotated("s1")); err != nil {
 		t.Fatal(err)
 	}
-	if f := credentialsFile(t, dir); strings.Contains(f, "ter_cli_") || strings.Contains(f, "ter_clr_") || !strings.Contains(f, "org-a") {
-		t.Fatalf("credentials.json must index the credential without its tokens:\n%s", f)
+	if f := credentialsFile(t, dir); strings.Contains(f, "access-") || strings.Contains(f, "refresh-") || !strings.Contains(f, `"session_id": "s1"`) {
+		t.Fatalf("user-credentials.json must index the credential without its tokens:\n%s", f)
 	}
 	if StoredInFile(dir, config.DefaultProfile) {
 		t.Fatal("StoredInFile = true")
 	}
 	cred, err := LoadCredential(dir, config.DefaultProfile)
-	if err != nil || cred.AccessToken != "ter_cli_rotated" || cred.RefreshToken != "ter_clr_rotated" {
+	if err != nil || cred.AccessToken != "access-rotated" || cred.RefreshToken != "refresh-rotated" {
 		t.Fatalf("LoadCredential = %+v, %v; want the rotated pair", cred, err)
 	}
 }
@@ -52,13 +55,13 @@ func TestInsecureStorageKeepsTokensInTheFile(t *testing.T) {
 	if err := config.UpdateFile(dir, func(f *config.File) { f.InsecureStorage = true }); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := SaveCredential(dir, config.DefaultProfile, orgCredential("org-a", "s1")); err != nil {
+	if _, err := SaveCredential(dir, config.DefaultProfile, sessionCredential("s1")); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(credentialsFile(t, dir), "ter_cli_org-a") || !StoredInFile(dir, config.DefaultProfile) {
-		t.Fatal("--insecure-storage must keep the tokens in credentials.json")
+	if !strings.Contains(credentialsFile(t, dir), "access-s1") || !StoredInFile(dir, config.DefaultProfile) {
+		t.Fatal("--insecure-storage must keep the tokens in user-credentials.json")
 	}
-	if _, err := secret.Get(dir, itemName(config.DefaultProfile, "org-a")); !errors.Is(err, secret.ErrNotFound) {
+	if _, err := secret.Get(dir, itemName(config.DefaultProfile)); !errors.Is(err, secret.ErrNotFound) {
 		t.Fatalf("the keychain holds an item: %v", err)
 	}
 }
@@ -69,19 +72,17 @@ func TestNoKeychainFallsBackToTheFile(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	secret.FailForTest(t, dir)
-	if _, err := SaveCredential(dir, config.DefaultProfile, orgCredential("org-a", "s1")); err != nil {
+	if _, err := SaveCredential(dir, config.DefaultProfile, sessionCredential("s1")); err != nil {
 		t.Fatal(err)
 	}
 	if !StoredInFile(dir, config.DefaultProfile) {
-		t.Fatal("the tokens must fall back to credentials.json")
+		t.Fatal("the tokens must fall back to user-credentials.json")
 	}
-	refreshed := orgCredential("org-a", "s1")
-	refreshed.AccessToken = "ter_cli_rotated"
-	if err := UpdateCredential(dir, config.DefaultProfile, refreshed); err != nil {
+	if err := UpdateCredential(dir, config.DefaultProfile, rotated("s1")); err != nil {
 		t.Fatal(err)
 	}
 	cred, err := LoadCredential(dir, config.DefaultProfile)
-	if err != nil || cred.AccessToken != "ter_cli_rotated" {
+	if err != nil || cred.AccessToken != "access-rotated" {
 		t.Fatalf("LoadCredential = %+v, %v", cred, err)
 	}
 	if err := DeleteCredential(dir, config.DefaultProfile); err != nil {
@@ -94,17 +95,36 @@ func TestNoKeychainFallsBackToTheFile(t *testing.T) {
 func TestARefreshTheKeychainRefusesLandsInTheFile(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	if _, err := SaveCredential(dir, config.DefaultProfile, orgCredential("org-a", "s1")); err != nil {
+	if _, err := SaveCredential(dir, config.DefaultProfile, sessionCredential("s1")); err != nil {
 		t.Fatal(err)
 	}
-	refreshed := orgCredential("org-a", "s1")
-	refreshed.AccessToken = "ter_cli_rotated"
 	secret.FailForTest(t, dir)
-	if err := UpdateCredential(dir, config.DefaultProfile, refreshed); err != nil {
+	if err := UpdateCredential(dir, config.DefaultProfile, rotated("s1")); err != nil {
 		t.Fatal(err)
 	}
 	cred, err := LoadCredential(dir, config.DefaultProfile)
-	if err != nil || cred.AccessToken != "ter_cli_rotated" {
+	if err != nil || cred.AccessToken != "access-rotated" {
+		t.Fatalf("LoadCredential = %+v, %v", cred, err)
+	}
+}
+
+// A refresh the keychain refuses for this one item, while it takes others, lands in the
+// file too.
+func TestARefreshTheKeychainRefusesForItsItemLandsInTheFile(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	if _, err := SaveCredential(dir, config.DefaultProfile, sessionCredential("s1")); err != nil {
+		t.Fatal(err)
+	}
+	secret.RefuseForTest(t, dir, itemName(config.DefaultProfile))
+	if err := UpdateCredential(dir, config.DefaultProfile, rotated("s1")); err != nil {
+		t.Fatal(err)
+	}
+	if !StoredInFile(dir, config.DefaultProfile) {
+		t.Fatal("the refused refresh did not land in the file")
+	}
+	cred, err := LoadCredential(dir, config.DefaultProfile)
+	if err != nil || cred.AccessToken != "access-rotated" {
 		t.Fatalf("LoadCredential = %+v, %v", cred, err)
 	}
 }
@@ -114,40 +134,43 @@ func TestARefreshTheKeychainRefusesLandsInTheFile(t *testing.T) {
 func TestALockedKeychainIsNotSignedOut(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	if _, err := SaveCredential(dir, config.DefaultProfile, orgCredential("org-a", "s1")); err != nil {
+	if _, err := SaveCredential(dir, config.DefaultProfile, sessionCredential("s1")); err != nil {
 		t.Fatal(err)
 	}
 	secret.FailForTest(t, dir)
 	for name, err := range map[string]error{
-		"LoadCredential":    func() error { _, err := LoadCredential(dir, config.DefaultProfile); return err }(),
-		"LoadCredentialFor": func() error { _, err := LoadCredentialFor(dir, config.DefaultProfile, "org-a"); return err }(),
-		"Credentials":       func() error { _, err := Credentials(dir, config.DefaultProfile); return err }(),
+		"LoadCredential": func() error { _, err := LoadCredential(dir, config.DefaultProfile); return err }(),
+		"Tx.Load": Locked(t.Context(), dir, func(tx *Tx) error {
+			_, err := tx.Load(config.DefaultProfile)
+			return err
+		}),
+		"DeleteCredentialIf": DeleteCredentialIf(dir, config.DefaultProfile, "refresh-s1"),
 	} {
 		if !secret.IsUnavailable(err) || errors.Is(err, ErrNotLoggedIn) {
 			t.Errorf("%s = %v, want the keychain unavailable", name, err)
 		}
 	}
+	if _, err := LoadIdentity(dir, config.DefaultProfile); err != nil {
+		t.Fatalf("the sign-in was dropped: %v", err)
+	}
 }
 
-func TestSigningOutRemovesTheKeychainItems(t *testing.T) {
+func TestSigningOutRemovesTheKeychainItem(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	for _, org := range []string{"org-a", "org-b"} {
-		if _, err := SaveCredential(dir, config.DefaultProfile, orgCredential(org, "s-"+org)); err != nil {
+	for _, profile := range []string{config.DefaultProfile, "work"} {
+		if _, err := SaveCredential(dir, profile, sessionCredential("s-"+profile)); err != nil {
 			t.Fatal(err)
 		}
-	}
-	if err := DeleteCredentialFor(dir, config.DefaultProfile, "org-b"); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := secret.Get(dir, itemName(config.DefaultProfile, "org-b")); !errors.Is(err, secret.ErrNotFound) {
-		t.Fatalf("org-b's tokens outlived its credential: %v", err)
 	}
 	if err := DeleteCredential(dir, config.DefaultProfile); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := secret.Get(dir, itemName(config.DefaultProfile, "org-a")); !errors.Is(err, secret.ErrNotFound) {
-		t.Fatalf("org-a's tokens outlived sign-out: %v", err)
+	if _, err := secret.Get(dir, itemName(config.DefaultProfile)); !errors.Is(err, secret.ErrNotFound) {
+		t.Fatalf("the tokens outlived sign-out: %v", err)
+	}
+	if _, err := secret.Get(dir, itemName("work")); err != nil {
+		t.Fatalf("signing out of one profile removed another's tokens: %v", err)
 	}
 }
 
@@ -156,16 +179,14 @@ func TestSigningOutRemovesTheKeychainItems(t *testing.T) {
 func TestSigningInAgainReturnsTheDisplacedSessionsTokens(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	if _, err := SaveCredential(dir, config.DefaultProfile, orgCredential("org-a", "s1")); err != nil {
+	if _, err := SaveCredential(dir, config.DefaultProfile, sessionCredential("s1")); err != nil {
 		t.Fatal(err)
 	}
-	next := orgCredential("org-a", "s2")
-	next.AccessToken = "ter_cli_second"
-	replaced, err := SaveCredential(dir, config.DefaultProfile, next)
+	replaced, err := SaveCredential(dir, config.DefaultProfile, sessionCredential("s2"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if replaced == nil || replaced.SessionID != "s1" || replaced.AccessToken != "ter_cli_org-a" {
+	if replaced == nil || replaced.SessionID != "s1" || replaced.AccessToken != "access-s1" {
 		t.Fatalf("replaced = %+v, want session s1 with its own token", replaced)
 	}
 }
@@ -175,16 +196,16 @@ func TestSigningInAgainReturnsTheDisplacedSessionsTokens(t *testing.T) {
 func TestInsecureStorageTakesTheKeychainItemAlong(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	if _, err := SaveCredential(dir, config.DefaultProfile, orgCredential("org-a", "s1")); err != nil {
+	if _, err := SaveCredential(dir, config.DefaultProfile, sessionCredential("s1")); err != nil {
 		t.Fatal(err)
 	}
 	if err := config.UpdateFile(dir, func(f *config.File) { f.InsecureStorage = true }); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := SaveCredential(dir, config.DefaultProfile, orgCredential("org-a", "s1")); err != nil {
+	if _, err := SaveCredential(dir, config.DefaultProfile, sessionCredential("s1")); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := secret.Get(dir, itemName(config.DefaultProfile, "org-a")); !errors.Is(err, secret.ErrNotFound) {
+	if _, err := secret.Get(dir, itemName(config.DefaultProfile)); !errors.Is(err, secret.ErrNotFound) {
 		t.Fatalf("the keychain item outlived the move: %v", err)
 	}
 	if !StoredInFile(dir, config.DefaultProfile) {
@@ -193,33 +214,17 @@ func TestInsecureStorageTakesTheKeychainItemAlong(t *testing.T) {
 }
 
 // LoadIdentity answers who is signed in from the file alone: a locked keychain does not
-// hide the organization.
+// hide the user.
 func TestLoadIdentityNeverReadsTheKeychain(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	if _, err := SaveCredential(dir, config.DefaultProfile, orgCredential("org-a", "s1")); err != nil {
+	if _, err := SaveCredential(dir, config.DefaultProfile, sessionCredential("s1")); err != nil {
 		t.Fatal(err)
 	}
 	secret.FailForTest(t, dir)
 	cred, err := LoadIdentity(dir, config.DefaultProfile)
-	if err != nil || cred.OrganizationID != "org-a" || cred.AccessToken != "" {
+	if err != nil || cred.UserID != "user-1" || cred.SessionID != "s1" || cred.AccessToken != "" {
 		t.Fatalf("LoadIdentity = %+v, %v", cred, err)
-	}
-}
-
-// An organization id with characters a keychain backend could misread, as a hostile
-// server could send, is still kept in the keychain, under an encoded name.
-func TestAnOddOrganizationIDIsKeptInTheKeychain(t *testing.T) {
-	t.Parallel()
-	dir := t.TempDir()
-	if _, err := SaveCredential(dir, config.DefaultProfile, orgCredential("o'rg\nadd-generic-password", "s1")); err != nil {
-		t.Fatal(err)
-	}
-	if StoredInFile(dir, config.DefaultProfile) {
-		t.Fatal("the tokens fell back to the file")
-	}
-	if cred, err := LoadCredential(dir, config.DefaultProfile); err != nil || cred.AccessToken == "" {
-		t.Fatalf("LoadCredential = %+v, %v", cred, err)
 	}
 }
 
@@ -228,19 +233,17 @@ func TestAnOddOrganizationIDIsKeptInTheKeychain(t *testing.T) {
 func TestAnItemTheKeychainKeptIsRemovedAtSignOut(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	if _, err := SaveCredential(dir, config.DefaultProfile, orgCredential("org-a", "s1")); err != nil {
+	if _, err := SaveCredential(dir, config.DefaultProfile, sessionCredential("s1")); err != nil {
 		t.Fatal(err)
 	}
 	if err := config.UpdateFile(dir, func(f *config.File) { f.InsecureStorage = true }); err != nil {
 		t.Fatal(err)
 	}
 	unlock := secret.FailForTest(t, dir)
-	if _, err := SaveCredential(dir, config.DefaultProfile, orgCredential("org-a", "s1")); err != nil {
+	if _, err := SaveCredential(dir, config.DefaultProfile, sessionCredential("s1")); err != nil {
 		t.Fatal(err)
 	}
-	refreshed := orgCredential("org-a", "s1")
-	refreshed.AccessToken = "ter_cli_rotated"
-	if err := UpdateCredential(dir, config.DefaultProfile, refreshed); err != nil {
+	if err := UpdateCredential(dir, config.DefaultProfile, rotated("s1")); err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(credentialsFile(t, dir), `"stale_keychain_item": true`) {
@@ -250,7 +253,7 @@ func TestAnItemTheKeychainKeptIsRemovedAtSignOut(t *testing.T) {
 	if err := DeleteCredential(dir, config.DefaultProfile); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := secret.Get(dir, itemName(config.DefaultProfile, "org-a")); !errors.Is(err, secret.ErrNotFound) {
+	if _, err := secret.Get(dir, itemName(config.DefaultProfile)); !errors.Is(err, secret.ErrNotFound) {
 		t.Fatalf("the keychain item outlived sign-out: %v", err)
 	}
 }
@@ -260,26 +263,24 @@ func TestAnItemTheKeychainKeptIsRemovedAtSignOut(t *testing.T) {
 func TestARefusedRefreshMarksTheItemItLeft(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	if _, err := SaveCredential(dir, config.DefaultProfile, orgCredential("org-a", "s1")); err != nil {
+	if _, err := SaveCredential(dir, config.DefaultProfile, sessionCredential("s1")); err != nil {
 		t.Fatal(err)
 	}
 	unlock := secret.FailForTest(t, dir)
-	refreshed := orgCredential("org-a", "s1")
-	refreshed.AccessToken = "ter_cli_rotated"
-	if err := UpdateCredential(dir, config.DefaultProfile, refreshed); err != nil {
+	if err := UpdateCredential(dir, config.DefaultProfile, rotated("s1")); err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(credentialsFile(t, dir), `"stale_keychain_item": true`) {
 		t.Fatal("the refused refresh did not mark the item it left")
 	}
 	unlock()
-	if err := UpdateCredential(dir, config.DefaultProfile, refreshed); err != nil {
+	if err := UpdateCredential(dir, config.DefaultProfile, rotated("s1")); err != nil {
 		t.Fatal(err)
 	}
 	if f := credentialsFile(t, dir); strings.Contains(f, "stale_keychain_item") {
 		t.Fatalf("the mark outlived the item:\n%s", f)
 	}
-	if _, err := secret.Get(dir, itemName(config.DefaultProfile, "org-a")); !errors.Is(err, secret.ErrNotFound) {
+	if _, err := secret.Get(dir, itemName(config.DefaultProfile)); !errors.Is(err, secret.ErrNotFound) {
 		t.Fatalf("the stale item is still there: %v", err)
 	}
 }
@@ -290,7 +291,7 @@ func TestATimedOutWriteIsCleanedUpAtSignOut(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	unlock := secret.TimeOutForTest(t, dir)
-	if _, err := SaveCredential(dir, config.DefaultProfile, orgCredential("org-a", "s1")); err != nil {
+	if _, err := SaveCredential(dir, config.DefaultProfile, sessionCredential("s1")); err != nil {
 		t.Fatal(err)
 	}
 	if !StoredInFile(dir, config.DefaultProfile) || !strings.Contains(credentialsFile(t, dir), `"stale_keychain_item": true`) {
@@ -298,13 +299,13 @@ func TestATimedOutWriteIsCleanedUpAtSignOut(t *testing.T) {
 	}
 	unlock()
 	// The abandoned write lands late.
-	if err := secret.Set(dir, itemName(config.DefaultProfile, "org-a"), `{"access_token":"late"}`); err != nil {
+	if err := secret.Set(dir, itemName(config.DefaultProfile), `{"access_token":"late"}`); err != nil {
 		t.Fatal(err)
 	}
 	if err := DeleteCredential(dir, config.DefaultProfile); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := secret.Get(dir, itemName(config.DefaultProfile, "org-a")); !errors.Is(err, secret.ErrNotFound) {
+	if _, err := secret.Get(dir, itemName(config.DefaultProfile)); !errors.Is(err, secret.ErrNotFound) {
 		t.Fatalf("the late write outlived sign-out: %v", err)
 	}
 }
@@ -315,7 +316,7 @@ func TestNoKeychainMarksNothing(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	secret.FailForTest(t, dir)
-	if _, err := SaveCredential(dir, config.DefaultProfile, orgCredential("org-a", "s1")); err != nil {
+	if _, err := SaveCredential(dir, config.DefaultProfile, sessionCredential("s1")); err != nil {
 		t.Fatal(err)
 	}
 	if strings.Contains(credentialsFile(t, dir), "stale_keychain_item") {
@@ -323,13 +324,14 @@ func TestNoKeychainMarksNothing(t *testing.T) {
 	}
 }
 
-// Relocate moves every organization's tokens, not only the active one's: into the file
-// under insecure storage, and back into the keychain without it.
+// Relocate moves every profile's tokens: into the file under insecure storage, and back
+// into the keychain without it.
 func TestRelocateMovesEveryCredential(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	for _, org := range []string{"org-a", "org-b"} {
-		if _, err := SaveCredential(dir, config.DefaultProfile, orgCredential(org, "s-"+org)); err != nil {
+	profiles := []string{config.DefaultProfile, "work"}
+	for _, profile := range profiles {
+		if _, err := SaveCredential(dir, profile, sessionCredential("s-"+profile)); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -340,12 +342,12 @@ func TestRelocateMovesEveryCredential(t *testing.T) {
 		t.Fatal(err)
 	}
 	f := credentialsFile(t, dir)
-	if !strings.Contains(f, "ter_cli_org-a") || !strings.Contains(f, "ter_cli_org-b") {
-		t.Fatalf("insecure storage must bring every organization's tokens into the file:\n%s", f)
-	}
-	for _, org := range []string{"org-a", "org-b"} {
-		if _, err := secret.Get(dir, itemName(config.DefaultProfile, org)); !errors.Is(err, secret.ErrNotFound) {
-			t.Fatalf("%s's keychain item outlived the move: %v", org, err)
+	for _, profile := range profiles {
+		if !strings.Contains(f, "access-s-"+profile) {
+			t.Fatalf("insecure storage must bring %s's tokens into the file:\n%s", profile, f)
+		}
+		if _, err := secret.Get(dir, itemName(profile)); !errors.Is(err, secret.ErrNotFound) {
+			t.Fatalf("%s's keychain item outlived the move: %v", profile, err)
 		}
 	}
 	if err := config.UpdateFile(dir, func(f *config.File) { f.InsecureStorage = false }); err != nil {
@@ -354,49 +356,13 @@ func TestRelocateMovesEveryCredential(t *testing.T) {
 	if err := Relocate(dir); err != nil {
 		t.Fatal(err)
 	}
-	if f := credentialsFile(t, dir); strings.Contains(f, "ter_cli_") {
+	if f := credentialsFile(t, dir); strings.Contains(f, "access-") {
 		t.Fatalf("Relocate left tokens in the file:\n%s", f)
 	}
-	if creds, err := Credentials(dir, config.DefaultProfile); err != nil || len(creds) != 2 {
-		t.Fatalf("Credentials = %d, %v", len(creds), err)
-	}
-}
-
-// Relocate holds the credential lock through one credential's keychain write at a time,
-// never through every one, so a writer behind it waits about one write, not all of them.
-// The writer's deadline is five writes: well past the one it should wait, and well short
-// of the eight it would wait if Relocate kept the lock.
-func TestRelocateLetsTheLockGoBetweenCredentials(t *testing.T) {
-	t.Parallel()
-	dir := t.TempDir()
-	if err := config.UpdateFile(dir, func(f *config.File) { f.InsecureStorage = true }); err != nil {
-		t.Fatal(err)
-	}
-	orgs := []string{"org-a", "org-b", "org-c", "org-d", "org-e", "org-f", "org-g", "org-h"}
-	for _, org := range orgs {
-		if _, err := SaveCredential(dir, config.DefaultProfile, orgCredential(org, "s-"+org)); err != nil {
-			t.Fatal(err)
+	for _, profile := range profiles {
+		if cred, err := LoadCredential(dir, profile); err != nil || cred.AccessToken != "access-s-"+profile {
+			t.Fatalf("LoadCredential(%s) = %+v, %v", profile, cred, err)
 		}
-	}
-	if err := config.UpdateFile(dir, func(f *config.File) { f.InsecureStorage = false }); err != nil {
-		t.Fatal(err)
-	}
-	const write = 250 * time.Millisecond
-	secret.DelayForTest(t, dir, write)
-	done := make(chan error)
-	go func() { done <- Relocate(dir) }()
-	time.Sleep(write / 3)
-
-	ctx, cancel := context.WithTimeout(t.Context(), 5*write)
-	defer cancel()
-	if err := Locked(ctx, dir, func(*Tx) error { return nil }); err != nil {
-		t.Fatalf("a writer behind Relocate's %d keychain writes: %v; want the lock within one", len(orgs), err)
-	}
-	if err := <-done; err != nil {
-		t.Fatal(err)
-	}
-	if f := credentialsFile(t, dir); strings.Contains(f, "ter_cli_") {
-		t.Fatalf("Relocate left tokens in the file:\n%s", f)
 	}
 }
 
@@ -408,7 +374,7 @@ func TestADelayedRelocationKeepsItsMark(t *testing.T) {
 	if err := config.UpdateFile(dir, func(f *config.File) { f.InsecureStorage = true }); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := SaveCredential(dir, config.DefaultProfile, orgCredential("org-a", "s1")); err != nil {
+	if _, err := SaveCredential(dir, config.DefaultProfile, sessionCredential("s1")); err != nil {
 		t.Fatal(err)
 	}
 	if err := config.UpdateFile(dir, func(f *config.File) { f.InsecureStorage = false }); err != nil {

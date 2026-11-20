@@ -111,8 +111,8 @@ func (app *App) ensureRelayToken() (string, error) {
 		return token, nil
 	}
 	if cfg, err := app.loadConfig(); err == nil {
-		org, authURL := daemon.Identity(cfg)
-		if token, ok := daemon.ReviveToken(app.stateDir, org, authURL); ok {
+		account, authURL := daemon.Identity(cfg)
+		if token, ok := daemon.ReviveToken(app.stateDir, account, authURL); ok {
 			return token, nil
 		}
 	}

@@ -1,5 +1,5 @@
 // Package config resolves CLI settings from flags, environment and the on-disk
-// profile, and persists the non-secret half; tokens live apart in credentials.json (0600).
+// profile, and persists the non-secret half; tokens live apart in user-credentials.json (0600).
 package config
 
 import (
@@ -28,8 +28,11 @@ const (
 	DefaultProfile = "default"
 
 	configFileName      = "config.json"
-	credentialsFileName = "credentials.json"
-	dirName             = "terma"
+	credentialsFileName = "user-credentials.json"
+	// legacyCredentialsFileName is where a terma before user tokens kept one sign-in per
+	// organization; signing in deletes it (auth.ForgetLegacy).
+	legacyCredentialsFileName = "credentials.json"
+	dirName                   = "terma"
 )
 
 // Profile is the non-secret half of a profile: where to talk to and what is selected.
@@ -394,8 +397,13 @@ func userDir(xdg, windows string, rel ...string) (string, error) {
 // Path is where config.json lives under the config directory dir.
 func Path(dir string) string { return filepath.Join(dir, configFileName) }
 
-// CredentialsPath is where credentials.json lives under the config directory dir.
+// CredentialsPath is where user-credentials.json, the profiles' sign-ins, lives under the
+// config directory dir.
 func CredentialsPath(dir string) string { return filepath.Join(dir, credentialsFileName) }
+
+// LegacyCredentialsPath is where a terma before user tokens kept its per-organization
+// sign-ins, under the config directory dir.
+func LegacyCredentialsPath(dir string) string { return filepath.Join(dir, legacyCredentialsFileName) }
 
 func firstNonEmpty(values ...string) string {
 	for _, v := range values {

@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -162,22 +161,22 @@ func (app *App) removeHookState() error {
 
 // retireRelayToken removes the relay's token, keeping it for this sign-in when keep.
 func (app *App) retireRelayToken(keep bool) error {
-	org, authURL := "", ""
+	account, authURL := "", ""
 	if !keep {
 		if err := daemon.DiscardRetiredToken(app.stateDir); err != nil {
 			return err
 		}
 	} else if cfg, err := app.loadConfig(); err == nil {
-		org, authURL = daemon.Identity(cfg)
+		account, authURL = daemon.Identity(cfg)
 	}
-	return daemon.RetireToken(app.stateDir, org, authURL)
+	return daemon.RetireToken(app.stateDir, account, authURL)
 }
 
 var errNoSessionWithAPIKey = errors.New("TERMA_API_KEY is set — there is no session to sign out of; unset it to use the stored credential")
 
-// signOut revokes every session this profile holds server-side and deletes the local
-// credentials, one per organization signed into. A failed revoke still clears the local
-// file: the developer asked to be signed out. A profile set up with a server key stops
+// signOut revokes this profile's session server-side and deletes the local credential,
+// and an older terma's per-organization sign-ins with it. A failed revoke still clears the
+// local file: the developer asked to be signed out. A profile set up with a server key stops
 // counting it as its sign-in; the key itself is revoked only in the Terma web app.
 func (app *App) signOut(cmd *cobra.Command) error {
 	out := cmd.OutOrStdout()
@@ -194,34 +193,47 @@ func (app *App) signOut(cmd *cobra.Command) error {
 		}
 		fmt.Fprintln(out, "Signed out of the team's server key; it keeps working until you revoke it in the Terma web app.")
 	}
-	creds, err := auth.Credentials(app.dir, cfg.ProfileName)
+	// Read and revoked under the credential lock: a refresh in another process (the relay's)
+	// could otherwise rotate the pair in between, and revoking the spent token is reuse,
+	// which ends the whole family, a Terma Desktop session it was delegated from included.
+	var cred *auth.Credential
+	var revokeErr error
+	err = auth.Locked(cmd.Context(), app.dir, func(tx *auth.Tx) error {
+		var err error
+		if cred, err = auth.LoadCredential(app.dir, cfg.ProfileName); err != nil {
+			return err
+		}
+		revokeErr = app.revokeSession(cmd.Context(), cfg, cred)
+		return tx.DeleteIf(cfg.ProfileName, cred.RefreshToken)
+	})
+	legacy := auth.HasLegacySignIns(app.dir)
 	switch {
 	case secret.IsUnavailable(err):
 		// Signed out all the same: only the server-side revoke needs the tokens.
-		fmt.Fprintf(cmd.ErrOrStderr(), "Warning: could not read the sessions to revoke them server-side (%v).\n", err)
-	case err != nil:
-		return err
-	case len(creds) == 0:
+		fmt.Fprintf(cmd.ErrOrStderr(), "Warning: could not read the session to revoke it server-side (%v).\n", err)
+	case errors.Is(err, auth.ErrNotLoggedIn) && !legacy:
 		if !cfg.ServerKeySignIn {
 			fmt.Fprintln(out, "Already signed out.")
 		}
 		return nil
+	case err != nil && !errors.Is(err, auth.ErrNotLoggedIn):
+		return err
+	case revokeErr != nil:
+		// The stored sign-in goes whatever the server answers.
+		fmt.Fprintf(cmd.ErrOrStderr(), "Warning: could not revoke the session server-side (%v).\n", revokeErr)
 	}
-	for _, cred := range creds {
-		if err := app.revokeSession(cmd.Context(), cfg, cred); err != nil {
-			fmt.Fprintf(cmd.ErrOrStderr(), "Warning: could not revoke the session for %s server-side (%v).\n",
-				cmp.Or(cred.OrganizationID, "this organization"), err)
-		}
+	app.retireLegacySessions(cmd.Context())
+	if err == nil {
+		// Deleted under the lock with the session it revoked; a sign-in stored since is not
+		// this one's to forget.
+		fmt.Fprintln(out, "Signed out.")
+		return nil
 	}
 	if err := auth.DeleteCredential(app.dir, cfg.ProfileName); secret.IsUnavailable(err) {
 		return fmt.Errorf("signed out, but %w: delete the keychain items of the service %s by hand", err, secret.Service(app.dir))
 	} else if err != nil {
 		return err
 	}
-	if len(creds) > 1 {
-		fmt.Fprintf(out, "Signed out of %d organizations.\n", len(creds))
-	} else {
-		fmt.Fprintln(out, "Signed out.")
-	}
+	fmt.Fprintln(out, "Signed out.")
 	return nil
 }

@@ -57,7 +57,7 @@ func testFailedSaves(t *testing.T, failures int) {
 		// Each pair is already within the expiry skew, so every Refresh redeems again.
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"access_token": fmt.Sprintf("mir_cli_%d", n), "refresh_token": fmt.Sprintf("mir_clr_%d", n), "expires_in": 30,
-			"session_id": "session-1", "organization": map[string]string{"id": "org-test"},
+			"session_id": "session-1",
 		})
 	}))
 	defer srv.Close()
@@ -73,7 +73,7 @@ func testFailedSaves(t *testing.T, failures int) {
 		t.Fatal(err)
 	}
 	if _, err := auth.SaveCredential(dir, config.DefaultProfile, &auth.Credential{AccessToken: "mir_cli_0", RefreshToken: "mir_clr_0",
-		SessionID: "session-1", OrganizationID: "org-test", AuthURL: srv.URL, ExpiresAt: time.Now().Add(-time.Hour)}); err != nil {
+		SessionID: "session-1", AuthURL: srv.URL, ExpiresAt: time.Now().Add(-time.Hour)}); err != nil {
 		t.Fatal(err)
 	}
 	client, err := New(&config.Config{Dir: dir, ProfileName: config.DefaultProfile, APIURL: srv.URL, AuthURL: srv.URL}, Options{Version: "test"})
@@ -147,7 +147,7 @@ func TestClient_RefreshGivesUpOnAHungHolder(t *testing.T) {
 		t.Fatal(err)
 	}
 	if _, err := auth.SaveCredential(dir, config.DefaultProfile, &auth.Credential{AccessToken: "mir_cli_0", RefreshToken: "mir_clr_0",
-		SessionID: "session-1", OrganizationID: "org-test", AuthURL: srv.URL, ExpiresAt: time.Now().Add(-time.Hour)}); err != nil {
+		SessionID: "session-1", AuthURL: srv.URL, ExpiresAt: time.Now().Add(-time.Hour)}); err != nil {
 		t.Fatal(err)
 	}
 

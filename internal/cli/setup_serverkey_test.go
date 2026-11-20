@@ -115,10 +115,7 @@ func TestSetupWithAServerKey(t *testing.T) {
 		t.Fatalf("team key = %q, %v", key, err)
 	}
 	if _, err := os.Stat(config.CredentialsPath(testApp.dir)); !errors.Is(err, fs.ErrNotExist) {
-		t.Fatalf("setup with a server key wrote credentials.json: %v", err)
-	}
-	if n := gateway.keysMint.Load(); n != 0 {
-		t.Fatalf("setup with a server key minted %d keys", n)
+		t.Fatalf("setup with a server key wrote user-credentials.json: %v", err)
 	}
 
 	t.Setenv("TERMA_API_KEY", "")
@@ -159,7 +156,7 @@ func TestSignOutOfAServerKey(t *testing.T) {
 		t.Run(fmt.Sprintf("behind a login %v", behindLogin), func(t *testing.T) {
 			gateway, _ := keySandbox(t)
 			if behindLogin {
-				if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(gateway, orgA())); err != nil {
+				if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(gateway)); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -178,8 +175,8 @@ func TestSignOutOfAServerKey(t *testing.T) {
 			if revokes := gateway.revokes.Load(); behindLogin && revokes != 1 || !behindLogin && revokes != 0 {
 				t.Errorf("revokes = %d; want the login behind the key revoked, and nothing else", revokes)
 			}
-			if creds, err := auth.Credentials(testApp.dir, config.DefaultProfile); err != nil || len(creds) != 0 {
-				t.Errorf("credentials left after sign-out: %d, %v", len(creds), err)
+			if cred, err := auth.LoadIdentity(testApp.dir, config.DefaultProfile); err != auth.ErrNotLoggedIn {
+				t.Errorf("a sign-in left after sign-out: %+v, %v", cred, err)
 			}
 		})
 	}
@@ -265,7 +262,7 @@ func TestSetupWithAServerKeyReplacesTheAgentsKeys(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	pol, err := testApp.relayDeps().Resolver(cfg, nil)(claim.Claim{ProjectID: team, Tool: "claude-code"})
+	pol, err := testApp.relayDeps().Resolver(cfg)(claim.Claim{ProjectID: team, Tool: "claude-code"})
 	if err != nil || pol.Key != testServerKey {
 		t.Fatalf("the relay sends Claude Code's session with %q, %v; want the server key", pol.Key, err)
 	}
@@ -275,7 +272,7 @@ func TestSetupWithAServerKeyReplacesTheAgentsKeys(t *testing.T) {
 // for another team, and the keystore exactly as they were, --insecure-storage included.
 func TestAFailedServerKeySetupChangesNothing(t *testing.T) {
 	gateway, team := keySandbox(t)
-	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(gateway, orgA())); err != nil {
+	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(gateway)); err != nil {
 		t.Fatal(err)
 	}
 	if err := config.UpdateProfile(testApp.dir, config.DefaultProfile, func(p *config.Profile) {
@@ -350,7 +347,7 @@ func TestServerKeySetupMovesTheKeyWhereSecretsAreKept(t *testing.T) {
 	if out, err := runTerma(t, "setup", "--yes", "--harness", "claude", "--insecure-storage"); err != nil {
 		t.Fatalf("setup --insecure-storage: %v\n%s", err, out)
 	}
-	login := storedSession(gateway, orgA())
+	login := storedSession(gateway)
 	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, login); err != nil {
 		t.Fatal(err)
 	}
@@ -403,10 +400,10 @@ func TestServerKeySetupRecordsALoginTheKeychainRefuses(t *testing.T) {
 	if out, err := runTerma(t, "setup", "--yes", "--harness", "claude", "--insecure-storage"); err != nil {
 		t.Fatalf("setup --insecure-storage: %v\n%s", err, out)
 	}
-	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(gateway, orgA())); err != nil {
+	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(gateway)); err != nil {
 		t.Fatal(err)
 	}
-	secret.RefuseForTest(t, testApp.dir, "credential/")
+	secret.RefuseForTest(t, testApp.dir, "user-credential/")
 	t.Setenv("TERMA_API_KEY", rotatedKey)
 	setupWithKey(t)
 	if keystore.StoredInFile(testApp.dir, team) {
@@ -455,11 +452,11 @@ func TestSetupWithARotatedServerKeyReplacesTheOld(t *testing.T) {
 // disk unused; signing in as a person again takes it back.
 func TestServerKeySetupAndSignInTakeTurns(t *testing.T) {
 	gateway, team := keySandbox(t)
-	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(gateway, orgA())); err != nil {
+	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(gateway)); err != nil {
 		t.Fatal(err)
 	}
 	setupWithKey(t)
-	if cred, err := auth.LoadCredential(testApp.dir, config.DefaultProfile); err != nil || cred.OrganizationID != orgA().ID {
+	if cred, err := auth.LoadCredential(testApp.dir, config.DefaultProfile); err != nil || cred.UserID != "u-1" {
 		t.Fatalf("the login was not kept: %+v, %v", cred, err)
 	}
 	t.Setenv("TERMA_API_KEY", "")

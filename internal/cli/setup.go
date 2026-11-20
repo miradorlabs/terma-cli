@@ -243,14 +243,6 @@ func (app *App) runSetup(cmd *cobra.Command, f setupFlags) error {
 				detail: ui.Detail(),
 			})
 		},
-		SpoolKey: func(ctx context.Context, cfg *config.Config) {
-			if k := app.ensureSpoolKey(ctx, cfg); k.fix == "" {
-				ui.OK("Hook events", k.state)
-			} else {
-				ui.Warn("Hook events", k.state)
-				ui.Then(k.fix)
-			}
-		},
 		MachineHooks: func(_ context.Context, names []string) error {
 			err := app.globalMode().Apply(names, func(what string) { ui.OK("Machine", what) },
 				func(what string) { ui.Summary("Machine", what) }, ui.Then)

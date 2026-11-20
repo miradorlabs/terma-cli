@@ -1,32 +1,30 @@
 package auth
 
 import (
+	"errors"
 	"os"
-	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/miradorlabs/terma-cli/internal/account/secret"
 	"github.com/miradorlabs/terma-cli/internal/config"
 )
 
 func sampleCredential() *Credential {
-	return &Credential{
-		AccessToken:    "ter_cli_x",
-		OrganizationID: "org-test",
-		RefreshToken:   "ter_clr_x",
-		ExpiresAt:      time.Now().Add(time.Hour),
-	}
+	return sessionCredential("s1")
 }
 
-func orgCredential(org, session string) *Credential {
+// sessionCredential is a sign-in of session whose tokens name it.
+func sessionCredential(session string) *Credential {
 	return &Credential{
-		AccessToken:    "ter_cli_" + org,
-		RefreshToken:   "ter_clr_" + org,
-		ExpiresAt:      time.Now().Add(time.Hour),
-		SessionID:      session,
-		OrganizationID: org,
+		AccessToken:  "access-" + session,
+		RefreshToken: "refresh-" + session,
+		ExpiresAt:    time.Now().Add(time.Hour),
+		SessionID:    session,
+		AuthURL:      "https://auth.example.test",
+		UserID:       "user-1",
 	}
 }
 
@@ -41,12 +39,12 @@ func TestSaveCredential_WritesFile0600(t *testing.T) {
 		t.Fatalf("SaveCredential: %v", err)
 	}
 
-	info, err := os.Stat(filepath.Join(dir, "credentials.json"))
+	info, err := os.Stat(config.CredentialsPath(dir))
 	if err != nil {
-		t.Fatalf("stat credentials.json: %v", err)
+		t.Fatalf("stat user-credentials.json: %v", err)
 	}
 	if perm := info.Mode().Perm(); perm != 0o600 {
-		t.Errorf("credentials.json mode = %o, want 600", perm)
+		t.Errorf("user-credentials.json mode = %o, want 600", perm)
 	}
 }
 
@@ -54,18 +52,18 @@ func TestMutateCredentialFile_PreservesOtherProfiles(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 
-	if _, err := SaveCredential(dir, "work", sampleCredential()); err != nil {
+	if _, err := SaveCredential(dir, "work", sessionCredential("s-work")); err != nil {
 		t.Fatalf("SaveCredential(dir, work): %v", err)
 	}
-	if _, err := SaveCredential(dir, "personal", sampleCredential()); err != nil {
+	if _, err := SaveCredential(dir, "personal", sessionCredential("s-personal")); err != nil {
 		t.Fatalf("SaveCredential(dir, personal): %v", err)
 	}
 
-	if _, err := LoadCredential(dir, "work"); err != nil {
-		t.Errorf("work profile was lost after writing personal: %v", err)
+	if cred, err := LoadCredential(dir, "work"); err != nil || cred.AccessToken != "access-s-work" {
+		t.Errorf("work profile was lost after writing personal: %+v, %v", cred, err)
 	}
-	if _, err := LoadCredential(dir, "personal"); err != nil {
-		t.Errorf("personal profile not saved: %v", err)
+	if cred, err := LoadCredential(dir, "personal"); err != nil || cred.AccessToken != "access-s-personal" {
+		t.Errorf("personal profile not saved: %+v, %v", cred, err)
 	}
 }
 
@@ -101,105 +99,107 @@ func TestDeleteCredential_MissingProfileIsNoError(t *testing.T) {
 	}
 }
 
-func TestSaveCredential_KeepsOneCredentialPerOrganization(t *testing.T) {
+// Signing in as a different session returns the one it replaced, for the caller to revoke.
+// Signing in again as the same session returns nothing, since there is nothing to revoke.
+func TestSaveCredential_ReturnsTheReplacedSession(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 
-	if _, err := SaveCredential(dir, "default", orgCredential("org-a", "s-a")); err != nil {
-		t.Fatal(err)
+	replaced, err := SaveCredential(dir, config.DefaultProfile, sessionCredential("s1"))
+	if err != nil || replaced != nil {
+		t.Fatalf("the first sign-in = %+v, %v; want nothing replaced", replaced, err)
 	}
-	replaced, err := SaveCredential(dir, "default", orgCredential("org-b", "s-b"))
+	replaced, err = SaveCredential(dir, config.DefaultProfile, sessionCredential("s1"))
+	if err != nil || replaced != nil {
+		t.Fatalf("signing in again as the same session = %+v, %v; want nothing replaced", replaced, err)
+	}
+	replaced, err = SaveCredential(dir, config.DefaultProfile, sessionCredential("s2"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if replaced != nil {
-		t.Fatalf("signing into a second organization replaced nothing, got %+v", replaced)
+	if replaced == nil || replaced.SessionID != "s1" || replaced.RefreshToken != "refresh-s1" {
+		t.Fatalf("replaced = %+v; want session s1 with its tokens", replaced)
 	}
-
-	active, err := LoadCredential(dir, "default")
-	if err != nil || active.OrganizationID != "org-b" {
-		t.Fatalf("active = %+v, %v; want org-b", active, err)
-	}
-	parked, err := LoadCredentialFor(dir, "default", "org-a")
-	if err != nil || parked.SessionID != "s-a" {
-		t.Fatalf("org-a credential should be kept: %+v, %v", parked, err)
-	}
-	all, err := Credentials(dir, "default")
-	if err != nil || len(all) != 2 || all[0].OrganizationID != "org-b" {
-		t.Fatalf("Credentials should list both, active first: %+v, %v", all, err)
-	}
-
-	replaced, err = SaveCredential(dir, "default", orgCredential("org-a", "s-a2"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if replaced == nil || replaced.SessionID != "s-a" {
-		t.Fatalf("want the displaced org-a session reported, got %+v", replaced)
+	if cred, err := LoadCredential(dir, config.DefaultProfile); err != nil || cred.SessionID != "s2" {
+		t.Fatalf("LoadCredential = %+v, %v; want session s2", cred, err)
 	}
 }
 
-// A refresh of a parked credential persists it without changing the active organization.
-func TestUpdateCredential_DoesNotChangeTheActiveOrganization(t *testing.T) {
+// DeleteCredentialIf forgets the sign-in only while it still holds the caller's refresh
+// token: one another process stored since stays.
+func TestDeleteCredentialIf_DeletesOnlyTheCallersSignIn(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	if _, err := SaveCredential(dir, "default", orgCredential("org-a", "s-a")); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := SaveCredential(dir, "default", orgCredential("org-b", "s-b")); err != nil {
+	if _, err := SaveCredential(dir, config.DefaultProfile, sessionCredential("s1")); err != nil {
 		t.Fatal(err)
 	}
 
-	rotated := orgCredential("org-a", "s-a")
-	rotated.AccessToken = "ter_cli_rotated"
-	if err := UpdateCredential(dir, "default", rotated); err != nil {
+	if err := DeleteCredentialIf(dir, config.DefaultProfile, "refresh-other"); err != nil {
 		t.Fatal(err)
 	}
-	if active, _ := LoadCredential(dir, "default"); active.OrganizationID != "org-b" {
-		t.Fatalf("refresh switched the active organization: %+v", active)
+	if cred, err := LoadCredential(dir, config.DefaultProfile); err != nil || cred.SessionID != "s1" {
+		t.Fatalf("a sign-in with another refresh token was deleted: %+v, %v", cred, err)
 	}
-	if parked, _ := LoadCredentialFor(dir, "default", "org-a"); parked.AccessToken != "ter_cli_rotated" {
-		t.Fatalf("rotated token not persisted: %+v", parked)
+
+	if err := DeleteCredentialIf(dir, config.DefaultProfile, "refresh-s1"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := LoadCredential(dir, config.DefaultProfile); err != ErrNotLoggedIn {
+		t.Fatalf("the matching sign-in survived: %v", err)
+	}
+	if _, err := secret.Get(dir, itemName(config.DefaultProfile)); !errors.Is(err, secret.ErrNotFound) {
+		t.Fatalf("the keychain item outlived the sign-in: %v", err)
+	}
+
+	if err := DeleteCredentialIf(dir, "never-existed", "refresh-s1"); err != nil {
+		t.Fatalf("deleting a missing profile should be a no-op, got %v", err)
 	}
 }
 
-func TestDeleteCredentialFor_FallsBackToAnotherOrganization(t *testing.T) {
+// A writer must not take a sign-in whose keychain item is missing for signed out: Tx.Load
+// reports an error, while a reader sees ErrNotLoggedIn.
+func TestTxLoad_AMissingKeychainItemIsAnError(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	if _, err := SaveCredential(dir, "default", orgCredential("org-a", "s-a")); err != nil {
+	if _, err := SaveCredential(dir, config.DefaultProfile, sampleCredential()); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := SaveCredential(dir, "default", orgCredential("org-b", "s-b")); err != nil {
+	if err := secret.Delete(dir, itemName(config.DefaultProfile)); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := DeleteCredentialFor(dir, "default", "org-b"); err != nil {
-		t.Fatal(err)
+	if _, err := LoadCredential(dir, config.DefaultProfile); !errors.Is(err, ErrNotLoggedIn) {
+		t.Fatalf("LoadCredential = %v, want ErrNotLoggedIn", err)
 	}
-	active, err := LoadCredential(dir, "default")
-	if err != nil || active.OrganizationID != "org-a" {
-		t.Fatalf("deleting the active credential should fall back to org-a, got %+v, %v", active, err)
+	err := Locked(t.Context(), dir, func(tx *Tx) error {
+		_, err := tx.Load(config.DefaultProfile)
+		return err
+	})
+	if err == nil || errors.Is(err, ErrNotLoggedIn) {
+		t.Fatalf("Tx.Load = %v; want an error that is not ErrNotLoggedIn", err)
 	}
-	if err := DeleteCredentialFor(dir, "default", "org-a"); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := LoadCredential(dir, "default"); err != ErrNotLoggedIn {
-		t.Fatalf("nothing left should read as not logged in, got %v", err)
+	if err := DeleteCredentialIf(dir, config.DefaultProfile, "refresh-s1"); err == nil {
+		t.Fatal("DeleteCredentialIf deleted a sign-in whose tokens it could not read")
 	}
 }
 
-// An unsupported credential layout must not silently authenticate a profile.
-func TestLoadCredentialIgnoresSingleCredentialShape(t *testing.T) {
+// An entry without a session must not authenticate a profile, and an older terma's
+// credentials.json does not sign anyone in.
+func TestLoadCredential_IgnoresAnEntryWithoutASession(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	data := `{"default":{"access_token":"ter_cli_old","organization_id":"org-a"}}`
-	if err := os.WriteFile(filepath.Join(dir, "credentials.json"), []byte(data), 0o600); err != nil {
+	data := `{"default":{"access_token":"access-old","auth_url":"https://auth.example.test"}}`
+	if err := os.WriteFile(config.CredentialsPath(dir), []byte(data), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := LoadCredential(dir, "default"); err != ErrNotLoggedIn {
-		t.Fatalf("unsupported credential authenticated: %v", err)
+	legacy := `{"work":{"active":"org-a","organizations":{"org-a":{"access_token":"access-old","session_id":"s-old"}}}}`
+	if err := os.WriteFile(config.LegacyCredentialsPath(dir), []byte(legacy), 0o600); err != nil {
+		t.Fatal(err)
 	}
-	if _, err := LoadCredentialFor(dir, "default", "org-a"); err != ErrNotLoggedIn {
-		t.Fatalf("unsupported organization authenticated: %v", err)
+	for _, profile := range []string{"default", "work"} {
+		if _, err := LoadCredential(dir, profile); err != ErrNotLoggedIn {
+			t.Fatalf("LoadCredential(%s) = %v; want ErrNotLoggedIn", profile, err)
+		}
 	}
 }
 
