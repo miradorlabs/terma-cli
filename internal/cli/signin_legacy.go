@@ -34,7 +34,7 @@ func (app *App) retireLegacySessions(ctx context.Context, authURL string) {
 		// what could be read of it is still revoked and forgotten below.
 		var record error
 		if auth.HasLegacySignIns(app.dir) && (len(signIns) == 0 || !auth.LegacyParsedWhole(app.dir)) {
-			record = auth.RecordNoOne(app.stateDir, time.Now())
+			record = auth.RecordNoOne(app.stateDir, signIns, time.Now())
 		} else {
 			record = auth.RecordLegacy(app.stateDir, signIns, time.Now())
 		}

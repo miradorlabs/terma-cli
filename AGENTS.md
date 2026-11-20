@@ -136,7 +136,15 @@ team's policy cannot be read yet waits in memory as long as the outbox would kee
 one a stopping relay drops is counted there too. A server key sends only what no person's
 sign-in collected; what a server-key profile collected is no person's, and leaves only
 under a server key, so a profile switched from a server key to a person's sign-in leaves
-it to age out.
+it to age out. A spool event is in one of three cases: it names an account (`account`),
+and leaves only under that sign-in; it is no person's (`no_person`, collected under a
+server key: the hook's spool is bound with `BindNoPerson`), and leaves only under a server
+key; or neither (an older terma's, or a sandboxed hook's that couldn't read the sign-in).
+Only that last case is ever bound later, to whatever the appending spool is bound to
+(`Spool.Append`, and unparking): the hook's account, or no person under a server key.
+Every replay of a recorded event (`AppendAsCollected`) keeps what it says. An event with
+neither from before `legacy-sign-ins.json`'s `retired_at` counts as the account that record
+names, which is no one when it is ambiguous; one from after leaves only under a server key.
 
 ## Rules
 

@@ -454,8 +454,9 @@ func TestAPartlyBrokenOlderFileIsRetiredAsNoOnes(t *testing.T) {
 	if got := f.legacyRevokedTokens(); len(got) != 1 || got[0] != legacyA {
 		t.Fatalf("revoked %d older sessions, want the readable one", len(got))
 	}
-	if rec, err := auth.ReadLegacyRecord(testApp.stateDir); err != nil || rec.Account != auth.LegacyAccountAmbiguous {
-		t.Fatalf("record = %+v, %v; want one naming no one", rec, err)
+	if rec, err := auth.ReadLegacyRecord(testApp.stateDir); err != nil || rec.Account != auth.LegacyAccountAmbiguous ||
+		len(rec.SessionIDs) != 1 || rec.SessionIDs[0] != "old-a" {
+		t.Fatalf("record = %+v, %v; want one naming no one, keeping the readable session for the heartbeat", rec, err)
 	}
 	if auth.HasLegacySignIns(testApp.dir) {
 		t.Fatal("the older file outlived the sign-in")
