@@ -207,6 +207,51 @@ func TestLoadIdentityNeverReadsTheKeychain(t *testing.T) {
 	}
 }
 
+// A refresh's marks are written to credentials.json alone: the refresh read its token
+// under the same lock, so marking it before the send, expiring it and clearing it read
+// nothing from the keychain, and a keychain gone unreachable since cannot stop them.
+func TestMarksNeverReadTheKeychain(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	if _, err := SaveCredential(dir, config.DefaultProfile, orgCredential("org-a", "s1")); err != nil {
+		t.Fatal(err)
+	}
+	unlock := secret.FailForTest(t, dir)
+	markOf := func() (time.Time, string) {
+		t.Helper()
+		cred, err := LoadIdentity(dir, config.DefaultProfile)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return cred.RefreshUnsettledAt, cred.RefreshUnsettledFor
+	}
+	sum := TokenSHA256("ter_clr_org-a")
+	at := time.Now().Round(0).Truncate(time.Second)
+	if err := lockedWrite(dir, func(tx *Tx) error { return tx.MarkUnsettled(config.DefaultProfile, "org-a", "ter_clr_org-a", at) }); err != nil {
+		t.Fatalf("MarkUnsettled with the keychain locked: %v", err)
+	}
+	if got, of := markOf(); !got.Equal(at) || of != sum {
+		t.Fatalf("mark = %v of %q, want %v of the token's SHA-256", got, of, at)
+	}
+	if err := lockedWrite(dir, func(tx *Tx) error { return tx.ClearUnsettled(config.DefaultProfile, "org-a", "ter_clr_org-a", at) }); err != nil {
+		t.Fatalf("ClearUnsettled with the keychain locked: %v", err)
+	}
+	if got, of := markOf(); !got.IsZero() || of != "" {
+		t.Fatalf("mark = %v of %q after clearing it, want none", got, of)
+	}
+	if err := lockedWrite(dir, func(tx *Tx) error { return tx.ExpireUnsettled(config.DefaultProfile, "org-a", "ter_clr_org-a") }); err != nil {
+		t.Fatalf("ExpireUnsettled with the keychain locked: %v", err)
+	}
+	unlock()
+	cred, err := LoadCredential(dir, config.DefaultProfile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := cred.UnsettledSince(); !got.Equal(UnsettledExpired) {
+		t.Errorf("mark = %v, want it expired", got)
+	}
+}
+
 // An organization id with characters a keychain backend could misread, as a hostile
 // server could send, is still kept in the keychain, under an encoded name.
 func TestAnOddOrganizationIDIsKeptInTheKeychain(t *testing.T) {

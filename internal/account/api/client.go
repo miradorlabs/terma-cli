@@ -95,6 +95,18 @@ type Client struct {
 	// unsaved holds the refresh tokens this client spent since its last successful save.
 	// A store that still holds one of them is behind this client.
 	unsaved []string
+	// refusedToken is the refresh token the server last refused, which is never sent again.
+	refusedToken string
+	// exchangeBudget, when set, replaces RefreshBudget, so a test need not wait 40 s.
+	exchangeBudget time.Duration
+	// now, when set, replaces time.Now, so a test can move the wall clock.
+	now func() time.Time
+	// unsettled is this client's own mark of a refresh it sent without an answer
+	// (markUnsettled), which counts with the mark of the pair a refresh reads under the
+	// credential lock (unsettledSince).
+	unsettled unsettledMark
+	// pauseUnit, when set, replaces the second the pauses between attempts are made of.
+	pauseUnit time.Duration
 	// refreshing is a one-slot semaphore for this process's token exchanges. The
 	// credential lock serializes them across processes.
 	refreshing chan struct{}

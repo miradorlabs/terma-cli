@@ -8,6 +8,8 @@ package auth
 
 import (
 	"cmp"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -43,6 +45,38 @@ type Credential struct {
 	// StaleKeychainItem marks a credential kept in the file while its earlier tokens may
 	// still sit in the keychain, which could not remove them then; sign-out tries again.
 	StaleKeychainItem bool `json:"stale_keychain_item,omitempty"`
+	// RefreshUnsettledAt is when a refresh of this pair was first sent whose answer has not
+	// come: the server may have spent RefreshToken then. Zero when none is outstanding, and
+	// UnsettledExpired once it may never be sent again. It is no secret, so credentials.json
+	// keeps it beside the keychain's tokens; a new pair has none. Read it with
+	// UnsettledSince, which checks that it is about this pair's refresh token.
+	RefreshUnsettledAt time.Time `json:"refresh_unsettled_at,omitzero"`
+	// RefreshUnsettledFor names the refresh token RefreshUnsettledAt is about, by its
+	// SHA-256 in hex. A save whose keychain write landed and whose credentials.json write
+	// did not leaves the mark beside tokens it is not about, and then it does not count.
+	RefreshUnsettledFor string `json:"refresh_unsettled_for,omitempty"`
+}
+
+// UnsettledExpired is the mark of a refresh token that may never be sent again: one whose
+// refresh went unanswered past its budget, or whose mark was found in the future after the
+// wall clock went back. It is earlier than every real mark, so it is never in budget again,
+// whatever the clock does next, and no later mark replaces it (Tx.MarkUnsettled).
+var UnsettledExpired = time.Unix(1, 0).UTC()
+
+// UnsettledSince is when a refresh of c's refresh token was first sent without an answer,
+// or zero when none is outstanding, or the mark is about another token.
+func (c *Credential) UnsettledSince() time.Time {
+	if c.RefreshUnsettledAt.IsZero() || c.RefreshUnsettledFor != TokenSHA256(c.RefreshToken) {
+		return time.Time{}
+	}
+	return c.RefreshUnsettledAt
+}
+
+// TokenSHA256 is how a token is named where the token itself must not appear: its
+// SHA-256, in lowercase hex.
+func TokenSHA256(token string) string {
+	sum := sha256.Sum256([]byte(token))
+	return hex.EncodeToString(sum[:])
 }
 
 // ErrWrongEnvironment reports a credential issued by a different auth host than the
@@ -258,21 +292,27 @@ func (tx *Tx) saveReplacing(profile string, cred *Credential) (replaced *Credent
 // process may have rotated the pair or signed in again since, and writing back the older
 // pair would give the next refresh a spent refresh token. It returns the credential as
 // saved.
+//
+// An entry gone since is not restored: ErrNotLoggedIn. Another process may have removed
+// it on the server's refusal of its refresh token (Tx.DeleteFor), and cred may hold that
+// token.
 func ResaveCredential(dir, profile string, cred *Credential) (*Credential, error) {
-	saved := cred
+	var saved *Credential
 	err := lockedWrite(dir, func(tx *Tx) error {
-		switch stored, err := tx.LoadFor(profile, cred.OrganizationID); {
-		case err == nil:
-			stored.UserEmail = cmp.Or(stored.UserEmail, cred.UserEmail)
-			stored.UserID = cmp.Or(stored.UserID, cred.UserID)
-			saved = stored
-		case !errors.Is(err, ErrNotLoggedIn):
-			// Unreadable is not absent: what is stored may be newer than cred.
+		stored, err := tx.LoadFor(profile, cred.OrganizationID)
+		if err != nil {
+			// Absent, or unreadable, which is not absent: what is stored may be newer than cred.
 			return err
 		}
+		stored.UserEmail = cmp.Or(stored.UserEmail, cred.UserEmail)
+		stored.UserID = cmp.Or(stored.UserID, cred.UserID)
+		saved = stored
 		return tx.save(profile, saved)
 	})
-	return saved, err
+	if err != nil {
+		return nil, err
+	}
+	return saved, nil
 }
 
 // UpdateCredential persists a refreshed credential without changing which organization
