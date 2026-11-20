@@ -70,6 +70,9 @@ func (s *refreshScript) serve(w http.ResponseWriter, r *http.Request) {
 	case "401":
 		w.WriteHeader(http.StatusUnauthorized)
 		w.Write([]byte(`{"error":{"code":"UNAUTHENTICATED","message":"invalid refresh token"}}`))
+	case "401 bare":
+		w.WriteHeader(http.StatusUnauthorized)
+		w.Write([]byte("Unauthorized\n"))
 	default:
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"access_token": fmt.Sprintf("access-%d", n+1), "refresh_token": fmt.Sprintf("refresh-%d", n+1),
@@ -355,6 +358,37 @@ func TestARotationOutlivesItsCaller(t *testing.T) {
 	}
 	if got := storedPair(t, c); got.RefreshToken != "refresh-2" || !got.RefreshInDoubtSince.IsZero() {
 		t.Fatalf("stored %+v, want the rotation with no doubt left", got)
+	}
+}
+
+// The auth gateway's own 401 ends the sign-in: the stored pair goes, so no process
+// presents the refused token again.
+func TestARefusedRefreshRemovesTheSignIn(t *testing.T) {
+	script := &refreshScript{answers: []string{"401"}}
+	c := expiredClient(t, script)
+	err := c.Refresh(context.Background())
+	if !errors.Is(err, auth.ErrNotLoggedIn) {
+		t.Fatalf("refresh = %v, want the sign-in over", err)
+	}
+	if _, err := auth.LoadCredential(c.dir, config.DefaultProfile); !errors.Is(err, auth.ErrNotLoggedIn) {
+		t.Fatalf("the refused sign-in is still stored (%v)", err)
+	}
+}
+
+// A 401 without the gateway's envelope, a proxy's, signs no one out and leaves nothing in
+// doubt: the request never reached the auth host.
+func TestABare401KeepsTheSignIn(t *testing.T) {
+	script := &refreshScript{answers: []string{"401 bare"}}
+	c := expiredClient(t, script)
+	err := c.Refresh(context.Background())
+	if err == nil || errors.Is(err, auth.ErrNotLoggedIn) {
+		t.Fatalf("refresh = %v, want a plain error", err)
+	}
+	if got := storedPair(t, c); got.RefreshToken != "refresh-0" || !got.RefreshInDoubtSince.IsZero() {
+		t.Fatalf("stored %+v, want the pair kept with no doubt", got)
+	}
+	if err := c.Refresh(context.Background()); err != nil {
+		t.Fatalf("the next refresh: %v", err)
 	}
 }
 

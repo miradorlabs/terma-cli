@@ -107,7 +107,14 @@ func (c *Client) postToken(ctx context.Context, body tokenRequest) (*tokenRespon
 
 	var out tokenResponse
 	if err := decode(resp, &out); err != nil {
-		if apiErr, ok := errors.AsType[*Error](err); ok && apiErr.Unauthenticated() {
+		apiErr, ok := errors.AsType[*Error](err)
+		switch {
+		case !ok || !apiErr.Unauthenticated():
+		case body.GrantType == "refresh_token" && apiErr.Code != "UNAUTHENTICATED":
+			// A 401 without the auth gateway's envelope, maybe a proxy's, says nothing of
+			// the session: no sign-out, so apiErr is not wrapped.
+			return nil, fmt.Errorf("the token endpoint answered 401 without the auth gateway's refusal: %w", apiErr)
+		default:
 			return nil, fmt.Errorf("%w: %w", auth.ErrNotLoggedIn, apiErr)
 		}
 		return nil, err

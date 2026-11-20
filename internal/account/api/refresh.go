@@ -23,7 +23,8 @@ import (
 //     attempt; past it the sign-in ends rather than present a spent token after the grace.
 //     A Retry-After that would end past the budget ends it at once, deliberately: no send
 //     may land after the grace.
-//   - 401: the session is over.
+//   - 401 in the auth gateway's envelope: the session is over, and the stored pair goes,
+//     compare-and-set on its refresh token. A bare 401, maybe a proxy's, spent nothing.
 //
 // The store records when the refresh came into doubt before the token first leaves, so a
 // process killed mid-request leaves the next one the same budget; the mark goes again only
@@ -74,6 +75,9 @@ func (c *Client) redeem(ctx context.Context, held, current *auth.Credential, red
 		case refreshRotated:
 			return c.keepRotation(tx, current, c.credentialFrom(resp))
 		case refreshOver:
+			if tx != nil {
+				_ = tx.DeleteIf(c.profile, current.RefreshToken)
+			}
 			return fmt.Errorf("%w: session expired, run `terma setup`", err)
 		case refreshSuperseded:
 			clean = false
@@ -123,6 +127,9 @@ func classifyRefresh(err error) (kind int, wait time.Duration) {
 		return refreshSuperseded, 0
 	case isAPI && (apiErr.StatusCode >= 500 || apiErr.StatusCode == http.StatusRequestTimeout):
 		return refreshInDoubt, cmp.Or(apiErr.RetryAfter, defaultRetryAfter)
+	case isAPI && apiErr.Unauthenticated():
+		// A bare 401 (postToken wraps the gateway's own as ErrNotLoggedIn, above).
+		return refreshUnspent, 0
 	case !isAPI && !notSent(err):
 		return refreshInDoubt, defaultRetryAfter
 	default:
