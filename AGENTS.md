@@ -111,7 +111,8 @@ the relay stamps on the session's records (`stampCheckout`): its origin, branch 
 it is a linked worktree under any policy (`vcs.*`, `terma.repository.worktree.linked`), and
 its working tree, the directory in it and the worktree's name with tool content only
 (`terma.repository.root`, `terma.working_directory`, `terma.repository.worktree.name`). A subagent's
-claim names the session that opened it, which the relay stamps as `terma.session.parent.id`
+claim names the session that opened it where the agent's own telemetry does not (omp's,
+`hookrun.Extension.ClaimParent`), which the relay stamps as `terma.session.parent.id`
 (`stampParent`). Hook events never pass the relay, so delivery applies
 the same rules when it sends them. A session marked not collected is dropped on arrival;
 everything else unclaimed is held briefly and dropped: nothing unclaimed leaves the
