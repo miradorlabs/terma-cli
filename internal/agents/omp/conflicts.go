@@ -1,28 +1,30 @@
 package omp
 
 import (
-	_ "embed"
 	"os"
 	"strings"
 
 	"github.com/miradorlabs/terma-cli/internal/harness"
 )
 
-// ConflictsWith reports shell exports that would defeat or redirect e.
-func (c exporter) ConflictsWith(e harness.Exporter) ([]harness.Conflict, error) {
-	return ompConflicts(e), nil
-}
-
-// ompConflicts reports shell-exported OTEL_* variables that outrank the extension, which
-// never overrides what a developer exported on purpose.
+// ompConflicts reports shell-exported OTEL_* variables, which omp reads ahead of its .env:
+// an endpoint there takes the export somewhere else.
 func ompConflicts(e harness.Exporter) []harness.Conflict {
 	var out []harness.Conflict
 
-	if value := os.Getenv(harness.EnvOTLPEndpoint); value != "" && value != e.Endpoint {
+	endpoints := []string{harness.EnvOTLPEndpoint}
+	for _, s := range harness.AllSignals {
+		endpoints = append(endpoints, signalKey(s, "ENDPOINT"))
+	}
+	for _, key := range endpoints {
+		value := strings.TrimRight(os.Getenv(key), "/")
+		if value == "" || value == e.Endpoint || e.Endpoint != "" && strings.HasPrefix(value, e.Endpoint+"/v1/") {
+			continue
+		}
 		out = append(out, harness.Conflict{
-			Key:        harness.EnvOTLPEndpoint,
+			Key:        key,
 			Value:      value,
-			Reason:     "exported in your shell, where it takes effect regardless of what Terma's extension sets — the export goes there, not to Terma",
+			Reason:     "exported in your shell, where omp reads it ahead of its .env — the export goes there, not to Terma",
 			Credential: true,
 			Scope:      harness.ScopeEnvironment,
 			Clearable:  false,
@@ -53,11 +55,10 @@ func ompConflicts(e harness.Exporter) []harness.Conflict {
 	return out
 }
 
-// capturesContent reports whether an exported capture value keeps content on, as terma
-// always asks.
+// capturesContent reports whether a capture value keeps full content on, as omp reads it.
 func capturesContent(value string) bool {
 	switch strings.ToLower(strings.TrimSpace(value)) {
-	case "true", "1", "summary":
+	case "true", "1", "yes", ompCaptureContentFull:
 		return true
 	}
 	return false

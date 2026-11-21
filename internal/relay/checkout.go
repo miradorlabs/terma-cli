@@ -63,3 +63,13 @@ func stampCheckout(p *part, ran claim.Claim, toolContent bool) {
 		}
 	}
 }
+
+// stampParent names the session that opened the part's session for a subagent, from the
+// claim ran, so the backend can put the subagent's run in its parent's session: the relay's
+// to name, never the agent's.
+func stampParent(p *part, ran claim.Claim) {
+	unstamp(p, semconv.TermaSessionParentIDKey)
+	if ran.Parent != "" {
+		stamp(p, semconv.TermaSessionParentIDKey, ran.Parent)
+	}
+}

@@ -1,324 +1,370 @@
 package omp
 
 import (
+	"context"
 	"os"
 	"path/filepath"
-	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
+	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/harness"
-	"github.com/miradorlabs/terma-cli/internal/semconv"
 )
 
-// ompIn sandboxes omp's agent directory (OMP_DIR) and terma's own.
-func ompIn(t *testing.T) (exporter, string) {
+const relayToken = "relay-token-0123456789abcdef"
+
+// ompIn sandboxes omp's agent directory and terma's own, and returns the agent and the .env.
+func ompIn(t *testing.T) (Agent, string) {
 	t.Helper()
 	dir := t.TempDir()
-	t.Setenv(ompConfigOverride, dir)
-	return exporter{dir: filepath.Join(dir, "terma")}, filepath.Join(dir, "agent", "hooks", "pre", "terma.ts")
+	t.Setenv(envAgentDir, filepath.Join(dir, "agent"))
+	for _, k := range []string{harness.EnvOTLPEndpoint, harness.EnvOTLPProtocol, ompCaptureContentEnv,
+		signalKey(harness.SignalTraces, "ENDPOINT"), signalKey(harness.SignalLogs, "ENDPOINT"), signalKey(harness.SignalMetrics, "ENDPOINT")} {
+		t.Setenv(k, "")
+	}
+	return Agent{ConfigDir: filepath.Join(dir, "terma")}, filepath.Join(dir, "agent", ".env")
 }
 
-func ompExporter(t *testing.T, h exporter, helper bool) harness.Exporter {
+func relayConfig() agents.RelayConfig {
+	return agents.RelayConfig{Endpoint: "http://127.0.0.1:43180", Token: relayToken, HookCommand: []string{"/usr/local/bin/terma", "hook"}}
+}
+
+func write(t *testing.T, path, text string, mode os.FileMode) {
 	t.Helper()
-	e := baseExporter()
-	if helper {
-		path, err := harness.HelperFilePath(h.dir, h, "proj_123")
-		if err != nil {
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(text), mode); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func read(t *testing.T, path string) string {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(data)
+}
+
+// The developer's .env keeps every line terma does not manage; terma's keys win over theirs,
+// once each; a per-signal endpoint, header or switch already there is pointed at the relay
+// too; the file is private; and a teardown puts back exactly what was there.
+func TestRelayEnvSpliceAndTeardown(t *testing.T) {
+	a, env := ompIn(t)
+	const before = `# my omp settings
+ANTHROPIC_BASE_URL=https://proxy.example
+export OTEL_EXPORTER_OTLP_ENDPOINT=https://collector.example:4318 # company collector
+OTEL_EXPORTER_OTLP_TRACES_ENDPOINT="https://traces.example/v1/traces"
+OTEL_EXPORTER_OTLP_TRACES_HEADERS=x-team=blue
+OTEL_METRICS_EXPORTER=none
+NOTE="two
+lines"
+OTEL_EXPORTER_OTLP_ENDPOINT=https://later.example
+`
+	write(t, env, before, 0o644)
+
+	if _, err := a.ConfigureRelay(context.Background(), relayConfig()); err != nil {
+		t.Fatal(err)
+	}
+	after := read(t, env)
+	for _, keep := range []string{"# my omp settings", "ANTHROPIC_BASE_URL=https://proxy.example", "NOTE=\"two\nlines\""} {
+		if !strings.Contains(after, keep) {
+			t.Errorf("the developer's line %q is gone:\n%s", keep, after)
+		}
+	}
+	f, err := loadEnvFile(env)
+	if err != nil {
+		t.Fatal(err)
+	}
+	values := f.values()
+	for key, want := range map[string]string{
+		harness.EnvOTLPEndpoint:                      "http://127.0.0.1:43180/" + relayToken,
+		harness.EnvOTLPProtocol:                      harness.ProtocolHTTPProtobuf,
+		ompCaptureContentEnv:                         "full",
+		signalKey(harness.SignalTraces, "ENDPOINT"):  "http://127.0.0.1:43180/" + relayToken + "/v1/traces",
+		signalKey(harness.SignalLogs, "ENDPOINT"):    "http://127.0.0.1:43180/" + relayToken + "/v1/logs",
+		signalKey(harness.SignalMetrics, "ENDPOINT"): "http://127.0.0.1:43180/" + relayToken + "/v1/metrics",
+		signalKey(harness.SignalTraces, "HEADERS"):   "x-team=blue",
+		signalExporterKey(harness.SignalMetrics):     "otlp",
+		"NOTE":                                       "two\nlines",
+		"ANTHROPIC_BASE_URL":                         "https://proxy.example",
+	} {
+		if values[key] != want {
+			t.Errorf("%s = %q, want %q", key, values[key], want)
+		}
+	}
+	// A repository's .env that sets a signal's endpoint outranks this file, and omp would
+	// send it this file's headers: the token rides only in terma's own endpoints' path.
+	if strings.Contains(strings.ToLower(after), "authorization") || strings.Count(after, relayToken) != 4 {
+		t.Errorf("the token is somewhere other than the four endpoints:\n%s", after)
+	}
+	if n := strings.Count(after, harness.EnvOTLPEndpoint+"="); n != 1 {
+		t.Errorf("the common endpoint is in the file %d times, want once:\n%s", n, after)
+	}
+	if !strings.HasPrefix(after, "# my omp settings\nANTHROPIC_BASE_URL=https://proxy.example\nOTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:43180/"+relayToken+"\n") {
+		t.Errorf("terma's endpoint did not take the developer's line's place:\n%s", after)
+	}
+	if info, _ := os.Stat(env); info.Mode().Perm() != 0o600 {
+		t.Errorf(".env is %v: it holds the relay's token", info.Mode().Perm())
+	}
+	if pointed, known := a.RelayPointed("127.0.0.1:43180"); !known || !pointed {
+		t.Error("the .env it just wrote does not read as pointed at the relay")
+	}
+
+	if _, err := a.UnconfigureRelay(context.Background(), relayToken); err != nil {
+		t.Fatal(err)
+	}
+	restored, err := loadEnvFile(env)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := restored.values()
+	for key, want := range map[string]string{
+		harness.EnvOTLPEndpoint:                     "https://later.example",
+		signalKey(harness.SignalTraces, "ENDPOINT"): "https://traces.example/v1/traces",
+		signalKey(harness.SignalTraces, "HEADERS"):  "x-team=blue",
+		signalExporterKey(harness.SignalMetrics):    "none",
+		"NOTE":                                      "two\nlines",
+	} {
+		if got[key] != want {
+			t.Errorf("after teardown %s = %q, want %q", key, got[key], want)
+		}
+	}
+	for _, gone := range []string{harness.EnvOTLPProtocol, harness.EnvOTLPHeaders, ompCaptureContentEnv, signalKey(harness.SignalLogs, "ENDPOINT")} {
+		if _, ok := got[gone]; ok {
+			t.Errorf("teardown left %s, which the developer never set", gone)
+		}
+	}
+	if strings.Contains(read(t, env), relayToken) {
+		t.Error("teardown left the relay's token in the .env")
+	}
+	if j, err := harness.LoadJournal(a.ConfigDir, name, env); err != nil || j != nil {
+		t.Errorf("the journal outlived the teardown: %+v, %v", j, err)
+	}
+}
+
+// A .env setup created goes again at teardown, and a reconnect keeps the developer's
+// original values to restore, not terma's own.
+func TestRelayEnvReconnectAndRemoval(t *testing.T) {
+	a, env := ompIn(t)
+	write(t, env, "OTEL_EXPORTER_OTLP_PROTOCOL=grpc\n", 0o600)
+	for range 2 {
+		if _, err := a.ConfigureRelay(context.Background(), relayConfig()); err != nil {
 			t.Fatal(err)
 		}
-		e.HelperPath = path
 	}
-	return e
+	if _, err := a.UnconfigureRelay(context.Background(), relayToken); err != nil {
+		t.Fatal(err)
+	}
+	if got := read(t, env); got != "OTEL_EXPORTER_OTLP_PROTOCOL=grpc\n" {
+		t.Fatalf("after two setups and a teardown the .env is:\n%s", got)
+	}
+
+	if err := os.Remove(env); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := a.ConfigureRelay(context.Background(), relayConfig()); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := a.UnconfigureRelay(context.Background(), relayToken); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(env); !os.IsNotExist(err) {
+		t.Fatalf("the .env setup created outlived the teardown: %v", err)
+	}
 }
 
-// The embedded extension has exactly one config placeholder, or every connect installs
-// an inert extension.
-func TestOmpTemplateHasOneConfigLineAndOneExport(t *testing.T) {
-	t.Parallel()
-	if n := strings.Count(ompExtensionSource, ompConfigPlaceholder); n != 1 {
-		t.Fatalf("placeholder appears %d times, want 1", n)
+// A key the developer changed after setup is theirs: teardown leaves it, says so, and
+// doctor no longer reads omp as sending to the relay.
+func TestRelayEnvEditedAfterSetup(t *testing.T) {
+	a, env := ompIn(t)
+	if _, err := a.ConfigureRelay(context.Background(), relayConfig()); err != nil {
+		t.Fatal(err)
 	}
-	exports := 0
-	for line := range strings.SplitSeq(ompExtensionSource, "\n") {
-		if strings.HasPrefix(line, "export ") {
-			exports++
+	text := strings.Replace(read(t, env), "OTEL_EXPORTER_OTLP_LOGS_ENDPOINT=http://127.0.0.1:43180/"+relayToken+"/v1/logs", "OTEL_EXPORTER_OTLP_LOGS_ENDPOINT=https://mine.example/v1/logs", 1)
+	write(t, env, text, 0o600)
+	if pointed, _ := a.RelayPointed("127.0.0.1:43180"); pointed {
+		t.Error("a per-signal endpoint elsewhere still reads as pointed at the relay")
+	}
+	res, err := a.UnconfigureRelay(context.Background(), relayToken)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.ContainsFunc(res.Notes, func(n string) bool { return strings.Contains(n, "OTEL_EXPORTER_OTLP_LOGS_ENDPOINT") }) {
+		t.Errorf("teardown did not name the key it left: %v", res.Notes)
+	}
+	if got := read(t, env); got != "OTEL_EXPORTER_OTLP_LOGS_ENDPOINT=https://mine.example/v1/logs\n" {
+		t.Errorf("teardown left:\n%s", got)
+	}
+}
+
+// omp switches a signal off whose exporter list names no otlp, as it does one naming none:
+// such a signal is not read as exporting, setup turns it on, and teardown puts the list back.
+func TestRelayEnvExporterListWithoutOTLP(t *testing.T) {
+	a, env := ompIn(t)
+	write(t, env, "OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:43180/"+relayToken+"\nOTEL_TRACES_EXPORTER=console\n", 0o600)
+	st, err := a.Harness().Status()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if slices.Contains(st.Signals, harness.SignalTraces) {
+		t.Errorf("traces read as exported though their exporter is console: %v", st.Signals)
+	}
+	if _, err := a.ConfigureRelay(context.Background(), relayConfig()); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(read(t, env), "OTEL_TRACES_EXPORTER=otlp\n") {
+		t.Errorf("setup left traces off:\n%s", read(t, env))
+	}
+	if _, err := a.UnconfigureRelay(context.Background(), relayToken); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(read(t, env), "OTEL_TRACES_EXPORTER=console\n") {
+		t.Errorf("teardown did not restore the list:\n%s", read(t, env))
+	}
+}
+
+// An earlier setup sent the token in an Authorization header; the next one takes each header
+// it wrote back to what the developer had, and teardown leaves that.
+func TestRelayEnvRetiresTheTokenHeader(t *testing.T) {
+	a, env := ompIn(t)
+	write(t, env, "OTEL_EXPORTER_OTLP_TRACES_HEADERS=x-team=blue\n", 0o600)
+	auth := "authorization=Bearer%20" + relayToken
+	headers := []string{harness.EnvOTLPHeaders, signalKey(harness.SignalTraces, "HEADERS")}
+	blue := "x-team=blue"
+	earlier := harness.NewJournal(name, env, map[string]string{headers[1]: blue}, map[string]string{headers[0]: auth, headers[1]: auth}, nil, nil, nil)
+	if err := earlier.Save(a.ConfigDir); err != nil {
+		t.Fatal(err)
+	}
+	write(t, env, headers[1]+"="+auth+"\n"+headers[0]+"="+auth+"\n", 0o600)
+
+	if _, err := a.ConfigureRelay(context.Background(), relayConfig()); err != nil {
+		t.Fatal(err)
+	}
+	after := read(t, env)
+	if strings.Contains(strings.ToLower(after), "authorization") || !strings.Contains(after, headers[1]+"="+blue+"\n") {
+		t.Fatalf("setup kept a token header or lost the developer's:\n%s", after)
+	}
+	if pointed, _ := a.RelayPointed("127.0.0.1:43180"); !pointed {
+		t.Error("the .env does not read as pointed at the relay")
+	}
+	if _, err := a.UnconfigureRelay(context.Background(), relayToken); err != nil {
+		t.Fatal(err)
+	}
+	if got := read(t, env); got != headers[1]+"="+blue+"\n" {
+		t.Errorf("teardown left:\n%s", got)
+	}
+}
+
+// A .env that links to a file kept elsewhere is written through, and teardown leaves the
+// link resolving to an emptied file, which a later setup can write again.
+func TestRelayEnvSymlinkedTeardown(t *testing.T) {
+	a, env := ompIn(t)
+	target := filepath.Join(t.TempDir(), "dotfiles", "omp.env")
+	write(t, target, "", 0o600)
+	if err := os.MkdirAll(filepath.Dir(env), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(target, env); err != nil {
+		t.Fatal(err)
+	}
+	for range 2 {
+		if _, err := a.ConfigureRelay(context.Background(), relayConfig()); err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(read(t, target), relayToken) {
+			t.Fatal("setup did not write through the link")
+		}
+		if _, err := a.UnconfigureRelay(context.Background(), relayToken); err != nil {
+			t.Fatal(err)
+		}
+		if got := read(t, target); got != "" {
+			t.Fatalf("after teardown the linked file holds:\n%s", got)
 		}
 	}
-	// omp's hook loader treats every export as a hook factory; a stray helper export
-	// would make the hook fail to load.
-	if exports != 1 {
-		t.Fatalf("extension has %d exports, want exactly 1 (the hook factory)", exports)
-	}
-	if _, ok := readOmpExtensionConfig([]byte(ompExtensionSource)); ok {
-		t.Fatal("the raw template must read as unconfigured")
+	if info, err := os.Lstat(env); err != nil || info.Mode()&os.ModeSymlink == 0 {
+		t.Fatalf("the link is gone: %v, %v", info, err)
 	}
 }
 
-func TestOmpConnectWritesExtensionAndHelper(t *testing.T) {
-	h, path := ompIn(t)
-	e := ompExporter(t, h, true)
-	if err := h.Connect(e, false); err != nil {
-		t.Fatalf("connect: %v", err)
-	}
-
-	data, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatalf("extension not written: %v", err)
-	}
-	if strings.Contains(string(data), ompConfigPlaceholder) {
-		t.Fatal("placeholder left in place")
-	}
-	if strings.Contains(string(data), e.APIKey) {
-		t.Fatal("the key landed in the extension file; it belongs in the helper")
-	}
-	cfg, ok := readOmpExtensionConfig(data)
-	if !ok {
-		t.Fatal("config line not readable back")
-	}
-	if cfg.Endpoint != e.Endpoint || cfg.HeadersHelper != e.HelperPath || len(cfg.Headers) != 0 {
-		t.Errorf("config = %+v", cfg)
-	}
-	if !reflect.DeepEqual(cfg.Signals, []string{"traces", "logs", "metrics"}) || !cfg.IncludePrompts || !cfg.IncludeToolContent {
-		t.Errorf("policy = %v / %v / %v, want every signal and all content", cfg.Signals, cfg.IncludePrompts, cfg.IncludeToolContent)
-	}
-	if cfg.ResourceAttributes[semconv.MiradorProjectIDKey] != "proj_123" || cfg.ResourceAttributes[harness.AttrEnduserID] != "dev@example.com" {
-		t.Errorf("resource attributes = %v", cfg.ResourceAttributes)
-	}
-	if !reflect.DeepEqual(cfg.HookCommand, []string{"terma", "hook"}) {
-		t.Errorf("hook command = %v", cfg.HookCommand)
-	}
-	// No secret in the file, so it is readable like any other hook.
-	if info, _ := os.Stat(path); info.Mode().Perm() != 0o644 {
-		t.Errorf("extension mode = %o, want 0644", info.Mode().Perm())
-	}
-	if info, err := os.Stat(e.HelperPath); err != nil || info.Mode().Perm() != 0o700 {
-		t.Fatalf("helper: %v, mode %v", err, info)
-	}
-	if harness.KeyFromHelper(e.HelperPath) != e.APIKey {
-		t.Fatal("helper does not hold the key")
-	}
-	// The user's own config was never touched.
-	if _, err := os.Stat(filepath.Join(filepath.Dir(filepath.Dir(path)), "config.yml")); err == nil {
-		t.Fatal("connect wrote config.yml")
-	}
-}
-
-func TestOmpStatusRoundTrip(t *testing.T) {
-	h, path := ompIn(t)
-	st, err := h.Status()
-	if err != nil || st.Exists || st.Connected || st.ManagedKeys != 0 || st.ConfigPath != path {
-		t.Fatalf("empty status = %+v, %v", st, err)
-	}
-
-	e := ompExporter(t, h, true)
-	e.Signals = []harness.Signal{harness.SignalTraces, harness.SignalLogs}
-	if err := h.Connect(e, false); err != nil {
-		t.Fatal(err)
-	}
-	st, err = h.Status()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !st.Exists || !st.Connected || st.Endpoint != e.Endpoint || st.ManagedKeys != 1 {
-		t.Errorf("status = %+v", st)
-	}
-	if !reflect.DeepEqual(st.Signals, []harness.Signal{harness.SignalTraces, harness.SignalLogs}) {
-		t.Errorf("signals = %v", st.Signals)
-	}
-	if st.KeyPrefix != harness.MaskKey(e.APIKey) || strings.Contains(st.KeyPrefix, e.APIKey[len(e.APIKey)-6:]) {
-		t.Errorf("key prefix = %q", st.KeyPrefix)
-	}
-	if st.ProjectID != "proj_123" {
-		t.Errorf("project = %q", st.ProjectID)
-	}
-
-	key, ok := h.CurrentCredential(e.Endpoint, "proj_123")
-	if !ok || key != e.APIKey {
-		t.Errorf("CurrentCredential = %q, %v", key, ok)
-	}
-	if _, ok := h.CurrentCredential(e.Endpoint, "other"); ok {
-		t.Error("a key for another project must not be reused")
-	}
-	if _, ok := h.CurrentCredential("https://elsewhere.example.com", "proj_123"); ok {
-		t.Error("a key for another endpoint must not be reused")
-	}
-}
-
-// A hook file without terma's config line exists but is not managed, and disconnect
-// leaves it.
-func TestOmpForeignExtensionIsNotOurs(t *testing.T) {
-	h, path := ompIn(t)
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	src := []byte("// my own hook\nexport default function (pi) {}\n")
-	if err := os.WriteFile(path, src, 0o644); err != nil {
-		t.Fatal(err)
-	}
-	st, err := h.Status()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !st.Exists || st.Connected || st.ManagedKeys != 0 {
-		t.Errorf("status = %+v", st)
-	}
-	result, err := h.Disconnect()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if result.Removed != 0 {
-		t.Errorf("removed %d foreign files", result.Removed)
-	}
-	data, _ := os.ReadFile(path)
-	if string(data) != string(src) {
-		t.Error("foreign extension was modified")
-	}
-}
-
-func TestOmpInlineKeyIsTightened(t *testing.T) {
-	h, path := ompIn(t)
-	e := ompExporter(t, h, false)
-	if err := h.Connect(e, false); err != nil {
-		t.Fatal(err)
-	}
-	if info, _ := os.Stat(path); info.Mode().Perm() != 0o600 {
-		t.Errorf("mode = %o, want 0600 with the key inline", info.Mode().Perm())
-	}
-	st, _ := h.Status()
-	if !st.Connected || st.KeyPrefix != harness.MaskKey(e.APIKey) {
-		t.Errorf("status = %+v", st)
-	}
-	if key, ok := h.CurrentCredential(e.Endpoint, "proj_123"); !ok || key != e.APIKey {
-		t.Errorf("CurrentCredential = %q, %v", key, ok)
-	}
-}
-
-func TestOmpDisconnectRemovesExtensionAndHelper(t *testing.T) {
-	h, path := ompIn(t)
-	e := ompExporter(t, h, true)
-	if err := h.Connect(e, false); err != nil {
-		t.Fatal(err)
-	}
-	result, err := h.Disconnect()
-	if err != nil || result.Removed != 1 {
-		t.Fatalf("disconnect = %+v, %v", result, err)
-	}
-	if _, err := os.Stat(path); err == nil {
-		t.Error("extension still present")
-	}
-	if _, err := os.Stat(e.HelperPath); err == nil {
-		t.Error("helper still present — the credential must go with the extension")
-	}
-	result, err = h.Disconnect()
-	if err != nil || result.Removed != 0 {
-		t.Fatalf("second disconnect = %+v, %v", result, err)
-	}
-}
-
-// A helper outside terma's helpers directory is the user's and is left alone.
-func TestOmpDisconnectLeavesForeignHelper(t *testing.T) {
-	h, path := ompIn(t)
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	foreign := filepath.Join(t.TempDir(), "my-helper")
-	if err := os.WriteFile(foreign, []byte("#!/bin/sh\n"), 0o700); err != nil {
-		t.Fatal(err)
-	}
-	cfg := ompConfig{Version: 1, Endpoint: "https://otel.terma.ai", HeadersHelper: foreign, Signals: []string{"traces"}}
-	src, err := renderOmpExtension(cfg)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(path, src, 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := h.Disconnect(); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := os.Stat(foreign); err != nil {
-		t.Errorf("foreign helper removed: %v", err)
-	}
-}
-
-// The repository-scope file carries the policy and no endpoint, key or identity.
-func TestOmpLocalPolicyCarriesNoCredential(t *testing.T) {
-	t.Parallel()
-	root := t.TempDir()
-	local := exporter{root: root}
-	e := ompExporter(t, local, true)
-	if err := local.Connect(e, false); err != nil {
-		t.Fatal(err)
-	}
-	path := filepath.Join(root, ompLocalPolicy)
-	data, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, secret := range []string{e.APIKey, e.Endpoint, "proj_123", "dev@example.com", e.HelperPath} {
-		if strings.Contains(string(data), secret) {
-			t.Errorf("local policy carries %q", secret)
+// omp's agent directory is PI_CODING_AGENT_DIR, else ~/$PI_CONFIG_DIR/agent, else ~/.omp/agent.
+func TestAgentDirFollowsOmp(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	for _, tc := range []struct{ agentDir, configDir, want string }{
+		{"", "", filepath.Join(home, ".omp", "agent", ".env")},
+		{"", ".omp-work", filepath.Join(home, ".omp-work", "agent", ".env")},
+		{filepath.Join(home, "custom"), ".omp-work", filepath.Join(home, "custom", ".env")},
+	} {
+		t.Setenv(envAgentDir, tc.agentDir)
+		t.Setenv(envConfigDir, tc.configDir)
+		if got, err := (exporter{}).ConfigPath(); err != nil || got != tc.want {
+			t.Errorf("PI_CODING_AGENT_DIR=%q PI_CONFIG_DIR=%q: %s, %v; want %s", tc.agentDir, tc.configDir, got, err, tc.want)
 		}
 	}
-	st, err := local.Status()
-	if err != nil || !st.Exists || !st.HasPolicy || st.Connected {
-		t.Errorf("local status = %+v, %v", st, err)
-	}
-	if !reflect.DeepEqual(st.Signals, []harness.Signal{harness.SignalTraces, harness.SignalLogs, harness.SignalMetrics}) {
-		t.Errorf("signals = %v", st.Signals)
-	}
-	if _, ok := local.CurrentCredential(e.Endpoint, "proj_123"); ok {
-		t.Error("a repository scope holds no credential")
-	}
-	if _, err := local.Disconnect(); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := os.Stat(path); err == nil {
-		t.Error("local policy still present")
-	}
 }
 
-func TestOmpConflicts(t *testing.T) {
-	e := harness.Exporter{Endpoint: "https://otel.terma.ai"}
+// Setup replaces the span-exporting extension and the exporter hook an earlier terma wrote,
+// leaves a developer's own file of either name, and writes an extension that holds no
+// token: it only hands sessions and edits to terma's hooks.
+func TestConfigureRelayReplacesLegacyFiles(t *testing.T) {
+	a, env := ompIn(t)
+	dir := filepath.Dir(env)
+	legacy := filepath.Join(dir, "extensions", "terma-relay.ts")
+	hook := filepath.Join(dir, "hooks", "pre", "terma.ts")
+	write(t, legacy, "// Terma extension for Pi (@earendil-works/pi-coding-agent) and omp\nconst CONFIG = {}\n", 0o600)
+	write(t, hook, "// my own pre hook\n", 0o644)
 
-	// A shell export pointing elsewhere defeats the extension's set.
-	t.Setenv(harness.EnvOTLPEndpoint, "https://other.example.com")
-	conflicts, err := (exporter{}).ConflictsWith(e)
+	res, err := a.ConfigureRelay(context.Background(), relayConfig())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(conflicts) != 1 || !conflicts[0].Credential || conflicts[0].Clearable {
-		t.Errorf("endpoint conflict = %+v", conflicts)
+	if _, err := os.Stat(legacy); !os.IsNotExist(err) {
+		t.Errorf("the legacy extension is still there: %v", err)
+	}
+	if read(t, hook) != "// my own pre hook\n" {
+		t.Error("setup removed a hook terma did not write")
+	}
+	ext := filepath.Join(dir, "extensions", "terma-omp.ts")
+	body := read(t, ext)
+	for _, want := range []string{`"agent":"omp"`, `"lifecycle":true`, `"endpoint":""`, `"hookCommand":["/usr/local/bin/terma","hook"]`} {
+		if !strings.Contains(body, want) {
+			t.Errorf("extension lacks %s", want)
+		}
+	}
+	if strings.Contains(body, relayToken) {
+		t.Error("the extension holds the relay's token; only the .env should")
+	}
+	for _, want := range []string{env, ext, legacy} {
+		if !slices.Contains(res.Paths, want) {
+			t.Errorf("result paths %v lack %s", res.Paths, want)
+		}
 	}
 
-	t.Setenv(harness.EnvOTLPEndpoint, e.Endpoint)
-	if conflicts, _ := (exporter{}).ConflictsWith(e); len(conflicts) != 0 {
-		t.Errorf("same endpoint should not conflict: %+v", conflicts)
+	if _, err := a.UnconfigureRelay(context.Background(), relayToken); err != nil {
+		t.Fatal(err)
 	}
-
-	// A protocol mismatch would silently disable the export.
-	t.Setenv(harness.EnvOTLPEndpoint, "")
-	t.Setenv(harness.EnvOTLPProtocol, "grpc")
-	conflicts, _ = (exporter{}).ConflictsWith(e)
-	if len(conflicts) != 1 || conflicts[0].Key != harness.EnvOTLPProtocol {
-		t.Errorf("protocol conflict = %+v", conflicts)
-	}
-
-	// The upstream content switch exported in the shell is advisory, never blocking.
-	t.Setenv(harness.EnvOTLPProtocol, "")
-	t.Setenv(ompCaptureContentEnv, "false")
-	conflicts, _ = (exporter{}).ConflictsWith(harness.Exporter{Endpoint: e.Endpoint})
-	if len(conflicts) != 1 || !conflicts[0].Advisory {
-		t.Errorf("content-capture conflict should be advisory: %+v", conflicts)
-	}
-	t.Setenv(ompCaptureContentEnv, "true")
-	if conflicts, _ := (exporter{}).ConflictsWith(harness.Exporter{Endpoint: e.Endpoint}); len(conflicts) != 0 {
-		t.Errorf("a matching content export should not conflict: %+v", conflicts)
+	if _, err := os.Stat(ext); !os.IsNotExist(err) {
+		t.Errorf("teardown left the extension: %v", err)
 	}
 }
 
-func baseExporter() harness.Exporter {
-	return harness.Exporter{Endpoint: "https://otel.terma.ai", APIKey: "ter_srv_0123456789abcdef", ProjectID: "proj_123", Signals: harness.AllSignals,
-		ResourceAttributes: map[string]string{harness.AttrServiceName: "omp", harness.AttrEnduserID: "dev@example.com", semconv.MiradorProjectIDKey: "proj_123"}}
+// A shell export outranks the .env: an endpoint elsewhere is a credential conflict, the
+// relay's own is none.
+func TestShellExportsConflict(t *testing.T) {
+	_, _ = ompIn(t)
+	e := harness.Exporter{Endpoint: "http://127.0.0.1:43180"}
+	t.Setenv(signalKey(harness.SignalTraces, "ENDPOINT"), "http://127.0.0.1:43180/v1/traces")
+	if c := ompConflicts(e); len(c) != 0 {
+		t.Fatalf("the relay's own endpoint is a conflict: %+v", c)
+	}
+	t.Setenv(harness.EnvOTLPEndpoint, "https://collector.example")
+	t.Setenv(ompCaptureContentEnv, "summary")
+	c := ompConflicts(e)
+	if len(c) != 2 || c[0].Key != harness.EnvOTLPEndpoint || !c[0].Credential || c[1].Key != ompCaptureContentEnv || !c[1].Advisory {
+		t.Fatalf("conflicts = %+v", c)
+	}
 }

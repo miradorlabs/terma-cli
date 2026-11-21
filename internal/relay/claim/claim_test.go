@@ -450,3 +450,25 @@ func TestClaimFollowsTheBranch(t *testing.T) {
 		}
 	}
 }
+
+// A subagent's parent, named by its start hook, stays the session's: a later hook that names
+// none keeps it, the placement a record is judged by carries it, and naming it for the first
+// time rewrites a fresh claim.
+func TestClaimKeepsItsParent(t *testing.T) {
+	t.Parallel()
+	dir := enable(t)
+	now := time.Now()
+	Write(dir, "child", Claim{ProjectID: "p1", Tool: "omp", PIDs: []int{7}}, now)
+	if !Write(dir, "child", Claim{ProjectID: "p1", Tool: "omp", PIDs: []int{7}, Parent: "parent"}, now.Add(time.Second)) {
+		t.Fatal("a fresh claim was not rewritten to name its parent")
+	}
+	Write(dir, "child", Claim{ProjectID: "p1", PIDs: []int{8}}, now.Add(2*time.Second))
+	Write(dir, "child", Claim{ProjectID: "p2", PIDs: []int{9}}, now.Add(3*time.Second))
+	c, ok := Read(dir, "child", now.Add(3*time.Second))
+	if !ok || c.Parent != "parent" {
+		t.Fatalf("claim = %+v, %v; want it to keep its parent", c, ok)
+	}
+	if at, ok := c.At(8, now.Add(2*time.Second)); !ok || at.Parent != "parent" {
+		t.Fatalf("the placement lost the parent: %+v, %v", at, ok)
+	}
+}
