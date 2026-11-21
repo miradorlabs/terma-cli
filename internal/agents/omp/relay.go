@@ -10,7 +10,6 @@ import (
 	"slices"
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
-	"github.com/miradorlabs/terma-cli/internal/agents/internal/pifamily"
 	"github.com/miradorlabs/terma-cli/internal/agents/internal/relayexport"
 	"github.com/miradorlabs/terma-cli/internal/harness"
 )
@@ -37,7 +36,7 @@ func (a Agent) ConfigureRelay(_ context.Context, cfg agents.RelayConfig) (agents
 	if path, err := a.Harness().ConfigPath(); err == nil {
 		result.Paths = append(result.Paths, path)
 	}
-	ext, err := pifamily.Write(filepath.Join(dir, extensionPath), pifamily.ForHooks(name, cfg))
+	ext, err := writeExtension(filepath.Join(dir, extensionPath), cfg.HookCommand)
 	if err != nil {
 		return result, err
 	}

@@ -330,7 +330,7 @@ func TestConfigureRelayReplacesLegacyFiles(t *testing.T) {
 	}
 	ext := filepath.Join(dir, "extensions", "terma-omp.ts")
 	body := read(t, ext)
-	for _, want := range []string{`"agent":"omp"`, `"lifecycle":true`, `"endpoint":""`, `"hookCommand":["/usr/local/bin/terma","hook"]`} {
+	for _, want := range []string{`"hookCommand":["/usr/local/bin/terma","hook"]`} {
 		if !strings.Contains(body, want) {
 			t.Errorf("extension lacks %s", want)
 		}

@@ -1,4 +1,4 @@
-package pifamily
+package omp
 
 import (
 	"encoding/json"
@@ -9,12 +9,10 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/miradorlabs/terma-cli/internal/agents"
 )
 
-// driver loads the rendered extension under Node with a stand-in for omp's extension API,
-// replays the events omp 19.0.1 fired for a session that ran a subagent (their shapes as
+// driver loads the rendered extension under Node with a stand-in for OMP's extension API,
+// replays the events OMP 19.0.1 fired for a session that ran a subagent (their shapes as
 // a probe extension recorded them), and records any export it attempts.
 const driver = `
 const [ext, fetched, tmp] = process.argv.slice(2)
@@ -41,20 +39,28 @@ const fs = await import("node:fs")
 fs.writeFileSync(tmp + "/Scout_2.jsonl", '{"type":"title","v":1,"title":""}\n{"type":"session","version":3,"id":"01a1fe3e-6e03-7557-b1af-a171883bcfca"}\n')
 const nested = { cwd: "/work", sessionManager: sm("01a1fe40-0000-7000-8000-000000000004", tmp + "/Scout_2/Inner.jsonl", { parentSession: tmp + "/Scout_2.jsonl" }) }
 await handlers.session_start({ reason: "startup" }, nested)
-await handlers.message_end({ message: { role: "assistant", model: "m", usage: { input: 1, output: 1 }, content: [] } }, parent)
+await handlers.message_end?.({ message: { role: "assistant", model: "m", usage: { input: 1, output: 1 }, content: [] } }, parent)
 await handlers.agent_end?.()
 await handlers.session_shutdown({}, parent)
 `
 
-// For omp the extension exports nothing and holds no token: it hands omp's hooks each
-// session's start, naming a subagent's parent (a nested one's too) but never a fork's, and each file a tool call
-// changed, successful ones only, with the call's id as omp's own spans name it.
-func TestHooksOnlyExtensionUnderNode(t *testing.T) {
-	byEvent, ext, fetched := runDriver(t, func(hook string) Config {
-		return ForHooks("omp", agents.RelayConfig{Endpoint: "http://127.0.0.1:43180", Token: "relay-token", HookCommand: []string{hook}})
-	})
-	if data, _ := os.ReadFile(ext); strings.Contains(string(data), "relay-token") {
-		t.Fatal("the hooks-only extension holds the relay's token")
+// OMP's extension exports nothing, neither spans nor logs, and holds no token: it hands
+// OMP's hooks each session's start, naming a subagent's parent (a nested one's too) but
+// never a fork's, and each file a tool call changed, successful ones only, with the call's
+// id as OMP's own spans name it.
+func TestExtensionUnderNode(t *testing.T) {
+	byEvent, ext, fetched := runDriver(t)
+	data, err := os.ReadFile(ext)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info, _ := os.Stat(ext); info.Mode().Perm() != 0o600 {
+		t.Errorf("extension is %v, want 0600", info.Mode().Perm())
+	}
+	for _, w := range []string{"relay-token", "127.0.0.1", "endpoint"} {
+		if strings.Contains(string(data), w) {
+			t.Errorf("the extension names %q", w)
+		}
 	}
 	starts := byEvent["omp-session-start"]
 	if len(starts) != 4 {
@@ -100,30 +106,10 @@ func TestHooksOnlyExtensionUnderNode(t *testing.T) {
 	}
 }
 
-// Pi's hooks are as they were: no start names a parent and no edit a tool call.
-func TestPiExtensionNamesNoParentOrCall(t *testing.T) {
-	byEvent, _, _ := runDriver(t, func(hook string) Config {
-		return ForRelay("pi", true, agents.RelayConfig{Endpoint: "http://127.0.0.1:43180", Token: "relay-token", HookCommand: []string{hook}})
-	})
-	if len(byEvent["pi-session-start"]) != 4 || len(byEvent["pi-file-edit"]) != 3 {
-		t.Fatalf("calls = %v", byEvent)
-	}
-	for _, s := range byEvent["pi-session-start"] {
-		if s["parent_session_id"] != nil {
-			t.Errorf("a Pi start named parent %v", s["parent_session_id"])
-		}
-	}
-	for _, e := range byEvent["pi-file-edit"] {
-		if e["tool_call_id"] != nil {
-			t.Errorf("a Pi edit named call %v", e["tool_call_id"])
-		}
-	}
-}
-
-// runDriver renders the extension cfg gives for a hook command, replays the driver's
+// runDriver renders the extension for a recording hook command, replays the driver's
 // events through it under Node, and returns each hook call's payloads by event, the
 // extension's path and the file any export would name.
-func runDriver(t *testing.T, cfg func(hook string) Config) (byEvent map[string][]map[string]any, ext, fetched string) {
+func runDriver(t *testing.T) (byEvent map[string][]map[string]any, ext, fetched string) {
 	t.Helper()
 	node, err := exec.LookPath("node")
 	if err != nil {
@@ -144,7 +130,7 @@ func runDriver(t *testing.T, cfg func(hook string) Config) (byEvent map[string][
 		t.Fatal(err)
 	}
 	ext = filepath.Join(dir, "terma-ext.ts")
-	if _, err := Write(ext, cfg(hook)); err != nil {
+	if _, err := writeExtension(ext, []string{hook}); err != nil {
 		t.Fatal(err)
 	}
 	script := filepath.Join(dir, "driver.mjs")
