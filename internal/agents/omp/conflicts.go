@@ -22,7 +22,7 @@ func ompConflicts(e harness.Exporter) []harness.Conflict {
 		out = append(out, harness.Conflict{
 			Key:        key,
 			Value:      value,
-			Reason:     "exported in your shell, where omp reads it ahead of its .env — the export goes there, not to Terma",
+			Reason:     "exported in your shell, where OMP reads it ahead of its .env — the export goes there, not to Terma",
 			Credential: true,
 			Scope:      harness.ScopeEnvironment,
 			Clearable:  false,
@@ -34,7 +34,7 @@ func ompConflicts(e harness.Exporter) []harness.Conflict {
 		out = append(out, harness.Conflict{
 			Key:       harness.EnvOTLPProtocol,
 			Value:     value,
-			Reason:    "omp's exporter supports http/protobuf only; a " + value + " export would disable every signal",
+			Reason:    "OMP's exporter supports http/protobuf only; a " + value + " export would disable every signal",
 			Scope:     harness.ScopeEnvironment,
 			Clearable: false,
 		})
@@ -43,7 +43,7 @@ func ompConflicts(e harness.Exporter) []harness.Conflict {
 		out = append(out, harness.Conflict{
 			Key:       envSDKDisabled,
 			Value:     value,
-			Reason:    "exported in your shell, where it switches omp's whole export off",
+			Reason:    "exported in your shell, where it switches OMP's whole export off",
 			Scope:     harness.ScopeEnvironment,
 			Clearable: false,
 		})
@@ -53,11 +53,11 @@ func ompConflicts(e harness.Exporter) []harness.Conflict {
 		var off []harness.Conflict
 		if value := strings.ToLower(strings.TrimSpace(os.Getenv(signalKey(s, "PROTOCOL")))); value != "" && value != harness.ProtocolHTTPProtobuf {
 			off = append(off, harness.Conflict{Key: signalKey(s, "PROTOCOL"), Value: value,
-				Reason: "omp's exporter supports http/protobuf only; a " + value + " export would disable its " + string(s)})
+				Reason: "OMP's exporter supports http/protobuf only; a " + value + " export would disable its " + string(s)})
 		}
 		if value := os.Getenv(signalExporterKey(s)); value != "" && !exportsOTLP(value) {
 			off = append(off, harness.Conflict{Key: signalExporterKey(s), Value: value,
-				Reason: "exported in your shell, where it switches omp's " + string(s) + " export off"})
+				Reason: "exported in your shell, where it switches OMP's " + string(s) + " export off"})
 		}
 		for _, c := range off {
 			c.Scope, c.Advisory = harness.ScopeEnvironment, s != harness.SignalTraces
