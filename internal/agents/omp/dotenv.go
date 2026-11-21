@@ -67,9 +67,19 @@ func (f *envFile) values() map[string]string {
 	return out
 }
 
-// apply sets each key in changes to its value, or removes it where the value is nil. A key's
-// first entry is replaced in place and any later one dropped, so the file holds it once; a
-// key not in the file is appended.
+// entries is the text of each key's last entry, as the developer wrote it: what a teardown
+// puts back.
+func (f *envFile) entries() map[string]string {
+	out := map[string]string{}
+	for _, e := range parseEnvEntries(f.lines) {
+		out[e.key] = strings.Join(f.lines[e.start:e.end], "\n")
+	}
+	return out
+}
+
+// apply sets each key in changes to its entry text, or removes it where the text is nil. A
+// key's first entry is replaced in place and any later one dropped, so the file holds it
+// once; a key not in the file is appended.
 func (f *envFile) apply(changes map[string]*string) {
 	byStart := map[int]envEntry{}
 	for _, e := range parseEnvEntries(f.lines) {
@@ -89,7 +99,7 @@ func (f *envFile) apply(changes map[string]*string) {
 		case !changed:
 			out = append(out, f.lines[e.start:e.end]...)
 		case !written[e.key] && value != nil:
-			out = append(out, envLine(e.key, *value))
+			out = append(out, strings.Split(*value, "\n")...)
 		}
 		if changed {
 			written[e.key] = true
@@ -98,7 +108,7 @@ func (f *envFile) apply(changes map[string]*string) {
 	}
 	for _, key := range slices.Sorted(maps.Keys(changes)) {
 		if value := changes[key]; !written[key] && value != nil {
-			out = append(out, envLine(key, *value))
+			out = append(out, strings.Split(*value, "\n")...)
 		}
 	}
 	f.lines = out
@@ -135,6 +145,15 @@ func envLine(key, value string) string {
 	default:
 		return key + `="` + strings.ReplaceAll(value, "\n", `\n`) + `"`
 	}
+}
+
+// journaledEntry is the entry text and value of what a journal holds for key: the entry as
+// the developer wrote it, or, from a journal that holds a bare value, that value rendered.
+func journaledEntry(key, journaled string) (text, value string) {
+	if es := parseEnvEntries(strings.Split(journaled, "\n")); len(es) == 1 && es[0].key == key && es[0].start == 0 && es[0].end == strings.Count(journaled, "\n")+1 {
+		return journaled, es[0].value
+	}
+	return envLine(key, journaled), journaled
 }
 
 // parseEnvEntries reads the entries of lines; a line that is no entry is skipped, as omp

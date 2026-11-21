@@ -2,6 +2,7 @@ package omp
 
 import (
 	"context"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -555,5 +556,43 @@ func TestRelayPointedNeedsTheCurrentExtension(t *testing.T) {
 		if problem == c.pointed || !c.pointed && (!strings.Contains(detail, extensionPath) || fix != "terma setup") {
 			t.Errorf("%s: problem %v %q %q", c.name, problem, detail, fix)
 		}
+	}
+}
+
+// Teardown puts back the developer's own entry as they wrote it, whatever quoting, prefix,
+// comment or line ending it had: an unquoted value holding every quote character reads back
+// whole, which no re-quoting of it would.
+func TestRelayEnvTeardownRestoresTheEntryVerbatim(t *testing.T) {
+	cases := map[string]string{
+		"every quote, unquoted": "OTEL_EXPORTER_OTLP_ENDPOINT=https://collector.example/a'b\"c`d\n",
+		"export and comment":    "export OTEL_EXPORTER_OTLP_ENDPOINT=https://collector.example:4318   # company\n",
+		"crlf":                  "OTEL_EXPORTER_OTLP_ENDPOINT='https://collector.example'\r\nA=1\r\n",
+		"multiline":             "OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=\"no\nreally\"\nA=1\n",
+	}
+	for name, before := range cases {
+		t.Run(name, func(t *testing.T) {
+			a, env := ompIn(t)
+			write(t, env, before, 0o600)
+			want, err := loadEnvFile(env)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := a.ConfigureRelay(context.Background(), relayConfig()); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := a.UnconfigureRelay(context.Background(), relayToken); err != nil {
+				t.Fatal(err)
+			}
+			if got := read(t, env); got != before {
+				t.Errorf("teardown left:\n%q\nwant:\n%q", got, before)
+			}
+			got, err := loadEnvFile(env)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !maps.Equal(got.values(), want.values()) {
+				t.Errorf("teardown reads as %q, want %q", got.values(), want.values())
+			}
+		})
 	}
 }

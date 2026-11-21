@@ -171,10 +171,20 @@ func (c exporter) Connect(e harness.Exporter, _ bool) error {
 	}
 	changes := retireHeaders(previous, current)
 	installing := managed(e, current)
-	j := harness.NewJournal(c.Name(), path, current, installing, nil, nil, previous)
+	// The journal keeps each entry's own text for teardown to put back, except where it still
+	// holds what terma wrote, which the journal compares by value.
+	existing := f.entries()
+	if previous != nil {
+		for key, installed := range previous.Installed {
+			if v, ok := current[key]; ok && v == installed {
+				existing[key] = v
+			}
+		}
+	}
+	j := harness.NewJournal(c.Name(), path, existing, installing, nil, nil, previous)
 
 	for key, value := range installing {
-		changes[key] = &value
+		changes[key] = new(envLine(key, value))
 	}
 	f.apply(changes)
 
@@ -227,7 +237,8 @@ func (c exporter) Disconnect() (harness.DisconnectResult, error) {
 			case !has && had:
 				changes[key] = nil
 			case has && (!had || now != was):
-				changes[key] = &now
+				text, _ := journaledEntry(key, now)
+				changes[key] = &text
 			}
 		}
 		f.apply(changes)
@@ -291,11 +302,11 @@ func retireHeaders(previous *harness.Journal, current map[string]string) map[str
 			continue
 		}
 		if current[key] == installed {
-			prior := previous.Previous[key]
-			changes[key] = prior
-			if prior != nil {
-				current[key] = *prior
+			if prior := previous.Previous[key]; prior != nil {
+				text, value := journaledEntry(key, *prior)
+				changes[key], current[key] = &text, value
 			} else {
+				changes[key] = nil
 				delete(current, key)
 			}
 		}
