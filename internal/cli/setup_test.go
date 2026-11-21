@@ -224,6 +224,12 @@ func TestHarnessSelectionComingSoon(t *testing.T) {
 	if len(form.Items) != len(wantOrder) {
 		t.Fatalf("picker has %d items, want %d", len(form.Items), len(wantOrder))
 	}
+	// The supported agents lead the list, each selectable, under the name setup shows.
+	for i, label := range []string{"Claude Code & Desktop", "Codex TUI & Desktop", "Copilot (beta)", "OMP"} {
+		if item := form.Items[i]; item.Label != label || item.Disabled || !testApp.agents.IsSupported(wantOrder[i]) {
+			t.Errorf("picker row %d = %+v, want %q supported and selectable", i, item, label)
+		}
+	}
 	for i, name := range wantOrder {
 		display := name
 		if s, _, ok := testApp.agents.Surface(name); ok {
