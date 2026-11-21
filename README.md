@@ -7,7 +7,8 @@
 
 The `terma` cli connects coding agents to [Terma](https://terma.ai), then stamps the commits
 they produce so agent spend can be traced to shipped code. It supports **Claude Code**
-(CLI and Desktop), **Codex** (CLI and Desktop) and **GitHub Copilot** (CLI and VS Code).
+(CLI and Desktop), **Codex** (CLI and Desktop), **GitHub Copilot** (CLI and VS Code) and
+**omp** (oh-my-pi).
 
 ## Get started
 
@@ -256,7 +257,7 @@ terma setup --org acme --team platform --harness claude,codex,copilot --yes
 - `--team <name-or-id>` sets up that team; without it, setup asks when your organization
   has several teams, with the one you chose before as the default, else takes the only
   one; when it cannot ask (`--yes` or no terminal), it keeps the team you chose before.
-- `--harness <agents>` records those agents (`claude`, `codex`, `copilot`); with `--yes` or no
+- `--harness <agents>` records those agents (`claude`, `codex`, `copilot`, `omp`); with `--yes` or no
   terminal and no `--harness`, setup records the agents recorded before and every
   supported agent installed on this machine.
 - `--yes` skips the browser prompt and the organization and agents questions. The team
@@ -432,6 +433,17 @@ it is, and a `copilot` started another way (a script, an absolute path, an edito
 still claimed by its hooks but exports nothing. `TERMA_SHELL_LAUNCHERS=0` keeps the
 function out of your startup files. Copilot reports token counts and AI credits, not a
 cost, and a file one of its shell commands writes is not attributed to its session.
+
+omp exports natively and reads its exporter privately from its agent directory's `.env`
+(`~/.omp/agent/.env`, or `$PI_CODING_AGENT_DIR/.env`), which no tool or shell it runs
+inherits. Setup writes its `OTEL_*` keys there, pointed at the relay, in place of any
+line of yours for the same key, and records what each held so `terma teardown` puts it
+back; your other lines stay as they are. An `OTEL_*` export in your shell, or in the
+`.env` of the directory omp starts in, still outranks the file, and a named profile
+(`omp --profile`) has a directory of its own that setup does not configure. terma's
+extension (`~/.omp/agent/extensions/terma-omp.ts`) exports nothing: it reports sessions
+and the files omp's edit and write tools change, for commit attribution, and names the
+session that opened a subagent's, which the relay stamps on the subagent's records.
 
 `terma setup` runs the relay as a per-user background service, so it is up before any
 agent starts; with `--relay-service off`, hooks start it on demand. `terma update`
