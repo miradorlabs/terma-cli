@@ -33,7 +33,7 @@ func (Agent) Installed(ctx context.Context) bool { return exporter{}.Detect(ctx)
 
 // Events are the extension's omp-* hooks.
 func (Agent) Events() map[string]agents.Handler {
-	return hookrun.Extension{Tool: name}.Events(name)
+	return hookrun.Extension{Tool: name, ClaimParent: true}.Events(name)
 }
 
 // FlushAfter delivers the spool when a session ends.
