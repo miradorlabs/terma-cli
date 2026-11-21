@@ -438,6 +438,9 @@ and a subagent's start names the session that opened it, which the relay stamps 
 subagent's records as `terma.session.parent.id`, since OMP's spans do not. Setup removes
 the span-exporting extension and exporter hook an earlier terma wrote there.
 
+terma needs OMP 19 or later: an earlier OMP loads its `.env` into its own environment, so the
+tools it runs would inherit the relay's token, and setup refuses it while doctor fails it.
+
 OMP's known limits: an `OTEL_*` export in your shell, or in the `.env` of the directory OMP
 starts in, still outranks the file: a signal's endpoint there takes that signal's export,
 but never terma's token, nor content on terma's request: the `.env` asks for none, and

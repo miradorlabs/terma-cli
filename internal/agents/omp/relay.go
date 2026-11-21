@@ -22,10 +22,14 @@ var (
 	legacyPaths   = []string{filepath.Join("extensions", "terma-relay.ts"), filepath.Join("hooks", "pre", "terma.ts")}
 )
 
-// ConfigureRelay writes the extension that reports sessions and file edits (it exports
-// nothing itself), then points omp's native exporter at the local relay through its .env.
-// The extension goes first: without its claims the relay holds omp's spans and drops them.
-func (a Agent) ConfigureRelay(_ context.Context, cfg agents.RelayConfig) (agents.RelayResult, error) {
+// ConfigureRelay refuses an omp too old to keep the relay's token from its tools. Otherwise
+// it writes the extension that reports sessions and file edits (it exports nothing itself),
+// then points omp's native exporter at the local relay through its .env. The extension goes
+// first: without its claims the relay holds omp's spans and drops them.
+func (a Agent) ConfigureRelay(ctx context.Context, cfg agents.RelayConfig) (agents.RelayResult, error) {
+	if why, old := tooOld(ctx); old {
+		return agents.RelayResult{}, errors.New(why)
+	}
 	dir, err := ompAgentDir()
 	if err != nil {
 		return agents.RelayResult{}, err
@@ -76,10 +80,14 @@ func (a Agent) RelayPointed(addr string) (bool, bool) {
 	return err == nil && !slices.ContainsFunc(st.Conflicts, func(c harness.Conflict) bool { return !c.Advisory }), true
 }
 
-// RelayProblem reports terma's extension missing from omp's agent directory, or not the
-// hooks-only file this terma writes for the relay at addr: without its claims the relay holds
-// omp's spans and drops them, and without the relay's address it asks OMP for no content.
+// RelayProblem reports an omp too old to be pointed at the relay, or terma's extension missing
+// from omp's agent directory or not the hooks-only file this terma writes for the relay at
+// addr: without its claims the relay holds omp's spans and drops them, and without the
+// relay's address it asks OMP for no content.
 func (Agent) RelayProblem(addr string) (detail, fix string, problem bool) {
+	if why, old := tooOld(context.Background()); old {
+		return why, "upgrade OMP, then run terma setup", true
+	}
 	dir, err := ompAgentDir()
 	if err != nil {
 		return "", "", false
