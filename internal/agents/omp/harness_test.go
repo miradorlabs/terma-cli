@@ -227,6 +227,37 @@ func TestRelayEnvExporterListWithoutOTLP(t *testing.T) {
 	}
 }
 
+// OMP fills a key its agent .env leaves unset from the dotenv files it reads after it, where a
+// switch can turn a signal or the whole SDK off: setup sets every such key in the agent .env
+// whether or not it was there, and teardown takes away the ones it added.
+func TestRelayEnvShadowsSwitchesItDidNotFind(t *testing.T) {
+	a, env := ompIn(t)
+	if _, err := a.ConfigureRelay(context.Background(), relayConfig()); err != nil {
+		t.Fatal(err)
+	}
+	f, err := loadEnvFile(env)
+	if err != nil {
+		t.Fatal(err)
+	}
+	values := f.values()
+	want := map[string]string{envSDKDisabled: "false"}
+	for _, s := range harness.AllSignals {
+		want[signalExporterKey(s)] = exporterOTLP
+		want[signalKey(s, "PROTOCOL")] = harness.ProtocolHTTPProtobuf
+	}
+	for key, v := range want {
+		if values[key] != v {
+			t.Errorf("%s = %q, want %q", key, values[key], v)
+		}
+	}
+	if _, err := a.UnconfigureRelay(context.Background(), relayToken); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := os.ReadFile(env); err == nil && strings.Contains(string(got), "OTEL_") {
+		t.Errorf("teardown left:\n%s", got)
+	}
+}
+
 // An earlier setup sent the token in an Authorization header; the next one takes each header
 // it wrote back to what the developer had, and teardown leaves that.
 func TestRelayEnvRetiresTheTokenHeader(t *testing.T) {
