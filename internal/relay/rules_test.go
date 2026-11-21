@@ -38,6 +38,7 @@ var (
 		"github.copilot.tool.parameters.command", "github.copilot.tool.parameters.file_path",
 		"omp.gen_ai.request.messages", "omp.gen_ai.response.tool_calls",
 		"file_path", "result", "cwd"}
+	pinnedMessageFields     = []string{"gen_ai.input.messages", "gen_ai.output.messages"}
 	pinnedToolContentEvents = []string{"tool.output", "tool.input"}
 	pinnedSessionKeys       = []string{"session.id", "conversation.id", "gen_ai.conversation.id", "thread.id", "thread_id"}
 )
@@ -52,6 +53,7 @@ func TestComposedRulesArePinned(t *testing.T) {
 		{"prompt drop fields", testRules.promptDropFields, pinnedPromptDropFields},
 		{"prompt body events", testRules.promptBodyEvents, pinnedPromptBodyEvents},
 		{"resource prompt fields", testRules.resourcePromptFields, pinnedResourcePromptFields},
+		{"message fields", testRules.messageFields, pinnedMessageFields},
 		{"tool content fields", testRules.toolContentFields, pinnedToolContentFields},
 		{"tool content events", testRules.toolContentEvents, pinnedToolContentEvents},
 		{"start events", testRules.startEvents, []string{"codex.conversation_starts"}},
@@ -80,7 +82,7 @@ func TestNoDeclaredContentKeyIsSafe(t *testing.T) {
 	t.Parallel()
 	for _, c := range testCapturers {
 		r := c.CaptureRules()
-		for _, key := range slices.Concat(r.PromptFields, r.PromptDropFields, r.ResourcePromptFields, r.ToolContentFields) {
+		for _, key := range slices.Concat(r.PromptFields, r.PromptDropFields, r.MessageFields, r.ResourcePromptFields, r.ToolContentFields) {
 			if testRules.safeKey(key) {
 				t.Errorf("%T declares %q as content, and allow.go lists it safe", c, key)
 			}

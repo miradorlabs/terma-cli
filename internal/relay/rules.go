@@ -21,6 +21,7 @@ type rules struct {
 	promptDropFields     []string
 	promptBodyEvents     []string
 	resourcePromptFields []string
+	messageFields        []string
 	toolContentFields    []string
 	toolContentEvents    []string
 	agents               []shape.CaptureRules
@@ -38,6 +39,8 @@ var generic = shape.CaptureRules{
 		"gen_ai.system_instructions", "gen_ai.tool.definitions", "gen_ai.tool.description", "gen_ai.agent.description",
 		"gen_ai.request.stop_sequences",
 		"error", "reason", "reasoning", "metadata", "value", "key", "from", "db"},
+	// The GenAI conventions' envelopes carry tool calls and their results as parts beside the text.
+	MessageFields:        []string{"gen_ai.input.messages", "gen_ai.output.messages"},
 	ResourcePromptFields: []string{"process.command_args", "process.command_line"},
 	// cwd is a local path, as file_path is.
 	ToolContentFields: []string{"gen_ai.tool.call.arguments", "gen_ai.tool.call.result", "file_path", "result", "cwd"},
@@ -70,6 +73,8 @@ func compose(correlators []shape.Correlator, capturers []shape.Capturer) *rules 
 		r.promptDropFields = union(r.promptDropFields, c.PromptDropFields)
 		r.promptBodyEvents = union(r.promptBodyEvents, c.PromptBodyEvents)
 		r.resourcePromptFields = union(r.resourcePromptFields, c.ResourcePromptFields)
+		r.messageFields = union(r.messageFields, c.MessageFields)
+		r.promptDropFields = union(r.promptDropFields, c.MessageFields)
 		r.toolContentFields = union(r.toolContentFields, c.ToolContentFields)
 		r.toolContentEvents = union(r.toolContentEvents, c.ToolContentEvents)
 		r.bodyPrefixes = union(r.bodyPrefixes, c.BodyPrefixes)

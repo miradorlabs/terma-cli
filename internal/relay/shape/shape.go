@@ -46,6 +46,11 @@ type CaptureRules struct {
 	PromptDropFields     []string
 	PromptBodyEvents     []string
 	ResourcePromptFields []string
+	// MessageFields hold a GenAI message envelope: a JSON list of messages, each a role and its
+	// parts, removed whole when prompts are withheld. With prompts collected and tool content withheld,
+	// only its text and reasoning parts leave, every message keeping its role; one that is no
+	// such envelope is removed whole.
+	MessageFields []string
 	// ToolContentFields and ToolContentEvents are removed when tool content is withheld.
 	ToolContentFields []string
 	ToolContentEvents []string
