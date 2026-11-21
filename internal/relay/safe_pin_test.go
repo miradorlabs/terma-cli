@@ -66,7 +66,7 @@ var pinnedSafeKeys = []string{
 	"model", "model.provided", "model_reasoning_effort",
 	"omp.agent.cost.unavailable_reasons", "omp.agent.coverage.models_used", "omp.agent.coverage.providers_used", "omp.agent.coverage.tools_available", "omp.agent.coverage.tools_invoked", "omp.agent.coverage.tools_unused",
 	"omp.gen_ai.agent.id", "omp.gen_ai.agent.name", "omp.gen_ai.agent.tools.available", "omp.gen_ai.agent.tools.invoked", "omp.gen_ai.agent.tools.unused", "omp.gen_ai.gateway.call_id",
-	"omp.gen_ai.gateway.endpoint", "omp.gen_ai.gateway.name", "omp.gen_ai.handoff.to_agent.id", "omp.gen_ai.handoff.to_agent.name", "omp.gen_ai.request.available_tools", "omp.gen_ai.request.reasoning.effort", "omp.gen_ai.tool.status", "omp.tool.status",
+	"omp.gen_ai.gateway.endpoint", "omp.gen_ai.gateway.name", "omp.gen_ai.handoff.to_agent.id", "omp.gen_ai.handoff.to_agent.name", "omp.gen_ai.judgment.purpose", "omp.gen_ai.oneshot.kind", "omp.gen_ai.request.available_tools", "omp.gen_ai.request.reasoning.effort", "omp.gen_ai.tool.status", "omp.tool.status",
 	"opencode.agent",
 	"opencode.message.id", "opencode.parent_message.id", "opencode.project.id",
 	"opencode.version", "operation", "organization.id",

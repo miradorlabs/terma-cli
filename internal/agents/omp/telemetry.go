@@ -33,6 +33,10 @@ func (Agent) CaptureRules() shape.CaptureRules {
 			// A tool call's outcome (ok, error, skipped, blocked, timeout, aborted), a chat's
 			// stop reason, and the reasoning effort it asked for.
 			"omp.gen_ai.tool.status", "omp.tool.status", "gen_ai.response.finish_reason", "omp.gen_ai.request.reasoning.effort",
+			// What a chat outside the agent loop was for (compaction_summary, handoff,
+			// image_question, …), and why a judgment ran (find, ttsr, judge_batch, …): OMP's own
+			// classifiers, which tell a one-off call from a turn.
+			"omp.gen_ai.oneshot.kind", "omp.gen_ai.judgment.purpose",
 			// The provider gateway by name, its base URL (as server.address names a server)
 			// and its request id.
 			"omp.gen_ai.gateway.name", "omp.gen_ai.gateway.endpoint", "omp.gen_ai.gateway.call_id",
