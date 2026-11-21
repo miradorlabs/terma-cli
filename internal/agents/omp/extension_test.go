@@ -32,6 +32,10 @@ handlers.tool_result({ toolName: "edit", toolCallId: "RZPvkTswD|fc_1", isError: 
 handlers.tool_result({ toolName: "write", toolCallId: "6taIXxcqF|fc_2", isError: false, input: { path: "hello.txt", content: "hello" }, details: { resolvedPath: "/work/hello.txt" } }, parent)
 handlers.tool_result({ toolName: "edit", toolCallId: "h3DEyzO37|fc_3", isError: false, input: { input: "[notes.txt#B686]", path: "notes.txt" }, details: { path: "/work/notes.txt", op: "update" } }, parent)
 handlers.tool_result({ toolName: "edit", toolCallId: "multi|fc_4", isError: false, input: {}, details: { perFileResults: [{ path: "/work/a.go" }, { path: "/work/b.go", isError: true }] } }, parent)
+handlers.tool_result({ toolName: "write", toolCallId: "peer|fc_9", isError: false, input: { path: "agent://scout", content: "hi" }, details: { touchesNoFiles: true } }, parent)
+handlers.tool_result({ toolName: "write", toolCallId: "cfg|fc_10", isError: false, input: { path: "cfg://edit.mode", content: "patch" }, details: {} }, parent)
+handlers.tool_result({ toolName: "write", toolCallId: "local|fc_11", isError: false, input: { path: "local://notes.md", content: "n" }, details: { resolvedPath: "/home/dev/.omp/local/notes.md" } }, parent)
+handlers.tool_result({ toolName: "write", toolCallId: "none|fc_12", isError: false, input: { path: "plain.txt", content: "p" }, details: { resolvedPath: "/work/plain.txt", touchesNoFiles: true } }, parent)
 handlers.tool_result({ toolName: "apply_patch", toolCallId: "patch|fc_6", isError: false, input: { input: "*** Begin Patch" }, details: { path: "/work/c.go", op: "update" } }, parent)
 handlers.tool_result({ toolName: "apply_patch", toolCallId: "patch|fc_7", isError: false, input: { input: "*** Begin Patch" }, details: { perFileResults: [{ path: "/work/d.go" }, { path: "/work/e.go", isError: true }] } }, parent)
 handlers.tool_result({ toolName: "apply_patch", toolCallId: "patch|fc_8", isError: true, input: { input: "*** Begin Patch" }, details: { path: "/work/f.go" } }, parent)
@@ -50,7 +54,9 @@ await handlers.session_shutdown({}, parent)
 // OMP's extension exports nothing, neither spans nor logs, and holds no token: it hands
 // OMP's hooks each session's start, naming a subagent's parent (a nested one's too) but
 // never a fork's, and each file a tool call changed, successful ones only, with the call's
-// id as OMP's own spans name it; an edit under its apply_patch wire name counts as an edit.
+// id as OMP's own spans name it; an edit under its apply_patch wire name counts as an edit. A
+// write names its resolved file, and none when it touches no file (a message to a peer) or
+// goes to one of OMP's internal URLs that resolves to none.
 func TestExtensionUnderNode(t *testing.T) {
 	byEvent, ext, fetched := runDriver(t)
 	data, err := os.ReadFile(ext)
@@ -93,7 +99,7 @@ func TestExtensionUnderNode(t *testing.T) {
 		}
 		edits[e["tool_call_id"].(string)] = strings.Join(files, ",")
 	}
-	want := map[string]string{"6taIXxcqF|fc_2": "hello.txt", "h3DEyzO37|fc_3": "/work/notes.txt", "multi|fc_4": "/work/a.go",
+	want := map[string]string{"6taIXxcqF|fc_2": "/work/hello.txt", "local|fc_11": "/home/dev/.omp/local/notes.md", "h3DEyzO37|fc_3": "/work/notes.txt", "multi|fc_4": "/work/a.go",
 		"patch|fc_6": "/work/c.go", "patch|fc_7": "/work/d.go"}
 	for _, id := range []string{"patch|fc_6", "patch|fc_7"} {
 		if tools[id] != "apply_patch" {
