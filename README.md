@@ -447,7 +447,8 @@ protocol set to anything else switches its export off, as do `OTEL_SDK_DISABLED=
 export elsewhere or switches it off; setup does not check your shell, so it can report OMP
 set up while such an export stands. A named profile (`omp --profile`) has a directory of its
 own that setup does not configure. A file one of OMP's shell commands writes is not
-attributed to its session.
+attributed to its session. A `PI_CODING_AGENT_DIR` that Pi and OMP share holds both terma
+extensions, and each agent then loads the other's too.
 
 `terma setup` runs the relay as a per-user background service, so it is up before any
 agent starts; with `--relay-service off`, hooks start it on demand. `terma update`

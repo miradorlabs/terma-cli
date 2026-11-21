@@ -66,6 +66,7 @@ func (exporter) Detect(ctx context.Context) harness.Detection {
 // ~/$PI_CONFIG_DIR/agent, ~/.omp/agent by default. A named profile (omp --profile) has its
 // own directory, which terma does not configure.
 func ompAgentDir() (string, error) {
+	// Accepted risk: a PI_CODING_AGENT_DIR that Pi and OMP share puts both terma extensions in one extensions/ folder, which each host loads; the upgrade path is a host check in each extension, once confirmed against Pi's source.
 	if dir := os.Getenv(envAgentDir); dir != "" {
 		return filepath.Abs(dir)
 	}
