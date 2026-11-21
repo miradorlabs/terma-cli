@@ -6,8 +6,8 @@ import (
 	"testing"
 )
 
-// The .env reads as omp reads it: each want is node:util parseEnv's output for its input, in
-// Node 26 and in the Bun runtime omp 19.0.1 ships, which loads the file with it.
+// The .env reads as omp reads it: each want is node:util parseEnv's output for its input in
+// the Bun 1.4.4 runtime OMP 19.1.0 ships (`BUN_BE_BUN=1 omp`), less the names OMP drops.
 func TestEnvFileReadsAsParseEnv(t *testing.T) {
 	t.Parallel()
 	cases := map[string]struct {
@@ -29,6 +29,21 @@ func TestEnvFileReadsAsParseEnv(t *testing.T) {
 		"comment line":     {"# A=1\nB=2", map[string]string{"B": "2"}},
 		"empty value":      {"A=", map[string]string{"A": ""}},
 		"no expansion":     {"A=$HOME", map[string]string{"A": "$HOME"}},
+		"escaped double quote spans lines": {"A=\"one\\\"\nOTEL_EXPORTER_OTLP_ENDPOINT=x\ntwo\"\nB=c",
+			map[string]string{"A": "one\\\"\nOTEL_EXPORTER_OTLP_ENDPOINT=x\ntwo", "B": "c"}},
+		"escaped single quote spans lines": {"A='one\\'\nB=x\ntwo'", map[string]string{"A": "one\\'\nB=x\ntwo"}},
+		"escaped backtick spans lines":     {"A=`one\\`\nB=x\ntwo`", map[string]string{"A": "one\\`\nB=x\ntwo"}},
+		"escaped backslash closes":         {"A=\"a\\\\\"\nB=x\"", map[string]string{"A": `a\\`, "B": `x"`}},
+		"escapes decode in pairs":          {`A="a\\nb\rc\td"`, map[string]string{"A": "a\\\\nb\rc\\td"}},
+		"text after the closing quote":     {"A=\"x\"y B=1\nC=z", map[string]string{"A": "x", "C": "z"}},
+		"colon separator":                  {"A: \"x\nC=1\n\"", map[string]string{"A": "x\nC=1\n"}},
+		"colon needs a space":              {"A:\"x\nC=1\n\"", map[string]string{"C": "1"}},
+		"value on the next line":           {"A=\n\"x\nC=1\n\"", map[string]string{"A": "x\nC=1\n"}},
+		"separator on the next line":       {"A\n=1", map[string]string{"A": "1"}},
+		"a name omp drops keeps its value": {"A-B=\"x\nC=1\n\"\n1A=2", map[string]string{}},
+		"crlf in quotes":                   {"A=\"x\r\nB=1\"\r\nC=2", map[string]string{"A": "x\nB=1", "C": "2"}},
+		"ascii trim only":                  {"A=\u00a0x\u00a0", map[string]string{"A": "\u00a0x\u00a0"}},
+		"byte order mark":                  {"\ufeffA=1", map[string]string{"A": "1"}},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {

@@ -608,3 +608,69 @@ func TestRelayEnvTeardownRestoresTheEntryVerbatim(t *testing.T) {
 		})
 	}
 }
+
+// A line inside another entry's quoted value is part of that value as OMP reads it, an escaped
+// quote not closing it, so setup leaves it alone: rewritten, it would put the relay's token in
+// an ordinary variable that OMP hands to the tools it runs.
+func TestRelayEnvLeavesALineInsideAQuotedValue(t *testing.T) {
+	for _, q := range []string{`"`, `'`, "`"} {
+		a, env := ompIn(t)
+		note := "NOTE=" + q + `one\` + q + "\nOTEL_EXPORTER_OTLP_ENDPOINT=https://collector.example\ntwo" + q + "\n"
+		write(t, env, note, 0o600)
+		if _, err := a.ConfigureRelay(context.Background(), relayConfig()); err != nil {
+			t.Fatal(err)
+		}
+		after := read(t, env)
+		if !strings.HasPrefix(after, note) {
+			t.Errorf("%s: setup rewrote the inside of NOTE's value:\n%s", q, after)
+		}
+		f, err := loadEnvFile(env)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := f.values()["NOTE"]; strings.Contains(got, relayToken) {
+			t.Errorf("%s: NOTE holds the relay's token: %q", q, got)
+		}
+		if got := f.values()[harness.EnvOTLPEndpoint]; got != "http://127.0.0.1:43180/"+relayToken {
+			t.Errorf("%s: the common endpoint is %q", q, got)
+		}
+	}
+}
+
+// A file whose lines terma cannot map to OMP's entries, here a bare carriage return that OMP
+// reads as a line break, is refused rather than edited.
+func TestRelayEnvRefusesAFileItCannotReadWithCertainty(t *testing.T) {
+	a, env := ompIn(t)
+	const before = "A=1\rOTEL_EXPORTER_OTLP_ENDPOINT=https://collector.example\n"
+	write(t, env, before, 0o600)
+	_, err := a.ConfigureRelay(context.Background(), relayConfig())
+	if err == nil || !strings.Contains(err.Error(), env) {
+		t.Fatalf("setup edited a .env it cannot read with certainty: %v", err)
+	}
+	if got := read(t, env); got != before {
+		t.Errorf("the refused .env changed:\n%q", got)
+	}
+}
+
+// Every signal must reach the relay as OMP resolves it, its own endpoint ahead of the common
+// one, as the extension requires before it asks OMP for content: one sent elsewhere is not
+// pointed, whichever it is.
+func TestRelayEnvASignalSentElsewhereIsNotPointed(t *testing.T) {
+	const relay = "http://127.0.0.1:43180/" + relayToken
+	for name, extra := range map[string]string{
+		"logs elsewhere":    "OTEL_EXPORTER_OTLP_LOGS_ENDPOINT=https://collector.example/ingest/v1/logs\n",
+		"metrics elsewhere": "OTEL_EXPORTER_OTLP_METRICS_ENDPOINT=https://collector.example/ingest/v1/metrics\n",
+		"only traces on the relay": "OTEL_EXPORTER_OTLP_ENDPOINT=https://collector.example/ingest\n" +
+			"OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=" + relay + "/v1/traces\n" +
+			"OTEL_EXPORTER_OTLP_LOGS_ENDPOINT=\nOTEL_EXPORTER_OTLP_METRICS_ENDPOINT=\n",
+	} {
+		a, env := ompIn(t)
+		if _, err := a.ConfigureRelay(context.Background(), relayConfig()); err != nil {
+			t.Fatal(err)
+		}
+		write(t, env, read(t, env)+extra, 0o600)
+		if pointed, _ := a.RelayPointed("127.0.0.1:43180"); pointed {
+			t.Errorf("%s: the .env still reads as pointed at the relay", name)
+		}
+	}
+}

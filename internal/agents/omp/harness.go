@@ -90,8 +90,9 @@ func (exporter) ConfigPath() (string, error) {
 	return filepath.Join(dir, envFileName), nil
 }
 
-// Status reads back where omp's exporter sends: the common endpoint, or a per-signal one
-// that differs from it, which is where that signal's records go.
+// Status reads back where omp's exporter sends traces: their own endpoint, else the common
+// one. It is connected only where logs and metrics resolve to the same endpoint, as the
+// extension requires before it asks OMP for content.
 func (c exporter) Status() (harness.Status, error) {
 	path, err := c.ConfigPath()
 	if err != nil {
@@ -104,15 +105,14 @@ func (c exporter) Status() (harness.Status, error) {
 	values := f.values()
 	status := harness.Status{ConfigPath: path, Exists: f.existed}
 
-	base := strings.TrimRight(values[harness.EnvOTLPEndpoint], "/")
-	status.Endpoint = base
-	for _, s := range harness.AllSignals {
-		per := strings.TrimRight(values[signalKey(s, "ENDPOINT")], "/")
-		if per != "" && strings.TrimSuffix(per, "/v1/"+string(s)) != base {
-			status.Endpoint = per
-			break
+	resolve := func(s harness.Signal) string {
+		if per := strings.TrimRight(values[signalKey(s, "ENDPOINT")], "/"); per != "" {
+			return strings.TrimSuffix(per, "/v1/"+string(s))
 		}
+		return strings.TrimRight(values[harness.EnvOTLPEndpoint], "/")
 	}
+	status.Endpoint = resolve(harness.SignalTraces)
+	split := slices.ContainsFunc(harness.AllSignals, func(s harness.Signal) bool { return resolve(s) != status.Endpoint })
 	disabled := strings.EqualFold(strings.TrimSpace(values[envSDKDisabled]), "true")
 	for _, s := range harness.AllSignals {
 		protocol := values[signalKey(s, "PROTOCOL")]
@@ -124,7 +124,7 @@ func (c exporter) Status() (harness.Status, error) {
 		}
 	}
 	// Traces alone name OMP's session: without them nothing it sends is attributed.
-	status.Connected = slices.Contains(status.Signals, harness.SignalTraces) && tokenPath(status.Endpoint)
+	status.Connected = !split && slices.Contains(status.Signals, harness.SignalTraces) && tokenPath(status.Endpoint)
 	status.Conflicts = ompConflicts(harness.Exporter{Endpoint: status.Endpoint})
 
 	j, err := harness.LoadJournal(c.dir, c.Name(), path)
@@ -186,7 +186,9 @@ func (c exporter) Connect(e harness.Exporter, _ bool) error {
 	for key, value := range installing {
 		changes[key] = new(envLine(key, value))
 	}
-	f.apply(changes)
+	if err := f.apply(changes); err != nil {
+		return err
+	}
 
 	if err := j.Save(c.dir); err != nil {
 		return err
@@ -241,7 +243,9 @@ func (c exporter) Disconnect() (harness.DisconnectResult, error) {
 				changes[key] = &text
 			}
 		}
-		f.apply(changes)
+		if err := f.apply(changes); err != nil {
+			return result, err
+		}
 		if err := f.save(); err != nil {
 			return result, err
 		}
