@@ -1,4 +1,4 @@
-// Terma extension for Pi (@earendil-works/pi-coding-agent) and omp (oh-my-pi, Pi's fork,
+// Terma extension for Pi (@earendil-works/pi-coding-agent) and OMP (Pi's fork,
 // with the same extension events).
 //
 // Written by `terma relay setup --harness pi|omp` into ~/.pi/agent/extensions/terma.ts or

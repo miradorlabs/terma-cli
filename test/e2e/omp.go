@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-// omp (oh-my-pi) exports natively, reading OTEL_* privately from ~/.omp/agent/.env, which
+// OMP exports natively, reading OTEL_* privately from ~/.omp/agent/.env, which
 // relay setup points at the relay; terma's Pi-family extension
 // (internal/agents/internal/pifamily/terma.ts, ~/.omp/agent/extensions/terma-omp.ts)
 // exports nothing for omp and only hands sessions, prompts and file edits to
