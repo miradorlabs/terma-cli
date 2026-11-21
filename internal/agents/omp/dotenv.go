@@ -19,7 +19,7 @@ import (
 // the keys it changes, so the developer's other lines, comments and order survive byte for
 // byte. It is read with the dotenv grammar omp parses it with (node:util parseEnv):
 // `KEY=value`, an optional `export `, quoted values that may span lines, and an unquoted
-// value ending at ` #`. Of two entries for one key the last is the one omp reads.
+// value ending at `#`. Of two entries for one key the last is the one omp reads.
 type envFile struct {
 	path string
 	// writePath is path with symlinks resolved, so a write goes through a symlinked file.
@@ -173,7 +173,7 @@ func parseEnvEntries(lines []string) []envEntry {
 			}
 			// An unclosed quote: dotenv reads the line as it stands.
 		}
-		if j := strings.Index(rest, " #"); j >= 0 {
+		if j := strings.IndexByte(rest, '#'); j >= 0 {
 			rest = rest[:j]
 		}
 		e.value = strings.TrimSpace(rest)
