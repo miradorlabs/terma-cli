@@ -443,10 +443,11 @@ starts in, still outranks the file: a signal's endpoint there takes that signal'
 and a repository's `.env` that sets one takes its content too (which it could ask OMP for on
 its own), but never terma's token. OMP exports `http/protobuf` only, so a shell's OTLP
 protocol set to anything else switches its export off, as do `OTEL_SDK_DISABLED=true` and an
-`OTEL_TRACES_EXPORTER` that names no `otlp`; `terma doctor` fails while your shell takes the
-export elsewhere or switches it off, though setup does not check and reports OMP set up. A named profile (`omp --profile`) has a directory of its own
-that setup does not configure. A file one of OMP's shell commands writes is not attributed
-to its session.
+`OTEL_TRACES_EXPORTER` that names no `otlp`. `terma doctor` fails while your shell takes the
+export elsewhere or switches it off; setup does not check your shell, so it can report OMP
+set up while such an export stands. A named profile (`omp --profile`) has a directory of its
+own that setup does not configure. A file one of OMP's shell commands writes is not
+attributed to its session.
 
 `terma setup` runs the relay as a per-user background service, so it is up before any
 agent starts; with `--relay-service off`, hooks start it on demand. `terma update`
