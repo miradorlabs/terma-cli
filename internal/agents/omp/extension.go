@@ -53,8 +53,8 @@ func writeExtension(path string, hookCommand []string) (string, error) {
 	return path, config.WriteFileAtomic(path, []byte(text), 0o600)
 }
 
-// extensionCurrent reports whether path holds the extension this terma renders, whatever
-// hook command its configuration line names.
+// extensionCurrent reports whether path holds the extension this terma renders, with a
+// configuration naming a hook command, whichever.
 func extensionCurrent(path string) bool {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -64,6 +64,11 @@ func extensionCurrent(path string) bool {
 	if !ok {
 		return false
 	}
-	_, tail, ok := strings.Cut(rest, " /* terma:config */")
-	return ok && head+extensionConfigMarker+tail == extensionTemplate
+	literal, tail, ok := strings.Cut(rest, " /* terma:config */")
+	var cfg extensionConfig
+	// A configuration that is no rendered one (the template's null) leaves the extension inert.
+	if !ok || json.Unmarshal([]byte(literal), &cfg) != nil || cfg.Version != 1 || len(cfg.HookCommand) == 0 {
+		return false
+	}
+	return head+extensionConfigMarker+tail == extensionTemplate
 }

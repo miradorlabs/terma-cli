@@ -520,6 +520,8 @@ func TestRelayPointedNeedsTheCurrentExtension(t *testing.T) {
 	}{
 		{"another hook command", other, true},
 		{"an older extension", strings.Replace(other, "omp-session-start", "omp-session-begin", 1), false},
+		{"the bare template", extensionTemplate, false},
+		{"an empty hook command", strings.Replace(other, `"hookCommand":["/opt/terma/bin/terma","hook"]`, `"hookCommand":[]`, 1), false},
 		{"the developer's own file", "export default function () {}\n", false},
 		{"missing", "", false},
 	} {
