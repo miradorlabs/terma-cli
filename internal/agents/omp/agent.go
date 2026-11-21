@@ -31,6 +31,11 @@ func (Agent) DisplayName() string { return displayName }
 // Installed reports whether omp is on the PATH.
 func (Agent) Installed(ctx context.Context) bool { return exporter{}.Detect(ctx).Found }
 
+// Surfaces is OMP as one choice, marked beta at setup.
+func (a Agent) Surfaces() []agents.Surface {
+	return []agents.Surface{{Name: name, DisplayName: displayName + " (beta)", Installed: a.Installed}}
+}
+
 // Events are the extension's omp-* hooks.
 func (Agent) Events() map[string]agents.Handler {
 	return hookrun.Extension{Tool: name, ClaimParent: true}.Events(name)
@@ -52,4 +57,5 @@ var (
 	_ agents.Covered   = Agent{}
 	_ agents.Exporting = Agent{}
 	_ agents.Agent     = Agent{}
+	_ agents.Surfaced  = Agent{}
 )
