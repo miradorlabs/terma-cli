@@ -444,7 +444,7 @@ and a repository's `.env` that sets one takes its content too (which it could as
 its own), but never terma's token. OMP exports `http/protobuf` only, so a shell's OTLP
 protocol set to anything else switches its export off, as do `OTEL_SDK_DISABLED=true` and an
 `OTEL_TRACES_EXPORTER` that names no `otlp`; `terma doctor` fails while your shell takes the
-export elsewhere or switches it off. A named profile (`omp --profile`) has a directory of its own
+export elsewhere or switches it off, though setup does not check and reports OMP set up. A named profile (`omp --profile`) has a directory of its own
 that setup does not configure. A file one of OMP's shell commands writes is not attributed
 to its session.
 
