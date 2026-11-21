@@ -220,7 +220,7 @@ func TestHarnessSelectionComingSoon(t *testing.T) {
 		chosen[name] = true
 	}
 	form := testApp.harnessSelectionForm(context.Background(), chosen)
-	wantOrder := []string{"claude", "codex", "copilot", "cursor", "opencode", "omp", "pi", "hermes", "gemini", "dsh", "antigravity"}
+	wantOrder := []string{"claude", "codex", "copilot", "omp", "cursor", "opencode", "pi", "hermes", "gemini", "dsh", "antigravity"}
 	if len(form.Items) != len(wantOrder) {
 		t.Fatalf("picker has %d items, want %d", len(form.Items), len(wantOrder))
 	}
@@ -258,6 +258,9 @@ func TestHarnessSelectionFlags(t *testing.T) {
 	if err != nil || !slices.Equal(got, []string{"claude", "codex"}) {
 		t.Fatalf("available selection = %v, %v", got, err)
 	}
+	if got, err := testApp.chooseHarnesses(&cobra.Command{}, &config.Config{}, setupFlags{harnesses: "omp,claude"}); err != nil || !slices.Equal(got, []string{"claude", "omp"}) {
+		t.Fatalf("--harness omp,claude = %v, %v", got, err)
+	}
 }
 
 func TestHarnessSelectionFiltersSavedAgents(t *testing.T) {
@@ -267,11 +270,11 @@ func TestHarnessSelectionFiltersSavedAgents(t *testing.T) {
 		cfg := &config.Config{Harnesses: saved}
 		wantInstalled := []string(nil)
 		if slices.Contains(saved, "claude") {
-			wantInstalled = []string{"claude", "codex", "copilot"}
+			wantInstalled = []string{"claude", "codex", "copilot", "omp"}
 		}
 		if len(wantInstalled) == 0 {
 			// With no CLI on PATH, an installed desktop app or editor still counts.
-			for _, n := range []string{"claude", "codex", "copilot"} {
+			for _, n := range []string{"claude", "codex", "copilot", "omp"} {
 				if s, _, _ := testApp.agents.Surface(n); s.Installed(context.Background()) {
 					wantInstalled = append(wantInstalled, n)
 				}
