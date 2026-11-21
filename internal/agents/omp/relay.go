@@ -62,13 +62,31 @@ func (a Agent) UnconfigureRelay(context.Context, string) (agents.RelayResult, er
 }
 
 // RelayPointed reports whether omp's .env points its exporter at the relay at addr, with no
-// shell export that omp reads ahead of the .env taking the export elsewhere or switching it off.
+// shell export that omp reads ahead of the .env taking the export elsewhere or switching it
+// off, and terma's extension in place to claim the sessions it exports.
 func (a Agent) RelayPointed(addr string) (bool, bool) {
 	if !relayexport.NativePointed(a.Harness(), addr) {
 		return false, true
 	}
+	if _, _, problem := a.RelayProblem(addr); problem {
+		return false, true
+	}
 	st, err := a.Harness().Status()
 	return err == nil && !slices.ContainsFunc(st.Conflicts, func(c harness.Conflict) bool { return !c.Advisory }), true
+}
+
+// RelayProblem reports terma's extension missing from omp's agent directory, or not the
+// hooks-only file this terma writes: without its claims the relay holds omp's spans and drops them.
+func (Agent) RelayProblem(string) (detail, fix string, problem bool) {
+	dir, err := ompAgentDir()
+	if err != nil {
+		return "", "", false
+	}
+	path := filepath.Join(dir, extensionPath)
+	if extensionCurrent(path) {
+		return "", "", false
+	}
+	return "OMP's terma extension " + path + " is missing or not this terma's, so no hook claims OMP's sessions and the relay drops their telemetry", "terma setup", true
 }
 
 // removeOwn deletes the files under dir among rels that terma wrote, each opening with its
@@ -95,4 +113,7 @@ func removeOwn(dir string, rels []string) ([]string, error) {
 	return removed, nil
 }
 
-var _ agents.RelayExporter = Agent{}
+var (
+	_ agents.RelayExporter = Agent{}
+	_ agents.RelayChecker  = Agent{}
+)

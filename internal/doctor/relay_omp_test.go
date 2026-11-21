@@ -45,4 +45,13 @@ func TestRelayCheckReadsOmpsEnv(t *testing.T) {
 	if c := RelayCheck(reg, healthy(), keyed, "proj_x", "dev", []string{"omp"}); c.Status != Fail || !strings.Contains(c.Detail, "OMP not exporting to the local relay") {
 		t.Fatalf("RelayCheck = %+v, want a failure naming omp", c)
 	}
+	if err := os.WriteFile(env, data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(filepath.Join(dir, "extensions", "terma-omp.ts")); err != nil {
+		t.Fatal(err)
+	}
+	if c := RelayCheck(reg, healthy(), keyed, "proj_x", "dev", []string{"omp"}); c.Status != Fail || !strings.Contains(c.Detail, "terma-omp.ts") || c.Fix != "terma setup" {
+		t.Fatalf("RelayCheck without terma's extension = %+v, want a failure naming it", c)
+	}
 }

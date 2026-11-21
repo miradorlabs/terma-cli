@@ -18,6 +18,9 @@ type SessionKey struct {
 	// Claimed: a hook claims every session the key names, so global mode's catch-all never
 	// takes one and a session no hook claims, a harness's hidden side thread, stays here.
 	Claimed bool
+	// Scope, when set, is the instrumentation scope whose records the key names this way: an
+	// agent's own reading of a key other agents share. Elsewhere the key reads as they declare it.
+	Scope string
 }
 
 // The session keys several agents share, ranked ahead of and after any one agent's.

@@ -490,3 +490,52 @@ func TestShellExportsSwitchingSignalsOff(t *testing.T) {
 		})
 	}
 }
+
+// OMP's spans are attributed only by the claims terma's extension makes, so an .env pointed
+// at the relay is not enough: the extension must be in place and be this terma's hooks-only
+// file, whatever hook command it names. Doctor says which is wrong.
+func TestRelayPointedNeedsTheCurrentExtension(t *testing.T) {
+	a, _ := ompIn(t)
+	if _, err := a.ConfigureRelay(context.Background(), relayConfig()); err != nil {
+		t.Fatal(err)
+	}
+	dir, err := ompAgentDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	ext := filepath.Join(dir, extensionPath)
+	if pointed, _ := a.RelayPointed("127.0.0.1:43180"); !pointed {
+		t.Fatal("a fresh setup does not read as pointed")
+	}
+	if _, _, problem := a.RelayProblem("127.0.0.1:43180"); problem {
+		t.Fatal("a fresh setup reports a problem")
+	}
+	other, err := renderExtension([]string{"/opt/terma/bin/terma", "hook"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range []struct {
+		name, text string
+		pointed    bool
+	}{
+		{"another hook command", other, true},
+		{"an older extension", strings.Replace(other, "omp-session-start", "omp-session-begin", 1), false},
+		{"the developer's own file", "export default function () {}\n", false},
+		{"missing", "", false},
+	} {
+		if c.text == "" {
+			if err := os.Remove(ext); err != nil {
+				t.Fatal(err)
+			}
+		} else {
+			write(t, ext, c.text, 0o600)
+		}
+		if pointed, known := a.RelayPointed("127.0.0.1:43180"); !known || pointed != c.pointed {
+			t.Errorf("%s: pointed %v, want %v", c.name, pointed, c.pointed)
+		}
+		detail, fix, problem := a.RelayProblem("127.0.0.1:43180")
+		if problem == c.pointed || !c.pointed && (!strings.Contains(detail, extensionPath) || fix != "terma setup") {
+			t.Errorf("%s: problem %v %q %q", c.name, problem, detail, fix)
+		}
+	}
+}

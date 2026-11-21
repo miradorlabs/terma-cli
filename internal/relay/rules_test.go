@@ -40,7 +40,7 @@ var (
 		"file_path", "result", "cwd"}
 	pinnedMessageFields     = []string{"gen_ai.input.messages", "gen_ai.output.messages"}
 	pinnedToolContentEvents = []string{"tool.output", "tool.input"}
-	pinnedSessionKeys       = []string{"session.id", "conversation.id", "gen_ai.conversation.id", "thread.id", "thread_id"}
+	pinnedSessionKeys       = []string{"session.id", "conversation.id", "gen_ai.conversation.id@@oh-my-pi/pi-agent-core", "gen_ai.conversation.id", "thread.id", "thread_id"}
 )
 
 func TestComposedRulesArePinned(t *testing.T) {
@@ -64,7 +64,11 @@ func TestComposedRulesArePinned(t *testing.T) {
 	}
 	var keys, numericRejected []string
 	for _, k := range testRules.sessionKeys {
-		keys = append(keys, k.Attr)
+		name := k.Attr
+		if k.Scope != "" {
+			name += "@" + k.Scope
+		}
+		keys = append(keys, name)
 		if k.RejectNumeric {
 			numericRejected = append(numericRejected, k.Attr)
 		}
@@ -196,7 +200,7 @@ func deliverThroughRelay(t *testing.T, global bool, pol Policy, key shape.Sessio
 			Body: &commonpb.AnyValue{Value: &commonpb.AnyValue_StringValue{StringValue: sentinel(event)}}})
 	}
 	logs := &logspb.LogsData{ResourceLogs: []*logspb.ResourceLogs{{Resource: &resourcepb.Resource{Attributes: resAttrs},
-		ScopeLogs: []*logspb.ScopeLogs{{LogRecords: recs}}}}}
+		ScopeLogs: []*logspb.ScopeLogs{{Scope: &commonpb.InstrumentationScope{Name: key.Scope}, LogRecords: recs}}}}}
 	sp := &tracepb.Span{TraceId: make([]byte, 16), SpanId: []byte{1, 2, 3, 4, 5, 6, 7, 8}, Name: "turn",
 		Attributes: append([]*commonpb.KeyValue{kv(sessionKey, sid)}, attrs...)}
 	sp.TraceId[0] = 1
@@ -204,7 +208,7 @@ func deliverThroughRelay(t *testing.T, global bool, pol Policy, key shape.Sessio
 		sp.Events = append(sp.Events, &tracepb.Span_Event{Name: event})
 	}
 	traces := &tracepb.TracesData{ResourceSpans: []*tracepb.ResourceSpans{{Resource: &resourcepb.Resource{Attributes: resAttrs},
-		ScopeSpans: []*tracepb.ScopeSpans{{Spans: []*tracepb.Span{sp}}}}}}
+		ScopeSpans: []*tracepb.ScopeSpans{{Scope: &commonpb.InstrumentationScope{Name: key.Scope}, Spans: []*tracepb.Span{sp}}}}}}
 
 	for path, msg := range map[string]proto.Message{"/v1/logs": logs, "/v1/traces": traces} {
 		body, err := proto.Marshal(msg)
@@ -248,24 +252,29 @@ func TestWithheldBodyOnlyNamesItsEvent(t *testing.T) {
 
 // Each record names its session by the first key in precedence order; a numeric thread
 // id is an OS thread and names none. Codex's keys are Claimed: its hooks claim every session.
+// OMP's gen_ai.conversation.id is Claimed on its own spans alone: Copilot's and Gemini's are not.
 func TestSessionKeyPrecedence(t *testing.T) {
 	t.Parallel()
 	for _, c := range []struct {
+		scope   string
 		attrs   []*commonpb.KeyValue
 		want    string
 		claimed bool
 	}{
-		{[]*commonpb.KeyValue{kv("thread.id", "T"), kv("conversation.id", "C"), kv("session.id", "S")}, "S", false},
-		{[]*commonpb.KeyValue{kv("thread.id", "T"), kv("gen_ai.conversation.id", "G"), kv("conversation.id", "C")}, "C", true},
-		{[]*commonpb.KeyValue{kv("thread_id", "U"), kv("thread.id", "T")}, "T", true},
-		{[]*commonpb.KeyValue{kv("thread.id", "4242"), kv("thread_id", "U")}, "U", true},
-		{[]*commonpb.KeyValue{kv("thread.id", "4242")}, "", false},
+		{"", []*commonpb.KeyValue{kv("thread.id", "T"), kv("conversation.id", "C"), kv("session.id", "S")}, "S", false},
+		{"", []*commonpb.KeyValue{kv("thread.id", "T"), kv("gen_ai.conversation.id", "G"), kv("conversation.id", "C")}, "C", true},
+		{"", []*commonpb.KeyValue{kv("thread_id", "U"), kv("thread.id", "T")}, "T", true},
+		{"", []*commonpb.KeyValue{kv("thread.id", "4242"), kv("thread_id", "U")}, "U", true},
+		{"", []*commonpb.KeyValue{kv("thread.id", "4242")}, "", false},
+		{"@oh-my-pi/pi-agent-core", []*commonpb.KeyValue{kv("gen_ai.conversation.id", "G")}, "G", true},
+		{"github.copilot", []*commonpb.KeyValue{kv("gen_ai.conversation.id", "G")}, "G", false},
+		{"", []*commonpb.KeyValue{kv("gen_ai.conversation.id", "G")}, "G", false},
 	} {
-		if got, claimed := testRules.sessionOf(c.attrs, nil); got != c.want || claimed != c.claimed {
-			t.Errorf("%v: session %q claimed %v, want %q %v", c.attrs, got, claimed, c.want, c.claimed)
+		if got, claimed := testRules.sessionOf(c.scope, c.attrs, nil); got != c.want || claimed != c.claimed {
+			t.Errorf("%q %v: session %q claimed %v, want %q %v", c.scope, c.attrs, got, claimed, c.want, c.claimed)
 		}
 	}
-	if got, _ := testRules.sessionOf(nil, []*commonpb.KeyValue{kv("session.id", "R")}); got != "R" {
+	if got, _ := testRules.sessionOf("", nil, []*commonpb.KeyValue{kv("session.id", "R")}); got != "R" {
 		t.Errorf("resource session %q, want R", got)
 	}
 }
