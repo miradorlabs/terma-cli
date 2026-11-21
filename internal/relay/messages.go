@@ -8,6 +8,9 @@ import (
 	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
 )
 
+// roleTool is a tool result's message: every part of it is the tool's output, whatever its type.
+const roleTool = "tool"
+
 var (
 	// saidParts are the part types of a message envelope that are what was said; every other
 	// type (a tool call, its response, a file, a provider's own) is withheld with tool content.
@@ -16,8 +19,9 @@ var (
 	messageKeys = []string{"role", "name", "finish_reason", "parts"}
 )
 
-// message is one message of an envelope as it leaves: its role, a tool's name, why the model
-// stopped, and the parts that were said.
+// message is one message of an envelope as it leaves: its role, the name of the tool a tool
+// message answers (another role's name is a participant's, free text), why the model stopped,
+// and the parts that were said.
 type message struct {
 	Role         string            `json:"role"`
 	Name         string            `json:"name,omitempty"`
@@ -32,7 +36,7 @@ type saidPart struct {
 }
 
 // withoutToolParts is a message envelope (shape.CaptureRules.MessageFields) holding only what
-// was said: each message's text and reasoning parts, under its role, so a message left with
+// was said: each message's text and reasoning parts, a tool message's none, under its role, so a message left with
 // none still marks its turn. It is rebuilt from what was read, so nothing a reader of the JSON
 // would not see (a repeated key) passes. did reports whether anything was removed, and ok
 // whether v is an envelope at all; when it is not, nothing in it can be told apart and it is
@@ -54,10 +58,13 @@ func withoutToolParts(v *commonpb.AnyValue) (said string, did, ok bool) {
 		for key := range keys[i] {
 			did = did || !slices.Contains(messageKeys, key)
 		}
+		if msgs[i].Role != roleTool && msgs[i].Name != "" {
+			msgs[i].Name, did = "", true
+		}
 		kept := make([]json.RawMessage, 0, len(msgs[i].Parts))
 		for _, p := range msgs[i].Parts {
 			part, ok := textPart(p)
-			if !ok {
+			if !ok || msgs[i].Role == roleTool {
 				did = true
 				continue
 			}

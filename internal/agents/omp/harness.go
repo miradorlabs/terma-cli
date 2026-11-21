@@ -169,7 +169,7 @@ func (c exporter) Connect(e harness.Exporter, _ bool) error {
 		rollback = &kept
 	}
 	changes := retireHeaders(previous, current)
-	installing := managed(e, current)
+	installing := managed(e)
 	j := harness.NewJournal(c.Name(), path, current, installing, nil, nil, previous)
 
 	for key, value := range installing {
@@ -246,30 +246,25 @@ func (exporter) CurrentCredential(string, string) (string, bool) { return "", fa
 // Backup takes none: the journal restores each key terma wrote.
 func (exporter) Backup(string) (string, error) { return "", nil }
 
-// managed is what a connect to e writes, given the file's current values: the common
-// endpoint, protocol and content capture, every signal's own endpoint (a per-signal endpoint
-// in a dotenv file omp reads after this one would otherwise outrank the common one), and the
-// per-signal settings already in the file that would switch a signal off. The relay's token
-// leads each endpoint's path, never a header: a repository's .env that sets a signal's
-// endpoint outranks this file, and omp would send it this file's headers.
-func managed(e harness.Exporter, current map[string]string) map[string]string {
+// managed is what a connect to e writes: the common endpoint, protocol and content capture,
+// and every signal's own endpoint, protocol and exporter, with the SDK switched on. OMP fills a
+// key this file leaves unset from the dotenv files it reads after it (its config root's, then
+// the home directory's), so each key that could switch a signal off or send it elsewhere is set
+// here, whether or not this file had it. The relay's token leads each endpoint's path, never a
+// header: a repository's .env that sets a signal's endpoint outranks this file, and omp would
+// send it this file's headers.
+func managed(e harness.Exporter) map[string]string {
 	base := strings.TrimRight(e.Endpoint, "/") + "/" + e.APIKey
 	out := map[string]string{
 		harness.EnvOTLPEndpoint: base,
 		harness.EnvOTLPProtocol: harness.ProtocolHTTPProtobuf,
 		ompCaptureContentEnv:    ompCaptureContentFull,
+		envSDKDisabled:          "false",
 	}
 	for _, s := range harness.AllSignals {
 		out[signalKey(s, "ENDPOINT")] = harness.Exporter{Endpoint: base}.SignalEndpoint(s)
-		if _, ok := current[signalKey(s, "PROTOCOL")]; ok {
-			out[signalKey(s, "PROTOCOL")] = harness.ProtocolHTTPProtobuf
-		}
-		if v, ok := current[signalExporterKey(s)]; ok && !exportsOTLP(v) {
-			out[signalExporterKey(s)] = exporterOTLP
-		}
-	}
-	if v, ok := current[envSDKDisabled]; ok && strings.EqualFold(strings.TrimSpace(v), "true") {
-		out[envSDKDisabled] = "false"
+		out[signalKey(s, "PROTOCOL")] = harness.ProtocolHTTPProtobuf
+		out[signalExporterKey(s)] = exporterOTLP
 	}
 	return out
 }
