@@ -1,4 +1,4 @@
-// Package omp integrates OMP (oh-my-pi): its native OTLP exporter, pointed at the local
+// Package omp integrates OMP: its native OTLP exporter, pointed at the local
 // relay through OMP's .env, and terma's Pi-family extension, which reports sessions and
 // file edits to `terma hook omp-*` for commit attribution.
 package omp

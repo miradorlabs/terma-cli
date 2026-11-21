@@ -8,7 +8,7 @@
 The `terma` cli connects coding agents to [Terma](https://terma.ai), then stamps the commits
 they produce so agent spend can be traced to shipped code. It supports **Claude Code**
 (CLI and Desktop), **Codex** (CLI and Desktop), **GitHub Copilot** (CLI and VS Code) and
-**OMP** ([oh-my-pi](https://github.com/can1357/oh-my-pi)).
+**[OMP](https://github.com/can1357/oh-my-pi)**.
 
 ## Get started
 
