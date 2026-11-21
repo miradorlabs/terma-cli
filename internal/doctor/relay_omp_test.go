@@ -11,7 +11,7 @@ import (
 )
 
 // omp's exporter is its .env: doctor passes while its keys point at the relay, and fails
-// once one sends elsewhere.
+// once one sends elsewhere, or a shell export omp reads ahead of the .env does.
 func TestRelayCheckReadsOmpsEnv(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("HOME", dir)
@@ -24,6 +24,11 @@ func TestRelayCheckReadsOmpsEnv(t *testing.T) {
 	if c := RelayCheck(reg, healthy(), keyed, "proj_x", "dev", []string{"omp"}); c.Status != Pass {
 		t.Fatalf("RelayCheck = %+v, want a pass", c)
 	}
+	t.Setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "https://collector.example")
+	if c := RelayCheck(reg, healthy(), keyed, "proj_x", "dev", []string{"omp"}); c.Status != Fail || !strings.Contains(c.Detail, "Omp not exporting to the local relay") {
+		t.Fatalf("RelayCheck with a shell endpoint = %+v, want a failure naming omp", c)
+	}
+	t.Setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "")
 	env := filepath.Join(dir, ".env")
 	data, err := os.ReadFile(env)
 	if err != nil {
