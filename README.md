@@ -441,8 +441,10 @@ the span-exporting extension and exporter hook an earlier terma wrote there.
 OMP's known limits: an `OTEL_*` export in your shell, or in the `.env` of the directory OMP
 starts in, still outranks the file: a signal's endpoint there takes that signal's export,
 and a repository's `.env` that sets one takes its content too (which it could ask OMP for on
-its own), but never terma's token. OMP exports `http/protobuf` only, so a shell's OTLP
-protocol set to anything else switches its export off, as do `OTEL_SDK_DISABLED=true` and an
+its own), but never terma's token. OMP exports `http/protobuf` only, so a shell's per-signal
+OTLP protocol set to anything else switches that signal off (the common
+`OTEL_EXPORTER_OTLP_PROTOCOL` does not, since the file sets each signal's own), as do
+`OTEL_SDK_DISABLED=true` and an
 `OTEL_TRACES_EXPORTER` that names no `otlp`. `terma doctor` fails while your shell takes the
 export elsewhere or switches it off; setup does not check your shell, so it can report OMP
 set up while such an export stands. A named profile (`omp --profile`) has a directory of its

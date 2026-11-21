@@ -444,15 +444,16 @@ func TestConfigureRelayReplacesLegacyFiles(t *testing.T) {
 }
 
 // A shell export outranks the .env key by key: a signal's endpoint elsewhere is a credential
-// conflict, the relay's own is none, and the common endpoint is none, since omp reads each
-// signal's own first and the .env sets every one.
+// conflict, the relay's own is none, and the common endpoint or protocol is none, since omp
+// reads each signal's own first and the .env sets every one.
 func TestShellExportsConflict(t *testing.T) {
 	_, _ = ompIn(t)
 	e := harness.Exporter{Endpoint: "http://127.0.0.1:43180"}
 	t.Setenv(signalKey(harness.SignalLogs, "ENDPOINT"), "http://127.0.0.1:43180/v1/logs")
 	t.Setenv(harness.EnvOTLPEndpoint, "https://collector.example")
+	t.Setenv(harness.EnvOTLPProtocol, "grpc")
 	if c := ompConflicts(e); len(c) != 0 {
-		t.Fatalf("the relay's own or the common endpoint is a conflict: %+v", c)
+		t.Fatalf("the relay's own or the common endpoint or protocol is a conflict: %+v", c)
 	}
 	t.Setenv(signalKey(harness.SignalTraces, "ENDPOINT"), "https://collector.example/v1/traces")
 	t.Setenv(ompCaptureContentEnv, "summary")
@@ -522,6 +523,7 @@ func TestRelayPointedNeedsTheCurrentExtension(t *testing.T) {
 		{"an older extension", strings.Replace(other, "omp-session-start", "omp-session-begin", 1), false},
 		{"the bare template", extensionTemplate, false},
 		{"an empty hook command", strings.Replace(other, `"hookCommand":["/opt/terma/bin/terma","hook"]`, `"hookCommand":[]`, 1), false},
+		{"an empty hook executable", strings.Replace(other, `"hookCommand":["/opt/terma/bin/terma","hook"]`, `"hookCommand":[""]`, 1), false},
 		{"the developer's own file", "export default function () {}\n", false},
 		{"missing", "", false},
 	} {

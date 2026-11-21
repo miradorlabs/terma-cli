@@ -67,7 +67,7 @@ func extensionCurrent(path string) bool {
 	literal, tail, ok := strings.Cut(rest, " /* terma:config */")
 	var cfg extensionConfig
 	// A configuration that is no rendered one (the template's null) leaves the extension inert.
-	if !ok || json.Unmarshal([]byte(literal), &cfg) != nil || cfg.Version != 1 || len(cfg.HookCommand) == 0 {
+	if !ok || json.Unmarshal([]byte(literal), &cfg) != nil || cfg.Version != 1 || len(cfg.HookCommand) == 0 || strings.TrimSpace(cfg.HookCommand[0]) == "" {
 		return false
 	}
 	return head+extensionConfigMarker+tail == extensionTemplate

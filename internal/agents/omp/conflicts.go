@@ -9,7 +9,7 @@ import (
 
 // ompConflicts reports shell-exported OTEL_* variables, which omp reads key by key ahead of
 // its .env: a signal's endpoint there takes that export somewhere else. The common endpoint
-// does not, since omp reads each signal's own first and the .env sets every one.
+// and protocol do not, since omp reads each signal's own first and the .env sets every one.
 func ompConflicts(e harness.Exporter) []harness.Conflict {
 	var out []harness.Conflict
 
@@ -29,16 +29,6 @@ func ompConflicts(e harness.Exporter) []harness.Conflict {
 		})
 	}
 
-	// omp supports http/protobuf only; any other protocol silently disables the export.
-	if value := strings.ToLower(strings.TrimSpace(os.Getenv(harness.EnvOTLPProtocol))); value != "" && value != harness.ProtocolHTTPProtobuf {
-		out = append(out, harness.Conflict{
-			Key:       harness.EnvOTLPProtocol,
-			Value:     value,
-			Reason:    "OMP's exporter supports http/protobuf only; a " + value + " export would disable every signal",
-			Scope:     harness.ScopeEnvironment,
-			Clearable: false,
-		})
-	}
 	if value := os.Getenv(envSDKDisabled); strings.EqualFold(strings.TrimSpace(value), "true") {
 		out = append(out, harness.Conflict{
 			Key:       envSDKDisabled,
