@@ -147,7 +147,9 @@ func (r *Relay) deliverAttributed(c claim.Claim, pol Policy, p *part, how attrib
 	if r.opts.Version != "" {
 		stamp(p, semconv.TermaVersionKey, r.opts.Version)
 	}
-	stampCheckout(p, r.ranIn(c, p, how), pol.IncludeToolContent)
+	ran := r.ranIn(c, p, how)
+	stampCheckout(p, ran, pol.IncludeToolContent)
+	stampParent(p, ran)
 	nameUser(p, pol)
 	if how.how != "" {
 		stamp(p, semconv.TermaRelayAttributionKey, how.how)
