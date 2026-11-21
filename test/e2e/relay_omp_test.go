@@ -138,3 +138,54 @@ func TestOmpAttribution(t *testing.T) {
 		}
 	})
 }
+
+// Setup asks OMP for all content because the relay applies the team's policy to it. A traces
+// endpoint the developer's shell or repository .env sets outranks the agent .env, and gets
+// no content from terma's request; with no such override the relay receives it all.
+func TestRelayOmpContentOnlyToTheRelay(t *testing.T) {
+	forEachOmp(t, func(t *testing.T, b Binary) {
+		track(t)
+		const marker = "TERMA_OMP_PRIVATE_PROMPT"
+		promptIn := func(e telemetryEvidence) []string {
+			return slices.DeleteFunc(leakedFieldsOf(e, marker), func(f string) bool { return !strings.Contains(f, "gen_ai") })
+		}
+		for _, override := range []string{"shell", "repository .env"} {
+			t.Run(override, func(t *testing.T) {
+				sb := ompSandbox(t, "")(t)
+				other := StartReceiver(t)
+				env := []string{"OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=" + other.URL() + "/v1/traces", "OTEL_EXPORTER_OTLP_TRACES_PROTOCOL=http/protobuf"}
+				if override == "shell" {
+					sb.ExtraEnv = append(sb.ExtraEnv, env...)
+				} else {
+					sb.writeAbs(filepath.Join(sb.Repo, ".env"), strings.Join(env, "\n")+"\n")
+				}
+				sb.UseRelay(RelayOptions{Start: true, Content: true})
+				sb.OmpRun(b, sb.Repo, "Reply to "+marker)
+				for deadline := time.Now().Add(6 * time.Second); len(other.evidence().spans) == 0 && time.Now().Before(deadline); {
+					time.Sleep(40 * time.Millisecond)
+				}
+				ev := other.evidence()
+				if len(ev.spans) == 0 {
+					t.Fatal("the overriding endpoint received no traces, so the check proves nothing")
+				}
+				if fields := promptIn(ev); len(fields) > 0 {
+					t.Errorf("the prompt left for the developer's own endpoint: %v", fields)
+				}
+				sb.StopRelay()
+			})
+		}
+		t.Run("none", func(t *testing.T) {
+			ProvesAll(t, b, "relay.content_allowed")
+			sb := ompSandbox(t, "")(t)
+			sb.UseRelay(RelayOptions{Start: true, Content: true})
+			sb.OmpRun(b, sb.Repo, "Reply to "+marker)
+			for deadline := time.Now().Add(10 * time.Second); len(promptIn(sb.Receiver.evidence())) == 0 && time.Now().Before(deadline); {
+				time.Sleep(100 * time.Millisecond)
+			}
+			if len(promptIn(sb.Receiver.evidence())) == 0 {
+				t.Errorf("the relay passed on no prompt though the policy allows it: %v", sb.RelayStats())
+			}
+			sb.StopRelay()
+		})
+	})
+}

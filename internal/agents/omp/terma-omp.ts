@@ -108,8 +108,23 @@ function editedFiles(event: any): string[] {
   return files
 }
 
+// keepContentForTheRelay switches OMP's content capture off where it would leave for a
+// collector other than the relay. Terma's agent .env asks for full content because the relay
+// applies the team's policy to it, but OMP reads each OTEL_* key from the shell or the launch
+// directory's .env ahead of that file: a signal's own collector set there takes the signal,
+// and the capture request with it, elsewhere. A capture setting of the developer's own stands.
+// OMP reads capture once, at its first model call, after it binds this extension.
+function keepContentForTheRelay() {
+  const env = process.env
+  if (env.OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT) return
+  if (["TRACES", "LOGS", "METRICS"].some((s) => env[`OTEL_EXPORTER_OTLP_${s}_ENDPOINT`])) {
+    env.OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT = "none"
+  }
+}
+
 export default function (omp: any) {
   if (!CONFIG) return
+  keepContentForTheRelay()
 
   omp.on("session_start", (event: any, ctx: any) => {
     session = sessionOf(ctx)

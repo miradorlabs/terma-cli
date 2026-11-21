@@ -184,3 +184,47 @@ func runDriver(t *testing.T) (byEvent map[string][]map[string]any, ext, fetched 
 	}
 	return byEvent, ext, fetched
 }
+
+// OMP reads a traces, logs or metrics collector the shell or the launch directory's .env sets
+// ahead of its agent .env, and would send it the full content that .env asks for on the
+// relay's behalf: under such an override the extension switches capture off, unless the
+// developer set capture themselves, and with none it leaves capture to the .env.
+func TestExtensionKeepsContentForTheRelay(t *testing.T) {
+	node, err := exec.LookPath("node")
+	if err != nil {
+		t.Skip("node is not installed")
+	}
+	if out, err := exec.Command(node, "-p", "process.features.typescript").Output(); err != nil || !slices.Contains([]string{"strip", "transform"}, strings.TrimSpace(string(out))) {
+		t.Skip("node does not run TypeScript")
+	}
+	ext := filepath.Join(t.TempDir(), "terma-ext.ts")
+	if _, err := writeExtension(ext, []string{"true"}); err != nil {
+		t.Fatal(err)
+	}
+	const capture = ompCaptureContentEnv
+	cases := map[string]struct {
+		env  []string
+		want string
+	}{
+		"no override":             {nil, "<unset>"},
+		"common collector only":   {[]string{"OTEL_EXPORTER_OTLP_ENDPOINT=https://c.example"}, "<unset>"},
+		"traces collector":        {[]string{"OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=https://c.example/v1/traces"}, "none"},
+		"logs collector":          {[]string{"OTEL_EXPORTER_OTLP_LOGS_ENDPOINT=https://c.example/v1/logs"}, "none"},
+		"metrics collector":       {[]string{"OTEL_EXPORTER_OTLP_METRICS_ENDPOINT=https://c.example/v1/metrics"}, "none"},
+		"developer's own capture": {[]string{"OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=https://c.example/v1/traces", capture + "=full"}, "full"},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			script := `const mod = await import(process.argv[1]); mod.default({ on: () => {} }); console.log(process.env.` + capture + ` ?? "<unset>")`
+			cmd := exec.Command(node, "--input-type=module", "-e", script, ext)
+			cmd.Env = append([]string{"PATH=" + os.Getenv("PATH")}, c.env...)
+			out, err := cmd.CombinedOutput()
+			if err != nil {
+				t.Fatalf("node: %v\n%s", err, out)
+			}
+			if got := strings.TrimSpace(string(out)); got != c.want {
+				t.Errorf("%s = %s, want %s", capture, got, c.want)
+			}
+		})
+	}
+}

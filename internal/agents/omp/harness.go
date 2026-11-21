@@ -265,7 +265,10 @@ func (exporter) Backup(string) (string, error) { return "", nil }
 // the home directory's), so each key that could switch a signal off or send it elsewhere is set
 // here, whether or not this file had it. The relay's token leads each endpoint's path, never a
 // header: a repository's .env that sets a signal's endpoint outranks this file, and omp would
-// send it this file's headers.
+// send it this file's headers. Content capture outranked the same way would send full content
+// there: terma's extension switches it off when a signal's endpoint comes from outside the file.
+// Accepted risk: `omp --no-extensions` skips that switch, so an endpoint of the developer's own
+// gets full content; the upgrade path is a capture setting OMP binds to one endpoint.
 func managed(e harness.Exporter, current map[string]string) map[string]string {
 	base := strings.TrimRight(e.Endpoint, "/") + "/" + e.APIKey
 	out := map[string]string{
