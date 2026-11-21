@@ -13,7 +13,7 @@ import (
 
 const (
 	name        = "omp"
-	displayName = "Omp"
+	displayName = "OMP"
 )
 
 // Agent is omp: telemetry from its native exporter, attribution from terma's extension.

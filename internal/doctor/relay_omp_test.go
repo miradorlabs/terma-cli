@@ -29,7 +29,7 @@ func TestRelayCheckReadsOmpsEnv(t *testing.T) {
 		t.Fatalf("RelayCheck with a shell common endpoint = %+v, want a pass: the .env's own per signal outrank it", c)
 	}
 	t.Setenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", "https://collector.example/v1/traces")
-	if c := RelayCheck(reg, healthy(), keyed, "proj_x", "dev", []string{"omp"}); c.Status != Fail || !strings.Contains(c.Detail, "Omp not exporting to the local relay") {
+	if c := RelayCheck(reg, healthy(), keyed, "proj_x", "dev", []string{"omp"}); c.Status != Fail || !strings.Contains(c.Detail, "OMP not exporting to the local relay") {
 		t.Fatalf("RelayCheck with a shell traces endpoint = %+v, want a failure naming omp", c)
 	}
 	t.Setenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", "")
@@ -42,7 +42,7 @@ func TestRelayCheckReadsOmpsEnv(t *testing.T) {
 	if err := os.WriteFile(env, []byte(moved), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if c := RelayCheck(reg, healthy(), keyed, "proj_x", "dev", []string{"omp"}); c.Status != Fail || !strings.Contains(c.Detail, "Omp not exporting to the local relay") {
+	if c := RelayCheck(reg, healthy(), keyed, "proj_x", "dev", []string{"omp"}); c.Status != Fail || !strings.Contains(c.Detail, "OMP not exporting to the local relay") {
 		t.Fatalf("RelayCheck = %+v, want a failure naming omp", c)
 	}
 }
