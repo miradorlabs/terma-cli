@@ -7,10 +7,12 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/agents/internal/pifamily"
 	"github.com/miradorlabs/terma-cli/internal/agents/internal/relayexport"
+	"github.com/miradorlabs/terma-cli/internal/harness"
 )
 
 // The extension terma writes into omp's agent directory, named apart from Pi's, which a
@@ -60,9 +62,14 @@ func (a Agent) UnconfigureRelay(context.Context, string) (agents.RelayResult, er
 	return result, err
 }
 
-// RelayPointed reports whether omp's .env points its exporter at the relay at addr.
+// RelayPointed reports whether omp's .env points its exporter at the relay at addr, with no
+// shell export that omp reads ahead of the .env taking the export elsewhere or switching it off.
 func (a Agent) RelayPointed(addr string) (bool, bool) {
-	return relayexport.NativePointed(a.Harness(), addr), true
+	if !relayexport.NativePointed(a.Harness(), addr) {
+		return false, true
+	}
+	st, err := a.Harness().Status()
+	return err == nil && !slices.ContainsFunc(st.Conflicts, func(c harness.Conflict) bool { return !c.Advisory }), true
 }
 
 // removeOwn deletes the files under dir among rels that terma wrote, each opening with its
