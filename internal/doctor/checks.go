@@ -201,14 +201,24 @@ func RelayCheck(reg *agents.Registry, relay Relay, keys Keys, projectID, env str
 		}
 		return slices.ContainsFunc(agents.Selections(e), func(s string) bool { return slices.Contains(selected, s) })
 	}
-	var wrong []string
+	// What an agent can say about why (RelayChecker) follows its name.
+	var wrong, why []string
 	for _, e := range reg.With[agents.RelayExporter]() {
 		if pointed, known := e.RelayPointed(addr); mine(e) && known && !pointed {
 			wrong = append(wrong, e.DisplayName())
+			if c, ok := e.(agents.RelayChecker); ok {
+				if detail, _, problem := c.RelayProblem(addr); problem {
+					why = append(why, detail)
+				}
+			}
 		}
 	}
 	if len(wrong) > 0 {
-		return Check{Status: Fail, Detail: strings.Join(wrong, " and ") + " not exporting to the local relay", Fix: "terma setup"}
+		detail := strings.Join(wrong, " and ") + " not exporting to the local relay"
+		if len(why) > 0 {
+			detail += ": " + strings.Join(why, "; ")
+		}
+		return Check{Status: Fail, Detail: detail, Fix: "terma setup"}
 	}
 	if !running && relay.LastFailure != "" {
 		return Check{Status: Warn, Detail: "the local relay last failed to start: " + relay.LastFailure, Fix: "terma setup"}

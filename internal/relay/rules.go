@@ -48,19 +48,22 @@ var generic = shape.CaptureRules{
 
 func compose(correlators []shape.Correlator, capturers []shape.Capturer) *rules {
 	r := &rules{}
-	byAttr := map[string]shape.SessionKey{}
+	type scopedAttr struct{ attr, scope string }
+	byAttr := map[scopedAttr]shape.SessionKey{}
 	for _, c := range correlators {
 		cor := c.Correlation()
 		for _, k := range cor.SessionKeys {
-			if prev, ok := byAttr[k.Attr]; ok && prev != k {
+			at := scopedAttr{k.Attr, k.Scope}
+			if prev, ok := byAttr[at]; ok && prev != k {
 				panic(fmt.Sprintf("relay: session key %q declared as %+v and %+v", k.Attr, prev, k))
 			}
-			byAttr[k.Attr] = k
+			byAttr[at] = k
 		}
 		r.startEvents = union(r.startEvents, cor.StartEvents)
 	}
 	r.sessionKeys = slices.SortedFunc(maps.Values(byAttr), func(a, b shape.SessionKey) int {
-		return cmp.Or(cmp.Compare(a.Rank, b.Rank), strings.Compare(a.Attr, b.Attr))
+		// A key scoped to an agent's records is read there ahead of the same key unscoped.
+		return cmp.Or(cmp.Compare(a.Rank, b.Rank), strings.Compare(a.Attr, b.Attr), strings.Compare(b.Scope, a.Scope))
 	})
 	r.safeKeys, r.safePrefixes = maps.Clone(genericSafeKeys), slices.Clone(genericSafePrefixes)
 	r.metricSafeKeys = map[string][]string{}

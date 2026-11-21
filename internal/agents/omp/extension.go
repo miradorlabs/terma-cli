@@ -52,3 +52,18 @@ func writeExtension(path string, hookCommand []string) (string, error) {
 	}
 	return path, config.WriteFileAtomic(path, []byte(text), 0o600)
 }
+
+// extensionCurrent reports whether path holds the extension this terma renders, whatever
+// hook command its configuration line names.
+func extensionCurrent(path string) bool {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return false
+	}
+	head, rest, ok := strings.Cut(string(data), "const CONFIG: TermaConfig | null = ")
+	if !ok {
+		return false
+	}
+	_, tail, ok := strings.Cut(rest, " /* terma:config */")
+	return ok && head+extensionConfigMarker+tail == extensionTemplate
+}

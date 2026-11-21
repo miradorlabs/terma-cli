@@ -2,11 +2,18 @@ package omp
 
 import "github.com/miradorlabs/terma-cli/internal/relay/shape"
 
+// traceScope is the instrumentation scope of omp's native spans.
+const traceScope = "@oh-my-pi/pi-agent-core"
+
 // Correlation names omp's session: gen_ai.conversation.id, on its native invoke_agent, chat
 // and execute_tool spans; a subagent's spans carry its own. Its logs and metrics name no
-// session, and go by the process that sent them.
+// session, and go by the process that sent them. The key is Claimed on omp's spans: the
+// extension claims each session and subagent it starts, but the advisor loop omp runs beside
+// a session names a conversation of its own (<session>-advisor) and starts no session.
 func (Agent) Correlation() shape.Correlation {
-	return shape.Correlation{SessionKeys: []shape.SessionKey{shape.GenAIConversationID}}
+	key := shape.GenAIConversationID
+	key.Claimed, key.Scope = true, traceScope
+	return shape.Correlation{SessionKeys: []shape.SessionKey{key}}
 }
 
 // CaptureRules are where omp's native telemetry carries content beyond the GenAI attributes
