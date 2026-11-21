@@ -190,7 +190,7 @@ function sessionOf(ctx: any): string {
 // parentOf is the session that opened this one for a subagent: its header's parentSession
 // is the parent's transcript, and a subagent's own transcript sits in the folder of that
 // name. A top-level parent's is <dir>/<time>_<id>.jsonl; a subagent's, opening one of its
-// own, is <agent>.jsonl, whose header names its id. A fork or a continuation names a parent
+// own, is <agent>.jsonl (an agent id may hold "_"), whose header names its id. A fork or a continuation names a parent
 // too, but elsewhere.
 function parentOf(ctx: any): string {
   try {
@@ -198,7 +198,7 @@ function parentOf(ctx: any): string {
     const parent = sm && typeof sm.getHeader === "function" ? sm.getHeader()?.parentSession : undefined
     const file = sm && typeof sm.getSessionFile === "function" ? sm.getSessionFile() : undefined
     if (typeof parent !== "string" || typeof file !== "string" || dirname(file) + ".jsonl" !== parent) return ""
-    const m = /_([^_]+)\.jsonl$/.exec(basename(parent))
+    const m = /^\d{4}-\d\d-\d\dT\d\d-\d\d-\d\d-\d{3}Z_(.+)\.jsonl$/.exec(basename(parent))
     if (m) return m[1]
     const head = Buffer.alloc(16 * 1024)
     const fd = openSync(parent, "r")
@@ -251,7 +251,7 @@ export default function (pi: any) {
 
   pi.on("session_start", (event: any, ctx: any) => {
     session = sessionOf(ctx)
-    if (LIFECYCLE) termaHook(AGENT + "-session-start", { session_id: session, cwd: ctx?.cwd, model: ctx?.model?.id, reason: event?.reason, parent_session_id: parentOf(ctx) || undefined })
+    if (LIFECYCLE) termaHook(AGENT + "-session-start", { session_id: session, cwd: ctx?.cwd, model: ctx?.model?.id, reason: event?.reason, parent_session_id: AGENT === "omp" ? parentOf(ctx) || undefined : undefined })
   })
 
   pi.on("session_shutdown", async (_event: any, ctx: any) => {
@@ -313,7 +313,7 @@ export default function (pi: any) {
     }, event?.isError === true)
     const files = editedFiles(event)
     if (LIFECYCLE && files.length > 0) {
-      termaHook(AGENT + "-file-edit", { session_id: s, cwd: ctx?.cwd, tool: name, files, tool_call_id: event?.toolCallId })
+      termaHook(AGENT + "-file-edit", { session_id: s, cwd: ctx?.cwd, tool: name, files, tool_call_id: AGENT === "omp" ? event?.toolCallId : undefined })
     }
   })
 

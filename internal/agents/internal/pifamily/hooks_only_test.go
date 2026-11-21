@@ -37,8 +37,8 @@ handlers.tool_result({ toolName: "read", toolCallId: "paHFu2n2k|fc_5", isError: 
 await handlers.session_start({ reason: "startup" }, child)
 await handlers.session_start({ reason: "startup" }, fork)
 const fs = await import("node:fs")
-fs.writeFileSync(tmp + "/Sub.jsonl", '{"type":"title","v":1,"title":""}\n{"type":"session","version":3,"id":"01a1fe3e-6e03-7557-b1af-a171883bcfca"}\n')
-const nested = { cwd: "/work", sessionManager: sm("01a1fe40-0000-7000-8000-000000000004", tmp + "/Sub/Inner.jsonl", { parentSession: tmp + "/Sub.jsonl" }) }
+fs.writeFileSync(tmp + "/Scout_2.jsonl", '{"type":"title","v":1,"title":""}\n{"type":"session","version":3,"id":"01a1fe3e-6e03-7557-b1af-a171883bcfca"}\n')
+const nested = { cwd: "/work", sessionManager: sm("01a1fe40-0000-7000-8000-000000000004", tmp + "/Scout_2/Inner.jsonl", { parentSession: tmp + "/Scout_2.jsonl" }) }
 await handlers.session_start({ reason: "startup" }, nested)
 await handlers.message_end({ message: { role: "assistant", model: "m", usage: { input: 1, output: 1 }, content: [] } }, parent)
 await handlers.agent_end?.()
@@ -49,64 +49,15 @@ await handlers.session_shutdown({}, parent)
 // session's start, naming a subagent's parent (a nested one's too) but never a fork's, and each file a tool call
 // changed, successful ones only, with the call's id as omp's own spans name it.
 func TestHooksOnlyExtensionUnderNode(t *testing.T) {
-	node, err := exec.LookPath("node")
-	if err != nil {
-		t.Skip("node is not installed")
-	}
-	dir := t.TempDir()
-	// Each hook call is a process of its own, racing the others: one file per call.
-	hooks := filepath.Join(dir, "hooks")
-	if err := os.Mkdir(hooks, 0o700); err != nil {
-		t.Fatal(err)
-	}
-	hook := filepath.Join(dir, "hook.sh")
-	if err := os.WriteFile(hook, []byte("#!/bin/sh\nf=$(mktemp "+hooks+"/call.XXXXXX)\nprintf '{\"event\":\"%s\",\"payload\":' \"$1\" > $f.part\ncat >> $f.part\necho '}' >> $f.part\nmv $f.part $f.json\n"), 0o700); err != nil {
-		t.Fatal(err)
-	}
-	ext := filepath.Join(dir, "terma-omp.ts")
-	if _, err := Write(ext, ForHooks("omp", agents.RelayConfig{Endpoint: "http://127.0.0.1:43180", Token: "relay-token", HookCommand: []string{hook}})); err != nil {
-		t.Fatal(err)
-	}
+	byEvent, ext, fetched := runDriver(t, func(hook string) Config {
+		return ForHooks("omp", agents.RelayConfig{Endpoint: "http://127.0.0.1:43180", Token: "relay-token", HookCommand: []string{hook}})
+	})
 	if data, _ := os.ReadFile(ext); strings.Contains(string(data), "relay-token") {
 		t.Fatal("the hooks-only extension holds the relay's token")
 	}
-	script := filepath.Join(dir, "driver.mjs")
-	if err := os.WriteFile(script, []byte(strings.ReplaceAll(driver, `require("node:fs")`, `(await import("node:fs"))`)), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	fetched := filepath.Join(dir, "fetched")
-	cmd := exec.Command(node, script, ext, fetched, dir)
-	if out, err := cmd.CombinedOutput(); err != nil {
-		t.Fatalf("node: %v\n%s", err, out)
-	}
-
-	type call struct {
-		Event   string         `json:"event"`
-		Payload map[string]any `json:"payload"`
-	}
-	var calls []call
-	deadline := time.Now().Add(10 * time.Second)
-	for {
-		calls = nil
-		files, _ := filepath.Glob(filepath.Join(hooks, "*.json"))
-		for _, f := range files {
-			var c call
-			if data, err := os.ReadFile(f); err == nil && json.Unmarshal(data, &c) == nil {
-				calls = append(calls, c)
-			}
-		}
-		if len(calls) >= 9 || time.Now().After(deadline) {
-			break
-		}
-		time.Sleep(50 * time.Millisecond)
-	}
-	byEvent := map[string][]map[string]any{}
-	for _, c := range calls {
-		byEvent[c.Event] = append(byEvent[c.Event], c.Payload)
-	}
 	starts := byEvent["omp-session-start"]
 	if len(starts) != 4 {
-		t.Fatalf("session starts = %v; calls %v", starts, calls)
+		t.Fatalf("session starts = %v; calls %v", starts, byEvent)
 	}
 	parents := map[string]any{}
 	for _, s := range starts {
@@ -146,4 +97,83 @@ func TestHooksOnlyExtensionUnderNode(t *testing.T) {
 	if data, err := os.ReadFile(fetched); err == nil {
 		t.Errorf("the hooks-only extension exported:\n%s", data)
 	}
+}
+
+// Pi's hooks are as they were: no start names a parent and no edit a tool call.
+func TestPiExtensionNamesNoParentOrCall(t *testing.T) {
+	byEvent, _, _ := runDriver(t, func(hook string) Config {
+		return ForRelay("pi", true, agents.RelayConfig{Endpoint: "http://127.0.0.1:43180", Token: "relay-token", HookCommand: []string{hook}})
+	})
+	if len(byEvent["pi-session-start"]) != 4 || len(byEvent["pi-file-edit"]) != 3 {
+		t.Fatalf("calls = %v", byEvent)
+	}
+	for _, s := range byEvent["pi-session-start"] {
+		if s["parent_session_id"] != nil {
+			t.Errorf("a Pi start named parent %v", s["parent_session_id"])
+		}
+	}
+	for _, e := range byEvent["pi-file-edit"] {
+		if e["tool_call_id"] != nil {
+			t.Errorf("a Pi edit named call %v", e["tool_call_id"])
+		}
+	}
+}
+
+// runDriver renders the extension cfg gives for a hook command, replays the driver's
+// events through it under Node, and returns each hook call's payloads by event, the
+// extension's path and the file any export would name.
+func runDriver(t *testing.T, cfg func(hook string) Config) (byEvent map[string][]map[string]any, ext, fetched string) {
+	t.Helper()
+	node, err := exec.LookPath("node")
+	if err != nil {
+		t.Skip("node is not installed")
+	}
+	dir := t.TempDir()
+	// Each hook call is a process of its own, racing the others: one file per call.
+	hooks := filepath.Join(dir, "hooks")
+	if err := os.Mkdir(hooks, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	hook := filepath.Join(dir, "hook.sh")
+	if err := os.WriteFile(hook, []byte("#!/bin/sh\nf=$(mktemp "+hooks+"/call.XXXXXX)\nprintf '{\"event\":\"%s\",\"payload\":' \"$1\" > $f.part\ncat >> $f.part\necho '}' >> $f.part\nmv $f.part $f.json\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	ext = filepath.Join(dir, "terma-ext.ts")
+	if _, err := Write(ext, cfg(hook)); err != nil {
+		t.Fatal(err)
+	}
+	script := filepath.Join(dir, "driver.mjs")
+	if err := os.WriteFile(script, []byte(strings.ReplaceAll(driver, `require("node:fs")`, `(await import("node:fs"))`)), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	fetched = filepath.Join(dir, "fetched")
+	if out, err := exec.Command(node, script, ext, fetched, dir).CombinedOutput(); err != nil {
+		t.Fatalf("node: %v\n%s", err, out)
+	}
+
+	type call struct {
+		Event   string         `json:"event"`
+		Payload map[string]any `json:"payload"`
+	}
+	var calls []call
+	deadline := time.Now().Add(10 * time.Second)
+	for {
+		calls = nil
+		files, _ := filepath.Glob(filepath.Join(hooks, "*.json"))
+		for _, f := range files {
+			var c call
+			if data, err := os.ReadFile(f); err == nil && json.Unmarshal(data, &c) == nil {
+				calls = append(calls, c)
+			}
+		}
+		if len(calls) >= 9 || time.Now().After(deadline) {
+			break
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	byEvent = map[string][]map[string]any{}
+	for _, c := range calls {
+		byEvent[c.Event] = append(byEvent[c.Event], c.Payload)
+	}
+	return byEvent, ext, fetched
 }
