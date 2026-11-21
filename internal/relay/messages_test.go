@@ -134,6 +134,8 @@ func TestMessageEnvelopeWithholdingFailsClosed(t *testing.T) {
 		{"a role that is no string", strValue(`[{"role":{"tool":"TOOL<x>"},"parts":[]}]`), ""},
 		{"a tool's output as text", strValue(`[{"role":"tool","name":"bash","parts":[{"type":"text","content":"TOOL<result>"}]}]`),
 			`[{"role":"tool","name":"bash","parts":[]}]`},
+		{"a tool role in capitals", strValue(`[{"role":"Tool","parts":[{"type":"text","content":"TOOL<result>"}]}]`),
+			`[{"role":"Tool","parts":[]}]`},
 		{"a participant's name", strValue(`[{"role":"user","name":"PROMPT<name>","parts":[{"type":"text","content":"PROMPT<text>"}]}]`),
 			`[{"role":"user","parts":[{"type":"text","content":"PROMPT<text>"}]}]`},
 		{"a message key no rule names", strValue(`[{"role":"user","tool_calls":"TOOL<x>","parts":[{"type":"text","content":"PROMPT<a&b>"}]}]`),

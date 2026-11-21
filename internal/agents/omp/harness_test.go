@@ -258,6 +258,21 @@ func TestRelayEnvShadowsSwitchesItDidNotFind(t *testing.T) {
 	}
 }
 
+// An exporter list that already names otlp exports to the relay as it is: setup keeps it.
+func TestRelayEnvKeepsAnExporterListNamingOTLP(t *testing.T) {
+	a, env := ompIn(t)
+	write(t, env, "OTEL_TRACES_EXPORTER=console,otlp\n", 0o600)
+	if _, err := a.ConfigureRelay(context.Background(), relayConfig()); err != nil {
+		t.Fatal(err)
+	}
+	if got := read(t, env); !strings.Contains(got, "OTEL_TRACES_EXPORTER=console,otlp\n") {
+		t.Errorf("setup replaced a list that names otlp:\n%s", got)
+	}
+	if pointed, _ := a.RelayPointed("127.0.0.1:43180"); !pointed {
+		t.Error("the .env does not read as pointed at the relay")
+	}
+}
+
 // An earlier setup sent the token in an Authorization header; the next one takes each header
 // it wrote back to what the developer had, and teardown leaves that.
 func TestRelayEnvRetiresTheTokenHeader(t *testing.T) {

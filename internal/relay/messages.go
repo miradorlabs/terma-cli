@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"slices"
+	"strings"
 
 	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
 )
@@ -58,13 +59,14 @@ func withoutToolParts(v *commonpb.AnyValue) (said string, did, ok bool) {
 		for key := range keys[i] {
 			did = did || !slices.Contains(messageKeys, key)
 		}
-		if msgs[i].Role != roleTool && msgs[i].Name != "" {
+		tool := strings.EqualFold(msgs[i].Role, roleTool)
+		if !tool && msgs[i].Name != "" {
 			msgs[i].Name, did = "", true
 		}
 		kept := make([]json.RawMessage, 0, len(msgs[i].Parts))
 		for _, p := range msgs[i].Parts {
 			part, ok := textPart(p)
-			if !ok || msgs[i].Role == roleTool {
+			if !ok || tool {
 				did = true
 				continue
 			}
