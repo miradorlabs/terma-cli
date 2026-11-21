@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-21T12:26:45.690660582Z",
+  "generated_at": "2026-11-21T17:46:22.01218662Z",
   "versions": [
     {
       "harness": "codex-desktop",
@@ -25,8 +25,8 @@
       "highlights": [],
       "signing": null,
       "partial": true,
-      "attempted_at": "2026-11-21T11:30:49.032301444Z",
-      "attempts": 3
+      "attempted_at": "2026-11-21T17:46:22.01218662Z",
+      "attempts": 4
     },
     {
       "harness": "claude-desktop",

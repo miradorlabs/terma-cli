@@ -22759,7 +22759,7 @@
         "read": true
       },
       "CLAUDE_CODE_FORK_SUBAGENT": {
-        "description": "Controls fork mode, which is on by default and lets Claude start forks on its own. While fork mode is on, Claude also can't wait for a subagent in interactive terminal, VS Code, or desktop sessions on your machine. Set to `0` to turn fork mode off. For versions, see Turn fork mode off",
+        "description": "Controls fork mode, which is on by default and lets Claude start forks on its own. Set to `0` to turn fork mode off, for example to let Claude wait for a subagent. For versions, see Turn fork mode off",
         "read": true
       },
       "CLAUDE_CODE_FORWARD_SUBAGENT_TEXT": {
@@ -23271,7 +23271,7 @@
         "read": true
       },
       "CLAUDE_CODE_WEBFETCH_CACHE_TTL_MS": {
-        "description": "Set to the number of milliseconds WebFetch keeps each fetched URL's response cached. The default is `900000`, which is 15 minutes. Takes plain digits only; `0`, a decimal, or any other spelling keeps the default. Claude Code reads the value once per launch, so a change in a settings `env` block applies when you next launch `claude`. Requires Claude Code v2.1.233 or later",
+        "description": "Set to the number of milliseconds WebFetch keeps each fetched page cached. The default is `900000`, which is 15 minutes. Takes plain digits only; `0`, a decimal, or any other spelling keeps the default. Claude Code reads the value once per launch, so a change in a settings `env` block applies when you next launch `claude`. Requires Claude Code v2.1.233 or later",
         "read": true
       },
       "CLAUDE_CODE_WEBFETCH_DEADLINE_MS": {
@@ -23711,7 +23711,7 @@
         "read": false
       }
     },
-    "fetched_at": "2026-11-21T12:26:45.690660582Z",
+    "fetched_at": "2026-11-21T17:46:22.01218662Z",
     "settings": {
       "advisorModel": {
         "default": "unset, so the advisor is off",
