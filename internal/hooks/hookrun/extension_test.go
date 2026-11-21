@@ -66,8 +66,8 @@ func TestExtensionSessionIsStampedOnItsCommit(t *testing.T) {
 	}
 }
 
-// A subagent's start names its parent: its start event and its relay claim carry it, and
-// the session is not made active. One tool call's several files are one touch, joined to
+// A subagent's start names its parent: its start event carries it, its relay claim too
+// where the extension claims parents, and the session is not made active. One tool call's several files are one touch, joined to
 // the call by its id.
 func TestExtensionSubagentAndMultiFileEdit(t *testing.T) {
 	t.Parallel()
@@ -77,7 +77,7 @@ func TestExtensionSubagentAndMultiFileEdit(t *testing.T) {
 	env := func(stdin string) Env {
 		return Env{StateDir: stateDir, Now: now, Cwd: root, Policy: hookruntest.Admitting(root), Stdin: strings.NewReader(stdin), Spool: sp, Version: "test", Team: hookruntest.Team}
 	}
-	events := Extension{Tool: "ext"}.Events("ext")
+	events := Extension{Tool: "ext", ClaimParent: true}.Events("ext")
 	const child, parent = "01a1fe3e-6e03-7557-b1af-a171883bcfca", "01a1fe3e-5eb1-7520-a3b3-a7f2a87931bf"
 	if err := events["ext-session-start"](ctx, env(`{"session_id":"`+child+`","cwd":"`+hookruntest.InJSON(root)+`","parent_session_id":"`+parent+`"}`)); err != nil {
 		t.Fatal(err)
@@ -91,6 +91,15 @@ func TestExtensionSubagentAndMultiFileEdit(t *testing.T) {
 	}
 	if active, ok := hookruntest.Store(t, root).Active(now, time.Hour); ok {
 		t.Fatalf("a subagent's session was made active: %+v", active)
+	}
+	// An agent whose own telemetry names the parent leaves it out of the claim, so the relay
+	// stamps nothing on that agent's records.
+	const other = "01a1fe3e-6e03-7557-b1af-a171883bcfcb"
+	if err := (Extension{Tool: "other"}).Events("other")["other-session-start"](ctx, env(`{"session_id":"`+other+`","cwd":"`+hookruntest.InJSON(root)+`","parent_session_id":"`+parent+`"}`)); err != nil {
+		t.Fatal(err)
+	}
+	if c, ok := claim.Read(stateDir, other, now); !ok || c.Parent != "" {
+		t.Fatalf("claim = %+v, %v; want one naming no parent", c, ok)
 	}
 
 	hookruntest.WriteFile(t, root, "a.go", "package a\n")

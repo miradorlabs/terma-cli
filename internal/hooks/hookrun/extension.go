@@ -15,6 +15,9 @@ import (
 // the session id its telemetry carries too.
 type Extension struct {
 	Tool string
+	// ClaimParent names a subagent's parent in its relay claim, for the relay to stamp on
+	// the subagent's telemetry: for an agent whose own telemetry does not name the parent.
+	ClaimParent bool
 }
 
 // Events is the extension's <prefix>-session-start, -prompt, -session-end and -file-edit handlers.
@@ -70,6 +73,9 @@ func (x Extension) sessionStart(ctx context.Context, env Env) error {
 	// A subagent's session is announced, never made active: it would claim the
 	// developer's next hand-written commit. Its edits still build its own manifest.
 	env.PruneManifests(r, sess.UpdatedAt)
+	if x.ClaimParent {
+		env.parent = in.ParentSessionID
+	}
 	env.EmitStart(r, sess, map[string]any{semconv.TermaSessionParentIDKey: in.ParentSessionID})
 	return nil
 }
