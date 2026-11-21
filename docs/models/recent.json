@@ -1,7 +1,31 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-20T22:37:46.135098265Z",
+  "generated_at": "2026-11-21T00:33:01.87527665Z",
   "events": [
+    {
+      "at": "2026-11-21T00:33:01.87527665Z",
+      "model": "gpt-6.2-sol",
+      "vendor": "openai",
+      "name": "GPT-6.2 Sol",
+      "event": "changed",
+      "changes": 2,
+      "highlights": [
+        "Platform id: now Google Cloud gpt-6.2-sol",
+        "Model page changed (+171 −0 chars)"
+      ]
+    },
+    {
+      "at": "2026-11-21T00:33:01.87527665Z",
+      "model": "gpt-6.2-astra",
+      "vendor": "openai",
+      "name": "GPT-6.2 Astra",
+      "event": "changed",
+      "changes": 2,
+      "highlights": [
+        "Platform id: now Google Cloud gpt-6.2-astra",
+        "Model page changed (+173 −0 chars)"
+      ]
+    },
     {
       "at": "2026-11-20T15:38:20.327053739Z",
       "model": "grok-build-0.1",

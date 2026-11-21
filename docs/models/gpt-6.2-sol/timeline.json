@@ -3,6 +3,52 @@
   "id": "gpt-6.2-sol",
   "steps": [
     {
+      "at": "2026-11-21T00:33:01.87527665Z",
+      "event": "changed",
+      "changes": [
+        {
+          "id": "facts/platform_ids",
+          "category": "facts",
+          "op": "added",
+          "path": [
+            "facts",
+            "platform_ids"
+          ],
+          "title": "Platform id: now Google Cloud gpt-6.2-sol",
+          "impact": "notable",
+          "before": null,
+          "after": {
+            "Google Cloud": "gpt-6.2-sol"
+          },
+          "text_diff": null,
+          "terma": null,
+          "source": null,
+          "documented": null
+        },
+        {
+          "id": "docs/overview",
+          "category": "docs",
+          "op": "changed",
+          "path": [
+            "docs",
+            "overview"
+          ],
+          "title": "Model page changed (+171 −0 chars)",
+          "impact": "informational",
+          "before": null,
+          "after": null,
+          "text_diff": "@@ -94,6 +94,14 @@\n \n - `gpt-6.2-sol`\n \n+## Cloud providers\n+\n+Model IDs across cloud providers.\n+\n+| Provider | Model ID |\n+| --- | --- |\n+| [Google Cloud](/api/docs/guides/google-cloud)<br>Private preview | `gpt-6.2-sol` |\n+\n ## Rate limits\n \n Rate limits ensure fair and reliable access to the API by placing specific caps on requests, tokens, audio duration, or other usage within a given time period. Your usage tier determines how high these limits are set and automatically increases as you send more requests and spend more on the API.\n",
+          "stats": {
+            "added_chars": 171,
+            "removed_chars": 0
+          },
+          "terma": null,
+          "source": null,
+          "documented": null
+        }
+      ]
+    },
+    {
       "at": "2026-11-17T23:12:13.967477009Z",
       "event": "changed",
       "changes": [
