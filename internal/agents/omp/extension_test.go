@@ -19,7 +19,7 @@ const [ext, fetched, tmp] = process.argv.slice(2)
 globalThis.fetch = async (url) => { require("node:fs").appendFileSync(fetched, String(url) + "\n") }
 const handlers = {}
 const mod = await import(ext)
-mod.default({ on: (name, fn) => { handlers[name] = fn } })
+await mod.default({ on: (name, fn) => { handlers[name] = fn } })
 const dir = "/home/dev/.omp/agent/sessions/-work"
 const parentFile = dir + "/2026-11-21T13-14-22-769Z_01a1fe3e-5eb1-7520-a3b3-a7f2a87931bf.jsonl"
 const sm = (id, file, header) => ({ getSessionId: () => id, getSessionFile: () => file, getHeader: () => header })
@@ -185,11 +185,11 @@ func runDriver(t *testing.T) (byEvent map[string][]map[string]any, ext, fetched 
 	return byEvent, ext, fetched
 }
 
-// OMP reads a traces, logs or metrics collector the shell or the launch directory's .env sets
-// ahead of its agent .env, and would send it the full content that .env asks for on the
-// relay's behalf: under such an override the extension switches capture off, unless the
-// developer set capture themselves, and with none it leaves capture to the .env.
-func TestExtensionKeepsContentForTheRelay(t *testing.T) {
+// OMP reads a signal's collector from the shell or the launch directory's .env ahead of its
+// agent .env, where setup writes the relay's: the extension asks OMP for full content, kept
+// from the tools it runs as its agent .env's settings are, only where no such override
+// stands and the developer set no capture of their own; without OMP's module it asks nothing.
+func TestExtensionAsksForContentOnlyForTheRelay(t *testing.T) {
 	node, err := exec.LookPath("node")
 	if err != nil {
 		t.Skip("node is not installed")
@@ -197,33 +197,52 @@ func TestExtensionKeepsContentForTheRelay(t *testing.T) {
 	if out, err := exec.Command(node, "-p", "process.features.typescript").Output(); err != nil || !slices.Contains([]string{"strip", "transform"}, strings.TrimSpace(string(out))) {
 		t.Skip("node does not run TypeScript")
 	}
-	ext := filepath.Join(t.TempDir(), "terma-ext.ts")
-	if _, err := writeExtension(ext, []string{"true"}); err != nil {
+	withOMP := t.TempDir()
+	stub := filepath.Join(withOMP, "node_modules", "@oh-my-pi", "pi-utils")
+	if err := os.MkdirAll(stub, 0o700); err != nil {
 		t.Fatal(err)
+	}
+	for name, text := range map[string]string{
+		"package.json": `{"name":"@oh-my-pi/pi-utils","type":"module","main":"index.js"}`,
+		"index.js":     `export function claimOmpOtelEnvFileEntry(name, value) { globalThis.claimed = name + "=" + value; return true }`,
+	} {
+		if err := os.WriteFile(filepath.Join(stub, name), []byte(text), 0o600); err != nil {
+			t.Fatal(err)
+		}
 	}
 	const capture = ompCaptureContentEnv
 	cases := map[string]struct {
+		dir  string
 		env  []string
 		want string
 	}{
-		"no override":             {nil, "<unset>"},
-		"common collector only":   {[]string{"OTEL_EXPORTER_OTLP_ENDPOINT=https://c.example"}, "<unset>"},
-		"traces collector":        {[]string{"OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=https://c.example/v1/traces"}, "none"},
-		"logs collector":          {[]string{"OTEL_EXPORTER_OTLP_LOGS_ENDPOINT=https://c.example/v1/logs"}, "none"},
-		"metrics collector":       {[]string{"OTEL_EXPORTER_OTLP_METRICS_ENDPOINT=https://c.example/v1/metrics"}, "none"},
-		"developer's own capture": {[]string{"OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=https://c.example/v1/traces", capture + "=full"}, "full"},
+		"no override":             {withOMP, nil, capture + "=full"},
+		"common collector only":   {withOMP, []string{"OTEL_EXPORTER_OTLP_ENDPOINT=https://c.example"}, capture + "=full"},
+		"traces collector":        {withOMP, []string{"OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=https://c.example/v1/traces"}, "none"},
+		"logs collector":          {withOMP, []string{"OTEL_EXPORTER_OTLP_LOGS_ENDPOINT=https://c.example/v1/logs"}, "none"},
+		"metrics collector":       {withOMP, []string{"OTEL_EXPORTER_OTLP_METRICS_ENDPOINT=https://c.example/v1/metrics"}, "none"},
+		"developer's own capture": {withOMP, []string{capture + "=summary"}, "none"},
+		"no OMP module":           {t.TempDir(), nil, "none"},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			script := `const mod = await import(process.argv[1]); mod.default({ on: () => {} }); console.log(process.env.` + capture + ` ?? "<unset>")`
+			ext := filepath.Join(c.dir, "terma-ext.ts")
+			if _, err := writeExtension(ext, []string{"true"}); err != nil {
+				t.Fatal(err)
+			}
+			script := `const mod = await import(process.argv[1]); await mod.default({ on: () => {} }); console.log((globalThis.claimed ?? "none") + " " + (process.env.` + capture + ` ?? ""))`
 			cmd := exec.Command(node, "--input-type=module", "-e", script, ext)
 			cmd.Env = append([]string{"PATH=" + os.Getenv("PATH")}, c.env...)
 			out, err := cmd.CombinedOutput()
 			if err != nil {
 				t.Fatalf("node: %v\n%s", err, out)
 			}
-			if got := strings.TrimSpace(string(out)); got != c.want {
-				t.Errorf("%s = %s, want %s", capture, got, c.want)
+			claimed, live, _ := strings.Cut(strings.TrimSpace(string(out)), " ")
+			if claimed != c.want {
+				t.Errorf("claimed %s, want %s", claimed, c.want)
+			}
+			if want := strings.TrimPrefix(strings.Join(slices.DeleteFunc(slices.Clone(c.env), func(kv string) bool { return !strings.HasPrefix(kv, capture+"=") }), ""), capture+"="); live != want {
+				t.Errorf("the extension changed the process's %s to %q", capture, live)
 			}
 		})
 	}

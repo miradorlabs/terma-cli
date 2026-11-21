@@ -162,14 +162,14 @@ func (c exporter) Connect(e harness.Exporter, _ bool) error {
 		return err
 	}
 	current := f.values()
-	// retireHeaders edits previous; a failed write restores the journal as it was.
+	// retireUnwritten edits previous; a failed write restores the journal as it was.
 	rollback := previous
 	if previous != nil {
 		kept := *previous
 		kept.Installed, kept.Previous = maps.Clone(previous.Installed), maps.Clone(previous.Previous)
 		rollback = &kept
 	}
-	changes := retireHeaders(previous, current)
+	changes := retireUnwritten(previous, current)
 	installing := managed(e, current)
 	// The journal keeps each entry's own text for teardown to put back, except where it still
 	// holds what terma wrote, which the journal compares by value.
@@ -258,23 +258,20 @@ func (exporter) CurrentCredential(string, string) (string, bool) { return "", fa
 // Backup takes none: the journal restores each key terma wrote.
 func (exporter) Backup(string) (string, error) { return "", nil }
 
-// managed is what a connect to e writes, given the file's current values: the common endpoint,
-// protocol and content capture, and every signal's own endpoint, protocol and exporter (an
-// exporter list that already names otlp kept as it is), with the SDK switched on. OMP fills a
-// key this file leaves unset from the dotenv files it reads after it (its config root's, then
-// the home directory's), so each key that could switch a signal off or send it elsewhere is set
-// here, whether or not this file had it. The relay's token leads each endpoint's path, never a
-// header: a repository's .env that sets a signal's endpoint outranks this file, and omp would
-// send it this file's headers. Content capture outranked the same way would send full content
-// there: terma's extension switches it off when a signal's endpoint comes from outside the file.
-// Accepted risk: `omp --no-extensions` skips that switch, so an endpoint of the developer's own
-// gets full content; the upgrade path is a capture setting OMP binds to one endpoint.
+// managed is what a connect to e writes, given the file's current values: the common endpoint
+// and protocol, and every signal's own endpoint, protocol and exporter (an exporter list that
+// already names otlp kept as it is), with the SDK switched on. OMP fills a key this file leaves
+// unset from the dotenv files it reads after it (its config root's, then the home directory's),
+// so each key that could switch a signal off or send it elsewhere is set here, whether or not
+// this file had it. The relay's token leads each endpoint's path, never a header: a
+// repository's .env that sets a signal's endpoint outranks this file, and omp would send it
+// this file's headers. Content capture is not here for the same reason: terma's extension asks
+// for it in the running OMP, only where no endpoint outranks this file.
 func managed(e harness.Exporter, current map[string]string) map[string]string {
 	base := strings.TrimRight(e.Endpoint, "/") + "/" + e.APIKey
 	out := map[string]string{
 		harness.EnvOTLPEndpoint: base,
 		harness.EnvOTLPProtocol: harness.ProtocolHTTPProtobuf,
-		ompCaptureContentEnv:    ompCaptureContentFull,
 		envSDKDisabled:          "false",
 	}
 	for _, s := range harness.AllSignals {
@@ -287,15 +284,16 @@ func managed(e harness.Exporter, current map[string]string) map[string]string {
 	return out
 }
 
-// retireHeaders undoes the Authorization headers an earlier setup wrote, which carried the
-// relay's token: each one still as written goes back to what it held, in current too, and
+// retireUnwritten undoes what an earlier setup wrote and this one does not: the Authorization
+// headers that carried the relay's token, and content capture, which reached any endpoint that
+// outranked the file. Each one still as written goes back to what it held, in current too, and
 // the journal previous no longer owns any. It returns the file changes that makes.
-func retireHeaders(previous *harness.Journal, current map[string]string) map[string]*string {
+func retireUnwritten(previous *harness.Journal, current map[string]string) map[string]*string {
 	changes := map[string]*string{}
 	if previous == nil {
 		return changes
 	}
-	keys := []string{harness.EnvOTLPHeaders}
+	keys := []string{harness.EnvOTLPHeaders, ompCaptureContentEnv}
 	for _, s := range harness.AllSignals {
 		keys = append(keys, signalKey(s, "HEADERS"))
 	}

@@ -67,12 +67,16 @@ func (f *envFile) values() map[string]string {
 	return out
 }
 
-// entries is the text of each key's last entry, as the developer wrote it: what a teardown
-// puts back.
+// entries is the text of each key's entries, in order, as the developer wrote them: what a
+// teardown puts back, where apply leaves the key's first entry.
 func (f *envFile) entries() map[string]string {
 	out := map[string]string{}
 	for _, e := range parseEnvEntries(f.lines) {
-		out[e.key] = strings.Join(f.lines[e.start:e.end], "\n")
+		text := strings.Join(f.lines[e.start:e.end], "\n")
+		if prior, ok := out[e.key]; ok {
+			text = prior + "\n" + text
+		}
+		out[e.key] = text
 	}
 	return out
 }
@@ -147,11 +151,22 @@ func envLine(key, value string) string {
 	}
 }
 
-// journaledEntry is the entry text and value of what a journal holds for key: the entry as
-// the developer wrote it, or, from a journal that holds a bare value, that value rendered.
+// journaledEntry is the entry text and value of what a journal holds for key: the key's
+// entries as the developer wrote them, the last one read, or, from a journal that holds a bare
+// value, that value rendered.
 func journaledEntry(key, journaled string) (text, value string) {
-	if es := parseEnvEntries(strings.Split(journaled, "\n")); len(es) == 1 && es[0].key == key && es[0].start == 0 && es[0].end == strings.Count(journaled, "\n")+1 {
-		return journaled, es[0].value
+	lines := strings.Split(journaled, "\n")
+	es := parseEnvEntries(lines)
+	end := 0
+	for _, e := range es {
+		if e.key != key || e.start != end {
+			end = -1
+			break
+		}
+		end = e.end
+	}
+	if len(es) > 0 && end == len(lines) {
+		return journaled, es[len(es)-1].value
 	}
 	return envLine(key, journaled), journaled
 }

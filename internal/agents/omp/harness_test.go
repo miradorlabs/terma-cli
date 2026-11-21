@@ -1,6 +1,7 @@
 package omp
 
 import (
+	"cmp"
 	"context"
 	"maps"
 	"os"
@@ -84,7 +85,6 @@ OTEL_EXPORTER_OTLP_ENDPOINT=https://later.example
 	for key, want := range map[string]string{
 		harness.EnvOTLPEndpoint:                      "http://127.0.0.1:43180/" + relayToken,
 		harness.EnvOTLPProtocol:                      harness.ProtocolHTTPProtobuf,
-		ompCaptureContentEnv:                         "full",
 		signalKey(harness.SignalTraces, "ENDPOINT"):  "http://127.0.0.1:43180/" + relayToken + "/v1/traces",
 		signalKey(harness.SignalLogs, "ENDPOINT"):    "http://127.0.0.1:43180/" + relayToken + "/v1/logs",
 		signalKey(harness.SignalMetrics, "ENDPOINT"): "http://127.0.0.1:43180/" + relayToken + "/v1/metrics",
@@ -96,6 +96,11 @@ OTEL_EXPORTER_OTLP_ENDPOINT=https://later.example
 		if values[key] != want {
 			t.Errorf("%s = %q, want %q", key, values[key], want)
 		}
+	}
+	// Content capture in this file would reach an endpoint that outranks it: the extension asks
+	// for it in the running OMP instead.
+	if _, ok := values[ompCaptureContentEnv]; ok {
+		t.Errorf("setup wrote %s into the .env", ompCaptureContentEnv)
 	}
 	// A repository's .env that sets a signal's endpoint outranks this file, and omp would
 	// send it this file's headers: the token rides only in terma's own endpoints' path.
@@ -274,26 +279,26 @@ func TestRelayEnvKeepsAnExporterListNamingOTLP(t *testing.T) {
 	}
 }
 
-// An earlier setup sent the token in an Authorization header; the next one takes each header
-// it wrote back to what the developer had, and teardown leaves that.
+// An earlier setup sent the token in an Authorization header and wrote content capture; the
+// next one takes each back to what the developer had, and teardown leaves that.
 func TestRelayEnvRetiresTheTokenHeader(t *testing.T) {
 	a, env := ompIn(t)
 	write(t, env, "OTEL_EXPORTER_OTLP_TRACES_HEADERS=x-team=blue\n", 0o600)
 	auth := "authorization=Bearer%20" + relayToken
 	headers := []string{harness.EnvOTLPHeaders, signalKey(harness.SignalTraces, "HEADERS")}
 	blue := "x-team=blue"
-	earlier := harness.NewJournal(name, env, map[string]string{headers[1]: blue}, map[string]string{headers[0]: auth, headers[1]: auth}, nil, nil, nil)
+	earlier := harness.NewJournal(name, env, map[string]string{headers[1]: blue}, map[string]string{headers[0]: auth, headers[1]: auth, ompCaptureContentEnv: "full"}, nil, nil, nil)
 	if err := earlier.Save(a.ConfigDir); err != nil {
 		t.Fatal(err)
 	}
-	write(t, env, headers[1]+"="+auth+"\n"+headers[0]+"="+auth+"\n", 0o600)
+	write(t, env, headers[1]+"="+auth+"\n"+headers[0]+"="+auth+"\n"+ompCaptureContentEnv+"=full\n", 0o600)
 
 	if _, err := a.ConfigureRelay(context.Background(), relayConfig()); err != nil {
 		t.Fatal(err)
 	}
 	after := read(t, env)
-	if strings.Contains(strings.ToLower(after), "authorization") || !strings.Contains(after, headers[1]+"="+blue+"\n") {
-		t.Fatalf("setup kept a token header or lost the developer's:\n%s", after)
+	if strings.Contains(strings.ToLower(after), "authorization") || strings.Contains(after, ompCaptureContentEnv) || !strings.Contains(after, headers[1]+"="+blue+"\n") {
+		t.Fatalf("setup kept a token header or content capture, or lost the developer's header:\n%s", after)
 	}
 	if pointed, _ := a.RelayPointed("127.0.0.1:43180"); !pointed {
 		t.Error("the .env does not read as pointed at the relay")
@@ -559,18 +564,24 @@ func TestRelayPointedNeedsTheCurrentExtension(t *testing.T) {
 	}
 }
 
-// Teardown puts back the developer's own entry as they wrote it, whatever quoting, prefix,
-// comment or line ending it had: an unquoted value holding every quote character reads back
-// whole, which no re-quoting of it would.
+// Teardown puts back the developer's own entries as they wrote them, whatever quoting, prefix,
+// comment or line ending they had: an unquoted value holding every quote character reads back
+// whole, which no re-quoting of it would. A key written twice keeps both entries, the later
+// one moved up to the first, where the file holds the key while terma's.
 func TestRelayEnvTeardownRestoresTheEntryVerbatim(t *testing.T) {
-	cases := map[string]string{
-		"every quote, unquoted": "OTEL_EXPORTER_OTLP_ENDPOINT=https://collector.example/a'b\"c`d\n",
-		"export and comment":    "export OTEL_EXPORTER_OTLP_ENDPOINT=https://collector.example:4318   # company\n",
-		"crlf":                  "OTEL_EXPORTER_OTLP_ENDPOINT='https://collector.example'\r\nA=1\r\n",
-		"multiline":             "OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=\"no\nreally\"\nA=1\n",
+	cases := map[string]struct{ before, after string }{
+		"every quote, unquoted": {"OTEL_EXPORTER_OTLP_ENDPOINT=https://collector.example/a'b\"c`d\n", ""},
+		"export and comment":    {"export OTEL_EXPORTER_OTLP_ENDPOINT=https://collector.example:4318   # company\n", ""},
+		"crlf":                  {"OTEL_EXPORTER_OTLP_ENDPOINT='https://collector.example'\r\nA=1\r\n", ""},
+		"multiline":             {"OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=\"https://collector.example\nv1\"\nA=1\n", ""},
+		"written twice": {
+			"A=1\nOTEL_EXPORTER_OTLP_ENDPOINT=https://first.example # first\nB=2\nOTEL_EXPORTER_OTLP_ENDPOINT=https://second.example\n",
+			"A=1\nOTEL_EXPORTER_OTLP_ENDPOINT=https://first.example # first\nOTEL_EXPORTER_OTLP_ENDPOINT=https://second.example\nB=2\n",
+		},
 	}
-	for name, before := range cases {
+	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
+			before, after := c.before, cmp.Or(c.after, c.before)
 			a, env := ompIn(t)
 			write(t, env, before, 0o600)
 			want, err := loadEnvFile(env)
@@ -583,8 +594,8 @@ func TestRelayEnvTeardownRestoresTheEntryVerbatim(t *testing.T) {
 			if _, err := a.UnconfigureRelay(context.Background(), relayToken); err != nil {
 				t.Fatal(err)
 			}
-			if got := read(t, env); got != before {
-				t.Errorf("teardown left:\n%q\nwant:\n%q", got, before)
+			if got := read(t, env); got != after {
+				t.Errorf("teardown left:\n%q\nwant:\n%q", got, after)
 			}
 			got, err := loadEnvFile(env)
 			if err != nil {

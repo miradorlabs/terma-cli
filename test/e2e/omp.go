@@ -52,13 +52,13 @@ OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=full
 `)
 }
 
-// OmpRun runs one `omp -p` in dir.
-func (sb *Sandbox) OmpRun(b Binary, dir, prompt string) string {
+// OmpRun runs one `omp -p` in dir, with any further flags.
+func (sb *Sandbox) OmpRun(b Binary, dir, prompt string, flags ...string) string {
 	t := sb.T
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), scenarioTimeout)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, b.Path, "-p", prompt, "--model", "fake/m")
+	cmd := exec.CommandContext(ctx, b.Path, append([]string{"-p", prompt, "--model", "fake/m"}, flags...)...)
 	cmd.Dir = dir
 	cmd.Env = sb.termaEnv()
 	var out bytes.Buffer
