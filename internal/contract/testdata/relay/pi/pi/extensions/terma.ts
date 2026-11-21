@@ -171,14 +171,6 @@ function sessionOf(ctx: any): string {
   return own ? String(own) : session
 }
 
-// editedFiles are the files a tool call changed: Pi's write and edit name theirs in their
-// input.
-function editedFiles(event: any): string[] {
-  const name = String(event?.toolName ?? "")
-  const input = event?.input
-  return (name === "write" || name === "edit") && input && typeof input.path === "string" && input.path ? [input.path] : []
-}
-
 export default function (pi: any) {
   if (!CONFIG) return
 
@@ -244,9 +236,9 @@ export default function (pi: any) {
       "gen_ai.tool.call.arguments": CONFIG!.includeToolContent ? truncate(event?.input, 16 * 1024) : undefined,
       "gen_ai.tool.call.result": CONFIG!.includeToolContent ? truncate(event?.content, 16 * 1024) : undefined,
     }, event?.isError === true)
-    const files = editedFiles(event)
-    if (files.length > 0) {
-      termaHook(AGENT + "-file-edit", { session_id: s, cwd: ctx?.cwd, tool: name, files })
+    const file = event?.input && typeof event.input.path === "string" ? event.input.path : ""
+    if ((name === "write" || name === "edit") && file) {
+      termaHook(AGENT + "-file-edit", { session_id: s, cwd: ctx?.cwd, tool: name, file })
     }
   })
 
