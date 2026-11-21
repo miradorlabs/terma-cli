@@ -55,8 +55,8 @@ func writeExtension(path string, hookCommand []string, relay string) (string, er
 }
 
 // extensionCurrent reports whether path holds the extension this terma renders, with a
-// configuration naming a hook command, whichever.
-func extensionCurrent(path string) bool {
+// configuration naming a hook command, whichever, and the relay at addr (host:port).
+func extensionCurrent(path, addr string) bool {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return false
@@ -68,7 +68,7 @@ func extensionCurrent(path string) bool {
 	literal, tail, ok := strings.Cut(rest, " /* terma:config */")
 	var cfg extensionConfig
 	// A configuration that is no rendered one (the template's null) leaves the extension inert.
-	if !ok || json.Unmarshal([]byte(literal), &cfg) != nil || cfg.Version != 1 || len(cfg.HookCommand) == 0 || strings.TrimSpace(cfg.HookCommand[0]) == "" {
+	if !ok || json.Unmarshal([]byte(literal), &cfg) != nil || cfg.Version != 1 || cfg.Relay != "http://"+addr || len(cfg.HookCommand) == 0 || strings.TrimSpace(cfg.HookCommand[0]) == "" {
 		return false
 	}
 	return head+extensionConfigMarker+tail == extensionTemplate

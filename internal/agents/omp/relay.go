@@ -77,14 +77,15 @@ func (a Agent) RelayPointed(addr string) (bool, bool) {
 }
 
 // RelayProblem reports terma's extension missing from omp's agent directory, or not the
-// hooks-only file this terma writes: without its claims the relay holds omp's spans and drops them.
-func (Agent) RelayProblem(string) (detail, fix string, problem bool) {
+// hooks-only file this terma writes for the relay at addr: without its claims the relay holds
+// omp's spans and drops them, and without the relay's address it asks OMP for no content.
+func (Agent) RelayProblem(addr string) (detail, fix string, problem bool) {
 	dir, err := ompAgentDir()
 	if err != nil {
 		return "", "", false
 	}
 	path := filepath.Join(dir, extensionPath)
-	if extensionCurrent(path) {
+	if extensionCurrent(path, addr) {
 		return "", "", false
 	}
 	return "OMP's terma extension " + path + " is missing or not this terma's, so no hook claims OMP's sessions and the relay drops their telemetry", "terma setup", true

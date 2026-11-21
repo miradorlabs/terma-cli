@@ -514,7 +514,7 @@ func TestShellExportsSwitchingSignalsOff(t *testing.T) {
 
 // OMP's spans are attributed only by the claims terma's extension makes, so an .env pointed
 // at the relay is not enough: the extension must be in place and be this terma's hooks-only
-// file, whatever hook command it names. Doctor says which is wrong.
+// file for this relay, whatever hook command it names. Doctor says which is wrong.
 func TestRelayPointedNeedsTheCurrentExtension(t *testing.T) {
 	a, _ := ompIn(t)
 	if _, err := a.ConfigureRelay(context.Background(), relayConfig()); err != nil {
@@ -544,6 +544,7 @@ func TestRelayPointedNeedsTheCurrentExtension(t *testing.T) {
 		{"the bare template", extensionTemplate, false},
 		{"an empty hook command", strings.Replace(other, `"hookCommand":["/opt/terma/bin/terma","hook"]`, `"hookCommand":[]`, 1), false},
 		{"an empty hook executable", strings.Replace(other, `"hookCommand":["/opt/terma/bin/terma","hook"]`, `"hookCommand":[""]`, 1), false},
+		{"another relay's address", strings.Replace(other, `"relay":"http://127.0.0.1:43180"`, `"relay":"http://127.0.0.1:43181"`, 1), false},
 		{"the developer's own file", "export default function () {}\n", false},
 		{"missing", "", false},
 	} {
