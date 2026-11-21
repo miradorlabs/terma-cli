@@ -16,9 +16,11 @@ import (
 
 const relayToken = "relay-token-0123456789abcdef"
 
-// ompIn sandboxes omp's agent directory and terma's own, and returns the agent and the .env.
+// ompIn sandboxes omp's agent directory and terma's own, with an OMP 19.1.0 on PATH, and
+// returns the agent and the .env.
 func ompIn(t *testing.T) (Agent, string) {
 	t.Helper()
+	ompOnPath(t, "19.1.0")
 	dir := t.TempDir()
 	t.Setenv(envAgentDir, filepath.Join(dir, "agent"))
 	for _, k := range []string{harness.EnvOTLPEndpoint, harness.EnvOTLPProtocol, ompCaptureContentEnv,

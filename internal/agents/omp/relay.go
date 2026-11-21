@@ -68,8 +68,12 @@ func (a Agent) UnconfigureRelay(context.Context, string) (agents.RelayResult, er
 
 // RelayPointed reports whether omp's .env points its exporter at the relay at addr, with no
 // shell export that omp reads ahead of the .env taking the export elsewhere or switching it
-// off, and terma's extension in place to claim the sessions it exports.
+// off, and terma's extension in place to claim the sessions it exports. It is unknown where
+// omp is not on the PATH, as Copilot's is where no VS Code runs it: nothing exports.
 func (a Agent) RelayPointed(addr string) (bool, bool) {
+	if !(exporter{}).Detect(context.Background()).Found {
+		return false, false
+	}
 	if !relayexport.NativePointed(a.Harness(), addr) {
 		return false, true
 	}
@@ -83,8 +87,11 @@ func (a Agent) RelayPointed(addr string) (bool, bool) {
 // RelayProblem reports an omp too old to be pointed at the relay, or terma's extension missing
 // from omp's agent directory or not the hooks-only file this terma writes for the relay at
 // addr: without its claims the relay holds omp's spans and drops them, and without the
-// relay's address it asks OMP for no content.
+// relay's address it asks OMP for no content. An omp not on the PATH has none.
 func (Agent) RelayProblem(addr string) (detail, fix string, problem bool) {
+	if !(exporter{}).Detect(context.Background()).Found {
+		return "", "", false
+	}
 	if why, old := tooOld(context.Background()); old {
 		return why, "upgrade OMP, then run terma setup", true
 	}
