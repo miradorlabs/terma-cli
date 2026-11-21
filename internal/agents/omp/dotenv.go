@@ -24,6 +24,7 @@ type envFile struct {
 	path string
 	// writePath is path with symlinks resolved, so a write goes through a symlinked file.
 	writePath string
+	symlinked bool
 	lines     []string
 	existed   bool
 }
@@ -37,11 +38,11 @@ type envEntry struct {
 var envKeyRE = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 
 func loadEnvFile(path string) (*envFile, error) {
-	writePath, _, err := config.ResolveWritePath(path)
+	writePath, symlinked, err := config.ResolveWritePath(path)
 	if err != nil {
 		return nil, err
 	}
-	f := &envFile{path: path, writePath: writePath}
+	f := &envFile{path: path, writePath: writePath, symlinked: symlinked}
 	data, err := os.ReadFile(path)
 	if errors.Is(err, fs.ErrNotExist) {
 		return f, nil
@@ -104,9 +105,9 @@ func (f *envFile) apply(changes map[string]*string) {
 }
 
 // save writes the file private to this user, since it holds the relay's token, and removes a
-// file left with nothing in it.
+// file left with nothing in it; a symlinked one is emptied instead, so the link still resolves.
 func (f *envFile) save() error {
-	if strings.TrimSpace(strings.Join(f.lines, "")) == "" {
+	if strings.TrimSpace(strings.Join(f.lines, "")) == "" && !f.symlinked {
 		if err := os.Remove(f.writePath); err != nil && !errors.Is(err, fs.ErrNotExist) {
 			return err
 		}
@@ -115,7 +116,11 @@ func (f *envFile) save() error {
 	if err := os.MkdirAll(filepath.Dir(f.writePath), 0o700); err != nil {
 		return err
 	}
-	return config.WriteFileAtomic(f.writePath, []byte(strings.Join(f.lines, "\n")+"\n"), harness.SettingsMode)
+	text := strings.Join(f.lines, "\n")
+	if text != "" {
+		text += "\n"
+	}
+	return config.WriteFileAtomic(f.writePath, []byte(text), harness.SettingsMode)
 }
 
 // envLine renders one entry so the dotenv grammar reads value back unchanged.

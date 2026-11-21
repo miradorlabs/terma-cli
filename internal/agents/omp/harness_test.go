@@ -197,6 +197,37 @@ func TestRelayEnvEditedAfterSetup(t *testing.T) {
 	}
 }
 
+// A .env that links to a file kept elsewhere is written through, and teardown leaves the
+// link resolving to an emptied file, which a later setup can write again.
+func TestRelayEnvSymlinkedTeardown(t *testing.T) {
+	a, env := ompIn(t)
+	target := filepath.Join(t.TempDir(), "dotfiles", "omp.env")
+	write(t, target, "", 0o600)
+	if err := os.MkdirAll(filepath.Dir(env), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(target, env); err != nil {
+		t.Fatal(err)
+	}
+	for range 2 {
+		if _, err := a.ConfigureRelay(context.Background(), relayConfig()); err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(read(t, target), relayToken) {
+			t.Fatal("setup did not write through the link")
+		}
+		if _, err := a.UnconfigureRelay(context.Background(), relayToken); err != nil {
+			t.Fatal(err)
+		}
+		if got := read(t, target); got != "" {
+			t.Fatalf("after teardown the linked file holds:\n%s", got)
+		}
+	}
+	if info, err := os.Lstat(env); err != nil || info.Mode()&os.ModeSymlink == 0 {
+		t.Fatalf("the link is gone: %v, %v", info, err)
+	}
+}
+
 // omp's agent directory is PI_CODING_AGENT_DIR, else ~/$PI_CONFIG_DIR/agent, else ~/.omp/agent.
 func TestAgentDirFollowsOmp(t *testing.T) {
 	home := t.TempDir()
