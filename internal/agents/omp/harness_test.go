@@ -443,6 +443,20 @@ func TestConfigureRelayReplacesLegacyFiles(t *testing.T) {
 	}
 }
 
+// A setup that cannot write the extension leaves omp's exporter where it was: pointed at
+// the relay with nothing to claim its sessions, its spans would be held and dropped.
+func TestConfigureRelayWithoutTheExtensionLeavesTheEnv(t *testing.T) {
+	a, env := ompIn(t)
+	write(t, env, "OTEL_EXPORTER_OTLP_ENDPOINT=https://collector.example\n", 0o600)
+	write(t, filepath.Join(filepath.Dir(env), "extensions"), "not a directory\n", 0o600)
+	if _, err := a.ConfigureRelay(context.Background(), relayConfig()); err == nil {
+		t.Fatal("setup succeeded without its extension")
+	}
+	if got := read(t, env); got != "OTEL_EXPORTER_OTLP_ENDPOINT=https://collector.example\n" {
+		t.Fatalf(".env = %q", got)
+	}
+}
+
 // A shell export outranks the .env key by key: a signal's endpoint elsewhere is a credential
 // conflict, the relay's own is none, and the common endpoint or protocol is none, since omp
 // reads each signal's own first and the .env sets every one.

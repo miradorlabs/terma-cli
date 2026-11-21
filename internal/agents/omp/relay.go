@@ -22,10 +22,15 @@ var (
 	legacyPaths   = []string{filepath.Join("extensions", "terma-relay.ts"), filepath.Join("hooks", "pre", "terma.ts")}
 )
 
-// ConfigureRelay points omp's native exporter at the local relay through its .env, and
-// writes the extension that reports sessions and file edits; it exports nothing itself.
+// ConfigureRelay writes the extension that reports sessions and file edits (it exports
+// nothing itself), then points omp's native exporter at the local relay through its .env.
+// The extension goes first: without its claims the relay holds omp's spans and drops them.
 func (a Agent) ConfigureRelay(_ context.Context, cfg agents.RelayConfig) (agents.RelayResult, error) {
 	dir, err := ompAgentDir()
+	if err != nil {
+		return agents.RelayResult{}, err
+	}
+	ext, err := writeExtension(filepath.Join(dir, extensionPath), cfg.HookCommand)
 	if err != nil {
 		return agents.RelayResult{}, err
 	}
@@ -35,10 +40,6 @@ func (a Agent) ConfigureRelay(_ context.Context, cfg agents.RelayConfig) (agents
 	}
 	if path, err := a.Harness().ConfigPath(); err == nil {
 		result.Paths = append(result.Paths, path)
-	}
-	ext, err := writeExtension(filepath.Join(dir, extensionPath), cfg.HookCommand)
-	if err != nil {
-		return result, err
 	}
 	result.Paths = append(result.Paths, ext)
 	removed, err := removeOwn(dir, legacyPaths)
