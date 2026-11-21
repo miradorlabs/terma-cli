@@ -169,7 +169,7 @@ func (c exporter) Connect(e harness.Exporter, _ bool) error {
 		rollback = &kept
 	}
 	changes := retireHeaders(previous, current)
-	installing := managed(e)
+	installing := managed(e, current)
 	j := harness.NewJournal(c.Name(), path, current, installing, nil, nil, previous)
 
 	for key, value := range installing {
@@ -246,14 +246,15 @@ func (exporter) CurrentCredential(string, string) (string, bool) { return "", fa
 // Backup takes none: the journal restores each key terma wrote.
 func (exporter) Backup(string) (string, error) { return "", nil }
 
-// managed is what a connect to e writes: the common endpoint, protocol and content capture,
-// and every signal's own endpoint, protocol and exporter, with the SDK switched on. OMP fills a
+// managed is what a connect to e writes, given the file's current values: the common endpoint,
+// protocol and content capture, and every signal's own endpoint, protocol and exporter (an
+// exporter list that already names otlp kept as it is), with the SDK switched on. OMP fills a
 // key this file leaves unset from the dotenv files it reads after it (its config root's, then
 // the home directory's), so each key that could switch a signal off or send it elsewhere is set
 // here, whether or not this file had it. The relay's token leads each endpoint's path, never a
 // header: a repository's .env that sets a signal's endpoint outranks this file, and omp would
 // send it this file's headers.
-func managed(e harness.Exporter) map[string]string {
+func managed(e harness.Exporter, current map[string]string) map[string]string {
 	base := strings.TrimRight(e.Endpoint, "/") + "/" + e.APIKey
 	out := map[string]string{
 		harness.EnvOTLPEndpoint: base,
@@ -264,7 +265,9 @@ func managed(e harness.Exporter) map[string]string {
 	for _, s := range harness.AllSignals {
 		out[signalKey(s, "ENDPOINT")] = harness.Exporter{Endpoint: base}.SignalEndpoint(s)
 		out[signalKey(s, "PROTOCOL")] = harness.ProtocolHTTPProtobuf
-		out[signalExporterKey(s)] = exporterOTLP
+		if v := current[signalExporterKey(s)]; strings.TrimSpace(v) == "" || !exportsOTLP(v) {
+			out[signalExporterKey(s)] = exporterOTLP
+		}
 	}
 	return out
 }
