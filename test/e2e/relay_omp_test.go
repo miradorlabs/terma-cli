@@ -4,6 +4,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -15,15 +16,21 @@ func ompSandbox(t *testing.T, cmd string) func(t *testing.T) *Sandbox {
 		sb := New(t, Isolated)
 		sb.RelayAgents = []string{"omp"}
 		var calls atomic.Int32
-		provider := httptest.NewServer(openAIToolProvider(&calls, cmd))
+		// omp asks for a session title first, offering no tools: the call goes to the first
+		// request that offers them.
+		tool, args := "", map[string]any(nil)
+		if cmd != "" {
+			tool, args = "bash", map[string]any{"command": cmd, "description": "workload"}
+		}
+		provider := httptest.NewServer(openAIProbeProvider(&calls, tool, args))
 		t.Cleanup(provider.Close)
 		sb.UseOmpProvider(provider.URL)
 		return sb
 	}
 }
 
-// omp through the relay: terma's extension exports the same telemetry as it does
-// pointed straight at the receiver, and the relay drops none of an opted-in session's.
+// omp through the relay: its native exporter sends the same telemetry as it does pointed
+// straight at the receiver, and the relay drops none of an opted-in session's.
 func TestRelayWorkloadsOmp(t *testing.T) {
 	forEachOmp(t, func(t *testing.T, b Binary) {
 		ProvesAll(t, b, "relay.equivalent")
@@ -31,7 +38,7 @@ func TestRelayWorkloadsOmp(t *testing.T) {
 			t.Run(w.name, func(t *testing.T) {
 				runBoth(t, b, ompSandbox(t, w.cmd), func(t *testing.T, sb *Sandbox) {
 					if !sb.relayed {
-						sb.UseOmpExtensionDirect()
+						sb.UseOmpNativeDirect()
 					}
 					sb.OmpRun(b, sb.Repo, "Do the task. TERMA_WORKLOAD")
 				})
@@ -40,7 +47,7 @@ func TestRelayWorkloadsOmp(t *testing.T) {
 	})
 }
 
-// omp outside any admitted repository: its extension exports to the relay, the relay holds
+// omp outside any admitted repository: its native exporter sends to the relay, the relay holds
 // the unclaimed session and drops it, and nothing reaches upstream.
 func TestRelayOmpOutsideARepository(t *testing.T) {
 	forEachOmp(t, func(t *testing.T, b Binary) {
@@ -67,8 +74,8 @@ func TestRelayOmpOutsideARepository(t *testing.T) {
 	})
 }
 
-// Nothing omp runs inherits terma's endpoint or its key: terma sets no environment for
-// omp at all (see TestRelayClaudeToolsGetNoExporter for why it matters).
+// Nothing omp runs inherits terma's endpoint or its key: omp keeps the OTEL_* of its .env
+// from the tools it runs (see TestRelayClaudeToolsGetNoExporter for why it matters).
 func TestRelayOmpToolsGetNoExporter(t *testing.T) {
 	forEachOmp(t, func(t *testing.T, b Binary) {
 		ProvesAll(t, b, "relay.tools_no_token")
@@ -94,5 +101,40 @@ func TestRelayOmpToolsGetNoExporter(t *testing.T) {
 			t.Errorf("omp's session reached nothing upstream: %v", sb.RelayStats())
 		}
 		sb.StopRelay()
+	})
+}
+
+// A file omp writes is attributed: terma's extension hands the edit to omp-file-edit, naming
+// the tool call as omp's spans do, and the commit of it is stamped with omp's session.
+func TestOmpAttribution(t *testing.T) {
+	forEachOmp(t, func(t *testing.T, b Binary) {
+		track(t)
+		sb := New(t, Isolated)
+		sb.RelayAgents = []string{"omp"}
+		var calls atomic.Int32
+		provider := httptest.NewServer(openAIProbeProvider(&calls, "write", map[string]any{"path": "hello.txt", "content": "hello\n"}))
+		t.Cleanup(provider.Close)
+		sb.UseOmpProvider(provider.URL)
+		sb.UseRelay(RelayOptions{Start: true, Content: true})
+		sb.OmpRun(b, sb.Repo, "Write hello.txt.")
+		starts := sb.WaitEvents("terma.session.start", "", 10*time.Second)
+		if len(starts) == 0 {
+			t.Fatalf("omp announced no session; spool: %+v", sb.Spool())
+		}
+		sid := starts[0].SessionID
+		evs := sb.WaitEvents("terma.files.touched", sid, 10*time.Second)
+		if len(evs) == 0 {
+			t.Fatalf("no terma.files.touched for %s; spool: %+v", sid, sb.Spool())
+		}
+		if files := listAttr(evs[0].Attrs["terma.files.paths"]); !slices.Contains(files, "hello.txt") {
+			t.Errorf("files touched = %q", files)
+		}
+		if id, _ := evs[0].Attrs["gen_ai.tool.call.id"].(string); id == "" {
+			t.Errorf("the edit names no tool call: %+v", evs[0].Attrs)
+		}
+		msg := sb.Commit("add hello")
+		if !strings.Contains(msg, "Agent-Session-Id: "+sid) || !strings.Contains(msg, "Agent-Tool: omp") {
+			t.Errorf("commit not stamped with omp's session %s:\n%s", sid, msg)
+		}
 	})
 }
