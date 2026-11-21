@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -127,6 +128,10 @@ func runDriver(t *testing.T, cfg func(hook string) Config) (byEvent map[string][
 	node, err := exec.LookPath("node")
 	if err != nil {
 		t.Skip("node is not installed")
+	}
+	// The extension is TypeScript, which only a Node that strips types loads (22.18+, 23.6+).
+	if out, err := exec.Command(node, "-p", "process.features.typescript").Output(); err != nil || !slices.Contains([]string{"strip", "transform"}, strings.TrimSpace(string(out))) {
+		t.Skip("node does not run TypeScript")
 	}
 	dir := t.TempDir()
 	// Each hook call is a process of its own, racing the others: one file per call.
