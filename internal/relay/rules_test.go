@@ -36,6 +36,7 @@ var (
 		"gen_ai.tool.call.arguments", "gen_ai.tool.call.result", "opencode.tool.file_path", "opencode.session.directory",
 		"function_args", "hook_input", "hook_output", "stdout", "stderr",
 		"github.copilot.tool.parameters.command", "github.copilot.tool.parameters.file_path",
+		"omp.gen_ai.request.messages", "omp.gen_ai.response.tool_calls",
 		"file_path", "result", "cwd"}
 	pinnedToolContentEvents = []string{"tool.output", "tool.input"}
 	pinnedSessionKeys       = []string{"session.id", "conversation.id", "gen_ai.conversation.id", "thread.id", "thread_id"}
@@ -104,7 +105,8 @@ func TestEveryExportingAgentDeclaresItsShape(t *testing.T) {
 }
 
 // For every agent, mode and content policy, each declared content field leaves only when
-// the policy allows it; sentinel values show in the bytes upstream receives.
+// the policy allows it, and one declared both prompt and tool content only when it allows
+// both; sentinel values show in the bytes upstream receives.
 func TestPolicyMatrixPerAgent(t *testing.T) {
 	t.Parallel()
 	for _, c := range testCapturers {
@@ -120,8 +122,16 @@ func TestPolicyMatrixPerAgent(t *testing.T) {
 					name := fmt.Sprintf("%s/global=%v/prompts=%v/tools=%v", agent, global, prompts, toolContent)
 					t.Run(name, func(t *testing.T) {
 						got := deliverThroughRelay(t, global, Policy{IncludePrompts: prompts, IncludeToolContent: toolContent}, session, rules)
+						mixed := func(key string) bool {
+							return slices.Contains(rules.ToolContentFields, key) &&
+								(slices.Contains(rules.PromptFields, key) || slices.Contains(rules.PromptDropFields, key))
+						}
 						check := func(kind string, keys []string, allowed bool) {
 							for _, key := range keys {
+								allowed := allowed
+								if mixed(key) {
+									allowed = prompts && toolContent
+								}
 								leaked := strings.Contains(got, sentinel(key))
 								if kind == "tool content event" {
 									leaked = strings.Contains(got, key)

@@ -2,33 +2,35 @@
 // with the same extension events).
 //
 // Written by `terma relay setup --harness pi|omp` into ~/.pi/agent/extensions/terma.ts or
-// ~/.omp/agent/extensions/terma-relay.ts; do not edit — the next setup rewrites it.
+// ~/.omp/agent/extensions/terma-omp.ts; do not edit — the next setup rewrites it.
 // CONFIG below is the only part that differs per machine (the raw template ships
 // `CONFIG = null` and is inert). CONFIG.agent names the agent on every record and hook.
 //
-// omp has a native exporter, but it reads its OTEL_* variables once at startup, before
-// any extension loads, so only the process that launches omp could set them, and
-// anything omp then ran would inherit terma's endpoint and token. This
-// extension sets no environment: it exports from omp's own events, as it does for Pi.
-// For omp, CONFIG.lifecycle is false: omp's committed hook file already reports session
-// start, end and file edits, and this extension only claims the session at each prompt.
-//
-// Pi has no OpenTelemetry of its own, so this extension is its exporter, following the
-// GenAI semantic conventions: one `chat {model}` span per model response carrying its
+// Pi has no OpenTelemetry of its own, so for Pi this extension is its exporter, following
+// the GenAI semantic conventions: one `chat {model}` span per model response carrying its
 // usage and cost, one `execute_tool {tool}` span per tool call, and a `pi.user_prompt`
 // log per prompt — every record naming its session as `session.id`, Pi's own id
-// (ctx.sessionManager.getSessionId()). Session lifecycle, prompts and file edits are handed
-// to `terma hook pi-*`, which claims the session for the local relay and records commit
-// attribution. The relay decides what leaves the machine and withholds content per
-// project; this extension sends prompt and tool content only as CONFIG allows.
+// (ctx.sessionManager.getSessionId()). The relay decides what leaves the machine and
+// withholds content per project; this extension sends prompt and tool content only as
+// CONFIG allows.
+//
+// omp exports natively, from the OTEL_* settings terma writes into its .env, so for omp
+// CONFIG has no endpoint and this extension exports nothing: it only hands session
+// lifecycle, prompts and file edits to `terma hook omp-*`, naming each edit's tool call
+// as omp's own spans do, and a subagent's session names the session that opened it.
+//
+// Session lifecycle, prompts and file edits are handed to `terma hook <agent>-*`, which
+// claims the session for the local relay and records commit attribution.
 //
 // Dependency-free: Pi loads extensions with jiti, and this file uses only Node's
-// fetch, node:crypto and node:child_process.
+// fetch, node:crypto, node:fs, node:path and node:child_process.
 
 const CONFIG: TermaConfig | null = null /* terma:config */
 
 import { createHash, randomBytes } from "node:crypto"
 import { spawn } from "node:child_process"
+import { closeSync, openSync, readSync } from "node:fs"
+import { basename, dirname } from "node:path"
 
 type TermaConfig = {
   version: 1
@@ -84,6 +86,8 @@ function truncate(s: unknown, max: number): string {
 
 const AGENT = (CONFIG && CONFIG.agent) || "pi"
 const LIFECYCLE = !CONFIG || CONFIG.lifecycle !== false
+// EXPORT is false for an agent that exports natively: CONFIG names no endpoint.
+const EXPORT = !!CONFIG && !!CONFIG.endpoint
 const RESOURCE = { attributes: attrs({ "service.name": AGENT, "telemetry.sdk.name": "terma-" + AGENT }) }
 const SCOPE = { name: "terma-" + AGENT, version: "1" }
 
@@ -123,6 +127,7 @@ function schedule() {
 }
 
 function span(session: string, name: string, start: number, end: number, a: Record<string, unknown>, error = false) {
+  if (!EXPORT) return
   spans.push({
     traceId: traceId(session),
     spanId: hex(8),
@@ -137,6 +142,7 @@ function span(session: string, name: string, start: number, end: number, a: Reco
 }
 
 function record(session: string, event: string, body: string, a: Record<string, unknown>) {
+  if (!EXPORT) return
   const t = nanos(Date.now())
   logs.push({
     timeUnixNano: t,
@@ -153,15 +159,21 @@ function record(session: string, event: string, body: string, a: Record<string, 
 // --- terma hook ----------------------------------------------------------------------
 
 // termaHook hands an event to `terma hook pi-*`, detached: attribution is best-effort
-// and never delays the agent.
-function termaHook(event: string, payload: Record<string, unknown>) {
-  if (!CONFIG) return
-  try {
-    const [cmd, ...args] = CONFIG.hookCommand
-    const child = spawn(cmd, [...args, event], { stdio: ["pipe", "ignore", "ignore"], detached: false })
-    child.on("error", () => {})
-    child.stdin.end(JSON.stringify(payload))
-  } catch {}
+// and never delays the agent. It settles once the payload is written, which a handler that
+// runs as the agent exits awaits: the agent's exit would otherwise cut the payload off.
+function termaHook(event: string, payload: Record<string, unknown>): Promise<void> {
+  if (!CONFIG) return Promise.resolve()
+  return new Promise((resolve) => {
+    try {
+      const [cmd, ...args] = CONFIG!.hookCommand
+      const child = spawn(cmd, [...args, event], { stdio: ["pipe", "ignore", "ignore"], detached: false })
+      child.on("error", () => resolve())
+      child.stdin.on("error", () => resolve())
+      child.stdin.end(JSON.stringify(payload), () => resolve())
+    } catch {
+      resolve()
+    }
+  })
 }
 
 // --- the extension -------------------------------------------------------------------
@@ -175,18 +187,77 @@ function sessionOf(ctx: any): string {
   return own ? String(own) : session
 }
 
+// parentOf is the session that opened this one for a subagent: its header's parentSession
+// is the parent's transcript, and a subagent's own transcript sits in the folder of that
+// name. A top-level parent's is <dir>/<time>_<id>.jsonl; a subagent's, opening one of its
+// own, is <agent>.jsonl, whose header names its id. A fork or a continuation names a parent
+// too, but elsewhere.
+function parentOf(ctx: any): string {
+  try {
+    const sm = ctx && ctx.sessionManager
+    const parent = sm && typeof sm.getHeader === "function" ? sm.getHeader()?.parentSession : undefined
+    const file = sm && typeof sm.getSessionFile === "function" ? sm.getSessionFile() : undefined
+    if (typeof parent !== "string" || typeof file !== "string" || dirname(file) + ".jsonl" !== parent) return ""
+    const m = /_([^_]+)\.jsonl$/.exec(basename(parent))
+    if (m) return m[1]
+    const head = Buffer.alloc(16 * 1024)
+    const fd = openSync(parent, "r")
+    const n = readSync(fd, head, 0, head.length, 0)
+    closeSync(fd)
+    for (const line of head.subarray(0, n).toString("utf8").split("\n")) {
+      if (!line.includes('"type":"session"')) continue
+      const id = JSON.parse(line).id
+      return typeof id === "string" ? id : ""
+    }
+    return ""
+  } catch {
+    return ""
+  }
+}
+
+// editedFiles are the files a tool call changed. omp's write names its file in its input,
+// and its edit in its details, one file or several, each with its own outcome; Pi's write
+// and edit name theirs in their input.
+function editedFiles(event: any): string[] {
+  const name = String(event?.toolName ?? "")
+  const input = event?.input
+  if (AGENT !== "omp") {
+    return (name === "write" || name === "edit") && input && typeof input.path === "string" && input.path ? [input.path] : []
+  }
+  if (event?.isError === true) return []
+  const files: string[] = []
+  const add = (p: unknown) => {
+    if (typeof p === "string" && p && !files.includes(p)) files.push(p)
+  }
+  if (name === "write") add(input?.path)
+  if (name === "edit") {
+    const d = event?.details
+    add(d?.path)
+    add(d?.move)
+    if (Array.isArray(d?.perFileResults)) {
+      for (const r of d.perFileResults) {
+        if (r && r.isError !== true) {
+          add(r.path)
+          add(r.move)
+        }
+      }
+    }
+  }
+  return files
+}
+
 export default function (pi: any) {
   if (!CONFIG) return
 
   pi.on("session_start", (event: any, ctx: any) => {
     session = sessionOf(ctx)
-    if (LIFECYCLE) termaHook(AGENT + "-session-start", { session_id: session, cwd: ctx?.cwd, model: ctx?.model?.id, reason: event?.reason })
+    if (LIFECYCLE) termaHook(AGENT + "-session-start", { session_id: session, cwd: ctx?.cwd, model: ctx?.model?.id, reason: event?.reason, parent_session_id: parentOf(ctx) || undefined })
   })
 
   pi.on("session_shutdown", async (_event: any, ctx: any) => {
     const s = sessionOf(ctx)
-    if (s && LIFECYCLE) termaHook(AGENT + "-session-end", { session_id: s, cwd: ctx?.cwd })
-    await flush()
+    const ended = s && LIFECYCLE ? termaHook(AGENT + "-session-end", { session_id: s, cwd: ctx?.cwd }) : undefined
+    await Promise.all([ended, flush()])
   })
 
   pi.on("before_agent_start", (event: any, ctx: any) => {
@@ -240,9 +311,9 @@ export default function (pi: any) {
       "gen_ai.tool.call.arguments": CONFIG!.includeToolContent ? truncate(event?.input, 16 * 1024) : undefined,
       "gen_ai.tool.call.result": CONFIG!.includeToolContent ? truncate(event?.content, 16 * 1024) : undefined,
     }, event?.isError === true)
-    const file = event?.input && typeof event.input.path === "string" ? event.input.path : ""
-    if (LIFECYCLE && (name === "write" || name === "edit") && file) {
-      termaHook(AGENT + "-file-edit", { session_id: s, cwd: ctx?.cwd, tool: name, file })
+    const files = editedFiles(event)
+    if (LIFECYCLE && files.length > 0) {
+      termaHook(AGENT + "-file-edit", { session_id: s, cwd: ctx?.cwd, tool: name, files, tool_call_id: event?.toolCallId })
     }
   })
 
