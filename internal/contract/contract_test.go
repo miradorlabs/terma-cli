@@ -71,7 +71,7 @@ func TestRelayExporterFiles(t *testing.T) {
 			e, _ := builtin.Agents(filepath.Join(home, ".terma-state")).Find[agents.RelayExporter](a.Name())
 			for key, dir := range map[string]string{
 				"CLAUDE_CONFIG_DIR": "claude", "CODEX_HOME": "codex", "XDG_CONFIG_HOME": "xdg",
-				"PI_CODING_AGENT_DIR": "pi", "OMP_DIR": "omp", "HERMES_HOME": "hermes",
+				"PI_CODING_AGENT_DIR": "pi", "HERMES_HOME": "hermes",
 				"GEMINI_CLI_HOME": "gemini", "DSH_HOME": "dsh", "COPILOT_HOME": "copilot", "VSCODE_APPDATA": "vscode",
 			} {
 				t.Setenv(key, filepath.Join(home, dir))

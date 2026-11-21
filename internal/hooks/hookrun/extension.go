@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"slices"
 
 	"github.com/miradorlabs/terma-cli/internal/semconv"
 	"github.com/miradorlabs/terma-cli/internal/session"
@@ -31,7 +32,11 @@ type extensionHookInput struct {
 	Cwd       string `json:"cwd"`
 	Model     string `json:"model"`
 	File      string `json:"file"`
-	Tool      string `json:"tool"`
+	// Files are the files one tool call changed, where it changed several.
+	Files []string `json:"files"`
+	Tool  string   `json:"tool"`
+	// ToolCallID is the call's id, as the agent's own telemetry names it.
+	ToolCallID string `json:"tool_call_id"`
 	// ParentSessionID is set on a session an agent opened for a subagent.
 	ParentSessionID string `json:"parent_session_id"`
 }
@@ -89,7 +94,8 @@ func (x Extension) fileEdit(ctx context.Context, env Env) error {
 		env.Logf("%v", err)
 		return nil
 	}
-	if !session.ValidID(in.SessionID) || in.File == "" {
+	paths := slices.DeleteFunc(append([]string{in.File}, in.Files...), func(p string) bool { return p == "" })
+	if !session.ValidID(in.SessionID) || len(paths) == 0 {
 		return nil
 	}
 	env.Cwd = cmp.Or(in.Cwd, env.Cwd)
@@ -97,8 +103,9 @@ func (x Extension) fileEdit(ctx context.Context, env Env) error {
 	if err != nil {
 		return nil
 	}
-	env.Touch(r, session.Session{ID: in.SessionID, Tool: x.Tool, Model: in.Model}, in.Tool,
-		[]string{in.File}, nil)
+	attrs := map[string]any{}
+	BoundedAttr(attrs, semconv.GenAIToolCallIDKey, in.ToolCallID)
+	env.Touch(r, session.Session{ID: in.SessionID, Tool: x.Tool, Model: in.Model}, in.Tool, paths, attrs)
 	return nil
 }
 

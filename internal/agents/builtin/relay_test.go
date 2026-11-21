@@ -38,14 +38,14 @@ func TestConfigureIsolatesAgentFilesAndEnvironment(t *testing.T) {
 			e, _ := Agents(filepath.Join(home, "terma")).Find[agents.RelayExporter](a.Name())
 			for key, dir := range map[string]string{
 				"CLAUDE_CONFIG_DIR": "claude", "CODEX_HOME": "codex", "XDG_CONFIG_HOME": "xdg",
-				"PI_CODING_AGENT_DIR": "pi", "OMP_DIR": "omp", "HERMES_HOME": "hermes",
+				"PI_CODING_AGENT_DIR": "pi", "HERMES_HOME": "hermes",
 				"GEMINI_CLI_HOME": "gemini", "DSH_HOME": "dsh", "COPILOT_HOME": "copilot",
 			} {
 				t.Setenv(key, filepath.Join(home, dir))
 			}
 			paths := map[string]string{
 				"claude": "claude/settings.json", "codex": "codex/config.toml",
-				"opencode": "xdg/opencode/plugins/terma.js", "omp": "omp/agent/extensions/terma-relay.ts",
+				"opencode": "xdg/opencode/plugins/terma.js", "omp": "pi/.env",
 				"pi": "pi/extensions/terma.ts", "hermes": "hermes/plugins/terma/__init__.py",
 				"gemini": "gemini/.gemini/settings.json", "dsh": "dsh/plugins/terma-relay.mjs",
 				"copilot": vscodeSettings(t, home),
@@ -144,7 +144,7 @@ func TestUnconfigureRelayUndoesConfigure(t *testing.T) {
 			t.Setenv("PATH", "") // no Hermes to enable or disable the plugin
 			for key, dir := range map[string]string{
 				"CLAUDE_CONFIG_DIR": "claude", "CODEX_HOME": "codex", "XDG_CONFIG_HOME": "xdg",
-				"PI_CODING_AGENT_DIR": "pi", "OMP_DIR": "omp", "HERMES_HOME": "hermes",
+				"PI_CODING_AGENT_DIR": "pi", "HERMES_HOME": "hermes",
 				"GEMINI_CLI_HOME": "gemini", "DSH_HOME": "dsh", "COPILOT_HOME": "copilot",
 			} {
 				t.Setenv(key, filepath.Join(home, dir))

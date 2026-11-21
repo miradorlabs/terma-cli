@@ -1,7 +1,11 @@
 package omp
 
 import (
+	"bytes"
 	"context"
+	"errors"
+	"io/fs"
+	"os"
 	"path/filepath"
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
@@ -9,25 +13,80 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/agents/internal/relayexport"
 )
 
-// ConfigureRelay writes terma's exporter into omp, sending to the local relay.
-func (Agent) ConfigureRelay(ctx context.Context, cfg agents.RelayConfig) (agents.RelayResult, error) {
-	// Not the native exporter: it initializes before extensions, and its environment
-	// would reach every tool omp runs.
+// The extension terma writes into omp's agent directory, named apart from Pi's, which a
+// PI_CODING_AGENT_DIR both read would share; and the files an earlier terma wrote there: an
+// extension that exported spans itself, and a hook that set the exporter.
+var (
+	extensionPath = filepath.Join("extensions", "terma-omp.ts")
+	legacyPaths   = []string{filepath.Join("extensions", "terma-relay.ts"), filepath.Join("hooks", "pre", "terma.ts")}
+)
+
+// ConfigureRelay points omp's native exporter at the local relay through its .env, and
+// writes the extension that reports sessions and file edits; it exports nothing itself.
+func (a Agent) ConfigureRelay(_ context.Context, cfg agents.RelayConfig) (agents.RelayResult, error) {
 	dir, err := ompAgentDir()
 	if err != nil {
 		return agents.RelayResult{}, err
 	}
-	path, err := pifamily.Write(filepath.Join(dir, "extensions", "terma-relay.ts"), pifamily.ForRelay("omp", false, cfg))
-	return agents.RelayResult{Paths: []string{path}}, err
+	result, err := relayexport.Native(a.Harness(), cfg)
+	if err != nil {
+		return result, err
+	}
+	if path, err := a.Harness().ConfigPath(); err == nil {
+		result.Paths = append(result.Paths, path)
+	}
+	ext, err := pifamily.Write(filepath.Join(dir, extensionPath), pifamily.ForHooks(name, cfg))
+	if err != nil {
+		return result, err
+	}
+	result.Paths = append(result.Paths, ext)
+	removed, err := removeOwn(dir, legacyPaths)
+	result.Paths = append(result.Paths, removed...)
+	return result, err
 }
 
-// UnconfigureRelay removes terma's relay extension for omp.
-func (Agent) UnconfigureRelay(context.Context, string) (agents.RelayResult, error) {
+// UnconfigureRelay restores omp's .env and removes terma's extension.
+func (a Agent) UnconfigureRelay(context.Context, string) (agents.RelayResult, error) {
 	dir, err := ompAgentDir()
 	if err != nil {
 		return agents.RelayResult{}, err
 	}
-	return relayexport.RemoveOwn(filepath.Join(dir, "extensions", "terma-relay.ts"))
+	result, err := relayexport.Unnative(a.Harness())
+	if err != nil {
+		return result, err
+	}
+	removed, err := removeOwn(dir, append([]string{extensionPath}, legacyPaths...))
+	result.Paths = append(result.Paths, removed...)
+	return result, err
+}
+
+// RelayPointed reports whether omp's .env points its exporter at the relay at addr.
+func (a Agent) RelayPointed(addr string) (bool, bool) {
+	return relayexport.NativePointed(a.Harness(), addr), true
+}
+
+// removeOwn deletes the files under dir among rels that terma wrote, each opening with its
+// "// Terma " header; a file of the developer's own by the same name stays.
+func removeOwn(dir string, rels []string) ([]string, error) {
+	var removed []string
+	for _, rel := range rels {
+		path := filepath.Join(dir, rel)
+		data, err := os.ReadFile(path)
+		if errors.Is(err, fs.ErrNotExist) {
+			continue
+		}
+		if err != nil {
+			return removed, err
+		}
+		if !bytes.HasPrefix(data, []byte("// Terma ")) {
+			continue
+		}
+		if err := os.Remove(path); err != nil && !errors.Is(err, fs.ErrNotExist) {
+			return removed, err
+		}
+		removed = append(removed, path)
+	}
+	return removed, nil
 }
 
 var _ agents.RelayExporter = Agent{}

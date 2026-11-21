@@ -21,7 +21,8 @@ var template string
 const configMarker = "const CONFIG: TermaConfig | null = null /* terma:config */"
 
 // Config is what the extension is spliced with; without Lifecycle it only claims the
-// session at each prompt and leaves start, end and edits to hooks.
+// session at each prompt and leaves start, end and edits to hooks, and without an Endpoint
+// it exports nothing, for an agent that exports natively.
 type Config struct {
 	Version            int               `json:"version"`
 	Agent              string            `json:"agent"`
@@ -37,6 +38,12 @@ type Config struct {
 func ForRelay(agent string, lifecycle bool, cfg agents.RelayConfig) Config {
 	return Config{Agent: agent, Lifecycle: lifecycle, Endpoint: cfg.Endpoint, Headers: relayexport.Headers(cfg),
 		IncludePrompts: true, IncludeToolContent: true, HookCommand: cfg.HookCommand}
+}
+
+// ForHooks only hands the agent's sessions, prompts and file edits to `terma hook`, for an
+// agent whose own exporter sends its telemetry.
+func ForHooks(agent string, cfg agents.RelayConfig) Config {
+	return Config{Agent: agent, Lifecycle: true, HookCommand: cfg.HookCommand}
 }
 
 // Render splices cfg into the template.
@@ -55,7 +62,7 @@ func Render(cfg Config) (string, error) {
 	return strings.Replace(template, configMarker, "const CONFIG: TermaConfig | null = "+string(data)+" /* terma:config */", 1), nil
 }
 
-// Write renders cfg to path, private to this user since it holds the relay's token.
+// Write renders cfg to path, private to this user since it may hold the relay's token.
 func Write(path string, cfg Config) (string, error) {
 	text, err := Render(cfg)
 	if err != nil {
