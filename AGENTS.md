@@ -3,7 +3,7 @@
 This file provides guidance to coding agents (Claude Code, Codex and others) when working
 with code in this repository.
 
-`terma` is a Go CLI that connects coding agents (Claude Code, Codex, GitHub Copilot, omp) to
+`terma` is a Go CLI that connects coding agents (Claude Code, Codex, GitHub Copilot, OMP) to
 Terma and stamps the commits they produce with the agent session that wrote them.
 
 ## Commands
@@ -111,7 +111,7 @@ the relay stamps on the session's records (`stampCheckout`): its origin, branch 
 it is a linked worktree under any policy (`vcs.*`, `terma.repository.worktree.linked`), and
 its working tree, the directory in it and the worktree's name with tool content only
 (`terma.repository.root`, `terma.working_directory`, `terma.repository.worktree.name`). A subagent's
-claim names the session that opened it where the agent's own telemetry does not (omp's,
+claim names the session that opened it where the agent's own telemetry does not (OMP's,
 `hookrun.Extension.ClaimParent`), which the relay stamps as `terma.session.parent.id`
 (`stampParent`). Hook events never pass the relay, so delivery applies
 the same rules when it sends them. A session marked not collected is dropped on arrival;

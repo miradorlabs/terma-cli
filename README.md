@@ -8,7 +8,7 @@
 The `terma` cli connects coding agents to [Terma](https://terma.ai), then stamps the commits
 they produce so agent spend can be traced to shipped code. It supports **Claude Code**
 (CLI and Desktop), **Codex** (CLI and Desktop), **GitHub Copilot** (CLI and VS Code) and
-**omp** (oh-my-pi).
+**OMP** ([oh-my-pi](https://github.com/can1357/oh-my-pi)).
 
 ## Get started
 
@@ -100,7 +100,7 @@ instead: see [Scripted and headless setup](#scripted-and-headless-setup).
 
 ```mermaid
 flowchart LR
-  agent["Claude Code / Codex / Copilot"] -- "telemetry" --> relay["terma relay<br/>(127.0.0.1)"]
+  agent["Claude Code / Codex / Copilot / OMP"] -- "telemetry" --> relay["terma relay<br/>(127.0.0.1)"]
   agent -- "hook events" --> hook["terma hook"]
   git["git commit"] -- "commit hooks" --> hook
   hook -- "claims the session<br/>for your team" --> relay
@@ -249,7 +249,7 @@ before it restarts, and otherwise your next terma command runs it. On the latest
 Every question `terma setup` asks has a flag:
 
 ```bash
-terma setup --org acme --team platform --harness claude,codex,copilot --yes
+terma setup --org acme --team platform --harness claude,codex,copilot,omp --yes
 ```
 
 - `--org <name-or-id>` signs in to that organization. Without it, setup asks when you
@@ -434,19 +434,28 @@ still claimed by its hooks but exports nothing. `TERMA_SHELL_LAUNCHERS=0` keeps 
 function out of your startup files. Copilot reports token counts and AI credits, not a
 cost, and a file one of its shell commands writes is not attributed to its session.
 
-omp exports natively and reads its exporter privately from its agent directory's `.env`
+OMP exports natively and reads its exporter privately from its agent directory's `.env`
 (`~/.omp/agent/.env`, or `$PI_CODING_AGENT_DIR/.env`), which no tool or shell it runs
 inherits. Setup writes its `OTEL_*` keys there, pointed at the relay, in place of any
 line of yours for the same key, and records what each held so `terma teardown` puts it
 back; your other lines stay as they are. The relay's token leads the path of each endpoint
-setup writes, never a header, so the file stays private to you (0600). An `OTEL_*` export in
-your shell, or in the `.env` of the directory omp starts in, still outranks the file: a
-repository's `.env` that sets a signal's endpoint takes that signal's export, with its
-content (which it could ask omp for on its own), but never terma's token. A named profile
-(`omp --profile`) has a directory of its own that setup does not configure. terma's
-extension (`~/.omp/agent/extensions/terma-omp.ts`) exports nothing: it reports sessions
-and the files omp's edit and write tools change, for commit attribution, and names the
-session that opened a subagent's, which the relay stamps on the subagent's records.
+setup writes, never a header, so the file stays private to you (0600). Tokens, estimated
+cost, tool calls and subagents ride OMP's own spans. terma's extension
+(`~/.omp/agent/extensions/terma-omp.ts`) exports nothing and sets no exporter: its hooks
+report sessions and the files OMP's edit and write tools change, for commit attribution,
+and a subagent's start names the session that opened it, which the relay stamps on the
+subagent's records as `terma.session.parent.id`, since OMP's spans do not. Setup removes
+the span-exporting extension and exporter hook an earlier terma wrote there.
+
+OMP's known limits: an `OTEL_*` export in your shell, or in the `.env` of the directory OMP
+starts in, still outranks the file: a signal's endpoint there takes that signal's export,
+and a repository's `.env` that sets one takes its content too (which it could ask OMP for on
+its own), but never terma's token. OMP exports `http/protobuf` only, so a shell's OTLP
+protocol set to anything else switches its export off, as do `OTEL_SDK_DISABLED=true` and an
+`OTEL_TRACES_EXPORTER` that names no `otlp`; `terma doctor` fails while your shell takes the
+export elsewhere or switches it off. A named profile (`omp --profile`) has a directory of its own
+that setup does not configure. A file one of OMP's shell commands writes is not attributed
+to its session.
 
 `terma setup` runs the relay as a per-user background service, so it is up before any
 agent starts; with `--relay-service off`, hooks start it on demand. `terma update`
