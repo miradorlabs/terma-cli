@@ -78,6 +78,7 @@ function parentOf(ctx: any): string {
 
 // editedFiles are the files a successful tool call changed: OMP's write names its file in
 // its input, and its edit in its details, one file or several, each with its own outcome.
+// apply_patch is the edit tool's wire name in patch mode, with the same details.
 function editedFiles(event: any): string[] {
   if (event?.isError === true) return []
   const name = String(event?.toolName ?? "")
@@ -86,7 +87,7 @@ function editedFiles(event: any): string[] {
     if (typeof p === "string" && p && !files.includes(p)) files.push(p)
   }
   if (name === "write") add(event?.input?.path)
-  if (name === "edit") {
+  if (name === "edit" || name === "apply_patch") {
     const d = event?.details
     add(d?.path)
     add(d?.move)

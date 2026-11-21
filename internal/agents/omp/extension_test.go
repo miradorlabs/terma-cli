@@ -32,6 +32,9 @@ handlers.tool_result({ toolName: "edit", toolCallId: "RZPvkTswD|fc_1", isError: 
 handlers.tool_result({ toolName: "write", toolCallId: "6taIXxcqF|fc_2", isError: false, input: { path: "hello.txt", content: "hello" }, details: { resolvedPath: "/work/hello.txt" } }, parent)
 handlers.tool_result({ toolName: "edit", toolCallId: "h3DEyzO37|fc_3", isError: false, input: { input: "[notes.txt#B686]", path: "notes.txt" }, details: { path: "/work/notes.txt", op: "update" } }, parent)
 handlers.tool_result({ toolName: "edit", toolCallId: "multi|fc_4", isError: false, input: {}, details: { perFileResults: [{ path: "/work/a.go" }, { path: "/work/b.go", isError: true }] } }, parent)
+handlers.tool_result({ toolName: "apply_patch", toolCallId: "patch|fc_6", isError: false, input: { input: "*** Begin Patch" }, details: { path: "/work/c.go", op: "update" } }, parent)
+handlers.tool_result({ toolName: "apply_patch", toolCallId: "patch|fc_7", isError: false, input: { input: "*** Begin Patch" }, details: { perFileResults: [{ path: "/work/d.go" }, { path: "/work/e.go", isError: true }] } }, parent)
+handlers.tool_result({ toolName: "apply_patch", toolCallId: "patch|fc_8", isError: true, input: { input: "*** Begin Patch" }, details: { path: "/work/f.go" } }, parent)
 handlers.tool_result({ toolName: "read", toolCallId: "paHFu2n2k|fc_5", isError: false, input: { path: "notes.txt" }, details: {} }, parent)
 await handlers.session_start({ reason: "startup" }, child)
 await handlers.session_start({ reason: "startup" }, fork)
@@ -47,7 +50,7 @@ await handlers.session_shutdown({}, parent)
 // OMP's extension exports nothing, neither spans nor logs, and holds no token: it hands
 // OMP's hooks each session's start, naming a subagent's parent (a nested one's too) but
 // never a fork's, and each file a tool call changed, successful ones only, with the call's
-// id as OMP's own spans name it.
+// id as OMP's own spans name it; an edit under its apply_patch wire name counts as an edit.
 func TestExtensionUnderNode(t *testing.T) {
 	byEvent, ext, fetched := runDriver(t)
 	data, err := os.ReadFile(ext)
@@ -81,15 +84,22 @@ func TestExtensionUnderNode(t *testing.T) {
 			t.Errorf("%s is no subagent, but its start named parent %v", s, parents[s])
 		}
 	}
-	edits := map[string]string{}
+	edits, tools := map[string]string{}, map[string]any{}
 	for _, e := range byEvent["omp-file-edit"] {
+		tools[e["tool_call_id"].(string)] = e["tool"]
 		var files []string
 		for _, f := range e["files"].([]any) {
 			files = append(files, f.(string))
 		}
 		edits[e["tool_call_id"].(string)] = strings.Join(files, ",")
 	}
-	want := map[string]string{"6taIXxcqF|fc_2": "hello.txt", "h3DEyzO37|fc_3": "/work/notes.txt", "multi|fc_4": "/work/a.go"}
+	want := map[string]string{"6taIXxcqF|fc_2": "hello.txt", "h3DEyzO37|fc_3": "/work/notes.txt", "multi|fc_4": "/work/a.go",
+		"patch|fc_6": "/work/c.go", "patch|fc_7": "/work/d.go"}
+	for _, id := range []string{"patch|fc_6", "patch|fc_7"} {
+		if tools[id] != "apply_patch" {
+			t.Errorf("patch %s was handed over as tool %v, want apply_patch", id, tools[id])
+		}
+	}
 	if len(edits) != len(want) {
 		t.Errorf("file edits = %v, want %v", edits, want)
 	}
