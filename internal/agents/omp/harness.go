@@ -43,7 +43,7 @@ func signalKey(s harness.Signal, suffix string) string {
 	return "OTEL_EXPORTER_OTLP_" + strings.ToUpper(string(s)) + "_" + suffix
 }
 
-// signalExporterKey is OTEL_TRACES_EXPORTER and its kin; a list naming none switches the signal off.
+// signalExporterKey is OTEL_TRACES_EXPORTER and its kin; a list that does not name otlp, or names none, switches the signal off.
 func signalExporterKey(s harness.Signal) string {
 	return "OTEL_" + strings.ToUpper(string(s)) + "_EXPORTER"
 }
@@ -118,7 +118,7 @@ func (c exporter) Status() (harness.Status, error) {
 		if protocol == "" {
 			protocol = values[harness.EnvOTLPProtocol]
 		}
-		if !disabled && !namesNone(values[signalExporterKey(s)]) && (protocol == "" || protocol == harness.ProtocolHTTPProtobuf) {
+		if !disabled && exportsOTLP(values[signalExporterKey(s)]) && (protocol == "" || protocol == harness.ProtocolHTTPProtobuf) {
 			status.Signals = append(status.Signals, s)
 		}
 	}
@@ -259,7 +259,7 @@ func managed(e harness.Exporter, current map[string]string) map[string]string {
 		if _, ok := current[signalKey(s, "PROTOCOL")]; ok {
 			out[signalKey(s, "PROTOCOL")] = harness.ProtocolHTTPProtobuf
 		}
-		if v, ok := current[signalExporterKey(s)]; ok && namesNone(v) {
+		if v, ok := current[signalExporterKey(s)]; ok && !exportsOTLP(v) {
 			out[signalExporterKey(s)] = exporterOTLP
 		}
 	}
@@ -269,10 +269,22 @@ func managed(e harness.Exporter, current map[string]string) map[string]string {
 	return out
 }
 
-func namesNone(list string) bool {
-	return slices.ContainsFunc(strings.Split(list, ","), func(s string) bool {
-		return strings.EqualFold(strings.TrimSpace(s), exporterNone)
-	})
+// exportsOTLP reports whether omp exports a signal whose exporter list is list: an empty one
+// does, one naming none does not, and otherwise one must name otlp.
+func exportsOTLP(list string) bool {
+	otlp, named := false, false
+	for e := range strings.SplitSeq(list, ",") {
+		switch strings.ToLower(strings.TrimSpace(e)) {
+		case "":
+			continue
+		case exporterNone:
+			return false
+		case exporterOTLP:
+			otlp = true
+		}
+		named = true
+	}
+	return otlp || !named
 }
 
 // bearer is the token an OTLP headers list sends as `authorization=Bearer <token>`, its
