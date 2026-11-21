@@ -460,8 +460,8 @@
       "name": "Claude Desktop (Code)",
       "role": "side_request",
       "first": "4.16336.0",
-      "last": "6.28899.2",
-      "builds": 9,
+      "last": "6.28899.6",
+      "builds": 10,
       "current": true
     }
   ]

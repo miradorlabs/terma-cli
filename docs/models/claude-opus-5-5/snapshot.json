@@ -518,8 +518,8 @@
       "name": "Claude Desktop (Code)",
       "role": "default",
       "first": "4.16336.0",
-      "last": "6.28899.2",
-      "builds": 9,
+      "last": "6.28899.6",
+      "builds": 10,
       "current": true,
       "params": {
         "output_config": {
@@ -594,17 +594,7 @@
                 "cwd": "<repo>",
                 "default_branch": null,
                 "root": "<repo>",
-                "status": {
-                  "clean": true,
-                  "counts": {
-                    "modified": 0,
-                    "staged": 0,
-                    "untracked": null,
-                    "untracked_normal": 0
-                  },
-                  "porcelain": null,
-                  "truncated": false
-                },
+                "status": null,
                 "visibility": {
                   "origin": {
                     "host": "github.com",
@@ -840,8 +830,8 @@
       "name": "Claude Desktop (Code)",
       "role": "side_request",
       "first": "4.16336.0",
-      "last": "6.28899.2",
-      "builds": 9,
+      "last": "6.28899.6",
+      "builds": 10,
       "current": true
     }
   ]
