@@ -531,7 +531,7 @@ func TestRelayPointedNeedsTheCurrentExtension(t *testing.T) {
 	if _, _, problem := a.RelayProblem("127.0.0.1:43180"); problem {
 		t.Fatal("a fresh setup reports a problem")
 	}
-	other, err := renderExtension([]string{"/opt/terma/bin/terma", "hook"})
+	other, err := renderExtension([]string{"/opt/terma/bin/terma", "hook"}, "http://127.0.0.1:43180")
 	if err != nil {
 		t.Fatal(err)
 	}

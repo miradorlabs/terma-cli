@@ -441,8 +441,8 @@ the span-exporting extension and exporter hook an earlier terma wrote there.
 OMP's known limits: an `OTEL_*` export in your shell, or in the `.env` of the directory OMP
 starts in, still outranks the file: a signal's endpoint there takes that signal's export,
 but never terma's token, nor content on terma's request: the `.env` asks for none, and
-terma's extension asks the running OMP for full content only while no such endpoint stands
-and you set no capture yourself. OMP started with `--no-extensions` sends no content. OMP
+terma's extension asks the running OMP for full content only while every signal goes to the
+relay and you set no capture yourself. OMP started with `--no-extensions` sends no content. OMP
 exports `http/protobuf` only, so a shell's per-signal
 OTLP protocol set to anything else switches that signal off (the common
 `OTEL_EXPORTER_OTLP_PROTOCOL` does not, since the file sets each signal's own), as do

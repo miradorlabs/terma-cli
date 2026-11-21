@@ -140,9 +140,9 @@ func TestOmpAttribution(t *testing.T) {
 }
 
 // terma asks OMP for all content because the relay applies the team's policy to it, and only
-// where it goes to the relay: a traces endpoint the developer's shell or repository .env sets
-// outranks the agent .env and gets no content on terma's request, OMP running terma's
-// extension or not (--no-extensions); with no such override the relay receives it all.
+// where it goes to the relay: a traces endpoint the developer's shell, repository .env or
+// agent .env sets gets no content on terma's request, OMP running terma's extension or not
+// (--no-extensions); with every signal on the relay the relay receives it all.
 func TestRelayOmpContentOnlyToTheRelay(t *testing.T) {
 	forEachOmp(t, func(t *testing.T, b Binary) {
 		track(t)
@@ -176,6 +176,48 @@ func TestRelayOmpContentOnlyToTheRelay(t *testing.T) {
 					sb.StopRelay()
 				})
 			}
+		}
+		// The agent .env pointed elsewhere after setup, or never pointed at the relay (a setup
+		// that wrote the extension and failed at the .env): the extension asks for nothing.
+		agentEnv := map[string]func(sb *Sandbox, other string){
+			"agent .env edited": func(sb *Sandbox, other string) {
+				path := filepath.Join(sb.Home, ".omp", "agent", ".env")
+				data, err := os.ReadFile(path)
+				if err != nil {
+					t.Fatal(err)
+				}
+				var lines []string
+				for l := range strings.SplitSeq(strings.TrimSpace(string(data)), "\n") {
+					if strings.HasPrefix(l, "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=") {
+						l = "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=" + other + "/v1/traces"
+					}
+					lines = append(lines, l)
+				}
+				sb.writeAbs(path, strings.Join(lines, "\n")+"\n")
+			},
+			"agent .env never pointed": func(sb *Sandbox, other string) {
+				sb.writeAbs(filepath.Join(sb.Home, ".omp", "agent", ".env"), "OTEL_EXPORTER_OTLP_ENDPOINT="+other+"\nOTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf\n")
+			},
+		}
+		for name, edit := range agentEnv {
+			t.Run(name, func(t *testing.T) {
+				sb := ompSandbox(t, "")(t)
+				other := StartReceiver(t)
+				sb.UseRelay(RelayOptions{Start: true, Content: true})
+				edit(sb, other.URL())
+				sb.OmpRun(b, sb.Repo, "Reply to "+marker)
+				for deadline := time.Now().Add(6 * time.Second); len(other.evidence().spans) == 0 && time.Now().Before(deadline); {
+					time.Sleep(40 * time.Millisecond)
+				}
+				ev := other.evidence()
+				if len(ev.spans) == 0 {
+					t.Fatal("the developer's endpoint received no traces, so the check proves nothing")
+				}
+				if fields := promptIn(ev); len(fields) > 0 {
+					t.Errorf("the prompt left for the developer's own endpoint: %v", fields)
+				}
+				sb.StopRelay()
+			})
 		}
 		t.Run("none", func(t *testing.T) {
 			ProvesAll(t, b, "relay.content_allowed")

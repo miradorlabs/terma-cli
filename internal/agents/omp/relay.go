@@ -30,7 +30,7 @@ func (a Agent) ConfigureRelay(_ context.Context, cfg agents.RelayConfig) (agents
 	if err != nil {
 		return agents.RelayResult{}, err
 	}
-	ext, err := writeExtension(filepath.Join(dir, extensionPath), cfg.HookCommand)
+	ext, err := writeExtension(filepath.Join(dir, extensionPath), cfg.HookCommand, cfg.Endpoint)
 	if err != nil {
 		return agents.RelayResult{}, err
 	}

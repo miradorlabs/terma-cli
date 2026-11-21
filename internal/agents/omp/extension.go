@@ -12,8 +12,8 @@ import (
 )
 
 // OMP exports its own telemetry, so terma's extension is hooks only: it hands sessions,
-// prompts, file edits and a subagent's parent to `terma hook omp-*`, and holds no endpoint
-// or token.
+// prompts, file edits and a subagent's parent to `terma hook omp-*`, and asks OMP for full
+// content where every signal goes to the relay, whose address it holds, never its token.
 
 //go:embed terma-omp.ts
 var extensionTemplate string
@@ -23,10 +23,11 @@ const extensionConfigMarker = "const CONFIG: TermaConfig | null = null /* terma:
 type extensionConfig struct {
 	Version     int      `json:"version"`
 	HookCommand []string `json:"hookCommand"`
+	Relay       string   `json:"relay"`
 }
 
-func renderExtension(hookCommand []string) (string, error) {
-	cfg := extensionConfig{Version: 1, HookCommand: hookCommand}
+func renderExtension(hookCommand []string, relay string) (string, error) {
+	cfg := extensionConfig{Version: 1, HookCommand: hookCommand, Relay: strings.TrimRight(relay, "/")}
 	if len(cfg.HookCommand) == 0 {
 		cfg.HookCommand = []string{"terma", "hook"}
 	}
@@ -42,8 +43,8 @@ func renderExtension(hookCommand []string) (string, error) {
 
 // writeExtension renders the extension to path, private to this user like the rest of
 // OMP's agent directory.
-func writeExtension(path string, hookCommand []string) (string, error) {
-	text, err := renderExtension(hookCommand)
+func writeExtension(path string, hookCommand []string, relay string) (string, error) {
+	text, err := renderExtension(hookCommand, relay)
 	if err != nil {
 		return "", err
 	}

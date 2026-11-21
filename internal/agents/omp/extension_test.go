@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/miradorlabs/terma-cli/internal/harness"
 )
 
 // driver loads the rendered extension under Node with a stand-in for OMP's extension API,
@@ -66,7 +68,7 @@ func TestExtensionUnderNode(t *testing.T) {
 	if info, _ := os.Stat(ext); info.Mode().Perm() != 0o600 {
 		t.Errorf("extension is %v, want 0600", info.Mode().Perm())
 	}
-	for _, w := range []string{"relay-token", "127.0.0.1", "endpoint"} {
+	for _, w := range []string{relayToken} {
 		if strings.Contains(string(data), w) {
 			t.Errorf("the extension names %q", w)
 		}
@@ -146,7 +148,7 @@ func runDriver(t *testing.T) (byEvent map[string][]map[string]any, ext, fetched 
 		t.Fatal(err)
 	}
 	ext = filepath.Join(dir, "terma-ext.ts")
-	if _, err := writeExtension(ext, []string{hook}); err != nil {
+	if _, err := writeExtension(ext, []string{hook}, relayConfig().Endpoint); err != nil {
 		t.Fatal(err)
 	}
 	script := filepath.Join(dir, "driver.mjs")
@@ -185,10 +187,10 @@ func runDriver(t *testing.T) (byEvent map[string][]map[string]any, ext, fetched 
 	return byEvent, ext, fetched
 }
 
-// OMP reads a signal's collector from the shell or the launch directory's .env ahead of its
-// agent .env, where setup writes the relay's: the extension asks OMP for full content, kept
-// from the tools it runs as its agent .env's settings are, only where no such override
-// stands and the developer set no capture of their own; without OMP's module it asks nothing.
+// The extension asks OMP for full content, kept from the tools it runs as its agent .env's
+// settings are, only where every signal goes to the relay as OMP resolves it (the shell and
+// the launch directory's .env ahead of its own .env files): a collector of the developer's
+// for any signal, or none set, and it asks nothing, nor does it in an OMP without the module.
 func TestExtensionAsksForContentOnlyForTheRelay(t *testing.T) {
 	node, err := exec.LookPath("node")
 	if err != nil {
@@ -204,35 +206,51 @@ func TestExtensionAsksForContentOnlyForTheRelay(t *testing.T) {
 	}
 	for name, text := range map[string]string{
 		"package.json": `{"name":"@oh-my-pi/pi-utils","type":"module","main":"index.js"}`,
-		"index.js":     `export function claimOmpOtelEnvFileEntry(name, value) { globalThis.claimed = name + "=" + value; return true }`,
+		"index.js": `const resolved = JSON.parse(process.env.RESOLVED || "{}")
+export function $otelEnv(name) { return resolved[name] }
+export function claimOmpOtelEnvFileEntry(name, value) { globalThis.claimed = name + "=" + value; return true }`,
 	} {
 		if err := os.WriteFile(filepath.Join(stub, name), []byte(text), 0o600); err != nil {
 			t.Fatal(err)
 		}
 	}
-	const capture = ompCaptureContentEnv
+	relay := relayConfig().Endpoint + "/" + relayToken
+	signals := func(traces, logs, metrics string) map[string]string {
+		return map[string]string{
+			signalKey(harness.SignalTraces, "ENDPOINT"):  traces,
+			signalKey(harness.SignalLogs, "ENDPOINT"):    logs,
+			signalKey(harness.SignalMetrics, "ENDPOINT"): metrics,
+		}
+	}
+	all := signals(relay+"/v1/traces", relay+"/v1/logs", relay+"/v1/metrics")
+	const full = ompCaptureContentEnv + "=full"
 	cases := map[string]struct {
-		dir  string
-		env  []string
-		want string
+		dir      string
+		resolved map[string]string
+		want     string
 	}{
-		"no override":             {withOMP, nil, capture + "=full"},
-		"common collector only":   {withOMP, []string{"OTEL_EXPORTER_OTLP_ENDPOINT=https://c.example"}, capture + "=full"},
-		"traces collector":        {withOMP, []string{"OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=https://c.example/v1/traces"}, "none"},
-		"logs collector":          {withOMP, []string{"OTEL_EXPORTER_OTLP_LOGS_ENDPOINT=https://c.example/v1/logs"}, "none"},
-		"metrics collector":       {withOMP, []string{"OTEL_EXPORTER_OTLP_METRICS_ENDPOINT=https://c.example/v1/metrics"}, "none"},
-		"developer's own capture": {withOMP, []string{capture + "=summary"}, "none"},
-		"no OMP module":           {t.TempDir(), nil, "none"},
+		"every signal to the relay":     {withOMP, all, full},
+		"the relay's common endpoint":   {withOMP, map[string]string{harness.EnvOTLPEndpoint: relay}, full},
+		"traces elsewhere":              {withOMP, signals("https://c.example/v1/traces", relay+"/v1/logs", relay+"/v1/metrics"), "none"},
+		"metrics elsewhere":             {withOMP, signals(relay+"/v1/traces", relay+"/v1/logs", "http://127.0.0.1:4318/v1/metrics"), "none"},
+		"another port on loopback":      {withOMP, signals("http://127.0.0.1:43181/"+relayToken+"/v1/traces", relay+"/v1/logs", relay+"/v1/metrics"), "none"},
+		"only the developer's endpoint": {withOMP, map[string]string{harness.EnvOTLPEndpoint: "https://c.example"}, "none"},
+		"nothing set":                   {withOMP, nil, "none"},
+		"no OMP module":                 {t.TempDir(), all, "none"},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
 			ext := filepath.Join(c.dir, "terma-ext.ts")
-			if _, err := writeExtension(ext, []string{"true"}); err != nil {
+			if _, err := writeExtension(ext, []string{"true"}, relayConfig().Endpoint); err != nil {
 				t.Fatal(err)
 			}
-			script := `const mod = await import(process.argv[1]); await mod.default({ on: () => {} }); console.log((globalThis.claimed ?? "none") + " " + (process.env.` + capture + ` ?? ""))`
+			resolved, err := json.Marshal(c.resolved)
+			if err != nil {
+				t.Fatal(err)
+			}
+			script := `const mod = await import(process.argv[1]); await mod.default({ on: () => {} }); console.log((globalThis.claimed ?? "none") + " " + (process.env.` + ompCaptureContentEnv + ` ?? ""))`
 			cmd := exec.Command(node, "--input-type=module", "-e", script, ext)
-			cmd.Env = append([]string{"PATH=" + os.Getenv("PATH")}, c.env...)
+			cmd.Env = []string{"PATH=" + os.Getenv("PATH"), "RESOLVED=" + string(resolved)}
 			out, err := cmd.CombinedOutput()
 			if err != nil {
 				t.Fatalf("node: %v\n%s", err, out)
@@ -241,8 +259,8 @@ func TestExtensionAsksForContentOnlyForTheRelay(t *testing.T) {
 			if claimed != c.want {
 				t.Errorf("claimed %s, want %s", claimed, c.want)
 			}
-			if want := strings.TrimPrefix(strings.Join(slices.DeleteFunc(slices.Clone(c.env), func(kv string) bool { return !strings.HasPrefix(kv, capture+"=") }), ""), capture+"="); live != want {
-				t.Errorf("the extension changed the process's %s to %q", capture, live)
+			if live != "" {
+				t.Errorf("the extension set the process's %s to %q, which the tools OMP runs inherit", ompCaptureContentEnv, live)
 			}
 		})
 	}
