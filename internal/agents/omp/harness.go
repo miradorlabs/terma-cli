@@ -90,7 +90,7 @@ func (exporter) ConfigPath() (string, error) {
 }
 
 // Status reads back where omp's exporter sends: the common endpoint, or a per-signal one
-// that differs from it, which is where that signal's records and the token go.
+// that differs from it, which is where that signal's records go.
 func (c exporter) Status() (harness.Status, error) {
 	path, err := c.ConfigPath()
 	if err != nil {
@@ -122,7 +122,7 @@ func (c exporter) Status() (harness.Status, error) {
 			status.Signals = append(status.Signals, s)
 		}
 	}
-	status.Connected = status.Endpoint != "" && len(status.Signals) > 0 && bearer(values[harness.EnvOTLPHeaders]) != ""
+	status.Connected = len(status.Signals) > 0 && tokenPath(status.Endpoint)
 	status.Conflicts = ompConflicts(harness.Exporter{Endpoint: status.Endpoint})
 
 	j, err := harness.LoadJournal(c.dir, c.Name(), path)
@@ -160,10 +160,10 @@ func (c exporter) Connect(e harness.Exporter, _ bool) error {
 		return err
 	}
 	current := f.values()
+	changes := retireHeaders(previous, current)
 	installing := managed(e, current)
 	j := harness.NewJournal(c.Name(), path, current, installing, nil, nil, previous)
 
-	changes := map[string]*string{}
 	for key, value := range installing {
 		changes[key] = &value
 	}
@@ -239,23 +239,20 @@ func (exporter) CurrentCredential(string, string) (string, bool) { return "", fa
 func (exporter) Backup(string) (string, error) { return "", nil }
 
 // managed is what a connect to e writes, given the file's current values: the common
-// endpoint, protocol, Authorization header and content capture, every signal's own endpoint
-// (a per-signal endpoint in a dotenv file omp reads after this one would otherwise outrank
-// the common one, and receive the relay's token), and the per-signal settings already in
-// the file that would redirect or switch off a signal.
+// endpoint, protocol and content capture, every signal's own endpoint (a per-signal endpoint
+// in a dotenv file omp reads after this one would otherwise outrank the common one), and the
+// per-signal settings already in the file that would switch a signal off. The relay's token
+// leads each endpoint's path, never a header: a repository's .env that sets a signal's
+// endpoint outranks this file, and omp would send it this file's headers.
 func managed(e harness.Exporter, current map[string]string) map[string]string {
-	auth := "authorization=Bearer%20" + url.QueryEscape(e.APIKey)
+	base := strings.TrimRight(e.Endpoint, "/") + "/" + e.APIKey
 	out := map[string]string{
-		harness.EnvOTLPEndpoint: e.Endpoint,
+		harness.EnvOTLPEndpoint: base,
 		harness.EnvOTLPProtocol: harness.ProtocolHTTPProtobuf,
-		harness.EnvOTLPHeaders:  auth,
 		ompCaptureContentEnv:    ompCaptureContentFull,
 	}
 	for _, s := range harness.AllSignals {
-		out[signalKey(s, "ENDPOINT")] = e.SignalEndpoint(s)
-		if _, ok := current[signalKey(s, "HEADERS")]; ok {
-			out[signalKey(s, "HEADERS")] = auth
-		}
+		out[signalKey(s, "ENDPOINT")] = harness.Exporter{Endpoint: base}.SignalEndpoint(s)
 		if _, ok := current[signalKey(s, "PROTOCOL")]; ok {
 			out[signalKey(s, "PROTOCOL")] = harness.ProtocolHTTPProtobuf
 		}
@@ -267,6 +264,38 @@ func managed(e harness.Exporter, current map[string]string) map[string]string {
 		out[envSDKDisabled] = "false"
 	}
 	return out
+}
+
+// retireHeaders undoes the Authorization headers an earlier setup wrote, which carried the
+// relay's token: each one still as written goes back to what it held, in current too, and
+// the journal previous no longer owns any. It returns the file changes that makes.
+func retireHeaders(previous *harness.Journal, current map[string]string) map[string]*string {
+	changes := map[string]*string{}
+	if previous == nil {
+		return changes
+	}
+	keys := []string{harness.EnvOTLPHeaders}
+	for _, s := range harness.AllSignals {
+		keys = append(keys, signalKey(s, "HEADERS"))
+	}
+	for _, key := range keys {
+		installed, owned := previous.Installed[key]
+		if !owned {
+			continue
+		}
+		if current[key] == installed {
+			prior := previous.Previous[key]
+			changes[key] = prior
+			if prior != nil {
+				current[key] = *prior
+			} else {
+				delete(current, key)
+			}
+		}
+		delete(previous.Installed, key)
+		delete(previous.Previous, key)
+	}
+	return changes
 }
 
 // exportsOTLP reports whether omp exports a signal whose exporter list is list: an empty one
@@ -287,22 +316,10 @@ func exportsOTLP(list string) bool {
 	return otlp || !named
 }
 
-// bearer is the token an OTLP headers list sends as `authorization=Bearer <token>`, its
-// values percent-encoded as omp decodes them.
-func bearer(headers string) string {
-	for pair := range strings.SplitSeq(headers, ",") {
-		k, v, ok := strings.Cut(pair, "=")
-		if !ok || !strings.EqualFold(strings.TrimSpace(k), "authorization") {
-			continue
-		}
-		if decoded, err := url.PathUnescape(strings.TrimSpace(v)); err == nil {
-			v = decoded
-		}
-		if token, ok := strings.CutPrefix(v, "Bearer "); ok {
-			return strings.TrimSpace(token)
-		}
-	}
-	return ""
+// tokenPath reports whether endpoint names a path, the relay's token, ahead of /v1/<signal>.
+func tokenPath(endpoint string) bool {
+	u, err := url.Parse(endpoint)
+	return err == nil && u.Host != "" && strings.Trim(u.Path, "/") != ""
 }
 
 var _ harness.Harness = exporter{}

@@ -81,14 +81,13 @@ OTEL_EXPORTER_OTLP_ENDPOINT=https://later.example
 	}
 	values := f.values()
 	for key, want := range map[string]string{
-		harness.EnvOTLPEndpoint:                      "http://127.0.0.1:43180",
+		harness.EnvOTLPEndpoint:                      "http://127.0.0.1:43180/" + relayToken,
 		harness.EnvOTLPProtocol:                      harness.ProtocolHTTPProtobuf,
-		harness.EnvOTLPHeaders:                       "authorization=Bearer%20" + relayToken,
 		ompCaptureContentEnv:                         "full",
-		signalKey(harness.SignalTraces, "ENDPOINT"):  "http://127.0.0.1:43180/v1/traces",
-		signalKey(harness.SignalLogs, "ENDPOINT"):    "http://127.0.0.1:43180/v1/logs",
-		signalKey(harness.SignalMetrics, "ENDPOINT"): "http://127.0.0.1:43180/v1/metrics",
-		signalKey(harness.SignalTraces, "HEADERS"):   "authorization=Bearer%20" + relayToken,
+		signalKey(harness.SignalTraces, "ENDPOINT"):  "http://127.0.0.1:43180/" + relayToken + "/v1/traces",
+		signalKey(harness.SignalLogs, "ENDPOINT"):    "http://127.0.0.1:43180/" + relayToken + "/v1/logs",
+		signalKey(harness.SignalMetrics, "ENDPOINT"): "http://127.0.0.1:43180/" + relayToken + "/v1/metrics",
+		signalKey(harness.SignalTraces, "HEADERS"):   "x-team=blue",
 		signalExporterKey(harness.SignalMetrics):     "otlp",
 		"NOTE":                                       "two\nlines",
 		"ANTHROPIC_BASE_URL":                         "https://proxy.example",
@@ -97,10 +96,15 @@ OTEL_EXPORTER_OTLP_ENDPOINT=https://later.example
 			t.Errorf("%s = %q, want %q", key, values[key], want)
 		}
 	}
+	// A repository's .env that sets a signal's endpoint outranks this file, and omp would
+	// send it this file's headers: the token rides only in terma's own endpoints' path.
+	if strings.Contains(strings.ToLower(after), "authorization") || strings.Count(after, relayToken) != 4 {
+		t.Errorf("the token is somewhere other than the four endpoints:\n%s", after)
+	}
 	if n := strings.Count(after, harness.EnvOTLPEndpoint+"="); n != 1 {
 		t.Errorf("the common endpoint is in the file %d times, want once:\n%s", n, after)
 	}
-	if !strings.HasPrefix(after, "# my omp settings\nANTHROPIC_BASE_URL=https://proxy.example\nOTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:43180\n") {
+	if !strings.HasPrefix(after, "# my omp settings\nANTHROPIC_BASE_URL=https://proxy.example\nOTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:43180/"+relayToken+"\n") {
 		t.Errorf("terma's endpoint did not take the developer's line's place:\n%s", after)
 	}
 	if info, _ := os.Stat(env); info.Mode().Perm() != 0o600 {
@@ -180,7 +184,7 @@ func TestRelayEnvEditedAfterSetup(t *testing.T) {
 	if _, err := a.ConfigureRelay(context.Background(), relayConfig()); err != nil {
 		t.Fatal(err)
 	}
-	text := strings.Replace(read(t, env), "OTEL_EXPORTER_OTLP_LOGS_ENDPOINT=http://127.0.0.1:43180/v1/logs", "OTEL_EXPORTER_OTLP_LOGS_ENDPOINT=https://mine.example/v1/logs", 1)
+	text := strings.Replace(read(t, env), "OTEL_EXPORTER_OTLP_LOGS_ENDPOINT=http://127.0.0.1:43180/"+relayToken+"/v1/logs", "OTEL_EXPORTER_OTLP_LOGS_ENDPOINT=https://mine.example/v1/logs", 1)
 	write(t, env, text, 0o600)
 	if pointed, _ := a.RelayPointed("127.0.0.1:43180"); pointed {
 		t.Error("a per-signal endpoint elsewhere still reads as pointed at the relay")
@@ -201,7 +205,7 @@ func TestRelayEnvEditedAfterSetup(t *testing.T) {
 // such a signal is not read as exporting, setup turns it on, and teardown puts the list back.
 func TestRelayEnvExporterListWithoutOTLP(t *testing.T) {
 	a, env := ompIn(t)
-	write(t, env, "OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:43180\nOTEL_EXPORTER_OTLP_HEADERS=authorization=Bearer%20"+relayToken+"\nOTEL_TRACES_EXPORTER=console\n", 0o600)
+	write(t, env, "OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:43180/"+relayToken+"\nOTEL_TRACES_EXPORTER=console\n", 0o600)
 	st, err := a.Harness().Status()
 	if err != nil {
 		t.Fatal(err)
@@ -220,6 +224,38 @@ func TestRelayEnvExporterListWithoutOTLP(t *testing.T) {
 	}
 	if !strings.Contains(read(t, env), "OTEL_TRACES_EXPORTER=console\n") {
 		t.Errorf("teardown did not restore the list:\n%s", read(t, env))
+	}
+}
+
+// An earlier setup sent the token in an Authorization header; the next one takes each header
+// it wrote back to what the developer had, and teardown leaves that.
+func TestRelayEnvRetiresTheTokenHeader(t *testing.T) {
+	a, env := ompIn(t)
+	write(t, env, "OTEL_EXPORTER_OTLP_TRACES_HEADERS=x-team=blue\n", 0o600)
+	auth := "authorization=Bearer%20" + relayToken
+	headers := []string{harness.EnvOTLPHeaders, signalKey(harness.SignalTraces, "HEADERS")}
+	blue := "x-team=blue"
+	earlier := harness.NewJournal(name, env, map[string]string{headers[1]: blue}, map[string]string{headers[0]: auth, headers[1]: auth}, nil, nil, nil)
+	if err := earlier.Save(a.ConfigDir); err != nil {
+		t.Fatal(err)
+	}
+	write(t, env, headers[1]+"="+auth+"\n"+headers[0]+"="+auth+"\n", 0o600)
+
+	if _, err := a.ConfigureRelay(context.Background(), relayConfig()); err != nil {
+		t.Fatal(err)
+	}
+	after := read(t, env)
+	if strings.Contains(strings.ToLower(after), "authorization") || !strings.Contains(after, headers[1]+"="+blue+"\n") {
+		t.Fatalf("setup kept a token header or lost the developer's:\n%s", after)
+	}
+	if pointed, _ := a.RelayPointed("127.0.0.1:43180"); !pointed {
+		t.Error("the .env does not read as pointed at the relay")
+	}
+	if _, err := a.UnconfigureRelay(context.Background(), relayToken); err != nil {
+		t.Fatal(err)
+	}
+	if got := read(t, env); got != headers[1]+"="+blue+"\n" {
+		t.Errorf("teardown left:\n%s", got)
 	}
 }
 

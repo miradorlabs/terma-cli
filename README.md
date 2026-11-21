@@ -429,8 +429,11 @@ omp exports natively and reads its exporter privately from its agent directory's
 (`~/.omp/agent/.env`, or `$PI_CODING_AGENT_DIR/.env`), which no tool or shell it runs
 inherits. Setup writes its `OTEL_*` keys there, pointed at the relay, in place of any
 line of yours for the same key, and records what each held so `terma teardown` puts it
-back; your other lines stay as they are. An `OTEL_*` export in your shell, or in the
-`.env` of the directory omp starts in, still outranks the file, and a named profile
+back; your other lines stay as they are. The relay's token leads the path of each endpoint
+setup writes, never a header, so the file stays private to you (0600). An `OTEL_*` export in
+your shell, or in the `.env` of the directory omp starts in, still outranks the file: a
+repository's `.env` that sets a signal's endpoint takes that signal's export, with its
+content (which it could ask omp for on its own), but never terma's token. A named profile
 (`omp --profile`) has a directory of its own that setup does not configure. terma's
 extension (`~/.omp/agent/extensions/terma-omp.ts`) exports nothing: it reports sessions
 and the files omp's edit and write tools change, for commit attribution, and names the

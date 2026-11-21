@@ -29,7 +29,7 @@ func TestRelayCheckReadsOmpsEnv(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	moved := strings.Replace(string(data), "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://127.0.0.1:43180/v1/traces", "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=https://collector.example/v1/traces", 1)
+	moved := strings.Replace(string(data), "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://127.0.0.1:43180/tok/v1/traces", "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=https://collector.example/v1/traces", 1)
 	if err := os.WriteFile(env, []byte(moved), 0o600); err != nil {
 		t.Fatal(err)
 	}
