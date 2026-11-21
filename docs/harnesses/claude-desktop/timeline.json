@@ -5,7 +5,248 @@
     {
       "version": "6.28899.6",
       "previous": "6.28899.2",
-      "changes": []
+      "changes": [
+        {
+          "id": "model.params.safeguards.0.classifier_context.git_state.status",
+          "category": "model",
+          "op": "changed",
+          "title": "Model parameter safeguards.0.classifier_context.git_state.status: {\"clean\":true,\"counts\":{\"modified\":0,\"staged\":0,\"untracke… → none",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "prompt.context.2.text",
+          "category": "prompt",
+          "op": "changed",
+          "title": "Injected context changed (+2033 −2032 chars)",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "prompt.system.0.text",
+          "category": "prompt",
+          "op": "changed",
+          "title": "System prompt changed",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "tools.CronCreate.description",
+          "category": "tools",
+          "op": "changed",
+          "title": "CronCreate tool description changed (+628 −313 chars)",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "tools.CronCreate.input_schema.properties.durable.description",
+          "category": "tools",
+          "op": "changed",
+          "title": "CronCreate tool parameter durable: description changed (+269 −208 chars)",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "tools.CronCreate.input_schema.properties.recurring.description",
+          "category": "tools",
+          "op": "changed",
+          "title": "CronCreate tool parameter recurring: description changed (+225 −224 chars)",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "tools.DesignSync.description",
+          "category": "tools",
+          "op": "changed",
+          "title": "DesignSync tool description changed (+1017 −505 chars)",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "tools.mcp__scheduled-tasks__list_scheduled_tasks.description",
+          "category": "tools",
+          "op": "changed",
+          "title": "mcp__scheduled-tasks__list_scheduled_tasks tool description changed (+55 −0 chars)",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "request.headers.user-agent",
+          "category": "request",
+          "op": "changed",
+          "title": "Header user-agent: claude-cli/2.1.328 (external, claude-desktop-3p, agent-sd… → claude-cli/2.1.330 (external, claude-desktop-3p, agent-sd…",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "cli.commands.claude.options.--name.description",
+          "category": "cli",
+          "op": "changed",
+          "title": "`claude --name`: description changed (+130 −97 chars)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "cli.commands.claude.options.--restricted.description",
+          "category": "cli",
+          "op": "changed",
+          "title": "`claude --restricted`: description changed (+261 −226 chars)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "cli.help.--help",
+          "category": "cli",
+          "op": "changed",
+          "title": "Full help text of `--help` changed (+364 −218 chars)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "cli.launch.env.BUN_ENABLE_CRASH_REPORTING",
+          "category": "cli",
+          "op": "added",
+          "title": "The app now sets its agent's BUN_ENABLE_CRASH_REPORTING",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "cli.launch.env_values.BAGGAGE",
+          "category": "cli",
+          "op": "changed",
+          "title": "The app's agent's BAGGAGE: none → none",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "cli.launch.env_values.BUN_ENABLE_CRASH_REPORTING",
+          "category": "cli",
+          "op": "added",
+          "title": "The app's agent's BUN_ENABLE_CRASH_REPORTING: none → 0",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "cli.launch.env_values.CLAUDE_AGENT_SDK_VERSION",
+          "category": "cli",
+          "op": "changed",
+          "title": "The app's agent's CLAUDE_AGENT_SDK_VERSION: 0.3.328 → 0.3.330",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "cli.launch.env_values.SENTRY-TRACE",
+          "category": "cli",
+          "op": "changed",
+          "title": "The app's agent's SENTRY-TRACE: <hex>-a6466bbeebaf1c8e → <hex>-b927d603fc76926b",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.additionalDirectoryConfigRoots",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: additionalDirectoryConfigRoots",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.options.deniedMcpServers.serverUrl.description",
+          "category": "config",
+          "op": "changed",
+          "title": "deniedMcpServers.serverUrl description changed (+232 −98 chars)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.options.desktopMcpServersListScope",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: desktopMcpServersListScope",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.options.disableDirectMcpSkills",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: disableDirectMcpSkills",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.options.sandbox.windows.backend.description",
+          "category": "config",
+          "op": "changed",
+          "title": "sandbox.windows.backend description changed (+560 −668 chars)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.env_vars",
+          "category": "config",
+          "op": "changed",
+          "title": "Environment variables: +26 −10",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "network.egress.GET downloads.claude.ai/claude-code-releases/2.1.328/darwin-arm64/claude.app.tar.zst",
+          "category": "network",
+          "op": "removed",
+          "title": "Network request no longer made: GET downloads.claude.ai/claude-code-releases/2.1.328/darwin-arm64/claude.app.tar.zst",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.egress.GET downloads.claude.ai/claude-code-releases/2.1.330/darwin-arm64/claude.app.tar.zst",
+          "category": "network",
+          "op": "added",
+          "title": "New network request: GET downloads.claude.ai/claude-code-releases/2.1.330/darwin-arm64/claude.app.tar.zst",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST claude.ai/api/event_logging/v2/batch.events.desktop_ccd_session_start_wait",
+          "category": "network",
+          "op": "added",
+          "title": "New vendor telemetry event: desktop_ccd_session_start_wait",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "network.telemetry.POST claude.ai/api/event_logging/v2/batch.events.desktop_ccd_transcript_newest_page",
+          "category": "network",
+          "op": "added",
+          "title": "New vendor telemetry event: desktop_ccd_transcript_newest_page",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "binary.agent.download",
+          "category": "binary",
+          "op": "changed",
+          "title": "Binary agent.download: https://downloads.claude.ai/claude-code-releases/2.1.328/… → https://downloads.claude.ai/claude-code-releases/2.1.330/…",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "binary.agent.sdk",
+          "category": "binary",
+          "op": "changed",
+          "title": "Binary agent.sdk: @anthropic-ai/claude-agent-sdk 0.3.328 → @anthropic-ai/claude-agent-sdk 0.3.330",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "binary.agent.version",
+          "category": "binary",
+          "op": "changed",
+          "title": "Runs its agent's build 2.1.330 (was 2.1.328)",
+          "impact": "notable",
+          "documented": null
+        }
+      ]
     },
     {
       "version": "6.28899.2",

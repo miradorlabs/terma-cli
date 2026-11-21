@@ -12593,7 +12593,24 @@
               "properties"
             ]
           }
-        }
+        },
+        "unobserved": [
+          "desktop_ccd_keep_awake_held",
+          "desktop_ccd_message_cycle_outcome",
+          "desktop_ccd_message_cycle_start",
+          "desktop_ccd_remote_control_auto_enable",
+          "desktop_ccd_session_initialized",
+          "desktop_ccd_session_start_timing",
+          "desktop_ccd_session_visibility_changed",
+          "desktop_ccd_spawn_tool_parity",
+          "desktop_ccd_stream_render",
+          "desktop_main_event_loop_stall",
+          "desktop_notification_suppressed",
+          "desktop_protocol_handlers_lookup",
+          "desktop_session_title_set",
+          "lam_internal_mcp_server_created",
+          "lam_mcp_servers_setup_summary"
+        ]
       }
     }
   },

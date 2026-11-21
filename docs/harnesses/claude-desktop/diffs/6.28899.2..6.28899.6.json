@@ -3,19 +3,733 @@
   "harness": "claude-desktop",
   "from": "6.28899.2",
   "to": "6.28899.6",
-  "generated_at": "2026-11-20T23:48:14.51485671Z",
+  "generated_at": "2026-11-21T12:26:45.690660582Z",
   "source": null,
   "changelog": null,
   "summary": {
-    "changes": 0,
-    "categories": {},
+    "changes": 30,
+    "categories": {
+      "binary": 3,
+      "cli": 8,
+      "config": 6,
+      "model": 1,
+      "network": 4,
+      "prompt": 2,
+      "request": 1,
+      "tools": 5
+    },
     "impact": {
       "breaking": 0,
       "degrading": 0,
-      "informational": 0,
-      "notable": 0
+      "informational": 12,
+      "notable": 18
     },
     "undocumented": null
   },
-  "changes": []
+  "changes": [
+    {
+      "id": "model.params.safeguards.0.classifier_context.git_state.status",
+      "category": "model",
+      "op": "changed",
+      "path": [
+        "model",
+        "params",
+        "safeguards",
+        "0",
+        "classifier_context",
+        "git_state",
+        "status"
+      ],
+      "title": "Model parameter safeguards.0.classifier_context.git_state.status: {\"clean\":true,\"counts\":{\"modified\":0,\"staged\":0,\"untracke… → none",
+      "impact": "notable",
+      "before": {
+        "clean": true,
+        "counts": {
+          "modified": 0,
+          "staged": 0,
+          "untracked": null,
+          "untracked_normal": 0
+        },
+        "porcelain": null,
+        "truncated": false
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "prompt.context.2.text",
+      "category": "prompt",
+      "op": "changed",
+      "path": [
+        "prompt",
+        "context",
+        "2",
+        "text"
+      ],
+      "title": "Injected context changed (+2033 −2032 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -7,8 +7,8 @@\n If the task cannot be finished with what you were given, do what you can and tell the user plainly what is missing instead of finding another way to it; that report is a complete answer.\n \n How the sandbox is configured in this session:\n-Filesystem: {\"read\":{\"denyOnly\":[\"<claude-config>/seed-admin\",\"<claude-config>/daemon\",\"<claude-config>/file-history\",\"<tmp>\",\"<claude-config>/bridge-spawn\",\"<claude-config>/remote/run\",\"<tmp>\",\"<claude-config>/ide\"],\"allowWithinDeny\":[]},\"write\":{\"allowOnly\":[\"/dev/stdout\",\"/dev/stderr\",\"/dev/null\",\"/dev/tty\",\"/dev/dtracehelper\",\"/dev/autofs_nowait\",\"<tmp>\",\"<tmp>\",\"<home>/.npm/_logs\",\"<claude-config>/debug\",\".\",\"$TMPDIR\"],\"denyWithinAllow\":[\"<claude-config>/settings.json\",\"<repo>/.claude/settings.json\",\"<repo>/.claude/settings.local.json\",\"<tmp>\",\"/Library/Application Support/ClaudeCode/managed-settings.json\",\"/Library/Application Support/ClaudeCode/managed-settings.d\",\"<repo>/.claude/skills\",\"<repo>/.claude/hooks\",\"<claude-config>/local\",\"<repo>/.claude/.cc-writes\",\"<claude-config>/.cc-writes\",\"<claude-config>/jobs\",\"<claude-config>/seed-admin\",\"<claude-config>/daemon\",\"<claude-config>/file-history\",\"<tmp>\",\"<claude-config>/bridge-spawn\",\"<claude-config>/child-logs\",\"<tmp>\",\"<claude-config>/shell-snapshots\",\"<claude-config>/session-env\",\"<claude-config>/plugins\",\"<claude-config>/hooks\",\"<claude-config>/skills\",\"<claude-config>/workflows\",\"<claude-config>/commands\",\"<claude-config>/agents\",\"<claude-config>/routines\",\"<claude-config>/rules\",\"<claude-config>/output-styles\",\"<claude-config>/scheduled_tasks.json\",\"<claude-config>/launch.json\",\"<claude-config>/CLAUDE.md\",\"<claude-config>/projects\",\"<claude-config>/daemon.json\",\"<claude-config>/policy-limits.json\",\"<claude-config>/policy-limits.json.signature.json\",\"<claude-config>/policy-limits.json.signature-iat.json\",\"<claude-config>/policy-limits.json.stamp.json\",\"<claude-config>/backups\",\"<claude-config>/loop.md\",\"<claude-config>/cowork_plugins\",\"<claude-config>/dev-mods\",\"<tmp><repo-slug>/<uuid>/tasks\",\"<tmp>\",\"<app-data>/local-agent-mode-sessions/skills-plugin/<uuid>/<uuid>\",\"<claude-config>/mcp-skill-archives\",\"<claude-config>/mcp-discovery-cache\",\"<claude-config>/shares\",\"<claude-config>/todos\",\"...\n-and 189 more (truncated for prompt size)\"]}}\n+Filesystem: {\"read\":{\"denyOnly\":[\"<claude-config>/seed-admin\",\"<claude-config>/daemon\",\"<claude-config>/file-history\",\"<tmp>\",\"<claude-config>/bridge-spawn\",\"<claude-config>/remote/run\",\"<tmp>\",\"/dev/tty[p-w]*\",\"<claude-config>/ide\"],\"allowWithinDeny\":[]},\"write\":{\"allowOnly\":[\"/dev/stdout\",\"/dev/stderr\",\"/dev/null\",\"/dev/tty\",\"/dev/dtracehelper\",\"/dev/autofs_nowait\",\"<tmp>\",\"<tmp>\",\"<home>/.npm/_logs\",\"<claude-config>/debug\",\".\",\"$TMPDIR\"],\"denyWithinAllow\":[\"<claude-config>/settings.json\",\"<repo>/.claude/settings.json\",\"<repo>/.claude/settings.local.json\",\"<tmp>\",\"/Library/Application Support/ClaudeCode/managed-settings.json\",\"/Library/Application Support/ClaudeCode/managed-settings.d\",\"<repo>/.claude/skills\",\"<repo>/.claude/hooks\",\"<claude-config>/local\",\"<repo>/.claude/.cc-writes\",\"<claude-config>/.cc-writes\",\"<claude-config>/jobs\",\"<claude-config>/seed-admin\",\"<claude-config>/daemon\",\"<claude-config>/file-history\",\"<tmp>\",\"<claude-config>/bridge-spawn\",\"<claude-config>/child-logs\",\"<tmp>\",\"<claude-config>/shell-snapshots\",\"<claude-config>/session-env\",\"<claude-config>/plugins\",\"<claude-config>/hooks\",\"<claude-config>/skills\",\"<claude-config>/workflows\",\"<claude-config>/commands\",\"<claude-config>/agents\",\"<claude-config>/routines\",\"<claude-config>/rules\",\"<claude-config>/output-styles\",\"<claude-config>/scheduled_tasks.json\",\"<claude-config>/launch.json\",\"<claude-config>/CLAUDE.md\",\"<claude-config>/projects\",\"<claude-config>/daemon.json\",\"<claude-config>/policy-limits.json\",\"<claude-config>/policy-limits.json.signature.json\",\"<claude-config>/policy-limits.json.signature-iat.json\",\"<claude-config>/policy-limits.json.stamp.json\",\"<claude-config>/backups\",\"<claude-config>/loop.md\",\"<claude-config>/cowork_plugins\",\"<claude-config>/dev-mods\",\"<tmp><repo-slug>/<uuid>/tasks\",\"<tmp>\",\"<tmp>\",\"<app-data>/local-agent-mode-sessions/skills-plugin/<uuid>/<uuid>\",\"<claude-config>/mcp-skill-archives\",\"<claude-config>/mcp-discovery-cache\",\"<claude-config>/shares\",\"...\n+and 191 more (truncated for prompt size)\"]}}\n \n  - The `dangerouslyDisableSandbox` parameter is disabled in this session's configuration; setting it does not take a command out of the sandbox.\n  - If a command the task needs fails on a sandbox restriction, tell the user which restriction it hit; changing the sandbox settings is their decision, not yours.\n",
+      "stats": {
+        "added_chars": 2033,
+        "removed_chars": 2032
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "prompt.system.0.text",
+      "category": "prompt",
+      "op": "changed",
+      "path": [
+        "prompt",
+        "system",
+        "0",
+        "text"
+      ],
+      "title": "System prompt changed",
+      "impact": "notable",
+      "before": "x-anthropic-billing-header: cc_version=2.1.328.ad6; cc_entrypoint=claude-desktop-3p;",
+      "after": "x-anthropic-billing-header: cc_version=2.1.330.d80; cc_entrypoint=claude-desktop-3p;",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "tools.CronCreate.description",
+      "category": "tools",
+      "op": "changed",
+      "path": [
+        "tools",
+        "CronCreate",
+        "description"
+      ],
+      "title": "CronCreate tool description changed (+628 −313 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -27,6 +27,8 @@\n \n By default (durable: false) the job lives only in this Claude session — nothing is written to disk, and the job is gone when Claude exits.\n Pass durable: true to write to .claude/scheduled_tasks.json so the job survives restarts.\n+If Claude Code can't tell which organization this session is signed in to, the job stays session-only even with durable: true.\n+If the result says \"Session-only\" after durable: true, tell the user that the job won't survive restarts.\n Only use durable: true when the user explicitly asks for the task to persist (\"keep doing this every day\", \"set this up permanently\").\n Most \"remind me in 5 minutes\" / \"check back in an hour\" requests should stay session-only.\n \n@@ -37,13 +39,13 @@\n ## Runtime behavior\n \n Jobs only fire while the REPL is idle (not mid-query).\n-Durable jobs persist to .claude/scheduled_tasks.json and survive session restarts — on next launch they resume automatically.\n+Durable jobs that were saved to .claude/scheduled_tasks.json survive session restarts — on the next launch signed in to the same organization they resume automatically.\n One-shot durable tasks that were missed while the REPL was closed are surfaced for catch-up.\n Session-only jobs die with the process.\n The scheduler shifts each job by a fixed per-job offset on top of whatever you pick: by default a recurring job runs up to 50% of its period late (max 30 min), and a one-shot job landing on :00 or :30 runs up to 90 s early.\n The result of this tool and of CronList gives each job's actual next run time: when you tell the user when a job will run, give that time, not the minute in the cron expression.\n Picking an off-minute is still the bigger lever.\n \n-Recurring tasks auto-expire after 7 days — they fire one final time, then are deleted. This bounds session lifetime. Tell the user about the 7-day limit when scheduling recurring jobs.\n+Recurring tasks auto-expire after 30 days — they fire one final time, with a note that it is their last run, then are deleted. This bounds session lifetime. Tell the user about the 30-day limit when scheduling recurring jobs.\n \n Returns a job ID you can pass to CronDelete.\n",
+      "stats": {
+        "added_chars": 628,
+        "removed_chars": 313
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "tools.CronCreate.input_schema.properties.durable.description",
+      "category": "tools",
+      "op": "changed",
+      "path": [
+        "tools",
+        "CronCreate",
+        "input_schema",
+        "properties",
+        "durable",
+        "description"
+      ],
+      "title": "CronCreate tool parameter durable: description changed (+269 −208 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-true = persist to .claude/scheduled_tasks.json and survive restarts. false (default) = in-memory only, dies when this Claude session ends. Use true only when the user asks the task to survive across sessions.\n+true = persist to .claude/scheduled_tasks.json and survive restarts (the result says Session-only if the job could not be saved). false (default) = in-memory only, dies when this Claude session ends. Use true only when the user asks the task to survive across sessions.\n",
+      "stats": {
+        "added_chars": 269,
+        "removed_chars": 208
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "tools.CronCreate.input_schema.properties.recurring.description",
+      "category": "tools",
+      "op": "changed",
+      "path": [
+        "tools",
+        "CronCreate",
+        "input_schema",
+        "properties",
+        "recurring",
+        "description"
+      ],
+      "title": "CronCreate tool parameter recurring: description changed (+225 −224 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-true (default) = fire on every cron match until deleted or auto-expired after 7 days. false = fire once at the next match, then auto-delete. Use false for \"remind me at X\" one-shot requests with pinned minute/hour/dom/month.\n+true (default) = fire on every cron match until deleted or auto-expired after 30 days. false = fire once at the next match, then auto-delete. Use false for \"remind me at X\" one-shot requests with pinned minute/hour/dom/month.\n",
+      "stats": {
+        "added_chars": 225,
+        "removed_chars": 224
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "tools.DesignSync.description",
+      "category": "tools",
+      "op": "changed",
+      "path": [
+        "tools",
+        "DesignSync",
+        "description"
+      ],
+      "title": "DesignSync tool description changed (+1017 −505 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -3,7 +3,7 @@\n \n Standalone Claude Design (claude.ai/design) closes by <date>.\n Claude Design now lives in Claude.\n-If the server refuses a call because standalone Claude Design or the project has closed or moved, give the user the server's message as written and stop.\n+If the server refuses a call because standalone Claude Design or the project has closed or moved, give the user the server's message as written and stop, unless /design-sync's own text says how to go on.\n For a project that has moved or is moving, call `get_project` once first: if it returns a `notice`, give that in place of the server's message.\n \n The tool dispatches on `method`:\n@@ -12,7 +12,9 @@\n - `list_projects` — list design-system projects the user can write to. Returns name, owner, projectId, updatedAt. Filtered to writable projects only.\n - `get_project` — read one project's metadata (name, type, owner, canEdit).\n Use to verify a `--project <uuid>` target is actually `type: PROJECT_TYPE_DESIGN_SYSTEM` before pushing — that type is immutable at creation, so pushing to a regular project never makes it a design system.\n-For a design system that has moved or is moving to Claude it also returns `moveState` and a `notice`: the server refuses uploads to it, so give the user the notice as written and stop.\n+For a design system that has moved or is moving to Claude it also returns `moveState` and a `notice`: an upload to it is refused, or reaches only the copy it left behind, so give the user the notice as written and stop, unless /design-sync's own text says how to go on.\n+For one that has moved, `movedTo`, present only where claude.ai/design's record says the user can open it, is the link of its artifact in Claude.\n+`movedToHeldBy`, present only where that record says so, is whose account the artifact is under: `you` (the user's), `owner` (the design system's owner's) or `someone_else` (another account in the design system's organization).\n - `list_files` — list paths in a project. Use this to build the structural diff.\n - `get_file` — read one remote file's content. Capped at 256 KiB. Only call this when you need to compare content for a specific component the user named.\n \n@@ -27,7 +29,7 @@\n When some don't fit, the prompt tells the user to answer No and ask you for them.\n If the user asks, list every path under the name it will be stored under, and call finalize_plan again once the user agrees.\n claude.ai/design stores some files under a plainer name than they have on disk.\n-In a file's name (folders keep theirs) it drops `#`, `?` and invisible characters, and makes curly and angle quotes, long dashes, the ellipsis and unusual spaces plain.\n+In a file's name (folders keep theirs) it drops `#`, `?` and some invisible characters, and makes curly and angle quotes, long dashes, the ellipsis and unusual spaces plain.\n The permission prompt, the plan and the methods below all go by the stored name.\n The returned `writes` and `deletes` give it and `list_files` returns it, so compare a listing with stored names, not with names on disk.\n In a plan entry a `?` is always a wildcard, and a pattern with any other of those characters in the file's name matches nothing: list such a file by its stored name.\n",
+      "stats": {
+        "added_chars": 1017,
+        "removed_chars": 505
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "tools.mcp__scheduled-tasks__list_scheduled_tasks.description",
+      "category": "tools",
+      "op": "changed",
+      "path": [
+        "tools",
+        "mcp__scheduled-tasks__list_scheduled_tasks",
+        "description"
+      ],
+      "title": "mcp__scheduled-tasks__list_scheduled_tasks tool description changed (+55 −0 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -6,5 +6,6 @@\n `waiting`, where present, means that a run is due and has not started, and names what holds it where that is known; nextRunAt is then the run after it.\n Two exceptions: \"last run failed; will be retried automatically\", or words that end in \"retry of a failed run\", mean that the run started and failed, and that the app will start it again by itself once nothing holds it; `not_available` alone, on a task that runs on an SSH host or in WSL, says only that this app can't start runs there right now, whether or not one is due; `not_available, run_due` means that one is.\n Each entry also includes a `path` to the task's SKILL.md — Read it to see the current prompt.\n+`model`, where present, is the model the task asks for.\n \n To see a task's recent runs (the sessions it started, with status and a one-line summary) call list_task_runs; to start one right now, exactly like the user's \"Run now\" button, call run_scheduled_task.\n",
+      "stats": {
+        "added_chars": 55,
+        "removed_chars": 0
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "request.headers.user-agent",
+      "category": "request",
+      "op": "changed",
+      "path": [
+        "request",
+        "headers",
+        "user-agent"
+      ],
+      "title": "Header user-agent: claude-cli/2.1.328 (external, claude-desktop-3p, agent-sd… → claude-cli/2.1.330 (external, claude-desktop-3p, agent-sd…",
+      "impact": "informational",
+      "before": "claude-cli/2.1.328 (external, claude-desktop-3p, agent-sdk/0.3.328)",
+      "after": "claude-cli/2.1.330 (external, claude-desktop-3p, agent-sdk/0.3.330)",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "cli.commands.claude.options.--name.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "claude",
+        "options",
+        "--name",
+        "description"
+      ],
+      "title": "`claude --name`: description changed (+130 −97 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Set a display name for this session (shown in the prompt box, /resume picker, and terminal title)\n+Set a display name for this session (shown in the prompt box, /resume picker, and terminal title). Also names a new cloud session.\n",
+      "stats": {
+        "added_chars": 130,
+        "removed_chars": 97
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "cli.commands.claude.options.--restricted.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "claude",
+        "options",
+        "--restricted",
+        "description"
+      ],
+      "title": "`claude --restricted`: description changed (+261 −226 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,2 +1,2 @@\n Restricted mode: removes the built-in tools that run commands or code (Bash, PowerShell and the other code-running tools) and WebFetch unless --tools names them, and ignores user, project and local settings files (managed settings and --settings still apply; add --strict-mcp-config to skip MCP servers too).\n-Also confines the file tools to the working directories (--add-dir included), refuses bypassPermissions, and lets only a person or the configured permission handler approve writes to settings, git and tool-configuration files.\n+Also starts no plugin language servers, confines the file tools to the working directories (--add-dir included), refuses bypassPermissions, and lets only a person or the configured permission handler approve writes to settings, git and tool-configuration files.\n",
+      "stats": {
+        "added_chars": 261,
+        "removed_chars": 226
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "cli.help.--help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "--help"
+      ],
+      "title": "Full help text of `--help` changed (+364 −218 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -137,7 +137,8 @@\n                                         model's full name.\n   -n, --name <name>                     Set a display name for this session\n                                         (shown in the prompt box, /resume\n-                                        picker, and terminal title)\n+                                        picker, and terminal title). Also names\n+                                        a new cloud session.\n   --no-chrome                           Turn off Claude in Chrome\n   --no-session-persistence              Don't save sessions to disk; they can't\n                                         be resumed (only works with --print)\n@@ -198,8 +199,9 @@\n                                         local settings files (managed settings\n                                         and --settings still apply; add\n                                         --strict-mcp-config to skip MCP servers\n-                                        too). Also confines the file tools to\n-                                        the working directories (--add-dir\n+                                        too). Also starts no plugin language\n+                                        servers, confines the file tools to the\n+                                        working directories (--add-dir\n                                         included), refuses bypassPermissions,\n                                         and lets only a person or the configured\n                                         permission handler approve writes to\n",
+      "stats": {
+        "added_chars": 364,
+        "removed_chars": 218
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "cli.launch.env.BUN_ENABLE_CRASH_REPORTING",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "launch",
+        "env",
+        "BUN_ENABLE_CRASH_REPORTING"
+      ],
+      "title": "The app now sets its agent's BUN_ENABLE_CRASH_REPORTING",
+      "impact": "notable",
+      "before": null,
+      "after": "BUN_ENABLE_CRASH_REPORTING",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "cli.launch.env_values.BAGGAGE",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "launch",
+        "env_values",
+        "BAGGAGE"
+      ],
+      "title": "The app's agent's BAGGAGE: none → none",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-sentry-environment=production,sentry-release=Claude%406.28899.2,sentry-public_key=<hex>,sentry-trace_id=<hex>,sentry-org_id=1158394\n+sentry-environment=production,sentry-release=Claude%406.28899.6,sentry-public_key=<hex>,sentry-trace_id=<hex>,sentry-org_id=1158394\n",
+      "stats": {
+        "added_chars": 131,
+        "removed_chars": 131
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "cli.launch.env_values.BUN_ENABLE_CRASH_REPORTING",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "launch",
+        "env_values",
+        "BUN_ENABLE_CRASH_REPORTING"
+      ],
+      "title": "The app's agent's BUN_ENABLE_CRASH_REPORTING: none → 0",
+      "impact": "notable",
+      "before": null,
+      "after": "0",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "cli.launch.env_values.CLAUDE_AGENT_SDK_VERSION",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "launch",
+        "env_values",
+        "CLAUDE_AGENT_SDK_VERSION"
+      ],
+      "title": "The app's agent's CLAUDE_AGENT_SDK_VERSION: 0.3.328 → 0.3.330",
+      "impact": "notable",
+      "before": "0.3.328",
+      "after": "0.3.330",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "cli.launch.env_values.SENTRY-TRACE",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "launch",
+        "env_values",
+        "SENTRY-TRACE"
+      ],
+      "title": "The app's agent's SENTRY-TRACE: <hex>-a6466bbeebaf1c8e → <hex>-b927d603fc76926b",
+      "impact": "notable",
+      "before": "<hex>-a6466bbeebaf1c8e",
+      "after": "<hex>-b927d603fc76926b",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.additionalDirectoryConfigRoots",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "additionalDirectoryConfigRoots"
+      ],
+      "title": "New setting: additionalDirectoryConfigRoots",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "@internal For the program that starts Claude Code only: read from --settings and from settings that program sends while the session runs; ignored in settings files. Maps an added folder (--add-dir, or a claim's additional_directories) by its absolute path, also matched by its real path, to the absolute path of the checkout whose .claude skills, commands, agents and plugin settings that folder then reads instead of its own; file access stays with the folder. Full contract, with when to send it and what makes a root unusable: apps/cli/docs/desktop-host-contract.md, entry additionalDirectoryConfigRoots."
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.deniedMcpServers.serverUrl.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "deniedMcpServers.serverUrl",
+        "description"
+      ],
+      "title": "deniedMcpServers.serverUrl description changed (+232 −98 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-URL pattern with wildcard support (e.g., \"https://*.example.com/*\") for blocked remote MCP servers\n+URL pattern with wildcard support (e.g., \"https://*.example.com/*\") for blocked remote MCP servers. A pattern with no query also blocks the URL with any query, or with a trailing slash added or, if its path has no wildcard, removed.\n",
+      "stats": {
+        "added_chars": 232,
+        "removed_chars": 98
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.desktopMcpServersListScope",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "desktopMcpServersListScope"
+      ],
+      "title": "New setting: desktopMcpServersListScope",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Claude desktop app only. Where your allow list and deny list apply to MCP servers added in the Claude desktop app. \"code\" (default): Your allow list also governs MCP servers added in the Claude desktop app, in Code tab sessions and the Artifact pane. \"all\": Your allow list and your deny list also govern MCP servers added in the Claude desktop app, in every tab (including Chat and Cowork). \"off\": Your allow list doesn't govern MCP servers added in the Claude desktop app. Read only from managed settings. Any other value counts as `all`. Where sources are merged or mixed, `off` counts as `all`. Leave the key out, or set it only in the managed source that holds your list. `deniedMcpServers` applies in Code tab sessions and the Artifact pane with every value, and in every tab with `all`. MCP servers sent to SSH hosts are not governed by these lists in this release. The Claude Code CLI reads nothing from this key, but written alone in a higher managed source it makes that source lead, and Claude Code skips the managed sources beneath it. Write it only beside the list it scopes."
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.disableDirectMcpSkills",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "disableDirectMcpSkills"
+      ],
+      "title": "New setting: disableDirectMcpSkills",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "When true in managed settings, Claude Code lists and loads no skill of an MCP server that it connects to directly, reads no listed file of a loaded one, and lists no directory of the server. On the Team and Enterprise plans these skills are off unless an administrator sets it to false. Connectors that Claude Code reaches through Anthropic keep their skills, and each server keeps its tools. In a user, project or local settings file it has no effect."
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.sandbox.windows.backend.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "sandbox.windows.backend",
+        "description"
+      ],
+      "title": "sandbox.windows.backend description changed (+560 −668 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,6 +1,7 @@\n Windows only: how sandboxed commands are confined.\n-\"sandboxuser\" (default) runs them as the dedicated sandbox account that the sandbox set-up creates.\n+There is no default: until it is set, sandboxed commands are refused.\n+\"sandboxuser\" runs them as the dedicated sandbox account that the sandbox set-up creates.\n \"mxc\" runs them in a Microsoft eXecution Container (BaseContainer) through the MXC SDK, with no install step; experimental.\n-Claude Code ignores \"mxc\" and uses the sandbox account, with a note in /sandbox, when this build lacks the MXC SDK, when a higher settings tier or another managed source sets network.tlsTerminate, or when an administrator requires the sandbox or locks reads (filesystem.allowManagedReadPathsOnly) unless managed settings picked \"mxc\" and no other managed source sets network.allowManagedDomainsOnly.\n-On \"mxc\" only the PowerShell tool is enabled and Bash commands are refused (MXC cannot run Git Bash yet); network.tlsTerminate and network.allowLocalBinding do not apply.\n+Managed settings decide over --settings, and --settings over user settings.\n+On \"mxc\" only the PowerShell tool is enabled and Bash commands are refused (MXC cannot run Git Bash yet); network.allowLocalBinding does not apply, and sandboxed commands are refused while network.tlsTerminate is set, or while managed settings lock reads (filesystem.allowManagedReadPathsOnly) without picking \"mxc\" themselves.\n Read from user, managed/policy or --settings settings only; a value in ${…} is ignored.\n",
+      "stats": {
+        "added_chars": 560,
+        "removed_chars": 668
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "env_vars"
+      ],
+      "title": "Environment variables: +26 −10",
+      "impact": "informational",
+      "before": [
+        "API_FORCE_IDLE_TIMEOUT",
+        "AWS_BEARER_TOKEN_BEDROCK",
+        "BROWSER",
+        "BUF_BIGINT_DISABLE",
+        "CHOKIDAR_INTERVAL",
+        "CHOKIDAR_USEPOLLING",
+        "CLAUDE_CODE_TEST_ALLOW_REAL_NETWORK",
+        "CLAUDE_CODE_TEST_FIXTURES_ROOT",
+        "CLAUDE_CODE_ULTRAREVIEW_PREFLIGHT_FIXTURE",
+        "CLAUDE_CODE_ULTRAREVIEW_QUOTA_FIXTURE"
+      ],
+      "after": [
+        "CLAUDE_AI_AUTHORIZE_URL",
+        "CLAUDE_CODE_CFC_REFUSED",
+        "CLAUDE_CODE_COWORK_SHELL_CHECK",
+        "CLAUDE_CODE_DISABLE_REDIRECT_DENY_RECHECK",
+        "CLAUDE_CODE_FULL_SIGN_IN_LINK",
+        "CLAUDE_CODE_HOST_ALLOW_RESETS_DENIAL_STREAK",
+        "CLAUDE_CODE_HOST_HYBRID_ORGANIZATION_UUID",
+        "CLAUDE_CODE_HOST_READS_NO_BASH_EDIT_DIFF",
+        "CLAUDE_CODE_HOST_SHOWS_CONNECTION_NOTICE",
+        "CLAUDE_CODE_LINKED_SPINDLE",
+        "CLAUDE_CODE_MODEL_NOBODY_CHOSE",
+        "CLAUDE_CODE_PROJECTS_FEATURE_FLAGS",
+        "CLAUDE_CODE_QUEUED_NOTIFICATIONS_BY_POLL",
+        "CLAUDE_CODE_RELAUNCH_BYPASS_SWITCH",
+        "CLAUDE_CODE_REPORT_REPO_PROVENANCE",
+        "CLAUDE_CODE_RUNNER_START_NOTES",
+        "CLAUDE_CODE_SCRATCHPAD_DIR",
+        "CLAUDE_CODE_SERVED_PATHS",
+        "CLAUDE_CODE_SERVED_SCHEMA_VERSION",
+        "CLAUDE_CODE_STARTER_MAY_HOLD_CONNECTOR_FILE",
+        "CLAUDE_CODE_WEBFETCH_MCP_TOOL",
+        "CLAUDE_RUNNER_DISABLE_START_HEARTBEATS",
+        "CLAUDE_RUNNER_START_FOLDER",
+        "SELF_HOSTED_RUNNER_SKIP_AGENT_PROXY_CHECK",
+        "SELF_HOSTED_RUNNER_START_DIR",
+        "SYSTEMROOT"
+      ],
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "network.egress.GET downloads.claude.ai/claude-code-releases/2.1.328/darwin-arm64/claude.app.tar.zst",
+      "category": "network",
+      "op": "removed",
+      "path": [
+        "network",
+        "egress",
+        "GET downloads.claude.ai/claude-code-releases/2.1.328/darwin-arm64/claude.app.tar.zst"
+      ],
+      "title": "Network request no longer made: GET downloads.claude.ai/claude-code-releases/2.1.328/darwin-arm64/claude.app.tar.zst",
+      "impact": "notable",
+      "before": {
+        "host": "downloads.claude.ai",
+        "method": "GET",
+        "path": "/claude-code-releases/2.1.328/darwin-arm64/claude.app.tar.zst",
+        "when": "before"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "network.egress.GET downloads.claude.ai/claude-code-releases/2.1.330/darwin-arm64/claude.app.tar.zst",
+      "category": "network",
+      "op": "added",
+      "path": [
+        "network",
+        "egress",
+        "GET downloads.claude.ai/claude-code-releases/2.1.330/darwin-arm64/claude.app.tar.zst"
+      ],
+      "title": "New network request: GET downloads.claude.ai/claude-code-releases/2.1.330/darwin-arm64/claude.app.tar.zst",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "host": "downloads.claude.ai",
+        "method": "GET",
+        "path": "/claude-code-releases/2.1.330/darwin-arm64/claude.app.tar.zst",
+        "when": "before"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "network.telemetry.POST claude.ai/api/event_logging/v2/batch.events.desktop_ccd_session_start_wait",
+      "category": "network",
+      "op": "added",
+      "path": [
+        "network",
+        "telemetry",
+        "POST claude.ai/api/event_logging/v2/batch",
+        "events",
+        "desktop_ccd_session_start_wait"
+      ],
+      "title": "New vendor telemetry event: desktop_ccd_session_start_wait",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "count": 1,
+        "fields": [
+          "auth",
+          "auth.account_uuid",
+          "auth.organization_uuid",
+          "event_name",
+          "metadata",
+          "timestamp",
+          "user_properties",
+          "user_properties.user_id"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "network.telemetry.POST claude.ai/api/event_logging/v2/batch.events.desktop_ccd_transcript_newest_page",
+      "category": "network",
+      "op": "added",
+      "path": [
+        "network",
+        "telemetry",
+        "POST claude.ai/api/event_logging/v2/batch",
+        "events",
+        "desktop_ccd_transcript_newest_page"
+      ],
+      "title": "New vendor telemetry event: desktop_ccd_transcript_newest_page",
+      "impact": "notable",
+      "before": null,
+      "after": {
+        "count": 1,
+        "fields": [
+          "auth",
+          "auth.account_uuid",
+          "auth.organization_uuid",
+          "event_name",
+          "metadata",
+          "timestamp",
+          "user_properties",
+          "user_properties.user_id"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "binary.agent.download",
+      "category": "binary",
+      "op": "changed",
+      "path": [
+        "binary",
+        "agent",
+        "download"
+      ],
+      "title": "Binary agent.download: https://downloads.claude.ai/claude-code-releases/2.1.328/… → https://downloads.claude.ai/claude-code-releases/2.1.330/…",
+      "impact": "informational",
+      "before": "https://downloads.claude.ai/claude-code-releases/2.1.328/darwin-arm64/claude.app.tar.zst",
+      "after": "https://downloads.claude.ai/claude-code-releases/2.1.330/darwin-arm64/claude.app.tar.zst",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "binary.agent.sdk",
+      "category": "binary",
+      "op": "changed",
+      "path": [
+        "binary",
+        "agent",
+        "sdk"
+      ],
+      "title": "Binary agent.sdk: @anthropic-ai/claude-agent-sdk 0.3.328 → @anthropic-ai/claude-agent-sdk 0.3.330",
+      "impact": "informational",
+      "before": "@anthropic-ai/claude-agent-sdk 0.3.328",
+      "after": "@anthropic-ai/claude-agent-sdk 0.3.330",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "binary.agent.version",
+      "category": "binary",
+      "op": "changed",
+      "path": [
+        "binary",
+        "agent",
+        "version"
+      ],
+      "title": "Runs its agent's build 2.1.330 (was 2.1.328)",
+      "impact": "notable",
+      "before": "2.1.328",
+      "after": "2.1.330",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    }
+  ]
 }
