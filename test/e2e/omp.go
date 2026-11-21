@@ -8,13 +8,12 @@ import (
 	"testing"
 )
 
-// omp (oh-my-pi) has a native exporter, but it reads its OTEL_* variables once at
-// startup, before any extension loads, so only the process that launches omp could set them. Through
-// the relay, omp runs terma's Pi-family extension instead (internal/agents/internal/pifamily/terma.ts,
-// agent "omp", in ~/.omp/agent/extensions), which exports from omp's own events; its
-// sessions are claimed by the extension's claim-only omp-prompt, and terma writes no omp
-// hooks, so its commits carry no attribution. The direct half of a comparison runs the
-// same extension pointed at the receiver. Only the installed build is tested: the npm
+// omp (oh-my-pi) exports natively, reading OTEL_* privately from ~/.omp/agent/.env, which
+// relay setup points at the relay; terma's Pi-family extension
+// (internal/agents/internal/pifamily/terma.ts, ~/.omp/agent/extensions/terma-omp.ts)
+// exports nothing for omp and only hands sessions, prompts and file edits to
+// `terma hook omp-*`, so its commits carry attribution. The direct half of a comparison
+// points the native exporter at the receiver. Only the installed build is tested: the npm
 // package is over a gigabyte.
 
 func forEachOmp(t *testing.T, run func(t *testing.T, b Binary)) {
@@ -44,11 +43,14 @@ func (sb *Sandbox) UseOmpProvider(url string) {
 `)
 }
 
-// UseOmpExtensionDirect writes terma's extension for omp pointed straight at the
-// receiver, as the direct half of a comparison.
-func (sb *Sandbox) UseOmpExtensionDirect() {
-	sb.T.Helper()
-	sb.writePiFamilyExtension(filepath.Join(sb.Home, ".omp", "agent", "extensions", "terma-relay.ts"), "omp", false)
+// UseOmpNativeDirect points omp's native exporter straight at the receiver, as the
+// direct half of a comparison.
+func (sb *Sandbox) UseOmpNativeDirect() {
+	sb.writeAbs(filepath.Join(sb.Home, ".omp", "agent", ".env"), "OTEL_EXPORTER_OTLP_ENDPOINT="+sb.Receiver.URL()+`
+OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
+OTEL_EXPORTER_OTLP_HEADERS=authorization=Bearer%20`+liveKey+`
+OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=full
+`)
 }
 
 // OmpRun runs one `omp -p` in dir.
