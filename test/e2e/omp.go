@@ -9,9 +9,9 @@ import (
 )
 
 // OMP exports natively, reading OTEL_* privately from ~/.omp/agent/.env, which
-// relay setup points at the relay; terma's Pi-family extension
-// (internal/agents/internal/pifamily/terma.ts, ~/.omp/agent/extensions/terma-omp.ts)
-// exports nothing for omp and only hands sessions, prompts and file edits to
+// relay setup points at the relay; terma's extension
+// (internal/agents/omp/terma-omp.ts, ~/.omp/agent/extensions/terma-omp.ts)
+// exports nothing and only hands sessions, prompts and file edits to
 // `terma hook omp-*`, so its commits carry attribution. The direct half of a comparison
 // points the native exporter at the receiver. Only the installed build is tested: the npm
 // package is over a gigabyte.
