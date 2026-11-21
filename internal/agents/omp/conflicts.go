@@ -41,6 +41,31 @@ func ompConflicts(e harness.Exporter) []harness.Conflict {
 			Clearable: false,
 		})
 	}
+	if value := os.Getenv(envSDKDisabled); strings.EqualFold(strings.TrimSpace(value), "true") {
+		out = append(out, harness.Conflict{
+			Key:       envSDKDisabled,
+			Value:     value,
+			Reason:    "exported in your shell, where it switches omp's whole export off",
+			Scope:     harness.ScopeEnvironment,
+			Clearable: false,
+		})
+	}
+	// A signal switched off: only traces name omp's session, so logs or metrics off is advisory.
+	for _, s := range harness.AllSignals {
+		var off []harness.Conflict
+		if value := strings.ToLower(strings.TrimSpace(os.Getenv(signalKey(s, "PROTOCOL")))); value != "" && value != harness.ProtocolHTTPProtobuf {
+			off = append(off, harness.Conflict{Key: signalKey(s, "PROTOCOL"), Value: value,
+				Reason: "omp's exporter supports http/protobuf only; a " + value + " export would disable its " + string(s)})
+		}
+		if value := os.Getenv(signalExporterKey(s)); value != "" && !exportsOTLP(value) {
+			off = append(off, harness.Conflict{Key: signalExporterKey(s), Value: value,
+				Reason: "exported in your shell, where it switches omp's " + string(s) + " export off"})
+		}
+		for _, c := range off {
+			c.Scope, c.Advisory = harness.ScopeEnvironment, s != harness.SignalTraces
+			out = append(out, c)
+		}
+	}
 
 	if value := os.Getenv(ompCaptureContentEnv); value != "" && !capturesContent(value) {
 		out = append(out, harness.Conflict{

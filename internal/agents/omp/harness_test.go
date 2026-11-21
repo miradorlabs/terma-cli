@@ -368,3 +368,32 @@ func TestShellExportsConflict(t *testing.T) {
 		t.Fatalf("conflicts = %+v", c)
 	}
 }
+
+// A shell export that switches omp's export off outranks the .env too: traces off is a
+// conflict, since only they name the session; logs or metrics off is advisory.
+func TestShellExportsSwitchingSignalsOff(t *testing.T) {
+	_, _ = ompIn(t)
+	e := harness.Exporter{Endpoint: "http://127.0.0.1:43180"}
+	t.Setenv(signalExporterKey(harness.SignalTraces), "otlp,console")
+	if c := ompConflicts(e); len(c) != 0 {
+		t.Fatalf("an exporter list naming otlp is a conflict: %+v", c)
+	}
+	for _, c := range []struct {
+		key, value string
+		advisory   bool
+	}{
+		{envSDKDisabled, "true", false},
+		{signalExporterKey(harness.SignalTraces), "none", false},
+		{signalKey(harness.SignalTraces, "PROTOCOL"), "grpc", false},
+		{signalExporterKey(harness.SignalMetrics), "console", true},
+		{signalKey(harness.SignalLogs, "PROTOCOL"), "grpc", true},
+	} {
+		t.Run(c.key, func(t *testing.T) {
+			t.Setenv(c.key, c.value)
+			got := ompConflicts(e)
+			if len(got) != 1 || got[0].Key != c.key || got[0].Advisory != c.advisory || got[0].Scope != harness.ScopeEnvironment {
+				t.Fatalf("conflicts = %+v", got)
+			}
+		})
+	}
+}
