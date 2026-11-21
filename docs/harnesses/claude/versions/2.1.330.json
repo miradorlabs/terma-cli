@@ -22018,6 +22018,7 @@
       "disableDesktopLocalSessions",
       "disableMobileSimulatorTools",
       "disableRemotePreviewScripts",
+      "enforceAnthropicSignIn",
       "sshHostAllowlist",
       "strictPluginOnlyCustomization.agents",
       "strictPluginOnlyCustomization.hooks",
@@ -23710,7 +23711,7 @@
         "read": false
       }
     },
-    "fetched_at": "2026-11-20T23:48:14.51485671Z",
+    "fetched_at": "2026-11-21T02:22:05.125946673Z",
     "settings": {
       "advisorModel": {
         "default": "unset, so the advisor is off",
@@ -24392,6 +24393,15 @@
         "scope": "Any file",
         "topic": "Plugins and skills",
         "type": "object mapping `plugin-name@marketplace-name` to a Boolean"
+      },
+      "enforceAnthropicSignIn": {
+        "default": "unset",
+        "description": "Require a claude.ai login on Anthropic's API, or an Enterprise Admin Console sign-in. An Enterprise Admin Console sign-in counts only when `forceLoginOrgUUID` names your organization and you set no `policyHelper`. Requires Claude Code v2.1.329 or later.",
+        "read": false,
+        "scope": "Managed",
+        "scope_note": "Set it in a managed settings file, where it applies even beneath server-managed settings. If the machine also has an MDM policy, set it there. Claude Code ignores the key in server-managed settings, HKCU, and policy helper output.",
+        "topic": "Authentication and providers",
+        "type": "Boolean"
       },
       "enforceAvailableModels": {
         "default": "`false`",
