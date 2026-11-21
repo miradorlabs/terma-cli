@@ -8,7 +8,7 @@ import (
 )
 
 // ompConflicts reports shell-exported OTEL_* variables, which omp reads ahead of its .env:
-// an endpoint there takes the export, and the relay's token with it, somewhere else.
+// an endpoint there takes the export somewhere else.
 func ompConflicts(e harness.Exporter) []harness.Conflict {
 	var out []harness.Conflict
 
