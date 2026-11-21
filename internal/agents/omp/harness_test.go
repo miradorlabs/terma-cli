@@ -197,6 +197,32 @@ func TestRelayEnvEditedAfterSetup(t *testing.T) {
 	}
 }
 
+// omp switches a signal off whose exporter list names no otlp, as it does one naming none:
+// such a signal is not read as exporting, setup turns it on, and teardown puts the list back.
+func TestRelayEnvExporterListWithoutOTLP(t *testing.T) {
+	a, env := ompIn(t)
+	write(t, env, "OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:43180\nOTEL_EXPORTER_OTLP_HEADERS=authorization=Bearer%20"+relayToken+"\nOTEL_TRACES_EXPORTER=console\n", 0o600)
+	st, err := a.Harness().Status()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if slices.Contains(st.Signals, harness.SignalTraces) {
+		t.Errorf("traces read as exported though their exporter is console: %v", st.Signals)
+	}
+	if _, err := a.ConfigureRelay(context.Background(), relayConfig()); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(read(t, env), "OTEL_TRACES_EXPORTER=otlp\n") {
+		t.Errorf("setup left traces off:\n%s", read(t, env))
+	}
+	if _, err := a.UnconfigureRelay(context.Background(), relayToken); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(read(t, env), "OTEL_TRACES_EXPORTER=console\n") {
+		t.Errorf("teardown did not restore the list:\n%s", read(t, env))
+	}
+}
+
 // A .env that links to a file kept elsewhere is written through, and teardown leaves the
 // link resolving to an emptied file, which a later setup can write again.
 func TestRelayEnvSymlinkedTeardown(t *testing.T) {
