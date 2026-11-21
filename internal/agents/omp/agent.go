@@ -1,5 +1,5 @@
-// Package omp integrates omp (oh-my-pi): its native OTLP exporter, pointed at the local
-// relay through omp's .env, and terma's Pi-family extension, which reports sessions and
+// Package omp integrates OMP (oh-my-pi): its native OTLP exporter, pointed at the local
+// relay through OMP's .env, and terma's Pi-family extension, which reports sessions and
 // file edits to `terma hook omp-*` for commit attribution.
 package omp
 
@@ -16,7 +16,7 @@ const (
 	displayName = "OMP"
 )
 
-// Agent is omp: telemetry from its native exporter, attribution from terma's extension.
+// Agent is OMP: telemetry from its native exporter, attribution from terma's extension.
 type Agent struct {
 	// ConfigDir is terma's config directory, which holds the journal of omp's .env.
 	ConfigDir string
@@ -45,7 +45,7 @@ func (a Agent) Harness() harness.Harness { return exporter{dir: a.ConfigDir} }
 // Coverage is how completely terma supports the agent.
 func (Agent) Coverage() (attribution, telemetry agents.CapabilitySupport) {
 	return agents.CapabilitySupport{Level: agents.SupportFull},
-		agents.CapabilitySupport{Level: agents.SupportFull, Note: "tokens, estimated cost, tool calls and subagents ride omp's native OTLP spans to the local relay; terma's extension reports only sessions and file edits"}
+		agents.CapabilitySupport{Level: agents.SupportFull, Note: "tokens, estimated cost, tool calls and subagents ride OMP's native OTLP spans to the local relay; terma's extension exports nothing and reports sessions, edit and write tool changes and subagent parents"}
 }
 
 var (
