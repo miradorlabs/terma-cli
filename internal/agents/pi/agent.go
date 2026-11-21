@@ -1,4 +1,7 @@
-// Package pi integrates Pi.
+// Package pi integrates Pi, which has no OpenTelemetry of its own: terma's extension
+// (terma.ts) is its exporter, sending chat and tool spans and prompt logs to the local
+// relay, and hands sessions, prompts and file edits to `terma hook pi-*` for commit
+// attribution.
 package pi
 
 import (
