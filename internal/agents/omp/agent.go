@@ -28,8 +28,14 @@ func (Agent) Name() string { return name }
 // DisplayName is how prose names the agent.
 func (Agent) DisplayName() string { return displayName }
 
-// Installed reports whether omp is on the PATH.
-func (Agent) Installed(ctx context.Context) bool { return exporter{}.Detect(ctx).Found }
+// Installed reports whether an omp terma can set up is on the PATH: one before OMP 19 is
+// not, so setup --yes leaves it out rather than stopping at its refusal.
+func (Agent) Installed(ctx context.Context) bool {
+	if _, old := tooOld(ctx); old {
+		return false
+	}
+	return exporter{}.Detect(ctx).Found
+}
 
 // Surfaces is OMP as one choice, marked beta at setup.
 func (a Agent) Surfaces() []agents.Surface {
