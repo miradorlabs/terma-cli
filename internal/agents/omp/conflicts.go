@@ -7,16 +7,14 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/harness"
 )
 
-// ompConflicts reports shell-exported OTEL_* variables, which omp reads ahead of its .env:
-// an endpoint there takes the export somewhere else.
+// ompConflicts reports shell-exported OTEL_* variables, which omp reads key by key ahead of
+// its .env: a signal's endpoint there takes that export somewhere else. The common endpoint
+// does not, since omp reads each signal's own first and the .env sets every one.
 func ompConflicts(e harness.Exporter) []harness.Conflict {
 	var out []harness.Conflict
 
-	endpoints := []string{harness.EnvOTLPEndpoint}
 	for _, s := range harness.AllSignals {
-		endpoints = append(endpoints, signalKey(s, "ENDPOINT"))
-	}
-	for _, key := range endpoints {
+		key := signalKey(s, "ENDPOINT")
 		value := strings.TrimRight(os.Getenv(key), "/")
 		if value == "" || value == e.Endpoint || e.Endpoint != "" && strings.HasPrefix(value, e.Endpoint+"/v1/") {
 			continue

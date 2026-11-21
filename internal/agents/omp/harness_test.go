@@ -352,19 +352,21 @@ func TestConfigureRelayReplacesLegacyFiles(t *testing.T) {
 	}
 }
 
-// A shell export outranks the .env: an endpoint elsewhere is a credential conflict, the
-// relay's own is none.
+// A shell export outranks the .env key by key: a signal's endpoint elsewhere is a credential
+// conflict, the relay's own is none, and the common endpoint is none, since omp reads each
+// signal's own first and the .env sets every one.
 func TestShellExportsConflict(t *testing.T) {
 	_, _ = ompIn(t)
 	e := harness.Exporter{Endpoint: "http://127.0.0.1:43180"}
-	t.Setenv(signalKey(harness.SignalTraces, "ENDPOINT"), "http://127.0.0.1:43180/v1/traces")
-	if c := ompConflicts(e); len(c) != 0 {
-		t.Fatalf("the relay's own endpoint is a conflict: %+v", c)
-	}
+	t.Setenv(signalKey(harness.SignalLogs, "ENDPOINT"), "http://127.0.0.1:43180/v1/logs")
 	t.Setenv(harness.EnvOTLPEndpoint, "https://collector.example")
+	if c := ompConflicts(e); len(c) != 0 {
+		t.Fatalf("the relay's own or the common endpoint is a conflict: %+v", c)
+	}
+	t.Setenv(signalKey(harness.SignalTraces, "ENDPOINT"), "https://collector.example/v1/traces")
 	t.Setenv(ompCaptureContentEnv, "summary")
 	c := ompConflicts(e)
-	if len(c) != 2 || c[0].Key != harness.EnvOTLPEndpoint || !c[0].Credential || c[1].Key != ompCaptureContentEnv || !c[1].Advisory {
+	if len(c) != 2 || c[0].Key != signalKey(harness.SignalTraces, "ENDPOINT") || !c[0].Credential || c[1].Key != ompCaptureContentEnv || !c[1].Advisory {
 		t.Fatalf("conflicts = %+v", c)
 	}
 }

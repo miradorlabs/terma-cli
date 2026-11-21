@@ -6,8 +6,8 @@ import (
 	"testing"
 )
 
-// The .env reads as omp reads it: each want is node:util parseEnv's output for its input
-// (Node 26), the parser omp loads the file with.
+// The .env reads as omp reads it: each want is node:util parseEnv's output for its input, in
+// Node 26 and in the Bun runtime omp 19.0.1 ships, which loads the file with it.
 func TestEnvFileReadsAsParseEnv(t *testing.T) {
 	t.Parallel()
 	cases := map[string]struct {
