@@ -122,7 +122,8 @@ func (c exporter) Status() (harness.Status, error) {
 			status.Signals = append(status.Signals, s)
 		}
 	}
-	status.Connected = len(status.Signals) > 0 && tokenPath(status.Endpoint)
+	// Traces alone name OMP's session: without them nothing it sends is attributed.
+	status.Connected = slices.Contains(status.Signals, harness.SignalTraces) && tokenPath(status.Endpoint)
 	status.Conflicts = ompConflicts(harness.Exporter{Endpoint: status.Endpoint})
 
 	j, err := harness.LoadJournal(c.dir, c.Name(), path)
@@ -160,6 +161,13 @@ func (c exporter) Connect(e harness.Exporter, _ bool) error {
 		return err
 	}
 	current := f.values()
+	// retireHeaders edits previous; a failed write restores the journal as it was.
+	rollback := previous
+	if previous != nil {
+		kept := *previous
+		kept.Installed, kept.Previous = maps.Clone(previous.Installed), maps.Clone(previous.Previous)
+		rollback = &kept
+	}
 	changes := retireHeaders(previous, current)
 	installing := managed(e, current)
 	j := harness.NewJournal(c.Name(), path, current, installing, nil, nil, previous)
@@ -175,8 +183,8 @@ func (c exporter) Connect(e harness.Exporter, _ bool) error {
 	defer harness.PruneJournals(c.dir)
 	if err := f.save(); err != nil {
 		var rollbackErr error
-		if previous != nil {
-			rollbackErr = previous.Save(c.dir)
+		if rollback != nil {
+			rollbackErr = rollback.Save(c.dir)
 		} else {
 			rollbackErr = harness.DeleteJournal(c.dir, c.Name(), path)
 		}

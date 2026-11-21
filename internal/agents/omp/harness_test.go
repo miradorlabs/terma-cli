@@ -259,6 +259,51 @@ func TestRelayEnvRetiresTheTokenHeader(t *testing.T) {
 	}
 }
 
+// Traces alone name OMP's session, so a .env that switches them off after setup is not
+// pointed at the relay, though logs and metrics still export there.
+func TestRelayEnvTracesOffIsNotPointed(t *testing.T) {
+	for _, line := range []string{"OTEL_TRACES_EXPORTER=none", "OTEL_EXPORTER_OTLP_TRACES_PROTOCOL=grpc"} {
+		a, env := ompIn(t)
+		if _, err := a.ConfigureRelay(context.Background(), relayConfig()); err != nil {
+			t.Fatal(err)
+		}
+		write(t, env, read(t, env)+line+"\n", 0o600)
+		if pointed, _ := a.RelayPointed("127.0.0.1:43180"); pointed {
+			t.Errorf("with %s the .env still reads as pointed at the relay", line)
+		}
+	}
+}
+
+// A reconnect whose .env write fails leaves the earlier journal as it was, header records
+// included, so teardown can still take back the token header the .env still holds.
+func TestRelayEnvFailedReconnectKeepsTheJournal(t *testing.T) {
+	if os.Getuid() == 0 {
+		t.Skip("root writes into a read-only directory")
+	}
+	a, env := ompIn(t)
+	auth := "authorization=Bearer%20" + relayToken
+	earlier := harness.NewJournal(name, env, map[string]string{}, map[string]string{harness.EnvOTLPHeaders: auth}, nil, nil, nil)
+	if err := earlier.Save(a.ConfigDir); err != nil {
+		t.Fatal(err)
+	}
+	write(t, env, harness.EnvOTLPHeaders+"="+auth+"\n", 0o600)
+	if err := os.Chmod(filepath.Dir(env), 0o500); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(filepath.Dir(env), 0o700) })
+
+	if _, err := a.ConfigureRelay(context.Background(), relayConfig()); err == nil {
+		t.Fatal("setup wrote into a read-only directory")
+	}
+	j, err := harness.LoadJournal(a.ConfigDir, name, env)
+	if err != nil || j == nil {
+		t.Fatalf("journal = %v, %v", j, err)
+	}
+	if j.Installed[harness.EnvOTLPHeaders] != auth {
+		t.Errorf("the restored journal lost the header it installed: %v", j.Installed)
+	}
+}
+
 // A .env that links to a file kept elsewhere is written through, and teardown leaves the
 // link resolving to an emptied file, which a later setup can write again.
 func TestRelayEnvSymlinkedTeardown(t *testing.T) {
