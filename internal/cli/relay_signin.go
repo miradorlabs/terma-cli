@@ -208,13 +208,13 @@ func (s *signInSource) Retired(token string) {
 func (app *App) bindRelay(engine *relay.Options, cfg *config.Config) {
 	engine.SignIn = app.signInSource(cfg)
 	engine.Installation = func() string { return config.StoredInstallationID(app.dir) }
-	legacy := cachedLegacyRecord(app.dir, app.stateDir, func() bool {
+	legacy := cachedLegacyRecord(app.dir, app.stateDir, func() (bool, error) {
 		file, err := config.LoadFile(app.dir)
 		if err != nil {
-			return false // unread, no record is written: what has no owner waits
+			return false, err
 		}
 		p := file.Profiles[cfg.ProfileName]
-		return p != nil && p.ServerKeySignIn
+		return p != nil && p.ServerKeySignIn, nil
 	})
 	// Looked at now, before any export arrives: a first look records the older sign-ins'
 	// boundary (auth.LegacyOwnership), which what the relay accepts from now on is after.
@@ -236,8 +236,10 @@ func (app *App) bindRelay(engine *relay.Options, cfg *config.Config) {
 // relay asks for it for every queued entry from before user tokens, and a change, such as a
 // switch to a server key, takes effect at the next entry. A read that fails keeps the last
 // record that named a boundary, or with none, names no one (auth.UnreadableLegacyRecord),
-// never no record.
-func cachedLegacyRecord(dir, stateDir string, serverKey func() bool) func() auth.LegacyRecord {
+// never no record. While the profile's mode can't be read (serverKey's error), every entry
+// bound to no account is named by no one, and nothing is kept: a file made readable again
+// need not look changed. The last record and a pending first look stand for the next read.
+func cachedLegacyRecord(dir, stateDir string, serverKey func() (bool, error)) func() auth.LegacyRecord {
 	var mu sync.Mutex
 	rec := auth.UnreadableLegacyRecord(stateDir)
 	var files [3]os.FileInfo
@@ -253,9 +255,14 @@ func cachedLegacyRecord(dir, stateDir string, serverKey func() bool) func() auth
 		if read && pending.IsZero() && unchanged(files[0], now[0]) && unchanged(files[1], now[1]) && unchanged(files[2], now[2]) {
 			return rec
 		}
+		sk, err := serverKey()
+		if err != nil {
+			read = false
+			return auth.LegacyRecord{Account: auth.LegacyAccountAmbiguous, RetiredAt: auth.LegacyStillSignedIn, SessionIDs: rec.SessionIDs}
+		}
 		files, read = now, true
 		at := cmp.Or(pending, time.Now())
-		switch got, err := auth.LegacyOwnershipAt(dir, stateDir, serverKey(), at); {
+		switch got, err := auth.LegacyOwnershipAt(dir, stateDir, sk, at); {
 		case err == nil:
 			rec, pending = got, time.Time{}
 			if !got.RetiredAt.IsZero() && statOrNil(recordPath) == nil {

@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -236,7 +237,7 @@ func TestAnUnreadableLegacyRecordNamesNoOne(t *testing.T) {
 	}
 	// Named by no one up to when the record was written; what a server key collects after
 	// is its own.
-	if got := cachedLegacyRecord(t.TempDir(), dir, func() bool { return false })(); got.Account != auth.LegacyAccountAmbiguous || got.RetiredAt.Sub(written).Abs() > time.Second {
+	if got := cachedLegacyRecord(t.TempDir(), dir, func() (bool, error) { return false, nil })(); got.Account != auth.LegacyAccountAmbiguous || got.RetiredAt.Sub(written).Abs() > time.Second {
 		t.Fatalf("unreadable record = %+v; want one naming no one up to %v", got, written)
 	}
 	if err := os.RemoveAll(path); err != nil {
@@ -245,7 +246,7 @@ func TestAnUnreadableLegacyRecordNamesNoOne(t *testing.T) {
 	if err := auth.RecordLegacy(dir, []auth.LegacySignIn{{SessionID: "s", UserID: "u", AuthURL: "https://auth.example"}}, time.Now()); err != nil {
 		t.Fatal(err)
 	}
-	legacy := cachedLegacyRecord(t.TempDir(), dir, func() bool { return false })
+	legacy := cachedLegacyRecord(t.TempDir(), dir, func() (bool, error) { return false, nil })
 	good := legacy()
 	if good.Account != auth.AccountKey("https://auth.example", "u") {
 		t.Fatalf("record = %+v", good)
@@ -263,7 +264,7 @@ func TestAnUnreadableLegacyRecordNamesNoOne(t *testing.T) {
 // relay then names no one, rather than keep the empty answer.
 func TestALegacyRecordThatBecomesUnreadableNamesNoOne(t *testing.T) {
 	stateDir := t.TempDir()
-	legacy := cachedLegacyRecord(t.TempDir(), stateDir, func() bool { return true })
+	legacy := cachedLegacyRecord(t.TempDir(), stateDir, func() (bool, error) { return true, nil })
 	if got := legacy(); !got.RetiredAt.IsZero() {
 		t.Fatalf("no record = %+v", got)
 	}
@@ -301,5 +302,30 @@ func TestAccountUserNamesOnlyTheTokensOwnUser(t *testing.T) {
 		if got := testApp.accountUser(cfg, "team", cfg.OTLPURL, account); got != want {
 			t.Errorf("for account %q named %q, want %q", account, got, want)
 		}
+	}
+}
+
+// While the profile's mode can't be read, every entry bound to no account is named by no
+// one, and that is not kept: once it reads as a server key's, with an older terma's sign-ins
+// on the machine, the first look's boundary holds their backlog.
+func TestALegacyLookupWithAnUnreadableProfileIsNotKept(t *testing.T) {
+	dir, stateDir := t.TempDir(), t.TempDir()
+	data := `{"default": {"organizations": {"o": {"session_id": "s", "auth_url": "https://auth.example.test", "user_id": "u"}}}}`
+	if err := os.WriteFile(config.LegacyCredentialsPath(dir), []byte(data), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	var readable atomic.Bool
+	legacy := cachedLegacyRecord(dir, stateDir, func() (bool, error) {
+		if !readable.Load() {
+			return false, errors.New("permission denied")
+		}
+		return true, nil
+	})
+	if got := legacy(); got.Account != auth.LegacyAccountAmbiguous || !got.RetiredAt.Equal(auth.LegacyStillSignedIn) {
+		t.Fatalf("with the profile unreadable: %+v; want everything named by no one", got)
+	}
+	readable.Store(true)
+	if got := legacy(); got.Account != auth.LegacyAccountAmbiguous || got.RetiredAt.IsZero() || got.RetiredAt.Equal(auth.LegacyStillSignedIn) {
+		t.Fatalf("readable again, as a server key's: %+v; want the first look's boundary", got)
 	}
 }

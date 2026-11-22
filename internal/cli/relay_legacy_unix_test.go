@@ -23,7 +23,7 @@ func TestAnUnwrittenFirstLookIsWrittenLaterWithItsBoundary(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = os.Chmod(stateDir, 0o700) })
-	legacy := cachedLegacyRecord(dir, stateDir, func() bool { return true })
+	legacy := cachedLegacyRecord(dir, stateDir, func() (bool, error) { return true, nil })
 	first := legacy()
 	if first.RetiredAt.IsZero() || first.Account != auth.LegacyAccountAmbiguous {
 		t.Fatalf("first look = %+v", first)
