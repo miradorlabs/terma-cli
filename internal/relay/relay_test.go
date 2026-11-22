@@ -104,6 +104,7 @@ type fixture struct {
 	now      time.Time
 	warnings []string
 	version  string
+	signIn   SignIn // nil: no person's sign-in
 }
 
 func (f *fixture) warned() []string {
@@ -136,6 +137,7 @@ func (f *fixture) clock() time.Time {
 func (f *fixture) relay(t *testing.T, u *upstream, policies map[string]Policy) (*Relay, *httptest.Server) {
 	r := newRelay(Options{Dir: t.TempDir(),
 		Version: f.version,
+		SignIn:  f.signIn,
 		Token:   token,
 		Hold:    time.Minute,
 		Lookup:  f.lookup,

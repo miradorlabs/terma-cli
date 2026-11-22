@@ -51,14 +51,14 @@ func (r *Relay) sender(rt route) *sender {
 
 // enqueue writes a part to its route's outbox before the export is answered, so a crash
 // loses none. It runs under deliverMu, so files are named in arrival order.
-func (r *Relay) enqueue(c claim.Claim, p *part) {
+func (r *Relay) enqueue(c claim.Claim, p *part, now time.Time) {
 	rt := routeOf(p.account, c)
 	body, err := proto.Marshal(p.msg)
 	if err != nil {
 		r.stats.dropped(p.signal, "encode_failed", p.records)
 		return
 	}
-	e := newEntry(r.opts.Now(), p.signal, p.records)
+	e := newEntry(now, p.signal, p.records)
 	if err := r.outbox.put(rt, c.Repository, e, body); err != nil {
 		r.stats.dropped(p.signal, "outbox_write_failed", p.records)
 		r.warnf("outbox %s: %v; dropped %d %s", rt, err, p.records, p.signal)
@@ -106,12 +106,17 @@ func (r *Relay) account() string {
 // for a part bound to none, the retired sign-ins' account if it arrived before they were
 // retired; "" for none.
 func (r *Relay) owner(rt route, e entry) string {
-	if rt.account != "" || r.opts.Legacy == nil {
-		return rt.account
-	}
-	account, retiredAt := r.opts.Legacy()
-	if account != "" && e.received().Before(retiredAt) {
+	return r.ownerAt(rt.account, e.received())
+}
+
+// ownerAt is owner for an entry bound to account and received at.
+func (r *Relay) ownerAt(account string, at time.Time) string {
+	if account != "" || r.opts.Legacy == nil {
 		return account
+	}
+	legacy, retiredAt := r.opts.Legacy()
+	if legacy != "" && at.Before(retiredAt) {
+		return legacy
 	}
 	return ""
 }

@@ -696,3 +696,22 @@ func TestReuseRefusesASessionReplacedMeanwhile(t *testing.T) {
 		t.Fatalf("reuse = %v, %v; want it refused", ok, err)
 	}
 }
+
+// A record that can't be read while the older sign-ins remain holds everything unbound too:
+// its time is no bound on what an older hook still running queues.
+func TestAnUnreadableRecordHoldsEverythingWhileTheOlderSignInsRemain(t *testing.T) {
+	dir, stateDir := t.TempDir(), t.TempDir()
+	if err := os.WriteFile(filepath.Join(stateDir, auth.LegacyRecordFile), []byte("{"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if got := spoolLegacyOwnership(dir, stateDir, true); got.RetiredAt.Equal(auth.LegacyStillSignedIn) {
+		t.Fatalf("with no older sign-ins left, judged by %v; want the record's time", got.RetiredAt)
+	}
+	data := `{"default": {"organizations": {"o": {"session_id": "s", "auth_url": "https://auth.example.test", "user_id": "u"}}}}`
+	if err := os.WriteFile(config.LegacyCredentialsPath(dir), []byte(data), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if got := spoolLegacyOwnership(dir, stateDir, true); !got.RetiredAt.Equal(auth.LegacyStillSignedIn) || got.Account != auth.LegacyAccountAmbiguous {
+		t.Fatalf("judged by %+v; want everything unbound named by no one", got)
+	}
+}

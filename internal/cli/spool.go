@@ -225,10 +225,10 @@ func (app *App) flushSpool(ctx context.Context, force bool, minInterval time.Dur
 // server key's parts are bound to no account.
 func spoolLegacyOwnership(dir, stateDir string, serverKey bool) auth.LegacyRecord {
 	rec, err := auth.LegacyOwnership(dir, stateDir, serverKey)
-	switch {
-	case err != nil:
-		return auth.UnreadableLegacyRecord(stateDir)
-	case !rec.RetiredAt.IsZero() && auth.HasLegacySignIns(dir):
+	if err != nil {
+		rec = auth.UnreadableLegacyRecord(stateDir)
+	}
+	if !rec.RetiredAt.IsZero() && auth.HasLegacySignIns(dir) {
 		rec.RetiredAt = auth.LegacyStillSignedIn
 	}
 	return rec

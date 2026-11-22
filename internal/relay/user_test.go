@@ -3,6 +3,7 @@ package relay
 import (
 	"strings"
 	"testing"
+	"time"
 
 	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
 	resourcepb "go.opentelemetry.io/proto/otlp/resource/v1"
@@ -19,26 +20,46 @@ import (
 // names no one (E) names no one at all.
 func TestRelayNamesTheUserOnEveryPart(t *testing.T) {
 	t.Parallel()
-	u := newUpstream(t)
-	f := newFixture()
-	f.claims["E"] = claim.Claim{ProjectID: "p4", Tool: "claude-code"}
-	r, srv := f.relay(t, u, map[string]Policy{
-		"p1": {Endpoint: u.srv.URL, Key: "key-p1", IncludePrompts: true, IncludeToolContent: true, User: "user-a"},
-		"p2": {Endpoint: u.srv.URL, Key: "key-p2", User: "user-a"},
-		"p4": {Endpoint: u.srv.URL, Key: "key-p4", IncludePrompts: true, IncludeToolContent: true},
-	})
-	for _, session := range []string{"A", "B", "E"} {
-		m := logsOf(session, 1)
-		m.ResourceLogs[0].Resource.Attributes = []*commonpb.KeyValue{kv(semconv.TermaUserIDKey, "SPOOF-ID")}
-		postProto(t, srv, "/v1/logs", m)
+	for _, c := range []struct {
+		sessions []string
+		want     string
+	}{{[]string{"A", "B"}, "user-a"}, {[]string{"E"}, ""}} {
+		u := newUpstream(t)
+		f := newFixture()
+		f.signIn = &testSignIn{account: accountA}
+		f.claims["E"] = claim.Claim{ProjectID: "p4", Tool: "claude-code"}
+		r, srv := f.relay(t, u, map[string]Policy{
+			"p1": {Endpoint: u.srv.URL, IncludePrompts: true, IncludeToolContent: true, User: "user-a", UserAccount: accountA},
+			"p2": {Endpoint: u.srv.URL, User: "user-a", UserAccount: accountA},
+			"p4": {Endpoint: u.srv.URL, IncludePrompts: true, IncludeToolContent: true},
+		})
+		for _, session := range c.sessions {
+			m := logsOf(session, 1)
+			m.ResourceLogs[0].Resource.Attributes = []*commonpb.KeyValue{kv(semconv.TermaUserIDKey, "SPOOF-ID")}
+			postProto(t, srv, "/v1/logs", m)
+		}
+		waitForCounters(t, r, func(n map[string]int) bool { return n["forwarded.logs"] == len(c.sessions) })
+		u.checkStamps(t, map[string]map[string]string{semconv.TermaUserIDKey: {"Bearer token-" + accountA: c.want}})
+		for name := range r.Stats().Snapshot().Counters {
+			if strings.HasPrefix(name, "unclassified.") {
+				t.Errorf("the relay withheld a key no rule names: %s", name)
+			}
+		}
 	}
-	waitForCounters(t, r, func(c map[string]int) bool { return c["forwarded.logs"] == 3 })
-	u.checkStamps(t, map[string]map[string]string{semconv.TermaUserIDKey: {
-		"Bearer key-p1": "user-a", "Bearer key-p2": "user-a", "Bearer key-p4": "",
-	}})
-	for name := range r.Stats().Snapshot().Counters {
-		if strings.HasPrefix(name, "unclassified.") {
-			t.Errorf("the relay withheld a key no rule names: %s", name)
+}
+
+// Under a server key no part names a user, even one placed after a switch to a person's
+// sign-in: what a server key collected is no person's, and leaves only with the key.
+func TestAServerKeysPartNamesNoUserAfterASwitch(t *testing.T) {
+	t.Parallel()
+	pol := Policy{User: "user-a", UserAccount: accountA}
+	r := newRelay(Options{Dir: t.TempDir(), Token: token, SignIn: &testSignIn{account: accountA}})
+	m := logsOf("A", 1)
+	p := &part{msg: m} // arrived under the key: bound to no account
+	nameUser(p, pol, r.ownerAt(p.account, time.Now()))
+	for _, a := range m.ResourceLogs[0].Resource.GetAttributes() {
+		if a.Key == semconv.TermaUserIDKey {
+			t.Fatalf("a server key's part names %q", a.Value.GetStringValue())
 		}
 	}
 }
@@ -49,7 +70,7 @@ func TestQueuedPartKeepsItsUserUnderAStricterPolicy(t *testing.T) {
 	t.Parallel()
 	r := newRelay(Options{Dir: t.TempDir(), Token: token})
 	p := &part{signal: Traces, msg: &tracepb.TracesData{ResourceSpans: []*tracepb.ResourceSpans{{Resource: &resourcepb.Resource{}}}}}
-	nameUser(p, Policy{IncludePrompts: true, IncludeToolContent: true, User: "user-a"})
+	nameUser(p, Policy{IncludePrompts: true, IncludeToolContent: true, User: "user-a", UserAccount: "account-a"}, "account-a")
 	body, err := proto.Marshal(p.msg)
 	if err != nil {
 		t.Fatal(err)
@@ -64,24 +85,41 @@ func TestQueuedPartKeepsItsUserUnderAStricterPolicy(t *testing.T) {
 	}
 }
 
-// A part names the policy's user only when it was bound to that user's account, or to none:
-// one that arrived under another person, and is placed after a switch, names no one, so its
-// terma.user.id is never another than the sign-in it leaves with.
+// A part names the policy's user only when it leaves under that user's account: one that
+// arrived under another person, or under no one (a server key's), and is placed after a
+// switch names no one, so its terma.user.id is never another than the sign-in it leaves
+// with. An older terma's backlog leaves under the account it was retired as, so names it.
 func TestAPartNamesOnlyItsOwnAccountsUser(t *testing.T) {
 	t.Parallel()
 	pol := Policy{User: "user-b", UserAccount: "account-b"}
-	for account, want := range map[string]string{"account-b": "user-b", "": "user-b", "account-a": ""} {
+	retired := time.Now().Add(time.Hour)
+	for _, c := range []struct {
+		account, legacy string
+		retiredAt       time.Time
+		want            string
+	}{
+		{account: "account-b", want: "user-b"},
+		{account: "account-a"},
+		{account: ""}, // a server key's part
+		{account: "", legacy: "account-b", retiredAt: retired, want: "user-b"}, // before the retirement
+		{account: "", legacy: "account-b", retiredAt: time.Now().Add(-time.Hour)},
+		{account: "", legacy: "ambiguous", retiredAt: retired},
+	} {
+		r := newRelay(Options{Dir: t.TempDir(), Token: token})
+		if c.legacy != "" {
+			r.opts.Legacy = func() (string, time.Time) { return c.legacy, c.retiredAt }
+		}
 		m := logsOf("A", 1)
-		p := &part{msg: m, account: account}
-		nameUser(p, pol)
+		p := &part{msg: m, account: c.account}
+		nameUser(p, pol, r.ownerAt(p.account, time.Now()))
 		got := ""
 		for _, a := range m.ResourceLogs[0].Resource.GetAttributes() {
 			if a.Key == semconv.TermaUserIDKey {
 				got = a.Value.GetStringValue()
 			}
 		}
-		if got != want {
-			t.Errorf("a part bound to %q names %q, want %q", account, got, want)
+		if got != c.want {
+			t.Errorf("%+v names %q, want %q", c, got, c.want)
 		}
 	}
 }
