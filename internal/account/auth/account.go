@@ -37,23 +37,19 @@ func Account(dir, profile, authURL string) string {
 // only a newer terma, signed in again, sends again.
 var ErrSignInRetired = errors.New("this sign-in is retired: update terma and run `terma login`")
 
-// MarkRetired records, on the profile's stored sign-in whose refresh token is refreshToken,
-// that the server refused it as retired, for doctor and status to say what fixes it. ""
-// marks whatever sign-in is stored. A sign-in stored since is not marked.
-func MarkRetired(dir, profile, refreshToken string) error {
-	return lockedWrite(dir, func(tx *Tx) error { return tx.MarkRetired(profile, refreshToken) })
+// MarkRetired records, on the profile's stored sign-in of session, that the server refused
+// it as retired, for doctor and status to say what fixes it. "" marks whatever sign-in is
+// stored. A sign-in of another session, stored since, is not marked. It edits
+// user-credentials.json alone, never the keychain, so a token another process rotated
+// since, within the same session, or a locked keychain, still lets it be recorded.
+func MarkRetired(dir, profile, session string) error {
+	return lockedWrite(dir, func(tx *Tx) error { return tx.MarkRetired(profile, session) })
 }
 
 // MarkRetired is MarkRetired inside the transaction.
-func (tx *Tx) MarkRetired(profile, refreshToken string) error {
-	if refreshToken != "" {
-		stored, err := tx.Load(profile)
-		if err != nil || stored.RefreshToken != refreshToken {
-			return nil
-		}
-	}
+func (tx *Tx) MarkRetired(profile, session string) error {
 	return tx.mutate(func(file credentialFile) {
-		if c := file.get(profile); c != nil && c.RetiredAt.IsZero() {
+		if c := file.get(profile); c != nil && c.RetiredAt.IsZero() && (session == "" || c.SessionID == session) {
 			c.RetiredAt = time.Now().UTC()
 		}
 	})

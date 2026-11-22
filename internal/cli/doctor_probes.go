@@ -53,8 +53,9 @@ func (app *App) doctorProbes(cfg *config.Config) doctor.Probes {
 			d.Delivered, d.Undelivered = describeFlush(res, app.signInFix(cfg))
 			for _, f := range res.Failures {
 				ingest, refused := errors.AsType[*delivery.IngestError](f.Err)
+				retired := refused && ingest.Retired()
 				d.Failures = append(d.Failures, doctor.Failure{ProjectID: f.ProjectID, Endpoint: f.Endpoint, Err: f.Err,
-					Refused: refused, KeyRefused: refused && ingest.KeyRefused()})
+					Refused: refused, KeyRefused: refused && ingest.KeyRefused() && !retired, Retired: retired})
 			}
 			return d, nil
 		},

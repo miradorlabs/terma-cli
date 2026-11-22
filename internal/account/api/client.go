@@ -302,8 +302,8 @@ func (c *Client) MarkRetired() { c.markRetired() }
 // still that one, that a server refused it as retired.
 func (c *Client) markRetired() {
 	cred := c.retireHeld()
-	if c.profile != "" && cred != nil && cred.RefreshToken != "" {
-		_ = auth.MarkRetired(c.dir, c.profile, cred.RefreshToken)
+	if c.profile != "" && cred != nil && cred.SessionID != "" {
+		_ = auth.MarkRetired(c.dir, c.profile, cred.SessionID)
 	}
 }
 

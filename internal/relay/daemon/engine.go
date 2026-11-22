@@ -96,8 +96,14 @@ func (d Deps) Engine(ctx context.Context, stateDir string, cfg *config.Config, s
 // Resolver turns a claim into its session's policy.
 func (d Deps) Resolver(cfg *config.Config) func(claim.Claim) (relay.Policy, error) {
 	return Resolver(cfg, ResolverDeps{AgentName: d.AgentName, RelayTargets: d.RelayTargets,
-		Endpoint: func(projectID string) string { return d.Endpoint(cfg, projectID) },
-		User:     func(projectID, endpoint string) string { return d.User(cfg, projectID, endpoint) }})
+		Endpoint: func(projectID string, serverKey bool) string {
+			// The profile's mode as it is now, not at startup: a person's token never goes to
+			// a host keys.json filed for a server key.
+			live := *cfg
+			live.ServerKeySignIn = serverKey
+			return d.Endpoint(&live, projectID)
+		},
+		User: func(projectID, endpoint string) string { return d.User(cfg, projectID, endpoint) }})
 }
 
 // CatchAll is global mode's claim for everything an agent exports.

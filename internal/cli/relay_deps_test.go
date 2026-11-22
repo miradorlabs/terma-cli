@@ -254,3 +254,19 @@ func TestAnUnreadableLegacyRecordNamesNoOne(t *testing.T) {
 		t.Fatalf("after a failed read, record = %+v; want the last one read", got)
 	}
 }
+
+// A record that becomes unreadable after a read found none is not taken for no record: the
+// relay then names no one, rather than keep the empty answer.
+func TestALegacyRecordThatBecomesUnreadableNamesNoOne(t *testing.T) {
+	stateDir := t.TempDir()
+	legacy := cachedLegacyRecord(t.TempDir(), stateDir, func() bool { return true })
+	if got := legacy(); !got.RetiredAt.IsZero() {
+		t.Fatalf("no record = %+v", got)
+	}
+	if err := os.WriteFile(filepath.Join(stateDir, auth.LegacyRecordFile), []byte("{"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if got := legacy(); got.Account != auth.LegacyAccountAmbiguous {
+		t.Fatalf("an unreadable record = %+v, want one naming no one", got)
+	}
+}

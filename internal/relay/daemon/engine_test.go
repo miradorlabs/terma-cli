@@ -109,7 +109,7 @@ func TestAFreshBindingIsHeldUntilTheRelayFetchesItsPolicy(t *testing.T) {
 	if err := keystore.Set(configDir, "p1", mintedKey, keystore.HostsOf(cfg)); err != nil {
 		t.Fatal(err)
 	}
-	resolve := Resolver(cfg, ResolverDeps{AgentName: func(string) string { return "claude" }, Endpoint: func(string) string { return "https://otel.example" },
+	resolve := Resolver(cfg, ResolverDeps{AgentName: func(string) string { return "claude" }, Endpoint: func(string, bool) string { return "https://otel.example" },
 		RelayTargets: func(s []string) []string { return s }})
 	c := claim.Claim{ProjectID: "p1", Tool: "claude"}
 	if pol, err := resolve(c); err == nil {

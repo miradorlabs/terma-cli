@@ -2,6 +2,7 @@ package relay
 
 import (
 	"context"
+	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -355,5 +356,35 @@ func TestOutboxLossesStartOverAfterAQuietWindow(t *testing.T) {
 	o.recordLosses(0, 2, start.Add(lossWindow+2*time.Hour))
 	if l, _ := ReadOutboxLosses(o.dir); l.Full != 0 || l.Expired != 2 {
 		t.Fatalf("losses = %+v, want only the new loss", l)
+	}
+}
+
+// Under a server key, an older terma's part at the head of one signal holds up no other: the
+// sender takes the oldest signal with a part the key may send.
+func TestABlockedSignalHoldsUpNoOtherUnderAServerKey(t *testing.T) {
+	t.Parallel()
+	u := newSignInUpstream(t)
+	dir := t.TempDir()
+	retired := time.Now()
+	rt := routeOf("", claim.Claim{ProjectID: "p1"})
+	span, _ := proto.Marshal(&tracepb.TracesData{ResourceSpans: []*tracepb.ResourceSpans{{ScopeSpans: []*tracepb.ScopeSpans{{
+		Spans: []*tracepb.Span{{Name: "old", Attributes: []*commonpb.KeyValue{kv("session.id", "old")}}}}}}}})
+	// The older terma's trace is the oldest part on the route; the key's log came after.
+	if err := (outbox{dir: dir}).put(rt, claim.Claim{}.Repository, newEntry(retired.Add(-time.Hour), Traces, 1), span); err != nil {
+		t.Fatal(err)
+	}
+	queueAt(t, dir, "", retired.Add(time.Minute))
+	r := newRelay(Options{Dir: dir, Token: token, SignIn: &testSignIn{},
+		Legacy: func() (string, time.Time) { return "ambiguous", retired },
+		Resolve: func(claim.Claim) (Policy, error) {
+			return Policy{Endpoint: u.srv.URL, Key: "server-key", IncludePrompts: true, IncludeToolContent: true}, nil
+		}})
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() { r.Run(ctx); close(done) }()
+	t.Cleanup(func() { cancel(); <-done })
+	waitForCounters(t, r, func(c map[string]int) bool { return c["forwarded.logs"] == 1 })
+	if c := r.Stats().Snapshot().Counters; c["forwarded.traces"] != 0 {
+		t.Fatalf("the older terma's trace left under the key: %v", c)
 	}
 }

@@ -50,7 +50,7 @@ func TestResolverGrantsOnlyAValidatedPolicyOfThisLogin(t *testing.T) {
 			if err := keystore.Set(configDir, "p1", mintedKey, keystore.HostsOf(cfg)); err != nil {
 				t.Fatal(err)
 			}
-			resolve := Resolver(cfg, ResolverDeps{AgentName: func(string) string { return "" }, Endpoint: func(string) string { return "https://otel.example" }, RelayTargets: func(s []string) []string { return s }})
+			resolve := Resolver(cfg, ResolverDeps{AgentName: func(string) string { return "" }, Endpoint: func(string, bool) string { return "https://otel.example" }, RelayTargets: func(s []string) []string { return s }})
 			pol, err := resolve(claim.Claim{ProjectID: "p1"})
 			if tc.ok {
 				// A person's profile names no key: the relay sends with the sign-in.
@@ -76,7 +76,7 @@ func TestResolverGrantsNothingOnceTheProfileIsGone(t *testing.T) {
 	if err := keystore.Set(configDir, "p1", mintedKey, keystore.HostsOf(cfg)); err != nil {
 		t.Fatal(err)
 	}
-	resolve := Resolver(cfg, ResolverDeps{AgentName: func(string) string { return "" }, Endpoint: func(string) string { return "https://otel.example" }, RelayTargets: func(s []string) []string { return s }})
+	resolve := Resolver(cfg, ResolverDeps{AgentName: func(string) string { return "" }, Endpoint: func(string, bool) string { return "https://otel.example" }, RelayTargets: func(s []string) []string { return s }})
 	if pol, err := resolve(claim.Claim{ProjectID: "p1"}); err == nil {
 		t.Fatalf("granted %+v with no profile on file", pol)
 	}
@@ -94,7 +94,7 @@ func TestResolverTellsALockedKeychainFromAMissingKey(t *testing.T) {
 		t.Fatal(err)
 	}
 	secret.FailForTest(t, configDir)
-	resolve := Resolver(cfg, ResolverDeps{AgentName: func(string) string { return "" }, Endpoint: func(string) string { return "https://otel.example" }, RelayTargets: func(s []string) []string { return s }})
+	resolve := Resolver(cfg, ResolverDeps{AgentName: func(string) string { return "" }, Endpoint: func(string, bool) string { return "https://otel.example" }, RelayTargets: func(s []string) []string { return s }})
 	_, err := resolve(claim.Claim{ProjectID: "p1"})
 	if !secret.IsUnavailable(err) || errors.Is(err, relay.ErrNoKey) {
 		t.Fatalf("resolve = %v; want the keychain unavailable, which is no missing key", err)
@@ -113,7 +113,7 @@ func TestResolverWaitsBeforeAskingALockedKeychainAgain(t *testing.T) {
 		t.Fatal(err)
 	}
 	unlock := secret.FailForTest(t, configDir)
-	resolve := Resolver(cfg, ResolverDeps{AgentName: func(string) string { return "" }, Endpoint: func(string) string { return "https://otel.example" }, RelayTargets: func(s []string) []string { return s }})
+	resolve := Resolver(cfg, ResolverDeps{AgentName: func(string) string { return "" }, Endpoint: func(string, bool) string { return "https://otel.example" }, RelayTargets: func(s []string) []string { return s }})
 	if _, err := resolve(claim.Claim{ProjectID: "p1"}); !secret.IsUnavailable(err) {
 		t.Fatalf("first resolve = %v", err)
 	}
@@ -140,7 +140,7 @@ func TestResolverNamesTheUserForEveryClaim(t *testing.T) {
 		t.Fatal(err)
 	}
 	var asked []string
-	resolve := Resolver(cfg, ResolverDeps{AgentName: func(tool string) string { return tool }, Endpoint: func(string) string { return "https://otel.example" },
+	resolve := Resolver(cfg, ResolverDeps{AgentName: func(tool string) string { return tool }, Endpoint: func(string, bool) string { return "https://otel.example" },
 		RelayTargets: func(s []string) []string { return s },
 		User: func(projectID, endpoint string) string {
 			asked = append(asked, projectID+"@"+endpoint)

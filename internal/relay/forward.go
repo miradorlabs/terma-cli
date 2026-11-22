@@ -203,7 +203,11 @@ func (s *sender) loop() {
 		// Another person's or environment's backlog waits for its own sign-in, and ages out;
 		// a server key sends only what no person's sign-in collected.
 		if ok {
-			if entries = s.r.mayLeave(s.route, entries, pol.Key != ""); len(entries) == 0 {
+			// The oldest signal with parts that may leave: one whose head may not (an older
+			// terma's backlog under a server key) holds up none of the others.
+			serverKey := pol.Key != ""
+			entries = s.nextLeaving(limit, func(es []entry) []entry { return s.r.mayLeave(s.route, es, serverKey) })
+			if len(entries) == 0 {
 				ok = false
 			}
 		}

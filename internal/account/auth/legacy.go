@@ -13,6 +13,7 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/account/secret"
 	"github.com/miradorlabs/terma-cli/internal/config"
+	"github.com/miradorlabs/terma-cli/internal/flock"
 )
 
 // A terma before user tokens signed in once per organization, and kept each sign-in in
@@ -173,6 +174,13 @@ func RecordLegacy(stateDir string, signIns []LegacySignIn, now time.Time) error 
 	if len(signIns) == 0 {
 		return nil
 	}
+	return withLegacyRecord(stateDir, func() error { return recordLegacy(stateDir, signIns, now) })
+}
+
+func recordLegacy(stateDir string, signIns []LegacySignIn, now time.Time) error {
+	if len(signIns) == 0 {
+		return nil
+	}
 	// A record that can't be read is not taken for none: this retirement is not the first,
 	// and the account it kept must not be replaced.
 	rec, err := ReadLegacyRecord(stateDir)
@@ -236,7 +244,15 @@ func LegacyOwnership(dir, stateDir string, serverKey bool) (LegacyRecord, error)
 			}
 		}
 	}
-	if config.WriteJSON(filepath.Join(stateDir, LegacyRecordFile), nameless, 0o600) != nil {
+	// Written only while there is still no record, under the record's lock: a retirement
+	// writing the older sign-ins' own account at the same moment is never overwritten.
+	write := func() error {
+		if rec, err := ReadLegacyRecord(stateDir); err != nil || !rec.RetiredAt.IsZero() {
+			return err
+		}
+		return config.WriteJSON(filepath.Join(stateDir, LegacyRecordFile), nameless, 0o600)
+	}
+	if withLegacyRecord(stateDir, write) != nil {
 		return nameless, nil
 	}
 	if written, err := ReadLegacyRecord(stateDir); err == nil && !written.RetiredAt.IsZero() {
@@ -250,6 +266,10 @@ func LegacyOwnership(dir, stateDir string, serverKey bool) (LegacyRecord, error)
 // no one's. The sessions that could be read, signIns, are kept for the heartbeat all the
 // same. A record already kept stands, and gains those sessions.
 func RecordNoOne(stateDir string, signIns []LegacySignIn, now time.Time) error {
+	return withLegacyRecord(stateDir, func() error { return recordNoOne(stateDir, signIns, now) })
+}
+
+func recordNoOne(stateDir string, signIns []LegacySignIn, now time.Time) error {
 	rec, err := ReadLegacyRecord(stateDir)
 	if err != nil {
 		return err
@@ -264,6 +284,16 @@ func RecordNoOne(stateDir string, signIns []LegacySignIn, now time.Time) error {
 	}
 	return config.WriteJSON(filepath.Join(stateDir, LegacyRecordFile), rec, 0o600)
 }
+
+// withLegacyRecord runs fn holding the legacy record's lock: every write reads the record
+// first and keeps one already kept, which only holds if no other write lands in between.
+func withLegacyRecord(stateDir string, fn func() error) error {
+	return flock.Locked(filepath.Join(stateDir, LegacyRecordFile), legacyRecordWait, fn)
+}
+
+// legacyRecordWait bounds the wait for the legacy record's lock; its holders only read and
+// write one small file.
+const legacyRecordWait = 5 * time.Second
 
 // ReadLegacyRecord is what RecordLegacy kept, the zero record when nothing was.
 func ReadLegacyRecord(stateDir string) (LegacyRecord, error) {

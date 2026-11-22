@@ -1,7 +1,10 @@
 package hookrun
 
 import (
+	"encoding/json"
+	"os"
 	"testing"
+	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
 	"github.com/miradorlabs/terma-cli/internal/spool"
@@ -38,5 +41,56 @@ func TestUnparkingKeepsTheAccountsEventsWereCollectedUnder(t *testing.T) {
 		if a, ok := got[name]; !ok || a != account {
 			t.Errorf("%s unparked under %q, want %q", name, a, account)
 		}
+	}
+}
+
+// An event an older terma parked, from before its sign-ins were retired, stays its: no
+// sign-in that unparks it later takes it. One from after is bound as before.
+func TestUnparkingLeavesAnOlderTermasEventsUnbound(t *testing.T) {
+	root := hookruntest.InitRepo(t)
+	sp, err := spool.Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := &Repo{GitDir: root + "/.git"}
+	retired := time.Now().Add(-time.Hour)
+	for _, ev := range []spool.Event{
+		{Name: "older", Time: retired.Add(-time.Hour)},
+		{Name: "newer", Time: retired.Add(time.Minute)},
+	} {
+		if !(Env{}).park(r, parkedEvents, ev) {
+			t.Fatalf("could not park %s", ev.Name)
+		}
+	}
+	sp.Bind("account-b")
+	Env{Spool: sp, Account: "account-b", LegacyBefore: func() time.Time { return retired }}.unpark(r)
+	got := map[string]string{}
+	for _, ev := range hookruntest.Spooled(t, sp) {
+		got[ev.Name] = ev.Account
+	}
+	if got["older"] != "" || got["newer"] != "account-b" {
+		t.Fatalf("accounts = %v; want the older terma's unbound, the newer bound", got)
+	}
+}
+
+// A push a sandboxed pre-push parked, unable to read the sign-in, is bound as an unparked
+// event is, before it is reported.
+func TestAParkedPushIsBoundWhenUnparked(t *testing.T) {
+	root := hookruntest.InitRepo(t)
+	state := t.TempDir()
+	r := &Repo{GitDir: root + "/.git"}
+	rec := pushRecord{ID: "p1", Root: root, GitDir: root + "/.git", Event: spool.Event{Name: "push", Time: time.Now()}}
+	if !(Env{}).park(r, parkedPushes, rec) {
+		t.Fatal("could not park the push")
+	}
+	var recorded []string
+	Env{StateDir: state, Account: "account-b", AwaitPush: func(path string) { recorded = append(recorded, path) }}.unparkPushes(r)
+	if len(recorded) != 1 {
+		t.Fatalf("recorded %v", recorded)
+	}
+	var got pushRecord
+	data, err := os.ReadFile(recorded[0])
+	if err != nil || json.Unmarshal(data, &got) != nil || got.Event.Account != "account-b" {
+		t.Fatalf("recorded push = %+v, %v; want it bound to account-b", got.Event, err)
 	}
 }

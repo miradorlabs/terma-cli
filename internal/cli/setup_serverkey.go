@@ -51,17 +51,19 @@ func (app *App) useServerKey(s *setup.Steps, ui *setupUI, org orgRef, team *stri
 	}
 	s.FetchPolicy = func(ctx context.Context, cfg *config.Config) (config.Policy, error) {
 		pol, err := app.policies().FetchWithKey(ctx, cfg, cfg.APIKey)
-		// The sign-in is kept here, once the key has proved it reads the policy and before
-		// setup stores that policy, so a failed fetch writes nothing.
-		if err == nil {
-			err = app.keepServerKey(cfg, insecure)
-		}
 		if err != nil {
 			return config.Policy{}, err
 		}
-		// An older terma's sign-ins are retired here too, and recorded first: the record is
-		// the only account what that terma queued keeps, which a server key must not send.
+		// An older terma's sign-ins are retired, and recorded first, once the key has proved
+		// it reads the policy, and before the profile becomes the key's: a relay that saw a
+		// server key with them still on the machine would record their backlog as no one's
+		// (auth.LegacyOwnership), where the retirement knows its person.
 		app.retireLegacySessions(ctx, cfg.AuthURL)
+		// The sign-in is kept here, before setup stores the policy, so a failed fetch writes
+		// nothing.
+		if err := app.keepServerKey(cfg, insecure); err != nil {
+			return config.Policy{}, err
+		}
 		return pol, nil
 	}
 	s.SpoolKey = func(_ context.Context, cfg *config.Config) {

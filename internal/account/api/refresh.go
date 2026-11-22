@@ -95,7 +95,7 @@ func (c *Client) redeem(ctx context.Context, held, current *auth.Credential, red
 			// Held retired too: the access token it still holds must not be presented again.
 			c.retireHeld()
 			if tx != nil {
-				_ = tx.MarkRetired(c.profile, current.RefreshToken)
+				_ = tx.MarkRetired(c.profile, current.SessionID)
 			}
 			return c.settle(tx, current, clean, err)
 		case refreshOver:

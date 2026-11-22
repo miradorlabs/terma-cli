@@ -239,3 +239,32 @@ func TestAnUnreadableConfigLeavesTheLegacyLookAlone(t *testing.T) {
 		t.Fatalf("record = %+v, %v; want none written", rec, err)
 	}
 }
+
+// A retirement is recorded on the session that sent the refused token even after another
+// process rotated that session's token: it is matched by session, in user-credentials.json.
+func TestARetirementIsRecordedAfterAnotherProcessRotated(t *testing.T) {
+	f := newFakeAuth(t)
+	authSandbox(t, f)
+	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(f)); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := testApp.loadConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	src := testApp.signInSource(cfg)
+	sent, err := src.Token(t.Context(), auth.AccountKey(f.srv.URL, "u-1"))
+	if err != nil || sent == "" {
+		t.Fatalf("token = %q, %v", sent, err)
+	}
+	// Another process rotates the same session's pair.
+	rotated := storedSession(f)
+	rotated.AccessToken, rotated.RefreshToken = rotated.AccessToken+"-2", rotated.RefreshToken+"-2"
+	if err := auth.UpdateCredential(testApp.dir, config.DefaultProfile, rotated); err != nil {
+		t.Fatal(err)
+	}
+	src.Retired(sent)
+	if !auth.Retired(testApp.dir, config.DefaultProfile) {
+		t.Fatal("the retirement was lost to a rotation in another process")
+	}
+}

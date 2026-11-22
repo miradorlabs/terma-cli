@@ -51,6 +51,26 @@ func (s *sender) next(limit int) []entry {
 	return slices.Clone(head[:min(limit, len(head))])
 }
 
+// nextLeaving is next among the parts that may leave now (leave filters a signal's head):
+// the oldest signal with any, so a head no one may send now holds up no other signal.
+func (s *sender) nextLeaving(limit int, leave func([]entry) []entry) []entry {
+	s.mu.Lock()
+	var heads [][]entry
+	for _, q := range s.queue {
+		if len(q) > 0 {
+			heads = append(heads, slices.Clone(q[:min(limit, len(q))]))
+		}
+	}
+	s.mu.Unlock()
+	slices.SortFunc(heads, func(a, b []entry) int { return strings.Compare(a[0].name, b[0].name) })
+	for _, head := range heads {
+		if out := leave(head); len(out) > 0 {
+			return out
+		}
+	}
+	return nil
+}
+
 // forget takes parts that left the outbox, delivered, dropped or buried, off the queue.
 func (s *sender) forget(batch []entry) {
 	if len(batch) == 0 {

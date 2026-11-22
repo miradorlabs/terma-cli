@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"path/filepath"
 	"slices"
 	"sync"
 	"time"
@@ -217,21 +218,31 @@ func (app *App) bindRelay(engine *relay.Options, cfg *config.Config) {
 	}
 }
 
-// cachedLegacyRecord reads the legacy record at most once a second: the relay asks for it
-// for every queued entry from before user tokens. A read that fails keeps the last record
-// read, or with none, names no one (auth.UnreadableLegacyRecord), never no record.
+// cachedLegacyRecord reads the legacy record again whenever a file it depends on changed
+// (the record, the older terma's credentials.json, config.json for the profile's mode): the
+// relay asks for it for every queued entry from before user tokens, and a change, such as a
+// switch to a server key, takes effect at the next entry. A read that fails keeps the last
+// record that named a boundary, or with none, names no one (auth.UnreadableLegacyRecord),
+// never no record.
 func cachedLegacyRecord(dir, stateDir string, serverKey func() bool) func() auth.LegacyRecord {
 	var mu sync.Mutex
 	rec := auth.UnreadableLegacyRecord(stateDir)
-	var at time.Time
+	var files [3]os.FileInfo
+	read := false
 	return func() auth.LegacyRecord {
 		mu.Lock()
 		defer mu.Unlock()
-		if time.Since(at) > time.Second {
-			if read, err := auth.LegacyOwnership(dir, stateDir, serverKey()); err == nil {
-				rec = read
-			}
-			at = time.Now()
+		now := [3]os.FileInfo{statOrNil(filepath.Join(stateDir, auth.LegacyRecordFile)),
+			statOrNil(config.LegacyCredentialsPath(dir)), statOrNil(config.Path(dir))}
+		if read && unchanged(files[0], now[0]) && unchanged(files[1], now[1]) && unchanged(files[2], now[2]) {
+			return rec
+		}
+		files, read = now, true
+		switch got, err := auth.LegacyOwnership(dir, stateDir, serverKey()); {
+		case err == nil:
+			rec = got
+		case rec.RetiredAt.IsZero():
+			rec = auth.UnreadableLegacyRecord(stateDir)
 		}
 		return rec
 	}

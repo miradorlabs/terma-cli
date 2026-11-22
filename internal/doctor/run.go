@@ -159,8 +159,9 @@ type Delivery struct {
 type Failure struct {
 	ProjectID, Endpoint string
 	Err                 error
-	// Refused says the host answered and refused; KeyRefused that it refused the key.
-	Refused, KeyRefused bool
+	// Refused says the host answered and refused; KeyRefused that it refused the key;
+	// Retired that it refused the sign-in as retired (SIGN_IN_RETIRED).
+	Refused, KeyRefused, Retired bool
 }
 
 // Progress is how a run reports as it goes; every field is optional.
@@ -428,6 +429,9 @@ func describeFailure(f Failure) string {
 
 // failureFix is the next step for a failed delivery; a refused key is not a network problem.
 func failureFix(f Failure) string {
+	if f.Retired {
+		return RetiredFix
+	}
 	if f.KeyRefused {
 		return "the key this machine holds for team " + f.ProjectID + " was refused by " + f.Endpoint + " — it may have been revoked, or belong to another environment"
 	}

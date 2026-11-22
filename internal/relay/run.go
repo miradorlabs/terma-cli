@@ -102,6 +102,20 @@ func (r *Relay) dropHeldAtExit() {
 	}
 }
 
+// unpinnedLocked counts the held records not pinned to a team waiting for its policy. r.mu
+// is held.
+func (r *Relay) unpinnedLocked() int {
+	n := 0
+	for _, parts := range r.held {
+		for _, h := range parts {
+			if h.pinned == nil {
+				n += h.p.records
+			}
+		}
+	}
+	return n
+}
+
 // countQueuedAtExit counts the outbox as queued, not lost: the next relay delivers it.
 func (r *Relay) countQueuedAtExit() {
 	routes, _ := r.outbox.routes()
@@ -126,15 +140,21 @@ func (r *Relay) Holding() bool {
 // is queued is on disk, so it does not count.
 func (r *Relay) Quiesce(quiet time.Duration) bool { return r.quiesce(quiet, false) }
 
-// QuiesceDroppingHold is Quiesce for a relay that may wait no longer for its hold: what it
-// holds is dropped at exit, and counted as lost (dropHeldAtExit). An update that fixes what
-// holds them, a retired sign-in's, must not wait on them.
+// QuiesceDroppingHold is Quiesce for a relay that may wait no longer for the parts that wait
+// for their team's policy (pinned): those are dropped at exit, and counted as lost
+// (dropHeldAtExit); an update that fixes what holds them, a retired sign-in's, must not
+// wait on them. Every other held part (a conversation start, a span waiting for its
+// session) is still waited for, as Quiesce does.
 func (r *Relay) QuiesceDroppingHold(quiet time.Duration) bool { return r.quiesce(quiet, true) }
 
 func (r *Relay) quiesce(quiet time.Duration, dropHold bool) bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if (r.heldN > 0 && !dropHold) || r.inflight > 0 || r.opts.Now().Sub(r.lastSeen) < quiet {
+	waiting := r.heldN
+	if dropHold {
+		waiting = r.unpinnedLocked()
+	}
+	if waiting > 0 || r.inflight > 0 || r.opts.Now().Sub(r.lastSeen) < quiet {
 		return false
 	}
 	r.refusing = true

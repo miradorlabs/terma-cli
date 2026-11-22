@@ -192,6 +192,8 @@ func (e Env) unparkPushes(r *Repo) {
 			if json.Unmarshal(line, &rec) != nil || rec.ID == "" {
 				continue
 			}
+			// Bound as unparked events are: a sandboxed pre-push could not read the sign-in.
+			e.bindReplayed(&rec.Event)
 			path := filepath.Join(e.StateDir, PushesDir, rec.ID+".json")
 			if err := config.WriteJSON(path, rec, 0o600); err != nil {
 				return err

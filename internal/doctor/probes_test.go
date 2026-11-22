@@ -516,3 +516,34 @@ func TestStatusSaysAnUpdateNeedsASignIn(t *testing.T) {
 	}
 	t.Fatal("no Account row")
 }
+
+// terma status says a retired sign-in is retired, with its fix, never that it is signed in.
+func TestStatusSaysASignInIsRetired(t *testing.T) {
+	t.Parallel()
+	e := env(t, Probes{Credential: func() (Credential, error) { return Credential{Email: "dev@example.com", Retired: true}, nil },
+		Spool: func() SpoolState { return SpoolState{} }, SignInFix: RetiredFix})
+	rep, err := Local(t.Context(), e)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, row := range rep.Rows {
+		if row.Label == "Account" && (!strings.Contains(row.Value, "retired") || !strings.Contains(row.Value, RetiredFix)) {
+			t.Fatalf("Account = %q", row.Value)
+		}
+	}
+	named := false
+	for _, c := range rep.Checks {
+		named = named || c.Status == Fail && c.Fix == RetiredFix
+	}
+	if !named {
+		t.Fatalf("no failing check names %q: %+v", RetiredFix, rep.Checks)
+	}
+}
+
+// A delivery refused as SIGN_IN_RETIRED names the sign-in's fix, not a refused team key.
+func TestARetiredDeliveryIsNoRefusedKey(t *testing.T) {
+	t.Parallel()
+	if got := failureFix(Failure{ProjectID: "p1", Endpoint: "https://otel", Refused: true, Retired: true}); got != RetiredFix {
+		t.Fatalf("fix = %q, want %q", got, RetiredFix)
+	}
+}

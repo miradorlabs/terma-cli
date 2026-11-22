@@ -2,6 +2,7 @@ package auth
 
 import (
 	"errors"
+	"github.com/miradorlabs/terma-cli/internal/flock"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -278,5 +279,37 @@ func TestRecordNoOne_KeepsARecordAndAddsItsSessions(t *testing.T) {
 	rec, err := ReadLegacyRecord(stateDir)
 	if err != nil || !rec.RetiredAt.Equal(first) || rec.Account != LegacyAccountAmbiguous || len(rec.SessionIDs) != 1 || rec.SessionIDs[0] != "s-a" {
 		t.Fatalf("record = %+v, %v; want the first boundary with s-a added", rec, err)
+	}
+}
+
+// A server key's first look never overwrites a record a retirement writes at the same
+// moment: it writes only while there is still no record, under the record's lock.
+func TestLegacyOwnership_NeverOverwritesARecordWrittenMeanwhile(t *testing.T) {
+	t.Parallel()
+	dir, stateDir := t.TempDir(), t.TempDir()
+	data := `{"default": {"organizations": {"o": {"session_id": "s", "auth_url": "https://auth.example.test", "user_id": "u"}}}}`
+	if err := os.WriteFile(config.LegacyCredentialsPath(dir), []byte(data), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	unlock, err := flock.Lock(t.Context(), filepath.Join(stateDir, LegacyRecordFile)+".lock")
+	if err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan LegacyRecord)
+	go func() {
+		rec, _ := LegacyOwnership(dir, stateDir, true)
+		done <- rec
+	}()
+	// The retirement records the older sign-ins' own account while the look waits.
+	time.Sleep(100 * time.Millisecond)
+	signIns, _ := LegacySignIns(dir, false)
+	if err := recordLegacy(stateDir, signIns, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	unlock()
+	got := <-done
+	want := AccountKey("https://auth.example.test", "u")
+	if rec, err := ReadLegacyRecord(stateDir); err != nil || rec.Account != want || got.Account != want {
+		t.Fatalf("record = %+v (%v), look = %+v; want the retirement's account kept", rec, err, got)
 	}
 }

@@ -770,3 +770,21 @@ func TestAFollowerPlacedByTheCatchAllIsNotPinned(t *testing.T) {
 		}
 	}
 }
+
+// An update stops waiting only for parts that wait for their team's policy: a part held
+// for anything else (here, a session not yet claimed) is still waited for.
+func TestAnUpdateStillWaitsForPartsNotWaitingForAPolicy(t *testing.T) {
+	t.Parallel()
+	f := newFixture()
+	r := newRelay(Options{Dir: t.TempDir(), Token: token, Hold: time.Minute, Lookup: f.lookup, Now: f.clock,
+		Resolve: func(claim.Claim) (Policy, error) { return Policy{}, ErrNoKey }})
+	srv := httptest.NewServer(r.Handler())
+	t.Cleanup(srv.Close)
+	postProto(t, srv, "/v1/logs", logsOf("unclaimed", 1))
+	f.mu.Lock()
+	f.now = f.now.Add(time.Minute)
+	f.mu.Unlock()
+	if r.QuiesceDroppingHold(0) {
+		t.Fatal("an update dropped a part that waits for its session's claim")
+	}
+}

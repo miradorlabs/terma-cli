@@ -90,8 +90,28 @@ func (app *App) hookProfile() dispatch.Profile {
 	if p.ServerKey = cfg.ServerKeySignIn; !p.ServerKey {
 		p.Account = auth.Account(cfg.Dir, cfg.ProfileName, cfg.AuthURL)
 	}
+	p.LegacyBefore = func() time.Time { return legacyBefore(app.dir, app.stateDir) }
 	return p
 }
+
+// legacyBefore is when an older terma's sign-ins were retired: what has no account from
+// before then is theirs. While they are on the machine with no record, or the record can't
+// be read, every event so far is.
+func legacyBefore(dir, stateDir string) time.Time {
+	rec, err := auth.ReadLegacyRecord(stateDir)
+	switch {
+	case err != nil:
+		return farFuture
+	case !rec.RetiredAt.IsZero():
+		return rec.RetiredAt
+	case auth.HasLegacySignIns(dir):
+		return farFuture
+	}
+	return time.Time{}
+}
+
+// farFuture is a boundary nothing is after.
+var farFuture = time.Date(9999, 1, 1, 0, 0, 0, 0, time.UTC)
 
 // hookPolicy is the collection policy while it is validated and fresh, else NoPolicy.
 func (app *App) hookPolicy() config.Policy {

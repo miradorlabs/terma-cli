@@ -23,8 +23,9 @@ type ResolverDeps struct {
 	AgentName func(tool string) string
 	// RelayTargets names the agents among the developer's choices that send through the relay.
 	RelayTargets func(selected []string) []string
-	// Endpoint is the ingest host a project's telemetry goes to.
-	Endpoint func(projectID string) string
+	// Endpoint is the ingest host a project's telemetry goes to, under a server key or a
+	// person's sign-in (serverKey), as the profile is set up now.
+	Endpoint func(projectID string, serverKey bool) string
 	// User is who parts sent to projectID at endpoint name, by Mirador user id; "" names no one.
 	User func(projectID, endpoint string) string
 }
@@ -104,7 +105,7 @@ func Resolver(cfg *config.Config, r ResolverDeps) func(claim.Claim) (relay.Polic
 			in.Harness = r.AgentName(c.Tool)
 		}
 		pol := CapturePolicy(in)
-		pol.Endpoint, pol.Key = r.Endpoint(c.ProjectID), key
+		pol.Endpoint, pol.Key = r.Endpoint(c.ProjectID, serverKey), key
 		if r.User != nil {
 			pol.User = r.User(c.ProjectID, pol.Endpoint)
 			if pol.User != "" {
