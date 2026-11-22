@@ -102,13 +102,15 @@ func (r *Relay) dropHeldAtExit() {
 	}
 }
 
-// notAwaitingPolicyLocked counts the held records not waiting for their team's policy,
-// pinned to its claim or, in global mode, the catch-all's. r.mu is held.
-func (r *Relay) notAwaitingPolicyLocked() int {
+// waitedForLocked counts the held records still waited for: every one not waiting for its
+// team's policy (pinned to its claim or, in global mode, the catch-all's), and one that is
+// but has waited less than waited. r.mu is held.
+func (r *Relay) waitedForLocked(waited time.Duration) int {
+	now := r.opts.Now()
 	n := 0
 	for _, parts := range r.held {
 		for _, h := range parts {
-			if h.pinned == nil && !h.awaitingPolicy {
+			if (h.pinned == nil && !h.awaitingPolicy) || now.Sub(h.at) < waited {
 				n += h.p.records
 			}
 		}
@@ -138,21 +140,24 @@ func (r *Relay) Holding() bool {
 // held, no export is being read or routed, and none has arrived for quiet, it answers every
 // later export 503, which an exporter sends again, to the next relay, and reports true. What
 // is queued is on disk, so it does not count.
-func (r *Relay) Quiesce(quiet time.Duration) bool { return r.quiesce(quiet, false) }
+func (r *Relay) Quiesce(quiet time.Duration) bool { return r.quiesce(quiet, false, 0) }
 
-// QuiesceDroppingHold is Quiesce for a relay that may wait no longer for the parts that wait
-// for their team's policy (pinned, or awaitingPolicy): those are dropped at exit, and counted as lost
-// (dropHeldAtExit); an update that fixes what holds them, a retired sign-in's, must not
-// wait on them. Every other held part (a conversation start, a span waiting for its
-// session) is still waited for, as Quiesce does.
-func (r *Relay) QuiesceDroppingHold(quiet time.Duration) bool { return r.quiesce(quiet, true) }
+// QuiesceDroppingHold is Quiesce for a relay that may wait no longer for the parts that have
+// waited at least waited for their team's policy (pinned, or awaitingPolicy): those are
+// dropped at exit, and counted as lost (dropHeldAtExit); an update that fixes what holds
+// them, a retired sign-in's, must not wait on them. One that began waiting since, a fresh
+// team's moments before its fetch, is still given that long. Every other held part (a
+// conversation start, a span waiting for its session) is still waited for, as Quiesce does.
+func (r *Relay) QuiesceDroppingHold(quiet, waited time.Duration) bool {
+	return r.quiesce(quiet, true, waited)
+}
 
-func (r *Relay) quiesce(quiet time.Duration, dropHold bool) bool {
+func (r *Relay) quiesce(quiet time.Duration, dropHold bool, waited time.Duration) bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	waiting := r.heldN
 	if dropHold {
-		waiting = r.notAwaitingPolicyLocked()
+		waiting = r.waitedForLocked(waited)
 	}
 	if waiting > 0 || r.inflight > 0 || r.opts.Now().Sub(r.lastSeen) < quiet {
 		return false

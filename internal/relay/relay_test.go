@@ -675,7 +675,7 @@ func TestAnUpdateNeedNotWaitForTheHold(t *testing.T) {
 	if r.Quiesce(0) {
 		t.Fatal("a relay that holds parts quiesced")
 	}
-	if !r.QuiesceDroppingHold(0) {
+	if !r.QuiesceDroppingHold(0, 0) {
 		t.Fatal("QuiesceDroppingHold waited for the hold")
 	}
 }
@@ -786,7 +786,7 @@ func TestAnUpdateStillWaitsForPartsNotWaitingForAPolicy(t *testing.T) {
 	f.mu.Lock()
 	f.now = f.now.Add(time.Minute)
 	f.mu.Unlock()
-	if r.QuiesceDroppingHold(0) {
+	if r.QuiesceDroppingHold(0, 0) {
 		t.Fatal("an update dropped a part that waits for its session's claim")
 	}
 }
@@ -809,7 +809,7 @@ func TestAnUpdateDoesNotWaitForGlobalModesPolicy(t *testing.T) {
 	if !r.Holding() {
 		t.Fatal("the part was not held")
 	}
-	if !r.QuiesceDroppingHold(0) {
+	if !r.QuiesceDroppingHold(0, 0) {
 		t.Fatal("an update waited for a part that waits for global mode's policy")
 	}
 }
@@ -865,5 +865,27 @@ func TestAPinnedTracePartIgnoresItsPidsReuse(t *testing.T) {
 	r.mu.Unlock()
 	if len(held) != 1 || held[0].pinned == nil || held[0].pinned.ProjectID != "p1" {
 		t.Fatalf("held %+v; want the part kept, pinned to p1", held)
+	}
+}
+
+// An update stops waiting only for a part that has waited for its policy at least as long as
+// it gives one: a part that began waiting moments ago, a fresh team's before its fetch,
+// still keeps it waiting.
+func TestAnUpdateGivesAFreshPolicyWaitItsTime(t *testing.T) {
+	t.Parallel()
+	f := newFixture()
+	r := newRelay(Options{Dir: t.TempDir(), Token: token, Hold: time.Minute, Lookup: f.lookup, Now: f.clock,
+		Resolve: func(claim.Claim) (Policy, error) { return Policy{}, ErrNoKey }})
+	srv := httptest.NewServer(r.Handler())
+	t.Cleanup(srv.Close)
+	postProto(t, srv, "/v1/logs", logsOf("D", 1)) // claimed for p3, whose policy can't be read
+	if r.QuiesceDroppingHold(0, 2*time.Minute) {
+		t.Fatal("an update dropped a part that began waiting for its policy just now")
+	}
+	f.mu.Lock()
+	f.now = f.now.Add(2 * time.Minute)
+	f.mu.Unlock()
+	if !r.QuiesceDroppingHold(0, 2*time.Minute) {
+		t.Fatal("an update still waited for a part that has waited its time")
 	}
 }
