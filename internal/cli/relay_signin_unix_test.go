@@ -43,3 +43,38 @@ func TestARetiredSignInGivesNoTokenWhenTheStoreFails(t *testing.T) {
 		t.Fatalf("a retired sign-in's token = %q, %v; want none", again, err)
 	}
 }
+
+// A profile whose mode can't be read binds nothing to the person signed in: it may be a
+// server key's, which keeps an earlier sign-in on disk. Once it can be read again, the
+// sign-in counts again, though the file looks unchanged.
+func TestAnUnreadableProfileBindsNoAccount(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root reads a file its mode forbids")
+	}
+	f := newFakeAuth(t)
+	authSandbox(t, f)
+	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(f)); err != nil {
+		t.Fatal(err)
+	}
+	if err := config.UpdateFile(testApp.dir, func(*config.File) {}); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := testApp.loadConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(config.Path(testApp.dir), 0o000); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(config.Path(testApp.dir), 0o600) })
+	src := testApp.signInSource(cfg)
+	if got := src.Account(); got != "" {
+		t.Fatalf("with the profile unreadable, account = %q; want none", got)
+	}
+	if err := os.Chmod(config.Path(testApp.dir), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if got := src.Account(); got != auth.AccountKey(f.srv.URL, "u-1") {
+		t.Fatalf("readable again, account = %q; want u-1's", got)
+	}
+}

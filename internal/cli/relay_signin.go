@@ -36,6 +36,7 @@ type signInSource struct {
 	// change either file at any moment.
 	account      string
 	accountFiles [2]os.FileInfo
+	accountRead  bool // account was read, and may be kept while the files are unchanged
 }
 
 type sentToken struct{ token, session string }
@@ -67,14 +68,20 @@ func (s *signInSource) Account() string {
 	s.accountMu.Lock()
 	defer s.accountMu.Unlock()
 	files := [2]os.FileInfo{statOrNil(config.Path(s.cfg.Dir)), statOrNil(config.CredentialsPath(s.cfg.Dir))}
-	if unchanged(s.accountFiles[0], files[0]) && unchanged(s.accountFiles[1], files[1]) {
+	if s.accountRead && unchanged(s.accountFiles[0], files[0]) && unchanged(s.accountFiles[1], files[1]) {
 		return s.account
 	}
-	s.account, s.accountFiles = "", files
-	if file, err := config.LoadFile(s.cfg.Dir); err == nil {
-		if p := file.Profiles[s.cfg.ProfileName]; p != nil && p.ServerKeySignIn {
-			return ""
-		}
+	s.account, s.accountFiles, s.accountRead = "", files, false
+	// A profile whose mode can't be read may be a server key's, which keeps an earlier
+	// person's sign-in on disk: no one's, until it can be read, and not kept, since a
+	// file made readable again (its permissions) need not look changed.
+	file, err := config.LoadFile(s.cfg.Dir)
+	if err != nil {
+		return ""
+	}
+	s.accountRead = true
+	if p := file.Profiles[s.cfg.ProfileName]; p != nil && p.ServerKeySignIn {
+		return ""
 	}
 	s.account = auth.Account(s.cfg.Dir, s.cfg.ProfileName, s.cfg.AuthURL)
 	return s.account
