@@ -208,16 +208,30 @@ func (app *App) flushSpool(ctx context.Context, force bool, minInterval time.Dur
 	}
 	r := app.delivery()
 	r.SignIn = app.signInSource(cfg)
-	rec, err := auth.LegacyOwnership(app.dir, app.stateDir, cfg.ServerKeySignIn)
-	if err != nil {
-		rec = auth.UnreadableLegacyRecord(app.stateDir)
-	}
+	rec := spoolLegacyOwnership(app.dir, app.stateDir, cfg.ServerKeySignIn)
 	r.LegacyAccount, r.LegacyBefore = rec.Account, rec.RetiredAt
 	// A hook that found the policy stale started this flush to refresh it (hookrun refreshPolicy).
 	if cfg.Policy.Stale(time.Now()) {
 		r.Policy = refreshOnce(ctx, cfg, cfg.Policy.Team(), r.Policy)
 	}
 	return r.Flush(ctx, s, cfg, force, minInterval), nil
+}
+
+// spoolLegacyOwnership is auth.LegacyOwnership for the spool. While the older sign-ins are
+// still on the machine, a retirement that could not forget them, an older terma's hook may
+// still be queueing events bound to no account, so every one is theirs: the boundary is
+// auth.LegacyStillSignedIn. Every event a hook of this terma queues is bound (an account,
+// or NoPerson under a server key), so none is held by it. Not so in the relay, where a
+// server key's parts are bound to no account.
+func spoolLegacyOwnership(dir, stateDir string, serverKey bool) auth.LegacyRecord {
+	rec, err := auth.LegacyOwnership(dir, stateDir, serverKey)
+	switch {
+	case err != nil:
+		return auth.UnreadableLegacyRecord(stateDir)
+	case !rec.RetiredAt.IsZero() && auth.HasLegacySignIns(dir):
+		rec.RetiredAt = auth.LegacyStillSignedIn
+	}
+	return rec
 }
 
 var errTornDown = errors.New("terma is not set up on this machine; run `terma setup`")

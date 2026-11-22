@@ -19,6 +19,7 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/account/auth"
 	"github.com/miradorlabs/terma-cli/internal/account/keystore"
+	"github.com/miradorlabs/terma-cli/internal/account/secret"
 	"github.com/miradorlabs/terma-cli/internal/config"
 )
 
@@ -495,6 +496,71 @@ func TestTheLegacyBoundaryIsSetOnceTheRetirementIsDone(t *testing.T) {
 	rec, err := auth.ReadLegacyRecord(testApp.stateDir)
 	if err != nil || revoked.Load() == 0 || !rec.RetiredAt.After(time.Unix(0, revoked.Load())) {
 		t.Fatalf("boundary %v, revoked at %v (%v); want the boundary after the revoke", rec.RetiredAt, time.Unix(0, revoked.Load()), err)
+	}
+}
+
+// With the older sign-ins still on the machine, because the keychain would not let one go,
+// an older hook may still be queueing: every unbound event in the spool stays theirs, for
+// delivery and the hooks alike. The relay, whose server-key parts are unbound, keeps the
+// record's boundary, which is the end of the attempt.
+func TestEverythingUnboundStaysLegacyWhileTheOlderSignInsRemain(t *testing.T) {
+	f := newFakeAuth(t)
+	authSandbox(t, f)
+	legacyA := legacyTokenPrefix + orgA().ID
+	data := `{"default": {"organizations": {` +
+		`"` + orgA().ID + `": {"access_token": "` + legacyA + `", "session_id": "old-a", "auth_url": "` + f.srv.URL + `", "organization_id": "` + orgA().ID + `", "user_id": "u-1"},` +
+		`"` + orgB().ID + `": {"session_id": "old-b", "auth_url": "` + f.srv.URL + `", "organization_id": "` + orgB().ID + `", "user_id": "u-1"}}}}`
+	if err := os.WriteFile(config.LegacyCredentialsPath(testApp.dir), []byte(data), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	var revoked atomic.Int64
+	inner := f.srv.Config.Handler
+	f.srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/v1/auth/cli/revoke" {
+			time.Sleep(50 * time.Millisecond)
+			revoked.Store(time.Now().UnixNano())
+		}
+		inner.ServeHTTP(w, r)
+	})
+	if err := config.UpdateFile(testApp.dir, func(file *config.File) { file.InsecureStorage = true }); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := testApp.loadConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The second older sign-in's tokens are in the keychain, which won't let them go.
+	secret.FailForTest(t, testApp.dir)
+	if err := testApp.storeLogin(context.Background(), cfg, storedSession(f)); err != nil {
+		t.Fatal(err)
+	}
+	if !auth.HasLegacySignIns(testApp.dir) {
+		t.Fatal("the older sign-ins were forgotten although the keychain kept one")
+	}
+	rec, err := auth.ReadLegacyRecord(testApp.stateDir)
+	if err != nil || revoked.Load() == 0 || !rec.RetiredAt.After(time.Unix(0, revoked.Load())) {
+		t.Fatalf("boundary %v, revoked at %v (%v); want it after the attempt", rec.RetiredAt, time.Unix(0, revoked.Load()), err)
+	}
+	for _, serverKey := range []bool{false, true} {
+		if got := spoolLegacyOwnership(testApp.dir, testApp.stateDir, serverKey); !got.RetiredAt.Equal(auth.LegacyStillSignedIn) {
+			t.Errorf("server key %v: delivery judges by %v; want everything unbound held", serverKey, got.RetiredAt)
+		}
+	}
+	if got, err := auth.LegacyOwnership(testApp.dir, testApp.stateDir, true); err != nil || !got.RetiredAt.Equal(rec.RetiredAt) {
+		t.Errorf("the relay judges by %v (%v), want the record's %v", got.RetiredAt, err, rec.RetiredAt)
+	}
+	if got := legacyBefore(testApp.dir, testApp.stateDir); !got.Equal(farFuture) {
+		t.Errorf("the hooks judge by %v; want everything unbound held", got)
+	}
+	// Once they are gone the record's own boundary counts again.
+	if err := os.Remove(config.LegacyCredentialsPath(testApp.dir)); err != nil {
+		t.Fatal(err)
+	}
+	if got := spoolLegacyOwnership(testApp.dir, testApp.stateDir, true); !got.RetiredAt.Equal(rec.RetiredAt) {
+		t.Errorf("after the sign-ins went: %v, want %v", got.RetiredAt, rec.RetiredAt)
+	}
+	if got := legacyBefore(testApp.dir, testApp.stateDir); !got.Equal(rec.RetiredAt) {
+		t.Errorf("hooks after the sign-ins went: %v, want %v", got, rec.RetiredAt)
 	}
 }
 

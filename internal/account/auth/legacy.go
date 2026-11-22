@@ -209,13 +209,18 @@ func recordLegacy(stateDir string, signIns []LegacySignIn, now time.Time) error 
 	return config.WriteJSON(filepath.Join(stateDir, LegacyRecordFile), rec, 0o600)
 }
 
+// LegacyStillSignedIn is a boundary nothing is after: while an older terma's sign-ins are
+// still on the machine, its hooks may still be queueing, so every event bound to no
+// account is theirs.
+var LegacyStillSignedIn = time.Date(9999, 1, 1, 0, 0, 0, 0, time.UTC)
+
 // UnreadableLegacyRecord stands in for stateDir's record when it exists but can't be
 // read: an entry bound to no account counts as named by no one if it arrived before the
 // record was last written, which is no earlier than the retirement. So a server key sends
 // none of an older terma's backlog, and still sends what it collects after. With no time
 // for the record either, every such entry counts as named by no one.
 func UnreadableLegacyRecord(stateDir string) LegacyRecord {
-	rec := LegacyRecord{Account: LegacyAccountAmbiguous, RetiredAt: time.Date(9999, 1, 1, 0, 0, 0, 0, time.UTC)}
+	rec := LegacyRecord{Account: LegacyAccountAmbiguous, RetiredAt: LegacyStillSignedIn}
 	if info, err := os.Stat(filepath.Join(stateDir, LegacyRecordFile)); err == nil {
 		rec.RetiredAt = info.ModTime().UTC()
 	}
