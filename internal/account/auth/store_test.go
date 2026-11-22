@@ -313,3 +313,17 @@ func TestAnUnreadableSignInIsNoSignedOutOne(t *testing.T) {
 		t.Fatalf("unreadable: %q, want %q", got, AccountUnreadable)
 	}
 }
+
+// A sign-in for another environment keeps its own account: what is collected under it is
+// that person's, never the "" of a signed-out profile, which a server key may send for.
+func TestASignInForAnotherEnvironmentKeepsItsAccount(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	if _, err := SaveCredential(dir, "default", &Credential{AccessToken: "a", RefreshToken: "r", ExpiresAt: time.Now().Add(time.Hour),
+		AuthURL: "https://auth.prod.example.test", SessionID: "s", UserID: "u"}); err != nil {
+		t.Fatal(err)
+	}
+	if got, want := Account(dir, "default", "https://auth.dev.example.test"), AccountKey("https://auth.prod.example.test", "u"); got != want {
+		t.Fatalf("another environment's sign-in: %q, want its own account %q", got, want)
+	}
+}

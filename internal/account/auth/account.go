@@ -22,10 +22,11 @@ func AccountKey(authURL, userID string) string {
 	return hex.EncodeToString(sum[:])[:AccountKeyLen]
 }
 
-// Account is the account key of the sign-in a profile holds for authURL: "" when signed
-// out or signed in to another environment, AccountUnreadable when user-credentials.json
-// is there but can't be read. It reads only that file, never the keychain, so a hook can
-// afford it.
+// Account is the account key of the sign-in a profile holds: "" when signed out,
+// AccountUnreadable when user-credentials.json is there but can't be read. A sign-in for
+// another environment than authURL keeps its own account, which no token here and no
+// server key sends for: what is collected under it is that person's, never no one's. It
+// reads only that file, never the keychain, so a hook can afford it.
 func Account(dir, profile, authURL string) string {
 	cred, err := LoadIdentity(dir, profile)
 	switch {
@@ -34,7 +35,10 @@ func Account(dir, profile, authURL string) string {
 	case err != nil:
 		return AccountUnreadable
 	case cred.CheckEnvironment(authURL) != nil:
-		return ""
+		if key := AccountKey(cred.AuthURL, cred.UserID); key != "" {
+			return key
+		}
+		return AccountUnreadable
 	}
 	return AccountKey(cred.AuthURL, cred.UserID)
 }

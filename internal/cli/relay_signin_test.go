@@ -268,3 +268,25 @@ func TestARetirementIsRecordedAfterAnotherProcessRotated(t *testing.T) {
 		t.Fatal("the retirement was lost to a rotation in another process")
 	}
 }
+
+// A sign-in for another environment is no credential doctor may count here, though what it
+// collected keeps its account.
+func TestASignInForAnotherEnvironmentIsNoDeliveryCredential(t *testing.T) {
+	f := newFakeAuth(t)
+	authSandbox(t, f)
+	cred := storedSession(f)
+	cred.AuthURL = "https://auth.elsewhere.example.test"
+	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, cred); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := testApp.loadConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := testApp.deliveryCredential(cfg)("", "p1"); got != "" {
+		t.Fatalf("another environment's sign-in reads %q, want none", got)
+	}
+	if got := testApp.signInSource(cfg).Account(); got != auth.AccountKey(cred.AuthURL, "u-1") {
+		t.Fatalf("its account = %q, want its own", got)
+	}
+}

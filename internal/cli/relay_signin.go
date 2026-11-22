@@ -62,7 +62,8 @@ func (app *App) signInSource(cfg *config.Config) *signInSource {
 	return &signInSource{cfg: cfg, version: app.version}
 }
 
-// Account is the account key of the profile's sign-in for its environment; "" when it is
+// Account is the account key of the profile's sign-in, as auth.Account gives it (one for
+// another environment keeps its own, which Token never has a token for); "" when it is
 // signed out, or set up with a server key, which is no one's; auth.AccountUnreadable while
 // config.json or the sign-in can't be read.
 func (s *signInSource) Account() string {
