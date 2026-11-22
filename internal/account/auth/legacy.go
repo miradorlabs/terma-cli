@@ -156,6 +156,21 @@ type LegacyRecord struct {
 	SessionIDs []string  `json:"session_ids,omitempty"`
 	Account    string    `json:"account,omitempty"`
 	RetiredAt  time.Time `json:"retired_at"`
+	// ForgottenAt is when a retirement last set out to forget the older sign-ins, and when
+	// one did, its last: until then an older terma's hook may still have queued, so what
+	// has no account from before then is theirs in the spool (ReplayBefore). RetiredAt
+	// stays the relay's boundary, which a server key's parts are judged by.
+	ForgottenAt time.Time `json:"forgotten_at,omitzero"`
+}
+
+// ReplayBefore is the boundary of what an older terma's hooks queued: an event bound to no
+// account from before it is the older sign-ins'. The later of RetiredAt and ForgottenAt,
+// so a retirement that took more than one try still holds what was queued between them.
+func (r LegacyRecord) ReplayBefore() time.Time {
+	if r.ForgottenAt.After(r.RetiredAt) {
+		return r.ForgottenAt
+	}
+	return r.RetiredAt
 }
 
 // LegacyAccountAmbiguous is the account of retired sign-ins that named more than one
@@ -284,6 +299,19 @@ func AdvanceLegacyBoundary(stateDir string, from, to time.Time) error {
 			return err
 		}
 		rec.RetiredAt = to.UTC()
+		return config.WriteJSON(filepath.Join(stateDir, LegacyRecordFile), rec, 0o600)
+	})
+}
+
+// MarkLegacyForgotten moves the record's ForgottenAt forward to at; never back, and never on
+// a record not yet kept.
+func MarkLegacyForgotten(stateDir string, at time.Time) error {
+	return withLegacyRecord(stateDir, func() error {
+		rec, err := ReadLegacyRecord(stateDir)
+		if err != nil || rec.RetiredAt.IsZero() || !at.After(rec.ForgottenAt) {
+			return err
+		}
+		rec.ForgottenAt = at.UTC()
 		return config.WriteJSON(filepath.Join(stateDir, LegacyRecordFile), rec, 0o600)
 	})
 }

@@ -54,6 +54,17 @@ func (app *App) retireLegacySessions(ctx context.Context, authURL string) {
 		}
 		wg.Wait()
 		cancel()
+		// What an older hook queued until the sign-ins are gone stays theirs in the spool,
+		// this retirement the first or a retry: marked before they go, so a reader that
+		// sees them gone sees at most the keychain deletes' moments unmarked, and again
+		// once they are.
+		if auth.MarkLegacyForgotten(app.stateDir, time.Now()) != nil {
+			return
+		}
+		if auth.ForgetLegacy(app.dir) == nil {
+			_ = auth.MarkLegacyForgotten(app.stateDir, time.Now())
+		}
+		return
 	}
 	_ = auth.ForgetLegacy(app.dir)
 }

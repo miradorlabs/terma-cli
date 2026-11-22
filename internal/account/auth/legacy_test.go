@@ -337,3 +337,29 @@ func TestAdvanceLegacyBoundary_MovesOnlyItsOwn(t *testing.T) {
 		t.Fatalf("boundary = %v, want %v", rec.RetiredAt, later)
 	}
 }
+
+// A retirement's mark of when it forgot the older sign-ins only moves forward, never touches
+// the relay's boundary, and is not made on a record not yet kept.
+func TestMarkLegacyForgotten_MovesOnlyForward(t *testing.T) {
+	t.Parallel()
+	stateDir := t.TempDir()
+	at := time.Unix(1_800_000_000, 0).UTC()
+	if err := MarkLegacyForgotten(stateDir, at); err != nil {
+		t.Fatal(err)
+	}
+	if rec, err := ReadLegacyRecord(stateDir); err != nil || !rec.RetiredAt.IsZero() {
+		t.Fatalf("a mark with no record wrote %+v, %v", rec, err)
+	}
+	if err := RecordLegacy(stateDir, []LegacySignIn{{SessionID: "s", AuthURL: "https://auth.example.test", UserID: "u"}}, at); err != nil {
+		t.Fatal(err)
+	}
+	for _, mark := range []time.Time{at.Add(time.Hour), at.Add(time.Minute)} {
+		if err := MarkLegacyForgotten(stateDir, mark); err != nil {
+			t.Fatal(err)
+		}
+	}
+	rec, err := ReadLegacyRecord(stateDir)
+	if err != nil || !rec.ForgottenAt.Equal(at.Add(time.Hour)) || !rec.RetiredAt.Equal(at) || !rec.ReplayBefore().Equal(at.Add(time.Hour)) {
+		t.Fatalf("record = %+v, %v; want forgotten an hour after a boundary left as it was", rec, err)
+	}
+}

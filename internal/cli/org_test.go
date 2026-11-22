@@ -530,7 +530,7 @@ func TestEverythingUnboundStaysLegacyWhileTheOlderSignInsRemain(t *testing.T) {
 		t.Fatal(err)
 	}
 	// The second older sign-in's tokens are in the keychain, which won't let them go.
-	secret.FailForTest(t, testApp.dir)
+	unlock := secret.FailForTest(t, testApp.dir)
 	if err := testApp.storeLogin(context.Background(), cfg, storedSession(f)); err != nil {
 		t.Fatal(err)
 	}
@@ -552,15 +552,22 @@ func TestEverythingUnboundStaysLegacyWhileTheOlderSignInsRemain(t *testing.T) {
 	if got := legacyBefore(testApp.dir, testApp.stateDir); !got.Equal(farFuture) {
 		t.Errorf("the hooks judge by %v; want everything unbound held", got)
 	}
-	// Once they are gone the record's own boundary counts again.
-	if err := os.Remove(config.LegacyCredentialsPath(testApp.dir)); err != nil {
-		t.Fatal(err)
+	// The keychain unlocks and a later retirement forgets them: what an older hook queued
+	// meanwhile, before that retry, is still theirs in the spool. The relay's boundary stays.
+	queuedMeanwhile := time.Now()
+	unlock()
+	retry := time.Now()
+	testApp.retireLegacySessions(context.Background(), f.srv.URL)
+	if auth.HasLegacySignIns(testApp.dir) {
+		t.Fatal("the retry left the older sign-ins")
 	}
-	if got := spoolLegacyOwnership(testApp.dir, testApp.stateDir, true); !got.RetiredAt.Equal(rec.RetiredAt) {
-		t.Errorf("after the sign-ins went: %v, want %v", got.RetiredAt, rec.RetiredAt)
+	for _, got := range []time.Time{spoolLegacyOwnership(testApp.dir, testApp.stateDir, true).RetiredAt, legacyBefore(testApp.dir, testApp.stateDir)} {
+		if !got.After(retry) || got.Equal(farFuture) || !queuedMeanwhile.Before(got) {
+			t.Errorf("after the retry the spool judges by %v; want a boundary after the retry (%v)", got, retry)
+		}
 	}
-	if got := legacyBefore(testApp.dir, testApp.stateDir); !got.Equal(rec.RetiredAt) {
-		t.Errorf("hooks after the sign-ins went: %v, want %v", got, rec.RetiredAt)
+	if got, err := auth.LegacyOwnership(testApp.dir, testApp.stateDir, true); err != nil || !got.RetiredAt.Equal(rec.RetiredAt) {
+		t.Errorf("after the retry the relay judges by %v (%v), want the first retirement's %v", got.RetiredAt, err, rec.RetiredAt)
 	}
 }
 

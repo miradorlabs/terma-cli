@@ -228,8 +228,12 @@ func spoolLegacyOwnership(dir, stateDir string, serverKey bool) auth.LegacyRecor
 	if err != nil {
 		rec = auth.UnreadableLegacyRecord(stateDir)
 	}
-	if !rec.RetiredAt.IsZero() && auth.HasLegacySignIns(dir) {
+	switch {
+	case rec.RetiredAt.IsZero():
+	case auth.HasLegacySignIns(dir):
 		rec.RetiredAt = auth.LegacyStillSignedIn
+	default:
+		rec.RetiredAt = rec.ReplayBefore()
 	}
 	return rec
 }

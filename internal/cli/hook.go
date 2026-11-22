@@ -105,7 +105,7 @@ func legacyBefore(dir, stateDir string) time.Time {
 	case err != nil, auth.HasLegacySignIns(dir):
 		return farFuture
 	}
-	return rec.RetiredAt
+	return rec.ReplayBefore()
 }
 
 // farFuture is a boundary nothing is after.
