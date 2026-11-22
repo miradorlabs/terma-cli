@@ -41,14 +41,15 @@ func (app *App) doctorProbes(cfg *config.Config) doctor.Probes {
 				return doctor.SpoolState{}
 			}
 			n, _, _ := s.Pending()
-			return doctor.SpoolState{Open: true, Queued: n, WriteErr: s.Writable(), NextAttempt: s.NextAttempt(), Windows: s.RetryWindows(time.Now())}
+			return doctor.SpoolState{Open: true, Queued: n, WriteErr: s.Writable(), NextAttempt: s.NextAttempt(), Windows: s.RetryWindows(time.Now()),
+				Images: app.imageQueue()}
 		},
 		Deliver: func(ctx context.Context) (doctor.Delivery, error) {
 			res, err := app.flushSpool(ctx, true, 0)
 			if err != nil {
 				return doctor.Delivery{}, err
 			}
-			d := doctor.Delivery{Sent: res.Sent, Err: res.Err, Endpoints: res.Endpoints}
+			d := doctor.Delivery{Sent: res.Sent, Err: res.Err, Endpoints: res.Endpoints, Images: app.imageQueue()}
 			d.Delivered, d.Undelivered = describeFlush(res)
 			for _, f := range res.Failures {
 				ingest, refused := errors.AsType[*delivery.IngestError](f.Err)

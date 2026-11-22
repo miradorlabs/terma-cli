@@ -35,6 +35,9 @@ type Event struct {
 	// event to the repository list in force when it leaves. Local only.
 	Repository config.Repository `json:"repository,omitzero"`
 	Attrs      map[string]any    `json:"attrs,omitempty"`
+	// Attempts counts the sends of an image record that reached the host and did not get
+	// through; delivery gives up the image's bytes after a few. Local only.
+	Attempts int `json:"attempts,omitempty"`
 }
 
 // ValidTraceID reports whether id is an OTel trace id: 32 lowercase hex digits, not all zero.
@@ -82,6 +85,10 @@ func (f SenderFunc) Send(ctx context.Context, events []Event) ([]Event, error) {
 // Dir is the spool's folder under the state directory.
 const Dir = "spool"
 
+// ImageDir is the image lane's spool folder under the state directory: terma.prompt.image
+// records wait there, apart from the events, so no event waits on an image's upload.
+const ImageDir = "image-spool"
+
 const (
 	eventsFile       = "events.jsonl"
 	backoffFile      = "next-attempt"
@@ -100,10 +107,12 @@ const (
 	DefaultFlushTimeout = 30 * time.Second
 	// Local operations must not wait indefinitely for another process.
 	localLockTimeout = 250 * time.Millisecond
-	minBackoff       = 30 * time.Second
-	maxBackoff       = time.Hour
-	dirMode          = 0o700
-	fileMode         = 0o600
+	// ackTimeout bounds acknowledging a delivered batch, which outlives the pass's deadline.
+	ackTimeout = 2 * time.Second
+	minBackoff = 30 * time.Second
+	maxBackoff = time.Hour
+	dirMode    = 0o700
+	fileMode   = 0o600
 )
 
 // Spool is one queue directory.
@@ -207,6 +216,32 @@ func (s *Spool) Writable() error {
 		return err
 	}
 	return f.Sync()
+}
+
+// Mentions reports which of the needles appear in a queued event's line. It reads the file
+// as it stands, without the append lock or decoding a line: an append is whole lines and a
+// rewrite an atomic rename, so a needle unique enough to name one thing (a sha256) is
+// found wherever it is queued, and a false match only says too much.
+func (s *Spool) Mentions(needles []string) (map[string]bool, error) {
+	data, err := os.ReadFile(s.path())
+	if errors.Is(err, fs.ErrNotExist) {
+		return map[string]bool{}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return mentions(data, needles), nil
+}
+
+// mentions is which of the needles data holds.
+func mentions(data []byte, needles []string) map[string]bool {
+	found := map[string]bool{}
+	for _, n := range needles {
+		if n != "" && bytes.Contains(data, []byte(n)) {
+			found[n] = true
+		}
+	}
+	return found
 }
 
 // Peek returns up to n queued events without consuming them.

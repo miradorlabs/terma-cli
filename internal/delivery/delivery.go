@@ -34,15 +34,27 @@ type Router struct {
 	// User is who events sent to projectID at endpoint name, by Mirador user id, asked as they
 	// are flushed, as the relay asks as it accepts a part; "" or a nil User names no one.
 	User func(cfg *config.Config, projectID, endpoint string) string
+	// Images is the image lane's spool, which FlushImages delivers; Flush hands it any image
+	// record an older build spooled with the events.
+	Images *spool.Queue
+	// SetUp reports whether terma is still set up on this machine: a pass over the images stops
+	// before its next image once teardown has begun. Nil is set up.
+	SetUp func() bool
+
+	// requestTimeout stands in for timeoutFor when set.
+	requestTimeout func(n int) time.Duration
 }
 
 // Result summarizes one delivery pass; its counters are disjoint, one per reason.
 type Result struct {
 	Sent, Held, Failed, Expired, Pruned, Dropped, Unroutable, Withheld int
-	Skipped                                                            bool
-	Reason                                                             spool.SkipReason
-	NextAttempt                                                        time.Time
-	Err                                                                error
+	// Moved counts the image records an older build spooled with the events, which the
+	// events' pass handed to the image lane.
+	Moved       int
+	Skipped     bool
+	Reason      spool.SkipReason
+	NextAttempt time.Time
+	Err         error
 	// Failures names each failed project once, in order; doctor tells its own from another's.
 	Failures []Failure
 	// Waiting names each project skipped because its retry window was open.
@@ -68,8 +80,13 @@ func (r Result) Lost() bool {
 	return r.Expired > 0 || r.Pruned > 0 || r.Dropped > 0 || r.Unroutable > 0
 }
 
+// errNoImageLane is a Router with no image spool to hand images to.
+var errNoImageLane = errors.New("no image queue to hand images to")
+
 // Flush delivers everything s holds, each project with its own key to its own host. A
-// keyless or policy-less project's events are held; a failing one backs off alone.
+// keyless or policy-less project's events are held; a failing one backs off alone. Images
+// are not its to send: an image record an older build spooled with the events goes on to
+// the image lane (Images), whose own pass sends it.
 func (r Router) Flush(ctx context.Context, s *spool.Spool, cfg *config.Config, force bool, minInterval time.Duration) Result {
 	var res Result
 	now := time.Now()
@@ -77,49 +94,51 @@ func (r Router) Flush(ctx context.Context, s *spool.Spool, cfg *config.Config, f
 	waiting := map[string]bool{}
 	accepted := map[string]bool{}
 	router := spool.SenderFunc(func(ctx context.Context, events []spool.Event) ([]spool.Event, error) {
-		byProject := map[string][]spool.Event{}
-		var held []spool.Event
-		policies := map[string]config.Policy{}
-		policyErrors := map[string]error{}
-		for _, e := range events {
-			id, _ := e.Attrs[hookrun.AttrProjectID].(string)
-			if id == "" {
-				res.Unroutable++
-				continue
-			}
-			pol, checked := policies[id]
-			if !checked && policyErrors[id] == nil {
-				var err error
-				pol, err = r.Policy(ctx, cfg, id)
-				if err != nil {
-					policyErrors[id] = err
-				} else {
-					policies[id] = pol
-				}
-			}
-			if policyErrors[id] != nil {
-				held = append(held, e)
-				continue
-			}
-			out, ok := r.Outgoing(pol, id, e)
-			if !ok {
-				res.Withheld++
-				continue
-			}
-			byProject[id] = append(byProject[id], out)
-		}
 		var undelivered []spool.Event
 		var errs []error
+		// An image record goes on to the image queue. Should this batch's acknowledgement
+		// then fail, the next pass moves it again and the image queue holds it twice: each
+		// is sent, and the platform folds the second away. That costs one more upload after a
+		// rare failure, so no move is checked against what the image queue holds.
+		events, images := splitImages(events)
+		if len(images) > 0 {
+			err := errNoImageLane
+			if r.Images != nil {
+				err = r.Images.Append(images...)
+			}
+			if err != nil {
+				errs = append(errs, fmt.Errorf("hand %d image record(s) to the image queue: %w", len(images), err))
+				undelivered = append(undelivered, images...)
+			} else {
+				res.Moved += len(images)
+			}
+		}
+		byProject := map[string][]spool.Event{}
+		var held []spool.Event
+		places := r.places(cfg)
+		for _, e := range events {
+			id, out, place := places.of(ctx, e)
+			switch place {
+			case placeSend:
+				byProject[id] = append(byProject[id], out)
+			case placeHeld:
+				held = append(held, e)
+			case placeUnroutable:
+				res.Unroutable++
+			case placeWithheld:
+				res.Withheld++
+			}
+		}
 		for _, id := range slices.Sorted(maps.Keys(byProject)) {
 			batch := byProject[id]
-			key, err := keystore.Get(r.ConfigDir, id)
+			sender, err := r.senderFor(cfg, id)
 			if err != nil {
 				// The keychain is locked or out of reach: retry as for a refused send.
 				errs = append(errs, fmt.Errorf("%s: %w", id, err))
 				undelivered = append(undelivered, batch...)
 				continue
 			}
-			if key == "" {
+			if sender == nil {
 				// No key yet; MaxAge already dropped anything too old to wait.
 				held = append(held, batch...)
 				continue
@@ -137,25 +156,20 @@ func (r Router) Flush(ctx context.Context, s *spool.Spool, cfg *config.Config, f
 				undelivered = append(undelivered, batch...)
 				continue
 			}
-			endpoint := r.Endpoint(cfg, id)
-			sender := &otlpSender{Endpoint: endpoint, APIKey: key, ProjectID: id, Version: r.Version}
-			if r.User != nil {
-				sender.UserID = r.User(cfg, id, endpoint)
-			}
 			if _, err := sender.Send(ctx, wire(batch)); err != nil {
 				failed[id] = true
-				f := Failure{ProjectID: id, Endpoint: endpoint, Err: err}
+				f := Failure{ProjectID: id, Endpoint: sender.Endpoint, Err: err}
 				// A pass cut short by its own deadline learned nothing about the host.
 				if ctx.Err() == nil {
 					f.RetryAt = s.DestinationFailed(id, time.Now())
 				}
 				res.Failures = append(res.Failures, f)
-				errs = append(errs, fmt.Errorf("%s (%s): %w", id, endpoint, err))
+				errs = append(errs, fmt.Errorf("%s (%s): %w", id, sender.Endpoint, err))
 				undelivered = append(undelivered, batch...)
 				continue
 			}
 			s.DestinationDelivered(id, time.Now())
-			accepted[endpoint] = true
+			accepted[sender.Endpoint] = true
 			res.Sent += len(batch)
 		}
 		if len(undelivered) > 0 {
@@ -178,6 +192,73 @@ func (r Router) Flush(ctx context.Context, s *spool.Spool, cfg *config.Config, f
 	return res
 }
 
+// place is where an event goes this pass.
+type place int
+
+const (
+	// placeSend is an event its project's policy lets leave.
+	placeSend place = iota
+	// placeHeld is an event whose project's policy is out of reach: it waits for a later pass.
+	placeHeld
+	// placeUnroutable is an event with no project, and placeWithheld one its project's
+	// policy withholds whole: neither ever leaves.
+	placeUnroutable
+	placeWithheld
+)
+
+// placer places a pass's events, asking each project's policy once.
+type placer struct {
+	r        Router
+	cfg      *config.Config
+	policies map[string]config.Policy
+	errs     map[string]error
+}
+
+// places is a placer for one pass.
+func (r Router) places(cfg *config.Config) *placer {
+	return &placer{r: r, cfg: cfg, policies: map[string]config.Policy{}, errs: map[string]error{}}
+}
+
+// of is where e goes: its project, and e as its team's policy now lets it leave.
+func (p *placer) of(ctx context.Context, e spool.Event) (string, spool.Event, place) {
+	id, _ := e.Attrs[hookrun.AttrProjectID].(string)
+	if id == "" {
+		return "", e, placeUnroutable
+	}
+	pol, checked := p.policies[id]
+	if !checked && p.errs[id] == nil {
+		var err error
+		if pol, err = p.r.Policy(ctx, p.cfg, id); err != nil {
+			p.errs[id] = err
+		} else {
+			p.policies[id] = pol
+		}
+	}
+	if p.errs[id] != nil {
+		return id, e, placeHeld
+	}
+	out, ok := p.r.Outgoing(pol, id, e)
+	if !ok {
+		return id, e, placeWithheld
+	}
+	return id, out, placeSend
+}
+
+// senderFor is how project id is sent to: with its own key, to its own host. A nil sender
+// is a project with no key yet; an error, a keychain locked or out of reach.
+func (r Router) senderFor(cfg *config.Config, id string) (*otlpSender, error) {
+	key, err := keystore.Get(r.ConfigDir, id)
+	if err != nil || key == "" {
+		return nil, err
+	}
+	endpoint := r.Endpoint(cfg, id)
+	sender := &otlpSender{Endpoint: endpoint, APIKey: key, ProjectID: id, Version: r.Version, timeout: r.requestTimeout}
+	if r.User != nil {
+		sender.UserID = r.User(cfg, id, endpoint)
+	}
+	return sender, nil
+}
+
 // Allowed rechecks the policy ceiling on every delivery, since hook events bypass the
 // relay and may predate a tightened policy: an event from a repository the list no longer
 // names, a reply or a thread's name the policy's prompts-off withholds, sends nothing. Outgoing removes the
@@ -187,7 +268,7 @@ func (r Router) Allowed(org config.Policy, projectID string, e spool.Event) bool
 	if org.CollectsNothing || e.Global && !org.Global() || !org.Admits(e.Repository) {
 		return false
 	}
-	if e.Name == semconv.TermaAssistantMessageEvent || e.Name == semconv.TermaSessionTitleEvent {
+	if e.Name == semconv.TermaAssistantMessageEvent || e.Name == semconv.TermaSessionTitleEvent || e.Name == semconv.TermaPromptImageEvent {
 		prompts, _ := org.Content()
 		return prompts && r.consented(e, org.Global())
 	}
