@@ -722,3 +722,28 @@ func TestAnUnreadableRecordHoldsEverythingWhileTheOlderSignInsRemain(t *testing.
 		t.Fatalf("judged by %+v; want everything unbound named by no one", got)
 	}
 }
+
+// Once the older sign-ins are retired and gone, a later sign-in, setup or sign-out leaves
+// their record as it was: its boundary and its mark never move on, so what is queued after
+// the retirement is never counted as theirs.
+func TestARetirementDoneLeavesItsRecordToLaterSignIns(t *testing.T) {
+	f := newFakeAuth(t)
+	authSandbox(t, f)
+	stateDir := testApp.stateDir
+	at := time.Now().Add(-time.Hour).UTC()
+	if err := auth.RecordLegacy(stateDir, []auth.LegacySignIn{{SessionID: "old", AuthURL: f.srv.URL, UserID: "u-1"}}, at); err != nil {
+		t.Fatal(err)
+	}
+	if err := auth.MarkLegacyForgotten(stateDir, at); err != nil {
+		t.Fatal(err)
+	}
+	before, err := auth.ReadLegacyRecord(stateDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	testApp.retireLegacySessions(context.Background(), f.srv.URL)
+	after, err := auth.ReadLegacyRecord(stateDir)
+	if err != nil || !after.ReplayBefore().Equal(before.ReplayBefore()) || !after.RetiredAt.Equal(before.RetiredAt) {
+		t.Fatalf("record %+v became %+v (%v); want it left as the retirement left it", before, after, err)
+	}
+}

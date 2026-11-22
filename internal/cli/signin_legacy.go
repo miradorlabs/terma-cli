@@ -27,6 +27,11 @@ func (app *App) retireOlderSignIns(ctx context.Context, authURL string) {
 // their account for what was queued under them (auth.RecordLegacy); unless that record
 // can't be written, when they stay for the next sign-in to retire.
 func (app *App) retireLegacySessions(ctx context.Context, authURL string) {
+	// None left, as on every sign-in once they are retired: the record, and the boundary
+	// and the mark it keeps, stay as the retirement left them.
+	if !auth.HasLegacySignIns(app.dir) {
+		return
+	}
 	if signIns, err := auth.LegacySignIns(app.dir, true); err == nil {
 		// The record is the only account what an older terma queued has once its sign-ins
 		// are gone: without it, keep them, and the next sign-in tries again.
