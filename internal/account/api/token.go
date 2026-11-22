@@ -222,6 +222,11 @@ func (c *Client) refresh(ctx context.Context, redeem redeemFunc) error {
 	if held == nil || held.RefreshToken == "" {
 		return auth.ErrNotLoggedIn
 	}
+	// Held retired, perhaps by a mark the store could not take: never presented again, and
+	// never replaced by the stored pair, which may not say so.
+	if !held.RetiredAt.IsZero() {
+		return errRetired
+	}
 	if c.profile == "" {
 		return c.redeem(ctx, held, held, redeem, nil)
 	}
@@ -326,6 +331,14 @@ func (c *Client) spent(refreshToken string) bool {
 // replace makes cred the client's credential.
 func (c *Client) replace(cred *auth.Credential) {
 	c.mu.Lock()
+	// A session held retired stays so, though the pair replacing it (a rotation, the
+	// stored one) doesn't say it: the mark may never have reached the store.
+	if held := c.credential; held != nil && !held.RetiredAt.IsZero() && cred != nil &&
+		cred.RetiredAt.IsZero() && cred.SessionID == held.SessionID {
+		marked := *cred
+		marked.RetiredAt = held.RetiredAt
+		cred = &marked
+	}
 	c.credential = cred
 	c.tokenGen++
 	c.mu.Unlock()

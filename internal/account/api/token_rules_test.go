@@ -721,3 +721,40 @@ func TestARetired401IsNeverRefreshed(t *testing.T) {
 		t.Fatalf("%d requests: the retired sign-in was refreshed or sent again", n)
 	}
 }
+
+// A sign-in held retired, by a mark the store could not take, is never refreshed: not as its
+// token expires, nor when a server refuses it, and the stored pair, which doesn't say it is
+// retired, never replaces what the client holds.
+func TestARetirementHeldOnlyByTheClientIsNeverRefreshed(t *testing.T) {
+	var requests atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests.Add(1)
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	t.Cleanup(srv.Close)
+	c := newTestClient(t, srv.URL, &auth.Credential{AccessToken: "access-0", RefreshToken: "refresh-0",
+		ExpiresAt: time.Now().Add(-time.Hour)}, "")
+	c.retireHeld() // the store didn't take the mark
+	// Another process rotated the pair on disk, for the same session.
+	if err := auth.UpdateCredential(c.dir, config.DefaultProfile, &auth.Credential{AccessToken: "access-1", RefreshToken: "refresh-1",
+		ExpiresAt: time.Now().Add(-time.Minute), AuthURL: srv.URL, SessionID: c.Credential().SessionID}); err != nil {
+		t.Fatal(err)
+	}
+	if err := c.Refresh(context.Background()); !errors.Is(err, auth.ErrSignInRetired) {
+		t.Fatalf("Refresh = %v, want retired", err)
+	}
+	if err := c.RefreshRefused(context.Background(), TokenSHA256("access-0")); !errors.Is(err, auth.ErrSignInRetired) {
+		t.Fatalf("RefreshRefused = %v, want retired", err)
+	}
+	if n := requests.Load(); n != 0 {
+		t.Fatalf("%d requests: the retired sign-in was presented", n)
+	}
+	if c.Credential().RetiredAt.IsZero() {
+		t.Fatal("the client no longer holds the sign-in retired")
+	}
+	// A pair of the same session replacing the held one keeps it retired.
+	c.replace(&auth.Credential{AccessToken: "access-2", RefreshToken: "refresh-2", SessionID: c.Credential().SessionID})
+	if c.Credential().RetiredAt.IsZero() {
+		t.Fatal("a pair of the same session replaced the held retirement")
+	}
+}
