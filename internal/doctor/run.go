@@ -159,9 +159,11 @@ type Delivery struct {
 type Failure struct {
 	ProjectID, Endpoint string
 	Err                 error
-	// Refused says the host answered and refused; KeyRefused that it refused the key;
-	// Retired that it refused the sign-in as retired (SIGN_IN_RETIRED).
-	Refused, KeyRefused, Retired bool
+	// Refused says the host answered and refused; KeyRefused that it refused the server
+	// key; SignInRefused that it refused a person's sign-in for the team (403: no longer in
+	// its organization, say); TokenRefused that it refused the sign-in's token (401: rotated
+	// or revoked since); Retired that it refused the sign-in as retired (SIGN_IN_RETIRED).
+	Refused, KeyRefused, SignInRefused, TokenRefused, Retired bool
 }
 
 // Progress is how a run reports as it goes; every field is optional.
@@ -434,6 +436,12 @@ func failureFix(f Failure) string {
 	}
 	if f.KeyRefused {
 		return "the key this machine holds for team " + f.ProjectID + " was refused by " + f.Endpoint + " — it may have been revoked, or belong to another environment"
+	}
+	if f.SignInRefused {
+		return "your sign-in was refused for team " + f.ProjectID + " by " + f.Endpoint + " — check you still belong to its organization, or run `terma switch` to choose another"
+	}
+	if f.TokenRefused {
+		return "your sign-in's token was refused by " + f.Endpoint + " — run `terma doctor` again, or `terma login` to sign in again"
 	}
 	return "check the network and " + f.Endpoint + ", then run `terma doctor` again (it retries delivery)"
 }

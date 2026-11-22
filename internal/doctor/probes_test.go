@@ -547,3 +547,19 @@ func TestARetiredDeliveryIsNoRefusedKey(t *testing.T) {
 		t.Fatalf("fix = %q, want %q", got, RetiredFix)
 	}
 }
+
+// A refusal of a person's sign-in names the sign-in and the organization, never a team key
+// this profile does not use; a server key's refusal names the key.
+func TestARefusedSignInIsNotCalledARefusedKey(t *testing.T) {
+	t.Parallel()
+	signIn := failureFix(Failure{ProjectID: "p1", Endpoint: "https://otlp.example", Refused: true, SignInRefused: true})
+	if strings.Contains(signIn, "key") || !strings.Contains(signIn, "organization") {
+		t.Errorf("a refused sign-in's fix = %q", signIn)
+	}
+	if token := failureFix(Failure{ProjectID: "p1", Endpoint: "https://otlp.example", Refused: true, TokenRefused: true}); strings.Contains(token, "key") || !strings.Contains(token, "terma login") {
+		t.Errorf("a refused token's fix = %q", token)
+	}
+	if key := failureFix(Failure{ProjectID: "p1", Endpoint: "https://otlp.example", Refused: true, KeyRefused: true}); !strings.Contains(key, "key") {
+		t.Errorf("a refused key's fix = %q", key)
+	}
+}

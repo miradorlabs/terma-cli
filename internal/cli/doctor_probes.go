@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -52,10 +53,7 @@ func (app *App) doctorProbes(cfg *config.Config) doctor.Probes {
 			d := doctor.Delivery{Sent: res.Sent, Err: res.Err, Endpoints: res.Endpoints}
 			d.Delivered, d.Undelivered = describeFlush(res, app.signInFix(cfg))
 			for _, f := range res.Failures {
-				ingest, refused := errors.AsType[*delivery.IngestError](f.Err)
-				retired := refused && ingest.Retired()
-				d.Failures = append(d.Failures, doctor.Failure{ProjectID: f.ProjectID, Endpoint: f.Endpoint, Err: f.Err,
-					Refused: refused, KeyRefused: refused && ingest.KeyRefused() && !retired, Retired: retired})
+				d.Failures = append(d.Failures, doctorFailure(f, cfg.ServerKeySignIn))
 			}
 			return d, nil
 		},
@@ -180,4 +178,17 @@ func (app *App) updateRows(exe string) []doctor.Row {
 			c.Attempted, c.AttemptAt.Local().Format(when), c.Failure, c.Retry().Local().Format(when))})
 	}
 	return rows
+}
+
+// doctorFailure is a failed delivery as doctor reads it. The credential a refusal names is
+// the server key only on a profile set up with one (serverKey); otherwise it is the
+// person's sign-in.
+func doctorFailure(f delivery.Failure, serverKey bool) doctor.Failure {
+	ingest, refused := errors.AsType[*delivery.IngestError](f.Err)
+	retired := refused && ingest.Retired()
+	credRefused := refused && ingest.KeyRefused() && !retired
+	signIn := credRefused && !serverKey
+	return doctor.Failure{ProjectID: f.ProjectID, Endpoint: f.Endpoint, Err: f.Err, Refused: refused,
+		KeyRefused: credRefused && serverKey, Retired: retired,
+		SignInRefused: signIn && ingest.Status == http.StatusForbidden, TokenRefused: signIn && ingest.Status != http.StatusForbidden}
 }
