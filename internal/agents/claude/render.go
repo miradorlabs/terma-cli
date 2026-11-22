@@ -87,7 +87,7 @@ func boolValue(on bool) string {
 // isOn treats Claude Code's truthy spellings as on and everything else, including absent, as off.
 func isOn(v string) bool {
 	switch strings.ToLower(strings.TrimSpace(v)) {
-	case "1", "true", "yes":
+	case "1", "true", "yes", "on":
 		return true
 	default:
 		return false

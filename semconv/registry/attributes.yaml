@@ -68,6 +68,52 @@ attributes:
     stability: development
     brief: Where the provider says it ran the call, in its own spelling.
     examples: ["global", "us"]
+  - key: terma.serving.backend
+    type:
+      members:
+        - id: anthropic
+          value: anthropic
+          brief: Anthropic's own API.
+          stability: development
+        - id: aws_bedrock
+          value: aws-bedrock
+          brief: Amazon Bedrock.
+          stability: development
+        - id: google_vertex
+          value: google-vertex
+          brief: Google Cloud Vertex AI.
+          stability: development
+        - id: azure_foundry
+          value: azure-foundry
+          brief: Microsoft Foundry.
+          stability: development
+        - id: openai
+          value: openai
+          brief: OpenAI's own API.
+          stability: development
+        - id: azure_openai
+          value: azure-openai
+          brief: Azure OpenAI.
+          stability: development
+        - id: anthropic_aws
+          value: anthropic-aws
+          brief: Anthropic's platform, sold and run on AWS.
+          stability: development
+        - id: anthropic_google_cloud
+          value: anthropic-google-cloud
+          brief: Anthropic's platform, sold and run on Google Cloud.
+          stability: development
+        - id: private
+          value: private
+          brief: >-
+            An endpoint that is not a recognised public provider: a custom base URL's host, or a
+            custom, self-hosted or local provider.
+          stability: development
+    stability: development
+    brief: Who served the session's model calls, from the route the agent was configured with.
+    note: >-
+      Absent when nothing says where the calls went; `private` when they went somewhere terma
+      does not recognise. Never the host, URL or provider id itself.
 
   # Operations.
   - key: terma.operation.status

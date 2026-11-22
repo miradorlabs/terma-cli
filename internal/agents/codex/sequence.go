@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
@@ -25,6 +26,8 @@ type quotaCursor struct {
 	Anchor    string `json:"anchor"`
 	TurnID    string `json:"turn_id,omitempty"`
 	Skipping  bool   `json:"skipping,omitempty"`
+	// Provider is the thread's model provider id, which stays on this machine.
+	Provider string `json:"provider,omitempty"`
 	turnState
 }
 
@@ -67,12 +70,19 @@ func readFunding(ctx context.Context, sessionID, transcript string, cursor quota
 	if cursor.Identity == "" || reset {
 		cursor = quotaCursor{Identity: identity, Stream: fundingHash(identity + old.Stream + fmt.Sprint(old.Offset))}
 	}
+	// Only a read from the start knows the provider: a cursor written before it was tracked may be past a move to
+	// another, so it sends none until the next move.
+	if cursor.Provider == "" && cursor.Offset == 0 {
+		cursor.Provider = codexSessionProvider(first)
+	}
+	routes := sync.OnceValue(readCodexRoutes)
 	send := func(e hookrun.FundingEvidence, offset int64) error {
 		if e.Attrs == nil {
 			e.Attrs = map[string]any{}
 		}
 		e.Attrs[semconv.TermaObservationStreamKey] = cursor.Stream
 		e.Attrs[semconv.TermaObservationIDKey] = fundingHash(sessionID + cursor.Stream + fmt.Sprint(offset) + e.Status)
+		hookrun.BoundedAttr(e.Attrs, semconv.TermaServingBackendKey, routes().backend(cursor.Provider))
 		// A gap in a withheld turn leaves, but not which turn it was.
 		if cursor.TurnID != "" && cursor.Admitted {
 			e.Attrs[semconv.TermaTurnIDKey] = cursor.TurnID
@@ -81,6 +91,18 @@ func readFunding(ctx context.Context, sessionID, transcript string, cursor quota
 	}
 	gap := func(offset int64) error {
 		return send(hookrun.FundingEvidence{Source: sourceCodexRollout, Status: "gap"}, offset)
+	}
+	// skip reports a record it cannot read as a gap. That record may have moved the thread to
+	// another turn or provider.
+	// Accepted risk: the backend is then unknown, and not sent, until the thread's next provider
+	// move; reading the provider out of an oversized or unparseable record would keep it.
+	skip := func(offset int64) error {
+		cursor.Provider = ""
+		if err := gap(offset); err != nil {
+			return err
+		}
+		cursor.TurnID = ""
+		return nil
 	}
 	if reset {
 		if err := gap(0); err != nil {
@@ -118,12 +140,11 @@ func readFunding(ctx context.Context, sessionID, transcript string, cursor quota
 				}
 				return checkpoint("incomplete", nil)
 			}
-			if err := gap(cursor.Offset); err != nil {
+			if err := skip(cursor.Offset); err != nil {
 				return checkpoint("append_failed", err)
 			}
 			cursor.Offset += int64(len(data))
 			cursor.Skipping = true
-			cursor.TurnID = ""
 			return checkpoint("backlog", nil)
 		}
 		if cursor.Skipping {
@@ -140,14 +161,16 @@ func readFunding(ctx context.Context, sessionID, transcript string, cursor quota
 				} `json:"payload"`
 			}
 			if json.Unmarshal(line, &rec) != nil {
-				if err := gap(cursor.Offset); err != nil {
+				if err := skip(cursor.Offset); err != nil {
 					return checkpoint("append_failed", err)
 				}
 				emitted++
-				cursor.TurnID = ""
 			} else {
 				cursor.track(admits, rec.Type, rec.Payload.Type, rec.Payload.turnFields)
 				switch {
+				case rec.Type == "event_msg" && rec.Payload.Type == "thread_settings_applied" && rec.Payload.ThreadSettings.ModelProviderID != "":
+					// A resume can move the thread to another provider.
+					cursor.Provider = rec.Payload.ThreadSettings.ModelProviderID
 				case rec.Type == "turn_context" || (rec.Type == "event_msg" && (rec.Payload.Type == "task_started" || rec.Payload.Type == "turn_started")):
 					cursor.TurnID = ""
 					if hookrun.EvidenceLabel.MatchString(rec.Payload.TurnID) {
