@@ -36,7 +36,9 @@ type Router struct {
 	Consent func(tool string, c hookrun.Consent) bool
 	// User is who events sent to projectID at endpoint name, by Mirador user id, asked as they
 	// are flushed, as the relay asks as it accepts a part; "" or a nil User names no one.
-	User func(cfg *config.Config, projectID, endpoint string) string
+	// account is the sign-in the events' token was had for, "" under a server key: only its
+	// user may be named, never one who signed in since.
+	User func(cfg *config.Config, projectID, endpoint, account string) string
 	// SignIn is who events are sent as, on a profile not set up with a server key: each only
 	// under the account it was collected under (spool.Event.Account), else held until it
 	// ages out. Nil sends nothing that way.
@@ -176,7 +178,11 @@ func (r Router) Flush(ctx context.Context, s *spool.Spool, cfg *config.Config, f
 			endpoint := r.Endpoint(cfg, id)
 			sender := &otlpSender{Endpoint: endpoint, APIKey: key, ProjectID: id, NameProject: !serverKey, Version: r.Version}
 			if r.User != nil {
-				sender.UserID = r.User(cfg, id, endpoint)
+				bearer := account
+				if serverKey {
+					bearer = ""
+				}
+				sender.UserID = r.User(cfg, id, endpoint, bearer)
 			}
 			if _, err := sender.Send(ctx, wire(batch)); err != nil {
 				r.refused(ctx, serverKey, key, err)

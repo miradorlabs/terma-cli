@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -206,5 +207,21 @@ func TestAServerKeyNeverSendsAPersonsEvents(t *testing.T) {
 		if strings.Contains(req.body, "a-persons") || strings.Contains(req.body, "older-termas") {
 			t.Fatal("a person's event left with the server key")
 		}
+	}
+}
+
+// Events sent with a person's token ask who they name for that token's account, the one
+// they were collected under, never the account signed in when the user is asked.
+func TestEventsAskForTheUserOfTheAccountWhoseTokenSendsThem(t *testing.T) {
+	t.Parallel()
+	srv, _ := recordingIngest(t, http.StatusOK)
+	r := signInRouter(&fakeSignIn{account: "aaaaaaaaaaaaaaaa", token: "token-a"}, "")
+	var asked []string
+	r.User = func(_ *config.Config, _, _, account string) string { asked = append(asked, account); return "" }
+	if res := r.Flush(t.Context(), spoolOf(t, eventFor("p1", "mine", "aaaaaaaaaaaaaaaa")), &config.Config{OTLPURL: srv.URL}, true, 0); res.Sent != 1 || res.Err != nil {
+		t.Fatalf("Flush = %+v", res)
+	}
+	if !slices.Equal(asked, []string{"aaaaaaaaaaaaaaaa"}) {
+		t.Fatalf("asked for the user of %q, want A's account", asked)
 	}
 }

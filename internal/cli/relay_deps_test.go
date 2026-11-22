@@ -270,3 +270,32 @@ func TestALegacyRecordThatBecomesUnreadableNamesNoOne(t *testing.T) {
 		t.Fatalf("an unreadable record = %+v, want one naming no one", got)
 	}
 }
+
+// What a person's token sends names that token's own user only: asked for another account
+// (one signed in, or out, since the token was had), it names no one.
+func TestAccountUserNamesOnlyTheTokensOwnUser(t *testing.T) {
+	srv := httptest.NewServer(http.NotFoundHandler())
+	defer srv.Close()
+	authSandbox(t, &fakeAuth{srv: srv})
+	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, &auth.Credential{AccessToken: "ter_cli_a", RefreshToken: "ter_clr_a",
+		ExpiresAt: time.Now().Add(time.Hour), AuthURL: srv.URL, SessionID: "s-" + "org-a", UserID: "user-a"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := config.UpdateProfile(testApp.dir, config.DefaultProfile, func(p *config.Profile) { p.SelectOrganization("org-a", "A") }); err != nil {
+		t.Fatal(err)
+	}
+	selectPolicy(t, config.Policy{Mode: config.ModeRepo, TeamID: "team", Revision: 1, FetchedAt: time.Now()})
+	cfg, err := testApp.loadConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for account, want := range map[string]string{
+		auth.AccountKey(cfg.AuthURL, "user-a"): "user-a",
+		auth.AccountKey(cfg.AuthURL, "user-b"): "",
+		"":                                     "",
+	} {
+		if got := testApp.accountUser(cfg, "team", cfg.OTLPURL, account); got != want {
+			t.Errorf("for account %q named %q, want %q", account, got, want)
+		}
+	}
+}

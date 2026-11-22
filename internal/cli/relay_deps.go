@@ -113,6 +113,17 @@ func (app *App) teamUser(cfg *config.Config, projectID, endpoint string) string 
 	return signedInUser(cfg)
 }
 
+// accountUser is teamUser when it is account's, the sign-in a token was had for ("" for a
+// server key's): a person who signed in since, while it was had, is named on none of what
+// it sends.
+func (app *App) accountUser(cfg *config.Config, projectID, endpoint, account string) string {
+	user := app.teamUser(cfg, projectID, endpoint)
+	if auth.AccountKey(cfg.AuthURL, user) != account {
+		return ""
+	}
+	return user
+}
+
 func sameHost(a, b string) bool { return strings.TrimRight(a, "/") == strings.TrimRight(b, "/") }
 
 // signedInUser is the Mirador user cfg's profile is signed in as, from
@@ -144,7 +155,7 @@ func (app *App) signedInHeartbeat(ctx context.Context, cfg *config.Config, team 
 		return relay.ErrNoKey // signed out, retired, or another person's: no beat goes
 	}
 	endpoint := app.delivery().Endpoint(cfg, team)
-	relay.NameHeartbeatUser(beat, app.teamUser(cfg, team, endpoint))
+	relay.NameHeartbeatUser(beat, app.accountUser(cfg, team, endpoint, account))
 	err = sendHeartbeat(ctx, endpoint, token, team, beat)
 	if refusal, ok := errors.AsType[*heartbeatError](err); ok {
 		switch {

@@ -433,7 +433,7 @@ func TestHookEventsNameTheUser(t *testing.T) {
 	var asked []string
 	r := Router{ConfigDir: dir, OTLPPinned: true,
 		Policy: func(context.Context, *config.Config, string) (config.Policy, error) { return withheld, nil },
-		User: func(_ *config.Config, projectID, endpoint string) string {
+		User: func(_ *config.Config, projectID, endpoint, _ string) string {
 			asked = append(asked, projectID+"@"+endpoint)
 			if projectID == "p1" {
 				return "user-a"
