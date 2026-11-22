@@ -3,6 +3,7 @@ package relay
 import (
 	"bytes"
 	"context"
+	"github.com/miradorlabs/terma-cli/internal/account/auth"
 	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
 	"io"
 	"net/http"
@@ -547,5 +548,32 @@ func TestARetiredRefusalIsNeverTakenForAnExpiredToken(t *testing.T) {
 	defer signIn.mu.Unlock()
 	if len(signIn.refused) != 0 {
 		t.Fatalf("a retired sign-in's token was handed back as expired: %v", signIn.refused)
+	}
+}
+
+// A part collected while the sign-in could not be read is kept, on its own route, and never
+// leaves under a server key: it may be a person's.
+func TestAnUnreadableSignInsPartIsKeptButNeverSentByAKey(t *testing.T) {
+	t.Parallel()
+	u := newSignInUpstream(t)
+	dir := t.TempDir()
+	r := newRelay(Options{Dir: dir, Token: token, SignIn: &testSignIn{account: auth.AccountUnreadable},
+		Lookup: func(string, time.Time) (claim.Claim, bool) { return claim.Claim{ProjectID: "p1"}, true },
+		Resolve: func(claim.Claim) (Policy, error) {
+			return Policy{Endpoint: u.srv.URL, Key: "server-key", IncludePrompts: true, IncludeToolContent: true}, nil
+		}})
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() { r.Run(ctx); close(done) }()
+	t.Cleanup(func() { cancel(); <-done })
+	srv := httptest.NewServer(r.Handler())
+	defer srv.Close()
+	post(t, srv, "/v1/logs", oneLog("unreadable"), "application/x-protobuf", token, false)
+	time.Sleep(100 * time.Millisecond)
+	if c := r.Stats().Snapshot().Counters; c["dropped.outbox_write_failed.logs"] != 0 || len(u.requests()) != 0 {
+		t.Fatalf("counters %v, %d sent; want it kept and not sent", c, len(u.requests()))
+	}
+	if entries, err := r.outbox.list(routeOf(auth.AccountUnreadable, claim.Claim{ProjectID: "p1"})); err != nil || len(entries) != 1 {
+		t.Fatalf("queued %v (%v); want the part on its own route", entries, err)
 	}
 }

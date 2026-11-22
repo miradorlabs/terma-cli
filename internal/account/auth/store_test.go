@@ -297,3 +297,19 @@ func TestARefreshMarkCountsOnlyForItsToken(t *testing.T) {
 		t.Fatalf("LoadCredential = %+v, %v; want no mark beside another token", cred, err)
 	}
 }
+
+// A sign-in that can't be read is no one's account but its own: never the "" of a signed-out
+// profile, which a server key may send for.
+func TestAnUnreadableSignInIsNoSignedOutOne(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	if got := Account(dir, "default", "https://auth.example.test"); got != "" {
+		t.Fatalf("signed out: %q", got)
+	}
+	if err := os.WriteFile(config.CredentialsPath(dir), []byte("{"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if got := Account(dir, "default", "https://auth.example.test"); got != AccountUnreadable {
+		t.Fatalf("unreadable: %q, want %q", got, AccountUnreadable)
+	}
+}

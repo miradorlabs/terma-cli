@@ -91,7 +91,7 @@ func (app *App) deliveryCredential(cfg *config.Config) doctor.Keys {
 	}
 	return func(string, string) string {
 		// A retired sign-in sends nothing: only a newer terma, signed in again, does.
-		if auth.Account(cfg.Dir, cfg.ProfileName, cfg.AuthURL) == "" || auth.Retired(cfg.Dir, cfg.ProfileName) {
+		if a := auth.Account(cfg.Dir, cfg.ProfileName, cfg.AuthURL); a == "" || a == auth.AccountUnreadable || auth.Retired(cfg.Dir, cfg.ProfileName) {
 			return ""
 		}
 		return "your sign-in"

@@ -57,6 +57,8 @@ func TestUnparkingLeavesAnOlderTermasEventsUnbound(t *testing.T) {
 	for _, ev := range []spool.Event{
 		{Name: "older", Time: retired.Add(-time.Hour)},
 		{Name: "newer", Time: retired.Add(time.Minute)},
+		// Bound while the sign-in could not be read: this terma's, so bound, whatever its time.
+		{Name: "unreadable", Time: retired.Add(-time.Hour), Account: AccountUnreadable},
 	} {
 		if !(Env{}).park(r, parkedEvents, ev) {
 			t.Fatalf("could not park %s", ev.Name)
@@ -68,8 +70,28 @@ func TestUnparkingLeavesAnOlderTermasEventsUnbound(t *testing.T) {
 	for _, ev := range hookruntest.Spooled(t, sp) {
 		got[ev.Name] = ev.Account
 	}
-	if got["older"] != "" || got["newer"] != "account-b" {
-		t.Fatalf("accounts = %v; want the older terma's unbound, the newer bound", got)
+	if got["older"] != "" || got["newer"] != "account-b" || got["unreadable"] != "account-b" {
+		t.Fatalf("accounts = %v; want the older terma's unbound, the newer and the unreadable bound", got)
+	}
+}
+
+// An event bound while the sign-in could not be read is never unparked as no one's: under a
+// server key it keeps its account, and ages out.
+func TestAnUnreadableEventIsNeverUnparkedAsNoOnes(t *testing.T) {
+	root := hookruntest.InitRepo(t)
+	sp, err := spool.Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := &Repo{GitDir: root + "/.git"}
+	if !(Env{}).park(r, parkedEvents, spool.Event{Name: "unreadable", Time: time.Now(), Account: AccountUnreadable}) {
+		t.Fatal("could not park")
+	}
+	sp.BindNoPerson()
+	Env{Spool: sp, ServerKey: true}.unpark(r)
+	evs := hookruntest.Spooled(t, sp)
+	if len(evs) != 1 || evs[0].Account != AccountUnreadable || evs[0].NoPerson {
+		t.Fatalf("unparked %+v; want it kept as the unreadable sign-in's", evs)
 	}
 }
 

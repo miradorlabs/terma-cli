@@ -197,16 +197,17 @@ func TestAServerKeyNeverSendsAPersonsEvents(t *testing.T) {
 	}
 	old := eventFor("p1", "older-termas", "")
 	old.Time = time.Now().Add(-2 * time.Hour)
-	s := spoolOf(t, eventFor("p1", "a-persons", "aaaaaaaaaaaaaaaa"), old, eventFor("p1", "unbound", ""))
+	// One collected while the sign-ins couldn't be read is maybe a person's: never no one's.
+	s := spoolOf(t, eventFor("p1", "a-persons", "aaaaaaaaaaaaaaaa"), old, eventFor("p1", "unbound", ""), eventFor("p1", "unreadable", "unreadable")) // auth.AccountUnreadable
 	r := signInRouter(&fakeSignIn{}, "bbbbbbbbbbbbbbbb")
 	r.LegacyBefore = time.Now().Add(-time.Hour)
 	r.ConfigDir = dir
 	res := r.Flush(t.Context(), s, &config.Config{OTLPURL: srv.URL, ServerKeySignIn: true}, true, 0)
-	if res.Sent != 1 || res.Held != 2 {
+	if res.Sent != 1 || res.Held != 3 {
 		t.Fatalf("Flush = %+v", res)
 	}
 	for _, req := range sent() {
-		if strings.Contains(req.body, "a-persons") || strings.Contains(req.body, "older-termas") {
+		if strings.Contains(req.body, "a-persons") || strings.Contains(req.body, "older-termas") || strings.Contains(req.body, `"unreadable"`) {
 			t.Fatal("a person's event left with the server key")
 		}
 	}

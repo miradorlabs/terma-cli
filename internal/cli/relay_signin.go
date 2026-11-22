@@ -84,6 +84,8 @@ func (s *signInSource) Account() string {
 		return ""
 	}
 	s.account = auth.Account(s.cfg.Dir, s.cfg.ProfileName, s.cfg.AuthURL)
+	// Not kept either: a file made readable again need not look changed.
+	s.accountRead = s.account != auth.AccountUnreadable
 	return s.account
 }
 

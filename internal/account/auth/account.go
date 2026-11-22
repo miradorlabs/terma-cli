@@ -23,15 +23,26 @@ func AccountKey(authURL, userID string) string {
 }
 
 // Account is the account key of the sign-in a profile holds for authURL: "" when signed
-// out or signed in to another environment. It reads only user-credentials.json, never the
-// keychain, so a hook can afford it.
+// out or signed in to another environment, AccountUnreadable when user-credentials.json
+// is there but can't be read. It reads only that file, never the keychain, so a hook can
+// afford it.
 func Account(dir, profile, authURL string) string {
 	cred, err := LoadIdentity(dir, profile)
-	if err != nil || cred.CheckEnvironment(authURL) != nil {
+	switch {
+	case errors.Is(err, ErrNotLoggedIn):
+		return ""
+	case err != nil:
+		return AccountUnreadable
+	case cred.CheckEnvironment(authURL) != nil:
 		return ""
 	}
 	return AccountKey(cred.AuthURL, cred.UserID)
 }
+
+// AccountUnreadable is the account of what is collected while the sign-ins can't be read:
+// a person's maybe, so never no one's, which a server key would send; and no sign-in's
+// token is had for it. It ages out.
+const AccountUnreadable = "unreadable"
 
 // ErrSignInRetired is the server's answer that it no longer accepts this kind of sign-in:
 // only a newer terma, signed in again, sends again.

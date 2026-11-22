@@ -3,6 +3,7 @@
 package cli
 
 import (
+	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"os"
 	"testing"
 
@@ -72,6 +73,40 @@ func TestAnUnreadableProfileBindsNoAccount(t *testing.T) {
 		t.Fatalf("with the profile unreadable, account = %q; want none", got)
 	}
 	if err := os.Chmod(config.Path(testApp.dir), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if got := src.Account(); got != auth.AccountKey(f.srv.URL, "u-1") {
+		t.Fatalf("readable again, account = %q; want u-1's", got)
+	}
+}
+
+// A sign-in that can't be read binds what arrives to no sign-in that could send it, nor to
+// no one: AccountUnreadable, read again at the next export, though the file looks unchanged.
+func TestAnUnreadableSignInBindsTheUnreadableAccount(t *testing.T) {
+	if hookrun.AccountUnreadable != auth.AccountUnreadable {
+		t.Fatalf("the hook runtime's AccountUnreadable %q is not auth's %q", hookrun.AccountUnreadable, auth.AccountUnreadable)
+	}
+	if os.Geteuid() == 0 {
+		t.Skip("root reads a file its mode forbids")
+	}
+	f := newFakeAuth(t)
+	authSandbox(t, f)
+	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(f)); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := testApp.loadConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(config.CredentialsPath(testApp.dir), 0o000); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(config.CredentialsPath(testApp.dir), 0o600) })
+	src := testApp.signInSource(cfg)
+	if got := src.Account(); got != auth.AccountUnreadable {
+		t.Fatalf("with the sign-in unreadable, account = %q", got)
+	}
+	if err := os.Chmod(config.CredentialsPath(testApp.dir), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	if got := src.Account(); got != auth.AccountKey(f.srv.URL, "u-1") {

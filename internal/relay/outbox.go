@@ -162,7 +162,7 @@ func validRoute(rt route) bool {
 }
 
 func validAccount(a string) bool {
-	return a == "" || len(a) == auth.AccountKeyLen && strings.Trim(a, "0123456789abcdef") == ""
+	return a == "" || a == auth.AccountUnreadable || len(a) == auth.AccountKeyLen && strings.Trim(a, "0123456789abcdef") == ""
 }
 
 func validRepoKey(k string) bool {
