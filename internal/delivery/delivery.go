@@ -118,6 +118,13 @@ func (r Router) Flush(ctx context.Context, s *spool.Spool, cfg *config.Config, f
 				res.Unroutable++
 				continue
 			}
+			// Another person's or environment's events wait for their own sign-in; a server key
+			// sends only what no person's sign-in collected. Judged first: no policy is asked
+			// for, under this credential, for events it can't send.
+			if owner := r.owner(e); serverKey && owner != "" || !serverKey && (account == "" || owner != account) {
+				held = append(held, e)
+				continue
+			}
 			pol, checked := policies[id]
 			if !checked && policyErrors[id] == nil {
 				var err error
@@ -129,12 +136,6 @@ func (r Router) Flush(ctx context.Context, s *spool.Spool, cfg *config.Config, f
 				}
 			}
 			if policyErrors[id] != nil {
-				held = append(held, e)
-				continue
-			}
-			// Another person's or environment's events wait for their own sign-in; a server key
-			// sends only what no person's sign-in collected.
-			if owner := r.owner(e); serverKey && owner != "" || !serverKey && (account == "" || owner != account) {
 				held = append(held, e)
 				continue
 			}

@@ -228,3 +228,21 @@ func TestEventsAskForTheUserOfTheAccountWhoseTokenSendsThem(t *testing.T) {
 		t.Fatalf("asked for the user of %q, want A's account", asked)
 	}
 }
+
+// Events no credential here may send ask for no policy: another person's team's is never
+// fetched, or overwritten, under this sign-in.
+func TestEventsThatCantLeaveAskForNoPolicy(t *testing.T) {
+	t.Parallel()
+	srv, sent := recordingIngest(t, http.StatusOK)
+	r := signInRouter(&fakeSignIn{account: "aaaaaaaaaaaaaaaa", token: "token-a"}, "")
+	asked := 0
+	pol := config.Policy{Mode: config.ModeRepo, Repositories: listed, FetchedAt: time.Now()}
+	r.Policy = func(context.Context, *config.Config, string) (config.Policy, error) { asked++; return pol, nil }
+	res := r.Flush(t.Context(), spoolOf(t, eventFor("team-b", "someone-elses", "bbbbbbbbbbbbbbbb")), &config.Config{OTLPURL: srv.URL}, true, 0)
+	if res.Sent != 0 || res.Held != 1 || len(sent()) != 0 {
+		t.Fatalf("Flush = %+v", res)
+	}
+	if asked != 0 {
+		t.Fatalf("asked for %d policies for events that can't leave", asked)
+	}
+}
