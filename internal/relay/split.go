@@ -46,6 +46,9 @@ type part struct {
 	// account is the account key of the sign-in in place when the part arrived, which it
 	// leaves under, however long it is held first.
 	account string
+	// arrived is when the relay accepted it, which its outbox entry is named by however
+	// long it is held: whose an unbound part is depends on it (Relay.ownerAt).
+	arrived time.Time
 }
 
 // sessionOf is the first session key, by rank, on the record's attributes, then its

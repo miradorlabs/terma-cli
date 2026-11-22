@@ -5,10 +5,13 @@ import (
 	"strings"
 )
 
-// push queues a part enqueue wrote; enqueue runs under deliverMu, so each queue stays in arrival order.
+// push queues a part enqueue wrote, in its signal's queue by arrival (its name).
 func (s *sender) push(e entry) {
 	s.mu.Lock()
-	s.queue[e.signal] = append(s.queue[e.signal], e)
+	// A part released from the hold arrived before parts queued while it waited.
+	q := s.queue[e.signal]
+	i, _ := slices.BinarySearchFunc(q, e, func(a, b entry) int { return strings.Compare(a.name, b.name) })
+	s.queue[e.signal] = slices.Insert(q, i, e)
 	s.mu.Unlock()
 }
 

@@ -432,3 +432,50 @@ func TestAnExportKeepsTheSignInItArrivedUnder(t *testing.T) {
 		t.Fatalf("sent %q, want account A's token", got)
 	}
 }
+
+// A part that arrived bound to no account before the older sign-ins were retired is theirs,
+// however long it waited in the hold: released after the retirement, it still leaves under
+// their account.
+func TestAHeldPartKeepsTheTimeItArrived(t *testing.T) {
+	t.Parallel()
+	u := newSignInUpstream(t)
+	signIn := &testSignIn{} // signed out
+	var mu sync.Mutex
+	policyReady := false
+	var retiredAt time.Time // no record yet
+	r := newRelay(Options{Dir: t.TempDir(), Token: token, Hold: time.Minute, SignIn: signIn,
+		Legacy: func() (string, time.Time) {
+			mu.Lock()
+			defer mu.Unlock()
+			return accountA, retiredAt
+		},
+		Lookup: func(string, time.Time) (claim.Claim, bool) { return claim.Claim{ProjectID: "p1"}, true },
+		Resolve: func(claim.Claim) (Policy, error) {
+			mu.Lock()
+			defer mu.Unlock()
+			if !policyReady {
+				return Policy{}, ErrNoKey
+			}
+			return Policy{Endpoint: u.srv.URL, IncludePrompts: true, IncludeToolContent: true}, nil
+		}})
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() { r.Run(ctx); close(done) }()
+	t.Cleanup(func() { cancel(); <-done })
+	srv := httptest.NewServer(r.Handler())
+	defer srv.Close()
+	post(t, srv, "/v1/logs", oneLog("held"), "application/x-protobuf", token, false)
+	time.Sleep(10 * time.Millisecond)
+	// A signs in, which retires the older sign-ins, A's own; then the policy arrives.
+	mu.Lock()
+	retiredAt, policyReady = time.Now(), true
+	mu.Unlock()
+	signIn.set(accountA)
+	time.Sleep(10 * time.Millisecond)
+	r.cache.expire(time.Now().Add(time.Hour))
+	r.sweep()
+	waitFor(t, func() bool { return len(u.requests()) == 1 })
+	if got := u.requests()[0]; got != "Bearer token-"+accountA+" p1" {
+		t.Fatalf("sent %q, want A's token", got)
+	}
+}

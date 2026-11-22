@@ -166,9 +166,13 @@ func (r *Relay) deliverAttributed(c claim.Claim, pol Policy, p *part, how attrib
 		stamp(p, semconv.TermaVersionKey, r.opts.Version)
 	}
 	stampCheckout(p, r.ranIn(c, p, how), pol.IncludeToolContent)
-	// One time for whose the part is and for its outbox entry, so the two agree.
-	now := r.opts.Now()
-	nameUser(p, pol, r.ownerAt(p.account, now))
+	// One time for whose the part is and for its outbox entry, so the two agree: when it
+	// arrived, however long it was held.
+	at := p.arrived
+	if at.IsZero() {
+		at = r.opts.Now()
+	}
+	nameUser(p, pol, r.ownerAt(p.account, at))
 	if how.how != "" {
 		stamp(p, semconv.TermaRelayAttributionKey, how.how)
 		if how.session != "" {
@@ -177,7 +181,7 @@ func (r *Relay) deliverAttributed(c claim.Claim, pol Policy, p *part, how attrib
 		// attributed_by_process or attributed_by_catch_all: global mode's default project is no process's.
 		r.stats.add("attributed_by_"+strings.ReplaceAll(how.how, "-", "_")+"."+string(p.signal), p.records)
 	}
-	r.enqueue(c, p, now)
+	r.enqueue(c, p, at)
 }
 
 // ranIn is the claim naming where the part's session ran, its Root the working tree and its

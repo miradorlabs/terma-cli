@@ -50,15 +50,16 @@ func (r *Relay) sender(rt route) *sender {
 }
 
 // enqueue writes a part to its route's outbox before the export is answered, so a crash
-// loses none. It runs under deliverMu, so files are named in arrival order.
-func (r *Relay) enqueue(c claim.Claim, p *part, now time.Time) {
+// loses none. Its file is named by at, when the part arrived, so a part released from the
+// hold sorts before the ones that arrived while it waited.
+func (r *Relay) enqueue(c claim.Claim, p *part, at time.Time) {
 	rt := routeOf(p.account, c)
 	body, err := proto.Marshal(p.msg)
 	if err != nil {
 		r.stats.dropped(p.signal, "encode_failed", p.records)
 		return
 	}
-	e := newEntry(now, p.signal, p.records)
+	e := newEntry(at, p.signal, p.records)
 	if err := r.outbox.put(rt, c.Repository, e, body); err != nil {
 		r.stats.dropped(p.signal, "outbox_write_failed", p.records)
 		r.warnf("outbox %s: %v; dropped %d %s", rt, err, p.records, p.signal)
