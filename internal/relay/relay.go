@@ -327,6 +327,9 @@ func (r *Relay) export(w http.ResponseWriter, req *http.Request, s Signal) {
 		r.inflight--
 		r.mu.Unlock()
 	}()
+	// The sign-in the export arrived under, before its body is read: a switch while it
+	// is read or decoded does not hand what was collected under one account to another.
+	account := r.account()
 	body, err := readBody(req)
 	if err != nil {
 		r.stats.add("refused_unreadable", 1)
@@ -343,7 +346,6 @@ func (r *Relay) export(w http.ResponseWriter, req *http.Request, s Signal) {
 	pid := r.senderPID(req)
 	_, global := r.catchAll()
 	narrow := r.opts.CatchAll != nil && !global
-	account := r.account()
 	for _, p := range parts {
 		p.pid, p.narrow, p.account = pid, narrow, account
 		p.at = earliest(p.msg)

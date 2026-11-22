@@ -1,8 +1,10 @@
 package relay
 
 import (
+	"bytes"
 	"context"
 	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -386,5 +388,47 @@ func TestABlockedSignalHoldsUpNoOtherUnderAServerKey(t *testing.T) {
 	waitForCounters(t, r, func(c map[string]int) bool { return c["forwarded.logs"] == 1 })
 	if c := r.Stats().Snapshot().Counters; c["forwarded.traces"] != 0 {
 		t.Fatalf("the older terma's trace left under the key: %v", c)
+	}
+}
+
+// switchOnRead is an export body whose first read switches the sign-in, as a switch landing
+// while the relay reads the request would.
+type switchOnRead struct {
+	r      io.Reader
+	onRead func()
+	once   sync.Once
+}
+
+func (b *switchOnRead) Read(p []byte) (int, error) {
+	b.once.Do(b.onRead)
+	return b.r.Read(p)
+}
+
+// An export is bound to the sign-in it arrived under, even when another one takes its place
+// while its body is still being read: it leaves under A's token, not B's.
+func TestAnExportKeepsTheSignInItArrivedUnder(t *testing.T) {
+	t.Parallel()
+	u := newSignInUpstream(t)
+	signIn := &testSignIn{account: accountA}
+	r := signedInRelay(t, u, signIn, t.TempDir(), "")
+	body := &switchOnRead{r: bytes.NewReader(oneLog("new")), onRead: func() { signIn.set(accountB) }}
+	req := httptest.NewRequest(http.MethodPost, "/v1/logs", body)
+	req.Header.Set("Content-Type", "application/x-protobuf")
+	req.Header.Set("Authorization", "Bearer "+token)
+	w := httptest.NewRecorder()
+	r.Handler().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("export answered %d: %s", w.Code, w.Body)
+	}
+	time.Sleep(50 * time.Millisecond)
+	if n := len(u.requests()); n != 0 {
+		t.Fatalf("%d requests left under B: %v", n, u.requests())
+	}
+	// A signs back in: the part, bound to A, leaves under A.
+	signIn.set(accountA)
+	r.sender(routeOf(accountA, claim.Claim{ProjectID: "p1"})).poke()
+	waitFor(t, func() bool { return len(u.requests()) == 1 })
+	if got := u.requests()[0]; got != "Bearer token-"+accountA+" p1" {
+		t.Fatalf("sent %q, want account A's token", got)
 	}
 }
