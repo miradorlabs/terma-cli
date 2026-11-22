@@ -463,6 +463,41 @@ func TestAPartlyBrokenOlderFileIsRetiredAsNoOnes(t *testing.T) {
 	}
 }
 
+// The older sign-ins' boundary is when their retirement is done, after their revokes: what
+// an older terma's hook still running queued meanwhile stays on that terma's side.
+func TestTheLegacyBoundaryIsSetOnceTheRetirementIsDone(t *testing.T) {
+	f := newFakeAuth(t)
+	authSandbox(t, f)
+	if err := config.UpdateFile(testApp.dir, func(file *config.File) { file.InsecureStorage = true }); err != nil {
+		t.Fatal(err)
+	}
+	legacyA := legacyTokenPrefix + orgA().ID
+	data := `{"default": {"organizations": {"` + orgA().ID + `": {"access_token": "` + legacyA + `", "session_id": "old-a", "auth_url": "` + f.srv.URL + `", "organization_id": "` + orgA().ID + `", "user_id": "u-1"}}}}`
+	if err := os.WriteFile(config.LegacyCredentialsPath(testApp.dir), []byte(data), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	var revoked atomic.Int64
+	inner := f.srv.Config.Handler
+	f.srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/v1/auth/cli/revoke" {
+			time.Sleep(50 * time.Millisecond)
+			revoked.Store(time.Now().UnixNano())
+		}
+		inner.ServeHTTP(w, r)
+	})
+	cfg, err := testApp.loadConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := testApp.storeLogin(context.Background(), cfg, storedSession(f)); err != nil {
+		t.Fatal(err)
+	}
+	rec, err := auth.ReadLegacyRecord(testApp.stateDir)
+	if err != nil || revoked.Load() == 0 || !rec.RetiredAt.After(time.Unix(0, revoked.Load())) {
+		t.Fatalf("boundary %v, revoked at %v (%v); want the boundary after the revoke", rec.RetiredAt, time.Unix(0, revoked.Load()), err)
+	}
+}
+
 // `terma teardown --sign-out` revokes the session server-side and forgets it.
 func TestSignOutRevokesTheSession(t *testing.T) {
 	f := newFakeAuth(t)

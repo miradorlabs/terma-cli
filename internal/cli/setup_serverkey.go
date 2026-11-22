@@ -54,10 +54,16 @@ func (app *App) useServerKey(s *setup.Steps, ui *setupUI, org orgRef, team *stri
 		if err != nil {
 			return config.Policy{}, err
 		}
+		// keepServerKey refuses a team key the keychain will not give up: refused before
+		// anything is retired, so a setup that stops there changes nothing.
+		if _, err := keystore.Get(app.dir, cfg.Team); err != nil {
+			return config.Policy{}, fmt.Errorf("read this team's current key (%w): unlock the system keychain, then run `terma setup` again", err)
+		}
 		// An older terma's sign-ins are retired, and recorded first, once the key has proved
 		// it reads the policy, and before the profile becomes the key's: a relay that saw a
 		// server key with them still on the machine would record their backlog as no one's
-		// (auth.LegacyOwnership), where the retirement knows its person.
+		// (auth.LegacyOwnership), where the retirement knows its person. A setup that fails
+		// after this leaves them retired, as this release retires them anyway.
 		app.retireLegacySessions(ctx, cfg.AuthURL)
 		// The sign-in is kept here, before setup stores the policy, so a failed fetch writes
 		// nothing.

@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"os"
@@ -229,18 +230,25 @@ func cachedLegacyRecord(dir, stateDir string, serverKey func() bool) func() auth
 	rec := auth.UnreadableLegacyRecord(stateDir)
 	var files [3]os.FileInfo
 	read := false
+	// pending is the boundary of a first look that could not be written: it is judged by,
+	// and written again at every call until it lands, never replaced by a later one.
+	var pending time.Time
+	recordPath := filepath.Join(stateDir, auth.LegacyRecordFile)
 	return func() auth.LegacyRecord {
 		mu.Lock()
 		defer mu.Unlock()
-		now := [3]os.FileInfo{statOrNil(filepath.Join(stateDir, auth.LegacyRecordFile)),
-			statOrNil(config.LegacyCredentialsPath(dir)), statOrNil(config.Path(dir))}
-		if read && unchanged(files[0], now[0]) && unchanged(files[1], now[1]) && unchanged(files[2], now[2]) {
+		now := [3]os.FileInfo{statOrNil(recordPath), statOrNil(config.LegacyCredentialsPath(dir)), statOrNil(config.Path(dir))}
+		if read && pending.IsZero() && unchanged(files[0], now[0]) && unchanged(files[1], now[1]) && unchanged(files[2], now[2]) {
 			return rec
 		}
 		files, read = now, true
-		switch got, err := auth.LegacyOwnership(dir, stateDir, serverKey()); {
+		at := cmp.Or(pending, time.Now())
+		switch got, err := auth.LegacyOwnershipAt(dir, stateDir, serverKey(), at); {
 		case err == nil:
-			rec = got
+			rec, pending = got, time.Time{}
+			if !got.RetiredAt.IsZero() && statOrNil(recordPath) == nil {
+				pending = got.RetiredAt // not written yet: tried again next time
+			}
 		case rec.RetiredAt.IsZero():
 			rec = auth.UnreadableLegacyRecord(stateDir)
 		}

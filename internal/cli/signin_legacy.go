@@ -33,14 +33,18 @@ func (app *App) retireLegacySessions(ctx context.Context, authURL string) {
 		// A file that names no sign-in, or doesn't read whole, names no one, and says so;
 		// what could be read of it is still revoked and forgotten below.
 		var record error
+		recorded := time.Now()
 		if auth.HasLegacySignIns(app.dir) && (len(signIns) == 0 || !auth.LegacyParsedWhole(app.dir)) {
-			record = auth.RecordNoOne(app.stateDir, signIns, time.Now())
+			record = auth.RecordNoOne(app.stateDir, signIns, recorded)
 		} else {
-			record = auth.RecordLegacy(app.stateDir, signIns, time.Now())
+			record = auth.RecordLegacy(app.stateDir, signIns, recorded)
 		}
 		if record != nil {
 			return
 		}
+		// The boundary moves to when the retirement is done (below): an older terma's hook
+		// still running queues on that terma's side until its sign-ins are gone.
+		defer func() { _ = auth.AdvanceLegacyBoundary(app.stateDir, recorded, time.Now()) }()
 		revokeCtx, cancel := context.WithTimeout(ctx, legacyRevokeWait)
 		var wg sync.WaitGroup
 		for _, s := range signIns {

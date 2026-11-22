@@ -313,3 +313,27 @@ func TestLegacyOwnership_NeverOverwritesARecordWrittenMeanwhile(t *testing.T) {
 		t.Fatalf("record = %+v (%v), look = %+v; want the retirement's account kept", rec, err, got)
 	}
 }
+
+// The boundary moves only from the one its retirement wrote: a record another look or
+// retirement wrote keeps its own, and it never moves back.
+func TestAdvanceLegacyBoundary_MovesOnlyItsOwn(t *testing.T) {
+	t.Parallel()
+	stateDir := t.TempDir()
+	first := time.Now().Add(-time.Minute).UTC()
+	if err := RecordNoOne(stateDir, nil, first); err != nil {
+		t.Fatal(err)
+	}
+	later := first.Add(30 * time.Second)
+	if err := AdvanceLegacyBoundary(stateDir, first.Add(-time.Hour), later); err != nil {
+		t.Fatal(err)
+	}
+	if rec, _ := ReadLegacyRecord(stateDir); !rec.RetiredAt.Equal(first) {
+		t.Fatalf("another's boundary moved: %v", rec.RetiredAt)
+	}
+	if err := AdvanceLegacyBoundary(stateDir, first, later); err != nil {
+		t.Fatal(err)
+	}
+	if rec, _ := ReadLegacyRecord(stateDir); !rec.RetiredAt.Equal(later) {
+		t.Fatalf("boundary = %v, want %v", rec.RetiredAt, later)
+	}
+}

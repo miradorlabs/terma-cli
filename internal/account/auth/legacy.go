@@ -232,11 +232,18 @@ func UnreadableLegacyRecord(stateDir string) LegacyRecord {
 // their sign-in. A record that can't be written leaves every such entry, up to now, named
 // by no one. A record that can't be read is as UnreadableLegacyRecord.
 func LegacyOwnership(dir, stateDir string, serverKey bool) (LegacyRecord, error) {
+	return LegacyOwnershipAt(dir, stateDir, serverKey, time.Now())
+}
+
+// LegacyOwnershipAt is LegacyOwnership with at as the first look's boundary: a caller whose
+// first look could not be written tries again with the same one, so the boundary it has
+// been judging by is the one recorded.
+func LegacyOwnershipAt(dir, stateDir string, serverKey bool, at time.Time) (LegacyRecord, error) {
 	rec, err := ReadLegacyRecord(stateDir)
 	if err != nil || !rec.RetiredAt.IsZero() || !serverKey || !HasLegacySignIns(dir) {
 		return rec, err
 	}
-	nameless := LegacyRecord{Account: LegacyAccountAmbiguous, RetiredAt: time.Now().UTC()}
+	nameless := LegacyRecord{Account: LegacyAccountAmbiguous, RetiredAt: at.UTC()}
 	if signIns, err := LegacySignIns(dir, false); err == nil {
 		for _, s := range signIns {
 			if s.SessionID != "" {
@@ -259,6 +266,21 @@ func LegacyOwnership(dir, stateDir string, serverKey bool) (LegacyRecord, error)
 		return written, nil
 	}
 	return nameless, nil
+}
+
+// AdvanceLegacyBoundary moves the record's boundary from from to to, only while it is still
+// from: the retirement that wrote it moves it to when its work is done, so what an older
+// terma's hook still running queued meanwhile stays on that terma's side. A record any
+// earlier look or retirement wrote keeps its own boundary.
+func AdvanceLegacyBoundary(stateDir string, from, to time.Time) error {
+	return withLegacyRecord(stateDir, func() error {
+		rec, err := ReadLegacyRecord(stateDir)
+		if err != nil || !rec.RetiredAt.Equal(from.UTC()) || !to.After(from) {
+			return err
+		}
+		rec.RetiredAt = to.UTC()
+		return config.WriteJSON(filepath.Join(stateDir, LegacyRecordFile), rec, 0o600)
+	})
 }
 
 // RecordNoOne keeps, under stateDir, that the sign-ins an older terma left name no one

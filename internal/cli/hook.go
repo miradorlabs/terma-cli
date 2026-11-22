@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -90,7 +91,8 @@ func (app *App) hookProfile() dispatch.Profile {
 	if p.ServerKey = cfg.ServerKeySignIn; !p.ServerKey {
 		p.Account = auth.Account(cfg.Dir, cfg.ProfileName, cfg.AuthURL)
 	}
-	p.LegacyBefore = func() time.Time { return legacyBefore(app.dir, app.stateDir) }
+	// Read once per hook run, and only by a replay that needs it.
+	p.LegacyBefore = sync.OnceValue(func() time.Time { return legacyBefore(app.dir, app.stateDir) })
 	return p
 }
 
