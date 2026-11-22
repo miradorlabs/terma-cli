@@ -112,43 +112,64 @@ func (r *Relay) owner(rt route, e entry) string {
 
 // ownerAt is owner for an entry bound to account and received at.
 func (r *Relay) ownerAt(account string, at time.Time) string {
-	if account != "" || r.opts.Legacy == nil {
-		return account
-	}
-	legacy, retiredAt := r.opts.Legacy()
-	if legacy != "" && at.Before(retiredAt) {
-		return legacy
-	}
-	return ""
+	return r.ownerOf(account)(at)
 }
 
-// mayLeave keeps of entries, in arrival order, those that may be sent now: with a sign-in,
-// only under the account that collected them while its sign-in is the one in place; with
-// a server key (serverKey), only those no person's sign-in collected, the older sign-ins'
-// backlog included.
+// ownerOf is ownerAt for entries bound to account, the legacy record read once: a pass
+// over a route's queue asks it for each entry.
+func (r *Relay) ownerOf(account string) func(at time.Time) string {
+	if account != "" || r.opts.Legacy == nil {
+		return func(time.Time) string { return account }
+	}
+	legacy, retiredAt := r.opts.Legacy()
+	return func(at time.Time) string {
+		if legacy != "" && at.Before(retiredAt) {
+			return legacy
+		}
+		return ""
+	}
+}
+
+// leaving keeps of a route's entries, in arrival order, up to limit of those that may be sent now:
+// with a sign-in, only under the account that collected them while its sign-in is the one
+// in place; with a server key (serverKey), only those no person's sign-in collected, the
+// older sign-ins' backlog included.
 //
 // Under a sign-in it keeps the leading run, so a route's parts leave in arrival order: a
 // route's entries share one owner, but for an older terma's backlog, which comes first.
-// Under a server key it keeps every entry of the batch no person collected, so that
-// backlog, which never leaves that way, holds up nothing behind it in the same batch; one
-// longer than a batch holds the route until it ages out.
-func (r *Relay) mayLeave(rt route, entries []entry, serverKey bool) []entry {
+// Under a server key it keeps every entry no person collected, so that backlog, which
+// never leaves that way, holds up nothing behind it, however long it is.
+//
+// The sign-in and the legacy record are read now, once: what it returns reads nothing, so
+// a sender can run it on its live queue under its lock. Its result may share entries' array.
+func (r *Relay) leaving(rt route, serverKey bool, limit int) func([]entry) []entry {
+	owner := r.ownerOf(rt.account)
 	if serverKey {
-		var out []entry
-		for _, e := range entries {
-			if r.owner(rt, e) == "" {
-				out = append(out, e)
+		return func(entries []entry) []entry {
+			var out []entry
+			for _, e := range entries {
+				if len(out) == limit {
+					break
+				}
+				if owner(e.received()) == "" {
+					out = append(out, e)
+				}
 			}
+			return out
 		}
-		return out
 	}
 	now := r.account()
-	for i, e := range entries {
-		if owner := r.owner(rt, e); owner == "" || owner != now {
-			return entries[:i]
+	return func(entries []entry) []entry {
+		for i, e := range entries {
+			if i == limit {
+				return entries[:i]
+			}
+			if o := owner(e.received()); o == "" || o != now {
+				return entries[:i]
+			}
 		}
+		return entries
 	}
-	return entries
 }
 
 // loop delivers the outbox oldest first; a stopping relay keeps going within its grace.
@@ -209,10 +230,10 @@ func (s *sender) loop() {
 		// Another person's or environment's backlog waits for its own sign-in, and ages out;
 		// a server key sends only what no person's sign-in collected.
 		if ok {
-			// The oldest signal with parts that may leave: one whose head may not (an older
-			// terma's backlog under a server key) holds up none of the others.
-			serverKey := pol.Key != ""
-			entries = s.nextLeaving(limit, func(es []entry) []entry { return s.r.mayLeave(s.route, es, serverKey) })
+			// The oldest signal with parts that may leave: a head that may not (an older
+			// terma's backlog under a server key) holds up neither its own signal's parts
+			// behind it nor another signal.
+			entries = s.nextLeaving(s.r.leaving(s.route, pol.Key != "", limit))
 			if len(entries) == 0 {
 				ok = false
 			}

@@ -479,3 +479,51 @@ func TestAHeldPartKeepsTheTimeItArrived(t *testing.T) {
 		t.Fatalf("sent %q, want A's token", got)
 	}
 }
+
+// serverKeyRelay runs a relay on dir under a server key, the older sign-ins named no one
+// and retired at retired.
+func serverKeyRelay(t *testing.T, u *signInUpstream, dir string, retired time.Time) *Relay {
+	t.Helper()
+	r := newRelay(Options{Dir: dir, Token: token, SignIn: &testSignIn{},
+		Legacy: func() (string, time.Time) { return "ambiguous", retired },
+		Resolve: func(claim.Claim) (Policy, error) {
+			return Policy{Endpoint: u.srv.URL, Key: "server-key", IncludePrompts: true, IncludeToolContent: true}, nil
+		}})
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() { r.Run(ctx); close(done) }()
+	t.Cleanup(func() { cancel(); <-done })
+	return r
+}
+
+// An older terma's backlog longer than a batch, at the head of a signal, holds up none of
+// the key's own parts behind it.
+func TestALongBacklogHoldsUpNoKeysPartBehindIt(t *testing.T) {
+	t.Parallel()
+	u := newSignInUpstream(t)
+	dir := t.TempDir()
+	retired := time.Now()
+	for i := range maxMergeFiles + 1 {
+		queueAt(t, dir, "", retired.Add(-time.Hour+time.Duration(i)*time.Millisecond))
+	}
+	queueAt(t, dir, "", retired.Add(time.Minute))
+	r := serverKeyRelay(t, u, dir, retired)
+	waitForCounters(t, r, func(c map[string]int) bool { return c["forwarded.logs"] == 1 })
+}
+
+// A merged batch refused behind an older terma's part is sent again a part at a time: the
+// part blocked at the head does not stop the key's own parts going one by one.
+func TestARefusedBatchIsSentAPartAtATimePastABlockedHead(t *testing.T) {
+	t.Parallel()
+	u := newSignInUpstream(t, http.StatusBadRequest)
+	dir := t.TempDir()
+	retired := time.Now()
+	queueAt(t, dir, "", retired.Add(-time.Hour))
+	queueAt(t, dir, "", retired.Add(time.Minute))
+	queueAt(t, dir, "", retired.Add(2*time.Minute))
+	r := serverKeyRelay(t, u, dir, retired)
+	waitForCounters(t, r, func(c map[string]int) bool { return c["forwarded.logs"] == 2 })
+	if n := len(u.requests()); n != 3 {
+		t.Fatalf("%d requests; want the refused batch, then each part alone", n)
+	}
+}
