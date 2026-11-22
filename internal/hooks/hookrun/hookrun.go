@@ -56,6 +56,9 @@ type Env struct {
 	// Account is the account key of the sign-in in place, stamped on every event this hook
 	// queues, parked ones included, so it leaves under that sign-in only.
 	Account string
+	// AccountSince is when that sign-in began, zero when unknown: an event from before it
+	// was collected under another sign-in, or none, and is never bound to this one.
+	AccountSince time.Time
 	// ServerKey is that the profile is set up with a server key: what the hook queues is
 	// no person's (spool.Event.NoPerson).
 	ServerKey bool
@@ -281,6 +284,11 @@ func (e Env) bindReplayed(ev *spool.Event) {
 		return
 	}
 	if e.LegacyBefore != nil && ev.Time.Before(e.LegacyBefore()) {
+		return
+	}
+	// A person's sign-in takes only what was queued since it began: one parked while signed
+	// out, or under someone else since signed out, is not theirs. Unknown, it takes none.
+	if e.Account != "" && !e.ServerKey && (e.AccountSince.IsZero() || ev.Time.Before(e.AccountSince)) {
 		return
 	}
 	ev.Account, ev.NoPerson = e.Account, e.Account == "" && e.ServerKey

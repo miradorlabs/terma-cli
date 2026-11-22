@@ -65,6 +65,8 @@ type Profile struct {
 	// Account is the account key of the sign-in in place, which what the hook queues is
 	// bound to; "" with none, or under a server key.
 	Account string
+	// AccountSince is when that sign-in began (auth.SignedInAt), zero when unknown.
+	AccountSince time.Time
 	// ServerKey is a profile set up with a server key: what the hook queues is no person's.
 	ServerKey bool
 	// LegacyBefore is, read when needed, when an older terma's sign-ins were retired: an
@@ -91,7 +93,7 @@ func Run(ctx context.Context, d Deps, r Request) int {
 		p := d.Profile()
 		env := hookrun.Env{Now: time.Now(), Cwd: r.Cwd, Args: r.Args, Stdin: r.Stdin, Stdout: r.Stdout, Stderr: r.Stderr,
 			ConfigDir: d.ConfigDir, StateDir: d.StateDir, Version: r.Version, Debug: r.Debug, Flush: d.Flush, Policy: p.Policy, Team: p.Team,
-			Account: p.Account, ServerKey: p.ServerKey, LegacyBefore: p.LegacyBefore}
+			Account: p.Account, AccountSince: p.AccountSince, ServerKey: p.ServerKey, LegacyBefore: p.LegacyBefore}
 		if !r.HooksOff {
 			env.Spool = bound(d.Spool(), p)
 		}
@@ -145,6 +147,7 @@ func run(ctx context.Context, d Deps, r Request, handler agents.Handler, flush b
 		Team:         p.Team,
 		Agents:       p.Agents,
 		Account:      p.Account,
+		AccountSince: p.AccountSince,
 		ServerKey:    p.ServerKey,
 		LegacyBefore: p.LegacyBefore,
 	}

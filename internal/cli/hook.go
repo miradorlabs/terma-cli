@@ -93,6 +93,7 @@ func (app *App) hookProfile() dispatch.Profile {
 	p := dispatch.Profile{Team: cfg.Policy.TeamID, Agents: cfg.Harnesses, Policy: cfg.Policy.InForce(cfg.OrganizationID, cfg.AuthURL)}
 	if p.ServerKey = cfg.ServerKeySignIn; !p.ServerKey {
 		p.Account = auth.Account(cfg.Dir, cfg.ProfileName, cfg.AuthURL)
+		p.AccountSince = accountSince(cfg, p.Account)
 	}
 	// Read once per hook run, and only by a replay that needs it.
 	p.LegacyBefore = sync.OnceValue(func() time.Time { return legacyBefore(app.dir, app.stateDir) })
@@ -109,6 +110,16 @@ func legacyBefore(dir, stateDir string) time.Time {
 		return farFuture
 	}
 	return rec.ReplayBefore()
+}
+
+// accountSince is when account, the profile's sign-in, began, which what unparking binds to
+// it is from since. The unreadable account takes every unbound event, from any time: it
+// sends none, and keeps them from being no one's, which a server key would send.
+func accountSince(cfg *config.Config, account string) time.Time {
+	if account == auth.AccountUnreadable {
+		return time.Unix(0, 0)
+	}
+	return auth.SignedInAt(cfg.Dir, cfg.ProfileName)
 }
 
 // farFuture is a boundary nothing is after.

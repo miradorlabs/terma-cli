@@ -24,14 +24,14 @@ func TestUnparkingKeepsTheAccountsEventsWereCollectedUnder(t *testing.T) {
 	for _, ev := range []spool.Event{
 		{Name: "a-persons", Account: "account-a"},
 		{Name: "a-server-keys", NoPerson: true},
-		{Name: "unread"},
+		{Name: "unread", Time: time.Now()},
 	} {
 		if !sandboxed.park(r, parkedEvents, ev) {
 			t.Fatalf("could not park %s", ev.Name)
 		}
 	}
 	sp.Bind("account-b")
-	Env{Spool: sp, Account: "account-b"}.unpark(r)
+	Env{Spool: sp, Account: "account-b", AccountSince: time.Now().Add(-time.Hour)}.unpark(r)
 	got := map[string]string{}
 	for _, ev := range hookruntest.Spooled(t, sp) {
 		got[ev.Name] = ev.Account
@@ -66,7 +66,7 @@ func TestUnparkingLeavesAnOlderTermasEventsUnbound(t *testing.T) {
 		}
 	}
 	sp.Bind("account-b")
-	Env{Spool: sp, Account: "account-b", LegacyBefore: func() time.Time { return retired }}.unpark(r)
+	Env{Spool: sp, Account: "account-b", AccountSince: retired.Add(-2 * time.Hour), LegacyBefore: func() time.Time { return retired }}.unpark(r)
 	got := map[string]string{}
 	for _, ev := range hookruntest.Spooled(t, sp) {
 		got[ev.Name] = ev.Account
@@ -107,7 +107,7 @@ func TestAParkedPushIsBoundWhenUnparked(t *testing.T) {
 		t.Fatal("could not park the push")
 	}
 	var recorded []string
-	Env{StateDir: state, Account: "account-b", AwaitPush: func(path string) { recorded = append(recorded, path) }}.unparkPushes(r)
+	Env{StateDir: state, Account: "account-b", AccountSince: time.Now().Add(-time.Hour), AwaitPush: func(path string) { recorded = append(recorded, path) }}.unparkPushes(r)
 	if len(recorded) != 1 {
 		t.Fatalf("recorded %v", recorded)
 	}
@@ -120,3 +120,46 @@ func TestAParkedPushIsBoundWhenUnparked(t *testing.T) {
 
 // unreadable is auth.AccountUnreadable, which the hook runtime may not import.
 const unreadable = "unreadable"
+
+// An event parked before the sign-in in place began, while signed out or under someone
+// since signed out, is not that sign-in's: unparked, it stays bound to no one. One from
+// since is bound. With no start known, none is.
+func TestUnparkingBindsOnlyWhatTheSignInCollected(t *testing.T) {
+	root := hookruntest.InitRepo(t)
+	sp, err := spool.Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := &Repo{GitDir: root + "/.git"}
+	signedIn := time.Now().Add(-time.Hour)
+	for _, ev := range []spool.Event{
+		{Name: "before", Time: signedIn.Add(-time.Minute)},
+		{Name: "since", Time: signedIn.Add(time.Minute)},
+	} {
+		if !(Env{}).park(r, parkedEvents, ev) {
+			t.Fatalf("could not park %s", ev.Name)
+		}
+	}
+	sp.Bind("account-b")
+	Env{Spool: sp, Account: "account-b", AccountSince: signedIn}.unpark(r)
+	got := map[string]string{}
+	for _, ev := range hookruntest.Spooled(t, sp) {
+		got[ev.Name] = ev.Account
+	}
+	if got["before"] != "" || got["since"] != "account-b" {
+		t.Fatalf("accounts = %v; want only what came since the sign-in bound to it", got)
+	}
+	// A sign-in whose start isn't known takes none.
+	sp2, err := spool.Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !(Env{}).park(r, parkedEvents, spool.Event{Name: "unknown", Time: time.Now()}) {
+		t.Fatal("could not park")
+	}
+	sp2.Bind("account-b")
+	Env{Spool: sp2, Account: "account-b"}.unpark(r)
+	if evs := hookruntest.Spooled(t, sp2); len(evs) != 1 || evs[0].Account != "" {
+		t.Fatalf("unparked %+v; want it bound to no one", evs)
+	}
+}

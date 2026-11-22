@@ -142,6 +142,9 @@ server key: the hook's spool is bound with `BindNoPerson`), and leaves only unde
 key; or neither (an older terma's, or a sandboxed hook's that couldn't read the sign-in).
 Only that last case is ever bound later, to whatever the appending spool is bound to
 (`Spool.Append`, and unparking): the hook's account, or no person under a server key.
+Unparking binds it to a person's sign-in only if it was collected since that sign-in began
+(`signed_in_at` in `user-credentials.json`); one from before, or with no start known, stays
+unbound.
 Every replay of a recorded event (`AppendAsCollected`) keeps what it says. An event with
 neither from before `legacy-sign-ins.json`'s `retired_at` counts as the account that record
 names, which is no one when it is ambiguous; one from after leaves only under a server key.

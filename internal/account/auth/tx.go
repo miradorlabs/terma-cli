@@ -84,6 +84,10 @@ func (tx *Tx) Update(profile string, cred *Credential) error {
 			inFile = true
 		}
 		kept := keep(tx.dir, profile, cred, old, inFile)
+		// A rotation keeps when the session was signed in.
+		if kept.SignedInAt.IsZero() && old != nil && old.SessionID == kept.SessionID {
+			kept.SignedInAt = old.SignedInAt
+		}
 		unindexed = old == nil && kept.AccessToken == ""
 		file[profile] = kept
 	})

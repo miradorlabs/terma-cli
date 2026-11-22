@@ -327,3 +327,27 @@ func TestASignInForAnotherEnvironmentKeepsItsAccount(t *testing.T) {
 		t.Fatalf("another environment's sign-in: %q, want its own account %q", got, want)
 	}
 }
+
+// A new sign-in records when it began, and a rotation of its tokens keeps that.
+func TestASignInKeepsWhenItBeganThroughItsRotations(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	before := time.Now()
+	cred := &Credential{AccessToken: "a1", RefreshToken: "r1", ExpiresAt: time.Now().Add(time.Hour),
+		AuthURL: "https://auth.example.test", SessionID: "s", UserID: "u"}
+	if _, err := SaveCredential(dir, "default", cred); err != nil {
+		t.Fatal(err)
+	}
+	began := SignedInAt(dir, "default")
+	if began.Before(before) || began.After(time.Now()) {
+		t.Fatalf("signed in at %v; want the save's time", began)
+	}
+	rotated := &Credential{AccessToken: "a2", RefreshToken: "r2", ExpiresAt: time.Now().Add(time.Hour),
+		AuthURL: "https://auth.example.test", SessionID: "s", UserID: "u"}
+	if err := UpdateCredential(dir, "default", rotated); err != nil {
+		t.Fatal(err)
+	}
+	if got := SignedInAt(dir, "default"); !got.Equal(began) {
+		t.Fatalf("after a rotation signed in at %v; want %v", got, began)
+	}
+}

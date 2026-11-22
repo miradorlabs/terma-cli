@@ -62,6 +62,7 @@ func (app *App) pushEnv() hookrun.Env {
 		}
 	default:
 		env.Account = auth.Account(cfg.Dir, cfg.ProfileName, cfg.AuthURL)
+		env.AccountSince = accountSince(cfg, env.Account)
 		if env.Spool != nil {
 			env.Spool.Bind(env.Account)
 		}
