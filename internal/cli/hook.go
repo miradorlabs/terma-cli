@@ -85,6 +85,9 @@ func (app *App) hookDeps() dispatch.Deps {
 func (app *App) hookProfile() dispatch.Profile {
 	cfg, err := config.Load(app.dir, app.stateDir, config.Overrides{})
 	if err != nil {
+		// Bound to no account, but NoPolicy admits no repository, so nothing is spooled or
+		// parked under it: an emit path that skipped Repo's admission would queue events a
+		// later server key sends.
 		return dispatch.Profile{Policy: config.NoPolicy("", "")}
 	}
 	p := dispatch.Profile{Team: cfg.Policy.TeamID, Agents: cfg.Harnesses, Policy: cfg.Policy.InForce(cfg.OrganizationID, cfg.AuthURL)}

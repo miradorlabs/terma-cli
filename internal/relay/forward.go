@@ -1,6 +1,7 @@
 package relay
 
 import (
+	"github.com/miradorlabs/terma-cli/internal/account/auth"
 	"sync"
 	"time"
 
@@ -164,7 +165,8 @@ func (r *Relay) leaving(rt route, serverKey bool, limit int) func([]entry) []ent
 			if i == limit {
 				return entries[:i]
 			}
-			if o := owner(e.received()); o == "" || o != now {
+			// The unreadable account is no sign-in's, even while it is what reads as signed in.
+			if o := owner(e.received()); o == "" || o == auth.AccountUnreadable || o != now {
 				return entries[:i]
 			}
 		}

@@ -73,11 +73,12 @@ func (s *signInSource) Account() string {
 	}
 	s.account, s.accountFiles, s.accountRead = "", files, false
 	// A profile whose mode can't be read may be a server key's, which keeps an earlier
-	// person's sign-in on disk: no one's, until it can be read, and not kept, since a
-	// file made readable again (its permissions) need not look changed.
+	// person's sign-in on disk, or a person's: neither's, so the unreadable account, which
+	// no token and no server key sends for; and not kept, since a file made readable again
+	// (its permissions) need not look changed.
 	file, err := config.LoadFile(s.cfg.Dir)
 	if err != nil {
-		return ""
+		return auth.AccountUnreadable
 	}
 	s.accountRead = true
 	if p := file.Profiles[s.cfg.ProfileName]; p != nil && p.ServerKeySignIn {

@@ -57,8 +57,9 @@ func TestUnparkingLeavesAnOlderTermasEventsUnbound(t *testing.T) {
 	for _, ev := range []spool.Event{
 		{Name: "older", Time: retired.Add(-time.Hour)},
 		{Name: "newer", Time: retired.Add(time.Minute)},
-		// Bound while the sign-in could not be read: this terma's, so bound, whatever its time.
-		{Name: "unreadable", Time: retired.Add(-time.Hour), Account: AccountUnreadable},
+		// Bound while the sign-in could not be read (auth.AccountUnreadable): maybe another
+		// person's than the one signed in now, so it keeps that account.
+		{Name: "unreadable", Time: retired.Add(time.Minute), Account: unreadable},
 	} {
 		if !(Env{}).park(r, parkedEvents, ev) {
 			t.Fatalf("could not park %s", ev.Name)
@@ -70,8 +71,8 @@ func TestUnparkingLeavesAnOlderTermasEventsUnbound(t *testing.T) {
 	for _, ev := range hookruntest.Spooled(t, sp) {
 		got[ev.Name] = ev.Account
 	}
-	if got["older"] != "" || got["newer"] != "account-b" || got["unreadable"] != "account-b" {
-		t.Fatalf("accounts = %v; want the older terma's unbound, the newer and the unreadable bound", got)
+	if got["older"] != "" || got["newer"] != "account-b" || got["unreadable"] != unreadable {
+		t.Fatalf("accounts = %v; want the older terma's unbound, the newer bound, the unreadable kept", got)
 	}
 }
 
@@ -84,13 +85,13 @@ func TestAnUnreadableEventIsNeverUnparkedAsNoOnes(t *testing.T) {
 		t.Fatal(err)
 	}
 	r := &Repo{GitDir: root + "/.git"}
-	if !(Env{}).park(r, parkedEvents, spool.Event{Name: "unreadable", Time: time.Now(), Account: AccountUnreadable}) {
+	if !(Env{}).park(r, parkedEvents, spool.Event{Name: "unreadable", Time: time.Now(), Account: unreadable}) {
 		t.Fatal("could not park")
 	}
 	sp.BindNoPerson()
 	Env{Spool: sp, ServerKey: true}.unpark(r)
 	evs := hookruntest.Spooled(t, sp)
-	if len(evs) != 1 || evs[0].Account != AccountUnreadable || evs[0].NoPerson {
+	if len(evs) != 1 || evs[0].Account != unreadable || evs[0].NoPerson {
 		t.Fatalf("unparked %+v; want it kept as the unreadable sign-in's", evs)
 	}
 }
@@ -116,3 +117,6 @@ func TestAParkedPushIsBoundWhenUnparked(t *testing.T) {
 		t.Fatalf("recorded push = %+v, %v; want it bound to account-b", got.Event, err)
 	}
 }
+
+// unreadable is auth.AccountUnreadable, which the hook runtime may not import.
+const unreadable = "unreadable"

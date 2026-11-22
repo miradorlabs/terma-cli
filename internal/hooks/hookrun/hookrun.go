@@ -270,32 +270,21 @@ func (e Env) unpark(r *Repo) {
 	}
 }
 
-// bindReplayed binds a replayed event that names neither an account nor no person, or one
-// bound while the sign-in could not be read (AccountUnreadable), as the sign-in in place
-// collected it: a sandboxed hook that could not read the sign-in queued it moments ago. One
-// from before an older terma's sign-ins were retired is that terma's, and stays unbound
-// for their record to decide.
+// bindReplayed binds a replayed event that names neither an account nor no person as the
+// sign-in in place collected it: a sandboxed hook that could not read the sign-in queued it
+// moments ago. One bound already keeps its account, the one a hook that could not read the
+// sign-in names (auth.AccountUnreadable) included: it may be another person's than the one
+// signed in now. One from before an older terma's sign-ins were retired is that terma's,
+// and stays unbound for their record to decide.
 func (e Env) bindReplayed(ev *spool.Event) {
-	switch {
-	case ev.NoPerson:
+	if ev.Account != "" || ev.NoPerson {
 		return
-	case ev.Account == AccountUnreadable:
-		// This terma's, whatever its time, and maybe a person's: bound to a sign-in only,
-		// never to no one, which a server key would send.
-		if e.Account == "" {
-			return
-		}
-	case ev.Account != "":
-		return
-	case e.LegacyBefore != nil && ev.Time.Before(e.LegacyBefore()):
+	}
+	if e.LegacyBefore != nil && ev.Time.Before(e.LegacyBefore()) {
 		return
 	}
 	ev.Account, ev.NoPerson = e.Account, e.Account == "" && e.ServerKey
 }
-
-// AccountUnreadable is auth.AccountUnreadable, the account of what a hook collected while
-// it could not read the sign-in; the hook runtime knows no account package.
-const AccountUnreadable = "unreadable"
 
 // Admits reports whether the team policy collects the working copy at dir, judged as Repo
 // judges the current directory.

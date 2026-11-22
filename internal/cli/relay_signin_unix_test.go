@@ -3,7 +3,6 @@
 package cli
 
 import (
-	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"os"
 	"testing"
 
@@ -45,10 +44,10 @@ func TestARetiredSignInGivesNoTokenWhenTheStoreFails(t *testing.T) {
 	}
 }
 
-// A profile whose mode can't be read binds nothing to the person signed in: it may be a
-// server key's, which keeps an earlier sign-in on disk. Once it can be read again, the
-// sign-in counts again, though the file looks unchanged.
-func TestAnUnreadableProfileBindsNoAccount(t *testing.T) {
+// A profile whose mode can't be read binds nothing to the person signed in, nor to no one:
+// it may be a server key's, which keeps an earlier sign-in on disk, or a person's. Once it
+// can be read again, the sign-in counts again, though the file looks unchanged.
+func TestAnUnreadableProfileBindsTheUnreadableAccount(t *testing.T) {
 	if os.Geteuid() == 0 {
 		t.Skip("root reads a file its mode forbids")
 	}
@@ -69,8 +68,8 @@ func TestAnUnreadableProfileBindsNoAccount(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = os.Chmod(config.Path(testApp.dir), 0o600) })
 	src := testApp.signInSource(cfg)
-	if got := src.Account(); got != "" {
-		t.Fatalf("with the profile unreadable, account = %q; want none", got)
+	if got := src.Account(); got != auth.AccountUnreadable {
+		t.Fatalf("with the profile unreadable, account = %q; want %q", got, auth.AccountUnreadable)
 	}
 	if err := os.Chmod(config.Path(testApp.dir), 0o600); err != nil {
 		t.Fatal(err)
@@ -83,9 +82,6 @@ func TestAnUnreadableProfileBindsNoAccount(t *testing.T) {
 // A sign-in that can't be read binds what arrives to no sign-in that could send it, nor to
 // no one: AccountUnreadable, read again at the next export, though the file looks unchanged.
 func TestAnUnreadableSignInBindsTheUnreadableAccount(t *testing.T) {
-	if hookrun.AccountUnreadable != auth.AccountUnreadable {
-		t.Fatalf("the hook runtime's AccountUnreadable %q is not auth's %q", hookrun.AccountUnreadable, auth.AccountUnreadable)
-	}
 	if os.Geteuid() == 0 {
 		t.Skip("root reads a file its mode forbids")
 	}
