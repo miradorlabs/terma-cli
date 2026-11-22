@@ -69,3 +69,37 @@ func TestAnUnreadableLegacyRecordIsReadAgain(t *testing.T) {
 		t.Fatalf("readable again: %+v; want its own account %q and boundary %v", got, want, at)
 	}
 }
+
+// A retirement that writes its record before an unwritten first look lands keeps the first
+// look's boundary: what the server key collected between the two is never counted as the
+// person's backlog.
+func TestARetirementBeforeTheFirstLookLandsKeepsItsBoundary(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root writes where a mode forbids")
+	}
+	dir, stateDir := t.TempDir(), t.TempDir()
+	data := `{"default": {"organizations": {"o": {"session_id": "s", "auth_url": "https://auth.example.test", "user_id": "u"}}}}`
+	if err := os.WriteFile(config.LegacyCredentialsPath(dir), []byte(data), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(stateDir, 0o500); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(stateDir, 0o700) })
+	legacy := cachedLegacyRecord(dir, stateDir, func() (bool, error) { return true, nil })
+	first := legacy()
+	if err := os.Chmod(stateDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	// The person signs in and retires the older sign-ins, later, before the retry.
+	later := first.RetiredAt.Add(time.Minute)
+	if err := auth.RecordLegacy(stateDir, []auth.LegacySignIn{{SessionID: "s", AuthURL: "https://auth.example.test", UserID: "u"}}, later); err != nil {
+		t.Fatal(err)
+	}
+	if got := legacy(); got.Account != auth.LegacyAccountAmbiguous || !got.RetiredAt.Equal(first.RetiredAt) {
+		t.Fatalf("judged by %+v; want the first look's boundary, no one's", got)
+	}
+	if rec, err := auth.ReadLegacyRecord(stateDir); err != nil || !rec.RetiredAt.Equal(first.RetiredAt) || rec.Account != auth.LegacyAccountAmbiguous {
+		t.Fatalf("record = %+v, %v; want the first look's boundary kept", rec, err)
+	}
+}

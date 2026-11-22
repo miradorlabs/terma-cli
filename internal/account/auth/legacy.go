@@ -303,6 +303,22 @@ func AdvanceLegacyBoundary(stateDir string, from, to time.Time) error {
 	})
 }
 
+// KeepFirstLook writes into the record a server key's first look at, which could not be
+// written then: everything bound to no account before at is no one's. A record a
+// retirement wrote since, with a later boundary, takes at and names no one, as that
+// retirement would have kept a first look already written (recordLegacy); its sessions
+// and its mark stay. A record with a boundary no later than at stands.
+func KeepFirstLook(stateDir string, at time.Time) error {
+	return withLegacyRecord(stateDir, func() error {
+		rec, err := ReadLegacyRecord(stateDir)
+		if err != nil || rec.RetiredAt.IsZero() || !rec.RetiredAt.After(at) {
+			return err
+		}
+		rec.Account, rec.RetiredAt = LegacyAccountAmbiguous, at.UTC()
+		return config.WriteJSON(filepath.Join(stateDir, LegacyRecordFile), rec, 0o600)
+	})
+}
+
 // MarkLegacyForgotten moves the record's ForgottenAt forward to at; never back, and never on
 // a record not yet kept.
 func MarkLegacyForgotten(stateDir string, at time.Time) error {

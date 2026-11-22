@@ -272,6 +272,17 @@ func cachedLegacyRecord(dir, stateDir string, serverKey func() (bool, error)) fu
 			}
 			return rec
 		}
+		if !pending.IsZero() && got.RetiredAt.After(pending) {
+			// A retirement wrote its record before the first look could: the first look's
+			// boundary, judged by since, is the one kept, as it would have been written.
+			if auth.KeepFirstLook(stateDir, pending) != nil {
+				return rec // tried again next time
+			}
+			if got, err = auth.LegacyOwnershipAt(dir, stateDir, sk, at); err != nil {
+				read = false
+				return rec
+			}
+		}
 		rec, pending = got, time.Time{}
 		if !got.RetiredAt.IsZero() && statOrNil(recordPath) == nil {
 			pending = got.RetiredAt // not written yet: tried again next time
