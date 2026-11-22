@@ -347,3 +347,40 @@ func words(name string) []string {
 func plural(runes []rune, i int) bool {
 	return runes[i] == 's' && (i+1 == len(runes) || !unicode.IsLower(runes[i+1]))
 }
+
+// TestAgentsAppendThroughTheHookRuntime holds that an agent reaches the spool only through
+// hookrun (Env.Append, Env.EmitFor and their kin), which stamp each event with its repository,
+// project and global mark: delivery's admission reads them, and a hand-built event once left
+// the global mark out.
+func TestAgentsAppendThroughTheHookRuntime(t *testing.T) {
+	root := repoRoot(t)
+	dir := filepath.Join(root, "internal", "agents")
+	err := filepath.WalkDir(dir, func(path string, d os.DirEntry, err error) error {
+		if err != nil || d.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+			return err
+		}
+		f, err := parser.ParseFile(token.NewFileSet(), path, nil, 0)
+		if err != nil {
+			return err
+		}
+		ast.Inspect(f, func(n ast.Node) bool {
+			call, ok := n.(*ast.CallExpr)
+			if !ok {
+				return true
+			}
+			sel, ok := call.Fun.(*ast.SelectorExpr)
+			if !ok || sel.Sel.Name != "Append" {
+				return true
+			}
+			if field, ok := sel.X.(*ast.SelectorExpr); ok && field.Sel.Name == "Spool" {
+				rel, _ := filepath.Rel(root, path)
+				t.Errorf("%s appends to the spool directly; use Env.Append, which stamps the event", rel)
+			}
+			return true
+		})
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}

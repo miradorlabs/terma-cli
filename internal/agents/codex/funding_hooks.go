@@ -47,7 +47,7 @@ func captureCodexFunding(ctx context.Context, e hookrun.Env, r *hookrun.Repo, in
 	userEmail := oauthEmail()
 	ctx, cancel := context.WithTimeout(ctx, codexCaptureTimeout)
 	defer cancel()
-	next, status, readErr := readFunding(ctx, rollout, in.TranscriptPath, cursor, turnAdmission(ctx, e), func(ev hookrun.FundingEvidence) error {
+	next, status, readErr := readFunding(ctx, rollout, in.TranscriptPath, cursor, e.Admission(ctx), func(ev hookrun.FundingEvidence) error {
 		attrs := hookrun.AgentAttrs(ev.Attrs, in.AgentID, in.AgentType)
 		attrs[semconv.GenAIMainAgentNameKey] = codexTool
 		attrs[semconv.TermaEvidenceSourceKey], attrs[semconv.TermaEvidenceStatusKey] = ev.Source, ev.Status
@@ -69,7 +69,7 @@ func captureCodexFunding(ctx context.Context, e hookrun.Env, r *hookrun.Repo, in
 		if !ev.SourceTime.IsZero() {
 			attrs[semconv.TermaObservationTimeKey] = ev.SourceTime.UTC().Format(time.RFC3339Nano)
 		}
-		return e.Spool.Append(spool.Event{Time: e.Time(), Name: semconv.TermaSessionQuotaEvent, SessionID: in.SessionID, Repository: r.Repository, Attrs: attrs})
+		return e.Append(r, spool.Event{Time: e.Time(), Name: semconv.TermaSessionQuotaEvent, SessionID: in.SessionID, Attrs: attrs})
 	})
 	if next != cursor {
 		b, _ := json.Marshal(next)

@@ -123,7 +123,8 @@ func (e Env) CaptureObservation(ctx context.Context, r *Repo, o Observation) {
 	state.LastHash, state.At = hash, e.Time()
 	attrs[semconv.TermaObservationStreamKey], attrs[semconv.TermaObservationSequenceKey] = state.Stream, state.Sequence
 	attrs[semconv.TermaObservationIDKey] = EvidenceID(fmt.Sprintf("%s\x00%s\x00%d", o.Tool, state.Stream, state.Sequence))
-	state.Pending = &spool.Event{Time: e.Time(), Name: semconv.TermaSessionObservationEvent, SessionID: o.SessionID, Repository: r.Repository, Attrs: attrs}
+	pending := e.stamp(r, spool.Event{Time: e.Time(), Name: semconv.TermaSessionObservationEvent, SessionID: o.SessionID, Attrs: attrs})
+	state.Pending = &pending
 	if err = write(); err != nil {
 		e.Logf("%s checkpoint: %v", o.Tool, err)
 		return

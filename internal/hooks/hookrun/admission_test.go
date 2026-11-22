@@ -365,3 +365,30 @@ func TestAdmitsJudgesTheDirectoryItIsGiven(t *testing.T) {
 		}
 	}
 }
+
+// No directory is never collected, however the process's own is: a transcript record that
+// names none is not judged by where the hook runs.
+func TestAdmitsNoDirectoryWherever(t *testing.T) {
+	listed := namedRepo(t, "listed", "git@github.com:acme/listed.git")
+	t.Chdir(listed)
+	e := Env{StateDir: t.TempDir(), Cwd: listed, Policy: listing("github.com/acme/listed")}
+	if e.Admits(context.Background(), "") {
+		t.Fatal("Admits(\"\") judged the process's own directory")
+	}
+	if e.Admission(context.Background())("") {
+		t.Fatal("Admission admitted a record with no directory")
+	}
+}
+
+// Global mode collects every session, so Admission admits every record: one with no
+// directory, a directory gone, and one outside git.
+func TestAdmissionAdmitsEveryRecordInGlobalMode(t *testing.T) {
+	t.Parallel()
+	e := Env{StateDir: t.TempDir(), Cwd: t.TempDir(), Policy: config.Policy{Mode: config.ModeGlobal, DefaultProjectID: "p-default"}}
+	admits := e.Admission(context.Background())
+	for _, dir := range []string{"", filepath.Join(t.TempDir(), "gone"), t.TempDir()} {
+		if !admits(dir) {
+			t.Errorf("Admission(%q) = false in global mode", dir)
+		}
+	}
+}

@@ -58,7 +58,7 @@ func SpoolTitle(e Env, r *Repo, stateDir, sessionID string, attrs map[string]any
 	}
 	out := maps.Clone(attrs)
 	out[semconv.TermaSessionTitleKey], out[AttrProjectID] = title, r.ProjectID
-	if err := e.Spool.Append(spool.Event{Time: e.Time(), Name: semconv.TermaSessionTitleEvent, SessionID: sessionID, Repository: r.Repository, Global: e.Policy.Global(), Attrs: out}); err != nil {
+	if err := e.Append(r, spool.Event{Time: e.Time(), Name: semconv.TermaSessionTitleEvent, SessionID: sessionID, Attrs: out}); err != nil {
 		e.Logf("title: %v", err)
 		return
 	}

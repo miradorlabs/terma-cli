@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
@@ -21,6 +22,33 @@ import (
 func TestCodexDesktopActivityCarriesTheProject(t *testing.T) {
 	env := fundingEnv(t)
 	routeCodex(t, &env)
+	for _, e := range codexDesktopActivity(t, env) {
+		if e.Attrs[hookrun.AttrProjectID] != "project-a" {
+			t.Fatalf("%s spooled without its project: %v", e.Name, e.Attrs)
+		}
+		if e.Global {
+			t.Fatalf("%s marked global under a repository policy", e.Name)
+		}
+	}
+}
+
+// Under a global policy, Desktop activity says so, as Env.EmitFor's events do: delivery drops
+// it if the policy is no longer global when it leaves.
+func TestCodexDesktopActivityIsMarkedGlobal(t *testing.T) {
+	env := fundingEnv(t)
+	env.Policy.Mode, env.Policy.DefaultProjectID = config.ModeGlobal, "p-default"
+	routeCodex(t, &env)
+	for _, e := range codexDesktopActivity(t, env) {
+		if !e.Global {
+			t.Fatalf("%s not marked global under a global policy", e.Name)
+		}
+	}
+}
+
+// codexDesktopActivity runs a turn's Stop over a Desktop rollout and returns the activity it
+// spooled.
+func codexDesktopActivity(t *testing.T, env hookrun.Env) []spool.Event {
+	t.Helper()
 	path := filepath.Join(os.Getenv("CODEX_HOME"), "sessions", "2026", "09", "19", "rollout-2026-09-19T12-18-12-"+replySession+".jsonl")
 	hookruntest.WriteFile(t, filepath.Dir(path), filepath.Base(path), strings.Join([]string{
 		`{"type":"session_meta","payload":{"id":"` + replySession + `"}}`,
@@ -34,19 +62,16 @@ func TestCodexDesktopActivityCarriesTheProject(t *testing.T) {
 	if err := stop(context.Background(), env); err != nil {
 		t.Fatal(err)
 	}
-	activity := 0
+	var activity []spool.Event
 	for _, e := range hookruntest.Spooled(t, env.Spool) {
-		if e.Name != semconv.TermaToolCallEvent && e.Name != semconv.TermaCompactionEvent {
-			continue
-		}
-		activity++
-		if e.Attrs[hookrun.AttrProjectID] != "project-a" {
-			t.Fatalf("%s spooled without its project: %v", e.Name, e.Attrs)
+		if e.Name == semconv.TermaToolCallEvent || e.Name == semconv.TermaCompactionEvent {
+			activity = append(activity, e)
 		}
 	}
-	if activity == 0 {
+	if len(activity) == 0 {
 		t.Fatal("no Desktop activity was captured")
 	}
+	return activity
 }
 
 // A subagent's own thread id (agent_id) is claimed too, from a spooled event or a bare
