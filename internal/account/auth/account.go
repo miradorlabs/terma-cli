@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"cmp"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
@@ -23,10 +24,11 @@ func AccountKey(authURL, userID string) string {
 }
 
 // Account is the account key of the sign-in a profile holds: "" when signed out,
-// AccountUnreadable when user-credentials.json is there but can't be read. A sign-in for
-// another environment than authURL keeps its own account, which no token here and no
-// server key sends for: what is collected under it is that person's, never no one's. It
-// reads only that file, never the keychain, so a hook can afford it.
+// AccountUnreadable when user-credentials.json is there but can't be read, or its sign-in
+// has no user id to key it by. The account does not depend on authURL: a sign-in for
+// another environment keeps its own, which no token here and no server key sends for, so
+// what is collected under it is that person's, never no one's. It reads only that file,
+// never the keychain, so a hook can afford it.
 func Account(dir, profile, authURL string) string {
 	cred, err := LoadIdentity(dir, profile)
 	switch {
@@ -34,13 +36,10 @@ func Account(dir, profile, authURL string) string {
 		return ""
 	case err != nil:
 		return AccountUnreadable
-	case cred.CheckEnvironment(authURL) != nil:
-		if key := AccountKey(cred.AuthURL, cred.UserID); key != "" {
-			return key
-		}
-		return AccountUnreadable
 	}
-	return AccountKey(cred.AuthURL, cred.UserID)
+	// A sign-in there is someone's: one with no account to key it by (no user id) is the
+	// unreadable account, never the "" of a signed-out profile.
+	return cmp.Or(AccountKey(cred.AuthURL, cred.UserID), AccountUnreadable)
 }
 
 // SignedInAt is when the profile's sign-in was signed in on this machine; zero when it is

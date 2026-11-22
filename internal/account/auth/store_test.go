@@ -351,3 +351,19 @@ func TestASignInKeepsWhenItBeganThroughItsRotations(t *testing.T) {
 		t.Fatalf("after a rotation signed in at %v; want %v", got, began)
 	}
 }
+
+// A sign-in with no user id to key it by is the unreadable account, in this environment as
+// in another: never the "" of a signed-out profile.
+func TestASignInWithNoUserIsUnreadable(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	if _, err := SaveCredential(dir, "default", &Credential{AccessToken: "a", RefreshToken: "r", ExpiresAt: time.Now().Add(time.Hour),
+		AuthURL: "https://auth.example.test", SessionID: "s"}); err != nil {
+		t.Fatal(err)
+	}
+	for _, env := range []string{"https://auth.example.test", "https://auth.other.example.test"} {
+		if got := Account(dir, "default", env); got != AccountUnreadable {
+			t.Errorf("for %s: %q, want %q", env, got, AccountUnreadable)
+		}
+	}
+}
