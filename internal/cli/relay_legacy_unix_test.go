@@ -4,6 +4,7 @@ package cli
 
 import (
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -37,5 +38,34 @@ func TestAnUnwrittenFirstLookIsWrittenLaterWithItsBoundary(t *testing.T) {
 	}
 	if rec, err := auth.ReadLegacyRecord(stateDir); err != nil || !rec.RetiredAt.Equal(first.RetiredAt) {
 		t.Fatalf("record = %+v, %v; want the first look's boundary written", rec, err)
+	}
+}
+
+// A record that can't be read is read again at the next look: once readable, though it
+// looks unchanged, its own account and boundary count, not the unreadable stand-in.
+func TestAnUnreadableLegacyRecordIsReadAgain(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root reads a file its mode forbids")
+	}
+	dir, stateDir := t.TempDir(), t.TempDir()
+	at := time.Now().Add(-time.Hour).UTC()
+	if err := auth.RecordLegacy(stateDir, []auth.LegacySignIn{{SessionID: "s", AuthURL: "https://auth.example.test", UserID: "u"}}, at); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(stateDir, auth.LegacyRecordFile)
+	if err := os.Chmod(path, 0o000); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(path, 0o600) })
+	legacy := cachedLegacyRecord(dir, stateDir, func() (bool, error) { return true, nil })
+	if got := legacy(); got.Account != auth.LegacyAccountAmbiguous {
+		t.Fatalf("unreadable: %+v; want it named by no one", got)
+	}
+	if err := os.Chmod(path, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	want := auth.AccountKey("https://auth.example.test", "u")
+	if got := legacy(); got.Account != want || !got.RetiredAt.Equal(at) {
+		t.Fatalf("readable again: %+v; want its own account %q and boundary %v", got, want, at)
 	}
 }

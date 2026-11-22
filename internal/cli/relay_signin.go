@@ -236,9 +236,9 @@ func (app *App) bindRelay(engine *relay.Options, cfg *config.Config) {
 // relay asks for it for every queued entry from before user tokens, and a change, such as a
 // switch to a server key, takes effect at the next entry. A read that fails keeps the last
 // record that named a boundary, or with none, names no one (auth.UnreadableLegacyRecord),
-// never no record. While the profile's mode can't be read (serverKey's error), every entry
-// bound to no account is named by no one, and nothing is kept: a file made readable again
-// need not look changed. The last record and a pending first look stand for the next read.
+// never no record, and is not kept either. While the profile's mode can't be read
+// (serverKey's error), every entry bound to no account is named by no one, and nothing is
+// kept: a file made readable again need not look changed. The last record and a pending first look stand for the next read.
 func cachedLegacyRecord(dir, stateDir string, serverKey func() (bool, error)) func() auth.LegacyRecord {
 	var mu sync.Mutex
 	rec := auth.UnreadableLegacyRecord(stateDir)
@@ -262,14 +262,18 @@ func cachedLegacyRecord(dir, stateDir string, serverKey func() (bool, error)) fu
 		}
 		files, read = now, true
 		at := cmp.Or(pending, time.Now())
-		switch got, err := auth.LegacyOwnershipAt(dir, stateDir, sk, at); {
-		case err == nil:
-			rec, pending = got, time.Time{}
-			if !got.RetiredAt.IsZero() && statOrNil(recordPath) == nil {
-				pending = got.RetiredAt // not written yet: tried again next time
+		got, err := auth.LegacyOwnershipAt(dir, stateDir, sk, at)
+		if err != nil {
+			// Not kept: a record made readable again (its permissions) need not look changed.
+			read = false
+			if rec.RetiredAt.IsZero() {
+				rec = auth.UnreadableLegacyRecord(stateDir)
 			}
-		case rec.RetiredAt.IsZero():
-			rec = auth.UnreadableLegacyRecord(stateDir)
+			return rec
+		}
+		rec, pending = got, time.Time{}
+		if !got.RetiredAt.IsZero() && statOrNil(recordPath) == nil {
+			pending = got.RetiredAt // not written yet: tried again next time
 		}
 		return rec
 	}
