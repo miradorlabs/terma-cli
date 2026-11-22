@@ -179,7 +179,7 @@ func TestEveryToolLabelIsASessionKey(t *testing.T) {
 func TestAntigravityIsComingSoonOnWindows(t *testing.T) {
 	t.Parallel()
 	for goos, want := range map[string]bool{"linux": true, "darwin": true, "windows": false} {
-		r := agentsOn("", goos)
+		r := AgentsOn("", goos)
 		if got := r.IsSupported("antigravity"); got != want {
 			t.Errorf("%s: antigravity supported = %v, want %v", goos, got, want)
 		}

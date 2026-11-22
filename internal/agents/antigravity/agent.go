@@ -15,6 +15,11 @@ type Agent struct{}
 
 func (Agent) Name() string        { return "antigravity" }
 func (Agent) DisplayName() string { return "Antigravity" }
+
+// Surfaces is Antigravity as one choice, marked beta at setup.
+func (a Agent) Surfaces() []agents.Surface {
+	return []agents.Surface{{Name: a.Name(), DisplayName: a.DisplayName() + " (beta)", Installed: a.Installed}}
+}
 func (Agent) Installed(ctx context.Context) bool {
 	return detect(ctx).Found
 }
@@ -52,6 +57,7 @@ var (
 	_ agents.Agent         = Agent{}
 	_ agents.PayloadReader = Agent{}
 	_ agents.UserHooks     = Agent{}
+	_ agents.Surfaced      = Agent{}
 )
 
 // StateDirs are the directories its hooks keep state in.

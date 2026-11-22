@@ -18,6 +18,8 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/miradorlabs/terma-cli/internal/account/keystore"
+	"github.com/miradorlabs/terma-cli/internal/agents"
+	"github.com/miradorlabs/terma-cli/internal/agents/builtin"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/doctor"
 	"github.com/miradorlabs/terma-cli/internal/relay"
@@ -245,14 +247,21 @@ func TestHarnessSelectionComingSoon(t *testing.T) {
 		t.Fatalf("picker has %d items, want %d", len(form.Items), len(wantOrder))
 	}
 	// The supported agents lead the list, each selectable, under the name setup shows.
-	for i, label := range []string{"Claude Code & Desktop", "Codex TUI & Desktop", "Copilot (beta)", "OMP 18.18.2+ (beta)"} {
+	leading := []string{"Claude Code & Desktop", "Codex TUI & Desktop", "Copilot (beta)", "OMP 18.18.2+ (beta)"}
+	if testApp.agents.IsSupported("antigravity") {
+		leading = append(leading, "Antigravity (beta)")
+	}
+	for i, label := range leading {
 		if item := form.Items[i]; item.Label != label || item.Disabled || !testApp.agents.IsSupported(wantOrder[i]) {
 			t.Errorf("picker row %d = %+v, want %q supported and selectable", i, item, label)
 		}
 	}
 	for i, name := range wantOrder {
+		// A Coming Soon agent is listed under its own name, without a surface's marker.
 		display := name
-		if s, _, ok := testApp.agents.Surface(name); ok {
+		if a, ok := testApp.agents.Lookup(name); ok && !testApp.agents.IsSupported(name) {
+			display = a.DisplayName()
+		} else if s, _, ok := testApp.agents.Surface(name); ok {
 			display = s.DisplayName
 		}
 		if form.Items[i].Label != display {
@@ -266,6 +275,24 @@ func TestHarnessSelectionComingSoon(t *testing.T) {
 			}
 		} else if !item.Disabled || item.Selected || item.Reason != "Coming Soon" {
 			t.Errorf("%s should be disabled, unselected, and labeled Coming Soon: %+v", name, item)
+		}
+	}
+}
+
+// On Windows Antigravity is Coming Soon, listed under its own name: "(beta)" marks what
+// setup offers, and it offers Antigravity on macOS and Linux only.
+func TestHarnessSelectionAntigravityOnWindows(t *testing.T) {
+	app := New(func(dir string) *agents.Registry { return builtin.AgentsOn(dir, "windows") }, "dev")
+	app.binDirs = func() []string { return nil }
+	app.configure(t.TempDir(), t.TempDir())
+	form := app.harnessSelectionForm(context.Background(), map[string]bool{"antigravity": true})
+	item := form.Items[len(form.Items)-1]
+	if item.Label != "Antigravity" || !item.Disabled || item.Selected || item.Reason != "Coming Soon" {
+		t.Fatalf("Antigravity's row on Windows = %+v, want plain, disabled and Coming Soon", item)
+	}
+	for _, other := range form.Items[:len(form.Items)-1] {
+		if strings.Contains(other.Label, "Antigravity") {
+			t.Fatalf("Antigravity listed twice: %+v", other)
 		}
 	}
 }
