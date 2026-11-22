@@ -147,7 +147,21 @@ func (r *Relay) sweep() {
 		var out []release
 		// A part that must wait holds up nothing: order matters only among parts that leave.
 		for _, h := range parts {
-			c, pol, why, ok, how := r.decide(key, h.p.pid, h.p.at, h.p.narrow, h.p.claimed)
+			var c claim.Claim
+			var pol Policy
+			var why string
+			var ok bool
+			var how attribution
+			if h.pinned != nil && (strings.HasPrefix(key, procPrefix) ||
+				r.sessionFor(key) == "" && h.pinnedHow.how == semconv.TermaRelayAttributionProcess) {
+				// Placed by its process, pinned only once that process had exited: whatever
+				// its pid names since is another process, so the pin alone places it (global
+				// mode's catch-all included). A trace named since goes by its session.
+				c, pol, why, ok = r.placePinned(*h.pinned, h.p.narrow)
+				how = h.pinnedHow
+			} else {
+				c, pol, why, ok, how = r.decide(key, h.p.pid, h.p.at, h.p.narrow, h.p.claimed)
+			}
 			if why == whyNoKey && c.ProjectID != "" {
 				pinned := c
 				h.pinned, h.pinnedHow = &pinned, how

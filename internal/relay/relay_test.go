@@ -813,3 +813,57 @@ func TestAnUpdateDoesNotWaitForGlobalModesPolicy(t *testing.T) {
 		t.Fatal("an update waited for a part that waits for global mode's policy")
 	}
 }
+
+// A part placed by its exited process and pinned to that team while the team's policy
+// can't be read goes by its pin alone: the pid reused since by another process, running
+// and naming another session, neither drops it nor places it elsewhere.
+func TestAPinnedProcessPartIgnoresItsPidsReuse(t *testing.T) {
+	t.Parallel()
+	f := newFixture()
+	r := newRelay(Options{Dir: t.TempDir(), Token: token, Hold: time.Minute, Lookup: f.lookup, Now: f.clock,
+		Resolve: func(claim.Claim) (Policy, error) { return Policy{}, ErrNoKey }})
+	const pid = 4242
+	p := &part{signal: Logs, session: procKey(pid), pid: pid, msg: logsOf("", 1), records: 1, at: f.clock()}
+	r.hold(p, &claim.Claim{ProjectID: "p1"}, attribution{}, true)
+	// The pid is reused by a new process, running, naming session B.
+	r.learnProcess(pid, "B")
+	f.mu.Lock()
+	f.now = f.now.Add(r.opts.TraceHold + time.Minute) // past the hold of a part waiting for its process
+	f.mu.Unlock()
+	r.sweep()
+	r.mu.Lock()
+	held := r.held[procKey(pid)]
+	r.mu.Unlock()
+	if len(held) != 1 || held[0].pinned == nil || held[0].pinned.ProjectID != "p1" {
+		t.Fatalf("held %+v; want the part kept, pinned to p1", held)
+	}
+}
+
+// So does a part of a trace no record has named, placed by its exited process and pinned:
+// the pid reused since, by a process that names another team's session and exits, never
+// moves it there.
+func TestAPinnedTracePartIgnoresItsPidsReuse(t *testing.T) {
+	t.Parallel()
+	f := newFixture()
+	r := newRelay(Options{Dir: t.TempDir(), Token: token, Hold: time.Minute, Lookup: f.lookup, Now: f.clock,
+		Resolve: func(claim.Claim) (Policy, error) { return Policy{}, ErrNoKey }})
+	const pid = 4243
+	key := tracePrefix + "abc"
+	p := &part{signal: Logs, session: key, pid: pid, msg: logsOf("", 1), records: 1, at: f.clock()}
+	r.hold(p, &claim.Claim{ProjectID: "p1"}, attribution{how: semconv.TermaRelayAttributionProcess, session: "A"}, true)
+	// The pid is reused by a process naming session B (team p2), which then exits.
+	r.learnProcess(pid, "B")
+	r.mu.Lock()
+	r.procs[pid].exitedAt = f.now.Add(-time.Minute)
+	r.mu.Unlock()
+	f.mu.Lock()
+	f.now = f.now.Add(r.opts.TraceHold + time.Minute)
+	f.mu.Unlock()
+	r.sweep()
+	r.mu.Lock()
+	held := r.held[key]
+	r.mu.Unlock()
+	if len(held) != 1 || held[0].pinned == nil || held[0].pinned.ProjectID != "p1" {
+		t.Fatalf("held %+v; want the part kept, pinned to p1", held)
+	}
+}
