@@ -42,6 +42,15 @@ type RelayChecker interface {
 	RelayProblem(addr string) (detail, fix string, ok bool)
 }
 
+// EnvExporter is an agent whose exporter takes the OpenTelemetry SDK's standard
+// OTEL_EXPORTER_OTLP_* variables from the environment it started with, where one a parent
+// process sets outranks what terma configured.
+type EnvExporter interface {
+	Agent
+	// ExportsFromEnvironment marks the capability.
+	ExportsFromEnvironment()
+}
+
 // Labeled is an agent whose hooks and trailers use a label other than its name.
 type Labeled interface {
 	Tool() string
