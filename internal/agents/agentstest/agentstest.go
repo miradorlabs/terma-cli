@@ -68,7 +68,7 @@ type Refreshing struct {
 }
 
 // RefreshMachine reports Path, or Err.
-func (r Refreshing) RefreshMachine() (string, bool, error) {
+func (r Refreshing) RefreshMachine(string) (string, bool, error) {
 	return r.Path, r.Path != "" && r.Err == nil, r.Err
 }
 

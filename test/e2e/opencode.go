@@ -150,7 +150,7 @@ func (sb *Sandbox) directOpenCode() {
 		"headers": map[string]string{"Authorization": "Bearer " + liveKey}, "signals": []string{"traces", "logs", "metrics"},
 		"includePrompts": true, "includeToolContent": true,
 		"resourceAttributes": map[string]string{"mirador.project.id": sb.ProjectID, "service.name": "opencode"},
-		"hookCommand":        []string{"terma", "hook"}})
+		"hookCommand":        []string{sb.Terma, "hook"}})
 	const placeholder = "const CONFIG = null /* terma:config */"
 	if !bytes.Contains(src, []byte(placeholder)) {
 		t.Fatal("the OpenCode plugin has no config placeholder")

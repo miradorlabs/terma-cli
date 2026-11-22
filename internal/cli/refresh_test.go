@@ -250,7 +250,7 @@ func TestRefreshAfterUpgradeRunsOncePerRelease(t *testing.T) {
 func plantStaleStatusLine(t *testing.T) string {
 	t.Helper()
 	c := claudeHarness(t)
-	if _, err := c.InstallStatusLine(); err != nil {
+	if _, err := c.InstallStatusLine("/usr/local/bin/terma"); err != nil {
 		t.Fatal(err)
 	}
 	path, err := c.ConfigPath()

@@ -58,9 +58,6 @@ func pluginDir() (string, error) {
 // renderPlugin splices cfg in as a JSON string literal: Go's quoting of it is valid Python too.
 func renderPlugin(cfg pluginConfig) (string, error) {
 	cfg.Version = 1
-	if len(cfg.HookCommand) == 0 {
-		cfg.HookCommand = []string{"terma", "hook"}
-	}
 	data, err := json.Marshal(cfg)
 	if err != nil {
 		return "", err

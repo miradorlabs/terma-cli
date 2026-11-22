@@ -30,7 +30,12 @@ func (app *App) wrapStatusLine(errOut io.Writer) (string, bool) {
 	if !ok {
 		return "", false
 	}
-	changed, err := c.InstallStatusLine()
+	terma, err := app.hookExecutable()
+	if err != nil {
+		fmt.Fprintf(errOut, "Warning: could not wrap %s's status line (%v); plan usage will not be captured.\n", c.DisplayName(), err)
+		return "", false
+	}
+	changed, err := c.InstallStatusLine(terma)
 	if err != nil {
 		fmt.Fprintf(errOut, "Warning: could not wrap %s's status line (%v); plan usage will not be captured.\n", c.DisplayName(), err)
 		return "", false
