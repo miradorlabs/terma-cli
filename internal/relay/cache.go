@@ -47,6 +47,20 @@ func (r *Relay) lookup(session string) (claim.Claim, bool) {
 	return c, ok
 }
 
+// lookupFresh reads a session's claim afresh, past the cache, and caches what it read. A
+// governance part is placed by its time (claim.During): a claim cached from before the
+// session moved would place records sent after the move under the old placement.
+func (r *Relay) lookupFresh(session string) (claim.Claim, bool) {
+	now := r.opts.Now()
+	c, ok := r.opts.Lookup(session, now)
+	if r.opts.ClaimCacheTTL > 0 {
+		r.cache.mu.Lock()
+		r.cache.claims[session] = cachedClaim{c, ok, now}
+		r.cache.mu.Unlock()
+	}
+	return c, ok
+}
+
 func (r *Relay) resolve(c claim.Claim) (Policy, bool) {
 	now := r.opts.Now()
 	key := strings.Join([]string{c.ProjectID, c.Tool, c.Repository.Origin}, "\x00")

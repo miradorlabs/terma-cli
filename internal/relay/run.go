@@ -80,7 +80,7 @@ func (r *Relay) dropHeldAtExit() {
 	r.mu.Unlock()
 	for key, parts := range held {
 		for _, h := range parts {
-			_, _, why, ok, _ := r.decide(key, h.p.pid, h.p.at, h.p.narrow, h.p.claimed)
+			_, _, why, ok, _ := r.decide(key, h.p)
 			if ok {
 				why = "claimed"
 			}

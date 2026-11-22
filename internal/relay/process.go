@@ -53,7 +53,7 @@ func (r *Relay) decideExited(pid int, at time.Time, narrow bool) (claim.Claim, P
 	case overflow || len(sessions) != 1:
 		return claim.Claim{}, Policy{}, whyAmbiguous, false, attribution{}
 	}
-	c, pol, why, ok := r.decideClaimed(sessions[0], pid, at, narrow)
+	c, pol, why, ok := r.decideClaimed(sessions[0], &part{pid: pid, at: at, narrow: narrow})
 	if !ok {
 		return claim.Claim{}, Policy{}, why, false, attribution{}
 	}

@@ -19,6 +19,10 @@ import (
 var hookContent = map[string][]string{
 	semconv.TermaToolCallEvent:          {semconv.GenAIToolCallArgumentsKey},
 	semconv.TermaApprovalRequestedEvent: {semconv.TermaApprovalReasonKey},
+	// Terma Desktop's governance, which comes through the relay; classified here as there.
+	semconv.TermaNetworkConnectionEvent: {semconv.TermaProcessCommandKey},
+	semconv.TermaPolicyDeniedEvent:      {semconv.TermaPolicyPathKey},
+	semconv.TermaFilesAccessedEvent:     {semconv.TermaFilePathKey, semconv.TermaFileRenamedToKey},
 }
 
 // contentFree are the event kinds that carry no content, or (a reply, a thread's name) that
@@ -34,6 +38,7 @@ var contentFree = map[string]bool{
 	semconv.TermaSubagentCallEvent: true, semconv.TermaSessionObservationEvent: true,
 	semconv.TermaAssistantMessageEvent: true, semconv.TermaSessionTitleEvent: true,
 	semconv.TermaModelCallResponseEvent: true,
+	semconv.TermaNetworkExchangeEvent:   true, semconv.TermaGovernanceRunEvent: true,
 }
 
 // Outgoing is e as it may leave for projectID under org, the team's policy now, without
