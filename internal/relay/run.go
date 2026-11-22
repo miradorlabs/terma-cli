@@ -102,13 +102,13 @@ func (r *Relay) dropHeldAtExit() {
 	}
 }
 
-// unpinnedLocked counts the held records not pinned to a team waiting for its policy. r.mu
-// is held.
-func (r *Relay) unpinnedLocked() int {
+// notAwaitingPolicyLocked counts the held records not waiting for their team's policy,
+// pinned to its claim or, in global mode, the catch-all's. r.mu is held.
+func (r *Relay) notAwaitingPolicyLocked() int {
 	n := 0
 	for _, parts := range r.held {
 		for _, h := range parts {
-			if h.pinned == nil {
+			if h.pinned == nil && !h.awaitingPolicy {
 				n += h.p.records
 			}
 		}
@@ -141,7 +141,7 @@ func (r *Relay) Holding() bool {
 func (r *Relay) Quiesce(quiet time.Duration) bool { return r.quiesce(quiet, false) }
 
 // QuiesceDroppingHold is Quiesce for a relay that may wait no longer for the parts that wait
-// for their team's policy (pinned): those are dropped at exit, and counted as lost
+// for their team's policy (pinned, or awaitingPolicy): those are dropped at exit, and counted as lost
 // (dropHeldAtExit); an update that fixes what holds them, a retired sign-in's, must not
 // wait on them. Every other held part (a conversation start, a span waiting for its
 // session) is still waited for, as Quiesce does.
@@ -152,7 +152,7 @@ func (r *Relay) quiesce(quiet time.Duration, dropHold bool) bool {
 	defer r.mu.Unlock()
 	waiting := r.heldN
 	if dropHold {
-		waiting = r.unpinnedLocked()
+		waiting = r.notAwaitingPolicyLocked()
 	}
 	if waiting > 0 || r.inflight > 0 || r.opts.Now().Sub(r.lastSeen) < quiet {
 		return false

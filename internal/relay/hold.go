@@ -29,6 +29,9 @@ type heldPart struct {
 	// trace index (traceTTL) expire long before the part may, and the part stays the team's.
 	pinned    *claim.Claim
 	pinnedHow attribution
+	// awaitingPolicy is that it was last held for its team's policy (whyNoKey), pinned or
+	// not: in global mode the catch-all's part has no claim to pin it to.
+	awaitingPolicy bool
 }
 
 type traceSession struct {
@@ -38,13 +41,13 @@ type traceSession struct {
 	at      time.Time
 }
 
-func (r *Relay) hold(p *part, pin *claim.Claim, how attribution) {
+func (r *Relay) hold(p *part, pin *claim.Claim, how attribution, awaitingPolicy bool) {
 	size := proto.Size(p.msg)
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	refuse := func() {
 		r.stats.dropped(p.signal, "unclaimed_overflow", p.records)
-		if pin != nil {
+		if pin != nil || awaitingPolicy {
 			r.heldLost += p.records // a team's part, lost: counted where doctor reads losses
 		}
 	}
@@ -59,7 +62,7 @@ func (r *Relay) hold(p *part, pin *claim.Claim, how attribution) {
 			return
 		}
 	}
-	r.held[p.session] = append(r.held[p.session], heldPart{p: p, at: r.opts.Now(), size: size, pinned: pin, pinnedHow: how})
+	r.held[p.session] = append(r.held[p.session], heldPart{p: p, at: r.opts.Now(), size: size, pinned: pin, pinnedHow: how, awaitingPolicy: awaitingPolicy})
 	r.heldN += p.records
 	r.heldBytes += size
 	r.stats.add("held_parts", 1)
@@ -94,7 +97,7 @@ func (r *Relay) evictOldestLocked() bool {
 	}
 	r.heldN -= h.p.records
 	r.heldBytes -= h.size
-	if h.pinned != nil {
+	if h.pinned != nil || h.awaitingPolicy {
 		// A team's part, lost: doctor's outbox row counts it (the next sweep records it).
 		r.heldLost += h.p.records
 	}
@@ -149,6 +152,7 @@ func (r *Relay) sweep() {
 				pinned := c
 				h.pinned, h.pinnedHow = &pinned, how
 			}
+			h.awaitingPolicy = why == whyNoKey
 			if !ok && h.pinned != nil && (why == whyUnclaimed || why == whyNoTrace || why == whyProcessIdle) {
 				// What placed it (its claim, its trace, its process) expired while the part
 				// waited for the team's policy: still placed by that claim, as decideClaimed
@@ -181,7 +185,7 @@ func (r *Relay) sweep() {
 				out = append(out, release{c, pol, h.p, how})
 			case why == whyWidened || why == whyNotCollected || now.Sub(h.at) >= limit:
 				r.stats.dropped(h.p.signal, why, h.p.records)
-				if h.pinned != nil && why != whyWidened && why != whyNotCollected {
+				if (h.pinned != nil || h.awaitingPolicy) && why != whyWidened && why != whyNotCollected {
 					lost += h.p.records
 				}
 				if r.opts.Logf != nil {

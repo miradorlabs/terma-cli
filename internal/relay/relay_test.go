@@ -699,7 +699,7 @@ func TestATeamsPartLostBeforeAnySweepIsCounted(t *testing.T) {
 	}
 	// One too large for the hold, refused as it arrives.
 	big := &part{signal: Logs, session: "D", msg: logsOf("D", 1), records: maxHeld + 1}
-	r.hold(big, &claim.Claim{ProjectID: "p3"}, attribution{})
+	r.hold(big, &claim.Claim{ProjectID: "p3"}, attribution{}, true)
 	r.sweep()
 	if l, err := ReadOutboxLosses(dir); err != nil || l.Held != maxHeld+1 {
 		t.Fatalf("losses = %+v, %v; want the refused part counted", l, err)
@@ -788,5 +788,28 @@ func TestAnUpdateStillWaitsForPartsNotWaitingForAPolicy(t *testing.T) {
 	f.mu.Unlock()
 	if r.QuiesceDroppingHold(0) {
 		t.Fatal("an update dropped a part that waits for its session's claim")
+	}
+}
+
+// In global mode a part waiting for the catch-all's policy has no claim to pin it to, and
+// still waits for that policy, not a claim: an update stops waiting for it as for a pinned one.
+func TestAnUpdateDoesNotWaitForGlobalModesPolicy(t *testing.T) {
+	t.Parallel()
+	f := newFixture()
+	r := newRelay(Options{Dir: t.TempDir(), Token: token, Hold: time.Minute, Lookup: f.lookup, Now: f.clock,
+		CatchAll: func() (claim.Claim, bool) { return claim.Claim{ProjectID: "global"}, true },
+		Resolve:  func(claim.Claim) (Policy, error) { return Policy{}, ErrNoKey }})
+	srv := httptest.NewServer(r.Handler())
+	t.Cleanup(srv.Close)
+	postProto(t, srv, "/v1/logs", logsOf("Z", 1))
+	f.mu.Lock()
+	f.now = f.now.Add(time.Minute)
+	f.mu.Unlock()
+	r.sweep() // judged again, still waiting for the policy
+	if !r.Holding() {
+		t.Fatal("the part was not held")
+	}
+	if !r.QuiesceDroppingHold(0) {
+		t.Fatal("an update waited for a part that waits for global mode's policy")
 	}
 }

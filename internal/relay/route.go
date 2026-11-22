@@ -138,7 +138,7 @@ func (r *Relay) route(p *part) {
 	if (why == whyNoKey || ok && how.how != semconv.TermaRelayAttributionCatchAll) && c.ProjectID != "" {
 		pin = &c
 	}
-	r.hold(p, pin, how)
+	r.hold(p, pin, how, why == whyNoKey)
 }
 
 // deliverAttributed applies the content policy, stamps the project and enqueues. deliverMu is held.
