@@ -1,6 +1,7 @@
 package daemon
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"io"
@@ -121,7 +122,9 @@ func (d Deps) Refresher() *PolicyRefresher {
 				return nil
 			}
 			teams := keystore.CollectionProjects(cfg.Dir)
-			selected := cfg.Policy.Team()
+			// The selected team even while its policy isn't stored (a fresh or cleared state
+			// directory): a person's sign-in holds no team key to name it otherwise.
+			selected := cmp.Or(cfg.Policy.Team(), cfg.Team)
 			if selected != "" && !slices.Contains(teams, selected) {
 				teams = append(teams, selected)
 			}
