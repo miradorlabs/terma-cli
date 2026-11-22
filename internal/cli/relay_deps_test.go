@@ -175,26 +175,30 @@ func TestRelayUserFollowsTheHeartbeatsRule(t *testing.T) {
 }
 
 // A heartbeat refused as SIGN_IN_RETIRED marks the sign-in, so an idle machine's doctor says
-// what fixes it.
+// what fixes it, whatever status the refusal comes with: a 401 is not taken for an expired token.
 func TestARetiredHeartbeatMarksTheSignIn(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusForbidden)
-		_, _ = io.WriteString(w, `{"code":7,"message":"retired","details":[{"@type":"type.googleapis.com/google.rpc.ErrorInfo","reason":"SIGN_IN_RETIRED"}]}`)
-	}))
-	defer srv.Close()
-	f := &fakeAuth{srv: srv}
-	authSandbox(t, f)
-	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(f)); err != nil {
-		t.Fatal(err)
-	}
-	selectPolicy(t, config.Policy{Mode: config.ModeRepo, TeamID: "team", Revision: 1, FetchedAt: time.Now()})
-	beat := &logspb.LogsData{ResourceLogs: []*logspb.ResourceLogs{{ScopeLogs: []*logspb.ScopeLogs{{LogRecords: []*logspb.LogRecord{{}}}}}}}
-	if err := testApp.relayHeartbeatSend(context.Background(), beat); err == nil {
-		t.Fatal("a refused beat was taken")
-	}
-	if !auth.Retired(testApp.dir, config.DefaultProfile) {
-		t.Fatal("the retired sign-in was not marked")
+	for _, status := range []int{http.StatusForbidden, http.StatusUnauthorized} {
+		t.Run(http.StatusText(status), func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(status)
+				_, _ = io.WriteString(w, `{"code":7,"message":"retired","details":[{"@type":"type.googleapis.com/google.rpc.ErrorInfo","reason":"SIGN_IN_RETIRED"}]}`)
+			}))
+			defer srv.Close()
+			f := &fakeAuth{srv: srv}
+			authSandbox(t, f)
+			if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(f)); err != nil {
+				t.Fatal(err)
+			}
+			selectPolicy(t, config.Policy{Mode: config.ModeRepo, TeamID: "team", Revision: 1, FetchedAt: time.Now()})
+			beat := &logspb.LogsData{ResourceLogs: []*logspb.ResourceLogs{{ScopeLogs: []*logspb.ScopeLogs{{LogRecords: []*logspb.LogRecord{{}}}}}}}
+			if err := testApp.relayHeartbeatSend(context.Background(), beat); err == nil {
+				t.Fatal("a refused beat was taken")
+			}
+			if !auth.Retired(testApp.dir, config.DefaultProfile) {
+				t.Fatal("the retired sign-in was not marked")
+			}
+		})
 	}
 }
 

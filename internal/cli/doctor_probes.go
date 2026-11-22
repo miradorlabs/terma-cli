@@ -190,5 +190,5 @@ func doctorFailure(f delivery.Failure, serverKey bool) doctor.Failure {
 	signIn := credRefused && !serverKey
 	return doctor.Failure{ProjectID: f.ProjectID, Endpoint: f.Endpoint, Err: f.Err, Refused: refused,
 		KeyRefused: credRefused && serverKey, Retired: retired,
-		SignInRefused: signIn && ingest.Status == http.StatusForbidden, TokenRefused: signIn && ingest.Status != http.StatusForbidden}
+		SignInRefused: signIn && ingest.Status == http.StatusForbidden, TokenRefused: signIn && ingest.Status == http.StatusUnauthorized}
 }

@@ -161,6 +161,8 @@ func TestARefusedTokenIsRotatedAndKeepsTheEvents(t *testing.T) {
 	}{
 		{http.StatusUnauthorized, "", false},
 		{http.StatusForbidden, `{"code":7,"message":"retired","details":[{"@type":"type.googleapis.com/google.rpc.ErrorInfo","reason":"SIGN_IN_RETIRED"}]}`, true},
+		// Retired is retired, whatever the status: never handed back as expired.
+		{http.StatusUnauthorized, `{"code":16,"message":"retired","details":[{"@type":"type.googleapis.com/google.rpc.ErrorInfo","reason":"SIGN_IN_RETIRED"}]}`, true},
 	} {
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			w.WriteHeader(tc.status)
@@ -176,8 +178,8 @@ func TestARefusedTokenIsRotatedAndKeepsTheEvents(t *testing.T) {
 		if n, _, _ := s.Pending(); n != 1 {
 			t.Fatalf("%d: the event was not kept", tc.status)
 		}
-		if tc.status == http.StatusUnauthorized && (len(signIn.refused) != 1 || signIn.refused[0] != "token-a") {
-			t.Fatalf("refused tokens = %v", signIn.refused)
+		if wantRefused := tc.status == http.StatusUnauthorized && !tc.retired; wantRefused != (len(signIn.refused) == 1 && signIn.refused[0] == "token-a") || !wantRefused && len(signIn.refused) != 0 {
+			t.Fatalf("%d: refused tokens = %v", tc.status, signIn.refused)
 		}
 		if signIn.retired != tc.retired {
 			t.Fatalf("%d: retired = %v", tc.status, signIn.retired)

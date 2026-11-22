@@ -159,10 +159,10 @@ func (app *App) signedInHeartbeat(ctx context.Context, cfg *config.Config, team 
 	err = sendHeartbeat(ctx, endpoint, token, team, beat)
 	if refusal, ok := errors.AsType[*heartbeatError](err); ok {
 		switch {
+		case refusal.reason == sendas.ReasonSignInRetired: // whatever its status
+			src.Retired(token)
 		case refusal.status == http.StatusUnauthorized:
 			src.Refused(ctx, token)
-		case refusal.reason == sendas.ReasonSignInRetired:
-			src.Retired(token)
 		}
 	}
 	return err

@@ -527,3 +527,25 @@ func TestARefusedBatchIsSentAPartAtATimePastABlockedHead(t *testing.T) {
 		t.Fatalf("%d requests; want the refused batch, then each part alone", n)
 	}
 }
+
+// A sign-in refused as retired is marked retired whatever status the refusal comes with,
+// a 401 included: never handed back to be refreshed as an expired token.
+func TestARetiredRefusalIsNeverTakenForAnExpiredToken(t *testing.T) {
+	t.Parallel()
+	u := newSignInUpstream(t, http.StatusUnauthorized)
+	u.body = []byte(`{"code":16,"message":"retired","details":[{"@type":"type.googleapis.com/google.rpc.ErrorInfo","reason":"SIGN_IN_RETIRED"}]}`)
+	signIn := &testSignIn{account: accountA}
+	dir := t.TempDir()
+	queue(t, dir, accountA)
+	signedInRelay(t, u, signIn, dir, "")
+	waitFor(t, func() bool {
+		signIn.mu.Lock()
+		defer signIn.mu.Unlock()
+		return signIn.retired
+	})
+	signIn.mu.Lock()
+	defer signIn.mu.Unlock()
+	if len(signIn.refused) != 0 {
+		t.Fatalf("a retired sign-in's token was handed back as expired: %v", signIn.refused)
+	}
+}

@@ -57,6 +57,11 @@ func (s *sender) send(ctx context.Context, pol Policy, first entry, body []byte)
 	switch code := resp.StatusCode; {
 	case code/100 == 2:
 		return sent, 0, "", partialSuccess(answer)
+	case pol.Key == "" && sendas.Reason(answer) == sendas.ReasonSignInRetired:
+		// Retired, whatever the status it comes with, as delivery and the heartbeat take it:
+		// never refreshed as a token expired.
+		s.r.opts.SignIn.Retired(bearer)
+		return retry, refusedBackoff, fmt.Sprintf("HTTP %d %s: the sign-in is retired", code, sendas.ReasonSignInRetired), 0
 	case code == http.StatusUnauthorized && pol.Key == "":
 		// An expired or rotated token: the next attempt sends a fresh one.
 		s.r.opts.SignIn.Refused(ctx, bearer)
@@ -66,9 +71,6 @@ func (s *sender) send(ctx context.Context, pol Policy, first entry, body []byte)
 		// a membership granted back is refused until it is published, and the outbox ages
 		// out what never leaves.
 		reason := sendas.Reason(answer)
-		if reason == sendas.ReasonSignInRetired {
-			s.r.opts.SignIn.Retired(bearer)
-		}
 		return retry, refusedBackoff, fmt.Sprintf("HTTP 403 %s: the sign-in may not send to this team", reason), 0
 	case code == http.StatusUnauthorized || code == http.StatusForbidden:
 		return retry, refusedBackoff, fmt.Sprintf("HTTP %d: the team's key was refused", code), 0

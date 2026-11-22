@@ -242,10 +242,10 @@ func (r Router) refused(ctx context.Context, serverKey bool, token string, err e
 		return
 	}
 	switch {
+	case ingest.Retired(): // whatever the status it comes with: never refreshed as expired
+		r.SignIn.Retired(token)
 	case ingest.Status == http.StatusUnauthorized:
 		r.SignIn.Refused(ctx, token)
-	case ingest.Retired():
-		r.SignIn.Retired(token)
 	}
 }
 
