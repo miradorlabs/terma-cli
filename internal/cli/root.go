@@ -63,6 +63,7 @@ Every command is safe to run again.`,
 		SilenceErrors: true,
 		Version:       app.version,
 		PersistentPostRun: func(cmd *cobra.Command, _ []string) {
+			app.tellSignInAfterUpdate(cmd, canPrompt())
 			app.printUpdateNotice(cmd)
 		},
 	}
@@ -125,6 +126,33 @@ func (app *App) newVersionCommand() *cobra.Command {
 	}
 }
 
+// notSignedIn is what a command that needs a sign-in says without one: after an update
+// that retired an older terma's sign-ins, why.
+func (app *App) notSignedIn() string {
+	if auth.HasLegacySignIns(app.dir) {
+		return signInAfterUpdate + "."
+	}
+	return "not signed in. Run `terma setup`."
+}
+
+// tellSignInAfterUpdate says, after a person's command, that an update retired the sign-ins
+// an older terma kept and nothing is signed in until they sign in once: otherwise the
+// machine looks signed out for no reason. Setup, which signs in, and doctor, which says
+// it in its own check, do not repeat it.
+func (app *App) tellSignInAfterUpdate(cmd *cobra.Command, interactive bool) {
+	if !app.humanFacing(cmd, interactive) || slices.Contains([]string{"setup", "teardown", "doctor"}, cmd.Name()) ||
+		!auth.HasLegacySignIns(app.dir) {
+		return
+	}
+	cfg, err := app.loadConfig()
+	if err != nil || cfg.ServerKeySignIn {
+		return
+	}
+	if _, err := auth.LoadIdentity(app.dir, cfg.ProfileName); errors.Is(err, auth.ErrNotLoggedIn) {
+		fmt.Fprintln(cmd.ErrOrStderr(), "Note: "+signInAfterUpdate+".")
+	}
+}
+
 // printUpdateNotice runs update maintenance after interactive commands, never from a
 // hook or a spool flush, which must stay silent and fast. It first says, once, what the
 // relay, which prints nothing, installed in the background since the last one.
@@ -144,7 +172,13 @@ func (app *App) printUpdateNotice(cmd *cobra.Command) {
 }
 
 func (app *App) automaticUpdatesAllowed(cmd *cobra.Command, interactive bool) bool {
-	if !interactive || (app.flags.output != "" && app.flags.output != "table") || selfupdate.OptedOut(os.Getenv) {
+	return app.humanFacing(cmd, interactive) && !selfupdate.OptedOut(os.Getenv)
+}
+
+// humanFacing reports whether cmd, run interactively, prints for a person: no program
+// reads its output, and no hook or flush, which stay silent, runs it.
+func (app *App) humanFacing(cmd *cobra.Command, interactive bool) bool {
+	if !interactive || (app.flags.output != "" && app.flags.output != "table") {
 		return false
 	}
 	for c := cmd; c != nil; c = c.Parent() {
@@ -280,7 +314,7 @@ func (app *App) Execute() int {
 		errOut := style.Highlight(os.Stderr)
 		label := style.For(os.Stderr).Fail("Error:")
 		if errors.Is(err, auth.ErrNotLoggedIn) {
-			fmt.Fprintf(errOut, "%s not signed in. Run `terma setup`.\n", label)
+			fmt.Fprintf(errOut, "%s %s\n", label, app.notSignedIn())
 			return 1
 		}
 		if wrongEnv, ok := errors.AsType[*auth.ErrWrongEnvironment](err); ok {

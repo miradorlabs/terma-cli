@@ -27,7 +27,7 @@ type Source struct {
 
 // Fetch asks cfg's organization for the collection policy of cfg's project: with the
 // project's key from the keystore when the profile signed in with a server key, which
-// reads only the profile's team, else with the developer's login.
+// reads only the profile's team, else with the developer's sign-in.
 func (s Source) Fetch(ctx context.Context, cfg *config.Config) (config.Policy, error) {
 	switch {
 	// Only an explicit offline fixture skips the profile's credential.
@@ -55,11 +55,10 @@ func (s Source) Fetch(ctx context.Context, cfg *config.Config) (config.Policy, e
 	if err != nil {
 		return config.Policy{}, err
 	}
+	// A user token reads every organization the person belongs to: the profile names the
+	// one setup chose, which every policy it stores is stamped with.
 	if cfg.OrganizationID == "" {
-		cfg.OrganizationID = cred.OrganizationID
-	}
-	if cfg.OrganizationID != cred.OrganizationID {
-		return config.Policy{}, errors.New("collection policy login belongs to another organization — run `terma setup`")
+		return config.Policy{}, errors.New("no organization is chosen — run `terma setup`")
 	}
 	// A login profile always uses the developer login, even while TERMA_API_KEY is set.
 	policyConfig := *cfg

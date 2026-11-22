@@ -4,8 +4,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/miradorlabs/terma-cli/internal/account/auth"
-	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/doctor"
 )
 
@@ -22,9 +20,7 @@ func TestSetupRecommendsCommitHooksWhenThePolicyHasThemOff(t *testing.T) {
 			sandboxMachine(t)
 			t.Setenv("CODEX_HOME", t.TempDir())
 			t.Setenv("TERMA_POLICY_STUB", `{"mode":"repo","repositories":["github.com/acme/app"],"include_prompts":true,"include_tool_content":true,"git_hooks":`+tc.gitHooks+`,"default_project_id":"team"}`)
-			if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(gateway, orgA())); err != nil {
-				t.Fatal(err)
-			}
+			signInTo(t, gateway, orgA())
 			out, err := runTerma(t, "setup", "--harness", "codex")
 			if err != nil {
 				t.Fatalf("setup: %v\n%s", err, out)

@@ -361,6 +361,37 @@ func DeleteHarnessKeys(dir, projectID string) error {
 	})
 }
 
+// RetainOnly forgets every key but the projects' own keys in keep: the team keys an older
+// terma minted with a developer's sign-in, which a user token replaces, and every
+// harness's. A server key a profile signed in with (TERMA_API_KEY) is kept by naming its
+// team. The keychain items of what is forgotten are marked stale, for sweepStale to
+// remove once the file is on disk. With no keys.json there is nothing to forget.
+func RetainOnly(dir string, keep []string) error {
+	if _, err := os.Stat(path(dir)); errors.Is(err, fs.ErrNotExist) {
+		return nil
+	}
+	return update(dir, func(f *file, _ bool) {
+		for id, v := range f.Keys {
+			if slices.Contains(keep, id) {
+				continue
+			}
+			if v == "" {
+				f.mark(projectItem(id))
+			}
+			delete(f.Keys, id)
+			delete(f.Hosts, id)
+		}
+		for harness, keys := range f.HarnessKeys {
+			for id, v := range keys {
+				if v == "" {
+					f.mark(harnessItem(harness, id))
+				}
+			}
+			delete(f.HarnessKeys, harness)
+		}
+	})
+}
+
 // Relocate moves every key to where config.json now keeps secrets: into the keychain, or,
 // under InsecureStorage, into keys.json. A key the keychain will not take or give up
 // stays where it is; with no keys.json there is nothing to move.

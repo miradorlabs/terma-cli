@@ -11,7 +11,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/miradorlabs/terma-cli/internal/account/auth"
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/globalmode"
@@ -32,9 +31,7 @@ func globalSandbox(t *testing.T) (codexHome string) {
 	prev := testApp.hookExecutable
 	testApp.hookExecutable = func() (string, error) { return bin, nil }
 	t.Cleanup(func() { testApp.hookExecutable = prev })
-	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(gateway, orgA())); err != nil {
-		t.Fatal(err)
-	}
+	signInTo(t, gateway, orgA())
 	return codexHome
 }
 

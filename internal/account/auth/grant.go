@@ -13,12 +13,12 @@ import (
 
 // The desktop grant: Terma Desktop signs this CLI in with no browser and no listener.
 // `terma setup --desktop-grant` reads the desktop's identity from stdin, and either reuses
-// its own stored sign-in for that user and organization, or prints a PKCE challenge it
-// made itself, reads back a code the desktop obtained for that challenge, and redeems it
-// with its own verifier. The lines are pinned by terma-desktop's
+// its own stored sign-in for that user, or prints a PKCE challenge it made itself, reads
+// back a code the desktop delegated for that challenge from its own user session, and
+// redeems it with its own verifier. The lines are pinned by terma-desktop's
 // shared/fixtures/auth.json delegatedGrant, copied to testdata/delegated_grant.json:
 //
-//	stdin  1  {"user_id":"<uuid>","org_id":"<uuid>"}
+//	stdin  1  {"user_id":"<uuid>","org_id":"<uuid>"}  (org_id optional: a user session has none)
 //	stdout 1  {"challenge":"<S256>","label":"<label>"}  or  {"reused":true}
 //	stdin  2  {"code":"<code>"}  (only after a challenge)
 //
@@ -29,12 +29,11 @@ const (
 	// GrantNoCode: stdin ended, or stayed silent for GrantTimeout, before a code.
 	GrantNoCode = "grant_no_code"
 	// GrantBadInput: an identity or code line that is not the protocol's, or an
-	// identity for another organization than --org.
+	// identity naming another organization than --org.
 	GrantBadInput = "grant_bad_input"
 	// GrantRejected: the auth host did not redeem the code.
 	GrantRejected = "grant_rejected"
-	// GrantIdentityMismatch: the code signed in another user or organization than the
-	// desktop's.
+	// GrantIdentityMismatch: the code signed in another user than the desktop's.
 	GrantIdentityMismatch = "grant_identity_mismatch"
 )
 
@@ -73,10 +72,11 @@ func (e *GrantError) Error() string {
 
 func (e *GrantError) Unwrap() error { return e.Err }
 
-// GrantIdentity is who the desktop is signed in as, the first line it writes.
+// GrantIdentity is who the desktop is signed in as, the first line it writes. OrgID is the
+// organization it sets this CLI up for, "" when it names none.
 type GrantIdentity struct {
 	UserID string `json:"user_id"`
-	OrgID  string `json:"org_id"`
+	OrgID  string `json:"org_id,omitempty"`
 }
 
 var grantUUID = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
@@ -93,7 +93,7 @@ func ReadGrantIdentity(ctx context.Context, in io.Reader, timeout time.Duration)
 		return GrantIdentity{}, &GrantError{Code: GrantBadInput, Message: "Terma Desktop sent no identity line on stdin", Err: err}
 	}
 	var id GrantIdentity
-	if json.Unmarshal(line, &id) != nil || !grantUUID.MatchString(id.UserID) || !grantUUID.MatchString(id.OrgID) {
+	if json.Unmarshal(line, &id) != nil || !grantUUID.MatchString(id.UserID) || id.OrgID != "" && !grantUUID.MatchString(id.OrgID) {
 		return GrantIdentity{}, &GrantError{Code: GrantBadInput, Message: `the identity line on stdin is not {"user_id":"<uuid>","org_id":"<uuid>"}`}
 	}
 	// Terma's ids are lowercase; an uppercase spelling names the same user and organization.

@@ -1,13 +1,15 @@
 // Package auth implements the CLI side of the Terma PKCE loopback login: the
 // browser handoff, the code exchange, credential storage, and transparent refresh.
 //
-// credentials.json indexes each profile's credentials; their tokens live in the system
-// keychain (internal/account/secret), or in the file itself where there is none or
-// `terma setup --insecure-storage` asked for it, as gh keeps its token.
+// A profile holds one sign-in: a user session of the person who signed in, which reads
+// every organization and team they belong to. user-credentials.json indexes each
+// profile's; its tokens live in the system keychain (internal/account/secret), or in the
+// file itself where there is none or `terma setup --insecure-storage` asked for it, as gh
+// keeps its token. A terma before user tokens kept one sign-in per organization in
+// credentials.json; signing in deletes them (legacy.go).
 package auth
 
 import (
-	"cmp"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -15,66 +17,57 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
-	"slices"
-	"sort"
 	"time"
 
+	"github.com/miradorlabs/terma-cli/internal/account/secret"
 	"github.com/miradorlabs/terma-cli/internal/config"
 )
 
 // ErrNotLoggedIn is returned when there is no usable credential.
 var ErrNotLoggedIn = errors.New("not logged in")
 
-// Credential is one profile's stored tokens for one organization.
+// Credential is one profile's sign-in: a user session's tokens.
 type Credential struct {
 	// The tokens are empty on disk when the keychain holds them.
 	AccessToken  string    `json:"access_token,omitempty"`
 	RefreshToken string    `json:"refresh_token,omitempty"`
 	ExpiresAt    time.Time `json:"expires_at"`
-	SessionID    string    `json:"session_id,omitempty"`
+	SessionID    string    `json:"session_id"`
+	// FamilyID is the session's own id, or the id of the Terma Desktop session that
+	// delegated it.
+	FamilyID string `json:"family_id,omitempty"`
 	// AuthURL is the host that minted this credential, the only one it is valid to.
-	AuthURL        string `json:"auth_url,omitempty"`
-	OrganizationID string `json:"organization_id,omitempty"`
-	UserEmail      string `json:"user_email,omitempty"`
-	// UserID is the Mirador user who signed in, as every token exchange names them: a
-	// credential saved before it was kept gains it at its next refresh.
-	UserID string `json:"user_id,omitempty"`
+	AuthURL   string `json:"auth_url"`
+	UserEmail string `json:"user_email,omitempty"`
+	// UserID is the Mirador user who signed in.
+	UserID string `json:"user_id"`
 	// Label is the session label a desktop grant asked for (DesktopLabel), kept so doctor
 	// can say the sign-in came from Terma Desktop; "" for a browser sign-in.
 	Label string `json:"label,omitempty"`
+	// RefreshInDoubtSince is when a refresh of RefreshToken was first sent without an
+	// answer that said whether it rotated (a 503 or a lost response). The server forgives a
+	// retry of a spent token for 60 seconds and treats a later one as reuse, which revokes
+	// the whole family, so no process presents it again once refreshAttemptBudget has
+	// passed: the sign-in is over instead. Zero when no refresh is in doubt.
+	RefreshInDoubtSince time.Time `json:"refresh_in_doubt_since,omitzero"`
+	// RefreshInDoubtFor is the SHA-256, in hex, of the refresh token RefreshInDoubtSince
+	// was recorded for. A mark beside another token (a rotation the keychain took and the
+	// file then missed) is not that token's, and is read as none. "" (a mark from before
+	// it) counts for whatever token is stored.
+	RefreshInDoubtFor string `json:"refresh_in_doubt_for,omitempty"`
 	// StaleKeychainItem marks a credential kept in the file while its earlier tokens may
 	// still sit in the keychain, which could not remove them then; sign-out tries again.
 	StaleKeychainItem bool `json:"stale_keychain_item,omitempty"`
-	// RefreshUnsettledAt is when a refresh of this pair was first sent whose answer has not
-	// come: the server may have spent RefreshToken then. Zero when none is outstanding, and
-	// UnsettledExpired once it may never be sent again. It is no secret, so credentials.json
-	// keeps it beside the keychain's tokens; a new pair has none. Read it with
-	// UnsettledSince, which checks that it is about this pair's refresh token.
-	RefreshUnsettledAt time.Time `json:"refresh_unsettled_at,omitzero"`
-	// RefreshUnsettledFor names the refresh token RefreshUnsettledAt is about, by its
-	// SHA-256 in hex. A save whose keychain write landed and whose credentials.json write
-	// did not leaves the mark beside tokens it is not about, and then it does not count.
-	RefreshUnsettledFor string `json:"refresh_unsettled_for,omitempty"`
 }
 
-// UnsettledExpired is the mark of a refresh token that may never be sent again: one whose
-// refresh went unanswered past its budget, or whose mark was found in the future after the
-// wall clock went back. It is earlier than every real mark, so it is never in budget again,
-// whatever the clock does next, and no later mark replaces it (Tx.MarkUnsettled).
-var UnsettledExpired = time.Unix(1, 0).UTC()
-
-// UnsettledSince is when a refresh of c's refresh token was first sent without an answer,
-// or zero when none is outstanding, or the mark is about another token.
-func (c *Credential) UnsettledSince() time.Time {
-	if c.RefreshUnsettledAt.IsZero() || c.RefreshUnsettledFor != TokenSHA256(c.RefreshToken) {
-		return time.Time{}
+// dropForeignMark forgets a refresh mark recorded for another refresh token than c's.
+func (c *Credential) dropForeignMark() {
+	if c.RefreshInDoubtFor != "" && c.RefreshInDoubtFor != tokenHash(c.RefreshToken) {
+		c.RefreshInDoubtSince, c.RefreshInDoubtFor = time.Time{}, ""
 	}
-	return c.RefreshUnsettledAt
 }
 
-// TokenSHA256 is how a token is named where the token itself must not appear: its
-// SHA-256, in lowercase hex.
-func TokenSHA256(token string) string {
+func tokenHash(token string) string {
 	sum := sha256.Sum256([]byte(token))
 	return hex.EncodeToString(sum[:])
 }
@@ -109,43 +102,27 @@ func (c *Credential) Expired() bool {
 	return c.ExpiresAt.IsZero() || time.Now().Add(skew).After(c.ExpiresAt)
 }
 
-// profileCredentials keeps one credential per organization, so switching organizations
-// reuses an approved session instead of a second browser handoff.
-type profileCredentials struct {
-	Active        string                 `json:"active,omitempty"`
-	Organizations map[string]*Credential `json:"organizations"`
-}
-
-func (p *profileCredentials) active() *Credential {
-	if p == nil || p.Active == "" {
-		return nil
-	}
-	cred := p.Organizations[p.Active]
-	if !cred.present() {
-		return nil
-	}
-	return cred
-}
-
 // present reports whether the file indexes c, whose tokens may be in the keychain.
-func (c *Credential) present() bool { return c != nil && c.OrganizationID != "" }
+func (c *Credential) present() bool { return c != nil && c.SessionID != "" }
 
-func (p *profileCredentials) put(cred *Credential) {
-	if p.Organizations == nil {
-		p.Organizations = map[string]*Credential{}
+// credentialFile is user-credentials.json: each profile's sign-in.
+type credentialFile map[string]*Credential
+
+func (f credentialFile) get(profile string) *Credential {
+	c := f[profile]
+	if !c.present() {
+		return nil
 	}
-	p.Organizations[cred.OrganizationID] = cred
+	return c
 }
 
-type credentialFile map[string]*profileCredentials
-
-// LoadCredential returns the active credential for a profile, or ErrNotLoggedIn.
+// LoadCredential returns a profile's sign-in, or ErrNotLoggedIn.
 func LoadCredential(dir, profile string) (*Credential, error) {
 	file, err := loadCredentialFile(dir)
 	if err != nil {
 		return nil, err
 	}
-	cred := file[profile].active()
+	cred := file.get(profile)
 	if cred == nil {
 		return nil, ErrNotLoggedIn
 	}
@@ -155,14 +132,14 @@ func LoadCredential(dir, profile string) (*Credential, error) {
 	return cred, nil
 }
 
-// LoadIdentity returns the profile's active credential without its tokens: who signed in,
-// to which organization and auth host. It reads only credentials.json, never the keychain.
+// LoadIdentity returns the profile's sign-in without its tokens: who signed in, to which
+// auth host. It reads only user-credentials.json, never the keychain.
 func LoadIdentity(dir, profile string) (*Credential, error) {
 	file, err := loadCredentialFile(dir)
 	if err != nil {
 		return nil, err
 	}
-	cred := file[profile].active()
+	cred := file.get(profile)
 	if cred == nil {
 		return nil, ErrNotLoggedIn
 	}
@@ -170,81 +147,25 @@ func LoadIdentity(dir, profile string) (*Credential, error) {
 	return cred, nil
 }
 
-// StoredInFile reports whether the profile's active credential keeps its tokens in
-// credentials.json rather than the system keychain.
+// StoredInFile reports whether the profile's sign-in keeps its tokens in
+// user-credentials.json rather than the system keychain.
 func StoredInFile(dir, profile string) bool {
 	file, err := loadCredentialFile(dir)
 	if err != nil {
 		return false
 	}
-	cred := file[profile].active()
+	cred := file.get(profile)
 	return cred != nil && cred.AccessToken != ""
 }
 
-// LoadCredentialFor returns the profile's credential for one organization, active or
-// not, or ErrNotLoggedIn when the profile never signed into it.
-func LoadCredentialFor(dir, profile, organizationID string) (*Credential, error) {
-	file, err := loadCredentialFile(dir)
-	if err != nil {
-		return nil, err
-	}
-	p := file[profile]
-	if p == nil {
-		return nil, ErrNotLoggedIn
-	}
-	cred := p.Organizations[organizationID]
-	if !cred.present() {
-		return nil, ErrNotLoggedIn
-	}
-	if err := hydrate(dir, profile, cred); err != nil {
-		return nil, err
-	}
-	return cred, nil
-}
-
-// Credentials lists every credential a profile holds, the active one first. A
-// credential whose tokens are gone is left out; an unreachable keychain is an error.
-func Credentials(dir, profile string) ([]*Credential, error) {
-	file, err := loadCredentialFile(dir)
-	if err != nil {
-		return nil, err
-	}
-	p := file[profile]
-	if p == nil {
-		return nil, nil
-	}
-	keys := make([]string, 0, len(p.Organizations))
-	for key, cred := range p.Organizations {
-		if cred.present() {
-			keys = append(keys, key)
-		}
-	}
-	sort.Slice(keys, func(i, j int) bool {
-		if (keys[i] == p.Active) != (keys[j] == p.Active) {
-			return keys[i] == p.Active
-		}
-		return keys[i] < keys[j]
-	})
-	out := make([]*Credential, 0, len(keys))
-	for _, key := range keys {
-		cred := p.Organizations[key]
-		switch err := hydrate(dir, profile, cred); {
-		case errors.Is(err, ErrNotLoggedIn):
-			continue
-		case err != nil:
-			return nil, err
-		}
-		out = append(out, cred)
-	}
-	return out, nil
-}
-
-// SaveCredential stores and activates a credential, returning the session it displaced
-// for the caller to revoke. Signing in decides where the tokens live: the system
-// keychain, unless there is none or config.json asks for files (InsecureStorage).
+// SaveCredential stores a new sign-in as the profile's, returning the one it replaced
+// for the caller to revoke, once the new one is stored: a machine keeps one session, and a
+// crash in between leaves the old one live but unused rather than the machine signed out.
+// Signing in decides where the tokens live: the system keychain, unless there is none or
+// config.json asks for files (InsecureStorage).
 func SaveCredential(dir, profile string, cred *Credential) (replaced *Credential, err error) {
 	err = lockedWrite(dir, func(tx *Tx) error {
-		replaced, err = tx.saveReplacing(profile, cred)
+		replaced, err = tx.saveReplacing(profile, cred, config.InsecureStorage(dir))
 		return err
 	})
 	if replaced != nil && replaced.SessionID == cred.SessionID {
@@ -253,86 +174,64 @@ func SaveCredential(dir, profile string, cred *Credential) (replaced *Credential
 	return replaced, err
 }
 
-func (tx *Tx) save(profile string, cred *Credential) error {
-	_, err := tx.saveReplacing(profile, cred)
-	return err
-}
-
-func (tx *Tx) saveReplacing(profile string, cred *Credential) (replaced *Credential, err error) {
+// saveReplacing stores cred as profile's sign-in, keeping its tokens in the file when
+// inFile, and returns the sign-in it replaced, with its tokens when they can be read.
+func (tx *Tx) saveReplacing(profile string, cred *Credential, inFile bool) (replaced *Credential, err error) {
 	dir := tx.dir
-	inFile := config.InsecureStorage(dir)
 	var unindexed bool
-	err = tx.mutate(func(file credentialFile) {
-		p := file[profile]
-		if p == nil {
-			p = &profileCredentials{}
-			file[profile] = p
-		}
+	// overwritten is the sign-in whose keychain item the new tokens replaced: a file that
+	// then fails to save still indexes it, so its tokens go back.
+	var overwritten *Credential
+	var unread error
+	err = tx.mutateIf(func(file credentialFile) bool {
 		// Read before the new tokens overwrite the keychain item.
-		old := p.Organizations[cred.OrganizationID]
+		old := file.get(profile)
 		var indexed *Credential
-		if old.present() {
+		if old != nil {
 			copied := *old
 			indexed = &copied
-			if hydrate(dir, profile, old) == nil {
+			switch err := hydrate(dir, profile, old); {
+			case err == nil:
 				replaced = old
+			case !errors.Is(err, errTokensGone) && !inFile && old.SessionID != cred.SessionID:
+				// The keychain did not answer: its item may still hold the only copy of
+				// another live session's tokens, which the new ones must not overwrite
+				// unread. (Kept in the file, the new ones overwrite nothing.)
+				unread = err
+				return false
 			}
 		}
 		kept := keep(dir, profile, cred, indexed, inFile)
-		unindexed = !old.present() && kept.AccessToken == ""
-		p.put(kept)
-		p.Active = cred.OrganizationID
+		unindexed = old == nil && kept.AccessToken == ""
+		if replaced != nil && indexed.AccessToken == "" {
+			overwritten = replaced
+		}
+		file[profile] = kept
+		return true
 	})
-	tx.after = append(tx.after, func() { afterSave(dir, profile, cred.OrganizationID, unindexed, err) })
+	if err == nil && unread != nil {
+		err = fmt.Errorf("read the sign-in it replaces from the system keychain: %w", unread)
+	}
+	if err != nil && overwritten != nil {
+		pair, _ := json.Marshal(tokenPair{AccessToken: overwritten.AccessToken, RefreshToken: overwritten.RefreshToken, SessionID: overwritten.SessionID})
+		_ = secret.Set(dir, itemName(profile), string(pair))
+	}
+	tx.after = append(tx.after, func() { afterSave(dir, profile, unindexed, err) })
 	return replaced, err
 }
 
-// ResaveCredential activates and saves a session read from the store earlier, as
-// SaveCredential does. Under the lock it keeps the pair stored now, not cred's. Another
-// process may have rotated the pair or signed in again since, and writing back the older
-// pair would give the next refresh a spent refresh token. It returns the credential as
-// saved.
-//
-// An entry gone since is not restored: ErrNotLoggedIn. Another process may have removed
-// it on the server's refusal of its refresh token (Tx.DeleteFor), and cred may hold that
-// token.
-func ResaveCredential(dir, profile string, cred *Credential) (*Credential, error) {
-	var saved *Credential
-	err := lockedWrite(dir, func(tx *Tx) error {
-		stored, err := tx.LoadFor(profile, cred.OrganizationID)
-		if err != nil {
-			// Absent, or unreadable, which is not absent: what is stored may be newer than cred.
-			return err
-		}
-		stored.UserEmail = cmp.Or(stored.UserEmail, cred.UserEmail)
-		stored.UserID = cmp.Or(stored.UserID, cred.UserID)
-		saved = stored
-		return tx.save(profile, saved)
-	})
-	if err != nil {
-		return nil, err
-	}
-	return saved, nil
-}
-
-// UpdateCredential persists a refreshed credential without changing which organization
-// is active, keeping its tokens where they already are; a keychain that fails gets the
-// new pair written to the file, so a rotated token is never lost.
+// UpdateCredential persists a refreshed credential, keeping its tokens where they already
+// are; a keychain that fails gets the new pair written to the file, so a rotated token is
+// never lost.
 func UpdateCredential(dir, profile string, cred *Credential) error {
 	return lockedWrite(dir, func(tx *Tx) error { return tx.Update(profile, cred) })
 }
 
-// DeleteCredential forgets every credential a profile holds — logout.
+// DeleteCredential forgets a profile's sign-in — logout.
 func DeleteCredential(dir, profile string) error {
-	var gone []*Credential
+	var gone *Credential
 	err := mutateCredentialFile(dir, func(file credentialFile) {
-		if p := file[profile]; p != nil {
-			for _, c := range p.Organizations {
-				if c.present() {
-					gone = append(gone, c)
-				}
-			}
-		}
+		gone = file.get(profile)
 		delete(file, profile)
 	})
 	if err != nil {
@@ -341,36 +240,47 @@ func DeleteCredential(dir, profile string) error {
 	return forget(dir, profile, gone)
 }
 
-// DeleteCredentialFor forgets one organization's credential; if it was active, another becomes active.
-func DeleteCredentialFor(dir, profile, organizationID string) error {
-	var gone []*Credential
-	err := mutateCredentialFile(dir, func(file credentialFile) {
-		p := file[profile]
-		if p == nil {
-			return
-		}
-		key := organizationID
-		if c := p.Organizations[key]; c.present() {
-			gone = append(gone, c)
-		}
-		delete(p.Organizations, key)
-		if p.Active != key {
-			return
-		}
-		p.Active = ""
-		remaining := make([]string, 0, len(p.Organizations))
-		for k := range p.Organizations {
-			remaining = append(remaining, k)
-		}
-		slices.Sort(remaining)
-		if len(remaining) > 0 {
-			p.Active = remaining[0]
-		}
-	})
+// DeleteCredentialIf forgets a profile's sign-in only while its refresh token is still
+// refreshToken: a sign-in another process stored since is not this caller's to forget.
+func DeleteCredentialIf(dir, profile, refreshToken string) error {
+	return lockedWrite(dir, func(tx *Tx) error { return tx.DeleteIf(profile, refreshToken) })
+}
+
+// DeleteIf is DeleteCredentialIf inside the transaction. It removes the sign-in from
+// user-credentials.json alone, as v0.3.1's DeleteFor did: a keychain delete that timed out
+// can still land after the lock is released, and would then remove the tokens a new
+// sign-in just wrote under the same item name. The item left is overwritten by the next
+// sign-in to the keychain. Signing out, which means to remove it, uses SignOutIf.
+func (tx *Tx) DeleteIf(profile, refreshToken string) error {
+	_, err := tx.deleteIf(profile, refreshToken)
+	return err
+}
+
+// SignOutIf is DeleteIf for signing out: the sign-in's keychain item goes too.
+func (tx *Tx) SignOutIf(profile, refreshToken string) error {
+	gone, err := tx.deleteIf(profile, refreshToken)
 	if err != nil {
 		return err
 	}
-	return forget(dir, profile, gone)
+	return forget(tx.dir, profile, gone)
+}
+
+func (tx *Tx) deleteIf(profile, refreshToken string) (*Credential, error) {
+	stored, err := tx.Load(profile)
+	switch {
+	case errors.Is(err, ErrNotLoggedIn):
+		return nil, nil
+	case err != nil:
+		return nil, err
+	case stored.RefreshToken != refreshToken:
+		return nil, nil
+	}
+	var gone *Credential
+	err = tx.mutate(func(file credentialFile) {
+		gone = file.get(profile)
+		delete(file, profile)
+	})
+	return gone, err
 }
 
 // mutateCredentialFile runs mutate under a cross-process lock: unlocked, a second
@@ -403,6 +313,9 @@ func saveCredentialFile(path string, file credentialFile) error {
 	if err != nil {
 		return err
 	}
-	// 0600: this file holds live access and refresh tokens.
-	return config.WriteFileAtomic(path, append(data, '\n'), 0o600)
+	// 0600: this file may hold live access and refresh tokens.
+	return writeCredentialFile(path, append(data, '\n'), 0o600)
 }
+
+// writeCredentialFile writes user-credentials.json; a test can make it fail alone.
+var writeCredentialFile = config.WriteFileAtomic

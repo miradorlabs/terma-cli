@@ -54,7 +54,7 @@ func TestAuthToken_ConcurrentProcessesRedeemOnce(t *testing.T) {
 		case <-srv.redeeming:
 		case <-time.After(10 * time.Second):
 		}
-		if _, ok, err := testApp.reuseStoredSession(t.Context(), cfg, orgRef{}); err != nil || !ok {
+		if _, ok, err := testApp.reuseStoredSession(t.Context(), cfg, nil); err != nil || !ok {
 			setupErr = err
 			if err == nil {
 				setupErr = auth.ErrNotLoggedIn

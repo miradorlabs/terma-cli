@@ -86,6 +86,17 @@ func TestDoctorJudgesTheSignInFromItsProbe(t *testing.T) {
 	}
 }
 
+// A machine an older terma signed in, updated and not signed in since, is told why it is
+// signed out: the update retired its sign-ins.
+func TestDoctorSaysAnUpdateNeedsASignIn(t *testing.T) {
+	t.Parallel()
+	updated := func() (Credential, error) { return Credential{SignInAfterUpdate: true}, nil }
+	c := check(Run(t.Context(), env(t, Probes{Credential: updated, Spool: func() SpoolState { return SpoolState{} }}), Progress{}), KeyAuth)
+	if c.Status != Fail || !strings.Contains(c.Detail, "updated") || c.Fix != "terma setup" {
+		t.Fatalf("signed in = %+v", c)
+	}
+}
+
 // A locked keychain is not a missing sign-in: doctor says which, and says where a working
 // credential is kept.
 func TestDoctorTellsALockedKeychainFromNoSignIn(t *testing.T) {
@@ -442,4 +453,25 @@ func TestCaptureOffWarnsTheCollectionChecks(t *testing.T) {
 			}
 		})
 	}
+}
+
+// terma status says, as doctor does, that an updated machine is signed out until its person
+// signs in once, never that it is signed in.
+func TestStatusSaysAnUpdateNeedsASignIn(t *testing.T) {
+	t.Parallel()
+	e := env(t, Probes{Credential: func() (Credential, error) { return Credential{SignInAfterUpdate: true}, nil },
+		Spool: func() SpoolState { return SpoolState{} }})
+	rep, err := Local(t.Context(), e)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, row := range rep.Rows {
+		if row.Label == "Account" {
+			if !strings.Contains(row.Value, "terma was updated") || strings.Contains(row.Value, "signed in in") {
+				t.Fatalf("Account = %q", row.Value)
+			}
+			return
+		}
+	}
+	t.Fatal("no Account row")
 }

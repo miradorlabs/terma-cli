@@ -49,7 +49,7 @@ func TestHeartbeatNamesTheUserOnlyWithTheTeamKey(t *testing.T) {
 	signIn := func(org, user string) {
 		t.Helper()
 		if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, &auth.Credential{AccessToken: "ter_cli_" + org,
-			RefreshToken: "ter_clr_" + org, ExpiresAt: time.Now().Add(time.Hour), AuthURL: srv.URL, OrganizationID: org, UserID: user}); err != nil {
+			RefreshToken: "ter_clr_" + org, ExpiresAt: time.Now().Add(time.Hour), AuthURL: srv.URL, SessionID: "s-" + org, UserID: user}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -76,7 +76,7 @@ func TestHeartbeatNamesTheUserOnlyWithTheTeamKey(t *testing.T) {
 		t.Fatal(err)
 	}
 	send()
-	signIn("org-b", "user-b") // the login moved to another organization; the profile did not
+	signIn("org-b", "user-b") // another person signed in: the one sign-in is theirs, whatever the organization
 	send()
 	signIn("org-a", "user-a")
 	// No team selected, so no validated policy: TERMA_TEAM_ID alone picks the key.
@@ -102,22 +102,22 @@ func TestHeartbeatNamesTheUserOnlyWithTheTeamKey(t *testing.T) {
 	}
 	selectPolicy(t, config.Policy{Mode: config.ModeRepo, TeamID: "team2", Revision: 1, FetchedAt: time.Now()})
 	send()
-	want := []string{"ter_srv_elsewhere=", "ter_srv_team=user-a", "ter_srv_team=", "ter_srv_elsewhere=", "ter_srv_team=",
+	want := []string{"ter_srv_elsewhere=", "ter_srv_team=user-a", "ter_srv_team=user-b", "ter_srv_elsewhere=", "ter_srv_team=",
 		"ter_srv_team=user-a", "ter_srv_team2="}
 	if strings.Join(sent, " ") != strings.Join(want, " ") {
 		t.Fatalf("beats sent %q, want %q", sent, want)
 	}
 }
 
-// signedInUser names the profile's login from credentials.json: no one signed out, signed
-// in for another organization or environment, or set up with a server key.
+// signedInUser names the profile's login from user-credentials.json: no one signed out,
+// signed in for another environment, or set up with a server key.
 func TestSignedInUser(t *testing.T) {
 	useConfigDir(t, t.TempDir())
 	cfg := config.Config{Dir: testApp.dir, ProfileName: config.DefaultProfile, AuthURL: "https://auth.example", OrganizationID: "org-a"}
 	if got := signedInUser(&cfg); got != "" {
 		t.Fatalf("signed out, named %q", got)
 	}
-	if _, err := auth.SaveCredential(testApp.dir, cfg.ProfileName, &auth.Credential{AccessToken: "ter_cli_a", OrganizationID: "org-a", AuthURL: cfg.AuthURL, UserID: "user-a"}); err != nil {
+	if _, err := auth.SaveCredential(testApp.dir, cfg.ProfileName, &auth.Credential{AccessToken: "ter_cli_a", SessionID: "s-a", AuthURL: cfg.AuthURL, UserID: "user-a"}); err != nil {
 		t.Fatal(err)
 	}
 	if got := signedInUser(&cfg); got != "user-a" {
@@ -126,7 +126,6 @@ func TestSignedInUser(t *testing.T) {
 	for name, c := range map[string]config.Config{
 		"server key":          {Dir: cfg.Dir, ProfileName: cfg.ProfileName, AuthURL: cfg.AuthURL, OrganizationID: "org-a", ServerKeySignIn: true},
 		"another environment": {Dir: cfg.Dir, ProfileName: cfg.ProfileName, AuthURL: "https://auth.other", OrganizationID: "org-a"},
-		"another org":         {Dir: cfg.Dir, ProfileName: cfg.ProfileName, AuthURL: cfg.AuthURL, OrganizationID: "org-b"},
 	} {
 		if got := signedInUser(&c); got != "" {
 			t.Errorf("%s: named %q", name, got)
@@ -142,7 +141,7 @@ func TestRelayUserFollowsTheHeartbeatsRule(t *testing.T) {
 	defer srv.Close()
 	authSandbox(t, &fakeAuth{srv: srv})
 	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, &auth.Credential{AccessToken: "ter_cli_a", RefreshToken: "ter_clr_a",
-		ExpiresAt: time.Now().Add(time.Hour), AuthURL: srv.URL, OrganizationID: "org-a", UserID: "user-a"}); err != nil {
+		ExpiresAt: time.Now().Add(time.Hour), AuthURL: srv.URL, SessionID: "s-" + "org-a", UserID: "user-a"}); err != nil {
 		t.Fatal(err)
 	}
 	if err := config.UpdateProfile(testApp.dir, config.DefaultProfile, func(p *config.Profile) { p.SelectOrganization("org-a", "A") }); err != nil {

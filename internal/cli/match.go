@@ -87,9 +87,9 @@ func (k matchKind[T]) index(items []T, query string) (int, error) {
 			names = append(names[:maxListedChoices], fmt.Sprintf("and %d more", len(items)-maxListedChoices))
 		}
 		if len(names) == 0 {
-			return -1, fmt.Errorf("no %s matches %q, and you have none", k.noun, query)
+			return -1, noMatchError(fmt.Sprintf("no %s matches %q, and you have none", k.noun, query))
 		}
-		return -1, fmt.Errorf("no %s matches %q — yours: %s", k.noun, query, strings.Join(names, ", "))
+		return -1, noMatchError(fmt.Sprintf("no %s matches %q — yours: %s", k.noun, query, strings.Join(names, ", ")))
 	default:
 		names := make([]string, len(matches))
 		for i, m := range matches {
@@ -98,6 +98,11 @@ func (k matchKind[T]) index(items []T, query string) (int, error) {
 		return -1, fmt.Errorf("%q matches several %ss (%s) — use the full name or the id", query, k.noun, strings.Join(names, ", "))
 	}
 }
+
+// noMatchError is a query that names none of the items, as opposed to several.
+type noMatchError string
+
+func (e noMatchError) Error() string { return string(e) }
 
 func (k matchKind[T]) match(items []T, query string) (*T, error) {
 	i, err := k.index(items, query)

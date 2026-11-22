@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -162,22 +161,22 @@ func (app *App) removeHookState() error {
 
 // retireRelayToken removes the relay's token, keeping it for this sign-in when keep.
 func (app *App) retireRelayToken(keep bool) error {
-	org, authURL := "", ""
+	account, authURL := "", ""
 	if !keep {
 		if err := daemon.DiscardRetiredToken(app.stateDir); err != nil {
 			return err
 		}
 	} else if cfg, err := app.loadConfig(); err == nil {
-		org, authURL = daemon.Identity(cfg)
+		account, authURL = daemon.Identity(cfg)
 	}
-	return daemon.RetireToken(app.stateDir, org, authURL)
+	return daemon.RetireToken(app.stateDir, account, authURL)
 }
 
 var errNoSessionWithAPIKey = errors.New("TERMA_API_KEY is set — there is no session to sign out of; unset it to use the stored credential")
 
-// signOut revokes every session this profile holds server-side and deletes the local
-// credentials, one per organization signed into. A failed revoke still clears the local
-// file: the developer asked to be signed out. A profile set up with a server key stops
+// signOut revokes this profile's session server-side and deletes the local credential,
+// and an older terma's per-organization sign-ins with it. A failed revoke still clears the
+// local file: the developer asked to be signed out. A profile set up with a server key stops
 // counting it as its sign-in; the key itself is revoked only in the Terma web app.
 func (app *App) signOut(cmd *cobra.Command) error {
 	out := cmd.OutOrStdout()
@@ -194,34 +193,58 @@ func (app *App) signOut(cmd *cobra.Command) error {
 		}
 		fmt.Fprintln(out, "Signed out of the team's server key; it keeps working until you revoke it in the Terma web app.")
 	}
-	creds, err := auth.Credentials(app.dir, cfg.ProfileName)
-	switch {
-	case secret.IsUnavailable(err):
-		// Signed out all the same: only the server-side revoke needs the tokens.
-		fmt.Fprintf(cmd.ErrOrStderr(), "Warning: could not read the sessions to revoke them server-side (%v).\n", err)
-	case err != nil:
+	// Deleted under the credential lock, then revoked: once the stored copy is gone, no
+	// refresh in another process (the relay's) presents its token, so the revoke never
+	// sends a spent one, which would be reuse and end the whole family, a Terma Desktop
+	// session it was delegated from included. No network call holds the lock.
+	var cred *auth.Credential
+	err = auth.Locked(cmd.Context(), app.dir, func(tx *auth.Tx) error {
+		var err error
+		if cred, err = tx.Load(cfg.ProfileName); err != nil {
+			cred = nil
+			return err
+		}
+		err = tx.SignOutIf(cfg.ProfileName, cred.RefreshToken)
+		// Revoked only once the store no longer lists it: a copy still stored is one a
+		// refresh may spend after the lock, and revoking a spent token is reuse.
+		if still, lerr := auth.LoadIdentity(app.dir, cfg.ProfileName); (lerr == nil && still.SessionID == cred.SessionID) ||
+			(lerr != nil && !errors.Is(lerr, auth.ErrNotLoggedIn)) {
+			cred = nil
+		}
 		return err
-	case len(creds) == 0:
+	})
+	if cred != nil {
+		// Read, and gone from the store even when its keychain item could not be removed.
+		if err := app.revokeSession(cmd.Context(), cfg, cred); err != nil {
+			fmt.Fprintf(cmd.ErrOrStderr(), "Warning: could not revoke the session server-side (%v).\n", err)
+		}
+	}
+	legacy := auth.HasLegacySignIns(app.dir)
+	switch {
+	case err == nil:
+	case cred != nil && secret.IsUnavailable(err):
+		return fmt.Errorf("signed out, but %w: delete the keychain items of the service %s by hand", err, secret.Service(app.dir))
+	case cred != nil:
+		return err
+	case errors.Is(err, auth.ErrNotLoggedIn) && !legacy:
 		if !cfg.ServerKeySignIn {
 			fmt.Fprintln(out, "Already signed out.")
 		}
 		return nil
-	}
-	for _, cred := range creds {
-		if err := app.revokeSession(cmd.Context(), cfg, cred); err != nil {
-			fmt.Fprintf(cmd.ErrOrStderr(), "Warning: could not revoke the session for %s server-side (%v).\n",
-				cmp.Or(cred.OrganizationID, "this organization"), err)
+	case errors.Is(err, auth.ErrNotLoggedIn):
+	case secret.IsUnavailable(err) || errors.Is(err, auth.ErrTokensUnreadable):
+		// Tokens that cannot be read sign the machine out all the same: only the
+		// server-side revoke needs them.
+		fmt.Fprintf(cmd.ErrOrStderr(), "Warning: could not read the session to revoke it server-side (%v).\n", err)
+		if err := auth.DeleteCredential(app.dir, cfg.ProfileName); secret.IsUnavailable(err) {
+			return fmt.Errorf("signed out, but %w: delete the keychain items of the service %s by hand", err, secret.Service(app.dir))
+		} else if err != nil {
+			return err
 		}
-	}
-	if err := auth.DeleteCredential(app.dir, cfg.ProfileName); secret.IsUnavailable(err) {
-		return fmt.Errorf("signed out, but %w: delete the keychain items of the service %s by hand", err, secret.Service(app.dir))
-	} else if err != nil {
+	default:
 		return err
 	}
-	if len(creds) > 1 {
-		fmt.Fprintf(out, "Signed out of %d organizations.\n", len(creds))
-	} else {
-		fmt.Fprintln(out, "Signed out.")
-	}
+	app.retireLegacySessions(cmd.Context(), cfg.AuthURL)
+	fmt.Fprintln(out, "Signed out.")
 	return nil
 }

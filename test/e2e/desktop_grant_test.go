@@ -23,20 +23,23 @@ const (
 
 // TestDesktopGrant is Terma Desktop's onboarding as the CLI sees it: the real binary, its
 // stdin and stdout as pipes, and the account fixture's delegate and token endpoints, which
-// follow the platform's contract (POST /v1/auth/cli/delegate rotates the desktop's refresh
-// token and binds a single-use code to the CLI's challenge; /v1/auth/cli/token redeems it
-// with redirect_port 0 and the verifier). The desktop writes its identity, reads the
-// challenge, delegates and writes the code; the CLI signs itself in and sets up, and
-// doctor says the sign-in came from Terma Desktop. A second run reuses it. The same run
-// against dev, with a desktop session's own refresh token, waits on the platform's
-// delegate endpoint there.
+// follow the platform's contract (POST /v1/auth/user/delegate rotates the desktop user
+// session's refresh token and binds a single-use code to the CLI's challenge;
+// /v1/auth/user/token redeems it with redirect_port 0, the installation's id and the
+// verifier, for a user session of the CLI's own in user-credentials.json). The desktop
+// writes its identity, reads the challenge, delegates and writes the code; the CLI signs
+// itself in and sets up in --org, and doctor says the sign-in came from Terma Desktop. A
+// second run reuses it. The same run against dev, with a desktop session's own refresh
+// token, waits on the platform's delegate endpoint there.
 func TestDesktopGrant(t *testing.T) {
 	track(t)
 	sb := New(t, Isolated, WithProject(desktopTeam))
-	// The CLI starts without a sign-in of its own.
-	if err := os.Remove(filepath.Join(sb.TermaConfig, "credentials.json")); err != nil {
+	// The CLI starts without a sign-in of its own, or an organization: setup records --org.
+	credsPath := filepath.Join(sb.TermaConfig, "user-credentials.json")
+	if err := os.Remove(credsPath); err != nil {
 		t.Fatal(err)
 	}
+	sb.editProfile("default", func(p map[string]any) { delete(p, "organization_id") })
 
 	delegate := func(request map[string]any) string {
 		challenge, _ := request["challenge"].(string)
@@ -51,22 +54,20 @@ func TestDesktopGrant(t *testing.T) {
 		return code
 	}
 
-	// A desktop whose session may not delegate (NOT_DELEGABLE: approve again; or
-	// ORG_NOT_ACCESSIBLE: signed out of that organization) has no code to give and closes
-	// stdin: the CLI ends with grant_no_code, as the desktop's fixture pins it.
-	for _, reason := range []string{"NOT_DELEGABLE", "ORG_NOT_ACCESSIBLE"} {
-		sb.account.RefuseDelegation(reason)
-		_, rest, err := sb.desktopSetup(accountUser, func(request map[string]any) string {
-			challenge, _ := request["challenge"].(string)
-			label, _ := request["label"].(string)
-			if _, err := sb.account.Delegate(challenge, label); err == nil || !strings.Contains(err.Error(), "403 PERMISSION_DENIED "+reason) {
-				t.Fatalf("delegate for a session refused with %s: %v", reason, err)
-			}
-			return ""
-		})
-		if code, ok := exitCode(err); !ok || code != 1 || !strings.Contains(rest, `{"error":{"code":"grant_no_code"`) {
-			t.Fatalf("%s: exit %v, output:\n%s", reason, err, rest)
+	// A desktop whose session may not delegate (NOT_DELEGABLE: sign in on the desktop
+	// again) has no code to give and closes stdin: the CLI ends with grant_no_code, as the
+	// desktop's fixture pins it.
+	sb.account.RefuseDelegation("NOT_DELEGABLE")
+	_, rest, err := sb.desktopSetup(accountUser, func(request map[string]any) string {
+		challenge, _ := request["challenge"].(string)
+		label, _ := request["label"].(string)
+		if _, err := sb.account.Delegate(challenge, label); err == nil || !strings.Contains(err.Error(), "403 PERMISSION_DENIED NOT_DELEGABLE") {
+			t.Fatalf("delegate for a session that may not delegate: %v", err)
 		}
+		return ""
+	})
+	if code, ok := exitCode(err); !ok || code != 1 || !strings.Contains(rest, `{"error":{"code":"grant_no_code"`) {
+		t.Fatalf("NOT_DELEGABLE: exit %v, output:\n%s", err, rest)
 	}
 	sb.account.RefuseDelegation("")
 
@@ -76,8 +77,11 @@ func TestDesktopGrant(t *testing.T) {
 	if code, ok := exitCode(err); !ok || code != 1 || !strings.Contains(rest, `{"error":{"code":"grant_identity_mismatch"`) {
 		t.Fatalf("another user's code: first line %v, exit %v, output:\n%s", first, err, rest)
 	}
-	if _, err := os.Stat(filepath.Join(sb.TermaConfig, "credentials.json")); !os.IsNotExist(err) || sb.account.revokes.Load() != 1 {
-		t.Fatalf("another user's sign-in was kept (%v) or not signed out (%d revokes)", err, sb.account.revokes.Load())
+	if _, err := os.Stat(credsPath); !os.IsNotExist(err) {
+		t.Fatalf("another user's sign-in was kept: %v", err)
+	}
+	if delegated, other := sb.account.RevokedDelegated(); delegated != 1 || other != 0 {
+		t.Fatalf("another user's session was not signed out: %d delegated sessions and %d others revoked", delegated, other)
 	}
 
 	first, rest, err = sb.desktopSetup(accountUser, delegate)
@@ -87,12 +91,18 @@ func TestDesktopGrant(t *testing.T) {
 	if _, ok := first["challenge"]; !ok || sb.account.delegations.Load() != 2 {
 		t.Fatalf("first line = %v after %d delegations", first, sb.account.delegations.Load())
 	}
-	if strings.Contains(rest, "ter_cod_") || strings.Contains(rest, "ter_clr_") {
-		t.Fatalf("setup printed a code or a token:\n%s", rest)
+	for _, secret := range []string{userCodePrefix, userRefreshPrefix, userAccessPrefix} {
+		if strings.Contains(rest, secret) {
+			t.Fatalf("setup printed a code or a token:\n%s", rest)
+		}
 	}
-	creds, err := os.ReadFile(filepath.Join(sb.TermaConfig, "credentials.json"))
-	if err != nil || !strings.Contains(string(creds), "(via Terma Desktop)") || !strings.Contains(string(creds), accountUser) {
-		t.Fatalf("credentials.json = %s, %v", creds, err)
+	creds, err := os.ReadFile(credsPath)
+	if err != nil || !strings.Contains(string(creds), "(via Terma Desktop)") || !strings.Contains(string(creds), accountUser) ||
+		!strings.Contains(string(creds), desktopSession) || strings.Contains(string(creds), accountOrg) {
+		t.Fatalf("user-credentials.json = %s, %v", creds, err)
+	}
+	if org := sb.profileOrganization("default"); org != accountOrg {
+		t.Fatalf("config.json's profile is in organization %q, want --org %s", org, accountOrg)
 	}
 	if doctor := sb.doctor(); !strings.Contains(doctor, "signed in through Terma Desktop") {
 		t.Fatalf("doctor does not name the desktop sign-in:\n%s", doctor)
@@ -100,7 +110,7 @@ func TestDesktopGrant(t *testing.T) {
 
 	// Onboarding again, or a switch back: the CLI's own sign-in serves, nothing is delegated.
 	again, rest, err := sb.desktopSetup(accountUser, func(map[string]any) string {
-		t.Fatal("a stored sign-in for the same user and organization asked for a grant")
+		t.Fatal("a stored sign-in for the same user asked for a grant")
 		return ""
 	})
 	if err != nil || again["reused"] != true || sb.account.delegations.Load() != 2 {
@@ -169,6 +179,45 @@ func (sb *Sandbox) desktopSetup(user string, grant func(request map[string]any) 
 		sb.StopRelay()
 	}
 	return first, string(rest) + stderr.String(), err
+}
+
+// editProfile changes profile's entry in config.json.
+func (sb *Sandbox) editProfile(profile string, edit func(map[string]any)) {
+	sb.T.Helper()
+	path := filepath.Join(sb.TermaConfig, "config.json")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		sb.T.Fatal(err)
+	}
+	var file map[string]any
+	if err := json.Unmarshal(data, &file); err != nil {
+		sb.T.Fatal(err)
+	}
+	p, ok := file["profiles"].(map[string]any)[profile].(map[string]any)
+	if !ok {
+		sb.T.Fatalf("config.json has no profile %q", profile)
+	}
+	edit(p)
+	data, _ = json.Marshal(file)
+	sb.writeAbs(path, string(data))
+}
+
+// profileOrganization is the organization config.json records for profile.
+func (sb *Sandbox) profileOrganization(profile string) string {
+	sb.T.Helper()
+	data, err := os.ReadFile(filepath.Join(sb.TermaConfig, "config.json"))
+	if err != nil {
+		sb.T.Fatal(err)
+	}
+	var file struct {
+		Profiles map[string]struct {
+			OrganizationID string `json:"organization_id"`
+		} `json:"profiles"`
+	}
+	if err := json.Unmarshal(data, &file); err != nil {
+		sb.T.Fatal(err)
+	}
+	return file.Profiles[profile].OrganizationID
 }
 
 // doctor is `terma doctor`'s output, whatever its verdict.

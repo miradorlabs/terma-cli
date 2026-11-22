@@ -47,7 +47,7 @@ func TestClient_ConcurrentExpiredRequestsRefreshOnce(t *testing.T) {
 				"refresh_token": "mir_clr_rotated",
 				"token_type":    "Bearer",
 				"expires_in":    3600,
-				"organization":  map[string]string{"id": "org-1"},
+				"session_id":    "session-test",
 			})
 			return
 		}
@@ -95,7 +95,7 @@ func TestClient_Concurrent401sRefreshOnce(t *testing.T) {
 				"refresh_token": "mir_clr_rotated",
 				"token_type":    "Bearer",
 				"expires_in":    3600,
-				"organization":  map[string]string{"id": "org-1"},
+				"session_id":    "session-test",
 			})
 			return
 		}

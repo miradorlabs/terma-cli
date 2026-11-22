@@ -15,8 +15,8 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/config"
 )
 
-// switchSandbox is a machine signed in to both fake organizations, with active the
-// selected one and team its selected team.
+// switchSandbox is a machine signed in, its one sign-in reading both fake organizations,
+// with active the selected one and team its selected team.
 func switchSandbox(t *testing.T, active organization, team string) *fakeAuth {
 	t.Helper()
 	f := newFakeAuth(t)
@@ -25,14 +25,7 @@ func switchSandbox(t *testing.T, active organization, team string) *fakeAuth {
 	prev := testApp.canAsk
 	testApp.canAsk = func() bool { return true }
 	t.Cleanup(func() { testApp.canAsk = prev })
-	for _, o := range fakeOrgs {
-		if o.ID != active.ID {
-			if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(f, o)); err != nil {
-				t.Fatal(err)
-			}
-		}
-	}
-	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(f, active)); err != nil {
+	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(f)); err != nil {
 		t.Fatal(err)
 	}
 	if err := config.UpdateProfile(testApp.dir, config.DefaultProfile, func(p *config.Profile) {
@@ -54,8 +47,10 @@ func selected(t *testing.T) (org, team string, signIns int) {
 	if p := file.Profiles[config.DefaultProfile]; p != nil {
 		org, team = p.OrganizationID, p.Team
 	}
-	creds, _ := auth.Credentials(testApp.dir, config.DefaultProfile)
-	return org, team, len(creds)
+	if _, err := auth.LoadIdentity(testApp.dir, config.DefaultProfile); err == nil {
+		signIns = 1
+	}
+	return org, team, signIns
 }
 
 // switchWith runs switch with stdin as the answer to its question, under a deadline that
@@ -76,7 +71,7 @@ func switchWith(t *testing.T, f switchFlags, stdin string) (string, error) {
 
 const acmeWeb = "aaaaaaaa-0000-4000-8000-000000000001"
 
-// switch signs out of every organization, forgets the organization and team, and hands
+// switch signs the machine out, forgets the organization and team, and hands
 // over to setup, which signs in in the browser rather than reusing a stored sign-in.
 func TestSwitchSignsOutThenRunsSetup(t *testing.T) {
 	f := switchSandbox(t, orgA(), acmeWeb)
@@ -84,8 +79,8 @@ func TestSwitchSignsOutThenRunsSetup(t *testing.T) {
 	if err == nil || !strings.Contains(out, "Open this URL") {
 		t.Fatalf("setup's browser sign-in should have started (and the deadline cut it): %v\n%s", err, out)
 	}
-	if got := f.revokes.Load(); got != 2 {
-		t.Errorf("revoked %d sessions, want both organizations'", got)
+	if got := f.revokes.Load(); got != 1 {
+		t.Errorf("revoked %d sessions, want the machine's one", got)
 	}
 	if org, team, signIns := selected(t); org != "" || team != "" || signIns != 0 {
 		t.Errorf("after switch: organization %q team %q, %d sign-ins stored", org, team, signIns)
@@ -102,7 +97,7 @@ func TestSwitchDeclinedChangesNothing(t *testing.T) {
 	if err != nil || !strings.Contains(out, "Nothing was changed") {
 		t.Fatalf("declined switch: %v\n%s", err, out)
 	}
-	if org, team, signIns := selected(t); org != orgA().ID || team != acmeWeb || signIns != 2 || f.revokes.Load() != 0 {
+	if org, team, signIns := selected(t); org != orgA().ID || team != acmeWeb || signIns != 1 || f.revokes.Load() != 0 {
 		t.Errorf("after a declined switch: organization %q team %q, %d sign-ins, %d revokes", org, team, signIns, f.revokes.Load())
 	}
 }
@@ -124,7 +119,7 @@ func TestSwitchRefusesBeforeChangingAnything(t *testing.T) {
 			if err == nil || (tc.want != nil && !errors.Is(err, tc.want)) || (tc.want == nil && !strings.Contains(err.Error(), tc.env)) {
 				t.Fatalf("err = %v", err)
 			}
-			if org, team, signIns := selected(t); org != orgA().ID || team != acmeWeb || signIns != 2 || f.revokes.Load() != 0 {
+			if org, team, signIns := selected(t); org != orgA().ID || team != acmeWeb || signIns != 1 || f.revokes.Load() != 0 {
 				t.Errorf("after a refused switch: organization %q team %q, %d sign-ins, %d revokes", org, team, signIns, f.revokes.Load())
 			}
 		})
@@ -138,7 +133,7 @@ func TestSwitchWithoutATerminalChangesNothing(t *testing.T) {
 	if _, err := switchWith(t, switchFlags{assumeYes: true}, ""); err == nil || !strings.Contains(err.Error(), "terminal") {
 		t.Fatalf("err = %v", err)
 	}
-	if org, team, signIns := selected(t); org != orgA().ID || team != acmeWeb || signIns != 2 || f.revokes.Load() != 0 {
+	if org, team, signIns := selected(t); org != orgA().ID || team != acmeWeb || signIns != 1 || f.revokes.Load() != 0 {
 		t.Errorf("after a refused switch: organization %q team %q, %d sign-ins, %d revokes", org, team, signIns, f.revokes.Load())
 	}
 }
@@ -156,7 +151,7 @@ func TestAfterSwitchSetupAsksForTheTeam(t *testing.T) {
 		t.Fatal("the deadline should have cut setup's browser sign-in")
 	}
 	// The browser sign-in approves the same organization again.
-	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(f, orgA())); err != nil {
+	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(f)); err != nil {
 		t.Fatal(err)
 	}
 	cfg, err := testApp.loadConfig()
@@ -195,7 +190,7 @@ func TestSwitchRefusesAnInactiveProfile(t *testing.T) {
 		t.Fatalf("err = %v", err)
 	}
 	t.Setenv("TERMA_PROFILE", "")
-	if org, team, signIns := selected(t); org != orgA().ID || team != acmeWeb || signIns != 2 || f.revokes.Load() != 0 {
+	if org, team, signIns := selected(t); org != orgA().ID || team != acmeWeb || signIns != 1 || f.revokes.Load() != 0 {
 		t.Errorf("after a refused switch: organization %q team %q, %d sign-ins, %d revokes", org, team, signIns, f.revokes.Load())
 	}
 }

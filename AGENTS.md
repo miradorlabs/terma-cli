@@ -79,11 +79,17 @@ delivers them to each project. `internal/boundary` keeps `net/http` out of the h
 and agent packages.
 
 **Files.** The config directory (`config.Dir`) holds what the developer chose and what
-setup changed: `config.json` (profiles and settings), `credentials.json`, `keys.json`, and
+setup changed: `config.json` (profiles and settings), `user-credentials.json` (each
+profile's one sign-in: a user session of the person, which reads every organization and
+team they belong to), `keys.json` (only a server key a profile was set up with,
+`TERMA_API_KEY`), `installation-id` (this installation's stable id, sent at sign-in) and
 `setup/` (each change setup made to another tool's files, with what it replaced). The
 credentials' secrets, sign-in tokens and server keys, live in the system keychain
-(`internal/account/secret`), as gh keeps its token: `credentials.json` and `keys.json`
-index them, and hold them only where there is no keychain or `--insecure-storage` asks.
+(`internal/account/secret`), as gh keeps its token: `user-credentials.json` and `keys.json`
+index them, and hold them only where there is no keychain or `--insecure-storage` asks. An
+older terma's per-organization `credentials.json` sessions are revoked and deleted at the
+next sign-in, and the team keys it minted are deleted from this machine (a user token
+cannot revoke them; an admin can, in the web app).
 The state directory (`config.StateDir`) holds what terma writes as it runs: `relay/`,
 `spool/`, `policies/`, `agents/<agent>/` (each agent's hook state), `funding/`,
 `workspaces/` (session stores for work begun outside git) and `update/`; a repository's

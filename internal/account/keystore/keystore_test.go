@@ -153,3 +153,35 @@ func TestHostsOfNamesABuiltInEnvironment(t *testing.T) {
 		t.Fatalf("HostsFor = %+v, want the recorded hosts", got)
 	}
 }
+
+// RetainOnly forgets every key but the teams' named, and every harness's key, with the
+// keychain items they leave behind.
+func TestRetainOnlyKeepsOnlyTheNamedTeams(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	minted, kept := "ter_srv_"+"minted0123456789", "ter_srv_"+"kept0123456789ab"
+	if err := SetFor(dir, "claude", "minted", minted, Hosts{OTLP: "https://otel.example"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := Set(dir, "kept", kept, Hosts{OTLP: "https://otel.example"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := RetainOnly(dir, []string{"kept"}); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := Get(dir, "minted"); got != "" {
+		t.Fatalf("the minted team's key survived: %q", got)
+	}
+	if got, _ := GetFor(dir, "claude", "minted"); got != "" {
+		t.Fatalf("a harness's key survived: %q", got)
+	}
+	if _, ok := HostsFor(dir, "minted"); ok {
+		t.Fatal("the minted team's hosts survived")
+	}
+	if got, _ := Get(dir, "kept"); got != kept {
+		t.Fatalf("the named team's key = %q", got)
+	}
+	if err := RetainOnly(t.TempDir(), nil); err != nil {
+		t.Fatalf("with no keys.json: %v", err)
+	}
+}

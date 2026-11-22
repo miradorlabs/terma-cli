@@ -33,7 +33,6 @@ func (app *App) relayDeps() daemon.Deps {
 		RelayTargets:  app.agents.RelayTargets,
 		Endpoint:      app.delivery().Endpoint,
 		User:          app.relayUser,
-		CreateKey:     app.createProjectKey,
 		SendHeartbeat: app.relayHeartbeatSend,
 		HookPolicy:    app.hookPolicy,
 		LoadConfig:    app.loadConfig,
@@ -51,32 +50,15 @@ func (app *App) globalMode() globalmode.Machine {
 	return globalmode.Machine{ConfigDir: app.dir, Agents: app.agents, Terma: app.hookExecutable, ManagedRoot: app.managedRoot}
 }
 
-func (app *App) createProjectKey(ctx context.Context, cfg *config.Config, projectID string) (string, error) {
-	scoped := *cfg
-	scoped.ProjectID = projectID
-	client, err := app.newClient(&scoped)
-	if err != nil {
-		return "", err
-	}
-	key, _, err := client.CreateServerKey(ctx, projectID, "terma-relay@"+hostname(),
-		"Created by the terma relay, for a repository connected in Terma")
-	return key, err
-}
-
 // relayHeartbeatSend delivers a heartbeat to a project's ingest with that project's key: the
-// selected team's, minted if missing, else any project's held here; with none, nothing is sent.
-// It sends once, so the user teamUser names never rides on to another key.
+// selected team's, else any project's held here; with none, nothing is sent. It sends
+// once, so the user teamUser names never rides on to another key.
 func (app *App) relayHeartbeatSend(ctx context.Context, beat *logspb.LogsData) error {
 	cfg, err := config.Load(app.dir, app.stateDir, config.Overrides{})
 	if err != nil {
 		return err
 	}
 	selected := cmp.Or(cfg.Policy.TeamID, cfg.Policy.DefaultProjectID, cfg.ProjectID)
-	if key, err := keystore.Get(app.dir, selected); selected != "" && key == "" && err == nil && cfg.APIKey == "" {
-		if key, err := app.createProjectKey(ctx, cfg, selected); err == nil && key != "" {
-			_ = keystore.Set(app.dir, selected, key, keystore.HostsOf(cfg))
-		}
-	}
 	others := keystore.CollectionProjects(app.dir)
 	slices.Sort(others)
 	for _, projectID := range append([]string{selected}, others...) {
@@ -123,15 +105,15 @@ func (app *App) teamUser(cfg *config.Config, projectID, endpoint string) string 
 
 func sameHost(a, b string) bool { return strings.TrimRight(a, "/") == strings.TrimRight(b, "/") }
 
-// signedInUser is the Mirador user cfg's profile is signed in as, from credentials.json alone,
-// never the keychain: "" when it is signed out, signed in for another organization or
-// environment, or set up with a server key, which is no one's.
+// signedInUser is the Mirador user cfg's profile is signed in as, from
+// user-credentials.json alone, never the keychain: "" when it is signed out, signed in for
+// another environment, or set up with a server key, which is no one's.
 func signedInUser(cfg *config.Config) string {
 	if cfg.ServerKeySignIn {
 		return ""
 	}
 	cred, err := auth.LoadIdentity(cfg.Dir, cfg.ProfileName)
-	if err != nil || cred.CheckEnvironment(cfg.AuthURL) != nil || cred.OrganizationID != cfg.OrganizationID {
+	if err != nil || cred.CheckEnvironment(cfg.AuthURL) != nil {
 		return ""
 	}
 	return cred.UserID

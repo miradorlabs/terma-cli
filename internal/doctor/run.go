@@ -58,6 +58,9 @@ type Credential struct {
 	InFile bool
 	// Locked is a credential the system keychain holds but will not give up now.
 	Locked bool
+	// SignInAfterUpdate is no sign-in on a machine an older terma signed in: its
+	// per-organization sign-ins are retired, and the person signs in once.
+	SignInAfterUpdate bool
 	// ServerKey is, masked, the team server key a profile set up with one signs in with;
 	// "" for a developer's login.
 	ServerKey string
@@ -255,6 +258,10 @@ func (d *run) signedIn() Check {
 	err := errors.New("no credential probe")
 	if d.env.Probes.Credential != nil {
 		cred, err = d.env.Probes.Credential()
+	}
+	if err == nil && cred.SignInAfterUpdate {
+		return Check{Status: Fail, Detail: "terma was updated and now signs in once per person: the sign-ins it kept before are retired",
+			Fix: "terma setup"}
 	}
 	if err == nil && cred.Locked {
 		return Check{Status: Fail, Detail: "the system keychain holding your credentials is locked or unavailable",

@@ -164,6 +164,13 @@ func TestLogin_ExchangesCodeWithTheVerifierAndPort(t *testing.T) {
 	if mode := parsed.Query().Get("response_mode"); mode != "form_post" {
 		t.Errorf("response_mode = %q, want form_post: the page posts the code only to a CLI that says it takes a POST", mode)
 	}
+	// The page runs the user-session approval only for this marker, and never infers it.
+	if protocol := parsed.Query().Get("protocol"); protocol != "user" {
+		t.Errorf("protocol = %q, want user: the approval is for one user session", protocol)
+	}
+	if parsed.Query().Has("org") {
+		t.Error("the link names an organization: a user session covers every one the person belongs to")
+	}
 
 	wantPort, _ := strconv.Atoi(parsed.Query().Get("port"))
 	if exchanger.port != wantPort {

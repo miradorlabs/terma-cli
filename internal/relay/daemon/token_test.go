@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"net/http"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -95,5 +96,21 @@ func TestARetiredTokenNeedsASignIn(t *testing.T) {
 	}
 	if err := RetireToken(stateDir, "org-a", authURL); err != nil {
 		t.Fatalf("retiring with no token: %v", err)
+	}
+}
+
+// A token an earlier terma retired names its organization, not an account: it is revived
+// for that organization's server key, the same sign-in.
+func TestAnEarlierTermasRetiredTokenIsRevivedForItsServerKey(t *testing.T) {
+	stateDir, _, _ := setUpRelay(t)
+	if err := RetireToken(stateDir, "org-a", authURL); err != nil {
+		t.Fatal(err)
+	}
+	earlier := []byte(`{"token":"tok","organization_id":"org-1","auth_url":"` + authURL + `","retired_at":"2026-11-01T00:00:00Z"}` + "\n")
+	if err := os.WriteFile(filepath.Join(stateDir, RetiredTokenFile), earlier, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if token, ok := ReviveToken(stateDir, "organization:org-1", authURL); !ok || token != "tok" {
+		t.Fatalf("ReviveToken = %q, %v; want the earlier terma's token", token, ok)
 	}
 }

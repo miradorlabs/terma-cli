@@ -24,7 +24,10 @@ const loginTimeout = 5 * time.Minute
 // maxCallbackBody bounds a posted callback, which carries only a code and a state.
 const maxCallbackBody = 8 << 10
 
-// TokenExchanger performs the code exchange against the API gateway.
+// userProtocol is the approval link's marker for a user session (protocol=user).
+const userProtocol = "user"
+
+// TokenExchanger performs the code exchange against the auth host.
 type TokenExchanger interface {
 	// ExchangeCode redeems a browser approval's code, sent to the listener on port.
 	ExchangeCode(ctx context.Context, code, verifier string, port int) (*Credential, error)
@@ -38,8 +41,6 @@ type LoginOptions struct {
 	// AppURL is the web app that serves the approval page, <AppURL>/cli/auth.
 	AppURL string
 	Label  string
-	// Organization is only preselected; the user may pick another, so callers check.
-	Organization string
 	// NoBrowser prints the URL instead of opening it.
 	NoBrowser bool
 	Out       io.Writer
@@ -117,7 +118,7 @@ func Login(ctx context.Context, exchanger TokenExchanger, opts LoginOptions) (*C
 		_ = server.Shutdown(shutdownCtx)
 	}()
 
-	authURL := buildAuthorizeURL(opts.AppURL, pkce.Challenge, state, port, opts.Label, opts.Organization)
+	authURL := buildAuthorizeURL(opts.AppURL, pkce.Challenge, state, port, opts.Label)
 	if opts.NoBrowser {
 		fmt.Fprintf(out, "Open this URL to authorize the CLI:\n\n  %s\n\n", authURL)
 	} else {
@@ -193,18 +194,19 @@ func isLoopbackRequest(r *http.Request, port int) bool {
 // buildAuthorizeURL is the approval page's link. response_mode=form_post (the name OAuth gives
 // the same handoff) tells the page this listener takes the code as a form POST, so the page
 // can tell a CLI that reads only a GET to update rather than send it a code it would ignore.
-func buildAuthorizeURL(appURL, challenge, state string, port int, label, organization string) string {
+// protocol=user asks for a user session: one approval for every organization the person
+// belongs to, so the link names none. The page never infers the protocol from what else
+// the link carries.
+func buildAuthorizeURL(appURL, challenge, state string, port int, label string) string {
 	u := appURL + "/cli/auth"
 	q := url.Values{}
 	q.Set("challenge", challenge)
 	q.Set("state", state)
 	q.Set("port", strconv.Itoa(port))
 	q.Set("response_mode", "form_post")
+	q.Set("protocol", userProtocol)
 	if label != "" {
 		q.Set("label", label)
-	}
-	if organization != "" {
-		q.Set("org", organization)
 	}
 	return u + "?" + q.Encode()
 }
