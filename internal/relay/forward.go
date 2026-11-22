@@ -1,6 +1,7 @@
 package relay
 
 import (
+	"strings"
 	"sync"
 	"time"
 
@@ -78,7 +79,8 @@ func (s *sender) poke() {
 	}
 }
 
-// busy ignores a keyless route, since only a new key can move it.
+// busy ignores a keyless route, since only a new key, or a sign-in that may send it, can
+// move it.
 func (s *sender) busy() bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -303,6 +305,18 @@ func (s *sender) loop() {
 			s.r.warnf("upstream %s refused %d %s: %s", s.route, batch[0].records, batch[0].signal, detail)
 			s.r.outbox.bury(s.route, batch[0])
 			s.forget(batch[:1])
+		case keyless:
+			// Waiting for a sign-in, as a route no sign-in may send is: idle, not retrying.
+			s.setKeyless(true)
+			backoff = 0 // no host is at fault: new parts may wake it
+			if strings.HasPrefix(detail, signInErrPrefix) {
+				s.r.warnf("relay %s: %s; waiting for a sign-in", s.route, detail)
+			} else if s.r.opts.Logf != nil {
+				s.r.opts.Logf("relay %s: %s; waiting", s.route, detail)
+			}
+			if stopping() || !sleep(keylessRetry) {
+				return
+			}
 		case retry:
 			if ctx.Err() != nil {
 				return
@@ -358,4 +372,7 @@ const (
 	sent outcome = iota
 	retry
 	refused
+	// keyless is a send no sign-in may make now (retired, another person's, or one whose
+	// token can't be had): the route waits as one with no policy does, no host at fault.
+	keyless
 )

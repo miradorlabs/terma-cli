@@ -114,7 +114,8 @@ func unchanged(was, now os.FileInfo) bool {
 
 // Token is a fresh access token of the sign-in whose account key is account: "" with no
 // error when that sign-in cannot send at all now (signed out, another person's, or
-// retired), so what waits for it is held; an error for what a retry may fix.
+// retired), so what waits for it is held; an error for what a retry may fix (a locked
+// keychain, an auth host out of reach), which the relay also waits out as keyless.
 func (s *signInSource) Token(ctx context.Context, account string) (string, error) {
 	ident, err := auth.LoadIdentity(s.cfg.Dir, s.cfg.ProfileName)
 	switch {

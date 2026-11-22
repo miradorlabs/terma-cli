@@ -592,3 +592,26 @@ func TestAnUnreadableRouteNeverLeavesUnderASignIn(t *testing.T) {
 		t.Fatalf("%d of the unreadable account's parts may leave under a server key", len(got))
 	}
 }
+
+// tokenlessSignIn is a sign-in in place that gives no token, as a retired one does.
+type tokenlessSignIn struct{ testSignIn }
+
+func (s *tokenlessSignIn) Token(context.Context, string) (string, error) { return "", nil }
+
+// A route whose sign-in gives no token (retired, say) waits as one no sign-in may send: the
+// relay reads as idle, and nothing counts as an upstream retry.
+func TestARouteWithNoTokenWaitsIdle(t *testing.T) {
+	t.Parallel()
+	u := newSignInUpstream(t)
+	dir := t.TempDir()
+	queue(t, dir, accountA)
+	r := signedInRelay(t, u, &tokenlessSignIn{testSignIn{account: accountA}}, dir, "")
+	waitForCounters(t, r, func(c map[string]int) bool { return c["recovered_from_outbox"] == 1 })
+	time.Sleep(200 * time.Millisecond) // a pass, which would count a retry
+	if _, idle := r.Idle(); !idle {
+		t.Fatal("the relay reads as busy while no sign-in may send its parts")
+	}
+	if c := r.Stats().Snapshot().Counters; c["upstream_retries"] != 0 || len(u.requests()) != 0 {
+		t.Fatalf("counters %v, %d sent; want it waiting, not retried", c, len(u.requests()))
+	}
+}

@@ -19,7 +19,8 @@ import (
 // send delivers one request and classifies the answer: 401, 403 and 404 are configuration fixed
 // on this machine and retried slowly; only a body the host judges bad is refused for good.
 // Without a server key it sends with the sign-in the route's parts were collected under,
-// naming the team; a sign-in it cannot have now is retried later, as a refusal is.
+// naming the team; a sign-in it cannot have now (none, or its token can't be had) leaves the
+// route waiting for one (keyless), as a route no sign-in may send does.
 func (s *sender) send(ctx context.Context, pol Policy, first entry, body []byte) (outcome, time.Duration, string, int64) {
 	sig := first.signal
 	ctx, cancel := context.WithTimeout(ctx, sendTimeout)
@@ -37,10 +38,10 @@ func (s *sender) send(ctx context.Context, pol Policy, first entry, body []byte)
 		// now: Token gives none for another.
 		token, err := s.r.opts.SignIn.Token(ctx, s.r.owner(s.route, first))
 		if err != nil {
-			return retry, keylessRetry, "the sign-in: " + err.Error(), 0
+			return keyless, keylessRetry, signInErrPrefix + err.Error(), 0
 		}
 		if token == "" {
-			return retry, keylessRetry, "no sign-in that may send these parts now", 0
+			return keyless, keylessRetry, "no sign-in that may send these parts now", 0
 		}
 		bearer = token
 		req.Header.Set(ProjectHeader, s.route.project)
@@ -80,6 +81,10 @@ func (s *sender) send(ctx context.Context, pol Policy, first entry, body []byte)
 		return refused, 0, "refused_" + strconv.Itoa(code), 0
 	}
 }
+
+// signInErrPrefix starts the detail of a send whose sign-in's token could not be had, which
+// is warned of: a refresh or keychain that keeps failing must still show.
+const signInErrPrefix = "the sign-in: "
 
 // partialSuccess reads the rejected count (field 1 of field 1) by hand, since the collector
 // packages that define the response pull gRPC into every hook.
