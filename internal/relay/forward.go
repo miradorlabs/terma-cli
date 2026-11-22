@@ -1,12 +1,12 @@
 package relay
 
 import (
-	"github.com/miradorlabs/terma-cli/internal/account/auth"
 	"sync"
 	"time"
 
 	"google.golang.org/protobuf/proto"
 
+	"github.com/miradorlabs/terma-cli/internal/account/auth"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 )
 

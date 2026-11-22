@@ -577,3 +577,18 @@ func TestAnUnreadableSignInsPartIsKeptButNeverSentByAKey(t *testing.T) {
 		t.Fatalf("queued %v (%v); want the part on its own route", entries, err)
 	}
 }
+
+// A route of the unreadable account never leaves under a sign-in, even while the sign-in in
+// place reads as unreadable too: it is no sign-in's.
+func TestAnUnreadableRouteNeverLeavesUnderASignIn(t *testing.T) {
+	t.Parallel()
+	r := newRelay(Options{Dir: t.TempDir(), Token: token, SignIn: &testSignIn{account: auth.AccountUnreadable}})
+	rt := routeOf(auth.AccountUnreadable, claim.Claim{ProjectID: "p1"})
+	entries := []entry{newEntry(time.Now(), Logs, 1)}
+	if got := r.leaving(rt, false, maxMergeFiles)(entries); len(got) != 0 {
+		t.Fatalf("%d of the unreadable account's parts may leave under a sign-in", len(got))
+	}
+	if got := r.leaving(rt, true, maxMergeFiles)(entries); len(got) != 0 {
+		t.Fatalf("%d of the unreadable account's parts may leave under a server key", len(got))
+	}
+}

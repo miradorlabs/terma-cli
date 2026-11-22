@@ -63,7 +63,8 @@ func (app *App) signInSource(cfg *config.Config) *signInSource {
 }
 
 // Account is the account key of the profile's sign-in for its environment; "" when it is
-// signed out, or set up with a server key, which is no one's.
+// signed out, or set up with a server key, which is no one's; auth.AccountUnreadable while
+// config.json or the sign-in can't be read.
 func (s *signInSource) Account() string {
 	s.accountMu.Lock()
 	defer s.accountMu.Unlock()
