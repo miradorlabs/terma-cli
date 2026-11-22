@@ -14,6 +14,11 @@ import (
 // ProjectHeader names the team a request with a user token writes to.
 const ProjectHeader = "X-Mirador-Project"
 
+// AccountUnreadable is the account of what is collected while the sign-ins can't be read
+// (auth.AccountUnreadable): a person's maybe, so never no one's, and no sign-in's token is
+// had for it. The relay and delivery hold what is bound to it, and it ages out.
+const AccountUnreadable = "unreadable"
+
 // ReasonSignInRetired is the reason a gateway gives a sign-in it no longer accepts.
 const ReasonSignInRetired = "SIGN_IN_RETIRED"
 

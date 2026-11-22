@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
+	"github.com/miradorlabs/terma-cli/internal/sendas"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
@@ -118,8 +119,8 @@ func TestAParkedPushIsBoundWhenUnparked(t *testing.T) {
 	}
 }
 
-// unreadable is auth.AccountUnreadable, which the hook runtime may not import.
-const unreadable = "unreadable"
+// unreadable is the account of what is collected while the sign-in can't be read.
+const unreadable = sendas.AccountUnreadable
 
 // An event parked before the sign-in in place began, while signed out or under someone
 // since signed out, is not that sign-in's: unparked, it stays bound to no one. One from

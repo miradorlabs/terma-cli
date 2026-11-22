@@ -121,7 +121,8 @@ func (r Router) Flush(ctx context.Context, s *spool.Spool, cfg *config.Config, f
 			// Another person's or environment's events wait for their own sign-in; a server key
 			// sends only what no person's sign-in collected. Judged first: no policy is asked
 			// for, under this credential, for events it can't send.
-			if owner := r.owner(e); serverKey && owner != "" || !serverKey && (account == "" || owner != account) {
+			// The unreadable account is no sign-in's, even while it is what reads as signed in.
+			if owner := r.owner(e); serverKey && owner != "" || !serverKey && (account == "" || owner != account || owner == sendas.AccountUnreadable) {
 				held = append(held, e)
 				continue
 			}
@@ -229,7 +230,7 @@ func (r Router) credential(ctx context.Context, serverKey bool, account, project
 	if serverKey {
 		return keystore.Get(r.ConfigDir, projectID)
 	}
-	if r.SignIn == nil || account == "" {
+	if r.SignIn == nil || account == "" || account == sendas.AccountUnreadable {
 		return "", nil
 	}
 	return r.SignIn.Token(ctx, account)

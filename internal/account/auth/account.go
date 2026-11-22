@@ -6,6 +6,8 @@ import (
 	"encoding/hex"
 	"errors"
 	"time"
+
+	"github.com/miradorlabs/terma-cli/internal/sendas"
 )
 
 // AccountKeyLen is the length of an account key, in hex digits.
@@ -56,7 +58,7 @@ func SignedInAt(dir, profile string) time.Time {
 // AccountUnreadable is the account of what is collected while the sign-ins can't be read:
 // a person's maybe, so never no one's, which a server key would send; and no sign-in's
 // token is had for it. It ages out.
-const AccountUnreadable = "unreadable"
+const AccountUnreadable = sendas.AccountUnreadable
 
 // ErrSignInRetired is the server's answer that it no longer accepts this kind of sign-in:
 // only a newer terma, signed in again, sends again.

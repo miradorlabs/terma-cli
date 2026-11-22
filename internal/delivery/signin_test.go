@@ -198,7 +198,7 @@ func TestAServerKeyNeverSendsAPersonsEvents(t *testing.T) {
 	old := eventFor("p1", "older-termas", "")
 	old.Time = time.Now().Add(-2 * time.Hour)
 	// One collected while the sign-ins couldn't be read is maybe a person's: never no one's.
-	s := spoolOf(t, eventFor("p1", "a-persons", "aaaaaaaaaaaaaaaa"), old, eventFor("p1", "unbound", ""), eventFor("p1", "unreadable", "unreadable")) // auth.AccountUnreadable
+	s := spoolOf(t, eventFor("p1", "a-persons", "aaaaaaaaaaaaaaaa"), old, eventFor("p1", "unbound", ""), eventFor("p1", "unreadable", sendas.AccountUnreadable))
 	r := signInRouter(&fakeSignIn{}, "bbbbbbbbbbbbbbbb")
 	r.LegacyBefore = time.Now().Add(-time.Hour)
 	r.ConfigDir = dir
@@ -244,5 +244,23 @@ func TestEventsThatCantLeaveAskForNoPolicy(t *testing.T) {
 	}
 	if asked != 0 {
 		t.Fatalf("asked for %d policies for events that can't leave", asked)
+	}
+}
+
+// Events bound to the unreadable account are held, even while the sign-in in place reads as
+// unreadable too: no policy is asked for, nothing is withheld, and no token is asked for.
+func TestUnreadableEventsAreHeldWhileTheSignInIsUnreadable(t *testing.T) {
+	t.Parallel()
+	srv, sent := recordingIngest(t, http.StatusOK)
+	signIn := &fakeSignIn{account: sendas.AccountUnreadable, token: "token-x"}
+	r := signInRouter(signIn, "")
+	asked := 0
+	r.Policy = func(context.Context, *config.Config, string) (config.Policy, error) {
+		asked++
+		return config.Policy{}, nil
+	}
+	res := r.Flush(t.Context(), spoolOf(t, eventFor("p1", "unread", sendas.AccountUnreadable)), &config.Config{OTLPURL: srv.URL}, true, 0)
+	if res.Sent != 0 || res.Held != 1 || res.Withheld != 0 || asked != 0 || len(sent()) != 0 || len(signIn.accounts) != 0 {
+		t.Fatalf("Flush = %+v, %d policies, %d sent, tokens for %v; want it held untouched", res, asked, len(sent()), signIn.accounts)
 	}
 }
