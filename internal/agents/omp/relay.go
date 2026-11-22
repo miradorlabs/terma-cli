@@ -30,4 +30,18 @@ func (Agent) UnconfigureRelay(context.Context, string) (agents.RelayResult, erro
 	return relayexport.RemoveOwn(filepath.Join(dir, "extensions", "terma-relay.ts"))
 }
 
-var _ agents.RelayExporter = Agent{}
+// RefreshMachine rewrites terma's relay extension for omp in this build's template.
+func (Agent) RefreshMachine() (string, bool, error) {
+	dir, err := ompAgentDir()
+	if err != nil {
+		return "", false, err
+	}
+	path := filepath.Join(dir, "extensions", "terma-relay.ts")
+	changed, err := pifamily.Refresh(path)
+	return path, changed, err
+}
+
+var (
+	_ agents.RelayExporter    = Agent{}
+	_ agents.MachineRefresher = Agent{}
+)
