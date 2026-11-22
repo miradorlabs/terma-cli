@@ -260,7 +260,13 @@ func (c *Client) do(ctx context.Context, h host, method, path string, query url.
 	}
 
 	if resp.StatusCode == http.StatusUnauthorized && c.canRefresh() {
+		// A retirement that comes as a 401 is no expired token: never refreshed.
+		refusal := parseError(resp)
 		resp.Body.Close()
+		if apiErr, ok := errors.AsType[*Error](refusal); ok && apiErr.SignInRetired() {
+			c.markRetired()
+			return &Meta{StatusCode: resp.StatusCode}, fmt.Errorf("%w: %w", errRetired, refusal)
+		}
 		// The refused token is redeemed past unless another process already has.
 		refused := func(held, current *auth.Credential) bool {
 			return current.AccessToken == held.AccessToken || current.Expired()

@@ -698,3 +698,26 @@ func TestARetiredAnswerElsewhereMarksTheSignIn(t *testing.T) {
 		t.Fatalf("%d requests: the retired token was presented again", n)
 	}
 }
+
+// A request refused as SIGN_IN_RETIRED with a 401 is no expired token: the sign-in is marked
+// and nothing is refreshed or sent again.
+func TestARetired401IsNeverRefreshed(t *testing.T) {
+	var requests atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests.Add(1)
+		w.WriteHeader(http.StatusUnauthorized)
+		w.Write([]byte(`{"error":{"code":"UNAUTHENTICATED","reason":"SIGN_IN_RETIRED","message":"retired"}}`))
+	}))
+	t.Cleanup(srv.Close)
+	c := newTestClient(t, srv.URL, &auth.Credential{AccessToken: "access-0", RefreshToken: "refresh-0",
+		ExpiresAt: time.Now().Add(time.Hour)}, "")
+	if err := c.AuthGet(context.Background(), "/v1/organizations", nil, nil); !errors.Is(err, auth.ErrSignInRetired) {
+		t.Fatalf("err = %v", err)
+	}
+	if !auth.Retired(c.dir, config.DefaultProfile) {
+		t.Fatal("the stored sign-in was not marked retired")
+	}
+	if n := requests.Load(); n != 1 {
+		t.Fatalf("%d requests: the retired sign-in was refreshed or sent again", n)
+	}
+}
