@@ -889,3 +889,29 @@ func TestAnUpdateGivesAFreshPolicyWaitItsTime(t *testing.T) {
 		t.Fatal("an update still waited for a part that has waited its time")
 	}
 }
+
+// An update gives a part its wait from when it began waiting for its policy, not from when
+// it entered the hold: a conversation start held minutes for its claim, then claimed for a
+// team whose policy is being fetched, still keeps the update waiting for its time.
+func TestAnUpdateCountsAPolicyWaitFromWhenItBegan(t *testing.T) {
+	t.Parallel()
+	f := newFixture()
+	r := newRelay(Options{Dir: t.TempDir(), Token: token, Hold: time.Minute, Lookup: f.lookup, Now: f.clock,
+		Resolve: func(claim.Claim) (Policy, error) { return Policy{}, ErrNoKey }})
+	p := &part{signal: Logs, session: "Z", msg: logsOf("Z", 1), records: 1, start: true, at: f.clock()}
+	r.hold(p, nil, attribution{}, false) // a conversation start, waiting for its claim
+	f.mu.Lock()
+	f.now = f.now.Add(3 * time.Minute)
+	f.mu.Unlock()
+	f.claim("Z", claim.Claim{ProjectID: "p9"}) // claimed now, for a team whose policy isn't read yet
+	r.sweep()
+	if r.QuiesceDroppingHold(0, 2*time.Minute) {
+		t.Fatal("an update dropped a part that began waiting for its policy just now")
+	}
+	f.mu.Lock()
+	f.now = f.now.Add(2 * time.Minute)
+	f.mu.Unlock()
+	if !r.QuiesceDroppingHold(0, 2*time.Minute) {
+		t.Fatal("an update still waited for a part that has waited its time")
+	}
+}

@@ -104,13 +104,13 @@ func (r *Relay) dropHeldAtExit() {
 
 // waitedForLocked counts the held records still waited for: every one not waiting for its
 // team's policy (pinned to its claim or, in global mode, the catch-all's), and one that is
-// but has waited less than waited. r.mu is held.
+// but has waited for it less than waited, however long it was held before. r.mu is held.
 func (r *Relay) waitedForLocked(waited time.Duration) int {
 	now := r.opts.Now()
 	n := 0
 	for _, parts := range r.held {
 		for _, h := range parts {
-			if (h.pinned == nil && !h.awaitingPolicy) || now.Sub(h.at) < waited {
+			if (h.pinned == nil && !h.awaitingPolicy) || now.Sub(h.awaitingSince) < waited {
 				n += h.p.records
 			}
 		}

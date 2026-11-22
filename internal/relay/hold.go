@@ -32,6 +32,10 @@ type heldPart struct {
 	// awaitingPolicy is that it was last held for its team's policy (whyNoKey), pinned or
 	// not: in global mode the catch-all's part has no claim to pin it to.
 	awaitingPolicy bool
+	// awaitingSince is when it became a team's part waiting for its policy (pinned, which
+	// stays, or awaitingPolicy), which an update gives its own wait from; zero while it is
+	// neither. A pinned part keeps its first time.
+	awaitingSince time.Time
 }
 
 type traceSession struct {
@@ -62,7 +66,11 @@ func (r *Relay) hold(p *part, pin *claim.Claim, how attribution, awaitingPolicy 
 			return
 		}
 	}
-	r.held[p.session] = append(r.held[p.session], heldPart{p: p, at: r.opts.Now(), size: size, pinned: pin, pinnedHow: how, awaitingPolicy: awaitingPolicy})
+	h := heldPart{p: p, at: r.opts.Now(), size: size, pinned: pin, pinnedHow: how, awaitingPolicy: awaitingPolicy}
+	if pin != nil || awaitingPolicy {
+		h.awaitingSince = h.at
+	}
+	r.held[p.session] = append(r.held[p.session], h)
 	r.heldN += p.records
 	r.heldBytes += size
 	r.stats.add("held_parts", 1)
@@ -166,7 +174,6 @@ func (r *Relay) sweep() {
 				pinned := c
 				h.pinned, h.pinnedHow = &pinned, how
 			}
-			h.awaitingPolicy = why == whyNoKey
 			if !ok && h.pinned != nil && (why == whyUnclaimed || why == whyNoTrace || why == whyProcessIdle) {
 				// What placed it (its claim, its trace, its process) expired while the part
 				// waited for the team's policy: still placed by that claim, as decideClaimed
@@ -174,6 +181,14 @@ func (r *Relay) sweep() {
 				// never overridden by a guess.
 				c, pol, why, ok = r.placePinned(*h.pinned, h.p.narrow)
 				how = h.pinnedHow
+			}
+			// Judged after the pin's own placement, which may find the policy still unread.
+			h.awaitingPolicy = why == whyNoKey
+			switch {
+			case h.pinned == nil && !h.awaitingPolicy:
+				h.awaitingSince = time.Time{}
+			case h.awaitingSince.IsZero():
+				h.awaitingSince = now
 			}
 			limit := hold
 			switch {
