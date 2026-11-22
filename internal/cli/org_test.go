@@ -747,3 +747,24 @@ func TestARetirementDoneLeavesItsRecordToLaterSignIns(t *testing.T) {
 		t.Fatalf("record %+v became %+v (%v); want it left as the retirement left it", before, after, err)
 	}
 }
+
+// Older sign-ins whose file can't be read at the retirement are neither recorded nor
+// deleted: deleted unrecorded, what that terma queued would have no account at all.
+func TestOlderSignInsThatCantBeReadAreKept(t *testing.T) {
+	f := newFakeAuth(t)
+	authSandbox(t, f)
+	data := `{"default": {"organizations": {"o": {"session_id": "old", "auth_url": "` + f.srv.URL + `", "user_id": "u-1"}}}}`
+	if err := os.WriteFile(config.LegacyCredentialsPath(testApp.dir), []byte(data), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	read := testApp.legacySignIns
+	t.Cleanup(func() { testApp.legacySignIns = read })
+	testApp.legacySignIns = func(string, bool) ([]auth.LegacySignIn, error) { return nil, errors.New("sharing violation") }
+	testApp.retireLegacySessions(context.Background(), f.srv.URL)
+	if !auth.HasLegacySignIns(testApp.dir) {
+		t.Fatal("the older sign-ins were deleted unread")
+	}
+	if rec, err := auth.ReadLegacyRecord(testApp.stateDir); err != nil || !rec.RetiredAt.IsZero() {
+		t.Fatalf("record = %+v, %v; want none yet", rec, err)
+	}
+}

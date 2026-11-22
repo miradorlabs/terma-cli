@@ -32,46 +32,48 @@ func (app *App) retireLegacySessions(ctx context.Context, authURL string) {
 	if !auth.HasLegacySignIns(app.dir) {
 		return
 	}
-	if signIns, err := auth.LegacySignIns(app.dir, true); err == nil {
-		// The record is the only account what an older terma queued has once its sign-ins
-		// are gone: without it, keep them, and the next sign-in tries again.
-		// A file that names no sign-in, or doesn't read whole, names no one, and says so;
-		// what could be read of it is still revoked and forgotten below.
-		var record error
-		recorded := time.Now()
-		if auth.HasLegacySignIns(app.dir) && (len(signIns) == 0 || !auth.LegacyParsedWhole(app.dir)) {
-			record = auth.RecordNoOne(app.stateDir, signIns, recorded)
-		} else {
-			record = auth.RecordLegacy(app.stateDir, signIns, recorded)
-		}
-		if record != nil {
-			return
-		}
-		// The boundary moves to when the retirement is done (below): an older terma's hook
-		// still running queues on that terma's side until its sign-ins are gone.
-		defer func() { _ = auth.AdvanceLegacyBoundary(app.stateDir, recorded, time.Now()) }()
-		revokeCtx, cancel := context.WithTimeout(ctx, legacyRevokeWait)
-		var wg sync.WaitGroup
-		for _, s := range signIns {
-			if s.AccessToken != "" && sameHost(s.AuthURL, authURL) {
-				wg.Go(func() { _ = api.RevokeLegacySession(revokeCtx, s.AuthURL, app.version, s.AccessToken) })
-			}
-		}
-		wg.Wait()
-		cancel()
-		// What an older hook queued until the sign-ins are gone stays theirs in the spool,
-		// this retirement the first or a retry: marked before they go, so a reader that
-		// sees them gone sees at most the keychain deletes' moments unmarked, and again
-		// once they are.
-		if auth.MarkLegacyForgotten(app.stateDir, time.Now()) != nil {
-			return
-		}
-		if auth.ForgetLegacy(app.dir) == nil {
-			_ = auth.MarkLegacyForgotten(app.stateDir, time.Now())
-		}
+	signIns, err := app.legacySignIns(app.dir, true)
+	if err != nil {
+		// Not read, so not recorded: they stay, for the next sign-in to retire. Deleted
+		// now, what that terma queued would be left with no account at all.
 		return
 	}
-	_ = auth.ForgetLegacy(app.dir)
+	// The record is the only account what an older terma queued has once its sign-ins
+	// are gone: without it, keep them, and the next sign-in tries again.
+	// A file that names no sign-in, or doesn't read whole, names no one, and says so;
+	// what could be read of it is still revoked and forgotten below.
+	var record error
+	recorded := time.Now()
+	if auth.HasLegacySignIns(app.dir) && (len(signIns) == 0 || !auth.LegacyParsedWhole(app.dir)) {
+		record = auth.RecordNoOne(app.stateDir, signIns, recorded)
+	} else {
+		record = auth.RecordLegacy(app.stateDir, signIns, recorded)
+	}
+	if record != nil {
+		return
+	}
+	// The boundary moves to when the retirement is done (below): an older terma's hook
+	// still running queues on that terma's side until its sign-ins are gone.
+	defer func() { _ = auth.AdvanceLegacyBoundary(app.stateDir, recorded, time.Now()) }()
+	revokeCtx, cancel := context.WithTimeout(ctx, legacyRevokeWait)
+	var wg sync.WaitGroup
+	for _, s := range signIns {
+		if s.AccessToken != "" && sameHost(s.AuthURL, authURL) {
+			wg.Go(func() { _ = api.RevokeLegacySession(revokeCtx, s.AuthURL, app.version, s.AccessToken) })
+		}
+	}
+	wg.Wait()
+	cancel()
+	// What an older hook queued until the sign-ins are gone stays theirs in the spool,
+	// this retirement the first or a retry: marked before they go, so a reader that
+	// sees them gone sees at most the keychain deletes' moments unmarked, and again
+	// once they are.
+	if auth.MarkLegacyForgotten(app.stateDir, time.Now()) != nil {
+		return
+	}
+	if auth.ForgetLegacy(app.dir) == nil {
+		_ = auth.MarkLegacyForgotten(app.stateDir, time.Now())
+	}
 }
 
 // legacyRevokeWait bounds the best-effort revokes of an older terma's sessions.

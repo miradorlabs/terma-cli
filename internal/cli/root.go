@@ -219,6 +219,9 @@ type App struct {
 	// backgroundStep runs one update program for the relay, with no terminal and detached,
 	// its output to out.
 	backgroundStep func(ctx context.Context, out io.Writer, argv ...string) error
+	// legacySignIns lists an older terma's sign-ins, as auth.LegacySignIns does; a test
+	// makes it fail as a read that races a write would.
+	legacySignIns func(dir string, tokens bool) ([]auth.LegacySignIn, error)
 	// canAsk reports whether a person is at a terminal to answer questions.
 	canAsk func() bool
 	// binary is the executable as this process started from it, for the updater: a command
@@ -233,6 +236,7 @@ func New(agentsFor func(configDir string) *agents.Registry, version string) *App
 	app := &App{agentsFor: agentsFor, version: version, binDirs: doctor.WellKnownBinDirs, hookExecutable: procinfo.AbsExecutable,
 		managedRoot: "/", runUpdateStep: runUpdateStep, nateRemoveBinary: removeNateBinary, spawnRelay: daemon.SpawnFrom,
 		backgroundStep: runBackgroundStep,
+		legacySignIns:  auth.LegacySignIns,
 		canAsk:         canPrompt}
 	app.nateBinaryCandidates = app.installedTermaBinaries
 	if exe, err := os.Executable(); err == nil {
