@@ -81,8 +81,8 @@ func signInRouter(signIn *fakeSignIn) Router {
 		Policy: func(context.Context, *config.Config, string) (config.Policy, error) { return pol, nil }}
 }
 
-// spoolOf is a queue holding events as they are, tagged or not: an older terma's backlog
-// is queued untagged (spool.IngestLegacy), which no append does.
+// spoolOf is a queue holding events as they are, tagged or not, which no append does: an
+// untagged line is one an older terma, or anything else, could leave there.
 func spoolOf(t *testing.T, events ...spool.Event) *spool.Spool {
 	t.Helper()
 	dir := t.TempDir()
@@ -112,8 +112,7 @@ func eventFor(project, session, account string) spool.Event {
 
 // On a person's profile, events leave with the sign-in's token, naming their team, and
 // only under the account they were collected under: another person's backlog is held,
-// never sent in this person's name. An event that names no account, an older terma's no
-// one sign-in may send, never leaves.
+// never sent in this person's name. An event that names no lane is dropped, never sent.
 func TestEventsLeaveOnlyUnderTheAccountThatCollectedThem(t *testing.T) {
 	t.Parallel()
 	srv, sent := recordingIngest(t, http.StatusOK)
@@ -123,7 +122,7 @@ func TestEventsLeaveOnlyUnderTheAccountThatCollectedThem(t *testing.T) {
 		eventFor("p1", "someone-elses", "bbbbbbbbbbbbbbbb"),
 		eventFor("p2", "before-user-tokens", ""))
 	res := signInRouter(signIn).Flush(t.Context(), s, &config.Config{OTLPURL: srv.URL}, true, 0)
-	if res.Sent != 1 || res.Held != 2 || res.Err != nil {
+	if res.Sent != 1 || res.Held != 1 || res.Dropped != 1 || res.Err != nil {
 		t.Fatalf("Flush = %+v", res)
 	}
 	for _, r := range sent() {
@@ -134,10 +133,9 @@ func TestEventsLeaveOnlyUnderTheAccountThatCollectedThem(t *testing.T) {
 			t.Error("another person's event, or no one's, left under this sign-in")
 		}
 	}
-	if n, _, _ := s.Pending(); n != 2 {
-		t.Fatalf("%d events queued, want the other person's and no one's kept", n)
+	if n, _, _ := s.Pending(); n != 1 {
+		t.Fatalf("%d events queued, want only the other person's kept", n)
 	}
-
 }
 
 // Signed out, events are held, not failed: nothing about them is wrong.
@@ -189,7 +187,7 @@ func TestARefusedTokenIsRotatedAndKeepsTheEvents(t *testing.T) {
 }
 
 // A profile set up with a server key sends only events no person collected: never a
-// person's, nor one that names no account, an older terma's no one sign-in may send.
+// person's, nor one that names no lane, which is dropped.
 func TestAServerKeyNeverSendsAPersonsEvents(t *testing.T) {
 	t.Parallel()
 	srv, sent := recordingIngest(t, http.StatusOK)
@@ -203,7 +201,7 @@ func TestAServerKeyNeverSendsAPersonsEvents(t *testing.T) {
 	r := signInRouter(&fakeSignIn{})
 	r.ConfigDir = dir
 	res := r.Flush(t.Context(), s, &config.Config{OTLPURL: srv.URL, ServerKeySignIn: true}, true, 0)
-	if res.Sent != 1 || res.Held != 2 {
+	if res.Sent != 1 || res.Held != 1 || res.Dropped != 1 {
 		t.Fatalf("Flush = %+v", res)
 	}
 	for _, req := range sent() {

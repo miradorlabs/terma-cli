@@ -36,10 +36,9 @@ const lostPolicyTimeout = "policy_timeout"
 // send, another account's backlog and a sign-in that cannot send now all wait.
 type OutboxLosses struct {
 	// Counts are the records lost by reason: outbox_full and outbox_expired, past the
-	// outbox's room or age; legacy_ambiguous, what an older relay queued that no one
-	// sign-in may send, aged out; policy_timeout, dropped from memory while they waited
-	// for a team's policy or key the relay couldn't read; signed_out and unreadable, collected with no sign-in to bind them
-	// to.
+	// outbox's room or age; policy_timeout, dropped from memory while they waited for a
+	// team's policy or key the relay couldn't read; signed_out and unreadable, collected
+	// with no sign-in to bind them to.
 	Counts map[string]int `json:"counts,omitempty"`
 	Last   time.Time      `json:"last,omitzero"`
 }

@@ -145,8 +145,6 @@ const (
 	TermaInvocationInitialStepsKey = "terma.invocation.initial_steps"
 	// TermaInvocationNumberKey is terma.invocation.number: The agent's invocation counter.
 	TermaInvocationNumberKey = "terma.invocation.number"
-	// TermaLegacySessionIDsKey is terma.legacy_session_ids: The session ids of the per-organization sign-ins an older terma kept on this machine, which the user token replaced.
-	TermaLegacySessionIDsKey = "terma.legacy_session_ids"
 	// TermaLoopCountKey is terma.loop.count: How many agent loops the run took.
 	TermaLoopCountKey = "terma.loop.count"
 	// TermaMainAgentVersionKey is terma.main_agent.version: The version of the agent named by gen_ai.main_agent.name.

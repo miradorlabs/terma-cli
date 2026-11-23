@@ -38,20 +38,9 @@ func LaneOf(account string, serverKey bool) Lane {
 	return Lane{Account: account}
 }
 
-// untagged is why e, about to be queued in lane, can't be: it names no account and no
-// person, so no one could send it. An older terma's backlog is the only such kind queued
-// (IngestLegacy), never through an append. "" when e is tagged. bound is that the append
-// gave e the lane: one that didn't (AppendAsCollected) replays what was recorded with no
-// lane, which only an older terma records.
-func untagged(e Event, lane Lane, bound bool) string {
-	switch {
-	case e.Account != "" || e.NoPerson:
-		return ""
-	case bound && lane.Lost != "":
-		return lane.Lost
-	}
-	return sendas.LostLegacyAmbiguous
-}
+// tagged reports whether e names a lane, an account or no person: one that names neither
+// no one could send, so it is never queued.
+func tagged(e Event) bool { return e.Account != "" || e.NoPerson }
 
 // lossesDir, in Dir, keeps what hooks lost: a file per UTC day of one JSON line per loss
 // (lossLine), each written whole in one append, so concurrent hooks never lose a count,

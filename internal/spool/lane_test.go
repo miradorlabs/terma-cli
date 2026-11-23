@@ -1,6 +1,7 @@
 package spool
 
 import (
+	"maps"
 	"os"
 	"path/filepath"
 	"sync"
@@ -11,8 +12,9 @@ import (
 )
 
 // No append ever queues an event no one could send, whoever calls it: one that names
-// neither an account nor no person, in a spool bound to no lane, or replayed as collected
-// with none, is lost and counted by why, and the rest of the append is queued.
+// neither an account nor no person, in a spool bound to no lane, is lost and counted by
+// why; one replayed as collected with none is dropped, uncounted; and the rest of the
+// append is queued.
 func TestNoAppendQueuesAnUntaggedEvent(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct {
@@ -26,9 +28,9 @@ func TestNoAppendQueuesAnUntaggedEvent(t *testing.T) {
 		{"never bound", func(*Spool) {}, false, Event{Name: "e"}, sendas.LostUnreadable},
 		{"signed out", func(s *Spool) { s.Bind("") }, false, Event{Name: "e"}, sendas.LostSignedOut},
 		{"unreadable", func(s *Spool) { s.Bind(sendas.AccountUnreadable) }, false, Event{Name: "e"}, sendas.LostUnreadable},
-		{"replayed untagged", func(s *Spool) { s.Bind("aaaaaaaaaaaaaaaa") }, true, Event{Name: "e"}, sendas.LostLegacyAmbiguous},
-		// A replay recorded with no lane is an older terma's, whatever the spool's own lane.
-		{"replayed into a signed-out spool", func(s *Spool) { s.Bind("") }, true, Event{Name: "e"}, sendas.LostLegacyAmbiguous},
+		// A replay recorded with no lane is no one's, whatever the spool's own lane.
+		{"replayed untagged", func(s *Spool) { s.Bind("aaaaaaaaaaaaaaaa") }, true, Event{Name: "e"}, ""},
+		{"replayed into a signed-out spool", func(s *Spool) { s.Bind("") }, true, Event{Name: "e"}, ""},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
@@ -51,8 +53,12 @@ func TestNoAppendQueuesAnUntaggedEvent(t *testing.T) {
 				t.Fatalf("queued %+v, %v; want only the tagged one", evs, err)
 			}
 			l, err := ReadLosses(dir, time.Now())
-			if err != nil || len(l.Counts) != 1 || l.Counts[tc.why] != 1 {
-				t.Fatalf("losses = %v, %v; want one %s", l.Counts, err, tc.why)
+			want := map[string]int{}
+			if tc.why != "" {
+				want[tc.why] = 1
+			}
+			if err != nil || !maps.Equal(l.Counts, want) {
+				t.Fatalf("losses = %v, %v; want %v", l.Counts, err, want)
 			}
 		})
 	}

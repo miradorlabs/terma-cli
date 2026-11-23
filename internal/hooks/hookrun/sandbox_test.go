@@ -225,7 +225,7 @@ func TestARecordIsItsHooksOnlyWhereItsSessionsAgree(t *testing.T) {
 	}
 }
 
-// A manifest with no account, as an older terma wrote it, gives a sandboxed record no lane:
+// A manifest with no account, as one written signed out has, gives a sandboxed record no lane:
 // it is lost, and counted, never put in the lane of whoever is signed in now, and a write
 // under someone's sign-in since never gives the manifest one.
 func TestAManifestWithNoAccountGivesNoLane(t *testing.T) {
@@ -283,64 +283,33 @@ func TestASignInSwitchNeverRetagsASession(t *testing.T) {
 	}
 }
 
-// An older terma's hook beside this one: what it parked (in .git/terma's events and pushes)
-// is queued where it queues, for the legacy decision to take in, and what this one parks is
-// under names it never reads.
-func TestAnOlderTermasParkedRecordsAreItsBacklog(t *testing.T) {
-	defer func(f func() int) { gitPushPID = f }(gitPushPID)
-	gitPushPID = func() int { return 0 }
+// A parked event that names no lane is dropped as it is unparked, never queued: this
+// version parks none, and no sign-in may send one. What an older terma parked, under its
+// own names, is never read.
+func TestAnUntaggedParkedEventIsDropped(t *testing.T) {
 	p := newPushRepo(t)
-	older := session.Open(filepath.Join(p.root, ".git", project.GitStoreDir))
-	if err := older.Park(legacyParkedEvents, []byte(`{"name":"older-event","time":"2026-11-20T00:00:00Z"}`+"\n")); err != nil {
+	parking := session.Open(filepath.Join(p.root, ".git", project.GitStoreDir))
+	untagged := []byte(`{"name":"untagged","time":"2026-11-20T00:00:00Z"}` + "\n")
+	tagged := []byte(`{"name":"tagged","time":"2026-11-20T00:00:00Z","account":"` + personA + `","attrs":{"terma.project.id":"t"}}` + "\n")
+	if err := parking.Park(parkedEvents, append(untagged, tagged...)); err != nil {
 		t.Fatal(err)
 	}
-	p.git("commit", "-q", "--allow-empty", "-m", "older push")
-	rec := `{"id":"older-push","time":"2026-11-20T00:00:00Z","root":"` + p.root + `","git_dir":"` + filepath.Join(p.root, ".git") +
-		`","remote":"backup","refs":[{"local_ref":"refs/heads/main","local_sha":"` + p.sha("HEAD") + `","remote_ref":"refs/heads/main","remote_sha":"` +
-		p.sha("backup/main") + `"}],"event":{"name":"` + semconv.TermaPushEvent + `","time":"2026-11-20T00:00:00Z"}}` + "\n"
-	if err := older.Park(legacyParkedPushes, []byte(rec)); err != nil {
+	if err := parking.Park(olderParkedEvents, untagged); err != nil {
 		t.Fatal(err)
 	}
-	// This version parks a tagged event; an older terma's unpark finds nothing.
-	sandboxed := sandboxedHook(t, p)
-	if err := gitStore(p, personA).Touch(session.Session{ID: "sess-a", Tool: "claude-code"}, []string{"a.go"}, time.Now()); err != nil {
-		t.Fatal(err)
-	}
-	ours := commit(t, p, sandboxed, []string{"a.go"}, "sess-a")
-	for _, name := range []string{legacyParkedEvents, legacyParkedPushes} {
-		var olderSaw []byte
-		if err := older.Unpark(name, func(lines []byte) error {
-			olderSaw = append(olderSaw, lines...)
-			return nil
-		}); err != nil {
-			t.Fatal(err)
-		}
-		if strings.Contains(string(olderSaw), personA) {
-			t.Errorf("an older terma's %s unparked this one's %s", name, olderSaw)
-		}
-		// Put back what the older terma's own unpark took, as though it never ran.
-		if len(olderSaw) > 0 {
-			if err := older.Park(name, olderSaw); err != nil {
-				t.Fatal(err)
-			}
-		}
-	}
-	outside, dir := signedIn(t, p, personB)
+	outside, dir := signedIn(t, p, personA)
 	if _, err := outside.Repo(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	if got := lanes(t, outside.Spool); len(got) != 1 || got[semconv.TermaCommitEvent+" "+ours] != personA {
-		t.Errorf("queued %v; want only this version's commit, in its own lane", got)
+	evs := hookruntest.Spooled(t, outside.Spool)
+	if len(evs) != 1 || evs[0].Name != "tagged" || evs[0].Account != personA {
+		t.Errorf("queued %+v; want only the tagged event, in its lane", evs)
 	}
-	if err := outside.Spool.IngestLegacy(personA, false); err != nil {
-		t.Fatal(err)
+	if l := lossesIn(t, dir); len(l) != 0 {
+		t.Errorf("losses = %v; want none counted", l)
 	}
-	got := lanes(t, outside.Spool)
-	if got["older-event "] != personA || got[semconv.TermaPushEvent+" "+p.sha("HEAD~1")] != personA || len(got) != 2 {
-		t.Errorf("after the legacy decision, queued %v; want the older terma's event and push under it", got)
-	}
-	if _, err := os.Stat(filepath.Join(dir, spool.LegacyEventsFile)); err == nil {
-		t.Error("the older queue was not taken in")
+	if _, err := os.Stat(filepath.Join(p.root, ".git", project.GitStoreDir, "events.jsonl")); err != nil {
+		t.Errorf("an older terma's parked events were read: %v", err)
 	}
 }
 

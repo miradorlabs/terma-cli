@@ -26,8 +26,6 @@ const (
 	LostSignedOut = "signed_out"
 	// LostUnreadable is collected while the profile or its sign-in could not be read.
 	LostUnreadable = "unreadable"
-	// LostLegacyAmbiguous is what an older terma queued that no one sign-in may send.
-	LostLegacyAmbiguous = "legacy_ambiguous"
 	// LostAccountConflict is a hook's record of a session whose manifest names another
 	// account than the hook's sign-in, or can't be read to tell: a session has one owner.
 	LostAccountConflict = "account_conflict"

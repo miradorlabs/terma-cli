@@ -14,7 +14,6 @@ import (
 	logspb "go.opentelemetry.io/proto/otlp/logs/v1"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/miradorlabs/terma-cli/internal/account/auth"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/sendas"
 )
@@ -68,7 +67,7 @@ func TestAServerKeysPartLandsOnTheNoPersonRoute(t *testing.T) {
 
 // A route is one lane, and leaves only under its own credential: no person's only under a
 // server key, a person's only under that person's sign-in, and neither a route with no lane
-// nor an older terma's ambiguous backlog under either.
+// nor one of a lane it doesn't know under either.
 func TestEachLaneLeavesOnlyUnderItsOwnCredential(t *testing.T) {
 	t.Parallel()
 	r := newRelay(Options{Dir: t.TempDir(), Token: token, SignIn: &testSignIn{account: accountA}})
@@ -84,8 +83,8 @@ func TestEachLaneLeavesOnlyUnderItsOwnCredential(t *testing.T) {
 		{accountB, false, false},
 		{"", true, false},
 		{"", false, false},
-		{auth.LegacyAccountAmbiguous, true, false},
-		{auth.LegacyAccountAmbiguous, false, false},
+		{"ambiguous", true, false},
+		{"ambiguous", false, false},
 		{sendas.AccountUnreadable, false, false},
 	} {
 		if got := r.mayLeave(routeOf(c.account, claim.Claim{ProjectID: "p1"}), c.serverKey); got != c.may {
@@ -107,7 +106,7 @@ func TestAPersonsSignInNeverSendsTheNoPersonRoute(t *testing.T) {
 	u := newSignInUpstream(t)
 	dir := t.TempDir()
 	queue(t, dir, sendas.NoPersonLane)
-	signedInRelay(t, u, &testSignIn{account: accountA}, dir, "")
+	signedInRelay(t, u, &testSignIn{account: accountA}, dir)
 	time.Sleep(200 * time.Millisecond)
 	if got := u.requests(); len(got) != 0 {
 		t.Fatalf("sent %q: no person's part left under a person's sign-in", got)

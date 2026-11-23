@@ -180,7 +180,7 @@ func (s *sender) loop() {
 		}
 		// The content policy as it stands now: a project that turned prompts off since sends none still queued.
 		// Counted only once the batch leaves the outbox: a retry filters it again.
-		body, tl := s.r.withholdQueued(batch[0].signal, body, pol, s.route.account)
+		body, tl := s.r.withholdQueued(batch[0].signal, body, pol)
 		if pol.Signals != nil && !contains(pol.Signals, string(batch[0].signal)) || body == nil {
 			reason, records := "policy_signal_or_content", 0
 			for _, e := range batch {

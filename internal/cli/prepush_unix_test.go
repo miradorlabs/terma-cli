@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
 	"github.com/miradorlabs/terma-cli/internal/repohooks"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
@@ -73,7 +74,7 @@ func TestARealPushIsReportedByTheInstalledHook(t *testing.T) {
 	// The record is gone once reported.
 	deadline = time.Now().Add(10 * time.Second)
 	for {
-		entries, _ := os.ReadDir(filepath.Join(stateDir, "pushes"))
+		entries, _ := os.ReadDir(filepath.Join(stateDir, hookrun.PushesDir))
 		if len(entries) == 0 {
 			break
 		}

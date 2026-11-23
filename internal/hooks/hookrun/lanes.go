@@ -50,13 +50,6 @@ const (
 	parkedLosses = "losses-v2"
 )
 
-// An older terma (v0.3.x) parks under these names, with no lane: its backlog, which is
-// queued where it queues, for the one legacy decision to take in (spool.IngestLegacy).
-const (
-	legacyParkedEvents = "events"
-	legacyParkedPushes = "pushes"
-)
-
 // park keeps v, which the state directory refused, in the repository's git directory under name;
 // the next hook there that reaches the state directory unparks it.
 func (e Env) park(r *Repo, name string, v any) bool {
@@ -77,8 +70,8 @@ func (e Env) park(r *Repo, name string, v any) bool {
 // unpark hands on what sandboxed hooks parked in r's git directory: pushes to AwaitPush,
 // the counts of what they lost to the spool's, and events to the spool, in one append, then
 // a flush. A parked event keeps the lane it was parked in, whoever is signed in now: it
-// leaves only under its own person's sign-in, or a server key. What an older terma parked
-// goes to its own queue.
+// leaves only under its own person's sign-in, or a server key; one parked with no lane is
+// dropped (spool.Spool.AppendAsCollected).
 func (e Env) unpark(r *Repo) {
 	if r.GitDir == "" {
 		return
@@ -105,12 +98,6 @@ func (e Env) unpark(r *Repo) {
 		// parked file stays, when the rest fails.
 		return e.Spool.AppendAsCollected(events...)
 	})
-	if err == nil {
-		err = parking.Unpark(legacyParkedEvents, func(lines []byte) error {
-			moved = true
-			return e.Spool.AppendLegacy(lines)
-		})
-	}
 	if err != nil {
 		e.Logf("unpark events: %v", err)
 		return

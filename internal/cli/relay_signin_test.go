@@ -2,9 +2,7 @@ package cli
 
 import (
 	"maps"
-	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -319,61 +317,6 @@ func TestARetirementCountsAfterTheSessionRotated(t *testing.T) {
 	}
 }
 
-// On a server-key profile the relay's first look records the key's decision: what an older
-// terma queued is no person's, and its spool file is set aside as the decision is taken.
-func TestTheRelaysFirstLookRecordsTheKeysDecision(t *testing.T) {
-	f := newFakeAuth(t)
-	authSandbox(t, f)
-	spoolForTest(t)
-	queueAsAnOlderTerma(t, "before")
-	data := `{"default": {"organizations": {"o": {"session_id": "s", "auth_url": "https://auth.example.test", "organization_id": "o", "user_id": "u"}}}}`
-	if err := os.WriteFile(config.LegacyCredentialsPath(testApp.dir), []byte(data), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	serverKeyProfile(t)
-	cfg, err := testApp.loadConfig()
-	if err != nil {
-		t.Fatal(err)
-	}
-	var engine relay.Options
-	testApp.bindRelay(&engine, cfg)
-	if got := engine.LegacyOwner(); got != auth.LegacyNoPerson {
-		t.Fatalf("decision = %q; want no person's", got)
-	}
-	rec, err := auth.ReadLegacyRecord(testApp.stateDir)
-	if err != nil || rec.Account != auth.LegacyNoPerson || !slices.Equal(rec.SessionIDs, []string{"s"}) {
-		t.Fatalf("record = %+v, %v; want the key's decision, with the session", rec, err)
-	}
-	if _, err := os.Stat(filepath.Join(testApp.stateDir, spool.Dir, spool.LegacyEventsFile)); err == nil {
-		t.Fatal("the older spool file was not set aside at the decision")
-	}
-}
-
-// A config.json that can't be read never stops the relay's legacy look: no record is
-// written, and the relay goes on.
-func TestAnUnreadableConfigLeavesTheLegacyLookAlone(t *testing.T) {
-	f := newFakeAuth(t)
-	authSandbox(t, f)
-	if err := os.WriteFile(config.LegacyCredentialsPath(testApp.dir), []byte(`{}`), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	cfg, err := testApp.loadConfig()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(config.Path(testApp.dir), []byte("{"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	var engine relay.Options
-	testApp.bindRelay(&engine, cfg)
-	if got := engine.LegacyOwner(); got != "" {
-		t.Fatalf("decision = %q; want none", got)
-	}
-	if rec, err := auth.ReadLegacyRecord(testApp.stateDir); err != nil || !rec.RetiredAt.IsZero() {
-		t.Fatalf("record = %+v, %v; want none written", rec, err)
-	}
-}
-
 // A retirement is recorded on the session that sent the refused token even after another
 // process rotated that session's token: it is matched by session, in user-credentials.json.
 func TestARetirementIsRecordedAfterAnotherProcessRotated(t *testing.T) {
@@ -441,4 +384,18 @@ func TestASignInWithNoUserIsNoDeliveryCredential(t *testing.T) {
 	if got := testApp.deliveryCredential(cfg)("", "p1"); got != "" {
 		t.Fatalf("a sign-in with no user reads %q, want none", got)
 	}
+}
+
+// queued is the spool's events by name.
+func queued(t *testing.T, s *spool.Spool) map[string]spool.Event {
+	t.Helper()
+	events, err := s.Peek(100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := map[string]spool.Event{}
+	for _, e := range events {
+		out[e.Name] = e
+	}
+	return out
 }

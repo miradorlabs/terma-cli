@@ -5,8 +5,6 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"path/filepath"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -219,29 +217,6 @@ func TestAHeartbeatFollowsNoRedirect(t *testing.T) {
 	}
 	if n := followed.Load(); n != 0 {
 		t.Fatalf("the heartbeat followed a redirect %d times", n)
-	}
-}
-
-// A legacy record that can't be read is no decision, never a server key's, nor what part of
-// it reads: nothing is taken in under it.
-func TestAnUnreadableLegacyRecordIsNoDecision(t *testing.T) {
-	authSandbox(t, newFakeAuth(t))
-	path := filepath.Join(testApp.stateDir, auth.LegacyRecordFile)
-	if err := os.WriteFile(path, []byte(`{"account": "aaaaaaaaaaaaaaaa", "session_ids": 5}`), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	if got := testApp.legacyRecord(config.DefaultProfile); got.Account != "" {
-		t.Fatalf("a record that reads in part = %+v; want no decision", got)
-	}
-	if err := os.Remove(path); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.MkdirAll(filepath.Join(path, "x"), 0o700); err != nil {
-		t.Fatal(err)
-	}
-	serverKeyProfile(t)
-	if got := testApp.legacyRecord(config.DefaultProfile); got.Account != "" {
-		t.Fatalf("unreadable record = %+v; want no decision", got)
 	}
 }
 

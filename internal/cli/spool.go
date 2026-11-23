@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/miradorlabs/terma-cli/internal/account/auth"
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/delivery"
@@ -152,9 +151,6 @@ func describeFlush(res delivery.Result, signInFix string) (delivered string, und
 	if res.Expired > 0 {
 		undelivered = append(undelivered, fmt.Sprintf("expired %d past the spool's age limit", res.Expired))
 	}
-	if res.LegacyAmbiguous > 0 {
-		undelivered = append(undelivered, fmt.Sprintf("expired %d an older terma queued that no one sign-in may send", res.LegacyAmbiguous))
-	}
 	if res.Pruned > 0 {
 		undelivered = append(undelivered, fmt.Sprintf("pruned %d to stay under the size limit", res.Pruned))
 	}
@@ -217,34 +213,11 @@ func (app *App) flushSpool(ctx context.Context, force bool, minInterval time.Dur
 	}
 	r := app.delivery()
 	r.SignIn = app.signInSource(cfg)
-	app.ingestLegacySpool(s, cfg.ServerKeySignIn)
 	// A hook that found the policy stale started this flush to refresh it (hookrun refreshPolicy).
 	if cfg.Policy.Stale(time.Now()) {
 		r.Policy = refreshOnce(ctx, cfg, cfg.Policy.Team(), r.Policy)
 	}
 	return r.Flush(ctx, s, cfg, force, minInterval), nil
-}
-
-// ingestLegacySpool takes what an older terma queued into s. What it held at the one
-// decision the legacy record keeps (auth.LegacyOwnership) was set aside as it was taken
-// (legacyStages), and is taken in under it: its person's, no person's, or, when ambiguous or
-// not understood, neither, so it never leaves. An older terma's hook may still be queueing,
-// so every flush takes what is new, as ambiguous: a sign-in since may be someone else's.
-// With no decision yet, or a record that can't be read, it stays where it is.
-func (app *App) ingestLegacySpool(s *spool.Spool, serverKey bool) {
-	rec, err := auth.LegacyOwnership(app.dir, app.stateDir, serverKey, app.legacyStages()...)
-	if err != nil || rec.Account == "" {
-		return
-	}
-	switch lane := auth.LegacyLane(rec.Account); lane {
-	case auth.LegacyNoPerson:
-		_ = s.IngestStaged("", true)
-	case auth.LegacyAccountAmbiguous:
-		_ = s.IngestStaged("", false)
-	default:
-		_ = s.IngestStaged(lane, false)
-	}
-	_ = s.IngestLegacy("", false)
 }
 
 var errTornDown = errors.New("terma is not set up on this machine; run `terma setup`")

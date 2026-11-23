@@ -81,8 +81,7 @@ func Prepare(cfg *config.Config) {
 // Engine is the relay's options for this machine. It starts nothing.
 func (d Deps) Engine(ctx context.Context, stateDir string, cfg *config.Config, s Settings, logw io.Writer) relay.Options {
 	opts := relay.Options{Correlators: d.Correlators, Capturers: d.Capturers,
-		Hold: s.Hold, Dir: filepath.Join(claim.Dir(stateDir), relay.OutboxDir),
-		LegacyDir: filepath.Join(claim.Dir(stateDir), relay.LegacyOutboxDir), Resolve: d.Resolver(cfg), Version: d.Version,
+		Hold: s.Hold, Dir: filepath.Join(claim.Dir(stateDir), relay.OutboxDir), Resolve: d.Resolver(cfg), Version: d.Version,
 		Lookup:   func(sessionID string, now time.Time) (claim.Claim, bool) { return claim.Read(stateDir, sessionID, now) },
 		CatchAll: d.CatchAll(), HeartbeatSend: d.SendHeartbeat, HeartbeatEvery: s.Heartbeat,
 		PeerPID: procinfo.FindSender, ProcessAlive: procinfo.Alive, ClaimCacheTTL: time.Second, PolicyCacheTTL: time.Second}

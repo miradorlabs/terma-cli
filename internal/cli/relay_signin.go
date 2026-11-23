@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 	"slices"
 	"sync"
-	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/account/api"
 	"github.com/miradorlabs/terma-cli/internal/account/auth"
@@ -234,39 +233,13 @@ func (s *signInSource) Retired(token string) {
 }
 
 // bindRelay has the relay send as the profile's sign-in, bind what it accepts to that
-// sign-in's account, take in what an older relay queued by the legacy record's decision,
-// and name this installation, and the older sign-ins while recent, on its heartbeat. The
-// record and the id are read as they are needed, at each outbox sweep and heartbeat: a
-// sign-in after the relay started writes them.
+// sign-in's account, and name this installation on its heartbeat. The id is read as it is
+// needed, at each heartbeat: a sign-in after the relay started writes it.
 func (app *App) bindRelay(engine *relay.Options, cfg *config.Config) {
 	engine.SignIn = app.signInSource(cfg)
 	engine.Installation = func() string { return config.StoredInstallationID(app.dir) }
-	engine.LegacyOwner = func() string { return app.legacyRecord(cfg.ProfileName).Account }
 	engine.HookLosses = func() map[string]int {
 		losses, _ := spool.TakeNewLosses(filepath.Join(app.stateDir, spool.Dir))
 		return losses
 	}
-	engine.LegacySessionIDs = func() []string {
-		if rec := app.legacyRecord(cfg.ProfileName); rec.Recent(time.Now()) {
-			return rec.SessionIDs
-		}
-		return nil
-	}
-}
-
-// legacyRecord is the legacy record as it stands, on a server-key profile with the key's
-// decision recorded if none is kept (auth.LegacyOwnership). A record that can't be read or
-// written, or a profile's mode that can't be read, is the zero record: no decision, never a
-// server key's.
-func (app *App) legacyRecord(profile string) auth.LegacyRecord {
-	file, err := config.LoadFile(app.dir)
-	if err != nil {
-		return auth.LegacyRecord{}
-	}
-	p := file.Profiles[profile]
-	rec, err := auth.LegacyOwnership(app.dir, app.stateDir, p != nil && p.ServerKeySignIn, app.legacyStages()...)
-	if err != nil {
-		return auth.LegacyRecord{}
-	}
-	return rec
 }

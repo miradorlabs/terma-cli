@@ -18,7 +18,6 @@ const OutboxLossWindow = 14 * 24 * time.Hour
 var outboxLosses = []struct{ reason, what string }{
 	{"outbox_full", "because the outbox was full"},
 	{"outbox_expired", "older than it keeps them"},
-	{"legacy_ambiguous", "an older terma queued that no one sign-in may send, past its age"},
 	{"policy_timeout", "claimed for a team whose policy or key the relay couldn't read within 15 minutes"},
 	{"signed_out", "collected while signed out"},
 	{"unreadable", "collected while the sign-in could not be read"},

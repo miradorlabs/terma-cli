@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"path/filepath"
 	"slices"
 	"strings"
 	"sync/atomic"
@@ -19,9 +18,7 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/account/auth"
 	"github.com/miradorlabs/terma-cli/internal/account/keystore"
-	"github.com/miradorlabs/terma-cli/internal/account/secret"
 	"github.com/miradorlabs/terma-cli/internal/config"
-	"github.com/miradorlabs/terma-cli/internal/flock"
 )
 
 func TestParseOrgRef(t *testing.T) {
@@ -308,44 +305,6 @@ func TestStoreLoginRetiresAnOlderTermasSignIns(t *testing.T) {
 	}
 }
 
-// Retiring an older terma's sign-ins waits for their record: it is the only account what
-// that terma queued keeps once they are gone, so when it can't be written they stay, unrevoked,
-// for the next sign-in to retire.
-func TestAnUnrecordedRetirementKeepsTheOlderSignIns(t *testing.T) {
-	f := newFakeAuth(t)
-	authSandbox(t, f)
-	if err := config.UpdateFile(testApp.dir, func(file *config.File) { file.InsecureStorage = true }); err != nil {
-		t.Fatal(err)
-	}
-	legacyA := legacyTokenPrefix + orgA().ID
-	legacy := map[string]any{"default": map[string]any{"active": orgA().ID, "organizations": map[string]any{
-		orgA().ID: map[string]any{"access_token": legacyA, "session_id": "old-a", "auth_url": f.srv.URL, "organization_id": orgA().ID, "user_id": "u-1"},
-	}}}
-	data, _ := json.Marshal(legacy)
-	if err := os.WriteFile(config.LegacyCredentialsPath(testApp.dir), data, 0o600); err != nil {
-		t.Fatal(err)
-	}
-	// A directory where the record goes: writing it fails.
-	record := filepath.Join(testApp.stateDir, auth.LegacyRecordFile)
-	if err := os.MkdirAll(filepath.Join(record, "x"), 0o700); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = os.RemoveAll(record) })
-	cfg, err := testApp.loadConfig()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := testApp.storeLogin(context.Background(), cfg, storedSession(f)); err != nil {
-		t.Fatal(err)
-	}
-	if !auth.HasLegacySignIns(testApp.dir) {
-		t.Fatal("the older sign-ins were deleted with no record of whose they were")
-	}
-	if got := f.legacyRevokedTokens(); len(got) != 0 {
-		t.Fatalf("revoked %d older sessions before recording them", len(got))
-	}
-}
-
 // A session's refresh token is revoked only at the auth host this profile is configured
 // for: a credential naming another host, as a tampered file might, sends it nowhere.
 func TestRevokeSendsTheTokenOnlyToTheConfiguredHost(t *testing.T) {
@@ -407,105 +366,6 @@ func TestAnUpdatedMachineIsToldToSignIn(t *testing.T) {
 	}
 	if got := notice("status"); got != "" {
 		t.Fatalf("a signed-in machine was told to sign in: %q", got)
-	}
-}
-
-// An older terma's file that names no sign-in that can be read is retired with a record
-// that names no one: what that terma queued is no server key's to send later.
-func TestAnUnreadableOlderFileIsRetiredAsNoOnes(t *testing.T) {
-	f := newFakeAuth(t)
-	authSandbox(t, f)
-	if err := os.WriteFile(config.LegacyCredentialsPath(testApp.dir), []byte("not json"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	cfg, err := testApp.loadConfig()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := testApp.storeLogin(context.Background(), cfg, storedSession(f)); err != nil {
-		t.Fatal(err)
-	}
-	if auth.HasLegacySignIns(testApp.dir) {
-		t.Fatal("the older file outlived the sign-in")
-	}
-	if rec, err := auth.ReadLegacyRecord(testApp.stateDir); err != nil || rec.Account != auth.LegacyAccountAmbiguous || rec.RetiredAt.IsZero() {
-		t.Fatalf("record = %+v, %v; want one naming no one", rec, err)
-	}
-}
-
-// An older file that doesn't read whole is retired as no one's, but what could be read of it
-// is still revoked: its sessions don't stay live with nothing pointing at them.
-func TestAPartlyBrokenOlderFileIsRetiredAsNoOnes(t *testing.T) {
-	f := newFakeAuth(t)
-	authSandbox(t, f)
-	if err := config.UpdateFile(testApp.dir, func(file *config.File) { file.InsecureStorage = true }); err != nil {
-		t.Fatal(err)
-	}
-	legacyA := legacyTokenPrefix + orgA().ID
-	data := `{"default": {"organizations": {"` + orgA().ID + `": {"access_token": "` + legacyA + `", "session_id": "old-a", "auth_url": "` + f.srv.URL + `", "organization_id": "` + orgA().ID + `", "user_id": "u-1"}}}, "work": {"organizations": "not a map"}}`
-	if err := os.WriteFile(config.LegacyCredentialsPath(testApp.dir), []byte(data), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	cfg, err := testApp.loadConfig()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := testApp.storeLogin(context.Background(), cfg, storedSession(f)); err != nil {
-		t.Fatal(err)
-	}
-	if got := f.legacyRevokedTokens(); len(got) != 1 || got[0] != legacyA {
-		t.Fatalf("revoked %d older sessions, want the readable one", len(got))
-	}
-	if rec, err := auth.ReadLegacyRecord(testApp.stateDir); err != nil || rec.Account != auth.LegacyAccountAmbiguous ||
-		len(rec.SessionIDs) != 1 || rec.SessionIDs[0] != "old-a" {
-		t.Fatalf("record = %+v, %v; want one naming no one, keeping the readable session for the heartbeat", rec, err)
-	}
-	if auth.HasLegacySignIns(testApp.dir) {
-		t.Fatal("the older file outlived the sign-in")
-	}
-}
-
-// With the older sign-ins still on the machine, because the keychain would not let one go,
-// the decision is kept all the same, before they go, and a later retirement keeps it.
-func TestTheDecisionIsKeptWhileTheOlderSignInsRemain(t *testing.T) {
-	f := newFakeAuth(t)
-	authSandbox(t, f)
-	legacyA := legacyTokenPrefix + orgA().ID
-	data := `{"default": {"organizations": {` +
-		`"` + orgA().ID + `": {"access_token": "` + legacyA + `", "session_id": "old-a", "auth_url": "` + f.srv.URL + `", "organization_id": "` + orgA().ID + `", "user_id": "u-1"},` +
-		`"` + orgB().ID + `": {"session_id": "old-b", "auth_url": "` + f.srv.URL + `", "organization_id": "` + orgB().ID + `", "user_id": "u-1"}}}}`
-	if err := os.WriteFile(config.LegacyCredentialsPath(testApp.dir), []byte(data), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	if err := config.UpdateFile(testApp.dir, func(file *config.File) { file.InsecureStorage = true }); err != nil {
-		t.Fatal(err)
-	}
-	cfg, err := testApp.loadConfig()
-	if err != nil {
-		t.Fatal(err)
-	}
-	// The second older sign-in's tokens are in the keychain, which won't let them go.
-	unlock := secret.FailForTest(t, testApp.dir)
-	if err := testApp.storeLogin(context.Background(), cfg, storedSession(f)); err != nil {
-		t.Fatal(err)
-	}
-	if !auth.HasLegacySignIns(testApp.dir) {
-		t.Fatal("the older sign-ins were forgotten although the keychain kept one")
-	}
-	want := auth.AccountKey(f.srv.URL, "u-1")
-	if rec, err := auth.ReadLegacyRecord(testApp.stateDir); err != nil || rec.Account != want {
-		t.Fatalf("record = %+v, %v; want their person's", rec, err)
-	}
-	unlock()
-	// A retry, as a server key's even, keeps the first decision.
-	if err := testApp.retireLegacySessions(context.Background(), f.srv.URL, true); err != nil {
-		t.Fatal(err)
-	}
-	if auth.HasLegacySignIns(testApp.dir) {
-		t.Fatal("the retry left the older sign-ins")
-	}
-	if rec, err := auth.ReadLegacyRecord(testApp.stateDir); err != nil || rec.Account != want {
-		t.Fatalf("after the retry, record = %+v, %v; want the first decision", rec, err)
 	}
 }
 
@@ -639,81 +499,5 @@ func TestReuseRefusesASessionReplacedMeanwhile(t *testing.T) {
 	}
 	if _, ok, err := testApp.reuseStoredSession(t.Context(), cfg, nil); ok || err == nil || !strings.Contains(err.Error(), "signed in again") {
 		t.Fatalf("reuse = %v, %v; want it refused", ok, err)
-	}
-}
-
-// Once the older sign-ins are retired and gone, a later sign-in, setup or sign-out leaves
-// their record as it was.
-func TestARetirementDoneLeavesItsRecordToLaterSignIns(t *testing.T) {
-	f := newFakeAuth(t)
-	authSandbox(t, f)
-	stateDir := testApp.stateDir
-	if err := auth.RecordLegacy(stateDir, []auth.LegacySignIn{{SessionID: "old", AuthURL: f.srv.URL, UserID: "u-1"}}, auth.AccountKey(f.srv.URL, "u-1"), time.Now().Add(-time.Hour)); err != nil {
-		t.Fatal(err)
-	}
-	before, err := auth.ReadLegacyRecord(stateDir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := testApp.retireLegacySessions(context.Background(), f.srv.URL, true); err != nil {
-		t.Fatal(err)
-	}
-	after, err := auth.ReadLegacyRecord(stateDir)
-	if err != nil || after.Account != before.Account || !after.RetiredAt.Equal(before.RetiredAt) {
-		t.Fatalf("record %+v became %+v (%v); want it left as the retirement left it", before, after, err)
-	}
-}
-
-// Older sign-ins whose file can't be read at the retirement are neither recorded nor
-// deleted: deleted unrecorded, what that terma queued would have no account at all.
-func TestOlderSignInsThatCantBeReadAreKept(t *testing.T) {
-	f := newFakeAuth(t)
-	authSandbox(t, f)
-	data := `{"default": {"organizations": {"o": {"session_id": "old", "auth_url": "` + f.srv.URL + `", "user_id": "u-1"}}}}`
-	if err := os.WriteFile(config.LegacyCredentialsPath(testApp.dir), []byte(data), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	read := testApp.legacySignIns
-	t.Cleanup(func() { testApp.legacySignIns = read })
-	testApp.legacySignIns = func(string, bool) ([]auth.LegacySignIn, bool, error) {
-		return nil, false, errors.New("sharing violation")
-	}
-	if err := testApp.retireLegacySessions(context.Background(), f.srv.URL, false); err != nil {
-		t.Fatal(err)
-	}
-	if !auth.HasLegacySignIns(testApp.dir) {
-		t.Fatal("the older sign-ins were deleted unread")
-	}
-	if rec, err := auth.ReadLegacyRecord(testApp.stateDir); err != nil || !rec.RetiredAt.IsZero() {
-		t.Fatalf("record = %+v, %v; want none yet", rec, err)
-	}
-}
-
-// A retirement while an older terma holds credentials.json's lock, signing in, say, leaves
-// the older sign-ins for the next: none is recorded from, or forgotten under, a file that may
-// be replaced meanwhile.
-func TestARetirementWaitsOutAnOlderTermasLock(t *testing.T) {
-	f := newFakeAuth(t)
-	authSandbox(t, f)
-	data := `{"default": {"organizations": {"o": {"session_id": "old", "auth_url": "` + f.srv.URL + `", "user_id": "u-1"}}}}`
-	path := config.LegacyCredentialsPath(testApp.dir)
-	if err := os.WriteFile(path, []byte(data), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	unlock, err := flock.Lock(context.Background(), path+".lock")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer unlock()
-	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
-	defer cancel()
-	if err := testApp.retireLegacySessions(ctx, f.srv.URL, false); err == nil {
-		t.Fatal("a retirement left to the next sign-in reported nothing")
-	}
-	if !auth.HasLegacySignIns(testApp.dir) {
-		t.Fatal("the older sign-ins were forgotten under an older terma's lock")
-	}
-	if rec, err := auth.ReadLegacyRecord(testApp.stateDir); err != nil || !rec.RetiredAt.IsZero() {
-		t.Fatalf("record = %+v, %v; want none yet", rec, err)
 	}
 }

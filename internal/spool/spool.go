@@ -5,6 +5,7 @@ package spool
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -35,8 +36,8 @@ type Event struct {
 	// event to the repository list in force when it leaves. Local only.
 	Repository config.Repository `json:"repository,omitzero"`
 	// Account is the account key (auth.AccountKey) of the sign-in the event was collected
-	// under, so it leaves under that sign-in only; "" when none was, as for an event an
-	// older terma queued, the only kind queued with neither it nor NoPerson. Local only.
+	// under, so it leaves under that sign-in only; "" when none was. An event with neither
+	// it nor NoPerson is never queued, and one found queued is dropped. Local only.
 	Account string `json:"account,omitempty"`
 	// NoPerson marks an event collected under a server key: no person's, so its empty
 	// Account is final, never bound to a sign-in later (AppendAsCollected). Local only.
@@ -91,8 +92,9 @@ const Dir = "spool"
 
 // EventsFile is the queue, in Dir. Its name, and every other file's this version keeps
 // there, are new: an older terma's hook or flusher still running reads and writes only
-// its own (LegacyEventsFile), so it never sends what this version queued with its own
-// credential, nor holds up or throttles this version's flushes.
+// its own (events.jsonl), so it never sends what this version queued with its own
+// credential, nor holds up or throttles this version's flushes. This version never reads
+// an older terma's.
 const EventsFile = "events-v2.jsonl"
 
 const (
@@ -176,13 +178,15 @@ func (s *Spool) AppendContext(ctx context.Context, events ...Event) error {
 
 // AppendAsCollected is Append for events that already carry the account they were
 // collected under: a checkpointed event appended again later keeps it, whoever the Spool
-// is bound to by then. One that carries none is lost.
+// is bound to by then. One that carries none is dropped, uncounted: this version records
+// none, so no one collected it under a sign-in that could send it.
 func (s *Spool) AppendAsCollected(events ...Event) error {
 	return s.appendEvents(context.Background(), false, events)
 }
 
 // appendEvents never queues an event that names neither an account nor no person: no one
-// could ever send it. It is lost instead, counted by why (Lost), and the rest are appended.
+// could ever send it. It is lost instead, counted by why its bound lane has none (Lost),
+// and the rest are appended.
 func (s *Spool) appendEvents(ctx context.Context, bind bool, events []Event) error {
 	var lines []byte
 	lost := map[string]int{}
@@ -193,8 +197,10 @@ func (s *Spool) appendEvents(ctx context.Context, bind bool, events []Event) err
 		if bind && e.Account == "" && !e.NoPerson {
 			e.Account, e.NoPerson = s.lane.Account, s.lane.NoPerson
 		}
-		if why := untagged(e, s.lane, bind); why != "" {
-			lost[why]++
+		if !tagged(e) {
+			if bind {
+				lost[cmp.Or(s.lane.Lost, sendas.LostUnreadable)]++
+			}
 			continue
 		}
 		line, err := json.Marshal(e)

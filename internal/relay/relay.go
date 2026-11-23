@@ -92,13 +92,6 @@ type Options struct {
 	// that arrives signed out, or while the sign-in can't be read, is lost, and counted.
 	// Nil is a server key's relay.
 	SignIn SignIn
-	// LegacyDir is an older relay's outbox, and LegacyOwner, asked at every outbox sweep,
-	// the one decision of whose what it queued is (auth.LegacyRecord.Account): "" for none
-	// yet, when it stays where it is. Taking the decision set aside what the older outbox
-	// held then (StageLegacyOutbox), which goes into that decision's lane, and what an older
-	// relay queued since into the ambiguous one (ingestLegacy).
-	LegacyDir   string
-	LegacyOwner func() string
 	// CatchAll, in global mode, is where a part whose hold ran out unplaced goes instead of being dropped.
 	CatchAll func() (claim.Claim, bool)
 	// HeartbeatSend, set, turns the heartbeat on; HeartbeatEvery is its period.
@@ -131,10 +124,6 @@ type Options struct {
 	// Installation is, asked at every heartbeat, this installation's stable id, on its
 	// resource as terma.installation.id; nil or "" sends none.
 	Installation func() string
-	// LegacySessionIDs are, asked at every heartbeat, the sessions of the per-organization
-	// sign-ins an older terma kept here, while recent: on its resource as
-	// terma.legacy_session_ids.
-	LegacySessionIDs func() []string
 	// HookLosses are, asked at every heartbeat, what hooks lost since it was last asked, by
 	// reason (spool.TakeNewLosses): counted as dropped.<reason>.hooks, so the beat carries
 	// the hooks' losses with the relay's.

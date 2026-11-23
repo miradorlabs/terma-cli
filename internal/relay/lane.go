@@ -152,8 +152,8 @@ func (r *Relay) account() string {
 
 // mayLeave reports whether rt's parts may leave now. A route is one lane: a person's leaves
 // only with no server key (serverKey), while its account's sign-in is the one in place; no
-// person's only under a server key. Every other route, an older terma's ambiguous backlog
-// among them, waits, and ages out with the outbox.
+// person's only under a server key. Every other route, one without a lane among them,
+// waits, and ages out with the outbox.
 func (r *Relay) mayLeave(rt route, serverKey bool) bool {
 	if serverKey {
 		return rt.account == sendas.NoPersonLane

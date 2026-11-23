@@ -50,11 +50,11 @@ type SignIn = sendas.SignIn
 
 // Result summarizes one delivery pass; its counters are disjoint, one per reason.
 type Result struct {
-	Sent, Held, Failed, Expired, LegacyAmbiguous, Pruned, Dropped, Unroutable, Withheld int
-	Skipped                                                                             bool
-	Reason                                                                              spool.SkipReason
-	NextAttempt                                                                         time.Time
-	Err                                                                                 error
+	Sent, Held, Failed, Expired, Pruned, Dropped, Unroutable, Withheld int
+	Skipped                                                            bool
+	Reason                                                             spool.SkipReason
+	NextAttempt                                                        time.Time
+	Err                                                                error
 	// Failures names each failed project once, in order; doctor tells its own from another's.
 	Failures []Failure
 	// Waiting names each project skipped because its retry window was open.
@@ -77,7 +77,7 @@ type Wait struct {
 
 // Lost reports whether the pass discarded events rather than delivering or holding them.
 func (r Result) Lost() bool {
-	return r.Expired > 0 || r.LegacyAmbiguous > 0 || r.Pruned > 0 || r.Dropped > 0 || r.Unroutable > 0
+	return r.Expired > 0 || r.Pruned > 0 || r.Dropped > 0 || r.Unroutable > 0
 }
 
 // Flush delivers everything s holds, each project with its own key to its own host. A
@@ -105,8 +105,7 @@ func (r Router) Flush(ctx context.Context, s *spool.Spool, cfg *config.Config, f
 				continue
 			}
 			// Another person's or environment's events wait for their own sign-in; a server key
-			// sends only what no person collected. One that names neither, an older terma's
-			// no one sign-in may send, never leaves. Judged first: no policy is asked for,
+			// sends only what no person collected. Judged first: no policy is asked for,
 			// under this credential, for events it can't send.
 			if serverKey && !e.NoPerson || !serverKey && (account == "" || e.Account != account) {
 				held = append(held, e)
@@ -196,7 +195,6 @@ func (r Router) Flush(ctx context.Context, s *spool.Spool, cfg *config.Config, f
 	res.Held = fr.Held
 	res.Failed = fr.Failed
 	res.Expired = fr.Expired
-	res.LegacyAmbiguous = fr.LegacyAmbiguous
 	res.Pruned = fr.Pruned
 	res.Dropped = fr.Dropped
 	res.Skipped = fr.Skipped

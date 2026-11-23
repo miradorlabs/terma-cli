@@ -46,8 +46,8 @@ type Manifest struct {
 	Files       map[string]time.Time `json:"files"`
 	// Account is the lane of the sign-in the session's first write was collected under: an
 	// account key, or sendas.NoPersonLane under a server key. No write makes it another's
-	// (Touch, Merge, claimed). "" names no one: a manifest written signed out, or by an older terma, which gives what
-	// a git hook records of the session no lane, and is never filled in later.
+	// (Touch, Merge, claimed). "" names no one, as a manifest written signed out does: what a
+	// git hook records of the session gets no lane from it, and it is never filled in later.
 	Account string `json:"account,omitempty"`
 }
 

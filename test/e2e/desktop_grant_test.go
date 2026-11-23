@@ -19,9 +19,6 @@ import (
 const (
 	desktopTeam = "55555555-5555-4555-8555-555555555555"
 	anotherUser = "99999999-9999-4999-8999-999999999999"
-	// legacySession and legacyAccess are an older terma's per-organization sign-in.
-	legacySession = "66666666-6666-4666-8666-666666666666"
-	legacyAccess  = "legacy-access"
 )
 
 // TestDesktopGrant is Terma Desktop's onboarding as the CLI sees it: the real binary, its
@@ -43,14 +40,6 @@ func TestDesktopGrant(t *testing.T) {
 		t.Fatal(err)
 	}
 	sb.editProfile("default", func(p map[string]any) { delete(p, "organization_id") })
-	// An older terma's per-organization sign-in, which the first sign-in on user tokens
-	// signs out and deletes, then names on the heartbeat for a while.
-	legacyPath := filepath.Join(sb.TermaConfig, "credentials.json")
-	legacy, _ := json.Marshal(map[string]any{"default": map[string]any{"active": accountOrg, "organizations": map[string]any{accountOrg: map[string]any{
-		"access_token": legacyAccess, "session_id": legacySession, "auth_url": sb.account.srv.URL, "organization_id": accountOrg, "user_id": accountUser,
-		"expires_at": time.Now().Add(time.Hour).UTC().Format(time.RFC3339),
-	}}}})
-	sb.writeAbs(legacyPath, string(legacy))
 
 	delegate := func(request map[string]any) string {
 		challenge, _ := request["challenge"].(string)
@@ -94,26 +83,18 @@ func TestDesktopGrant(t *testing.T) {
 	if delegated, other := sb.account.RevokedDelegated(); delegated != 1 || other != 0 {
 		t.Fatalf("another user's session was not signed out: %d delegated sessions and %d others revoked", delegated, other)
 	}
-	if !fileExists(legacyPath) || len(sb.account.LegacyRevoked()) != 0 {
-		t.Fatalf("a refused sign-in retired the older sign-in (file kept: %t, revoked %v)", fileExists(legacyPath), sb.account.LegacyRevoked())
-	}
 
 	sb.Receiver.Reset()
 	first, rest, err = sb.desktopSetup(accountUser, delegate)
 	if err != nil {
 		t.Fatalf("terma setup --desktop-grant: %v\n%s", err, rest)
 	}
-	if revoked := sb.account.LegacyRevoked(); fileExists(legacyPath) || len(revoked) != 1 || revoked[0] != legacyAccess {
-		t.Fatalf("the older sign-in was not retired: file kept %t, revoked %v", fileExists(legacyPath), revoked)
-	}
-	// Setup's check-in goes with the new sign-in to --team, naming this installation and,
-	// as a sign-in just retired it, the older terma's session.
+	// Setup's check-in goes with the new sign-in to --team, naming this installation.
 	beats := sb.Receiver.WaitLogs(10*time.Second, func(l LogRecord) bool { return l.EventName == "terma.relay.heartbeat" })
 	if len(beats) == 0 {
 		t.Fatal("setup's check-in reached no ingest")
 	}
-	if b := beats[0]; b.Authorization != personBearer() || b.Project != desktopTeam || b.Resource["terma.installation.id"] != accountInstallation ||
-		!strings.Contains(b.Resource["terma.legacy_session_ids"], legacySession) {
+	if b := beats[0]; b.Authorization != personBearer() || b.Project != desktopTeam || b.Resource["terma.installation.id"] != accountInstallation {
 		t.Errorf("setup's check-in went with %q naming team %q, resource %v", b.Authorization, b.Project, b.Resource)
 	}
 	if _, ok := first["challenge"]; !ok || sb.account.delegations.Load() != 2 {

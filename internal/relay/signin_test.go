@@ -102,12 +102,10 @@ func (u *signInUpstream) requests() []string {
 }
 
 // signedInRelay runs a relay that sends with signIn, its outbox dir, every session claimed
-// for p1 under a policy that names no key. What an older relay queued, in
-// legacyOutbox(dir), is taken in under the decision legacy, "" for none.
-func signedInRelay(t *testing.T, u *signInUpstream, signIn SignIn, dir, legacy string) *Relay {
+// for p1 under a policy that names no key.
+func signedInRelay(t *testing.T, u *signInUpstream, signIn SignIn, dir string) *Relay {
 	t.Helper()
 	r := newRelay(Options{Dir: dir, Token: token, Hold: time.Minute, SignIn: signIn,
-		LegacyDir: legacyOutbox(dir), LegacyOwner: decided(t, dir, legacy),
 		Lookup: func(string, time.Time) (claim.Claim, bool) { return claim.Claim{ProjectID: "p1"}, true },
 		Resolve: func(claim.Claim) (Policy, error) {
 			return Policy{Endpoint: u.srv.URL, IncludePrompts: true, IncludeToolContent: true}, nil
@@ -124,21 +122,6 @@ func oneLog(session string) []byte {
 		LogRecords: []*logspb.LogRecord{{Attributes: []*commonpb.KeyValue{kv("session.id", session)}}}}}}}})
 	return b
 }
-
-// decided is Options.LegacyOwner for the decision legacy, "" for none, with what the older
-// outbox beside dir holds set aside as taking it does (auth.LegacyStage).
-func decided(t *testing.T, dir, legacy string) func() string {
-	t.Helper()
-	if legacy != "" {
-		if err := StageLegacyOutbox(legacyOutbox(dir)); err != nil {
-			t.Fatal(err)
-		}
-	}
-	return func() string { return legacy }
-}
-
-// legacyOutbox is where tests keep an older relay's outbox beside the outbox dir.
-func legacyOutbox(dir string) string { return dir + "-legacy" }
 
 // queue writes a part into dir's outbox under account, as an earlier relay left it.
 func queue(t *testing.T, dir, account string) { t.Helper(); queueAt(t, dir, account, time.Now()) }
@@ -160,7 +143,7 @@ func TestPartsLeaveOnlyUnderTheirOwnSignIn(t *testing.T) {
 	dir := t.TempDir()
 	queue(t, dir, accountB)
 	signIn := &testSignIn{account: accountA}
-	r := signedInRelay(t, u, signIn, dir, "")
+	r := signedInRelay(t, u, signIn, dir)
 	srv := httptest.NewServer(r.Handler())
 	defer srv.Close()
 	post(t, srv, "/v1/logs", oneLog("new"), "application/x-protobuf", token, false)
@@ -181,59 +164,29 @@ func TestPartsLeaveOnlyUnderTheirOwnSignIn(t *testing.T) {
 	}
 }
 
-// What an older relay queued, in its own outbox, is taken into the account the retirement
-// decided, and leaves under that account only: under another sign-in it waits in that
-// account's lane. A route of the older outbox already in a lane moves as it is.
-func TestABacklogFromBeforeUserTokensLeavesUnderItsAccount(t *testing.T) {
-	t.Parallel()
-	u := newSignInUpstream(t)
-	dir := t.TempDir()
-	queue(t, legacyOutbox(dir), "")
-	signedInRelay(t, u, &testSignIn{account: accountA}, dir, accountA)
-	waitFor(t, func() bool { return len(u.requests()) == 1 })
-	if got := u.requests()[0]; got != "Bearer token-"+accountA+" p1" {
-		t.Fatalf("sent %q, want A's token", got)
-	}
+// anyAccountSignIn is a sign-in that hands its token out for any account, "" included, so
+// only the relay's own check of a route's lane keeps a part from leaving with it.
+type anyAccountSignIn struct{ testSignIn }
 
-	u2 := newSignInUpstream(t)
-	dir2 := t.TempDir()
-	queue(t, legacyOutbox(dir2), "")
-	queue(t, legacyOutbox(dir2), accountA)
-	signedInRelay(t, u2, &testSignIn{account: accountA}, dir2, accountB)
-	waitFor(t, func() bool { return len(u2.requests()) == 1 })
-	time.Sleep(100 * time.Millisecond)
-	if got := u2.requests(); len(got) != 1 || got[0] != "Bearer token-"+accountA+" p1" {
-		t.Fatalf("sent %q: want only A's own part, B's backlog kept", got)
-	}
-	if entries, _ := (outbox{dir: dir2}).list(routeOf(accountB, claim.Claim{ProjectID: "p1"})); len(entries) != 1 {
-		t.Fatalf("B's lane holds %d parts, want the older relay's one", len(entries))
-	}
-	if routes, _ := (outbox{dir: legacyOutbox(dir2)}).routes(); len(routes) != 0 {
-		for _, rt := range routes {
-			if entries, _ := (outbox{dir: legacyOutbox(dir2)}).list(rt); len(entries) != 0 {
-				t.Fatalf("the older outbox kept %d parts on %s", len(entries), rt)
-			}
-		}
-	}
+func (s *anyAccountSignIn) Token(context.Context, string) (string, error) {
+	return "token-" + s.Account(), nil
 }
 
-// With no decision yet, an older relay's outbox is left as it is: nothing is taken in.
-func TestNoDecisionTakesNothingFromAnOlderRelay(t *testing.T) {
+// A route bound to no lane, which this version never writes, never leaves with a person's
+// token, even from a sign-in that would hand one out for it. It waits, and ages out.
+func TestARouteWithNoLaneNeverLeavesWithAUserToken(t *testing.T) {
 	t.Parallel()
 	u := newSignInUpstream(t)
 	dir := t.TempDir()
-	queue(t, legacyOutbox(dir), "")
-	r := signedInRelay(t, u, &testSignIn{account: accountA}, dir, "")
-	r.janitor(time.Now())
-	time.Sleep(100 * time.Millisecond)
-	if n := len(u.requests()); n != 0 {
-		t.Fatalf("%d requests: an older relay's part left with no decision", n)
+	queue(t, dir, "")
+	r := signedInRelay(t, u, &anyAccountSignIn{testSignIn{account: accountA}}, dir)
+	r.sender(routeOf("", claim.Claim{ProjectID: "p1"})).poke()
+	time.Sleep(200 * time.Millisecond)
+	if got := u.requests(); len(got) != 0 {
+		t.Fatalf("sent %q: a part in no lane left with a user token", got)
 	}
-	if entries, _ := (outbox{dir: legacyOutbox(dir)}).list(routeOf("", claim.Claim{ProjectID: "p1"})); len(entries) != 1 {
-		t.Fatalf("the older outbox holds %d parts, want its one left", len(entries))
-	}
-	if routes, _ := (outbox{dir: dir}).routes(); len(routes) != 0 {
-		t.Fatalf("routes %v were made with no decision", routes)
+	if entries, _ := (outbox{dir: dir}).list(routeOf("", claim.Claim{ProjectID: "p1"})); len(entries) != 1 {
+		t.Fatalf("the route holds %d parts, want its one kept to age out", len(entries))
 	}
 }
 
@@ -243,7 +196,7 @@ func TestARefusedTokenIsRotatedAndThePartKept(t *testing.T) {
 	t.Parallel()
 	u := newSignInUpstream(t, http.StatusUnauthorized)
 	signIn := &testSignIn{account: accountA}
-	r := signedInRelay(t, u, signIn, t.TempDir(), "")
+	r := signedInRelay(t, u, signIn, t.TempDir())
 	srv := httptest.NewServer(r.Handler())
 	defer srv.Close()
 	post(t, srv, "/v1/logs", oneLog("new"), "application/x-protobuf", token, false)
@@ -302,7 +255,7 @@ func TestASwitchMidSendNeverLendsTheNewSignIn(t *testing.T) {
 	u := newSignInUpstream(t)
 	dir := t.TempDir()
 	queue(t, dir, accountA)
-	signedInRelay(t, u, &switchingSignIn{testSignIn: testSignIn{account: accountA}, to: accountB}, dir, "")
+	signedInRelay(t, u, &switchingSignIn{testSignIn: testSignIn{account: accountA}, to: accountB}, dir)
 	time.Sleep(200 * time.Millisecond)
 	if got := u.requests(); len(got) != 0 {
 		t.Fatalf("sent %q: A's parts left after B signed in", got)
@@ -364,18 +317,16 @@ func TestAHeldPartKeepsTheAccountItArrivedUnder(t *testing.T) {
 }
 
 // A profile set up with a server key sends only what no person's sign-in collected, its
-// no_person lane: a person's bound backlog, an older relay's the retirement decided was a
-// person's, and a route bound to no lane are never sent with the key.
+// no_person lane: a person's bound backlog and a route bound to no lane are never sent with
+// the key.
 func TestAServerKeyNeverSendsAPersonsBacklog(t *testing.T) {
 	t.Parallel()
 	u := newSignInUpstream(t)
 	dir := t.TempDir()
 	queue(t, dir, accountA)
-	queue(t, legacyOutbox(dir), "")    // an older relay's: the retired sign-ins' person's
 	queue(t, dir, sendas.NoPersonLane) // the key's own
 	queue(t, dir, "")                  // no lane's, which this version never writes
 	r := newRelay(Options{Dir: dir, Token: token, SignIn: &testSignIn{account: sendas.NoPersonLane},
-		LegacyDir: legacyOutbox(dir), LegacyOwner: decided(t, dir, accountB),
 		Resolve: func(claim.Claim) (Policy, error) {
 			return Policy{Endpoint: u.srv.URL, Key: "server-key", IncludePrompts: true, IncludeToolContent: true}, nil
 		}})
@@ -425,7 +376,7 @@ func TestAnExportKeepsTheSignInItArrivedUnder(t *testing.T) {
 	t.Parallel()
 	u := newSignInUpstream(t)
 	signIn := &testSignIn{account: accountA}
-	r := signedInRelay(t, u, signIn, t.TempDir(), "")
+	r := signedInRelay(t, u, signIn, t.TempDir())
 	body := &switchOnRead{r: bytes.NewReader(oneLog("new")), onRead: func() { signIn.set(accountB) }}
 	req := httptest.NewRequest(http.MethodPost, "/v1/logs", body)
 	req.Header.Set("Content-Type", "application/x-protobuf")
@@ -448,12 +399,10 @@ func TestAnExportKeepsTheSignInItArrivedUnder(t *testing.T) {
 	}
 }
 
-// serverKeyRelay runs a relay on dir under a server key, what an older relay queued in
-// legacyOutbox(dir) taken in under the decision legacy.
-func serverKeyRelay(t *testing.T, u *signInUpstream, dir, legacy string) *Relay {
+// serverKeyRelay runs a relay on dir under a server key.
+func serverKeyRelay(t *testing.T, u *signInUpstream, dir string) *Relay {
 	t.Helper()
 	r := newRelay(Options{Dir: dir, Token: token, SignIn: &testSignIn{account: sendas.NoPersonLane},
-		LegacyDir: legacyOutbox(dir), LegacyOwner: decided(t, dir, legacy),
 		Resolve: func(claim.Claim) (Policy, error) {
 			return Policy{Endpoint: u.srv.URL, Key: "server-key", IncludePrompts: true, IncludeToolContent: true}, nil
 		}})
@@ -471,7 +420,7 @@ func TestARefusedBatchIsSentAPartAtATime(t *testing.T) {
 	dir := t.TempDir()
 	queueAt(t, dir, sendas.NoPersonLane, time.Now().Add(time.Minute))
 	queueAt(t, dir, sendas.NoPersonLane, time.Now().Add(2*time.Minute))
-	r := serverKeyRelay(t, u, dir, "")
+	r := serverKeyRelay(t, u, dir)
 	waitForCounters(t, r, func(c map[string]int) bool { return c["forwarded.logs"] == 2 })
 	if n := len(u.requests()); n != 3 {
 		t.Fatalf("%d requests; want the refused batch, then each part alone", n)
@@ -487,7 +436,7 @@ func TestARetiredRefusalIsNeverTakenForAnExpiredToken(t *testing.T) {
 	signIn := &testSignIn{account: accountA}
 	dir := t.TempDir()
 	queue(t, dir, accountA)
-	signedInRelay(t, u, signIn, dir, "")
+	signedInRelay(t, u, signIn, dir)
 	waitFor(t, func() bool {
 		signIn.mu.Lock()
 		defer signIn.mu.Unlock()
@@ -512,7 +461,7 @@ func TestARouteWithNoTokenWaitsIdle(t *testing.T) {
 	u := newSignInUpstream(t)
 	dir := t.TempDir()
 	queue(t, dir, accountA)
-	r := signedInRelay(t, u, &tokenlessSignIn{testSignIn{account: accountA}}, dir, "")
+	r := signedInRelay(t, u, &tokenlessSignIn{testSignIn{account: accountA}}, dir)
 	waitForCounters(t, r, func(c map[string]int) bool { return c["recovered_from_outbox"] == 1 })
 	time.Sleep(200 * time.Millisecond) // a pass, which would count a retry
 	if _, idle := r.Idle(); !idle {
@@ -520,5 +469,32 @@ func TestARouteWithNoTokenWaitsIdle(t *testing.T) {
 	}
 	if c := r.Stats().Snapshot().Counters; c["upstream_retries"] != 0 || len(u.requests()) != 0 {
 		t.Fatalf("counters %v, %d sent; want it waiting, not retried", c, len(u.requests()))
+	}
+}
+
+// An older relay's outbox, beside this one's, is fenced off both ways: what it holds is
+// never sent, even a part in the lane of the sign-in in place, and what arrives is never
+// written there.
+func TestAnOlderRelaysOutboxIsNeitherReadNorWritten(t *testing.T) {
+	t.Parallel()
+	u := newSignInUpstream(t)
+	parent := t.TempDir()
+	older := filepath.Join(parent, "outbox") // where an older relay (v0.3.x) queues
+	queue(t, older, "")
+	queue(t, older, accountA)
+	r := signedInRelay(t, u, &testSignIn{account: accountA}, filepath.Join(parent, OutboxDir))
+	r.janitor(time.Now())
+	srv := httptest.NewServer(r.Handler())
+	defer srv.Close()
+	post(t, srv, "/v1/logs", oneLog("new"), "application/x-protobuf", token, false)
+	waitFor(t, func() bool { return len(u.requests()) >= 1 })
+	time.Sleep(200 * time.Millisecond)
+	if got := u.requests(); len(got) != 1 {
+		t.Fatalf("sent %q; want only the part this relay accepted", got)
+	}
+	for _, account := range []string{"", accountA} {
+		if entries, _ := (outbox{dir: older}).list(routeOf(account, claim.Claim{ProjectID: "p1"})); len(entries) != 1 {
+			t.Fatalf("the older outbox's %q route holds %d parts, want its one untouched", account, len(entries))
+		}
 	}
 }

@@ -149,18 +149,6 @@ func (r *Relay) heartbeatData(reason string, attrs []*commonpb.KeyValue) *logspb
 			res.Attributes = append(res.Attributes, &commonpb.KeyValue{Key: semconv.TermaInstallationIDKey, Value: strValue(id)})
 		}
 	}
-	var legacy []string
-	if r.opts.LegacySessionIDs != nil {
-		legacy = r.opts.LegacySessionIDs()
-	}
-	if len(legacy) > 0 {
-		ids := make([]*commonpb.AnyValue, 0, len(legacy))
-		for _, id := range legacy {
-			ids = append(ids, strValue(id))
-		}
-		res.Attributes = append(res.Attributes, &commonpb.KeyValue{Key: semconv.TermaLegacySessionIDsKey,
-			Value: &commonpb.AnyValue{Value: &commonpb.AnyValue_ArrayValue{ArrayValue: &commonpb.ArrayValue{Values: ids}}}})
-	}
 	return &logspb.LogsData{ResourceLogs: []*logspb.ResourceLogs{{Resource: res,
 		ScopeLogs: []*logspb.ScopeLogs{{Scope: &commonpb.InstrumentationScope{Name: HeartbeatService, Version: r.opts.Version}, LogRecords: []*logspb.LogRecord{rec}}}}}}
 }

@@ -51,23 +51,12 @@ func (app *App) useServerKey(s *setup.Steps, ui *setupUI, org orgRef, team *stri
 	}
 	s.FetchPolicy = func(ctx context.Context, cfg *config.Config) (config.Policy, error) {
 		pol, err := app.policies().FetchWithKey(ctx, cfg, cfg.APIKey)
+		// The sign-in is kept here, once the key has proved it reads the policy and before
+		// setup stores that policy, so a failed fetch writes nothing.
+		if err == nil {
+			err = app.keepServerKey(cfg, insecure)
+		}
 		if err != nil {
-			return config.Policy{}, err
-		}
-		// keepServerKey refuses a team key the keychain will not give up: refused before
-		// anything is retired, so a setup that stops there changes nothing.
-		if _, err := keystore.Get(app.dir, cfg.Team); err != nil {
-			return config.Policy{}, fmt.Errorf("read this team's current key (%w): unlock the system keychain, then run `terma setup` again", err)
-		}
-		// An older terma's sign-ins are retired, and their backlog recorded as the key's,
-		// once the key has proved it reads the policy. A setup that fails after this leaves
-		// them retired, as this release retires them anyway.
-		if err := app.retireLegacySessions(ctx, cfg.AuthURL, true); err != nil {
-			return config.Policy{}, fmt.Errorf("retire an older terma's sign-ins (%w): run `terma setup` again once it is done", err)
-		}
-		// The sign-in is kept here, before setup stores the policy, so a failed fetch writes
-		// nothing.
-		if err := app.keepServerKey(cfg, insecure); err != nil {
 			return config.Policy{}, err
 		}
 		return pol, nil

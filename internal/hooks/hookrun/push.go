@@ -37,10 +37,6 @@ import (
 // new to this version, so an older terma's sweep never reports, and strips, a tagged record.
 const PushesDir = "pushes-v2"
 
-// legacyPushesDir is where an older terma (v0.3.x) keeps its pushes, whose records name no
-// lane: reported, they are queued where it queues (spool.AppendLegacy).
-const legacyPushesDir = "pushes"
-
 const (
 	// MaxPushCommits bounds terma.push.commits; terma.push.commit.count stays the count.
 	MaxPushCommits = 500
@@ -119,8 +115,6 @@ type pushRecord struct {
 	// hook's; with none, the hook was in an agent's sandbox, and each ref's report takes its
 	// sessions' (recordLane).
 	Event spool.Event `json:"event"`
-	// legacy is a record an older terma wrote (legacyPushesDir).
-	legacy bool
 }
 
 // PrePush records a push for AwaitPush, which reports it once git push exits. It reads
@@ -191,37 +185,34 @@ func PrePush(ctx context.Context, env Env) error {
 	return nil
 }
 
-// unparkPushes records the pushes a sandboxed pre-push parked in r's git directory, as they
-// were parked, and starts their AwaitPush, which reports each at once, its git push long gone.
-// What an older terma parked is recorded where it records them.
+// unparkPushes records the pushes a sandboxed pre-push parked in r's git directory and starts their
+// AwaitPush, which reports each at once, its git push long gone.
 func (e Env) unparkPushes(r *Repo) {
 	if e.AwaitPush == nil {
 		return
 	}
-	for name, dir := range map[string]string{parkedPushes: PushesDir, legacyParkedPushes: legacyPushesDir} {
-		var recorded []string
-		err := r.parking().Unpark(name, func(lines []byte) error {
-			for line := range bytes.Lines(lines) {
-				var rec pushRecord
-				if json.Unmarshal(line, &rec) != nil || rec.ID == "" {
-					continue
-				}
-				path := filepath.Join(e.StateDir, dir, rec.ID+".json")
-				if err := config.WriteJSON(path, rec, 0o600); err != nil {
-					return err
-				}
-				recorded = append(recorded, path)
+	var recorded []string
+	err := r.parking().Unpark(parkedPushes, func(lines []byte) error {
+		for line := range bytes.Lines(lines) {
+			var rec pushRecord
+			if json.Unmarshal(line, &rec) != nil || rec.ID == "" {
+				continue
 			}
-			return nil
-		})
-		if err != nil {
-			// Still parked: the next hook records them all again and awaits each once.
-			e.Logf("unpark pushes: %v", err)
-			continue
+			path := filepath.Join(e.StateDir, PushesDir, rec.ID+".json")
+			if err := config.WriteJSON(path, rec, 0o600); err != nil {
+				return err
+			}
+			recorded = append(recorded, path)
 		}
-		for _, path := range recorded {
-			e.AwaitPush(path)
-		}
+		return nil
+	})
+	if err != nil {
+		// Still parked: the next hook records them all again and awaits each once.
+		e.Logf("unpark pushes: %v", err)
+		return
+	}
+	for _, path := range recorded {
+		e.AwaitPush(path)
 	}
 }
 
@@ -243,14 +234,9 @@ func AwaitPush(ctx context.Context, env Env, path string) {
 }
 
 // SweepPushes reports the pushes whose AwaitPush never finished: one the machine slept
-// through, or that was killed, and an older terma's.
+// through, or that was killed.
 func SweepPushes(ctx context.Context, env Env) {
-	for _, name := range []string{PushesDir, legacyPushesDir} {
-		sweepPushes(ctx, env, filepath.Join(env.StateDir, name))
-	}
-}
-
-func sweepPushes(ctx context.Context, env Env, dir string) {
+	dir := filepath.Join(env.StateDir, PushesDir)
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return
@@ -295,7 +281,6 @@ func readPush(path string) (pushRecord, error) {
 	if rec.ID == "" || rec.Root == "" || rec.GitDir == "" {
 		return rec, errors.New("incomplete push record")
 	}
-	rec.legacy = filepath.Base(filepath.Dir(path)) == legacyPushesDir
 	return rec, nil
 }
 
@@ -319,16 +304,10 @@ func reportPush(ctx context.Context, env Env, path string, rec pushRecord) {
 		switch {
 		case !ok:
 			failed = true
-		case !walked && !rec.legacy:
+		case !walked:
 			// The walk stopped at its bound: a session past it may be anyone's.
 			env.countLost(nil, sendas.LostAmbiguousPush, 1)
 			rec.Refs[i].Reported = true
-		case rec.legacy:
-			if line, err := json.Marshal(ev); err == nil && env.Spool != nil && env.Spool.AppendLegacy(append(line, '\n')) == nil {
-				emitted, rec.Refs[i].Reported = true, true
-			} else {
-				failed = true
-			}
 		default:
 			lane, owned := pushLane(rec.lane(), pushStore(env, rec), sessions)
 			if !owned {

@@ -11,7 +11,6 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -40,9 +39,6 @@ type Account struct {
 	// refuseDelegation, when set, is the error.reason delegate refuses the desktop's
 	// session with: NOT_DELEGABLE.
 	refuseDelegation string
-	// legacyRevoked are the access tokens of an older terma's per-organization sessions
-	// ended at /v1/auth/cli/revoke.
-	legacyRevoked []string
 }
 
 // delegatedCode is a code the delegate endpoint made for a CLI's challenge and label, the
@@ -109,13 +105,6 @@ func (sb *Sandbox) StartAccount() *Account {
 			}
 		case "/v1/auth/user/revoke":
 			a.serveRevoke(w, r)
-			return
-		case "/v1/auth/cli/revoke":
-			// An older terma's session, ended with its own access token.
-			a.mu.Lock()
-			a.legacyRevoked = append(a.legacyRevoked, strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer "))
-			a.mu.Unlock()
-			w.WriteHeader(http.StatusNoContent)
 			return
 		}
 		if r.Header.Get("Authorization") != "Bearer "+a.token {
@@ -394,11 +383,4 @@ func (a *Account) Delegate(challenge, label string) (string, error) {
 		return "", fmt.Errorf("delegate: HTTP %d %s %s, %v", resp.StatusCode, out.Error.Code, out.Error.Reason, err)
 	}
 	return out.Code, nil
-}
-
-// LegacyRevoked are the access tokens of the older terma's sessions signed out so far.
-func (a *Account) LegacyRevoked() []string {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	return append([]string(nil), a.legacyRevoked...)
 }

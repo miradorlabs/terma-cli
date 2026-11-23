@@ -40,8 +40,8 @@ const (
 	SkipMinInterval SkipReason = "a flush completed within the throttle interval"
 )
 
-// Result summarizes a flush; its counts are disjoint, and only Expired, LegacyAmbiguous,
-// Pruned and Dropped are loss.
+// Result summarizes a flush; its counts are disjoint, and only Expired, Pruned and
+// Dropped are loss.
 type Result struct {
 	Sent int
 	// Held counts events handed back for later; still queued.
@@ -50,12 +50,10 @@ type Result struct {
 	Failed int
 	// Expired counts events older than MaxAge.
 	Expired int
-	// LegacyAmbiguous counts events older than MaxAge that name neither an account nor no
-	// person: an older terma's, which no one sign-in may send.
-	LegacyAmbiguous int
 	// Pruned counts events discarded to keep the spool under MaxBytes.
 	Pruned int
-	// Dropped counts lines that would not decode, such as a killed hook's torn write.
+	// Dropped counts lines that would not decode, such as a killed hook's torn write, and
+	// events that name neither an account nor no person, which no one may send.
 	Dropped int
 	Skipped bool
 	Reason  SkipReason
@@ -65,7 +63,6 @@ type Result struct {
 // add folds one read's losses into the pass; Sent and Held are counted at delivery.
 func (r *Result) add(b batch) {
 	r.Expired += b.Expired
-	r.LegacyAmbiguous += b.LegacyAmbiguous
 	r.Pruned += b.Pruned
 	r.Dropped += b.Dropped
 }
@@ -178,11 +175,10 @@ type batch struct {
 	// Size is the file size the read saw, bounding what this pass may send.
 	Size int64
 	// Prefix hashes the consumed bytes, so the acknowledgement can refuse a changed queue.
-	Prefix          [32]byte
-	Expired         int
-	LegacyAmbiguous int
-	Pruned          int
-	Dropped         int
+	Prefix  [32]byte
+	Expired int
+	Pruned  int
+	Dropped int
 }
 
 // readFlushBatch holds the append lock only while reading; it prunes only before
@@ -236,16 +232,14 @@ func (s *Spool) readBatch(n int, limit int64, now time.Time) (batch, error) {
 		if len(bytes.TrimSpace(line)) == 0 {
 			continue
 		}
-		if err := json.Unmarshal(line, &e); err != nil {
+		// No append queues an event in no lane: one found here, whoever wrote it, is no
+		// one's to send, and is dropped.
+		if err := json.Unmarshal(line, &e); err != nil || e.Account == "" && !e.NoPerson {
 			b.Dropped++
 			continue
 		}
 		if !now.IsZero() && !e.Time.IsZero() && now.Sub(e.Time) > MaxAge {
-			if e.Account == "" && !e.NoPerson {
-				b.LegacyAmbiguous++
-			} else {
-				b.Expired++
-			}
+			b.Expired++
 			continue
 		}
 		b.Events = append(b.Events, e)
