@@ -33,12 +33,15 @@ func (m Machine) Remove(said func(string)) error {
 }
 
 func (m Machine) apply(selected []string, install bool, said, approved, then func(string)) error {
-	files, err := m.ApplyUserHooks(selected, install)
+	files, notes, err := m.applyUserHooks(selected, install)
 	if err != nil {
 		return err
 	}
 	for _, f := range files {
 		said("Machine-wide hooks updated: " + output.TildePath(f))
+	}
+	for _, note := range notes {
+		said(note)
 	}
 	m.syncUserHookTrust(approved, then)
 	for _, step := range m.TrustSteps(selected) {

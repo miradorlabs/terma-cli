@@ -172,6 +172,9 @@ func TestAntigravityHooksSwitchTermasBackOn(t *testing.T) {
 	if err != nil || plan.Empty() {
 		t.Fatalf("a disabled hook planned as in place: %+v, %v", plan, err)
 	}
+	if len(plan.Notes) != 1 || !strings.Contains(plan.Notes[0], "back on") {
+		t.Fatalf("setup did not say it switched the hook back on: %q", plan.Notes)
+	}
 	if err := hookmgr.Apply(root, plan); err != nil {
 		t.Fatal(err)
 	}
@@ -190,12 +193,12 @@ func TestAntigravityHooksSwitchTermasBackOn(t *testing.T) {
 	}
 }
 
-// A file that does not parse (agy reads comments and trailing commas) is refused by an
-// install, naming the file. Removal, which setup for any other agent and teardown run,
-// leaves it alone unless it holds terma's entries.
+// A file that is not JSON even as JSONC is refused by an install, naming the file.
+// Removal, which setup for any other agent and teardown run, leaves it alone unless it
+// holds terma's entries, which it then reports rather than skip.
 func TestAntigravityHooksMalformedFile(t *testing.T) {
 	t.Parallel()
-	for _, body := range []string{"[]", "{", "null", "// mine\n{}\n", `{"lint": {"Stop": [],},}`} {
+	for _, body := range []string{"[]", "{", "null", `{"lint": }`} {
 		root := t.TempDir()
 		hookruntest.WriteFile(t, root, "hooks.json", body)
 		if _, err := planUserHooks(root, testCommand, true); err == nil || !strings.Contains(err.Error(), filepath.Join(root, "hooks.json")) {
@@ -205,12 +208,64 @@ func TestAntigravityHooksMalformedFile(t *testing.T) {
 			t.Errorf("%q: removal = %+v, %v; want nothing to do", body, plan, err)
 		}
 	}
-	// One that holds terma's entries is not quietly left behind.
 	root := t.TempDir()
-	hookruntest.WriteFile(t, root, "hooks.json", `// mine
-{"terma": {"Stop": [{"type": "command", "command": "`+hookruntest.InJSON(testCommand("antigravity-stop"))+`"}]}}`)
+	hookruntest.WriteFile(t, root, "hooks.json", `{"terma": {"Stop": [{"type": "command", "command": "`+hookruntest.InJSON(testCommand("antigravity-stop"))+`"}]`)
 	if _, err := planUserHooks(root, testCommand, false); err == nil {
 		t.Error("removal skipped a malformed file holding terma's hooks")
+	}
+}
+
+// agy reads its hooks file as JSONC: setup and teardown patch one with comments and
+// trailing commas in place, keeping the developer's comments.
+func TestAntigravityHooksKeepJSONCComments(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	hookruntest.WriteFile(t, root, "hooks.json", "// my hooks\n{\n  \"lint\": {\"Stop\": [{\"command\": \"./lint.sh\"},]}, // keep lint\n}\n")
+	apply := func(install bool) string {
+		t.Helper()
+		plan, err := planUserHooks(root, testCommand, install)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := hookmgr.Apply(root, plan); err != nil {
+			t.Fatal(err)
+		}
+		return hookruntest.ReadFile(t, root, "hooks.json")
+	}
+	got := apply(true)
+	if !strings.Contains(got, "// my hooks") || !strings.Contains(got, "// keep lint") || !strings.Contains(got, "./lint.sh") || !strings.Contains(got, testCommand("antigravity-stop")) {
+		t.Fatalf("after install:\n%s", got)
+	}
+	if again, err := planUserHooks(root, testCommand, true); err != nil || !again.Empty() {
+		t.Fatalf("a second install = %+v, %v", again, err)
+	}
+	got = apply(false)
+	if !strings.Contains(got, "// my hooks") || !strings.Contains(got, "./lint.sh") || strings.Contains(got, "hook --user") || strings.Contains(got, `"terma"`) {
+		t.Fatalf("after removal:\n%s", got)
+	}
+}
+
+// Removal takes out terma's own entries and leaves whatever else is in its hook, of any
+// shape: an event that is not a list, an entry that is not an object.
+func TestAntigravityHooksRemovalToleratesOddShapes(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	stop := hookruntest.InJSON(testCommand("antigravity-stop"))
+	hookruntest.WriteFile(t, root, "hooks.json", `{"terma": {"PreInvocation": "nonsense", "Stop": [42, {"type": "command", "command": "`+stop+`"}]}}`)
+	plan, err := planUserHooks(root, testCommand, false)
+	if err != nil {
+		t.Fatalf("removal: %v", err)
+	}
+	if err := hookmgr.Apply(root, plan); err != nil {
+		t.Fatal(err)
+	}
+	got := hookruntest.ReadFile(t, root, "hooks.json")
+	if strings.Contains(got, "hook --user") || !strings.Contains(got, `"nonsense"`) || !strings.Contains(got, "42") {
+		t.Fatalf("after removal:\n%s", got)
+	}
+	// Install, which writes the hook, refuses what it cannot merge into.
+	if _, err := planUserHooks(root, testCommand, true); err == nil {
+		t.Error("install merged into an event that is not a list")
 	}
 }
 

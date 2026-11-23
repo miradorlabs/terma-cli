@@ -249,7 +249,7 @@ func TestHarnessSelectionComingSoon(t *testing.T) {
 	// The supported agents lead the list, each selectable, under the name setup shows.
 	leading := []string{"Claude Code & Desktop", "Codex TUI & Desktop", "Copilot (beta)", "OMP 18.18.2+ (beta)"}
 	if testApp.agents.IsSupported("antigravity") {
-		leading = append(leading, "Antigravity (beta)")
+		leading = append(leading, "Antigravity 1.2.4+ (beta)")
 	}
 	for i, label := range leading {
 		if item := form.Items[i]; item.Label != label || item.Disabled || !testApp.agents.IsSupported(wantOrder[i]) {
@@ -405,7 +405,7 @@ func TestSetupWithAntigravityAloneTurnsHooksOn(t *testing.T) {
 	if err != nil || !strings.Contains(string(hooks), "hook --user antigravity-stop") {
 		t.Fatalf("agy hooks = %s, %v", hooks, err)
 	}
-	if out, _ := runTerma(t, "doctor"); strings.Contains(out, "missing or out of date") {
+	if out, _ := runTerma(t, "doctor"); strings.Contains(out, "switched off or out of date") {
 		t.Errorf("doctor faults hooks that are in place:\n%s", out)
 	}
 
@@ -415,16 +415,16 @@ func TestSetupWithAntigravityAloneTurnsHooksOn(t *testing.T) {
 	if err := os.WriteFile(path, []byte(disabled), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if out, err := runTerma(t, "doctor"); err == nil || !strings.Contains(out, "missing or out of date") {
+	if out, err := runTerma(t, "doctor"); err == nil || !strings.Contains(out, "switched off or out of date") {
 		t.Errorf("doctor with terma's agy hook disabled: %v\n%s", err, out)
 	}
 	if err := os.Remove(path); err != nil {
 		t.Fatal(err)
 	}
-	if out, err := runTerma(t, "doctor"); err == nil || !strings.Contains(out, "missing or out of date") || !strings.Contains(out, "Antigravity") {
+	if out, err := runTerma(t, "doctor"); err == nil || !strings.Contains(out, "switched off or out of date") || !strings.Contains(out, "Antigravity") {
 		t.Errorf("doctor with agy's hooks gone: %v\n%s", err, out)
 	}
-	if out, _ := runTerma(t, "status"); !strings.Contains(out, "missing or out of date") {
+	if out, _ := runTerma(t, "status"); !strings.Contains(out, "switched off or out of date") {
 		t.Errorf("status with agy's hooks gone:\n%s", out)
 	}
 }
@@ -717,5 +717,43 @@ func TestDesktopGrantCutoverKeepsInFlightWorkWithItsTeam(t *testing.T) {
 	}
 	if queued := queuedProjects(t); len(queued) != 0 {
 		t.Fatalf("queue = %v after the switch back", queued)
+	}
+}
+
+// agy reads its hooks file as JSONC. A comment or trailing comma the developer adds after
+// setup holds up neither setup run again nor teardown, which retires the relay's token
+// and leaves the comment in place.
+func TestSetupAndTeardownPatchACommentedAgyHooksFile(t *testing.T) {
+	if !testApp.agents.IsSupported("antigravity") {
+		t.Skip("Antigravity is Coming Soon on Windows")
+	}
+	gateway := newFakeAuth(t)
+	authSandbox(t, gateway)
+	sandboxMachine(t)
+	signInTo(t, gateway, orgA())
+	if out, err := runTerma(t, "setup", "--harness", "antigravity"); err != nil {
+		t.Fatalf("setup: %v\n%s", err, out)
+	}
+	path := filepath.Join(os.Getenv("HOME"), ".gemini", "config", "hooks.json")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	commented := "// my agy hooks\n" + strings.Replace(string(data), "\n}", ",\n}", 1)
+	if err := os.WriteFile(path, []byte(commented), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if out, err := runTerma(t, "setup", "--harness", "antigravity"); err != nil {
+		t.Fatalf("setup again: %v\n%s", err, out)
+	}
+	if out, err := runTerma(t, "teardown", "--yes"); err != nil {
+		t.Fatalf("teardown: %v\n%s", err, out)
+	}
+	if claim.Enabled(testApp.stateDir) {
+		t.Error("teardown left the relay's token")
+	}
+	got, err := os.ReadFile(path)
+	if err == nil && (strings.Contains(string(got), "hook --user") || !strings.Contains(string(got), "// my agy hooks")) {
+		t.Errorf("after teardown:\n%s", got)
 	}
 }

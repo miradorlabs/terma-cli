@@ -1,8 +1,10 @@
 package doctor
 
 import (
+	"context"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -11,19 +13,41 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookmgr"
 )
 
+// versioned is a hooks-only agent that reports its installed version.
+type versioned struct {
+	agentstest.UserHooked
+	version string
+}
+
+func (v versioned) DetectedVersion(context.Context) string { return v.version }
+
+// binary writes an executable stand-in for terma at path.
+func binary(t *testing.T, path string) string {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
 // An agent that reports through its hooks alone is recorded only while they are there:
-// doctor fails a chosen one whose hooks file is gone, or names another terma, and says
-// nothing of one the developer did not choose.
+// doctor fails a chosen one whose hooks are gone or name a terma that is not there, accepts
+// another path to this same terma, warns of hooks that run another terma, and says nothing
+// of one the developer did not choose.
 func TestAgentHooksCheck(t *testing.T) {
 	t.Parallel()
+	ctx := context.Background()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "hooks.json")
-	fake := agentstest.UserHooked{Agent: agentstest.Agent{ID: "fake"}, Path: path}
+	fake := versioned{agentstest.UserHooked{Agent: agentstest.Agent{ID: "fake"}, Path: path}, "1.5.15"}
 	reg := agents.New(fake).Support(fake)
-	command := hookmgr.UserHookCommand("/opt/terma/bin/terma")
-	install := func(cmd func(string) string) {
+	exe := binary(t, filepath.Join(t.TempDir(), "bin", "terma"))
+	install := func(terma string) {
 		t.Helper()
-		plan, err := fake.PlanUserHooks(dir, cmd, true)
+		plan, err := fake.PlanUserHooks(dir, hookmgr.UserHookCommand(terma), true)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -31,38 +55,47 @@ func TestAgentHooksCheck(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	check := func(want Status, contains string) {
+		t.Helper()
+		c, ok := AgentHooksCheck(ctx, reg, []string{"fake"}, exe)
+		if !ok || c.Status != want || !strings.Contains(c.Detail, contains) {
+			t.Fatalf("check = %+v, %v; want %v naming %q", c, ok, want, contains)
+		}
+	}
 
-	if _, ok := AgentHooksCheck(reg, nil, command); ok {
+	if _, ok := AgentHooksCheck(ctx, reg, nil, exe); ok {
 		t.Error("an agent the developer did not choose was checked")
 	}
-	if _, ok := AgentHooksCheck(reg, []string{"fake"}, nil); ok {
-		t.Error("checked without knowing the command setup writes")
+	if c, ok := AgentHooksCheck(ctx, reg, []string{"fake"}, ""); !ok || c.Status != Warn {
+		t.Errorf("unknown terma: %+v, %v; want a warning, never silence", c, ok)
+	}
+	if _, ok := AgentHooksCheck(ctx, agents.New(fake), []string{"fake"}, exe); ok {
+		t.Error("an agent this build does not offer was checked")
 	}
 
-	c, ok := AgentHooksCheck(reg, []string{"fake"}, command)
-	if !ok || c.Status != Fail || c.Fix != "terma setup" || !strings.Contains(c.Detail, "fake") {
-		t.Fatalf("no hooks file: %+v, %v", c, ok)
+	check(Fail, "fake 1.5.15")
+	install(exe)
+	check(Pass, "fake 1.5.15")
+
+	if runtime.GOOS != "windows" {
+		// Another path to this terma, as a second symlink or an install directory makes.
+		link := filepath.Join(t.TempDir(), "terma")
+		if err := os.Symlink(exe, link); err != nil {
+			t.Fatal(err)
+		}
+		install(link)
+		check(Pass, "fake")
 	}
 
-	install(command)
-	if c, ok := AgentHooksCheck(reg, []string{"fake"}, command); !ok || c.Status != Pass {
-		t.Fatalf("hooks in place: %+v, %v", c, ok)
-	}
+	other := binary(t, filepath.Join(t.TempDir(), "other", "terma"))
+	install(other)
+	check(Warn, "other")
 
-	install(hookmgr.UserHookCommand("/old/terma"))
-	if c, ok := AgentHooksCheck(reg, []string{"fake"}, command); !ok || c.Status != Fail {
-		t.Fatalf("hooks naming another terma: %+v, %v", c, ok)
-	}
+	install(filepath.Join(t.TempDir(), "gone", "terma"))
+	check(Fail, "out of date")
 
 	if err := os.Remove(path); err != nil {
 		t.Fatal(err)
 	}
-	if c, ok := AgentHooksCheck(reg, []string{"fake"}, command); !ok || c.Status != Fail {
-		t.Fatalf("hooks file deleted: %+v, %v", c, ok)
-	}
-
-	// An agent this build does not offer is not judged.
-	if _, ok := AgentHooksCheck(agents.New(fake), []string{"fake"}, command); ok {
-		t.Error("an unsupported agent was checked")
-	}
+	check(Fail, "hooks.json")
 }

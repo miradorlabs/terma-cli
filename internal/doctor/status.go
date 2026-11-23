@@ -155,7 +155,7 @@ func Local(ctx context.Context, env Env) (LocalReport, error) {
 	if !authOK {
 		rep.Checks = append(rep.Checks, Check{Status: Fail, Fix: "terma setup"})
 	}
-	if c, ok := AgentHooksCheck(reg, cfg.Harnesses, env.HookCommand); ok && c.Status != Pass {
+	if c, ok := AgentHooksCheck(ctx, reg, cfg.Harnesses, env.HookExecutable); ok && c.Status != Pass {
 		add("Agent hooks", "%s", c.Detail)
 		rep.Checks = append(rep.Checks, c)
 	}
