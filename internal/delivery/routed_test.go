@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -1251,9 +1252,9 @@ func TestPreActivationFailsClosedOnProfileOnlyRoutedEvent(t *testing.T) {
 }
 
 // Idempotent no_destination loss recording: a flush whose context expires during a slow
-// parcel must not record premature losses, and a crash between CountLost and ackBatch
-// must deduplicate per event even when intervening hooks append new distinct or identical
-// destination-less events before the retry flush, then clean up the journal once acked.
+// parcel must not record premature losses, a crash between ImportLosses and ackBatch must
+// deduplicate per event even when intervening hooks append distinct or identical events
+// before retry, and expired imported~nodest-* loss files are pruned independently.
 func TestRoutedNoDestinationLossIsIdempotentOnCanceledFlush(t *testing.T) {
 	t.Parallel()
 	m := newRoutedMachine(t)
@@ -1303,9 +1304,9 @@ func TestRoutedNoDestinationLossIsIdempotentOnCanceledFlush(t *testing.T) {
 		t.Fatalf("canceled pass must not record premature no_destination loss: losses=%+v err=%v", losses, err)
 	}
 
-	// Simulate a crash right after CountLost + journal persistence for evA (before ackBatch),
-	// followed by intervening hooks appending a new distinct event evB and an identical copy
-	// of evA before the retry flush reads all three together as one batch.
+	// Simulate a crash right after ImportLosses for evA (before ackBatch), followed by
+	// intervening hooks appending a distinct event evB and an identical copy of evA before
+	// the retry flush reads all three together as one batch.
 	crashed := &pass{r: r, s: m.spool}
 	if err := crashed.recordNoDestination([]spool.Event{evA}); err != nil {
 		t.Fatalf("simulated pre-crash recordNoDestination: %v", err)
@@ -1313,9 +1314,19 @@ func TestRoutedNoDestinationLossIsIdempotentOnCanceledFlush(t *testing.T) {
 	evB := routedEvent(aliceLane, config.DefaultProfile, "", "github.com/acme/other", semconv.TermaToolCallEvent)
 	m.queueRaw(evB, evA)
 
+	// Also plant an expired imported~nodest-* loss file to prove independent pruning.
+	stalePath := filepath.Join(spoolDir, "losses", "imported~nodest-stale.jsonl")
+	if err := os.WriteFile(stalePath, spool.EncodeLoss(LossNoDestination, 1, time.Now().Add(-spool.LossWindow-48*time.Hour)), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	oldTime := time.Now().Add(-spool.LossWindow - 48*time.Hour)
+	if err := os.Chtimes(stalePath, oldTime, oldTime); err != nil {
+		t.Fatal(err)
+	}
+
 	// Pass 2: endpoint recovers -> spool replays [team-slow, evA, evB, evA] in one batch.
-	// evA#0 was already counted before the crash; only evB#0 and evA#1 are newly counted,
-	// yielding 1 + 2 = 3 total no_destination losses for 3 dropped events.
+	// evA-0 overwrites the pre-crash file with identical bytes; evB-0 and evA-1 are new,
+	// yielding exactly 3 no_destination losses for 3 dropped events, and stale file is pruned.
 	stall.Store(false)
 	res2 := r.Flush(t.Context(), m.spool, cfg, true, 0)
 	if res2.Sent != 1 || res2.Unroutable != 3 || res2.Err != nil || m.pending() != 0 {
@@ -1327,17 +1338,139 @@ func TestRoutedNoDestinationLossIsIdempotentOnCanceledFlush(t *testing.T) {
 	if taken, err := spool.TakeNewLosses(spoolDir); err != nil || taken[LossNoDestination] != 3 {
 		t.Fatalf("TakeNewLosses after intervening-append replay = %v (err=%v), want 3", taken, err)
 	}
-	if _, err := os.Stat(filepath.Join(m.state, noDestSeenFile)); !os.IsNotExist(err) {
-		t.Fatalf("pending loss journal must be removed after batch ack, stat err = %v", err)
+	if _, err := os.Stat(stalePath); !os.IsNotExist(err) {
+		t.Fatalf("expired imported~nodest-* loss file must be pruned, stat err = %v", err)
 	}
+}
 
-	// Pass 3: a genuinely new drop after ack (even with identical bytes to evA) must count.
-	m.queueRaw(evA)
-	res3 := r.Flush(t.Context(), m.spool, cfg, true, 0)
-	if res3.Unroutable != 1 || res3.Err != nil || m.pending() != 0 {
-		t.Fatalf("post-ack pass 3 = %+v, pending=%d", res3, m.pending())
-	}
-	if taken, err := spool.TakeNewLosses(spoolDir); err != nil || taken[LossNoDestination] != 1 {
-		t.Fatalf("TakeNewLosses after post-ack drop = %v (err=%v), want 1", taken, err)
-	}
+// Full-slot saturation + early-403/late-cancellation:
+//  1. When all maxParcelConcurrency (4) worker slots are saturated by stalled enrollments,
+//     wave budgeting still gives a 5th queued healthy enrollment a turn and reserves
+//     acknowledgement headroom so the healthy delivery commits durably.
+//  2. When one enrollment fails early with 403 ORG_NOT_ACCESSIBLE and a stalled sibling
+//     subsequently expires the flush context, the 403 enrollment still persists its
+//     per-enrollment retry backoff without retiring the shared user token.
+func TestRoutedFullSlotSaturationAndEarly403Backoff(t *testing.T) {
+	t.Parallel()
+
+	t.Run("full-slot saturation progresses queued healthy parcel", func(t *testing.T) {
+		t.Parallel()
+		m := newRoutedMachine(t)
+		teams := []routing.Team{
+			orgTeam("org-1", "team-1", "github.com/acme/r1"),
+			orgTeam("org-2", "team-2", "github.com/acme/r2"),
+			orgTeam("org-3", "team-3", "github.com/acme/r3"),
+			orgTeam("org-4", "team-4", "github.com/acme/r4"),
+			orgTeam("org-5", "team-5", "github.com/acme/r5"),
+		}
+		enr := m.createState(config.DefaultProfile, aliceLane, teams, func(s *routing.State, _ map[string]string) error {
+			for i, tm := range teams {
+				if err := s.Bind(fmt.Sprintf("github.com/acme/r%d", i+1), tm.OrganizationID, false); err != nil {
+					return err
+				}
+			}
+			return nil
+		})
+		// Pick the lexicographically last enrollment ID as the healthy team so the 4
+		// stalled enrollments sort ahead of it and saturate all maxParcelConcurrency slots.
+		fastTeam := ""
+		maxEnr := ""
+		for _, tm := range teams {
+			if enr[tm.TeamID] > maxEnr {
+				maxEnr = enr[tm.TeamID]
+				fastTeam = tm.TeamID
+			}
+		}
+
+		release := make(chan struct{})
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			_, _ = io.Copy(io.Discard, r.Body)
+			if r.Header.Get(sendas.ProjectHeader) == fastTeam {
+				w.WriteHeader(http.StatusOK)
+				return
+			}
+			select {
+			case <-r.Context().Done():
+			case <-release:
+			}
+		}))
+		t.Cleanup(func() {
+			close(release)
+			srv.Close()
+		})
+
+		for i, tm := range teams {
+			m.queueRaw(routedEvent(aliceLane, config.DefaultProfile, enr[tm.TeamID], fmt.Sprintf("github.com/acme/r%d", i+1), semconv.TermaToolCallEvent))
+		}
+
+		ctx, cancel := context.WithTimeout(t.Context(), 1500*time.Millisecond)
+		defer cancel()
+		res := m.router(&fakeSignIn{account: aliceLane, token: "shared-tok"}).Flush(
+			ctx, m.spool, &config.Config{OTLPURL: srv.URL, ProfileName: config.DefaultProfile, AuthURL: routedAuth}, true, 0,
+		)
+		if res.Sent != 1 || res.Failed != 4 || m.pending() != 4 {
+			t.Fatalf("full-slot saturation must durably commit queued healthy parcel: res=%+v pending=%d", res, m.pending())
+		}
+	})
+
+	t.Run("early 403 keeps retry backoff despite sibling context timeout", func(t *testing.T) {
+		t.Parallel()
+		m := newRoutedMachine(t)
+		enr := m.createState(config.DefaultProfile, aliceLane, []routing.Team{
+			orgTeam("org-403", "team-403", "github.com/acme/denied"),
+			orgTeam("org-stall", "team-stall", "github.com/acme/stall"),
+		}, func(s *routing.State, _ map[string]string) error {
+			if err := s.Bind("github.com/acme/denied", "org-403", false); err != nil {
+				return err
+			}
+			return s.Bind("github.com/acme/stall", "org-stall", false)
+		})
+
+		release := make(chan struct{})
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			_, _ = io.Copy(io.Discard, r.Body)
+			if r.Header.Get(sendas.ProjectHeader) == "team-403" {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusForbidden)
+				_, _ = w.Write([]byte(`{"error":"ORG_NOT_ACCESSIBLE"}`))
+				return
+			}
+			select {
+			case <-r.Context().Done():
+			case <-release:
+			}
+		}))
+		t.Cleanup(func() {
+			close(release)
+			srv.Close()
+		})
+
+		m.queueRaw(
+			routedEvent(aliceLane, config.DefaultProfile, enr["team-403"], "github.com/acme/denied", semconv.TermaToolCallEvent),
+			routedEvent(aliceLane, config.DefaultProfile, enr["team-stall"], "github.com/acme/stall", semconv.TermaToolCallEvent),
+		)
+
+		si := &fakeSignIn{account: aliceLane, token: "shared-tok"}
+		// Short timeout (< 1s) expires outer ctx while team-stall blocks after team-403
+		// already received 403 ORG_NOT_ACCESSIBLE.
+		ctx, cancel := context.WithTimeout(t.Context(), 200*time.Millisecond)
+		defer cancel()
+		r := m.router(si)
+		res := r.Flush(ctx, m.spool, &config.Config{OTLPURL: srv.URL, ProfileName: config.DefaultProfile, AuthURL: routedAuth}, true, 0)
+		var retry403 time.Time
+		for _, f := range res.Failures {
+			if f.ProjectID == "team-403" {
+				retry403 = f.RetryAt
+			}
+		}
+		if retry403.IsZero() {
+			t.Fatalf("early 403 must still record per-enrollment RetryAt when sibling expires ctx: failures=%+v", res.Failures)
+		}
+		if len(si.refused) != 0 || si.retired {
+			t.Fatalf("403 ORG_NOT_ACCESSIBLE must not call Refused/Retired: refused=%v retired=%v", si.refused, si.retired)
+		}
+		if m.spool.RetryAt(retryDest(enr["team-403"])).IsZero() {
+			t.Fatalf("team-403 retry window was not persisted in spool")
+		}
+	})
 }

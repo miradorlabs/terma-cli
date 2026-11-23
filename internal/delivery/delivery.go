@@ -175,7 +175,6 @@ func (r Router) Flush(ctx context.Context, s *spool.Spool, cfg *config.Config, f
 		sender = p.routed
 	}
 	fr := s.Flush(ctx, sender, spool.FlushOptions{Force: force, MinInterval: minInterval, Now: now})
-	p.finishNoDestination(fr)
 	res.Endpoints = slices.Sorted(maps.Keys(p.accepted))
 	// Loss is the spool's to report; Sent is the router's per-destination count.
 	res.Held = fr.Held
@@ -210,10 +209,6 @@ type pass struct {
 	// profiles caches non-active profile configs loaded for cross-profile routed parcels
 	// (nil entry records a missing or unreadable profile so it fails closed).
 	profiles map[string]*config.Config
-	// expectedAck and lastNoDestKeys track whether spool.Flush acknowledged the batch
-	// whose no_destination losses were recorded in nodest-losses-pending.json.
-	expectedAck    int
-	lastNoDestKeys []string
 }
 
 // byProject sends a batch on a pre-activation machine: each event to the project its
@@ -343,8 +338,10 @@ func (p *pass) recordOutcome(ctx context.Context, dest, id, key, endpoint string
 		p.r.refused(ctx, p.serverKey, key, err)
 		p.failed[dest] = true
 		f := Failure{ProjectID: id, Endpoint: endpoint, Err: err}
-		// A pass cut short by its own deadline learned nothing about the host.
-		if ctx.Err() == nil {
+		// A pass cut short by its own deadline learned nothing about the host; explicit
+		// host errors (e.g. 403 ORG_NOT_ACCESSIBLE) still record their backoff window even
+		// if a slower sibling parcel later exhausts the shared flush context.
+		if ctx.Err() == nil || !isContextErr(err) {
 			f.RetryAt = p.s.DestinationFailed(dest, p.r.currentTime())
 		}
 		p.res.Failures = append(p.res.Failures, f)

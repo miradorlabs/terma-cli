@@ -1,9 +1,11 @@
 package delivery
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -223,124 +225,75 @@ func (r Router) outgoingTo(team routing.Team, e spool.Event) (spool.Event, bool)
 
 func sameHost(a, b string) bool { return strings.TrimRight(a, "/") == strings.TrimRight(b, "/") }
 
-// noDestSeenFile holds per-event fingerprints of destination-less events already recorded
-// via CountLost in an unacknowledged batch, preventing double-counting across crashes or
-// canceled ackBatch calls even when hooks append new events before the retry. Deleted as
-// soon as spool.Flush acknowledges the batch.
-const noDestSeenFile = "nodest-losses-pending.json"
-
-type noDestJournal struct {
-	Seen map[string]time.Time `json:"seen"`
+func isContextErr(err error) bool {
+	return errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)
 }
 
-func (p *pass) noDestSeenPath() string {
-	if p.r.StateDir == "" {
-		return ""
-	}
-	return filepath.Join(p.r.StateDir, noDestSeenFile)
-}
+const noDestImportPrefix = "nodest-"
 
-// recordNoDestination records no_destination losses via Spool.CountLost (which appends to
-// the daily loss log and runs standard retention pruning) while deduplicating per event
-// against any prior unacknowledged batch recorded in nodest-losses-pending.json.
+// recordNoDestination persists each destination-less event's no_destination loss
+// atomically under a stable per-event ImportLosses ID (nodest-<sha256>-<occ>) with
+// deterministic timestamp. Because the loss record and its deduplication identity are the
+// same atomic file, a crash or canceled ackBatch at any point cannot double-count on retry
+// even when intervening hooks append distinct or identical events before the next flush.
 func (p *pass) recordNoDestination(noDest []spool.Event) error {
-	now := p.r.currentTime().UTC()
-	seen := p.loadPendingNoDest(now)
 	occ := make(map[string]int, len(noDest))
-	keys := make([]string, 0, len(noDest))
-	newCount := 0
+	now := p.r.currentTime().UTC()
 	for _, e := range noDest {
 		fp := eventFingerprint(e)
-		key := fmt.Sprintf("%s#%d", fp, occ[fp])
+		id := fmt.Sprintf("%s%s-%d", noDestImportPrefix, fp, occ[fp])
 		occ[fp]++
-		keys = append(keys, key)
-		if _, already := seen[key]; !already {
-			newCount++
+		at := e.Time
+		if at.IsZero() {
+			at = now.Truncate(time.Second)
 		}
-	}
-	if newCount > 0 {
-		if err := p.s.CountLost(LossNoDestination, newCount); err != nil {
+		if err := p.importNoDestLoss(id, at); err != nil {
 			return err
 		}
 	}
-	for _, k := range keys {
-		if _, already := seen[k]; !already {
-			seen[k] = now
-		}
-	}
-	p.savePendingNoDest(seen)
-	p.lastNoDestKeys = keys
+	p.pruneNoDestLosses(now)
 	return nil
 }
 
-func (p *pass) ackPendingNoDest(keys []string) {
-	if p.noDestSeenPath() == "" || len(keys) == 0 {
-		return
-	}
-	seen := p.loadPendingNoDest(p.r.currentTime().UTC())
-	if len(seen) == 0 {
-		return
-	}
-	for _, k := range keys {
-		delete(seen, k)
-	}
-	p.savePendingNoDest(seen)
-}
-
-func (p *pass) finishNoDestination(fr spool.Result) {
-	if !p.res.Routed || fr.Skipped {
-		return
-	}
-	if fr.Err == nil {
-		if path := p.noDestSeenPath(); path != "" {
-			_ = os.Remove(path)
-		}
-		p.lastNoDestKeys = nil
-		return
-	}
-	if len(p.lastNoDestKeys) > 0 && fr.Sent == p.expectedAck {
-		p.ackPendingNoDest(p.lastNoDestKeys)
-		p.lastNoDestKeys = nil
-	}
-}
-
-func (p *pass) loadPendingNoDest(now time.Time) map[string]time.Time {
-	seen := map[string]time.Time{}
-	path := p.noDestSeenPath()
-	if path == "" {
-		return seen
-	}
-	raw, err := os.ReadFile(path)
+func (p *pass) importNoDestLoss(id string, at time.Time) error {
+	f, err := os.CreateTemp("", ".nodest-loss-*")
 	if err != nil {
-		return seen
+		return err
 	}
-	var j noDestJournal
-	if json.Unmarshal(raw, &j) != nil {
-		return seen
+	tmpPath := f.Name()
+	defer func() { _ = os.Remove(tmpPath) }()
+	if _, err := f.Write(spool.EncodeLoss(LossNoDestination, 1, at)); err != nil {
+		_ = f.Close()
+		return err
 	}
-	for k, ts := range j.Seen {
-		if now.Sub(ts) <= spool.MaxAge {
-			seen[k] = ts
-		}
+	if err := f.Close(); err != nil {
+		return err
 	}
-	return seen
+	return p.s.ImportLosses(tmpPath, id)
 }
 
-func (p *pass) savePendingNoDest(seen map[string]time.Time) {
-	path := p.noDestSeenPath()
-	if path == "" {
+// pruneNoDestLosses removes expired imported~nodest-*.jsonl loss files past
+// spool.LossWindow+24h so workloads with only destination-less losses never accumulate
+// files indefinitely even when CountLost is not called.
+func (p *pass) pruneNoDestLosses(now time.Time) {
+	if p.r.StateDir == "" {
 		return
 	}
-	if len(seen) == 0 {
-		_ = os.Remove(path)
-		return
-	}
-	raw, err := json.Marshal(noDestJournal{Seen: seen})
+	dir := filepath.Join(p.r.StateDir, spool.Dir, "losses")
+	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return
 	}
-	_ = os.MkdirAll(p.r.StateDir, 0o700)
-	_ = config.WriteFileAtomic(path, raw, 0o600)
+	const prefix = "imported~" + noDestImportPrefix
+	for _, e := range entries {
+		if !strings.HasPrefix(e.Name(), prefix) || !strings.HasSuffix(e.Name(), ".jsonl") {
+			continue
+		}
+		info, err := e.Info()
+		if err == nil && now.Sub(info.ModTime()) > spool.LossWindow+24*time.Hour {
+			_ = os.Remove(filepath.Join(dir, e.Name()))
+		}
+	}
 }
 
 func eventFingerprint(e spool.Event) string {

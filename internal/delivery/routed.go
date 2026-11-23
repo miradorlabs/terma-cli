@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/routing"
@@ -38,11 +39,6 @@ const maxParcelConcurrency = 4
 //     filtered by the team's content policy now, and revalidated (state generation and
 //     policy expiry clock) immediately before each POST.
 func (p *pass) routed(ctx context.Context, events []spool.Event) ([]spool.Event, error) {
-	// Reaching another batch proves spool.Flush acknowledged the previous batch.
-	if len(p.lastNoDestKeys) > 0 {
-		p.ackPendingNoDest(p.lastNoDestKeys)
-		p.lastNoDestKeys = nil
-	}
 	now := p.r.currentTime()
 	res := p.res
 	lane := p.lane()
@@ -160,7 +156,6 @@ func (p *pass) routed(ctx context.Context, events []spool.Event) ([]spool.Event,
 			res.Unroutable += len(noDest)
 		}
 	}
-	p.expectedAck += len(events) - len(held) - len(undelivered)
 	return p.settle(held, undelivered, errs)
 }
 
@@ -185,13 +180,31 @@ type parcelOutcome struct {
 // bounded concurrency so slow enrollments cannot starve healthy sibling enrollments.
 // Shared routing cache and admission counters are guarded by mu only for local checks,
 // never held across network I/O; spool retry windows and result settlement run serially
-// in the caller after all goroutines return.
+// in the caller after all goroutines return. When the flush carries a deadline >= 1s,
+// sendParcels reserves acknowledgement headroom before the outer deadline and shares the
+// send budget across waves so full-slot saturation by stalled hosts still lets queued
+// healthy parcels deliver and be durably acknowledged.
 func (p *pass) sendParcels(ctx context.Context, jobs []parcelJob, lane string) []parcelOutcome {
 	outcomes := make([]parcelOutcome, len(jobs))
 	limit := p.r.maxConcurrency
 	if limit <= 0 {
 		limit = maxParcelConcurrency
 	}
+	sendCtx := ctx
+	var waveTimeout time.Duration
+	if deadline, ok := ctx.Deadline(); ok {
+		if rem := time.Until(deadline); rem >= time.Second {
+			headroom := min(2*time.Second, rem/5)
+			sendDeadline := deadline.Add(-headroom)
+			var cancelSend context.CancelFunc
+			sendCtx, cancelSend = context.WithDeadline(ctx, sendDeadline)
+			defer cancelSend()
+			if waves := (len(jobs) + limit - 1) / limit; waves > 1 {
+				waveTimeout = time.Until(sendDeadline) / time.Duration(waves)
+			}
+		}
+	}
+
 	var mu sync.Mutex
 	runOne := func(i int, job parcelJob) {
 		mu.Lock()
@@ -224,7 +237,13 @@ func (p *pass) sendParcels(ctx context.Context, jobs []parcelJob, lane string) [
 			outcomes[i] = parcelOutcome{reheld: reheld}
 			return
 		}
-		_, err := sender.Send(ctx, wireEvents)
+		reqCtx := sendCtx
+		if waveTimeout > 0 {
+			var cancelReq context.CancelFunc
+			reqCtx, cancelReq = context.WithTimeout(sendCtx, waveTimeout)
+			defer cancelReq()
+		}
+		_, err := sender.Send(reqCtx, wireEvents)
 		outcomes[i] = parcelOutcome{
 			sent:      true,
 			team:      team,
