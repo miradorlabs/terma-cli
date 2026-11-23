@@ -11,15 +11,9 @@ import (
 	"mvdan.cc/sh/v3/syntax"
 )
 
-// Bounds on a shell reach scan: maxShellPlaces places returned, maxShellLookups filesystem
-// lookups, maxShellWords words expanded, maxShellBytes bytes parsed/expanded across nested
-// scripts, maxShellDepth nested scripts, maxShellBraces braces per word, and maxShellTime
-// deadline (overridden to 1s in tests; deadline tests use shellTime directly).
-const shellTime = 20 * time.Millisecond
-
-var maxShellTime = shellTime
-
+// Bounds on a shell reach scan (maxShellTime is overridden to 1s in tests).
 const (
+	shellTime       = 20 * time.Millisecond
 	maxShellPlaces  = 256
 	maxShellLookups = 4096
 	maxShellWords   = 4 * maxShellLookups
@@ -29,18 +23,16 @@ const (
 	maxGlobSegments = 3
 )
 
-// UnknownReach marks that a call may have reached an unresolved checkout (contains NUL so it
-// never collides with a filesystem path); unknownReach appends NUL + firstWords(command).
+var maxShellTime = shellTime
+
+// UnknownReach marks an unresolved reach (NUL-prefixed so it cannot collide with a path).
 const UnknownReach = "\x00unknown"
 
 func unknownReach(command string) string { return UnknownReach + "\x00" + firstWords(command) }
+func isUnknownReach(p string) bool       { return strings.HasPrefix(p, UnknownReach) }
 
-func isUnknownReach(p string) bool { return strings.HasPrefix(p, UnknownReach) }
-
-// errOpaque is returned when an expansion cannot be resolved statically.
 var errOpaque = errors.New("an expansion ShellPaths cannot resolve")
 
-// role is how a word counts toward a command's reach.
 type role uint8
 
 const (
@@ -94,16 +86,13 @@ type candidate struct {
 	r         role
 }
 
-// cached records what a candidate lookup found, so a cache hit still replays its folder
-// operands onto the current command's sc.reads (for example `ls .. && rg TODO ..`).
+// cached records what a candidate lookup found so cache hits replay folder operands onto sc.reads.
 type cached struct {
 	dir     string
 	named   bool
 	folders []string
 }
 
-// newScan is a scan from cwd, with done done, by maxShellTime from now when done has no
-// deadline.
 func newScan(cwd string, env func(string) (string, bool), done work) *scan {
 	if done.deadline.IsZero() {
 		done.deadline = time.Now().Add(maxShellTime)
@@ -119,13 +108,11 @@ func newScan(cwd string, env func(string) (string, bool), done work) *scan {
 	return sc
 }
 
-// config is a configuration to expand words where the command is.
 func (sc *scan) config() *expand.Config {
 	return &expand.Config{Env: sc, CmdSubst: sc.substitute, ProcSubst: opaqueProcess, NoUnset: true}
 }
 
-// Get is the variable name where the command is now, for expand: unset when not known,
-// which expand (NoUnset) takes for an error unless the word gives a fallback (${X:-y}).
+// Get resolves a shell variable for expand (unset fails under NoUnset unless a fallback is given).
 func (sc *scan) Get(name string) expand.Variable {
 	if v, ok := sc.lookup(name); ok {
 		return expand.Variable{Set: true, Kind: expand.String, Str: v}
@@ -136,9 +123,6 @@ func (sc *scan) Get(name string) expand.Variable {
 // Each lists no variables: expand asks for each it expands.
 func (sc *scan) Each(func(string, expand.Variable) bool) {}
 
-// lookup is the value of the variable name where the command is now: PWD and OLDPWD as its
-// cds left them, an assignment earlier in the command, else the hook's environment, HOME
-// falling back to the home directory.
 func (sc *scan) lookup(name string) (string, bool) {
 	switch {
 	case name == "PWD":
@@ -162,7 +146,6 @@ func (sc *scan) lookup(name string) (string, bool) {
 	return "", false
 }
 
-// place adds the folder p to what the command reaches, past maxShellPlaces unknown.
 func (sc *scan) place(p string) {
 	switch {
 	case sc.places[p]:
@@ -174,8 +157,6 @@ func (sc *scan) place(p string) {
 	}
 }
 
-// spend counts n lookups and reports whether the scan may make them: not past
-// maxShellLookups or its deadline, which make the reach unknown.
 func (sc *scan) spend(n int) bool {
 	if sc.unknown || sc.lookups+n > maxShellLookups || time.Now().After(sc.deadline) {
 		sc.unknown = true
@@ -185,8 +166,6 @@ func (sc *scan) spend(n int) bool {
 	return true
 }
 
-// charge counts n bytes parsed or expanded and reports whether the scan may: not past
-// maxShellBytes or its deadline, which make the reach unknown.
 func (sc *scan) charge(n int) bool {
 	if sc.unknown || sc.bytes+n > maxShellBytes || time.Now().After(sc.deadline) {
 		sc.unknown = true
@@ -196,13 +175,8 @@ func (sc *scan) charge(n int) bool {
 	return true
 }
 
-// substitutionSize bounds what a command substitution ShellPaths knows writes (a path), or
-// an arithmetic expansion.
 const substitutionSize = 4096
 
-// size bounds the bytes w may expand to, before it is: its literal text, each variable's
-// value, a pattern replacement's as if each of its bytes were replaced, a fallback's word,
-// and each substitution's output. A size past maxShellBytes is maxShellBytes+1.
 func (sc *scan) size(w *syntax.Word) int {
 	n := 0
 	syntax.Walk(w, func(node syntax.Node) bool {
@@ -223,16 +197,19 @@ func (sc *scan) size(w *syntax.Word) int {
 	return min(n, maxShellBytes+1)
 }
 
-// paramSize bounds the bytes the parameter expansion pe may expand to (size).
-func (sc *scan) paramSize(pe *syntax.ParamExp) int {
+func (sc *scan) paramValue(pe *syntax.ParamExp) string {
 	var v string
 	if pe.Param != nil {
 		v, _ = sc.lookup(pe.Param.Value)
 		if pe.Excl {
-			v, _ = sc.lookup(v) // ${!name}: the variable name holds the name of
+			v, _ = sc.lookup(v)
 		}
 	}
-	n := len(v)
+	return v
+}
+
+func (sc *scan) paramSize(pe *syntax.ParamExp) int {
+	n := len(sc.paramValue(pe))
 	if pe.Repl != nil && pe.Repl.With != nil {
 		base := max(n, 1)
 		if with := sc.size(pe.Repl.With); with >= (maxShellBytes+1)/base {
@@ -247,13 +224,97 @@ func (sc *scan) paramSize(pe *syntax.ParamExp) int {
 	return min(n, maxShellBytes+1)
 }
 
-// fields, document and pattern expand w as expand's functions of those names do, each once
-// the byte budget allows for what w may expand to (size), fields for each word its braces
-// make; past it, w is not resolved and the reach is not known.
+// fieldsBounded ensures unquoted parameter expansions cannot split into > maxShellWords fields
+// before expand.Fields materializes them.
+func (sc *scan) fieldsBounded(w *syntax.Word, limit int) bool {
+	ifs, ok := sc.lookup("IFS")
+	if !ok {
+		ifs = " \t\n"
+	}
+	if ifs == "" {
+		return true
+	}
+	return sc.checkPartsFields(w.Parts, ifs, limit, false) >= 0
+}
+
+func (sc *scan) checkPartsFields(parts []syntax.WordPart, ifs string, rem int, inParam bool) int {
+	for _, p := range parts {
+		switch p := p.(type) {
+		case *syntax.DblQuoted:
+			if inParam {
+				rem = sc.checkPartsFields(p.Parts, ifs, rem, true)
+			}
+		case *syntax.Lit:
+			if inParam {
+				rem = sc.consumeFields(p.Value, ifs, rem)
+			}
+		case *syntax.SglQuoted:
+			if inParam {
+				rem = sc.consumeFields(p.Value, ifs, rem)
+			}
+		case *syntax.ParamExp:
+			v := sc.paramValue(p)
+			if p.Repl != nil && p.Repl.All && len(v) > rem {
+				sc.unknown = true
+				return -1
+			}
+			if rem = sc.consumeFields(v, ifs, rem); rem >= 0 && p.Exp != nil && p.Exp.Word != nil {
+				rem = sc.checkPartsFields(p.Exp.Word.Parts, ifs, rem, true)
+			}
+			if rem >= 0 && p.Repl != nil && p.Repl.With != nil {
+				before := rem
+				rem = sc.checkPartsFields(p.Repl.With.Parts, ifs, rem, true)
+				if rem >= 0 && p.Repl.All && len(v) > 0 {
+					perMatch := 1 + (before - rem)
+					if len(v) > rem/perMatch {
+						sc.unknown = true
+						return -1
+					}
+					rem -= len(v) * perMatch
+				}
+			}
+		}
+		if rem < 0 {
+			return -1
+		}
+	}
+	return rem
+}
+
+func (sc *scan) consumeFields(v, ifs string, rem int) int {
+	if n := countFields(v, ifs, rem); n > rem {
+		sc.unknown = true
+		return -1
+	} else if n > 1 {
+		rem -= n - 1
+	}
+	return rem
+}
+
+func countFields(v, ifs string, limit int) int {
+	n, inWord := 0, false
+	for _, r := range v {
+		if strings.ContainsRune(ifs, r) {
+			if !inWord && r != ' ' && r != '\t' && r != '\n' {
+				if n++; n > limit {
+					return n
+				}
+			}
+			inWord = false
+		} else if !inWord {
+			inWord = true
+			if n++; n > limit {
+				return n
+			}
+		}
+	}
+	return n
+}
+
 func (sc *scan) fields(w *syntax.Word) ([]string, error) {
 	var out []string
 	for b, err := range sc.braces(w) {
-		if err != nil || !sc.charge(sc.size(b)) {
+		if err != nil || !sc.charge(sc.size(b)) || !sc.fieldsBounded(b, maxShellWords-len(out)) {
 			return nil, errOpaque
 		}
 		f, err := expand.Fields(sc.cfg, b)
@@ -261,12 +322,14 @@ func (sc *scan) fields(w *syntax.Word) ([]string, error) {
 			return nil, err
 		}
 		out = append(out, f...)
+		if len(out) > maxShellWords {
+			sc.unknown = true
+			return nil, errOpaque
+		}
 	}
 	return out, nil
 }
 
-// braces are the words w's braces make, each a lookup, or w itself when it holds none. Past
-// maxShellBraces or the scan's bounds they end in an error, and the reach is not known.
 func (sc *scan) braces(w *syntax.Word) iter.Seq2[*syntax.Word, error] {
 	return func(yield func(*syntax.Word, error) bool) {
 		n := 0

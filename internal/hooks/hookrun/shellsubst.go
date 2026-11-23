@@ -12,11 +12,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/gitx"
 )
 
-// The command substitutions whose output ShellPaths knows where the command is.
-
-// outputs are the command substitutions whose output ShellPaths knows, by their leading
-// words: what each writes where the command is, given the words after those, and whether
-// it is known. Any other's is not.
+// outputs maps known command-substitution prefixes to static path evaluators.
 var outputs = map[string]func(sc *scan, args []*syntax.Word) (string, bool){
 	"pwd":                           where,
 	"pwd -L":                        where,
@@ -31,8 +27,6 @@ var outputs = map[string]func(sc *scan, args []*syntax.Word) (string, bool){
 	"readlink -f":                   ofOperand((*scan).real),
 }
 
-// substitute writes the output of the command substitution cs, for expand, when it is one
-// of outputs, by the longest of its leading words that is.
 func (sc *scan) substitute(w io.Writer, cs *syntax.CmdSubst) error {
 	if len(cs.Stmts) != 1 || len(cs.Stmts[0].Redirs) != 0 {
 		return errOpaque
@@ -61,19 +55,15 @@ func (sc *scan) substitute(w io.Writer, cs *syntax.CmdSubst) error {
 	return errOpaque
 }
 
-// where is what pwd writes: where the command is.
 func where(sc *scan, args []*syntax.Word) (string, bool) {
 	return sc.dir, sc.dir != "" && len(args) == 0
 }
 
-// toplevel is what git rev-parse --show-toplevel writes: the root of the checkout the
-// command is in.
 func toplevel(sc *scan, args []*syntax.Word) (string, bool) {
 	root, _, ok := gitx.LocateFS(sc.dir)
 	return root, ok && len(args) == 0
 }
 
-// gopath is what go env GOPATH writes: $GOPATH, else ~/go.
 func gopath(sc *scan, args []*syntax.Word) (string, bool) {
 	if v, ok := sc.lookup("GOPATH"); ok && v != "" {
 		return v, len(args) == 0
@@ -82,19 +72,18 @@ func gopath(sc *scan, args []*syntax.Word) (string, bool) {
 	return filepath.Join(home, "go"), ok && len(args) == 0
 }
 
-// modcache is what go env GOMODCACHE writes: $GOMODCACHE, else pkg/mod in GOPATH's first
-// folder.
 func modcache(sc *scan, args []*syntax.Word) (string, bool) {
 	if v, ok := sc.lookup("GOMODCACHE"); ok && v != "" {
 		return v, len(args) == 0
 	}
 	gp, ok := gopath(sc, args)
-	return filepath.Join(filepath.SplitList(gp)[0], "pkg", "mod"), ok
+	list := filepath.SplitList(gp)
+	if !ok || len(list) == 0 || list[0] == "" {
+		return "", false
+	}
+	return filepath.Join(list[0], "pkg", "mod"), true
 }
 
-// mktemp is what mktemp writes: a new file or folder in the temporary folder, or where the
-// command is for a template given without -t. One given a folder (-p) or a template with
-// a slash is not known.
 func mktemp(sc *scan, args []*syntax.Word) (string, bool) {
 	name, tmp := "", false
 	for _, a := range args {
@@ -129,8 +118,6 @@ func mktemp(sc *scan, args []*syntax.Word) (string, bool) {
 	return filepath.Join(dir, cmp.Or(name, "tmp.XXXXXXXXXX")), dir != ""
 }
 
-// ofOperand is the output of a command that writes what f makes of its one operand,
-// expanded.
 func ofOperand(f func(sc *scan, p string) string) func(*scan, []*syntax.Word) (string, bool) {
 	return func(sc *scan, args []*syntax.Word) (string, bool) {
 		if len(args) > 0 && args[0].Lit() == "--" {
@@ -147,7 +134,6 @@ func ofOperand(f func(sc *scan, p string) string) func(*scan, []*syntax.Word) (s
 	}
 }
 
-// dirname is what dirname writes for p: its folder, trailing slashes aside.
 func dirname(_ *scan, p string) string {
 	if trimmed := strings.TrimRight(p, "/"); trimmed != "" || p == "" {
 		return filepath.Dir(trimmed)
@@ -155,15 +141,10 @@ func dirname(_ *scan, p string) string {
 	return "/"
 }
 
-// real is what realpath and readlink -f write for p: the path it names from where the
-// command is, its symlinks followed when it is there.
 func (sc *scan) real(p string) string {
 	q, ok := sc.path(p, sc.dir)
-	if !ok {
-		return p
-	}
-	if sc.linkTargetRemote(q) {
-		return q
+	if !ok || sc.hasRemoteLink(q) {
+		return cmp.Or(q, p)
 	}
 	if r, err := filepath.EvalSymlinks(q); err == nil {
 		return r
@@ -171,5 +152,4 @@ func (sc *scan) real(p string) string {
 	return q
 }
 
-// opaqueProcess is a process substitution's path, for expand: not known.
 func opaqueProcess(*syntax.ProcSubst) (string, error) { return "", errOpaque }

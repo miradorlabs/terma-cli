@@ -13,34 +13,22 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/gitx"
 )
 
-// How a scan reads below a folder, a program's or a search's: what a program's words name,
-// how deep it reads, the trees known to hold no checkout, and a folder's entries.
-
-// operands are what a program's words name that is there: the folders, which it reads below
-// unless it is known not to (run), and whether any names anything.
 type operands struct {
 	folders []string
 	named   bool
 }
 
-// maxBelowDepth bounds how far below a folder outside any checkout ShellPaths looks for the
-// checkouts a program or a search reading below it reads.
 const maxBelowDepth = 4
 
-// below reaches the checkouts below dir, a folder a program or a search reads below, to the
-// depth levels whose entries it reads (find -maxdepth; past maxBelowDepth for no bound of
-// its own): none when dir is in a checkout (unless that checkout is $HOME or strictly
-// encloses the command's own checkout, such as a ~/.git dotfiles repository), or in a tree
-// known to hold none (holdsNone); else each checkout a walk down at most maxBelowDepth
-// levels finds, each folder it reads and each entry a lookup, the trees known to hold none
-// skipped. A walk that runs out of either, or past the scan's deadline, reaches somewhere
-// not known.
 func (sc *scan) below(dir string, levels int) {
 	c := candidate{dir, strconv.Itoa(levels), walked}
 	if _, seen := sc.examined[c]; seen || !sc.spend(1) {
 		return
 	}
 	sc.examined[c] = cached{}
+	if sc.hasRemoteLink(dir) {
+		return
+	}
 	if root, _, ok := gitx.LocateFS(dir); ok && !sc.enclosingCheckout(root) || sc.holdsNone(dir) {
 		return
 	}
@@ -51,7 +39,7 @@ func (sc *scan) below(dir string, levels int) {
 			for _, e := range sc.readDir(d) {
 				sub := filepath.Join(d, e.Name())
 				if e.Type()&fs.ModeSymlink != 0 {
-					if !sc.spend(1) || sc.linkTargetRemote(sub) {
+					if !sc.spend(1) || sc.linkTargetRemote(sub, 0) {
 						if sc.unknown {
 							return
 						}
@@ -80,15 +68,11 @@ func (sc *scan) below(dir string, levels int) {
 	}
 }
 
-// enclosingCheckout reports whether root is a checkout that encloses the command's working
-// directory without being its own checkout (for example a ~/.git dotfiles repository or a
-// parent repository above a nested checkout), so below does not stop at it and miss sibling
-// checkouts beneath it.
 func (sc *scan) enclosingCheckout(root string) bool {
 	if root == "" {
 		return false
 	}
-	if home, ok := sc.lookup("HOME"); ok && home != "" {
+	if home, ok := sc.lookup("HOME"); ok && home != "" && !sc.hasRemoteLink(home) {
 		if resolved, err := filepath.EvalSymlinks(home); err == nil {
 			home = resolved
 		}

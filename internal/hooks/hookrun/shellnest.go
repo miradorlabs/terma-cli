@@ -5,41 +5,24 @@ import (
 	"strings"
 )
 
-// Bounds on a script, checked before it is parsed (parsable), besides maxShellBytes. The
-// parser recurses at each level of a script's nesting and at each operator of an arithmetic
-// or test expression: a megabyte of either overflows its stack, which no recover catches, or
-// takes it far past the hook's budget. maxShellNesting bounds the brackets, quotes and
-// substitutions open at once, and the compound commands (if, for, case...), pipes and lists
-// (|, &&, ||) a script holds; maxShellExpr the bytes of an expression: (( )), $(( )), [[ ]],
-// [ ], $[ ], ${ } and let's. A megabyte of short words or expansions takes the parser some
-// 40ms, so a script holding more than maxShellWords of either, which the scan would not
-// read to the end, is not parsed either.
+// Pre-parse bounds preventing deep parser recursion or huge expression backtracking.
 const (
 	maxShellNesting = 4096
 	maxShellExpr    = 4096
 )
 
-// compounds are the words that open a compound command; separators the bytes that end a
-// word.
 var (
 	compounds  = []string{"if", "for", "while", "until", "case", "select"}
 	separators = " \t\n;&|()<>"
 )
 
-// heredoc is a here-document's delimiter, whether it was quoted (its body holds nothing),
-// and whether <<- strips leading tabs from its closing line.
 type heredoc struct {
 	delim     string
 	quoted    bool
 	stripTabs bool
 }
 
-// parsable reports whether src is within maxShellNesting, maxShellExpr and maxShellWords,
-// lexed as a shell does: a comment, a single-quoted string and a quoted here-document's body
-// hold nothing, and a double-quoted string and any other here-document's body hold only
-// expansions. Where it may read src otherwise than the parser (a quote never closed, a
-// here-document's delimiter followed by a parenthesis), it reads on as commands: a script
-// misread is only ever taken for one past the bounds, never the other way.
+// parsable reports whether src is within maxShellNesting, maxShellExpr, and maxShellWords.
 func parsable(src string) bool {
 	var open []byte // what closes each context open: ) } ] " `; h and q a body's (nothing)
 	var docs, bodies []heredoc

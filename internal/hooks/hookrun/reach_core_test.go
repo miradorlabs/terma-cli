@@ -398,4 +398,162 @@ func TestScanBoundsAndSafety(t *testing.T) {
 		!scNone.holdsNone(filepath.Join(dir, "modcache", "pkg")) {
 		t.Fatal("holdsNone missed node_modules, ~/Library, or GOMODCACHE")
 	}
+
+	// Remote parent symlink on a nonexistent child (link/new) must fail closed in reachNew and real without statting.
+	scNew := newScan(dir, os.LookupEnv, work{deadline: time.Now().Add(time.Minute)})
+	scNew.candidate(filepath.Join(remoteLink, "new"), creates)
+	if !scNew.unknown {
+		t.Fatal("reachNew through remote parent symlink did not mark unknown")
+	}
+	scReal := newScan(dir, os.LookupEnv, work{deadline: time.Now().Add(time.Minute)})
+	scReal.real(filepath.Join(remoteLink, "new"))
+	if !scReal.unknown {
+		t.Fatal("real through remote parent symlink did not mark unknown")
+	}
+
+	// 9-hop symlink chain (> maxSymlinkHops) fails closed as unknown.
+	chainPrev := filepath.Join(dir, "chain-target")
+	if err := os.MkdirAll(chainPrev, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	for i := range maxSymlinkHops + 1 {
+		next := filepath.Join(dir, "hop-"+string(rune('a'+i)))
+		if err := os.Symlink(chainPrev, next); err != nil {
+			t.Fatal(err)
+		}
+		chainPrev = next
+	}
+	scHops := newScan(dir, os.LookupEnv, work{deadline: time.Now().Add(time.Minute)})
+	scHops.candidate(chainPrev, plain)
+	if !scHops.unknown {
+		t.Fatal("9-hop symlink chain did not fail closed as unknown")
+	}
+
+	// Replacing a previously scanned parent directory with a remote symlink mid-scan still fails closed.
+	swapDir := filepath.Join(dir, "swap")
+	if err := os.MkdirAll(swapDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(swapDir, "one"), nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	scSwap := newScan(dir, os.LookupEnv, work{deadline: time.Now().Add(time.Minute)})
+	scSwap.candidate(filepath.Join(swapDir, "one"), plain)
+	if scSwap.unknown {
+		t.Fatal("initial local file marked unknown")
+	}
+	if err := os.RemoveAll(swapDir); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(`//remote-server/share`, swapDir); err != nil {
+		t.Fatal(err)
+	}
+	scSwap.candidate(filepath.Join(swapDir, "two"), plain)
+	if !scSwap.unknown {
+		t.Fatal("directory replaced with remote symlink mid-scan did not fail closed")
+	}
+
+	// Unquoted $BIG (500 KiB of "x "), fallbacks, and global replacements fail closed before expand.Fields materializes fields.
+	bigFields := strings.Repeat("x ", 250_000)
+	bigColon := strings.Repeat("x:", 25_000)
+	tenKA := strings.Repeat("a", 10_000)
+	fortyWords := strings.Repeat("x ", 40)
+	envFields := func(k string) (string, bool) {
+		switch k {
+		case "BIG":
+			return bigFields, true
+		case "COLON":
+			return bigColon, true
+		case "VAR":
+			return "a", true
+		case "V":
+			return tenKA, true
+		case "REP":
+			return fortyWords, true
+		}
+		return "", false
+	}
+	for _, cmd := range []string{
+		"echo $BIG",
+		"echo ${UNSET:-$BIG}",
+		`echo ${UNSET:-"$BIG"}`,
+		`echo ${VAR/a/"$BIG"}`,
+		`echo ${V//a/` + fortyWords + `}`,
+		`echo ${V//a/"$REP"}`,
+	} {
+		fBig, err := syntax.NewParser().Parse(strings.NewReader(cmd), "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		start := time.Now()
+		scF := newScan(dir, envFields, work{deadline: start.Add(time.Minute)})
+		if _, err := scF.fields(fBig.Stmts[0].Cmd.(*syntax.CallExpr).Args[1]); err == nil || !scF.unknown {
+			t.Fatalf("%q did not fail closed: err=%v unknown=%v", cmd, err, scF.unknown)
+		}
+		if took := time.Since(start); took > 50*time.Millisecond {
+			t.Fatalf("%q took %v, want < 50ms", cmd, took)
+		}
+	}
+	// Custom non-whitespace IFS (:) is also bounded.
+	fColon, err := syntax.NewParser().Parse(strings.NewReader("echo $COLON"), "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	scColon := newScan(dir, func(k string) (string, bool) {
+		if k == "IFS" {
+			return ":", true
+		}
+		return envFields(k)
+	}, work{deadline: time.Now().Add(time.Minute)})
+	if _, err := scColon.fields(fColon.Stmts[0].Cmd.(*syntax.CallExpr).Args[1]); err == nil || !scColon.unknown {
+		t.Fatal("IFS=: $COLON did not fail closed")
+	}
+
+	// modcache matches Go: a leading empty GOPATH segment (e.g. ":/x") yields no GOMODCACHE.
+	gpDir := filepath.Join(dir, "gp")
+	scGP := newScan(dir, func(k string) (string, bool) {
+		if k == "GOPATH" {
+			return string(os.PathListSeparator) + gpDir, true
+		}
+		return "", false
+	}, work{deadline: time.Now().Add(time.Minute)})
+	if got, ok := modcache(scGP, nil); ok || got != "" {
+		t.Fatalf("modcache(leading empty GOPATH) = (%q, %v), want (\"\", false)", got, ok)
+	}
+
+	// candidate cache keys ~ by HOME so changing HOME reaches both directories.
+	homeA, homeB := filepath.Join(dir, "homeA"), filepath.Join(dir, "homeB")
+	for _, h := range []string{homeA, homeB} {
+		if err := os.MkdirAll(h, 0o700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	scHome := newScan(dir, os.LookupEnv, work{deadline: time.Now().Add(time.Minute)})
+	scHome.vars["HOME"] = &homeA
+	scHome.candidate("~", plain)
+	scHome.vars["HOME"] = &homeB
+	scHome.candidate("~", plain)
+	if !slices.Contains(scHome.out, homeA) || !slices.Contains(scHome.out, homeB) {
+		t.Fatalf("~ cache missed HOME change: out=%q, want both %q and %q", scHome.out, homeA, homeB)
+	}
+}
+
+func FuzzParsable(f *testing.F) {
+	for _, seed := range []string{
+		"ls -la",
+		"cat <<'EOF'\nhello\nEOF\nls",
+		"cat <<-EOF\n\tEOF",
+		"echo $((1+2)) ${a:-b} $(pwd)",
+		`echo "a\"b" 'c' $'d\'e'`,
+		"if true; then echo hi; fi",
+		"let x=1<<2",
+	} {
+		f.Add(seed)
+	}
+	f.Fuzz(func(t *testing.T, src string) {
+		if len(src) > 4096 {
+			return
+		}
+		_ = parsable(src)
+	})
 }
