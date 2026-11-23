@@ -236,11 +236,13 @@ func (s *signInSource) Retired(token string) {
 	}
 }
 
-// bindRelay has the relay send as the profile's sign-in, bind what it accepts to that
-// sign-in's account, and name this installation on its heartbeat. The id is read as it is
-// needed, at each heartbeat: a sign-in after the relay started writes it.
+// bindRelay has the relay send and heartbeat as the profile's sign-in, bind what it accepts
+// to that sign-in's account, and name this installation on its heartbeat. The id is read as
+// it is needed, at each heartbeat: a sign-in after the relay started writes it.
 func (app *App) bindRelay(engine *relay.Options, cfg *config.Config) {
-	engine.SignIn = app.signInSource(cfg)
+	src := app.signInSource(cfg)
+	engine.SignIn = src
+	engine.HeartbeatSend = app.relayHeartbeat(src)
 	engine.Installation = func() string { return config.StoredInstallationID(app.dir) }
 	engine.HookLosses = func() map[string]int {
 		losses, _ := spool.TakeNewLosses(filepath.Join(app.stateDir, spool.Dir))

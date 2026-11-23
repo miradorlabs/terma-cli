@@ -56,6 +56,8 @@ type memoryStore struct {
 	delays map[string]time.Duration
 	// refusing are service and item-name prefixes whose items Set refuses (RefuseForTest).
 	refusing []string
+	// reads counts Get calls per service for tests that ask (ReadsForTest).
+	reads map[string]int
 }
 
 func (m *memoryStore) Set(service, user, password string) error {
@@ -71,6 +73,9 @@ func (m *memoryStore) Set(service, user, password string) error {
 func (m *memoryStore) Get(service, user string) (string, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if _, watched := m.reads[service]; watched {
+		m.reads[service]++
+	}
 	v, ok := m.items[service+"\x00"+user]
 	if !ok {
 		return "", keyring.ErrNotFound
@@ -153,4 +158,28 @@ func RefuseForTest(t testing.TB, dir, prefix string) {
 		memory.refusing = slices.DeleteFunc(memory.refusing, func(p string) bool { return p == refused })
 		memory.mu.Unlock()
 	})
+}
+
+// ReadsForTest counts Get calls for the config directory dir until t ends. Only for tests.
+func ReadsForTest(t testing.TB, dir string) func() int {
+	service := Service(dir)
+	memory.mu.Lock()
+	if memory.reads == nil {
+		memory.reads = map[string]int{}
+	}
+	memory.reads[service] = 0
+	memory.mu.Unlock()
+	t.Cleanup(func() {
+		memory.mu.Lock()
+		delete(memory.reads, service)
+		if len(memory.reads) == 0 {
+			memory.reads = nil
+		}
+		memory.mu.Unlock()
+	})
+	return func() int {
+		memory.mu.Lock()
+		defer memory.mu.Unlock()
+		return memory.reads[service]
+	}
 }
