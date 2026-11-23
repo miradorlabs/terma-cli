@@ -188,9 +188,11 @@ func (c exporter) ConflictsWith(e harness.Exporter) ([]harness.Conflict, error) 
 	return grokConflicts(e, f.Table), nil
 }
 
-// Connect writes the eight keys into [telemetry], leaving every other key, table and comment
-// as it was; what each key held before, or that it was absent, is journaled first, so a
-// failed write leaves nothing unrecorded.
+// Connect writes the eight keys into [telemetry], leaving every other key and table, and the
+// comments outside [telemetry], as they were; the table itself is rendered anew, its keys
+// sorted and its own comments gone, as grok's next settings save would leave it. What each
+// key held before, or that it was absent, is journaled first, so a failed write leaves nothing
+// unrecorded.
 func (c exporter) Connect(e harness.Exporter, _ bool) error {
 	path, f, err := c.loadConfig()
 	if err != nil {
@@ -233,7 +235,7 @@ func (c exporter) Connect(e harness.Exporter, _ bool) error {
 
 // Disconnect puts back what each journaled key held before, or takes it out, where it still
 // holds what terma wrote; one changed since is the developer's and is named, not touched. A
-// file terma only added keys to comes back as it was.
+// file that had no [telemetry] table comes back byte for byte.
 func (c exporter) Disconnect() (harness.DisconnectResult, error) {
 	path, err := c.ConfigPath()
 	if err != nil {

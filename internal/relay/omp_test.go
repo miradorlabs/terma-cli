@@ -125,7 +125,7 @@ func TestRelayWithholdsOmpToolContent(t *testing.T) {
 func TestRelayStampsNoHomeDirectoryOnOmp(t *testing.T) {
 	t.Parallel()
 	_, u := ompRelay(t, Policy{IncludePrompts: true, IncludeToolContent: true})
-	if sent := u.sent(); strings.Contains(sent, semconv.TermaHomeDirectoryKey) || !strings.Contains(sent, semconv.TermaVersionKey) && !strings.Contains(sent, semconv.MiradorProjectIDKey) {
+	if sent := u.sent(); strings.Contains(sent, semconv.TermaHomeDirectoryKey) || !strings.Contains(sent, semconv.MiradorProjectIDKey) {
 		t.Errorf("omp's parts name the home directory, or carry no stamp at all")
 	}
 }

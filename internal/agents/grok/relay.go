@@ -104,6 +104,10 @@ func (a Agent) RelayProblem(addr string) (detail, fix string, problem bool) {
 	if detail, fix, problem := a.relayProblem(addr); problem {
 		return detail, fix, true
 	}
+	// A warning is no reason an export misses the relay: none where it does for another cause.
+	if !relayexport.NativePointed(a.Harness(), addr) {
+		return "", "", false
+	}
 	if detail, fix, problem := sandboxed(); problem {
 		return detail, fix, true
 	}

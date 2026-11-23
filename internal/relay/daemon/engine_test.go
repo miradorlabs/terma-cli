@@ -80,7 +80,7 @@ func TestTheEngineNamesTheHomeDirectory(t *testing.T) {
 		t.Skip(err)
 	}
 	resolved, _ := filepath.EvalSymlinks(target)
-	for home, want := range map[string]string{link: resolved, link + "/": resolved, target + "//": resolved, "relative/home": ""} {
+	for home, want := range map[string]string{link: resolved, link + "/": resolved, target + "//": resolved, "relative/home": "", "/": ""} {
 		t.Setenv("HOME", home)
 		got := (Deps{HookPolicy: func() config.Policy { return config.Policy{} }}).Engine(t.Context(), t.TempDir(), &config.Config{}, Settings{}, nil).HomeDir
 		if got != want {
