@@ -109,9 +109,9 @@ func (c exporter) Status() (harness.Status, error) {
 	// misses the relay's route.
 	misrouted := false
 	resolve := func(s harness.Signal) string {
-		if per := strings.TrimRight(values[signalKey(s, "ENDPOINT")], "/"); per != "" {
+		if per := values[signalKey(s, "ENDPOINT")]; per != "" {
 			misrouted = misrouted || !strings.HasSuffix(per, "/v1/"+string(s))
-			return strings.TrimSuffix(per, "/v1/"+string(s))
+			return strings.TrimSuffix(strings.TrimRight(per, "/"), "/v1/"+string(s))
 		}
 		return strings.TrimRight(values[harness.EnvOTLPEndpoint], "/")
 	}

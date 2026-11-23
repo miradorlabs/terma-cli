@@ -16,7 +16,7 @@ func ompConflicts(e harness.Exporter) []harness.Conflict {
 
 	for _, s := range harness.AllSignals {
 		key := signalKey(s, "ENDPOINT")
-		value := strings.TrimRight(os.Getenv(key), "/")
+		value := os.Getenv(key)
 		if value == "" || e.Endpoint != "" && value == e.Endpoint+"/v1/"+string(s) {
 			continue
 		}

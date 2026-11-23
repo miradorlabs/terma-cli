@@ -131,7 +131,7 @@ func TestRelayCheckFailsOmpsWrongTokenOrPath(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, bad := range []string{"http://127.0.0.1:43180/tok-current", "http://127.0.0.1:43180/tok-current/v1/logs"} {
+	for _, bad := range []string{"http://127.0.0.1:43180/tok-current", "http://127.0.0.1:43180/tok-current/v1/logs", "http://127.0.0.1:43180/tok-current/v1/traces/"} {
 		edited := strings.Replace(string(data), "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://127.0.0.1:43180/tok-current/v1/traces", "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT="+bad, 1)
 		if edited == string(data) {
 			t.Fatal("the .env names no traces endpoint to edit")
