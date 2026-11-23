@@ -1,6 +1,6 @@
 # MIR-708: Rebuild Multi-Org Routing (#140) on the Single User Token
 
-Status: Approved; Phase 2 implementation in progress.  
+Status: Approved.  
 Branch stack: `dawson/mir-708-1-routing-cas` .. `dawson/mir-708-12-*` (branched from `origin/main` at `c0b2cb59`).  
 Reference PR: `miradorlabs/terma-cli#140` (`dawson/multi-org-integration`, +29.5k / −1.6k across 244 files, ~14.5k non-test lines).
 

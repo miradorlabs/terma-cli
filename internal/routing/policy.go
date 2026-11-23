@@ -90,12 +90,18 @@ func StorePolicy(cfg *config.Config, pol *config.Policy) error {
 	return rejected
 }
 
-// StoreTeamPolicy writes t's policy file in stateDir without touching config.json or
-// checking a profile's single organization. Callers must pass the committed Team
-// returned by routing.Update (after ApplyRefresh succeeds and commits, never inside the
-// update closure or from an uncommitted copy). It requires TeamID, OrganizationID, and
-// AuthURL matching t, downgrades a non-personal team's global policy to repository mode
-// (matching State.ApplyRefresh), and refuses a backward revision for the same org/env.
+// StoreTeamPolicy writes t's policy file in stateDir (policies/<team>.json) without
+// touching config.json or checking a profile's single organization. Callers must pass the
+// committed Team returned by routing.Update (after ApplyRefresh succeeds and commits,
+// never inside the update closure or from an uncommitted copy). It requires TeamID,
+// OrganizationID, and AuthURL matching t, downgrades a non-personal team's global policy
+// to repository mode (matching State.ApplyRefresh), and refuses a backward revision for
+// the same org/env.
+//
+// Because StoreTeamPolicy is a second write after routing.Update, a crash between the two
+// leaves routing/<profile>.json ahead of policies/<team>.json; the file self-heals on the
+// next refresh. Policy files are keyed per team ID and shared across profiles, guarded by
+// organization, environment, and monotonic revision checks.
 func StoreTeamPolicy(stateDir string, t Team) error {
 	pol := t.Policy
 	if !t.owns(pol) {

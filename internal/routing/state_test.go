@@ -82,20 +82,20 @@ func TestApplyRefreshKeepsRefusalsInOrder(t *testing.T) {
 		must(t, err)
 		return changed
 	}
-	state := func() TeamState { return s.Team(id).StateAt(now) }
+	state := func() TeamState { return s.team(id).StateAt(now) }
 
 	// A delayed refusal or transient started before a newer success cannot undo the success.
-	beforeSuccess := s.Team(id).Epoch
-	if !apply(Refresh{EnrollmentID: id, Epoch: beforeSuccess, Policy: ok(2), At: now}) || s.Team(id).Epoch != beforeSuccess+1 {
-		t.Fatalf("success did not advance epoch: %+v", s.Team(id))
+	beforeSuccess := s.team(id).Epoch
+	if !apply(Refresh{EnrollmentID: id, Epoch: beforeSuccess, Policy: ok(2), At: now}) || s.team(id).Epoch != beforeSuccess+1 {
+		t.Fatalf("success did not advance epoch: %+v", s.team(id))
 	}
 	for _, delayed := range []ErrorClass{Terminal, OrgAccessLost, SignIn, Transient} {
-		if apply(Refresh{EnrollmentID: id, Epoch: beforeSuccess, Failure: delayed, At: now}) || state() != Active || s.Team(id).LastError != "" {
-			t.Fatalf("delayed %s from stale epoch overwrote newer success: %+v", delayed, s.Team(id))
+		if apply(Refresh{EnrollmentID: id, Epoch: beforeSuccess, Failure: delayed, At: now}) || state() != Active || s.team(id).LastError != "" {
+			t.Fatalf("delayed %s from stale epoch overwrote newer success: %+v", delayed, s.team(id))
 		}
 	}
 
-	inFlight := s.Team(id).Epoch
+	inFlight := s.team(id).Epoch
 	apply(Refresh{EnrollmentID: id, Epoch: inFlight, Failure: Terminal})
 	if state() != Suspended {
 		t.Fatalf("one terminal refusal left the team %s", state())
@@ -103,23 +103,23 @@ func TestApplyRefreshKeepsRefusalsInOrder(t *testing.T) {
 	if apply(Refresh{EnrollmentID: id, Epoch: inFlight, Policy: ok(3)}) || state() != Suspended {
 		t.Fatal("a success started before the refusal undid it")
 	}
-	apply(Refresh{EnrollmentID: id, Epoch: s.Team(id).Epoch, Failure: Transient})
+	apply(Refresh{EnrollmentID: id, Epoch: s.team(id).Epoch, Failure: Transient})
 	if state() != Suspended {
 		t.Fatal("a network failure cleared a suspension")
 	}
 	refusedAt := now.Add(time.Minute)
-	apply(Refresh{EnrollmentID: id, Epoch: s.Team(id).Epoch, Failure: Terminal, At: refusedAt})
-	if state() != Refused || !s.Team(id).RefusedAt.Equal(refusedAt) {
-		t.Fatalf("two terminal refusals left the team %s, refusedAt=%v", state(), s.Team(id).RefusedAt)
+	apply(Refresh{EnrollmentID: id, Epoch: s.team(id).Epoch, Failure: Terminal, At: refusedAt})
+	if state() != Refused || !s.team(id).RefusedAt.Equal(refusedAt) {
+		t.Fatalf("two terminal refusals left the team %s, refusedAt=%v", state(), s.team(id).RefusedAt)
 	}
-	apply(Refresh{EnrollmentID: id, Epoch: s.Team(id).Epoch, Policy: ok(3)})
-	if state() != Active || !s.Team(id).RefusedAt.IsZero() {
+	apply(Refresh{EnrollmentID: id, Epoch: s.team(id).Epoch, Policy: ok(3)})
+	if state() != Active || !s.team(id).RefusedAt.IsZero() {
 		t.Fatal("the daily recheck's success did not restore the team and clear RefusedAt")
 	}
-	if _, err := s.ApplyRefresh(Refresh{EnrollmentID: id, Epoch: s.Team(id).Epoch, Policy: ok(2)}); err == nil {
+	if _, err := s.ApplyRefresh(Refresh{EnrollmentID: id, Epoch: s.team(id).Epoch, Policy: ok(2)}); err == nil {
 		t.Fatal("accepted an older revision")
 	}
-	beforeSignIn := s.Team(id).Epoch
+	beforeSignIn := s.team(id).Epoch
 	apply(Refresh{EnrollmentID: id, Epoch: beforeSignIn, Failure: SignIn})
 	if state() != SignInNeeded {
 		t.Fatal("a refused sign-in did not block the team")
@@ -129,13 +129,13 @@ func TestApplyRefreshKeepsRefusalsInOrder(t *testing.T) {
 	}
 	// Single OrgAccessLost transitions immediately to Refused and stamps RefusedAt.
 	orgLostAt := now.Add(2 * time.Minute)
-	apply(Refresh{EnrollmentID: id, Epoch: s.Team(id).Epoch, Failure: OrgAccessLost, At: orgLostAt})
-	if state() != Refused || s.Team(id).LastError != OrgAccessLost || !s.Team(id).RefusedAt.Equal(orgLostAt) {
-		t.Fatalf("OrgAccessLost left %+v", s.Team(id))
+	apply(Refresh{EnrollmentID: id, Epoch: s.team(id).Epoch, Failure: OrgAccessLost, At: orgLostAt})
+	if state() != Refused || s.team(id).LastError != OrgAccessLost || !s.team(id).RefusedAt.Equal(orgLostAt) {
+		t.Fatalf("OrgAccessLost left %+v", s.team(id))
 	}
 	for _, bad := range []Refresh{
-		{EnrollmentID: id, Epoch: s.Team(id).Epoch, Policy: &config.Policy{TeamID: "clientco-contractors", Revision: 9, FetchedAt: now}},
-		{EnrollmentID: id, Epoch: s.Team(id).Epoch},
+		{EnrollmentID: id, Epoch: s.team(id).Epoch, Policy: &config.Policy{TeamID: "clientco-contractors", Revision: 9, FetchedAt: now}},
+		{EnrollmentID: id, Epoch: s.team(id).Epoch},
 	} {
 		if _, err := s.ApplyRefresh(bad); err == nil {
 			t.Errorf("accepted %+v", bad)
@@ -145,7 +145,7 @@ func TestApplyRefreshKeepsRefusalsInOrder(t *testing.T) {
 	s.Deselect(id)
 	again, err := s.Select(team("acme", "acme-platform", "github.com/acme/*"))
 	must(t, err)
-	if apply(Refresh{EnrollmentID: id, Epoch: 0, Failure: Terminal}) || s.Team(again).StateAt(now) != Active {
+	if apply(Refresh{EnrollmentID: id, Epoch: 0, Failure: Terminal}) || s.team(again).StateAt(now) != Active {
 		t.Fatal("an ended enrollment's refresh reached the team ticked again")
 	}
 }
@@ -177,10 +177,10 @@ func TestApplyOrgAccessLostRefusesMatchingEpochSiblingsOnly(t *testing.T) {
 
 	// Pre-request epoch snapshot across acme (including the other-env enrollment to verify authURL filtering).
 	snapshot := map[string]int64{
-		ePlat:     s.Team(ePlat).Epoch,
-		eMob:      s.Team(eMob).Epoch,
-		eFresh:    s.Team(eFresh).Epoch,
-		eOtherEnv: s.Team(eOtherEnv).Epoch,
+		ePlat:     s.team(ePlat).Epoch,
+		eMob:      s.team(eMob).Epoch,
+		eFresh:    s.team(eFresh).Epoch,
+		eOtherEnv: s.team(eOtherEnv).Epoch,
 	}
 	// acme-fresh completes a newer successful refresh before the 403 arrives.
 	freshPol := config.Policy{
@@ -200,14 +200,14 @@ func TestApplyOrgAccessLostRefusesMatchingEpochSiblingsOnly(t *testing.T) {
 		t.Fatal("ApplyOrgAccessLost reported no change")
 	}
 	for _, refusedID := range []string{ePlat, eMob} {
-		tm := s.Team(refusedID)
+		tm := s.team(refusedID)
 		if tm.StateAt(now) != Refused || tm.LastError != OrgAccessLost || !tm.RefusedAt.Equal(at) || tm.Epoch != snapshot[refusedID]+1 {
 			t.Errorf("enrollment %s = %+v, want Refused/OrgAccessLost at %v", refusedID, tm, at)
 		}
 	}
 	// Sibling with newer epoch, other auth environment, other org, and Personal are untouched.
 	for _, activeID := range []string{eFresh, eOtherEnv, eClient, ePers} {
-		if st := s.Team(activeID).StateAt(now); st != Active {
+		if st := s.team(activeID).StateAt(now); st != Active {
 			t.Errorf("enrollment %s became %s, want Active", activeID, st)
 		}
 	}
@@ -215,7 +215,7 @@ func TestApplyOrgAccessLostRefusesMatchingEpochSiblingsOnly(t *testing.T) {
 	if s.ApplyOrgAccessLost("acme", authURL, snapshot, at.Add(time.Hour)) {
 		t.Fatal("stale snapshot modified already-advanced enrollments")
 	}
-	if !s.Team(ePlat).RefusedAt.Equal(at) {
+	if !s.team(ePlat).RefusedAt.Equal(at) {
 		t.Fatal("RefusedAt changed on stale re-apply")
 	}
 	// Bindings remain intact: acme repos hold as Refused, never spilling into Personal.
@@ -550,10 +550,10 @@ func TestStoreTeamPolicyValidation(t *testing.T) {
 		return err
 	})
 	must(t, err)
-	must(t, StoreTeamPolicy(dir, *committed.Team(enrID)))
+	must(t, StoreTeamPolicy(dir, *committed.team(enrID)))
 	got, ok, err = config.ReadPolicy(dir, "team-a")
-	if err != nil || !ok || got.Mode != config.ModeRepo || len(got.Repositories) != 0 || got.Revision != 4 || committed.Team(enrID).Policy.Mode != got.Mode {
-		t.Fatalf("non-personal global stored unsanitized: file=%+v state=%+v, ok=%v, err=%v", got, committed.Team(enrID).Policy, ok, err)
+	if err != nil || !ok || got.Mode != config.ModeRepo || len(got.Repositories) != 0 || got.Revision != 4 || committed.team(enrID).Policy.Mode != got.Mode {
+		t.Fatalf("non-personal global stored unsanitized: file=%+v state=%+v, ok=%v, err=%v", got, committed.team(enrID).Policy, ok, err)
 	}
 
 	// Direct StoreTeamPolicy on an unsanitized non-personal global Team also downgrades.
@@ -594,19 +594,126 @@ func TestRefusedAtPreservedAcrossRefusalReasons(t *testing.T) {
 	if _, err := s.ApplyRefresh(Refresh{EnrollmentID: id, Epoch: 1, Failure: Terminal, At: t1}); err != nil {
 		t.Fatal(err)
 	}
-	if !s.Team(id).RefusedAt.Equal(t1) {
-		t.Fatalf("initial RefusedAt = %v, want %v", s.Team(id).RefusedAt, t1)
+	if !s.team(id).RefusedAt.Equal(t1) {
+		t.Fatalf("initial RefusedAt = %v, want %v", s.team(id).RefusedAt, t1)
 	}
 	if changed, err := s.ApplyRefresh(Refresh{EnrollmentID: id, Epoch: 2, Failure: OrgAccessLost, At: t2}); err != nil || !changed {
 		t.Fatalf("OrgAccessLost on Refused: changed=%v err=%v", changed, err)
 	}
-	if tm := s.Team(id); !tm.RefusedAt.Equal(t1) || tm.Epoch != 3 || tm.LastError != OrgAccessLost {
+	if tm := s.team(id); !tm.RefusedAt.Equal(t1) || tm.Epoch != 3 || tm.LastError != OrgAccessLost {
 		t.Fatalf("after OrgAccessLost on Refused: %+v", tm)
 	}
 	if changed, err := s.ApplyRefresh(Refresh{EnrollmentID: id, Epoch: 3, Failure: Terminal, At: t3}); err != nil || !changed {
 		t.Fatalf("Terminal on OrgAccessLost: changed=%v err=%v", changed, err)
 	}
-	if tm := s.Team(id); !tm.RefusedAt.Equal(t1) || tm.Epoch != 4 || tm.LastError != Terminal {
+	if tm := s.team(id); !tm.RefusedAt.Equal(t1) || tm.Epoch != 4 || tm.LastError != Terminal {
 		t.Fatalf("after Terminal on OrgAccessLost: %+v", tm)
+	}
+}
+
+// Background policy refreshes advance Generation without advancing ConsentGeneration, so
+// interactive editors using ExpectConsent() succeed across refreshes while concurrent
+// team/binding edits or account switches are rejected with ErrStaleGeneration /
+// ErrAccountMismatch.
+func TestConsentGenerationAndExpectConsent(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	pol := func(rev int64) config.Policy {
+		return config.Policy{Mode: config.ModeRepo, TeamID: "acme-platform", OrganizationID: "acme", AuthURL: authURL, Revision: rev, FetchedAt: now}
+	}
+	var enrID string
+	st, err := Create(dir, "default", testAccount, func(s *State) error {
+		var selErr error
+		enrID, selErr = s.Select(Team{OrganizationID: "acme", AuthURL: authURL, TeamID: "acme-platform", Policy: pol(1)})
+		return selErr
+	})
+	must(t, err)
+	if st.Generation != 1 || st.ConsentGeneration != 1 {
+		t.Fatalf("after Create: gen=%d consent=%d", st.Generation, st.ConsentGeneration)
+	}
+
+	// Background refresh advances Generation (1->2) but NOT ConsentGeneration (stays 1).
+	p2 := pol(2)
+	refreshed, err := Update(dir, "default", Expect{Account: testAccount}, func(s *State) error {
+		_, err := s.ApplyRefresh(Refresh{EnrollmentID: enrID, Epoch: 0, Policy: &p2, At: now})
+		return err
+	})
+	must(t, err)
+	if refreshed.Generation != 2 || refreshed.ConsentGeneration != 1 {
+		t.Fatalf("after refresh: gen=%d consent=%d, want 2, 1", refreshed.Generation, refreshed.ConsentGeneration)
+	}
+
+	// Exact Expect() from st fails, but ExpectConsent() from st succeeds across the refresh!
+	if _, err := Update(dir, "default", st.Expect(), func(s *State) error {
+		return s.Bind("github.com/acme/api", "acme", false)
+	}); !errors.Is(err, ErrStaleGeneration) {
+		t.Fatalf("stale exact Expect: got %v, want ErrStaleGeneration", err)
+	}
+	bound, err := Update(dir, "default", st.ExpectConsent(), func(s *State) error {
+		return s.Bind("github.com/acme/api", "acme", false)
+	})
+	must(t, err)
+	if bound.Generation != 3 || bound.ConsentGeneration != 2 {
+		t.Fatalf("after Bind: gen=%d consent=%d, want 3, 2", bound.Generation, bound.ConsentGeneration)
+	}
+
+	// A second consent writer using st.ExpectConsent() is now rejected with ErrStaleGeneration.
+	if _, err := Update(dir, "default", st.ExpectConsent(), func(s *State) error {
+		return s.Bind("github.com/acme/other", "acme", false)
+	}); !errors.Is(err, ErrStaleGeneration) {
+		t.Fatalf("stale ExpectConsent after Bind: got %v, want ErrStaleGeneration", err)
+	}
+
+	// ApplyOrgAccessLost advances Generation without advancing ConsentGeneration.
+	orgLost, err := Update(dir, "default", Expect{Account: testAccount}, func(s *State) error {
+		s.ApplyOrgAccessLost("acme", authURL, map[string]int64{enrID: 1}, now)
+		return nil
+	})
+	must(t, err)
+	if orgLost.Generation != 4 || orgLost.ConsentGeneration != 2 {
+		t.Fatalf("after ApplyOrgAccessLost: gen=%d consent=%d, want 4, 2", orgLost.Generation, orgLost.ConsentGeneration)
+	}
+
+	// Deselect advances ConsentGeneration, and Replace advances it past the prior value.
+	deselected, err := Update(dir, "default", bound.ExpectConsent(), func(s *State) error {
+		s.Deselect(enrID)
+		return nil
+	})
+	must(t, err)
+	if deselected.ConsentGeneration != 3 {
+		t.Fatalf("after Deselect: consent=%d, want 3", deselected.ConsentGeneration)
+	}
+	replaced, err := Replace(dir, "default", nil, testAccount, func(s *State) error { return nil })
+	must(t, err)
+	if replaced.ConsentGeneration != 4 {
+		t.Fatalf("after Replace: consent=%d, want 4", replaced.ConsentGeneration)
+	}
+
+	// Expect with ConsentGeneration but empty StateID is refused.
+	g := int64(2)
+	if _, err := Update(dir, "default", Expect{Account: testAccount, ConsentGeneration: &g}, func(s *State) error {
+		return nil
+	}); err == nil {
+		t.Fatal("Expect with ConsentGeneration and empty StateID succeeded")
+	}
+}
+
+// State.Team returns a defensive copy whose slice mutations cannot alias State.
+func TestTeamReturnsDefensiveCopy(t *testing.T) {
+	t.Parallel()
+	s := fixture(t, team("acme", "acme-platform", "github.com/acme/api"))
+	id := enrollment(t, s, "acme-platform")
+	if _, ok := s.Team("missing"); ok {
+		t.Fatal("Team(missing) returned ok=true")
+	}
+	cp, ok := s.Team(id)
+	if !ok {
+		t.Fatalf("Team(%s) returned ok=false", id)
+	}
+	cp.Policy.Repositories[0] = "github.com/mutated/repo"
+	cp.Refusals = 99
+	fresh, _ := s.Team(id)
+	if fresh.Policy.Repositories[0] != "github.com/acme/api" || fresh.Refusals != 0 {
+		t.Fatalf("State.Team aliased internal state: %+v", fresh)
 	}
 }

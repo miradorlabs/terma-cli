@@ -13,6 +13,9 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/routing"
 )
 
+// teamRefreshTimeout bounds a single team policy HTTP fetch.
+const teamRefreshTimeout = 10 * time.Second
+
 // ErrOtherEnvironment is a team selected in another environment than the profile now
 // points at (TERMA_ENV, an endpoint override): it is neither fetched nor sent to, so it
 // fails closed, and it expires as any team no refresh reaches. The routing state is not
@@ -20,10 +23,10 @@ import (
 // use now.
 var ErrOtherEnvironment = errors.New("the team was selected in another environment than this profile's")
 
-// ErrAccountMismatch is a stored user sign-in belonging to a different account than the
+// ErrCredentialAccount is a stored user sign-in belonging to a different account than the
 // profile expects: FetchTeam refuses rather than refreshing one account's team with
 // another person's token.
-var ErrAccountMismatch = errors.New("stored sign-in belongs to another account")
+var ErrCredentialAccount = errors.New("stored sign-in belongs to another account")
 
 // FetchTeam asks the gateway for t's collection policy using the profile's single user
 // token (auth.LoadCredential), or, on a server-key profile, that team's key in keys.json
@@ -69,7 +72,7 @@ func (s Source) FetchTeam(ctx context.Context, cfg *config.Config, t routing.Tea
 			return config.Policy{}, err
 		}
 		if cfg.Account == "" || cred.Account() != cfg.Account {
-			return config.Policy{}, fmt.Errorf("team %s: %w", t.TeamID, ErrAccountMismatch)
+			return config.Policy{}, fmt.Errorf("team %s: %w", t.TeamID, ErrCredentialAccount)
 		}
 		if client, err = api.New(&scoped, api.Options{Version: s.Version, ProjectID: t.TeamID, Credential: cred}); err != nil {
 			return config.Policy{}, err
@@ -93,14 +96,14 @@ func (s Source) FetchTeam(ctx context.Context, cfg *config.Config, t routing.Tea
 // RefreshTeam does not persist the policy file: the caller applies the result inside
 // routing.Update (which checks the state's account/generation and team epoch) and, only
 // after routing.Update returns successfully, writes the committed team
-// (*committed.Team(r.EnrollmentID)) via routing.StoreTeamPolicy (never inside the Update
+// (committed.Team(r.EnrollmentID)) via routing.StoreTeamPolicy (never inside the Update
 // closure or from an uncommitted local copy). That ensures a stale-epoch or
 // stale-generation result never overwrites policies/<team>.json and any non-personal
 // global policy is persisted sanitized. Callers that handle OrgAccessLost org-wide
 // should snapshot per-enrollment epochs across t.OrganizationID before invoking
 // RefreshTeam and apply them via State.ApplyOrgAccessLost.
 func (s Source) RefreshTeam(ctx context.Context, cfg *config.Config, t routing.Team) (routing.Refresh, error) {
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, teamRefreshTimeout)
 	defer cancel()
 	r := routing.Refresh{EnrollmentID: t.EnrollmentID, Epoch: t.Epoch}
 	pol, err := s.FetchTeam(ctx, cfg, t)
@@ -118,8 +121,8 @@ func (s Source) RefreshTeam(ctx context.Context, cfg *config.Config, t routing.T
 //
 //   - HTTP 403 ORG_NOT_ACCESSIBLE: OrgAccessLost (authoritative loss of org membership);
 //   - HTTP 403 PROJECT_NOT_FOUND: Terminal (1st suspends, 2nd refuses);
-//   - HTTP 401, SIGN_IN_RETIRED, missing login, wrong-environment login, or account
-//     mismatch: SignIn;
+//   - HTTP 401, SIGN_IN_RETIRED, missing login, wrong-environment login, or credential
+//     account mismatch: SignIn;
 //   - anything else (403 AUTHORIZATION_UNAVAILABLE, bare 403, 404, 5xx, 429, network,
 //     locked keychain, ErrOtherEnvironment): Transient.
 func Classify(err error) routing.ErrorClass {
@@ -135,7 +138,7 @@ func Classify(err error) routing.ErrorClass {
 		return routing.Terminal
 	case errors.Is(err, auth.ErrSignInRetired),
 		errors.Is(err, auth.ErrNotLoggedIn),
-		errors.Is(err, ErrAccountMismatch),
+		errors.Is(err, ErrCredentialAccount),
 		errors.As(err, &otherEnv),
 		errors.As(err, &apiErr) && (apiErr.Unauthenticated() || apiErr.SignInRetired()):
 		return routing.SignIn

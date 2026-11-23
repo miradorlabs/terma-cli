@@ -33,8 +33,14 @@ type State struct {
 	// random ID so a Delete-then-Create or Replace over a corrupt file never ABA-matches
 	// an Expect captured from an earlier state.
 	StateID string `json:"state_id,omitempty"`
-	// Generation counts the writes; Update, Create, and Replace advance it.
+	// Generation counts all writes; Update, Create, and Replace advance it.
 	Generation int64 `json:"generation"`
+	// ConsentGeneration counts writes that change Teams membership/order/identity or
+	// Bindings (Select, Deselect, Bind, Unbind, Create, Replace). Background policy
+	// refreshes advance Generation without advancing ConsentGeneration, so interactive
+	// consent editors (terma teams) can CAS on ExpectConsent() without failing on every
+	// minute's refresh.
+	ConsentGeneration int64 `json:"consent_generation,omitempty"`
 	// Profile is the profile the state belongs to; a state for another is never read.
 	Profile string `json:"profile"`
 	// Account is the lane that owns this state: a 16-hex account key for a signed-in user,
@@ -47,10 +53,18 @@ type State struct {
 }
 
 // Expect returns the compare-and-set precondition matching this exact state snapshot
-// (its account, state instance ID, and generation).
+// (its account, state instance ID, and write generation).
 func (s State) Expect() Expect {
 	g := s.Generation
 	return Expect{Account: s.Account, StateID: s.StateID, Generation: &g}
+}
+
+// ExpectConsent returns the compare-and-set precondition matching this state's account,
+// state instance ID, and consent generation, allowing concurrent policy refreshes while
+// rejecting concurrent team/binding edits or account switches.
+func (s State) ExpectConsent() Expect {
+	g := s.ConsentGeneration
+	return Expect{Account: s.Account, StateID: s.StateID, ConsentGeneration: &g}
 }
 
 // SameGeneration reports whether b is the same generation of the state a was: the same
@@ -182,8 +196,12 @@ func sanitizeTeamPolicy(pol config.Policy, personal bool) config.Policy {
 // refusal/transient can overwrite a newer state transition; two concurrent refreshers on
 // the same team intentionally let the first win and discard the second. A policy whose
 // revision moved backwards is refused.
+//
+// An OrgAccessLost failure passed here refuses only r.EnrollmentID; callers enforcing an
+// org-wide 403 ORG_NOT_ACCESSIBLE across sibling enrollments should call
+// ApplyOrgAccessLost with epochs snapshotted before the request started.
 func (s *State) ApplyRefresh(r Refresh) (bool, error) {
-	t := s.Team(r.EnrollmentID)
+	t := s.team(r.EnrollmentID)
 	if t == nil || r.Epoch != t.Epoch {
 		return false, nil
 	}
@@ -200,12 +218,11 @@ func (s *State) ApplyRefresh(r Refresh) (bool, error) {
 		t.Refusals++
 		t.Epoch++
 		t.LastError = Terminal
-	case r.Failure == OrgAccessLost:
-		if t.Refusals < 2 {
-			t.Refusals = 2
+		if !wasRefused && t.Refusals >= 2 {
+			t.RefusedAt = refusedTimestamp(r.At)
 		}
-		t.Epoch++
-		t.LastError = OrgAccessLost
+	case r.Failure == OrgAccessLost:
+		t.markOrgAccessLost(refusedTimestamp(r.At))
 	case r.Failure == SignIn:
 		t.SignInNeeded, t.LastError = true, SignIn
 		t.Epoch++
@@ -213,9 +230,6 @@ func (s *State) ApplyRefresh(r Refresh) (bool, error) {
 		t.LastError = Transient
 	default:
 		return false, fmt.Errorf("refresh for %s carries neither a policy nor a failure", r.EnrollmentID)
-	}
-	if !wasRefused && t.Refusals >= 2 {
-		t.RefusedAt = refusedTimestamp(r.At)
 	}
 	return true, nil
 }
@@ -241,18 +255,22 @@ func (s *State) ApplyOrgAccessLost(organizationID, authURL string, epochs map[st
 		if !ok || t.Epoch != wantEpoch {
 			continue
 		}
-		wasRefused := t.Refusals >= 2
-		if t.Refusals < 2 {
-			t.Refusals = 2
-		}
-		t.Epoch++
-		t.LastError = OrgAccessLost
-		if !wasRefused {
-			t.RefusedAt = ts
-		}
+		t.markOrgAccessLost(ts)
 		changed = true
 	}
 	return changed
+}
+
+func (t *Team) markOrgAccessLost(ts time.Time) {
+	wasRefused := t.Refusals >= 2
+	if t.Refusals < 2 {
+		t.Refusals = 2
+	}
+	t.Epoch++
+	t.LastError = OrgAccessLost
+	if !wasRefused {
+		t.RefusedAt = ts
+	}
 }
 
 func refusedTimestamp(at time.Time) time.Time {
@@ -262,14 +280,25 @@ func refusedTimestamp(at time.Time) time.Time {
 	return at.UTC()
 }
 
-// Team is the selected team whose enrollment is id, or nil.
-func (s *State) Team(id string) *Team {
+// team returns a mutable pointer to enrollment id within the routing package.
+func (s *State) team(id string) *Team {
 	for i := range s.Teams {
 		if s.Teams[i].EnrollmentID == id {
 			return &s.Teams[i]
 		}
 	}
 	return nil
+}
+
+// Team returns a defensive copy of the selected team whose enrollment is id, or false.
+func (s State) Team(id string) (Team, bool) {
+	t := s.team(id)
+	if t == nil {
+		return Team{}, false
+	}
+	cp := *t
+	cp.Policy.Repositories = slices.Clone(t.Policy.Repositories)
+	return cp, true
 }
 
 // Select adds t under a new enrollment, organizations before personal, and returns the
@@ -321,7 +350,7 @@ func (s *State) Deselect(enrollmentID string) bool {
 
 // Selected reports whether enrollmentID is still selected.
 func (s State) Selected(enrollmentID string) bool {
-	return s.Team(enrollmentID) != nil
+	return s.team(enrollmentID) != nil
 }
 
 // check reports the first way s breaks the shape every reader relies on.

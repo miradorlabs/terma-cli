@@ -47,7 +47,7 @@ func TestClassifyByStatusAndReason(t *testing.T) {
 		{"403 SIGN_IN_RETIRED api error", refusal(403, api.ReasonSignInRetired), routing.SignIn},
 		{"no login on file", auth.ErrNotLoggedIn, routing.SignIn},
 		{"login from another environment", &auth.ErrWrongEnvironment{IssuedBy: "a", ConfiguredAs: "b"}, routing.SignIn},
-		{"account mismatch is sign_in", ErrAccountMismatch, routing.SignIn},
+		{"account mismatch is sign_in", ErrCredentialAccount, routing.SignIn},
 		{"5xx is transient", refusal(503, ""), routing.Transient},
 		{"429 is transient", refusal(429, ""), routing.Transient},
 		{"network error is transient", errors.New("dial tcp: connection refused"), routing.Transient},
@@ -101,11 +101,15 @@ func TestFetchTeamUsesSingleUserToken(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := routing.StoreTeamPolicy(cfg.StateDir, *st.Team(enrID)); err != nil {
+	tm, ok := st.Team(enrID)
+	if !ok {
+		t.Fatalf("missing team %s", enrID)
+	}
+	if err := routing.StoreTeamPolicy(cfg.StateDir, tm); err != nil {
 		t.Fatal(err)
 	}
 
-	r, err := (Source{}).RefreshTeam(t.Context(), cfg, *st.Team(enrID))
+	r, err := (Source{}).RefreshTeam(t.Context(), cfg, tm)
 	if err != nil || r.Policy == nil || r.Epoch != 0 || r.EnrollmentID != enrID || r.At.IsZero() {
 		t.Fatalf("RefreshTeam = %+v, %v", r, err)
 	}
@@ -132,7 +136,11 @@ func TestFetchTeamUsesSingleUserToken(t *testing.T) {
 	if err != nil || !changed {
 		t.Fatalf("routing.Update(ApplyRefresh) = %v, %v", changed, err)
 	}
-	if err := routing.StoreTeamPolicy(cfg.StateDir, *committed.Team(enrID)); err != nil {
+	committedTeam, ok := committed.Team(enrID)
+	if !ok {
+		t.Fatalf("missing committed team %s", enrID)
+	}
+	if err := routing.StoreTeamPolicy(cfg.StateDir, committedTeam); err != nil {
 		t.Fatal(err)
 	}
 	if stored, ok, err := config.ReadPolicy(cfg.StateDir, "team-b"); err != nil || !ok || stored.Revision != 7 {
@@ -189,17 +197,17 @@ func TestFetchTeamFailsClosed(t *testing.T) {
 		t.Fatalf("other environment team: %+v, %v, asked=%d", r, err, asked.Load())
 	}
 
-	// Empty cfg.Account -> ErrAccountMismatch / SignIn, zero HTTP calls.
+	// Empty cfg.Account -> ErrCredentialAccount / SignIn, zero HTTP calls.
 	cfg.Account = ""
 	r, err = (Source{}).RefreshTeam(t.Context(), cfg, tm)
-	if !errors.Is(err, ErrAccountMismatch) || r.Failure != routing.SignIn || asked.Load() != 0 {
+	if !errors.Is(err, ErrCredentialAccount) || r.Failure != routing.SignIn || asked.Load() != 0 {
 		t.Fatalf("empty account: %+v, %v, asked=%d", r, err, asked.Load())
 	}
 
-	// Account mismatch -> ErrAccountMismatch / SignIn, zero HTTP calls.
+	// Account mismatch -> ErrCredentialAccount / SignIn, zero HTTP calls.
 	cfg.Account = auth.AccountKey(srv.URL, "bob")
 	r, err = (Source{}).RefreshTeam(t.Context(), cfg, tm)
-	if !errors.Is(err, ErrAccountMismatch) || r.Failure != routing.SignIn || asked.Load() != 0 {
+	if !errors.Is(err, ErrCredentialAccount) || r.Failure != routing.SignIn || asked.Load() != 0 {
 		t.Fatalf("account mismatch: %+v, %v, asked=%d", r, err, asked.Load())
 	}
 
