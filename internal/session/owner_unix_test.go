@@ -262,3 +262,35 @@ func TestReadOnlyStoreDoesNotReportAccountConflict(t *testing.T) {
 		t.Fatalf("touch in read-only tool dir returned ErrAccountConflict (%v); want raw I/O error", err)
 	}
 }
+
+// Prune gives up when another writer holds the store lock, leaving manifests and owner files
+// untouched until the lock is free.
+func TestPruneSkipsWhenStoreLockIsHeld(t *testing.T) {
+	t.Parallel()
+	now := time.Now()
+	store := bound(Open(t.TempDir()), "aaaaaaaaaaaaaaaa")
+	sess := Session{ID: "sess-stale", Tool: "codex"}
+	if err := store.Touch(sess, []string{"a.go"}, now.Add(-48*time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	release, err := flock.Lock(context.Background(), filepath.Join(store.dir, lockFile))
+	if err != nil {
+		t.Fatal(err)
+	}
+	hasty := *store
+	hasty.lockWait = time.Millisecond
+	n, err := hasty.Prune(now.Add(-24 * time.Hour))
+	release()
+	if err != nil || n != 0 {
+		t.Fatalf("contended Prune = %d, %v; want 0, nil", n, err)
+	}
+	if !fileExists(store.manifestPath(sess.Key())) || !fileExists(store.ownerPath(sess.Key())) {
+		t.Fatalf("contended Prune removed manifest or owner without holding the lock")
+	}
+	if n, err := store.Prune(now.Add(-24 * time.Hour)); err != nil || n != 1 {
+		t.Fatalf("uncontended Prune = %d, %v; want 1, nil", n, err)
+	}
+	if fileExists(store.manifestPath(sess.Key())) || fileExists(store.ownerPath(sess.Key())) {
+		t.Fatalf("uncontended Prune left stale manifest or owner behind")
+	}
+}

@@ -633,13 +633,18 @@ func (s *Store) Merge(fromID string, into Session, at time.Time) ([]string, erro
 	return files, nil
 }
 
-// Prune drops manifests not updated since before, and a stale active session.
+// Prune drops manifests not updated since before, and a stale active session. It gives up
+// when another writer holds the store, so an active write is never raced by a manifest or
+// owner removal.
 func (s *Store) Prune(before time.Time) (int, error) {
 	if s.missing() {
 		return 0, nil
 	}
-	// Locked, so a manifest a Touch just revived is not removed as stale.
-	defer s.lock()()
+	unlock, held := s.acquire()
+	defer unlock()
+	if !held {
+		return 0, nil
+	}
 	return s.prune(before)
 }
 
