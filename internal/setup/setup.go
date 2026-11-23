@@ -7,7 +7,6 @@ import (
 	"context"
 	"errors"
 
-	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/routing"
 )
@@ -45,7 +44,7 @@ type Result struct {
 
 // Run sets the machine up for cfg's profile. The agents are recorded before the policy
 // is fetched, and the policy is stored before anything is pointed at the relay.
-func Run(ctx context.Context, reg *agents.Registry, cfg *config.Config, s Steps) (Result, error) {
+func Run(ctx context.Context, cfg *config.Config, s Steps) (Result, error) {
 	if s.SignIn == nil || s.ChooseAgents == nil || s.SelectTeam == nil || s.FetchPolicy == nil {
 		return Result{}, errors.New("setup: sign-in, the agent choice, the team and the policy fetch are required")
 	}

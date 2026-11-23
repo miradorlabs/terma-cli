@@ -68,7 +68,9 @@ func TestAntigravityConversationIsStampedOnItsCommit(t *testing.T) {
 	run(postToolUse, antigravityPayload(root, "PostToolUse", `"error":"","stepIdx":4,"toolCall":{"args":{"AllowMultiple":false,"EndLine":1,"Instruction":"Change hello to goodbye","ReplacementContent":"goodbye","StartLine":1,"TargetContent":"hello","TargetFile":"`+hookruntest.InJSON(filepath.Join(root, "hello.txt"))+`","toolAction":"Editing file","toolSummary":"Update hello.txt"},"name":"replace_file_content"}`))
 	// A read is not an edit, and a file outside the repository is not ours.
 	run(postToolUse, antigravityPayload(root, "PostToolUse", `"error":"","stepIdx":6,"toolCall":{"args":{"AbsolutePath":"`+hookruntest.InJSON(filepath.Join(root, "hello.txt"))+`"},"name":"view_file"}`))
-	run(postToolUse, antigravityPayload(root, "PostToolUse", `"error":"","stepIdx":7,"toolCall":{"args":{"TargetFile":"/etc/hosts"},"name":"write_to_file"}`))
+	// Absolute on every OS: on Windows /etc/hosts is relative, and would land in the repository.
+	outside := filepath.Join(t.TempDir(), "hosts")
+	run(postToolUse, antigravityPayload(root, "PostToolUse", `"error":"","stepIdx":7,"toolCall":{"args":{"TargetFile":"`+hookruntest.InJSON(outside)+`"},"name":"write_to_file"}`))
 	// Spooled drains, so the steps' events are read once.
 	stepEvents := hookruntest.Spooled(t, sp)
 	touched := 0

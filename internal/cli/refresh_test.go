@@ -31,7 +31,10 @@ import (
 // sandboxMachine keeps a refresh away from the developer's real home-directory files.
 func sandboxMachine(t *testing.T) {
 	t.Helper()
-	t.Setenv("HOME", t.TempDir())
+	home := t.TempDir()
+	// os.UserHomeDir reads USERPROFILE on Windows and HOME elsewhere.
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
 	t.Setenv("SHELL", "/bin/zsh")
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	t.Setenv("CLAUDE_CONFIG_DIR", t.TempDir())

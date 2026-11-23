@@ -263,7 +263,7 @@ func (app *App) runSetup(cmd *cobra.Command, f setupFlags) error {
 	if cfg.APIKey != "" {
 		app.useServerKey(&steps, ui, parseOrgRef(f.org), &team, f.insecureStorage)
 	}
-	res, err := setup.Run(cmd.Context(), app.agents, cfg, steps)
+	res, err := setup.Run(cmd.Context(), cfg, steps)
 	// A team picker left after the agents were recorded is still a cancellation, but not
 	// one that recorded nothing.
 	if errors.Is(err, errCancelled) {
