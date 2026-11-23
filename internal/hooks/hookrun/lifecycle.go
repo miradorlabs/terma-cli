@@ -106,7 +106,7 @@ func (e Env) owns(r *Repo, sess session.Session) bool {
 	if r.Store.Owns(sess.Key()) {
 		return true
 	}
-	e.countLost(r, sendas.LostAccountConflict, 1)
+	e.CountLost(r, sendas.LostAccountConflict, 1)
 	return false
 }
 
@@ -115,7 +115,7 @@ func (e Env) owns(r *Repo, sess session.Session) bool {
 // another account's hook may claim the session in between; the write is what decides.
 func (e Env) recordOwned(r *Repo, sess session.Session, paths []string, mirror bool) bool {
 	if _, refused := e.record(r, sess, paths, mirror); refused {
-		e.countLost(r, sendas.LostAccountConflict, 1)
+		e.CountLost(r, sendas.LostAccountConflict, 1)
 		return false
 	}
 	return true

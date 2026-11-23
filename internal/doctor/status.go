@@ -117,8 +117,10 @@ func Local(ctx context.Context, env Env) (LocalReport, error) {
 				connected = append(connected, v.DisplayName)
 			}
 			add("Agent", "%s %s", v.DisplayName, suffix)
-			if a, lines := StatusLineAgent(reg); lines && v.Name == a.Name() && ok {
-				add("Status line", "%s", StatusLineSummary(JudgeStatusLine(reg, root)))
+			for _, a := range StatusLineAgents(reg) {
+				if v.Name == a.Name() && ok {
+					add("Status line", "%s", StatusLineSummary(JudgeStatusLine(a, root)))
+				}
 			}
 		}
 		if len(connected) == 0 {
@@ -307,7 +309,12 @@ func StatusLineSummary(v StatusLineVerdict) string {
 	case StatusLineBehind:
 		return "capturing plan usage; your own (" + output.SanitizeTerminal(v.Renderer) + ") runs behind it"
 	case StatusLineDefault:
+		if v.Stacked {
+			return "capturing plan usage; the agent's own line is unchanged"
+		}
 		return "capturing plan usage (terma's default line)"
+	case StatusLineSwitchedOff:
+		return `switched off ("enabled": false) — plan usage is NOT captured (run ` + "`terma setup`" + `)`
 	case StatusLineReplaced:
 		return "replaced by your own since terma wrapped it — plan usage is NOT captured (run `terma setup`)"
 	}

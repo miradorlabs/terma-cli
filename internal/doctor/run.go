@@ -238,8 +238,8 @@ func Run(ctx context.Context, env Env, progress Progress) Report {
 		timed(KeyOutbox, "records lost", func() Check { return OutboxCheck(r) })
 	}
 
-	if a, ok := StatusLineAgent(env.Agents); ok && a.Installed(ctx) {
-		timed(KeyStatusLine, a.DisplayName()+" status line", d.statusLine)
+	for _, a := range checkedStatusLines(ctx, env.Agents, cfg.Harnesses) {
+		timed(KeyStatusLine, a.DisplayName()+" status line", func() Check { return d.statusLine(a) })
 	}
 
 	timed(KeySpool, "event spool", d.eventSpool)
@@ -352,14 +352,6 @@ func (d *run) agentsExporting() Check {
 	}
 	verdicts := JudgeHarnesses(d.ctx, d.env.Agents, d.cfg.OTLPURL, d.projectID, d.env.Root)
 	return HarnessCheck(d.env.Agents, verdicts, d.cfg.OTLPURL, d.projectID, d.admitted)
-}
-
-func (d *run) statusLine() Check {
-	repoRoot := ""
-	if d.env.RepoErr == nil {
-		repoRoot = d.env.Root
-	}
-	return StatusLineCheck(JudgeStatusLine(d.env.Agents, repoRoot))
 }
 
 func (d *run) eventSpool() Check {

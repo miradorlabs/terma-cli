@@ -473,11 +473,35 @@ one named hook, `terma`, to `~/.gemini/config/hooks.json`, which every `agy` ses
 and leaves the file's other hooks, and its comments, as they are. It needs `agy` 1.2.4 or later,
 the first whose Stop hook runs reliably; `terma doctor` names the version it finds. Those hooks report the model, each turn,
 each tool step (its name and whether it failed, never its arguments) and how the turn
-ended, and the files `agy`'s own file tools write are stamped on your commits. `agy`
-reports no token counts or cost, and runs no hook after a turn you cancel, so what that
-turn did is sent with the next turn's. On Windows, setup lists Antigravity as Coming Soon: `agy` runs
-its hooks with `cmd` there, and terma's hook command for it has been checked only on macOS
-and Linux.
+ended, and the files `agy`'s own file tools write are stamped on your commits. Each hook
+also reads the conversation's transcript and sends every model call written since the last
+one: its model and its input, cache-read and output tokens. `agy` does not count thinking
+apart from output, or cache writes, so neither is sent; there is no cost, which the
+platform estimates from list prices. A call goes only from a hook of its own turn, in the
+checkout and under the sign-in that turn began with, and only where your team's policy
+collects. `agy` runs no hook after a turn you cancel, so the call in flight when you cancel
+is not sent. Nor is the rest of a turn after one of its hooks ran where the policy collects
+nothing, or got a payload over 4 MiB from `agy`, which repeats the prompt and the tool's
+arguments in it. `terma doctor` counts these calls among what terma lost. A cancelled
+turn's hook events go with the next turn's. The turns of a conversation before terma first
+saw it are never sent. A subagent is its own conversation, linked to the one that opened it.
+`agy` reports a conversation's first folder as its working directory for as long as the
+conversation lasts, so one you resume from a second repository is still recorded under the
+first, whichever of the two your team's policy collects
+([#174](https://github.com/miradorlabs/terma-cli/issues/174)).
+
+Setup also puts `terma hook antigravity-statusline` in `statusLine` in
+`~/.gemini/antigravity-cli/settings.json`. Its payload is the only place `agy` names your
+plan, its quota buckets and the account's email, which terma sends as they change. Your
+own status line keeps running behind it; without one, terma's draws nothing and `agy`'s
+built-in line stays. The file is read as JSONC, as `agy` reads it, and its comments stay.
+Setup switches terma's line back on, and says so, when it is set `"enabled": false`;
+`terma update --refresh` leaves it as it is. `terma teardown` puts the file back as it was,
+or only the `statusLine` entry when something else has changed the file since. `agy` runs a status line
+only in its interactive CLI: an `agy -p` session reports no plan or quota.
+
+On Windows, setup lists Antigravity as Coming Soon: `agy` runs its hooks with `cmd` there,
+and terma's hook command for it has been checked only on macOS and Linux.
 
 `terma setup` runs the relay as a per-user background service, so it is up before any
 agent starts; with `--relay-service off`, hooks start it on demand. `terma update`

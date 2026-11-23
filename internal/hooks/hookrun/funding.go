@@ -39,7 +39,8 @@ func (e Env) CaptureFunding(r *Repo, id, tool, name string, evidence FundingEvid
 	if err != nil {
 		return
 	}
-	hash := sha256.Sum256(raw)
+	// The lane is hashed, never sent: the same evidence under another sign-in is new.
+	hash := sha256.Sum256(append(raw, "\x00"+laneName(e.lane())...))
 	key := sha256.Sum256([]byte(tool + "\x00" + name + "\x00" + id))
 	dir := filepath.Join(e.StateDir, fundingStateDir)
 	if os.MkdirAll(dir, 0o700) != nil {
@@ -62,7 +63,7 @@ func (e Env) CaptureFunding(r *Repo, id, tool, name string, evidence FundingEvid
 	if prev.Hash == next.Hash && !next.At.Before(prev.At) && next.At.Sub(prev.At) < QuotaHeartbeat {
 		return
 	}
-	ev := spool.Event{Time: e.Time(), Name: name, SessionID: id, Repository: r.Repository, Attrs: attrs}
+	ev := spool.Event{Time: e.Time(), Name: name, SessionID: id, Repository: r.Repository, Global: e.Policy.Global(), Attrs: attrs}
 	if e.Spool.Append(ev) != nil {
 		return
 	} // Retry a failed append at the next hook.

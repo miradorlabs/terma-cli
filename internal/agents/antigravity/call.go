@@ -1,0 +1,85 @@
+package antigravity
+
+import (
+	"encoding/json"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
+	"github.com/miradorlabs/terma-cli/internal/semconv"
+	"github.com/miradorlabs/terma-cli/internal/session"
+	"github.com/miradorlabs/terma-cli/internal/spool"
+)
+
+// sourceAntigravityTranscript is terma.evidence.source for what agy's transcript recorded.
+const sourceAntigravityTranscript = "antigravity_transcript"
+
+// antigravitySubagentMarker opens the result of invoke_subagent, which names the child
+// conversation the subagent runs in.
+const antigravitySubagentMarker = "Created the following subagent:"
+
+// antigravityCallEvent is one PLANNER_RESPONSE as a terma.model_call. agy counts input
+// without the cache reads, which OpenTelemetry's input count includes, and thinking
+// inside output: no reasoning count is sent, and the usage is partial, rather than a zero.
+func antigravityCallEvent(id string, s antigravityStep, turn string) spool.Event {
+	step := *s.StepIndex
+	a := map[string]any{
+		semconv.GenAIMainAgentNameKey:  antigravityTool,
+		semconv.TermaEvidenceSourceKey: sourceAntigravityTranscript,
+		semconv.TermaModelCallIDKey:    "step-" + strconv.FormatInt(step, 10),
+		semconv.TermaStepIndexKey:      step,
+	}
+	hookrun.BoundedAttr(a, semconv.GenAIRequestModelKey, s.Model)
+	if hookrun.ShortLabel(turn) {
+		a[semconv.TermaTurnIDKey] = turn
+	}
+	switch s.Status {
+	case "DONE":
+		a[semconv.TermaOperationStatusKey] = "completed"
+	case "ERROR":
+		a[semconv.TermaOperationStatusKey] = "error"
+	}
+	input, inPresent, inOK := hookrun.JSONNumber(s.InputTokens, true)
+	cached, cachePresent, cacheOK := hookrun.JSONNumber(s.CacheReadTokens, true)
+	output, outPresent, outOK := hookrun.JSONNumber(s.OutputTokens, true)
+	switch {
+	case (inPresent && !inOK) || (cachePresent && !cacheOK) || (outPresent && !outOK):
+		a[semconv.TermaUsageStatusKey] = semconv.TermaUsageStatusInvalid
+	case !inPresent && !cachePresent && !outPresent:
+		a[semconv.TermaUsageStatusKey] = semconv.TermaUsageStatusUnavailable
+	default:
+		// Thinking and cache writes are never counted apart.
+		a[semconv.TermaUsageStatusKey] = semconv.TermaUsageStatusPartial
+		if inPresent {
+			// A missing cache count is no cache read: cached is then 0.
+			a[semconv.GenAIUsageInputTokensKey] = int64(input + cached)
+		}
+		if cachePresent {
+			a[semconv.GenAIUsageCacheReadInputTokensKey] = int64(cached)
+		}
+		if outPresent {
+			a[semconv.GenAIUsageOutputTokensKey] = int64(output)
+		}
+	}
+	ev := spool.Event{Name: semconv.TermaModelCallEvent, SessionID: id, Attrs: a}
+	if t, err := time.Parse(time.RFC3339, s.CreatedAt); err == nil {
+		ev.Time = t
+	}
+	return ev
+}
+
+// antigravitySubagent is the child conversation an invoke_subagent result names, or "".
+func antigravitySubagent(content string) string {
+	_, rest, ok := strings.Cut(content, antigravitySubagentMarker)
+	if !ok {
+		return ""
+	}
+	var child struct {
+		ConversationID string `json:"conversationId"`
+	}
+	if json.NewDecoder(strings.NewReader(rest)).Decode(&child) != nil || !session.ValidID(child.ConversationID) {
+		return ""
+	}
+	return child.ConversationID
+}

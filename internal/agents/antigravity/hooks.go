@@ -53,11 +53,11 @@ func (Agent) PlanUserHooks(dir string, command func(string) string, install bool
 	return planUserHooks(dir, command, install)
 }
 
-// RefreshMachine points the hooks terma wrote into agy's file at this terma, as `terma
+// refreshHooksFile points the hooks terma wrote into agy's file at this terma, as `terma
 // update --refresh` does after the binary moved; a file without them is left alone. Not on
 // Windows, where terma does not offer Antigravity and a shared home holds another
 // system's hooks.
-func (a Agent) RefreshMachine() (string, bool, error) {
+func (a Agent) refreshHooksFile() (string, bool, error) {
 	if runtime.GOOS == "windows" {
 		return "", false, nil
 	}

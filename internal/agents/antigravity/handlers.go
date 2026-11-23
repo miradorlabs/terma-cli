@@ -29,6 +29,8 @@ type antigravityHookInput struct {
 	WorkspacePaths []string `json:"workspacePaths"`
 	Cwd            string   `json:"cwd"`
 	ModelName      string   `json:"modelName"`
+	// TranscriptPath is the conversation's transcript_full.jsonl (agy 1.5+).
+	TranscriptPath string `json:"transcriptPath"`
 	// Error is failure text; only its presence is recorded, since the text is content.
 	Error string `json:"error"`
 	// PostToolUse.
@@ -78,6 +80,20 @@ func readAntigravityInput(r io.Reader) (*antigravityHookInput, error) {
 	return in, nil
 }
 
+// antigravityInput reads a hook's payload. One it cannot read ends the turn terma was
+// following in the conversation agy's environment names: agy repeats the prompt in every
+// payload, so a prompt past hookrun.MaxInput hides its whole turn's hooks, the first
+// included, and no later hook may send that turn's calls as the turn before's.
+func antigravityInput(env hookrun.Env) (*antigravityHookInput, bool) {
+	in, err := readAntigravityInput(env.Stdin)
+	if err != nil {
+		env.Logf("%v", err)
+		endAntigravityTurnInEnvironment(env)
+		return nil, false
+	}
+	return in, true
+}
+
 // antigravityAck writes the empty object every agy hook expects on stdout, even when the
 // handler bails out early, so agy never prints a parse warning.
 func antigravityAck(env hookrun.Env) {
@@ -90,9 +106,16 @@ func antigravityAck(env hookrun.Env) {
 // agy has no SessionStart: invocation 0 of a fresh conversation is where a session begins.
 func preInvocation(ctx context.Context, env hookrun.Env) error {
 	defer antigravityAck(env)
-	in, err := readAntigravityInput(env.Stdin)
+	in, ok := antigravityInput(env)
+	if !ok {
+		return nil
+	}
+	env.Cwd = in.cwd(env.Cwd)
+	r, err := env.Repo(ctx)
 	if err != nil {
-		env.Logf("%v", err)
+		// At any invocation, not only the turn's first.
+		env.Logf("not in a git repository: %v", err)
+		antigravitySkipCalls(env, in)
 		return nil
 	}
 	invocation, _, invocationKnown := hookrun.JSONNumber(in.InvocationNum, true)
@@ -100,12 +123,8 @@ func preInvocation(ctx context.Context, env hookrun.Env) error {
 		// A model call in the middle of a turn.
 		return nil
 	}
-	env.Cwd = in.cwd(env.Cwd)
-	r, err := env.Repo(ctx)
-	if err != nil {
-		env.Logf("not in a git repository: %v", err)
-		return nil
-	}
+	// The turn is recorded first: agy calls the model only once this hook returns.
+	turn := beginAntigravityTurn(env, r, in)
 	id := in.id()
 	sess := env.NewSession(r, id, antigravityTool, in.ModelName)
 	now := sess.UpdatedAt
@@ -113,15 +132,16 @@ func preInvocation(ctx context.Context, env hookrun.Env) error {
 		sess.StartedAt = active.StartedAt
 	}
 	env.SetActive(r, sess)
-	turn := beginAntigravityTurn(env, r, in)
 	// A later turn, or a resumed conversation, was announced before.
 	if steps, _, stepsKnown := hookrun.JSONNumber(in.InitialNumSteps, true); !stepsKnown || steps <= 1 {
 		env.PruneManifests(r, now)
 		env.EmitStart(r, sess, nil)
 	}
+	// This passes a cancelled turn's last call (see turn.go).
+	read := captureAntigravityCalls(ctx, env, r, in)
 	env.CaptureObservation(ctx, r, hookrun.Observation{
 		Tool: antigravityTool, Source: sourceAntigravityHook, StateDir: antigravityObservationDir,
-		SessionID: id, Hook: "PreInvocation", TurnID: turn, Attrs: antigravityObservationAttrs(in, "PreInvocation", turn),
+		SessionID: id, Hook: "PreInvocation", TurnID: turn, Attrs: antigravityObservationAttrs(in, "PreInvocation", turn, read),
 	})
 	return nil
 }
@@ -169,14 +189,14 @@ func antigravityEditedPaths(in *antigravityHookInput) []string {
 // only for those paths.
 func postToolUse(ctx context.Context, env hookrun.Env) error {
 	defer antigravityAck(env)
-	in, err := readAntigravityInput(env.Stdin)
-	if err != nil {
-		env.Logf("%v", err)
+	in, ok := antigravityInput(env)
+	if !ok {
 		return nil
 	}
 	env.Cwd = in.cwd(env.Cwd)
 	r, err := env.Repo(ctx)
 	if err != nil {
+		antigravitySkipCalls(env, in)
 		return nil
 	}
 	id := in.id()
@@ -193,6 +213,7 @@ func postToolUse(ctx context.Context, env hookrun.Env) error {
 	if used {
 		hookrun.SpoolSkills(env, r, antigravitySkillStateDir, id, antigravitySkillAttrs(), []hookrun.Skill{skill})
 	}
+	captureAntigravityCalls(ctx, env, r, in)
 
 	// A failed edit changed nothing. No toolCall yields no paths, so this guard also makes
 	// in.ToolCall safe below.
@@ -239,8 +260,8 @@ func antigravityToolCallAttrs(in *antigravityHookInput, turn string) (map[string
 	return a, true
 }
 
-// postInvocation and stop record the turn's shape as observations: evidence of activity,
-// never usage, since agy reports no token counts.
+// postInvocation and stop record the turn's shape as observations, and send the calls
+// the transcript recorded since the last hook, each as a terma.model_call.
 func postInvocation(ctx context.Context, env hookrun.Env) error {
 	return antigravityObserve(ctx, env, "PostInvocation")
 }
@@ -251,15 +272,23 @@ func stop(ctx context.Context, env hookrun.Env) error {
 
 func antigravityObserve(ctx context.Context, env hookrun.Env, hook string) error {
 	defer antigravityAck(env)
-	in, err := readAntigravityInput(env.Stdin)
-	if err != nil {
-		env.Logf("%v", err)
+	in, ok := antigravityInput(env)
+	if !ok {
 		return nil
 	}
 	env.Cwd = in.cwd(env.Cwd)
 	r, err := env.Repo(ctx)
 	if err != nil {
+		antigravitySkipCalls(env, in)
 		return nil
+	}
+	if hook == "PostInvocation" {
+		// Invocation 0 carries the turn's first step, as its PreInvocation did, so it can
+		// tell a stale record (see turn.go).
+		invocation, _, invocationKnown := hookrun.JSONNumber(in.InvocationNum, true)
+		if steps, _, stepsKnown := hookrun.JSONNumber(in.InitialNumSteps, true); invocationKnown && invocation == 0 && stepsKnown {
+			endAntigravityTurnUnlessBegunAt(env, in.id(), int64(steps))
+		}
 	}
 	if hook == "Stop" {
 		// Keep the session fresh for the commit that may follow.
@@ -269,18 +298,32 @@ func antigravityObserve(ctx context.Context, env hookrun.Env, hook string) error
 			_ = r.Store.SetActive(*active)
 		}
 	}
+	begun := antigravityTurnBegun(env, in.id())
 	turn := antigravityTurnID(env, r, in.id())
+	read := captureAntigravityCalls(ctx, env, r, in)
+	if hook == "Stop" {
+		// Stop ends the turn it found and no other; a prompt or a wake after it starts with
+		// a PreInvocation at invocation 0, which records the turn again.
+		endAntigravityTurnBegun(env, in.id(), begun)
+	}
 	env.CaptureObservation(ctx, r, hookrun.Observation{
 		Tool: antigravityTool, Source: sourceAntigravityHook, StateDir: antigravityObservationDir,
-		SessionID: in.id(), Hook: hook, TurnID: turn, Attrs: antigravityObservationAttrs(in, hook, turn),
+		SessionID: in.id(), Hook: hook, TurnID: turn, Attrs: antigravityObservationAttrs(in, hook, turn, read),
 	})
 	return nil
 }
 
-func antigravityObservationAttrs(in *antigravityHookInput, hook, turn string) map[string]any {
+// antigravityObservationAttrs is a hook's observation. A hook carries no plan, quota or
+// account (the status line does), and no token counts: when the hook read the transcript,
+// the calls carry them as terma.model_call, so the observation makes no claim about usage;
+// when it could not, its usage is unavailable.
+func antigravityObservationAttrs(in *antigravityHookInput, hook, turn string, callsRead bool) map[string]any {
 	a := hookrun.EvidenceAttrs(antigravityTool, sourceAntigravityHook, hook)
-	for _, k := range []string{semconv.TermaUsageStatusKey, semconv.TermaFundingStatusKey, semconv.TermaQuotaStatusKey, semconv.TermaAccountStatusKey} {
+	for _, k := range []string{semconv.TermaFundingStatusKey, semconv.TermaQuotaStatusKey, semconv.TermaAccountStatusKey} {
 		a[k] = hookrun.StatusUnavailable
+	}
+	if !callsRead {
+		a[semconv.TermaUsageStatusKey] = hookrun.StatusUnavailable
 	}
 	hookrun.BoundedAttr(a, semconv.GenAIRequestModelKey, in.ModelName)
 	if turn != "" {
@@ -307,4 +350,11 @@ func antigravityObservationAttrs(in *antigravityHookInput, hook, turn string) ma
 		}
 	}
 	return a
+}
+
+// antigravitySkipCalls is a hook that could not resolve where it ran, or ran where the
+// team's policy collects nothing: it ends the turn terma was following and reads nothing
+// (see turn.go).
+func antigravitySkipCalls(env hookrun.Env, in *antigravityHookInput) {
+	endAntigravityTurn(env, in.id())
 }

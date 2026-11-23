@@ -306,12 +306,12 @@ func reportPush(ctx context.Context, env Env, path string, rec pushRecord) {
 			failed = true
 		case !walked:
 			// The walk stopped at its bound: a session past it may be anyone's.
-			env.countLost(nil, sendas.LostAmbiguousPush, 1)
+			env.CountLost(nil, sendas.LostAmbiguousPush, 1)
 			rec.Refs[i].Reported = true
 		default:
 			lane, owned := pushLane(rec.lane(), pushStore(env, rec), sessions)
 			if !owned {
-				env.countLost(nil, sendas.LostAmbiguousPush, 1)
+				env.CountLost(nil, sendas.LostAmbiguousPush, 1)
 				rec.Refs[i].Reported = true
 				continue
 			}

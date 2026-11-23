@@ -116,7 +116,7 @@ func (e Env) emitRecord(r *Repo, ev spool.Event, accounts []string) bool {
 	}
 	lane, ok := recordLane(e.lane(), accounts)
 	if !ok {
-		e.countLost(r, sendas.LostAmbiguousPush, 1)
+		e.CountLost(r, sendas.LostAmbiguousPush, 1)
 		return true
 	}
 	ev = e.stamp(r, ev)
@@ -187,7 +187,7 @@ func (e Env) lost(r *Repo, n int) bool {
 	if why == "" {
 		return false
 	}
-	e.countLost(r, why, n)
+	e.CountLost(r, why, n)
 	return true
 }
 
@@ -205,10 +205,10 @@ func (e Env) lostOutside(r *Repo, n int) bool {
 	return e.lost(r, n)
 }
 
-// countLost counts n events lost for why in the spool or, by a hook in an agent's sandbox
+// CountLost counts n events lost for why in the spool or, by a hook in an agent's sandbox
 // that can't write the state directory, in r's git directory, which the next hook outside
 // moves into the spool's (unpark).
-func (e Env) countLost(r *Repo, why string, n int) {
+func (e Env) CountLost(r *Repo, why string, n int) {
 	if e.Spool != nil && e.Spool.CountLost(why, n) == nil {
 		return
 	}

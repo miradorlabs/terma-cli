@@ -33,7 +33,7 @@ var contentFree = map[string]bool{
 	semconv.TermaSessionCaptureEvent: true, semconv.TermaSubagentStartEvent: true, semconv.TermaSubagentEndEvent: true,
 	semconv.TermaSubagentCallEvent: true, semconv.TermaSessionObservationEvent: true,
 	semconv.TermaAssistantMessageEvent: true, semconv.TermaSessionTitleEvent: true,
-	semconv.TermaModelCallResponseEvent: true,
+	semconv.TermaModelCallResponseEvent: true, semconv.TermaModelCallEvent: true,
 }
 
 // contentWhole are the event kinds that are content through and through, of both kinds, so

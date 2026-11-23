@@ -3,6 +3,7 @@ package doctor
 import (
 	"context"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
@@ -96,6 +97,8 @@ const (
 	StatusLineDefault
 	// StatusLineReplaced means terma wrapped it once and the developer has since replaced it.
 	StatusLineReplaced
+	// StatusLineSwitchedOff means terma's line is there but switched off, so it never runs.
+	StatusLineSwitchedOff
 )
 
 // StatusLineVerdict is whether the status line captures, and what stands in its way.
@@ -104,29 +107,45 @@ type StatusLineVerdict struct {
 	Err       error
 	Overrides []string
 	Renderer  string
+	// Stacked means the agent's own line stays, under nothing of terma's.
+	Stacked bool
 }
 
-// StatusLineAgent is the agent whose status line terma wraps.
-func StatusLineAgent(reg *agents.Registry) (agents.StatusLiner, bool) {
-	s := reg.With[agents.StatusLiner]()
-	if len(s) == 0 {
-		return nil, false
-	}
-	return s[0], true
+// StatusLineAgents are the agents whose status line terma wraps.
+func StatusLineAgents(reg *agents.Registry) []agents.StatusLiner {
+	return reg.With[agents.StatusLiner]()
 }
 
-// JudgeStatusLine judges the status line terma wraps, as seen from repoRoot.
-func JudgeStatusLine(reg *agents.Registry, repoRoot string) StatusLineVerdict {
-	s, ok := StatusLineAgent(reg)
-	if !ok {
-		return StatusLineVerdict{}
+// checkedStatusLines are the status lines doctor checks: an agent's the developer chose (any,
+// with no choice recorded), supported here and installed.
+func checkedStatusLines(ctx context.Context, reg *agents.Registry, chosen []string) []agents.StatusLiner {
+	var out []agents.StatusLiner
+	for _, a := range StatusLineAgents(reg) {
+		picked := len(chosen) == 0 || slices.ContainsFunc(agents.Selections(a), func(s string) bool { return slices.Contains(chosen, s) })
+		if picked && reg.IsSupported(a.Name()) && a.Installed(ctx) {
+			out = append(out, a)
+		}
 	}
+	return out
+}
+
+// statusLine judges a's status line from the repository doctor runs in.
+func (d *run) statusLine(a agents.StatusLiner) Check {
+	repoRoot := ""
+	if d.env.RepoErr == nil {
+		repoRoot = d.env.Root
+	}
+	return StatusLineCheck(JudgeStatusLine(a, repoRoot))
+}
+
+// JudgeStatusLine judges the status line terma wraps for s, as seen from repoRoot.
+func JudgeStatusLine(s agents.StatusLiner, repoRoot string) StatusLineVerdict {
 	return ClassifyStatusLine(s.StatusLineState(repoRoot))
 }
 
 // ClassifyStatusLine judges a status line from its state.
 func ClassifyStatusLine(st agents.StatusLineState, err error) StatusLineVerdict {
-	v := StatusLineVerdict{Err: err, Overrides: st.Overrides, Renderer: st.Renderer}
+	v := StatusLineVerdict{Err: err, Overrides: st.Overrides, Renderer: st.Renderer, Stacked: st.Stacked}
 	switch {
 	case err != nil:
 		v.Capture = StatusLineUnknown
@@ -136,6 +155,8 @@ func ClassifyStatusLine(st agents.StatusLineState, err error) StatusLineVerdict 
 		v.Capture = StatusLineBehind
 	case st.Installed:
 		v.Capture = StatusLineDefault
+	case st.Disabled:
+		v.Capture = StatusLineSwitchedOff
 	case st.Replaced:
 		v.Capture = StatusLineReplaced
 	default:

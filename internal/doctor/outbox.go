@@ -21,6 +21,7 @@ var outboxLosses = []struct{ reason, what string }{
 	{"policy_timeout", "claimed for a team whose policy or key the relay couldn't read within 15 minutes"},
 	{"signed_out", "collected while signed out"},
 	{"unreadable", "collected while the sign-in could not be read"},
+	{"turn_ended", "model calls in turns that ended before a hook of theirs read them"},
 }
 
 // OutboxCheck reports what the relay and hooks lost of what they collected, by reason:
