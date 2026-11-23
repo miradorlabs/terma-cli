@@ -82,7 +82,8 @@ func (a Agent) refreshHooksFile() (string, bool, error) {
 		case bytes.Contains(data, []byte(" hook --user antigravity-")):
 			carry = append(carry, path)
 			on = on || termaHookOn(data)
-		case namesNoTermaHook(data):
+		case namesNoTermaHook(data) && isDir(filepath.Dir(filepath.Dir(path))):
+			// A home that is not there, ~/.gemini with no agy say, is not made.
 			bare = append(bare, path)
 		}
 	}
@@ -114,6 +115,12 @@ func (a Agent) refreshHooksFile() (string, bool, error) {
 		}
 	}
 	return strings.Join(changed, ", "), len(changed) > 0, errors.Join(errs...)
+}
+
+// isDir reports whether path is a folder.
+func isDir(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && info.IsDir()
 }
 
 // namesNoTermaHook reports whether a hooks file, data as read (nil when absent), has no

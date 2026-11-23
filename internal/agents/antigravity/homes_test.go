@@ -312,3 +312,19 @@ func jsonEqual(t *testing.T, a, b any) bool {
 	}
 	return string(x) == string(y)
 }
+
+// A refresh makes no home: with T3 Code's hook switched on and no ~/.gemini, as on a machine
+// with no agy, it leaves ~/.gemini unmade.
+func TestAntigravityRefreshMakesNoHome(t *testing.T) {
+	h := newRefreshHome(t)
+	installAt(t, h.t3a, "/old/terma")
+	if _, ok, err := (Agent{}).refreshHooksFile(); err != nil || !ok {
+		t.Fatalf("refresh = %v, %v", ok, err)
+	}
+	if _, err := os.Stat(h.gemini); !os.IsNotExist(err) {
+		t.Errorf("a refresh made ~/.gemini: %v", err)
+	}
+	if member(t, hooksAt(h.t3b), "terma") == nil {
+		t.Error("T3 Code's other home did not get terma's hook")
+	}
+}

@@ -496,8 +496,9 @@ Setup writes the same hook into each T3 Code Antigravity provider folder too:
 `~/.t3/userdata/providers/<instance>/<id>/config/hooks.json`, or the same path under
 `$T3CODE_HOME` when that is set to an absolute path. terma finds these folders by the
 `antigravity-acp` folder T3 Code keeps in each, whatever you named the instance, and offers
-Antigravity at setup when one is there, even with no `agy` on your PATH. With an `agy` on
-your PATH older than 1.2.4, terma writes its hook nowhere, T3 Code's folders included,
+Antigravity at setup when one is there, even with no `agy` on your PATH. Setup then writes
+`~/.gemini/config/hooks.json` too, for an `agy` you install later; a refresh never makes
+`~/.gemini`. With an `agy` on your PATH older than 1.2.4, terma writes its hook nowhere, T3 Code's folders included,
 until you update `agy`. A folder T3 Code creates after setup is picked up by the next
 `terma setup`. It is also picked up by `terma update --refresh`, and on its own the first
 time terma runs after an upgrade, when another folder has terma's hook switched on. A
