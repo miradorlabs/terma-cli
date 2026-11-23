@@ -15,6 +15,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
 	"github.com/miradorlabs/terma-cli/internal/relay/shape"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
+	"github.com/tailscale/hujson"
 )
 
 // agySettings is the shape agy 1.5.13 writes its settings in.
@@ -46,9 +47,14 @@ func statusLineOf(t *testing.T, path string) map[string]any {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// agy reads it as JSONC.
+	std, err := hujson.Standardize(b)
 	var doc map[string]any
-	if err := json.Unmarshal(b, &doc); err != nil {
-		t.Fatalf("settings no longer JSON: %v\n%s", err, b)
+	if err == nil {
+		err = json.Unmarshal(std, &doc)
+	}
+	if err != nil {
+		t.Fatalf("settings no longer JSONC: %v\n%s", err, b)
 	}
 	sl, _ := doc["statusLine"].(map[string]any)
 	return sl
@@ -355,8 +361,8 @@ func TestAntigravityStatusLineSetupSwitchesTermasBackOn(t *testing.T) {
 	}
 	b, _ := os.ReadFile(path)
 	writeSettings(t, path, strings.Replace(string(b), `"type":"command"`, `"enabled":false,"type":"command"`, 1))
-	if st, _ := a.StatusLineState(""); st.Installed {
-		t.Fatalf("a switched-off line reads as installed: %+v", st)
+	if st, _ := a.StatusLineState(""); st.Installed || !st.Disabled {
+		t.Fatalf("a switched-off line: %+v", st)
 	}
 	if changed, err := a.InstallStatusLine(); err != nil || !changed {
 		t.Fatalf("install: %v %v", changed, err)
@@ -457,5 +463,35 @@ func TestAntigravityStatusLineKeepsJSONC(t *testing.T) {
 	b, _ = os.ReadFile(path)
 	if strings.Contains(string(b), "statusLine") || !strings.Contains(string(b), "// folders agy trusts") || !strings.Contains(string(b), "/home/dev/new") {
 		t.Fatalf("after teardown:\n%s", b)
+	}
+}
+
+// A comment just before the settings' closing brace stays through setup and teardown,
+// on one line with what it follows or in an empty object.
+func TestAntigravityStatusLineKeepsACommentBeforeTheClosingBrace(t *testing.T) {
+	for _, content := range []string{
+		`{"other":true /* keep */}`,
+		"{\n  \"other\": true // keep\n}\n",
+		`{ /* keep */ }`,
+	} {
+		t.Run(content, func(t *testing.T) {
+			a, path := statusLineHome(t)
+			writeSettings(t, path, content)
+			if _, err := a.InstallStatusLine(); err != nil {
+				t.Fatal(err)
+			}
+			b, _ := os.ReadFile(path)
+			if !strings.Contains(string(b), "keep") || statusLineOf(t, path)["command"] != antigravityStatusLineCommand("") {
+				t.Fatalf("after install:\n%s", b)
+			}
+			// Teardown after another change, so only the member goes back.
+			writeSettings(t, path, strings.Replace(string(b), "{", "{\"agy\": 1,", 1))
+			if _, err := a.RemoveStatusLine(); err != nil {
+				t.Fatal(err)
+			}
+			if b, _ := os.ReadFile(path); !strings.Contains(string(b), "keep") || strings.Contains(string(b), "statusLine") {
+				t.Fatalf("after teardown:\n%s", b)
+			}
+		})
 	}
 }

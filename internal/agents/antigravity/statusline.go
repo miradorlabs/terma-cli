@@ -358,6 +358,8 @@ func (a Agent) StatusLineState(string) (agents.StatusLineState, error) {
 		if rec != nil {
 			st.Renderer, st.Stacked = rec.Renderer, rec.Renderer == ""
 		}
+	case cur != nil && isAntigravityStatusLineOurs(command):
+		st.Disabled = true
 	case rec != nil:
 		st.Replaced = true
 	}

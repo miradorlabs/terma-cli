@@ -58,6 +58,13 @@ func TestStatusLineVerdictInBothCommands(t *testing.T) {
 			status: "replaced by your own since terma wrapped it — plan usage is NOT captured (run `terma setup`)",
 		},
 		{
+			name:         "switched off",
+			st:           agents.StatusLineState{Disabled: true},
+			capture:      doctor.StatusLineSwitchedOff,
+			doctorStatus: doctor.Warn, doctorDetail: `switched off ("enabled": false); plan usage is not captured`,
+			status: "switched off (\"enabled\": false) — plan usage is NOT captured (run `terma setup`)",
+		},
+		{
 			name:         "never wrapped",
 			capture:      doctor.StatusLineNotWrapped,
 			doctorStatus: doctor.Warn, doctorDetail: "not wrapped; plan usage is not captured",

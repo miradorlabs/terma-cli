@@ -96,6 +96,13 @@ const antigravityTurnsKept = 32
 // output) is skipped unread.
 const antigravityLineLimit = 8 << 20
 
+// antigravityHeadLen is how much of an overlong line is kept to tell its type: agy writes
+// step_index, source and type first.
+const antigravityHeadLen = 256
+
+// antigravityUnknownTurn opens the turn of a prompt too long to read; no hook decides it.
+const antigravityUnknownTurn = "?"
+
 // antigravityStep is the part of a transcript line terma reads.
 type antigravityStep struct {
 	StepIndex       *int64                `json:"step_index"`
@@ -333,7 +340,7 @@ func readAntigravitySteps(path string, last antigravityCallState, emit func(s an
 	}
 	br := bufio.NewReader(f)
 	for {
-		line, n, err := antigravityLine(br)
+		line, head, n, err := antigravityLine(br)
 		if err != nil {
 			// A line without its newline is still being written.
 			if errors.Is(err, io.EOF) {
@@ -343,8 +350,12 @@ func readAntigravitySteps(path string, last antigravityCallState, emit func(s an
 			return state, err
 		}
 		if line == nil {
-			// Too long to read: no call line is; what results it may have held are unknown.
+			// Too long to read: what results it may have held are unknown. A prompt starts a
+			// turn no hook can name: its calls, and any after it, belong to no turn decided.
 			state.Results = nil
+			if bytes.Contains(head, []byte(`"USER_INPUT"`)) {
+				state.Turn = antigravityUnknownTurn + strconv.FormatInt(state.Offset, 10)
+			}
 			state.Offset += n
 			continue
 		}
@@ -397,14 +408,16 @@ func readAntigravitySteps(path string, last antigravityCallState, emit func(s an
 }
 
 // antigravityLine reads one whole line, or nil for one longer than antigravityLineLimit,
-// and the bytes it took; at the end of the file it returns io.EOF and takes none.
-func antigravityLine(br *bufio.Reader) ([]byte, int64, error) {
-	var line []byte
-	var n int64
+// the line's first antigravityHeadLen bytes, which name its type, and the bytes it took;
+// at the end of the file it returns io.EOF and takes none.
+func antigravityLine(br *bufio.Reader) (line, head []byte, n int64, err error) {
 	over := false
 	for {
 		chunk, err := br.ReadSlice('\n')
 		n += int64(len(chunk))
+		if len(head) < antigravityHeadLen {
+			head = append(head, chunk[:min(len(chunk), antigravityHeadLen-len(head))]...)
+		}
 		if !over && len(line)+len(chunk) <= antigravityLineLimit {
 			line = append(line, chunk...)
 		} else {
@@ -414,11 +427,11 @@ func antigravityLine(br *bufio.Reader) ([]byte, int64, error) {
 		case errors.Is(err, bufio.ErrBufferFull):
 			continue
 		case err != nil:
-			return nil, 0, err
+			return nil, nil, 0, err
 		case over:
-			return nil, n, nil
+			return nil, head, n, nil
 		}
-		return line, n, nil
+		return line, head, n, nil
 	}
 }
 

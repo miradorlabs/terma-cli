@@ -310,6 +310,8 @@ func StatusLineSummary(v StatusLineVerdict) string {
 			return "capturing plan usage; the agent's own line is unchanged"
 		}
 		return "capturing plan usage (terma's default line)"
+	case StatusLineSwitchedOff:
+		return `switched off ("enabled": false) — plan usage is NOT captured (run ` + "`terma setup`" + `)`
 	case StatusLineReplaced:
 		return "replaced by your own since terma wrapped it — plan usage is NOT captured (run `terma setup`)"
 	}

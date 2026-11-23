@@ -535,3 +535,19 @@ func TestAntigravityTurnInDoubt(t *testing.T) {
 		}
 	}
 }
+
+// A prompt too long to read starts a turn no hook can name: its calls are never filed
+// under the turn before it.
+func TestAntigravityOverlongPromptMarksItsTurnUnknown(t *testing.T) {
+	g := newTranscriptRig(t, turnsConversation, "transcript_turns.jsonl")
+	g.write(8)
+	g.hook(preInvocation, `"initialNumSteps":8,"invocationNum":0`)
+	g.drain()
+	long := `{"step_index":12,"source":"USER_EXPLICIT","type":"USER_INPUT","status":"DONE","created_at":"2026-11-20T16:52:00Z","content":"` + strings.Repeat("x", antigravityLineLimit) + `"}`
+	g.lines = append(append([]string{}, g.lines[:12]...), long, g.lines[13], g.lines[14], g.lines[15], g.lines[16])
+	g.write(len(g.lines))
+	g.hook(stop, `"executionNum":0,"fullyIdle":true,"terminationReason":"NO_TOOL_CALL"`)
+	if s := strings.Join(callSteps(g.drain()[semconv.TermaModelCallEvent]), ","); s != "step-9,step-11" {
+		t.Fatalf("sent %s, want turn 8's calls alone", s)
+	}
+}

@@ -96,11 +96,20 @@ func (s *antigravitySettings) set(key, raw string) error {
 			indent = before[i+1:]
 		}
 	}
-	if !bytes.Contains(s.obj.AfterExtra, []byte("\n")) {
-		s.obj.AfterExtra = hujson.Extra("\n")
+	// A comment before the closing brace belongs to what it follows: it stays there, after
+	// the last member's value or ahead of the new member in an empty object.
+	before := hujson.Extra("\n" + indent)
+	if comment := bytes.TrimRight(s.obj.AfterExtra, " \t\r\n"); len(comment) > 0 {
+		if n := len(s.obj.Members); n > 0 {
+			last := &s.obj.Members[n-1].Value
+			last.AfterExtra = append(last.AfterExtra, s.obj.AfterExtra...)
+		} else {
+			before = append(append(hujson.Extra{}, s.obj.AfterExtra...), before...)
+		}
 	}
+	s.obj.AfterExtra = hujson.Extra("\n")
 	s.obj.Members = append(s.obj.Members, hujson.ObjectMember{
-		Name:  hujson.Value{BeforeExtra: hujson.Extra("\n" + indent), Value: hujson.String(key)},
+		Name:  hujson.Value{BeforeExtra: before, Value: hujson.String(key)},
 		Value: hujson.Value{BeforeExtra: hujson.Extra(" "), Value: value.Value},
 	})
 	return nil
@@ -112,8 +121,20 @@ func (s *antigravitySettings) remove(key string) {
 	if i < 0 {
 		return
 	}
+	// A comment written ahead of the member stays, ahead of what follows it.
+	if comment := bytes.TrimRight(s.obj.Members[i].Name.BeforeExtra, " \t\r\n"); len(comment) > 0 {
+		next := &s.obj.AfterExtra
+		if i+1 < len(s.obj.Members) {
+			next = &s.obj.Members[i+1].Name.BeforeExtra
+		}
+		carried := append(hujson.Extra{}, comment...)
+		if !bytes.Contains(*next, []byte("\n")) {
+			carried = append(carried, '\n')
+		}
+		*next = append(carried, *next...)
+	}
 	s.obj.Members = slices.Delete(s.obj.Members, i, i+1)
-	if len(s.obj.Members) == 0 {
+	if len(s.obj.Members) == 0 && len(bytes.TrimSpace(s.obj.AfterExtra)) == 0 {
 		s.obj.AfterExtra = nil
 	}
 }

@@ -488,8 +488,10 @@ Setup also puts `terma hook antigravity-statusline` in `statusLine` in
 `~/.gemini/antigravity-cli/settings.json`. Its payload is the only place `agy` names your
 plan, its quota buckets and the account's email, which terma sends as they change. Your
 own status line keeps running behind it; without one, terma's draws nothing and `agy`'s
-built-in line stays. `terma teardown` puts the file back as it was, or only the
-`statusLine` entry when something else has changed the file since. `agy` runs a status line
+built-in line stays. The file is read as JSONC, as `agy` reads it, and its comments stay.
+Setup switches terma's line back on, and says so, when it is set `"enabled": false`;
+`terma update --refresh` leaves it as it is. `terma teardown` puts the file back as it was,
+or only the `statusLine` entry when something else has changed the file since. `agy` runs a status line
 only in its interactive CLI: an `agy -p` session reports no plan or quota.
 
 On Windows, setup lists Antigravity as Coming Soon: `agy` runs its hooks with `cmd` there,

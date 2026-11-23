@@ -28,9 +28,13 @@ func (app *App) setupStatusLine(errOut io.Writer, ui *setupUI, names []string) {
 		if len(lines) > 1 {
 			label = a.DisplayName() + " status line"
 		}
+		before, _ := a.StatusLineState("")
 		if note, ok := wrapStatusLine(errOut, a); ok {
 			fmt.Fprintf(ui.Detail(), "\n%s\n", note)
 			ui.OK(label, "reads your plan's usage windows")
+			if before.Disabled {
+				ui.Caution(label, fmt.Sprintf(`switched back on in %s (it was "enabled": false)`, output.TildePath(before.ConfigPath)))
+			}
 		} else {
 			ui.Warn(label, "not wrapped — your plan's usage windows are not captured")
 			ui.Then("Run `terma doctor` to see why the status line was not wrapped.")

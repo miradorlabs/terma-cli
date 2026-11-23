@@ -108,6 +108,8 @@ func StatusLineCheck(v StatusLineVerdict) Check {
 			return Check{Status: Pass, Detail: "capturing plan usage; the agent's own line is unchanged"}
 		}
 		return Check{Status: Pass, Detail: "capturing plan usage (terma's default line)"}
+	case StatusLineSwitchedOff:
+		return Check{Status: Warn, Detail: `switched off ("enabled": false); plan usage is not captured`, Fix: "terma setup"}
 	case StatusLineReplaced:
 		return Check{Status: Warn, Detail: "replaced by your own status line since terma wrapped it; plan usage is not captured", Fix: "terma setup"}
 	}

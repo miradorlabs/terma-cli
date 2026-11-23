@@ -79,7 +79,7 @@ func decideAntigravityTurn(turns map[string]string, turn, root string) map[strin
 	for t, d := range turns {
 		out[t] = d
 	}
-	if _, ok := out[turn]; !ok {
+	if _, ok := out[turn]; !ok && !strings.HasPrefix(turn, antigravityUnknownTurn) {
 		out[turn] = root
 	}
 	for len(out) > antigravityTurnsKept {

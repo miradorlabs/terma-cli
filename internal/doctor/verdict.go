@@ -96,6 +96,8 @@ const (
 	StatusLineDefault
 	// StatusLineReplaced means terma wrapped it once and the developer has since replaced it.
 	StatusLineReplaced
+	// StatusLineSwitchedOff means terma's line is there but switched off, so it never runs.
+	StatusLineSwitchedOff
 )
 
 // StatusLineVerdict is whether the status line captures, and what stands in its way.
@@ -130,6 +132,8 @@ func ClassifyStatusLine(st agents.StatusLineState, err error) StatusLineVerdict 
 		v.Capture = StatusLineBehind
 	case st.Installed:
 		v.Capture = StatusLineDefault
+	case st.Disabled:
+		v.Capture = StatusLineSwitchedOff
 	case st.Replaced:
 		v.Capture = StatusLineReplaced
 	default:
