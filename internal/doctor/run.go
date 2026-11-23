@@ -115,6 +115,8 @@ type Relay struct {
 	// ServiceInstalled says a relay service is installed; ServiceCurrent that it is the one
 	// this terma would install, in the environment install recorded.
 	ServiceInstalled, ServiceCurrent bool
+	// Token is the relay's token, "" before setup made one; never shown.
+	Token string
 }
 
 // SpoolState is the event queue as a run finds it.

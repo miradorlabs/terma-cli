@@ -21,6 +21,7 @@ type rules struct {
 	promptDropFields     []string
 	promptBodyEvents     []string
 	resourcePromptFields []string
+	messageFields        []string
 	toolContentFields    []string
 	toolContentEvents    []string
 	agents               []shape.CaptureRules
@@ -38,6 +39,8 @@ var generic = shape.CaptureRules{
 		"gen_ai.system_instructions", "gen_ai.tool.definitions", "gen_ai.tool.description", "gen_ai.agent.description",
 		"gen_ai.request.stop_sequences",
 		"error", "reason", "reasoning", "metadata", "value", "key", "from", "db"},
+	// The GenAI conventions' envelopes carry tool calls and their results as parts beside the text.
+	MessageFields:        []string{"gen_ai.input.messages", "gen_ai.output.messages"},
 	ResourcePromptFields: []string{"process.command_args", "process.command_line"},
 	// cwd is a local path, as file_path is.
 	ToolContentFields: []string{"gen_ai.tool.call.arguments", "gen_ai.tool.call.result", "file_path", "result", "cwd"},
@@ -45,19 +48,22 @@ var generic = shape.CaptureRules{
 
 func compose(correlators []shape.Correlator, capturers []shape.Capturer) *rules {
 	r := &rules{}
-	byAttr := map[string]shape.SessionKey{}
+	type scopedAttr struct{ attr, scope string }
+	byAttr := map[scopedAttr]shape.SessionKey{}
 	for _, c := range correlators {
 		cor := c.Correlation()
 		for _, k := range cor.SessionKeys {
-			if prev, ok := byAttr[k.Attr]; ok && prev != k {
+			at := scopedAttr{k.Attr, k.Scope}
+			if prev, ok := byAttr[at]; ok && prev != k {
 				panic(fmt.Sprintf("relay: session key %q declared as %+v and %+v", k.Attr, prev, k))
 			}
-			byAttr[k.Attr] = k
+			byAttr[at] = k
 		}
 		r.startEvents = union(r.startEvents, cor.StartEvents)
 	}
 	r.sessionKeys = slices.SortedFunc(maps.Values(byAttr), func(a, b shape.SessionKey) int {
-		return cmp.Or(cmp.Compare(a.Rank, b.Rank), strings.Compare(a.Attr, b.Attr))
+		// A key scoped to an agent's records is read there ahead of the same key unscoped.
+		return cmp.Or(cmp.Compare(a.Rank, b.Rank), strings.Compare(a.Attr, b.Attr), strings.Compare(b.Scope, a.Scope))
 	})
 	r.safeKeys, r.safePrefixes = maps.Clone(genericSafeKeys), slices.Clone(genericSafePrefixes)
 	r.metricSafeKeys = map[string][]string{}
@@ -70,6 +76,8 @@ func compose(correlators []shape.Correlator, capturers []shape.Capturer) *rules 
 		r.promptDropFields = union(r.promptDropFields, c.PromptDropFields)
 		r.promptBodyEvents = union(r.promptBodyEvents, c.PromptBodyEvents)
 		r.resourcePromptFields = union(r.resourcePromptFields, c.ResourcePromptFields)
+		r.messageFields = union(r.messageFields, c.MessageFields)
+		r.promptDropFields = union(r.promptDropFields, c.MessageFields)
 		r.toolContentFields = union(r.toolContentFields, c.ToolContentFields)
 		r.toolContentEvents = union(r.toolContentEvents, c.ToolContentEvents)
 		r.bodyPrefixes = union(r.bodyPrefixes, c.BodyPrefixes)

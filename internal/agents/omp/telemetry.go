@@ -2,17 +2,54 @@ package omp
 
 import "github.com/miradorlabs/terma-cli/internal/relay/shape"
 
-// Correlation names omp's session: session.id on the extension's logs,
-// gen_ai.conversation.id on its spans.
+// traceScope is the instrumentation scope of omp's native spans.
+const traceScope = "@oh-my-pi/pi-agent-core"
+
+// Correlation names omp's session: gen_ai.conversation.id, on its native invoke_agent, chat
+// and execute_tool spans; a subagent's spans carry its own. Its logs and metrics name no
+// session, and go by the process that sent them. The key is Claimed on omp's spans: the
+// extension claims each session and subagent it starts, but the advisor loop omp runs beside
+// a session names a conversation of its own (<session>-advisor) and starts no session.
 func (Agent) Correlation() shape.Correlation {
-	return shape.Correlation{SessionKeys: []shape.SessionKey{shape.SessionID, shape.GenAIConversationID}}
+	key := shape.GenAIConversationID
+	key.Claimed, key.Scope = true, traceScope
+	return shape.Correlation{SessionKeys: []shape.SessionKey{key}}
 }
 
-// CaptureRules are where omp's telemetry carries content.
+// CaptureRules are where omp's native telemetry carries content beyond the GenAI attributes
+// every agent shares, and the keys of its own that carry none.
 func (Agent) CaptureRules() shape.CaptureRules {
 	return shape.CaptureRules{
 		PromptDropFields: []string{"omp.gen_ai.request.messages", "omp.gen_ai.response.text"},
+		// The request restates every tool result in the conversation, and the response's
+		// tool calls are their input.
+		ToolContentFields: []string{"omp.gen_ai.request.messages", "omp.gen_ai.response.tool_calls"},
+		// The prompt log of the span-exporting extension an earlier terma wrote, until setup
+		// replaces it.
 		PromptBodyEvents: []string{"omp.user_prompt"},
+		// Strings and lists only: a number or a flag passes whatever its key (cost, token
+		// counts, latencies). Each is one omp 19.0.1 sends, read from its own export.
+		SafeKeys: []string{
+			// A tool call's outcome (ok, error, skipped, blocked, timeout, aborted), a chat's
+			// stop reason, and the reasoning effort it asked for.
+			"omp.gen_ai.tool.status", "omp.tool.status", "gen_ai.response.finish_reason", "omp.gen_ai.request.reasoning.effort",
+			// What a chat outside the agent loop was for (compaction_summary, handoff,
+			// image_question, …), and why a judgment ran (find, ttsr, judge_batch, …): OMP's own
+			// classifiers, which tell a one-off call from a turn.
+			"omp.gen_ai.oneshot.kind", "omp.gen_ai.judgment.purpose",
+			// The provider gateway by name, its base URL (as server.address names a server)
+			// and its request id.
+			"omp.gen_ai.gateway.name", "omp.gen_ai.gateway.endpoint", "omp.gen_ai.gateway.call_id",
+			// A subagent's id and name (its description is the agent's prose), and where a
+			// handoff went.
+			"gen_ai.agent.id", "omp.gen_ai.agent.id", "omp.gen_ai.agent.name",
+			"omp.gen_ai.handoff.to_agent.id", "omp.gen_ai.handoff.to_agent.name",
+			// The tools, models and providers a run had and used, by name.
+			"omp.gen_ai.request.available_tools", "omp.gen_ai.agent.tools.available",
+			"omp.gen_ai.agent.tools.invoked", "omp.gen_ai.agent.tools.unused",
+			"omp.agent.coverage.tools_available", "omp.agent.coverage.tools_invoked", "omp.agent.coverage.tools_unused",
+			"omp.agent.coverage.models_used", "omp.agent.coverage.providers_used", "omp.agent.cost.unavailable_reasons",
+		},
 	}
 }
 
