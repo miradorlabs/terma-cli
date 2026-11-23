@@ -328,3 +328,54 @@ func TestPruneAliasDeletionSerializedWithReassignment(t *testing.T) {
 		}
 	}
 }
+
+// Pruning must follow transitive alias chains (leaf -> a -> b -> root) before treating any
+// intermediate alias as orphaned when intermediate ledgers are absent or aged past Retention.
+func TestPruneMultiHopAliasChainPreservesMixed(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	runsDir := filepath.Join(dir, Dir)
+	long := time.Now().Add(-Retention - 24*time.Hour)
+	cross := long.Add(time.Minute)
+
+	start(t, dir, "mh-root", long)
+	must(t, MarkMixed(dir, "mh-root", cross, Why{Reason: Crossed, Where: "root"}))
+	must(t, Alias(dir, "mh-a", "mh-leaf"))
+	must(t, Alias(dir, "mh-b", "mh-a"))
+	must(t, Alias(dir, "mh-root", "mh-b"))
+	// Simulate intermediate ledgers never written (or already pruned) and age all aliases past Retention.
+	for _, id := range []string{"mh-leaf", "mh-a", "mh-b"} {
+		_ = os.Remove(filepath.Join(runsDir, id+".json"))
+		age(t, aliasPath(dir, id), Retention+2*time.Hour)
+	}
+	age(t, filepath.Join(runsDir, "mh-root.json"), Retention+2*time.Hour)
+
+	// Queuing leaf (and root being within MixedRetention) must keep every link in the chain.
+	Prune(context.Background(), dir, time.Now(), map[string]bool{"mh-leaf": true})
+	for _, id := range []string{"mh-leaf", "mh-a", "mh-b"} {
+		if gone(aliasPath(dir, id)) {
+			t.Fatalf("intermediate alias %s was pruned while mh-root is retained", id)
+		}
+	}
+	if _, mixed := MixedAt(dir, "mh-leaf", cross.Add(time.Second)); !mixed {
+		t.Fatal("mh-leaf lost access to retained Mixed mh-root after Prune")
+	}
+
+	// Past MixedRetention with leaf still queued: root and every chain link stay.
+	future := time.Now().Add(MixedRetention + 24*time.Hour)
+	Prune(context.Background(), dir, future, map[string]bool{"mh-leaf": true})
+	if _, mixed := MixedAt(dir, "mh-leaf", cross.Add(time.Second)); !mixed {
+		t.Fatal("queued mh-leaf lost Mixed mh-root past MixedRetention")
+	}
+
+	// Past MixedRetention and no longer queued: root and all orphaned chain links are cleaned up.
+	Prune(context.Background(), dir, future, nil)
+	if !gone(filepath.Join(runsDir, "mh-root.json")) {
+		t.Fatal("mh-root survived past MixedRetention when unqueued")
+	}
+	for _, id := range []string{"mh-leaf", "mh-a", "mh-b"} {
+		if !gone(aliasPath(dir, id)) {
+			t.Fatalf("orphaned chain alias %s survived after mh-root was pruned", id)
+		}
+	}
+}

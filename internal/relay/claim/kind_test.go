@@ -429,6 +429,9 @@ func TestKindMixedStripsProjectAndSameRepoResumeSeparatesRuns(t *testing.T) {
 		t.Fatal("unlocked legacy write proceeded while lock was held")
 	}
 	unlock()
+	savedWait := lockWait
+	lockWait = 5 * time.Second
+	t.Cleanup(func() { lockWait = savedWait })
 
 	// Untimestamped record spanning a Mark (no kind) and a kinded placement is refused.
 	if !Mark(dir, "mixed-mark", "codex", []int{10}, t0) {
@@ -767,8 +770,13 @@ func TestMixedAsideEdgeCasesAndConcurrentRead(t *testing.T) {
 		}
 		close(stop)
 		wg.Wait()
-		// On Windows, a concurrent reader's open handle can prevent os.Remove(dir) until
-		// the next Prune, though all mark files inside must already be deleted.
+		// On Windows, a concurrent reader's open file handle can block os.Remove during the
+		// fold above; once readers exit, a follow-up fold cleans up the remaining mark file.
+		if runtime.GOOS == "windows" {
+			if entries, err := os.ReadDir(asidePath(pConc)); err == nil && len(entries) > 0 {
+				Write(dir, "conc", placed(KindRepository, "github.com/acme/api", "/src/api", "r1", 10), now.Add(3*time.Second))
+			}
+		}
 		if entries, err := os.ReadDir(asidePath(pConc)); !os.IsNotExist(err) && (runtime.GOOS != "windows" || err != nil || len(entries) > 0) {
 			t.Fatalf("conc sidecar dir not cleaned after fold: entries=%d err=%v", len(entries), err)
 		}

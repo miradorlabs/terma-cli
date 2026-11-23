@@ -93,20 +93,25 @@ func update(stateDir, sessionID string, change func(*ledger)) error {
 	return editLedger(stateDir, sessionID, false, func(path string, l *ledger) error { change(l); return save(path, l) })
 }
 func editLedger(stateDir, sessionID string, try bool, edit func(path string, l *ledger) error) error {
-	return withCanonical(stateDir, sessionID, "", try, func(_, path string, l *ledger) error { return edit(path, l) })
+	return withCanonical(stateDir, sessionID, "", try, func(_, path, _ string, l *ledger) error { return edit(path, l) })
 }
 func linkAlias(stateDir, sessionID, alias string) error {
 	if !session.ValidID(alias) {
 		return fmt.Errorf("runs: invalid alias %q", alias)
 	}
-	return withCanonical(stateDir, sessionID, alias, false, func(canon, path string, l *ledger) error {
+	return withCanonical(stateDir, sessionID, alias, false, func(canon, path, oldExtra string, l *ledger) error {
 		dl, dok, _, err := resolve(stateDir, alias)
 		if err != nil {
 			return err
 		}
-		changed := !slices.Contains(l.Aliases, alias)
-		if changed {
-			l.Aliases = append(l.Aliases, alias)
+		changed, add := false, []string{alias}
+		if oldExtra == alias {
+			add = append(add, dl.Aliases...)
+		}
+		for _, a := range add {
+			if a != canon && !slices.Contains(l.Aliases, a) {
+				l.Aliases, changed = append(l.Aliases, a), true
+			}
 		}
 		if dok && mergeMixed(l, dl) || changed {
 			if err := save(path, l); err != nil {
@@ -127,7 +132,7 @@ func linkAlias(stateDir, sessionID, alias string) error {
 		return nil
 	})
 }
-func withCanonical(stateDir, sessionID, extra string, try bool, fn func(canon, path string, l *ledger) error) error {
+func withCanonical(stateDir, sessionID, extra string, try bool, fn func(canon, path, oldExtra string, l *ledger) error) error {
 	for range 8 {
 		canon, err := aliasTarget(stateDir, sessionID)
 		if err != nil || extra == canon {
@@ -159,7 +164,7 @@ func withCanonical(stateDir, sessionID, extra string, try bool, fn func(canon, p
 				err = fold(path, &l)
 			}
 			if err == nil {
-				err = fn(canon, path, &l)
+				err = fn(canon, path, oldExtra, &l)
 			}
 			return err
 		}

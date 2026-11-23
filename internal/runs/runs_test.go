@@ -599,6 +599,12 @@ func TestAliasPrecedenceAndMixedMerge(t *testing.T) {
 			t.Fatalf("transitive %s MixedAt = %v, %v; want %v, true", id, at, mixed, crossB)
 		}
 	}
+	if pos, ok := Locate(dir, "chain-c"); !ok || !slices.Contains(pos.Aliases, "chain-a") || !slices.Contains(pos.Aliases, "chain-b") {
+		t.Fatalf("Locate(chain-c).Aliases = %v, ok=%v; want chain-a and chain-b", pos.Aliases, ok)
+	}
+	if got, err := Aliases(dir, "chain-c"); err != nil || !slices.Contains(got, "chain-a") || !slices.Contains(got, "chain-b") {
+		t.Fatalf("Aliases(chain-c) = %v, %v; want chain-a and chain-b", got, err)
+	}
 	// Alias(chain-b, chain-c) must be a no-op rather than creating a cycle.
 	must(t, Alias(dir, "chain-b", "chain-c"))
 	if _, mixed := mixedAt(t, dir, "chain-b", t0.Add(3*time.Minute)); !mixed {

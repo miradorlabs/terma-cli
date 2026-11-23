@@ -42,22 +42,12 @@ type Event struct {
 	Account string `json:"account,omitempty"`
 	// NoPerson marks an event collected under a server key: no person's, so its empty
 	// Account is final, never bound to a sign-in later (AppendAsCollected). Local only.
-	NoPerson bool `json:"no_person,omitempty"`
-	// Profile is the profile whose routing state routed the event, so delivery checks that
-	// profile's routing state rather than assuming default. Local only.
-	Profile string `json:"profile,omitempty"`
-	// Enrollment is the event's destination: the enrollment it is sent to, or the one
-	// whose team holds it. Local only.
-	Enrollment string `json:"enrollment,omitempty"`
-	// HoldKey is the pending binding holding the event, which is sent only if that binding
-	// is then bound to the holding team's organization. Local only.
-	HoldKey string `json:"hold_key,omitempty"`
-	// Run is the session run the event belongs to (internal/runs). Local only.
-	Run string `json:"run,omitempty"`
-	// OwnLocation is set when the event's location is its own, as a file event's checkout
-	// or the directory an agent's turn names is, rather than its run's. Its run turning
-	// Mixed still drops it unless it carries no content (runs.Locational). Local only.
-	OwnLocation bool           `json:"own_location,omitempty"`
+	NoPerson    bool           `json:"no_person,omitempty"`
+	Profile     string         `json:"profile,omitempty"`      // profile whose routing state routed the event; local only
+	Enrollment  string         `json:"enrollment,omitempty"`   // destination enrollment sent to or holding the event; local only
+	HoldKey     string         `json:"hold_key,omitempty"`     // pending binding holding the event until bound to the team's org; local only
+	Run         string         `json:"run,omitempty"`          // session run the event belongs to (internal/runs); local only
+	OwnLocation bool           `json:"own_location,omitempty"` // event's own checkout/dir; still dropped on Mixed unless runs.Locational
 	Attrs       map[string]any `json:"attrs,omitempty"`
 }
 
@@ -307,15 +297,13 @@ func (s *Spool) Writable() error {
 	return f.Sync()
 }
 
-// Sessions calls add with the session ID of every queued event that names one, without
-// taking the append lock. A non-nil error (e.g. ctx done or ErrTooLong) means partial
-// results; callers must skip runs.Prune so queued sessions' ledgers are never deleted.
+// Sessions calls add with each queued event's session ID without locking. On non-nil error
+// (partial results), callers must skip runs.Prune so queued sessions' ledgers stay intact.
 func (s *Spool) Sessions(ctx context.Context, add func(sessionID string)) error {
 	f, err := os.Open(s.path())
 	if errors.Is(err, fs.ErrNotExist) {
 		return nil
-	}
-	if err != nil {
+	} else if err != nil {
 		return err
 	}
 	defer f.Close()
