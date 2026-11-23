@@ -2,6 +2,7 @@ package hookrun
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -76,9 +77,14 @@ func written(t *testing.T, p *pushRepo, env Env, dir string) []string {
 			out = append(out, "queued "+hookruntest.Names(evs))
 		}
 	}
-	// An observation's lock is no record; its checkpoint is.
+	// An observation's lock is no record, nor is a checkpoint with nothing pending to replay.
 	checkpoints, _ := filepath.Glob(filepath.Join(env.StateDir, "observations", "*.json"))
-	out = append(out, checkpoints...)
+	for _, path := range checkpoints {
+		var state ObservationState
+		if data, err := os.ReadFile(path); err != nil || json.Unmarshal(data, &state) != nil || state.Pending != nil {
+			out = append(out, path)
+		}
+	}
 	for _, dir := range []string{filepath.Join(env.StateDir, PushesDir), filepath.Join(p.root, ".git", project.GitStoreDir)} {
 		if entries, _ := os.ReadDir(dir); len(entries) > 0 {
 			out = append(out, "wrote in "+dir)
@@ -154,7 +160,7 @@ func TestAHookTagsWhatItWritesWithItsLane(t *testing.T) {
 			}
 			parked := spoolOpen(t)
 			parked.Bind("bbbbbbbbbbbbbbbb")
-			Env{Spool: parked, Account: "bbbbbbbbbbbbbbbb", AccountSince: time.Now().Add(-time.Hour)}.unpark(r)
+			Env{Spool: parked, Account: "bbbbbbbbbbbbbbbb"}.unpark(r)
 			if evs := hookruntest.Spooled(t, parked); len(evs) != 1 || evs[0].Account != signIn || evs[0].NoPerson != serverKey {
 				t.Fatalf("unparked %+v; want it in the lane it was parked in", evs)
 			}
@@ -180,9 +186,8 @@ func TestASignInSwitchNeverHandsAsEventsToB(t *testing.T) {
 	out, _ := lanedHook(t, p, "", false, true)
 	out.EmitFor(r, spool.Event{Name: "signed-out"})
 	// B signs in, after both, and B's hook unparks and queues.
-	signedIn := time.Now().Add(-time.Minute)
 	queue.Bind(b)
-	env = Env{StateDir: p.stateDir, Now: time.Now(), Cwd: p.root, Spool: queue, Team: p.team, Policy: hookruntest.Admitting(p.root), Account: b, AccountSince: signedIn}
+	env = Env{StateDir: p.stateDir, Now: time.Now(), Cwd: p.root, Spool: queue, Team: p.team, Policy: hookruntest.Admitting(p.root), Account: b}
 	r, err = env.Repo(context.Background())
 	if err != nil {
 		t.Fatal(err)
@@ -214,4 +219,22 @@ func spoolOpen(t *testing.T) *spool.Spool {
 		t.Fatal(err)
 	}
 	return s
+}
+
+// Signed out, the same snapshot seen again is suppressed as it is signed in: lost and
+// counted once, not at every hook.
+func TestASignedOutSnapshotIsCountedOnce(t *testing.T) {
+	p := newPushRepo(t)
+	env, dir := lanedHook(t, p, "", false, false)
+	r, err := env.Repo(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for range 3 {
+		env.CaptureObservation(context.Background(), r, Observation{Tool: "fake", Source: "fake", StateDir: "observations", SessionID: "s1", Hook: "stop",
+			Attrs: map[string]any{"turn": "t1"}})
+	}
+	if l, _ := spool.ReadLosses(dir, time.Now()); l.Counts[sendas.LostSignedOut] != 1 {
+		t.Fatalf("losses = %v; want the snapshot counted once", l.Counts)
+	}
 }

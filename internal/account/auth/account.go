@@ -50,17 +50,6 @@ func Account(dir, profile, authURL string) string {
 	return cmp.Or(AccountKey(cred.AuthURL, cred.UserID), AccountUnreadable)
 }
 
-// SignedInAt is when the profile's sign-in was signed in on this machine; zero when it is
-// signed out, can't be read, or was stored before that was recorded. It reads only
-// user-credentials.json.
-func SignedInAt(dir, profile string) time.Time {
-	cred, err := LoadIdentity(dir, profile)
-	if err != nil {
-		return time.Time{}
-	}
-	return cred.SignedInAt
-}
-
 // AccountUnreadable is Account's answer while the sign-ins can't be read: a person's maybe,
 // so never no one's, which a server key would send; and no sign-in's token is had for it.
 // What is collected under it is lost, never queued (spool.LaneOf).

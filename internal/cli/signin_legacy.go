@@ -41,7 +41,7 @@ func (app *App) retireOlderSignIns(ctx context.Context, authURL string) {
 func (app *App) retireLegacySessions(ctx context.Context, authURL string, serverKey bool) error {
 	if !auth.HasLegacySignIns(app.dir) {
 		if app.hasLegacyBacklog() {
-			_ = auth.RecordLegacy(app.stateDir, nil, auth.LegacyOwner(nil, true, serverKey), time.Now())
+			_ = auth.RecordLegacy(app.stateDir, nil, auth.LegacyOwner(nil, true, serverKey), time.Now(), app.legacyStages()...)
 		}
 		return nil
 	}
@@ -58,7 +58,7 @@ func (app *App) retireLegacySessions(ctx context.Context, authURL string, server
 		// and the next sign-in tries again. A file that names no sign-in, or doesn't parse
 		// whole, names no one; what could be read of it is still revoked and forgotten below.
 		owner := auth.LegacyOwner(signIns, whole, serverKey)
-		if auth.RecordLegacy(app.stateDir, signIns, owner, time.Now()) != nil {
+		if auth.RecordLegacy(app.stateDir, signIns, owner, time.Now(), app.legacyStages()...) != nil {
 			return
 		}
 		revokeCtx, cancel := context.WithTimeout(ctx, legacyRevokeWait)
@@ -72,6 +72,23 @@ func (app *App) retireLegacySessions(ctx context.Context, authURL string, server
 		cancel()
 		_ = auth.ForgetLegacy(app.dir)
 	})
+}
+
+// legacyStages set aside what an older terma holds in its spool file and its relay's outbox,
+// as the decision of whose it is is taken (auth.RecordLegacy).
+func (app *App) legacyStages() []auth.LegacyStage {
+	return []auth.LegacyStage{
+		{Queue: auth.LegacySpool, Stage: func() error {
+			s, err := spool.Open(filepath.Join(app.stateDir, spool.Dir))
+			if err != nil {
+				return err
+			}
+			return s.StageLegacy()
+		}},
+		{Queue: auth.LegacyOutbox, Stage: func() error {
+			return relay.StageLegacyOutbox(filepath.Join(claim.Dir(app.stateDir), relay.LegacyOutboxDir))
+		}},
+	}
 }
 
 // hasLegacyBacklog reports whether an older terma left anything queued: in its spool file or

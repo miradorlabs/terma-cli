@@ -381,3 +381,32 @@ func TestLegacyLane(t *testing.T) {
 		}
 	}
 }
+
+// The decision is taken only once every older queue is set aside: with a stage that fails,
+// as one does while an older terma's flush holds its lock, nothing is recorded, and the next
+// try sets them aside and decides. A decision taken stands, and sets nothing aside again.
+func TestRecordLegacyDecidesOnlyOnceEveryQueueIsSetAside(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	staged := map[string]int{}
+	stages := func(outbox error) []LegacyStage {
+		return []LegacyStage{
+			{Queue: LegacySpool, Stage: func() error { staged[LegacySpool]++; return nil }},
+			{Queue: LegacyOutbox, Stage: func() error { staged[LegacyOutbox]++; return outbox }},
+		}
+	}
+	if err := RecordLegacy(dir, nil, LegacyNoPerson, time.Now(), stages(errors.New("held"))...); err == nil {
+		t.Fatal("a decision whose outbox could not be set aside was recorded")
+	}
+	if rec, err := ReadLegacyRecord(dir); err != nil || rec.Account != "" {
+		t.Fatalf("record = %+v, %v; want none", rec, err)
+	}
+	for _, owner := range []string{LegacyNoPerson, LegacyAccountAmbiguous} {
+		if err := RecordLegacy(dir, nil, owner, time.Now(), stages(nil)...); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if rec, _ := ReadLegacyRecord(dir); rec.Account != LegacyNoPerson || staged[LegacySpool] != 2 || staged[LegacyOutbox] != 2 {
+		t.Fatalf("record = %+v, staged %v; want the first decision taken, each queue set aside twice", rec, staged)
+	}
+}

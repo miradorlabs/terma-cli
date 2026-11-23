@@ -141,3 +141,37 @@ func TestIngestLegacyNoPersonAndAmbiguous(t *testing.T) {
 		})
 	}
 }
+
+// What an older terma held at the decision is set aside once and taken in under it; what
+// it queues after, even if a run set the queue aside and stopped before recording it, is a
+// queue of its own, taken in as ambiguous.
+func TestStageLegacySetsAsideOnlyWhatWasThere(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	s, err := Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeLegacy(t, dir, legacyLine(t, Event{Name: "before", Time: time.Now()}))
+	if err := s.StageLegacy(); err != nil {
+		t.Fatal(err)
+	}
+	writeLegacy(t, dir, legacyLine(t, Event{Name: "after", Time: time.Now()}))
+	if err := s.StageLegacy(); err != nil { // a run that resumes
+		t.Fatal(err)
+	}
+	if err := s.IngestStaged("aaaaaaaaaaaaaaaa", false); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.IngestLegacy("", false); err != nil {
+		t.Fatal(err)
+	}
+	evs, err := s.Peek(10)
+	got := map[string]string{}
+	for _, e := range evs {
+		got[e.Name] = e.Account
+	}
+	if err != nil || len(got) != 2 || got["before"] != "aaaaaaaaaaaaaaaa" || got["after"] != "" {
+		t.Fatalf("queued %v, %v; want before under the decision and after ambiguous", got, err)
+	}
+}

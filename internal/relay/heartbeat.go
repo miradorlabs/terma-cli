@@ -43,6 +43,15 @@ func (r *Relay) heartbeat(ctx context.Context, reason, exit string) error {
 	if r.opts.HeartbeatSend == nil {
 		return errNoHeartbeat
 	}
+	if r.opts.HookLosses != nil {
+		// One at a time: a beat asked for can overlap the periodic one, and two takes of the
+		// same losses would count them twice.
+		r.hookLossesMu.Lock()
+		for reason, n := range r.opts.HookLosses() {
+			r.stats.dropped(hooksSignal, reason, n)
+		}
+		r.hookLossesMu.Unlock()
+	}
 	delta := r.stats.takeSinceBeat()
 	var attrs []*commonpb.KeyValue
 	if exit != "" {
@@ -72,6 +81,9 @@ func (r *Relay) heartbeat(ctx context.Context, reason, exit string) error {
 	r.stats.add("heartbeats_sent", 1)
 	return nil
 }
+
+// hooksSignal names, in place of a signal, what hooks lost: their events never pass the relay.
+const hooksSignal Signal = "hooks"
 
 // unclassifiedPrefix starts the counters named after an attribute (Stats.unclassified).
 const unclassifiedPrefix = "unclassified"

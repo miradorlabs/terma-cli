@@ -103,7 +103,7 @@ func (u *signInUpstream) requests() []string {
 func signedInRelay(t *testing.T, u *signInUpstream, signIn SignIn, dir, legacy string) *Relay {
 	t.Helper()
 	r := newRelay(Options{Dir: dir, Token: token, Hold: time.Minute, SignIn: signIn,
-		LegacyDir: legacyOutbox(dir), LegacyOwner: func() string { return legacy },
+		LegacyDir: legacyOutbox(dir), LegacyOwner: decided(t, dir, legacy),
 		Lookup: func(string, time.Time) (claim.Claim, bool) { return claim.Claim{ProjectID: "p1"}, true },
 		Resolve: func(claim.Claim) (Policy, error) {
 			return Policy{Endpoint: u.srv.URL, IncludePrompts: true, IncludeToolContent: true}, nil
@@ -119,6 +119,18 @@ func oneLog(session string) []byte {
 	b, _ := proto.Marshal(&logspb.LogsData{ResourceLogs: []*logspb.ResourceLogs{{ScopeLogs: []*logspb.ScopeLogs{{
 		LogRecords: []*logspb.LogRecord{{Attributes: []*commonpb.KeyValue{kv("session.id", session)}}}}}}}})
 	return b
+}
+
+// decided is Options.LegacyOwner for the decision legacy, "" for none, with what the older
+// outbox beside dir holds set aside as taking it does (auth.LegacyStage).
+func decided(t *testing.T, dir, legacy string) func() string {
+	t.Helper()
+	if legacy != "" {
+		if err := StageLegacyOutbox(legacyOutbox(dir)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return func() string { return legacy }
 }
 
 // legacyOutbox is where tests keep an older relay's outbox beside the outbox dir.
@@ -348,7 +360,7 @@ func TestAServerKeyNeverSendsAPersonsBacklog(t *testing.T) {
 	queue(t, dir, sendas.NoPersonLane) // the key's own
 	queue(t, dir, "")                  // no lane's, which this version never writes
 	r := newRelay(Options{Dir: dir, Token: token, SignIn: &testSignIn{account: sendas.NoPersonLane},
-		LegacyDir: legacyOutbox(dir), LegacyOwner: func() string { return accountB },
+		LegacyDir: legacyOutbox(dir), LegacyOwner: decided(t, dir, accountB),
 		Resolve: func(claim.Claim) (Policy, error) {
 			return Policy{Endpoint: u.srv.URL, Key: "server-key", IncludePrompts: true, IncludeToolContent: true}, nil
 		}})
@@ -426,7 +438,7 @@ func TestAnExportKeepsTheSignInItArrivedUnder(t *testing.T) {
 func serverKeyRelay(t *testing.T, u *signInUpstream, dir, legacy string) *Relay {
 	t.Helper()
 	r := newRelay(Options{Dir: dir, Token: token, SignIn: &testSignIn{account: sendas.NoPersonLane},
-		LegacyDir: legacyOutbox(dir), LegacyOwner: func() string { return legacy },
+		LegacyDir: legacyOutbox(dir), LegacyOwner: decided(t, dir, legacy),
 		Resolve: func(claim.Claim) (Policy, error) {
 			return Policy{Endpoint: u.srv.URL, Key: "server-key", IncludePrompts: true, IncludeToolContent: true}, nil
 		}})

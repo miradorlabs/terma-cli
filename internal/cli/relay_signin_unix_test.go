@@ -5,7 +5,6 @@ package cli
 import (
 	"os"
 	"testing"
-	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/account/auth"
 	"github.com/miradorlabs/terma-cli/internal/config"
@@ -108,17 +107,5 @@ func TestAnUnreadableSignInBindsTheUnreadableAccount(t *testing.T) {
 	}
 	if got := src.Account(); got != auth.AccountKey(f.srv.URL, "u-1") {
 		t.Fatalf("readable again, account = %q; want u-1's", got)
-	}
-}
-
-// An unreadable sign-in claims every unbound event at unpark, from any time, so none is
-// left no one's; a readable one takes only what came since it began.
-func TestAnUnreadableSignInClaimsWhatItUnparks(t *testing.T) {
-	cfg := &config.Config{Dir: t.TempDir(), ProfileName: config.DefaultProfile}
-	if got := accountSince(cfg, auth.AccountUnreadable); !got.Before(time.Unix(1, 0)) {
-		t.Fatalf("the unreadable account began at %v; want before any event", got)
-	}
-	if got := accountSince(cfg, "aaaaaaaaaaaaaaaa"); !got.IsZero() {
-		t.Fatalf("a sign-in with no start began at %v; want unknown", got)
 	}
 }

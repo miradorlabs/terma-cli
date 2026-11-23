@@ -15,6 +15,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/relay"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/sendas"
+	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
 // The relay and the spool's delivery send as the sign-in in place, read again at each send:
@@ -271,10 +272,12 @@ func TestARetirementCountsAfterTheSessionRotated(t *testing.T) {
 }
 
 // On a server-key profile the relay's first look records the key's decision: what an older
-// terma queued is no person's.
+// terma queued is no person's, and its spool file is set aside as the decision is taken.
 func TestTheRelaysFirstLookRecordsTheKeysDecision(t *testing.T) {
 	f := newFakeAuth(t)
 	authSandbox(t, f)
+	spoolForTest(t)
+	queueAsAnOlderTerma(t, "before")
 	data := `{"default": {"organizations": {"o": {"session_id": "s", "auth_url": "https://auth.example.test", "organization_id": "o", "user_id": "u"}}}}`
 	if err := os.WriteFile(config.LegacyCredentialsPath(testApp.dir), []byte(data), 0o600); err != nil {
 		t.Fatal(err)
@@ -292,6 +295,9 @@ func TestTheRelaysFirstLookRecordsTheKeysDecision(t *testing.T) {
 	rec, err := auth.ReadLegacyRecord(testApp.stateDir)
 	if err != nil || rec.Account != auth.LegacyNoPerson || !slices.Equal(rec.SessionIDs, []string{"s"}) {
 		t.Fatalf("record = %+v, %v; want the key's decision, with the session", rec, err)
+	}
+	if _, err := os.Stat(filepath.Join(testApp.stateDir, spool.Dir, spool.LegacyEventsFile)); err == nil {
+		t.Fatal("the older spool file was not set aside at the decision")
 	}
 }
 

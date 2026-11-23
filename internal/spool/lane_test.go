@@ -26,9 +26,9 @@ func TestNoAppendQueuesAnUntaggedEvent(t *testing.T) {
 		{"never bound", func(*Spool) {}, false, Event{Name: "e"}, sendas.LostUnreadable},
 		{"signed out", func(s *Spool) { s.Bind("") }, false, Event{Name: "e"}, sendas.LostSignedOut},
 		{"unreadable", func(s *Spool) { s.Bind(sendas.AccountUnreadable) }, false, Event{Name: "e"}, sendas.LostUnreadable},
-		{"named unreadable", func(s *Spool) { s.Bind("aaaaaaaaaaaaaaaa") }, false, Event{Name: "e", Account: sendas.AccountUnreadable}, sendas.LostUnreadable},
 		{"replayed untagged", func(s *Spool) { s.Bind("aaaaaaaaaaaaaaaa") }, true, Event{Name: "e"}, sendas.LostLegacyAmbiguous},
-		{"replayed into a signed-out spool", func(s *Spool) { s.Bind("") }, true, Event{Name: "e"}, sendas.LostSignedOut},
+		// A replay recorded with no lane is an older terma's, whatever the spool's own lane.
+		{"replayed into a signed-out spool", func(s *Spool) { s.Bind("") }, true, Event{Name: "e"}, sendas.LostLegacyAmbiguous},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
@@ -137,5 +137,45 @@ func TestAFailedAppendCountsNothing(t *testing.T) {
 	}
 	if l, _ := ReadLosses(dir, time.Now()); len(l.Counts) != 0 {
 		t.Fatalf("a failed append counted %v", l.Counts)
+	}
+}
+
+// TakeNewLosses hands out each loss once, the day's and an imported file's alike, and what
+// was counted since on the next call.
+func TestTakeNewLossesHandsOutEachLossOnce(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	s, err := Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.CountLost(sendas.LostSignedOut, 2); err != nil {
+		t.Fatal(err)
+	}
+	parked := filepath.Join(t.TempDir(), "parked")
+	if err := os.WriteFile(parked, EncodeLoss(sendas.LostAmbiguousPush, 3, time.Now()), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.ImportLosses(parked, "x1"); err != nil {
+		t.Fatal(err)
+	}
+	for i, want := range []map[string]int{
+		{sendas.LostSignedOut: 2, sendas.LostAmbiguousPush: 3},
+		{},
+	} {
+		got, err := TakeNewLosses(dir)
+		if err != nil || len(got) != len(want) || got[sendas.LostSignedOut] != want[sendas.LostSignedOut] || got[sendas.LostAmbiguousPush] != want[sendas.LostAmbiguousPush] {
+			t.Fatalf("call %d: %v, %v; want %v", i, got, err, want)
+		}
+	}
+	if err := s.CountLost(sendas.LostSignedOut, 1); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := TakeNewLosses(dir); len(got) != 1 || got[sendas.LostSignedOut] != 1 {
+		t.Fatalf("after one more: %v", got)
+	}
+	// Doctor still counts every one.
+	if l, _ := ReadLosses(dir, time.Now()); l.Counts[sendas.LostSignedOut] != 3 || l.Counts[sendas.LostAmbiguousPush] != 3 {
+		t.Fatalf("doctor's losses = %v", l.Counts)
 	}
 }

@@ -181,7 +181,7 @@ func (s *Spool) appendEvents(ctx context.Context, bind bool, events []Event) err
 		if bind && e.Account == "" && !e.NoPerson {
 			e.Account, e.NoPerson = s.lane.Account, s.lane.NoPerson
 		}
-		if why := untagged(e, s.lane); why != "" {
+		if why := untagged(e, s.lane, bind); why != "" {
 			lost[why]++
 			continue
 		}

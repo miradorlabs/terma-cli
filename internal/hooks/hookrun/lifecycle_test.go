@@ -157,7 +157,7 @@ func TestTouchNamesEachCheckoutByIDAndReportNone(t *testing.T) {
 	sess := session.Session{ID: "sess-checkout-id", Tool: "claude-code"}
 	paths := []string{filepath.Join(own, "a.go"), filepath.Join(other, "b.go")}
 	env.Touch(r, sess, "Edit", paths, nil)
-	env.Report(r, sess, "Bash", paths, nil)
+	env.ReportExpected(r, sess, nil, "Bash", paths, nil)
 
 	events := hookruntest.Spooled(t, sp)
 	if len(events) != 4 {

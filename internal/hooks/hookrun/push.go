@@ -19,7 +19,9 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/gitx"
 	"github.com/miradorlabs/terma-cli/internal/procinfo"
+	"github.com/miradorlabs/terma-cli/internal/project"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
+	"github.com/miradorlabs/terma-cli/internal/sendas"
 	"github.com/miradorlabs/terma-cli/internal/session"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 	"github.com/miradorlabs/terma-cli/internal/trailer"
@@ -30,8 +32,13 @@ import (
 // was given to a record under PushesDir and hands it to a detached AwaitPush; a record
 // no AwaitPush finished is resolved by SweepPushes. pre-push itself starts no git.
 
-// PushesDir holds, under the state directory, the pushes waiting to be reported.
-const PushesDir = "pushes"
+// PushesDir holds, under the state directory, the pushes waiting to be reported. Its name is
+// new to this version, so an older terma's sweep never reports, and strips, a tagged record.
+const PushesDir = "pushes-v2"
+
+// legacyPushesDir is where an older terma (v0.3.x) keeps its pushes, whose records name no
+// lane: reported, they are queued where it queues (spool.AppendLegacy).
+const legacyPushesDir = "pushes"
 
 const (
 	// MaxPushCommits bounds terma.push.commits; terma.push.commit.count stays the count.
@@ -107,8 +114,12 @@ type pushRecord struct {
 	// Excluded are the remote's branches as its remote-tracking refs showed them before the
 	// push: a new branch's commits are those none of them has.
 	Excluded []string `json:"excluded,omitempty"`
-	// Event is the stamped event every ref's report starts from.
+	// Event is the stamped event every ref's report starts from. Its lane is the pre-push
+	// hook's; with none, the hook was in an agent's sandbox, and each ref's report takes its
+	// sessions' (recordLane).
 	Event spool.Event `json:"event"`
+	// legacy is a record an older terma wrote (legacyPushesDir).
+	legacy bool
 }
 
 // PrePush records a push for AwaitPush, which reports it once git push exits. It reads
@@ -126,7 +137,7 @@ func PrePush(ctx context.Context, env Env) error {
 		return nil
 	}
 	refs := ParsePushInput(string(input))
-	if len(refs) == 0 || env.lost(len(refs)) {
+	if len(refs) == 0 || env.lostOutside(r, len(refs)) {
 		return nil
 	}
 	// git names a push to a URL by the URL twice; a URL never goes out as a remote's name.
@@ -179,36 +190,37 @@ func PrePush(ctx context.Context, env Env) error {
 	return nil
 }
 
-// unparkPushes records the pushes a sandboxed pre-push parked in r's git directory and starts their
-// AwaitPush, which reports each at once, its git push long gone.
+// unparkPushes records the pushes a sandboxed pre-push parked in r's git directory, as they
+// were parked, and starts their AwaitPush, which reports each at once, its git push long gone.
+// What an older terma parked is recorded where it records them.
 func (e Env) unparkPushes(r *Repo) {
 	if e.AwaitPush == nil {
 		return
 	}
-	var recorded []string
-	err := r.parking().Unpark(parkedPushes, func(lines []byte) error {
-		for line := range bytes.Lines(lines) {
-			var rec pushRecord
-			if json.Unmarshal(line, &rec) != nil || rec.ID == "" {
-				continue
+	for name, dir := range map[string]string{parkedPushes: PushesDir, legacyParkedPushes: legacyPushesDir} {
+		var recorded []string
+		err := r.parking().Unpark(name, func(lines []byte) error {
+			for line := range bytes.Lines(lines) {
+				var rec pushRecord
+				if json.Unmarshal(line, &rec) != nil || rec.ID == "" {
+					continue
+				}
+				path := filepath.Join(e.StateDir, dir, rec.ID+".json")
+				if err := config.WriteJSON(path, rec, 0o600); err != nil {
+					return err
+				}
+				recorded = append(recorded, path)
 			}
-			// Bound as unparked events are: a sandboxed pre-push could not read the sign-in.
-			e.bindReplayed(&rec.Event)
-			path := filepath.Join(e.StateDir, PushesDir, rec.ID+".json")
-			if err := config.WriteJSON(path, rec, 0o600); err != nil {
-				return err
-			}
-			recorded = append(recorded, path)
+			return nil
+		})
+		if err != nil {
+			// Still parked: the next hook records them all again and awaits each once.
+			e.Logf("unpark pushes: %v", err)
+			continue
 		}
-		return nil
-	})
-	if err != nil {
-		// Still parked: the next hook records them all again and awaits each once.
-		e.Logf("unpark pushes: %v", err)
-		return
-	}
-	for _, path := range recorded {
-		e.AwaitPush(path)
+		for _, path := range recorded {
+			e.AwaitPush(path)
+		}
 	}
 }
 
@@ -230,9 +242,14 @@ func AwaitPush(ctx context.Context, env Env, path string) {
 }
 
 // SweepPushes reports the pushes whose AwaitPush never finished: one the machine slept
-// through, or that was killed.
+// through, or that was killed, and an older terma's.
 func SweepPushes(ctx context.Context, env Env) {
-	dir := filepath.Join(env.StateDir, PushesDir)
+	for _, name := range []string{PushesDir, legacyPushesDir} {
+		sweepPushes(ctx, env, filepath.Join(env.StateDir, name))
+	}
+}
+
+func sweepPushes(ctx context.Context, env Env, dir string) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return
@@ -277,6 +294,7 @@ func readPush(path string) (pushRecord, error) {
 	if rec.ID == "" || rec.Root == "" || rec.GitDir == "" {
 		return rec, errors.New("incomplete push record")
 	}
+	rec.legacy = filepath.Base(filepath.Dir(path)) == legacyPushesDir
 	return rec, nil
 }
 
@@ -296,10 +314,29 @@ func reportPush(ctx context.Context, env Env, path string, rec pushRecord) {
 		if ref.Reported {
 			continue
 		}
-		if ev, ok := pushEvent(ctx, env, rec, i, ref, exited); ok && env.emitAsCollected(ev) {
-			emitted, rec.Refs[i].Reported = true, true
-		} else {
+		ev, sessions, ok := pushEvent(ctx, env, rec, i, ref, exited)
+		switch {
+		case !ok:
 			failed = true
+		case rec.legacy:
+			if line, err := json.Marshal(ev); err == nil && env.Spool != nil && env.Spool.AppendLegacy(append(line, '\n')) == nil {
+				emitted, rec.Refs[i].Reported = true, true
+			} else {
+				failed = true
+			}
+		default:
+			lane, owned := recordLane(rec.lane(), accountsOf(pushStore(env, rec), sessions))
+			if !owned {
+				env.countLost(nil, sendas.LostAmbiguousPush, 1)
+				rec.Refs[i].Reported = true
+				continue
+			}
+			ev.Account, ev.NoPerson = lane.Account, lane.NoPerson
+			if env.emitAsCollected(ev) {
+				emitted, rec.Refs[i].Reported = true, true
+			} else {
+				failed = true
+			}
 		}
 	}
 	// A ref that could not be reported is retried by a later sweep, for a while; the record
@@ -317,8 +354,27 @@ func reportPush(ctx context.Context, env Env, path string, rec pushRecord) {
 	}
 }
 
-// pushEvent is the report of one ref of a push; ok is false when its commits cannot be read.
-func pushEvent(ctx context.Context, env Env, rec pushRecord, i int, ref PushRef, exited bool) (spool.Event, bool) {
+// lane is the pre-push hook's lane, as its record's event names it: with none, the hook could
+// not read its sign-in, in an agent's sandbox.
+func (rec pushRecord) lane() spool.Lane {
+	if rec.Event.Account == "" && !rec.Event.NoPerson {
+		return spool.Lane{Lost: sendas.LostUnreadable}
+	}
+	return spool.Lane{Account: rec.Event.Account, NoPerson: rec.Event.NoPerson}
+}
+
+// pushStore is the session store of the checkout rec pushed from.
+func pushStore(env Env, rec pushRecord) *session.Store {
+	dir, err := project.StoreDir(env.StateDir, rec.Root, rec.GitDir)
+	if err != nil {
+		return session.Open(filepath.Join(rec.GitDir, project.GitStoreDir))
+	}
+	return session.Open(dir)
+}
+
+// pushEvent is the report of one ref of a push, and the sessions stamped into the commits it
+// pushed; ok is false when its commits cannot be read.
+func pushEvent(ctx context.Context, env Env, rec pushRecord, i int, ref PushRef, exited bool) (spool.Event, []trailer.Trailer, bool) {
 	attrs := maps.Clone(rec.Event.Attrs)
 	if attrs == nil {
 		attrs = map[string]any{}
@@ -341,7 +397,7 @@ func pushEvent(ctx context.Context, env Env, rec pushRecord, i int, ref PushRef,
 	commits, err := gitx.Commits(ctx, rec.Root, ref.LocalSHA, exclude, maxPushWalk)
 	if err != nil {
 		env.Logf("pushed commits: %v", err)
-		return spool.Event{}, false
+		return spool.Event{}, nil, false
 	}
 	shas, sessions := pushedLists(commits)
 	ids := sessionIDs(sessions)
@@ -367,7 +423,7 @@ func pushEvent(ctx context.Context, env Env, rec pushRecord, i int, ref PushRef,
 	if len(ids) > 0 {
 		ev.SessionID = ids[0]
 	}
-	return ev, true
+	return ev, sessions, true
 }
 
 // pushedLists are the commit ids terma.push.commits lists, at most MaxPushCommits, and the

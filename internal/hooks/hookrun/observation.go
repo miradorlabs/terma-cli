@@ -119,8 +119,13 @@ func (e Env) CaptureObservation(ctx context.Context, r *Repo, o Observation) {
 	if state.LastHash == hash && !e.Time().Before(state.At) && e.Time().Sub(state.At) < QuotaHeartbeat {
 		return
 	}
-	// No lane, no checkpoint: nothing of it is written, to be replayed later.
-	if e.lost(1) {
+	// No lane, nothing of it is written to be replayed later; only that it was seen, so the
+	// same snapshot again is suppressed, not counted lost again.
+	if e.lost(r, 1) {
+		state.LastHash, state.At = hash, e.Time()
+		if err = write(); err != nil {
+			e.Logf("%s checkpoint: %v", o.Tool, err)
+		}
 		return
 	}
 	state.Sequence++

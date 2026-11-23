@@ -62,7 +62,6 @@ func (app *App) pushEnv() hookrun.Env {
 		}
 	default:
 		env.Account = auth.Account(cfg.Dir, cfg.ProfileName, cfg.AuthURL)
-		env.AccountSince = accountSince(cfg, env.Account)
 		if env.Spool != nil {
 			env.Spool.Bind(env.Account)
 		}
@@ -220,26 +219,26 @@ func (app *App) flushSpool(ctx context.Context, force bool, minInterval time.Dur
 	return r.Flush(ctx, s, cfg, force, minInterval), nil
 }
 
-// ingestLegacySpool takes what an older terma queued into s, tagged by the one decision
-// the legacy record keeps (auth.LegacyOwnership), in the lane the relay takes it to
-// (auth.LegacyLane): its person's, no person's, or, when ambiguous or not understood,
-// neither, so it never leaves. With no decision yet, or a record that can't be
-// read, it stays where it is. An older terma's hook may still be queueing, so every flush
-// takes what is new.
+// ingestLegacySpool takes what an older terma queued into s. What it held at the one
+// decision the legacy record keeps (auth.LegacyOwnership) was set aside as it was taken
+// (legacyStages), and is taken in under it: its person's, no person's, or, when ambiguous or
+// not understood, neither, so it never leaves. An older terma's hook may still be queueing,
+// so every flush takes what is new, as ambiguous: a sign-in since may be someone else's.
+// With no decision yet, or a record that can't be read, it stays where it is.
 func (app *App) ingestLegacySpool(s *spool.Spool, serverKey bool) {
-	rec, err := auth.LegacyOwnership(app.dir, app.stateDir, serverKey)
-	lane := auth.LegacyLane(rec.Account)
-	if err != nil || lane == "" {
+	rec, err := auth.LegacyOwnership(app.dir, app.stateDir, serverKey, app.legacyStages()...)
+	if err != nil || rec.Account == "" {
 		return
 	}
-	switch lane {
+	switch lane := auth.LegacyLane(rec.Account); lane {
 	case auth.LegacyNoPerson:
-		_ = s.IngestLegacy("", true)
+		_ = s.IngestStaged("", true)
 	case auth.LegacyAccountAmbiguous:
-		_ = s.IngestLegacy("", false)
+		_ = s.IngestStaged("", false)
 	default:
-		_ = s.IngestLegacy(lane, false)
+		_ = s.IngestStaged(lane, false)
 	}
+	_ = s.IngestLegacy("", false)
 }
 
 var errTornDown = errors.New("terma is not set up on this machine; run `terma setup`")

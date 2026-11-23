@@ -14,6 +14,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/relay"
 	"github.com/miradorlabs/terma-cli/internal/sendas"
+	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
 // signInSource is the profile's sign-in as the relay and the spool's delivery send with it:
@@ -233,8 +234,12 @@ func (app *App) bindRelay(engine *relay.Options, cfg *config.Config) {
 		}
 		p := file.Profiles[cfg.ProfileName]
 		return p != nil && p.ServerKeySignIn, nil
-	})
+	}, app.legacyStages()...)
 	engine.LegacyOwner = func() string { return legacy().Account }
+	engine.HookLosses = func() map[string]int {
+		losses, _ := spool.TakeNewLosses(filepath.Join(app.stateDir, spool.Dir))
+		return losses
+	}
 	engine.LegacySessionIDs = func() []string {
 		if rec := legacy(); rec.Recent(time.Now()) {
 			return rec.SessionIDs
@@ -246,10 +251,10 @@ func (app *App) bindRelay(engine *relay.Options, cfg *config.Config) {
 // cachedLegacyRecord reads the legacy record again whenever a file it depends on changed
 // (the record, the older terma's credentials.json, config.json for the profile's mode), and
 // on a server-key profile records the key's decision if none is kept
-// (auth.LegacyOwnership). A read that fails keeps the last record, the zero one at first:
-// a record that can't be read, or a profile's mode that can't, is no decision, never a
-// server key's. It is not kept either, so it is read again next time.
-func cachedLegacyRecord(dir, stateDir string, serverKey func() (bool, error)) func() auth.LegacyRecord {
+// (auth.LegacyOwnership). A read that fails is the zero record: a record that can't be read,
+// or a profile's mode that can't, is no decision, never a server key's, nor the one its
+// changed file held before. It is not kept either, so it is read again next time.
+func cachedLegacyRecord(dir, stateDir string, serverKey func() (bool, error), stages ...auth.LegacyStage) func() auth.LegacyRecord {
 	var mu sync.Mutex
 	var rec auth.LegacyRecord
 	var files [3]os.FileInfo
@@ -262,12 +267,12 @@ func cachedLegacyRecord(dir, stateDir string, serverKey func() (bool, error)) fu
 		if read && unchanged(files[0], now[0]) && unchanged(files[1], now[1]) && unchanged(files[2], now[2]) {
 			return rec
 		}
-		read = false
+		read, rec = false, auth.LegacyRecord{}
 		sk, err := serverKey()
 		if err != nil {
 			return rec
 		}
-		got, err := auth.LegacyOwnership(dir, stateDir, sk)
+		got, err := auth.LegacyOwnership(dir, stateDir, sk, stages...)
 		if err != nil {
 			return rec
 		}

@@ -12,6 +12,7 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/account/auth"
 	"github.com/miradorlabs/terma-cli/internal/config"
+	"github.com/miradorlabs/terma-cli/internal/flock"
 	"github.com/miradorlabs/terma-cli/internal/relay"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/spool"
@@ -67,8 +68,9 @@ func queued(t *testing.T, s *spool.Spool) map[string]spool.Event {
 }
 
 // A person's sign-in that retires older sign-ins naming them alone decides their backlog is
-// theirs: the older queue's lines, and what an older terma still running queues after, go to
-// that person's lane, and the relay takes an older relay's parts into it too.
+// theirs: the older queue's lines go to that person's lane, once, and the relay takes an
+// older relay's parts into it too, once. What an older terma still running queues after
+// is no one sign-in's: a sign-in since may be someone else's.
 func TestAPersonsRetirementTakesTheOlderQueueIntoTheirLane(t *testing.T) {
 	f := newFakeAuth(t)
 	authSandbox(t, f)
@@ -84,6 +86,9 @@ func TestAPersonsRetirementTakesTheOlderQueueIntoTheirLane(t *testing.T) {
 	}
 	want := auth.AccountKey(f.srv.URL, "u-1")
 	testApp.ingestLegacySpool(s, false)
+	if got := queued(t, s)["before"]; got.Account != want || got.NoPerson {
+		t.Fatalf("an older terma's backlog = %+v; want it in %s's lane", got, want)
+	}
 	queueAsAnOlderTerma(t, "after")
 	// The flush takes in what the older terma queued since; with no team id, it is
 	// counted unroutable once taken.
@@ -96,13 +101,43 @@ func TestAPersonsRetirementTakesTheOlderQueueIntoTheirLane(t *testing.T) {
 	}
 	queueAsAnOlderTerma(t, "later")
 	testApp.ingestLegacySpool(s, false)
-	if got := queued(t, s)["later"]; got.Account != want || got.NoPerson {
-		t.Fatalf("an older terma's later event = %+v; want it in %s's lane", got, want)
+	if got := queued(t, s)["later"]; got.Account != "" || got.NoPerson {
+		t.Fatalf("an older terma's later event = %+v; want it ambiguous", got)
 	}
 	var engine relay.Options
 	testApp.bindRelay(&engine, cfg)
 	if got := engine.LegacyOwner(); got != want {
 		t.Fatalf("the relay takes an older relay's parts in as %q, want %q", got, want)
+	}
+}
+
+// The decision sets the older queues aside as it is taken, at sign-in: what an older terma
+// queues after, before any flush or relay sweep, is ambiguous, never the decision's.
+func TestTheDecisionSetsTheOlderQueuesAsideAtSignIn(t *testing.T) {
+	f := newFakeAuth(t)
+	authSandbox(t, f)
+	writeOlderSignIns(t, f.srv.URL, "u-1")
+	s := spoolForTest(t)
+	queueAsAnOlderTerma(t, "before")
+	outbox := filepath.Join(claim.Dir(testApp.stateDir), relay.LegacyOutboxDir)
+	if err := os.MkdirAll(filepath.Join(outbox, "p1"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := testApp.loadConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := testApp.storeLogin(context.Background(), cfg, storedSession(f)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(outbox); !errors.Is(err, fs.ErrNotExist) {
+		t.Fatalf("the older outbox was not set aside at sign-in: %v", err)
+	}
+	queueAsAnOlderTerma(t, "between")
+	testApp.ingestLegacySpool(s, false)
+	got := queued(t, s)
+	if want := auth.AccountKey(f.srv.URL, "u-1"); got["before"].Account != want || got["between"].Account != "" || got["between"].NoPerson {
+		t.Fatalf("queued %+v; want before under the decision, and between ambiguous", got)
 	}
 }
 
@@ -241,5 +276,90 @@ func TestAnUnknownDecisionIsAmbiguous(t *testing.T) {
 	testApp.ingestLegacySpool(s, false)
 	if got, ok := queued(t, s)["theirs"]; !ok || got.Account != "" || got.NoPerson {
 		t.Fatalf("taken in as %+v (%v); want it untagged", got, ok)
+	}
+}
+
+// An older terma's flush holding its queue's lock through a sign-in leaves the older queue
+// where it is, and so no decision and the older sign-ins kept: a decision taken without its
+// queue set aside would take in what it queues later. The next sign-in decides, and sets
+// aside what the older terma queued meanwhile too, which came before the decision.
+func TestASignInDuringAnOlderFlushDecidesNothing(t *testing.T) {
+	f := newFakeAuth(t)
+	authSandbox(t, f)
+	writeOlderSignIns(t, f.srv.URL, "u-1")
+	s := spoolForTest(t)
+	queueAsAnOlderTerma(t, "before")
+	release, err := flock.Lock(context.Background(), filepath.Join(testApp.stateDir, spool.Dir, "delivery.lock"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := testApp.loadConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := testApp.storeLogin(context.Background(), cfg, storedSession(f)); err != nil {
+		t.Fatal(err)
+	}
+	if rec, err := auth.ReadLegacyRecord(testApp.stateDir); err != nil || rec.Account != "" {
+		t.Fatalf("record = %+v, %v; want no decision while the older flush held its queue", rec, err)
+	}
+	if !auth.HasLegacySignIns(testApp.dir) {
+		t.Fatal("the older sign-ins went with no decision kept")
+	}
+	release()
+	queueAsAnOlderTerma(t, "between")
+	if err := testApp.storeLogin(context.Background(), cfg, storedSession(f)); err != nil {
+		t.Fatal(err)
+	}
+	testApp.ingestLegacySpool(s, false)
+	want := auth.AccountKey(f.srv.URL, "u-1")
+	if got := queued(t, s); got["before"].Account != want || got["between"].Account != want {
+		t.Fatalf("queued %+v; want both under the decision taken after them", got)
+	}
+}
+
+// What a sign-in set aside before it failed to decide is still an older terma's backlog
+// with its sign-ins gone: the next sign-in decides, and takes it in under the decision.
+func TestASetAsideBacklogWithNoDecisionIsDecidedLater(t *testing.T) {
+	for _, queue := range []string{auth.LegacySpool, auth.LegacyOutbox} {
+		t.Run(queue, func(t *testing.T) {
+			f := newFakeAuth(t)
+			authSandbox(t, f)
+			s := spoolForTest(t)
+			outbox := filepath.Join(claim.Dir(testApp.stateDir), relay.LegacyOutboxDir)
+			if queue == auth.LegacySpool {
+				queueAsAnOlderTerma(t, "before")
+				if err := s.StageLegacy(); err != nil {
+					t.Fatal(err)
+				}
+			} else {
+				route := filepath.Join(outbox, "770e8400-e29b-41d4-a716-446655440000", "_", "_")
+				if err := os.MkdirAll(route, 0o700); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(filepath.Join(route, "00000000000000000001-000001-logs-1.pb"), nil, 0o600); err != nil {
+					t.Fatal(err)
+				}
+				if err := relay.StageLegacyOutbox(outbox); err != nil {
+					t.Fatal(err)
+				}
+			}
+			cfg, err := testApp.loadConfig()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := testApp.storeLogin(context.Background(), cfg, storedSession(f)); err != nil {
+				t.Fatal(err)
+			}
+			if rec, err := auth.ReadLegacyRecord(testApp.stateDir); err != nil || rec.Account != auth.LegacyAccountAmbiguous {
+				t.Fatalf("record = %+v, %v; want the set-aside backlog decided (no one's sign-ins left: ambiguous)", rec, err)
+			}
+			if queue == auth.LegacySpool {
+				testApp.ingestLegacySpool(s, false)
+				if got, ok := queued(t, s)["before"]; !ok || got.Account != "" || got.NoPerson {
+					t.Fatalf("queued %+v; want the set-aside event taken in under the decision", queued(t, s))
+				}
+			}
+		})
 	}
 }

@@ -641,3 +641,50 @@ func TestCodexShellTargetInAWorktreeIsNotMirrored(t *testing.T) {
 		t.Fatalf("a developer's worktree commit was stamped from a Codex shell target:\n%s", data)
 	}
 }
+
+// A's Codex session, once B has signed in: a shell call, writing alone or committing too,
+// records and spools nothing of it under B, at PreToolUse or PostToolUse, and the call's
+// one event is counted lost as account_conflict.
+func TestCodexShellCallsOfAnotherPersonsSessionSendNothing(t *testing.T) {
+	for _, command := range []string{"printf x > p.txt", "printf x > p.txt && git add p.txt && git commit -m p"} {
+		t.Run(command, func(t *testing.T) {
+			ctx := context.Background()
+			root := hookruntest.InitRepo(t)
+			const id = "01a1204e-2470-7e31-859b-486d42353987"
+			asA := session.Open(filepath.Join(root, ".git", "terma"))
+			asA.Bind("aaaaaaaaaaaaaaaa")
+			if err := asA.Touch(session.Session{ID: id, Tool: codexTool}, []string{"a.go"}, time.Now()); err != nil {
+				t.Fatal(err)
+			}
+			dir := t.TempDir()
+			sp, _ := spool.Open(dir)
+			sp.Bind("bbbbbbbbbbbbbbbb")
+			stateDir := t.TempDir()
+			run := func(event string, handler func(context.Context, hookrun.Env) error) {
+				env := hookrun.Env{StateDir: stateDir, Now: time.Now(), Cwd: root, Policy: hookruntest.Admitting(root), Spool: sp, Version: "test",
+					Account: "bbbbbbbbbbbbbbbb", Stdin: strings.NewReader(`{"session_id":"` + id + `","turn_id":"t1","cwd":` + strconv.Quote(root) +
+						`,"hook_event_name":"` + event + `","model":"gpt-6.1-sol","tool_name":"Bash","tool_input":{"command":` + strconv.Quote(command) +
+						`},"tool_use_id":"exec-1","tool_response":{"exit_code":0,"output":""}}`)}
+				if err := handler(ctx, env); err != nil {
+					t.Fatal(err)
+				}
+			}
+			run("PreToolUse", preToolUse)
+			hookruntest.WriteFile(t, root, "p.txt", "x")
+			if strings.Contains(command, "commit") {
+				for _, args := range [][]string{{"add", "p.txt"}, {"commit", "-qm", "p"}} {
+					if _, err := gitx.Git(ctx, root, args...); err != nil {
+						t.Fatal(err)
+					}
+				}
+			}
+			run("PostToolUse", postToolUse)
+			if touched := hookruntest.Named(hookruntest.Spooled(t, sp), semconv.TermaFilesTouchedEvent); len(touched) != 0 {
+				t.Errorf("B spooled %+v of A's session", touched)
+			}
+			if l, _ := spool.ReadLosses(dir, time.Now()); l.Counts["account_conflict"] != 1 {
+				t.Errorf("losses = %v; want the call counted account_conflict once", l.Counts)
+			}
+		})
+	}
+}

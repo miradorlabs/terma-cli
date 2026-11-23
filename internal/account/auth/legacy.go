@@ -188,6 +188,23 @@ type LegacyRecord struct {
 	RetiredAt  time.Time `json:"retired_at"`
 }
 
+// The older queues the decision is taken into once: the spool, with what an older terma
+// parked or recorded as it goes there, and the relay's outbox.
+const (
+	LegacySpool  = "spool"
+	LegacyOutbox = "outbox"
+)
+
+// LegacyStage sets aside what an older terma holds in its queue Queue (LegacySpool or
+// LegacyOutbox) as the decision of whose it is is taken (RecordLegacy), to be taken in under
+// it: what the older terma queues after goes to a queue of its own, which is ambiguous. A
+// stage that finds something set aside already, by a run that stopped before recording the
+// decision, does nothing.
+type LegacyStage struct {
+	Queue string
+	Stage func() error
+}
+
 // LegacyAccountAmbiguous is the decision for retired sign-ins that named more than one
 // person or environment, or none, or a file that did not read whole: what an older terma
 // queued was collected by people, but no one sign-in may send it, and neither may a server
@@ -238,8 +255,10 @@ func LegacyOwner(signIns []LegacySignIn, whole, serverKey bool) string {
 // RecordLegacy keeps, under the state directory stateDir, owner as the decision for what an
 // older terma queued, and signIns' sessions for the heartbeat. The first decision written
 // stands: a later one only adds session ids. A record that can't be read is not taken for
-// none, and nothing is written.
-func RecordLegacy(stateDir string, signIns []LegacySignIn, owner string, now time.Time) error {
+// none, and nothing is written. The decision is taken only once every one of stages has set
+// its older queue aside, under the same lock, so nothing an older terma queues after it is
+// ever taken in under it: with one that fails, nothing is written, and the error says so.
+func RecordLegacy(stateDir string, signIns []LegacySignIn, owner string, now time.Time, stages ...LegacyStage) error {
 	return withLegacyRecord(stateDir, func() error {
 		rec, err := ReadLegacyRecord(stateDir)
 		if err != nil {
@@ -247,6 +266,11 @@ func RecordLegacy(stateDir string, signIns []LegacySignIn, owner string, now tim
 		}
 		changed := rec.Account == ""
 		if changed {
+			for _, s := range stages {
+				if err := s.Stage(); err != nil {
+					return fmt.Errorf("set aside an older terma's %s: %w", s.Queue, err)
+				}
+			}
 			rec.Account, rec.RetiredAt = owner, now.UTC()
 		}
 		for _, s := range signIns {
@@ -268,12 +292,12 @@ func RecordLegacy(stateDir string, signIns []LegacySignIn, owner string, now tim
 // what an older terma queued on a server-key machine is the key's, whether or not it left
 // sign-ins. On a person's profile nothing is recorded: the decision waits for the
 // retirement at their sign-in.
-func LegacyOwnership(dir, stateDir string, serverKey bool) (LegacyRecord, error) {
+func LegacyOwnership(dir, stateDir string, serverKey bool, stages ...LegacyStage) (LegacyRecord, error) {
 	if serverKey {
 		// Sessions that can't be read are none for the heartbeat; the decision is the key's
 		// all the same.
 		signIns, _ := LegacySignIns(dir, false)
-		if err := RecordLegacy(stateDir, signIns, LegacyNoPerson, time.Now()); err != nil {
+		if err := RecordLegacy(stateDir, signIns, LegacyNoPerson, time.Now(), stages...); err != nil {
 			return LegacyRecord{}, err
 		}
 	}

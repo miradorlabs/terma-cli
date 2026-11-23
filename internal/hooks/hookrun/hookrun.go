@@ -5,10 +5,8 @@
 package hookrun
 
 import (
-	"bytes"
 	"cmp"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -57,9 +55,6 @@ type Env struct {
 	// hook collects is in its lane (spool.LaneOf), parked events included; with one, the
 	// Spool's binding, made from the same profile, is the lane.
 	Account string
-	// AccountSince is when that sign-in began, zero when unknown: an event from before it
-	// was collected under another sign-in, or none, and is never bound to this one.
-	AccountSince time.Time
 	// ServerKey is that the profile is set up with a server key: what the hook queues is
 	// no person's (spool.Event.NoPerson).
 	ServerKey bool
@@ -191,100 +186,13 @@ func (e Env) resolve(ctx context.Context) (*Repo, error) {
 	if err != nil {
 		return nil, err
 	}
-	r := &Repo{Root: root, GitDir: gitDir, Store: session.Open(storeDir), Repository: id, Remote: remote}
+	r := &Repo{Root: root, GitDir: gitDir, Store: e.store(storeDir), Repository: id, Remote: remote}
 	r.Name, r.Worktree = CheckoutNames(root, gitDir)
 	r.ProjectID = e.Team
 	if e.Policy.Global() {
 		r.ProjectID = e.Policy.DefaultProjectID
 	}
 	return r, nil
-}
-
-// parking is where a git hook in an agent's sandbox parks what the state directory refused:
-// the repository's git directory, which the sandbox lets it write, even where the session
-// store is a workspace's under the state directory.
-func (r *Repo) parking() *session.Store {
-	return session.Open(filepath.Join(r.GitDir, project.GitStoreDir))
-}
-
-// What a git hook run in an agent's sandbox could not write to the state directory waits in
-// the repository's git directory, which it can write, under these names.
-const (
-	parkedEvents = "events"
-	parkedPushes = "pushes"
-)
-
-// park keeps v, which the state directory refused, in the repository's git directory under name;
-// the next hook there that reaches the state directory unparks it.
-func (e Env) park(r *Repo, name string, v any) bool {
-	if r == nil || r.GitDir == "" {
-		return false // a folder outside git keeps its store in the state directory too
-	}
-	line, err := json.Marshal(v)
-	if err == nil {
-		err = r.parking().Park(name, append(line, '\n'))
-	}
-	if err != nil {
-		e.Logf("park %s: %v", name, err)
-		return false
-	}
-	return true
-}
-
-// unpark hands on what sandboxed hooks parked in r's git directory: events to the spool, in
-// one append, then a flush, and pushes to AwaitPush.
-func (e Env) unpark(r *Repo) {
-	if r.GitDir == "" {
-		return
-	}
-	e.unparkPushes(r)
-	if e.Spool == nil {
-		return
-	}
-	moved := false
-	err := r.parking().Unpark(parkedEvents, func(lines []byte) error {
-		var events []spool.Event
-		for line := range bytes.Lines(lines) {
-			var ev spool.Event
-			if json.Unmarshal(line, &ev) == nil {
-				events = append(events, ev)
-			}
-		}
-		moved = len(events) > 0
-		// A parked event that names its account, or no person (a server key's), keeps it.
-		// One its sandboxed hook could read neither for is bound: it was collected under the
-		// sign-in in place, which unparks it moments later.
-		// Resolved here, then appended in one write: a part appended alone would be
-		// appended again, as the parked file stays, when the rest fails.
-		for i := range events {
-			e.bindReplayed(&events[i])
-		}
-		return e.Spool.AppendAsCollected(events...)
-	})
-	if err != nil {
-		e.Logf("unpark events: %v", err)
-		return
-	}
-	if moved && e.Flush != nil {
-		e.Flush()
-	}
-}
-
-// bindReplayed binds a replayed event that names neither an account nor no person as the
-// sign-in in place collected it: a sandboxed hook that could not read the sign-in queued it
-// moments ago. One bound already keeps its account, the one a hook that could not read the
-// sign-in names (auth.AccountUnreadable) included: it may be another person's than the one
-// signed in now.
-func (e Env) bindReplayed(ev *spool.Event) {
-	if ev.Account != "" || ev.NoPerson {
-		return
-	}
-	// A person's sign-in takes only what was queued since it began: one parked while signed
-	// out, or under someone else since signed out, is not theirs. Unknown, it takes none.
-	if e.Account != "" && !e.ServerKey && (e.AccountSince.IsZero() || ev.Time.Before(e.AccountSince)) {
-		return
-	}
-	ev.Account, ev.NoPerson = e.Account, e.Account == "" && e.ServerKey
 }
 
 // Admits reports whether the team policy collects the working copy at dir, judged as Repo
@@ -317,42 +225,17 @@ func (e Env) locate(ctx context.Context) (root, gitDir string, id config.Reposit
 func (e Env) EmitFor(r *Repo, ev spool.Event) bool {
 	ev = e.stamp(r, ev)
 	e.claimForRelay(r, ev)
-	if e.lost(1) {
+	if e.lost(r, 1) {
 		return true
 	}
+	return e.emitOrPark(r, ev)
+}
+
+func (e Env) emitOrPark(r *Repo, ev spool.Event) bool {
 	if ev.Time.IsZero() {
 		ev.Time = e.Time()
 	}
 	return e.emit(ev) || e.park(r, parkedEvents, ev)
-}
-
-// lane is whose what this hook collects is: its spool's binding, which the hook's caller
-// made from the profile (dispatch), or with no spool, the profile's own.
-func (e Env) lane() spool.Lane {
-	if e.Spool != nil {
-		return e.Spool.Lane()
-	}
-	return spool.LaneOf(e.Account, e.ServerKey)
-}
-
-// lost reports whether what this hook collects has no lane, before anything of it is
-// written, and if so counts its n events lost, by why.
-func (e Env) lost(n int) bool {
-	why := e.lane().Lost
-	if why == "" {
-		return false
-	}
-	e.countLost(why, n)
-	return true
-}
-
-// countLost counts n events lost for why in the spool. A hook in an agent's sandbox that
-// can't write the state directory has no spool to count in: its count is lost too.
-func (e Env) countLost(why string, n int) {
-	if e.Spool != nil && e.Spool.CountLost(why, n) == nil {
-		return
-	}
-	e.Logf("%d event(s) lost (%s), uncounted", n, why)
 }
 
 // stamp names the event's repository, for delivery's admission, its project and the

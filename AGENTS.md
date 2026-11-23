@@ -149,22 +149,38 @@ and ages out, counted as `legacy_ambiguous`. A hook's spool is bound to its prof
 with a sign-in that can't be read, what a hook collects is lost before anything of it is
 written (no queued line, checkpoint, push record or parked line), and counted as
 `signed_out` or `unreadable` in `spool/losses/`, a file per day of one line per loss,
-appended whole so concurrent hooks never lose a count; doctor adds them to the relay's.
-Unparking binds an event a sandboxed hook parked with neither to a person's sign-in only
-if it was collected since that sign-in began (`signed_in_at` in `user-credentials.json`);
-one it can't bind is lost. Every replay of a recorded event (`AppendAsCollected`) keeps
-what it says.
-This version queues to `spool/events-v2.jsonl` and `relay/outbox-v2/`, never to an older
-terma's `spool/events.jsonl` or `relay/outbox/`, so an older terma's hook, flusher or relay
-still running never sends what this one queued with its own credential. What an older
+appended whole so concurrent hooks never lose a count; doctor adds them to the relay's,
+and the relay's heartbeat carries each once, as `dropped.<reason>.hooks`
+(`spool.TakeNewLosses`). Every replay of a recorded event (`AppendAsCollected`) keeps
+what it says. A session's manifest names the lane of its first write (`account`), and
+never another: a hook whose sign-in is someone else's records nothing of the session, and
+counts its event `account_conflict`; a manifest with none, an older terma's or one
+written signed out, is never given one. A git hook's record of sessions (a commit, a push)
+is its collector's: a hook that reads its sign-in keeps it in its own lane, unless a
+session's manifest names another account; a git hook in an agent's sandbox, which can read
+neither the sign-in nor write the state directory, keeps it in the one lane all its
+sessions' manifests name, never `session.json`'s. Anything else (sessions of several
+people, a sandboxed record of no one's) is lost as `ambiguous_push`. What it writes it
+parks in `.git/terma/` (`events-v2`, `pushes-v2`, and `losses-v2`, the counts of what it
+lost), tagged as written, and the next hook outside the sandbox unparks it as it is and
+moves the counts into `spool/losses/` once.
+This version queues to `spool/events-v2.jsonl`, `pushes-v2/` and `relay/outbox-v2/`, never
+to an older terma's `spool/events.jsonl`, `pushes/` or `relay/outbox/`, nor its parked
+`.git/terma/events` and `pushes`, so an older terma's hook, flusher or relay still running
+never sends what this one queued with its own credential; what an older terma parked or
+recorded is queued to its own `spool/events.jsonl`. What an older
 terma queued gets one decision, kept in `legacy-sign-ins.json`'s `account` before its
 sign-ins are deleted, and the first written stands: the one person its sign-ins name, at a
 person's sign-in; `no_person` on a server-key machine (setup with a key, or the relay's or
-a flush's first look under one); else `ambiguous`. With a decision, each flush takes the
-older queue's lines into the new one, tagged by it, and the relay's outbox sweep takes the
-older outbox's routes into its lane (`@<account>/`, `@no_person/`, or `@ambiguous/`, which
-never leaves and ages out counted as `legacy_ambiguous`). With none yet, or a record that
-can't be read, they stay where they are.
+a flush's first look under one); else `ambiguous`. The decision is taken
+(`auth.RecordLegacy`) only once each older queue is set aside, by one rename under the
+record's lock, and not at all while one can't be (an older flush holds its lock). What was
+set aside is taken in tagged by the decision, the queue's lines into the new one and the
+outbox's routes into its lane (`@<account>/`, `@no_person/`, or `@ambiguous/`, which never
+leaves and ages out counted as `legacy_ambiguous`). What an older terma still running
+queues after, parks or records (each goes to its own queue) is taken in as ambiguous: a
+sign-in since may be someone else's. With no decision yet, or a
+record that can't be read, they stay where they are.
 
 ## Rules
 

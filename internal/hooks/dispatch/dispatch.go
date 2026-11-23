@@ -66,8 +66,6 @@ type Profile struct {
 	// is bound to: its account key; "" signed out, or under a server key; or
 	// sendas.AccountUnreadable, when what the hook collects is lost (spool.LaneOf).
 	Account string
-	// AccountSince is when that sign-in began (auth.SignedInAt), zero when unknown.
-	AccountSince time.Time
 	// ServerKey is a profile set up with a server key: what the hook queues is no person's.
 	ServerKey bool
 }
@@ -91,7 +89,7 @@ func Run(ctx context.Context, d Deps, r Request) int {
 		p := d.Profile()
 		env := hookrun.Env{Now: time.Now(), Cwd: r.Cwd, Args: r.Args, Stdin: r.Stdin, Stdout: r.Stdout, Stderr: r.Stderr,
 			ConfigDir: d.ConfigDir, StateDir: d.StateDir, Version: r.Version, Debug: r.Debug, Flush: d.Flush, Policy: p.Policy, Team: p.Team,
-			Account: p.Account, AccountSince: p.AccountSince, ServerKey: p.ServerKey}
+			Account: p.Account, ServerKey: p.ServerKey}
 		if !r.HooksOff {
 			env.Spool = bound(d.Spool(), p)
 		}
@@ -127,26 +125,25 @@ func run(ctx context.Context, d Deps, r Request, handler agents.Handler, flush b
 	// directory may not be: cmd starts a hook in a UNC checkout from the Windows directory.
 	claimed, claimedIn, flushed := false, r.Cwd, false
 	env := hookrun.Env{
-		Now:          time.Now(),
-		Cwd:          r.Cwd,
-		Args:         r.Args,
-		Stdin:        io.TeeReader(r.Stdin, payload),
-		OnClaim:      func(root string) { claimed, claimedIn = true, root },
-		Flush:        func() { flushed = true; d.Flush() },
-		AwaitPush:    d.AwaitPush,
-		Stdout:       r.Stdout,
-		Stderr:       r.Stderr,
-		ConfigDir:    d.ConfigDir,
-		StateDir:     d.StateDir,
-		Version:      r.Version,
-		Debug:        r.Debug,
-		Spool:        bound(d.Spool(), p),
-		Policy:       p.Policy,
-		Team:         p.Team,
-		Agents:       p.Agents,
-		Account:      p.Account,
-		AccountSince: p.AccountSince,
-		ServerKey:    p.ServerKey,
+		Now:       time.Now(),
+		Cwd:       r.Cwd,
+		Args:      r.Args,
+		Stdin:     io.TeeReader(r.Stdin, payload),
+		OnClaim:   func(root string) { claimed, claimedIn = true, root },
+		Flush:     func() { flushed = true; d.Flush() },
+		AwaitPush: d.AwaitPush,
+		Stdout:    r.Stdout,
+		Stderr:    r.Stderr,
+		ConfigDir: d.ConfigDir,
+		StateDir:  d.StateDir,
+		Version:   r.Version,
+		Debug:     r.Debug,
+		Spool:     bound(d.Spool(), p),
+		Policy:    p.Policy,
+		Team:      p.Team,
+		Agents:    p.Agents,
+		Account:   p.Account,
+		ServerKey: p.ServerKey,
 	}
 	ctx, cancel := context.WithTimeout(ctx, handlerTimeout)
 	defer cancel()

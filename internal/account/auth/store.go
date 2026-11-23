@@ -53,10 +53,6 @@ type Credential struct {
 	// RetiredAt is when a server refused this sign-in as retired (SIGN_IN_RETIRED): only a
 	// newer terma, signed in again, replaces it. Zero while it is accepted.
 	RetiredAt time.Time `json:"retired_at,omitzero"`
-	// SignedInAt is when this session was signed in on this machine, kept as its tokens
-	// rotate: only what was collected since is ever this sign-in's (hookrun's unpark).
-	// Zero for a sign-in stored before it was recorded.
-	SignedInAt time.Time `json:"signed_in_at,omitzero"`
 	// RefreshInDoubtFor is the SHA-256, in hex, of the refresh token RefreshInDoubtSince
 	// was recorded for. A mark beside another token (a rotation the keychain took and the
 	// file then missed) is not that token's, and is read as none. "" (a mark from before
@@ -171,11 +167,6 @@ func StoredInFile(dir, profile string) bool {
 // Signing in decides where the tokens live: the system keychain, unless there is none or
 // config.json asks for files (InsecureStorage).
 func SaveCredential(dir, profile string, cred *Credential) (replaced *Credential, err error) {
-	if cred.SignedInAt.IsZero() {
-		signedIn := *cred
-		signedIn.SignedInAt = time.Now().UTC()
-		cred = &signedIn
-	}
 	err = lockedWrite(dir, func(tx *Tx) error {
 		replaced, err = tx.saveReplacing(profile, cred, config.InsecureStorage(dir))
 		return err

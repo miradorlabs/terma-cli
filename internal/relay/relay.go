@@ -94,8 +94,9 @@ type Options struct {
 	SignIn SignIn
 	// LegacyDir is an older relay's outbox, and LegacyOwner, asked at every outbox sweep,
 	// the one decision of whose what it queued is (auth.LegacyRecord.Account): "" for none
-	// yet, when it stays where it is. The sweep moves its parts into Dir, an older relay's
-	// account-less routes into that decision's lane (ingestLegacy).
+	// yet, when it stays where it is. Taking the decision set aside what the older outbox
+	// held then (StageLegacyOutbox), which goes into that decision's lane, and what an older
+	// relay queued since into the ambiguous one (ingestLegacy).
 	LegacyDir   string
 	LegacyOwner func() string
 	// CatchAll, in global mode, is where a part whose hold ran out unplaced goes instead of being dropped.
@@ -134,6 +135,10 @@ type Options struct {
 	// sign-ins an older terma kept here, while recent: on its resource as
 	// terma.legacy_session_ids.
 	LegacySessionIDs func() []string
+	// HookLosses are, asked at every heartbeat, what hooks lost since it was last asked, by
+	// reason (spool.TakeNewLosses): counted as dropped.<reason>.hooks, so the beat carries
+	// the hooks' losses with the relay's.
+	HookLosses func() map[string]int
 	// UpdateAuto, set, is asked at every heartbeat whether this terma installs new releases
 	// by itself, sent on its record as terma.update.auto: the developer can turn automatic
 	// updates on or off while the relay runs.
@@ -148,10 +153,12 @@ type Options struct {
 
 // Relay is the local OTLP relay: Handler accepts exports and Run delivers or ages them out.
 type Relay struct {
-	opts  Options
-	rules *rules
-	stats *Stats
-	cache lookupCache
+	opts Options
+	// hookLossesMu serializes Options.HookLosses.
+	hookLossesMu sync.Mutex
+	rules        *rules
+	stats        *Stats
+	cache        lookupCache
 
 	// deliverMu keeps a session's parts in arrival order; taken before mu, never after.
 	deliverMu sync.Mutex

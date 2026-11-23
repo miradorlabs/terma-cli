@@ -1,6 +1,8 @@
 package relay
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -68,12 +70,14 @@ func TestAnAmbiguousBacklogNeverLeavesAndIsCountedWhenItAgesOut(t *testing.T) {
 	}
 }
 
-// A part an older relay still running queues after the first take is taken at the next
-// sweep, into the same decision's lane: it never leaves under another.
-func TestAPartAnOlderRelayQueuesLaterIsTakenByTheDecision(t *testing.T) {
+// The decision takes in what an older relay held once; a part it queues after that is
+// taken at the next sweep as ambiguous, which never leaves, under the decision's sign-in or
+// any other: whoever is signed in since may be someone else.
+func TestAPartAnOlderRelayQueuesLaterIsAmbiguous(t *testing.T) {
 	t.Parallel()
 	u := newSignInUpstream(t)
 	dir := t.TempDir()
+	queue(t, legacyOutbox(dir), "")
 	r := signedInRelay(t, u, &testSignIn{account: accountB}, dir, accountA)
 	r.janitor(time.Now())
 	queue(t, legacyOutbox(dir), "")
@@ -82,7 +86,81 @@ func TestAPartAnOlderRelayQueuesLaterIsTakenByTheDecision(t *testing.T) {
 	if n := len(u.requests()); n != 0 {
 		t.Fatalf("%d requests: A's backlog left under B", n)
 	}
-	if entries, _ := (outbox{dir: dir}).list(routeOf(accountA, claim.Claim{ProjectID: "p1"})); len(entries) != 1 {
-		t.Fatalf("A's lane holds %d parts, want the later one", len(entries))
+	for account, want := range map[string]int{accountA: 1, auth.LegacyAccountAmbiguous: 1} {
+		if entries, _ := (outbox{dir: dir}).list(routeOf(account, claim.Claim{ProjectID: "p1"})); len(entries) != want {
+			t.Errorf("%s's lane holds %d parts, want %d", account, len(entries), want)
+		}
+	}
+}
+
+// With no older outbox at the decision, there was nothing to take in under it: a part an
+// older relay queues after is ambiguous too.
+func TestAnOlderOutboxMadeAfterTheDecisionIsAmbiguous(t *testing.T) {
+	t.Parallel()
+	u := newSignInUpstream(t)
+	dir := t.TempDir()
+	r := signedInRelay(t, u, &testSignIn{account: accountB}, dir, accountA)
+	r.janitor(time.Now())
+	queue(t, legacyOutbox(dir), "")
+	r.janitor(time.Now())
+	if entries, _ := (outbox{dir: dir}).list(routeOf(auth.LegacyAccountAmbiguous, claim.Claim{ProjectID: "p1"})); len(entries) != 1 {
+		t.Fatalf("the ambiguous lane holds %d parts, want the later one", len(entries))
+	}
+}
+
+// What an older relay held at the decision is taken in under it however long it takes: a
+// route that can't be read at first waits, set aside, and is taken into the decision's lane
+// once it can, never into the ambiguous one.
+func TestAnUnreadableOlderRouteWaitsForTheDecision(t *testing.T) {
+	t.Parallel()
+	if os.Geteuid() == 0 {
+		t.Skip("root reads a directory its mode forbids")
+	}
+	u := newSignInUpstream(t)
+	dir := t.TempDir()
+	queue(t, legacyOutbox(dir), "")
+	routes, _ := (outbox{dir: legacyOutbox(dir)}).routes()
+	if len(routes) != 1 {
+		t.Fatalf("routes %v", routes)
+	}
+	route := (outbox{dir: legacyOutbox(dir)}).routeDir(routes[0])
+	rel, _ := filepath.Rel(legacyOutbox(dir), route)
+	parent := filepath.Dir(route)
+	if err := os.Chmod(parent, 0o000); err != nil {
+		t.Fatal(err)
+	}
+	staged := filepath.Join(legacyOutbox(dir)+legacyStagedSuffix, rel)
+	t.Cleanup(func() {
+		_ = os.Chmod(parent, 0o700)
+		_ = os.Chmod(filepath.Dir(staged), 0o700)
+	})
+	r := signedInRelay(t, u, &testSignIn{account: accountB}, dir, accountA)
+	r.janitor(time.Now())
+	if err := os.Chmod(filepath.Dir(staged), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	r.janitor(time.Now())
+	for account, want := range map[string]int{accountA: 1, auth.LegacyAccountAmbiguous: 0} {
+		if entries, _ := (outbox{dir: dir}).list(routeOf(account, claim.Claim{ProjectID: "p1"})); len(entries) != want {
+			t.Errorf("%s's lane holds %d parts, want %d", account, len(entries), want)
+		}
+	}
+}
+
+// A run that set the older outbox aside and stopped before taking it in leaves it to the
+// next, which takes it in under the decision, and what an older relay queued since as
+// ambiguous.
+func TestASetAsideOlderOutboxIsResumed(t *testing.T) {
+	t.Parallel()
+	u := newSignInUpstream(t)
+	dir := t.TempDir()
+	queue(t, legacyOutbox(dir)+legacyStagedSuffix, "")
+	queue(t, legacyOutbox(dir), "")
+	r := signedInRelay(t, u, &testSignIn{account: accountB}, dir, accountA)
+	r.janitor(time.Now())
+	for account, want := range map[string]int{accountA: 1, auth.LegacyAccountAmbiguous: 1} {
+		if entries, _ := (outbox{dir: dir}).list(routeOf(account, claim.Claim{ProjectID: "p1"})); len(entries) != want {
+			t.Errorf("%s's lane holds %d parts, want %d", account, len(entries), want)
+		}
 	}
 }

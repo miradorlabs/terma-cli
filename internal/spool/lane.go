@@ -2,6 +2,7 @@ package spool
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"errors"
 	"io/fs"
@@ -10,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/sendas"
 )
 
@@ -38,18 +40,16 @@ func LaneOf(account string, serverKey bool) Lane {
 
 // untagged is why e, about to be queued in lane, can't be: it names no account and no
 // person, so no one could send it. An older terma's backlog is the only such kind queued
-// (IngestLegacy), never through an append. "" when e is tagged.
-func untagged(e Event, lane Lane) string {
+// (IngestLegacy), never through an append. "" when e is tagged. bound is that the append
+// gave e the lane: one that didn't (AppendAsCollected) replays what was recorded with no
+// lane, which only an older terma records.
+func untagged(e Event, lane Lane, bound bool) string {
 	switch {
-	case e.Account == sendas.AccountUnreadable:
-		return sendas.LostUnreadable
 	case e.Account != "" || e.NoPerson:
 		return ""
-	case lane.Lost != "":
+	case bound && lane.Lost != "":
 		return lane.Lost
 	}
-	// Replayed untagged into a bound spool: what an older terma parked, whose no one
-	// sign-in may claim.
 	return sendas.LostLegacyAmbiguous
 }
 
@@ -79,15 +79,11 @@ func (s *Spool) CountLost(reason string, n int) error {
 		return err
 	}
 	now := time.Now().UTC()
-	line, err := json.Marshal(lossLine{Reason: reason, Count: n, Time: now})
-	if err != nil {
-		return err
-	}
 	f, err := os.OpenFile(filepath.Join(dir, now.Format(time.DateOnly)+".jsonl"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, fileMode)
 	if err != nil {
 		return err
 	}
-	_, err = f.Write(append(line, '\n'))
+	_, err = f.Write(EncodeLoss(reason, n, now))
 	if cerr := f.Close(); err == nil {
 		err = cerr
 	}
@@ -95,15 +91,100 @@ func (s *Spool) CountLost(reason string, n int) error {
 	return err
 }
 
-// pruneLosses deletes the days past LossWindow, which no hook appends to any more.
+// EncodeLoss is the line CountLost appends for n events lost for reason at at: a hook that
+// can't write the spool keeps it elsewhere, for ImportLosses to take in.
+func EncodeLoss(reason string, n int, at time.Time) []byte {
+	line, _ := json.Marshal(lossLine{Reason: reason, Count: n, Time: at.UTC()})
+	return append(line, '\n')
+}
+
+// ImportLosses moves the file at path, of lines EncodeLoss made, into the losses as a file
+// of its own named for id, which its caller keeps for that file alone: moved again, after a
+// crash between the copy and the removal, it lands on its own copy, so it is counted once.
+func (s *Spool) ImportLosses(path, id string) error {
+	dir := filepath.Join(s.dir, lossesDir)
+	if err := os.MkdirAll(dir, dirMode); err != nil {
+		return err
+	}
+	dst := filepath.Join(dir, importedPrefix+id+".jsonl")
+	if os.Rename(path, dst) == nil {
+		return nil
+	}
+	// Another filesystem: copied whole, then removed.
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	if err := config.WriteFileAtomic(dst, data, fileMode); err != nil {
+		return err
+	}
+	return os.Remove(path)
+}
+
+// importedPrefix starts the name of a file of losses ImportLosses took in.
+const importedPrefix = "imported~"
+
+// pruneLosses deletes the files past LossWindow, which no hook appends to any more: a day
+// by its name, an imported file by when it was last written.
 func pruneLosses(dir string, now time.Time) {
 	entries, _ := os.ReadDir(dir)
 	for _, e := range entries {
 		day, err := time.Parse(time.DateOnly, strings.TrimSuffix(e.Name(), ".jsonl"))
+		if info, ierr := e.Info(); err != nil && ierr == nil && strings.HasPrefix(e.Name(), importedPrefix) {
+			day, err = info.ModTime(), nil
+		}
 		if err == nil && now.Sub(day) > LossWindow+24*time.Hour {
 			_ = os.Remove(filepath.Join(dir, e.Name()))
 		}
 	}
+}
+
+// lossesReportedFile, in the losses folder, is how far TakeNewLosses has read each file.
+const lossesReportedFile = "reported.json"
+
+// TakeNewLosses counts, by reason, what hooks lost into the spool directory dir since it was
+// last called, and keeps how far it read each file, so each loss is handed out once: the
+// relay adds them to its heartbeat's counters. How far it read is kept before the counts are
+// handed out, so a crash between the two loses them, never counts them twice. A line not yet
+// whole waits for the next call.
+func TakeNewLosses(dir string) (map[string]int, error) {
+	ldir := filepath.Join(dir, lossesDir)
+	read := map[string]int64{}
+	if data, err := os.ReadFile(filepath.Join(ldir, lossesReportedFile)); err == nil {
+		_ = json.Unmarshal(data, &read) // written atomically; one that won't decode is read as none
+	} else if !errors.Is(err, fs.ErrNotExist) {
+		return nil, err
+	}
+	entries, err := os.ReadDir(ldir)
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	counts, next := map[string]int{}, map[string]int64{}
+	for _, e := range entries {
+		if !strings.HasSuffix(e.Name(), ".jsonl") {
+			continue
+		}
+		data, err := os.ReadFile(filepath.Join(ldir, e.Name()))
+		if err != nil {
+			return nil, err
+		}
+		from := min(read[e.Name()], int64(len(data)))
+		whole := from + int64(bytes.LastIndexByte(data[from:], '\n')+1)
+		for line := range bytes.Lines(data[from:whole]) {
+			var l lossLine
+			if json.Unmarshal(line, &l) == nil && l.Reason != "" && l.Count > 0 {
+				counts[l.Reason] += l.Count
+			}
+		}
+		next[e.Name()] = whole
+	}
+	if err := config.WriteJSON(filepath.Join(ldir, lossesReportedFile), next, fileMode); err != nil {
+		return nil, err
+	}
+	return counts, nil
 }
 
 // Losses are what hooks lost within LossWindow of now, by reason, and when the last was.

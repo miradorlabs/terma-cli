@@ -91,19 +91,8 @@ func (app *App) hookProfile() dispatch.Profile {
 	p := dispatch.Profile{Team: cfg.Policy.TeamID, Agents: cfg.Harnesses, Policy: cfg.Policy.InForce(cfg.OrganizationID, cfg.AuthURL)}
 	if p.ServerKey = cfg.ServerKeySignIn; !p.ServerKey {
 		p.Account = auth.Account(cfg.Dir, cfg.ProfileName, cfg.AuthURL)
-		p.AccountSince = accountSince(cfg, p.Account)
 	}
 	return p
-}
-
-// accountSince is when account, the profile's sign-in, began, which what unparking binds to
-// it is from since. The unreadable account takes every unbound event, from any time, which
-// keeps them from being no one's, which a server key would send: bound to it, they are lost.
-func accountSince(cfg *config.Config, account string) time.Time {
-	if account == auth.AccountUnreadable {
-		return time.Unix(0, 0)
-	}
-	return auth.SignedInAt(cfg.Dir, cfg.ProfileName)
 }
 
 // hookPolicy is the collection policy while it is validated and fresh, else NoPolicy.

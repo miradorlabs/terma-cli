@@ -224,7 +224,8 @@ func TestAHeartbeatFollowsNoRedirect(t *testing.T) {
 }
 
 // A legacy record that can't be read is no decision, never a server key's: before one is
-// read nothing is taken in, and after, a failed read keeps the last one.
+// read nothing is taken in, and after, a failed read of a changed file is none either: what it
+// held before is not what it holds.
 func TestAnUnreadableLegacyRecordIsNoDecision(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, auth.LegacyRecordFile)
@@ -249,8 +250,8 @@ func TestAnUnreadableLegacyRecordIsNoDecision(t *testing.T) {
 		t.Fatal(err)
 	}
 	time.Sleep(1100 * time.Millisecond)
-	if got := legacy(); got.Account != want {
-		t.Fatalf("after a failed read, record = %+v; want the last one read", got)
+	if got := legacy(); got.Account != "" {
+		t.Fatalf("after a failed read, record = %+v; want no decision", got)
 	}
 }
 
