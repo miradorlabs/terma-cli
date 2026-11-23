@@ -727,10 +727,11 @@ func (s *Store) prune(before time.Time) (int, error) {
 }
 
 // Owns reports whether k's manifest takes a write under the Store's account: none is
-// recorded yet, or it names that account or no one (Touch).
+// recorded yet, or it names that account or no one (Touch). A manifest that can't be read
+// names an owner no one can check, so it is not owned.
 func (s *Store) Owns(k Key) bool {
-	m, _, _ := s.load(k)
-	return m == nil || !conflicts(m.Account, s.account)
+	m, _, err := s.load(k)
+	return err == nil && (m == nil || !conflicts(m.Account, s.account))
 }
 
 // Accounts are the accounts the manifests of keys name, in order: "" for a session with no

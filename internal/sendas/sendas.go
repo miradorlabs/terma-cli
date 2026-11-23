@@ -29,7 +29,7 @@ const (
 	// LostLegacyAmbiguous is what an older terma queued that no one sign-in may send.
 	LostLegacyAmbiguous = "legacy_ambiguous"
 	// LostAccountConflict is a hook's record of a session whose manifest names another
-	// account than the hook's sign-in: a session has one owner.
+	// account than the hook's sign-in, or can't be read to tell: a session has one owner.
 	LostAccountConflict = "account_conflict"
 	// LostAmbiguousPush is a git hook's record of sessions, a commit or a push, that no one
 	// lane holds: its sessions name several accounts, or, in an agent's sandbox, none.

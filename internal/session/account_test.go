@@ -126,3 +126,24 @@ func TestDeltaOrderNeverDecidesAnOwner(t *testing.T) {
 		}
 	}
 }
+
+// A session with no manifest is new, and owned by whoever writes it first; one whose
+// manifest can't be read is no one's to write, since its owner can't be checked.
+func TestAnUnreadableManifestIsNotOwned(t *testing.T) {
+	t.Parallel()
+	store := bound(Open(t.TempDir()), "bbbbbbbbbbbbbbbb")
+	sess := Session{ID: "sess-1", Tool: "codex"}
+	if !store.Owns(sess.Key()) {
+		t.Fatal("a session with no manifest is not owned")
+	}
+	path := store.manifestPath(sess.Key())
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte("{torn"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if store.Owns(sess.Key()) {
+		t.Fatal("a session whose manifest can't be read is owned")
+	}
+}

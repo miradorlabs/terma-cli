@@ -63,6 +63,8 @@ type Env struct {
 	Team string
 	// Agents are the agents the developer chose at setup.
 	Agents []string
+	// afterOwns, in tests, runs once owns has read a session's manifest, before the record.
+	afterOwns func()
 }
 
 // Time is when the hook runs: Now when the caller set it, the clock otherwise.

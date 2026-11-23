@@ -3,6 +3,7 @@ package hookrun
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"maps"
 	"path/filepath"
 	"slices"
@@ -68,11 +69,10 @@ func (e Env) EndSession(r *Repo, id, tool string) {
 // session. Another checkout is reported only if the team policy admits it, and a path in no
 // admitted checkout is dropped. Each event names its checkout by id (terma.checkout.id): the
 // agent's hook saw the edit happen. A session whose manifest names another account than
-// this hook's sign-in is another person's: nothing is recorded or spooled, and the event is
-// counted lost (account_conflict).
+// this hook's sign-in, or can't be read, is not this hook's: nothing is spooled, and the
+// event is counted lost (account_conflict).
 func (e Env) Touch(r *Repo, sess session.Session, toolName string, paths []string, extra map[string]any) {
-	if e.owns(r, sess) {
-		e.record(r, sess, paths, true)
+	if e.owns(r, sess) && e.recordOwned(r, sess, paths, true) {
 		e.report(r, sess, toolName, paths, extra, true)
 	}
 }
@@ -80,8 +80,7 @@ func (e Env) Touch(r *Repo, sess session.Session, toolName string, paths []strin
 // TouchGuessed records and spools paths as Touch does, mirroring them into another checkout's
 // manifest too, without naming a checkout id: the tool may only have read them.
 func (e Env) TouchGuessed(r *Repo, sess session.Session, toolName string, paths []string, extra map[string]any) {
-	if e.owns(r, sess) {
-		e.record(r, sess, paths, true)
+	if e.owns(r, sess) && e.recordOwned(r, sess, paths, true) {
 		e.report(r, sess, toolName, paths, extra, false)
 	}
 }
@@ -91,15 +90,19 @@ func (e Env) TouchGuessed(r *Repo, sess session.Session, toolName string, paths 
 // may be nothing to record. A session that is another person's records and spools nothing,
 // as for Touch.
 func (e Env) ReportExpected(r *Repo, sess session.Session, expected []string, toolName string, reported []string, extra map[string]any) {
-	if e.owns(r, sess) {
-		e.record(r, sess, expected, false)
+	if e.owns(r, sess) && e.recordOwned(r, sess, expected, false) {
 		e.report(r, sess, toolName, reported, extra, false)
 	}
 }
 
 // owns reports whether sess is this hook's to record and report, as r's manifest of it names
-// (session.Store.Owns); if not, the event it would report is lost, and counted.
+// (session.Store.Owns); if not, the event it would report is lost, and counted. It is the
+// gate where r's store records nothing (no path of r, or a store that refuses the write);
+// where it records, the write decides (recordOwned).
 func (e Env) owns(r *Repo, sess session.Session) bool {
+	if e.afterOwns != nil {
+		defer e.afterOwns()
+	}
 	if r.Store.Owns(sess.Key()) {
 		return true
 	}
@@ -107,20 +110,32 @@ func (e Env) owns(r *Repo, sess session.Session) bool {
 	return false
 }
 
+// recordOwned is record for an event then reported: false, with the event counted lost, when
+// r's store refuses sess as another account's. owns reads the manifest before the write, so
+// another account's hook may claim the session in between; the write is what decides.
+func (e Env) recordOwned(r *Repo, sess session.Session, paths []string, mirror bool) bool {
+	if _, refused := e.record(r, sess, paths, mirror); refused {
+		e.countLost(r, sendas.LostAccountConflict, 1)
+		return false
+	}
+	return true
+}
+
 // Expect records in sess's manifest the files of r among paths, without reporting them, and
 // returns them repo-relative: a hook before a tool call records what a commit in the call
 // will take in. Only r's manifest records a prediction, since only there can settling it
 // withdraw it when the call is declined or writes nothing.
 func (e Env) Expect(r *Repo, sess session.Session, paths []string) []string {
-	return e.record(r, sess, paths, false)
+	own, _ := e.record(r, sess, paths, false)
+	return own
 }
 
 // record writes the files of r among paths to sess's manifest and returns them repo-relative.
 // With mirror, another checkout of r's repository (a linked worktree, where a session started
 // in the main checkout often works, or the main checkout from a worktree session) records its
 // files in its own manifest too, since a commit there is stamped from it; it is not claimed.
-func (e Env) record(r *Repo, sess session.Session, paths []string, mirror bool) []string {
-	var own []string
+// refused is that r's own store refused sess as another account's (session.ErrAccountConflict).
+func (e Env) record(r *Repo, sess session.Session, paths []string, mirror bool) (own []string, refused bool) {
 	for _, c := range e.checkouts(r, paths) {
 		store := r.Store
 		if c.repo != r {
@@ -141,13 +156,14 @@ func (e Env) record(r *Repo, sess session.Session, paths []string, mirror bool) 
 		// A store whose manifest of sess names another account refuses it (session.ErrAccountConflict).
 		if err := store.Touch(sess, c.files, e.Time()); err != nil {
 			e.Logf("record files: %v", err)
+			refused = refused || c.repo == r && errors.Is(err, session.ErrAccountConflict)
 			continue
 		}
 		if c.repo == r {
 			own = c.files
 		}
 	}
-	return own
+	return own, refused
 }
 
 func (e Env) report(r *Repo, sess session.Session, toolName string, paths []string, extra map[string]any, confirmed bool) {

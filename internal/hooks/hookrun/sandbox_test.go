@@ -2,6 +2,7 @@ package hookrun
 
 import (
 	"context"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -399,6 +400,83 @@ func TestASignedOutSandboxedHookTakesNoSessionsLane(t *testing.T) {
 	}
 	if l := lossesIn(t, dir); l[sendas.LostSignedOut] != 2 || len(l) != 1 {
 		t.Errorf("losses = %v; want the commit and the push counted signed_out", l)
+	}
+}
+
+// B's hook that reads A's session as no one's, before A's hook claims it, is refused by the
+// write: whichever path records and reports, nothing of it is spooled under B, and the event
+// is counted account_conflict once.
+func TestAClaimBetweenTheCheckAndTheWriteDecides(t *testing.T) {
+	for _, path := range []struct {
+		name string
+		run  func(Env, *Repo, session.Session)
+	}{
+		{"touch", func(e Env, r *Repo, s session.Session) { e.Touch(r, s, "Edit", []string{"b.go"}, nil) }},
+		{"guessed", func(e Env, r *Repo, s session.Session) { e.TouchGuessed(r, s, "Read", []string{"b.go"}, nil) }},
+		{"expected", func(e Env, r *Repo, s session.Session) {
+			e.ReportExpected(r, s, []string{"b.go"}, "Bash", []string{"b.go"}, nil)
+		}},
+	} {
+		t.Run(path.name, func(t *testing.T) {
+			p := newPushRepo(t)
+			sess := session.Session{ID: "sess-a", Tool: "claude-code"}
+			asB, dir := signedIn(t, p, personB)
+			r, err := asB.Repo(context.Background())
+			if err != nil {
+				t.Fatal(err)
+			}
+			asB.afterOwns = func() {
+				if err := gitStore(p, personA).Touch(sess, []string{"a.go"}, time.Now()); err != nil {
+					t.Fatal(err)
+				}
+			}
+			path.run(asB, r, sess)
+			if evs := hookruntest.Spooled(t, asB.Spool); len(evs) != 0 {
+				t.Errorf("B spooled %s of A's session", hookruntest.Names(evs))
+			}
+			if l := lossesIn(t, dir); l[sendas.LostAccountConflict] != 1 || len(l) != 1 {
+				t.Errorf("losses = %v; want B's event counted account_conflict once", l)
+			}
+			ms, err := r.Store.Manifests()
+			if err != nil || len(ms) != 1 || ms[0].Account != personA || len(ms[0].Files) != 1 {
+				t.Fatalf("manifests %+v, %v; want A's session, with A's file alone", ms, err)
+			}
+		})
+	}
+}
+
+// A session whose manifest can't be read has an owner no one can check: B's hook spools
+// nothing of it, and counts the event account_conflict.
+func TestAnUnreadableManifestIsNoOnesToReport(t *testing.T) {
+	p := newPushRepo(t)
+	sess := session.Session{ID: "sess-a", Tool: "claude-code"}
+	if err := gitStore(p, personA).Touch(sess, []string{"a.go"}, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	var manifest string
+	_ = filepath.WalkDir(filepath.Join(p.root, ".git", project.GitStoreDir), func(path string, d fs.DirEntry, err error) error {
+		if err == nil && d.Name() == sess.ID+".json" {
+			manifest = path
+		}
+		return nil
+	})
+	if manifest == "" {
+		t.Fatal("no manifest of A's session")
+	}
+	if err := os.WriteFile(manifest, []byte("{torn"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	asB, dir := signedIn(t, p, personB)
+	r, err := asB.Repo(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	asB.Touch(r, sess, "Edit", []string{"b.go"}, nil)
+	if evs := hookruntest.Spooled(t, asB.Spool); len(evs) != 0 {
+		t.Errorf("B spooled %s of a session whose owner can't be read", hookruntest.Names(evs))
+	}
+	if l := lossesIn(t, dir); l[sendas.LostAccountConflict] != 1 || len(l) != 1 {
+		t.Errorf("losses = %v; want B's touch counted account_conflict", l)
 	}
 }
 
