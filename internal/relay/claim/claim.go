@@ -54,9 +54,13 @@ type Claim struct {
 	// Remote is the working copy's origin, normalised without credentials, and Branch the
 	// branch its HEAD is on, "" when detached: what the relay stamps as
 	// vcs.repository.url.full and vcs.ref.head.name.
-	Remote    string    `json:"remote,omitempty"`
-	Branch    string    `json:"branch,omitempty"`
-	ClaimedAt time.Time `json:"claimed_at"`
+	Remote string `json:"remote,omitempty"`
+	Branch string `json:"branch,omitempty"`
+	// Credential is the kind of credential the session runs on as its agent's hooks last read
+	// it, a terma.account.credential value, "" where they could not tell: what the relay stamps
+	// as terma.account.credential. Only a hook that reads it names it (WriteCredential).
+	Credential string    `json:"credential,omitempty"`
+	ClaimedAt  time.Time `json:"claimed_at"`
 	// PIDs are the processes the claiming hooks ran under, so a session resumed by another
 	// process where no hook runs is not covered. Empty matches any sender.
 	PIDs []int `json:"pids,omitempty"`
@@ -78,10 +82,12 @@ type Placement struct {
 	// Cwd is Claim.Cwd for this run.
 	Cwd string `json:"cwd,omitempty"`
 	// Remote and Branch are Claim.Remote and Claim.Branch for this run.
-	Remote string    `json:"remote,omitempty"`
-	Branch string    `json:"branch,omitempty"`
-	PIDs   []int     `json:"pids,omitempty"`
-	Since  time.Time `json:"since"`
+	Remote string `json:"remote,omitempty"`
+	Branch string `json:"branch,omitempty"`
+	// Credential is Claim.Credential for this run.
+	Credential string    `json:"credential,omitempty"`
+	PIDs       []int     `json:"pids,omitempty"`
+	Since      time.Time `json:"since"`
 }
 
 // maxPIDs allows a few runs of one session, each with its chain of ancestors.
@@ -108,7 +114,7 @@ func (c Claim) placements() []Placement {
 		return c.Placements
 	}
 	return []Placement{{ProjectID: c.ProjectID, Tool: c.Tool, Repo: c.Repo, Worktree: c.Worktree, Repository: c.Repository, Root: c.Root, Cwd: c.Cwd,
-		Remote: c.Remote, Branch: c.Branch, PIDs: c.PIDs}}
+		Remote: c.Remote, Branch: c.Branch, Credential: c.Credential, PIDs: c.PIDs}}
 }
 
 // At is the claim as it applies to a record pid sent at time at: the covering placement
@@ -131,7 +137,7 @@ func (c Claim) At(pid int, at time.Time) (Claim, bool) {
 	}
 	return Claim{ProjectID: best.ProjectID, Tool: best.Tool, Repo: best.Repo, Worktree: best.Worktree,
 		Repository: best.Repository, Root: best.Root, Cwd: best.Cwd, Remote: best.Remote, Branch: best.Branch,
-		PIDs: best.PIDs, ClaimedAt: c.ClaimedAt, Placements: c.Placements}, true
+		Credential: best.Credential, PIDs: best.PIDs, ClaimedAt: c.ClaimedAt, Placements: c.Placements}, true
 }
 
 // Dir is the relay directory under the state directory dir.
@@ -163,22 +169,35 @@ var lockWait = 250 * time.Millisecond
 
 // Write merges c into sessionID's claim under the state directory dir, unless a fresh one already names its processes,
 // and reports whether it wrote; a hook never fails for want of a claim. The merge runs
-// under a sidecar lock: unlocked, 14 of 16 concurrent writers' processes were lost.
+// under a sidecar lock: unlocked, 14 of 16 concurrent writers' processes were lost. The
+// session keeps its Credential, whatever c's: only WriteCredential names one.
 func Write(dir, sessionID string, c Claim, now time.Time) bool {
 	if c.ProjectID == "" {
 		return false
 	}
-	return write(dir, sessionID, c, now)
+	return write(dir, sessionID, c, now, false)
+}
+
+// WriteCredential is Write from a hook that read the session's credential: c.Credential
+// replaces the session's, "" included, so a run whose hooks cannot tell keeps no earlier
+// run's. A fresh claim naming another is rewritten at once.
+func WriteCredential(dir, sessionID string, c Claim, now time.Time) bool {
+	if c.ProjectID == "" {
+		return false
+	}
+	return write(dir, sessionID, c, now, true)
 }
 
 // Mark records that sessionID runs, under processes pids, where its team does not collect,
 // so the relay drops what those processes send from now on instead of holding it. The
 // placement names no project and no repository; earlier placements keep their records.
 func Mark(dir, sessionID, tool string, pids []int, now time.Time) bool {
-	return write(dir, sessionID, Claim{Tool: tool, PIDs: pids}, now)
+	return write(dir, sessionID, Claim{Tool: tool, PIDs: pids}, now, false)
 }
 
-func write(dir, sessionID string, c Claim, now time.Time) bool {
+// write merges c into sessionID's claim; credited says c.Credential was read, and otherwise
+// the session's is kept.
+func write(dir, sessionID string, c Claim, now time.Time, credited bool) bool {
 	refresh := Refresh
 	if c.ProjectID == "" {
 		refresh = markRefresh
@@ -188,7 +207,8 @@ func write(dir, sessionID string, c Claim, now time.Time) bool {
 		return false
 	}
 	// The fast path needs no lock: a fresh claim already naming these processes.
-	if prev, ok := read(p); ok && samePlace(prev, c) && sameDirs(prev, c) && subset(c.PIDs, prev.PIDs) {
+	if prev, ok := read(p); ok && samePlace(prev, c) && sameDirs(prev, c) && subset(c.PIDs, prev.PIDs) &&
+		(!credited || prev.Credential == c.Credential) {
 		if info, err := os.Stat(p); err == nil && now.Sub(info.ModTime()) < refresh {
 			return false
 		}
@@ -204,11 +224,15 @@ func write(dir, sessionID string, c Claim, now time.Time) bool {
 	}
 	now = now.UTC()
 	prev, havePrev := read(p)
+	if !credited {
+		c.Credential = prev.Credential
+	}
 	placements := []Placement{}
 	switch {
 	case !havePrev:
 	case samePlace(prev, c):
-		if info, err := os.Stat(p); err == nil && now.Sub(info.ModTime()) < refresh && sameDirs(prev, c) && subset(c.PIDs, prev.PIDs) {
+		if info, err := os.Stat(p); err == nil && now.Sub(info.ModTime()) < refresh && sameDirs(prev, c) && subset(c.PIDs, prev.PIDs) &&
+			prev.Credential == c.Credential {
 			return false
 		}
 		c.PIDs = merge(prev.PIDs, c.PIDs)
@@ -228,7 +252,7 @@ func write(dir, sessionID string, c Claim, now time.Time) bool {
 		since = prev.placements()[len(prev.placements())-1].Since
 	}
 	placements = append(placements, Placement{ProjectID: c.ProjectID, Tool: c.Tool, Repo: c.Repo, Worktree: c.Worktree, Repository: c.Repository,
-		Root: c.Root, Cwd: c.Cwd, Remote: c.Remote, Branch: c.Branch, PIDs: c.PIDs, Since: since})
+		Root: c.Root, Cwd: c.Cwd, Remote: c.Remote, Branch: c.Branch, Credential: c.Credential, PIDs: c.PIDs, Since: since})
 	if len(placements) > maxPlacements {
 		placements = placements[len(placements)-maxPlacements:]
 	}

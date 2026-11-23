@@ -62,6 +62,9 @@ attribute_groups:
           still name it.
       - ref: vcs.ref.head.type
         note: branch, omitted on a detached HEAD.
+      - ref: terma.account.credential
+        requirement_level:
+          conditionally_required: When the session's hooks could tell its credential.
   - id: terma.relay.withheld
     visibility: public
     stability: development
