@@ -224,11 +224,17 @@ func (r *Router) personal(repo string, auth Authority, now time.Time) Decision {
 // which the relay records on arrival (Location.Narrow).
 func UnknownToPersonal(s State, now time.Time) bool { return s.unknownToPersonal(now) }
 
+// unknownToPersonalEligible reports whether personal is structurally the sole destination
+// for unknown locations (only team, collects everything, no org bindings), regardless of
+// whether personal is temporarily blocked.
+func (s State) unknownToPersonalEligible() bool {
+	return len(s.Teams) == 1 && s.Teams[0].collectsEverything() && !s.boundToAnOrganization()
+}
+
 // unknownToPersonal: personal is the only team, is Active and collects everything, and
 // nothing is bound to an organization the record could belong to.
 func (s State) unknownToPersonal(now time.Time) bool {
-	return len(s.Teams) == 1 && s.Teams[0].collectsEverything() && s.Teams[0].StateAt(now) == Active &&
-		!s.boundToAnOrganization()
+	return s.unknownToPersonalEligible() && s.Teams[0].StateAt(now) == Active
 }
 
 // OrganizationOf is the organization a location belongs to, for telling when a run
