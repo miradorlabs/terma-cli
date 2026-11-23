@@ -2,6 +2,7 @@ package hookrun
 
 import (
 	"bytes"
+	"errors"
 	"os"
 	"path/filepath"
 	"slices"
@@ -39,6 +40,8 @@ func TestFirstWordsMasksSecretsAndCapsLength(t *testing.T) {
 		"echo " + strings.Repeat("é", 2100):                                              "echo " + strings.Repeat("é", 55) + " …",
 		strings.Repeat("\x80", 4100):                                                     " …",
 		"echo hi\x00there":                                                               "echo hi there",
+		"curl -sH 'Authorization: Bearer xyz' https://example.com":                       "curl -s… … https://example.com",
+		"redis-cli -ha mypass ping":                                                      "redis-cli -h… … ping",
 		"one two three four five":                                                        "one two three four …",
 	}
 	for cmd, want := range cases {
@@ -535,6 +538,47 @@ func TestScanBoundsAndSafety(t *testing.T) {
 	scHome.candidate("~", plain)
 	if !slices.Contains(scHome.out, homeA) || !slices.Contains(scHome.out, homeB) {
 		t.Fatalf("~ cache missed HOME change: out=%q, want both %q and %q", scHome.out, homeA, homeB)
+	}
+
+	// link/../file resolves symlink before collapsing .. (both local target and remote fail-closed).
+	otherParent := filepath.Join(dir, "other-parent")
+	otherChild := filepath.Join(otherParent, "sub")
+	otherFile := filepath.Join(otherParent, "secret.txt")
+	if err := os.MkdirAll(otherChild, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(otherFile, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	localLink := filepath.Join(dir, "local-link")
+	if err := os.Symlink(otherChild, localLink); err != nil {
+		t.Fatal(err)
+	}
+	scDotDot := newScan(dir, os.LookupEnv, work{deadline: time.Now().Add(time.Minute)})
+	resolvedParent, _ := filepath.EvalSymlinks(otherParent)
+	if got, ok := scDotDot.path("local-link/../secret.txt", dir); !ok || got != filepath.Join(resolvedParent, "secret.txt") {
+		t.Fatalf("path(local-link/../secret.txt) = (%q, %v), want %q", got, ok, filepath.Join(resolvedParent, "secret.txt"))
+	}
+	scRemoteDotDot := newScan(dir, os.LookupEnv, work{deadline: time.Now().Add(time.Minute)})
+	if _, ok := scRemoteDotDot.path(filepath.Base(remoteLink)+"/../file", dir); ok || !scRemoteDotDot.unknown {
+		t.Fatalf("remoteLink/../file did not fail closed: ok=%v unknown=%v", ok, scRemoteDotDot.unknown)
+	}
+
+	// Large unknown command substitution dispatches in O(1) without quadratic prefix joins.
+	bigSubst := "echo $(unknown" + strings.Repeat(" a", 4000) + ")"
+	fSubst, err := syntax.NewParser().Parse(strings.NewReader(bigSubst), "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cs := fSubst.Stmts[0].Cmd.(*syntax.CallExpr).Args[1].Parts[0].(*syntax.CmdSubst)
+	startSubst := time.Now()
+	scSubst := newScan(dir, os.LookupEnv, work{deadline: startSubst.Add(time.Minute)})
+	var sb strings.Builder
+	if err := scSubst.substitute(&sb, cs); !errors.Is(err, errOpaque) {
+		t.Fatalf("large unknown substitute err = %v, want errOpaque", err)
+	}
+	if took := time.Since(startSubst); took > 50*time.Millisecond {
+		t.Fatalf("large unknown substitute took %v, want < 50ms", took)
 	}
 }
 
