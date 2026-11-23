@@ -46,6 +46,8 @@ type UserHooked struct {
 	Agent
 	Path   string
 	Others []string
+	// LeftOut, when set, is the note an install plans instead, changing nothing.
+	LeftOut string
 }
 
 // UserHooksPath is Path.
@@ -56,8 +58,11 @@ func (u UserHooked) UserHooksPaths() ([]string, error) {
 	return append([]string{u.Path}, u.Others...), nil
 }
 
-// PlanUserHooks merges the Stop hook into the file in dir.
+// PlanUserHooks merges the Stop hook into the file in dir, or plans LeftOut's note.
 func (u UserHooked) PlanUserHooks(dir string, command func(string) string, install bool) (hookmgr.Plan, error) {
+	if install && u.LeftOut != "" {
+		return hookmgr.Plan{Notes: []string{u.LeftOut}}, nil
+	}
 	g, err := hookmgr.Group("Stop", "", map[string]string{"type": "command", "command": command(u.ID + "-stop")})
 	if err != nil {
 		return hookmgr.Plan{}, err

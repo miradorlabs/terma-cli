@@ -3,6 +3,7 @@ package globalmode
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -171,5 +172,24 @@ func TestMachineWideHooksInEveryFile(t *testing.T) {
 	}
 	if data, _ := os.ReadFile(kept); !strings.Contains(string(data), `"theme"`) {
 		t.Fatalf("the developer's setting went:\n%s", data)
+	}
+}
+
+// A plan that changes nothing can still carry a note, saying why a file was left out: setup
+// reports it.
+func TestMachineWideHooksReportANoteWithNoChange(t *testing.T) {
+	m, hooks := sandbox(t)
+	fake := agentstest.UserHooked{ID: "fake", Label: "fake-cli", Path: hooks, LeftOut: "left the file out"}
+	m.Agents = agents.New(fake).Support(fake)
+	var said []string
+	say := func(s string) { said = append(said, s) }
+	if err := m.Apply([]string{"fake"}, say, say, say); err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Contains(said, "fake: left the file out") {
+		t.Errorf("said %q", said)
+	}
+	if _, err := os.Stat(hooks); !os.IsNotExist(err) {
+		t.Errorf("hooks file written: %v", err)
 	}
 }

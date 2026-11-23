@@ -2,7 +2,6 @@ package antigravity
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -44,25 +43,30 @@ func (Agent) UserHooksPath() (string, error) {
 	return filepath.Join(home, ".gemini", "config", "hooks.json"), err
 }
 
-// PlanUserHooks writes terma's named hook into <dir>/hooks.json, or takes it out; it
-// writes none, into any home, while the agy on PATH is too old to run them.
+// PlanUserHooks writes terma's named hook into <dir>/hooks.json, or takes it out. While
+// the agy on PATH is too old to run the hooks it writes none into ~/.gemini, the home that
+// agy uses: with no client's home here it refuses, saying why; beside one it plans nothing
+// there, with a note saying why, so setup goes on to the clients' homes, which run their own
+// agy.
 func (Agent) PlanUserHooks(dir string, command func(string) string, install bool) (hookmgr.Plan, error) {
-	if why, old := tooOld(context.Background()); install && old {
-		return hookmgr.Plan{}, errors.New(why)
+	if install {
+		if why, old := tooOldFor(dir); old {
+			if clients, _ := clientHomes(); len(clients) > 0 {
+				return hookmgr.Plan{Notes: []string{"left ~/.gemini out: " + why}}, nil
+			}
+			return hookmgr.Plan{}, errors.New(why)
+		}
 	}
 	return planUserHooks(dir, command, install)
 }
 
-// refreshHooksFile points the hooks terma wrote into each Antigravity home's file at this
-// terma, as `terma update --refresh` does after the binary moved, and names each file it
-// changed. A file without them is left alone, but for one: a home whose file names no terma
-// hook at all gets it, when another home's file has terma's hook switched on, so a home a
-// client made after setup is covered (the developer chose Antigravity with hooks, as that
-// other file says). A hook already named terma there, switched off or edited, is the
-// developer's and stays, and one switched off is never copied to another home. While the
-// agy on PATH is too old to run them, no home gets it, as PlanUserHooks says. Not on
-// Windows, where terma does not offer Antigravity and a shared home holds another system's
-// hooks.
+// refreshHooksFile points terma's hooks in each Antigravity home's file at this terma, as
+// `terma update --refresh` does after the binary moved, and names the files it changed.
+// When one home's file has the hook switched on, a home that is there and names no terma
+// hook gets it too, so a home a client made after setup is covered; not ~/.gemini while the
+// agy on PATH is too old (see PlanUserHooks). A hook named terma that is switched off or
+// edited is the developer's: it stays, and is never copied. Not on Windows, where terma
+// does not offer Antigravity.
 func (a Agent) refreshHooksFile() (string, bool, error) {
 	if runtime.GOOS == "windows" {
 		return "", false, nil
@@ -71,43 +75,27 @@ func (a Agent) refreshHooksFile() (string, bool, error) {
 	if err != nil {
 		return "", false, err
 	}
-	var carry, bare []string
-	var errs []error
-	on := false
-	for _, path := range paths {
-		data, err := hookmgr.ReadFile(path)
-		switch {
-		case err != nil:
-			errs = append(errs, err)
-		case bytes.Contains(data, []byte(" hook --user antigravity-")):
-			carry = append(carry, path)
-			on = on || termaHookOn(data)
-		case namesNoTermaHook(data) && isDir(filepath.Dir(filepath.Dir(path))):
-			// A home that is not there, ~/.gemini with no agy say, is not made.
-			bare = append(bare, path)
-		}
-	}
-	if len(carry) == 0 {
+	files := readHooksFiles(paths)
+	errs := files.errs
+	if len(files.carry) == 0 {
 		return "", false, errors.Join(errs...)
 	}
-	if !on {
-		bare = nil
-	} else if _, old := tooOld(context.Background()); old {
-		bare = nil
+	if !files.on {
+		files.bare = nil
 	}
 	terma, err := procinfo.AbsExecutable()
 	if err != nil {
 		return "", false, errors.Join(append(errs, err)...)
 	}
 	var changed []string
-	for _, path := range carry {
+	for _, path := range files.carry {
 		if _, ok, err := refreshHooks(path, terma); err != nil {
 			errs = append(errs, err)
 		} else if ok {
 			changed = append(changed, path)
 		}
 	}
-	for _, path := range bare {
+	for _, path := range files.bare {
 		if ok, err := installHooks(path, terma); err != nil {
 			errs = append(errs, err)
 		} else if ok {
@@ -115,12 +103,6 @@ func (a Agent) refreshHooksFile() (string, bool, error) {
 		}
 	}
 	return strings.Join(changed, ", "), len(changed) > 0, errors.Join(errs...)
-}
-
-// isDir reports whether path is a folder.
-func isDir(path string) bool {
-	info, err := os.Stat(path)
-	return err == nil && info.IsDir()
 }
 
 // namesNoTermaHook reports whether a hooks file, data as read (nil when absent), has no

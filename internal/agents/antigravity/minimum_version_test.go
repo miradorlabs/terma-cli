@@ -10,6 +10,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/miradorlabs/terma-cli/internal/agents"
+	"github.com/miradorlabs/terma-cli/internal/doctor"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookmgr"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
 )
@@ -28,8 +30,8 @@ func fakeAgy(t *testing.T, out string, code int) {
 	t.Setenv("PATH", dir)
 }
 
-// An agy older than the first terma relies on is not offered by setup --yes, and setup
-// refuses to write its hooks into any home, ~/.gemini or a client's, saying why; removal
+// An agy older than the first terma relies on, with no client's home, is not offered by
+// setup --yes, and setup refuses to write its hooks into ~/.gemini, saying why; removal
 // still works.
 func TestAntigravityTooOld(t *testing.T) {
 	fakeAgy(t, "1.1.9", 0)
@@ -48,13 +50,65 @@ func TestAntigravityTooOld(t *testing.T) {
 	if _, err := (Agent{}).PlanUserHooks(dir, testCommand, false); err != nil {
 		t.Fatalf("removal for an old agy: %v", err)
 	}
+}
+
+// Beside a client's home, which runs the client's own agy, an old agy on PATH leaves only
+// ~/.gemini out: its plan is empty with a note saying why, the client's home is planned, and
+// Antigravity is offered.
+func TestAntigravityTooOldBesideAClientHome(t *testing.T) {
+	fakeAgy(t, "1.1.9", 0)
+	home := isolatedHome(t)
 	client := filepath.Join(t3Home(t, filepath.Join(home, ".t3"), "antigravity", "a1"), "config")
-	if _, err := (Agent{}).PlanUserHooks(client, testCommand, true); err == nil || !strings.Contains(err.Error(), "1.2.4 or later") {
-		t.Fatalf("install into a client's home for an old agy: %v", err)
+	plan, err := (Agent{}).PlanUserHooks(filepath.Join(home, ".gemini", "config"), testCommand, true)
+	if err != nil || !plan.Empty() || len(plan.Notes) != 1 ||
+		!strings.Contains(plan.Notes[0], "~/.gemini") || !strings.Contains(plan.Notes[0], "1.2.4 or later") {
+		t.Fatalf("~/.gemini for an old agy = %+v, %v", plan, err)
 	}
-	// setup --yes would otherwise stop at the refusal.
-	if (Agent{}).Installed(ctx) {
-		t.Error("an agy before 1.2.4 counts as installed beside a client's home")
+	if plan, err := (Agent{}).PlanUserHooks(client, testCommand, true); err != nil || plan.Empty() {
+		t.Fatalf("the client's home for an old agy = %+v, %v", plan, err)
+	}
+	if !(Agent{}).Installed(context.Background()) {
+		t.Error("an old agy beside a client's home is not offered")
+	}
+}
+
+// With an old agy on PATH, doctor finds terma's hooks in place when every client's home has
+// them and ~/.gemini has none.
+func TestAntigravityTooOldDoctorPasses(t *testing.T) {
+	fakeAgy(t, "1.1.9", 0)
+	home := isolatedHome(t)
+	client := t3Home(t, filepath.Join(home, ".t3"), "antigravity", "a1")
+	exe := filepath.Join(t.TempDir(), "terma")
+	if err := os.WriteFile(exe, []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	installAt(t, client, exe)
+	reg := agents.New(Agent{}).Support(Agent{})
+	c, ok := doctor.AgentHooksCheck(context.Background(), reg, []string{"antigravity"}, exe)
+	if !ok || c.Status != doctor.Pass {
+		t.Fatalf("doctor = %+v, %v", c, ok)
+	}
+}
+
+// With an old agy on PATH, a refresh still gives a bare client's home terma's hook from
+// another that has it switched on, and puts none into a bare ~/.gemini.
+func TestAntigravityTooOldRefresh(t *testing.T) {
+	h := newRefreshHome(t)
+	fakeAgy(t, "1.1.9", 0)
+	installAt(t, h.t3a, "/old/terma")
+	hookruntest.WriteFile(t, filepath.Join(h.gemini, "config"), "hooks.json", guardHook)
+	changed, ok, err := Agent{}.refreshHooksFile()
+	if err != nil || !ok {
+		t.Fatalf("refresh = %q, %v, %v", changed, ok, err)
+	}
+	if strings.Contains(changed, hooksAt(h.gemini)) || !strings.Contains(changed, hooksAt(h.t3b)) {
+		t.Errorf("refresh named %q", changed)
+	}
+	if member(t, hooksAt(h.gemini), "terma") != nil {
+		t.Error("~/.gemini got terma's hook for an old agy")
+	}
+	if member(t, hooksAt(h.t3b), "terma") == nil {
+		t.Error("a bare client's home did not get terma's hook")
 	}
 }
 

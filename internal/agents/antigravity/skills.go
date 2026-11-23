@@ -64,9 +64,7 @@ type antigravitySkillRoots struct {
 // transcript's path, <home>/<app data>/brain/<id>/.system_generated/logs/...; agy's own
 // home's for a payload with none (agy before 1.5).
 func antigravityRoots(in *antigravityHookInput) antigravitySkillRoots {
-	if transcript := antigravityTranscript(in); transcript != "" {
-		// Up from the file, logs/, .system_generated/, <id>/ and brain/.
-		appData := filepath.Dir(filepath.Dir(filepath.Dir(filepath.Dir(filepath.Dir(transcript)))))
+	if appData := antigravityAppData(in); appData != "" {
 		return antigravitySkillRoots{Config: filepath.Join(filepath.Dir(appData), "config"), Builtin: filepath.Join(appData, "builtin")}
 	}
 	config, err := defaultHooksDir()

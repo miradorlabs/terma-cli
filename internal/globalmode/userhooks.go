@@ -125,6 +125,10 @@ func (m Machine) applyAgentHooks(a agents.UserHooks, path, terma string, want bo
 	if err != nil {
 		return false, err
 	}
+	// A note can come with no change: one that says why a file was left out.
+	for _, note := range plan.Notes {
+		*notes = append(*notes, a.DisplayName()+": "+note)
+	}
 	if plan.Empty() {
 		return false, nil
 	}
@@ -136,9 +140,6 @@ func (m Machine) applyAgentHooks(a agents.UserHooks, path, terma string, want bo
 	// Often a dotfiles link: written through, as the exporter step does.
 	if err := hookmgr.ApplyThroughLinks(dir, plan); err != nil {
 		return false, err
-	}
-	for _, note := range plan.Notes {
-		*notes = append(*notes, a.DisplayName()+": "+note)
 	}
 	return true, nil
 }

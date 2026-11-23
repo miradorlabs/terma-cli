@@ -37,26 +37,42 @@ const antigravityCallLockWait = 3 * time.Second
 // antigravityTranscript is the hook's transcriptPath when it is the conversation's own
 // transcript in agy's brain folder: the full one, never the compact copy.
 func antigravityTranscript(in *antigravityHookInput) string {
+	transcript, _ := antigravityTranscriptPaths(in)
+	return transcript
+}
+
+// antigravityAppData is the app data folder of the home in's session runs in,
+// <home>/<app data>, read from a transcript path antigravityTranscript accepts; "" without
+// one.
+func antigravityAppData(in *antigravityHookInput) string {
+	_, appData := antigravityTranscriptPaths(in)
+	return appData
+}
+
+// antigravityTranscriptPaths are antigravityTranscript and antigravityAppData, both "" for a
+// transcript path that is not the shape agy writes.
+func antigravityTranscriptPaths(in *antigravityHookInput) (transcript, appData string) {
 	p := in.TranscriptPath
 	if p == "" || !filepath.IsAbs(p) {
-		return ""
+		return "", ""
 	}
 	p = filepath.Clean(p)
 	if filepath.Base(p) == "transcript.jsonl" {
 		p = filepath.Join(filepath.Dir(p), antigravityTranscriptName)
 	}
 	if filepath.Base(p) != antigravityTranscriptName {
-		return ""
+		return "", ""
 	}
 	// <appDataDir>/brain/<conversationId>/.system_generated/logs/transcript_full.jsonl
 	logs := filepath.Dir(p)
 	generated := filepath.Dir(logs)
 	conversation := filepath.Dir(generated)
+	brain := filepath.Dir(conversation)
 	if filepath.Base(logs) != "logs" || filepath.Base(generated) != ".system_generated" ||
-		filepath.Base(conversation) != in.id() || filepath.Base(filepath.Dir(conversation)) != "brain" {
-		return ""
+		filepath.Base(conversation) != in.id() || filepath.Base(brain) != "brain" {
+		return "", ""
 	}
-	return p
+	return p, filepath.Dir(brain)
 }
 
 // captureAntigravityCalls reads the transcript past the last read and sends each model
