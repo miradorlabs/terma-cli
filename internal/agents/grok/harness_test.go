@@ -346,8 +346,8 @@ func TestConfigureRelayRefusesABlockingConflictFirst(t *testing.T) {
 			}
 			terma := t.TempDir()
 			_, err := Agent{ConfigDir: terma}.ConfigureRelay(context.Background(), relayConfig())
-			if err == nil || !strings.Contains(err.Error(), key) {
-				t.Fatalf("configure: %v", err)
+			if err == nil || !strings.Contains(err.Error(), key) || strings.Contains(err.Error(), displayName) {
+				t.Fatalf("configure: %v", err) // setup names the agent itself
 			}
 			if _, err := os.Stat(grokDir); !os.IsNotExist(err) {
 				t.Errorf("grok's home was written: %v", err)
@@ -360,8 +360,12 @@ func TestConfigureRelayRefusesABlockingConflictFirst(t *testing.T) {
 	t.Run("advisory", func(t *testing.T) {
 		sandbox(t, "1.0.92")
 		t.Setenv("OTEL_LOG_TOOL_DETAILS", "off")
-		if _, err := (Agent{ConfigDir: t.TempDir()}).ConfigureRelay(context.Background(), relayConfig()); err != nil {
+		result, err := (Agent{ConfigDir: t.TempDir()}).ConfigureRelay(context.Background(), relayConfig())
+		if err != nil {
 			t.Fatal(err)
+		}
+		if !slices.ContainsFunc(result.Notes, func(n string) bool { return strings.Contains(n, "OTEL_LOG_TOOL_DETAILS") }) {
+			t.Errorf("setup did not say the shell turns content off: %q", result.Notes)
 		}
 	})
 }
@@ -430,6 +434,16 @@ func TestRelayPointed(t *testing.T) {
 		t.Error("the sandbox switched off still warns")
 	}
 
+	// A content switch turned off in the shell is a warning too: the export still arrives.
+	t.Setenv("OTEL_LOG_TOOL_CONTENT", "0")
+	if pointed, _ := a.RelayPointed("127.0.0.1:43180"); !pointed {
+		t.Error("a content switch turned off made the export read as not pointed")
+	}
+	if detail, fix, problem := a.RelayProblem("127.0.0.1:43180"); !problem || !strings.Contains(detail, "OTEL_LOG_TOOL_CONTENT") || fix != "unset it" {
+		t.Errorf("content switch warning %q, %q, %v", detail, fix, problem)
+	}
+	t.Setenv("OTEL_LOG_TOOL_CONTENT", "")
+
 	t.Setenv(sandboxEnv, "")
 	path, _ := a.Harness().ConfigPath()
 	f, _ := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0)
@@ -442,6 +456,16 @@ func TestRelayPointed(t *testing.T) {
 	t.Setenv(envLogsExporter, "none")
 	if pointed, _ := a.RelayPointed("127.0.0.1:43180"); pointed {
 		t.Error("pointed with the log export switched off in the shell")
+	}
+	t.Setenv(envLogsExporter, "")
+
+	// A conflict in grok's own config is fixed there, not in the shell.
+	text := strings.Replace(readFile(t, path), "[telemetry]\n", "[telemetry]\notel_metrics_exporter = \"otlp\"\notel_endpoint = \"http://127.0.0.1:43180\"\n", 1)
+	if err := os.WriteFile(path, []byte(text), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if detail, fix, problem := a.RelayProblem("127.0.0.1:43180"); !problem || !strings.Contains(detail, "otel_metrics_exporter") || !strings.Contains(fix, "config.toml") {
+		t.Errorf("config metrics conflict %q, %q, %v", detail, fix, problem)
 	}
 }
 

@@ -25,6 +25,8 @@ func (Agent) CaptureRules() shape.CaptureRules {
 	return shape.CaptureRules{
 		// A tool's output, and an error that may quote it.
 		ToolContentFields: []string{"tool_output", "error_message"},
+		// grok writes the home directory as ~ in every string it exports, a file_path included.
+		HomeRelativeScopes: []string{logScope},
 		// Strings only: a number or a flag passes whatever its key (tokens, cost, counts,
 		// durations, turn_number). Each is one grok 1.0.92 sends, read from its own export.
 		SafeKeys: []string{

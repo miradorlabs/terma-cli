@@ -72,8 +72,8 @@ func sessionStart(ctx context.Context, env hookrun.Env) error {
 	return nil
 }
 
-// sessionEnd spools the end and clears the active session. A subagent's end (it names its
-// kind) clears nothing: its session was never active, and its parent's stays so.
+// sessionEnd spools the end and clears the active session if it is this one. A subagent's end
+// clears nothing: its session was never active, and its parent's stays so.
 func sessionEnd(ctx context.Context, env hookrun.Env) error {
 	in, err := readInput(env.Stdin)
 	if err != nil {
@@ -82,10 +82,6 @@ func sessionEnd(ctx context.Context, env hookrun.Env) error {
 	}
 	r, ok := env.Open(ctx, in.SessionID, in.Cwd)
 	if !ok {
-		return nil
-	}
-	if in.child() {
-		env.EmitFor(r, spoolEnd(in.SessionID))
 		return nil
 	}
 	env.EndSession(r, in.SessionID, name)

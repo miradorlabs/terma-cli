@@ -122,9 +122,10 @@ leaves (`config.Policy.Content`). The claim also names the checkout the hook ran
 the relay stamps on the session's records (`stampCheckout`): its origin, branch and whether
 it is a linked worktree under any policy (`vcs.*`, `terma.repository.worktree.linked`), and
 its working tree, the directory in it and the worktree's name with tool content only
-(`terma.repository.root`, `terma.working_directory`, `terma.repository.worktree.name`), beside
-the home directory of the user the relay runs as (`terma.home_directory`, `Options.HomeDir`),
-which an agent that writes it as `~` in its exported paths is read against. A subagent's
+(`terma.repository.root`, `terma.working_directory`, `terma.repository.worktree.name`). On the
+parts of an agent that writes the home directory as `~` in its exported paths, and on no
+other (`shape.CaptureRules.HomeRelativeScopes`: grok's), it also stamps that directory with
+tool content (`terma.home_directory`, `Options.HomeDir`). A subagent's
 claim names the session that opened it where the agent's own telemetry does not (OMP's and
 grok's, `hookrun.Env.StartSubagent`), which the relay stamps as `terma.session.parent.id`
 (`stampParent`). Hook events never pass the relay, so delivery applies

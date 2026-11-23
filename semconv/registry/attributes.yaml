@@ -783,10 +783,12 @@ attributes:
     stability: development
     brief: The absolute path of the home directory of the user the relay runs as, symlink-resolved.
     note: >
-      Read once as the relay starts, never from what an agent sends. An agent that writes the
-      home directory as `~` in the paths it exports (grok) is read against it, so a path under
-      the home directory names a real file. A local path, so it leaves only while the team's
-      policy collects tool content. A resource attribute the relay stamps on agent telemetry.
+      Absolute, symlink-resolved and with no trailing slash; read once as the relay starts,
+      never from what an agent sends. A resource attribute the relay stamps only on the parts
+      of an agent that writes the home directory as `~` in the paths it exports (grok, by its
+      instrumentation scope), which are read against it, so a path under the home directory
+      names a real file; no other agent's records carry it. A local path, so it leaves only
+      while the team's policy collects tool content.
     examples: ["/home/dev"]
     annotations:
       content: tool

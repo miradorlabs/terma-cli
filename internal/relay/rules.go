@@ -29,6 +29,7 @@ type rules struct {
 	safeKeys             map[string]bool
 	safePrefixes         []string
 	metricSafeKeys       map[string][]string // metric name → keys safe on its data points
+	homeRelativeScopes   []string            // scopes whose records write the home directory as ~
 }
 
 const defaultMarker = "<REDACTED>"
@@ -81,6 +82,7 @@ func compose(correlators []shape.Correlator, capturers []shape.Capturer) *rules 
 		r.toolContentFields = union(r.toolContentFields, c.ToolContentFields)
 		r.toolContentEvents = union(r.toolContentEvents, c.ToolContentEvents)
 		r.bodyPrefixes = union(r.bodyPrefixes, c.BodyPrefixes)
+		r.homeRelativeScopes = union(r.homeRelativeScopes, c.HomeRelativeScopes)
 		for _, k := range c.SafeKeys {
 			r.safeKeys[k] = true
 		}

@@ -49,9 +49,10 @@ type Options struct {
 	ProcessAlive func(pid int) bool
 	// HTTP sends upstream; a no-redirect client with a 15-second timeout when nil.
 	HTTP *http.Client
-	// HomeDir is the home directory of the user the relay runs as, symlink-resolved, which it
-	// stamps as terma.home_directory with tool content: an agent that writes it as `~` in the
-	// paths it exports is read against it. "" stamps none.
+	// HomeDir is the home directory of the user the relay runs as, absolute, symlink-resolved
+	// and with no trailing slash, which it stamps as terma.home_directory, with tool content,
+	// on the parts of an agent that writes it as `~` in the paths it exports
+	// (shape.CaptureRules.HomeRelativeScopes) and on no other. "" stamps none.
 	HomeDir string
 	// Dir is the on-disk outbox, so a restart loses nothing; required for anything to leave.
 	Dir string

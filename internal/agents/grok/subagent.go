@@ -6,7 +6,6 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
 	"github.com/miradorlabs/terma-cli/internal/session"
-	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
 // subagentStart announces the subagent grok is about to run as a session of its own. grok
@@ -33,9 +32,4 @@ func subagentStart(ctx context.Context, env hookrun.Env) error {
 	}
 	env.StartSubagent(r, env.NewSession(r, in.SubagentID, name, ""), in.SessionID, true, extra)
 	return nil
-}
-
-// spoolEnd is a session's end, which EndSession spools for a session that was active.
-func spoolEnd(id string) spool.Event {
-	return spool.Event{Name: semconv.TermaSessionEndEvent, SessionID: id, Attrs: map[string]any{semconv.GenAIMainAgentNameKey: name}}
 }

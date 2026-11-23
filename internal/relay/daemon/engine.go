@@ -91,15 +91,19 @@ func (d Deps) Engine(ctx context.Context, stateDir string, cfg *config.Config, s
 	return opts
 }
 
-// homeDir is the home directory of the user the relay runs as, symlink-resolved, read once
-// as it starts: $HOME, as the agents it serves read it; "" when it cannot be read.
+// homeDir is the home directory of the user the relay runs as, read once as it starts: $HOME,
+// as the agents it serves read it, symlink-resolved, absolute and with no trailing slash; ""
+// when it cannot be read or names no absolute path.
 func homeDir() string {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return ""
 	}
 	if resolved, err := filepath.EvalSymlinks(home); err == nil {
-		return resolved
+		home = resolved
+	}
+	if home = filepath.Clean(home); !filepath.IsAbs(home) {
+		return ""
 	}
 	return home
 }

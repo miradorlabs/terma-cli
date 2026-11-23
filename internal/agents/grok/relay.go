@@ -1,6 +1,7 @@
 package grok
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"net/url"
@@ -43,7 +44,7 @@ func (a Agent) ConfigureRelay(ctx context.Context, cfg agents.RelayConfig) (agen
 	}
 	for _, c := range conflicts {
 		if !c.Advisory {
-			return agents.RelayResult{}, errors.New(blocking(c))
+			return agents.RelayResult{}, errors.New(said(c) + "; " + remedy(c) + " again")
 		}
 	}
 	result, err := relayexport.Native(a.Harness(), cfg)
@@ -54,17 +55,21 @@ func (a Agent) ConfigureRelay(ctx context.Context, cfg agents.RelayConfig) (agen
 		result.Paths = append(result.Paths, path)
 	}
 	result.Notes = append(result.Notes, trustPromptNote)
+	for _, c := range conflicts {
+		result.Notes = append(result.Notes, displayName+": "+said(c)+".")
+	}
 	return result, nil
 }
 
-// blocking says why a conflict stops grok's setup, and what to do.
-func blocking(c harness.Conflict) string {
-	where := c.Key + "=" + c.Value
-	fix := "unset it"
+// said is a conflict as setup and doctor word it.
+func said(c harness.Conflict) string { return c.Key + "=" + c.Value + " is " + c.Reason }
+
+// remedy is what to do about a conflict, by where it was found.
+func remedy(c harness.Conflict) string {
 	if c.Scope == harness.ScopeUserSettings {
-		fix = "remove it from grok's config.toml"
+		return "remove it from grok's config.toml, then run terma setup"
 	}
-	return "Grok Build: " + where + " is " + c.Reason + "; " + fix + ", then run terma setup again"
+	return "unset it, then run terma setup"
 }
 
 // UnconfigureRelay restores the [telemetry] keys terma wrote.
@@ -84,39 +89,56 @@ func (a Agent) RelayPointed(addr string) (bool, bool) {
 	if !relayexport.NativePointed(a.Harness(), addr) {
 		return false, true
 	}
-	_, _, problem := a.relayProblem()
+	_, _, problem := a.relayProblem(addr)
 	return !problem, true
 }
 
-// RelayProblem reports why grok's export misses the relay at addr, or, where nothing does,
-// that grok runs sandboxed, where its hooks cannot claim a session: the export still flows,
-// and the relay holds it and drops it.
-func (a Agent) RelayProblem(string) (detail, fix string, problem bool) {
+// RelayProblem reports why grok's export misses the relay at addr, or, where nothing does, a
+// warning: that grok runs sandboxed, where its hooks cannot claim a session (the export still
+// flows, and the relay holds it and drops it), or that a shell export turns off content the
+// team's policy may collect.
+func (a Agent) RelayProblem(addr string) (detail, fix string, problem bool) {
 	if !(exporter{}).Detect(context.Background()).Found {
 		return "", "", false
 	}
-	if detail, fix, problem := a.relayProblem(); problem {
+	if detail, fix, problem := a.relayProblem(addr); problem {
 		return detail, fix, true
 	}
-	return sandboxed()
+	if detail, fix, problem := sandboxed(); problem {
+		return detail, fix, true
+	}
+	conflicts, _ := a.conflictsAt(addr)
+	if i := slices.IndexFunc(conflicts, func(c harness.Conflict) bool { return c.Advisory }); i >= 0 {
+		return displayName + ": " + said(conflicts[i]), "unset it", true
+	}
+	return "", "", false
+}
+
+// conflictsAt is what would defeat grok's export to the relay at addr: to the endpoint its
+// config names, or, where it names none yet, the relay's own.
+func (a Agent) conflictsAt(addr string) ([]harness.Conflict, error) {
+	st, err := a.Harness().Status()
+	if err != nil {
+		return nil, err
+	}
+	return a.Harness().ConflictsWith(harness.Exporter{Endpoint: cmp.Or(st.Endpoint, "http://"+addr)})
 }
 
 // relayProblem is what keeps grok's export from the relay: a grok too old, terma's hooks
 // file missing or not this terma's, or a blocking conflict.
-func (a Agent) relayProblem() (detail, fix string, problem bool) {
+func (a Agent) relayProblem(addr string) (detail, fix string, problem bool) {
 	if why, old := tooOld(context.Background()); old {
 		return why, "upgrade grok, then run terma setup", true
 	}
 	if path, current := hooksCurrent(); !current {
 		return "Grok Build's terma hooks " + output.TildePath(path) + " are missing or not this terma's, so no hook claims grok's sessions and the relay drops their telemetry", setupFix, true
 	}
-	st, err := a.Harness().Status()
+	conflicts, err := a.conflictsAt(addr)
 	if err != nil {
 		return "could not read " + displayName + "'s config: " + err.Error(), "repair it, then run terma setup", true
 	}
-	if i := slices.IndexFunc(st.Conflicts, func(c harness.Conflict) bool { return !c.Advisory }); i >= 0 {
-		c := st.Conflicts[i]
-		return displayName + ": " + c.Key + "=" + c.Value + " is " + c.Reason, "unset it, then run terma setup", true
+	if i := slices.IndexFunc(conflicts, func(c harness.Conflict) bool { return !c.Advisory }); i >= 0 {
+		return displayName + ": " + said(conflicts[i]), remedy(conflicts[i]), true
 	}
 	return "", "", false
 }

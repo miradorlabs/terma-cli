@@ -134,7 +134,8 @@ func TestRelayWithholdsGrokToolContent(t *testing.T) {
 }
 
 // A subagent's records carry the session that opened it, from its claim; its parent's carry
-// none. Every part names the relay's home directory with tool content, and none without.
+// none. Every part of grok's names the relay's home directory with tool content, and none
+// without: grok declares that it writes paths from `~` (HomeRelativeScopes).
 func TestRelayStampsGrokParentAndHome(t *testing.T) {
 	t.Parallel()
 	for _, toolContent := range []bool{true, false} {

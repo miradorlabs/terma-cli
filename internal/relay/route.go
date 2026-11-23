@@ -165,7 +165,12 @@ func (r *Relay) deliverAttributed(c claim.Claim, pol Policy, p *part, how attrib
 		stamp(p, semconv.TermaVersionKey, r.opts.Version)
 	}
 	ran := r.ranIn(c, p, how)
-	stampCheckout(p, ran, pol.IncludeToolContent, r.opts.HomeDir)
+	// The home directory, only on a part of an agent that writes it as ~ (HomeRelativeScopes).
+	home := ""
+	if r.rules.homeRelative(p) {
+		home = r.opts.HomeDir
+	}
+	stampCheckout(p, ran, pol.IncludeToolContent, home)
 	stampParent(p, ran)
 	// Its outbox entry is named by when it arrived, however long it was held.
 	at := p.arrived
@@ -247,6 +252,44 @@ func stampValue(p *part, key string, value *commonpb.AnyValue) {
 			set(rm.Resource)
 		}
 	}
+}
+
+// homeRelative reports whether p holds records of an instrumentation scope an agent declared
+// as writing the home directory as ~ (shape.CaptureRules.HomeRelativeScopes).
+func (ru *rules) homeRelative(p *part) bool {
+	if len(ru.homeRelativeScopes) == 0 {
+		return false
+	}
+	declared := func(scope *commonpb.InstrumentationScope) bool {
+		return slices.Contains(ru.homeRelativeScopes, scope.GetName())
+	}
+	switch m := p.msg.(type) {
+	case *logspb.LogsData:
+		for _, rl := range m.GetResourceLogs() {
+			for _, sl := range rl.GetScopeLogs() {
+				if declared(sl.GetScope()) {
+					return true
+				}
+			}
+		}
+	case *tracepb.TracesData:
+		for _, rs := range m.GetResourceSpans() {
+			for _, ss := range rs.GetScopeSpans() {
+				if declared(ss.GetScope()) {
+					return true
+				}
+			}
+		}
+	case *metricspb.MetricsData:
+		for _, rm := range m.GetResourceMetrics() {
+			for _, sm := range rm.GetScopeMetrics() {
+				if declared(sm.GetScope()) {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }
 
 // unstamp removes a resource attribute from every resource.
