@@ -4,6 +4,7 @@
 package spool
 
 import (
+	"bufio"
 	"bytes"
 	"cmp"
 	"context"
@@ -41,8 +42,23 @@ type Event struct {
 	Account string `json:"account,omitempty"`
 	// NoPerson marks an event collected under a server key: no person's, so its empty
 	// Account is final, never bound to a sign-in later (AppendAsCollected). Local only.
-	NoPerson bool           `json:"no_person,omitempty"`
-	Attrs    map[string]any `json:"attrs,omitempty"`
+	NoPerson bool `json:"no_person,omitempty"`
+	// Profile is the profile whose routing state routed the event, so delivery checks that
+	// profile's routing state rather than assuming default. Local only.
+	Profile string `json:"profile,omitempty"`
+	// Enrollment is the event's destination: the enrollment it is sent to, or the one
+	// whose team holds it. Local only.
+	Enrollment string `json:"enrollment,omitempty"`
+	// HoldKey is the pending binding holding the event, which is sent only if that binding
+	// is then bound to the holding team's organization. Local only.
+	HoldKey string `json:"hold_key,omitempty"`
+	// Run is the session run the event belongs to (internal/runs). Local only.
+	Run string `json:"run,omitempty"`
+	// OwnLocation is set when the event's location is its own, as a file event's checkout
+	// or the directory an agent's turn names is, rather than its run's. Its run turning
+	// Mixed still drops it unless it carries no content (runs.Locational). Local only.
+	OwnLocation bool           `json:"own_location,omitempty"`
+	Attrs       map[string]any `json:"attrs,omitempty"`
 }
 
 // ValidTraceID reports whether id is an OTel trace id: 32 lowercase hex digits, not all zero.
@@ -289,6 +305,34 @@ func (s *Spool) Writable() error {
 		return err
 	}
 	return f.Sync()
+}
+
+// Sessions calls add with the session ID of every queued event that names one, a line at
+// a time, without the lock appends take, so no hook waits on it: an event appended
+// meanwhile may be missed. It stops with ctx's error once ctx is done.
+func (s *Spool) Sessions(ctx context.Context, add func(sessionID string)) error {
+	f, err := os.Open(s.path())
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	lines := bufio.NewScanner(f)
+	lines.Buffer(nil, MaxBytes)
+	for lines.Scan() {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		var e struct {
+			SessionID string `json:"session_id"`
+		}
+		if json.Unmarshal(lines.Bytes(), &e) == nil && e.SessionID != "" {
+			add(e.SessionID)
+		}
+	}
+	return lines.Err()
 }
 
 // Peek returns up to n queued events without consuming them.
