@@ -44,7 +44,7 @@ func newTranscriptRig(t *testing.T, id, fixture string) *transcriptRig {
 	if err != nil {
 		t.Fatal(err)
 	}
-	sp, _ := spool.Open(t.TempDir())
+	sp, _ := hookruntest.OpenSpool(t.TempDir())
 	brain := filepath.Join(t.TempDir(), ".gemini", "antigravity-cli", "brain")
 	transcript := filepath.Join(brain, id, ".system_generated", "logs", antigravityTranscriptName)
 	if err := os.MkdirAll(filepath.Dir(transcript), 0o700); err != nil {
@@ -549,5 +549,26 @@ func TestAntigravityOverlongPromptMarksItsTurnUnknown(t *testing.T) {
 	g.hook(stop, `"executionNum":0,"fullyIdle":true,"terminationReason":"NO_TOOL_CALL"`)
 	if s := strings.Join(callSteps(g.drain()[semconv.TermaModelCallEvent]), ","); s != "step-9,step-11" {
 		t.Fatalf("sent %s, want turn 8's calls alone", s)
+	}
+}
+
+// A call decided under one sign-in is never sent under another's: a later hook in the same
+// checkout, signed in as someone else, holds it.
+func TestAntigravityCallNeverGoesInAnotherSignInsLane(t *testing.T) {
+	g := newTranscriptRig(t, turnsConversation, "transcript_turns.jsonl")
+	g.write(18)
+	g.hook(preInvocation, `"initialNumSteps":18,"invocationNum":0`)
+	g.drain()
+	g.lines = append(g.lines[:21], `{"step_index":21,"source":"USER_EXPLICIT","type":"USER_INPUT","status":"DONE","created_at":"2026-11-20T16:55:00Z","content":"<scrubbed>"}`)
+	g.write(len(g.lines))
+	other, err := spool.Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	other.Bind("fedcba9876543210")
+	g.sp = other
+	g.hook(preInvocation, `"initialNumSteps":22,"invocationNum":0`)
+	if got := hookruntest.Named(hookruntest.Spooled(t, other), semconv.TermaModelCallEvent); len(got) != 0 {
+		t.Fatalf("turn 18's call went in another sign-in's lane: %v", got)
 	}
 }

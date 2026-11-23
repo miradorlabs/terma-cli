@@ -8,18 +8,30 @@ import (
 	"strings"
 
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
+	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
 // Which checkout a turn's calls go under: each hook decides its own turn, and a call goes
 // only where its turn was decided collected, or is held for a hook there.
 
-// antigravityRoute names the checkout a collecting hook runs in: its path, its origin and
-// the project it sends to; "" for a hook the policy does not collect.
-func antigravityRoute(r *hookrun.Repo) string {
+// antigravityRoute names where a collecting hook's calls go: its checkout's path, origin
+// and project, and the lane it queues in, the sign-in in place or no person under a server
+// key; "" for a hook the policy does not collect. A call decided under one sign-in is never
+// sent under another.
+func antigravityRoute(e hookrun.Env, r *hookrun.Repo) string {
 	if r == nil {
 		return ""
 	}
-	return r.Root + "\x00" + r.Repository.Origin + "\x00" + r.ProjectID
+	// The lane the hook's events queue in, as hookrun stamps them.
+	l := spool.LaneOf(e.Account, e.ServerKey)
+	if e.Spool != nil {
+		l = e.Spool.Lane()
+	}
+	lane := "@" + l.Account
+	if l.NoPerson {
+		lane = "no_person"
+	}
+	return r.Root + "\x00" + r.Repository.Origin + "\x00" + r.ProjectID + "\x00" + lane
 }
 
 // antigravityTurnInDoubt reports whether a call at step, read as turn's, may be another

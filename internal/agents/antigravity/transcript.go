@@ -188,7 +188,7 @@ func captureAntigravityCalls(ctx context.Context, e hookrun.Env, r *hookrun.Repo
 		}
 		return false
 	}
-	route := antigravityRoute(r)
+	route := antigravityRoute(e, r)
 	last.Turns = decideAntigravityTurn(last.Turns, probe.Turn, route)
 	last.Held = probe.Held
 	send := func(s antigravityStep, turn string) bool {

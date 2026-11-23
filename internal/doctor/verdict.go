@@ -3,6 +3,7 @@ package doctor
 import (
 	"context"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
@@ -113,6 +114,28 @@ type StatusLineVerdict struct {
 // StatusLineAgents are the agents whose status line terma wraps.
 func StatusLineAgents(reg *agents.Registry) []agents.StatusLiner {
 	return reg.With[agents.StatusLiner]()
+}
+
+// checkedStatusLines are the status lines doctor checks: an agent's the developer chose (any,
+// with no choice recorded), supported here and installed.
+func checkedStatusLines(ctx context.Context, reg *agents.Registry, chosen []string) []agents.StatusLiner {
+	var out []agents.StatusLiner
+	for _, a := range StatusLineAgents(reg) {
+		picked := len(chosen) == 0 || slices.ContainsFunc(agents.Selections(a), func(s string) bool { return slices.Contains(chosen, s) })
+		if picked && reg.IsSupported(a.Name()) && a.Installed(ctx) {
+			out = append(out, a)
+		}
+	}
+	return out
+}
+
+// statusLine judges a's status line from the repository doctor runs in.
+func (d *run) statusLine(a agents.StatusLiner) Check {
+	repoRoot := ""
+	if d.env.RepoErr == nil {
+		repoRoot = d.env.Root
+	}
+	return StatusLineCheck(JudgeStatusLine(a, repoRoot))
 }
 
 // JudgeStatusLine judges the status line terma wraps for s, as seen from repoRoot.

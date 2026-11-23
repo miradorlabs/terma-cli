@@ -116,3 +116,44 @@ func TestAntigravityHookQueuesInTheSignedInLane(t *testing.T) {
 		t.Fatalf("queued %d session starts for the conversation, want 1 (%d events)", starts, len(events))
 	}
 }
+
+// What Antigravity's transcript and status line give, a model call and the plan's quota
+// and account, queues in the signed-in person's lane too.
+func TestAntigravityUsageAndSeatQueueInTheSignedInLane(t *testing.T) {
+	root := collectedRepo(t)
+	account := signInHereAs(t, "u-agy-usage")
+	const id = "agy-lane-usage"
+	transcript := filepath.Join(t.TempDir(), "brain", id, ".system_generated", "logs", "transcript_full.jsonl")
+	if err := os.MkdirAll(filepath.Dir(transcript), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(transcript, []byte(`{"step_index":0,"source":"USER_EXPLICIT","type":"USER_INPUT","status":"DONE","created_at":"2026-11-20T16:50:00Z","content":"x"}
+{"step_index":1,"source":"MODEL","type":"PLANNER_RESPONSE","status":"DONE","created_at":"2026-11-20T16:50:01Z","model":"gemini-3.8-flash-low","input_tokens":100,"cache_read_tokens":20,"output_tokens":5}
+`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	payload := `"conversationId":"` + id + `","cwd":"` + hookruntest.InJSON(root) + `","transcriptPath":"` + hookruntest.InJSON(transcript) + `","modelName":"gemini-3.8-flash-low"`
+	runHook(t, "antigravity-pre-invocation", `{`+payload+`,"initialNumSteps":1,"invocationNum":0}`)
+	runHook(t, "antigravity-post-invocation", `{`+payload+`,"initialNumSteps":1,"invocationNum":0}`)
+	runHook(t, "antigravity-statusline", `{"conversation_id":"`+id+`","session_id":"`+id+`","cwd":"`+hookruntest.InJSON(root)+`","plan_tier":"Google AI Ultra","email":"dev@example.com",`+
+		`"quota":{"gemini-5h":{"remaining_fraction":0.9,"reset_time":"2026-11-23T20:00:00Z"}}}`)
+	events, err := spoolForTest(t).Peek(100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	seen := map[string]int{}
+	for _, e := range events {
+		if e.SessionID != id {
+			continue
+		}
+		seen[e.Name]++
+		if e.Account != account || e.NoPerson {
+			t.Errorf("%s queued outside the signed-in lane: account %q, no person %v", e.Name, e.Account, e.NoPerson)
+		}
+	}
+	for _, name := range []string{"terma.model_call", "terma.session.quota", "terma.session.account"} {
+		if seen[name] != 1 {
+			t.Errorf("queued %d %s for the conversation, want 1: %v", seen[name], name, seen)
+		}
+	}
+}
