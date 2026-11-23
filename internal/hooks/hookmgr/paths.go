@@ -21,13 +21,15 @@ func TermaPaths(data []byte) []string {
 		return nil
 	}
 	var paths []string
+	seen := map[string]bool{}
 	var walk func(v any)
 	walk = func(v any) {
 		switch t := v.(type) {
 		case string:
 			if m := userHookParts.FindStringSubmatch(strings.TrimSpace(t)); m != nil && m[1] == m[2] {
 				p := strings.ReplaceAll(m[1][1:len(m[1])-1], `'\''`, "'")
-				if !slices.Contains(paths, p) {
+				if !seen[p] {
+					seen[p] = true
 					paths = append(paths, p)
 				}
 			}

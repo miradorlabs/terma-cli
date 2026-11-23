@@ -331,3 +331,98 @@ func TestAntigravityUserHooksPath(t *testing.T) {
 		t.Fatalf("UserHooksPath = %q, %v", got, err)
 	}
 }
+
+// In a JSONC file, setup and teardown patch only the fields of terma's hook they change: a
+// comment on a part of it terma does not touch stays.
+func TestAntigravityHooksKeepCommentsInsideTermas(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	stop := hookruntest.InJSON(testCommand("antigravity-stop"))
+	hookruntest.WriteFile(t, root, "hooks.json", `{
+  "terma": {
+    "Stop": [{"type": "command", "command": "`+stop+`", "timeout": 10}],
+    // the developer's own, inside terma's hook
+    "SessionStart": [{"command": "./hello.sh"}],
+  },
+}
+`)
+	apply := func(cmd func(string) string, install bool) string {
+		t.Helper()
+		plan, err := planUserHooks(root, cmd, install)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := hookmgr.Apply(root, plan); err != nil {
+			t.Fatal(err)
+		}
+		return hookruntest.ReadFile(t, root, "hooks.json")
+	}
+	moved := hookmgr.UserHookCommand("/usr/local/bin/terma")
+	got := apply(moved, true)
+	if !strings.Contains(got, "// the developer's own, inside terma's hook") || !strings.Contains(got, moved("antigravity-stop")) || strings.Contains(got, "/opt/terma") {
+		t.Fatalf("after setup:\n%s", got)
+	}
+	got = apply(moved, false)
+	if !strings.Contains(got, "// the developer's own, inside terma's hook") || !strings.Contains(got, "./hello.sh") || strings.Contains(got, "hook --user") {
+		t.Fatalf("after teardown:\n%s", got)
+	}
+}
+
+// Removal takes terma's handler out of a matcher group even when a sibling handler there
+// is not an object, which stays.
+func TestAntigravityHooksRemoveFromAGroupWithAMalformedSibling(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	post := hookruntest.InJSON(testCommand("antigravity-post-tool-use"))
+	hookruntest.WriteFile(t, root, "hooks.json", `{"terma": {"PostToolUse": [{"matcher": "", "hooks": ["odd", {"type": "command", "command": "`+post+`"}]}]}}`)
+	plan, err := planUserHooks(root, testCommand, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := hookmgr.Apply(root, plan); err != nil {
+		t.Fatal(err)
+	}
+	if got := hookruntest.ReadFile(t, root, "hooks.json"); strings.Contains(got, "hook --user") || !strings.Contains(got, `"odd"`) {
+		t.Fatalf("after removal:\n%s", got)
+	}
+}
+
+// Teardown takes terma's handlers out and keeps the hook's other fields, which setup never
+// writes and so are the developer's.
+func TestAntigravityHooksRemovalKeepsTheHooksOtherFields(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	stop := hookruntest.InJSON(testCommand("antigravity-stop"))
+	hookruntest.WriteFile(t, root, "hooks.json", `{"terma": {"description": "mine", "Stop": [{"type": "command", "command": "`+stop+`"}]}}`)
+	plan, err := planUserHooks(root, testCommand, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := hookmgr.Apply(root, plan); err != nil {
+		t.Fatal(err)
+	}
+	if got := hookruntest.ReadFile(t, root, "hooks.json"); strings.Contains(got, "hook --user") || !strings.Contains(got, `"description": "mine"`) {
+		t.Fatalf("after removal:\n%s", got)
+	}
+}
+
+// A refresh points terma's existing entries at the terma it runs as, and changes nothing
+// else: a hook switched off stays off, and an event terma's hook no longer lists is not
+// added back.
+func TestAntigravityRefreshRewritesOnlyTermasCommands(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	path := filepath.Join(dir, "hooks.json")
+	old := hookmgr.UserHookCommand("/old/terma")
+	hookruntest.WriteFile(t, dir, "hooks.json", `{"terma": {"enabled": false, "Stop": [{"type": "command", "command": "`+hookruntest.InJSON(old("antigravity-stop"))+`", "timeout": 10}]}}`)
+	if _, changed, err := refreshHooks(path, "/new/terma"); err != nil || !changed {
+		t.Fatalf("refresh = %v, %v", changed, err)
+	}
+	got := hookruntest.ReadFile(t, dir, "hooks.json")
+	if !strings.Contains(got, `"enabled": false`) || strings.Contains(got, "/old/terma") || !strings.Contains(got, "/new/terma") {
+		t.Fatalf("after refresh:\n%s", got)
+	}
+	if strings.Contains(got, "PreInvocation") || strings.Contains(got, "PostToolUse") {
+		t.Fatalf("refresh added events:\n%s", got)
+	}
+}

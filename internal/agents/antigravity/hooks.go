@@ -6,9 +6,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
+	"strings"
 
 	"github.com/tailscale/hujson"
 
@@ -73,10 +76,11 @@ func (a Agent) RefreshMachine() (string, bool, error) {
 	return refreshHooks(path, terma)
 }
 
-// refreshHooks rewrites terma's entries in the hooks file at path for terma there.
+// refreshHooks rewrites the entries of terma's already in the hooks file at path to run
+// terma there, and nothing else: it adds no event and leaves the hook on or off as it is.
 func refreshHooks(path, terma string) (string, bool, error) {
 	dir := filepath.Dir(path)
-	plan, err := planUserHooks(dir, hookmgr.UserHookCommand(terma), true)
+	plan, err := planHooks(dir, hookmgr.UserHookCommand(terma), modeRefresh)
 	if err != nil || plan.Empty() {
 		return path, false, err
 	}
@@ -110,14 +114,33 @@ func ownEntries(command func(event string) string) (map[string]json.RawMessage, 
 	return own, nil
 }
 
+// planMode is what a plan does to terma's entries: put them in, take them out, or point
+// the ones already there at another terma.
+type planMode int
+
+const (
+	modeInstall planMode = iota
+	modeRemove
+	modeRefresh
+)
+
 // planUserHooks puts terma's entries into the one named hook terma owns, or takes them
-// out, leaving every other named hook, and any handler of the developer's inside terma's,
-// as it was read. agy reads its file as JSONC: one with comments or trailing commas is
-// patched in place, its comments kept. Installing also switches terma's hook back on, as
-// a note says: agy runs none of a hook set "enabled": false. Removal never fails on what
-// it did not write: a file it cannot parse that holds nothing of terma's, or a part of
-// terma's hook that is not the shape terma writes, is left as it is.
+// out; see planHooks.
 func planUserHooks(dir string, command func(event string) string, install bool) (hookmgr.Plan, error) {
+	if install {
+		return planHooks(dir, command, modeInstall)
+	}
+	return planHooks(dir, command, modeRemove)
+}
+
+// planHooks changes terma's entries in its named hook and nothing else of the developer's:
+// other named hooks, their handlers inside terma's, and its other fields stay as read.
+// agy reads its file as JSONC: one with comments or trailing commas is patched in place,
+// event by event, its comments kept. Installing also switches terma's hook back on, as a
+// note says: agy runs none of a hook set "enabled": false. Removal never fails on what it
+// did not write: a file it cannot parse that holds nothing of terma's, or a part of
+// terma's hook that is not the shape terma writes, is left as it is.
+func planHooks(dir string, command func(event string) string, mode planMode) (hookmgr.Plan, error) {
 	const path = "hooks.json"
 	full := filepath.Join(dir, path)
 	p := hookmgr.Plan{}
@@ -127,26 +150,28 @@ func planUserHooks(dir string, command func(event string) string, install bool) 
 	}
 	doc, top, err := parseHooks(before)
 	if err != nil {
-		if !install && !bytes.Contains(before, []byte(" hook --user antigravity-")) {
+		if mode != modeInstall && !bytes.Contains(before, []byte(" hook --user antigravity-")) {
 			return p, nil
 		}
 		return p, fmt.Errorf("parse %s: %w", full, err)
 	}
 	member := map[string]json.RawMessage{}
-	if current, present := top[antigravityHookName]; present {
+	current, present := top[antigravityHookName]
+	if present {
 		if err := json.Unmarshal(current, &member); err != nil || member == nil {
-			if !install {
+			if mode != modeInstall {
 				return p, nil
 			}
 			return p, fmt.Errorf("parse %s: hook %q is not an object", full, antigravityHookName)
 		}
 	}
+	read := maps.Clone(member)
 	own, err := ownEntries(command)
 	if err != nil {
 		return p, err
 	}
 	changed, switchedOn, theirs := false, false, false
-	if raw, ok := member["enabled"]; install && ok && string(bytes.TrimSpace(raw)) == "false" {
+	if raw, ok := member["enabled"]; mode == modeInstall && ok && string(bytes.TrimSpace(raw)) == "false" {
 		delete(member, "enabled")
 		changed, switchedOn = true, true
 	}
@@ -154,32 +179,32 @@ func planUserHooks(dir string, command func(event string) string, install bool) 
 		var entries, kept []json.RawMessage
 		if raw, ok := member[h.Event]; ok {
 			if err := json.Unmarshal(raw, &entries); err != nil {
-				if !install {
+				if mode != modeInstall {
 					continue
 				}
 				return p, fmt.Errorf("parse %s: %s.%s is not a list: %w", full, antigravityHookName, h.Event, err)
 			}
 		}
-		ours := false
+		ours, hadOurs := false, false
 		for _, entry := range entries {
-			if install && !ours && hookmgr.SameJSON(entry, own[h.Event]) {
+			if mode != modeRemove && !ours && hookmgr.SameJSON(entry, own[h.Event]) {
 				kept, ours = append(kept, entry), true
 				continue
 			}
-			remaining, removed, err := hookmgr.WithoutTerma(entry)
+			remaining, removed, err := withoutTerma(entry)
 			if err != nil {
-				if !install {
+				if mode != modeInstall {
 					kept, theirs = append(kept, entry), true
 					continue
 				}
 				return p, fmt.Errorf("parse %s: %s.%s: %w", full, antigravityHookName, h.Event, err)
 			}
-			changed = changed || removed
+			changed, hadOurs = changed || removed, hadOurs || removed
 			if remaining != nil {
 				kept, theirs = append(kept, remaining), true
 			}
 		}
-		if install && !ours {
+		if !ours && (mode == modeInstall || mode == modeRefresh && hadOurs) {
 			kept, changed = append(kept, own[h.Event]), true
 		}
 		if len(kept) == 0 {
@@ -202,16 +227,16 @@ func planUserHooks(dir string, command func(event string) string, install bool) 
 		}
 		p.Notes = append(p.Notes, note)
 	}
-	var value json.RawMessage
-	if hasEvents(member) {
-		if value, err = hookmgr.MarshalJSON(member, "  ", "  "); err != nil {
+	if len(member) > 0 {
+		value, err := hookmgr.MarshalJSON(member, "  ", "  ")
+		if err != nil {
 			return p, err
 		}
 		top[antigravityHookName] = value
 	} else {
 		delete(top, antigravityHookName)
 	}
-	if !install && len(top) == 0 {
+	if mode == modeRemove && len(top) == 0 {
 		p.Changes = append(p.Changes, hookmgr.Change{Path: path, Before: before})
 		return p, nil
 	}
@@ -220,11 +245,49 @@ func planUserHooks(dir string, command func(event string) string, install bool) 
 		if after, err = hookmgr.MarshalOrdered(top); err != nil {
 			return p, err
 		}
-	} else if after, err = patchHooks(doc, value); err != nil {
+	} else if after, err = patchHooks(doc, present, read, member); err != nil {
 		return p, fmt.Errorf("patch %s: %w", full, err)
 	}
 	p.Changes = append(p.Changes, hookmgr.Change{Path: path, Before: before, After: append(bytes.TrimRight(after, "\n"), '\n')})
 	return p, nil
+}
+
+// withoutTerma is hookmgr.WithoutTerma, keeping rather than refusing a handler of a group
+// that is not an object: terma's own still go. An entry that is no object is an error.
+func withoutTerma(entry json.RawMessage) (json.RawMessage, bool, error) {
+	remaining, removed, err := hookmgr.WithoutTerma(entry)
+	if err == nil {
+		return remaining, removed, nil
+	}
+	var group map[string]json.RawMessage
+	var handlers []json.RawMessage
+	if json.Unmarshal(entry, &group) != nil || json.Unmarshal(group["hooks"], &handlers) != nil {
+		return nil, false, err
+	}
+	var kept []json.RawMessage
+	removed = false
+	for _, handler := range handlers {
+		rest, gone, err := hookmgr.WithoutTerma(handler)
+		if err != nil {
+			kept = append(kept, handler)
+			continue
+		}
+		removed = removed || gone
+		if rest != nil {
+			kept = append(kept, rest)
+		}
+	}
+	if !removed {
+		return entry, false, nil
+	}
+	if len(kept) == 0 {
+		return nil, true, nil
+	}
+	if group["hooks"], err = hookmgr.MarshalJSON(kept, "", ""); err != nil {
+		return nil, false, err
+	}
+	out, err := hookmgr.MarshalJSON(group, "", "")
+	return out, true, err
 }
 
 // parseHooks reads agy's hooks file, its named hooks by name. doc is the file as JSONC
@@ -250,15 +313,37 @@ func parseHooks(data []byte) (*hujson.Value, map[string]json.RawMessage, error) 
 	return &v, top, nil
 }
 
-// patchHooks sets terma's named hook in a JSONC file to value, or removes it when value is
-// nil, leaving the developer's comments and the rest of the file as they were.
-func patchHooks(doc *hujson.Value, value json.RawMessage) ([]byte, error) {
-	pointer := "/" + antigravityHookName
-	op := map[string]any{"op": "add", "path": pointer, "value": value}
-	if value == nil {
-		op = map[string]any{"op": "remove", "path": pointer}
+// patchHooks writes terma's named hook into a JSONC file as member, the hook read
+// before (when present) as read: the whole hook when it is new or goes, else only the
+// fields of it that changed, so the developer's comments elsewhere, in terma's hook too,
+// stay.
+func patchHooks(doc *hujson.Value, present bool, read, member map[string]json.RawMessage) ([]byte, error) {
+	hook := "/" + antigravityHookName
+	var ops []map[string]any
+	switch {
+	case len(member) == 0:
+		ops = append(ops, map[string]any{"op": "remove", "path": hook})
+	case !present:
+		ops = append(ops, map[string]any{"op": "add", "path": hook, "value": member})
+	default:
+		keys := slices.Sorted(maps.Keys(read))
+		for _, k := range slices.Sorted(maps.Keys(member)) {
+			if !slices.Contains(keys, k) {
+				keys = append(keys, k)
+			}
+		}
+		for _, k := range keys {
+			pointer := hook + "/" + strings.NewReplacer("~", "~0", "/", "~1").Replace(k)
+			value, keep := member[k]
+			switch old, had := read[k]; {
+			case !keep:
+				ops = append(ops, map[string]any{"op": "remove", "path": pointer})
+			case !had || !hookmgr.SameJSON(old, value):
+				ops = append(ops, map[string]any{"op": "add", "path": pointer, "value": value})
+			}
+		}
 	}
-	patch, err := json.Marshal([]any{op})
+	patch, err := json.Marshal(ops)
 	if err != nil {
 		return nil, err
 	}
@@ -267,15 +352,4 @@ func patchHooks(doc *hujson.Value, value json.RawMessage) ([]byte, error) {
 	}
 	doc.Format()
 	return doc.Pack(), nil
-}
-
-// hasEvents reports whether a named hook still lists handlers for an event: its other
-// members, such as "enabled", hold none.
-func hasEvents(member map[string]json.RawMessage) bool {
-	for _, raw := range member {
-		if t := bytes.TrimSpace(raw); len(t) > 0 && t[0] == '[' {
-			return true
-		}
-	}
-	return false
 }
