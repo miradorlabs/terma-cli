@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-23T17:12:55.239748041Z",
+  "generated_at": "2026-11-23T17:37:27.894803447Z",
   "vendors": [
     {
       "id": "anthropic",
@@ -973,12 +973,12 @@
       "successor": "gemini-3.1-flash-lite",
       "context_window": 1048576,
       "max_output": 65536,
-      "knowledge_cutoff": "2025-01",
+      "knowledge_cutoff": null,
       "reasoning": true,
       "harnesses": [],
       "last_change": {
-        "at": "2026-11-16T14:58:16.292875039Z",
-        "changes": 1
+        "at": "2026-11-23T17:37:27.894803447Z",
+        "changes": 4
       },
       "probed": false
     },

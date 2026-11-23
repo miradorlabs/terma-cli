@@ -3,6 +3,81 @@
   "id": "gemini-3.1-flash-lite-preview",
   "steps": [
     {
+      "at": "2026-11-23T17:37:27.894803447Z",
+      "event": "changed",
+      "changes": [
+        {
+          "id": "facts/knowledge_cutoff",
+          "category": "facts",
+          "op": "removed",
+          "path": [
+            "facts",
+            "knowledge_cutoff"
+          ],
+          "title": "Knowledge cutoff: no longer stated (was 2025-01)",
+          "impact": "notable",
+          "before": "2025-01",
+          "after": null,
+          "text_diff": null,
+          "terma": null,
+          "source": null,
+          "documented": null
+        },
+        {
+          "id": "facts/open_weights",
+          "category": "facts",
+          "op": "removed",
+          "path": [
+            "facts",
+            "open_weights"
+          ],
+          "title": "Open weights: no longer stated (was no)",
+          "impact": "notable",
+          "before": false,
+          "after": null,
+          "text_diff": null,
+          "terma": null,
+          "source": null,
+          "documented": null
+        },
+        {
+          "id": "facts/reasoning_efforts/none",
+          "category": "facts",
+          "op": "added",
+          "path": [
+            "facts",
+            "reasoning_efforts",
+            "none"
+          ],
+          "title": "Reasoning effort added: none",
+          "impact": "notable",
+          "before": null,
+          "after": "none",
+          "text_diff": null,
+          "terma": null,
+          "source": null,
+          "documented": null
+        },
+        {
+          "id": "facts/sampling_parameters",
+          "category": "facts",
+          "op": "removed",
+          "path": [
+            "facts",
+            "sampling_parameters"
+          ],
+          "title": "Sampling parameters: no longer stated (was yes)",
+          "impact": "notable",
+          "before": true,
+          "after": null,
+          "text_diff": null,
+          "terma": null,
+          "source": null,
+          "documented": null
+        }
+      ]
+    },
+    {
       "at": "2026-11-16T14:58:16.292875039Z",
       "event": "changed",
       "changes": [

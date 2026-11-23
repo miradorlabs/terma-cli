@@ -1,7 +1,20 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-23T17:12:55.239748041Z",
+  "generated_at": "2026-11-23T17:37:27.894803447Z",
   "events": [
+    {
+      "at": "2026-11-23T17:37:27.894803447Z",
+      "model": "gemini-3.1-flash-lite-preview",
+      "vendor": "google",
+      "name": "Gemini 3.1 Flash-Lite preview",
+      "event": "changed",
+      "changes": 4,
+      "highlights": [
+        "Knowledge cutoff: no longer stated (was 2025-01)",
+        "Open weights: no longer stated (was no)",
+        "Reasoning effort added: none"
+      ]
+    },
     {
       "at": "2026-11-21T00:33:01.87527665Z",
       "model": "gpt-6.2-sol",

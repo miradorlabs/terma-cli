@@ -28,25 +28,23 @@
       "audio",
       "pdf"
     ],
-    "knowledge_cutoff": "2025-01",
     "max_input": 1048576,
     "max_output": 65536,
     "name": "Gemini 3.1 Flash-Lite preview",
-    "open_weights": false,
     "output_modalities": [
       "text"
     ],
     "reasoning": true,
     "reasoning_efforts": [
-      "minimal",
-      "low",
+      "high",
       "medium",
-      "high"
+      "low",
+      "minimal",
+      "none"
     ],
     "released_at": "2026-03-03",
     "replacement": "gemini-3.1-flash-lite",
     "retires_at": "2026-05-25",
-    "sampling_parameters": true,
     "snapshots": [
       "gemini-3.1-flash-lite-preview"
     ],
@@ -62,7 +60,6 @@
   },
   "provenance": {
     "context_window": {
-      "models.dev": 1048576,
       "openrouter": 1048576
     },
     "default_effort": {
@@ -92,13 +89,6 @@
         "audio",
         "pdf"
       ],
-      "models.dev": [
-        "text",
-        "image",
-        "video",
-        "audio",
-        "pdf"
-      ],
       "openrouter": [
         "text",
         "image",
@@ -107,30 +97,19 @@
         "audio"
       ]
     },
-    "knowledge_cutoff": {
-      "models.dev": "2025-01"
-    },
     "max_input": {
       "google-docs": 1048576
     },
     "max_output": {
       "google-docs": 65536,
-      "models.dev": 65536,
       "openrouter": 65536
     },
     "name": {
       "google-docs": "Gemini 3.1 Flash-Lite preview",
-      "models.dev": "Gemini 3.1 Flash Lite Preview",
       "openrouter": "Gemini 3.1 Flash Lite Preview"
-    },
-    "open_weights": {
-      "models.dev": false
     },
     "output_modalities": {
       "google-docs": [
-        "text"
-      ],
-      "models.dev": [
         "text"
       ],
       "openrouter": [
@@ -139,16 +118,9 @@
     },
     "reasoning": {
       "google-docs": true,
-      "models.dev": true,
       "openrouter": true
     },
     "reasoning_efforts": {
-      "models.dev": [
-        "minimal",
-        "low",
-        "medium",
-        "high"
-      ],
       "openrouter": [
         "high",
         "medium",
@@ -158,17 +130,13 @@
       ]
     },
     "released_at": {
-      "google-docs": "2026-03-03",
-      "models.dev": "2026-03-03"
+      "google-docs": "2026-03-03"
     },
     "replacement": {
       "google-docs": "gemini-3.1-flash-lite"
     },
     "retires_at": {
       "google-docs": "2026-05-25"
-    },
-    "sampling_parameters": {
-      "models.dev": true
     },
     "snapshots": {
       "google-docs": [
@@ -179,12 +147,10 @@
       "google-docs": "retired"
     },
     "structured_outputs": {
-      "google-docs": true,
-      "models.dev": true
+      "google-docs": true
     },
     "tool_calling": {
       "google-docs": true,
-      "models.dev": true,
       "openrouter": true
     },
     "unsupported_features": {
@@ -201,7 +167,6 @@
   ],
   "sources": {
     "google-docs": "https://ai.google.dev/gemini-api/docs/models/gemini-3.1-flash-lite-preview",
-    "models.dev": "https://models.dev",
     "openrouter": "https://openrouter.ai/google/gemini-3.1-flash-lite-preview"
   },
   "docs": {

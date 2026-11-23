@@ -28,6 +28,27 @@
       "text": "*   Launched Gemini 3.1 Flash-Lite Preview, the first Flash-Lite model in the\n    Gemini 3 series. Read the [model\n    page](/docs/models/gemini-3.1-flash-lite-preview) for specs, specific\n    updates, and developer guidance."
     }
   ],
-  "changes": [],
-  "highlights": []
+  "changes": [
+    {
+      "id": "facts/reasoning_efforts/none",
+      "category": "facts",
+      "op": "removed",
+      "path": [
+        "facts",
+        "reasoning_efforts",
+        "none"
+      ],
+      "title": "Reasoning effort removed: none",
+      "impact": "notable",
+      "before": "none",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    }
+  ],
+  "highlights": [
+    "Reasoning effort removed: none"
+  ]
 }
