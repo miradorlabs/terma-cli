@@ -99,14 +99,46 @@ func TestFlushWithholdsASkillDefinitionQueuedBeforeThePolicyChanged(t *testing.T
 	if err != nil {
 		t.Fatal(err)
 	}
+	s.BindNoPerson()
 	if err := s.Append(skillDefinition()); err != nil {
 		t.Fatal(err)
 	}
 	now := config.Policy{Mode: config.ModeRepo, Repositories: listed, TeamID: "p1", IncludePrompts: true, FetchedAt: time.Now()}
 	r := Router{ConfigDir: dir, OTLPPinned: true, Policy: func(context.Context, *config.Config, string) (config.Policy, error) { return now, nil }}
-	res := r.Flush(t.Context(), s, &config.Config{OTLPURL: srv.URL}, true, 0)
+	res := r.Flush(t.Context(), s, &config.Config{OTLPURL: srv.URL, ServerKeySignIn: true}, true, 0)
 	if res.Withheld != 1 || res.Sent != 0 || sent != 0 || res.Err != nil {
 		t.Fatalf("Flush = %+v, %d requests", res, sent)
+	}
+}
+
+// Under a person's sign-in a definition leaves as under a server key: whole, with the
+// sign-in's token, while the policy collects prompts and tool content, and only under the
+// account that collected it; another person's waits for their own sign-in.
+func TestASkillDefinitionLeavesUnderTheSignInThatCollectedIt(t *testing.T) {
+	t.Parallel()
+	srv, sent := recordingIngest(t, http.StatusOK)
+	signIn := &fakeSignIn{account: "aaaaaaaaaaaaaaaa", token: "token-a"}
+	mine, theirs := skillDefinition(), skillDefinition()
+	mine.Account, theirs.Account, theirs.SessionID = "aaaaaaaaaaaaaaaa", "bbbbbbbbbbbbbbbb", "s2"
+	theirs.Attrs[semconv.TermaSkillDescriptionKey] = "someone else's description"
+	s := spoolOf(t, mine, theirs)
+	pol := config.Policy{Mode: config.ModeRepo, Repositories: listed, IncludePrompts: true, IncludeToolContent: true, FetchedAt: time.Now()}
+	r := Router{OTLPPinned: true, SignIn: signIn, Policy: func(context.Context, *config.Config, string) (config.Policy, error) { return pol, nil }}
+	res := r.Flush(t.Context(), s, &config.Config{OTLPURL: srv.URL}, true, 0)
+	if res.Sent != 1 || res.Held != 1 || res.Err != nil {
+		t.Fatalf("Flush = %+v", res)
+	}
+	got := sent()
+	if len(got) != 1 || got[0].auth != "Bearer token-a" {
+		t.Fatalf("sent %+v", got)
+	}
+	for _, want := range []string{semconv.TermaSkillDefinitionEvent, "private description", "https://github.com/acme/app", ".agents/skills/deploy/SKILL.md"} {
+		if !strings.Contains(got[0].body, want) {
+			t.Errorf("the definition left without %q", want)
+		}
+	}
+	if strings.Contains(got[0].body, "someone else's") {
+		t.Error("another person's definition left under this sign-in")
 	}
 }
 

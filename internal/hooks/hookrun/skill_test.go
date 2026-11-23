@@ -12,6 +12,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
+	"github.com/miradorlabs/terma-cli/internal/sendas"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
@@ -157,6 +158,39 @@ func TestSpoolSkillsSendsNothingWhileThePolicyWithholds(t *testing.T) {
 	env.Spool = nil
 	if SpoolSkills(env, r, "skills", "sess-skill-4", skillBase, []Skill{{Name: "deploy"}}) {
 		t.Error("a skill with no spool to go to reported success")
+	}
+}
+
+// Signed out, a skill's use is lost and counted, and nothing is queued; the skill stays
+// unreported, so its next use in the session, under a sign-in, is sent once, in that
+// sign-in's lane.
+func TestSpoolSkillsWithNoLaneLosesTheUseAndSendsTheNextOne(t *testing.T) {
+	t.Parallel()
+	p := newPushRepo(t)
+	skill := []Skill{{Name: "deploy"}}
+	out, outDir := lanedHook(t, p, "", false, false)
+	r, err := out.Repo(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !SpoolSkills(out, r, "skills", "sess-skill-5", skillBase, skill) {
+		t.Fatal("a lost use failed the caller")
+	}
+	if evs := hookruntest.Spooled(t, out.Spool); len(evs) != 0 {
+		t.Fatalf("signed out, queued %s", hookruntest.Names(evs))
+	}
+	if l, err := spool.ReadLosses(outDir, time.Now()); err != nil || l.Counts[sendas.LostSignedOut] != 1 {
+		t.Fatalf("losses = %v, %v; want the use counted once", l.Counts, err)
+	}
+	in, _ := lanedHook(t, p, "aaaaaaaaaaaaaaaa", false, false)
+	for range 2 {
+		if !SpoolSkills(in, r, "skills", "sess-skill-5", skillBase, skill) {
+			t.Fatal("SpoolSkills reported a failure")
+		}
+	}
+	evs := hookruntest.Named(hookruntest.Spooled(t, in.Spool), semconv.TermaSkillDefinitionEvent)
+	if len(evs) != 1 || evs[0].Account != "aaaaaaaaaaaaaaaa" {
+		t.Fatalf("queued %+v; want one definition in the sign-in's lane", evs)
 	}
 }
 

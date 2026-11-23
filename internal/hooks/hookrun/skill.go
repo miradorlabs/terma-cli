@@ -89,6 +89,12 @@ func SpoolSkills(e Env, r *Repo, stateDir, sessionID string, attrs map[string]an
 			if one == nil || slices.Contains(st.Reported, hash) {
 				continue
 			}
+			// With no lane (signed out, or a sign-in that can't be read) the use is lost and
+			// counted, and the skill stays unreported: a later use under a sign-in is a new
+			// collection, sent then.
+			if e.lost(r, 1) {
+				continue
+			}
 			out := maps.Clone(attrs)
 			maps.Copy(out, one)
 			if !e.EmitFor(r, spool.Event{Name: semconv.TermaSkillDefinitionEvent, SessionID: sessionID, Attrs: out}) {
