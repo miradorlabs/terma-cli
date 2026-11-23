@@ -35,9 +35,10 @@ import (
 // must still say so right before the send. Every other line a hook reads it passes for good:
 // the calls of turns before terma watched the conversation, of a turn begun somewhere else
 // or under another sign-in, and the last call of a cancelled turn, after which agy runs no
-// hook of that turn. A collecting hook counts what it passes as lost (turn_ended), except on
-// a conversation's first read, which holds turns from before terma watched; a hook the
-// policy does not collect counts nothing.
+// hook of that turn. A collecting hook counts the calls it passes as lost (turn_ended),
+// except on a conversation's first read, which holds turns from before terma watched; a
+// hook the policy does not collect counts nothing. A subagent's link passed the same way is
+// not a call and is not counted: the subagent is then sent with no parent.
 
 // sourceAntigravityTranscript is terma.evidence.source for what agy's transcript recorded.
 const sourceAntigravityTranscript = "antigravity_transcript"
@@ -154,11 +155,16 @@ func captureAntigravityCalls(ctx context.Context, e hookrun.Env, r *hookrun.Repo
 	own := antigravityTurnID(e, r, id)
 	first := antigravityTurnNumber(own)
 	passed := 0
+	pass := func(s antigravityStep) bool {
+		if s.Type == "PLANNER_RESPONSE" {
+			passed++
+		}
+		return true
+	}
 	next, err := readAntigravitySteps(transcript, last, func(s antigravityStep) bool {
 		if first < 0 || *s.StepIndex < first {
 			// Before this turn, or no turn of this hook's: passed for good.
-			passed++
-			return true
+			return pass(s)
 		}
 		if ctx.Err() != nil {
 			// Out of time: what was handled is saved, the rest goes with the next hook.
@@ -169,8 +175,7 @@ func captureAntigravityCalls(ctx context.Context, e hookrun.Env, r *hookrun.Repo
 		// still names this turn here cannot be a later turn's.
 		if antigravityTurnID(e, r, id) != own {
 			first = -1
-			passed++
-			return true
+			return pass(s)
 		}
 		if s.Type == "PLANNER_RESPONSE" {
 			return e.EmitFor(r, antigravityCallEvent(id, s, own))

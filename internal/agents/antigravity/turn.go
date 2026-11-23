@@ -1,6 +1,7 @@
 package antigravity
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -17,17 +18,24 @@ import (
 // only grows, and is the step the turn's first call comes after, so it names the turn.
 //
 // The record is the conversation's turn in progress and where a collecting hook saw it
-// begin: one per conversation, written by the turn's first PreInvocation and removed by the
-// turn's Stop, by any hook of the conversation that cannot tell where it ran or runs where
-// the policy does not collect, and by a hook whose payload terma cannot read. After a Stop,
-// a prompt or a wake starts at invocation 0 again. agy runs PreInvocation before it
+// begin: one per conversation, written by the turn's first PreInvocation. Three things end
+// a turn, each by removing the record, and nothing else does:
+//   - its Stop, once it has read the turn's last calls (after a Stop, a prompt or a wake
+//     starts at invocation 0 again, and agy runs it only once the Stop hook has returned);
+//   - a hook of the conversation that runs where the policy collects nothing, or cannot
+//     tell where it ran;
+//   - a hook whose payload terma cannot read.
+//
+// A hook in another collected checkout, or under another sign-in, has no turn of its own:
+// it sends nothing and leaves the record, so the turn's own hooks go on. agy runs PreInvocation before it
 // calls the model (on 1.5.15, a hook that slept 3 s delayed the call by 3 s), so the record
 // names a turn before that turn's first call is written: a line read while the record still
 // names a hook's turn is that turn's, or an earlier one's.
 
 type antigravityTurn struct {
-	TurnID string    `json:"turn_id"`
-	At     time.Time `json:"at"`
+	TurnID string `json:"turn_id"`
+	// At tells one beginning from another of the same number (endAntigravityTurnBegun).
+	At time.Time `json:"at"`
 	// Where is antigravityWhere of the hook that saw the turn begin.
 	Where string `json:"where"`
 }
@@ -92,6 +100,21 @@ func beginAntigravityTurn(e hookrun.Env, r *hookrun.Repo, in *antigravityHookInp
 func endAntigravityTurn(e hookrun.Env, sessionID string) {
 	if err := os.Remove(antigravityTurnPath(e.StateDir, sessionID)); err != nil && !os.IsNotExist(err) {
 		e.Logf("antigravity turn: %v", err)
+	}
+}
+
+// antigravityTurnBegun is the conversation's record as it stands, nil for none: what a Stop
+// reads first, to end the turn it is of and no other.
+func antigravityTurnBegun(e hookrun.Env, sessionID string) []byte {
+	b, _ := os.ReadFile(antigravityTurnPath(e.StateDir, sessionID))
+	return b
+}
+
+// endAntigravityTurnBegun removes the record if it is still begun, the turn a Stop found
+// when it started: a turn that began since keeps its own.
+func endAntigravityTurnBegun(e hookrun.Env, sessionID string, begun []byte) {
+	if begun != nil && bytes.Equal(antigravityTurnBegun(e, sessionID), begun) {
+		endAntigravityTurn(e, sessionID)
 	}
 }
 

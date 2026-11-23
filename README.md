@@ -480,9 +480,11 @@ apart from output, or cache writes, so neither is sent; there is no cost, which 
 platform estimates from list prices. A call goes only from a hook of its own turn, in the
 checkout and under the sign-in that turn began with, and only where your team's policy
 collects. `agy` runs no hook after a turn you cancel, so the call in flight when you cancel
-is not sent; `terma doctor` counts it among what terma lost. That turn's hook events go with
-the next turn's. The turns of a conversation before terma first saw it are never sent. A
-subagent is its own conversation, linked to the one that opened it.
+is not sent. Nor is the rest of a turn after one of its hooks ran where the policy collects
+nothing, or got a payload over 4 MiB from `agy`, which repeats the prompt and the tool's
+arguments in it. `terma doctor` counts these calls among what terma lost. A cancelled
+turn's hook events go with the next turn's. The turns of a conversation before terma first
+saw it are never sent. A subagent is its own conversation, linked to the one that opened it.
 
 Setup also puts `terma hook antigravity-statusline` in `statusLine` in
 `~/.gemini/antigravity-cli/settings.json`. Its payload is the only place `agy` names your

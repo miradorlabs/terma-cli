@@ -284,12 +284,13 @@ func antigravityObserve(ctx context.Context, env hookrun.Env, hook string) error
 			_ = r.Store.SetActive(*active)
 		}
 	}
+	begun := antigravityTurnBegun(env, in.id())
 	turn := antigravityTurnID(env, r, in.id())
 	read := captureAntigravityCalls(ctx, env, r, in)
 	if hook == "Stop" {
-		// Stop ends the turn: whatever agy does next in the conversation, a prompt or a wake,
-		// starts with a PreInvocation at invocation 0, which records the turn again.
-		endAntigravityTurn(env, in.id())
+		// Stop ends the turn it found: whatever agy does next in the conversation, a prompt or
+		// a wake, starts with a PreInvocation at invocation 0, which records the turn again.
+		endAntigravityTurnBegun(env, in.id(), begun)
 	}
 	env.CaptureObservation(ctx, r, hookrun.Observation{
 		Tool: antigravityTool, Source: sourceAntigravityHook, StateDir: antigravityObservationDir,
