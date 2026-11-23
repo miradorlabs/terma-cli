@@ -441,6 +441,7 @@ func TestAntigravityHooksSwitchOnNoteNamesTheDevelopersHandlers(t *testing.T) {
 	}{
 		"a guard under an event terma does not write": {`{"enabled": false, "PreToolUse": [{"type": "command", "command": "/usr/local/bin/my-guard"}]}`, true},
 		"a matcher group under SessionStart":          {`{"enabled": false, "SessionStart": [{"matcher": "", "hooks": [{"command": "./hello.sh"}]}]}`, true},
+		"a guard in a file with comments":             {"{\"enabled\": false, // off for now\n \"PreToolUse\": [{\"command\": \"/usr/local/bin/my-guard\"},],}", true},
 		"a handler under an event terma writes":       {`{"enabled": false, "Stop": [{"command": "./my-stop.sh"}]}`, true},
 		"fields that list no handlers":                {`{"enabled": false, "description": "mine", "priority": 3, "SessionStart": [], "PreToolUse": {"note": "not a list"}}`, false},
 		"terma's own entries alone":                   {`{"enabled": false, "Stop": [{"type": "command", "command": "` + stop + `", "timeout": 10}]}`, false},

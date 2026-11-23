@@ -254,7 +254,8 @@ func planHooks(dir string, command func(event string) string, mode planMode) (ho
 
 // listsOtherHandlers reports whether terma's hook lists handlers under an event terma does
 // not write, agy's PreToolUse or SessionStart say: those are the developer's, and come back
-// on with the hook. A field that is no list, or an empty list, holds none.
+// on with the hook. A field that is no list, or an empty list, holds none; a list's entries
+// are counted as they stand, an empty group too, which errs toward the warning.
 func listsOtherHandlers(member map[string]json.RawMessage) bool {
 	for key, raw := range member {
 		own := key == "enabled"
