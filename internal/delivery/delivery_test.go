@@ -296,8 +296,8 @@ func TestOutgoingSendsTheCheckoutIDUnderEveryPolicy(t *testing.T) {
 	}
 }
 
-// Every event kind the hooks spool is classified, as content-bearing or content-free, so
-// delivery never sends an unknown kind's content past a policy that withholds it.
+// Every event kind the hooks spool is classified, as content-bearing, content-free or content
+// whole, so delivery never sends an unknown kind's content past a policy that withholds it.
 func TestEveryHookEventKindIsClassified(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
@@ -322,8 +322,14 @@ func TestEveryHookEventKindIsClassified(t *testing.T) {
 			}
 			kind, _ := strconv.Unquote(lit.Value)
 			kinds++
-			if _, content := hookContent[kind]; content == contentFree[kind] {
-				t.Errorf("%s (%s): classify it in exactly one of hookContent or contentFree", name.Name, kind)
+			lists := 0
+			for _, in := range []bool{hookContent[kind] != nil, contentFree[kind], contentWhole[kind]} {
+				if in {
+					lists++
+				}
+			}
+			if lists != 1 {
+				t.Errorf("%s (%s): classify it in exactly one of hookContent, contentFree or contentWhole", name.Name, kind)
 			}
 		}
 		return true
