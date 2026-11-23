@@ -185,10 +185,11 @@ type Relay struct {
 	stopping   chan struct{}
 	// lossMu orders the writes of what the relay lost (recordLosses).
 	lossMu sync.Mutex
-	// unreadableRetry is how long an export waits for a sign-in that can't be read;
-	// unreadableAt, under mu, when the last such wait failed (arrivalLane).
+	// unreadableRetry is how long an export waits for a sign-in that can't be read, and
+	// unreadableAt, under mu, when the last such wait failed; lanes the lane read last.
 	unreadableRetry time.Duration
 	unreadableAt    time.Time
+	lanes           laneState
 }
 
 // New returns a relay. Run must be started for anything to leave.
@@ -224,7 +225,7 @@ func New(opts Options) *Relay {
 		opts.Grace = 5 * time.Second
 	}
 	sendCtx, cancel := context.WithCancel(context.Background())
-	return &Relay{
+	r := &Relay{
 		opts: opts, rules: compose(opts.Correlators, opts.Capturers), stats: newStats(),
 		cache:  lookupCache{claims: map[string]cachedClaim{}, policies: map[string]cachedPolicy{}},
 		held:   map[string][]heldPart{},
@@ -232,6 +233,8 @@ func New(opts Options) *Relay {
 		lastSeen: opts.Now(), sendCtx: sendCtx, cancelSend: cancel, stopping: make(chan struct{}),
 		unreadableRetry: unreadableRetry,
 	}
+	r.seedLane()
+	return r
 }
 
 // Stats is the relay's running account.

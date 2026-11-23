@@ -1,7 +1,9 @@
 package relay
 
 import (
+	"bytes"
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"slices"
@@ -10,6 +12,7 @@ import (
 	"time"
 
 	logspb "go.opentelemetry.io/proto/otlp/logs/v1"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/miradorlabs/terma-cli/internal/account/auth"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
@@ -169,7 +172,8 @@ func TestAnUnreadableSignInIsRetriedThenLost(t *testing.T) {
 	if waited := time.Since(start); waited < 300*time.Millisecond || waited > 3*time.Second {
 		t.Fatalf("the export was answered after %v; want it to wait out the retry, and no longer", waited)
 	}
-	if n := signIn.asks(); n < 2 {
+	// Once as the relay starts, then at the export and again at its retry.
+	if n := signIn.asks(); n < 3 {
 		t.Fatalf("the sign-in was asked %d times; want it asked again", n)
 	}
 	waitForCounters(t, r, func(c map[string]int) bool { return c["dropped.unreadable.logs"] == 1 })
@@ -181,9 +185,10 @@ func TestAnUnreadableSignInIsRetriedThenLost(t *testing.T) {
 	}
 }
 
-// A sign-in written as an export arrives reads as unreadable for a moment: the retry binds
-// the export to the sign-in once it reads, and it leaves under that sign-in.
-func TestASignInSwapMidWriteIsRecoveredByTheRetry(t *testing.T) {
+// A relay that has read no lane yet, since its sign-in could not be read when it started,
+// takes the lane its first export's retry reads (arrivalLane): a sign-in written as that
+// export arrives binds it to the sign-in once it reads, and it leaves under that sign-in.
+func TestAFirstExportBeforeAnyLaneTakesTheLaneItsRetryReads(t *testing.T) {
 	t.Parallel()
 	u := newSignInUpstream(t)
 	signIn := &scriptedSignIn{accounts: []string{sendas.AccountUnreadable, sendas.AccountUnreadable, accountB}}
@@ -263,7 +268,8 @@ func TestTheHeartbeatCarriesLossesByReason(t *testing.T) {
 // once, counted by its reason, and never pushes a genuine held part out of the hold.
 func TestALostPartIsNeverHeld(t *testing.T) {
 	t.Parallel()
-	signIn := &scriptedSignIn{accounts: []string{accountA, sendas.AccountUnreadable}}
+	// The relay reads the sign-in once as it starts, then once per export.
+	signIn := &scriptedSignIn{accounts: []string{accountA, accountA, sendas.AccountUnreadable}}
 	r := newRelay(Options{Dir: t.TempDir(), Token: token, Hold: time.Minute, SignIn: signIn,
 		Lookup:  func(string, time.Time) (claim.Claim, bool) { return claim.Claim{ProjectID: "p1"}, true },
 		Resolve: func(claim.Claim) (Policy, error) { return Policy{}, ErrNoKey }})
@@ -346,5 +352,250 @@ func TestASignInThatReadsAgainAfterAFailedRetryIsUsed(t *testing.T) {
 	waitForCounters(t, r, func(c map[string]int) bool { return c["forwarded.logs"] == 1 })
 	if c := r.Stats().Snapshot().Counters; c["dropped.unreadable.logs"] != 1 {
 		t.Fatalf("counters %v; want only the first export lost", c)
+	}
+}
+
+// rewrittenSignIn is a sign-in being rewritten: unreadable until a moment after rewrite,
+// whoever reads it, then as the account written.
+type rewrittenSignIn struct {
+	testSignIn
+	until  time.Time
+	misses int // reads while unreadable
+}
+
+func (s *rewrittenSignIn) rewrite(account string, takes time.Duration) {
+	s.mu.Lock()
+	s.account, s.until = account, time.Now().Add(takes)
+	s.mu.Unlock()
+}
+
+func (s *rewrittenSignIn) missed() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.misses
+}
+
+func (s *rewrittenSignIn) Account() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if time.Now().Before(s.until) {
+		s.misses++
+		return sendas.AccountUnreadable
+	}
+	return s.account
+}
+
+// A retry ends only on the lane read last: the same person's sign-in rewritten as an
+// export arrives (a token rotation) keeps the export in that person's lane, but a switch
+// to another person, or to a server key, loses it as unreadable, never in the new lane.
+func TestARetryEndsOnlyOnTheLaneReadLast(t *testing.T) {
+	t.Parallel()
+	for _, c := range []struct {
+		name, after string
+		kept        bool
+	}{
+		{"rotation", accountA, true},
+		{"another person", accountB, false},
+		{"a server key", sendas.NoPersonLane, false},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			signIn := &rewrittenSignIn{testSignIn: testSignIn{account: accountA}}
+			r := newRelay(Options{Dir: t.TempDir(), Token: token, Hold: time.Minute, SignIn: signIn,
+				Lookup: func(string, time.Time) (claim.Claim, bool) { return claim.Claim{ProjectID: "p1"}, true },
+				Resolve: func(claim.Claim) (Policy, error) {
+					return Policy{Endpoint: "http://127.0.0.1:1", IncludePrompts: true, IncludeToolContent: true}, nil
+				}})
+			r.unreadableRetry = time.Second
+			srv := httptest.NewServer(r.Handler())
+			defer srv.Close()
+			postProto(t, srv, "/v1/logs", logsOf("first", 1))
+			// The second export reads the sign-in mid-write, then, at its retry, as c.after.
+			signIn.rewrite(c.after, 5*unreadablePoll)
+			start := time.Now()
+			postProto(t, srv, "/v1/logs", logsOf("second", 1))
+			if waited := time.Since(start); waited < unreadablePoll {
+				t.Fatalf("the second export waited %v; want it read mid-write, then again", waited)
+			}
+			r.sweep()
+			inA, _ := r.outbox.list(routeOf(accountA, claim.Claim{ProjectID: "p1"}))
+			inAfter, _ := r.outbox.list(routeOf(c.after, claim.Claim{ProjectID: "p1"}))
+			l, err := ReadOutboxLosses(r.outbox.dir)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if c.kept {
+				if len(inA) != 2 || l.Counts["unreadable"] != 0 {
+					t.Fatalf("A's lane holds %d parts, %d lost; want both kept in it", len(inA), l.Counts["unreadable"])
+				}
+				return
+			}
+			if len(inA) != 1 || len(inAfter) != 0 || l.Counts["unreadable"] != 1 {
+				t.Fatalf("A's lane holds %d parts, the new lane %d, %d lost unreadable; want the second lost, in neither", len(inA), len(inAfter), l.Counts["unreadable"])
+			}
+		})
+	}
+}
+
+// rewriteRelay is a relay whose every session is claimed for p1, its sign-in signIn, that
+// waits a second for one that can't be read; it is not run, so nothing leaves.
+func rewriteRelay(t *testing.T, signIn SignIn) (*Relay, *httptest.Server) {
+	t.Helper()
+	r := newRelay(Options{Dir: t.TempDir(), Token: token, Hold: time.Minute, SignIn: signIn,
+		Lookup: func(string, time.Time) (claim.Claim, bool) { return claim.Claim{ProjectID: "p1"}, true },
+		Resolve: func(claim.Claim) (Policy, error) {
+			return Policy{Endpoint: "http://127.0.0.1:1", IncludePrompts: true, IncludeToolContent: true}, nil
+		}})
+	r.unreadableRetry = time.Second
+	srv := httptest.NewServer(r.Handler())
+	t.Cleanup(srv.Close)
+	return r, srv
+}
+
+// laneParts is how many parts r's outbox holds in account's lane for p1, and how many it
+// lost as unreadable.
+func laneParts(t *testing.T, r *Relay, account string) (queued, unreadable int) {
+	t.Helper()
+	r.sweep()
+	entries, _ := r.outbox.list(routeOf(account, claim.Claim{ProjectID: "p1"}))
+	l, err := ReadOutboxLosses(r.outbox.dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return len(entries), l.Counts["unreadable"]
+}
+
+// A retry ends only on the lane in place when its export arrived: another export that reads
+// B while it waits moves the lane read last to B, and says nothing of whose the waiting
+// export is, so it is lost, while the other is B's.
+func TestARetryIsNotSettledByAnotherExportsRead(t *testing.T) {
+	t.Parallel()
+	signIn := &rewrittenSignIn{testSignIn: testSignIn{account: accountA}}
+	r, srv := rewriteRelay(t, signIn)
+	signIn.rewrite(accountB, time.Hour)
+	done := exportAsync(srv, logsOf("first", 1))
+	waitFor(t, func() bool { return signIn.missed() > 0 })
+	// B is written whole before the first export's next poll, and a second export reads it.
+	signIn.rewrite(accountB, 0)
+	postProto(t, srv, "/v1/logs", logsOf("second", 1))
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+	inA, _ := laneParts(t, r, accountA)
+	inB, unreadable := laneParts(t, r, accountB)
+	if inA != 0 || inB != 1 || unreadable != 1 {
+		t.Fatalf("A's lane holds %d, B's %d, %d lost unreadable; want the first lost and the second B's", inA, inB, unreadable)
+	}
+}
+
+// A switch from A to B and back to A while an export's retry waits, seen by another export
+// that read B, loses the waiting export, though its retry reads A again: it may be B's.
+func TestASwitchAndBackWithinARetryLosesTheExport(t *testing.T) {
+	t.Parallel()
+	signIn := &rewrittenSignIn{testSignIn: testSignIn{account: accountA}}
+	r, srv := rewriteRelay(t, signIn)
+	signIn.rewrite(accountB, time.Hour)
+	done := exportAsync(srv, logsOf("first", 1))
+	waitFor(t, func() bool { return signIn.missed() > 0 })
+	signIn.rewrite(accountB, 0)
+	postProto(t, srv, "/v1/logs", logsOf("second", 1))
+	// Back to A before the first export's next poll.
+	signIn.rewrite(accountA, 0)
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+	inA, _ := laneParts(t, r, accountA)
+	inB, unreadable := laneParts(t, r, accountB)
+	if inA != 0 || inB != 1 || unreadable != 1 {
+		t.Fatalf("A's lane holds %d, B's %d, %d lost unreadable; want the first lost and the second B's", inA, inB, unreadable)
+	}
+}
+
+// Two other exports that read B, then A, while an export's retry waits leave the lane A's
+// as it was, but changed twice: the waiting export is lost, though its retry reads A.
+func TestASwitchAndBackSeenByTwoExportsLosesTheWaitingOne(t *testing.T) {
+	t.Parallel()
+	signIn := &rewrittenSignIn{testSignIn: testSignIn{account: accountA}}
+	r, srv := rewriteRelay(t, signIn)
+	signIn.rewrite(accountB, time.Hour)
+	done := exportAsync(srv, logsOf("first", 1))
+	waitFor(t, func() bool { return signIn.missed() > 0 })
+	signIn.rewrite(accountB, 0)
+	postProto(t, srv, "/v1/logs", logsOf("second", 1))
+	signIn.rewrite(accountA, 0)
+	postProto(t, srv, "/v1/logs", logsOf("third", 1))
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+	inA, _ := laneParts(t, r, accountA)
+	inB, unreadable := laneParts(t, r, accountB)
+	if inA != 1 || inB != 1 || unreadable != 1 {
+		t.Fatalf("A's lane holds %d, B's %d, %d lost unreadable; want the second B's, the third A's, the first lost", inA, inB, unreadable)
+	}
+}
+
+// Reads of the sign-in that finish out of order never move the lane back: a read that
+// started before one already applied is stale, and leaves the lane and its version alone.
+func TestAStaleReadNeverMovesTheLaneBack(t *testing.T) {
+	t.Parallel()
+	var l laneState
+	older, newer := l.take(), l.take()
+	l.apply(newer, accountB)
+	l.apply(older, accountA)
+	if last, gen := l.snapshot(); last != accountB || gen != 1 {
+		t.Fatalf("lane %q at version %d; want B's, changed once", last, gen)
+	}
+}
+
+// exportAsync posts m to srv's logs endpoint in the background, sending on the channel
+// returned its error, or nil once it is answered 200.
+func exportAsync(srv *httptest.Server, m proto.Message) <-chan error {
+	done := make(chan error, 1)
+	go func() {
+		body, err := proto.Marshal(m)
+		if err != nil {
+			done <- err
+			return
+		}
+		req, _ := http.NewRequest(http.MethodPost, srv.URL+"/v1/logs", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/x-protobuf")
+		req.Header.Set("Authorization", "Bearer "+token)
+		resp, err := srv.Client().Do(req)
+		if err != nil {
+			done <- err
+			return
+		}
+		_ = resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			done <- fmt.Errorf("export answered %d", resp.StatusCode)
+			return
+		}
+		done <- nil
+	}()
+	return done
+}
+
+// A relay knows the lane in place as it starts: its first export, met by a switch to B, is
+// lost, never B's; one started while the sign-in can't be read knows none, and takes B.
+func TestARelayStartsKnowingItsLane(t *testing.T) {
+	t.Parallel()
+	for _, c := range []struct {
+		name, at string
+		lost     bool
+	}{
+		{"signed in as A", accountA, true},
+		{"unreadable", sendas.AccountUnreadable, false},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			signIn := &rewrittenSignIn{testSignIn: testSignIn{account: c.at}}
+			r, srv := rewriteRelay(t, signIn)
+			signIn.rewrite(accountB, 2*unreadablePoll)
+			postProto(t, srv, "/v1/logs", logsOf("first", 1))
+			inB, unreadable := laneParts(t, r, accountB)
+			if c.lost != (inB == 0 && unreadable == 1) || !c.lost && inB != 1 {
+				t.Fatalf("B's lane holds %d, %d lost unreadable; want lost %v", inB, unreadable, c.lost)
+			}
+		})
 	}
 }
