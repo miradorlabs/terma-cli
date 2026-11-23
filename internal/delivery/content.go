@@ -40,7 +40,8 @@ var contentFree = map[string]bool{
 // neither switch alone covers them (a skill's definition: its description is what was said,
 // its name and file are a tool's): sent whole while the policy collects prompts and tool
 // content, dropped otherwise. Hooks check the policy before spooling one too; this catches
-// one queued before the policy changed.
+// one queued before the policy changed. A tool call that names the skill it loaded
+// (terma.skill.name) loses that name by the same rule, and the call still leaves.
 var contentWhole = map[string]bool{semconv.TermaSkillDefinitionEvent: true}
 
 // Outgoing is e as it may leave for projectID under org, the team's policy now, without
@@ -62,6 +63,7 @@ func (r Router) Outgoing(org config.Policy, projectID string, e spool.Event) (sp
 	}
 	e.Attrs = maps.Clone(e.Attrs)
 	delete(e.Attrs, semconv.UserEmailKey)
+	delete(e.Attrs, semconv.TermaSkillNameKey)
 	if !toolContent {
 		for _, k := range toolKeys {
 			delete(e.Attrs, k)

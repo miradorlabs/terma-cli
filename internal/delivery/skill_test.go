@@ -50,6 +50,30 @@ func TestOutgoingSendsASkillDefinitionOnlyWhole(t *testing.T) {
 	}
 }
 
+// A tool call that names the skill it loaded leaves under every policy, the name only while
+// the policy collects prompts and tool content.
+func TestOutgoingSendsAToolCallsSkillNameOnlyWithAllContent(t *testing.T) {
+	t.Parallel()
+	ev := spool.Event{Repository: app, Name: semconv.TermaToolCallEvent, SessionID: "s1", Attrs: map[string]any{
+		hookrun.AttrProjectID: "p1", semconv.GenAIToolNameKey: "read_file", semconv.GenAIToolCallIDKey: "step-2", semconv.TermaSkillNameKey: "deploy",
+	}}
+	for _, pol := range []config.Policy{
+		{Mode: config.ModeRepo, Repositories: listed},
+		{Mode: config.ModeRepo, Repositories: listed, IncludePrompts: true},
+		{Mode: config.ModeRepo, Repositories: listed, IncludeToolContent: true},
+		{Mode: config.ModeRepo, Repositories: listed, IncludePrompts: true, IncludeToolContent: true},
+	} {
+		out, ok := (Router{ConfigDir: t.TempDir()}).Outgoing(pol, "p1", ev)
+		_, named := out.Attrs[semconv.TermaSkillNameKey]
+		if !ok || named != (pol.IncludePrompts && pol.IncludeToolContent) || out.Attrs[semconv.GenAIToolCallIDKey] != "step-2" {
+			t.Errorf("prompts %v, tool content %v: %+v, %v", pol.IncludePrompts, pol.IncludeToolContent, out.Attrs, ok)
+		}
+	}
+	if ev.Attrs[semconv.TermaSkillNameKey] != "deploy" {
+		t.Error("the queued event was changed")
+	}
+}
+
 // A queued definition loses the place of its skill's file once the policy no longer collects
 // the repository that place names, the session's own still collected; a plugin's skill keeps
 // its marketplace, which no policy lists, also when it names no path.
