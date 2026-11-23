@@ -290,3 +290,21 @@ func TestASignInForAnotherEnvironmentIsNoDeliveryCredential(t *testing.T) {
 		t.Fatalf("its account = %q, want its own", got)
 	}
 }
+
+// A stored sign-in with no user id is no delivery credential: nothing can be sent as it.
+func TestASignInWithNoUserIsNoDeliveryCredential(t *testing.T) {
+	f := newFakeAuth(t)
+	authSandbox(t, f)
+	cred := storedSession(f)
+	cred.UserID = ""
+	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, cred); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := testApp.loadConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := testApp.deliveryCredential(cfg)("", "p1"); got != "" {
+		t.Fatalf("a sign-in with no user reads %q, want none", got)
+	}
+}
