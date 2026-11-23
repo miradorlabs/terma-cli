@@ -60,7 +60,7 @@ func MarkAside(stateDir, sessionID, runID string, at time.Time) error {
 		if afterAsideWrite != nil {
 			afterAsideWrite(cur)
 		}
-		next, err := aliasTarget(stateDir, cur)
+		next, err := aliasTarget(stateDir, sessionID)
 		if err != nil || next == cur {
 			return err
 		}

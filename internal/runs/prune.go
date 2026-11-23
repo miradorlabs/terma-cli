@@ -83,8 +83,10 @@ func pruneLedger(stateDir, path string, now time.Time, queued map[string]bool) {
 		unlock()
 		return
 	}
-	for _, alias := range l.Aliases {
-		removeAliasIf(stateDir, alias, func(target string) bool { return target == sessionID })
+	if cur, aerr := aliasTarget(stateDir, sessionID); aerr == nil && cur == sessionID {
+		for _, alias := range l.Aliases {
+			removeAliasIf(stateDir, alias, func(target string) bool { return target == sessionID })
+		}
 	}
 	_ = os.Remove(path)
 	flock.Remove(lock, unlock)
@@ -143,11 +145,15 @@ func pruneAliases(stateDir string, now time.Time, queued map[string]bool) {
 			if info, err := os.Lstat(aliasPath(stateDir, e.Name())); err != nil || now.Sub(info.ModTime()) <= Retention {
 				return false
 			}
-			ledger, err := ledgerPath(stateDir, target)
-			if err == nil {
-				_, err = os.Lstat(ledger)
+			if !session.ValidID(target) {
+				return true
 			}
-			return err != nil && (errors.Is(err, fs.ErrNotExist) || !session.ValidID(target))
+			canon, err := aliasTarget(stateDir, target)
+			if err != nil || queued[canon] {
+				return false
+			}
+			_, err = os.Lstat(filepath.Join(stateDir, Dir, canon+".json"))
+			return errors.Is(err, fs.ErrNotExist)
 		})
 	}
 }

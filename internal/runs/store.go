@@ -93,20 +93,25 @@ func update(stateDir, sessionID string, change func(*ledger)) error {
 	return editLedger(stateDir, sessionID, false, func(path string, l *ledger) error { change(l); return save(path, l) })
 }
 func editLedger(stateDir, sessionID string, try bool, edit func(path string, l *ledger) error) error {
-	return withCanonical(stateDir, sessionID, "", try, func(_, path string, l *ledger) error { return edit(path, l) })
+	return withCanonical(stateDir, sessionID, "", try, func(_, path, _ string, l *ledger) error { return edit(path, l) })
 }
 func linkAlias(stateDir, sessionID, alias string) error {
 	if !session.ValidID(alias) {
 		return fmt.Errorf("runs: invalid alias %q", alias)
 	}
-	return withCanonical(stateDir, sessionID, alias, false, func(canon, path string, l *ledger) error {
+	return withCanonical(stateDir, sessionID, alias, false, func(canon, path, oldExtra string, l *ledger) error {
 		dl, dok, _, err := resolve(stateDir, alias)
 		if err != nil {
 			return err
 		}
-		changed := !slices.Contains(l.Aliases, alias)
-		if changed {
-			l.Aliases = append(l.Aliases, alias)
+		changed, add := false, []string{alias}
+		if oldExtra == alias {
+			add = append(add, dl.Aliases...)
+		}
+		for _, a := range add {
+			if a != canon && !slices.Contains(l.Aliases, a) {
+				l.Aliases, changed = append(l.Aliases, a), true
+			}
 		}
 		if dok && mergeMixed(l, dl) || changed {
 			if err := save(path, l); err != nil {
@@ -127,33 +132,44 @@ func linkAlias(stateDir, sessionID, alias string) error {
 		return nil
 	})
 }
-func withCanonical(stateDir, sessionID, extra string, try bool, fn func(canon, path string, l *ledger) error) error {
+func withCanonical(stateDir, sessionID, extra string, try bool, fn func(canon, path, oldExtra string, l *ledger) error) error {
 	for range 8 {
 		canon, err := aliasTarget(stateDir, sessionID)
 		if err != nil || extra == canon {
 			return err
 		}
+		var oldExtra string
+		ids := []string{canon}
+		if extra != "" {
+			if oldExtra, err = aliasTarget(stateDir, extra); err != nil {
+				return err
+			}
+			ids = append(ids, extra, oldExtra)
+			slices.Sort(ids)
+			ids = slices.Compact(ids)
+		}
 		path, retry := filepath.Join(stateDir, Dir, canon+".json"), false
 		run := func() error {
-			next, err := aliasTarget(stateDir, canon)
-			if err != nil || next != canon {
-				sessionID, retry = next, err == nil
+			if next, err := aliasTarget(stateDir, sessionID); err != nil || next != canon {
+				retry = err == nil
 				return err
+			} else if extra != "" {
+				if cur, err := aliasTarget(stateDir, extra); err != nil || cur != oldExtra {
+					retry = err == nil
+					return err
+				}
 			}
 			l, _, err := load(path)
 			if err == nil {
 				err = fold(path, &l)
 			}
 			if err == nil {
-				err = fn(canon, path, &l)
+				err = fn(canon, path, oldExtra, &l)
 			}
 			return err
 		}
-		if extra != "" {
-			p1, p2 := filepath.Join(stateDir, Dir, min(canon, extra)+".json"), filepath.Join(stateDir, Dir, max(canon, extra)+".json")
-			err = flock.Locked(p1, lockWait, func() error { return flock.Locked(p2, lockWait, run) })
-		} else if !try {
-			err = flock.Locked(path, lockWait, run)
+		if !try {
+			err = lockAll(stateDir, ids, run)
 		} else if err = os.MkdirAll(filepath.Dir(path), 0o700); err == nil {
 			if unlock, uerr := flock.TryLock(path + ".lock"); uerr != nil {
 				err = uerr
@@ -167,6 +183,12 @@ func withCanonical(stateDir, sessionID, extra string, try bool, fn func(canon, p
 		}
 	}
 	return fmt.Errorf("runs: alias loop for %q", sessionID)
+}
+func lockAll(stateDir string, ids []string, run func() error) error {
+	if len(ids) == 0 {
+		return run()
+	}
+	return flock.Locked(filepath.Join(stateDir, Dir, ids[0]+".json"), lockWait, func() error { return lockAll(stateDir, ids[1:], run) })
 }
 func ledgerPath(stateDir, sessionID string) (string, error) {
 	if !session.ValidID(sessionID) {

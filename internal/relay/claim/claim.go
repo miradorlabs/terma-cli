@@ -178,13 +178,10 @@ var lockWait = 250 * time.Millisecond
 // a kinded claim may name a location alone. On lock timeout, non-Mixed writes back off
 // and KindMixed writes to .mixed. KindMixed clears ProjectID; the runs ledger is authoritative.
 func Write(dir, sessionID string, c Claim, now time.Time) bool {
-	if c.ProjectID == "" && c.Kind == "" {
-		return false
-	}
 	if c.Kind == KindMixed {
 		c.ProjectID = ""
 	}
-	if c.ProjectID != "" && c.Account == "" {
+	if c.ProjectID == "" && c.Kind == "" || c.ProjectID != "" && c.Account == "" {
 		return false
 	}
 	return write(dir, sessionID, c, now)
@@ -309,7 +306,6 @@ func tombstoneFailClosed(mixed []string, c Claim) bool {
 	return c.Kind != KindMixed && (c.Kind != "" || c.ProjectID != "") &&
 		(slices.Contains(mixed, "*") || c.Run == "" && len(mixed) > 0)
 }
-
 func canSkipRefresh(p string, prev, c Claim, now time.Time, refresh time.Duration) bool {
 	if !samePlace(prev, c) || !sameDirs(prev, c) || !sameParent(prev, c) || !subset(c.PIDs, prev.PIDs) || !sameRun(prev, c) || tombstoneFailClosed(prev.MixedRuns, c) {
 		return false
@@ -320,8 +316,6 @@ func canSkipRefresh(p string, prev, c Claim, now time.Time, refresh time.Duratio
 	info, err := os.Stat(p)
 	return err == nil && now.Sub(info.ModTime()) < refresh
 }
-
-// persist saves c atomically before removing folded sidecar marks so Readers never miss Mixed.
 func persist(p string, c Claim, asideFiles []string) bool {
 	data, err := json.Marshal(c)
 	if err != nil || config.WriteFileAtomicNoSync(p, data, 0o600) != nil {
@@ -330,38 +324,21 @@ func persist(p string, c Claim, asideFiles []string) bool {
 	removeAside(p, asideFiles)
 	return true
 }
-
-// samePlace reports whether c continues prev's latest run under the same sign-in.
 func samePlace(prev, c Claim) bool {
-	if prev.Kind != c.Kind || prev.ProjectID != c.ProjectID || prev.Repository != c.Repository || prev.Profile != c.Profile || prev.Account != c.Account {
-		return false
-	}
-	if prev.Run != "" && c.Run != "" && prev.Run != c.Run {
-		return false
-	}
-	return c.Kind != KindOutsideGit || prev.Cwd == c.Cwd
+	return prev.Kind == c.Kind && prev.ProjectID == c.ProjectID && prev.Repository == c.Repository && prev.Profile == c.Profile && prev.Account == c.Account &&
+		(prev.Run == "" || c.Run == "" || prev.Run == c.Run) && (c.Kind != KindOutsideGit || prev.Cwd == c.Cwd)
 }
-
 func sameRun(prev, c Claim) bool { return c.Run == "" || c.Run == prev.Run }
-
-// staysMixed blocks non-Mixed writes to a Mixed tail and collected/kinded writes to earlier or evicted Mixed runs.
 func staysMixed(prev, c Claim) bool {
 	return c.Kind != KindMixed && (prev.Kind == KindMixed && (c.Run == "" || c.Run == prev.Run) ||
 		(c.Kind != "" || c.ProjectID != "") && (c.Run != "" && slices.Contains(prev.MixedRuns, c.Run) ||
 			slices.ContainsFunc(prev.placements(), func(p Placement) bool { return p.Kind == KindMixed && (c.Run == "" || p.Run == c.Run) })))
 }
-
-// sameDirs reports whether c names the same working tree, directory, worktree, remote, and branch as prev.
 func sameDirs(prev, c Claim) bool {
 	return prev.Root == c.Root && (c.Cwd == "" || prev.Cwd == c.Cwd) &&
 		prev.Worktree == c.Worktree && prev.Remote == c.Remote && prev.Branch == c.Branch
 }
-
-// sameParent reports whether c names the parent prev does, or none, which keeps prev's.
-func sameParent(prev, c Claim) bool {
-	return c.Parent == "" || c.Parent == prev.Parent
-}
-
+func sameParent(prev, c Claim) bool { return c.Parent == "" || c.Parent == prev.Parent }
 func subset(a, b []int) bool {
 	for _, v := range a {
 		if !slices.Contains(b, v) {
@@ -394,8 +371,7 @@ func Read(dir, sessionID string, now time.Time) (Claim, bool) {
 		return Claim{}, false
 	}
 	marks, _ := loadAside(p, now)
-	var c Claim
-	var have bool
+	c, have := Claim{}, false
 	if info, err := os.Stat(p); err == nil && now.Sub(info.ModTime()) < TTL {
 		c, have = read(p)
 	}
