@@ -51,20 +51,28 @@ func antigravitySkillRead(in *antigravityHookInput, cwd string) string {
 	return filepath.Clean(p)
 }
 
-// antigravitySkillRoots are where agy finds skills outside a repository.
+// antigravitySkillRoots are where agy finds skills outside a repository, in the home the
+// session runs in.
 type antigravitySkillRoots struct {
-	// Config is agy's global customization root, ~/.gemini/config; Builtin holds the skills
-	// agy ships, ~/.gemini/antigravity-cli/builtin.
+	// Config is the home's global customization root, <home>/config; Builtin holds the
+	// skills agy ships, in the home's app data folder, <home>/<app data>/builtin. For agy's
+	// own home those are ~/.gemini/config and ~/.gemini/antigravity-cli/builtin.
 	Config, Builtin string
 }
 
-// antigravityRoots are this machine's.
-func antigravityRoots() antigravitySkillRoots {
-	hooks, err := Agent{}.UserHooksPath()
+// antigravityRoots are the roots of the home in's session runs in, read from its
+// transcript's path, <home>/<app data>/brain/<id>/.system_generated/logs/...; agy's own
+// home's for a payload with none (agy before 1.5).
+func antigravityRoots(in *antigravityHookInput) antigravitySkillRoots {
+	if transcript := antigravityTranscript(in); transcript != "" {
+		// Up from the file, logs/, .system_generated/, <id>/ and brain/.
+		appData := filepath.Dir(filepath.Dir(filepath.Dir(filepath.Dir(filepath.Dir(transcript)))))
+		return antigravitySkillRoots{Config: filepath.Join(filepath.Dir(appData), "config"), Builtin: filepath.Join(appData, "builtin")}
+	}
+	config, err := defaultHooksDir()
 	if err != nil {
 		return antigravitySkillRoots{}
 	}
-	config := filepath.Dir(hooks)
 	return antigravitySkillRoots{Config: config, Builtin: filepath.Join(filepath.Dir(config), "antigravity-cli", "builtin")}
 }
 
@@ -78,7 +86,7 @@ func antigravityUsedSkill(e hookrun.Env, r *hookrun.Repo, in *antigravityHookInp
 	if path == "" {
 		return hookrun.Skill{}, false
 	}
-	return antigravityRoots().skill(e, r, path)
+	return antigravityRoots(in).skill(e, r, path)
 }
 
 // skill is the skill whose SKILL.md is at path, when agy counts it as one: a file exactly one

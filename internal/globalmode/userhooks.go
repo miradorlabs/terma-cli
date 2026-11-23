@@ -95,49 +95,52 @@ func (m Machine) applyUserHooks(selected []string, install bool) (changed, notes
 		}
 		// Not where the organization's managed hooks run: both would fire.
 		want := install && slices.Contains(covered, a.Name()) && !m.ManagedDeployed(a.Name())
-		path, err := m.applyAgentHooks(a, terma, want, &notes)
+		paths, err := agents.UserHooksPaths(a)
 		if err != nil {
 			return changed, notes, err
 		}
-		if path != "" {
-			changed = append(changed, path)
+		for _, path := range paths {
+			done, err := m.applyAgentHooks(a, path, terma, want, &notes)
+			if err != nil {
+				return changed, notes, err
+			}
+			if done {
+				changed = append(changed, path)
+			}
 		}
 	}
 	return changed, notes, nil
 }
 
-// applyAgentHooks writes or removes one agent's entries, returning the file when it changed.
-func (m Machine) applyAgentHooks(a agents.UserHooks, terma string, want bool, notes *[]string) (string, error) {
-	path, err := a.UserHooksPath()
-	if err != nil {
-		return "", err
-	}
+// applyAgentHooks writes or removes one agent's entries in its hooks file at path,
+// reporting whether the file changed.
+func (m Machine) applyAgentHooks(a agents.UserHooks, path, terma string, want bool, notes *[]string) (bool, error) {
 	dir := filepath.Dir(path)
 	if !want {
 		if _, err := os.Stat(path); errors.Is(err, fs.ErrNotExist) {
-			return "", nil
+			return false, nil
 		}
 	}
 	plan, err := a.PlanUserHooks(dir, hookmgr.UserHookCommand(terma), want)
 	if err != nil {
-		return "", err
+		return false, err
 	}
 	if plan.Empty() {
-		return "", nil
+		return false, nil
 	}
 	if want {
 		if err := os.MkdirAll(dir, 0o700); err != nil {
-			return "", err
+			return false, err
 		}
 	}
 	// Often a dotfiles link: written through, as the exporter step does.
 	if err := hookmgr.ApplyThroughLinks(dir, plan); err != nil {
-		return "", err
+		return false, err
 	}
 	for _, note := range plan.Notes {
 		*notes = append(*notes, a.DisplayName()+": "+note)
 	}
-	return path, nil
+	return true, nil
 }
 
 func (m Machine) managedHookFiles(agent string) []string {

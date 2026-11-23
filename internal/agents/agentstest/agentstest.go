@@ -40,15 +40,21 @@ func (Agent) FlushAfter() []string { return nil }
 // Tool is the agent's label.
 func (a Agent) Tool() string { return cmp.Or(a.Label, a.ID) }
 
-// UserHooked is an Agent with machine-wide hooks: a JSON file at Path with one Stop hook
-// running the command it is given for "<id>-stop".
+// UserHooked is an Agent with machine-wide hooks: a JSON file at Path, and at each of
+// Others, with one Stop hook running the command it is given for "<id>-stop".
 type UserHooked struct {
 	Agent
-	Path string
+	Path   string
+	Others []string
 }
 
 // UserHooksPath is Path.
 func (u UserHooked) UserHooksPath() (string, error) { return u.Path, nil }
+
+// UserHooksPaths is Path, then Others.
+func (u UserHooked) UserHooksPaths() ([]string, error) {
+	return append([]string{u.Path}, u.Others...), nil
+}
 
 // PlanUserHooks merges the Stop hook into the file in dir.
 func (u UserHooked) PlanUserHooks(dir string, command func(string) string, install bool) (hookmgr.Plan, error) {
@@ -77,4 +83,5 @@ var (
 	_ agents.Agent            = Agent{}
 	_ agents.Labeled          = Agent{}
 	_ agents.UserHooks        = UserHooked{}
+	_ agents.UserHooksFiles   = UserHooked{}
 )

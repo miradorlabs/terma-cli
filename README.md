@@ -490,6 +490,18 @@ conversation lasts, so one you resume from a second repository is still recorded
 first, whichever of the two your team's policy collects
 ([#174](https://github.com/miradorlabs/terma-cli/issues/174)).
 
+T3 Code runs its own copy of Antigravity, with a folder of its own in place of `~/.gemini`.
+Setup writes the same hook into each T3 Code Antigravity provider folder too:
+`~/.t3/userdata/providers/<instance>/<id>/config/hooks.json`, or the same path under
+`$T3CODE_HOME` when that is set. terma finds these folders by the `antigravity-acp` folder
+T3 Code keeps in each, whatever you named the instance, and offers Antigravity at setup
+when one is there, even with no `agy` on your PATH. A folder T3 Code creates after setup
+is picked up by the next `terma setup`, or by `terma update --refresh` when another folder
+already has terma's hook. Until then `terma doctor` names the file that lacks it. T3 Code
+threads report what `agy` sessions do: the session, each turn, each tool step, each model
+call with its tokens, and the files its file tools write. They report no plan, quota or
+account, since T3 Code runs Antigravity with no status line.
+
 Setup also puts `terma hook antigravity-statusline` in `statusLine` in
 `~/.gemini/antigravity-cli/settings.json`. Its payload is the only place `agy` names your
 plan, its quota buckets and the account's email, which terma sends as they change. Your

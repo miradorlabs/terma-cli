@@ -9,9 +9,11 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 )
 
-// Agent is Google's Antigravity CLI (`agy`), with machine-wide hooks in agy's global
-// customization root, ~/.gemini/config/hooks.json, and its status line in agy's settings;
-// ConfigDir is terma's, where setup records what it replaced there.
+// Agent is Google's Antigravity CLI (`agy`), with machine-wide hooks in the global
+// customization root of each Antigravity home: agy's own, ~/.gemini/config/hooks.json, and
+// each one T3 Code keeps for the agy it runs (homes.go). Its status line is in agy's
+// settings, ~/.gemini's only; ConfigDir is terma's, where setup records what it replaced
+// there.
 type Agent struct{ ConfigDir string }
 
 func (Agent) Name() string        { return "antigravity" }
@@ -23,13 +25,19 @@ func (a Agent) Surfaces() []agents.Surface {
 	return []agents.Surface{{Name: a.Name(), DisplayName: a.DisplayName() + " " + minimumVersion + "+ (beta)", Installed: a.Installed}}
 }
 
-// Installed reports whether an agy terma can set up is on the PATH: one before
-// minimumVersion is not, so setup --yes leaves it out rather than stopping at its refusal.
+// Installed reports whether an agy terma can set up is on the PATH, or a client keeps an
+// Antigravity home here, with a copy of agy of its own. An agy on PATH before
+// minimumVersion is not one terma can set up, so setup --yes leaves Antigravity out rather
+// than stopping at its refusal for ~/.gemini, a client's home or not.
 func (Agent) Installed(ctx context.Context) bool {
 	if _, old := tooOld(ctx); old {
 		return false
 	}
-	return detect(ctx).Found
+	if detect(ctx).Found {
+		return true
+	}
+	clients, _ := clientHomes()
+	return len(clients) > 0
 }
 
 // DetectedVersion is the version of the agy on PATH, for doctor; "" when it cannot tell.
@@ -85,7 +93,7 @@ func (Agent) PayloadSession(payload []byte) (hookrun.PayloadSession, bool) {
 // Coverage is how completely terma supports the agent.
 func (Agent) Coverage() (attribution, telemetry agents.CapabilitySupport) {
 	return agents.CapabilitySupport{Level: agents.SupportPartial, Note: "files its file tools write; a file a shell command writes is not recorded"},
-		agents.CapabilitySupport{Level: agents.SupportPartial, Note: "hooks and its transcript, no OTLP export: each model call's tokens (thinking not counted apart), every turn and tool step; plan, quota and account from the status line, interactive sessions only; no cost or tool durations"}
+		agents.CapabilitySupport{Level: agents.SupportPartial, Note: "hooks and its transcript, no OTLP export: each model call's tokens (thinking not counted apart), every turn and tool step; plan, quota and account from the status line, interactive agy sessions only, so none from T3 Code threads; no cost or tool durations"}
 }
 
 var (
@@ -94,6 +102,7 @@ var (
 	_ agents.Agent            = Agent{}
 	_ agents.PayloadReader    = Agent{}
 	_ agents.UserHooks        = Agent{}
+	_ agents.UserHooksFiles   = Agent{}
 	_ agents.Surfaced         = Agent{}
 	_ agents.OffSwitched      = Agent{}
 	_ agents.VersionReporter  = Agent{}

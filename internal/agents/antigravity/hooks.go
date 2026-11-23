@@ -45,35 +45,107 @@ func (Agent) UserHooksPath() (string, error) {
 }
 
 // PlanUserHooks writes terma's named hook into <dir>/hooks.json, or takes it out; it
-// writes none for an agy too old to run them.
+// writes none into ~/.gemini/config for an agy on PATH too old to run them. A client's home
+// is exempt: the client runs its own agy through `agy acp`, which exists only from 1.5.0,
+// past minimumVersion.
 func (Agent) PlanUserHooks(dir string, command func(string) string, install bool) (hookmgr.Plan, error) {
-	if why, old := tooOld(context.Background()); install && old {
-		return hookmgr.Plan{}, errors.New(why)
+	if install && isDefaultHooksDir(dir) {
+		if why, old := tooOld(context.Background()); old {
+			return hookmgr.Plan{}, errors.New(why)
+		}
 	}
 	return planUserHooks(dir, command, install)
 }
 
-// refreshHooksFile points the hooks terma wrote into agy's file at this terma, as `terma
-// update --refresh` does after the binary moved; a file without them is left alone. Not on
-// Windows, where terma does not offer Antigravity and a shared home holds another
-// system's hooks.
+// isDefaultHooksDir reports whether dir is ~/.gemini/config, the agy on PATH's.
+func isDefaultHooksDir(dir string) bool {
+	def, err := defaultHooksDir()
+	return err != nil || filepath.Clean(dir) == def
+}
+
+// refreshHooksFile points the hooks terma wrote into each Antigravity home's file at this
+// terma, as `terma update --refresh` does after the binary moved, and names each file it
+// changed. A file without them is left alone, but for one: a home whose file names no terma
+// hook at all gets it, when another home's file carries terma's hook, so a home a client
+// made after setup is covered (the developer chose Antigravity with hooks, as that other
+// file says). A hook already named terma there, switched off or edited, is the developer's
+// and stays. Not on Windows, where terma does not offer Antigravity and a shared home holds
+// another system's hooks.
 func (a Agent) refreshHooksFile() (string, bool, error) {
 	if runtime.GOOS == "windows" {
 		return "", false, nil
 	}
-	path, err := a.UserHooksPath()
+	paths, err := a.UserHooksPaths()
 	if err != nil {
 		return "", false, err
 	}
-	data, err := hookmgr.ReadFile(path)
-	if err != nil || !bytes.Contains(data, []byte(" hook --user antigravity-")) {
-		return path, false, err
+	var carry, bare []string
+	var errs []error
+	for _, path := range paths {
+		data, err := hookmgr.ReadFile(path)
+		switch {
+		case err != nil:
+			errs = append(errs, err)
+		case bytes.Contains(data, []byte(" hook --user antigravity-")):
+			carry = append(carry, path)
+		case namesNoTermaHook(data):
+			bare = append(bare, path)
+		}
+	}
+	if len(carry) == 0 {
+		return "", false, errors.Join(errs...)
 	}
 	terma, err := procinfo.AbsExecutable()
 	if err != nil {
-		return path, false, err
+		return "", false, errors.Join(append(errs, err)...)
 	}
-	return refreshHooks(path, terma)
+	var changed []string
+	for _, path := range carry {
+		if _, ok, err := refreshHooks(path, terma); err != nil {
+			errs = append(errs, err)
+		} else if ok {
+			changed = append(changed, path)
+		}
+	}
+	for _, path := range bare {
+		// The agy on PATH must run them, as PlanUserHooks says.
+		if isDefaultHooksDir(filepath.Dir(path)) {
+			if _, old := tooOld(context.Background()); old {
+				continue
+			}
+		}
+		if ok, err := installHooks(path, terma); err != nil {
+			errs = append(errs, err)
+		} else if ok {
+			changed = append(changed, path)
+		}
+	}
+	return strings.Join(changed, ", "), len(changed) > 0, errors.Join(errs...)
+}
+
+// namesNoTermaHook reports whether a hooks file, data as read (nil when absent), has no
+// top-level terma member; one refresh cannot parse is not judged to have none.
+func namesNoTermaHook(data []byte) bool {
+	_, top, err := parseHooks(data)
+	if err != nil {
+		return false
+	}
+	_, named := top[antigravityHookName]
+	return !named
+}
+
+// installHooks writes terma's hook into the hooks file at path as setup does, creating its
+// folder, and reports whether it changed the file.
+func installHooks(path, terma string) (bool, error) {
+	dir := filepath.Dir(path)
+	plan, err := planHooks(dir, hookmgr.UserHookCommand(terma), modeInstall)
+	if err != nil || plan.Empty() {
+		return false, err
+	}
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return false, err
+	}
+	return true, hookmgr.ApplyThroughLinks(dir, plan)
 }
 
 // refreshHooks rewrites the entries of terma's already in the hooks file at path to run

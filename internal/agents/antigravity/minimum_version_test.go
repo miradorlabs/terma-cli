@@ -29,9 +29,11 @@ func fakeAgy(t *testing.T, out string, code int) {
 }
 
 // An agy older than the first terma relies on is not offered by setup --yes, and setup
-// refuses to write its hooks, saying why; removal still works.
+// refuses to write its hooks into ~/.gemini, saying why; removal still works. A client's
+// home is planned all the same: the client runs an agy of its own, through agy acp.
 func TestAntigravityTooOld(t *testing.T) {
 	fakeAgy(t, "1.1.9", 0)
+	home := isolatedHome(t)
 	ctx := context.Background()
 	if (Agent{}).Installed(ctx) {
 		t.Error("an agy before 1.2.4 counts as installed")
@@ -39,12 +41,21 @@ func TestAntigravityTooOld(t *testing.T) {
 	if v := (Agent{}).DetectedVersion(ctx); v != "1.1.9" {
 		t.Errorf("DetectedVersion = %q", v)
 	}
-	dir := t.TempDir()
+	dir := filepath.Join(home, ".gemini", "config")
 	if _, err := (Agent{}).PlanUserHooks(dir, testCommand, true); err == nil || !strings.Contains(err.Error(), "1.2.4 or later") {
 		t.Fatalf("install for an old agy: %v", err)
 	}
 	if _, err := (Agent{}).PlanUserHooks(dir, testCommand, false); err != nil {
 		t.Fatalf("removal for an old agy: %v", err)
+	}
+	client := filepath.Join(t3Home(t, filepath.Join(home, ".t3"), "antigravity", "a1"), "config")
+	plan, err := (Agent{}).PlanUserHooks(client, testCommand, true)
+	if err != nil || plan.Empty() {
+		t.Fatalf("install into a client's home with an old agy on PATH: %+v, %v", plan, err)
+	}
+	// setup --yes would otherwise stop at ~/.gemini's refusal.
+	if (Agent{}).Installed(ctx) {
+		t.Error("an agy before 1.2.4 counts as installed beside a client's home")
 	}
 }
 

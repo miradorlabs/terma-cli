@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"encoding/json"
 	"maps"
 	"os"
 	"path/filepath"
@@ -11,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
@@ -297,6 +299,58 @@ func TestAntigravitySkillByRoot(t *testing.T) {
 			RepositoryURL: "https://github.com/acme/" + filepath.Base(dotfiles), Path: "skills/dotfile/SKILL.md"}
 		if got, ok := roots.skill(env, r, filepath.Join(linked, "SKILL.md")); !ok || got != want {
 			t.Errorf("linked: %+v, %v; want %+v", got, ok, want)
+		}
+	}
+}
+
+// A session in a T3 Code home finds its personal and built-in skills in that home, by the
+// payload's transcript path: a skill in agy's own ~/.gemini is no skill of that session's.
+// With no transcript path (agy before 1.5) the roots are ~/.gemini's.
+func TestAntigravitySkillRootsFollowTheSessionsHome(t *testing.T) {
+	home := isolatedHome(t)
+	t3 := t3Home(t, filepath.Join(home, ".t3"), "work-neon", "a1")
+	skill := func(root, rel, name string) string {
+		hookruntest.WriteFile(t, root, rel, "---\nname: "+name+"\ndescription: The "+name+" skill.\n---\nbody\n")
+		return filepath.Join(root, filepath.FromSlash(rel))
+	}
+	personal := skill(t3, "config/skills/qa-t3/SKILL.md", "qa-t3")
+	builtin := skill(t3, t3AppDataDir+"/builtin/skills/guide/SKILL.md", "guide")
+	gemini := skill(home, ".gemini/config/skills/qa-gemini/SKILL.md", "qa-gemini")
+	geminiBuiltin := skill(home, ".gemini/antigravity-cli/builtin/skills/cli-guide/SKILL.md", "cli-guide")
+
+	const id = "4f56f53a-9318-4a8a-8136-5c8bd563b2ee"
+	transcript := filepath.Join(t3, t3AppDataDir, "brain", id, ".system_generated", "logs", antigravityTranscriptName)
+	in := &antigravityHookInput{}
+	if err := json.Unmarshal([]byte(`{"conversationId":"`+id+`","transcriptPath":"`+hookruntest.InJSON(transcript)+`"}`), in); err != nil {
+		t.Fatal(err)
+	}
+	roots := antigravityRoots(in)
+	if want := (antigravitySkillRoots{Config: filepath.Join(t3, "config"), Builtin: filepath.Join(t3, t3AppDataDir, "builtin")}); roots != want {
+		t.Fatalf("roots = %+v, want %+v", roots, want)
+	}
+	env := hookrun.Env{Policy: config.DefaultPolicy()}
+	for _, tc := range []struct {
+		path   string
+		origin string
+	}{{personal, semconv.TermaSkillOriginPersonal}, {builtin, semconv.TermaSkillOriginBuiltin}, {gemini, ""}, {geminiBuiltin, ""}} {
+		got, ok := roots.skill(env, nil, tc.path)
+		if ok != (tc.origin != "") || ok && got.Origin != tc.origin {
+			t.Errorf("%s: %+v, %v; want origin %q", tc.path, got, ok, tc.origin)
+		}
+	}
+
+	// A transcript path that is not agy's layout, or none, falls back to ~/.gemini.
+	for _, payload := range []string{`{"conversationId":"` + id + `"}`, `{"conversationId":"other","transcriptPath":"` + hookruntest.InJSON(transcript) + `"}`} {
+		in := &antigravityHookInput{}
+		if err := json.Unmarshal([]byte(payload), in); err != nil {
+			t.Fatal(err)
+		}
+		want := antigravitySkillRoots{Config: filepath.Join(home, ".gemini", "config"), Builtin: filepath.Join(home, ".gemini", "antigravity-cli", "builtin")}
+		if got := antigravityRoots(in); got != want {
+			t.Errorf("%s: roots = %+v, want %+v", payload, got, want)
+		}
+		if got, ok := antigravityRoots(in).skill(env, nil, gemini); !ok || got.Origin != semconv.TermaSkillOriginPersonal {
+			t.Errorf("%s: ~/.gemini's skill: %+v, %v", payload, got, ok)
 		}
 	}
 }

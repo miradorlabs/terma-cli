@@ -14,6 +14,26 @@ type UserHooks interface {
 	PlanUserHooks(dir string, command func(string) string, install bool) (hookmgr.Plan, error)
 }
 
+// UserHooksFiles is a UserHooks agent with more than one machine-wide hooks file: one
+// for each home the agent keeps on this machine, UserHooksPath's among them. Setup,
+// teardown and doctor treat each alike.
+type UserHooksFiles interface {
+	UserHooksPaths() ([]string, error)
+}
+
+// UserHooksPaths are a's machine-wide hooks files: its UserHooksPaths when it has several,
+// else its one UserHooksPath.
+func UserHooksPaths(a UserHooks) ([]string, error) {
+	if f, ok := a.(UserHooksFiles); ok {
+		return f.UserHooksPaths()
+	}
+	path, err := a.UserHooksPath()
+	if err != nil {
+		return nil, err
+	}
+	return []string{path}, nil
+}
+
 // UserHooksTrust is an agent that runs its machine-wide hooks only once the developer
 // trusts them; UserHooksTrustStep says how, and UserHooksTrusted whether terma's entries are
 // there (present) and run as written (trusted).

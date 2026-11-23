@@ -42,7 +42,7 @@ func TestAgentHooksCheck(t *testing.T) {
 	ctx := context.Background()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "hooks.json")
-	fake := versioned{agentstest.UserHooked{Agent: agentstest.Agent{ID: "fake"}, Path: path}, "1.5.15"}
+	fake := versioned{agentstest.UserHooked{ID: "fake", Path: path}, "1.5.15"}
 	reg := agents.New(fake).Support(fake)
 	exe := binary(t, filepath.Join(t.TempDir(), "bin", "terma"))
 	install := func(terma string) {
@@ -98,4 +98,35 @@ func TestAgentHooksCheck(t *testing.T) {
 		t.Fatal(err)
 	}
 	check(Fail, "hooks.json")
+}
+
+// An agent with several hooks files has its hooks in place only when every file has them:
+// one file without them fails, naming that file alone.
+func TestAgentHooksCheckEveryFile(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	dir, client := t.TempDir(), t.TempDir()
+	path, other := filepath.Join(dir, "hooks.json"), filepath.Join(client, "hooks.json")
+	fake := agentstest.UserHooked{ID: "fake", Path: path, Others: []string{other}}
+	reg := agents.New(fake).Support(fake)
+	exe := binary(t, filepath.Join(t.TempDir(), "bin", "terma"))
+	install := func(dir string) {
+		t.Helper()
+		plan, err := fake.PlanUserHooks(dir, hookmgr.UserHookCommand(exe), true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := hookmgr.Apply(dir, plan); err != nil {
+			t.Fatal(err)
+		}
+	}
+	install(dir)
+	c, ok := AgentHooksCheck(ctx, reg, []string{"fake"}, exe)
+	if !ok || c.Status != Fail || !strings.Contains(c.Detail, other) || strings.Contains(c.Detail, path) {
+		t.Fatalf("one file without the hooks: %+v, %v", c, ok)
+	}
+	install(client)
+	if c, ok := AgentHooksCheck(ctx, reg, []string{"fake"}, exe); !ok || c.Status != Pass {
+		t.Fatalf("every file with the hooks: %+v, %v", c, ok)
+	}
 }

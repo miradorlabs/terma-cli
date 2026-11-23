@@ -16,7 +16,7 @@ func sandbox(t *testing.T) (Machine, string) {
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
 	hooks := filepath.Join(t.TempDir(), "hooks.json")
-	fake := agentstest.UserHooked{Agent: agentstest.Agent{ID: "fake", Label: "fake-cli"}, Path: hooks}
+	fake := agentstest.UserHooked{ID: "fake", Label: "fake-cli", Path: hooks}
 	m := Machine{
 		ConfigDir:   t.TempDir(),
 		Agents:      agents.New(fake, agentstest.Agent{ID: "plain"}).Support(fake),
@@ -130,12 +130,46 @@ func TestUnsupportedAgentsHooksAreLeftAlone(t *testing.T) {
 		t.Fatal(err)
 	}
 	before, _ := os.ReadFile(hooks)
-	fake := agentstest.UserHooked{Agent: agentstest.Agent{ID: "fake", Label: "fake-cli"}, Path: hooks}
+	fake := agentstest.UserHooked{ID: "fake", Label: "fake-cli", Path: hooks}
 	m.Agents = agents.New(fake)
 	if changed, err := m.ApplyUserHooks(nil, false); err != nil || len(changed) != 0 {
 		t.Fatalf("removal touched an unsupported agent's hooks: %v, %v", changed, err)
 	}
 	if after, _ := os.ReadFile(hooks); string(after) != string(before) {
 		t.Fatalf("hooks file changed:\n%s", after)
+	}
+}
+
+// An agent with several hooks files has each written, and each named; removal takes
+// terma's hooks out of every one and keeps what else a file holds.
+func TestMachineWideHooksInEveryFile(t *testing.T) {
+	m, hooks := sandbox(t)
+	other := filepath.Join(t.TempDir(), "client", "config", "hooks.json")
+	kept := filepath.Join(t.TempDir(), "hooks.json")
+	if err := os.WriteFile(kept, []byte(`{"theme":"dark"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	fake := agentstest.UserHooked{ID: "fake", Label: "fake-cli", Path: hooks, Others: []string{other, kept}}
+	m.Agents = agents.New(fake).Support(fake)
+
+	changed, err := m.ApplyUserHooks([]string{"fake"}, true)
+	if err != nil || strings.Join(changed, ",") != strings.Join([]string{hooks, other, kept}, ",") {
+		t.Fatalf("ApplyUserHooks = %v, %v", changed, err)
+	}
+	for _, path := range []string{hooks, other, kept} {
+		if data, _ := os.ReadFile(path); !strings.Contains(string(data), "hook --user fake-stop") {
+			t.Fatalf("%s:\n%s", path, data)
+		}
+	}
+	if changed, err := m.ApplyUserHooks([]string{"fake"}, false); err != nil || len(changed) != 3 {
+		t.Fatalf("removal = %v, %v", changed, err)
+	}
+	for _, path := range []string{hooks, other, kept} {
+		if data, _ := os.ReadFile(path); strings.Contains(string(data), "hook --user") {
+			t.Fatalf("%s: machine-wide hooks left:\n%s", path, data)
+		}
+	}
+	if data, _ := os.ReadFile(kept); !strings.Contains(string(data), `"theme"`) {
+		t.Fatalf("the developer's setting went:\n%s", data)
 	}
 }
