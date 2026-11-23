@@ -21,7 +21,7 @@ var pinnedCounterNames = []string{
 	"dropped.no_session_trace.", "dropped.no_session_trace_at_exit.", "dropped.not_collected.",
 	"dropped.not_collected_at_exit.", "dropped.outbox_expired.", "dropped.outbox_full.",
 	"dropped.outbox_unreadable.", "dropped.outbox_write_failed.", "dropped.policy_repository.",
-	"dropped.policy_signal.", "dropped.policy_signal_or_content.", "dropped.policy_widened.",
+	"dropped.policy_signal.", "dropped.policy_signal_or_content.", "dropped.policy_timeout.", "dropped.policy_widened.",
 	"dropped.policy_widened_at_exit.", "dropped.process_running.",
 	"dropped.process_running_at_exit.", "dropped.signed_out.", "dropped.unclaimed_evicted.",
 	"dropped.unclaimed_expired.", "dropped.unclaimed_expired_at_exit.",

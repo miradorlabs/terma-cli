@@ -20,22 +20,19 @@ const (
 
 const maxTraces = 100000
 
+// policyHold is how long a claimed part waits in the hold for its team's policy or key
+// while the relay can't read them (whyNoKey: a policy not yet fetched, which the policy
+// refresher fetches meanwhile, a locked keychain, a changed organization, a removed profile,
+// an unreadable config.json): past it the part is dropped, and counted as lostPolicyTimeout.
+const policyHold = 15 * time.Minute
+
 type heldPart struct {
 	p    *part
 	at   time.Time
 	size int
-	// pinned is the claim the part was last found claimed under while its team's policy
-	// could not be read, and pinnedHow how it was placed: the claim file (claim.TTL) and the
-	// trace index (traceTTL) expire long before the part may, and the part stays the team's.
-	pinned    *claim.Claim
-	pinnedHow attribution
-	// awaitingPolicy is that it was last held for its team's policy (whyNoKey), pinned or
-	// not: in global mode the catch-all's part has no claim to pin it to.
-	awaitingPolicy bool
-	// awaitingSince is when it became a team's part waiting for its policy (pinned, which
-	// stays, or awaitingPolicy), which an update gives its own wait from; zero while it is
-	// neither. A pinned part keeps its first time.
-	awaitingSince time.Time
+	// awaitingPolicy is when it began waiting for its team's policy or key (whyNoKey), zero
+	// while it waits for anything else: it waits for them policyHold at most.
+	awaitingPolicy time.Time
 }
 
 type traceSession struct {
@@ -45,14 +42,15 @@ type traceSession struct {
 	at      time.Time
 }
 
-func (r *Relay) hold(p *part, pin *claim.Claim, how attribution, awaitingPolicy bool) {
+// hold keeps p until it may leave; awaitingPolicy is that it waits for its team's policy.
+func (r *Relay) hold(p *part, awaitingPolicy bool) {
 	size := proto.Size(p.msg)
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	refuse := func() {
 		r.stats.dropped(p.signal, "unclaimed_overflow", p.records)
-		if pin != nil || awaitingPolicy {
-			r.heldLost += p.records // a team's part, lost: counted where doctor reads losses
+		if awaitingPolicy {
+			r.policyLost += p.records // a team's part, lost: counted where doctor reads losses
 		}
 	}
 	if p.records > maxHeld || size > maxHeldBytes {
@@ -66,9 +64,9 @@ func (r *Relay) hold(p *part, pin *claim.Claim, how attribution, awaitingPolicy 
 			return
 		}
 	}
-	h := heldPart{p: p, at: r.opts.Now(), size: size, pinned: pin, pinnedHow: how, awaitingPolicy: awaitingPolicy}
-	if pin != nil || awaitingPolicy {
-		h.awaitingSince = h.at
+	h := heldPart{p: p, at: r.opts.Now(), size: size}
+	if awaitingPolicy {
+		h.awaitingPolicy = h.at
 	}
 	r.held[p.session] = append(r.held[p.session], h)
 	r.heldN += p.records
@@ -105,9 +103,9 @@ func (r *Relay) evictOldestLocked() bool {
 	}
 	r.heldN -= h.p.records
 	r.heldBytes -= h.size
-	if h.pinned != nil || h.awaitingPolicy {
+	if !h.awaitingPolicy.IsZero() {
 		// A team's part, lost: doctor's outbox row counts it (the next sweep records it).
-		r.heldLost += h.p.records
+		r.policyLost += h.p.records
 	}
 	r.stats.dropped(h.p.signal, "unclaimed_evicted", h.p.records)
 	return true
@@ -131,12 +129,13 @@ func (r *Relay) sweep() {
 
 	r.deliverMu.Lock()
 	defer r.deliverMu.Unlock()
-	// A team's parts the hold dropped, for age or room, are counted where doctor reads them.
+	// A team's parts the hold dropped waiting for its policy, past policyHold or for room,
+	// are counted where doctor reads them.
 	r.mu.Lock()
-	lost := r.heldLost
-	r.heldLost = 0
+	lost := r.policyLost
+	r.policyLost = 0
 	r.mu.Unlock()
-	defer func() { r.recordLosses(map[string]int{heldLoss: lost}, now) }()
+	defer func() { r.recordLosses(map[string]int{lostPolicyTimeout: lost}, now) }()
 	for _, key := range keys {
 		hold := r.opts.Hold
 		if strings.HasPrefix(key, tracePrefix) || strings.HasPrefix(key, procPrefix) {
@@ -155,51 +154,17 @@ func (r *Relay) sweep() {
 		var out []release
 		// A part that must wait holds up nothing: order matters only among parts that leave.
 		for _, h := range parts {
-			var c claim.Claim
-			var pol Policy
-			var why string
-			var ok bool
-			var how attribution
-			if h.pinned != nil && (strings.HasPrefix(key, procPrefix) ||
-				r.sessionFor(key) == "" && h.pinnedHow.how == semconv.TermaRelayAttributionProcess) {
-				// Placed by its process, pinned only once that process had exited: whatever
-				// its pid names since is another process, so the pin alone places it (global
-				// mode's catch-all included). A trace named since goes by its session.
-				c, pol, why, ok = r.placePinned(*h.pinned, h.p.narrow)
-				how = h.pinnedHow
-			} else {
-				c, pol, why, ok, how = r.decide(key, h.p.pid, h.p.at, h.p.narrow, h.p.claimed)
-			}
-			if why == whyNoKey && c.ProjectID != "" {
-				pinned := c
-				h.pinned, h.pinnedHow = &pinned, how
-			}
-			if !ok && h.pinned != nil && (why == whyUnclaimed || why == whyNoTrace || why == whyProcessIdle) {
-				// What placed it (its claim, its trace, its process) expired while the part
-				// waited for the team's policy: still placed by that claim, as decideClaimed
-				// would. Any other answer (not collected, widened, ambiguous) is a decision,
-				// never overridden by a guess.
-				c, pol, why, ok = r.placePinned(*h.pinned, h.p.narrow)
-				how = h.pinnedHow
-			}
-			// Judged after the pin's own placement, which may find the policy still unread.
-			h.awaitingPolicy = why == whyNoKey
+			c, pol, why, ok, how := r.decide(key, h.p.pid, h.p.at, h.p.narrow, h.p.claimed)
 			switch {
-			case h.pinned == nil && !h.awaitingPolicy:
-				h.awaitingSince = time.Time{}
-			case h.awaitingSince.IsZero():
-				h.awaitingSince = now
+			case why != whyNoKey:
+				h.awaitingPolicy = time.Time{}
+			case h.awaitingPolicy.IsZero():
+				h.awaitingPolicy = now
 			}
 			limit := hold
-			switch {
-			case h.p.start && why == whyUnclaimed:
+			if h.p.start && why == whyUnclaimed {
 				// A conversation start waits for the thread's first turn.
 				limit = max(hold, r.opts.TraceHold)
-			case why == whyNoKey:
-				// Claimed for a team whose policy cannot be read now (a refresh the sign-in's
-				// remediation blocks): kept as long as the outbox keeps parts, within the
-				// hold's bounds, and placed once the policy is back.
-				limit = max(hold, maxOutboxAge)
 			}
 			if !ok && !h.p.narrow && !h.p.claimed && why != whyNoKey && now.Sub(h.at) >= limit {
 				if cc, cok := r.catchAll(); cok {
@@ -212,11 +177,15 @@ func (r *Relay) sweep() {
 			switch {
 			case ok:
 				out = append(out, release{c, pol, h.p, how})
-			case why == whyWidened || why == whyNotCollected || now.Sub(h.at) >= limit:
-				r.stats.dropped(h.p.signal, why, h.p.records)
-				if (h.pinned != nil || h.awaitingPolicy) && why != whyWidened && why != whyNotCollected {
+			case why == whyNoKey && now.Sub(h.awaitingPolicy) < policyHold:
+				keep = append(keep, h)
+			case why == whyNoKey || why == whyWidened || why == whyNotCollected || now.Sub(h.at) >= limit:
+				if why == whyNoKey {
+					// Claimed for a team whose policy or key couldn't be read in time: lost, and counted.
+					why = lostPolicyTimeout
 					lost += h.p.records
 				}
+				r.stats.dropped(h.p.signal, why, h.p.records)
 				if r.opts.Logf != nil {
 					c, _ := r.lookup(r.sessionFor(key))
 					r.opts.Logf("drop %s %s: %d %s from pid %d; claim %q pids %v", why, key, h.p.records, h.p.signal, h.p.pid, c.ProjectID, c.PIDs)

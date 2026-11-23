@@ -134,8 +134,12 @@ that account's own token, never in another person's name, and names (`terma.user
 user but that account's; it ages out with the outbox
 (14 days), whose `losses.json` counts what the relay lost, by reason, for doctor (the
 heartbeat carries the same reasons as `dropped.<reason>.<signal>` counters). A claimed part
-whose team's policy cannot be read yet waits in memory as long as the outbox would keep
-it, and one a stopping relay drops is counted there too. What a server-key profile
+whose team's policy or key the relay can't read (not fetched yet, a locked keychain, a
+changed organization, a removed profile) waits in memory for them, fetched meanwhile, for
+15 minutes at most (`policyHold`): one still waiting then, or dropped for room or by a
+stopping relay, is counted as `policy_timeout`. An update waits for the hold to empty, but
+past its pause wait no longer for such parts, which steady exports would renew and only a
+restart may fix. What a server-key profile
 collected is no person's (`@no_person/`), and leaves only under a server key, so a profile
 switched from a server key to a person's sign-in leaves it to age out; a server key sends
 nothing else. A claimed part that arrives signed out, or while `config.json` or the

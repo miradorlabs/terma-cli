@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -301,15 +302,15 @@ func TestRelayRoutesLogsPerClaimedSession(t *testing.T) {
 			r.sweep()
 			c = r.Stats().Snapshot().Counters
 			// The unclaimed part goes; the claimed one whose team has no key or policy here waits.
-			if c["dropped.no_key.logs"] != 0 || c["dropped.unclaimed_expired.logs"] != 1 {
+			if c["dropped.policy_timeout.logs"] != 0 || c["dropped.unclaimed_expired.logs"] != 1 {
 				t.Fatalf("after the hold: %v", c)
 			}
 			f.mu.Lock()
-			f.now = f.now.Add(maxOutboxAge)
+			f.now = f.now.Add(policyHold)
 			f.mu.Unlock()
 			r.sweep()
-			if c = r.Stats().Snapshot().Counters; c["dropped.no_key.logs"] != 1 {
-				t.Fatalf("after the outbox's age: %v", c)
+			if c = r.Stats().Snapshot().Counters; c["dropped.policy_timeout.logs"] != 1 {
+				t.Fatalf("after the policy's hold: %v", c)
 			}
 		})
 	}
@@ -387,13 +388,12 @@ func TestRelayHoldReleasesOrExpires(t *testing.T) {
 	if c["dropped.unclaimed_expired.logs"] != 1 || c["forwarded.logs"] != 4 {
 		t.Fatalf("stats = %v", c)
 	}
-	// A claimed part with no key or policy to leave under is still held, as long as the
-	// outbox would keep it.
+	// A claimed part with no key or policy to leave under is still held, for policyHold.
 	if _, ok := r.Idle(); ok {
 		t.Fatal("a held claimed part let the relay go idle")
 	}
 	f.mu.Lock()
-	f.now = f.now.Add(maxOutboxAge)
+	f.now = f.now.Add(policyHold)
 	f.mu.Unlock()
 	r.sweep()
 	// The sender marks itself done just after the counter moves.
@@ -593,10 +593,11 @@ func TestRelayRefusedKeyIsRetriedNotDropped(t *testing.T) {
 	}
 }
 
-// A part claimed for a team whose policy can't be read keeps that claim: the claim file
-// expires long before the part may, and it is still placed by it once the policy is back.
-// Dropped for age, it is counted where doctor reads the outbox's losses.
-func TestAPartWaitingForItsPolicyOutlivesItsClaim(t *testing.T) {
+// A part claimed for a team whose policy the machine has never stored waits for it
+// policyHold, from when it began waiting, and leaves once the policy is fetched; one whose
+// policy never arrives is dropped then, and counted as policy_timeout where doctor reads the
+// outbox's losses, never kept as long as the outbox keeps parts.
+func TestAPartWaitsForANeverStoredPolicyOnlyPolicyHold(t *testing.T) {
 	t.Parallel()
 	u := newUpstream(t)
 	f := newFixture()
@@ -618,50 +619,55 @@ func TestAPartWaitingForItsPolicyOutlivesItsClaim(t *testing.T) {
 	t.Cleanup(func() { cancel(); <-done })
 	srv := httptest.NewServer(r.Handler())
 	t.Cleanup(srv.Close)
-	time.Sleep(10 * time.Millisecond)
+	advance := func(d time.Duration) {
+		f.mu.Lock()
+		f.now = f.now.Add(d)
+		f.mu.Unlock()
+		r.cache.expire(f.clock().Add(time.Hour))
+		r.sweep()
+	}
 
+	// Fetched within the hold, the policy releases the part to its team.
 	postProto(t, srv, "/v1/logs", logsOf("D", 1))
 	waitForCounters(t, r, func(c map[string]int) bool { return c["held_parts"] == 1 })
-	r.sweep()
-	// The claim expires and is pruned; hours pass.
-	f.mu.Lock()
-	delete(f.claims, "D")
-	f.now = f.now.Add(5 * time.Hour)
-	f.mu.Unlock()
-	r.sweep()
-	if c := r.Stats().Snapshot().Counters; c["dropped.unclaimed_expired.logs"] != 0 || !r.Holding() {
-		t.Fatalf("a team's part dropped with its claim: %v", c)
+	advance(policyHold - time.Minute)
+	if !r.Holding() {
+		t.Fatal("a part waiting for its team's policy was dropped within the hold")
 	}
 	mu.Lock()
 	readable = true
 	mu.Unlock()
-	r.cache.expire(f.clock().Add(time.Hour))
-	r.sweep()
+	advance(time.Second)
 	waitForCounters(t, r, func(c map[string]int) bool { return c["forwarded.logs"] == 1 })
+	if got, projects := u.logs(t); len(got["Bearer key-p3"]) != 1 || projects["Bearer key-p3"] != "p3" {
+		t.Fatalf("forwarded by key = %v, projects %v", got, projects)
+	}
 
-	// Another that ages out waiting is a loss doctor reports.
+	// A conversation start held for its claim waits for the policy from when it is claimed.
 	mu.Lock()
 	readable = false
 	mu.Unlock()
-	f.mu.Lock()
-	f.claims["D"] = claim.Claim{ProjectID: "p3"}
-	f.mu.Unlock()
-	r.cache.expire(f.clock().Add(2 * time.Hour))
-	postProto(t, srv, "/v1/logs", logsOf("D", 1))
-	waitForCounters(t, r, func(c map[string]int) bool { return c["held_parts"] == 2 })
-	r.sweep()
-	f.mu.Lock()
-	f.now = f.now.Add(maxOutboxAge + time.Hour)
-	f.mu.Unlock()
-	r.sweep()
-	if l, err := ReadOutboxLosses(dir); err != nil || l.Counts["held"] != 1 {
-		t.Fatalf("losses = %+v, %v; want the aged-out part counted", l, err)
+	r.hold(&part{signal: Logs, session: "Z", msg: logsOf("Z", 1), records: 1, start: true, at: f.clock()}, false)
+	advance(3 * time.Minute)
+	f.claim("Z", claim.Claim{ProjectID: "p3"})
+	advance(time.Second)
+	advance(policyHold - time.Minute)
+	if c := r.Stats().Snapshot().Counters; c["dropped.policy_timeout.logs"] != 0 || !r.Holding() {
+		t.Fatalf("a part was given less than policyHold for its policy: %v", c)
+	}
+	// It never arrives: dropped, and counted.
+	advance(time.Minute)
+	if c := r.Stats().Snapshot().Counters; c["dropped.policy_timeout.logs"] != 1 || r.Holding() {
+		t.Fatalf("a part outlived policyHold: %v, holding %v", c, r.Holding())
+	}
+	if l, err := ReadOutboxLosses(dir); err != nil || l.Counts[lostPolicyTimeout] != 1 {
+		t.Fatalf("losses = %+v, %v; want the part counted as policy_timeout", l, err)
 	}
 }
 
-// An update waits for the hold only so long: QuiesceDroppingHold quiesces a relay that
-// holds parts, which it then drops and counts at exit.
-func TestAnUpdateNeedNotWaitForTheHold(t *testing.T) {
+// An update waits for the hold, which a part waiting for its team's policy leaves within
+// policyHold: no policy that never arrives holds an update up for longer.
+func TestAnUpdateWaitsForAPolicyOnlyPolicyHold(t *testing.T) {
 	t.Parallel()
 	f := newFixture()
 	r := newRelay(Options{Dir: t.TempDir(), Token: token, Hold: time.Minute, Lookup: f.lookup, Now: f.clock,
@@ -669,20 +675,22 @@ func TestAnUpdateNeedNotWaitForTheHold(t *testing.T) {
 	srv := httptest.NewServer(r.Handler())
 	t.Cleanup(srv.Close)
 	postProto(t, srv, "/v1/logs", logsOf("D", 1))
-	f.mu.Lock()
-	f.now = f.now.Add(time.Minute)
-	f.mu.Unlock()
+	r.sweep()
 	if r.Quiesce(0) {
-		t.Fatal("a relay that holds parts quiesced")
+		t.Fatal("a relay that holds a part quiesced")
 	}
-	if !r.QuiesceDroppingHold(0, 0) {
-		t.Fatal("QuiesceDroppingHold waited for the hold")
+	f.mu.Lock()
+	f.now = f.now.Add(policyHold)
+	f.mu.Unlock()
+	r.sweep()
+	if !r.Quiesce(0) {
+		t.Fatal("an update still waits for a part past policyHold")
 	}
 }
 
-// A part known to be a team's is pinned as it enters the hold: one the full hold can't
-// take, or evicts before any sweep, is counted where doctor reads losses.
-func TestATeamsPartLostBeforeAnySweepIsCounted(t *testing.T) {
+// A part waiting for its team's policy that the full hold can't take is counted as
+// policy_timeout where doctor reads losses, as one the relay drops as it stops is.
+func TestAPolicyWaitLostToTheHoldsRoomOrAStopIsCounted(t *testing.T) {
 	t.Parallel()
 	f := newFixture()
 	dir := t.TempDir()
@@ -690,92 +698,45 @@ func TestATeamsPartLostBeforeAnySweepIsCounted(t *testing.T) {
 		Resolve: func(claim.Claim) (Policy, error) { return Policy{}, ErrNoKey }})
 	srv := httptest.NewServer(r.Handler())
 	t.Cleanup(srv.Close)
-	postProto(t, srv, "/v1/logs", logsOf("D", 1))
-	r.mu.Lock()
-	pinned := len(r.held["D"]) == 1 && r.held["D"][0].pinned != nil
-	r.mu.Unlock()
-	if !pinned {
-		t.Fatal("a team's part entered the hold unpinned")
-	}
-	// One too large for the hold, refused as it arrives.
-	big := &part{signal: Logs, session: "D", msg: logsOf("D", 1), records: maxHeld + 1}
-	r.hold(big, &claim.Claim{ProjectID: "p3"}, attribution{}, true)
+	r.hold(&part{signal: Logs, session: "D", msg: logsOf("D", 1), records: maxHeld + 1}, true)
 	r.sweep()
-	if l, err := ReadOutboxLosses(dir); err != nil || l.Counts["held"] != maxHeld+1 {
+	if l, err := ReadOutboxLosses(dir); err != nil || l.Counts[lostPolicyTimeout] != maxHeld+1 {
 		t.Fatalf("losses = %+v, %v; want the refused part counted", l, err)
 	}
+	postProto(t, srv, "/v1/logs", logsOf("D", 1))
+	r.dropHeldAtExit()
+	if l, err := ReadOutboxLosses(dir); err != nil || l.Counts[lostPolicyTimeout] != maxHeld+2 {
+		t.Fatalf("losses = %+v, %v; want the part dropped at exit counted", l, err)
+	}
 }
 
-// A part held only to keep order behind one waiting for its team's policy is pinned too:
-// lost before a sweep, it is counted as that team's.
-func TestAFollowerHeldForOrderIsPinned(t *testing.T) {
+// A part whose team's policy is read only after the last sweep, so that it is placeable but
+// dropped as the relay stops, is still counted as lost.
+func TestAPolicyReadTooLateAtExitIsCounted(t *testing.T) {
 	t.Parallel()
-	u := newUpstream(t)
 	f := newFixture()
-	var mu sync.Mutex
-	readable := false
-	r := newRelay(Options{Dir: t.TempDir(), Token: token, Hold: time.Minute, Lookup: f.lookup, Now: f.clock,
-		Resolve: func(c claim.Claim) (Policy, error) {
-			mu.Lock()
-			defer mu.Unlock()
-			if !readable {
+	dir := t.TempDir()
+	var readable atomic.Bool
+	r := newRelay(Options{Dir: dir, Token: token, Hold: time.Minute, Lookup: f.lookup, Now: f.clock,
+		Resolve: func(claim.Claim) (Policy, error) {
+			if !readable.Load() {
 				return Policy{}, ErrNoKey
 			}
-			return Policy{Endpoint: u.srv.URL, Key: "key-p3"}, nil
+			return Policy{Endpoint: "http://127.0.0.1:1", Key: "key-p3"}, nil
 		}})
 	srv := httptest.NewServer(r.Handler())
 	t.Cleanup(srv.Close)
 	postProto(t, srv, "/v1/logs", logsOf("D", 1))
-	mu.Lock()
-	readable = true
-	mu.Unlock()
-	postProto(t, srv, "/v1/logs", logsOf("D", 1))
-	r.mu.Lock()
-	held := append([]heldPart(nil), r.held["D"]...)
-	r.mu.Unlock()
-	if len(held) != 2 || held[1].pinned == nil {
-		t.Fatalf("held %d parts, the follower pinned: %v", len(held), len(held) == 2 && held[1].pinned != nil)
+	readable.Store(true)
+	r.dropHeldAtExit()
+	if l, err := ReadOutboxLosses(dir); err != nil || l.Counts[lostPolicyTimeout] != 1 {
+		t.Fatalf("losses = %+v, %v; want the claimed part dropped at exit counted", l, err)
 	}
 }
 
-// A follower placed by global mode's catch-all is not pinned: global mode is decided again
-// at every sweep, and switched off it must send nothing under the catch-all.
-func TestAFollowerPlacedByTheCatchAllIsNotPinned(t *testing.T) {
-	t.Parallel()
-	u := newUpstream(t)
-	f := newFixture()
-	var mu sync.Mutex
-	readable := false
-	r := newRelay(Options{Dir: t.TempDir(), Token: token, Hold: time.Minute, Lookup: f.lookup, Now: f.clock,
-		CatchAll: func() (claim.Claim, bool) { return claim.Claim{ProjectID: "global"}, true },
-		Resolve: func(c claim.Claim) (Policy, error) {
-			mu.Lock()
-			defer mu.Unlock()
-			if !readable {
-				return Policy{}, ErrNoKey
-			}
-			return Policy{Endpoint: u.srv.URL, Key: "key-global"}, nil
-		}})
-	srv := httptest.NewServer(r.Handler())
-	t.Cleanup(srv.Close)
-	postProto(t, srv, "/v1/logs", logsOf("Z", 1))
-	mu.Lock()
-	readable = true
-	mu.Unlock()
-	postProto(t, srv, "/v1/logs", logsOf("Z", 1))
-	r.mu.Lock()
-	held := append([]heldPart(nil), r.held["Z"]...)
-	r.mu.Unlock()
-	for i, h := range held {
-		if h.pinned != nil {
-			t.Fatalf("held part %d is pinned to the catch-all %q", i, h.pinned.ProjectID)
-		}
-	}
-}
-
-// An update stops waiting only for parts that wait for their team's policy: a part held
-// for anything else (here, a session not yet claimed) is still waited for.
-func TestAnUpdateStillWaitsForPartsNotWaitingForAPolicy(t *testing.T) {
+// Past its pause wait an update stops waiting for parts waiting for their team's policy or
+// key, never for one waiting for anything else, here its session's claim.
+func TestQuiesceDroppingPolicyWaitsWaitsForEveryOtherPart(t *testing.T) {
 	t.Parallel()
 	f := newFixture()
 	r := newRelay(Options{Dir: t.TempDir(), Token: token, Hold: time.Minute, Lookup: f.lookup, Now: f.clock,
@@ -783,135 +744,15 @@ func TestAnUpdateStillWaitsForPartsNotWaitingForAPolicy(t *testing.T) {
 	srv := httptest.NewServer(r.Handler())
 	t.Cleanup(srv.Close)
 	postProto(t, srv, "/v1/logs", logsOf("unclaimed", 1))
-	f.mu.Lock()
-	f.now = f.now.Add(time.Minute)
-	f.mu.Unlock()
-	if r.QuiesceDroppingHold(0, 0) {
+	postProto(t, srv, "/v1/logs", logsOf("D", 1))
+	if r.Quiesce(0) || r.QuiesceDroppingPolicyWaits(0) {
 		t.Fatal("an update dropped a part that waits for its session's claim")
 	}
-}
-
-// In global mode a part waiting for the catch-all's policy has no claim to pin it to, and
-// still waits for that policy, not a claim: an update stops waiting for it as for a pinned one.
-func TestAnUpdateDoesNotWaitForGlobalModesPolicy(t *testing.T) {
-	t.Parallel()
-	f := newFixture()
-	r := newRelay(Options{Dir: t.TempDir(), Token: token, Hold: time.Minute, Lookup: f.lookup, Now: f.clock,
-		CatchAll: func() (claim.Claim, bool) { return claim.Claim{ProjectID: "global"}, true },
-		Resolve:  func(claim.Claim) (Policy, error) { return Policy{}, ErrNoKey }})
-	srv := httptest.NewServer(r.Handler())
-	t.Cleanup(srv.Close)
-	postProto(t, srv, "/v1/logs", logsOf("Z", 1))
-	f.mu.Lock()
-	f.now = f.now.Add(time.Minute)
-	f.mu.Unlock()
-	r.sweep() // judged again, still waiting for the policy
-	if !r.Holding() {
-		t.Fatal("the part was not held")
-	}
-	if !r.QuiesceDroppingHold(0, 0) {
-		t.Fatal("an update waited for a part that waits for global mode's policy")
-	}
-}
-
-// A part placed by its exited process and pinned to that team while the team's policy
-// can't be read goes by its pin alone: the pid reused since by another process, running
-// and naming another session, neither drops it nor places it elsewhere.
-func TestAPinnedProcessPartIgnoresItsPidsReuse(t *testing.T) {
-	t.Parallel()
-	f := newFixture()
-	r := newRelay(Options{Dir: t.TempDir(), Token: token, Hold: time.Minute, Lookup: f.lookup, Now: f.clock,
-		Resolve: func(claim.Claim) (Policy, error) { return Policy{}, ErrNoKey }})
-	const pid = 4242
-	p := &part{signal: Logs, session: procKey(pid), pid: pid, msg: logsOf("", 1), records: 1, at: f.clock()}
-	r.hold(p, &claim.Claim{ProjectID: "p1"}, attribution{}, true)
-	// The pid is reused by a new process, running, naming session B.
-	r.learnProcess(pid, "B")
-	f.mu.Lock()
-	f.now = f.now.Add(r.opts.TraceHold + time.Minute) // past the hold of a part waiting for its process
-	f.mu.Unlock()
-	r.sweep()
-	r.mu.Lock()
-	held := r.held[procKey(pid)]
-	r.mu.Unlock()
-	if len(held) != 1 || held[0].pinned == nil || held[0].pinned.ProjectID != "p1" {
-		t.Fatalf("held %+v; want the part kept, pinned to p1", held)
-	}
-}
-
-// So does a part of a trace no record has named, placed by its exited process and pinned:
-// the pid reused since, by a process that names another team's session and exits, never
-// moves it there.
-func TestAPinnedTracePartIgnoresItsPidsReuse(t *testing.T) {
-	t.Parallel()
-	f := newFixture()
-	r := newRelay(Options{Dir: t.TempDir(), Token: token, Hold: time.Minute, Lookup: f.lookup, Now: f.clock,
-		Resolve: func(claim.Claim) (Policy, error) { return Policy{}, ErrNoKey }})
-	const pid = 4243
-	key := tracePrefix + "abc"
-	p := &part{signal: Logs, session: key, pid: pid, msg: logsOf("", 1), records: 1, at: f.clock()}
-	r.hold(p, &claim.Claim{ProjectID: "p1"}, attribution{how: semconv.TermaRelayAttributionProcess, session: "A"}, true)
-	// The pid is reused by a process naming session B (team p2), which then exits.
-	r.learnProcess(pid, "B")
-	r.mu.Lock()
-	r.procs[pid].exitedAt = f.now.Add(-time.Minute)
-	r.mu.Unlock()
-	f.mu.Lock()
-	f.now = f.now.Add(r.opts.TraceHold + time.Minute)
-	f.mu.Unlock()
-	r.sweep()
-	r.mu.Lock()
-	held := r.held[key]
-	r.mu.Unlock()
-	if len(held) != 1 || held[0].pinned == nil || held[0].pinned.ProjectID != "p1" {
-		t.Fatalf("held %+v; want the part kept, pinned to p1", held)
-	}
-}
-
-// An update stops waiting only for a part that has waited for its policy at least as long as
-// it gives one: a part that began waiting moments ago, a fresh team's before its fetch,
-// still keeps it waiting.
-func TestAnUpdateGivesAFreshPolicyWaitItsTime(t *testing.T) {
-	t.Parallel()
-	f := newFixture()
-	r := newRelay(Options{Dir: t.TempDir(), Token: token, Hold: time.Minute, Lookup: f.lookup, Now: f.clock,
-		Resolve: func(claim.Claim) (Policy, error) { return Policy{}, ErrNoKey }})
-	srv := httptest.NewServer(r.Handler())
-	t.Cleanup(srv.Close)
-	postProto(t, srv, "/v1/logs", logsOf("D", 1)) // claimed for p3, whose policy can't be read
-	if r.QuiesceDroppingHold(0, 2*time.Minute) {
-		t.Fatal("an update dropped a part that began waiting for its policy just now")
-	}
 	f.mu.Lock()
 	f.now = f.now.Add(2 * time.Minute)
 	f.mu.Unlock()
-	if !r.QuiesceDroppingHold(0, 2*time.Minute) {
-		t.Fatal("an update still waited for a part that has waited its time")
-	}
-}
-
-// An update gives a part its wait from when it began waiting for its policy, not from when
-// it entered the hold: a conversation start held minutes for its claim, then claimed for a
-// team whose policy is being fetched, still keeps the update waiting for its time.
-func TestAnUpdateCountsAPolicyWaitFromWhenItBegan(t *testing.T) {
-	t.Parallel()
-	f := newFixture()
-	r := newRelay(Options{Dir: t.TempDir(), Token: token, Hold: time.Minute, Lookup: f.lookup, Now: f.clock,
-		Resolve: func(claim.Claim) (Policy, error) { return Policy{}, ErrNoKey }})
-	p := &part{signal: Logs, session: "Z", msg: logsOf("Z", 1), records: 1, start: true, at: f.clock()}
-	r.hold(p, nil, attribution{}, false) // a conversation start, waiting for its claim
-	f.mu.Lock()
-	f.now = f.now.Add(3 * time.Minute)
-	f.mu.Unlock()
-	f.claim("Z", claim.Claim{ProjectID: "p9"}) // claimed now, for a team whose policy isn't read yet
-	r.sweep()
-	if r.QuiesceDroppingHold(0, 2*time.Minute) {
-		t.Fatal("an update dropped a part that began waiting for its policy just now")
-	}
-	f.mu.Lock()
-	f.now = f.now.Add(2 * time.Minute)
-	f.mu.Unlock()
-	if !r.QuiesceDroppingHold(0, 2*time.Minute) {
-		t.Fatal("an update still waited for a part that has waited its time")
+	r.sweep() // the unclaimed part goes; D still waits for its policy
+	if r.Quiesce(0) || !r.QuiesceDroppingPolicyWaits(0) {
+		t.Fatal("an update past its pause wait still waits for a part waiting for its policy")
 	}
 }

@@ -166,14 +166,15 @@ type Relay struct {
 	mu    sync.Mutex
 	held  map[string][]heldPart
 	heldN int
-	// heldLost counts a team's parts evicted from a full hold since the last sweep.
-	heldLost  int
-	heldBytes int
-	traces    map[string]traceSession
-	procs     map[int]*procState // sender pid → the sessions it named, and whether it exited
-	outbox    outbox
-	senders   map[route]*sender
-	lastSeen  time.Time
+	// policyLost counts the parts waiting for their team's policy that a full hold refused
+	// or evicted since the last sweep.
+	policyLost int
+	heldBytes  int
+	traces     map[string]traceSession
+	procs      map[int]*procState // sender pid → the sessions it named, and whether it exited
+	outbox     outbox
+	senders    map[route]*sender
+	lastSeen   time.Time
 	// inflight counts the exports being read and routed; refusing, set by Quiesce, answers
 	// each new one 503 so its exporter sends it again, to the next relay.
 	inflight   int

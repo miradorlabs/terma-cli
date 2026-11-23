@@ -56,10 +56,6 @@ func (r *Relay) decideExited(pid int, at time.Time, narrow bool) (claim.Claim, P
 	c, pol, why, ok := r.decideClaimed(sessions[0], pid, at, narrow)
 	how := attribution{how: semconv.TermaRelayAttributionProcess, session: sessions[0]}
 	if !ok {
-		if why == whyNoKey {
-			// The process's session is that team's, waiting for its policy: kept (pinned).
-			return c, Policy{}, why, false, how
-		}
 		return claim.Claim{}, Policy{}, why, false, attribution{}
 	}
 	return c, pol, "", true, how

@@ -65,11 +65,8 @@ func (r *Relay) decide(key string, pid int, at time.Time, narrow, claimed bool) 
 			if ok {
 				return c, pol, "", true, how
 			}
-			if why == whyNotCollected {
+			if why == whyNotCollected || why == whyNoKey {
 				return claim.Claim{}, Policy{}, why, false, attribution{}
-			}
-			if why == whyNoKey {
-				return c, Policy{}, why, false, how
 			}
 		}
 		return claim.Claim{}, Policy{}, whyNoTrace, false, attribution{}
@@ -94,16 +91,9 @@ func (r *Relay) decideClaimed(session string, pid int, at time.Time, narrow bool
 	if c.ProjectID == "" {
 		return claim.Claim{}, Policy{}, whyNotCollected, false
 	}
-	return r.placePinned(c, narrow)
-}
-
-// placePinned places a part under the placement c of its claim, as decideClaimed does once
-// it has found it, or one the part kept after its claim expired. whyNoKey keeps c: the part
-// is that team's, waiting for its policy.
-func (r *Relay) placePinned(c claim.Claim, narrow bool) (claim.Claim, Policy, string, bool) {
 	pol, ok := r.resolve(c)
 	if !ok {
-		return c, Policy{}, whyNoKey, false
+		return claim.Claim{}, Policy{}, whyNoKey, false
 	}
 	if narrow && !pol.RequireClaim {
 		return claim.Claim{}, Policy{}, whyWidened, false
@@ -142,15 +132,7 @@ func (r *Relay) route(p *part) {
 			return
 		}
 	}
-	// A part already known to be a team's, waiting for its policy, is held pinned to that
-	// claim from the start: evicted before any sweep, it is still counted as that team's.
-	// So is one claimed and placeable but held behind it, to keep arrival order; never a
-	// catch-all placement, which global mode decides again at every sweep.
-	var pin *claim.Claim
-	if (why == whyNoKey || ok && how.how != semconv.TermaRelayAttributionCatchAll) && c.ProjectID != "" {
-		pin = &c
-	}
-	r.hold(p, pin, how, why == whyNoKey)
+	r.hold(p, why == whyNoKey)
 }
 
 // deliverAttributed applies the content policy, stamps the project and enqueues. deliverMu is held.

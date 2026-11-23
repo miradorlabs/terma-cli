@@ -26,9 +26,10 @@ const (
 	lostUnreadable = "unreadable" // the profile or its sign-in could not be read, even after a retry
 )
 
-// heldLoss is the loss reason of claimed records a stopping relay, or a full hold, dropped
-// from memory, where they waited for their team's policy.
-const heldLoss = "held"
+// lostPolicyTimeout is the loss reason of claimed records dropped from the hold while they
+// waited for their team's policy or key, which the relay couldn't read: past policyHold, for
+// room, or as the relay stopped.
+const lostPolicyTimeout = "policy_timeout"
 
 // OutboxLosses are the claimed records the relay lost, counted from the first loss since a
 // quiet lossWindow, for doctor to report. Nothing else it queues is ever lost: a refused
@@ -36,8 +37,8 @@ const heldLoss = "held"
 type OutboxLosses struct {
 	// Counts are the records lost by reason: outbox_full and outbox_expired, past the
 	// outbox's room or age; legacy_ambiguous, what an older relay queued that no one
-	// sign-in may send, aged out; held, dropped from memory while their team's policy
-	// could not be read; signed_out and unreadable, collected with no sign-in to bind them
+	// sign-in may send, aged out; policy_timeout, dropped from memory while they waited
+	// for a team's policy or key the relay couldn't read; signed_out and unreadable, collected with no sign-in to bind them
 	// to.
 	Counts map[string]int `json:"counts,omitempty"`
 	Last   time.Time      `json:"last,omitzero"`

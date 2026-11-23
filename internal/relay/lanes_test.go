@@ -280,7 +280,7 @@ func TestALostPartIsNeverHeld(t *testing.T) {
 		t.Fatalf("held %d genuine, %d unreadable parts (%d records); want only the genuine one", genuine, unreadable, heldN)
 	}
 	l, err := ReadOutboxLosses(r.outbox.dir)
-	if err != nil || l.Counts["unreadable"] != maxHeld || l.Counts["held"] != 0 {
+	if err != nil || l.Counts["unreadable"] != maxHeld || l.Counts[lostPolicyTimeout] != 0 {
 		t.Fatalf("losses = %+v, %v; want %d unreadable and none held", l, err, maxHeld)
 	}
 }

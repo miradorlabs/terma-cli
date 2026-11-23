@@ -19,14 +19,14 @@ var outboxLosses = []struct{ reason, what string }{
 	{"outbox_full", "because the outbox was full"},
 	{"outbox_expired", "older than it keeps them"},
 	{"legacy_ambiguous", "an older terma queued that no one sign-in may send, past its age"},
-	{"held", "held while their team's policy could not be read, when the relay stopped"},
+	{"policy_timeout", "claimed for a team whose policy or key the relay couldn't read within 15 minutes"},
 	{"signed_out", "collected while signed out"},
 	{"unreadable", "collected while the sign-in could not be read"},
 }
 
 // OutboxCheck reports what the relay and hooks lost of what they collected, by reason:
 // records past the outbox's room or age, which means sends failed for long; claimed records
-// a stopping relay dropped from memory while their team's policy could not be read; and
+// dropped from memory while they waited for a team's policy or key the relay couldn't read; and
 // records collected with no sign-in to send them as. A reason it has no words for is
 // listed by name.
 func OutboxCheck(r Relay) Check {
@@ -47,8 +47,8 @@ func OutboxCheck(r Relay) Check {
 	if !r.OutboxLossAt.IsZero() {
 		detail += "; the last at " + r.OutboxLossAt.Local().Format("2006-01-02 15:04")
 	}
-	// Sends that failed for long, and a sign-out, are this machine's to fix; a stopped
-	// relay's held parts are not.
+	// Sends that failed for long, and a sign-out, are this machine's to fix; a policy or key
+	// the relay couldn't read is not.
 	fix := ""
 	switch {
 	case r.OutboxLosses["outbox_full"]+r.OutboxLosses["outbox_expired"] > 0:

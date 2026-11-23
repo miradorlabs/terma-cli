@@ -146,11 +146,12 @@ func TestDoctorReadsTheRelaysLossesByReason(t *testing.T) {
 	}
 }
 
-// Doctor counts what hooks lost with what the relay lost, by reason, in one row.
+// Doctor counts what hooks lost with what the relay lost, by reason, in one row, each
+// reason in words.
 func TestDoctorAddsTheHooksLossesToTheRelays(t *testing.T) {
 	useConfigDir(t, t.TempDir())
 	at := time.Now().UTC().Add(-time.Hour).Truncate(time.Second)
-	losses := relay.OutboxLosses{Counts: map[string]int{"signed_out": 2, "outbox_full": 1}, Last: at}
+	losses := relay.OutboxLosses{Counts: map[string]int{"signed_out": 2, "outbox_full": 1, "policy_timeout": 4}, Last: at}
 	if err := config.WriteJSON(filepath.Join(claim.Dir(testApp.stateDir), relay.OutboxDir, "losses.json"), losses, 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -159,12 +160,13 @@ func TestDoctorAddsTheHooksLossesToTheRelays(t *testing.T) {
 		t.Fatal("could not count")
 	}
 	got := testApp.relayFacts()
-	want := map[string]int{"signed_out": 5, "outbox_full": 1, "unreadable": 1}
+	want := map[string]int{"signed_out": 5, "outbox_full": 1, "unreadable": 1, "policy_timeout": 4}
 	if !maps.Equal(got.OutboxLosses, want) || !got.OutboxLossAt.After(at) {
 		t.Fatalf("doctor read %v at %v; want %v after %v", got.OutboxLosses, got.OutboxLossAt, want, at)
 	}
 	c := doctor.OutboxCheck(got)
-	if !strings.Contains(c.Detail, "5 collected while signed out") || !strings.Contains(c.Detail, "1 collected while the sign-in could not be read") {
+	if !strings.Contains(c.Detail, "5 collected while signed out") || !strings.Contains(c.Detail, "1 collected while the sign-in could not be read") ||
+		!strings.Contains(c.Detail, "4 claimed for a team whose policy or key the relay couldn't read within 15 minutes") {
 		t.Fatalf("check = %+v", c)
 	}
 }
