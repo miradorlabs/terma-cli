@@ -1,7 +1,20 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-23T17:37:27.894803447Z",
+  "generated_at": "2026-11-23T18:38:45.64964981Z",
   "events": [
+    {
+      "at": "2026-11-23T18:38:45.64964981Z",
+      "model": "claude-opus-4-5-20251101",
+      "vendor": "anthropic",
+      "name": "Claude Opus 4.5",
+      "event": "changed",
+      "changes": 3,
+      "highlights": [
+        "API listing deprecated_at: none → 2026-11-23T18:30:00Z",
+        "API listing lifecycle: active → deprecated",
+        "API listing retires_at: none → 2027-01-22T20:00:00Z"
+      ]
+    },
     {
       "at": "2026-11-23T17:37:27.894803447Z",
       "model": "gemini-3.1-flash-lite-preview",

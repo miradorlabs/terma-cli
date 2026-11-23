@@ -3,6 +3,66 @@
   "id": "claude-opus-4-5-20251101",
   "steps": [
     {
+      "at": "2026-11-23T18:38:45.64964981Z",
+      "event": "changed",
+      "changes": [
+        {
+          "id": "api/listing/deprecated_at",
+          "category": "api",
+          "op": "changed",
+          "path": [
+            "api",
+            "listing",
+            "deprecated_at"
+          ],
+          "title": "API listing deprecated_at: none → 2026-11-23T18:30:00Z",
+          "impact": "informational",
+          "before": null,
+          "after": "2026-11-23T18:30:00Z",
+          "text_diff": null,
+          "terma": null,
+          "source": null,
+          "documented": null
+        },
+        {
+          "id": "api/listing/lifecycle",
+          "category": "api",
+          "op": "changed",
+          "path": [
+            "api",
+            "listing",
+            "lifecycle"
+          ],
+          "title": "API listing lifecycle: active → deprecated",
+          "impact": "informational",
+          "before": "active",
+          "after": "deprecated",
+          "text_diff": null,
+          "terma": null,
+          "source": null,
+          "documented": null
+        },
+        {
+          "id": "api/listing/retires_at",
+          "category": "api",
+          "op": "changed",
+          "path": [
+            "api",
+            "listing",
+            "retires_at"
+          ],
+          "title": "API listing retires_at: none → 2027-01-22T20:00:00Z",
+          "impact": "informational",
+          "before": null,
+          "after": "2027-01-22T20:00:00Z",
+          "text_diff": null,
+          "terma": null,
+          "source": null,
+          "documented": null
+        }
+      ]
+    },
+    {
       "at": "2026-11-20T19:23:57.807121456Z",
       "event": "changed",
       "changes": [
