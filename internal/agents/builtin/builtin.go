@@ -43,5 +43,5 @@ func AgentsOn(configDir, goos string) *agents.Registry {
 		gemini.Agent{},
 		dsh.Agent{},
 		agy,
-	).Support(supported...)
+	).Support(supported...).Starters(grokBuild{})
 }

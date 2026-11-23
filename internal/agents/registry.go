@@ -16,6 +16,7 @@ type Registry struct {
 	all       []Agent
 	supported map[string]bool
 	upcoming  []string
+	starters  []HookStarter
 
 	indexOnce sync.Once
 	events    map[string]Event
@@ -77,6 +78,29 @@ func (r *Registry) Support(agents ...Agent) *Registry {
 func (r *Registry) Upcoming(displayNames ...string) *Registry {
 	r.upcoming = append(r.upcoming, displayNames...)
 	return r
+}
+
+// Starters registers harnesses the build has no agent for yet, which still start hook
+// processes from another agent's hooks file.
+func (r *Registry) Starters(s ...HookStarter) *Registry {
+	r.starters = append(r.starters, s...)
+	return r
+}
+
+// StartedElsewhere reports whether a harness other than the agent that owns event started
+// this hook process, whose environment getenv reads: a registered agent other than the
+// owner, or a starter registered with Starters. An unknown event is never another's.
+func (r *Registry) StartedElsewhere(event string, getenv func(string) string) bool {
+	e, ok := r.Event(event)
+	if !ok {
+		return false
+	}
+	for _, a := range r.all {
+		if s, ok := a.(HookStarter); ok && a.Name() != e.Agent.Name() && s.StartedHook(getenv) {
+			return true
+		}
+	}
+	return slices.ContainsFunc(r.starters, func(s HookStarter) bool { return s.StartedHook(getenv) })
 }
 
 // UpcomingNames lists the announced agents' display names.

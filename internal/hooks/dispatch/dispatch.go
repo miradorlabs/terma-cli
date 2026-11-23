@@ -37,6 +37,8 @@ type Request struct {
 	Debug, HooksOff bool
 	// Cwd is where the hook runs, empty when it cannot be told.
 	Cwd string
+	// Getenv reads the hook process's environment; nil reads nothing.
+	Getenv func(string) string
 }
 
 // Deps are what a hook reaches beyond the hook runtime.
@@ -94,6 +96,14 @@ func Run(ctx context.Context, d Deps, r Request) int {
 			env.Spool = bound(d.Spool(), p)
 		}
 		return render(ctx, env)
+	}
+	// A harness that also runs another agent's hook entries started this process: the
+	// handler would record its session as that agent's, so nothing runs and nothing replies.
+	if r.Getenv != nil && d.Agents.StartedElsewhere(r.Event, r.Getenv) {
+		if r.Debug {
+			fmt.Fprintf(r.Stderr, "terma hook: %s stands down: another harness started this hook\n", r.Event)
+		}
+		return 0
 	}
 	if r.HooksOff {
 		if off, ok := d.Agents.WhenHooksOff(r.Event); ok {

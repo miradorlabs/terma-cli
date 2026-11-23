@@ -12,6 +12,7 @@
 //	UserHooksTrust  the step the developer takes before those run
 //	ManagedHooks    the same hooks as configuration an organization deploys
 //	PayloadReader   a hook payload that names its session in keys of its own
+//	HookStarter     the mark a harness leaves on the hook processes it starts
 //	Renderer        a hook that draws something (a status line)
 //	OffSwitched     what an event still runs with hooks switched off
 //

@@ -66,7 +66,11 @@ policy's repository list (`config.Policy.Admits`); in repository mode, in a repo
 name, or outside git, it writes no manifest, spool line, trailer or claim for a project,
 only a placement with no project that marks the session not collected (`claim.Mark`), and
 under a policy no relay has refreshed for minutes it also starts a refresh. Each
-session is claimed for the developer's own team from setup.
+session is claimed for the developer's own team from setup. A harness may run the entries
+in another agent's hooks file (grok runs Claude Code's and Cursor's), so an agent marks the
+hook processes it starts (`agents.HookStarter`), and `terma hook` stands down in a process a
+harness other than the event's owner started: no claim, no spool line, no reply. The git
+hooks are not subject to it.
 
 **Commits.** The agent hooks announce the session and record the files it edits in a
 session manifest. At commit time, `prepare-commit-msg` matches the staged files against
