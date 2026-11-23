@@ -1,0 +1,2813 @@
+{
+ "resourceSpans": [
+  {
+   "resource": {
+    "attributes": [
+     {
+      "key": "service.name",
+      "value": {
+       "stringValue": "oh-my-pi"
+      }
+     }
+    ]
+   },
+   "scopeSpans": [
+    {
+     "scope": {
+      "name": "@oh-my-pi/pi-agent-core"
+     },
+     "spans": [
+      {
+       "traceId": "Uv5QsAvlUdKPXTVQ2pmwbg==",
+       "spanId": "42uxuD976Ww=",
+       "parentSpanId": "abISz1dZ3iM=",
+       "flags": 257,
+       "name": "chat mistralai/mistral-small-2603",
+       "kind": "SPAN_KIND_CLIENT",
+       "startTimeUnixNano": "1795266862869000000",
+       "endTimeUnixNano": "1795266865051742375",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "chat"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "mistralai/mistral-small-2603"
+         }
+        },
+        {
+         "key": "gen_ai.provider.name",
+         "value": {
+          "stringValue": "openrouter"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "00000002-0000-7000-8000-000000000001"
+         }
+        },
+        {
+         "key": "omp.gen_ai.agent.step.number",
+         "value": {
+          "intValue": "0"
+         }
+        },
+        {
+         "key": "gen_ai.output.type",
+         "value": {
+          "stringValue": "text"
+         }
+        },
+        {
+         "key": "gen_ai.request.stream",
+         "value": {
+          "boolValue": true
+         }
+        },
+        {
+         "key": "omp.gen_ai.request.reasoning.effort",
+         "value": {
+          "stringValue": "high"
+         }
+        },
+        {
+         "key": "omp.gen_ai.request.available_tools",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "read"
+            },
+            {
+             "stringValue": "bash"
+            },
+            {
+             "stringValue": "edit"
+            },
+            {
+             "stringValue": "eval"
+            },
+            {
+             "stringValue": "glob"
+            },
+            {
+             "stringValue": "grep"
+            },
+            {
+             "stringValue": "find"
+            },
+            {
+             "stringValue": "task"
+            },
+            {
+             "stringValue": "wait"
+            },
+            {
+             "stringValue": "todo"
+            },
+            {
+             "stringValue": "web_search"
+            },
+            {
+             "stringValue": "write"
+            }
+           ]
+          }
+         }
+        },
+        {
+         "key": "omp.gen_ai.request.messages",
+         "value": {
+          "stringValue": "CONTENT<omp.gen_ai.request.messages>"
+         }
+        },
+        {
+         "key": "gen_ai.system_instructions",
+         "value": {
+          "stringValue": "CONTENT<gen_ai.system_instructions>"
+         }
+        },
+        {
+         "key": "gen_ai.input.messages",
+         "value": {
+          "stringValue": "CONTENT<gen_ai.input.messages>"
+         }
+        },
+        {
+         "key": "gen_ai.response.model",
+         "value": {
+          "stringValue": "mistralai/mistral-small-2603"
+         }
+        },
+        {
+         "key": "gen_ai.response.id",
+         "value": {
+          "stringValue": "gen-001"
+         }
+        },
+        {
+         "key": "gen_ai.response.time_to_first_chunk",
+         "value": {
+          "doubleValue": 0.879144375
+         }
+        },
+        {
+         "key": "gen_ai.response.finish_reasons",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "tool_calls"
+            }
+           ]
+          }
+         }
+        },
+        {
+         "key": "gen_ai.usage.input_tokens",
+         "value": {
+          "intValue": "8329"
+         }
+        },
+        {
+         "key": "gen_ai.usage.output_tokens",
+         "value": {
+          "intValue": "229"
+         }
+        },
+        {
+         "key": "omp.gen_ai.usage.total_tokens",
+         "value": {
+          "intValue": "8558"
+         }
+        },
+        {
+         "key": "gen_ai.usage.cache_read.input_tokens",
+         "value": {
+          "intValue": "0"
+         }
+        },
+        {
+         "key": "gen_ai.usage.cache_creation.input_tokens",
+         "value": {
+          "intValue": "0"
+         }
+        },
+        {
+         "key": "gen_ai.usage.reasoning.output_tokens",
+         "value": {
+          "intValue": "200"
+         }
+        },
+        {
+         "key": "omp.gen_ai.gateway.name",
+         "value": {
+          "stringValue": "openrouter"
+         }
+        },
+        {
+         "key": "omp.gen_ai.gateway.endpoint",
+         "value": {
+          "stringValue": "https://openrouter.ai/api/v1"
+         }
+        },
+        {
+         "key": "omp.gen_ai.gateway.call_id",
+         "value": {
+          "stringValue": "gen-001"
+         }
+        },
+        {
+         "key": "omp.gen_ai.cost.estimated_usd",
+         "value": {
+          "doubleValue": 0.00138675
+         }
+        },
+        {
+         "key": "omp.gen_ai.cost.input_usd",
+         "value": {
+          "doubleValue": 0.00124935
+         }
+        },
+        {
+         "key": "omp.gen_ai.cost.output_usd",
+         "value": {
+          "doubleValue": 0.0001374
+         }
+        },
+        {
+         "key": "omp.gen_ai.response.tool_calls",
+         "value": {
+          "stringValue": "CONTENT<omp.gen_ai.response.tool_calls>"
+         }
+        },
+        {
+         "key": "gen_ai.output.messages",
+         "value": {
+          "stringValue": "CONTENT<gen_ai.output.messages>"
+         }
+        }
+       ],
+       "status": {}
+      },
+      {
+       "traceId": "Uv5QsAvlUdKPXTVQ2pmwbg==",
+       "spanId": "f0B2x4Z8oo4=",
+       "parentSpanId": "abISz1dZ3iM=",
+       "flags": 257,
+       "name": "execute_tool read",
+       "kind": "SPAN_KIND_INTERNAL",
+       "startTimeUnixNano": "1795266865053000000",
+       "endTimeUnixNano": "1795266865059659125",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "execute_tool"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "00000002-0000-7000-8000-000000000001"
+         }
+        },
+        {
+         "key": "gen_ai.tool.name",
+         "value": {
+          "stringValue": "read"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.id",
+         "value": {
+          "stringValue": "paHFu2n2k|fc_tmp_cg6ldsbdja7"
+         }
+        },
+        {
+         "key": "gen_ai.tool.type",
+         "value": {
+          "stringValue": "function"
+         }
+        },
+        {
+         "key": "gen_ai.tool.description",
+         "value": {
+          "stringValue": "CONTENT<gen_ai.tool.description>"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.arguments",
+         "value": {
+          "stringValue": "CONTENT<gen_ai.tool.call.arguments>"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.result",
+         "value": {
+          "stringValue": "CONTENT<gen_ai.tool.call.result>"
+         }
+        },
+        {
+         "key": "omp.gen_ai.tool.status",
+         "value": {
+          "stringValue": "ok"
+         }
+        }
+       ],
+       "status": {}
+      },
+      {
+       "traceId": "Uv5QsAvlUdKPXTVQ2pmwbg==",
+       "spanId": "s9TiO17EO6w=",
+       "parentSpanId": "abISz1dZ3iM=",
+       "flags": 257,
+       "name": "execute_tool write",
+       "kind": "SPAN_KIND_INTERNAL",
+       "startTimeUnixNano": "1795266865060000000",
+       "endTimeUnixNano": "1795266865064217958",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "execute_tool"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "00000002-0000-7000-8000-000000000001"
+         }
+        },
+        {
+         "key": "gen_ai.tool.name",
+         "value": {
+          "stringValue": "write"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.id",
+         "value": {
+          "stringValue": "6taIXxcqF|fc_tmp_xjnt3w7lvdp"
+         }
+        },
+        {
+         "key": "gen_ai.tool.type",
+         "value": {
+          "stringValue": "function"
+         }
+        },
+        {
+         "key": "gen_ai.tool.description",
+         "value": {
+          "stringValue": "CONTENT<gen_ai.tool.description>"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.arguments",
+         "value": {
+          "stringValue": "CONTENT<gen_ai.tool.call.arguments>"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.result",
+         "value": {
+          "stringValue": "CONTENT<gen_ai.tool.call.result>"
+         }
+        },
+        {
+         "key": "omp.gen_ai.tool.status",
+         "value": {
+          "stringValue": "ok"
+         }
+        }
+       ],
+       "status": {}
+      },
+      {
+       "traceId": "Uv5QsAvlUdKPXTVQ2pmwbg==",
+       "spanId": "T2h2dtmb+kU=",
+       "parentSpanId": "abISz1dZ3iM=",
+       "flags": 257,
+       "name": "chat mistralai/mistral-small-2603",
+       "kind": "SPAN_KIND_CLIENT",
+       "startTimeUnixNano": "1795266865066000000",
+       "endTimeUnixNano": "1795266866667591000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "chat"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "mistralai/mistral-small-2603"
+         }
+        },
+        {
+         "key": "gen_ai.provider.name",
+         "value": {
+          "stringValue": "openrouter"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "00000002-0000-7000-8000-000000000001"
+         }
+        },
+        {
+         "key": "omp.gen_ai.agent.step.number",
+         "value": {
+          "intValue": "1"
+         }
+        },
+        {
+         "key": "gen_ai.output.type",
+         "value": {
+          "stringValue": "text"
+         }
+        },
+        {
+         "key": "gen_ai.request.stream",
+         "value": {
+          "boolValue": true
+         }
+        },
+        {
+         "key": "omp.gen_ai.request.reasoning.effort",
+         "value": {
+          "stringValue": "high"
+         }
+        },
+        {
+         "key": "omp.gen_ai.request.available_tools",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "read"
+            },
+            {
+             "stringValue": "bash"
+            },
+            {
+             "stringValue": "edit"
+            },
+            {
+             "stringValue": "eval"
+            },
+            {
+             "stringValue": "glob"
+            },
+            {
+             "stringValue": "grep"
+            },
+            {
+             "stringValue": "find"
+            },
+            {
+             "stringValue": "task"
+            },
+            {
+             "stringValue": "wait"
+            },
+            {
+             "stringValue": "todo"
+            },
+            {
+             "stringValue": "web_search"
+            },
+            {
+             "stringValue": "write"
+            }
+           ]
+          }
+         }
+        },
+        {
+         "key": "omp.gen_ai.request.messages",
+         "value": {
+          "stringValue": "CONTENT<omp.gen_ai.request.messages>"
+         }
+        },
+        {
+         "key": "gen_ai.system_instructions",
+         "value": {
+          "stringValue": "CONTENT<gen_ai.system_instructions>"
+         }
+        },
+        {
+         "key": "gen_ai.input.messages",
+         "value": {
+          "stringValue": "CONTENT<gen_ai.input.messages>"
+         }
+        },
+        {
+         "key": "gen_ai.response.model",
+         "value": {
+          "stringValue": "mistralai/mistral-small-2603"
+         }
+        },
+        {
+         "key": "gen_ai.response.id",
+         "value": {
+          "stringValue": "gen-002"
+         }
+        },
+        {
+         "key": "gen_ai.response.time_to_first_chunk",
+         "value": {
+          "doubleValue": 0.5676494159999997
+         }
+        },
+        {
+         "key": "gen_ai.response.finish_reasons",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "tool_calls"
+            }
+           ]
+          }
+         }
+        },
+        {
+         "key": "gen_ai.usage.input_tokens",
+         "value": {
+          "intValue": "8591"
+         }
+        },
+        {
+         "key": "gen_ai.usage.output_tokens",
+         "value": {
+          "intValue": "147"
+         }
+        },
+        {
+         "key": "omp.gen_ai.usage.total_tokens",
+         "value": {
+          "intValue": "8738"
+         }
+        },
+        {
+         "key": "gen_ai.usage.cache_read.input_tokens",
+         "value": {
+          "intValue": "8304"
+         }
+        },
+        {
+         "key": "gen_ai.usage.cache_creation.input_tokens",
+         "value": {
+          "intValue": "0"
+         }
+        },
+        {
+         "key": "gen_ai.usage.reasoning.output_tokens",
+         "value": {
+          "intValue": "52"
+         }
+        },
+        {
+         "key": "omp.gen_ai.gateway.name",
+         "value": {
+          "stringValue": "openrouter"
+         }
+        },
+        {
+         "key": "omp.gen_ai.gateway.endpoint",
+         "value": {
+          "stringValue": "https://openrouter.ai/api/v1"
+         }
+        },
+        {
+         "key": "omp.gen_ai.gateway.call_id",
+         "value": {
+          "stringValue": "gen-002"
+         }
+        },
+        {
+         "key": "omp.gen_ai.cost.estimated_usd",
+         "value": {
+          "doubleValue": 0.00025581
+         }
+        },
+        {
+         "key": "omp.gen_ai.cost.input_usd",
+         "value": {
+          "doubleValue": 4.3049999999999996e-05
+         }
+        },
+        {
+         "key": "omp.gen_ai.cost.output_usd",
+         "value": {
+          "doubleValue": 8.82e-05
+         }
+        },
+        {
+         "key": "omp.gen_ai.response.tool_calls",
+         "value": {
+          "stringValue": "CONTENT<omp.gen_ai.response.tool_calls>"
+         }
+        },
+        {
+         "key": "gen_ai.output.messages",
+         "value": {
+          "stringValue": "CONTENT<gen_ai.output.messages>"
+         }
+        }
+       ],
+       "status": {}
+      },
+      {
+       "traceId": "Uv5QsAvlUdKPXTVQ2pmwbg==",
+       "spanId": "O17q2UErP5w=",
+       "parentSpanId": "abISz1dZ3iM=",
+       "flags": 257,
+       "name": "execute_tool edit",
+       "kind": "SPAN_KIND_INTERNAL",
+       "startTimeUnixNano": "1795266866668000000",
+       "endTimeUnixNano": "1795266866669707834",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "execute_tool"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "00000002-0000-7000-8000-000000000001"
+         }
+        },
+        {
+         "key": "gen_ai.tool.name",
+         "value": {
+          "stringValue": "edit"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.id",
+         "value": {
+          "stringValue": "RZPvkTswD|fc_tmp_epynyjtee9"
+         }
+        },
+        {
+         "key": "gen_ai.tool.type",
+         "value": {
+          "stringValue": "function"
+         }
+        },
+        {
+         "key": "gen_ai.tool.description",
+         "value": {
+          "stringValue": "CONTENT<gen_ai.tool.description>"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.arguments",
+         "value": {
+          "stringValue": "CONTENT<gen_ai.tool.call.arguments>"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.result",
+         "value": {
+          "stringValue": "CONTENT<gen_ai.tool.call.result>"
+         }
+        },
+        {
+         "key": "error.type",
+         "value": {
+          "stringValue": "tool_error"
+         }
+        },
+        {
+         "key": "omp.gen_ai.tool.status",
+         "value": {
+          "stringValue": "error"
+         }
+        }
+       ],
+       "status": {
+        "message": "CONTENT<status>",
+        "code": "STATUS_CODE_ERROR"
+       }
+      },
+      {
+       "traceId": "Uv5QsAvlUdKPXTVQ2pmwbg==",
+       "spanId": "cEjxPlzg8SQ=",
+       "parentSpanId": "abISz1dZ3iM=",
+       "flags": 257,
+       "name": "execute_tool task",
+       "kind": "SPAN_KIND_INTERNAL",
+       "startTimeUnixNano": "1795266866670000000",
+       "endTimeUnixNano": "1795266866675349250",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "execute_tool"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "00000002-0000-7000-8000-000000000001"
+         }
+        },
+        {
+         "key": "gen_ai.tool.name",
+         "value": {
+          "stringValue": "task"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.id",
+         "value": {
+          "stringValue": "V4YA2k8ST|fc_tmp_dp7d9ojbf5k"
+         }
+        },
+        {
+         "key": "gen_ai.tool.type",
+         "value": {
+          "stringValue": "function"
+         }
+        },
+        {
+         "key": "gen_ai.tool.description",
+         "value": {
+          "stringValue": "CONTENT<gen_ai.tool.description>"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.arguments",
+         "value": {
+          "stringValue": "CONTENT<gen_ai.tool.call.arguments>"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.result",
+         "value": {
+          "stringValue": "CONTENT<gen_ai.tool.call.result>"
+         }
+        },
+        {
+         "key": "omp.gen_ai.tool.status",
+         "value": {
+          "stringValue": "ok"
+         }
+        }
+       ],
+       "status": {}
+      },
+      {
+       "traceId": "Uv5QsAvlUdKPXTVQ2pmwbg==",
+       "spanId": "OOTZi1Idi7w=",
+       "parentSpanId": "cEjxPlzg8SQ=",
+       "flags": 257,
+       "name": "handoff to task",
+       "kind": "SPAN_KIND_INTERNAL",
+       "startTimeUnixNano": "1795266866691000000",
+       "endTimeUnixNano": "1795266866691020833",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "handoff"
+         }
+        },
+        {
+         "key": "omp.gen_ai.handoff.to_agent.name",
+         "value": {
+          "stringValue": "task"
+         }
+        },
+        {
+         "key": "omp.gen_ai.handoff.to_agent.id",
+         "value": {
+          "stringValue": "EchoSub"
+         }
+        }
+       ],
+       "status": {}
+      },
+      {
+       "traceId": "Uv5QsAvlUdKPXTVQ2pmwbg==",
+       "spanId": "EufQvuCy9gE=",
+       "parentSpanId": "VK4s8eDJLl8=",
+       "flags": 257,
+       "name": "chat mistralai/mistral-small-2603",
+       "kind": "SPAN_KIND_CLIENT",
+       "startTimeUnixNano": "1795266866778000000",
+       "endTimeUnixNano": "1795266868099043709",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "chat"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "mistralai/mistral-small-2603"
+         }
+        },
+        {
+         "key": "gen_ai.provider.name",
+         "value": {
+          "stringValue": "openrouter"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "00000002-0000-7000-8000-000000000002"
+         }
+        },
+        {
+         "key": "gen_ai.agent.id",
+         "value": {
+          "stringValue": "EchoSub"
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "task"
+         }
+        },
+        {
+         "key": "gen_ai.agent.description",
+         "value": {
+          "stringValue": "CONTENT<gen_ai.agent.description>"
+         }
+        },
+        {
+         "key": "omp.gen_ai.agent.step.number",
+         "value": {
+          "intValue": "0"
+         }
+        },
+        {
+         "key": "gen_ai.output.type",
+         "value": {
+          "stringValue": "text"
+         }
+        },
+        {
+         "key": "gen_ai.request.stream",
+         "value": {
+          "boolValue": true
+         }
+        },
+        {
+         "key": "omp.gen_ai.request.reasoning.effort",
+         "value": {
+          "stringValue": "high"
+         }
+        },
+        {
+         "key": "omp.gen_ai.request.available_tools",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "read"
+            },
+            {
+             "stringValue": "bash"
+            },
+            {
+             "stringValue": "edit"
+            },
+            {
+             "stringValue": "eval"
+            },
+            {
+             "stringValue": "glob"
+            },
+            {
+             "stringValue": "grep"
+            },
+            {
+             "stringValue": "find"
+            },
+            {
+             "stringValue": "task"
+            },
+            {
+             "stringValue": "wait"
+            },
+            {
+             "stringValue": "web_search"
+            },
+            {
+             "stringValue": "write"
+            }
+           ]
+          }
+         }
+        },
+        {
+         "key": "omp.gen_ai.request.messages",
+         "value": {
+          "stringValue": "CONTENT<omp.gen_ai.request.messages>"
+         }
+        },
+        {
+         "key": "gen_ai.system_instructions",
+         "value": {
+          "stringValue": "CONTENT<gen_ai.system_instructions>"
+         }
+        },
+        {
+         "key": "gen_ai.input.messages",
+         "value": {
+          "stringValue": "CONTENT<gen_ai.input.messages>"
+         }
+        },
+        {
+         "key": "gen_ai.response.model",
+         "value": {
+          "stringValue": "mistralai/mistral-small-2603"
+         }
+        },
+        {
+         "key": "gen_ai.response.id",
+         "value": {
+          "stringValue": "gen-003"
+         }
+        },
+        {
+         "key": "gen_ai.response.time_to_first_chunk",
+         "value": {
+          "doubleValue": 0.566913791
+         }
+        },
+        {
+         "key": "gen_ai.response.finish_reasons",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "tool_calls"
+            }
+           ]
+          }
+         }
+        },
+        {
+         "key": "gen_ai.usage.input_tokens",
+         "value": {
+          "intValue": "8088"
+         }
+        },
+        {
+         "key": "gen_ai.usage.output_tokens",
+         "value": {
+          "intValue": "158"
+         }
+        },
+        {
+         "key": "omp.gen_ai.usage.total_tokens",
+         "value": {
+          "intValue": "8246"
+         }
+        },
+        {
+         "key": "gen_ai.usage.cache_read.input_tokens",
+         "value": {
+          "intValue": "0"
+         }
+        },
+        {
+         "key": "gen_ai.usage.cache_creation.input_tokens",
+         "value": {
+          "intValue": "0"
+         }
+        },
+        {
+         "key": "gen_ai.usage.reasoning.output_tokens",
+         "value": {
+          "intValue": "42"
+         }
+        },
+        {
+         "key": "omp.gen_ai.gateway.name",
+         "value": {
+          "stringValue": "openrouter"
+         }
+        },
+        {
+         "key": "omp.gen_ai.gateway.endpoint",
+         "value": {
+          "stringValue": "https://openrouter.ai/api/v1"
+         }
+        },
+        {
+         "key": "omp.gen_ai.gateway.call_id",
+         "value": {
+          "stringValue": "gen-003"
+         }
+        },
+        {
+         "key": "omp.gen_ai.cost.estimated_usd",
+         "value": {
+          "doubleValue": 0.001308
+         }
+        },
+        {
+         "key": "omp.gen_ai.cost.input_usd",
+         "value": {
+          "doubleValue": 0.0012132
+         }
+        },
+        {
+         "key": "omp.gen_ai.cost.output_usd",
+         "value": {
+          "doubleValue": 9.48e-05
+         }
+        },
+        {
+         "key": "omp.gen_ai.response.tool_calls",
+         "value": {
+          "stringValue": "CONTENT<omp.gen_ai.response.tool_calls>"
+         }
+        },
+        {
+         "key": "gen_ai.output.messages",
+         "value": {
+          "stringValue": "CONTENT<gen_ai.output.messages>"
+         }
+        }
+       ],
+       "status": {}
+      },
+      {
+       "traceId": "Uv5QsAvlUdKPXTVQ2pmwbg==",
+       "spanId": "Lg969ks4pNk=",
+       "parentSpanId": "VK4s8eDJLl8=",
+       "flags": 257,
+       "name": "execute_tool bash",
+       "kind": "SPAN_KIND_INTERNAL",
+       "startTimeUnixNano": "1795266868103000000",
+       "endTimeUnixNano": "1795266868156624541",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "execute_tool"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "00000002-0000-7000-8000-000000000002"
+         }
+        },
+        {
+         "key": "gen_ai.agent.id",
+         "value": {
+          "stringValue": "EchoSub"
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "task"
+         }
+        },
+        {
+         "key": "gen_ai.agent.description",
+         "value": {
+          "stringValue": "CONTENT<gen_ai.agent.description>"
+         }
+        },
+        {
+         "key": "gen_ai.tool.name",
+         "value": {
+          "stringValue": "bash"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.id",
+         "value": {
+          "stringValue": "oSWqLyljx|fc_tmp_7106y02hnfv"
+         }
+        },
+        {
+         "key": "gen_ai.tool.type",
+         "value": {
+          "stringValue": "function"
+         }
+        },
+        {
+         "key": "gen_ai.tool.description",
+         "value": {
+          "stringValue": "CONTENT<gen_ai.tool.description>"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.arguments",
+         "value": {
+          "stringValue": "CONTENT<gen_ai.tool.call.arguments>"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.result",
+         "value": {
+          "stringValue": "CONTENT<gen_ai.tool.call.result>"
+         }
+        },
+        {
+         "key": "omp.gen_ai.tool.status",
+         "value": {
+          "stringValue": "ok"
+         }
+        }
+       ],
+       "status": {}
+      },
+      {
+       "traceId": "Uv5QsAvlUdKPXTVQ2pmwbg==",
+       "spanId": "jJeVd4FL1fM=",
+       "parentSpanId": "abISz1dZ3iM=",
+       "flags": 257,
+       "name": "chat mistralai/mistral-small-2603",
+       "kind": "SPAN_KIND_CLIENT",
+       "startTimeUnixNano": "1795266866680000000",
+       "endTimeUnixNano": "1795266868278537917",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "chat"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "mistralai/mistral-small-2603"
+         }
+        },
+        {
+         "key": "gen_ai.provider.name",
+         "value": {
+          "stringValue": "openrouter"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "00000002-0000-7000-8000-000000000001"
+         }
+        },
+        {
+         "key": "omp.gen_ai.agent.step.number",
+         "value": {
+          "intValue": "2"
+         }
+        },
+        {
+         "key": "gen_ai.output.type",
+         "value": {
+          "stringValue": "text"
+         }
+        },
+        {
+         "key": "gen_ai.request.stream",
+         "value": {
+          "boolValue": true
+         }
+        },
+        {
+         "key": "omp.gen_ai.request.reasoning.effort",
+         "value": {
+          "stringValue": "high"
+         }
+        },
+        {
+         "key": "omp.gen_ai.request.available_tools",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "read"
+            },
+            {
+             "stringValue": "bash"
+            },
+            {
+             "stringValue": "edit"
+            },
+            {
+             "stringValue": "eval"
+            },
+            {
+             "stringValue": "glob"
+            },
+            {
+             "stringValue": "grep"
+            },
+            {
+             "stringValue": "find"
+            },
+            {
+             "stringValue": "task"
+            },
+            {
+             "stringValue": "wait"
+            },
+            {
+             "stringValue": "todo"
+            },
+            {
+             "stringValue": "web_search"
+            },
+            {
+             "stringValue": "write"
+            }
+           ]
+          }
+         }
+        },
+        {
+         "key": "omp.gen_ai.request.messages",
+         "value": {
+          "stringValue": "CONTENT<omp.gen_ai.request.messages>"
+         }
+        },
+        {
+         "key": "gen_ai.system_instructions",
+         "value": {
+          "stringValue": "CONTENT<gen_ai.system_instructions>"
+         }
+        },
+        {
+         "key": "gen_ai.input.messages",
+         "value": {
+          "stringValue": "CONTENT<gen_ai.input.messages>"
+         }
+        },
+        {
+         "key": "gen_ai.response.model",
+         "value": {
+          "stringValue": "mistralai/mistral-small-2603"
+         }
+        },
+        {
+         "key": "gen_ai.response.id",
+         "value": {
+          "stringValue": "gen-004"
+         }
+        },
+        {
+         "key": "gen_ai.response.time_to_first_chunk",
+         "value": {
+          "doubleValue": 1.1404193329999999
+         }
+        },
+        {
+         "key": "gen_ai.response.finish_reasons",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "tool_calls"
+            }
+           ]
+          }
+         }
+        },
+        {
+         "key": "gen_ai.usage.input_tokens",
+         "value": {
+          "intValue": "8897"
+         }
+        },
+        {
+         "key": "gen_ai.usage.output_tokens",
+         "value": {
+          "intValue": "70"
+         }
+        },
+        {
+         "key": "omp.gen_ai.usage.total_tokens",
+         "value": {
+          "intValue": "8967"
+         }
+        },
+        {
+         "key": "gen_ai.usage.cache_read.input_tokens",
+         "value": {
+          "intValue": "8560"
+         }
+        },
+        {
+         "key": "gen_ai.usage.cache_creation.input_tokens",
+         "value": {
+          "intValue": "0"
+         }
+        },
+        {
+         "key": "gen_ai.usage.reasoning.output_tokens",
+         "value": {
+          "intValue": "41"
+         }
+        },
+        {
+         "key": "omp.gen_ai.gateway.name",
+         "value": {
+          "stringValue": "openrouter"
+         }
+        },
+        {
+         "key": "omp.gen_ai.gateway.endpoint",
+         "value": {
+          "stringValue": "https://openrouter.ai/api/v1"
+         }
+        },
+        {
+         "key": "omp.gen_ai.gateway.call_id",
+         "value": {
+          "stringValue": "gen-004"
+         }
+        },
+        {
+         "key": "omp.gen_ai.cost.estimated_usd",
+         "value": {
+          "doubleValue": 0.00022095
+         }
+        },
+        {
+         "key": "omp.gen_ai.cost.input_usd",
+         "value": {
+          "doubleValue": 5.055000000000001e-05
+         }
+        },
+        {
+         "key": "omp.gen_ai.cost.output_usd",
+         "value": {
+          "doubleValue": 4.2000000000000004e-05
+         }
+        },
+        {
+         "key": "omp.gen_ai.response.tool_calls",
+         "value": {
+          "stringValue": "CONTENT<omp.gen_ai.response.tool_calls>"
+         }
+        },
+        {
+         "key": "gen_ai.output.messages",
+         "value": {
+          "stringValue": "CONTENT<gen_ai.output.messages>"
+         }
+        }
+       ],
+       "status": {}
+      },
+      {
+       "traceId": "Uv5QsAvlUdKPXTVQ2pmwbg==",
+       "spanId": "uIeh58ID0tQ=",
+       "parentSpanId": "abISz1dZ3iM=",
+       "flags": 257,
+       "name": "execute_tool edit",
+       "kind": "SPAN_KIND_INTERNAL",
+       "startTimeUnixNano": "1795266868279000000",
+       "endTimeUnixNano": "1795266868279719000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "execute_tool"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "00000002-0000-7000-8000-000000000001"
+         }
+        },
+        {
+         "key": "gen_ai.tool.name",
+         "value": {
+          "stringValue": "edit"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.id",
+         "value": {
+          "stringValue": "PHhdDjEDw|fc_tmp_rjx0mihscp"
+         }
+        },
+        {
+         "key": "gen_ai.tool.type",
+         "value": {
+          "stringValue": "function"
+         }
+        },
+        {
+         "key": "gen_ai.tool.description",
+         "value": {
+          "stringValue": "CONTENT<gen_ai.tool.description>"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.arguments",
+         "value": {
+          "stringValue": "CONTENT<gen_ai.tool.call.arguments>"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.result",
+         "value": {
+          "stringValue": "CONTENT<gen_ai.tool.call.result>"
+         }
+        },
+        {
+         "key": "error.type",
+         "value": {
+          "stringValue": "tool_error"
+         }
+        },
+        {
+         "key": "omp.gen_ai.tool.status",
+         "value": {
+          "stringValue": "error"
+         }
+        }
+       ],
+       "status": {
+        "message": "CONTENT<status>",
+        "code": "STATUS_CODE_ERROR"
+       }
+      },
+      {
+       "traceId": "Uv5QsAvlUdKPXTVQ2pmwbg==",
+       "spanId": "hdxbpatXOXA=",
+       "parentSpanId": "VK4s8eDJLl8=",
+       "flags": 257,
+       "name": "chat mistralai/mistral-small-2603",
+       "kind": "SPAN_KIND_CLIENT",
+       "startTimeUnixNano": "1795266868159000000",
+       "endTimeUnixNano": "1795266869105664791",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "chat"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "mistralai/mistral-small-2603"
+         }
+        },
+        {
+         "key": "gen_ai.provider.name",
+         "value": {
+          "stringValue": "openrouter"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "00000002-0000-7000-8000-000000000002"
+         }
+        },
+        {
+         "key": "gen_ai.agent.id",
+         "value": {
+          "stringValue": "EchoSub"
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "task"
+         }
+        },
+        {
+         "key": "gen_ai.agent.description",
+         "value": {
+          "stringValue": "CONTENT<gen_ai.agent.description>"
+         }
+        },
+        {
+         "key": "omp.gen_ai.agent.step.number",
+         "value": {
+          "intValue": "1"
+         }
+        },
+        {
+         "key": "gen_ai.output.type",
+         "value": {
+          "stringValue": "text"
+         }
+        },
+        {
+         "key": "gen_ai.request.stream",
+         "value": {
+          "boolValue": true
+         }
+        },
+        {
+         "key": "omp.gen_ai.request.reasoning.effort",
+         "value": {
+          "stringValue": "high"
+         }
+        },
+        {
+         "key": "omp.gen_ai.request.available_tools",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "read"
+            },
+            {
+             "stringValue": "bash"
+            },
+            {
+             "stringValue": "edit"
+            },
+            {
+             "stringValue": "eval"
+            },
+            {
+             "stringValue": "glob"
+            },
+            {
+             "stringValue": "grep"
+            },
+            {
+             "stringValue": "find"
+            },
+            {
+             "stringValue": "task"
+            },
+            {
+             "stringValue": "wait"
+            },
+            {
+             "stringValue": "web_search"
+            },
+            {
+             "stringValue": "write"
+            }
+           ]
+          }
+         }
+        },
+        {
+         "key": "omp.gen_ai.request.messages",
+         "value": {
+          "stringValue": "CONTENT<omp.gen_ai.request.messages>"
+         }
+        },
+        {
+         "key": "gen_ai.system_instructions",
+         "value": {
+          "stringValue": "CONTENT<gen_ai.system_instructions>"
+         }
+        },
+        {
+         "key": "gen_ai.input.messages",
+         "value": {
+          "stringValue": "CONTENT<gen_ai.input.messages>"
+         }
+        },
+        {
+         "key": "gen_ai.response.model",
+         "value": {
+          "stringValue": "mistralai/mistral-small-2603"
+         }
+        },
+        {
+         "key": "gen_ai.response.id",
+         "value": {
+          "stringValue": "gen-006"
+         }
+        },
+        {
+         "key": "gen_ai.response.time_to_first_chunk",
+         "value": {
+          "doubleValue": 0.7146332499999999
+         }
+        },
+        {
+         "key": "gen_ai.response.finish_reasons",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "stop"
+            }
+           ]
+          }
+         }
+        },
+        {
+         "key": "gen_ai.usage.input_tokens",
+         "value": {
+          "intValue": "8250"
+         }
+        },
+        {
+         "key": "gen_ai.usage.output_tokens",
+         "value": {
+          "intValue": "33"
+         }
+        },
+        {
+         "key": "omp.gen_ai.usage.total_tokens",
+         "value": {
+          "intValue": "8283"
+         }
+        },
+        {
+         "key": "gen_ai.usage.cache_read.input_tokens",
+         "value": {
+          "intValue": "8064"
+         }
+        },
+        {
+         "key": "gen_ai.usage.cache_creation.input_tokens",
+         "value": {
+          "intValue": "0"
+         }
+        },
+        {
+         "key": "gen_ai.usage.reasoning.output_tokens",
+         "value": {
+          "intValue": "29"
+         }
+        },
+        {
+         "key": "omp.gen_ai.gateway.name",
+         "value": {
+          "stringValue": "openrouter"
+         }
+        },
+        {
+         "key": "omp.gen_ai.gateway.endpoint",
+         "value": {
+          "stringValue": "https://openrouter.ai/api/v1"
+         }
+        },
+        {
+         "key": "omp.gen_ai.gateway.call_id",
+         "value": {
+          "stringValue": "gen-006"
+         }
+        },
+        {
+         "key": "omp.gen_ai.cost.estimated_usd",
+         "value": {
+          "doubleValue": 0.00016866
+         }
+        },
+        {
+         "key": "omp.gen_ai.cost.input_usd",
+         "value": {
+          "doubleValue": 2.7899999999999997e-05
+         }
+        },
+        {
+         "key": "omp.gen_ai.cost.output_usd",
+         "value": {
+          "doubleValue": 1.98e-05
+         }
+        },
+        {
+         "key": "omp.gen_ai.response.text",
+         "value": {
+          "stringValue": "CONTENT<omp.gen_ai.response.text>"
+         }
+        },
+        {
+         "key": "gen_ai.output.messages",
+         "value": {
+          "stringValue": "CONTENT<gen_ai.output.messages>"
+         }
+        }
+       ],
+       "status": {}
+      },
+      {
+       "traceId": "Uv5QsAvlUdKPXTVQ2pmwbg==",
+       "spanId": "VK4s8eDJLl8=",
+       "parentSpanId": "cEjxPlzg8SQ=",
+       "flags": 257,
+       "name": "invoke_agent task",
+       "kind": "SPAN_KIND_INTERNAL",
+       "startTimeUnixNano": "1795266866777000000",
+       "endTimeUnixNano": "1795266869105898334",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "invoke_agent"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "mistralai/mistral-small-2603"
+         }
+        },
+        {
+         "key": "gen_ai.provider.name",
+         "value": {
+          "stringValue": "openrouter"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "00000002-0000-7000-8000-000000000002"
+         }
+        },
+        {
+         "key": "gen_ai.agent.id",
+         "value": {
+          "stringValue": "EchoSub"
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "task"
+         }
+        },
+        {
+         "key": "gen_ai.agent.description",
+         "value": {
+          "stringValue": "CONTENT<gen_ai.agent.description>"
+         }
+        },
+        {
+         "key": "omp.gen_ai.agent.step.count",
+         "value": {
+          "intValue": "2"
+         }
+        },
+        {
+         "key": "omp.gen_ai.agent.chats.count",
+         "value": {
+          "intValue": "2"
+         }
+        },
+        {
+         "key": "omp.gen_ai.agent.chats.total_latency_ms",
+         "value": {
+          "doubleValue": 2267.662958
+         }
+        },
+        {
+         "key": "omp.gen_ai.agent.chats.stop_reason.stop.count",
+         "value": {
+          "intValue": "1"
+         }
+        },
+        {
+         "key": "omp.gen_ai.agent.chats.stop_reason.toolUse.count",
+         "value": {
+          "intValue": "1"
+         }
+        },
+        {
+         "key": "omp.gen_ai.agent.tools.count",
+         "value": {
+          "intValue": "1"
+         }
+        },
+        {
+         "key": "omp.gen_ai.agent.tools.ok.count",
+         "value": {
+          "intValue": "1"
+         }
+        },
+        {
+         "key": "omp.gen_ai.agent.tools.error.count",
+         "value": {
+          "intValue": "0"
+         }
+        },
+        {
+         "key": "omp.gen_ai.agent.tools.skipped.count",
+         "value": {
+          "intValue": "0"
+         }
+        },
+        {
+         "key": "omp.gen_ai.agent.tools.blocked.count",
+         "value": {
+          "intValue": "0"
+         }
+        },
+        {
+         "key": "omp.gen_ai.agent.tools.timeout.count",
+         "value": {
+          "intValue": "0"
+         }
+        },
+        {
+         "key": "omp.gen_ai.agent.tools.aborted.count",
+         "value": {
+          "intValue": "0"
+         }
+        },
+        {
+         "key": "omp.gen_ai.agent.tools.total_latency_ms",
+         "value": {
+          "doubleValue": 53.578708000000006
+         }
+        },
+        {
+         "key": "omp.gen_ai.agent.tools.invoked",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "bash"
+            }
+           ]
+          }
+         }
+        },
+        {
+         "key": "omp.gen_ai.agent.tools.available",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "bash"
+            },
+            {
+             "stringValue": "edit"
+            },
+            {
+             "stringValue": "eval"
+            },
+            {
+             "stringValue": "find"
+            },
+            {
+             "stringValue": "glob"
+            },
+            {
+             "stringValue": "grep"
+            },
+            {
+             "stringValue": "read"
+            },
+            {
+             "stringValue": "task"
+            },
+            {
+             "stringValue": "wait"
+            },
+            {
+             "stringValue": "web_search"
+            },
+            {
+             "stringValue": "write"
+            }
+           ]
+          }
+         }
+        },
+        {
+         "key": "omp.gen_ai.agent.tools.unused",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "edit"
+            },
+            {
+             "stringValue": "eval"
+            },
+            {
+             "stringValue": "find"
+            },
+            {
+             "stringValue": "glob"
+            },
+            {
+             "stringValue": "grep"
+            },
+            {
+             "stringValue": "read"
+            },
+            {
+             "stringValue": "task"
+            },
+            {
+             "stringValue": "wait"
+            },
+            {
+             "stringValue": "web_search"
+            },
+            {
+             "stringValue": "write"
+            }
+           ]
+          }
+         }
+        },
+        {
+         "key": "omp.gen_ai.agent.usage.input_tokens.total",
+         "value": {
+          "intValue": "16338"
+         }
+        },
+        {
+         "key": "omp.gen_ai.agent.usage.output_tokens.total",
+         "value": {
+          "intValue": "191"
+         }
+        },
+        {
+         "key": "omp.gen_ai.agent.usage.cache_read.input_tokens.total",
+         "value": {
+          "intValue": "8064"
+         }
+        },
+        {
+         "key": "omp.gen_ai.agent.usage.cache_creation.input_tokens.total",
+         "value": {
+          "intValue": "0"
+         }
+        },
+        {
+         "key": "omp.gen_ai.agent.usage.reasoning.output_tokens.total",
+         "value": {
+          "intValue": "71"
+         }
+        },
+        {
+         "key": "omp.gen_ai.agent.usage.total_tokens.total",
+         "value": {
+          "intValue": "16529"
+         }
+        },
+        {
+         "key": "omp.gen_ai.agent.cost.estimated_usd.total",
+         "value": {
+          "doubleValue": 0.0014766599999999999
+         }
+        },
+        {
+         "key": "omp.gen_ai.agent.errors.count",
+         "value": {
+          "intValue": "0"
+         }
+        }
+       ],
+       "status": {}
+      },
+      {
+       "traceId": "Uv5QsAvlUdKPXTVQ2pmwbg==",
+       "spanId": "/0NAn9Gynfc=",
+       "parentSpanId": "abISz1dZ3iM=",
+       "flags": 257,
+       "name": "chat mistralai/mistral-small-2603",
+       "kind": "SPAN_KIND_CLIENT",
+       "startTimeUnixNano": "1795266868282000000",
+       "endTimeUnixNano": "1795266869412800709",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "chat"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "mistralai/mistral-small-2603"
+         }
+        },
+        {
+         "key": "gen_ai.provider.name",
+         "value": {
+          "stringValue": "openrouter"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "00000002-0000-7000-8000-000000000001"
+         }
+        },
+        {
+         "key": "omp.gen_ai.agent.step.number",
+         "value": {
+          "intValue": "3"
+         }
+        },
+        {
+         "key": "gen_ai.output.type",
+         "value": {
+          "stringValue": "text"
+         }
+        },
+        {
+         "key": "gen_ai.request.stream",
+         "value": {
+          "boolValue": true
+         }
+        },
+        {
+         "key": "omp.gen_ai.request.reasoning.effort",
+         "value": {
+          "stringValue": "high"
+         }
+        },
+        {
+         "key": "omp.gen_ai.request.available_tools",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "read"
+            },
+            {
+             "stringValue": "bash"
+            },
+            {
+             "stringValue": "edit"
+            },
+            {
+             "stringValue": "eval"
+            },
+            {
+             "stringValue": "glob"
+            },
+            {
+             "stringValue": "grep"
+            },
+            {
+             "stringValue": "find"
+            },
+            {
+             "stringValue": "task"
+            },
+            {
+             "stringValue": "wait"
+            },
+            {
+             "stringValue": "todo"
+            },
+            {
+             "stringValue": "web_search"
+            },
+            {
+             "stringValue": "write"
+            }
+           ]
+          }
+         }
+        },
+        {
+         "key": "omp.gen_ai.request.messages",
+         "value": {
+          "stringValue": "CONTENT<omp.gen_ai.request.messages>"
+         }
+        },
+        {
+         "key": "gen_ai.system_instructions",
+         "value": {
+          "stringValue": "CONTENT<gen_ai.system_instructions>"
+         }
+        },
+        {
+         "key": "gen_ai.input.messages",
+         "value": {
+          "stringValue": "CONTENT<gen_ai.input.messages>"
+         }
+        },
+        {
+         "key": "gen_ai.response.model",
+         "value": {
+          "stringValue": "mistralai/mistral-small-2603"
+         }
+        },
+        {
+         "key": "gen_ai.response.id",
+         "value": {
+          "stringValue": "gen-005"
+         }
+        },
+        {
+         "key": "gen_ai.response.time_to_first_chunk",
+         "value": {
+          "doubleValue": 0.4804527499999995
+         }
+        },
+        {
+         "key": "gen_ai.response.finish_reasons",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "tool_calls"
+            }
+           ]
+          }
+         }
+        },
+        {
+         "key": "gen_ai.usage.input_tokens",
+         "value": {
+          "intValue": "9021"
+         }
+        },
+        {
+         "key": "gen_ai.usage.output_tokens",
+         "value": {
+          "intValue": "93"
+         }
+        },
+        {
+         "key": "omp.gen_ai.usage.total_tokens",
+         "value": {
+          "intValue": "9114"
+         }
+        },
+        {
+         "key": "gen_ai.usage.cache_read.input_tokens",
+         "value": {
+          "intValue": "8880"
+         }
+        },
+        {
+         "key": "gen_ai.usage.cache_creation.input_tokens",
+         "value": {
+          "intValue": "0"
+         }
+        },
+        {
+         "key": "gen_ai.usage.reasoning.output_tokens",
+         "value": {
+          "intValue": "64"
+         }
+        },
+        {
+         "key": "omp.gen_ai.gateway.name",
+         "value": {
+          "stringValue": "openrouter"
+         }
+        },
+        {
+         "key": "omp.gen_ai.gateway.endpoint",
+         "value": {
+          "stringValue": "https://openrouter.ai/api/v1"
+         }
+        },
+        {
+         "key": "omp.gen_ai.gateway.call_id",
+         "value": {
+          "stringValue": "gen-005"
+         }
+        },
+        {
+         "key": "omp.gen_ai.cost.estimated_usd",
+         "value": {
+          "doubleValue": 0.00021015
+         }
+        },
+        {
+         "key": "omp.gen_ai.cost.input_usd",
+         "value": {
+          "doubleValue": 2.1150000000000002e-05
+         }
+        },
+        {
+         "key": "omp.gen_ai.cost.output_usd",
+         "value": {
+          "doubleValue": 5.580000000000001e-05
+         }
+        },
+        {
+         "key": "omp.gen_ai.response.tool_calls",
+         "value": {
+          "stringValue": "CONTENT<omp.gen_ai.response.tool_calls>"
+         }
+        },
+        {
+         "key": "gen_ai.output.messages",
+         "value": {
+          "stringValue": "CONTENT<gen_ai.output.messages>"
+         }
+        }
+       ],
+       "status": {}
+      },
+      {
+       "traceId": "Uv5QsAvlUdKPXTVQ2pmwbg==",
+       "spanId": "oPkYoNINOyM=",
+       "parentSpanId": "abISz1dZ3iM=",
+       "flags": 257,
+       "name": "execute_tool edit",
+       "kind": "SPAN_KIND_INTERNAL",
+       "startTimeUnixNano": "1795266869414000000",
+       "endTimeUnixNano": "1795266869419246375",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "execute_tool"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "00000002-0000-7000-8000-000000000001"
+         }
+        },
+        {
+         "key": "gen_ai.tool.name",
+         "value": {
+          "stringValue": "edit"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.id",
+         "value": {
+          "stringValue": "h3DEyzO37|fc_tmp_avf6zkfc1t"
+         }
+        },
+        {
+         "key": "gen_ai.tool.type",
+         "value": {
+          "stringValue": "function"
+         }
+        },
+        {
+         "key": "gen_ai.tool.description",
+         "value": {
+          "stringValue": "CONTENT<gen_ai.tool.description>"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.arguments",
+         "value": {
+          "stringValue": "CONTENT<gen_ai.tool.call.arguments>"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.result",
+         "value": {
+          "stringValue": "CONTENT<gen_ai.tool.call.result>"
+         }
+        },
+        {
+         "key": "omp.gen_ai.tool.status",
+         "value": {
+          "stringValue": "ok"
+         }
+        }
+       ],
+       "status": {}
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "resource": {
+    "attributes": [
+     {
+      "key": "service.name",
+      "value": {
+       "stringValue": "oh-my-pi"
+      }
+     }
+    ]
+   },
+   "scopeSpans": [
+    {
+     "scope": {
+      "name": "@oh-my-pi/pi-agent-core"
+     },
+     "spans": [
+      {
+       "traceId": "Uv5QsAvlUdKPXTVQ2pmwbg==",
+       "spanId": "Qs1ZKuFzzYY=",
+       "parentSpanId": "abISz1dZ3iM=",
+       "flags": 257,
+       "name": "chat mistralai/mistral-small-2603",
+       "kind": "SPAN_KIND_CLIENT",
+       "startTimeUnixNano": "1795266869422000000",
+       "endTimeUnixNano": "1795266870473318458",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "chat"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "mistralai/mistral-small-2603"
+         }
+        },
+        {
+         "key": "gen_ai.provider.name",
+         "value": {
+          "stringValue": "openrouter"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "00000002-0000-7000-8000-000000000001"
+         }
+        },
+        {
+         "key": "omp.gen_ai.agent.step.number",
+         "value": {
+          "intValue": "4"
+         }
+        },
+        {
+         "key": "gen_ai.output.type",
+         "value": {
+          "stringValue": "text"
+         }
+        },
+        {
+         "key": "gen_ai.request.stream",
+         "value": {
+          "boolValue": true
+         }
+        },
+        {
+         "key": "omp.gen_ai.request.reasoning.effort",
+         "value": {
+          "stringValue": "high"
+         }
+        },
+        {
+         "key": "omp.gen_ai.request.available_tools",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "read"
+            },
+            {
+             "stringValue": "bash"
+            },
+            {
+             "stringValue": "edit"
+            },
+            {
+             "stringValue": "eval"
+            },
+            {
+             "stringValue": "glob"
+            },
+            {
+             "stringValue": "grep"
+            },
+            {
+             "stringValue": "find"
+            },
+            {
+             "stringValue": "task"
+            },
+            {
+             "stringValue": "wait"
+            },
+            {
+             "stringValue": "todo"
+            },
+            {
+             "stringValue": "web_search"
+            },
+            {
+             "stringValue": "write"
+            }
+           ]
+          }
+         }
+        },
+        {
+         "key": "omp.gen_ai.request.messages",
+         "value": {
+          "stringValue": "CONTENT<omp.gen_ai.request.messages>"
+         }
+        },
+        {
+         "key": "gen_ai.system_instructions",
+         "value": {
+          "stringValue": "CONTENT<gen_ai.system_instructions>"
+         }
+        },
+        {
+         "key": "gen_ai.input.messages",
+         "value": {
+          "stringValue": "CONTENT<gen_ai.input.messages>"
+         }
+        },
+        {
+         "key": "gen_ai.response.model",
+         "value": {
+          "stringValue": "mistralai/mistral-small-2603"
+         }
+        },
+        {
+         "key": "gen_ai.response.id",
+         "value": {
+          "stringValue": "gen-007"
+         }
+        },
+        {
+         "key": "gen_ai.response.time_to_first_chunk",
+         "value": {
+          "doubleValue": 0.6358037920000006
+         }
+        },
+        {
+         "key": "gen_ai.response.finish_reasons",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "stop"
+            }
+           ]
+          }
+         }
+        },
+        {
+         "key": "gen_ai.usage.input_tokens",
+         "value": {
+          "intValue": "9219"
+         }
+        },
+        {
+         "key": "gen_ai.usage.output_tokens",
+         "value": {
+          "intValue": "68"
+         }
+        },
+        {
+         "key": "omp.gen_ai.usage.total_tokens",
+         "value": {
+          "intValue": "9287"
+         }
+        },
+        {
+         "key": "gen_ai.usage.cache_read.input_tokens",
+         "value": {
+          "intValue": "8992"
+         }
+        },
+        {
+         "key": "gen_ai.usage.cache_creation.input_tokens",
+         "value": {
+          "intValue": "0"
+         }
+        },
+        {
+         "key": "gen_ai.usage.reasoning.output_tokens",
+         "value": {
+          "intValue": "63"
+         }
+        },
+        {
+         "key": "omp.gen_ai.gateway.name",
+         "value": {
+          "stringValue": "openrouter"
+         }
+        },
+        {
+         "key": "omp.gen_ai.gateway.endpoint",
+         "value": {
+          "stringValue": "https://openrouter.ai/api/v1"
+         }
+        },
+        {
+         "key": "omp.gen_ai.gateway.call_id",
+         "value": {
+          "stringValue": "gen-007"
+         }
+        },
+        {
+         "key": "omp.gen_ai.cost.estimated_usd",
+         "value": {
+          "doubleValue": 0.00020973
+         }
+        },
+        {
+         "key": "omp.gen_ai.cost.input_usd",
+         "value": {
+          "doubleValue": 3.405000000000001e-05
+         }
+        },
+        {
+         "key": "omp.gen_ai.cost.output_usd",
+         "value": {
+          "doubleValue": 4.08e-05
+         }
+        },
+        {
+         "key": "omp.gen_ai.response.text",
+         "value": {
+          "stringValue": "CONTENT<omp.gen_ai.response.text>"
+         }
+        },
+        {
+         "key": "gen_ai.output.messages",
+         "value": {
+          "stringValue": "CONTENT<gen_ai.output.messages>"
+         }
+        }
+       ],
+       "status": {}
+      },
+      {
+       "traceId": "Uv5QsAvlUdKPXTVQ2pmwbg==",
+       "spanId": "abISz1dZ3iM=",
+       "flags": 257,
+       "name": "invoke_agent",
+       "kind": "SPAN_KIND_INTERNAL",
+       "startTimeUnixNano": "1795266862864000000",
+       "endTimeUnixNano": "1795266870474402667",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "invoke_agent"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "mistralai/mistral-small-2603"
+         }
+        },
+        {
+         "key": "gen_ai.provider.name",
+         "value": {
+          "stringValue": "openrouter"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "00000002-0000-7000-8000-000000000001"
+         }
+        },
+        {
+         "key": "omp.gen_ai.agent.step.count",
+         "value": {
+          "intValue": "5"
+         }
+        },
+        {
+         "key": "omp.gen_ai.agent.chats.count",
+         "value": {
+          "intValue": "5"
+         }
+        },
+        {
+         "key": "omp.gen_ai.agent.chats.total_latency_ms",
+         "value": {
+          "doubleValue": 7564.8304579999985
+         }
+        },
+        {
+         "key": "omp.gen_ai.agent.chats.stop_reason.stop.count",
+         "value": {
+          "intValue": "1"
+         }
+        },
+        {
+         "key": "omp.gen_ai.agent.chats.stop_reason.toolUse.count",
+         "value": {
+          "intValue": "4"
+         }
+        },
+        {
+         "key": "omp.gen_ai.agent.tools.count",
+         "value": {
+          "intValue": "6"
+         }
+        },
+        {
+         "key": "omp.gen_ai.agent.tools.ok.count",
+         "value": {
+          "intValue": "4"
+         }
+        },
+        {
+         "key": "omp.gen_ai.agent.tools.error.count",
+         "value": {
+          "intValue": "2"
+         }
+        },
+        {
+         "key": "omp.gen_ai.agent.tools.skipped.count",
+         "value": {
+          "intValue": "0"
+         }
+        },
+        {
+         "key": "omp.gen_ai.agent.tools.blocked.count",
+         "value": {
+          "intValue": "0"
+         }
+        },
+        {
+         "key": "omp.gen_ai.agent.tools.timeout.count",
+         "value": {
+          "intValue": "0"
+         }
+        },
+        {
+         "key": "omp.gen_ai.agent.tools.aborted.count",
+         "value": {
+          "intValue": "0"
+         }
+        },
+        {
+         "key": "omp.gen_ai.agent.tools.total_latency_ms",
+         "value": {
+          "doubleValue": 23.78545699999904
+         }
+        },
+        {
+         "key": "omp.gen_ai.agent.tools.invoked",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "edit"
+            },
+            {
+             "stringValue": "read"
+            },
+            {
+             "stringValue": "task"
+            },
+            {
+             "stringValue": "write"
+            }
+           ]
+          }
+         }
+        },
+        {
+         "key": "omp.gen_ai.agent.tools.available",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "bash"
+            },
+            {
+             "stringValue": "edit"
+            },
+            {
+             "stringValue": "eval"
+            },
+            {
+             "stringValue": "find"
+            },
+            {
+             "stringValue": "glob"
+            },
+            {
+             "stringValue": "grep"
+            },
+            {
+             "stringValue": "read"
+            },
+            {
+             "stringValue": "task"
+            },
+            {
+             "stringValue": "todo"
+            },
+            {
+             "stringValue": "wait"
+            },
+            {
+             "stringValue": "web_search"
+            },
+            {
+             "stringValue": "write"
+            }
+           ]
+          }
+         }
+        },
+        {
+         "key": "omp.gen_ai.agent.tools.unused",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "bash"
+            },
+            {
+             "stringValue": "eval"
+            },
+            {
+             "stringValue": "find"
+            },
+            {
+             "stringValue": "glob"
+            },
+            {
+             "stringValue": "grep"
+            },
+            {
+             "stringValue": "todo"
+            },
+            {
+             "stringValue": "wait"
+            },
+            {
+             "stringValue": "web_search"
+            }
+           ]
+          }
+         }
+        },
+        {
+         "key": "omp.gen_ai.agent.usage.input_tokens.total",
+         "value": {
+          "intValue": "44057"
+         }
+        },
+        {
+         "key": "omp.gen_ai.agent.usage.output_tokens.total",
+         "value": {
+          "intValue": "607"
+         }
+        },
+        {
+         "key": "omp.gen_ai.agent.usage.cache_read.input_tokens.total",
+         "value": {
+          "intValue": "34736"
+         }
+        },
+        {
+         "key": "omp.gen_ai.agent.usage.cache_creation.input_tokens.total",
+         "value": {
+          "intValue": "0"
+         }
+        },
+        {
+         "key": "omp.gen_ai.agent.usage.reasoning.output_tokens.total",
+         "value": {
+          "intValue": "420"
+         }
+        },
+        {
+         "key": "omp.gen_ai.agent.usage.total_tokens.total",
+         "value": {
+          "intValue": "44664"
+         }
+        },
+        {
+         "key": "omp.gen_ai.agent.cost.estimated_usd.total",
+         "value": {
+          "doubleValue": 0.0022833899999999997
+         }
+        },
+        {
+         "key": "omp.gen_ai.agent.errors.count",
+         "value": {
+          "intValue": "2"
+         }
+        }
+       ],
+       "status": {}
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

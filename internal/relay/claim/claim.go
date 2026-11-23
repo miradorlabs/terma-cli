@@ -57,6 +57,10 @@ type Claim struct {
 	Remote    string    `json:"remote,omitempty"`
 	Branch    string    `json:"branch,omitempty"`
 	ClaimedAt time.Time `json:"claimed_at"`
+	// Parent is the session that opened this one for a subagent, as its start hook named it:
+	// what the relay stamps as terma.session.parent.id. It is the session's, so a later hook
+	// that names none keeps it.
+	Parent string `json:"parent,omitempty"`
 	// PIDs are the processes the claiming hooks ran under, so a session resumed by another
 	// process where no hook runs is not covered. Empty matches any sender.
 	PIDs []int `json:"pids,omitempty"`
@@ -140,7 +144,7 @@ func (c Claim) At(pid int, at time.Time) (Claim, bool) {
 	}
 	return Claim{ProjectID: best.ProjectID, Account: best.Account, Tool: best.Tool, Repo: best.Repo, Worktree: best.Worktree,
 		Repository: best.Repository, Root: best.Root, Cwd: best.Cwd, Remote: best.Remote, Branch: best.Branch,
-		PIDs: best.PIDs, ClaimedAt: c.ClaimedAt, Placements: c.Placements}, true
+		PIDs: best.PIDs, ClaimedAt: c.ClaimedAt, Parent: c.Parent, Placements: c.Placements}, true
 }
 
 // Dir is the relay directory under the state directory dir.
@@ -197,7 +201,7 @@ func write(dir, sessionID string, c Claim, now time.Time) bool {
 		return false
 	}
 	// The fast path needs no lock: a fresh claim already naming these processes.
-	if prev, ok := read(p); ok && samePlace(prev, c) && sameDirs(prev, c) && subset(c.PIDs, prev.PIDs) {
+	if prev, ok := read(p); ok && samePlace(prev, c) && sameDirs(prev, c) && sameParent(prev, c) && subset(c.PIDs, prev.PIDs) {
 		if info, err := os.Stat(p); err == nil && now.Sub(info.ModTime()) < refresh {
 			return false
 		}
@@ -213,11 +217,14 @@ func write(dir, sessionID string, c Claim, now time.Time) bool {
 	}
 	now = now.UTC()
 	prev, havePrev := read(p)
+	if havePrev && c.Parent == "" {
+		c.Parent = prev.Parent
+	}
 	placements := []Placement{}
 	switch {
 	case !havePrev:
 	case samePlace(prev, c):
-		if info, err := os.Stat(p); err == nil && now.Sub(info.ModTime()) < refresh && sameDirs(prev, c) && subset(c.PIDs, prev.PIDs) {
+		if info, err := os.Stat(p); err == nil && now.Sub(info.ModTime()) < refresh && sameDirs(prev, c) && sameParent(prev, c) && subset(c.PIDs, prev.PIDs) {
 			return false
 		}
 		c.PIDs = merge(prev.PIDs, c.PIDs)
@@ -264,6 +271,11 @@ func samePlace(prev, c Claim) bool {
 func sameDirs(prev, c Claim) bool {
 	return prev.Root == c.Root && (c.Cwd == "" || prev.Cwd == c.Cwd) &&
 		prev.Worktree == c.Worktree && prev.Remote == c.Remote && prev.Branch == c.Branch
+}
+
+// sameParent reports whether c names the parent prev does, or none, which keeps prev's.
+func sameParent(prev, c Claim) bool {
+	return c.Parent == "" || c.Parent == prev.Parent
 }
 
 func subset(a, b []int) bool {

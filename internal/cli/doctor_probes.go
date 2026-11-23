@@ -157,6 +157,7 @@ func (app *App) relayFacts() doctor.Relay {
 			r.OutboxLossAt = losses.Last
 		}
 	}
+	r.Token, _ = daemon.Token(app.stateDir)
 	if service.Supported() {
 		state := daemon.CheckService(app.stateDir)
 		r.ServiceInstalled, r.ServiceCurrent = state.Installed, state.Current

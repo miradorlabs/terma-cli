@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
-	"github.com/miradorlabs/terma-cli/internal/agents/internal/pifamily"
 	"github.com/miradorlabs/terma-cli/internal/agents/internal/relayexport"
 )
 
@@ -16,7 +15,7 @@ func (Agent) ConfigureRelay(ctx context.Context, cfg agents.RelayConfig) (agents
 	if err != nil {
 		return agents.RelayResult{}, err
 	}
-	path, err := pifamily.Write(filepath.Join(dir, "extensions", "terma.ts"), pifamily.ForRelay("pi", true, cfg))
+	path, err := writeExtension(filepath.Join(dir, "extensions", "terma.ts"), relayExtension(cfg))
 	return agents.RelayResult{Paths: []string{path}}, err
 }
 

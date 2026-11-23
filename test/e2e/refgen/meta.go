@@ -46,7 +46,7 @@ var harnesses = map[string]harnessMeta{
 		repo: "anomalyco/opencode", language: "typescript", tag: "v%s", changelog: "https://github.com/anomalyco/opencode/releases"},
 	"pi": {name: "Pi", vendor: "Earendil", homepage: "https://github.com/earendil-works/pi", npm: "@earendil-works/pi-coding-agent",
 		repo: "earendil-works/pi", language: "typescript", tag: "v%s", changelog: "https://github.com/earendil-works/pi/releases"},
-	"omp": {name: "oh-my-pi", vendor: "can1357", homepage: "https://github.com/can1357/oh-my-pi", npm: "@oh-my-pi/pi-coding-agent",
+	"omp": {name: "OMP", vendor: "can1357", homepage: "https://github.com/can1357/oh-my-pi", npm: "@oh-my-pi/pi-coding-agent",
 		repo: "can1357/oh-my-pi", language: "typescript", tag: "v%s", changelog: "https://github.com/can1357/oh-my-pi/releases"},
 	"hermes": {name: "Hermes Agent", vendor: "Nous Research", homepage: "https://github.com/NousResearch/hermes-agent",
 		repo: "NousResearch/hermes-agent", language: "python", tag: "v%s", changelog: "https://github.com/NousResearch/hermes-agent/releases"},

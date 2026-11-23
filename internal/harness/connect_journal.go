@@ -32,6 +32,9 @@ type Journal struct {
 	InstalledSettings map[string]string  `json:"installed_settings,omitempty"`
 	PreviousSettings  map[string]*string `json:"previous_settings,omitempty"`
 	ProjectID         string             `json:"project_id,omitempty"`
+	// ConfigMode is the config file's mode before the first connect, for a harness whose
+	// teardown puts the file back as it was; nil when the connect created the file.
+	ConfigMode *fs.FileMode `json:"config_mode,omitempty"`
 }
 
 // JournalPath is the record under the config directory dir, keyed by a hash of the config
@@ -181,6 +184,7 @@ func (j *Journal) Apply(env map[string]string) (DisconnectResult, *Journal) {
 	remaining := &Journal{
 		Harness:           j.Harness,
 		ConfigPath:        j.ConfigPath,
+		ConfigMode:        j.ConfigMode,
 		Installed:         map[string]string{},
 		Previous:          map[string]*string{},
 		Cleared:           map[string]string{},

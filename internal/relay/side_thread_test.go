@@ -140,3 +140,54 @@ func TestRelayDropsASideThreadsLaterChildSpanInGlobalMode(t *testing.T) {
 		t.Fatalf("a side thread's span left: %v", c)
 	}
 }
+
+// In global mode an OMP conversation goes by its hooks' claim: the advisor loop OMP runs
+// beside a session names its own conversation (<session>-advisor) and fires no session
+// start, so it never leaves, while the session its hooks claimed does. Copilot shares the
+// key, outside OMP's scope, and its unclaimed conversation still goes to the catch-all.
+func TestRelayHoldsAnUnclaimedOmpConversationInGlobalMode(t *testing.T) {
+	t.Parallel()
+	const advisor = ompParent + "-advisor"
+	u := newUpstream(t)
+	f := newFixture()
+	f.claims[ompParent] = claim.Claim{ProjectID: "p-default", Tool: "omp"}
+	pol := Policy{Endpoint: u.srv.URL, Key: "key-default", IncludePrompts: true, IncludeToolContent: true}
+	r := newRelay(Options{Dir: t.TempDir(), Token: token, Hold: time.Minute, Lookup: f.lookup, Now: f.clock,
+		CatchAll: func() (claim.Claim, bool) { return claim.Claim{ProjectID: "p-default"}, true },
+		Resolve:  func(claim.Claim) (Policy, error) { return pol, nil }})
+	runRelay(t, r)
+	srv := httptest.NewServer(r.Handler())
+	defer srv.Close()
+
+	span := func(id byte, scope, conversation string) *tracepb.ResourceSpans {
+		trace := make([]byte, 16)
+		trace[0] = id
+		return &tracepb.ResourceSpans{ScopeSpans: []*tracepb.ScopeSpans{{
+			Scope: &commonpb.InstrumentationScope{Name: scope},
+			Spans: []*tracepb.Span{{TraceId: trace, SpanId: []byte{id, 0, 0, 0, 0, 0, 0, 0}, Name: "chat",
+				Attributes: []*commonpb.KeyValue{kv("gen_ai.conversation.id", conversation)}}}}}}
+	}
+	body, _ := proto.Marshal(&tracepb.TracesData{ResourceSpans: []*tracepb.ResourceSpans{
+		span(1, "@oh-my-pi/pi-agent-core", ompParent),
+		span(2, "@oh-my-pi/pi-agent-core", advisor),
+		span(3, "github.copilot", copilotConversation),
+	}})
+	post(t, srv, "/v1/traces", body, "application/x-protobuf", token, false)
+	waitForCounters(t, r, func(c map[string]int) bool { return c["forwarded.traces"] == 2 })
+	f.mu.Lock()
+	f.now = f.now.Add(DefaultTraceHold + time.Minute)
+	f.mu.Unlock()
+	waitForCounters(t, r, func(c map[string]int) bool { return c["dropped.unclaimed_expired.traces"] == 1 })
+	if c := r.Stats().Snapshot().Counters; c["forwarded.traces"] != 2 || c["attributed_by_catch_all.traces"] != 1 {
+		t.Fatalf("counters %v", c)
+	}
+	sent := u.sent()
+	for _, s := range []string{ompParent, copilotConversation} {
+		if !strings.Contains(sent, s) {
+			t.Errorf("%s was not sent", s)
+		}
+	}
+	if strings.Contains(sent, advisor) {
+		t.Error("the unclaimed OMP conversation left the machine")
+	}
+}

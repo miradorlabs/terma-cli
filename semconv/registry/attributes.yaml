@@ -41,6 +41,9 @@ attributes:
     type: string
     stability: development
     brief: The session that opened this one for a subagent.
+    note: >
+      On agent telemetry it is a resource attribute the relay stamps from the subagent's
+      session claim, which its start hook wrote; an id, so it leaves under every policy.
   - key: terma.session.title
     type: string
     stability: development

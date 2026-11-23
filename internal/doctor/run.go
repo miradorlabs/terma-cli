@@ -131,6 +131,8 @@ type Relay struct {
 	// (relay.OutboxLosses, spool.ReadLosses), one count for both; OutboxLossAt is the last.
 	OutboxLosses map[string]int
 	OutboxLossAt time.Time
+	// Token is the relay's token, "" before setup made one; never shown.
+	Token string
 }
 
 // SpoolState is the event queue as a run finds it.

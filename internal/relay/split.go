@@ -53,10 +53,14 @@ type part struct {
 }
 
 // sessionOf is the first session key, by rank, on the record's attributes, then its
-// resource's, and whether that key is Claimed.
-func (ru *rules) sessionOf(attrs, resource []*commonpb.KeyValue) (string, bool) {
+// resource's, read as declared for the record's instrumentation scope, and whether that key
+// is Claimed.
+func (ru *rules) sessionOf(scope string, attrs, resource []*commonpb.KeyValue) (string, bool) {
 	for _, set := range [][]*commonpb.KeyValue{attrs, resource} {
 		for _, key := range ru.sessionKeys {
+			if key.Scope != "" && key.Scope != scope {
+				continue
+			}
 			for _, kv := range set {
 				if kv.GetKey() == key.Attr {
 					if v := kv.GetValue().GetStringValue(); v != "" && (!key.RejectNumeric || !numeric(v)) {
@@ -90,7 +94,7 @@ func (ru *rules) splitLogs(req *logspb.LogsData, learn func(traceID, session str
 			claimed := map[string]bool{}
 			var order []string
 			for _, lr := range sl.GetLogRecords() {
-				s, c := ru.sessionOf(lr.GetAttributes(), res)
+				s, c := ru.sessionOf(sl.GetScope().GetName(), lr.GetAttributes(), res)
 				if s != "" && len(lr.GetTraceId()) > 0 {
 					learn(hex.EncodeToString(lr.GetTraceId()), s, c)
 				}
@@ -130,7 +134,7 @@ func (ru *rules) splitTraces(req *tracepb.TracesData, learn func(traceID, sessio
 		res := rs.GetResource().GetAttributes()
 		for _, ss := range rs.GetScopeSpans() {
 			for _, sp := range ss.GetSpans() {
-				if s, c := ru.sessionOf(sp.GetAttributes(), res); s != "" && len(sp.GetTraceId()) > 0 {
+				if s, c := ru.sessionOf(ss.GetScope().GetName(), sp.GetAttributes(), res); s != "" && len(sp.GetTraceId()) > 0 {
 					learn(hex.EncodeToString(sp.GetTraceId()), s, c)
 				}
 			}
@@ -144,7 +148,7 @@ func (ru *rules) splitTraces(req *tracepb.TracesData, learn func(traceID, sessio
 			claimed := map[string]bool{}
 			var order []string
 			for _, sp := range ss.GetSpans() {
-				s, c := ru.sessionOf(sp.GetAttributes(), res)
+				s, c := ru.sessionOf(ss.GetScope().GetName(), sp.GetAttributes(), res)
 				if s == "" && len(sp.GetTraceId()) > 0 {
 					id := hex.EncodeToString(sp.GetTraceId())
 					if s, c = known(id); s == "" {
@@ -188,7 +192,7 @@ func (ru *rules) splitMetrics(req *metricspb.MetricsData) map[string]*part {
 			claimed := map[string]bool{}
 			var order []string
 			for _, m := range sm.GetMetrics() {
-				for s, piece := range ru.splitMetric(m, res) {
+				for s, piece := range ru.splitMetric(sm.GetScope().GetName(), m, res) {
 					if _, seen := bySession[s]; !seen {
 						order = append(order, s)
 					}
@@ -223,11 +227,11 @@ type metricPiece struct {
 	claimed bool
 }
 
-func (ru *rules) splitMetric(m *metricspb.Metric, res []*commonpb.KeyValue) map[string]metricPiece {
+func (ru *rules) splitMetric(scope string, m *metricspb.Metric, res []*commonpb.KeyValue) map[string]metricPiece {
 	out := map[string]metricPiece{}
 	claimed := map[string]bool{}
 	sessionOf := func(attrs []*commonpb.KeyValue) string {
-		s, c := ru.sessionOf(attrs, res)
+		s, c := ru.sessionOf(scope, attrs, res)
 		claimed[s] = claimed[s] || c
 		return s
 	}

@@ -164,7 +164,9 @@ func (r *Relay) deliverAttributed(c claim.Claim, pol Policy, p *part, how attrib
 	if r.opts.Version != "" {
 		stamp(p, semconv.TermaVersionKey, r.opts.Version)
 	}
-	stampCheckout(p, r.ranIn(c, p, how), pol.IncludeToolContent)
+	ran := r.ranIn(c, p, how)
+	stampCheckout(p, ran, pol.IncludeToolContent)
+	stampParent(p, ran)
 	// Its outbox entry is named by when it arrived, however long it was held.
 	at := p.arrived
 	if at.IsZero() {
