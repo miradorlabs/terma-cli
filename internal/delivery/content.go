@@ -23,7 +23,7 @@ var hookContent = map[string][]string{
 
 // contentFree are the event kinds that carry no content, or (a reply, a thread's name) that
 // Allowed sends or withholds whole; terma.repository.root, which some of them name, Outgoing
-// withholds with tool content. A kind in none of the three lists is withheld whenever the
+// withholds with tool content. A kind in none of the four lists is withheld whenever the
 // policy withholds any content, so a new kind leaks nothing until it is classified.
 var contentFree = map[string]bool{
 	semconv.TermaSessionStartEvent: true, semconv.TermaSessionEndEvent: true,
@@ -44,6 +44,14 @@ var contentFree = map[string]bool{
 // (terma.skill.name) loses that name by the same rule, and the call still leaves.
 var contentWhole = map[string]bool{semconv.TermaSkillDefinitionEvent: true}
 
+// promptContent is where each hook event kind that leaves under any policy carries what was
+// said: removed when the policy withholds prompts, or the agent that spooled it no longer has
+// the developer's consent (a prompt a hook spooled while it had), and the rest of the event
+// sent. Withholding tool content alone leaves it.
+var promptContent = map[string][]string{
+	semconv.TermaUserMessageEvent: {semconv.TermaMessageTextKey, semconv.TermaMessageTruncatedKey},
+}
+
 // Outgoing is e as it may leave for projectID under org, the team's policy now, without
 // the content that policy withholds (config.Policy.Content, the relay's rule); false when
 // none of it may leave. A policy withholding either kind of content withholds user.email
@@ -54,11 +62,18 @@ func (r Router) Outgoing(org config.Policy, projectID string, e spool.Event) (sp
 	}
 	pol := routing.EffectivePolicy(r.StateDir, org, projectID)
 	prompts, toolContent := pol.Content()
+	promptKeys, said := promptContent[e.Name]
+	if said && (!prompts || !r.consented(e, pol.Global())) {
+		e.Attrs = maps.Clone(e.Attrs)
+		for _, k := range promptKeys {
+			delete(e.Attrs, k)
+		}
+	}
 	if prompts && toolContent {
 		return skillLinkAdmitted(pol, e), true
 	}
 	toolKeys, ok := hookContent[e.Name]
-	if contentWhole[e.Name] || !ok && !contentFree[e.Name] {
+	if contentWhole[e.Name] || !ok && !contentFree[e.Name] && !said {
 		return spool.Event{}, false
 	}
 	e.Attrs = maps.Clone(e.Attrs)

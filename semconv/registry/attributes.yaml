@@ -778,6 +778,18 @@ attributes:
       agent telemetry it is a resource attribute the relay stamps from the session's claim.
     annotations:
       content: tool
+  - key: terma.home_directory
+    type: string
+    stability: development
+    brief: The absolute path of the home directory of the user the relay runs as, symlink-resolved.
+    note: >
+      Read once as the relay starts, never from what an agent sends. An agent that writes the
+      home directory as `~` in the paths it exports (grok) is read against it, so a path under
+      the home directory names a real file. A local path, so it leaves only while the team's
+      policy collects tool content. A resource attribute the relay stamps on agent telemetry.
+    examples: ["/home/dev"]
+    annotations:
+      content: tool
   - key: terma.repository.worktree.linked
     type: boolean
     stability: development

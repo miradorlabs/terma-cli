@@ -1,4 +1,4 @@
-package codex
+package tomledit
 
 import (
 	"strings"
@@ -7,12 +7,12 @@ import (
 
 func mustSplice(t *testing.T, raw string, otel map[string]any) string {
 	t.Helper()
-	out, err := spliceOtelTable([]byte(raw), otel)
+	out, err := Splice([]byte(raw), "otel", otel)
 	if err != nil {
-		t.Fatalf("spliceOtelTable: %v", err)
+		t.Fatalf("Splice: %v", err)
 	}
-	if err := verifySplice(mustParse(t, raw), otel, out); err != nil {
-		t.Fatalf("verifySplice: %v\n--- output ---\n%s", err, out)
+	if err := Verify(mustParse(t, raw), "otel", otel, out); err != nil {
+		t.Fatalf("Verify: %v\n--- output ---\n%s", err, out)
 	}
 	return string(out)
 }
@@ -23,7 +23,7 @@ func mustParse(t *testing.T, raw string) map[string]any {
 	if strings.TrimSpace(raw) == "" {
 		return doc
 	}
-	if err := unmarshalTOMLLenient([]byte(raw), &doc); err != nil {
+	if err := Unmarshal([]byte(raw), &doc); err != nil {
 		t.Fatalf("parse: %v", err)
 	}
 	return doc
@@ -194,21 +194,21 @@ func TestSplicePreservesCRLF(t *testing.T) {
 }
 
 // A scanner mistake is caught by re-parsing rather than written.
-func TestVerifySpliceRejectsAChangedDocument(t *testing.T) {
+func TestVerifyRejectsAChangedDocument(t *testing.T) {
 	t.Parallel()
 	original := mustParse(t, "model = \"a\"\n")
-	if err := verifySplice(original, map[string]any{}, []byte("model = \"b\"\n")); err == nil {
+	if err := Verify(original, "otel", map[string]any{}, []byte("model = \"b\"\n")); err == nil {
 		t.Fatal("a rewrite that changed a setting outside otel was accepted")
 	}
-	if err := verifySplice(original, map[string]any{"x": int64(1)}, []byte("model = \"a\"\n[otel]\nx = 2\n")); err == nil {
+	if err := Verify(original, "otel", map[string]any{"x": int64(1)}, []byte("model = \"a\"\n[otel]\nx = 2\n")); err == nil {
 		t.Fatal("a rewrite whose otel table differs from the intended one was accepted")
 	}
-	if err := verifySplice(original, map[string]any{}, []byte("model = \n")); err == nil {
+	if err := Verify(original, "otel", map[string]any{}, []byte("model = \n")); err == nil {
 		t.Fatal("an unparseable rewrite was accepted")
 	}
 }
 
-func TestRenderTOMLValueRoundTrips(t *testing.T) {
+func TestRenderRoundTrips(t *testing.T) {
 	t.Parallel()
 	for _, text := range []string{
 		`"plain"`,
@@ -227,11 +227,11 @@ func TestRenderTOMLValueRoundTrips(t *testing.T) {
 		`1979-05-27T07:32:00Z`,
 		`1979-05-27`,
 	} {
-		v, err := parseTOMLValue(text)
+		v, err := Parse(text)
 		if err != nil {
 			t.Fatalf("parse %s: %v", text, err)
 		}
-		got, err := renderTOMLValue(v)
+		got, err := Render(v)
 		if err != nil {
 			t.Fatalf("render %s: %v", text, err)
 		}
@@ -242,13 +242,51 @@ func TestRenderTOMLValueRoundTrips(t *testing.T) {
 }
 
 // Inline table keys are sorted, so the same value always renders the same text.
-func TestRenderTOMLValueIsCanonical(t *testing.T) {
+func TestRenderIsCanonical(t *testing.T) {
 	t.Parallel()
-	a, _ := parseTOMLValue(`{ b = 1, a = 2 }`)
-	b, _ := parseTOMLValue(`{ a = 2, b = 1 }`)
-	ra, _ := renderTOMLValue(a)
-	rb, _ := renderTOMLValue(b)
+	a, _ := Parse(`{ b = 1, a = 2 }`)
+	b, _ := Parse(`{ a = 2, b = 1 }`)
+	ra, _ := Render(a)
+	rb, _ := Render(b)
 	if ra != rb || ra != `{ a = 2, b = 1 }` {
 		t.Fatalf("renderings differ: %q vs %q", ra, rb)
+	}
+}
+
+// Another table, as grok's [telemetry], is spliced as the otel table is: its own text alone,
+// a lookalike left as it was.
+func TestSpliceAnotherTable(t *testing.T) {
+	t.Parallel()
+	const raw = `# grok
+[model.fake-m]
+base_url = "http://127.0.0.1:1/v1"
+
+[telemetry]
+otel_enabled = false
+
+[telemetry_extra]
+x = 1
+`
+	values := map[string]any{"otel_enabled": true, "otel_logs_exporter": "otlp"}
+	out, err := Splice([]byte(raw), "telemetry", values)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := Verify(mustParse(t, raw), "telemetry", values, out); err != nil {
+		t.Fatalf("Verify: %v\n%s", err, out)
+	}
+	const want = `# grok
+[model.fake-m]
+base_url = "http://127.0.0.1:1/v1"
+
+[telemetry]
+otel_enabled = true
+otel_logs_exporter = "otlp"
+
+[telemetry_extra]
+x = 1
+`
+	if string(out) != want {
+		t.Fatalf("splice =\n%s\nwant\n%s", out, want)
 	}
 }

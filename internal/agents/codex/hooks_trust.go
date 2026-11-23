@@ -61,7 +61,7 @@ func (c exporter) hookTrustFor(hooksPath string) (hookTrust, error) {
 	if err != nil {
 		return trust, err
 	}
-	hooks, _ := f.doc[codexHooksStateTable].(map[string]any)
+	hooks, _ := f.Doc[codexHooksStateTable].(map[string]any)
 	state, _ := hooks[codexHooksStateKey].(map[string]any)
 	if len(state) == 0 {
 		return trust, nil

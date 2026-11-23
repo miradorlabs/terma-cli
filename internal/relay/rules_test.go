@@ -37,10 +37,11 @@ var (
 		"function_args", "hook_input", "hook_output", "stdout", "stderr",
 		"github.copilot.tool.parameters.command", "github.copilot.tool.parameters.file_path",
 		"omp.gen_ai.request.messages", "omp.gen_ai.response.tool_calls",
+		"tool_output", "error_message",
 		"file_path", "result", "cwd"}
 	pinnedMessageFields     = []string{"gen_ai.input.messages", "gen_ai.output.messages"}
 	pinnedToolContentEvents = []string{"tool.output", "tool.input"}
-	pinnedSessionKeys       = []string{"session.id", "conversation.id", "gen_ai.conversation.id@@oh-my-pi/pi-agent-core", "gen_ai.conversation.id", "thread.id", "thread_id"}
+	pinnedSessionKeys       = []string{"session.id@ai.xai.grok_code", "session.id", "conversation.id", "gen_ai.conversation.id@@oh-my-pi/pi-agent-core", "gen_ai.conversation.id", "thread.id", "thread_id"}
 )
 
 func TestComposedRulesArePinned(t *testing.T) {

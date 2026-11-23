@@ -40,6 +40,7 @@ func TestConfigureIsolatesAgentFilesAndEnvironment(t *testing.T) {
 				"CLAUDE_CONFIG_DIR": "claude", "CODEX_HOME": "codex", "XDG_CONFIG_HOME": "xdg",
 				"PI_CODING_AGENT_DIR": "pi", "HERMES_HOME": "hermes",
 				"GEMINI_CLI_HOME": "gemini", "DSH_HOME": "dsh", "COPILOT_HOME": "copilot",
+				"GROK_HOME": "grok",
 			} {
 				t.Setenv(key, filepath.Join(home, dir))
 			}
@@ -48,7 +49,7 @@ func TestConfigureIsolatesAgentFilesAndEnvironment(t *testing.T) {
 				"opencode": "xdg/opencode/plugins/terma.js", "omp": "pi/.env",
 				"pi": "pi/extensions/terma.ts", "hermes": "hermes/plugins/terma/__init__.py",
 				"gemini": "gemini/.gemini/settings.json", "dsh": "dsh/plugins/terma-relay.mjs",
-				"copilot": vscodeSettings(t, home),
+				"copilot": vscodeSettings(t, home), "grok": "grok/config.toml",
 			}
 			if _, ok := paths[e.Name()]; !ok {
 				t.Fatalf("this test knows no configuration file for %s", e.Name())
@@ -146,6 +147,7 @@ func TestUnconfigureRelayUndoesConfigure(t *testing.T) {
 				"CLAUDE_CONFIG_DIR": "claude", "CODEX_HOME": "codex", "XDG_CONFIG_HOME": "xdg",
 				"PI_CODING_AGENT_DIR": "pi", "HERMES_HOME": "hermes",
 				"GEMINI_CLI_HOME": "gemini", "DSH_HOME": "dsh", "COPILOT_HOME": "copilot",
+				"GROK_HOME": "grok",
 			} {
 				t.Setenv(key, filepath.Join(home, dir))
 			}

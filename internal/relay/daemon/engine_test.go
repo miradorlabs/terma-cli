@@ -3,6 +3,8 @@ package daemon
 import (
 	"bytes"
 	"context"
+	"os"
+	"path/filepath"
 	"slices"
 	"testing"
 	"time"
@@ -65,6 +67,21 @@ func TestTheEngineStartsNothing(t *testing.T) {
 	}
 	if opts := d.Engine(t.Context(), t.TempDir(), &config.Config{}, Settings{Debug: true}, &log); opts.Logf == nil {
 		t.Fatal("debug settings logged nothing")
+	}
+}
+
+// The relay names the home directory of the user it runs as, through any symlink, as it
+// starts: the agents it serves read $HOME too.
+func TestTheEngineNamesTheHomeDirectory(t *testing.T) {
+	target := t.TempDir()
+	link := filepath.Join(t.TempDir(), "home")
+	if err := os.Symlink(target, link); err != nil {
+		t.Skip(err)
+	}
+	t.Setenv("HOME", link)
+	want, _ := filepath.EvalSymlinks(target)
+	if got := (Deps{HookPolicy: func() config.Policy { return config.Policy{} }}).Engine(t.Context(), t.TempDir(), &config.Config{}, Settings{}, nil).HomeDir; got != want {
+		t.Errorf("HomeDir = %q, want %q", got, want)
 	}
 }
 

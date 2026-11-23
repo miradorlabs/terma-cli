@@ -165,7 +165,7 @@ func (r *Relay) deliverAttributed(c claim.Claim, pol Policy, p *part, how attrib
 		stamp(p, semconv.TermaVersionKey, r.opts.Version)
 	}
 	ran := r.ranIn(c, p, how)
-	stampCheckout(p, ran, pol.IncludeToolContent)
+	stampCheckout(p, ran, pol.IncludeToolContent, r.opts.HomeDir)
 	stampParent(p, ran)
 	// Its outbox entry is named by when it arrived, however long it was held.
 	at := p.arrived

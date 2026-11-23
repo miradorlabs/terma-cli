@@ -237,10 +237,10 @@ func TestHarnessSelectionComingSoon(t *testing.T) {
 		chosen[name] = true
 	}
 	form := testApp.harnessSelectionForm(context.Background(), chosen)
-	wantOrder := []string{"claude", "codex", "copilot", "omp", "antigravity", "cursor", "opencode", "pi", "hermes", "gemini", "dsh"}
+	wantOrder := []string{"claude", "codex", "copilot", "omp", "antigravity", "grok", "cursor", "opencode", "pi", "hermes", "gemini", "dsh"}
 	if !testApp.agents.IsSupported("antigravity") {
 		// Coming Soon on Windows: last, in registry order.
-		wantOrder = append(slices.Delete(wantOrder, 4, 5), "antigravity")
+		wantOrder = append(slices.Delete(wantOrder, 4, 6), "antigravity", "grok")
 	}
 	if len(form.Items) != len(wantOrder) {
 		t.Fatalf("picker has %d items, want %d", len(form.Items), len(wantOrder))
@@ -248,7 +248,7 @@ func TestHarnessSelectionComingSoon(t *testing.T) {
 	// The supported agents lead the list, each selectable, under the name setup shows.
 	leading := []string{"Claude Code & Desktop", "Codex TUI & Desktop", "Copilot (beta)", "OMP 18.18.2+ (beta)"}
 	if testApp.agents.IsSupported("antigravity") {
-		leading = append(leading, "Antigravity 1.2.4+ (beta)")
+		leading = append(leading, "Antigravity 1.2.4+ (beta)", "Grok Build (beta)")
 	}
 	for i, label := range leading {
 		if item := form.Items[i]; item.Label != label || item.Disabled || !testApp.agents.IsSupported(wantOrder[i]) {
@@ -278,20 +278,23 @@ func TestHarnessSelectionComingSoon(t *testing.T) {
 	}
 }
 
-// On Windows Antigravity is Coming Soon, listed under its own name: "(beta)" marks what
-// setup offers, and it offers Antigravity on macOS and Linux only.
+// On Windows Antigravity and Grok Build are Coming Soon, listed under their own names:
+// "(beta)" marks what setup offers, and it offers them on macOS and Linux only.
 func TestHarnessSelectionAntigravityOnWindows(t *testing.T) {
 	app := New(func(dir string) *agents.Registry { return builtin.AgentsOn(dir, "windows") }, "dev")
 	app.binDirs = func() []string { return nil }
 	app.configure(t.TempDir(), t.TempDir())
-	form := app.harnessSelectionForm(context.Background(), map[string]bool{"antigravity": true})
-	item := form.Items[len(form.Items)-1]
-	if item.Label != "Antigravity" || !item.Disabled || item.Selected || item.Reason != "Coming Soon" {
-		t.Fatalf("Antigravity's row on Windows = %+v, want plain, disabled and Coming Soon", item)
-	}
-	for _, other := range form.Items[:len(form.Items)-1] {
-		if strings.Contains(other.Label, "Antigravity") {
-			t.Fatalf("Antigravity listed twice: %+v", other)
+	form := app.harnessSelectionForm(context.Background(), map[string]bool{"antigravity": true, "grok": true})
+	last := len(form.Items) - 2
+	for i, label := range []string{"Antigravity", "Grok Build"} {
+		item := form.Items[last+i]
+		if item.Label != label || !item.Disabled || item.Selected || item.Reason != "Coming Soon" {
+			t.Fatalf("%s's row on Windows = %+v, want plain, disabled and Coming Soon", label, item)
+		}
+		for _, other := range form.Items[:last] {
+			if strings.Contains(other.Label, label) {
+				t.Fatalf("%s listed twice: %+v", label, other)
+			}
 		}
 	}
 }
@@ -313,13 +316,15 @@ func TestHarnessSelectionFlags(t *testing.T) {
 	if got, err := testApp.chooseHarnesses(&cobra.Command{}, &config.Config{}, setupFlags{harnesses: "omp,claude"}); err != nil || !slices.Equal(got, []string{"claude", "omp"}) {
 		t.Fatalf("--harness omp,claude = %v, %v", got, err)
 	}
-	got, err = testApp.chooseHarnesses(&cobra.Command{}, &config.Config{}, setupFlags{harnesses: "antigravity,claude"})
-	if !testApp.agents.IsSupported("antigravity") {
-		if err == nil || !strings.Contains(err.Error(), "Coming Soon") {
-			t.Fatalf("antigravity on Windows: %v, %v", got, err)
+	for _, name := range []string{"antigravity", "grok"} {
+		got, err = testApp.chooseHarnesses(&cobra.Command{}, &config.Config{}, setupFlags{harnesses: name + ",claude"})
+		if !testApp.agents.IsSupported(name) {
+			if err == nil || !strings.Contains(err.Error(), "Coming Soon") {
+				t.Fatalf("%s on Windows: %v, %v", name, got, err)
+			}
+		} else if err != nil || !slices.Equal(got, []string{"claude", name}) {
+			t.Fatalf("%s selection = %v, %v", name, got, err)
 		}
-	} else if err != nil || !slices.Equal(got, []string{"claude", "antigravity"}) {
-		t.Fatalf("antigravity selection = %v, %v", got, err)
 	}
 }
 
@@ -340,10 +345,12 @@ func TestHarnessSelectionFiltersSavedAgents(t *testing.T) {
 				}
 			}
 		}
-		// Antigravity is not on the emptied PATH, so only a saved choice keeps it.
+		// Antigravity and grok are not on the emptied PATH, so only a saved choice keeps them.
 		wantSetup := slices.Clone(wantInstalled)
-		if slices.Contains(saved, "antigravity") && testApp.agents.IsSupported("antigravity") {
-			wantSetup = append(wantSetup, "antigravity")
+		for _, name := range []string{"antigravity", "grok"} {
+			if slices.Contains(saved, name) && testApp.agents.IsSupported(name) {
+				wantSetup = append(wantSetup, name)
+			}
 		}
 		got, err := testApp.chooseHarnesses(cmd, cfg, setupFlags{assumeYes: true})
 		if err != nil || !slices.Equal(got, wantSetup) {

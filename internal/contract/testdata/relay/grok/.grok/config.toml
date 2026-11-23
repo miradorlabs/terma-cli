@@ -1,0 +1,9 @@
+[telemetry]
+otel_enabled = true
+otel_log_assistant_responses = true
+otel_log_tool_content = true
+otel_log_tool_details = true
+otel_log_user_prompts = true
+otel_logs_endpoint = "http://127.0.0.1:43180/relay-token/v1/logs"
+otel_logs_exporter = "otlp"
+otel_logs_protocol = "http/protobuf"

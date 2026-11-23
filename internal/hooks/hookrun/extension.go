@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"maps"
 	"slices"
 
 	"github.com/miradorlabs/terma-cli/internal/semconv"
@@ -70,14 +71,24 @@ func (x Extension) sessionStart(ctx context.Context, env Env) error {
 		env.Announce(r, sess, nil)
 		return nil
 	}
-	// A subagent's session is announced, never made active: it would claim the
-	// developer's next hand-written commit. Its edits still build its own manifest.
-	env.PruneManifests(r, sess.UpdatedAt)
-	if x.ClaimParent {
-		env.parent = in.ParentSessionID
-	}
-	env.EmitStart(r, sess, map[string]any{semconv.TermaSessionParentIDKey: in.ParentSessionID})
+	env.StartSubagent(r, sess, in.ParentSessionID, x.ClaimParent, nil)
 	return nil
+}
+
+// StartSubagent announces sess, a session an agent opened for a subagent of the session
+// parent: it ages out old manifests and spools the start naming parent
+// (terma.session.parent.id), with extra attributes only one agent knows. The session is never
+// made active: it would claim the developer's next hand-written commit. Its edits still build
+// its own manifest. With claimParent, the session's relay claim names parent too, for the
+// relay to stamp on the subagent's telemetry, where the agent's own does not name it.
+func (e Env) StartSubagent(r *Repo, sess session.Session, parent string, claimParent bool, extra map[string]any) {
+	e.PruneManifests(r, sess.UpdatedAt)
+	if claimParent {
+		e.parent = parent
+	}
+	attrs := map[string]any{semconv.TermaSessionParentIDKey: parent}
+	maps.Copy(attrs, extra)
+	e.EmitStart(r, sess, attrs)
 }
 
 func (x Extension) sessionEnd(ctx context.Context, env Env) error {

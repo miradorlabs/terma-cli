@@ -537,8 +537,9 @@ func CheckPathName(kind, name string) error {
 }
 
 // ensureNpmBuild installs version of an npm package under the versions directory and returns its
-// command bin, as `npm install` puts it in node_modules/.bin.
-func ensureNpmBuild(harness, pkg, bin string) func(version string) (string, error) {
+// command bin, as `npm install` puts it in node_modules/.bin. env is added to the install's
+// environment.
+func ensureNpmBuild(harness, pkg, bin string, env ...string) func(version string) (string, error) {
 	return func(version string) (string, error) {
 		if err := CheckPathName(harness+" version", version); err != nil {
 			return "", err
@@ -551,7 +552,7 @@ func ensureNpmBuild(harness, pkg, bin string) func(version string) (string, erro
 		ctx, cancel := context.WithTimeout(context.Background(), scenarioTimeout)
 		defer cancel()
 		cmd := exec.CommandContext(ctx, "npm", "install", "--silent", "--no-audit", "--no-fund", "--prefix", dir, pkg+"@"+version)
-		cmd.Env = installEnv()
+		cmd.Env = append(installEnv(), env...)
 		if out, err := cmd.CombinedOutput(); err != nil {
 			return "", fmt.Errorf("npm install %s@%s: %v\n%s", pkg, version, err, out)
 		}

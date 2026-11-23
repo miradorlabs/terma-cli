@@ -80,7 +80,8 @@ func (d Deps) Engine(ctx context.Context, stateDir string, cfg *config.Config, s
 		Hold: s.Hold, Dir: filepath.Join(claim.Dir(stateDir), relay.OutboxDir), Resolve: d.Resolver(cfg), Version: d.Version,
 		Lookup:   func(sessionID string, now time.Time) (claim.Claim, bool) { return claim.Read(stateDir, sessionID, now) },
 		CatchAll: d.CatchAll(), HeartbeatEvery: s.Heartbeat,
-		PeerPID: procinfo.FindSender, ProcessAlive: procinfo.Alive, ClaimCacheTTL: time.Second, PolicyCacheTTL: time.Second}
+		PeerPID: procinfo.FindSender, ProcessAlive: procinfo.Alive, ClaimCacheTTL: time.Second, PolicyCacheTTL: time.Second,
+		HomeDir: homeDir()}
 	if d.Bind != nil {
 		d.Bind(&opts, cfg)
 	}
@@ -88,6 +89,19 @@ func (d Deps) Engine(ctx context.Context, stateDir string, cfg *config.Config, s
 		opts.Logf = func(f string, a ...any) { fmt.Fprintf(logw, time.Now().Format("15:04:05.000 ")+f+"\n", a...) }
 	}
 	return opts
+}
+
+// homeDir is the home directory of the user the relay runs as, symlink-resolved, read once
+// as it starts: $HOME, as the agents it serves read it; "" when it cannot be read.
+func homeDir() string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+	if resolved, err := filepath.EvalSymlinks(home); err == nil {
+		return resolved
+	}
+	return home
 }
 
 // Resolver turns a claim into its session's policy.

@@ -74,6 +74,7 @@ var envPrefixes = map[string][]string{
 	"opencode": {"OPENCODE_", "OTEL_"},
 	"pi":       {"PI_"},
 	"omp":      {"OMP_", "PI_", "OTEL_"},
+	"grok":     {"GROK_", "XAI_", "OTEL_"},
 	"hermes":   {"HERMES_", "OPENAI_", "OPENROUTER_", "ANTHROPIC_"},
 	"dsh":      {"DSH_", "DEEPSEEK_", "OTEL_"},
 	"copilot":  {"COPILOT_", "GH_", "GITHUB_", "OTEL_"},

@@ -1,4 +1,4 @@
-package builtin
+package grok_test
 
 import (
 	"bufio"
@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
+	"github.com/miradorlabs/terma-cli/internal/agents/builtin"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/hooks/dispatch"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
@@ -24,6 +25,9 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/semconv"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
+
+// reg is every agent the build knows.
+var reg = builtin.Agents("")
 
 // grokHook is one hook process grok 1.0.92 started, as captured: its environment and the
 // payload on its stdin, the workspace scrubbed to /work/repo.
@@ -56,12 +60,19 @@ var grokPayloadFor = map[string]string{
 	"cursor-pre-compact":           "stop",
 	"cursor-subagent-stop":         "subagent_stop",
 	"cursor-session-end":           "session_end",
+
+	"grok-session-start":      "session_start",
+	"grok-user-prompt-submit": "user_prompt_submit",
+	"grok-post-tool-use":      "post_tool_use",
+	"grok-subagent-start":     "subagent_start",
+	"grok-stop":               "stop",
+	"grok-session-end":        "session_end",
 }
 
 // grokHooks reads the captured hooks, in the order grok started them.
 func grokHooks(t *testing.T) []grokHook {
 	t.Helper()
-	f, err := os.Open(filepath.Join("testdata", "grok_hooks.jsonl"))
+	f, err := os.Open(filepath.Join("testdata", "standdown_hooks.jsonl"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -90,9 +101,9 @@ type grokRun struct {
 	stdout, sessions []string
 }
 
-// runGrokHooks runs, for each captured hook in order, every Claude Code and Cursor event
-// mapped to it through dispatch.Run, with grok's environment when grok is set.
-func runGrokHooks(t *testing.T, grok bool) *grokRun {
+// runGrokHooks runs, for each captured hook in order, every event of owners mapped to it
+// through dispatch.Run, with grok's environment when grok is set.
+func runGrokHooks(t *testing.T, grok bool, owners ...string) *grokRun {
 	t.Helper()
 	root, stateDir, sp := hookruntest.Project(t)
 	hookruntest.RelayOn(t, stateDir)
@@ -111,7 +122,7 @@ func runGrokHooks(t *testing.T, grok bool) *grokRun {
 		Flush:   func() { run.flushes++ },
 	}
 	var events []string
-	for _, owner := range []string{"claude", "cursor"} {
+	for _, owner := range owners {
 		a, ok := reg.Lookup(owner)
 		if !ok {
 			t.Fatalf("no %s agent", owner)
@@ -156,7 +167,7 @@ func TestGrokHooksStandDown(t *testing.T) {
 	t.Setenv("CLAUDE_CONFIG_DIR", t.TempDir())
 
 	t.Run("grok", func(t *testing.T) {
-		run := runGrokHooks(t, true)
+		run := runGrokHooks(t, true, "claude", "cursor")
 		if events := hookruntest.Spooled(t, run.sp); len(events) != 0 {
 			t.Errorf("spooled %s", hookruntest.Names(events))
 		}
@@ -185,7 +196,7 @@ func TestGrokHooksStandDown(t *testing.T) {
 
 	// Control: the same hooks, without grok's environment, record and claim the session.
 	t.Run("without grok", func(t *testing.T) {
-		run := runGrokHooks(t, false)
+		run := runGrokHooks(t, false, "claude", "cursor")
 		events := hookruntest.Spooled(t, run.sp)
 		main := run.sessions[0]
 		claudeCode, _ := reg.Lookup("claude")
@@ -205,6 +216,34 @@ func TestGrokHooksStandDown(t *testing.T) {
 		}
 		if run.claims == 0 {
 			t.Error("Claimed never ran")
+		}
+	})
+
+	// grok's mark stands down another agent's entries only: grok's own events, in grok's own
+	// environment, record grok's session and claim it.
+	t.Run("grok's own events", func(t *testing.T) {
+		run := runGrokHooks(t, true, "grok")
+		events := hookruntest.Spooled(t, run.sp)
+		main := run.sessions[0]
+		for _, name := range []string{semconv.TermaSessionStartEvent, semconv.TermaUserMessageEvent, semconv.TermaSessionEndEvent} {
+			found := false
+			for _, e := range hookruntest.Named(events, name) {
+				if e.SessionID == main && e.Attrs[semconv.GenAIMainAgentNameKey] == "grok" {
+					found = true
+				}
+			}
+			if !found {
+				t.Errorf("no %s for %s as grok in %s", name, main, hookruntest.Names(events))
+			}
+		}
+		if c, ok := claim.Read(run.stateDir, main, time.Now()); !ok || c.ProjectID == "" || c.Tool != "grok" {
+			t.Errorf("claim %+v, %v", c, ok)
+		}
+		if run.claims == 0 || run.flushes == 0 {
+			t.Errorf("%d claims, %d flushes", run.claims, run.flushes)
+		}
+		if len(run.stdout) != 0 {
+			t.Errorf("replied %q", run.stdout)
 		}
 	})
 }
