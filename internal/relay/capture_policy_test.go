@@ -130,7 +130,7 @@ func TestQueuedExportsRecheckTheRepository(t *testing.T) {
 func TestQueuedCapturePolicyDropsCorruptBodies(t *testing.T) {
 	t.Parallel()
 	r := newRelay(Options{})
-	if got, _ := r.withholdQueued(Traces, []byte{0xff}, Policy{}); got != nil {
+	if got, _ := r.withholdQueued(Traces, []byte{0xff}, Policy{}, ""); got != nil {
 		t.Fatal("uncheckable body was forwarded")
 	}
 }

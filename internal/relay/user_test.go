@@ -49,7 +49,7 @@ func TestRelayNamesTheUserOnEveryPart(t *testing.T) {
 }
 
 // A queued part is checked again against the policy when it is sent: a stricter one by then
-// keeps the user the relay named.
+// keeps the user the relay named, in that user's own lane.
 func TestQueuedPartKeepsItsUserUnderAStricterPolicy(t *testing.T) {
 	t.Parallel()
 	r := newRelay(Options{Dir: t.TempDir(), Token: token})
@@ -59,7 +59,7 @@ func TestQueuedPartKeepsItsUserUnderAStricterPolicy(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	out, _ := r.withholdQueued(Traces, body, Policy{})
+	out, _ := r.withholdQueued(Traces, body, Policy{User: "user-a", UserAccount: accountA}, accountA)
 	var sent tracepb.TracesData
 	if err := proto.Unmarshal(out, &sent); err != nil {
 		t.Fatal(err)

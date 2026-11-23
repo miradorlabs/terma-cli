@@ -6,8 +6,14 @@ import (
 	"testing"
 	"time"
 
+	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
+	logspb "go.opentelemetry.io/proto/otlp/logs/v1"
+	resourcepb "go.opentelemetry.io/proto/otlp/resource/v1"
+	"google.golang.org/protobuf/proto"
+
 	"github.com/miradorlabs/terma-cli/internal/account/auth"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
+	"github.com/miradorlabs/terma-cli/internal/semconv"
 	"github.com/miradorlabs/terma-cli/internal/sendas"
 )
 
@@ -35,6 +41,102 @@ func TestAServerKeyMachinesBacklogLeavesOnlyUnderTheKey(t *testing.T) {
 	}
 	if entries, _ := (outbox{dir: dir2}).list(routeOf(sendas.NoPersonLane, claim.Claim{ProjectID: "p1"})); len(entries) != 1 {
 		t.Fatalf("no person's lane holds %d parts, want the older relay's one", len(entries))
+	}
+}
+
+// An older relay named its user on every part: one taken into no person's lane on a
+// server-key machine leaves with the key naming no one, and one in a person's lane names
+// only that person's user, never another's.
+func TestAQueuedPartNamesOnlyItsLanesUser(t *testing.T) {
+	t.Parallel()
+	named := func(user string) []byte {
+		b, _ := proto.Marshal(&logspb.LogsData{ResourceLogs: []*logspb.ResourceLogs{{
+			Resource:  &resourcepb.Resource{Attributes: []*commonpb.KeyValue{kv(semconv.TermaUserIDKey, user)}},
+			ScopeLogs: []*logspb.ScopeLogs{{LogRecords: []*logspb.LogRecord{{Attributes: []*commonpb.KeyValue{kv("session.id", "old")}}}}}}}})
+		return b
+	}
+	sentUser := func(t *testing.T, body []byte) string {
+		t.Helper()
+		var sent logspb.LogsData
+		if err := proto.Unmarshal(body, &sent); err != nil {
+			t.Fatal(err)
+		}
+		return attr(sent.ResourceLogs[0].GetResource().GetAttributes(), semconv.TermaUserIDKey)
+	}
+
+	u := newSignInUpstream(t)
+	dir := t.TempDir()
+	if err := (outbox{dir: legacyOutbox(dir)}).put(routeOf("", claim.Claim{ProjectID: "p1"}), claim.Claim{}.Repository, newEntry(time.Now(), Logs, 1), named("user-old")); err != nil {
+		t.Fatal(err)
+	}
+	r := serverKeyRelay(t, u, dir, sendas.NoPersonLane)
+	waitForCounters(t, r, func(c map[string]int) bool { return c["forwarded.logs"] == 1 })
+	u.mu.Lock()
+	body := u.sent[0]
+	u.mu.Unlock()
+	if got := sentUser(t, body); got != "" {
+		t.Fatalf("no person's part left naming %q; want no one", got)
+	}
+
+	pol := Policy{IncludePrompts: true, IncludeToolContent: true, User: "user-a", UserAccount: accountA}
+	for _, c := range []struct{ account, queued, want string }{
+		{accountA, "user-a", "user-a"},
+		{accountA, "user-old", "user-a"},
+		{accountB, "user-a", ""},
+		{sendas.NoPersonLane, "user-a", ""},
+	} {
+		out, _ := r.withholdQueued(Logs, named(c.queued), pol, c.account)
+		if got := sentUser(t, out); got != c.want {
+			t.Errorf("a part naming %q in lane %s left naming %q; want %q", c.queued, c.account, got, c.want)
+		}
+	}
+	unnamed := pol
+	unnamed.User = ""
+	if out, _ := r.withholdQueued(Logs, named("user-a"), unnamed, accountA); sentUser(t, out) != "" {
+		t.Errorf("under a policy that names no user, a part left naming %q", sentUser(t, out))
+	}
+}
+
+// A part this relay queued in its user's own lane, naming that user, is sent as it was
+// queued, never decoded: only a part naming another id, or one whose key appears anywhere
+// else, is decoded and named again.
+func TestAPartNamingItsOwnUserIsSentUndecoded(t *testing.T) {
+	t.Parallel()
+	r := newRelay(Options{Dir: t.TempDir(), Token: token})
+	pol := Policy{IncludePrompts: true, IncludeToolContent: true, User: "user-a", UserAccount: accountA}
+	queued := func(user, record string) []byte {
+		p := &part{signal: Logs, account: accountA, msg: &logspb.LogsData{ResourceLogs: []*logspb.ResourceLogs{{
+			Resource:  &resourcepb.Resource{},
+			ScopeLogs: []*logspb.ScopeLogs{{LogRecords: []*logspb.LogRecord{{Attributes: []*commonpb.KeyValue{kv("note", record)}}}}}}}}}
+		stamp(p, semconv.TermaUserIDKey, user)
+		b, err := proto.Marshal(p.msg)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return b
+	}
+	undecoded := func(in, out []byte) bool { return len(out) > 0 && &in[0] == &out[0] }
+	for _, c := range []struct {
+		name, user, record string
+		fast               bool
+	}{
+		{"its own user", "user-a", "", true},
+		{"another id", "user-old", "", false},
+		{"a longer id", "user-ab", "", false},
+		{"the key elsewhere too", "user-a", semconv.TermaUserIDKey, false},
+	} {
+		body := queued(c.user, c.record)
+		out, _ := r.withholdQueued(Logs, body, pol, accountA)
+		if undecoded(body, out) != c.fast {
+			t.Errorf("%s: sent undecoded %v; want %v", c.name, !c.fast, c.fast)
+		}
+		var sent logspb.LogsData
+		if err := proto.Unmarshal(out, &sent); err != nil {
+			t.Fatal(err)
+		}
+		if got := attr(sent.ResourceLogs[0].GetResource().GetAttributes(), semconv.TermaUserIDKey); got != "user-a" {
+			t.Errorf("%s: left naming %q; want user-a", c.name, got)
+		}
 	}
 }
 
