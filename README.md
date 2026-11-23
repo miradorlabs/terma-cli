@@ -473,7 +473,7 @@ Antigravity's `agy` has no telemetry export, so nothing of it passes the relay. 
 one named hook, `terma`, to `~/.gemini/config/hooks.json`, which every `agy` session loads,
 and leaves the file's other hooks, and its comments, as they are. It needs `agy` 1.2.4 or later,
 the first whose Stop hook runs reliably; `terma doctor` names the version it finds. Those hooks report the model, each turn,
-each tool step (its name and whether it failed, never its arguments) and how the turn
+each tool step (its name and whether it failed) and how the turn
 ended, and the files `agy`'s own file tools write are stamped on your commits. Each hook
 also reads the conversation's transcript and sends every model call written since the last
 one: its model and its input, cache-read and output tokens. `agy` does not count thinking
@@ -491,6 +491,29 @@ conversation lasts, so one you resume from a second repository is still recorded
 first, whichever of the two your team's policy collects
 ([#174](https://github.com/miradorlabs/terma-cli/issues/174)).
 
+What a conversation says goes by the same rule, from the same hooks, while you chose
+Antigravity at setup (or in global mode). Each prompt and each reply goes while your team's
+policy collects prompts. A prompt still counts when its text is withheld. Each tool call's
+arguments and each tool's result go while the policy collects tool content. The prompt and
+the reply come from the transcript, never from the copy `agy` repeats in every hook. A
+prompt from T3 Code loses T3 Code's own instructions and notes first, and keeps only the
+request; when terma cannot tell where the request starts and ends, the prompt goes without
+its text. A prompt or a reply longer than 16 KiB is cut there and marked as cut. A result is
+cut at 16 KiB and ends with how many characters were dropped. Arguments longer than 16 KiB
+keep their short values, such as a path or a command, and each long value is cut to 2 KiB
+and ends the same way. Thinking is not sent. A tool's result on a transcript line over 8 MiB
+is lost.
+
+Two rules keep another repository's content out. A conversation sends no content at all
+while any folder it works in is outside a repository your team's policy collects: resumed
+from such a repository, or from a folder outside git, it sends none for the rest of its
+life. A tool call whose arguments name a file in a repository the policy does not collect
+sends neither its arguments nor its result; links and nested clones are followed to the
+repository that holds the file, and a file terma cannot place counts as not collected. A
+file in no repository at all, such as a note in your home folder, is shown, as Claude Code
+and Codex show it. A shell command or an MCP tool that reads another repository is not
+caught, and neither is a reply that repeats what a refused read returned.
+
 T3 Code runs its own copy of Antigravity, with a folder of its own in place of `~/.gemini`.
 Setup writes the same hook into each T3 Code Antigravity provider folder too:
 `~/.t3/userdata/providers/<instance>/<id>/config/hooks.json`, or the same path under
@@ -506,8 +529,8 @@ time terma runs after an upgrade, when another folder has terma's hook switched 
 `terma` hook you set `"enabled": false` in one folder stays off there and is never copied
 to another. While a folder lacks the hook, `terma doctor` names its file. T3 Code
 threads report what `agy` sessions do: the session, each turn, each tool step, each model
-call with its tokens, and the files its file tools write. They report no plan, quota or
-account, since T3 Code runs Antigravity with no status line.
+call with its tokens, what was said, and the files its file tools write. They report no
+plan, quota or account, since T3 Code runs Antigravity with no status line.
 
 Setup also puts `terma hook antigravity-statusline` in `statusLine` in
 `~/.gemini/antigravity-cli/settings.json`. Its payload is the only place `agy` names your

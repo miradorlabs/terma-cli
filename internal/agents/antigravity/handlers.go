@@ -126,6 +126,11 @@ func preInvocation(ctx context.Context, env hookrun.Env) error {
 	// The turn is recorded first: agy calls the model only once this hook returns.
 	turn := beginAntigravityTurn(env, r, in)
 	id := in.id()
+	// One hold of the conversation: the transcript read (the turn's prompt, and a cancelled
+	// turn's last call passed, see turn.go), then this hook's own events, each stamped.
+	conv := openAntigravityConversation(ctx, env, r, in)
+	defer conv.close()
+	read := conv.read(ctx)
 	sess := env.NewSession(r, id, antigravityTool, in.ModelName)
 	now := sess.UpdatedAt
 	if active, _ := r.Store.Active(now, 0); active != nil && active.ID == id && !active.StartedAt.IsZero() {
@@ -135,11 +140,11 @@ func preInvocation(ctx context.Context, env hookrun.Env) error {
 	// A later turn, or a resumed conversation, was announced before.
 	if steps, _, stepsKnown := hookrun.JSONNumber(in.InitialNumSteps, true); !stepsKnown || steps <= 1 {
 		env.PruneManifests(r, now)
-		env.EmitStart(r, sess, nil)
+		conv.at(env).EmitStart(r, sess, nil)
 	}
-	// This passes a cancelled turn's last call (see turn.go).
-	read := captureAntigravityCalls(ctx, env, r, in)
-	env.CaptureObservation(ctx, r, hookrun.Observation{
+	observed := conv.at(env)
+	conv.close()
+	observed.CaptureObservation(ctx, r, hookrun.Observation{
 		Tool: antigravityTool, Source: sourceAntigravityHook, StateDir: antigravityObservationDir,
 		SessionID: id, Hook: "PreInvocation", TurnID: turn, Attrs: antigravityObservationAttrs(in, "PreInvocation", turn, read),
 	})
@@ -185,8 +190,10 @@ func antigravityEditedPaths(in *antigravityHookInput) []string {
 }
 
 // postToolUse records every tool step as a `terma.tool.call`, since agy has no other
-// export, the file an edit changed and the skill a read loaded; `toolCall.args` is opened
-// only for those paths.
+// export, with its arguments where the content rules allow, the file an edit changed and the
+// skill a read loaded. Under one hold of the conversation it records a refusal of the call's
+// content, reads the transcript, then spools the call, so the model call that asked for the
+// tool sorts before it.
 func postToolUse(ctx context.Context, env hookrun.Env) error {
 	defer antigravityAck(env)
 	in, ok := antigravityInput(env)
@@ -202,18 +209,37 @@ func postToolUse(ctx context.Context, env hookrun.Env) error {
 	id := in.id()
 	turn := antigravityTurnID(env, r, id)
 	call, called := antigravityToolCallAttrs(in, turn)
+	conv := openAntigravityConversation(ctx, env, r, in)
+	defer conv.close()
+	step, stepped := call[semconv.TermaStepIndexKey].(int64)
+	if stepped {
+		conv.callStep = step
+	}
+	refused := antigravityRefuses(env, in)
+	if refused && (!stepped || !conv.refuse(step)) && antigravityTranscript(in) != "" {
+		// A refusal that cannot be recorded must not let the result through: the turn ends,
+		// as an unreadable payload ends it. With no transcript there is no result to keep back.
+		endAntigravityTurn(env, id)
+		turn = ""
+	}
+	conv.read(ctx)
 	// A skill's use rides on the read that loaded it; its definition goes once per conversation.
 	skill, used := antigravityUsedSkill(env, r, in)
 	if called {
 		if used {
 			nameSkill(call, skill)
 		}
-		env.EmitFor(r, spool.Event{Name: semconv.TermaToolCallEvent, SessionID: id, Attrs: call})
+		// Arguments go only in this hook's own turn, under the lock, unless refused.
+		if turn != "" && conv.held && !refused && conv.contentFor().tools {
+			if args, ok := cutArguments(in.ToolCall.Args); ok {
+				call[semconv.GenAIToolCallArgumentsKey] = args
+			}
+		}
+		env.EmitFor(r, spool.Event{Name: semconv.TermaToolCallEvent, SessionID: id, Time: conv.callTime(), Attrs: call})
 	}
 	if used {
-		hookrun.SpoolSkills(env, r, antigravitySkillStateDir, id, antigravitySkillAttrs(), []hookrun.Skill{skill})
+		hookrun.SpoolSkills(conv.at(env), r, antigravitySkillStateDir, id, antigravitySkillAttrs(), []hookrun.Skill{skill})
 	}
-	captureAntigravityCalls(ctx, env, r, in)
 
 	// A failed edit changed nothing. No toolCall yields no paths, so this guard also makes
 	// in.ToolCall safe below.
@@ -221,6 +247,8 @@ func postToolUse(ctx context.Context, env hookrun.Env) error {
 	if len(files) == 0 || in.Error != "" {
 		return nil
 	}
+	env = conv.at(env)
+	conv.close()
 	// The step's terma.tool.call ids: this is what that call changed, not a second call.
 	ids := map[string]any{}
 	for _, k := range []string{semconv.GenAIToolCallIDKey, semconv.TermaStepIndexKey, semconv.TermaTurnIDKey} {
@@ -300,13 +328,21 @@ func antigravityObserve(ctx context.Context, env hookrun.Env, hook string) error
 	}
 	begun := antigravityTurnBegun(env, in.id())
 	turn := antigravityTurnID(env, r, in.id())
-	read := captureAntigravityCalls(ctx, env, r, in)
+	conv := openAntigravityConversation(ctx, env, r, in)
+	defer conv.close()
+	read := conv.read(ctx)
+	if hook == "Stop" {
+		// What the turn's refusals left goes with it.
+		conv.endTurn()
+	}
+	observed := conv.at(env)
+	conv.close()
 	if hook == "Stop" {
 		// Stop ends the turn it found and no other; a prompt or a wake after it starts with
 		// a PreInvocation at invocation 0, which records the turn again.
 		endAntigravityTurnBegun(env, in.id(), begun)
 	}
-	env.CaptureObservation(ctx, r, hookrun.Observation{
+	observed.CaptureObservation(ctx, r, hookrun.Observation{
 		Tool: antigravityTool, Source: sourceAntigravityHook, StateDir: antigravityObservationDir,
 		SessionID: in.id(), Hook: hook, TurnID: turn, Attrs: antigravityObservationAttrs(in, hook, turn, read),
 	})

@@ -14,6 +14,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
+	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
 // testdata/t3_acp_hooks.jsonl is every hook payload of a two-turn T3 Code thread run by its
@@ -21,6 +22,9 @@ import (
 // and the home folder's path replaced by /home/dev; the thread worked in t3Worktree.
 // testdata/t3_acp_transcript.jsonl is that conversation's transcript, each step's index,
 // source, type, status, time, model, tokens and tool names. Line i is step i.
+// testdata/t3_acp_transcript_content.jsonl is a copy with made-up content in the real
+// shapes: each prompt in agy's envelope around T3 Code's wrapper, each tool's result, and
+// each turn's reply.
 const (
 	t3Conversation = "4f56f53a-9318-4a8a-8136-5c8bd563b2ee"
 	t3Worktree     = "/home/dev/.t3/worktrees/terma-cli/t3-2c0e1164-91bdb0d41c8fe828"
@@ -36,7 +40,59 @@ type t3Payload struct {
 
 // T3 Code's Antigravity runs terma's hooks from its own home, in the thread's worktree: the
 // turn's tool steps and each model call, with its tokens, are sent as from agy's own home.
+// With Antigravity chosen and content in the transcript, each prompt goes with T3's wrapper
+// off, each call with its arguments, each result and each reply.
 func TestAntigravityT3CodeThreadSendsItsTurns(t *testing.T) {
+	t.Run("as captured", func(t *testing.T) { replayT3(t, "t3_acp_transcript.jsonl", nil) })
+	t.Run("with made-up content", func(t *testing.T) {
+		got := replayT3(t, "t3_acp_transcript_content.jsonl", []string{Agent{}.Name()})
+		var prompts []string
+		for _, e := range hookruntest.Named(got, semconv.TermaUserMessageEvent) {
+			prompts = append(prompts, e.Attrs[semconv.TermaMessageIDKey].(string)+" "+e.Attrs[semconv.TermaTurnIDKey].(string)+" "+e.Attrs[semconv.TermaMessageTextKey].(string))
+		}
+		want := []string{
+			"step-0 turn-1 [T3 Code: the agent in T3 thread \"made-up\" sent this message, not the user.]\n\nAct as a made-up sub-agent.\n\nWrite alpha to a made-up file, then change it.",
+			"step-14 turn-15 [T3 Code: the agent in T3 thread \"made-up\" sent this message, not the user.]\nNow read the made-up file back.",
+		}
+		if strings.Join(prompts, "|") != strings.Join(want, "|") {
+			t.Errorf("prompts\n got %q\nwant %q", prompts, want)
+		}
+		var replies []string
+		for _, e := range hookruntest.Named(got, semconv.TermaAssistantMessageEvent) {
+			replies = append(replies, e.Attrs[semconv.TermaMessageIDKey].(string)+" "+e.Attrs[semconv.TermaTurnIDKey].(string)+" "+e.Attrs[semconv.TermaMessageTextKey].(string))
+		}
+		if strings.Join(replies, "|") != "step-13 turn-1 Made-up reply at step 13.|step-21 turn-15 Made-up reply at step 21." {
+			t.Errorf("replies %q", replies)
+		}
+		calls := map[string]time.Time{}
+		for _, e := range hookruntest.Named(got, semconv.TermaToolCallEvent) {
+			id := e.Attrs[semconv.GenAIToolCallIDKey].(string)
+			calls[id] = e.Time
+			if args, ok := e.Attrs[semconv.GenAIToolCallArgumentsKey].(map[string]any); !ok || len(args) == 0 {
+				t.Errorf("%s went without its arguments: %v", id, e.Attrs)
+			}
+		}
+		var results []string
+		for _, e := range hookruntest.Named(got, semconv.TermaToolResultEvent) {
+			id := e.Attrs[semconv.GenAIToolCallIDKey].(string)
+			results = append(results, id)
+			if text, _ := e.Attrs[semconv.GenAIToolCallResultKey].(string); !strings.HasSuffix(text, "made-up output of "+strings.Replace(id, "-", " ", 1)) {
+				t.Errorf("%s's result: %q", id, text)
+			}
+			if at, ok := calls[id]; !ok || !e.Time.After(at) {
+				t.Errorf("%s's result has no call before it", id)
+			}
+		}
+		if s := strings.Join(results, " "); s != "step-2 step-4 step-7 step-9 step-12 step-17 step-19" {
+			t.Errorf("results %s", s)
+		}
+	})
+}
+
+// replayT3 runs the capture's hooks against the transcript fixture as it grew, with agents
+// chosen, checks what is sent today, and returns every event spooled.
+func replayT3(t *testing.T, fixture string, agents []string) []spool.Event {
+	t.Helper()
 	root := hookruntest.InitRepo(t)
 	home := isolatedHome(t)
 	provider := filepath.Join(home, ".t3", "userdata", "providers", "antigravity", filepath.Base(t3Provider))
@@ -44,7 +100,7 @@ func TestAntigravityT3CodeThreadSendsItsTurns(t *testing.T) {
 	if err := os.MkdirAll(filepath.Dir(transcript), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	steps, err := os.ReadFile(filepath.Join("testdata", "t3_acp_transcript.jsonl"))
+	steps, err := os.ReadFile(filepath.Join("testdata", fixture))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -70,13 +126,15 @@ func TestAntigravityT3CodeThreadSendsItsTurns(t *testing.T) {
 	}
 
 	// upTo is how many steps are on disk when payload i runs: a turn's model call waits for
-	// PreInvocation, and a step's tool result is written before its PostToolUse.
+	// PreInvocation, and a step's tool result is written only once its PostToolUse hooks have
+	// returned (seen on T3 Code's 1.5.14 and agy 1.5.15 with a hook that slept 3 s, for read,
+	// write, edit, command and MCP tools).
 	upTo := func(i int) int {
 		switch p := parsed[i]; p.Event {
 		case "PreInvocation":
 			return p.InitialNumSteps
 		case "PostToolUse":
-			return p.StepIdx + 1
+			return p.StepIdx
 		}
 		// PostInvocation and Stop: what the next invocation finds, less the next turn's
 		// prompt after a Stop.
@@ -108,7 +166,7 @@ func TestAntigravityT3CodeThreadSendsItsTurns(t *testing.T) {
 			hookruntest.WriteFile(t, root, "probe17.txt", "alpha\n")
 		}
 		var stdout bytes.Buffer
-		env := hookrun.Env{StateDir: stateDir, Now: time.Now(), Cwd: hookDir, Policy: hookruntest.Admitting(root), Stdin: strings.NewReader(p), Stdout: &stdout, Spool: sp, Version: "test"}
+		env := hookrun.Env{StateDir: stateDir, Now: time.Now(), Cwd: hookDir, Policy: hookruntest.Admitting(root), Agents: agents, Stdin: strings.NewReader(p), Stdout: &stdout, Spool: sp, Version: "test"}
 		if err := handlers[parsed[i].Event](context.Background(), env); err != nil {
 			t.Fatal(err)
 		}
@@ -120,7 +178,8 @@ func TestAntigravityT3CodeThreadSendsItsTurns(t *testing.T) {
 	var tools, calls []string
 	var input, output int64
 	touched := 0
-	for _, e := range hookruntest.Spooled(t, sp) {
+	spooled := hookruntest.Spooled(t, sp)
+	for _, e := range spooled {
 		if e.SessionID != t3Conversation {
 			t.Errorf("%s for session %q", e.Name, e.SessionID)
 		}
@@ -175,4 +234,5 @@ func TestAntigravityT3CodeThreadSendsItsTurns(t *testing.T) {
 	if touched == 0 {
 		t.Error("the files its file tools wrote were not recorded")
 	}
+	return spooled
 }

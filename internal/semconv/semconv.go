@@ -29,6 +29,8 @@ const (
 	GenAIToolCallArgumentsKey = "gen_ai.tool.call.arguments"
 	// GenAIToolCallIDKey is gen_ai.tool.call.id: The tool call identifier.
 	GenAIToolCallIDKey = "gen_ai.tool.call.id"
+	// GenAIToolCallResultKey is gen_ai.tool.call.result: The result returned by the tool call (if any and if execution was successful).
+	GenAIToolCallResultKey = "gen_ai.tool.call.result"
 	// GenAIToolNameKey is gen_ai.tool.name: Name of the tool utilized by the agent.
 	GenAIToolNameKey = "gen_ai.tool.name"
 	// GenAIToolTypeKey is gen_ai.tool.type: Type of the tool utilized by the agent
@@ -391,6 +393,8 @@ const (
 	TermaSubagentStartEvent = "terma.subagent.start"
 	// TermaToolCallEvent is terma.tool.call: One tool call, keyed on its call id, which is its replay identity.
 	TermaToolCallEvent = "terma.tool.call"
+	// TermaToolResultEvent is terma.tool.result: One tool call's result, read apart from the call; it joins the call's own record by its call id.
+	TermaToolResultEvent = "terma.tool.result"
 	// TermaUserMessageEvent is terma.user.message: One prompt to an agent whose export may lose its prompts, from the agent's prompt hook.
 	TermaUserMessageEvent = "terma.user.message"
 )

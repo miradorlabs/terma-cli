@@ -234,16 +234,20 @@ func (r Router) refused(ctx context.Context, serverKey bool, token string, err e
 
 // Allowed rechecks the policy ceiling on every delivery, since hook events bypass the
 // relay and may predate a tightened policy: an event from a repository the list no longer
-// names, a reply or a thread's name the policy's prompts-off withholds, sends nothing. Outgoing removes the
-// rest of what the policy withholds.
+// names, a reply or a thread's name the policy's prompts-off withholds, a tool's result its
+// tool-content-off withholds, sends nothing, nor does a reply or result whose agent the
+// developer no longer chose. Outgoing removes the rest of what the policy withholds.
 func (r Router) Allowed(org config.Policy, projectID string, e spool.Event) bool {
 	org = routing.EffectivePolicy(r.StateDir, org, projectID)
 	if org.CollectsNothing || e.Global && !org.Global() || !org.Admits(e.Repository) {
 		return false
 	}
-	if e.Name == semconv.TermaAssistantMessageEvent || e.Name == semconv.TermaSessionTitleEvent {
-		prompts, _ := org.Content()
+	prompts, toolContent := org.Content()
+	switch e.Name {
+	case semconv.TermaAssistantMessageEvent, semconv.TermaSessionTitleEvent:
 		return prompts && r.consented(e, org.Global())
+	case semconv.TermaToolResultEvent:
+		return toolContent && r.consented(e, org.Global())
 	}
 	return true
 }

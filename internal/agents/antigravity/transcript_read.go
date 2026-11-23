@@ -13,7 +13,7 @@ import (
 )
 
 // Reading agy's transcript: how far a conversation's transcript was read, and the lines
-// past that point that a hook may send. Which of them it sends is captureAntigravityCalls'.
+// past that point that a hook may send. Which of them it sends is antigravitySend's.
 
 // antigravityCallState is how far a conversation's transcript was read.
 type antigravityCallState struct {
@@ -27,9 +27,23 @@ type antigravityCallState struct {
 	// follow it in order, one line each.
 	Results []string `json:"results,omitempty"`
 	// Before is the transcript's size when this state began: the lines that start before it
-	// are never sent and never counted. 0 once a read has passed it, and for a state that
-	// began with no transcript.
+	// are never sent and never counted, but for the turn's own prompt (readAntigravitySteps).
+	// 0 once a read has passed it, and for a state that began with no transcript.
 	Before int64 `json:"before,omitempty"`
+	// Refused are the steps whose content a hook refused (content_paths.go), sorted: their
+	// results are withheld. Cleared once read past, and at the turn's Stop.
+	Refused []int64 `json:"refused,omitempty"`
+	// Withheld is the turn whose replies are withheld after a refusal, when
+	// antigravityWithholdsRepliesAfterRefusal is on.
+	Withheld *antigravityWithheld `json:"withheld,omitempty"`
+	// Clock is the last time stamped on an event of the conversation, in Unix milliseconds.
+	Clock int64 `json:"clock,omitempty"`
+}
+
+// antigravityWithheld is a turn whose replies after step From are withheld.
+type antigravityWithheld struct {
+	Turn string `json:"turn"`
+	From int64  `json:"from"`
 }
 
 // antigravityLineLimit bounds a transcript line terma reads; a longer one (a tool's whole
@@ -47,10 +61,13 @@ type antigravityStep struct {
 	CacheReadTokens json.RawMessage       `json:"cache_read_tokens"`
 	OutputTokens    json.RawMessage       `json:"output_tokens"`
 	ToolCalls       []antigravityToolCall `json:"tool_calls"`
-	// Content is read only on an invoke_subagent result, for the child's id.
+	// Content is a prompt's text in agy's envelope, a reply's text, or a tool's result, which
+	// for invoke_subagent names the child.
 	Content string `json:"content"`
 	// subagentResult is set on the result of an invoke_subagent call.
 	subagentResult bool
+	// prompt is set on the USER_INPUT the turn being read began with.
+	prompt bool
 }
 
 type antigravityToolCall struct {
@@ -60,11 +77,17 @@ type antigravityToolCall struct {
 // antigravityTailLen is how many bytes before the offset identify the file read so far.
 const antigravityTailLen = 256
 
-// readAntigravitySteps hands each call, and each invoke_subagent result, past last's
-// offset and above last.Step to emit, in order, and returns the state after the last line
-// emit took. A line that starts before last.Before is passed without emit. emit returning
-// false, or ctx done before a line, stops the read there, for the next hook.
-func readAntigravitySteps(ctx context.Context, path string, last antigravityCallState, emit func(s antigravityStep) bool) (antigravityCallState, error) {
+// antigravityKept are the line types the reader hands on: a prompt, a model call (and its
+// reply), a tool's result.
+var antigravityKept = map[string]bool{"USER_INPUT": true, "PLANNER_RESPONSE": true, "GENERIC": true}
+
+// readAntigravitySteps hands each prompt, call and tool result past last's offset and above
+// last.Step to emit, in order, and returns the state after the last line emit took. A line
+// that starts before last.Before is passed without emit, but for the USER_INPUT at exactly
+// step prompt (-1 for none), the turn's own prompt, written just before the turn's first
+// hook: it is handed on marked, before the boundary or not. emit returning false, or ctx
+// done before a line, stops the read there, for the next hook.
+func readAntigravitySteps(ctx context.Context, path string, last antigravityCallState, prompt int64, emit func(s antigravityStep) bool) (antigravityCallState, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		// Missing too: a subagent's first hooks run before its transcript exists.
@@ -120,8 +143,8 @@ func readAntigravitySteps(ctx context.Context, path string, last antigravityCall
 			advance(n)
 			continue
 		}
-		if !bytes.Contains(line, []byte(`"PLANNER_RESPONSE"`)) &&
-			(len(state.Results) == 0 || !bytes.Contains(line, []byte(`"GENERIC"`))) {
+		if !bytes.Contains(line, []byte(`"PLANNER_RESPONSE"`)) && !bytes.Contains(line, []byte(`"GENERIC"`)) &&
+			!bytes.Contains(line, []byte(`"USER_INPUT"`)) {
 			advance(n)
 			continue
 		}
@@ -147,8 +170,9 @@ func readAntigravitySteps(ctx context.Context, path string, last antigravityCall
 				results = results[1:]
 			}
 		}
-		if step > state.Step && (s.Type == "PLANNER_RESPONSE" || s.subagentResult) {
-			if state.Offset >= state.Before && !emit(s) {
+		if step > state.Step && antigravityKept[s.Type] {
+			s.prompt = s.Type == "USER_INPUT" && prompt >= 0 && step == prompt
+			if (state.Offset >= state.Before || s.prompt) && !emit(s) {
 				state.Tail = antigravityTail(f, state.Offset)
 				return state, nil
 			}
