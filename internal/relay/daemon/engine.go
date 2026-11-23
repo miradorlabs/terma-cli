@@ -10,8 +10,6 @@ import (
 	"slices"
 	"time"
 
-	logspb "go.opentelemetry.io/proto/otlp/logs/v1"
-
 	"github.com/miradorlabs/terma-cli/internal/account/keystore"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/procinfo"
@@ -38,16 +36,14 @@ type Deps struct {
 	Endpoint func(cfg *config.Config, projectID string) string
 	// User is who parts sent to projectID at endpoint name under cfg's profile, by Mirador user id.
 	User func(cfg *config.Config, projectID, endpoint string) string
-	// SendHeartbeat delivers a heartbeat with a project's key.
-	SendHeartbeat func(ctx context.Context, beat *logspb.LogsData) error
 	// HookPolicy is the organization's policy as a hook reads it.
 	HookPolicy func() config.Policy
 	// LoadConfig is the configuration as the command line resolves it.
 	LoadConfig func() (*config.Config, error)
 	// RefreshPolicy fetches and stores cfg's project's policy.
 	RefreshPolicy func(ctx context.Context, cfg *config.Config) error
-	// Bind gives the relay cfg's sign-in to send with, and what it binds queued parts to;
-	// nil sends only with a server key.
+	// Bind gives the relay cfg's sign-in to send and heartbeat with, and what it binds
+	// queued parts to; nil sends only with a server key and sends no heartbeats.
 	Bind func(opts *relay.Options, cfg *config.Config)
 }
 
@@ -83,7 +79,7 @@ func (d Deps) Engine(ctx context.Context, stateDir string, cfg *config.Config, s
 	opts := relay.Options{Correlators: d.Correlators, Capturers: d.Capturers,
 		Hold: s.Hold, Dir: filepath.Join(claim.Dir(stateDir), relay.OutboxDir), Resolve: d.Resolver(cfg), Version: d.Version,
 		Lookup:   func(sessionID string, now time.Time) (claim.Claim, bool) { return claim.Read(stateDir, sessionID, now) },
-		CatchAll: d.CatchAll(), HeartbeatSend: d.SendHeartbeat, HeartbeatEvery: s.Heartbeat,
+		CatchAll: d.CatchAll(), HeartbeatEvery: s.Heartbeat,
 		PeerPID: procinfo.FindSender, ProcessAlive: procinfo.Alive, ClaimCacheTTL: time.Second, PolicyCacheTTL: time.Second}
 	if d.Bind != nil {
 		d.Bind(&opts, cfg)

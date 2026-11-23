@@ -111,8 +111,6 @@ func (e Env) unpark(r *Repo) {
 // name accounts, one per session (session.Store.Accounts): it goes in the lane recordLane
 // gives it, or with none is lost, counted as ambiguous_push.
 func (e Env) emitRecord(r *Repo, ev spool.Event, accounts []string) bool {
-	ev = e.stamp(r, ev)
-	e.claimForRelay(r, ev)
 	if e.lostOutside(r, 1) {
 		return true
 	}
@@ -121,7 +119,9 @@ func (e Env) emitRecord(r *Repo, ev spool.Event, accounts []string) bool {
 		e.countLost(r, sendas.LostAmbiguousPush, 1)
 		return true
 	}
+	ev = e.stamp(r, ev)
 	ev.Account, ev.NoPerson = lane.Account, lane.NoPerson
+	e.claimForRelay(r, ev)
 	return e.emitOrPark(r, ev)
 }
 

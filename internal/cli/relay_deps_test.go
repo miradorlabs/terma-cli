@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -15,10 +16,25 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/account/auth"
 	"github.com/miradorlabs/terma-cli/internal/account/keystore"
+	"github.com/miradorlabs/terma-cli/internal/account/secret"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/relay"
+	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
 )
+
+func testHeartbeatOpts(t *testing.T) relay.Options {
+	t.Helper()
+	cfg, err := testApp.loadConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return testApp.relayDeps().Engine(t.Context(), testApp.stateDir, cfg, daemon.Settings{}, nil)
+}
+
+func emptyBeat() *logspb.LogsData {
+	return &logspb.LogsData{ResourceLogs: []*logspb.ResourceLogs{{ScopeLogs: []*logspb.ScopeLogs{{LogRecords: []*logspb.LogRecord{{}}}}}}}
+}
 
 // On a person's profile a beat goes with the sign-in's token to the selected team's ingest,
 // naming the team; it names the signed-in user only for the team whose validated policy the
@@ -49,14 +65,12 @@ func TestHeartbeatGoesWithTheSignIn(t *testing.T) {
 	if err := keystore.Set(testApp.dir, "team", "ter_srv_team", keystore.Hosts{OTLP: srv.URL}); err != nil {
 		t.Fatal(err)
 	}
-	beat := func() *logspb.LogsData {
-		return &logspb.LogsData{ResourceLogs: []*logspb.ResourceLogs{{ScopeLogs: []*logspb.ScopeLogs{{LogRecords: []*logspb.LogRecord{{}}}}}}}
-	}
-	if err := testApp.relayHeartbeatSend(context.Background(), beat()); err == nil {
+	send := testHeartbeatOpts(t).HeartbeatSend
+	if err := send(context.Background(), emptyBeat()); err == nil {
 		t.Fatal("a beat with no team selected was sent")
 	}
 	selectPolicy(t, config.Policy{Mode: config.ModeRepo, TeamID: "team", Revision: 1, FetchedAt: time.Now()})
-	if err := testApp.relayHeartbeatSend(context.Background(), beat()); err != nil {
+	if err := send(context.Background(), emptyBeat()); err != nil {
 		t.Fatal(err)
 	}
 	want := []string{"Bearer " + fakeUserToken("u-1") + " team=u-1"}
@@ -66,7 +80,7 @@ func TestHeartbeatGoesWithTheSignIn(t *testing.T) {
 	if err := auth.DeleteCredential(testApp.dir, config.DefaultProfile); err != nil {
 		t.Fatal(err)
 	}
-	if err := testApp.relayHeartbeatSend(context.Background(), beat()); err == nil || len(sent) != 1 {
+	if err := send(context.Background(), emptyBeat()); err == nil || len(sent) != 1 {
 		t.Fatalf("a signed-out profile sent a beat: %v, %q", err, sent)
 	}
 }
@@ -85,15 +99,15 @@ func TestServerKeyHeartbeatNamesNoOne(t *testing.T) {
 	if err := keystore.Set(testApp.dir, "elsewhere", "ter_srv_elsewhere", hosts); err != nil {
 		t.Fatal(err)
 	}
-	beat := &logspb.LogsData{ResourceLogs: []*logspb.ResourceLogs{{ScopeLogs: []*logspb.ScopeLogs{{LogRecords: []*logspb.LogRecord{{}}}}}}}
-	if err := testApp.relayHeartbeatSend(context.Background(), beat); err != nil {
+	send := testHeartbeatOpts(t).HeartbeatSend
+	if err := send(context.Background(), emptyBeat()); err != nil {
 		t.Fatal(err)
 	}
 	if err := keystore.Set(testApp.dir, "team", "ter_srv_team", hosts); err != nil {
 		t.Fatal(err)
 	}
 	selectPolicy(t, config.Policy{Mode: config.ModeRepo, TeamID: "team", Revision: 1, FetchedAt: time.Now()})
-	if err := testApp.relayHeartbeatSend(context.Background(), beat); err != nil {
+	if err := send(context.Background(), emptyBeat()); err != nil {
 		t.Fatal(err)
 	}
 	if want := []string{"ter_srv_elsewhere ", "ter_srv_team "}; strings.Join(sent, "|") != strings.Join(want, "|") {
@@ -189,8 +203,8 @@ func TestARetiredHeartbeatMarksTheSignIn(t *testing.T) {
 				t.Fatal(err)
 			}
 			selectPolicy(t, config.Policy{Mode: config.ModeRepo, TeamID: "team", Revision: 1, FetchedAt: time.Now()})
-			beat := &logspb.LogsData{ResourceLogs: []*logspb.ResourceLogs{{ScopeLogs: []*logspb.ScopeLogs{{LogRecords: []*logspb.LogRecord{{}}}}}}}
-			if err := testApp.relayHeartbeatSend(context.Background(), beat); err == nil {
+			send := testHeartbeatOpts(t).HeartbeatSend
+			if err := send(context.Background(), emptyBeat()); err == nil {
 				t.Fatal("a refused beat was taken")
 			}
 			if !auth.Retired(testApp.dir, config.DefaultProfile) {
@@ -247,4 +261,140 @@ func TestAccountUserNamesOnlyTheTokensOwnUser(t *testing.T) {
 			t.Errorf("for account %q named %q, want %q", account, got, want)
 		}
 	}
+}
+
+// Heartbeats share the relay's sign-in source, so the system keychain is read once across
+// many beats and OTLP sends for the same session rather than prompting on every beat.
+func TestHeartbeatSharesTheRelaysSignInAndReadsTheKeychainOnce(t *testing.T) {
+	f, ingest := pairingSandbox(t)
+	if auth.StoredInFile(testApp.dir, config.DefaultProfile) {
+		t.Fatal("test sign-in was stored in a file rather than the keychain; the test proves nothing")
+	}
+	reads := secret.ReadsForTest(t, testApp.dir)
+	opts := testHeartbeatOpts(t)
+	for i := range 5 {
+		if err := opts.HeartbeatSend(t.Context(), emptyBeat()); err != nil {
+			t.Fatalf("beat %d: %v", i+1, err)
+		}
+	}
+	token, err := opts.SignIn.Token(t.Context(), auth.AccountKey(f.srv.URL, "u-1"))
+	if err != nil || token != fakeUserToken("u-1") {
+		t.Fatalf("SignIn.Token = %q, %v", token, err)
+	}
+	if got := reads(); got != 1 {
+		t.Fatalf("keychain read %d times across 5 heartbeats and a relay token lookup; want 1", got)
+	}
+	sent := ingest.take()
+	if len(sent) != 5 {
+		t.Fatalf("sent %d beats, want 5", len(sent))
+	}
+	wantAuth := "Bearer " + fakeUserToken("u-1")
+	for i, r := range sent {
+		if r.auth != wantAuth || r.project != acmeWeb {
+			t.Fatalf("beat %d went with %q to %q; want %q to %q", i+1, r.auth, r.project, wantAuth, acmeWeb)
+		}
+	}
+	// A locked keychain after the first read still lets later beats reuse the cached session.
+	secret.FailForTest(t, testApp.dir)
+	if err := opts.HeartbeatSend(t.Context(), emptyBeat()); err != nil {
+		t.Fatalf("beat with locked keychain after cache warm: %v", err)
+	}
+	if got := reads(); got != 1 {
+		t.Fatalf("keychain read %d times after locked-keychain beat; want 1", got)
+	}
+	if locked := ingest.take(); len(locked) != 1 || locked[0].auth != wantAuth || locked[0].project != acmeWeb {
+		t.Fatalf("locked-keychain beat sent %+v; want %q to %q", locked, wantAuth, acmeWeb)
+	}
+}
+
+// A heartbeat reads the profile's team and sign-in as one snapshot: an account switch
+// between the two reads, or an unpaired sign-in stored before the profile is rewritten,
+// sends no heartbeat and never pairs B's token with A's team.
+func TestHeartbeatNeverPairsAnothersTokenWithTheLastTeam(t *testing.T) {
+	tokenB := "Bearer " + fakeUserToken("u-2")
+	betaCore := projectsIn(orgB().ID)[0].ID
+
+	t.Run("switch between reads", func(t *testing.T) {
+		f, ingest := pairingSandbox(t)
+		cfg, err := testApp.loadConfig()
+		if err != nil {
+			t.Fatal(err)
+		}
+		opts := testApp.relayDeps().Engine(t.Context(), testApp.stateDir, cfg, daemon.Settings{}, nil)
+		switched := false
+		testApp.betweenProfileReads = func() {
+			if switched {
+				return
+			}
+			switched = true
+			if err := testApp.storeLogin(context.Background(), cfg, storedSessionOf(f, "u-2")); err != nil {
+				t.Error(err)
+			}
+		}
+		t.Cleanup(func() { testApp.betweenProfileReads = nil })
+
+		if err := opts.HeartbeatSend(t.Context(), emptyBeat()); !errors.Is(err, relay.ErrNoKey) {
+			t.Fatalf("beat across account switch = %v, want %v", err, relay.ErrNoKey)
+		}
+		if sent := ingest.take(); len(sent) != 0 {
+			t.Fatalf("beat across account switch sent %+v; want nothing", sent)
+		}
+		// After the switch completes and before B picks a team, no beat goes either.
+		if err := opts.HeartbeatSend(t.Context(), emptyBeat()); !errors.Is(err, relay.ErrNoKey) {
+			t.Fatalf("beat after switch with no team = %v, want %v", err, relay.ErrNoKey)
+		}
+		if sent := ingest.take(); len(sent) != 0 {
+			t.Fatalf("beat after switch with no team sent %+v; want nothing", sent)
+		}
+
+		// Once B chooses their own organization and team, heartbeats go with B's token to B's team.
+		if err := config.UpdateProfile(testApp.dir, config.DefaultProfile, func(p *config.Profile) {
+			p.SelectOrganization(orgB().ID, orgB().Name)
+		}); err != nil {
+			t.Fatal(err)
+		}
+		selectPolicy(t, config.Policy{Mode: config.ModeRepo, TeamID: betaCore, OrganizationID: orgB().ID, AuthURL: f.srv.URL, Revision: 1, FetchedAt: time.Now()})
+		if err := opts.HeartbeatSend(t.Context(), emptyBeat()); err != nil {
+			t.Fatalf("beat under B's own team: %v", err)
+		}
+		sent := ingest.take()
+		if len(sent) != 1 || sent[0].auth != tokenB || sent[0].project != betaCore {
+			t.Fatalf("B's beat sent %+v; want %q to %q", sent, tokenB, betaCore)
+		}
+	})
+
+	t.Run("unpaired sign-in stored before profile", func(t *testing.T) {
+		f, ingest := pairingSandbox(t)
+		opts := testHeartbeatOpts(t)
+		if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSessionOf(f, "u-2")); err != nil {
+			t.Fatal(err)
+		}
+		if err := opts.HeartbeatSend(t.Context(), emptyBeat()); !errors.Is(err, relay.ErrNoKey) {
+			t.Fatalf("beat with unpaired B credential = %v, want %v", err, relay.ErrNoKey)
+		}
+		if sent := ingest.take(); len(sent) != 0 {
+			t.Fatalf("beat with unpaired B credential sent %+v; want nothing", sent)
+		}
+	})
+
+	t.Run("switch to server key between reads", func(t *testing.T) {
+		_, ingest := pairingSandbox(t)
+		opts := testHeartbeatOpts(t)
+		switched := false
+		testApp.betweenProfileReads = func() {
+			if switched {
+				return
+			}
+			switched = true
+			serverKeyProfile(t)
+		}
+		t.Cleanup(func() { testApp.betweenProfileReads = nil })
+
+		if err := opts.HeartbeatSend(t.Context(), emptyBeat()); !errors.Is(err, relay.ErrNoKey) {
+			t.Fatalf("beat across switch to server key = %v, want %v", err, relay.ErrNoKey)
+		}
+		if sent := ingest.take(); len(sent) != 0 {
+			t.Fatalf("beat across switch to server key sent %+v; want nothing", sent)
+		}
+	})
 }

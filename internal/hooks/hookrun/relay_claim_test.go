@@ -132,7 +132,7 @@ func TestGlobalModeClaimsEverySession(t *testing.T) {
 	scratch := t.TempDir()
 	last := hookruntest.InitRepo(t)
 	claimIn := func(dir, sid string, pol config.Policy) (claim.Claim, bool) {
-		env := Env{StateDir: stateDir, Now: time.Now(), Cwd: dir, Stdin: strings.NewReader(""), Policy: pol}
+		env := Env{StateDir: stateDir, Now: time.Now(), Cwd: dir, Stdin: strings.NewReader(""), Policy: pol, Account: hookruntest.Account}
 		ClaimFromPayload(context.Background(), env, PayloadSession{ID: sid, Cwd: dir}, "claude-code")
 		return claim.Read(stateDir, sid, time.Now())
 	}
@@ -178,7 +178,7 @@ func TestTheClaimNamesTheDirectoryTheHookRanIn(t *testing.T) {
 	if err := startSession(context.Background(), env); err != nil {
 		t.Fatal(err)
 	}
-	payloadEnv := Env{StateDir: stateDir, Now: time.Now(), Cwd: sub, Policy: hookruntest.Admitting(repo), Team: "proj"}
+	payloadEnv := Env{StateDir: stateDir, Now: time.Now(), Cwd: sub, Policy: hookruntest.Admitting(repo), Team: "proj", Account: hookruntest.Account}
 	ClaimFromPayload(context.Background(), payloadEnv, PayloadSession{ID: "sess-payload", Cwd: sub}, "codex")
 	for _, sid := range []string{"sess-sub", "sess-payload"} {
 		if c, ok := claim.Read(stateDir, sid, time.Now()); !ok || c.Root != root || c.Cwd != dir {

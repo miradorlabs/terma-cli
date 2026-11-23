@@ -36,7 +36,6 @@ func (app *App) relayDeps() daemon.Deps {
 		RelayTargets:  app.agents.RelayTargets,
 		Endpoint:      app.delivery().Endpoint,
 		User:          app.relayUser,
-		SendHeartbeat: app.relayHeartbeatSend,
 		HookPolicy:    app.hookPolicy,
 		LoadConfig:    app.loadConfig,
 		RefreshPolicy: pols.Refresh,
@@ -54,20 +53,43 @@ func (app *App) globalMode() globalmode.Machine {
 	return globalmode.Machine{ConfigDir: app.dir, Agents: app.agents, Terma: app.hookExecutable, ManagedRoot: app.managedRoot}
 }
 
+// relayHeartbeat is the relay's HeartbeatSend, sharing src with the relay's OTLP sender so
+// heartbeats reuse its cached credential and in-memory retirement mark.
+func (app *App) relayHeartbeat(src *signInSource) func(context.Context, *logspb.LogsData) error {
+	return func(ctx context.Context, beat *logspb.LogsData) error {
+		return app.relayHeartbeatSend(ctx, src, beat)
+	}
+}
+
 // relayHeartbeatSend delivers a heartbeat to the selected team's ingest with the person's
 // sign-in, naming the team; on a profile set up with a server key, with the selected
 // team's key, else any project's held here. With neither, nothing is sent. It sends once,
 // so the user teamUser names never rides on to another key.
-func (app *App) relayHeartbeatSend(ctx context.Context, beat *logspb.LogsData) error {
-	cfg, err := config.Load(app.dir, app.stateDir, config.Overrides{})
-	if err != nil {
-		return err
+func (app *App) relayHeartbeatSend(ctx context.Context, src *signInSource, beat *logspb.LogsData) error {
+	overrides := app.configOverrides()
+	if src != nil && src.cfg != nil && src.cfg.ProfileName != "" {
+		overrides.Profile = src.cfg.ProfileName
+	}
+	var cfg *config.Config
+	var loadErr error
+	// Read the profile's mode, team and sign-in as one snapshot (readLaneAsOne): a switch
+	// between config.json and user-credentials.json makes the lane unreadable, so a beat
+	// never pairs one account's token with another's team.
+	lane, _ := readLaneAsOne(app.dir, func() string {
+		cfg, loadErr = config.Load(app.dir, app.stateDir, overrides)
+		if loadErr != nil {
+			return sendas.AccountUnreadable
+		}
+		return app.profileLane(cfg)
+	})
+	if loadErr != nil {
+		return loadErr
 	}
 	selected := cmp.Or(cfg.Policy.TeamID, cfg.Policy.DefaultProjectID, cfg.ProjectID)
 	// The profile decides, as for the relay, the hooks and delivery: TERMA_API_KEY is setup's
 	// input, recorded as the profile's server-key sign-in.
-	if !cfg.ServerKeySignIn {
-		return app.signedInHeartbeat(ctx, cfg, selected, beat)
+	if lane != sendas.NoPersonLane {
+		return app.signedInHeartbeat(ctx, src, cfg, lane, selected, beat)
 	}
 	others := keystore.CollectionProjects(app.dir)
 	slices.Sort(others)
@@ -141,10 +163,10 @@ func signedInUser(cfg *config.Config) string {
 }
 
 // signedInHeartbeat sends beat to team's ingest with the person's sign-in, naming the team.
-func (app *App) signedInHeartbeat(ctx context.Context, cfg *config.Config, team string, beat *logspb.LogsData) error {
-	src := app.signInSource(cfg)
-	account := src.Account()
-	if team == "" || account == "" {
+// account was read in the same snapshot as cfg and team (readLaneAsOne), so a sign-in
+// switch can never pair one account's token with another's team.
+func (app *App) signedInHeartbeat(ctx context.Context, src *signInSource, cfg *config.Config, account, team string, beat *logspb.LogsData) error {
+	if team == "" || !auth.ValidAccountKey(account) || account != cfg.Account || src == nil || src.cfg == nil || !sameHost(cfg.AuthURL, src.cfg.AuthURL) {
 		return relay.ErrNoKey
 	}
 	token, err := src.Token(ctx, account)

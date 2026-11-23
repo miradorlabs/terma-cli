@@ -61,7 +61,7 @@ func TestCodexSubagentThreadIsClaimed(t *testing.T) {
 		t.Fatal(err)
 	}
 	payload := `{"session_id":"root-thread","agent_id":"child-thread-2","cwd":` + strconv.Quote(root) + `}`
-	hookrun.ClaimFromPayload(context.Background(), hookrun.Env{StateDir: stateDir, Now: time.Now(), Cwd: root, Policy: hookruntest.Admitting(root), Team: "project-a"}, payloadSession(t, payload), "codex")
+	hookrun.ClaimFromPayload(context.Background(), hookrun.Env{StateDir: stateDir, Now: time.Now(), Cwd: root, Policy: hookruntest.Admitting(root), Team: "project-a", Account: hookruntest.Account}, payloadSession(t, payload), "codex")
 	// Either way the claim names the working tree, which the relay stamps on Codex's own records.
 	tree, _ := filepath.EvalSymlinks(root)
 	for _, id := range []string{"root-thread", "child-thread", "child-thread-2"} {
