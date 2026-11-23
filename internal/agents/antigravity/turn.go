@@ -27,7 +27,8 @@ import (
 //   - a hook whose payload terma cannot read.
 //
 // A hook in another collected checkout, or under another sign-in, has no turn of its own:
-// it sends nothing and leaves the record, so the turn's own hooks go on. agy runs PreInvocation before it
+// it sends nothing and leaves the record. What it read past is lost; the turn's own hooks
+// send what comes after. agy runs PreInvocation before it
 // calls the model (on 1.5.15, a hook that slept 3 s delayed the call by 3 s), so the record
 // names a turn before that turn's first call is written: a line read while the record still
 // names a hook's turn is that turn's, or an earlier one's.
@@ -111,7 +112,9 @@ func antigravityTurnBegun(e hookrun.Env, sessionID string) []byte {
 }
 
 // endAntigravityTurnBegun removes the record if it is still begun, the turn a Stop found
-// when it started: a turn that began since keeps its own.
+// when it started: a turn that began since keeps its own. The compare and the remove are
+// two steps, which is enough because agy starts the next turn's first hook only once the
+// Stop hook has returned (seen on 1.5.15 with a Stop hook that slept 6 s).
 func endAntigravityTurnBegun(e hookrun.Env, sessionID string, begun []byte) {
 	if begun != nil && bytes.Equal(antigravityTurnBegun(e, sessionID), begun) {
 		endAntigravityTurn(e, sessionID)

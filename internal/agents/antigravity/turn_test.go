@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
 )
 
@@ -51,5 +52,24 @@ func TestAntigravityPassedSubagentLinkIsNotCountedAsACall(t *testing.T) {
 	}
 	if n := g.lost(); n != 2 {
 		t.Errorf("counted %d lost, want the two calls and not the subagent's link", n)
+	}
+}
+
+// Every hook where the policy collects nothing ends the turn, a PreInvocation in the middle
+// of it included: the calls made after it never leave from a hook back where it began.
+func TestAntigravityMidTurnInvocationWhereExcludedEndsTheTurn(t *testing.T) {
+	g := newTranscriptRig(t, turnsConversation, "transcript_turns.jsonl")
+	g.write(8)
+	g.hook(preInvocation, begin("8"))
+	g.write(10)
+	g.hookAt(preInvocation, hookruntest.InitRepo(t), `"initialNumSteps":10,"invocationNum":1`)
+	if got := g.drain(); len(got[semconv.TermaModelCallEvent]) != 0 {
+		t.Fatalf("the excluded hook spooled %v", got)
+	}
+	g.write(12)
+	g.hook(postInvocation, `"initialNumSteps":10,"invocationNum":1`)
+	g.hook(stop, stopped)
+	if s := g.calls(); s != "" {
+		t.Fatalf("sent %s after a hook of the turn ran where the policy collects nothing", s)
 	}
 }

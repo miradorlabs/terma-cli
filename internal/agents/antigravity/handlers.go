@@ -112,16 +112,17 @@ func preInvocation(ctx context.Context, env hookrun.Env) error {
 	if !ok {
 		return nil
 	}
-	invocation, _, invocationKnown := hookrun.JSONNumber(in.InvocationNum, true)
-	if invocationKnown && invocation != 0 {
-		// A model call in the middle of a turn.
-		return nil
-	}
 	env.Cwd = in.cwd(env.Cwd)
 	r, err := env.Repo(ctx)
 	if err != nil {
+		// At any invocation: a hook where the policy collects nothing ends the turn.
 		env.Logf("not in a git repository: %v", err)
 		antigravitySkipCalls(ctx, env, in, err)
+		return nil
+	}
+	invocation, _, invocationKnown := hookrun.JSONNumber(in.InvocationNum, true)
+	if invocationKnown && invocation != 0 {
+		// A model call in the middle of a turn.
 		return nil
 	}
 	// The turn is recorded first: agy calls the model once this hook returns, and every
