@@ -16,12 +16,9 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/config"
 )
 
-// Lock-free <claim>.mixed/<rand>.json sidecar for KindMixed writes whose lock timed out.
-// Read merges the sidecar before reading <claim>; locked writes save <claim> before removing marks.
-const (
-	asideExt    = ".mixed"
-	asideWrites = 3
-)
+// Lock-free <claim>.mixed/<rand>.json sidecar for KindMixed writes on lock timeout.
+// Read merges before reading <claim>; locked writes save <claim> before removing marks.
+const asideExt, asideWrites = ".mixed", 3
 
 type asideMark struct {
 	claim Claim

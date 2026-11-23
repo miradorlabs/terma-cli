@@ -54,6 +54,9 @@ func TestLocationOnlyPlacements(t *testing.T) {
 	if Write(dir, "s2", Claim{Tool: "codex"}, now) {
 		t.Fatal("a placement with neither a project nor a kind was written")
 	}
+	if Write(dir, "s2", Claim{ProjectID: "p1", Kind: KindRepository, Run: "r1"}, now) {
+		t.Fatal("a project claim without an account was written")
+	}
 }
 
 // samePlace compares the kind, the project and the repository, and outside git the
@@ -73,7 +76,7 @@ func TestSamePlaceComparesTheLocation(t *testing.T) {
 		{placed(KindOutsideGit, "", "/tmp/a", "r1", 10), 3},
 		{placed(KindOutsideGit, "", "/tmp/a", "r1", 10), 3},
 		{placed(KindOutsideGit, "", "/tmp/b", "r1", 10), 4},
-		{Claim{ProjectID: "p1", Repository: repoAt("github.com/acme/web"), Cwd: "/src/web", PIDs: []int{10}}, 5},
+		{Claim{ProjectID: "p1", Account: testAccount, Repository: repoAt("github.com/acme/web"), Cwd: "/src/web", PIDs: []int{10}}, 5},
 	}
 	for i, step := range steps {
 		at = at.Add(time.Minute)
@@ -122,7 +125,7 @@ func TestMixedOnlyTurnsOn(t *testing.T) {
 		placed(KindRepository, "github.com/acme/api", "/src/api", "r1", 10),
 		placed(KindOutsideGit, "", "/tmp/a", "r1", 10),
 		placed(KindRepository, "github.com/acme/api", "/src/api", "", 10),
-		{ProjectID: "p1", Repository: repoAt("github.com/acme/api"), PIDs: []int{10}},
+		{ProjectID: "p1", Account: testAccount, Repository: repoAt("github.com/acme/api"), PIDs: []int{10}},
 	} {
 		if Write(dir, "s", c, next()) {
 			t.Fatalf("write %d replaced a Mixed placement in its run", i)
@@ -175,7 +178,7 @@ func TestALockTimeoutNeverReplacesMixed(t *testing.T) {
 func writeSpread(t *testing.T, dir, sid string, t0 time.Time, n int, kinds bool) Claim {
 	t.Helper()
 	for i := range n {
-		c := Claim{ProjectID: fmt.Sprintf("p%d", i), Repository: repoAt(fmt.Sprintf("github.com/acme/r%d", i)), PIDs: []int{10}}
+		c := Claim{ProjectID: fmt.Sprintf("p%d", i), Account: testAccount, Repository: repoAt(fmt.Sprintf("github.com/acme/r%d", i)), PIDs: []int{10}}
 		if kinds {
 			c.Kind, c.Run = KindRepository, "r1"
 		}
@@ -210,7 +213,7 @@ func TestEviction(t *testing.T) {
 		t.Fatal("a record without a time was covered after an eviction")
 	}
 	// The mark stays once set, through a write that evicts nothing.
-	latest := Claim{ProjectID: fmt.Sprintf("p%d", maxPlacements), Kind: KindRepository, Run: "r1", Repository: repoAt(fmt.Sprintf("github.com/acme/r%d", maxPlacements)), PIDs: []int{11}}
+	latest := Claim{ProjectID: fmt.Sprintf("p%d", maxPlacements), Account: testAccount, Kind: KindRepository, Run: "r1", Repository: repoAt(fmt.Sprintf("github.com/acme/r%d", maxPlacements)), PIDs: []int{11}}
 	if !Write(dir, "kinds", latest, t0.Add(time.Hour)) {
 		t.Fatal("a new process in the latest placement was not written")
 	}
@@ -285,7 +288,7 @@ func TestLegacyClaimsStayAsTheyWere(t *testing.T) {
 	t.Parallel()
 	dir := enable(t)
 	now := time.Now()
-	Write(dir, "s", Claim{ProjectID: "p1", Repository: repoAt("github.com/acme/api"), PIDs: []int{10}}, now)
+	Write(dir, "s", Claim{ProjectID: "p1", Account: testAccount, Repository: repoAt("github.com/acme/api"), PIDs: []int{10}}, now)
 	Mark(dir, "m", "codex", []int{10}, now)
 	for _, sid := range []string{"s", "m"} {
 		p, _ := path(dir, sid)
@@ -422,7 +425,7 @@ func TestKindMixedStripsProjectAndSameRepoResumeSeparatesRuns(t *testing.T) {
 	if Write(dir, "resume", placed(KindRepository, "github.com/acme/web", "/src/web", "r2", 10), t0.Add(15*time.Minute)) {
 		t.Fatal("unlocked non-Mixed Kind write proceeded while lock was held")
 	}
-	if Write(dir, "resume", Claim{ProjectID: "p1", Repository: repoAt("github.com/acme/web"), PIDs: []int{10}}, t0.Add(16*time.Minute)) {
+	if Write(dir, "resume", Claim{ProjectID: "p1", Account: testAccount, Repository: repoAt("github.com/acme/web"), PIDs: []int{10}}, t0.Add(16*time.Minute)) {
 		t.Fatal("unlocked legacy write proceeded while lock was held")
 	}
 
@@ -438,10 +441,10 @@ func TestKindMixedStripsProjectAndSameRepoResumeSeparatesRuns(t *testing.T) {
 	}
 
 	// Out-of-order delayed Mark at t1 between collected writes at t0 and t2 keeps its boundary at t1.
-	if !Write(dir, "delayed-mark", Claim{ProjectID: "p1", Repository: repoAt("github.com/acme/api"), PIDs: []int{10}}, t0) {
+	if !Write(dir, "delayed-mark", Claim{ProjectID: "p1", Account: testAccount, Repository: repoAt("github.com/acme/api"), PIDs: []int{10}}, t0) {
 		t.Fatal("delayed-mark t0 write failed")
 	}
-	if !Write(dir, "delayed-mark", Claim{ProjectID: "p2", Repository: repoAt("github.com/acme/web"), PIDs: []int{10}}, t0.Add(2*time.Minute)) {
+	if !Write(dir, "delayed-mark", Claim{ProjectID: "p2", Account: testAccount, Repository: repoAt("github.com/acme/web"), PIDs: []int{10}}, t0.Add(2*time.Minute)) {
 		t.Fatal("delayed-mark t2 write failed")
 	}
 	if !Mark(dir, "delayed-mark", "codex", []int{10}, t0.Add(time.Minute)) {

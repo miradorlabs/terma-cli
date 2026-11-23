@@ -14,14 +14,9 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/config"
 )
 
-// Crossings a hook could not write under the ledger lock are written lock-free to
-// runs/<session>.mixed/<id>.json. Unlike claim sidecars, runs sidecars never expire;
-// Prune keeps them with their ledger and for MixedRetention after their last mark. Reads
-// check the sidecar before the ledger, and folds save the ledger before removing marks.
-const (
-	asideExt    = ".mixed"
-	asideWrites = 3 // retries if a concurrent fold removed the emptied sidecar directory
-)
+// Crossings a hook could not write under the ledger lock go lock-free to runs/<session>.mixed/<id>.json.
+// Never expire; Prune keeps them with their ledger and MixedRetention after the last mark.
+const asideExt, asideWrites = ".mixed", 3
 
 type aside struct {
 	marks []mark
