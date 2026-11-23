@@ -345,3 +345,20 @@ func TestRelayQueuedPartsFollowTheCurrentContentPolicy(t *testing.T) {
 		t.Fatalf("nothing was withheld at delivery: %v", c)
 	}
 }
+
+// A part ages out of the outbox from when it arrived, not from when its file was written: one
+// that waited in the hold nearly the whole of its time, then queued, goes when its time is up.
+func TestAPartAgesOutFromWhenItArrived(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	o := outbox{dir}
+	rt := route{project: "p1", tool: noTool, repo: noRepo}
+	held := newEntry(time.Now().Add(-maxOutboxAge-time.Hour), Logs, 2) // arrived long ago, written now
+	if err := o.put(rt, config.Repository{}, held, []byte("x")); err != nil {
+		t.Fatal(err)
+	}
+	r := newRelay(Options{Dir: dir, Token: token})
+	if removed := r.sweepOutbox(time.Now()); len(removed[rt]) != 1 {
+		t.Fatalf("removed %v; want the part past its time since it arrived", removed)
+	}
+}

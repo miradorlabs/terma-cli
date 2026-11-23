@@ -292,7 +292,13 @@ func (r *Relay) sweepOutbox(now time.Time) map[route][]entry {
 	var total int64
 	var kept []queued
 	for _, q := range all {
-		if now.Sub(q.mtime) > maxOutboxAge {
+		// Aged from when the part arrived, which its name keeps, so the time it waited in
+		// the hold counts too: one retention clock, not a hold's and then an outbox's.
+		age := q.mtime
+		if at := q.e.received(); !at.IsZero() && at.Before(age) {
+			age = at
+		}
+		if now.Sub(age) > maxOutboxAge {
 			drop(q, "outbox_expired")
 			continue
 		}
