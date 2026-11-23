@@ -48,6 +48,15 @@ type PayloadReader interface {
 	PayloadSession(payload []byte) (hookrun.PayloadSession, bool)
 }
 
+// HookStarter is a harness that marks the hook processes it starts, in their environment.
+// Some harnesses also run the entries of another agent's hooks file; such a process is the
+// starter's, whichever agent its event belongs to (Registry.StartedElsewhere).
+type HookStarter interface {
+	// StartedHook reports whether the harness started this hook process, whose environment
+	// getenv reads.
+	StartedHook(getenv func(string) string) bool
+}
+
 // RenderHandler is a hook that draws something; its result is the process's exit status.
 type RenderHandler = func(context.Context, hookrun.Env) int
 
