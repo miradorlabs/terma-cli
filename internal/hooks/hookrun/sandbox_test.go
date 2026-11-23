@@ -2,8 +2,10 @@ package hookrun
 
 import (
 	"context"
+	"fmt"
 	"io/fs"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -489,6 +491,79 @@ func TestAnUncountedLossIsNoSandbox(t *testing.T) {
 	prePush(t, p, unreadable, commit(t, p, unreadable, []string{"a.go"}, "sess-a"))
 	if got := lanes(t, unreadable.Spool); len(got) != 0 {
 		t.Errorf("queued %v; want nothing collected while the sign-in couldn't be read", got)
+	}
+}
+
+// A push past the cap on the commits its report lists is still in one lane only if every
+// commit's session agrees: B's session in a commit past the cap keeps A's push of it from
+// A's lane, and it is lost, counted ambiguous_push.
+func TestAPushPastTheCapIsInALaneOnlyIfEveryCommitAgrees(t *testing.T) {
+	defer func(f func() int) { gitPushPID = f }(gitPushPID)
+	gitPushPID = func() int { return 0 }
+	p := newPushRepo(t)
+	for _, s := range []struct{ id, account string }{{"sess-a", personA}, {"sess-b", personB}} {
+		if err := gitStore(p, s.account).Touch(session.Session{ID: s.id, Tool: "claude-code"}, []string{s.id + ".go"}, time.Now()); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// The oldest commit, past the cap, is B's session's; the newest MaxPushCommits are A's.
+	var stream strings.Builder
+	for i := range MaxPushCommits + 1 {
+		sess := "sess-a"
+		if i == 0 {
+			sess = "sess-b"
+		}
+		msg := fmt.Sprintf("work %d\n\nAgent-Session-Id: %s\nAgent-Tool: claude-code\n", i, sess)
+		fmt.Fprintf(&stream, "commit refs/heads/main\nmark :%d\ncommitter T <t@example.com> %d +0000\ndata %d\n%s", i+1, 1700000000+i, len(msg), msg)
+		if i == 0 {
+			fmt.Fprintf(&stream, "from %s\n", p.sha("HEAD"))
+		} else {
+			fmt.Fprintf(&stream, "from :%d\n", i)
+		}
+	}
+	cmd := exec.Command("git", "fast-import", "--quiet", "--force")
+	cmd.Dir, cmd.Stdin = p.root, strings.NewReader(stream.String())
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("fast-import: %v: %s", err, out)
+	}
+	asA, dir := signedIn(t, p, personA)
+	prePush(t, p, asA, p.sha("refs/heads/main"))
+	if got := lanes(t, asA.Spool); len(got) != 0 {
+		t.Errorf("queued %d events; want the push of A's and B's sessions in no lane", len(got))
+	}
+	if l := lossesIn(t, dir); l[sendas.LostAmbiguousPush] != 1 || len(l) != 1 {
+		t.Errorf("losses = %v; want the push counted ambiguous_push", l)
+	}
+}
+
+// A push whose history walk stops at its bound has commits no one read, whose sessions may
+// be anyone's: it is lost, counted ambiguous_push. One whose walk reached every commit is in
+// its sessions' lane.
+func TestAPushPastTheWalkIsInNoLane(t *testing.T) {
+	defer func(f func() int) { gitPushPID = f }(gitPushPID)
+	gitPushPID = func() int { return 0 }
+	for _, c := range []struct {
+		name string
+		walk int
+		kept bool
+	}{{"walked whole", 3, true}, {"past the walk", 2, false}} {
+		t.Run(c.name, func(t *testing.T) {
+			p := newPushRepo(t)
+			if err := gitStore(p, personA).Touch(session.Session{ID: "sess-a", Tool: "claude-code"}, []string{"a.go"}, time.Now()); err != nil {
+				t.Fatal(err)
+			}
+			for i := range 3 {
+				p.git("commit", "-q", "--allow-empty", "-m", fmt.Sprintf("work %d\n\nAgent-Session-Id: sess-a\nAgent-Tool: claude-code\n", i))
+			}
+			asA, dir := signedIn(t, p, personA)
+			asA.pushWalk = c.walk
+			asA.AwaitPush = func(path string) { AwaitPush(context.Background(), asA, path) }
+			prePush(t, p, asA, p.sha("HEAD"))
+			got, l := lanes(t, asA.Spool), lossesIn(t, dir)
+			if c.kept != (len(got) == 1) || c.kept != (len(l) == 0) || !c.kept && l[sendas.LostAmbiguousPush] != 1 {
+				t.Errorf("queued %d, losses %v; want kept %v, else counted ambiguous_push", len(got), l, c.kept)
+			}
+		})
 	}
 }
 

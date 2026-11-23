@@ -12,6 +12,7 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
 	"github.com/miradorlabs/terma-cli/internal/project"
+	"github.com/miradorlabs/terma-cli/internal/semconv"
 	"github.com/miradorlabs/terma-cli/internal/sendas"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
@@ -90,6 +91,56 @@ func written(t *testing.T, p *pushRepo, env Env, dir string) []string {
 		}
 	}
 	return out
+}
+
+// A snapshot dropped while signed out leaves the checkpoint as it was: the same snapshot
+// collected once someone signs in, within the heartbeat, is a new collection, queued.
+func TestASnapshotDroppedWithNoLaneIsCollectedOnceThereIsOne(t *testing.T) {
+	p := newPushRepo(t)
+	obs := Observation{Tool: "fake", Source: "fake", StateDir: "observations", SessionID: "s1", Hook: "stop", Attrs: map[string]any{"turn": "t1"}}
+	out, outDir := lanedHook(t, p, "", false, false)
+	r, err := out.Repo(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	out.CaptureObservation(context.Background(), r, obs)
+	if l, err := spool.ReadLosses(outDir, time.Now()); err != nil || l.Counts[sendas.LostSignedOut] != 1 {
+		t.Fatalf("losses = %v, %v; want the signed-out snapshot counted", l.Counts, err)
+	}
+	in, _ := lanedHook(t, p, "aaaaaaaaaaaaaaaa", false, false)
+	in.Now = out.Now.Add(QuotaHeartbeat / 2)
+	obs.Attrs = map[string]any{"turn": "t1"}
+	in.CaptureObservation(context.Background(), r, obs)
+	evs := hookruntest.Spooled(t, in.Spool)
+	if len(evs) != 1 || evs[0].Name != semconv.TermaSessionObservationEvent || evs[0].Account != "aaaaaaaaaaaaaaaa" {
+		t.Fatalf("queued %s; want the snapshot collected under the sign-in", hookruntest.Names(evs))
+	}
+}
+
+// A snapshot collected between two lost ones ends their run: the same snapshot lost again
+// after it, within the heartbeat, is counted again.
+func TestALostSnapshotAfterACollectionIsCountedAgain(t *testing.T) {
+	p := newPushRepo(t)
+	obs := func(turn string) Observation {
+		return Observation{Tool: "fake", Source: "fake", StateDir: "observations", SessionID: "s1", Hook: "stop", Attrs: map[string]any{"turn": turn}}
+	}
+	out, outDir := lanedHook(t, p, "", false, false)
+	r, err := out.Repo(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	out.CaptureObservation(context.Background(), r, obs("h"))
+	in, _ := lanedHook(t, p, "aaaaaaaaaaaaaaaa", false, false)
+	in.Now = out.Now.Add(time.Minute)
+	in.CaptureObservation(context.Background(), r, obs("h-prime"))
+	if evs := hookruntest.Spooled(t, in.Spool); len(evs) != 1 {
+		t.Fatalf("queued %s; want the signed-in snapshot", hookruntest.Names(evs))
+	}
+	out.Now = out.Now.Add(2 * time.Minute)
+	out.CaptureObservation(context.Background(), r, obs("h"))
+	if l, err := spool.ReadLosses(outDir, time.Now()); err != nil || l.Counts[sendas.LostSignedOut] != 2 {
+		t.Fatalf("losses = %v, %v; want both signed-out snapshots counted", l.Counts, err)
+	}
 }
 
 // parkedOnly reports whether store holds what was parked under name and nothing else but
@@ -257,8 +308,8 @@ func spoolOpen(t *testing.T) *spool.Spool {
 	return s
 }
 
-// Signed out, the same snapshot seen again is suppressed as it is signed in: lost and
-// counted once, not at every hook.
+// Signed out, the same snapshot seen again in a row is lost and counted once, not at every
+// hook.
 func TestASignedOutSnapshotIsCountedOnce(t *testing.T) {
 	p := newPushRepo(t)
 	env, dir := lanedHook(t, p, "", false, false)

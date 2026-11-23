@@ -65,6 +65,8 @@ type Env struct {
 	Agents []string
 	// afterOwns, in tests, runs once owns has read a session's manifest, before the record.
 	afterOwns func()
+	// pushWalk, in tests, lowers maxPushWalk.
+	pushWalk int
 }
 
 // Time is when the hook runs: Now when the caller set it, the clock otherwise.

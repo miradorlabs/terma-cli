@@ -408,7 +408,8 @@ func TestSweepReportsATakenPushItsReporterLeft(t *testing.T) {
 	}
 }
 
-// The sessions are those of the commits listed, and both lists are empty, never nil.
+// The sessions listed are those of the commits listed, and both lists are empty, never nil;
+// every commit's sessions are kept apart, for the lane.
 func TestPushedListsNameOnlyTheListedCommitsSessions(t *testing.T) {
 	commits := make([]gitx.PushedCommit, MaxPushCommits+1)
 	for i := range commits {
@@ -417,12 +418,16 @@ func TestPushedListsNameOnlyTheListedCommitsSessions(t *testing.T) {
 	commits[0].Trailers = "Agent-Session-Id: sess-listed\nAgent-Tool: codex/1\nAgent-Session-Id: ../bad\n"
 	commits[1].Trailers = "Agent-Session-Id: sess-listed\nAgent-Tool: codex/2\nAgent-Session-Id: sess-listed\nAgent-Tool: claude-code\n"
 	commits[MaxPushCommits].Trailers = "Agent-Session-Id: sess-beyond\nAgent-Tool: codex\n"
-	shas, sessions := pushedLists(commits)
+	shas, sessions, all := pushedLists(commits)
 	want := []trailer.Trailer{{SessionID: "sess-listed", Tool: "codex/1"}, {SessionID: "sess-listed", Tool: "claude-code"}}
 	if len(shas) != MaxPushCommits || !slices.Equal(sessions, want) {
 		t.Errorf("%d shas, sessions %+v", len(shas), sessions)
 	}
-	if shas, sessions := pushedLists(nil); shas == nil || sessionIDs(sessions) == nil || sessionsAttr(sessions) == nil {
+	// The push's lane goes by every commit's session, past the cap too.
+	if want := append(want, trailer.Trailer{SessionID: "sess-beyond", Tool: "codex"}); !slices.Equal(all, want) {
+		t.Errorf("all sessions %+v; want %+v", all, want)
+	}
+	if shas, sessions, _ := pushedLists(nil); shas == nil || sessionIDs(sessions) == nil || sessionsAttr(sessions) == nil {
 		t.Errorf("nil lists: %#v %#v", shas, sessions)
 	}
 }

@@ -36,6 +36,10 @@ type ObservationState struct {
 	LastHash string       `json:"last_hash"`
 	At       time.Time    `json:"at"`
 	Pending  *spool.Event `json:"pending,omitempty"`
+	// LostHash and LostAt are the snapshot last lost for want of a lane, apart from
+	// LastHash and At: it is counted once, and never suppresses a later collection of it.
+	LostHash string    `json:"lost_hash,omitempty"`
+	LostAt   time.Time `json:"lost_at,omitzero"`
 }
 
 // CaptureObservation appends o to the spool with a durable per-stream sequence,
@@ -119,10 +123,15 @@ func (e Env) CaptureObservation(ctx context.Context, r *Repo, o Observation) {
 	if state.LastHash == hash && !e.Time().Before(state.At) && e.Time().Sub(state.At) < QuotaHeartbeat {
 		return
 	}
-	// No lane, nothing of it is written to be replayed later; only that it was seen, so the
-	// same snapshot again is suppressed, not counted lost again.
-	if e.lost(r, 1) {
-		state.LastHash, state.At = hash, e.Time()
+	// No lane, nothing of it is written to be replayed, nor taken as collected: the same
+	// snapshot seen again with a lane is a new collection, by whoever is signed in then, never
+	// suppressed as this one's repeat. Seen again still with none, it is not counted again.
+	if e.lane().Lost != "" {
+		if state.LostHash == hash && !e.Time().Before(state.LostAt) && e.Time().Sub(state.LostAt) < QuotaHeartbeat {
+			return
+		}
+		e.lost(r, 1)
+		state.LostHash, state.LostAt = hash, e.Time()
 		if err = write(); err != nil {
 			e.Logf("%s checkpoint: %v", o.Tool, err)
 		}
@@ -130,6 +139,8 @@ func (e Env) CaptureObservation(ctx context.Context, r *Repo, o Observation) {
 	}
 	state.Sequence++
 	state.LastHash, state.At = hash, e.Time()
+	// A collection ends the run of lost snapshots: the next lost one is counted anew.
+	state.LostHash, state.LostAt = "", time.Time{}
 	attrs[semconv.TermaObservationStreamKey], attrs[semconv.TermaObservationSequenceKey] = state.Stream, state.Sequence
 	attrs[semconv.TermaObservationIDKey] = EvidenceID(fmt.Sprintf("%s\x00%s\x00%d", o.Tool, state.Stream, state.Sequence))
 	// Bound before the checkpoint, and appended as collected: a failed append is retried

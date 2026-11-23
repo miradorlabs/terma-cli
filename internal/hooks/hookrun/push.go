@@ -2,6 +2,7 @@ package hookrun
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"crypto/rand"
 	"encoding/json"
@@ -314,10 +315,14 @@ func reportPush(ctx context.Context, env Env, path string, rec pushRecord) {
 		if ref.Reported {
 			continue
 		}
-		ev, sessions, ok := pushEvent(ctx, env, rec, i, ref, exited)
+		ev, sessions, walked, ok := pushEvent(ctx, env, rec, i, ref, exited)
 		switch {
 		case !ok:
 			failed = true
+		case !walked && !rec.legacy:
+			// The walk stopped at its bound: a session past it may be anyone's.
+			env.countLost(nil, sendas.LostAmbiguousPush, 1)
+			rec.Refs[i].Reported = true
 		case rec.legacy:
 			if line, err := json.Marshal(ev); err == nil && env.Spool != nil && env.Spool.AppendLegacy(append(line, '\n')) == nil {
 				emitted, rec.Refs[i].Reported = true, true
@@ -325,7 +330,7 @@ func reportPush(ctx context.Context, env Env, path string, rec pushRecord) {
 				failed = true
 			}
 		default:
-			lane, owned := recordLane(rec.lane(), accountsOf(pushStore(env, rec), sessions))
+			lane, owned := pushLane(rec.lane(), pushStore(env, rec), sessions)
 			if !owned {
 				env.countLost(nil, sendas.LostAmbiguousPush, 1)
 				rec.Refs[i].Reported = true
@@ -354,15 +359,6 @@ func reportPush(ctx context.Context, env Env, path string, rec pushRecord) {
 	}
 }
 
-// lane is the pre-push hook's lane, as its record's event names it: with none, the hook could
-// not read its sign-in, in an agent's sandbox.
-func (rec pushRecord) lane() spool.Lane {
-	if rec.Event.Account == "" && !rec.Event.NoPerson {
-		return spool.Lane{Lost: sendas.LostUnreadable}
-	}
-	return spool.Lane{Account: rec.Event.Account, NoPerson: rec.Event.NoPerson}
-}
-
 // pushStore is the session store of the checkout rec pushed from.
 func pushStore(env Env, rec pushRecord) *session.Store {
 	dir, err := project.StoreDir(env.StateDir, rec.Root, rec.GitDir)
@@ -372,9 +368,11 @@ func pushStore(env Env, rec pushRecord) *session.Store {
 	return session.Open(dir)
 }
 
-// pushEvent is the report of one ref of a push, and the sessions stamped into the commits it
-// pushed; ok is false when its commits cannot be read.
-func pushEvent(ctx context.Context, env Env, rec pushRecord, i int, ref PushRef, exited bool) (spool.Event, []trailer.Trailer, bool) {
+// pushEvent is the report of one ref of a push, and every session stamped into the commits
+// it pushed, past the caps on what the report lists; walked is false when the walk stopped
+// at its bound (maxPushWalk), so some commits went unread; ok is false when its commits
+// cannot be read.
+func pushEvent(ctx context.Context, env Env, rec pushRecord, i int, ref PushRef, exited bool) (_ spool.Event, all []trailer.Trailer, walked, ok bool) {
 	attrs := maps.Clone(rec.Event.Attrs)
 	if attrs == nil {
 		attrs = map[string]any{}
@@ -394,12 +392,15 @@ func pushEvent(ctx context.Context, env Env, rec pushRecord, i int, ref PushRef,
 			rng = semconv.TermaPushRangeFallback
 		}
 	}
-	commits, err := gitx.Commits(ctx, rec.Root, ref.LocalSHA, exclude, maxPushWalk)
+	walk := cmp.Or(env.pushWalk, maxPushWalk)
+	commits, err := gitx.Commits(ctx, rec.Root, ref.LocalSHA, exclude, walk+1)
 	if err != nil {
 		env.Logf("pushed commits: %v", err)
-		return spool.Event{}, nil, false
+		return spool.Event{}, nil, false, false
 	}
-	shas, sessions := pushedLists(commits)
+	walked = len(commits) <= walk
+	commits = commits[:min(len(commits), walk)]
+	shas, sessions, all := pushedLists(commits)
 	ids := sessionIDs(sessions)
 	status := semconv.TermaPushStatusUnknown
 	if exited && ref.Tracking != "" && ref.TrackingBefore != ref.LocalSHA {
@@ -423,24 +424,5 @@ func pushEvent(ctx context.Context, env Env, rec pushRecord, i int, ref PushRef,
 	if len(ids) > 0 {
 		ev.SessionID = ids[0]
 	}
-	return ev, sessions, true
-}
-
-// pushedLists are the commit ids terma.push.commits lists, at most MaxPushCommits, and the
-// sessions stamped into those commits alone, each agent's session once, at most
-// maxPushSessions. shas is never nil: an empty list is still the string[] the registry declares.
-func pushedLists(commits []gitx.PushedCommit) (shas []string, sessions []trailer.Trailer) {
-	listed := commits[:min(len(commits), MaxPushCommits)]
-	shas = make([]string, 0, len(listed))
-	var stamped []trailer.Trailer
-	for _, c := range listed {
-		shas = append(shas, c.SHA)
-		for _, t := range trailer.Parse(c.Trailers, "") {
-			if session.ValidID(t.SessionID) {
-				stamped = append(stamped, t)
-			}
-		}
-	}
-	sessions = uniqueSessions(stamped)
-	return shas, sessions[:min(len(sessions), maxPushSessions)]
+	return ev, all, walked, true
 }
