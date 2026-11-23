@@ -49,7 +49,7 @@ func runPostToolUse(t *testing.T, root string, sp *spool.Spool, payload string) 
 // A waited-for subagent's Agent tool response names its model and how the run went.
 func TestClaudeSubagentCallCarriesTheModelAndTheRollUp(t *testing.T) {
 	root := newRepo(t)
-	sp, _ := spool.Open(t.TempDir())
+	sp, _ := hookruntest.OpenSpool(t.TempDir())
 	runPostToolUse(t, root, sp, agentToolPayload(root, "Agent", completedAgentResponse, ""))
 
 	events := hookruntest.Lifecycle(hookruntest.Spooled(t, sp))
@@ -89,7 +89,7 @@ func TestClaudeSubagentCallCarriesTheModelAndTheRollUp(t *testing.T) {
 // A background launch has no totals, and they stay absent: a zero would read as nothing used.
 func TestClaudeSubagentCallLaunchedInTheBackgroundHasNoTotals(t *testing.T) {
 	root := newRepo(t)
-	sp, _ := spool.Open(t.TempDir())
+	sp, _ := hookruntest.OpenSpool(t.TempDir())
 	runPostToolUse(t, root, sp, agentToolPayload(root, "Agent", launchedAgentResponse, ""))
 
 	events := hookruntest.Lifecycle(hookruntest.Spooled(t, sp))
@@ -111,7 +111,7 @@ func TestClaudeSubagentCallLaunchedInTheBackgroundHasNoTotals(t *testing.T) {
 func TestClaudeSubagentCallNeverCarriesWhatWasSaid(t *testing.T) {
 	root := newRepo(t)
 	for _, response := range []string{completedAgentResponse, launchedAgentResponse} {
-		sp, _ := spool.Open(t.TempDir())
+		sp, _ := hookruntest.OpenSpool(t.TempDir())
 		runPostToolUse(t, root, sp, agentToolPayload(root, "Agent", response, ""))
 		raw, err := json.Marshal(hookruntest.Spooled(t, sp))
 		if err != nil {
@@ -173,7 +173,7 @@ func TestClaudeSubagentCallVariants(t *testing.T) {
 		}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			sp, _ := spool.Open(t.TempDir())
+			sp, _ := hookruntest.OpenSpool(t.TempDir())
 			runPostToolUse(t, root, sp, agentToolPayload(root, tc.tool, tc.response, tc.extra))
 			tc.check(t, hookruntest.Lifecycle(hookruntest.Spooled(t, sp)))
 		})
@@ -183,7 +183,7 @@ func TestClaudeSubagentCallVariants(t *testing.T) {
 // An edit names its tool call, so the platform can fold it into Claude's own record of that call.
 func TestEditNamesItsToolCall(t *testing.T) {
 	root := newRepo(t)
-	sp, _ := spool.Open(t.TempDir())
+	sp, _ := hookruntest.OpenSpool(t.TempDir())
 	hookruntest.WriteFile(t, root, "src/main.go", "package src\n")
 	runPostToolUse(t, root, sp, `{"session_id":"sess-edit-1","cwd":`+jsonString(root)+`,"hook_event_name":"PostToolUse","tool_name":"Edit","tool_use_id":"toolu_01","tool_input":{"file_path":"src/main.go"}}`)
 
@@ -199,7 +199,7 @@ func TestEditNamesItsToolCall(t *testing.T) {
 // `claude --agent <name>` stamps agent_type on every hook; without agent_id it is not a subagent.
 func TestAgentTypeWithoutAnAgentIDIsNotASubagent(t *testing.T) {
 	root := newRepo(t)
-	sp, _ := spool.Open(t.TempDir())
+	sp, _ := hookruntest.OpenSpool(t.TempDir())
 	hookruntest.WriteFile(t, root, "src/main.go", "package src\n")
 	runPostToolUse(t, root, sp, `{"session_id":"sess-agent-2","cwd":`+jsonString(root)+`,"agent_type":"reviewer","hook_event_name":"PostToolUse","tool_name":"Write","tool_input":{"file_path":"src/main.go"}}`)
 

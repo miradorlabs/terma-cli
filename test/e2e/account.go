@@ -4,13 +4,13 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -18,18 +18,14 @@ import (
 
 // Account stands in for Terma's account service and API gateway where `terma setup`
 // and the relay need them: a developer signed in with a user session (/v1/whoami, which
-// names no organization), the organizations and teams it reads, and server keys minted
-// per project (/v1/api-keys/server), each recorded so a scenario can tell which key
-// the relay sent a project's records with.
+// names no organization) and the organizations, teams and policies it reads. The relay
+// and the spool send with that session's access token (accountToken).
 type Account struct {
-	srv       *httptest.Server
-	token     string
-	mints     atomic.Int32
-	denyMints atomic.Bool
+	srv   *httptest.Server
+	token string
 	// withholdContent is the team's collection policy: no prompts, no tool content.
 	withholdContent atomic.Bool
 	mu              sync.Mutex
-	keys            map[string]string // project → minted key
 	// desktopRefresh is Terma Desktop's refresh token, which /v1/auth/user/delegate rotates;
 	// delegated are its unredeemed codes, each bound to the CLI's challenge, and delegations
 	// counts its calls.
@@ -73,12 +69,29 @@ var (
 // secretLike is a fake secret of a shape: prefix and n as 32 hex digits.
 func secretLike(prefix string, n int32) string { return fmt.Sprintf("%s%032x", prefix, n) }
 
+// accountToken is the signed-in person's access token, which SignIn seeds and a delegated
+// code signs in with: the bearer the relay, the spool's delivery and the heartbeat send
+// with on a person's profile. accountInstallation is the installation id a sign-in made.
+var accountToken = secretLike(userAccessPrefix, 1)
+
+const accountInstallation = "44444444-4444-4444-8444-444444444444"
+
+// personBearer is the Authorization a person's profile sends to the ingest with.
+func personBearer() string { return "Bearer " + accountToken }
+
+// accountKey is the account a person's queued parts are bound to: sha256 of the auth
+// host and the user, as auth.AccountKey makes it.
+func (a *Account) accountKey() string {
+	sum := sha256.Sum256([]byte(a.srv.URL + "\n" + accountUser))
+	return hex.EncodeToString(sum[:])[:16]
+}
+
 // StartAccount serves the fake account service until the test ends.
 func (sb *Sandbox) StartAccount() *Account {
 	if sb.account != nil {
 		return sb.account
 	}
-	a := &Account{token: secretLike(userAccessPrefix, 1), keys: map[string]string{}, desktopRefresh: secretLike(userRefreshPrefix, 0xde5c0),
+	a := &Account{token: accountToken, desktopRefresh: secretLike(userRefreshPrefix, 0xde5c0),
 		delegated: map[string]delegatedCode{}, issued: map[string]bool{}}
 	a.srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// The sign-in endpoints take no bearer: the body is the credential.
@@ -124,22 +137,6 @@ func (sb *Sandbox) StartAccount() *Account {
 			// git_hooks on: the scenarios commit by hand and expect the trailer, which only
 			// the hooks terma installs in the repository can add.
 			fmt.Fprintf(w, `{"policy":{"version":"1.1","terma":{"per_repository":{"repositories":%s},"git_hooks":true,"capture":{"exclude_prompts":%t,"exclude_tool_content":%t}}},"revision":1,"updated_at":"2026-09-30T12:27:05Z"}`, repos, withhold, withhold)
-		case "/v1/api-keys/server":
-			if a.denyMints.Load() {
-				w.WriteHeader(http.StatusForbidden)
-				return
-			}
-			var body struct {
-				ProjectID string `json:"project_id"`
-				Name      string `json:"name"`
-			}
-			_ = json.NewDecoder(r.Body).Decode(&body)
-			n := a.mints.Add(1)
-			key := fmt.Sprintf("ter_srv_minted%04d%s", n, strings.Repeat("0", 20))
-			a.mu.Lock()
-			a.keys[body.ProjectID] = key
-			a.mu.Unlock()
-			_ = json.NewEncoder(w).Encode(map[string]any{"key": key, "server_key": map[string]any{"id": fmt.Sprint(n), "project_id": body.ProjectID, "name": body.Name, "key_prefix": "ter_srv_"}})
 		default:
 			http.NotFound(w, r)
 		}
@@ -153,11 +150,14 @@ func (sb *Sandbox) StartAccount() *Account {
 
 // SignIn signs the developer in to the fake account under profile: the user session
 // `terma setup` would have stored in user-credentials.json (tokens in the file, as
-// --insecure-storage keeps them) and the organization setup chose, in config.json, with
-// the account's hosts, so launchd/systemd relays (which do not inherit ExtraEnv) load the
-// same scoped policy and login.
+// --insecure-storage keeps them), the installation id signing in made, and the
+// organization setup chose, in config.json, with the account's hosts, so launchd/systemd
+// relays (which do not inherit ExtraEnv) load the same scoped policy and login.
 func (sb *Sandbox) SignIn(profile string) {
 	a := sb.account
+	if installation := filepath.Join(sb.TermaConfig, "installation-id"); !fileExists(installation) {
+		sb.writeAbs(installation, accountInstallation+"\n")
+	}
 	credsPath := filepath.Join(sb.TermaConfig, "user-credentials.json")
 	creds := map[string]any{}
 	if data, err := os.ReadFile(credsPath); err == nil {
@@ -189,6 +189,73 @@ func (sb *Sandbox) SignIn(profile string) {
 	p["auth_url"], p["api_url"], p["app_url"] = a.srv.URL, a.srv.URL, a.srv.URL
 	data, _ = json.Marshal(file)
 	sb.writeAbs(path, string(data))
+}
+
+// editProfile changes profile's entry in config.json.
+func (sb *Sandbox) editProfile(profile string, edit func(map[string]any)) {
+	sb.T.Helper()
+	path := filepath.Join(sb.TermaConfig, "config.json")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		sb.T.Fatal(err)
+	}
+	var file map[string]any
+	if err := json.Unmarshal(data, &file); err != nil {
+		sb.T.Fatal(err)
+	}
+	p, ok := file["profiles"].(map[string]any)[profile].(map[string]any)
+	if !ok {
+		sb.T.Fatalf("config.json has no profile %q", profile)
+	}
+	edit(p)
+	data, _ = json.Marshal(file)
+	sb.writeAbs(path, string(data))
+}
+
+// profileLane is the lane a hook running under profile claims a session in
+// (claim.Claim.Account): no person's under a server key, else the account the profile
+// was chosen under.
+func (sb *Sandbox) profileLane(profile string) string {
+	sb.T.Helper()
+	data, err := os.ReadFile(filepath.Join(sb.TermaConfig, "config.json"))
+	if err != nil {
+		sb.T.Fatal(err)
+	}
+	var file struct {
+		Profiles map[string]struct {
+			Account         string `json:"account"`
+			ServerKeySignIn bool   `json:"server_key_sign_in"`
+		} `json:"profiles"`
+	}
+	if err := json.Unmarshal(data, &file); err != nil {
+		sb.T.Fatal(err)
+	}
+	p := file.Profiles[profile]
+	if p.ServerKeySignIn {
+		return "no_person"
+	}
+	if p.Account == "" {
+		sb.T.Fatalf("config.json's profile %q names no account", profile)
+	}
+	return p.Account
+}
+
+// profileOrganization is the organization config.json records for profile.
+func (sb *Sandbox) profileOrganization(profile string) string {
+	sb.T.Helper()
+	data, err := os.ReadFile(filepath.Join(sb.TermaConfig, "config.json"))
+	if err != nil {
+		sb.T.Fatal(err)
+	}
+	var file struct {
+		Profiles map[string]struct {
+			OrganizationID string `json:"organization_id"`
+		} `json:"profiles"`
+	}
+	if err := json.Unmarshal(data, &file); err != nil {
+		sb.T.Fatal(err)
+	}
+	return file.Profiles[profile].OrganizationID
 }
 
 // The auth gateway's answers, as mirador-platform's gateways/auth/spec/openapi.yaml has
@@ -344,11 +411,4 @@ func (a *Account) Delegate(challenge, label string) (string, error) {
 		return "", fmt.Errorf("delegate: HTTP %d %s %s, %v", resp.StatusCode, out.Error.Code, out.Error.Reason, err)
 	}
 	return out.Code, nil
-}
-
-// KeyFor is the key the account minted for a project, "" if none.
-func (a *Account) KeyFor(project string) string {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	return a.keys[project]
 }

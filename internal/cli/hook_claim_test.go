@@ -92,3 +92,27 @@ func TestHooksSendNothingOnceTornDown(t *testing.T) {
 		}
 	}
 }
+
+// An Antigravity hook under a person's sign-in queues what it collects in that person's
+// lane, which the spool sends with their sign-in: no team key is involved.
+func TestAntigravityHookQueuesInTheSignedInLane(t *testing.T) {
+	root := collectedRepo(t)
+	account := signInHereAs(t, "u-agy")
+	runHook(t, "antigravity-pre-invocation", `{"conversationId":"agy-lane-1","cwd":"`+hookruntest.InJSON(root)+`","modelName":"gemini-3.8-flash-low","initialNumSteps":1,"invocationNum":0}`)
+	events, err := spoolForTest(t).Peek(100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	starts := 0
+	for _, e := range events {
+		if e.Account != account || e.NoPerson {
+			t.Errorf("%s queued outside the signed-in lane: account %q, no person %v", e.Name, e.Account, e.NoPerson)
+		}
+		if e.Name == "terma.session.start" && e.SessionID == "agy-lane-1" {
+			starts++
+		}
+	}
+	if starts != 1 {
+		t.Fatalf("queued %d session starts for the conversation, want 1 (%d events)", starts, len(events))
+	}
+}

@@ -38,6 +38,7 @@ func TestEveryEventLeavesNamingItsRepository(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	s.BindNoPerson()
 	const own = "https://github.com/acme/app"
 	attrs := func(extra ...string) map[string]any {
 		m := map[string]any{hookrun.AttrProjectID: "p1", semconv.GenAIMainAgentNameKey: "fake"}
@@ -65,7 +66,7 @@ func TestEveryEventLeavesNamingItsRepository(t *testing.T) {
 		Policy:  func(context.Context, *config.Config, string) (config.Policy, error) { return pol, nil },
 		Consent: func(string, hookrun.Consent) bool { return true },
 	}
-	if res := r.Flush(t.Context(), s, &config.Config{OTLPURL: srv.URL}, true, 0); res.Sent != 8 || res.Err != nil {
+	if res := r.Flush(t.Context(), s, &config.Config{OTLPURL: srv.URL, ServerKeySignIn: true}, true, 0); res.Sent != 8 || res.Err != nil {
 		t.Fatalf("Flush = %+v", res)
 	}
 	var payload struct {

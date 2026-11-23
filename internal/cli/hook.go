@@ -9,11 +9,13 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/miradorlabs/terma-cli/internal/account/auth"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/hooks/dispatch"
 	"github.com/miradorlabs/terma-cli/internal/procinfo"
 	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
 	"github.com/miradorlabs/terma-cli/internal/repohooks"
+	"github.com/miradorlabs/terma-cli/internal/sendas"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
@@ -79,13 +81,39 @@ func (app *App) hookDeps() dispatch.Deps {
 
 // hookProfile is one small local read. Hooks run on the last validated policy even once
 // it has expired, so a refresh outage stops no claim: what leaves is decided downstream,
-// under the policy in force then.
+// under the policy in force then. config.json and the sign-in are read as one snapshot
+// (readLaneAsOne): a sign-in as someone else between the two reads makes the account
+// unreadable, so what the hook collects is lost, never bound to the new sign-in. So does one
+// stored before the profile is paired with it (pairedLane): the team is the last person's.
 func (app *App) hookProfile() dispatch.Profile {
-	cfg, err := config.Load(app.dir, app.stateDir, config.Overrides{})
-	if err != nil {
-		return dispatch.Profile{Policy: config.NoPolicy("", "")}
+	// NoPolicy admits no repository, so nothing is collected under it; and the profile
+	// can't be read, so what a path that skipped Repo's admission collects is lost.
+	p := dispatch.Profile{Policy: config.NoPolicy("", "")}
+	lane, _ := readLaneAsOne(app.dir, func() string {
+		cfg, err := config.Load(app.dir, app.stateDir, config.Overrides{})
+		if err != nil {
+			return sendas.AccountUnreadable
+		}
+		p = dispatch.Profile{Team: cfg.Policy.TeamID, Agents: cfg.Harnesses, Policy: cfg.Policy.InForce(cfg.OrganizationID, cfg.AuthURL)}
+		return app.profileLane(cfg)
+	})
+	if p.ServerKey = lane == sendas.NoPersonLane; !p.ServerKey {
+		p.Account = lane
 	}
-	return dispatch.Profile{Team: cfg.Policy.TeamID, Agents: cfg.Harnesses, Policy: cfg.Policy.InForce(cfg.OrganizationID, cfg.AuthURL)}
+	return p
+}
+
+// profileLane is the lane of cfg's profile, which was just read from config.json: no
+// person's under a server key, else its sign-in's account as auth.Account names it, paired
+// with the profile (pairedLane).
+func (app *App) profileLane(cfg *config.Config) string {
+	if cfg.ServerKeySignIn {
+		return sendas.NoPersonLane
+	}
+	if app.betweenProfileReads != nil {
+		app.betweenProfileReads()
+	}
+	return pairedLane(auth.Account(cfg.Dir, cfg.ProfileName, cfg.AuthURL), cfg.Account)
 }
 
 // hookPolicy is the collection policy while it is validated and fresh, else NoPolicy.

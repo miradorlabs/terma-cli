@@ -79,7 +79,7 @@ func sandboxedCommit(t *testing.T, workspace bool) {
 	root := hookruntest.InitRepo(t)
 	stateDir := t.TempDir()
 	spoolDir := filepath.Join(stateDir, spool.Dir)
-	sp, err := spool.Open(spoolDir)
+	sp, err := hookruntest.OpenSpool(spoolDir)
 	if err != nil {
 		t.Fatal(err)
 	}

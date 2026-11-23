@@ -16,6 +16,7 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
+	"github.com/miradorlabs/terma-cli/internal/sendas"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
@@ -49,8 +50,28 @@ func (app *App) newSpoolAwaitPushCommand() *cobra.Command {
 
 // pushEnv is what reporting a push needs: the spool, and a flush once it is spooled.
 func (app *App) pushEnv() hookrun.Env {
-	return hookrun.Env{StateDir: app.stateDir, ConfigDir: app.dir, Spool: app.openSpool(), Flush: spawnFlush,
+	env := hookrun.Env{StateDir: app.stateDir, ConfigDir: app.dir, Spool: app.openSpool(), Flush: spawnFlush,
 		Stderr: os.Stderr, Debug: os.Getenv("TERMA_DEBUG") != ""}
+	// One snapshot, as a hook's profile (hookProfile): a mixed one is unreadable, and lost.
+	lane, _ := readLaneAsOne(app.dir, func() string {
+		cfg, err := app.loadConfig()
+		if err != nil {
+			return sendas.AccountUnreadable
+		}
+		return app.profileLane(cfg)
+	})
+	if lane == sendas.NoPersonLane {
+		env.ServerKey = true
+		if env.Spool != nil {
+			env.Spool.BindNoPerson()
+		}
+	} else {
+		env.Account = lane
+		if env.Spool != nil {
+			env.Spool.Bind(env.Account)
+		}
+	}
+	return env
 }
 
 func (app *App) newSpoolFlushCommand() *cobra.Command {
@@ -67,7 +88,7 @@ The exit status distinguishes the outcomes a script needs apart:
   1  delivery failed for at least one team; its events stay queued and that
      team backs off on its own, while every other team's are delivered
   2  nothing was attempted: an earlier failure's retry window is open (--force overrides)
-  3  the pass ran but left work: events held for a team key or waiting out
+  3  the pass ran but left work: events held for a sign-in or a key, or waiting out
      their team's retry window (--force overrides), or given up on for age,
      disk pressure, or being unreadable`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
@@ -87,7 +108,11 @@ The exit status distinguishes the outcomes a script needs apart:
 				fmt.Fprintf(out, "Skipped: backing off until %s after an earlier failure (use --force to retry now).\n", res.NextAttempt.Local().Format(time.Kitchen))
 				return exitWith(ExitBackoff)
 			}
-			delivered, undelivered := describeFlush(res)
+			fix := "terma setup"
+			if cfg, err := app.loadConfig(); err == nil {
+				fix = app.signInFix(cfg)
+			}
+			delivered, undelivered := describeFlush(res, fix)
 			fmt.Fprintf(out, "Flushed %s.\n", strings.Join(append([]string{delivered}, undelivered...), ", "))
 			if res.Err != nil {
 				return res.Err
@@ -107,10 +132,10 @@ The exit status distinguishes the outcomes a script needs apart:
 
 // describeFlush words a flush pass: what was delivered, then one clause per reason an
 // event was not; `terma spool flush` and doctor share it so they agree on the terms.
-func describeFlush(res delivery.Result) (delivered string, undelivered []string) {
+func describeFlush(res delivery.Result, signInFix string) (delivered string, undelivered []string) {
 	delivered = fmt.Sprintf("%d event%s", res.Sent, plural(res.Sent))
 	if res.Held > 0 {
-		undelivered = append(undelivered, fmt.Sprintf("holding %d for a team key (run `terma setup`)", res.Held))
+		undelivered = append(undelivered, fmt.Sprintf("holding %d for a sign-in that may send them (run `%s`)", res.Held, signInFix))
 	}
 	if res.Failed > 0 {
 		undelivered = append(undelivered, fmt.Sprintf("keeping %d queued after a failed delivery", res.Failed))
@@ -156,7 +181,7 @@ func (app *App) delivery() delivery.Router {
 		Version:    app.version,
 		OTLPPinned: app.flags.otlpURL != "" || os.Getenv("TERMA_OTLP_URL") != "",
 		Policy:     app.policies().Current,
-		User:       app.teamUser,
+		User:       app.accountUser,
 		Consent: func(tool string, c hookrun.Consent) bool {
 			a, ok := app.agents.ForTool(tool)
 			if !ok {
@@ -187,6 +212,7 @@ func (app *App) flushSpool(ctx context.Context, force bool, minInterval time.Dur
 		return delivery.Result{}, err
 	}
 	r := app.delivery()
+	r.SignIn = app.signInSource(cfg)
 	// A hook that found the policy stale started this flush to refresh it (hookrun refreshPolicy).
 	if cfg.Policy.Stale(time.Now()) {
 		r.Policy = refreshOnce(ctx, cfg, cfg.Policy.Team(), r.Policy)

@@ -25,7 +25,7 @@ func switchSandbox(t *testing.T, active organization, team string) *fakeAuth {
 	prev := testApp.canAsk
 	testApp.canAsk = func() bool { return true }
 	t.Cleanup(func() { testApp.canAsk = prev })
-	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(f)); err != nil {
+	if err := saveSignIn(testApp.dir, storedSession(f)); err != nil {
 		t.Fatal(err)
 	}
 	if err := config.UpdateProfile(testApp.dir, config.DefaultProfile, func(p *config.Profile) {
@@ -151,7 +151,7 @@ func TestAfterSwitchSetupAsksForTheTeam(t *testing.T) {
 		t.Fatal("the deadline should have cut setup's browser sign-in")
 	}
 	// The browser sign-in approves the same organization again.
-	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(f)); err != nil {
+	if err := saveSignIn(testApp.dir, storedSession(f)); err != nil {
 		t.Fatal(err)
 	}
 	cfg, err := testApp.loadConfig()

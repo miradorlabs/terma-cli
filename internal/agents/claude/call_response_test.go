@@ -13,6 +13,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
+	"github.com/miradorlabs/terma-cli/internal/sendas"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
@@ -284,5 +285,43 @@ func TestClaudeSessionEndSendsACallFinishedAfterStop(t *testing.T) {
 	got := spooledResponses(t, env.Spool)
 	if len(got) != 1 || got[0].Attrs[semconv.TermaModelCallIDKey] != "req_a" || got[0].Attrs[semconv.GenAIUsageReasoningOutputTokensKey] != float64(76) {
 		t.Fatalf("got %+v, want req_a with its final count at the session's end", got)
+	}
+}
+
+// Signed out, a Stop's calls are lost once, each counted, and read past: a later Stop
+// neither counts them again nor, once someone has signed in, sends them in that person's
+// name.
+func TestASignedOutStopLosesItsCallsOnce(t *testing.T) {
+	env := titleEnv(t)
+	dir := t.TempDir()
+	sp, err := spool.Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sp.Bind("")
+	env.Spool = sp
+	path := transcript(t, t.TempDir(), assistantRecord("req_a", "2026-10-28T03:31:45Z", 76), assistantRecord("req_b", "2026-10-28T03:32:00Z", 12))
+	stopClaude(t, env, path)
+	first, _ := spool.ReadLosses(dir, time.Now())
+	stopClaude(t, env, path)
+	second, _ := spool.ReadLosses(dir, time.Now())
+	// The two calls, and anything else the Stop collected, counted once.
+	if n := first.Counts[sendas.LostSignedOut]; n < 2 || second.Counts[sendas.LostSignedOut] != n {
+		t.Fatalf("counted %v, then %v; want each call once", first.Counts, second.Counts)
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var state callResponseState
+	b, _ := os.ReadFile(filepath.Join(env.StateDir, claudeCallResponseStateDir, hookrun.EvidenceID(path)+".json"))
+	if json.Unmarshal(b, &state) != nil || state.Offset != info.Size() {
+		t.Fatalf("offset %d, want the transcript read past (%d)", state.Offset, info.Size())
+	}
+	sp.Bind("bbbbbbbbbbbbbbbb")
+	env.Account = "bbbbbbbbbbbbbbbb"
+	stopClaude(t, env, path)
+	if got := spooledResponses(t, sp); len(got) != 0 {
+		t.Fatalf("a call collected signed out left under the next sign-in: %+v", got)
 	}
 }

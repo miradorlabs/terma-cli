@@ -136,7 +136,7 @@ func TestGlobalModeClaude(t *testing.T) {
 		track(t)
 		t.Setenv("ANTHROPIC_API_KEY", "synthetic-telemetry-key")
 		sb := New(t, Isolated, WithClaude(b))
-		acct := sb.UseGlobalSetup("claude")
+		sb.UseGlobalSetup("claude")
 
 		known := sb.newRepo("known", "git@github.com:org/known.git")
 		unknown := sb.newRepo("unknown", "https://gitlab.example/me/side.git")
@@ -181,12 +181,8 @@ func TestGlobalModeClaude(t *testing.T) {
 				}
 			})
 		}
-		// All global records went with the selected team's key.
-		for _, p := range []string{globalDefault} {
-			if acct.KeyFor(p) == "" {
-				t.Errorf("no key was minted for %s", p)
-			}
-		}
+		// Everything went with the person's sign-in, naming the default team.
+		sb.checkSentAsPerson(t, globalDefault)
 		sb.StopRelay()
 		c := sb.RelayStats()
 		noteRelayStats(t.Name(), c)

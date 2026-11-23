@@ -17,7 +17,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/miradorlabs/terma-cli/internal/account/keystore"
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/agents/builtin"
 	"github.com/miradorlabs/terma-cli/internal/config"
@@ -565,8 +564,8 @@ func TestSetupReleasesTheRelayFromADeselectedAgent(t *testing.T) {
 
 // otlpRequest is one request an ingest host received: the key it came with and its body.
 type otlpRequest struct {
-	auth string
-	body []byte
+	auth, project string
+	body          []byte
 }
 
 // recordingIngest is an ingest host that takes every request and keeps it.
@@ -582,7 +581,7 @@ func newRecordingIngest(t *testing.T) *recordingIngest {
 	h.Server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, _ := io.ReadAll(r.Body)
 		h.mu.Lock()
-		h.requests = append(h.requests, otlpRequest{auth: r.Header.Get("Authorization"), body: body})
+		h.requests = append(h.requests, otlpRequest{auth: r.Header.Get("Authorization"), project: r.Header.Get(relay.ProjectHeader), body: body})
 		h.mu.Unlock()
 		w.WriteHeader(http.StatusOK)
 	}))
@@ -600,14 +599,14 @@ func (h *recordingIngest) take() []otlpRequest {
 }
 
 // The cutover when Terma Desktop moves the CLI to another organization (the organization-
-// model council's item 1a), proved on the existing routing: work in flight keeps its team
-// and that team's restrictions, nothing is sent for the old team while the profile is on
-// the new organization, never with the new team's key nor under its wider policy, and a
-// switch back collects for the old team under its own policy again.
+// model council's item 1a), on user tokens: one sign-in serves both organizations, so the
+// switch exchanges one code. Work in flight keeps its team and that team's restrictions:
+// every request names, in X-Mirador-Project, the team its events were queued for, never the
+// new one, and a relay on the new organization never sends the claimed session under the
+// new team's wider policy. A switch back collects for the old team under its own policy.
 func TestDesktopGrantCutoverKeepsInFlightWorkWithItsTeam(t *testing.T) {
-	t.Skip("sends with team keys, which no terma mints any more: MIR-703 moves the relay and the spool onto the user token, and this test with them")
 	gateway := grantSandbox(t)
-	t.Setenv("TERMA_POLICY_STUB", "") // the real fetches, which the account service scopes
+	t.Setenv("TERMA_POLICY_STUB", "") // the real fetches, which the auth gateway scopes
 	gateway.scopedPolicies = true
 	teamA, personal := teamOrgTeam(), personalTeam()
 	gateway.policyBodies = map[string]string{
@@ -619,7 +618,6 @@ func TestDesktopGrantCutoverKeepsInFlightWorkWithItsTeam(t *testing.T) {
 	ingest := newRecordingIngest(t)
 	t.Setenv("TERMA_OTLP_URL", ingest.URL)
 	gateway.grant("to-team", deskUser)
-	gateway.grant("to-personal", deskUser)
 	setupFor := func(org organization, team, code string) {
 		t.Helper()
 		stdin := identityLine(deskUser, org.ID)
@@ -630,14 +628,6 @@ func TestDesktopGrantCutoverKeepsInFlightWorkWithItsTeam(t *testing.T) {
 			t.Fatalf("setup for %s: %v\n%s%s", org.Name, err, stdout, stderr)
 		}
 		ingest.take() // setup's own check-in is not the delivery under test
-	}
-	keyOf := func(team string) string {
-		t.Helper()
-		key, err := keystore.Get(testApp.dir, team)
-		if err != nil || key == "" {
-			t.Fatalf("no key for team %s: %v", team, err)
-		}
-		return key
 	}
 	// resolve is what a relay started now does with the claim of session sid.
 	resolve := func(sid string) (relay.Policy, error) {
@@ -659,62 +649,68 @@ func TestDesktopGrantCutoverKeepsInFlightWorkWithItsTeam(t *testing.T) {
 		}
 		return ingest.take()
 	}
+	token := "Bearer " + fakeUserToken(deskUser)
+	// Each request names, as its team, the one whose events it carries.
+	checkTeams := func(sent []otlpRequest) {
+		t.Helper()
+		for _, r := range sent {
+			if r.auth != token {
+				t.Fatalf("a request went with %q, not the sign-in's token", r.auth)
+			}
+			for _, team := range []string{teamA, personal} {
+				if bytes.Contains(r.body, []byte(team)) != (r.project == team) {
+					t.Fatalf("a request naming team %s carried team %s's events: %v", r.project, team, bytes.Contains(r.body, []byte(team)))
+				}
+			}
+		}
+	}
 
 	// On the SHARED organization: events queued for team A, and a session claimed for it.
 	setupFor(orgA(), teamA, "to-team")
-	keyA := keyOf(teamA)
 	s := spoolForTest(t)
 	appendEvent(t, s, teamA, time.Now())
 	appendEvent(t, s, teamA, time.Now())
-	if !claim.Write(testApp.stateDir, "in-flight", claim.Claim{ProjectID: teamA, Tool: "codex", Repository: appRepo}, time.Now()) {
+	signedIn, err := testApp.loadConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !claim.Write(testApp.stateDir, "in-flight", claim.Claim{ProjectID: teamA, Tool: "codex", Repository: appRepo, Account: signedIn.Account}, time.Now()) {
 		t.Fatal("could not claim the session")
 	}
-	if pol, err := resolve("in-flight"); err != nil || pol.Key != keyA || pol.IncludePrompts || pol.IncludeToolContent {
-		t.Fatalf("before the switch the claim resolves to %+v, %v; want team A's key and policy", pol, err)
+	if pol, err := resolve("in-flight"); err != nil || pol.Key != "" || pol.IncludePrompts || pol.IncludeToolContent {
+		t.Fatalf("before the switch the claim resolves to %+v, %v; want team A's policy and no key", pol, err)
 	}
 
-	// Onboarding moves the CLI to Personal.
-	setupFor(personalOrg(), personal, "to-personal")
-	keyP := keyOf(personal)
+	// Onboarding moves the CLI to Personal: the same sign-in, no second code.
+	setupFor(personalOrg(), personal, "")
 	appendEvent(t, s, personal, time.Now()) // Personal's own, which must still go
 	sent := flush()
-	if len(sent) == 0 {
+	if !slices.ContainsFunc(sent, func(r otlpRequest) bool { return r.project == personal }) {
 		t.Fatal("Personal's own event was not delivered: the pass proves nothing")
 	}
-	for _, r := range sent {
-		if r.auth != "Bearer "+keyP || bytes.Contains(r.body, []byte(teamA)) {
-			t.Fatalf("while on Personal a request went with %q carrying team A: %v", r.auth, bytes.Contains(r.body, []byte(teamA)))
-		}
-	}
-	if queued := queuedProjects(t); len(queued) != 2 || queued[0] != teamA || queued[1] != teamA {
-		t.Fatalf("queue = %v, want team A's two events kept under team A", queued)
-	}
-	// A relay started on Personal neither sends the claimed session with Personal's key nor
-	// under Personal's policy: it has no validated policy for team A, so it withholds.
-	if pol, err := resolve("in-flight"); err == nil && (pol.Key == keyP || pol.Signals == nil || len(pol.Signals) != 0) {
+	checkTeams(sent)
+	// A relay started on Personal never sends the claimed session under Personal's wider
+	// policy: at most under team A's own restrictions.
+	if pol, err := resolve("in-flight"); err == nil && (pol.IncludePrompts || pol.IncludeToolContent || pol.Unadmitted) {
 		t.Fatalf("on Personal the claim for team A resolves to %+v", pol)
 	}
 
 	// The desktop switches back: the stored sign-in serves, and team A collects under its own
-	// policy, with its own key.
+	// policy.
 	setupFor(orgA(), teamA, "")
-	if gateway.exchanges.Load() != 2 {
-		t.Fatalf("the switch back exchanged a code (%d exchanges); it reuses the stored sign-in", gateway.exchanges.Load())
+	if gateway.exchanges.Load() != 1 {
+		t.Fatalf("the switches exchanged %d codes; the one sign-in serves both organizations", gateway.exchanges.Load())
 	}
 	pol, err := resolve("in-flight")
-	if err != nil || pol.Key != keyA || pol.IncludePrompts || pol.IncludeToolContent || pol.Unadmitted || pol.Signals != nil {
-		t.Fatalf("back on the SHARED organization the claim resolves to %+v, %v; want team A's key and restrictions", pol, err)
+	if err != nil || pol.Key != "" || pol.IncludePrompts || pol.IncludeToolContent || pol.Unadmitted || pol.Signals != nil {
+		t.Fatalf("back on the SHARED organization the claim resolves to %+v, %v; want team A's restrictions", pol, err)
 	}
 	appendEvent(t, s, teamA, time.Now())
 	sent = flush()
-	if len(sent) == 0 {
+	if !slices.ContainsFunc(sent, func(r otlpRequest) bool { return r.project == teamA }) {
 		t.Fatal("team A's events were not delivered after the switch back")
 	}
-	for _, r := range sent {
-		if r.auth != "Bearer "+keyA {
-			t.Fatalf("team A's events went with %q, not team A's own key", r.auth)
-		}
-	}
+	checkTeams(sent)
 	if queued := queuedProjects(t); len(queued) != 0 {
 		t.Fatalf("queue = %v after the switch back", queued)
 	}

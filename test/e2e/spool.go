@@ -16,11 +16,13 @@ type Event struct {
 	SessionID string         `json:"session_id"`
 	TraceID   string         `json:"trace_id"`
 	Attrs     map[string]any `json:"attrs"`
+	// Account is the sign-in the event is bound to: it leaves only with that sign-in.
+	Account string `json:"account"`
 }
 
 // Spool reads every event the sandbox's hooks have written.
 func (sb *Sandbox) Spool() []Event {
-	f, err := os.Open(filepath.Join(sb.TermaConfig, "spool", "events.jsonl"))
+	f, err := os.Open(filepath.Join(sb.TermaConfig, "spool", "events-v2.jsonl"))
 	if err != nil {
 		return nil
 	}

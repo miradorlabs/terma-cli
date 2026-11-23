@@ -11,7 +11,6 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/gitx"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
-	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
 // The repository comes from the payload's workspace roots, and the conversation id ties
@@ -21,7 +20,7 @@ func TestCursorConversationIsStampedOnItsCommit(t *testing.T) {
 	root := hookruntest.InitRepo(t)
 	stateDir := t.TempDir()
 	ctx := context.Background()
-	sp, _ := spool.Open(t.TempDir())
+	sp, _ := hookruntest.OpenSpool(t.TempDir())
 	elsewhere := t.TempDir()
 	env := func(stdin string, args ...string) hookrun.Env {
 		return hookrun.Env{StateDir: stateDir, Now: time.Now(), Cwd: elsewhere, Policy: hookruntest.Admitting(root), Args: args, Stdin: strings.NewReader(stdin), Spool: sp, Version: "test"}

@@ -22,7 +22,7 @@ const (
 	whyNoTrace        = "no_session_trace"   // a span of a trace no record has named yet
 	whyUnclaimed      = "unclaimed_expired"  // no hook in a collected repository claimed the session
 	whyProcess        = "uncovered_process"  // claimed, but by other processes: resumed elsewhere
-	whyNoKey          = "no_key"             // claimed, but this machine holds no key for the project
+	whyNoKey          = "no_key"             // claimed, but its team has no policy (or key) here to send under yet
 	whyAmbiguous      = "ambiguous_process"  // no session named; its process named more than one session
 	whyProcessIdle    = "no_session_process" // no session named; its process has named none
 	whyProcessRunning = "process_running"    // no session named; attributed only once its process exits
@@ -40,10 +40,11 @@ type attribution struct {
 // A part is placed only by what it or its trace names; a part naming no session waits
 // for its process to exit (decideExited), because a shared process that has shown one
 // claimed session may be about to name a personal one: loss, never a guess. narrow and
-// claimed are the part's (part.narrow, part.claimed): global mode's catch-all may take neither.
-func (r *Relay) decide(key string, pid int, at time.Time, narrow, claimed bool) (claim.Claim, Policy, string, bool, attribution) {
+// claimed are the part's (part.narrow, part.claimed): global mode's catch-all may take neither;
+// lane is the part's too (part.account), the sign-in its policy must have been resolved for.
+func (r *Relay) decide(key string, pid int, at time.Time, narrow, claimed bool, lane string) (claim.Claim, Policy, string, bool, attribution) {
 	if c, global := r.catchAll(); global && !narrow && !claimed {
-		pol, ok := r.resolve(c)
+		pol, ok := r.resolve(c, lane)
 		if !ok {
 			return claim.Claim{}, Policy{}, whyNoKey, false, attribution{}
 		}
@@ -56,29 +57,29 @@ func (r *Relay) decide(key string, pid int, at time.Time, narrow, claimed bool) 
 		if r.collectsNone(n, at) {
 			return claim.Claim{}, Policy{}, whyNotCollected, false, attribution{}
 		}
-		return r.decideExited(n, at, narrow)
+		return r.decideExited(n, at, narrow, lane)
 	}
 	session := r.sessionFor(key)
 	if session == "" {
 		if pid != 0 {
-			c, pol, why, ok, how := r.decideExited(pid, at, narrow)
+			c, pol, why, ok, how := r.decideExited(pid, at, narrow, lane)
 			if ok {
 				return c, pol, "", true, how
 			}
-			if why == whyNotCollected {
+			if why == whyNotCollected || why == whyNoKey {
 				return claim.Claim{}, Policy{}, why, false, attribution{}
 			}
 		}
 		return claim.Claim{}, Policy{}, whyNoTrace, false, attribution{}
 	}
-	c, pol, why, ok := r.decideClaimed(session, pid, at, narrow)
+	c, pol, why, ok := r.decideClaimed(session, pid, at, narrow, lane)
 	return c, pol, why, ok, attribution{}
 }
 
 // decideClaimed places a part by its session's claim: the placement covering pid at the part's time.
 // A narrow part never leaves under a policy that needs no claim: only global mode grants
 // one, so the part's session was not collected when it arrived, whatever repository it is in.
-func (r *Relay) decideClaimed(session string, pid int, at time.Time, narrow bool) (claim.Claim, Policy, string, bool) {
+func (r *Relay) decideClaimed(session string, pid int, at time.Time, narrow bool, lane string) (claim.Claim, Policy, string, bool) {
 	c, ok := r.lookup(session)
 	if !ok {
 		return claim.Claim{}, Policy{}, whyUnclaimed, false
@@ -91,7 +92,7 @@ func (r *Relay) decideClaimed(session string, pid int, at time.Time, narrow bool
 	if c.ProjectID == "" {
 		return claim.Claim{}, Policy{}, whyNotCollected, false
 	}
-	pol, ok := r.resolve(c)
+	pol, ok := r.resolve(c, lane)
 	if !ok {
 		return claim.Claim{}, Policy{}, whyNoKey, false
 	}
@@ -102,12 +103,24 @@ func (r *Relay) decideClaimed(session string, pid int, at time.Time, narrow bool
 }
 
 // route sends a part on only if nothing is held for its key, so arrival order holds, and
-// drops a part of a session marked not collected without holding it.
+// drops a part of a session marked not collected without holding it. A part collected with
+// no sign-in to bind it to (part.lost) is never held, since it can never leave: it is lost
+// now, counted by its reason when it is a team's, or dropped by why it can't be placed.
 func (r *Relay) route(p *part) {
 	r.deliverMu.Lock()
 	defer r.deliverMu.Unlock()
-	c, pol, why, ok, how := r.decide(p.session, p.pid, p.at, p.narrow, p.claimed)
-	if why == whyNotCollected {
+	c, pol, why, ok, how := r.decide(p.session, p.pid, p.at, p.narrow, p.claimed, p.account)
+	switch {
+	case why == whyNotCollected:
+		r.stats.dropped(p.signal, why, p.records)
+		return
+	case p.lost != "" && ok:
+		r.deliverAttributed(c, pol, p, how) // the policy's own drops first
+		return
+	case p.lost != "" && why == whyNoKey:
+		r.lose(p)
+		return
+	case p.lost != "":
 		r.stats.dropped(p.signal, why, p.records)
 		return
 	}
@@ -120,7 +133,7 @@ func (r *Relay) route(p *part) {
 			return
 		}
 	}
-	r.hold(p)
+	r.hold(p, why == whyNoKey)
 }
 
 // deliverAttributed applies the content policy, stamps the project and enqueues. deliverMu is held.
@@ -131,6 +144,10 @@ func (r *Relay) deliverAttributed(c claim.Claim, pol Policy, p *part, how attrib
 	}
 	if pol.Signals != nil && !contains(pol.Signals, string(p.signal)) {
 		r.stats.dropped(p.signal, "policy_signal", p.records)
+		return
+	}
+	if p.lost != "" {
+		r.lose(p)
 		return
 	}
 	unclassified := map[string]int{}
@@ -150,6 +167,11 @@ func (r *Relay) deliverAttributed(c claim.Claim, pol Policy, p *part, how attrib
 	ran := r.ranIn(c, p, how)
 	stampCheckout(p, ran, pol.IncludeToolContent)
 	stampParent(p, ran)
+	// Its outbox entry is named by when it arrived, however long it was held.
+	at := p.arrived
+	if at.IsZero() {
+		at = r.opts.Now()
+	}
 	nameUser(p, pol)
 	if how.how != "" {
 		stamp(p, semconv.TermaRelayAttributionKey, how.how)
@@ -159,7 +181,14 @@ func (r *Relay) deliverAttributed(c claim.Claim, pol Policy, p *part, how attrib
 		// attributed_by_process or attributed_by_catch_all: global mode's default project is no process's.
 		r.stats.add("attributed_by_"+strings.ReplaceAll(how.how, "-", "_")+"."+string(p.signal), p.records)
 	}
-	r.enqueue(c, p)
+	r.enqueue(c, p, at)
+}
+
+// lose drops a team's part collected with no sign-in to bind it to: never written, and
+// counted as lost by its reason.
+func (r *Relay) lose(p *part) {
+	r.stats.dropped(p.signal, p.lost, p.records)
+	r.recordLosses(map[string]int{p.lost: p.records}, r.opts.Now())
 }
 
 // ranIn is the claim naming where the part's session ran, its Root the working tree and its

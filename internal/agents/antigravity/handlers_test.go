@@ -13,7 +13,6 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
-	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
 // antigravityPayload is a recorded agy payload with the workspace substituted.
@@ -26,7 +25,7 @@ func antigravityPayload(root, event string, extra string) string {
 func TestAntigravityConversationIsStampedOnItsCommit(t *testing.T) {
 	root := hookruntest.InitRepo(t)
 	ctx := context.Background()
-	sp, _ := spool.Open(t.TempDir())
+	sp, _ := hookruntest.OpenSpool(t.TempDir())
 	stateDir := t.TempDir()
 	hookDir := filepath.Join(root, ".agents")
 	if err := os.MkdirAll(hookDir, 0o755); err != nil {
@@ -178,7 +177,7 @@ func TestAntigravityConversationIsStampedOnItsCommit(t *testing.T) {
 func TestAntigravityLaterTurnsRefreshWithoutRestarting(t *testing.T) {
 	root := hookruntest.InitRepo(t)
 	ctx := context.Background()
-	sp, _ := spool.Open(t.TempDir())
+	sp, _ := hookruntest.OpenSpool(t.TempDir())
 	stateDir := t.TempDir()
 	env := func(stdin string) hookrun.Env {
 		return hookrun.Env{StateDir: stateDir, Now: time.Now(), Cwd: root, Policy: hookruntest.Admitting(root), Stdin: strings.NewReader(stdin), Spool: sp, Version: "test"}
@@ -243,7 +242,7 @@ func TestAntigravityHandlersIgnoreBadInputAndStillAck(t *testing.T) {
 // payload that omits it still finds its session.
 func TestAntigravityConversationFallsBackToTheEnvironment(t *testing.T) {
 	root := hookruntest.InitRepo(t)
-	sp, _ := spool.Open(t.TempDir())
+	sp, _ := hookruntest.OpenSpool(t.TempDir())
 	stateDir := t.TempDir()
 	t.Setenv(antigravityConversationEnv, "env-conv-1")
 	stdin := `{"workspacePaths":["` + hookruntest.InJSON(root) + `"],"modelName":"gemini-3.8-pro","initialNumSteps":1,"invocationNum":0}`
@@ -266,7 +265,7 @@ func TestAntigravityConversationFallsBackToTheEnvironment(t *testing.T) {
 func TestAntigravityTurnsAreNamedByWhereTheyBegan(t *testing.T) {
 	root := hookruntest.InitRepo(t)
 	ctx := context.Background()
-	sp, _ := spool.Open(t.TempDir())
+	sp, _ := hookruntest.OpenSpool(t.TempDir())
 	stateDir := t.TempDir()
 	run := func(h func(context.Context, hookrun.Env) error, extra string) {
 		t.Helper()
@@ -386,7 +385,7 @@ func antigravity1513Payload(root, event, extra string) string {
 func TestAntigravity1513ConversationThroughMachineWideHooks(t *testing.T) {
 	root := hookruntest.InitRepo(t)
 	ctx := context.Background()
-	sp, _ := spool.Open(t.TempDir())
+	sp, _ := hookruntest.OpenSpool(t.TempDir())
 	stateDir, hookDir := t.TempDir(), t.TempDir()
 	var stdout bytes.Buffer
 	run := func(h func(context.Context, hookrun.Env) error, stdin string) {

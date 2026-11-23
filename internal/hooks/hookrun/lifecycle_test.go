@@ -12,8 +12,8 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
+	"github.com/miradorlabs/terma-cli/internal/sendas"
 	"github.com/miradorlabs/terma-cli/internal/session"
-	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
 // A session edits files in its own repository, another the team collects, one it does not
@@ -24,7 +24,7 @@ func TestTouchReportsEachFileUnderItsOwnRepository(t *testing.T) {
 	own, other, denied := hookruntest.InitRepo(t), hookruntest.InitRepo(t), hookruntest.InitRepo(t)
 	outside := t.TempDir()
 	stateDir := t.TempDir()
-	sp, _ := spool.Open(t.TempDir())
+	sp, _ := hookruntest.OpenSpool(t.TempDir())
 	var claimed []string
 	env := Env{
 		StateDir: stateDir, Now: time.Now(), Cwd: own, Spool: sp, Team: hookruntest.Team,
@@ -71,6 +71,14 @@ func TestTouchReportsEachFileUnderItsOwnRepository(t *testing.T) {
 	if c, ok := claim.Read(stateDir, sid, time.Now()); !ok || c.Repo != filepath.Base(own) || c.Repository.Origin != "github.com/acme/"+filepath.Base(own) {
 		t.Errorf("claim = %+v, %v: the session's own repository claims it", c, ok)
 	}
+	// The claim is made under the lane the hook's events are in.
+	lane := events[0].Account
+	if events[0].NoPerson {
+		lane = sendas.NoPersonLane
+	}
+	if c, _ := claim.Read(stateDir, sid, time.Now()); lane == "" || c.Account != lane {
+		t.Errorf("claim made under %q, the events' lane %q", c.Account, lane)
+	}
 	for _, root := range claimed {
 		if root != own {
 			t.Errorf("OnClaim(%q): only the session's own repository is wired", root)
@@ -91,7 +99,7 @@ func TestTouchInAGlobalFolderOutsideGitNamesNoRepository(t *testing.T) {
 	t.Parallel()
 	dir, _ := filepath.EvalSymlinks(t.TempDir()) // a folder outside git is located with symlinks resolved
 	stateDir := t.TempDir()
-	sp, _ := spool.Open(t.TempDir())
+	sp, _ := hookruntest.OpenSpool(t.TempDir())
 	env := Env{StateDir: stateDir, Now: time.Now(), Cwd: dir, Spool: sp, Policy: config.Policy{Mode: config.ModeGlobal, DefaultProjectID: "p-default"}}
 	r, err := env.Repo(context.Background())
 	if err != nil {
@@ -146,7 +154,7 @@ func TestCheckoutIDPinsTheSharedVectors(t *testing.T) {
 func TestTouchNamesEachCheckoutByIDAndReportNone(t *testing.T) {
 	t.Parallel()
 	own, other := hookruntest.InitRepo(t), hookruntest.InitRepo(t)
-	sp, _ := spool.Open(t.TempDir())
+	sp, _ := hookruntest.OpenSpool(t.TempDir())
 	env := Env{
 		StateDir: t.TempDir(), Now: time.Now(), Cwd: own, Spool: sp, Team: hookruntest.Team,
 		Policy: listing("github.com/acme/"+filepath.Base(own), "github.com/acme/"+filepath.Base(other)),
@@ -158,7 +166,7 @@ func TestTouchNamesEachCheckoutByIDAndReportNone(t *testing.T) {
 	sess := session.Session{ID: "sess-checkout-id", Tool: "claude-code"}
 	paths := []string{filepath.Join(own, "a.go"), filepath.Join(other, "b.go")}
 	env.Touch(r, sess, "Edit", paths, nil)
-	env.Report(r, sess, "Bash", paths, nil)
+	env.ReportExpected(r, sess, nil, "Bash", paths, nil)
 
 	events := hookruntest.Spooled(t, sp)
 	if len(events) != 4 {

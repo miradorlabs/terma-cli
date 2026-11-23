@@ -14,8 +14,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/miradorlabs/terma-cli/internal/agents/builtin"
 	"github.com/miradorlabs/terma-cli/internal/relay"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
+	"github.com/miradorlabs/terma-cli/internal/relay/shape"
 )
 
 // now fires at once, recording each wait it was asked for.
@@ -338,6 +340,48 @@ func TestAnUpdatedRelayNeverDropsWhatItHoldsAfterThePauseWait(t *testing.T) {
 	}
 	if got := counters(t, filepath.Join(dir, StatsFile))["dropped.no_session_trace_at_exit.traces"]; got != 0 {
 		t.Fatalf("the restart dropped %d held spans", got)
+	}
+}
+
+// Past updatePauseWait an update no longer waits for parts waiting for their team's policy
+// or key, which an agent's steady exports renew and only a restart may fix: it restarts,
+// counting them as lost.
+func TestSteadyPolicyWaitsDoNotKeepAnUpdateFromRestarting(t *testing.T) {
+	was := updatePauseWait
+	updatePauseWait = time.Second
+	t.Cleanup(func() { updatePauseWait = was })
+	stateDir, _, token := setUpRelay(t)
+	c := runConfig(stateDir, 0, nil)
+	c.Addr, c.Version, c.Service, c.Updater = freeAddr(t), "1.2.0", true, installsAtOnce()
+	c.Engine.Lookup = func(string, time.Time) (claim.Claim, bool) { return claim.Claim{ProjectID: "p3"}, true }
+	c.Engine.Resolve = func(claim.Claim) (relay.Policy, error) { return relay.Policy{}, relay.ErrNoKey }
+	c.Engine.Correlators = builtin.Agents("").With[shape.Correlator]()
+	r := startRun(t, c)
+	r.await(t, "the relay")
+	stop := make(chan struct{})
+	sent := make(chan struct{})
+	go func() {
+		defer close(sent)
+		for {
+			select {
+			case <-stop:
+				return
+			case <-time.After(100 * time.Millisecond):
+				_, _ = exportSpans(c.Addr, token, "D", 1)
+			}
+		}
+	}()
+	defer func() { close(stop); <-sent }()
+	select {
+	case <-r.done:
+	case <-time.After(updatePauseWait + 5*time.Second):
+		t.Fatal("steady exports waiting for their policy kept the update from restarting")
+	}
+	if !r.res.Updated {
+		t.Fatalf("Run = %+v, want Updated", r.res)
+	}
+	if l, err := relay.ReadOutboxLosses(c.Engine.Dir); err != nil || l.Counts["policy_timeout"] == 0 {
+		t.Fatalf("losses = %+v, %v; want the dropped parts counted", l, err)
 	}
 }
 

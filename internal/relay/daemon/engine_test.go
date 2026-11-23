@@ -95,6 +95,19 @@ func TestTheRefresherKeepsTheSelectedTeamFresh(t *testing.T) {
 	}
 }
 
+// A person's profile has no team key, so its selected team, with no policy stored yet (a
+// fresh or cleared state directory), is still refreshed: it is named by the profile alone.
+func TestTheRefresherFindsASelectedTeamWithNoPolicyStored(t *testing.T) {
+	t.Parallel()
+	configDir := t.TempDir()
+	d := Deps{LoadConfig: func() (*config.Config, error) {
+		return &config.Config{Dir: configDir, Team: "t1", Policy: config.NoPolicy("", "")}, nil
+	}}
+	if teams := d.Refresher().Teams(); !slices.Equal(teams, []string{"t1"}) {
+		t.Fatalf("Teams = %v; want the profile's selected team", teams)
+	}
+}
+
 // A team with its key on file and no policy fetched is held, never granted; the relay's refresher finds it at once by its key, and once that fetch is
 // stored the team's records follow its policy.
 func TestAFreshBindingIsHeldUntilTheRelayFetchesItsPolicy(t *testing.T) {
@@ -109,7 +122,7 @@ func TestAFreshBindingIsHeldUntilTheRelayFetchesItsPolicy(t *testing.T) {
 	if err := keystore.Set(configDir, "p1", mintedKey, keystore.HostsOf(cfg)); err != nil {
 		t.Fatal(err)
 	}
-	resolve := Resolver(cfg, ResolverDeps{AgentName: func(string) string { return "claude" }, Endpoint: func(string) string { return "https://otel.example" },
+	resolve := Resolver(cfg, ResolverDeps{AgentName: func(string) string { return "claude" }, Endpoint: func(string, bool) string { return "https://otel.example" },
 		RelayTargets: func(s []string) []string { return s }})
 	c := claim.Claim{ProjectID: "p1", Tool: "claude"}
 	if pol, err := resolve(c); err == nil {

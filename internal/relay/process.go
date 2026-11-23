@@ -32,7 +32,7 @@ type procState struct {
 // decideExited attributes a sessionless part sent at at to the one session its exited
 // sender named, if claimed, under the placement in force at at: a process that moved
 // repositories sent its earlier parts from the earlier one.
-func (r *Relay) decideExited(pid int, at time.Time, narrow bool) (claim.Claim, Policy, string, bool, attribution) {
+func (r *Relay) decideExited(pid int, at time.Time, narrow bool, lane string) (claim.Claim, Policy, string, bool, attribution) {
 	r.mu.Lock()
 	st := r.procs[pid]
 	var sessions []string
@@ -53,11 +53,12 @@ func (r *Relay) decideExited(pid int, at time.Time, narrow bool) (claim.Claim, P
 	case overflow || len(sessions) != 1:
 		return claim.Claim{}, Policy{}, whyAmbiguous, false, attribution{}
 	}
-	c, pol, why, ok := r.decideClaimed(sessions[0], pid, at, narrow)
+	c, pol, why, ok := r.decideClaimed(sessions[0], pid, at, narrow, lane)
+	how := attribution{how: semconv.TermaRelayAttributionProcess, session: sessions[0]}
 	if !ok {
 		return claim.Claim{}, Policy{}, why, false, attribution{}
 	}
-	return c, pol, "", true, attribution{how: semconv.TermaRelayAttributionProcess, session: sessions[0]}
+	return c, pol, "", true, how
 }
 
 // collectsNone reports whether every session pid has named is, at at, marked not

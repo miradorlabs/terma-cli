@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"maps"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
@@ -49,7 +50,7 @@ func TestRelayClaudeDesktop(t *testing.T) {
 		time.Sleep(8 * time.Second) // past the hold: the personal session is dropped by now
 		got := reached(sb.Receiver)
 		for name, sid := range map[string]string{"repository": repoSID, "worktree": wtSID} {
-			if r := got[sid]; !r["project "+sb.ProjectID] || !r["key Bearer "+liveKey] || len(r) != 2 {
+			if r := got[sid]; !maps.Equal(r, asPerson(sb.ProjectID)) {
 				t.Errorf("the %s session %s reached upstream as %v", name, sid, r)
 			}
 			if len(sb.APIRequests(sid, time.Second)) == 0 {

@@ -10,6 +10,7 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/account/secret"
 	"github.com/miradorlabs/terma-cli/internal/config"
+	"github.com/miradorlabs/terma-cli/internal/sendas"
 )
 
 func sampleCredential() *Credential {
@@ -295,5 +296,65 @@ func TestARefreshMarkCountsOnlyForItsToken(t *testing.T) {
 	mark("an-older-token")
 	if cred, err := LoadCredential(dir, config.DefaultProfile); err != nil || !cred.RefreshInDoubtSince.IsZero() {
 		t.Fatalf("LoadCredential = %+v, %v; want no mark beside another token", cred, err)
+	}
+}
+
+// A sign-in that can't be read is no one's account but its own: never the "" of a signed-out
+// profile, which a server key may send for.
+func TestAnUnreadableSignInIsNoSignedOutOne(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	if got := Account(dir, "default", "https://auth.example.test"); got != "" {
+		t.Fatalf("signed out: %q", got)
+	}
+	if err := os.WriteFile(config.CredentialsPath(dir), []byte("{"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if got := Account(dir, "default", "https://auth.example.test"); got != sendas.AccountUnreadable {
+		t.Fatalf("unreadable: %q, want %q", got, sendas.AccountUnreadable)
+	}
+}
+
+// A sign-in for another environment keeps its own account: what is collected under it is
+// that person's, never the "" of a signed-out profile, which a server key may send for.
+func TestASignInForAnotherEnvironmentKeepsItsAccount(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	if _, err := SaveCredential(dir, "default", &Credential{AccessToken: "a", RefreshToken: "r", ExpiresAt: time.Now().Add(time.Hour),
+		AuthURL: "https://auth.prod.example.test", SessionID: "s", UserID: "u"}); err != nil {
+		t.Fatal(err)
+	}
+	if got, want := Account(dir, "default", "https://auth.dev.example.test"), AccountKey("https://auth.prod.example.test", "u"); got != want {
+		t.Fatalf("another environment's sign-in: %q, want its own account %q", got, want)
+	}
+}
+
+// A sign-in records no start: nothing collected is bound to a sign-in by when it began.
+func TestASignInRecordsNoStart(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	if _, err := SaveCredential(dir, "default", &Credential{AccessToken: "a", RefreshToken: "r", ExpiresAt: time.Now().Add(time.Hour),
+		AuthURL: "https://auth.example.test", SessionID: "s", UserID: "u"}); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(config.CredentialsPath(dir))
+	if err != nil || strings.Contains(string(data), "signed_in_at") {
+		t.Fatalf("user-credentials.json = %s, %v; want no signed_in_at", data, err)
+	}
+}
+
+// A sign-in with no user id to key it by is the unreadable account, in this environment as
+// in another: never the "" of a signed-out profile.
+func TestASignInWithNoUserIsUnreadable(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	if _, err := SaveCredential(dir, "default", &Credential{AccessToken: "a", RefreshToken: "r", ExpiresAt: time.Now().Add(time.Hour),
+		AuthURL: "https://auth.example.test", SessionID: "s"}); err != nil {
+		t.Fatal(err)
+	}
+	for _, env := range []string{"https://auth.example.test", "https://auth.other.example.test"} {
+		if got := Account(dir, "default", env); got != sendas.AccountUnreadable {
+			t.Errorf("for %s: %q, want %q", env, got, sendas.AccountUnreadable)
+		}
 	}
 }

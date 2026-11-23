@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
 	"github.com/miradorlabs/terma-cli/internal/repohooks"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
@@ -38,6 +39,7 @@ func TestARealPushIsReportedByTheInstalledHook(t *testing.T) {
 	gitOut(t, root, "commit", "-q", "--allow-empty", "-m", "init")
 	gitOut(t, root, "push", "-q", "backup", "main")
 	admitHere(t, root, "team")
+	signInHereAs(t, "u-push")
 	hookruntest.RelayOn(t, stateDir)
 	if _, err := repohooks.Install(stateDir, bin, filepath.Join(root, ".git")); err != nil {
 		t.Fatal(err)
@@ -52,7 +54,7 @@ func TestARealPushIsReportedByTheInstalledHook(t *testing.T) {
 		t.Errorf("the push took %s", took)
 	}
 
-	events := filepath.Join(stateDir, spool.Dir, "events.jsonl")
+	events := filepath.Join(stateDir, spool.Dir, spool.EventsFile)
 	deadline := time.Now().Add(30 * time.Second)
 	for {
 		data, _ := os.ReadFile(events)
@@ -72,7 +74,7 @@ func TestARealPushIsReportedByTheInstalledHook(t *testing.T) {
 	// The record is gone once reported.
 	deadline = time.Now().Add(10 * time.Second)
 	for {
-		entries, _ := os.ReadDir(filepath.Join(stateDir, "pushes"))
+		entries, _ := os.ReadDir(filepath.Join(stateDir, hookrun.PushesDir))
 		if len(entries) == 0 {
 			break
 		}

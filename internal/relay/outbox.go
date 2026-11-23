@@ -20,16 +20,24 @@ import (
 	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/miradorlabs/terma-cli/internal/account/auth"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/project"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
+	"github.com/miradorlabs/terma-cli/internal/sendas"
 )
 
 // The outbox is plain files, one part each, renamed into place so a crash leaves a whole file or none:
 //
-//	<dir>/<project>/<tool>/<repo>/<received>-<seq>-<signal>-<records>.pb   accepted, not yet delivered
-//	<dir>/<project>/<tool>/<repo>/identity.json                            the repository <repo> hashes
-//	<dir>/.dead/<project>-<tool>-<repo>-<name>                             refused by the host
+//	<dir>/@<account>/<project>/<tool>/<repo>/<received>-<seq>-<signal>-<records>.pb   accepted, not yet delivered
+//	<dir>/@<account>/<project>/<tool>/<repo>/identity.json                            the repository <repo> hashes
+//	<dir>/.dead/<account>-<project>-<tool>-<repo>-<name>                              refused by the host
+//
+// <account> is the parts' lane: the account key (auth.AccountKey) of the sign-in that
+// collected them, so they leave only under it; or no_person (sendas.NoPersonLane), for what
+// was collected under a server key, which only a server key sends. This version never
+// writes a route without a lane, <dir>/<project>/...: one found there is never sent, and
+// ages out (mayLeave).
 //
 // <received> is zero-padded Unix nanoseconds, so a name sort is arrival order. Only claimed
 // parts, already filtered, are written; unsynced, so a power cut can lose the last seconds.
@@ -51,20 +59,21 @@ const (
 	maxOutboxAge   = 14 * 24 * time.Hour
 )
 
-// route is where a part goes: a project, with the key of the tool that claimed it and a
-// hash of the repository its session ran in.
+// route is where a part goes: the account that collected it, a project, the tool that
+// claimed it and a hash of the repository its session ran in.
 type route struct {
+	account string
 	project string
 	tool    string
 	repo    string
 }
 
-func routeOf(c claim.Claim) route {
+func routeOf(account string, c claim.Claim) route {
 	t := c.Tool
 	if t == "" {
 		t = noTool
 	}
-	return route{project: c.ProjectID, tool: t, repo: repoKey(c.Repository)}
+	return route{account: account, project: c.ProjectID, tool: t, repo: repoKey(c.Repository)}
 }
 
 func repoKey(r config.Repository) string {
@@ -83,7 +92,13 @@ func (rt route) toolLabel() string {
 	return rt.tool
 }
 
-func (rt route) String() string { return rt.project + "/" + rt.tool + "/" + rt.repo }
+func (rt route) String() string {
+	s := rt.project + "/" + rt.tool + "/" + rt.repo
+	if rt.account != "" {
+		s = "@" + rt.account + "/" + s
+	}
+	return s
+}
 
 type entry struct {
 	name    string
@@ -96,6 +111,16 @@ var seq atomic.Uint64
 func newEntry(now time.Time, sig Signal, records int) entry {
 	n := seq.Add(1) % 1_000_000
 	return entry{name: fmt.Sprintf("%020d-%06d-%s-%d%s", now.UnixNano(), n, sig, records, pbSuffix), signal: sig, records: records}
+}
+
+// received is when the entry's part arrived, from its name.
+func (e entry) received() time.Time {
+	ns, _, _ := strings.Cut(e.name, "-")
+	n, err := strconv.ParseInt(ns, 10, 64)
+	if err != nil {
+		return time.Time{}
+	}
+	return time.Unix(0, n)
 }
 
 func parseEntry(name string) (entry, bool) {
@@ -123,11 +148,24 @@ func parseEntry(name string) (entry, bool) {
 
 type outbox struct{ dir string }
 
-func (o outbox) routeDir(rt route) string { return filepath.Join(o.dir, rt.project, rt.tool, rt.repo) }
+func (o outbox) routeDir(rt route) string {
+	if rt.account != "" {
+		return filepath.Join(o.dir, accountPrefix+rt.account, rt.project, rt.tool, rt.repo)
+	}
+	return filepath.Join(o.dir, rt.project, rt.tool, rt.repo)
+}
 
-// validRoute admits a route's three directory names: a project id, a tool label and a repository key.
+// accountPrefix starts an account's directory, which no project id does.
+const accountPrefix = "@"
+
+// validRoute admits a route's directory names: an account key or none, a project id, a
+// tool label and a repository key.
 func validRoute(rt route) bool {
-	return project.ValidID(rt.project) && (rt.tool == noTool || project.ValidID(rt.tool)) && validRepoKey(rt.repo)
+	return validAccount(rt.account) && project.ValidID(rt.project) && (rt.tool == noTool || project.ValidID(rt.tool)) && validRepoKey(rt.repo)
+}
+
+func validAccount(a string) bool {
+	return a == "" || a == sendas.NoPersonLane || auth.ValidAccountKey(a)
 }
 
 func validRepoKey(k string) bool {
@@ -213,45 +251,9 @@ func (o outbox) remove(rt route, batch []entry) {
 func (o outbox) bury(rt route, e entry) {
 	dead := filepath.Join(o.dir, deadDir)
 	src := filepath.Join(o.routeDir(rt), e.name)
-	if os.MkdirAll(dead, 0o700) != nil || config.Rename(src, filepath.Join(dead, rt.project+"-"+rt.tool+"-"+rt.repo+"-"+e.name)) != nil {
+	if os.MkdirAll(dead, 0o700) != nil || config.Rename(src, filepath.Join(dead, deadName(rt, e))) != nil {
 		_ = config.Remove(src)
 	}
-}
-
-func (o outbox) routes() ([]route, error) {
-	projects, err := os.ReadDir(o.dir)
-	if errors.Is(err, fs.ErrNotExist) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	var out []route
-	for _, p := range projects {
-		if !p.IsDir() || strings.HasPrefix(p.Name(), ".") {
-			continue
-		}
-		tools, err := os.ReadDir(filepath.Join(o.dir, p.Name()))
-		if err != nil {
-			continue
-		}
-		for _, t := range tools {
-			if !t.IsDir() {
-				continue
-			}
-			repos, err := os.ReadDir(filepath.Join(o.dir, p.Name(), t.Name()))
-			if err != nil {
-				continue
-			}
-			for _, k := range repos {
-				rt := route{project: p.Name(), tool: t.Name(), repo: k.Name()}
-				if k.IsDir() && validRoute(rt) {
-					out = append(out, rt)
-				}
-			}
-		}
-	}
-	return out, nil
 }
 
 type queued struct {
@@ -281,16 +283,25 @@ func (r *Relay) sweepOutbox(now time.Time) map[route][]entry {
 	}
 	slices.SortFunc(all, func(a, b queued) int { return strings.Compare(a.e.name, b.e.name) })
 	removed := map[route][]entry{}
+	lost := map[string]int{}
+	defer func() { r.recordLosses(lost, now) }()
 	drop := func(q queued, why string) {
 		if os.Remove(q.path) == nil {
 			r.stats.dropped(q.e.signal, why, q.e.records)
 			removed[q.rt] = append(removed[q.rt], q.e)
+			lost[why] += q.e.records
 		}
 	}
 	var total int64
 	var kept []queued
 	for _, q := range all {
-		if now.Sub(q.mtime) > maxOutboxAge {
+		// Aged from when the part arrived, which its name keeps, so the time it waited in
+		// the hold counts too: one retention clock, not a hold's and then an outbox's.
+		age := q.mtime
+		if at := q.e.received(); !at.IsZero() && at.Before(age) {
+			age = at
+		}
+		if now.Sub(age) > maxOutboxAge {
 			drop(q, "outbox_expired")
 			continue
 		}
@@ -349,6 +360,9 @@ func (r *Relay) removeEmptyRoutes(routes []route) {
 		_ = os.Remove(dir)
 		_ = os.Remove(filepath.Dir(dir))
 		_ = os.Remove(filepath.Dir(filepath.Dir(dir)))
+		if rt.account != "" {
+			_ = os.Remove(filepath.Dir(filepath.Dir(filepath.Dir(dir))))
+		}
 	}
 }
 
@@ -387,5 +401,7 @@ func mergeBodies(sig Signal, bodies [][]byte) ([]byte, error) {
 	}
 }
 
-// OutboxDir is the outbox's directory name under the relay directory.
-const OutboxDir = "outbox"
+// OutboxDir is the outbox's directory name under the relay directory. It is new in this
+// version, so an older relay, which reads only its own, outbox, never sends what this one
+// queued with its own credential; this one never reads an older relay's.
+const OutboxDir = "outbox-v2"

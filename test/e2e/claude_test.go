@@ -122,8 +122,10 @@ func TestClaudeSubscriptionSession(t *testing.T) {
 		}
 		CheckKeys(t, "claude/api_request", first.Attrs, newest)
 		CheckKeys(t, "claude/resource", first.Resource, newest)
-		if auths := sb.Receiver.Authorizations(); len(auths) == 0 || auths[0] != "Bearer "+liveKey {
-			t.Errorf("exports not authorised with the live key: %v", auths)
+		// The agent's exports carry the live key; the spool's delivery, the person's sign-in.
+		if exports := sb.Receiver.Requests(); !slices.ContainsFunc(exports, func(r ExportRequest) bool { return r.Authorization == "Bearer "+liveKey }) ||
+			slices.ContainsFunc(exports, func(r ExportRequest) bool { return !exportAuthorized(r) }) {
+			t.Errorf("exports not authorised with the live key or the person's sign-in: %v", sb.Receiver.Authorizations())
 		}
 		AddSpend(SpendOf(reqs))
 		checkClaudeAccount(t, sb, sid, mode == RealLogin)

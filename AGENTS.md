@@ -111,8 +111,9 @@ starts it through `terma launch <agent>`, which adds the exporter to that one pr
 environment, and the real command as it was once terma is gone. A hook in a collected repository
 claims its session for the developer's team, naming the repository. The relay forwards
 only claimed sessions, only from the processes the claim names, and only while the policy
-still lists the claim's repository. It sends them with the team's key and applies the team's
-collection policy: agents export all content to it, and the policy alone decides what
+still lists the claim's repository. It sends them with the person's sign-in, a user token,
+naming the team in `X-Mirador-Project` (a profile set up with a server key sends with that
+key instead), and applies the team's collection policy: agents export all content to it, and the policy alone decides what
 leaves (`config.Policy.Content`). The claim also names the checkout the hook ran in, which
 the relay stamps on the session's records (`stampCheckout`): its origin, branch and whether
 it is a linked worktree under any policy (`vcs.*`, `terma.repository.worktree.linked`), and
@@ -129,6 +130,53 @@ policy's default project, and the relay sends what no claim places there too, ex
 session an agent's hooks claim every one of (`shape.SessionKey.Claimed`): it waits for its
 claim, so a hidden side thread no hook claims stays here. What is held stays in memory,
 never on disk, and a stopping relay drops it.
+
+### Lanes, ownership, and loss accounting
+
+- **Account-bound lanes.** Everything that leaves is bound to the sign-in in place when it
+  arrived (a 16-hex-digit hash of auth URL + user id): the relay outbox stores it under
+  `@<account>/` and spool events carry `account`. A lane leaves only with that account's own
+  token, never in another person's name, and `terma.user.id` names only that lane's user.
+  Server-key profiles collect into `@no_person/` / `no_person` and leave only under a server
+  key (switching to a user sign-in leaves that backlog to age out); a server key sends nothing
+  else, and a route bound to no lane is never sent.
+- **Fail closed on missing or unreadable sign-in.** Config (`config.json`, which pairs the
+  selected organization/team with `Profile.Account`) and the sign-in are read as one snapshot.
+  In the relay, a claimed part arriving signed out or unreadable (after up to ~3 s of retry
+  for mid-write swaps) is never written and is counted as `signed_out` or `unreadable`. In
+  hooks, `spool.LaneOf` binds the spool and refuses untagged writes: signed-out or unreadable
+  events are dropped before writing any queue line, checkpoint, push record, or park file, and
+  appended whole to `spool/losses/` (one file per day, so concurrent hooks never lose a count).
+  Any untagged line found queued or parked is dropped.
+- **Policy hold and outbox aging.** A claimed part whose team policy or key the relay can't
+  read (not fetched yet, locked keychain, changed organization, or removed profile) waits in
+  memory (`policyHold`) for up to 15 minutes while policy is fetched, then is dropped and
+  counted as `policy_timeout` (also when dropped for room or on stop; updates stop waiting for
+  policy-only parts past their pause wait). Outbox lanes age out after 14 days, with relay
+  losses tracked in `losses.json`; `terma doctor` combines them with `spool/losses/`, and
+  heartbeats report both (`dropped.<reason>.<signal>` and `dropped.<reason>.hooks` via
+  `spool.TakeNewLosses`). Replays (`AppendAsCollected`) preserve their recorded lane.
+- **Per-session atomic ownership.** Every session manifest write (locked or unlocked delta)
+  first claims `<id>.owner` atomically via temp file + sync + `os.Link` (with an
+  `O_CREATE|O_EXCL` fallback). The first claim decides the session's owner for good (`""` for
+  a manifest written signed out is never filled in later). A hook under another account, or a
+  session whose owner file or manifest can't be read, fails closed (`ErrAccountConflict`) and
+  is counted as `account_conflict`. `Prune` skips when `store.lock` is busy, and unlocked
+  delta writes re-claim after landing their delta so pruning cannot hand an active session to
+  another account.
+- **Git hooks and sandboxes.** A git hook's commit or push record uses its collector's lane
+  unless a session's manifest names another account. A sandboxed git hook (which can read
+  neither credentials nor write the state directory) takes the single lane agreed upon by all
+  its sessions' manifests (never `session.json`), parks tagged records and loss counts under
+  `.git/terma/` (`events-v2`, `pushes-v2`, `losses-v2`), and lets the next unsandboxed hook
+  unpark and import counts once. Multi-account or unowned sandboxed records are dropped as
+  `ambiguous_push`.
+- **v2 queue isolation from v0.3.x.** This version writes only `spool/events-v2.jsonl`,
+  `pushes-v2/`, `relay/outbox-v2/`, and `.git/terma/events-v2` / `pushes-v2`, never v0.3.x
+  paths (`events.jsonl`, `pushes/`, `outbox/`, `.git/terma/events`, `pushes`). Neither version
+  reads the other's queues, so an older relay outliving an update by hours (or an older install
+  running alongside this one) cannot send v0.4 records with its own credential. 0.3.x is
+  maintained on `release/v0.3.x`, and everyone signs in again at rollout.
 
 ## Rules
 

@@ -73,6 +73,7 @@ func TestSweepAgesOutHookStateAndWorkspaces(t *testing.T) {
 		"cursors/live.json",
 		"cursors/live.json.lock",
 		project.WorkspacesDir + "/fresh/manifests/agent/s-fresh.json",
+		project.WorkspacesDir + "/fresh/manifests/agent/s-fresh.owner",
 		project.WorkspacesDir + "/fresh/store.lock",
 		project.WorkspacesDir + "/new/store.lock",
 	}

@@ -451,6 +451,29 @@ func TestClaimFollowsTheBranch(t *testing.T) {
 	}
 }
 
+// A claim of the same project under another sign-in is another run: each placement keeps
+// the account it was made under, and a record is placed under the one in force when sent.
+func TestAClaimUnderAnotherSignInIsAnotherPlacement(t *testing.T) {
+	t.Parallel()
+	dir := enable(t)
+	now := time.Now()
+	if !Write(dir, "sess-1", Claim{ProjectID: "p1", Account: "aaaaaaaaaaaaaaaa"}, now) {
+		t.Fatal("first claim not written")
+	}
+	if !Write(dir, "sess-1", Claim{ProjectID: "p1", Account: "bbbbbbbbbbbbbbbb"}, now.Add(time.Minute)) {
+		t.Fatal("a claim under another sign-in is rewritten at once")
+	}
+	c, ok := Read(dir, "sess-1", now.Add(time.Minute))
+	if !ok || len(c.Placements) != 2 {
+		t.Fatalf("read = %+v, %v; want two placements", c, ok)
+	}
+	for at, want := range map[time.Time]string{now.Add(time.Second): "aaaaaaaaaaaaaaaa", now.Add(2 * time.Minute): "bbbbbbbbbbbbbbbb"} {
+		if got, ok := c.At(0, at); !ok || got.Account != want {
+			t.Errorf("at %v: %+v, %v; want account %s", at.Sub(now), got, ok, want)
+		}
+	}
+}
+
 // A subagent's parent, named by its start hook, stays the session's: a later hook that names
 // none keeps it, the placement a record is judged by carries it, and naming it for the first
 // time rewrites a fresh claim.

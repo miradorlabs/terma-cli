@@ -41,6 +41,11 @@ func (c *Client) redeem(ctx context.Context, held, current *auth.Credential, red
 	if !redeem(held, current) {
 		return nil
 	}
+	// A retired sign-in is never presented again, nor ended: its record is what doctor
+	// and status read to say that updating terma and signing in fixes it.
+	if !current.RetiredAt.IsZero() {
+		return fmt.Errorf("%w: %w", auth.ErrSignInRetired, auth.ErrNotLoggedIn)
+	}
 	// The gateway refused this token: it is never presented again, and its removal is
 	// tried again, compare-and-set as the first time.
 	if c.wasRefused(current.RefreshToken) {
@@ -86,6 +91,13 @@ func (c *Client) redeem(ctx context.Context, held, current *auth.Credential, red
 		switch kind, wait := classifyRefresh(err); kind {
 		case refreshRotated:
 			return c.keepRotation(tx, current, c.credentialFrom(resp))
+		case refreshRetired:
+			// Held retired too: the access token it still holds must not be presented again.
+			c.retireHeld()
+			if tx != nil {
+				_ = tx.MarkRetired(c.profile, current.SessionID)
+			}
+			return c.settle(tx, current, clean, err)
 		case refreshOver:
 			// Remembered first: should the store not take the removal, this client still
 			// never presents the token again.
@@ -174,6 +186,7 @@ func retryAfterOf(err error) time.Duration {
 const (
 	refreshRotated    = iota // a new pair
 	refreshOver              // 401: the session is over
+	refreshRetired           // SIGN_IN_RETIRED: only a newer terma, signed in again, sends again
 	refreshSuperseded        // 409: a concurrent refresh of the token won
 	refreshInDoubt           // a 5xx or no answer: it may have rotated
 	refreshUnspent           // anything else, or a request that never left: nothing rotated
@@ -186,6 +199,8 @@ func classifyRefresh(err error) (kind int, wait time.Duration) {
 	switch {
 	case err == nil:
 		return refreshRotated, 0
+	case errors.Is(err, auth.ErrSignInRetired):
+		return refreshRetired, 0
 	case errors.Is(err, auth.ErrNotLoggedIn):
 		return refreshOver, 0
 	case isAPI && apiErr.Superseded():

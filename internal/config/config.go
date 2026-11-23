@@ -46,6 +46,11 @@ type Profile struct {
 	OTLPURL          string `json:"otlp_url,omitempty"`
 	OrganizationID   string `json:"organization_id,omitempty"`
 	OrganizationName string `json:"organization_name,omitempty"`
+	// Account is the account key (auth.AccountKey) of the sign-in the organization and team
+	// were chosen under, written with them: a reader pairs them with the sign-in stored
+	// only while it is this account's, so a sign-in as someone else, stored before this
+	// file is rewritten, never reads as theirs.
+	Account string `json:"account,omitempty"`
 	// Harnesses lists the agents and launch surfaces `terma setup` recorded; a preference, not a connection.
 	Harnesses []string `json:"harnesses,omitempty"`
 	// Team is the team `terma setup` selected, whose policy (PoliciesDir) the hooks apply.
@@ -121,6 +126,8 @@ type Config struct {
 	OrganizationName string
 	ProjectID        string
 	ProjectName      string
+	// Account is the profile's: the sign-in its organization and team were chosen under.
+	Account string
 
 	Harnesses []string
 	// Team is the team the profile selected, kept even while its policy is not stored.
@@ -189,6 +196,7 @@ func Load(dir, stateDir string, o Overrides) (*Config, error) {
 		MCPURL:             strings.TrimRight(firstNonEmpty(os.Getenv("TERMA_MCP_URL"), defaults.MCPURL), "/"),
 		OrganizationID:     firstNonEmpty(os.Getenv("TERMA_ORGANIZATION_ID"), profile.OrganizationID),
 		OrganizationName:   profile.OrganizationName,
+		Account:            profile.Account,
 		ProjectID:          firstNonEmpty(o.ProjectID, os.Getenv("TERMA_TEAM_ID")),
 		Harnesses:          profile.Harnesses,
 		Team:               profile.Team,

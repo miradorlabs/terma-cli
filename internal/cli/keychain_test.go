@@ -150,7 +150,7 @@ func TestAFailedSignInKeepsTheStorageChoice(t *testing.T) {
 func TestALockedKeychainStopsSetupBeforeTheBrowser(t *testing.T) {
 	f := newFakeAuth(t)
 	authSandbox(t, f)
-	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(f)); err != nil {
+	if err := saveSignIn(testApp.dir, storedSession(f)); err != nil {
 		t.Fatal(err)
 	}
 	if auth.StoredInFile(testApp.dir, config.DefaultProfile) {

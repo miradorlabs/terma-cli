@@ -25,7 +25,7 @@ func (s *Spool) size(t *testing.T) int64 {
 // Only the lock wait is charged the append budget, never the encode.
 func TestAppendBudgetsOnlyTheLockWait(t *testing.T) {
 	t.Parallel()
-	s, _ := Open(t.TempDir())
+	s, _ := openBound(t.TempDir())
 	oversized := Event{Name: "large", Attrs: map[string]any{"data": strings.Repeat("x", 8<<20)}}
 	if err := s.AppendContext(context.Background(), oversized); err != nil {
 		t.Fatalf("a free lock must accept a slow encode: %v", err)
@@ -49,7 +49,7 @@ func TestAppendBudgetsOnlyTheLockWait(t *testing.T) {
 
 func TestFlushDeadlineSpansBatches(t *testing.T) {
 	// Serial: the first batch must be sent well inside the 50 ms deadline.
-	s, _ := Open(t.TempDir())
+	s, _ := openBound(t.TempDir())
 	for _, name := range []string{"sent", "timed-out", "not-attempted"} {
 		if err := s.Append(Event{Name: name}); err != nil {
 			t.Fatal(err)
@@ -84,7 +84,7 @@ func TestFlushDeadlineSpansBatches(t *testing.T) {
 
 func TestFlushCancellationBeforeAcknowledgementPreservesBatch(t *testing.T) {
 	t.Parallel()
-	s, _ := Open(t.TempDir())
+	s, _ := openBound(t.TempDir())
 	_ = s.Append(Event{Name: "replay"})
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -106,7 +106,7 @@ func TestFlushCancellationBeforeAcknowledgementPreservesBatch(t *testing.T) {
 
 func TestFlushHeldRewriteFailurePreservesOriginalBatch(t *testing.T) {
 	t.Parallel()
-	s, _ := Open(t.TempDir())
+	s, _ := openBound(t.TempDir())
 	_ = s.Append(Event{Name: "held"})
 	res := s.Flush(context.Background(), SenderFunc(func(_ context.Context, events []Event) ([]Event, error) {
 		events[0].Attrs = map[string]any{"invalid": make(chan int)}
@@ -123,7 +123,7 @@ func TestFlushHeldRewriteFailurePreservesOriginalBatch(t *testing.T) {
 
 func TestPeekCannotPruneAnInflightBatch(t *testing.T) {
 	t.Parallel()
-	s, _ := Open(t.TempDir())
+	s, _ := openBound(t.TempDir())
 	_ = s.Append(Event{Name: "in-flight"})
 	// Big enough to exceed MaxBytes, small enough to encode quickly.
 	oversized := Event{Name: "large", Attrs: map[string]any{"data": strings.Repeat("x", 2<<20)}}
@@ -186,7 +186,8 @@ func TestPeekCannotPruneAnInflightBatch(t *testing.T) {
 // A torn line and an expired event leave together but are counted apart.
 func TestFlushSeparatesExpiryFromUnreadableLines(t *testing.T) {
 	t.Parallel()
-	s, _ := Open(t.TempDir())
+	s, _ := openBound(t.TempDir())
+	s.Bind("account-a")
 	_ = s.Append(Event{Name: "expired", Time: time.Now().Add(-2 * MaxAge)})
 	f, err := os.OpenFile(s.path(), os.O_APPEND|os.O_WRONLY, fileMode)
 	if err != nil {
@@ -208,7 +209,7 @@ func TestFlushSeparatesExpiryFromUnreadableLines(t *testing.T) {
 
 func TestFlushDoesNotAcknowledgeAChangedPrefix(t *testing.T) {
 	t.Parallel()
-	s, _ := Open(t.TempDir())
+	s, _ := openBound(t.TempDir())
 	now := time.Now()
 	_ = s.Append(Event{Name: "first", Time: now})
 	res := s.Flush(context.Background(), SenderFunc(func(context.Context, []Event) ([]Event, error) {

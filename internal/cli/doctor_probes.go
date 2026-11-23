@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -15,10 +17,12 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/delivery"
 	"github.com/miradorlabs/terma-cli/internal/doctor"
+	"github.com/miradorlabs/terma-cli/internal/relay"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
 	"github.com/miradorlabs/terma-cli/internal/relay/service"
 	"github.com/miradorlabs/terma-cli/internal/selfupdate"
+	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
 func (app *App) doctorEnv(ctx context.Context) doctor.Env {
@@ -52,11 +56,9 @@ func (app *App) doctorProbes(cfg *config.Config) doctor.Probes {
 				return doctor.Delivery{}, err
 			}
 			d := doctor.Delivery{Sent: res.Sent, Err: res.Err, Endpoints: res.Endpoints}
-			d.Delivered, d.Undelivered = describeFlush(res)
+			d.Delivered, d.Undelivered = describeFlush(res, app.signInFix(cfg))
 			for _, f := range res.Failures {
-				ingest, refused := errors.AsType[*delivery.IngestError](f.Err)
-				d.Failures = append(d.Failures, doctor.Failure{ProjectID: f.ProjectID, Endpoint: f.Endpoint, Err: f.Err,
-					Refused: refused, KeyRefused: refused && ingest.KeyRefused()})
+				d.Failures = append(d.Failures, doctorFailure(f, cfg.ServerKeySignIn))
 			}
 			return d, nil
 		},
@@ -78,10 +80,41 @@ func (app *App) doctorProbes(cfg *config.Config) doctor.Probes {
 			}
 			return doctor.Credential{Email: cred.UserEmail, OrganizationID: cfg.OrganizationID,
 				OtherEnvironment: cred.CheckEnvironment(cfg.AuthURL) != nil, InFile: auth.StoredInFile(app.dir, cfg.ProfileName),
-				ViaDesktop: cred.ViaDesktop()}, nil
+				ViaDesktop: cred.ViaDesktop(), Retired: !cred.RetiredAt.IsZero()}, nil
 		},
-		Keys: app.storedKeys,
+		Keys:      app.deliveryCredential(cfg),
+		SignInFix: app.signInFix(cfg),
 	}
+}
+
+// deliveryCredential says, for doctor and status, what a team's telemetry is sent with: on
+// a person's profile, their sign-in, for every team; on one set up with a server key, the
+// keys in this machine's keystore.
+func (app *App) deliveryCredential(cfg *config.Config) doctor.Keys {
+	if cfg.ServerKeySignIn {
+		return app.storedKeys
+	}
+	return func(string, string) string {
+		// A retired sign-in sends nothing: only a newer terma, signed in again, does.
+		// Only a sign-in for this environment sends; one for another is no credential here.
+		// Nor one with no account to send as (no user id), which only the unreadable account
+		// names.
+		ident, err := auth.LoadIdentity(cfg.Dir, cfg.ProfileName)
+		if err != nil || ident.CheckEnvironment(cfg.AuthURL) != nil || auth.Retired(cfg.Dir, cfg.ProfileName) ||
+			auth.AccountKey(ident.AuthURL, ident.UserID) == "" {
+			return ""
+		}
+		return "your sign-in"
+	}
+}
+
+// signInFix is what makes cfg's profile send where nothing may: a retired sign-in's fix,
+// else `terma setup`.
+func (app *App) signInFix(cfg *config.Config) string {
+	if !cfg.ServerKeySignIn && auth.Retired(cfg.Dir, cfg.ProfileName) {
+		return doctor.RetiredFix
+	}
+	return "terma setup"
 }
 
 // serverKeyCredential is what a profile set up with a server key signs in with: its team's
@@ -111,6 +144,21 @@ func (app *App) relayFacts() doctor.Relay {
 	if info, ok := daemon.RunningRelay(dir); ok {
 		r.Environment, r.HookStarted = info.Environment, info.Launch != daemon.LaunchService
 		r.Version, r.Earlier = info.Version, selfupdate.Newer(info.Version, app.version)
+	}
+	// What the relay lost and what hooks lost are one count, by reason, each within its
+	// window: the relay's counts start again after a quiet window, a hook's each age out.
+	r.OutboxLosses = map[string]int{}
+	if losses, err := relay.ReadOutboxLosses(filepath.Join(dir, relay.OutboxDir)); err == nil && time.Since(losses.Last) < doctor.OutboxLossWindow {
+		maps.Copy(r.OutboxLosses, losses.Counts)
+		r.OutboxLossAt = losses.Last
+	}
+	if losses, err := spool.ReadLosses(filepath.Join(app.stateDir, spool.Dir), time.Now()); err == nil {
+		for reason, n := range losses.Counts {
+			r.OutboxLosses[reason] += n
+		}
+		if losses.Last.After(r.OutboxLossAt) {
+			r.OutboxLossAt = losses.Last
+		}
 	}
 	r.Token, _ = daemon.Token(app.stateDir)
 	if service.Supported() {
@@ -153,4 +201,17 @@ func (app *App) updateRows(exe string) []doctor.Row {
 			c.Attempted, c.AttemptAt.Local().Format(when), c.Failure, c.Retry().Local().Format(when))})
 	}
 	return rows
+}
+
+// doctorFailure is a failed delivery as doctor reads it. The credential a refusal names is
+// the server key only on a profile set up with one (serverKey); otherwise it is the
+// person's sign-in.
+func doctorFailure(f delivery.Failure, serverKey bool) doctor.Failure {
+	ingest, refused := errors.AsType[*delivery.IngestError](f.Err)
+	retired := refused && ingest.Retired()
+	credRefused := refused && ingest.KeyRefused() && !retired
+	signIn := credRefused && !serverKey
+	return doctor.Failure{ProjectID: f.ProjectID, Endpoint: f.Endpoint, Err: f.Err, Refused: refused,
+		KeyRefused: credRefused && serverKey, Retired: retired,
+		SignInRefused: signIn && ingest.Status == http.StatusForbidden, TokenRefused: signIn && ingest.Status == http.StatusUnauthorized}
 }

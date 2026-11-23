@@ -15,6 +15,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
+	"github.com/miradorlabs/terma-cli/internal/sendas"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
@@ -246,5 +247,72 @@ func TestRunHandsOnTheClaimedCheckout(t *testing.T) {
 	// The policy goes with it: what a repository gets installed depends on it.
 	if policy.TeamID != hookruntest.Team {
 		t.Fatalf("policy = %+v, want the profile's", policy)
+	}
+}
+
+// appender is an agent whose one event appends straight to the spool, with no account of
+// its own, as several agents' hooks do.
+type appender struct{}
+
+func (appender) Name() string                   { return "appender" }
+func (appender) DisplayName() string            { return "Appender" }
+func (appender) Installed(context.Context) bool { return true }
+func (appender) FlushAfter() []string           { return nil }
+func (appender) Events() map[string]agents.Handler {
+	return map[string]agents.Handler{"appender-edit": func(_ context.Context, env hookrun.Env) error {
+		return env.Spool.Append(spool.Event{Name: "direct"})
+	}}
+}
+
+// A hook's spool is bound to its profile's lane, so even an append that names no account
+// is a person's, or no person's under a server key; signed out, or with a sign-in that
+// can't be read, it is lost and counted.
+func TestAHooksSpoolIsBoundToItsProfilesLane(t *testing.T) {
+	t.Parallel()
+	const person = "aaaaaaaaaaaaaaaa"
+	for _, tc := range []struct {
+		name    string
+		profile Profile
+		want    string // the account queued, "no person", or the reason lost
+	}{
+		{"person", Profile{Account: person}, person},
+		{"server key", Profile{ServerKey: true}, "no person"},
+		{"signed out", Profile{}, sendas.LostSignedOut},
+		{"unreadable", Profile{Account: sendas.AccountUnreadable}, sendas.LostUnreadable},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			dir := t.TempDir()
+			s, err := spool.Open(dir)
+			if err != nil {
+				t.Fatal(err)
+			}
+			d := Deps{ConfigDir: t.TempDir(), StateDir: t.TempDir(), Agents: agents.New(appender{}),
+				Profile: func() Profile { return tc.profile }, Spool: func() *spool.Spool { return s },
+				Claimed: func(string, config.Policy) {}, Flush: func() {}}
+			hookruntest.RelayOn(t, d.StateDir)
+			Run(context.Background(), d, request("appender-edit"))
+			evs, err := s.Peek(10)
+			if err != nil {
+				t.Fatal(err)
+			}
+			l, _ := spool.ReadLosses(dir, time.Now())
+			got := ""
+			switch {
+			case len(evs) == 1 && evs[0].NoPerson:
+				got = "no person"
+			case len(evs) == 1:
+				got = evs[0].Account
+			case len(l.Counts) == 1:
+				for why, n := range l.Counts {
+					if n == 1 {
+						got = why
+					}
+				}
+			}
+			if got != tc.want {
+				t.Fatalf("queued %+v, lost %v; want %s", evs, l.Counts, tc.want)
+			}
+		})
 	}
 }

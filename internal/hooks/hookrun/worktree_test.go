@@ -13,7 +13,6 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/session"
-	"github.com/miradorlabs/terma-cli/internal/spool"
 	"github.com/miradorlabs/terma-cli/internal/trailer"
 )
 
@@ -32,7 +31,7 @@ func TestWorktreeEventsReportTheMainRepositoryAndProject(t *testing.T) {
 	}
 	wt, _ = filepath.EvalSymlinks(wt)
 
-	sp, err := spool.Open(t.TempDir())
+	sp, err := hookruntest.OpenSpool(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -84,7 +83,7 @@ func TestTheWorkingTreeIsSymlinkResolved(t *testing.T) {
 		t.Skip("no symlinks here:", err)
 	}
 	want, _ := filepath.EvalSymlinks(repo)
-	sp, _ := spool.Open(t.TempDir())
+	sp, _ := hookruntest.OpenSpool(t.TempDir())
 	env := Env{StateDir: stateDir, Now: time.Now(), Cwd: link, Policy: hookruntest.Admitting(repo), Spool: sp, Version: "test", Team: "proj",
 		Stdin: strings.NewReader(`{"session_id":"sess-link","cwd":"` + hookruntest.InJSON(link) + `","hook_event_name":"SessionStart"}`)}
 	if err := startSession(context.Background(), env); err != nil {
@@ -169,7 +168,7 @@ func TestAFileNamedThroughASymlinkIsTheSessionsOwn(t *testing.T) {
 		t.Skip("no symlinks here:", err)
 	}
 	resolvedRoot, _ := filepath.EvalSymlinks(repo)
-	sp, _ := spool.Open(t.TempDir())
+	sp, _ := hookruntest.OpenSpool(t.TempDir())
 	env := Env{StateDir: stateDir, Now: time.Now(), Cwd: resolvedRoot, Policy: hookruntest.Admitting(repo), Spool: sp, Version: "test", Team: "proj"}
 	r, err := env.Repo(context.Background())
 	if err != nil {
