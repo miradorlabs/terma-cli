@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io"
 	"io/fs"
 	"maps"
 	"os"
@@ -135,9 +136,9 @@ func runGrokHooks(t *testing.T, grok bool) *grokRun {
 			if grokPayloadFor[event] != h.Event {
 				continue
 			}
-			var stdout, stderr bytes.Buffer
+			var stdout bytes.Buffer
 			dispatch.Run(context.Background(), deps, dispatch.Request{
-				Event: event, Stdin: strings.NewReader(payload), Stdout: &stdout, Stderr: &stderr,
+				Event: event, Stdin: strings.NewReader(payload), Stdout: &stdout, Stderr: io.Discard,
 				Version: "test", Cwd: root, Getenv: func(k string) string { return env[k] },
 			})
 			if stdout.Len() > 0 {
@@ -153,7 +154,6 @@ func runGrokHooks(t *testing.T, grok bool) *grokRun {
 // the same payloads without grok's environment record a Claude Code session.
 func TestGrokHooksStandDown(t *testing.T) {
 	t.Setenv("CLAUDE_CONFIG_DIR", t.TempDir())
-	t.Setenv("CODEX_HOME", t.TempDir())
 
 	t.Run("grok", func(t *testing.T) {
 		run := runGrokHooks(t, true)
