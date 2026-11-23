@@ -35,19 +35,32 @@ func (Agent) Events() map[string]agents.Handler {
 
 func (Agent) FlushAfter() []string { return []string{"antigravity-stop"} }
 
+// WhenHooksOff still answers each hook with the {} agy expects, with hooks switched off or
+// terma torn down while a session runs.
+func (a Agent) WhenHooksOff() map[string]agents.Handler {
+	off := map[string]agents.Handler{}
+	for event := range a.Events() {
+		off[event] = func(_ context.Context, env hookrun.Env) error {
+			antigravityAck(env)
+			return nil
+		}
+	}
+	return off
+}
+
 // PayloadSession reads agy's protojson payload; the directory comes from it, since the
 // hook runs in the folder holding hooks.json.
 func (Agent) PayloadSession(payload []byte) (hookrun.PayloadSession, bool) {
 	var in antigravityHookInput
-	if json.Unmarshal(payload, &in) != nil || in.ConversationID == "" {
+	if json.Unmarshal(payload, &in) != nil || in.id() == "" {
 		return hookrun.PayloadSession{}, false
 	}
-	return hookrun.PayloadSession{ID: in.ConversationID, Cwd: in.cwd("")}, true
+	return hookrun.PayloadSession{ID: in.id(), Cwd: in.cwd("")}, true
 }
 
 // Coverage is how completely terma supports the agent.
 func (Agent) Coverage() (attribution, telemetry agents.CapabilitySupport) {
-	return agents.CapabilitySupport{Level: agents.SupportFull},
+	return agents.CapabilitySupport{Level: agents.SupportPartial, Note: "files its file tools write; a file a shell command writes is not recorded"},
 		agents.CapabilitySupport{Level: agents.SupportPartial, Note: "hooks only: model, turns, every tool step and termination; no token counts, plan, quota, cost or tool durations — agy has no OTLP export"}
 }
 
@@ -58,6 +71,7 @@ var (
 	_ agents.PayloadReader = Agent{}
 	_ agents.UserHooks     = Agent{}
 	_ agents.Surfaced      = Agent{}
+	_ agents.OffSwitched   = Agent{}
 )
 
 // StateDirs are the directories its hooks keep state in.

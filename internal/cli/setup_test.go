@@ -389,15 +389,65 @@ func TestSetupWithAntigravityAloneTurnsHooksOn(t *testing.T) {
 	authSandbox(t, gateway)
 	sandboxMachine(t)
 	signInTo(t, gateway, orgA())
-	if out, err := runTerma(t, "setup", "--harness", "antigravity"); err != nil {
+	out, err := runTerma(t, "setup", "--harness", "antigravity")
+	if err != nil {
 		t.Fatalf("setup: %v\n%s", err, out)
 	}
 	if !claim.Enabled(testApp.stateDir) {
 		t.Fatal("setup left no relay token, so every hook is off")
 	}
-	hooks, err := os.ReadFile(filepath.Join(os.Getenv("HOME"), ".gemini", "config", "hooks.json"))
+	// The relay it starts reports this machine, as it does for an exporting agent.
+	if !strings.Contains(out, "Check-in") {
+		t.Errorf("setup did not check in:\n%s", out)
+	}
+	path := filepath.Join(os.Getenv("HOME"), ".gemini", "config", "hooks.json")
+	hooks, err := os.ReadFile(path)
 	if err != nil || !strings.Contains(string(hooks), "hook --user antigravity-stop") {
 		t.Fatalf("agy hooks = %s, %v", hooks, err)
+	}
+	if out, _ := runTerma(t, "doctor"); strings.Contains(out, "missing or out of date") {
+		t.Errorf("doctor faults hooks that are in place:\n%s", out)
+	}
+
+	// Its hooks are all it reports through: doctor and status say when they are gone.
+	if err := os.Remove(path); err != nil {
+		t.Fatal(err)
+	}
+	if out, err := runTerma(t, "doctor"); err == nil || !strings.Contains(out, "missing or out of date") || !strings.Contains(out, "Antigravity") {
+		t.Errorf("doctor with agy's hooks gone: %v\n%s", err, out)
+	}
+	if out, _ := runTerma(t, "status"); !strings.Contains(out, "missing or out of date") {
+		t.Errorf("status with agy's hooks gone:\n%s", out)
+	}
+}
+
+// A ~/.gemini/config/hooks.json that does not parse, as agy's comments and trailing commas
+// do not, holds up neither setup for another agent nor teardown, which still retires the
+// relay's token.
+func TestSetupAndTeardownPassAMalformedAgyHooksFile(t *testing.T) {
+	gateway := newFakeAuth(t)
+	authSandbox(t, gateway)
+	sandboxMachine(t)
+	signInTo(t, gateway, orgA())
+	path := filepath.Join(os.Getenv("HOME"), ".gemini", "config", "hooks.json")
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	const mine = "// the developer's\n{\"lint\": {\"Stop\": [],},}\n"
+	if err := os.WriteFile(path, []byte(mine), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if out, err := runTerma(t, "setup", "--harness", "claude"); err != nil {
+		t.Fatalf("setup: %v\n%s", err, out)
+	}
+	if out, err := runTerma(t, "teardown", "--yes"); err != nil {
+		t.Fatalf("teardown: %v\n%s", err, out)
+	}
+	if claim.Enabled(testApp.stateDir) {
+		t.Error("teardown left the relay's token")
+	}
+	if got, _ := os.ReadFile(path); string(got) != mine {
+		t.Errorf("hooks.json changed:\n%s", got)
 	}
 }
 

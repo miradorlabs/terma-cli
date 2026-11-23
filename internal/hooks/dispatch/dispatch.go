@@ -90,7 +90,7 @@ func Run(ctx context.Context, d Deps, r Request) int {
 	}
 	if r.HooksOff {
 		if off, ok := d.Agents.WhenHooksOff(r.Event); ok {
-			_ = off(ctx, hookrun.Env{Now: time.Now(), Args: r.Args, Stderr: r.Stderr, ConfigDir: d.ConfigDir, StateDir: d.StateDir, Debug: r.Debug})
+			_ = off(ctx, hookrun.Env{Now: time.Now(), Args: r.Args, Stdout: r.Stdout, Stderr: r.Stderr, ConfigDir: d.ConfigDir, StateDir: d.StateDir, Debug: r.Debug})
 		}
 		return 0
 	}

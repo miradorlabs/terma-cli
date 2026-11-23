@@ -18,7 +18,7 @@ import (
 
 // antigravityPayload is a recorded agy payload with the workspace substituted.
 func antigravityPayload(root, event string, extra string) string {
-	common := `"artifactDirectoryPath":"/home/dev/.gemini/antigravity-cli/brain/6ac5e722-b53c-4798-8cc5-9d1d035b68da","conversationId":"6ac5e722-b53c-4798-8cc5-9d1d035b68da","modelName":"gemini-3.8-flash-high","transcriptPath":"/home/dev/.gemini/antigravity-cli/brain/6ac5e722-b53c-4798-8cc5-9d1d035b68da/.system_generated/logs/transcript_full.jsonl","workspacePaths":["` + root + `"]`
+	common := `"artifactDirectoryPath":"/home/dev/.gemini/antigravity-cli/brain/6ac5e722-b53c-4798-8cc5-9d1d035b68da","conversationId":"6ac5e722-b53c-4798-8cc5-9d1d035b68da","modelName":"gemini-3.8-flash-high","transcriptPath":"/home/dev/.gemini/antigravity-cli/brain/6ac5e722-b53c-4798-8cc5-9d1d035b68da/.system_generated/logs/transcript_full.jsonl","workspacePaths":["` + hookruntest.InJSON(root) + `"]`
 	_ = event
 	return `{` + common + `,` + extra + `}`
 }
@@ -64,10 +64,10 @@ func TestAntigravityConversationIsStampedOnItsCommit(t *testing.T) {
 	}
 
 	hookruntest.WriteFile(t, root, "hello.txt", "hello\n")
-	run(postToolUse, antigravityPayload(root, "PostToolUse", `"error":"","stepIdx":2,"toolCall":{"args":{"CodeContent":"hello","Description":"Create hello.txt","Overwrite":true,"TargetFile":"`+filepath.Join(root, "hello.txt")+`","toolAction":"Creating file","toolSummary":"Create hello.txt"},"name":"write_to_file"}`))
-	run(postToolUse, antigravityPayload(root, "PostToolUse", `"error":"","stepIdx":4,"toolCall":{"args":{"AllowMultiple":false,"EndLine":1,"Instruction":"Change hello to goodbye","ReplacementContent":"goodbye","StartLine":1,"TargetContent":"hello","TargetFile":"`+filepath.Join(root, "hello.txt")+`","toolAction":"Editing file","toolSummary":"Update hello.txt"},"name":"replace_file_content"}`))
+	run(postToolUse, antigravityPayload(root, "PostToolUse", `"error":"","stepIdx":2,"toolCall":{"args":{"CodeContent":"hello","Description":"Create hello.txt","Overwrite":true,"TargetFile":"`+hookruntest.InJSON(filepath.Join(root, "hello.txt"))+`","toolAction":"Creating file","toolSummary":"Create hello.txt"},"name":"write_to_file"}`))
+	run(postToolUse, antigravityPayload(root, "PostToolUse", `"error":"","stepIdx":4,"toolCall":{"args":{"AllowMultiple":false,"EndLine":1,"Instruction":"Change hello to goodbye","ReplacementContent":"goodbye","StartLine":1,"TargetContent":"hello","TargetFile":"`+hookruntest.InJSON(filepath.Join(root, "hello.txt"))+`","toolAction":"Editing file","toolSummary":"Update hello.txt"},"name":"replace_file_content"}`))
 	// A read is not an edit, and a file outside the repository is not ours.
-	run(postToolUse, antigravityPayload(root, "PostToolUse", `"error":"","stepIdx":6,"toolCall":{"args":{"AbsolutePath":"`+filepath.Join(root, "hello.txt")+`"},"name":"view_file"}`))
+	run(postToolUse, antigravityPayload(root, "PostToolUse", `"error":"","stepIdx":6,"toolCall":{"args":{"AbsolutePath":"`+hookruntest.InJSON(filepath.Join(root, "hello.txt"))+`"},"name":"view_file"}`))
 	run(postToolUse, antigravityPayload(root, "PostToolUse", `"error":"","stepIdx":7,"toolCall":{"args":{"TargetFile":"/etc/hosts"},"name":"write_to_file"}`))
 	// Spooled drains, so the steps' events are read once.
 	stepEvents := hookruntest.Spooled(t, sp)
@@ -202,7 +202,7 @@ func TestAntigravityLaterTurnsRefreshWithoutRestarting(t *testing.T) {
 	}
 	// The continuing conversation still owns what it writes, so a commit of it is stamped.
 	hookruntest.WriteFile(t, root, "b.txt", "x\n")
-	if err := postToolUse(ctx, env(antigravityPayload(root, "PostToolUse", `"error":"","stepIdx":2,"toolCall":{"args":{"CodeContent":"x","TargetFile":"`+filepath.Join(root, "b.txt")+`"},"name":"write_to_file"}`))); err != nil {
+	if err := postToolUse(ctx, env(antigravityPayload(root, "PostToolUse", `"error":"","stepIdx":2,"toolCall":{"args":{"CodeContent":"x","TargetFile":"`+hookruntest.InJSON(filepath.Join(root, "b.txt"))+`"},"name":"write_to_file"}`))); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := gitx.Git(ctx, root, "add", "b.txt"); err != nil {
@@ -244,7 +244,7 @@ func TestAntigravityConversationFallsBackToTheEnvironment(t *testing.T) {
 	sp, _ := spool.Open(t.TempDir())
 	stateDir := t.TempDir()
 	t.Setenv(antigravityConversationEnv, "env-conv-1")
-	stdin := `{"workspacePaths":["` + root + `"],"modelName":"gemini-3.8-pro","initialNumSteps":1,"invocationNum":0}`
+	stdin := `{"workspacePaths":["` + hookruntest.InJSON(root) + `"],"modelName":"gemini-3.8-pro","initialNumSteps":1,"invocationNum":0}`
 	if err := preInvocation(context.Background(), hookrun.Env{StateDir: stateDir, Now: time.Now(), Cwd: root, Policy: hookruntest.Admitting(root), Stdin: strings.NewReader(stdin), Spool: sp}); err != nil {
 		t.Fatal(err)
 	}
@@ -373,9 +373,9 @@ func TestReaderRefusesOversizedInput(t *testing.T) {
 // lastUserInput.
 func antigravity1513Payload(root, event, extra string) string {
 	const id = "c85c4a14-b449-4d7f-8d65-38a4a6acf178"
-	return `{"artifactDirectoryPath":"/home/dev/.gemini/antigravity-cli/brain/` + id + `","conversationId":"` + id + `","cwd":"` + root +
+	return `{"artifactDirectoryPath":"/home/dev/.gemini/antigravity-cli/brain/` + id + `","conversationId":"` + id + `","cwd":"` + hookruntest.InJSON(root) +
 		`","hookEventName":"` + event + `","lastUserInput":"Create a file named agy-live.txt","modelName":"gemini-3.8-flash-low","transcriptPath":"/home/dev/.gemini/antigravity-cli/brain/` + id +
-		`/.system_generated/logs/transcript_full.jsonl","workspacePaths":["` + root + `"],` + extra + `}`
+		`/.system_generated/logs/transcript_full.jsonl","workspacePaths":["` + hookruntest.InJSON(root) + `"],` + extra + `}`
 }
 
 // agy 1.5.13 through the machine-wide hooks: each runs in ~/.gemini/config, outside any
@@ -401,18 +401,18 @@ func TestAntigravity1513ConversationThroughMachineWideHooks(t *testing.T) {
 	file := filepath.Join(root, "agy-live.txt")
 	run(preInvocation, antigravity1513Payload(root, "PreInvocation", `"initialNumSteps":1,"invocationNum":0`))
 	hookruntest.WriteFile(t, root, "agy-live.txt", "first turn\n")
-	run(postToolUse, antigravity1513Payload(root, "PostToolUse", `"error":"","stepIdx":2,"toolCall":{"args":{"Content":"first turn","Overwrite":true,"Path":"`+file+`"},"id":"call_15193050319603990877","name":"write_file"}`))
+	run(postToolUse, antigravity1513Payload(root, "PostToolUse", `"error":"","stepIdx":2,"toolCall":{"args":{"Content":"first turn","Overwrite":true,"Path":"`+hookruntest.InJSON(file)+`"},"id":"call_15193050319603990877","name":"write_file"}`))
 	run(postToolUse, antigravity1513Payload(root, "PostToolUse", `"error":"","stepIdx":3,"toolCall":{"args":{"CommandLine":"cat agy-live.txt","IsDaemon":false,"WaitMsBeforeAsync":5000,"toolSummary":"Read agy-live.txt contents"},"id":"call_15193050319603992998","name":"run_command"}`))
 	run(postInvocation, antigravity1513Payload(root, "PostInvocation", `"initialNumSteps":4,"invocationNum":1`))
 	run(stop, antigravity1513Payload(root, "Stop", `"continuationActive":false,"error":"","executionNum":0,"fullyIdle":true,"terminationReason":"NO_TOOL_CALL"`))
 	// A later turn: an edit, then a read that fails.
 	run(preInvocation, antigravity1513Payload(root, "PreInvocation", `"initialNumSteps":6,"invocationNum":0`))
 	hookruntest.WriteFile(t, root, "agy-live.txt", "second turn\n")
-	run(postToolUse, antigravity1513Payload(root, "PostToolUse", `"error":"","stepIdx":8,"toolCall":{"args":{"Path":"`+file+`","Replacement":"second turn","Target":"first turn"},"id":"call_7055438953673328586","name":"edit_file"}`))
+	run(postToolUse, antigravity1513Payload(root, "PostToolUse", `"error":"","stepIdx":8,"toolCall":{"args":{"Path":"`+hookruntest.InJSON(file)+`","Replacement":"second turn","Target":"first turn"},"id":"call_7055438953673328586","name":"edit_file"}`))
 	// An edit that fails changes nothing, so it claims no file.
 	hookruntest.WriteFile(t, root, "other.txt", "mine\n")
-	run(postToolUse, antigravity1513Payload(root, "PostToolUse", `"error":"target content not found","stepIdx":11,"toolCall":{"args":{"Path":"`+filepath.Join(root, "other.txt")+`","Replacement":"x","Target":"absent"},"id":"call_2","name":"edit_file"}`))
-	run(postToolUse, antigravity1513Payload(root, "PostToolUse", `"error":"file does not exist","stepIdx":13,"toolCall":{"args":{"Path":"`+filepath.Join(root, "missing-agy-file.txt")+`"},"id":"call_3430319919917972303","name":"read_file"}`))
+	run(postToolUse, antigravity1513Payload(root, "PostToolUse", `"error":"target content not found","stepIdx":11,"toolCall":{"args":{"Path":"`+hookruntest.InJSON(filepath.Join(root, "other.txt"))+`","Replacement":"x","Target":"absent"},"id":"call_2","name":"edit_file"}`))
+	run(postToolUse, antigravity1513Payload(root, "PostToolUse", `"error":"file does not exist","stepIdx":13,"toolCall":{"args":{"Path":"`+hookruntest.InJSON(filepath.Join(root, "missing-agy-file.txt"))+`"},"id":"call_3430319919917972303","name":"read_file"}`))
 
 	var calls []string
 	touched := 0
@@ -472,5 +472,31 @@ func TestAntigravityPayloadSessionPrefersCwd(t *testing.T) {
 	s, ok = Agent{}.PayloadSession([]byte(`{"conversationId":"c1","workspacePaths":["/w"]}`))
 	if !ok || s.Cwd != "/w" {
 		t.Fatalf("PayloadSession without cwd = %+v, %v", s, ok)
+	}
+}
+
+// With hooks off, or terma torn down while a session runs, every hook still answers with
+// the {} agy expects.
+func TestAntigravityAnswersWithHooksOff(t *testing.T) {
+	t.Parallel()
+	off := Agent{}.WhenHooksOff()
+	if len(off) != len(Agent{}.Events()) {
+		t.Fatalf("off handlers for %d of %d events", len(off), len(Agent{}.Events()))
+	}
+	for event, h := range off {
+		var out bytes.Buffer
+		if err := h(context.Background(), hookrun.Env{Stdout: &out}); err != nil || out.String() != "{}\n" {
+			t.Errorf("%s with hooks off: %q, %v", event, out.String(), err)
+		}
+	}
+}
+
+// A payload without its conversation id takes it from ANTIGRAVITY_CONVERSATION_ID, as the
+// handlers do.
+func TestAntigravityPayloadSessionFallsBackToTheEnvironment(t *testing.T) {
+	t.Setenv(antigravityConversationEnv, "env-conversation")
+	s, ok := Agent{}.PayloadSession([]byte(`{"cwd":"/w"}`))
+	if !ok || s.ID != "env-conversation" || s.Cwd != "/w" {
+		t.Fatalf("PayloadSession = %+v, %v", s, ok)
 	}
 }
