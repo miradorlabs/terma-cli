@@ -239,9 +239,10 @@ installs it automatically.
 
 After an update, the new version also refreshes what earlier versions wrote in your home
 directory — the wrapped Claude Code status line, the OpenCode plugin, the relay's service —
-keeping every choice you made. It works from what is on disk, never signs in, and never
-adds a file. After an update the relay installed, the relay has the new version run it
-before it restarts, and otherwise your next terma command runs it. On the latest release,
+keeping every choice you made. It works from what is on disk, never signs in, and adds no
+file but one: terma's hook in a T3 Code Antigravity folder made after setup, as described
+under Antigravity below. After an update the relay installed, the relay has the new version
+run it before it restarts, and otherwise your next terma command runs it. On the latest release,
 `terma update` does just that refresh.
 
 ## Scripted and headless setup
@@ -493,11 +494,15 @@ first, whichever of the two your team's policy collects
 T3 Code runs its own copy of Antigravity, with a folder of its own in place of `~/.gemini`.
 Setup writes the same hook into each T3 Code Antigravity provider folder too:
 `~/.t3/userdata/providers/<instance>/<id>/config/hooks.json`, or the same path under
-`$T3CODE_HOME` when that is set. terma finds these folders by the `antigravity-acp` folder
-T3 Code keeps in each, whatever you named the instance, and offers Antigravity at setup
-when one is there, even with no `agy` on your PATH. A folder T3 Code creates after setup
-is picked up by the next `terma setup`, or by `terma update --refresh` when another folder
-already has terma's hook. Until then `terma doctor` names the file that lacks it. T3 Code
+`$T3CODE_HOME` when that is set to an absolute path. terma finds these folders by the
+`antigravity-acp` folder T3 Code keeps in each, whatever you named the instance, and offers
+Antigravity at setup when one is there, even with no `agy` on your PATH. With an `agy` on
+your PATH older than 1.2.4, terma writes its hook nowhere, T3 Code's folders included,
+until you update `agy`. A folder T3 Code creates after setup is picked up by the next
+`terma setup`. It is also picked up by `terma update --refresh`, and on its own the first
+time terma runs after an upgrade, when another folder has terma's hook switched on. A
+`terma` hook you set `"enabled": false` in one folder stays off there and is never copied
+to another. While a folder lacks the hook, `terma doctor` names its file. T3 Code
 threads report what `agy` sessions do: the session, each turn, each tool step, each model
 call with its tokens, and the files its file tools write. They report no plan, quota or
 account, since T3 Code runs Antigravity with no status line.

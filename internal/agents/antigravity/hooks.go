@@ -45,32 +45,24 @@ func (Agent) UserHooksPath() (string, error) {
 }
 
 // PlanUserHooks writes terma's named hook into <dir>/hooks.json, or takes it out; it
-// writes none into ~/.gemini/config for an agy on PATH too old to run them. A client's home
-// is exempt: the client runs its own agy through `agy acp`, which exists only from 1.5.0,
-// past minimumVersion.
+// writes none, into any home, while the agy on PATH is too old to run them.
 func (Agent) PlanUserHooks(dir string, command func(string) string, install bool) (hookmgr.Plan, error) {
-	if install && isDefaultHooksDir(dir) {
-		if why, old := tooOld(context.Background()); old {
-			return hookmgr.Plan{}, errors.New(why)
-		}
+	if why, old := tooOld(context.Background()); install && old {
+		return hookmgr.Plan{}, errors.New(why)
 	}
 	return planUserHooks(dir, command, install)
-}
-
-// isDefaultHooksDir reports whether dir is ~/.gemini/config, the agy on PATH's.
-func isDefaultHooksDir(dir string) bool {
-	def, err := defaultHooksDir()
-	return err != nil || filepath.Clean(dir) == def
 }
 
 // refreshHooksFile points the hooks terma wrote into each Antigravity home's file at this
 // terma, as `terma update --refresh` does after the binary moved, and names each file it
 // changed. A file without them is left alone, but for one: a home whose file names no terma
-// hook at all gets it, when another home's file carries terma's hook, so a home a client
-// made after setup is covered (the developer chose Antigravity with hooks, as that other
-// file says). A hook already named terma there, switched off or edited, is the developer's
-// and stays. Not on Windows, where terma does not offer Antigravity and a shared home holds
-// another system's hooks.
+// hook at all gets it, when another home's file has terma's hook switched on, so a home a
+// client made after setup is covered (the developer chose Antigravity with hooks, as that
+// other file says). A hook already named terma there, switched off or edited, is the
+// developer's and stays, and one switched off is never copied to another home. While the
+// agy on PATH is too old to run them, no home gets it, as PlanUserHooks says. Not on
+// Windows, where terma does not offer Antigravity and a shared home holds another system's
+// hooks.
 func (a Agent) refreshHooksFile() (string, bool, error) {
 	if runtime.GOOS == "windows" {
 		return "", false, nil
@@ -81,6 +73,7 @@ func (a Agent) refreshHooksFile() (string, bool, error) {
 	}
 	var carry, bare []string
 	var errs []error
+	on := false
 	for _, path := range paths {
 		data, err := hookmgr.ReadFile(path)
 		switch {
@@ -88,12 +81,18 @@ func (a Agent) refreshHooksFile() (string, bool, error) {
 			errs = append(errs, err)
 		case bytes.Contains(data, []byte(" hook --user antigravity-")):
 			carry = append(carry, path)
+			on = on || termaHookOn(data)
 		case namesNoTermaHook(data):
 			bare = append(bare, path)
 		}
 	}
 	if len(carry) == 0 {
 		return "", false, errors.Join(errs...)
+	}
+	if !on {
+		bare = nil
+	} else if _, old := tooOld(context.Background()); old {
+		bare = nil
 	}
 	terma, err := procinfo.AbsExecutable()
 	if err != nil {
@@ -108,12 +107,6 @@ func (a Agent) refreshHooksFile() (string, bool, error) {
 		}
 	}
 	for _, path := range bare {
-		// The agy on PATH must run them, as PlanUserHooks says.
-		if isDefaultHooksDir(filepath.Dir(path)) {
-			if _, old := tooOld(context.Background()); old {
-				continue
-			}
-		}
 		if ok, err := installHooks(path, terma); err != nil {
 			errs = append(errs, err)
 		} else if ok {

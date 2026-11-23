@@ -26,9 +26,9 @@ func (a Agent) Surfaces() []agents.Surface {
 }
 
 // Installed reports whether an agy terma can set up is on the PATH, or a client keeps an
-// Antigravity home here, with a copy of agy of its own. An agy on PATH before
-// minimumVersion is not one terma can set up, so setup --yes leaves Antigravity out rather
-// than stopping at its refusal for ~/.gemini, a client's home or not.
+// Antigravity home here, with a copy of agy of its own. With an agy on PATH before
+// minimumVersion it is false, a client's home or not: PlanUserHooks writes into no home
+// until agy is updated, and setup --yes leaves Antigravity out rather than stop at that.
 func (Agent) Installed(ctx context.Context) bool {
 	if _, old := tooOld(ctx); old {
 		return false

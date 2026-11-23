@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -159,6 +161,9 @@ type refreshHome struct {
 
 func newRefreshHome(t *testing.T) refreshHome {
 	t.Helper()
+	if runtime.GOOS == "windows" {
+		t.Skip("terma does not refresh Antigravity's hooks on Windows")
+	}
 	home := isolatedHome(t)
 	t.Setenv("PATH", t.TempDir())
 	t3 := filepath.Join(home, ".t3")
@@ -235,6 +240,63 @@ func TestAntigravityRefreshWithoutTermasHookWritesNothing(t *testing.T) {
 	}
 	if got := hookruntest.ReadFile(t, filepath.Join(h.t3b, "config"), "hooks.json"); got != guardHook {
 		t.Errorf("the developer's file changed:\n%s", got)
+	}
+}
+
+// A home whose terma hook is switched off, terma's handlers still in it, has them pointed at
+// this terma and stays off; it puts no hook into a home that names none.
+func TestAntigravityRefreshCopiesNoSwitchedOffHook(t *testing.T) {
+	h := newRefreshHome(t)
+	exe, err := procinfo.AbsExecutable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	installAt(t, h.gemini, "/old/terma")
+	var top map[string]map[string]any
+	if err := json.Unmarshal([]byte(hookruntest.ReadFile(t, filepath.Join(h.gemini, "config"), "hooks.json")), &top); err != nil {
+		t.Fatal(err)
+	}
+	top["terma"]["enabled"] = false
+	off, err := json.Marshal(top)
+	if err != nil {
+		t.Fatal(err)
+	}
+	hookruntest.WriteFile(t, filepath.Join(h.gemini, "config"), "hooks.json", string(off))
+
+	changed, ok, err := Agent{}.refreshHooksFile()
+	if err != nil || !ok || changed != hooksAt(h.gemini) {
+		t.Fatalf("refresh = %q, %v, %v; want %q", changed, ok, err, hooksAt(h.gemini))
+	}
+	got := hookruntest.ReadFile(t, filepath.Join(h.gemini, "config"), "hooks.json")
+	if strings.Contains(got, "/old/terma") || !strings.Contains(got, exe) {
+		t.Errorf("terma's commands were not refreshed:\n%s", got)
+	}
+	if on := member(t, hooksAt(h.gemini), "terma").(map[string]any)["enabled"]; on != false {
+		t.Errorf("enabled = %v, want false:\n%s", on, got)
+	}
+	for _, home := range []string{h.t3a, h.t3b, h.t3c} {
+		if _, err := os.Stat(filepath.Join(home, "config")); !os.IsNotExist(err) {
+			t.Errorf("%s: config folder made: %v", home, err)
+		}
+	}
+}
+
+// terma's command in a comment is no hook: it puts none into a home that names none.
+func TestAntigravityRefreshCopiesNoCommentedHook(t *testing.T) {
+	h := newRefreshHome(t)
+	commented := "{\n  // \"terma\": {\"Stop\": [{\"type\": \"command\", \"command\": " +
+		strconv.Quote(hookmgr.UserHookCommand("/old/terma")("antigravity-stop")) + ", \"timeout\": 10}]}\n}\n"
+	hookruntest.WriteFile(t, filepath.Join(h.gemini, "config"), "hooks.json", commented)
+	if changed, ok, err := (Agent{}).refreshHooksFile(); ok || err != nil || changed != "" {
+		t.Fatalf("refresh = %q, %v, %v", changed, ok, err)
+	}
+	if got := hookruntest.ReadFile(t, filepath.Join(h.gemini, "config"), "hooks.json"); got != commented {
+		t.Errorf("the commented file changed:\n%s", got)
+	}
+	for _, home := range []string{h.t3a, h.t3b, h.t3c} {
+		if _, err := os.Stat(filepath.Join(home, "config")); !os.IsNotExist(err) {
+			t.Errorf("%s: config folder made: %v", home, err)
+		}
 	}
 }
 

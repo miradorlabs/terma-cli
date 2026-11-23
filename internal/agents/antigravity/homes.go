@@ -1,9 +1,13 @@
 package antigravity
 
 import (
+	"bytes"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"slices"
+
+	"github.com/miradorlabs/terma-cli/internal/hooks/hookmgr"
 )
 
 // An Antigravity home is the folder agy calls its gemini dir: config/ holds its hooks.json
@@ -74,4 +78,22 @@ func (Agent) UserHooksPaths() ([]string, error) {
 func defaultHooksDir() (string, error) {
 	path, err := Agent{}.UserHooksPath()
 	return filepath.Dir(path), err
+}
+
+// termaHookOn reports whether a hooks file, data as read, has terma's hook switched on: a
+// top-level terma member, not "enabled": false, that runs at least one of terma's handlers.
+// A mention elsewhere, in a comment say, is none.
+func termaHookOn(data []byte) bool {
+	_, top, err := parseHooks(data)
+	if err != nil {
+		return false
+	}
+	var member map[string]json.RawMessage
+	if json.Unmarshal(top[antigravityHookName], &member) != nil {
+		return false
+	}
+	if raw, ok := member["enabled"]; ok && string(bytes.TrimSpace(raw)) == "false" {
+		return false
+	}
+	return hookmgr.CallsTerma(top[antigravityHookName])
 }

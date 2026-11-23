@@ -11,6 +11,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/agents/agentstest"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookmgr"
+	"github.com/miradorlabs/terma-cli/internal/ui/output"
 )
 
 // versioned is a hooks-only agent that reports its installed version.
@@ -122,7 +123,7 @@ func TestAgentHooksCheckEveryFile(t *testing.T) {
 	}
 	install(dir)
 	c, ok := AgentHooksCheck(ctx, reg, []string{"fake"}, exe)
-	if !ok || c.Status != Fail || !strings.Contains(c.Detail, other) || strings.Contains(c.Detail, path) {
+	if !ok || c.Status != Fail || !strings.Contains(c.Detail, output.TildePath(other)) || strings.Contains(c.Detail, output.TildePath(path)) {
 		t.Fatalf("one file without the hooks: %+v, %v", c, ok)
 	}
 	install(client)
