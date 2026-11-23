@@ -16,7 +16,8 @@ const ProjectHeader = "X-Mirador-Project"
 
 // AccountUnreadable is the account of what is collected while the sign-ins can't be read
 // (auth.AccountUnreadable): a person's maybe, so never no one's, and no sign-in's token is
-// had for it. The relay and delivery hold what is bound to it, and it ages out.
+// had for it. Delivery holds what is bound to it, and it ages out; the relay binds nothing
+// to it, and loses what still arrives under it after a short retry.
 const AccountUnreadable = "unreadable"
 
 // NoPersonLane is the lane of what no person collected, under a server key: it leaves only
@@ -29,7 +30,9 @@ const ReasonSignInRetired = "SIGN_IN_RETIRED"
 // SignIn is the person's sign-in telemetry is sent with, as it stands at each send: the
 // developer can sign in, out or as someone else meanwhile.
 type SignIn interface {
-	// Account is the account key (auth.AccountKey) of the sign-in now, "" with none.
+	// Account is the lane of the sign-in now: its account key (auth.AccountKey);
+	// NoPersonLane under a server key; "" signed out; AccountUnreadable while it can't be
+	// read.
 	Account() string
 	// Token is a fresh access token of the sign-in whose account key is account: "" with no
 	// error when that sign-in cannot send now (signed out, another person's, retired), an

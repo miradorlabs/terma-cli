@@ -1,15 +1,19 @@
 package cli
 
 import (
-	"github.com/miradorlabs/terma-cli/internal/doctor"
-	"github.com/miradorlabs/terma-cli/internal/relay"
+	"maps"
 	"os"
+	"path/filepath"
 	"slices"
 	"testing"
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/account/auth"
 	"github.com/miradorlabs/terma-cli/internal/config"
+	"github.com/miradorlabs/terma-cli/internal/doctor"
+	"github.com/miradorlabs/terma-cli/internal/relay"
+	"github.com/miradorlabs/terma-cli/internal/relay/claim"
+	"github.com/miradorlabs/terma-cli/internal/sendas"
 )
 
 // The relay and the spool's delivery send as the sign-in in place, read again at each send:
@@ -47,8 +51,8 @@ func TestTheSignInSourceSendsOnlyAsItsOwnAccount(t *testing.T) {
 		t.Fatalf("a retired sign-in's token = %q, %v", token, err)
 	}
 	serverKeyProfile(t)
-	if got := testApp.signInSource(cfg).Account(); got != "" {
-		t.Fatalf("a server-key profile has account %q", got)
+	if got := testApp.signInSource(cfg).Account(); got != sendas.NoPersonLane {
+		t.Fatalf("a server-key profile has account %q, want no person's lane", got)
 	}
 }
 
@@ -79,8 +83,8 @@ func TestTheSignInSourceFollowsASwitchAtOnce(t *testing.T) {
 		t.Fatalf("after a switch, account = %q, want u-2's", got)
 	}
 	serverKeyProfile(t)
-	if got := src.Account(); got != "" {
-		t.Fatalf("after a switch to a server key, account = %q", got)
+	if got := src.Account(); got != sendas.NoPersonLane {
+		t.Fatalf("after a switch to a server key, account = %q, want no person's lane", got)
 	}
 	if err := config.UpdateProfile(testApp.dir, config.DefaultProfile, func(p *config.Profile) { p.ServerKeySignIn = false }); err != nil {
 		t.Fatal(err)
@@ -93,6 +97,50 @@ func TestTheSignInSourceFollowsASwitchAtOnce(t *testing.T) {
 	}
 	if got := src.Account(); got != "" {
 		t.Fatalf("after a sign-out, account = %q", got)
+	}
+}
+
+// Account reads config.json and the sign-in as one snapshot: a switch to a server key that
+// lands between the two reads is read again, never bound to the person signed in before.
+func TestAccountReadsTheProfileAndTheSignInAsOne(t *testing.T) {
+	f := newFakeAuth(t)
+	authSandbox(t, f)
+	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(f)); err != nil {
+		t.Fatal(err)
+	}
+	if err := config.UpdateFile(testApp.dir, func(*config.File) {}); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := testApp.loadConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	src := testApp.signInSource(cfg)
+	switched := false
+	src.betweenReads = func() {
+		if !switched {
+			switched = true
+			serverKeyProfile(t)
+		}
+	}
+	if got := src.Account(); got != auth.AccountUnreadable {
+		t.Fatalf("with the profile switched mid-read, account = %q; want it read again", got)
+	}
+	if got := src.Account(); got != sendas.NoPersonLane {
+		t.Fatalf("read again, account = %q; want no person's lane", got)
+	}
+}
+
+// Doctor reads what the relay lost by reason from its outbox's losses.json.
+func TestDoctorReadsTheRelaysLossesByReason(t *testing.T) {
+	useConfigDir(t, t.TempDir())
+	at := time.Now().UTC().Truncate(time.Second)
+	losses := relay.OutboxLosses{Counts: map[string]int{"signed_out": 2, "unreadable": 1}, Last: at}
+	if err := config.WriteJSON(filepath.Join(claim.Dir(testApp.stateDir), relay.OutboxDir, "losses.json"), losses, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if got := testApp.relayFacts(); !maps.Equal(got.OutboxLosses, losses.Counts) || !got.OutboxLossAt.Equal(at) {
+		t.Fatalf("doctor read %v at %v; want %v at %v", got.OutboxLosses, got.OutboxLossAt, losses.Counts, at)
 	}
 }
 

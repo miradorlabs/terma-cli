@@ -112,12 +112,24 @@ func (r *Relay) placePinned(c claim.Claim, narrow bool) (claim.Claim, Policy, st
 }
 
 // route sends a part on only if nothing is held for its key, so arrival order holds, and
-// drops a part of a session marked not collected without holding it.
+// drops a part of a session marked not collected without holding it. A part collected with
+// no sign-in to bind it to (part.lost) is never held, since it can never leave: it is lost
+// now, counted by its reason when it is a team's, or dropped by why it can't be placed.
 func (r *Relay) route(p *part) {
 	r.deliverMu.Lock()
 	defer r.deliverMu.Unlock()
 	c, pol, why, ok, how := r.decide(p.session, p.pid, p.at, p.narrow, p.claimed)
-	if why == whyNotCollected {
+	switch {
+	case why == whyNotCollected:
+		r.stats.dropped(p.signal, why, p.records)
+		return
+	case p.lost != "" && ok:
+		r.deliverAttributed(c, pol, p, how) // the policy's own drops first
+		return
+	case p.lost != "" && why == whyNoKey:
+		r.lose(p)
+		return
+	case p.lost != "":
 		r.stats.dropped(p.signal, why, p.records)
 		return
 	}
@@ -151,6 +163,10 @@ func (r *Relay) deliverAttributed(c claim.Claim, pol Policy, p *part, how attrib
 		r.stats.dropped(p.signal, "policy_signal", p.records)
 		return
 	}
+	if p.lost != "" {
+		r.lose(p)
+		return
+	}
 	unclassified := map[string]int{}
 	if n := r.rules.withhold(p, pol.IncludePrompts, pol.IncludeToolContent, unclassified); n > 0 {
 		r.stats.add("withheld_content_records", n)
@@ -181,6 +197,13 @@ func (r *Relay) deliverAttributed(c claim.Claim, pol Policy, p *part, how attrib
 		r.stats.add("attributed_by_"+strings.ReplaceAll(how.how, "-", "_")+"."+string(p.signal), p.records)
 	}
 	r.enqueue(c, p, at)
+}
+
+// lose drops a team's part collected with no sign-in to bind it to: never written, and
+// counted as lost by its reason.
+func (r *Relay) lose(p *part) {
+	r.stats.dropped(p.signal, p.lost, p.records)
+	r.recordLosses(map[string]int{p.lost: p.records}, r.opts.Now())
 }
 
 // ranIn is the claim naming where the part's session ran, its Root the working tree and its

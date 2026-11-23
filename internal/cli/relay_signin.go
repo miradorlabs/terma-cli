@@ -13,6 +13,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/account/auth"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/relay"
+	"github.com/miradorlabs/terma-cli/internal/sendas"
 )
 
 // signInSource is the profile's sign-in as the relay and the spool's delivery send with it:
@@ -36,6 +37,8 @@ type signInSource struct {
 	account      string
 	accountFiles [2]os.FileInfo
 	accountRead  bool // account was read, and may be kept while the files are unchanged
+	// betweenReads, in tests, runs between Account's read of config.json and of the sign-in.
+	betweenReads func()
 }
 
 type sentToken struct{ token, session string }
@@ -61,34 +64,48 @@ func (app *App) signInSource(cfg *config.Config) *signInSource {
 	return &signInSource{cfg: cfg, version: app.version}
 }
 
-// Account is the account key of the profile's sign-in, as auth.Account gives it (one for
-// another environment keeps its own, which Token never has a token for); "" when it is
-// signed out, or set up with a server key, which is no one's; auth.AccountUnreadable while
-// config.json or the sign-in can't be read.
+// Account is the lane of the profile's sign-in: its account key, as auth.Account gives it
+// (one for another environment keeps its own, which Token never has a token for);
+// sendas.NoPersonLane when it is set up with a server key; "" when it is signed out;
+// auth.AccountUnreadable while config.json or the sign-in can't be read, or the two changed
+// while they were read.
 func (s *signInSource) Account() string {
 	s.accountMu.Lock()
 	defer s.accountMu.Unlock()
-	files := [2]os.FileInfo{statOrNil(config.Path(s.cfg.Dir)), statOrNil(config.CredentialsPath(s.cfg.Dir))}
+	files := s.accountFilesNow()
 	if s.accountRead && unchanged(s.accountFiles[0], files[0]) && unchanged(s.accountFiles[1], files[1]) {
 		return s.account
 	}
-	s.account, s.accountFiles, s.accountRead = "", files, false
-	// A profile whose mode can't be read may be a server key's, which keeps an earlier
-	// person's sign-in on disk, or a person's: neither's, so the unreadable account, which
-	// no token and no server key sends for; and not kept, since a file made readable again
-	// (its permissions) need not look changed.
+	s.account, s.accountFiles, s.accountRead = s.readAccount(), files, false
+	// Read as one snapshot: a file replaced between the two reads may pair one sign-in's
+	// profile with another's identity, so it is read again. An unreadable one is not kept
+	// either: a file made readable again (its permissions) need not look changed.
+	if now := s.accountFilesNow(); !unchanged(files[0], now[0]) || !unchanged(files[1], now[1]) {
+		return auth.AccountUnreadable
+	}
+	s.accountRead = s.account != auth.AccountUnreadable
+	return s.account
+}
+
+func (s *signInSource) accountFilesNow() [2]os.FileInfo {
+	return [2]os.FileInfo{statOrNil(config.Path(s.cfg.Dir)), statOrNil(config.CredentialsPath(s.cfg.Dir))}
+}
+
+// readAccount reads the profile's mode, then its sign-in. A profile whose mode can't be
+// read may be a server key's, which keeps an earlier person's sign-in on disk, or a
+// person's: neither's, so the unreadable account.
+func (s *signInSource) readAccount() string {
 	file, err := config.LoadFile(s.cfg.Dir)
 	if err != nil {
 		return auth.AccountUnreadable
 	}
-	s.accountRead = true
 	if p := file.Profiles[s.cfg.ProfileName]; p != nil && p.ServerKeySignIn {
-		return ""
+		return sendas.NoPersonLane
 	}
-	s.account = auth.Account(s.cfg.Dir, s.cfg.ProfileName, s.cfg.AuthURL)
-	// Not kept either: a file made readable again need not look changed.
-	s.accountRead = s.account != auth.AccountUnreadable
-	return s.account
+	if s.betweenReads != nil {
+		s.betweenReads()
+	}
+	return auth.Account(s.cfg.Dir, s.cfg.ProfileName, s.cfg.AuthURL)
 }
 
 func statOrNil(path string) os.FileInfo {

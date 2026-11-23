@@ -10,33 +10,53 @@ import (
 // outbox keeps a part.
 const OutboxLossWindow = 14 * 24 * time.Hour
 
-// OutboxCheck reports what the relay dropped of what it could not send: records past the
-// outbox's room or age, which means sends failed for long, and claimed records a stopping
-// relay dropped from memory while their team's policy could not be read.
+// outboxLosses say, by the relay's reason (relay.OutboxLosses), what each loss was, in the
+// order doctor lists them.
+var outboxLosses = []struct{ reason, what string }{
+	{"outbox_full", "because the outbox was full"},
+	{"outbox_expired", "older than it keeps them"},
+	{"legacy_ambiguous", "an older terma queued that no one sign-in may send, past its age"},
+	{"held", "held while their team's policy could not be read, when the relay stopped"},
+	{"signed_out", "collected while signed out"},
+	{"unreadable", "collected while the sign-in could not be read"},
+}
+
+// OutboxCheck reports what the relay lost of what it collected, by reason: records past the
+// outbox's room or age, which means sends failed for long; claimed records a stopping relay
+// dropped from memory while their team's policy could not be read; and records collected
+// with no sign-in to send them as.
 func OutboxCheck(r Relay) Check {
 	var lost []string
-	if r.OutboxFull > 0 {
-		lost = append(lost, fmt.Sprintf("%d because the outbox was full", r.OutboxFull))
-	}
-	if r.OutboxExpired > 0 {
-		lost = append(lost, fmt.Sprintf("%d older than it keeps them", r.OutboxExpired))
-	}
-	if r.OutboxLegacyAmbiguous > 0 {
-		lost = append(lost, fmt.Sprintf("%d an older terma queued that no one sign-in may send, past its age", r.OutboxLegacyAmbiguous))
-	}
-	if r.OutboxHeld > 0 {
-		lost = append(lost, fmt.Sprintf("%d held while their team's policy could not be read, when the relay stopped", r.OutboxHeld))
+	for _, l := range outboxLosses {
+		if n := r.OutboxLosses[l.reason]; n > 0 {
+			lost = append(lost, fmt.Sprintf("%d %s", n, l.what))
+		}
 	}
 	detail := "the relay dropped records it could not send: " + strings.Join(lost, ", ")
 	if !r.OutboxLossAt.IsZero() {
 		detail += "; the last at " + r.OutboxLossAt.Local().Format("2006-01-02 15:04")
 	}
-	// Sends that failed for long are this machine's to fix; a stopped relay's held parts are not.
+	// Sends that failed for long, and a sign-out, are this machine's to fix; a stopped
+	// relay's held parts are not.
 	fix := ""
-	if r.OutboxFull+r.OutboxExpired > 0 {
+	switch {
+	case r.OutboxLosses["outbox_full"]+r.OutboxLosses["outbox_expired"] > 0:
 		fix = "terma setup"
+	case r.OutboxLosses["signed_out"] > 0:
+		fix = "terma login"
 	}
 	return Check{Status: Warn, Detail: detail, Fix: fix}
+}
+
+// lostRecently reports whether the relay lost any record within OutboxLossWindow: an older
+// loss is history.
+func (r Relay) lostRecently() bool {
+	for _, n := range r.OutboxLosses {
+		if n > 0 {
+			return time.Since(r.OutboxLossAt) < OutboxLossWindow
+		}
+	}
+	return false
 }
 
 // relayFacts is the relay's state, the zero one when there is no probe.

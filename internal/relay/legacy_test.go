@@ -58,7 +58,7 @@ func TestAnAmbiguousBacklogNeverLeavesAndIsCountedWhenItAgesOut(t *testing.T) {
 			if n := len(u.requests()); n != 0 {
 				t.Fatalf("%d requests: an ambiguous backlog left", n)
 			}
-			if l, err := ReadOutboxLosses(dir); err != nil || l.LegacyAmbiguous != 1 || l.Expired != 0 {
+			if l, err := ReadOutboxLosses(dir); err != nil || l.Counts["legacy_ambiguous"] != 1 || l.Counts["outbox_expired"] != 0 {
 				t.Fatalf("losses = %+v, %v; want the aged-out part counted as ambiguous", l, err)
 			}
 			if entries, _ := (outbox{dir: dir}).list(routeOf(auth.LegacyAccountAmbiguous, claim.Claim{ProjectID: "p1"})); len(entries) != 1 {

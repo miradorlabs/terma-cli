@@ -654,7 +654,7 @@ func TestAPartWaitingForItsPolicyOutlivesItsClaim(t *testing.T) {
 	f.now = f.now.Add(maxOutboxAge + time.Hour)
 	f.mu.Unlock()
 	r.sweep()
-	if l, err := ReadOutboxLosses(dir); err != nil || l.Held != 1 {
+	if l, err := ReadOutboxLosses(dir); err != nil || l.Counts["held"] != 1 {
 		t.Fatalf("losses = %+v, %v; want the aged-out part counted", l, err)
 	}
 }
@@ -701,7 +701,7 @@ func TestATeamsPartLostBeforeAnySweepIsCounted(t *testing.T) {
 	big := &part{signal: Logs, session: "D", msg: logsOf("D", 1), records: maxHeld + 1}
 	r.hold(big, &claim.Claim{ProjectID: "p3"}, attribution{}, true)
 	r.sweep()
-	if l, err := ReadOutboxLosses(dir); err != nil || l.Held != maxHeld+1 {
+	if l, err := ReadOutboxLosses(dir); err != nil || l.Counts["held"] != maxHeld+1 {
 		t.Fatalf("losses = %+v, %v; want the refused part counted", l, err)
 	}
 }

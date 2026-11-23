@@ -141,8 +141,7 @@ func (app *App) relayFacts() doctor.Relay {
 		r.Version, r.Earlier = info.Version, selfupdate.Newer(info.Version, app.version)
 	}
 	if losses, err := relay.ReadOutboxLosses(filepath.Join(dir, relay.OutboxDir)); err == nil {
-		r.OutboxFull, r.OutboxExpired, r.OutboxHeld, r.OutboxLossAt = losses.Full, losses.Expired, losses.Held, losses.Last
-		r.OutboxLegacyAmbiguous = losses.LegacyAmbiguous
+		r.OutboxLosses, r.OutboxLossAt = losses.Counts, losses.Last
 	}
 	if service.Supported() {
 		state := daemon.CheckService(app.stateDir)

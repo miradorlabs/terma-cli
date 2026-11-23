@@ -3,7 +3,6 @@ package relay
 import (
 	"bytes"
 	"context"
-	"github.com/miradorlabs/terma-cli/internal/account/auth"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -18,6 +17,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
+	"github.com/miradorlabs/terma-cli/internal/sendas"
 )
 
 const (
@@ -259,7 +259,7 @@ func TestOutboxLossesAreRecorded(t *testing.T) {
 	r := newRelay(Options{Dir: dir, Token: token})
 	r.sweepOutbox(time.Now())
 	l, err := ReadOutboxLosses(dir)
-	if err != nil || l.Expired != 1 || l.Full != 0 || l.Last.IsZero() {
+	if err != nil || l.Counts["outbox_expired"] != 1 || l.Counts["outbox_full"] != 0 || l.Last.IsZero() {
 		t.Fatalf("losses = %+v, %v", l, err)
 	}
 	if routes, _ := r.outbox.routes(); len(routes) != 0 {
@@ -336,17 +336,18 @@ func TestAHeldPartKeepsTheAccountItArrivedUnder(t *testing.T) {
 	}
 }
 
-// A profile set up with a server key sends only what no person's sign-in collected: a
-// person's bound backlog, or an older relay's the retirement decided was a person's, is
-// never sent with the key.
+// A profile set up with a server key sends only what no person's sign-in collected, its
+// no_person lane: a person's bound backlog, an older relay's the retirement decided was a
+// person's, and a route bound to no lane are never sent with the key.
 func TestAServerKeyNeverSendsAPersonsBacklog(t *testing.T) {
 	t.Parallel()
 	u := newSignInUpstream(t)
 	dir := t.TempDir()
 	queue(t, dir, accountA)
-	queue(t, legacyOutbox(dir), "") // an older relay's: the retired sign-ins' person's
-	queue(t, dir, "")               // the key's own
-	r := newRelay(Options{Dir: dir, Token: token, SignIn: &testSignIn{},
+	queue(t, legacyOutbox(dir), "")    // an older relay's: the retired sign-ins' person's
+	queue(t, dir, sendas.NoPersonLane) // the key's own
+	queue(t, dir, "")                  // no lane's, which this version never writes
+	r := newRelay(Options{Dir: dir, Token: token, SignIn: &testSignIn{account: sendas.NoPersonLane},
 		LegacyDir: legacyOutbox(dir), LegacyOwner: func() string { return accountB },
 		Resolve: func(claim.Claim) (Policy, error) {
 			return Policy{Endpoint: u.srv.URL, Key: "server-key", IncludePrompts: true, IncludeToolContent: true}, nil
@@ -365,15 +366,15 @@ func TestAServerKeyNeverSendsAPersonsBacklog(t *testing.T) {
 // Losses are counted from the first one after a quiet window: older counts start over.
 func TestOutboxLossesStartOverAfterAQuietWindow(t *testing.T) {
 	t.Parallel()
-	o := outbox{dir: t.TempDir()}
+	r := newRelay(Options{Dir: t.TempDir(), Token: token})
 	start := time.Now()
-	o.recordLosses(3, 0, 0, start)
-	o.recordLosses(0, 1, 0, start.Add(time.Hour))
-	if l, _ := ReadOutboxLosses(o.dir); l.Full != 3 || l.Expired != 1 {
+	r.recordLosses(map[string]int{"outbox_full": 3}, start)
+	r.recordLosses(map[string]int{"outbox_expired": 1}, start.Add(time.Hour))
+	if l, _ := ReadOutboxLosses(r.outbox.dir); l.Counts["outbox_full"] != 3 || l.Counts["outbox_expired"] != 1 {
 		t.Fatalf("losses = %+v, want both counted", l)
 	}
-	o.recordLosses(0, 2, 0, start.Add(lossWindow+2*time.Hour))
-	if l, _ := ReadOutboxLosses(o.dir); l.Full != 0 || l.Expired != 2 {
+	r.recordLosses(map[string]int{"outbox_expired": 2}, start.Add(lossWindow+2*time.Hour))
+	if l, _ := ReadOutboxLosses(r.outbox.dir); l.Counts["outbox_full"] != 0 || l.Counts["outbox_expired"] != 2 {
 		t.Fatalf("losses = %+v, want only the new loss", l)
 	}
 }
@@ -424,7 +425,7 @@ func TestAnExportKeepsTheSignInItArrivedUnder(t *testing.T) {
 // legacyOutbox(dir) taken in under the decision legacy.
 func serverKeyRelay(t *testing.T, u *signInUpstream, dir, legacy string) *Relay {
 	t.Helper()
-	r := newRelay(Options{Dir: dir, Token: token, SignIn: &testSignIn{},
+	r := newRelay(Options{Dir: dir, Token: token, SignIn: &testSignIn{account: sendas.NoPersonLane},
 		LegacyDir: legacyOutbox(dir), LegacyOwner: func() string { return legacy },
 		Resolve: func(claim.Claim) (Policy, error) {
 			return Policy{Endpoint: u.srv.URL, Key: "server-key", IncludePrompts: true, IncludeToolContent: true}, nil
@@ -441,8 +442,8 @@ func TestARefusedBatchIsSentAPartAtATime(t *testing.T) {
 	t.Parallel()
 	u := newSignInUpstream(t, http.StatusBadRequest)
 	dir := t.TempDir()
-	queueAt(t, dir, "", time.Now().Add(time.Minute))
-	queueAt(t, dir, "", time.Now().Add(2*time.Minute))
+	queueAt(t, dir, sendas.NoPersonLane, time.Now().Add(time.Minute))
+	queueAt(t, dir, sendas.NoPersonLane, time.Now().Add(2*time.Minute))
 	r := serverKeyRelay(t, u, dir, "")
 	waitForCounters(t, r, func(c map[string]int) bool { return c["forwarded.logs"] == 2 })
 	if n := len(u.requests()); n != 3 {
@@ -469,48 +470,6 @@ func TestARetiredRefusalIsNeverTakenForAnExpiredToken(t *testing.T) {
 	defer signIn.mu.Unlock()
 	if len(signIn.refused) != 0 {
 		t.Fatalf("a retired sign-in's token was handed back as expired: %v", signIn.refused)
-	}
-}
-
-// A part collected while the sign-in could not be read is kept, on its own route, and never
-// leaves under a server key: it may be a person's.
-func TestAnUnreadableSignInsPartIsKeptButNeverSentByAKey(t *testing.T) {
-	t.Parallel()
-	u := newSignInUpstream(t)
-	dir := t.TempDir()
-	r := newRelay(Options{Dir: dir, Token: token, SignIn: &testSignIn{account: auth.AccountUnreadable},
-		Lookup: func(string, time.Time) (claim.Claim, bool) { return claim.Claim{ProjectID: "p1"}, true },
-		Resolve: func(claim.Claim) (Policy, error) {
-			return Policy{Endpoint: u.srv.URL, Key: "server-key", IncludePrompts: true, IncludeToolContent: true}, nil
-		}})
-	ctx, cancel := context.WithCancel(context.Background())
-	done := make(chan struct{})
-	go func() { r.Run(ctx); close(done) }()
-	t.Cleanup(func() { cancel(); <-done })
-	srv := httptest.NewServer(r.Handler())
-	defer srv.Close()
-	post(t, srv, "/v1/logs", oneLog("unreadable"), "application/x-protobuf", token, false)
-	time.Sleep(100 * time.Millisecond)
-	if c := r.Stats().Snapshot().Counters; c["dropped.outbox_write_failed.logs"] != 0 || len(u.requests()) != 0 {
-		t.Fatalf("counters %v, %d sent; want it kept and not sent", c, len(u.requests()))
-	}
-	if entries, err := r.outbox.list(routeOf(auth.AccountUnreadable, claim.Claim{ProjectID: "p1"})); err != nil || len(entries) != 1 {
-		t.Fatalf("queued %v (%v); want the part on its own route", entries, err)
-	}
-}
-
-// A route of the unreadable account never leaves under a sign-in, even while the sign-in in
-// place reads as unreadable too: it is no sign-in's.
-func TestAnUnreadableRouteNeverLeavesUnderASignIn(t *testing.T) {
-	t.Parallel()
-	r := newRelay(Options{Dir: t.TempDir(), Token: token, SignIn: &testSignIn{account: auth.AccountUnreadable}})
-	rt := routeOf(auth.AccountUnreadable, claim.Claim{ProjectID: "p1"})
-	entries := []entry{newEntry(time.Now(), Logs, 1)}
-	if got := r.leaving(rt, false, maxMergeFiles)(entries); len(got) != 0 {
-		t.Fatalf("%d of the unreadable account's parts may leave under a sign-in", len(got))
-	}
-	if got := r.leaving(rt, true, maxMergeFiles)(entries); len(got) != 0 {
-		t.Fatalf("%d of the unreadable account's parts may leave under a server key", len(got))
 	}
 }
 

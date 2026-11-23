@@ -7,9 +7,7 @@ import (
 
 	"google.golang.org/protobuf/proto"
 
-	"github.com/miradorlabs/terma-cli/internal/account/auth"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
-	"github.com/miradorlabs/terma-cli/internal/sendas"
 )
 
 const (
@@ -97,34 +95,6 @@ func (s *sender) setKeyless(v bool) {
 	s.mu.Lock()
 	s.keyless = v
 	s.mu.Unlock()
-}
-
-// account is the account key of the sign-in now, which parts arriving now are bound to.
-func (r *Relay) account() string {
-	if r.opts.SignIn == nil {
-		return ""
-	}
-	return r.opts.SignIn.Account()
-}
-
-// leaving keeps of a route's entries, in arrival order, up to limit of those that may be sent
-// now. Every entry of a route is in its lane: with a sign-in, a person's lane leaves only
-// while its account's sign-in is the one in place; with a server key (serverKey), only no
-// person's lane does, and what was bound to no account. An older terma's ambiguous backlog
-// never leaves.
-//
-// The sign-in is read now, once: what it returns reads nothing, so a sender can run it on
-// its live queue under its lock. Its result may share entries' array.
-func (r *Relay) leaving(rt route, serverKey bool, limit int) func([]entry) []entry {
-	// The unreadable account is no sign-in's, even while it is what reads as signed in.
-	may := serverKey && (rt.account == "" || rt.account == sendas.NoPersonLane) ||
-		!serverKey && rt.account != "" && rt.account != auth.AccountUnreadable && rt.account == r.account()
-	return func(entries []entry) []entry {
-		if !may {
-			return nil
-		}
-		return entries[:min(limit, len(entries))]
-	}
 }
 
 // loop delivers the outbox oldest first; a stopping relay keeps going within its grace.

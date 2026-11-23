@@ -35,13 +35,13 @@ import (
 //
 // <account> is the parts' lane: the account key (auth.AccountKey) of the sign-in that
 // collected them, so they leave only under it; no_person (sendas.NoPersonLane), for what
-// an older relay queued on a server-key machine; or ambiguous
+// was collected under a server key, which only a server key sends; or ambiguous
 // (auth.LegacyAccountAmbiguous), for what an older relay queued that no one sign-in may
-// send, which never leaves and ages out. A route without one, <dir>/<project>/..., was
-// queued with no sign-in to bind it to, under a server key or signed out.
+// send, which never leaves and ages out.
 //
-// An older relay's outbox, LegacyOutboxDir, has only routes without one; this version
-// never writes there, and moves what it holds into its own (ingestLegacy).
+// An older relay's outbox, LegacyOutboxDir, has only routes without one,
+// <dir>/<project>/...; this version never writes there, nor a route without a lane, and
+// moves what it holds into a lane of its own (ingestLegacy).
 //
 // <received> is zero-padded Unix nanoseconds, so a name sort is arrival order. Only claimed
 // parts, already filtered, are written; unsynced, so a power cut can lose the last seconds.
@@ -169,7 +169,7 @@ func validRoute(rt route) bool {
 }
 
 func validAccount(a string) bool {
-	return a == "" || a == auth.AccountUnreadable || a == sendas.NoPersonLane || a == auth.LegacyAccountAmbiguous || auth.ValidAccountKey(a)
+	return a == "" || a == sendas.NoPersonLane || a == auth.LegacyAccountAmbiguous || auth.ValidAccountKey(a)
 }
 
 func validRepoKey(k string) bool {
@@ -288,7 +288,7 @@ func (r *Relay) sweepOutbox(now time.Time) map[route][]entry {
 	slices.SortFunc(all, func(a, b queued) int { return strings.Compare(a.e.name, b.e.name) })
 	removed := map[route][]entry{}
 	lost := map[string]int{}
-	defer func() { o.recordLosses(lost["outbox_full"], lost["outbox_expired"], lost["legacy_ambiguous"], now) }()
+	defer func() { r.recordLosses(lost, now) }()
 	drop := func(q queued, why string) {
 		if os.Remove(q.path) == nil {
 			r.stats.dropped(q.e.signal, why, q.e.records)

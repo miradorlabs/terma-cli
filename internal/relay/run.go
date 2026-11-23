@@ -83,10 +83,10 @@ func (r *Relay) dropHeldAtExit() {
 	r.heldN, r.heldBytes = 0, 0
 	r.mu.Unlock()
 	r.mu.Lock()
-	claimedLost := r.heldLost
+	lost := map[string]int{heldLoss: r.heldLost}
 	r.heldLost = 0
 	r.mu.Unlock()
-	defer func() { r.outbox.recordHeldLosses(claimedLost, r.opts.Now()) }()
+	defer func() { r.recordLosses(lost, r.opts.Now()) }()
 	for key, parts := range held {
 		for _, h := range parts {
 			_, _, why, ok, _ := r.decide(key, h.p.pid, h.p.at, h.p.narrow, h.p.claimed)
@@ -95,7 +95,7 @@ func (r *Relay) dropHeldAtExit() {
 			}
 			// A claimed part that waited for its team's policy is the developer's work, lost.
 			if ok || why == whyNoKey || h.pinned != nil {
-				claimedLost += h.p.records
+				lost[heldLoss] += h.p.records
 			}
 			r.stats.dropped(h.p.signal, why+"_at_exit", h.p.records)
 			if r.opts.Logf != nil {

@@ -136,7 +136,7 @@ func (r *Relay) sweep() {
 	lost := r.heldLost
 	r.heldLost = 0
 	r.mu.Unlock()
-	defer func() { r.outbox.recordHeldLosses(lost, now) }()
+	defer func() { r.recordLosses(map[string]int{heldLoss: lost}, now) }()
 	for _, key := range keys {
 		hold := r.opts.Hold
 		if strings.HasPrefix(key, tracePrefix) || strings.HasPrefix(key, procPrefix) {

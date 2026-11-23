@@ -474,22 +474,33 @@ func TestDoctorFailsARetiredSignIn(t *testing.T) {
 	}
 }
 
-// What the relay's outbox dropped for room or age is reported; nothing else adds the row.
+// What the relay lost is reported by reason; nothing else adds the row.
 func TestDoctorReportsOutboxLosses(t *testing.T) {
 	quiet := env(t, Probes{Credential: signedIn, Spool: func() SpoolState { return SpoolState{} }})
 	if c := check(Run(t.Context(), quiet, Progress{}), KeyOutbox); c.Key != "missing" {
 		t.Fatalf("a row with no loss: %+v", c)
 	}
 	lossy := env(t, Probes{Credential: signedIn, Spool: func() SpoolState { return SpoolState{} },
-		Relay: func() Relay { return Relay{OutboxFull: 3, OutboxExpired: 2, OutboxLossAt: time.Now()} }})
+		Relay: func() Relay {
+			return Relay{OutboxLosses: map[string]int{"outbox_full": 3, "outbox_expired": 2}, OutboxLossAt: time.Now()}
+		}})
 	c := check(Run(t.Context(), lossy, Progress{}), KeyOutbox)
 	if c.Status != Warn || !strings.Contains(c.Detail, "3 because the outbox was full") || !strings.Contains(c.Detail, "2 older than it keeps them") {
+		t.Fatalf("check = %+v", c)
+	}
+	signedOut := env(t, Probes{Credential: signedIn, Spool: func() SpoolState { return SpoolState{} },
+		Relay: func() Relay {
+			return Relay{OutboxLosses: map[string]int{"signed_out": 4, "unreadable": 1}, OutboxLossAt: time.Now()}
+		}})
+	c = check(Run(t.Context(), signedOut, Progress{}), KeyOutbox)
+	if c.Status != Warn || c.Fix != "terma login" || !strings.Contains(c.Detail, "4 collected while signed out") ||
+		!strings.Contains(c.Detail, "1 collected while the sign-in could not be read") {
 		t.Fatalf("check = %+v", c)
 	}
 	// A loss older than the outbox keeps parts is history.
 	old := env(t, Probes{Credential: signedIn, Spool: func() SpoolState { return SpoolState{} },
 		Relay: func() Relay {
-			return Relay{OutboxExpired: 2, OutboxLossAt: time.Now().Add(-OutboxLossWindow - time.Hour)}
+			return Relay{OutboxLosses: map[string]int{"outbox_expired": 2}, OutboxLossAt: time.Now().Add(-OutboxLossWindow - time.Hour)}
 		}})
 	if c := check(Run(t.Context(), old, Progress{}), KeyOutbox); c.Key != "missing" {
 		t.Fatalf("an old loss still shows: %+v", c)

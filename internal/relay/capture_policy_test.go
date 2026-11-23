@@ -16,6 +16,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
+	"github.com/miradorlabs/terma-cli/internal/sendas"
 
 	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
 	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
@@ -65,7 +66,7 @@ func TestQueuedExportsRespectSignalAndCoverageChanges(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			rt := route{project: "team", tool: "codex", repo: noRepo}
+			rt := route{account: sendas.NoPersonLane, project: "team", tool: "codex", repo: noRepo}
 			e := newEntry(time.Now(), Logs, 1)
 			if err := r.outbox.put(rt, config.Repository{}, e, body); err != nil {
 				t.Fatal(err)
@@ -106,7 +107,7 @@ func TestQueuedExportsRecheckTheRepository(t *testing.T) {
 			t.Fatal(err)
 		}
 		c := claim.Claim{ProjectID: "team", Tool: "codex", Repository: repo}
-		if err := r.outbox.put(routeOf("", c), repo, newEntry(time.Now(), Logs, 1), body); err != nil {
+		if err := r.outbox.put(routeOf(sendas.NoPersonLane, c), repo, newEntry(time.Now(), Logs, 1), body); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -121,7 +122,7 @@ func TestQueuedExportsRecheckTheRepository(t *testing.T) {
 	if body, _ := got.Load().(string); !strings.Contains(body, "session-kept") || strings.Contains(body, "session-removed") {
 		t.Fatalf("upstream got %q, want only the kept repository's part", body)
 	}
-	if entries, _ := r.outbox.list(routeOf("", claim.Claim{ProjectID: "team", Tool: "codex", Repository: removed})); len(entries) != 0 {
+	if entries, _ := r.outbox.list(routeOf(sendas.NoPersonLane, claim.Claim{ProjectID: "team", Tool: "codex", Repository: removed})); len(entries) != 0 {
 		t.Fatalf("the removed repository's part stayed queued: %v", entries)
 	}
 }
@@ -156,7 +157,7 @@ func TestQueuedWithholdingCountsOnceAcrossRetries(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := r.outbox.put(route{project: "team", tool: "claude", repo: noRepo}, config.Repository{}, newEntry(time.Now(), Traces, 2), body); err != nil {
+	if err := r.outbox.put(route{account: sendas.NoPersonLane, project: "team", tool: "claude", repo: noRepo}, config.Repository{}, newEntry(time.Now(), Traces, 2), body); err != nil {
 		t.Fatal(err)
 	}
 	ctx, cancel := context.WithCancel(context.Background())

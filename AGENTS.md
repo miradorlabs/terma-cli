@@ -131,12 +131,16 @@ never on disk, and a stopping relay drops it. What leaves is bound to the accoun
 of the auth host and the user) of the sign-in in place when it arrived: the relay's
 outbox keeps it under `@<account>/`, spool events carry `account`, and it leaves only with
 that account's own token, never in another person's name; it ages out with the outbox
-(14 days), whose `losses.json` counts what it dropped for doctor. A claimed part whose
-team's policy cannot be read yet waits in memory as long as the outbox would keep it, and
-one a stopping relay drops is counted there too. A server key sends only what no person's
-sign-in collected; what a server-key profile collected is no person's, and leaves only
-under a server key, so a profile switched from a server key to a person's sign-in leaves
-it to age out. A spool event is in one of three cases: it names an account (`account`),
+(14 days), whose `losses.json` counts what the relay lost, by reason, for doctor (the
+heartbeat carries the same reasons as `dropped.<reason>.<signal>` counters). A claimed part
+whose team's policy cannot be read yet waits in memory as long as the outbox would keep
+it, and one a stopping relay drops is counted there too. What a server-key profile
+collected is no person's (`@no_person/`), and leaves only under a server key, so a profile
+switched from a server key to a person's sign-in leaves it to age out; a server key sends
+nothing else. A claimed part that arrives signed out, or while `config.json` or the
+sign-in can't be read (they are read as one snapshot, and an export waits a few seconds
+for them to read), is bound to no lane: it is never written, and counted as `signed_out`
+or `unreadable`. A spool event is in one of three cases: it names an account (`account`),
 and leaves only under that sign-in; it is no person's (`no_person`, collected under a
 server key: the hook's spool is bound with `BindNoPerson`), and leaves only under a server
 key; or neither (an older terma's no one sign-in may send, or one queued signed out), which

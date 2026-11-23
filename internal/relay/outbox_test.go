@@ -20,6 +20,7 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
+	"github.com/miradorlabs/terma-cli/internal/sendas"
 )
 
 func countFiles(t *testing.T, dir string) int {
@@ -114,7 +115,7 @@ func TestRelayWritesNothingUnclaimed(t *testing.T) {
 		return nil
 	})
 	for _, want := range []string{"p1", "p2"} {
-		if _, err := os.Stat(filepath.Join(r.opts.Dir, want)); err != nil {
+		if _, err := os.Stat(filepath.Join(r.opts.Dir, accountPrefix+sendas.NoPersonLane, want)); err != nil {
 			t.Errorf("no outbox for %s: %v", want, err)
 		}
 	}
@@ -127,7 +128,7 @@ func TestRelayWritesNothingUnclaimed(t *testing.T) {
 func TestRelayKeylessOutboxDoesNotKeepTheRelayBusy(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	rt := route{project: "p1", tool: "claude-code", repo: noRepo}
+	rt := route{account: sendas.NoPersonLane, project: "p1", tool: "claude-code", repo: noRepo}
 	e := newEntry(time.Now(), Logs, 2)
 	body, _ := proto.Marshal(logsOf("A", 2))
 	if err := (outbox{dir}).put(rt, config.Repository{}, e, body); err != nil {
@@ -147,7 +148,7 @@ func TestOutboxJanitorBounds(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	o := outbox{dir}
-	rt := route{project: "p1", tool: noTool, repo: noRepo}
+	rt := route{account: sendas.NoPersonLane, project: "p1", tool: noTool, repo: noRepo}
 	old := newEntry(time.Now(), Logs, 4)
 	body := []byte("x")
 	if err := o.put(rt, config.Repository{}, old, body); err != nil {
@@ -176,8 +177,8 @@ func TestOutboxJanitorRemovesEmptyRoutes(t *testing.T) {
 	dir := t.TempDir()
 	o := outbox{dir}
 	repo := config.Repository{Origin: "github.com/acme/web"}
-	done := routeOf("", claim.Claim{ProjectID: "p1", Tool: "codex", Repository: repo})
-	busy := routeOf("", claim.Claim{ProjectID: "p2", Tool: "codex", Repository: repo})
+	done := routeOf(sendas.NoPersonLane, claim.Claim{ProjectID: "p1", Tool: "codex", Repository: repo})
+	busy := routeOf(sendas.NoPersonLane, claim.Claim{ProjectID: "p2", Tool: "codex", Repository: repo})
 	for _, rt := range []route{done, busy} {
 		if err := o.put(rt, repo, newEntry(time.Now(), Logs, 1), []byte("x")); err != nil {
 			t.Fatal(err)
@@ -209,11 +210,11 @@ func TestOutboxRouteKeepsItsRepository(t *testing.T) {
 	t.Parallel()
 	o := outbox{t.TempDir()}
 	repo := config.Repository{Origin: "github.com/acme/web"}
-	rt := routeOf("", claim.Claim{ProjectID: "p1", Tool: "codex", Repository: repo})
+	rt := routeOf(sendas.NoPersonLane, claim.Claim{ProjectID: "p1", Tool: "codex", Repository: repo})
 	if rt.repo == noRepo || !validRoute(rt) {
 		t.Fatalf("routeOf gave %v", rt)
 	}
-	if routeOf("", claim.Claim{ProjectID: "p1"}).repo != noRepo {
+	if routeOf(sendas.NoPersonLane, claim.Claim{ProjectID: "p1"}).repo != noRepo {
 		t.Fatal("no repository did not route to noRepo")
 	}
 	e := newEntry(time.Now(), Logs, 1)
@@ -244,8 +245,8 @@ func TestOutboxEntryNames(t *testing.T) {
 			t.Errorf("parseEntry accepted %q", bad)
 		}
 	}
-	if validRoute(route{project: "../x", tool: noTool, repo: noRepo}) || validRoute(route{project: "p", tool: "a/b", repo: noRepo}) ||
-		validRoute(route{project: "p", tool: noTool, repo: ".."}) || validRoute(route{project: "p", tool: noTool}) {
+	if validRoute(route{account: sendas.NoPersonLane, project: "../x", tool: noTool, repo: noRepo}) || validRoute(route{account: sendas.NoPersonLane, project: "p", tool: "a/b", repo: noRepo}) ||
+		validRoute(route{account: sendas.NoPersonLane, project: "p", tool: noTool, repo: ".."}) || validRoute(route{account: sendas.NoPersonLane, project: "p", tool: noTool}) {
 		t.Fatal("validRoute admitted a path")
 	}
 }
@@ -352,7 +353,7 @@ func TestAPartAgesOutFromWhenItArrived(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	o := outbox{dir}
-	rt := route{project: "p1", tool: noTool, repo: noRepo}
+	rt := route{account: sendas.NoPersonLane, project: "p1", tool: noTool, repo: noRepo}
 	held := newEntry(time.Now().Add(-maxOutboxAge-time.Hour), Logs, 2) // arrived long ago, written now
 	if err := o.put(rt, config.Repository{}, held, []byte("x")); err != nil {
 		t.Fatal(err)

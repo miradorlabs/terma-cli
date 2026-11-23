@@ -14,6 +14,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
+	"github.com/miradorlabs/terma-cli/internal/sendas"
 )
 
 // drainBodies is one small part of each signal, as an agent's exports interleave them.
@@ -49,7 +50,7 @@ func drainOutbox(b *testing.B, n int) time.Duration {
 	dir := b.TempDir()
 	o := outbox{dir: dir}
 	bodies := drainBodies(b)
-	rt := routeOf("", claim.Claim{ProjectID: "p1"})
+	rt := routeOf(sendas.NoPersonLane, claim.Claim{ProjectID: "p1"})
 	signals := []Signal{Logs, Traces, Metrics}
 	start := time.Now()
 	for i := range n {

@@ -85,9 +85,12 @@ type Options struct {
 	// Resolve turns a claim into a Policy, or ErrNoKey.
 	Resolve func(c claim.Claim) (Policy, error)
 	// SignIn is who parts without a server key are sent as; none leave without it. A part
-	// is queued under the account of the sign-in when it arrives, and leaves only while
-	// that sign-in is the one in place, so a backlog never goes out in another person's
-	// name or to another environment; it ages out of the outbox meanwhile.
+	// is bound to the lane of the sign-in when it arrives: a person's account, which it
+	// leaves under only while that sign-in is the one in place, so a backlog never goes out
+	// in another person's name or to another environment (it ages out of the outbox
+	// meanwhile); or no person's, under a server key, which only a server key sends. One
+	// that arrives signed out, or while the sign-in can't be read, is lost, and counted.
+	// Nil is a server key's relay.
 	SignIn SignIn
 	// LegacyDir is an older relay's outbox, and LegacyOwner, asked at every outbox sweep,
 	// the one decision of whose what it queued is (auth.LegacyRecord.Account): "" for none
@@ -172,6 +175,12 @@ type Relay struct {
 	sendCtx    context.Context
 	cancelSend context.CancelFunc
 	stopping   chan struct{}
+	// lossMu orders the writes of what the relay lost (recordLosses).
+	lossMu sync.Mutex
+	// unreadableRetry is how long an export waits for a sign-in that can't be read;
+	// unreadableAt, under mu, when the last such wait failed (arrivalLane).
+	unreadableRetry time.Duration
+	unreadableAt    time.Time
 }
 
 // New returns a relay. Run must be started for anything to leave.
@@ -213,6 +222,7 @@ func New(opts Options) *Relay {
 		held:   map[string][]heldPart{},
 		traces: map[string]traceSession{}, procs: map[int]*procState{}, senders: map[route]*sender{}, outbox: outbox{dir: opts.Dir},
 		lastSeen: opts.Now(), sendCtx: sendCtx, cancelSend: cancel, stopping: make(chan struct{}),
+		unreadableRetry: unreadableRetry,
 	}
 }
 
@@ -329,7 +339,8 @@ func (r *Relay) export(w http.ResponseWriter, req *http.Request, s Signal) {
 	}()
 	// The sign-in the export arrived under, before its body is read: a switch while it
 	// is read or decoded does not hand what was collected under one account to another.
-	account, arrived := r.account(), r.opts.Now()
+	lane, lost := r.arrivalLane(req.Context())
+	arrived := r.opts.Now()
 	body, err := readBody(req)
 	if err != nil {
 		r.stats.add("refused_unreadable", 1)
@@ -347,7 +358,7 @@ func (r *Relay) export(w http.ResponseWriter, req *http.Request, s Signal) {
 	_, global := r.catchAll()
 	narrow := r.opts.CatchAll != nil && !global
 	for _, p := range parts {
-		p.pid, p.narrow, p.account, p.arrived = pid, narrow, account, arrived
+		p.pid, p.narrow, p.account, p.lost, p.arrived = pid, narrow, lane, lost, arrived
 		p.at = earliest(p.msg)
 		r.stats.received(s, p.records)
 		if p.session != "" && !strings.HasPrefix(p.session, tracePrefix) {
