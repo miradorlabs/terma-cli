@@ -65,6 +65,11 @@ func (e Env) SkillsCollected() bool {
 // policy drops that other checkout before the queue is flushed, delivery, which judges r,
 // still sends the definition (a link to the dropped checkout is removed). Upgrade path: queue
 // each definition under the checkout it was used in.
+//
+// Accepted risk: like a session's title and replies, a definition goes in the lane of the hook
+// that reads the use, not the session's owner, so after a sign-in switch mid-session a use
+// read late leaves under the new sign-in; session ownership guards file attribution only.
+// Upgrade path: gate every session-content event on the owner together, not this one alone.
 func SpoolSkills(e Env, r *Repo, stateDir, sessionID string, attrs map[string]any, skills []Skill) bool {
 	if !e.SkillsCollected() || len(skills) == 0 {
 		return true
@@ -83,16 +88,17 @@ func SpoolSkills(e Env, r *Repo, stateDir, sessionID string, attrs map[string]an
 		}
 		ok = true
 		changed := false
+		lost := map[string]bool{}
 		for _, s := range skills {
 			one := skillAttrs(s)
 			hash := EvidenceID(s.Name)
-			if one == nil || slices.Contains(st.Reported, hash) {
+			if one == nil || slices.Contains(st.Reported, hash) || lost[hash] {
 				continue
 			}
 			// With no lane (signed out, or a sign-in that can't be read) the use is lost and
-			// counted, and the skill stays unreported: a later use under a sign-in is a new
-			// collection, sent then.
-			if e.lost(r, 1) {
+			// counted, once per skill however often the batch names it, and the skill stays
+			// unreported: a later use under a sign-in is a new collection, sent then.
+			if lost[hash] = e.lost(r, 1); lost[hash] {
 				continue
 			}
 			out := maps.Clone(attrs)

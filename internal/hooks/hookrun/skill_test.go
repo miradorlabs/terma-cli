@@ -161,7 +161,8 @@ func TestSpoolSkillsSendsNothingWhileThePolicyWithholds(t *testing.T) {
 	}
 }
 
-// Signed out, a skill's use is lost and counted, and nothing is queued; the skill stays
+// Signed out, a skill's use is lost and counted once, however often the batch names it, and
+// nothing is queued; the skill stays
 // unreported, so its next use in the session, under a sign-in, is sent once, in that
 // sign-in's lane.
 func TestSpoolSkillsWithNoLaneLosesTheUseAndSendsTheNextOne(t *testing.T) {
@@ -173,7 +174,7 @@ func TestSpoolSkillsWithNoLaneLosesTheUseAndSendsTheNextOne(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !SpoolSkills(out, r, "skills", "sess-skill-5", skillBase, skill) {
+	if !SpoolSkills(out, r, "skills", "sess-skill-5", skillBase, append(skill, skill...)) {
 		t.Fatal("a lost use failed the caller")
 	}
 	if evs := hookruntest.Spooled(t, out.Spool); len(evs) != 0 {
