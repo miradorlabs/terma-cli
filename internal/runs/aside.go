@@ -22,7 +22,6 @@ type aside struct {
 	marks []mark
 	files []string // file names for fold to remove
 }
-
 type mark struct {
 	Run string    `json:"run"`
 	At  time.Time `json:"at"`
@@ -69,7 +68,6 @@ func MarkAside(stateDir, sessionID, runID string, at time.Time) error {
 	}
 	return fmt.Errorf("runs: alias loop for %q", sessionID)
 }
-
 func (a aside) apply(l *ledger) {
 	for _, m := range a.marks {
 		i := slices.IndexFunc(l.Runs, func(r run) bool { return r.ID == m.Run })

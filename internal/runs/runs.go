@@ -161,11 +161,11 @@ func Read(stateDir, idOrAlias string) Snapshot {
 	if !session.ValidID(idOrAlias) {
 		return Snapshot{}
 	}
-	l, _, _, err := resolve(stateDir, idOrAlias)
-	if err != nil {
+	if l, _, _, err := resolve(stateDir, idOrAlias); err != nil {
 		return Snapshot{unreadable: true}
+	} else {
+		return Snapshot{runs: l.Runs}
 	}
-	return Snapshot{runs: l.Runs}
 }
 
 // MixedAt is the package's MixedAt, answered from this read of the ledger.
@@ -211,12 +211,11 @@ type Position struct {
 
 // Locate reads the ledger once for a hook's current run, locations, Mixed/sidecar state, and aliases.
 func Locate(stateDir, idOrAlias string) (Position, bool) {
-	l, ok, aside, err := resolve(stateDir, idOrAlias)
-	if err != nil || !ok || len(l.Runs) == 0 {
-		return Position{}, false
+	if l, ok, aside, err := resolve(stateDir, idOrAlias); err == nil && ok && len(l.Runs) > 0 {
+		cur := l.Runs[len(l.Runs)-1]
+		return Position{Run: cur.ID, Locations: cur.Locations, Active: l.lastActive(time.Time{}), MixedAt: cur.MixedAt, Aside: aside, Aliases: l.Aliases}, true
 	}
-	cur := l.Runs[len(l.Runs)-1]
-	return Position{Run: cur.ID, Locations: cur.Locations, Active: l.lastActive(time.Time{}), MixedAt: cur.MixedAt, Aside: aside, Aliases: l.Aliases}, true
+	return Position{}, false
 }
 
 // Refresh renews sessionID's ledger at now if its last activity is older than RefreshEvery.

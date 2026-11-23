@@ -26,7 +26,6 @@ type asideMark struct {
 }
 
 func asidePath(claimPath string) string { return claimPath + asideExt }
-
 func writeMixedAside(claimPath string, c Claim, now time.Time) bool {
 	c.Kind, c.ProjectID, c.ClaimedAt = KindMixed, "", now.UTC()
 	existing, _ := loadAside(claimPath, c.ClaimedAt)
@@ -104,7 +103,6 @@ func loadAside(claimPath string, now time.Time) (marks []asideMark, files []stri
 	slices.SortStableFunc(marks, func(a, b asideMark) int { return a.claim.ClaimedAt.Compare(b.claim.ClaimedAt) })
 	return marks, files
 }
-
 func applyAside(prev Claim, havePrev bool, marks []asideMark) (Claim, bool, bool) {
 	changed := false
 	for _, em := range marks {
@@ -155,7 +153,6 @@ func applyAside(prev Claim, havePrev bool, marks []asideMark) (Claim, bool, bool
 	}
 	return prev, havePrev, changed
 }
-
 func clampSince(pls []Placement, run string, since time.Time) time.Time {
 	for _, pl := range pls {
 		if (run == "" || pl.Run == "" || pl.Run != run) && since.Before(pl.Since) {

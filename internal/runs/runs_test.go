@@ -760,4 +760,17 @@ func TestMarkAsideChainedAliasAndMergeBeforePointer(t *testing.T) {
 	if _, mixed := mixedAt(t, dir, "clean-parent", t0.Add(time.Minute)); mixed {
 		t.Fatal("clean-parent was unexpectedly modified on failed Alias")
 	}
+
+	// 4. Re-aliasing a child from a Mixed parent to a new parent merges the old parent's Mixed state before replacing the pointer.
+	start(t, dir, "re-old", t0)
+	start(t, dir, "re-new", t0)
+	must(t, Alias(dir, "re-old", "re-child"))
+	must(t, Alias(dir, "re-new", "re-sibling"))
+	must(t, MarkMixed(dir, "re-old", cross, Why{Reason: Crossed, Where: "old-parent"}))
+	must(t, Alias(dir, "re-new", "re-child"))
+	for _, id := range []string{"re-child", "re-new", "re-sibling"} {
+		if at, mixed := mixedAt(t, dir, id, t0.Add(6*time.Minute)); !mixed || !at.Equal(cross) {
+			t.Fatalf("re-alias %s MixedAt = %v, %v; want %v, true", id, at, mixed, cross)
+		}
+	}
 }

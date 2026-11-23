@@ -51,7 +51,6 @@ func Mixed(stateDir string, now time.Time, recent time.Duration) []MixedRun {
 	slices.SortFunc(out, func(a, b MixedRun) int { return strings.Compare(a.Session, b.Session) })
 	return out
 }
-
 func sessionOf(name string) (string, bool) {
 	if id, ok := strings.CutSuffix(name, ".json"); ok && session.ValidID(id) {
 		return id, true

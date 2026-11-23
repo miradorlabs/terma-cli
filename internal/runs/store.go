@@ -100,7 +100,7 @@ func linkAlias(stateDir, sessionID, alias string) error {
 		return fmt.Errorf("runs: invalid alias %q", alias)
 	}
 	return withCanonical(stateDir, sessionID, alias, false, func(canon, path string, l *ledger) error {
-		dl, dok, _, err := readLedger(stateDir, alias)
+		dl, dok, _, err := resolve(stateDir, alias)
 		if err != nil {
 			return err
 		}
@@ -168,7 +168,6 @@ func withCanonical(stateDir, sessionID, extra string, try bool, fn func(canon, p
 	}
 	return fmt.Errorf("runs: alias loop for %q", sessionID)
 }
-
 func ledgerPath(stateDir, sessionID string) (string, error) {
 	if !session.ValidID(sessionID) {
 		return "", fmt.Errorf("runs: invalid session id %q", sessionID)

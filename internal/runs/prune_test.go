@@ -3,9 +3,11 @@ package runs
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
@@ -265,5 +267,64 @@ func TestPruneFailsClosedOnUnreadableLedgerOrSidecar(t *testing.T) {
 	}
 	if !gone(aliasPath(dir, "sub-badside")) {
 		t.Fatal("alias of pruned corrupt-sidecar ledger survived")
+	}
+}
+
+// Alias deletion in Prune must serialize with Alias reassignment under alias.json.lock so
+// pruning an expired parent never deletes a replacement pointer to a new Mixed parent.
+func TestPruneAliasDeletionSerializedWithReassignment(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	runsDir := filepath.Join(dir, Dir)
+	long := time.Now().Add(-Retention - 24*time.Hour)
+
+	// 1. Deterministic lock hold: hold agent-lock.json.lock (as Alias(new, agent-lock) does)
+	//    while Prune removes expired old.json; the alias pointer must survive while locked.
+	start(t, dir, "old-det", long)
+	must(t, Alias(dir, "old-det", "agent-lock"))
+	age(t, filepath.Join(runsDir, "old-det.json"), Retention+2*time.Hour)
+	age(t, aliasPath(dir, "agent-lock"), Retention+2*time.Hour)
+	unlock, err := flock.TryLock(filepath.Join(runsDir, "agent-lock.json.lock"))
+	must(t, err)
+	Prune(context.Background(), dir, time.Now(), nil)
+	if !gone(filepath.Join(runsDir, "old-det.json")) {
+		unlock()
+		t.Fatal("old-det.json was not pruned")
+	}
+	if gone(aliasPath(dir, "agent-lock")) {
+		unlock()
+		t.Fatal("Prune deleted aliases/agent-lock while agent-lock.json.lock was held")
+	}
+	unlock()
+
+	// 2. Concurrent stress: Prune expired old-i while Alias(new-i, agent-i) reassigns and marks new-i Mixed.
+	cross := time.Now().UTC()
+	for i := range 16 {
+		oldID, newID, agID := fmt.Sprintf("pold-%d", i), fmt.Sprintf("pnew-%d", i), fmt.Sprintf("pag-%d", i)
+		start(t, dir, oldID, long)
+		start(t, dir, newID, cross)
+		must(t, Alias(dir, oldID, agID))
+		must(t, MarkMixed(dir, newID, cross, Why{Reason: Crossed, Where: "new"}))
+		age(t, filepath.Join(runsDir, oldID+".json"), Retention+2*time.Hour)
+		age(t, aliasPath(dir, agID), Retention+2*time.Hour)
+		var wg sync.WaitGroup
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			Prune(context.Background(), dir, time.Now(), nil)
+		}()
+		go func() {
+			defer wg.Done()
+			if err := Alias(dir, newID, agID); err != nil {
+				t.Errorf("Alias(%s, %s): %v", newID, agID, err)
+			}
+		}()
+		wg.Wait()
+		if gone(aliasPath(dir, agID)) {
+			t.Fatalf("stress %d: Prune deleted reassigned alias %s", i, agID)
+		}
+		if _, mixed := MixedAt(dir, agID, cross.Add(time.Second)); !mixed {
+			t.Fatalf("stress %d: reassigned alias %s lost new parent's Mixed state", i, agID)
+		}
 	}
 }

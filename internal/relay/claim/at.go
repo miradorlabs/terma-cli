@@ -31,7 +31,6 @@ func (c Claim) At(pid int, at time.Time) (Claim, bool) {
 	return Claim{ProjectID: best.ProjectID, Kind: best.Kind, Run: best.Run, Profile: best.Profile, Account: best.Account, Tool: best.Tool, Repo: best.Repo, Worktree: best.Worktree,
 		Repository: best.Repository, Root: best.Root, Cwd: best.Cwd, Remote: best.Remote, Branch: best.Branch, PIDs: best.PIDs, ClaimedAt: c.ClaimedAt, Parent: c.Parent, Placements: c.Placements, Evicted: c.Evicted}, true
 }
-
 func inForce(covering []*Placement, at time.Time) *Placement {
 	var best *Placement
 	for _, p := range covering {
@@ -41,7 +40,6 @@ func inForce(covering []*Placement, at time.Time) *Placement {
 	}
 	return best
 }
-
 func locate(covering []*Placement, at time.Time, evicted bool) *Placement {
 	if at.IsZero() {
 		if evicted || slices.ContainsFunc(covering, func(p *Placement) bool {
