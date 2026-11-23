@@ -5,9 +5,11 @@ import (
 	"context"
 	"errors"
 	"io/fs"
+	"net/url"
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/agents/internal/relayexport"
@@ -106,6 +108,20 @@ func (Agent) RelayProblem(addr string) (detail, fix string, problem bool) {
 	return "OMP's terma extension " + path + " is missing or not this terma's, so no hook claims OMP's sessions and the relay drops their telemetry", "terma setup", true
 }
 
+// RelayTokenCurrent reports whether omp's .env presents token, the relay's, which leads the
+// path of the endpoint every signal shares; known is false where the .env names none.
+func (a Agent) RelayTokenCurrent(token string) (tokenMatches, known bool) {
+	st, err := a.Harness().Status()
+	if err != nil || !st.Connected {
+		return false, false
+	}
+	u, err := url.Parse(st.Endpoint)
+	if err != nil {
+		return false, false
+	}
+	return strings.Trim(u.Path, "/") == token, true
+}
+
 // removeOwn deletes the files under dir among rels that terma wrote, each opening with its
 // "// Terma " header; a file of the developer's own by the same name stays.
 func removeOwn(dir string, rels []string) ([]string, error) {
@@ -131,6 +147,7 @@ func removeOwn(dir string, rels []string) ([]string, error) {
 }
 
 var (
-	_ agents.RelayExporter = Agent{}
-	_ agents.RelayChecker  = Agent{}
+	_ agents.RelayExporter     = Agent{}
+	_ agents.RelayChecker      = Agent{}
+	_ agents.RelayTokenChecker = Agent{}
 )

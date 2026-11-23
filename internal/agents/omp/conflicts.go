@@ -8,15 +8,16 @@ import (
 )
 
 // ompConflicts reports shell-exported OTEL_* variables, which omp reads key by key ahead of
-// its .env: a signal's endpoint there takes that export somewhere else. The common endpoint
-// and protocol do not, since omp reads each signal's own first and the .env sets every one.
+// its .env: a signal's endpoint there, unless it is the relay's own URL for that signal, which
+// omp sends to as given, takes that export somewhere else. The common endpoint and protocol do
+// not, since omp reads each signal's own first and the .env sets every one.
 func ompConflicts(e harness.Exporter) []harness.Conflict {
 	var out []harness.Conflict
 
 	for _, s := range harness.AllSignals {
 		key := signalKey(s, "ENDPOINT")
 		value := strings.TrimRight(os.Getenv(key), "/")
-		if value == "" || value == e.Endpoint || e.Endpoint != "" && strings.HasPrefix(value, e.Endpoint+"/v1/") {
+		if value == "" || e.Endpoint != "" && value == e.Endpoint+"/v1/"+string(s) {
 			continue
 		}
 		out = append(out, harness.Conflict{

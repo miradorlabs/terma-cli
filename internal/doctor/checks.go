@@ -211,6 +211,12 @@ func RelayCheck(reg *agents.Registry, relay Relay, keys Keys, projectID, env str
 					why = append(why, detail)
 				}
 			}
+		} else if c, ok := e.(agents.RelayTokenChecker); ok && mine(e) && known && relay.Token != "" {
+			// The relay refuses an export that presents any other token.
+			if matches, known := c.RelayTokenCurrent(relay.Token); known && !matches {
+				wrong = append(wrong, e.DisplayName())
+				why = append(why, e.DisplayName()+"'s exporter presents a relay token other than the relay's, which refuses it")
+			}
 		}
 	}
 	if len(wrong) > 0 {

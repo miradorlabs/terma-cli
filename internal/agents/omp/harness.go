@@ -105,8 +105,12 @@ func (c exporter) Status() (harness.Status, error) {
 	values := f.values()
 	status := harness.Status{ConfigPath: path, Exists: f.existed}
 
+	// omp sends a signal to its own endpoint as given: one not ending in the signal's path
+	// misses the relay's route.
+	misrouted := false
 	resolve := func(s harness.Signal) string {
 		if per := strings.TrimRight(values[signalKey(s, "ENDPOINT")], "/"); per != "" {
+			misrouted = misrouted || !strings.HasSuffix(per, "/v1/"+string(s))
 			return strings.TrimSuffix(per, "/v1/"+string(s))
 		}
 		return strings.TrimRight(values[harness.EnvOTLPEndpoint], "/")
@@ -124,7 +128,7 @@ func (c exporter) Status() (harness.Status, error) {
 		}
 	}
 	// Traces alone name OMP's session: without them nothing it sends is attributed.
-	status.Connected = !split && slices.Contains(status.Signals, harness.SignalTraces) && tokenPath(status.Endpoint)
+	status.Connected = !split && !misrouted && slices.Contains(status.Signals, harness.SignalTraces) && tokenPath(status.Endpoint)
 	status.Conflicts = ompConflicts(harness.Exporter{Endpoint: status.Endpoint})
 
 	j, err := harness.LoadJournal(c.dir, c.Name(), path)
