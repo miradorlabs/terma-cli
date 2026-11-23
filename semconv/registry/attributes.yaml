@@ -219,8 +219,9 @@ attributes:
     stability: development
     brief: The skill's name as the agent itself reports it, case kept.
     note: >
-      A plugin's skill is `plugin:skill`. The record that carries it is content as a whole,
-      sent only while the team's policy collects prompts and tool content.
+      A plugin's skill is `plugin:skill`. Sent only while the team's policy collects prompts
+      and tool content: a terma.skill.definition is content as a whole and is withheld with
+      it, a terma.tool.call leaves without it.
     examples: ["release-notes", "tools:release-notes"]
     annotations:
       content: tool

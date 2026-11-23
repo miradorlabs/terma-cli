@@ -206,6 +206,7 @@ func TestAntigravitySkillRead(t *testing.T) {
 		{"failed", `{"conversationId":"c1","error":"file does not exist","toolCall":{"name":"read_file","args":{"Path":"` + hookruntest.InJSON(abs) + `"}}}`, ""},
 		{"other-file", `{"conversationId":"c1","toolCall":{"name":"read_file","args":{"Path":"` + hookruntest.InJSON(filepath.Join(filepath.Dir(abs), "notes.md")) + `"}}}`, ""},
 		{"view-file", `{"conversationId":"c1","toolCall":{"name":"view_file","args":{"AbsolutePath":"` + hookruntest.InJSON(abs) + `"}}}`, ""},
+		{"dot-dot", `{"conversationId":"c1","toolCall":{"name":"read_file","args":{"Path":"` + hookruntest.InJSON(filepath.Join(filepath.Dir(abs), "link")) + `/../SKILL.md"}}}`, ""},
 		{"lowercase-key", `{"conversationId":"c1","toolCall":{"name":"read_file","args":{"path":"` + hookruntest.InJSON(abs) + `"}}}`, ""},
 		{"no-args", `{"conversationId":"c1","toolCall":{"name":"read_file"}}`, ""},
 		{"no-call", `{"conversationId":"c1"}`, ""},
@@ -221,7 +222,8 @@ func TestAntigravitySkillRead(t *testing.T) {
 }
 
 // A SKILL.md is agy's skill only exactly one folder below a skills folder of one of its
-// roots, or of a plugin's there; a plugin's skill is named plugin:name, never twice.
+// roots, or of a plugin's there, and in a checkout only in a folder from the working directory
+// up to its root; a plugin's skill is named plugin:name, never twice.
 func TestAntigravitySkillByRoot(t *testing.T) {
 	t.Parallel()
 	repo := hookruntest.InitRepo(t)
@@ -247,31 +249,48 @@ func TestAntigravitySkillByRoot(t *testing.T) {
 		symlinked = false
 	}
 
+	deep := hookrun.Skill{Name: "deep", Origin: semconv.TermaSkillOriginRepository, RepositoryURL: repoURL, Path: "sub/_agent/skills/deep/SKILL.md"}
+	deepPath := write(repo, "sub/_agent/skills/deep/SKILL.md", "name: deep\n")
 	for _, tc := range []struct {
-		name, path string
-		want       hookrun.Skill
-		ok         bool
+		name, cwd, path string
+		want            hookrun.Skill
+		ok              bool
 	}{
-		{"two-deep", write(repo, ".agents/skills/a/b/SKILL.md", "name: b\n"), hookrun.Skill{}, false},
-		{"claude-skills", write(repo, ".claude/skills/x/SKILL.md", "name: x\n"), hookrun.Skill{}, false},
-		{"no-name", write(roots.Config, "skills/folder/SKILL.md", "description: Named by its folder.\n"),
+		{"two-deep", repo, write(repo, ".agents/skills/a/b/SKILL.md", "name: b\n"), hookrun.Skill{}, false},
+		{"claude-skills", repo, write(repo, ".claude/skills/x/SKILL.md", "name: x\n"), hookrun.Skill{}, false},
+		{"no-name", repo, write(roots.Config, "skills/folder/SKILL.md", "description: Named by its folder.\n"),
 			hookrun.Skill{Name: "folder", Description: "Named by its folder.", Origin: semconv.TermaSkillOriginPersonal}, true},
-		{"sub-folder", write(repo, "sub/_agent/skills/deep/SKILL.md", "name: deep\n"),
-			hookrun.Skill{Name: "deep", Origin: semconv.TermaSkillOriginRepository, RepositoryURL: repoURL, Path: "sub/_agent/skills/deep/SKILL.md"}, true},
-		{"plugin-prefixed", write(repo, ".agent/plugins/kit/skills/go/SKILL.md", "name: kit:go\n"),
+		// agy lists a folder's skills only to a session working in it or below it.
+		{"sub-folder-from-the-root", repo, deepPath, hookrun.Skill{}, false},
+		{"sub-folder-from-a-sibling", filepath.Join(repo, "subway"), deepPath, hookrun.Skill{}, false},
+		{"sub-folder-from-outside", t.TempDir(), deepPath, hookrun.Skill{}, false},
+		{"sub-folder-from-itself", filepath.Join(repo, "sub"), deepPath, deep, true},
+		{"sub-folder-from-below", filepath.Join(repo, "sub", "pkg", "x"), deepPath, deep, true},
+		{"root-from-below", filepath.Join(repo, "sub"), write(repo, ".agents/skills/top/SKILL.md", "name: top\n"),
+			hookrun.Skill{Name: "top", Origin: semconv.TermaSkillOriginRepository, RepositoryURL: repoURL, Path: ".agents/skills/top/SKILL.md"}, true},
+		{"plugin-prefixed", repo, write(repo, ".agent/plugins/kit/skills/go/SKILL.md", "name: kit:go\n"),
 			hookrun.Skill{Name: "kit:go", Origin: semconv.TermaSkillOriginPlugin, Plugin: "kit"}, true},
-		{"plugin-personal", write(roots.Config, "plugins/kit/skills/run/SKILL.md", "name: run\n"),
+		{"plugin-named-as-a-skill-folder", repo, write(repo, ".agents/plugins/.agents/skills/go/SKILL.md", "name: go\n"),
+			hookrun.Skill{Name: ".agents:go", Origin: semconv.TermaSkillOriginPlugin, Plugin: ".agents"}, true},
+		{"plugin-personal", repo, write(roots.Config, "plugins/kit/skills/run/SKILL.md", "name: run\n"),
 			hookrun.Skill{Name: "kit:run", Origin: semconv.TermaSkillOriginPlugin, Plugin: "kit"}, true},
-		{"plugin-builtin", write(roots.Builtin, "plugins/core/skills/help/SKILL.md", "name: help\n"),
+		{"plugin-builtin", repo, write(roots.Builtin, "plugins/core/skills/help/SKILL.md", "name: help\n"),
 			hookrun.Skill{Name: "core:help", Origin: semconv.TermaSkillOriginPlugin, Plugin: "core"}, true},
-		{"builtin-reference", write(roots.Builtin, "skills/guide/references/SKILL.md", "name: ref\n"), hookrun.Skill{}, false},
-		{"elsewhere", write(t.TempDir(), "skills/x/SKILL.md", "name: x\n"), hookrun.Skill{}, false},
-		{"missing", filepath.Join(roots.Config, "skills", "gone", "SKILL.md"), hookrun.Skill{}, false},
+		{"builtin-reference", repo, write(roots.Builtin, "skills/guide/references/SKILL.md", "name: ref\n"), hookrun.Skill{}, false},
+		{"elsewhere", repo, write(t.TempDir(), "skills/x/SKILL.md", "name: x\n"), hookrun.Skill{}, false},
+		{"missing", repo, filepath.Join(roots.Config, "skills", "gone", "SKILL.md"), hookrun.Skill{}, false},
 	} {
+		env.Cwd = tc.cwd
 		got, ok := roots.skill(env, r, tc.path)
 		if ok != tc.ok || ok && got != tc.want {
 			t.Errorf("%s: %+v, %v; want %+v, %v", tc.name, got, ok, tc.want, tc.ok)
 		}
+	}
+	// A skill agy ships carries no link, though its folder lies in a collected checkout.
+	shipped := antigravitySkillRoots{Config: t.TempDir(), Builtin: filepath.Join(dotfiles, "builtin")}
+	want := hookrun.Skill{Name: "guide", Origin: semconv.TermaSkillOriginBuiltin}
+	if got, ok := shipped.skill(env, r, write(dotfiles, "builtin/skills/guide/SKILL.md", "name: guide\n")); !ok || got != want {
+		t.Errorf("shipped: %+v, %v; want %+v", got, ok, want)
 	}
 	if symlinked {
 		want := hookrun.Skill{Name: "dotfile", Origin: semconv.TermaSkillOriginPersonal,

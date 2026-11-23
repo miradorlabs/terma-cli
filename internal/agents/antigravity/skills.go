@@ -22,7 +22,9 @@ var antigravitySkillStateDir = hookrun.AgentStateDir(Agent{}.Name(), "skills")
 var antigravityRepositorySkillFolders = []string{".agents", ".agent", "_agents", "_agent"}
 
 // antigravitySkillRead is the SKILL.md a successful read_file read, absolute and cleaned: how
-// the model loads a skill agy lists, a relative Path joined to cwd. "" for any other step.
+// the model loads a skill agy lists, a relative Path joined to cwd. "" for any other step,
+// and for a Path with a ".." in it: past a linked folder it names another file than the
+// cleaned path does.
 //
 // Accepted risk: agy before 1.5 read files with view_file and AbsolutePath, which was never
 // captured loading a skill, so such a read is not counted. Upgrade path: a capture of an older
@@ -36,7 +38,8 @@ func antigravitySkillRead(in *antigravityHookInput, cwd string) string {
 		return ""
 	}
 	var p string
-	if json.Unmarshal(args["Path"], &p) != nil || p == "" || filepath.Base(p) != antigravitySkillFile {
+	if json.Unmarshal(args["Path"], &p) != nil || p == "" || filepath.Base(p) != antigravitySkillFile ||
+		slices.Contains(strings.Split(filepath.ToSlash(p), "/"), "..") {
 		return ""
 	}
 	if !filepath.IsAbs(p) {
@@ -94,7 +97,7 @@ func (roots antigravitySkillRoots) skill(e hookrun.Env, r *hookrun.Repo, path st
 		plugin, ok = antigravitySkillLayout(strings.Split(filepath.ToSlash(rel), "/"))
 		s.Origin = semconv.TermaSkillOriginPersonal
 	} else if r != nil {
-		plugin, ok = antigravityRepositorySkill(path, r.Root)
+		plugin, ok = antigravityRepositorySkill(path, r.Root, e.Cwd)
 		s.Origin = semconv.TermaSkillOriginRepository
 	}
 	if !ok {
@@ -116,7 +119,10 @@ func (roots antigravitySkillRoots) skill(e hookrun.Env, r *hookrun.Repo, path st
 		}
 		return s, true
 	}
-	s.RepositoryURL, s.Path = e.SkillLink(path)
+	// A skill agy ships is held in no repository, whatever checkout its folder lies in.
+	if s.Origin != semconv.TermaSkillOriginBuiltin {
+		s.RepositoryURL, s.Path = e.SkillLink(path)
+	}
 	return s, true
 }
 
@@ -133,20 +139,30 @@ func antigravitySkillLayout(segs []string) (plugin string, ok bool) {
 }
 
 // antigravityRepositorySkill reports whether path lies in the checkout at root, in one of
-// agy's skill folders at any depth, and the plugin it belongs to. agy reads them from the
-// working directory up to the repository's root, so a sub-folder's skill read from above it
-// is counted too.
-func antigravityRepositorySkill(path, root string) (plugin string, ok bool) {
+// agy's skill folders, and the plugin it belongs to. agy reads those folders from its working
+// directory up to the repository's root, so one in any other folder of the checkout (an
+// example's, a dependency's) holds no skill of this session; a cwd outside the checkout counts
+// as its root.
+func antigravityRepositorySkill(path, root, cwd string) (plugin string, ok bool) {
 	rel, below := hookrun.PathBelow(path, root)
 	if !below {
 		return "", false
 	}
+	// "" at the root.
+	from, _ := hookrun.PathBelow(cwd, root)
+	from = filepath.ToSlash(from)
 	segs := strings.Split(filepath.ToSlash(rel), "/")
-	for _, n := range []int{3, 5} {
-		if i := len(segs) - n - 1; i >= 0 && slices.Contains(antigravityRepositorySkillFolders, segs[i]) {
-			if plugin, ok := antigravitySkillLayout(segs[i+1:]); ok {
-				return plugin, true
-			}
+	// A plugin's layout first: a plugin's folder may bear a skill folder's name.
+	for _, n := range []int{5, 3} {
+		i := len(segs) - n - 1
+		if i < 0 || !slices.Contains(antigravityRepositorySkillFolders, segs[i]) {
+			continue
+		}
+		if holder := strings.Join(segs[:i], "/"); holder != "" && holder != from && !strings.HasPrefix(from, holder+"/") {
+			continue
+		}
+		if plugin, ok := antigravitySkillLayout(segs[i+1:]); ok {
+			return plugin, true
 		}
 	}
 	return "", false

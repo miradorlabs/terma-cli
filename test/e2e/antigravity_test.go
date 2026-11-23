@@ -244,16 +244,19 @@ func TestAntigravityRealLogin(t *testing.T) {
 		t.Errorf("want a completed command and a failed tool call: %v", statuses)
 	}
 	// The model loads a skill by reading its SKILL.md: that read's tool call names the skill,
-	// and what the skill says it is goes once.
-	defs := sb.Delivered("terma.skill.definition", conversation, 10*time.Second)
-	if len(defs) != 1 || defs[0].Attrs["terma.skill.name"] != "house-greeting" || defs[0].Attrs["terma.skill.origin"] != "repository" ||
+	// and what the skill says it is goes once. The developer's own skills are listed to the
+	// model too, so only this one's records are judged.
+	greeting := func(event string) []LogRecord {
+		return sb.Receiver.WaitLogs(10*time.Second, func(l LogRecord) bool {
+			return l.EventName == event && l.Attrs["session.id"] == conversation && l.Attrs["terma.skill.name"] == "house-greeting"
+		})
+	}
+	defs := greeting("terma.skill.definition")
+	if len(defs) != 1 || defs[0].Attrs["terma.skill.origin"] != "repository" ||
 		defs[0].Attrs["terma.skill.description"] != "Greets the person in the house style. Use when asked for a house greeting." {
 		t.Errorf("want one definition of the house-greeting skill, got %+v", defs)
 	}
-	used := sb.Receiver.WaitLogs(time.Second, func(l LogRecord) bool {
-		return l.EventName == "terma.tool.call" && l.Attrs["session.id"] == conversation && l.Attrs["terma.skill.name"] != ""
-	})
-	if len(used) == 0 || used[0].Attrs["terma.skill.name"] != "house-greeting" || used[0].Attrs["gen_ai.tool.name"] != "read_file" {
+	if used := greeting("terma.tool.call"); len(used) == 0 || used[0].Attrs["gen_ai.tool.name"] != "read_file" {
 		t.Errorf("want the skill's read_file call to name it, got %+v", used)
 	}
 	touched := sb.Delivered("terma.files.touched", conversation, 10*time.Second)
