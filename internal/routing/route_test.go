@@ -12,6 +12,12 @@ var now = time.Date(2026, 11, 12, 12, 0, 0, 0, time.UTC)
 // authURL is the sign-in environment every test team and its policies were fetched in.
 const authURL = "https://auth.example"
 
+// testAccount and bobAccount are valid 16-hex account keys for routing state tests.
+const (
+	testAccount = "0123456789abcdef"
+	bobAccount  = "fedcba9876543210"
+)
+
 // team is a selected team with a policy validated an hour before now.
 func team(org, id string, entries ...string) Team {
 	return Team{OrganizationID: org, AuthURL: authURL, TeamID: id, Policy: config.Policy{
@@ -36,7 +42,7 @@ func fixture(t *testing.T, teams ...Team) *State {
 	if teams == nil {
 		teams = []Team{team("acme", "acme-platform", "github.com/acme/*"), team("clientco", "clientco-contractors", "github.com/clientco/app"), personal()}
 	}
-	s := &State{Profile: "default"}
+	s := &State{Profile: "default", Account: testAccount}
 	for _, tm := range teams {
 		if _, err := s.Select(tm); err != nil {
 			t.Fatal(err)
@@ -74,7 +80,7 @@ func expect(t *testing.T, s *State, loc Location, outcome Outcome, want string) 
 	d := NewRouter(*s).Route(loc, now)
 	got := ""
 	if d.EnrollmentID != "" {
-		got = s.team(d.EnrollmentID).TeamID
+		got = s.Team(d.EnrollmentID).TeamID
 	}
 	if d.Outcome != outcome || got != want {
 		t.Errorf("Route(%+v) = %s to %q (%s), want %s to %q", loc, d.Outcome, got, d.Reason, outcome, want)

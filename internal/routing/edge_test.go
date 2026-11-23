@@ -118,7 +118,7 @@ func TestRouteEdges(t *testing.T) {
 		expect(t, s, repo("github.com/acme/api"), Send, "acme-first")
 	})
 	t.Run("a repository that names no repository is held, never personal's", func(t *testing.T) {
-		alone := &State{Profile: "default"}
+		alone := &State{Profile: "default", Account: testAccount}
 		if _, err := alone.Select(personal()); err != nil {
 			t.Fatal(err)
 		}
@@ -130,7 +130,7 @@ func TestRouteEdges(t *testing.T) {
 		if err := fixture(t).Bind("github.com/dawson", "me", false); err == nil {
 			t.Fatal("bound an owner to the personal organization")
 		}
-		before := &State{Profile: "default"}
+		before := &State{Profile: "default", Account: testAccount}
 		must(t, before.Bind("github.com/dawson", "me", false))
 		if _, err := before.Select(personal()); err == nil {
 			t.Fatal("ticked personal while an owner was bound to it")
@@ -170,7 +170,7 @@ func TestRouteEdges(t *testing.T) {
 // keeps one Router per state it loads.
 func BenchmarkRoute(b *testing.B) {
 	for _, n := range []int{10, 100, 500} {
-		s := State{Profile: "default"}
+		s := State{Profile: "default", Account: testAccount}
 		for i := range 5 {
 			entries := make([]string, n)
 			for j := range entries {
@@ -221,7 +221,7 @@ func FuzzNormalize(f *testing.F) {
 // A refused binding is no organization's, so it never trips the personal guard.
 func TestRefusedBindingsAreNotBoundToPersonal(t *testing.T) {
 	t.Parallel()
-	s := &State{Profile: "default"}
+	s := &State{Profile: "default", Account: testAccount}
 	must(t, s.Refuse("github.com/acme"))
 	if _, err := s.Select(personal()); err != nil {
 		t.Fatalf("a refusal blocked ticking personal: %v", err)
@@ -256,7 +256,7 @@ func TestNoGrantFromEncodedEntriesOrForeignPolicies(t *testing.T) {
 		{Mode: config.ModeRepo, TeamID: "acme-platform", OrganizationID: "clientco", AuthURL: authURL, Revision: 5, FetchedAt: now},
 		{Mode: config.ModeRepo, TeamID: "acme-platform", OrganizationID: "acme", AuthURL: "https://auth.other", Revision: 5, FetchedAt: now},
 	} {
-		if _, err := s.ApplyRefresh(Refresh{EnrollmentID: id, Epoch: s.team(id).Epoch, Policy: &p}); err == nil {
+		if _, err := s.ApplyRefresh(Refresh{EnrollmentID: id, Epoch: s.Team(id).Epoch, Policy: &p}); err == nil {
 			t.Errorf("a policy fetched under %s/%s became the team's grant", p.OrganizationID, p.AuthURL)
 		}
 	}
@@ -266,11 +266,11 @@ func TestNoGrantFromEncodedEntriesOrForeignPolicies(t *testing.T) {
 		t.Error("selected a team with another organization's policy")
 	}
 
-	_, err := s.ApplyRefresh(Refresh{EnrollmentID: id, Epoch: s.team(id).Epoch, Failure: Terminal})
+	_, err := s.ApplyRefresh(Refresh{EnrollmentID: id, Epoch: s.Team(id).Epoch, Failure: Terminal})
 	must(t, err)
-	_, err = s.ApplyRefresh(Refresh{EnrollmentID: id, Epoch: s.team(id).Epoch, Failure: SignIn})
+	_, err = s.ApplyRefresh(Refresh{EnrollmentID: id, Epoch: s.Team(id).Epoch, Failure: SignIn})
 	must(t, err)
-	if st := s.team(id).StateAt(now); st != SignInNeeded {
+	if st := s.Team(id).StateAt(now); st != SignInNeeded {
 		t.Fatalf("a 401 after a suspension shows %s", st)
 	}
 }
@@ -294,20 +294,23 @@ func TestOwnershipIsStrictEverywhere(t *testing.T) {
 	} {
 		unstamped := team("acme", "acme-platform", "github.com/acme/*")
 		blank(&unstamped)
-		if _, err := (&State{Profile: "default"}).Select(unstamped); err == nil {
+		if _, err := (&State{Profile: "default", Account: testAccount}).Select(unstamped); err == nil {
 			t.Errorf("selected a team where %s", name)
 		}
 	}
 	s := fixture(t)
 	id := enrollment(t, s, "acme-platform")
-	if _, err := s.ApplyRefresh(Refresh{EnrollmentID: id, Epoch: s.team(id).Epoch, Policy: &config.Policy{
+	if _, err := s.ApplyRefresh(Refresh{EnrollmentID: id, Epoch: s.Team(id).Epoch, Policy: &config.Policy{
 		Mode: config.ModeRepo, TeamID: "acme-platform", Revision: 5, FetchedAt: now,
 	}}); err == nil {
 		t.Error("a refresh with no organization or environment became the team's grant")
 	}
 
 	dir := t.TempDir()
-	_, err := Create(dir, "default", func(st *State) error { *st = *s; st.Generation = 0; return nil })
+	_, err := Create(dir, "default", testAccount, func(st *State) error {
+		st.Teams, st.Bindings = s.Teams, s.Bindings
+		return nil
+	})
 	must(t, err)
 	path, _ := StatePath(dir, "default")
 	b, err := os.ReadFile(path)

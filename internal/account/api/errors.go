@@ -28,6 +28,9 @@ const (
 	// removed, deactivated, a suspended organization, or another product's. The only
 	// answer that means access is lost.
 	ReasonOrgNotAccessible = "ORG_NOT_ACCESSIBLE"
+	// ReasonProjectNotFound: the requested team was deleted or does not belong to the
+	// organization.
+	ReasonProjectNotFound = "PROJECT_NOT_FOUND"
 	// ReasonAuthorizationUnavailable: the gateway cannot confirm the team or organization
 	// yet. Retryable: it never means the team is gone.
 	ReasonAuthorizationUnavailable = "AUTHORIZATION_UNAVAILABLE"
@@ -41,6 +44,11 @@ const (
 // OrgNotAccessible reports whether the person has lost access to the organization.
 func (e *Error) OrgNotAccessible() bool {
 	return e.StatusCode == http.StatusForbidden && e.Reason == ReasonOrgNotAccessible
+}
+
+// ProjectNotFound reports whether the team was deleted or is not in the organization.
+func (e *Error) ProjectNotFound() bool {
+	return e.StatusCode == http.StatusForbidden && e.Reason == ReasonProjectNotFound
 }
 
 // SignInRetired reports whether the server no longer accepts this kind of sign-in.

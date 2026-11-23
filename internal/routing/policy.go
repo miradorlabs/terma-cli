@@ -55,14 +55,7 @@ func StorePolicy(cfg *config.Config, pol *config.Policy) error {
 	if profile.OrganizationID != "" && profile.OrganizationID != cfg.OrganizationID {
 		return errors.New("organization changed while fetching collection policy")
 	}
-	err = flock.Locked(path, 5*time.Second, func() error {
-		prev, ok, _ := config.ReadPolicy(cfg.StateDir, pol.TeamID)
-		if ok && prev.OrganizationID == pol.OrganizationID && prev.AuthURL == pol.AuthURL && prev.Revision > pol.Revision {
-			return errors.New("collection policy revision moved backwards")
-		}
-		return config.WritePolicy(cfg.StateDir, *pol)
-	})
-	if err != nil {
+	if err := writePolicyFile(cfg.StateDir, path, pol); err != nil {
 		return err
 	}
 	// Only a profile that records something new is rewritten: refreshes leave config.json alone.
@@ -95,6 +88,30 @@ func StorePolicy(cfg *config.Config, pol *config.Policy) error {
 		return err
 	}
 	return rejected
+}
+
+// StoreTeamPolicy writes pol as its team's policy file in stateDir without touching
+// config.json or checking a profile's single organization. It requires TeamID,
+// OrganizationID, and AuthURL and refuses a backward revision for the same org/env.
+func StoreTeamPolicy(stateDir string, pol *config.Policy) error {
+	if pol == nil || pol.TeamID == "" || pol.OrganizationID == "" || pol.AuthURL == "" {
+		return errors.New("a team's collection policy is stored only with its team, organization and environment")
+	}
+	path, err := config.PolicyPath(stateDir, pol.TeamID)
+	if err != nil {
+		return err
+	}
+	return writePolicyFile(stateDir, path, pol)
+}
+
+func writePolicyFile(stateDir, path string, pol *config.Policy) error {
+	return flock.Locked(path, 5*time.Second, func() error {
+		prev, ok, _ := config.ReadPolicy(stateDir, pol.TeamID)
+		if ok && prev.OrganizationID == pol.OrganizationID && prev.AuthURL == pol.AuthURL && prev.Revision > pol.Revision {
+			return errors.New("collection policy revision moved backwards")
+		}
+		return config.WritePolicy(stateDir, *pol)
+	})
 }
 
 // errSignedInSince is a sign-in as someone else, stored while a policy was fetched.
