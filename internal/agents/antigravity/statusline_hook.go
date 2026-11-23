@@ -122,7 +122,7 @@ type antigravitySeatState struct {
 	Stream    string    `json:"stream,omitempty"`
 	Sequence  uint64    `json:"sequence,omitempty"`
 	EmittedAt time.Time `json:"emitted_at"`
-	// Hash covers what the snapshot reported, the email only as part of it.
+	// Hash covers what the snapshot reported, the email only as part of it, and its lane.
 	Hash string `json:"hash"`
 }
 
@@ -227,7 +227,8 @@ func captureAntigravitySeat(e hookrun.Env, p *antigravityStatusLinePayload) bool
 	if len(buckets) == 0 && prev == nil {
 		return false
 	}
-	snapshot, _ := json.Marshal(map[string]any{"buckets": buckets, "account": account, "project": r.ProjectID})
+	// The lane is hashed, never sent: the same snapshot under another sign-in is new.
+	snapshot, _ := json.Marshal(map[string]any{"buckets": buckets, "account": account, "project": r.ProjectID, "lane": e.Spool.Lane()})
 	next := antigravitySeatState{EmittedAt: now, Hash: hookrun.EvidenceID(string(snapshot)), Sequence: 1}
 	if prev != nil && prev.Hash == next.Hash && !now.Before(prev.EmittedAt) && now.Sub(prev.EmittedAt) < hookrun.QuotaHeartbeat {
 		return false

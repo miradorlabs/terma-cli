@@ -326,6 +326,42 @@ func TestAntigravityStatusLineSpoolsPlanQuotaAndAccountOnChange(t *testing.T) {
 	}
 }
 
+// A redraw under another terma sign-in queues the plan, quota and account again for that
+// account, even within the heartbeat (issue #176).
+func TestAntigravityStatusLineQueuesAgainUnderAnotherAccount(t *testing.T) {
+	root, stateDir, sp := hookruntest.Project(t)
+	payload := statusLinePayload(t, root)
+	now := time.Date(2026, 11, 20, 18, 0, 0, 0, time.UTC)
+	draw := func(account string, at time.Duration) (quota, accounts int) {
+		t.Helper()
+		sp.Bind(account)
+		env := hookrun.Env{StateDir: stateDir, Now: now.Add(at), Cwd: root, Policy: hookruntest.Admitting(root), Stdin: strings.NewReader(payload), Stdout: &bytes.Buffer{}, Spool: sp}
+		if code := antigravityStatusLine(context.Background(), env, "", ""); code != 0 {
+			t.Fatalf("code %d", code)
+		}
+		events := hookruntest.Spooled(t, sp)
+		for _, e := range events {
+			if e.Account != account {
+				t.Errorf("%s queued under %q, want %q", e.Name, e.Account, account)
+			}
+		}
+		return len(hookruntest.Named(events, semconv.TermaSessionQuotaEvent)), len(hookruntest.Named(events, semconv.TermaSessionAccountEvent))
+	}
+	for _, step := range []struct {
+		account       string
+		at            time.Duration
+		quota, record int
+	}{
+		{"account-a", 0, 1, 1},
+		{"account-b", time.Minute, 1, 1},
+		{"account-b", 2 * time.Minute, 0, 0},
+	} {
+		if quota, record := draw(step.account, step.at); quota != step.quota || record != step.record {
+			t.Fatalf("draw under %s at +%v: %d quota, %d account; want %d, %d", step.account, step.at, quota, record, step.quota, step.record)
+		}
+	}
+}
+
 // Before the first prompt agy has no conversation yet: the payload names none, and terma
 // has nothing to file the plan under.
 func TestAntigravityStatusLineBeforeTheConversationSpoolsNothing(t *testing.T) {
