@@ -1,6 +1,7 @@
 package omp
 
 import (
+	"net/url"
 	"os"
 	"strings"
 
@@ -22,7 +23,7 @@ func ompConflicts(e harness.Exporter) []harness.Conflict {
 		}
 		out = append(out, harness.Conflict{
 			Key:        key,
-			Value:      value,
+			Value:      withoutRelayToken(value, e.Endpoint),
 			Reason:     "exported in your shell, where OMP reads it ahead of its .env — the export goes there, not to Terma",
 			Credential: true,
 			Scope:      harness.ScopeEnvironment,
@@ -67,6 +68,22 @@ func ompConflicts(e harness.Exporter) []harness.Conflict {
 		})
 	}
 	return out
+}
+
+// withoutRelayToken is value with the first segment of its path, where the relay's token
+// sits, masked when it is an URL on the relay's host: a conflict's value is never a credential.
+func withoutRelayToken(value, relayEndpoint string) string {
+	u, err := url.Parse(value)
+	relay, rerr := url.Parse(relayEndpoint)
+	if err != nil || rerr != nil || u.Host == "" || u.Host != relay.Host {
+		return value
+	}
+	segments := strings.SplitN(strings.TrimPrefix(u.Path, "/"), "/", 2)
+	if segments[0] == "" {
+		return value
+	}
+	segments[0] = "***"
+	return u.Scheme + "://" + u.Host + "/" + strings.Join(segments, "/")
 }
 
 // capturesContent reports whether a capture value keeps full content on, as omp reads it.

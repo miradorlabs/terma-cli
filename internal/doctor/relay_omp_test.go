@@ -124,6 +124,11 @@ func TestRelayCheckFailsOmpsWrongTokenOrPath(t *testing.T) {
 	if strings.Contains(c.Detail+c.Fix, "tok-") {
 		t.Errorf("doctor shows a token: %+v", c)
 	}
+	// Before setup made a token there is none to compare: the check is skipped, not failed.
+	relay.Token = ""
+	if c := RelayCheck(reg, relay, keyed, "proj_x", "dev", []string{"omp"}); c.Status != Pass {
+		t.Fatalf("RelayCheck with no relay token = %+v, want a pass", c)
+	}
 	relay.Token = "tok-current"
 
 	env := filepath.Join(dir, ".env")
@@ -151,6 +156,11 @@ func TestRelayCheckFailsOmpsWrongTokenOrPath(t *testing.T) {
 		}
 		t.Setenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", "")
 	}
+	t.Setenv("OTEL_EXPORTER_OTLP_LOGS_ENDPOINT", "http://127.0.0.1:43180/tok-current")
+	if c := RelayCheck(reg, relay, keyed, "proj_x", "dev", []string{"omp"}); c.Status != Fail {
+		t.Errorf("RelayCheck with the shell's logs endpoint without /v1/logs = %+v, want a failure", c)
+	}
+	t.Setenv("OTEL_EXPORTER_OTLP_LOGS_ENDPOINT", "")
 	t.Setenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", "http://127.0.0.1:43180/tok-current/v1/traces")
 	if c := RelayCheck(reg, relay, keyed, "proj_x", "dev", []string{"omp"}); c.Status != Pass {
 		t.Fatalf("RelayCheck with the shell naming the relay's own traces URL = %+v, want a pass", c)
