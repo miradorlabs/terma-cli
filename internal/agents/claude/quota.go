@@ -17,11 +17,15 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
-// quotaWindows are the status line's rate-limit windows and the keys each one leaves under.
-var quotaWindows = []struct{ name, used, resets string }{
-	{"five_hour", semconv.TermaRateLimitFiveHourUsedPercentKey, semconv.TermaRateLimitFiveHourResetsAtKey},
-	{"seven_day", semconv.TermaRateLimitSevenDayUsedPercentKey, semconv.TermaRateLimitSevenDayResetsAtKey},
-	{"spend_limit", semconv.TermaRateLimitSpendLimitUsedPercentKey, semconv.TermaRateLimitSpendLimitResetsAtKey},
+// quotaWindows are the status line's rate-limit windows, the keys each one leaves under, and
+// the length its name gives it; a spend limit's period is the gateway's, so it has none.
+var quotaWindows = []struct {
+	name, used, resets string
+	length             time.Duration
+}{
+	{"five_hour", semconv.TermaRateLimitFiveHourUsedPercentKey, semconv.TermaRateLimitFiveHourResetsAtKey, 5 * time.Hour},
+	{"seven_day", semconv.TermaRateLimitSevenDayUsedPercentKey, semconv.TermaRateLimitSevenDayResetsAtKey, 7 * 24 * time.Hour},
+	{"spend_limit", semconv.TermaRateLimitSpendLimitUsedPercentKey, semconv.TermaRateLimitSpendLimitResetsAtKey, 0},
 }
 
 // quotaState is the last emitted snapshot, per session, so a 300 ms redraw cadence becomes one
