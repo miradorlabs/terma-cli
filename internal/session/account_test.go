@@ -105,10 +105,23 @@ func TestMergeNeverJoinsTwoOwners(t *testing.T) {
 			t.Errorf("the child's manifest went: %v", err)
 		}
 	}
+	// Merging A's child into a new parent under B is refused without claiming the parent for B.
+	store := Open(t.TempDir())
+	child := Session{ID: "conv-child", Tool: "cursor"}
+	parent := Session{ID: "conv-parent", Tool: "cursor"}
+	if err := bound(store, "aaaaaaaaaaaaaaaa").Touch(child, []string{"c.go"}, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if moved, err := bound(store, "bbbbbbbbbbbbbbbb").Merge(child.ID, parent, time.Now()); !errors.Is(err, ErrAccountConflict) || len(moved) != 0 {
+		t.Fatalf("B merging A's child into new parent: %v, %v; want ErrAccountConflict", moved, err)
+	}
+	if fileExists(store.ownerPath(parent.Key())) {
+		t.Errorf("a refused merge left an owner file for %s", parent.ID)
+	}
 }
 
-// Deltas with no manifest stored yet give a session the same owner in either order: one that
-// names no one neither sets it nor clears it.
+// Deltas with no manifest or owner file stored yet give a session the same owner in either
+// order: one that names no one neither sets it nor clears it.
 func TestDeltaOrderNeverDecidesAnOwner(t *testing.T) {
 	t.Parallel()
 	for _, order := range [][2]string{{"", "aaaaaaaaaaaaaaaa"}, {"aaaaaaaaaaaaaaaa", ""}} {
@@ -130,7 +143,8 @@ func TestDeltaOrderNeverDecidesAnOwner(t *testing.T) {
 }
 
 // A session with no manifest is new, and owned by whoever writes it first; one whose
-// manifest can't be read is no one's to write, since its owner can't be checked.
+// manifest can't be read is no one's to write, since its owner can't be checked — whether
+// or not an intact owner file names the caller.
 func TestAnUnreadableManifestIsNotOwned(t *testing.T) {
 	t.Parallel()
 	store := bound(Open(t.TempDir()), "bbbbbbbbbbbbbbbb")
@@ -138,15 +152,20 @@ func TestAnUnreadableManifestIsNotOwned(t *testing.T) {
 	if !store.Owns(sess.Key()) {
 		t.Fatal("a session with no manifest is not owned")
 	}
-	path := store.manifestPath(sess.Key())
-	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+	if err := store.Touch(sess, []string{"b.go"}, time.Now()); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(path, []byte("{torn"), 0o600); err != nil {
+	if err := os.WriteFile(store.manifestPath(sess.Key()), []byte("{torn"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	if store.Owns(sess.Key()) {
-		t.Fatal("a session whose manifest can't be read is owned")
+		t.Fatal("a session whose manifest can't be read is owned (with owner file)")
+	}
+	if err := os.Remove(store.ownerPath(sess.Key())); err != nil {
+		t.Fatal(err)
+	}
+	if store.Owns(sess.Key()) {
+		t.Fatal("a session whose manifest can't be read is owned (without owner file)")
 	}
 }
 
@@ -225,8 +244,8 @@ func TestATornManifestIsPrunedAtRetention(t *testing.T) {
 	if got := files(store, old); len(got) != 0 {
 		t.Errorf("the old torn session left %v", got)
 	}
-	if got := files(store, fresh); len(got) != 2 {
-		t.Errorf("the fresh torn session has %v; want its manifest and its delta kept", got)
+	if got := files(store, fresh); len(got) != 3 {
+		t.Errorf("the fresh torn session has %v; want its manifest, its owner and its delta kept", got)
 	}
 	retired := Open(t.TempDir())
 	torn(retired, "sess-old", now.Add(-48*time.Hour))

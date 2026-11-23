@@ -45,9 +45,10 @@ type Manifest struct {
 	UpdatedAt   time.Time            `json:"updated_at"`
 	Files       map[string]time.Time `json:"files"`
 	// Account is the lane of the sign-in the session's first write was collected under: an
-	// account key, or sendas.NoPersonLane under a server key. No write makes it another's
-	// (Touch, Merge, claimed). "" names no one, as a manifest written signed out does: what a
-	// git hook records of the session gets no lane from it, and it is never filled in later.
+	// account key, or sendas.NoPersonLane under a server key, as its owner file names it
+	// (claim). No write makes it another's (Touch, Merge, claimed). "" names no one, as a
+	// manifest written signed out does: what a git hook records of the session gets no lane
+	// from it, and it is never filled in later.
 	Account string `json:"account,omitempty"`
 }
 
@@ -90,6 +91,8 @@ type Store struct {
 	account string
 	// lockWait bounds a writer's wait for the store lock; exclusion tests raise it.
 	lockWait time.Duration
+	// emptyOwnerWait, in tests, runs between retries on an empty owner file.
+	emptyOwnerWait func()
 }
 
 const (
@@ -243,9 +246,9 @@ func (s *Store) acquire() (unlock func(), held bool) {
 }
 
 // Touch records that sess edited files (repo-relative) at at, and refreshes the
-// active session's UpdatedAt so the TTL fallback tracks activity. The first write of a
-// session's manifest names the Store's account, and a write under another is refused,
-// ErrAccountConflict, so no write, folded or merged, changes whose the session is.
+// active session's UpdatedAt so the TTL fallback tracks activity. The session's first write
+// claims it for the Store's account (claim), and a write under another is refused,
+// ErrAccountConflict, locked or not, so no write, folded or merged, changes whose it is.
 func (s *Store) Touch(sess Session, files []string, at time.Time) error {
 	if !sess.Key().valid() {
 		return fmt.Errorf("invalid session %q of tool %q", sess.ID, sess.Tool)
@@ -255,7 +258,15 @@ func (s *Store) Touch(sess Session, files []string, at time.Time) error {
 		return err
 	}
 	defer unlock()
-	touched := newManifest(sess, s.account, at)
+	// Claimed before anything is recorded, on either path: the claim decides, atomically.
+	owner, err := s.claim(sess.Key())
+	if err != nil {
+		return err
+	}
+	if conflicts(owner, s.account) {
+		return ErrAccountConflict
+	}
+	touched := newManifest(sess, owner, at)
 	for _, f := range files {
 		if f = Normalize(f); f != "" {
 			touched.Files[f] = at
@@ -263,8 +274,8 @@ func (s *Store) Touch(sess Session, files []string, at time.Time) error {
 	}
 	if !held {
 		// Another writer's read-modify-write would overwrite this one's: a delta of its
-		// own survives, and the next locked writer folds it in, if it names the account the
-		// manifest does by then (load).
+		// own survives, and the next locked writer folds it in. It names the owner just
+		// claimed; the manifest is read only so one that can't be is refused.
 		m, err := s.manifest(sess.Key())
 		if err != nil {
 			return unreadableOwner(err)
@@ -272,7 +283,17 @@ func (s *Store) Touch(sess Session, files []string, at time.Time) error {
 		if m != nil && conflicts(m.Account, s.account) {
 			return ErrAccountConflict
 		}
-		return s.writeDelta(touched)
+		if err := s.writeDelta(touched); err != nil {
+			return err
+		}
+		// Re-check owner after landing the delta in case a concurrent prune dropped an old
+		// owner and another account claimed the session before this delta appeared.
+		if o, err := s.owner(sess.Key()); err != nil {
+			return unreadableOwner(err)
+		} else if o.claimed && conflicts(o.account, s.account) {
+			return ErrAccountConflict
+		}
+		return nil
 	}
 	m, deltas, err := s.load(sess.Key())
 	if err != nil {
@@ -293,10 +314,10 @@ func (s *Store) Touch(sess Session, files []string, at time.Time) error {
 	return nil
 }
 
-// unreadableOwner is the refusal of a write to a session whose manifest can't be read
-// (err): its owner can't be checked, so the write may be another account's session's.
+// unreadableOwner is the refusal of a write to a session whose manifest or owner can't be
+// read (err): its owner can't be checked, so the write may be another account's session's.
 func unreadableOwner(err error) error {
-	return fmt.Errorf("%w: its manifest can't be read: %w", ErrAccountConflict, err)
+	return fmt.Errorf("%w: its owner can't be read: %w", ErrAccountConflict, err)
 }
 
 func newManifest(sess Session, account string, at time.Time) *Manifest {
@@ -347,9 +368,14 @@ func (s *Store) writeDelta(m *Manifest) error {
 }
 
 // load is k's manifest with its deltas folded in, and the deltas' paths, which a locked
-// writer removes once it has written the result. A delta that appears later is kept.
+// writer removes once it has written the result. A delta that appears later is kept. It
+// names the session's owner, where it has one, and leaves out a delta that names another.
 func (s *Store) load(k Key) (*Manifest, []string, error) {
 	m, err := s.manifest(k)
+	if err != nil {
+		return nil, nil, err
+	}
+	o, err := s.owner(k)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -366,14 +392,18 @@ func (s *Store) load(k Key) (*Manifest, []string, error) {
 			d.Files = map[string]time.Time{}
 		}
 		folded = append(folded, p)
-		// A delta naming another account than the stored manifest's is refused, and dropped.
-		if stored && conflicts(m.Account, d.Account) {
+		// A delta naming another account than the stored manifest's, or the owner's, is
+		// refused, and dropped.
+		if stored && conflicts(m.Account, d.Account) || o.claimed && conflicts(o.account, d.Account) {
 			continue
 		}
 		m = fold(m, &d)
 		claims = append(claims, d.Account)
 	}
-	if m != nil && !stored {
+	switch {
+	case m != nil && o.claimed:
+		m.Account = o.account
+	case m != nil && !stored:
 		m.Account = claimed(claims)
 	}
 	return m, folded, nil
@@ -427,19 +457,26 @@ func sorted(byKey map[Key]*Manifest) []Manifest {
 
 // readTool folds the manifests and deltas in tool's folder into byKey and deltas. A
 // session's manifest sorts before its deltas (id.json before id~), so it is read first. A
-// session whose manifest can't be read is left out of byKey, its deltas too: they would name
-// its account in place of the one the manifest names. Its key is returned in torn, and its
-// deltas' paths are in deltas, for prune to remove.
+// session whose manifest or owner can't be read is left out of byKey, its deltas too: they
+// would name their account in place of the one the session's is. Its key is returned in torn,
+// and its deltas' paths are in deltas, for prune to remove. A session names its owner, where
+// it has one, and a delta that names another is left out.
 func (s *Store) readTool(tool string, byKey map[Key]*Manifest, deltas map[Key][]string) (torn []Key) {
 	dir := filepath.Join(s.dir, manifestsDir, tool)
 	entries, _ := os.ReadDir(dir)
 	stored := map[Key]bool{}
 	tornIDs := map[string]bool{}
 	claims := map[Key][]string{}
+	owners := map[Key]owner{}
 	defer func() {
-		for k, accounts := range claims {
-			if !stored[k] {
-				byKey[k].Account = claimed(accounts)
+		for k, m := range byKey {
+			if k.Tool != tool {
+				continue
+			}
+			if o := owners[k]; o.claimed {
+				m.Account = o.account
+			} else if !stored[k] {
+				m.Account = claimed(claims[k])
 			}
 		}
 	}()
@@ -463,6 +500,20 @@ func (s *Store) readTool(tool string, byKey map[Key]*Manifest, deltas map[Key][]
 		if tornIDs[id] {
 			deltas[Key{Tool: tool, ID: id}] = append(deltas[Key{Tool: tool, ID: id}], filepath.Join(dir, name))
 			continue
+		}
+		if k := (Key{Tool: tool, ID: id}); k.valid() {
+			if _, read := owners[k]; !read {
+				o, err := s.owner(k)
+				if err != nil {
+					tornIDs[id] = true
+					torn = append(torn, k)
+					if strings.HasSuffix(name, deltaExt) {
+						deltas[k] = append(deltas[k], filepath.Join(dir, name))
+					}
+					continue
+				}
+				owners[k] = o
+			}
 		}
 		var m Manifest
 		if err := readJSON(filepath.Join(dir, name), &m); err != nil {
@@ -489,7 +540,7 @@ func (s *Store) readTool(tool string, byKey map[Key]*Manifest, deltas map[Key][]
 			continue
 		}
 		deltas[k] = append(deltas[k], filepath.Join(dir, name))
-		if stored[k] && conflicts(byKey[k].Account, m.Account) {
+		if stored[k] && conflicts(byKey[k].Account, m.Account) || owners[k].claimed && conflicts(owners[k].account, m.Account) {
 			continue
 		}
 		byKey[k] = fold(byKey[k], &m)
@@ -541,7 +592,19 @@ func (s *Store) Merge(fromID string, into Session, at time.Time) ([]string, erro
 		return nil, err
 	}
 	if dst == nil {
-		dst = newManifest(into, s.account, at)
+		o, err := s.owner(into.Key())
+		if err != nil {
+			return nil, unreadableOwner(err)
+		}
+		if o.claimed && src.Account != o.account || !o.claimed && src.Account != s.account {
+			return nil, ErrAccountConflict
+		}
+		// A new manifest is claimed first, as Touch's is.
+		owner, err := s.claim(into.Key())
+		if err != nil {
+			return nil, err
+		}
+		dst = newManifest(into, owner, at)
 	}
 	if src.Account != dst.Account {
 		return nil, ErrAccountConflict
@@ -738,23 +801,34 @@ func (s *Store) prune(before time.Time) (int, error) {
 	n := 0
 	for _, m := range manifests {
 		if m.UpdatedAt.Before(before) {
-			// Its deltas go too, or they would bring the session back.
+			// Its deltas go too, or they would bring the session back, and its owner last.
 			removeAll(deltas[m.Key()])
 			if err := os.Remove(s.manifestPath(m.Key())); err == nil || len(deltas[m.Key()]) > 0 {
 				n++
 			}
-		}
-	}
-	// A manifest that can't be read has no UpdatedAt: its file's time is when it was last
-	// written. Kept, it and its deltas would keep the store from ever being retired.
-	for _, k := range torn {
-		if info, err := os.Stat(s.manifestPath(k)); err == nil && info.ModTime().Before(before) {
-			removeAll(deltas[k])
-			if os.Remove(s.manifestPath(k)) == nil {
-				n++
+			if !s.hasDeltas(m.Key()) {
+				_ = os.Remove(s.ownerPath(m.Key()))
 			}
 		}
 	}
+	// A manifest that can't be read has no UpdatedAt: its file's time is when it was last
+	// written, or with none, its owner's. Kept, it and its deltas would keep the store from
+	// ever being retired.
+	for _, k := range torn {
+		info, err := os.Stat(s.manifestPath(k))
+		if errors.Is(err, fs.ErrNotExist) {
+			info, err = os.Stat(s.ownerPath(k))
+		}
+		if err == nil && info.ModTime().Before(before) {
+			removeAll(deltas[k])
+			if os.Remove(s.manifestPath(k)) == nil || len(deltas[k]) > 0 {
+				n++
+			}
+			_ = os.Remove(s.ownerPath(k))
+		}
+	}
+	// An owner a crash or a Merge left with nothing else of its session goes too.
+	s.pruneOwners(before)
 	// Active with no ttl reports fresh, so the cutoff is the test.
 	if active, _ := s.Active(before, 0); active != nil && active.UpdatedAt.Before(before) {
 		_ = s.clearActive(active.Key())
@@ -762,10 +836,22 @@ func (s *Store) prune(before time.Time) (int, error) {
 	return n, nil
 }
 
-// Owns reports whether k's manifest takes a write under the Store's account: none is
-// recorded yet, or it names that account or no one (Touch). A manifest that can't be read
-// names an owner no one can check, so it is not owned.
+// Owns reports whether k's session takes a write under the Store's account: no one has
+// claimed it yet, or its owner is that account or no one (Touch). A manifest or owner that
+// can't be read names an owner no one can check, so it is not owned. Only the write's claim
+// decides: another account's may come in between.
 func (s *Store) Owns(k Key) bool {
+	o, err := s.owner(k)
+	if err != nil {
+		return false
+	}
+	if o.claimed {
+		if conflicts(o.account, s.account) {
+			return false
+		}
+		m, err := s.manifest(k)
+		return err == nil && (m == nil || !conflicts(m.Account, s.account))
+	}
 	m, _, err := s.load(k)
 	return err == nil && (m == nil || !conflicts(m.Account, s.account))
 }

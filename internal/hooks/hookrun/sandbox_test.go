@@ -417,26 +417,79 @@ func TestAClaimBetweenTheCheckAndTheWriteDecides(t *testing.T) {
 	}
 }
 
-// A session whose manifest can't be read has an owner no one can check: B's hook spools
-// nothing of it, and counts the event account_conflict.
-func TestAnUnreadableManifestIsNoOnesToReport(t *testing.T) {
+// A's hook claims a session in a delta, while another writer holds the store, after B's hook
+// read it as no one's: B's write, missing the lock too, is refused, so nothing of it is
+// spooled under B, and the event is counted account_conflict (PR #152, comment 7101173452).
+func TestADeltaClaimDecidesAnUnlockedWrite(t *testing.T) {
 	p := newPushRepo(t)
 	sess := session.Session{ID: "sess-a", Tool: "claude-code"}
-	if err := gitStore(p, personA).Touch(sess, []string{"a.go"}, time.Now()); err != nil {
-		t.Fatal(err)
-	}
-	tearManifest(t, p, sess.ID)
 	asB, dir := signedIn(t, p, personB)
 	r, err := asB.Repo(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
+	store := filepath.Join(p.root, ".git", project.GitStoreDir)
+	if err := os.MkdirAll(store, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	release, err := flock.Lock(context.Background(), filepath.Join(store, "store.lock"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer release()
+	asB.afterOwns = func() {
+		if err := gitStore(p, personA).Touch(sess, []string{"a.go"}, time.Now()); err != nil {
+			t.Fatal(err)
+		}
+	}
 	asB.Touch(r, sess, "Edit", []string{"b.go"}, nil)
 	if evs := hookruntest.Spooled(t, asB.Spool); len(evs) != 0 {
-		t.Errorf("B spooled %s of a session whose owner can't be read", hookruntest.Names(evs))
+		t.Errorf("B spooled %s of A's session", hookruntest.Names(evs))
 	}
 	if l := lossesIn(t, dir); l[sendas.LostAccountConflict] != 1 || len(l) != 1 {
 		t.Errorf("losses = %v; want B's touch counted account_conflict", l)
+	}
+	// A subsequent hook of B, with A's delta-only session already claimed and the lock still
+	// busy, is refused too.
+	asB.afterOwns = nil
+	asB.Touch(r, sess, "Edit", []string{"b2.go"}, nil)
+	if evs := hookruntest.Spooled(t, asB.Spool); len(evs) != 0 {
+		t.Errorf("B spooled %s of A's delta-only session", hookruntest.Names(evs))
+	}
+	if l := lossesIn(t, dir); l[sendas.LostAccountConflict] != 2 || len(l) != 1 {
+		t.Errorf("losses = %v; want both of B's touches counted account_conflict", l)
+	}
+	ms, err := r.Store.Manifests()
+	if err != nil || len(ms) != 1 || ms[0].Account != personA || len(ms[0].Files) != 1 {
+		t.Fatalf("manifests %+v, %v; want A's session, with A's file alone", ms, err)
+	}
+}
+
+// A session whose manifest can't be read has an owner no one can check: neither another
+// account's hook nor the owning account's spools anything of it, and both count the event
+// account_conflict.
+func TestAnUnreadableManifestIsNoOnesToReport(t *testing.T) {
+	for _, account := range []string{personB, personA} {
+		t.Run(account, func(t *testing.T) {
+			p := newPushRepo(t)
+			sess := session.Session{ID: "sess-a", Tool: "claude-code"}
+			if err := gitStore(p, personA).Touch(sess, []string{"a.go"}, time.Now()); err != nil {
+				t.Fatal(err)
+			}
+			tearManifest(t, p, sess.ID)
+			as, dir := signedIn(t, p, account)
+			r, err := as.Repo(context.Background())
+			if err != nil {
+				t.Fatal(err)
+			}
+			as.Touch(r, sess, "Edit", []string{"b.go"}, nil)
+			if evs := hookruntest.Spooled(t, as.Spool); len(evs) != 0 {
+				t.Errorf("%s spooled %s of a session whose owner can't be read", account, hookruntest.Names(evs))
+			}
+			if l := lossesIn(t, dir); l[sendas.LostAccountConflict] != 1 || len(l) != 1 {
+				t.Errorf("losses = %v; want touch counted account_conflict", l)
+			}
+		})
 	}
 }
 
