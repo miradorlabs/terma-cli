@@ -6,6 +6,7 @@ package omp
 
 import (
 	"context"
+	"strconv"
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/harness"
@@ -38,9 +39,9 @@ func (Agent) Installed(ctx context.Context) bool {
 	return exporter{}.Detect(ctx).Found
 }
 
-// Surfaces is OMP as one choice, marked beta at setup.
+// Surfaces is OMP as one choice, marked beta at setup and naming the first OMP terma sets up.
 func (a Agent) Surfaces() []agents.Surface {
-	return []agents.Surface{{Name: name, DisplayName: displayName + " (beta)", Installed: a.Installed}}
+	return []agents.Surface{{Name: name, DisplayName: displayName + " " + strconv.Itoa(minimumMajor) + "+ (beta)", Installed: a.Installed}}
 }
 
 // Events are the extension's omp-* hooks.
