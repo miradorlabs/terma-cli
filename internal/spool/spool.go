@@ -16,8 +16,8 @@ import (
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/config"
-
 	"github.com/miradorlabs/terma-cli/internal/flock"
+	"github.com/miradorlabs/terma-cli/internal/sendas"
 )
 
 // Event is one thing that happened on this machine worth telling the backend.
@@ -36,7 +36,7 @@ type Event struct {
 	Repository config.Repository `json:"repository,omitzero"`
 	// Account is the account key (auth.AccountKey) of the sign-in the event was collected
 	// under, so it leaves under that sign-in only; "" when none was, as for an event an
-	// older terma queued. Local only.
+	// older terma queued, the only kind queued with neither it nor NoPerson. Local only.
 	Account string `json:"account,omitempty"`
 	// NoPerson marks an event collected under a server key: no person's, so its empty
 	// Account is final, never bound to a sign-in later (AppendAsCollected). Local only.
@@ -121,26 +121,31 @@ const (
 // Spool is one queue directory.
 type Spool struct {
 	dir string
-	// account binds what this Spool appends to a sign-in (Bind); noPerson marks it no
-	// person's instead (BindNoPerson).
-	account  string
-	noPerson bool
+	// lane is whose what this Spool appends without a tag is (Bind, BindNoPerson): with
+	// none, it is lost.
+	lane Lane
 }
 
-// Bind has every event this Spool appends without an account carry account: the sign-in
-// collecting it.
-func (s *Spool) Bind(account string) { s.account, s.noPerson = account, false }
+// Bind has every event this Spool appends without an account carry account, as
+// auth.Account names the sign-in collecting it. Signed out ("") or unreadable
+// (sendas.AccountUnreadable), it names no one: what it would carry is lost.
+func (s *Spool) Bind(account string) { s.lane = LaneOf(account, false) }
 
 // BindNoPerson has every event this Spool appends without an account marked no person's
 // (Event.NoPerson): collected under a server key, whichever path appends it.
-func (s *Spool) BindNoPerson() { s.account, s.noPerson = "", true }
+func (s *Spool) BindNoPerson() { s.lane = LaneOf("", true) }
 
-// Open addresses (and creates) the spool directory.
+// Lane is whose what this Spool appends without a tag is. Unbound, it is no one's, as
+// though the sign-in could not be read.
+func (s *Spool) Lane() Lane { return s.lane }
+
+// Open addresses (and creates) the spool directory. Until it is bound, what it appends
+// without a tag is lost, counted as unreadable.
 func Open(dir string) (*Spool, error) {
 	if err := os.MkdirAll(dir, dirMode); err != nil {
 		return nil, fmt.Errorf("create spool dir: %w", err)
 	}
-	return &Spool{dir: dir}, nil
+	return &Spool{dir: dir, lane: Lane{Lost: sendas.LostUnreadable}}, nil
 }
 
 func (s *Spool) path() string { return filepath.Join(s.dir, EventsFile) }
@@ -158,26 +163,44 @@ func (s *Spool) AppendContext(ctx context.Context, events ...Event) error {
 }
 
 // AppendAsCollected is Append for events that already carry the account they were
-// collected under, "" for none: a checkpointed event appended again later keeps it,
-// whoever the Spool is bound to by then.
+// collected under: a checkpointed event appended again later keeps it, whoever the Spool
+// is bound to by then. One that carries none is lost.
 func (s *Spool) AppendAsCollected(events ...Event) error {
 	return s.appendEvents(context.Background(), false, events)
 }
 
+// appendEvents never queues an event that names neither an account nor no person: no one
+// could ever send it. It is lost instead, counted by why (Lost), and the rest are appended.
 func (s *Spool) appendEvents(ctx context.Context, bind bool, events []Event) error {
 	var lines []byte
+	lost := map[string]int{}
 	for _, e := range events {
 		if e.Time.IsZero() {
 			e.Time = time.Now()
 		}
 		if bind && e.Account == "" && !e.NoPerson {
-			e.Account, e.NoPerson = s.account, s.noPerson
+			e.Account, e.NoPerson = s.lane.Account, s.lane.NoPerson
+		}
+		if why := untagged(e, s.lane); why != "" {
+			lost[why]++
+			continue
 		}
 		line, err := json.Marshal(e)
 		if err != nil {
 			return err
 		}
 		lines = append(append(lines, line...), '\n')
+	}
+	// Counted once the rest is queued: a failed append is retried, and would count them again.
+	// A count that can't be written is no reason to fail the append.
+	countLost := func() {
+		for why, n := range lost {
+			_ = s.CountLost(why, n)
+		}
+	}
+	if len(lines) == 0 {
+		countLost()
+		return nil
 	}
 	// The budget starts after the encode: a slow encode charged to the wait would
 	// refuse a lock nobody holds and lose the event.
@@ -193,8 +216,11 @@ func (s *Spool) appendEvents(ctx context.Context, bind bool, events []Event) err
 		return err
 	}
 	defer f.Close()
-	_, err = f.Write(lines)
-	return err
+	if _, err = f.Write(lines); err != nil {
+		return err
+	}
+	countLost()
+	return nil
 }
 
 // Pending reports how many events are queued and the spool size in bytes.

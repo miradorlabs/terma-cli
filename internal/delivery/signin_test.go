@@ -1,10 +1,14 @@
 package delivery
 
 import (
+	"cmp"
 	"context"
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"sync"
@@ -77,13 +81,25 @@ func signInRouter(signIn *fakeSignIn) Router {
 		Policy: func(context.Context, *config.Config, string) (config.Policy, error) { return pol, nil }}
 }
 
+// spoolOf is a queue holding events as they are, tagged or not: an older terma's backlog
+// is queued untagged (spool.IngestLegacy), which no append does.
 func spoolOf(t *testing.T, events ...spool.Event) *spool.Spool {
 	t.Helper()
-	s, err := spool.Open(t.TempDir())
+	dir := t.TempDir()
+	s, err := spool.Open(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := s.Append(events...); err != nil {
+	var lines []byte
+	for _, e := range events {
+		e.Time = cmp.Or(e.Time, time.Now())
+		line, err := json.Marshal(e)
+		if err != nil {
+			t.Fatal(err)
+		}
+		lines = append(append(lines, line...), '\n')
+	}
+	if err := os.WriteFile(filepath.Join(dir, spool.EventsFile), lines, 0o600); err != nil {
 		t.Fatal(err)
 	}
 	return s
@@ -183,16 +199,15 @@ func TestAServerKeyNeverSendsAPersonsEvents(t *testing.T) {
 	}
 	keys := eventFor("p1", "the-keys", "")
 	keys.NoPerson = true
-	// One collected while the sign-ins couldn't be read is maybe a person's: never no one's.
-	s := spoolOf(t, eventFor("p1", "a-persons", "aaaaaaaaaaaaaaaa"), keys, eventFor("p1", "older-termas", ""), eventFor("p1", "unreadable", sendas.AccountUnreadable))
+	s := spoolOf(t, eventFor("p1", "a-persons", "aaaaaaaaaaaaaaaa"), keys, eventFor("p1", "older-termas", ""))
 	r := signInRouter(&fakeSignIn{})
 	r.ConfigDir = dir
 	res := r.Flush(t.Context(), s, &config.Config{OTLPURL: srv.URL, ServerKeySignIn: true}, true, 0)
-	if res.Sent != 1 || res.Held != 3 {
+	if res.Sent != 1 || res.Held != 2 {
 		t.Fatalf("Flush = %+v", res)
 	}
 	for _, req := range sent() {
-		if strings.Contains(req.body, "a-persons") || strings.Contains(req.body, "older-termas") || strings.Contains(req.body, `"unreadable"`) {
+		if strings.Contains(req.body, "a-persons") || strings.Contains(req.body, "older-termas") {
 			t.Fatal("a person's event left with the server key")
 		}
 	}
@@ -229,23 +244,5 @@ func TestEventsThatCantLeaveAskForNoPolicy(t *testing.T) {
 	}
 	if asked != 0 {
 		t.Fatalf("asked for %d policies for events that can't leave", asked)
-	}
-}
-
-// Events bound to the unreadable account are held, even while the sign-in in place reads as
-// unreadable too: no policy is asked for, nothing is withheld, and no token is asked for.
-func TestUnreadableEventsAreHeldWhileTheSignInIsUnreadable(t *testing.T) {
-	t.Parallel()
-	srv, sent := recordingIngest(t, http.StatusOK)
-	signIn := &fakeSignIn{account: sendas.AccountUnreadable, token: "token-x"}
-	r := signInRouter(signIn)
-	asked := 0
-	r.Policy = func(context.Context, *config.Config, string) (config.Policy, error) {
-		asked++
-		return config.Policy{}, nil
-	}
-	res := r.Flush(t.Context(), spoolOf(t, eventFor("p1", "unread", sendas.AccountUnreadable)), &config.Config{OTLPURL: srv.URL}, true, 0)
-	if res.Sent != 0 || res.Held != 1 || res.Withheld != 0 || asked != 0 || len(sent()) != 0 || len(signIn.accounts) != 0 {
-		t.Fatalf("Flush = %+v, %d policies, %d sent, tokens for %v; want it held untouched", res, asked, len(sent()), signIn.accounts)
 	}
 }

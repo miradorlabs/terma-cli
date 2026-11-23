@@ -23,7 +23,7 @@ func TestCursorSubagentStopRecordsOutcomeAndFiles(t *testing.T) {
 	root := hookruntest.InitRepo(t)
 	stateDir := t.TempDir()
 	ctx := context.Background()
-	sp, _ := spool.Open(t.TempDir())
+	sp, _ := hookruntest.OpenSpool(t.TempDir())
 	elsewhere := t.TempDir()
 	env := func(stdin string) hookrun.Env {
 		return hookrun.Env{StateDir: stateDir, Now: time.Now(), Cwd: elsewhere, Policy: hookruntest.Admitting(root), Stdin: strings.NewReader(stdin), Spool: sp, Version: "test"}
@@ -82,7 +82,7 @@ func TestCursorSubagentEditsAreFoldedIntoTheParentConversation(t *testing.T) {
 	root := hookruntest.InitRepo(t)
 	stateDir := t.TempDir()
 	ctx := context.Background()
-	sp, _ := spool.Open(t.TempDir())
+	sp, _ := hookruntest.OpenSpool(t.TempDir())
 	env := func(stdin string, args ...string) hookrun.Env {
 		return hookrun.Env{StateDir: stateDir, Now: time.Now(), Cwd: root, Policy: hookruntest.Admitting(root), Args: args, Stdin: strings.NewReader(stdin), Spool: sp, Version: "test"}
 	}

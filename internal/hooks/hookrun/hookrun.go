@@ -53,8 +53,9 @@ type Env struct {
 	AwaitPush func(path string)
 	// Policy is the organization's collection policy; global mode places every session in its DefaultProjectID.
 	Policy config.Policy
-	// Account is the account key of the sign-in in place, stamped on every event this hook
-	// queues, parked ones included, so it leaves under that sign-in only.
+	// Account is the sign-in in place as auth.Account names it. With no Spool, what this
+	// hook collects is in its lane (spool.LaneOf), parked events included; with one, the
+	// Spool's binding, made from the same profile, is the lane.
 	Account string
 	// AccountSince is when that sign-in began, zero when unknown: an event from before it
 	// was collected under another sign-in, or none, and is never bound to this one.
@@ -309,24 +310,59 @@ func (e Env) locate(ctx context.Context) (root, gitDir string, id config.Reposit
 }
 
 // EmitFor spools an event stamped with the repository's project, parking it in the
-// repository's store when the spool cannot be written, and reports whether it was kept.
+// repository's store when the spool cannot be written, and reports whether it is done with:
+// false only when it could be neither, for the caller to try again. Collected with no lane
+// (signed out, or a sign-in that can't be read), it is done with too: lost, and counted, so
+// a retry never hands it to whoever signs in next.
 func (e Env) EmitFor(r *Repo, ev spool.Event) bool {
 	ev = e.stamp(r, ev)
 	e.claimForRelay(r, ev)
+	if e.lost(1) {
+		return true
+	}
 	if ev.Time.IsZero() {
 		ev.Time = e.Time()
 	}
 	return e.emit(ev) || e.park(r, parkedEvents, ev)
 }
 
+// lane is whose what this hook collects is: its spool's binding, which the hook's caller
+// made from the profile (dispatch), or with no spool, the profile's own.
+func (e Env) lane() spool.Lane {
+	if e.Spool != nil {
+		return e.Spool.Lane()
+	}
+	return spool.LaneOf(e.Account, e.ServerKey)
+}
+
+// lost reports whether what this hook collects has no lane, before anything of it is
+// written, and if so counts its n events lost, by why.
+func (e Env) lost(n int) bool {
+	why := e.lane().Lost
+	if why == "" {
+		return false
+	}
+	e.countLost(why, n)
+	return true
+}
+
+// countLost counts n events lost for why in the spool. A hook in an agent's sandbox that
+// can't write the state directory has no spool to count in: its count is lost too.
+func (e Env) countLost(why string, n int) {
+	if e.Spool != nil && e.Spool.CountLost(why, n) == nil {
+		return
+	}
+	e.Logf("%d event(s) lost (%s), uncounted", n, why)
+}
+
 // stamp names the event's repository, for delivery's admission, its project and the
-// account that collected it.
+// lane that collected it.
 func (e Env) stamp(r *Repo, ev spool.Event) spool.Event {
 	ev.Global = e.Policy.Global()
-	if ev.Account == "" {
-		ev.Account = e.Account
+	if ev.Account == "" && !ev.NoPerson {
+		l := e.lane()
+		ev.Account, ev.NoPerson = l.Account, l.NoPerson
 	}
-	ev.NoPerson = ev.NoPerson || ev.Account == "" && e.ServerKey
 	if r != nil {
 		ev.Repository = r.Repository
 	}

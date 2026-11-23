@@ -497,6 +497,15 @@ func TestDoctorReportsOutboxLosses(t *testing.T) {
 		!strings.Contains(c.Detail, "1 collected while the sign-in could not be read") {
 		t.Fatalf("check = %+v", c)
 	}
+	// A reason doctor has no words for is still listed, by name.
+	unknown := env(t, Probes{Credential: signedIn, Spool: func() SpoolState { return SpoolState{} },
+		Relay: func() Relay {
+			return Relay{OutboxLosses: map[string]int{"account_conflict": 3}, OutboxLossAt: time.Now()}
+		}})
+	c = check(Run(t.Context(), unknown, Progress{}), KeyOutbox)
+	if c.Status != Warn || !strings.Contains(c.Detail, "3 lost as account_conflict") {
+		t.Fatalf("check = %+v", c)
+	}
 	// A loss older than the outbox keeps parts is history.
 	old := env(t, Probes{Credential: signedIn, Spool: func() SpoolState { return SpoolState{} },
 		Relay: func() Relay {

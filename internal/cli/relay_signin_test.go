@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -141,6 +142,29 @@ func TestDoctorReadsTheRelaysLossesByReason(t *testing.T) {
 	}
 	if got := testApp.relayFacts(); !maps.Equal(got.OutboxLosses, losses.Counts) || !got.OutboxLossAt.Equal(at) {
 		t.Fatalf("doctor read %v at %v; want %v at %v", got.OutboxLosses, got.OutboxLossAt, losses.Counts, at)
+	}
+}
+
+// Doctor counts what hooks lost with what the relay lost, by reason, in one row.
+func TestDoctorAddsTheHooksLossesToTheRelays(t *testing.T) {
+	useConfigDir(t, t.TempDir())
+	at := time.Now().UTC().Add(-time.Hour).Truncate(time.Second)
+	losses := relay.OutboxLosses{Counts: map[string]int{"signed_out": 2, "outbox_full": 1}, Last: at}
+	if err := config.WriteJSON(filepath.Join(claim.Dir(testApp.stateDir), relay.OutboxDir, "losses.json"), losses, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	s := testApp.openSpool()
+	if s.CountLost(sendas.LostSignedOut, 3) != nil || s.CountLost(sendas.LostUnreadable, 1) != nil {
+		t.Fatal("could not count")
+	}
+	got := testApp.relayFacts()
+	want := map[string]int{"signed_out": 5, "outbox_full": 1, "unreadable": 1}
+	if !maps.Equal(got.OutboxLosses, want) || !got.OutboxLossAt.After(at) {
+		t.Fatalf("doctor read %v at %v; want %v after %v", got.OutboxLosses, got.OutboxLossAt, want, at)
+	}
+	c := doctor.OutboxCheck(got)
+	if !strings.Contains(c.Detail, "5 collected while signed out") || !strings.Contains(c.Detail, "1 collected while the sign-in could not be read") {
+		t.Fatalf("check = %+v", c)
 	}
 }
 

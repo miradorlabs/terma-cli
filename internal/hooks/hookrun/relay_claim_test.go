@@ -13,7 +13,6 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
-	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
 // Any hook of a session in an installed repository, not only its start, claims it for
@@ -22,7 +21,7 @@ func TestHooksClaimSessionsForTheRelay(t *testing.T) {
 	t.Parallel()
 	stateDir := t.TempDir()
 	root := hookruntest.InitRepo(t)
-	sp, _ := spool.Open(t.TempDir())
+	sp, _ := hookruntest.OpenSpool(t.TempDir())
 	claimed := 0
 	// The hook runs from elsewhere; the claim names the checkout its payload is in.
 	env := func(stdin string) Env {
@@ -64,7 +63,7 @@ func TestAnExpiredPolicyStillClaims(t *testing.T) {
 	configDir, stateDir := t.TempDir(), t.TempDir()
 	root := hookruntest.InitRepo(t)
 	expired := config.Policy{Mode: config.ModeRepo, Repositories: hookruntest.Admitting(root).Repositories, TeamID: "project-a", Revision: 1, FetchedAt: time.Now().Add(-config.MaxPolicyAge - time.Hour)}
-	sp, _ := spool.Open(t.TempDir())
+	sp, _ := hookruntest.OpenSpool(t.TempDir())
 	claimed := false
 	env := Env{ConfigDir: configDir, StateDir: stateDir, Now: time.Now(), Cwd: root, Spool: sp, Policy: expired, Team: "project-a", OnClaim: func(string) { claimed = true },
 		Stdin: strings.NewReader(`{"session_id":"expired-session","cwd":"` + hookruntest.InJSON(root) + `","model":"m"}`)}
@@ -87,7 +86,7 @@ func TestEachDeveloperClaimsForTheirOwnTeam(t *testing.T) {
 	t.Parallel()
 	stateDir := t.TempDir()
 	root := hookruntest.InitRepo(t)
-	sp, _ := spool.Open(t.TempDir())
+	sp, _ := hookruntest.OpenSpool(t.TempDir())
 	for sid, team := range map[string]string{"backend-session": "team-backend", "billing-session": "team-billing"} {
 		env := Env{StateDir: stateDir, Now: time.Now(), Cwd: root, Spool: sp, Team: team, Policy: hookruntest.Admitting(root),
 			Stdin: strings.NewReader(`{"session_id":"` + sid + `","cwd":"` + hookruntest.InJSON(root) + `","model":"m"}`)}
@@ -173,7 +172,7 @@ func TestTheClaimNamesTheDirectoryTheHookRanIn(t *testing.T) {
 	}
 	root, _ := filepath.EvalSymlinks(repo)
 	dir, _ := filepath.EvalSymlinks(sub)
-	sp, _ := spool.Open(t.TempDir())
+	sp, _ := hookruntest.OpenSpool(t.TempDir())
 	env := Env{StateDir: stateDir, Now: time.Now(), Cwd: sub, Policy: hookruntest.Admitting(repo), Spool: sp, Version: "test", Team: "proj",
 		Stdin: strings.NewReader(`{"session_id":"sess-sub","cwd":"` + hookruntest.InJSON(sub) + `","hook_event_name":"SessionStart"}`)}
 	if err := startSession(context.Background(), env); err != nil {
@@ -210,7 +209,7 @@ func TestCommitHooksKeepTheAgentsDirectory(t *testing.T) {
 	}
 	sub := filepath.Join(root, "frontend")
 	hookruntest.WriteFile(t, root, "frontend/src/x.ts", "x\n")
-	sp, _ := spool.Open(t.TempDir())
+	sp, _ := hookruntest.OpenSpool(t.TempDir())
 	env := func(cwd, stdin string, args ...string) Env {
 		return Env{StateDir: stateDir, Now: time.Now(), Cwd: cwd, Policy: listing("github.com/o/r"), Args: args,
 			Stdin: strings.NewReader(stdin), Spool: sp, Version: "test", Team: "proj_test"}

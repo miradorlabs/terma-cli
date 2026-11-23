@@ -126,7 +126,7 @@ func PrePush(ctx context.Context, env Env) error {
 		return nil
 	}
 	refs := ParsePushInput(string(input))
-	if len(refs) == 0 {
+	if len(refs) == 0 || env.lost(len(refs)) {
 		return nil
 	}
 	// git names a push to a URL by the URL twice; a URL never goes out as a remote's name.

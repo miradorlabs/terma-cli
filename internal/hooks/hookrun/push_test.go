@@ -61,7 +61,7 @@ func newPushRepo(t *testing.T) *pushRepo {
 	p.git("remote", "add", "backup", remote)
 	p.git("commit", "-q", "--allow-empty", "-m", "init")
 	p.git("push", "-q", "backup", "main")
-	sp, err := spool.Open(t.TempDir())
+	sp, err := hookruntest.OpenSpool(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -320,11 +320,11 @@ func TestSweepReportsAnAbandonedPush(t *testing.T) {
 	}
 }
 
-// A push keeps the account it was recorded under, or none: reported by a sweep after
-// someone else signed in, it never leaves under them.
+// A push keeps the lane it was recorded under, a person's or no person's: reported by a
+// sweep after someone else signed in, it never leaves under them.
 func TestASweptPushKeepsTheAccountItWasRecordedUnder(t *testing.T) {
 	for _, recordedAs := range []string{"account-a", ""} {
-		t.Run("recorded as "+cmp.Or(recordedAs, "none"), func(t *testing.T) {
+		t.Run("recorded as "+cmp.Or(recordedAs, "no person"), func(t *testing.T) {
 			defer func(f func() int) { gitPushPID = f }(gitPushPID)
 			p := newPushRepo(t)
 			p.git("commit", "-q", "--allow-empty", "-m", "more")
@@ -333,7 +333,12 @@ func TestASweptPushKeepsTheAccountItWasRecordedUnder(t *testing.T) {
 			var recorded string
 			env := Env{StateDir: p.stateDir, Now: time.Now(), Cwd: p.root, Args: []string{"backup", p.remote},
 				Stdin: strings.NewReader(pushLine("refs/heads/main", head, "refs/heads/main", p.sha("backup/main")) + "\n"), Spool: p.sp,
-				Team: p.team, Policy: hookruntest.Admitting(p.root), AwaitPush: func(path string) { recorded = path }, Account: recordedAs}
+				Team: p.team, Policy: hookruntest.Admitting(p.root), AwaitPush: func(path string) { recorded = path }, Account: recordedAs, ServerKey: recordedAs == ""}
+			if recordedAs == "" {
+				p.sp.BindNoPerson()
+			} else {
+				p.sp.Bind(recordedAs)
+			}
 			if err := PrePush(context.Background(), env); err != nil {
 				t.Fatal(err)
 			}
@@ -342,11 +347,11 @@ func TestASweptPushKeepsTheAccountItWasRecordedUnder(t *testing.T) {
 				t.Fatal(err)
 			}
 			// Someone else is signed in when the sweep reports it.
-			env.Account = "account-b"
+			env.Account, env.ServerKey = "account-b", false
 			p.sp.Bind("account-b")
 			SweepPushes(context.Background(), env)
 			events := hookruntest.Named(hookruntest.Spooled(t, p.sp), semconv.TermaPushEvent)
-			if len(events) != 1 || events[0].Account != recordedAs {
+			if len(events) != 1 || events[0].Account != recordedAs || events[0].NoPerson != (recordedAs == "") {
 				t.Fatalf("pushes %+v; want one under %q", events, recordedAs)
 			}
 		})

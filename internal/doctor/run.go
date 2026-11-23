@@ -127,8 +127,8 @@ type Relay struct {
 	// ServiceInstalled says a relay service is installed; ServiceCurrent that it is the one
 	// this terma would install, in the environment install recorded.
 	ServiceInstalled, ServiceCurrent bool
-	// OutboxLosses count the records the relay lost lately, by reason (relay.OutboxLosses);
-	// OutboxLossAt is the last.
+	// OutboxLosses count the records the relay and hooks lost lately, by reason
+	// (relay.OutboxLosses, spool.ReadLosses), one count for both; OutboxLossAt is the last.
 	OutboxLosses map[string]int
 	OutboxLossAt time.Time
 }
@@ -231,7 +231,7 @@ func Run(ctx context.Context, env Env, progress Progress) Report {
 
 	timed(KeyHarness, "agent exporting to Terma", func() Check { return unlessCaptureOff(d.pol, d.agentsExporting()) })
 	if r := relayFacts(env.Probes); r.lostRecently() {
-		timed(KeyOutbox, "relay outbox", func() Check { return OutboxCheck(r) })
+		timed(KeyOutbox, "records lost", func() Check { return OutboxCheck(r) })
 	}
 
 	if a, ok := StatusLineAgent(env.Agents); ok && a.Installed(ctx) {

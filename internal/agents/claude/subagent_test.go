@@ -22,7 +22,7 @@ import (
 func TestClaudeSubagentStopIgnoresInternalForks(t *testing.T) {
 	stateDir := t.TempDir()
 	root := newRepo(t)
-	sp, _ := spool.Open(t.TempDir())
+	sp, _ := hookruntest.OpenSpool(t.TempDir())
 	for i := range 61 {
 		kind := ""
 		if i%2 == 0 {
@@ -44,7 +44,7 @@ func TestClaudeSubagentStopRequiresEvidenceForItsSessionAndAgent(t *testing.T) {
 	for _, launch := range []string{"start", "Agent", "Task"} {
 		t.Run(launch, func(t *testing.T) {
 			root := newRepo(t)
-			sp, _ := spool.Open(t.TempDir())
+			sp, _ := hookruntest.OpenSpool(t.TempDir())
 			ctx := context.Background()
 			const sessionID = "sess-agent-1"
 			const agentID = "a838402ff1ef43bee"
@@ -84,7 +84,7 @@ func TestClaudeSubagentStopRequiresEvidenceForItsSessionAndAgent(t *testing.T) {
 func TestClaudeSubagentConcurrentLaunchesSurvive(t *testing.T) {
 	stateDir := t.TempDir()
 	root := newRepo(t)
-	sp, _ := spool.Open(t.TempDir())
+	sp, _ := hookruntest.OpenSpool(t.TempDir())
 	ctx := context.Background()
 	var wg sync.WaitGroup
 	for i := range 16 {
@@ -111,7 +111,7 @@ func TestClaudeSubagentConcurrentLaunchesSurvive(t *testing.T) {
 func TestClaudeSubagentLaunchEvidenceExpires(t *testing.T) {
 	stateDir := t.TempDir()
 	root := newRepo(t)
-	sp, _ := spool.Open(t.TempDir())
+	sp, _ := hookruntest.OpenSpool(t.TempDir())
 	ctx := context.Background()
 	now := time.Now()
 	for _, id := range []string{"old", "fresh"} {
@@ -150,7 +150,7 @@ func TestClaudeSubagentLaunchEvidenceExpires(t *testing.T) {
 func TestClaudeSubagentUnavailableLaunchStateDoesNotFailHooks(t *testing.T) {
 	stateDir := t.TempDir()
 	root := newRepo(t)
-	sp, _ := spool.Open(t.TempDir())
+	sp, _ := hookruntest.OpenSpool(t.TempDir())
 	path := claudeSubagentPath(stateDir, "parent", "worker")
 	// A file in place of the state directory makes recording a launch fail.
 	if err := os.MkdirAll(filepath.Dir(filepath.Dir(path)), 0o700); err != nil {
@@ -175,7 +175,7 @@ func TestClaudeSubagentIsAFacetOfTheParentSession(t *testing.T) {
 	stateDir := t.TempDir()
 	root := newRepo(t)
 	ctx := context.Background()
-	sp, _ := spool.Open(t.TempDir())
+	sp, _ := hookruntest.OpenSpool(t.TempDir())
 	env := func(stdin string) hookrun.Env {
 		return hookrun.Env{StateDir: stateDir, Now: time.Now(), Cwd: root, Policy: hookruntest.Admitting(root), Stdin: strings.NewReader(stdin), Spool: sp, Version: "test"}
 	}

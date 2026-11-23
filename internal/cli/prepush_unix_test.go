@@ -38,6 +38,7 @@ func TestARealPushIsReportedByTheInstalledHook(t *testing.T) {
 	gitOut(t, root, "commit", "-q", "--allow-empty", "-m", "init")
 	gitOut(t, root, "push", "-q", "backup", "main")
 	admitHere(t, root, "team")
+	signInHereAs(t, "u-push")
 	hookruntest.RelayOn(t, stateDir)
 	if _, err := repohooks.Install(stateDir, bin, filepath.Join(root, ".git")); err != nil {
 		t.Fatal(err)

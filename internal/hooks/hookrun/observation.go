@@ -119,14 +119,19 @@ func (e Env) CaptureObservation(ctx context.Context, r *Repo, o Observation) {
 	if state.LastHash == hash && !e.Time().Before(state.At) && e.Time().Sub(state.At) < QuotaHeartbeat {
 		return
 	}
+	// No lane, no checkpoint: nothing of it is written, to be replayed later.
+	if e.lost(1) {
+		return
+	}
 	state.Sequence++
 	state.LastHash, state.At = hash, e.Time()
 	attrs[semconv.TermaObservationStreamKey], attrs[semconv.TermaObservationSequenceKey] = state.Stream, state.Sequence
 	attrs[semconv.TermaObservationIDKey] = EvidenceID(fmt.Sprintf("%s\x00%s\x00%d", o.Tool, state.Stream, state.Sequence))
 	// Bound before the checkpoint, and appended as collected: a failed append is retried
 	// later, maybe once someone else has signed in, and must still leave only under the
-	// account that collected it, or none.
-	state.Pending = &spool.Event{Time: e.Time(), Name: semconv.TermaSessionObservationEvent, SessionID: o.SessionID, Repository: r.Repository, Attrs: attrs, Account: e.Account, NoPerson: e.Account == "" && e.ServerKey}
+	// lane that collected it.
+	lane := e.lane()
+	state.Pending = &spool.Event{Time: e.Time(), Name: semconv.TermaSessionObservationEvent, SessionID: o.SessionID, Repository: r.Repository, Attrs: attrs, Account: lane.Account, NoPerson: lane.NoPerson}
 	if err = write(); err != nil {
 		e.Logf("%s checkpoint: %v", o.Tool, err)
 		return

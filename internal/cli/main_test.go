@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/miradorlabs/terma-cli/internal/account/auth"
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/agents/builtin"
 	"github.com/miradorlabs/terma-cli/internal/config"
@@ -91,6 +92,18 @@ func admitHere(t *testing.T, root, team string) {
 	pol := config.Policy{Mode: config.ModeRepo, Repositories: []string{"github.com/acme/" + filepath.Base(root)}, IncludePrompts: true, IncludeToolContent: true,
 		TeamID: team, Revision: 1, FetchedAt: time.Now()}
 	selectPolicy(t, pol)
+}
+
+// signInHereAs stores a person's sign-in for the default profile, as `terma login` leaves
+// it, so what hooks collect is in user's lane; it returns that lane's account key.
+func signInHereAs(t *testing.T, user string) string {
+	t.Helper()
+	const authURL = "https://auth.example.test"
+	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, &auth.Credential{AccessToken: "token-of-" + user, SessionID: "s-" + user, UserID: user,
+		AuthURL: authURL, ExpiresAt: time.Now().Add(time.Hour)}); err != nil {
+		t.Fatal(err)
+	}
+	return auth.AccountKey(authURL, user)
 }
 
 func newTestRelay(o relay.Options) *relay.Relay {

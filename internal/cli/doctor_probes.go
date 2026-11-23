@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -21,6 +22,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
 	"github.com/miradorlabs/terma-cli/internal/relay/service"
 	"github.com/miradorlabs/terma-cli/internal/selfupdate"
+	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
 func (app *App) doctorEnv(ctx context.Context) doctor.Env {
@@ -140,8 +142,20 @@ func (app *App) relayFacts() doctor.Relay {
 		r.Environment, r.HookStarted = info.Environment, info.Launch != daemon.LaunchService
 		r.Version, r.Earlier = info.Version, selfupdate.Newer(info.Version, app.version)
 	}
-	if losses, err := relay.ReadOutboxLosses(filepath.Join(dir, relay.OutboxDir)); err == nil {
-		r.OutboxLosses, r.OutboxLossAt = losses.Counts, losses.Last
+	// What the relay lost and what hooks lost are one count, by reason, each within its
+	// window: the relay's counts start again after a quiet window, a hook's each age out.
+	r.OutboxLosses = map[string]int{}
+	if losses, err := relay.ReadOutboxLosses(filepath.Join(dir, relay.OutboxDir)); err == nil && time.Since(losses.Last) < doctor.OutboxLossWindow {
+		maps.Copy(r.OutboxLosses, losses.Counts)
+		r.OutboxLossAt = losses.Last
+	}
+	if losses, err := spool.ReadLosses(filepath.Join(app.stateDir, spool.Dir), time.Now()); err == nil {
+		for reason, n := range losses.Counts {
+			r.OutboxLosses[reason] += n
+		}
+		if losses.Last.After(r.OutboxLossAt) {
+			r.OutboxLossAt = losses.Last
+		}
 	}
 	if service.Supported() {
 		state := daemon.CheckService(app.stateDir)

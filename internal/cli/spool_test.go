@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"cmp"
 	"context"
 	"net/http"
 	"net/http/httptest"
@@ -45,12 +46,13 @@ func acceptingOTLP(t *testing.T) {
 
 func appendEvent(t *testing.T, s *spool.Spool, projectID string, at time.Time) {
 	t.Helper()
-	// Bound to the sign-in in place, or no person's under a server key, as a hook's append is.
-	e := spool.Event{Name: "terma.commit", Time: at, Repository: appRepo}
-	if cfg, err := testApp.loadConfig(); err == nil && !cfg.ServerKeySignIn {
-		e.Account = auth.Account(cfg.Dir, cfg.ProfileName, cfg.AuthURL)
+	// Bound to the sign-in in place, or no person's under a server key, as a hook's append
+	// is; signed out, to a person since signed out.
+	e := spool.Event{Name: "terma.commit", Time: at, Repository: appRepo, Account: "aaaaaaaaaaaaaaaa"}
+	if cfg, err := testApp.loadConfig(); err == nil && cfg.ServerKeySignIn {
+		e.Account, e.NoPerson = "", true
 	} else if err == nil {
-		e.NoPerson = true
+		e.Account = cmp.Or(auth.Account(cfg.Dir, cfg.ProfileName, cfg.AuthURL), e.Account)
 	}
 	if projectID != "" {
 		e.Attrs = map[string]any{hookrun.AttrProjectID: projectID}

@@ -143,11 +143,17 @@ for them to read), is bound to no lane: it is never written, and counted as `sig
 or `unreadable`. A spool event is in one of three cases: it names an account (`account`),
 and leaves only under that sign-in; it is no person's (`no_person`, collected under a
 server key: the hook's spool is bound with `BindNoPerson`), and leaves only under a server
-key; or neither (an older terma's no one sign-in may send, or one queued signed out), which
-never leaves and ages out, counted as `legacy_ambiguous`. Only that last case is ever bound
-later, to whatever the appending spool is bound to (`Spool.Append`, and unparking), and
-unparking binds it to a person's sign-in only if it was collected since that sign-in began
-(`signed_in_at` in `user-credentials.json`). Every replay of a recorded event (`AppendAsCollected`) keeps what it says.
+key; or neither, which only an older terma's backlog is (`IngestLegacy`): it never leaves
+and ages out, counted as `legacy_ambiguous`. A hook's spool is bound to its profile's lane
+(`spool.LaneOf`), and no append ever queues an event that names neither: signed out, or
+with a sign-in that can't be read, what a hook collects is lost before anything of it is
+written (no queued line, checkpoint, push record or parked line), and counted as
+`signed_out` or `unreadable` in `spool/losses/`, a file per day of one line per loss,
+appended whole so concurrent hooks never lose a count; doctor adds them to the relay's.
+Unparking binds an event a sandboxed hook parked with neither to a person's sign-in only
+if it was collected since that sign-in began (`signed_in_at` in `user-credentials.json`);
+one it can't bind is lost. Every replay of a recorded event (`AppendAsCollected`) keeps
+what it says.
 This version queues to `spool/events-v2.jsonl` and `relay/outbox-v2/`, never to an older
 terma's `spool/events.jsonl` or `relay/outbox/`, so an older terma's hook, flusher or relay
 still running never sends what this one queued with its own credential. What an older

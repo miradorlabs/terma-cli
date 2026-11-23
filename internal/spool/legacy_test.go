@@ -39,7 +39,7 @@ func legacyLine(t *testing.T, e Event) string {
 func TestAppendWritesOnlyTheNewFile(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	s, err := Open(dir)
+	s, err := openBound(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -62,7 +62,7 @@ func TestAppendWritesOnlyTheNewFile(t *testing.T) {
 func TestIngestLegacyMovesEachLineOnceTaggedByTheDecision(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	s, err := Open(dir)
+	s, err := openBound(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -119,7 +119,7 @@ func TestIngestLegacyNoPersonAndAmbiguous(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			dir := t.TempDir()
-			s, err := Open(dir)
+			s, err := openBound(dir)
 			if err != nil {
 				t.Fatal(err)
 			}

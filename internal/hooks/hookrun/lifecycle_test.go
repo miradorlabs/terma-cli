@@ -13,7 +13,6 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
 	"github.com/miradorlabs/terma-cli/internal/session"
-	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
 // A session edits files in its own repository, another the team collects, one it does not
@@ -24,7 +23,7 @@ func TestTouchReportsEachFileUnderItsOwnRepository(t *testing.T) {
 	own, other, denied := hookruntest.InitRepo(t), hookruntest.InitRepo(t), hookruntest.InitRepo(t)
 	outside := t.TempDir()
 	stateDir := t.TempDir()
-	sp, _ := spool.Open(t.TempDir())
+	sp, _ := hookruntest.OpenSpool(t.TempDir())
 	var claimed []string
 	env := Env{
 		StateDir: stateDir, Now: time.Now(), Cwd: own, Spool: sp, Team: hookruntest.Team,
@@ -91,7 +90,7 @@ func TestTouchInAGlobalFolderOutsideGitNamesNoRepository(t *testing.T) {
 	t.Parallel()
 	dir, _ := filepath.EvalSymlinks(t.TempDir()) // a folder outside git is located with symlinks resolved
 	stateDir := t.TempDir()
-	sp, _ := spool.Open(t.TempDir())
+	sp, _ := hookruntest.OpenSpool(t.TempDir())
 	env := Env{StateDir: stateDir, Now: time.Now(), Cwd: dir, Spool: sp, Policy: config.Policy{Mode: config.ModeGlobal, DefaultProjectID: "p-default"}}
 	r, err := env.Repo(context.Background())
 	if err != nil {
@@ -146,7 +145,7 @@ func TestCheckoutIDPinsTheSharedVectors(t *testing.T) {
 func TestTouchNamesEachCheckoutByIDAndReportNone(t *testing.T) {
 	t.Parallel()
 	own, other := hookruntest.InitRepo(t), hookruntest.InitRepo(t)
-	sp, _ := spool.Open(t.TempDir())
+	sp, _ := hookruntest.OpenSpool(t.TempDir())
 	env := Env{
 		StateDir: t.TempDir(), Now: time.Now(), Cwd: own, Spool: sp, Team: hookruntest.Team,
 		Policy: listing("github.com/acme/"+filepath.Base(own), "github.com/acme/"+filepath.Base(other)),

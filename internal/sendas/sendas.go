@@ -14,11 +14,21 @@ import (
 // ProjectHeader names the team a request with a user token writes to.
 const ProjectHeader = "X-Mirador-Project"
 
-// AccountUnreadable is the account of what is collected while the sign-ins can't be read
-// (auth.AccountUnreadable): a person's maybe, so never no one's, and no sign-in's token is
-// had for it. Delivery holds what is bound to it, and it ages out; the relay binds nothing
-// to it, and loses what still arrives under it after a short retry.
+// AccountUnreadable is auth.Account's answer while the sign-ins can't be read: a person's
+// maybe, so never no one's, and no sign-in's token is had for it. Nothing is bound to it:
+// what is collected while it is the answer is lost, counted as LostUnreadable.
 const AccountUnreadable = "unreadable"
+
+// Why what is collected is lost, with no lane to queue it in; each is its loss's reason in
+// the relay's and the hooks' counts, which doctor lists.
+const (
+	// LostSignedOut is collected under a person's profile, signed out.
+	LostSignedOut = "signed_out"
+	// LostUnreadable is collected while the profile or its sign-in could not be read.
+	LostUnreadable = "unreadable"
+	// LostLegacyAmbiguous is what an older terma queued that no one sign-in may send.
+	LostLegacyAmbiguous = "legacy_ambiguous"
+)
 
 // NoPersonLane is the lane of what no person collected, under a server key: it leaves only
 // under a server key. Not hex, so no account key is ever it.

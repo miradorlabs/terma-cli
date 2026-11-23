@@ -45,11 +45,12 @@ func TestUnparkingKeepsTheAccountsEventsWereCollectedUnder(t *testing.T) {
 	}
 }
 
-// An event bound while the sign-in could not be read is never unparked as no one's: under a
-// server key it keeps its account, and ages out.
+// An event bound while the sign-in could not be read is never unparked as no one's, nor
+// queued: it is lost, and counted.
 func TestAnUnreadableEventIsNeverUnparkedAsNoOnes(t *testing.T) {
 	root := hookruntest.InitRepo(t)
-	sp, err := spool.Open(t.TempDir())
+	dir := t.TempDir()
+	sp, err := spool.Open(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -59,9 +60,11 @@ func TestAnUnreadableEventIsNeverUnparkedAsNoOnes(t *testing.T) {
 	}
 	sp.BindNoPerson()
 	Env{Spool: sp, ServerKey: true}.unpark(r)
-	evs := hookruntest.Spooled(t, sp)
-	if len(evs) != 1 || evs[0].Account != unreadable || evs[0].NoPerson {
-		t.Fatalf("unparked %+v; want it kept as the unreadable sign-in's", evs)
+	if evs := hookruntest.Spooled(t, sp); len(evs) != 0 {
+		t.Fatalf("unparked %+v; want it lost", evs)
+	}
+	if l, _ := spool.ReadLosses(dir, time.Now()); l.Counts[sendas.LostUnreadable] != 1 {
+		t.Fatalf("losses = %v; want it counted unreadable", l.Counts)
 	}
 }
 
@@ -91,8 +94,8 @@ func TestAParkedPushIsBoundWhenUnparked(t *testing.T) {
 const unreadable = sendas.AccountUnreadable
 
 // An event parked before the sign-in in place began, while signed out or under someone
-// since signed out, is not that sign-in's: unparked, it stays bound to no one. One from
-// since is bound. With no start known, none is.
+// since signed out, is not that sign-in's: unparked, it is bound to no one, so it is lost.
+// One from since is bound. With no start known, none is.
 func TestUnparkingBindsOnlyWhatTheSignInCollected(t *testing.T) {
 	root := hookruntest.InitRepo(t)
 	sp, err := spool.Open(t.TempDir())
@@ -115,7 +118,7 @@ func TestUnparkingBindsOnlyWhatTheSignInCollected(t *testing.T) {
 	for _, ev := range hookruntest.Spooled(t, sp) {
 		got[ev.Name] = ev.Account
 	}
-	if got["before"] != "" || got["since"] != "account-b" {
+	if _, kept := got["before"]; kept || got["since"] != "account-b" {
 		t.Fatalf("accounts = %v; want only what came since the sign-in bound to it", got)
 	}
 	// A sign-in whose start isn't known takes none.
@@ -128,7 +131,7 @@ func TestUnparkingBindsOnlyWhatTheSignInCollected(t *testing.T) {
 	}
 	sp2.Bind("account-b")
 	Env{Spool: sp2, Account: "account-b"}.unpark(r)
-	if evs := hookruntest.Spooled(t, sp2); len(evs) != 1 || evs[0].Account != "" {
-		t.Fatalf("unparked %+v; want it bound to no one", evs)
+	if evs := hookruntest.Spooled(t, sp2); len(evs) != 0 {
+		t.Fatalf("unparked %+v; want it bound to no one, and lost", evs)
 	}
 }

@@ -61,9 +61,9 @@ func SignedInAt(dir, profile string) time.Time {
 	return cred.SignedInAt
 }
 
-// AccountUnreadable is the account of what is collected while the sign-ins can't be read:
-// a person's maybe, so never no one's, which a server key would send; and no sign-in's
-// token is had for it. It ages out.
+// AccountUnreadable is Account's answer while the sign-ins can't be read: a person's maybe,
+// so never no one's, which a server key would send; and no sign-in's token is had for it.
+// What is collected under it is lost, never queued (spool.LaneOf).
 const AccountUnreadable = sendas.AccountUnreadable
 
 // ErrSignInRetired is the server's answer that it no longer accepts this kind of sign-in:

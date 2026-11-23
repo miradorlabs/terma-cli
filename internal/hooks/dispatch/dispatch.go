@@ -62,8 +62,9 @@ type Profile struct {
 	Agents []string
 	// Policy is the collection policy, NoPolicy until one is validated.
 	Policy config.Policy
-	// Account is the account key of the sign-in in place, which what the hook queues is
-	// bound to; "" with none, or under a server key.
+	// Account is the sign-in in place as auth.Account names it, which what the hook queues
+	// is bound to: its account key; "" signed out, or under a server key; or
+	// sendas.AccountUnreadable, when what the hook collects is lost (spool.LaneOf).
 	Account string
 	// AccountSince is when that sign-in began (auth.SignedInAt), zero when unknown.
 	AccountSince time.Time
@@ -179,7 +180,8 @@ func (b *boundedBuffer) Write(p []byte) (int, error) {
 // Bytes returns what was kept.
 func (b *boundedBuffer) Bytes() []byte { return b.buf }
 
-// bound is s binding what it queues to account, the sign-in collecting it; nil stays nil.
+// bound is s binding what it queues to the lane collecting it, or losing it when there is
+// none; nil stays nil.
 func bound(s *spool.Spool, p Profile) *spool.Spool {
 	switch {
 	case s == nil:

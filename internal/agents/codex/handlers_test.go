@@ -35,7 +35,7 @@ func TestCodexSessionStampsItsCommitFromApplyPatch(t *testing.T) {
 	root := hookruntest.InitRepo(t)
 	stateDir := t.TempDir()
 	ctx := context.Background()
-	sp, _ := spool.Open(t.TempDir())
+	sp, _ := hookruntest.OpenSpool(t.TempDir())
 	env := func(stdin string) hookrun.Env {
 		return hookrun.Env{StateDir: stateDir, Now: time.Now(), Cwd: root, Policy: hookruntest.Admitting(root), Stdin: strings.NewReader(stdin), Spool: sp, Version: "test"}
 	}
@@ -94,7 +94,7 @@ func TestCodexSessionStampsItsCommitFromShellWrite(t *testing.T) {
 	root := hookruntest.InitRepo(t)
 	stateDir := t.TempDir()
 	ctx := context.Background()
-	sp, _ := spool.Open(t.TempDir())
+	sp, _ := hookruntest.OpenSpool(t.TempDir())
 	const id = "01a08bd5-0487-74b1-9d82-45e619c574fb"
 	hookruntest.WriteFile(t, root, "src/a.go", "package src\n")
 	command := strconv.Quote("cd src && cat > a.go <<'EOF'\npackage src\nEOF")
@@ -136,7 +136,7 @@ func TestCodexNonPatchToolNamesNoCheckout(t *testing.T) {
 			root := hookruntest.InitRepo(t)
 			stateDir := t.TempDir()
 			ctx := context.Background()
-			sp, _ := spool.Open(t.TempDir())
+			sp, _ := hookruntest.OpenSpool(t.TempDir())
 			const id = "01a08bd5-0487-74b1-9d82-45e619c574fa"
 			hookruntest.WriteFile(t, root, "diagram.png", "png")
 			input := fmt.Sprintf(tc.input, strconv.Quote(filepath.Join(root, "diagram.png")))
@@ -180,7 +180,7 @@ func TestCodexMCPWriteIntoASiblingWorktreeStampsItsCommit(t *testing.T) {
 	main := hookruntest.InitRepo(t)
 	stateDir := t.TempDir()
 	ctx := context.Background()
-	sp, _ := spool.Open(t.TempDir())
+	sp, _ := hookruntest.OpenSpool(t.TempDir())
 	if _, err := gitx.Git(ctx, main, "commit", "-q", "--allow-empty", "-m", "init"); err != nil {
 		t.Fatal(err)
 	}
@@ -233,7 +233,7 @@ func TestCodexPostToolUseIgnoresCallsWithoutAPatch(t *testing.T) {
 	root := hookruntest.InitRepo(t)
 	stateDir := t.TempDir()
 	ctx := context.Background()
-	sp, _ := spool.Open(t.TempDir())
+	sp, _ := hookruntest.OpenSpool(t.TempDir())
 	env := hookrun.Env{StateDir: stateDir, Now: time.Now(), Cwd: root, Policy: hookruntest.Admitting(root), Spool: sp, Version: "test",
 		Stdin: strings.NewReader(`{"session_id":"01a08bd5-0487-74b1-9d82-45e619c574fa","hook_event_name":"PostToolUse","cwd":` + strconv.Quote(root) + `,"model":"gpt-6","permission_mode":"default","tool_name":"shell","tool_use_id":"c1","turn_id":"t1","transcript_path":null,"tool_response":"","tool_input":{"command":"go test ./..."}}`)}
 	if err := postToolUse(ctx, env); err != nil {
@@ -322,7 +322,7 @@ func TestCodexPreToolUseStampsACommitInTheSameCall(t *testing.T) {
 			ctx := context.Background()
 			root := hookruntest.InitRepo(t)
 			stateDir := t.TempDir()
-			sp, _ := spool.Open(t.TempDir())
+			sp, _ := hookruntest.OpenSpool(t.TempDir())
 			for _, p := range tc.before {
 				hookruntest.WriteFile(t, root, p, "before\n")
 			}
@@ -389,7 +389,7 @@ type codexCall struct {
 const codexCallSession = "01a1204e-2470-7e31-859b-486d42353986"
 
 func newCodexCall(t *testing.T) *codexCall {
-	sp, _ := spool.Open(t.TempDir())
+	sp, _ := hookruntest.OpenSpool(t.TempDir())
 	return &codexCall{t: t, ctx: context.Background(), root: hookruntest.InitRepo(t), stateDir: t.TempDir(), sp: sp}
 }
 
@@ -612,7 +612,7 @@ func TestCodexShellTargetInAWorktreeIsNotMirrored(t *testing.T) {
 	root := hookruntest.InitRepo(t)
 	stateDir := t.TempDir()
 	ctx := context.Background()
-	sp, _ := spool.Open(t.TempDir())
+	sp, _ := hookruntest.OpenSpool(t.TempDir())
 	if _, err := gitx.Git(ctx, root, "commit", "-q", "--allow-empty", "-m", "init"); err != nil {
 		t.Fatal(err)
 	}

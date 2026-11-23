@@ -84,10 +84,9 @@ func (app *App) hookDeps() dispatch.Deps {
 func (app *App) hookProfile() dispatch.Profile {
 	cfg, err := config.Load(app.dir, app.stateDir, config.Overrides{})
 	if err != nil {
-		// Bound to no account, but NoPolicy admits no repository, so nothing is spooled or
-		// parked under it: an emit path that skipped Repo's admission would queue events a
-		// later server key sends.
-		return dispatch.Profile{Policy: config.NoPolicy("", "")}
+		// NoPolicy admits no repository, so nothing is collected under it; and the profile
+		// can't be read, so what a path that skipped Repo's admission collects is lost.
+		return dispatch.Profile{Policy: config.NoPolicy("", ""), Account: auth.AccountUnreadable}
 	}
 	p := dispatch.Profile{Team: cfg.Policy.TeamID, Agents: cfg.Harnesses, Policy: cfg.Policy.InForce(cfg.OrganizationID, cfg.AuthURL)}
 	if p.ServerKey = cfg.ServerKeySignIn; !p.ServerKey {
@@ -98,8 +97,8 @@ func (app *App) hookProfile() dispatch.Profile {
 }
 
 // accountSince is when account, the profile's sign-in, began, which what unparking binds to
-// it is from since. The unreadable account takes every unbound event, from any time: it
-// sends none, and keeps them from being no one's, which a server key would send.
+// it is from since. The unreadable account takes every unbound event, from any time, which
+// keeps them from being no one's, which a server key would send: bound to it, they are lost.
 func accountSince(cfg *config.Config, account string) time.Time {
 	if account == auth.AccountUnreadable {
 		return time.Unix(0, 0)

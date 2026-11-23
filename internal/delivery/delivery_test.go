@@ -271,7 +271,7 @@ func TestOutgoingWithholdsTheWorkingTreeWithToolContent(t *testing.T) {
 func TestOutgoingSendsTheCheckoutIDUnderEveryPolicy(t *testing.T) {
 	t.Parallel()
 	root := hookruntest.InitRepo(t)
-	sp, _ := spool.Open(t.TempDir())
+	sp, _ := hookruntest.OpenSpool(t.TempDir())
 	env := hookrun.Env{StateDir: t.TempDir(), Now: time.Now(), Cwd: root, Spool: sp, Team: hookruntest.Team, Policy: hookruntest.Admitting(root)}
 	r, err := env.Repo(context.Background())
 	if err != nil {
