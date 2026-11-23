@@ -306,6 +306,10 @@ func TestAntigravitySubagentIsLinkedToItsParent(t *testing.T) {
 	// The child's first hook runs before its transcript exists, as agy runs it.
 	c := newTranscriptRig(t, childConversation, "transcript_subagent_child.jsonl")
 	c.hook(preInvocation, begin("0"))
+	// Saved with nothing read: the next hook must not begin again past the child's calls.
+	if s := c.readCallState(); s.Before != 0 || s.Offset != 0 {
+		t.Fatalf("the child's state is %+v", s)
+	}
 	c.write(len(c.lines))
 	c.hook(postInvocation, begin("0"))
 	c.hook(stop, stopped)

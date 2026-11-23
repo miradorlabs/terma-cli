@@ -35,10 +35,11 @@ import (
 // must still say so right before the send. Every other line a hook reads it passes for good:
 // the calls of turns before terma watched the conversation, of a turn begun somewhere else
 // or under another sign-in, and the last call of a cancelled turn, after which agy runs no
-// hook of that turn. A collecting hook counts the calls it passes as lost (turn_ended),
-// except on a conversation's first read, which holds turns from before terma watched; a
+// hook of that turn. A collecting hook counts the calls it passes as lost (turn_ended); a
 // hook the policy does not collect counts nothing. A subagent's link passed the same way is
-// not a call and is not counted: the subagent is then sent with no parent.
+// not a call and is not counted: the subagent is then sent with no parent. The lines
+// already in the transcript when terma began following the conversation are neither sent
+// nor counted (antigravityCallState.Before).
 
 // sourceAntigravityTranscript is terma.evidence.source for what agy's transcript recorded.
 const sourceAntigravityTranscript = "antigravity_transcript"
@@ -69,10 +70,10 @@ type antigravityCallState struct {
 	// Results names the tools of the last call whose results are still to be read: they
 	// follow it in order, one line each.
 	Results []string `json:"results,omitempty"`
-	// CatchingUp is set from a conversation's first read until a read reaches the end of
-	// the transcript: what is passed until then is from before terma watched, and is not
-	// counted lost.
-	CatchingUp bool `json:"catching_up,omitempty"`
+	// Before is the transcript's size when this state began: the lines that start before it
+	// are never sent and never counted. 0 once a read has passed it, and for a state that
+	// began with no transcript.
+	Before int64 `json:"before,omitempty"`
 }
 
 // antigravityLineLimit bounds a transcript line terma reads; a longer one (a tool's whole
@@ -149,25 +150,23 @@ func captureAntigravityCalls(ctx context.Context, e hookrun.Env, r *hookrun.Repo
 		return false
 	}
 	defer unlock()
+	// A state begins when there is none or the one there does not parse: what is in the
+	// transcript then was there before terma followed the conversation from this state, or
+	// may have been sent already. It is passed unsent and uncounted, however many hooks the
+	// read takes; what is written after goes by the rule above.
 	last := antigravityCallState{Step: -1}
 	b, readErr := os.ReadFile(path)
-	// A state that does not parse leaves what was sent unknown: this hook sends and counts
-	// nothing, and the state it writes starts the next hook past every line here.
-	unknown := readErr == nil && json.Unmarshal(b, &last) != nil
-	if unknown {
+	began := readErr != nil || json.Unmarshal(b, &last) != nil
+	if began {
 		last = antigravityCallState{Step: -1}
+		if info, err := os.Stat(transcript); err == nil {
+			last.Before = info.Size()
+		}
 	}
 	before, _ := json.Marshal(last)
-	if readErr != nil || unknown {
-		last.CatchingUp = true
-	}
-	catchingUp := last.CatchingUp
 	// The turn this hook saw begin here, and its first step; -1 sends nothing.
 	own := antigravityTurnID(e, r, id)
 	first := antigravityTurnNumber(own)
-	if unknown {
-		first = -1
-	}
 	passed := 0
 	pass := func(s antigravityStep) bool {
 		if s.Type == "PLANNER_RESPONSE" {
@@ -202,12 +201,12 @@ func captureAntigravityCalls(ctx context.Context, e hookrun.Env, r *hookrun.Repo
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		e.Logf("antigravity transcript: %v", err)
 	}
-	// A conversation's first read, however many hooks it takes, holds the turns before
-	// terma watched it: not counted.
-	if r != nil && !catchingUp && passed > 0 {
+	if r != nil && passed > 0 {
 		e.CountLost(r, sendas.LostTurnEnded, passed)
 	}
-	if b, err := json.Marshal(next); err == nil && !bytes.Equal(b, before) {
+	// A state that began is saved even unchanged: a subagent's first hook runs before its
+	// transcript exists, and the next must not begin again past the subagent's first call.
+	if b, err := json.Marshal(next); err == nil && (began || !bytes.Equal(b, before)) {
 		if err := hookrun.WriteState(path, b); err != nil {
 			e.Logf("antigravity calls state: %v", err)
 		}
@@ -288,8 +287,8 @@ const antigravityTailLen = 256
 
 // readAntigravitySteps hands each call, and each invoke_subagent result, past last's
 // offset and above last.Step to emit, in order, and returns the state after the last line
-// emit took. emit returning false, or ctx done before a line, stops the read there, for the
-// next hook.
+// emit took. A line that starts before last.Before is passed without emit. emit returning
+// false, or ctx done before a line, stops the read there, for the next hook.
 func readAntigravitySteps(ctx context.Context, path string, last antigravityCallState, emit func(s antigravityStep) bool) (antigravityCallState, error) {
 	f, err := os.Open(path)
 	if err != nil {
@@ -307,8 +306,19 @@ func readAntigravitySteps(ctx context.Context, path string, last antigravityCall
 	state := last
 	if state.Offset > info.Size() || antigravityTail(f, state.Offset) != state.Tail {
 		// Rewritten (compaction) or replaced: read again from the start; Step keeps what
-		// was handled.
+		// was handled. A read that had not passed the boundary begins it again: what the file
+		// holds now was not read.
 		state.Offset = 0
+		if state.Before > 0 {
+			state.Before = info.Size()
+		}
+	}
+	// advance moves the offset past a line read, and the boundary once it is passed.
+	advance := func(n int64) {
+		state.Offset += n
+		if state.Before > 0 && state.Offset >= state.Before {
+			state.Before = 0
+		}
 	}
 	if _, err := f.Seek(state.Offset, io.SeekStart); err != nil {
 		return last, err
@@ -324,7 +334,7 @@ func readAntigravitySteps(ctx context.Context, path string, last antigravityCall
 		if err != nil {
 			// A line without its newline is still being written.
 			if errors.Is(err, io.EOF) {
-				err, state.CatchingUp = nil, false
+				err = nil
 			}
 			state.Tail = antigravityTail(f, state.Offset)
 			return state, err
@@ -332,17 +342,17 @@ func readAntigravitySteps(ctx context.Context, path string, last antigravityCall
 		if line == nil {
 			// Too long to read: what results it may have held are unknown.
 			state.Results = nil
-			state.Offset += n
+			advance(n)
 			continue
 		}
 		if !bytes.Contains(line, []byte(`"PLANNER_RESPONSE"`)) &&
 			(len(state.Results) == 0 || !bytes.Contains(line, []byte(`"GENERIC"`))) {
-			state.Offset += n
+			advance(n)
 			continue
 		}
 		var s antigravityStep
 		if json.Unmarshal(line, &s) != nil || s.StepIndex == nil || *s.StepIndex < 0 {
-			state.Offset += n
+			advance(n)
 			continue
 		}
 		step := *s.StepIndex
@@ -363,14 +373,14 @@ func readAntigravitySteps(ctx context.Context, path string, last antigravityCall
 			}
 		}
 		if step > state.Step && (s.Type == "PLANNER_RESPONSE" || s.subagentResult) {
-			if !emit(s) {
+			if state.Offset >= state.Before && !emit(s) {
 				state.Tail = antigravityTail(f, state.Offset)
 				return state, nil
 			}
 			state.Step = step
 		}
 		state.Results = results
-		state.Offset += n
+		advance(n)
 	}
 }
 

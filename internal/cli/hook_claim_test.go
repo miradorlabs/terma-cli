@@ -130,13 +130,18 @@ func TestAntigravityUsageAndSeatQueueInTheSignedInLane(t *testing.T) {
 	if err := os.MkdirAll(filepath.Dir(transcript), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(transcript, []byte(`{"step_index":0,"source":"USER_EXPLICIT","type":"USER_INPUT","status":"DONE","created_at":"2026-11-20T16:50:00Z","content":"x"}
-{"step_index":1,"source":"MODEL","type":"PLANNER_RESPONSE","status":"DONE","created_at":"2026-11-20T16:50:01Z","model":"gemini-3.8-flash-low","input_tokens":100,"cache_read_tokens":20,"output_tokens":5}
-`), 0o600); err != nil {
+	prompt := `{"step_index":0,"source":"USER_EXPLICIT","type":"USER_INPUT","status":"DONE","created_at":"2026-11-20T16:50:00Z","content":"x"}
+`
+	if err := os.WriteFile(transcript, []byte(prompt), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	payload := `"conversationId":"` + id + `","cwd":"` + hookruntest.InJSON(root) + `","transcriptPath":"` + hookruntest.InJSON(transcript) + `","modelName":"gemini-3.8-flash-low"`
 	runHook(t, "antigravity-pre-invocation", `{`+payload+`,"initialNumSteps":1,"invocationNum":0}`)
+	// agy writes the turn's call once its first PreInvocation has returned.
+	if err := os.WriteFile(transcript, []byte(prompt+`{"step_index":1,"source":"MODEL","type":"PLANNER_RESPONSE","status":"DONE","created_at":"2026-11-20T16:50:01Z","model":"gemini-3.8-flash-low","input_tokens":100,"cache_read_tokens":20,"output_tokens":5}
+`), 0o600); err != nil {
+		t.Fatal(err)
+	}
 	runHook(t, "antigravity-post-invocation", `{`+payload+`,"initialNumSteps":1,"invocationNum":0}`)
 	runHook(t, "antigravity-statusline", `{"conversation_id":"`+id+`","session_id":"`+id+`","cwd":"`+hookruntest.InJSON(root)+`","plan_tier":"Google AI Ultra","email":"dev@example.com",`+
 		`"quota":{"gemini-5h":{"remaining_fraction":0.9,"reset_time":"2026-11-23T20:00:00Z"}}}`)
