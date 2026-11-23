@@ -231,11 +231,11 @@ func (e Env) locate(ctx context.Context) (root, gitDir string, id config.Reposit
 // (signed out, or a sign-in that can't be read), it is done with too: lost, and counted, so
 // a retry never hands it to whoever signs in next.
 func (e Env) EmitFor(r *Repo, ev spool.Event) bool {
-	ev = e.stamp(r, ev)
-	e.claimForRelay(r, ev)
 	if e.lost(r, 1) {
 		return true
 	}
+	ev = e.stamp(r, ev)
+	e.claimForRelay(r, ev)
 	return e.emitOrPark(r, ev)
 }
 
@@ -267,9 +267,10 @@ func (e Env) stamp(r *Repo, ev spool.Event) spool.Event {
 }
 
 // claimForRelay claims the event's session for the repository's project on every hook,
-// not only at start, since a start hook may never have fired.
+// not only at start, since a start hook may never have fired. With no lane (signed out,
+// or an unreadable sign-in), it writes nothing and skips OnClaim.
 func (e Env) claimForRelay(r *Repo, ev spool.Event) {
-	if r == nil || r.ProjectID == "" || ev.SessionID == "" {
+	if r == nil || r.ProjectID == "" || ev.SessionID == "" || e.lane().Lost != "" {
 		return
 	}
 	tool, _ := ev.Attrs[semconv.GenAIMainAgentNameKey].(string)

@@ -476,7 +476,7 @@ func BenchmarkRelayExport(b *testing.B) {
 	dir := b.TempDir()
 	now := time.Now()
 	for i := range 5 {
-		claim.Write(dir, fmt.Sprintf("s%d", i), claim.Claim{ProjectID: "p1"}, now)
+		claim.Write(dir, fmt.Sprintf("s%d", i), claim.Claim{ProjectID: "p1", Account: "aaaaaaaaaaaaaaaa"}, now)
 	}
 	sink := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
 	defer sink.Close()

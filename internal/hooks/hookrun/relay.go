@@ -40,7 +40,8 @@ func ReadPayloadSession(payload []byte) (PayloadSession, bool) {
 }
 
 // ClaimFromPayload claims a hook's session for the relay when its handler spooled nothing,
-// so a session whose hooks were trusted mid-way is still forwarded.
+// so a session whose hooks were trusted mid-way is still forwarded. With no lane (signed
+// out, or an unreadable sign-in), it still marks unlisted repositories but writes no claim.
 func ClaimFromPayload(ctx context.Context, env Env, s PayloadSession, tool string) bool {
 	if s.ID == "" {
 		return false
@@ -65,6 +66,9 @@ func ClaimFromPayload(ctx context.Context, env Env, s PayloadSession, tool strin
 		// Global mode, outside any repository.
 		c = claim.Claim{ProjectID: env.Policy.DefaultProjectID, Tool: tool, Repo: filepath.Base(env.Cwd)}
 	default:
+		return false
+	}
+	if env.lane().Lost != "" {
 		return false
 	}
 	c.PIDs, c.Cwd, c.Account = claimPIDs(), env.workingDir(), env.claimAccount()
