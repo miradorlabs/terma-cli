@@ -8,9 +8,6 @@ import (
 	"unicode/utf8"
 )
 
-// secretOptions are the options whose value, the next word, firstWords leaves out, as it does
-// that of any option whose name holds one of secretNames, and of redis-cli -a; userinfo is a
-// URL's user and password.
 var (
 	secretOptions = []string{
 		"-u", "--user", "-H", "--header", "-p", "--password",
@@ -21,12 +18,7 @@ var (
 	userinfo    = regexp.MustCompile(`://[^/\s]+@`)
 )
 
-// firstWords are command's first four words, split at whitespace outside quotes, at most 60
-// characters, with what may be secret left out: an assignment's or an option's value
-// (NAME=…, --password=…, -p…), the value of a secretOptions option or of one whose name
-// holds a secretNames word (-H …, --api-key …), and a URL's user and password
-// (https://…@host). Enough for doctor to name the command, and no more of it on disk;
-// heuristic masking does not cover arbitrary positional args like httpie's Key:Value.
+// firstWords returns command's first four words (<=60 runes) with secret-like values masked.
 func firstWords(command string) string {
 	cut := len(command) > 4096 // past the four words' 60 characters, however masked
 	if cut {
