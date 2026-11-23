@@ -14,28 +14,42 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
-// agy names no turn: `invocationNum` restarts each turn, `initialNumSteps` moves each
-// invocation, and Stop's `executionNum` is per process. `initialNumSteps` at invocation 0
-// only grows, and is the step the turn's first call comes after, so it names the turn.
+// Which hook may send a model call. This is the one statement of the rule; the code
+// elsewhere points here.
 //
-// The record is the conversation's turn in progress and where a collecting hook saw it
-// begin: one per conversation, written by the turn's first PreInvocation. These end a turn,
-// each by removing the record, and nothing else does:
-//   - its Stop, once it has read the turn's last calls (after a Stop, a prompt or a wake
-//     starts at invocation 0 again, and agy runs it only once the Stop hook has returned);
-//   - a hook of the conversation that runs where the policy collects nothing, or cannot
-//     tell where it ran; it reads nothing;
+// The record. agy names no turn: `invocationNum` restarts each turn, `initialNumSteps`
+// moves each invocation, and Stop's `executionNum` is per process. But `initialNumSteps` at
+// invocation 0 only grows, and it is the step the turn's first call comes after, so it
+// names the turn. The record holds the conversation's turn in progress and where a
+// collecting hook saw it begin: the checkout and the lane (antigravityWhere). There is one
+// record per conversation. The turn's first PreInvocation writes it.
+//
+// A hook sends a call only when all three hold:
+//   - the record names this hook's checkout and lane;
+//   - the call's step is at or after the turn's first;
+//   - the record still says so right before the send.
+//
+// These end a turn, each by removing the record. Nothing else does:
+//   - the turn's Stop, once it has read the turn's last calls;
+//   - a hook that runs where the policy collects nothing, or cannot tell where it ran;
 //   - a PostInvocation at invocation 0 whose `initialNumSteps` is not the record's turn:
 //     the record is stale, and this turn's first hook never ran;
 //   - a hook whose payload terma cannot read;
 //   - a hook run while hooks are off, switched off or torn down.
 //
-// A hook in another collected checkout, or under another sign-in, has no turn of its own:
-// it sends nothing and leaves the record. What it read past is lost; the turn's own hooks
-// send what comes after. agy runs PreInvocation before it
-// calls the model (on 1.5.15, a hook that slept 3 s delayed the call by 3 s), so the record
-// names a turn before that turn's first call is written: a line read while the record still
-// names a hook's turn is that turn's, or an earlier one's.
+// What a hook passes and counts. A hook passes for good every call it reads and does not
+// send: the calls of turns before terma watched the conversation, of a turn begun in
+// another checkout or lane, and the last call of a cancelled turn, after which agy runs no
+// hook of that turn. A hook in another checkout or lane leaves the record alone; the turn's
+// own hooks send what comes after. A collecting hook counts the calls it passes as lost
+// (turn_ended). A hook where the policy collects nothing reads nothing. A subagent's link
+// passed the same way is not a call and is not counted: the subagent is then sent with no
+// parent.
+//
+// A calls state that begins. When there is no saved read state, or it does not parse, the
+// lines already in the transcript are passed, unsent and uncounted, however many hooks the
+// read takes (antigravityCallState.Before). They were there before terma followed the
+// conversation, or may have been sent already. Lines written after go by the rule above.
 
 type antigravityTurn struct {
 	TurnID string `json:"turn_id"`
@@ -49,10 +63,9 @@ func antigravityTurnPath(dir, sessionID string) string {
 	return filepath.Join(dir, antigravityTurnDir, hookrun.EvidenceID(sessionID)+".json")
 }
 
-// antigravityWhere names where a collecting hook's calls go: its checkout's path, origin
-// and project, and the lane it queues in, the sign-in in place or no person under a server
-// key, hashed. A turn begun under one of them is never sent under another: a hook anywhere
-// else, or signed in as someone else, finds the record is not its own.
+// antigravityWhere names, hashed, where a collecting hook's calls go: its checkout's path,
+// origin and project, and the lane it queues in (the sign-in in place, or no person under a
+// server key).
 func antigravityWhere(e hookrun.Env, r *hookrun.Repo) string {
 	// The lane the hook's events queue in, as hookrun stamps them.
 	l := spool.LaneOf(e.Account, e.ServerKey)
@@ -100,8 +113,8 @@ func beginAntigravityTurn(e hookrun.Env, r *hookrun.Repo, in *antigravityHookInp
 	return turn.TurnID
 }
 
-// endAntigravityTurn removes the conversation's record: a hook where the policy collects
-// nothing ends the turn terma was following, and no later hook sends the rest of it.
+// endAntigravityTurn removes the conversation's record, which ends its turn: no later hook
+// sends the rest of it.
 func endAntigravityTurn(e hookrun.Env, sessionID string) {
 	if err := os.Remove(antigravityTurnPath(e.StateDir, sessionID)); err != nil && !os.IsNotExist(err) {
 		e.Logf("antigravity turn: %v", err)

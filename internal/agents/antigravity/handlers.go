@@ -113,7 +113,7 @@ func preInvocation(ctx context.Context, env hookrun.Env) error {
 	env.Cwd = in.cwd(env.Cwd)
 	r, err := env.Repo(ctx)
 	if err != nil {
-		// At any invocation: a hook where the policy collects nothing ends the turn.
+		// At any invocation, not only the turn's first.
 		env.Logf("not in a git repository: %v", err)
 		antigravitySkipCalls(env, in)
 		return nil
@@ -123,8 +123,7 @@ func preInvocation(ctx context.Context, env hookrun.Env) error {
 		// A model call in the middle of a turn.
 		return nil
 	}
-	// The turn is recorded first: agy calls the model once this hook returns, and every
-	// call of the turn is sent only while the record names it, here.
+	// The turn is recorded first: agy calls the model only once this hook returns.
 	turn := beginAntigravityTurn(env, r, in)
 	id := in.id()
 	sess := env.NewSession(r, id, antigravityTool, in.ModelName)
@@ -138,8 +137,7 @@ func preInvocation(ctx context.Context, env hookrun.Env) error {
 		env.PruneManifests(r, now)
 		env.EmitStart(r, sess, nil)
 	}
-	// A cancelled turn ran no hook after its last call: this one passes that call, unsent,
-	// and counts it lost.
+	// This passes a cancelled turn's last call (see turn.go).
 	read := captureAntigravityCalls(ctx, env, r, in)
 	env.CaptureObservation(ctx, r, hookrun.Observation{
 		Tool: antigravityTool, Source: sourceAntigravityHook, StateDir: antigravityObservationDir,
@@ -276,8 +274,8 @@ func antigravityObserve(ctx context.Context, env hookrun.Env, hook string) error
 		return nil
 	}
 	if hook == "PostInvocation" {
-		// Invocation 0's initialNumSteps is the turn's first step, as its PreInvocation gave
-		// it: a record of another turn is stale, the first hook of this one never ran.
+		// Invocation 0 carries the turn's first step, as its PreInvocation did, so it can
+		// tell a stale record (see turn.go).
 		invocation, _, invocationKnown := hookrun.JSONNumber(in.InvocationNum, true)
 		if steps, _, stepsKnown := hookrun.JSONNumber(in.InitialNumSteps, true); invocationKnown && invocation == 0 && stepsKnown {
 			endAntigravityTurnUnlessBegunAt(env, in.id(), int64(steps))
@@ -295,8 +293,8 @@ func antigravityObserve(ctx context.Context, env hookrun.Env, hook string) error
 	turn := antigravityTurnID(env, r, in.id())
 	read := captureAntigravityCalls(ctx, env, r, in)
 	if hook == "Stop" {
-		// Stop ends the turn it found: whatever agy does next in the conversation, a prompt or
-		// a wake, starts with a PreInvocation at invocation 0, which records the turn again.
+		// Stop ends the turn it found and no other; a prompt or a wake after it starts with
+		// a PreInvocation at invocation 0, which records the turn again.
 		endAntigravityTurnBegun(env, in.id(), begun)
 	}
 	env.CaptureObservation(ctx, r, hookrun.Observation{
@@ -346,10 +344,8 @@ func antigravityObservationAttrs(in *antigravityHookInput, hook, turn string, ca
 }
 
 // antigravitySkipCalls is a hook that could not resolve where it ran, or ran where the
-// team's policy collects nothing: whatever the reason, it ends the turn terma was following,
-// so no later hook sends the rest of it, and reads nothing. The next collecting hook has no
-// turn of its own for the lines written meanwhile and passes them; a new turn's first step
-// is past them.
+// team's policy collects nothing: it ends the turn terma was following and reads nothing
+// (see turn.go).
 func antigravitySkipCalls(env hookrun.Env, in *antigravityHookInput) {
 	endAntigravityTurn(env, in.id())
 }
