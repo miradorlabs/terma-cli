@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io/fs"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/flock"
+	"github.com/miradorlabs/terma-cli/internal/session"
 )
 
 // Prune removes ledgers idle past retention that no queued record names (along with locks
@@ -23,14 +25,10 @@ func Prune(ctx context.Context, stateDir string, now time.Time, queued map[strin
 	if err != nil {
 		return
 	}
-	keep := queued
-	if len(queued) > 0 {
-		keep = make(map[string]bool, len(queued))
-		for id := range queued {
-			keep[id] = true
-			if canon, err := aliasTarget(stateDir, id); err == nil {
-				keep[canon] = true
-			}
+	keep := maps.Clone(queued)
+	for id := range queued {
+		if canon, err := aliasTarget(stateDir, id); err == nil {
+			keep[canon] = true
 		}
 	}
 	for _, e := range entries {
@@ -61,7 +59,6 @@ func Prune(ctx context.Context, stateDir string, now time.Time, queued map[strin
 	}
 	pruneAliases(stateDir, now, keep)
 }
-
 func pruneLedger(stateDir, path string, now time.Time, queued map[string]bool) {
 	lock := path + ".lock"
 	unlock, err := flock.TryLock(lock)
@@ -87,14 +84,11 @@ func pruneLedger(stateDir, path string, now time.Time, queued map[string]bool) {
 		return
 	}
 	for _, alias := range l.Aliases {
-		if b, err := os.ReadFile(aliasPath(stateDir, alias)); err == nil && string(b) == sessionID {
-			_ = os.Remove(aliasPath(stateDir, alias))
-		}
+		removeAliasIf(stateDir, alias, func(target string) bool { return target == sessionID })
 	}
 	_ = os.Remove(path)
 	flock.Remove(lock, unlock)
 }
-
 func pruneAside(stateDir, name string, now time.Time, queued map[string]bool) {
 	sessionID, ok := sessionOf(name)
 	if !ok {
@@ -136,25 +130,38 @@ func (l ledger) retention() time.Duration {
 	return Retention
 }
 func pruneAliases(stateDir string, now time.Time, queued map[string]bool) {
-	dir := filepath.Join(stateDir, Dir, aliasesDir)
-	entries, _ := os.ReadDir(dir)
+	entries, _ := os.ReadDir(filepath.Join(stateDir, Dir, aliasesDir))
 	for _, e := range entries {
-		info, err := e.Info()
-		if err != nil || e.IsDir() || now.Sub(info.ModTime()) <= Retention || queued[e.Name()] {
+		if info, err := e.Info(); err != nil || e.IsDir() || now.Sub(info.ModTime()) <= Retention || queued[e.Name()] {
 			continue
 		}
-		path := filepath.Join(dir, e.Name())
 		if strings.HasPrefix(e.Name(), config.TempPrefix) {
-			_ = os.Remove(path)
+			_ = os.Remove(aliasPath(stateDir, e.Name()))
 			continue
 		}
-		if b, err := os.ReadFile(path); err == nil {
-			if ledger, err := ledgerPath(stateDir, string(b)); err == nil {
-				if _, err := os.Lstat(ledger); !errors.Is(err, fs.ErrNotExist) {
-					continue
-				}
+		removeAliasIf(stateDir, e.Name(), func(target string) bool {
+			if info, err := os.Lstat(aliasPath(stateDir, e.Name())); err != nil || now.Sub(info.ModTime()) <= Retention {
+				return false
 			}
-			_ = os.Remove(path)
-		}
+			ledger, err := ledgerPath(stateDir, target)
+			if err == nil {
+				_, err = os.Lstat(ledger)
+			}
+			return err != nil && (errors.Is(err, fs.ErrNotExist) || !session.ValidID(target))
+		})
+	}
+}
+func removeAliasIf(stateDir, alias string, match func(target string) bool) {
+	if !session.ValidID(alias) {
+		return
+	}
+	unlock, err := flock.TryLock(filepath.Join(stateDir, Dir, alias+".json.lock"))
+	if err != nil {
+		return
+	}
+	defer unlock()
+	p := aliasPath(stateDir, alias)
+	if b, err := os.ReadFile(p); err == nil && match(strings.TrimSpace(string(b))) {
+		_ = os.Remove(p)
 	}
 }

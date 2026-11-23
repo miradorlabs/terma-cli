@@ -22,7 +22,6 @@ type aside struct {
 	marks []mark
 	files []string // file names for fold to remove
 }
-
 type mark struct {
 	Run string    `json:"run"`
 	At  time.Time `json:"at"`
@@ -30,36 +29,45 @@ type mark struct {
 
 func asidePath(ledger string) string { return strings.TrimSuffix(ledger, ".json") + asideExt }
 
+var afterAsideWrite func(id string) // test hook for deterministic interleavings
+
 // MarkAside records a lock-free Mixed mark for sessionID/runID with reason Aside.
 func MarkAside(stateDir, sessionID, runID string, at time.Time) error {
-	if target, err := aliasTarget(stateDir, sessionID); err == nil {
-		sessionID = target
-	}
-	path, err := ledgerPath(stateDir, sessionID)
-	if err != nil {
-		return err
-	}
-	dir, b := asidePath(path), []byte(nil)
 	if runID == "" {
 		runID = newRunID()
 	}
-	if b, err = json.Marshal(mark{Run: runID, At: at.UTC()}); err != nil {
+	b, err := json.Marshal(mark{Run: runID, At: at.UTC()})
+	if err != nil {
 		return err
 	}
-	file := filepath.Join(dir, newRunID()+".json")
-	for range asideWrites {
-		if err = os.MkdirAll(dir, 0o700); err == nil {
-			if err = config.WriteFileAtomic(file, b, 0o600); err == nil {
-				return nil
+	cur, err := aliasTarget(stateDir, sessionID)
+	if err != nil {
+		return err
+	}
+	for range 8 {
+		dir, name := asidePath(filepath.Join(stateDir, Dir, cur+".json")), newRunID()+".json"
+		for range asideWrites {
+			if err = os.MkdirAll(dir, 0o700); err == nil {
+				err = config.WriteFileAtomic(filepath.Join(dir, name), b, 0o600)
+			}
+			if err == nil || !errors.Is(err, fs.ErrNotExist) {
+				break
 			}
 		}
-		if !errors.Is(err, fs.ErrNotExist) {
+		if err != nil {
 			return err
 		}
+		if afterAsideWrite != nil {
+			afterAsideWrite(cur)
+		}
+		next, err := aliasTarget(stateDir, cur)
+		if err != nil || next == cur {
+			return err
+		}
+		cur = next
 	}
-	return err
+	return fmt.Errorf("runs: alias loop for %q", sessionID)
 }
-
 func (a aside) apply(l *ledger) {
 	for _, m := range a.marks {
 		i := slices.IndexFunc(l.Runs, func(r run) bool { return r.ID == m.Run })
@@ -103,11 +111,9 @@ func loadAside(dir string) (a aside, err error) {
 		if entries, err = os.ReadDir(dir); err == nil {
 			break
 		}
-		info, statErr := os.Lstat(dir)
-		if errors.Is(err, fs.ErrNotExist) && errors.Is(statErr, fs.ErrNotExist) {
+		if info, statErr := os.Lstat(dir); errors.Is(err, fs.ErrNotExist) && errors.Is(statErr, fs.ErrNotExist) {
 			return aside{}, nil
-		}
-		if !errors.Is(err, fs.ErrNotExist) || statErr != nil || !info.IsDir() {
+		} else if !errors.Is(err, fs.ErrNotExist) || statErr != nil || !info.IsDir() {
 			return aside{}, err
 		}
 	}
@@ -126,8 +132,7 @@ func loadAside(dir string) (a aside, err error) {
 		var m mark
 		if err != nil {
 			return aside{}, err
-		}
-		if err := json.Unmarshal(b, &m); err != nil {
+		} else if err := json.Unmarshal(b, &m); err != nil {
 			return aside{}, fmt.Errorf("parse %s: %w", p, err)
 		}
 		a.marks, a.files = append(a.marks, m), append(a.files, e.Name())

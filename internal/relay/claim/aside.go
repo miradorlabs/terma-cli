@@ -26,13 +26,12 @@ type asideMark struct {
 }
 
 func asidePath(claimPath string) string { return claimPath + asideExt }
-
 func writeMixedAside(claimPath string, c Claim, now time.Time) bool {
 	c.Kind, c.ProjectID, c.ClaimedAt = KindMixed, "", now.UTC()
 	existing, _ := loadAside(claimPath, c.ClaimedAt)
 	for _, em := range existing {
 		e := em.claim
-		if em.file != "" && e.Run == c.Run && e.Account == c.Account && e.Profile == c.Profile &&
+		if em.file != "" && e.Run == c.Run && e.Account == c.Account && e.Profile == c.Profile && (c.Parent == "" || e.Parent == c.Parent) &&
 			coveredPIDs(c.PIDs, e.PIDs) && !c.ClaimedAt.Before(e.ClaimedAt) {
 			_ = os.Chtimes(filepath.Join(asidePath(claimPath), em.file), c.ClaimedAt, c.ClaimedAt)
 			return true
@@ -44,13 +43,13 @@ func writeMixedAside(claimPath string, c Claim, now time.Time) bool {
 	}
 	var rnd [16]byte
 	_, _ = rand.Read(rnd[:])
-	dir := asidePath(claimPath)
-	file := filepath.Join(dir, hex.EncodeToString(rnd[:])+".json")
+	dir, name := asidePath(claimPath), hex.EncodeToString(rnd[:])+".json"
 	for range asideWrites {
 		if err = os.MkdirAll(dir, 0o700); err == nil {
-			if err = config.WriteFileAtomicNoSync(file, data, 0o600); err == nil {
-				return true
-			}
+			err = config.WriteFileAtomicNoSync(filepath.Join(dir, name), data, 0o600)
+		}
+		if err == nil {
+			return true
 		}
 		if !errors.Is(err, fs.ErrNotExist) {
 			return false
@@ -58,7 +57,6 @@ func writeMixedAside(claimPath string, c Claim, now time.Time) bool {
 	}
 	return false
 }
-
 func loadAside(claimPath string, now time.Time) (marks []asideMark, files []string) {
 	dir, fail := asidePath(claimPath), []asideMark{{claim: Claim{Kind: KindMixed}}}
 	var entries []os.DirEntry
@@ -67,11 +65,9 @@ func loadAside(claimPath string, now time.Time) (marks []asideMark, files []stri
 		if entries, err = os.ReadDir(dir); err == nil {
 			break
 		}
-		info, statErr := os.Lstat(dir)
-		if errors.Is(err, fs.ErrNotExist) && errors.Is(statErr, fs.ErrNotExist) {
+		if info, statErr := os.Lstat(dir); errors.Is(err, fs.ErrNotExist) && errors.Is(statErr, fs.ErrNotExist) {
 			return nil, nil
-		}
-		if !errors.Is(err, fs.ErrNotExist) || statErr != nil || !info.IsDir() {
+		} else if !errors.Is(err, fs.ErrNotExist) || statErr != nil || !info.IsDir() {
 			return fail, nil
 		}
 	}
@@ -107,7 +103,6 @@ func loadAside(claimPath string, now time.Time) (marks []asideMark, files []stri
 	slices.SortStableFunc(marks, func(a, b asideMark) int { return a.claim.ClaimedAt.Compare(b.claim.ClaimedAt) })
 	return marks, files
 }
-
 func applyAside(prev Claim, havePrev bool, marks []asideMark) (Claim, bool, bool) {
 	changed := false
 	for _, em := range marks {
@@ -158,7 +153,6 @@ func applyAside(prev Claim, havePrev bool, marks []asideMark) (Claim, bool, bool
 	}
 	return prev, havePrev, changed
 }
-
 func clampSince(pls []Placement, run string, since time.Time) time.Time {
 	for _, pl := range pls {
 		if (run == "" || pl.Run == "" || pl.Run != run) && since.Before(pl.Since) {
@@ -167,7 +161,6 @@ func clampSince(pls []Placement, run string, since time.Time) time.Time {
 	}
 	return since
 }
-
 func unionPIDs(a, b []int) []int {
 	if len(a) == 0 || len(b) == 0 {
 		return nil
@@ -183,9 +176,7 @@ func unionPIDs(a, b []int) []int {
 	}
 	return out
 }
-
 func coveredPIDs(want, have []int) bool { return len(have) == 0 || len(want) > 0 && subset(want, have) }
-
 func mergeMixedInto(pls []Placement, idx int, m Claim) ([]Placement, bool) {
 	pl, mod, cut := pls[idx], false, idx
 	if !coveredPIDs(m.PIDs, pl.PIDs) {
@@ -206,11 +197,9 @@ func mergeMixedInto(pls []Placement, idx int, m Claim) ([]Placement, bool) {
 	}
 	return slices.Replace(pls, cut, idx+1, pl), true
 }
-
 func sameLane(pl Placement, run, profile, account string) bool {
 	return (run == "" || pl.Run == "" || pl.Run == run) && (profile == "" || pl.Profile == profile) && (account == "" || pl.Account == account)
 }
-
 func prepareMixed(pls []Placement, run, profile, account string, add []int, since time.Time) ([]Placement, []int, bool) {
 	pids := slices.Clone(add)
 	for _, pl := range pls {
@@ -227,7 +216,6 @@ func prepareMixed(pls []Placement, run, profile, account string, add []int, sinc
 	}
 	return pls[:n], pids, hit
 }
-
 func poisonRun(pls []Placement, run string, since time.Time) (hit bool) {
 	for i := range pls {
 		if (run == "" || pls[i].Run == "" || pls[i].Run == run) && !pls[i].Since.Before(since) && (pls[i].Kind != KindMixed || pls[i].ProjectID != "") {
@@ -236,8 +224,12 @@ func poisonRun(pls []Placement, run string, since time.Time) (hit bool) {
 	}
 	return hit
 }
-
 func foldEarlierRun(prev *Claim, m Claim) (matched, changed bool) {
+	defer func() {
+		if matched && prev.Parent == "" && m.Parent != "" {
+			prev.Parent, changed = m.Parent, true
+		}
+	}()
 	pls, idx := slices.Clone(prev.placements()), -1
 	for i := len(pls) - 1; i >= 0 && idx < 0; i-- {
 		if pls[i].Run == m.Run {
@@ -263,7 +255,6 @@ func foldEarlierRun(prev *Claim, m Claim) (matched, changed bool) {
 	prev.Placements, prev.Evicted, prev.MixedRuns = trimPlacements(pls, prev.Evicted, prev.MixedRuns)
 	return true, true
 }
-
 func trimPlacements(pls []Placement, evicted bool, mixed []string) ([]Placement, bool, []string) {
 	if len(pls) <= maxPlacements {
 		return pls, evicted, mixed
@@ -280,7 +271,6 @@ func trimPlacements(pls []Placement, evicted bool, mixed []string) ([]Placement,
 	}
 	return pls[drop:], true, out
 }
-
 func removeAside(claimPath string, files []string) {
 	if len(files) == 0 {
 		return
@@ -291,7 +281,6 @@ func removeAside(claimPath string, files []string) {
 	}
 	_ = os.Remove(dir)
 }
-
 func pruneAside(dir string, now time.Time) {
 	entries, _ := os.ReadDir(dir)
 	for _, e := range entries {
