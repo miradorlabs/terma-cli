@@ -426,3 +426,39 @@ func TestAntigravityRefreshRewritesOnlyTermasCommands(t *testing.T) {
 		t.Fatalf("refresh added events:\n%s", got)
 	}
 }
+
+// When setup switches terma's hook back on, its note says so, and says the developer's own
+// handlers come back on with it wherever in the hook they sit: under an event terma writes,
+// or under one it does not, such as a PreToolUse guard. A field that lists no handlers is
+// not one.
+func TestAntigravityHooksSwitchOnNoteNamesTheDevelopersHandlers(t *testing.T) {
+	t.Parallel()
+	const withTheirs = ", and with it the handlers you added to that hook"
+	stop := hookruntest.InJSON(testCommand("antigravity-stop"))
+	for name, tc := range map[string]struct {
+		hook   string
+		theirs bool
+	}{
+		"a guard under an event terma does not write": {`{"enabled": false, "PreToolUse": [{"type": "command", "command": "/usr/local/bin/my-guard"}]}`, true},
+		"a matcher group under SessionStart":          {`{"enabled": false, "SessionStart": [{"matcher": "", "hooks": [{"command": "./hello.sh"}]}]}`, true},
+		"a handler under an event terma writes":       {`{"enabled": false, "Stop": [{"command": "./my-stop.sh"}]}`, true},
+		"fields that list no handlers":                {`{"enabled": false, "description": "mine", "priority": 3, "SessionStart": [], "PreToolUse": {"note": "not a list"}}`, false},
+		"terma's own entries alone":                   {`{"enabled": false, "Stop": [{"type": "command", "command": "` + stop + `", "timeout": 10}]}`, false},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			root := t.TempDir()
+			hookruntest.WriteFile(t, root, "hooks.json", `{"terma": `+tc.hook+`}`)
+			plan, err := planUserHooks(root, testCommand, true)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(plan.Notes) != 1 || !strings.Contains(plan.Notes[0], `back on (it was "enabled": false)`) {
+				t.Fatalf("notes = %q, want the one saying the hook is back on", plan.Notes)
+			}
+			if got := strings.HasSuffix(plan.Notes[0], withTheirs); got != tc.theirs {
+				t.Errorf("note = %q; names the developer's handlers: %v, want %v", plan.Notes[0], got, tc.theirs)
+			}
+		})
+	}
+}
