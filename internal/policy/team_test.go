@@ -19,6 +19,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/account/serverkey"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/routing"
+	"github.com/miradorlabs/terma-cli/internal/sendas"
 )
 
 // Every refusal is classified by status, AIP-193 reason, and typed error — never by
@@ -109,7 +110,7 @@ func TestFetchTeamUsesSingleUserToken(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	r, err := (Source{}).RefreshTeam(t.Context(), cfg, tm)
+	r, err := (Source{}).RefreshTeam(t.Context(), cfg, st.Account, tm)
 	if err != nil || r.Policy == nil || r.Epoch != 0 || r.EnrollmentID != enrID || r.At.IsZero() {
 		t.Fatalf("RefreshTeam = %+v, %v", r, err)
 	}
@@ -153,7 +154,7 @@ func TestFetchTeamUsesSingleUserToken(t *testing.T) {
 
 // RefreshTeam surfaces per-request 403 ORG_NOT_ACCESSIBLE as OrgAccessLost, 403
 // PROJECT_NOT_FOUND as Terminal, and fails closed on missing login, wrong environment,
-// empty expected account, or account mismatch without hitting the server.
+// empty/no_person state account, or state-vs-credential mismatch without hitting the server.
 func TestFetchTeamFailsClosed(t *testing.T) {
 	var asked atomic.Int32
 	var mu sync.Mutex
@@ -171,9 +172,11 @@ func TestFetchTeamFailsClosed(t *testing.T) {
 	cfg := setUp(t, "")
 	cfg.AuthURL = srv.URL
 	tm := routing.Team{EnrollmentID: "e", OrganizationID: "org_b", AuthURL: srv.URL, TeamID: "team-b"}
+	aliceAcct := auth.AccountKey(srv.URL, "alice")
+	bobAcct := auth.AccountKey(srv.URL, "bob")
 
 	// No login -> SignIn, zero HTTP calls.
-	r, err := (Source{}).RefreshTeam(t.Context(), cfg, tm)
+	r, err := (Source{}).RefreshTeam(t.Context(), cfg, aliceAcct, tm)
 	if err == nil || r.Failure != routing.SignIn || r.Policy != nil || asked.Load() != 0 {
 		t.Fatalf("signed out: %+v, %v, asked=%d", r, err, asked.Load())
 	}
@@ -192,28 +195,27 @@ func TestFetchTeamFailsClosed(t *testing.T) {
 
 	// Team from another environment -> ErrOtherEnvironment / Transient, zero HTTP calls.
 	otherEnvTeam := routing.Team{EnrollmentID: "e", OrganizationID: "org_a", AuthURL: "https://auth.elsewhere", TeamID: "team-a"}
-	r, err = (Source{}).RefreshTeam(t.Context(), cfg, otherEnvTeam)
+	r, err = (Source{}).RefreshTeam(t.Context(), cfg, aliceAcct, otherEnvTeam)
 	if !errors.Is(err, ErrOtherEnvironment) || r.Failure != routing.Transient || asked.Load() != 0 {
 		t.Fatalf("other environment team: %+v, %v, asked=%d", r, err, asked.Load())
 	}
 
-	// Empty cfg.Account -> ErrCredentialAccount / SignIn, zero HTTP calls.
-	cfg.Account = ""
-	r, err = (Source{}).RefreshTeam(t.Context(), cfg, tm)
-	if !errors.Is(err, ErrCredentialAccount) || r.Failure != routing.SignIn || asked.Load() != 0 {
-		t.Fatalf("empty account: %+v, %v, asked=%d", r, err, asked.Load())
+	// Empty or no_person state account on user-token profile -> ErrCredentialAccount / SignIn, zero HTTP calls.
+	for _, badAcct := range []string{"", sendas.NoPersonLane} {
+		r, err = (Source{}).RefreshTeam(t.Context(), cfg, badAcct, tm)
+		if !errors.Is(err, ErrCredentialAccount) || r.Failure != routing.SignIn || asked.Load() != 0 {
+			t.Fatalf("account %q: %+v, %v, asked=%d", badAcct, r, err, asked.Load())
+		}
 	}
 
 	// Account mismatch -> ErrCredentialAccount / SignIn, zero HTTP calls.
-	cfg.Account = auth.AccountKey(srv.URL, "bob")
-	r, err = (Source{}).RefreshTeam(t.Context(), cfg, tm)
+	r, err = (Source{}).RefreshTeam(t.Context(), cfg, bobAcct, tm)
 	if !errors.Is(err, ErrCredentialAccount) || r.Failure != routing.SignIn || asked.Load() != 0 {
 		t.Fatalf("account mismatch: %+v, %v, asked=%d", r, err, asked.Load())
 	}
 
 	// Matching account receives 403 ORG_NOT_ACCESSIBLE -> OrgAccessLost.
-	cfg.Account = alice.Account()
-	r, err = (Source{}).RefreshTeam(t.Context(), cfg, tm)
+	r, err = (Source{}).RefreshTeam(t.Context(), cfg, alice.Account(), tm)
 	if err == nil || r.Failure != routing.OrgAccessLost || asked.Load() != 1 {
 		t.Fatalf("403 ORG_NOT_ACCESSIBLE: %+v, %v, asked=%d", r, err, asked.Load())
 	}
@@ -222,7 +224,7 @@ func TestFetchTeamFailsClosed(t *testing.T) {
 	mu.Lock()
 	reason = "PROJECT_NOT_FOUND"
 	mu.Unlock()
-	r, err = (Source{}).RefreshTeam(t.Context(), cfg, tm)
+	r, err = (Source{}).RefreshTeam(t.Context(), cfg, alice.Account(), tm)
 	if err == nil || r.Failure != routing.Terminal || asked.Load() != 2 {
 		t.Fatalf("403 PROJECT_NOT_FOUND: %+v, %v, asked=%d", r, err, asked.Load())
 	}
@@ -238,10 +240,48 @@ func TestFetchTeamFailsClosed(t *testing.T) {
 	if _, err := auth.SaveCredential(cfg.Dir, cfg.ProfileName, otherCred); err != nil {
 		t.Fatal(err)
 	}
-	cfg.Account = otherCred.Account()
-	r, err = (Source{}).RefreshTeam(t.Context(), cfg, tm)
+	r, err = (Source{}).RefreshTeam(t.Context(), cfg, otherCred.Account(), tm)
 	if err == nil || r.Failure != routing.SignIn || asked.Load() != 2 {
 		t.Fatalf("wrong-environment credential: %+v, %v, asked=%d", r, err, asked.Load())
+	}
+}
+
+// Interrupted account switch: config.json and the stored credential both belong to Bob,
+// while the routing state is still owned by Alice. FetchTeam and RefreshTeam must refuse
+// with ErrCredentialAccount and make zero HTTP requests so Alice's teams are never
+// marked Refused using Bob's token.
+func TestFetchTeamRefusesStateAccountMismatchDespiteMatchingConfig(t *testing.T) {
+	var asked atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		asked.Add(1)
+		w.WriteHeader(http.StatusForbidden)
+		fmt.Fprint(w, `{"error":{"code":"PERMISSION_DENIED","reason":"ORG_NOT_ACCESSIBLE","message":"no access"}}`)
+	}))
+	defer srv.Close()
+
+	cfg := setUp(t, "")
+	cfg.AuthURL = srv.URL
+	bob := &auth.Credential{
+		AccessToken: "bob-token-fixture",
+		AuthURL:     srv.URL,
+		SessionID:   "sess-b",
+		UserID:      "bob",
+		ExpiresAt:   time.Now().Add(time.Hour),
+	}
+	if _, err := auth.SaveCredential(cfg.Dir, cfg.ProfileName, bob); err != nil {
+		t.Fatal(err)
+	}
+	cfg.Account = bob.Account() // config.json already updated to Bob
+
+	aliceAccount := auth.AccountKey(srv.URL, "alice") // routing.State still owned by Alice
+	tm := routing.Team{EnrollmentID: "e", OrganizationID: "org_a", AuthURL: srv.URL, TeamID: "team-a"}
+
+	if _, err := (Source{}).FetchTeam(t.Context(), cfg, aliceAccount, tm); !errors.Is(err, ErrCredentialAccount) || asked.Load() != 0 {
+		t.Fatalf("FetchTeam with Bob cred+config against Alice state: err=%v, asked=%d", err, asked.Load())
+	}
+	r, err := (Source{}).RefreshTeam(t.Context(), cfg, aliceAccount, tm)
+	if !errors.Is(err, ErrCredentialAccount) || r.Failure != routing.SignIn || asked.Load() != 0 {
+		t.Fatalf("RefreshTeam with Bob cred+config against Alice state: %+v, %v, asked=%d", r, err, asked.Load())
 	}
 }
 
@@ -270,14 +310,14 @@ func TestFetchTeam404ProjectNotFoundIsTransient(t *testing.T) {
 	if !routing.ValidAccount(cfg.Account) {
 		t.Fatalf("routing.ValidAccount rejected auth.AccountKey %q", cfg.Account)
 	}
-	r, err := (Source{}).RefreshTeam(t.Context(), cfg, routing.Team{EnrollmentID: "e", OrganizationID: "org_b", AuthURL: srv.URL, TeamID: "team-b"})
+	r, err := (Source{}).RefreshTeam(t.Context(), cfg, cred.Account(), routing.Team{EnrollmentID: "e", OrganizationID: "org_b", AuthURL: srv.URL, TeamID: "team-b"})
 	if err == nil || r.Failure != routing.Transient {
 		t.Fatalf("404 PROJECT_NOT_FOUND: %+v, %v, want Transient", r, err)
 	}
 }
 
-// A server-key profile fetches only its configured team using keys.json, omits project_id,
-// and refuses another team or another auth host.
+// A server-key profile requires the no_person state account, fetches only its configured
+// team using keys.json, omits project_id, and refuses another team or another auth host.
 func TestFetchTeamWithServerKey(t *testing.T) {
 	var mu sync.Mutex
 	var bearer, queryProject string
@@ -299,13 +339,24 @@ func TestFetchTeamWithServerKey(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Non-no_person state accounts (empty or user account) are refused before any HTTP request.
+	teamA := routing.Team{EnrollmentID: "e1", OrganizationID: "org_a", AuthURL: srv.URL, TeamID: "team-a"}
+	for _, badAcct := range []string{"", auth.AccountKey(srv.URL, "alice")} {
+		if _, err := (Source{}).FetchTeam(t.Context(), cfg, badAcct, teamA); !errors.Is(err, ErrCredentialAccount) || asked.Load() != 0 {
+			t.Fatalf("server-key with account %q: err=%v, asked=%d", badAcct, err, asked.Load())
+		}
+		if r, err := (Source{}).RefreshTeam(t.Context(), cfg, badAcct, teamA); !errors.Is(err, ErrCredentialAccount) || r.Failure != routing.SignIn || asked.Load() != 0 {
+			t.Fatalf("RefreshTeam server-key with account %q: %+v, %v, asked=%d", badAcct, r, err, asked.Load())
+		}
+	}
+
 	// Another team is refused before any HTTP request.
-	if _, err := (Source{}).FetchTeam(t.Context(), cfg, routing.Team{EnrollmentID: "e2", OrganizationID: "org_a", AuthURL: srv.URL, TeamID: "team-b"}); err == nil || asked.Load() != 0 {
+	if _, err := (Source{}).FetchTeam(t.Context(), cfg, sendas.NoPersonLane, routing.Team{EnrollmentID: "e2", OrganizationID: "org_a", AuthURL: srv.URL, TeamID: "team-b"}); err == nil || asked.Load() != 0 {
 		t.Fatalf("other team on server-key profile: err=%v, asked=%d", err, asked.Load())
 	}
 
-	// Configured team succeeds with keys.json and no project_id query parameter.
-	p, err := (Source{}).FetchTeam(t.Context(), cfg, routing.Team{EnrollmentID: "e1", OrganizationID: "org_a", AuthURL: srv.URL, TeamID: "team-a"})
+	// Configured team succeeds with no_person, keys.json, and no project_id query parameter.
+	p, err := (Source{}).FetchTeam(t.Context(), cfg, sendas.NoPersonLane, teamA)
 	mu.Lock()
 	gotBearer, gotQuery := bearer, queryProject
 	mu.Unlock()
@@ -317,7 +368,7 @@ func TestFetchTeamWithServerKey(t *testing.T) {
 // Under the offline stub a team's policy is the stub's, stamped as the team's.
 func TestFetchTeamUnderStub(t *testing.T) {
 	cfg := setUp(t, `{"mode":"repo","repositories":["github.com/acme/api"],"include_prompts":true}`)
-	p, err := (Source{}).FetchTeam(t.Context(), cfg, routing.Team{EnrollmentID: "e", OrganizationID: org, AuthURL: authURL, TeamID: "team-x"})
+	p, err := (Source{}).FetchTeam(t.Context(), cfg, sendas.NoPersonLane, routing.Team{EnrollmentID: "e", OrganizationID: org, AuthURL: authURL, TeamID: "team-x"})
 	if err != nil || p.TeamID != "team-x" || p.OrganizationID != org || p.AuthURL != authURL || p.FetchedAt.IsZero() {
 		t.Fatalf("FetchTeam = %+v, %v", p, err)
 	}

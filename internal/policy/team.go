@@ -11,6 +11,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/account/keystore"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/routing"
+	"github.com/miradorlabs/terma-cli/internal/sendas"
 )
 
 // teamRefreshTimeout bounds a single team policy HTTP fetch.
@@ -23,16 +24,19 @@ const teamRefreshTimeout = 10 * time.Second
 // use now.
 var ErrOtherEnvironment = errors.New("the team was selected in another environment than this profile's")
 
-// ErrCredentialAccount is a stored user sign-in belonging to a different account than the
-// profile expects: FetchTeam refuses rather than refreshing one account's team with
-// another person's token.
+// ErrCredentialAccount is a stored sign-in that does not match the account owning the
+// routing state (State.Account, or sendas.NoPersonLane on a server-key profile): FetchTeam
+// refuses rather than refreshing one account's team with another person's token.
 var ErrCredentialAccount = errors.New("stored sign-in belongs to another account")
 
 // FetchTeam asks the gateway for t's collection policy using the profile's single user
 // token (auth.LoadCredential), or, on a server-key profile, that team's key in keys.json
-// (keystore.Get). The returned policy is stamped with t's team, organization, and
-// environment, which alone make it t's (routing.State.ApplyRefresh).
-func (s Source) FetchTeam(ctx context.Context, cfg *config.Config, t routing.Team) (config.Policy, error) {
+// (keystore.Get). account is the routing state's owning account (State.Account): user-token
+// profiles refuse with ErrCredentialAccount unless cred.Account() matches account, and
+// server-key profiles refuse unless account is sendas.NoPersonLane. The returned policy is
+// stamped with t's team, organization, and environment, which alone make it t's
+// (routing.State.ApplyRefresh).
+func (s Source) FetchTeam(ctx context.Context, cfg *config.Config, account string, t routing.Team) (config.Policy, error) {
 	if t.TeamID == "" || t.OrganizationID == "" || t.AuthURL == "" {
 		return config.Policy{}, errors.New("a team is fetched only with its team, organization and environment")
 	}
@@ -47,8 +51,11 @@ func (s Source) FetchTeam(ctx context.Context, cfg *config.Config, t routing.Tea
 	case config.PolicyStub() != "":
 		client = api.NewAnonymous(t.AuthURL, s.Version)
 	case cfg.ServerKeySignIn:
-		// A server-key profile reads only its configured team and only against the auth host
-		// it was set up for.
+		// A server-key profile owns the no_person lane, reads only its configured team, and
+		// only against the auth host it was set up for.
+		if account != sendas.NoPersonLane {
+			return config.Policy{}, fmt.Errorf("team %s: %w", t.TeamID, ErrCredentialAccount)
+		}
 		if t.TeamID != cfg.Team {
 			return config.Policy{}, fmt.Errorf("this machine is set up with team %s's server key, which fetches only that team's policy, not team %s's", cfg.Team, t.TeamID)
 		}
@@ -67,11 +74,14 @@ func (s Source) FetchTeam(ctx context.Context, cfg *config.Config, t routing.Tea
 			return config.Policy{}, err
 		}
 	default:
+		if account == "" || account == sendas.NoPersonLane {
+			return config.Policy{}, fmt.Errorf("team %s: %w", t.TeamID, ErrCredentialAccount)
+		}
 		cred, err := auth.LoadCredential(cfg.Dir, cfg.ProfileName)
 		if err != nil {
 			return config.Policy{}, err
 		}
-		if cfg.Account == "" || cred.Account() != cfg.Account {
+		if cred.Account() != account {
 			return config.Policy{}, fmt.Errorf("team %s: %w", t.TeamID, ErrCredentialAccount)
 		}
 		if client, err = api.New(&scoped, api.Options{Version: s.Version, ProjectID: t.TeamID, Credential: cred}); err != nil {
@@ -89,9 +99,9 @@ func (s Source) FetchTeam(ctx context.Context, cfg *config.Config, t routing.Tea
 	return pol, nil
 }
 
-// RefreshTeam fetches t's policy (FetchTeam) as the refresher applies it: the policy, or
-// the class of its failure (Classify), under the epoch t had as the request started, so a
-// delayed result never overwrites a newer transition.
+// RefreshTeam fetches t's policy (FetchTeam) for the routing state owned by account as the
+// refresher applies it: the policy, or the class of its failure (Classify), under the epoch
+// t had as the request started, so a delayed result never overwrites a newer transition.
 //
 // RefreshTeam does not persist the policy file: the caller applies the result inside
 // routing.Update (which checks the state's account/generation and team epoch) and, only
@@ -102,11 +112,11 @@ func (s Source) FetchTeam(ctx context.Context, cfg *config.Config, t routing.Tea
 // global policy is persisted sanitized. Callers that handle OrgAccessLost org-wide
 // should snapshot per-enrollment epochs across t.OrganizationID before invoking
 // RefreshTeam and apply them via State.ApplyOrgAccessLost.
-func (s Source) RefreshTeam(ctx context.Context, cfg *config.Config, t routing.Team) (routing.Refresh, error) {
+func (s Source) RefreshTeam(ctx context.Context, cfg *config.Config, account string, t routing.Team) (routing.Refresh, error) {
 	ctx, cancel := context.WithTimeout(ctx, teamRefreshTimeout)
 	defer cancel()
 	r := routing.Refresh{EnrollmentID: t.EnrollmentID, Epoch: t.Epoch}
-	pol, err := s.FetchTeam(ctx, cfg, t)
+	pol, err := s.FetchTeam(ctx, cfg, account, t)
 	r.At = time.Now().UTC()
 	if err != nil {
 		r.Failure = Classify(err)
