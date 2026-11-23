@@ -1,7 +1,43 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-21T17:46:22.01218662Z",
+  "generated_at": "2026-11-23T18:53:04.497531851Z",
   "versions": [
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.331",
+      "released_at": "2026-11-23T18:36:26.468Z",
+      "captured_at": "2026-11-23T18:53:04.497531851Z",
+      "platforms": [
+        "darwin/arm64",
+        "linux/amd64"
+      ],
+      "support": "supported",
+      "previous": "2.1.330",
+      "changes": 16,
+      "categories": {
+        "binary": 1,
+        "cli": 1,
+        "config": 5,
+        "filesystem": 3,
+        "telemetry": 6
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 16,
+        "notable": 0
+      },
+      "undocumented": null,
+      "highlights": [
+        "New telemetry field: gen_ai.operation.name on traces/claude_code.llm_request",
+        "New telemetry field: gen_ai.response.model on traces/claude_code.llm_request",
+        "New telemetry field: gen_ai.usage.cache_read.input_tokens on traces/claude_code.llm_request"
+      ],
+      "signing": "valid",
+      "attempted_at": "2026-11-23T18:53:04.497531851Z",
+      "attempts": 1
+    },
     {
       "harness": "codex-desktop",
       "name": "Codex app",
@@ -6177,40 +6213,6 @@
         "Interactive system prompt changed (+169 −173 chars)",
         "System prompt changed (+169 −173 chars)",
         "New flag `claude --autocompact`"
-      ],
-      "signing": "valid"
-    },
-    {
-      "harness": "codex",
-      "name": "Codex CLI",
-      "version": "0.146.0",
-      "released_at": "2026-07-29T01:45:57.696Z",
-      "captured_at": "2026-11-05T09:54:28.532441Z",
-      "platforms": [
-        "darwin/arm64",
-        "linux/amd64"
-      ],
-      "support": "untested",
-      "previous": "0.145.0",
-      "changes": 36,
-      "categories": {
-        "behavior": 3,
-        "caching": 1,
-        "cli": 6,
-        "config": 19,
-        "filesystem": 7
-      },
-      "impact": {
-        "breaking": 0,
-        "degrading": 0,
-        "informational": 26,
-        "notable": 10
-      },
-      "undocumented": 20,
-      "highlights": [
-        "Caching across_turns: none → {\"breakpoints\":[[],[],[]],\"stable_cache_key\":true,\"stable…",
-        "Behaviour: compaction added",
-        "Behaviour: subagents removed"
       ],
       "signing": "valid"
     }

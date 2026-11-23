@@ -3,8 +3,8 @@
   "harness": "claude",
   "window": {
     "oldest": "2.1.206",
-    "newest": "2.1.330",
-    "builds": 111
+    "newest": "2.1.331",
+    "builds": 112
   },
   "items": {
     "cli.commands.claude agents": {
@@ -2361,6 +2361,17 @@
       ],
       "since_bounded": true
     },
+    "config.env_vars.ANTHROPIC_IDENTITY_TOKEN_FILE": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "2.1.331",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.env_vars.ANTHROPIC_LOG": {
       "kind": "env_var",
       "ranges": [
@@ -2736,6 +2747,11 @@
           "since": "2.1.206",
           "until": "2.1.238",
           "removed": "2.1.239"
+        },
+        {
+          "since": "2.1.331",
+          "until": null,
+          "removed": null
         }
       ],
       "since_bounded": false
@@ -2916,6 +2932,17 @@
       ],
       "since_bounded": false
     },
+    "config.env_vars.AllocUnsupportedTargetBufferTooSmallSysLexerMissingResolveDirInvalidResolveDirParseErrorAlreadyLoggedSecurityScannerConfiguredThrown": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "2.1.331",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.env_vars.BASH_DEFAULT_TIMEOUT_MS": {
       "kind": "env_var",
       "ranges": [
@@ -3026,6 +3053,17 @@
       ],
       "since_bounded": false
     },
+    "config.env_vars.BUN_CRASH_REPORT_URL": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "2.1.331",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.env_vars.BUN_DISABLE_DYNAMIC_CHUNK_SIZE": {
       "kind": "env_var",
       "ranges": [
@@ -3059,6 +3097,11 @@
           "since": "2.1.308",
           "until": "2.1.309",
           "removed": "2.1.310"
+        },
+        {
+          "since": "2.1.331",
+          "until": null,
+          "removed": null
         }
       ],
       "since_bounded": true
@@ -3088,8 +3131,8 @@
         },
         {
           "since": "2.1.310",
-          "until": null,
-          "removed": null
+          "until": "2.1.330",
+          "removed": "2.1.331"
         }
       ],
       "since_bounded": false
@@ -3147,6 +3190,17 @@
         }
       ],
       "since_bounded": false
+    },
+    "config.env_vars.BUN_OPTIONS": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "2.1.331",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
     },
     "config.env_vars.BundleV2": {
       "kind": "env_var",
@@ -5304,6 +5358,17 @@
       ],
       "since_bounded": true
     },
+    "config.env_vars.CLAUDE_CODE_BRIDGE_CHILD_HELD_TO_AUTO": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "2.1.331",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.env_vars.CLAUDE_CODE_BRIDGE_CHILD_MACHINE_SETTINGS": {
       "kind": "env_var",
       "ranges": [
@@ -5749,6 +5814,17 @@
       "ranges": [
         {
           "since": "2.1.260",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.env_vars.CLAUDE_CODE_CHROME_SIDE_PANEL": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "2.1.331",
           "until": null,
           "removed": null
         }
@@ -6668,6 +6744,17 @@
       ],
       "since_bounded": true
     },
+    "config.env_vars.CLAUDE_CODE_DISABLE_DESKTOP_SHIP": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "2.1.331",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.env_vars.CLAUDE_CODE_DISABLE_DIR_SYNC": {
       "kind": "env_var",
       "ranges": [
@@ -7273,6 +7360,17 @@
       ],
       "since_bounded": true
     },
+    "config.env_vars.CLAUDE_CODE_DISABLE_REDIRECT_CHECK": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "2.1.331",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.env_vars.CLAUDE_CODE_DISABLE_REDIRECT_DENY_RECHECK": {
       "kind": "env_var",
       "ranges": [
@@ -7306,6 +7404,17 @@
       ],
       "since_bounded": true
     },
+    "config.env_vars.CLAUDE_CODE_DISABLE_RESPONSE_COMPRESSION": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "2.1.331",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.env_vars.CLAUDE_CODE_DISABLE_RESUME_LOAD_GOODBYE_SKIP": {
       "kind": "env_var",
       "ranges": [
@@ -7333,6 +7442,17 @@
       "ranges": [
         {
           "since": "2.1.327",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.env_vars.CLAUDE_CODE_DISABLE_SHIP": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "2.1.331",
           "until": null,
           "removed": null
         }
@@ -7641,6 +7761,17 @@
       "ranges": [
         {
           "since": "2.1.282",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.env_vars.CLAUDE_CODE_ELEGANT_MIST": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "2.1.331",
           "until": null,
           "removed": null
         }
@@ -8235,6 +8366,17 @@
       "ranges": [
         {
           "since": "2.1.242",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.env_vars.CLAUDE_CODE_FETCH_PERSONAL_CLOUD_CONFIGURATION": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "2.1.331",
           "until": null,
           "removed": null
         }
@@ -9126,6 +9268,17 @@
       ],
       "since_bounded": true
     },
+    "config.env_vars.CLAUDE_CODE_HOST_STARTED_AHEAD": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "2.1.331",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.env_vars.CLAUDE_CODE_HOST_WORKTREE": {
       "kind": "env_var",
       "ranges": [
@@ -9406,6 +9559,17 @@
       "ranges": [
         {
           "since": "2.1.327",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.env_vars.CLAUDE_CODE_LAZY_WORKTREE": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "2.1.331",
           "until": null,
           "removed": null
         }
@@ -11974,6 +12138,17 @@
       ],
       "since_bounded": true
     },
+    "config.env_vars.CLAUDE_CODE_SENDS_VIA_SESSION_SERVICE": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "2.1.331",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.env_vars.CLAUDE_CODE_SEND_FEEDBACK": {
       "kind": "env_var",
       "ranges": [
@@ -12171,6 +12346,17 @@
         }
       ],
       "since_bounded": false
+    },
+    "config.env_vars.CLAUDE_CODE_SHINY_FOUNTAIN": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "2.1.331",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
     },
     "config.env_vars.CLAUDE_CODE_SHOWN_PLUGINS_DIR": {
       "kind": "env_var",
@@ -13591,6 +13777,17 @@
       ],
       "since_bounded": true
     },
+    "config.env_vars.CLAUDE_CODE_USER_DELEGATED_SESSION_SERVER_CHECK_PROVIDERS": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "2.1.331",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.env_vars.CLAUDE_CODE_USER_DIALOG_TIMEOUT_MS": {
       "kind": "env_var",
       "ranges": [
@@ -14218,6 +14415,17 @@
       ],
       "since_bounded": true
     },
+    "config.env_vars.CLAUDE_GATEWAY_IDP_CONNECT_BY_HOSTNAME": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "2.1.331",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.env_vars.CLAUDE_GATEWAY_LOG_FORMAT": {
       "kind": "env_var",
       "ranges": [
@@ -14393,6 +14601,17 @@
         }
       ],
       "since_bounded": false
+    },
+    "config.env_vars.CLAUDE_PROJECT_DIR": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "2.1.331",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
     },
     "config.env_vars.CLAUDE_PROJECT_UUID": {
       "kind": "env_var",
@@ -16940,8 +17159,8 @@
       "ranges": [
         {
           "since": "2.1.269",
-          "until": null,
-          "removed": null
+          "until": "2.1.330",
+          "removed": "2.1.331"
         }
       ],
       "since_bounded": true
@@ -16956,6 +17175,17 @@
         }
       ],
       "since_bounded": false
+    },
+    "config.env_vars.NODE_ENVexecutablePath": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "2.1.331",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
     },
     "config.env_vars.NODE_ENVfunctionSource": {
       "kind": "env_var",
@@ -17193,8 +17423,8 @@
       "ranges": [
         {
           "since": "2.1.206",
-          "until": null,
-          "removed": null
+          "until": "2.1.330",
+          "removed": "2.1.331"
         }
       ],
       "since_bounded": false
@@ -22352,6 +22582,17 @@
       ],
       "since_bounded": false
     },
+    "config.options.downloadsMirrorUrl": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.331",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.options.editorMode": {
       "kind": "setting",
       "ranges": [
@@ -23803,6 +24044,28 @@
         }
       ],
       "since_bounded": false
+    },
+    "config.options.modelCatalogPublicKey": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.331",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.modelCatalogUrl": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.331",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
     },
     "config.options.modelOverrides": {
       "kind": "setting",

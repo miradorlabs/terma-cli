@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-21T17:46:22.01218662Z",
+  "generated_at": "2026-11-23T18:53:04.497531851Z",
   "harnesses": [
     {
       "id": "claude",
@@ -9,19 +9,22 @@
       "homepage": "https://claude.com/claude-code",
       "source": null,
       "changelog": "https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md",
-      "latest": "2.1.330",
+      "latest": "2.1.331",
       "support": "supported",
-      "versions_tracked": 111,
+      "versions_tracked": 112,
       "first_tracked": "2026-07-09",
       "last_change": {
-        "from": "2.1.329",
-        "to": "2.1.330",
-        "at": "2026-11-20T19:39:16.85026872Z",
-        "released_at": "2026-11-20T19:16:01.07Z",
-        "changes": 30,
+        "from": "2.1.330",
+        "to": "2.1.331",
+        "at": "2026-11-23T18:53:04.497531851Z",
+        "released_at": "2026-11-23T18:36:26.468Z",
+        "changes": 16,
         "categories": {
-          "config": 22,
-          "filesystem": 8
+          "binary": 1,
+          "cli": 1,
+          "config": 5,
+          "filesystem": 3,
+          "telemetry": 6
         }
       }
     },
@@ -202,7 +205,7 @@
     },
     {
       "id": "omp",
-      "name": "oh-my-pi",
+      "name": "OMP",
       "vendor": "can1357",
       "homepage": "https://github.com/can1357/oh-my-pi",
       "source": {

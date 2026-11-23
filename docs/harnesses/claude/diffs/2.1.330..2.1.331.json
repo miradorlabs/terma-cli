@@ -1,0 +1,408 @@
+{
+  "schema_version": 1,
+  "harness": "claude",
+  "from": "2.1.330",
+  "to": "2.1.331",
+  "generated_at": "2026-11-23T18:53:04.497531851Z",
+  "source": null,
+  "changelog": null,
+  "summary": {
+    "changes": 16,
+    "categories": {
+      "binary": 1,
+      "cli": 1,
+      "config": 5,
+      "filesystem": 3,
+      "telemetry": 6
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 16,
+      "notable": 0
+    },
+    "undocumented": null
+  },
+  "changes": [
+    {
+      "id": "telemetry.surfaces.traces/claude_code.llm_request.keys.gen_ai.operation.name",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "traces/claude_code.llm_request",
+        "keys",
+        "gen_ai.operation.name"
+      ],
+      "title": "New telemetry field: gen_ai.operation.name on traces/claude_code.llm_request",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "class": "safe",
+        "kinds": [
+          "text"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "telemetry.surfaces.traces/claude_code.llm_request.keys.gen_ai.response.model",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "traces/claude_code.llm_request",
+        "keys",
+        "gen_ai.response.model"
+      ],
+      "title": "New telemetry field: gen_ai.response.model on traces/claude_code.llm_request",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "class": "safe",
+        "kinds": [
+          "text"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "telemetry.surfaces.traces/claude_code.llm_request.keys.gen_ai.usage.cache_read.input_tokens",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "traces/claude_code.llm_request",
+        "keys",
+        "gen_ai.usage.cache_read.input_tokens"
+      ],
+      "title": "New telemetry field: gen_ai.usage.cache_read.input_tokens on traces/claude_code.llm_request",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "class": "safe",
+        "kinds": [
+          "number"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "telemetry.surfaces.traces/claude_code.llm_request.keys.gen_ai.usage.cache_write.input_tokens",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "traces/claude_code.llm_request",
+        "keys",
+        "gen_ai.usage.cache_write.input_tokens"
+      ],
+      "title": "New telemetry field: gen_ai.usage.cache_write.input_tokens on traces/claude_code.llm_request",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "class": "safe",
+        "kinds": [
+          "number"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "telemetry.surfaces.traces/claude_code.llm_request.keys.gen_ai.usage.input_tokens",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "traces/claude_code.llm_request",
+        "keys",
+        "gen_ai.usage.input_tokens"
+      ],
+      "title": "New telemetry field: gen_ai.usage.input_tokens on traces/claude_code.llm_request",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "class": "safe",
+        "kinds": [
+          "number"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "telemetry.surfaces.traces/claude_code.llm_request.keys.gen_ai.usage.output_tokens",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "traces/claude_code.llm_request",
+        "keys",
+        "gen_ai.usage.output_tokens"
+      ],
+      "title": "New telemetry field: gen_ai.usage.output_tokens on traces/claude_code.llm_request",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "class": "safe",
+        "kinds": [
+          "number"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "cli.help.auth --help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "auth --help"
+      ],
+      "title": "Full help text of `auth --help` changed (+55 −55 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -8,6 +8,6 @@\n Commands:\n   help [command]    display help for command\n   login [options]   Sign in to your Anthropic account\n-  logout            Log out from your Anthropic account\n+  logout [options]  Log out from your Anthropic account\n   status [options]  Show authentication status\n \n",
+      "stats": {
+        "added_chars": 55,
+        "removed_chars": 55
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.downloadsMirrorUrl",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "downloadsMirrorUrl"
+      ],
+      "title": "New setting: downloadsMirrorUrl",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Anthropic-run mirror from which native installs download Claude Code releases (claude install, claude update, and auto-updates), instead of https://downloads.claude.ai. Must be exactly https://claude.fedstart.com/claude-downloads (Claude for Government). Any other value stops installs and updates with an error. CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC normally turns auto-updates off, but not with this mirror set. Only read from managed (policy) settings."
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.fileCheckpointingEnabled.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "fileCheckpointingEnabled",
+        "description"
+      ],
+      "title": "fileCheckpointingEnabled description changed (+122 −55 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Snapshot files before edits so /rewind can restore them\n+Snapshot files before edits so /rewind can restore them. In a session an SDK starts, only an administrator's false applies\n",
+      "stats": {
+        "added_chars": 122,
+        "removed_chars": 55
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.modelCatalogPublicKey",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "modelCatalogPublicKey"
+      ],
+      "title": "New setting: modelCatalogPublicKey",
+      "impact": "informational",
+      "before": null,
+      "after": {},
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.modelCatalogUrl",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "modelCatalogUrl"
+      ],
+      "title": "New setting: modelCatalogUrl",
+      "impact": "informational",
+      "before": null,
+      "after": {},
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "env_vars"
+      ],
+      "title": "Environment variables: +22 −3",
+      "impact": "informational",
+      "before": [
+        "BUN_ENVprocess",
+        "NODE_ENVdefaultInternal",
+        "OTEL_EXPORTER_OTLP_INSECURE"
+      ],
+      "after": [
+        "ANTHROPIC_IDENTITY_TOKEN_FILE",
+        "AWS_WEB_IDENTITY_TOKEN_FILE",
+        "AllocUnsupportedTargetBufferTooSmallSysLexerMissingResolveDirInvalidResolveDirParseErrorAlreadyLoggedSecurityScannerConfiguredThrown",
+        "BUN_CRASH_REPORT_URL",
+        "BUN_ENV",
+        "BUN_OPTIONS",
+        "CLAUDE_CODE_BRIDGE_CHILD_HELD_TO_AUTO",
+        "CLAUDE_CODE_CHROME_SIDE_PANEL",
+        "CLAUDE_CODE_DISABLE_DESKTOP_SHIP",
+        "CLAUDE_CODE_DISABLE_REDIRECT_CHECK",
+        "CLAUDE_CODE_DISABLE_RESPONSE_COMPRESSION",
+        "CLAUDE_CODE_DISABLE_SHIP",
+        "CLAUDE_CODE_ELEGANT_MIST",
+        "CLAUDE_CODE_FETCH_PERSONAL_CLOUD_CONFIGURATION",
+        "CLAUDE_CODE_HOST_STARTED_AHEAD",
+        "CLAUDE_CODE_LAZY_WORKTREE",
+        "CLAUDE_CODE_SENDS_VIA_SESSION_SERVICE",
+        "CLAUDE_CODE_SHINY_FOUNTAIN",
+        "CLAUDE_CODE_USER_DELEGATED_SESSION_SERVER_CHECK_PROVIDERS",
+        "CLAUDE_GATEWAY_IDP_CONNECT_BY_HOSTNAME",
+        "CLAUDE_PROJECT_DIR",
+        "NODE_ENVexecutablePath"
+      ],
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "filesystem.darwin/arm64.exec.git -c core.askPass= -c protocol.ext.allow=never -c core.alternateRefsCommand=f() { git --git-dir=\"$1\" for-each-ref --format='%(objectname)'; }; f -c submodule.recurse=false -c log.showSignature=false -c format.pretty=medium -c gc.auto=0 -c maintenance.auto=false -c diff.autoRefreshIndex=false -c hook.applypatch-msg.enabled=false -c hook.pre-applypatch.enabled=false -c hook.post-applypatch.enabled=false -c hook.pre-commit.enabled=false -c hook.pre-merge-commit.enabled=false -c hook.prepare-commit-msg.enabled=false -c hook.commit-msg.enabled=false -c hook.post-commit.enabled=false -c hook.pre-rebase.enabled=false -c hook.post-checkout.enabled=false -c hook.post-merge.enabled=false -c hook.pre-push.enabled=false -c hook.pre-receive.enabled=false -c hook.update.enabled=false -c hook.proc-receive.enabled=false -c hook.post-receive.enabled=false -c hook.post-update.enabled=false -c hook.reference-transaction.enabled=false -c hook.push-to-checkout.enabled=false -c hook.pre-auto-gc.enabled=false -c hook.post-rewrite.enabled=false -c hook.sendemail-validate.enabled=false -c hook.fsmonitor-watchman.enabled=false -c hook.p4-changelist.enabled=false -c hook.p4-prepare-changelist.enabled=false -c hook.p4-post-changelist.enabled=false -c hook.p4-pre-submit.enabled=false -c hook.post-index-change.enabled=false -c core.hooksPath=/dev/null -c core.fsmonitor= remote get-url origin.phases.turn",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "darwin/arm64",
+        "exec",
+        "git -c core.askPass= -c protocol.ext.allow=never -c core.alternateRefsCommand=f() { git --git-dir=\"$1\" for-each-ref --format='%(objectname)'; }; f -c submodule.recurse=false -c log.showSignature=false -c format.pretty=medium -c gc.auto=0 -c maintenance.auto=false -c diff.autoRefreshIndex=false -c hook.applypatch-msg.enabled=false -c hook.pre-applypatch.enabled=false -c hook.post-applypatch.enabled=false -c hook.pre-commit.enabled=false -c hook.pre-merge-commit.enabled=false -c hook.prepare-commit-msg.enabled=false -c hook.commit-msg.enabled=false -c hook.post-commit.enabled=false -c hook.pre-rebase.enabled=false -c hook.post-checkout.enabled=false -c hook.post-merge.enabled=false -c hook.pre-push.enabled=false -c hook.pre-receive.enabled=false -c hook.update.enabled=false -c hook.proc-receive.enabled=false -c hook.post-receive.enabled=false -c hook.post-update.enabled=false -c hook.reference-transaction.enabled=false -c hook.push-to-checkout.enabled=false -c hook.pre-auto-gc.enabled=false -c hook.post-rewrite.enabled=false -c hook.sendemail-validate.enabled=false -c hook.fsmonitor-watchman.enabled=false -c hook.p4-changelist.enabled=false -c hook.p4-prepare-changelist.enabled=false -c hook.p4-post-changelist.enabled=false -c hook.p4-pre-submit.enabled=false -c hook.post-index-change.enabled=false -c core.hooksPath=/dev/null -c core.fsmonitor= remote get-url origin",
+        "phases",
+        "turn"
+      ],
+      "title": "`git -c core.askPass= -c protocol.ext.allow=never -c core.alternateRefsCommand=f() { git --git-dir=\"$ …` now also runs at turn (darwin/arm64)",
+      "impact": "informational",
+      "before": null,
+      "after": "turn",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "filesystem.darwin/arm64.exec.git -c core.askPass= -c protocol.ext.allow=never -c core.alternateRefsCommand=f() { git --git-dir=\"$1\" for-each-ref --format='%(objectname)'; }; f -c submodule.recurse=false -c log.showSignature=false -c format.pretty=medium -c gc.auto=0 -c maintenance.auto=false -c diff.autoRefreshIndex=false -c hook.applypatch-msg.enabled=false -c hook.pre-applypatch.enabled=false -c hook.post-applypatch.enabled=false -c hook.pre-commit.enabled=false -c hook.pre-merge-commit.enabled=false -c hook.prepare-commit-msg.enabled=false -c hook.commit-msg.enabled=false -c hook.post-commit.enabled=false -c hook.pre-rebase.enabled=false -c hook.post-checkout.enabled=false -c hook.post-merge.enabled=false -c hook.pre-push.enabled=false -c hook.pre-receive.enabled=false -c hook.update.enabled=false -c hook.proc-receive.enabled=false -c hook.post-receive.enabled=false -c hook.post-update.enabled=false -c hook.reference-transaction.enabled=false -c hook.push-to-checkout.enabled=false -c hook.pre-auto-gc.enabled=false -c hook.post-rewrite.enabled=false -c hook.sendemail-validate.enabled=false -c hook.fsmonitor-watchman.enabled=false -c hook.p4-changelist.enabled=false -c hook.p4-prepare-changelist.enabled=false -c hook.p4-post-changelist.enabled=false -c hook.p4-pre-submit.enabled=false -c hook.post-index-change.enabled=false -c core.hooksPath=/dev/null -c core.fsmonitor= remote get-url origin.phases.startup",
+      "category": "filesystem",
+      "op": "removed",
+      "path": [
+        "filesystem",
+        "darwin/arm64",
+        "exec",
+        "git -c core.askPass= -c protocol.ext.allow=never -c core.alternateRefsCommand=f() { git --git-dir=\"$1\" for-each-ref --format='%(objectname)'; }; f -c submodule.recurse=false -c log.showSignature=false -c format.pretty=medium -c gc.auto=0 -c maintenance.auto=false -c diff.autoRefreshIndex=false -c hook.applypatch-msg.enabled=false -c hook.pre-applypatch.enabled=false -c hook.post-applypatch.enabled=false -c hook.pre-commit.enabled=false -c hook.pre-merge-commit.enabled=false -c hook.prepare-commit-msg.enabled=false -c hook.commit-msg.enabled=false -c hook.post-commit.enabled=false -c hook.pre-rebase.enabled=false -c hook.post-checkout.enabled=false -c hook.post-merge.enabled=false -c hook.pre-push.enabled=false -c hook.pre-receive.enabled=false -c hook.update.enabled=false -c hook.proc-receive.enabled=false -c hook.post-receive.enabled=false -c hook.post-update.enabled=false -c hook.reference-transaction.enabled=false -c hook.push-to-checkout.enabled=false -c hook.pre-auto-gc.enabled=false -c hook.post-rewrite.enabled=false -c hook.sendemail-validate.enabled=false -c hook.fsmonitor-watchman.enabled=false -c hook.p4-changelist.enabled=false -c hook.p4-prepare-changelist.enabled=false -c hook.p4-post-changelist.enabled=false -c hook.p4-pre-submit.enabled=false -c hook.post-index-change.enabled=false -c core.hooksPath=/dev/null -c core.fsmonitor= remote get-url origin",
+        "phases",
+        "startup"
+      ],
+      "title": "`git -c core.askPass= -c protocol.ext.allow=never -c core.alternateRefsCommand=f() { git --git-dir=\"$ …` no longer runs at startup (darwin/arm64)",
+      "impact": "informational",
+      "before": "startup",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "filesystem.linux/amd64.paths.<home>/.claude/remote/run",
+      "category": "filesystem",
+      "op": "added",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "paths",
+        "<home>/.claude/remote/run"
+      ],
+      "title": "Now looks for ~/.claude/remote/run (linux/amd64)",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "ops": [
+          "probe"
+        ],
+        "phases": [
+          "turn"
+        ]
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "binary.runtime",
+      "category": "binary",
+      "op": "changed",
+      "path": [
+        "binary",
+        "runtime"
+      ],
+      "title": "Binary runtime: bun 1.4.4 → bun 1.4.6",
+      "impact": "informational",
+      "before": "bun 1.4.4",
+      "after": "bun 1.4.6",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    }
+  ]
+}

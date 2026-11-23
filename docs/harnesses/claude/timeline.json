@@ -3,6 +3,140 @@
   "harness": "claude",
   "steps": [
     {
+      "version": "2.1.331",
+      "previous": "2.1.330",
+      "changes": [
+        {
+          "id": "telemetry.surfaces.traces/claude_code.llm_request.keys.gen_ai.operation.name",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry field: gen_ai.operation.name on traces/claude_code.llm_request",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "telemetry.surfaces.traces/claude_code.llm_request.keys.gen_ai.response.model",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry field: gen_ai.response.model on traces/claude_code.llm_request",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "telemetry.surfaces.traces/claude_code.llm_request.keys.gen_ai.usage.cache_read.input_tokens",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry field: gen_ai.usage.cache_read.input_tokens on traces/claude_code.llm_request",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "telemetry.surfaces.traces/claude_code.llm_request.keys.gen_ai.usage.cache_write.input_tokens",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry field: gen_ai.usage.cache_write.input_tokens on traces/claude_code.llm_request",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "telemetry.surfaces.traces/claude_code.llm_request.keys.gen_ai.usage.input_tokens",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry field: gen_ai.usage.input_tokens on traces/claude_code.llm_request",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "telemetry.surfaces.traces/claude_code.llm_request.keys.gen_ai.usage.output_tokens",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry field: gen_ai.usage.output_tokens on traces/claude_code.llm_request",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "cli.help.auth --help",
+          "category": "cli",
+          "op": "changed",
+          "title": "Full help text of `auth --help` changed (+55 −55 chars)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.options.downloadsMirrorUrl",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: downloadsMirrorUrl",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.options.fileCheckpointingEnabled.description",
+          "category": "config",
+          "op": "changed",
+          "title": "fileCheckpointingEnabled description changed (+122 −55 chars)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.options.modelCatalogPublicKey",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: modelCatalogPublicKey",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.options.modelCatalogUrl",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: modelCatalogUrl",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.env_vars",
+          "category": "config",
+          "op": "changed",
+          "title": "Environment variables: +22 −3",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "filesystem.darwin/arm64.exec.git -c core.askPass= -c protocol.ext.allow=never -c core.alternateRefsCommand=f() { git --git-dir=\"$1\" for-each-ref --format='%(objectname)'; }; f -c submodule.recurse=false -c log.showSignature=false -c format.pretty=medium -c gc.auto=0 -c maintenance.auto=false -c diff.autoRefreshIndex=false -c hook.applypatch-msg.enabled=false -c hook.pre-applypatch.enabled=false -c hook.post-applypatch.enabled=false -c hook.pre-commit.enabled=false -c hook.pre-merge-commit.enabled=false -c hook.prepare-commit-msg.enabled=false -c hook.commit-msg.enabled=false -c hook.post-commit.enabled=false -c hook.pre-rebase.enabled=false -c hook.post-checkout.enabled=false -c hook.post-merge.enabled=false -c hook.pre-push.enabled=false -c hook.pre-receive.enabled=false -c hook.update.enabled=false -c hook.proc-receive.enabled=false -c hook.post-receive.enabled=false -c hook.post-update.enabled=false -c hook.reference-transaction.enabled=false -c hook.push-to-checkout.enabled=false -c hook.pre-auto-gc.enabled=false -c hook.post-rewrite.enabled=false -c hook.sendemail-validate.enabled=false -c hook.fsmonitor-watchman.enabled=false -c hook.p4-changelist.enabled=false -c hook.p4-prepare-changelist.enabled=false -c hook.p4-post-changelist.enabled=false -c hook.p4-pre-submit.enabled=false -c hook.post-index-change.enabled=false -c core.hooksPath=/dev/null -c core.fsmonitor= remote get-url origin.phases.turn",
+          "category": "filesystem",
+          "op": "added",
+          "title": "`git -c core.askPass= -c protocol.ext.allow=never -c core.alternateRefsCommand=f() { git --git-dir=\"$ …` now also runs at turn (darwin/arm64)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "filesystem.darwin/arm64.exec.git -c core.askPass= -c protocol.ext.allow=never -c core.alternateRefsCommand=f() { git --git-dir=\"$1\" for-each-ref --format='%(objectname)'; }; f -c submodule.recurse=false -c log.showSignature=false -c format.pretty=medium -c gc.auto=0 -c maintenance.auto=false -c diff.autoRefreshIndex=false -c hook.applypatch-msg.enabled=false -c hook.pre-applypatch.enabled=false -c hook.post-applypatch.enabled=false -c hook.pre-commit.enabled=false -c hook.pre-merge-commit.enabled=false -c hook.prepare-commit-msg.enabled=false -c hook.commit-msg.enabled=false -c hook.post-commit.enabled=false -c hook.pre-rebase.enabled=false -c hook.post-checkout.enabled=false -c hook.post-merge.enabled=false -c hook.pre-push.enabled=false -c hook.pre-receive.enabled=false -c hook.update.enabled=false -c hook.proc-receive.enabled=false -c hook.post-receive.enabled=false -c hook.post-update.enabled=false -c hook.reference-transaction.enabled=false -c hook.push-to-checkout.enabled=false -c hook.pre-auto-gc.enabled=false -c hook.post-rewrite.enabled=false -c hook.sendemail-validate.enabled=false -c hook.fsmonitor-watchman.enabled=false -c hook.p4-changelist.enabled=false -c hook.p4-prepare-changelist.enabled=false -c hook.p4-post-changelist.enabled=false -c hook.p4-pre-submit.enabled=false -c hook.post-index-change.enabled=false -c core.hooksPath=/dev/null -c core.fsmonitor= remote get-url origin.phases.startup",
+          "category": "filesystem",
+          "op": "removed",
+          "title": "`git -c core.askPass= -c protocol.ext.allow=never -c core.alternateRefsCommand=f() { git --git-dir=\"$ …` no longer runs at startup (darwin/arm64)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "filesystem.linux/amd64.paths.<home>/.claude/remote/run",
+          "category": "filesystem",
+          "op": "added",
+          "title": "Now looks for ~/.claude/remote/run (linux/amd64)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "binary.runtime",
+          "category": "binary",
+          "op": "changed",
+          "title": "Binary runtime: bun 1.4.4 → bun 1.4.6",
+          "impact": "informational",
+          "documented": null
+        }
+      ]
+    },
+    {
       "version": "2.1.330",
       "previous": "2.1.329",
       "changes": [

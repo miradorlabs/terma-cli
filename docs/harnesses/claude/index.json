@@ -7,23 +7,60 @@
     "homepage": "https://claude.com/claude-code",
     "source": null,
     "changelog": "https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md",
-    "latest": "2.1.330",
+    "latest": "2.1.331",
     "support": "supported",
-    "versions_tracked": 111,
+    "versions_tracked": 112,
     "first_tracked": "2026-07-09",
     "last_change": {
-      "from": "2.1.329",
-      "to": "2.1.330",
-      "at": "2026-11-20T19:39:16.85026872Z",
-      "released_at": "2026-11-20T19:16:01.07Z",
-      "changes": 30,
+      "from": "2.1.330",
+      "to": "2.1.331",
+      "at": "2026-11-23T18:53:04.497531851Z",
+      "released_at": "2026-11-23T18:36:26.468Z",
+      "changes": 16,
       "categories": {
-        "config": 22,
-        "filesystem": 8
+        "binary": 1,
+        "cli": 1,
+        "config": 5,
+        "filesystem": 3,
+        "telemetry": 6
       }
     }
   },
   "versions": [
+    {
+      "version": "2.1.331",
+      "released_at": "2026-11-23T18:36:26.468Z",
+      "captured_at": "2026-11-23T18:53:04.497531851Z",
+      "platforms": [
+        "darwin/arm64",
+        "linux/amd64"
+      ],
+      "support": "supported",
+      "previous": "2.1.330",
+      "changes": 16,
+      "categories": {
+        "binary": 1,
+        "cli": 1,
+        "config": 5,
+        "filesystem": 3,
+        "telemetry": 6
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 16,
+        "notable": 0
+      },
+      "undocumented": null,
+      "highlights": [
+        "New telemetry field: gen_ai.operation.name on traces/claude_code.llm_request",
+        "New telemetry field: gen_ai.response.model on traces/claude_code.llm_request",
+        "New telemetry field: gen_ai.usage.cache_read.input_tokens on traces/claude_code.llm_request"
+      ],
+      "signing": "valid",
+      "attempted_at": "2026-11-23T18:53:04.497531851Z",
+      "attempts": 1
+    },
     {
       "version": "2.1.330",
       "released_at": "2026-11-20T19:16:01.07Z",

@@ -2,7 +2,7 @@
   "schema_version": 1,
   "harness": {
     "id": "omp",
-    "name": "oh-my-pi",
+    "name": "OMP",
     "vendor": "can1357",
     "homepage": "https://github.com/can1357/oh-my-pi",
     "source": {
