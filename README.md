@@ -440,7 +440,7 @@ interactive OMP gives a session (a headless `omp -p` names none) is sent as its 
 while you chose OMP at setup (or in global mode) and the team's policy collects prompts. Setup removes
 the span-exporting extension and exporter hook an earlier terma wrote there.
 
-terma needs OMP 19 or later: an earlier OMP loads its `.env` into its own environment, so the
+terma needs OMP 18.18.2 or later: an earlier OMP loads its `.env` into its own environment, so the
 tools it runs would inherit the relay's token, and setup refuses it while doctor fails it.
 
 OMP's known limits: an `OTEL_*` export in your shell, or in the `.env` of the directory OMP

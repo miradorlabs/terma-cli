@@ -16,15 +16,19 @@ func ompOnPath(t *testing.T, version string) {
 	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
 }
 
-// OMP before 19 loads its agent .env into its own environment, so every tool it runs would
-// inherit the relay's endpoints and their token: setup leaves such an OMP alone, and doctor
-// fails it, and setup does not pick it as installed. An OMP 19 or later, or one setup cannot
-// run, is set up as before.
-func TestOMPBefore19IsRefused(t *testing.T) {
+// OMP before 18.18.2 loads its agent .env into its own environment, so every tool it runs
+// would inherit the relay's endpoints and their token: setup leaves such an OMP alone, and
+// doctor fails it, and setup does not pick it as installed. An OMP 18.18.2 or later, or one
+// setup cannot run, is set up as before.
+func TestOMPBefore18_18_2IsRefused(t *testing.T) {
 	for _, c := range []struct {
 		version string
 		refused bool
-	}{{"18.0.0", true}, {"18.9.4-beta.1", true}, {"19.0.0", false}, {"19.1.0", false}, {"20.0.1", false}} {
+	}{
+		{"18.0.0", true}, {"18.9.4-beta.1", true}, {"18.17.0", true}, {"18.18.1", true},
+		{"18.18.2", false}, {"18.22.2", false}, {"19.0.0", false}, {"19.0.0-beta.2+build.7", false}, {"19.1.1", false}, {"20.0.1", false},
+		{"nightly", false},
+	} {
 		t.Run(c.version, func(t *testing.T) {
 			a, env := ompIn(t)
 			ompOnPath(t, c.version)
@@ -44,7 +48,7 @@ func TestOMPBefore19IsRefused(t *testing.T) {
 				}
 				return
 			}
-			if !strings.Contains(err.Error(), "OMP 19 or later is required") || !strings.Contains(err.Error(), c.version) {
+			if !strings.Contains(err.Error(), "OMP 18.18.2 or later is required") || !strings.Contains(err.Error(), c.version) {
 				t.Errorf("setup said %q", err)
 			}
 			if _, statErr := os.Stat(env); !os.IsNotExist(statErr) {
@@ -56,7 +60,7 @@ func TestOMPBefore19IsRefused(t *testing.T) {
 				}
 			}
 			detail, fix, problem := a.RelayProblem("127.0.0.1:43180")
-			if !problem || !strings.Contains(detail, "OMP 19 or later is required") || fix == "" {
+			if !problem || !strings.Contains(detail, "OMP 18.18.2 or later is required") || fix == "" {
 				t.Errorf("doctor: problem %v %q %q", problem, detail, fix)
 			}
 		})

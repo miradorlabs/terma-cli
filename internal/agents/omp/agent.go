@@ -6,7 +6,6 @@ package omp
 
 import (
 	"context"
-	"strconv"
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/harness"
@@ -30,7 +29,7 @@ func (Agent) Name() string { return name }
 // DisplayName is how prose names the agent.
 func (Agent) DisplayName() string { return displayName }
 
-// Installed reports whether an omp terma can set up is on the PATH: one before OMP 19 is
+// Installed reports whether an omp terma can set up is on the PATH: one before OMP 18.18.2 is
 // not, so setup --yes leaves it out rather than stopping at its refusal.
 func (Agent) Installed(ctx context.Context) bool {
 	if _, old := tooOld(ctx); old {
@@ -41,7 +40,7 @@ func (Agent) Installed(ctx context.Context) bool {
 
 // Surfaces is OMP as one choice, marked beta at setup and naming the first OMP terma sets up.
 func (a Agent) Surfaces() []agents.Surface {
-	return []agents.Surface{{Name: name, DisplayName: displayName + " " + strconv.Itoa(minimumMajor) + "+ (beta)", Installed: a.Installed}}
+	return []agents.Surface{{Name: name, DisplayName: displayName + " " + minimumVersion + "+ (beta)", Installed: a.Installed}}
 }
 
 // Events are the extension's omp-* hooks.
