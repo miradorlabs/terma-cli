@@ -64,7 +64,9 @@ func (app *App) useServerKey(s *setup.Steps, ui *setupUI, org orgRef, team *stri
 		// server key with them still on the machine would record their backlog as no one's
 		// (auth.LegacyOwnership), where the retirement knows its person. A setup that fails
 		// after this leaves them retired, as this release retires them anyway.
-		app.retireLegacySessions(ctx, cfg.AuthURL)
+		if err := app.retireLegacySessions(ctx, cfg.AuthURL); err != nil {
+			return config.Policy{}, fmt.Errorf("retire an older terma's sign-ins (%w): run `terma setup` again once it is done", err)
+		}
 		// The sign-in is kept here, before setup stores the policy, so a failed fetch writes
 		// nothing.
 		if err := app.keepServerKey(cfg, insecure); err != nil {

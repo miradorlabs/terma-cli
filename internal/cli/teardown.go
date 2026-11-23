@@ -244,7 +244,9 @@ func (app *App) signOut(cmd *cobra.Command) error {
 	default:
 		return err
 	}
-	app.retireLegacySessions(cmd.Context(), cfg.AuthURL)
+	if err := app.retireLegacySessions(cmd.Context(), cfg.AuthURL); err != nil {
+		fmt.Fprintf(cmd.ErrOrStderr(), "An older terma's sign-ins were left on this machine (%v): run `terma teardown --sign-out` again once it is done.\n", err)
+	}
 	fmt.Fprintln(out, "Signed out.")
 	return nil
 }

@@ -21,6 +21,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/account/keystore"
 	"github.com/miradorlabs/terma-cli/internal/account/secret"
 	"github.com/miradorlabs/terma-cli/internal/config"
+	"github.com/miradorlabs/terma-cli/internal/flock"
 )
 
 func TestParseOrgRef(t *testing.T) {
@@ -557,7 +558,9 @@ func TestEverythingUnboundStaysLegacyWhileTheOlderSignInsRemain(t *testing.T) {
 	queuedMeanwhile := time.Now()
 	unlock()
 	retry := time.Now()
-	testApp.retireLegacySessions(context.Background(), f.srv.URL)
+	if err := testApp.retireLegacySessions(context.Background(), f.srv.URL); err != nil {
+		t.Fatal(err)
+	}
 	if auth.HasLegacySignIns(testApp.dir) {
 		t.Fatal("the retry left the older sign-ins")
 	}
@@ -741,7 +744,9 @@ func TestARetirementDoneLeavesItsRecordToLaterSignIns(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	testApp.retireLegacySessions(context.Background(), f.srv.URL)
+	if err := testApp.retireLegacySessions(context.Background(), f.srv.URL); err != nil {
+		t.Fatal(err)
+	}
 	after, err := auth.ReadLegacyRecord(stateDir)
 	if err != nil || !after.ReplayBefore().Equal(before.ReplayBefore()) || !after.RetiredAt.Equal(before.RetiredAt) {
 		t.Fatalf("record %+v became %+v (%v); want it left as the retirement left it", before, after, err)
@@ -760,9 +765,40 @@ func TestOlderSignInsThatCantBeReadAreKept(t *testing.T) {
 	read := testApp.legacySignIns
 	t.Cleanup(func() { testApp.legacySignIns = read })
 	testApp.legacySignIns = func(string, bool) ([]auth.LegacySignIn, error) { return nil, errors.New("sharing violation") }
-	testApp.retireLegacySessions(context.Background(), f.srv.URL)
+	if err := testApp.retireLegacySessions(context.Background(), f.srv.URL); err != nil {
+		t.Fatal(err)
+	}
 	if !auth.HasLegacySignIns(testApp.dir) {
 		t.Fatal("the older sign-ins were deleted unread")
+	}
+	if rec, err := auth.ReadLegacyRecord(testApp.stateDir); err != nil || !rec.RetiredAt.IsZero() {
+		t.Fatalf("record = %+v, %v; want none yet", rec, err)
+	}
+}
+
+// A retirement while an older terma holds credentials.json's lock, signing in, say, leaves
+// the older sign-ins for the next: none is recorded from, or forgotten under, a file that may
+// be replaced meanwhile.
+func TestARetirementWaitsOutAnOlderTermasLock(t *testing.T) {
+	f := newFakeAuth(t)
+	authSandbox(t, f)
+	data := `{"default": {"organizations": {"o": {"session_id": "old", "auth_url": "` + f.srv.URL + `", "user_id": "u-1"}}}}`
+	path := config.LegacyCredentialsPath(testApp.dir)
+	if err := os.WriteFile(path, []byte(data), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	unlock, err := flock.Lock(context.Background(), path+".lock")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer unlock()
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancel()
+	if err := testApp.retireLegacySessions(ctx, f.srv.URL); err == nil {
+		t.Fatal("a retirement left to the next sign-in reported nothing")
+	}
+	if !auth.HasLegacySignIns(testApp.dir) {
+		t.Fatal("the older sign-ins were forgotten under an older terma's lock")
 	}
 	if rec, err := auth.ReadLegacyRecord(testApp.stateDir); err != nil || !rec.RetiredAt.IsZero() {
 		t.Fatalf("record = %+v, %v; want none yet", rec, err)

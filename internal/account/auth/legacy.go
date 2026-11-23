@@ -2,6 +2,7 @@ package auth
 
 import (
 	"cmp"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -111,10 +112,10 @@ func HasLegacySignIns(dir string) bool {
 }
 
 // ForgetLegacy deletes the sign-ins an older terma left: every keychain item
-// credentials.json names, then the file and its lock. A keychain item that cannot be
-// removed is reported, and the file stays so a later sign-in tries again. A sign-in the
-// file holds the tokens of has no item to remove, as forget judges it, so a machine with
-// no keychain loses its older sign-ins too.
+// credentials.json names, then the file (its lock goes with WithLegacySignIns). A keychain
+// item that cannot be removed is reported, and the file stays so a later sign-in tries
+// again. A sign-in the file holds the tokens of has no item to remove, as forget judges it,
+// so a machine with no keychain loses its older sign-ins too.
 func ForgetLegacy(dir string) error {
 	signIns, err := LegacySignIns(dir, false)
 	if err != nil {
@@ -136,9 +137,35 @@ func ForgetLegacy(dir string) error {
 	if err := os.Remove(path); err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return err
 	}
-	_ = os.Remove(path + ".lock")
 	return nil
 }
+
+// WithLegacySignIns runs fn holding the lock an older terma writes credentials.json
+// under, so the sign-ins a retirement reads, records and forgets are one snapshot: no
+// older terma signing in meanwhile can replace the file between. It waits up to
+// legacyLockWait. Once fn has forgotten the file, its lock goes too.
+func WithLegacySignIns(ctx context.Context, dir string, fn func()) error {
+	ctx, cancel := context.WithTimeout(ctx, legacyLockWait)
+	defer cancel()
+	path := config.LegacyCredentialsPath(dir)
+	unlock, err := lockCredentialFile(ctx, path)
+	if err != nil {
+		return err
+	}
+	fn()
+	// Decided while held: removed after its unlock, a waiter could take the lock and lose
+	// the file to a third process's new one, and two would hold it.
+	if HasLegacySignIns(dir) {
+		unlock()
+	} else {
+		flock.Remove(path+".lock", unlock)
+	}
+	return nil
+}
+
+// legacyLockWait bounds the wait for an older terma that holds credentials.json's lock, as
+// one does through a refresh.
+var legacyLockWait = 10 * time.Second
 
 // LegacyRecordFile is, in the state directory, what the first sign-in on user tokens kept of
 // the sign-ins it retired.

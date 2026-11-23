@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"errors"
 	"github.com/miradorlabs/terma-cli/internal/flock"
 	"io/fs"
@@ -88,8 +89,9 @@ func TestLegacySignIns_NoFile(t *testing.T) {
 	}
 }
 
-// ForgetLegacy deletes every keychain item credentials.json names, then the file and its
-// lock, and leaves the current sign-in alone.
+// ForgetLegacy, under the older terma's lock as a retirement runs it, deletes every keychain
+// item credentials.json names, then the file and, once it is let go, its lock; and leaves
+// the current sign-in alone.
 func TestForgetLegacy_DeletesItemsFileAndLock(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
@@ -101,8 +103,9 @@ func TestForgetLegacy_DeletesItemsFileAndLock(t *testing.T) {
 		t.Fatal("HasLegacySignIns = false with credentials.json present")
 	}
 
-	if err := ForgetLegacy(dir); err != nil {
-		t.Fatal(err)
+	var forgot error
+	if err := WithLegacySignIns(context.Background(), dir, func() { forgot = ForgetLegacy(dir) }); err != nil || forgot != nil {
+		t.Fatal(err, forgot)
 	}
 	for _, org := range []string{"org-a", "org-b"} {
 		if _, err := secret.Get(dir, legacyItemName(config.DefaultProfile, org)); !errors.Is(err, secret.ErrNotFound) {
@@ -361,5 +364,34 @@ func TestMarkLegacyForgotten_MovesOnlyForward(t *testing.T) {
 	rec, err := ReadLegacyRecord(stateDir)
 	if err != nil || !rec.ForgottenAt.Equal(at.Add(time.Hour)) || !rec.RetiredAt.Equal(at) || !rec.ReplayBefore().Equal(at.Add(time.Hour)) {
 		t.Fatalf("record = %+v, %v; want forgotten an hour after a boundary left as it was", rec, err)
+	}
+}
+
+// A retirement waits for an older terma holding credentials.json's lock, as one signing in
+// does, and gives up past its wait: nothing is read, recorded or forgotten under a file that
+// may be replaced. With the lock free it runs, and once the file is forgotten its lock goes.
+func TestARetirementHoldsTheOlderTermasLock(t *testing.T) {
+	dir := t.TempDir()
+	path := config.LegacyCredentialsPath(dir)
+	if err := os.WriteFile(path, []byte(`{}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	was := legacyLockWait
+	legacyLockWait = 100 * time.Millisecond
+	t.Cleanup(func() { legacyLockWait = was })
+	unlock, err := lockCredentialFile(context.Background(), path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ran := false
+	if err := WithLegacySignIns(context.Background(), dir, func() { ran = true }); err == nil || ran {
+		t.Fatalf("ran %v, err %v; want it to give up while an older terma holds the lock", ran, err)
+	}
+	unlock()
+	if err := WithLegacySignIns(context.Background(), dir, func() { _ = os.Remove(path) }); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(path + ".lock"); !errors.Is(err, fs.ErrNotExist) {
+		t.Fatalf("the lock stayed after the file was forgotten: %v", err)
 	}
 }
