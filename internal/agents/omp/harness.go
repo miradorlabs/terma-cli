@@ -257,7 +257,12 @@ func (c exporter) Disconnect() (harness.DisconnectResult, error) {
 		if err := f.apply(changes); err != nil {
 			return result, err
 		}
-		if err := f.save(j.ConfigMode); err != nil {
+		// A key teardown leaves can still hold the relay's token: the file stays private until the last one goes.
+		mode := j.ConfigMode
+		if mode != nil && !remaining.Empty() {
+			mode = new(harness.SettingsMode)
+		}
+		if err := f.save(mode); err != nil {
 			return result, err
 		}
 	}

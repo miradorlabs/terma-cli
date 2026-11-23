@@ -218,6 +218,26 @@ func TestRelayEnvTeardownRestoresTheFile(t *testing.T) {
 	}
 }
 
+// A teardown that leaves a key terma wrote, which can still hold the relay's token, keeps
+// the developer's .env private.
+func TestRelayEnvPartialTeardownKeepsTheFilePrivate(t *testing.T) {
+	a, env := ompIn(t)
+	write(t, env, "A=1\n", 0o644)
+	if _, err := a.ConfigureRelay(context.Background(), relayConfig()); err != nil {
+		t.Fatal(err)
+	}
+	write(t, env, read(t, env)+harness.EnvOTLPEndpoint+"=https://mine\n", 0o600)
+	if _, err := a.UnconfigureRelay(context.Background(), relayToken); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(read(t, env), relayToken) {
+		t.Fatal("the probe needs terma's line, with its token, left behind")
+	}
+	if info, _ := os.Stat(env); info.Mode().Perm() != 0o600 {
+		t.Errorf(".env holding the relay's token is %v after a partial teardown, want 0600", info.Mode().Perm())
+	}
+}
+
 // A key the developer changed after setup is theirs: teardown leaves it, says so, and
 // doctor no longer reads omp as sending to the relay.
 func TestRelayEnvEditedAfterSetup(t *testing.T) {
