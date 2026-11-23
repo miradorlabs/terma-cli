@@ -3,6 +3,101 @@
   "id": "claude-opus-4-5-20251101",
   "steps": [
     {
+      "at": "2026-11-23T18:52:43.50051894Z",
+      "event": "changed",
+      "changes": [
+        {
+          "id": "facts/deprecated_at",
+          "category": "facts",
+          "op": "added",
+          "path": [
+            "facts",
+            "deprecated_at"
+          ],
+          "title": "Deprecated: now 2026-11-23",
+          "impact": "notable",
+          "before": null,
+          "after": "2026-11-23",
+          "text_diff": null,
+          "terma": null,
+          "source": null,
+          "documented": null
+        },
+        {
+          "id": "facts/retires_at",
+          "category": "facts",
+          "op": "added",
+          "path": [
+            "facts",
+            "retires_at"
+          ],
+          "title": "Retires: now 2027-01-22",
+          "impact": "notable",
+          "before": null,
+          "after": "2027-01-22",
+          "text_diff": null,
+          "terma": null,
+          "source": null,
+          "documented": null
+        },
+        {
+          "id": "facts/retires_not_before",
+          "category": "facts",
+          "op": "removed",
+          "path": [
+            "facts",
+            "retires_not_before"
+          ],
+          "title": "Retires no sooner than: no longer stated (was 2026-11-24)",
+          "impact": "notable",
+          "before": "2026-11-24",
+          "after": null,
+          "text_diff": null,
+          "terma": null,
+          "source": null,
+          "documented": null
+        },
+        {
+          "id": "facts/status",
+          "category": "facts",
+          "op": "changed",
+          "path": [
+            "facts",
+            "status"
+          ],
+          "title": "Status: active → deprecated",
+          "impact": "notable",
+          "before": "active",
+          "after": "deprecated",
+          "text_diff": null,
+          "terma": null,
+          "source": null,
+          "documented": null
+        },
+        {
+          "id": "docs/overview",
+          "category": "docs",
+          "op": "changed",
+          "path": [
+            "docs",
+            "overview"
+          ],
+          "title": "Model page changed (+608 −513 chars)",
+          "impact": "informational",
+          "before": null,
+          "after": null,
+          "text_diff": "@@ -1,12 +1,13 @@\n ---\n title: Claude Opus 4.5\n url: https://platform.claude.com/docs/en/models/opus-4-5/overview\n-description: \"Claude Opus 4.5 reference: lifecycle status, model IDs on every platform, context window, output limits, pricing, and migration resources. Claude Opus 4.5 is a legacy model; Claude Opus 5.5 is the current Opus model.\"\n+description: \"Claude Opus 4.5 reference: lifecycle status, model IDs on every platform, context window, output limits, pricing, and migration resources. Claude Opus 4.5 is a deprecated model on the Claude API; Claude Opus 5.5 is the current Opus model.\"\n ---\n \n-**Legacy.** Released November 24, 2025.\n+**Deprecated.** Released November 24, 2025.\n \n-Although Claude Opus 4.5 is still available, you should consider migrating to Claude Opus 5.5.\n+Claude Opus 4.5 is deprecated: it is still functional but no longer recommended, and retires on January 22, 2027.\n+Recommended replacement: Claude Opus 5.5.\n [See Claude Opus 5.5](https://platform.claude.com/docs/en/models/opus-5-5/overview) · [Migrate to Claude Opus 5.5](https://platform.claude.com/docs/en/models/opus-5-5/migration-guide#migrating-from-claude-opus-45)\n \n Model ID: `claude-opus-4-5-20251101`\n@@ -78,9 +79,10 @@\n \n | Feature | Value |\n | :---- | :---- |\n-| [Status](https://platform.claude.com/docs/en/about-claude/model-deprecations) | Active (legacy) |\n+| [Status](https://platform.claude.com/docs/en/about-claude/model-deprecations) | Deprecated |\n | Released | November 24, 2025 |\n-| Retirement | Not sooner than November 24, 2026 |\n+| Deprecated | November 23, 2026 |\n+| Retires | January 22, 2027 |\n | Platforms | Claude API, [Amazon Bedrock (bedrock-runtime)](https://platform.claude.com/docs/en/build-with-claude/claude-on-amazon-bedrock-legacy), [Claude Models on Google Cloud (Google managed)](https://platform.claude.com/docs/en/build-with-claude/claude-models-on-google-cloud/google-managed), [Microsoft Foundry](https://platform.claude.com/docs/en/build-with-claude/claude-in-microsoft-foundry), [Claude Platform on AWS](https://platform.claude.com/docs/en/build-with-claude/claude-platform-on-aws), [Claude Models on Google Cloud (Anthropic managed)](https://platform.claude.com/docs/en/build-with-claude/claude-models-on-google-cloud/anthropic-managed) |\n \n ## Resources\n",
+          "stats": {
+            "added_chars": 608,
+            "removed_chars": 513
+          },
+          "terma": null,
+          "source": null,
+          "documented": null
+        }
+      ]
+    },
+    {
       "at": "2026-11-23T18:38:45.64964981Z",
       "event": "changed",
       "changes": [

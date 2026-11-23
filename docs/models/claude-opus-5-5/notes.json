@@ -15,6 +15,11 @@
   ],
   "changelog": [
     {
+      "date": "2026-11-23",
+      "url": "https://platform.claude.com/docs/en/release-notes/api",
+      "text": "* We announced the deprecation of the Claude Opus 4.5 model (`claude-opus-4-5-20251101` and `claude-opus-4-5`), with retirement on the Claude API scheduled for January 22, 2027. We recommend migrating to Claude Opus 5.5. See [Migrating from Claude Opus 4.5 or earlier](https://platform.claude.com/docs/en/models/opus-5-5/migration-guide#migrating-from-claude-opus-45). To check which dates apply on other platforms, see [Model deprecations](https://platform.claude.com/docs/en/about-claude/model-deprecations)."
+    },
+    {
       "date": "2026-11-09",
       "url": "https://platform.claude.com/docs/en/release-notes/api",
       "text": "* Claude Fable 5.2 and Claude Mythos 5.2 read other models’ thinking blocks on the Claude API and Claude Models on Google Cloud (Google managed). So on those platforms, a conversation that moves onto either model keeps its reasoning. The other models include Claude Opus 5.5, Claude Sonnet 5.5, and Claude Haiku 5.5."

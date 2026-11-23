@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-23T18:38:45.64964981Z",
+  "generated_at": "2026-11-23T18:52:43.50051894Z",
   "vendors": [
     {
       "id": "anthropic",
@@ -1110,7 +1110,7 @@
       "vendor": "anthropic",
       "name": "Claude Opus 4.5",
       "family": "claude-opus",
-      "status": "active",
+      "status": "deprecated",
       "released_at": "2025-11-24",
       "first_seen": "2026-11-11T14:15:45.0307666Z",
       "predecessor": "claude-opus-4-1-20250805",
@@ -1121,8 +1121,8 @@
       "reasoning": true,
       "harnesses": [],
       "last_change": {
-        "at": "2026-11-23T18:38:45.64964981Z",
-        "changes": 3
+        "at": "2026-11-23T18:52:43.50051894Z",
+        "changes": 5
       },
       "probed": true
     },
