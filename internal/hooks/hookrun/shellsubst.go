@@ -46,7 +46,7 @@ func (sc *scan) substitute(w io.Writer, cs *syntax.CmdSubst) error {
 			sc.cfg = sc.config() // expand is not reentrant: an operand expands with its own
 			out, ok := known(sc, ce.Args[n:])
 			sc.cfg = outer
-			if !ok {
+			if !ok || !sc.charge(len(out)) || !sc.chargeFields(out) {
 				return errOpaque
 			}
 			_, err := io.WriteString(w, out)
@@ -150,5 +150,3 @@ func (sc *scan) real(p string) string {
 	}
 	return q
 }
-
-func opaqueProcess(*syntax.ProcSubst) (string, error) { return "", errOpaque }

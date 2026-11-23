@@ -580,6 +580,26 @@ func TestScanBoundsAndSafety(t *testing.T) {
 	if took := time.Since(startSubst); took > 50*time.Millisecond {
 		t.Fatalf("large unknown substitute took %v, want < 50ms", took)
 	}
+
+	// Whitespace-heavy known command substitution fails closed before expand.Fields materializes fields.
+	hugeGP := strings.Repeat("x ", 250_000)
+	fGP, err := syntax.NewParser().Parse(strings.NewReader("echo $(go env GOPATH)"), "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	startGP := time.Now()
+	scGopath := newScan(dir, func(k string) (string, bool) {
+		if k == "GOPATH" {
+			return hugeGP, true
+		}
+		return "", false
+	}, work{deadline: startGP.Add(time.Minute)})
+	if _, err := scGopath.fields(fGP.Stmts[0].Cmd.(*syntax.CallExpr).Args[1]); err == nil || !scGopath.unknown {
+		t.Fatalf("whitespace-heavy $(go env GOPATH) did not fail closed: err=%v unknown=%v", err, scGopath.unknown)
+	}
+	if took := time.Since(startGP); took > 50*time.Millisecond {
+		t.Fatalf("whitespace-heavy $(go env GOPATH) took %v, want < 50ms", took)
+	}
 }
 
 func FuzzParsable(f *testing.F) {
