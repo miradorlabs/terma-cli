@@ -16,20 +16,23 @@ const (
 	unreadablePoll  = 100 * time.Millisecond
 	// unreadableMemory is how many retries long a failed retry is remembered.
 	unreadableMemory = 10
+	// unreadableBrief is how long an export waits while a failed retry is remembered: a
+	// couple of polls, enough for a sign-in written as it arrives.
+	unreadableBrief = 2 * unreadablePoll
 )
 
 // arrivalLane is the lane what arrives now is bound to: the account key of the person
 // signed in, or no person's (sendas.NoPersonLane) under a server key. With neither, it is
 // why what arrives is lost once it is placed: signed out, or a sign-in that still can't be
-// read after unreadableRetry. A retry that failed within unreadableRetry's last few
-// multiples is not waited out again: a sign-in that stays unreadable costs each export one
-// read, not the retry.
+// read after unreadableRetry. Within unreadableRetry's last few multiples of a retry that
+// failed, an export waits only unreadableBrief: a sign-in that stays unreadable costs each
+// export a couple of polls, not the retry, and one that reads again is used at once.
 func (r *Relay) arrivalLane(ctx context.Context) (lane, lost string) {
 	start := time.Now()
 	r.mu.Lock()
 	deadline := start.Add(r.unreadableRetry)
 	if !r.unreadableAt.IsZero() && start.Sub(r.unreadableAt) < unreadableMemory*r.unreadableRetry {
-		deadline = start
+		deadline = start.Add(min(unreadableBrief, r.unreadableRetry))
 	}
 	r.mu.Unlock()
 	for {

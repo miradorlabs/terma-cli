@@ -286,17 +286,18 @@ func TestALostPartIsNeverHeld(t *testing.T) {
 }
 
 // A sign-in that stayed unreadable through a retry is not waited out again at the next
-// export, which is lost at once; once it reads, the retry is back.
+// export, which waits a couple of polls and is lost; once it reads, the retry is back.
 func TestAStillUnreadableSignInIsNotWaitedOutAgain(t *testing.T) {
 	t.Parallel()
 	u := newSignInUpstream(t)
 	signIn := &testSignIn{account: sendas.AccountUnreadable}
-	r, srv := laneRelay(t, u, signIn, "", 300*time.Millisecond)
+	const retry = time.Second
+	r, srv := laneRelay(t, u, signIn, "", retry)
 	post(t, srv, "/v1/logs", oneLog("first"), "application/x-protobuf", token, false)
 	start := time.Now()
 	post(t, srv, "/v1/logs", oneLog("second"), "application/x-protobuf", token, false)
-	if waited := time.Since(start); waited >= 300*time.Millisecond {
-		t.Fatalf("the second export waited %v; want it lost at once", waited)
+	if waited := time.Since(start); waited >= retry/2 {
+		t.Fatalf("the second export waited %v; want only a couple of polls", waited)
 	}
 	waitForCounters(t, r, func(c map[string]int) bool { return c["dropped.unreadable.logs"] == 2 })
 	signIn.set(accountA)
@@ -304,7 +305,46 @@ func TestAStillUnreadableSignInIsNotWaitedOutAgain(t *testing.T) {
 	signIn.set(sendas.AccountUnreadable)
 	start = time.Now()
 	post(t, srv, "/v1/logs", oneLog("unreadable again"), "application/x-protobuf", token, false)
-	if waited := time.Since(start); waited < 300*time.Millisecond {
+	if waited := time.Since(start); waited < retry {
 		t.Fatalf("after a readable sign-in, an export waited only %v; want the retry again", waited)
+	}
+}
+
+// readsAgainSignIn is a sign-in that can't be read until armed, then reads as accountA from
+// the read after the next: one written as an export arrives.
+type readsAgainSignIn struct {
+	testSignIn
+	armed bool
+}
+
+func (s *readsAgainSignIn) arm() {
+	s.mu.Lock()
+	s.armed = true
+	s.mu.Unlock()
+}
+
+func (s *readsAgainSignIn) Account() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	a := s.account
+	if s.armed {
+		s.armed, s.account = false, accountA
+	}
+	return a
+}
+
+// After a failed retry, an export whose sign-in reads again a poll after it arrives is
+// kept, not lost with the one before.
+func TestASignInThatReadsAgainAfterAFailedRetryIsUsed(t *testing.T) {
+	t.Parallel()
+	u := newSignInUpstream(t)
+	signIn := &readsAgainSignIn{testSignIn: testSignIn{account: sendas.AccountUnreadable}}
+	r, srv := laneRelay(t, u, signIn, "", 300*time.Millisecond)
+	post(t, srv, "/v1/logs", oneLog("first"), "application/x-protobuf", token, false)
+	signIn.arm()
+	post(t, srv, "/v1/logs", oneLog("second"), "application/x-protobuf", token, false)
+	waitForCounters(t, r, func(c map[string]int) bool { return c["forwarded.logs"] == 1 })
+	if c := r.Stats().Snapshot().Counters; c["dropped.unreadable.logs"] != 1 {
+		t.Fatalf("counters %v; want only the first export lost", c)
 	}
 }
