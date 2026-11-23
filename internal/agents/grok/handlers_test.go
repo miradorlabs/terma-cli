@@ -343,6 +343,32 @@ func TestPromptTextFollowsConsentAndPolicy(t *testing.T) {
 	})
 }
 
+// grok fires UserPromptSubmit for a turn it starts itself too: a background subagent that
+// finishes while its parent is idle hands the parent a system reminder for a prompt, under an
+// id of grok's own making (seen live on 1.0.92; the payload is otherwise a prompt hook's).
+// Nobody wrote it, and grok's export sends no user_prompt for it: no message, and the session
+// is still claimed.
+func TestAPromptGrokWroteItselfIsNoMessage(t *testing.T) {
+	run := replay(t, "headless_fork_2_fork_session", replayOpts{edit: func(event string, payload []byte) []byte {
+		if event != "user_prompt_submit" {
+			return payload
+		}
+		var m map[string]any
+		_ = json.Unmarshal(payload, &m)
+		m["promptId"] = "subagent-completed-01a20a78-86a5-72d2-8cb6-2c1d7201fb27"
+		m["prompt"] = "<system-reminder>\nWhile you were idle, 1 background subagent completed.\n</system-reminder>"
+		out, _ := json.Marshal(m)
+		return out
+	}})
+	spooled := hookruntest.Spooled(t, run.sp)
+	if n := len(hookruntest.Named(spooled, semconv.TermaUserMessageEvent)); n != 0 {
+		t.Errorf("%d messages for a prompt grok wrote itself", n)
+	}
+	if len(hookruntest.Named(spooled, semconv.TermaSessionStartEvent)) == 0 {
+		t.Error("the session was not announced")
+	}
+}
+
 // A subagent's SessionEnd ends the subagent alone: its parent stays the active session.
 func TestCapturedSubagentEndLeavesItsParentActive(t *testing.T) {
 	for _, fixture := range []string{"headless_subagent_worktree", "headless_edit_background_subagent"} {
