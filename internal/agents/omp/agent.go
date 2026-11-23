@@ -50,8 +50,8 @@ func (Agent) Events() map[string]agents.Handler {
 	return events
 }
 
-// FlushAfter delivers the spool when a session ends, and a session's new name, which the
-// extension may hand over as OMP shuts down, racing the end's flush.
+// FlushAfter delivers the spool when a session ends, and when a session is named: OMP names
+// it after the first reply, and a long session would otherwise hold its name until its end.
 func (Agent) FlushAfter() []string { return []string{"omp-session-end", "omp-title"} }
 
 // Harness is how terma configures the agent's exporter.

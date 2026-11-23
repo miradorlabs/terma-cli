@@ -133,6 +133,9 @@ func TestExtensionUnderNode(t *testing.T) {
 	if strings.Join(titles, "|") != "Fix the flaky build|Release notes" {
 		t.Errorf("titles = %v, want the name once and the rename at shutdown", titles)
 	}
+	if order, _ := os.ReadFile(filepath.Join(filepath.Dir(ext), "titles.log")); string(order) != "Fix the flaky build\nRelease notes\n" {
+		t.Errorf("titles landed in the order %q, want the rename last", order)
+	}
 	if len(byEvent["omp-prompt"]) != 2 || len(byEvent["omp-session-end"]) != 1 {
 		t.Errorf("prompts %v, ends %v", byEvent["omp-prompt"], byEvent["omp-session-end"])
 	}
@@ -161,7 +164,9 @@ func runDriver(t *testing.T) (byEvent map[string][]map[string]any, ext, fetched 
 		t.Fatal(err)
 	}
 	hook := filepath.Join(dir, "hook.sh")
-	if err := os.WriteFile(hook, []byte("#!/bin/sh\nf=$(mktemp "+hooks+"/call.XXXXXX)\nprintf '{\"event\":\"%s\",\"payload\":' \"$1\" > $f.part\ncat >> $f.part\necho '}' >> $f.part\nmv $f.part $f.json\n"), 0o700); err != nil {
+	// The first name's hook is slow, as a cold start can be: the rename must still land after it.
+	if err := os.WriteFile(hook, []byte("#!/bin/sh\nf=$(mktemp "+hooks+"/call.XXXXXX)\nprintf '{\"event\":\"%s\",\"payload\":' \"$1\" > $f.part\ncat >> $f.part\necho '}' >> $f.part\n"+
+		"if [ \"$1\" = omp-title ]; then grep -q flaky $f.part && sleep 1; sed -n 's/.*\"title\":\"\\([^\"]*\\)\".*/\\1/p' $f.part >> "+filepath.Join(dir, "titles.log")+"; fi\nmv $f.part $f.json\n"), 0o700); err != nil {
 		t.Fatal(err)
 	}
 	ext = filepath.Join(dir, "terma-ext.ts")

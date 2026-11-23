@@ -28,8 +28,9 @@ type TermaConfig = {
 
 // termaHook hands an event to `terma hook omp-*`, detached: attribution is best-effort
 // and never delays the agent. It settles once the payload is written, which a handler that
-// runs as the agent exits awaits: the agent's exit would otherwise cut the payload off.
-function termaHook(event: string, payload: Record<string, unknown>): Promise<void> {
+// runs as the agent exits awaits: the agent's exit would otherwise cut the payload off; with
+// untilExit, once the hook has exited, for a caller that orders its hooks.
+function termaHook(event: string, payload: Record<string, unknown>, untilExit = false): Promise<void> {
   if (!CONFIG) return Promise.resolve()
   return new Promise((resolve) => {
     try {
@@ -37,7 +38,10 @@ function termaHook(event: string, payload: Record<string, unknown>): Promise<voi
       const child = spawn(cmd, [...args, event], { stdio: ["pipe", "ignore", "ignore"], detached: false })
       child.on("error", () => resolve())
       child.stdin.on("error", () => resolve())
-      child.stdin.end(JSON.stringify(payload), () => resolve())
+      if (untilExit) child.on("close", () => resolve())
+      child.stdin.end(JSON.stringify(payload), () => {
+        if (!untilExit) resolve()
+      })
     } catch {
       resolve()
     }
@@ -51,8 +55,11 @@ function sessionOf(ctx: any): string {
   return own ? String(own) : session
 }
 
-// titled is the name last handed over for each session this process ran.
+// titled is the name last handed over for each session this process ran; titles hands
+// them over one at a time, each hook done before the next starts, so a rename is never
+// overtaken by the name it replaced.
 const titled = new Map<string, string>()
+let titles: Promise<void> = Promise.resolve()
 
 // sendTitle hands over the session's name when OMP has named it, or renamed it, since the
 // last one sent: OMP names an interactive session after its first reply, in the background,
@@ -64,7 +71,9 @@ function sendTitle(ctx: any): Promise<void> {
     const s = sessionOf(ctx)
     if (typeof name !== "string" || !name.trim() || !s || titled.get(s) === name) return Promise.resolve()
     titled.set(s, name)
-    return termaHook("omp-title", { session_id: s, cwd: ctx?.cwd, title: name })
+    const payload = { session_id: s, cwd: ctx?.cwd, title: name }
+    titles = titles.then(() => termaHook("omp-title", payload, true))
+    return titles
   } catch {
     return Promise.resolve()
   }
