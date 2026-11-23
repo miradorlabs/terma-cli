@@ -477,12 +477,12 @@ ended, and the files `agy`'s own file tools write are stamped on your commits. E
 also reads the conversation's transcript and sends every model call written since the last
 one: its model and its input, cache-read and output tokens. `agy` does not count thinking
 apart from output, or cache writes, so neither is sent; there is no cost, which the
-platform estimates from list prices. `agy` runs no hook after a turn you cancel, so that
-turn's calls and steps go with the next turn's. A call goes only under the repository its
-own turn ran in, and only where your team's policy collects; a call whose turn is in doubt
-after `agy` compacts the transcript, and the turns of a conversation before terma first saw
-it, are never sent. A subagent is its own conversation, linked to
-the one that opened it.
+platform estimates from list prices. A call goes only from a hook of its own turn, in the
+checkout and under the sign-in that turn began with, and only where your team's policy
+collects. `agy` runs no hook after a turn you cancel, so the call in flight when you cancel
+is not sent; `terma doctor` counts it among what terma lost. That turn's hook events go with
+the next turn's. The turns of a conversation before terma first saw it are never sent. A
+subagent is its own conversation, linked to the one that opened it.
 
 Setup also puts `terma hook antigravity-statusline` in `statusLine` in
 `~/.gemini/antigravity-cli/settings.json`. Its payload is the only place `agy` names your

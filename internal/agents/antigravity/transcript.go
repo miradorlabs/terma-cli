@@ -18,6 +18,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/flock"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
+	"github.com/miradorlabs/terma-cli/internal/sendas"
 	"github.com/miradorlabs/terma-cli/internal/session"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
@@ -25,17 +26,18 @@ import (
 // agy has no export, but its transcript records every model call as a PLANNER_RESPONSE
 // line with the call's model and token counts, written before the hooks that follow the
 // call run. Each hook reads the lines written since the last one and sends one
-// terma.model_call per call. A cancelled turn runs no hook: its calls go with the
-// conversation's next one, and the step index each call was sent under keeps any from
-// going twice, even after compaction rewrites the file.
+// terma.model_call per call, and the highest step handled keeps any from going twice, even
+// after compaction rewrites the file.
 //
-// A call goes only under the checkout its own turn ran in, as a hook there decided: each
-// hook decides its turn, the transcript's latest prompt, collected in its checkout (its
-// path, origin and project) or not collected at all. A call of a turn no hook decided (one
-// before terma watched the conversation) or decided not collected never leaves, nor does
-// one whose turn is in doubt: a later decided prompt that a rewrite dropped. A call decided
-// for another checkout, as a cancelled turn leaves for a hook elsewhere, is held, a few at
-// a time, for a hook in its own; a rewrite drops what is held. The cursor always moves on.
+// A call goes only from a hook of its own turn, in the checkout and under the sign-in that
+// turn began with: the conversation's turn record (turn.go) must name this hook's
+// checkout and lane, the call's step must be at or after the turn's first, and the record
+// must still say so right before the send. Every other line a hook reads it passes for good:
+// the calls of turns before terma watched the conversation, of a turn begun somewhere else
+// or under another sign-in, and the last call of a cancelled turn, after which agy runs no
+// hook of that turn. A collecting hook counts what it passes as lost (turn_ended), except on
+// a conversation's first read, which holds turns from before terma watched; a hook the
+// policy does not collect counts nothing.
 
 // sourceAntigravityTranscript is terma.evidence.source for what agy's transcript recorded.
 const sourceAntigravityTranscript = "antigravity_transcript"
@@ -61,47 +63,16 @@ type antigravityCallState struct {
 	// file rewritten in place is read again from the start.
 	Offset int64  `json:"offset"`
 	Tail   string `json:"tail,omitempty"`
-	// Step is the highest step index sent, -1 before any.
+	// Step is the highest step index handled, sent or passed, -1 before any.
 	Step int64 `json:"step"`
-	// Turn is the turn of the last prompt read, for the calls after it.
-	Turn string `json:"turn,omitempty"`
 	// Results names the tools of the last call whose results are still to be read: they
 	// follow it in order, one line each.
 	Results []string `json:"results,omitempty"`
-	// Turns is each recent turn's decision: the checkout a collecting hook ran it in, or ""
-	// where the team's policy collects nothing.
-	Turns map[string]string `json:"turns,omitempty"`
-	// Held are the lines read for a checkout other than the hook's, oldest first.
-	Held []antigravityHeld `json:"held,omitempty"`
 }
-
-// antigravityHeld is a line held for a hook in its turn's checkout: where it is in the
-// transcript, and what it was.
-type antigravityHeld struct {
-	Offset int64  `json:"offset"`
-	Length int64  `json:"length"`
-	Step   int64  `json:"step"`
-	Turn   string `json:"turn"`
-	// Subagent is set on invoke_subagent's result; else the line is a call.
-	Subagent bool `json:"subagent,omitempty"`
-}
-
-// antigravityHeldKept bounds the lines held; the oldest go first.
-const antigravityHeldKept = 16
-
-// antigravityTurnsKept bounds the decisions a conversation's state keeps, newest first.
-const antigravityTurnsKept = 32
 
 // antigravityLineLimit bounds a transcript line terma reads; a longer one (a tool's whole
 // output) is skipped unread.
 const antigravityLineLimit = 8 << 20
-
-// antigravityHeadLen is how much of an overlong line is kept to tell its type: agy writes
-// step_index, source and type first.
-const antigravityHeadLen = 256
-
-// antigravityUnknownTurn opens the turn of a prompt too long to read; no hook decides it.
-const antigravityUnknownTurn = "?"
 
 // antigravityStep is the part of a transcript line terma reads.
 type antigravityStep struct {
@@ -150,10 +121,10 @@ func antigravityTranscript(in *antigravityHookInput) string {
 }
 
 // captureAntigravityCalls sends each model call, and each subagent the conversation
-// opened, that the transcript recorded since the last read. It reports whether it read
-// the transcript, so the hook's observation says usage travels apart. With no repository,
-// a hook the team's policy does not collect, it decides its turn not collected and sends
-// nothing; a collected turn's call it reaches waits for a hook in that turn's checkout.
+// opened, that the transcript recorded since the last read and that belongs to the turn
+// this hook saw begin, here and under this sign-in. It reports whether it read the
+// transcript, so the hook's observation says usage travels apart. With no repository, a
+// hook the team's policy does not collect, it passes everything it reads.
 func captureAntigravityCalls(ctx context.Context, e hookrun.Env, r *hookrun.Repo, in *antigravityHookInput) bool {
 	transcript := antigravityTranscript(in)
 	id := in.id()
@@ -179,58 +150,46 @@ func captureAntigravityCalls(ctx context.Context, e hookrun.Env, r *hookrun.Repo
 		last = antigravityCallState{Step: -1}
 	}
 	before, _ := json.Marshal(last)
-	// The hook's own turn is the latest prompt the transcript holds: decide it first. A
-	// rewrite found here drops what was held.
-	probe, err := readAntigravitySteps(transcript, last, func(antigravityStep, string, int64, int64) bool { return true })
-	if err != nil {
-		if !errors.Is(err, os.ErrNotExist) {
-			e.Logf("antigravity transcript: %v", err)
+	// The turn this hook saw begin here, and its first step; -1 sends nothing.
+	own := antigravityTurnID(e, r, id)
+	first := antigravityTurnNumber(own)
+	passed := 0
+	next, err := readAntigravitySteps(transcript, last, func(s antigravityStep) bool {
+		if first < 0 || *s.StepIndex < first {
+			// Before this turn, or no turn of this hook's: passed for good.
+			passed++
+			return true
 		}
-		return false
-	}
-	route := antigravityRoute(e, r)
-	last.Turns = decideAntigravityTurn(last.Turns, probe.Turn, route)
-	last.Held = probe.Held
-	send := func(s antigravityStep, turn string) bool {
+		if ctx.Err() != nil {
+			// Out of time: what was handled is saved, the rest goes with the next hook.
+			return false
+		}
+		// A later turn's first hook rewrites or removes the record before that turn's first
+		// call is written (agy waits for PreInvocation), so a line read while the record
+		// still names this turn here cannot be a later turn's.
+		if antigravityTurnID(e, r, id) != own {
+			first = -1
+			passed++
+			return true
+		}
 		if s.Type == "PLANNER_RESPONSE" {
-			return e.EmitFor(r, antigravityCallEvent(id, s, turn))
+			return e.EmitFor(r, antigravityCallEvent(id, s, own))
 		}
 		// Only invoke_subagent's result names a child; other output could quote one.
-		if child := antigravitySubagent(s.Content); s.subagentResult && child != "" && child != id {
+		if child := antigravitySubagent(s.Content); child != "" && child != id {
 			// The child's own hooks name no parent: its session start, again, does.
 			return e.EmitFor(r, spool.Event{Name: semconv.TermaSessionStartEvent, SessionID: child, Attrs: map[string]any{
 				semconv.GenAIMainAgentNameKey: antigravityTool, semconv.TermaSessionParentIDKey: id,
 			}})
 		}
 		return true
-	}
-	if r != nil {
-		last.Held = sendAntigravityHeld(ctx, transcript, last.Held, last.Turns, route, send)
-	}
-	var held []antigravityHeld
-	next, err := readAntigravitySteps(transcript, last, func(s antigravityStep, turn string, off, n int64) bool {
-		decided, ok := last.Turns[turn]
-		switch {
-		case !ok || decided == "" || antigravityTurnInDoubt(turn, *s.StepIndex, last.Turns):
-			// Not collected, before terma watched, or its turn in doubt: it never leaves.
-			return true
-		case decided != route:
-			// Collected in another checkout: held for a hook there.
-			if s.Type == "PLANNER_RESPONSE" || s.subagentResult {
-				held = append(held, antigravityHeld{Offset: off, Length: n, Step: *s.StepIndex, Turn: turn, Subagent: s.subagentResult})
-			}
-			return true
-		case ctx.Err() != nil:
-			// Out of time: what was sent is saved, the rest goes with the next hook.
-			return false
-		}
-		return send(s, turn)
 	})
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		e.Logf("antigravity transcript: %v", err)
 	}
-	if next.Held = append(next.Held, held...); len(next.Held) > antigravityHeldKept {
-		next.Held = next.Held[len(next.Held)-antigravityHeldKept:]
+	// A conversation's first read holds the turns before terma watched it: not counted.
+	if r != nil && readErr == nil && passed > 0 {
+		e.CountLost(r, sendas.LostTurnEnded, passed)
 	}
 	if b, err := json.Marshal(next); err == nil && !bytes.Equal(b, before) {
 		if err := hookrun.WriteState(path, b); err != nil {
@@ -311,11 +270,10 @@ func antigravitySubagent(content string) string {
 // antigravityTailLen is how many bytes before the offset identify the file read so far.
 const antigravityTailLen = 256
 
-// readAntigravitySteps hands each whole line past last's offset that may matter to emit,
-// in order, with the turn it belongs to, and returns the state after the last line emit
-// took. A call at or below last.Step was sent before and is skipped. emit returning false
-// stops the read there, for the next hook.
-func readAntigravitySteps(path string, last antigravityCallState, emit func(s antigravityStep, turn string, offset, length int64) bool) (antigravityCallState, error) {
+// readAntigravitySteps hands each call, and each invoke_subagent result, past last's
+// offset and above last.Step to emit, in order, and returns the state after the last line
+// emit took. emit returning false stops the read there, for the next hook.
+func readAntigravitySteps(path string, last antigravityCallState, emit func(s antigravityStep) bool) (antigravityCallState, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		// Missing too: a subagent's first hooks run before its transcript exists.
@@ -332,15 +290,15 @@ func readAntigravitySteps(path string, last antigravityCallState, emit func(s an
 	state := last
 	if state.Offset > info.Size() || antigravityTail(f, state.Offset) != state.Tail {
 		// Rewritten (compaction) or replaced: read again from the start; Step keeps what
-		// was sent, and Turn the turn until a prompt the rewrite kept names it again.
-		state.Offset, state.Held = 0, nil
+		// was handled.
+		state.Offset = 0
 	}
 	if _, err := f.Seek(state.Offset, io.SeekStart); err != nil {
 		return last, err
 	}
 	br := bufio.NewReader(f)
 	for {
-		line, head, n, err := antigravityLine(br)
+		line, n, err := antigravityLine(br)
 		if err != nil {
 			// A line without its newline is still being written.
 			if errors.Is(err, io.EOF) {
@@ -350,31 +308,27 @@ func readAntigravitySteps(path string, last antigravityCallState, emit func(s an
 			return state, err
 		}
 		if line == nil {
-			// Too long to read: what results it may have held are unknown. A prompt starts a
-			// turn no hook can name: its calls, and any after it, belong to no turn decided.
+			// Too long to read: what results it may have held are unknown.
 			state.Results = nil
-			if bytes.Contains(head, []byte(`"USER_INPUT"`)) {
-				state.Turn = antigravityUnknownTurn + strconv.FormatInt(state.Offset, 10)
-			}
 			state.Offset += n
 			continue
 		}
-		if !bytes.Contains(line, []byte(`"PLANNER_RESPONSE"`)) && !bytes.Contains(line, []byte(`"USER_INPUT"`)) &&
+		if !bytes.Contains(line, []byte(`"PLANNER_RESPONSE"`)) &&
 			(len(state.Results) == 0 || !bytes.Contains(line, []byte(`"GENERIC"`))) {
-			state.Offset += int64(len(line))
+			state.Offset += n
 			continue
 		}
 		var s antigravityStep
 		if json.Unmarshal(line, &s) != nil || s.StepIndex == nil || *s.StepIndex < 0 {
-			state.Offset += int64(len(line))
+			state.Offset += n
 			continue
 		}
 		step := *s.StepIndex
 		// What the line moves on, kept only once it is read: a line emit refuses is read again.
+		// A prompt clears nothing: one that joins a running turn leaves its results pending,
+		// and after a cancelled turn the next call resets them.
 		results := state.Results
 		switch s.Type {
-		case "USER_INPUT":
-			results = nil
 		case "PLANNER_RESPONSE":
 			results = nil
 			for _, c := range s.ToolCalls {
@@ -386,38 +340,25 @@ func readAntigravitySteps(path string, last antigravityCallState, emit func(s an
 				results = results[1:]
 			}
 		}
-		switch {
-		case s.Type == "USER_INPUT":
-			// agy's turn starts with the prompt's step counted: initialNumSteps, its turn id.
-			// A rewrite that kept only an older prompt never moves it back.
-			if step+1 > antigravityTurnNumber(state.Turn) {
-				state.Turn = "turn-" + strconv.FormatInt(step+1, 10)
-			}
-		case step <= state.Step:
-			// Sent before a rewrite.
-		case s.Type == "PLANNER_RESPONSE" || s.subagentResult:
-			if !emit(s, state.Turn, state.Offset, n) {
+		if step > state.Step && (s.Type == "PLANNER_RESPONSE" || s.subagentResult) {
+			if !emit(s) {
 				state.Tail = antigravityTail(f, state.Offset)
 				return state, nil
 			}
 			state.Step = step
 		}
 		state.Results = results
-		state.Offset += int64(len(line))
+		state.Offset += n
 	}
 }
 
 // antigravityLine reads one whole line, or nil for one longer than antigravityLineLimit,
-// the line's first antigravityHeadLen bytes, which name its type, and the bytes it took;
-// at the end of the file it returns io.EOF and takes none.
-func antigravityLine(br *bufio.Reader) (line, head []byte, n int64, err error) {
+// and the bytes it took; at the end of the file it returns io.EOF and takes none.
+func antigravityLine(br *bufio.Reader) (line []byte, n int64, err error) {
 	over := false
 	for {
 		chunk, err := br.ReadSlice('\n')
 		n += int64(len(chunk))
-		if len(head) < antigravityHeadLen {
-			head = append(head, chunk[:min(len(chunk), antigravityHeadLen-len(head))]...)
-		}
 		if !over && len(line)+len(chunk) <= antigravityLineLimit {
 			line = append(line, chunk...)
 		} else {
@@ -427,11 +368,11 @@ func antigravityLine(br *bufio.Reader) (line, head []byte, n int64, err error) {
 		case errors.Is(err, bufio.ErrBufferFull):
 			continue
 		case err != nil:
-			return nil, nil, 0, err
+			return nil, 0, err
 		case over:
-			return nil, head, n, nil
+			return nil, n, nil
 		}
-		return line, head, n, nil
+		return line, n, nil
 	}
 }
 

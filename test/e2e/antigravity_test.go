@@ -185,7 +185,7 @@ func TestAntigravityRealLogin(t *testing.T) {
 
 	// A cancelled turn: agy 1.5.13 runs no hook after it, neither `agy -p` interrupted
 	// nor Esc in the interactive CLI, though its hooks guide lists Stop's USER_CANCELED.
-	// The turn's events wait in the spool for the next turn's flush.
+	// The turn's hook events wait in the spool for the next turn's flush.
 	completed := len(sb.HookPayloads("antigravity-stop"))
 	if completed < 3 {
 		t.Errorf("want a Stop per completed turn, got %d", completed)
@@ -215,8 +215,9 @@ func TestAntigravityRealLogin(t *testing.T) {
 		time.Sleep(time.Second)
 	}
 	// Cancelled while a command runs: the call that asked for it is in the transcript, and
-	// no hook has read it, so it can only go with the conversation's next hook. agy moves a
-	// command to the background after five seconds, so the command takes four.
+	// no hook of its turn reads it, so it is never sent: the next turn's hooks pass it and
+	// count it lost. agy moves a command to the background after five seconds, so the
+	// command takes four.
 	transcript := filepath.Join(home, ".gemini", "antigravity-cli", "brain", conversation, ".system_generated", "logs", "transcript_full.jsonl")
 	prompts, _ := antigravityToolCallPending(transcript, -1)
 	if err := terminal.Type("Run the shell command `sleep 4`, then reply with the word done."); err != nil {
@@ -251,7 +252,7 @@ func TestAntigravityRealLogin(t *testing.T) {
 		t.Errorf("a cancelled turn's Stop says %q", cancelled)
 	}
 
-	// The cancelled turn's calls wait for the conversation's next hook: one more turn.
+	// One more turn: its hooks pass the cancelled turn's call, unsent, and count it lost.
 	_ = terminal.Close("/quit", 10*time.Second)
 	run("Reply with just the word OK. Use no tools.", conversation)
 	checkAntigravityCalls(t, sb, filepath.Join(home, ".gemini", "antigravity-cli", "brain", conversation, ".system_generated", "logs", "transcript_full.jsonl"), conversation)
@@ -288,7 +289,9 @@ func TestAntigravityRealLogin(t *testing.T) {
 }
 
 // checkAntigravityCalls holds every model call agy's transcript recorded to one
-// terma.model_call, sent once, with the transcript's counts: input with the cache reads.
+// terma.model_call, sent once, with the transcript's counts (input with the cache reads),
+// except the cancelled turn's first call: no hook of its turn read it, so it is never sent,
+// and the sandbox's spool counts it lost as turn_ended.
 func checkAntigravityCalls(t *testing.T, sb *Sandbox, transcript, conversation string) {
 	t.Helper()
 	data, err := os.ReadFile(transcript)
@@ -328,6 +331,11 @@ func checkAntigravityCalls(t *testing.T, sb *Sandbox, transcript, conversation s
 			}
 		}
 	}
+	// Every call but the cancelled turn's is expected.
+	expected := len(want)
+	if cancelledStep != "" {
+		expected--
+	}
 	var got map[string]int
 	deadline := time.Now().Add(30 * time.Second)
 	for {
@@ -351,7 +359,7 @@ func checkAntigravityCalls(t *testing.T, sb *Sandbox, transcript, conversation s
 				t.Errorf("%s carries a reasoning count agy never gave", id)
 			}
 		}
-		if len(got) >= len(want) || time.Now().After(deadline) {
+		if len(got) >= expected || time.Now().After(deadline) {
 			break
 		}
 		time.Sleep(500 * time.Millisecond)
@@ -374,14 +382,42 @@ func checkAntigravityCalls(t *testing.T, sb *Sandbox, transcript, conversation s
 		}
 	}
 	for id := range want {
-		if got[id] == 0 {
+		if got[id] == 0 && id != cancelledStep {
 			t.Errorf("%s (in the transcript) was never delivered", id)
 		}
 	}
 	t.Logf("model calls: %d in the transcript, %d delivered; the cancelled turn's first: %q", len(want), len(got), cancelledStep)
 	if cancelledStep == "" {
-		t.Errorf("the cancelled turn recorded no call to recover")
+		t.Errorf("the cancelled turn recorded no call")
+	} else if got[cancelledStep] != 0 {
+		t.Errorf("the cancelled turn's call %s was delivered %d times, want never", cancelledStep, got[cancelledStep])
 	}
+	if n := antigravityLosses(sb, "turn_ended"); n < 1 {
+		t.Errorf("the spool counts %d calls lost as turn_ended, want the cancelled turn's", n)
+	}
+}
+
+// antigravityLosses is how many events the sandbox's hooks counted lost for reason, from the
+// spool's losses: one JSON line per loss, {"reason":…,"count":…}.
+func antigravityLosses(sb *Sandbox, reason string) int {
+	files, _ := filepath.Glob(filepath.Join(sb.TermaConfig, "spool", "losses", "*.jsonl"))
+	n := 0
+	for _, f := range files {
+		data, err := os.ReadFile(f)
+		if err != nil {
+			continue
+		}
+		for line := range bytes.Lines(data) {
+			var l struct {
+				Reason string `json:"reason"`
+				Count  int    `json:"count"`
+			}
+			if json.Unmarshal(line, &l) == nil && l.Reason == reason {
+				n += l.Count
+			}
+		}
+	}
+	return n
 }
 
 // checkAntigravitySeat holds the status line to have reported the plan, its quota

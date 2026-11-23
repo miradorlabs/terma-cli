@@ -19,8 +19,8 @@ const ProjectHeader = "X-Mirador-Project"
 // what is collected while it is the answer is lost, counted as LostUnreadable.
 const AccountUnreadable = "unreadable"
 
-// Why what is collected is lost, with no lane to queue it in; each is its loss's reason in
-// the relay's and the hooks' counts, which doctor lists.
+// Why what is collected is lost, most with no lane to queue it in; each is its loss's reason
+// in the relay's and the hooks' counts, which doctor lists.
 const (
 	// LostSignedOut is collected under a person's profile, signed out.
 	LostSignedOut = "signed_out"
@@ -32,6 +32,10 @@ const (
 	// LostAmbiguousPush is a git hook's record of sessions, a commit or a push, that no one
 	// lane holds: its sessions name several accounts, or, in an agent's sandbox, none.
 	LostAmbiguousPush = "ambiguous_push"
+	// LostTurnEnded is a model call its agent's transcript recorded that no hook of its own
+	// turn read, the last call of a cancelled turn: a later hook passes it and never sends it
+	// as its own.
+	LostTurnEnded = "turn_ended"
 )
 
 // NoPersonLane is the lane of what no person collected, under a server key: it leaves only
