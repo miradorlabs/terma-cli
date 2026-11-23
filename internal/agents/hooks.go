@@ -50,7 +50,9 @@ type PayloadReader interface {
 
 // HookStarter is a harness that marks the hook processes it starts, in their environment.
 // Some harnesses also run the entries of another agent's hooks file; such a process is the
-// starter's, whichever agent its event belongs to (Registry.StartedElsewhere).
+// starter's, whichever agent its event belongs to (Registry.StartedElsewhere). The mark is
+// one the harness sets on its hook processes alone: a variable it also hands the commands
+// its tools run would stand down the hooks of an agent started from one of them.
 type HookStarter interface {
 	// StartedHook reports whether the harness started this hook process, whose environment
 	// getenv reads.
