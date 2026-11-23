@@ -391,6 +391,8 @@ const (
 	TermaSubagentStartEvent = "terma.subagent.start"
 	// TermaToolCallEvent is terma.tool.call: One tool call, keyed on its call id, which is its replay identity.
 	TermaToolCallEvent = "terma.tool.call"
+	// TermaUserMessageEvent is terma.user.message: One prompt to an agent whose export may lose its prompts, from the agent's prompt hook.
+	TermaUserMessageEvent = "terma.user.message"
 )
 
 // Enum values.

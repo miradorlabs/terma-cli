@@ -323,13 +323,13 @@ func TestEveryHookEventKindIsClassified(t *testing.T) {
 			kind, _ := strconv.Unquote(lit.Value)
 			kinds++
 			lists := 0
-			for _, in := range []bool{hookContent[kind] != nil, contentFree[kind], contentWhole[kind]} {
+			for _, in := range []bool{hookContent[kind] != nil, contentFree[kind], contentWhole[kind], promptContent[kind] != nil} {
 				if in {
 					lists++
 				}
 			}
 			if lists != 1 {
-				t.Errorf("%s (%s): classify it in exactly one of hookContent, contentFree or contentWhole", name.Name, kind)
+				t.Errorf("%s (%s): classify it in exactly one of hookContent, contentFree, contentWhole or promptContent", name.Name, kind)
 			}
 		}
 		return true
@@ -464,5 +464,51 @@ func TestHookEventsNameTheUser(t *testing.T) {
 		case strings.Contains(body, "s-p2") && strings.Contains(body, semconv.TermaUserIDKey):
 			t.Errorf("p2's events named a user:\n%s", body)
 		}
+	}
+}
+
+// A prompt a hook spooled (terma.user.message) always leaves, so it counts: whole while the
+// policy collects prompts and its agent still has the developer's consent, without its text
+// once prompts are withheld or the agent was deselected, whatever happened to tool content.
+// The spooled event stays as it was.
+func TestOutgoingWithholdsAPromptsTextAlone(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	prompt := spool.Event{Repository: app, Name: semconv.TermaUserMessageEvent, Attrs: map[string]any{
+		semconv.GenAIMainAgentNameKey: "fake", semconv.TermaMessageIDKey: "m1",
+		semconv.TermaMessageTextKey: "fix the bug", semconv.TermaMessageTruncatedKey: false,
+	}}
+	consent := func(ok bool) func(string, hookrun.Consent) bool {
+		return func(tool string, _ hookrun.Consent) bool { return ok && tool == "fake" }
+	}
+	policy := func(prompts, toolContent bool) config.Policy {
+		return config.Policy{Mode: config.ModeRepo, Repositories: listed, IncludePrompts: prompts, IncludeToolContent: toolContent}
+	}
+	for _, tc := range []struct {
+		name     string
+		pol      config.Policy
+		consent  func(string, hookrun.Consent) bool
+		withText bool
+	}{
+		{"everything, consented", policy(true, true), consent(true), true},
+		{"prompts only, consented", policy(true, false), consent(true), true},
+		{"everything, deselected", policy(true, true), consent(false), false},
+		{"everything, no one to ask", policy(true, true), nil, false},
+		{"prompts withheld", policy(false, true), consent(true), false},
+		{"nothing but logs", policy(false, false), consent(true), false},
+	} {
+		out, ok := (Router{ConfigDir: dir, Consent: tc.consent}).Outgoing(tc.pol, "p1", prompt)
+		if !ok || out.Attrs[semconv.TermaMessageIDKey] != "m1" || out.Attrs[semconv.GenAIMainAgentNameKey] != "fake" {
+			t.Errorf("%s: %+v, %v", tc.name, out, ok)
+			continue
+		}
+		_, text := out.Attrs[semconv.TermaMessageTextKey]
+		_, cut := out.Attrs[semconv.TermaMessageTruncatedKey]
+		if text != tc.withText || cut != tc.withText {
+			t.Errorf("%s: text %v, truncated %v, want %v", tc.name, text, cut, tc.withText)
+		}
+	}
+	if prompt.Attrs[semconv.TermaMessageTextKey] != "fix the bug" {
+		t.Fatal("Outgoing changed the spooled event")
 	}
 }

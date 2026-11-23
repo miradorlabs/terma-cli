@@ -605,6 +605,27 @@ events:
       - ref: terma.agent.id
       - ref: gen_ai.agent.name
 
+  - name: terma.user.message
+    stability: development
+    requirement_level: recommended
+    brief: One prompt to an agent whose export may lose its prompts, from the agent's prompt hook.
+    note: >
+      Sent for every prompt, with its text only while the team's policy collects prompts and
+      the developer chose the agent; a withheld prompt still counts as one. It names no turn:
+      nothing joins the hook's prompt id to the turn the agent's export names. A subagent's
+      prompt names the subagent's kind in gen_ai.agent.name: the parent agent wrote it, not
+      the person.
+    attributes:
+      - ref: session.id
+        requirement_level: required
+      - ref: gen_ai.main_agent.name
+        requirement_level: required
+      - ref: terma.message.id
+        requirement_level: required
+      - ref: terma.message.text
+      - ref: terma.message.truncated
+      - ref: gen_ai.agent.name
+
   - name: terma.session.title
     stability: development
     requirement_level: recommended
