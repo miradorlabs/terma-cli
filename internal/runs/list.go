@@ -1,6 +1,7 @@
 package runs
 
 import (
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -26,11 +27,6 @@ func Mixed(stateDir string, now time.Time, recent time.Duration) []MixedRun {
 	written := map[string]time.Time{}
 	for _, e := range entries {
 		if id, ok := sessionOf(e.Name()); ok && e.IsDir() == strings.HasSuffix(e.Name(), asideExt) {
-			if b, err := os.ReadFile(aliasPath(stateDir, id)); err == nil {
-				if canon := strings.TrimSpace(string(b)); session.ValidID(canon) {
-					id = canon
-				}
-			}
 			var at time.Time
 			if info, err := e.Info(); err == nil {
 				at = info.ModTime()
@@ -38,25 +34,29 @@ func Mixed(stateDir string, now time.Time, recent time.Duration) []MixedRun {
 			written[id] = latest(written[id], at)
 		}
 	}
-	var out []MixedRun
+	seen := map[string]MixedRun{}
 	for id, at := range written {
+		canon := id
+		if t, err := aliasTarget(stateDir, id); err == nil {
+			canon = t
+		}
 		if l, found, _, err := resolve(stateDir, id); err != nil {
-			out = append(out, MixedRun{Session: id, Recent: true})
+			seen[canon] = MixedRun{Session: canon, Recent: true}
 		} else if found && len(l.Runs) > 0 {
-			if r := inForce(l.Runs, now); !r.MixedAt.IsZero() {
-				out = append(out, MixedRun{Session: id, Why: r.why(), Recent: now.Sub(l.lastActive(at)) <= recent})
+			if r := inForce(l.Runs, now); !r.MixedAt.IsZero() && !seen[canon].Recent {
+				seen[canon] = MixedRun{Session: canon, Why: r.why(), Recent: now.Sub(l.lastActive(at)) <= recent}
 			}
 		}
 	}
+	out := slices.Collect(maps.Values(seen))
 	slices.SortFunc(out, func(a, b MixedRun) int { return strings.Compare(a.Session, b.Session) })
 	return out
 }
 
 func sessionOf(name string) (string, bool) {
-	for _, ext := range []string{".json", asideExt} {
-		if id, ok := strings.CutSuffix(name, ext); ok && session.ValidID(id) {
-			return id, true
-		}
+	if id, ok := strings.CutSuffix(name, ".json"); ok && session.ValidID(id) {
+		return id, true
 	}
-	return "", false
+	id, ok := strings.CutSuffix(name, asideExt)
+	return id, ok && session.ValidID(id)
 }

@@ -1192,8 +1192,8 @@ func TestMixedAsideEdgeCasesAndConcurrentRead(t *testing.T) {
 
 	t.Run("runless_eviction_boundary_and_refresh_fast_path", func(t *testing.T) {
 		t0 := now.Add(-2 * time.Hour)
-		// Boundary: runless Mixed + (maxPlacements-1) named placements, then a runless collected write
-		// triggers the first eviction of "" and must fail closed immediately.
+		// Boundary: runless Mixed + (maxPlacements-1) named placements; a runless collected write
+		// is rejected while the retained Mixed placement remains, so PID 11 is never routed and t0 stays Mixed.
 		if !Write(dir, "runless-bound", placed(KindMixed, "", "", "", 10), t0) {
 			t.Fatal("initial runless Mixed write failed")
 		}
@@ -1204,14 +1204,15 @@ func TestMixedAsideEdgeCasesAndConcurrentRead(t *testing.T) {
 			}
 		}
 		evictAt := t0.Add(time.Hour)
-		if !Write(dir, "runless-bound", Claim{ProjectID: "p2", Account: testAccount, Kind: KindRepository, Repository: repoAt("github.com/acme/evict"), PIDs: []int{11}}, evictAt) {
-			t.Fatal("runless boundary write failed")
+		if Write(dir, "runless-bound", Claim{ProjectID: "p2", Account: testAccount, Kind: KindRepository, Repository: repoAt("github.com/acme/evict"), PIDs: []int{11}}, evictAt) {
+			t.Fatal("runless write succeeded while a retained Mixed placement remained")
 		}
 		cBound := mustRead(t, dir, "runless-bound", now)
-		for _, pid := range []int{10, 11} {
-			if got, ok := cBound.At(pid, evictAt); !ok || got.Kind != KindMixed || got.ProjectID != "" {
-				t.Fatalf("boundary At(pid=%d) = %+v, %v; want KindMixed", pid, got, ok)
-			}
+		if got, ok := cBound.At(11, evictAt); ok && got.ProjectID != "" {
+			t.Fatalf("boundary At(pid=11) = %+v, %v; want unrouted", got, ok)
+		}
+		if got, ok := cBound.At(10, t0); !ok || got.Kind != KindMixed || got.ProjectID != "" {
+			t.Fatalf("boundary At(pid=10, t0) = %+v, %v; want KindMixed", got, ok)
 		}
 
 		// Fast path: after runless Mixed is evicted by maxPlacements named writes, a matching runless
@@ -1249,6 +1250,20 @@ func TestMixedAsideEdgeCasesAndConcurrentRead(t *testing.T) {
 		}
 		if got, ok := mustRead(t, dir, "named-then-runless", now).At(10, now); !ok || got.Kind != KindMixed || got.ProjectID != "" {
 			t.Fatalf("runless write after named Mixed eviction = %+v, %v; want KindMixed", got, ok)
+		}
+
+		// While a retained named Mixed placement remains, a delayed runless collected write must not downgrade its PID.
+		if !Write(dir, "retained-mixed-runless", placed(KindMixed, "r0", "", "", 10), t0) ||
+			!Write(dir, "retained-mixed-runless", Claim{ProjectID: "p1", Account: testAccount, Kind: KindRepository, Run: "r1", Repository: repoAt("github.com/acme/r1"), PIDs: []int{20}}, t0.Add(time.Minute)) {
+			t.Fatal("retained-mixed-runless setup failed")
+		}
+		Write(dir, "retained-mixed-runless", Claim{ProjectID: "p1", Account: testAccount, Kind: KindRepository, Repository: repoAt("github.com/acme/r1"), PIDs: []int{10}}, now)
+		cRet := mustRead(t, dir, "retained-mixed-runless", now)
+		if got, ok := cRet.At(10, now); !ok || got.Kind != KindMixed || got.ProjectID != "" {
+			t.Fatalf("PID 10 after delayed runless write = %+v, %v; want KindMixed", got, ok)
+		}
+		if got, ok := cRet.At(20, now); !ok || got.Kind != KindRepository || got.ProjectID != "p1" {
+			t.Fatalf("PID 20 on clean r1 = %+v, %v; want KindRepository p1", got, ok)
 		}
 	})
 }

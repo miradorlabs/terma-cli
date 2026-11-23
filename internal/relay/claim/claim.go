@@ -347,11 +347,11 @@ func samePlace(prev, c Claim) bool {
 
 func sameRun(prev, c Claim) bool { return c.Run == "" || c.Run == prev.Run }
 
-// staysMixed blocks non-Mixed writes to a Mixed tail and collected/kinded writes to earlier or evicted named Mixed runs.
+// staysMixed blocks non-Mixed writes to a Mixed tail and collected/kinded writes to earlier or evicted Mixed runs.
 func staysMixed(prev, c Claim) bool {
 	return c.Kind != KindMixed && (prev.Kind == KindMixed && (c.Run == "" || c.Run == prev.Run) ||
-		(c.Kind != "" || c.ProjectID != "") && c.Run != "" && (slices.Contains(prev.MixedRuns, c.Run) ||
-			slices.ContainsFunc(prev.placements(), func(p Placement) bool { return p.Kind == KindMixed && p.Run == c.Run })))
+		(c.Kind != "" || c.ProjectID != "") && (c.Run != "" && slices.Contains(prev.MixedRuns, c.Run) ||
+			slices.ContainsFunc(prev.placements(), func(p Placement) bool { return p.Kind == KindMixed && (c.Run == "" || p.Run == c.Run) })))
 }
 
 // sameDirs reports whether c names the same working tree, directory, worktree, remote, and branch as prev.

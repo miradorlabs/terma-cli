@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/config"
@@ -85,12 +86,11 @@ func (r *run) mark(at time.Time, why Why) {
 // Start records a new clean run of sessionID beginning at at and returns its ID.
 func Start(stateDir, sessionID string, at time.Time) (string, error) {
 	id := newRunID()
-	err := update(stateDir, sessionID, func(l *ledger) {
+	if err := update(stateDir, sessionID, func(l *ledger) {
 		l.Runs = append(l.Runs, run{ID: id, Started: at.UTC()})
 		slices.SortStableFunc(l.Runs, func(a, b run) int { return a.Started.Compare(b.Started) })
 		l.active(at)
-	})
-	if err != nil {
+	}); err != nil {
 		return "", err
 	}
 	return id, nil
@@ -101,12 +101,20 @@ func Alias(stateDir, sessionID, alias string) error {
 	if !session.ValidID(alias) {
 		return fmt.Errorf("runs: invalid alias %q", alias)
 	}
-	if alias == sessionID {
-		return nil
-	}
 	return editLedger(stateDir, sessionID, false, func(path string, l *ledger) error {
-		if !slices.Contains(l.Aliases, alias) {
+		canon := strings.TrimSuffix(filepath.Base(path), ".json")
+		if alias == canon {
+			return nil
+		}
+		dl, dok, _, err := readLedger(stateDir, alias)
+		if err != nil {
+			return err
+		}
+		changed := !slices.Contains(l.Aliases, alias)
+		if changed {
 			l.Aliases = append(l.Aliases, alias)
+		}
+		if dok && mergeMixed(l, dl) || changed {
 			if err := save(path, l); err != nil {
 				return err
 			}
@@ -115,7 +123,7 @@ func Alias(stateDir, sessionID, alias string) error {
 		if err := os.MkdirAll(filepath.Dir(pointer), 0o700); err != nil {
 			return err
 		}
-		return config.WriteFileAtomic(pointer, []byte(sessionID), 0o600)
+		return config.WriteFileAtomic(pointer, []byte(canon), 0o600)
 	})
 }
 
@@ -241,9 +249,6 @@ type Position struct {
 
 // Locate reads the ledger once for a hook's current run, locations, Mixed/sidecar state, and aliases.
 func Locate(stateDir, idOrAlias string) (Position, bool) {
-	if !session.ValidID(idOrAlias) {
-		return Position{}, false
-	}
 	l, ok, aside, err := resolve(stateDir, idOrAlias)
 	if err != nil || !ok || len(l.Runs) == 0 {
 		return Position{}, false
@@ -288,8 +293,8 @@ func inForceIdx(runs []run, t time.Time) int {
 			earliest = i
 		}
 	}
-	if best < 0 {
-		return earliest
+	if best >= 0 {
+		return best
 	}
-	return best
+	return earliest
 }

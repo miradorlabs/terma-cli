@@ -59,8 +59,8 @@ func writeMixedAside(claimPath string, c Claim, now time.Time) bool {
 	return false
 }
 
-func loadAside(claimPath string, now time.Time) ([]asideMark, []string) {
-	dir := asidePath(claimPath)
+func loadAside(claimPath string, now time.Time) (marks []asideMark, files []string) {
+	dir, fail := asidePath(claimPath), []asideMark{{claim: Claim{Kind: KindMixed}}}
 	var entries []os.DirEntry
 	var err error
 	for range 2 {
@@ -72,13 +72,12 @@ func loadAside(claimPath string, now time.Time) ([]asideMark, []string) {
 			return nil, nil
 		}
 		if !errors.Is(err, fs.ErrNotExist) || statErr != nil || !info.IsDir() {
-			return []asideMark{{claim: Claim{Kind: KindMixed}}}, nil
+			return fail, nil
 		}
 	}
 	if err != nil {
-		return []asideMark{{claim: Claim{Kind: KindMixed}}}, nil
+		return fail, nil
 	}
-	marks, files := []asideMark(nil), []string(nil)
 	for _, e := range entries {
 		if e.IsDir() || strings.HasPrefix(e.Name(), config.TempPrefix) {
 			continue
@@ -86,7 +85,7 @@ func loadAside(claimPath string, now time.Time) ([]asideMark, []string) {
 		info, err := e.Info()
 		if err != nil {
 			if !errors.Is(err, fs.ErrNotExist) {
-				marks = append(marks, asideMark{claim: Claim{Kind: KindMixed}})
+				marks = append(marks, fail[0])
 			}
 			continue
 		}
@@ -132,8 +131,7 @@ func applyAside(prev Claim, havePrev bool, marks []asideMark) (Claim, bool, bool
 		}
 		pls := slices.Clone(prev.placements())
 		if prev.Kind == KindMixed && sameRun && (m.Profile == "" || m.Profile == prev.Profile) && (m.Account == "" || m.Account == prev.Account) {
-			var mod bool
-			pls, mod = mergeMixedInto(pls, len(pls)-1, m)
+			pls, mod := mergeMixedInto(pls, len(pls)-1, m)
 			last := len(pls) - 1
 			if mod && len(prev.PIDs) > 0 {
 				prev.PIDs = pls[last].PIDs
@@ -155,8 +153,7 @@ func applyAside(prev Claim, havePrev bool, marks []asideMark) (Claim, bool, bool
 		}
 		since := clampSince(pls, m.Run, m.ClaimedAt)
 		runID, profile, account, tool, parent := cmp.Or(m.Run, prev.Run), cmp.Or(m.Profile, prev.Profile), cmp.Or(m.Account, prev.Account), cmp.Or(m.Tool, prev.Tool), cmp.Or(prev.Parent, m.Parent)
-		pls = append(pls, Placement{Kind: KindMixed, Run: runID, Profile: profile, Account: account, Tool: tool, PIDs: pids, Since: since})
-		pls, evicted, mixed := trimPlacements(pls, prev.Evicted, prev.MixedRuns)
+		pls, evicted, mixed := trimPlacements(append(pls, Placement{Kind: KindMixed, Run: runID, Profile: profile, Account: account, Tool: tool, PIDs: pids, Since: since}), prev.Evicted, prev.MixedRuns)
 		prev, changed = Claim{Kind: KindMixed, Run: runID, Profile: profile, Account: account, Tool: tool, Parent: parent, PIDs: pids, Placements: pls, Evicted: evicted, MixedRuns: mixed, ClaimedAt: claimedAt}, true
 	}
 	return prev, havePrev, changed
@@ -231,8 +228,7 @@ func prepareMixed(pls []Placement, run, profile, account string, add []int, sinc
 	return pls[:n], pids, hit
 }
 
-func poisonRun(pls []Placement, run string, since time.Time) bool {
-	hit := false
+func poisonRun(pls []Placement, run string, since time.Time) (hit bool) {
 	for i := range pls {
 		if (run == "" || pls[i].Run == "" || pls[i].Run == run) && !pls[i].Since.Before(since) && (pls[i].Kind != KindMixed || pls[i].ProjectID != "") {
 			pls[i].Kind, pls[i].ProjectID, hit = KindMixed, "", true
@@ -252,11 +248,11 @@ func foldEarlierRun(prev *Claim, m Claim) (matched, changed bool) {
 		return slices.Contains(prev.MixedRuns, m.Run), false
 	}
 	if pls[idx].Kind == KindMixed && sameLane(pls[idx], m.Run, m.Profile, m.Account) {
-		if next, mod := mergeMixedInto(pls, idx, m); mod {
+		next, mod := mergeMixedInto(pls, idx, m)
+		if mod {
 			prev.Placements = next
-			return true, true
 		}
-		return true, false
+		return true, mod
 	}
 	prefix, pids, _ := prepareMixed(pls[:idx+1], m.Run, m.Profile, m.Account, m.PIDs, m.ClaimedAt)
 	since := clampSince(prefix, m.Run, m.ClaimedAt)
@@ -274,13 +270,12 @@ func trimPlacements(pls []Placement, evicted bool, mixed []string) ([]Placement,
 	}
 	drop, out := len(pls)-maxPlacements, slices.Clone(mixed)
 	for _, p := range pls[:drop] {
-		if p.Kind != KindMixed || slices.Contains(out, "*") || slices.Contains(out, p.Run) {
-			continue
-		}
-		if len(out) >= maxPIDs {
-			out = []string{"*"}
-		} else {
-			out = append(out, p.Run)
+		if p.Kind == KindMixed && !slices.Contains(out, "*") && !slices.Contains(out, p.Run) {
+			if len(out) >= maxPIDs {
+				out = []string{"*"}
+			} else {
+				out = append(out, p.Run)
+			}
 		}
 	}
 	return pls[drop:], true, out

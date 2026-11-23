@@ -12,7 +12,6 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/flock"
-	"github.com/miradorlabs/terma-cli/internal/session"
 )
 
 // Prune removes ledgers idle past retention that no queued record names (along with locks
@@ -29,12 +28,8 @@ func Prune(ctx context.Context, stateDir string, now time.Time, queued map[strin
 		keep = make(map[string]bool, len(queued))
 		for id := range queued {
 			keep[id] = true
-			if session.ValidID(id) {
-				if b, err := os.ReadFile(aliasPath(stateDir, id)); err == nil {
-					if canon := strings.TrimSpace(string(b)); session.ValidID(canon) {
-						keep[canon] = true
-					}
-				}
+			if canon, err := aliasTarget(stateDir, id); err == nil {
+				keep[canon] = true
 			}
 		}
 	}
@@ -114,17 +109,16 @@ func pruneAside(stateDir, name string, now time.Time, queued map[string]bool) {
 	if info, err := os.Lstat(dir); (loadErr == nil && now.Sub(a.last()) <= MixedRetention) || err != nil || now.Sub(info.ModTime()) <= MixedRetention {
 		return
 	}
+	age := MixedRetention
 	if loadErr == nil {
 		for _, f := range a.files {
 			_ = os.Remove(filepath.Join(dir, f))
 		}
-		cleanAsideEntries(dir, now, Retention, true)
-	} else {
-		cleanAsideEntries(dir, now, MixedRetention, false)
+		age = Retention
 	}
+	cleanAsideEntries(dir, now, age, loadErr == nil)
 	_ = os.Remove(dir)
 }
-
 func cleanAsideEntries(dir string, now time.Time, age time.Duration, tempsOnly bool) {
 	entries, _ := os.ReadDir(dir)
 	for _, e := range entries {
@@ -135,14 +129,12 @@ func cleanAsideEntries(dir string, now time.Time, age time.Duration, tempsOnly b
 		}
 	}
 }
-
 func (l ledger) retention() time.Duration {
 	if n := len(l.Runs); n > 0 && !l.Runs[n-1].MixedAt.IsZero() {
 		return MixedRetention
 	}
 	return Retention
 }
-
 func pruneAliases(stateDir string, now time.Time, queued map[string]bool) {
 	dir := filepath.Join(stateDir, Dir, aliasesDir)
 	entries, _ := os.ReadDir(dir)

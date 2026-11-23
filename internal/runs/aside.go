@@ -32,22 +32,24 @@ func asidePath(ledger string) string { return strings.TrimSuffix(ledger, ".json"
 
 // MarkAside records a lock-free Mixed mark for sessionID/runID with reason Aside.
 func MarkAside(stateDir, sessionID, runID string, at time.Time) error {
+	if target, err := aliasTarget(stateDir, sessionID); err == nil {
+		sessionID = target
+	}
 	path, err := ledgerPath(stateDir, sessionID)
 	if err != nil {
 		return err
 	}
-	dir := asidePath(path)
+	dir, b := asidePath(path), []byte(nil)
 	if runID == "" {
 		runID = newRunID()
 	}
-	b, err := json.Marshal(mark{Run: runID, At: at.UTC()})
-	if err != nil {
+	if b, err = json.Marshal(mark{Run: runID, At: at.UTC()}); err != nil {
 		return err
 	}
-	name := newRunID() + ".json"
+	file := filepath.Join(dir, newRunID()+".json")
 	for range asideWrites {
 		if err = os.MkdirAll(dir, 0o700); err == nil {
-			if err = config.WriteFileAtomic(filepath.Join(dir, name), b, 0o600); err == nil {
+			if err = config.WriteFileAtomic(file, b, 0o600); err == nil {
 				return nil
 			}
 		}
@@ -71,14 +73,12 @@ func (a aside) apply(l *ledger) {
 		l.active(m.At)
 	}
 }
-
 func (a aside) last() (out time.Time) {
 	for _, m := range a.marks {
 		out = latest(out, m.At)
 	}
 	return out
 }
-
 func fold(path string, l *ledger) error {
 	dir := asidePath(path)
 	a, err := loadAside(dir)
@@ -97,10 +97,8 @@ func fold(path string, l *ledger) error {
 	_ = os.Remove(dir)
 	return nil
 }
-
-func loadAside(dir string) (aside, error) {
+func loadAside(dir string) (a aside, err error) {
 	var entries []os.DirEntry
-	var err error
 	for range 2 {
 		if entries, err = os.ReadDir(dir); err == nil {
 			break
@@ -116,12 +114,12 @@ func loadAside(dir string) (aside, error) {
 	if err != nil {
 		return aside{}, err
 	}
-	var a aside
 	for _, e := range entries {
 		if e.IsDir() || strings.HasPrefix(e.Name(), config.TempPrefix) {
 			continue
 		}
-		b, err := os.ReadFile(filepath.Join(dir, e.Name()))
+		p := filepath.Join(dir, e.Name())
+		b, err := os.ReadFile(p)
 		if errors.Is(err, fs.ErrNotExist) {
 			continue
 		}
@@ -130,7 +128,7 @@ func loadAside(dir string) (aside, error) {
 			return aside{}, err
 		}
 		if err := json.Unmarshal(b, &m); err != nil {
-			return aside{}, fmt.Errorf("parse %s: %w", filepath.Join(dir, e.Name()), err)
+			return aside{}, fmt.Errorf("parse %s: %w", p, err)
 		}
 		a.marks, a.files = append(a.marks, m), append(a.files, e.Name())
 	}

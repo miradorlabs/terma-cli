@@ -545,22 +545,45 @@ func TestAliasPrecedenceAndMixedMerge(t *testing.T) {
 		t.Fatalf("Mixed = %+v, want only [parent-a]", got)
 	}
 
-	// Start(child) -> MarkMixed(child) -> Start(parent) -> Alias(parent, child) still reads Mixed.
+	// Start(child) -> MarkMixed(child) -> Start(parent) -> Alias(parent, child) reconciles into parent, sibling, and Mixed.
 	start(t, dir, "child-b", t0)
 	crossB := t0.Add(2 * time.Minute)
 	must(t, MarkMixed(dir, "child-b", crossB, Why{Reason: UnknownReach, Where: "eval"}))
 	start(t, dir, "parent-b", t0)
+	must(t, Alias(dir, "parent-b", "sibling-b"))
 	must(t, Alias(dir, "parent-b", "child-b"))
-	if at, mixed := mixedAt(t, dir, "child-b", t0.Add(3*time.Minute)); !mixed || !at.Equal(crossB) {
-		t.Fatalf("child-b after pre-alias MarkMixed: MixedAt = %v, %v; want %v, true", at, mixed, crossB)
+	for _, id := range []string{"child-b", "parent-b", "sibling-b"} {
+		if at, mixed := mixedAt(t, dir, id, t0.Add(3*time.Minute)); !mixed || !at.Equal(crossB) {
+			t.Fatalf("%s after pre-alias MarkMixed: MixedAt = %v, %v; want %v, true", id, at, mixed, crossB)
+		}
+	}
+	// Alias(parent, child) -> MarkMixed(child) writes to canonical parent so parent and sibling read Mixed.
+	start(t, dir, "parent-d", t0)
+	must(t, Alias(dir, "parent-d", "child-d"))
+	must(t, Alias(dir, "parent-d", "sibling-d"))
+	must(t, MarkMixed(dir, "child-d", crossB, Why{Reason: Crossed, Where: "other"}))
+	for _, id := range []string{"parent-d", "child-d", "sibling-d"} {
+		if at, mixed := mixedAt(t, dir, id, t0.Add(3*time.Minute)); !mixed || !at.Equal(crossB) {
+			t.Fatalf("%s after post-alias MarkMixed(child): MixedAt = %v, %v; want %v, true", id, at, mixed, crossB)
+		}
 	}
 
-	// Unstarted parent with alias still preserves child's Mixed mark.
+	// Unstarted parent with alias still preserves child's Mixed mark and appears in Mixed().
 	start(t, dir, "child-c", t0)
 	must(t, MarkMixed(dir, "child-c", crossB, Why{Reason: Crossed}))
 	must(t, Alias(dir, "parent-c", "child-c"))
-	if _, mixed := mixedAt(t, dir, "child-c", t0.Add(3*time.Minute)); !mixed {
-		t.Fatal("child-c aliased to unstarted parent lost its Mixed mark")
+	for _, id := range []string{"child-c", "parent-c"} {
+		if _, mixed := mixedAt(t, dir, id, t0.Add(3*time.Minute)); !mixed {
+			t.Fatalf("%s aliased to unstarted parent lost its Mixed mark", id)
+		}
+	}
+	gotMixed := Mixed(dir, t0.Add(6*time.Minute), time.Hour)
+	var names []string
+	for _, m := range gotMixed {
+		names = append(names, m.Session)
+	}
+	if !slices.Equal(names, []string{"parent-a", "parent-b", "parent-c", "parent-d"}) {
+		t.Fatalf("Mixed sessions = %v, want [parent-a parent-b parent-c parent-d]", names)
 	}
 
 	// Empty alias file fails closed.
