@@ -307,9 +307,9 @@ func (s *Spool) Writable() error {
 	return f.Sync()
 }
 
-// Sessions calls add with the session ID of every queued event that names one, a line at
-// a time, without the lock appends take, so no hook waits on it: an event appended
-// meanwhile may be missed. It stops with ctx's error once ctx is done.
+// Sessions calls add with the session ID of every queued event that names one, without
+// taking the append lock. A non-nil error (e.g. ctx done or ErrTooLong) means partial
+// results; callers must skip runs.Prune so queued sessions' ledgers are never deleted.
 func (s *Spool) Sessions(ctx context.Context, add func(sessionID string)) error {
 	f, err := os.Open(s.path())
 	if errors.Is(err, fs.ErrNotExist) {

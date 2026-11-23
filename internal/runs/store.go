@@ -20,11 +20,11 @@ import (
 // concurrent fold (save ledger before removing sidecar) never hides a Mixed mark.
 func resolve(stateDir, idOrAlias string) (l ledger, ok, aside bool, err error) {
 	read := func(sessionID string) error {
-		a, err := readAside(stateDir, sessionID)
+		path, err := ledgerPath(stateDir, sessionID)
 		if err != nil {
 			return err
 		}
-		path, err := ledgerPath(stateDir, sessionID)
+		a, err := loadAside(asidePath(path))
 		if err != nil {
 			return err
 		}
@@ -41,10 +41,10 @@ func resolve(stateDir, idOrAlias string) (l ledger, ok, aside bool, err error) {
 		return l, ok, aside, err
 	}
 	b, err := os.ReadFile(aliasPath(stateDir, idOrAlias))
-	if errors.Is(err, fs.ErrNotExist) {
-		return ledger{}, false, false, nil
-	}
 	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			err = nil
+		}
 		return ledger{}, false, false, err
 	}
 	err = read(strings.TrimSpace(string(b)))
@@ -52,24 +52,29 @@ func resolve(stateDir, idOrAlias string) (l ledger, ok, aside bool, err error) {
 }
 
 func update(stateDir, sessionID string, change func(*ledger)) error {
-	return lockedEdit(stateDir, sessionID, func(path string, l *ledger) error {
+	return editLedger(stateDir, sessionID, false, func(path string, l *ledger) error {
 		change(l)
 		return save(path, l)
 	})
 }
 
-func lockedEdit(stateDir, sessionID string, edit func(path string, l *ledger) error) error {
+func editLedger(stateDir, sessionID string, try bool, edit func(path string, l *ledger) error) error {
 	path, err := ledgerPath(stateDir, sessionID)
 	if err != nil {
 		return err
 	}
-	return flock.Locked(path, lockWait, func() error { return editLoaded(stateDir, sessionID, path, edit) })
-}
-
-func tryEdit(stateDir, sessionID string, edit func(path string, l *ledger) error) error {
-	path, err := ledgerPath(stateDir, sessionID)
-	if err != nil {
-		return err
+	run := func() error {
+		l, _, err := load(path)
+		if err != nil {
+			return err
+		}
+		if err := fold(path, &l); err != nil {
+			return err
+		}
+		return edit(path, &l)
+	}
+	if !try {
+		return flock.Locked(path, lockWait, run)
 	}
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return err
@@ -79,18 +84,7 @@ func tryEdit(stateDir, sessionID string, edit func(path string, l *ledger) error
 		return err
 	}
 	defer unlock()
-	return editLoaded(stateDir, sessionID, path, edit)
-}
-
-func editLoaded(stateDir, sessionID, path string, edit func(path string, l *ledger) error) error {
-	l, _, err := load(path)
-	if err != nil {
-		return err
-	}
-	if err := fold(stateDir, sessionID, path, &l); err != nil {
-		return err
-	}
-	return edit(path, &l)
+	return run()
 }
 
 func ledgerPath(stateDir, sessionID string) (string, error) {
@@ -100,16 +94,14 @@ func ledgerPath(stateDir, sessionID string) (string, error) {
 	return filepath.Join(stateDir, Dir, sessionID+".json"), nil
 }
 
-func aliasPath(stateDir, alias string) string {
-	return filepath.Join(stateDir, Dir, aliasesDir, alias)
-}
+func aliasPath(stateDir, alias string) string { return filepath.Join(stateDir, Dir, aliasesDir, alias) }
 
 func load(path string) (ledger, bool, error) {
 	b, err := os.ReadFile(path)
-	if errors.Is(err, fs.ErrNotExist) {
-		return ledger{}, false, nil
-	}
 	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			err = nil
+		}
 		return ledger{}, false, err
 	}
 	var l ledger
@@ -127,10 +119,8 @@ func save(path string, l *ledger) error {
 	return config.WriteFileAtomic(path, b, 0o600)
 }
 
-func newRunID() (string, error) {
+func newRunID() string {
 	var b [16]byte
-	if _, err := rand.Read(b[:]); err != nil {
-		return "", err
-	}
-	return hex.EncodeToString(b[:]), nil
+	_, _ = rand.Read(b[:])
+	return hex.EncodeToString(b[:])
 }

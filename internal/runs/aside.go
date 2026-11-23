@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/config"
-	"github.com/miradorlabs/terma-cli/internal/session"
 )
 
 // Crossings a hook could not write under the ledger lock are written lock-free to
@@ -34,26 +33,25 @@ type mark struct {
 	At  time.Time `json:"at"`
 }
 
+func asidePath(ledger string) string { return strings.TrimSuffix(ledger, ".json") + asideExt }
+
 // MarkAside records a lock-free Mixed mark for sessionID/runID with reason Aside; an
-// empty runID allocates a new run covering all earlier records, matching MarkMixed.
+// empty runID marks the latest run if a ledger exists, or starts a run covering earlier
+// records when no ledger exists yet.
 func MarkAside(stateDir, sessionID, runID string, at time.Time) error {
-	dir, err := asideDir(stateDir, sessionID)
+	path, err := ledgerPath(stateDir, sessionID)
 	if err != nil {
 		return err
 	}
+	dir := asidePath(path)
 	if runID == "" {
-		if runID, err = newRunID(); err != nil {
-			return err
-		}
+		runID = newRunID()
 	}
 	b, err := json.Marshal(mark{Run: runID, At: at.UTC()})
 	if err != nil {
 		return err
 	}
-	name, err := newRunID()
-	if err != nil {
-		return err
-	}
+	name := newRunID()
 	for range asideWrites {
 		if err = os.MkdirAll(dir, 0o700); err == nil {
 			if err = config.WriteFileAtomic(filepath.Join(dir, name+".json"), b, 0o600); err == nil {
@@ -83,20 +81,16 @@ func (a aside) apply(l *ledger) {
 	}
 }
 
-func (a aside) last() time.Time {
-	var out time.Time
+func (a aside) last() (out time.Time) {
 	for _, m := range a.marks {
 		out = latest(out, m.At)
 	}
 	return out
 }
 
-// fold saves sessionID's sidecar marks into the locked ledger before removing them.
-func fold(stateDir, sessionID, path string, l *ledger) error {
-	dir, err := asideDir(stateDir, sessionID)
-	if err != nil {
-		return err
-	}
+// fold saves the ledger's sidecar marks into the locked ledger before removing them.
+func fold(path string, l *ledger) error {
+	dir := asidePath(path)
 	a, err := loadAside(dir)
 	if err != nil || len(a.marks) == 0 {
 		return err
@@ -114,27 +108,12 @@ func fold(stateDir, sessionID, path string, l *ledger) error {
 	return nil
 }
 
-func readAside(stateDir, sessionID string) (aside, error) {
-	dir, err := asideDir(stateDir, sessionID)
-	if err != nil {
-		return aside{}, nil
-	}
-	return loadAside(dir)
-}
-
-func asideDir(stateDir, sessionID string) (string, error) {
-	if !session.ValidID(sessionID) {
-		return "", fmt.Errorf("runs: invalid session id %q", sessionID)
-	}
-	return filepath.Join(stateDir, Dir, sessionID+asideExt), nil
-}
-
 func loadAside(dir string) (aside, error) {
 	entries, err := os.ReadDir(dir)
-	if errors.Is(err, fs.ErrNotExist) {
-		return aside{}, nil
-	}
 	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			err = nil
+		}
 		return aside{}, err
 	}
 	var a aside

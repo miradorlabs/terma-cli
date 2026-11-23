@@ -427,12 +427,153 @@ func TestKindMixedStripsProjectAndSameRepoResumeSeparatesRuns(t *testing.T) {
 	}
 
 	// Untimestamped record spanning a Mark (no kind) and a kinded placement is refused.
-	Mark(dir, "mixed-mark", "codex", []int{10}, t0)
+	if !Mark(dir, "mixed-mark", "codex", []int{10}, t0) {
+		t.Fatal("Mark was not written")
+	}
 	if !Write(dir, "mixed-mark", placed(KindOutsideGit, "", "/tmp/a", "r1", 10), t0.Add(time.Minute)) {
 		t.Fatal("kinded placement after Mark was not written")
 	}
 	if got, ok := mustRead(t, dir, "mixed-mark", t0.Add(time.Minute)).At(10, time.Time{}); ok {
 		t.Fatalf("untimed record spanning Mark and KindOutsideGit was covered: %+v", got)
+	}
+
+	// Out-of-order delayed Mark at t1 between collected writes at t0 and t2 keeps its boundary at t1.
+	if !Write(dir, "delayed-mark", Claim{ProjectID: "p1", Repository: repoAt("github.com/acme/api"), PIDs: []int{10}}, t0) {
+		t.Fatal("delayed-mark t0 write failed")
+	}
+	if !Write(dir, "delayed-mark", Claim{ProjectID: "p2", Repository: repoAt("github.com/acme/web"), PIDs: []int{10}}, t0.Add(2*time.Minute)) {
+		t.Fatal("delayed-mark t2 write failed")
+	}
+	if !Mark(dir, "delayed-mark", "codex", []int{10}, t0.Add(time.Minute)) {
+		t.Fatal("delayed-mark t1 Mark failed")
+	}
+	if got, ok := mustRead(t, dir, "delayed-mark", t0.Add(3*time.Minute)).At(10, t0.Add(90*time.Second)); !ok || got.ProjectID != "" {
+		t.Fatalf("delayed Mark at t1+30s = %+v, %v; want exclusion Mark", got, ok)
+	}
+}
+
+// A locked KindMixed write from one process in a run must cover every process already
+// placed in that run (and same account/profile lane) from the crossing onward, while
+// leaving pre-crossing records intact and never leaking PIDs across accounts.
+func TestLockedMixedPoisonsAllProcessesInSameRun(t *testing.T) {
+	t.Parallel()
+	dir := enable(t)
+	t0 := time.Now().UTC().Add(-time.Hour).Truncate(time.Second)
+
+	if !Write(dir, "multi-pid", placed(KindRepository, "github.com/acme/api", "/src/api", "r1", 10), t0) {
+		t.Fatal("r1 PID 10 write failed")
+	}
+	if !Write(dir, "multi-pid", placed(KindOutsideGit, "", "/tmp/scratch", "r1", 12), t0.Add(time.Minute)) {
+		t.Fatal("r1 PID 12 write failed")
+	}
+	if !Write(dir, "multi-pid", placed(KindMixed, "", "", "r1", 11), t0.Add(2*time.Minute)) {
+		t.Fatal("r1 PID 11 locked Mixed write failed")
+	}
+	c := mustRead(t, dir, "multi-pid", t0.Add(3*time.Minute))
+	if got, ok := c.At(10, t0.Add(30*time.Second)); !ok || got.Kind != KindRepository {
+		t.Fatalf("PID 10 before crossing = %+v, %v; want KindRepository", got, ok)
+	}
+	for _, pid := range []int{10, 11, 12} {
+		if got, ok := c.At(pid, t0.Add(2*time.Minute)); !ok || got.Kind != KindMixed || got.ProjectID != "" {
+			t.Fatalf("PID %d at crossing = %+v, %v; want KindMixed", pid, got, ok)
+		}
+	}
+	if got, ok := c.At(10, time.Time{}); ok {
+		t.Fatalf("untimed record for PID 10 spanning Repository and Mixed was covered: %+v", got)
+	}
+
+	// Delayed locked KindMixed at t1 (t0 < t1 < t2) after Repository@t0 and OutsideGit@t2
+	// must cover (t1, t2) as KindMixed without leaving an unpoisoned Repository gap.
+	if !Write(dir, "delayed-locked", placed(KindRepository, "github.com/acme/api", "/src/api", "r1", 10), t0) {
+		t.Fatal("delayed-locked repo write failed")
+	}
+	if !Write(dir, "delayed-locked", placed(KindOutsideGit, "", "/tmp/scratch", "r1", 10), t0.Add(2*time.Minute)) {
+		t.Fatal("delayed-locked outside-git write failed")
+	}
+	if !Write(dir, "delayed-locked", placed(KindMixed, "", "", "r1", 10), t0.Add(time.Minute)) {
+		t.Fatal("delayed-locked Mixed write failed")
+	}
+	cDelayed := mustRead(t, dir, "delayed-locked", t0.Add(3*time.Minute))
+	if got, ok := cDelayed.At(10, t0.Add(30*time.Second)); !ok || got.Kind != KindRepository {
+		t.Fatalf("delayed-locked before t1 = %+v, %v; want KindRepository", got, ok)
+	}
+	for _, at := range []time.Time{t0.Add(90 * time.Second), t0.Add(3 * time.Minute)} {
+		if got, ok := cDelayed.At(10, at); !ok || got.Kind != KindMixed || got.ProjectID != "" {
+			t.Fatalf("delayed-locked At(%v) = %+v, %v; want KindMixed", at, got, ok)
+		}
+	}
+	// An even earlier locked KindMixed at t0+20s lowers the boundary in place.
+	if !Write(dir, "delayed-locked", placed(KindMixed, "", "", "r1", 10), t0.Add(20*time.Second)) {
+		t.Fatal("earlier locked Mixed write failed")
+	}
+	if got, ok := mustRead(t, dir, "delayed-locked", t0.Add(3*time.Minute)).At(10, t0.Add(30*time.Second)); !ok || got.Kind != KindMixed || got.ProjectID != "" {
+		t.Fatalf("delayed-locked after lowering to t0+20s = %+v, %v; want KindMixed", got, ok)
+	}
+
+	// Cross-account locked KindMixed must not inherit another account's PIDs, and an
+	// interleaved placement from another account must not push Bob's delayed crossing past t1.
+	alice := placed(KindRepository, "github.com/acme/api", "/src/api", "r1", 10)
+	alice.Account, alice.Profile = "aaaaaaaaaaaaaaaa", "work"
+	if !Write(dir, "cross-acct-locked", alice, t0) {
+		t.Fatal("alice write failed")
+	}
+	bob := placed(KindMixed, "", "", "r1", 20)
+	bob.Account, bob.Profile = "bbbbbbbbbbbbbbbb", "work"
+	if !Write(dir, "cross-acct-locked", bob, t0.Add(time.Minute)) {
+		t.Fatal("bob locked Mixed write failed")
+	}
+	got := mustRead(t, dir, "cross-acct-locked", t0.Add(2*time.Minute))
+	if got.Kind != KindMixed || got.Account != "bbbbbbbbbbbbbbbb" || slices.Contains(got.PIDs, 10) {
+		t.Fatalf("cross-account locked Mixed leaked PIDs: %+v", got)
+	}
+
+	bobRepo := placed(KindRepository, "github.com/acme/web", "/src/web", "r1", 20)
+	bobRepo.Account, bobRepo.Profile = "bbbbbbbbbbbbbbbb", "work"
+	if !Write(dir, "interleaved-lanes", bobRepo, t0) {
+		t.Fatal("bob repo write failed")
+	}
+	if !Write(dir, "interleaved-lanes", alice, t0.Add(2*time.Minute)) {
+		t.Fatal("alice repo write failed")
+	}
+	if !Write(dir, "interleaved-lanes", bob, t0.Add(time.Minute)) {
+		t.Fatal("bob delayed Mixed write failed")
+	}
+	cInter := mustRead(t, dir, "interleaved-lanes", t0.Add(3*time.Minute))
+	if got, ok := cInter.At(20, t0.Add(30*time.Second)); !ok || got.Kind != KindRepository {
+		t.Fatalf("bob before t1 = %+v, %v; want KindRepository", got, ok)
+	}
+	if got, ok := cInter.At(20, t0.Add(90*time.Second)); !ok || got.Kind != KindMixed || got.ProjectID != "" {
+		t.Fatalf("bob in (t1, t2) = %+v, %v; want KindMixed", got, ok)
+	}
+
+	// PID union overflow (> maxPIDs) during Mixed fold fails closed (nil PIDs) rather than
+	// dropping an active process back to a collected pre-crossing placement.
+	many := make([]int, maxPIDs)
+	for i := range many {
+		many[i] = 100 + i
+	}
+	first := placed(KindRepository, "github.com/acme/api", "/src/api", "r1", 65)
+	first.PIDs = append([]int{65}, many[:maxPIDs-1]...)
+	if !Write(dir, "pid-overflow", first, t0) {
+		t.Fatal("pid-overflow initial write failed")
+	}
+	second := placed(KindOutsideGit, "", "/tmp/work", "r1", 65)
+	second.PIDs = []int{65, many[maxPIDs-1]}
+	if !Write(dir, "pid-overflow", second, t0.Add(2*time.Minute)) {
+		t.Fatal("pid-overflow second write failed")
+	}
+	pOver, _ := path(dir, "pid-overflow")
+	if !writeMixedAside(pOver, placed(KindMixed, "", "", "r1", 99), t0.Add(time.Minute)) {
+		t.Fatal("pid-overflow sidecar failed")
+	}
+	cOver := mustRead(t, dir, "pid-overflow", t0.Add(3*time.Minute))
+	if len(cOver.PIDs) != 0 {
+		t.Fatalf("pid-overflow did not fail closed to nil PIDs: len=%d", len(cOver.PIDs))
+	}
+	for _, pid := range []int{65, 99, many[0], many[maxPIDs-1]} {
+		if got, ok := cOver.At(pid, t0.Add(3*time.Minute)); !ok || got.Kind != KindMixed || got.ProjectID != "" {
+			t.Fatalf("pid-overflow At(%d) = %+v, %v; want KindMixed", pid, got, ok)
+		}
 	}
 }
 
@@ -518,263 +659,286 @@ func TestMixedAsideEdgeCasesAndConcurrentRead(t *testing.T) {
 	t.Parallel()
 	dir := enable(t)
 	now := time.Now().UTC().Truncate(time.Second)
-
-	// 1. Expired sidecar mark must not resurrect Mixed on the next locked write.
-	pExp, _ := path(dir, "expired-aside")
-	if !writeMixedAside(pExp, placed(KindMixed, "", "", "r1", 10), now.Add(-TTL-time.Hour)) {
-		t.Fatal("writeMixedAside failed")
-	}
-	entries, err := os.ReadDir(asidePath(pExp))
-	if err != nil || len(entries) != 1 {
-		t.Fatalf("aside entries = %v, err = %v", entries, err)
-	}
 	old := now.Add(-TTL - time.Hour)
-	if err := os.Chtimes(filepath.Join(asidePath(pExp), entries[0].Name()), old, old); err != nil {
-		t.Fatal(err)
-	}
-	if !Write(dir, "expired-aside", placed(KindRepository, "github.com/acme/api", "/src/api", "r1", 10), now) {
-		t.Fatal("locked write blocked by expired sidecar mark")
-	}
-	if got := mustRead(t, dir, "expired-aside", now); got.Kind != KindRepository {
-		t.Fatalf("Read after expired sidecar = %+v, want KindRepository", got)
-	}
-	if _, err := os.Stat(asidePath(pExp)); !os.IsNotExist(err) {
-		t.Fatalf("expired sidecar dir still exists after locked write: err=%v", err)
-	}
 
-	// 2. Older run's Mixed mark folded after r2 landed keeps r1 Mixed and r2 intact.
-	if !Write(dir, "older-run", placed(KindRepository, "github.com/acme/api", "/src/api", "r1", 10), now.Add(-10*time.Minute)) {
-		t.Fatal("r1 write failed")
-	}
-	if !Write(dir, "older-run", placed(KindRepository, "github.com/acme/web", "/src/web", "r2", 20), now.Add(-2*time.Minute)) {
-		t.Fatal("r2 write failed")
-	}
-	pOld, _ := path(dir, "older-run")
-	if !writeMixedAside(pOld, placed(KindMixed, "", "", "r1", 10), now.Add(-5*time.Minute)) {
-		t.Fatal("r1 sidecar mark failed")
-	}
-	// Locked write for r2 folds r1's delayed mark into Placements while keeping r2 live.
-	if !Write(dir, "older-run", placed(KindRepository, "github.com/acme/web", "/src/web", "r2", 21), now) {
-		t.Fatal("r2 locked write failed")
-	}
-	cOld := mustRead(t, dir, "older-run", now)
-	if cOld.Kind != KindRepository || cOld.Run != "r2" {
-		t.Fatalf("latest run = %+v, want KindRepository for r2", cOld)
-	}
-	if got, ok := cOld.At(10, now.Add(-4*time.Minute)); !ok || got.Kind != KindMixed || got.Run != "r1" {
-		t.Fatalf("r1 after crossing = %+v, %v; want KindMixed", got, ok)
-	}
+	t.Run("expired_aside_does_not_resurrect", func(t *testing.T) {
+		pExp, _ := path(dir, "expired-aside")
+		if !writeMixedAside(pExp, placed(KindMixed, "", "", "r1", 10), old) {
+			t.Fatal("writeMixedAside failed")
+		}
+		entries, err := os.ReadDir(asidePath(pExp))
+		if err != nil || len(entries) != 1 {
+			t.Fatalf("aside entries = %v, err = %v", entries, err)
+		}
+		if err := os.Chtimes(filepath.Join(asidePath(pExp), entries[0].Name()), old, old); err != nil {
+			t.Fatal(err)
+		}
+		if !Write(dir, "expired-aside", placed(KindRepository, "github.com/acme/api", "/src/api", "r1", 10), now) {
+			t.Fatal("locked write blocked by expired sidecar mark")
+		}
+		if got := mustRead(t, dir, "expired-aside", now); got.Kind != KindRepository {
+			t.Fatalf("Read after expired sidecar = %+v, want KindRepository", got)
+		}
+		if _, err := os.Stat(asidePath(pExp)); !os.IsNotExist(err) {
+			t.Fatalf("expired sidecar dir still exists after locked write: err=%v", err)
+		}
+	})
 
-	// 3. Cross-account sidecar mark must not merge prev's PIDs into the new account lane.
-	alice := placed(KindRepository, "github.com/acme/api", "/src/api", "r1", 10)
-	alice.Account, alice.Profile = "aaaaaaaaaaaaaaaa", "work"
-	if !Write(dir, "cross-acct", alice, now.Add(-2*time.Minute)) {
-		t.Fatal("alice write failed")
-	}
-	pAcct, _ := path(dir, "cross-acct")
-	bob := placed(KindMixed, "", "", "r1", 20)
-	bob.Account, bob.Profile = "bbbbbbbbbbbbbbbb", "work"
-	if !writeMixedAside(pAcct, bob, now.Add(-time.Minute)) {
-		t.Fatal("bob sidecar write failed")
-	}
-	// Duplicate bob mark with same PID dedupes to a single sidecar file.
-	if !writeMixedAside(pAcct, bob, now) {
-		t.Fatal("bob duplicate sidecar write failed")
-	}
-	if es, err := os.ReadDir(asidePath(pAcct)); err != nil || len(es) != 1 {
-		t.Fatalf("sidecar dedupe failed: len=%d, err=%v", len(es), err)
-	}
-	gotAcct := mustRead(t, dir, "cross-acct", now)
-	if gotAcct.Kind != KindMixed || gotAcct.Account != "bbbbbbbbbbbbbbbb" || slices.Contains(gotAcct.PIDs, 10) {
-		t.Fatalf("cross-account fold leaked PIDs: %+v", gotAcct)
-	}
+	t.Run("older_run_aside_keeps_newer_run", func(t *testing.T) {
+		if !Write(dir, "older-run", placed(KindRepository, "github.com/acme/api", "/src/api", "r1", 10), now.Add(-10*time.Minute)) {
+			t.Fatal("r1 write failed")
+		}
+		if !Write(dir, "older-run", placed(KindRepository, "github.com/acme/web", "/src/web", "r2", 20), now.Add(-2*time.Minute)) {
+			t.Fatal("r2 write failed")
+		}
+		pOld, _ := path(dir, "older-run")
+		if !writeMixedAside(pOld, placed(KindMixed, "", "", "r1", 10), now.Add(-5*time.Minute)) {
+			t.Fatal("r1 sidecar mark failed")
+		}
+		// Locked write for r2 folds r1's delayed mark into Placements while keeping r2 live.
+		if !Write(dir, "older-run", placed(KindRepository, "github.com/acme/web", "/src/web", "r2", 21), now) {
+			t.Fatal("r2 locked write failed")
+		}
+		cOld := mustRead(t, dir, "older-run", now)
+		if cOld.Kind != KindRepository || cOld.Run != "r2" {
+			t.Fatalf("latest run = %+v, want KindRepository for r2", cOld)
+		}
+		if got, ok := cOld.At(10, now.Add(-4*time.Minute)); !ok || got.Kind != KindMixed || got.Run != "r1" {
+			t.Fatalf("r1 after crossing = %+v, %v; want KindMixed", got, ok)
+		}
+	})
 
-	// 4. Fast path must not short-circuit while a sidecar mark is pending; concurrent
-	// Readers during fold always see KindMixed.
-	if !Write(dir, "conc", placed(KindRepository, "github.com/acme/api", "/src/api", "r1", 10), now) {
-		t.Fatal("conc initial write failed")
-	}
-	pConc, _ := path(dir, "conc")
-	if !writeMixedAside(pConc, placed(KindMixed, "", "", "r1", 10), now.Add(time.Second)) {
-		t.Fatal("conc sidecar write failed")
-	}
-	var wg sync.WaitGroup
-	stop := make(chan struct{})
-	for range 4 {
-		wg.Go(func() {
-			for {
-				select {
-				case <-stop:
-					return
-				default:
-					if c, ok := Read(dir, "conc", now.Add(2*time.Second)); !ok || c.Kind != KindMixed {
-						t.Errorf("concurrent Read during fold saw ok=%v kind=%q", ok, c.Kind)
+	t.Run("cross_account_aside_and_dedupe", func(t *testing.T) {
+		alice := placed(KindRepository, "github.com/acme/api", "/src/api", "r1", 10)
+		alice.Account, alice.Profile = "aaaaaaaaaaaaaaaa", "work"
+		if !Write(dir, "cross-acct", alice, now.Add(-2*time.Minute)) {
+			t.Fatal("alice write failed")
+		}
+		pAcct, _ := path(dir, "cross-acct")
+		bob := placed(KindMixed, "", "", "r1", 20)
+		bob.Account, bob.Profile = "bbbbbbbbbbbbbbbb", "work"
+		if !writeMixedAside(pAcct, bob, now.Add(-time.Minute)) {
+			t.Fatal("bob sidecar write failed")
+		}
+		if !writeMixedAside(pAcct, bob, now) {
+			t.Fatal("bob duplicate sidecar write failed")
+		}
+		if es, err := os.ReadDir(asidePath(pAcct)); err != nil || len(es) != 1 {
+			t.Fatalf("sidecar dedupe failed: len=%d, err=%v", len(es), err)
+		}
+		gotAcct := mustRead(t, dir, "cross-acct", now)
+		if gotAcct.Kind != KindMixed || gotAcct.Account != "bbbbbbbbbbbbbbbb" || slices.Contains(gotAcct.PIDs, 10) {
+			t.Fatalf("cross-account fold leaked PIDs: %+v", gotAcct)
+		}
+	})
+
+	t.Run("concurrent_read_during_fold", func(t *testing.T) {
+		if !Write(dir, "conc", placed(KindRepository, "github.com/acme/api", "/src/api", "r1", 10), now) {
+			t.Fatal("conc initial write failed")
+		}
+		pConc, _ := path(dir, "conc")
+		if !writeMixedAside(pConc, placed(KindMixed, "", "", "r1", 10), now.Add(time.Second)) {
+			t.Fatal("conc sidecar write failed")
+		}
+		var wg sync.WaitGroup
+		stop := make(chan struct{})
+		for range 4 {
+			wg.Go(func() {
+				for {
+					select {
+					case <-stop:
 						return
+					default:
+						if c, ok := Read(dir, "conc", now.Add(2*time.Second)); !ok || c.Kind != KindMixed {
+							t.Errorf("concurrent Read during fold saw ok=%v kind=%q", ok, c.Kind)
+							return
+						}
+						runtime.Gosched()
 					}
 				}
-			}
-		})
-	}
-	// Same-place write within Refresh still enters lock because aside is pending, folds it, and returns false.
-	if Write(dir, "conc", placed(KindRepository, "github.com/acme/api", "/src/api", "r1", 10), now.Add(2*time.Second)) {
+			})
+		}
+		// Same-place write within Refresh still enters lock because aside is pending, folds it, and returns false.
+		if Write(dir, "conc", placed(KindRepository, "github.com/acme/api", "/src/api", "r1", 10), now.Add(2*time.Second)) {
+			close(stop)
+			wg.Wait()
+			t.Fatal("fast path downgraded pending sidecar mark")
+		}
 		close(stop)
 		wg.Wait()
-		t.Fatal("fast path downgraded pending sidecar mark")
-	}
-	close(stop)
-	wg.Wait()
-	// On Windows, a concurrent reader's open handle can prevent os.Remove(dir) until
-	// the next Prune, though all mark files inside must already be deleted.
-	if entries, err := os.ReadDir(asidePath(pConc)); !os.IsNotExist(err) && (runtime.GOOS != "windows" || err != nil || len(entries) > 0) {
-		t.Fatalf("conc sidecar dir not cleaned after fold: entries=%d err=%v", len(entries), err)
-	}
-
-	// 4b. Locked earlier-run KindMixed write folds into r1 without overwriting r2 at the tail;
-	// repeating it is idempotent (no duplicate placements, r0 is not evicted), an out-of-order
-	// earlier timestamp lowers Since in place without adding a duplicate, and a post-r2
-	// timestamp clamps Since to r2's start without affecting r2.
-	if !Write(dir, "locked-older-run", placed(KindRepository, "github.com/acme/core", "/src/core", "r0", 5), now.Add(-20*time.Minute)) {
-		t.Fatal("locked r0 write failed")
-	}
-	if !Write(dir, "locked-older-run", placed(KindRepository, "github.com/acme/api", "/src/api", "r1", 10), now.Add(-10*time.Minute)) {
-		t.Fatal("locked r1 write failed")
-	}
-	if !Write(dir, "locked-older-run", placed(KindRepository, "github.com/acme/web", "/src/web", "r2", 20), now.Add(-2*time.Minute)) {
-		t.Fatal("locked r2 write failed")
-	}
-	if !Write(dir, "locked-older-run", placed(KindMixed, "", "", "r1", 10), now.Add(-5*time.Minute)) {
-		t.Fatal("locked delayed r1 KindMixed write failed")
-	}
-	for i := range 10 {
-		if Write(dir, "locked-older-run", placed(KindMixed, "", "", "r1", 10), now.Add(time.Duration(i)*time.Second)) {
-			t.Fatalf("repeat %d of locked earlier-run KindMixed unexpectedly rewrote claim", i)
+		// On Windows, a concurrent reader's open handle can prevent os.Remove(dir) until
+		// the next Prune, though all mark files inside must already be deleted.
+		if entries, err := os.ReadDir(asidePath(pConc)); !os.IsNotExist(err) && (runtime.GOOS != "windows" || err != nil || len(entries) > 0) {
+			t.Fatalf("conc sidecar dir not cleaned after fold: entries=%d err=%v", len(entries), err)
 		}
-	}
-	// Out-of-order earlier Mixed mark lowers Since in place without growing Placements.
-	if !Write(dir, "locked-older-run", placed(KindMixed, "", "", "r1", 10), now.Add(-7*time.Minute)) {
-		t.Fatal("out-of-order earlier r1 KindMixed write failed")
-	}
-	cLockedOld := mustRead(t, dir, "locked-older-run", now)
-	if cLockedOld.Evicted || len(cLockedOld.Placements) != 4 {
-		t.Fatalf("repeated/out-of-order earlier-run Mixed grew/evicted placements: evicted=%v len=%d", cLockedOld.Evicted, len(cLockedOld.Placements))
-	}
-	if got, ok := cLockedOld.At(10, now.Add(-6*time.Minute)); !ok || got.Kind != KindMixed || got.Run != "r1" {
-		t.Fatalf("r1 at lowered Since = %+v, %v; want KindMixed", got, ok)
-	}
-	if cLockedOld.Kind != KindRepository || cLockedOld.Run != "r2" {
-		t.Fatalf("latest run after locked earlier Mixed = %+v, want KindRepository for r2", cLockedOld)
-	}
-	if got, ok := cLockedOld.At(5, now.Add(-19*time.Minute)); !ok || got.Kind != KindRepository || got.Run != "r0" {
-		t.Fatalf("r0 after repeated earlier Mixed = %+v, %v; want KindRepository for r0", got, ok)
-	}
-	if got, ok := cLockedOld.At(10, now.Add(-4*time.Minute)); !ok || got.Kind != KindMixed || got.Run != "r1" {
-		t.Fatalf("r1 after locked earlier Mixed = %+v, %v; want KindMixed", got, ok)
-	}
-	if got, ok := cLockedOld.At(20, now); !ok || got.Kind != KindRepository || got.Run != "r2" {
-		t.Fatalf("r2 after locked earlier Mixed = %+v, %v; want KindRepository", got, ok)
-	}
-	// Post-r2 timestamp on an earlier run's first Mixed write clamps Since to r2's start.
-	if !Write(dir, "clamped-older-run", placed(KindRepository, "github.com/acme/api", "/src/api", "r1", 10), now.Add(-10*time.Minute)) ||
-		!Write(dir, "clamped-older-run", placed(KindRepository, "github.com/acme/web", "/src/web", "r2", 20), now.Add(-2*time.Minute)) ||
-		!Write(dir, "clamped-older-run", placed(KindMixed, "", "", "r1", 10), now) {
-		t.Fatal("clamped-older-run setup failed")
-	}
-	cClamped := mustRead(t, dir, "clamped-older-run", now)
-	if got, ok := cClamped.At(10, now.Add(-time.Minute)); !ok || got.Kind != KindMixed || got.Run != "r1" {
-		t.Fatalf("clamped r1 = %+v, %v; want KindMixed", got, ok)
-	}
-	if got, ok := cClamped.At(20, now); !ok || got.Kind != KindRepository || got.Run != "r2" {
-		t.Fatalf("clamped r2 = %+v, %v; want KindRepository", got, ok)
-	}
+	})
 
-	// 5. Out-of-order Since race: a same-run non-Mixed placement written at t10.1 after a
-	// lock-timeout Mixed mark stamped t10 must still resolve as KindMixed at t10.05 and t11.
-	t9 := now.Add(-10 * time.Second)
-	t10 := now.Add(-5 * time.Second)
-	t101 := now.Add(-4 * time.Second)
-	if !Write(dir, "since-race", placed(KindRepository, "github.com/acme/api", "/src/api", "r1", 10), t9) {
-		t.Fatal("since-race initial write failed")
-	}
-	if !Write(dir, "since-race", placed(KindOutsideGit, "", "/tmp/work", "r1", 10), t101) {
-		t.Fatal("since-race outside-git write failed")
-	}
-	pRace, _ := path(dir, "since-race")
-	if !writeMixedAside(pRace, placed(KindMixed, "", "", "r1", 10), t10) {
-		t.Fatal("since-race sidecar write failed")
-	}
-	cRace := mustRead(t, dir, "since-race", now)
-	for _, at := range []time.Time{t101, now} {
-		if got, ok := cRace.At(10, at); !ok || got.Kind != KindMixed || got.ProjectID != "" {
-			t.Fatalf("At(%v) = %+v, %v; want KindMixed", at, got, ok)
+	t.Run("locked_earlier_run_idempotent_and_clamped", func(t *testing.T) {
+		if !Write(dir, "locked-older-run", placed(KindRepository, "github.com/acme/core", "/src/core", "r0", 5), now.Add(-20*time.Minute)) {
+			t.Fatal("locked r0 write failed")
 		}
-	}
+		if !Write(dir, "locked-older-run", placed(KindRepository, "github.com/acme/api", "/src/api", "r1", 10), now.Add(-10*time.Minute)) {
+			t.Fatal("locked r1 write failed")
+		}
+		if !Write(dir, "locked-older-run", placed(KindRepository, "github.com/acme/web", "/src/web", "r2", 20), now.Add(-2*time.Minute)) {
+			t.Fatal("locked r2 write failed")
+		}
+		if !Write(dir, "locked-older-run", placed(KindMixed, "", "", "r1", 10), now.Add(-5*time.Minute)) {
+			t.Fatal("locked delayed r1 KindMixed write failed")
+		}
+		for i := range 10 {
+			if Write(dir, "locked-older-run", placed(KindMixed, "", "", "r1", 10), now.Add(time.Duration(i)*time.Second)) {
+				t.Fatalf("repeat %d of locked earlier-run KindMixed unexpectedly rewrote claim", i)
+			}
+		}
+		if !Write(dir, "locked-older-run", placed(KindMixed, "", "", "r1", 10), now.Add(-7*time.Minute)) {
+			t.Fatal("out-of-order earlier r1 KindMixed write failed")
+		}
+		cLockedOld := mustRead(t, dir, "locked-older-run", now)
+		if cLockedOld.Evicted || len(cLockedOld.Placements) != 4 {
+			t.Fatalf("repeated/out-of-order earlier-run Mixed grew/evicted placements: evicted=%v len=%d", cLockedOld.Evicted, len(cLockedOld.Placements))
+		}
+		if got, ok := cLockedOld.At(10, now.Add(-6*time.Minute)); !ok || got.Kind != KindMixed || got.Run != "r1" {
+			t.Fatalf("r1 at lowered Since = %+v, %v; want KindMixed", got, ok)
+		}
+		if cLockedOld.Kind != KindRepository || cLockedOld.Run != "r2" {
+			t.Fatalf("latest run after locked earlier Mixed = %+v, want KindRepository for r2", cLockedOld)
+		}
+		if got, ok := cLockedOld.At(5, now.Add(-19*time.Minute)); !ok || got.Kind != KindRepository || got.Run != "r0" {
+			t.Fatalf("r0 after repeated earlier Mixed = %+v, %v; want KindRepository for r0", got, ok)
+		}
+		if got, ok := cLockedOld.At(10, now.Add(-4*time.Minute)); !ok || got.Kind != KindMixed || got.Run != "r1" {
+			t.Fatalf("r1 after locked earlier Mixed = %+v, %v; want KindMixed", got, ok)
+		}
+		if got, ok := cLockedOld.At(20, now); !ok || got.Kind != KindRepository || got.Run != "r2" {
+			t.Fatalf("r2 after locked earlier Mixed = %+v, %v; want KindRepository", got, ok)
+		}
+		// Post-r2 timestamp on an earlier run's first Mixed write clamps Since to r2's start.
+		if !Write(dir, "clamped-older-run", placed(KindRepository, "github.com/acme/api", "/src/api", "r1", 10), now.Add(-10*time.Minute)) ||
+			!Write(dir, "clamped-older-run", placed(KindRepository, "github.com/acme/web", "/src/web", "r2", 20), now.Add(-2*time.Minute)) ||
+			!Write(dir, "clamped-older-run", placed(KindMixed, "", "", "r1", 10), now) {
+			t.Fatal("clamped-older-run setup failed")
+		}
+		cClamped := mustRead(t, dir, "clamped-older-run", now)
+		if got, ok := cClamped.At(10, now.Add(-time.Minute)); !ok || got.Kind != KindMixed || got.Run != "r1" {
+			t.Fatalf("clamped r1 = %+v, %v; want KindMixed", got, ok)
+		}
+		if got, ok := cClamped.At(20, now); !ok || got.Kind != KindRepository || got.Run != "r2" {
+			t.Fatalf("clamped r2 = %+v, %v; want KindRepository", got, ok)
+		}
+	})
 
-	// 6. Corrupt unexpired sidecar over an existing non-Mixed claim fails closed for existing PIDs.
-	if !Write(dir, "corrupt-existing", placed(KindRepository, "github.com/acme/api", "/src/api", "r1", 10), t9) {
-		t.Fatal("corrupt-existing initial write failed")
-	}
-	pCorrupt, _ := path(dir, "corrupt-existing")
-	if err := os.MkdirAll(asidePath(pCorrupt), 0o700); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(asidePath(pCorrupt), "bad.json"), []byte("{"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	// Locked write folds the corrupt sidecar and refuses to downgrade.
-	if Write(dir, "corrupt-existing", placed(KindRepository, "github.com/acme/api", "/src/api", "r1", 10), now) {
-		t.Fatal("corrupt sidecar did not block downgrade")
-	}
-	if got, ok := mustRead(t, dir, "corrupt-existing", now).At(10, now); !ok || got.Kind != KindMixed || got.ProjectID != "" {
-		t.Fatalf("At after corrupt sidecar fold = %+v, %v; want KindMixed", got, ok)
-	}
+	t.Run("out_of_order_since_and_corrupt_aside", func(t *testing.T) {
+		t9 := now.Add(-10 * time.Second)
+		t10 := now.Add(-5 * time.Second)
+		t101 := now.Add(-4 * time.Second)
+		if !Write(dir, "since-race", placed(KindRepository, "github.com/acme/api", "/src/api", "r1", 10), t9) {
+			t.Fatal("since-race initial write failed")
+		}
+		if !Write(dir, "since-race", placed(KindOutsideGit, "", "/tmp/work", "r1", 10), t101) {
+			t.Fatal("since-race outside-git write failed")
+		}
+		pRace, _ := path(dir, "since-race")
+		if !writeMixedAside(pRace, placed(KindMixed, "", "", "r1", 10), t10) {
+			t.Fatal("since-race sidecar write failed")
+		}
+		cRace := mustRead(t, dir, "since-race", now)
+		for _, at := range []time.Time{t101, now} {
+			if got, ok := cRace.At(10, at); !ok || got.Kind != KindMixed || got.ProjectID != "" {
+				t.Fatalf("At(%v) = %+v, %v; want KindMixed", at, got, ok)
+			}
+		}
 
-	// 7. Live sidecar survives an expired main claim; earlier-run mark poisons post-crossing
-	// placements before r2; unseen new-run mark with earlier timestamp is never dropped.
-	if !Write(dir, "exp-main", placed(KindRepository, "github.com/acme/api", "/src/api", "r1", 10), now.Add(-TTL-time.Hour)) {
-		t.Fatal("exp-main write failed")
-	}
-	pExpMain, _ := path(dir, "exp-main")
-	if err := os.Chtimes(pExpMain, old, old); err != nil {
-		t.Fatal(err)
-	}
-	if !writeMixedAside(pExpMain, placed(KindMixed, "", "", "r1", 10), now) {
-		t.Fatal("exp-main sidecar failed")
-	}
-	if got := mustRead(t, dir, "exp-main", now); got.Kind != KindMixed {
-		t.Fatalf("live sidecar with expired main = %+v, want KindMixed", got)
-	}
+		// Corrupt unexpired sidecar over an existing non-Mixed claim fails closed for existing PIDs.
+		if !Write(dir, "corrupt-existing", placed(KindRepository, "github.com/acme/api", "/src/api", "r1", 10), t9) {
+			t.Fatal("corrupt-existing initial write failed")
+		}
+		pCorrupt, _ := path(dir, "corrupt-existing")
+		if err := os.MkdirAll(asidePath(pCorrupt), 0o700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(asidePath(pCorrupt), "bad.json"), []byte("{"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if Write(dir, "corrupt-existing", placed(KindRepository, "github.com/acme/api", "/src/api", "r1", 10), now) {
+			t.Fatal("corrupt sidecar did not block downgrade")
+		}
+		if got, ok := mustRead(t, dir, "corrupt-existing", now).At(10, now); !ok || got.Kind != KindMixed || got.ProjectID != "" {
+			t.Fatalf("At after corrupt sidecar fold = %+v, %v; want KindMixed", got, ok)
+		}
+	})
 
-	// Earlier-run post-crossing placement poisoned before r2.
-	if !Write(dir, "early-poison", placed(KindRepository, "github.com/acme/api", "/src/api", "r1", 10), now.Add(-10*time.Minute)) {
-		t.Fatal("r1 repo write failed")
-	}
-	if !Write(dir, "early-poison", placed(KindOutsideGit, "", "/tmp/work", "r1", 10), now.Add(-6*time.Minute)) {
-		t.Fatal("r1 outside-git write failed")
-	}
-	if !Write(dir, "early-poison", placed(KindRepository, "github.com/acme/web", "/src/web", "r2", 20), now.Add(-2*time.Minute)) {
-		t.Fatal("r2 write failed")
-	}
-	pEP, _ := path(dir, "early-poison")
-	if !writeMixedAside(pEP, placed(KindMixed, "", "", "r1", 10), now.Add(-8*time.Minute)) {
-		t.Fatal("r1 delayed sidecar failed")
-	}
-	cEP := mustRead(t, dir, "early-poison", now)
-	if got, ok := cEP.At(10, now.Add(-5*time.Minute)); !ok || got.Kind != KindMixed {
-		t.Fatalf("r1 after t1 crossing = %+v, %v; want KindMixed", got, ok)
-	}
-	if got, ok := cEP.At(20, now); !ok || got.Kind != KindRepository || got.Run != "r2" {
-		t.Fatalf("r2 after r1 fold = %+v, %v; want KindRepository r2", got, ok)
-	}
+	t.Run("expired_main_early_poison_and_unseen_run", func(t *testing.T) {
+		if !Write(dir, "exp-main", placed(KindRepository, "github.com/acme/api", "/src/api", "r1", 10), old) {
+			t.Fatal("exp-main write failed")
+		}
+		pExpMain, _ := path(dir, "exp-main")
+		if err := os.Chtimes(pExpMain, old, old); err != nil {
+			t.Fatal(err)
+		}
+		if !writeMixedAside(pExpMain, placed(KindMixed, "", "", "r1", 10), now) {
+			t.Fatal("exp-main sidecar failed")
+		}
+		if got := mustRead(t, dir, "exp-main", now); got.Kind != KindMixed {
+			t.Fatalf("live sidecar with expired main = %+v, want KindMixed", got)
+		}
 
-	// Unseen new-run mark stamped earlier than r1's ClaimedAt is appended, never dropped.
-	if !Write(dir, "skew-r2", placed(KindRepository, "github.com/acme/api", "/src/api", "r1", 10), now) {
-		t.Fatal("skew-r2 r1 write failed")
-	}
-	pSkew, _ := path(dir, "skew-r2")
-	if !writeMixedAside(pSkew, placed(KindMixed, "", "", "r2", 20), now.Add(-time.Second)) {
-		t.Fatal("skew-r2 sidecar failed")
-	}
-	if got := mustRead(t, dir, "skew-r2", now); got.Kind != KindMixed || got.Run != "r2" {
-		t.Fatalf("unseen r2 mark = %+v, want KindMixed r2", got)
-	}
+		if !Write(dir, "early-poison", placed(KindRepository, "github.com/acme/api", "/src/api", "r1", 10), now.Add(-10*time.Minute)) {
+			t.Fatal("r1 repo write failed")
+		}
+		if !Write(dir, "early-poison", placed(KindOutsideGit, "", "/tmp/work", "r1", 10), now.Add(-6*time.Minute)) {
+			t.Fatal("r1 outside-git write failed")
+		}
+		if !Write(dir, "early-poison", placed(KindRepository, "github.com/acme/web", "/src/web", "r2", 20), now.Add(-2*time.Minute)) {
+			t.Fatal("r2 write failed")
+		}
+		pEP, _ := path(dir, "early-poison")
+		if !writeMixedAside(pEP, placed(KindMixed, "", "", "r1", 10), now.Add(-8*time.Minute)) {
+			t.Fatal("r1 delayed sidecar failed")
+		}
+		cEP := mustRead(t, dir, "early-poison", now)
+		if got, ok := cEP.At(10, now.Add(-5*time.Minute)); !ok || got.Kind != KindMixed {
+			t.Fatalf("r1 after t1 crossing = %+v, %v; want KindMixed", got, ok)
+		}
+		if got, ok := cEP.At(20, now); !ok || got.Kind != KindRepository || got.Run != "r2" {
+			t.Fatalf("r2 after r1 fold = %+v, %v; want KindRepository r2", got, ok)
+		}
+
+		if !Write(dir, "skew-r2", placed(KindRepository, "github.com/acme/api", "/src/api", "r1", 10), now) {
+			t.Fatal("skew-r2 r1 write failed")
+		}
+		pSkew, _ := path(dir, "skew-r2")
+		if !writeMixedAside(pSkew, placed(KindMixed, "", "", "r2", 20), now.Add(-time.Second)) {
+			t.Fatal("skew-r2 sidecar failed")
+		}
+		if got := mustRead(t, dir, "skew-r2", now); got.Kind != KindMixed || got.Run != "r2" {
+			t.Fatalf("unseen r2 mark = %+v, want KindMixed r2", got)
+		}
+	})
+
+	t.Run("expired_mixed_main_renewed_by_duplicate_aside", func(t *testing.T) {
+		if !Write(dir, "exp-mixed", placed(KindMixed, "", "", "r1", 10), old) {
+			t.Fatal("exp-mixed initial write failed")
+		}
+		pExpMixed, _ := path(dir, "exp-mixed")
+		if err := os.Chtimes(pExpMixed, old, old); err != nil {
+			t.Fatal(err)
+		}
+		if !writeMixedAside(pExpMixed, placed(KindMixed, "", "", "r1", 10), now) {
+			t.Fatal("exp-mixed duplicate sidecar write failed")
+		}
+		if Write(dir, "exp-mixed", placed(KindRepository, "github.com/acme/api", "/src/api", "r1", 10), now) {
+			t.Fatal("non-Mixed write downgraded renewed Mixed claim")
+		}
+		if got := mustRead(t, dir, "exp-mixed", now); got.Kind != KindMixed || got.Run != "r1" {
+			t.Fatalf("Read after duplicate sidecar fold = %+v, want KindMixed r1", got)
+		}
+		Prune(dir, now)
+		if got := mustRead(t, dir, "exp-mixed", now); got.Kind != KindMixed || got.Run != "r1" {
+			t.Fatalf("Read after Prune = %+v, want KindMixed r1", got)
+		}
+		if Write(dir, "exp-mixed", placed(KindRepository, "github.com/acme/api", "/src/api", "r1", 10), now) {
+			t.Fatal("same-run non-Mixed write replaced renewed Mixed claim after Prune")
+		}
+	})
 }

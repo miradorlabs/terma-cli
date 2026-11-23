@@ -20,21 +20,15 @@ func (c Claim) At(pid int, at time.Time) (Claim, bool) {
 	if len(covering) == 0 {
 		return Claim{}, false
 	}
-	var best *Placement
+	best := inForce(covering, at)
 	if kinds {
 		best = locate(covering, at, c.Evicted)
-	} else {
-		best = inForce(covering, at)
 	}
 	if best == nil {
 		return Claim{}, false
 	}
-	return Claim{
-		ProjectID: best.ProjectID, Kind: best.Kind, Run: best.Run, Profile: best.Profile, Account: best.Account,
-		Tool: best.Tool, Repo: best.Repo, Worktree: best.Worktree,
-		Repository: best.Repository, Root: best.Root, Cwd: best.Cwd, Remote: best.Remote, Branch: best.Branch,
-		PIDs: best.PIDs, ClaimedAt: c.ClaimedAt, Parent: c.Parent, Placements: c.Placements, Evicted: c.Evicted,
-	}, true
+	return Claim{ProjectID: best.ProjectID, Kind: best.Kind, Run: best.Run, Profile: best.Profile, Account: best.Account, Tool: best.Tool, Repo: best.Repo, Worktree: best.Worktree,
+		Repository: best.Repository, Root: best.Root, Cwd: best.Cwd, Remote: best.Remote, Branch: best.Branch, PIDs: best.PIDs, ClaimedAt: c.ClaimedAt, Parent: c.Parent, Placements: c.Placements, Evicted: c.Evicted}, true
 }
 
 // inForce is the placement in force at at among covering, oldest first, as a legacy claim
@@ -56,9 +50,7 @@ func locate(covering []*Placement, at time.Time, evicted bool) *Placement {
 			return nil
 		}
 		for _, p := range covering {
-			if p.Kind != covering[0].Kind || p.Repository != covering[0].Repository ||
-				p.Profile != covering[0].Profile || p.Account != covering[0].Account ||
-				p.Run != covering[0].Run {
+			if p.Kind != covering[0].Kind || p.Repository != covering[0].Repository || p.Profile != covering[0].Profile || p.Account != covering[0].Account || p.Run != covering[0].Run {
 				return nil
 			}
 		}

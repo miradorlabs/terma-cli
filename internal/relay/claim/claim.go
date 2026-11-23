@@ -4,6 +4,7 @@
 package claim
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"os"
@@ -40,15 +41,9 @@ const markRefresh = TTL / 2
 // An empty ProjectID with no Kind is a run in a working copy the team does not collect (Mark).
 type Claim struct {
 	ProjectID string `json:"project_id"`
-	// Kind is the latest placement's (Placement.Kind).
-	Kind Kind `json:"kind,omitempty"`
-	// Run is the latest placement's (Placement.Run).
-	Run string `json:"run,omitempty"`
-	// Profile is the latest placement's (Placement.Profile).
-	Profile  string `json:"profile,omitempty"`
-	Tool     string `json:"tool,omitempty"`
-	Repo     string `json:"repo,omitempty"`
-	Worktree string `json:"worktree,omitempty"`
+	Tool      string `json:"tool,omitempty"`
+	Repo      string `json:"repo,omitempty"`
+	Worktree  string `json:"worktree,omitempty"`
 	// Repository is the working copy as admission names it; the relay rechecks it.
 	Repository config.Repository `json:"repository,omitzero"`
 	// Root is the working tree the claiming hook ran in, "" outside git: what the relay
@@ -73,6 +68,10 @@ type Claim struct {
 	// Placements are where the session has run, oldest first: an agent can keep a session id
 	// across resumes in another repository, and the first run's late records stay its own.
 	Placements []Placement `json:"placements,omitempty"`
+	// Kind, Run, and Profile mirror the latest placement.
+	Kind    Kind   `json:"kind,omitempty"`
+	Run     string `json:"run,omitempty"`
+	Profile string `json:"profile,omitempty"`
 	// Evicted is set once a placement has been dropped to keep maxPlacements, after which
 	// a record older than every kept placement is no longer known to be theirs (At).
 	Evicted bool `json:"evicted,omitempty"`
@@ -185,12 +184,14 @@ func path(dir, sessionID string) (string, bool) {
 	return filepath.Join(Dir(dir), claimsDir, sessionID+".json"), true
 }
 
-// lockWait caps lock waits; on timeout, KindMixed falls back to the lock-free .mixed sidecar.
+// lockWait caps lock waits; on timeout, non-Mixed writes back off and KindMixed falls back
+// to the lock-free .mixed sidecar so an active lock holder can never overwrite Mixed.
 var lockWait = 250 * time.Millisecond
 
-// Write merges c into sessionID's claim under dir and reports whether it wrote.
-// c names a project (requiring an Account) or, with a Kind, a location alone. KindMixed
-// clears ProjectID and cannot be replaced within the same run; the runs ledger remains authoritative.
+// Write merges c into sessionID's claim under dir under a sidecar lock (unlocked writers
+// lose concurrent PIDs) and reports whether it wrote. A project claim requires Account;
+// a kinded claim may name a location alone. On lock timeout, non-Mixed writes back off
+// and KindMixed writes to .mixed. KindMixed clears ProjectID; the runs ledger is authoritative.
 func Write(dir, sessionID string, c Claim, now time.Time) bool {
 	if c.ProjectID == "" && c.Kind == "" {
 		return false
@@ -204,7 +205,8 @@ func Write(dir, sessionID string, c Claim, now time.Time) bool {
 	return write(dir, sessionID, c, now)
 }
 
-// Mark records that sessionID runs under pids where its team does not collect.
+// Mark records that sessionID runs under pids where its team does not collect so the relay
+// drops those processes' records instead of holding them.
 func Mark(dir, sessionID, tool string, pids []int, now time.Time) bool {
 	return write(dir, sessionID, Claim{Tool: tool, PIDs: pids}, now)
 }
@@ -218,11 +220,10 @@ func write(dir, sessionID string, c Claim, now time.Time) bool {
 	if !ok {
 		return false
 	}
+	// Fast path skips the lock when no sidecar marks are pending and a fresh claim matches.
 	if asideMarks, _ := loadAside(p, now); len(asideMarks) == 0 {
-		if prev, ok := read(p); ok && samePlace(prev, c) && sameDirs(prev, c) && sameParent(prev, c) && subset(c.PIDs, prev.PIDs) && sameRun(prev, c) {
-			if info, err := os.Stat(p); err == nil && now.Sub(info.ModTime()) < refresh {
-				return false
-			}
+		if prev, ok := read(p); ok && canSkipRefresh(p, prev, c, now, refresh) {
+			return false
 		}
 	}
 	if err := os.MkdirAll(filepath.Dir(p), 0o700); err != nil {
@@ -242,87 +243,99 @@ func write(dir, sessionID string, c Claim, now time.Time) bool {
 	asideMarks, asideFiles := loadAside(p, now)
 	prev, havePrev := read(p)
 	prev, havePrev, folded := applyAside(prev, havePrev, asideMarks)
-	if havePrev && staysMixed(prev, c, true) {
-		if folded {
-			if data, err := json.Marshal(prev); err == nil && config.WriteFileAtomicNoSync(p, data, 0o600) == nil {
-				removeAside(p, asideFiles)
-			}
-		} else if len(asideFiles) > 0 {
+	if havePrev && staysMixed(prev, c) {
+		if folded || len(asideMarks) > 0 {
+			_ = persist(p, prev, asideFiles)
+		} else {
 			removeAside(p, asideFiles)
 		}
 		return false
 	}
+	// Earlier-run Mixed writes fold into that run's slot; an unseen run may be a new run
+	// starting Mixed, so falling through to append at the tail fails closed intentionally.
 	if havePrev && c.Kind == KindMixed && c.Run != "" && prev.Run != "" && c.Run != prev.Run {
 		c.ClaimedAt = now
 		if matched, ch := foldEarlierRun(&prev, c); matched {
-			if ch || folded {
-				if data, err := json.Marshal(prev); err != nil || config.WriteFileAtomicNoSync(p, data, 0o600) != nil {
-					return false
-				}
+			if ch || folded || len(asideMarks) > 0 {
+				return persist(p, prev, asideFiles)
 			}
-			if len(asideFiles) > 0 {
-				removeAside(p, asideFiles)
-			}
-			return ch || folded
+			removeAside(p, asideFiles)
+			return false
 		}
 	}
 	if havePrev && c.Parent == "" {
 		c.Parent = prev.Parent
 	}
 	placements := []Placement{}
+	keepSince := false
 	switch {
 	case !havePrev:
 	case samePlace(prev, c):
-		if !folded {
-			if info, err := os.Stat(p); err == nil && now.Sub(info.ModTime()) < refresh && sameDirs(prev, c) && sameParent(prev, c) && subset(c.PIDs, prev.PIDs) && sameRun(prev, c) {
-				if len(asideFiles) > 0 {
-					removeAside(p, asideFiles)
-				}
-				return false
-			}
+		prevPls := prev.placements()
+		lowerSince := c.Kind == KindMixed && now.Before(prevPls[len(prevPls)-1].Since)
+		if !folded && canSkipRefresh(p, prev, c, now, refresh) {
+			removeAside(p, asideFiles)
+			return false
 		}
-		c.PIDs = merge(prev.PIDs, c.PIDs)
-		if c.Tool == "" {
-			c.Tool = prev.Tool
+		if prev.Kind == KindMixed {
+			c.PIDs = unionPIDs(prev.PIDs, c.PIDs)
+		} else {
+			c.PIDs = merge(prev.PIDs, c.PIDs)
 		}
-		if c.Cwd == "" {
-			c.Cwd = prev.Cwd
+		c.Tool, c.Cwd, c.Run = cmp.Or(c.Tool, prev.Tool), cmp.Or(c.Cwd, prev.Cwd), cmp.Or(c.Run, prev.Run)
+		placements = slices.Clone(prevPls[:len(prevPls)-1])
+		keepSince = !lowerSince
+		if lowerSince {
+			placements, c.PIDs, _ = prepareMixed(placements, c.Run, c.Profile, c.Account, c.PIDs, now)
 		}
-		if c.Run == "" {
-			c.Run = prev.Run
-		}
-		placements = prev.placements()
-		placements = placements[:len(placements)-1]
 	default:
-		placements = prev.placements()
+		placements = slices.Clone(prev.placements())
+		if c.Kind == KindMixed && (c.Run == "" || prev.Run == "" || c.Run == prev.Run) {
+			placements, c.PIDs, _ = prepareMixed(placements, c.Run, c.Profile, c.Account, c.PIDs, now)
+		}
 	}
 	since := now
-	if havePrev && samePlace(prev, c) {
+	if keepSince {
 		since = prev.placements()[len(prev.placements())-1].Since
+	} else if c.Kind == KindMixed {
+		since = clampSince(placements, c.Run, now)
 	}
 	placements = append(placements, Placement{ProjectID: c.ProjectID, Kind: c.Kind, Run: c.Run, Profile: c.Profile, Account: c.Account, Tool: c.Tool, Repo: c.Repo, Worktree: c.Worktree,
 		Repository: c.Repository, Root: c.Root, Cwd: c.Cwd, Remote: c.Remote, Branch: c.Branch, PIDs: c.PIDs, Since: since})
 	c.Evicted = havePrev && prev.Evicted
 	if len(placements) > maxPlacements {
-		placements = placements[len(placements)-maxPlacements:]
-		c.Evicted = true
+		placements, c.Evicted = placements[len(placements)-maxPlacements:], true
 	}
 	c.Placements = placements
 	c.ClaimedAt = now
+	return persist(p, c, asideFiles)
+}
+
+func canSkipRefresh(p string, prev, c Claim, now time.Time, refresh time.Duration) bool {
+	if !samePlace(prev, c) || !sameDirs(prev, c) || !sameParent(prev, c) || !subset(c.PIDs, prev.PIDs) || !sameRun(prev, c) {
+		return false
+	}
+	if c.Kind == KindMixed && now.Before(prev.placements()[len(prev.placements())-1].Since) {
+		return false
+	}
+	info, err := os.Stat(p)
+	return err == nil && now.Sub(info.ModTime()) < refresh
+}
+
+// persist saves c atomically before removing folded sidecar marks so Readers never miss Mixed.
+func persist(p string, c Claim, asideFiles []string) bool {
 	data, err := json.Marshal(c)
-	if err != nil {
+	if err != nil || config.WriteFileAtomicNoSync(p, data, 0o600) != nil {
 		return false
 	}
-	if config.WriteFileAtomicNoSync(p, data, 0o600) != nil {
-		return false
-	}
-	if len(asideFiles) > 0 {
-		removeAside(p, asideFiles)
-	}
+	removeAside(p, asideFiles)
 	return true
 }
 
-// samePlace reports whether c continues prev's latest run under the same lane.
+// samePlace reports whether c continues prev's latest run, under the same sign-in. Another working tree of the same
+// repository, or another directory in it, is the same run, whose Root and Cwd are rewritten in
+// place: a placement decides where records go, and a session switching between worktrees must
+// never push an earlier one out.
 func samePlace(prev, c Claim) bool {
 	if prev.Kind != c.Kind || prev.ProjectID != c.ProjectID || prev.Repository != c.Repository || prev.Profile != c.Profile || prev.Account != c.Account {
 		return false
@@ -335,20 +348,24 @@ func samePlace(prev, c Claim) bool {
 
 func sameRun(prev, c Claim) bool { return c.Run == "" || c.Run == prev.Run }
 
-// staysMixed holds prev's Mixed tail unless a locked write names another run.
-func staysMixed(prev, c Claim, locked bool) bool {
-	if prev.Kind != KindMixed || c.Kind == KindMixed {
-		return false
-	}
-	return !locked || c.Run == "" || c.Run == prev.Run
+// staysMixed holds prev's Mixed tail until a locked write names a different run (a write
+// naming no run cannot prove it is a new run).
+func staysMixed(prev, c Claim) bool {
+	return prev.Kind == KindMixed && c.Kind != KindMixed && (c.Run == "" || c.Run == prev.Run)
 }
 
+// sameDirs reports whether c names the working tree, directory, worktree, remote and branch
+// prev does, so a fresh claim needs no rewrite: a checkout of another branch in the same tree
+// is told at the next hook. A claim naming no directory (a git hook's) keeps prev's.
 func sameDirs(prev, c Claim) bool {
 	return prev.Root == c.Root && (c.Cwd == "" || prev.Cwd == c.Cwd) &&
 		prev.Worktree == c.Worktree && prev.Remote == c.Remote && prev.Branch == c.Branch
 }
 
-func sameParent(prev, c Claim) bool { return c.Parent == "" || c.Parent == prev.Parent }
+// sameParent reports whether c names the parent prev does, or none, which keeps prev's.
+func sameParent(prev, c Claim) bool {
+	return c.Parent == "" || c.Parent == prev.Parent
+}
 
 func subset(a, b []int) bool {
 	for _, v := range a {
@@ -412,20 +429,20 @@ func Prune(dir string, now time.Time) {
 		return
 	}
 	for _, e := range entries {
-		p := filepath.Join(claims, e.Name())
-		if e.IsDir() && strings.HasSuffix(p, asideExt) {
-			pruneAside(p, now)
+		path := filepath.Join(claims, e.Name())
+		if e.IsDir() && strings.HasSuffix(path, asideExt) {
+			pruneAside(path, now)
 			continue
 		}
 		info, err := e.Info()
 		if err != nil || now.Sub(info.ModTime()) < TTL {
 			continue
 		}
-		if !strings.HasSuffix(p, ".lock") {
-			_ = os.Remove(p)
-		} else if unlock, err := flock.TryLock(p); err == nil {
+		if !strings.HasSuffix(path, ".lock") {
+			_ = os.Remove(path)
+		} else if unlock, err := flock.TryLock(path); err == nil {
 			// A lock's time is its creation, so an old one may still be in use.
-			flock.Remove(p, unlock)
+			flock.Remove(path, unlock)
 		}
 	}
 }

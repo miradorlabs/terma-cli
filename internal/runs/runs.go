@@ -3,6 +3,7 @@
 package runs
 
 import (
+	"cmp"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -39,14 +40,10 @@ func (l ledger) lastActive(written time.Time) time.Time {
 	for _, r := range l.Runs {
 		last = latest(last, r.Started, r.MixedAt)
 	}
-	if last.IsZero() {
-		return written
-	}
-	return last
+	return cmp.Or(last, written)
 }
 
-func latest(ts ...time.Time) time.Time {
-	var out time.Time
+func latest(ts ...time.Time) (out time.Time) {
 	for _, t := range ts {
 		if t.After(out) {
 			out = t
@@ -82,7 +79,7 @@ type run struct {
 
 func (r run) why() Why {
 	if r.MixedWhy.Reason == "" {
-		return Why{Reason: Crossed, Where: r.MixedWhy.Where}
+		r.MixedWhy.Reason = Crossed
 	}
 	return r.MixedWhy
 }
@@ -95,15 +92,11 @@ func (r *run) mark(at time.Time, why Why) {
 
 // Start records a new clean run of sessionID beginning at at and returns its ID.
 func Start(stateDir, sessionID string, at time.Time) (string, error) {
-	id, err := newRunID()
-	if err != nil {
-		return "", err
-	}
-	err = update(stateDir, sessionID, func(l *ledger) {
+	id := newRunID()
+	if err := update(stateDir, sessionID, func(l *ledger) {
 		l.Runs = append(l.Runs, run{ID: id, Started: at.UTC()})
 		l.active(at)
-	})
-	if err != nil {
+	}); err != nil {
 		return "", err
 	}
 	return id, nil
@@ -117,7 +110,7 @@ func Alias(stateDir, sessionID, alias string) error {
 	if alias == sessionID {
 		return nil
 	}
-	return lockedEdit(stateDir, sessionID, func(path string, l *ledger) error {
+	return editLedger(stateDir, sessionID, false, func(path string, l *ledger) error {
 		if !slices.Contains(l.Aliases, alias) {
 			l.Aliases = append(l.Aliases, alias)
 			if err := save(path, l); err != nil {
@@ -134,13 +127,9 @@ func Alias(stateDir, sessionID, alias string) error {
 
 // MarkMixed marks sessionID's current run Mixed at at (earlier time wins); starts one if absent.
 func MarkMixed(stateDir, sessionID string, at time.Time, why Why) error {
-	id, err := newRunID()
-	if err != nil {
-		return err
-	}
 	return update(stateDir, sessionID, func(l *ledger) {
 		if len(l.Runs) == 0 {
-			l.Runs = append(l.Runs, run{ID: id})
+			l.Runs = append(l.Runs, run{ID: newRunID()})
 		}
 		l.Runs[len(l.Runs)-1].mark(at, why)
 		l.active(at)
@@ -152,48 +141,39 @@ func Touch(stateDir, sessionID, runID string, locations []string) ([]string, err
 	if len(locations) == 0 {
 		return nil, nil
 	}
-	return touchWith(lockedEdit, stateDir, sessionID, runID, locations)
+	return touchWith(false, stateDir, sessionID, runID, locations)
 }
 
 // TryTouch is Touch only if the lock is immediately free; also folds any sidecar marks.
 func TryTouch(stateDir, sessionID, runID string, locations []string) ([]string, error) {
-	return touchWith(tryEdit, stateDir, sessionID, runID, locations)
+	return touchWith(true, stateDir, sessionID, runID, locations)
 }
 
 // MaxLocations bounds the distinct locations stored per run in the ledger. Touching more
 // than MaxLocations distinct locations marks the run Mixed with LocationBound.
 const MaxLocations = 64
 
-func touchWith(edit func(stateDir, sessionID string, edit func(path string, l *ledger) error) error, stateDir, sessionID, runID string, locations []string) ([]string, error) {
+func touchWith(try bool, stateDir, sessionID, runID string, locations []string) ([]string, error) {
 	var merged []string
-	err := edit(stateDir, sessionID, func(path string, l *ledger) error {
+	err := editLedger(stateDir, sessionID, try, func(path string, l *ledger) error {
 		if len(l.Runs) == 0 {
-			id, err := newRunID()
-			if err != nil {
-				return err
-			}
-			l.Runs = append(l.Runs, run{ID: id})
+			l.Runs = append(l.Runs, run{ID: newRunID()})
 		}
 		i := slices.IndexFunc(l.Runs, func(r run) bool { return r.ID == runID })
 		if runID == "" || i < 0 {
 			i = len(l.Runs) - 1
 		}
 		r := &l.Runs[i]
-		known := len(r.Locations)
-		prevMixedAt, prevMixedWhy := r.MixedAt, r.MixedWhy
-		exceeded := false
+		known, prevMixedAt, prevMixedWhy := len(r.Locations), r.MixedAt, r.MixedWhy
 		for _, loc := range locations {
 			if loc == "" || slices.Contains(r.Locations, loc) {
 				continue
 			}
 			if len(r.Locations) >= MaxLocations {
-				exceeded = true
+				r.mark(time.Now(), Why{Reason: LocationBound})
 				break
 			}
 			r.Locations = append(r.Locations, loc)
-		}
-		if exceeded {
-			r.mark(time.Now(), Why{Reason: LocationBound})
 		}
 		merged = r.Locations
 		if len(r.Locations) == known && r.MixedAt.Equal(prevMixedAt) && r.MixedWhy == prevMixedWhy {
@@ -292,7 +272,7 @@ func Locate(stateDir, idOrAlias string) (Position, bool) {
 
 // Refresh renews sessionID's ledger at now if its last activity is older than RefreshEvery.
 func Refresh(stateDir, sessionID string, now time.Time) error {
-	return lockedEdit(stateDir, sessionID, func(path string, l *ledger) error {
+	return editLedger(stateDir, sessionID, false, func(path string, l *ledger) error {
 		if len(l.Runs) == 0 || now.Sub(l.lastActive(time.Time{})) <= RefreshEvery {
 			return nil
 		}

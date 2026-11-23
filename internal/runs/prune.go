@@ -42,11 +42,10 @@ func Prune(ctx context.Context, stateDir string, now time.Time, queued map[strin
 		case strings.HasSuffix(name, ".json"):
 			pruneLedger(stateDir, path, now, queued)
 		case strings.HasSuffix(name, ".lock"):
-			if _, err := os.Lstat(strings.TrimSuffix(path, ".lock")); err == nil {
-				continue
-			}
-			if unlock, err := flock.TryLock(path); err == nil {
-				flock.Remove(path, unlock)
+			if _, err := os.Lstat(strings.TrimSuffix(path, ".lock")); err != nil {
+				if unlock, err := flock.TryLock(path); err == nil {
+					flock.Remove(path, unlock)
+				}
 			}
 		case strings.HasPrefix(name, config.TempPrefix):
 			_ = os.Remove(path)
@@ -153,13 +152,12 @@ func pruneAliases(stateDir string, now time.Time) {
 			_ = os.Remove(path)
 			continue
 		}
-		b, err := os.ReadFile(path)
-		if err != nil {
-			continue
-		}
-		if ledger, err := ledgerPath(stateDir, string(b)); err != nil {
-			_ = os.Remove(path)
-		} else if _, err := os.Lstat(ledger); errors.Is(err, fs.ErrNotExist) {
+		if b, err := os.ReadFile(path); err == nil {
+			if ledger, err := ledgerPath(stateDir, string(b)); err == nil {
+				if _, err := os.Lstat(ledger); !errors.Is(err, fs.ErrNotExist) {
+					continue
+				}
+			}
 			_ = os.Remove(path)
 		}
 	}

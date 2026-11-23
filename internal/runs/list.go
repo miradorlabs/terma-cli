@@ -37,16 +37,12 @@ func Mixed(stateDir string, now time.Time, recent time.Duration) []MixedRun {
 	}
 	var out []MixedRun
 	for id, at := range written {
-		l, found, _, err := resolve(stateDir, id)
-		if err != nil {
+		if l, found, _, err := resolve(stateDir, id); err != nil {
 			out = append(out, MixedRun{Session: id, Recent: true})
-			continue
-		}
-		if !found || len(l.Runs) == 0 {
-			continue
-		}
-		if r := inForce(l.Runs, now); !r.MixedAt.IsZero() {
-			out = append(out, MixedRun{Session: id, Why: r.why(), Recent: now.Sub(l.lastActive(at)) <= recent})
+		} else if found && len(l.Runs) > 0 {
+			if r := inForce(l.Runs, now); !r.MixedAt.IsZero() {
+				out = append(out, MixedRun{Session: id, Why: r.why(), Recent: now.Sub(l.lastActive(at)) <= recent})
+			}
 		}
 	}
 	slices.SortFunc(out, func(a, b MixedRun) int { return strings.Compare(a.Session, b.Session) })
