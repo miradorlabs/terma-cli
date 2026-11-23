@@ -10,7 +10,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/miradorlabs/terma-cli/internal/account/auth"
 	"github.com/miradorlabs/terma-cli/internal/config"
 )
 
@@ -22,7 +21,7 @@ func TestASignOutThatCannotDeleteRevokesNothing(t *testing.T) {
 	if err := config.UpdateFile(testApp.dir, func(file *config.File) { file.InsecureStorage = true }); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(f)); err != nil {
+	if err := saveSignIn(testApp.dir, storedSession(f)); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.Chmod(testApp.dir, 0o500); err != nil {

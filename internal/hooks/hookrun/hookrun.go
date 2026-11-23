@@ -5,10 +5,8 @@
 package hookrun
 
 import (
-	"bytes"
 	"cmp"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -53,11 +51,22 @@ type Env struct {
 	AwaitPush func(path string)
 	// Policy is the organization's collection policy; global mode places every session in its DefaultProjectID.
 	Policy config.Policy
+	// Account is the sign-in in place as auth.Account names it. With no Spool, what this
+	// hook collects is in its lane (spool.LaneOf), parked events included; with one, the
+	// Spool's binding, made from the same profile, is the lane.
+	Account string
+	// ServerKey is that the profile is set up with a server key: what the hook queues is
+	// no person's (spool.Event.NoPerson).
+	ServerKey bool
 	// Team is the developer's team from setup, which claims every session they run in a
 	// collected repository, whatever the policy's state.
 	Team string
 	// Agents are the agents the developer chose at setup.
 	Agents []string
+	// afterOwns, in tests, runs once owns has read a session's manifest, before the record.
+	afterOwns func()
+	// pushWalk, in tests, lowers maxPushWalk.
+	pushWalk int
 
 	// parent is the session that opened this one for a subagent, which the claim names for
 	// the relay to stamp on the subagent's telemetry (Extension.ClaimParent).
@@ -80,13 +89,23 @@ func (e Env) Logf(format string, args ...any) {
 }
 
 func (e Env) emit(ev spool.Event) bool {
+	return e.emitWith(ev, e.Spool.Append)
+}
+
+// emitAsCollected is emit for an event recorded earlier with the account it was collected
+// under, "" for none: appended later, maybe once someone else signed in, it keeps that.
+func (e Env) emitAsCollected(ev spool.Event) bool {
+	return e.emitWith(ev, e.Spool.AppendAsCollected)
+}
+
+func (e Env) emitWith(ev spool.Event, appendEvents func(...spool.Event) error) bool {
 	if e.Spool == nil {
 		return false
 	}
 	if ev.Time.IsZero() {
 		ev.Time = e.Time()
 	}
-	if err := e.Spool.Append(ev); err != nil {
+	if err := appendEvents(ev); err != nil {
 		e.Logf("spool append failed: %v", err)
 		return false
 	}
@@ -175,75 +194,13 @@ func (e Env) resolve(ctx context.Context) (*Repo, error) {
 	if err != nil {
 		return nil, err
 	}
-	r := &Repo{Root: root, GitDir: gitDir, Store: session.Open(storeDir), Repository: id, Remote: remote}
+	r := &Repo{Root: root, GitDir: gitDir, Store: e.store(storeDir), Repository: id, Remote: remote}
 	r.Name, r.Worktree = CheckoutNames(root, gitDir)
 	r.ProjectID = e.Team
 	if e.Policy.Global() {
 		r.ProjectID = e.Policy.DefaultProjectID
 	}
 	return r, nil
-}
-
-// parking is where a git hook in an agent's sandbox parks what the state directory refused:
-// the repository's git directory, which the sandbox lets it write, even where the session
-// store is a workspace's under the state directory.
-func (r *Repo) parking() *session.Store {
-	return session.Open(filepath.Join(r.GitDir, project.GitStoreDir))
-}
-
-// What a git hook run in an agent's sandbox could not write to the state directory waits in
-// the repository's git directory, which it can write, under these names.
-const (
-	parkedEvents = "events"
-	parkedPushes = "pushes"
-)
-
-// park keeps v, which the state directory refused, in the repository's git directory under name;
-// the next hook there that reaches the state directory unparks it.
-func (e Env) park(r *Repo, name string, v any) bool {
-	if r == nil || r.GitDir == "" {
-		return false // a folder outside git keeps its store in the state directory too
-	}
-	line, err := json.Marshal(v)
-	if err == nil {
-		err = r.parking().Park(name, append(line, '\n'))
-	}
-	if err != nil {
-		e.Logf("park %s: %v", name, err)
-		return false
-	}
-	return true
-}
-
-// unpark hands on what sandboxed hooks parked in r's git directory: events to the spool, in
-// one append, then a flush, and pushes to AwaitPush.
-func (e Env) unpark(r *Repo) {
-	if r.GitDir == "" {
-		return
-	}
-	e.unparkPushes(r)
-	if e.Spool == nil {
-		return
-	}
-	moved := false
-	err := r.parking().Unpark(parkedEvents, func(lines []byte) error {
-		var events []spool.Event
-		for line := range bytes.Lines(lines) {
-			var ev spool.Event
-			if json.Unmarshal(line, &ev) == nil {
-				events = append(events, ev)
-			}
-		}
-		moved = len(events) > 0
-		return e.Spool.Append(events...)
-	})
-	if err != nil {
-		e.Logf("unpark events: %v", err)
-		return
-	}
-	if moved && e.Flush != nil {
-		e.Flush()
-	}
 }
 
 // Admits reports whether the team policy collects the working copy at dir, judged as Repo
@@ -269,19 +226,34 @@ func (e Env) locate(ctx context.Context) (root, gitDir string, id config.Reposit
 }
 
 // EmitFor spools an event stamped with the repository's project, parking it in the
-// repository's store when the spool cannot be written, and reports whether it was kept.
+// repository's store when the spool cannot be written, and reports whether it is done with:
+// false only when it could be neither, for the caller to try again. Collected with no lane
+// (signed out, or a sign-in that can't be read), it is done with too: lost, and counted, so
+// a retry never hands it to whoever signs in next.
 func (e Env) EmitFor(r *Repo, ev spool.Event) bool {
 	ev = e.stamp(r, ev)
 	e.claimForRelay(r, ev)
+	if e.lost(r, 1) {
+		return true
+	}
+	return e.emitOrPark(r, ev)
+}
+
+func (e Env) emitOrPark(r *Repo, ev spool.Event) bool {
 	if ev.Time.IsZero() {
 		ev.Time = e.Time()
 	}
 	return e.emit(ev) || e.park(r, parkedEvents, ev)
 }
 
-// stamp names the event's repository, for delivery's admission, and its project.
+// stamp names the event's repository, for delivery's admission, its project and the
+// lane that collected it.
 func (e Env) stamp(r *Repo, ev spool.Event) spool.Event {
 	ev.Global = e.Policy.Global()
+	if ev.Account == "" && !ev.NoPerson {
+		l := e.lane()
+		ev.Account, ev.NoPerson = l.Account, l.NoPerson
+	}
 	if r != nil {
 		ev.Repository = r.Repository
 	}
@@ -302,7 +274,7 @@ func (e Env) claimForRelay(r *Repo, ev spool.Event) {
 	}
 	tool, _ := ev.Attrs[semconv.GenAIMainAgentNameKey].(string)
 	c := r.claim(tool)
-	c.Cwd, c.PIDs = e.workingDir(), claimPIDs()
+	c.Cwd, c.PIDs, c.Account = e.workingDir(), claimPIDs(), e.claimAccount()
 	c.Parent = e.parent
 	claim.Write(e.StateDir, ev.SessionID, c, e.Time())
 	// A subagent whose telemetry uses its agent id as session id would otherwise be dropped.

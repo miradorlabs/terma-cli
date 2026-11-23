@@ -62,6 +62,12 @@ type Profile struct {
 	Agents []string
 	// Policy is the collection policy, NoPolicy until one is validated.
 	Policy config.Policy
+	// Account is the sign-in in place as auth.Account names it, which what the hook queues
+	// is bound to: its account key; "" signed out, or under a server key; or
+	// sendas.AccountUnreadable, when what the hook collects is lost (spool.LaneOf).
+	Account string
+	// ServerKey is a profile set up with a server key: what the hook queues is no person's.
+	ServerKey bool
 }
 
 // maxPayload bounds the copy of a payload kept to claim a session from.
@@ -82,9 +88,10 @@ func Run(ctx context.Context, d Deps, r Request) int {
 	if render, ok := d.Agents.Render(r.Event); ok {
 		p := d.Profile()
 		env := hookrun.Env{Now: time.Now(), Cwd: r.Cwd, Args: r.Args, Stdin: r.Stdin, Stdout: r.Stdout, Stderr: r.Stderr,
-			ConfigDir: d.ConfigDir, StateDir: d.StateDir, Version: r.Version, Debug: r.Debug, Flush: d.Flush, Policy: p.Policy, Team: p.Team}
+			ConfigDir: d.ConfigDir, StateDir: d.StateDir, Version: r.Version, Debug: r.Debug, Flush: d.Flush, Policy: p.Policy, Team: p.Team,
+			Account: p.Account, ServerKey: p.ServerKey}
 		if !r.HooksOff {
-			env.Spool = d.Spool()
+			env.Spool = bound(d.Spool(), p)
 		}
 		return render(ctx, env)
 	}
@@ -131,10 +138,12 @@ func run(ctx context.Context, d Deps, r Request, handler agents.Handler, flush b
 		StateDir:  d.StateDir,
 		Version:   r.Version,
 		Debug:     r.Debug,
-		Spool:     d.Spool(),
+		Spool:     bound(d.Spool(), p),
 		Policy:    p.Policy,
 		Team:      p.Team,
 		Agents:    p.Agents,
+		Account:   p.Account,
+		ServerKey: p.ServerKey,
 	}
 	ctx, cancel := context.WithTimeout(ctx, handlerTimeout)
 	defer cancel()
@@ -167,3 +176,16 @@ func (b *boundedBuffer) Write(p []byte) (int, error) {
 
 // Bytes returns what was kept.
 func (b *boundedBuffer) Bytes() []byte { return b.buf }
+
+// bound is s binding what it queues to the lane collecting it, or losing it when there is
+// none; nil stays nil.
+func bound(s *spool.Spool, p Profile) *spool.Spool {
+	switch {
+	case s == nil:
+	case p.ServerKey:
+		s.BindNoPerson()
+	default:
+		s.Bind(p.Account)
+	}
+	return s
+}

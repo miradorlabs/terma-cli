@@ -66,12 +66,25 @@ func (e telemetryEvidence) logsFor(t contractReporter, event, sessionKey, sid st
 	return out
 }
 
+// exportAuthorized reports whether r came with a credential the ingest accepts: an agent's
+// own exporter's (or a server key's) liveKey naming no team, or the signed-in person's
+// access token naming the team it is for.
+func exportAuthorized(r ExportRequest) bool {
+	switch r.Authorization {
+	case "Bearer " + liveKey:
+		return r.Project == ""
+	case personBearer():
+		return r.Project != ""
+	}
+	return false
+}
+
 func checkExportRequests(t contractReporter, e telemetryEvidence, paths ...string) {
 	t.Helper()
 	seen := map[string]bool{}
 	for _, r := range e.requests {
 		seen[r.Path] = true
-		if r.Authorization != "Bearer "+liveKey {
+		if !exportAuthorized(r) {
 			t.Errorf("%s: export used wrong/missing authorization", r.Path)
 		}
 		if r.DecodeError != nil {

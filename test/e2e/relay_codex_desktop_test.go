@@ -3,6 +3,7 @@ package e2e
 import (
 	"fmt"
 	metricspb "go.opentelemetry.io/proto/otlp/metrics/v1"
+	"maps"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
@@ -29,10 +30,10 @@ func codexDesktopSandbox(t *testing.T, b Binary) (*Sandbox, *AppServer, string) 
 }
 
 // codexThreadReached reports whether anything of thread reached upstream, and whether
-// all of it came with the project and its key.
+// all of it came with the project, sent with the person's sign-in naming it.
 func codexThreadReached(sb *Sandbox, thread string) (any, ok bool) {
 	r := reached(sb.Receiver)[thread]
-	return len(r) > 0, r["project "+sb.ProjectID] && r["key Bearer "+liveKey] && len(r) == 2
+	return len(r) > 0, maps.Equal(r, asPerson(sb.ProjectID))
 }
 
 // Codex Desktop through the relay: one app-server process runs a thread in the bound

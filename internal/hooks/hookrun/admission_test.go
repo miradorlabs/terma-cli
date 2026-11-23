@@ -13,7 +13,6 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/gitx"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
-	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
 // namedRepo is a git repository in a folder called name, with remote origin when given.
@@ -113,7 +112,7 @@ func TestAHookOutsideTheListOnlyMarksTheSession(t *testing.T) {
 	t.Parallel()
 	stateDir := t.TempDir()
 	root := namedRepo(t, "personal", "git@github.com:me/personal.git")
-	sp, _ := spool.Open(t.TempDir())
+	sp, _ := hookruntest.OpenSpool(t.TempDir())
 	env := func(stdin string, args ...string) Env {
 		return Env{StateDir: stateDir, Now: time.Now(), Cwd: root, Args: args, Stdin: strings.NewReader(stdin), Spool: sp, Team: "t1", Policy: fetched(listing("github.com/acme/work"))}
 	}

@@ -638,3 +638,123 @@ func TestAMarkForAnotherSessionIsRefused(t *testing.T) {
 		t.Fatal("another session's mark reached the file")
 	}
 }
+
+// A refresh refused as SIGN_IN_RETIRED marks the stored sign-in, for doctor, and reads as
+// both signed out and retired.
+func TestARetiredSignInIsMarked(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+		w.Write([]byte(`{"error":{"code":"UNAUTHENTICATED","reason":"SIGN_IN_RETIRED","message":"retired"}}`))
+	}))
+	t.Cleanup(srv.Close)
+	c := newTestClient(t, srv.URL, &auth.Credential{AccessToken: "access-0", RefreshToken: "refresh-0",
+		ExpiresAt: time.Now().Add(-time.Hour)}, "")
+	err := c.Refresh(context.Background())
+	if !errors.Is(err, auth.ErrSignInRetired) || !errors.Is(err, auth.ErrNotLoggedIn) {
+		t.Fatalf("err = %v, want retired and signed out", err)
+	}
+	if !auth.Retired(c.dir, config.DefaultProfile) {
+		t.Fatal("the stored sign-in was not marked retired")
+	}
+	if c.Credential().RetiredAt.IsZero() {
+		t.Fatal("the client still holds the retired pair as live: its access token would be presented again")
+	}
+	if got := storedPair(t, c); !got.RefreshInDoubtSince.IsZero() {
+		t.Fatal("a retired answer, which rotated nothing, left the refresh in doubt")
+	}
+	// Past the budget, the retired sign-in is still stored, and nothing is sent again.
+	shortRetries(t, 0, time.Millisecond)
+	if err := c.Refresh(context.Background()); !errors.Is(err, auth.ErrSignInRetired) {
+		t.Fatalf("a second refresh = %v, want retired", err)
+	}
+	if !auth.Retired(c.dir, config.DefaultProfile) {
+		t.Fatal("the retired sign-in was deleted")
+	}
+}
+
+// Any other request a gateway refuses as SIGN_IN_RETIRED marks it too, and the client
+// sends nothing more with it: the retired sign-in reads as signed out.
+func TestARetiredAnswerElsewhereMarksTheSignIn(t *testing.T) {
+	var requests atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests.Add(1)
+		w.WriteHeader(http.StatusForbidden)
+		w.Write([]byte(`{"error":{"code":"PERMISSION_DENIED","reason":"SIGN_IN_RETIRED","message":"retired"}}`))
+	}))
+	t.Cleanup(srv.Close)
+	c := newTestClient(t, srv.URL, &auth.Credential{AccessToken: "access-0", RefreshToken: "refresh-0",
+		ExpiresAt: time.Now().Add(time.Hour)}, "")
+	if err := c.AuthGet(context.Background(), "/v1/organizations", nil, nil); !errors.Is(err, auth.ErrSignInRetired) {
+		t.Fatalf("err = %v", err)
+	}
+	if !auth.Retired(c.dir, config.DefaultProfile) {
+		t.Fatal("the stored sign-in was not marked retired")
+	}
+	err := c.AuthGet(context.Background(), "/v1/organizations", nil, nil)
+	if !errors.Is(err, auth.ErrSignInRetired) || !errors.Is(err, auth.ErrNotLoggedIn) {
+		t.Fatalf("a second request = %v, want retired and signed out", err)
+	}
+	if n := requests.Load(); n != 1 {
+		t.Fatalf("%d requests: the retired token was presented again", n)
+	}
+}
+
+// A request refused as SIGN_IN_RETIRED with a 401 is no expired token: the sign-in is marked
+// and nothing is refreshed or sent again.
+func TestARetired401IsNeverRefreshed(t *testing.T) {
+	var requests atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests.Add(1)
+		w.WriteHeader(http.StatusUnauthorized)
+		w.Write([]byte(`{"error":{"code":"UNAUTHENTICATED","reason":"SIGN_IN_RETIRED","message":"retired"}}`))
+	}))
+	t.Cleanup(srv.Close)
+	c := newTestClient(t, srv.URL, &auth.Credential{AccessToken: "access-0", RefreshToken: "refresh-0",
+		ExpiresAt: time.Now().Add(time.Hour)}, "")
+	if err := c.AuthGet(context.Background(), "/v1/organizations", nil, nil); !errors.Is(err, auth.ErrSignInRetired) {
+		t.Fatalf("err = %v", err)
+	}
+	if !auth.Retired(c.dir, config.DefaultProfile) {
+		t.Fatal("the stored sign-in was not marked retired")
+	}
+	if n := requests.Load(); n != 1 {
+		t.Fatalf("%d requests: the retired sign-in was refreshed or sent again", n)
+	}
+}
+
+// A sign-in held retired, by a mark the store could not take, is never refreshed: not as its
+// token expires, nor when a server refuses it, and the stored pair, which doesn't say it is
+// retired, never replaces what the client holds.
+func TestARetirementHeldOnlyByTheClientIsNeverRefreshed(t *testing.T) {
+	var requests atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests.Add(1)
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	t.Cleanup(srv.Close)
+	c := newTestClient(t, srv.URL, &auth.Credential{AccessToken: "access-0", RefreshToken: "refresh-0",
+		ExpiresAt: time.Now().Add(-time.Hour)}, "")
+	c.retireHeld() // the store didn't take the mark
+	// Another process rotated the pair on disk, for the same session.
+	if err := auth.UpdateCredential(c.dir, config.DefaultProfile, &auth.Credential{AccessToken: "access-1", RefreshToken: "refresh-1",
+		ExpiresAt: time.Now().Add(-time.Minute), AuthURL: srv.URL, SessionID: c.Credential().SessionID}); err != nil {
+		t.Fatal(err)
+	}
+	if err := c.Refresh(context.Background()); !errors.Is(err, auth.ErrSignInRetired) {
+		t.Fatalf("Refresh = %v, want retired", err)
+	}
+	if err := c.RefreshRefused(context.Background(), TokenSHA256("access-0")); !errors.Is(err, auth.ErrSignInRetired) {
+		t.Fatalf("RefreshRefused = %v, want retired", err)
+	}
+	if n := requests.Load(); n != 0 {
+		t.Fatalf("%d requests: the retired sign-in was presented", n)
+	}
+	if c.Credential().RetiredAt.IsZero() {
+		t.Fatal("the client no longer holds the sign-in retired")
+	}
+	// A pair of the same session replacing the held one keeps it retired.
+	c.replace(&auth.Credential{AccessToken: "access-2", RefreshToken: "refresh-2", SessionID: c.Credential().SessionID})
+	if c.Credential().RetiredAt.IsZero() {
+		t.Fatal("a pair of the same session replaced the held retirement")
+	}
+}

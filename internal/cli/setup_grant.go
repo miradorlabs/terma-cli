@@ -74,7 +74,7 @@ func (app *App) signInWithGrant(cmd *cobra.Command, cfg *config.Config, orgID st
 		chosen, err = grantOrganization(orgs, err, orgID)
 		return err == nil, err
 	}
-	_, reused, err := app.reuseStoredSession(ctx, cfg, sameDesktop)
+	signedIn, reused, err := app.reuseStoredSession(ctx, cfg, sameDesktop)
 	if err != nil {
 		return nil, err
 	}
@@ -113,9 +113,10 @@ func (app *App) signInWithGrant(cmd *cobra.Command, cfg *config.Config, orgID st
 		if err := app.storeLogin(ctx, cfg, cred); err != nil {
 			return nil, err
 		}
+		signedIn = cred
 	}
 	// The organization checked above, from the account service's own list, is recorded.
-	if err := config.UpdateProfile(app.dir, cfg.ProfileName, func(p *config.Profile) { p.SelectOrganization(chosen.ID, chosen.Name) }); err != nil {
+	if err := recordOrganization(app.dir, cfg.ProfileName, signedIn, chosen); err != nil {
 		return nil, err
 	}
 	if reused {

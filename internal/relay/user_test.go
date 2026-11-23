@@ -11,6 +11,7 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
+	"github.com/miradorlabs/terma-cli/internal/sendas"
 )
 
 // Every part the relay sends names the user its policy names, by id, whichever agent sent it
@@ -19,26 +20,30 @@ import (
 // names no one (E) names no one at all.
 func TestRelayNamesTheUserOnEveryPart(t *testing.T) {
 	t.Parallel()
-	u := newUpstream(t)
-	f := newFixture()
-	f.claims["E"] = claim.Claim{ProjectID: "p4", Tool: "claude-code"}
-	r, srv := f.relay(t, u, map[string]Policy{
-		"p1": {Endpoint: u.srv.URL, Key: "key-p1", IncludePrompts: true, IncludeToolContent: true, User: "user-a"},
-		"p2": {Endpoint: u.srv.URL, Key: "key-p2", User: "user-a"},
-		"p4": {Endpoint: u.srv.URL, Key: "key-p4", IncludePrompts: true, IncludeToolContent: true},
-	})
-	for _, session := range []string{"A", "B", "E"} {
-		m := logsOf(session, 1)
-		m.ResourceLogs[0].Resource.Attributes = []*commonpb.KeyValue{kv(semconv.TermaUserIDKey, "SPOOF-ID")}
-		postProto(t, srv, "/v1/logs", m)
-	}
-	waitForCounters(t, r, func(c map[string]int) bool { return c["forwarded.logs"] == 3 })
-	u.checkStamps(t, map[string]map[string]string{semconv.TermaUserIDKey: {
-		"Bearer key-p1": "user-a", "Bearer key-p2": "user-a", "Bearer key-p4": "",
-	}})
-	for name := range r.Stats().Snapshot().Counters {
-		if strings.HasPrefix(name, "unclassified.") {
-			t.Errorf("the relay withheld a key no rule names: %s", name)
+	for _, c := range []struct {
+		sessions []string
+		want     string
+	}{{[]string{"A", "B"}, "user-a"}, {[]string{"E"}, ""}} {
+		u := newUpstream(t)
+		f := newFixture()
+		f.signIn = &testSignIn{account: accountA}
+		f.claims["E"] = claim.Claim{ProjectID: "p4", Tool: "claude-code"}
+		r, srv := f.relay(t, u, map[string]Policy{
+			"p1": {Endpoint: u.srv.URL, IncludePrompts: true, IncludeToolContent: true, User: "user-a", UserAccount: accountA},
+			"p2": {Endpoint: u.srv.URL, User: "user-a", UserAccount: accountA},
+			"p4": {Endpoint: u.srv.URL, IncludePrompts: true, IncludeToolContent: true},
+		})
+		for _, session := range c.sessions {
+			m := logsOf(session, 1)
+			m.ResourceLogs[0].Resource.Attributes = []*commonpb.KeyValue{kv(semconv.TermaUserIDKey, "SPOOF-ID")}
+			postProto(t, srv, "/v1/logs", m)
+		}
+		waitForCounters(t, r, func(n map[string]int) bool { return n["forwarded.logs"] == len(c.sessions) })
+		u.checkStamps(t, map[string]map[string]string{semconv.TermaUserIDKey: {"Bearer token-" + accountA: c.want}})
+		for name := range r.Stats().Snapshot().Counters {
+			if strings.HasPrefix(name, "unclassified.") {
+				t.Errorf("the relay withheld a key no rule names: %s", name)
+			}
 		}
 	}
 }
@@ -48,8 +53,8 @@ func TestRelayNamesTheUserOnEveryPart(t *testing.T) {
 func TestQueuedPartKeepsItsUserUnderAStricterPolicy(t *testing.T) {
 	t.Parallel()
 	r := newRelay(Options{Dir: t.TempDir(), Token: token})
-	p := &part{signal: Traces, msg: &tracepb.TracesData{ResourceSpans: []*tracepb.ResourceSpans{{Resource: &resourcepb.Resource{}}}}}
-	nameUser(p, Policy{IncludePrompts: true, IncludeToolContent: true, User: "user-a"})
+	p := &part{signal: Traces, account: accountA, msg: &tracepb.TracesData{ResourceSpans: []*tracepb.ResourceSpans{{Resource: &resourcepb.Resource{}}}}}
+	nameUser(p, Policy{IncludePrompts: true, IncludeToolContent: true, User: "user-a", UserAccount: accountA})
 	body, err := proto.Marshal(p.msg)
 	if err != nil {
 		t.Fatal(err)
@@ -61,5 +66,35 @@ func TestQueuedPartKeepsItsUserUnderAStricterPolicy(t *testing.T) {
 	}
 	if got := attr(sent.ResourceSpans[0].GetResource().GetAttributes(), semconv.TermaUserIDKey); got != "user-a" {
 		t.Errorf("the queued part left naming %q, want user-a", got)
+	}
+}
+
+// A part names the policy's user only when its lane is that user's account: one that
+// arrived under another person, or under no one (a server key's), and is placed after a
+// switch names no one, so its terma.user.id is never another person's than the sign-in it
+// leaves with. Whatever the agent sent under the key is gone either way.
+func TestAPartNamesOnlyItsOwnAccountsUser(t *testing.T) {
+	t.Parallel()
+	pol := Policy{User: "user-b", UserAccount: accountB}
+	for _, c := range []struct {
+		account, want string
+	}{
+		{account: accountB, want: "user-b"},
+		{account: accountA},
+		{account: sendas.NoPersonLane},
+		{account: ""},
+	} {
+		m := logsOf("A", 1)
+		m.ResourceLogs[0].Resource.Attributes = []*commonpb.KeyValue{kv(semconv.TermaUserIDKey, "user-b")}
+		nameUser(&part{msg: m, account: c.account}, pol)
+		if got := attr(m.ResourceLogs[0].Resource.GetAttributes(), semconv.TermaUserIDKey); got != c.want {
+			t.Errorf("%+v names %q, want %q", c, got, c.want)
+		}
+	}
+	// A part bound to no lane names no one, even under a policy whose user has no account.
+	m := logsOf("A", 1)
+	nameUser(&part{msg: m}, Policy{User: "user-b"})
+	if got := attr(m.ResourceLogs[0].Resource.GetAttributes(), semconv.TermaUserIDKey); got != "" {
+		t.Errorf("a part of no lane names %q", got)
 	}
 }

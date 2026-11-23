@@ -185,11 +185,11 @@ func TestCursorPendingReplayKeepsIdentity(t *testing.T) {
 func TestCursorFailedAppendIsRecoveredBeforeNextTurn(t *testing.T) {
 	env := testEnv(t)
 	badDir := t.TempDir()
-	badSpool, err := spool.Open(badDir)
+	badSpool, err := hookruntest.OpenSpool(badDir)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err = os.Mkdir(filepath.Join(badDir, "events.jsonl"), 0o700); err != nil {
+	if err = os.Mkdir(filepath.Join(badDir, spool.EventsFile), 0o700); err != nil {
 		t.Fatal(err)
 	}
 	failed := env
@@ -208,6 +208,56 @@ func TestCursorFailedAppendIsRecoveredBeforeNextTurn(t *testing.T) {
 	evs := cursorObservations(t, env.Spool)
 	if len(evs) != 2 || evs[0].Attrs[semconv.TermaTurnIDKey] != "turn-a" || evs[1].Attrs[semconv.TermaTurnIDKey] != "turn-b" {
 		t.Fatal(evs)
+	}
+}
+
+// A checkpointed observation keeps the account that collected it: retried after someone
+// else signed in, it still leaves only under its own.
+func TestCursorPendingKeepsItsAccount(t *testing.T) {
+	env := testEnv(t)
+	badDir := t.TempDir()
+	badSpool, err := hookruntest.OpenSpool(badDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = os.Mkdir(filepath.Join(badDir, spool.EventsFile), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	badSpool.Bind("account-a")
+	failed := env
+	failed.Spool, failed.Account = badSpool, "account-a"
+	cursorRun(t, failed, "stop", "turn-a", nil)
+	env.Account = "account-b"
+	env.Spool.Bind("account-b")
+	cursorRun(t, env, "stop", "turn-b", nil)
+	evs := cursorObservations(t, env.Spool)
+	if len(evs) != 2 || evs[0].Account != "account-a" || evs[1].Account != "account-b" {
+		t.Fatalf("accounts %q, %q; want the pending one under account-a", evs[0].Account, evs[1].Account)
+	}
+}
+
+// One collected under a server key stays no person's: retried once a person has signed in,
+// it is still not theirs.
+func TestCursorPendingOfNoPersonStaysNoPersons(t *testing.T) {
+	env := testEnv(t)
+	badDir := t.TempDir()
+	badSpool, err := hookruntest.OpenSpool(badDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = os.Mkdir(filepath.Join(badDir, spool.EventsFile), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	badSpool.BindNoPerson()
+	failed := env
+	failed.Spool, failed.Account, failed.ServerKey = badSpool, "", true
+	cursorRun(t, failed, "stop", "turn-a", nil)
+	env.Account = "account-b"
+	env.Spool.Bind("account-b")
+	cursorRun(t, env, "stop", "turn-b", nil)
+	evs := cursorObservations(t, env.Spool)
+	if len(evs) != 2 || evs[0].Account != "" || !evs[0].NoPerson || evs[1].Account != "account-b" {
+		t.Fatalf("events %+v; want the pending one no person's", evs)
 	}
 }
 

@@ -213,7 +213,7 @@ func TestStopFailureOmitsAccountIDUnderOverrideCredential(t *testing.T) {
 func TestFundingRetriesAfterFailedAppend(t *testing.T) {
 	env := newFundingEnv(t)
 	dir := filepath.Join(t.TempDir(), "spool")
-	sp, err := spool.Open(dir)
+	sp, err := hookruntest.OpenSpool(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -422,7 +422,7 @@ func TestSessionEndReportsAnUnreportedLimit(t *testing.T) {
 	env.Now = env.Now.Add(time.Minute)
 	write(apiError(env.Now.Add(-time.Second), "overloaded"))
 	spoolDir := filepath.Join(t.TempDir(), "spool")
-	sp, err := spool.Open(spoolDir)
+	sp, err := hookruntest.OpenSpool(spoolDir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -445,5 +445,28 @@ func TestSessionEndReportsAnUnreportedLimit(t *testing.T) {
 	write(apiError(env.Now.Add(-time.Second), "unknown"))
 	if got := limitRun(t, env, path, "", stopFailure, sessionEnd); len(got) != 0 {
 		t.Fatalf("the session's end made up a category: %+v", got)
+	}
+}
+
+// Signed out, a session's limit is lost once and marked reported: a later end, once someone
+// has signed in, never sends it in that person's name.
+func TestASignedOutLimitIsNeverSentUnderALaterSignIn(t *testing.T) {
+	env := newFundingEnv(t)
+	sp, err := spool.Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	sp.Bind("")
+	env.Spool = sp
+	dir := t.TempDir()
+	b, _ := json.Marshal(map[string]any{"type": "assistant", "sessionId": "funding-session", "timestamp": env.Now.Add(-time.Second),
+		"isApiErrorMessage": true, "apiErrorStatus": 429, "error": "overloaded"})
+	hookruntest.WriteFile(t, dir, "funding-session.jsonl", string(b)+"\n")
+	path := filepath.Join(dir, "funding-session.jsonl")
+	limitRun(t, env, path, "", sessionEnd)
+	sp.Bind("bbbbbbbbbbbbbbbb")
+	env.Account = "bbbbbbbbbbbbbbbb"
+	if got := limitRun(t, env, path, "", sessionEnd); len(got) != 0 {
+		t.Fatalf("a limit collected signed out left under the next sign-in: %+v", got)
 	}
 }

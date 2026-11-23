@@ -15,7 +15,7 @@ import (
 // Per-destination retry windows, so one refused project does not hold back the others.
 // Only a Sender inside Flush writes them: the delivery lock makes the read-edit-rename safe.
 
-const retryFile = "retry.json"
+const retryFile = "retry-v2.json"
 
 // retryWindow keeps the wait that produced Next, so the next failure can double it.
 type retryWindow struct {

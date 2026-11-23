@@ -115,7 +115,7 @@ func Admitting(root string) config.Policy {
 func Project(t *testing.T) (root, stateDir string, sp *spool.Spool) {
 	t.Helper()
 	root = InitRepo(t)
-	sp, err := spool.Open(t.TempDir())
+	sp, err := OpenSpool(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -195,4 +195,17 @@ func RelayOn(t *testing.T, stateDir string) {
 func InJSON(s string) string {
 	b, _ := json.Marshal(s)
 	return string(b[1 : len(b)-1])
+}
+
+// Account is the account key of the person these tests' hooks run signed in as.
+const Account = "0123456789abcdef"
+
+// OpenSpool is spool.Open bound to Account, as a signed-in hook's spool is: an unbound
+// spool keeps nothing it is handed without an account.
+func OpenSpool(dir string) (*spool.Spool, error) {
+	sp, err := spool.Open(dir)
+	if err == nil {
+		sp.Bind(Account)
+	}
+	return sp, err
 }

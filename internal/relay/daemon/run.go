@@ -401,11 +401,14 @@ func watch(ctx context.Context, r *relay.Relay, stateDir string, idle time.Durat
 			replacing = time.Now()
 		}
 		if !upgraded.IsZero() {
-			quiet := updateQuiet
-			if time.Since(upgraded) >= updatePauseWait {
+			// After updatePauseWait the update stops waiting for a pause, and for parts waiting
+			// for their team's policy or key, which steady exports renew and only a restart
+			// may fix: an agent that never falls quiet must not keep it waiting for good.
+			quiet, paused := updateQuiet, time.Since(upgraded) >= updatePauseWait
+			if paused {
 				quiet = 0
 			}
-			if r.Quiesce(quiet) {
+			if r.Quiesce(quiet) || paused && r.QuiesceDroppingPolicyWaits(quiet) {
 				if installed.Replaced {
 					return stopUpdatedByAnother, installed.Installed, nil
 				}

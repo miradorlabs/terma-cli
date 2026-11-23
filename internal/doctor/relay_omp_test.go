@@ -36,15 +36,15 @@ func TestRelayCheckReadsOmpsEnv(t *testing.T) {
 	if _, err := a.ConfigureRelay(t.Context(), agents.RelayConfig{Endpoint: "http://127.0.0.1:43180", Token: "tok", HookCommand: []string{"terma", "hook"}}); err != nil {
 		t.Fatal(err)
 	}
-	if c := RelayCheck(reg, healthy(), keyed, "proj_x", "dev", []string{"omp"}); c.Status != Pass {
+	if c := RelayCheck(reg, healthy(), keyed, "proj_x", "dev", []string{"omp"}, "terma setup"); c.Status != Pass {
 		t.Fatalf("RelayCheck = %+v, want a pass", c)
 	}
 	t.Setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "https://collector.example")
-	if c := RelayCheck(reg, healthy(), keyed, "proj_x", "dev", []string{"omp"}); c.Status != Pass {
+	if c := RelayCheck(reg, healthy(), keyed, "proj_x", "dev", []string{"omp"}, "terma setup"); c.Status != Pass {
 		t.Fatalf("RelayCheck with a shell common endpoint = %+v, want a pass: the .env's own per signal outrank it", c)
 	}
 	t.Setenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", "https://collector.example/v1/traces")
-	if c := RelayCheck(reg, healthy(), keyed, "proj_x", "dev", []string{"omp"}); c.Status != Fail || !strings.Contains(c.Detail, "OMP not exporting to the local relay") {
+	if c := RelayCheck(reg, healthy(), keyed, "proj_x", "dev", []string{"omp"}, "terma setup"); c.Status != Fail || !strings.Contains(c.Detail, "OMP not exporting to the local relay") {
 		t.Fatalf("RelayCheck with a shell traces endpoint = %+v, want a failure naming omp", c)
 	}
 	t.Setenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", "")
@@ -57,7 +57,7 @@ func TestRelayCheckReadsOmpsEnv(t *testing.T) {
 	if err := os.WriteFile(env, []byte(moved), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if c := RelayCheck(reg, healthy(), keyed, "proj_x", "dev", []string{"omp"}); c.Status != Fail || !strings.Contains(c.Detail, "OMP not exporting to the local relay") {
+	if c := RelayCheck(reg, healthy(), keyed, "proj_x", "dev", []string{"omp"}, "terma setup"); c.Status != Fail || !strings.Contains(c.Detail, "OMP not exporting to the local relay") {
 		t.Fatalf("RelayCheck = %+v, want a failure naming omp", c)
 	}
 	if err := os.WriteFile(env, data, 0o600); err != nil {
@@ -66,7 +66,7 @@ func TestRelayCheckReadsOmpsEnv(t *testing.T) {
 	if err := os.Remove(filepath.Join(dir, "extensions", "terma-omp.ts")); err != nil {
 		t.Fatal(err)
 	}
-	if c := RelayCheck(reg, healthy(), keyed, "proj_x", "dev", []string{"omp"}); c.Status != Fail || !strings.Contains(c.Detail, "terma-omp.ts") || c.Fix != "terma setup" {
+	if c := RelayCheck(reg, healthy(), keyed, "proj_x", "dev", []string{"omp"}, "terma setup"); c.Status != Fail || !strings.Contains(c.Detail, "terma-omp.ts") || c.Fix != "terma setup" {
 		t.Fatalf("RelayCheck without terma's extension = %+v, want a failure naming it", c)
 	}
 }
@@ -89,11 +89,11 @@ func TestRelayCheckWithoutASelectionJudgesOmpOnlyWhereInstalled(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if c := RelayCheck(reg, healthy(), keyed, "proj_x", "dev", nil); c.Status != Pass {
+	if c := RelayCheck(reg, healthy(), keyed, "proj_x", "dev", nil, "terma setup"); c.Status != Pass {
 		t.Fatalf("RelayCheck without OMP installed = %+v, want a pass", c)
 	}
 	ompInstalled(t, bin)
-	if c := RelayCheck(reg, healthy(), keyed, "proj_x", "dev", nil); c.Status != Fail || !strings.Contains(c.Detail, "OMP not exporting to the local relay") {
+	if c := RelayCheck(reg, healthy(), keyed, "proj_x", "dev", nil, "terma setup"); c.Status != Fail || !strings.Contains(c.Detail, "OMP not exporting to the local relay") {
 		t.Fatalf("RelayCheck with OMP installed and not pointed = %+v, want a failure naming OMP", c)
 	}
 }
@@ -113,11 +113,11 @@ func TestRelayCheckFailsOmpsWrongTokenOrPath(t *testing.T) {
 	}
 	relay := healthy()
 	relay.Token = "tok-current"
-	if c := RelayCheck(reg, relay, keyed, "proj_x", "dev", []string{"omp"}); c.Status != Pass {
+	if c := RelayCheck(reg, relay, keyed, "proj_x", "dev", []string{"omp"}, "terma setup"); c.Status != Pass {
 		t.Fatalf("RelayCheck with the relay's token = %+v, want a pass", c)
 	}
 	relay.Token = "tok-rotated"
-	c := RelayCheck(reg, relay, keyed, "proj_x", "dev", []string{"omp"})
+	c := RelayCheck(reg, relay, keyed, "proj_x", "dev", []string{"omp"}, "terma setup")
 	if c.Status != Fail || !strings.Contains(c.Detail, "OMP not exporting to the local relay") || !strings.Contains(c.Detail, "relay token") {
 		t.Fatalf("RelayCheck with another token = %+v, want a failure naming the token", c)
 	}
@@ -126,7 +126,7 @@ func TestRelayCheckFailsOmpsWrongTokenOrPath(t *testing.T) {
 	}
 	// Before setup made a token there is none to compare: the check is skipped, not failed.
 	relay.Token = ""
-	if c := RelayCheck(reg, relay, keyed, "proj_x", "dev", []string{"omp"}); c.Status != Pass {
+	if c := RelayCheck(reg, relay, keyed, "proj_x", "dev", []string{"omp"}, "terma setup"); c.Status != Pass {
 		t.Fatalf("RelayCheck with no relay token = %+v, want a pass", c)
 	}
 	relay.Token = "tok-current"
@@ -144,25 +144,25 @@ func TestRelayCheckFailsOmpsWrongTokenOrPath(t *testing.T) {
 		if err := os.WriteFile(env, []byte(edited), 0o600); err != nil {
 			t.Fatal(err)
 		}
-		if c := RelayCheck(reg, relay, keyed, "proj_x", "dev", []string{"omp"}); c.Status != Fail {
+		if c := RelayCheck(reg, relay, keyed, "proj_x", "dev", []string{"omp"}, "terma setup"); c.Status != Fail {
 			t.Errorf("RelayCheck with the .env's traces endpoint %s = %+v, want a failure", bad, c)
 		}
 		if err := os.WriteFile(env, data, 0o600); err != nil {
 			t.Fatal(err)
 		}
 		t.Setenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", bad)
-		if c := RelayCheck(reg, relay, keyed, "proj_x", "dev", []string{"omp"}); c.Status != Fail {
+		if c := RelayCheck(reg, relay, keyed, "proj_x", "dev", []string{"omp"}, "terma setup"); c.Status != Fail {
 			t.Errorf("RelayCheck with the shell's traces endpoint %s = %+v, want a failure", bad, c)
 		}
 		t.Setenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", "")
 	}
 	t.Setenv("OTEL_EXPORTER_OTLP_LOGS_ENDPOINT", "http://127.0.0.1:43180/tok-current")
-	if c := RelayCheck(reg, relay, keyed, "proj_x", "dev", []string{"omp"}); c.Status != Fail {
+	if c := RelayCheck(reg, relay, keyed, "proj_x", "dev", []string{"omp"}, "terma setup"); c.Status != Fail {
 		t.Errorf("RelayCheck with the shell's logs endpoint without /v1/logs = %+v, want a failure", c)
 	}
 	t.Setenv("OTEL_EXPORTER_OTLP_LOGS_ENDPOINT", "")
 	t.Setenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", "http://127.0.0.1:43180/tok-current/v1/traces")
-	if c := RelayCheck(reg, relay, keyed, "proj_x", "dev", []string{"omp"}); c.Status != Pass {
+	if c := RelayCheck(reg, relay, keyed, "proj_x", "dev", []string{"omp"}, "terma setup"); c.Status != Pass {
 		t.Fatalf("RelayCheck with the shell naming the relay's own traces URL = %+v, want a pass", c)
 	}
 }

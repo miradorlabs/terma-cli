@@ -43,6 +43,13 @@ type part struct {
 	narrow bool
 	// claimed marks a part named by a Claimed session key: only its session's claim may send it.
 	claimed bool
+	// account is the lane of the sign-in in place when the part arrived (arrivalLane),
+	// which it leaves under, however long it is held first; lost, when it had none, why it
+	// is lost once placed.
+	account, lost string
+	// arrived is when the relay accepted it, which its outbox entry is named by however
+	// long it is held.
+	arrived time.Time
 }
 
 // sessionOf is the first session key, by rank, on the record's attributes, then its

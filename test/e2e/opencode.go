@@ -156,7 +156,6 @@ func (sb *Sandbox) directOpenCode() {
 		t.Fatal("the OpenCode plugin has no config placeholder")
 	}
 	sb.writeAbs(filepath.Join(sb.Home, ".config", "opencode", "plugins", "terma.js"), strings.Replace(string(src), placeholder, "const CONFIG = "+string(cfg), 1))
-	sb.useLiveKey()
 }
 
 // OpenCodeRun runs one headless `opencode run` in dir (continuing session when it is

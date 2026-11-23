@@ -100,7 +100,7 @@ func TestHookKillSwitch(t *testing.T) {
 	if got := stamp(); got != original {
 		t.Fatalf("stamped on a machine torn down:\n%s", got)
 	}
-	events := filepath.Join(testApp.stateDir, spool.Dir, "events.jsonl")
+	events := filepath.Join(testApp.stateDir, spool.Dir, spool.EventsFile)
 	before, _ := os.ReadFile(events)
 	git("commit", "-q", "-m", "by hand")
 	run("", "post-commit")

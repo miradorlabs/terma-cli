@@ -47,6 +47,9 @@ func Local(ctx context.Context, env Env) (LocalReport, error) {
 		if cred, err := p.Credential(); err == nil && cred.SignInAfterUpdate {
 			authOK = false
 			add("Account", "not signed in — terma was updated and now signs in once per person: run `terma setup`")
+		} else if err == nil && cred.Retired {
+			authOK = false
+			add("Account", "this sign-in is retired — run `%s`", RetiredFix)
 		} else if err == nil && cred.Locked {
 			authOK = false
 			add("Account", "credentials unreadable: the system keychain is locked or unavailable")
@@ -99,7 +102,7 @@ func Local(ctx context.Context, env Env) (LocalReport, error) {
 	// Through the relay one line gives doctor's own verdict (RelayCheck).
 	var export Check
 	if claim.Enabled(env.StateDir) && p.Relay != nil {
-		export = RelayCheck(reg, p.Relay(), p.Keys, projectID, cfg.Environment, cfg.Harnesses)
+		export = RelayCheck(reg, p.Relay(), p.Keys, projectID, cfg.Environment, cfg.Harnesses, p.signInFix())
 		export.Key = KeyHarness
 		add("Agents", "%s", export.Detail)
 		if export.Fix != "" {
@@ -141,9 +144,9 @@ func Local(ctx context.Context, env Env) (LocalReport, error) {
 			}
 			if projectID != "" {
 				if key := keyOf(p.Keys, projectID); key != "" {
-					line += ", key " + key
+					line += ", sent with " + key
 				} else {
-					line += ", no team key (run `terma setup`)"
+					line += ", no sign-in or team key (run `" + p.signInFix() + "`)"
 					backendOK = false
 				}
 			}
@@ -153,7 +156,7 @@ func Local(ctx context.Context, env Env) (LocalReport, error) {
 
 	rep.Checks = []Check{BinaryCheck(env.Exe, env.BinDirs), unlessCaptureOff(pol, export), {Key: KeyBackend, Status: Skip}}
 	if !authOK {
-		rep.Checks = append(rep.Checks, Check{Status: Fail, Fix: "terma setup"})
+		rep.Checks = append(rep.Checks, Check{Status: Fail, Fix: p.signInFix()})
 	}
 	// Only a repository that should be stamped and is not counts against the machine.
 	if hooks.Status == Warn || hooks.Status == Fail {

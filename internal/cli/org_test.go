@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -108,7 +109,7 @@ func chooseHere(t *testing.T, want orgRef, ask orgAsker) (int, error) {
 func TestSignInReusesAWorkingSession(t *testing.T) {
 	f := newFakeAuth(t)
 	authSandbox(t, f)
-	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(f)); err != nil {
+	if err := saveSignIn(testApp.dir, storedSession(f)); err != nil {
 		t.Fatal(err)
 	}
 
@@ -129,7 +130,7 @@ func TestSignInReusesAWorkingSession(t *testing.T) {
 func TestChooseOrganizationWithOneSignIn(t *testing.T) {
 	f := newFakeAuth(t)
 	authSandbox(t, f)
-	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(f)); err != nil {
+	if err := saveSignIn(testApp.dir, storedSession(f)); err != nil {
 		t.Fatal(err)
 	}
 	for _, step := range []struct {
@@ -177,7 +178,7 @@ func TestChooseOrganizationWithOneSignIn(t *testing.T) {
 func TestChooseOrganizationKeepsTheChoiceWhenUnavailable(t *testing.T) {
 	f := newFakeAuth(t)
 	authSandbox(t, f)
-	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(f)); err != nil {
+	if err := saveSignIn(testApp.dir, storedSession(f)); err != nil {
 		t.Fatal(err)
 	}
 	if err := config.UpdateProfile(testApp.dir, config.DefaultProfile, func(p *config.Profile) {
@@ -209,7 +210,7 @@ func mustProfile(t *testing.T) *config.Profile {
 func TestSignInDropsADeadSession(t *testing.T) {
 	f := newFakeAuth(t)
 	authSandbox(t, f)
-	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(f)); err != nil {
+	if err := saveSignIn(testApp.dir, storedSession(f)); err != nil {
 		t.Fatal(err)
 	}
 	f.deadToken = fakeUserToken("u-1")
@@ -232,7 +233,7 @@ func TestStoreLoginEndsTheReplacedSessionAfterStoring(t *testing.T) {
 	f := newFakeAuth(t)
 	authSandbox(t, f)
 	old := storedSession(f)
-	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, old); err != nil {
+	if err := saveSignIn(testApp.dir, old); err != nil {
 		t.Fatal(err)
 	}
 	cfg, err := testApp.loadConfig()
@@ -360,7 +361,7 @@ func TestAnUpdatedMachineIsToldToSignIn(t *testing.T) {
 	if got := testApp.notSignedIn(); !strings.Contains(got, "terma was updated") {
 		t.Fatalf("not signed in = %q, want it to say the update needs a sign-in", got)
 	}
-	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(f)); err != nil {
+	if err := saveSignIn(testApp.dir, storedSession(f)); err != nil {
 		t.Fatal(err)
 	}
 	if got := notice("status"); got != "" {
@@ -372,7 +373,7 @@ func TestAnUpdatedMachineIsToldToSignIn(t *testing.T) {
 func TestSignOutRevokesTheSession(t *testing.T) {
 	f := newFakeAuth(t)
 	authSandbox(t, f)
-	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(f)); err != nil {
+	if err := saveSignIn(testApp.dir, storedSession(f)); err != nil {
 		t.Fatal(err)
 	}
 	var out bytes.Buffer
@@ -402,7 +403,7 @@ func TestSignOutNeverPresentsATokenInDoubt(t *testing.T) {
 	authSandbox(t, f)
 	cred := storedSession(f)
 	cred.RefreshInDoubtSince = time.Now()
-	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, cred); err != nil {
+	if err := saveSignIn(testApp.dir, cred); err != nil {
 		t.Fatal(err)
 	}
 	var out bytes.Buffer
@@ -429,7 +430,7 @@ func TestReusingASignInRetiresWhatIsLeftOfAnOlderTerma(t *testing.T) {
 	if err := config.UpdateFile(testApp.dir, func(file *config.File) { file.InsecureStorage = true }); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(f)); err != nil {
+	if err := saveSignIn(testApp.dir, storedSession(f)); err != nil {
 		t.Fatal(err)
 	}
 	here, elsewhere := legacyTokenPrefix+"here", legacyTokenPrefix+"elsewhere"
@@ -452,12 +453,34 @@ func TestReusingASignInRetiresWhatIsLeftOfAnOlderTerma(t *testing.T) {
 	}
 }
 
+// A retired sign-in is not reused: `terma login` forgets it and opens the browser, rather
+// than fail on it until its token expires.
+func TestReuseForgetsARetiredSignIn(t *testing.T) {
+	f := newFakeAuth(t)
+	authSandbox(t, f)
+	retired := storedSession(f)
+	retired.RetiredAt = time.Now().UTC()
+	if err := saveSignIn(testApp.dir, retired); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := testApp.loadConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cred, ok, err := testApp.reuseStoredSession(t.Context(), cfg, nil); ok || err != nil || cred != nil {
+		t.Fatalf("reuse = %v, %v; want the browser opened", ok, err)
+	}
+	if _, err := auth.LoadCredential(testApp.dir, config.DefaultProfile); !errors.Is(err, auth.ErrNotLoggedIn) {
+		t.Fatalf("the retired sign-in is still stored (%v)", err)
+	}
+}
+
 // A sign-in another setup stored while this one verified the stored session ends the reuse:
 // the session it verified is over, and setting up with it would mix two people's.
 func TestReuseRefusesASessionReplacedMeanwhile(t *testing.T) {
 	f := newFakeAuth(t)
 	authSandbox(t, f)
-	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(f)); err != nil {
+	if err := saveSignIn(testApp.dir, storedSession(f)); err != nil {
 		t.Fatal(err)
 	}
 	inner := f.srv.Config.Handler

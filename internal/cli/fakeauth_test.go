@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/account/auth"
+	"github.com/miradorlabs/terma-cli/internal/config"
 )
 
 // The fake's credentials are joined at run time, so no literal in this file is shaped
@@ -67,6 +68,9 @@ type fakeAuth struct {
 	installations  []string
 	revoked        []string
 	legacyRevoked  []string
+	// revoking, when set, is told of each revoke, which then waits for holdRevokes to close.
+	revoking    chan struct{}
+	holdRevokes chan struct{}
 }
 
 // fakeGrant is who a code signs in, and whether a desktop delegated it.
@@ -106,6 +110,10 @@ func (f *fakeAuth) serve(w http.ResponseWriter, r *http.Request) {
 			RefreshToken string `json:"refresh_token"`
 		}
 		_ = json.NewDecoder(r.Body).Decode(&body)
+		if f.revoking != nil {
+			f.revoking <- struct{}{}
+			<-f.holdRevokes
+		}
 		f.revokes.Add(1)
 		f.mu.Lock()
 		f.revoked = append(f.revoked, body.RefreshToken)
@@ -323,4 +331,13 @@ func storedSessionOf(f *fakeAuth, user string) *auth.Credential {
 		UserID:       user,
 		UserEmail:    "dev@example.com",
 	}
+}
+
+// saveSignIn stores cred as dir's default profile's sign-in, paired with the profile as
+// storeLogin pairs a new login (config.Profile.Account), keeping what the profile chose.
+func saveSignIn(dir string, cred *auth.Credential) error {
+	if _, err := auth.SaveCredential(dir, config.DefaultProfile, cred); err != nil {
+		return err
+	}
+	return config.UpdateProfile(dir, config.DefaultProfile, func(p *config.Profile) { p.Account = cred.Account() })
 }

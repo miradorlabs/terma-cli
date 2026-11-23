@@ -8,17 +8,23 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/relay"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
+	"github.com/miradorlabs/terma-cli/internal/sendas"
 )
 
 const mintedKey = "ter_srv_minted0123456789abcdefghijklmnopqrstuv"
 
-// A claimed project without a key here waits for one, which nothing mints; with a key,
-// the organization's policy decides content.
+// On a profile set up with a server key, a claimed project without a key here waits for
+// one, which nothing mints; with a key, the organization's policy decides content. A
+// person's profile names no key at all: its parts go with the sign-in.
 func TestRelayResolverCapsContent(t *testing.T) {
 	useConfigDir(t, t.TempDir())
-	cfg := &config.Config{Dir: testApp.dir, OTLPURL: "https://otel.example", Policy: config.DefaultPolicy(), Harnesses: []string{"codex"}}
+	person := &config.Config{Dir: testApp.dir, OTLPURL: "https://otel.example", Policy: config.DefaultPolicy(), Harnesses: []string{"codex"}}
+	if pol, err := testApp.relayDeps().Resolver(person)(claim.Claim{ProjectID: "p1", Tool: "codex"}); err != nil || pol.Key != "" {
+		t.Fatalf("a person's profile resolved %+v, %v", pol, err)
+	}
+	cfg := &config.Config{Dir: testApp.dir, OTLPURL: "https://otel.example", Policy: config.DefaultPolicy(), Harnesses: []string{"codex"}, ServerKeySignIn: true}
 	resolve := testApp.relayDeps().Resolver(cfg)
-	c := claim.Claim{ProjectID: "p1", Tool: "codex"}
+	c := claim.Claim{ProjectID: "p1", Tool: "codex", Account: sendas.NoPersonLane}
 	if _, err := resolve(c); !errors.Is(err, relay.ErrNoKey) {
 		t.Fatalf("keyless: err %v", err)
 	}

@@ -1,6 +1,7 @@
 package hookrun
 
 import (
+	"cmp"
 	"context"
 	"os"
 	"os/exec"
@@ -60,7 +61,7 @@ func newPushRepo(t *testing.T) *pushRepo {
 	p.git("remote", "add", "backup", remote)
 	p.git("commit", "-q", "--allow-empty", "-m", "init")
 	p.git("push", "-q", "backup", "main")
-	sp, err := spool.Open(t.TempDir())
+	sp, err := hookruntest.OpenSpool(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -319,6 +320,44 @@ func TestSweepReportsAnAbandonedPush(t *testing.T) {
 	}
 }
 
+// A push keeps the lane it was recorded under, a person's or no person's: reported by a
+// sweep after someone else signed in, it never leaves under them.
+func TestASweptPushKeepsTheAccountItWasRecordedUnder(t *testing.T) {
+	for _, recordedAs := range []string{"account-a", ""} {
+		t.Run("recorded as "+cmp.Or(recordedAs, "no person"), func(t *testing.T) {
+			defer func(f func() int) { gitPushPID = f }(gitPushPID)
+			p := newPushRepo(t)
+			p.git("commit", "-q", "--allow-empty", "-m", "more")
+			head := p.sha("HEAD")
+			gitPushPID = func() int { return 0 }
+			var recorded string
+			env := Env{StateDir: p.stateDir, Now: time.Now(), Cwd: p.root, Args: []string{"backup", p.remote},
+				Stdin: strings.NewReader(pushLine("refs/heads/main", head, "refs/heads/main", p.sha("backup/main")) + "\n"), Spool: p.sp,
+				Team: p.team, Policy: hookruntest.Admitting(p.root), AwaitPush: func(path string) { recorded = path }, Account: recordedAs, ServerKey: recordedAs == ""}
+			if recordedAs == "" {
+				p.sp.BindNoPerson()
+			} else {
+				p.sp.Bind(recordedAs)
+			}
+			if err := PrePush(context.Background(), env); err != nil {
+				t.Fatal(err)
+			}
+			old := time.Now().Add(-pushAbandoned - time.Minute)
+			if err := os.Chtimes(recorded, old, old); err != nil {
+				t.Fatal(err)
+			}
+			// Someone else is signed in when the sweep reports it.
+			env.Account, env.ServerKey = "account-b", false
+			p.sp.Bind("account-b")
+			SweepPushes(context.Background(), env)
+			events := hookruntest.Named(hookruntest.Spooled(t, p.sp), semconv.TermaPushEvent)
+			if len(events) != 1 || events[0].Account != recordedAs || events[0].NoPerson != (recordedAs == "") {
+				t.Fatalf("pushes %+v; want one under %q", events, recordedAs)
+			}
+		})
+	}
+}
+
 // Nothing to report records nothing: an up-to-date push gives pre-push no lines.
 func TestPrePushWithNothingToReport(t *testing.T) {
 	p := newPushRepo(t)
@@ -369,7 +408,8 @@ func TestSweepReportsATakenPushItsReporterLeft(t *testing.T) {
 	}
 }
 
-// The sessions are those of the commits listed, and both lists are empty, never nil.
+// The sessions listed are those of the commits listed, and both lists are empty, never nil;
+// every commit's sessions are kept apart, for the lane.
 func TestPushedListsNameOnlyTheListedCommitsSessions(t *testing.T) {
 	commits := make([]gitx.PushedCommit, MaxPushCommits+1)
 	for i := range commits {
@@ -378,12 +418,16 @@ func TestPushedListsNameOnlyTheListedCommitsSessions(t *testing.T) {
 	commits[0].Trailers = "Agent-Session-Id: sess-listed\nAgent-Tool: codex/1\nAgent-Session-Id: ../bad\n"
 	commits[1].Trailers = "Agent-Session-Id: sess-listed\nAgent-Tool: codex/2\nAgent-Session-Id: sess-listed\nAgent-Tool: claude-code\n"
 	commits[MaxPushCommits].Trailers = "Agent-Session-Id: sess-beyond\nAgent-Tool: codex\n"
-	shas, sessions := pushedLists(commits)
+	shas, sessions, all := pushedLists(commits)
 	want := []trailer.Trailer{{SessionID: "sess-listed", Tool: "codex/1"}, {SessionID: "sess-listed", Tool: "claude-code"}}
 	if len(shas) != MaxPushCommits || !slices.Equal(sessions, want) {
 		t.Errorf("%d shas, sessions %+v", len(shas), sessions)
 	}
-	if shas, sessions := pushedLists(nil); shas == nil || sessionIDs(sessions) == nil || sessionsAttr(sessions) == nil {
+	// The push's lane goes by every commit's session, past the cap too.
+	if want := append(want, trailer.Trailer{SessionID: "sess-beyond", Tool: "codex"}); !slices.Equal(all, want) {
+		t.Errorf("all sessions %+v; want %+v", all, want)
+	}
+	if shas, sessions, _ := pushedLists(nil); shas == nil || sessionIDs(sessions) == nil || sessionsAttr(sessions) == nil {
 		t.Errorf("nil lists: %#v %#v", shas, sessions)
 	}
 }

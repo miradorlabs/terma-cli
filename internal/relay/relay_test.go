@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -104,6 +105,7 @@ type fixture struct {
 	now      time.Time
 	warnings []string
 	version  string
+	signIn   SignIn // nil: no person's sign-in
 }
 
 func (f *fixture) warned() []string {
@@ -136,6 +138,7 @@ func (f *fixture) clock() time.Time {
 func (f *fixture) relay(t *testing.T, u *upstream, policies map[string]Policy) (*Relay, *httptest.Server) {
 	r := newRelay(Options{Dir: t.TempDir(),
 		Version: f.version,
+		SignIn:  f.signIn,
 		Token:   token,
 		Hold:    time.Minute,
 		Lookup:  f.lookup,
@@ -298,8 +301,16 @@ func TestRelayRoutesLogsPerClaimedSession(t *testing.T) {
 			f.mu.Unlock()
 			r.sweep()
 			c = r.Stats().Snapshot().Counters
-			if c["dropped.no_key.logs"] != 1 || c["dropped.unclaimed_expired.logs"] != 1 {
+			// The unclaimed part goes; the claimed one whose team has no key or policy here waits.
+			if c["dropped.policy_timeout.logs"] != 0 || c["dropped.unclaimed_expired.logs"] != 1 {
 				t.Fatalf("after the hold: %v", c)
+			}
+			f.mu.Lock()
+			f.now = f.now.Add(policyHold)
+			f.mu.Unlock()
+			r.sweep()
+			if c = r.Stats().Snapshot().Counters; c["dropped.policy_timeout.logs"] != 1 {
+				t.Fatalf("after the policy's hold: %v", c)
 			}
 		})
 	}
@@ -377,6 +388,14 @@ func TestRelayHoldReleasesOrExpires(t *testing.T) {
 	if c["dropped.unclaimed_expired.logs"] != 1 || c["forwarded.logs"] != 4 {
 		t.Fatalf("stats = %v", c)
 	}
+	// A claimed part with no key or policy to leave under is still held, for policyHold.
+	if _, ok := r.Idle(); ok {
+		t.Fatal("a held claimed part let the relay go idle")
+	}
+	f.mu.Lock()
+	f.now = f.now.Add(policyHold)
+	f.mu.Unlock()
+	r.sweep()
 	// The sender marks itself done just after the counter moves.
 	waitFor(t, func() bool { idle, ok := r.Idle(); return ok && idle >= 0 })
 }
@@ -571,5 +590,169 @@ func TestRelayRefusedKeyIsRetriedNotDropped(t *testing.T) {
 	}
 	if n := countFiles(t, r.opts.Dir); n != 2 {
 		t.Fatalf("outbox holds %d parts, want the two projects' 2", n)
+	}
+}
+
+// A part claimed for a team whose policy the machine has never stored waits for it
+// policyHold, from when it began waiting, and leaves once the policy is fetched; one whose
+// policy never arrives is dropped then, and counted as policy_timeout where doctor reads the
+// outbox's losses, never kept as long as the outbox keeps parts.
+func TestAPartWaitsForANeverStoredPolicyOnlyPolicyHold(t *testing.T) {
+	t.Parallel()
+	u := newUpstream(t)
+	f := newFixture()
+	dir := t.TempDir()
+	var mu sync.Mutex
+	readable := false
+	r := newRelay(Options{Dir: dir, Token: token, Hold: time.Minute, Lookup: f.lookup, Now: f.clock,
+		Resolve: func(c claim.Claim) (Policy, error) {
+			mu.Lock()
+			defer mu.Unlock()
+			if c.ProjectID != "p3" || !readable {
+				return Policy{}, ErrNoKey
+			}
+			return Policy{Endpoint: u.srv.URL, Key: "key-p3"}, nil
+		}})
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() { r.Run(ctx); close(done) }()
+	t.Cleanup(func() { cancel(); <-done })
+	srv := httptest.NewServer(r.Handler())
+	t.Cleanup(srv.Close)
+	advance := func(d time.Duration) {
+		f.mu.Lock()
+		f.now = f.now.Add(d)
+		f.mu.Unlock()
+		r.cache.expire(f.clock().Add(time.Hour))
+		r.sweep()
+	}
+
+	// Fetched within the hold, the policy releases the part to its team.
+	postProto(t, srv, "/v1/logs", logsOf("D", 1))
+	waitForCounters(t, r, func(c map[string]int) bool { return c["held_parts"] == 1 })
+	advance(policyHold - time.Minute)
+	if !r.Holding() {
+		t.Fatal("a part waiting for its team's policy was dropped within the hold")
+	}
+	mu.Lock()
+	readable = true
+	mu.Unlock()
+	advance(time.Second)
+	waitForCounters(t, r, func(c map[string]int) bool { return c["forwarded.logs"] == 1 })
+	if got, projects := u.logs(t); len(got["Bearer key-p3"]) != 1 || projects["Bearer key-p3"] != "p3" {
+		t.Fatalf("forwarded by key = %v, projects %v", got, projects)
+	}
+
+	// A conversation start held for its claim waits for the policy from when it is claimed.
+	mu.Lock()
+	readable = false
+	mu.Unlock()
+	r.hold(&part{signal: Logs, session: "Z", msg: logsOf("Z", 1), records: 1, start: true, at: f.clock()}, false)
+	advance(3 * time.Minute)
+	f.claim("Z", claim.Claim{ProjectID: "p3"})
+	advance(time.Second)
+	advance(policyHold - time.Minute)
+	if c := r.Stats().Snapshot().Counters; c["dropped.policy_timeout.logs"] != 0 || !r.Holding() {
+		t.Fatalf("a part was given less than policyHold for its policy: %v", c)
+	}
+	// It never arrives: dropped, and counted.
+	advance(time.Minute)
+	if c := r.Stats().Snapshot().Counters; c["dropped.policy_timeout.logs"] != 1 || r.Holding() {
+		t.Fatalf("a part outlived policyHold: %v, holding %v", c, r.Holding())
+	}
+	if l, err := ReadOutboxLosses(dir); err != nil || l.Counts[lostPolicyTimeout] != 1 {
+		t.Fatalf("losses = %+v, %v; want the part counted as policy_timeout", l, err)
+	}
+}
+
+// An update waits for the hold, which a part waiting for its team's policy leaves within
+// policyHold: no policy that never arrives holds an update up for longer.
+func TestAnUpdateWaitsForAPolicyOnlyPolicyHold(t *testing.T) {
+	t.Parallel()
+	f := newFixture()
+	r := newRelay(Options{Dir: t.TempDir(), Token: token, Hold: time.Minute, Lookup: f.lookup, Now: f.clock,
+		Resolve: func(claim.Claim) (Policy, error) { return Policy{}, ErrNoKey }})
+	srv := httptest.NewServer(r.Handler())
+	t.Cleanup(srv.Close)
+	postProto(t, srv, "/v1/logs", logsOf("D", 1))
+	r.sweep()
+	if r.Quiesce(0) {
+		t.Fatal("a relay that holds a part quiesced")
+	}
+	f.mu.Lock()
+	f.now = f.now.Add(policyHold)
+	f.mu.Unlock()
+	r.sweep()
+	if !r.Quiesce(0) {
+		t.Fatal("an update still waits for a part past policyHold")
+	}
+}
+
+// A part waiting for its team's policy that the full hold can't take is counted as
+// policy_timeout where doctor reads losses, as one the relay drops as it stops is.
+func TestAPolicyWaitLostToTheHoldsRoomOrAStopIsCounted(t *testing.T) {
+	t.Parallel()
+	f := newFixture()
+	dir := t.TempDir()
+	r := newRelay(Options{Dir: dir, Token: token, Hold: time.Minute, Lookup: f.lookup, Now: f.clock,
+		Resolve: func(claim.Claim) (Policy, error) { return Policy{}, ErrNoKey }})
+	srv := httptest.NewServer(r.Handler())
+	t.Cleanup(srv.Close)
+	r.hold(&part{signal: Logs, session: "D", msg: logsOf("D", 1), records: maxHeld + 1}, true)
+	r.sweep()
+	if l, err := ReadOutboxLosses(dir); err != nil || l.Counts[lostPolicyTimeout] != maxHeld+1 {
+		t.Fatalf("losses = %+v, %v; want the refused part counted", l, err)
+	}
+	postProto(t, srv, "/v1/logs", logsOf("D", 1))
+	r.dropHeldAtExit()
+	if l, err := ReadOutboxLosses(dir); err != nil || l.Counts[lostPolicyTimeout] != maxHeld+2 {
+		t.Fatalf("losses = %+v, %v; want the part dropped at exit counted", l, err)
+	}
+}
+
+// A part whose team's policy is read only after the last sweep, so that it is placeable but
+// dropped as the relay stops, is still counted as lost.
+func TestAPolicyReadTooLateAtExitIsCounted(t *testing.T) {
+	t.Parallel()
+	f := newFixture()
+	dir := t.TempDir()
+	var readable atomic.Bool
+	r := newRelay(Options{Dir: dir, Token: token, Hold: time.Minute, Lookup: f.lookup, Now: f.clock,
+		Resolve: func(claim.Claim) (Policy, error) {
+			if !readable.Load() {
+				return Policy{}, ErrNoKey
+			}
+			return Policy{Endpoint: "http://127.0.0.1:1", Key: "key-p3"}, nil
+		}})
+	srv := httptest.NewServer(r.Handler())
+	t.Cleanup(srv.Close)
+	postProto(t, srv, "/v1/logs", logsOf("D", 1))
+	readable.Store(true)
+	r.dropHeldAtExit()
+	if l, err := ReadOutboxLosses(dir); err != nil || l.Counts[lostPolicyTimeout] != 1 {
+		t.Fatalf("losses = %+v, %v; want the claimed part dropped at exit counted", l, err)
+	}
+}
+
+// Past its pause wait an update stops waiting for parts waiting for their team's policy or
+// key, never for one waiting for anything else, here its session's claim.
+func TestQuiesceDroppingPolicyWaitsWaitsForEveryOtherPart(t *testing.T) {
+	t.Parallel()
+	f := newFixture()
+	r := newRelay(Options{Dir: t.TempDir(), Token: token, Hold: time.Minute, Lookup: f.lookup, Now: f.clock,
+		Resolve: func(claim.Claim) (Policy, error) { return Policy{}, ErrNoKey }})
+	srv := httptest.NewServer(r.Handler())
+	t.Cleanup(srv.Close)
+	postProto(t, srv, "/v1/logs", logsOf("unclaimed", 1))
+	postProto(t, srv, "/v1/logs", logsOf("D", 1))
+	if r.Quiesce(0) || r.QuiesceDroppingPolicyWaits(0) {
+		t.Fatal("an update dropped a part that waits for its session's claim")
+	}
+	f.mu.Lock()
+	f.now = f.now.Add(2 * time.Minute)
+	f.mu.Unlock()
+	r.sweep() // the unclaimed part goes; D still waits for its policy
+	if r.Quiesce(0) || !r.QuiesceDroppingPolicyWaits(0) {
+		t.Fatal("an update past its pause wait still waits for a part waiting for its policy")
 	}
 }

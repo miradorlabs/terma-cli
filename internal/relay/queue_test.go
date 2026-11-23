@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
+	"github.com/miradorlabs/terma-cli/internal/sendas"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -79,7 +80,7 @@ func TestRecoverOutboxWaitsForAnEnqueueInProgress(t *testing.T) {
 	t.Parallel()
 	r := newRelay(Options{Dir: t.TempDir(), Token: token})
 	c := claim.Claim{ProjectID: "p1"}
-	rt := routeOf(c)
+	rt := routeOf(sendas.NoPersonLane, c)
 	body, _ := proto.Marshal(logsOf("S", 1))
 	left := newEntry(time.Unix(1_800_000_000, 0), Logs, 1)
 	if err := r.outbox.put(rt, c.Repository, left, body); err != nil {
@@ -107,5 +108,19 @@ func TestRecoverOutboxWaitsForAnEnqueueInProgress(t *testing.T) {
 	}
 	if n := r.Stats().Snapshot().Counters["recovered_from_outbox"]; n != 1 {
 		t.Fatalf("recovered_from_outbox = %d, want only the part left behind", n)
+	}
+}
+
+// A part released from the hold is queued by when it arrived, ahead of the parts that
+// arrived while it waited.
+func TestAReleasedPartIsQueuedInArrivalOrder(t *testing.T) {
+	s := &sender{queue: map[Signal][]entry{}}
+	at := time.Unix(1_800_000_000, 0)
+	later, earlier, latest := newEntry(at.Add(time.Second), Logs, 1), newEntry(at, Logs, 1), newEntry(at.Add(2*time.Second), Logs, 1)
+	s.push(later)
+	s.push(latest)
+	s.push(earlier)
+	if got, want := names(s.next(3)), names([]entry{earlier, later, latest}); !slices.Equal(got, want) {
+		t.Fatalf("queued %v, want %v", got, want)
 	}
 }

@@ -87,7 +87,11 @@ func PrepareCommitMsg(ctx context.Context, env Env) error {
 		attrs[semconv.TermaCommitMessageSourceKey] = source
 	}
 	vcsAttrs(attrs, r)
-	env.EmitFor(r, spool.Event{Name: semconv.TermaCommitStampedEvent, SessionID: ids[0], Attrs: attrs})
+	accounts := make([]string, 0, len(attributions))
+	for _, a := range attributions {
+		accounts = append(accounts, a.Account)
+	}
+	env.emitRecord(r, spool.Event{Name: semconv.TermaCommitStampedEvent, SessionID: ids[0], Attrs: attrs}, accounts)
 	return nil
 }
 
@@ -119,19 +123,15 @@ func PostCommit(ctx context.Context, env Env) error {
 			files = append(files, f.OldPath)
 		}
 	}
-	keys := make([]session.Key, 0, len(stamped))
-	for _, t := range stamped {
-		agent, _ := t.Agent()
-		if agent == "" {
-			// Not terma's stamp, which always names the agent: no manifest of it to retire.
-			env.Logf("session %s stamped with no %s", t.SessionID, trailer.KeyTool)
-			continue
-		}
-		keys = append(keys, session.Key{Tool: agent, ID: t.SessionID})
+	keys := sessionKeys(stamped)
+	if len(keys) < len(stamped) {
+		// Not terma's stamp, which always names the agent: no manifest of it to retire.
+		env.Logf("a session stamped with no %s", trailer.KeyTool)
 	}
 	// Read before Consume empties the manifests. A single stamped session still names its
 	// files, since its commit can carry a hand edit too.
 	owners := fileOwners(env, r.Store, keys)
+	accounts := accountsOf(r.Store, stamped)
 	for _, k := range keys {
 		if err := r.Store.Consume(k, files); err != nil {
 			env.Logf("consume manifest: %v", err)
@@ -145,8 +145,32 @@ func PostCommit(ctx context.Context, env Env) error {
 		attrs[semconv.GenAIMainAgentNameKey] = agent
 	}
 	addFileStats(attrs, head.Files, owners)
-	env.EmitFor(r, spool.Event{Name: semconv.TermaCommitEvent, SessionID: stamped[0].SessionID, Attrs: attrs})
+	env.emitRecord(r, spool.Event{Name: semconv.TermaCommitEvent, SessionID: stamped[0].SessionID, Attrs: attrs}, accounts)
 	return nil
+}
+
+// accountsOf are the accounts the manifests of the stamped sessions name, one per session:
+// "" for one stamped with no agent, which has no manifest, so a sandboxed record of it names
+// no one's; sendas.AccountUnreadable for one whose manifest can't be read, so a record of it
+// is no one's (recordLane).
+func accountsOf(store *session.Store, stamped []trailer.Trailer) []string {
+	keys := make([]session.Key, 0, len(stamped))
+	for _, t := range stamped {
+		agent, _ := t.Agent()
+		keys = append(keys, session.Key{Tool: agent, ID: t.SessionID})
+	}
+	return store.Accounts(keys)
+}
+
+// sessionKeys are the stamped sessions' manifests' keys; a session stamped with no agent has none.
+func sessionKeys(stamped []trailer.Trailer) []session.Key {
+	keys := make([]session.Key, 0, len(stamped))
+	for _, t := range stamped {
+		if agent, _ := t.Agent(); agent != "" {
+			keys = append(keys, session.Key{Tool: agent, ID: t.SessionID})
+		}
+	}
+	return keys
 }
 
 // uniqueSessions is each agent's session once, in stamping order: an id names a session
@@ -211,7 +235,7 @@ func emitUnattributedCommit(env Env, r *Repo, head gitx.Commit) {
 	if head.IsMerge() || head.IsSquash() {
 		return
 	}
-	env.EmitFor(r, spool.Event{Name: semconv.TermaCommitUnattributedEvent, Attrs: commitAttrs(r, head)})
+	env.emitRecord(r, spool.Event{Name: semconv.TermaCommitUnattributedEvent, Attrs: commitAttrs(r, head)}, nil)
 }
 
 // commitAttrs is a commit's identity and size, with no second git subprocess and no file names.

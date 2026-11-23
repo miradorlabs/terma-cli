@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
@@ -25,7 +26,7 @@ func TestOTLPSenderEncodesTheRecord(t *testing.T) {
 		body, _ = io.ReadAll(r.Body)
 	}))
 	defer srv.Close()
-	s, err := spool.Open(t.TempDir())
+	s, err := hookruntest.OpenSpool(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -108,7 +109,7 @@ func TestOTLPSenderEncodesTheRecord(t *testing.T) {
 
 func TestFlushStalledHTTPAllowsAppendAndRetainsQueue(t *testing.T) {
 	// Serial: the 500 ms delivery deadline must outlast the server being scheduled.
-	s, _ := spool.Open(t.TempDir())
+	s, _ := hookruntest.OpenSpool(t.TempDir())
 	if err := s.Append(spool.Event{Name: "first"}); err != nil {
 		t.Fatal(err)
 	}

@@ -47,7 +47,13 @@ type Probes struct {
 	Credential func() (Credential, error)
 	// Keys are the delivery keys stored on this machine.
 	Keys Keys
+	// SignInFix is what makes this machine's sign-in send, where nothing may: "" is
+	// `terma setup`; a retired sign-in's is RetiredFix.
+	SignInFix string
 }
+
+// signInFix is p.SignInFix, `terma setup` by default.
+func (p Probes) signInFix() string { return cmp.Or(p.SignInFix, "terma setup") }
 
 // Credential is the signed-in developer as doctor needs them.
 type Credential struct {
@@ -67,7 +73,13 @@ type Credential struct {
 	// ViaDesktop is a login Terma Desktop delegated to this CLI (its label ends
 	// auth.Credential.ViaDesktop), not one approved in the browser.
 	ViaDesktop bool
+	// Retired is a login a server refused as retired (SIGN_IN_RETIRED): only a newer terma,
+	// signed in again, sends again.
+	Retired bool
 }
+
+// RetiredFix is what makes a retired sign-in send again.
+const RetiredFix = "terma update && terma login"
 
 // Origin says how a developer's login was made: ", signed in through Terma Desktop" for
 // one the desktop delegated, "" for a browser sign-in or a server key.
@@ -115,6 +127,10 @@ type Relay struct {
 	// ServiceInstalled says a relay service is installed; ServiceCurrent that it is the one
 	// this terma would install, in the environment install recorded.
 	ServiceInstalled, ServiceCurrent bool
+	// OutboxLosses count the records the relay and hooks lost lately, by reason
+	// (relay.OutboxLosses, spool.ReadLosses), one count for both; OutboxLossAt is the last.
+	OutboxLosses map[string]int
+	OutboxLossAt time.Time
 	// Token is the relay's token, "" before setup made one; never shown.
 	Token string
 }
@@ -144,8 +160,11 @@ type Delivery struct {
 type Failure struct {
 	ProjectID, Endpoint string
 	Err                 error
-	// Refused says the host answered and refused; KeyRefused that it refused the key.
-	Refused, KeyRefused bool
+	// Refused says the host answered and refused; KeyRefused that it refused the server
+	// key; SignInRefused that it refused a person's sign-in for the team (403: no longer in
+	// its organization, say); TokenRefused that it refused the sign-in's token (401: rotated
+	// or revoked since); Retired that it refused the sign-in as retired (SIGN_IN_RETIRED).
+	Refused, KeyRefused, SignInRefused, TokenRefused, Retired bool
 }
 
 // Progress is how a run reports as it goes; every field is optional.
@@ -213,6 +232,9 @@ func Run(ctx context.Context, env Env, progress Progress) Report {
 	}
 
 	timed(KeyHarness, "agent exporting to Terma", func() Check { return unlessCaptureOff(d.pol, d.agentsExporting()) })
+	if r := relayFacts(env.Probes); r.lostRecently() {
+		timed(KeyOutbox, "records lost", func() Check { return OutboxCheck(r) })
+	}
 
 	if a, ok := StatusLineAgent(env.Agents); ok && a.Installed(ctx) {
 		timed(KeyStatusLine, a.DisplayName()+" status line", d.statusLine)
@@ -281,6 +303,10 @@ func (d *run) signedIn() Check {
 	if cred.OtherEnvironment {
 		return Check{Status: Fail, Detail: "signed in against a different environment", Fix: "terma setup"}
 	}
+	if cred.Retired {
+		return Check{Status: Fail, Detail: "Terma no longer accepts this sign-in: update terma and run `terma login`; until then nothing is sent, and what is queued waits",
+			Fix: RetiredFix}
+	}
 	who, storage := cmp.Or(cred.Email, "your account"), cred.Origin()+", credentials "+cred.Storage()
 	if cred.ServerKey != "" {
 		who, storage = "server key "+cred.ServerKey, ""
@@ -320,7 +346,7 @@ func (d *run) commitHooks() Check {
 
 func (d *run) agentsExporting() Check {
 	if claim.Enabled(d.env.StateDir) {
-		return RelayCheck(d.env.Agents, d.env.Probes.Relay(), d.env.Probes.Keys, d.projectID, d.cfg.Environment, d.cfg.Harnesses)
+		return RelayCheck(d.env.Agents, d.env.Probes.Relay(), d.env.Probes.Keys, d.projectID, d.cfg.Environment, d.cfg.Harnesses, d.env.Probes.signInFix())
 	}
 	verdicts := JudgeHarnesses(d.ctx, d.env.Agents, d.cfg.OTLPURL, d.projectID, d.env.Root)
 	return HarnessCheck(d.env.Agents, verdicts, d.cfg.OTLPURL, d.projectID, d.admitted)
@@ -345,7 +371,7 @@ func (d *run) eventSpool() Check {
 		return Check{Status: Fail, Detail: "events cannot be written to the spool: " + s.WriteErr.Error(), Fix: "check permissions and free space on " + output.TildePath(d.env.StateDir)}
 	}
 	if d.projectID != "" && !d.env.Probes.Keys.has("", d.projectID) {
-		return Check{Status: Fail, Detail: fmt.Sprintf("%d queued; no team key stored for %s", n, cmp.Or(d.cfg.ProjectName, d.projectID)), Fix: "terma setup"}
+		return Check{Status: Fail, Detail: fmt.Sprintf("%d queued; nothing on this machine may send them to %s: no sign-in, nor a team key", n, cmp.Or(d.cfg.ProjectName, d.projectID)), Fix: d.env.Probes.signInFix()}
 	}
 	return Check{Status: Pass, Detail: fmt.Sprintf("%d queued, spool writable", n)}
 }
@@ -353,7 +379,7 @@ func (d *run) eventSpool() Check {
 // BackendCheck flushes every project's queued events; a flush the backend accepts is the proof.
 func BackendCheck(ctx context.Context, p Probes, projectID string) Check {
 	if projectID != "" && !p.Keys.has("", projectID) {
-		return Check{Status: Skip, Detail: "no team key on this machine; nothing can be delivered", Fix: "terma setup"}
+		return Check{Status: Skip, Detail: "no sign-in or team key on this machine; nothing can be delivered", Fix: p.signInFix()}
 	}
 	res, err := p.Deliver(ctx)
 	if err != nil {
@@ -405,8 +431,17 @@ func describeFailure(f Failure) string {
 
 // failureFix is the next step for a failed delivery; a refused key is not a network problem.
 func failureFix(f Failure) string {
+	if f.Retired {
+		return RetiredFix
+	}
 	if f.KeyRefused {
 		return "the key this machine holds for team " + f.ProjectID + " was refused by " + f.Endpoint + " — it may have been revoked, or belong to another environment"
+	}
+	if f.SignInRefused {
+		return "your sign-in was refused for team " + f.ProjectID + " by " + f.Endpoint + " — check you still belong to its organization, or run `terma switch` to choose another"
+	}
+	if f.TokenRefused {
+		return "your sign-in's token was refused by " + f.Endpoint + " — run `terma doctor` again, or `terma login` to sign in again"
 	}
 	return "check the network and " + f.Endpoint + ", then run `terma doctor` again (it retries delivery)"
 }
