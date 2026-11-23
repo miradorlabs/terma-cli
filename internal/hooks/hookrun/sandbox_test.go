@@ -469,6 +469,29 @@ func TestAnUnreadableManifestIsNoOnesToReport(t *testing.T) {
 	}
 }
 
+// A hook outside any sandbox whose sign-in can't be read loses its records even when their
+// loss can't be counted: its spool takes a write, so it is no sandbox's, and its records
+// never take their sessions' lane.
+func TestAnUncountedLossIsNoSandbox(t *testing.T) {
+	defer func(f func() int) { gitPushPID = f }(gitPushPID)
+	gitPushPID = func() int { return 0 }
+	p := newPushRepo(t)
+	if err := gitStore(p, personA).Touch(session.Session{ID: "sess-a", Tool: "claude-code"}, []string{"a.go"}, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	unreadable, dir := signedIn(t, p, sendas.AccountUnreadable)
+	// The spool's losses can't be written, though its queue can ("losses" is spool's lossesDir).
+	losses := filepath.Join(dir, "losses")
+	if err := os.Mkdir(losses, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	readOnly(t, losses)
+	prePush(t, p, unreadable, commit(t, p, unreadable, []string{"a.go"}, "sess-a"))
+	if got := lanes(t, unreadable.Spool); len(got) != 0 {
+		t.Errorf("queued %v; want nothing collected while the sign-in couldn't be read", got)
+	}
+}
+
 // tearManifest overwrites the manifest of session id in p's session store with a torn write.
 func tearManifest(t *testing.T, p *pushRepo, id string) {
 	t.Helper()

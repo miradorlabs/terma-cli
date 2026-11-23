@@ -150,6 +150,18 @@ func Open(dir string) (*Spool, error) {
 
 func (s *Spool) path() string { return filepath.Join(s.dir, EventsFile) }
 
+// Appendable reports whether the spool's queue can be opened to append to, which an agent's
+// sandbox refuses. Unlike Writable it takes no lock and writes nothing, so a hook can ask
+// at no cost while a flush holds the spool.
+func (s *Spool) Appendable() bool {
+	f, err := os.OpenFile(s.path(), os.O_CREATE|os.O_WRONLY|os.O_APPEND, fileMode)
+	if err != nil {
+		return false
+	}
+	_ = f.Close()
+	return true
+}
+
 // Append records events in one write under the lock Flush holds while rewriting the file,
 // so they never land on a file about to be replaced.
 func (s *Spool) Append(events ...Event) error {

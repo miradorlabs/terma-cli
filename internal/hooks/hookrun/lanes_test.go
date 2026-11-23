@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -91,9 +92,31 @@ func written(t *testing.T, p *pushRepo, env Env, dir string) []string {
 	return out
 }
 
+// parkedOnly reports whether store holds what was parked under name and nothing else but
+// its lock.
+func parkedOnly(t *testing.T, store, name string) bool {
+	t.Helper()
+	entries, err := os.ReadDir(store)
+	if err != nil {
+		t.Fatal(err)
+	}
+	parked := false
+	for _, e := range entries {
+		switch {
+		case strings.HasPrefix(e.Name(), name):
+			parked = true
+		case e.Name() != "store.lock":
+			t.Logf("also in the store: %s", e.Name())
+			return false
+		}
+	}
+	return parked
+}
+
 // Signed out, or with a sign-in that can't be read, a hook collects for no lane: it writes
-// nothing at all, no queued event, no checkpoint to replay, no push record and nothing
-// parked, sandboxed or not, and counts each event lost by why.
+// no queued event, no checkpoint to replay and no push record, and counts each event lost
+// by why. The one exception: in a sandbox whose sign-in can't be read, a push is parked,
+// for the next hook outside to place by its sessions' lane.
 func TestAHookWithNoLaneWritesNothing(t *testing.T) {
 	for _, tc := range []struct {
 		name, signIn, why string
@@ -110,13 +133,24 @@ func TestAHookWithNoLaneWritesNothing(t *testing.T) {
 				p := newPushRepo(t)
 				env, dir := lanedHook(t, p, tc.signIn, false, sandboxed)
 				collect(t, p, env)
-				if w := written(t, p, env, dir); len(w) > 0 {
-					t.Fatalf("a hook with no lane %v", w)
-				}
+				w := written(t, p, env, dir)
 				// A sandboxed hook has no state directory to keep an observation's sequence in.
 				want := 3
 				if sandboxed {
 					want = 2
+				}
+				// In an agent's sandbox a sign-in can't be read at all: the push, a record of
+				// sessions, is parked for the next hook to place by its sessions' lane
+				// (lostOutside), so it is not lost here.
+				if sandboxed && tc.why == sendas.LostUnreadable {
+					store := filepath.Join(p.root, ".git", project.GitStoreDir)
+					if !slices.Equal(w, []string{"wrote in " + store}) || !parkedOnly(t, store, parkedPushes) {
+						t.Fatalf("a sandboxed hook that can't read its sign-in %v; want the push parked alone", w)
+					}
+					w, want = nil, 1
+				}
+				if len(w) > 0 {
+					t.Fatalf("a hook with no lane %v", w)
 				}
 				l, err := spool.ReadLosses(dir, time.Now())
 				if err != nil || l.Counts[tc.why] != want || len(l.Counts) != 1 {

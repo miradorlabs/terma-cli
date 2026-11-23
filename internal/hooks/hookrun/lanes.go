@@ -199,11 +199,13 @@ func (e Env) lost(r *Repo, n int) bool {
 // lostOutside is lost for a git hook's record of sessions, except in an agent's sandbox, where
 // a hook can't write the state directory and so can't read the sign-in either: there a
 // sign-in it can't read is no reason to lose the record, which takes its sessions' lane
-// instead (recordLane). Counting is how it finds out. Signed out is signed out anywhere.
+// instead (recordLane). The sandbox is told by what it refuses, a write to the spool
+// (spool.Spool.Appendable), never by whether the count went through: a hook whose spool takes
+// a write read its sign-in where it could, so the record is lost, however its count fares.
+// Signed out is signed out anywhere.
 func (e Env) lostOutside(r *Repo, n int) bool {
-	why := e.lane().Lost
-	if why == sendas.LostUnreadable {
-		return e.Spool != nil && e.Spool.CountLost(why, n) == nil
+	if e.lane().Lost == sendas.LostUnreadable && (e.Spool == nil || !e.Spool.Appendable()) {
+		return false
 	}
 	return e.lost(r, n)
 }
