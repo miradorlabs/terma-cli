@@ -983,4 +983,255 @@ func TestMixedAsideEdgeCasesAndConcurrentRead(t *testing.T) {
 			t.Fatalf("r2 = %+v, %v; want KindRepository r2", got, ok)
 		}
 	})
+
+	t.Run("nil_pids_widens_finite_mixed", func(t *testing.T) {
+		// Locked path: finite-PID Mixed claim must widen to nil (all processes) within Refresh.
+		if !Write(dir, "widen-lock", placed(KindMixed, "", "", "r1", 10), now) {
+			t.Fatal("initial finite Mixed write failed")
+		}
+		if !Write(dir, "widen-lock", placed(KindMixed, "", "", "r1"), now.Add(time.Second)) {
+			t.Fatal("nil-PID Mixed write was skipped instead of widening finite Mixed claim")
+		}
+		if got := mustRead(t, dir, "widen-lock", now.Add(time.Second)); len(got.PIDs) != 0 || !got.Covers(999) {
+			t.Fatalf("widened locked Mixed = %+v, want nil PIDs covering all processes", got)
+		}
+
+		// Sidecar path: nil-PID sidecar mark must not dedupe against an existing finite-PID sidecar mark.
+		pW, _ := path(dir, "widen-aside")
+		if !writeMixedAside(pW, placed(KindMixed, "", "", "r1", 10), now) {
+			t.Fatal("initial finite aside failed")
+		}
+		if !writeMixedAside(pW, placed(KindMixed, "", "", "r1"), now.Add(time.Second)) {
+			t.Fatal("nil-PID aside failed")
+		}
+		if got := mustRead(t, dir, "widen-aside", now.Add(time.Second)); len(got.PIDs) != 0 || !got.Covers(999) {
+			t.Fatalf("widened aside Mixed = %+v, want nil PIDs covering all processes", got)
+		}
+	})
+
+	t.Run("evicted_mixed_tombstone_blocks_old_run", func(t *testing.T) {
+		t0 := now.Add(-time.Hour)
+		if !Write(dir, "evict-mix", placed(KindMixed, "", "", "r0", 10), t0) {
+			t.Fatal("initial Mixed write failed")
+		}
+		for i := 1; i <= maxPlacements; i++ {
+			run := fmt.Sprintf("r%d", i)
+			repo := fmt.Sprintf("github.com/acme/repo-%d", i)
+			if !Write(dir, "evict-mix", placed(KindRepository, repo, "/src/"+run, run, 10+i), t0.Add(time.Duration(i)*time.Minute)) {
+				t.Fatalf("write for %s failed", run)
+			}
+		}
+		c := mustRead(t, dir, "evict-mix", now)
+		if !c.Evicted || !slices.Contains(c.MixedRuns, "r0") {
+			t.Fatalf("expected evicted tombstone for r0, got evicted=%v mixed_runs=%v", c.Evicted, c.MixedRuns)
+		}
+		// Delayed non-Mixed write for evicted Mixed run r0 is refused.
+		if Write(dir, "evict-mix", placed(KindRepository, "github.com/acme/api", "/src/api", "r0", 10), now) {
+			t.Fatal("delayed non-Mixed write resurrected evicted Mixed run r0")
+		}
+		// Delayed KindMixed write for evicted r0 is a no-op and does not poison the active tail run.
+		if Write(dir, "evict-mix", placed(KindMixed, "", "", "r0", 10), now) {
+			t.Fatal("delayed Mixed write for evicted r0 unexpectedly rewrote active tail")
+		}
+		// A brand-new clean run still succeeds.
+		if !Write(dir, "evict-mix", placed(KindRepository, "github.com/acme/fresh", "/src/fresh", "r-new", 99), now.Add(time.Second)) {
+			t.Fatal("new clean run after Mixed eviction was blocked")
+		}
+		if got := mustRead(t, dir, "evict-mix", now.Add(time.Second)); got.Kind != KindRepository || got.Run != "r-new" {
+			t.Fatalf("after new clean run = %+v, want KindRepository r-new", got)
+		}
+	})
+
+	t.Run("tombstone_overflow_applies_new_mixed_marks", func(t *testing.T) {
+		t0 := now.Add(-2 * time.Hour)
+		// Evict maxPIDs+1 distinct Mixed runs so MixedRuns overflows to ["*"].
+		for i := range maxPlacements + maxPIDs + 1 {
+			run := fmt.Sprintf("m%d", i)
+			if !Write(dir, "evict-over", placed(KindMixed, "", "", run, 10), t0.Add(time.Duration(i)*time.Second)) {
+				t.Fatalf("mixed write %s failed", run)
+			}
+		}
+		if got := mustRead(t, dir, "evict-over", now); !slices.Equal(got.MixedRuns, []string{"*"}) {
+			t.Fatalf("evict-over MixedRuns = %v, want [*]", got.MixedRuns)
+		}
+		// Seed a collected clean tail with MixedRuns == ["*"] and verify a new Mixed run is still applied.
+		for _, tc := range []struct {
+			name  string
+			aside bool
+		}{
+			{name: "locked", aside: false},
+			{name: "aside", aside: true},
+		} {
+			sid := "over-" + tc.name
+			if !Write(dir, sid, placed(KindRepository, "github.com/acme/api", "/src/api", "r-clean", 10), t0) {
+				t.Fatalf("%s initial clean write failed", tc.name)
+			}
+			p, _ := path(dir, sid)
+			prev, ok := read(p)
+			if !ok {
+				t.Fatalf("%s read failed", tc.name)
+			}
+			prev.Evicted, prev.MixedRuns = true, []string{"*"}
+			if !persist(p, prev, nil) {
+				t.Fatalf("%s persist wildcard tombstone failed", tc.name)
+			}
+			// A new Mixed run sharing PID 10 must NOT be discarded by MixedRuns == ["*"].
+			newMix := placed(KindMixed, "", "", "r-new-mix", 10)
+			if tc.aside {
+				if !writeMixedAside(p, newMix, now) {
+					t.Fatalf("%s sidecar write failed", tc.name)
+				}
+			} else if !Write(dir, sid, newMix, now) {
+				t.Fatalf("%s locked new Mixed write was discarded under wildcard tombstone", tc.name)
+			}
+			c := mustRead(t, dir, sid, now)
+			if got, ok := c.At(10, now); !ok || got.Kind != KindMixed || got.Run != "r-new-mix" {
+				t.Fatalf("%s At(10, now) = %+v, %v; want KindMixed r-new-mix", tc.name, got, ok)
+			}
+		}
+	})
+
+	t.Run("mark_lands_after_runless_and_wildcard_eviction", func(t *testing.T) {
+		t0 := now.Add(-2 * time.Hour)
+		// Runless Mixed placement evicted by maxPlacements named collected runs leaves "" in MixedRuns.
+		if !Write(dir, "mark-runless", placed(KindMixed, "", "", "", 10), t0) {
+			t.Fatal("initial runless Mixed write failed")
+		}
+		for i := 1; i <= maxPlacements; i++ {
+			run := fmt.Sprintf("c%d", i)
+			c := Claim{ProjectID: "p1", Account: testAccount, Kind: KindRepository, Run: run, Repository: repoAt(fmt.Sprintf("github.com/acme/r%d", i)), PIDs: []int{10}}
+			if !Write(dir, "mark-runless", c, t0.Add(time.Duration(i)*time.Minute)) {
+				t.Fatalf("collected write %s failed", run)
+			}
+		}
+		if !Mark(dir, "mark-runless", "codex", []int{10}, now) {
+			t.Fatal("Mark was rejected after runless Mixed eviction")
+		}
+		if got, ok := mustRead(t, dir, "mark-runless", now).At(10, now); !ok || got.ProjectID != "" {
+			t.Fatalf("after Mark on runless-evicted tail = %+v, %v; want no project", got, ok)
+		}
+
+		// Wildcard overflow ("*") on a collected tail must also allow exclusion Mark.
+		if !Write(dir, "mark-wild", Claim{ProjectID: "p1", Account: testAccount, Kind: KindRepository, Run: "r1", Repository: repoAt("github.com/acme/api"), PIDs: []int{10}}, t0) {
+			t.Fatal("mark-wild initial write failed")
+		}
+		pW, _ := path(dir, "mark-wild")
+		prev, _ := read(pW)
+		prev.Evicted, prev.MixedRuns = true, []string{"*"}
+		if !persist(pW, prev, nil) {
+			t.Fatal("mark-wild persist failed")
+		}
+		if !Mark(dir, "mark-wild", "codex", []int{10}, now) {
+			t.Fatal("Mark was rejected under wildcard MixedRuns overflow")
+		}
+		if got, ok := mustRead(t, dir, "mark-wild", now).At(10, now); !ok || got.ProjectID != "" {
+			t.Fatalf("after Mark on wildcard-evicted tail = %+v, %v; want no project", got, ok)
+		}
+	})
+
+	t.Run("wildcard_overflow_does_not_leave_stale_collected_tail", func(t *testing.T) {
+		t0 := now.Add(-2 * time.Hour)
+		// Fill maxPlacements + maxPIDs distinct Mixed runs, then one collected placement on PID 10
+		// so MixedRuns has maxPIDs entries (one shy of overflow) while PID 10 is collected.
+		for i := range maxPlacements + maxPIDs - 1 {
+			run := fmt.Sprintf("w%d", i)
+			if !Write(dir, "wild-tail", placed(KindMixed, "", "", run, 10), t0.Add(time.Duration(i)*time.Second)) {
+				t.Fatalf("mixed write %s failed", run)
+			}
+		}
+		if !Write(dir, "wild-tail", Claim{ProjectID: "p1", Account: testAccount, Kind: KindRepository, Run: "r-over", Repository: repoAt("github.com/acme/api"), PIDs: []int{10}}, t0.Add(30*time.Minute)) {
+			t.Fatal("pre-overflow collected write failed")
+		}
+		// Another process (PID 11) in the same run switches repos, triggering the final Mixed eviction -> ["*"].
+		overflowAt := t0.Add(time.Hour)
+		if !Write(dir, "wild-tail", Claim{ProjectID: "p2", Account: testAccount, Kind: KindRepository, Run: "r-over", Repository: repoAt("github.com/acme/web"), PIDs: []int{11}}, overflowAt) {
+			t.Fatal("overflow write failed")
+		}
+		cOver := mustRead(t, dir, "wild-tail", now)
+		for _, pid := range []int{10, 11} {
+			if got, ok := cOver.At(pid, overflowAt); !ok || got.Kind != KindMixed || got.ProjectID != "" {
+				t.Fatalf("overflowing write At(pid=%d) = %+v, %v; want KindMixed with empty ProjectID", pid, got, ok)
+			}
+		}
+		// Even if a stored claim already has MixedRuns=["*"] beside a collected tail, a new clean run
+		// must fail closed rather than leaving the old collected project active for later records.
+		if !Write(dir, "wild-stale", Claim{ProjectID: "p1", Account: testAccount, Kind: KindRepository, Run: "r1", Repository: repoAt("github.com/acme/api"), PIDs: []int{10}}, t0) {
+			t.Fatal("wild-stale initial write failed")
+		}
+		pS, _ := path(dir, "wild-stale")
+		prev, _ := read(pS)
+		prev.Evicted, prev.MixedRuns = true, []string{"*"}
+		if !persist(pS, prev, nil) {
+			t.Fatal("wild-stale persist failed")
+		}
+		if !Write(dir, "wild-stale", Claim{ProjectID: "p2", Account: testAccount, Kind: KindRepository, Run: "r2", Repository: repoAt("github.com/acme/web"), PIDs: []int{11}}, now) {
+			t.Fatal("clean write after wildcard overflow failed to persist fail-closed boundary")
+		}
+		if got, ok := mustRead(t, dir, "wild-stale", now).At(11, now); !ok || got.Kind != KindMixed || got.ProjectID != "" {
+			t.Fatalf("after clean run on wildcard tail = %+v, %v; want KindMixed with empty ProjectID", got, ok)
+		}
+
+		// Earlier retained run r1 sharing PID 10 with tail r2 under MixedRuns=["*"] must still append a tail Mixed boundary.
+		if !Write(dir, "wild-earlier", Claim{ProjectID: "p1", Account: testAccount, Kind: KindRepository, Run: "r1", Repository: repoAt("github.com/acme/api"), PIDs: []int{10}}, t0) ||
+			!Write(dir, "wild-earlier", Claim{ProjectID: "p2", Account: testAccount, Kind: KindRepository, Run: "r2", Repository: repoAt("github.com/acme/web"), PIDs: []int{10}}, t0.Add(time.Minute)) {
+			t.Fatal("wild-earlier setup failed")
+		}
+		pE, _ := path(dir, "wild-earlier")
+		prevE, _ := read(pE)
+		prevE.Evicted, prevE.MixedRuns = true, []string{"*"}
+		if !persist(pE, prevE, nil) {
+			t.Fatal("wild-earlier persist failed")
+		}
+		if !Write(dir, "wild-earlier", Claim{ProjectID: "p1", Account: testAccount, Kind: KindRepository, Run: "r1", Repository: repoAt("github.com/acme/api"), PIDs: []int{10}}, now) {
+			t.Fatal("earlier retained run write under wildcard overflow did not persist Mixed tail")
+		}
+		if got, ok := mustRead(t, dir, "wild-earlier", now).At(10, now); !ok || got.Kind != KindMixed || got.ProjectID != "" {
+			t.Fatalf("after earlier retained run under wildcard overflow = %+v, %v; want KindMixed", got, ok)
+		}
+	})
+
+	t.Run("runless_eviction_boundary_and_refresh_fast_path", func(t *testing.T) {
+		t0 := now.Add(-2 * time.Hour)
+		// Boundary: runless Mixed + (maxPlacements-1) named placements, then a runless collected write
+		// triggers the first eviction of "" and must fail closed immediately.
+		if !Write(dir, "runless-bound", placed(KindMixed, "", "", "", 10), t0) {
+			t.Fatal("initial runless Mixed write failed")
+		}
+		for i := 1; i < maxPlacements; i++ {
+			run := fmt.Sprintf("b%d", i)
+			if !Write(dir, "runless-bound", Claim{ProjectID: "p1", Account: testAccount, Kind: KindRepository, Run: run, Repository: repoAt(fmt.Sprintf("github.com/acme/b%d", i)), PIDs: []int{10}}, t0.Add(time.Duration(i)*time.Minute)) {
+				t.Fatalf("named write %s failed", run)
+			}
+		}
+		evictAt := t0.Add(time.Hour)
+		if !Write(dir, "runless-bound", Claim{ProjectID: "p2", Account: testAccount, Kind: KindRepository, Repository: repoAt("github.com/acme/evict"), PIDs: []int{11}}, evictAt) {
+			t.Fatal("runless boundary write failed")
+		}
+		cBound := mustRead(t, dir, "runless-bound", now)
+		for _, pid := range []int{10, 11} {
+			if got, ok := cBound.At(pid, evictAt); !ok || got.Kind != KindMixed || got.ProjectID != "" {
+				t.Fatalf("boundary At(pid=%d) = %+v, %v; want KindMixed", pid, got, ok)
+			}
+		}
+
+		// Fast path: after runless Mixed is evicted by maxPlacements named writes, a matching runless
+		// collected write within Refresh must NOT take canSkipRefresh and leave the collected tail active.
+		if !Write(dir, "runless-fast", placed(KindMixed, "", "", "", 10), t0) {
+			t.Fatal("runless-fast initial write failed")
+		}
+		var lastRepo config.Repository
+		for i := 1; i <= maxPlacements; i++ {
+			run := fmt.Sprintf("f%d", i)
+			lastRepo = repoAt(fmt.Sprintf("github.com/acme/f%d", i))
+			if !Write(dir, "runless-fast", Claim{ProjectID: "p1", Account: testAccount, Kind: KindRepository, Run: run, Repository: lastRepo, PIDs: []int{10}}, now.Add(-time.Duration(maxPlacements-i+1)*time.Second)) {
+				t.Fatalf("runless-fast named write %s failed", run)
+			}
+		}
+		if !Write(dir, "runless-fast", Claim{ProjectID: "p1", Account: testAccount, Kind: KindRepository, Repository: lastRepo, PIDs: []int{10}}, now) {
+			t.Fatal("runless write within Refresh was skipped by fast path instead of failing closed")
+		}
+		if got, ok := mustRead(t, dir, "runless-fast", now).At(10, now); !ok || got.Kind != KindMixed || got.ProjectID != "" {
+			t.Fatalf("after runless refresh write = %+v, %v; want KindMixed", got, ok)
+		}
+	})
 }

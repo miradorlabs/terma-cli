@@ -77,12 +77,7 @@ type run struct {
 	Locations []string  `json:"locations,omitempty"`
 }
 
-func (r run) why() Why {
-	if r.MixedWhy.Reason == "" {
-		r.MixedWhy.Reason = Crossed
-	}
-	return r.MixedWhy
-}
+func (r run) why() Why { r.MixedWhy.Reason = cmp.Or(r.MixedWhy.Reason, Crossed); return r.MixedWhy }
 
 func (r *run) mark(at time.Time, why Why) {
 	if at = at.UTC(); r.MixedAt.IsZero() || at.Before(r.MixedAt) {
@@ -93,11 +88,12 @@ func (r *run) mark(at time.Time, why Why) {
 // Start records a new clean run of sessionID beginning at at and returns its ID.
 func Start(stateDir, sessionID string, at time.Time) (string, error) {
 	id := newRunID()
-	if err := update(stateDir, sessionID, func(l *ledger) {
+	err := update(stateDir, sessionID, func(l *ledger) {
 		l.Runs = append(l.Runs, run{ID: id, Started: at.UTC()})
 		slices.SortStableFunc(l.Runs, func(a, b run) int { return a.Started.Compare(b.Started) })
 		l.active(at)
-	}); err != nil {
+	})
+	if err != nil {
 		return "", err
 	}
 	return id, nil
@@ -150,8 +146,7 @@ func TryTouch(stateDir, sessionID, runID string, locations []string) ([]string, 
 	return touchWith(true, stateDir, sessionID, runID, locations)
 }
 
-// MaxLocations bounds the distinct locations stored per run in the ledger. Touching more
-// than MaxLocations distinct locations marks the run Mixed with LocationBound.
+// MaxLocations bounds distinct locations per run; exceeding it marks the run Mixed (LocationBound).
 const MaxLocations = 64
 
 func touchWith(try bool, stateDir, sessionID, runID string, locations []string) ([]string, error) {
@@ -183,14 +178,10 @@ func touchWith(try bool, stateDir, sessionID, runID string, locations []string) 
 		l.active(time.Now())
 		return save(path, l)
 	})
-	if err != nil {
-		return nil, err
-	}
-	return merged, nil
+	return merged, err
 }
 
 // MixedAt reports whether the run of idOrAlias in force at recordTime is Mixed and since when.
-// Unreadable ledgers count as Mixed from the start; missing ledgers never do.
 func MixedAt(stateDir, idOrAlias string, recordTime time.Time) (time.Time, bool) {
 	return Read(stateDir, idOrAlias).MixedAt(recordTime)
 }
@@ -215,10 +206,10 @@ func Read(stateDir, idOrAlias string) Snapshot {
 
 // MixedAt is the package's MixedAt, answered from this read of the ledger.
 func (s Snapshot) MixedAt(recordTime time.Time) (time.Time, bool) {
-	switch {
-	case s.unreadable:
+	if s.unreadable {
 		return time.Time{}, true
-	case len(s.runs) == 0:
+	}
+	if len(s.runs) == 0 {
 		return time.Time{}, false
 	}
 	r := inForce(s.runs, recordTime)
@@ -227,11 +218,10 @@ func (s Snapshot) MixedAt(recordTime time.Time) (time.Time, bool) {
 
 // Why returns why the run in force at recordTime is Mixed (zero if not or unreadable).
 func (s Snapshot) Why(recordTime time.Time) Why {
-	if s.unreadable || len(s.runs) == 0 {
-		return Why{}
-	}
-	if r := inForce(s.runs, recordTime); !r.MixedAt.IsZero() {
-		return r.why()
+	if !s.unreadable && len(s.runs) > 0 {
+		if r := inForce(s.runs, recordTime); !r.MixedAt.IsZero() {
+			return r.why()
+		}
 	}
 	return Why{}
 }
@@ -243,7 +233,7 @@ func Current(stateDir, idOrAlias string) (string, bool) {
 }
 
 // Locations returns Current along with the locations that run has been placed in or touched.
-func Locations(stateDir, idOrAlias string) (run string, locations []string, ok bool) {
+func Locations(stateDir, idOrAlias string) (string, []string, bool) {
 	p, ok := Locate(stateDir, idOrAlias)
 	return p.Run, p.Locations, ok
 }
@@ -289,13 +279,9 @@ func Aliases(stateDir, sessionID string) ([]string, error) {
 		return nil, err
 	}
 	l, _, err := load(path)
-	if err != nil {
-		return nil, err
-	}
-	return slices.Clone(l.Aliases), nil
+	return slices.Clone(l.Aliases), err
 }
 
-// inForce is the run in force at t among runs, in the order they began.
 func inForce(runs []run, t time.Time) run {
 	if t.IsZero() {
 		return runs[len(runs)-1]

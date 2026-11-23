@@ -12,6 +12,7 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/flock"
+	"github.com/miradorlabs/terma-cli/internal/session"
 )
 
 // Prune removes ledgers idle past retention that no queued record names (along with locks
@@ -23,6 +24,20 @@ func Prune(ctx context.Context, stateDir string, now time.Time, queued map[strin
 	if err != nil {
 		return
 	}
+	keep := queued
+	if len(queued) > 0 {
+		keep = make(map[string]bool, len(queued))
+		for id := range queued {
+			keep[id] = true
+			if session.ValidID(id) {
+				if b, err := os.ReadFile(aliasPath(stateDir, id)); err == nil {
+					if canon := strings.TrimSpace(string(b)); session.ValidID(canon) {
+						keep[canon] = true
+					}
+				}
+			}
+		}
+	}
 	for _, e := range entries {
 		if ctx.Err() != nil {
 			return
@@ -32,15 +47,13 @@ func Prune(ctx context.Context, stateDir string, now time.Time, queued map[strin
 			continue
 		}
 		path := filepath.Join(dir, e.Name())
-		if e.IsDir() {
-			if strings.HasSuffix(e.Name(), asideExt) {
-				pruneAside(stateDir, e.Name(), now, queued)
-			}
-			continue
-		}
 		switch name := e.Name(); {
+		case e.IsDir():
+			if strings.HasSuffix(name, asideExt) {
+				pruneAside(stateDir, name, now, keep)
+			}
 		case strings.HasSuffix(name, ".json"):
-			pruneLedger(stateDir, path, now, queued)
+			pruneLedger(stateDir, path, now, keep)
 		case strings.HasSuffix(name, ".lock"):
 			if _, err := os.Lstat(strings.TrimSuffix(path, ".lock")); err != nil {
 				if unlock, err := flock.TryLock(path); err == nil {
@@ -51,7 +64,7 @@ func Prune(ctx context.Context, stateDir string, now time.Time, queued map[strin
 			_ = os.Remove(path)
 		}
 	}
-	pruneAliases(stateDir, now)
+	pruneAliases(stateDir, now, keep)
 }
 
 func pruneLedger(stateDir, path string, now time.Time, queued map[string]bool) {
@@ -68,12 +81,13 @@ func pruneLedger(stateDir, path string, now time.Time, queued map[string]bool) {
 	sessionID := strings.TrimSuffix(filepath.Base(path), ".json")
 	l, _, _, err := resolve(stateDir, sessionID)
 	if err != nil {
-		if queued[sessionID] || now.Sub(info.ModTime()) <= MixedRetention {
-			unlock()
-			return
+		if raw, ok, rerr := load(path); rerr == nil && ok {
+			l = raw
 		}
-	} else if now.Sub(l.lastActive(info.ModTime())) <= l.retention() || queued[sessionID] ||
-		slices.ContainsFunc(l.Aliases, func(a string) bool { return queued[a] }) {
+	}
+	if queued[sessionID] || slices.ContainsFunc(l.Aliases, func(a string) bool { return queued[a] }) ||
+		(err != nil && now.Sub(info.ModTime()) <= MixedRetention) ||
+		(err == nil && now.Sub(l.lastActive(info.ModTime())) <= l.retention()) {
 		unlock()
 		return
 	}
@@ -111,20 +125,16 @@ func pruneAside(stateDir, name string, now time.Time, queued map[string]bool) {
 	} else {
 		cleanAsideEntries(dir, now, MixedRetention, false)
 	}
-	_ = os.Remove(dir) // succeeds only when empty
+	_ = os.Remove(dir)
 }
 
 func cleanAsideEntries(dir string, now time.Time, age time.Duration, tempsOnly bool) {
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return
-	}
+	entries, _ := os.ReadDir(dir)
 	for _, e := range entries {
-		if tempsOnly && !strings.HasPrefix(e.Name(), config.TempPrefix) {
-			continue
-		}
-		if info, err := e.Info(); err == nil && now.Sub(info.ModTime()) > age {
-			_ = os.Remove(filepath.Join(dir, e.Name()))
+		if !tempsOnly || strings.HasPrefix(e.Name(), config.TempPrefix) {
+			if info, err := e.Info(); err == nil && now.Sub(info.ModTime()) > age {
+				_ = os.Remove(filepath.Join(dir, e.Name()))
+			}
 		}
 	}
 }
@@ -136,15 +146,12 @@ func (l ledger) retention() time.Duration {
 	return Retention
 }
 
-func pruneAliases(stateDir string, now time.Time) {
+func pruneAliases(stateDir string, now time.Time, queued map[string]bool) {
 	dir := filepath.Join(stateDir, Dir, aliasesDir)
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return
-	}
+	entries, _ := os.ReadDir(dir)
 	for _, e := range entries {
 		info, err := e.Info()
-		if err != nil || e.IsDir() || now.Sub(info.ModTime()) <= Retention {
+		if err != nil || e.IsDir() || now.Sub(info.ModTime()) <= Retention || queued[e.Name()] {
 			continue
 		}
 		path := filepath.Join(dir, e.Name())

@@ -72,9 +72,10 @@ type Claim struct {
 	Kind    Kind   `json:"kind,omitempty"`
 	Run     string `json:"run,omitempty"`
 	Profile string `json:"profile,omitempty"`
-	// Evicted is set once a placement has been dropped to keep maxPlacements, after which
-	// a record older than every kept placement is no longer known to be theirs (At).
-	Evicted bool `json:"evicted,omitempty"`
+	// Evicted is set once a placement has been dropped to keep maxPlacements; MixedRuns
+	// retains tombstones for any KindMixed runs dropped from Placements ("*" on overflow).
+	Evicted   bool     `json:"evicted,omitempty"`
+	MixedRuns []string `json:"mixed_runs,omitempty"`
 	// Account is the lane of the sign-in the claiming hook ran under: its account key, or
 	// sendas.NoPersonLane under a server key. The team is the one chosen under it, so the
 	// relay resolves the claim only for that sign-in.
@@ -87,35 +88,19 @@ type Claim struct {
 // Kind is what a placement's location is.
 type Kind string
 
-// Placement kinds. A placement with no kind is a legacy one, as written before kinds:
-// with a project it is a run in a repository the team collects, and with none it was
-// written by Mark and means "not collected" everywhere, never "outside git".
+// Placement kinds ("" is legacy: with a project = collected, without = Mark exclusion).
 const (
-	// KindRepository is a run in a git checkout, located by its Repository whether or not
-	// anything collects it.
-	KindRepository Kind = "repository"
-	// KindOutsideGit is a run in a directory outside any checkout, located by its Cwd.
-	KindOutsideGit Kind = "outside_git"
-	// KindMixed is a run that has crossed organizations: it only ever turns on within a
-	// run, and its records are dropped.
-	KindMixed Kind = "mixed"
+	KindRepository Kind = "repository"  // git checkout located by Repository
+	KindOutsideGit Kind = "outside_git" // directory outside git located by Cwd
+	KindMixed      Kind = "mixed"       // crossed organizations; drops records within its run
 )
 
-// Placement is one run of a session in one location: a repository, or a directory
-// outside git.
+// Placement is one run of a session in one location (repository or outside git).
 type Placement struct {
 	ProjectID string `json:"project_id"`
-	// Kind is what the location is; "" for a legacy placement. A placement with a kind
-	// may name no project: a location alone, for routing to decide. Readers that predate
-	// kind-aware routing treat an empty ProjectID as not collected (failing closed), so
-	// hooks only emit location-only placements once the relay routes by Kind.
-	Kind Kind `json:"kind,omitempty"`
-	// Run is the session run the placement belongs to (internal/runs); "" when the hook
-	// named none.
-	Run string `json:"run,omitempty"`
-	// Profile is the profile whose routing state the hook placed it under, on a machine
-	// routing by teams: the relay routes its records by that profile's. "" elsewhere.
-	Profile string `json:"profile,omitempty"`
+	Kind      Kind   `json:"kind,omitempty"`
+	Run       string `json:"run,omitempty"`
+	Profile   string `json:"profile,omitempty"`
 	// Account is Claim.Account for this run.
 	Account  string `json:"account,omitempty"`
 	Tool     string `json:"tool,omitempty"`
@@ -251,9 +236,13 @@ func write(dir, sessionID string, c Claim, now time.Time) bool {
 		}
 		return false
 	}
+	tombForced := havePrev && tombstoneFailClosed(prev.MixedRuns, c)
+	if tombForced {
+		c.Kind, c.ProjectID, c.PIDs = KindMixed, "", nil
+	}
 	// Earlier-run Mixed writes fold into that run's slot; an unseen run may be a new run
 	// starting Mixed, so falling through to append at the tail fails closed intentionally.
-	if havePrev && c.Kind == KindMixed && c.Run != "" && prev.Run != "" && c.Run != prev.Run {
+	if !tombForced && havePrev && c.Kind == KindMixed && c.Run != "" && prev.Run != "" && c.Run != prev.Run {
 		c.ClaimedAt = now
 		if matched, ch := foldEarlierRun(&prev, c); matched {
 			if ch || folded || len(asideMarks) > 0 {
@@ -302,20 +291,27 @@ func write(dir, sessionID string, c Claim, now time.Time) bool {
 	}
 	placements = append(placements, Placement{ProjectID: c.ProjectID, Kind: c.Kind, Run: c.Run, Profile: c.Profile, Account: c.Account, Tool: c.Tool, Repo: c.Repo, Worktree: c.Worktree,
 		Repository: c.Repository, Root: c.Root, Cwd: c.Cwd, Remote: c.Remote, Branch: c.Branch, PIDs: c.PIDs, Since: since})
-	c.Evicted = havePrev && prev.Evicted
-	if len(placements) > maxPlacements {
-		placements, c.Evicted = placements[len(placements)-maxPlacements:], true
+	c.Placements, c.Evicted, c.MixedRuns = trimPlacements(placements, havePrev && prev.Evicted, prev.MixedRuns)
+	if tombstoneFailClosed(c.MixedRuns, c) {
+		c.Kind, c.ProjectID, c.PIDs = KindMixed, "", nil
+		last := &c.Placements[len(c.Placements)-1]
+		last.Kind, last.ProjectID, last.PIDs = KindMixed, "", nil
+		poisonRun(c.Placements, c.Run, last.Since)
 	}
-	c.Placements = placements
 	c.ClaimedAt = now
 	return persist(p, c, asideFiles)
 }
 
+func tombstoneFailClosed(mixed []string, c Claim) bool {
+	return c.Kind != KindMixed && (c.Kind != "" || c.ProjectID != "") &&
+		(slices.Contains(mixed, "*") || c.Run == "" && slices.Contains(mixed, ""))
+}
+
 func canSkipRefresh(p string, prev, c Claim, now time.Time, refresh time.Duration) bool {
-	if !samePlace(prev, c) || !sameDirs(prev, c) || !sameParent(prev, c) || !subset(c.PIDs, prev.PIDs) || !sameRun(prev, c) {
+	if !samePlace(prev, c) || !sameDirs(prev, c) || !sameParent(prev, c) || !subset(c.PIDs, prev.PIDs) || !sameRun(prev, c) || tombstoneFailClosed(prev.MixedRuns, c) {
 		return false
 	}
-	if c.Kind == KindMixed && now.Before(prev.placements()[len(prev.placements())-1].Since) {
+	if c.Kind == KindMixed && (!coveredPIDs(c.PIDs, prev.PIDs) || now.Before(prev.placements()[len(prev.placements())-1].Since)) {
 		return false
 	}
 	info, err := os.Stat(p)
@@ -332,10 +328,7 @@ func persist(p string, c Claim, asideFiles []string) bool {
 	return true
 }
 
-// samePlace reports whether c continues prev's latest run, under the same sign-in. Another working tree of the same
-// repository, or another directory in it, is the same run, whose Root and Cwd are rewritten in
-// place: a placement decides where records go, and a session switching between worktrees must
-// never push an earlier one out.
+// samePlace reports whether c continues prev's latest run under the same sign-in.
 func samePlace(prev, c Claim) bool {
 	if prev.Kind != c.Kind || prev.ProjectID != c.ProjectID || prev.Repository != c.Repository || prev.Profile != c.Profile || prev.Account != c.Account {
 		return false
@@ -348,15 +341,14 @@ func samePlace(prev, c Claim) bool {
 
 func sameRun(prev, c Claim) bool { return c.Run == "" || c.Run == prev.Run }
 
-// staysMixed blocks non-Mixed writes to a Mixed tail (or unmarked write) and any earlier Mixed run.
+// staysMixed blocks non-Mixed writes to a Mixed tail and collected/kinded writes to earlier or evicted named Mixed runs.
 func staysMixed(prev, c Claim) bool {
 	return c.Kind != KindMixed && (prev.Kind == KindMixed && (c.Run == "" || c.Run == prev.Run) ||
-		c.Run != "" && slices.ContainsFunc(prev.placements(), func(p Placement) bool { return p.Kind == KindMixed && p.Run == c.Run }))
+		(c.Kind != "" || c.ProjectID != "") && c.Run != "" && (slices.Contains(prev.MixedRuns, c.Run) ||
+			slices.ContainsFunc(prev.placements(), func(p Placement) bool { return p.Kind == KindMixed && p.Run == c.Run })))
 }
 
-// sameDirs reports whether c names the working tree, directory, worktree, remote and branch
-// prev does, so a fresh claim needs no rewrite: a checkout of another branch in the same tree
-// is told at the next hook. A claim naming no directory (a git hook's) keeps prev's.
+// sameDirs reports whether c names the same working tree, directory, worktree, remote, and branch as prev.
 func sameDirs(prev, c Claim) bool {
 	return prev.Root == c.Root && (c.Cwd == "" || prev.Cwd == c.Cwd) &&
 		prev.Worktree == c.Worktree && prev.Remote == c.Remote && prev.Branch == c.Branch

@@ -219,14 +219,18 @@ func TestPruneFailsClosedOnUnreadableLedgerOrSidecar(t *testing.T) {
 	runsDir := filepath.Join(dir, Dir)
 	must(t, os.MkdirAll(runsDir, 0o700))
 
-	// Corrupt ledger JSON.
+	// Corrupt ledger JSON with a subagent alias pointing at it.
 	corruptLedger := filepath.Join(runsDir, "corrupt.json")
 	must(t, os.WriteFile(corruptLedger, []byte("{not-json"), 0o600))
 	age(t, corruptLedger, Retention+24*time.Hour)
+	must(t, os.MkdirAll(filepath.Dir(aliasPath(dir, "sub-corrupt")), 0o700))
+	must(t, os.WriteFile(aliasPath(dir, "sub-corrupt"), []byte("corrupt"), 0o600))
+	age(t, aliasPath(dir, "sub-corrupt"), Retention+24*time.Hour)
 
-	// Valid ledger with a corrupt mark file in its sidecar.
+	// Valid ledger with a subagent alias and a corrupt mark file in its sidecar.
 	long := time.Now().Add(-Retention - 24*time.Hour)
 	start(t, dir, "badside", long)
+	must(t, Alias(dir, "badside", "sub-badside"))
 	badSideDir := filepath.Join(runsDir, "badside"+asideExt)
 	must(t, os.MkdirAll(badSideDir, 0o700))
 	must(t, os.WriteFile(filepath.Join(badSideDir, "m1"), []byte("{not-json"), 0o600))
@@ -241,22 +245,25 @@ func TestPruneFailsClosedOnUnreadableLedgerOrSidecar(t *testing.T) {
 		t.Fatal("ledger with corrupt sidecar was pruned before MixedRetention")
 	}
 
-	// Past MixedRetention but queued: both stay.
+	// Past MixedRetention but queued via subagent alias: both ledgers and aliases stay.
 	future := time.Now().Add(MixedRetention + 24*time.Hour)
-	Prune(context.Background(), dir, future, map[string]bool{"corrupt": true, "badside": true})
-	if gone(corruptLedger) {
-		t.Fatal("queued corrupt ledger was pruned")
+	Prune(context.Background(), dir, future, map[string]bool{"sub-corrupt": true, "sub-badside": true})
+	if gone(corruptLedger) || gone(aliasPath(dir, "sub-corrupt")) {
+		t.Fatal("alias-queued corrupt ledger or its alias was pruned")
 	}
 	if gone(filepath.Join(runsDir, "badside.json")) {
-		t.Fatal("queued ledger with corrupt sidecar was pruned")
+		t.Fatal("alias-queued ledger with corrupt sidecar was pruned")
 	}
 
-	// Past MixedRetention and no longer queued: both are pruned.
+	// Past MixedRetention and no longer queued: both (and their aliases) are pruned.
 	Prune(context.Background(), dir, future, nil)
-	if !gone(corruptLedger) {
-		t.Fatal("unreferenced corrupt ledger survived MixedRetention")
+	if !gone(corruptLedger) || !gone(aliasPath(dir, "sub-corrupt")) {
+		t.Fatal("unreferenced corrupt ledger or its alias survived MixedRetention")
 	}
 	if !gone(filepath.Join(runsDir, "badside.json")) {
 		t.Fatal("unreferenced ledger with corrupt sidecar survived MixedRetention")
+	}
+	if !gone(aliasPath(dir, "sub-badside")) {
+		t.Fatal("alias of pruned corrupt-sidecar ledger survived")
 	}
 }

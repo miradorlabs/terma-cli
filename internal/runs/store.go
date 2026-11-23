@@ -43,7 +43,7 @@ func resolve(stateDir, idOrAlias string) (l ledger, ok, aside bool, err error) {
 	b, err := os.ReadFile(aliasPath(stateDir, idOrAlias))
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
-			err = nil
+			return ledger{}, false, false, nil
 		}
 		return ledger{}, false, false, err
 	}
@@ -119,8 +119,4 @@ func save(path string, l *ledger) error {
 	return config.WriteFileAtomic(path, b, 0o600)
 }
 
-func newRunID() string {
-	var b [16]byte
-	_, _ = rand.Read(b[:])
-	return hex.EncodeToString(b[:])
-}
+func newRunID() string { var b [16]byte; _, _ = rand.Read(b[:]); return hex.EncodeToString(b[:]) }
