@@ -540,6 +540,10 @@ func TestAliasPrecedenceAndMixedMerge(t *testing.T) {
 	if pos, ok := Locate(dir, "child-a"); !ok || !pos.MixedAt.Equal(cross) {
 		t.Fatalf("Locate(child-a) = %+v, %v; want parent MixedAt %v", pos, ok, cross)
 	}
+	// Mixed must emit only canonical parent-a, not duplicate alias child-a even though child-a.json exists.
+	if got := Mixed(dir, t0.Add(6*time.Minute), time.Hour); len(got) != 1 || got[0].Session != "parent-a" {
+		t.Fatalf("Mixed = %+v, want only [parent-a]", got)
+	}
 
 	// Start(child) -> MarkMixed(child) -> Start(parent) -> Alias(parent, child) still reads Mixed.
 	start(t, dir, "child-b", t0)

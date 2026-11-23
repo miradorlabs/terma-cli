@@ -310,7 +310,7 @@ func write(dir, sessionID string, c Claim, now time.Time) bool {
 
 func tombstoneFailClosed(mixed []string, c Claim) bool {
 	return c.Kind != KindMixed && (c.Kind != "" || c.ProjectID != "") &&
-		(slices.Contains(mixed, "*") || c.Run == "" && slices.Contains(mixed, ""))
+		(slices.Contains(mixed, "*") || c.Run == "" && len(mixed) > 0)
 }
 
 func canSkipRefresh(p string, prev, c Claim, now time.Time, refresh time.Duration) bool {

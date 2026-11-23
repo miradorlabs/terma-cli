@@ -75,10 +75,7 @@ func mergeMixed(dst *ledger, src ledger) {
 }
 
 func update(stateDir, sessionID string, change func(*ledger)) error {
-	return editLedger(stateDir, sessionID, false, func(path string, l *ledger) error {
-		change(l)
-		return save(path, l)
-	})
+	return editLedger(stateDir, sessionID, false, func(path string, l *ledger) error { change(l); return save(path, l) })
 }
 
 func editLedger(stateDir, sessionID string, try bool, edit func(path string, l *ledger) error) error {

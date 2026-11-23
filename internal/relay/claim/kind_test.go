@@ -1233,5 +1233,22 @@ func TestMixedAsideEdgeCasesAndConcurrentRead(t *testing.T) {
 		if got, ok := mustRead(t, dir, "runless-fast", now).At(10, now); !ok || got.Kind != KindMixed || got.ProjectID != "" {
 			t.Fatalf("after runless refresh write = %+v, %v; want KindMixed", got, ok)
 		}
+
+		// After a named Mixed run is evicted, a runless collected write cannot prove it is a new run and must fail closed.
+		if !Write(dir, "named-then-runless", placed(KindMixed, "r0", "", "", 10), t0) {
+			t.Fatal("initial named Mixed write failed")
+		}
+		for i := 1; i <= maxPlacements; i++ {
+			run := fmt.Sprintf("n%d", i)
+			if !Write(dir, "named-then-runless", Claim{ProjectID: "p1", Account: testAccount, Kind: KindRepository, Run: run, Repository: repoAt(fmt.Sprintf("github.com/acme/n%d", i)), PIDs: []int{10}}, t0.Add(time.Duration(i)*time.Minute)) {
+				t.Fatalf("named write %s failed", run)
+			}
+		}
+		if !Write(dir, "named-then-runless", Claim{ProjectID: "p2", Account: testAccount, Kind: KindRepository, Repository: repoAt("github.com/acme/late"), PIDs: []int{10}}, now) {
+			t.Fatal("runless write after named Mixed eviction failed")
+		}
+		if got, ok := mustRead(t, dir, "named-then-runless", now).At(10, now); !ok || got.Kind != KindMixed || got.ProjectID != "" {
+			t.Fatalf("runless write after named Mixed eviction = %+v, %v; want KindMixed", got, ok)
+		}
 	})
 }

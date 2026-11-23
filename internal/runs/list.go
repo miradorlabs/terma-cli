@@ -26,6 +26,11 @@ func Mixed(stateDir string, now time.Time, recent time.Duration) []MixedRun {
 	written := map[string]time.Time{}
 	for _, e := range entries {
 		if id, ok := sessionOf(e.Name()); ok && e.IsDir() == strings.HasSuffix(e.Name(), asideExt) {
+			if b, err := os.ReadFile(aliasPath(stateDir, id)); err == nil {
+				if canon := strings.TrimSpace(string(b)); session.ValidID(canon) {
+					id = canon
+				}
+			}
 			var at time.Time
 			if info, err := e.Info(); err == nil {
 				at = info.ModTime()
