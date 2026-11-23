@@ -29,21 +29,22 @@ type TermaConfig = {
 // termaHook hands an event to `terma hook omp-*`, detached: attribution is best-effort
 // and never delays the agent. It settles once the payload is written, which a handler that
 // runs as the agent exits awaits: the agent's exit would otherwise cut the payload off; with
-// untilExit, once the hook has exited, for a caller that orders its hooks.
-function termaHook(event: string, payload: Record<string, unknown>, untilExit = false): Promise<void> {
-  if (!CONFIG) return Promise.resolve()
+// untilExit, once the hook has exited, for a caller that orders its hooks. It reports whether
+// the hook took the payload: with untilExit, whether it exited cleanly.
+function termaHook(event: string, payload: Record<string, unknown>, untilExit = false): Promise<boolean> {
+  if (!CONFIG) return Promise.resolve(false)
   return new Promise((resolve) => {
     try {
       const [cmd, ...args] = CONFIG!.hookCommand
       const child = spawn(cmd, [...args, event], { stdio: ["pipe", "ignore", "ignore"], detached: false })
-      child.on("error", () => resolve())
-      child.stdin.on("error", () => resolve())
-      if (untilExit) child.on("close", () => resolve())
+      child.on("error", () => resolve(false))
+      child.stdin.on("error", () => resolve(false))
+      if (untilExit) child.on("close", (code: number | null) => resolve(code === 0))
       child.stdin.end(JSON.stringify(payload), () => {
-        if (!untilExit) resolve()
+        if (!untilExit) resolve(true)
       })
     } catch {
-      resolve()
+      resolve(false)
     }
   })
 }
@@ -55,9 +56,10 @@ function sessionOf(ctx: any): string {
   return own ? String(own) : session
 }
 
-// titled is the name last handed over for each session this process ran; titles hands
-// them over one at a time, each hook done before the next starts, so a rename is never
-// overtaken by the name it replaced.
+// titled is the name last handed over, or queued, for each session this process ran; a
+// hook that fails gives it back, so the next look sends it again. titles hands them over one
+// at a time, each hook done before the next starts, so a rename is never overtaken by the
+// name it replaced.
 const titled = new Map<string, string>()
 let titles: Promise<void> = Promise.resolve()
 
@@ -74,7 +76,9 @@ function sendTitle(ctx: any): Promise<void> {
     if (typeof name !== "string" || !name.trim() || !s || titled.get(s) === name) return titles
     titled.set(s, name)
     const payload = { session_id: s, cwd: ctx?.cwd, title: name }
-    titles = titles.then(() => termaHook("omp-title", payload, true))
+    titles = titles.then(async () => {
+      if (!(await termaHook("omp-title", payload, true)) && titled.get(s) === name) titled.delete(s)
+    })
     return titles
   } catch {
     return Promise.resolve()

@@ -27,6 +27,8 @@ type envFile struct {
 	symlinked bool
 	lines     []string
 	existed   bool
+	// mode is the existing file's permission bits.
+	mode fs.FileMode
 }
 
 // envEntry is one KEY=value entry, on lines [start, end).
@@ -50,7 +52,11 @@ func loadEnvFile(path string) (*envFile, error) {
 	if err != nil {
 		return nil, fmt.Errorf("read %s: %w", path, err)
 	}
-	f.existed = true
+	info, err := os.Stat(path)
+	if err != nil {
+		return nil, err
+	}
+	f.existed, f.mode = true, info.Mode().Perm()
 	text := strings.TrimSuffix(string(data), "\n")
 	if text != "" {
 		f.lines = strings.Split(text, "\n")
@@ -134,10 +140,12 @@ func (f *envFile) apply(changes map[string]*string) error {
 	return nil
 }
 
-// save writes the file private to this user, since it holds the relay's token, and removes a
-// file left with nothing in it; a symlinked one is emptied instead, so the link still resolves.
-func (f *envFile) save() error {
-	if strings.TrimSpace(strings.Join(f.lines, "")) == "" && !f.symlinked {
+// save writes the file private to this user, since it holds the relay's token, or at mode,
+// the mode it had before terma, as a teardown puts it back. A file left with nothing in it
+// that terma created (mode nil) is removed; a symlinked one is emptied instead, so the link
+// still resolves.
+func (f *envFile) save(mode *fs.FileMode) error {
+	if strings.TrimSpace(strings.Join(f.lines, "")) == "" && !f.symlinked && mode == nil {
 		if err := os.Remove(f.writePath); err != nil && !errors.Is(err, fs.ErrNotExist) {
 			return err
 		}
@@ -150,7 +158,11 @@ func (f *envFile) save() error {
 	if text != "" {
 		text += "\n"
 	}
-	return config.WriteFileAtomic(f.writePath, []byte(text), harness.SettingsMode)
+	perm := harness.SettingsMode
+	if mode != nil {
+		perm = *mode
+	}
+	return config.WriteFileAtomic(f.writePath, []byte(text), perm)
 }
 
 // envLine renders one entry so the dotenv grammar reads value back unchanged.

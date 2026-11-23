@@ -305,3 +305,33 @@ export function claimOmpOtelEnvFileEntry(name, value) { globalThis.claimed = nam
 		})
 	}
 }
+
+// A title whose hook fails is sent again at the next look, and once it lands, not again.
+func TestExtensionRetriesAFailedTitle(t *testing.T) {
+	node, err := exec.LookPath("node")
+	if err != nil {
+		t.Skip("node is not installed")
+	}
+	if out, err := exec.Command(node, "-p", "process.features.typescript").Output(); err != nil || !slices.Contains([]string{"strip", "transform"}, strings.TrimSpace(string(out))) {
+		t.Skip("node does not run TypeScript")
+	}
+	dir := t.TempDir()
+	calls, failed := filepath.Join(dir, "calls"), filepath.Join(dir, "failed")
+	hook := filepath.Join(dir, "hook.sh")
+	if err := os.WriteFile(hook, []byte("#!/bin/sh\ncat > /dev/null\n[ \"$1\" = omp-title ] || exit 0\necho x >> "+calls+"\n[ -e "+failed+" ] && exit 0\ntouch "+failed+"\nexit 1\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	ext := filepath.Join(dir, "terma-ext.ts")
+	if _, err := writeExtension(ext, []string{hook}, relayConfig().Endpoint); err != nil {
+		t.Fatal(err)
+	}
+	script := `const mod = await import(process.argv[1]); const h = {}; await mod.default({ on: (n, fn) => { h[n] = fn } })
+const ctx = { cwd: "/work", sessionManager: { getSessionId: () => "s1", getSessionName: () => "Fix the build" } }
+for (let i = 0; i < 3; i++) await h.session_before_switch({ reason: "new" }, ctx)`
+	if out, err := exec.Command(node, "--input-type=module", "-e", script, ext).CombinedOutput(); err != nil {
+		t.Fatalf("node: %v\n%s", err, out)
+	}
+	if got := strings.Count(read(t, calls), "x"); got != 2 {
+		t.Errorf("omp-title ran %d times, want the failed one and its retry", got)
+	}
+}

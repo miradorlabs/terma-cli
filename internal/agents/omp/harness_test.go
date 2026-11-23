@@ -185,6 +185,39 @@ func TestRelayEnvReconnectAndRemoval(t *testing.T) {
 	}
 }
 
+// A .env that was there before setup is there after teardown, as it was: an empty or
+// blank one is kept, not removed, and its mode comes back from the 0600 setup wrote it at,
+// after two setups too.
+func TestRelayEnvTeardownRestoresTheFile(t *testing.T) {
+	for name, before := range map[string]string{"empty": "", "blank": "\n  \n", "the developer's": "# mine\nANTHROPIC_BASE_URL=https://proxy.example\n"} {
+		t.Run(name, func(t *testing.T) {
+			a, env := ompIn(t)
+			write(t, env, before, 0o644)
+			for range 2 {
+				if _, err := a.ConfigureRelay(context.Background(), relayConfig()); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if info, _ := os.Stat(env); info.Mode().Perm() != 0o600 {
+				t.Errorf("after setup .env is %v: it holds the relay's token", info.Mode().Perm())
+			}
+			if _, err := a.UnconfigureRelay(context.Background(), relayToken); err != nil {
+				t.Fatal(err)
+			}
+			info, err := os.Stat(env)
+			if err != nil {
+				t.Fatalf("teardown removed the developer's .env: %v", err)
+			}
+			if info.Mode().Perm() != 0o644 {
+				t.Errorf("after teardown .env is %v, want 0644 as it was", info.Mode().Perm())
+			}
+			if got := read(t, env); got != before {
+				t.Errorf("after teardown .env is %q, want %q", got, before)
+			}
+		})
+	}
+}
+
 // A key the developer changed after setup is theirs: teardown leaves it, says so, and
 // doctor no longer reads omp as sending to the relay.
 func TestRelayEnvEditedAfterSetup(t *testing.T) {

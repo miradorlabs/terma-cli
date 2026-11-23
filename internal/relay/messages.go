@@ -9,10 +9,13 @@ import (
 	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
 )
 
-// roleTool is a tool result's message: every part of it is the tool's output, whatever its type.
+// roleTool is a tool result's message: its name is the tool's, and every part is the tool's output.
 const roleTool = "tool"
 
 var (
+	// saidRoles are the roles whose text and reasoning parts are what was said; a message of any
+	// other role (a tool's result, under whatever name) keeps none of its parts.
+	saidRoles = []string{"user", "assistant", "system"}
 	// saidParts are the part types of a message envelope that are what was said; every other
 	// type (a tool call, its response, a file, a provider's own) is withheld with tool content.
 	saidParts = []string{"text", "reasoning"}
@@ -37,7 +40,8 @@ type saidPart struct {
 }
 
 // withoutToolParts is a message envelope (shape.CaptureRules.MessageFields) holding only what
-// was said: each message's text and reasoning parts, a tool message's none, under its role, so a message left with
+// was said: the text and reasoning parts of each user, assistant or system message, any other
+// role's none, under its role, so a message left with
 // none still marks its turn. It is rebuilt from what was read, so nothing a reader of the JSON
 // would not see (a repeated key) passes. did reports whether anything was removed, and ok
 // whether v is an envelope at all, each message with a role and parts; when it is not, nothing
@@ -60,14 +64,14 @@ func withoutToolParts(v *commonpb.AnyValue) (said string, did, ok bool) {
 		for key := range keys[i] {
 			did = did || !slices.Contains(messageKeys, key)
 		}
-		tool := strings.EqualFold(msgs[i].Role, roleTool)
-		if !tool && msgs[i].Name != "" {
+		said := slices.ContainsFunc(saidRoles, func(r string) bool { return strings.EqualFold(msgs[i].Role, r) })
+		if !strings.EqualFold(msgs[i].Role, roleTool) && msgs[i].Name != "" {
 			msgs[i].Name, did = "", true
 		}
 		kept := make([]json.RawMessage, 0, len(msgs[i].Parts))
 		for _, p := range msgs[i].Parts {
 			part, ok := textPart(p)
-			if !ok || tool {
+			if !ok || !said {
 				did = true
 				continue
 			}

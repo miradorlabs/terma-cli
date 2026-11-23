@@ -186,6 +186,13 @@ func (c exporter) Connect(e harness.Exporter, _ bool) error {
 		}
 	}
 	j := harness.NewJournal(c.Name(), path, existing, installing, nil, nil, previous)
+	// The file as it was before terma's first connect, which a reconnect has since rewritten.
+	switch {
+	case previous != nil:
+		j.ConfigMode = previous.ConfigMode
+	case f.existed:
+		j.ConfigMode = new(f.mode)
+	}
 
 	for key, value := range installing {
 		changes[key] = new(envLine(key, value))
@@ -198,7 +205,7 @@ func (c exporter) Connect(e harness.Exporter, _ bool) error {
 		return err
 	}
 	defer harness.PruneJournals(c.dir)
-	if err := f.save(); err != nil {
+	if err := f.save(nil); err != nil {
 		var rollbackErr error
 		if rollback != nil {
 			rollbackErr = rollback.Save(c.dir)
@@ -250,7 +257,7 @@ func (c exporter) Disconnect() (harness.DisconnectResult, error) {
 		if err := f.apply(changes); err != nil {
 			return result, err
 		}
-		if err := f.save(); err != nil {
+		if err := f.save(j.ConfigMode); err != nil {
 			return result, err
 		}
 	}
