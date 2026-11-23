@@ -9,18 +9,14 @@ import (
 )
 
 var (
-	secretOptions = []string{
-		"-u", "--user", "-H", "--header", "-p", "--password",
-		"-b", "--cookie", "-d", "--data", "--data-raw", "--data-binary", "--data-urlencode",
-		"--oauth2-bearer",
-	}
-	secretNames = []string{"pass", "token", "secret", "key", "auth"}
-	userinfo    = regexp.MustCompile(`://[^/\s]+@`)
+	secretOptions = []string{"-u", "--user", "-H", "--header", "-p", "--password", "-b", "--cookie", "-d", "--data", "--data-raw", "--data-binary", "--data-urlencode", "--oauth2-bearer"}
+	secretNames   = []string{"pass", "token", "secret", "key", "auth"}
+	userinfo      = regexp.MustCompile(`://[^/\s]+@`)
 )
 
 // firstWords returns command's first four words (<=60 runes) with secret-like values masked.
 func firstWords(command string) string {
-	cut := len(command) > 4096 // past the four words' 60 characters, however masked
+	cut := len(command) > 4096
 	if cut {
 		n := 4096
 		for n > 0 && !utf8.RuneStart(command[n]) {
@@ -31,13 +27,10 @@ func firstWords(command string) string {
 	words := shellFields(command, 5)
 	more := cut || len(words) > 4
 	words = words[:min(len(words), 4)]
-	secret := false
-	hasRedis := false
+	secret, hasRedis := false, false
 	for i, w := range words {
 		bare := strings.Trim(w, `"'`)
-		if strings.HasSuffix(bare, "redis-cli") {
-			hasRedis = true
-		}
+		hasRedis = hasRedis || strings.HasSuffix(bare, "redis-cli")
 		name, _, eq := strings.Cut(w, "=")
 		switch {
 		case secret:
@@ -49,7 +42,9 @@ func firstWords(command string) string {
 		}
 		words[i] = userinfo.ReplaceAllString(words[i], "://…@")
 		lower := strings.ToLower(bare)
-		secret = slices.Contains(secretOptions, bare) || bare == "-a" && hasRedis ||
+		tail := len(bare) > 2 && bare[0] == '-' && bare[1] != '-' &&
+			(slices.Contains(secretOptions, "-"+bare[len(bare)-1:]) || bare[len(bare)-1] == 'a' && hasRedis)
+		secret = slices.Contains(secretOptions, bare) || bare == "-a" && hasRedis || tail ||
 			strings.HasPrefix(bare, "-") && slices.ContainsFunc(secretNames, func(n string) bool { return strings.Contains(lower, n) })
 	}
 	s := strings.Map(func(r rune) rune {

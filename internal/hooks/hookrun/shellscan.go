@@ -74,19 +74,16 @@ type scan struct {
 	unknown bool
 }
 
-// work tracks lookup, byte, and deadline budgets across nested scans.
 type work struct {
 	lookups, bytes int
 	deadline       time.Time
 }
 
-// candidate is a word as expanded, from where it was read and in what role, once looked at.
 type candidate struct {
 	word, dir string
 	r         role
 }
 
-// cached records what a candidate lookup found so cache hits replay folder operands onto sc.reads.
 type cached struct {
 	dir     string
 	named   bool
@@ -97,13 +94,7 @@ func newScan(cwd string, env func(string) (string, bool), done work) *scan {
 	if done.deadline.IsZero() {
 		done.deadline = time.Now().Add(maxShellTime)
 	}
-	sc := &scan{
-		cwd: cwd, dir: cwd, env: env,
-		vars:     map[string]*string{},
-		places:   map[string]bool{},
-		examined: map[candidate]cached{},
-		work:     done,
-	}
+	sc := &scan{cwd: cwd, dir: cwd, env: env, vars: map[string]*string{}, places: map[string]bool{}, examined: map[candidate]cached{}, work: done}
 	sc.cfg = sc.config()
 	return sc
 }

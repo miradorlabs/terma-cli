@@ -35,11 +35,12 @@ func (sc *scan) substitute(w io.Writer, cs *syntax.CmdSubst) error {
 	if !ok || len(ce.Assigns) != 0 {
 		return errOpaque
 	}
-	words := make([]string, len(ce.Args))
-	for i, a := range ce.Args {
-		words[i] = a.Lit()
+	limit := min(len(ce.Args), 4)
+	words := make([]string, limit)
+	for i := range limit {
+		words[i] = ce.Args[i].Lit()
 	}
-	for n := len(words); n > 0; n-- {
+	for n := limit; n > 0; n-- {
 		if known, ok := outputs[strings.Join(words[:n], " ")]; ok {
 			outer := sc.cfg
 			sc.cfg = sc.config() // expand is not reentrant: an operand expands with its own
@@ -95,12 +96,10 @@ func mktemp(sc *scan, args []*syntax.Word) (string, bool) {
 			tmp = true
 		case strings.HasPrefix(l, "-") && !strings.HasPrefix(l, "--"):
 			for j := 1; j < len(l); j++ {
-				switch l[j] {
-				case 't':
-					tmp = true
-				case 'p':
+				if l[j] == 'p' {
 					return "", false
 				}
+				tmp = tmp || l[j] == 't'
 			}
 		case !strings.HasPrefix(l, "-") && pathLike(l):
 			return "", false

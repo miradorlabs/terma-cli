@@ -164,22 +164,13 @@ func parsable(src string) bool {
 	return len(bodies) == 0 && len(docs) == 0
 }
 
-// closing is the byte that closes the context c opens.
 func closing(c byte) byte {
-	switch c {
-	case '(':
-		return ')'
-	case '{':
-		return '}'
-	case '[':
-		return ']'
+	if i := strings.IndexByte("({[", c); i >= 0 {
+		return ")}]"[i]
 	}
-	return c // a quote
+	return c
 }
 
-// heredocDelimiter is the here-document whose operator ends at i (past its - and blanks),
-// its delimiter's quotes removed, and the index of its word's last byte (or -1 when the
-// delimiter uses an unclosed quote across a newline or ANSI-C quoting so parsable fails closed).
 func heredocDelimiter(src string, i int) (heredoc, int) {
 	stripTabs := i < len(src) && src[i] == '-'
 	if stripTabs {
@@ -217,7 +208,6 @@ func heredocDelimiter(src string, i int) (heredoc, int) {
 	return heredoc{d.String(), quoted, stripTabs}, i - 1
 }
 
-// lineEnd is the index of the newline that ends the line at i, or len(src).
 func lineEnd(src string, i int) int {
 	if j := strings.IndexByte(src[i:], '\n'); j >= 0 {
 		return i + j
@@ -225,7 +215,6 @@ func lineEnd(src string, i int) int {
 	return len(src)
 }
 
-// delimiterLine reports whether line ends heredoc h (stripping leading tabs only for <<-).
 func delimiterLine(line string, h heredoc) bool {
 	if h.stripTabs {
 		line = strings.TrimLeft(line, "\t")

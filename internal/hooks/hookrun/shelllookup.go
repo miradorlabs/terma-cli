@@ -49,8 +49,7 @@ func (sc *scan) resolve(t string, r role, slashed bool) cached {
 	if info != nil {
 		res.named = true
 		if info.IsDir() {
-			res.dir = p
-			res.folders = append(res.folders, p)
+			res.dir, res.folders = p, append(res.folders, p)
 		}
 	}
 	if backInfo != nil {
@@ -69,17 +68,15 @@ func (sc *scan) resolve(t string, r role, slashed bool) cached {
 }
 
 func (sc *scan) recordCached(res cached, r role) {
-	if sc.reads == nil || !res.named || r != plain && r != folder && r != part {
-		return
+	if sc.reads != nil && res.named && (r == plain || r == folder || r == part) {
+		sc.reads.named = true
+		sc.reads.folders = append(sc.reads.folders, res.folders...)
 	}
-	sc.reads.named = true
-	sc.reads.folders = append(sc.reads.folders, res.folders...)
 }
 
 const maxSymlinkHops = 8
 
-// hasRemoteLink walks components of p top-down without following symlinks, failing closed if
-// any component traverses a remote share or > maxSymlinkHops hops.
+// hasRemoteLink walks components of p top-down without following symlinks, failing closed on remote shares or >maxSymlinkHops.
 func (sc *scan) hasRemoteLink(p string) bool { return sc.hasRemoteLinkAt(filepath.Clean(p), 0) }
 
 func (sc *scan) hasRemoteLinkAt(p string, hops int) bool {
@@ -93,22 +90,21 @@ func (sc *scan) hasRemoteLinkAt(p string, hops int) bool {
 	var chain []string
 	for cur := p; ; {
 		chain = append(chain, cur)
-		parent := filepath.Dir(cur)
-		if parent == cur {
+		if parent := filepath.Dir(cur); parent == cur {
 			break
+		} else {
+			cur = parent
 		}
-		cur = parent
 	}
 	for i := len(chain) - 1; i >= 0; i-- {
-		cur := chain[i]
 		if !sc.spend(1) {
 			return true
 		}
-		info, err := os.Lstat(cur)
+		info, err := os.Lstat(chain[i])
 		if err != nil {
 			return false
 		}
-		if info.Mode()&fs.ModeSymlink != 0 && sc.linkTargetRemote(cur, hops) {
+		if info.Mode()&fs.ModeSymlink != 0 && sc.linkTargetRemote(chain[i], hops) {
 			return true
 		}
 	}
@@ -196,10 +192,7 @@ func (sc *scan) reachNew(w, dir string) {
 	if !ok || len(p) > maxPathBytes || sc.hasRemoteLink(filepath.Dir(p)) {
 		return
 	}
-	for d := filepath.Dir(p); ok; d = filepath.Dir(d) {
-		if !sc.spend(1) {
-			return
-		}
+	for d := filepath.Dir(p); ok && sc.spend(1); d = filepath.Dir(d) {
 		if info, err := os.Stat(d); err == nil {
 			if info.IsDir() {
 				sc.place(d)
@@ -219,16 +212,62 @@ func (sc *scan) away(w string, r role) bool {
 }
 
 func (sc *scan) path(w, dir string) (string, bool) {
+	base, rel := dir, w
 	switch {
 	case w == "~" || strings.HasPrefix(w, "~/"):
 		home, ok := sc.lookup("HOME")
-		return filepath.Join(home, w[1:]), ok && home != "" && !remote(home, sc.cwd)
+		if !ok || home == "" || remote(home, sc.cwd) {
+			return "", false
+		}
+		base, rel = home, w[1:]
 	case remote(w, sc.cwd):
 		return "", false
 	case filepath.IsAbs(w):
-		return filepath.Clean(w), true
+		if !hasDotDot(w) {
+			return filepath.Clean(w), true
+		}
+		vol := filepath.VolumeName(w)
+		return sc.cleanSafe(vol+string(filepath.Separator), w[len(vol):])
+	case dir == "":
+		return "", false
 	}
-	return filepath.Join(dir, w), dir != ""
+	if hasDotDot(rel) {
+		return sc.cleanSafe(base, rel)
+	}
+	return filepath.Join(base, rel), true
+}
+
+func hasDotDot(p string) bool {
+	return p == ".." || strings.HasPrefix(p, "../") || strings.HasPrefix(p, `..\`) || strings.Contains(p, "/..") || strings.Contains(p, `\..`)
+}
+
+// cleanSafe resolves symlinks and checks remote shares before collapsing any ".." segment.
+func (sc *scan) cleanSafe(base, rel string) (string, bool) {
+	if len(base)+len(rel) > maxPathBytes {
+		return filepath.Join(base, rel), true
+	}
+	cur := filepath.Clean(base)
+	for _, part := range strings.FieldsFunc(rel, func(r rune) bool { return r == '/' || r == '\\' }) {
+		switch part {
+		case "", ".":
+		case "..":
+			if sc.hasRemoteLink(cur) || !sc.spend(1) {
+				return "", false
+			}
+			if info, err := os.Lstat(cur); err == nil && info.Mode()&fs.ModeSymlink != 0 {
+				resolved, err := filepath.EvalSymlinks(cur)
+				if err != nil || remote(resolved, sc.cwd) {
+					sc.unknown = true
+					return "", false
+				}
+				cur = resolved
+			}
+			cur = filepath.Dir(cur)
+		default:
+			cur = filepath.Join(cur, part)
+		}
+	}
+	return filepath.Clean(cur), true
 }
 
 func urlPath(w string) (string, bool) {

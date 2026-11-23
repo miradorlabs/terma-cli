@@ -89,14 +89,11 @@ func (sc *scan) enclosingCheckout(root string) bool {
 	return sc.cwdRoot != "" && !samePath(root, sc.cwdRoot) && isStrictlyBelow(sc.cwdRoot, root)
 }
 
-// isStrictlyBelow reports whether child sits strictly beneath parent.
 func isStrictlyBelow(child, parent string) bool {
 	rel, err := filepath.Rel(parent, child)
 	return err == nil && rel != "." && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
 }
 
-// holdsNone reports whether p is in a tree known to hold no checkout: a node_modules folder,
-// the Go module cache, ~/Library or /System.
 func (sc *scan) holdsNone(p string) bool {
 	sep := string(filepath.Separator)
 	if filepath.Base(p) == "node_modules" || strings.Contains(p, sep+"node_modules"+sep) {
@@ -111,18 +108,12 @@ func (sc *scan) holdsNone(p string) bool {
 			sc.none = append(sc.none, filepath.Join(home, "Library"))
 		}
 	}
-	return slices.ContainsFunc(sc.none, func(root string) bool {
-		return p == root || strings.HasPrefix(p, root+sep)
-	})
+	return slices.ContainsFunc(sc.none, func(root string) bool { return p == root || strings.HasPrefix(p, root+sep) })
 }
 
-// readChunk is how many of a folder's entries readDir reads at a time.
 const readChunk = 256
 
-// readDir is what the folder dir holds, by name, each entry read a lookup: none past
-// maxShellLookups, which it reads no further than, or its deadline, checked after each
-// readChunk entries. It opens dir with O_DIRECTORY|O_CLOEXEC on Unix so a FIFO or a
-// symlink to one never blocks the scan; unexpected open or read errors fail closed (sc.unknown).
+// readDir lists dir via O_DIRECTORY|O_CLOEXEC (FIFO-safe), failing closed on unexpected errors.
 func (sc *scan) readDir(dir string) []fs.DirEntry {
 	if !sc.spend(1) {
 		return nil
