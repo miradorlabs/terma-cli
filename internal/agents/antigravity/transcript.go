@@ -30,10 +30,12 @@ import (
 // going twice, even after compaction rewrites the file.
 //
 // A call goes only under the checkout its own turn ran in, as a hook there decided: each
-// hook decides its turn, the transcript's latest prompt, collected in its checkout or not
-// collected at all. A call of a turn no hook decided (one before terma watched the
-// conversation) or decided not collected never leaves; one decided for another checkout
-// never leaves either, rather than go under the wrong repository.
+// hook decides its turn, the transcript's latest prompt, collected in its checkout (its
+// path, origin and project) or not collected at all. A call of a turn no hook decided (one
+// before terma watched the conversation) or decided not collected never leaves, nor does
+// one whose turn is in doubt: a later decided prompt that a rewrite dropped. A call decided
+// for another checkout, as a cancelled turn leaves for a hook elsewhere, is held, a few at
+// a time, for a hook in its own; a rewrite drops what is held. The cursor always moves on.
 
 // sourceAntigravityTranscript is terma.evidence.source for what agy's transcript recorded.
 const sourceAntigravityTranscript = "antigravity_transcript"
@@ -69,7 +71,23 @@ type antigravityCallState struct {
 	// Turns is each recent turn's decision: the checkout a collecting hook ran it in, or ""
 	// where the team's policy collects nothing.
 	Turns map[string]string `json:"turns,omitempty"`
+	// Held are the lines read for a checkout other than the hook's, oldest first.
+	Held []antigravityHeld `json:"held,omitempty"`
 }
+
+// antigravityHeld is a line held for a hook in its turn's checkout: where it is in the
+// transcript, and what it was.
+type antigravityHeld struct {
+	Offset int64  `json:"offset"`
+	Length int64  `json:"length"`
+	Step   int64  `json:"step"`
+	Turn   string `json:"turn"`
+	// Subagent is set on invoke_subagent's result; else the line is a call.
+	Subagent bool `json:"subagent,omitempty"`
+}
+
+// antigravityHeldKept bounds the lines held; the oldest go first.
+const antigravityHeldKept = 16
 
 // antigravityTurnsKept bounds the decisions a conversation's state keeps, newest first.
 const antigravityTurnsKept = 32
@@ -154,51 +172,58 @@ func captureAntigravityCalls(ctx context.Context, e hookrun.Env, r *hookrun.Repo
 		last = antigravityCallState{Step: -1}
 	}
 	before, _ := json.Marshal(last)
-	// The hook's own turn is the latest prompt the transcript holds: decide it first.
-	probe, err := readAntigravitySteps(transcript, last, func(antigravityStep, string) bool { return true })
+	// The hook's own turn is the latest prompt the transcript holds: decide it first. A
+	// rewrite found here drops what was held.
+	probe, err := readAntigravitySteps(transcript, last, func(antigravityStep, string, int64, int64) bool { return true })
 	if err != nil {
 		if !errors.Is(err, os.ErrNotExist) {
 			e.Logf("antigravity transcript: %v", err)
 		}
 		return false
 	}
-	root := ""
-	if r != nil {
-		root = r.Root
-	}
-	last.Turns = decideAntigravityTurn(last.Turns, probe.Turn, root)
-	next, err := readAntigravitySteps(transcript, last, func(s antigravityStep, turn string) bool {
-		switch decided, ok := last.Turns[turn]; {
-		case !ok || decided == "":
-			// Not collected, or before terma watched: it never leaves.
-			return true
-		case r == nil:
-			// A collected turn's call, a cancel left: it waits for a hook in its checkout.
-			return false
-		case decided != r.Root:
-			// Collected in another checkout: never sent under this one's repository.
-			return true
+	route := antigravityRoute(r)
+	last.Turns = decideAntigravityTurn(last.Turns, probe.Turn, route)
+	last.Held = probe.Held
+	send := func(s antigravityStep, turn string) bool {
+		if s.Type == "PLANNER_RESPONSE" {
+			return e.EmitFor(r, antigravityCallEvent(id, s, turn))
 		}
-		if ctx.Err() != nil {
+		// Only invoke_subagent's result names a child; other output could quote one.
+		if child := antigravitySubagent(s.Content); s.subagentResult && child != "" && child != id {
+			// The child's own hooks name no parent: its session start, again, does.
+			return e.EmitFor(r, spool.Event{Name: semconv.TermaSessionStartEvent, SessionID: child, Attrs: map[string]any{
+				semconv.GenAIMainAgentNameKey: antigravityTool, semconv.TermaSessionParentIDKey: id,
+			}})
+		}
+		return true
+	}
+	if r != nil {
+		last.Held = sendAntigravityHeld(ctx, transcript, last.Held, last.Turns, route, send)
+	}
+	var held []antigravityHeld
+	next, err := readAntigravitySteps(transcript, last, func(s antigravityStep, turn string, off, n int64) bool {
+		decided, ok := last.Turns[turn]
+		switch {
+		case !ok || decided == "" || antigravityTurnInDoubt(turn, *s.StepIndex, last.Turns):
+			// Not collected, before terma watched, or its turn in doubt: it never leaves.
+			return true
+		case decided != route:
+			// Collected in another checkout: held for a hook there.
+			if s.Type == "PLANNER_RESPONSE" || s.subagentResult {
+				held = append(held, antigravityHeld{Offset: off, Length: n, Step: *s.StepIndex, Turn: turn, Subagent: s.subagentResult})
+			}
+			return true
+		case ctx.Err() != nil:
 			// Out of time: what was sent is saved, the rest goes with the next hook.
 			return false
 		}
-		switch s.Type {
-		case "PLANNER_RESPONSE":
-			return e.EmitFor(r, antigravityCallEvent(id, s, turn))
-		case "GENERIC":
-			// Only invoke_subagent's result names a child; other output could quote one.
-			if child := antigravitySubagent(s.Content); s.subagentResult && child != "" && child != id {
-				// The child's own hooks name no parent: its session start, again, does.
-				return e.EmitFor(r, spool.Event{Name: semconv.TermaSessionStartEvent, SessionID: child, Attrs: map[string]any{
-					semconv.GenAIMainAgentNameKey: antigravityTool, semconv.TermaSessionParentIDKey: id,
-				}})
-			}
-		}
-		return true
+		return send(s, turn)
 	})
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		e.Logf("antigravity transcript: %v", err)
+	}
+	if next.Held = append(next.Held, held...); len(next.Held) > antigravityHeldKept {
+		next.Held = next.Held[len(next.Held)-antigravityHeldKept:]
 	}
 	if b, err := json.Marshal(next); err == nil && !bytes.Equal(b, before) {
 		if err := hookrun.WriteState(path, b); err != nil {
@@ -283,7 +308,7 @@ const antigravityTailLen = 256
 // in order, with the turn it belongs to, and returns the state after the last line emit
 // took. A call at or below last.Step was sent before and is skipped. emit returning false
 // stops the read there, for the next hook.
-func readAntigravitySteps(path string, last antigravityCallState, emit func(antigravityStep, string) bool) (antigravityCallState, error) {
+func readAntigravitySteps(path string, last antigravityCallState, emit func(s antigravityStep, turn string, offset, length int64) bool) (antigravityCallState, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		// Missing too: a subagent's first hooks run before its transcript exists.
@@ -301,7 +326,7 @@ func readAntigravitySteps(path string, last antigravityCallState, emit func(anti
 	if state.Offset > info.Size() || antigravityTail(f, state.Offset) != state.Tail {
 		// Rewritten (compaction) or replaced: read again from the start; Step keeps what
 		// was sent, and Turn the turn until a prompt the rewrite kept names it again.
-		state.Offset = 0
+		state.Offset, state.Held = 0, nil
 	}
 	if _, err := f.Seek(state.Offset, io.SeekStart); err != nil {
 		return last, err
@@ -360,7 +385,7 @@ func readAntigravitySteps(path string, last antigravityCallState, emit func(anti
 		case step <= state.Step:
 			// Sent before a rewrite.
 		case s.Type == "PLANNER_RESPONSE" || s.subagentResult:
-			if !emit(s, state.Turn) {
+			if !emit(s, state.Turn, state.Offset, n) {
 				state.Tail = antigravityTail(f, state.Offset)
 				return state, nil
 			}
@@ -369,39 +394,6 @@ func readAntigravitySteps(path string, last antigravityCallState, emit func(anti
 		state.Results = results
 		state.Offset += int64(len(line))
 	}
-}
-
-// decideAntigravityTurn records turn's decision, the checkout root a collecting hook ran
-// it in or "" for none, keeping the newest antigravityTurnsKept. A turn keeps its first
-// decision: a later hook of it runs in the same checkout. A subagent's transcript holds no
-// prompt, so its calls' turn is "", decided like any other.
-func decideAntigravityTurn(turns map[string]string, turn, root string) map[string]string {
-	out := make(map[string]string, len(turns)+1)
-	for t, d := range turns {
-		out[t] = d
-	}
-	if _, ok := out[turn]; !ok {
-		out[turn] = root
-	}
-	for len(out) > antigravityTurnsKept {
-		oldest, n := "", int64(-1)
-		for t := range out {
-			if m := antigravityTurnNumber(t); n < 0 || m < n {
-				oldest, n = t, m
-			}
-		}
-		delete(out, oldest)
-	}
-	return out
-}
-
-// antigravityTurnNumber is the number in a turn id, -1 for none.
-func antigravityTurnNumber(turn string) int64 {
-	n, err := strconv.ParseInt(strings.TrimPrefix(turn, "turn-"), 10, 64)
-	if err != nil || !strings.HasPrefix(turn, "turn-") {
-		return -1
-	}
-	return n
 }
 
 // antigravityLine reads one whole line, or nil for one longer than antigravityLineLimit,

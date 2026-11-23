@@ -465,3 +465,73 @@ func TestAntigravityOverlongLineIsSkipped(t *testing.T) {
 		t.Fatalf("sent %s", s)
 	}
 }
+
+// A cancelled turn's call, read by a hook in another collected checkout, is held, and
+// goes once a hook runs in its own checkout again; the other checkout's calls go meanwhile.
+func TestAntigravityHeldCallGoesInItsOwnCheckout(t *testing.T) {
+	g := newTranscriptRig(t, turnsConversation, "transcript_turns.jsonl")
+	home := g.root
+	g.write(18)
+	g.hook(preInvocation, `"initialNumSteps":18,"invocationNum":0`)
+	g.drain()
+	g.lines = append(g.lines[:21], `{"step_index":21,"source":"USER_EXPLICIT","type":"USER_INPUT","status":"DONE","created_at":"2026-11-20T16:55:00Z","content":"<scrubbed>"}`,
+		`{"step_index":22,"source":"MODEL","type":"PLANNER_RESPONSE","status":"DONE","created_at":"2026-11-20T16:55:01Z","model":"gemini-3.8-flash-low","input_tokens":5,"cache_read_tokens":0,"output_tokens":1}`)
+	g.write(len(g.lines))
+	g.root = hookruntest.InitRepo(t)
+	g.hook(stop, `"executionNum":0,"fullyIdle":true,"terminationReason":"NO_TOOL_CALL"`)
+	if s := strings.Join(callSteps(g.drain()[semconv.TermaModelCallEvent]), ","); s != "step-22" {
+		t.Fatalf("the other checkout sent %s, want its own call alone", s)
+	}
+	g.root = home
+	g.lines = append(g.lines, `{"step_index":23,"source":"USER_EXPLICIT","type":"USER_INPUT","status":"DONE","created_at":"2026-11-20T16:56:00Z","content":"<scrubbed>"}`)
+	g.write(len(g.lines))
+	g.hook(preInvocation, `"initialNumSteps":24,"invocationNum":0`)
+	g.hook(preInvocation, `"initialNumSteps":24,"invocationNum":0`)
+	if s := strings.Join(callSteps(g.drain()[semconv.TermaModelCallEvent]), ","); s != "step-19" {
+		t.Fatalf("back home, sent %s, want turn 18's call once", s)
+	}
+}
+
+// A rewrite that drops a decided turn's prompt but keeps its call leaves that call's turn
+// in doubt: it never leaves, rather than go as the turn before it.
+func TestAntigravityCallOfADroppedPromptNeverLeaves(t *testing.T) {
+	g := newTranscriptRig(t, turnsConversation, "transcript_turns.jsonl")
+	g.write(8) // turn 8's prompt
+	g.hook(preInvocation, `"initialNumSteps":8,"invocationNum":0`)
+	g.write(13) // turn 13's prompt, decided where the policy collects nothing
+	excluded := hookruntest.InitRepo(t)
+	payload := `{"conversationId":"` + g.id + `","cwd":"` + excluded + `","transcriptPath":"` + g.transcript + `","initialNumSteps":13,"invocationNum":0}`
+	env := hookrun.Env{StateDir: g.stateDir, Now: time.Now(), Cwd: excluded, Policy: hookruntest.Admitting(g.root), Stdin: strings.NewReader(payload), Stdout: &bytes.Buffer{}, Spool: g.sp, Version: "test"}
+	if err := preInvocation(context.Background(), env); err != nil {
+		t.Fatal(err)
+	}
+	g.drain()
+	// Compaction drops turn 13's prompt but keeps its call, step 14, after turn 8's.
+	g.lines = append([]string{}, g.lines[7], g.lines[8], g.lines[13], g.lines[14])
+	g.write(len(g.lines))
+	g.hook(stop, `"executionNum":0,"fullyIdle":true,"terminationReason":"NO_TOOL_CALL"`)
+	for _, c := range g.drain()[semconv.TermaModelCallEvent] {
+		if c.Attrs[semconv.TermaModelCallIDKey] == "step-14" {
+			t.Fatalf("turn 13's call went as turn 8's: %v", c.Attrs)
+		}
+	}
+}
+
+// A call is in doubt when a decided prompt lies between its turn's prompt and it.
+func TestAntigravityTurnInDoubt(t *testing.T) {
+	turns := map[string]string{"turn-8": "a", "turn-13": ""}
+	for _, tc := range []struct {
+		turn string
+		step int64
+		want bool
+	}{
+		{"turn-8", 11, false}, // before turn 13's prompt (step 12)
+		{"turn-8", 14, true},  // past it: turn 13's call, its prompt dropped
+		{"turn-13", 14, false},
+		{"", 10, true}, // read before any prompt, yet turn 8's prompt (step 7) comes first
+	} {
+		if got := antigravityTurnInDoubt(tc.turn, tc.step, turns); got != tc.want {
+			t.Errorf("antigravityTurnInDoubt(%q, %d) = %v, want %v", tc.turn, tc.step, got, tc.want)
+		}
+	}
+}

@@ -423,3 +423,39 @@ func TestAntigravityStatusLineUnreadableFileKeepsTheRecord(t *testing.T) {
 		t.Fatalf("record dropped: %v %v", rec, err)
 	}
 }
+
+// agy reads its settings as JSONC: comments and trailing commas stay through setup, and
+// teardown puts the file back byte for byte, or keeps them when only the member goes back.
+func TestAntigravityStatusLineKeepsJSONC(t *testing.T) {
+	a, path := statusLineHome(t)
+	jsonc := "{\n  // folders agy trusts\n  \"trustedWorkspaces\": [\n    \"/home/dev/repo\", // mine\n  ],\n}\n"
+	writeSettings(t, path, jsonc)
+	if changed, err := a.InstallStatusLine(); err != nil || !changed {
+		t.Fatalf("install: %v %v", changed, err)
+	}
+	b, _ := os.ReadFile(path)
+	if !strings.Contains(string(b), "// folders agy trusts") || !strings.Contains(string(b), "// mine") || !strings.Contains(string(b), "terma hook antigravity-statusline") {
+		t.Fatalf("after install:\n%s", b)
+	}
+	if _, err := a.RemoveStatusLine(); err != nil {
+		t.Fatal(err)
+	}
+	if b, _ := os.ReadFile(path); string(b) != jsonc {
+		t.Fatalf("not restored byte for byte:\n%s", b)
+	}
+
+	// Changed by agy since setup: only the member goes, the comments stay.
+	if _, err := a.InstallStatusLine(); err != nil {
+		t.Fatal(err)
+	}
+	b, _ = os.ReadFile(path)
+	writeSettings(t, path, strings.Replace(string(b), `"/home/dev/repo", // mine`, `"/home/dev/repo", // mine
+    "/home/dev/new",`, 1))
+	if _, err := a.RemoveStatusLine(); err != nil {
+		t.Fatal(err)
+	}
+	b, _ = os.ReadFile(path)
+	if strings.Contains(string(b), "statusLine") || !strings.Contains(string(b), "// folders agy trusts") || !strings.Contains(string(b), "/home/dev/new") {
+		t.Fatalf("after teardown:\n%s", b)
+	}
+}

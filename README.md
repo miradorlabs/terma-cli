@@ -479,8 +479,9 @@ one: its model and its input, cache-read and output tokens. `agy` does not count
 apart from output, or cache writes, so neither is sent; there is no cost, which the
 platform estimates from list prices. `agy` runs no hook after a turn you cancel, so that
 turn's calls and steps go with the next turn's. A call goes only under the repository its
-own turn ran in, and only where your team's policy collects; the turns of a conversation
-before terma first saw it are never sent. A subagent is its own conversation, linked to
+own turn ran in, and only where your team's policy collects; a call whose turn is in doubt
+after `agy` compacts the transcript, and the turns of a conversation before terma first saw
+it, are never sent. A subagent is its own conversation, linked to
 the one that opened it.
 
 Setup also puts `terma hook antigravity-statusline` in `statusLine` in
