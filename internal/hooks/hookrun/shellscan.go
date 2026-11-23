@@ -75,8 +75,8 @@ type scan struct {
 }
 
 type work struct {
-	lookups, bytes int
-	deadline       time.Time
+	lookups, bytes, words int
+	deadline              time.Time
 }
 
 type candidate struct {
@@ -100,7 +100,7 @@ func newScan(cwd string, env func(string) (string, bool), done work) *scan {
 }
 
 func (sc *scan) config() *expand.Config {
-	return &expand.Config{Env: sc, CmdSubst: sc.substitute, ProcSubst: opaqueProcess, NoUnset: true}
+	return &expand.Config{Env: sc, CmdSubst: sc.substitute, ProcSubst: func(*syntax.ProcSubst) (string, error) { return "", errOpaque }, NoUnset: true}
 }
 
 // Get resolves a shell variable for expand (unset fails under NoUnset unless a fallback is given).
@@ -115,10 +115,10 @@ func (sc *scan) Get(name string) expand.Variable {
 func (sc *scan) Each(func(string, expand.Variable) bool) {}
 
 func (sc *scan) lookup(name string) (string, bool) {
-	switch {
-	case name == "PWD":
+	if name == "PWD" {
 		return sc.dir, sc.dir != ""
-	case name == "OLDPWD" && sc.prev != "":
+	}
+	if name == "OLDPWD" && sc.prev != "" {
 		return sc.prev, true
 	}
 	if v, ok := sc.vars[name]; ok {
@@ -138,16 +138,16 @@ func (sc *scan) lookup(name string) (string, bool) {
 }
 
 func (sc *scan) place(p string) {
-	switch {
-	case sc.places[p]:
-	case len(sc.places) == maxShellPlaces:
-		sc.unknown = true
-	default:
-		sc.places[p] = true
-		sc.out = append(sc.out, p)
+	if sc.places[p] {
+		return
 	}
+	if len(sc.places) == maxShellPlaces {
+		sc.unknown = true
+		return
+	}
+	sc.places[p] = true
+	sc.out = append(sc.out, p)
 }
-
 func (sc *scan) spend(n int) bool {
 	if sc.unknown || sc.lookups+n > maxShellLookups || time.Now().After(sc.deadline) {
 		sc.unknown = true
@@ -156,7 +156,6 @@ func (sc *scan) spend(n int) bool {
 	sc.lookups += n
 	return true
 }
-
 func (sc *scan) charge(n int) bool {
 	if sc.unknown || sc.bytes+n > maxShellBytes || time.Now().After(sc.deadline) {
 		sc.unknown = true
@@ -198,7 +197,6 @@ func (sc *scan) paramValue(pe *syntax.ParamExp) string {
 	}
 	return v
 }
-
 func (sc *scan) paramSize(pe *syntax.ParamExp) int {
 	n := len(sc.paramValue(pe))
 	if pe.Repl != nil && pe.Repl.With != nil {
@@ -214,20 +212,28 @@ func (sc *scan) paramSize(pe *syntax.ParamExp) int {
 	}
 	return min(n, maxShellBytes+1)
 }
-
-// fieldsBounded ensures unquoted parameter expansions cannot split into > maxShellWords fields
-// before expand.Fields materializes them.
-func (sc *scan) fieldsBounded(w *syntax.Word, limit int) bool {
-	ifs, ok := sc.lookup("IFS")
-	if !ok {
-		ifs = " \t\n"
+func (sc *scan) ifs() string {
+	if ifs, ok := sc.lookup("IFS"); ok {
+		return ifs
 	}
-	if ifs == "" {
-		return true
-	}
-	return sc.checkPartsFields(w.Parts, ifs, limit, false) >= 0
+	return " \t\n"
 }
-
+func (sc *scan) fieldsBounded(w *syntax.Word, limit int) bool {
+	ifs := sc.ifs()
+	return ifs == "" || sc.checkPartsFields(w.Parts, ifs, limit, false) >= 0
+}
+func (sc *scan) chargeFields(v string) bool {
+	if ifs := sc.ifs(); ifs != "" {
+		rem := maxShellWords - sc.words
+		n := countFields(v, ifs, rem)
+		if n > rem {
+			sc.unknown = true
+			return false
+		}
+		sc.words += n
+	}
+	return true
+}
 func (sc *scan) checkPartsFields(parts []syntax.WordPart, ifs string, rem int, inParam bool) int {
 	for _, p := range parts {
 		switch p := p.(type) {
@@ -271,7 +277,6 @@ func (sc *scan) checkPartsFields(parts []syntax.WordPart, ifs string, rem int, i
 	}
 	return rem
 }
-
 func (sc *scan) consumeFields(v, ifs string, rem int) int {
 	if n := countFields(v, ifs, rem); n > rem {
 		sc.unknown = true
@@ -281,7 +286,6 @@ func (sc *scan) consumeFields(v, ifs string, rem int) int {
 	}
 	return rem
 }
-
 func countFields(v, ifs string, limit int) int {
 	n, inWord := 0, false
 	for _, r := range v {
@@ -301,7 +305,6 @@ func countFields(v, ifs string, limit int) int {
 	}
 	return n
 }
-
 func (sc *scan) fields(w *syntax.Word) ([]string, error) {
 	var out []string
 	for b, err := range sc.braces(w) {
@@ -320,7 +323,6 @@ func (sc *scan) fields(w *syntax.Word) ([]string, error) {
 	}
 	return out, nil
 }
-
 func (sc *scan) braces(w *syntax.Word) iter.Seq2[*syntax.Word, error] {
 	return func(yield func(*syntax.Word, error) bool) {
 		n := 0
