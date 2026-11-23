@@ -276,7 +276,7 @@ each line has a green or red mark. For each harness's newest build it gives:
   classify each in `internal/relay/allow.go`, an agent's capture rules, or as content. Those
   still withheld from before are one reminder line until they are.
 
-For a harness whose source is public (Codex, Gemini CLI, OpenCode, Pi, omp, dsh, T3 Code
+For a harness whose source is public (Codex, Gemini CLI, OpenCode, Pi, OMP, dsh, T3 Code
 and Hermes: `Sources` in `sourcelink/sourcelink.go`, one line each, with its tag, the folders
 that ship and the language its files are read in, Rust, TypeScript or Python), `-source`
 links each of these to the lines of the build's source that name it, read from its release
@@ -356,7 +356,7 @@ REFGEN_SCAN_DIR=/tmp/pub/docs/harnesses go test ./refgen -run TestPublishedMachi
 A build's `config` itemizes every option it reads and every environment variable
 (`configschema/`). With `-source`, a public harness's are read from its source at the
 release's tag (Codex's `config.schema.json`, Gemini CLI's and Pi's settings schemas, OpenCode's
-Effect Schema, omp's `register()` calls, DeepSeek Harness's config catalog, Hermes's
+Effect Schema, OMP's `register()` calls, DeepSeek Harness's config catalog, Hermes's
 `DEFAULT_CONFIG`, and the variables the code reads), so no capture is needed. Claude Code's and
 the Copilot CLI's are read from the bundle at capture time (`settingsfacts.go`): its settings
 schema and the variables its JavaScript reads. `TestClaudeProfileBinary` and

@@ -17,6 +17,8 @@ var genericSafeKeys = setOf(
 	"tool_use_id", "gen_ai.tool.call.id", "gen_ai.response.id",
 	"event.name", "event.timestamp",
 	semconv.MiradorProjectIDKey, semconv.TermaVersionKey, semconv.TermaRelayAttributionKey, semconv.TermaRelaySessionIDKey, semconv.TermaAccountSeatIDKey,
+	// The session that opened a subagent's, which the relay stamps (stampParent).
+	semconv.TermaSessionParentIDKey,
 	// Models, providers and settings.
 	"model", "gen_ai.request.model", "gen_ai.response.model", "gen_ai.system", "gen_ai.provider.name",
 	"gen_ai.operation.name", "gen_ai.response.finish_reasons",

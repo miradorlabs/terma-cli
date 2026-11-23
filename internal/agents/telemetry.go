@@ -42,6 +42,13 @@ type RelayChecker interface {
 	RelayProblem(addr string) (detail, fix string, ok bool)
 }
 
+// RelayTokenChecker is an agent whose exporter settings carry the relay's token, which the
+// relay requires exactly: tokenMatches reports whether they carry token, known false when they
+// carry none to compare.
+type RelayTokenChecker interface {
+	RelayTokenCurrent(token string) (tokenMatches, known bool)
+}
+
 // Labeled is an agent whose hooks and trailers use a label other than its name.
 type Labeled interface {
 	Tool() string

@@ -106,6 +106,7 @@ func (app *App) relayFacts() doctor.Relay {
 		r.Environment, r.HookStarted = info.Environment, info.Launch != daemon.LaunchService
 		r.Version, r.Earlier = info.Version, selfupdate.Newer(info.Version, app.version)
 	}
+	r.Token, _ = daemon.Token(app.stateDir)
 	if service.Supported() {
 		state := daemon.CheckService(app.stateDir)
 		r.ServiceInstalled, r.ServiceCurrent = state.Installed, state.Current
