@@ -4,14 +4,9 @@ package runs
 
 import (
 	"cmp"
-	"fmt"
-	"os"
-	"path/filepath"
 	"slices"
-	"strings"
 	"time"
 
-	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/session"
 )
 
@@ -32,7 +27,6 @@ type ledger struct {
 }
 
 func (l *ledger) active(t time.Time) { l.Active = latest(l.Active, t.UTC()) }
-
 func (l ledger) lastActive(written time.Time) time.Time {
 	last := l.Active
 	for _, r := range l.Runs {
@@ -40,7 +34,6 @@ func (l ledger) lastActive(written time.Time) time.Time {
 	}
 	return cmp.Or(last, written)
 }
-
 func latest(ts ...time.Time) (out time.Time) {
 	for _, t := range ts {
 		if t.After(out) {
@@ -66,7 +59,6 @@ type Why struct {
 	Reason Reason `json:"reason,omitempty"`
 	Where  string `json:"where,omitempty"`
 }
-
 type run struct {
 	ID        string    `json:"id"`
 	Started   time.Time `json:"started"`
@@ -76,7 +68,6 @@ type run struct {
 }
 
 func (r run) why() Why { r.MixedWhy.Reason = cmp.Or(r.MixedWhy.Reason, Crossed); return r.MixedWhy }
-
 func (r *run) mark(at time.Time, why Why) {
 	if at = at.UTC(); r.MixedAt.IsZero() || at.Before(r.MixedAt) {
 		r.MixedAt, r.MixedWhy = at, why
@@ -97,35 +88,7 @@ func Start(stateDir, sessionID string, at time.Time) (string, error) {
 }
 
 // Alias records that alias (e.g. a subagent ID) shares sessionID's runs.
-func Alias(stateDir, sessionID, alias string) error {
-	if !session.ValidID(alias) {
-		return fmt.Errorf("runs: invalid alias %q", alias)
-	}
-	return editLedger(stateDir, sessionID, false, func(path string, l *ledger) error {
-		canon := strings.TrimSuffix(filepath.Base(path), ".json")
-		if alias == canon {
-			return nil
-		}
-		dl, dok, _, err := readLedger(stateDir, alias)
-		if err != nil {
-			return err
-		}
-		changed := !slices.Contains(l.Aliases, alias)
-		if changed {
-			l.Aliases = append(l.Aliases, alias)
-		}
-		if dok && mergeMixed(l, dl) || changed {
-			if err := save(path, l); err != nil {
-				return err
-			}
-		}
-		pointer := aliasPath(stateDir, alias)
-		if err := os.MkdirAll(filepath.Dir(pointer), 0o700); err != nil {
-			return err
-		}
-		return config.WriteFileAtomic(pointer, []byte(canon), 0o600)
-	})
-}
+func Alias(stateDir, sessionID, alias string) error { return linkAlias(stateDir, sessionID, alias) }
 
 // MarkMixed marks sessionID's current run Mixed at at (earlier time wins); starts one if absent.
 func MarkMixed(stateDir, sessionID string, at time.Time, why Why) error {
@@ -150,7 +113,6 @@ func Touch(stateDir, sessionID, runID string, locations []string) ([]string, err
 func TryTouch(stateDir, sessionID, runID string, locations []string) ([]string, error) {
 	return touchWith(true, stateDir, sessionID, runID, locations)
 }
-
 func touchWith(try bool, stateDir, sessionID, runID string, locations []string) ([]string, error) {
 	var merged []string
 	err := editLedger(stateDir, sessionID, try, func(path string, l *ledger) error {
@@ -277,9 +239,7 @@ func Aliases(stateDir, sessionID string) ([]string, error) {
 	l, _, err := load(path)
 	return slices.Clone(l.Aliases), err
 }
-
 func inForce(runs []run, t time.Time) run { return runs[inForceIdx(runs, t)] }
-
 func inForceIdx(runs []run, t time.Time) int {
 	if t.IsZero() {
 		return len(runs) - 1

@@ -32,32 +32,40 @@ func asidePath(ledger string) string { return strings.TrimSuffix(ledger, ".json"
 
 // MarkAside records a lock-free Mixed mark for sessionID/runID with reason Aside.
 func MarkAside(stateDir, sessionID, runID string, at time.Time) error {
-	if target, err := aliasTarget(stateDir, sessionID); err == nil {
-		sessionID = target
-	}
-	path, err := ledgerPath(stateDir, sessionID)
-	if err != nil {
-		return err
-	}
-	dir, b := asidePath(path), []byte(nil)
 	if runID == "" {
 		runID = newRunID()
 	}
-	if b, err = json.Marshal(mark{Run: runID, At: at.UTC()}); err != nil {
+	b, err := json.Marshal(mark{Run: runID, At: at.UTC()})
+	if err != nil {
 		return err
 	}
-	file := filepath.Join(dir, newRunID()+".json")
-	for range asideWrites {
-		if err = os.MkdirAll(dir, 0o700); err == nil {
-			if err = config.WriteFileAtomic(file, b, 0o600); err == nil {
-				return nil
-			}
-		}
-		if !errors.Is(err, fs.ErrNotExist) {
+	if target, err := aliasTarget(stateDir, sessionID); err == nil {
+		sessionID = target
+	}
+	for range 2 {
+		path, err := ledgerPath(stateDir, sessionID)
+		if err != nil {
 			return err
 		}
+		dir, name := asidePath(path), newRunID()+".json"
+		for range asideWrites {
+			if err = os.MkdirAll(dir, 0o700); err == nil {
+				err = config.WriteFileAtomic(filepath.Join(dir, name), b, 0o600)
+			}
+			if err == nil || !errors.Is(err, fs.ErrNotExist) {
+				break
+			}
+		}
+		if err != nil {
+			return err
+		}
+		if next, aerr := aliasTarget(stateDir, sessionID); aerr != nil || next == sessionID {
+			return nil
+		} else {
+			sessionID = next
+		}
 	}
-	return err
+	return nil
 }
 
 func (a aside) apply(l *ledger) {

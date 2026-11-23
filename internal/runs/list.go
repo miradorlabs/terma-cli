@@ -1,6 +1,7 @@
 package runs
 
 import (
+	"cmp"
 	"maps"
 	"os"
 	"path/filepath"
@@ -36,10 +37,8 @@ func Mixed(stateDir string, now time.Time, recent time.Duration) []MixedRun {
 	}
 	seen := map[string]MixedRun{}
 	for id, at := range written {
-		canon := id
-		if t, err := aliasTarget(stateDir, id); err == nil {
-			canon = t
-		}
+		t, _ := aliasTarget(stateDir, id)
+		canon := cmp.Or(t, id)
 		if l, found, _, err := resolve(stateDir, id); err != nil {
 			seen[canon] = MixedRun{Session: canon, Recent: true}
 		} else if found && len(l.Runs) > 0 {

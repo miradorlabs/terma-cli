@@ -1265,5 +1265,22 @@ func TestMixedAsideEdgeCasesAndConcurrentRead(t *testing.T) {
 		if got, ok := cRet.At(20, now); !ok || got.Kind != KindRepository || got.ProjectID != "p1" {
 			t.Fatalf("PID 20 on clean r1 = %+v, %v; want KindRepository p1", got, ok)
 		}
+
+		// Earlier-run parent-bearing KindMixed sidecar folded onto a newer run must preserve Parent.
+		if !Write(dir, "aside-earlier-parent", Claim{ProjectID: "p1", Account: testAccount, Kind: KindRepository, Run: "r0", Repository: repoAt("github.com/acme/r0"), PIDs: []int{10}}, t0) ||
+			!Write(dir, "aside-earlier-parent", Claim{ProjectID: "p2", Account: testAccount, Kind: KindRepository, Run: "r1", Repository: repoAt("github.com/acme/r1"), PIDs: []int{20}}, t0.Add(time.Minute)) {
+			t.Fatal("aside-earlier-parent setup failed")
+		}
+		pAside, _ := path(dir, "aside-earlier-parent")
+		if !writeMixedAside(pAside, Claim{Kind: KindMixed, Run: "r0", Account: testAccount, Parent: "parent-sess", PIDs: []int{10}}, t0.Add(30*time.Second)) {
+			t.Fatal("writeMixedAside failed")
+		}
+		cAside := mustRead(t, dir, "aside-earlier-parent", now)
+		if cAside.Parent != "parent-sess" {
+			t.Fatalf("Parent after earlier-run sidecar fold = %q, want parent-sess", cAside.Parent)
+		}
+		if got, ok := cAside.At(10, t0.Add(45*time.Second)); !ok || got.Kind != KindMixed || got.Parent != "parent-sess" {
+			t.Fatalf("At(10) after earlier-run sidecar fold = %+v, %v; want KindMixed with parent-sess", got, ok)
+		}
 	})
 }

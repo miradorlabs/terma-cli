@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/miradorlabs/terma-cli/internal/flock"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
@@ -586,9 +587,115 @@ func TestAliasPrecedenceAndMixedMerge(t *testing.T) {
 		t.Fatalf("Mixed sessions = %v, want [parent-a parent-b parent-c parent-d]", names)
 	}
 
+	// Transitive alias chain: Alias(A, B) then Alias(C, A) then MarkMixed(C) must propagate to B.
+	start(t, dir, "chain-a", t0)
+	start(t, dir, "chain-b", t0)
+	start(t, dir, "chain-c", t0)
+	must(t, Alias(dir, "chain-a", "chain-b"))
+	must(t, Alias(dir, "chain-c", "chain-a"))
+	must(t, MarkMixed(dir, "chain-c", crossB, Why{Reason: Crossed, Where: "transitive"}))
+	for _, id := range []string{"chain-a", "chain-b", "chain-c"} {
+		if at, mixed := mixedAt(t, dir, id, t0.Add(3*time.Minute)); !mixed || !at.Equal(crossB) {
+			t.Fatalf("transitive %s MixedAt = %v, %v; want %v, true", id, at, mixed, crossB)
+		}
+	}
+	// Alias(chain-b, chain-c) must be a no-op rather than creating a cycle.
+	must(t, Alias(dir, "chain-b", "chain-c"))
+	if _, mixed := mixedAt(t, dir, "chain-b", t0.Add(3*time.Minute)); !mixed {
+		t.Fatal("reverse alias broke chain-b Mixed state")
+	}
+
+	// Corrupted alias cycle on disk fails closed.
+	must(t, os.WriteFile(aliasPath(dir, "cyc-a"), []byte("cyc-b"), 0o600))
+	must(t, os.WriteFile(aliasPath(dir, "cyc-b"), []byte("cyc-a"), 0o600))
+	if _, mixed := Read(dir, "cyc-a").MixedAt(t0); !mixed {
+		t.Fatal("alias cycle did not fail closed")
+	}
+
 	// Empty alias file fails closed.
 	must(t, os.WriteFile(aliasPath(dir, "bad-alias"), nil, 0o600))
 	if _, mixed := Read(dir, "bad-alias").MixedAt(t0); !mixed {
 		t.Fatal("empty alias file did not fail closed")
+	}
+}
+
+// Deterministic + stress concurrency test: a writer that resolved child before Alias publishes
+// must revalidate under lock (or mirror sidecar) so parent, sibling, child, and Mixed() never miss Mixed.
+func TestAliasConcurrentWriteLinearizable(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	cross := t0.Add(5 * time.Minute)
+
+	// Deterministic lock-hold: hold parent.lock while starting MarkMixed(child) and Alias(parent, child),
+	// and also hold child.lock so both queue on the lock and revalidate after Alias publishes.
+	for _, holdTarget := range []string{"det-parent", "det-child"} {
+		sub := filepath.Join(dir, holdTarget)
+		start(t, sub, "det-parent", t0)
+		start(t, sub, "det-child", t0)
+		must(t, Alias(sub, "det-parent", "det-sibling"))
+		lockPath := filepath.Join(sub, Dir, holdTarget+".json.lock")
+		unlock, err := flock.TryLock(lockPath)
+		if err != nil {
+			t.Fatalf("TryLock(%s): %v", holdTarget, err)
+		}
+		var wg sync.WaitGroup
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			if err := MarkMixed(sub, "det-child", cross, Why{Reason: Crossed, Where: "race"}); err != nil {
+				t.Errorf("MarkMixed: %v", err)
+			}
+		}()
+		go func() {
+			defer wg.Done()
+			if err := Alias(sub, "det-parent", "det-child"); err != nil {
+				t.Errorf("Alias: %v", err)
+			}
+		}()
+		time.Sleep(25 * time.Millisecond)
+		unlock()
+		wg.Wait()
+		for _, id := range []string{"det-parent", "det-child", "det-sibling"} {
+			if at, mixed := mixedAt(t, sub, id, t0.Add(6*time.Minute)); !mixed || !at.Equal(cross) {
+				t.Fatalf("hold %s: %s MixedAt = %v, %v; want %v, true", holdTarget, id, at, mixed, cross)
+			}
+		}
+		if got := Mixed(sub, t0.Add(6*time.Minute), time.Hour); len(got) != 1 || got[0].Session != "det-parent" {
+			t.Fatalf("hold %s: Mixed = %+v, want [det-parent]", holdTarget, got)
+		}
+	}
+
+	// Stress: concurrent MarkMixed/MarkAside vs Alias across 16 sessions each.
+	for i := range 16 {
+		p, c, s := fmt.Sprintf("sp-%d", i), fmt.Sprintf("sc-%d", i), fmt.Sprintf("ss-%d", i)
+		start(t, dir, p, t0)
+		start(t, dir, c, t0)
+		must(t, Alias(dir, p, s))
+		var wg sync.WaitGroup
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			if i%2 == 0 {
+				if err := MarkMixed(dir, c, cross, Why{Reason: Crossed}); err != nil {
+					t.Errorf("MarkMixed(%s): %v", c, err)
+				}
+			} else {
+				if err := MarkAside(dir, c, "", cross); err != nil {
+					t.Errorf("MarkAside(%s): %v", c, err)
+				}
+			}
+		}()
+		go func() {
+			defer wg.Done()
+			if err := Alias(dir, p, c); err != nil {
+				t.Errorf("Alias(%s, %s): %v", p, c, err)
+			}
+		}()
+		wg.Wait()
+		for _, id := range []string{p, c, s} {
+			if _, mixed := mixedAt(t, dir, id, t0.Add(6*time.Minute)); !mixed {
+				t.Fatalf("stress %d: %s missed Mixed", i, id)
+			}
+		}
 	}
 }
