@@ -32,7 +32,8 @@ type Steps struct {
 	ConnectRelay func(ctx context.Context, names []string) error
 	// MachineHooks writes the agents' machine-wide hooks and git's global hooks path.
 	MachineHooks func(ctx context.Context, names []string) error
-	// CheckIn asks the relay for a heartbeat, once an agent reports through it.
+	// CheckIn asks the relay for a heartbeat once agents are chosen: ConnectRelay starts it
+	// for any agent, since an agent that reports through its hooks alone needs its token.
 	CheckIn func(ctx context.Context)
 }
 
@@ -94,7 +95,7 @@ func Run(ctx context.Context, reg *agents.Registry, cfg *config.Config, s Steps)
 			return Result{}, err
 		}
 	}
-	if len(reg.RelayTargets(names)) > 0 && s.CheckIn != nil {
+	if len(names) > 0 && s.CheckIn != nil {
 		s.CheckIn(ctx)
 	}
 	return Result{Agents: names, Policy: pol}, nil

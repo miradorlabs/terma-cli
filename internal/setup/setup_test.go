@@ -50,7 +50,8 @@ func TestSetupRecordsThenFetchesThenConnects(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []string{"sign-in", "choose", "recorded", "team", "fetch", "stop-relay", "fetched", "spool-key", "relay", "machine-hooks"}
+	// An agent with no relay exporter (fake) still checks in: the relay runs for its hooks.
+	want := []string{"sign-in", "choose", "recorded", "team", "fetch", "stop-relay", "fetched", "spool-key", "relay", "machine-hooks", "check-in"}
 	if !slices.Equal(log, want) {
 		t.Fatalf("steps = %v, want %v", log, want)
 	}
