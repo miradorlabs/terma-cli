@@ -35,11 +35,12 @@ func (Agent) Events() map[string]agents.Handler {
 	return map[string]agents.Handler{
 		"session-start": sessionStart,
 		"session-end":   sessionEnd,
+		"pre-tool-use":  preToolUse,
 		"post-tool-use": postToolUse,
 		"stop":          stop,
 		"stop-failure":  stopFailure,
 		// internal/cli/hook.go claims the session and starts the relay from the payload.
-		"user-prompt-submit": hookrun.TurnStart,
+		"user-prompt-submit": userPromptSubmit,
 		"subagent-start":     subagentStart,
 		"subagent-stop":      subagentStop,
 	}
@@ -131,7 +132,7 @@ var (
 
 // StateDirs are the directories its hooks keep state in.
 func (Agent) StateDirs() []string {
-	return []string{claudeSubagentDir, statusLineStateDir, claudeTitleStateDir, claudeAccountStateDir, claudeLimitStateDir, claudeCallResponseStateDir}
+	return []string{claudeSubagentDir, statusLineStateDir, claudeTitleStateDir, claudeAccountStateDir, claudeLimitStateDir, claudeCallResponseStateDir, claudeExpectedDir}
 }
 
 // ContentConsented is the consent session titles travel under.
