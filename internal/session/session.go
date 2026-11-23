@@ -93,6 +93,8 @@ type Store struct {
 	lockWait time.Duration
 	// emptyOwnerWait, in tests, runs between retries on an empty owner file.
 	emptyOwnerWait func()
+	// afterDelta, in tests, runs right after an unlocked Touch writes its delta.
+	afterDelta func()
 }
 
 const (
@@ -283,14 +285,23 @@ func (s *Store) Touch(sess Session, files []string, at time.Time) error {
 		if m != nil && conflicts(m.Account, s.account) {
 			return ErrAccountConflict
 		}
-		if err := s.writeDelta(touched); err != nil {
+		deltaPath, err := s.writeDeltaFile(touched)
+		if err != nil {
 			return err
 		}
-		// Re-check owner after landing the delta in case a concurrent prune dropped an old
-		// owner and another account claimed the session before this delta appeared.
-		if o, err := s.owner(sess.Key()); err != nil {
-			return unreadableOwner(err)
-		} else if o.claimed && conflicts(o.account, s.account) {
+		if s.afterDelta != nil {
+			s.afterDelta()
+		}
+		// Ensure an owner claim still stands after the delta lands: if a concurrent Prune
+		// removed an aged owner before this delta appeared, re-claim it atomically (or read
+		// whoever claimed it in between) and fail closed if another account won.
+		afterOwner, err := s.claim(sess.Key())
+		if err != nil {
+			_ = os.Remove(deltaPath)
+			return err
+		}
+		if afterOwner != owner {
+			_ = os.Remove(deltaPath)
 			return ErrAccountConflict
 		}
 		return nil
@@ -360,11 +371,21 @@ func claimed(accounts []string) string {
 
 // writeDelta records m under a name no other writer can choose.
 func (s *Store) writeDelta(m *Manifest) error {
+	_, err := s.writeDeltaFile(m)
+	return err
+}
+
+// writeDeltaFile records m under a unique delta path and returns that path.
+func (s *Store) writeDeltaFile(m *Manifest) (string, error) {
 	var b [8]byte
 	if _, err := rand.Read(b[:]); err != nil {
-		return err
+		return "", err
 	}
-	return writeJSON(filepath.Join(s.dir, manifestsDir, m.Tool, m.SessionID+deltaSep+hex.EncodeToString(b[:])+deltaExt), m)
+	path := filepath.Join(s.dir, manifestsDir, m.Tool, m.SessionID+deltaSep+hex.EncodeToString(b[:])+deltaExt)
+	if err := writeJSON(path, m); err != nil {
+		return "", err
+	}
+	return path, nil
 }
 
 // load is k's manifest with its deltas folded in, and the deltas' paths, which a locked

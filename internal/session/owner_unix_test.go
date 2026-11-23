@@ -294,3 +294,80 @@ func TestPruneSkipsWhenStoreLockIsHeld(t *testing.T) {
 		t.Fatalf("uncontended Prune left stale manifest or owner behind")
 	}
 }
+
+// If a concurrent prune removes an aged owner while an unlocked Touch is landing its delta,
+// the post-write claim either restores A's owner (blocking a subsequent B touch) or, if B
+// already claimed the session, removes A's delta and returns ErrAccountConflict.
+func TestUnlockedTouchHandlesRemovedOrReplacedOwner(t *testing.T) {
+	t.Parallel()
+	t.Run("owner removed uncontested", func(t *testing.T) {
+		store := Open(t.TempDir())
+		sess := Session{ID: "sess-prune-restore", Tool: "codex"}
+		if err := bound(store, "aaaaaaaaaaaaaaaa").Touch(sess, []string{"a1.go"}, time.Now()); err != nil {
+			t.Fatal(err)
+		}
+		store.lockWait = time.Millisecond
+		held(t, store)
+		a := bound(store, "aaaaaaaaaaaaaaaa")
+		a.afterDelta = func() {
+			_ = os.Remove(store.manifestPath(sess.Key()))
+			_ = os.Remove(store.ownerPath(sess.Key()))
+		}
+		if err := a.Touch(sess, []string{"a2.go"}, time.Now()); err != nil {
+			t.Fatalf("unlocked Touch after uncontested owner removal = %v; want nil", err)
+		}
+		if o, err := store.owner(sess.Key()); err != nil || !o.claimed || o.account != "aaaaaaaaaaaaaaaa" {
+			t.Fatalf("owner after restore = %+v, %v; want A", o, err)
+		}
+		ms, err := store.Manifests()
+		if err != nil || len(ms) != 1 || ms[0].Account != "aaaaaaaaaaaaaaaa" || len(ms[0].Files) != 1 {
+			t.Fatalf("manifests after restore = %+v, %v; want A's a2.go", ms, err)
+		}
+		if _, ok := ms[0].Files["a2.go"]; !ok {
+			t.Fatalf("manifests after restore = %+v; missing a2.go", ms[0].Files)
+		}
+		if err := bound(store, "bbbbbbbbbbbbbbbb").Touch(sess, []string{"b.go"}, time.Now()); !errors.Is(err, ErrAccountConflict) {
+			t.Fatalf("B touch after restored owner = %v; want ErrAccountConflict", err)
+		}
+	})
+	t.Run("owner reclaimed by B", func(t *testing.T) {
+		store := Open(t.TempDir())
+		sess := Session{ID: "sess-prune-reclaimed", Tool: "codex"}
+		if err := bound(store, "aaaaaaaaaaaaaaaa").Touch(sess, []string{"a1.go"}, time.Now()); err != nil {
+			t.Fatal(err)
+		}
+		store.lockWait = time.Millisecond
+		held(t, store)
+		a := bound(store, "aaaaaaaaaaaaaaaa")
+		a.afterDelta = func() {
+			_ = os.Remove(store.manifestPath(sess.Key()))
+			_ = os.Remove(store.ownerPath(sess.Key()))
+			_ = store.link(sess.Key(), "bbbbbbbbbbbbbbbb")
+		}
+		if err := a.Touch(sess, []string{"a2.go"}, time.Now()); !errors.Is(err, ErrAccountConflict) {
+			t.Fatalf("unlocked Touch after B reclaimed owner = %v; want ErrAccountConflict", err)
+		}
+		if store.hasDeltas(sess.Key()) {
+			t.Fatalf("refused unlocked Touch left its delta behind")
+		}
+	})
+	t.Run("owner torn after delta", func(t *testing.T) {
+		store := Open(t.TempDir())
+		sess := Session{ID: "sess-prune-torn", Tool: "codex"}
+		if err := bound(store, "aaaaaaaaaaaaaaaa").Touch(sess, []string{"a1.go"}, time.Now()); err != nil {
+			t.Fatal(err)
+		}
+		store.lockWait = time.Millisecond
+		held(t, store)
+		a := bound(store, "aaaaaaaaaaaaaaaa")
+		a.afterDelta = func() {
+			_ = os.WriteFile(store.ownerPath(sess.Key()), []byte("{torn"), fileMode)
+		}
+		if err := a.Touch(sess, []string{"a2.go"}, time.Now()); !errors.Is(err, ErrAccountConflict) {
+			t.Fatalf("unlocked Touch after torn owner = %v; want ErrAccountConflict", err)
+		}
+		if store.hasDeltas(sess.Key()) {
+			t.Fatalf("refused unlocked Touch left its delta behind on unreadable owner")
+		}
+	})
+}
