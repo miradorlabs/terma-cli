@@ -15,6 +15,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/delivery"
 	"github.com/miradorlabs/terma-cli/internal/doctor"
+	"github.com/miradorlabs/terma-cli/internal/hooks/hookmgr"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
 	"github.com/miradorlabs/terma-cli/internal/relay/service"
@@ -24,6 +25,9 @@ import (
 func (app *App) doctorEnv(ctx context.Context) doctor.Env {
 	exe, _ := os.Executable()
 	env := doctor.Env{ConfigDir: app.dir, StateDir: app.stateDir, Agents: app.agents, Exe: exe, BinDirs: app.binDirs(), Updates: app.updateRows(exe)}
+	if terma, err := app.hookExecutable(); err == nil {
+		env.HookCommand = hookmgr.UserHookCommand(terma)
+	}
 	env.Config, env.ConfigErr = app.loadConfig()
 	env.Root, env.GitDir, env.RepoErr = workspaceHere(ctx)
 	if env.Config != nil {

@@ -24,7 +24,10 @@ type Env struct {
 	Config    *config.Config
 	ConfigErr error
 	// Exe is the running executable; BinDirs is where else a terma may be installed.
-	Exe          string
+	Exe string
+	// HookCommand is the command setup writes for a machine-wide hook event, with this
+	// terma; nil when unknown.
+	HookCommand  func(event string) string
 	BinDirs      []string
 	Root, GitDir string
 	RepoErr      error
@@ -210,6 +213,9 @@ func Run(ctx context.Context, env Env, progress Progress) Report {
 
 	if c, ok := UserHooksCheck(env.Agents, cfg.Harnesses); ok {
 		timed(KeyUserHooks, "machine-wide hooks run", func() Check { return c })
+	}
+	if c, ok := AgentHooksCheck(env.Agents, cfg.Harnesses, env.HookCommand); ok {
+		timed(KeyAgentHooks, "agent hooks in place", func() Check { return c })
 	}
 
 	timed(KeyHarness, "agent exporting to Terma", func() Check { return unlessCaptureOff(d.pol, d.agentsExporting()) })

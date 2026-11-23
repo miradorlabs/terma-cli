@@ -72,6 +72,7 @@ const (
 	KeyProject       = "team"
 	KeyHooks         = "hooks"
 	KeyUserHooks     = "user-hooks"
+	KeyAgentHooks    = "agent-hooks"
 	KeyHarness       = "harness"
 	KeyCompatibility = "compatibility"
 	KeyRouting       = "routing"

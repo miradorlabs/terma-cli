@@ -155,6 +155,10 @@ func Local(ctx context.Context, env Env) (LocalReport, error) {
 	if !authOK {
 		rep.Checks = append(rep.Checks, Check{Status: Fail, Fix: "terma setup"})
 	}
+	if c, ok := AgentHooksCheck(reg, cfg.Harnesses, env.HookCommand); ok && c.Status != Pass {
+		add("Agent hooks", "%s", c.Detail)
+		rep.Checks = append(rep.Checks, c)
+	}
 	// Only a repository that should be stamped and is not counts against the machine.
 	if hooks.Status == Warn || hooks.Status == Fail {
 		rep.Checks = append(rep.Checks, hooks)
