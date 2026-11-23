@@ -17,6 +17,8 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/miradorlabs/terma-cli/internal/agents"
+	"github.com/miradorlabs/terma-cli/internal/agents/builtin"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/doctor"
 	"github.com/miradorlabs/terma-cli/internal/relay"
@@ -235,19 +237,30 @@ func TestHarnessSelectionComingSoon(t *testing.T) {
 		chosen[name] = true
 	}
 	form := testApp.harnessSelectionForm(context.Background(), chosen)
-	wantOrder := []string{"claude", "codex", "copilot", "omp", "cursor", "opencode", "pi", "hermes", "gemini", "dsh", "antigravity"}
+	wantOrder := []string{"claude", "codex", "copilot", "omp", "antigravity", "cursor", "opencode", "pi", "hermes", "gemini", "dsh"}
+	if !testApp.agents.IsSupported("antigravity") {
+		// Coming Soon on Windows: last, in registry order.
+		wantOrder = append(slices.Delete(wantOrder, 4, 5), "antigravity")
+	}
 	if len(form.Items) != len(wantOrder) {
 		t.Fatalf("picker has %d items, want %d", len(form.Items), len(wantOrder))
 	}
 	// The supported agents lead the list, each selectable, under the name setup shows.
-	for i, label := range []string{"Claude Code & Desktop", "Codex TUI & Desktop", "Copilot (beta)", "OMP 18.18.2+ (beta)"} {
+	leading := []string{"Claude Code & Desktop", "Codex TUI & Desktop", "Copilot (beta)", "OMP 18.18.2+ (beta)"}
+	if testApp.agents.IsSupported("antigravity") {
+		leading = append(leading, "Antigravity 1.2.4+ (beta)")
+	}
+	for i, label := range leading {
 		if item := form.Items[i]; item.Label != label || item.Disabled || !testApp.agents.IsSupported(wantOrder[i]) {
 			t.Errorf("picker row %d = %+v, want %q supported and selectable", i, item, label)
 		}
 	}
 	for i, name := range wantOrder {
+		// A Coming Soon agent is listed under its own name, without a surface's marker.
 		display := name
-		if s, _, ok := testApp.agents.Surface(name); ok {
+		if a, ok := testApp.agents.Lookup(name); ok && !testApp.agents.IsSupported(name) {
+			display = a.DisplayName()
+		} else if s, _, ok := testApp.agents.Surface(name); ok {
 			display = s.DisplayName
 		}
 		if form.Items[i].Label != display {
@@ -265,8 +278,26 @@ func TestHarnessSelectionComingSoon(t *testing.T) {
 	}
 }
 
+// On Windows Antigravity is Coming Soon, listed under its own name: "(beta)" marks what
+// setup offers, and it offers Antigravity on macOS and Linux only.
+func TestHarnessSelectionAntigravityOnWindows(t *testing.T) {
+	app := New(func(dir string) *agents.Registry { return builtin.AgentsOn(dir, "windows") }, "dev")
+	app.binDirs = func() []string { return nil }
+	app.configure(t.TempDir(), t.TempDir())
+	form := app.harnessSelectionForm(context.Background(), map[string]bool{"antigravity": true})
+	item := form.Items[len(form.Items)-1]
+	if item.Label != "Antigravity" || !item.Disabled || item.Selected || item.Reason != "Coming Soon" {
+		t.Fatalf("Antigravity's row on Windows = %+v, want plain, disabled and Coming Soon", item)
+	}
+	for _, other := range form.Items[:len(form.Items)-1] {
+		if strings.Contains(other.Label, "Antigravity") {
+			t.Fatalf("Antigravity listed twice: %+v", other)
+		}
+	}
+}
+
 func TestHarnessSelectionFlags(t *testing.T) {
-	for _, name := range []string{"cursor", "opencode", "antigravity"} {
+	for _, name := range []string{"cursor", "opencode"} {
 		t.Run(name, func(t *testing.T) {
 			cmd := &cobra.Command{}
 			cfg := &config.Config{}
@@ -281,6 +312,14 @@ func TestHarnessSelectionFlags(t *testing.T) {
 	}
 	if got, err := testApp.chooseHarnesses(&cobra.Command{}, &config.Config{}, setupFlags{harnesses: "omp,claude"}); err != nil || !slices.Equal(got, []string{"claude", "omp"}) {
 		t.Fatalf("--harness omp,claude = %v, %v", got, err)
+	}
+	got, err = testApp.chooseHarnesses(&cobra.Command{}, &config.Config{}, setupFlags{harnesses: "antigravity,claude"})
+	if !testApp.agents.IsSupported("antigravity") {
+		if err == nil || !strings.Contains(err.Error(), "Coming Soon") {
+			t.Fatalf("antigravity on Windows: %v, %v", got, err)
+		}
+	} else if err != nil || !slices.Equal(got, []string{"claude", "antigravity"}) {
+		t.Fatalf("antigravity selection = %v, %v", got, err)
 	}
 }
 
@@ -301,7 +340,11 @@ func TestHarnessSelectionFiltersSavedAgents(t *testing.T) {
 				}
 			}
 		}
+		// Antigravity is not on the emptied PATH, so only a saved choice keeps it.
 		wantSetup := slices.Clone(wantInstalled)
+		if slices.Contains(saved, "antigravity") && testApp.agents.IsSupported("antigravity") {
+			wantSetup = append(wantSetup, "antigravity")
+		}
 		got, err := testApp.chooseHarnesses(cmd, cfg, setupFlags{assumeYes: true})
 		if err != nil || !slices.Equal(got, wantSetup) {
 			t.Fatalf("setup selection = %v, %v; want %v", got, err, wantSetup)
@@ -332,6 +375,86 @@ func TestSetupRecordsTheRelayEnvironment(t *testing.T) {
 		if env[k] != os.Getenv(k) {
 			t.Errorf("recorded %s=%q, setup ran with %q", k, env[k], os.Getenv(k))
 		}
+	}
+}
+
+// Antigravity exports nothing to the relay, but hooks run only while the relay's token
+// exists: setup with it alone still mints the token, and writes agy's hooks.
+func TestSetupWithAntigravityAloneTurnsHooksOn(t *testing.T) {
+	if !testApp.agents.IsSupported("antigravity") {
+		t.Skip("Antigravity is Coming Soon on Windows")
+	}
+	gateway := newFakeAuth(t)
+	authSandbox(t, gateway)
+	sandboxMachine(t)
+	signInTo(t, gateway, orgA())
+	out, err := runTerma(t, "setup", "--harness", "antigravity")
+	if err != nil {
+		t.Fatalf("setup: %v\n%s", err, out)
+	}
+	if !claim.Enabled(testApp.stateDir) {
+		t.Fatal("setup left no relay token, so every hook is off")
+	}
+	// The relay it starts reports this machine, as it does for an exporting agent.
+	if !strings.Contains(out, "Check-in") {
+		t.Errorf("setup did not check in:\n%s", out)
+	}
+	path := filepath.Join(os.Getenv("HOME"), ".gemini", "config", "hooks.json")
+	hooks, err := os.ReadFile(path)
+	if err != nil || !strings.Contains(string(hooks), "hook --user antigravity-stop") {
+		t.Fatalf("agy hooks = %s, %v", hooks, err)
+	}
+	if out, _ := runTerma(t, "doctor"); strings.Contains(out, "switched off or out of date") {
+		t.Errorf("doctor faults hooks that are in place:\n%s", out)
+	}
+
+	// Its hooks are all it reports through: doctor says when they are switched off, and
+	// doctor and status when they are gone.
+	disabled := strings.Replace(string(hooks), `"terma": {`, `"terma": {"enabled": false, `, 1)
+	if err := os.WriteFile(path, []byte(disabled), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if out, err := runTerma(t, "doctor"); err == nil || !strings.Contains(out, "switched off or out of date") {
+		t.Errorf("doctor with terma's agy hook disabled: %v\n%s", err, out)
+	}
+	if err := os.Remove(path); err != nil {
+		t.Fatal(err)
+	}
+	if out, err := runTerma(t, "doctor"); err == nil || !strings.Contains(out, "switched off or out of date") || !strings.Contains(out, "Antigravity") {
+		t.Errorf("doctor with agy's hooks gone: %v\n%s", err, out)
+	}
+	if out, _ := runTerma(t, "status"); !strings.Contains(out, "switched off or out of date") {
+		t.Errorf("status with agy's hooks gone:\n%s", out)
+	}
+}
+
+// A ~/.gemini/config/hooks.json that does not parse, as agy's comments and trailing commas
+// do not, holds up neither setup for another agent nor teardown, which still retires the
+// relay's token.
+func TestSetupAndTeardownPassAMalformedAgyHooksFile(t *testing.T) {
+	gateway := newFakeAuth(t)
+	authSandbox(t, gateway)
+	sandboxMachine(t)
+	signInTo(t, gateway, orgA())
+	path := filepath.Join(os.Getenv("HOME"), ".gemini", "config", "hooks.json")
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	const mine = "// the developer's\n{\"lint\": {\"Stop\": [],},}\n"
+	if err := os.WriteFile(path, []byte(mine), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if out, err := runTerma(t, "setup", "--harness", "claude"); err != nil {
+		t.Fatalf("setup: %v\n%s", err, out)
+	}
+	if out, err := runTerma(t, "teardown", "--yes"); err != nil {
+		t.Fatalf("teardown: %v\n%s", err, out)
+	}
+	if claim.Enabled(testApp.stateDir) {
+		t.Error("teardown left the relay's token")
+	}
+	if got, _ := os.ReadFile(path); string(got) != mine {
+		t.Errorf("hooks.json changed:\n%s", got)
 	}
 }
 
@@ -590,5 +713,43 @@ func TestDesktopGrantCutoverKeepsInFlightWorkWithItsTeam(t *testing.T) {
 	checkTeams(sent)
 	if queued := queuedProjects(t); len(queued) != 0 {
 		t.Fatalf("queue = %v after the switch back", queued)
+	}
+}
+
+// agy reads its hooks file as JSONC. A comment or trailing comma the developer adds after
+// setup holds up neither setup run again nor teardown, which retires the relay's token
+// and leaves the comment in place.
+func TestSetupAndTeardownPatchACommentedAgyHooksFile(t *testing.T) {
+	if !testApp.agents.IsSupported("antigravity") {
+		t.Skip("Antigravity is Coming Soon on Windows")
+	}
+	gateway := newFakeAuth(t)
+	authSandbox(t, gateway)
+	sandboxMachine(t)
+	signInTo(t, gateway, orgA())
+	if out, err := runTerma(t, "setup", "--harness", "antigravity"); err != nil {
+		t.Fatalf("setup: %v\n%s", err, out)
+	}
+	path := filepath.Join(os.Getenv("HOME"), ".gemini", "config", "hooks.json")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	commented := "// my agy hooks\n" + strings.Replace(string(data), "\n}", ",\n}", 1)
+	if err := os.WriteFile(path, []byte(commented), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if out, err := runTerma(t, "setup", "--harness", "antigravity"); err != nil {
+		t.Fatalf("setup again: %v\n%s", err, out)
+	}
+	if out, err := runTerma(t, "teardown", "--yes"); err != nil {
+		t.Fatalf("teardown: %v\n%s", err, out)
+	}
+	if claim.Enabled(testApp.stateDir) {
+		t.Error("teardown left the relay's token")
+	}
+	got, err := os.ReadFile(path)
+	if err == nil && (strings.Contains(string(got), "hook --user") || !strings.Contains(string(got), "// my agy hooks")) {
+		t.Errorf("after teardown:\n%s", got)
 	}
 }

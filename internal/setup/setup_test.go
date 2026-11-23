@@ -7,8 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/miradorlabs/terma-cli/internal/agents"
-	"github.com/miradorlabs/terma-cli/internal/agents/agentstest"
 	"github.com/miradorlabs/terma-cli/internal/config"
 )
 
@@ -45,12 +43,12 @@ func TestSetupRecordsThenFetchesThenConnects(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	var log []string
-	reg := agents.New(agentstest.Agent{ID: "fake"})
-	res, err := Run(t.Context(), reg, &config.Config{Dir: dir, StateDir: dir, OrganizationID: "org_a", AuthURL: "https://auth.example"}, steps(dir, &log, policy()))
+	res, err := Run(t.Context(), &config.Config{Dir: dir, StateDir: dir, OrganizationID: "org_a", AuthURL: "https://auth.example"}, steps(dir, &log, policy()))
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []string{"sign-in", "choose", "recorded", "team", "fetch", "stop-relay", "fetched", "spool-key", "relay", "machine-hooks"}
+	// Any chosen agent checks in, one with no relay exporter too: the relay runs for its hooks.
+	want := []string{"sign-in", "choose", "recorded", "team", "fetch", "stop-relay", "fetched", "spool-key", "relay", "machine-hooks", "check-in"}
 	if !slices.Equal(log, want) {
 		t.Fatalf("steps = %v, want %v", log, want)
 	}
@@ -72,7 +70,7 @@ func TestSetupLeavesARelayOfTheSameScopeRunning(t *testing.T) {
 	dir := t.TempDir()
 	var log []string
 	pol := policy()
-	_, err := Run(t.Context(), agents.New(), &config.Config{Dir: dir, StateDir: dir, OrganizationID: "org_a", AuthURL: pol.AuthURL, Policy: pol}, steps(dir, &log, pol))
+	_, err := Run(t.Context(), &config.Config{Dir: dir, StateDir: dir, OrganizationID: "org_a", AuthURL: pol.AuthURL, Policy: pol}, steps(dir, &log, pol))
 	if err != nil || slices.Contains(log, "stop-relay") {
 		t.Fatalf("steps = %v, err %v", log, err)
 	}
@@ -85,14 +83,14 @@ func TestSetupRefusesWhatItCannotDoSafely(t *testing.T) {
 	var log []string
 	missing := steps(dir, &log, policy())
 	missing.FetchPolicy = nil
-	if _, err := Run(t.Context(), agents.New(), &config.Config{Dir: dir, StateDir: dir}, missing); err == nil {
+	if _, err := Run(t.Context(), &config.Config{Dir: dir, StateDir: dir}, missing); err == nil {
 		t.Fatal("ran without a policy fetch")
 	}
 	cancelled := errors.New("cancelled")
 	s := steps(dir, &log, policy())
 	s.ChooseAgents = func(context.Context, *config.Config) ([]string, error) { return nil, cancelled }
 	log = nil
-	if _, err := Run(t.Context(), agents.New(), &config.Config{Dir: dir, StateDir: dir}, s); !errors.Is(err, cancelled) {
+	if _, err := Run(t.Context(), &config.Config{Dir: dir, StateDir: dir}, s); !errors.Is(err, cancelled) {
 		t.Fatalf("a cancelled choice: %v", err)
 	}
 	if file, _ := config.LoadFile(dir); file != nil && file.Profiles[config.DefaultProfile] != nil {

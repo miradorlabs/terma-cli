@@ -61,3 +61,9 @@ type Renderer interface {
 type OffSwitched interface {
 	WhenHooksOff() map[string]Handler
 }
+
+// VersionReporter is an agent that reports which of its versions is installed here, for
+// doctor to name; "" when it cannot tell.
+type VersionReporter interface {
+	DetectedVersion(ctx context.Context) string
+}

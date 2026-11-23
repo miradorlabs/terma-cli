@@ -40,7 +40,11 @@ func (f fake) Renders() map[string]agents.RenderHandler {
 	}}
 }
 func (f fake) WhenHooksOff() map[string]agents.Handler {
-	return map[string]agents.Handler{"fake-edit": f.record("off")}
+	return map[string]agents.Handler{"fake-edit": func(ctx context.Context, env hookrun.Env) error {
+		// The reply an agent may expect even from a hook that records nothing.
+		_, _ = io.WriteString(env.Stdout, "{}\n")
+		return f.record("off")(ctx, env)
+	}}
 }
 
 type harness struct {
@@ -100,6 +104,9 @@ func TestRunWithHooksOffRunsOnlyTheOffHandler(t *testing.T) {
 	}
 	if strings.Join(h.ran, ",") != "off" || h.flushes != 0 {
 		t.Fatalf("ran %v, %d flushes", h.ran, h.flushes)
+	}
+	if got := r.Stdout.(*bytes.Buffer).String(); got != "{}\n" {
+		t.Fatalf("the hooks-off handler's reply %q did not reach the agent", got)
 	}
 }
 

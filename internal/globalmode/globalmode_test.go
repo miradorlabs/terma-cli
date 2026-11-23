@@ -16,9 +16,10 @@ func sandbox(t *testing.T) (Machine, string) {
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
 	hooks := filepath.Join(t.TempDir(), "hooks.json")
+	fake := agentstest.UserHooked{Agent: agentstest.Agent{ID: "fake", Label: "fake-cli"}, Path: hooks}
 	m := Machine{
 		ConfigDir:   t.TempDir(),
-		Agents:      agents.New(agentstest.UserHooked{Agent: agentstest.Agent{ID: "fake", Label: "fake-cli"}, Path: hooks}, agentstest.Agent{ID: "plain"}),
+		Agents:      agents.New(fake, agentstest.Agent{ID: "plain"}).Support(fake),
 		Terma:       func() (string, error) { return "/opt/terma/bin/terma", nil },
 		ManagedRoot: t.TempDir(),
 	}
@@ -118,5 +119,23 @@ func TestSetupLeavesGitsConfigurationAlone(t *testing.T) {
 			names = append(names, e.Name())
 		}
 		t.Fatalf("setup wrote hooks into the config directory: %v", names)
+	}
+}
+
+// An agent this build does not offer on this system keeps its hooks file as it is, even
+// when removing: a home directory shared with another system holds that system's hooks.
+func TestUnsupportedAgentsHooksAreLeftAlone(t *testing.T) {
+	m, hooks := sandbox(t)
+	if _, err := m.ApplyUserHooks([]string{"fake"}, true); err != nil {
+		t.Fatal(err)
+	}
+	before, _ := os.ReadFile(hooks)
+	fake := agentstest.UserHooked{Agent: agentstest.Agent{ID: "fake", Label: "fake-cli"}, Path: hooks}
+	m.Agents = agents.New(fake)
+	if changed, err := m.ApplyUserHooks(nil, false); err != nil || len(changed) != 0 {
+		t.Fatalf("removal touched an unsupported agent's hooks: %v, %v", changed, err)
+	}
+	if after, _ := os.ReadFile(hooks); string(after) != string(before) {
+		t.Fatalf("hooks file changed:\n%s", after)
 	}
 }

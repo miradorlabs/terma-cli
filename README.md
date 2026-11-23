@@ -7,8 +7,8 @@
 
 The `terma` cli connects coding agents to [Terma](https://terma.ai), then stamps the commits
 they produce so agent spend can be traced to shipped code. It supports **Claude Code**
-(CLI and Desktop), **Codex** (CLI and Desktop), **GitHub Copilot** (CLI and VS Code) and
-**[OMP](https://github.com/can1357/oh-my-pi)**.
+(CLI and Desktop), **Codex** (CLI and Desktop), **GitHub Copilot** (CLI and VS Code),
+**[OMP](https://github.com/can1357/oh-my-pi)** and **Antigravity** (the `agy` CLI 1.2.4 or later, on macOS and Linux).
 
 ## Get started
 
@@ -257,7 +257,7 @@ terma setup --org acme --team platform --harness claude,codex,copilot,omp --yes
 - `--team <name-or-id>` sets up that team; without it, setup asks when your organization
   has several teams, with the one you chose before as the default, else takes the only
   one; when it cannot ask (`--yes` or no terminal), it keeps the team you chose before.
-- `--harness <agents>` records those agents (`claude`, `codex`, `copilot`, `omp`); with `--yes` or no
+- `--harness <agents>` records those agents (`claude`, `codex`, `copilot`, `omp`, and on macOS and Linux `antigravity`); with `--yes` or no
   terminal and no `--harness`, setup records the agents recorded before and every
   supported agent installed on this machine.
 - `--yes` skips the browser prompt and the organization and agents questions. The team
@@ -467,6 +467,17 @@ set up while such an export stands. A named profile (`omp --profile`) has a dire
 own that setup does not configure. A file one of OMP's shell commands writes is not
 attributed to its session. A `PI_CODING_AGENT_DIR` that Pi and OMP share holds both terma
 extensions, and each agent then loads the other's too.
+
+Antigravity's `agy` has no telemetry export, so nothing of it passes the relay. Setup adds
+one named hook, `terma`, to `~/.gemini/config/hooks.json`, which every `agy` session loads,
+and leaves the file's other hooks, and its comments, as they are. It needs `agy` 1.2.4 or later,
+the first whose Stop hook runs reliably; `terma doctor` names the version it finds. Those hooks report the model, each turn,
+each tool step (its name and whether it failed, never its arguments) and how the turn
+ended, and the files `agy`'s own file tools write are stamped on your commits. `agy`
+reports no token counts or cost, and runs no hook after a turn you cancel, so what that
+turn did is sent with the next turn's. On Windows, setup lists Antigravity as Coming Soon: `agy` runs
+its hooks with `cmd` there, and terma's hook command for it has been checked only on macOS
+and Linux.
 
 `terma setup` runs the relay as a per-user background service, so it is up before any
 agent starts; with `--relay-service off`, hooks start it on demand. `terma update`

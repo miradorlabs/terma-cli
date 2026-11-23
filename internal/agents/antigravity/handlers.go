@@ -27,6 +27,7 @@ var (
 type antigravityHookInput struct {
 	ConversationID string   `json:"conversationId"`
 	WorkspacePaths []string `json:"workspacePaths"`
+	Cwd            string   `json:"cwd"`
 	ModelName      string   `json:"modelName"`
 	// Error is failure text; only its presence is recorded, since the text is content.
 	Error string `json:"error"`
@@ -54,8 +55,12 @@ func (in *antigravityHookInput) id() string {
 	return cmp.Or(in.ConversationID, os.Getenv(antigravityConversationEnv))
 }
 
-// cwd is the first workspace path, which agy calls the workspace; hooks run in its .agents.
+// cwd is the agent's working directory (agy 1.5.4+), else the first workspace path; a
+// hook itself runs in the folder holding hooks.json.
 func (in *antigravityHookInput) cwd(fallback string) string {
+	if in.Cwd != "" {
+		return in.Cwd
+	}
 	if len(in.WorkspacePaths) > 0 && in.WorkspacePaths[0] != "" {
 		return in.WorkspacePaths[0]
 	}
@@ -122,14 +127,16 @@ func preInvocation(ctx context.Context, env hookrun.Env) error {
 }
 
 // antigravityEditTools are the tools whose arguments name a changed file; agy exposes
-// edit tools per model family, its own taking TargetFile, the others the vendor's key.
+// edit tools per model family and release: through 1.2 its own took TargetFile
+// (write_to_file, replace_file_content), from 1.5 they take Path (write_file, edit_file),
+// and the others the vendor's key.
 var antigravityEditTools = map[string]bool{
 	"write_to_file": true, "replace_file_content": true, "multi_replace_file_content": true,
-	"create_file": true, "edit_file": true, "delete_file": true,
+	"write_file": true, "create_file": true, "edit_file": true, "delete_file": true,
 	"str_replace_editor": true, "notebook_edit": true,
 }
 
-var antigravityPathKeys = []string{"TargetFile", "target_file", "file_path", "path", "notebook_path"}
+var antigravityPathKeys = []string{"TargetFile", "Path", "target_file", "file_path", "path", "notebook_path"}
 
 // antigravityEditedPaths pulls the edited file out of a tool call; str_replace_editor's
 // `view` reads.
@@ -178,9 +185,10 @@ func postToolUse(ctx context.Context, env hookrun.Env) error {
 		env.EmitFor(r, spool.Event{Name: semconv.TermaToolCallEvent, SessionID: id, Attrs: call})
 	}
 
-	// No toolCall yields no paths, so this guard also makes in.ToolCall safe below.
+	// A failed edit changed nothing. No toolCall yields no paths, so this guard also makes
+	// in.ToolCall safe below.
 	files := antigravityEditedPaths(in)
-	if len(files) == 0 {
+	if len(files) == 0 || in.Error != "" {
 		return nil
 	}
 	// The step's terma.tool.call ids: this is what that call changed, not a second call.

@@ -7,7 +7,6 @@ import (
 	"context"
 	"errors"
 
-	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/routing"
 )
@@ -32,7 +31,8 @@ type Steps struct {
 	ConnectRelay func(ctx context.Context, names []string) error
 	// MachineHooks writes the agents' machine-wide hooks and git's global hooks path.
 	MachineHooks func(ctx context.Context, names []string) error
-	// CheckIn asks the relay for a heartbeat, once an agent reports through it.
+	// CheckIn asks the relay for a heartbeat once agents are chosen: ConnectRelay starts it
+	// for any agent, since an agent that reports through its hooks alone needs its token.
 	CheckIn func(ctx context.Context)
 }
 
@@ -44,7 +44,7 @@ type Result struct {
 
 // Run sets the machine up for cfg's profile. The agents are recorded before the policy
 // is fetched, and the policy is stored before anything is pointed at the relay.
-func Run(ctx context.Context, reg *agents.Registry, cfg *config.Config, s Steps) (Result, error) {
+func Run(ctx context.Context, cfg *config.Config, s Steps) (Result, error) {
 	if s.SignIn == nil || s.ChooseAgents == nil || s.SelectTeam == nil || s.FetchPolicy == nil {
 		return Result{}, errors.New("setup: sign-in, the agent choice, the team and the policy fetch are required")
 	}
@@ -94,7 +94,7 @@ func Run(ctx context.Context, reg *agents.Registry, cfg *config.Config, s Steps)
 			return Result{}, err
 		}
 	}
-	if len(reg.RelayTargets(names)) > 0 && s.CheckIn != nil {
+	if len(names) > 0 && s.CheckIn != nil {
 		s.CheckIn(ctx)
 	}
 	return Result{Agents: names, Policy: pol}, nil

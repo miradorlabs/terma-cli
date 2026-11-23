@@ -1,6 +1,7 @@
 package hookmgr
 
 import (
+	"encoding/json"
 	"testing"
 )
 
@@ -73,4 +74,27 @@ func TestSystemCmd(t *testing.T) {
 	if got := SystemCmd(); got != `C:\Windows\System32\cmd.exe` {
 		t.Fatalf("SystemCmd() without SystemRoot = %q", got)
 	}
+}
+
+// TermaPaths reads back the executables UserHookCommand put into a file, quoting and JSONC
+// comments included, and nothing from a command terma did not write.
+func TestTermaPaths(t *testing.T) {
+	t.Parallel()
+	odd := "/opt/it's terma/bin/terma"
+	data := []byte(`// hooks
+{"a": {"Stop": [{"command": ` + jsonString(UserHookCommand(odd)("x-stop")) + `}]},
+ "b": [{"hooks": [{"command": ` + jsonString(UserHookCommand("/usr/local/bin/terma")("y")) + `}]}, {"command": "terma hook --user z"}],
+ "c": {"command": ` + jsonString(UserHookCommand(odd)("x-start")) + `},}`)
+	got := TermaPaths(data)
+	if len(got) != 2 || got[0] != odd || got[1] != "/usr/local/bin/terma" {
+		t.Fatalf("TermaPaths = %q", got)
+	}
+	if TermaPaths([]byte("{")) != nil {
+		t.Fatal("a file that does not parse named a terma")
+	}
+}
+
+func jsonString(s string) string {
+	b, _ := json.Marshal(s)
+	return string(b)
 }

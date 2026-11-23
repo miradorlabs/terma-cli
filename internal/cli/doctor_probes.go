@@ -28,6 +28,9 @@ import (
 func (app *App) doctorEnv(ctx context.Context) doctor.Env {
 	exe, _ := os.Executable()
 	env := doctor.Env{ConfigDir: app.dir, StateDir: app.stateDir, Agents: app.agents, Exe: exe, BinDirs: app.binDirs(), Updates: app.updateRows(exe)}
+	if terma, err := app.hookExecutable(); err == nil {
+		env.HookExecutable = terma
+	}
 	env.Config, env.ConfigErr = app.loadConfig()
 	env.Root, env.GitDir, env.RepoErr = workspaceHere(ctx)
 	if env.Config != nil {

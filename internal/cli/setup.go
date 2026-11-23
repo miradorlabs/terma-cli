@@ -263,7 +263,7 @@ func (app *App) runSetup(cmd *cobra.Command, f setupFlags) error {
 	if cfg.APIKey != "" {
 		app.useServerKey(&steps, ui, parseOrgRef(f.org), &team, f.insecureStorage)
 	}
-	res, err := setup.Run(cmd.Context(), app.agents, cfg, steps)
+	res, err := setup.Run(cmd.Context(), cfg, steps)
 	// A team picker left after the agents were recorded is still a cancellation, but not
 	// one that recorded nothing.
 	if errors.Is(err, errCancelled) {
@@ -356,7 +356,11 @@ func (app *App) harnessSelectionAgents() []agentChoice {
 	for _, available := range []bool{true, false} {
 		for _, a := range app.agents.All() {
 			if app.agents.IsSupported(a.Name()) == available {
-				for _, surface := range agents.Surfaces(a) {
+				surfaces := agents.Surfaces(a)
+				if !available { // Coming Soon: one row under its own name, no surface's beta mark
+					surfaces = []agents.Surface{{Name: a.Name(), DisplayName: a.DisplayName(), Installed: a.Installed}}
+				}
+				for _, surface := range surfaces {
 					choices = append(choices, agentChoice{name: surface.Name, display: surface.DisplayName, installed: surface.Installed})
 				}
 			}

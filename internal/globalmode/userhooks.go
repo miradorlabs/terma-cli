@@ -74,46 +74,70 @@ func (m Machine) syncUserHookTrust(approved, then func(string)) {
 }
 
 // ApplyUserHooks writes terma's entries into each covered agent's machine-wide hooks file,
-// or removes them.
+// or removes them, and returns the files it changed.
 func (m Machine) ApplyUserHooks(selected []string, install bool) ([]string, error) {
+	changed, _, err := m.applyUserHooks(selected, install)
+	return changed, err
+}
+
+// applyUserHooks is ApplyUserHooks, with the notes each agent's plan carries, prefixed with
+// its name. An agent this build does not offer on this system is left alone: a home
+// directory shared with another system keeps that system's hooks.
+func (m Machine) applyUserHooks(selected []string, install bool) (changed, notes []string, _ error) {
 	terma, err := m.Terma()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	covered := m.userHookAgents(selected)
-	var changed []string
 	for _, a := range m.Agents.With[agents.UserHooks]() {
-		// Not where the organization's managed hooks run: both would fire.
-		want := install && slices.Contains(covered, a.Name()) && !m.ManagedDeployed(a.Name())
-		path, err := a.UserHooksPath()
-		dir, file := filepath.Dir(path), filepath.Base(path)
-		if err != nil {
-			return changed, err
-		}
-		if !want {
-			if _, err := os.Stat(filepath.Join(dir, file)); errors.Is(err, fs.ErrNotExist) {
-				continue
-			}
-		}
-		plan, err := a.PlanUserHooks(dir, hookmgr.UserHookCommand(terma), want)
-		if err != nil {
-			return changed, err
-		}
-		if plan.Empty() {
+		if !m.Agents.IsSupported(a.Name()) {
 			continue
 		}
-		if want {
-			if err := os.MkdirAll(dir, 0o700); err != nil {
-				return changed, err
-			}
+		// Not where the organization's managed hooks run: both would fire.
+		want := install && slices.Contains(covered, a.Name()) && !m.ManagedDeployed(a.Name())
+		path, err := m.applyAgentHooks(a, terma, want, &notes)
+		if err != nil {
+			return changed, notes, err
 		}
-		// Often a dotfiles link: written through, as the exporter step does.
-		if err := hookmgr.ApplyThroughLinks(dir, plan); err != nil {
-			return changed, err
+		if path != "" {
+			changed = append(changed, path)
 		}
-		changed = append(changed, filepath.Join(dir, file))
 	}
-	return changed, nil
+	return changed, notes, nil
+}
+
+// applyAgentHooks writes or removes one agent's entries, returning the file when it changed.
+func (m Machine) applyAgentHooks(a agents.UserHooks, terma string, want bool, notes *[]string) (string, error) {
+	path, err := a.UserHooksPath()
+	if err != nil {
+		return "", err
+	}
+	dir := filepath.Dir(path)
+	if !want {
+		if _, err := os.Stat(path); errors.Is(err, fs.ErrNotExist) {
+			return "", nil
+		}
+	}
+	plan, err := a.PlanUserHooks(dir, hookmgr.UserHookCommand(terma), want)
+	if err != nil {
+		return "", err
+	}
+	if plan.Empty() {
+		return "", nil
+	}
+	if want {
+		if err := os.MkdirAll(dir, 0o700); err != nil {
+			return "", err
+		}
+	}
+	// Often a dotfiles link: written through, as the exporter step does.
+	if err := hookmgr.ApplyThroughLinks(dir, plan); err != nil {
+		return "", err
+	}
+	for _, note := range plan.Notes {
+		*notes = append(*notes, a.DisplayName()+": "+note)
+	}
+	return path, nil
 }
 
 func (m Machine) managedHookFiles(agent string) []string {

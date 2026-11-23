@@ -173,3 +173,20 @@ func TestEveryToolLabelIsASessionKey(t *testing.T) {
 		}
 	}
 }
+
+// Antigravity's hooks are checked with the POSIX command only, so Windows offers it as
+// Coming Soon; the agents supported everywhere stay supported there.
+func TestAntigravityIsComingSoonOnWindows(t *testing.T) {
+	t.Parallel()
+	for goos, want := range map[string]bool{"linux": true, "darwin": true, "windows": false} {
+		r := AgentsOn("", goos)
+		if got := r.IsSupported("antigravity"); got != want {
+			t.Errorf("%s: antigravity supported = %v, want %v", goos, got, want)
+		}
+		for _, name := range []string{"claude", "codex", "copilot"} {
+			if !r.IsSupported(name) {
+				t.Errorf("%s: %s should stay supported", goos, name)
+			}
+		}
+	}
+}
