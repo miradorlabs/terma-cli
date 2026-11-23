@@ -83,8 +83,6 @@ func TestAntigravityRealLogin(t *testing.T) {
 	sb.SetupAgents = append(sb.SetupAgents, "antigravity")
 	sb.Setup(nil, "--team", sb.ProjectID, "--harness", sb.setupList())
 	sb.Receiver.Reset()
-	// A person's login mints no team key: the spool delivers with the receiver's.
-	sb.useLiveKey()
 	written, err := os.ReadFile(filepath.Join(sb.Home, ".gemini", "config", "hooks.json"))
 	if err != nil {
 		t.Fatalf("terma setup wrote no agy hooks: %v", err)

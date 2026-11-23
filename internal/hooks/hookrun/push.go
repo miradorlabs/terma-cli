@@ -2,6 +2,7 @@ package hookrun
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"crypto/rand"
 	"encoding/json"
@@ -19,7 +20,9 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/gitx"
 	"github.com/miradorlabs/terma-cli/internal/procinfo"
+	"github.com/miradorlabs/terma-cli/internal/project"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
+	"github.com/miradorlabs/terma-cli/internal/sendas"
 	"github.com/miradorlabs/terma-cli/internal/session"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 	"github.com/miradorlabs/terma-cli/internal/trailer"
@@ -30,8 +33,9 @@ import (
 // was given to a record under PushesDir and hands it to a detached AwaitPush; a record
 // no AwaitPush finished is resolved by SweepPushes. pre-push itself starts no git.
 
-// PushesDir holds, under the state directory, the pushes waiting to be reported.
-const PushesDir = "pushes"
+// PushesDir holds, under the state directory, the pushes waiting to be reported. Its name is
+// new to this version, so an older terma's sweep never reports, and strips, a tagged record.
+const PushesDir = "pushes-v2"
 
 const (
 	// MaxPushCommits bounds terma.push.commits; terma.push.commit.count stays the count.
@@ -107,7 +111,9 @@ type pushRecord struct {
 	// Excluded are the remote's branches as its remote-tracking refs showed them before the
 	// push: a new branch's commits are those none of them has.
 	Excluded []string `json:"excluded,omitempty"`
-	// Event is the stamped event every ref's report starts from.
+	// Event is the stamped event every ref's report starts from. Its lane is the pre-push
+	// hook's; with none, the hook was in an agent's sandbox, and each ref's report takes its
+	// sessions' (recordLane).
 	Event spool.Event `json:"event"`
 }
 
@@ -126,7 +132,7 @@ func PrePush(ctx context.Context, env Env) error {
 		return nil
 	}
 	refs := ParsePushInput(string(input))
-	if len(refs) == 0 {
+	if len(refs) == 0 || env.lostOutside(r, len(refs)) {
 		return nil
 	}
 	// git names a push to a URL by the URL twice; a URL never goes out as a remote's name.
@@ -294,10 +300,27 @@ func reportPush(ctx context.Context, env Env, path string, rec pushRecord) {
 		if ref.Reported {
 			continue
 		}
-		if ev, ok := pushEvent(ctx, env, rec, i, ref, exited); ok && env.emit(ev) {
-			emitted, rec.Refs[i].Reported = true, true
-		} else {
+		ev, sessions, walked, ok := pushEvent(ctx, env, rec, i, ref, exited)
+		switch {
+		case !ok:
 			failed = true
+		case !walked:
+			// The walk stopped at its bound: a session past it may be anyone's.
+			env.countLost(nil, sendas.LostAmbiguousPush, 1)
+			rec.Refs[i].Reported = true
+		default:
+			lane, owned := pushLane(rec.lane(), pushStore(env, rec), sessions)
+			if !owned {
+				env.countLost(nil, sendas.LostAmbiguousPush, 1)
+				rec.Refs[i].Reported = true
+				continue
+			}
+			ev.Account, ev.NoPerson = lane.Account, lane.NoPerson
+			if env.emitAsCollected(ev) {
+				emitted, rec.Refs[i].Reported = true, true
+			} else {
+				failed = true
+			}
 		}
 	}
 	// A ref that could not be reported is retried by a later sweep, for a while; the record
@@ -315,8 +338,20 @@ func reportPush(ctx context.Context, env Env, path string, rec pushRecord) {
 	}
 }
 
-// pushEvent is the report of one ref of a push; ok is false when its commits cannot be read.
-func pushEvent(ctx context.Context, env Env, rec pushRecord, i int, ref PushRef, exited bool) (spool.Event, bool) {
+// pushStore is the session store of the checkout rec pushed from.
+func pushStore(env Env, rec pushRecord) *session.Store {
+	dir, err := project.StoreDir(env.StateDir, rec.Root, rec.GitDir)
+	if err != nil {
+		return session.Open(filepath.Join(rec.GitDir, project.GitStoreDir))
+	}
+	return session.Open(dir)
+}
+
+// pushEvent is the report of one ref of a push, and every session stamped into the commits
+// it pushed, past the caps on what the report lists; walked is false when the walk stopped
+// at its bound (maxPushWalk), so some commits went unread; ok is false when its commits
+// cannot be read.
+func pushEvent(ctx context.Context, env Env, rec pushRecord, i int, ref PushRef, exited bool) (_ spool.Event, all []trailer.Trailer, walked, ok bool) {
 	attrs := maps.Clone(rec.Event.Attrs)
 	if attrs == nil {
 		attrs = map[string]any{}
@@ -336,12 +371,15 @@ func pushEvent(ctx context.Context, env Env, rec pushRecord, i int, ref PushRef,
 			rng = semconv.TermaPushRangeFallback
 		}
 	}
-	commits, err := gitx.Commits(ctx, rec.Root, ref.LocalSHA, exclude, maxPushWalk)
+	walk := cmp.Or(env.pushWalk, maxPushWalk)
+	commits, err := gitx.Commits(ctx, rec.Root, ref.LocalSHA, exclude, walk+1)
 	if err != nil {
 		env.Logf("pushed commits: %v", err)
-		return spool.Event{}, false
+		return spool.Event{}, nil, false, false
 	}
-	shas, sessions := pushedLists(commits)
+	walked = len(commits) <= walk
+	commits = commits[:min(len(commits), walk)]
+	shas, sessions, all := pushedLists(commits)
 	ids := sessionIDs(sessions)
 	status := semconv.TermaPushStatusUnknown
 	if exited && ref.Tracking != "" && ref.TrackingBefore != ref.LocalSHA {
@@ -365,24 +403,5 @@ func pushEvent(ctx context.Context, env Env, rec pushRecord, i int, ref PushRef,
 	if len(ids) > 0 {
 		ev.SessionID = ids[0]
 	}
-	return ev, true
-}
-
-// pushedLists are the commit ids terma.push.commits lists, at most MaxPushCommits, and the
-// sessions stamped into those commits alone, each agent's session once, at most
-// maxPushSessions. shas is never nil: an empty list is still the string[] the registry declares.
-func pushedLists(commits []gitx.PushedCommit) (shas []string, sessions []trailer.Trailer) {
-	listed := commits[:min(len(commits), MaxPushCommits)]
-	shas = make([]string, 0, len(listed))
-	var stamped []trailer.Trailer
-	for _, c := range listed {
-		shas = append(shas, c.SHA)
-		for _, t := range trailer.Parse(c.Trailers, "") {
-			if session.ValidID(t.SessionID) {
-				stamped = append(stamped, t)
-			}
-		}
-	}
-	sessions = uniqueSessions(stamped)
-	return shas, sessions[:min(len(sessions), maxPushSessions)]
+	return ev, all, walked, true
 }

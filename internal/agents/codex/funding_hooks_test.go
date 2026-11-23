@@ -25,7 +25,7 @@ func fundingEnv(t *testing.T) hookrun.Env {
 	t.Setenv("ANTHROPIC_API_KEY", "")
 	t.Setenv("ANTHROPIC_AUTH_TOKEN", "")
 	t.Setenv("CLAUDE_CODE_OAUTH_TOKEN", "")
-	sp, err := spool.Open(t.TempDir())
+	sp, err := hookruntest.OpenSpool(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -92,7 +92,7 @@ func TestCodexSequenceCheckpointAfterSpooling(t *testing.T) {
 	}
 	// An unsuccessful append must leave quota observations available for retry.
 	dir := filepath.Join(t.TempDir(), "spool")
-	sp, err := spool.Open(dir)
+	sp, err := hookruntest.OpenSpool(dir)
 	if err != nil {
 		t.Fatal(err)
 	}

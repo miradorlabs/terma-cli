@@ -69,7 +69,8 @@ func (r *Relay) janitor(now time.Time) {
 }
 
 // dropHeldAtExit drops what is still held: it lives in memory only, never on disk. Each
-// drop is named by what held the part (decide's reason), or "claimed" when a claim landed too late.
+// drop is named by what held the part (decide's reason), or "claimed" when a claim, or its
+// team's policy, landed too late; a claimed one is lost as lostPolicyTimeout.
 func (r *Relay) dropHeldAtExit() {
 	r.deliverMu.Lock()
 	defer r.deliverMu.Unlock()
@@ -77,12 +78,19 @@ func (r *Relay) dropHeldAtExit() {
 	held := maps.Clone(r.held)
 	clear(r.held)
 	r.heldN, r.heldBytes = 0, 0
+	lost := r.policyLost
+	r.policyLost = 0
 	r.mu.Unlock()
+	defer func() { r.recordLosses(map[string]int{lostPolicyTimeout: lost}, r.opts.Now()) }()
 	for key, parts := range held {
 		for _, h := range parts {
-			_, _, why, ok, _ := r.decide(key, h.p.pid, h.p.at, h.p.narrow, h.p.claimed)
+			_, _, why, ok, _ := r.decide(key, h.p.pid, h.p.at, h.p.narrow, h.p.claimed, h.p.account)
 			if ok {
 				why = "claimed"
+			}
+			// A claimed part, the developer's work, lost: its policy or key came too late.
+			if ok || why == whyNoKey {
+				lost += h.p.records
 			}
 			r.stats.dropped(h.p.signal, why+"_at_exit", h.p.records)
 			if r.opts.Logf != nil {
@@ -115,10 +123,28 @@ func (r *Relay) Holding() bool {
 // held, no export is being read or routed, and none has arrived for quiet, it answers every
 // later export 503, which an exporter sends again, to the next relay, and reports true. What
 // is queued is on disk, so it does not count.
-func (r *Relay) Quiesce(quiet time.Duration) bool {
+func (r *Relay) Quiesce(quiet time.Duration) bool { return r.quiesce(quiet, false) }
+
+// QuiesceDroppingPolicyWaits is Quiesce for a relay that may wait no longer for the parts
+// waiting for their team's policy or key, which only it stopping may fix ("restart the
+// relay"), and which steady exports would renew for good: they are dropped at exit, counted
+// as policy_timeout (dropHeldAtExit). Every other held part is still waited for.
+func (r *Relay) QuiesceDroppingPolicyWaits(quiet time.Duration) bool { return r.quiesce(quiet, true) }
+
+func (r *Relay) quiesce(quiet time.Duration, dropPolicyWaits bool) bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if r.heldN > 0 || r.inflight > 0 || r.opts.Now().Sub(r.lastSeen) < quiet {
+	waiting := r.heldN
+	if dropPolicyWaits {
+		for _, parts := range r.held {
+			for _, h := range parts {
+				if !h.awaitingPolicy.IsZero() {
+					waiting -= h.p.records
+				}
+			}
+		}
+	}
+	if waiting > 0 || r.inflight > 0 || r.opts.Now().Sub(r.lastSeen) < quiet {
 		return false
 	}
 	r.refusing = true

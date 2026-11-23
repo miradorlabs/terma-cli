@@ -148,7 +148,6 @@ func (sb *Sandbox) directCodex() {
 	if err := os.WriteFile(cfg, []byte(withoutTable(string(existing), "[otel]")+"\n"+otel), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	sb.useLiveKey()
 }
 
 // withoutTable is TOML text with one table, header to the next header, removed.

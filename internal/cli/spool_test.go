@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"cmp"
 	"context"
 	"net/http"
 	"net/http/httptest"
@@ -11,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/miradorlabs/terma-cli/internal/account/auth"
 	"github.com/miradorlabs/terma-cli/internal/account/keystore"
 	"github.com/miradorlabs/terma-cli/internal/delivery"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
@@ -44,7 +46,14 @@ func acceptingOTLP(t *testing.T) {
 
 func appendEvent(t *testing.T, s *spool.Spool, projectID string, at time.Time) {
 	t.Helper()
-	e := spool.Event{Name: "terma.commit", Time: at, Repository: appRepo}
+	// Bound to the sign-in in place, or no person's under a server key, as a hook's append
+	// is; signed out, to a person since signed out.
+	e := spool.Event{Name: "terma.commit", Time: at, Repository: appRepo, Account: "aaaaaaaaaaaaaaaa"}
+	if cfg, err := testApp.loadConfig(); err == nil && cfg.ServerKeySignIn {
+		e.Account, e.NoPerson = "", true
+	} else if err == nil {
+		e.Account = cmp.Or(auth.Account(cfg.Dir, cfg.ProfileName, cfg.AuthURL), e.Account)
+	}
 	if projectID != "" {
 		e.Attrs = map[string]any{hookrun.AttrProjectID: projectID}
 	}
@@ -59,7 +68,10 @@ func TestFlushSpoolSeparatesUnroutableFromExpired(t *testing.T) {
 	acceptingOTLP(t)
 	s := spoolForTest(t)
 	appendEvent(t, s, "", time.Now())
-	appendEvent(t, s, spoolTestProject, time.Now().Add(-2*spool.MaxAge))
+	if err := s.Append(spool.Event{Name: "terma.commit", Time: time.Now().Add(-2 * spool.MaxAge), Repository: appRepo, Account: "aaaaaaaaaaaaaaaa",
+		Attrs: map[string]any{hookrun.AttrProjectID: spoolTestProject}}); err != nil {
+		t.Fatal(err)
+	}
 
 	res, err := testApp.flushSpool(context.Background(), true, 0)
 	if err != nil {
@@ -88,7 +100,7 @@ func TestFlushSpoolHoldsEventsAndReportsIncomplete(t *testing.T) {
 	if !ok || code != ExitIncomplete {
 		t.Fatalf("held events should report incomplete: err=%v code=%d ok=%v\n%s", err, code, ok, out)
 	}
-	if !strings.Contains(out, "holding 1 for a team key") {
+	if !strings.Contains(out, "holding 1 for a sign-in that may send them") {
 		t.Fatalf("the report should name what is held:\n%s", out)
 	}
 	if n, _, _ := s.Pending(); n != 1 {
@@ -107,7 +119,7 @@ func TestSpoolFlushReportsBackoffAsExitCode(t *testing.T) {
 	}
 	next := time.Now().Add(time.Minute)
 	attempt := strconv.FormatInt(next.Unix(), 10) + " 30"
-	if err := os.WriteFile(filepath.Join(spoolDir, "next-attempt"), []byte(attempt), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(spoolDir, "next-attempt-v2"), []byte(attempt), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -129,6 +141,7 @@ func TestSpoolFlushReportsBackoffAsExitCode(t *testing.T) {
 func TestSpoolFlushThrottleIsNotAnError(t *testing.T) {
 	useConfigDir(t, t.TempDir())
 	acceptingOTLP(t)
+	serverKeyProfile(t)
 	if err := keystore.Set(testApp.dir, spoolTestProject, "ter_srv_test", keystore.Hosts{}); err != nil {
 		t.Fatal(err)
 	}
@@ -148,7 +161,8 @@ func TestSpoolFlushThrottleIsNotAnError(t *testing.T) {
 	}
 }
 
-// Every queued event reaches the backend under the project's key, and the command exits 0.
+// On a profile set up with a server key, every queued event reaches the backend under the
+// project's key, and the command exits 0.
 func TestSpoolFlushDeliversUnderTheProjectKey(t *testing.T) {
 	useConfigDir(t, t.TempDir())
 	auth := make(chan string, 4)
@@ -158,6 +172,7 @@ func TestSpoolFlushDeliversUnderTheProjectKey(t *testing.T) {
 	}))
 	t.Cleanup(srv.Close)
 	t.Setenv("TERMA_OTLP_URL", srv.URL)
+	serverKeyProfile(t)
 	if err := keystore.Set(testApp.dir, spoolTestProject, "ter_srv_test", keystore.Hosts{}); err != nil {
 		t.Fatal(err)
 	}
@@ -182,17 +197,17 @@ func TestSpoolFlushDeliversUnderTheProjectKey(t *testing.T) {
 
 // describeFlush gives one clause per reason, in a fixed order, and none for a quiet pass.
 func TestDescribeFlushNamesEveryReasonOnce(t *testing.T) {
-	delivered, undelivered := describeFlush(delivery.Result{Sent: 1})
+	delivered, undelivered := describeFlush(delivery.Result{Sent: 1}, "terma setup")
 	if delivered != "1 event" || len(undelivered) != 0 {
 		t.Fatalf("a clean pass = %q, %q", delivered, undelivered)
 	}
 
-	delivered, undelivered = describeFlush(delivery.Result{Sent: 2, Held: 3, Expired: 4, Pruned: 5, Unroutable: 6, Dropped: 7})
+	delivered, undelivered = describeFlush(delivery.Result{Sent: 2, Held: 3, Expired: 4, Pruned: 5, Unroutable: 6, Dropped: 7}, "terma setup")
 	if delivered != "2 events" {
 		t.Errorf("delivered = %q", delivered)
 	}
 	want := []string{
-		"holding 3 for a team key (run `terma setup`)",
+		"holding 3 for a sign-in that may send them (run `terma setup`)",
 		"expired 4 past the spool's age limit",
 		"pruned 5 to stay under the size limit",
 		"dropped 6 with no team id",

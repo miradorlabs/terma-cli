@@ -1,6 +1,7 @@
 package daemon
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"io"
@@ -45,6 +46,9 @@ type Deps struct {
 	LoadConfig func() (*config.Config, error)
 	// RefreshPolicy fetches and stores cfg's project's policy.
 	RefreshPolicy func(ctx context.Context, cfg *config.Config) error
+	// Bind gives the relay cfg's sign-in to send with, and what it binds queued parts to;
+	// nil sends only with a server key.
+	Bind func(opts *relay.Options, cfg *config.Config)
 }
 
 // Settings are the relay's timings: TERMA_RELAY_HOLD and TERMA_RELAY_HEARTBEAT shorten
@@ -81,6 +85,9 @@ func (d Deps) Engine(ctx context.Context, stateDir string, cfg *config.Config, s
 		Lookup:   func(sessionID string, now time.Time) (claim.Claim, bool) { return claim.Read(stateDir, sessionID, now) },
 		CatchAll: d.CatchAll(), HeartbeatSend: d.SendHeartbeat, HeartbeatEvery: s.Heartbeat,
 		PeerPID: procinfo.FindSender, ProcessAlive: procinfo.Alive, ClaimCacheTTL: time.Second, PolicyCacheTTL: time.Second}
+	if d.Bind != nil {
+		d.Bind(&opts, cfg)
+	}
 	if s.Debug && logw != nil {
 		opts.Logf = func(f string, a ...any) { fmt.Fprintf(logw, time.Now().Format("15:04:05.000 ")+f+"\n", a...) }
 	}
@@ -90,8 +97,14 @@ func (d Deps) Engine(ctx context.Context, stateDir string, cfg *config.Config, s
 // Resolver turns a claim into its session's policy.
 func (d Deps) Resolver(cfg *config.Config) func(claim.Claim) (relay.Policy, error) {
 	return Resolver(cfg, ResolverDeps{AgentName: d.AgentName, RelayTargets: d.RelayTargets,
-		Endpoint: func(projectID string) string { return d.Endpoint(cfg, projectID) },
-		User:     func(projectID, endpoint string) string { return d.User(cfg, projectID, endpoint) }})
+		Endpoint: func(projectID string, serverKey bool) string {
+			// The profile's mode as it is now, not at startup: a person's token never goes to
+			// a host keys.json filed for a server key.
+			live := *cfg
+			live.ServerKeySignIn = serverKey
+			return d.Endpoint(&live, projectID)
+		},
+		User: func(projectID, endpoint string) string { return d.User(cfg, projectID, endpoint) }})
 }
 
 // CatchAll is global mode's claim for everything an agent exports.
@@ -109,7 +122,9 @@ func (d Deps) Refresher() *PolicyRefresher {
 				return nil
 			}
 			teams := keystore.CollectionProjects(cfg.Dir)
-			selected := cfg.Policy.Team()
+			// The selected team even while its policy isn't stored (a fresh or cleared state
+			// directory): a person's sign-in holds no team key to name it otherwise.
+			selected := cmp.Or(cfg.Policy.Team(), cfg.Team)
 			if selected != "" && !slices.Contains(teams, selected) {
 				teams = append(teams, selected)
 			}

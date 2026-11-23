@@ -244,8 +244,7 @@ func postToolUse(ctx context.Context, env hookrun.Env) error {
 		case codexShellTool:
 			// A shell command's targets are guesses, written or not: only the session's own manifest records them,
 			// where the turn's Stop withdraws the unchanged ones (expected.go).
-			env.Expect(r, sess, candidates)
-			env.Report(r, sess, in.ToolName, candidates, attrs)
+			env.ReportExpected(r, sess, candidates, in.ToolName, candidates, attrs)
 		default:
 			// Any other tool's path may only have been read (view_image, an MCP tool): it is
 			// recorded, mirrored to sibling checkouts, as an edit would be, but names no checkout.
@@ -259,8 +258,7 @@ func postToolUse(ctx context.Context, env hookrun.Env) error {
 	}
 	// The call's commits took in what it wrote before them: recording those files again
 	// would hand the next commit of them to this session.
-	env.Expect(r, sess, candidates[commits[len(commits)-1]:])
-	env.Report(r, sess, in.ToolName, candidates, attrs)
+	env.ReportExpected(r, sess, candidates[commits[len(commits)-1]:], in.ToolName, candidates, attrs)
 	return nil
 }
 

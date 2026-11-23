@@ -49,7 +49,7 @@ func TestRelayCheckJudgesTheRelayItself(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			r := healthy()
 			tc.relay(&r)
-			c := RelayCheck(reg, r, keyed, "proj_x", tc.env, nil)
+			c := RelayCheck(reg, r, keyed, "proj_x", tc.env, nil, "terma setup")
 			if c.Status != tc.status || !strings.Contains(c.Detail, tc.want) {
 				t.Fatalf("RelayCheck = %+v, want %v containing %q", c, tc.status, tc.want)
 			}

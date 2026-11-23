@@ -20,10 +20,19 @@ const (
 
 const maxTraces = 100000
 
+// policyHold is how long a claimed part waits in the hold for its team's policy or key
+// while the relay can't read them (whyNoKey: a policy not yet fetched, which the policy
+// refresher fetches meanwhile, a locked keychain, a changed organization, a removed profile,
+// an unreadable config.json): past it the part is dropped, and counted as lostPolicyTimeout.
+const policyHold = 15 * time.Minute
+
 type heldPart struct {
 	p    *part
 	at   time.Time
 	size int
+	// awaitingPolicy is when it began waiting for its team's policy or key (whyNoKey), zero
+	// while it waits for anything else: it waits for them policyHold at most.
+	awaitingPolicy time.Time
 }
 
 type traceSession struct {
@@ -33,22 +42,33 @@ type traceSession struct {
 	at      time.Time
 }
 
-func (r *Relay) hold(p *part) {
+// hold keeps p until it may leave; awaitingPolicy is that it waits for its team's policy.
+func (r *Relay) hold(p *part, awaitingPolicy bool) {
 	size := proto.Size(p.msg)
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if p.records > maxHeld || size > maxHeldBytes {
+	refuse := func() {
 		r.stats.dropped(p.signal, "unclaimed_overflow", p.records)
+		if awaitingPolicy {
+			r.policyLost += p.records // a team's part, lost: counted where doctor reads losses
+		}
+	}
+	if p.records > maxHeld || size > maxHeldBytes {
+		refuse()
 		return
 	}
 	// Evict the oldest rather than refuse the newcomer, the likeliest to be claimed soon.
 	for r.heldN+p.records > maxHeld || r.heldBytes+size > maxHeldBytes {
 		if !r.evictOldestLocked() {
-			r.stats.dropped(p.signal, "unclaimed_overflow", p.records)
+			refuse()
 			return
 		}
 	}
-	r.held[p.session] = append(r.held[p.session], heldPart{p, r.opts.Now(), size})
+	h := heldPart{p: p, at: r.opts.Now(), size: size}
+	if awaitingPolicy {
+		h.awaitingPolicy = h.at
+	}
+	r.held[p.session] = append(r.held[p.session], h)
 	r.heldN += p.records
 	r.heldBytes += size
 	r.stats.add("held_parts", 1)
@@ -83,6 +103,10 @@ func (r *Relay) evictOldestLocked() bool {
 	}
 	r.heldN -= h.p.records
 	r.heldBytes -= h.size
+	if !h.awaitingPolicy.IsZero() {
+		// A team's part, lost: doctor's outbox row counts it (the next sweep records it).
+		r.policyLost += h.p.records
+	}
 	r.stats.dropped(h.p.signal, "unclaimed_evicted", h.p.records)
 	return true
 }
@@ -105,6 +129,13 @@ func (r *Relay) sweep() {
 
 	r.deliverMu.Lock()
 	defer r.deliverMu.Unlock()
+	// A team's parts the hold dropped waiting for its policy, past policyHold or for room,
+	// are counted where doctor reads them.
+	r.mu.Lock()
+	lost := r.policyLost
+	r.policyLost = 0
+	r.mu.Unlock()
+	defer func() { r.recordLosses(map[string]int{lostPolicyTimeout: lost}, now) }()
 	for _, key := range keys {
 		hold := r.opts.Hold
 		if strings.HasPrefix(key, tracePrefix) || strings.HasPrefix(key, procPrefix) {
@@ -123,7 +154,13 @@ func (r *Relay) sweep() {
 		var out []release
 		// A part that must wait holds up nothing: order matters only among parts that leave.
 		for _, h := range parts {
-			c, pol, why, ok, how := r.decide(key, h.p.pid, h.p.at, h.p.narrow, h.p.claimed)
+			c, pol, why, ok, how := r.decide(key, h.p.pid, h.p.at, h.p.narrow, h.p.claimed, h.p.account)
+			switch {
+			case why != whyNoKey:
+				h.awaitingPolicy = time.Time{}
+			case h.awaitingPolicy.IsZero():
+				h.awaitingPolicy = now
+			}
 			limit := hold
 			if h.p.start && why == whyUnclaimed {
 				// A conversation start waits for the thread's first turn.
@@ -131,7 +168,7 @@ func (r *Relay) sweep() {
 			}
 			if !ok && !h.p.narrow && !h.p.claimed && why != whyNoKey && now.Sub(h.at) >= limit {
 				if cc, cok := r.catchAll(); cok {
-					if cpol, pok := r.resolve(cc); pok && !cpol.RequireClaim {
+					if cpol, pok := r.resolve(cc, h.p.account); pok && !cpol.RequireClaim {
 						c, pol, ok, how = cc, cpol, true, attribution{how: semconv.TermaRelayAttributionCatchAll}
 						r.stats.add("caught_by_default."+string(h.p.signal), h.p.records)
 					}
@@ -140,7 +177,14 @@ func (r *Relay) sweep() {
 			switch {
 			case ok:
 				out = append(out, release{c, pol, h.p, how})
-			case why == whyWidened || why == whyNotCollected || now.Sub(h.at) >= limit:
+			case why == whyNoKey && now.Sub(h.awaitingPolicy) < policyHold:
+				keep = append(keep, h)
+			case why == whyNoKey || why == whyWidened || why == whyNotCollected || now.Sub(h.at) >= limit:
+				if why == whyNoKey {
+					// Claimed for a team whose policy or key couldn't be read in time: lost, and counted.
+					why = lostPolicyTimeout
+					lost += h.p.records
+				}
 				r.stats.dropped(h.p.signal, why, h.p.records)
 				if r.opts.Logf != nil {
 					c, _ := r.lookup(r.sessionFor(key))

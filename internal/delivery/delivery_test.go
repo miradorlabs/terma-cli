@@ -43,7 +43,7 @@ func TestEachProjectGoesToItsKeysOwnEnvironment(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cfg := &config.Config{OTLPURL: prod.OTLPURL, APIURL: prod.APIURL}
+	cfg := &config.Config{OTLPURL: prod.OTLPURL, APIURL: prod.APIURL, ServerKeySignIn: true}
 	if err := keystore.Set(dir, "keyed", testKey, keystore.Hosts{OTLP: "https://otlp.keyed", API: "https://api.keyed"}); err != nil {
 		t.Fatal(err)
 	}
@@ -59,6 +59,13 @@ func TestEachProjectGoesToItsKeysOwnEnvironment(t *testing.T) {
 	pinned := Router{ConfigDir: dir, OTLPPinned: true}
 	if pinned.Endpoint(cfg, "keyed") != cfg.OTLPURL {
 		t.Fatal("a pinned host was not used for every project")
+	}
+	// A person's token goes only to the profile's own host, never one keys.json filed for the
+	// team under another profile's server key.
+	person := *cfg
+	person.ServerKeySignIn = false
+	if got := r.Endpoint(&person, "keyed"); got != person.OTLPURL {
+		t.Fatalf("a sign-in's endpoint = %s, want the profile's %s", got, person.OTLPURL)
 	}
 }
 
@@ -123,6 +130,7 @@ func TestAProjectWithoutAPolicyOrAKeyKeepsItsEvents(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	s.BindNoPerson()
 	for _, id := range []string{"unfetched", "keyless", ""} {
 		if err := s.Append(spool.Event{Repository: app, Name: semconv.TermaSessionStartEvent, Attrs: map[string]any{hookrun.AttrProjectID: id}}); err != nil {
 			t.Fatal(err)
@@ -134,7 +142,7 @@ func TestAProjectWithoutAPolicyOrAKeyKeepsItsEvents(t *testing.T) {
 		}
 		return config.Policy{Mode: config.ModeRepo, Repositories: listed}, nil
 	}}
-	res := r.Flush(t.Context(), s, &config.Config{}, true, 0)
+	res := r.Flush(t.Context(), s, &config.Config{ServerKeySignIn: true}, true, 0)
 	if res.Sent != 0 || res.Held != 2 || res.Unroutable != 1 || res.Err != nil {
 		t.Fatalf("Flush = %+v", res)
 	}
@@ -158,6 +166,7 @@ func TestContentSpooledUnderAnOlderPolicyLeavesWithoutIt(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	s.BindNoPerson()
 	for _, e := range []spool.Event{
 		{Repository: app, Name: semconv.TermaSessionQuotaEvent, SessionID: "s1", Attrs: map[string]any{hookrun.AttrProjectID: "p1", semconv.TermaTurnIDKey: "turn-1", semconv.UserEmailKey: "private@example.com"}},
 		{Repository: app, Name: semconv.TermaToolCallEvent, SessionID: "s1", Attrs: map[string]any{hookrun.AttrProjectID: "p1", semconv.GenAIToolCallIDKey: "call-1", semconv.GenAIToolCallArgumentsKey: map[string]any{"cmd": "private arguments"}}},
@@ -169,7 +178,7 @@ func TestContentSpooledUnderAnOlderPolicyLeavesWithoutIt(t *testing.T) {
 	}
 	tightened := config.Policy{Mode: config.ModeRepo, Repositories: listed, TeamID: "p1", FetchedAt: time.Now()}
 	r := Router{ConfigDir: dir, OTLPPinned: true, Policy: func(context.Context, *config.Config, string) (config.Policy, error) { return tightened, nil }}
-	res := r.Flush(t.Context(), s, &config.Config{OTLPURL: srv.URL}, true, 0)
+	res := r.Flush(t.Context(), s, &config.Config{OTLPURL: srv.URL, ServerKeySignIn: true}, true, 0)
 	if res.Sent != 3 || res.Err != nil {
 		t.Fatalf("Flush = %+v", res)
 	}
@@ -262,7 +271,7 @@ func TestOutgoingWithholdsTheWorkingTreeWithToolContent(t *testing.T) {
 func TestOutgoingSendsTheCheckoutIDUnderEveryPolicy(t *testing.T) {
 	t.Parallel()
 	root := hookruntest.InitRepo(t)
-	sp, _ := spool.Open(t.TempDir())
+	sp, _ := hookruntest.OpenSpool(t.TempDir())
 	env := hookrun.Env{StateDir: t.TempDir(), Now: time.Now(), Cwd: root, Spool: sp, Team: hookruntest.Team, Policy: hookruntest.Admitting(root)}
 	r, err := env.Repo(context.Background())
 	if err != nil {
@@ -347,12 +356,13 @@ func TestALockedKeychainKeepsEventsQueued(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	s.BindNoPerson()
 	if err := s.Append(spool.Event{Repository: app, Name: semconv.TermaToolCallEvent, SessionID: "s1", Attrs: map[string]any{hookrun.AttrProjectID: "p1"}}); err != nil {
 		t.Fatal(err)
 	}
 	pol := config.Policy{Mode: config.ModeRepo, Repositories: listed, TeamID: "p1", FetchedAt: time.Now()}
 	r := Router{ConfigDir: dir, OTLPPinned: true, Policy: func(context.Context, *config.Config, string) (config.Policy, error) { return pol, nil }}
-	res := r.Flush(t.Context(), s, &config.Config{OTLPURL: srv.URL}, true, 0)
+	res := r.Flush(t.Context(), s, &config.Config{OTLPURL: srv.URL, ServerKeySignIn: true}, true, 0)
 	if sent != 0 || res.Sent != 0 || !secret.IsUnavailable(res.Err) {
 		t.Fatalf("Flush = %+v, sent %d; want nothing sent and the keychain named", res, sent)
 	}
@@ -417,6 +427,7 @@ func TestHookEventsNameTheUser(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	s.BindNoPerson()
 	for _, id := range []string{"p1", "p2"} {
 		if err := s.Append(spool.Event{Repository: app, Name: semconv.TermaSessionQuotaEvent, SessionID: "s-" + id, Attrs: map[string]any{hookrun.AttrProjectID: id}}); err != nil {
 			t.Fatal(err)
@@ -426,14 +437,14 @@ func TestHookEventsNameTheUser(t *testing.T) {
 	var asked []string
 	r := Router{ConfigDir: dir, OTLPPinned: true,
 		Policy: func(context.Context, *config.Config, string) (config.Policy, error) { return withheld, nil },
-		User: func(_ *config.Config, projectID, endpoint string) string {
+		User: func(_ *config.Config, projectID, endpoint, _ string) string {
 			asked = append(asked, projectID+"@"+endpoint)
 			if projectID == "p1" {
 				return "user-a"
 			}
 			return ""
 		}}
-	if res := r.Flush(t.Context(), s, &config.Config{OTLPURL: srv.URL}, true, 0); res.Sent != 2 || res.Err != nil {
+	if res := r.Flush(t.Context(), s, &config.Config{OTLPURL: srv.URL, ServerKeySignIn: true}, true, 0); res.Sent != 2 || res.Err != nil {
 		t.Fatalf("Flush = %+v", res)
 	}
 	if want := []string{"p1@" + srv.URL, "p2@" + srv.URL}; !slices.Equal(asked, want) {

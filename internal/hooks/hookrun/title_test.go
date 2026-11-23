@@ -11,7 +11,6 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
-	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
 // A session's name is spooled once per change: not before the agent has named the session,
@@ -20,7 +19,7 @@ import (
 func TestSpoolTitleSendsEachNameOnce(t *testing.T) {
 	t.Parallel()
 	dir, _ := filepath.EvalSymlinks(t.TempDir())
-	sp, _ := spool.Open(t.TempDir())
+	sp, _ := hookruntest.OpenSpool(t.TempDir())
 	env := Env{StateDir: t.TempDir(), Now: time.Now(), Cwd: dir, Spool: sp, Policy: config.Policy{Mode: config.ModeGlobal, DefaultProjectID: "p-default"}}
 	r, err := env.Repo(context.Background())
 	if err != nil {

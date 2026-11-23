@@ -78,6 +78,7 @@ const (
 	KeyRouting       = "routing"
 	KeyStatusLine    = "statusline"
 	KeySpool         = "spool"
+	KeyOutbox        = "outbox"
 	KeyBackend       = "backend"
 	KeyGitHubApp     = "github-app"
 )

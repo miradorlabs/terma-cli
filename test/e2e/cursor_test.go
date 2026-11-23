@@ -100,12 +100,8 @@ func cursorSession(t *testing.T, billingOnly, interactive bool) {
 			t.Errorf("write Cursor validation capture: %v", err)
 		}
 	})
-	// No local Cursor exporter exists to connect. Give only the sandbox spool
-	// the loopback receiver's dummy project key.
-	keys, _ := json.Marshal(map[string]any{"keys": map[string]string{sb.ProjectID: liveKey}})
-	if err = os.WriteFile(filepath.Join(sb.TermaConfig, "keys.json"), keys, 0o600); err != nil {
-		t.Fatal(err)
-	}
+	// No local Cursor exporter exists to connect: the spool delivers with the person's
+	// sign-in.
 	invocation := 0
 	var terminal *Terminal
 	t.Cleanup(func() {
@@ -329,10 +325,6 @@ func TestCursorHookDelivery(t *testing.T) {
 	track(t)
 	cursorHooksUnavailable(t)
 	sb := New(t, Isolated)
-	keys, _ := json.Marshal(map[string]any{"keys": map[string]string{sb.ProjectID: liveKey}})
-	if err := os.WriteFile(filepath.Join(sb.TermaConfig, "keys.json"), keys, 0o600); err != nil {
-		t.Fatal(err)
-	}
 	raw, err := os.ReadFile(filepath.Join(sb.Home, ".cursor", "hooks.json"))
 	if err != nil {
 		t.Fatal(err)
@@ -375,6 +367,12 @@ func TestCursorHookDelivery(t *testing.T) {
 		run("stop", turn, false)
 	}
 	run("stop", "disabled-turn", true)
+	// What the hooks queued is bound to the person signed in as they ran.
+	for _, e := range sb.Spool() {
+		if e.Account != sb.account.accountKey() {
+			t.Fatalf("spooled %s bound to account %q, want the sign-in's %s", e.Name, e.Account, sb.account.accountKey())
+		}
+	}
 	sb.terma(sb.Repo, "spool", "flush", "--quiet")
 	calls := sb.Delivered("terma.tool.call", "synthetic-cursor", 10*time.Second)
 	if len(calls) != 2 {
@@ -413,6 +411,7 @@ func TestCursorHookDelivery(t *testing.T) {
 	if len(ids) != 6 {
 		t.Fatalf("delivered %d unique observations, want 6", len(ids))
 	}
+	sb.checkSentAsPerson(t, sb.ProjectID)
 	for i := 1; i <= 6; i++ {
 		if !sequences[strconv.Itoa(i)] {
 			t.Fatalf("missing sequence %d", i)

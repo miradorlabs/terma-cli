@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -91,13 +92,13 @@ func TestRelayAdmissionStopsGlobalCoverageWithStaleCatchAll(t *testing.T) {
 	pol.Revision, pol.FetchedAt = 1, time.Now()
 	save := func() {
 		t.Helper()
-		if err := config.UpdateProfile(testApp.dir, cfg.ProfileName, func(p *config.Profile) { p.OrganizationID = cfg.OrganizationID }); err != nil {
+		if err := config.UpdateProfile(testApp.dir, cfg.ProfileName, func(p *config.Profile) { p.OrganizationID, p.ServerKeySignIn = cfg.OrganizationID, true }); err != nil {
 			t.Fatal(err)
 		}
 		selectPolicy(t, pol)
 	}
 	save()
-	cfg.Policy = pol
+	cfg.Policy, cfg.ServerKeySignIn = pol, true
 	if err := keystore.Set(testApp.dir, "team", policyTestKey, keystore.Hosts{OTLP: upstream.URL}); err != nil {
 		t.Fatal(err)
 	}
@@ -145,5 +146,34 @@ func TestRelayAdmissionStopsGlobalCoverageWithStaleCatchAll(t *testing.T) {
 	case <-arrived:
 		t.Fatal("new unclaimed record bypassed repository coverage through stale catch-all")
 	default:
+	}
+}
+
+// A relay started under a server key and switched to a person's sign-in sends the person's
+// token to the profile's own ingest host, never to the host keys.json filed for the key.
+func TestAPersonsTokenGoesToTheProfilesHostAfterASwitch(t *testing.T) {
+	useConfigDir(t, t.TempDir())
+	cfg, err := testApp.loadConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg.OrganizationID, cfg.ServerKeySignIn = "org-test", true
+	pol := config.DefaultPolicy()
+	pol.TeamID, pol.OrganizationID, pol.AuthURL, pol.Revision, pol.FetchedAt = "team", cfg.OrganizationID, cfg.AuthURL, 1, time.Now()
+	selectPolicy(t, pol)
+	cfg.Policy = pol
+	if err := keystore.Set(testApp.dir, "team", policyTestKey, keystore.Hosts{OTLP: "https://otlp.filed-for-the-key"}); err != nil {
+		t.Fatal(err)
+	}
+	// The profile switches to a person's sign-in while the relay runs.
+	if err := config.UpdateProfile(testApp.dir, cfg.ProfileName, func(p *config.Profile) { p.OrganizationID, p.ServerKeySignIn = cfg.OrganizationID, false }); err != nil {
+		t.Fatal(err)
+	}
+	got, err := testApp.relayDeps().Resolver(cfg)(claim.Claim{ProjectID: "team"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Key != "" || got.Endpoint != cfg.OTLPURL {
+		t.Fatalf("policy = key %q, endpoint %q; want the sign-in to %q", got.Key, got.Endpoint, cfg.OTLPURL)
 	}
 }

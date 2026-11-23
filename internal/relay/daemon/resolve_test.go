@@ -11,6 +11,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/relay"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
+	"github.com/miradorlabs/terma-cli/internal/sendas"
 )
 
 // A policy from another organization or environment, or none validated yet, grants nothing.
@@ -50,10 +51,11 @@ func TestResolverGrantsOnlyAValidatedPolicyOfThisLogin(t *testing.T) {
 			if err := keystore.Set(configDir, "p1", mintedKey, keystore.HostsOf(cfg)); err != nil {
 				t.Fatal(err)
 			}
-			resolve := Resolver(cfg, ResolverDeps{AgentName: func(string) string { return "" }, Endpoint: func(string) string { return "https://otel.example" }, RelayTargets: func(s []string) []string { return s }})
+			resolve := Resolver(cfg, ResolverDeps{AgentName: func(string) string { return "" }, Endpoint: func(string, bool) string { return "https://otel.example" }, RelayTargets: func(s []string) []string { return s }})
 			pol, err := resolve(claim.Claim{ProjectID: "p1"})
 			if tc.ok {
-				if err != nil || !pol.IncludePrompts || pol.Key != mintedKey {
+				// A person's profile names no key: the relay sends with the sign-in.
+				if err != nil || !pol.IncludePrompts || pol.Key != "" {
 					t.Fatalf("a validated policy was not applied: %+v, %v", pol, err)
 				}
 				return
@@ -75,22 +77,26 @@ func TestResolverGrantsNothingOnceTheProfileIsGone(t *testing.T) {
 	if err := keystore.Set(configDir, "p1", mintedKey, keystore.HostsOf(cfg)); err != nil {
 		t.Fatal(err)
 	}
-	resolve := Resolver(cfg, ResolverDeps{AgentName: func(string) string { return "" }, Endpoint: func(string) string { return "https://otel.example" }, RelayTargets: func(s []string) []string { return s }})
-	if pol, err := resolve(claim.Claim{ProjectID: "p1"}); err == nil {
+	resolve := Resolver(cfg, ResolverDeps{AgentName: func(string) string { return "" }, Endpoint: func(string, bool) string { return "https://otel.example" }, RelayTargets: func(s []string) []string { return s }})
+	if pol, err := resolve(claim.Claim{ProjectID: "p1", Account: sendas.NoPersonLane}); err == nil {
 		t.Fatalf("granted %+v with no profile on file", pol)
 	}
 }
 
 // A key the keychain will not give up now holds its parts back without minting another.
+// A profile set up with a server key tells a locked keychain from a missing key.
 func TestResolverTellsALockedKeychainFromAMissingKey(t *testing.T) {
 	configDir := t.TempDir()
-	cfg := &config.Config{Dir: configDir, ProfileName: "default"}
+	cfg := &config.Config{Dir: configDir, ProfileName: "default", ServerKeySignIn: true}
+	if err := config.UpdateProfile(configDir, cfg.ProfileName, func(p *config.Profile) { p.ServerKeySignIn, p.Team = true, "p1" }); err != nil {
+		t.Fatal(err)
+	}
 	if err := keystore.Set(configDir, "p1", mintedKey, keystore.HostsOf(cfg)); err != nil {
 		t.Fatal(err)
 	}
 	secret.FailForTest(t, configDir)
-	resolve := Resolver(cfg, ResolverDeps{AgentName: func(string) string { return "" }, Endpoint: func(string) string { return "https://otel.example" }, RelayTargets: func(s []string) []string { return s }})
-	_, err := resolve(claim.Claim{ProjectID: "p1"})
+	resolve := Resolver(cfg, ResolverDeps{AgentName: func(string) string { return "" }, Endpoint: func(string, bool) string { return "https://otel.example" }, RelayTargets: func(s []string) []string { return s }})
+	_, err := resolve(claim.Claim{ProjectID: "p1", Account: sendas.NoPersonLane})
 	if !secret.IsUnavailable(err) || errors.Is(err, relay.ErrNoKey) {
 		t.Fatalf("resolve = %v; want the keychain unavailable, which is no missing key", err)
 	}
@@ -100,17 +106,20 @@ func TestResolverTellsALockedKeychainFromAMissingKey(t *testing.T) {
 // unlock prompt. Unlocked meanwhile, it is still answered from the last refusal.
 func TestResolverWaitsBeforeAskingALockedKeychainAgain(t *testing.T) {
 	configDir := t.TempDir()
-	cfg := &config.Config{Dir: configDir, ProfileName: "default"}
+	cfg := &config.Config{Dir: configDir, ProfileName: "default", ServerKeySignIn: true}
+	if err := config.UpdateProfile(configDir, cfg.ProfileName, func(p *config.Profile) { p.ServerKeySignIn, p.Team = true, "p1" }); err != nil {
+		t.Fatal(err)
+	}
 	if err := keystore.Set(configDir, "p1", mintedKey, keystore.HostsOf(cfg)); err != nil {
 		t.Fatal(err)
 	}
 	unlock := secret.FailForTest(t, configDir)
-	resolve := Resolver(cfg, ResolverDeps{AgentName: func(string) string { return "" }, Endpoint: func(string) string { return "https://otel.example" }, RelayTargets: func(s []string) []string { return s }})
-	if _, err := resolve(claim.Claim{ProjectID: "p1"}); !secret.IsUnavailable(err) {
+	resolve := Resolver(cfg, ResolverDeps{AgentName: func(string) string { return "" }, Endpoint: func(string, bool) string { return "https://otel.example" }, RelayTargets: func(s []string) []string { return s }})
+	if _, err := resolve(claim.Claim{ProjectID: "p1", Account: sendas.NoPersonLane}); !secret.IsUnavailable(err) {
 		t.Fatalf("first resolve = %v", err)
 	}
 	unlock()
-	if _, err := resolve(claim.Claim{ProjectID: "p1"}); !secret.IsUnavailable(err) {
+	if _, err := resolve(claim.Claim{ProjectID: "p1", Account: sendas.NoPersonLane}); !secret.IsUnavailable(err) {
 		t.Fatalf("a resolve inside %s asked the keychain again: %v", keychainRetry, err)
 	}
 }
@@ -132,7 +141,7 @@ func TestResolverNamesTheUserForEveryClaim(t *testing.T) {
 		t.Fatal(err)
 	}
 	var asked []string
-	resolve := Resolver(cfg, ResolverDeps{AgentName: func(tool string) string { return tool }, Endpoint: func(string) string { return "https://otel.example" },
+	resolve := Resolver(cfg, ResolverDeps{AgentName: func(tool string) string { return tool }, Endpoint: func(string, bool) string { return "https://otel.example" },
 		RelayTargets: func(s []string) []string { return s },
 		User: func(projectID, endpoint string) string {
 			asked = append(asked, projectID+"@"+endpoint)

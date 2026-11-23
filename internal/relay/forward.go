@@ -1,18 +1,10 @@
 package relay
 
 import (
-	"bytes"
-	"context"
-	"fmt"
-	"io"
-	"math/rand/v2"
-	"net/http"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
 
-	"google.golang.org/protobuf/encoding/protowire"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
@@ -59,15 +51,16 @@ func (r *Relay) sender(rt route) *sender {
 }
 
 // enqueue writes a part to its route's outbox before the export is answered, so a crash
-// loses none. It runs under deliverMu, so files are named in arrival order.
-func (r *Relay) enqueue(c claim.Claim, p *part) {
-	rt := routeOf(c)
+// loses none. Its file is named by at, when the part arrived, so a part released from the
+// hold sorts before the ones that arrived while it waited.
+func (r *Relay) enqueue(c claim.Claim, p *part, at time.Time) {
+	rt := routeOf(p.account, c)
 	body, err := proto.Marshal(p.msg)
 	if err != nil {
 		r.stats.dropped(p.signal, "encode_failed", p.records)
 		return
 	}
-	e := newEntry(r.opts.Now(), p.signal, p.records)
+	e := newEntry(at, p.signal, p.records)
 	if err := r.outbox.put(rt, c.Repository, e, body); err != nil {
 		r.stats.dropped(p.signal, "outbox_write_failed", p.records)
 		r.warnf("outbox %s: %v; dropped %d %s", rt, err, p.records, p.signal)
@@ -85,7 +78,8 @@ func (s *sender) poke() {
 	}
 }
 
-// busy ignores a keyless route, since only a new key can move it.
+// busy ignores a keyless route, since only a new key, or a sign-in that may send it, can
+// move it.
 func (s *sender) busy() bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -110,7 +104,7 @@ func (s *sender) loop() {
 	backoff := time.Duration(0)
 	// single sends one file per request after a merged request was refused, so one bad file is set aside alone.
 	single := false
-	c := claim.Claim{ProjectID: s.route.project, Tool: s.route.toolLabel(), Repository: s.r.outbox.identity(s.route)}
+	c := claim.Claim{ProjectID: s.route.project, Tool: s.route.toolLabel(), Repository: s.r.outbox.identity(s.route), Account: s.route.account}
 	stopping := func() bool {
 		select {
 		case <-s.r.stopping:
@@ -157,8 +151,10 @@ func (s *sender) loop() {
 			}
 			continue
 		}
-		pol, ok := s.r.resolve(c)
-		if !ok {
+		pol, ok := s.r.resolve(c, s.route.account)
+		// Another person's or environment's backlog waits for its own sign-in, and ages out;
+		// a server key sends only what no person's sign-in collected.
+		if !ok || !s.r.mayLeave(s.route, pol.Key != "") {
 			s.setKeyless(true)
 			if stopping() || !sleep(keylessRetry) {
 				return
@@ -195,7 +191,7 @@ func (s *sender) loop() {
 			s.forget(batch)
 			continue
 		}
-		out, wait, detail, rejected := s.send(ctx, pol, batch[0].signal, body)
+		out, wait, detail, rejected := s.send(ctx, pol, batch[0], body)
 		switch out {
 		case sent:
 			s.r.count(batch[0].signal, tl)
@@ -221,6 +217,18 @@ func (s *sender) loop() {
 			s.r.warnf("upstream %s refused %d %s: %s", s.route, batch[0].records, batch[0].signal, detail)
 			s.r.outbox.bury(s.route, batch[0])
 			s.forget(batch[:1])
+		case keyless:
+			// Waiting for a sign-in, as a route no sign-in may send is: idle, not retrying.
+			s.setKeyless(true)
+			backoff = 0 // no host is at fault: new parts may wake it
+			if strings.HasPrefix(detail, signInErrPrefix) {
+				s.r.warnf("relay %s: %s; waiting for a sign-in", s.route, detail)
+			} else if s.r.opts.Logf != nil {
+				s.r.opts.Logf("relay %s: %s; waiting", s.route, detail)
+			}
+			if stopping() || !sleep(keylessRetry) {
+				return
+			}
 		case retry:
 			if ctx.Err() != nil {
 				return
@@ -276,138 +284,7 @@ const (
 	sent outcome = iota
 	retry
 	refused
+	// keyless is a send no sign-in may make now (retired, another person's, or one whose
+	// token can't be had): the route waits as one with no policy does, no host at fault.
+	keyless
 )
-
-// send delivers one request and classifies the answer: 401, 403 and 404 are configuration fixed
-// on this machine and retried slowly; only a body the host judges bad is refused for good.
-func (s *sender) send(ctx context.Context, pol Policy, sig Signal, body []byte) (outcome, time.Duration, string, int64) {
-	ctx, cancel := context.WithTimeout(ctx, sendTimeout)
-	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, strings.TrimRight(pol.Endpoint, "/")+"/v1/"+string(sig), bytes.NewReader(body))
-	if err != nil {
-		return refused, 0, "bad_endpoint", 0
-	}
-	req.Header.Set("Content-Type", "application/x-protobuf")
-	req.Header.Set("Authorization", "Bearer "+pol.Key)
-	req.Header.Set("User-Agent", "terma-relay/"+s.r.opts.Version)
-	resp, err := s.r.opts.HTTP.Do(req)
-	if err != nil {
-		return retry, 0, err.Error(), 0
-	}
-	defer func() { _ = resp.Body.Close() }()
-	answer, _ := io.ReadAll(io.LimitReader(resp.Body, 64<<10))
-	switch code := resp.StatusCode; {
-	case code/100 == 2:
-		return sent, 0, "", partialSuccess(answer)
-	case code == http.StatusUnauthorized || code == http.StatusForbidden:
-		return retry, refusedBackoff, fmt.Sprintf("HTTP %d: the team's key was refused", code), 0
-	case code == http.StatusRequestTimeout || code == http.StatusTooManyRequests || code == http.StatusNotFound || code >= 500:
-		return retry, retryAfter(resp.Header.Get("Retry-After")), fmt.Sprintf("HTTP %d", code), 0
-	default:
-		return refused, 0, "refused_" + strconv.Itoa(code), 0
-	}
-}
-
-// partialSuccess reads the rejected count (field 1 of field 1) by hand, since the collector
-// packages that define the response pull gRPC into every hook.
-func partialSuccess(body []byte) int64 {
-	ps := protoField(body, 1, protowire.BytesType)
-	if ps == nil {
-		return 0
-	}
-	for b := ps; len(b) > 0; {
-		num, typ, n := protowire.ConsumeTag(b)
-		if n < 0 {
-			return 0
-		}
-		b = b[n:]
-		if num == 1 && typ == protowire.VarintType {
-			v, m := protowire.ConsumeVarint(b)
-			if m < 0 {
-				return 0
-			}
-			return max(0, int64(v))
-		}
-		m := protowire.ConsumeFieldValue(num, typ, b)
-		if m < 0 {
-			return 0
-		}
-		b = b[m:]
-	}
-	return 0
-}
-
-func protoField(b []byte, num protowire.Number, typ protowire.Type) []byte {
-	for len(b) > 0 {
-		n, t, l := protowire.ConsumeTag(b)
-		if l < 0 {
-			return nil
-		}
-		b = b[l:]
-		if n == num && t == typ {
-			v, m := protowire.ConsumeBytes(b)
-			if m < 0 {
-				return nil
-			}
-			return v
-		}
-		m := protowire.ConsumeFieldValue(n, t, b)
-		if m < 0 {
-			return nil
-		}
-		b = b[m:]
-	}
-	return nil
-}
-
-func retryAfter(v string) time.Duration {
-	secs, err := strconv.Atoi(strings.TrimSpace(v))
-	if err != nil || secs <= 0 {
-		return 0
-	}
-	return min(time.Duration(secs)*time.Second, maxRetryAfter)
-}
-
-func nextBackoff(prev, floor time.Duration) time.Duration {
-	next := max(minBackoff, prev*2, floor)
-	limit := maxBackoff
-	if floor >= refusedBackoff {
-		limit = maxRefusedBackoff
-	}
-	return min(next, max(limit, floor))
-}
-
-// jitter spreads a wait over ±20% so relays that lost the gateway together do not return together.
-func jitter(d, floor time.Duration) time.Duration {
-	if d <= 0 {
-		return d
-	}
-	spread := int64(d) * 2 / 5
-	return max(floor, d-time.Duration(spread/2)+time.Duration(rand.Int64N(spread+1)))
-}
-
-func (r *Relay) recoverOutbox() {
-	routes, _ := r.outbox.routes()
-	for _, rt := range routes {
-		r.recoverRoute(rt)
-	}
-}
-
-// recoverRoute queues what a previous relay left on rt. It holds deliverMu so an export
-// arriving meanwhile is never between writing its part and queueing it: the part would be
-// listed here, then pushed again, and sent twice.
-func (r *Relay) recoverRoute(rt route) {
-	r.deliverMu.Lock()
-	defer r.deliverMu.Unlock()
-	entries, err := r.outbox.list(rt)
-	if err != nil || len(entries) == 0 {
-		return
-	}
-	s := r.sender(rt)
-	n := 0
-	for _, e := range s.recover(entries) {
-		n += e.records
-	}
-	r.stats.add("recovered_from_outbox", n)
-	s.poke()
-}

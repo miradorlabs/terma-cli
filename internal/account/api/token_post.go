@@ -71,6 +71,8 @@ func (c *Client) postToken(ctx context.Context, mayBeSent func() bool, body toke
 	if err := decode(resp, &out); err != nil {
 		apiErr, ok := errors.AsType[*Error](err)
 		switch {
+		case ok && apiErr.SignInRetired():
+			return nil, fmt.Errorf("%w: %w: %w", auth.ErrSignInRetired, auth.ErrNotLoggedIn, apiErr)
 		case !ok || !apiErr.Unauthenticated():
 		case body.GrantType == "refresh_token" && apiErr.Code != "UNAUTHENTICATED":
 			return nil, bare401Error{apiErr}

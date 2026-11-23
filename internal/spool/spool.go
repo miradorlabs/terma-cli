@@ -5,6 +5,7 @@ package spool
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -16,8 +17,8 @@ import (
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/config"
-
 	"github.com/miradorlabs/terma-cli/internal/flock"
+	"github.com/miradorlabs/terma-cli/internal/sendas"
 )
 
 // Event is one thing that happened on this machine worth telling the backend.
@@ -34,7 +35,14 @@ type Event struct {
 	// Repository is the working copy as admission names it, so delivery holds a queued
 	// event to the repository list in force when it leaves. Local only.
 	Repository config.Repository `json:"repository,omitzero"`
-	Attrs      map[string]any    `json:"attrs,omitempty"`
+	// Account is the account key (auth.AccountKey) of the sign-in the event was collected
+	// under, so it leaves under that sign-in only; "" when none was. An event with neither
+	// it nor NoPerson is never queued, and one found queued is dropped. Local only.
+	Account string `json:"account,omitempty"`
+	// NoPerson marks an event collected under a server key: no person's, so its empty
+	// Account is final, never bound to a sign-in later (AppendAsCollected). Local only.
+	NoPerson bool           `json:"no_person,omitempty"`
+	Attrs    map[string]any `json:"attrs,omitempty"`
 }
 
 // ValidTraceID reports whether id is an OTel trace id: 32 lowercase hex digits, not all zero.
@@ -82,12 +90,18 @@ func (f SenderFunc) Send(ctx context.Context, events []Event) ([]Event, error) {
 // Dir is the spool's folder under the state directory.
 const Dir = "spool"
 
+// EventsFile is the queue, in Dir. Its name, and every other file's this version keeps
+// there, are new: an older terma's hook or flusher still running reads and writes only
+// its own (events.jsonl), so it never sends what this version queued with its own
+// credential, nor holds up or throttles this version's flushes. This version never reads
+// an older terma's.
+const EventsFile = "events-v2.jsonl"
+
 const (
-	eventsFile       = "events.jsonl"
-	backoffFile      = "next-attempt"
-	lastFlushFile    = "last-flush"
-	lockFile         = "flush.lock"    // shared by appends and queue rewrites
-	deliveryLockFile = "delivery.lock" // held only by flushers
+	backoffFile      = "next-attempt-v2"
+	lastFlushFile    = "last-flush-v2"
+	lockFile         = "flush-v2.lock"    // shared by appends and queue rewrites
+	deliveryLockFile = "delivery-v2.lock" // held only by flushers
 	// probeEventName is reserved for Writable's probe line, which never reaches a sender.
 	probeEventName = "terma-write-probe"
 	// MaxBytes bounds the spool; past it the next flush drops the oldest events.
@@ -109,17 +123,46 @@ const (
 // Spool is one queue directory.
 type Spool struct {
 	dir string
+	// lane is whose what this Spool appends without a tag is (Bind, BindNoPerson): with
+	// none, it is lost.
+	lane Lane
 }
 
-// Open addresses (and creates) the spool directory.
+// Bind has every event this Spool appends without an account carry account, as
+// auth.Account names the sign-in collecting it. Signed out ("") or unreadable
+// (sendas.AccountUnreadable), it names no one: what it would carry is lost.
+func (s *Spool) Bind(account string) { s.lane = LaneOf(account, false) }
+
+// BindNoPerson has every event this Spool appends without an account marked no person's
+// (Event.NoPerson): collected under a server key, whichever path appends it.
+func (s *Spool) BindNoPerson() { s.lane = LaneOf("", true) }
+
+// Lane is whose what this Spool appends without a tag is. Unbound, it is no one's, as
+// though the sign-in could not be read.
+func (s *Spool) Lane() Lane { return s.lane }
+
+// Open addresses (and creates) the spool directory. Until it is bound, what it appends
+// without a tag is lost, counted as unreadable.
 func Open(dir string) (*Spool, error) {
 	if err := os.MkdirAll(dir, dirMode); err != nil {
 		return nil, fmt.Errorf("create spool dir: %w", err)
 	}
-	return &Spool{dir: dir}, nil
+	return &Spool{dir: dir, lane: Lane{Lost: sendas.LostUnreadable}}, nil
 }
 
-func (s *Spool) path() string { return filepath.Join(s.dir, eventsFile) }
+func (s *Spool) path() string { return filepath.Join(s.dir, EventsFile) }
+
+// Appendable reports whether the spool's queue can be opened to append to, which an agent's
+// sandbox refuses. Unlike Writable it takes no lock and writes nothing, so a hook can ask
+// at no cost while a flush holds the spool.
+func (s *Spool) Appendable() bool {
+	f, err := os.OpenFile(s.path(), os.O_CREATE|os.O_WRONLY|os.O_APPEND, fileMode)
+	if err != nil {
+		return false
+	}
+	_ = f.Close()
+	return true
+}
 
 // Append records events in one write under the lock Flush holds while rewriting the file,
 // so they never land on a file about to be replaced.
@@ -130,16 +173,52 @@ func (s *Spool) Append(events ...Event) error {
 // AppendContext observes caller cancellation and caps lock waits even when the
 // caller has no deadline. An error means no event was queued.
 func (s *Spool) AppendContext(ctx context.Context, events ...Event) error {
+	return s.appendEvents(ctx, true, events)
+}
+
+// AppendAsCollected is Append for events that already carry the account they were
+// collected under: a checkpointed event appended again later keeps it, whoever the Spool
+// is bound to by then. One that carries none is dropped, uncounted: this version records
+// none, so no one collected it under a sign-in that could send it.
+func (s *Spool) AppendAsCollected(events ...Event) error {
+	return s.appendEvents(context.Background(), false, events)
+}
+
+// appendEvents never queues an event that names neither an account nor no person: no one
+// could ever send it. It is lost instead, counted by why its bound lane has none (Lost),
+// and the rest are appended.
+func (s *Spool) appendEvents(ctx context.Context, bind bool, events []Event) error {
 	var lines []byte
+	lost := map[string]int{}
 	for _, e := range events {
 		if e.Time.IsZero() {
 			e.Time = time.Now()
+		}
+		if bind && e.Account == "" && !e.NoPerson {
+			e.Account, e.NoPerson = s.lane.Account, s.lane.NoPerson
+		}
+		if !tagged(e) {
+			if bind {
+				lost[cmp.Or(s.lane.Lost, sendas.LostUnreadable)]++
+			}
+			continue
 		}
 		line, err := json.Marshal(e)
 		if err != nil {
 			return err
 		}
 		lines = append(append(lines, line...), '\n')
+	}
+	// Counted once the rest is queued: a failed append is retried, and would count them again.
+	// A count that can't be written is no reason to fail the append.
+	countLost := func() {
+		for why, n := range lost {
+			_ = s.CountLost(why, n)
+		}
+	}
+	if len(lines) == 0 {
+		countLost()
+		return nil
 	}
 	// The budget starts after the encode: a slow encode charged to the wait would
 	// refuse a lock nobody holds and lose the event.
@@ -155,8 +234,11 @@ func (s *Spool) AppendContext(ctx context.Context, events ...Event) error {
 		return err
 	}
 	defer f.Close()
-	_, err = f.Write(lines)
-	return err
+	if _, err = f.Write(lines); err != nil {
+		return err
+	}
+	countLost()
+	return nil
 }
 
 // Pending reports how many events are queued and the spool size in bytes.

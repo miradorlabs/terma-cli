@@ -149,7 +149,7 @@ func signInForToken(t *testing.T, srv *tokenServer, expires time.Time, team stri
 		t.Fatal(err)
 	}
 	access, refresh, _, _, _ := srv.state()
-	if _, err := auth.SaveCredential(dir, config.DefaultProfile, &auth.Credential{
+	if err := saveSignIn(dir, &auth.Credential{
 		AccessToken: access, RefreshToken: refresh, ExpiresAt: expires, SessionID: "session-1",
 		AuthURL: srv.URL, UserID: "user-1",
 	}); err != nil {

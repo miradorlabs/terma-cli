@@ -97,6 +97,15 @@ func TestDoctorSaysAnUpdateNeedsASignIn(t *testing.T) {
 	}
 }
 
+// Where nothing may send, the fix is the one the probes name: a retired sign-in's, not setup.
+func TestNothingToSendNamesTheSignInsFix(t *testing.T) {
+	t.Parallel()
+	p := Probes{Keys: func(string, string) string { return "" }, SignInFix: RetiredFix}
+	if c := BackendCheck(t.Context(), p, "p1"); c.Fix != RetiredFix {
+		t.Fatalf("backend check = %+v, want the fix %q", c, RetiredFix)
+	}
+}
+
 // A locked keychain is not a missing sign-in: doctor says which, and says where a working
 // credential is kept.
 func TestDoctorTellsALockedKeychainFromNoSignIn(t *testing.T) {
@@ -187,7 +196,7 @@ func TestDoctorJudgesTheSpoolFromItsProbes(t *testing.T) {
 		detail string
 	}{
 		"unwritable": {SpoolState{Open: true, WriteErr: errors.New("read-only file system")}, keyed, Fail, "cannot be written"},
-		"keyless":    {SpoolState{Open: true, Queued: 3}, nil, Fail, "no team key"},
+		"keyless":    {SpoolState{Open: true, Queued: 3}, nil, Fail, "no sign-in, nor a team key"},
 		"closed":     {SpoolState{}, keyed, Fail, "cannot open"},
 		"healthy":    {SpoolState{Open: true, Queued: 3}, keyed, Pass, "3 queued"},
 	} {
@@ -233,7 +242,7 @@ func TestStatusSaysWhatDoctorWould(t *testing.T) {
 		rows[r.Label] = r.Value
 	}
 	if !strings.Contains(rows["Account"], "not signed in") || !strings.Contains(rows["Repository"], "github.com/acme/one is in the team's repositories") ||
-		!strings.Contains(rows["Spool"], "2 event(s) queued, no team key") {
+		!strings.Contains(rows["Spool"], "2 event(s) queued, no sign-in or team key") {
 		t.Fatalf("rows = %v", rows)
 	}
 	fixes := map[string]bool{}
@@ -455,6 +464,58 @@ func TestCaptureOffWarnsTheCollectionChecks(t *testing.T) {
 	}
 }
 
+// A sign-in a server refused as retired fails, naming what fixes it: a newer terma, signed
+// in again.
+func TestDoctorFailsARetiredSignIn(t *testing.T) {
+	retired := func() (Credential, error) { return Credential{Email: "dev@example.com", Retired: true}, nil }
+	c := check(Run(t.Context(), env(t, Probes{Credential: retired, Spool: func() SpoolState { return SpoolState{} }}), Progress{}), KeyAuth)
+	if c.Status != Fail || c.Fix != RetiredFix || !strings.Contains(c.Detail, "update terma and run `terma login`") {
+		t.Fatalf("check = %+v", c)
+	}
+}
+
+// What the relay lost is reported by reason; nothing else adds the row.
+func TestDoctorReportsOutboxLosses(t *testing.T) {
+	quiet := env(t, Probes{Credential: signedIn, Spool: func() SpoolState { return SpoolState{} }})
+	if c := check(Run(t.Context(), quiet, Progress{}), KeyOutbox); c.Key != "missing" {
+		t.Fatalf("a row with no loss: %+v", c)
+	}
+	lossy := env(t, Probes{Credential: signedIn, Spool: func() SpoolState { return SpoolState{} },
+		Relay: func() Relay {
+			return Relay{OutboxLosses: map[string]int{"outbox_full": 3, "outbox_expired": 2}, OutboxLossAt: time.Now()}
+		}})
+	c := check(Run(t.Context(), lossy, Progress{}), KeyOutbox)
+	if c.Status != Warn || !strings.Contains(c.Detail, "3 because the outbox was full") || !strings.Contains(c.Detail, "2 older than it keeps them") {
+		t.Fatalf("check = %+v", c)
+	}
+	signedOut := env(t, Probes{Credential: signedIn, Spool: func() SpoolState { return SpoolState{} },
+		Relay: func() Relay {
+			return Relay{OutboxLosses: map[string]int{"signed_out": 4, "unreadable": 1}, OutboxLossAt: time.Now()}
+		}})
+	c = check(Run(t.Context(), signedOut, Progress{}), KeyOutbox)
+	if c.Status != Warn || c.Fix != "terma login" || !strings.Contains(c.Detail, "4 collected while signed out") ||
+		!strings.Contains(c.Detail, "1 collected while the sign-in could not be read") {
+		t.Fatalf("check = %+v", c)
+	}
+	// A reason doctor has no words for is still listed, by name.
+	unknown := env(t, Probes{Credential: signedIn, Spool: func() SpoolState { return SpoolState{} },
+		Relay: func() Relay {
+			return Relay{OutboxLosses: map[string]int{"account_conflict": 3}, OutboxLossAt: time.Now()}
+		}})
+	c = check(Run(t.Context(), unknown, Progress{}), KeyOutbox)
+	if c.Status != Warn || !strings.Contains(c.Detail, "3 lost as account_conflict") {
+		t.Fatalf("check = %+v", c)
+	}
+	// A loss older than the outbox keeps parts is history.
+	old := env(t, Probes{Credential: signedIn, Spool: func() SpoolState { return SpoolState{} },
+		Relay: func() Relay {
+			return Relay{OutboxLosses: map[string]int{"outbox_expired": 2}, OutboxLossAt: time.Now().Add(-OutboxLossWindow - time.Hour)}
+		}})
+	if c := check(Run(t.Context(), old, Progress{}), KeyOutbox); c.Key != "missing" {
+		t.Fatalf("an old loss still shows: %+v", c)
+	}
+}
+
 // terma status says, as doctor does, that an updated machine is signed out until its person
 // signs in once, never that it is signed in.
 func TestStatusSaysAnUpdateNeedsASignIn(t *testing.T) {
@@ -474,4 +535,51 @@ func TestStatusSaysAnUpdateNeedsASignIn(t *testing.T) {
 		}
 	}
 	t.Fatal("no Account row")
+}
+
+// terma status says a retired sign-in is retired, with its fix, never that it is signed in.
+func TestStatusSaysASignInIsRetired(t *testing.T) {
+	t.Parallel()
+	e := env(t, Probes{Credential: func() (Credential, error) { return Credential{Email: "dev@example.com", Retired: true}, nil },
+		Spool: func() SpoolState { return SpoolState{} }, SignInFix: RetiredFix})
+	rep, err := Local(t.Context(), e)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, row := range rep.Rows {
+		if row.Label == "Account" && (!strings.Contains(row.Value, "retired") || !strings.Contains(row.Value, RetiredFix)) {
+			t.Fatalf("Account = %q", row.Value)
+		}
+	}
+	named := false
+	for _, c := range rep.Checks {
+		named = named || c.Status == Fail && c.Fix == RetiredFix
+	}
+	if !named {
+		t.Fatalf("no failing check names %q: %+v", RetiredFix, rep.Checks)
+	}
+}
+
+// A delivery refused as SIGN_IN_RETIRED names the sign-in's fix, not a refused team key.
+func TestARetiredDeliveryIsNoRefusedKey(t *testing.T) {
+	t.Parallel()
+	if got := failureFix(Failure{ProjectID: "p1", Endpoint: "https://otel", Refused: true, Retired: true}); got != RetiredFix {
+		t.Fatalf("fix = %q, want %q", got, RetiredFix)
+	}
+}
+
+// A refusal of a person's sign-in names the sign-in and the organization, never a team key
+// this profile does not use; a server key's refusal names the key.
+func TestARefusedSignInIsNotCalledARefusedKey(t *testing.T) {
+	t.Parallel()
+	signIn := failureFix(Failure{ProjectID: "p1", Endpoint: "https://otlp.example", Refused: true, SignInRefused: true})
+	if strings.Contains(signIn, "key") || !strings.Contains(signIn, "organization") {
+		t.Errorf("a refused sign-in's fix = %q", signIn)
+	}
+	if token := failureFix(Failure{ProjectID: "p1", Endpoint: "https://otlp.example", Refused: true, TokenRefused: true}); strings.Contains(token, "key") || !strings.Contains(token, "terma login") {
+		t.Errorf("a refused token's fix = %q", token)
+	}
+	if key := failureFix(Failure{ProjectID: "p1", Endpoint: "https://otlp.example", Refused: true, KeyRefused: true}); !strings.Contains(key, "key") {
+		t.Errorf("a refused key's fix = %q", key)
+	}
 }

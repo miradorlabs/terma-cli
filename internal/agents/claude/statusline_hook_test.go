@@ -23,7 +23,7 @@ func statusEnv(t *testing.T, stdin string) (hookrun.Env, *bytes.Buffer, *spool.S
 	stateDir := t.TempDir()
 	t.Helper()
 	cwd := newRepo(t)
-	sp, _ := spool.Open(t.TempDir())
+	sp, _ := hookruntest.OpenSpool(t.TempDir())
 	var out bytes.Buffer
 	return hookrun.Env{StateDir: stateDir, Now: time.Now(), Cwd: cwd, Policy: hookruntest.Admitting(cwd), Team: hookruntest.Team, Stdin: strings.NewReader(stdin), Stdout: &out, Stderr: os.Stderr, Spool: sp, Version: "test"}, &out, sp
 }

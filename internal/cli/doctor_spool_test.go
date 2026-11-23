@@ -18,7 +18,7 @@ func TestDoctorFailsWhenTheSpoolCannotBeWritten(t *testing.T) {
 		t.Fatal(err)
 	}
 	// A directory where the queue file belongs: reads still work, every append fails.
-	if err := os.Mkdir(filepath.Join(spoolDir, "events.jsonl"), 0o700); err != nil {
+	if err := os.Mkdir(filepath.Join(spoolDir, spool.EventsFile), 0o700); err != nil {
 		t.Fatal(err)
 	}
 

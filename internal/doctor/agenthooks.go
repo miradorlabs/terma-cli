@@ -58,6 +58,13 @@ func AgentHooksCheck(ctx context.Context, reg *agents.Registry, mine []string, e
 	return Check{Key: KeyAgentHooks, Status: Pass, Detail: "terma's hooks run for " + strings.Join(ok, ", ")}, true
 }
 
+// timeAgentHooks adds AgentHooksCheck to a doctor run, where it applies.
+func timeAgentHooks(ctx context.Context, env Env, mine []string, timed func(key, name string, fn func() Check)) {
+	if c, ok := AgentHooksCheck(ctx, env.Agents, mine, env.HookExecutable); ok {
+		timed(KeyAgentHooks, "agent hooks in place", func() Check { return c })
+	}
+}
+
 type hooksVerdict int
 
 const (

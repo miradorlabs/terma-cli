@@ -35,7 +35,7 @@ func TestCodexSessionStampsItsCommitFromApplyPatch(t *testing.T) {
 	root := hookruntest.InitRepo(t)
 	stateDir := t.TempDir()
 	ctx := context.Background()
-	sp, _ := spool.Open(t.TempDir())
+	sp, _ := hookruntest.OpenSpool(t.TempDir())
 	env := func(stdin string) hookrun.Env {
 		return hookrun.Env{StateDir: stateDir, Now: time.Now(), Cwd: root, Policy: hookruntest.Admitting(root), Stdin: strings.NewReader(stdin), Spool: sp, Version: "test"}
 	}
@@ -94,7 +94,7 @@ func TestCodexSessionStampsItsCommitFromShellWrite(t *testing.T) {
 	root := hookruntest.InitRepo(t)
 	stateDir := t.TempDir()
 	ctx := context.Background()
-	sp, _ := spool.Open(t.TempDir())
+	sp, _ := hookruntest.OpenSpool(t.TempDir())
 	const id = "01a08bd5-0487-74b1-9d82-45e619c574fb"
 	hookruntest.WriteFile(t, root, "src/a.go", "package src\n")
 	command := strconv.Quote("cd src && cat > a.go <<'EOF'\npackage src\nEOF")
@@ -136,7 +136,7 @@ func TestCodexNonPatchToolNamesNoCheckout(t *testing.T) {
 			root := hookruntest.InitRepo(t)
 			stateDir := t.TempDir()
 			ctx := context.Background()
-			sp, _ := spool.Open(t.TempDir())
+			sp, _ := hookruntest.OpenSpool(t.TempDir())
 			const id = "01a08bd5-0487-74b1-9d82-45e619c574fa"
 			hookruntest.WriteFile(t, root, "diagram.png", "png")
 			input := fmt.Sprintf(tc.input, strconv.Quote(filepath.Join(root, "diagram.png")))
@@ -180,7 +180,7 @@ func TestCodexMCPWriteIntoASiblingWorktreeStampsItsCommit(t *testing.T) {
 	main := hookruntest.InitRepo(t)
 	stateDir := t.TempDir()
 	ctx := context.Background()
-	sp, _ := spool.Open(t.TempDir())
+	sp, _ := hookruntest.OpenSpool(t.TempDir())
 	if _, err := gitx.Git(ctx, main, "commit", "-q", "--allow-empty", "-m", "init"); err != nil {
 		t.Fatal(err)
 	}
@@ -233,7 +233,7 @@ func TestCodexPostToolUseIgnoresCallsWithoutAPatch(t *testing.T) {
 	root := hookruntest.InitRepo(t)
 	stateDir := t.TempDir()
 	ctx := context.Background()
-	sp, _ := spool.Open(t.TempDir())
+	sp, _ := hookruntest.OpenSpool(t.TempDir())
 	env := hookrun.Env{StateDir: stateDir, Now: time.Now(), Cwd: root, Policy: hookruntest.Admitting(root), Spool: sp, Version: "test",
 		Stdin: strings.NewReader(`{"session_id":"01a08bd5-0487-74b1-9d82-45e619c574fa","hook_event_name":"PostToolUse","cwd":` + strconv.Quote(root) + `,"model":"gpt-6","permission_mode":"default","tool_name":"shell","tool_use_id":"c1","turn_id":"t1","transcript_path":null,"tool_response":"","tool_input":{"command":"go test ./..."}}`)}
 	if err := postToolUse(ctx, env); err != nil {
@@ -322,7 +322,7 @@ func TestCodexPreToolUseStampsACommitInTheSameCall(t *testing.T) {
 			ctx := context.Background()
 			root := hookruntest.InitRepo(t)
 			stateDir := t.TempDir()
-			sp, _ := spool.Open(t.TempDir())
+			sp, _ := hookruntest.OpenSpool(t.TempDir())
 			for _, p := range tc.before {
 				hookruntest.WriteFile(t, root, p, "before\n")
 			}
@@ -389,7 +389,7 @@ type codexCall struct {
 const codexCallSession = "01a1204e-2470-7e31-859b-486d42353986"
 
 func newCodexCall(t *testing.T) *codexCall {
-	sp, _ := spool.Open(t.TempDir())
+	sp, _ := hookruntest.OpenSpool(t.TempDir())
 	return &codexCall{t: t, ctx: context.Background(), root: hookruntest.InitRepo(t), stateDir: t.TempDir(), sp: sp}
 }
 
@@ -612,7 +612,7 @@ func TestCodexShellTargetInAWorktreeIsNotMirrored(t *testing.T) {
 	root := hookruntest.InitRepo(t)
 	stateDir := t.TempDir()
 	ctx := context.Background()
-	sp, _ := spool.Open(t.TempDir())
+	sp, _ := hookruntest.OpenSpool(t.TempDir())
 	if _, err := gitx.Git(ctx, root, "commit", "-q", "--allow-empty", "-m", "init"); err != nil {
 		t.Fatal(err)
 	}
@@ -639,5 +639,52 @@ func TestCodexShellTargetInAWorktreeIsNotMirrored(t *testing.T) {
 	}
 	if data, _ := os.ReadFile(msgPath); strings.Contains(string(data), "Agent-Session-Id") {
 		t.Fatalf("a developer's worktree commit was stamped from a Codex shell target:\n%s", data)
+	}
+}
+
+// A's Codex session, once B has signed in: a shell call, writing alone or committing too,
+// records and spools nothing of it under B, at PreToolUse or PostToolUse, and the call's
+// one event is counted lost as account_conflict.
+func TestCodexShellCallsOfAnotherPersonsSessionSendNothing(t *testing.T) {
+	for _, command := range []string{"printf x > p.txt", "printf x > p.txt && git add p.txt && git commit -m p"} {
+		t.Run(command, func(t *testing.T) {
+			ctx := context.Background()
+			root := hookruntest.InitRepo(t)
+			const id = "01a1204e-2470-7e31-859b-486d42353987"
+			asA := session.Open(filepath.Join(root, ".git", "terma"))
+			asA.Bind("aaaaaaaaaaaaaaaa")
+			if err := asA.Touch(session.Session{ID: id, Tool: codexTool}, []string{"a.go"}, time.Now()); err != nil {
+				t.Fatal(err)
+			}
+			dir := t.TempDir()
+			sp, _ := spool.Open(dir)
+			sp.Bind("bbbbbbbbbbbbbbbb")
+			stateDir := t.TempDir()
+			run := func(event string, handler func(context.Context, hookrun.Env) error) {
+				env := hookrun.Env{StateDir: stateDir, Now: time.Now(), Cwd: root, Policy: hookruntest.Admitting(root), Spool: sp, Version: "test",
+					Account: "bbbbbbbbbbbbbbbb", Stdin: strings.NewReader(`{"session_id":"` + id + `","turn_id":"t1","cwd":` + strconv.Quote(root) +
+						`,"hook_event_name":"` + event + `","model":"gpt-6.1-sol","tool_name":"Bash","tool_input":{"command":` + strconv.Quote(command) +
+						`},"tool_use_id":"exec-1","tool_response":{"exit_code":0,"output":""}}`)}
+				if err := handler(ctx, env); err != nil {
+					t.Fatal(err)
+				}
+			}
+			run("PreToolUse", preToolUse)
+			hookruntest.WriteFile(t, root, "p.txt", "x")
+			if strings.Contains(command, "commit") {
+				for _, args := range [][]string{{"add", "p.txt"}, {"commit", "-qm", "p"}} {
+					if _, err := gitx.Git(ctx, root, args...); err != nil {
+						t.Fatal(err)
+					}
+				}
+			}
+			run("PostToolUse", postToolUse)
+			if touched := hookruntest.Named(hookruntest.Spooled(t, sp), semconv.TermaFilesTouchedEvent); len(touched) != 0 {
+				t.Errorf("B spooled %+v of A's session", touched)
+			}
+			if l, _ := spool.ReadLosses(dir, time.Now()); l.Counts["account_conflict"] != 1 {
+				t.Errorf("losses = %v; want the call counted account_conflict once", l.Counts)
+			}
+		})
 	}
 }

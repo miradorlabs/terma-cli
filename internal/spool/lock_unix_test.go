@@ -16,7 +16,7 @@ func TestSpoolLockWaitsRespectDeadlines(t *testing.T) {
 	t.Parallel()
 	for _, filename := range []string{lockFile, deliveryLockFile} {
 		t.Run(filename, func(t *testing.T) {
-			s, _ := Open(t.TempDir())
+			s, _ := openBound(t.TempDir())
 			_ = s.Append(Event{Name: "pending"})
 			unlock, err := flock.Lock(context.Background(), filepath.Join(s.dir, filename))
 			if err != nil {
@@ -49,7 +49,7 @@ func TestSpoolLockWaitsRespectDeadlines(t *testing.T) {
 
 func TestConcurrentFlushWaitsWithoutResending(t *testing.T) {
 	t.Parallel()
-	s, _ := Open(t.TempDir())
+	s, _ := openBound(t.TempDir())
 	_ = s.Append(Event{Name: "once"})
 	entered, release := make(chan struct{}), make(chan struct{})
 	defer close(release)

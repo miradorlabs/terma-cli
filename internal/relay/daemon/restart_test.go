@@ -15,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
 	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
 	"google.golang.org/protobuf/proto"
 
@@ -123,32 +124,42 @@ func TestARestartDropsWhatTheRelayHeld(t *testing.T) {
 
 func postSessionlessSpans(t *testing.T, addr, tokenPath string, n int) {
 	t.Helper()
+	if code, err := exportSpans(addr, tokenPath, "", n); err != nil || code != http.StatusOK {
+		t.Fatalf("export: %d, %v", code, err)
+	}
+}
+
+// exportSpans sends n spans of one trace, of session when it isn't "", and answers the
+// relay's status code.
+func exportSpans(addr, tokenPath, session string, n int) (int, error) {
 	tok, err := os.ReadFile(tokenPath)
 	if err != nil {
-		t.Fatal(err)
+		return 0, err
+	}
+	var attrs []*commonpb.KeyValue
+	if session != "" {
+		attrs = []*commonpb.KeyValue{{Key: "session.id", Value: &commonpb.AnyValue{Value: &commonpb.AnyValue_StringValue{StringValue: session}}}}
 	}
 	var spans []*tracepb.Span
 	for range n {
-		spans = append(spans, &tracepb.Span{Name: "fs.read_file", TraceId: []byte("0123456789abcdef")})
+		spans = append(spans, &tracepb.Span{Name: "fs.read_file", TraceId: []byte("0123456789abcdef"), Attributes: attrs})
 	}
 	body, err := proto.Marshal(&tracepb.TracesData{ResourceSpans: []*tracepb.ResourceSpans{{ScopeSpans: []*tracepb.ScopeSpans{{Spans: spans}}}}})
 	if err != nil {
-		t.Fatal(err)
+		return 0, err
 	}
 	req, err := http.NewRequest(http.MethodPost, "http://"+addr+"/v1/traces", bytes.NewReader(body))
 	if err != nil {
-		t.Fatal(err)
+		return 0, err
 	}
 	req.Header.Set("Authorization", "Bearer "+string(bytes.TrimSpace(tok)))
 	req.Header.Set("Content-Type", "application/x-protobuf")
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		t.Fatal(err)
+		return 0, err
 	}
 	_ = resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("export: %s", resp.Status)
-	}
+	return resp.StatusCode, nil
 }
 
 func counters(t *testing.T, path string) map[string]int {

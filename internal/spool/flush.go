@@ -52,7 +52,8 @@ type Result struct {
 	Expired int
 	// Pruned counts events discarded to keep the spool under MaxBytes.
 	Pruned int
-	// Dropped counts lines that would not decode, such as a killed hook's torn write.
+	// Dropped counts lines that would not decode, such as a killed hook's torn write, and
+	// events that name neither an account nor no person, which no one may send.
 	Dropped int
 	Skipped bool
 	Reason  SkipReason
@@ -231,7 +232,9 @@ func (s *Spool) readBatch(n int, limit int64, now time.Time) (batch, error) {
 		if len(bytes.TrimSpace(line)) == 0 {
 			continue
 		}
-		if err := json.Unmarshal(line, &e); err != nil {
+		// No append queues an event in no lane: one found here, whoever wrote it, is no
+		// one's to send, and is dropped.
+		if err := json.Unmarshal(line, &e); err != nil || e.Account == "" && !e.NoPerson {
 			b.Dropped++
 			continue
 		}

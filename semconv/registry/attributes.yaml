@@ -784,6 +784,13 @@ attributes:
     stability: development
     brief: What started the relay.
     note: A resource attribute, so the platform tells a hook-started relay's bursts from a service relay's continuous heartbeat.
+  - key: terma.installation.id
+    type: string
+    stability: development
+    brief: This terma installation's stable id, a random UUID kept with its configuration and sent at every sign-in.
+    note: >-
+      A resource attribute of the relay heartbeat, in the client's word. Under a user token the otel
+      gateway also stamps mirador.installation.id, the installation the token was issued to.
   - key: terma.install.method
     type:
       members:

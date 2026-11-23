@@ -245,6 +245,10 @@ func (c *Client) AuthPost(ctx context.Context, path string, body, out any) error
 }
 
 func (c *Client) do(ctx context.Context, h host, method, path string, query url.Values, headers http.Header, body, out any) (*Meta, error) {
+	// A retired sign-in is never presented again: only signing in anew sends again.
+	if c.retired() {
+		return nil, errRetired
+	}
 	if err := c.refreshIfNeeded(ctx); err != nil {
 		return nil, err
 	}
@@ -256,7 +260,13 @@ func (c *Client) do(ctx context.Context, h host, method, path string, query url.
 	}
 
 	if resp.StatusCode == http.StatusUnauthorized && c.canRefresh() {
+		// A retirement that comes as a 401 is no expired token: never refreshed.
+		refusal := parseError(resp)
 		resp.Body.Close()
+		if apiErr, ok := errors.AsType[*Error](refusal); ok && apiErr.SignInRetired() {
+			c.markRetired()
+			return &Meta{StatusCode: resp.StatusCode}, fmt.Errorf("%w: %w", errRetired, refusal)
+		}
 		// The refused token is redeemed past unless another process already has.
 		refused := func(held, current *auth.Credential) bool {
 			return current.AccessToken == held.AccessToken || current.Expired()
@@ -272,7 +282,48 @@ func (c *Client) do(ctx context.Context, h host, method, path string, query url.
 	defer resp.Body.Close()
 
 	meta := &Meta{StatusCode: resp.StatusCode, ETag: resp.Header.Get("ETag")}
-	return meta, decode(resp, out)
+	err = decode(resp, out)
+	if apiErr, ok := errors.AsType[*Error](err); ok && apiErr.SignInRetired() {
+		c.markRetired()
+		return meta, fmt.Errorf("%w: %w", errRetired, err)
+	}
+	return meta, err
+}
+
+// errRetired is a request a server refused, or this client would not send, because the
+// sign-in is retired. It reads as signed out too, so a sign-in replaces it.
+var errRetired = fmt.Errorf("%w: %w", auth.ErrSignInRetired, auth.ErrNotLoggedIn)
+
+// retired reports whether the sign-in this client holds is retired.
+func (c *Client) retired() bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.credential != nil && !c.credential.RetiredAt.IsZero()
+}
+
+// MarkRetired is markRetired, for a refusal another sender read: an ingest's.
+func (c *Client) MarkRetired() { c.markRetired() }
+
+// markRetired records, on the pair this client holds and on the stored sign-in while it is
+// still that one, that a server refused it as retired.
+func (c *Client) markRetired() {
+	cred := c.retireHeld()
+	if c.profile != "" && cred != nil && cred.SessionID != "" {
+		_ = auth.MarkRetired(c.dir, c.profile, cred.SessionID)
+	}
+}
+
+// retireHeld marks the pair this client holds retired, and returns it as it was.
+func (c *Client) retireHeld() *auth.Credential {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	cred := c.credential
+	if cred != nil && cred.RetiredAt.IsZero() {
+		marked := *cred
+		marked.RetiredAt = time.Now().UTC()
+		c.credential = &marked
+	}
+	return cred
 }
 
 func (c *Client) attempt(ctx context.Context, h host, method, path string, query url.Values, headers http.Header, body any) (*http.Response, error) {

@@ -12,7 +12,6 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
-	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
 // The agent's hooks, as its events name them.
@@ -28,7 +27,7 @@ func TestOpenCodeSessionIsStampedOnItsCommit(t *testing.T) {
 	t.Parallel()
 	root := hookruntest.InitRepo(t)
 	ctx := context.Background()
-	sp, _ := spool.Open(t.TempDir())
+	sp, _ := hookruntest.OpenSpool(t.TempDir())
 	env := func(stdin string, args ...string) hookrun.Env {
 		return hookrun.Env{StateDir: t.TempDir(), Now: time.Now(), Cwd: root, Policy: hookruntest.Admitting(root), Args: args, Stdin: strings.NewReader(stdin), Spool: sp, Version: "test"}
 	}
@@ -92,7 +91,7 @@ func TestOpenCodeChildSessionNamesItsParent(t *testing.T) {
 	t.Parallel()
 	root := hookruntest.InitRepo(t)
 	ctx := context.Background()
-	sp, _ := spool.Open(t.TempDir())
+	sp, _ := hookruntest.OpenSpool(t.TempDir())
 	env := func(stdin string) hookrun.Env {
 		return hookrun.Env{StateDir: t.TempDir(), Now: time.Now(), Cwd: root, Policy: hookruntest.Admitting(root), Stdin: strings.NewReader(stdin), Spool: sp, Version: "test"}
 	}
@@ -121,7 +120,7 @@ func TestOpenCodeChildSessionNeverBecomesTheActiveOne(t *testing.T) {
 	t.Parallel()
 	root := hookruntest.InitRepo(t)
 	ctx := context.Background()
-	sp, _ := spool.Open(t.TempDir())
+	sp, _ := hookruntest.OpenSpool(t.TempDir())
 	env := func(stdin string, args ...string) hookrun.Env {
 		return hookrun.Env{StateDir: t.TempDir(), Now: time.Now(), Cwd: root, Policy: hookruntest.Admitting(root), Args: args, Stdin: strings.NewReader(stdin), Spool: sp, Version: "test"}
 	}

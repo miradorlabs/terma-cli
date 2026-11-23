@@ -19,7 +19,7 @@ func TestClaudeSessionStampsOnlyItsOwnFiles(t *testing.T) {
 	stateDir := t.TempDir()
 	root := newRepo(t)
 	ctx := context.Background()
-	sp, _ := spool.Open(t.TempDir())
+	sp, _ := hookruntest.OpenSpool(t.TempDir())
 	now := time.Now()
 	env := func(stdin string, args ...string) hookrun.Env {
 		return hookrun.Env{StateDir: stateDir, Now: now, Cwd: root, Policy: hookruntest.Admitting(root), Args: args, Stdin: strings.NewReader(stdin), Spool: sp, Version: "test"}

@@ -84,9 +84,18 @@ func TestDesktopGrant(t *testing.T) {
 		t.Fatalf("another user's session was not signed out: %d delegated sessions and %d others revoked", delegated, other)
 	}
 
+	sb.Receiver.Reset()
 	first, rest, err = sb.desktopSetup(accountUser, delegate)
 	if err != nil {
 		t.Fatalf("terma setup --desktop-grant: %v\n%s", err, rest)
+	}
+	// Setup's check-in goes with the new sign-in to --team, naming this installation.
+	beats := sb.Receiver.WaitLogs(10*time.Second, func(l LogRecord) bool { return l.EventName == "terma.relay.heartbeat" })
+	if len(beats) == 0 {
+		t.Fatal("setup's check-in reached no ingest")
+	}
+	if b := beats[0]; b.Authorization != personBearer() || b.Project != desktopTeam || b.Resource["terma.installation.id"] != accountInstallation {
+		t.Errorf("setup's check-in went with %q naming team %q, resource %v", b.Authorization, b.Project, b.Resource)
 	}
 	if _, ok := first["challenge"]; !ok || sb.account.delegations.Load() != 2 {
 		t.Fatalf("first line = %v after %d delegations", first, sb.account.delegations.Load())
@@ -179,45 +188,6 @@ func (sb *Sandbox) desktopSetup(user string, grant func(request map[string]any) 
 		sb.StopRelay()
 	}
 	return first, string(rest) + stderr.String(), err
-}
-
-// editProfile changes profile's entry in config.json.
-func (sb *Sandbox) editProfile(profile string, edit func(map[string]any)) {
-	sb.T.Helper()
-	path := filepath.Join(sb.TermaConfig, "config.json")
-	data, err := os.ReadFile(path)
-	if err != nil {
-		sb.T.Fatal(err)
-	}
-	var file map[string]any
-	if err := json.Unmarshal(data, &file); err != nil {
-		sb.T.Fatal(err)
-	}
-	p, ok := file["profiles"].(map[string]any)[profile].(map[string]any)
-	if !ok {
-		sb.T.Fatalf("config.json has no profile %q", profile)
-	}
-	edit(p)
-	data, _ = json.Marshal(file)
-	sb.writeAbs(path, string(data))
-}
-
-// profileOrganization is the organization config.json records for profile.
-func (sb *Sandbox) profileOrganization(profile string) string {
-	sb.T.Helper()
-	data, err := os.ReadFile(filepath.Join(sb.TermaConfig, "config.json"))
-	if err != nil {
-		sb.T.Fatal(err)
-	}
-	var file struct {
-		Profiles map[string]struct {
-			OrganizationID string `json:"organization_id"`
-		} `json:"profiles"`
-	}
-	if err := json.Unmarshal(data, &file); err != nil {
-		sb.T.Fatal(err)
-	}
-	return file.Profiles[profile].OrganizationID
 }
 
 // doctor is `terma doctor`'s output, whatever its verdict.

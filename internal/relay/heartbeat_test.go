@@ -6,6 +6,7 @@ import (
 	"maps"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -398,5 +399,56 @@ func TestHeartbeatCarriesInstallMethodAndAskedUpdateAutoEachBeat(t *testing.T) {
 	if attr(bare.ResourceLogs[0].Resource.Attributes, semconv.TermaInstallMethodKey) != "" ||
 		attr(bare.ResourceLogs[0].ScopeLogs[0].LogRecords[0].Attributes, semconv.TermaUpdateAutoKey) != "" {
 		t.Errorf("a relay told neither sent one: %v", bare)
+	}
+}
+
+// What hooks lost rides the next beat, by reason, as dropped.<reason>.hooks.
+func TestHeartbeatCarriesWhatHooksLost(t *testing.T) {
+	t.Parallel()
+	f := newFixture()
+	var beats []*logspb.LogsData
+	losses := map[string]int{"ambiguous_push": 2}
+	r := newRelay(Options{Dir: t.TempDir(), Token: token, Lookup: f.lookup, Now: f.clock,
+		HookLosses: func() map[string]int { l := losses; losses = nil; return l },
+		HeartbeatSend: func(_ context.Context, b *logspb.LogsData) error {
+			beats = append(beats, b)
+			return nil
+		}})
+	for range 2 {
+		if err := r.heartbeat(context.Background(), semconv.TermaRelayHeartbeatReasonInterval, ""); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for i, want := range []int64{2, 0} {
+		got := beatCounters(beats[i].ResourceLogs[0].ScopeLogs[0].LogRecords[0])["dropped.ambiguous_push.hooks"]
+		if got != want {
+			t.Errorf("beat %d carried %d hook losses; want %d", i, got, want)
+		}
+	}
+}
+
+// Beats that overlap, one asked for beside the periodic one, take what hooks lost one at a
+// time: two takes at once would hand the same losses out twice.
+func TestOverlappingBeatsTakeHookLossesOneAtATime(t *testing.T) {
+	t.Parallel()
+	f := newFixture()
+	var in, overlapped atomic.Int32
+	r := newRelay(Options{Dir: t.TempDir(), Token: token, Lookup: f.lookup, Now: f.clock,
+		HookLosses: func() map[string]int {
+			if in.Add(1) > 1 {
+				overlapped.Store(1)
+			}
+			time.Sleep(50 * time.Millisecond)
+			in.Add(-1)
+			return nil
+		},
+		HeartbeatSend: func(context.Context, *logspb.LogsData) error { return nil }})
+	var wg sync.WaitGroup
+	for range 2 {
+		wg.Go(func() { _ = r.heartbeat(context.Background(), semconv.TermaRelayHeartbeatReasonInterval, "") })
+	}
+	wg.Wait()
+	if overlapped.Load() != 0 {
+		t.Fatal("two beats took hook losses at once")
 	}
 }

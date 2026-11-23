@@ -59,7 +59,7 @@ func firstLine(t *testing.T, stdout string) map[string]any {
 // storeSignIn stores a sign-in of user's, as an earlier setup would have.
 func storeSignIn(t *testing.T, f *fakeAuth, user string) {
 	t.Helper()
-	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSessionOf(f, user)); err != nil {
+	if err := saveSignIn(testApp.dir, storedSessionOf(f, user)); err != nil {
 		t.Fatal(err)
 	}
 }

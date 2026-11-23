@@ -127,24 +127,22 @@ func (app *App) signIn(cmd *cobra.Command, cfg *config.Config, opts signInOption
 // machine keeps one, and storing first means a crash in between leaves the old one live
 // but unused, never the machine signed out. A sign-in that cannot be stored is ended too,
 // so it does not linger on the web. An older terma's sign-ins and the team keys it minted
-// go with it. Another person's sign-in leaves no organization or team chosen behind.
+// go with it. Another person's sign-in leaves no organization or team chosen behind: the
+// profile is paired with it (applyLogin) before the old session's revoke is waited on, and
+// until then the profile is still the other account's, which every reader refuses.
 func (app *App) storeLogin(ctx context.Context, cfg *config.Config, cred *auth.Credential) error {
 	replaced, err := auth.SaveCredential(app.dir, cfg.ProfileName, cred)
 	if err != nil {
 		_ = app.revokeSession(ctx, cfg, cred)
 		return err
 	}
+	err = app.pairProfile(cfg, cred.Account())
 	// Best-effort: the superseded session may already be dead, often why the user is here.
 	// No process presents its token any more (a refresh rotates only the stored session).
 	if replaced != nil {
 		_ = app.revokeSession(ctx, cfg, replaced)
 	}
-	if err := config.UpdateProfile(app.dir, cfg.ProfileName, func(p *config.Profile) {
-		if replaced != nil && replaced.UserID != cred.UserID {
-			p.SelectOrganization("", "")
-		}
-		applyLogin(p, cfg)
-	}); err != nil {
+	if err != nil {
 		return err
 	}
 	// After applyLogin: a profile that leaves its server key for a sign-in keeps it no more.
@@ -249,7 +247,7 @@ func (app *App) reuseStoredSession(ctx context.Context, cfg *config.Config, acce
 		verified = stored
 	}
 	verified.UserEmail = cmp.Or(identity.Email, verified.UserEmail)
-	if err := config.UpdateProfile(app.dir, cfg.ProfileName, func(p *config.Profile) { applyLogin(p, cfg) }); err != nil {
+	if err := app.pairProfile(cfg, verified.Account()); err != nil {
 		return nil, false, err
 	}
 	// A first retirement the keychain or the network cut short is tried again.
@@ -312,7 +310,7 @@ func (app *App) chooseOrganization(ctx context.Context, cfg *config.Config, cred
 	if err != nil {
 		return 0, err
 	}
-	return kept, config.UpdateProfile(app.dir, cfg.ProfileName, func(p *config.Profile) { p.SelectOrganization(org.ID, org.Name) })
+	return kept, recordOrganization(app.dir, cfg.ProfileName, cred, org)
 }
 
 // errNotYourOrganization is an --org the person's organizations, as the account service
@@ -357,7 +355,13 @@ func (app *App) revokeSession(ctx context.Context, cfg *config.Config, cred *aut
 // applyLogin records the environment the credential belongs to: hooks and the flushes they
 // start run without TERMA_ENV, and would otherwise resolve to production and hold every
 // event. The login is the profile's credential from then on, not a server key setup stored.
-func applyLogin(p *config.Profile, cfg *config.Config) {
+// It pairs the profile with account, the login's: an organization and team chosen under any
+// other account, or under none, are cleared in the same write.
+func applyLogin(p *config.Profile, cfg *config.Config, account string) {
+	if p.Account != account {
+		p.OrganizationID, p.OrganizationName, p.Team, p.TeamName = "", "", "", ""
+	}
+	p.Account = account
 	p.PinEnvironment(cfg.Environment)
 	p.ServerKeySignIn, p.ServerKeyAuthURL = false, ""
 }

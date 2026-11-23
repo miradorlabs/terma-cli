@@ -13,7 +13,7 @@ import (
 
 func TestAppendAndFlush(t *testing.T) {
 	t.Parallel()
-	s, err := Open(t.TempDir())
+	s, err := openBound(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -48,7 +48,7 @@ func TestAppendAndFlush(t *testing.T) {
 
 func TestFlushKeepsEventsOnFailureAndBacksOff(t *testing.T) {
 	t.Parallel()
-	s, _ := Open(t.TempDir())
+	s, _ := openBound(t.TempDir())
 	_ = s.Append(Event{Name: "a"})
 	_ = s.Append(Event{Name: "b"})
 	now := time.Date(2026, 9, 7, 12, 0, 0, 0, time.UTC)
@@ -87,7 +87,7 @@ func TestFlushKeepsEventsOnFailureAndBacksOff(t *testing.T) {
 
 func TestBackoffDoubles(t *testing.T) {
 	t.Parallel()
-	s, _ := Open(t.TempDir())
+	s, _ := openBound(t.TempDir())
 	_ = s.Append(Event{Name: "a"})
 	now := time.Date(2026, 9, 7, 12, 0, 0, 0, time.UTC)
 	fail := SenderFunc(func(context.Context, []Event) ([]Event, error) { return nil, errors.New("no") })
@@ -101,10 +101,10 @@ func TestBackoffDoubles(t *testing.T) {
 func TestFlushSkipsTornLinesAndKeepsConcurrentAppends(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	s, _ := Open(dir)
+	s, _ := openBound(dir)
 	_ = s.Append(Event{Name: "ok"})
 	// A hook killed mid-write leaves garbage; the flusher must step over it.
-	f, _ := os.OpenFile(filepath.Join(dir, eventsFile), os.O_APPEND|os.O_WRONLY, 0o600)
+	f, _ := os.OpenFile(filepath.Join(dir, EventsFile), os.O_APPEND|os.O_WRONLY, 0o600)
 	_, _ = f.WriteString("{not json\n")
 	f.Close()
 	_ = s.Append(Event{Name: "ok2"})
@@ -125,7 +125,7 @@ func TestFlushSkipsTornLinesAndKeepsConcurrentAppends(t *testing.T) {
 // Held events requeue at the tail, are not re-sent in the same pass, and return next flush.
 func TestHeldEventsRequeueWithoutLooping(t *testing.T) {
 	t.Parallel()
-	s, err := Open(t.TempDir())
+	s, err := openBound(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -179,7 +179,7 @@ func TestHeldEventsRequeueWithoutLooping(t *testing.T) {
 // what went out and ends as a failure without opening the spool-wide backoff.
 func TestPartialDeliveryAcknowledgesWhatWentOutAndCarriesOn(t *testing.T) {
 	t.Parallel()
-	s, err := Open(t.TempDir())
+	s, err := openBound(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -251,7 +251,7 @@ func TestPartialDeliveryAcknowledgesWhatWentOutAndCarriesOn(t *testing.T) {
 // A deferral leaves events queued and counted, with no error and no window.
 func TestPartialDeliveryThatOnlyDefersIsNotAFailure(t *testing.T) {
 	t.Parallel()
-	s, err := Open(t.TempDir())
+	s, err := openBound(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -274,7 +274,7 @@ func TestPartialDeliveryThatOnlyDefersIsNotAFailure(t *testing.T) {
 // A pass that reaches every destination clears a spool-wide window.
 func TestPartialDeliveryClearsAStaleSpoolWideWindow(t *testing.T) {
 	t.Parallel()
-	s, err := Open(t.TempDir())
+	s, err := openBound(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -294,7 +294,7 @@ func TestPartialDeliveryClearsAStaleSpoolWideWindow(t *testing.T) {
 // Each destination backs off on its own: 30 seconds doubling to an hour, reset by a delivery.
 func TestDestinationRetryWindows(t *testing.T) {
 	t.Parallel()
-	s, err := Open(t.TempDir())
+	s, err := openBound(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -338,10 +338,11 @@ func TestDestinationRetryWindows(t *testing.T) {
 
 func TestFlushDropsEventsOlderThanMaxAge(t *testing.T) {
 	t.Parallel()
-	s, err := Open(t.TempDir())
+	s, err := openBound(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
+	s.Bind("account-a")
 	now := time.Now()
 	if err := s.Append(Event{Time: now.Add(-MaxAge - time.Hour), Name: "stale", SessionID: "old"}); err != nil {
 		t.Fatal(err)
@@ -364,7 +365,7 @@ func TestFlushDropsEventsOlderThanMaxAge(t *testing.T) {
 
 func TestFlushMinIntervalSkipsARecentFlush(t *testing.T) {
 	t.Parallel()
-	s, err := Open(t.TempDir())
+	s, err := openBound(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -394,20 +395,20 @@ func TestFlushMinIntervalSkipsARecentFlush(t *testing.T) {
 func TestWritableLeavesTheQueueExactlyAsItWas(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	s, _ := Open(dir)
+	s, _ := openBound(dir)
 	for _, name := range []string{"a", "b", "c"} {
 		if err := s.Append(Event{Name: name}); err != nil {
 			t.Fatal(err)
 		}
 	}
-	before, err := os.ReadFile(filepath.Join(dir, eventsFile))
+	before, err := os.ReadFile(filepath.Join(dir, EventsFile))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if err := s.Writable(); err != nil {
 		t.Fatalf("a writable spool must report writable: %v", err)
 	}
-	after, err := os.ReadFile(filepath.Join(dir, eventsFile))
+	after, err := os.ReadFile(filepath.Join(dir, EventsFile))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -446,12 +447,70 @@ func TestWritableLeavesTheQueueExactlyAsItWas(t *testing.T) {
 func TestWritableReportsAnUnwritableSpool(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	s, _ := Open(dir)
+	s, _ := openBound(dir)
 	// A directory where the queue file belongs: open succeeds, writing fails.
-	if err := os.Mkdir(filepath.Join(dir, eventsFile), 0o700); err != nil {
+	if err := os.Mkdir(filepath.Join(dir, EventsFile), 0o700); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.Writable(); err == nil {
 		t.Fatal("a spool whose queue cannot be written must report an error")
 	}
+}
+
+// A bound spool stamps the sign-in's account on what it appends, unless an event names one.
+func TestBindStampsTheAccount(t *testing.T) {
+	t.Parallel()
+	s, err := openBound(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.Bind("aaaaaaaaaaaaaaaa")
+	if err := s.Append(Event{Name: "bound"}, Event{Name: "own", Account: "bbbbbbbbbbbbbbbb"}); err != nil {
+		t.Fatal(err)
+	}
+	var got []Event
+	s.Flush(t.Context(), SenderFunc(func(_ context.Context, events []Event) ([]Event, error) {
+		got = append(got, events...)
+		return nil, nil
+	}), FlushOptions{Force: true})
+	if len(got) != 2 || got[0].Account != "aaaaaaaaaaaaaaaa" || got[1].Account != "bbbbbbbbbbbbbbbb" {
+		t.Fatalf("events = %+v", got)
+	}
+}
+
+// A spool bound to no person marks what it appends without an account as no person's,
+// whichever path appends it, and never binds it to a sign-in later.
+func TestASpoolBoundToNoPersonMarksItsEvents(t *testing.T) {
+	t.Parallel()
+	s, err := openBound(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.BindNoPerson()
+	if err := s.Append(Event{Name: "server-key"}, Event{Name: "a-persons", Account: "account-a"}); err != nil {
+		t.Fatal(err)
+	}
+	s.Bind("account-b")
+	evs, err := s.Peek(10)
+	if err != nil || len(evs) != 2 {
+		t.Fatalf("peek = %v, %v", evs, err)
+	}
+	if evs[0].Account != "" || !evs[0].NoPerson || evs[1].Account != "account-a" || evs[1].NoPerson {
+		t.Fatalf("events = %+v", evs)
+	}
+	if err := s.Append(evs[0]); err != nil {
+		t.Fatal(err)
+	}
+	if again, _ := s.Peek(10); again[2].Account != "" {
+		t.Fatalf("a no-person event was bound later: %+v", again[2])
+	}
+}
+
+// openBound is Open bound to a person's account, as a signed-in hook's spool is.
+func openBound(dir string) (*Spool, error) {
+	s, err := Open(dir)
+	if err == nil {
+		s.Bind("aaaaaaaaaaaaaaaa")
+	}
+	return s, err
 }

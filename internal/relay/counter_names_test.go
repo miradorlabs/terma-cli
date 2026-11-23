@@ -21,12 +21,12 @@ var pinnedCounterNames = []string{
 	"dropped.no_session_trace.", "dropped.no_session_trace_at_exit.", "dropped.not_collected.",
 	"dropped.not_collected_at_exit.", "dropped.outbox_expired.", "dropped.outbox_full.",
 	"dropped.outbox_unreadable.", "dropped.outbox_write_failed.", "dropped.policy_repository.",
-	"dropped.policy_signal.", "dropped.policy_signal_or_content.", "dropped.policy_widened.",
+	"dropped.policy_signal.", "dropped.policy_signal_or_content.", "dropped.policy_timeout.", "dropped.policy_widened.",
 	"dropped.policy_widened_at_exit.", "dropped.process_running.",
-	"dropped.process_running_at_exit.", "dropped.unclaimed_evicted.",
+	"dropped.process_running_at_exit.", "dropped.signed_out.", "dropped.unclaimed_evicted.",
 	"dropped.unclaimed_expired.", "dropped.unclaimed_expired_at_exit.",
 	"dropped.unclaimed_overflow.", "dropped.uncovered_process.",
-	"dropped.uncovered_process_at_exit.", "dropped.upstream_", "forwarded.", "heartbeats_failed",
+	"dropped.uncovered_process_at_exit.", "dropped.unreadable.", "dropped.upstream_", "forwarded.", "heartbeats_failed",
 	"heartbeats_sent", "held_parts", "process_index_full", "queued_at_exit.", "received.",
 	"recovered_from_outbox", "refused_restarting", "refused_unauthorized", "refused_undecodable",
 	"refused_unreadable", "released_after_hold", "sender_unresolved", "trace_index_full",
@@ -36,7 +36,7 @@ var pinnedCounterNames = []string{
 
 // The counters' names are read from this package's source: every literal stats.add name, every
 // drop reason spelled as a literal (to stats.dropped, the outbox's drop, or a reason variable)
-// or a why… constant, and the unclassified total. A name this package spells is pinned; one
+// or a why… or lost… constant, and the unclassified total. A name this package spells is pinned; one
 // assembled from data at run time is not, and the patterns below must keep up.
 func TestCounterNamesArePinned(t *testing.T) {
 	t.Parallel()
@@ -47,6 +47,8 @@ func TestCounterNamesArePinned(t *testing.T) {
 	add := regexp.MustCompile(`stats\.add\("([a-z_.]+)"`)
 	drop := regexp.MustCompile(`stats\.dropped\([^,]+, "([a-z_]+)"(\+?)`)
 	why := regexp.MustCompile(`\bwhy[A-Z][A-Za-z]*\s*=\s*"([a-z_]+)"`)
+	// Why a part collected with no sign-in is lost (part.lost), dropped by that name.
+	lost := regexp.MustCompile(`\blost[A-Z][A-Za-z]*\s*=\s*"([a-z_]+)"`)
 	// The outbox's drop(q, "outbox_full") and a reason held in a variable before it is dropped.
 	reason := regexp.MustCompile(`\bdrop\(\w+, "([a-z_]+)"\)|\breason, records :?= "([a-z_]+)"`)
 	total := regexp.MustCompile(`\bunclassifiedPrefix\s*=\s*"([a-z_]+)"`)
@@ -72,6 +74,9 @@ func TestCounterNamesArePinned(t *testing.T) {
 		}
 		for _, m := range reason.FindAllSubmatch(src, -1) {
 			found["dropped."+string(m[1])+string(m[2])+"."] = true
+		}
+		for _, m := range lost.FindAllSubmatch(src, -1) {
+			found["dropped."+string(m[1])+"."] = true
 		}
 		for _, m := range total.FindAllSubmatch(src, -1) {
 			found[string(m[1])] = true

@@ -26,8 +26,10 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/miradorlabs/terma-cli/internal/account/auth"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/relay/shape"
+	"github.com/miradorlabs/terma-cli/internal/sendas"
 )
 
 // DefaultHold is how long a part that cannot leave yet waits, covering a first export that races its hook.
@@ -39,9 +41,12 @@ const DefaultTraceHold = 30 * time.Minute
 // maxBody bounds one export request, decompressed.
 const maxBody = 16 << 20
 
-// Policy is how a claimed session's telemetry leaves the machine: where, with which key, and what content.
+// Policy is how a claimed session's telemetry leaves the machine: where, with which
+// credential, and what content.
 type Policy struct {
-	Endpoint           string
+	Endpoint string
+	// Key is the team's server key a profile was set up with; "" sends with the person's
+	// sign-in (Options.SignIn), naming the team in the request's X-Mirador-Project.
 	Key                string
 	IncludePrompts     bool
 	IncludeToolContent bool
@@ -52,10 +57,29 @@ type Policy struct {
 	Unadmitted bool
 	// User is the Mirador user every part sent under this policy names, by id; "" names no one.
 	User string
+	// UserAccount is User's account key (auth.AccountKey): a part bound to another account
+	// names no one, so the user it names is never another than the sign-in it leaves with.
+	UserAccount string
+	// Account is the account key of the sign-in the profile's team was chosen under when
+	// this was resolved (config.Profile.Account); "" when unknown. A person's part in
+	// another lane is never sent under it.
+	Account string
+}
+
+// resolvedFor reports whether a part in lane may leave under pol: a server key's policy
+// names its own credential; a person's leaves only under the account it was resolved for.
+func (pol Policy) resolvedFor(lane string) bool {
+	return pol.Key != "" || pol.Account == "" || !auth.ValidAccountKey(lane) || pol.Account == lane
 }
 
 // ErrNoKey is Resolve's answer for a project this machine holds no key for; its parts wait, then drop.
 var ErrNoKey = errors.New("no key for this team on this machine")
+
+// SignIn is the person's sign-in the relay sends with (sendas.SignIn).
+type SignIn = sendas.SignIn
+
+// ProjectHeader names the team a part sent with a user token goes to.
+const ProjectHeader = sendas.ProjectHeader
 
 // Options configure a relay.
 type Options struct {
@@ -71,6 +95,14 @@ type Options struct {
 	Lookup func(sessionID string, now time.Time) (claim.Claim, bool)
 	// Resolve turns a claim into a Policy, or ErrNoKey.
 	Resolve func(c claim.Claim) (Policy, error)
+	// SignIn is who parts without a server key are sent as; none leave without it. A part
+	// is bound to the lane of the sign-in when it arrives: a person's account, which it
+	// leaves under only while that sign-in is the one in place, so a backlog never goes out
+	// in another person's name or to another environment (it ages out of the outbox
+	// meanwhile); or no person's, under a server key, which only a server key sends. One
+	// that arrives signed out, or while the sign-in can't be read, is lost, and counted.
+	// Nil is a server key's relay.
+	SignIn SignIn
 	// CatchAll, in global mode, is where a part whose hold ran out unplaced goes instead of being dropped.
 	CatchAll func() (claim.Claim, bool)
 	// HeartbeatSend, set, turns the heartbeat on; HeartbeatEvery is its period.
@@ -100,6 +132,13 @@ type Options struct {
 	// InstallMethod is how this terma was installed, on the heartbeat's resource as
 	// terma.install.method; "" sends none.
 	InstallMethod string
+	// Installation is, asked at every heartbeat, this installation's stable id, on its
+	// resource as terma.installation.id; nil or "" sends none.
+	Installation func() string
+	// HookLosses are, asked at every heartbeat, what hooks lost since it was last asked, by
+	// reason (spool.TakeNewLosses): counted as dropped.<reason>.hooks, so the beat carries
+	// the hooks' losses with the relay's.
+	HookLosses func() map[string]int
 	// UpdateAuto, set, is asked at every heartbeat whether this terma installs new releases
 	// by itself, sent on its record as terma.update.auto: the developer can turn automatic
 	// updates on or off while the relay runs.
@@ -114,23 +153,28 @@ type Options struct {
 
 // Relay is the local OTLP relay: Handler accepts exports and Run delivers or ages them out.
 type Relay struct {
-	opts  Options
-	rules *rules
-	stats *Stats
-	cache lookupCache
+	opts Options
+	// hookLossesMu serializes Options.HookLosses.
+	hookLossesMu sync.Mutex
+	rules        *rules
+	stats        *Stats
+	cache        lookupCache
 
 	// deliverMu keeps a session's parts in arrival order; taken before mu, never after.
 	deliverMu sync.Mutex
 
-	mu        sync.Mutex
-	held      map[string][]heldPart
-	heldN     int
-	heldBytes int
-	traces    map[string]traceSession
-	procs     map[int]*procState // sender pid → the sessions it named, and whether it exited
-	outbox    outbox
-	senders   map[route]*sender
-	lastSeen  time.Time
+	mu    sync.Mutex
+	held  map[string][]heldPart
+	heldN int
+	// policyLost counts the parts waiting for their team's policy that a full hold refused
+	// or evicted since the last sweep.
+	policyLost int
+	heldBytes  int
+	traces     map[string]traceSession
+	procs      map[int]*procState // sender pid → the sessions it named, and whether it exited
+	outbox     outbox
+	senders    map[route]*sender
+	lastSeen   time.Time
 	// inflight counts the exports being read and routed; refusing, set by Quiesce, answers
 	// each new one 503 so its exporter sends it again, to the next relay.
 	inflight   int
@@ -139,6 +183,13 @@ type Relay struct {
 	sendCtx    context.Context
 	cancelSend context.CancelFunc
 	stopping   chan struct{}
+	// lossMu orders the writes of what the relay lost (recordLosses).
+	lossMu sync.Mutex
+	// unreadableRetry is how long an export waits for a sign-in that can't be read, and
+	// unreadableAt, under mu, when the last such wait failed; lanes the lane read last.
+	unreadableRetry time.Duration
+	unreadableAt    time.Time
+	lanes           laneState
 }
 
 // New returns a relay. Run must be started for anything to leave.
@@ -174,13 +225,16 @@ func New(opts Options) *Relay {
 		opts.Grace = 5 * time.Second
 	}
 	sendCtx, cancel := context.WithCancel(context.Background())
-	return &Relay{
+	r := &Relay{
 		opts: opts, rules: compose(opts.Correlators, opts.Capturers), stats: newStats(),
 		cache:  lookupCache{claims: map[string]cachedClaim{}, policies: map[string]cachedPolicy{}},
 		held:   map[string][]heldPart{},
 		traces: map[string]traceSession{}, procs: map[int]*procState{}, senders: map[route]*sender{}, outbox: outbox{dir: opts.Dir},
 		lastSeen: opts.Now(), sendCtx: sendCtx, cancelSend: cancel, stopping: make(chan struct{}),
+		unreadableRetry: unreadableRetry,
 	}
+	r.seedLane()
+	return r
 }
 
 // Stats is the relay's running account.
@@ -294,6 +348,10 @@ func (r *Relay) export(w http.ResponseWriter, req *http.Request, s Signal) {
 		r.inflight--
 		r.mu.Unlock()
 	}()
+	// The sign-in the export arrived under, before its body is read: a switch while it
+	// is read or decoded does not hand what was collected under one account to another.
+	lane, lost := r.arrivalLane(req.Context())
+	arrived := r.opts.Now()
 	body, err := readBody(req)
 	if err != nil {
 		r.stats.add("refused_unreadable", 1)
@@ -311,7 +369,7 @@ func (r *Relay) export(w http.ResponseWriter, req *http.Request, s Signal) {
 	_, global := r.catchAll()
 	narrow := r.opts.CatchAll != nil && !global
 	for _, p := range parts {
-		p.pid, p.narrow = pid, narrow
+		p.pid, p.narrow, p.account, p.lost, p.arrived = pid, narrow, lane, lost, arrived
 		p.at = earliest(p.msg)
 		r.stats.received(s, p.records)
 		if p.session != "" && !strings.HasPrefix(p.session, tracePrefix) {

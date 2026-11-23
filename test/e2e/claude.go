@@ -315,5 +315,4 @@ func (sb *Sandbox) directClaude() {
 	doc["env"] = env
 	data, _ := json.MarshalIndent(doc, "", "  ")
 	sb.writeAbs(path, string(data)+"\n")
-	sb.useLiveKey()
 }

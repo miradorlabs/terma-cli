@@ -14,7 +14,6 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
-	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
 // Codex Desktop's activity, spooled without Env.EmitFor, carries the developer's team.
@@ -55,7 +54,7 @@ func TestCodexSubagentThreadIsClaimed(t *testing.T) {
 	t.Parallel()
 	root := hookruntest.InitRepo(t)
 	stateDir := t.TempDir()
-	sp, _ := spool.Open(t.TempDir())
+	sp, _ := hookruntest.OpenSpool(t.TempDir())
 	env := hookrun.Env{StateDir: stateDir, Now: time.Now(), Cwd: root, Policy: hookruntest.Admitting(root), Spool: sp, Team: "project-a",
 		Stdin: strings.NewReader(`{"session_id":"root-thread","agent_id":"child-thread","agent_type":"worker","cwd":` + strconv.Quote(root) + `}`)}
 	if err := subagentStart(context.Background(), env); err != nil {
