@@ -70,10 +70,10 @@ func ownEntries(command func(event string) string) (map[string]json.RawMessage, 
 
 // planUserHooks puts terma's entries into the one named hook terma owns, or takes them
 // out, leaving every other named hook, and any handler of the developer's inside terma's,
-// as it was read. A member of that name with no entry of terma's is the developer's:
-// neither written into nor removed. Removal leaves alone a file it cannot read that holds
-// nothing of terma's: agy reads comments and trailing commas, and setup for any other
-// agent, or teardown, must not fail on them.
+// as it was read. Installing also switches the hook back on: agy runs none of a hook set
+// "enabled": false. Removal leaves alone a file it cannot read that holds nothing of
+// terma's: agy reads comments and trailing commas, and setup for any other agent, or
+// teardown, must not fail on them.
 func planUserHooks(dir string, command func(event string) string, install bool) (hookmgr.Plan, error) {
 	const path = "hooks.json"
 	full := filepath.Join(dir, path)
@@ -96,13 +96,10 @@ func planUserHooks(dir string, command func(event string) string, install bool) 
 	}
 	member := map[string]json.RawMessage{}
 	if current, present := top[antigravityHookName]; present {
-		if !hookmgr.CallsTerma(current) {
-			if install {
-				return p, fmt.Errorf("%s already has a hook named %q that terma did not write", full, antigravityHookName)
-			}
-			return p, nil
-		}
 		if err := json.Unmarshal(current, &member); err != nil || member == nil {
+			if !install {
+				return p, nil
+			}
 			return p, fmt.Errorf("parse %s: hook %q is not an object", full, antigravityHookName)
 		}
 	}
@@ -111,6 +108,10 @@ func planUserHooks(dir string, command func(event string) string, install bool) 
 		return p, err
 	}
 	changed := false
+	if raw, ok := member["enabled"]; install && ok && string(bytes.TrimSpace(raw)) == "false" {
+		delete(member, "enabled")
+		changed = true
+	}
 	for _, h := range antigravityHooks {
 		var entries, kept []json.RawMessage
 		if raw, ok := member[h.Event]; ok {

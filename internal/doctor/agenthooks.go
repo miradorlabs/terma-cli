@@ -45,7 +45,7 @@ func AgentHooksCheck(reg *agents.Registry, mine []string, command func(event str
 		return Check{Key: KeyAgentHooks, Status: Fail, Fix: "terma setup",
 			Detail: "terma's hooks are missing or out of date, so no session is recorded, for " + strings.Join(missing, ", ")}, true
 	case len(ok) > 0:
-		return Check{Key: KeyAgentHooks, Status: Pass, Detail: strings.Join(ok, ", ") + " runs terma's hooks"}, true
+		return Check{Key: KeyAgentHooks, Status: Pass, Detail: "terma's hooks run for " + strings.Join(ok, ", ")}, true
 	}
 	return Check{}, false
 }

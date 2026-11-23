@@ -409,7 +409,15 @@ func TestSetupWithAntigravityAloneTurnsHooksOn(t *testing.T) {
 		t.Errorf("doctor faults hooks that are in place:\n%s", out)
 	}
 
-	// Its hooks are all it reports through: doctor and status say when they are gone.
+	// Its hooks are all it reports through: doctor says when they are switched off, and
+	// doctor and status when they are gone.
+	disabled := strings.Replace(string(hooks), `"terma": {`, `"terma": {"enabled": false, `, 1)
+	if err := os.WriteFile(path, []byte(disabled), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if out, err := runTerma(t, "doctor"); err == nil || !strings.Contains(out, "missing or out of date") {
+		t.Errorf("doctor with terma's agy hook disabled: %v\n%s", err, out)
+	}
 	if err := os.Remove(path); err != nil {
 		t.Fatal(err)
 	}

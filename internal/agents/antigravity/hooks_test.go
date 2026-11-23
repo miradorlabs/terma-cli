@@ -109,18 +109,84 @@ func TestAntigravityHooksCreateAndRemoveFile(t *testing.T) {
 	}
 }
 
-// A hook the developer named "terma" is theirs: setup refuses to replace it and teardown
-// leaves it.
-func TestAntigravityHooksLeaveADevelopersTermaHook(t *testing.T) {
+// A "terma" hook holding only the developer's handlers, as teardown leaves one, takes
+// terma's entries beside them on the next setup, and loses only those at teardown. One
+// that is not an object is refused by setup and left alone by removal.
+func TestAntigravityHooksMergeIntoADevelopersTermaHook(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	mine := `{"terma": {"Stop": [{"command": "./my-terma-notes.sh"}]}}`
-	hookruntest.WriteFile(t, root, "hooks.json", mine)
-	if _, err := planUserHooks(root, testCommand, true); err == nil {
-		t.Fatal("install replaced the developer's own hook")
+	hookruntest.WriteFile(t, root, "hooks.json", `{"terma": {"Stop": [{"command": "./my-terma-notes.sh"}]}}`)
+	plan, err := planUserHooks(root, testCommand, true)
+	if err != nil {
+		t.Fatalf("install over the developer's hook: %v", err)
 	}
-	if un, err := planUserHooks(root, testCommand, false); err != nil || !un.Empty() {
-		t.Fatalf("uninstall = %+v, %v", un, err)
+	if err := hookmgr.Apply(root, plan); err != nil {
+		t.Fatal(err)
+	}
+	got := hookruntest.ReadFile(t, root, "hooks.json")
+	if !strings.Contains(got, "./my-terma-notes.sh") || !strings.Contains(got, testCommand("antigravity-stop")) {
+		t.Fatalf("after install:\n%s", got)
+	}
+	un, err := planUserHooks(root, testCommand, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := hookmgr.Apply(root, un); err != nil {
+		t.Fatal(err)
+	}
+	if got := hookruntest.ReadFile(t, root, "hooks.json"); strings.Contains(got, "hook --user") || !strings.Contains(got, "./my-terma-notes.sh") {
+		t.Fatalf("after removal:\n%s", got)
+	}
+
+	other := t.TempDir()
+	hookruntest.WriteFile(t, other, "hooks.json", `{"terma": ["not", "a", "hook"]}`)
+	if _, err := planUserHooks(other, testCommand, true); err == nil || !strings.Contains(err.Error(), filepath.Join(other, "hooks.json")) {
+		t.Errorf("install over a hook that is not an object: %v", err)
+	}
+	if un, err := planUserHooks(other, testCommand, false); err != nil || !un.Empty() {
+		t.Errorf("removal of a hook that is not an object = %+v, %v", un, err)
+	}
+}
+
+// agy runs none of a hook set "enabled": false: setup switches terma's back on, so a
+// planner asked whether anything would change (doctor) says yes until it does.
+func TestAntigravityHooksSwitchTermasBackOn(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	plan, err := planUserHooks(root, testCommand, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := hookmgr.Apply(root, plan); err != nil {
+		t.Fatal(err)
+	}
+	var doc map[string]map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(hookruntest.ReadFile(t, root, "hooks.json")), &doc); err != nil {
+		t.Fatal(err)
+	}
+	doc["terma"]["enabled"] = json.RawMessage("false")
+	data, _ := json.Marshal(doc)
+	hookruntest.WriteFile(t, root, "hooks.json", string(data))
+
+	plan, err = planUserHooks(root, testCommand, true)
+	if err != nil || plan.Empty() {
+		t.Fatalf("a disabled hook planned as in place: %+v, %v", plan, err)
+	}
+	if err := hookmgr.Apply(root, plan); err != nil {
+		t.Fatal(err)
+	}
+	if got := hookruntest.ReadFile(t, root, "hooks.json"); strings.Contains(got, `"enabled"`) {
+		t.Fatalf("setup left terma's hook disabled:\n%s", got)
+	}
+	if again, _ := planUserHooks(root, testCommand, true); !again.Empty() {
+		t.Fatal("install should be idempotent once enabled")
+	}
+	// A developer's "enabled": true is theirs to keep.
+	doc["terma"]["enabled"] = json.RawMessage("true")
+	data, _ = json.Marshal(doc)
+	hookruntest.WriteFile(t, root, "hooks.json", string(data))
+	if again, _ := planUserHooks(root, testCommand, true); !again.Empty() {
+		t.Fatal(`setup rewrote "enabled": true`)
 	}
 }
 
@@ -190,6 +256,13 @@ func TestAntigravityHooksKeepAHandlerAddedToTermas(t *testing.T) {
 	}
 	if !strings.Contains(got, `"terma"`) || strings.Contains(got, "PreInvocation") {
 		t.Fatalf("teardown should keep the hook with the developer's handler alone:\n%s", got)
+	}
+
+	// Setup again after that teardown puts terma's entries back beside the handler.
+	apply(moved, true)
+	got = hookruntest.ReadFile(t, root, "hooks.json")
+	if !strings.Contains(got, "./my-stop.sh") || !strings.Contains(got, moved("antigravity-pre-invocation")) {
+		t.Fatalf("after setup again:\n%s", got)
 	}
 }
 
