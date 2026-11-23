@@ -222,7 +222,7 @@ func planHooks(dir string, command func(event string) string, mode planMode) (ho
 	}
 	if switchedOn {
 		note := "switched terma's hook in " + full + ` back on (it was "enabled": false)`
-		if theirs {
+		if theirs || listsOtherHandlers(member) {
 			note += ", and with it the handlers you added to that hook"
 		}
 		p.Notes = append(p.Notes, note)
@@ -250,6 +250,24 @@ func planHooks(dir string, command func(event string) string, mode planMode) (ho
 	}
 	p.Changes = append(p.Changes, hookmgr.Change{Path: path, Before: before, After: append(bytes.TrimRight(after, "\n"), '\n')})
 	return p, nil
+}
+
+// listsOtherHandlers reports whether terma's hook lists handlers under an event terma does
+// not write, agy's PreToolUse or SessionStart say: those are the developer's, and come back
+// on with the hook. A field that is no list, or an empty list, holds none; a list's entries
+// are counted as they stand, an empty group too, which errs toward the warning.
+func listsOtherHandlers(member map[string]json.RawMessage) bool {
+	for key, raw := range member {
+		own := key == "enabled"
+		for _, h := range antigravityHooks {
+			own = own || h.Event == key
+		}
+		var handlers []json.RawMessage
+		if !own && json.Unmarshal(raw, &handlers) == nil && len(handlers) > 0 {
+			return true
+		}
+	}
+	return false
 }
 
 // withoutTerma is hookmgr.WithoutTerma, keeping rather than refusing a handler of a group

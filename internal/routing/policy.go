@@ -55,14 +55,7 @@ func StorePolicy(cfg *config.Config, pol *config.Policy) error {
 	if profile.OrganizationID != "" && profile.OrganizationID != cfg.OrganizationID {
 		return errors.New("organization changed while fetching collection policy")
 	}
-	err = flock.Locked(path, 5*time.Second, func() error {
-		prev, ok, _ := config.ReadPolicy(cfg.StateDir, pol.TeamID)
-		if ok && prev.OrganizationID == pol.OrganizationID && prev.AuthURL == pol.AuthURL && prev.Revision > pol.Revision {
-			return errors.New("collection policy revision moved backwards")
-		}
-		return config.WritePolicy(cfg.StateDir, *pol)
-	})
-	if err != nil {
+	if err := writePolicyFile(cfg.StateDir, path, pol); err != nil {
 		return err
 	}
 	// Only a profile that records something new is rewritten: refreshes leave config.json alone.
@@ -95,6 +88,41 @@ func StorePolicy(cfg *config.Config, pol *config.Policy) error {
 		return err
 	}
 	return rejected
+}
+
+// StoreTeamPolicy writes t's policy file in stateDir (policies/<team>.json) without
+// touching config.json or checking a profile's single organization. Callers must pass the
+// committed Team returned by routing.Update (after ApplyRefresh succeeds and commits,
+// never inside the update closure or from an uncommitted copy). It requires TeamID,
+// OrganizationID, and AuthURL matching t, downgrades a non-personal team's global policy
+// to repository mode (matching State.ApplyRefresh), and refuses a backward revision for
+// the same org/env.
+//
+// Because StoreTeamPolicy is a second write after routing.Update, a crash between the two
+// leaves routing/<profile>.json ahead of policies/<team>.json; the file self-heals on the
+// next refresh. Policy files are keyed per team ID and shared across profiles, guarded by
+// organization, environment, and monotonic revision checks.
+func StoreTeamPolicy(stateDir string, t Team) error {
+	pol := t.Policy
+	if !t.owns(pol) {
+		return errors.New("a team's collection policy is stored only with its team, organization and environment")
+	}
+	pol = sanitizeTeamPolicy(pol, t.Personal)
+	path, err := config.PolicyPath(stateDir, pol.TeamID)
+	if err != nil {
+		return err
+	}
+	return writePolicyFile(stateDir, path, &pol)
+}
+
+func writePolicyFile(stateDir, path string, pol *config.Policy) error {
+	return flock.Locked(path, 5*time.Second, func() error {
+		prev, ok, _ := config.ReadPolicy(stateDir, pol.TeamID)
+		if ok && prev.OrganizationID == pol.OrganizationID && prev.AuthURL == pol.AuthURL && prev.Revision > pol.Revision {
+			return errors.New("collection policy revision moved backwards")
+		}
+		return config.WritePolicy(stateDir, *pol)
+	})
 }
 
 // errSignedInSince is a sign-in as someone else, stored while a policy was fetched.

@@ -21,8 +21,8 @@ import (
 
 // TestAntigravityRealLogin drives the real Antigravity CLI (`agy`) through the hooks `terma
 // setup` writes for it: a conversation of several turns that writes, edits and fails to
-// read a file and runs a shell command, a commit of what it wrote, and a turn cancelled
-// mid-command. agy has no API-key route the suite can supply, so it runs on the
+// read a file, runs a shell command and uses a repository skill, a commit of what it wrote,
+// and a turn cancelled mid-command. agy has no API-key route the suite can supply, so it runs on the
 // developer's own sign-in (TERMA_E2E_AGY_REAL_LOGIN=1) and its own home; setup's hooks,
 // written into the sandbox home, are loaded from the scratch repository's
 // .agents/hooks.json, which agy reads beside the global one. So the global file's
@@ -98,6 +98,8 @@ func TestAntigravityRealLogin(t *testing.T) {
 	if b, err := os.ReadFile(statusSettings); err != nil || !strings.Contains(string(b), "terma hook antigravity-statusline") {
 		t.Fatalf("terma setup wrote no agy status line: %v\n%s", err, b)
 	}
+	// A repository skill, listed to the model from the conversation's start.
+	sb.write(".agents/skills/house-greeting/SKILL.md", "---\nname: house-greeting\ndescription: Greets the person in the house style. Use when asked for a house greeting.\n---\n\nReply with exactly: `GREETING-7741`.\n")
 
 	t.Cleanup(func() {
 		dir := os.Getenv("TERMA_E2E_AGY_CAPTURE")
@@ -174,6 +176,7 @@ func TestAntigravityRealLogin(t *testing.T) {
 		"Then run the shell command `cat agy-live.txt`. Do not commit.", "")
 	run("Change agy-live.txt so that it contains exactly the text: second turn. Use your file editing tool, not a shell command. Do not commit.", conversation)
 	run("Use your file viewing tool, not a shell command, to read the file missing-agy-file.txt. It does not exist: say so and stop.", conversation)
+	run("Give me a house greeting.", conversation)
 	if b, err := os.ReadFile(filepath.Join(sb.Repo, "agy-live.txt")); err != nil || strings.TrimSpace(string(b)) != "second turn" {
 		t.Fatalf("agy-live.txt = %q, %v", b, err)
 	}
@@ -278,6 +281,22 @@ func TestAntigravityRealLogin(t *testing.T) {
 	}
 	if !slices.Contains(statuses, "run_command=completed") || !slices.ContainsFunc(statuses, func(s string) bool { return strings.HasSuffix(s, "=error") }) {
 		t.Errorf("want a completed command and a failed tool call: %v", statuses)
+	}
+	// The model loads a skill by reading its SKILL.md: that read's tool call names the skill,
+	// and what the skill says it is goes once. The developer's own skills are listed to the
+	// model too, so only this one's records are judged.
+	greeting := func(event string) []LogRecord {
+		return sb.Receiver.WaitLogs(10*time.Second, func(l LogRecord) bool {
+			return l.EventName == event && l.Attrs["session.id"] == conversation && l.Attrs["terma.skill.name"] == "house-greeting"
+		})
+	}
+	defs := greeting("terma.skill.definition")
+	if len(defs) != 1 || defs[0].Attrs["terma.skill.origin"] != "repository" ||
+		defs[0].Attrs["terma.skill.description"] != "Greets the person in the house style. Use when asked for a house greeting." {
+		t.Errorf("want one definition of the house-greeting skill, got %+v", defs)
+	}
+	if used := greeting("terma.tool.call"); len(used) == 0 || used[0].Attrs["gen_ai.tool.name"] != "read_file" {
+		t.Errorf("want the skill's read_file call to name it, got %+v", used)
 	}
 	touched := sb.Delivered("terma.files.touched", conversation, 10*time.Second)
 	if len(touched) == 0 {

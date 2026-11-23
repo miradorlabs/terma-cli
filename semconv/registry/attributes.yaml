@@ -215,6 +215,90 @@ attributes:
     stability: development
     brief: How many messages the run exchanged.
 
+  # Skills.
+  - key: terma.skill.name
+    type: string
+    stability: development
+    brief: The skill's name as the agent itself reports it, case kept.
+    note: >
+      A plugin's skill is `plugin:skill`. Sent only while the team's policy collects prompts
+      and tool content: a terma.skill.definition is content as a whole and is withheld with
+      it, a terma.tool.call leaves without it.
+    examples: ["release-notes", "tools:release-notes"]
+    annotations:
+      content: tool
+  - key: terma.skill.description
+    type: string
+    stability: development
+    brief: The skill's own description, whole; never the skill's body.
+    note: >
+      Sent only when it is valid UTF-8 of at most 2,048 Unicode code points; a longer one is
+      left out, never cut. The record that carries it is content as a whole, sent only while
+      the team's policy collects prompts and tool content.
+    annotations:
+      content: prompts
+  - key: terma.skill.origin
+    type:
+      members:
+        - id: personal
+          value: personal
+          brief: The developer's own skills, for every project.
+          stability: development
+        - id: repository
+          value: repository
+          brief: Skills a repository holds for whoever works in it.
+          stability: development
+        - id: plugin
+          value: plugin
+          brief: Skills an installed plugin brings.
+          stability: development
+        - id: builtin
+          value: builtin
+          brief: Skills the agent ships with.
+          stability: development
+        - id: managed
+          value: managed
+          brief: Skills an administrator installed for every user of the machine.
+          stability: development
+    stability: development
+    brief: Where the agent found the skill.
+    note: Omitted when it cannot be told.
+  - key: terma.skill.plugin.name
+    type: string
+    stability: development
+    brief: The plugin that brings the skill.
+    annotations:
+      content: tool
+  - key: terma.skill.marketplace.name
+    type: string
+    stability: development
+    brief: The marketplace the skill's plugin was installed from.
+    annotations:
+      content: tool
+  - key: terma.skill.repository.url
+    type: string
+    stability: development
+    brief: >
+      The https URL, without credentials, of the repository the skill's file is held in, or for
+      a plugin's skill the GitHub repository of the marketplace it was installed from.
+    note: >
+      Sent with terma.skill.path, or alone for a plugin's skill whose file's place in that
+      repository is not known. For a skill that is not a plugin's, only a repository the team's
+      policy collects; the file may be untracked there.
+    examples: ["https://github.com/acme/agent-plugins"]
+    annotations:
+      content: tool
+  - key: terma.skill.path
+    type: string
+    stability: development
+    brief: The path of the skill's file relative to terma.skill.repository.url, with forward slashes.
+    note: >
+      Sent only with terma.skill.repository.url: never an absolute or home-folder path, never
+      one with a `..` segment.
+    examples: ["plugins/tools/skills/release-notes/SKILL.md"]
+    annotations:
+      content: tool
+
   # Usage, as an agent without an export reports it.
   - key: terma.usage.status
     type:
