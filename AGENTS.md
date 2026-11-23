@@ -128,56 +128,54 @@ machine: it admits every repository, a hook outside git claims its session for t
 policy's default project, and the relay sends what no claim places there too, except a
 session an agent's hooks claim every one of (`shape.SessionKey.Claimed`): it waits for its
 claim, so a hidden side thread no hook claims stays here. What is held stays in memory,
-never on disk, and a stopping relay drops it. What leaves is bound to the account (a hash
-of the auth host and the user) of the sign-in in place when it arrived: the relay's
-outbox keeps it under `@<account>/`, spool events carry `account`, and it leaves only with
-that account's own token, never in another person's name, and names (`terma.user.id`) no
-user but that account's; it ages out with the outbox
-(14 days), whose `losses.json` counts what the relay lost, by reason, for doctor (the
-heartbeat carries the same reasons as `dropped.<reason>.<signal>` counters). A claimed part
-whose team's policy or key the relay can't read (not fetched yet, a locked keychain, a
-changed organization, a removed profile) waits in memory for them, fetched meanwhile, for
-15 minutes at most (`policyHold`): one still waiting then, or dropped for room or by a
-stopping relay, is counted as `policy_timeout`. An update waits for the hold to empty, but
-past its pause wait no longer for such parts, which steady exports would renew and only a
-restart may fix. What a server-key profile
-collected is no person's (`@no_person/`), and leaves only under a server key, so a profile
-switched from a server key to a person's sign-in leaves it to age out; a server key sends
-nothing else. A claimed part that arrives signed out, or while `config.json` or the
-sign-in can't be read (they are read as one snapshot, and an export waits a few seconds
-for them to read), is bound to no lane: it is never written, and counted as `signed_out`
-or `unreadable`. A route bound to no lane is never sent, and ages out. A spool event names
-an account (`account`), and leaves only under that sign-in, or is no person's
-(`no_person`, collected under a server key: the hook's spool is bound with
-`BindNoPerson`), and leaves only under a server key; one that names neither is never
-queued, and one found queued, or parked, is dropped. A hook's spool is bound to its profile's lane
-(`spool.LaneOf`), and no append ever queues an event that names neither: signed out, or
-with a sign-in that can't be read, what a hook collects is lost before anything of it is
-written (no queued line, checkpoint, push record or parked line), and counted as
-`signed_out` or `unreadable` in `spool/losses/`, a file per day of one line per loss,
-appended whole so concurrent hooks never lose a count; doctor adds them to the relay's,
-and the relay's heartbeat carries each once, as `dropped.<reason>.hooks`
-(`spool.TakeNewLosses`). Every replay of a recorded event (`AppendAsCollected`) keeps
-what it says. A session's manifest names the lane of its first write (`account`), and
-never another: a hook whose sign-in is someone else's records nothing of the session, and
-counts its event `account_conflict`; a manifest with none (one written signed out) is
-never given one. A git hook's record of sessions (a commit, a push)
-is its collector's: a hook that reads its sign-in keeps it in its own lane, unless a
-session's manifest names another account; a git hook in an agent's sandbox, which can read
-neither the sign-in nor write the state directory, keeps it in the one lane all its
-sessions' manifests name, never `session.json`'s. Anything else (sessions of several
-people, a sandboxed record of no one's) is lost as `ambiguous_push`. What it writes it
-parks in `.git/terma/` (`events-v2`, `pushes-v2`, and `losses-v2`, the counts of what it
-lost), tagged as written, and the next hook outside the sandbox unparks it as it is and
-moves the counts into `spool/losses/` once.
-This version queues to `spool/events-v2.jsonl`, `pushes-v2/` and `relay/outbox-v2/`, and
-parks in `.git/terma/events-v2` and `pushes-v2`, never where an older terma (v0.3.x) does
-(`spool/events.jsonl`, `pushes/`, `relay/outbox/`, `.git/terma/events` and `pushes`): an
-older relay can outlive the update that replaced its binary by hours, until its agents
-pause, and an older install can still run beside this one, and neither may send what
-this one queued with its own credential. Nor does this version read what an older terma
-queued there: it is never sent, nor taken into a lane. 0.3.x is maintained on
-`release/v0.3.x`, and everyone signs in again at the move to user tokens.
+never on disk, and a stopping relay drops it.
+
+### Lanes, ownership, and loss accounting
+
+- **Account-bound lanes.** Everything that leaves is bound to the sign-in in place when it
+  arrived (a 16-hex-digit hash of auth URL + user id): the relay outbox stores it under
+  `@<account>/` and spool events carry `account`. A lane leaves only with that account's own
+  token, never in another person's name, and `terma.user.id` names only that lane's user.
+  Server-key profiles collect into `@no_person/` / `no_person` and leave only under a server
+  key (switching to a user sign-in leaves that backlog to age out); a server key sends nothing
+  else, and a route bound to no lane is never sent.
+- **Fail closed on missing or unreadable sign-in.** Config (`config.json`, which pairs the
+  selected organization/team with `Profile.Account`) and the sign-in are read as one snapshot.
+  In the relay, a claimed part arriving signed out or unreadable (after up to ~3 s of retry
+  for mid-write swaps) is never written and is counted as `signed_out` or `unreadable`. In
+  hooks, `spool.LaneOf` binds the spool and refuses untagged writes: signed-out or unreadable
+  events are dropped before writing any queue line, checkpoint, push record, or park file, and
+  appended whole to `spool/losses/` (one file per day, so concurrent hooks never lose a count).
+  Any untagged line found queued or parked is dropped.
+- **Policy hold and outbox aging.** A claimed part whose team policy or key the relay can't
+  read (not fetched yet, locked keychain, changed organization, or removed profile) waits in
+  memory (`policyHold`) for up to 15 minutes while policy is fetched, then is dropped and
+  counted as `policy_timeout` (also when dropped for room or on stop; updates stop waiting for
+  policy-only parts past their pause wait). Outbox lanes age out after 14 days, with relay
+  losses tracked in `losses.json`; `terma doctor` combines them with `spool/losses/`, and
+  heartbeats report both (`dropped.<reason>.<signal>` and `dropped.<reason>.hooks` via
+  `spool.TakeNewLosses`). Replays (`AppendAsCollected`) preserve their recorded lane.
+- **Per-session atomic ownership.** Every session manifest write (locked or unlocked delta)
+  first claims `<id>.owner` atomically via temp file + sync + `os.Link` (with an
+  `O_CREATE|O_EXCL` fallback). The first claim decides the session's owner for good (`""` for
+  a manifest written signed out is never filled in later). A hook under another account, or a
+  session whose owner file or manifest can't be read, fails closed (`ErrAccountConflict`) and
+  is counted as `account_conflict`. `Prune` skips when `store.lock` is busy, and unlocked
+  delta writes re-claim after landing their delta so pruning cannot hand an active session to
+  another account.
+- **Git hooks and sandboxes.** A git hook's commit or push record uses its collector's lane
+  unless a session's manifest names another account. A sandboxed git hook (which can read
+  neither credentials nor write the state directory) takes the single lane agreed upon by all
+  its sessions' manifests (never `session.json`), parks tagged records and loss counts under
+  `.git/terma/` (`events-v2`, `pushes-v2`, `losses-v2`), and lets the next unsandboxed hook
+  unpark and import counts once. Multi-account or unowned sandboxed records are dropped as
+  `ambiguous_push`.
+- **v2 queue isolation from v0.3.x.** This version writes only `spool/events-v2.jsonl`,
+  `pushes-v2/`, `relay/outbox-v2/`, and `.git/terma/events-v2` / `pushes-v2`, never v0.3.x
+  paths (`events.jsonl`, `pushes/`, `outbox/`, `.git/terma/events`, `pushes`). Neither version
+  reads the other's queues, so an older relay outliving an update by hours (or an older install
+  running alongside this one) cannot send v0.4 records with its own credential. 0.3.x is
+  maintained on `release/v0.3.x`, and everyone signs in again at rollout.
 
 ## Rules
 

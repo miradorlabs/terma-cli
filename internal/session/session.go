@@ -401,6 +401,10 @@ func (s *Store) load(k Key) (*Manifest, []string, error) {
 		return nil, nil, err
 	}
 	stored := m != nil
+	storedAccount := ""
+	if stored {
+		storedAccount = m.Account
+	}
 	var claims []string
 	paths, _ := filepath.Glob(filepath.Join(s.dir, manifestsDir, k.Tool, k.ID+deltaSep+"*"+deltaExt))
 	var folded []string
@@ -413,19 +417,15 @@ func (s *Store) load(k Key) (*Manifest, []string, error) {
 			d.Files = map[string]time.Time{}
 		}
 		folded = append(folded, p)
-		// A delta naming another account than the stored manifest's, or the owner's, is
-		// refused, and dropped.
-		if stored && conflicts(m.Account, d.Account) || o.claimed && conflicts(o.account, d.Account) {
+		// A delta naming another account than the session's owner is refused and dropped.
+		if !o.admits(stored, storedAccount, d.Account) {
 			continue
 		}
 		m = fold(m, &d)
 		claims = append(claims, d.Account)
 	}
-	switch {
-	case m != nil && o.claimed:
-		m.Account = o.account
-	case m != nil && !stored:
-		m.Account = claimed(claims)
+	if m != nil {
+		m.Account = o.resolveAccount(stored, storedAccount, claims)
 	}
 	return m, folded, nil
 }
@@ -494,11 +494,7 @@ func (s *Store) readTool(tool string, byKey map[Key]*Manifest, deltas map[Key][]
 			if k.Tool != tool {
 				continue
 			}
-			if o := owners[k]; o.claimed {
-				m.Account = o.account
-			} else if !stored[k] {
-				m.Account = claimed(claims[k])
-			}
+			m.Account = owners[k].resolveAccount(stored[k], m.Account, claims[k])
 		}
 	}()
 	for _, e := range entries {
@@ -561,7 +557,11 @@ func (s *Store) readTool(tool string, byKey map[Key]*Manifest, deltas map[Key][]
 			continue
 		}
 		deltas[k] = append(deltas[k], filepath.Join(dir, name))
-		if stored[k] && conflicts(byKey[k].Account, m.Account) || owners[k].claimed && conflicts(owners[k].account, m.Account) {
+		storedAccount := ""
+		if stored[k] {
+			storedAccount = byKey[k].Account
+		}
+		if !owners[k].admits(stored[k], storedAccount, m.Account) {
 			continue
 		}
 		byKey[k] = fold(byKey[k], &m)
@@ -617,7 +617,7 @@ func (s *Store) Merge(fromID string, into Session, at time.Time) ([]string, erro
 		if err != nil {
 			return nil, unreadableOwner(err)
 		}
-		if o.claimed && src.Account != o.account || !o.claimed && src.Account != s.account {
+		if src.Account != o.effective(s.account) {
 			return nil, ErrAccountConflict
 		}
 		// A new manifest is claimed first, as Touch's is.
@@ -868,18 +868,19 @@ func (s *Store) prune(before time.Time) (int, error) {
 // decides: another account's may come in between.
 func (s *Store) Owns(k Key) bool {
 	o, err := s.owner(k)
+	if err != nil || o.conflicts(s.account) {
+		return false
+	}
+	var m *Manifest
+	if o.claimed {
+		m, err = s.manifest(k)
+	} else {
+		m, _, err = s.load(k)
+	}
 	if err != nil {
 		return false
 	}
-	if o.claimed {
-		if conflicts(o.account, s.account) {
-			return false
-		}
-		m, err := s.manifest(k)
-		return err == nil && (m == nil || !conflicts(m.Account, s.account))
-	}
-	m, _, err := s.load(k)
-	return err == nil && (m == nil || !conflicts(m.Account, s.account))
+	return m == nil || o.admits(true, m.Account, s.account)
 }
 
 // Accounts are the accounts the manifests of keys name, in order: "" for a session with no

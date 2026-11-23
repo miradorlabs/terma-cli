@@ -26,6 +26,37 @@ type owner struct {
 	claimed bool
 }
 
+// effective returns the owner's account when claimed, or fallback otherwise.
+func (o owner) effective(fallback string) string {
+	if o.claimed {
+		return o.account
+	}
+	return fallback
+}
+
+// conflicts reports whether o is claimed by a different account than account.
+func (o owner) conflicts(account string) bool {
+	return o.claimed && conflicts(o.account, account)
+}
+
+// admits reports whether a write or delta under account is compatible with owner o
+// and a stored manifest's account (storedAccount is checked only when stored is true).
+func (o owner) admits(stored bool, storedAccount, account string) bool {
+	if o.conflicts(account) {
+		return false
+	}
+	return !stored || !conflicts(storedAccount, account)
+}
+
+// resolveAccount returns the session's effective account: a claimed owner file wins;
+// otherwise a stored manifest keeps its account, and delta-only sessions take claimed.
+func (o owner) resolveAccount(stored bool, storedAccount string, claims []string) string {
+	if stored {
+		return o.effective(storedAccount)
+	}
+	return o.effective(claimed(claims))
+}
+
 func (s *Store) ownerPath(k Key) string {
 	return filepath.Join(s.dir, manifestsDir, k.Tool, k.ID+ownerExt)
 }
@@ -168,16 +199,43 @@ func (s *Store) hasDeltas(k Key) bool {
 
 // pruneOwners removes the owner files of sessions with nothing else left, no manifest and no
 // delta, claimed before before: what a Merge, or a writer killed after its claim, left. A
-// claim younger than that may be a writer's about to record.
+// claim younger than that may be a writer's about to record. It decides from a single ReadDir
+// snapshot per tool directory; a concurrent unlocked delta landing after ReadDir still
+// re-claims its owner after writing (Touch), and only owners older than before are eligible.
 func (s *Store) pruneOwners(before time.Time) {
-	paths, _ := filepath.Glob(filepath.Join(s.dir, manifestsDir, "*", "*"+ownerExt))
-	for _, p := range paths {
-		k := Key{Tool: filepath.Base(filepath.Dir(p)), ID: strings.TrimSuffix(filepath.Base(p), ownerExt)}
-		if !k.valid() || fileExists(s.manifestPath(k)) || s.hasDeltas(k) {
+	tools, _ := os.ReadDir(filepath.Join(s.dir, manifestsDir))
+	for _, t := range tools {
+		if !t.IsDir() || !ValidID(t.Name()) {
 			continue
 		}
-		if info, err := os.Stat(p); err == nil && info.ModTime().Before(before) {
-			_ = os.Remove(p)
+		dir := filepath.Join(s.dir, manifestsDir, t.Name())
+		entries, _ := os.ReadDir(dir)
+		hasFiles := make(map[string]bool)
+		var owners []os.DirEntry
+		for _, e := range entries {
+			if e.IsDir() {
+				continue
+			}
+			name := e.Name()
+			switch {
+			case strings.HasSuffix(name, ownerExt):
+				owners = append(owners, e)
+			case strings.HasSuffix(name, manifestExt):
+				hasFiles[strings.TrimSuffix(name, manifestExt)] = true
+			case strings.HasSuffix(name, deltaExt):
+				if id, _, ok := strings.Cut(strings.TrimSuffix(name, deltaExt), deltaSep); ok {
+					hasFiles[id] = true
+				}
+			}
+		}
+		for _, e := range owners {
+			id := strings.TrimSuffix(e.Name(), ownerExt)
+			if !ValidID(id) || hasFiles[id] {
+				continue
+			}
+			if info, err := e.Info(); err == nil && info.ModTime().Before(before) {
+				_ = os.Remove(filepath.Join(dir, e.Name()))
+			}
 		}
 	}
 }

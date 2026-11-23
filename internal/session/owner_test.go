@@ -195,3 +195,52 @@ func TestPruneDropsTornOwnerWithDeltaAtRetention(t *testing.T) {
 		t.Fatalf("aged torn owner or its delta remained after prune")
 	}
 }
+
+// An aged owner file is kept while its session still has a live delta (with no manifest yet)
+// or a live manifest; only a lone aged owner with neither is removed.
+func TestPruneKeepsAgedOwnerWithLiveDeltaOrManifest(t *testing.T) {
+	t.Parallel()
+	now := time.Now()
+	old := now.Add(-48 * time.Hour)
+	store := bound(Open(t.TempDir()), "aaaaaaaaaaaaaaaa")
+
+	deltaOnly := Session{ID: "sess-delta-only", Tool: "codex"}
+	if err := store.link(deltaOnly.Key(), "aaaaaaaaaaaaaaaa"); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chtimes(store.ownerPath(deltaOnly.Key()), old, old); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.writeDelta(newManifest(deltaOnly, "aaaaaaaaaaaaaaaa", now)); err != nil {
+		t.Fatal(err)
+	}
+
+	manifestOnly := Session{ID: "sess-manifest-only", Tool: "codex"}
+	if err := store.Touch(manifestOnly, []string{"a.go"}, now); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chtimes(store.ownerPath(manifestOnly.Key()), old, old); err != nil {
+		t.Fatal(err)
+	}
+
+	lone := Session{ID: "sess-lone-old", Tool: "codex"}
+	if err := store.link(lone.Key(), "aaaaaaaaaaaaaaaa"); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chtimes(store.ownerPath(lone.Key()), old, old); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := store.Prune(now.Add(-24 * time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	if !fileExists(store.ownerPath(deltaOnly.Key())) {
+		t.Fatalf("aged owner with live delta was pruned")
+	}
+	if !fileExists(store.ownerPath(manifestOnly.Key())) {
+		t.Fatalf("aged owner with live manifest was pruned")
+	}
+	if fileExists(store.ownerPath(lone.Key())) {
+		t.Fatalf("aged lone owner survived prune")
+	}
+}
