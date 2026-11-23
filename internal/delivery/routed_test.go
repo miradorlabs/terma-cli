@@ -1015,38 +1015,60 @@ func TestRoutedSlowEnrollmentsDoNotStarveHealthySibling(t *testing.T) {
 	t.Parallel()
 	m := newRoutedMachine(t)
 	enr := m.createState(config.DefaultProfile, aliceLane, []routing.Team{
-		orgTeam("org-a", "team-slow-1", "github.com/acme/slow1"),
-		orgTeam("org-b", "team-slow-2", "github.com/acme/slow2"),
-		orgTeam("org-c", "team-fast", "github.com/acme/fast"),
+		orgTeam("org-a", "team-slow", "github.com/acme/slow"),
+		orgTeam("org-b", "team-fast-1", "github.com/acme/fast1"),
+		orgTeam("org-c", "team-fast-2", "github.com/acme/fast2"),
+		orgTeam("org-d", "team-fast-3", "github.com/acme/fast3"),
+		orgTeam("org-e", "team-fast-4", "github.com/acme/fast4"),
 	}, func(s *routing.State, _ map[string]string) error {
-		if err := s.Bind("github.com/acme/slow1", "org-a", false); err != nil {
-			return err
+		for _, pair := range [][2]string{
+			{"github.com/acme/slow", "org-a"},
+			{"github.com/acme/fast1", "org-b"},
+			{"github.com/acme/fast2", "org-c"},
+			{"github.com/acme/fast3", "org-d"},
+			{"github.com/acme/fast4", "org-e"},
+		} {
+			if err := s.Bind(pair[0], pair[1], false); err != nil {
+				return err
+			}
 		}
-		if err := s.Bind("github.com/acme/slow2", "org-b", false); err != nil {
-			return err
-		}
-		return s.Bind("github.com/acme/fast", "org-c", false)
+		return nil
 	})
 
 	var mu sync.Mutex
-	var fastHits int
-	fastDone := make(chan struct{})
+	var fastHits, inFlight, peakInFlight int
+	allFastDone := make(chan struct{})
 	release := make(chan struct{})
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, _ = io.Copy(io.Discard, r.Body)
+		mu.Lock()
+		inFlight++
+		if inFlight > peakInFlight {
+			peakInFlight = inFlight
+		}
+		mu.Unlock()
+		defer func() {
+			mu.Lock()
+			inFlight--
+			mu.Unlock()
+		}()
+
 		team := r.Header.Get(sendas.ProjectHeader)
-		if team == "team-fast" {
+		if team != "team-slow" {
 			mu.Lock()
 			fastHits++
+			done := fastHits == 4
 			mu.Unlock()
 			w.WriteHeader(http.StatusOK)
-			close(fastDone)
+			if done {
+				close(allFastDone)
+			}
 			return
 		}
-		// Slow enrollments block until the healthy sibling finishes (impossible under
-		// serial execution whenever a slow enrollment sorts ahead of team-fast).
+		// Stalled enrollment blocks until all 4 healthy siblings finish — impossible under
+		// serial execution or without making progress past maxParcelConcurrency (4) slots.
 		select {
-		case <-fastDone:
+		case <-allFastDone:
 			w.WriteHeader(http.StatusGatewayTimeout)
 		case <-r.Context().Done():
 		case <-release:
@@ -1058,9 +1080,11 @@ func TestRoutedSlowEnrollmentsDoNotStarveHealthySibling(t *testing.T) {
 	})
 
 	m.queueRaw(
-		routedEvent(aliceLane, config.DefaultProfile, enr["team-slow-1"], "github.com/acme/slow1", semconv.TermaToolCallEvent),
-		routedEvent(aliceLane, config.DefaultProfile, enr["team-slow-2"], "github.com/acme/slow2", semconv.TermaToolCallEvent),
-		routedEvent(aliceLane, config.DefaultProfile, enr["team-fast"], "github.com/acme/fast", semconv.TermaToolCallEvent),
+		routedEvent(aliceLane, config.DefaultProfile, enr["team-slow"], "github.com/acme/slow", semconv.TermaToolCallEvent),
+		routedEvent(aliceLane, config.DefaultProfile, enr["team-fast-1"], "github.com/acme/fast1", semconv.TermaToolCallEvent),
+		routedEvent(aliceLane, config.DefaultProfile, enr["team-fast-2"], "github.com/acme/fast2", semconv.TermaToolCallEvent),
+		routedEvent(aliceLane, config.DefaultProfile, enr["team-fast-3"], "github.com/acme/fast3", semconv.TermaToolCallEvent),
+		routedEvent(aliceLane, config.DefaultProfile, enr["team-fast-4"], "github.com/acme/fast4", semconv.TermaToolCallEvent),
 	)
 
 	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
@@ -1069,10 +1093,13 @@ func TestRoutedSlowEnrollmentsDoNotStarveHealthySibling(t *testing.T) {
 		ctx, m.spool, &config.Config{OTLPURL: srv.URL, ProfileName: config.DefaultProfile, AuthURL: routedAuth}, true, 0,
 	)
 	mu.Lock()
-	gotFast := fastHits
+	gotFast, gotPeak := fastHits, peakInFlight
 	mu.Unlock()
-	if res.Sent != 1 || res.Failed != 2 || len(res.Failures) != 2 || gotFast != 1 || m.pending() != 2 {
-		t.Fatalf("healthy sibling must deliver despite stalled enrollments: res=%+v fastHits=%d pending=%d", res, gotFast, m.pending())
+	if res.Sent != 4 || res.Failed != 1 || len(res.Failures) != 1 || gotFast != 4 || m.pending() != 1 {
+		t.Fatalf("healthy siblings must deliver under saturation despite stalled enrollment: res=%+v fastHits=%d pending=%d", res, gotFast, m.pending())
+	}
+	if gotPeak > maxParcelConcurrency {
+		t.Fatalf("peak concurrent parcel sends = %d, exceeds maxParcelConcurrency=%d", gotPeak, maxParcelConcurrency)
 	}
 }
 
@@ -1224,9 +1251,9 @@ func TestPreActivationFailsClosedOnProfileOnlyRoutedEvent(t *testing.T) {
 }
 
 // Idempotent no_destination loss recording: a flush whose context expires during a slow
-// parcel must not double-count destination-less events when the batch replays, and even a
-// crash between ImportLosses and ackBatch counts the same batch once in ReadLosses and
-// TakeNewLosses.
+// parcel must not record premature losses, and a crash between CountLost and ackBatch
+// must deduplicate per event even when intervening hooks append new distinct or identical
+// destination-less events before the retry flush, then clean up the journal once acked.
 func TestRoutedNoDestinationLossIsIdempotentOnCanceledFlush(t *testing.T) {
 	t.Parallel()
 	m := newRoutedMachine(t)
@@ -1255,10 +1282,10 @@ func TestRoutedNoDestinationLossIsIdempotentOnCanceledFlush(t *testing.T) {
 		srv.Close()
 	})
 
-	noDestEv := routedEvent(aliceLane, config.DefaultProfile, "", "github.com/acme/app", semconv.TermaToolCallEvent)
+	evA := routedEvent(aliceLane, config.DefaultProfile, "", "github.com/acme/app", semconv.TermaToolCallEvent)
 	m.queueRaw(
 		routedEvent(aliceLane, config.DefaultProfile, enr["team-slow"], "github.com/acme/app", semconv.TermaToolCallEvent),
-		noDestEv,
+		evA,
 	)
 
 	// Pass 1: flush context expires while team-slow is stalled -> batch cannot ack, and
@@ -1276,26 +1303,41 @@ func TestRoutedNoDestinationLossIsIdempotentOnCanceledFlush(t *testing.T) {
 		t.Fatalf("canceled pass must not record premature no_destination loss: losses=%+v err=%v", losses, err)
 	}
 
-	// Pass 2: endpoint recovers -> both events settle, exactly 1 no_destination recorded.
+	// Simulate a crash right after CountLost + journal persistence for evA (before ackBatch),
+	// followed by intervening hooks appending a new distinct event evB and an identical copy
+	// of evA before the retry flush reads all three together as one batch.
+	crashed := &pass{r: r, s: m.spool}
+	if err := crashed.recordNoDestination([]spool.Event{evA}); err != nil {
+		t.Fatalf("simulated pre-crash recordNoDestination: %v", err)
+	}
+	evB := routedEvent(aliceLane, config.DefaultProfile, "", "github.com/acme/other", semconv.TermaToolCallEvent)
+	m.queueRaw(evB, evA)
+
+	// Pass 2: endpoint recovers -> spool replays [team-slow, evA, evB, evA] in one batch.
+	// evA#0 was already counted before the crash; only evB#0 and evA#1 are newly counted,
+	// yielding 1 + 2 = 3 total no_destination losses for 3 dropped events.
 	stall.Store(false)
 	res2 := r.Flush(t.Context(), m.spool, cfg, true, 0)
-	if res2.Sent != 1 || res2.Unroutable != 1 || res2.Err != nil || m.pending() != 0 {
+	if res2.Sent != 1 || res2.Unroutable != 3 || res2.Err != nil || m.pending() != 0 {
 		t.Fatalf("recovery pass 2 = %+v, pending=%d", res2, m.pending())
 	}
-	taken1, err := spool.TakeNewLosses(spoolDir)
-	if err != nil || taken1[LossNoDestination] != 1 {
-		t.Fatalf("TakeNewLosses after pass 2 = %v (err=%v), want 1", taken1, err)
+	if losses, err := spool.ReadLosses(spoolDir, time.Now()); err != nil || losses.Counts[LossNoDestination] != 3 {
+		t.Fatalf("ReadLosses after intervening-append replay = %+v (err=%v), want 3", losses, err)
+	}
+	if taken, err := spool.TakeNewLosses(spoolDir); err != nil || taken[LossNoDestination] != 3 {
+		t.Fatalf("TakeNewLosses after intervening-append replay = %v (err=%v), want 3", taken, err)
+	}
+	if _, err := os.Stat(filepath.Join(m.state, noDestSeenFile)); !os.IsNotExist(err) {
+		t.Fatalf("pending loss journal must be removed after batch ack, stat err = %v", err)
 	}
 
-	// Simulate a replay of the exact same noDest batch (e.g. crash between ImportLosses and ackBatch).
-	p := &pass{r: r, s: m.spool}
-	if err := p.recordNoDestination([]spool.Event{noDestEv}); err != nil {
-		t.Fatalf("replay recordNoDestination: %v", err)
+	// Pass 3: a genuinely new drop after ack (even with identical bytes to evA) must count.
+	m.queueRaw(evA)
+	res3 := r.Flush(t.Context(), m.spool, cfg, true, 0)
+	if res3.Unroutable != 1 || res3.Err != nil || m.pending() != 0 {
+		t.Fatalf("post-ack pass 3 = %+v, pending=%d", res3, m.pending())
 	}
-	if losses, err := spool.ReadLosses(spoolDir, time.Now()); err != nil || losses.Counts[LossNoDestination] != 1 {
-		t.Fatalf("ReadLosses after replay = %+v (err=%v), want 1", losses, err)
-	}
-	if taken2, err := spool.TakeNewLosses(spoolDir); err != nil || taken2[LossNoDestination] != 0 {
-		t.Fatalf("TakeNewLosses after replay = %v (err=%v), want 0 duplicates", taken2, err)
+	if taken, err := spool.TakeNewLosses(spoolDir); err != nil || taken[LossNoDestination] != 1 {
+		t.Fatalf("TakeNewLosses after post-ack drop = %v (err=%v), want 1", taken, err)
 	}
 }

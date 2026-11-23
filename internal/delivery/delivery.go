@@ -175,6 +175,7 @@ func (r Router) Flush(ctx context.Context, s *spool.Spool, cfg *config.Config, f
 		sender = p.routed
 	}
 	fr := s.Flush(ctx, sender, spool.FlushOptions{Force: force, MinInterval: minInterval, Now: now})
+	p.finishNoDestination(fr)
 	res.Endpoints = slices.Sorted(maps.Keys(p.accepted))
 	// Loss is the spool's to report; Sent is the router's per-destination count.
 	res.Held = fr.Held
@@ -209,23 +210,10 @@ type pass struct {
 	// profiles caches non-active profile configs loaded for cross-profile routed parcels
 	// (nil entry records a missing or unreadable profile so it fails closed).
 	profiles map[string]*config.Config
-}
-
-// inLane reports whether e belongs to this pass's active lane: server-key events under a
-// server key, or the signed-in account's own events under a valid user-token sign-in.
-func (p *pass) inLane(e spool.Event) bool {
-	if p.serverKey {
-		return e.NoPerson && e.Account == ""
-	}
-	return !e.NoPerson && routing.ValidAccount(p.account) && p.account != sendas.NoPersonLane && e.Account == p.account
-}
-
-// lane is the routing.State.Account value paired with this pass's active lane.
-func (p *pass) lane() string {
-	if p.serverKey {
-		return sendas.NoPersonLane
-	}
-	return p.account
+	// expectedAck and lastNoDestKeys track whether spool.Flush acknowledged the batch
+	// whose no_destination losses were recorded in nodest-losses-pending.json.
+	expectedAck    int
+	lastNoDestKeys []string
 }
 
 // byProject sends a batch on a pre-activation machine: each event to the project its

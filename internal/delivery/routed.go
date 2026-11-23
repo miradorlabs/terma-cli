@@ -3,16 +3,11 @@ package delivery
 import (
 	"cmp"
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"maps"
-	"os"
 	"slices"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/routing"
@@ -43,6 +38,11 @@ const maxParcelConcurrency = 4
 //     filtered by the team's content policy now, and revalidated (state generation and
 //     policy expiry clock) immediately before each POST.
 func (p *pass) routed(ctx context.Context, events []spool.Event) ([]spool.Event, error) {
+	// Reaching another batch proves spool.Flush acknowledged the previous batch.
+	if len(p.lastNoDestKeys) > 0 {
+		p.ackPendingNoDest(p.lastNoDestKeys)
+		p.lastNoDestKeys = nil
+	}
 	now := p.r.currentTime()
 	res := p.res
 	lane := p.lane()
@@ -160,43 +160,8 @@ func (p *pass) routed(ctx context.Context, events []spool.Event) ([]spool.Event,
 			res.Unroutable += len(noDest)
 		}
 	}
+	p.expectedAck += len(events) - len(held) - len(undelivered)
 	return p.settle(held, undelivered, errs)
-}
-
-// recordNoDestination records len(noDest) no_destination losses idempotently under a
-// content-addressed ImportLosses ID so a crash or canceled ackBatch between recording and
-// spool acknowledgement overwrites the same loss file with identical bytes instead of
-// inflating doctor/heartbeat counts on retry.
-func (p *pass) recordNoDestination(noDest []spool.Event) error {
-	h := sha256.New()
-	var at time.Time
-	for _, e := range noDest {
-		raw, _ := json.Marshal(e)
-		h.Write(raw)
-		h.Write([]byte{'\n'})
-		if e.Time.After(at) {
-			at = e.Time
-		}
-	}
-	if at.IsZero() {
-		at = p.r.currentTime().Truncate(time.Second)
-	}
-	id := "nodest-" + hex.EncodeToString(h.Sum(nil)[:16])
-
-	f, err := os.CreateTemp("", ".nodest-loss-*")
-	if err != nil {
-		return err
-	}
-	tmpPath := f.Name()
-	defer func() { _ = os.Remove(tmpPath) }()
-	if _, err := f.Write(spool.EncodeLoss(LossNoDestination, len(noDest), at)); err != nil {
-		_ = f.Close()
-		return err
-	}
-	if err := f.Close(); err != nil {
-		return err
-	}
-	return p.s.ImportLosses(tmpPath, id)
 }
 
 type parcelJob struct {

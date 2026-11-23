@@ -1,14 +1,38 @@
 package delivery
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/routing"
 	"github.com/miradorlabs/terma-cli/internal/runs"
+	"github.com/miradorlabs/terma-cli/internal/sendas"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
+
+// inLane reports whether e belongs to this pass's active lane: server-key events under a
+// server key, or the signed-in account's own events under a valid user-token sign-in.
+func (p *pass) inLane(e spool.Event) bool {
+	if p.serverKey {
+		return e.NoPerson && e.Account == ""
+	}
+	return !e.NoPerson && routing.ValidAccount(p.account) && p.account != sendas.NoPersonLane && e.Account == p.account
+}
+
+// lane is the routing.State.Account value paired with this pass's active lane.
+func (p *pass) lane() string {
+	if p.serverKey {
+		return sendas.NoPersonLane
+	}
+	return p.account
+}
 
 type admitAction uint8
 
@@ -198,3 +222,129 @@ func (r Router) outgoingTo(team routing.Team, e spool.Event) (spool.Event, bool)
 }
 
 func sameHost(a, b string) bool { return strings.TrimRight(a, "/") == strings.TrimRight(b, "/") }
+
+// noDestSeenFile holds per-event fingerprints of destination-less events already recorded
+// via CountLost in an unacknowledged batch, preventing double-counting across crashes or
+// canceled ackBatch calls even when hooks append new events before the retry. Deleted as
+// soon as spool.Flush acknowledges the batch.
+const noDestSeenFile = "nodest-losses-pending.json"
+
+type noDestJournal struct {
+	Seen map[string]time.Time `json:"seen"`
+}
+
+func (p *pass) noDestSeenPath() string {
+	if p.r.StateDir == "" {
+		return ""
+	}
+	return filepath.Join(p.r.StateDir, noDestSeenFile)
+}
+
+// recordNoDestination records no_destination losses via Spool.CountLost (which appends to
+// the daily loss log and runs standard retention pruning) while deduplicating per event
+// against any prior unacknowledged batch recorded in nodest-losses-pending.json.
+func (p *pass) recordNoDestination(noDest []spool.Event) error {
+	now := p.r.currentTime().UTC()
+	seen := p.loadPendingNoDest(now)
+	occ := make(map[string]int, len(noDest))
+	keys := make([]string, 0, len(noDest))
+	newCount := 0
+	for _, e := range noDest {
+		fp := eventFingerprint(e)
+		key := fmt.Sprintf("%s#%d", fp, occ[fp])
+		occ[fp]++
+		keys = append(keys, key)
+		if _, already := seen[key]; !already {
+			newCount++
+		}
+	}
+	if newCount > 0 {
+		if err := p.s.CountLost(LossNoDestination, newCount); err != nil {
+			return err
+		}
+	}
+	for _, k := range keys {
+		if _, already := seen[k]; !already {
+			seen[k] = now
+		}
+	}
+	p.savePendingNoDest(seen)
+	p.lastNoDestKeys = keys
+	return nil
+}
+
+func (p *pass) ackPendingNoDest(keys []string) {
+	if p.noDestSeenPath() == "" || len(keys) == 0 {
+		return
+	}
+	seen := p.loadPendingNoDest(p.r.currentTime().UTC())
+	if len(seen) == 0 {
+		return
+	}
+	for _, k := range keys {
+		delete(seen, k)
+	}
+	p.savePendingNoDest(seen)
+}
+
+func (p *pass) finishNoDestination(fr spool.Result) {
+	if !p.res.Routed || fr.Skipped {
+		return
+	}
+	if fr.Err == nil {
+		if path := p.noDestSeenPath(); path != "" {
+			_ = os.Remove(path)
+		}
+		p.lastNoDestKeys = nil
+		return
+	}
+	if len(p.lastNoDestKeys) > 0 && fr.Sent == p.expectedAck {
+		p.ackPendingNoDest(p.lastNoDestKeys)
+		p.lastNoDestKeys = nil
+	}
+}
+
+func (p *pass) loadPendingNoDest(now time.Time) map[string]time.Time {
+	seen := map[string]time.Time{}
+	path := p.noDestSeenPath()
+	if path == "" {
+		return seen
+	}
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return seen
+	}
+	var j noDestJournal
+	if json.Unmarshal(raw, &j) != nil {
+		return seen
+	}
+	for k, ts := range j.Seen {
+		if now.Sub(ts) <= spool.MaxAge {
+			seen[k] = ts
+		}
+	}
+	return seen
+}
+
+func (p *pass) savePendingNoDest(seen map[string]time.Time) {
+	path := p.noDestSeenPath()
+	if path == "" {
+		return
+	}
+	if len(seen) == 0 {
+		_ = os.Remove(path)
+		return
+	}
+	raw, err := json.Marshal(noDestJournal{Seen: seen})
+	if err != nil {
+		return
+	}
+	_ = os.MkdirAll(p.r.StateDir, 0o700)
+	_ = config.WriteFileAtomic(path, raw, 0o600)
+}
+
+func eventFingerprint(e spool.Event) string {
+	raw, _ := json.Marshal(e)
+	sum := sha256.Sum256(raw)
+	return hex.EncodeToString(sum[:16])
+}
