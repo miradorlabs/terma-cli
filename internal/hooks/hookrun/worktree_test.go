@@ -127,7 +127,7 @@ func TestAWorktreeCommitIsStampedForASessionInTheMainCheckout(t *testing.T) {
 	}
 	pol := hookruntest.Admitting(main)
 	env := func(cwd, stdin string, args ...string) Env {
-		return Env{StateDir: stateDir, Now: time.Now(), Cwd: cwd, Policy: pol, Args: args, Stdin: strings.NewReader(stdin), Version: "test", Team: "proj-main"}
+		return Env{StateDir: stateDir, Now: time.Now(), Cwd: cwd, Policy: pol, Args: args, Stdin: strings.NewReader(stdin), Version: "test", Team: "proj-main", Account: hookruntest.Account}
 	}
 	if err := startSession(ctx, env(main, `{"session_id":"sess-main","cwd":"`+hookruntest.InJSON(main)+`","hook_event_name":"SessionStart","source":"startup"}`)); err != nil {
 		t.Fatal(err)

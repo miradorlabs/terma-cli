@@ -2,6 +2,9 @@ package cli
 
 import (
 	"context"
+	"os/exec"
+	"path/filepath"
+	"reflect"
 	"testing"
 	"time"
 
@@ -9,6 +12,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/hooks/dispatch"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
+	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/sendas"
 	"github.com/miradorlabs/terma-cli/internal/spool"
@@ -127,6 +131,54 @@ func TestASignInStoredOverAnotherAccountsProfileIsNoLane(t *testing.T) {
 	}
 	if sent := ingest.take(); len(sent) != 0 {
 		t.Fatalf("a flush sent %d requests, the first for team %s with %q", len(sent), sent[0].project, sent[0].auth)
+	}
+}
+
+// A session claimed under A keeps its claim unchanged when B's credential is stored
+// without re-pairing the profile (as storeLogin does before pairProfile) and a
+// user-prompt-submit hook runs in that window.
+func TestAHookWithNoLaneLeavesClaimUnchanged(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not installed")
+	}
+	f, _ := pairingSandbox(t)
+	underA, err := testApp.loadConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	root, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, args := range [][]string{{"init", "-q"}, {"remote", "add", "origin", "git@github.com:acme/app.git"}} {
+		cmd := exec.Command("git", args...)
+		cmd.Dir = root
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+	t.Setenv("TERMA_HOOKS", "")
+	hookruntest.RelayOn(t, testApp.stateDir)
+	t.Chdir(root)
+
+	const sid = "session-162"
+	payload := `{"session_id":"` + sid + `","cwd":"` + hookruntest.InJSON(root) + `"}`
+	runHook(t, "user-prompt-submit", payload)
+	before, ok := claim.Read(testApp.stateDir, sid, time.Now())
+	if !ok || before.Account != underA.Account || before.ProjectID != acmeWeb || len(before.Placements) != 1 {
+		t.Fatalf("claim under A = %+v, %v; want one placement under %s for %s", before, ok, underA.Account, acmeWeb)
+	}
+
+	// Store B's credential without re-pairing the profile, as storeLogin does before pairProfile.
+	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSessionOf(f, "u-2")); err != nil {
+		t.Fatal(err)
+	}
+
+	// Replay one user-prompt-submit hook for that session; the claim must stay unchanged.
+	runHook(t, "user-prompt-submit", payload)
+	after, ok := claim.Read(testApp.stateDir, sid, time.Now())
+	if !ok || !reflect.DeepEqual(after, before) {
+		t.Fatalf("claim changed after unpaired user-prompt-submit:\nbefore: %+v\nafter:  %+v", before, after)
 	}
 }
 

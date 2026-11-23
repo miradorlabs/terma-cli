@@ -178,7 +178,7 @@ func TestASubdirectorySessionIsItsCheckouts(t *testing.T) {
 			t.Fatal(err)
 		}
 		sid := []string{"from-subdir", "from-worktree"}[i]
-		env := Env{StateDir: stateDir, Now: time.Now(), Cwd: cwd, Team: "t1", Policy: listing("github.com/miradorlabs/mirador-platform"),
+		env := Env{StateDir: stateDir, Now: time.Now(), Cwd: cwd, Team: "t1", Account: hookruntest.Account, Policy: listing("github.com/miradorlabs/mirador-platform"),
 			Stdin: strings.NewReader(`{"session_id":"` + sid + `","cwd":"` + hookruntest.InJSON(cwd) + `"}`)}
 		if err := startSession(ctx, env); err != nil {
 			t.Fatal(err)
@@ -201,10 +201,10 @@ func TestATurnInAnUnlistedRepositoryMarksTheClaim(t *testing.T) {
 	pol := listing("github.com/acme/work")
 	ctx := t.Context()
 	at := time.Now()
-	if !ClaimFromPayload(ctx, Env{StateDir: stateDir, Now: at, Cwd: work, Team: "t1", Policy: pol}, PayloadSession{ID: "thread", Cwd: work}, "codex") {
+	if !ClaimFromPayload(ctx, Env{StateDir: stateDir, Now: at, Cwd: work, Team: "t1", Account: hookruntest.Account, Policy: pol}, PayloadSession{ID: "thread", Cwd: work}, "codex") {
 		t.Fatal("the admitted turn was not claimed")
 	}
-	if ClaimFromPayload(ctx, Env{StateDir: stateDir, Now: at.Add(time.Minute), Cwd: personal, Team: "t1", Policy: pol}, PayloadSession{ID: "thread", Cwd: personal}, "codex") {
+	if ClaimFromPayload(ctx, Env{StateDir: stateDir, Now: at.Add(time.Minute), Cwd: personal, Team: "t1", Account: hookruntest.Account, Policy: pol}, PayloadSession{ID: "thread", Cwd: personal}, "codex") {
 		t.Fatal("the unlisted turn claimed")
 	}
 	c, ok := claim.Read(stateDir, "thread", at.Add(time.Minute))
@@ -226,11 +226,11 @@ func TestAMarkedSessionIsClaimedInAListedRepository(t *testing.T) {
 	pol := fetched(listing("github.com/acme/work"))
 	ctx := t.Context()
 	at := time.Now()
-	if ClaimFromPayload(ctx, Env{StateDir: stateDir, Now: at, Cwd: personal, Team: "t1", Policy: pol}, PayloadSession{ID: "thread", Cwd: personal}, "codex") {
+	if ClaimFromPayload(ctx, Env{StateDir: stateDir, Now: at, Cwd: personal, Team: "t1", Account: hookruntest.Account, Policy: pol}, PayloadSession{ID: "thread", Cwd: personal}, "codex") {
 		t.Fatal("the unlisted turn reported a claim")
 	}
 	markOf(t, stateDir, "thread")
-	if !ClaimFromPayload(ctx, Env{StateDir: stateDir, Now: at.Add(time.Minute), Cwd: work, Team: "t1", Policy: pol}, PayloadSession{ID: "thread", Cwd: work}, "codex") {
+	if !ClaimFromPayload(ctx, Env{StateDir: stateDir, Now: at.Add(time.Minute), Cwd: work, Team: "t1", Account: hookruntest.Account, Policy: pol}, PayloadSession{ID: "thread", Cwd: work}, "codex") {
 		t.Fatal("the listed turn was not claimed")
 	}
 	c, ok := claim.Read(stateDir, "thread", at.Add(time.Minute))
@@ -249,7 +249,7 @@ func TestWhereAHookMarks(t *testing.T) {
 	ctx := t.Context()
 	listed := fetched(listing("github.com/acme/work"))
 	mark := func(dir, sid, agent string, pol config.Policy) {
-		ClaimFromPayload(ctx, Env{StateDir: stateDir, Now: time.Now(), Cwd: dir, Team: "t1", Policy: pol}, PayloadSession{ID: sid, AgentID: agent, Cwd: dir}, "claude-code")
+		ClaimFromPayload(ctx, Env{StateDir: stateDir, Now: time.Now(), Cwd: dir, Team: "t1", Account: hookruntest.Account, Policy: pol}, PayloadSession{ID: sid, AgentID: agent, Cwd: dir}, "claude-code")
 	}
 	mark(outside, "outside", "", listed)
 	markOf(t, stateDir, "outside")
@@ -282,7 +282,7 @@ func TestAStalePolicyStartsARefresh(t *testing.T) {
 	otherTeam.TeamID = "t2"
 	flushes := 0
 	hook := func(sid string, pol config.Policy, now time.Time) bool {
-		return ClaimFromPayload(ctx, Env{StateDir: stateDir, Now: now, Cwd: personal, Team: "t1", Policy: pol, Flush: func() { flushes++ }}, PayloadSession{ID: sid, Cwd: personal}, "claude-code")
+		return ClaimFromPayload(ctx, Env{StateDir: stateDir, Now: now, Cwd: personal, Team: "t1", Account: hookruntest.Account, Policy: pol, Flush: func() { flushes++ }}, PayloadSession{ID: sid, Cwd: personal}, "claude-code")
 	}
 	hook("s1", stale, at)
 	markOf(t, stateDir, "s1")
@@ -338,7 +338,7 @@ func BenchmarkClaimFromPayloadUnlisted(b *testing.B) {
 	if err := os.WriteFile(tok, []byte("local"), 0o600); err != nil {
 		b.Fatal(err)
 	}
-	env := Env{StateDir: stateDir, Now: time.Now(), Cwd: root, Team: "t1", Policy: fetched(listing("github.com/acme/work"))}
+	env := Env{StateDir: stateDir, Now: time.Now(), Cwd: root, Team: "t1", Account: hookruntest.Account, Policy: fetched(listing("github.com/acme/work"))}
 	s := PayloadSession{ID: "bench", Cwd: root}
 	ClaimFromPayload(b.Context(), env, s, "claude-code")
 	for b.Loop() {

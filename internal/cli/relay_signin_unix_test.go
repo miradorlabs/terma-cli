@@ -3,11 +3,18 @@
 package cli
 
 import (
+	"errors"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/account/auth"
 	"github.com/miradorlabs/terma-cli/internal/config"
+	"github.com/miradorlabs/terma-cli/internal/relay"
 	"github.com/miradorlabs/terma-cli/internal/sendas"
 )
 
@@ -42,6 +49,50 @@ func TestARetiredSignInGivesNoTokenWhenTheStoreFails(t *testing.T) {
 	}
 	if again, err := src.Token(t.Context(), mine); err != nil || again != "" {
 		t.Fatalf("a retired sign-in's token = %q, %v; want none", again, err)
+	}
+}
+
+// A heartbeat refused as SIGN_IN_RETIRED keeps the in-memory retirement mark on the relay's
+// shared signInSource even when the store can't persist it, so later heartbeats and relay
+// sends stop immediately instead of retrying the retired sign-in.
+func TestARetiredHeartbeatStopsLaterBeatsWhenTheStoreFails(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root writes a read-only directory")
+	}
+	var hits atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hits.Add(1)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = io.WriteString(w, `{"code":7,"message":"retired","details":[{"@type":"type.googleapis.com/google.rpc.ErrorInfo","reason":"SIGN_IN_RETIRED"}]}`)
+	}))
+	t.Cleanup(srv.Close)
+	f := &fakeAuth{srv: srv}
+	authSandbox(t, f)
+	if err := saveSignIn(testApp.dir, storedSession(f)); err != nil {
+		t.Fatal(err)
+	}
+	selectPolicy(t, config.Policy{Mode: config.ModeRepo, TeamID: "team", Revision: 1, FetchedAt: time.Now()})
+	opts := testHeartbeatOpts(t)
+	if err := os.Chmod(testApp.dir, 0o500); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(testApp.dir, 0o700) })
+
+	if err := opts.HeartbeatSend(t.Context(), emptyBeat()); err == nil {
+		t.Fatal("a retired beat was accepted")
+	}
+	if auth.Retired(testApp.dir, config.DefaultProfile) {
+		t.Fatal("the read-only store took the mark; the test proves nothing")
+	}
+	if err := opts.HeartbeatSend(t.Context(), emptyBeat()); !errors.Is(err, relay.ErrNoKey) {
+		t.Fatalf("second beat after retirement = %v, want %v", err, relay.ErrNoKey)
+	}
+	if got := hits.Load(); got != 1 {
+		t.Fatalf("ingest hit %d times, want 1", got)
+	}
+	if again, err := opts.SignIn.Token(t.Context(), auth.AccountKey(f.srv.URL, "u-1")); err != nil || again != "" {
+		t.Fatalf("relay SignIn.Token after retired heartbeat = %q, %v; want none", again, err)
 	}
 }
 

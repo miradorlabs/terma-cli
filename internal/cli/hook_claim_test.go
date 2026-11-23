@@ -36,6 +36,7 @@ func collectedRepo(t *testing.T) string {
 	useConfigDir(t, t.TempDir())
 	t.Setenv("TERMA_HOOKS", "")
 	admitHere(t, root, "team")
+	signInHereAs(t, "u-hook")
 	hookruntest.RelayOn(t, testApp.stateDir)
 	t.Chdir(root)
 	return root

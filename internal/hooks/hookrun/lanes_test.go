@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
 	"github.com/miradorlabs/terma-cli/internal/project"
+	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
 	"github.com/miradorlabs/terma-cli/internal/sendas"
 	"github.com/miradorlabs/terma-cli/internal/spool"
@@ -85,7 +87,7 @@ func written(t *testing.T, p *pushRepo, env Env, dir string) []string {
 			out = append(out, path)
 		}
 	}
-	for _, dir := range []string{filepath.Join(env.StateDir, PushesDir), filepath.Join(p.root, ".git", project.GitStoreDir)} {
+	for _, dir := range []string{filepath.Join(env.StateDir, PushesDir), claim.Dir(env.StateDir), filepath.Join(p.root, ".git", project.GitStoreDir)} {
 		if entries, _ := os.ReadDir(dir); len(entries) > 0 {
 			out = append(out, "wrote in "+dir)
 		}
@@ -235,6 +237,13 @@ func TestAHookTagsWhatItWritesWithItsLane(t *testing.T) {
 					t.Errorf("%s queued as %q, no person %v", ev.Name, ev.Account, ev.NoPerson)
 				}
 			}
+			wantClaimAccount := person
+			if serverKey {
+				wantClaimAccount = sendas.NoPersonLane
+			}
+			if c, ok := claim.Read(p.stateDir, "s1", time.Now()); !ok || c.Account != wantClaimAccount {
+				t.Fatalf("claim = %+v, %v; want account %q", c, ok, wantClaimAccount)
+			}
 			// Sandboxed, what is parked carries the lane too.
 			p2 := newPushRepo(t)
 			env, _ = lanedHook(t, p2, signIn, serverKey, true)
@@ -323,5 +332,71 @@ func TestASignedOutSnapshotIsCountedOnce(t *testing.T) {
 	}
 	if l, _ := spool.ReadLosses(dir, time.Now()); l.Counts[sendas.LostSignedOut] != 1 {
 		t.Fatalf("losses = %v; want the snapshot counted once", l.Counts)
+	}
+}
+
+// A hook with no lane (signed out or unreadable sign-in) skips every claim path — EmitFor,
+// emitRecord and ClaimFromPayload — leaving an active session's claim and its placements intact.
+func TestAHookWithNoLaneLeavesExistingClaimUntouched(t *testing.T) {
+	const accountA = "aaaaaaaaaaaaaaaa"
+	for _, tc := range []struct {
+		name, signIn string
+	}{
+		{"signed out", ""},
+		{"unreadable", sendas.AccountUnreadable},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			p := newPushRepo(t)
+			inA, _ := lanedHook(t, p, accountA, false, false)
+			r, err := inA.Repo(context.Background())
+			if err != nil {
+				t.Fatal(err)
+			}
+			inA.EmitFor(r, spool.Event{Name: semconv.TermaSessionStartEvent, SessionID: "s1"})
+			before, ok := claim.Read(p.stateDir, "s1", time.Now())
+			if !ok || before.Account != accountA || len(before.Placements) != 1 {
+				t.Fatalf("initial claim = %+v, %v; want one placement under %s", before, ok, accountA)
+			}
+
+			noLane, _ := lanedHook(t, p, tc.signIn, false, false)
+			noLane.Now = inA.Now.Add(time.Minute)
+			onClaimCalled := false
+			noLane.OnClaim = func(string) { onClaimCalled = true }
+
+			noLane.EmitFor(r, spool.Event{Name: semconv.TermaSessionStartEvent, SessionID: "s1"})
+			noLane.emitRecord(r, spool.Event{Name: semconv.TermaCommitEvent, SessionID: "s1"}, []string{accountA})
+			// Sandboxed unreadable emitRecord (!Spool.Appendable) passes lostOutside and
+			// recordLane, reaching claimForRelay; keep StateDir writable to prove the guard stops it.
+			if tc.signIn == sendas.AccountUnreadable {
+				sandboxed, _ := lanedHook(t, p, tc.signIn, false, true)
+				sandboxed.StateDir = p.stateDir
+				sandboxed.Now = noLane.Now
+				sandboxed.OnClaim = noLane.OnClaim
+				sandboxed.emitRecord(r, spool.Event{Name: semconv.TermaCommitEvent, SessionID: "s1"}, []string{accountA})
+			}
+			if ClaimFromPayload(context.Background(), noLane, PayloadSession{ID: "s1", Cwd: p.root}, "claude-code") {
+				t.Fatal("ClaimFromPayload claimed with no lane")
+			}
+			if onClaimCalled {
+				t.Fatal("OnClaim ran for a hook with no lane")
+			}
+
+			after, ok := claim.Read(p.stateDir, "s1", noLane.Now)
+			if !ok || !reflect.DeepEqual(after, before) {
+				t.Fatalf("claim changed:\nbefore: %+v\nafter:  %+v", before, after)
+			}
+
+			// Moving into an unlisted repo with a validated policy must still mark the session
+			// even while the lane is lost, so personal-repo telemetry is dropped instead of
+			// continuing under the earlier placement.
+			unlisted := t.TempDir()
+			if ClaimFromPayload(context.Background(), noLane, PayloadSession{ID: "s1", Cwd: unlisted}, "claude-code") {
+				t.Fatal("ClaimFromPayload claimed in an unlisted directory")
+			}
+			marked, ok := claim.Read(p.stateDir, "s1", noLane.Now)
+			if !ok || marked.ProjectID != "" || len(marked.Placements) != 2 {
+				t.Fatalf("after unlisted turn with no lane: claim = %+v, %v; want a mark appended", marked, ok)
+			}
+		})
 	}
 }

@@ -334,8 +334,8 @@ func (app *App) Execute() int {
 	return 0
 }
 
-func (app *App) loadConfig() (*config.Config, error) {
-	return config.Load(app.dir, app.stateDir, config.Overrides{
+func (app *App) configOverrides() config.Overrides {
+	return config.Overrides{
 		Profile:   app.flags.profile,
 		Env:       app.flags.env,
 		APIURL:    app.flags.apiURL,
@@ -343,7 +343,11 @@ func (app *App) loadConfig() (*config.Config, error) {
 		AppURL:    app.flags.appURL,
 		OTLPURL:   app.flags.otlpURL,
 		ProjectID: app.flags.projectID,
-	})
+	}
+}
+
+func (app *App) loadConfig() (*config.Config, error) {
+	return config.Load(app.dir, app.stateDir, app.configOverrides())
 }
 
 func (app *App) resolveFormat() (output.Format, error) {

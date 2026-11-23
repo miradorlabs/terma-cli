@@ -23,6 +23,8 @@ func enable(t *testing.T) string {
 	return dir
 }
 
+const testAccount = "aaaaaaaaaaaaaaaa"
+
 func TestWriteReadRefresh(t *testing.T) {
 	t.Parallel()
 	dir := enable(t)
@@ -30,13 +32,13 @@ func TestWriteReadRefresh(t *testing.T) {
 		t.Fatal("a token means the relay is set up")
 	}
 	now := time.Now()
-	if !Write(dir, "sess-1", Claim{ProjectID: "p1", Tool: "codex"}, now) {
+	if !Write(dir, "sess-1", Claim{ProjectID: "p1", Account: testAccount, Tool: "codex"}, now) {
 		t.Fatal("first claim not written")
 	}
-	if Write(dir, "sess-1", Claim{ProjectID: "p1"}, now.Add(time.Minute)) {
+	if Write(dir, "sess-1", Claim{ProjectID: "p1", Account: testAccount}, now.Add(time.Minute)) {
 		t.Fatal("a fresh claim for the same project is not rewritten")
 	}
-	if !Write(dir, "sess-1", Claim{ProjectID: "p2"}, now.Add(time.Minute)) {
+	if !Write(dir, "sess-1", Claim{ProjectID: "p2", Account: testAccount}, now.Add(time.Minute)) {
 		t.Fatal("a claim for another project is rewritten at once")
 	}
 	c, ok := Read(dir, "sess-1", now.Add(time.Minute))
@@ -49,7 +51,7 @@ func TestReadRejectsStaleAndUnsafe(t *testing.T) {
 	t.Parallel()
 	dir := enable(t)
 	now := time.Now()
-	Write(dir, "sess-1", Claim{ProjectID: "p1"}, now)
+	Write(dir, "sess-1", Claim{ProjectID: "p1", Account: testAccount}, now)
 	p := filepath.Join(dir, DirName, claimsDir, "sess-1.json")
 	old := now.Add(-TTL - time.Minute)
 	if err := os.Chtimes(p, old, old); err != nil {
@@ -63,12 +65,15 @@ func TestReadRejectsStaleAndUnsafe(t *testing.T) {
 		t.Fatal("prune keeps a stale claim")
 	}
 	for _, bad := range []string{"", "../x", ".hidden", "a/b"} {
-		if Write(dir, bad, Claim{ProjectID: "p1"}, now) {
+		if Write(dir, bad, Claim{ProjectID: "p1", Account: testAccount}, now) {
 			t.Fatalf("unsafe session id %q was written", bad)
 		}
 	}
-	if Write(dir, "sess-2", Claim{}, now) {
+	if Write(dir, "sess-2", Claim{Account: testAccount}, now) {
 		t.Fatal("a claim without a project is not written")
+	}
+	if Write(dir, "sess-2", Claim{ProjectID: "p1"}, now) {
+		t.Fatal("a claim without an account is not written")
 	}
 }
 
@@ -105,11 +110,11 @@ func TestClaimMergesProcesses(t *testing.T) {
 	t.Parallel()
 	dir := enable(t)
 	now := time.Now()
-	Write(dir, "s", Claim{ProjectID: "p", PIDs: []int{10, 11}}, now)
-	if Write(dir, "s", Claim{ProjectID: "p", PIDs: []int{11}}, now) {
+	Write(dir, "s", Claim{ProjectID: "p", Account: testAccount, PIDs: []int{10, 11}}, now)
+	if Write(dir, "s", Claim{ProjectID: "p", Account: testAccount, PIDs: []int{11}}, now) {
 		t.Fatal("known processes rewrote a fresh claim")
 	}
-	if !Write(dir, "s", Claim{ProjectID: "p", PIDs: []int{20, 21}}, now) {
+	if !Write(dir, "s", Claim{ProjectID: "p", Account: testAccount, PIDs: []int{20, 21}}, now) {
 		t.Fatal("a new run of the session did not add its processes")
 	}
 	c, _ := Read(dir, "s", now)
@@ -136,7 +141,7 @@ func TestConcurrentWritersKeepEveryProcess(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			Write(dir, "s", Claim{ProjectID: "p", PIDs: []int{1000 + i}}, now)
+			Write(dir, "s", Claim{ProjectID: "p", Account: testAccount, PIDs: []int{1000 + i}}, now)
 		}()
 	}
 	wg.Wait()
@@ -157,8 +162,8 @@ func TestClaimKeepsEachPlacementOfAResumedSession(t *testing.T) {
 	dir := enable(t)
 	t0 := time.Now().Add(-time.Hour).Truncate(time.Second)
 	t1 := t0.Add(30 * time.Minute)
-	Write(dir, "s", Claim{ProjectID: "p1", Tool: "claude-code", PIDs: []int{10}}, t0)
-	if !Write(dir, "s", Claim{ProjectID: "p2", Tool: "claude-code", PIDs: []int{20}}, t1) {
+	Write(dir, "s", Claim{ProjectID: "p1", Account: testAccount, Tool: "claude-code", PIDs: []int{10}}, t0)
+	if !Write(dir, "s", Claim{ProjectID: "p2", Account: testAccount, Tool: "claude-code", PIDs: []int{20}}, t1) {
 		t.Fatal("a resume in another project did not write")
 	}
 	c, ok := Read(dir, "s", t1)
@@ -195,7 +200,7 @@ func TestClaimKeepsEachPlacementOfAResumedSession(t *testing.T) {
 		t.Fatal("a process neither run named is covered")
 	}
 	// Back in the first repository: a third placement, not a merge into the first.
-	Write(dir, "s", Claim{ProjectID: "p1", PIDs: []int{30}}, t1.Add(time.Minute))
+	Write(dir, "s", Claim{ProjectID: "p1", Account: testAccount, PIDs: []int{30}}, t1.Add(time.Minute))
 	c, _ = Read(dir, "s", t1.Add(time.Minute))
 	if len(c.Placements) != 3 {
 		t.Fatalf("placements %+v", c.Placements)
@@ -223,7 +228,7 @@ func TestWriteSurvivesAReaderHoldingTheClaim(t *testing.T) {
 	t.Parallel()
 	dir := enable(t)
 	now := time.Now()
-	if !Write(dir, "s", Claim{ProjectID: "p", PIDs: []int{1}}, now) {
+	if !Write(dir, "s", Claim{ProjectID: "p", Account: testAccount, PIDs: []int{1}}, now) {
 		t.Fatal("first write")
 	}
 	p, _ := path(dir, "s")
@@ -232,7 +237,7 @@ func TestWriteSurvivesAReaderHoldingTheClaim(t *testing.T) {
 		t.Fatal(err)
 	}
 	go func() { time.Sleep(20 * time.Millisecond); f.Close() }()
-	if !Write(dir, "s", Claim{ProjectID: "p", PIDs: []int{2}}, now) {
+	if !Write(dir, "s", Claim{ProjectID: "p", Account: testAccount, PIDs: []int{2}}, now) {
 		t.Fatal("a write while a reader held the claim was lost")
 	}
 	if c, _ := Read(dir, "s", now); !c.Covers(1) || !c.Covers(2) {
@@ -295,8 +300,8 @@ func TestAtAcrossMarkAndClaim(t *testing.T) {
 	t0 := time.Now().Add(-time.Hour).Truncate(time.Second)
 	t1 := t0.Add(30 * time.Minute)
 	Mark(dir, "unlisted-first", "codex", []int{10}, t0)
-	Write(dir, "unlisted-first", Claim{ProjectID: "p1", PIDs: []int{10}}, t1)
-	Write(dir, "listed-first", Claim{ProjectID: "p1", PIDs: []int{10}}, t0)
+	Write(dir, "unlisted-first", Claim{ProjectID: "p1", Account: testAccount, PIDs: []int{10}}, t1)
+	Write(dir, "listed-first", Claim{ProjectID: "p1", Account: testAccount, PIDs: []int{10}}, t0)
 	Mark(dir, "listed-first", "codex", []int{10}, t1)
 	for _, tc := range []struct {
 		session string
@@ -320,7 +325,7 @@ func TestAtAcrossMarkAndClaim(t *testing.T) {
 	}
 	// A listed run in another process: its first records, before its placement, are its own.
 	Mark(dir, "resumed", "codex", []int{10}, t0)
-	Write(dir, "resumed", Claim{ProjectID: "p1", PIDs: []int{20}}, t1)
+	Write(dir, "resumed", Claim{ProjectID: "p1", Account: testAccount, PIDs: []int{20}}, t1)
 	c, _ := Read(dir, "resumed", t1)
 	if got, ok := c.At(20, t0.Add(time.Minute)); !ok || got.ProjectID != "p1" {
 		t.Fatalf("the resumed run's early record = %+v, %v", got, ok)
@@ -335,7 +340,7 @@ func TestClaimFollowsTheWorkingTreeInPlace(t *testing.T) {
 	dir := enable(t)
 	t0 := time.Now().Add(-time.Hour).Truncate(time.Second)
 	Mark(dir, "s", "claude-code", []int{10}, t0)
-	main := Claim{ProjectID: "p1", Tool: "claude-code", Root: "/src/api", PIDs: []int{10}}
+	main := Claim{ProjectID: "p1", Account: testAccount, Tool: "claude-code", Root: "/src/api", PIDs: []int{10}}
 	wt := main
 	wt.Root, wt.Worktree = "/src/api/.claude/worktrees/fix-1", "fix-1"
 	at := t0.Add(time.Minute)
@@ -374,7 +379,7 @@ func TestClaimFollowsTheDirectoryInPlace(t *testing.T) {
 	t.Parallel()
 	dir := enable(t)
 	at := time.Now().Add(-time.Hour).Truncate(time.Second)
-	top := Claim{ProjectID: "p1", Tool: "claude-code", Root: "/src/api", Cwd: "/src/api", PIDs: []int{10}}
+	top := Claim{ProjectID: "p1", Account: testAccount, Tool: "claude-code", Root: "/src/api", Cwd: "/src/api", PIDs: []int{10}}
 	if !Write(dir, "s", top, at) {
 		t.Fatal("the first claim did not write")
 	}
@@ -404,7 +409,7 @@ func TestClaimWithoutADirectoryKeepsTheSessions(t *testing.T) {
 	t.Parallel()
 	dir := enable(t)
 	at := time.Now().Add(-time.Hour).Truncate(time.Second)
-	agent := Claim{ProjectID: "p1", Tool: "claude-code", Root: "/src/api", Cwd: "/src/api/web", PIDs: []int{10}}
+	agent := Claim{ProjectID: "p1", Account: testAccount, Tool: "claude-code", Root: "/src/api", Cwd: "/src/api/web", PIDs: []int{10}}
 	if !Write(dir, "s", agent, at) {
 		t.Fatal("the agent's claim did not write")
 	}
@@ -429,7 +434,7 @@ func TestClaimFollowsTheBranch(t *testing.T) {
 	t.Parallel()
 	dir := enable(t)
 	now := time.Now()
-	c := Claim{ProjectID: "p1", Root: "/work/a", Cwd: "/work/a", Remote: "https://github.com/acme/web", Branch: "main"}
+	c := Claim{ProjectID: "p1", Account: testAccount, Root: "/work/a", Cwd: "/work/a", Remote: "https://github.com/acme/web", Branch: "main"}
 	if !Write(dir, "sess-1", c, now) {
 		t.Fatal("first claim not written")
 	}
@@ -437,9 +442,9 @@ func TestClaimFollowsTheBranch(t *testing.T) {
 		t.Fatal("the same claim is not rewritten while fresh")
 	}
 	for _, next := range []Claim{
-		{ProjectID: "p1", Root: "/work/a", Cwd: "/work/a", Remote: "https://github.com/acme/web", Branch: "fix/login"},
-		{ProjectID: "p1", Root: "/work/a", Cwd: "/work/a", Remote: "https://github.com/acme/web2", Branch: "fix/login"},
-		{ProjectID: "p1", Root: "/work/a", Cwd: "/work/a", Remote: "https://github.com/acme/web2", Branch: "fix/login", Worktree: "login"},
+		{ProjectID: "p1", Account: testAccount, Root: "/work/a", Cwd: "/work/a", Remote: "https://github.com/acme/web", Branch: "fix/login"},
+		{ProjectID: "p1", Account: testAccount, Root: "/work/a", Cwd: "/work/a", Remote: "https://github.com/acme/web2", Branch: "fix/login"},
+		{ProjectID: "p1", Account: testAccount, Root: "/work/a", Cwd: "/work/a", Remote: "https://github.com/acme/web2", Branch: "fix/login", Worktree: "login"},
 	} {
 		if !Write(dir, "sess-1", next, now.Add(2*time.Second)) {
 			t.Fatalf("%+v: not rewritten", next)
@@ -474,6 +479,23 @@ func TestAClaimUnderAnotherSignInIsAnotherPlacement(t *testing.T) {
 	}
 }
 
+// Write refuses a claim with no account, leaving an existing claim and its placements intact.
+func TestWriteRefusesEmptyAccount(t *testing.T) {
+	t.Parallel()
+	dir := enable(t)
+	now := time.Now()
+	if !Write(dir, "sess-1", Claim{ProjectID: "p1", Account: testAccount, PIDs: []int{10}}, now) {
+		t.Fatal("first claim not written")
+	}
+	if Write(dir, "sess-1", Claim{ProjectID: "p1", PIDs: []int{10}}, now.Add(time.Minute)) {
+		t.Fatal("a claim without an account overwrote an existing claim")
+	}
+	c, ok := Read(dir, "sess-1", now.Add(time.Minute))
+	if !ok || c.Account != testAccount || len(c.Placements) != 1 || c.Placements[0].Account != testAccount {
+		t.Fatalf("claim = %+v, %v; want original placement under %s", c, ok, testAccount)
+	}
+}
+
 // A subagent's parent, named by its start hook, stays the session's: a later hook that names
 // none keeps it, the placement a record is judged by carries it, and naming it for the first
 // time rewrites a fresh claim.
@@ -481,12 +503,12 @@ func TestClaimKeepsItsParent(t *testing.T) {
 	t.Parallel()
 	dir := enable(t)
 	now := time.Now()
-	Write(dir, "child", Claim{ProjectID: "p1", Tool: "omp", PIDs: []int{7}}, now)
-	if !Write(dir, "child", Claim{ProjectID: "p1", Tool: "omp", PIDs: []int{7}, Parent: "parent"}, now.Add(time.Second)) {
+	Write(dir, "child", Claim{ProjectID: "p1", Account: testAccount, Tool: "omp", PIDs: []int{7}}, now)
+	if !Write(dir, "child", Claim{ProjectID: "p1", Account: testAccount, Tool: "omp", PIDs: []int{7}, Parent: "parent"}, now.Add(time.Second)) {
 		t.Fatal("a fresh claim was not rewritten to name its parent")
 	}
-	Write(dir, "child", Claim{ProjectID: "p1", PIDs: []int{8}}, now.Add(2*time.Second))
-	Write(dir, "child", Claim{ProjectID: "p2", PIDs: []int{9}}, now.Add(3*time.Second))
+	Write(dir, "child", Claim{ProjectID: "p1", Account: testAccount, PIDs: []int{8}}, now.Add(2*time.Second))
+	Write(dir, "child", Claim{ProjectID: "p2", Account: testAccount, PIDs: []int{9}}, now.Add(3*time.Second))
 	c, ok := Read(dir, "child", now.Add(3*time.Second))
 	if !ok || c.Parent != "parent" {
 		t.Fatalf("claim = %+v, %v; want it to keep its parent", c, ok)
