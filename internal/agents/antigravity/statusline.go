@@ -1,6 +1,7 @@
 package antigravity
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -159,7 +160,12 @@ func (a Agent) InstallStatusLine() (bool, error) {
 			return false, fmt.Errorf("%s: %w", path, err)
 		}
 		if isAntigravityStatusLineOurs(command) {
-			return false, nil
+			if !prev.disabled() {
+				return false, nil
+			}
+			// agy draws nothing of a line set "enabled": false: setup switches terma's back on.
+			delete(prev, "enabled")
+			return a.rewriteStatusLine(path, s, prev)
 		}
 		maps.Copy(entry, prev)
 		if !prev.disabled() {
@@ -234,25 +240,37 @@ func (a Agent) refreshStatusLine() (string, bool, error) {
 		return path, false, nil
 	}
 	cur["command"], _ = hookmgr.MarshalJSON(want, "", "")
-	installed, err := hookmgr.MarshalJSON(map[string]json.RawMessage(cur), "", "")
+	changed, err := a.rewriteStatusLine(path, s, cur)
+	return path, changed, err
+}
+
+// rewriteStatusLine writes entry, terma's own status line changed in place, and keeps the
+// record able to restore the file: whole while nothing else changed it since setup, else
+// the statusLine member alone.
+func (a Agent) rewriteStatusLine(path string, s *antigravitySettings, entry antigravityStatusLineEntry) (bool, error) {
+	installed, err := hookmgr.MarshalJSON(map[string]json.RawMessage(entry), "", "")
 	if err != nil {
-		return path, false, err
+		return false, err
 	}
 	if err := s.set(antigravityStatusLineKey, string(installed)); err != nil {
-		return path, false, err
+		return false, err
 	}
 	after := s.pack()
-	if hashBytes(s.data) == rec.After {
-		// Nothing else changed the file since setup: it can still be put back whole.
-		rec.After = hashBytes(after)
-	} else {
-		// Something did: teardown puts back the statusLine member alone.
-		rec.After, rec.Before = "", nil
+	rec, err := a.statusLineRecord(path)
+	if err != nil {
+		return false, err
 	}
-	if err := a.updateStatusLineRecords(func(recs map[string]*antigravityStatusLineRecordEntry) { recs[path] = rec }); err != nil {
-		return path, false, err
+	if rec != nil {
+		if hashBytes(s.data) == rec.After {
+			rec.After = hashBytes(after)
+		} else {
+			rec.After, rec.Before = "", nil
+		}
+		if err := a.updateStatusLineRecords(func(recs map[string]*antigravityStatusLineRecordEntry) { recs[path] = rec }); err != nil {
+			return false, err
+		}
 	}
-	return path, true, s.write(after)
+	return true, s.write(after)
 }
 
 // RemoveStatusLine puts back what terma replaced, if the file still holds terma's command:
@@ -267,19 +285,22 @@ func (a Agent) RemoveStatusLine() (bool, error) {
 		return false, err
 	}
 	s, err := loadAntigravitySettings(path)
-	if err != nil && rec == nil {
-		// Teardown runs this for every agent: a file terma never wrapped is not its to judge.
-		return false, nil
+	var cur antigravityStatusLineEntry
+	if err == nil {
+		if cur, err = parseAntigravityStatusLine(s.raw(antigravityStatusLineKey)); err != nil {
+			err = fmt.Errorf("%s: %w", path, err)
+		}
 	}
 	if err != nil {
+		// Teardown, and setup for any other agent, run this: a file terma cannot read that
+		// holds nothing of terma's is not its to judge.
+		if data, readErr := os.ReadFile(path); readErr != nil || !bytes.Contains(data, []byte(antigravityStatusLineMarker)) {
+			if rec == nil {
+				return false, nil
+			}
+			return false, a.deleteStatusLineRecord(path)
+		}
 		return false, err
-	}
-	cur, err := parseAntigravityStatusLine(s.raw(antigravityStatusLineKey))
-	if err != nil && rec == nil {
-		return false, nil
-	}
-	if err != nil {
-		return false, fmt.Errorf("%s: %w", path, err)
 	}
 	command, _ := cur.str("command")
 	if cur == nil || !isAntigravityStatusLineOurs(command) {

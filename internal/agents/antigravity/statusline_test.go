@@ -344,3 +344,59 @@ func TestAntigravityStatusLineHooksOffStillRenders(t *testing.T) {
 		t.Fatalf("code %d output %q", code, out.String())
 	}
 }
+
+// agy draws nothing of a status line set "enabled": false: setup switches terma's back on,
+// and teardown still puts back the file as it was before setup.
+func TestAntigravityStatusLineSetupSwitchesTermasBackOn(t *testing.T) {
+	a, path := statusLineHome(t)
+	writeSettings(t, path, agySettings)
+	if _, err := a.InstallStatusLine(); err != nil {
+		t.Fatal(err)
+	}
+	b, _ := os.ReadFile(path)
+	writeSettings(t, path, strings.Replace(string(b), `"type":"command"`, `"enabled":false,"type":"command"`, 1))
+	if st, _ := a.StatusLineState(""); st.Installed {
+		t.Fatalf("a switched-off line reads as installed: %+v", st)
+	}
+	if changed, err := a.InstallStatusLine(); err != nil || !changed {
+		t.Fatalf("install: %v %v", changed, err)
+	}
+	if sl := statusLineOf(t, path); sl["enabled"] != nil || sl["command"] != antigravityStatusLineCommand("") {
+		t.Fatalf("statusLine = %v", sl)
+	}
+	if st, _ := a.StatusLineState(""); !st.Installed {
+		t.Fatalf("state %+v", st)
+	}
+	if _, err := a.RemoveStatusLine(); err != nil {
+		t.Fatal(err)
+	}
+	if b, _ := os.ReadFile(path); strings.Contains(string(b), "statusLine") || !strings.Contains(string(b), "/home/dev/repo") {
+		t.Fatalf("after teardown:\n%s", b)
+	}
+}
+
+// A settings file terma cannot read is left alone when it no longer holds terma's
+// command, so teardown and setup for another agent go on; one that still does names the
+// file in its error.
+func TestAntigravityStatusLineUnreadableFileAfterSetup(t *testing.T) {
+	a, path := statusLineHome(t)
+	writeSettings(t, path, agySettings)
+	if _, err := a.InstallStatusLine(); err != nil {
+		t.Fatal(err)
+	}
+	b, _ := os.ReadFile(path)
+	writeSettings(t, path, string(b)+"}")
+	if _, err := a.RemoveStatusLine(); err == nil || !strings.Contains(err.Error(), path) {
+		t.Fatalf("a broken file still holding terma's line: %v", err)
+	}
+	writeSettings(t, path, `{"trustedWorkspaces": [`)
+	if restored, err := a.RemoveStatusLine(); err != nil || restored {
+		t.Fatalf("a broken file without terma's line: %v %v", restored, err)
+	}
+	if b, _ := os.ReadFile(path); string(b) != `{"trustedWorkspaces": [` {
+		t.Fatalf("changed %s", b)
+	}
+	if _, err := os.Stat(a.statusLineRecordPath()); !os.IsNotExist(err) {
+		t.Errorf("record kept for a wrap that is gone: %v", err)
+	}
+}
