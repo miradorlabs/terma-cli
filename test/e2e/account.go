@@ -212,6 +212,34 @@ func (sb *Sandbox) editProfile(profile string, edit func(map[string]any)) {
 	sb.writeAbs(path, string(data))
 }
 
+// profileLane is the lane a hook running under profile claims a session in
+// (claim.Claim.Account): no person's under a server key, else the account the profile
+// was chosen under.
+func (sb *Sandbox) profileLane(profile string) string {
+	sb.T.Helper()
+	data, err := os.ReadFile(filepath.Join(sb.TermaConfig, "config.json"))
+	if err != nil {
+		sb.T.Fatal(err)
+	}
+	var file struct {
+		Profiles map[string]struct {
+			Account         string `json:"account"`
+			ServerKeySignIn bool   `json:"server_key_sign_in"`
+		} `json:"profiles"`
+	}
+	if err := json.Unmarshal(data, &file); err != nil {
+		sb.T.Fatal(err)
+	}
+	p := file.Profiles[profile]
+	if p.ServerKeySignIn {
+		return "no_person"
+	}
+	if p.Account == "" {
+		sb.T.Fatalf("config.json's profile %q names no account", profile)
+	}
+	return p.Account
+}
+
 // profileOrganization is the organization config.json records for profile.
 func (sb *Sandbox) profileOrganization(profile string) string {
 	sb.T.Helper()

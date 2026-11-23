@@ -495,7 +495,8 @@ func TestRelayLateClaim(t *testing.T) {
 		if n := agentRecords(sb.Receiver.evidence()); n != 0 {
 			t.Fatalf("%d records reached upstream before any claim", n)
 		}
-		claim := fmt.Sprintf(`{"project_id":%q,"tool":"claude-code","repository":{"origin":"github.com/acme/repo"},"claimed_at":%q}`, sb.ProjectID, time.Now().UTC().Format(time.RFC3339Nano))
+		// A hook's claim names the sign-in it was made under; the relay refuses another's.
+		claim := fmt.Sprintf(`{"project_id":%q,"tool":"claude-code","account":%q,"repository":{"origin":"github.com/acme/repo"},"claimed_at":%q}`, sb.ProjectID, sb.profileLane("default"), time.Now().UTC().Format(time.RFC3339Nano))
 		sb.writeAbs(filepath.Join(sb.TermaConfig, "relay", "claims", sid+".json"), claim+"\n")
 		deadline := time.Now().Add(30 * time.Second)
 		for agentRecords(sb.Receiver.evidence()) == 0 && time.Now().Before(deadline) {
