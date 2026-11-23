@@ -45,9 +45,16 @@ func TestAntigravityRealLogin(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// The developer's own terma hooks would run too, against the sandbox's config.
-	if b, err := os.ReadFile(filepath.Join(home, ".gemini", "config", "hooks.json")); err == nil && strings.Contains(string(b), "hook --user antigravity-") {
-		t.Skip("this machine's agy already runs terma's hooks; every event would be recorded twice")
+	// Every hook in the developer's global file runs in these sessions too: terma's own would
+	// record every event twice, against the sandbox's config, and any other would run with
+	// tools approved. Only TERMA_E2E_AGY_GLOBAL_HOOKS=1 runs beside hooks that are not terma's.
+	if b, err := os.ReadFile(filepath.Join(home, ".gemini", "config", "hooks.json")); err == nil {
+		if strings.Contains(string(b), "hook --user antigravity-") {
+			t.Skip("this machine's agy already runs terma's hooks; every event would be recorded twice")
+		}
+		if len(bytes.TrimSpace(b)) > 2 && os.Getenv("TERMA_E2E_AGY_GLOBAL_HOOKS") != "1" {
+			t.Skip("~/.gemini/config/hooks.json holds hooks that would run with tools approved; set TERMA_E2E_AGY_GLOBAL_HOOKS=1 to run beside them")
+		}
 	}
 	model := cmp.Or(os.Getenv("TERMA_E2E_AGY_MODEL"), "gemini-3.8-flash-low")
 
@@ -89,10 +96,14 @@ func TestAntigravityRealLogin(t *testing.T) {
 		if err != nil {
 			t.Error(err)
 		}
+		// The payloads without the prompt, which agy repeats in every hook as lastUserInput.
 		files, _ := filepath.Glob(filepath.Join(sb.payloadDir(), "*.json"))
 		for _, f := range files {
-			if b, err := os.ReadFile(f); err == nil {
-				_ = os.WriteFile(filepath.Join(dir, "hook-payloads", filepath.Base(f)), b, 0o600)
+			var payload map[string]any
+			if b, err := os.ReadFile(f); err == nil && json.Unmarshal(b, &payload) == nil {
+				delete(payload, "lastUserInput")
+				out, _ := json.MarshalIndent(payload, "", " ")
+				_ = os.WriteFile(filepath.Join(dir, "hook-payloads", filepath.Base(f)), out, 0o600)
 			}
 		}
 	})
