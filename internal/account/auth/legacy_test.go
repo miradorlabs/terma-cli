@@ -13,6 +13,7 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/account/secret"
 	"github.com/miradorlabs/terma-cli/internal/config"
+	"github.com/miradorlabs/terma-cli/internal/sendas"
 )
 
 // writeLegacy leaves what an older terma kept: work's org-a sign-in with its token in
@@ -369,12 +370,12 @@ func TestReadLegacySignIns_AReadErrorDecidesNothing(t *testing.T) {
 func TestLegacyLane(t *testing.T) {
 	t.Parallel()
 	for decision, want := range map[string]string{
-		"":                     "",
-		"0123456789abcdef":     "0123456789abcdef",
-		LegacyNoPerson:         LegacyNoPerson,
-		LegacyAccountAmbiguous: LegacyAccountAmbiguous,
-		"someone":              LegacyAccountAmbiguous,
-		AccountUnreadable:      LegacyAccountAmbiguous,
+		"":                       "",
+		"0123456789abcdef":       "0123456789abcdef",
+		LegacyNoPerson:           LegacyNoPerson,
+		LegacyAccountAmbiguous:   LegacyAccountAmbiguous,
+		"someone":                LegacyAccountAmbiguous,
+		sendas.AccountUnreadable: LegacyAccountAmbiguous,
 	} {
 		if got := LegacyLane(decision); got != want {
 			t.Errorf("lane of %q = %q, want %q", decision, got, want)

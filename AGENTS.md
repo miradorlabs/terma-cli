@@ -130,7 +130,8 @@ claim, so a hidden side thread no hook claims stays here. What is held stays in 
 never on disk, and a stopping relay drops it. What leaves is bound to the account (a hash
 of the auth host and the user) of the sign-in in place when it arrived: the relay's
 outbox keeps it under `@<account>/`, spool events carry `account`, and it leaves only with
-that account's own token, never in another person's name; it ages out with the outbox
+that account's own token, never in another person's name, and names (`terma.user.id`) no
+user but that account's; it ages out with the outbox
 (14 days), whose `losses.json` counts what the relay lost, by reason, for doctor (the
 heartbeat carries the same reasons as `dropped.<reason>.<signal>` counters). A claimed part
 whose team's policy cannot be read yet waits in memory as long as the outbox would keep

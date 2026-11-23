@@ -187,7 +187,7 @@ func (r *Relay) deliverAttributed(c claim.Claim, pol Policy, p *part, how attrib
 	if at.IsZero() {
 		at = r.opts.Now()
 	}
-	nameUser(p, pol, p.account)
+	nameUser(p, pol)
 	if how.how != "" {
 		stamp(p, semconv.TermaRelayAttributionKey, how.how)
 		if how.session != "" {

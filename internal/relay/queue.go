@@ -54,22 +54,6 @@ func (s *sender) next(limit int) []entry {
 	return slices.Clone(head[:min(limit, len(head))])
 }
 
-// nextLeaving is next among the parts that may leave now (leave picks them from a signal's
-// whole queue, within its limit, reading nothing; it runs under s.mu): the oldest signal
-// with any, so a head no one may send now holds up neither its own signal's parts behind
-// it nor another signal. Only what leaves is copied.
-func (s *sender) nextLeaving(leave func([]entry) []entry) []entry {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	var best []entry
-	for _, q := range s.queue {
-		if out := leave(q); len(out) > 0 && (best == nil || out[0].name < best[0].name) {
-			best = out
-		}
-	}
-	return slices.Clone(best)
-}
-
 // forget takes parts that left the outbox, delivered, dropped or buried, off the queue.
 func (s *sender) forget(batch []entry) {
 	if len(batch) == 0 {

@@ -10,6 +10,7 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/account/secret"
 	"github.com/miradorlabs/terma-cli/internal/config"
+	"github.com/miradorlabs/terma-cli/internal/sendas"
 )
 
 func sampleCredential() *Credential {
@@ -309,8 +310,8 @@ func TestAnUnreadableSignInIsNoSignedOutOne(t *testing.T) {
 	if err := os.WriteFile(config.CredentialsPath(dir), []byte("{"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if got := Account(dir, "default", "https://auth.example.test"); got != AccountUnreadable {
-		t.Fatalf("unreadable: %q, want %q", got, AccountUnreadable)
+	if got := Account(dir, "default", "https://auth.example.test"); got != sendas.AccountUnreadable {
+		t.Fatalf("unreadable: %q, want %q", got, sendas.AccountUnreadable)
 	}
 }
 
@@ -352,8 +353,8 @@ func TestASignInWithNoUserIsUnreadable(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, env := range []string{"https://auth.example.test", "https://auth.other.example.test"} {
-		if got := Account(dir, "default", env); got != AccountUnreadable {
-			t.Errorf("for %s: %q, want %q", env, got, AccountUnreadable)
+		if got := Account(dir, "default", env); got != sendas.AccountUnreadable {
+			t.Errorf("for %s: %q, want %q", env, got, sendas.AccountUnreadable)
 		}
 	}
 }

@@ -63,13 +63,12 @@ func TestAServerKeysPartLandsOnTheNoPersonRoute(t *testing.T) {
 	}
 }
 
-// A lane leaves only under its own credential: no person's only under a server key, a
-// person's only under that person's sign-in, and neither a route with no lane nor an
-// older terma's ambiguous backlog under either.
+// A route is one lane, and leaves only under its own credential: no person's only under a
+// server key, a person's only under that person's sign-in, and neither a route with no lane
+// nor an older terma's ambiguous backlog under either.
 func TestEachLaneLeavesOnlyUnderItsOwnCredential(t *testing.T) {
 	t.Parallel()
 	r := newRelay(Options{Dir: t.TempDir(), Token: token, SignIn: &testSignIn{account: accountA}})
-	entries := []entry{newEntry(time.Now(), Logs, 1)}
 	for _, c := range []struct {
 		account   string
 		serverKey bool
@@ -84,17 +83,17 @@ func TestEachLaneLeavesOnlyUnderItsOwnCredential(t *testing.T) {
 		{"", false, false},
 		{auth.LegacyAccountAmbiguous, true, false},
 		{auth.LegacyAccountAmbiguous, false, false},
+		{sendas.AccountUnreadable, false, false},
 	} {
-		got := r.leaving(routeOf(c.account, claim.Claim{ProjectID: "p1"}), c.serverKey, maxMergeFiles)(entries)
-		if (len(got) == 1) != c.may {
-			t.Errorf("lane %q under a server key %v: %d may leave, want %v", c.account, c.serverKey, len(got), c.may)
+		if got := r.mayLeave(routeOf(c.account, claim.Claim{ProjectID: "p1"}), c.serverKey); got != c.may {
+			t.Errorf("lane %q under a server key %v: may leave %v, want %v", c.account, c.serverKey, got, c.may)
 		}
 	}
 	// A profile just switched to a server key, sent by a policy that names no key yet: no
 	// person's lane is no sign-in's, though it is what the sign-in reads.
 	keyed := newRelay(Options{Dir: t.TempDir(), Token: token, SignIn: &testSignIn{account: sendas.NoPersonLane}})
-	if got := keyed.leaving(routeOf(sendas.NoPersonLane, claim.Claim{ProjectID: "p1"}), false, maxMergeFiles)(entries); len(got) != 0 {
-		t.Errorf("%d of no person's parts may leave with no server key", len(got))
+	if keyed.mayLeave(routeOf(sendas.NoPersonLane, claim.Claim{ProjectID: "p1"}), false) {
+		t.Error("no person's parts may leave with no server key")
 	}
 }
 
@@ -163,7 +162,7 @@ func (s *scriptedSignIn) asks() int {
 func TestAnUnreadableSignInIsRetriedThenLost(t *testing.T) {
 	t.Parallel()
 	u := newSignInUpstream(t)
-	signIn := &scriptedSignIn{accounts: []string{auth.AccountUnreadable}}
+	signIn := &scriptedSignIn{accounts: []string{sendas.AccountUnreadable}}
 	r, srv := laneRelay(t, u, signIn, "", 300*time.Millisecond)
 	start := time.Now()
 	post(t, srv, "/v1/logs", oneLog("unreadable"), "application/x-protobuf", token, false)
@@ -187,7 +186,7 @@ func TestAnUnreadableSignInIsRetriedThenLost(t *testing.T) {
 func TestASignInSwapMidWriteIsRecoveredByTheRetry(t *testing.T) {
 	t.Parallel()
 	u := newSignInUpstream(t)
-	signIn := &scriptedSignIn{accounts: []string{auth.AccountUnreadable, auth.AccountUnreadable, accountB}}
+	signIn := &scriptedSignIn{accounts: []string{sendas.AccountUnreadable, sendas.AccountUnreadable, accountB}}
 	r, srv := laneRelay(t, u, signIn, "", 3*time.Second)
 	post(t, srv, "/v1/logs", oneLog("mid-swap"), "application/x-protobuf", token, false)
 	waitFor(t, func() bool { return len(u.requests()) == 1 })
@@ -248,7 +247,7 @@ func TestTheHeartbeatCarriesLossesByReason(t *testing.T) {
 	srv := httptest.NewServer(r.Handler())
 	defer srv.Close()
 	post(t, srv, "/v1/logs", oneLog("signed out"), "application/x-protobuf", token, false)
-	signIn.set(auth.AccountUnreadable)
+	signIn.set(sendas.AccountUnreadable)
 	post(t, srv, "/v1/logs", oneLog("unreadable"), "application/x-protobuf", token, false)
 	if err := r.heartbeat(t.Context(), "request", ""); err != nil {
 		t.Fatal(err)
@@ -264,7 +263,7 @@ func TestTheHeartbeatCarriesLossesByReason(t *testing.T) {
 // once, counted by its reason, and never pushes a genuine held part out of the hold.
 func TestALostPartIsNeverHeld(t *testing.T) {
 	t.Parallel()
-	signIn := &scriptedSignIn{accounts: []string{accountA, auth.AccountUnreadable}}
+	signIn := &scriptedSignIn{accounts: []string{accountA, sendas.AccountUnreadable}}
 	r := newRelay(Options{Dir: t.TempDir(), Token: token, Hold: time.Minute, SignIn: signIn,
 		Lookup:  func(string, time.Time) (claim.Claim, bool) { return claim.Claim{ProjectID: "p1"}, true },
 		Resolve: func(claim.Claim) (Policy, error) { return Policy{}, ErrNoKey }})
@@ -291,7 +290,7 @@ func TestALostPartIsNeverHeld(t *testing.T) {
 func TestAStillUnreadableSignInIsNotWaitedOutAgain(t *testing.T) {
 	t.Parallel()
 	u := newSignInUpstream(t)
-	signIn := &testSignIn{account: auth.AccountUnreadable}
+	signIn := &testSignIn{account: sendas.AccountUnreadable}
 	r, srv := laneRelay(t, u, signIn, "", 300*time.Millisecond)
 	post(t, srv, "/v1/logs", oneLog("first"), "application/x-protobuf", token, false)
 	start := time.Now()
@@ -302,7 +301,7 @@ func TestAStillUnreadableSignInIsNotWaitedOutAgain(t *testing.T) {
 	waitForCounters(t, r, func(c map[string]int) bool { return c["dropped.unreadable.logs"] == 2 })
 	signIn.set(accountA)
 	post(t, srv, "/v1/logs", oneLog("readable"), "application/x-protobuf", token, false)
-	signIn.set(auth.AccountUnreadable)
+	signIn.set(sendas.AccountUnreadable)
 	start = time.Now()
 	post(t, srv, "/v1/logs", oneLog("unreadable again"), "application/x-protobuf", token, false)
 	if waited := time.Since(start); waited < 300*time.Millisecond {

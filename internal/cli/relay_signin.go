@@ -68,7 +68,7 @@ func (app *App) signInSource(cfg *config.Config) *signInSource {
 // Account is the lane of the profile's sign-in: its account key, as auth.Account gives it
 // (one for another environment keeps its own, which Token never has a token for);
 // sendas.NoPersonLane when it is set up with a server key; "" when it is signed out;
-// auth.AccountUnreadable while config.json or the sign-in can't be read, or the two changed
+// sendas.AccountUnreadable while config.json or the sign-in can't be read, or the two changed
 // while they were read.
 func (s *signInSource) Account() string {
 	s.accountMu.Lock()
@@ -82,9 +82,9 @@ func (s *signInSource) Account() string {
 	// profile with another's identity, so it is read again. An unreadable one is not kept
 	// either: a file made readable again (its permissions) need not look changed.
 	if now := s.accountFilesNow(); !unchanged(files[0], now[0]) || !unchanged(files[1], now[1]) {
-		return auth.AccountUnreadable
+		return sendas.AccountUnreadable
 	}
-	s.accountRead = s.account != auth.AccountUnreadable
+	s.accountRead = s.account != sendas.AccountUnreadable
 	return s.account
 }
 
@@ -98,7 +98,7 @@ func (s *signInSource) accountFilesNow() [2]os.FileInfo {
 func (s *signInSource) readAccount() string {
 	file, err := config.LoadFile(s.cfg.Dir)
 	if err != nil {
-		return auth.AccountUnreadable
+		return sendas.AccountUnreadable
 	}
 	if p := file.Profiles[s.cfg.ProfileName]; p != nil && p.ServerKeySignIn {
 		return sendas.NoPersonLane
@@ -222,61 +222,37 @@ func (s *signInSource) Retired(token string) {
 // bindRelay has the relay send as the profile's sign-in, bind what it accepts to that
 // sign-in's account, take in what an older relay queued by the legacy record's decision,
 // and name this installation, and the older sign-ins while recent, on its heartbeat. The
-// record and the id are read as they are needed: a sign-in after the relay started writes
-// them.
+// record and the id are read as they are needed, at each outbox sweep and heartbeat: a
+// sign-in after the relay started writes them.
 func (app *App) bindRelay(engine *relay.Options, cfg *config.Config) {
 	engine.SignIn = app.signInSource(cfg)
 	engine.Installation = func() string { return config.StoredInstallationID(app.dir) }
-	legacy := cachedLegacyRecord(app.dir, app.stateDir, func() (bool, error) {
-		file, err := config.LoadFile(app.dir)
-		if err != nil {
-			return false, err
-		}
-		p := file.Profiles[cfg.ProfileName]
-		return p != nil && p.ServerKeySignIn, nil
-	}, app.legacyStages()...)
-	engine.LegacyOwner = func() string { return legacy().Account }
+	engine.LegacyOwner = func() string { return app.legacyRecord(cfg.ProfileName).Account }
 	engine.HookLosses = func() map[string]int {
 		losses, _ := spool.TakeNewLosses(filepath.Join(app.stateDir, spool.Dir))
 		return losses
 	}
 	engine.LegacySessionIDs = func() []string {
-		if rec := legacy(); rec.Recent(time.Now()) {
+		if rec := app.legacyRecord(cfg.ProfileName); rec.Recent(time.Now()) {
 			return rec.SessionIDs
 		}
 		return nil
 	}
 }
 
-// cachedLegacyRecord reads the legacy record again whenever a file it depends on changed
-// (the record, the older terma's credentials.json, config.json for the profile's mode), and
-// on a server-key profile records the key's decision if none is kept
-// (auth.LegacyOwnership). A read that fails is the zero record: a record that can't be read,
-// or a profile's mode that can't, is no decision, never a server key's, nor the one its
-// changed file held before. It is not kept either, so it is read again next time.
-func cachedLegacyRecord(dir, stateDir string, serverKey func() (bool, error), stages ...auth.LegacyStage) func() auth.LegacyRecord {
-	var mu sync.Mutex
-	var rec auth.LegacyRecord
-	var files [3]os.FileInfo
-	read := false
-	recordPath := filepath.Join(stateDir, auth.LegacyRecordFile)
-	return func() auth.LegacyRecord {
-		mu.Lock()
-		defer mu.Unlock()
-		now := [3]os.FileInfo{statOrNil(recordPath), statOrNil(config.LegacyCredentialsPath(dir)), statOrNil(config.Path(dir))}
-		if read && unchanged(files[0], now[0]) && unchanged(files[1], now[1]) && unchanged(files[2], now[2]) {
-			return rec
-		}
-		read, rec = false, auth.LegacyRecord{}
-		sk, err := serverKey()
-		if err != nil {
-			return rec
-		}
-		got, err := auth.LegacyOwnership(dir, stateDir, sk, stages...)
-		if err != nil {
-			return rec
-		}
-		rec, files, read = got, now, true
-		return rec
+// legacyRecord is the legacy record as it stands, on a server-key profile with the key's
+// decision recorded if none is kept (auth.LegacyOwnership). A record that can't be read or
+// written, or a profile's mode that can't be read, is the zero record: no decision, never a
+// server key's.
+func (app *App) legacyRecord(profile string) auth.LegacyRecord {
+	file, err := config.LoadFile(app.dir)
+	if err != nil {
+		return auth.LegacyRecord{}
 	}
+	p := file.Profiles[profile]
+	rec, err := auth.LegacyOwnership(app.dir, app.stateDir, p != nil && p.ServerKeySignIn, app.legacyStages()...)
+	if err != nil {
+		return auth.LegacyRecord{}
+	}
+	return rec
 }

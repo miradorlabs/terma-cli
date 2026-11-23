@@ -15,6 +15,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/procinfo"
 	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
 	"github.com/miradorlabs/terma-cli/internal/repohooks"
+	"github.com/miradorlabs/terma-cli/internal/sendas"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
@@ -86,7 +87,7 @@ func (app *App) hookProfile() dispatch.Profile {
 	if err != nil {
 		// NoPolicy admits no repository, so nothing is collected under it; and the profile
 		// can't be read, so what a path that skipped Repo's admission collects is lost.
-		return dispatch.Profile{Policy: config.NoPolicy("", ""), Account: auth.AccountUnreadable}
+		return dispatch.Profile{Policy: config.NoPolicy("", ""), Account: sendas.AccountUnreadable}
 	}
 	p := dispatch.Profile{Team: cfg.Policy.TeamID, Agents: cfg.Harnesses, Policy: cfg.Policy.InForce(cfg.OrganizationID, cfg.AuthURL)}
 	if p.ServerKey = cfg.ServerKeySignIn; !p.ServerKey {

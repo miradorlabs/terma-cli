@@ -125,7 +125,7 @@ func TestAccountReadsTheProfileAndTheSignInAsOne(t *testing.T) {
 			serverKeyProfile(t)
 		}
 	}
-	if got := src.Account(); got != auth.AccountUnreadable {
+	if got := src.Account(); got != sendas.AccountUnreadable {
 		t.Fatalf("with the profile switched mid-read, account = %q; want it read again", got)
 	}
 	if got := src.Account(); got != sendas.NoPersonLane {

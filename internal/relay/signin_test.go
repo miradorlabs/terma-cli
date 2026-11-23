@@ -17,6 +17,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
+	"github.com/miradorlabs/terma-cli/internal/semconv"
 	"github.com/miradorlabs/terma-cli/internal/sendas"
 )
 
@@ -69,6 +70,7 @@ type signInUpstream struct {
 	mu       sync.Mutex
 	srv      *httptest.Server
 	got      []string
+	sent     [][]byte // each request's body
 	statuses []int
 	body     []byte
 }
@@ -76,8 +78,10 @@ type signInUpstream struct {
 func newSignInUpstream(t *testing.T, statuses ...int) *signInUpstream {
 	u := &signInUpstream{statuses: statuses}
 	u.srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		sent, _ := io.ReadAll(r.Body)
 		u.mu.Lock()
 		u.got = append(u.got, r.Header.Get("Authorization")+" "+r.Header.Get(ProjectHeader))
+		u.sent = append(u.sent, sent)
 		status := http.StatusOK
 		if len(u.statuses) > 0 {
 			status, u.statuses = u.statuses[0], u.statuses[1:]
@@ -306,7 +310,8 @@ func TestASwitchMidSendNeverLendsTheNewSignIn(t *testing.T) {
 }
 
 // A part is bound to the sign-in in place when it arrives, however long it waits for its
-// team's policy: once B has signed in, A's held part never leaves as B's.
+// team's policy: once B has signed in, A's held part never leaves as B's, nor names B,
+// whom the policy it is placed under names.
 func TestAHeldPartKeepsTheAccountItArrivedUnder(t *testing.T) {
 	t.Parallel()
 	u := newSignInUpstream(t)
@@ -321,7 +326,7 @@ func TestAHeldPartKeepsTheAccountItArrivedUnder(t *testing.T) {
 			if !policyReady {
 				return Policy{}, ErrNoKey
 			}
-			return Policy{Endpoint: u.srv.URL, IncludePrompts: true, IncludeToolContent: true}, nil
+			return Policy{Endpoint: u.srv.URL, IncludePrompts: true, IncludeToolContent: true, User: "user-b", UserAccount: accountB}, nil
 		}})
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan struct{})
@@ -345,6 +350,16 @@ func TestAHeldPartKeepsTheAccountItArrivedUnder(t *testing.T) {
 	waitFor(t, func() bool { return len(u.requests()) == 1 })
 	if got := u.requests()[0]; got != "Bearer token-"+accountA+" p1" {
 		t.Fatalf("sent %q, want A's token", got)
+	}
+	var sent logspb.LogsData
+	u.mu.Lock()
+	err := proto.Unmarshal(u.sent[0], &sent)
+	u.mu.Unlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := attr(sent.ResourceLogs[0].GetResource().GetAttributes(), semconv.TermaUserIDKey); got != "" {
+		t.Fatalf("A's part left naming %q", got)
 	}
 }
 

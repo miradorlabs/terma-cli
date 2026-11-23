@@ -32,8 +32,8 @@ func AccountKey(authURL, userID string) string {
 }
 
 // Account is the account key of the sign-in a profile holds: "" when signed out,
-// AccountUnreadable when user-credentials.json is there but can't be read, or its sign-in
-// has no user id to key it by. The account does not depend on authURL: a sign-in for
+// sendas.AccountUnreadable when user-credentials.json is there but can't be read, or its
+// sign-in has no user id to key it by. The account does not depend on authURL: a sign-in for
 // another environment keeps its own, which no token here and no server key sends for, so
 // what is collected under it is that person's, never no one's. It reads only that file,
 // never the keychain, so a hook can afford it.
@@ -43,17 +43,12 @@ func Account(dir, profile, authURL string) string {
 	case errors.Is(err, ErrNotLoggedIn):
 		return ""
 	case err != nil:
-		return AccountUnreadable
+		return sendas.AccountUnreadable
 	}
 	// A sign-in there is someone's: one with no account to key it by (no user id) is the
 	// unreadable account, never the "" of a signed-out profile.
-	return cmp.Or(AccountKey(cred.AuthURL, cred.UserID), AccountUnreadable)
+	return cmp.Or(AccountKey(cred.AuthURL, cred.UserID), sendas.AccountUnreadable)
 }
-
-// AccountUnreadable is Account's answer while the sign-ins can't be read: a person's maybe,
-// so never no one's, which a server key would send; and no sign-in's token is had for it.
-// What is collected under it is lost, never queued (spool.LaneOf).
-const AccountUnreadable = sendas.AccountUnreadable
 
 // ErrSignInRetired is the server's answer that it no longer accepts this kind of sign-in:
 // only a newer terma, signed in again, sends again.

@@ -69,20 +69,13 @@ func (r *Relay) account() string {
 	return r.opts.SignIn.Account()
 }
 
-// leaving keeps of a route's entries, in arrival order, up to limit of those that may be sent
-// now. Every entry of a route is in its lane: a person's leaves only with no server key
-// (serverKey), while its account's sign-in is the one in place; no person's only under a
-// server key. An older terma's ambiguous backlog never leaves.
-//
-// The sign-in is read now, once: what it returns reads nothing, so a sender can run it on
-// its live queue under its lock. Its result may share entries' array.
-func (r *Relay) leaving(rt route, serverKey bool, limit int) func([]entry) []entry {
-	may := serverKey && rt.account == sendas.NoPersonLane ||
-		!serverKey && auth.ValidAccountKey(rt.account) && rt.account == r.account()
-	return func(entries []entry) []entry {
-		if !may {
-			return nil
-		}
-		return entries[:min(limit, len(entries))]
+// mayLeave reports whether rt's parts may leave now. A route is one lane: a person's leaves
+// only with no server key (serverKey), while its account's sign-in is the one in place; no
+// person's only under a server key. Every other route, an older terma's ambiguous backlog
+// among them, waits, and ages out with the outbox.
+func (r *Relay) mayLeave(rt route, serverKey bool) bool {
+	if serverKey {
+		return rt.account == sendas.NoPersonLane
 	}
+	return auth.ValidAccountKey(rt.account) && rt.account == r.account()
 }

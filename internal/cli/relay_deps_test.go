@@ -2,7 +2,6 @@ package cli
 
 import (
 	"context"
-	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -223,35 +222,26 @@ func TestAHeartbeatFollowsNoRedirect(t *testing.T) {
 	}
 }
 
-// A legacy record that can't be read is no decision, never a server key's: before one is
-// read nothing is taken in, and after, a failed read of a changed file is none either: what it
-// held before is not what it holds.
+// A legacy record that can't be read is no decision, never a server key's, nor what part of
+// it reads: nothing is taken in under it.
 func TestAnUnreadableLegacyRecordIsNoDecision(t *testing.T) {
-	dir := t.TempDir()
-	path := filepath.Join(dir, auth.LegacyRecordFile)
+	authSandbox(t, newFakeAuth(t))
+	path := filepath.Join(testApp.stateDir, auth.LegacyRecordFile)
+	if err := os.WriteFile(path, []byte(`{"account": "aaaaaaaaaaaaaaaa", "session_ids": 5}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if got := testApp.legacyRecord(config.DefaultProfile); got.Account != "" {
+		t.Fatalf("a record that reads in part = %+v; want no decision", got)
+	}
+	if err := os.Remove(path); err != nil {
+		t.Fatal(err)
+	}
 	if err := os.MkdirAll(filepath.Join(path, "x"), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	if got := cachedLegacyRecord(t.TempDir(), dir, func() (bool, error) { return true, nil })(); got.Account != "" {
+	serverKeyProfile(t)
+	if got := testApp.legacyRecord(config.DefaultProfile); got.Account != "" {
 		t.Fatalf("unreadable record = %+v; want no decision", got)
-	}
-	if err := os.RemoveAll(path); err != nil {
-		t.Fatal(err)
-	}
-	want := auth.AccountKey("https://auth.example", "u")
-	if err := auth.RecordLegacy(dir, []auth.LegacySignIn{{SessionID: "s", UserID: "u", AuthURL: "https://auth.example"}}, want, time.Now()); err != nil {
-		t.Fatal(err)
-	}
-	legacy := cachedLegacyRecord(t.TempDir(), dir, func() (bool, error) { return false, nil })
-	if good := legacy(); good.Account != want {
-		t.Fatalf("record = %+v", good)
-	}
-	if err := os.WriteFile(path, []byte("{"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	time.Sleep(1100 * time.Millisecond)
-	if got := legacy(); got.Account != "" {
-		t.Fatalf("after a failed read, record = %+v; want no decision", got)
 	}
 }
 
@@ -281,32 +271,5 @@ func TestAccountUserNamesOnlyTheTokensOwnUser(t *testing.T) {
 		if got := testApp.accountUser(cfg, "team", cfg.OTLPURL, account); got != want {
 			t.Errorf("for account %q named %q, want %q", account, got, want)
 		}
-	}
-}
-
-// While the profile's mode can't be read, there is no decision, and none is written: once
-// it reads as a server key's, the key's decision is.
-func TestALegacyLookupWithAnUnreadableProfileIsNoDecision(t *testing.T) {
-	dir, stateDir := t.TempDir(), t.TempDir()
-	data := `{"default": {"organizations": {"o": {"session_id": "s", "auth_url": "https://auth.example.test", "user_id": "u"}}}}`
-	if err := os.WriteFile(config.LegacyCredentialsPath(dir), []byte(data), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	var readable atomic.Bool
-	legacy := cachedLegacyRecord(dir, stateDir, func() (bool, error) {
-		if !readable.Load() {
-			return false, errors.New("permission denied")
-		}
-		return true, nil
-	})
-	if got := legacy(); got.Account != "" {
-		t.Fatalf("with the profile unreadable: %+v; want no decision", got)
-	}
-	if rec, err := auth.ReadLegacyRecord(stateDir); err != nil || rec.Account != "" {
-		t.Fatalf("record = %+v, %v; want none written", rec, err)
-	}
-	readable.Store(true)
-	if got := legacy(); got.Account != auth.LegacyNoPerson {
-		t.Fatalf("readable again, as a server key's: %+v; want no person's", got)
 	}
 }

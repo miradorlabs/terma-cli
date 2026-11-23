@@ -8,6 +8,7 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/account/auth"
 	"github.com/miradorlabs/terma-cli/internal/config"
+	"github.com/miradorlabs/terma-cli/internal/sendas"
 )
 
 // A sign-in refused as retired gives no token again, even when the store can't take the
@@ -68,8 +69,8 @@ func TestAnUnreadableProfileBindsTheUnreadableAccount(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = os.Chmod(config.Path(testApp.dir), 0o600) })
 	src := testApp.signInSource(cfg)
-	if got := src.Account(); got != auth.AccountUnreadable {
-		t.Fatalf("with the profile unreadable, account = %q; want %q", got, auth.AccountUnreadable)
+	if got := src.Account(); got != sendas.AccountUnreadable {
+		t.Fatalf("with the profile unreadable, account = %q; want %q", got, sendas.AccountUnreadable)
 	}
 	if err := os.Chmod(config.Path(testApp.dir), 0o600); err != nil {
 		t.Fatal(err)
@@ -99,7 +100,7 @@ func TestAnUnreadableSignInBindsTheUnreadableAccount(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = os.Chmod(config.CredentialsPath(testApp.dir), 0o600) })
 	src := testApp.signInSource(cfg)
-	if got := src.Account(); got != auth.AccountUnreadable {
+	if got := src.Account(); got != sendas.AccountUnreadable {
 		t.Fatalf("with the sign-in unreadable, account = %q", got)
 	}
 	if err := os.Chmod(config.CredentialsPath(testApp.dir), 0o600); err != nil {
