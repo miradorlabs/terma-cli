@@ -32,7 +32,7 @@ func writeMixedAside(claimPath string, c Claim, now time.Time) bool {
 	existing, _ := loadAside(claimPath, c.ClaimedAt)
 	for _, em := range existing {
 		e := em.claim
-		if e.Run == c.Run && e.Account == c.Account && e.Profile == c.Profile &&
+		if em.file != "" && e.Run == c.Run && e.Account == c.Account && e.Profile == c.Profile &&
 			subset(c.PIDs, e.PIDs) && !c.ClaimedAt.Before(e.ClaimedAt) {
 			_ = os.Chtimes(filepath.Join(asidePath(claimPath), em.file), c.ClaimedAt, c.ClaimedAt)
 			return true
@@ -60,21 +60,26 @@ func writeMixedAside(claimPath string, c Claim, now time.Time) bool {
 }
 
 // loadAside reads unexpired KindMixed sidecar marks for claimPath, sorted by ClaimedAt.
-// Expired filenames are returned in files for cleanup; corrupt unexpired files fail closed.
+// Expired filenames are returned in files; unreadable dirs/entries or corrupt files fail closed.
 func loadAside(claimPath string, now time.Time) ([]asideMark, []string) {
 	dir := asidePath(claimPath)
 	entries, err := os.ReadDir(dir)
 	if err != nil {
-		return nil, nil
+		if errors.Is(err, fs.ErrNotExist) {
+			return nil, nil
+		}
+		return []asideMark{{claim: Claim{Kind: KindMixed}}}, nil
 	}
-	var marks []asideMark
-	var files []string
+	marks, files := []asideMark(nil), []string(nil)
 	for _, e := range entries {
 		if e.IsDir() || strings.HasPrefix(e.Name(), config.TempPrefix) {
 			continue
 		}
 		info, err := e.Info()
 		if err != nil {
+			if !errors.Is(err, fs.ErrNotExist) {
+				marks = append(marks, asideMark{claim: Claim{Kind: KindMixed}})
+			}
 			continue
 		}
 		if now.Sub(info.ModTime()) >= TTL {
@@ -87,7 +92,7 @@ func loadAside(claimPath string, now time.Time) ([]asideMark, []string) {
 		}
 		var m Claim
 		if err != nil || json.Unmarshal(data, &m) != nil || m.Kind != KindMixed {
-			m = Claim{Kind: KindMixed} // nil PIDs covers all processes; zero time poisons the run
+			m = Claim{Kind: KindMixed}
 		}
 		m.ProjectID = ""
 		marks, files = append(marks, asideMark{claim: m, file: e.Name()}), append(files, e.Name())
@@ -98,9 +103,6 @@ func loadAside(claimPath string, now time.Time) ([]asideMark, []string) {
 
 // applyAside folds unexpired sidecar KindMixed marks onto prev (if any).
 func applyAside(prev Claim, havePrev bool, marks []asideMark) (Claim, bool, bool) {
-	if len(marks) == 0 {
-		return prev, havePrev, false
-	}
 	changed := false
 	for _, em := range marks {
 		m := em.claim

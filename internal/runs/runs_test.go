@@ -500,3 +500,24 @@ func TestTouchEnforcesMaxLocations(t *testing.T) {
 		t.Fatalf("already-Crossed run Why = %+v, want Crossed preserved", why)
 	}
 }
+
+// Concurrent or out-of-order Start calls keep Runs ordered by Started so MarkMixed and
+// Locate target the same latest run that timestamped MixedAt selects.
+func TestOutOfOrderStartsStayConsistentWithMarkMixed(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	later := start(t, dir, "ooo", t0.Add(10*time.Minute))
+	_ = start(t, dir, "ooo", t0)
+	if cur, ok := Current(dir, "ooo"); !ok || cur != later {
+		t.Fatalf("Current = %q, %v; want later run %q", cur, ok, later)
+	}
+	cross := t0.Add(12 * time.Minute)
+	must(t, MarkMixed(dir, "ooo", cross, Why{Reason: Crossed, Where: "github.com/other/repo"}))
+	snap := Read(dir, "ooo")
+	if _, mixed := snap.MixedAt(t0.Add(time.Minute)); mixed {
+		t.Fatal("earlier clean run was marked Mixed instead of the latest-started run")
+	}
+	if at, mixed := snap.MixedAt(t0.Add(15 * time.Minute)); !mixed || !at.Equal(cross) {
+		t.Fatalf("latest run MixedAt = %v, %v; want %v, true", at, mixed, cross)
+	}
+}

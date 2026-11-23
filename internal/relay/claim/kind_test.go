@@ -380,7 +380,6 @@ func TestKindClaimPreservesAccountParentAndCatchAll(t *testing.T) {
 // risking an overwrite of a concurrent Mixed write, and resuming in the same repository
 // under a new run starts a distinct placement.
 func TestKindMixedStripsProjectAndSameRepoResumeSeparatesRuns(t *testing.T) {
-	t.Parallel()
 	dir := enable(t)
 	t0 := time.Now().Add(-time.Hour).Truncate(time.Second)
 
@@ -421,13 +420,15 @@ func TestKindMixedStripsProjectAndSameRepoResumeSeparatesRuns(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer unlock()
 	if Write(dir, "resume", placed(KindRepository, "github.com/acme/web", "/src/web", "r2", 10), t0.Add(15*time.Minute)) {
+		unlock()
 		t.Fatal("unlocked non-Mixed Kind write proceeded while lock was held")
 	}
 	if Write(dir, "resume", Claim{ProjectID: "p1", Account: testAccount, Repository: repoAt("github.com/acme/web"), PIDs: []int{10}}, t0.Add(16*time.Minute)) {
+		unlock()
 		t.Fatal("unlocked legacy write proceeded while lock was held")
 	}
+	unlock()
 
 	// Untimestamped record spanning a Mark (no kind) and a kinded placement is refused.
 	if !Mark(dir, "mixed-mark", "codex", []int{10}, t0) {
@@ -459,7 +460,6 @@ func TestKindMixedStripsProjectAndSameRepoResumeSeparatesRuns(t *testing.T) {
 // placed in that run (and same account/profile lane) from the crossing onward, while
 // leaving pre-crossing records intact and never leaking PIDs across accounts.
 func TestLockedMixedPoisonsAllProcessesInSameRun(t *testing.T) {
-	t.Parallel()
 	dir := enable(t)
 	t0 := time.Now().UTC().Add(-time.Hour).Truncate(time.Second)
 
@@ -585,7 +585,6 @@ func TestLockedMixedPoisonsAllProcessesInSameRun(t *testing.T) {
 // the main file on the next locked write (which still refuses to clear Mixed), and expires
 // on Prune.
 func TestMixedAsideSurvivesStaleLockHolderAndPrunes(t *testing.T) {
-	t.Parallel()
 	dir := enable(t)
 	now := time.Now().UTC().Truncate(time.Second)
 
@@ -659,7 +658,6 @@ func TestMixedAsideSurvivesStaleLockHolderAndPrunes(t *testing.T) {
 // duplicate marks dedupe, pending marks bypass the fast path, and concurrent Reads during a
 // fold always observe Mixed.
 func TestMixedAsideEdgeCasesAndConcurrentRead(t *testing.T) {
-	t.Parallel()
 	dir := enable(t)
 	now := time.Now().UTC().Truncate(time.Second)
 	old := now.Add(-TTL - time.Hour)
@@ -942,6 +940,47 @@ func TestMixedAsideEdgeCasesAndConcurrentRead(t *testing.T) {
 		}
 		if Write(dir, "exp-mixed", placed(KindRepository, "github.com/acme/api", "/src/api", "r1", 10), now) {
 			t.Fatal("same-run non-Mixed write replaced renewed Mixed claim after Prune")
+		}
+	})
+
+	t.Run("unreadable_aside_dir_fails_closed", func(t *testing.T) {
+		if !Write(dir, "bad-aside", Claim{ProjectID: "p1", Account: testAccount, Kind: KindRepository, Run: "r1", Repository: repoAt("github.com/acme/api"), PIDs: []int{10}}, now) {
+			t.Fatal("initial claim write failed")
+		}
+		pBad, _ := path(dir, "bad-aside")
+		// A regular file at the .mixed path makes os.ReadDir fail with a non-ErrNotExist error on all OSes.
+		if err := os.WriteFile(asidePath(pBad), []byte("not-a-dir"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		got := mustRead(t, dir, "bad-aside", now)
+		if got.Kind != KindMixed || got.ProjectID != "" {
+			t.Fatalf("Read with unreadable .mixed sidecar = %+v, want KindMixed fail-closed", got)
+		}
+		if Write(dir, "bad-aside", Claim{ProjectID: "p1", Account: testAccount, Kind: KindRepository, Run: "r1", Repository: repoAt("github.com/acme/api"), PIDs: []int{10}}, now) {
+			t.Fatal("non-Mixed write succeeded despite unreadable .mixed sidecar")
+		}
+	})
+
+	t.Run("delayed_non_mixed_earlier_run_blocked", func(t *testing.T) {
+		t0 := now.Add(-10 * time.Minute)
+		if !Write(dir, "early-block", placed(KindRepository, "github.com/acme/api", "/src/api", "r1", 10), t0) {
+			t.Fatal("r1 repo write failed")
+		}
+		if !Write(dir, "early-block", placed(KindRepository, "github.com/acme/web", "/src/web", "r2", 20), t0.Add(4*time.Minute)) {
+			t.Fatal("r2 repo write failed")
+		}
+		if !Write(dir, "early-block", placed(KindMixed, "", "", "r1", 10), t0.Add(2*time.Minute)) {
+			t.Fatal("r1 locked Mixed fold failed")
+		}
+		if Write(dir, "early-block", placed(KindRepository, "github.com/acme/api", "/src/api", "r1", 10), t0.Add(3*time.Minute)) {
+			t.Fatal("delayed non-Mixed write downgraded earlier Mixed run r1 behind r2")
+		}
+		c := mustRead(t, dir, "early-block", now)
+		if got, ok := c.At(10, t0.Add(3*time.Minute)); !ok || got.Kind != KindMixed {
+			t.Fatalf("r1 after crossing = %+v, %v; want KindMixed", got, ok)
+		}
+		if got, ok := c.At(20, now); !ok || got.Kind != KindRepository || got.Run != "r2" {
+			t.Fatalf("r2 = %+v, %v; want KindRepository r2", got, ok)
 		}
 	})
 }

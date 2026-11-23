@@ -95,6 +95,7 @@ func Start(stateDir, sessionID string, at time.Time) (string, error) {
 	id := newRunID()
 	if err := update(stateDir, sessionID, func(l *ledger) {
 		l.Runs = append(l.Runs, run{ID: id, Started: at.UTC()})
+		slices.SortStableFunc(l.Runs, func(a, b run) int { return a.Started.Compare(b.Started) })
 		l.active(at)
 	}); err != nil {
 		return "", err

@@ -348,10 +348,10 @@ func samePlace(prev, c Claim) bool {
 
 func sameRun(prev, c Claim) bool { return c.Run == "" || c.Run == prev.Run }
 
-// staysMixed holds prev's Mixed tail until a locked write names a different run (a write
-// naming no run cannot prove it is a new run).
+// staysMixed blocks non-Mixed writes to a Mixed tail (or unmarked write) and any earlier Mixed run.
 func staysMixed(prev, c Claim) bool {
-	return prev.Kind == KindMixed && c.Kind != KindMixed && (c.Run == "" || c.Run == prev.Run)
+	return c.Kind != KindMixed && (prev.Kind == KindMixed && (c.Run == "" || c.Run == prev.Run) ||
+		c.Run != "" && slices.ContainsFunc(prev.placements(), func(p Placement) bool { return p.Kind == KindMixed && p.Run == c.Run }))
 }
 
 // sameDirs reports whether c names the working tree, directory, worktree, remote and branch
