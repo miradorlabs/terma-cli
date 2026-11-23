@@ -40,8 +40,8 @@ type saidPart struct {
 // was said: each message's text and reasoning parts, a tool message's none, under its role, so a message left with
 // none still marks its turn. It is rebuilt from what was read, so nothing a reader of the JSON
 // would not see (a repeated key) passes. did reports whether anything was removed, and ok
-// whether v is an envelope at all; when it is not, nothing in it can be told apart and it is
-// withheld whole.
+// whether v is an envelope at all, each message with a role and parts; when it is not, nothing
+// in it can be told apart and it is withheld whole.
 func withoutToolParts(v *commonpb.AnyValue) (said string, did, ok bool) {
 	raw, isString := v.GetValue().(*commonpb.AnyValue_StringValue)
 	if !isString {
@@ -53,7 +53,8 @@ func withoutToolParts(v *commonpb.AnyValue) (said string, did, ok bool) {
 		return "", false, false
 	}
 	for i := range msgs {
-		if _, has := keys[i]["parts"]; !has {
+		// A message with no role cannot be told from a tool's: it is withheld whole.
+		if _, has := keys[i]["parts"]; !has || msgs[i].Role == "" {
 			return "", false, false
 		}
 		for key := range keys[i] {
