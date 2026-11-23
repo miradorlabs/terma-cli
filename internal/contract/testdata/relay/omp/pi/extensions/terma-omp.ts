@@ -69,7 +69,9 @@ function sendTitle(ctx: any): Promise<void> {
     const sm = ctx && ctx.sessionManager
     const name = sm && typeof sm.getSessionName === "function" ? sm.getSessionName() : undefined
     const s = sessionOf(ctx)
-    if (typeof name !== "string" || !name.trim() || !s || titled.get(s) === name) return Promise.resolve()
+    // A name already queued may still wait behind an earlier one: the queue is what a
+    // caller about to leave the session waits on.
+    if (typeof name !== "string" || !name.trim() || !s || titled.get(s) === name) return titles
     titled.set(s, name)
     const payload = { session_id: s, cwd: ctx?.cwd, title: name }
     titles = titles.then(() => termaHook("omp-title", payload, true))
@@ -77,6 +79,20 @@ function sendTitle(ctx: any): Promise<void> {
   } catch {
     return Promise.resolve()
   }
+}
+
+// sendTitleBefore sends the title as OMP leaves a session, waiting at most ms: OMP gives a
+// shutdown handler 2 s, and the hooks ahead of it in the queue may still be running.
+// Accepted risk: a name still queued when OMP exits is never sent; a later run of the
+// session (resume) sends it, and a hook that reads OMP's transcript is the upgrade path.
+function sendTitleBefore(ctx: any, ms: number): Promise<void> {
+  return Promise.race([
+    sendTitle(ctx),
+    new Promise<void>((resolve) => {
+      const t: any = setTimeout(resolve, ms)
+      t?.unref?.()
+    }),
+  ])
 }
 
 // parentOf is the session that opened this one for a subagent: its header's parentSession
@@ -167,10 +183,20 @@ export default async function (omp: any) {
     termaHook("omp-session-start", { session_id: session, cwd: ctx?.cwd, model: ctx?.model?.id, reason: event?.reason, parent_session_id: parentOf(ctx) || undefined })
   })
 
+  // The session's end is handed over first: it must land within OMP's 2 s, or the next
+  // commit is credited to a session that has ended. A title that lands after the end's
+  // flush is delivered by its own.
   omp.on("session_shutdown", async (_event: any, ctx: any) => {
     const s = sessionOf(ctx)
-    await sendTitle(ctx)
-    if (s) await termaHook("omp-session-end", { session_id: s, cwd: ctx?.cwd })
+    const end = s ? termaHook("omp-session-end", { session_id: s, cwd: ctx?.cwd }) : Promise.resolve()
+    await Promise.all([end, sendTitleBefore(ctx, 1500)])
+  })
+
+  // /new, /resume and a fork leave the session without a shutdown: its name, given or
+  // changed since the last turn, goes now. ctx is still the session being left. The handler
+  // returns nothing, which lets the switch go ahead.
+  omp.on("session_before_switch", async (_event: any, ctx: any) => {
+    await sendTitleBefore(ctx, 1500)
   })
 
   // Every prompt is a claim too: a session whose start the extension missed, or a relay

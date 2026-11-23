@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -54,8 +55,12 @@ const nested = { cwd: "/work", sessionManager: sm("01a1fe40-0000-7000-8000-00000
 await handlers.session_start({ reason: "startup" }, nested)
 await handlers.message_end?.({ message: { role: "assistant", model: "m", usage: { input: 1, output: 1 }, content: [] } }, parent)
 await handlers.agent_end?.()
+title = "Renamed before switching"
+await handlers.session_before_switch({ reason: "new" }, parent)
 title = "Release notes"
+const shutdownStart = Date.now()
 await handlers.session_shutdown({}, parent)
+fs.writeFileSync(tmp + "/shutdown_ms", String(Date.now() - shutdownStart))
 `
 
 // OMP's extension exports nothing, neither spans nor logs, and holds no token: it hands
@@ -130,13 +135,18 @@ func TestExtensionUnderNode(t *testing.T) {
 		titles = append(titles, p["title"].(string))
 	}
 	slices.Sort(titles)
-	if strings.Join(titles, "|") != "Fix the flaky build|Release notes" {
-		t.Errorf("titles = %v, want the name once and the rename at shutdown", titles)
+	if strings.Join(titles, "|") != "Fix the flaky build|Release notes|Renamed before switching" {
+		t.Errorf("titles = %v, want the name once, the rename before a switch and the one at shutdown", titles)
 	}
-	if order, _ := os.ReadFile(filepath.Join(filepath.Dir(ext), "titles.log")); string(order) != "Fix the flaky build\nRelease notes\n" {
-		t.Errorf("titles landed in the order %q, want the rename last", order)
+	if order, _ := os.ReadFile(filepath.Join(filepath.Dir(ext), "titles.log")); string(order) != "Fix the flaky build\nRenamed before switching\nRelease notes\n" {
+		t.Errorf("titles landed in the order %q, want each rename after the name it replaced", order)
 	}
-	if len(byEvent["omp-prompt"]) != 2 || len(byEvent["omp-session-end"]) != 1 {
+	// A slow last title still leaves the session's end inside OMP's 2 s for shutdown.
+	raw, _ := os.ReadFile(filepath.Join(filepath.Dir(ext), "shutdown_ms"))
+	if ms, err := strconv.Atoi(string(raw)); err != nil || ms >= 1900 {
+		t.Errorf("shutdown took %q ms, over OMP's 2 s budget", raw)
+	}
+	if len(starts) != 4 || len(byEvent["omp-prompt"]) != 2 || len(byEvent["omp-session-end"]) != 1 {
 		t.Errorf("prompts %v, ends %v", byEvent["omp-prompt"], byEvent["omp-session-end"])
 	}
 	if data, err := os.ReadFile(fetched); err == nil {
@@ -164,9 +174,10 @@ func runDriver(t *testing.T) (byEvent map[string][]map[string]any, ext, fetched 
 		t.Fatal(err)
 	}
 	hook := filepath.Join(dir, "hook.sh")
-	// The first name's hook is slow, as a cold start can be: the rename must still land after it.
+	// The first name's hook is slow, as a cold start can be: the rename must still land after
+	// it. The last name's hook outlasts OMP's 2 s for a shutdown handler.
 	if err := os.WriteFile(hook, []byte("#!/bin/sh\nf=$(mktemp "+hooks+"/call.XXXXXX)\nprintf '{\"event\":\"%s\",\"payload\":' \"$1\" > $f.part\ncat >> $f.part\necho '}' >> $f.part\n"+
-		"if [ \"$1\" = omp-title ]; then grep -q flaky $f.part && sleep 1; sed -n 's/.*\"title\":\"\\([^\"]*\\)\".*/\\1/p' $f.part >> "+filepath.Join(dir, "titles.log")+"; fi\nmv $f.part $f.json\n"), 0o700); err != nil {
+		"if [ \"$1\" = omp-title ]; then grep -q flaky $f.part && sleep 1; grep -q Release $f.part && sleep 3; sed -n 's/.*\"title\":\"\\([^\"]*\\)\".*/\\1/p' $f.part >> "+filepath.Join(dir, "titles.log")+"; fi\nmv $f.part $f.json\n"), 0o700); err != nil {
 		t.Fatal(err)
 	}
 	ext = filepath.Join(dir, "terma-ext.ts")
@@ -186,9 +197,11 @@ func runDriver(t *testing.T) (byEvent map[string][]map[string]any, ext, fetched 
 		Event   string         `json:"event"`
 		Payload map[string]any `json:"payload"`
 	}
+	// Wait for every call the driver makes, then a while longer, so a late extra one counts.
 	var calls []call
-	deadline := time.Now().Add(10 * time.Second)
+	deadline, steady := time.Now().Add(10*time.Second), 0
 	for {
+		last := len(calls)
 		calls = nil
 		files, _ := filepath.Glob(filepath.Join(hooks, "*.json"))
 		for _, f := range files {
@@ -197,7 +210,12 @@ func runDriver(t *testing.T) (byEvent map[string][]map[string]any, ext, fetched 
 				calls = append(calls, c)
 			}
 		}
-		if len(calls) >= 15 || time.Now().After(deadline) {
+		if len(calls) >= 16 && len(calls) == last {
+			steady++
+		} else {
+			steady = 0
+		}
+		if steady >= 6 || time.Now().After(deadline) {
 			break
 		}
 		time.Sleep(50 * time.Millisecond)
