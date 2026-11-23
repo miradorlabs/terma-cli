@@ -157,8 +157,10 @@ func TestAntigravityCallsGoOnceEachWithTheirTokens(t *testing.T) {
 		t.Fatalf("turn three sent %s", s)
 	}
 
-	// Turn four is cancelled after its first call: no hook runs. Its call goes with the
-	// next turn's first hook, in its own turn, and once.
+	// Turn four is cancelled after its first call: no hook runs after its start. Its call
+	// goes with the next turn's first hook, in its own turn, and once.
+	g.write(18)
+	g.hook(preInvocation, `"initialNumSteps":18,"invocationNum":0`)
 	g.write(21)
 	g.lines = append(g.lines, `{"step_index":21,"source":"USER_EXPLICIT","type":"USER_INPUT","status":"DONE","created_at":"2026-11-20T16:55:00Z","content":"<scrubbed>"}`)
 	g.write(22)
@@ -176,6 +178,8 @@ func TestAntigravityCallsGoOnceEachWithTheirTokens(t *testing.T) {
 // Compaction rewrites the transcript in place: what was sent before stays sent.
 func TestAntigravityRewrittenTranscriptSendsNoCallTwice(t *testing.T) {
 	g := newTranscriptRig(t, turnsConversation, "transcript_turns.jsonl")
+	g.write(7)
+	g.hook(stop, `"executionNum":0,"fullyIdle":true,"terminationReason":"NO_TOOL_CALL"`)
 	g.write(12)
 	g.hook(stop, `"executionNum":0,"fullyIdle":true,"terminationReason":"NO_TOOL_CALL"`)
 	if s := strings.Join(callSteps(g.drain()[semconv.TermaModelCallEvent]), ","); s != "step-1,step-3,step-6,step-9,step-11" {
@@ -389,5 +393,75 @@ func TestAntigravityRewriteNeverMovesTheTurnBack(t *testing.T) {
 	calls := g.drain()[semconv.TermaModelCallEvent]
 	if len(calls) != 1 || calls[0].Attrs[semconv.TermaTurnIDKey] != "turn-13" {
 		t.Fatalf("calls %v", calls)
+	}
+}
+
+// A conversation terma first sees partway through sends the turn it sees, never the
+// turns before it: where they ran, collected or not, is unknown.
+func TestAntigravityTurnsBeforeTermaWatchedNeverLeave(t *testing.T) {
+	g := newTranscriptRig(t, turnsConversation, "transcript_turns.jsonl")
+	g.write(12)
+	g.hook(stop, `"executionNum":0,"fullyIdle":true,"terminationReason":"NO_TOOL_CALL"`)
+	if s := strings.Join(callSteps(g.drain()[semconv.TermaModelCallEvent]), ","); s != "step-9,step-11" {
+		t.Fatalf("sent %s, want turn 8's calls alone", s)
+	}
+}
+
+// A collected turn cancelled after a call, then a turn where the policy collects nothing:
+// the collected call waits, and goes once with the next hook in its own checkout.
+func TestAntigravityCollectedCallWaitsPastAnExcludedTurn(t *testing.T) {
+	g := newTranscriptRig(t, turnsConversation, "transcript_turns.jsonl")
+	g.write(18)
+	g.hook(preInvocation, `"initialNumSteps":18,"invocationNum":0`)
+	g.drain()
+	// Turn 18's call lands, the turn is cancelled, and turn 22 runs somewhere not collected.
+	g.lines = append(g.lines[:21], `{"step_index":21,"source":"USER_EXPLICIT","type":"USER_INPUT","status":"DONE","created_at":"2026-11-20T16:55:00Z","content":"<scrubbed>"}`,
+		`{"step_index":22,"source":"MODEL","type":"PLANNER_RESPONSE","status":"DONE","created_at":"2026-11-20T16:55:01Z","model":"gemini-3.8-flash-low","input_tokens":5,"cache_read_tokens":0,"output_tokens":1}`)
+	g.write(len(g.lines))
+	excluded := hookruntest.InitRepo(t)
+	payload := `{"conversationId":"` + g.id + `","cwd":"` + excluded + `","transcriptPath":"` + g.transcript + `","executionNum":0,"fullyIdle":true}`
+	env := hookrun.Env{StateDir: g.stateDir, Now: time.Now(), Cwd: excluded, Policy: hookruntest.Admitting(g.root), Stdin: strings.NewReader(payload), Stdout: &bytes.Buffer{}, Spool: g.sp, Version: "test"}
+	if err := stop(context.Background(), env); err != nil {
+		t.Fatal(err)
+	}
+	if got := g.drain(); len(got) != 0 {
+		t.Fatalf("the excluded hook spooled %v", got)
+	}
+	// Back in the collected checkout, turn 24.
+	g.lines = append(g.lines, `{"step_index":23,"source":"USER_EXPLICIT","type":"USER_INPUT","status":"DONE","created_at":"2026-11-20T16:56:00Z","content":"<scrubbed>"}`)
+	g.write(len(g.lines))
+	g.hook(preInvocation, `"initialNumSteps":24,"invocationNum":0`)
+	g.hook(preInvocation, `"initialNumSteps":24,"invocationNum":0`)
+	if s := strings.Join(callSteps(g.drain()[semconv.TermaModelCallEvent]), ","); s != "step-19" {
+		t.Fatalf("sent %s, want turn 18's call alone, once", s)
+	}
+}
+
+// A collected turn's call never goes under another checkout's repository.
+func TestAntigravityCallNeverGoesUnderAnotherCheckout(t *testing.T) {
+	g := newTranscriptRig(t, turnsConversation, "transcript_turns.jsonl")
+	g.write(18)
+	g.hook(preInvocation, `"initialNumSteps":18,"invocationNum":0`)
+	g.drain()
+	g.lines = append(g.lines[:21], `{"step_index":21,"source":"USER_EXPLICIT","type":"USER_INPUT","status":"DONE","created_at":"2026-11-20T16:55:00Z","content":"<scrubbed>"}`)
+	g.write(len(g.lines))
+	g.root = hookruntest.InitRepo(t)
+	g.hook(preInvocation, `"initialNumSteps":22,"invocationNum":0`)
+	if got := g.drain()[semconv.TermaModelCallEvent]; len(got) != 0 {
+		t.Fatalf("turn 18's call went under another checkout: %v", got)
+	}
+}
+
+// A line too long to read is skipped, and what follows it is read.
+func TestAntigravityOverlongLineIsSkipped(t *testing.T) {
+	g := newTranscriptRig(t, turnsConversation, "transcript_turns.jsonl")
+	g.write(1)
+	g.hook(preInvocation, `"initialNumSteps":1,"invocationNum":0`)
+	long := `{"step_index":1,"source":"MODEL","type":"GENERIC","status":"DONE","content":"` + strings.Repeat("x", antigravityLineLimit) + `"}`
+	g.lines = []string{g.lines[0], long, strings.Replace(g.lines[1], `"step_index":1`, `"step_index":2`, 1)}
+	g.write(3)
+	g.hook(stop, `"executionNum":0,"fullyIdle":true,"terminationReason":"NO_TOOL_CALL"`)
+	if s := strings.Join(callSteps(g.drain()[semconv.TermaModelCallEvent]), ","); s != "step-2" {
+		t.Fatalf("sent %s", s)
 	}
 }

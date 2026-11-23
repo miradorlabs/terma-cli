@@ -292,12 +292,14 @@ func (a Agent) RemoveStatusLine() (bool, error) {
 		}
 	}
 	if err != nil {
-		// Teardown, and setup for any other agent, run this: a file terma cannot read that
-		// holds nothing of terma's is not its to judge.
-		if data, readErr := os.ReadFile(path); readErr != nil || !bytes.Contains(data, []byte(antigravityStatusLineMarker)) {
-			if rec == nil {
-				return false, nil
-			}
+		// Teardown, and setup for any other agent, run this: a file terma never wrapped is
+		// not its to judge, and one it cannot parse that no longer holds terma's command
+		// leaves nothing to restore. A file it cannot read at all keeps the record.
+		if rec == nil {
+			return false, nil
+		}
+		data, readErr := os.ReadFile(path)
+		if errors.Is(readErr, fs.ErrNotExist) || readErr == nil && !bytes.Contains(data, []byte(antigravityStatusLineMarker)) {
 			return false, a.deleteStatusLineRecord(path)
 		}
 		return false, err

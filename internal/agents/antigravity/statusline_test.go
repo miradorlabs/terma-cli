@@ -400,3 +400,26 @@ func TestAntigravityStatusLineUnreadableFileAfterSetup(t *testing.T) {
 		t.Errorf("record kept for a wrap that is gone: %v", err)
 	}
 }
+
+// A settings file teardown cannot read at all keeps the record: the wrap may still be in
+// it, with the developer's own status line behind it.
+func TestAntigravityStatusLineUnreadableFileKeepsTheRecord(t *testing.T) {
+	a, path := statusLineHome(t)
+	if os.Geteuid() == 0 {
+		t.Skip("root reads a file of any mode")
+	}
+	writeSettings(t, path, agySettings)
+	if _, err := a.InstallStatusLine(); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(path, 0); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(path, 0o600) })
+	if _, err := a.RemoveStatusLine(); err == nil || !strings.Contains(err.Error(), path) {
+		t.Fatalf("remove: %v", err)
+	}
+	if rec, err := a.statusLineRecord(path); err != nil || rec == nil {
+		t.Fatalf("record dropped: %v %v", rec, err)
+	}
+}
