@@ -124,20 +124,80 @@ func TestAntigravityHooksLeaveADevelopersTermaHook(t *testing.T) {
 	}
 }
 
-func TestAntigravityHooksRefuseMalformedFile(t *testing.T) {
+// A file that does not parse (agy reads comments and trailing commas) is refused by an
+// install, naming the file. Removal, which setup for any other agent and teardown run,
+// leaves it alone unless it holds terma's entries.
+func TestAntigravityHooksMalformedFile(t *testing.T) {
 	t.Parallel()
-	for _, body := range []string{"[]", "{", "null"} {
+	for _, body := range []string{"[]", "{", "null", "// mine\n{}\n", `{"lint": {"Stop": [],},}`} {
 		root := t.TempDir()
 		hookruntest.WriteFile(t, root, "hooks.json", body)
-		if _, err := planUserHooks(root, testCommand, true); err == nil {
-			t.Errorf("%q: planned over an unreadable file", body)
+		if _, err := planUserHooks(root, testCommand, true); err == nil || !strings.Contains(err.Error(), filepath.Join(root, "hooks.json")) {
+			t.Errorf("%q: install = %v, want an error naming the file", body, err)
 		}
+		if plan, err := planUserHooks(root, testCommand, false); err != nil || !plan.Empty() {
+			t.Errorf("%q: removal = %+v, %v; want nothing to do", body, plan, err)
+		}
+	}
+	// One that holds terma's entries is not quietly left behind.
+	root := t.TempDir()
+	hookruntest.WriteFile(t, root, "hooks.json", `// mine
+{"terma": {"Stop": [{"type": "command", "command": "`+hookruntest.InJSON(testCommand("antigravity-stop"))+`"}]}}`)
+	if _, err := planUserHooks(root, testCommand, false); err == nil {
+		t.Error("removal skipped a malformed file holding terma's hooks")
 	}
 }
 
+// A handler the developer added inside terma's named hook stays through setup and
+// teardown; only terma's own entries are replaced or removed.
+func TestAntigravityHooksKeepAHandlerAddedToTermas(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	apply := func(cmd func(string) string, install bool) hookmgr.Plan {
+		t.Helper()
+		plan, err := planUserHooks(root, cmd, install)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := hookmgr.Apply(root, plan); err != nil {
+			t.Fatal(err)
+		}
+		return plan
+	}
+	apply(testCommand, true)
+	var doc map[string]map[string][]json.RawMessage
+	if err := json.Unmarshal([]byte(hookruntest.ReadFile(t, root, "hooks.json")), &doc); err != nil {
+		t.Fatal(err)
+	}
+	doc["terma"]["Stop"] = append(doc["terma"]["Stop"], json.RawMessage(`{"type":"command","command":"./my-stop.sh","timeout":10}`))
+	data, _ := json.Marshal(doc)
+	hookruntest.WriteFile(t, root, "hooks.json", string(data))
+
+	if p := apply(testCommand, true); !p.Empty() {
+		t.Fatalf("a second setup changed %v", p.Changes)
+	}
+	moved := hookmgr.UserHookCommand("/usr/local/bin/terma")
+	apply(moved, true)
+	got := hookruntest.ReadFile(t, root, "hooks.json")
+	if !strings.Contains(got, "./my-stop.sh") || !strings.Contains(got, "/usr/local/bin/terma") || strings.Contains(got, "/opt/terma/bin/terma") {
+		t.Fatalf("after terma moved:\n%s", got)
+	}
+
+	apply(moved, false)
+	got = hookruntest.ReadFile(t, root, "hooks.json")
+	if strings.Contains(got, "hook --user") || !strings.Contains(got, "./my-stop.sh") {
+		t.Fatalf("after teardown:\n%s", got)
+	}
+	if !strings.Contains(got, `"terma"`) || strings.Contains(got, "PreInvocation") {
+		t.Fatalf("teardown should keep the hook with the developer's handler alone:\n%s", got)
+	}
+}
+
+// os.UserHomeDir reads USERPROFILE on Windows and HOME elsewhere.
 func TestAntigravityUserHooksPath(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
 	got, err := Agent{}.UserHooksPath()
 	if err != nil || got != filepath.Join(home, ".gemini", "config", "hooks.json") {
 		t.Fatalf("UserHooksPath = %q, %v", got, err)

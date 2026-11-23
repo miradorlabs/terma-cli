@@ -1,7 +1,9 @@
 package antigravity
 
 import (
+	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -45,68 +47,120 @@ type antigravityHandler struct {
 	Timeout int    `json:"timeout"`
 }
 
-// ownHook is terma's named hook: every event, each running command.
-func ownHook(command func(event string) string) (json.RawMessage, error) {
-	events := map[string][]any{}
+// ownEntries are terma's entries in its named hook, by event, each running command.
+func ownEntries(command func(event string) string) (map[string]json.RawMessage, error) {
+	own := map[string]json.RawMessage{}
 	for _, h := range antigravityHooks {
-		handler := antigravityHandler{Type: "command", Command: command(h.Hook), Timeout: 10}
+		var entry any = antigravityHandler{Type: "command", Command: command(h.Hook), Timeout: 10}
 		if h.Grouped {
 			// An empty matcher matches every tool.
-			events[h.Event] = []any{struct {
-				Matcher string               `json:"matcher"`
-				Hooks   []antigravityHandler `json:"hooks"`
-			}{"", []antigravityHandler{handler}}}
-			continue
+			entry = struct {
+				Matcher string `json:"matcher"`
+				Hooks   []any  `json:"hooks"`
+			}{"", []any{entry}}
 		}
-		events[h.Event] = []any{handler}
+		raw, err := hookmgr.MarshalJSON(entry, "", "")
+		if err != nil {
+			return nil, err
+		}
+		own[h.Event] = raw
 	}
-	return hookmgr.MarshalJSON(events, "  ", "  ")
+	return own, nil
 }
 
-// planUserHooks sets or removes the one member terma owns, leaving every other named hook
-// as it was read. A member of that name terma did not write is the developer's: neither
-// replaced nor removed.
+// planUserHooks puts terma's entries into the one named hook terma owns, or takes them
+// out, leaving every other named hook, and any handler of the developer's inside terma's,
+// as it was read. A member of that name with no entry of terma's is the developer's:
+// neither written into nor removed. Removal leaves alone a file it cannot read that holds
+// nothing of terma's: agy reads comments and trailing commas, and setup for any other
+// agent, or teardown, must not fail on them.
 func planUserHooks(dir string, command func(event string) string, install bool) (hookmgr.Plan, error) {
 	const path = "hooks.json"
+	full := filepath.Join(dir, path)
 	p := hookmgr.Plan{}
-	before, err := hookmgr.ReadFile(filepath.Join(dir, path))
+	before, err := hookmgr.ReadFile(full)
 	if err != nil {
 		return p, err
 	}
 	top := map[string]json.RawMessage{}
 	if before != nil {
-		if err := json.Unmarshal(before, &top); err != nil {
-			return p, fmt.Errorf("parse %s: %w", path, err)
-		}
-		if top == nil {
-			return p, fmt.Errorf("parse %s: expected a JSON object", path)
+		if err := json.Unmarshal(before, &top); err != nil || top == nil {
+			if !install && !bytes.Contains(before, []byte(" hook --user antigravity-")) {
+				return p, nil
+			}
+			if err == nil {
+				err = errors.New("expected a JSON object")
+			}
+			return p, fmt.Errorf("parse %s: %w", full, err)
 		}
 	}
-	current, present := top[antigravityHookName]
-	if present && !hookmgr.CallsTerma(current) {
-		if install {
-			return p, fmt.Errorf("%s already has a hook named %q that terma did not write", filepath.Join(dir, path), antigravityHookName)
+	member := map[string]json.RawMessage{}
+	if current, present := top[antigravityHookName]; present {
+		if !hookmgr.CallsTerma(current) {
+			if install {
+				return p, fmt.Errorf("%s already has a hook named %q that terma did not write", full, antigravityHookName)
+			}
+			return p, nil
 		}
-		return p, nil
+		if err := json.Unmarshal(current, &member); err != nil || member == nil {
+			return p, fmt.Errorf("parse %s: hook %q is not an object", full, antigravityHookName)
+		}
 	}
-	if install {
-		own, err := ownHook(command)
+	own, err := ownEntries(command)
+	if err != nil {
+		return p, err
+	}
+	changed := false
+	for _, h := range antigravityHooks {
+		var entries, kept []json.RawMessage
+		if raw, ok := member[h.Event]; ok {
+			if err := json.Unmarshal(raw, &entries); err != nil {
+				return p, fmt.Errorf("parse %s: %s.%s: %w", full, antigravityHookName, h.Event, err)
+			}
+		}
+		ours := false
+		for _, entry := range entries {
+			if install && !ours && hookmgr.SameJSON(entry, own[h.Event]) {
+				kept, ours = append(kept, entry), true
+				continue
+			}
+			remaining, removed, err := hookmgr.WithoutTerma(entry)
+			if err != nil {
+				return p, fmt.Errorf("parse %s: %s.%s: %w", full, antigravityHookName, h.Event, err)
+			}
+			changed = changed || removed
+			if remaining != nil {
+				kept = append(kept, remaining)
+			}
+		}
+		if install && !ours {
+			kept, changed = append(kept, own[h.Event]), true
+		}
+		if len(kept) == 0 {
+			delete(member, h.Event)
+			continue
+		}
+		raw, err := hookmgr.MarshalJSON(kept, "", "")
 		if err != nil {
 			return p, err
 		}
-		if present && hookmgr.SameJSON(current, own) {
-			return p, nil
+		member[h.Event] = raw
+	}
+	if !changed {
+		return p, nil
+	}
+	if hasEvents(member) {
+		raw, err := hookmgr.MarshalJSON(member, "  ", "  ")
+		if err != nil {
+			return p, err
 		}
-		top[antigravityHookName] = own
+		top[antigravityHookName] = raw
 	} else {
-		if !present {
-			return p, nil
-		}
 		delete(top, antigravityHookName)
-		if len(top) == 0 {
-			p.Changes = append(p.Changes, hookmgr.Change{Path: path, Before: before})
-			return p, nil
-		}
+	}
+	if !install && len(top) == 0 {
+		p.Changes = append(p.Changes, hookmgr.Change{Path: path, Before: before})
+		return p, nil
 	}
 	out, err := hookmgr.MarshalOrdered(top)
 	if err != nil {
@@ -114,4 +168,15 @@ func planUserHooks(dir string, command func(event string) string, install bool) 
 	}
 	p.Changes = append(p.Changes, hookmgr.Change{Path: path, Before: before, After: append(out, '\n')})
 	return p, nil
+}
+
+// hasEvents reports whether a named hook still lists handlers for an event: its other
+// members, such as "enabled", hold none.
+func hasEvents(member map[string]json.RawMessage) bool {
+	for _, raw := range member {
+		if t := bytes.TrimSpace(raw); len(t) > 0 && t[0] == '[' {
+			return true
+		}
+	}
+	return false
 }
