@@ -219,8 +219,9 @@ func TestAntigravityTurnEndsAtAHookWhereThePolicyCollectsNothing(t *testing.T) {
 	if s := g.calls(); s != "" {
 		t.Fatalf("the rest of the turn sent %s", s)
 	}
-	if n := g.lost(); n != 1 {
-		t.Fatalf("counted %d lost, want step 11", n)
+	// The excluded hook read nothing: the next collecting hook passes steps 9 and 11.
+	if n := g.lost(); n != 2 {
+		t.Fatalf("counted %d lost, want steps 9 and 11", n)
 	}
 }
 

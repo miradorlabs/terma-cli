@@ -115,7 +115,7 @@ func preInvocation(ctx context.Context, env hookrun.Env) error {
 	if err != nil {
 		// At any invocation: a hook where the policy collects nothing ends the turn.
 		env.Logf("not in a git repository: %v", err)
-		antigravitySkipCalls(ctx, env, in, err)
+		antigravitySkipCalls(env, in)
 		return nil
 	}
 	invocation, _, invocationKnown := hookrun.JSONNumber(in.InvocationNum, true)
@@ -197,7 +197,7 @@ func postToolUse(ctx context.Context, env hookrun.Env) error {
 	env.Cwd = in.cwd(env.Cwd)
 	r, err := env.Repo(ctx)
 	if err != nil {
-		antigravitySkipCalls(ctx, env, in, err)
+		antigravitySkipCalls(env, in)
 		return nil
 	}
 	id := in.id()
@@ -272,8 +272,16 @@ func antigravityObserve(ctx context.Context, env hookrun.Env, hook string) error
 	env.Cwd = in.cwd(env.Cwd)
 	r, err := env.Repo(ctx)
 	if err != nil {
-		antigravitySkipCalls(ctx, env, in, err)
+		antigravitySkipCalls(env, in)
 		return nil
+	}
+	if hook == "PostInvocation" {
+		// Invocation 0's initialNumSteps is the turn's first step, as its PreInvocation gave
+		// it: a record of another turn is stale, the first hook of this one never ran.
+		invocation, _, invocationKnown := hookrun.JSONNumber(in.InvocationNum, true)
+		if steps, _, stepsKnown := hookrun.JSONNumber(in.InitialNumSteps, true); invocationKnown && invocation == 0 && stepsKnown {
+			endAntigravityTurnUnlessBegunAt(env, in.id(), int64(steps))
+		}
 	}
 	if hook == "Stop" {
 		// Keep the session fresh for the commit that may follow.
@@ -337,12 +345,11 @@ func antigravityObservationAttrs(in *antigravityHookInput, hook, turn string, ca
 	return a
 }
 
-// antigravitySkipCalls is a hook that could not resolve where it ran: whatever the reason,
-// it ends the turn terma was following, so no later hook sends the rest of it. Where the
-// team's policy does not collect, it also reads past the conversation's calls.
-func antigravitySkipCalls(ctx context.Context, env hookrun.Env, in *antigravityHookInput, err error) {
+// antigravitySkipCalls is a hook that could not resolve where it ran, or ran where the
+// team's policy collects nothing: whatever the reason, it ends the turn terma was following,
+// so no later hook sends the rest of it, and reads nothing. The next collecting hook has no
+// turn of its own for the lines written meanwhile and passes them; a new turn's first step
+// is past them.
+func antigravitySkipCalls(env hookrun.Env, in *antigravityHookInput) {
 	endAntigravityTurn(env, in.id())
-	if errors.Is(err, hookrun.ErrNotAdmitted) {
-		captureAntigravityCalls(ctx, env, nil, in)
-	}
 }

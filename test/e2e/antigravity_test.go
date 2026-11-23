@@ -369,16 +369,32 @@ func checkAntigravityCalls(t *testing.T, sb *Sandbox, transcript, conversation s
 			t.Errorf("%s delivered %d times", id, n)
 		}
 	}
-	// A call's turn, read from the transcript, is the turn agy's hooks name.
-	hookTurns := map[string]bool{}
+	// A call's turn is the one begun last at or before its step: each turn begins at the
+	// initialNumSteps of its PreInvocation at invocation 0.
+	starts := antigravityTurnStarts(sb, conversation)
 	for _, l := range sb.Receiver.Logs() {
-		if l.Attrs["session.id"] == conversation && l.EventName != "terma.model_call" && l.Attrs["terma.turn.id"] != "" {
-			hookTurns[l.Attrs["terma.turn.id"]] = true
+		if l.EventName != "terma.model_call" || l.Attrs["session.id"] != conversation {
+			continue
 		}
-	}
-	for _, l := range sb.Receiver.Logs() {
-		if l.EventName == "terma.model_call" && l.Attrs["session.id"] == conversation && !hookTurns[l.Attrs["terma.turn.id"]] {
-			t.Errorf("%s is in %q, a turn no hook named (%v)", l.Attrs["terma.model_call.id"], l.Attrs["terma.turn.id"], hookTurns)
+		id := l.Attrs["terma.model_call.id"]
+		step, err := strconv.Atoi(strings.TrimPrefix(id, "step-"))
+		if err != nil || !strings.HasPrefix(id, "step-") {
+			step, err = strconv.Atoi(l.Attrs["terma.step.index"])
+		}
+		if err != nil {
+			t.Errorf("%s names no step (terma.step.index %q)", id, l.Attrs["terma.step.index"])
+			continue
+		}
+		begun := -1
+		for _, s := range starts {
+			if s <= step && s > begun {
+				begun = s
+			}
+		}
+		if begun < 0 {
+			t.Errorf("%s is in %q, but no turn began at or before step %d (starts %v)", id, l.Attrs["terma.turn.id"], step, starts)
+		} else if want := "turn-" + strconv.Itoa(begun); l.Attrs["terma.turn.id"] != want {
+			t.Errorf("%s is in %q, want %s (starts %v)", id, l.Attrs["terma.turn.id"], want, starts)
 		}
 	}
 	for id := range want {
@@ -395,6 +411,29 @@ func checkAntigravityCalls(t *testing.T, sb *Sandbox, transcript, conversation s
 	if n := antigravityLosses(sb, "turn_ended"); n < 1 {
 		t.Errorf("the spool counts %d calls lost as turn_ended, want the cancelled turn's", n)
 	}
+}
+
+// antigravityTurnStarts is the first step of each turn of the conversation agy's
+// PreInvocation hooks began: the initialNumSteps of each payload at invocation 0, a payload
+// with no invocationNum included. A payload naming another conversation is not counted.
+func antigravityTurnStarts(sb *Sandbox, conversation string) []int {
+	var starts []int
+	for _, p := range sb.HookPayloads("antigravity-pre-invocation") {
+		if id, ok := p["conversationId"].(string); ok && id != conversation {
+			continue
+		}
+		steps, ok := p["initialNumSteps"].(float64)
+		if !ok {
+			continue
+		}
+		if n, present := p["invocationNum"]; present {
+			if f, ok := n.(float64); !ok || f != 0 {
+				continue
+			}
+		}
+		starts = append(starts, int(steps))
+	}
+	return starts
 }
 
 // antigravityLosses is how many events the sandbox's hooks counted lost for reason, from the

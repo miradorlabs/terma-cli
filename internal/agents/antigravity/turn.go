@@ -19,12 +19,14 @@ import (
 // only grows, and is the step the turn's first call comes after, so it names the turn.
 //
 // The record is the conversation's turn in progress and where a collecting hook saw it
-// begin: one per conversation, written by the turn's first PreInvocation. Three things end
-// a turn, each by removing the record, and nothing else does:
+// begin: one per conversation, written by the turn's first PreInvocation. These end a turn,
+// each by removing the record, and nothing else does:
 //   - its Stop, once it has read the turn's last calls (after a Stop, a prompt or a wake
 //     starts at invocation 0 again, and agy runs it only once the Stop hook has returned);
 //   - a hook of the conversation that runs where the policy collects nothing, or cannot
-//     tell where it ran;
+//     tell where it ran; it reads nothing;
+//   - a PostInvocation at invocation 0 whose `initialNumSteps` is not the record's turn:
+//     the record is stale, and this turn's first hook never ran;
 //   - a hook whose payload terma cannot read;
 //   - a hook run while hooks are off, switched off or torn down.
 //
@@ -128,6 +130,21 @@ func antigravityTurnBegun(e hookrun.Env, sessionID string) []byte {
 // Stop hook has returned (seen on 1.5.15 with a Stop hook that slept 6 s).
 func endAntigravityTurnBegun(e hookrun.Env, sessionID string, begun []byte) {
 	if begun != nil && bytes.Equal(antigravityTurnBegun(e, sessionID), begun) {
+		endAntigravityTurn(e, sessionID)
+	}
+}
+
+// endAntigravityTurnUnlessBegunAt ends the conversation's turn unless its record, whatever
+// checkout or lane wrote it, names the turn that begins at steps: what a PostInvocation at
+// invocation 0 gives, the same initialNumSteps its turn's first PreInvocation carried. It
+// writes no record of its own, since no hook saw where this turn began: its calls are passed.
+func endAntigravityTurnUnlessBegunAt(e hookrun.Env, sessionID string, steps int64) {
+	b := antigravityTurnBegun(e, sessionID)
+	if b == nil {
+		return
+	}
+	var turn antigravityTurn
+	if json.Unmarshal(b, &turn) != nil || antigravityTurnNumber(turn.TurnID) != steps {
 		endAntigravityTurn(e, sessionID)
 	}
 }

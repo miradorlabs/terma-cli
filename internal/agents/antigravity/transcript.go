@@ -36,7 +36,7 @@ import (
 // the calls of turns before terma watched the conversation, of a turn begun somewhere else
 // or under another sign-in, and the last call of a cancelled turn, after which agy runs no
 // hook of that turn. A collecting hook counts the calls it passes as lost (turn_ended); a
-// hook the policy does not collect counts nothing. A subagent's link passed the same way is
+// hook the policy does not collect reads nothing. A subagent's link passed the same way is
 // not a call and is not counted: the subagent is then sent with no parent. The lines
 // already in the transcript when terma began following the conversation are neither sent
 // nor counted (antigravityCallState.Before).
@@ -129,12 +129,11 @@ func antigravityTranscript(in *antigravityHookInput) string {
 // captureAntigravityCalls sends each model call, and each subagent the conversation
 // opened, that the transcript recorded since the last read and that belongs to the turn
 // this hook saw begin, here and under this sign-in. It reports whether it read the
-// transcript, so the hook's observation says usage travels apart. With no repository, a
-// hook the team's policy does not collect, it passes everything it reads.
+// transcript, so the hook's observation says usage travels apart.
 func captureAntigravityCalls(ctx context.Context, e hookrun.Env, r *hookrun.Repo, in *antigravityHookInput) bool {
 	transcript := antigravityTranscript(in)
 	id := in.id()
-	if transcript == "" || (r != nil && e.Spool == nil) || !session.ValidID(id) {
+	if transcript == "" || e.Spool == nil || !session.ValidID(id) {
 		return false
 	}
 	dir := filepath.Join(e.StateDir, antigravityCallDir)
@@ -201,7 +200,7 @@ func captureAntigravityCalls(ctx context.Context, e hookrun.Env, r *hookrun.Repo
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		e.Logf("antigravity transcript: %v", err)
 	}
-	if r != nil && passed > 0 {
+	if passed > 0 {
 		e.CountLost(r, sendas.LostTurnEnded, passed)
 	}
 	// A state that began is saved even unchanged: a subagent's first hook runs before its
