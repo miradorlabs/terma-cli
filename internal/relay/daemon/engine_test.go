@@ -82,6 +82,7 @@ func TestTheEngineNamesTheHomeDirectory(t *testing.T) {
 	resolved, _ := filepath.EvalSymlinks(target)
 	for home, want := range map[string]string{link: resolved, link + "/": resolved, target + "//": resolved, "relative/home": "", "/": ""} {
 		t.Setenv("HOME", home)
+		t.Setenv("USERPROFILE", home) // where Windows keeps it
 		got := (Deps{HookPolicy: func() config.Policy { return config.Policy{} }}).Engine(t.Context(), t.TempDir(), &config.Config{}, Settings{}, nil).HomeDir
 		if got != want {
 			t.Errorf("HOME=%q: HomeDir = %q, want %q", home, got, want)
