@@ -773,4 +773,60 @@ func TestMarkAsideChainedAliasAndMergeBeforePointer(t *testing.T) {
 			t.Fatalf("re-alias %s MixedAt = %v, %v; want %v, true", id, at, mixed, cross)
 		}
 	}
+
+	// 5. Deterministic concurrent re-aliasing while holding old.json.lock:
+	//    child -> old; hold old.json.lock; start MarkMixed(child) and Alias(new, child); release lock.
+	//    Both must coordinate via ordered locking & sessionID revalidation so child, new, and sibling all read Mixed.
+	for _, holdID := range []string{"cr-old", "cr-new", "cr-child"} {
+		sub := filepath.Join(dir, "re-"+holdID)
+		start(t, sub, "cr-old", t0)
+		start(t, sub, "cr-new", t0)
+		must(t, Alias(sub, "cr-old", "cr-child"))
+		must(t, Alias(sub, "cr-new", "cr-sibling"))
+		unlock, err := flock.TryLock(filepath.Join(sub, Dir, holdID+".json.lock"))
+		must(t, err)
+		var wg sync.WaitGroup
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			if err := MarkMixed(sub, "cr-child", cross, Why{Reason: Crossed, Where: "re-alias-race"}); err != nil {
+				t.Errorf("MarkMixed(cr-child): %v", err)
+			}
+		}()
+		go func() {
+			defer wg.Done()
+			if err := Alias(sub, "cr-new", "cr-child"); err != nil {
+				t.Errorf("Alias(cr-new, cr-child): %v", err)
+			}
+		}()
+		time.Sleep(25 * time.Millisecond)
+		unlock()
+		wg.Wait()
+		for _, id := range []string{"cr-child", "cr-new", "cr-sibling"} {
+			if at, mixed := mixedAt(t, sub, id, t0.Add(6*time.Minute)); !mixed || !at.Equal(cross) {
+				t.Fatalf("concurrent re-alias hold %s: %s MixedAt = %v, %v; want %v, true", holdID, id, at, mixed, cross)
+			}
+		}
+	}
+
+	// 6. Concurrent re-aliasing during MarkAside(child) when child already points to old:
+	//    child -> old -> MarkAside(child) writes old.mixed -> Alias(new, child) -> MarkAside mirrors to new.mixed.
+	start(t, dir, "ra-old", t0)
+	start(t, dir, "ra-new", t0)
+	must(t, Alias(dir, "ra-old", "ra-child"))
+	must(t, Alias(dir, "ra-new", "ra-sibling"))
+	afterAsideWrite = func(id string) {
+		if id == "ra-old" {
+			if err := Alias(dir, "ra-new", "ra-child"); err != nil {
+				t.Errorf("Alias(ra-new, ra-child): %v", err)
+			}
+		}
+	}
+	must(t, MarkAside(dir, "ra-child", "", cross))
+	afterAsideWrite = nil
+	for _, id := range []string{"ra-child", "ra-new", "ra-sibling"} {
+		if at, mixed := mixedAt(t, dir, id, t0.Add(6*time.Minute)); !mixed || !at.Equal(cross) {
+			t.Fatalf("MarkAside re-alias: %s MixedAt = %v, %v; want %v, true", id, at, mixed, cross)
+		}
+	}
 }

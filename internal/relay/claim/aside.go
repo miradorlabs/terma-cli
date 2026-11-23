@@ -272,14 +272,13 @@ func trimPlacements(pls []Placement, evicted bool, mixed []string) ([]Placement,
 	return pls[drop:], true, out
 }
 func removeAside(claimPath string, files []string) {
-	if len(files) == 0 {
-		return
+	if len(files) > 0 {
+		dir := asidePath(claimPath)
+		for _, name := range files {
+			_ = os.Remove(filepath.Join(dir, name))
+		}
+		_ = os.Remove(dir)
 	}
-	dir := asidePath(claimPath)
-	for _, name := range files {
-		_ = os.Remove(filepath.Join(dir, name))
-	}
-	_ = os.Remove(dir)
 }
 func pruneAside(dir string, now time.Time) {
 	entries, _ := os.ReadDir(dir)

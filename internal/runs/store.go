@@ -133,12 +133,26 @@ func withCanonical(stateDir, sessionID, extra string, try bool, fn func(canon, p
 		if err != nil || extra == canon {
 			return err
 		}
+		var oldExtra string
+		ids := []string{canon}
+		if extra != "" {
+			if oldExtra, err = aliasTarget(stateDir, extra); err != nil {
+				return err
+			}
+			ids = append(ids, extra, oldExtra)
+			slices.Sort(ids)
+			ids = slices.Compact(ids)
+		}
 		path, retry := filepath.Join(stateDir, Dir, canon+".json"), false
 		run := func() error {
-			next, err := aliasTarget(stateDir, canon)
-			if err != nil || next != canon {
-				sessionID, retry = next, err == nil
+			if next, err := aliasTarget(stateDir, sessionID); err != nil || next != canon {
+				retry = err == nil
 				return err
+			} else if extra != "" {
+				if cur, err := aliasTarget(stateDir, extra); err != nil || cur != oldExtra {
+					retry = err == nil
+					return err
+				}
 			}
 			l, _, err := load(path)
 			if err == nil {
@@ -149,11 +163,8 @@ func withCanonical(stateDir, sessionID, extra string, try bool, fn func(canon, p
 			}
 			return err
 		}
-		if extra != "" {
-			p1, p2 := filepath.Join(stateDir, Dir, min(canon, extra)+".json"), filepath.Join(stateDir, Dir, max(canon, extra)+".json")
-			err = flock.Locked(p1, lockWait, func() error { return flock.Locked(p2, lockWait, run) })
-		} else if !try {
-			err = flock.Locked(path, lockWait, run)
+		if !try {
+			err = lockAll(stateDir, ids, run)
 		} else if err = os.MkdirAll(filepath.Dir(path), 0o700); err == nil {
 			if unlock, uerr := flock.TryLock(path + ".lock"); uerr != nil {
 				err = uerr
@@ -167,6 +178,12 @@ func withCanonical(stateDir, sessionID, extra string, try bool, fn func(canon, p
 		}
 	}
 	return fmt.Errorf("runs: alias loop for %q", sessionID)
+}
+func lockAll(stateDir string, ids []string, run func() error) error {
+	if len(ids) == 0 {
+		return run()
+	}
+	return flock.Locked(filepath.Join(stateDir, Dir, ids[0]+".json"), lockWait, func() error { return lockAll(stateDir, ids[1:], run) })
 }
 func ledgerPath(stateDir, sessionID string) (string, error) {
 	if !session.ValidID(sessionID) {
