@@ -73,23 +73,37 @@ func (app *App) signInSource(cfg *config.Config) *signInSource {
 func (s *signInSource) Account() string {
 	s.accountMu.Lock()
 	defer s.accountMu.Unlock()
-	files := s.accountFilesNow()
-	if s.accountRead && unchanged(s.accountFiles[0], files[0]) && unchanged(s.accountFiles[1], files[1]) {
+	if s.accountRead && sameFiles(s.accountFiles, profileFiles(s.cfg.Dir)) {
 		return s.account
 	}
-	s.account, s.accountFiles, s.accountRead = s.readAccount(), files, false
-	// Read as one snapshot: a file replaced between the two reads may pair one sign-in's
-	// profile with another's identity, so it is read again. An unreadable one is not kept
-	// either: a file made readable again (its permissions) need not look changed.
-	if now := s.accountFilesNow(); !unchanged(files[0], now[0]) || !unchanged(files[1], now[1]) {
-		return sendas.AccountUnreadable
-	}
+	s.account, s.accountFiles = readLaneAsOne(s.cfg.Dir, s.readAccount)
+	// An unreadable one is not kept: a file made readable again (its permissions) need not
+	// look changed.
 	s.accountRead = s.account != sendas.AccountUnreadable
 	return s.account
 }
 
-func (s *signInSource) accountFilesNow() [2]os.FileInfo {
-	return [2]os.FileInfo{statOrNil(config.Path(s.cfg.Dir)), statOrNil(config.CredentialsPath(s.cfg.Dir))}
+// readLaneAsOne runs read, which reads config.json in dir and then the profile's sign-in,
+// and is its lane only if neither file changed meanwhile: one replaced between the two
+// reads (a sign-in as someone else, a switch to a server key) may pair one sign-in's
+// profile with another's identity, so the lane is sendas.AccountUnreadable instead. files
+// are the two as they were before read.
+func readLaneAsOne(dir string, read func() string) (lane string, files [2]os.FileInfo) {
+	files = profileFiles(dir)
+	lane = read()
+	if !sameFiles(files, profileFiles(dir)) {
+		return sendas.AccountUnreadable, files
+	}
+	return lane, files
+}
+
+// profileFiles are config.json and the sign-in in dir, nil where one is absent.
+func profileFiles(dir string) [2]os.FileInfo {
+	return [2]os.FileInfo{statOrNil(config.Path(dir)), statOrNil(config.CredentialsPath(dir))}
+}
+
+func sameFiles(was, now [2]os.FileInfo) bool {
+	return unchanged(was[0], now[0]) && unchanged(was[1], now[1])
 }
 
 // readAccount reads the profile's mode, then its sign-in. A profile whose mode can't be

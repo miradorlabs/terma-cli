@@ -228,6 +228,9 @@ type App struct {
 	// that ran a while, or the relay, may outlive its version, once another install
 	// replaces the binary.
 	binary os.FileInfo
+	// betweenProfileReads, in tests, runs between a hook's read of config.json and of the
+	// sign-in (profileLane).
+	betweenProfileReads func()
 }
 
 // New is the command line for the agents agentsFor registers under a config directory, at

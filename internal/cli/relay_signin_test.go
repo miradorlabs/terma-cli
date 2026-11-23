@@ -133,6 +133,52 @@ func TestAccountReadsTheProfileAndTheSignInAsOne(t *testing.T) {
 	}
 }
 
+// A hook, and a push reported after git push exits, read config.json and the sign-in as one
+// snapshot: a sign-in as someone else that lands between the two reads makes the account
+// unreadable, so the event is lost and counted, never stamped with the new person's account.
+func TestAHookReadsTheProfileAndTheSignInAsOne(t *testing.T) {
+	for _, path := range []struct {
+		name string
+		bind func() *spool.Spool
+	}{
+		{"hook", func() *spool.Spool {
+			p := testApp.hookProfile()
+			s := testApp.openSpool()
+			s.Bind(p.Account) // as the hook's runtime does (spool.LaneOf)
+			return s
+		}},
+		{"push", func() *spool.Spool { return testApp.pushEnv().Spool }},
+	} {
+		t.Run(path.name, func(t *testing.T) {
+			f := newFakeAuth(t)
+			authSandbox(t, f)
+			if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSessionOf(f, "u-a")); err != nil {
+				t.Fatal(err)
+			}
+			if err := config.UpdateFile(testApp.dir, func(*config.File) {}); err != nil {
+				t.Fatal(err)
+			}
+			testApp.betweenProfileReads = func() {
+				if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSessionOf(f, "u-b")); err != nil {
+					t.Fatal(err)
+				}
+			}
+			t.Cleanup(func() { testApp.betweenProfileReads = nil })
+			s := path.bind()
+			if err := s.Append(spool.Event{Name: "a-event"}); err != nil {
+				t.Fatal(err)
+			}
+			if got := queued(t, s); len(got) != 0 {
+				t.Fatalf("with the sign-in replaced mid-read, queued %+v; want the event lost, not person b's", got)
+			}
+			losses, err := spool.ReadLosses(filepath.Join(testApp.stateDir, spool.Dir), time.Now())
+			if err != nil || !maps.Equal(losses.Counts, map[string]int{sendas.LostUnreadable: 1}) {
+				t.Fatalf("losses = %v, %v; want one unreadable", losses.Counts, err)
+			}
+		})
+	}
+}
+
 // Doctor reads what the relay lost by reason from its outbox's losses.json.
 func TestDoctorReadsTheRelaysLossesByReason(t *testing.T) {
 	useConfigDir(t, t.TempDir())

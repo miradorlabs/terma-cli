@@ -17,6 +17,7 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
+	"github.com/miradorlabs/terma-cli/internal/sendas"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
@@ -52,16 +53,21 @@ func (app *App) newSpoolAwaitPushCommand() *cobra.Command {
 func (app *App) pushEnv() hookrun.Env {
 	env := hookrun.Env{StateDir: app.stateDir, ConfigDir: app.dir, Spool: app.openSpool(), Flush: spawnFlush,
 		Stderr: os.Stderr, Debug: os.Getenv("TERMA_DEBUG") != ""}
-	cfg, err := app.loadConfig()
-	switch {
-	case err != nil:
-	case cfg.ServerKeySignIn:
+	// One snapshot, as a hook's profile (hookProfile): a mixed one is unreadable, and lost.
+	lane, _ := readLaneAsOne(app.dir, func() string {
+		cfg, err := app.loadConfig()
+		if err != nil {
+			return sendas.AccountUnreadable
+		}
+		return app.profileLane(cfg)
+	})
+	if lane == sendas.NoPersonLane {
 		env.ServerKey = true
 		if env.Spool != nil {
 			env.Spool.BindNoPerson()
 		}
-	default:
-		env.Account = auth.Account(cfg.Dir, cfg.ProfileName, cfg.AuthURL)
+	} else {
+		env.Account = lane
 		if env.Spool != nil {
 			env.Spool.Bind(env.Account)
 		}
