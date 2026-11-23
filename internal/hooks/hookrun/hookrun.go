@@ -58,6 +58,10 @@ type Env struct {
 	Team string
 	// Agents are the agents the developer chose at setup.
 	Agents []string
+
+	// parent is the session that opened this one for a subagent, which the claim names for
+	// the relay to stamp on the subagent's telemetry (Extension.ClaimParent).
+	parent string
 }
 
 // Time is when the hook runs: Now when the caller set it, the clock otherwise.
@@ -299,6 +303,7 @@ func (e Env) claimForRelay(r *Repo, ev spool.Event) {
 	tool, _ := ev.Attrs[semconv.GenAIMainAgentNameKey].(string)
 	c := r.claim(tool)
 	c.Cwd, c.PIDs = e.workingDir(), claimPIDs()
+	c.Parent = e.parent
 	claim.Write(e.StateDir, ev.SessionID, c, e.Time())
 	// A subagent whose telemetry uses its agent id as session id would otherwise be dropped.
 	if agent, _ := ev.Attrs[semconv.TermaAgentIDKey].(string); agent != "" && agent != ev.SessionID {

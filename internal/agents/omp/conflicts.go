@@ -1,43 +1,60 @@
 package omp
 
 import (
-	_ "embed"
+	"net/url"
 	"os"
 	"strings"
 
 	"github.com/miradorlabs/terma-cli/internal/harness"
 )
 
-// ConflictsWith reports shell exports that would defeat or redirect e.
-func (c exporter) ConflictsWith(e harness.Exporter) ([]harness.Conflict, error) {
-	return ompConflicts(e), nil
-}
-
-// ompConflicts reports shell-exported OTEL_* variables that outrank the extension, which
-// never overrides what a developer exported on purpose.
+// ompConflicts reports shell-exported OTEL_* variables, which omp reads key by key ahead of
+// its .env: a signal's endpoint there, unless it is the relay's own URL for that signal, which
+// omp sends to as given, takes that export somewhere else. The common endpoint and protocol do
+// not, since omp reads each signal's own first and the .env sets every one.
 func ompConflicts(e harness.Exporter) []harness.Conflict {
 	var out []harness.Conflict
 
-	if value := os.Getenv(harness.EnvOTLPEndpoint); value != "" && value != e.Endpoint {
+	for _, s := range harness.AllSignals {
+		key := signalKey(s, "ENDPOINT")
+		value := os.Getenv(key)
+		if value == "" || e.Endpoint != "" && value == e.Endpoint+"/v1/"+string(s) {
+			continue
+		}
 		out = append(out, harness.Conflict{
-			Key:        harness.EnvOTLPEndpoint,
-			Value:      value,
-			Reason:     "exported in your shell, where it takes effect regardless of what Terma's extension sets — the export goes there, not to Terma",
+			Key:        key,
+			Value:      withoutRelayToken(value, e.Endpoint),
+			Reason:     "exported in your shell, where OMP reads it ahead of its .env — the export goes there, not to Terma",
 			Credential: true,
 			Scope:      harness.ScopeEnvironment,
 			Clearable:  false,
 		})
 	}
 
-	// omp supports http/protobuf only; any other protocol silently disables the export.
-	if value := strings.ToLower(strings.TrimSpace(os.Getenv(harness.EnvOTLPProtocol))); value != "" && value != harness.ProtocolHTTPProtobuf {
+	if value := os.Getenv(envSDKDisabled); strings.EqualFold(strings.TrimSpace(value), "true") {
 		out = append(out, harness.Conflict{
-			Key:       harness.EnvOTLPProtocol,
+			Key:       envSDKDisabled,
 			Value:     value,
-			Reason:    "omp's exporter supports http/protobuf only; a " + value + " export would disable every signal",
+			Reason:    "exported in your shell, where it switches OMP's whole export off",
 			Scope:     harness.ScopeEnvironment,
 			Clearable: false,
 		})
+	}
+	// A signal switched off: only traces name omp's session, so logs or metrics off is advisory.
+	for _, s := range harness.AllSignals {
+		var off []harness.Conflict
+		if value := strings.ToLower(strings.TrimSpace(os.Getenv(signalKey(s, "PROTOCOL")))); value != "" && value != harness.ProtocolHTTPProtobuf {
+			off = append(off, harness.Conflict{Key: signalKey(s, "PROTOCOL"), Value: value,
+				Reason: "OMP's exporter supports http/protobuf only; a " + value + " export would disable its " + string(s)})
+		}
+		if value := os.Getenv(signalExporterKey(s)); value != "" && !exportsOTLP(value) {
+			off = append(off, harness.Conflict{Key: signalExporterKey(s), Value: value,
+				Reason: "exported in your shell, where it switches OMP's " + string(s) + " export off"})
+		}
+		for _, c := range off {
+			c.Scope, c.Advisory = harness.ScopeEnvironment, s != harness.SignalTraces
+			out = append(out, c)
+		}
 	}
 
 	if value := os.Getenv(ompCaptureContentEnv); value != "" && !capturesContent(value) {
@@ -53,11 +70,26 @@ func ompConflicts(e harness.Exporter) []harness.Conflict {
 	return out
 }
 
-// capturesContent reports whether an exported capture value keeps content on, as terma
-// always asks.
+// withoutRelayToken is value with the first segment of its path, where the relay's token
+// sits, masked when it is an URL on the relay's host: a conflict's value is never a credential.
+func withoutRelayToken(value, relayEndpoint string) string {
+	u, err := url.Parse(value)
+	relay, rerr := url.Parse(relayEndpoint)
+	if err != nil || rerr != nil || u.Host == "" || u.Host != relay.Host {
+		return value
+	}
+	segments := strings.SplitN(strings.TrimPrefix(u.Path, "/"), "/", 2)
+	if segments[0] == "" {
+		return value
+	}
+	segments[0] = "***"
+	return u.Scheme + "://" + u.Host + "/" + strings.Join(segments, "/")
+}
+
+// capturesContent reports whether a capture value keeps full content on, as omp reads it.
 func capturesContent(value string) bool {
 	switch strings.ToLower(strings.TrimSpace(value)) {
-	case "true", "1", "summary":
+	case "true", "1", "yes", ompCaptureContentFull:
 		return true
 	}
 	return false

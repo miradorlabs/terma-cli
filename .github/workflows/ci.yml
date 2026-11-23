@@ -56,6 +56,11 @@ jobs:
 
       - run: go vet ./...
 
+      # OMP's extension test runs it under a Node that strips TypeScript types (22.18+).
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
       # The shell launcher tests parse their fish block with a real fish where one is installed.
       - name: Install fish
         run: sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends fish
@@ -180,7 +185,7 @@ jobs:
       # TestMachineHooks* is where setup's machine-wide hooks record: beside a
       # repository's own, in the repositories the team admits. TestDesktopGrant is Terma
       # Desktop signing the CLI in over its stdin.
-      E2E_TESTS: '^(TestClaudeTelemetry|TestCodexTelemetry|TestClaudeStopFailureDelivery|TestRelay.*|TestMachineHooks.*|TestPi.*|TestGemini.*|TestDsh.*|TestHermes.*|TestCopilot.*|TestDesktopGrant)$'
+      E2E_TESTS: '^(TestClaudeTelemetry|TestCodexTelemetry|TestClaudeStopFailureDelivery|TestRelay.*|TestMachineHooks.*|TestPi.*|TestOmp.*|TestGemini.*|TestDsh.*|TestHermes.*|TestCopilot.*|TestDesktopGrant)$'
       TERMA_ENV: dev
       TERMA_E2E: "1"
       TERMA_E2E_CLAUDE_VERSIONS: "2.1.283"
@@ -189,6 +194,8 @@ jobs:
       TERMA_E2E_GEMINI_VERSIONS: "0.62.0"
       TERMA_E2E_DSH_VERSIONS: "0.2.0-rc.2"
       TERMA_E2E_COPILOT_VERSIONS: "1.0.96"
+      # OMP's oldest supported build (internal/agents/omp/minimum_version.go) and its latest.
+      TERMA_E2E_OMP_VERSIONS: "18.18.2,19.1.1"
       # Copilot CLI runs against GitHub's service on this job's token, in the copilot shard
       # alone. A fork's pull request gets a read-only one, so there the Copilot tests skip
       # rather than fail.
@@ -217,8 +224,9 @@ jobs:
           node-version: 22
       - name: Install Pi and T3 Code
         # Pi has no exporter (terma's extension is one); T3 Code runs Codex and Claude
-        # Code itself. Gemini CLI and DeepSeek Harness install on demand (test/e2e/gemini.go,
-        # test/e2e/dsh.go). Hermes, omp and Cursor run only where installed or credentialed.
+        # Code itself. Gemini CLI, DeepSeek Harness and OMP install on demand (test/e2e/gemini.go,
+        # test/e2e/dsh.go, test/e2e/omp.go). Hermes and Cursor run only where installed or
+        # credentialed.
         run: npm install -g @earendil-works/pi-coding-agent@0.99.1 t3@0.0.42
       - name: Assert harness telemetry (no provider credentials)
         env:

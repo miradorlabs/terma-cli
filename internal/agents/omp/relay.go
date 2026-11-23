@@ -1,33 +1,153 @@
 package omp
 
 import (
+	"bytes"
 	"context"
+	"errors"
+	"io/fs"
+	"net/url"
+	"os"
 	"path/filepath"
+	"slices"
+	"strings"
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
-	"github.com/miradorlabs/terma-cli/internal/agents/internal/pifamily"
 	"github.com/miradorlabs/terma-cli/internal/agents/internal/relayexport"
+	"github.com/miradorlabs/terma-cli/internal/harness"
 )
 
-// ConfigureRelay writes terma's exporter into omp, sending to the local relay.
-func (Agent) ConfigureRelay(ctx context.Context, cfg agents.RelayConfig) (agents.RelayResult, error) {
-	// Not the native exporter: it initializes before extensions, and its environment
-	// would reach every tool omp runs.
+// The extension terma writes into omp's agent directory, named apart from Pi's, which a
+// PI_CODING_AGENT_DIR both read would share; and the files an earlier terma wrote there: an
+// extension that exported spans itself, and a hook that set the exporter.
+var (
+	extensionPath = filepath.Join("extensions", "terma-omp.ts")
+	legacyPaths   = []string{filepath.Join("extensions", "terma-relay.ts"), filepath.Join("hooks", "pre", "terma.ts")}
+)
+
+// ConfigureRelay refuses an omp too old to keep the relay's token from its tools. Otherwise
+// it writes the extension that reports sessions and file edits (it exports nothing itself),
+// then points omp's native exporter at the local relay through its .env. The extension goes
+// first: without its claims the relay holds omp's spans and drops them.
+func (a Agent) ConfigureRelay(ctx context.Context, cfg agents.RelayConfig) (agents.RelayResult, error) {
+	if why, old := tooOld(ctx); old {
+		return agents.RelayResult{}, errors.New(why)
+	}
 	dir, err := ompAgentDir()
 	if err != nil {
 		return agents.RelayResult{}, err
 	}
-	path, err := pifamily.Write(filepath.Join(dir, "extensions", "terma-relay.ts"), pifamily.ForRelay("omp", false, cfg))
-	return agents.RelayResult{Paths: []string{path}}, err
+	ext, err := writeExtension(filepath.Join(dir, extensionPath), cfg.HookCommand, cfg.Endpoint)
+	if err != nil {
+		return agents.RelayResult{}, err
+	}
+	result, err := relayexport.Native(a.Harness(), cfg)
+	if err != nil {
+		return result, err
+	}
+	if path, err := a.Harness().ConfigPath(); err == nil {
+		result.Paths = append(result.Paths, path)
+	}
+	result.Paths = append(result.Paths, ext)
+	removed, err := removeOwn(dir, legacyPaths)
+	result.Paths = append(result.Paths, removed...)
+	return result, err
 }
 
-// UnconfigureRelay removes terma's relay extension for omp.
-func (Agent) UnconfigureRelay(context.Context, string) (agents.RelayResult, error) {
+// UnconfigureRelay restores omp's .env and removes terma's extension.
+func (a Agent) UnconfigureRelay(context.Context, string) (agents.RelayResult, error) {
 	dir, err := ompAgentDir()
 	if err != nil {
 		return agents.RelayResult{}, err
 	}
-	return relayexport.RemoveOwn(filepath.Join(dir, "extensions", "terma-relay.ts"))
+	result, err := relayexport.Unnative(a.Harness())
+	if err != nil {
+		return result, err
+	}
+	removed, err := removeOwn(dir, append([]string{extensionPath}, legacyPaths...))
+	result.Paths = append(result.Paths, removed...)
+	return result, err
 }
 
-var _ agents.RelayExporter = Agent{}
+// RelayPointed reports whether omp's .env points its exporter at the relay at addr, with no
+// shell export that omp reads ahead of the .env taking the export elsewhere or switching it
+// off, and terma's extension in place to claim the sessions it exports. It is unknown where
+// omp is not on the PATH, as Copilot's is where no VS Code runs it: nothing exports.
+func (a Agent) RelayPointed(addr string) (bool, bool) {
+	if !(exporter{}).Detect(context.Background()).Found {
+		return false, false
+	}
+	if !relayexport.NativePointed(a.Harness(), addr) {
+		return false, true
+	}
+	if _, _, problem := a.RelayProblem(addr); problem {
+		return false, true
+	}
+	st, err := a.Harness().Status()
+	return err == nil && !slices.ContainsFunc(st.Conflicts, func(c harness.Conflict) bool { return !c.Advisory }), true
+}
+
+// RelayProblem reports an omp too old to be pointed at the relay, or terma's extension missing
+// from omp's agent directory or not the hooks-only file this terma writes for the relay at
+// addr: without its claims the relay holds omp's spans and drops them, and without the
+// relay's address it asks OMP for no content. An omp not on the PATH has none.
+func (Agent) RelayProblem(addr string) (detail, fix string, problem bool) {
+	if !(exporter{}).Detect(context.Background()).Found {
+		return "", "", false
+	}
+	if why, old := tooOld(context.Background()); old {
+		return why, "upgrade OMP, then run terma setup", true
+	}
+	dir, err := ompAgentDir()
+	if err != nil {
+		return "", "", false
+	}
+	path := filepath.Join(dir, extensionPath)
+	if extensionCurrent(path, addr) {
+		return "", "", false
+	}
+	return "OMP's terma extension " + path + " is missing or not this terma's, so no hook claims OMP's sessions and the relay drops their telemetry", "terma setup", true
+}
+
+// RelayTokenCurrent reports whether omp's .env presents token, the relay's, which leads the
+// path of the endpoint every signal shares; known is false where the .env names none.
+func (a Agent) RelayTokenCurrent(token string) (tokenMatches, known bool) {
+	st, err := a.Harness().Status()
+	if err != nil || !st.Connected {
+		return false, false
+	}
+	u, err := url.Parse(st.Endpoint)
+	if err != nil {
+		return false, false
+	}
+	return strings.Trim(u.Path, "/") == token, true
+}
+
+// removeOwn deletes the files under dir among rels that terma wrote, each opening with its
+// "// Terma " header; a file of the developer's own by the same name stays.
+func removeOwn(dir string, rels []string) ([]string, error) {
+	var removed []string
+	for _, rel := range rels {
+		path := filepath.Join(dir, rel)
+		data, err := os.ReadFile(path)
+		if errors.Is(err, fs.ErrNotExist) {
+			continue
+		}
+		if err != nil {
+			return removed, err
+		}
+		if !bytes.HasPrefix(data, []byte("// Terma ")) {
+			continue
+		}
+		if err := os.Remove(path); err != nil && !errors.Is(err, fs.ErrNotExist) {
+			return removed, err
+		}
+		removed = append(removed, path)
+	}
+	return removed, nil
+}
+
+var (
+	_ agents.RelayExporter     = Agent{}
+	_ agents.RelayChecker      = Agent{}
+	_ agents.RelayTokenChecker = Agent{}
+)

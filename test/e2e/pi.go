@@ -13,7 +13,7 @@ import (
 )
 
 // Pi (@earendil-works/pi-coding-agent) has no OpenTelemetry of its own: terma's
-// extension (internal/agents/internal/pifamily/terma.ts), written into Pi's agent directory, is its
+// extension (internal/agents/pi/terma.ts), written into Pi's agent directory, is its
 // exporter and calls `terma hook pi-*`. `terma relay setup --harness pi` writes it
 // pointed at the relay; a direct run splices the same template pointed at the receiver,
 // so the two differ only in where the extension sends. The builds are the installed one, or
@@ -58,21 +58,20 @@ func (sb *Sandbox) UsePiProvider(url string) {
 // as the direct half of a comparison.
 func (sb *Sandbox) UsePiExtensionDirect() {
 	sb.T.Helper()
-	sb.writePiFamilyExtension(filepath.Join(sb.piAgentDir(), "extensions", "terma.ts"), "pi", true)
+	sb.writePiExtension(filepath.Join(sb.piAgentDir(), "extensions", "terma.ts"))
 }
 
-// writePiFamilyExtension splices the Pi-family extension template (Pi, omp) pointed at
-// the receiver into path.
-func (sb *Sandbox) writePiFamilyExtension(path, agent string, lifecycle bool) {
+// writePiExtension splices Pi's extension template pointed at the receiver into path.
+func (sb *Sandbox) writePiExtension(path string) {
 	t := sb.T
 	t.Helper()
-	tmpl, err := os.ReadFile(filepath.Join("..", "..", "internal", "agents", "internal", "pifamily", "terma.ts"))
+	tmpl, err := os.ReadFile(filepath.Join("..", "..", "internal", "agents", "pi", "terma.ts"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	const marker = "const CONFIG: TermaConfig | null = null /* terma:config */"
 	cfg, _ := json.Marshal(map[string]any{
-		"version": 1, "agent": agent, "lifecycle": lifecycle, "endpoint": sb.Receiver.URL(), "headers": map[string]string{"Authorization": "Bearer " + liveKey},
+		"version": 1, "endpoint": sb.Receiver.URL(), "headers": map[string]string{"Authorization": "Bearer " + liveKey},
 		"includePrompts": true, "includeToolContent": true, "hookCommand": []string{sb.Terma, "hook"},
 	})
 	if !bytes.Contains(tmpl, []byte(marker)) {

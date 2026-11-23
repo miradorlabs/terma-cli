@@ -7,7 +7,8 @@
 
 The `terma` cli connects coding agents to [Terma](https://terma.ai), then stamps the commits
 they produce so agent spend can be traced to shipped code. It supports **Claude Code**
-(CLI and Desktop), **Codex** (CLI and Desktop) and **GitHub Copilot** (CLI and VS Code).
+(CLI and Desktop), **Codex** (CLI and Desktop), **GitHub Copilot** (CLI and VS Code) and
+**[OMP](https://github.com/can1357/oh-my-pi)**.
 
 ## Get started
 
@@ -99,7 +100,7 @@ instead: see [Scripted and headless setup](#scripted-and-headless-setup).
 
 ```mermaid
 flowchart LR
-  agent["Claude Code / Codex / Copilot"] -- "telemetry" --> relay["terma relay<br/>(127.0.0.1)"]
+  agent["Claude Code / Codex / Copilot / OMP"] -- "telemetry" --> relay["terma relay<br/>(127.0.0.1)"]
   agent -- "hook events" --> hook["terma hook"]
   git["git commit"] -- "commit hooks" --> hook
   hook -- "claims the session<br/>for your team" --> relay
@@ -248,7 +249,7 @@ before it restarts, and otherwise your next terma command runs it. On the latest
 Every question `terma setup` asks has a flag:
 
 ```bash
-terma setup --org acme --team platform --harness claude,codex,copilot --yes
+terma setup --org acme --team platform --harness claude,codex,copilot,omp --yes
 ```
 
 - `--org <name-or-id>` signs in to that organization. Without it, setup asks when you
@@ -256,7 +257,7 @@ terma setup --org acme --team platform --harness claude,codex,copilot --yes
 - `--team <name-or-id>` sets up that team; without it, setup asks when your organization
   has several teams, with the one you chose before as the default, else takes the only
   one; when it cannot ask (`--yes` or no terminal), it keeps the team you chose before.
-- `--harness <agents>` records those agents (`claude`, `codex`, `copilot`); with `--yes` or no
+- `--harness <agents>` records those agents (`claude`, `codex`, `copilot`, `omp`); with `--yes` or no
   terminal and no `--harness`, setup records the agents recorded before and every
   supported agent installed on this machine.
 - `--yes` skips the browser prompt and the organization and agents questions. The team
@@ -432,6 +433,40 @@ it is, and a `copilot` started another way (a script, an absolute path, an edito
 still claimed by its hooks but exports nothing. `TERMA_SHELL_LAUNCHERS=0` keeps the
 function out of your startup files. Copilot reports token counts and AI credits, not a
 cost, and a file one of its shell commands writes is not attributed to its session.
+
+OMP exports natively and reads its exporter privately from its agent directory's `.env`
+(`~/.omp/agent/.env`, or `$PI_CODING_AGENT_DIR/.env`), which no tool or shell it runs
+inherits. Setup writes its `OTEL_*` keys there, pointed at the relay, in place of any
+line of yours for the same key, and records what each held so `terma teardown` puts it
+back; your other lines stay as they are. The relay's token leads the path of each endpoint
+setup writes, never a header, so the file stays private to you (0600). Tokens, estimated
+cost, tool calls and subagents ride OMP's own spans. terma's extension
+(`~/.omp/agent/extensions/terma-omp.ts`) exports nothing and sets no exporter: its hooks
+report sessions and the files OMP's edit and write tools change, for commit attribution,
+and a subagent's start names the session that opened it, which the relay stamps on the
+subagent's records as `terma.session.parent.id`, since OMP's spans do not. The name an
+interactive OMP gives a session (a headless `omp -p` names none) is sent as its title, only
+while you chose OMP at setup (or in global mode) and the team's policy collects prompts. Setup removes
+the span-exporting extension and exporter hook an earlier terma wrote there.
+
+terma needs OMP 18.18.2 or later: an earlier OMP loads its `.env` into its own environment, so the
+tools it runs would inherit the relay's token, and setup refuses it while doctor fails it.
+
+OMP's known limits: an `OTEL_*` export in your shell, or in the `.env` of the directory OMP
+starts in, still outranks the file: a signal's endpoint there takes that signal's export,
+but never terma's token, nor content on terma's request: the `.env` asks for none, and
+terma's extension asks the running OMP for full content only while every signal goes to the
+relay and you set no capture yourself. OMP started with `--no-extensions` sends no content. OMP
+exports `http/protobuf` only, so a shell's per-signal
+OTLP protocol set to anything else switches that signal off (the common
+`OTEL_EXPORTER_OTLP_PROTOCOL` does not, since the file sets each signal's own), as do
+`OTEL_SDK_DISABLED=true` and an
+`OTEL_TRACES_EXPORTER` that names no `otlp`. `terma doctor` fails while your shell takes the
+export elsewhere or switches it off; setup does not check your shell, so it can report OMP
+set up while such an export stands. A named profile (`omp --profile`) has a directory of its
+own that setup does not configure. A file one of OMP's shell commands writes is not
+attributed to its session. A `PI_CODING_AGENT_DIR` that Pi and OMP share holds both terma
+extensions, and each agent then loads the other's too.
 
 `terma setup` runs the relay as a per-user background service, so it is up before any
 agent starts; with `--relay-service off`, hooks start it on demand. `terma update`

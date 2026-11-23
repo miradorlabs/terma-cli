@@ -16,8 +16,8 @@ pattern() {
 	claude) echo 'Claude|^TestRelayT3$' ;;
 	# Codex's slowest: its workloads, the long turn, the daemon and the desktop app.
 	codex-a) echo '^Test(RelayWorkloadsCodex|RelayCodexLongTurn|RelayCodexDaemonTUI|RelayCodexDesktop.*|CodexTelemetry)$' ;;
-	# The rest of Codex, DeepSeek Harness and Pi.
-	codex-b) echo 'Codex|Dsh|Pi([A-Z]|$)' ;;
+	# The rest of Codex, DeepSeek Harness, Pi and OMP.
+	codex-b) echo 'Codex|Dsh|Pi([A-Z]|$)|Omp' ;;
 	# GitHub Copilot, which runs against GitHub's service: its own check.
 	copilot) echo 'Copilot' ;;
 	others) echo '.' ;;
