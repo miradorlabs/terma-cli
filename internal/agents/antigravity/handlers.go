@@ -88,9 +88,7 @@ func antigravityInput(env hookrun.Env) (*antigravityHookInput, bool) {
 	in, err := readAntigravityInput(env.Stdin)
 	if err != nil {
 		env.Logf("%v", err)
-		if id := os.Getenv(antigravityConversationEnv); session.ValidID(id) {
-			endAntigravityTurn(env, id)
-		}
+		endAntigravityTurnInEnvironment(env)
 		return nil, false
 	}
 	return in, true

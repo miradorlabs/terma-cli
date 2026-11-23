@@ -47,12 +47,15 @@ func (Agent) Events() map[string]agents.Handler {
 func (Agent) FlushAfter() []string { return []string{"antigravity-stop"} }
 
 // WhenHooksOff still answers each hook with the {} agy expects, with hooks switched off or
-// terma torn down while a session runs.
+// terma torn down while a session runs, and ends the turn of the conversation agy's
+// environment names: with hooks off terma follows no turn, so a turn that ends or begins
+// meanwhile is not sent, once hooks are back, under the record of the one before.
 func (a Agent) WhenHooksOff() map[string]agents.Handler {
 	off := map[string]agents.Handler{}
 	for event := range a.Events() {
 		off[event] = func(_ context.Context, env hookrun.Env) error {
 			antigravityAck(env)
+			endAntigravityTurnInEnvironment(env)
 			return nil
 		}
 	}

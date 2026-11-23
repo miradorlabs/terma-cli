@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
+	"github.com/miradorlabs/terma-cli/internal/session"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
@@ -24,7 +25,8 @@ import (
 //     starts at invocation 0 again, and agy runs it only once the Stop hook has returned);
 //   - a hook of the conversation that runs where the policy collects nothing, or cannot
 //     tell where it ran;
-//   - a hook whose payload terma cannot read.
+//   - a hook whose payload terma cannot read;
+//   - a hook run while hooks are off, switched off or torn down.
 //
 // A hook in another collected checkout, or under another sign-in, has no turn of its own:
 // it sends nothing and leaves the record. What it read past is lost; the turn's own hooks
@@ -101,6 +103,15 @@ func beginAntigravityTurn(e hookrun.Env, r *hookrun.Repo, in *antigravityHookInp
 func endAntigravityTurn(e hookrun.Env, sessionID string) {
 	if err := os.Remove(antigravityTurnPath(e.StateDir, sessionID)); err != nil && !os.IsNotExist(err) {
 		e.Logf("antigravity turn: %v", err)
+	}
+}
+
+// endAntigravityTurnInEnvironment ends the turn of the conversation agy's environment
+// names, for a hook that has only the environment to go by: one whose payload terma cannot
+// read, or one run with hooks off, which reads no payload.
+func endAntigravityTurnInEnvironment(e hookrun.Env) {
+	if id := os.Getenv(antigravityConversationEnv); session.ValidID(id) {
+		endAntigravityTurn(e, id)
 	}
 }
 

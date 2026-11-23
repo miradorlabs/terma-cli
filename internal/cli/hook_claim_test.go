@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"os"
 	"os/exec"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
+	"github.com/miradorlabs/terma-cli/internal/semconv"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
@@ -156,5 +158,49 @@ func TestAntigravityUsageAndSeatQueueInTheSignedInLane(t *testing.T) {
 		if seen[name] != 1 {
 			t.Errorf("queued %d %s for the conversation, want 1: %v", seen[name], name, seen)
 		}
+	}
+}
+
+// With hooks off, agy's hooks still reach terma: each ends the conversation's turn, so a
+// turn begun meanwhile sends nothing as the one before's once hooks are back.
+func TestAntigravityTurnEndsWhileHooksAreOff(t *testing.T) {
+	root := collectedRepo(t)
+	const id = "agy-hooks-off"
+	t.Setenv("ANTIGRAVITY_CONVERSATION_ID", id)
+	transcript := filepath.Join(t.TempDir(), "brain", id, ".system_generated", "logs", "transcript_full.jsonl")
+	if err := os.MkdirAll(filepath.Dir(transcript), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	calls := func(steps ...string) {
+		var b strings.Builder
+		for _, step := range steps {
+			b.WriteString(`{"step_index":` + step + `,"source":"MODEL","type":"PLANNER_RESPONSE","status":"DONE","created_at":"2026-11-20T16:50:01Z","model":"gemini-3.8-flash-low","input_tokens":100,"output_tokens":5}` + "\n")
+		}
+		if err := os.WriteFile(transcript, []byte(b.String()), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	payload := `{"conversationId":"` + id + `","cwd":"` + hookruntest.InJSON(root) + `","transcriptPath":"` + hookruntest.InJSON(transcript) + `",`
+	runHook(t, "antigravity-pre-invocation", payload+`"initialNumSteps":1,"invocationNum":0}`)
+	calls("1")
+	runHook(t, "antigravity-post-invocation", payload+`"initialNumSteps":1,"invocationNum":0}`)
+	t.Setenv("TERMA_HOOKS", "0")
+	runHook(t, "antigravity-stop", payload+`"executionNum":0}`)
+	runHook(t, "antigravity-pre-invocation", payload+`"initialNumSteps":2,"invocationNum":0}`)
+	t.Setenv("TERMA_HOOKS", "")
+	calls("1", "3")
+	runHook(t, "antigravity-post-invocation", payload+`"initialNumSteps":2,"invocationNum":0}`)
+	events, err := spoolForTest(t).Peek(100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var sent []string
+	for _, e := range events {
+		if e.Name == semconv.TermaModelCallEvent && e.SessionID == id {
+			sent = append(sent, fmt.Sprint(e.Attrs[semconv.TermaModelCallIDKey], " ", e.Attrs[semconv.TermaTurnIDKey]))
+		}
+	}
+	if got := strings.Join(sent, ","); got != "step-1 turn-1" {
+		t.Fatalf("sent %q, want turn 1's call alone", got)
 	}
 }

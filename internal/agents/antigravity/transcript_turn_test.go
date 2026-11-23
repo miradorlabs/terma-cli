@@ -338,8 +338,9 @@ func TestAntigravityRecordIsReadAgainBeforeEachSend(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// The check before step 14, the third line of turn 8's hook at or past its first step.
-	ctx := &recordTrip{Context: context.Background(), n: 3, trip: func() {
+	// The check before step 14: the hook reads on from line 8, one check a line, and line i
+	// is step i.
+	ctx := &recordTrip{Context: context.Background(), n: 7, trip: func() {
 		beginAntigravityTurn(env, r, &antigravityHookInput{ConversationID: g.id, InitialNumSteps: []byte("13")})
 	}}
 	captureAntigravityCalls(ctx, env, r, &antigravityHookInput{ConversationID: g.id, TranscriptPath: g.transcript})

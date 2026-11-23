@@ -485,6 +485,10 @@ nothing, or got a payload over 4 MiB from `agy`, which repeats the prompt and th
 arguments in it. `terma doctor` counts these calls among what terma lost. A cancelled
 turn's hook events go with the next turn's. The turns of a conversation before terma first
 saw it are never sent. A subagent is its own conversation, linked to the one that opened it.
+`agy` reports a conversation's first folder as its working directory for as long as the
+conversation lasts, so one you resume from a second repository is still recorded under the
+first, whichever of the two your team's policy collects
+([#174](https://github.com/miradorlabs/terma-cli/issues/174)).
 
 Setup also puts `terma hook antigravity-statusline` in `statusLine` in
 `~/.gemini/antigravity-cli/settings.json`. Its payload is the only place `agy` names your

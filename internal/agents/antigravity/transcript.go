@@ -69,6 +69,10 @@ type antigravityCallState struct {
 	// Results names the tools of the last call whose results are still to be read: they
 	// follow it in order, one line each.
 	Results []string `json:"results,omitempty"`
+	// CatchingUp is set from a conversation's first read until a read reaches the end of
+	// the transcript: what is passed until then is from before terma watched, and is not
+	// counted lost.
+	CatchingUp bool `json:"catching_up,omitempty"`
 }
 
 // antigravityLineLimit bounds a transcript line terma reads; a longer one (a tool's whole
@@ -147,13 +151,23 @@ func captureAntigravityCalls(ctx context.Context, e hookrun.Env, r *hookrun.Repo
 	defer unlock()
 	last := antigravityCallState{Step: -1}
 	b, readErr := os.ReadFile(path)
-	if readErr == nil && json.Unmarshal(b, &last) != nil {
+	// A state that does not parse leaves what was sent unknown: this hook sends and counts
+	// nothing, and the state it writes starts the next hook past every line here.
+	unknown := readErr == nil && json.Unmarshal(b, &last) != nil
+	if unknown {
 		last = antigravityCallState{Step: -1}
 	}
 	before, _ := json.Marshal(last)
+	if readErr != nil || unknown {
+		last.CatchingUp = true
+	}
+	catchingUp := last.CatchingUp
 	// The turn this hook saw begin here, and its first step; -1 sends nothing.
 	own := antigravityTurnID(e, r, id)
 	first := antigravityTurnNumber(own)
+	if unknown {
+		first = -1
+	}
 	passed := 0
 	pass := func(s antigravityStep) bool {
 		if s.Type == "PLANNER_RESPONSE" {
@@ -161,14 +175,10 @@ func captureAntigravityCalls(ctx context.Context, e hookrun.Env, r *hookrun.Repo
 		}
 		return true
 	}
-	next, err := readAntigravitySteps(transcript, last, func(s antigravityStep) bool {
+	next, err := readAntigravitySteps(ctx, transcript, last, func(s antigravityStep) bool {
 		if first < 0 || *s.StepIndex < first {
 			// Before this turn, or no turn of this hook's: passed for good.
 			return pass(s)
-		}
-		if ctx.Err() != nil {
-			// Out of time: what was handled is saved, the rest goes with the next hook.
-			return false
 		}
 		// A later turn's first hook rewrites or removes the record before that turn's first
 		// call is written (agy waits for PreInvocation), so a line read while the record
@@ -192,8 +202,9 @@ func captureAntigravityCalls(ctx context.Context, e hookrun.Env, r *hookrun.Repo
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		e.Logf("antigravity transcript: %v", err)
 	}
-	// A conversation's first read holds the turns before terma watched it: not counted.
-	if r != nil && readErr == nil && passed > 0 {
+	// A conversation's first read, however many hooks it takes, holds the turns before
+	// terma watched it: not counted.
+	if r != nil && !catchingUp && passed > 0 {
 		e.CountLost(r, sendas.LostTurnEnded, passed)
 	}
 	if b, err := json.Marshal(next); err == nil && !bytes.Equal(b, before) {
@@ -277,8 +288,9 @@ const antigravityTailLen = 256
 
 // readAntigravitySteps hands each call, and each invoke_subagent result, past last's
 // offset and above last.Step to emit, in order, and returns the state after the last line
-// emit took. emit returning false stops the read there, for the next hook.
-func readAntigravitySteps(path string, last antigravityCallState, emit func(s antigravityStep) bool) (antigravityCallState, error) {
+// emit took. emit returning false, or ctx done before a line, stops the read there, for the
+// next hook.
+func readAntigravitySteps(ctx context.Context, path string, last antigravityCallState, emit func(s antigravityStep) bool) (antigravityCallState, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		// Missing too: a subagent's first hooks run before its transcript exists.
@@ -303,11 +315,16 @@ func readAntigravitySteps(path string, last antigravityCallState, emit func(s an
 	}
 	br := bufio.NewReader(f)
 	for {
+		if ctx.Err() != nil {
+			// Out of time: what was handled is saved, the rest goes with the next hook.
+			state.Tail = antigravityTail(f, state.Offset)
+			return state, nil
+		}
 		line, n, err := antigravityLine(br)
 		if err != nil {
 			// A line without its newline is still being written.
 			if errors.Is(err, io.EOF) {
-				err = nil
+				err, state.CatchingUp = nil, false
 			}
 			state.Tail = antigravityTail(f, state.Offset)
 			return state, err
