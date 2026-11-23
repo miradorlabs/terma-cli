@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-23T11:52:23.578119777Z",
+  "generated_at": "2026-11-23T15:14:29.913232916Z",
   "vendors": [
     {
       "id": "anthropic",
@@ -48,7 +48,7 @@
       "reasoning": true,
       "harnesses": [],
       "last_change": {
-        "at": "2026-11-20T12:41:24.916039967Z",
+        "at": "2026-11-23T15:14:29.913232916Z",
         "changes": 2
       },
       "probed": false
@@ -113,7 +113,7 @@
       "reasoning": true,
       "harnesses": [],
       "last_change": {
-        "at": "2026-11-20T12:52:41.662173791Z",
+        "at": "2026-11-23T15:14:29.913232916Z",
         "changes": 2
       },
       "probed": false
@@ -134,7 +134,7 @@
       "reasoning": true,
       "harnesses": [],
       "last_change": {
-        "at": "2026-11-20T12:41:24.916039967Z",
+        "at": "2026-11-23T15:14:29.913232916Z",
         "changes": 2
       },
       "probed": false
@@ -419,7 +419,7 @@
       "reasoning": true,
       "harnesses": [],
       "last_change": {
-        "at": "2026-11-19T18:16:55.34160588Z",
+        "at": "2026-11-23T15:14:29.913232916Z",
         "changes": 2
       },
       "probed": false
@@ -524,8 +524,8 @@
       "reasoning": true,
       "harnesses": [],
       "last_change": {
-        "at": "2026-11-18T20:37:18.20454344Z",
-        "changes": 1
+        "at": "2026-11-23T15:14:29.913232916Z",
+        "changes": 2
       },
       "probed": false
     },
@@ -545,7 +545,7 @@
       "reasoning": true,
       "harnesses": [],
       "last_change": {
-        "at": "2026-11-19T18:16:55.34160588Z",
+        "at": "2026-11-23T15:14:29.913232916Z",
         "changes": 2
       },
       "probed": false
@@ -734,7 +734,7 @@
       "reasoning": true,
       "harnesses": [],
       "last_change": {
-        "at": "2026-11-16T14:58:16.292875039Z",
+        "at": "2026-11-23T15:14:29.913232916Z",
         "changes": 1
       },
       "probed": false
@@ -998,7 +998,7 @@
       "reasoning": true,
       "harnesses": [],
       "last_change": {
-        "at": "2026-11-16T14:58:16.292875039Z",
+        "at": "2026-11-23T15:14:29.913232916Z",
         "changes": 1
       },
       "probed": false
@@ -1061,7 +1061,7 @@
       "reasoning": true,
       "harnesses": [],
       "last_change": {
-        "at": "2026-11-16T14:58:16.292875039Z",
+        "at": "2026-11-23T15:14:29.913232916Z",
         "changes": 1
       },
       "probed": false
