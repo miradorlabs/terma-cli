@@ -1,6 +1,7 @@
 // Package refresh rewrites, with this build's templates, the home-directory files an
-// earlier terma wrote: from disk alone, never creating a file, signing in, or changing a
-// choice, which `terma setup` would.
+// earlier terma wrote: from disk alone, never creating an agent's file, signing in, or
+// changing a choice, which `terma setup` would. It may write terma's own, such as a
+// headers helper under its config directory.
 package refresh
 
 import (
