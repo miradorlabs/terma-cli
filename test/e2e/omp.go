@@ -2,9 +2,16 @@ package e2e
 
 import (
 	"bytes"
+	"cmp"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"fmt"
+	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
+	"strings"
 	"testing"
 )
 
@@ -13,8 +20,12 @@ import (
 // (internal/agents/omp/terma-omp.ts, ~/.omp/agent/extensions/terma-omp.ts)
 // exports nothing and only hands sessions, prompts and file edits to
 // `terma hook omp-*`, so its commits carry attribution. The direct half of a comparison
-// points the native exporter at the receiver. Only the installed build is tested: the npm
-// package is over a gigabyte.
+// points the native exporter at the receiver. The builds are the installed one, or
+// TERMA_E2E_OMP_VERSIONS's: each release's standalone binary from GitHub, checked against
+// the release's SHA256SUMS.txt (the npm package is over a gigabyte).
+
+// ompPackage is OMP's npm package, which lists its releases.
+const ompPackage = "@oh-my-pi/pi-coding-agent"
 
 func forEachOmp(t *testing.T, run func(t *testing.T, b Binary)) {
 	t.Helper()
@@ -22,13 +33,52 @@ func forEachOmp(t *testing.T, run func(t *testing.T, b Binary)) {
 		t.Skip("live tests run only with TERMA_E2E=1")
 	}
 	skipUnlessSelected(t, "omp")
-	path, err := exec_LookPath("omp")
-	if err != nil {
+	spec := cmp.Or(os.Getenv("TERMA_E2E_OMP_VERSIONS"), "installed")
+	builds := resolve(t, "omp", spec, func() ([]string, error) { return npmReleases(ompPackage) }, ensureOmp)
+	if len(builds) == 0 {
 		Record(t.Name(), "not run", "omp is not installed")
 		t.Skip("omp is not installed")
 	}
-	b := Binary{Harness: "omp", Version: numberOf(Version(path)), Path: path, Installed: true}
-	t.Run(b.Label(), func(t *testing.T) { scenarioOfBuild(t, b); run(t, b) })
+	for _, b := range builds {
+		t.Run(b.Label(), func(t *testing.T) { scenarioOfBuild(t, b); run(t, b) })
+	}
+}
+
+// ensureOmp fetches the release's binary for this platform, checked against its SHA256SUMS.txt.
+func ensureOmp(version string) (string, error) {
+	if err := CheckPathName("omp version", version); err != nil {
+		return "", err
+	}
+	path := filepath.Join(versionsDir(), "omp", version, "omp")
+	if _, err := os.Stat(path); err == nil {
+		return abs(path), nil
+	}
+	asset := "omp-" + runtime.GOOS + "-" + map[string]string{"arm64": "arm64", "amd64": "x64"}[runtime.GOARCH]
+	base := "https://github.com/can1357/oh-my-pi/releases/download/v" + version + "/"
+	sums, err := fetch(base + "SHA256SUMS.txt")
+	if err != nil {
+		return "", err
+	}
+	want := ""
+	for line := range strings.Lines(string(sums)) {
+		if sum, name, ok := strings.Cut(strings.TrimSpace(line), "  "); ok && name == asset {
+			want = sum
+		}
+	}
+	if want == "" {
+		return "", fmt.Errorf("omp %s: no %s in SHA256SUMS.txt", version, asset)
+	}
+	bin, err := fetch(base + asset)
+	if err != nil {
+		return "", err
+	}
+	if sum := sha256.Sum256(bin); hex.EncodeToString(sum[:]) != want {
+		return "", fmt.Errorf("omp %s: checksum mismatch", version)
+	}
+	if err := writeBuild(path, bin); err != nil {
+		return "", err
+	}
+	return abs(path), nil
 }
 
 // UseOmpProvider points the sandbox's omp at an OpenAI-compatible endpoint.
