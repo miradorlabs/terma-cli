@@ -1222,3 +1222,80 @@ func TestPreActivationFailsClosedOnProfileOnlyRoutedEvent(t *testing.T) {
 		t.Fatalf("profile-only routed event must fail closed without routing state: res=%+v sent=%d", res, len(sent()))
 	}
 }
+
+// Idempotent no_destination loss recording: a flush whose context expires during a slow
+// parcel must not double-count destination-less events when the batch replays, and even a
+// crash between ImportLosses and ackBatch counts the same batch once in ReadLosses and
+// TakeNewLosses.
+func TestRoutedNoDestinationLossIsIdempotentOnCanceledFlush(t *testing.T) {
+	t.Parallel()
+	m := newRoutedMachine(t)
+	enr := m.createState(config.DefaultProfile, aliceLane, []routing.Team{
+		orgTeam("org-a", "team-slow", "github.com/acme/app"),
+	}, func(s *routing.State, _ map[string]string) error {
+		return s.Bind("github.com/acme/app", "org-a", false)
+	})
+
+	release := make(chan struct{})
+	var stall atomic.Bool
+	stall.Store(true)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.Copy(io.Discard, r.Body)
+		if stall.Load() {
+			select {
+			case <-r.Context().Done():
+			case <-release:
+			}
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(func() {
+		close(release)
+		srv.Close()
+	})
+
+	noDestEv := routedEvent(aliceLane, config.DefaultProfile, "", "github.com/acme/app", semconv.TermaToolCallEvent)
+	m.queueRaw(
+		routedEvent(aliceLane, config.DefaultProfile, enr["team-slow"], "github.com/acme/app", semconv.TermaToolCallEvent),
+		noDestEv,
+	)
+
+	// Pass 1: flush context expires while team-slow is stalled -> batch cannot ack, and
+	// no premature no_destination loss is written.
+	ctx1, cancel1 := context.WithTimeout(t.Context(), 150*time.Millisecond)
+	defer cancel1()
+	cfg := &config.Config{OTLPURL: srv.URL, ProfileName: config.DefaultProfile, AuthURL: routedAuth}
+	r := m.router(&fakeSignIn{account: aliceLane, token: "tok"})
+	res1 := r.Flush(ctx1, m.spool, cfg, true, 0)
+	if res1.Err == nil || m.pending() != 2 {
+		t.Fatalf("canceled pass 1 = %+v, pending=%d", res1, m.pending())
+	}
+	spoolDir := filepath.Join(m.state, spool.Dir)
+	if losses, err := spool.ReadLosses(spoolDir, time.Now()); err != nil || losses.Counts[LossNoDestination] != 0 {
+		t.Fatalf("canceled pass must not record premature no_destination loss: losses=%+v err=%v", losses, err)
+	}
+
+	// Pass 2: endpoint recovers -> both events settle, exactly 1 no_destination recorded.
+	stall.Store(false)
+	res2 := r.Flush(t.Context(), m.spool, cfg, true, 0)
+	if res2.Sent != 1 || res2.Unroutable != 1 || res2.Err != nil || m.pending() != 0 {
+		t.Fatalf("recovery pass 2 = %+v, pending=%d", res2, m.pending())
+	}
+	taken1, err := spool.TakeNewLosses(spoolDir)
+	if err != nil || taken1[LossNoDestination] != 1 {
+		t.Fatalf("TakeNewLosses after pass 2 = %v (err=%v), want 1", taken1, err)
+	}
+
+	// Simulate a replay of the exact same noDest batch (e.g. crash between ImportLosses and ackBatch).
+	p := &pass{r: r, s: m.spool}
+	if err := p.recordNoDestination([]spool.Event{noDestEv}); err != nil {
+		t.Fatalf("replay recordNoDestination: %v", err)
+	}
+	if losses, err := spool.ReadLosses(spoolDir, time.Now()); err != nil || losses.Counts[LossNoDestination] != 1 {
+		t.Fatalf("ReadLosses after replay = %+v (err=%v), want 1", losses, err)
+	}
+	if taken2, err := spool.TakeNewLosses(spoolDir); err != nil || taken2[LossNoDestination] != 0 {
+		t.Fatalf("TakeNewLosses after replay = %v (err=%v), want 0 duplicates", taken2, err)
+	}
+}
