@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -30,23 +31,50 @@ func gitStore(p *pushRepo, account string) *session.Store {
 // its spool nor its state directory takes a write, so whatever it keeps is parked.
 func sandboxedHook(t *testing.T, p *pushRepo) Env {
 	t.Helper()
-	if os.Geteuid() == 0 {
-		t.Skip("root writes a directory its mode forbids")
-	}
 	dir, state := t.TempDir(), t.TempDir()
 	sp, err := spool.Open(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
 	sp.Bind(sendas.AccountUnreadable)
-	for _, d := range []string{dir, state} {
+	readOnly(t, dir, state)
+	return Env{StateDir: state, Now: time.Now(), Cwd: p.root, Spool: sp, Team: p.team, Policy: hookruntest.Admitting(p.root),
+		Account: sendas.AccountUnreadable, AwaitPush: func(string) {}}
+}
+
+// readOnly makes dirs refuse a write, as an agent's sandbox does, until the test ends; it
+// skips the test where a directory's mode can't (modeIgnored).
+func readOnly(t *testing.T, dirs ...string) {
+	t.Helper()
+	if why := modeIgnored(); why != "" {
+		t.Skip(why)
+	}
+	chmodReadOnly(t, dirs...)
+}
+
+// chmodReadOnly sets dirs' mode to refuse a write until the test ends, where the mode is
+// kept (modeIgnored).
+func chmodReadOnly(t *testing.T, dirs ...string) {
+	t.Helper()
+	for _, d := range dirs {
 		if err := os.Chmod(d, 0o500); err != nil {
 			t.Fatal(err)
 		}
 		t.Cleanup(func() { _ = os.Chmod(d, 0o700) })
 	}
-	return Env{StateDir: state, Now: time.Now(), Cwd: p.root, Spool: sp, Team: p.team, Policy: hookruntest.Admitting(p.root),
-		Account: sendas.AccountUnreadable, AwaitPush: func(string) {}}
+}
+
+// modeIgnored is why a directory whose mode forbids a write takes one anyway here, or ""
+// where the mode is kept. Where it is ignored, a sandboxed hook would write its state
+// directory and spool as any other hook does, and the sandbox's path would go untested.
+func modeIgnored() string {
+	switch {
+	case runtime.GOOS == "windows":
+		return "Windows writes a directory whose mode forbids it"
+	case os.Geteuid() == 0:
+		return "root writes a directory its mode forbids"
+	}
+	return ""
 }
 
 // signedIn is a hook outside the sandbox signed in as account, whose AwaitPush reports at once.

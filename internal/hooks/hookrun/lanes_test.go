@@ -18,7 +18,8 @@ import (
 // lanedHook is a pushRepo's hook run under signIn, as auth.Account names the sign-in
 // (serverKey for a server key's profile), with sandboxed hooks' failures to write the
 // state directory on request: its spool and its state directory both refuse a write, so
-// whatever is kept is parked.
+// whatever is kept is parked. The spool refuses a write on every OS; the state directory
+// only where its mode is kept (modeIgnored).
 func lanedHook(t *testing.T, p *pushRepo, signIn string, serverKey, sandboxed bool) (Env, string) {
 	t.Helper()
 	// Reported at once: no git push is running.
@@ -40,10 +41,7 @@ func lanedHook(t *testing.T, p *pushRepo, signIn string, serverKey, sandboxed bo
 			t.Fatal(err)
 		}
 		state = t.TempDir()
-		if err := os.Chmod(state, 0o500); err != nil {
-			t.Fatal(err)
-		}
-		t.Cleanup(func() { _ = os.Chmod(state, 0o700) })
+		chmodReadOnly(t, state)
 	}
 	return Env{StateDir: state, Now: time.Now(), Cwd: p.root, Spool: sp, Team: p.team, Policy: hookruntest.Admitting(p.root),
 		Account: signIn, ServerKey: serverKey, AwaitPush: func(string) {}}, dir
@@ -105,6 +103,10 @@ func TestAHookWithNoLaneWritesNothing(t *testing.T) {
 	} {
 		for _, sandboxed := range []bool{false, true} {
 			t.Run(tc.name+map[bool]string{true: " sandboxed"}[sandboxed], func(t *testing.T) {
+				// The count below needs a state directory that refuses the observation's sequence.
+				if why := modeIgnored(); sandboxed && why != "" {
+					t.Skip(why)
+				}
 				p := newPushRepo(t)
 				env, dir := lanedHook(t, p, tc.signIn, false, sandboxed)
 				collect(t, p, env)
