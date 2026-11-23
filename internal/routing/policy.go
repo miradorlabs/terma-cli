@@ -90,18 +90,23 @@ func StorePolicy(cfg *config.Config, pol *config.Policy) error {
 	return rejected
 }
 
-// StoreTeamPolicy writes pol as its team's policy file in stateDir without touching
-// config.json or checking a profile's single organization. It requires TeamID,
-// OrganizationID, and AuthURL and refuses a backward revision for the same org/env.
-func StoreTeamPolicy(stateDir string, pol *config.Policy) error {
-	if pol == nil || pol.TeamID == "" || pol.OrganizationID == "" || pol.AuthURL == "" {
+// StoreTeamPolicy writes t's policy file in stateDir without touching config.json or
+// checking a profile's single organization. Callers must pass the committed Team
+// returned by routing.Update (after ApplyRefresh succeeds and commits, never inside the
+// update closure or from an uncommitted copy). It requires TeamID, OrganizationID, and
+// AuthURL matching t, downgrades a non-personal team's global policy to repository mode
+// (matching State.ApplyRefresh), and refuses a backward revision for the same org/env.
+func StoreTeamPolicy(stateDir string, t Team) error {
+	pol := t.Policy
+	if !t.owns(pol) {
 		return errors.New("a team's collection policy is stored only with its team, organization and environment")
 	}
+	pol = sanitizeTeamPolicy(pol, t.Personal)
 	path, err := config.PolicyPath(stateDir, pol.TeamID)
 	if err != nil {
 		return err
 	}
-	return writePolicyFile(stateDir, path, pol)
+	return writePolicyFile(stateDir, path, &pol)
 }
 
 func writePolicyFile(stateDir, path string, pol *config.Policy) error {

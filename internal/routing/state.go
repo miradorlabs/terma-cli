@@ -167,10 +167,21 @@ type Refresh struct {
 	At time.Time
 }
 
+// sanitizeTeamPolicy downgrades a global policy on a non-personal team to repository
+// mode with no repositories so only a personal organization may collect everything.
+func sanitizeTeamPolicy(pol config.Policy, personal bool) config.Policy {
+	if pol.Global() && !personal {
+		pol.Mode, pol.Repositories = config.ModeRepo, nil
+	}
+	return pol
+}
+
 // ApplyRefresh records r on its enrollment and reports whether it changed anything. A
 // result for an ended enrollment, or from a request started in an older epoch, is
-// discarded so neither a delayed success nor a delayed refusal/transient can overwrite a
-// newer state transition. A policy whose revision moved backwards is refused.
+// discarded (returning false, nil) so neither a delayed success nor a delayed
+// refusal/transient can overwrite a newer state transition; two concurrent refreshers on
+// the same team intentionally let the first win and discard the second. A policy whose
+// revision moved backwards is refused.
 func (s *State) ApplyRefresh(r Refresh) (bool, error) {
 	t := s.Team(r.EnrollmentID)
 	if t == nil || r.Epoch != t.Epoch {
@@ -182,12 +193,7 @@ func (s *State) ApplyRefresh(r Refresh) (bool, error) {
 		if !t.owns(*r.Policy) || r.Policy.Revision < t.Policy.Revision {
 			return false, errors.New("the refreshed policy is another team's, organization's or environment's, or an older revision")
 		}
-		pol := *r.Policy
-		if pol.Global() && !t.Personal {
-			// Only a personal organization may collect everything: anyone else's such
-			// policy collects nothing.
-			pol.Mode, pol.Repositories = config.ModeRepo, nil
-		}
+		pol := sanitizeTeamPolicy(*r.Policy, t.Personal)
 		t.Policy, t.Refusals, t.RefusedAt, t.SignInNeeded, t.LastError = pol, 0, time.Time{}, false, ""
 		t.Epoch++
 	case r.Failure == Terminal:

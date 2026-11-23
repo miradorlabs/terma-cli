@@ -90,12 +90,15 @@ func (s Source) FetchTeam(ctx context.Context, cfg *config.Config, t routing.Tea
 // the class of its failure (Classify), under the epoch t had as the request started, so a
 // delayed result never overwrites a newer transition.
 //
-// RefreshTeam does not persist the policy file: the caller writes it via
-// routing.StoreTeamPolicy only after State.ApplyRefresh accepts the result (matching
-// epoch), so a stale-epoch success never overwrites policies/<team>.json. Callers that
-// handle OrgAccessLost org-wide should snapshot per-enrollment epochs across
-// t.OrganizationID before invoking RefreshTeam and apply them via
-// State.ApplyOrgAccessLost.
+// RefreshTeam does not persist the policy file: the caller applies the result inside
+// routing.Update (which checks the state's account/generation and team epoch) and, only
+// after routing.Update returns successfully, writes the committed team
+// (*committed.Team(r.EnrollmentID)) via routing.StoreTeamPolicy (never inside the Update
+// closure or from an uncommitted local copy). That ensures a stale-epoch or
+// stale-generation result never overwrites policies/<team>.json and any non-personal
+// global policy is persisted sanitized. Callers that handle OrgAccessLost org-wide
+// should snapshot per-enrollment epochs across t.OrganizationID before invoking
+// RefreshTeam and apply them via State.ApplyOrgAccessLost.
 func (s Source) RefreshTeam(ctx context.Context, cfg *config.Config, t routing.Team) (routing.Refresh, error) {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()

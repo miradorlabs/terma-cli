@@ -89,15 +89,24 @@ func TestFetchTeamUsesSingleUserToken(t *testing.T) {
 	cfg.Account = cred.Account()
 	settings, _ := os.ReadFile(config.Path(cfg.Dir))
 
-	// Seed an existing policy file at revision 5 to verify RefreshTeam does not overwrite it
-	// prior to epoch-checked ApplyRefresh.
-	if err := routing.StoreTeamPolicy(cfg.StateDir, &config.Policy{Mode: config.ModeRepo, TeamID: "team-b", OrganizationID: "org_b", AuthURL: srv.URL, Revision: 5, FetchedAt: time.Now().UTC()}); err != nil {
+	// Seed routing.State and an existing policy file at revision 5 to verify RefreshTeam
+	// does not overwrite the policy file prior to a committed routing.Update.
+	seedPol := config.Policy{Mode: config.ModeRepo, TeamID: "team-b", OrganizationID: "org_b", AuthURL: srv.URL, Revision: 5, FetchedAt: time.Now().UTC()}
+	var enrID string
+	st, err := routing.Create(cfg.StateDir, cfg.ProfileName, cfg.Account, func(s *routing.State) error {
+		var selErr error
+		enrID, selErr = s.Select(routing.Team{OrganizationID: "org_b", AuthURL: srv.URL, TeamID: "team-b", Policy: seedPol})
+		return selErr
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := routing.StoreTeamPolicy(cfg.StateDir, *st.Team(enrID)); err != nil {
 		t.Fatal(err)
 	}
 
-	teamB := routing.Team{EnrollmentID: "e-b", OrganizationID: "org_b", AuthURL: srv.URL, TeamID: "team-b", Epoch: 3}
-	r, err := (Source{}).RefreshTeam(t.Context(), cfg, teamB)
-	if err != nil || r.Policy == nil || r.Epoch != 3 || r.EnrollmentID != "e-b" || r.At.IsZero() {
+	r, err := (Source{}).RefreshTeam(t.Context(), cfg, *st.Team(enrID))
+	if err != nil || r.Policy == nil || r.Epoch != 0 || r.EnrollmentID != enrID || r.At.IsZero() {
 		t.Fatalf("RefreshTeam = %+v, %v", r, err)
 	}
 	mu.Lock()
@@ -110,11 +119,20 @@ func TestFetchTeamUsesSingleUserToken(t *testing.T) {
 	if !p.Wildcards || p.TeamID != "team-b" || p.OrganizationID != "org_b" || p.AuthURL != srv.URL || p.Revision != 7 || !p.IncludePrompts || p.IncludeToolContent {
 		t.Fatalf("policy = %+v", p)
 	}
-	// Policy file stays at revision 5 until the caller's epoch-checked ApplyRefresh commits it.
+	// Policy file stays at revision 5 until routing.Update commits the epoch-checked ApplyRefresh.
 	if stored, ok, err := config.ReadPolicy(cfg.StateDir, "team-b"); err != nil || !ok || stored.Revision != 5 {
 		t.Fatalf("RefreshTeam prematurely overwrote policy file: %+v, %v, %v", stored, ok, err)
 	}
-	if err := routing.StoreTeamPolicy(cfg.StateDir, r.Policy); err != nil {
+	var changed bool
+	committed, err := routing.Update(cfg.StateDir, cfg.ProfileName, st.Expect(), func(s *routing.State) error {
+		var applyErr error
+		changed, applyErr = s.ApplyRefresh(r)
+		return applyErr
+	})
+	if err != nil || !changed {
+		t.Fatalf("routing.Update(ApplyRefresh) = %v, %v", changed, err)
+	}
+	if err := routing.StoreTeamPolicy(cfg.StateDir, *committed.Team(enrID)); err != nil {
 		t.Fatal(err)
 	}
 	if stored, ok, err := config.ReadPolicy(cfg.StateDir, "team-b"); err != nil || !ok || stored.Revision != 7 {

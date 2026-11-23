@@ -29,8 +29,9 @@ var ErrNoState = errors.New("no routing state for this profile")
 // ErrStateExists is Create finding an existing routing state for the profile.
 var ErrStateExists = errors.New("profile already has a routing state")
 
-// ErrAccountMismatch is a mutation finding that the routing state on disk belongs to a
-// different account than the caller expects.
+// ErrAccountMismatch is a routing-state mutation finding that the state file on disk
+// belongs to a different account than the caller expects (distinct from
+// policy.ErrAccountMismatch, which reports a mismatched keychain credential during fetch).
 var ErrAccountMismatch = errors.New("routing state belongs to another account")
 
 // ErrStaleGeneration is a mutation finding that the routing state on disk changed since
@@ -265,7 +266,8 @@ func Replace(stateDir, profile string, expectPrev *Expect, newAccount string, ch
 
 // Delete removes profile's routing state under the lock if the on-disk state matches
 // expect. Returns ErrNoState if absent, or ErrAccountMismatch/ErrStaleGeneration if
-// expect is not satisfied.
+// expect is not satisfied. A corrupt state file fails to load and cannot be deleted
+// through Delete; recover or reset it via Replace(stateDir, profile, nil, ...).
 func Delete(stateDir, profile string, expect Expect) error {
 	if err := expect.valid(); err != nil {
 		return err

@@ -501,30 +501,80 @@ func TestStoreCASRejectsWrongAccountAndStaleGeneration(t *testing.T) {
 	}
 }
 
-// StoreTeamPolicy requires team, organization, and auth environment, and refuses a
-// backward revision without altering the stored policy.
+// StoreTeamPolicy requires team, organization, and auth environment matching the Team,
+// downgrades a non-personal team's global policy to repository mode on disk, preserves
+// global mode for a personal team, and refuses a backward revision without altering the
+// stored policy.
 func TestStoreTeamPolicyValidation(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	base := config.Policy{Mode: config.ModeRepo, TeamID: "team-a", OrganizationID: "acme", AuthURL: authURL, Revision: 3, FetchedAt: now}
-	for _, bad := range []config.Policy{
-		{Mode: config.ModeRepo, OrganizationID: "acme", AuthURL: authURL, FetchedAt: now},
-		{Mode: config.ModeRepo, TeamID: "team-a", AuthURL: authURL, FetchedAt: now},
-		{Mode: config.ModeRepo, TeamID: "team-a", OrganizationID: "acme", FetchedAt: now},
+	basePol := config.Policy{Mode: config.ModeRepo, TeamID: "team-a", OrganizationID: "acme", AuthURL: authURL, Revision: 3, FetchedAt: now}
+	baseTeam := Team{TeamID: "team-a", OrganizationID: "acme", AuthURL: authURL, Policy: basePol}
+	for _, bad := range []Team{
+		{OrganizationID: "acme", AuthURL: authURL, Policy: config.Policy{Mode: config.ModeRepo, OrganizationID: "acme", AuthURL: authURL, FetchedAt: now}},
+		{TeamID: "team-a", AuthURL: authURL, Policy: config.Policy{Mode: config.ModeRepo, TeamID: "team-a", AuthURL: authURL, FetchedAt: now}},
+		{TeamID: "team-a", OrganizationID: "acme", Policy: config.Policy{Mode: config.ModeRepo, TeamID: "team-a", OrganizationID: "acme", FetchedAt: now}},
+		{TeamID: "team-a", OrganizationID: "acme", AuthURL: authURL, Policy: config.Policy{Mode: config.ModeRepo, TeamID: "other-team", OrganizationID: "acme", AuthURL: authURL, FetchedAt: now}},
+		{TeamID: "team-a", OrganizationID: "acme", AuthURL: authURL, Policy: config.Policy{Mode: config.ModeRepo, TeamID: "team-a", OrganizationID: "other-org", AuthURL: authURL, FetchedAt: now}},
+		{TeamID: "team-a", OrganizationID: "acme", AuthURL: authURL, Policy: config.Policy{Mode: config.ModeRepo, TeamID: "team-a", OrganizationID: "acme", AuthURL: "https://other.example", FetchedAt: now}},
 	} {
-		if err := StoreTeamPolicy(dir, &bad); err == nil {
-			t.Errorf("StoreTeamPolicy accepted missing scope %+v", bad)
+		if err := StoreTeamPolicy(dir, bad); err == nil {
+			t.Errorf("StoreTeamPolicy accepted invalid/mismatched team %+v", bad)
 		}
 	}
-	must(t, StoreTeamPolicy(dir, &base))
-	older := base
-	older.Revision = 2
-	if err := StoreTeamPolicy(dir, &older); err == nil {
+	must(t, StoreTeamPolicy(dir, baseTeam))
+	older := baseTeam
+	older.Policy.Revision = 2
+	if err := StoreTeamPolicy(dir, older); err == nil {
 		t.Fatal("StoreTeamPolicy accepted backward revision")
 	}
 	got, ok, err := config.ReadPolicy(dir, "team-a")
 	if err != nil || !ok || got.Revision != 3 {
 		t.Fatalf("after rejected backward write: %+v, ok=%v, err=%v", got, ok, err)
+	}
+
+	// ApplyRefresh and StoreTeamPolicy persist the exact same downgraded policy when a
+	// non-personal team returns ModeGlobal.
+	globalPol := config.Policy{
+		Mode: config.ModeGlobal, TeamID: "team-a", OrganizationID: "acme", AuthURL: authURL,
+		Revision: 4, Repositories: []string{"github.com/acme/api"}, FetchedAt: now,
+	}
+	st, err := Create(dir, "default", testAccount, func(s *State) error {
+		_, err := s.Select(baseTeam)
+		return err
+	})
+	must(t, err)
+	enrID := st.Teams[0].EnrollmentID
+	committed, err := Update(dir, "default", st.Expect(), func(s *State) error {
+		_, err := s.ApplyRefresh(Refresh{EnrollmentID: enrID, Epoch: 0, Policy: &globalPol, At: now})
+		return err
+	})
+	must(t, err)
+	must(t, StoreTeamPolicy(dir, *committed.Team(enrID)))
+	got, ok, err = config.ReadPolicy(dir, "team-a")
+	if err != nil || !ok || got.Mode != config.ModeRepo || len(got.Repositories) != 0 || got.Revision != 4 || committed.Team(enrID).Policy.Mode != got.Mode {
+		t.Fatalf("non-personal global stored unsanitized: file=%+v state=%+v, ok=%v, err=%v", got, committed.Team(enrID).Policy, ok, err)
+	}
+
+	// Direct StoreTeamPolicy on an unsanitized non-personal global Team also downgrades.
+	unsanitized := baseTeam
+	unsanitized.Policy = globalPol
+	unsanitized.Policy.Revision = 5
+	must(t, StoreTeamPolicy(dir, unsanitized))
+	got, ok, err = config.ReadPolicy(dir, "team-a")
+	if err != nil || !ok || got.Mode != config.ModeRepo || len(got.Repositories) != 0 || got.Revision != 5 {
+		t.Fatalf("direct non-personal global stored unsanitized: %+v, ok=%v, err=%v", got, ok, err)
+	}
+
+	// A personal team keeps ModeGlobal when persisted.
+	personalGlobal := Team{
+		TeamID: "personal-team", OrganizationID: "personal-org", AuthURL: authURL, Personal: true,
+		Policy: config.Policy{Mode: config.ModeGlobal, TeamID: "personal-team", OrganizationID: "personal-org", AuthURL: authURL, Revision: 1, FetchedAt: now},
+	}
+	must(t, StoreTeamPolicy(dir, personalGlobal))
+	got, ok, err = config.ReadPolicy(dir, "personal-team")
+	if err != nil || !ok || got.Mode != config.ModeGlobal {
+		t.Fatalf("personal global stored wrong mode: %+v, ok=%v, err=%v", got, ok, err)
 	}
 }
 
