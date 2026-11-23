@@ -25,6 +25,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/routing"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
+	"github.com/miradorlabs/terma-cli/internal/sendas"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 
 	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
@@ -131,7 +132,7 @@ func TestRelayRespectsHarnessSelection(t *testing.T) {
 			cfg := &config.Config{Dir: testApp.dir, StateDir: testApp.stateDir, Policy: config.DefaultPolicy(), OTLPURL: host.URL, Harnesses: []string{test.harness}, ServerKeySignIn: true}
 			cfg.Policy.Repositories = []string{appRepo.Origin}
 			r := newTestRelay(relay.Options{Token: "test-token", Dir: t.TempDir(), Resolve: testApp.relayDeps().Resolver(cfg), Lookup: func(string, time.Time) (claim.Claim, bool) {
-				return claim.Claim{ProjectID: "team", Tool: test.tool, Repository: appRepo}, true
+				return claim.Claim{ProjectID: "team", Tool: test.tool, Repository: appRepo, Account: sendas.NoPersonLane}, true
 			}})
 			ctx, cancel := context.WithCancel(t.Context())
 			done := make(chan struct{})
@@ -212,7 +213,7 @@ func TestQueuedRelayExportsRespectHarnessDeselection(t *testing.T) {
 	dir := t.TempDir()
 	cfg := &config.Config{Dir: testApp.dir, StateDir: testApp.stateDir, ProfileName: config.DefaultProfile, Policy: config.DefaultPolicy(), OTLPURL: host.URL}
 	r := newTestRelay(relay.Options{Token: "test-token", Dir: dir, Resolve: testApp.relayDeps().Resolver(cfg), Lookup: func(string, time.Time) (claim.Claim, bool) {
-		return claim.Claim{ProjectID: "team", Tool: "codex", Repository: appRepo}, true
+		return claim.Claim{ProjectID: "team", Tool: "codex", Repository: appRepo, Account: sendas.NoPersonLane}, true
 	}})
 	ctx, cancel := context.WithCancel(t.Context())
 	done := make(chan struct{})
@@ -265,7 +266,7 @@ func TestQueuedRelayExportsRespectHarnessDeselection(t *testing.T) {
 
 func seedPolicyLogin(t *testing.T, authURL string) {
 	t.Helper()
-	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, &auth.Credential{AccessToken: "developer-policy-token", SessionID: "s-policy", UserID: "u-1", AuthURL: authURL, ExpiresAt: time.Now().Add(time.Hour)}); err != nil {
+	if err := saveSignIn(testApp.dir, &auth.Credential{AccessToken: "developer-policy-token", SessionID: "s-policy", UserID: "u-1", AuthURL: authURL, ExpiresAt: time.Now().Add(time.Hour)}); err != nil {
 		t.Fatal(err)
 	}
 	if err := config.UpdateProfile(testApp.dir, config.DefaultProfile, func(p *config.Profile) { p.OrganizationID = "org-test" }); err != nil {
@@ -290,7 +291,7 @@ func TestPolicyRefreshOutageRetainsValidatedPolicy(t *testing.T) {
 			p.OrganizationID, p.AuthURL, p.TeamID = "org-test", srv.URL, "team"
 			p.Revision, p.IncludePrompts = 9, false
 			p.FetchedAt = time.Now().Add(-time.Hour)
-			cfg := &config.Config{Dir: testApp.dir, StateDir: testApp.stateDir, ProfileName: config.DefaultProfile, OrganizationID: "org-test", AuthURL: srv.URL, APIURL: srv.URL, Policy: p}
+			cfg := &config.Config{Dir: testApp.dir, StateDir: testApp.stateDir, ProfileName: config.DefaultProfile, OrganizationID: "org-test", Account: auth.AccountKey(srv.URL, "u-1"), AuthURL: srv.URL, APIURL: srv.URL, Policy: p}
 			if err := routing.StorePolicy(cfg, &p); err != nil {
 				t.Fatal(err)
 			}
@@ -376,7 +377,7 @@ func TestPolicyRefreshOtherTeamKeepsSelectedCoverage(t *testing.T) {
 	defer srv.Close()
 	seedPolicyLogin(t, srv.URL)
 	selected := config.Policy{Mode: config.ModeGlobal, TeamID: "selected", OrganizationID: "org-test", AuthURL: srv.URL, DefaultProjectID: "selected", Revision: 9, FetchedAt: time.Now()}
-	cfg := &config.Config{Dir: testApp.dir, StateDir: testApp.stateDir, ProfileName: config.DefaultProfile, OrganizationID: "org-test", AuthURL: srv.URL, ProjectID: "selected", Policy: selected}
+	cfg := &config.Config{Dir: testApp.dir, StateDir: testApp.stateDir, ProfileName: config.DefaultProfile, OrganizationID: "org-test", Account: auth.AccountKey(srv.URL, "u-1"), AuthURL: srv.URL, ProjectID: "selected", Policy: selected}
 	if err := routing.StorePolicy(cfg, &selected); err != nil {
 		t.Fatal(err)
 	}

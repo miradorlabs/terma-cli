@@ -30,7 +30,7 @@ func TestTheSignInSourceSendsOnlyAsItsOwnAccount(t *testing.T) {
 	if src.Account() != "" {
 		t.Fatal("a signed-out profile has an account")
 	}
-	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(f)); err != nil {
+	if err := saveSignIn(testApp.dir, storedSession(f)); err != nil {
 		t.Fatal(err)
 	}
 	src = testApp.signInSource(cfg)
@@ -66,7 +66,7 @@ func TestTheSignInSourceFollowsASwitchAtOnce(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(f)); err != nil {
+	if err := saveSignIn(testApp.dir, storedSession(f)); err != nil {
 		t.Fatal(err)
 	}
 	src := testApp.signInSource(cfg)
@@ -76,7 +76,7 @@ func TestTheSignInSourceFollowsASwitchAtOnce(t *testing.T) {
 	if got := src.Account(); got != auth.AccountKey(f.srv.URL, "u-1") {
 		t.Fatalf("cached account = %q, want u-1's", got)
 	}
-	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSessionOf(f, "u-2")); err != nil {
+	if err := saveSignIn(testApp.dir, storedSessionOf(f, "u-2")); err != nil {
 		t.Fatal(err)
 	}
 	if got := src.Account(); got != auth.AccountKey(f.srv.URL, "u-2") {
@@ -105,7 +105,7 @@ func TestTheSignInSourceFollowsASwitchAtOnce(t *testing.T) {
 func TestAccountReadsTheProfileAndTheSignInAsOne(t *testing.T) {
 	f := newFakeAuth(t)
 	authSandbox(t, f)
-	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(f)); err != nil {
+	if err := saveSignIn(testApp.dir, storedSession(f)); err != nil {
 		t.Fatal(err)
 	}
 	if err := config.UpdateFile(testApp.dir, func(*config.File) {}); err != nil {
@@ -150,14 +150,14 @@ func TestAHookReadsTheProfileAndTheSignInAsOne(t *testing.T) {
 		t.Run(path.name, func(t *testing.T) {
 			f := newFakeAuth(t)
 			authSandbox(t, f)
-			if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSessionOf(f, "u-a")); err != nil {
+			if err := saveSignIn(testApp.dir, storedSessionOf(f, "u-a")); err != nil {
 				t.Fatal(err)
 			}
 			if err := config.UpdateFile(testApp.dir, func(*config.File) {}); err != nil {
 				t.Fatal(err)
 			}
 			testApp.betweenProfileReads = func() {
-				if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSessionOf(f, "u-b")); err != nil {
+				if err := saveSignIn(testApp.dir, storedSessionOf(f, "u-b")); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -220,7 +220,7 @@ func TestDoctorAddsTheHooksLossesToTheRelays(t *testing.T) {
 func TestARetiredSignInSendsNothingDoctorCounts(t *testing.T) {
 	f := newFakeAuth(t)
 	authSandbox(t, f)
-	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(f)); err != nil {
+	if err := saveSignIn(testApp.dir, storedSession(f)); err != nil {
 		t.Fatal(err)
 	}
 	cfg, err := testApp.loadConfig()
@@ -246,7 +246,7 @@ func TestARetiredSignInSendsNothingDoctorCounts(t *testing.T) {
 func TestARetirementMarksOnlyTheSignInThatSent(t *testing.T) {
 	f := newFakeAuth(t)
 	authSandbox(t, f)
-	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSessionOf(f, "u-2")); err != nil {
+	if err := saveSignIn(testApp.dir, storedSessionOf(f, "u-2")); err != nil {
 		t.Fatal(err)
 	}
 	cfg, err := testApp.loadConfig()
@@ -293,7 +293,7 @@ func TestAccountDoesNotWaitOnTheClient(t *testing.T) {
 func TestARetirementCountsAfterTheSessionRotated(t *testing.T) {
 	f := newFakeAuth(t)
 	authSandbox(t, f)
-	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(f)); err != nil {
+	if err := saveSignIn(testApp.dir, storedSession(f)); err != nil {
 		t.Fatal(err)
 	}
 	cfg, err := testApp.loadConfig()
@@ -322,7 +322,7 @@ func TestARetirementCountsAfterTheSessionRotated(t *testing.T) {
 func TestARetirementIsRecordedAfterAnotherProcessRotated(t *testing.T) {
 	f := newFakeAuth(t)
 	authSandbox(t, f)
-	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(f)); err != nil {
+	if err := saveSignIn(testApp.dir, storedSession(f)); err != nil {
 		t.Fatal(err)
 	}
 	cfg, err := testApp.loadConfig()
@@ -353,7 +353,7 @@ func TestASignInForAnotherEnvironmentIsNoDeliveryCredential(t *testing.T) {
 	authSandbox(t, f)
 	cred := storedSession(f)
 	cred.AuthURL = "https://auth.elsewhere.example.test"
-	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, cred); err != nil {
+	if err := saveSignIn(testApp.dir, cred); err != nil {
 		t.Fatal(err)
 	}
 	cfg, err := testApp.loadConfig()
@@ -374,7 +374,7 @@ func TestASignInWithNoUserIsNoDeliveryCredential(t *testing.T) {
 	authSandbox(t, f)
 	cred := storedSession(f)
 	cred.UserID = ""
-	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, cred); err != nil {
+	if err := saveSignIn(testApp.dir, cred); err != nil {
 		t.Fatal(err)
 	}
 	cfg, err := testApp.loadConfig()

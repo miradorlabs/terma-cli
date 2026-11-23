@@ -20,6 +20,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/account/secret"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
+	"github.com/miradorlabs/terma-cli/internal/sendas"
 )
 
 // keyPolicy is the policy the auth host serves for the key's team.
@@ -156,7 +157,7 @@ func TestSignOutOfAServerKey(t *testing.T) {
 		t.Run(fmt.Sprintf("behind a login %v", behindLogin), func(t *testing.T) {
 			gateway, _ := keySandbox(t)
 			if behindLogin {
-				if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(gateway)); err != nil {
+				if err := saveSignIn(testApp.dir, storedSession(gateway)); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -262,7 +263,7 @@ func TestSetupWithAServerKeyReplacesTheAgentsKeys(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	pol, err := testApp.relayDeps().Resolver(cfg)(claim.Claim{ProjectID: team, Tool: "claude-code"})
+	pol, err := testApp.relayDeps().Resolver(cfg)(claim.Claim{ProjectID: team, Tool: "claude-code", Account: sendas.NoPersonLane})
 	if err != nil || pol.Key != testServerKey {
 		t.Fatalf("the relay sends Claude Code's session with %q, %v; want the server key", pol.Key, err)
 	}
@@ -272,7 +273,7 @@ func TestSetupWithAServerKeyReplacesTheAgentsKeys(t *testing.T) {
 // for another team, and the keystore exactly as they were, --insecure-storage included.
 func TestAFailedServerKeySetupChangesNothing(t *testing.T) {
 	gateway, team := keySandbox(t)
-	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(gateway)); err != nil {
+	if err := saveSignIn(testApp.dir, storedSession(gateway)); err != nil {
 		t.Fatal(err)
 	}
 	if err := config.UpdateProfile(testApp.dir, config.DefaultProfile, func(p *config.Profile) {
@@ -348,7 +349,7 @@ func TestServerKeySetupMovesTheKeyWhereSecretsAreKept(t *testing.T) {
 		t.Fatalf("setup --insecure-storage: %v\n%s", err, out)
 	}
 	login := storedSession(gateway)
-	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, login); err != nil {
+	if err := saveSignIn(testApp.dir, login); err != nil {
 		t.Fatal(err)
 	}
 	keysFile, credentialsFile := filepath.Join(testApp.dir, "keys.json"), config.CredentialsPath(testApp.dir)
@@ -400,7 +401,7 @@ func TestServerKeySetupRecordsALoginTheKeychainRefuses(t *testing.T) {
 	if out, err := runTerma(t, "setup", "--yes", "--harness", "claude", "--insecure-storage"); err != nil {
 		t.Fatalf("setup --insecure-storage: %v\n%s", err, out)
 	}
-	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(gateway)); err != nil {
+	if err := saveSignIn(testApp.dir, storedSession(gateway)); err != nil {
 		t.Fatal(err)
 	}
 	secret.RefuseForTest(t, testApp.dir, "user-credential/")
@@ -452,7 +453,7 @@ func TestSetupWithARotatedServerKeyReplacesTheOld(t *testing.T) {
 // disk unused; signing in as a person again takes it back.
 func TestServerKeySetupAndSignInTakeTurns(t *testing.T) {
 	gateway, team := keySandbox(t)
-	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(gateway)); err != nil {
+	if err := saveSignIn(testApp.dir, storedSession(gateway)); err != nil {
 		t.Fatal(err)
 	}
 	setupWithKey(t)

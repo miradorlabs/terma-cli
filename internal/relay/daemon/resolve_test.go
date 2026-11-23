@@ -11,6 +11,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/relay"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
+	"github.com/miradorlabs/terma-cli/internal/sendas"
 )
 
 // A policy from another organization or environment, or none validated yet, grants nothing.
@@ -77,7 +78,7 @@ func TestResolverGrantsNothingOnceTheProfileIsGone(t *testing.T) {
 		t.Fatal(err)
 	}
 	resolve := Resolver(cfg, ResolverDeps{AgentName: func(string) string { return "" }, Endpoint: func(string, bool) string { return "https://otel.example" }, RelayTargets: func(s []string) []string { return s }})
-	if pol, err := resolve(claim.Claim{ProjectID: "p1"}); err == nil {
+	if pol, err := resolve(claim.Claim{ProjectID: "p1", Account: sendas.NoPersonLane}); err == nil {
 		t.Fatalf("granted %+v with no profile on file", pol)
 	}
 }
@@ -95,7 +96,7 @@ func TestResolverTellsALockedKeychainFromAMissingKey(t *testing.T) {
 	}
 	secret.FailForTest(t, configDir)
 	resolve := Resolver(cfg, ResolverDeps{AgentName: func(string) string { return "" }, Endpoint: func(string, bool) string { return "https://otel.example" }, RelayTargets: func(s []string) []string { return s }})
-	_, err := resolve(claim.Claim{ProjectID: "p1"})
+	_, err := resolve(claim.Claim{ProjectID: "p1", Account: sendas.NoPersonLane})
 	if !secret.IsUnavailable(err) || errors.Is(err, relay.ErrNoKey) {
 		t.Fatalf("resolve = %v; want the keychain unavailable, which is no missing key", err)
 	}
@@ -114,11 +115,11 @@ func TestResolverWaitsBeforeAskingALockedKeychainAgain(t *testing.T) {
 	}
 	unlock := secret.FailForTest(t, configDir)
 	resolve := Resolver(cfg, ResolverDeps{AgentName: func(string) string { return "" }, Endpoint: func(string, bool) string { return "https://otel.example" }, RelayTargets: func(s []string) []string { return s }})
-	if _, err := resolve(claim.Claim{ProjectID: "p1"}); !secret.IsUnavailable(err) {
+	if _, err := resolve(claim.Claim{ProjectID: "p1", Account: sendas.NoPersonLane}); !secret.IsUnavailable(err) {
 		t.Fatalf("first resolve = %v", err)
 	}
 	unlock()
-	if _, err := resolve(claim.Claim{ProjectID: "p1"}); !secret.IsUnavailable(err) {
+	if _, err := resolve(claim.Claim{ProjectID: "p1", Account: sendas.NoPersonLane}); !secret.IsUnavailable(err) {
 		t.Fatalf("a resolve inside %s asked the keychain again: %v", keychainRetry, err)
 	}
 }

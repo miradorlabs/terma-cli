@@ -105,21 +105,25 @@ func sameFiles(was, now [2]os.FileInfo) bool {
 	return unchanged(was[0], now[0]) && unchanged(was[1], now[1])
 }
 
-// readAccount reads the profile's mode, then its sign-in. A profile whose mode can't be
-// read may be a server key's, which keeps an earlier person's sign-in on disk, or a
+// readAccount reads the profile's mode and pairing, then its sign-in. A profile whose mode
+// can't be read may be a server key's, which keeps an earlier person's sign-in on disk, or a
 // person's: neither's, so the unreadable account.
 func (s *signInSource) readAccount() string {
 	file, err := config.LoadFile(s.cfg.Dir)
 	if err != nil {
 		return sendas.AccountUnreadable
 	}
-	if p := file.Profiles[s.cfg.ProfileName]; p != nil && p.ServerKeySignIn {
+	p := file.Profiles[s.cfg.ProfileName]
+	if p == nil {
+		p = &config.Profile{}
+	}
+	if p.ServerKeySignIn {
 		return sendas.NoPersonLane
 	}
 	if s.betweenReads != nil {
 		s.betweenReads()
 	}
-	return auth.Account(s.cfg.Dir, s.cfg.ProfileName, s.cfg.AuthURL)
+	return pairedLane(auth.Account(s.cfg.Dir, s.cfg.ProfileName, s.cfg.AuthURL), p.Account)
 }
 
 func statOrNil(path string) os.FileInfo {

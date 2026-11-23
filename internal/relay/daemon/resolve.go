@@ -12,6 +12,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/relay"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/routing"
+	"github.com/miradorlabs/terma-cli/internal/sendas"
 )
 
 // keychainRetry is how long a relay waits before asking a locked keychain again.
@@ -79,11 +80,23 @@ func Resolver(cfg *config.Config, r ResolverDeps) func(claim.Claim) (relay.Polic
 			if p.OrganizationID != cfg.OrganizationID {
 				return relay.Policy{}, errors.New("organization changed; restart the relay")
 			}
+			// The team is the one chosen under the sign-in the relay started with, or none.
+			if p.Account != cfg.Account {
+				return relay.Policy{}, errors.New("signed in as someone else; restart the relay")
+			}
 			if stored, ok, err := config.ReadPolicy(cfg.StateDir, p.Team); err != nil || !ok || !stored.AppliesTo(cfg.OrganizationID, cfg.AuthURL) {
 				org = config.NoPolicy(cfg.OrganizationID, cfg.AuthURL)
 			} else {
 				org = stored
 			}
+		}
+		// A hook's claim goes only with the sign-in it was made under, whose team it names.
+		want := cfg.Account
+		if serverKey {
+			want = sendas.NoPersonLane
+		}
+		if !c.Profile && c.Account != want {
+			return relay.Policy{}, errors.New("the session was claimed under another sign-in")
 		}
 		key := ""
 		if serverKey {
@@ -105,7 +118,7 @@ func Resolver(cfg *config.Config, r ResolverDeps) func(claim.Claim) (relay.Polic
 			in.Harness = r.AgentName(c.Tool)
 		}
 		pol := CapturePolicy(in)
-		pol.Endpoint, pol.Key = r.Endpoint(c.ProjectID, serverKey), key
+		pol.Endpoint, pol.Key, pol.Account = r.Endpoint(c.ProjectID, serverKey), key, cfg.Account
 		if r.User != nil {
 			pol.User = r.User(c.ProjectID, pol.Endpoint)
 			if pol.User != "" {
@@ -132,6 +145,6 @@ func CatchAll(policy func() config.Policy) func() (claim.Claim, bool) {
 		if !cached.Global() || cached.DefaultProjectID == "" {
 			return claim.Claim{}, false
 		}
-		return claim.Claim{ProjectID: cached.DefaultProjectID}, true
+		return claim.Claim{ProjectID: cached.DefaultProjectID, Profile: true}, true
 	}
 }

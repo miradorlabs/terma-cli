@@ -163,6 +163,14 @@ func recordLane(own spool.Lane, accounts []string) (lane spool.Lane, ok bool) {
 	return spool.Lane{Account: accounts[0]}, true
 }
 
+// claimAccount is the lane a claim this hook writes is made under (claim.Claim.Account).
+func (e Env) claimAccount() string {
+	if l := e.lane(); !l.NoPerson {
+		return l.Account
+	}
+	return sendas.NoPersonLane
+}
+
 // lane is whose what this hook collects is: its spool's binding, which the hook's caller
 // made from the profile (dispatch), or with no spool, the profile's own.
 func (e Env) lane() spool.Lane {

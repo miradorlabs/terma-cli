@@ -63,14 +63,23 @@ type Claim struct {
 	// Placements are where the session has run, oldest first: an agent can keep a session id
 	// across resumes in another repository, and the first run's late records stay its own.
 	Placements []Placement `json:"placements,omitempty"`
+	// Account is the lane of the sign-in the claiming hook ran under: its account key, or
+	// sendas.NoPersonLane under a server key. The team is the one chosen under it, so the
+	// relay resolves the claim only for that sign-in.
+	Account string `json:"account,omitempty"`
+	// Profile marks a claim the relay made from the profile's own policy (global mode's
+	// catch-all), which no hook made under a sign-in; never stored.
+	Profile bool `json:"-"`
 }
 
 // Placement is one run of a session in one repository.
 type Placement struct {
 	ProjectID string `json:"project_id"`
-	Tool      string `json:"tool,omitempty"`
-	Repo      string `json:"repo,omitempty"`
-	Worktree  string `json:"worktree,omitempty"`
+	// Account is Claim.Account for this run.
+	Account  string `json:"account,omitempty"`
+	Tool     string `json:"tool,omitempty"`
+	Repo     string `json:"repo,omitempty"`
+	Worktree string `json:"worktree,omitempty"`
 	// Repository is Claim.Repository for this run.
 	Repository config.Repository `json:"repository,omitzero"`
 	// Root is Claim.Root for this run.
@@ -107,7 +116,7 @@ func (c Claim) placements() []Placement {
 	if len(c.Placements) > 0 {
 		return c.Placements
 	}
-	return []Placement{{ProjectID: c.ProjectID, Tool: c.Tool, Repo: c.Repo, Worktree: c.Worktree, Repository: c.Repository, Root: c.Root, Cwd: c.Cwd,
+	return []Placement{{ProjectID: c.ProjectID, Account: c.Account, Tool: c.Tool, Repo: c.Repo, Worktree: c.Worktree, Repository: c.Repository, Root: c.Root, Cwd: c.Cwd,
 		Remote: c.Remote, Branch: c.Branch, PIDs: c.PIDs}}
 }
 
@@ -129,7 +138,7 @@ func (c Claim) At(pid int, at time.Time) (Claim, bool) {
 	if best == nil {
 		return Claim{}, false
 	}
-	return Claim{ProjectID: best.ProjectID, Tool: best.Tool, Repo: best.Repo, Worktree: best.Worktree,
+	return Claim{ProjectID: best.ProjectID, Account: best.Account, Tool: best.Tool, Repo: best.Repo, Worktree: best.Worktree,
 		Repository: best.Repository, Root: best.Root, Cwd: best.Cwd, Remote: best.Remote, Branch: best.Branch,
 		PIDs: best.PIDs, ClaimedAt: c.ClaimedAt, Placements: c.Placements}, true
 }
@@ -227,7 +236,7 @@ func write(dir, sessionID string, c Claim, now time.Time) bool {
 	if havePrev && samePlace(prev, c) {
 		since = prev.placements()[len(prev.placements())-1].Since
 	}
-	placements = append(placements, Placement{ProjectID: c.ProjectID, Tool: c.Tool, Repo: c.Repo, Worktree: c.Worktree, Repository: c.Repository,
+	placements = append(placements, Placement{ProjectID: c.ProjectID, Account: c.Account, Tool: c.Tool, Repo: c.Repo, Worktree: c.Worktree, Repository: c.Repository,
 		Root: c.Root, Cwd: c.Cwd, Remote: c.Remote, Branch: c.Branch, PIDs: c.PIDs, Since: since})
 	if len(placements) > maxPlacements {
 		placements = placements[len(placements)-maxPlacements:]
@@ -241,12 +250,12 @@ func write(dir, sessionID string, c Claim, now time.Time) bool {
 	return config.WriteFileAtomicNoSync(p, data, 0o600) == nil
 }
 
-// samePlace reports whether c continues prev's latest run. Another working tree of the same
+// samePlace reports whether c continues prev's latest run, under the same sign-in. Another working tree of the same
 // repository, or another directory in it, is the same run, whose Root and Cwd are rewritten in
 // place: a placement decides where records go, and a session switching between worktrees must
 // never push an earlier one out.
 func samePlace(prev, c Claim) bool {
-	return prev.ProjectID == c.ProjectID && prev.Repository == c.Repository
+	return prev.ProjectID == c.ProjectID && prev.Repository == c.Repository && prev.Account == c.Account
 }
 
 // sameDirs reports whether c names the working tree, directory, worktree, remote and branch

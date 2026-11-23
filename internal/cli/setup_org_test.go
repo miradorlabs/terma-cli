@@ -33,10 +33,11 @@ func TestSetupWithoutATerminalSaysItKeptOneOfSeveralOrganizations(t *testing.T) 
 	}
 }
 
-// signInTo stores u-1's sign-in with org chosen, as an earlier setup would have left them.
+// signInTo stores u-1's sign-in with org chosen under it, as an earlier setup would have
+// left them.
 func signInTo(t *testing.T, f *fakeAuth, org organization) {
 	t.Helper()
-	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(f)); err != nil {
+	if err := saveSignIn(testApp.dir, storedSession(f)); err != nil {
 		t.Fatal(err)
 	}
 	if err := config.UpdateProfile(testApp.dir, config.DefaultProfile, func(p *config.Profile) { p.SelectOrganization(org.ID, org.Name) }); err != nil {
@@ -124,7 +125,7 @@ func TestSetupStoppedAtTheOrganizationStepKeepsTheCredentialWhereItWas(t *testin
 	gateway.orgsDown = true
 	authSandbox(t, gateway)
 	sandboxMachine(t)
-	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(gateway)); err != nil {
+	if err := saveSignIn(testApp.dir, storedSession(gateway)); err != nil {
 		t.Fatal(err)
 	}
 	if auth.StoredInFile(testApp.dir, config.DefaultProfile) {

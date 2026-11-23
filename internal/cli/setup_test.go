@@ -538,7 +538,11 @@ func TestDesktopGrantCutoverKeepsInFlightWorkWithItsTeam(t *testing.T) {
 	s := spoolForTest(t)
 	appendEvent(t, s, teamA, time.Now())
 	appendEvent(t, s, teamA, time.Now())
-	if !claim.Write(testApp.stateDir, "in-flight", claim.Claim{ProjectID: teamA, Tool: "codex", Repository: appRepo}, time.Now()) {
+	signedIn, err := testApp.loadConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !claim.Write(testApp.stateDir, "in-flight", claim.Claim{ProjectID: teamA, Tool: "codex", Repository: appRepo, Account: signedIn.Account}, time.Now()) {
 		t.Fatal("could not claim the session")
 	}
 	if pol, err := resolve("in-flight"); err != nil || pol.Key != "" || pol.IncludePrompts || pol.IncludeToolContent {

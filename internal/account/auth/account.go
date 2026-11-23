@@ -31,6 +31,9 @@ func AccountKey(authURL, userID string) string {
 	return hex.EncodeToString(sum[:])[:AccountKeyLen]
 }
 
+// Account is the account key of c's person and environment (AccountKey).
+func (c *Credential) Account() string { return AccountKey(c.AuthURL, c.UserID) }
+
 // Account is the account key of the sign-in a profile holds: "" when signed out,
 // sendas.AccountUnreadable when user-credentials.json is there but can't be read, or its
 // sign-in has no user id to key it by. The account does not depend on authURL: a sign-in for

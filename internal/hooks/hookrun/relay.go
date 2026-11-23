@@ -67,7 +67,7 @@ func ClaimFromPayload(ctx context.Context, env Env, s PayloadSession, tool strin
 	default:
 		return false
 	}
-	c.PIDs, c.Cwd = claimPIDs(), env.workingDir()
+	c.PIDs, c.Cwd, c.Account = claimPIDs(), env.workingDir(), env.claimAccount()
 	// A subagent's telemetry may name its own id (see claimForRelay).
 	if s.AgentID != "" && s.AgentID != id {
 		claim.Write(env.StateDir, s.AgentID, c, env.Time())

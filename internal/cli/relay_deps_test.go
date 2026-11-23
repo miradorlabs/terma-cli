@@ -43,7 +43,7 @@ func TestHeartbeatGoesWithTheSignIn(t *testing.T) {
 	defer srv.Close()
 	f := &fakeAuth{srv: srv}
 	authSandbox(t, f)
-	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(f)); err != nil {
+	if err := saveSignIn(testApp.dir, storedSession(f)); err != nil {
 		t.Fatal(err)
 	}
 	if err := keystore.Set(testApp.dir, "team", "ter_srv_team", keystore.Hosts{OTLP: srv.URL}); err != nil {
@@ -132,7 +132,7 @@ func TestRelayUserFollowsTheHeartbeatsRule(t *testing.T) {
 	srv := httptest.NewServer(http.NotFoundHandler())
 	defer srv.Close()
 	authSandbox(t, &fakeAuth{srv: srv})
-	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, &auth.Credential{AccessToken: "ter_cli_a", RefreshToken: "ter_clr_a",
+	if err := saveSignIn(testApp.dir, &auth.Credential{AccessToken: "ter_cli_a", RefreshToken: "ter_clr_a",
 		ExpiresAt: time.Now().Add(time.Hour), AuthURL: srv.URL, SessionID: "s-" + "org-a", UserID: "user-a"}); err != nil {
 		t.Fatal(err)
 	}
@@ -185,7 +185,7 @@ func TestARetiredHeartbeatMarksTheSignIn(t *testing.T) {
 			defer srv.Close()
 			f := &fakeAuth{srv: srv}
 			authSandbox(t, f)
-			if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(f)); err != nil {
+			if err := saveSignIn(testApp.dir, storedSession(f)); err != nil {
 				t.Fatal(err)
 			}
 			selectPolicy(t, config.Policy{Mode: config.ModeRepo, TeamID: "team", Revision: 1, FetchedAt: time.Now()})
@@ -226,7 +226,7 @@ func TestAccountUserNamesOnlyTheTokensOwnUser(t *testing.T) {
 	srv := httptest.NewServer(http.NotFoundHandler())
 	defer srv.Close()
 	authSandbox(t, &fakeAuth{srv: srv})
-	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, &auth.Credential{AccessToken: "ter_cli_a", RefreshToken: "ter_clr_a",
+	if err := saveSignIn(testApp.dir, &auth.Credential{AccessToken: "ter_cli_a", RefreshToken: "ter_clr_a",
 		ExpiresAt: time.Now().Add(time.Hour), AuthURL: srv.URL, SessionID: "s-" + "org-a", UserID: "user-a"}); err != nil {
 		t.Fatal(err)
 	}

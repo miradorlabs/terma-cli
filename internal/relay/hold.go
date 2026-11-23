@@ -154,7 +154,7 @@ func (r *Relay) sweep() {
 		var out []release
 		// A part that must wait holds up nothing: order matters only among parts that leave.
 		for _, h := range parts {
-			c, pol, why, ok, how := r.decide(key, h.p.pid, h.p.at, h.p.narrow, h.p.claimed)
+			c, pol, why, ok, how := r.decide(key, h.p.pid, h.p.at, h.p.narrow, h.p.claimed, h.p.account)
 			switch {
 			case why != whyNoKey:
 				h.awaitingPolicy = time.Time{}
@@ -168,7 +168,7 @@ func (r *Relay) sweep() {
 			}
 			if !ok && !h.p.narrow && !h.p.claimed && why != whyNoKey && now.Sub(h.at) >= limit {
 				if cc, cok := r.catchAll(); cok {
-					if cpol, pok := r.resolve(cc); pok && !cpol.RequireClaim {
+					if cpol, pok := r.resolve(cc, h.p.account); pok && !cpol.RequireClaim {
 						c, pol, ok, how = cc, cpol, true, attribution{how: semconv.TermaRelayAttributionCatchAll}
 						r.stats.add("caught_by_default."+string(h.p.signal), h.p.records)
 					}

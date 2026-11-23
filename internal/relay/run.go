@@ -84,7 +84,7 @@ func (r *Relay) dropHeldAtExit() {
 	defer func() { r.recordLosses(map[string]int{lostPolicyTimeout: lost}, r.opts.Now()) }()
 	for key, parts := range held {
 		for _, h := range parts {
-			_, _, why, ok, _ := r.decide(key, h.p.pid, h.p.at, h.p.narrow, h.p.claimed)
+			_, _, why, ok, _ := r.decide(key, h.p.pid, h.p.at, h.p.narrow, h.p.claimed, h.p.account)
 			if ok {
 				why = "claimed"
 			}

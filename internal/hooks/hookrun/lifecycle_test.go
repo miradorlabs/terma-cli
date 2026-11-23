@@ -12,6 +12,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
+	"github.com/miradorlabs/terma-cli/internal/sendas"
 	"github.com/miradorlabs/terma-cli/internal/session"
 )
 
@@ -69,6 +70,14 @@ func TestTouchReportsEachFileUnderItsOwnRepository(t *testing.T) {
 	}
 	if c, ok := claim.Read(stateDir, sid, time.Now()); !ok || c.Repo != filepath.Base(own) || c.Repository.Origin != "github.com/acme/"+filepath.Base(own) {
 		t.Errorf("claim = %+v, %v: the session's own repository claims it", c, ok)
+	}
+	// The claim is made under the lane the hook's events are in.
+	lane := events[0].Account
+	if events[0].NoPerson {
+		lane = sendas.NoPersonLane
+	}
+	if c, _ := claim.Read(stateDir, sid, time.Now()); lane == "" || c.Account != lane {
+		t.Errorf("claim made under %q, the events' lane %q", c.Account, lane)
 	}
 	for _, root := range claimed {
 		if root != own {

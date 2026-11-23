@@ -8,6 +8,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/relay"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
+	"github.com/miradorlabs/terma-cli/internal/sendas"
 )
 
 const mintedKey = "ter_srv_minted0123456789abcdefghijklmnopqrstuv"
@@ -23,7 +24,7 @@ func TestRelayResolverCapsContent(t *testing.T) {
 	}
 	cfg := &config.Config{Dir: testApp.dir, OTLPURL: "https://otel.example", Policy: config.DefaultPolicy(), Harnesses: []string{"codex"}, ServerKeySignIn: true}
 	resolve := testApp.relayDeps().Resolver(cfg)
-	c := claim.Claim{ProjectID: "p1", Tool: "codex"}
+	c := claim.Claim{ProjectID: "p1", Tool: "codex", Account: sendas.NoPersonLane}
 	if _, err := resolve(c); !errors.Is(err, relay.ErrNoKey) {
 		t.Fatalf("keyless: err %v", err)
 	}

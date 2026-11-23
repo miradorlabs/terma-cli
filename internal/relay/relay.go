@@ -26,6 +26,7 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/miradorlabs/terma-cli/internal/account/auth"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/relay/shape"
 	"github.com/miradorlabs/terma-cli/internal/sendas"
@@ -59,6 +60,16 @@ type Policy struct {
 	// UserAccount is User's account key (auth.AccountKey): a part bound to another account
 	// names no one, so the user it names is never another than the sign-in it leaves with.
 	UserAccount string
+	// Account is the account key of the sign-in the profile's team was chosen under when
+	// this was resolved (config.Profile.Account); "" when unknown. A person's part in
+	// another lane is never sent under it.
+	Account string
+}
+
+// resolvedFor reports whether a part in lane may leave under pol: a server key's policy
+// names its own credential; a person's leaves only under the account it was resolved for.
+func (pol Policy) resolvedFor(lane string) bool {
+	return pol.Key != "" || pol.Account == "" || !auth.ValidAccountKey(lane) || pol.Account == lane
 }
 
 // ErrNoKey is Resolve's answer for a project this machine holds no key for; its parts wait, then drop.

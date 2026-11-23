@@ -99,7 +99,7 @@ func admitHere(t *testing.T, root, team string) {
 func signInHereAs(t *testing.T, user string) string {
 	t.Helper()
 	const authURL = "https://auth.example.test"
-	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, &auth.Credential{AccessToken: "token-of-" + user, SessionID: "s-" + user, UserID: user,
+	if err := saveSignIn(testApp.dir, &auth.Credential{AccessToken: "token-of-" + user, SessionID: "s-" + user, UserID: user,
 		AuthURL: authURL, ExpiresAt: time.Now().Add(time.Hour)}); err != nil {
 		t.Fatal(err)
 	}

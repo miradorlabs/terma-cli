@@ -104,7 +104,7 @@ func (s *sender) loop() {
 	backoff := time.Duration(0)
 	// single sends one file per request after a merged request was refused, so one bad file is set aside alone.
 	single := false
-	c := claim.Claim{ProjectID: s.route.project, Tool: s.route.toolLabel(), Repository: s.r.outbox.identity(s.route)}
+	c := claim.Claim{ProjectID: s.route.project, Tool: s.route.toolLabel(), Repository: s.r.outbox.identity(s.route), Account: s.route.account}
 	stopping := func() bool {
 		select {
 		case <-s.r.stopping:
@@ -151,7 +151,7 @@ func (s *sender) loop() {
 			}
 			continue
 		}
-		pol, ok := s.r.resolve(c)
+		pol, ok := s.r.resolve(c, s.route.account)
 		// Another person's or environment's backlog waits for its own sign-in, and ages out;
 		// a server key sends only what no person's sign-in collected.
 		if !ok || !s.r.mayLeave(s.route, pol.Key != "") {

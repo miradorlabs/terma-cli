@@ -40,10 +40,11 @@ type attribution struct {
 // A part is placed only by what it or its trace names; a part naming no session waits
 // for its process to exit (decideExited), because a shared process that has shown one
 // claimed session may be about to name a personal one: loss, never a guess. narrow and
-// claimed are the part's (part.narrow, part.claimed): global mode's catch-all may take neither.
-func (r *Relay) decide(key string, pid int, at time.Time, narrow, claimed bool) (claim.Claim, Policy, string, bool, attribution) {
+// claimed are the part's (part.narrow, part.claimed): global mode's catch-all may take neither;
+// lane is the part's too (part.account), the sign-in its policy must have been resolved for.
+func (r *Relay) decide(key string, pid int, at time.Time, narrow, claimed bool, lane string) (claim.Claim, Policy, string, bool, attribution) {
 	if c, global := r.catchAll(); global && !narrow && !claimed {
-		pol, ok := r.resolve(c)
+		pol, ok := r.resolve(c, lane)
 		if !ok {
 			return claim.Claim{}, Policy{}, whyNoKey, false, attribution{}
 		}
@@ -56,12 +57,12 @@ func (r *Relay) decide(key string, pid int, at time.Time, narrow, claimed bool) 
 		if r.collectsNone(n, at) {
 			return claim.Claim{}, Policy{}, whyNotCollected, false, attribution{}
 		}
-		return r.decideExited(n, at, narrow)
+		return r.decideExited(n, at, narrow, lane)
 	}
 	session := r.sessionFor(key)
 	if session == "" {
 		if pid != 0 {
-			c, pol, why, ok, how := r.decideExited(pid, at, narrow)
+			c, pol, why, ok, how := r.decideExited(pid, at, narrow, lane)
 			if ok {
 				return c, pol, "", true, how
 			}
@@ -71,14 +72,14 @@ func (r *Relay) decide(key string, pid int, at time.Time, narrow, claimed bool) 
 		}
 		return claim.Claim{}, Policy{}, whyNoTrace, false, attribution{}
 	}
-	c, pol, why, ok := r.decideClaimed(session, pid, at, narrow)
+	c, pol, why, ok := r.decideClaimed(session, pid, at, narrow, lane)
 	return c, pol, why, ok, attribution{}
 }
 
 // decideClaimed places a part by its session's claim: the placement covering pid at the part's time.
 // A narrow part never leaves under a policy that needs no claim: only global mode grants
 // one, so the part's session was not collected when it arrived, whatever repository it is in.
-func (r *Relay) decideClaimed(session string, pid int, at time.Time, narrow bool) (claim.Claim, Policy, string, bool) {
+func (r *Relay) decideClaimed(session string, pid int, at time.Time, narrow bool, lane string) (claim.Claim, Policy, string, bool) {
 	c, ok := r.lookup(session)
 	if !ok {
 		return claim.Claim{}, Policy{}, whyUnclaimed, false
@@ -91,7 +92,7 @@ func (r *Relay) decideClaimed(session string, pid int, at time.Time, narrow bool
 	if c.ProjectID == "" {
 		return claim.Claim{}, Policy{}, whyNotCollected, false
 	}
-	pol, ok := r.resolve(c)
+	pol, ok := r.resolve(c, lane)
 	if !ok {
 		return claim.Claim{}, Policy{}, whyNoKey, false
 	}
@@ -108,7 +109,7 @@ func (r *Relay) decideClaimed(session string, pid int, at time.Time, narrow bool
 func (r *Relay) route(p *part) {
 	r.deliverMu.Lock()
 	defer r.deliverMu.Unlock()
-	c, pol, why, ok, how := r.decide(p.session, p.pid, p.at, p.narrow, p.claimed)
+	c, pol, why, ok, how := r.decide(p.session, p.pid, p.at, p.narrow, p.claimed, p.account)
 	switch {
 	case why == whyNotCollected:
 		r.stats.dropped(p.signal, why, p.records)

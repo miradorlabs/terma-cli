@@ -72,6 +72,12 @@ func StorePolicy(cfg *config.Config, pol *config.Policy) error {
 	}
 	var rejected error
 	err = config.UpdateProfile(cfg.Dir, cfg.ProfileName, func(p *config.Profile) {
+		// The team is recorded only under the sign-in the policy was fetched for: one as
+		// someone else, stored since, cleared the profile for itself (config.Profile.Account).
+		if p.Account != cfg.Account {
+			rejected = errSignedInSince
+			return
+		}
 		if p.OrganizationID == "" && cfg.OrganizationID != "" {
 			p.SelectOrganization(cfg.OrganizationID, "")
 		}
@@ -90,6 +96,9 @@ func StorePolicy(cfg *config.Config, pol *config.Policy) error {
 	}
 	return rejected
 }
+
+// errSignedInSince is a sign-in as someone else, stored while a policy was fetched.
+var errSignedInSince = errors.New("signed in as someone else while fetching collection policy")
 
 // ValidatedPolicy is team's last validated policy for cfg's organization and
 // environment; an unreadable one grants nothing.

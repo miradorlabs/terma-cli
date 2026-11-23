@@ -47,19 +47,23 @@ func (r *Relay) lookup(session string) (claim.Claim, bool) {
 	return c, ok
 }
 
-func (r *Relay) resolve(c claim.Claim) (Policy, bool) {
+// resolve is c's policy for a part in lane, the sign-in it leaves under. Its answer is kept
+// per lane, and one resolved under another person's sign-in (Policy.Account) is never
+// served: within the cache's moment a switch would otherwise send B's part, with B's token,
+// to the team A's profile chose.
+func (r *Relay) resolve(c claim.Claim, lane string) (Policy, bool) {
 	now := r.opts.Now()
-	key := strings.Join([]string{c.ProjectID, c.Tool, c.Repository.Origin}, "\x00")
+	key := strings.Join([]string{lane, c.ProjectID, c.Tool, c.Repository.Origin}, "\x00")
 	if ttl := r.opts.PolicyCacheTTL; ttl > 0 {
 		r.cache.mu.Lock()
 		e, hit := r.cache.policies[key]
 		r.cache.mu.Unlock()
-		if hit && now.Sub(e.at) < ttl {
+		if hit && now.Sub(e.at) < ttl && (!e.ok || e.pol.resolvedFor(lane)) {
 			return e.pol, e.ok
 		}
 	}
 	pol, err := r.opts.Resolve(c)
-	ok := err == nil && pol.Endpoint != "" && (pol.Key != "" || r.opts.SignIn != nil)
+	ok := err == nil && pol.Endpoint != "" && (pol.Key != "" || r.opts.SignIn != nil) && pol.resolvedFor(lane)
 	if r.opts.PolicyCacheTTL > 0 {
 		r.cache.mu.Lock()
 		r.cache.policies[key] = cachedPolicy{pol, ok, now}

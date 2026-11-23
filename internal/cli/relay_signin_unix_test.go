@@ -19,7 +19,7 @@ func TestARetiredSignInGivesNoTokenWhenTheStoreFails(t *testing.T) {
 	if err := config.UpdateFile(testApp.dir, func(file *config.File) { file.InsecureStorage = true }); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(f)); err != nil {
+	if err := saveSignIn(testApp.dir, storedSession(f)); err != nil {
 		t.Fatal(err)
 	}
 	cfg, err := testApp.loadConfig()
@@ -54,7 +54,7 @@ func TestAnUnreadableProfileBindsTheUnreadableAccount(t *testing.T) {
 	}
 	f := newFakeAuth(t)
 	authSandbox(t, f)
-	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(f)); err != nil {
+	if err := saveSignIn(testApp.dir, storedSession(f)); err != nil {
 		t.Fatal(err)
 	}
 	if err := config.UpdateFile(testApp.dir, func(*config.File) {}); err != nil {
@@ -88,7 +88,7 @@ func TestAnUnreadableSignInBindsTheUnreadableAccount(t *testing.T) {
 	}
 	f := newFakeAuth(t)
 	authSandbox(t, f)
-	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(f)); err != nil {
+	if err := saveSignIn(testApp.dir, storedSession(f)); err != nil {
 		t.Fatal(err)
 	}
 	cfg, err := testApp.loadConfig()
