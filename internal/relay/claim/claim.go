@@ -175,10 +175,10 @@ func path(dir, sessionID string) (string, bool) {
 var lockWait = 250 * time.Millisecond
 
 // Write merges c into sessionID's claim under the state directory dir, unless a fresh one already names its processes,
-// and reports whether it wrote; a hook never fails for want of a claim. The merge runs
-// under a sidecar lock: unlocked, 14 of 16 concurrent writers' processes were lost.
+// and reports whether it wrote; a claim without a ProjectID or Account is refused, and a hook never fails for want of
+// a claim. The merge runs under a sidecar lock: unlocked, 14 of 16 concurrent writers' processes were lost.
 func Write(dir, sessionID string, c Claim, now time.Time) bool {
-	if c.ProjectID == "" {
+	if c.ProjectID == "" || c.Account == "" {
 		return false
 	}
 	return write(dir, sessionID, c, now)

@@ -228,7 +228,7 @@ func TestRunHandsOnTheClaimedCheckout(t *testing.T) {
 	h.deps.Profile = func() Profile {
 		p := hookruntest.Admitting(root)
 		p.TeamID, p.FetchedAt = hookruntest.Team, time.Now()
-		return Profile{Team: hookruntest.Team, Policy: p}
+		return Profile{Team: hookruntest.Team, Account: hookruntest.Account, Policy: p}
 	}
 	r := request("fake-edit")
 	r.Cwd = t.TempDir()
