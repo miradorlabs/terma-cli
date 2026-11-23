@@ -64,6 +64,10 @@ type Router struct {
 	readLedger func(stateDir, idOrAlias string) runs.Snapshot
 	// loadState reads a profile's routing state; routing.Load when nil (test hook).
 	loadState func(stateDir, profile string) (routing.State, bool, error)
+	// now returns the current wall clock; time.Now when nil (test hook).
+	now func() time.Time
+	// maxConcurrency bounds concurrent routed parcel POSTs; maxParcelConcurrency when <= 0.
+	maxConcurrency int
 }
 
 // SignIn is the person's sign-in delivery sends with (sendas.SignIn).
@@ -140,13 +144,20 @@ func RoutingActive(stateDir, profile string) bool {
 	return false
 }
 
+func (r Router) currentTime() time.Time {
+	if r.now != nil {
+		return r.now()
+	}
+	return time.Now()
+}
+
 // Flush delivers everything s holds, each team with its lane's credential to its host.
 // Wrong-lane events are held untouched; a failing destination backs off alone. Once a
 // routing state exists under StateDir, each event goes only to its pinned enrollment
 // (routed.go).
 func (r Router) Flush(ctx context.Context, s *spool.Spool, cfg *config.Config, force bool, minInterval time.Duration) Result {
 	var res Result
-	now := time.Now()
+	now := r.currentTime()
 	serverKey := cfg.ServerKeySignIn
 	account := ""
 	if !serverKey && r.SignIn != nil {
@@ -160,7 +171,7 @@ func (r Router) Flush(ctx context.Context, s *spool.Spool, cfg *config.Config, f
 	sender := spool.SenderFunc(p.byProject)
 	if RoutingActive(r.StateDir, cfg.ProfileName) {
 		res.Routed = true
-		p.routes, p.ledgers = routeCache{}, map[string]runs.Snapshot{}
+		p.routes, p.ledgers, p.profiles = routeCache{}, map[string]runs.Snapshot{}, map[string]*config.Config{}
 		sender = p.routed
 	}
 	fr := s.Flush(ctx, sender, spool.FlushOptions{Force: force, MinInterval: minInterval, Now: now})
@@ -195,6 +206,9 @@ type pass struct {
 	routes routeCache
 	// ledgers are the run ledgers the pass read, by session or subagent ID (pass.mixed).
 	ledgers map[string]runs.Snapshot
+	// profiles caches non-active profile configs loaded for cross-profile routed parcels
+	// (nil entry records a missing or unreadable profile so it fails closed).
+	profiles map[string]*config.Config
 }
 
 // inLane reports whether e belongs to this pass's active lane: server-key events under a
@@ -215,8 +229,9 @@ func (p *pass) lane() string {
 }
 
 // byProject sends a batch on a pre-activation machine: each event to the project its
-// attrs.project_id names, under that project's policy now. Any routed event encountered
-// while no routing state file exists fails closed instead of falling back to Profile.Team.
+// attrs.project_id names, under that project's policy now. Any routed event (carrying
+// Enrollment or Profile metadata) encountered while no routing state file exists fails
+// closed instead of falling back to Profile.Team or attrs.project_id.
 func (p *pass) byProject(ctx context.Context, events []spool.Event) ([]spool.Event, error) {
 	r, cfg, res := p.r, p.cfg, p.res
 	byProject := map[string][]spool.Event{}
@@ -224,7 +239,7 @@ func (p *pass) byProject(ctx context.Context, events []spool.Event) ([]spool.Eve
 	policies := map[string]config.Policy{}
 	policyErrors := map[string]error{}
 	for _, e := range events {
-		if e.Enrollment != "" {
+		if e.Enrollment != "" || e.Profile != "" {
 			if !p.inLane(e) {
 				held = append(held, e)
 				continue
@@ -326,21 +341,31 @@ func (p *pass) deliver(ctx context.Context, dest, id, key, endpoint string, user
 	if user != nil {
 		sender.UserID = user(endpoint)
 	}
-	if _, err := sender.Send(ctx, wire(batch)); err != nil {
+	_, err := sender.Send(ctx, wire(batch))
+	if recErr := p.recordOutcome(ctx, dest, id, key, endpoint, len(batch), err); recErr != nil {
+		return batch, recErr
+	}
+	return nil, nil
+}
+
+// recordOutcome records the result of one HTTP POST to endpoint for project id under
+// retry key dest. Must be called from the pass's owning goroutine.
+func (p *pass) recordOutcome(ctx context.Context, dest, id, key, endpoint string, count int, err error) error {
+	if err != nil {
 		p.r.refused(ctx, p.serverKey, key, err)
 		p.failed[dest] = true
 		f := Failure{ProjectID: id, Endpoint: endpoint, Err: err}
 		// A pass cut short by its own deadline learned nothing about the host.
 		if ctx.Err() == nil {
-			f.RetryAt = p.s.DestinationFailed(dest, time.Now())
+			f.RetryAt = p.s.DestinationFailed(dest, p.r.currentTime())
 		}
 		p.res.Failures = append(p.res.Failures, f)
-		return batch, fmt.Errorf("%s (%s): %w", id, endpoint, err)
+		return fmt.Errorf("%s (%s): %w", id, endpoint, err)
 	}
-	p.s.DestinationDelivered(dest, time.Now())
+	p.s.DestinationDelivered(dest, p.r.currentTime())
 	p.accepted[endpoint] = true
-	p.res.Sent += len(batch)
-	return nil, nil
+	p.res.Sent += count
+	return nil
 }
 
 // settle is a batch's answer to the spool: what it holds, and what it could not deliver.

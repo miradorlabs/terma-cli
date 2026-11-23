@@ -873,7 +873,9 @@ func TestRoutedRevalidatesBeforePostWhenRoutingChangesMidPass(t *testing.T) {
 			routedEvent(aliceLane, config.DefaultProfile, enr["team-a"], "github.com/acme/app", semconv.TermaToolCallEvent),
 			routedEvent(aliceLane, config.DefaultProfile, enr["team-b"], "github.com/beta/app", semconv.TermaToolCallEvent),
 		)
-		res := m.router(&fakeSignIn{account: aliceLane, token: "tok"}).Flush(
+		r := m.router(&fakeSignIn{account: aliceLane, token: "tok"})
+		r.maxConcurrency = 1
+		res := r.Flush(
 			t.Context(), m.spool, &config.Config{OTLPURL: srv.URL, ProfileName: config.DefaultProfile, AuthURL: routedAuth}, true, 0,
 		)
 		if res.Sent != 1 || res.Discarded != 1 || res.Err != nil {
@@ -938,7 +940,9 @@ func TestRoutedRevalidatesBeforePostWhenRoutingChangesMidPass(t *testing.T) {
 		ev2.Attrs[semconv.GenAIToolCallArgumentsKey] = "must-be-stripped-mid-pass"
 		m.queueRaw(ev1, ev2)
 
-		res := m.router(&fakeSignIn{account: aliceLane, token: "tok"}).Flush(
+		r := m.router(&fakeSignIn{account: aliceLane, token: "tok"})
+		r.maxConcurrency = 1
+		res := r.Flush(
 			t.Context(), m.spool, &config.Config{OTLPURL: srv.URL, ProfileName: config.DefaultProfile, AuthURL: routedAuth}, true, 0,
 		)
 		if res.Sent != 2 || res.Err != nil {
@@ -950,6 +954,126 @@ func TestRoutedRevalidatesBeforePostWhenRoutingChangesMidPass(t *testing.T) {
 			t.Fatalf("tightened tool content leaked in second parcel: %s", bodies[secondTeam])
 		}
 	})
+
+	t.Run("policy expires during credential refresh holds instead of posting", func(t *testing.T) {
+		t.Parallel()
+		m := newRoutedMachine(t)
+		var clockMu sync.Mutex
+		now := time.Now()
+		tm := orgTeam("org-a", "team-a", "github.com/acme/app")
+		// Valid at initial admission, but expires if the clock advances by 10s during token refresh.
+		tm.Policy.FetchedAt = now.Add(-config.MaxPolicyAge + 5*time.Second)
+		enr := m.createState(config.DefaultProfile, aliceLane, []routing.Team{tm}, func(s *routing.State, _ map[string]string) error {
+			return s.Bind("github.com/acme/app", "org-a", false)
+		})
+		ev := routedEvent(aliceLane, config.DefaultProfile, enr["team-a"], "github.com/acme/app", semconv.TermaToolCallEvent)
+		ev.Time = now
+		m.queueRaw(ev)
+
+		srv, sent := recordingIngest(t, http.StatusOK)
+		signIn := &hookSignIn{
+			inner: &fakeSignIn{account: aliceLane, token: "tok-refreshed"},
+			onToken: func() {
+				clockMu.Lock()
+				now = now.Add(10 * time.Second)
+				clockMu.Unlock()
+			},
+		}
+		r := m.router(signIn)
+		r.now = func() time.Time {
+			clockMu.Lock()
+			defer clockMu.Unlock()
+			return now
+		}
+		res := r.Flush(
+			t.Context(), m.spool, &config.Config{OTLPURL: srv.URL, ProfileName: config.DefaultProfile, AuthURL: routedAuth}, true, 0,
+		)
+		if res.Sent != 0 || res.Blocked != 1 || res.Held != 1 || res.Err != nil || len(sent()) != 0 {
+			t.Fatalf("expired policy during credential refresh must hold without posting: res=%+v sent=%d", res, len(sent()))
+		}
+	})
+}
+
+type hookSignIn struct {
+	inner   SignIn
+	onToken func()
+}
+
+func (h *hookSignIn) Account() string { return h.inner.Account() }
+func (h *hookSignIn) Token(ctx context.Context, account string) (string, error) {
+	if h.onToken != nil {
+		h.onToken()
+	}
+	return h.inner.Token(ctx, account)
+}
+func (h *hookSignIn) Refused(ctx context.Context, token string) { h.inner.Refused(ctx, token) }
+func (h *hookSignIn) Retired(token string)                      { h.inner.Retired(token) }
+
+// Scheduling isolation: two slow enrollments stalling until the flush deadline must NOT
+// starve a healthy sibling enrollment in the same batch.
+func TestRoutedSlowEnrollmentsDoNotStarveHealthySibling(t *testing.T) {
+	t.Parallel()
+	m := newRoutedMachine(t)
+	enr := m.createState(config.DefaultProfile, aliceLane, []routing.Team{
+		orgTeam("org-a", "team-slow-1", "github.com/acme/slow1"),
+		orgTeam("org-b", "team-slow-2", "github.com/acme/slow2"),
+		orgTeam("org-c", "team-fast", "github.com/acme/fast"),
+	}, func(s *routing.State, _ map[string]string) error {
+		if err := s.Bind("github.com/acme/slow1", "org-a", false); err != nil {
+			return err
+		}
+		if err := s.Bind("github.com/acme/slow2", "org-b", false); err != nil {
+			return err
+		}
+		return s.Bind("github.com/acme/fast", "org-c", false)
+	})
+
+	var mu sync.Mutex
+	var fastHits int
+	fastDone := make(chan struct{})
+	release := make(chan struct{})
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.Copy(io.Discard, r.Body)
+		team := r.Header.Get(sendas.ProjectHeader)
+		if team == "team-fast" {
+			mu.Lock()
+			fastHits++
+			mu.Unlock()
+			w.WriteHeader(http.StatusOK)
+			close(fastDone)
+			return
+		}
+		// Slow enrollments block until the healthy sibling finishes (impossible under
+		// serial execution whenever a slow enrollment sorts ahead of team-fast).
+		select {
+		case <-fastDone:
+			w.WriteHeader(http.StatusGatewayTimeout)
+		case <-r.Context().Done():
+		case <-release:
+		}
+	}))
+	t.Cleanup(func() {
+		close(release)
+		srv.Close()
+	})
+
+	m.queueRaw(
+		routedEvent(aliceLane, config.DefaultProfile, enr["team-slow-1"], "github.com/acme/slow1", semconv.TermaToolCallEvent),
+		routedEvent(aliceLane, config.DefaultProfile, enr["team-slow-2"], "github.com/acme/slow2", semconv.TermaToolCallEvent),
+		routedEvent(aliceLane, config.DefaultProfile, enr["team-fast"], "github.com/acme/fast", semconv.TermaToolCallEvent),
+	)
+
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+	res := m.router(&fakeSignIn{account: aliceLane, token: "shared-tok"}).Flush(
+		ctx, m.spool, &config.Config{OTLPURL: srv.URL, ProfileName: config.DefaultProfile, AuthURL: routedAuth}, true, 0,
+	)
+	mu.Lock()
+	gotFast := fastHits
+	mu.Unlock()
+	if res.Sent != 1 || res.Failed != 2 || len(res.Failures) != 2 || gotFast != 1 || m.pending() != 2 {
+		t.Fatalf("healthy sibling must deliver despite stalled enrollments: res=%+v fastHits=%d pending=%d", res, gotFast, m.pending())
+	}
 }
 
 // HoldKey exact binding check: an event held for a wildcard owner binding (github.com/beta)
@@ -1013,5 +1137,88 @@ func TestRoutedCountLostFailureRetainsDestinationLessEvents(t *testing.T) {
 	)
 	if res.Err == nil || res.Unroutable != 0 || res.Failed != 1 || m.pending() != 1 || len(sent()) != 0 {
 		t.Fatalf("CountLost failure must retain event and return error: res=%+v pending=%d sent=%d", res, m.pending(), len(sent()))
+	}
+}
+
+// Cross-profile delivery: an event queued under another profile of the same account must
+// resolve its endpoint and environment from that event's own profile (not the active
+// profile's OTLPURL), respect a process-wide OTLPPinned override, and fail closed when
+// the event's profile does not exist in config.json.
+func TestRoutedCrossProfileUsesEventProfileEndpoint(t *testing.T) {
+	t.Parallel()
+	m := newRoutedMachine(t)
+	defaultSrv, defaultSent := recordingIngest(t, http.StatusOK)
+	workSrv, workSent := recordingIngest(t, http.StatusOK)
+	pinnedSrv, pinnedSent := recordingIngest(t, http.StatusOK)
+
+	if err := config.UpdateProfile(m.config, "work", func(p *config.Profile) {
+		p.AuthURL = routedAuth
+		p.OTLPURL = workSrv.URL
+	}); err != nil {
+		t.Fatal(err)
+	}
+	enrDefault := m.createState(config.DefaultProfile, aliceLane, []routing.Team{
+		orgTeam("org-a", "team-default", "github.com/acme/default"),
+	}, func(s *routing.State, _ map[string]string) error {
+		return s.Bind("github.com/acme/default", "org-a", false)
+	})
+	enrWork := m.createState("work", aliceLane, []routing.Team{
+		orgTeam("org-b", "team-work", "github.com/acme/work"),
+	}, func(s *routing.State, _ map[string]string) error {
+		return s.Bind("github.com/acme/work", "org-b", false)
+	})
+	enrMissing := m.createState("deleted", aliceLane, []routing.Team{
+		orgTeam("org-c", "team-deleted", "github.com/acme/deleted"),
+	}, func(s *routing.State, _ map[string]string) error {
+		return s.Bind("github.com/acme/deleted", "org-c", false)
+	})
+
+	m.queueRaw(
+		routedEvent(aliceLane, config.DefaultProfile, enrDefault["team-default"], "github.com/acme/default", semconv.TermaToolCallEvent),
+		routedEvent(aliceLane, "work", enrWork["team-work"], "github.com/acme/work", semconv.TermaToolCallEvent),
+		routedEvent(aliceLane, "deleted", enrMissing["team-deleted"], "github.com/acme/deleted", semconv.TermaToolCallEvent),
+	)
+
+	cfg := &config.Config{OTLPURL: defaultSrv.URL, ProfileName: config.DefaultProfile, AuthURL: routedAuth}
+	res := m.router(&fakeSignIn{account: aliceLane, token: "tok"}).Flush(t.Context(), m.spool, cfg, true, 0)
+	if res.Sent != 2 || res.Held != 1 || res.Err != nil {
+		t.Fatalf("cross-profile Flush = %+v, want Sent=2 Held=1", res)
+	}
+	if len(defaultSent()) != 1 || defaultSent()[0].project != "team-default" {
+		t.Fatalf("default endpoint received %+v, want only team-default", defaultSent())
+	}
+	if len(workSent()) != 1 || workSent()[0].project != "team-work" {
+		t.Fatalf("work endpoint received %+v, want only team-work", workSent())
+	}
+
+	// Process-wide OTLPPinned override wins over the event profile's OTLPURL.
+	m.queueRaw(routedEvent(aliceLane, "work", enrWork["team-work"], "github.com/acme/work", semconv.TermaToolCallEvent))
+	rPinned := m.router(&fakeSignIn{account: aliceLane, token: "tok"})
+	rPinned.OTLPPinned = true
+	resPinned := rPinned.Flush(t.Context(), m.spool, &config.Config{
+		OTLPURL: pinnedSrv.URL, ProfileName: config.DefaultProfile, AuthURL: routedAuth,
+	}, true, 0)
+	if resPinned.Sent != 1 || len(pinnedSent()) != 1 || len(workSent()) != 1 {
+		t.Fatalf("OTLPPinned Flush = %+v, pinned=%d work=%d", resPinned, len(pinnedSent()), len(workSent()))
+	}
+}
+
+// Fail closed in pre-activation byProject: if routing state is deleted, an event carrying
+// routed Profile metadata (even with empty Enrollment) must NOT fall through to legacy
+// attrs.project_id delivery.
+func TestPreActivationFailsClosedOnProfileOnlyRoutedEvent(t *testing.T) {
+	t.Parallel()
+	m := newRoutedMachine(t)
+	ev := routedEvent(aliceLane, config.DefaultProfile, "", "github.com/acme/app", semconv.TermaToolCallEvent)
+	ev.Attrs[hookrun.AttrProjectID] = "legacy-team"
+	m.queueRaw(ev)
+
+	srv, sent := recordingIngest(t, http.StatusOK)
+	r := m.router(&fakeSignIn{account: aliceLane, token: "tok"})
+	res := r.Flush(t.Context(), m.spool, &config.Config{
+		OTLPURL: srv.URL, ProfileName: config.DefaultProfile, AuthURL: routedAuth,
+	}, true, 0)
+	if res.Routed || res.Sent != 0 || res.Unrouted != 1 || res.Held != 1 || len(sent()) != 0 {
+		t.Fatalf("profile-only routed event must fail closed without routing state: res=%+v sent=%d", res, len(sent()))
 	}
 }

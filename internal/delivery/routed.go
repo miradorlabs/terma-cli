@@ -7,6 +7,7 @@ import (
 	"maps"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/config"
@@ -14,6 +15,11 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/runs"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
+
+// maxParcelConcurrency bounds concurrent HTTP POSTs across distinct enrollments in one
+// routed batch so slow endpoints cannot exhaust the flush deadline before healthy sibling
+// enrollments get a turn.
+const maxParcelConcurrency = 4
 
 // routed sends a batch once multi-org routing is active. Each event is gated on its lane
 // first (Account / NoPerson) before touching any routing state or run ledger: another
@@ -31,10 +37,10 @@ import (
 //   - team expired, signing in, suspended, or binding still pending: held (Blocked);
 //   - team Active and still covering it: sent per enrollment with SignIn.Token +
 //     X-Mirador-Project (user token) or keys.json with no X-Mirador-Project (server key),
-//     filtered by the team's content policy now, and revalidated immediately before POST
-//     if routing state changed during token refresh or an earlier parcel's request.
+//     filtered by the team's content policy now, and revalidated (state generation and
+//     policy expiry clock) immediately before each POST.
 func (p *pass) routed(ctx context.Context, events []spool.Event) ([]spool.Event, error) {
-	now := time.Now()
+	now := p.r.currentTime()
 	res := p.res
 	lane := p.lane()
 	b := &batchRoutes{
@@ -81,11 +87,16 @@ func (p *pass) routed(ctx context.Context, events []spool.Event) ([]spool.Event,
 		return cmp.Or(strings.Compare(a.profile, b.profile), strings.Compare(a.enrollment, b.enrollment))
 	})
 
+	var jobs []parcelJob
 	var undelivered []spool.Event
 	var errs []error
+	var userKey string
+	var userKeyErr error
+	userKeyFetched := false
 	for _, k := range keys {
 		pc := parcels[k]
-		if p.wrongEnvironment(pc.team) {
+		cfg, ok := p.profileConfig(pc.profile)
+		if !ok || p.wrongEnvironment(cfg, pc.team) {
 			held = append(held, pc.raw...)
 			continue
 		}
@@ -94,7 +105,17 @@ func (p *pass) routed(ctx context.Context, events []spool.Event) ([]spool.Event,
 			undelivered = append(undelivered, pc.raw...)
 			continue
 		}
-		key, err := p.r.credential(ctx, p.serverKey, p.account, pc.team.TeamID)
+		var key string
+		var err error
+		if p.serverKey {
+			key, err = p.r.credential(ctx, true, p.account, pc.team.TeamID)
+		} else {
+			if !userKeyFetched {
+				userKey, userKeyErr = p.r.credential(ctx, false, p.account, pc.team.TeamID)
+				userKeyFetched = true
+			}
+			key, err = userKey, userKeyErr
+		}
 		if err != nil {
 			// The keychain is locked or the auth host out of reach: retry as for a refused send.
 			errs = append(errs, fmt.Errorf("%s: %w", pc.team.TeamID, err))
@@ -106,30 +127,24 @@ func (p *pass) routed(ctx context.Context, events []spool.Event) ([]spool.Event,
 			held = append(held, pc.raw...)
 			continue
 		}
-		// Revalidate admission immediately before POST in case routing state changed
-		// during credential refresh or an earlier parcel's HTTP request.
-		team, sendEvents, sendRaw, reheld := p.revalidate(pc, lane)
-		held = append(held, reheld...)
-		if len(sendEvents) == 0 {
-			continue
-		}
-		if p.wrongEnvironment(team) || (p.serverKey && team.TeamID != pc.team.TeamID) {
-			held = append(held, sendRaw...)
-			continue
-		}
-		endpoint := p.r.Endpoint(p.cfg, team.TeamID)
-		var user func(string) string
-		if !p.serverKey && p.r.EnrolledUser != nil {
-			user = func(endpoint string) string { return p.r.EnrolledUser(pc.profile, team, endpoint, p.account) }
-		}
-		left, err := p.deliver(ctx, dest, team.TeamID, key, endpoint, user, sendEvents)
-		if len(left) > 0 {
-			undelivered = append(undelivered, sendRaw...)
-		}
-		if err != nil {
-			errs = append(errs, err)
+		jobs = append(jobs, parcelJob{pc: pc, cfg: cfg, dest: dest, key: key})
+	}
+
+	if len(jobs) > 0 {
+		outcomes := p.sendParcels(ctx, jobs, lane)
+		for i, job := range jobs {
+			out := outcomes[i]
+			held = append(held, out.reheld...)
+			if !out.sent {
+				continue
+			}
+			if recErr := p.recordOutcome(ctx, job.dest, out.team.TeamID, job.key, out.endpoint, out.sendCount, out.err); recErr != nil {
+				undelivered = append(undelivered, out.sendRaw...)
+				errs = append(errs, recErr)
+			}
 		}
 	}
+
 	if len(noDest) > 0 {
 		// Persist the loss count BEFORE spool acknowledges the batch: if losses/ is
 		// unwritable, retain the events as undelivered and surface the storage error so
@@ -142,6 +157,99 @@ func (p *pass) routed(ctx context.Context, events []spool.Event) ([]spool.Event,
 		}
 	}
 	return p.settle(held, undelivered, errs)
+}
+
+type parcelJob struct {
+	pc   *parcel
+	cfg  *config.Config
+	dest string
+	key  string
+}
+
+type parcelOutcome struct {
+	sent      bool
+	team      routing.Team
+	endpoint  string
+	sendRaw   []spool.Event
+	sendCount int
+	reheld    []spool.Event
+	err       error
+}
+
+// sendParcels revalidates each job immediately before POST and executes HTTP sends with
+// bounded concurrency so slow enrollments cannot starve healthy sibling enrollments.
+// Shared routing cache and admission counters are guarded by mu only for local checks,
+// never held across network I/O; spool retry windows and result settlement run serially
+// in the caller after all goroutines return.
+func (p *pass) sendParcels(ctx context.Context, jobs []parcelJob, lane string) []parcelOutcome {
+	outcomes := make([]parcelOutcome, len(jobs))
+	limit := p.r.maxConcurrency
+	if limit <= 0 {
+		limit = maxParcelConcurrency
+	}
+	var mu sync.Mutex
+	runOne := func(i int, job parcelJob) {
+		mu.Lock()
+		team, sendEvents, sendRaw, reheld := p.revalidate(job.pc, lane)
+		var sender *otlpSender
+		var wireEvents []spool.Event
+		var endpoint string
+		if len(sendEvents) > 0 {
+			if p.wrongEnvironment(job.cfg, team) || (p.serverKey && team.TeamID != job.pc.team.TeamID) {
+				reheld = append(reheld, sendRaw...)
+				sendEvents = nil
+			} else {
+				endpoint = p.r.Endpoint(job.cfg, team.TeamID)
+				sender = &otlpSender{
+					Endpoint:    endpoint,
+					APIKey:      job.key,
+					ProjectID:   team.TeamID,
+					NameProject: !p.serverKey,
+					Version:     p.r.Version,
+				}
+				if !p.serverKey && p.r.EnrolledUser != nil {
+					sender.UserID = p.r.EnrolledUser(job.pc.profile, team, endpoint, p.account)
+				}
+				wireEvents = wire(sendEvents)
+			}
+		}
+		mu.Unlock()
+
+		if len(sendEvents) == 0 {
+			outcomes[i] = parcelOutcome{reheld: reheld}
+			return
+		}
+		_, err := sender.Send(ctx, wireEvents)
+		outcomes[i] = parcelOutcome{
+			sent:      true,
+			team:      team,
+			endpoint:  endpoint,
+			sendRaw:   sendRaw,
+			sendCount: len(sendEvents),
+			reheld:    reheld,
+			err:       err,
+		}
+	}
+
+	if len(jobs) == 1 || limit == 1 {
+		for i, job := range jobs {
+			runOne(i, job)
+		}
+		return outcomes
+	}
+	sem := make(chan struct{}, min(limit, len(jobs)))
+	var wg sync.WaitGroup
+	for i, job := range jobs {
+		wg.Add(1)
+		go func(idx int, j parcelJob) {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+			runOne(idx, j)
+		}(i, job)
+	}
+	wg.Wait()
+	return outcomes
 }
 
 type admitAction uint8
@@ -189,15 +297,16 @@ func (p *pass) admit(e spool.Event, pr *profileRoute, lane string, now time.Time
 	}
 }
 
-// revalidate re-checks pc against the profile's current routing state immediately before
-// POSTing. When the state generation has not moved, it returns pc's already-filtered
-// events directly without recompiling or refiltering.
+// revalidate re-checks pc against the profile's current routing state and current wall
+// clock immediately before POSTing. When the state generation has not moved and the team's
+// policy has not expired, it returns pc's already-filtered events directly without
+// recompiling or refiltering.
 func (p *pass) revalidate(pc *parcel, lane string) (routing.Team, []spool.Event, []spool.Event, []spool.Event) {
+	now := p.r.currentTime()
 	fresh := p.routes.load(p.r.StateDir, pc.profile, p.r.loadState)
-	if fresh != nil && fresh.state.Account == lane && routing.SameGeneration(pc.state, fresh.state) {
+	if fresh != nil && fresh.state.Account == lane && routing.SameGeneration(pc.state, fresh.state) && pc.team.StateAt(now) == routing.Active {
 		return pc.team, pc.events, pc.raw, nil
 	}
-	now := time.Now()
 	var team routing.Team
 	var sendEvents, sendRaw, reheld []spool.Event
 	for _, e := range pc.raw {
@@ -214,17 +323,53 @@ func (p *pass) revalidate(pc *parcel, lane string) (routing.Team, []spool.Event,
 	return team, sendEvents, sendRaw, reheld
 }
 
-// wrongEnvironment reports whether sending to team would cross environments: either the
-// enrollment belongs to a different auth host than cfg.AuthURL, or a server-key profile's
-// key was set up against a different auth host than cfg.AuthURL.
-func (p *pass) wrongEnvironment(team routing.Team) bool {
-	if p.cfg.AuthURL == "" {
-		return false
+// profileConfig returns the resolved config for profile: the active pass's config when
+// profile matches p.cfg.ProfileName, else the named profile loaded from ConfigDir (with
+// any process-wide OTLPPinned override preserved). Missing, unreadable, or differently-
+// authenticated profiles fail closed so cross-profile events never post to the wrong
+// ingest endpoint.
+func (p *pass) profileConfig(profile string) (*config.Config, bool) {
+	if profile == p.cfg.ProfileName {
+		return p.cfg, true
 	}
-	if team.AuthURL != "" && !sameHost(team.AuthURL, p.cfg.AuthURL) {
+	if cfg, cached := p.profiles[profile]; cached {
+		return cfg, cfg != nil
+	}
+	file, err := config.LoadFile(p.r.ConfigDir)
+	if err != nil || file.Profiles[profile] == nil {
+		p.profiles[profile] = nil
+		return nil, false
+	}
+	cfg, err := config.Load(p.r.ConfigDir, p.r.StateDir, config.Overrides{Profile: profile})
+	if err != nil || cfg.ServerKeySignIn != p.serverKey {
+		p.profiles[profile] = nil
+		return nil, false
+	}
+	if p.r.OTLPPinned {
+		cfg.OTLPURL = p.cfg.OTLPURL
+	}
+	p.profiles[profile] = cfg
+	return cfg, true
+}
+
+// wrongEnvironment reports whether sending to team under cfg would cross environments:
+// either cfg disagrees with the active pass's auth host, the enrollment belongs to a
+// different auth host than cfg.AuthURL, or a server-key profile's key was set up against
+// a different auth host than cfg.AuthURL.
+func (p *pass) wrongEnvironment(cfg *config.Config, team routing.Team) bool {
+	if cfg == nil {
 		return true
 	}
-	if p.serverKey && !sameHost(p.cfg.ServerKeyAuthURL, p.cfg.AuthURL) {
+	if p.cfg.AuthURL != "" && cfg.AuthURL != "" && !sameHost(cfg.AuthURL, p.cfg.AuthURL) {
+		return true
+	}
+	if cfg.AuthURL == "" {
+		return false
+	}
+	if team.AuthURL != "" && !sameHost(team.AuthURL, cfg.AuthURL) {
+		return true
+	}
+	if p.serverKey && !sameHost(cfg.ServerKeyAuthURL, cfg.AuthURL) {
 		return true
 	}
 	return false
