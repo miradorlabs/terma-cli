@@ -1,6 +1,7 @@
 // Package omp integrates OMP: its native OTLP exporter, pointed at the local
 // relay through OMP's .env, and terma's hooks-only extension, which reports sessions and
-// file edits to `terma hook omp-*` for commit attribution.
+// file edits to `terma hook omp-*` for commit attribution, and an interactive session's
+// name to omp-title (title.go).
 package omp
 
 import (
@@ -44,11 +45,14 @@ func (a Agent) Surfaces() []agents.Surface {
 
 // Events are the extension's omp-* hooks.
 func (Agent) Events() map[string]agents.Handler {
-	return hookrun.Extension{Tool: name, ClaimParent: true}.Events(name)
+	events := hookrun.Extension{Tool: name, ClaimParent: true}.Events(name)
+	events["omp-title"] = title
+	return events
 }
 
-// FlushAfter delivers the spool when a session ends.
-func (Agent) FlushAfter() []string { return []string{"omp-session-end"} }
+// FlushAfter delivers the spool when a session ends, and a session's new name, which the
+// extension may hand over as OMP shuts down, racing the end's flush.
+func (Agent) FlushAfter() []string { return []string{"omp-session-end", "omp-title"} }
 
 // Harness is how terma configures the agent's exporter.
 func (a Agent) Harness() harness.Harness { return exporter{dir: a.ConfigDir} }
@@ -56,12 +60,20 @@ func (a Agent) Harness() harness.Harness { return exporter{dir: a.ConfigDir} }
 // Coverage is how completely terma supports the agent.
 func (Agent) Coverage() (attribution, telemetry agents.CapabilitySupport) {
 	return agents.CapabilitySupport{Level: agents.SupportFull},
-		agents.CapabilitySupport{Level: agents.SupportFull, Note: "tokens, estimated cost, tool calls and subagents ride OMP's native OTLP spans to the local relay; terma's extension exports nothing and reports sessions, edit and write tool changes and subagent parents"}
+		agents.CapabilitySupport{Level: agents.SupportFull, Note: "tokens, estimated cost, tool calls and subagents ride OMP's native OTLP spans to the local relay; terma's extension exports nothing and reports sessions, edit and write tool changes, subagent parents and an interactive session's name"}
 }
 
+// StateDirs are the directories its hooks keep state in.
+func (Agent) StateDirs() []string { return []string{ompTitleStateDir} }
+
+// ContentConsented is the consent session titles travel under.
+func (Agent) ContentConsented(c hookrun.Consent) bool { return titleConsented(c) }
+
 var (
-	_ agents.Covered   = Agent{}
-	_ agents.Exporting = Agent{}
-	_ agents.Agent     = Agent{}
-	_ agents.Surfaced  = Agent{}
+	_ agents.Covered        = Agent{}
+	_ agents.Exporting      = Agent{}
+	_ agents.Agent          = Agent{}
+	_ agents.Surfaced       = Agent{}
+	_ agents.StateKeeper    = Agent{}
+	_ agents.ContentConsent = Agent{}
 )

@@ -24,12 +24,16 @@ const mod = await import(ext)
 await mod.default({ on: (name, fn) => { handlers[name] = fn } })
 const dir = "/home/dev/.omp/agent/sessions/-work"
 const parentFile = dir + "/2026-11-21T13-14-22-769Z_01a1fe3e-5eb1-7520-a3b3-a7f2a87931bf.jsonl"
-const sm = (id, file, header) => ({ getSessionId: () => id, getSessionFile: () => file, getHeader: () => header })
+let title = ""
+const sm = (id, file, header) => ({ getSessionId: () => id, getSessionFile: () => file, getHeader: () => header, getSessionName: () => title })
 const parent = { cwd: "/work", sessionManager: sm("01a1fe3e-5eb1-7520-a3b3-a7f2a87931bf", parentFile, { id: "01a1fe3e-5eb1-7520-a3b3-a7f2a87931bf" }) }
 const child = { cwd: "/work", sessionManager: sm("01a1fe3e-6e03-7557-b1af-a171883bcfca", parentFile.replace(/\.jsonl$/, "") + "/EchoSub.jsonl", { parentSession: parentFile }) }
 const fork = { cwd: "/work", sessionManager: sm("01a1fe3f-0000-7000-8000-000000000003", dir + "/2026-11-21T14-00-00-000Z_01a1fe3f-0000-7000-8000-000000000003.jsonl", { parentSession: parentFile }) }
 await handlers.session_start({ reason: "startup" }, parent)
 await handlers.before_agent_start({ prompt: "do it" }, parent)
+title = "Fix the flaky build"
+await handlers.agent_end({}, parent)
+await handlers.before_agent_start({ prompt: "and again" }, parent)
 handlers.tool_result({ toolName: "edit", toolCallId: "RZPvkTswD|fc_1", isError: true, input: { input: "[notes.txt#B686]", path: "notes.txt", paths: ["notes.txt"] }, details: { diff: "", errorKind: "parse" } }, parent)
 handlers.tool_result({ toolName: "write", toolCallId: "6taIXxcqF|fc_2", isError: false, input: { path: "hello.txt", content: "hello" }, details: { resolvedPath: "/work/hello.txt" } }, parent)
 handlers.tool_result({ toolName: "edit", toolCallId: "h3DEyzO37|fc_3", isError: false, input: { input: "[notes.txt#B686]", path: "notes.txt" }, details: { path: "/work/notes.txt", op: "update" } }, parent)
@@ -50,6 +54,7 @@ const nested = { cwd: "/work", sessionManager: sm("01a1fe40-0000-7000-8000-00000
 await handlers.session_start({ reason: "startup" }, nested)
 await handlers.message_end?.({ message: { role: "assistant", model: "m", usage: { input: 1, output: 1 }, content: [] } }, parent)
 await handlers.agent_end?.()
+title = "Release notes"
 await handlers.session_shutdown({}, parent)
 `
 
@@ -58,7 +63,8 @@ await handlers.session_shutdown({}, parent)
 // never a fork's, and each file a tool call changed, successful ones only, with the call's
 // id as OMP's own spans name it; an edit under its apply_patch wire name counts as an edit. A
 // write names its resolved file, and none when it touches no file (a message to a peer) or
-// goes to one of OMP's internal URLs that resolves to none.
+// goes to one of OMP's internal URLs that resolves to none. The session's name goes to
+// omp-title once, and again when it changes.
 func TestExtensionUnderNode(t *testing.T) {
 	byEvent, ext, fetched := runDriver(t)
 	data, err := os.ReadFile(ext)
@@ -116,7 +122,18 @@ func TestExtensionUnderNode(t *testing.T) {
 			t.Errorf("edit %s named %q, want %q", id, edits[id], files)
 		}
 	}
-	if len(byEvent["omp-prompt"]) != 1 || len(byEvent["omp-session-end"]) != 1 {
+	var titles []string
+	for _, p := range byEvent["omp-title"] {
+		if p["session_id"] != "01a1fe3e-5eb1-7520-a3b3-a7f2a87931bf" {
+			t.Errorf("title for session %v", p["session_id"])
+		}
+		titles = append(titles, p["title"].(string))
+	}
+	slices.Sort(titles)
+	if strings.Join(titles, "|") != "Fix the flaky build|Release notes" {
+		t.Errorf("titles = %v, want the name once and the rename at shutdown", titles)
+	}
+	if len(byEvent["omp-prompt"]) != 2 || len(byEvent["omp-session-end"]) != 1 {
 		t.Errorf("prompts %v, ends %v", byEvent["omp-prompt"], byEvent["omp-session-end"])
 	}
 	if data, err := os.ReadFile(fetched); err == nil {
@@ -175,7 +192,7 @@ func runDriver(t *testing.T) (byEvent map[string][]map[string]any, ext, fetched 
 				calls = append(calls, c)
 			}
 		}
-		if len(calls) >= 9 || time.Now().After(deadline) {
+		if len(calls) >= 15 || time.Now().After(deadline) {
 			break
 		}
 		time.Sleep(50 * time.Millisecond)

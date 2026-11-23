@@ -435,7 +435,9 @@ cost, tool calls and subagents ride OMP's own spans. terma's extension
 (`~/.omp/agent/extensions/terma-omp.ts`) exports nothing and sets no exporter: its hooks
 report sessions and the files OMP's edit and write tools change, for commit attribution,
 and a subagent's start names the session that opened it, which the relay stamps on the
-subagent's records as `terma.session.parent.id`, since OMP's spans do not. Setup removes
+subagent's records as `terma.session.parent.id`, since OMP's spans do not. The name an
+interactive OMP gives a session (a headless `omp -p` names none) is sent as its title, only
+while you chose OMP at setup (or in global mode) and the team's policy collects prompts. Setup removes
 the span-exporting extension and exporter hook an earlier terma wrote there.
 
 terma needs OMP 19 or later: an earlier OMP loads its `.env` into its own environment, so the

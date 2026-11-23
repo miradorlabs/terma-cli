@@ -8,7 +8,8 @@
 // extension exports nothing and holds no token, only the relay's address: it hands session
 // lifecycle, prompts and file edits to `terma hook omp-*`, which claims the session for the
 // local relay and records commit attribution. Each edit names its tool call as OMP's own spans do, and a
-// subagent's session start names the session that opened it.
+// subagent's session start names the session that opened it. The name an interactive OMP
+// gives a session, which its telemetry never carries, goes to `terma hook omp-title`.
 //
 // Dependency-free: it uses only node:fs, node:path and node:child_process, and OMP's own
 // @oh-my-pi/pi-utils where OMP provides it.
@@ -48,6 +49,25 @@ let session = ""
 function sessionOf(ctx: any): string {
   const own = ctx && ctx.sessionManager && typeof ctx.sessionManager.getSessionId === "function" ? ctx.sessionManager.getSessionId() : ""
   return own ? String(own) : session
+}
+
+// titled is the name last handed over for each session this process ran.
+const titled = new Map<string, string>()
+
+// sendTitle hands over the session's name when OMP has named it, or renamed it, since the
+// last one sent: OMP names an interactive session after its first reply, in the background,
+// and fires no event for it, so each turn's start and end and the shutdown look again.
+function sendTitle(ctx: any): Promise<void> {
+  try {
+    const sm = ctx && ctx.sessionManager
+    const name = sm && typeof sm.getSessionName === "function" ? sm.getSessionName() : undefined
+    const s = sessionOf(ctx)
+    if (typeof name !== "string" || !name.trim() || !s || titled.get(s) === name) return Promise.resolve()
+    titled.set(s, name)
+    return termaHook("omp-title", { session_id: s, cwd: ctx?.cwd, title: name })
+  } catch {
+    return Promise.resolve()
+  }
 }
 
 // parentOf is the session that opened this one for a subagent: its header's parentSession
@@ -140,6 +160,7 @@ export default async function (omp: any) {
 
   omp.on("session_shutdown", async (_event: any, ctx: any) => {
     const s = sessionOf(ctx)
+    await sendTitle(ctx)
     if (s) await termaHook("omp-session-end", { session_id: s, cwd: ctx?.cwd })
   })
 
@@ -147,6 +168,11 @@ export default async function (omp: any) {
   // that stopped between turns, is covered before the turn exports anything.
   omp.on("before_agent_start", (_event: any, ctx: any) => {
     termaHook("omp-prompt", { session_id: sessionOf(ctx), cwd: ctx?.cwd })
+    sendTitle(ctx)
+  })
+
+  omp.on("agent_end", (_event: any, ctx: any) => {
+    sendTitle(ctx)
   })
 
   omp.on("tool_result", (event: any, ctx: any) => {
