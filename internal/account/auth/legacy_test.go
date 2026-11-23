@@ -395,3 +395,51 @@ func TestARetirementHoldsTheOlderTermasLock(t *testing.T) {
 		t.Fatalf("the lock stayed after the file was forgotten: %v", err)
 	}
 }
+
+// A server key's first look that couldn't read the older sign-ins kept none of their
+// sessions; a later look, once they read, adds them for the heartbeat and keeps the rest.
+func TestALaterLookAddsTheSessionsAFirstLookCouldntRead(t *testing.T) {
+	t.Parallel()
+	dir, stateDir := t.TempDir(), t.TempDir()
+	at := time.Now().Add(-time.Hour).UTC()
+	if err := config.WriteJSON(filepath.Join(stateDir, LegacyRecordFile), LegacyRecord{Account: LegacyAccountAmbiguous, RetiredAt: at}, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	data := `{"default": {"organizations": {"o": {"session_id": "s", "auth_url": "https://auth.example.test", "user_id": "u"}}}}`
+	if err := os.WriteFile(config.LegacyCredentialsPath(dir), []byte(data), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	rec, err := LegacyOwnershipAt(dir, stateDir, true, time.Now())
+	if err != nil || !slices.Equal(rec.SessionIDs, []string{"s"}) || rec.Account != LegacyAccountAmbiguous || !rec.RetiredAt.Equal(at) {
+		t.Fatalf("record = %+v, %v; want the session added, the rest kept", rec, err)
+	}
+}
+
+// Older sign-ins that name no session leave the record as it was: it is not written again
+// at each look.
+func TestALookWithNoSessionsToAddLeavesTheRecord(t *testing.T) {
+	t.Parallel()
+	dir, stateDir := t.TempDir(), t.TempDir()
+	path := filepath.Join(stateDir, LegacyRecordFile)
+	if err := config.WriteJSON(path, LegacyRecord{Account: LegacyAccountAmbiguous, RetiredAt: time.Now().Add(-time.Hour).UTC()}, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	data := `{"default": {"organizations": {"o": {"auth_url": "https://auth.example.test", "user_id": "u"}}}}`
+	if err := os.WriteFile(config.LegacyCredentialsPath(dir), []byte(data), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	before, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := LegacyOwnershipAt(dir, stateDir, true, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if err := RecordNoOne(stateDir, nil, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	after, err := os.Stat(path)
+	if err != nil || !os.SameFile(before, after) || !before.ModTime().Equal(after.ModTime()) {
+		t.Fatalf("the record was written again: %v", err)
+	}
+}

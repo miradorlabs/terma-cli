@@ -287,6 +287,14 @@ func LegacyOwnership(dir, stateDir string, serverKey bool) (LegacyRecord, error)
 // been judging by is the one recorded.
 func LegacyOwnershipAt(dir, stateDir string, serverKey bool, at time.Time) (LegacyRecord, error) {
 	rec, err := ReadLegacyRecord(stateDir)
+	if err == nil && !rec.RetiredAt.IsZero() && len(rec.SessionIDs) == 0 && serverKey && HasLegacySignIns(dir) {
+		// A record with none of their sessions (a first look that couldn't read them, say)
+		// gains them once they read, for the heartbeat, and keeps what it says.
+		if signIns, lerr := LegacySignIns(dir, false); lerr == nil && slices.ContainsFunc(signIns, func(s LegacySignIn) bool { return s.SessionID != "" }) &&
+			RecordNoOne(stateDir, signIns, at) == nil {
+			rec, err = ReadLegacyRecord(stateDir)
+		}
+	}
 	if err != nil || !rec.RetiredAt.IsZero() || !serverKey || !HasLegacySignIns(dir) {
 		return rec, err
 	}
@@ -372,13 +380,18 @@ func recordNoOne(stateDir string, signIns []LegacySignIn, now time.Time) error {
 	if err != nil {
 		return err
 	}
-	if rec.RetiredAt.IsZero() {
+	changed := rec.RetiredAt.IsZero()
+	if changed {
 		rec = LegacyRecord{Account: LegacyAccountAmbiguous, RetiredAt: now.UTC()}
 	}
 	for _, s := range signIns {
 		if s.SessionID != "" && !slices.Contains(rec.SessionIDs, s.SessionID) {
 			rec.SessionIDs = append(rec.SessionIDs, s.SessionID)
+			changed = true
 		}
+	}
+	if !changed {
+		return nil // a record kept as it was is not written again
 	}
 	return config.WriteJSON(filepath.Join(stateDir, LegacyRecordFile), rec, 0o600)
 }
