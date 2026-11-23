@@ -126,13 +126,12 @@ func applyAside(prev Claim, havePrev bool, marks []asideMark) (Claim, bool, bool
 				continue
 			}
 		}
-		sameLane := sameRun && (m.Profile == "" || m.Profile == prev.Profile) && (m.Account == "" || m.Account == prev.Account)
 		claimedAt := prev.ClaimedAt
 		if m.ClaimedAt.After(claimedAt) {
 			claimedAt = m.ClaimedAt
 		}
 		pls := slices.Clone(prev.placements())
-		if prev.Kind == KindMixed && sameLane {
+		if prev.Kind == KindMixed && sameRun && (m.Profile == "" || m.Profile == prev.Profile) && (m.Account == "" || m.Account == prev.Account) {
 			var mod bool
 			pls, mod = mergeMixedInto(pls, len(pls)-1, m)
 			last := len(pls) - 1
@@ -158,8 +157,7 @@ func applyAside(prev Claim, havePrev bool, marks []asideMark) (Claim, bool, bool
 		runID, profile, account, tool, parent := cmp.Or(m.Run, prev.Run), cmp.Or(m.Profile, prev.Profile), cmp.Or(m.Account, prev.Account), cmp.Or(m.Tool, prev.Tool), cmp.Or(prev.Parent, m.Parent)
 		pls = append(pls, Placement{Kind: KindMixed, Run: runID, Profile: profile, Account: account, Tool: tool, PIDs: pids, Since: since})
 		pls, evicted, mixed := trimPlacements(pls, prev.Evicted, prev.MixedRuns)
-		prev = Claim{Kind: KindMixed, Run: runID, Profile: profile, Account: account, Tool: tool, Parent: parent, PIDs: pids, Placements: pls, Evicted: evicted, MixedRuns: mixed, ClaimedAt: claimedAt}
-		changed = true
+		prev, changed = Claim{Kind: KindMixed, Run: runID, Profile: profile, Account: account, Tool: tool, Parent: parent, PIDs: pids, Placements: pls, Evicted: evicted, MixedRuns: mixed, ClaimedAt: claimedAt}, true
 	}
 	return prev, havePrev, changed
 }
@@ -173,7 +171,6 @@ func clampSince(pls []Placement, run string, since time.Time) time.Time {
 	return since
 }
 
-// unionPIDs returns the union of a and b, or nil (all processes) if either is empty or > maxPIDs.
 func unionPIDs(a, b []int) []int {
 	if len(a) == 0 || len(b) == 0 {
 		return nil
@@ -213,24 +210,22 @@ func mergeMixedInto(pls []Placement, idx int, m Claim) ([]Placement, bool) {
 	return slices.Replace(pls, cut, idx+1, pl), true
 }
 
+func sameLane(pl Placement, run, profile, account string) bool {
+	return (run == "" || pl.Run == "" || pl.Run == run) && (profile == "" || pl.Profile == profile) && (account == "" || pl.Account == account)
+}
+
 func prepareMixed(pls []Placement, run, profile, account string, add []int, since time.Time) ([]Placement, []int, bool) {
 	pids := slices.Clone(add)
 	for _, pl := range pls {
 		if len(pids) == 0 {
 			break
 		}
-		if (run != "" && pl.Run != "" && pl.Run != run) || (profile != "" && pl.Profile != profile) || (account != "" && pl.Account != account) {
-			continue
+		if sameLane(pl, run, profile, account) {
+			pids = unionPIDs(pids, pl.PIDs)
 		}
-		pids = unionPIDs(pids, pl.PIDs)
 	}
-	hit := poisonRun(pls, run, since)
-	n := len(pls)
-	for n > 0 {
-		pl := pls[n-1]
-		if (run != "" && pl.Run != "" && pl.Run != run) || (profile != "" && pl.Profile != profile) || (account != "" && pl.Account != account) || pl.Since.Before(since) {
-			break
-		}
+	hit, n := poisonRun(pls, run, since), len(pls)
+	for n > 0 && sameLane(pls[n-1], run, profile, account) && !pls[n-1].Since.Before(since) {
 		n--
 	}
 	return pls[:n], pids, hit
@@ -256,8 +251,7 @@ func foldEarlierRun(prev *Claim, m Claim) (matched, changed bool) {
 	if idx < 0 {
 		return slices.Contains(prev.MixedRuns, m.Run), false
 	}
-	sameLane := (m.Profile == "" || pls[idx].Profile == m.Profile) && (m.Account == "" || pls[idx].Account == m.Account)
-	if pls[idx].Kind == KindMixed && sameLane {
+	if pls[idx].Kind == KindMixed && sameLane(pls[idx], m.Run, m.Profile, m.Account) {
 		if next, mod := mergeMixedInto(pls, idx, m); mod {
 			prev.Placements = next
 			return true, true
@@ -304,10 +298,7 @@ func removeAside(claimPath string, files []string) {
 }
 
 func pruneAside(dir string, now time.Time) {
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return
-	}
+	entries, _ := os.ReadDir(dir)
 	for _, e := range entries {
 		if info, err := e.Info(); err == nil && now.Sub(info.ModTime()) >= TTL {
 			_ = os.Remove(filepath.Join(dir, e.Name()))

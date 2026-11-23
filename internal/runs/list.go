@@ -25,15 +25,13 @@ func Mixed(stateDir string, now time.Time, recent time.Duration) []MixedRun {
 	}
 	written := map[string]time.Time{}
 	for _, e := range entries {
-		id, ok := sessionOf(e.Name())
-		if !ok || e.IsDir() != strings.HasSuffix(e.Name(), asideExt) {
-			continue
+		if id, ok := sessionOf(e.Name()); ok && e.IsDir() == strings.HasSuffix(e.Name(), asideExt) {
+			var at time.Time
+			if info, err := e.Info(); err == nil {
+				at = info.ModTime()
+			}
+			written[id] = latest(written[id], at)
 		}
-		var at time.Time
-		if info, err := e.Info(); err == nil {
-			at = info.ModTime()
-		}
-		written[id] = latest(written[id], at)
 	}
 	var out []MixedRun
 	for id, at := range written {

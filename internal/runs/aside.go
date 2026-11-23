@@ -63,10 +63,9 @@ func (a aside) apply(l *ledger) {
 		i := slices.IndexFunc(l.Runs, func(r run) bool { return r.ID == m.Run })
 		if i < 0 {
 			if len(l.Runs) == 0 {
-				l.Runs, i = []run{{ID: m.Run}}, 0
-			} else {
-				i = len(l.Runs) - 1
+				l.Runs = []run{{ID: m.Run}}
 			}
+			i = len(l.Runs) - 1
 		}
 		l.Runs[i].mark(m.At, Why{Reason: Aside})
 		l.active(m.At)

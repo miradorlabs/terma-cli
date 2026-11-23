@@ -111,10 +111,7 @@ func pruneAside(stateDir, name string, now time.Time, queued map[string]bool) {
 		return
 	}
 	a, loadErr := loadAside(dir)
-	if loadErr == nil && now.Sub(a.last()) <= MixedRetention {
-		return
-	}
-	if info, err := os.Lstat(dir); err != nil || now.Sub(info.ModTime()) <= MixedRetention {
+	if info, err := os.Lstat(dir); (loadErr == nil && now.Sub(a.last()) <= MixedRetention) || err != nil || now.Sub(info.ModTime()) <= MixedRetention {
 		return
 	}
 	if loadErr == nil {

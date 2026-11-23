@@ -521,3 +521,47 @@ func TestOutOfOrderStartsStayConsistentWithMarkMixed(t *testing.T) {
 		t.Fatalf("latest run MixedAt = %v, %v; want %v, true", at, mixed, cross)
 	}
 }
+
+// An alias mapping takes precedence over a pre-existing direct ledger for the same ID,
+// and any Mixed mark on either side is preserved so neither order hides Mixed.
+func TestAliasPrecedenceAndMixedMerge(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+
+	// Start(child) -> Alias(parent, child) -> MarkMixed(parent) must leave child reading Mixed.
+	start(t, dir, "child-a", t0)
+	start(t, dir, "parent-a", t0)
+	must(t, Alias(dir, "parent-a", "child-a"))
+	cross := t0.Add(5 * time.Minute)
+	must(t, MarkMixed(dir, "parent-a", cross, Why{Reason: Crossed, Where: "github.com/other/repo"}))
+	if at, mixed := mixedAt(t, dir, "child-a", t0.Add(6*time.Minute)); !mixed || !at.Equal(cross) {
+		t.Fatalf("child-a after parent MarkMixed: MixedAt = %v, %v; want %v, true", at, mixed, cross)
+	}
+	if pos, ok := Locate(dir, "child-a"); !ok || !pos.MixedAt.Equal(cross) {
+		t.Fatalf("Locate(child-a) = %+v, %v; want parent MixedAt %v", pos, ok, cross)
+	}
+
+	// Start(child) -> MarkMixed(child) -> Start(parent) -> Alias(parent, child) still reads Mixed.
+	start(t, dir, "child-b", t0)
+	crossB := t0.Add(2 * time.Minute)
+	must(t, MarkMixed(dir, "child-b", crossB, Why{Reason: UnknownReach, Where: "eval"}))
+	start(t, dir, "parent-b", t0)
+	must(t, Alias(dir, "parent-b", "child-b"))
+	if at, mixed := mixedAt(t, dir, "child-b", t0.Add(3*time.Minute)); !mixed || !at.Equal(crossB) {
+		t.Fatalf("child-b after pre-alias MarkMixed: MixedAt = %v, %v; want %v, true", at, mixed, crossB)
+	}
+
+	// Unstarted parent with alias still preserves child's Mixed mark.
+	start(t, dir, "child-c", t0)
+	must(t, MarkMixed(dir, "child-c", crossB, Why{Reason: Crossed}))
+	must(t, Alias(dir, "parent-c", "child-c"))
+	if _, mixed := mixedAt(t, dir, "child-c", t0.Add(3*time.Minute)); !mixed {
+		t.Fatal("child-c aliased to unstarted parent lost its Mixed mark")
+	}
+
+	// Empty alias file fails closed.
+	must(t, os.WriteFile(aliasPath(dir, "bad-alias"), nil, 0o600))
+	if _, mixed := Read(dir, "bad-alias").MixedAt(t0); !mixed {
+		t.Fatal("empty alias file did not fail closed")
+	}
+}

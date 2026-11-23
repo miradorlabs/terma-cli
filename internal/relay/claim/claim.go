@@ -229,6 +229,9 @@ func write(dir, sessionID string, c Claim, now time.Time) bool {
 	prev, havePrev := read(p)
 	prev, havePrev, folded := applyAside(prev, havePrev, asideMarks)
 	if havePrev && staysMixed(prev, c) {
+		if c.Parent != "" && prev.Parent == "" {
+			prev.Parent, folded = c.Parent, true
+		}
 		if folded || len(asideMarks) > 0 {
 			_ = persist(p, prev, asideFiles)
 		} else {
@@ -245,6 +248,9 @@ func write(dir, sessionID string, c Claim, now time.Time) bool {
 	if !tombForced && havePrev && c.Kind == KindMixed && c.Run != "" && prev.Run != "" && c.Run != prev.Run {
 		c.ClaimedAt = now
 		if matched, ch := foldEarlierRun(&prev, c); matched {
+			if c.Parent != "" && prev.Parent == "" {
+				prev.Parent, ch = c.Parent, true
+			}
 			if ch || folded || len(asideMarks) > 0 {
 				return persist(p, prev, asideFiles)
 			}

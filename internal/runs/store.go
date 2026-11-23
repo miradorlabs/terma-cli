@@ -16,39 +16,62 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/session"
 )
 
-// resolve reads idOrAlias (or its session via alias) with sidecar read first so a
-// concurrent fold (save ledger before removing sidecar) never hides a Mixed mark.
-func resolve(stateDir, idOrAlias string) (l ledger, ok, aside bool, err error) {
-	read := func(sessionID string) error {
-		path, err := ledgerPath(stateDir, sessionID)
-		if err != nil {
-			return err
+// resolve reads idOrAlias (preferring aliases/<idOrAlias> when present) with sidecar read first.
+// If both an alias target and a direct ledger exist, any Mixed mark from the direct ledger is merged.
+func resolve(stateDir, idOrAlias string) (ledger, bool, bool, error) {
+	if b, err := os.ReadFile(aliasPath(stateDir, idOrAlias)); err == nil {
+		target := strings.TrimSpace(string(b))
+		if target == "" {
+			return ledger{}, false, false, fmt.Errorf("runs: empty alias %q", idOrAlias)
 		}
-		a, err := loadAside(asidePath(path))
-		if err != nil {
-			return err
+		if target != idOrAlias {
+			tl, tok, ta, err := readLedger(stateDir, target)
+			if err != nil {
+				return ledger{}, false, false, err
+			}
+			dl, dok, da, err := readLedger(stateDir, idOrAlias)
+			if err != nil || !tok {
+				return dl, dok, da, err
+			}
+			if dok {
+				mergeMixed(&tl, dl)
+			}
+			return tl, true, ta || da, nil
 		}
-		if l, ok, err = load(path); err != nil {
-			return err
-		}
-		if len(a.marks) > 0 {
-			a.apply(&l)
-			ok, aside = true, true
-		}
-		return nil
-	}
-	if err := read(idOrAlias); err != nil || ok {
-		return l, ok, aside, err
-	}
-	b, err := os.ReadFile(aliasPath(stateDir, idOrAlias))
-	if err != nil {
-		if errors.Is(err, fs.ErrNotExist) {
-			return ledger{}, false, false, nil
-		}
+	} else if !errors.Is(err, fs.ErrNotExist) {
 		return ledger{}, false, false, err
 	}
-	err = read(strings.TrimSpace(string(b)))
-	return l, ok, aside, err
+	return readLedger(stateDir, idOrAlias)
+}
+
+func readLedger(stateDir, id string) (ledger, bool, bool, error) {
+	path, err := ledgerPath(stateDir, id)
+	if err != nil {
+		return ledger{}, false, false, err
+	}
+	a, err := loadAside(asidePath(path))
+	if err != nil {
+		return ledger{}, false, false, err
+	}
+	l, ok, err := load(path)
+	if err != nil || len(a.marks) == 0 {
+		return l, ok, false, err
+	}
+	a.apply(&l)
+	return l, true, true, nil
+}
+
+func mergeMixed(dst *ledger, src ledger) {
+	for _, r := range src.Runs {
+		if !r.MixedAt.IsZero() {
+			if len(dst.Runs) == 0 {
+				dst.Runs = append(dst.Runs, r)
+			} else {
+				dst.Runs[inForceIdx(dst.Runs, r.MixedAt)].mark(r.MixedAt, r.why())
+			}
+			dst.active(r.MixedAt)
+		}
+	}
 }
 
 func update(stateDir, sessionID string, change func(*ledger)) error {
@@ -65,10 +88,10 @@ func editLedger(stateDir, sessionID string, try bool, edit func(path string, l *
 	}
 	run := func() error {
 		l, _, err := load(path)
-		if err != nil {
-			return err
+		if err == nil {
+			err = fold(path, &l)
 		}
-		if err := fold(path, &l); err != nil {
+		if err != nil {
 			return err
 		}
 		return edit(path, &l)
@@ -100,7 +123,7 @@ func load(path string) (ledger, bool, error) {
 	b, err := os.ReadFile(path)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
-			err = nil
+			return ledger{}, false, nil
 		}
 		return ledger{}, false, err
 	}

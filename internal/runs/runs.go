@@ -21,6 +21,7 @@ const (
 	MixedRetention  = 90 * 24 * time.Hour
 	RefreshEvery    = 24 * time.Hour
 	lockWait        = 2 * time.Second
+	MaxLocations    = 64 // exceeding it marks the run Mixed (LocationBound)
 )
 
 type ledger struct {
@@ -29,11 +30,7 @@ type ledger struct {
 	Active  time.Time `json:"active,omitzero"`
 }
 
-func (l *ledger) active(t time.Time) {
-	if t = t.UTC(); t.After(l.Active) {
-		l.Active = t
-	}
-}
+func (l *ledger) active(t time.Time) { l.Active = latest(l.Active, t.UTC()) }
 
 func (l ledger) lastActive(written time.Time) time.Time {
 	last := l.Active
@@ -146,9 +143,6 @@ func TryTouch(stateDir, sessionID, runID string, locations []string) ([]string, 
 	return touchWith(true, stateDir, sessionID, runID, locations)
 }
 
-// MaxLocations bounds distinct locations per run; exceeding it marks the run Mixed (LocationBound).
-const MaxLocations = 64
-
 func touchWith(try bool, stateDir, sessionID, runID string, locations []string) ([]string, error) {
 	var merged []string
 	err := editLedger(stateDir, sessionID, try, func(path string, l *ledger) error {
@@ -206,11 +200,8 @@ func Read(stateDir, idOrAlias string) Snapshot {
 
 // MixedAt is the package's MixedAt, answered from this read of the ledger.
 func (s Snapshot) MixedAt(recordTime time.Time) (time.Time, bool) {
-	if s.unreadable {
-		return time.Time{}, true
-	}
-	if len(s.runs) == 0 {
-		return time.Time{}, false
+	if s.unreadable || len(s.runs) == 0 {
+		return time.Time{}, s.unreadable
 	}
 	r := inForce(s.runs, recordTime)
 	return r.MixedAt, !r.MixedAt.IsZero()
@@ -282,9 +273,11 @@ func Aliases(stateDir, sessionID string) ([]string, error) {
 	return slices.Clone(l.Aliases), err
 }
 
-func inForce(runs []run, t time.Time) run {
+func inForce(runs []run, t time.Time) run { return runs[inForceIdx(runs, t)] }
+
+func inForceIdx(runs []run, t time.Time) int {
 	if t.IsZero() {
-		return runs[len(runs)-1]
+		return len(runs) - 1
 	}
 	best, earliest := -1, 0
 	for i, r := range runs {
@@ -296,7 +289,7 @@ func inForce(runs []run, t time.Time) run {
 		}
 	}
 	if best < 0 {
-		return runs[earliest]
+		return earliest
 	}
-	return runs[best]
+	return best
 }
