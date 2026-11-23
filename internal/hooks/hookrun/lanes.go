@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"path/filepath"
+	"slices"
 
 	"github.com/miradorlabs/terma-cli/internal/project"
 	"github.com/miradorlabs/terma-cli/internal/sendas"
@@ -146,8 +147,13 @@ func (e Env) emitRecord(r *Repo, ev spool.Event, accounts []string) bool {
 //     by: the record is in the one lane all their manifests name, and in none when a
 //     session's manifest names no one, or there is no session.
 //
-// ok is false for none: a record of several people's sessions, or of no one's, is lost.
+// A session whose manifest can't be read (sendas.AccountUnreadable) may be anyone's, so a
+// record of it is in no lane. ok is false for none: a record of several people's sessions,
+// or of no one's, is lost.
 func recordLane(own spool.Lane, accounts []string) (lane spool.Lane, ok bool) {
+	if slices.Contains(accounts, sendas.AccountUnreadable) {
+		return spool.Lane{}, false
+	}
 	if own.Lost == "" {
 		for _, a := range accounts {
 			if a != "" && a != laneName(own) {

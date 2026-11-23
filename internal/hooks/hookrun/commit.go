@@ -151,7 +151,8 @@ func PostCommit(ctx context.Context, env Env) error {
 
 // accountsOf are the accounts the manifests of the stamped sessions name, one per session:
 // "" for one stamped with no agent, which has no manifest, so a sandboxed record of it names
-// no one's.
+// no one's; sendas.AccountUnreadable for one whose manifest can't be read, so a record of it
+// is no one's (recordLane).
 func accountsOf(store *session.Store, stamped []trailer.Trailer) []string {
 	keys := make([]session.Key, 0, len(stamped))
 	for _, t := range stamped {

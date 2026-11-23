@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/miradorlabs/terma-cli/internal/flock"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
 	"github.com/miradorlabs/terma-cli/internal/project"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
@@ -453,17 +454,77 @@ func TestAnUnreadableManifestIsNoOnesToReport(t *testing.T) {
 	if err := gitStore(p, personA).Touch(sess, []string{"a.go"}, time.Now()); err != nil {
 		t.Fatal(err)
 	}
+	tearManifest(t, p, sess.ID)
+	asB, dir := signedIn(t, p, personB)
+	r, err := asB.Repo(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	asB.Touch(r, sess, "Edit", []string{"b.go"}, nil)
+	if evs := hookruntest.Spooled(t, asB.Spool); len(evs) != 0 {
+		t.Errorf("B spooled %s of a session whose owner can't be read", hookruntest.Names(evs))
+	}
+	if l := lossesIn(t, dir); l[sendas.LostAccountConflict] != 1 || len(l) != 1 {
+		t.Errorf("losses = %v; want B's touch counted account_conflict", l)
+	}
+}
+
+// tearManifest overwrites the manifest of session id in p's session store with a torn write.
+func tearManifest(t *testing.T, p *pushRepo, id string) {
+	t.Helper()
 	var manifest string
 	_ = filepath.WalkDir(filepath.Join(p.root, ".git", project.GitStoreDir), func(path string, d fs.DirEntry, err error) error {
-		if err == nil && d.Name() == sess.ID+".json" {
+		if err == nil && d.Name() == id+".json" {
 			manifest = path
 		}
 		return nil
 	})
 	if manifest == "" {
-		t.Fatal("no manifest of A's session")
+		t.Fatalf("no manifest of %s", id)
 	}
 	if err := os.WriteFile(manifest, []byte("{torn"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// A commit and a push of a session whose manifest can't be read may be anyone's: B's git
+// hooks keep neither in B's lane, and count both ambiguous_push.
+func TestARecordOfAnUnreadableManifestIsInNoLane(t *testing.T) {
+	defer func(f func() int) { gitPushPID = f }(gitPushPID)
+	gitPushPID = func() int { return 0 }
+	p := newPushRepo(t)
+	if err := gitStore(p, personA).Touch(session.Session{ID: "sess-a", Tool: "claude-code"}, []string{"a.go"}, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	tearManifest(t, p, "sess-a")
+	asB, dir := signedIn(t, p, personB)
+	prePush(t, p, asB, commit(t, p, asB, []string{"a.go"}, "sess-a"))
+	if got := lanes(t, asB.Spool); len(got) != 0 {
+		t.Errorf("queued %v; want nothing of a session whose owner can't be read", got)
+	}
+	if l := lossesIn(t, dir); l[sendas.LostAmbiguousPush] != 2 || len(l) != 1 {
+		t.Errorf("losses = %v; want the commit and the push counted ambiguous_push", l)
+	}
+}
+
+// A record of a session whose manifest can't be read is in no lane, whoever collects it:
+// a hook that read its sign-in, or a sandboxed one that goes by its sessions alone.
+func TestAnUnreadableManifestGivesARecordNoLane(t *testing.T) {
+	for _, own := range []spool.Lane{{Account: personB}, {Lost: sendas.LostUnreadable}} {
+		for _, accounts := range [][]string{{sendas.AccountUnreadable}, {personB, sendas.AccountUnreadable}} {
+			if lane, ok := recordLane(own, accounts); ok {
+				t.Errorf("collected in %+v, sessions %q: lane %+v; want none", own, accounts, lane)
+			}
+		}
+	}
+}
+
+// A manifest that becomes unreadable after owns read it refuses the write that waits on the
+// store's lock, so nothing of it is spooled, and the event is counted account_conflict.
+func TestAnUnreadableManifestRefusesAnUnlockedWrite(t *testing.T) {
+	p := newPushRepo(t)
+	sess := session.Session{ID: "sess-b", Tool: "claude-code"}
+	if err := gitStore(p, personB).Touch(sess, []string{"b.go"}, time.Now()); err != nil {
 		t.Fatal(err)
 	}
 	asB, dir := signedIn(t, p, personB)
@@ -471,7 +532,15 @@ func TestAnUnreadableManifestIsNoOnesToReport(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	asB.Touch(r, sess, "Edit", []string{"b.go"}, nil)
+	asB.afterOwns = func() {
+		tearManifest(t, p, sess.ID)
+		release, err := flock.Lock(context.Background(), filepath.Join(p.root, ".git", project.GitStoreDir, "store.lock"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(release)
+	}
+	asB.Touch(r, sess, "Edit", []string{"c.go"}, nil)
 	if evs := hookruntest.Spooled(t, asB.Spool); len(evs) != 0 {
 		t.Errorf("B spooled %s of a session whose owner can't be read", hookruntest.Names(evs))
 	}

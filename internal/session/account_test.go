@@ -5,10 +5,12 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/flock"
+	"github.com/miradorlabs/terma-cli/internal/sendas"
 )
 
 // bound is s bound to account.
@@ -145,5 +147,95 @@ func TestAnUnreadableManifestIsNotOwned(t *testing.T) {
 	}
 	if store.Owns(sess.Key()) {
 		t.Fatal("a session whose manifest can't be read is owned")
+	}
+}
+
+// A session whose manifest can't be read is no one's to write or to name: a write under
+// the lock or waiting on it is refused, Accounts names it unreadable, and Manifests leaves
+// it out with its deltas, which would name their own account in its place.
+func TestAnUnreadableManifestNamesNoOne(t *testing.T) {
+	t.Parallel()
+	store := Open(t.TempDir())
+	sess := Session{ID: "sess-1", Tool: "codex"}
+	a, b := bound(store, "aaaaaaaaaaaaaaaa"), bound(store, "bbbbbbbbbbbbbbbb")
+	if err := a.Touch(sess, []string{"a.go"}, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	// A delta B wrote while the manifest was still A's, and whole.
+	if err := b.writeDelta(newManifest(sess, "bbbbbbbbbbbbbbbb", time.Now())); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(store.manifestPath(sess.Key()), []byte("{torn"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := b.Touch(sess, []string{"b.go"}, time.Now()); !errors.Is(err, ErrAccountConflict) {
+		t.Fatalf("B's touch of an unreadable manifest: %v; want ErrAccountConflict", err)
+	}
+	hasty := bound(store, "bbbbbbbbbbbbbbbb")
+	hasty.lockWait = time.Millisecond
+	release, err := flock.Lock(context.Background(), filepath.Join(store.dir, lockFile))
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = hasty.Touch(sess, []string{"c.go"}, time.Now())
+	release()
+	if !errors.Is(err, ErrAccountConflict) {
+		t.Fatalf("B's unlocked touch of an unreadable manifest: %v; want ErrAccountConflict", err)
+	}
+	if got := store.Accounts([]Key{sess.Key(), {Tool: "codex", ID: "sess-new"}, {ID: "no-tool"}}); !slices.Equal(got, []string{sendas.AccountUnreadable, "", ""}) {
+		t.Fatalf("accounts = %q; want the unreadable one marked, the missing ones none", got)
+	}
+	if ms, err := store.Manifests(); err != nil || len(ms) != 0 {
+		t.Fatalf("manifests %+v, %v; want the unreadable session left out", ms, err)
+	}
+}
+
+// A torn manifest, left out of Manifests, still ages out with its deltas, by its file's
+// time: one past retention is pruned and its store can be retired; a fresh one is kept.
+func TestATornManifestIsPrunedAtRetention(t *testing.T) {
+	t.Parallel()
+	torn := func(store *Store, id string, at time.Time) Key {
+		t.Helper()
+		sess := Session{ID: id, Tool: "codex"}
+		if err := bound(store, "aaaaaaaaaaaaaaaa").Touch(sess, []string{"a.go"}, at); err != nil {
+			t.Fatal(err)
+		}
+		if err := store.writeDelta(newManifest(sess, "bbbbbbbbbbbbbbbb", at)); err != nil {
+			t.Fatal(err)
+		}
+		path := store.manifestPath(sess.Key())
+		if err := os.WriteFile(path, []byte("{torn"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Chtimes(path, at, at); err != nil {
+			t.Fatal(err)
+		}
+		return sess.Key()
+	}
+	files := func(store *Store, k Key) []string {
+		paths, _ := filepath.Glob(filepath.Join(store.dir, manifestsDir, k.Tool, k.ID+"*"))
+		return paths
+	}
+	now := time.Now()
+	store := Open(t.TempDir())
+	old, fresh := torn(store, "sess-old", now.Add(-48*time.Hour)), torn(store, "sess-fresh", now)
+	if n, err := store.Prune(now.Add(-24 * time.Hour)); err != nil || n != 1 {
+		t.Fatalf("pruned %d, %v; want the old torn session", n, err)
+	}
+	if got := files(store, old); len(got) != 0 {
+		t.Errorf("the old torn session left %v", got)
+	}
+	if got := files(store, fresh); len(got) != 2 {
+		t.Errorf("the fresh torn session has %v; want its manifest and its delta kept", got)
+	}
+	retired := Open(t.TempDir())
+	torn(retired, "sess-old", now.Add(-48*time.Hour))
+	if err := os.Chtimes(filepath.Join(retired.dir, lockFile), now.Add(-48*time.Hour), now.Add(-48*time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	retired.Retire(now.Add(-24 * time.Hour))
+	if !retired.missing() {
+		entries, _ := os.ReadDir(retired.dir)
+		t.Fatalf("a store holding only an aged torn session was not retired: %v", entries)
 	}
 }

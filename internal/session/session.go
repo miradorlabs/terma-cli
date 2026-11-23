@@ -22,6 +22,7 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/flock"
+	"github.com/miradorlabs/terma-cli/internal/sendas"
 )
 
 // Session is what a harness announced when it started.
@@ -264,14 +265,18 @@ func (s *Store) Touch(sess Session, files []string, at time.Time) error {
 		// Another writer's read-modify-write would overwrite this one's: a delta of its
 		// own survives, and the next locked writer folds it in, if it names the account the
 		// manifest does by then (load).
-		if m, _ := s.manifest(sess.Key()); m != nil && conflicts(m.Account, s.account) {
+		m, err := s.manifest(sess.Key())
+		if err != nil {
+			return unreadableOwner(err)
+		}
+		if m != nil && conflicts(m.Account, s.account) {
 			return ErrAccountConflict
 		}
 		return s.writeDelta(touched)
 	}
 	m, deltas, err := s.load(sess.Key())
 	if err != nil {
-		return err
+		return unreadableOwner(err)
 	}
 	if m != nil && conflicts(m.Account, s.account) {
 		return ErrAccountConflict
@@ -286,6 +291,12 @@ func (s *Store) Touch(sess Session, files []string, at time.Time) error {
 		_ = writeJSON(filepath.Join(s.dir, activeFile), active)
 	}
 	return nil
+}
+
+// unreadableOwner is the refusal of a write to a session whose manifest can't be read
+// (err): its owner can't be checked, so the write may be another account's session's.
+func unreadableOwner(err error) error {
+	return fmt.Errorf("%w: its manifest can't be read: %w", ErrAccountConflict, err)
 }
 
 func newManifest(sess Session, account string, at time.Time) *Manifest {
@@ -376,28 +387,28 @@ func removeAll(paths []string) {
 
 // Manifests lists every recorded session, deltas folded in, oldest first.
 func (s *Store) Manifests() ([]Manifest, error) {
-	out, _, err := s.manifests()
+	out, _, _, err := s.manifests()
 	return out, err
 }
 
-// manifests is Manifests, with each session's delta paths. A tool's manifests are in a
-// folder of its name.
-func (s *Store) manifests() ([]Manifest, map[Key][]string, error) {
+// manifests is Manifests, with each session's delta paths, and the sessions whose manifest
+// can't be read (torn), which it leaves out. A tool's manifests are in a folder of its name.
+func (s *Store) manifests() (out []Manifest, deltas map[Key][]string, torn []Key, err error) {
 	tools, err := os.ReadDir(filepath.Join(s.dir, manifestsDir))
 	if errors.Is(err, fs.ErrNotExist) {
-		return nil, nil, nil
+		return nil, nil, nil, nil
 	}
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	byKey := map[Key]*Manifest{}
-	deltas := map[Key][]string{}
+	deltas = map[Key][]string{}
 	for _, t := range tools {
 		if t.IsDir() && ValidID(t.Name()) {
-			s.readTool(t.Name(), byKey, deltas)
+			torn = append(torn, s.readTool(t.Name(), byKey, deltas)...)
 		}
 	}
-	return sorted(byKey), deltas, nil
+	return sorted(byKey), deltas, torn, nil
 }
 
 // sorted is the manifests oldest first.
@@ -415,11 +426,15 @@ func sorted(byKey map[Key]*Manifest) []Manifest {
 }
 
 // readTool folds the manifests and deltas in tool's folder into byKey and deltas. A
-// session's manifest sorts before its deltas (id.json before id~), so it is read first.
-func (s *Store) readTool(tool string, byKey map[Key]*Manifest, deltas map[Key][]string) {
+// session's manifest sorts before its deltas (id.json before id~), so it is read first. A
+// session whose manifest can't be read is left out of byKey, its deltas too: they would name
+// its account in place of the one the manifest names. Its key is returned in torn, and its
+// deltas' paths are in deltas, for prune to remove.
+func (s *Store) readTool(tool string, byKey map[Key]*Manifest, deltas map[Key][]string) (torn []Key) {
 	dir := filepath.Join(s.dir, manifestsDir, tool)
 	entries, _ := os.ReadDir(dir)
 	stored := map[Key]bool{}
+	tornIDs := map[string]bool{}
 	claims := map[Key][]string{}
 	defer func() {
 		for k, accounts := range claims {
@@ -445,9 +460,19 @@ func (s *Store) readTool(tool string, byKey map[Key]*Manifest, deltas map[Key][]
 		default:
 			continue
 		}
+		if tornIDs[id] {
+			deltas[Key{Tool: tool, ID: id}] = append(deltas[Key{Tool: tool, ID: id}], filepath.Join(dir, name))
+			continue
+		}
 		var m Manifest
 		if err := readJSON(filepath.Join(dir, name), &m); err != nil {
-			continue // a torn write is skipped, never fatal to a commit
+			// A torn write is skipped, never fatal to a commit; a torn manifest takes its
+			// session's deltas with it.
+			if k := (Key{Tool: tool, ID: id}); !strings.HasSuffix(name, deltaExt) && k.valid() {
+				tornIDs[id] = true
+				torn = append(torn, k)
+			}
+			continue
 		}
 		// Revalidate on read: the key reaches a commit message (a newline forges trailers)
 		// and Prune's manifestPath ("../../x" deletes elsewhere), so it must match its path.
@@ -470,6 +495,7 @@ func (s *Store) readTool(tool string, byKey map[Key]*Manifest, deltas map[Key][]
 		byKey[k] = fold(byKey[k], &m)
 		claims[k] = append(claims[k], m.Account)
 	}
+	return torn
 }
 
 // Consume removes files a commit carried from a session's manifest; an emptied manifest
@@ -705,7 +731,7 @@ func removeTemps(dir string, before time.Time) {
 
 // prune is Prune for a caller that holds the store lock.
 func (s *Store) prune(before time.Time) (int, error) {
-	manifests, deltas, err := s.manifests()
+	manifests, deltas, torn, err := s.manifests()
 	if err != nil {
 		return 0, err
 	}
@@ -715,6 +741,16 @@ func (s *Store) prune(before time.Time) (int, error) {
 			// Its deltas go too, or they would bring the session back.
 			removeAll(deltas[m.Key()])
 			if err := os.Remove(s.manifestPath(m.Key())); err == nil || len(deltas[m.Key()]) > 0 {
+				n++
+			}
+		}
+	}
+	// A manifest that can't be read has no UpdatedAt: its file's time is when it was last
+	// written. Kept, it and its deltas would keep the store from ever being retired.
+	for _, k := range torn {
+		if info, err := os.Stat(s.manifestPath(k)); err == nil && info.ModTime().Before(before) {
+			removeAll(deltas[k])
+			if os.Remove(s.manifestPath(k)) == nil {
 				n++
 			}
 		}
@@ -735,11 +771,20 @@ func (s *Store) Owns(k Key) bool {
 }
 
 // Accounts are the accounts the manifests of keys name, in order: "" for a session with no
-// manifest, or one that names no one.
+// manifest (one of no tool has none), or one that names no one; sendas.AccountUnreadable
+// for one that can't be read, whose owner no one can tell.
 func (s *Store) Accounts(keys []Key) []string {
 	out := make([]string, 0, len(keys))
 	for _, k := range keys {
-		m, _, _ := s.load(k)
+		if !k.valid() {
+			out = append(out, "")
+			continue
+		}
+		m, _, err := s.load(k)
+		if err != nil {
+			out = append(out, sendas.AccountUnreadable)
+			continue
+		}
 		if m == nil {
 			out = append(out, "")
 			continue
