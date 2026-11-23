@@ -699,3 +699,65 @@ func TestAliasConcurrentWriteLinearizable(t *testing.T) {
 		}
 	}
 }
+
+// Deterministic barrier tests for chained-alias MarkAside mirroring and merge-before-pointer.
+// Not parallel because it installs the package-level afterAsideWrite hook.
+func TestMarkAsideChainedAliasAndMergeBeforePointer(t *testing.T) {
+	dir := t.TempDir()
+	cross := t0.Add(5 * time.Minute)
+
+	// 1. Two chained concurrent parent changes during MarkAside(child):
+	//    child.mixed lands -> Alias(parent, child) -> parent.mixed lands -> Alias(root, parent) -> root.mixed lands.
+	start(t, dir, "ch-child", t0)
+	start(t, dir, "ch-parent", t0)
+	start(t, dir, "ch-root", t0)
+	must(t, Alias(dir, "ch-root", "ch-sibling"))
+	prevHook := afterAsideWrite
+	t.Cleanup(func() { afterAsideWrite = prevHook })
+	afterAsideWrite = func(id string) {
+		switch id {
+		case "ch-child":
+			if err := Alias(dir, "ch-parent", "ch-child"); err != nil {
+				t.Errorf("Alias(ch-parent, ch-child): %v", err)
+			}
+		case "ch-parent":
+			if err := Alias(dir, "ch-root", "ch-parent"); err != nil {
+				t.Errorf("Alias(ch-root, ch-parent): %v", err)
+			}
+		}
+	}
+	must(t, MarkAside(dir, "ch-child", "", cross))
+	for _, id := range []string{"ch-child", "ch-parent", "ch-root", "ch-sibling"} {
+		if at, mixed := mixedAt(t, dir, id, t0.Add(6*time.Minute)); !mixed || !at.Equal(cross) {
+			t.Fatalf("chained MarkAside: %s MixedAt = %v, %v; want %v, true", id, at, mixed, cross)
+		}
+	}
+
+	// 2. Exhausting the hop bound during concurrent re-aliasing must return an error (fail closed).
+	hops := 0
+	afterAsideWrite = func(id string) {
+		hops++
+		next := fmt.Sprintf("loop-%d", hops)
+		if err := Alias(dir, next, id); err != nil {
+			t.Errorf("Alias(%s, %s): %v", next, id, err)
+		}
+	}
+	if err := MarkAside(dir, "loop-0", "", cross); err == nil {
+		t.Fatal("MarkAside returned nil after exhausting chained-alias retry bound")
+	}
+	afterAsideWrite = nil
+
+	// 3. Merge-before-pointer: if the alias ledger is corrupt/unreadable, Alias fails without installing the pointer.
+	start(t, dir, "clean-parent", t0)
+	corruptChild := filepath.Join(dir, Dir, "corrupt-child.json")
+	must(t, os.WriteFile(corruptChild, []byte("{bad json"), 0o600))
+	if err := Alias(dir, "clean-parent", "corrupt-child"); err == nil {
+		t.Fatal("Alias succeeded with unreadable child ledger")
+	}
+	if _, err := os.Lstat(aliasPath(dir, "corrupt-child")); !os.IsNotExist(err) {
+		t.Fatalf("alias pointer was installed despite failed child read: %v", err)
+	}
+	if _, mixed := mixedAt(t, dir, "clean-parent", t0.Add(time.Minute)); mixed {
+		t.Fatal("clean-parent was unexpectedly modified on failed Alias")
+	}
+}

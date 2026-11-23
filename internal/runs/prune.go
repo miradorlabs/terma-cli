@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io/fs"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -23,14 +24,10 @@ func Prune(ctx context.Context, stateDir string, now time.Time, queued map[strin
 	if err != nil {
 		return
 	}
-	keep := queued
-	if len(queued) > 0 {
-		keep = make(map[string]bool, len(queued))
-		for id := range queued {
-			keep[id] = true
-			if canon, err := aliasTarget(stateDir, id); err == nil {
-				keep[canon] = true
-			}
+	keep := maps.Clone(queued)
+	for id := range queued {
+		if canon, err := aliasTarget(stateDir, id); err == nil {
+			keep[canon] = true
 		}
 	}
 	for _, e := range entries {

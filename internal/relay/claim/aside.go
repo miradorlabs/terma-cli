@@ -44,13 +44,13 @@ func writeMixedAside(claimPath string, c Claim, now time.Time) bool {
 	}
 	var rnd [16]byte
 	_, _ = rand.Read(rnd[:])
-	dir := asidePath(claimPath)
-	file := filepath.Join(dir, hex.EncodeToString(rnd[:])+".json")
+	dir, name := asidePath(claimPath), hex.EncodeToString(rnd[:])+".json"
 	for range asideWrites {
 		if err = os.MkdirAll(dir, 0o700); err == nil {
-			if err = config.WriteFileAtomicNoSync(file, data, 0o600); err == nil {
-				return true
-			}
+			err = config.WriteFileAtomicNoSync(filepath.Join(dir, name), data, 0o600)
+		}
+		if err == nil {
+			return true
 		}
 		if !errors.Is(err, fs.ErrNotExist) {
 			return false
@@ -58,7 +58,6 @@ func writeMixedAside(claimPath string, c Claim, now time.Time) bool {
 	}
 	return false
 }
-
 func loadAside(claimPath string, now time.Time) (marks []asideMark, files []string) {
 	dir, fail := asidePath(claimPath), []asideMark{{claim: Claim{Kind: KindMixed}}}
 	var entries []os.DirEntry
@@ -67,11 +66,9 @@ func loadAside(claimPath string, now time.Time) (marks []asideMark, files []stri
 		if entries, err = os.ReadDir(dir); err == nil {
 			break
 		}
-		info, statErr := os.Lstat(dir)
-		if errors.Is(err, fs.ErrNotExist) && errors.Is(statErr, fs.ErrNotExist) {
+		if info, statErr := os.Lstat(dir); errors.Is(err, fs.ErrNotExist) && errors.Is(statErr, fs.ErrNotExist) {
 			return nil, nil
-		}
-		if !errors.Is(err, fs.ErrNotExist) || statErr != nil || !info.IsDir() {
+		} else if !errors.Is(err, fs.ErrNotExist) || statErr != nil || !info.IsDir() {
 			return fail, nil
 		}
 	}

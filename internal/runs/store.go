@@ -100,12 +100,6 @@ func linkAlias(stateDir, sessionID, alias string) error {
 		return fmt.Errorf("runs: invalid alias %q", alias)
 	}
 	return withCanonical(stateDir, sessionID, alias, false, func(canon, path string, l *ledger) error {
-		pointer := aliasPath(stateDir, alias)
-		if err := os.MkdirAll(filepath.Dir(pointer), 0o700); err != nil {
-			return err
-		} else if err := config.WriteFileAtomic(pointer, []byte(canon), 0o600); err != nil {
-			return err
-		}
 		dl, dok, _, err := readLedger(stateDir, alias)
 		if err != nil {
 			return err
@@ -115,6 +109,19 @@ func linkAlias(stateDir, sessionID, alias string) error {
 			l.Aliases = append(l.Aliases, alias)
 		}
 		if dok && mergeMixed(l, dl) || changed {
+			if err := save(path, l); err != nil {
+				return err
+			}
+		}
+		pointer := aliasPath(stateDir, alias)
+		if err := os.MkdirAll(filepath.Dir(pointer), 0o700); err != nil {
+			return err
+		} else if err := config.WriteFileAtomic(pointer, []byte(canon), 0o600); err != nil {
+			return err
+		}
+		if dl, dok, _, err := readLedger(stateDir, alias); err != nil {
+			return err
+		} else if dok && mergeMixed(l, dl) {
 			return save(path, l)
 		}
 		return nil
