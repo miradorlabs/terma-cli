@@ -187,6 +187,7 @@ func TestPeekCannotPruneAnInflightBatch(t *testing.T) {
 func TestFlushSeparatesExpiryFromUnreadableLines(t *testing.T) {
 	t.Parallel()
 	s, _ := Open(t.TempDir())
+	s.Bind("account-a")
 	_ = s.Append(Event{Name: "expired", Time: time.Now().Add(-2 * MaxAge)})
 	f, err := os.OpenFile(s.path(), os.O_APPEND|os.O_WRONLY, fileMode)
 	if err != nil {

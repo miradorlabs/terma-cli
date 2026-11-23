@@ -43,32 +43,18 @@ type Router struct {
 	// under the account it was collected under (spool.Event.Account), else held until it
 	// ages out. Nil sends nothing that way.
 	SignIn SignIn
-	// LegacyAccount is the account an older terma's retired sign-ins belonged to, and
-	// LegacyBefore when they were retired: an event bound to no account queued before then
-	// leaves under it; one queued after, with no sign-in in place, under none, and ages
-	// out. "" leaves such events to a server key; auth.LegacyAccountAmbiguous, to none.
-	LegacyAccount string
-	LegacyBefore  time.Time
 }
 
 // SignIn is the person's sign-in delivery sends with (sendas.SignIn).
 type SignIn = sendas.SignIn
 
-// owner is the account an event leaves under, "" for none.
-func (r Router) owner(e spool.Event) string {
-	if e.Account == "" && !e.NoPerson && e.Time.Before(r.LegacyBefore) {
-		return r.LegacyAccount
-	}
-	return e.Account
-}
-
 // Result summarizes one delivery pass; its counters are disjoint, one per reason.
 type Result struct {
-	Sent, Held, Failed, Expired, Pruned, Dropped, Unroutable, Withheld int
-	Skipped                                                            bool
-	Reason                                                             spool.SkipReason
-	NextAttempt                                                        time.Time
-	Err                                                                error
+	Sent, Held, Failed, Expired, LegacyAmbiguous, Pruned, Dropped, Unroutable, Withheld int
+	Skipped                                                                             bool
+	Reason                                                                              spool.SkipReason
+	NextAttempt                                                                         time.Time
+	Err                                                                                 error
 	// Failures names each failed project once, in order; doctor tells its own from another's.
 	Failures []Failure
 	// Waiting names each project skipped because its retry window was open.
@@ -91,7 +77,7 @@ type Wait struct {
 
 // Lost reports whether the pass discarded events rather than delivering or holding them.
 func (r Result) Lost() bool {
-	return r.Expired > 0 || r.Pruned > 0 || r.Dropped > 0 || r.Unroutable > 0
+	return r.Expired > 0 || r.LegacyAmbiguous > 0 || r.Pruned > 0 || r.Dropped > 0 || r.Unroutable > 0
 }
 
 // Flush delivers everything s holds, each project with its own key to its own host. A
@@ -119,10 +105,11 @@ func (r Router) Flush(ctx context.Context, s *spool.Spool, cfg *config.Config, f
 				continue
 			}
 			// Another person's or environment's events wait for their own sign-in; a server key
-			// sends only what no person's sign-in collected. Judged first: no policy is asked
-			// for, under this credential, for events it can't send.
+			// sends only what no person collected. One that names neither, an older terma's
+			// no one sign-in may send, never leaves. Judged first: no policy is asked for,
+			// under this credential, for events it can't send.
 			// The unreadable account is no sign-in's, even while it is what reads as signed in.
-			if owner := r.owner(e); serverKey && owner != "" || !serverKey && (account == "" || owner != account || owner == sendas.AccountUnreadable) {
+			if serverKey && !e.NoPerson || !serverKey && (account == "" || e.Account != account || account == sendas.AccountUnreadable) {
 				held = append(held, e)
 				continue
 			}
@@ -214,6 +201,7 @@ func (r Router) Flush(ctx context.Context, s *spool.Spool, cfg *config.Config, f
 	res.Held = fr.Held
 	res.Failed = fr.Failed
 	res.Expired = fr.Expired
+	res.LegacyAmbiguous = fr.LegacyAmbiguous
 	res.Pruned = fr.Pruned
 	res.Dropped = fr.Dropped
 	res.Skipped = fr.Skipped

@@ -141,10 +141,10 @@ func TestForgetLegacy_KeepsTheFileWhenTheKeychainFails(t *testing.T) {
 	}
 }
 
-// The record keeps the account the retired sign-ins all belonged to. Sign-ins of more than
-// one person, or of no known user, name no one: their backlog is held from every sign-in
-// and every server key.
-func TestRecordLegacy_Account(t *testing.T) {
+// Whose an older terma's backlog is: a server-key machine's is no person's, whatever its
+// sign-ins say; else the one person they all name, from a file that read whole; else no
+// one's.
+func TestLegacyOwner(t *testing.T) {
 	t.Parallel()
 	const host = "https://auth.example.test"
 	of := func(users ...string) []LegacySignIn {
@@ -155,29 +155,58 @@ func TestRecordLegacy_Account(t *testing.T) {
 		return signIns
 	}
 	for name, tc := range map[string]struct {
-		signIns []LegacySignIn
-		want    string
+		signIns          []LegacySignIn
+		whole, serverKey bool
+		want             string
 	}{
-		"one person":     {of("user-1", "user-1"), AccountKey(host, "user-1")},
-		"two people":     {of("user-1", "user-2"), LegacyAccountAmbiguous},
-		"an unknown one": {of(""), LegacyAccountAmbiguous},
+		"one person":            {of("user-1", "user-1"), true, false, AccountKey(host, "user-1")},
+		"two people":            {of("user-1", "user-2"), true, false, LegacyAccountAmbiguous},
+		"an unknown one":        {of(""), true, false, LegacyAccountAmbiguous},
+		"none":                  {nil, true, false, LegacyAccountAmbiguous},
+		"a file not read whole": {of("user-1"), false, false, LegacyAccountAmbiguous},
+		"a server key":          {of("user-1"), true, true, LegacyNoPerson},
+		"a server key, unread":  {nil, false, true, LegacyNoPerson},
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			dir := t.TempDir()
-			if err := RecordLegacy(dir, tc.signIns, time.Now()); err != nil {
-				t.Fatal(err)
-			}
-			rec, err := ReadLegacyRecord(dir)
-			if err != nil || rec.Account != tc.want {
-				t.Fatalf("account = %q, %v; want %q", rec.Account, err, tc.want)
+			if got := LegacyOwner(tc.signIns, tc.whole, tc.serverKey); got != tc.want {
+				t.Fatalf("owner = %q; want %q", got, tc.want)
 			}
 		})
 	}
 }
 
+// The first decision written stands: a later retirement, of another person or as a server
+// key, only adds the sessions it read, and a record it adds none to is not written again.
+func TestRecordLegacy_TheFirstDecisionStands(t *testing.T) {
+	t.Parallel()
+	stateDir := t.TempDir()
+	first := time.Now().Add(-time.Hour).UTC()
+	if err := RecordLegacy(stateDir, []LegacySignIn{{SessionID: "s-a"}}, "0123456789abcdef", first); err != nil {
+		t.Fatal(err)
+	}
+	if err := RecordLegacy(stateDir, []LegacySignIn{{SessionID: "s-a"}, {SessionID: "s-b"}}, LegacyNoPerson, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	rec, err := ReadLegacyRecord(stateDir)
+	if err != nil || rec.Account != "0123456789abcdef" || !rec.RetiredAt.Equal(first) || !slices.Equal(rec.SessionIDs, []string{"s-a", "s-b"}) {
+		t.Fatalf("record = %+v, %v; want the first decision with s-b added", rec, err)
+	}
+	path := filepath.Join(stateDir, LegacyRecordFile)
+	before, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := RecordLegacy(stateDir, []LegacySignIn{{SessionID: "s-b"}}, LegacyAccountAmbiguous, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if after, err := os.Stat(path); err != nil || !os.SameFile(before, after) {
+		t.Fatalf("a record kept as it was was written again: %v", err)
+	}
+}
+
 // A record that can't be read is not taken for none: a later retirement keeps it, rather
-// than give an older terma's backlog the new sign-ins' account.
+// than decide again.
 func TestRecordLegacy_KeepsAnUnreadableRecord(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
@@ -186,7 +215,7 @@ func TestRecordLegacy_KeepsAnUnreadableRecord(t *testing.T) {
 		t.Fatal(err)
 	}
 	signIns := []LegacySignIn{{SessionID: "s", UserID: "u", AuthURL: "https://auth.example.test"}}
-	if err := RecordLegacy(dir, signIns, time.Now()); err == nil {
+	if err := RecordLegacy(dir, signIns, AccountKey("https://auth.example.test", "u"), time.Now()); err == nil {
 		t.Fatal("an unreadable record was replaced")
 	}
 	if data, _ := os.ReadFile(path); string(data) != "{" {
@@ -215,37 +244,36 @@ func TestForgetLegacy_FileHeldSignInsNeedNoKeychain(t *testing.T) {
 	}
 }
 
-// With older sign-ins on the machine and no record, a server-key profile records one at
-// its first look: everything bound to no account until then is no one's, for good, so a
-// later sign-in, even as the older sign-ins' person, never sends what the key collected. A
-// person's profile records nothing: its backlog waits for the retirement at sign-in.
-func TestLegacyOwnership_WithoutARecord(t *testing.T) {
+// A server-key profile's look records the key's decision, no person's, with or without
+// older sign-ins, and their sessions for the heartbeat; a later retirement as their person
+// keeps it. A person's profile records nothing: its backlog waits for the retirement at
+// sign-in.
+func TestLegacyOwnership_AServerKeyDecidesNoPerson(t *testing.T) {
 	t.Parallel()
 	dir, stateDir := t.TempDir(), t.TempDir()
-	if rec, err := LegacyOwnership(dir, stateDir, true); err != nil || !rec.RetiredAt.IsZero() {
-		t.Fatalf("no older sign-ins: %+v, %v; want no record", rec, err)
-	}
 	data := `{"default": {"organizations": {"o": {"session_id": "s", "auth_url": "https://auth.example.test", "organization_id": "o", "user_id": "u"}}}}`
 	if err := os.WriteFile(config.LegacyCredentialsPath(dir), []byte(data), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if rec, err := LegacyOwnership(dir, stateDir, false); err != nil || !rec.RetiredAt.IsZero() {
+	if rec, err := LegacyOwnership(dir, stateDir, false); err != nil || rec.Account != "" {
 		t.Fatalf("a person's profile: %+v, %v; want nothing recorded", rec, err)
 	}
 	first, err := LegacyOwnership(dir, stateDir, true)
-	if err != nil || first.Account != LegacyAccountAmbiguous || first.RetiredAt.IsZero() {
-		t.Fatalf("a server key's first look: %+v, %v; want everything until now named by no one", first, err)
+	if err != nil || first.Account != LegacyNoPerson || !slices.Equal(first.SessionIDs, []string{"s"}) {
+		t.Fatalf("a server key's look: %+v, %v; want no person's, with the session", first, err)
 	}
-	// The older person signs in later: the boundary and its no one stay.
 	signIns, err := LegacySignIns(dir, false)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := RecordLegacy(stateDir, signIns, first.RetiredAt.Add(2*time.Hour)); err != nil {
+	if err := RecordLegacy(stateDir, signIns, LegacyOwner(signIns, true, false), time.Now()); err != nil {
 		t.Fatal(err)
 	}
-	if rec, err := ReadLegacyRecord(stateDir); err != nil || !rec.RetiredAt.Equal(first.RetiredAt) || rec.Account != LegacyAccountAmbiguous {
-		t.Fatalf("after a sign-in: %+v, %v; want the server key's boundary kept", rec, err)
+	if rec, err := ReadLegacyRecord(stateDir); err != nil || rec.Account != LegacyNoPerson {
+		t.Fatalf("after a sign-in: %+v, %v; want the server key's decision kept", rec, err)
+	}
+	if rec, err := LegacyOwnership(t.TempDir(), t.TempDir(), true); err != nil || rec.Account != LegacyNoPerson {
+		t.Fatalf("no older sign-ins: %+v, %v; want no person's all the same", rec, err)
 	}
 }
 
@@ -258,8 +286,8 @@ func TestLegacySignIns_APartlyBrokenFileNamesNoOne(t *testing.T) {
 	if err := os.WriteFile(config.LegacyCredentialsPath(dir), []byte(data), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if LegacyParsedWhole(dir) {
-		t.Fatal("a partly broken file read whole")
+	if _, whole, err := ReadLegacySignIns(dir, false); err != nil || whole {
+		t.Fatalf("a partly broken file read whole (%v)", err)
 	}
 	// What can be read is still listed, to be revoked and forgotten.
 	if signIns, err := LegacySignIns(dir, false); err != nil || len(signIns) != 1 {
@@ -267,33 +295,11 @@ func TestLegacySignIns_APartlyBrokenFileNamesNoOne(t *testing.T) {
 	}
 }
 
-// A record already kept stands when the older sign-ins are retired as no one's, and gains
-// the sessions that could be read, for the heartbeat.
-func TestRecordNoOne_KeepsARecordAndAddsItsSessions(t *testing.T) {
-	t.Parallel()
-	stateDir := t.TempDir()
-	first := time.Now().Add(-time.Hour).UTC()
-	if err := RecordNoOne(stateDir, nil, first); err != nil {
-		t.Fatal(err)
-	}
-	if err := RecordNoOne(stateDir, []LegacySignIn{{SessionID: "s-a"}}, time.Now()); err != nil {
-		t.Fatal(err)
-	}
-	rec, err := ReadLegacyRecord(stateDir)
-	if err != nil || !rec.RetiredAt.Equal(first) || rec.Account != LegacyAccountAmbiguous || len(rec.SessionIDs) != 1 || rec.SessionIDs[0] != "s-a" {
-		t.Fatalf("record = %+v, %v; want the first boundary with s-a added", rec, err)
-	}
-}
-
-// A server key's first look never overwrites a record a retirement writes at the same
-// moment: it writes only while there is still no record, under the record's lock.
+// A server key's look never overwrites a record a retirement writes at the same moment:
+// it writes only while there is still no decision, under the record's lock.
 func TestLegacyOwnership_NeverOverwritesARecordWrittenMeanwhile(t *testing.T) {
 	t.Parallel()
 	dir, stateDir := t.TempDir(), t.TempDir()
-	data := `{"default": {"organizations": {"o": {"session_id": "s", "auth_url": "https://auth.example.test", "user_id": "u"}}}}`
-	if err := os.WriteFile(config.LegacyCredentialsPath(dir), []byte(data), 0o600); err != nil {
-		t.Fatal(err)
-	}
 	unlock, err := flock.Lock(t.Context(), filepath.Join(stateDir, LegacyRecordFile)+".lock")
 	if err != nil {
 		t.Fatal(err)
@@ -305,65 +311,14 @@ func TestLegacyOwnership_NeverOverwritesARecordWrittenMeanwhile(t *testing.T) {
 	}()
 	// The retirement records the older sign-ins' own account while the look waits.
 	time.Sleep(100 * time.Millisecond)
-	signIns, _ := LegacySignIns(dir, false)
-	if err := recordLegacy(stateDir, signIns, time.Now()); err != nil {
+	want := AccountKey("https://auth.example.test", "u")
+	if err := config.WriteJSON(filepath.Join(stateDir, LegacyRecordFile), LegacyRecord{Account: want, RetiredAt: time.Now()}, 0o600); err != nil {
 		t.Fatal(err)
 	}
 	unlock()
 	got := <-done
-	want := AccountKey("https://auth.example.test", "u")
 	if rec, err := ReadLegacyRecord(stateDir); err != nil || rec.Account != want || got.Account != want {
 		t.Fatalf("record = %+v (%v), look = %+v; want the retirement's account kept", rec, err, got)
-	}
-}
-
-// The boundary moves only from the one its retirement wrote: a record another look or
-// retirement wrote keeps its own, and it never moves back.
-func TestAdvanceLegacyBoundary_MovesOnlyItsOwn(t *testing.T) {
-	t.Parallel()
-	stateDir := t.TempDir()
-	first := time.Now().Add(-time.Minute).UTC()
-	if err := RecordNoOne(stateDir, nil, first); err != nil {
-		t.Fatal(err)
-	}
-	later := first.Add(30 * time.Second)
-	if err := AdvanceLegacyBoundary(stateDir, first.Add(-time.Hour), later); err != nil {
-		t.Fatal(err)
-	}
-	if rec, _ := ReadLegacyRecord(stateDir); !rec.RetiredAt.Equal(first) {
-		t.Fatalf("another's boundary moved: %v", rec.RetiredAt)
-	}
-	if err := AdvanceLegacyBoundary(stateDir, first, later); err != nil {
-		t.Fatal(err)
-	}
-	if rec, _ := ReadLegacyRecord(stateDir); !rec.RetiredAt.Equal(later) {
-		t.Fatalf("boundary = %v, want %v", rec.RetiredAt, later)
-	}
-}
-
-// A retirement's mark of when it forgot the older sign-ins only moves forward, never touches
-// the relay's boundary, and is not made on a record not yet kept.
-func TestMarkLegacyForgotten_MovesOnlyForward(t *testing.T) {
-	t.Parallel()
-	stateDir := t.TempDir()
-	at := time.Unix(1_800_000_000, 0).UTC()
-	if err := MarkLegacyForgotten(stateDir, at); err != nil {
-		t.Fatal(err)
-	}
-	if rec, err := ReadLegacyRecord(stateDir); err != nil || !rec.RetiredAt.IsZero() {
-		t.Fatalf("a mark with no record wrote %+v, %v", rec, err)
-	}
-	if err := RecordLegacy(stateDir, []LegacySignIn{{SessionID: "s", AuthURL: "https://auth.example.test", UserID: "u"}}, at); err != nil {
-		t.Fatal(err)
-	}
-	for _, mark := range []time.Time{at.Add(time.Hour), at.Add(time.Minute)} {
-		if err := MarkLegacyForgotten(stateDir, mark); err != nil {
-			t.Fatal(err)
-		}
-	}
-	rec, err := ReadLegacyRecord(stateDir)
-	if err != nil || !rec.ForgottenAt.Equal(at.Add(time.Hour)) || !rec.RetiredAt.Equal(at) || !rec.ReplayBefore().Equal(at.Add(time.Hour)) {
-		t.Fatalf("record = %+v, %v; want forgotten an hour after a boundary left as it was", rec, err)
 	}
 }
 
@@ -396,50 +351,33 @@ func TestARetirementHoldsTheOlderTermasLock(t *testing.T) {
 	}
 }
 
-// A server key's first look that couldn't read the older sign-ins kept none of their
-// sessions; a later look, once they read, adds them for the heartbeat and keeps the rest.
-func TestALaterLookAddsTheSessionsAFirstLookCouldntRead(t *testing.T) {
+// A file that can't be read is an error, not a file that names no one: nothing is decided
+// from it. One there is read once, with whether it parsed whole.
+func TestReadLegacySignIns_AReadErrorDecidesNothing(t *testing.T) {
 	t.Parallel()
-	dir, stateDir := t.TempDir(), t.TempDir()
-	at := time.Now().Add(-time.Hour).UTC()
-	if err := config.WriteJSON(filepath.Join(stateDir, LegacyRecordFile), LegacyRecord{Account: LegacyAccountAmbiguous, RetiredAt: at}, 0o600); err != nil {
+	dir := t.TempDir()
+	if err := os.Mkdir(config.LegacyCredentialsPath(dir), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	data := `{"default": {"organizations": {"o": {"session_id": "s", "auth_url": "https://auth.example.test", "user_id": "u"}}}}`
-	if err := os.WriteFile(config.LegacyCredentialsPath(dir), []byte(data), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	rec, err := LegacyOwnershipAt(dir, stateDir, true, time.Now())
-	if err != nil || !slices.Equal(rec.SessionIDs, []string{"s"}) || rec.Account != LegacyAccountAmbiguous || !rec.RetiredAt.Equal(at) {
-		t.Fatalf("record = %+v, %v; want the session added, the rest kept", rec, err)
+	if _, _, err := ReadLegacySignIns(dir, false); err == nil {
+		t.Fatal("an unreadable file read")
 	}
 }
 
-// Older sign-ins that name no session leave the record as it was: it is not written again
-// at each look.
-func TestALookWithNoSessionsToAddLeavesTheRecord(t *testing.T) {
+// The lane of a decision: a person's key and no person's are their own, no decision is
+// none, and anything else is ambiguous.
+func TestLegacyLane(t *testing.T) {
 	t.Parallel()
-	dir, stateDir := t.TempDir(), t.TempDir()
-	path := filepath.Join(stateDir, LegacyRecordFile)
-	if err := config.WriteJSON(path, LegacyRecord{Account: LegacyAccountAmbiguous, RetiredAt: time.Now().Add(-time.Hour).UTC()}, 0o600); err != nil {
-		t.Fatal(err)
-	}
-	data := `{"default": {"organizations": {"o": {"auth_url": "https://auth.example.test", "user_id": "u"}}}}`
-	if err := os.WriteFile(config.LegacyCredentialsPath(dir), []byte(data), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	before, err := os.Stat(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := LegacyOwnershipAt(dir, stateDir, true, time.Now()); err != nil {
-		t.Fatal(err)
-	}
-	if err := RecordNoOne(stateDir, nil, time.Now()); err != nil {
-		t.Fatal(err)
-	}
-	after, err := os.Stat(path)
-	if err != nil || !os.SameFile(before, after) || !before.ModTime().Equal(after.ModTime()) {
-		t.Fatalf("the record was written again: %v", err)
+	for decision, want := range map[string]string{
+		"":                     "",
+		"0123456789abcdef":     "0123456789abcdef",
+		LegacyNoPerson:         LegacyNoPerson,
+		LegacyAccountAmbiguous: LegacyAccountAmbiguous,
+		"someone":              LegacyAccountAmbiguous,
+		AccountUnreadable:      LegacyAccountAmbiguous,
+	} {
+		if got := LegacyLane(decision); got != want {
+			t.Errorf("lane of %q = %q, want %q", decision, got, want)
+		}
 	}
 }

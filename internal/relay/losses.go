@@ -26,6 +26,9 @@ const lossWindow = maxOutboxAge
 type OutboxLosses struct {
 	Full    int `json:"full,omitempty"`
 	Expired int `json:"expired,omitempty"`
+	// LegacyAmbiguous counts what an older relay queued that no one sign-in may send, which
+	// aged out.
+	LegacyAmbiguous int `json:"legacy_ambiguous,omitempty"`
 	// Held counts claimed records a stopping relay dropped from memory, where they waited
 	// for their team's policy: they never reach the disk, so they cannot outlive the relay.
 	Held int       `json:"held,omitempty"`
@@ -56,14 +59,15 @@ func (o outbox) recordHeldLosses(n int, now time.Time) {
 	_ = config.WriteJSON(filepath.Join(o.dir, lossesFile), l, 0o600)
 }
 
-// recordLosses adds full and expired records to the outbox's count.
-func (o outbox) recordLosses(full, expired int, now time.Time) {
-	if o.dir == "" || full+expired == 0 {
+// recordLosses adds full, expired and ambiguous legacy records to the outbox's count.
+func (o outbox) recordLosses(full, expired, legacyAmbiguous int, now time.Time) {
+	if o.dir == "" || full+expired+legacyAmbiguous == 0 {
 		return
 	}
 	l := o.recentLosses(now)
 	l.Full += full
 	l.Expired += expired
+	l.LegacyAmbiguous += legacyAmbiguous
 	l.Last = now.UTC()
 	_ = config.WriteJSON(filepath.Join(o.dir, lossesFile), l, 0o600)
 }

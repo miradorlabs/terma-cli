@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/sendas"
@@ -12,6 +13,11 @@ import (
 
 // AccountKeyLen is the length of an account key, in hex digits.
 const AccountKeyLen = 16
+
+// ValidAccountKey reports whether a is an account key: AccountKeyLen lowercase hex digits.
+func ValidAccountKey(a string) bool {
+	return len(a) == AccountKeyLen && strings.Trim(a, "0123456789abcdef") == ""
+}
 
 // AccountKey names the person and environment a sign-in belongs to, without naming either:
 // the start of the SHA-256 of the auth host and the user id. What terma queues is bound to

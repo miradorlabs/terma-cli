@@ -5,7 +5,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"sync"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -95,21 +94,7 @@ func (app *App) hookProfile() dispatch.Profile {
 		p.Account = auth.Account(cfg.Dir, cfg.ProfileName, cfg.AuthURL)
 		p.AccountSince = accountSince(cfg, p.Account)
 	}
-	// Read once per hook run, and only by a replay that needs it.
-	p.LegacyBefore = sync.OnceValue(func() time.Time { return legacyBefore(app.dir, app.stateDir) })
 	return p
-}
-
-// legacyBefore is when an older terma's sign-ins were retired: what has no account from
-// before then is theirs. While they are still on the machine (a retirement that could not
-// forget them, or none yet), or the record can't be read, every event so far is.
-func legacyBefore(dir, stateDir string) time.Time {
-	rec, err := auth.ReadLegacyRecord(stateDir)
-	switch {
-	case err != nil, auth.HasLegacySignIns(dir):
-		return farFuture
-	}
-	return rec.ReplayBefore()
 }
 
 // accountSince is when account, the profile's sign-in, began, which what unparking binds to
@@ -121,9 +106,6 @@ func accountSince(cfg *config.Config, account string) time.Time {
 	}
 	return auth.SignedInAt(cfg.Dir, cfg.ProfileName)
 }
-
-// farFuture is a boundary nothing is after.
-var farFuture = auth.LegacyStillSignedIn
 
 // hookPolicy is the collection policy while it is validated and fresh, else NoPolicy.
 func (app *App) hookPolicy() config.Policy {

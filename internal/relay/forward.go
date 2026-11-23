@@ -9,6 +9,7 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/account/auth"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
+	"github.com/miradorlabs/terma-cli/internal/sendas"
 )
 
 const (
@@ -106,73 +107,23 @@ func (r *Relay) account() string {
 	return r.opts.SignIn.Account()
 }
 
-// owner is the account a route's entry e leaves under: the one it was collected under, or
-// for a part bound to none, the retired sign-ins' account if it arrived before they were
-// retired; "" for none.
-func (r *Relay) owner(rt route, e entry) string {
-	return r.ownerAt(rt.account, e.received())
-}
-
-// ownerAt is owner for an entry bound to account and received at.
-func (r *Relay) ownerAt(account string, at time.Time) string {
-	return r.ownerOf(account)(at)
-}
-
-// ownerOf is ownerAt for entries bound to account, the legacy record read once: a pass
-// over a route's queue asks it for each entry.
-func (r *Relay) ownerOf(account string) func(at time.Time) string {
-	if account != "" || r.opts.Legacy == nil {
-		return func(time.Time) string { return account }
-	}
-	legacy, retiredAt := r.opts.Legacy()
-	return func(at time.Time) string {
-		if legacy != "" && at.Before(retiredAt) {
-			return legacy
-		}
-		return ""
-	}
-}
-
-// leaving keeps of a route's entries, in arrival order, up to limit of those that may be sent now:
-// with a sign-in, only under the account that collected them while its sign-in is the one
-// in place; with a server key (serverKey), only those no person's sign-in collected, the
-// older sign-ins' backlog included.
+// leaving keeps of a route's entries, in arrival order, up to limit of those that may be sent
+// now. Every entry of a route is in its lane: with a sign-in, a person's lane leaves only
+// while its account's sign-in is the one in place; with a server key (serverKey), only no
+// person's lane does, and what was bound to no account. An older terma's ambiguous backlog
+// never leaves.
 //
-// Under a sign-in it keeps the leading run, so a route's parts leave in arrival order: a
-// route's entries share one owner, but for an older terma's backlog, which comes first.
-// Under a server key it keeps every entry no person collected, so that backlog, which
-// never leaves that way, holds up nothing behind it, however long it is.
-//
-// The sign-in and the legacy record are read now, once: what it returns reads nothing, so
-// a sender can run it on its live queue under its lock. Its result may share entries' array.
+// The sign-in is read now, once: what it returns reads nothing, so a sender can run it on
+// its live queue under its lock. Its result may share entries' array.
 func (r *Relay) leaving(rt route, serverKey bool, limit int) func([]entry) []entry {
-	owner := r.ownerOf(rt.account)
-	if serverKey {
-		return func(entries []entry) []entry {
-			var out []entry
-			for _, e := range entries {
-				if len(out) == limit {
-					break
-				}
-				if owner(e.received()) == "" {
-					out = append(out, e)
-				}
-			}
-			return out
-		}
-	}
-	now := r.account()
+	// The unreadable account is no sign-in's, even while it is what reads as signed in.
+	may := serverKey && (rt.account == "" || rt.account == sendas.NoPersonLane) ||
+		!serverKey && rt.account != "" && rt.account != auth.AccountUnreadable && rt.account == r.account()
 	return func(entries []entry) []entry {
-		for i, e := range entries {
-			if i == limit {
-				return entries[:i]
-			}
-			// The unreadable account is no sign-in's, even while it is what reads as signed in.
-			if o := owner(e.received()); o == "" || o == auth.AccountUnreadable || o != now {
-				return entries[:i]
-			}
+		if !may {
+			return nil
 		}
-		return entries
+		return entries[:min(limit, len(entries))]
 	}
 }
 

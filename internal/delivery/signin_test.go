@@ -71,10 +71,9 @@ func recordingIngest(t *testing.T, status int) (*httptest.Server, func() []sentR
 	}
 }
 
-func signInRouter(signIn *fakeSignIn, legacy string) Router {
+func signInRouter(signIn *fakeSignIn) Router {
 	pol := config.Policy{Mode: config.ModeRepo, Repositories: listed, FetchedAt: time.Now()}
-	// The older sign-ins were retired after the test's events were queued.
-	return Router{OTLPPinned: true, SignIn: signIn, LegacyAccount: legacy, LegacyBefore: time.Now().Add(time.Hour),
+	return Router{OTLPPinned: true, SignIn: signIn,
 		Policy: func(context.Context, *config.Config, string) (config.Policy, error) { return pol, nil }}
 }
 
@@ -97,8 +96,8 @@ func eventFor(project, session, account string) spool.Event {
 
 // On a person's profile, events leave with the sign-in's token, naming their team, and
 // only under the account they were collected under: another person's backlog is held,
-// never sent in this person's name. Events an older terma queued count as the account its
-// retired sign-ins belonged to.
+// never sent in this person's name. An event that names no account, an older terma's no
+// one sign-in may send, never leaves.
 func TestEventsLeaveOnlyUnderTheAccountThatCollectedThem(t *testing.T) {
 	t.Parallel()
 	srv, sent := recordingIngest(t, http.StatusOK)
@@ -107,36 +106,22 @@ func TestEventsLeaveOnlyUnderTheAccountThatCollectedThem(t *testing.T) {
 		eventFor("p1", "mine", "aaaaaaaaaaaaaaaa"),
 		eventFor("p1", "someone-elses", "bbbbbbbbbbbbbbbb"),
 		eventFor("p2", "before-user-tokens", ""))
-	res := signInRouter(signIn, "aaaaaaaaaaaaaaaa").Flush(t.Context(), s, &config.Config{OTLPURL: srv.URL}, true, 0)
-	if res.Sent != 2 || res.Held != 1 || res.Err != nil {
+	res := signInRouter(signIn).Flush(t.Context(), s, &config.Config{OTLPURL: srv.URL}, true, 0)
+	if res.Sent != 1 || res.Held != 2 || res.Err != nil {
 		t.Fatalf("Flush = %+v", res)
 	}
 	for _, r := range sent() {
 		if r.auth != "Bearer token-a" || r.project == "" || !strings.Contains(r.body, `"stringValue":"`+r.project+`"`) {
 			t.Errorf("sent with %q naming %q", r.auth, r.project)
 		}
-		if strings.Contains(r.body, "someone-elses") {
-			t.Error("another person's event left under this sign-in")
+		if strings.Contains(r.body, "someone-elses") || strings.Contains(r.body, "before-user-tokens") {
+			t.Error("another person's event, or no one's, left under this sign-in")
 		}
 	}
-	if n, _, _ := s.Pending(); n != 1 {
-		t.Fatalf("%d events queued, want the other person's kept", n)
+	if n, _, _ := s.Pending(); n != 2 {
+		t.Fatalf("%d events queued, want the other person's and no one's kept", n)
 	}
 
-	// Events bound to no account and queued after the older sign-ins were retired, with no
-	// sign-in in place, leave under none.
-	late := signInRouter(signIn, "aaaaaaaaaaaaaaaa")
-	late.LegacyBefore = time.Now().Add(-time.Hour)
-	s = spoolOf(t, eventFor("p2", "signed-out", ""))
-	if res := late.Flush(t.Context(), s, &config.Config{OTLPURL: srv.URL}, true, 0); res.Sent != 0 || res.Held != 1 {
-		t.Fatalf("Flush = %+v", res)
-	}
-
-	// Without a legacy account, an older terma's events wait for a server key.
-	s = spoolOf(t, eventFor("p2", "before-user-tokens", ""))
-	if res := signInRouter(signIn, "").Flush(t.Context(), s, &config.Config{OTLPURL: srv.URL}, true, 0); res.Sent != 0 || res.Held != 1 {
-		t.Fatalf("Flush = %+v", res)
-	}
 }
 
 // Signed out, events are held, not failed: nothing about them is wrong.
@@ -144,7 +129,7 @@ func TestEventsWaitForASignIn(t *testing.T) {
 	t.Parallel()
 	srv, sent := recordingIngest(t, http.StatusOK)
 	s := spoolOf(t, eventFor("p1", "mine", "aaaaaaaaaaaaaaaa"))
-	res := signInRouter(&fakeSignIn{}, "").Flush(t.Context(), s, &config.Config{OTLPURL: srv.URL}, true, 0)
+	res := signInRouter(&fakeSignIn{}).Flush(t.Context(), s, &config.Config{OTLPURL: srv.URL}, true, 0)
 	if res.Sent != 0 || res.Held != 1 || len(res.Failures) != 0 || len(sent()) != 0 {
 		t.Fatalf("Flush = %+v, %d sent", res, len(sent()))
 	}
@@ -170,7 +155,7 @@ func TestARefusedTokenIsRotatedAndKeepsTheEvents(t *testing.T) {
 		}))
 		signIn := &fakeSignIn{account: "aaaaaaaaaaaaaaaa", token: "token-a"}
 		s := spoolOf(t, eventFor("p1", "mine", "aaaaaaaaaaaaaaaa"))
-		res := signInRouter(signIn, "").Flush(t.Context(), s, &config.Config{OTLPURL: srv.URL}, true, 0)
+		res := signInRouter(signIn).Flush(t.Context(), s, &config.Config{OTLPURL: srv.URL}, true, 0)
 		srv.Close()
 		if res.Sent != 0 || len(res.Failures) != 1 {
 			t.Fatalf("%d: Flush = %+v", tc.status, res)
@@ -187,7 +172,8 @@ func TestARefusedTokenIsRotatedAndKeepsTheEvents(t *testing.T) {
 	}
 }
 
-// A profile set up with a server key sends only events no person's sign-in collected.
+// A profile set up with a server key sends only events no person collected: never a
+// person's, nor one that names no account, an older terma's no one sign-in may send.
 func TestAServerKeyNeverSendsAPersonsEvents(t *testing.T) {
 	t.Parallel()
 	srv, sent := recordingIngest(t, http.StatusOK)
@@ -195,12 +181,11 @@ func TestAServerKeyNeverSendsAPersonsEvents(t *testing.T) {
 	if err := keystore.Set(dir, "p1", testKey, keystore.Hosts{}); err != nil {
 		t.Fatal(err)
 	}
-	old := eventFor("p1", "older-termas", "")
-	old.Time = time.Now().Add(-2 * time.Hour)
+	keys := eventFor("p1", "the-keys", "")
+	keys.NoPerson = true
 	// One collected while the sign-ins couldn't be read is maybe a person's: never no one's.
-	s := spoolOf(t, eventFor("p1", "a-persons", "aaaaaaaaaaaaaaaa"), old, eventFor("p1", "unbound", ""), eventFor("p1", "unreadable", sendas.AccountUnreadable))
-	r := signInRouter(&fakeSignIn{}, "bbbbbbbbbbbbbbbb")
-	r.LegacyBefore = time.Now().Add(-time.Hour)
+	s := spoolOf(t, eventFor("p1", "a-persons", "aaaaaaaaaaaaaaaa"), keys, eventFor("p1", "older-termas", ""), eventFor("p1", "unreadable", sendas.AccountUnreadable))
+	r := signInRouter(&fakeSignIn{})
 	r.ConfigDir = dir
 	res := r.Flush(t.Context(), s, &config.Config{OTLPURL: srv.URL, ServerKeySignIn: true}, true, 0)
 	if res.Sent != 1 || res.Held != 3 {
@@ -218,7 +203,7 @@ func TestAServerKeyNeverSendsAPersonsEvents(t *testing.T) {
 func TestEventsAskForTheUserOfTheAccountWhoseTokenSendsThem(t *testing.T) {
 	t.Parallel()
 	srv, _ := recordingIngest(t, http.StatusOK)
-	r := signInRouter(&fakeSignIn{account: "aaaaaaaaaaaaaaaa", token: "token-a"}, "")
+	r := signInRouter(&fakeSignIn{account: "aaaaaaaaaaaaaaaa", token: "token-a"})
 	var asked []string
 	r.User = func(_ *config.Config, _, _, account string) string { asked = append(asked, account); return "" }
 	if res := r.Flush(t.Context(), spoolOf(t, eventFor("p1", "mine", "aaaaaaaaaaaaaaaa")), &config.Config{OTLPURL: srv.URL}, true, 0); res.Sent != 1 || res.Err != nil {
@@ -234,7 +219,7 @@ func TestEventsAskForTheUserOfTheAccountWhoseTokenSendsThem(t *testing.T) {
 func TestEventsThatCantLeaveAskForNoPolicy(t *testing.T) {
 	t.Parallel()
 	srv, sent := recordingIngest(t, http.StatusOK)
-	r := signInRouter(&fakeSignIn{account: "aaaaaaaaaaaaaaaa", token: "token-a"}, "")
+	r := signInRouter(&fakeSignIn{account: "aaaaaaaaaaaaaaaa", token: "token-a"})
 	asked := 0
 	pol := config.Policy{Mode: config.ModeRepo, Repositories: listed, FetchedAt: time.Now()}
 	r.Policy = func(context.Context, *config.Config, string) (config.Policy, error) { asked++; return pol, nil }
@@ -253,7 +238,7 @@ func TestUnreadableEventsAreHeldWhileTheSignInIsUnreadable(t *testing.T) {
 	t.Parallel()
 	srv, sent := recordingIngest(t, http.StatusOK)
 	signIn := &fakeSignIn{account: sendas.AccountUnreadable, token: "token-x"}
-	r := signInRouter(signIn, "")
+	r := signInRouter(signIn)
 	asked := 0
 	r.Policy = func(context.Context, *config.Config, string) (config.Policy, error) {
 		asked++

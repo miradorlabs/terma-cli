@@ -4,6 +4,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/doctor"
 	"github.com/miradorlabs/terma-cli/internal/relay"
 	"os"
+	"slices"
 	"testing"
 	"time"
 
@@ -197,9 +198,9 @@ func TestARetirementCountsAfterTheSessionRotated(t *testing.T) {
 	}
 }
 
-// On a server-key profile the relay records the older sign-ins' boundary as it binds,
-// before any export arrives: what it accepts after is the key's own.
-func TestTheRelayRecordsTheLegacyBoundaryAsItBinds(t *testing.T) {
+// On a server-key profile the relay's first look records the key's decision: what an older
+// terma queued is no person's.
+func TestTheRelaysFirstLookRecordsTheKeysDecision(t *testing.T) {
 	f := newFakeAuth(t)
 	authSandbox(t, f)
 	data := `{"default": {"organizations": {"o": {"session_id": "s", "auth_url": "https://auth.example.test", "organization_id": "o", "user_id": "u"}}}}`
@@ -211,11 +212,14 @@ func TestTheRelayRecordsTheLegacyBoundaryAsItBinds(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	before := time.Now()
-	testApp.bindRelay(&relay.Options{}, cfg)
+	var engine relay.Options
+	testApp.bindRelay(&engine, cfg)
+	if got := engine.LegacyOwner(); got != auth.LegacyNoPerson {
+		t.Fatalf("decision = %q; want no person's", got)
+	}
 	rec, err := auth.ReadLegacyRecord(testApp.stateDir)
-	if err != nil || rec.RetiredAt.IsZero() || rec.RetiredAt.Before(before.Add(-time.Second)) {
-		t.Fatalf("record = %+v, %v; want it written as the relay bound", rec, err)
+	if err != nil || rec.Account != auth.LegacyNoPerson || !slices.Equal(rec.SessionIDs, []string{"s"}) {
+		t.Fatalf("record = %+v, %v; want the key's decision, with the session", rec, err)
 	}
 }
 
@@ -234,7 +238,11 @@ func TestAnUnreadableConfigLeavesTheLegacyLookAlone(t *testing.T) {
 	if err := os.WriteFile(config.Path(testApp.dir), []byte("{"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	testApp.bindRelay(&relay.Options{}, cfg)
+	var engine relay.Options
+	testApp.bindRelay(&engine, cfg)
+	if got := engine.LegacyOwner(); got != "" {
+		t.Fatalf("decision = %q; want none", got)
+	}
 	if rec, err := auth.ReadLegacyRecord(testApp.stateDir); err != nil || !rec.RetiredAt.IsZero() {
 		t.Fatalf("record = %+v, %v; want none written", rec, err)
 	}

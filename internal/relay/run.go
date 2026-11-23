@@ -57,7 +57,11 @@ func (r *Relay) Run(ctx context.Context) {
 	}
 }
 
+// janitor takes in what an older relay queued, then enforces the outbox's bounds.
 func (r *Relay) janitor(now time.Time) {
+	for _, rt := range r.ingestLegacy() {
+		r.recoverRoute(rt)
+	}
 	for rt, gone := range r.sweepOutbox(now) {
 		r.mu.Lock()
 		s := r.senders[rt]

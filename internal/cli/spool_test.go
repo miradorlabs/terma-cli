@@ -45,10 +45,12 @@ func acceptingOTLP(t *testing.T) {
 
 func appendEvent(t *testing.T, s *spool.Spool, projectID string, at time.Time) {
 	t.Helper()
-	// Bound to the sign-in in place, as a hook's append is.
+	// Bound to the sign-in in place, or no person's under a server key, as a hook's append is.
 	e := spool.Event{Name: "terma.commit", Time: at, Repository: appRepo}
 	if cfg, err := testApp.loadConfig(); err == nil && !cfg.ServerKeySignIn {
 		e.Account = auth.Account(cfg.Dir, cfg.ProfileName, cfg.AuthURL)
+	} else if err == nil {
+		e.NoPerson = true
 	}
 	if projectID != "" {
 		e.Attrs = map[string]any{hookrun.AttrProjectID: projectID}
@@ -64,7 +66,10 @@ func TestFlushSpoolSeparatesUnroutableFromExpired(t *testing.T) {
 	acceptingOTLP(t)
 	s := spoolForTest(t)
 	appendEvent(t, s, "", time.Now())
-	appendEvent(t, s, spoolTestProject, time.Now().Add(-2*spool.MaxAge))
+	if err := s.Append(spool.Event{Name: "terma.commit", Time: time.Now().Add(-2 * spool.MaxAge), Repository: appRepo, Account: "aaaaaaaaaaaaaaaa",
+		Attrs: map[string]any{hookrun.AttrProjectID: spoolTestProject}}); err != nil {
+		t.Fatal(err)
+	}
 
 	res, err := testApp.flushSpool(context.Background(), true, 0)
 	if err != nil {
@@ -112,7 +117,7 @@ func TestSpoolFlushReportsBackoffAsExitCode(t *testing.T) {
 	}
 	next := time.Now().Add(time.Minute)
 	attempt := strconv.FormatInt(next.Unix(), 10) + " 30"
-	if err := os.WriteFile(filepath.Join(spoolDir, "next-attempt"), []byte(attempt), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(spoolDir, "next-attempt-v2"), []byte(attempt), 0o600); err != nil {
 		t.Fatal(err)
 	}
 

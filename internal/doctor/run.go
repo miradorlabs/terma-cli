@@ -129,9 +129,10 @@ type Relay struct {
 	ServiceInstalled, ServiceCurrent bool
 	// OutboxFull and OutboxExpired count the records the relay's outbox dropped because it
 	// was full or they waited past its age, and OutboxHeld the claimed ones a stopping relay
-	// dropped from memory, since the outbox was made; OutboxLossAt is the last.
-	OutboxFull, OutboxExpired, OutboxHeld int
-	OutboxLossAt                          time.Time
+	// dropped from memory, since the outbox was made; OutboxLegacyAmbiguous what an older
+	// relay queued that no one sign-in may send, which aged out. OutboxLossAt is the last.
+	OutboxFull, OutboxExpired, OutboxHeld, OutboxLegacyAmbiguous int
+	OutboxLossAt                                                 time.Time
 }
 
 // SpoolState is the event queue as a run finds it.
@@ -232,7 +233,7 @@ func Run(ctx context.Context, env Env, progress Progress) Report {
 
 	timed(KeyHarness, "agent exporting to Terma", func() Check { return unlessCaptureOff(d.pol, d.agentsExporting()) })
 	// Only a recent loss: one older than the outbox keeps parts is history.
-	if r := relayFacts(env.Probes); r.OutboxFull+r.OutboxExpired+r.OutboxHeld > 0 && time.Since(r.OutboxLossAt) < OutboxLossWindow {
+	if r := relayFacts(env.Probes); r.OutboxFull+r.OutboxExpired+r.OutboxHeld+r.OutboxLegacyAmbiguous > 0 && time.Since(r.OutboxLossAt) < OutboxLossWindow {
 		timed(KeyOutbox, "relay outbox", func() Check { return OutboxCheck(r) })
 	}
 

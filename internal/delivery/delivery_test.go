@@ -130,6 +130,7 @@ func TestAProjectWithoutAPolicyOrAKeyKeepsItsEvents(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	s.BindNoPerson()
 	for _, id := range []string{"unfetched", "keyless", ""} {
 		if err := s.Append(spool.Event{Repository: app, Name: semconv.TermaSessionStartEvent, Attrs: map[string]any{hookrun.AttrProjectID: id}}); err != nil {
 			t.Fatal(err)
@@ -165,6 +166,7 @@ func TestContentSpooledUnderAnOlderPolicyLeavesWithoutIt(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	s.BindNoPerson()
 	for _, e := range []spool.Event{
 		{Repository: app, Name: semconv.TermaSessionQuotaEvent, SessionID: "s1", Attrs: map[string]any{hookrun.AttrProjectID: "p1", semconv.TermaTurnIDKey: "turn-1", semconv.UserEmailKey: "private@example.com"}},
 		{Repository: app, Name: semconv.TermaToolCallEvent, SessionID: "s1", Attrs: map[string]any{hookrun.AttrProjectID: "p1", semconv.GenAIToolCallIDKey: "call-1", semconv.GenAIToolCallArgumentsKey: map[string]any{"cmd": "private arguments"}}},
@@ -354,6 +356,7 @@ func TestALockedKeychainKeepsEventsQueued(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	s.BindNoPerson()
 	if err := s.Append(spool.Event{Repository: app, Name: semconv.TermaToolCallEvent, SessionID: "s1", Attrs: map[string]any{hookrun.AttrProjectID: "p1"}}); err != nil {
 		t.Fatal(err)
 	}
@@ -424,6 +427,7 @@ func TestHookEventsNameTheUser(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	s.BindNoPerson()
 	for _, id := range []string{"p1", "p2"} {
 		if err := s.Append(spool.Event{Repository: app, Name: semconv.TermaSessionQuotaEvent, SessionID: "s-" + id, Attrs: map[string]any{hookrun.AttrProjectID: id}}); err != nil {
 			t.Fatal(err)
@@ -454,19 +458,5 @@ func TestHookEventsNameTheUser(t *testing.T) {
 		case strings.Contains(body, "s-p2") && strings.Contains(body, semconv.TermaUserIDKey):
 			t.Errorf("p2's events named a user:\n%s", body)
 		}
-	}
-}
-
-// An event a server key collected is no person's: never counted as an older terma's
-// backlog, whatever its time.
-func TestANoPersonEventIsNeverTheOlderTermas(t *testing.T) {
-	t.Parallel()
-	r := Router{LegacyAccount: "older", LegacyBefore: time.Now()}
-	past := time.Now().Add(-time.Hour)
-	if got := r.owner(spool.Event{Time: past}); got != "older" {
-		t.Fatalf("an unbound event from before = %q, want the older account", got)
-	}
-	if got := r.owner(spool.Event{Time: past, NoPerson: true}); got != "" {
-		t.Fatalf("a server key's event = %q, want no one's", got)
 	}
 }

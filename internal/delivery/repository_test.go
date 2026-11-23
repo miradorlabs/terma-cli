@@ -38,6 +38,7 @@ func TestEveryEventLeavesNamingItsRepository(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	s.BindNoPerson()
 	const own = "https://github.com/acme/app"
 	attrs := func(extra ...string) map[string]any {
 		m := map[string]any{hookrun.AttrProjectID: "p1", semconv.GenAIMainAgentNameKey: "fake"}

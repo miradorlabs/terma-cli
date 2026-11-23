@@ -92,8 +92,8 @@ next sign-in, and the team keys it minted are deleted from this machine (a user 
 cannot revoke them; an admin can, in the web app).
 The state directory (`config.StateDir`) holds what terma writes as it runs: `relay/`,
 `spool/`, `policies/`, `agents/<agent>/` (each agent's hook state), `funding/`,
-`legacy-sign-ins.json` (what the first sign-in on user tokens kept of an older terma's
-retired sign-ins: their session ids and account),
+`legacy-sign-ins.json` (what the first retirement kept of an older terma's sign-ins: their
+session ids and whose their backlog is),
 `workspaces/` (session stores for work begun outside git) and `update/`; a repository's
 session store is `.git/terma/`, which also keeps what a git hook in an agent's sandbox could
 not write to the state directory, until a hook outside the sandbox moves it there. Names
@@ -139,15 +139,22 @@ under a server key, so a profile switched from a server key to a person's sign-i
 it to age out. A spool event is in one of three cases: it names an account (`account`),
 and leaves only under that sign-in; it is no person's (`no_person`, collected under a
 server key: the hook's spool is bound with `BindNoPerson`), and leaves only under a server
-key; or neither (an older terma's, or a sandboxed hook's that couldn't read the sign-in).
-Only that last case is ever bound later, to whatever the appending spool is bound to
-(`Spool.Append`, and unparking): the hook's account, or no person under a server key.
-Unparking binds it to a person's sign-in only if it was collected since that sign-in began
-(`signed_in_at` in `user-credentials.json`); one from before, or with no start known, stays
-unbound.
-Every replay of a recorded event (`AppendAsCollected`) keeps what it says. An event with
-neither from before `legacy-sign-ins.json`'s `retired_at` counts as the account that record
-names, which is no one when it is ambiguous; one from after leaves only under a server key.
+key; or neither (an older terma's no one sign-in may send, or one queued signed out), which
+never leaves and ages out, counted as `legacy_ambiguous`. Only that last case is ever bound
+later, to whatever the appending spool is bound to (`Spool.Append`, and unparking), and
+unparking binds it to a person's sign-in only if it was collected since that sign-in began
+(`signed_in_at` in `user-credentials.json`). Every replay of a recorded event (`AppendAsCollected`) keeps what it says.
+This version queues to `spool/events-v2.jsonl` and `relay/outbox-v2/`, never to an older
+terma's `spool/events.jsonl` or `relay/outbox/`, so an older terma's hook, flusher or relay
+still running never sends what this one queued with its own credential. What an older
+terma queued gets one decision, kept in `legacy-sign-ins.json`'s `account` before its
+sign-ins are deleted, and the first written stands: the one person its sign-ins name, at a
+person's sign-in; `no_person` on a server-key machine (setup with a key, or the relay's or
+a flush's first look under one); else `ambiguous`. With a decision, each flush takes the
+older queue's lines into the new one, tagged by it, and the relay's outbox sweep takes the
+older outbox's routes into its lane (`@<account>/`, `@no_person/`, or `@ambiguous/`, which
+never leaves and ages out counted as `legacy_ambiguous`). With none yet, or a record that
+can't be read, they stay where they are.
 
 ## Rules
 

@@ -36,7 +36,7 @@ func (s *sender) send(ctx context.Context, pol Policy, first entry, body []byte)
 		}
 		// The sign-in of the account that collected the parts, never whoever is signed in
 		// now: Token gives none for another.
-		token, err := s.r.opts.SignIn.Token(ctx, s.r.owner(s.route, first))
+		token, err := s.r.opts.SignIn.Token(ctx, s.route.account)
 		if err != nil {
 			return keyless, keylessRetry, signInErrPrefix + err.Error(), 0
 		}

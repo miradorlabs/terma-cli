@@ -189,7 +189,7 @@ func TestCursorFailedAppendIsRecoveredBeforeNextTurn(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err = os.Mkdir(filepath.Join(badDir, "events.jsonl"), 0o700); err != nil {
+	if err = os.Mkdir(filepath.Join(badDir, spool.EventsFile), 0o700); err != nil {
 		t.Fatal(err)
 	}
 	failed := env
@@ -220,7 +220,7 @@ func TestCursorPendingKeepsItsAccount(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err = os.Mkdir(filepath.Join(badDir, "events.jsonl"), 0o700); err != nil {
+	if err = os.Mkdir(filepath.Join(badDir, spool.EventsFile), 0o700); err != nil {
 		t.Fatal(err)
 	}
 	failed := env
@@ -244,7 +244,7 @@ func TestCursorPendingOfNoAccountStaysUnbound(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err = os.Mkdir(filepath.Join(badDir, "events.jsonl"), 0o700); err != nil {
+	if err = os.Mkdir(filepath.Join(badDir, spool.EventsFile), 0o700); err != nil {
 		t.Fatal(err)
 	}
 	failed := env

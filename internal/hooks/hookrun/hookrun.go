@@ -62,10 +62,6 @@ type Env struct {
 	// ServerKey is that the profile is set up with a server key: what the hook queues is
 	// no person's (spool.Event.NoPerson).
 	ServerKey bool
-	// LegacyBefore, when set, is when an older terma's sign-ins were retired, read when a
-	// replay needs it: a parked event of no account from before then is theirs (an older
-	// terma parked it), and is never bound to the sign-in that replays it.
-	LegacyBefore func() time.Time
 	// Team is the developer's team from setup, which claims every session they run in a
 	// collected repository, whatever the policy's state.
 	Team string
@@ -277,13 +273,9 @@ func (e Env) unpark(r *Repo) {
 // sign-in in place collected it: a sandboxed hook that could not read the sign-in queued it
 // moments ago. One bound already keeps its account, the one a hook that could not read the
 // sign-in names (auth.AccountUnreadable) included: it may be another person's than the one
-// signed in now. One from before an older terma's sign-ins were retired is that terma's,
-// and stays unbound for their record to decide.
+// signed in now.
 func (e Env) bindReplayed(ev *spool.Event) {
 	if ev.Account != "" || ev.NoPerson {
-		return
-	}
-	if e.LegacyBefore != nil && ev.Time.Before(e.LegacyBefore()) {
 		return
 	}
 	// A person's sign-in takes only what was queued since it began: one parked while signed

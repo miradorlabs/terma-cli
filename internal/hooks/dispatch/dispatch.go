@@ -69,9 +69,6 @@ type Profile struct {
 	AccountSince time.Time
 	// ServerKey is a profile set up with a server key: what the hook queues is no person's.
 	ServerKey bool
-	// LegacyBefore is, read when needed, when an older terma's sign-ins were retired: an
-	// event of no account from before then is theirs, never bound later (hookrun.Env).
-	LegacyBefore func() time.Time
 }
 
 // maxPayload bounds the copy of a payload kept to claim a session from.
@@ -93,7 +90,7 @@ func Run(ctx context.Context, d Deps, r Request) int {
 		p := d.Profile()
 		env := hookrun.Env{Now: time.Now(), Cwd: r.Cwd, Args: r.Args, Stdin: r.Stdin, Stdout: r.Stdout, Stderr: r.Stderr,
 			ConfigDir: d.ConfigDir, StateDir: d.StateDir, Version: r.Version, Debug: r.Debug, Flush: d.Flush, Policy: p.Policy, Team: p.Team,
-			Account: p.Account, AccountSince: p.AccountSince, ServerKey: p.ServerKey, LegacyBefore: p.LegacyBefore}
+			Account: p.Account, AccountSince: p.AccountSince, ServerKey: p.ServerKey}
 		if !r.HooksOff {
 			env.Spool = bound(d.Spool(), p)
 		}
@@ -149,7 +146,6 @@ func run(ctx context.Context, d Deps, r Request, handler agents.Handler, flush b
 		Account:      p.Account,
 		AccountSince: p.AccountSince,
 		ServerKey:    p.ServerKey,
-		LegacyBefore: p.LegacyBefore,
 	}
 	ctx, cancel := context.WithTimeout(ctx, handlerTimeout)
 	defer cancel()

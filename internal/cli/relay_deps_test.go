@@ -223,56 +223,34 @@ func TestAHeartbeatFollowsNoRedirect(t *testing.T) {
 	}
 }
 
-// The relay never reads an unreadable legacy record as no record: before one is read it
-// names no one, and after, a failed read keeps the last one.
-func TestAnUnreadableLegacyRecordNamesNoOne(t *testing.T) {
+// A legacy record that can't be read is no decision, never a server key's: before one is
+// read nothing is taken in, and after, a failed read keeps the last one.
+func TestAnUnreadableLegacyRecordIsNoDecision(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, auth.LegacyRecordFile)
 	if err := os.MkdirAll(filepath.Join(path, "x"), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	written := time.Now().Add(-time.Hour)
-	if err := os.Chtimes(path, written, written); err != nil {
-		t.Fatal(err)
-	}
-	// Named by no one up to when the record was written; what a server key collects after
-	// is its own.
-	if got := cachedLegacyRecord(t.TempDir(), dir, func() (bool, error) { return false, nil })(); got.Account != auth.LegacyAccountAmbiguous || got.RetiredAt.Sub(written).Abs() > time.Second {
-		t.Fatalf("unreadable record = %+v; want one naming no one up to %v", got, written)
+	if got := cachedLegacyRecord(t.TempDir(), dir, func() (bool, error) { return true, nil })(); got.Account != "" {
+		t.Fatalf("unreadable record = %+v; want no decision", got)
 	}
 	if err := os.RemoveAll(path); err != nil {
 		t.Fatal(err)
 	}
-	if err := auth.RecordLegacy(dir, []auth.LegacySignIn{{SessionID: "s", UserID: "u", AuthURL: "https://auth.example"}}, time.Now()); err != nil {
+	want := auth.AccountKey("https://auth.example", "u")
+	if err := auth.RecordLegacy(dir, []auth.LegacySignIn{{SessionID: "s", UserID: "u", AuthURL: "https://auth.example"}}, want, time.Now()); err != nil {
 		t.Fatal(err)
 	}
 	legacy := cachedLegacyRecord(t.TempDir(), dir, func() (bool, error) { return false, nil })
-	good := legacy()
-	if good.Account != auth.AccountKey("https://auth.example", "u") {
+	if good := legacy(); good.Account != want {
 		t.Fatalf("record = %+v", good)
 	}
 	if err := os.WriteFile(path, []byte("{"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	time.Sleep(1100 * time.Millisecond)
-	if got := legacy(); got.Account != good.Account {
+	if got := legacy(); got.Account != want {
 		t.Fatalf("after a failed read, record = %+v; want the last one read", got)
-	}
-}
-
-// A record that becomes unreadable after a read found none is not taken for no record: the
-// relay then names no one, rather than keep the empty answer.
-func TestALegacyRecordThatBecomesUnreadableNamesNoOne(t *testing.T) {
-	stateDir := t.TempDir()
-	legacy := cachedLegacyRecord(t.TempDir(), stateDir, func() (bool, error) { return true, nil })
-	if got := legacy(); !got.RetiredAt.IsZero() {
-		t.Fatalf("no record = %+v", got)
-	}
-	if err := os.WriteFile(filepath.Join(stateDir, auth.LegacyRecordFile), []byte("{"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	if got := legacy(); got.Account != auth.LegacyAccountAmbiguous {
-		t.Fatalf("an unreadable record = %+v, want one naming no one", got)
 	}
 }
 
@@ -305,10 +283,9 @@ func TestAccountUserNamesOnlyTheTokensOwnUser(t *testing.T) {
 	}
 }
 
-// While the profile's mode can't be read, every entry bound to no account is named by no
-// one, and that is not kept: once it reads as a server key's, with an older terma's sign-ins
-// on the machine, the first look's boundary holds their backlog.
-func TestALegacyLookupWithAnUnreadableProfileIsNotKept(t *testing.T) {
+// While the profile's mode can't be read, there is no decision, and none is written: once
+// it reads as a server key's, the key's decision is.
+func TestALegacyLookupWithAnUnreadableProfileIsNoDecision(t *testing.T) {
 	dir, stateDir := t.TempDir(), t.TempDir()
 	data := `{"default": {"organizations": {"o": {"session_id": "s", "auth_url": "https://auth.example.test", "user_id": "u"}}}}`
 	if err := os.WriteFile(config.LegacyCredentialsPath(dir), []byte(data), 0o600); err != nil {
@@ -321,11 +298,14 @@ func TestALegacyLookupWithAnUnreadableProfileIsNotKept(t *testing.T) {
 		}
 		return true, nil
 	})
-	if got := legacy(); got.Account != auth.LegacyAccountAmbiguous || !got.RetiredAt.Equal(auth.LegacyStillSignedIn) {
-		t.Fatalf("with the profile unreadable: %+v; want everything named by no one", got)
+	if got := legacy(); got.Account != "" {
+		t.Fatalf("with the profile unreadable: %+v; want no decision", got)
+	}
+	if rec, err := auth.ReadLegacyRecord(stateDir); err != nil || rec.Account != "" {
+		t.Fatalf("record = %+v, %v; want none written", rec, err)
 	}
 	readable.Store(true)
-	if got := legacy(); got.Account != auth.LegacyAccountAmbiguous || got.RetiredAt.IsZero() || got.RetiredAt.Equal(auth.LegacyStillSignedIn) {
-		t.Fatalf("readable again, as a server key's: %+v; want the first look's boundary", got)
+	if got := legacy(); got.Account != auth.LegacyNoPerson {
+		t.Fatalf("readable again, as a server key's: %+v; want no person's", got)
 	}
 }

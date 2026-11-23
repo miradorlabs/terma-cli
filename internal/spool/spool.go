@@ -89,12 +89,17 @@ func (f SenderFunc) Send(ctx context.Context, events []Event) ([]Event, error) {
 // Dir is the spool's folder under the state directory.
 const Dir = "spool"
 
+// EventsFile is the queue, in Dir. Its name, and every other file's this version keeps
+// there, are new: an older terma's hook or flusher still running reads and writes only
+// its own (LegacyEventsFile), so it never sends what this version queued with its own
+// credential, nor holds up or throttles this version's flushes.
+const EventsFile = "events-v2.jsonl"
+
 const (
-	eventsFile       = "events.jsonl"
-	backoffFile      = "next-attempt"
-	lastFlushFile    = "last-flush"
-	lockFile         = "flush.lock"    // shared by appends and queue rewrites
-	deliveryLockFile = "delivery.lock" // held only by flushers
+	backoffFile      = "next-attempt-v2"
+	lastFlushFile    = "last-flush-v2"
+	lockFile         = "flush-v2.lock"    // shared by appends and queue rewrites
+	deliveryLockFile = "delivery-v2.lock" // held only by flushers
 	// probeEventName is reserved for Writable's probe line, which never reaches a sender.
 	probeEventName = "terma-write-probe"
 	// MaxBytes bounds the spool; past it the next flush drops the oldest events.
@@ -138,7 +143,7 @@ func Open(dir string) (*Spool, error) {
 	return &Spool{dir: dir}, nil
 }
 
-func (s *Spool) path() string { return filepath.Join(s.dir, eventsFile) }
+func (s *Spool) path() string { return filepath.Join(s.dir, EventsFile) }
 
 // Append records events in one write under the lock Flush holds while rewriting the file,
 // so they never land on a file about to be replaced.

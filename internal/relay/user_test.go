@@ -3,7 +3,6 @@ package relay
 import (
 	"strings"
 	"testing"
-	"time"
 
 	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
 	resourcepb "go.opentelemetry.io/proto/otlp/resource/v1"
@@ -48,22 +47,6 @@ func TestRelayNamesTheUserOnEveryPart(t *testing.T) {
 	}
 }
 
-// Under a server key no part names a user, even one placed after a switch to a person's
-// sign-in: what a server key collected is no person's, and leaves only with the key.
-func TestAServerKeysPartNamesNoUserAfterASwitch(t *testing.T) {
-	t.Parallel()
-	pol := Policy{User: "user-a", UserAccount: accountA}
-	r := newRelay(Options{Dir: t.TempDir(), Token: token, SignIn: &testSignIn{account: accountA}})
-	m := logsOf("A", 1)
-	p := &part{msg: m} // arrived under the key: bound to no account
-	nameUser(p, pol, r.ownerAt(p.account, time.Now()))
-	for _, a := range m.ResourceLogs[0].Resource.GetAttributes() {
-		if a.Key == semconv.TermaUserIDKey {
-			t.Fatalf("a server key's part names %q", a.Value.GetStringValue())
-		}
-	}
-}
-
 // A queued part is checked again against the policy when it is sent: a stricter one by then
 // keeps the user the relay named.
 func TestQueuedPartKeepsItsUserUnderAStricterPolicy(t *testing.T) {
@@ -88,30 +71,20 @@ func TestQueuedPartKeepsItsUserUnderAStricterPolicy(t *testing.T) {
 // A part names the policy's user only when it leaves under that user's account: one that
 // arrived under another person, or under no one (a server key's), and is placed after a
 // switch names no one, so its terma.user.id is never another than the sign-in it leaves
-// with. An older terma's backlog leaves under the account it was retired as, so names it.
+// with.
 func TestAPartNamesOnlyItsOwnAccountsUser(t *testing.T) {
 	t.Parallel()
 	pol := Policy{User: "user-b", UserAccount: "account-b"}
-	retired := time.Now().Add(time.Hour)
 	for _, c := range []struct {
-		account, legacy string
-		retiredAt       time.Time
-		want            string
+		account, want string
 	}{
 		{account: "account-b", want: "user-b"},
 		{account: "account-a"},
 		{account: ""}, // a server key's part
-		{account: "", legacy: "account-b", retiredAt: retired, want: "user-b"}, // before the retirement
-		{account: "", legacy: "account-b", retiredAt: time.Now().Add(-time.Hour)},
-		{account: "", legacy: "ambiguous", retiredAt: retired},
 	} {
-		r := newRelay(Options{Dir: t.TempDir(), Token: token})
-		if c.legacy != "" {
-			r.opts.Legacy = func() (string, time.Time) { return c.legacy, c.retiredAt }
-		}
 		m := logsOf("A", 1)
 		p := &part{msg: m, account: c.account}
-		nameUser(p, pol, r.ownerAt(p.account, time.Now()))
+		nameUser(p, pol, p.account)
 		got := ""
 		for _, a := range m.ResourceLogs[0].Resource.GetAttributes() {
 			if a.Key == semconv.TermaUserIDKey {

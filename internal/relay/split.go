@@ -47,7 +47,7 @@ type part struct {
 	// leaves under, however long it is held first.
 	account string
 	// arrived is when the relay accepted it, which its outbox entry is named by however
-	// long it is held: whose an unbound part is depends on it (Relay.ownerAt).
+	// long it is held.
 	arrived time.Time
 }
 

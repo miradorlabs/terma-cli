@@ -89,12 +89,12 @@ type Options struct {
 	// that sign-in is the one in place, so a backlog never goes out in another person's
 	// name or to another environment; it ages out of the outbox meanwhile.
 	SignIn SignIn
-	// Legacy is, read again as it is needed, the account an older terma's retired sign-ins
-	// belonged to and when they were retired: a part bound to no account that arrived
-	// before then leaves under that account; one that arrived after, with no sign-in in
-	// place, under none, and ages out. Nil, or an account of "", leaves such parts to a
-	// server key.
-	Legacy func() (account string, retiredAt time.Time)
+	// LegacyDir is an older relay's outbox, and LegacyOwner, asked at every outbox sweep,
+	// the one decision of whose what it queued is (auth.LegacyRecord.Account): "" for none
+	// yet, when it stays where it is. The sweep moves its parts into Dir, an older relay's
+	// account-less routes into that decision's lane (ingestLegacy).
+	LegacyDir   string
+	LegacyOwner func() string
 	// CatchAll, in global mode, is where a part whose hold ran out unplaced goes instead of being dropped.
 	CatchAll func() (claim.Claim, bool)
 	// HeartbeatSend, set, turns the heartbeat on; HeartbeatEvery is its period.

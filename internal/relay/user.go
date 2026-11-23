@@ -11,7 +11,7 @@ var userSafeKeys = []string{semconv.TermaUserIDKey}
 // agent's: whatever the agent sent under the key goes first. An id, not a name, it leaves under
 // any policy, on the resource alone (withhold). Run after the content policy.
 //
-// owner is the account the part will leave under (Relay.ownerAt, judged when it is enqueued): only that account's
+// owner is the account the part will leave under, its lane's: only that account's
 // user is named. One no person collected, as under a server key, names no one, even when a
 // person's sign-in is in place by the time it is placed.
 func nameUser(p *part, pol Policy, owner string) {

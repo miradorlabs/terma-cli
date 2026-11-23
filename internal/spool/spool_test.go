@@ -104,7 +104,7 @@ func TestFlushSkipsTornLinesAndKeepsConcurrentAppends(t *testing.T) {
 	s, _ := Open(dir)
 	_ = s.Append(Event{Name: "ok"})
 	// A hook killed mid-write leaves garbage; the flusher must step over it.
-	f, _ := os.OpenFile(filepath.Join(dir, eventsFile), os.O_APPEND|os.O_WRONLY, 0o600)
+	f, _ := os.OpenFile(filepath.Join(dir, EventsFile), os.O_APPEND|os.O_WRONLY, 0o600)
 	_, _ = f.WriteString("{not json\n")
 	f.Close()
 	_ = s.Append(Event{Name: "ok2"})
@@ -342,6 +342,7 @@ func TestFlushDropsEventsOlderThanMaxAge(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	s.Bind("account-a")
 	now := time.Now()
 	if err := s.Append(Event{Time: now.Add(-MaxAge - time.Hour), Name: "stale", SessionID: "old"}); err != nil {
 		t.Fatal(err)
@@ -400,14 +401,14 @@ func TestWritableLeavesTheQueueExactlyAsItWas(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	before, err := os.ReadFile(filepath.Join(dir, eventsFile))
+	before, err := os.ReadFile(filepath.Join(dir, EventsFile))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if err := s.Writable(); err != nil {
 		t.Fatalf("a writable spool must report writable: %v", err)
 	}
-	after, err := os.ReadFile(filepath.Join(dir, eventsFile))
+	after, err := os.ReadFile(filepath.Join(dir, EventsFile))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -448,7 +449,7 @@ func TestWritableReportsAnUnwritableSpool(t *testing.T) {
 	dir := t.TempDir()
 	s, _ := Open(dir)
 	// A directory where the queue file belongs: open succeeds, writing fails.
-	if err := os.Mkdir(filepath.Join(dir, eventsFile), 0o700); err != nil {
+	if err := os.Mkdir(filepath.Join(dir, EventsFile), 0o700); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.Writable(); err == nil {

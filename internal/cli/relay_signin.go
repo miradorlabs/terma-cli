@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"cmp"
 	"context"
 	"errors"
 	"os"
@@ -203,9 +202,10 @@ func (s *signInSource) Retired(token string) {
 }
 
 // bindRelay has the relay send as the profile's sign-in, bind what it accepts to that
-// sign-in's account, count what an older terma queued as its retired sign-ins' account, and
-// name this installation, and those sign-ins while recent, on its heartbeat. The record and
-// the id are read as they are needed: a sign-in after the relay started writes them.
+// sign-in's account, take in what an older relay queued by the legacy record's decision,
+// and name this installation, and the older sign-ins while recent, on its heartbeat. The
+// record and the id are read as they are needed: a sign-in after the relay started writes
+// them.
 func (app *App) bindRelay(engine *relay.Options, cfg *config.Config) {
 	engine.SignIn = app.signInSource(cfg)
 	engine.Installation = func() string { return config.StoredInstallationID(app.dir) }
@@ -217,13 +217,7 @@ func (app *App) bindRelay(engine *relay.Options, cfg *config.Config) {
 		p := file.Profiles[cfg.ProfileName]
 		return p != nil && p.ServerKeySignIn, nil
 	})
-	// Looked at now, before any export arrives: a first look records the older sign-ins'
-	// boundary (auth.LegacyOwnership), which what the relay accepts from now on is after.
-	legacy()
-	engine.Legacy = func() (string, time.Time) {
-		rec := legacy()
-		return rec.Account, rec.RetiredAt
-	}
+	engine.LegacyOwner = func() string { return legacy().Account }
 	engine.LegacySessionIDs = func() []string {
 		if rec := legacy(); rec.Recent(time.Now()) {
 			return rec.SessionIDs
@@ -233,60 +227,34 @@ func (app *App) bindRelay(engine *relay.Options, cfg *config.Config) {
 }
 
 // cachedLegacyRecord reads the legacy record again whenever a file it depends on changed
-// (the record, the older terma's credentials.json, config.json for the profile's mode): the
-// relay asks for it for every queued entry from before user tokens, and a change, such as a
-// switch to a server key, takes effect at the next entry. A read that fails keeps the last
-// record that named a boundary, or with none, names no one (auth.UnreadableLegacyRecord),
-// never no record, and is not kept either. While the profile's mode can't be read
-// (serverKey's error), every entry bound to no account is named by no one, and nothing is
-// kept: a file made readable again need not look changed. The last record and a pending first look stand for the next read.
+// (the record, the older terma's credentials.json, config.json for the profile's mode), and
+// on a server-key profile records the key's decision if none is kept
+// (auth.LegacyOwnership). A read that fails keeps the last record, the zero one at first:
+// a record that can't be read, or a profile's mode that can't, is no decision, never a
+// server key's. It is not kept either, so it is read again next time.
 func cachedLegacyRecord(dir, stateDir string, serverKey func() (bool, error)) func() auth.LegacyRecord {
 	var mu sync.Mutex
-	rec := auth.UnreadableLegacyRecord(stateDir)
+	var rec auth.LegacyRecord
 	var files [3]os.FileInfo
 	read := false
-	// pending is the boundary of a first look that could not be written: it is judged by,
-	// and written again at every call until it lands, never replaced by a later one.
-	var pending time.Time
 	recordPath := filepath.Join(stateDir, auth.LegacyRecordFile)
 	return func() auth.LegacyRecord {
 		mu.Lock()
 		defer mu.Unlock()
 		now := [3]os.FileInfo{statOrNil(recordPath), statOrNil(config.LegacyCredentialsPath(dir)), statOrNil(config.Path(dir))}
-		if read && pending.IsZero() && unchanged(files[0], now[0]) && unchanged(files[1], now[1]) && unchanged(files[2], now[2]) {
+		if read && unchanged(files[0], now[0]) && unchanged(files[1], now[1]) && unchanged(files[2], now[2]) {
 			return rec
 		}
+		read = false
 		sk, err := serverKey()
 		if err != nil {
-			read = false
-			return auth.LegacyRecord{Account: auth.LegacyAccountAmbiguous, RetiredAt: auth.LegacyStillSignedIn, SessionIDs: rec.SessionIDs}
-		}
-		files, read = now, true
-		at := cmp.Or(pending, time.Now())
-		got, err := auth.LegacyOwnershipAt(dir, stateDir, sk, at)
-		if err != nil {
-			// Not kept: a record made readable again (its permissions) need not look changed.
-			read = false
-			if rec.RetiredAt.IsZero() {
-				rec = auth.UnreadableLegacyRecord(stateDir)
-			}
 			return rec
 		}
-		if !pending.IsZero() && got.RetiredAt.After(pending) {
-			// A retirement wrote its record before the first look could: the first look's
-			// boundary, judged by since, is the one kept, as it would have been written.
-			if auth.KeepFirstLook(stateDir, pending) != nil {
-				return rec // tried again next time
-			}
-			if got, err = auth.LegacyOwnershipAt(dir, stateDir, sk, at); err != nil {
-				read = false
-				return rec
-			}
+		got, err := auth.LegacyOwnership(dir, stateDir, sk)
+		if err != nil {
+			return rec
 		}
-		rec, pending = got, time.Time{}
-		if !got.RetiredAt.IsZero() && statOrNil(recordPath) == nil {
-			pending = got.RetiredAt // not written yet: tried again next time
-		}
+		rec, files, read = got, now, true
 		return rec
 	}
 }

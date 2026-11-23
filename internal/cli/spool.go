@@ -147,6 +147,9 @@ func describeFlush(res delivery.Result, signInFix string) (delivered string, und
 	if res.Expired > 0 {
 		undelivered = append(undelivered, fmt.Sprintf("expired %d past the spool's age limit", res.Expired))
 	}
+	if res.LegacyAmbiguous > 0 {
+		undelivered = append(undelivered, fmt.Sprintf("expired %d an older terma queued that no one sign-in may send", res.LegacyAmbiguous))
+	}
 	if res.Pruned > 0 {
 		undelivered = append(undelivered, fmt.Sprintf("pruned %d to stay under the size limit", res.Pruned))
 	}
@@ -209,8 +212,7 @@ func (app *App) flushSpool(ctx context.Context, force bool, minInterval time.Dur
 	}
 	r := app.delivery()
 	r.SignIn = app.signInSource(cfg)
-	rec := spoolLegacyOwnership(app.dir, app.stateDir, cfg.ServerKeySignIn)
-	r.LegacyAccount, r.LegacyBefore = rec.Account, rec.RetiredAt
+	app.ingestLegacySpool(s, cfg.ServerKeySignIn)
 	// A hook that found the policy stale started this flush to refresh it (hookrun refreshPolicy).
 	if cfg.Policy.Stale(time.Now()) {
 		r.Policy = refreshOnce(ctx, cfg, cfg.Policy.Team(), r.Policy)
@@ -218,25 +220,26 @@ func (app *App) flushSpool(ctx context.Context, force bool, minInterval time.Dur
 	return r.Flush(ctx, s, cfg, force, minInterval), nil
 }
 
-// spoolLegacyOwnership is auth.LegacyOwnership for the spool. While the older sign-ins are
-// still on the machine, a retirement that could not forget them, an older terma's hook may
-// still be queueing events bound to no account, so every one is theirs: the boundary is
-// auth.LegacyStillSignedIn. Every event a hook of this terma queues is bound (an account,
-// or NoPerson under a server key), so none is held by it. Not so in the relay, where a
-// server key's parts are bound to no account.
-func spoolLegacyOwnership(dir, stateDir string, serverKey bool) auth.LegacyRecord {
-	rec, err := auth.LegacyOwnership(dir, stateDir, serverKey)
-	if err != nil {
-		rec = auth.UnreadableLegacyRecord(stateDir)
+// ingestLegacySpool takes what an older terma queued into s, tagged by the one decision
+// the legacy record keeps (auth.LegacyOwnership), in the lane the relay takes it to
+// (auth.LegacyLane): its person's, no person's, or, when ambiguous or not understood,
+// neither, so it never leaves. With no decision yet, or a record that can't be
+// read, it stays where it is. An older terma's hook may still be queueing, so every flush
+// takes what is new.
+func (app *App) ingestLegacySpool(s *spool.Spool, serverKey bool) {
+	rec, err := auth.LegacyOwnership(app.dir, app.stateDir, serverKey)
+	lane := auth.LegacyLane(rec.Account)
+	if err != nil || lane == "" {
+		return
 	}
-	switch {
-	case rec.RetiredAt.IsZero():
-	case auth.HasLegacySignIns(dir):
-		rec.RetiredAt = auth.LegacyStillSignedIn
+	switch lane {
+	case auth.LegacyNoPerson:
+		_ = s.IngestLegacy("", true)
+	case auth.LegacyAccountAmbiguous:
+		_ = s.IngestLegacy("", false)
 	default:
-		rec.RetiredAt = rec.ReplayBefore()
+		_ = s.IngestLegacy(lane, false)
 	}
-	return rec
 }
 
 var errTornDown = errors.New("terma is not set up on this machine; run `terma setup`")

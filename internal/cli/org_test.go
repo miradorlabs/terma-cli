@@ -465,46 +465,9 @@ func TestAPartlyBrokenOlderFileIsRetiredAsNoOnes(t *testing.T) {
 	}
 }
 
-// The older sign-ins' boundary is when their retirement is done, after their revokes: what
-// an older terma's hook still running queued meanwhile stays on that terma's side.
-func TestTheLegacyBoundaryIsSetOnceTheRetirementIsDone(t *testing.T) {
-	f := newFakeAuth(t)
-	authSandbox(t, f)
-	if err := config.UpdateFile(testApp.dir, func(file *config.File) { file.InsecureStorage = true }); err != nil {
-		t.Fatal(err)
-	}
-	legacyA := legacyTokenPrefix + orgA().ID
-	data := `{"default": {"organizations": {"` + orgA().ID + `": {"access_token": "` + legacyA + `", "session_id": "old-a", "auth_url": "` + f.srv.URL + `", "organization_id": "` + orgA().ID + `", "user_id": "u-1"}}}}`
-	if err := os.WriteFile(config.LegacyCredentialsPath(testApp.dir), []byte(data), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	var revoked atomic.Int64
-	inner := f.srv.Config.Handler
-	f.srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/v1/auth/cli/revoke" {
-			time.Sleep(50 * time.Millisecond)
-			revoked.Store(time.Now().UnixNano())
-		}
-		inner.ServeHTTP(w, r)
-	})
-	cfg, err := testApp.loadConfig()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := testApp.storeLogin(context.Background(), cfg, storedSession(f)); err != nil {
-		t.Fatal(err)
-	}
-	rec, err := auth.ReadLegacyRecord(testApp.stateDir)
-	if err != nil || revoked.Load() == 0 || !rec.RetiredAt.After(time.Unix(0, revoked.Load())) {
-		t.Fatalf("boundary %v, revoked at %v (%v); want the boundary after the revoke", rec.RetiredAt, time.Unix(0, revoked.Load()), err)
-	}
-}
-
 // With the older sign-ins still on the machine, because the keychain would not let one go,
-// an older hook may still be queueing: every unbound event in the spool stays theirs, for
-// delivery and the hooks alike. The relay, whose server-key parts are unbound, keeps the
-// record's boundary, which is the end of the attempt.
-func TestEverythingUnboundStaysLegacyWhileTheOlderSignInsRemain(t *testing.T) {
+// the decision is kept all the same, before they go, and a later retirement keeps it.
+func TestTheDecisionIsKeptWhileTheOlderSignInsRemain(t *testing.T) {
 	f := newFakeAuth(t)
 	authSandbox(t, f)
 	legacyA := legacyTokenPrefix + orgA().ID
@@ -514,15 +477,6 @@ func TestEverythingUnboundStaysLegacyWhileTheOlderSignInsRemain(t *testing.T) {
 	if err := os.WriteFile(config.LegacyCredentialsPath(testApp.dir), []byte(data), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	var revoked atomic.Int64
-	inner := f.srv.Config.Handler
-	f.srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/v1/auth/cli/revoke" {
-			time.Sleep(50 * time.Millisecond)
-			revoked.Store(time.Now().UnixNano())
-		}
-		inner.ServeHTTP(w, r)
-	})
 	if err := config.UpdateFile(testApp.dir, func(file *config.File) { file.InsecureStorage = true }); err != nil {
 		t.Fatal(err)
 	}
@@ -538,39 +492,20 @@ func TestEverythingUnboundStaysLegacyWhileTheOlderSignInsRemain(t *testing.T) {
 	if !auth.HasLegacySignIns(testApp.dir) {
 		t.Fatal("the older sign-ins were forgotten although the keychain kept one")
 	}
-	rec, err := auth.ReadLegacyRecord(testApp.stateDir)
-	if err != nil || revoked.Load() == 0 || !rec.RetiredAt.After(time.Unix(0, revoked.Load())) {
-		t.Fatalf("boundary %v, revoked at %v (%v); want it after the attempt", rec.RetiredAt, time.Unix(0, revoked.Load()), err)
+	want := auth.AccountKey(f.srv.URL, "u-1")
+	if rec, err := auth.ReadLegacyRecord(testApp.stateDir); err != nil || rec.Account != want {
+		t.Fatalf("record = %+v, %v; want their person's", rec, err)
 	}
-	for _, serverKey := range []bool{false, true} {
-		if got := spoolLegacyOwnership(testApp.dir, testApp.stateDir, serverKey); !got.RetiredAt.Equal(auth.LegacyStillSignedIn) {
-			t.Errorf("server key %v: delivery judges by %v; want everything unbound held", serverKey, got.RetiredAt)
-		}
-	}
-	if got, err := auth.LegacyOwnership(testApp.dir, testApp.stateDir, true); err != nil || !got.RetiredAt.Equal(rec.RetiredAt) {
-		t.Errorf("the relay judges by %v (%v), want the record's %v", got.RetiredAt, err, rec.RetiredAt)
-	}
-	if got := legacyBefore(testApp.dir, testApp.stateDir); !got.Equal(farFuture) {
-		t.Errorf("the hooks judge by %v; want everything unbound held", got)
-	}
-	// The keychain unlocks and a later retirement forgets them: what an older hook queued
-	// meanwhile, before that retry, is still theirs in the spool. The relay's boundary stays.
-	queuedMeanwhile := time.Now()
 	unlock()
-	retry := time.Now()
-	if err := testApp.retireLegacySessions(context.Background(), f.srv.URL); err != nil {
+	// A retry, as a server key's even, keeps the first decision.
+	if err := testApp.retireLegacySessions(context.Background(), f.srv.URL, true); err != nil {
 		t.Fatal(err)
 	}
 	if auth.HasLegacySignIns(testApp.dir) {
 		t.Fatal("the retry left the older sign-ins")
 	}
-	for _, got := range []time.Time{spoolLegacyOwnership(testApp.dir, testApp.stateDir, true).RetiredAt, legacyBefore(testApp.dir, testApp.stateDir)} {
-		if !got.After(retry) || got.Equal(farFuture) || !queuedMeanwhile.Before(got) {
-			t.Errorf("after the retry the spool judges by %v; want a boundary after the retry (%v)", got, retry)
-		}
-	}
-	if got, err := auth.LegacyOwnership(testApp.dir, testApp.stateDir, true); err != nil || !got.RetiredAt.Equal(rec.RetiredAt) {
-		t.Errorf("after the retry the relay judges by %v (%v), want the first retirement's %v", got.RetiredAt, err, rec.RetiredAt)
+	if rec, err := auth.ReadLegacyRecord(testApp.stateDir); err != nil || rec.Account != want {
+		t.Fatalf("after the retry, record = %+v, %v; want the first decision", rec, err)
 	}
 }
 
@@ -707,48 +642,24 @@ func TestReuseRefusesASessionReplacedMeanwhile(t *testing.T) {
 	}
 }
 
-// A record that can't be read while the older sign-ins remain holds everything unbound too:
-// its time is no bound on what an older hook still running queues.
-func TestAnUnreadableRecordHoldsEverythingWhileTheOlderSignInsRemain(t *testing.T) {
-	dir, stateDir := t.TempDir(), t.TempDir()
-	if err := os.WriteFile(filepath.Join(stateDir, auth.LegacyRecordFile), []byte("{"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	if got := spoolLegacyOwnership(dir, stateDir, true); got.RetiredAt.Equal(auth.LegacyStillSignedIn) {
-		t.Fatalf("with no older sign-ins left, judged by %v; want the record's time", got.RetiredAt)
-	}
-	data := `{"default": {"organizations": {"o": {"session_id": "s", "auth_url": "https://auth.example.test", "user_id": "u"}}}}`
-	if err := os.WriteFile(config.LegacyCredentialsPath(dir), []byte(data), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	if got := spoolLegacyOwnership(dir, stateDir, true); !got.RetiredAt.Equal(auth.LegacyStillSignedIn) || got.Account != auth.LegacyAccountAmbiguous {
-		t.Fatalf("judged by %+v; want everything unbound named by no one", got)
-	}
-}
-
 // Once the older sign-ins are retired and gone, a later sign-in, setup or sign-out leaves
-// their record as it was: its boundary and its mark never move on, so what is queued after
-// the retirement is never counted as theirs.
+// their record as it was.
 func TestARetirementDoneLeavesItsRecordToLaterSignIns(t *testing.T) {
 	f := newFakeAuth(t)
 	authSandbox(t, f)
 	stateDir := testApp.stateDir
-	at := time.Now().Add(-time.Hour).UTC()
-	if err := auth.RecordLegacy(stateDir, []auth.LegacySignIn{{SessionID: "old", AuthURL: f.srv.URL, UserID: "u-1"}}, at); err != nil {
-		t.Fatal(err)
-	}
-	if err := auth.MarkLegacyForgotten(stateDir, at); err != nil {
+	if err := auth.RecordLegacy(stateDir, []auth.LegacySignIn{{SessionID: "old", AuthURL: f.srv.URL, UserID: "u-1"}}, auth.AccountKey(f.srv.URL, "u-1"), time.Now().Add(-time.Hour)); err != nil {
 		t.Fatal(err)
 	}
 	before, err := auth.ReadLegacyRecord(stateDir)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := testApp.retireLegacySessions(context.Background(), f.srv.URL); err != nil {
+	if err := testApp.retireLegacySessions(context.Background(), f.srv.URL, true); err != nil {
 		t.Fatal(err)
 	}
 	after, err := auth.ReadLegacyRecord(stateDir)
-	if err != nil || !after.ReplayBefore().Equal(before.ReplayBefore()) || !after.RetiredAt.Equal(before.RetiredAt) {
+	if err != nil || after.Account != before.Account || !after.RetiredAt.Equal(before.RetiredAt) {
 		t.Fatalf("record %+v became %+v (%v); want it left as the retirement left it", before, after, err)
 	}
 }
@@ -764,8 +675,10 @@ func TestOlderSignInsThatCantBeReadAreKept(t *testing.T) {
 	}
 	read := testApp.legacySignIns
 	t.Cleanup(func() { testApp.legacySignIns = read })
-	testApp.legacySignIns = func(string, bool) ([]auth.LegacySignIn, error) { return nil, errors.New("sharing violation") }
-	if err := testApp.retireLegacySessions(context.Background(), f.srv.URL); err != nil {
+	testApp.legacySignIns = func(string, bool) ([]auth.LegacySignIn, bool, error) {
+		return nil, false, errors.New("sharing violation")
+	}
+	if err := testApp.retireLegacySessions(context.Background(), f.srv.URL, false); err != nil {
 		t.Fatal(err)
 	}
 	if !auth.HasLegacySignIns(testApp.dir) {
@@ -794,7 +707,7 @@ func TestARetirementWaitsOutAnOlderTermasLock(t *testing.T) {
 	defer unlock()
 	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
 	defer cancel()
-	if err := testApp.retireLegacySessions(ctx, f.srv.URL); err == nil {
+	if err := testApp.retireLegacySessions(ctx, f.srv.URL, false); err == nil {
 		t.Fatal("a retirement left to the next sign-in reported nothing")
 	}
 	if !auth.HasLegacySignIns(testApp.dir) {

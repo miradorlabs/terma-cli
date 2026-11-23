@@ -52,7 +52,7 @@ func TestTeardownStopsTheRelayAndKeepsTheSignIn(t *testing.T) {
 	// What hooks kept, which only hooks would prune, and the policy they ran under.
 	hookState := []string{
 		filepath.Join(stateDir, termaproject.WorkspacesDir, "h", "store.lock"),
-		filepath.Join(stateDir, spool.Dir, "events.jsonl"),
+		filepath.Join(stateDir, spool.Dir, spool.EventsFile),
 		filepath.Join(stateDir, config.PoliciesDir, "team.json"), filepath.Join(stateDir, config.PoliciesDir, "team.json.lock"),
 	}
 	for _, dir := range testApp.hookStateDirs() {

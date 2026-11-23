@@ -24,6 +24,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/project"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
+	"github.com/miradorlabs/terma-cli/internal/sendas"
 )
 
 // The outbox is plain files, one part each, renamed into place so a crash leaves a whole file or none:
@@ -32,9 +33,15 @@ import (
 //	<dir>/@<account>/<project>/<tool>/<repo>/identity.json                            the repository <repo> hashes
 //	<dir>/.dead/<account>-<project>-<tool>-<repo>-<name>                              refused by the host
 //
-// <account> is the account key (auth.AccountKey) of the sign-in that collected the parts,
-// so they leave only under it. A route without one, <dir>/<project>/..., was queued with
-// no sign-in to bind it to: by a terma before user tokens, or under a server key.
+// <account> is the parts' lane: the account key (auth.AccountKey) of the sign-in that
+// collected them, so they leave only under it; no_person (sendas.NoPersonLane), for what
+// an older relay queued on a server-key machine; or ambiguous
+// (auth.LegacyAccountAmbiguous), for what an older relay queued that no one sign-in may
+// send, which never leaves and ages out. A route without one, <dir>/<project>/..., was
+// queued with no sign-in to bind it to, under a server key or signed out.
+//
+// An older relay's outbox, LegacyOutboxDir, has only routes without one; this version
+// never writes there, and moves what it holds into its own (ingestLegacy).
 //
 // <received> is zero-padded Unix nanoseconds, so a name sort is arrival order. Only claimed
 // parts, already filtered, are written; unsynced, so a power cut can lose the last seconds.
@@ -162,7 +169,7 @@ func validRoute(rt route) bool {
 }
 
 func validAccount(a string) bool {
-	return a == "" || a == auth.AccountUnreadable || len(a) == auth.AccountKeyLen && strings.Trim(a, "0123456789abcdef") == ""
+	return a == "" || a == auth.AccountUnreadable || a == sendas.NoPersonLane || a == auth.LegacyAccountAmbiguous || auth.ValidAccountKey(a)
 }
 
 func validRepoKey(k string) bool {
@@ -281,7 +288,7 @@ func (r *Relay) sweepOutbox(now time.Time) map[route][]entry {
 	slices.SortFunc(all, func(a, b queued) int { return strings.Compare(a.e.name, b.e.name) })
 	removed := map[route][]entry{}
 	lost := map[string]int{}
-	defer func() { o.recordLosses(lost["outbox_full"], lost["outbox_expired"], now) }()
+	defer func() { o.recordLosses(lost["outbox_full"], lost["outbox_expired"], lost["legacy_ambiguous"], now) }()
 	drop := func(q queued, why string) {
 		if os.Remove(q.path) == nil {
 			r.stats.dropped(q.e.signal, why, q.e.records)
@@ -299,7 +306,11 @@ func (r *Relay) sweepOutbox(now time.Time) map[route][]entry {
 			age = at
 		}
 		if now.Sub(age) > maxOutboxAge {
-			drop(q, "outbox_expired")
+			if q.rt.account == auth.LegacyAccountAmbiguous {
+				drop(q, "legacy_ambiguous")
+			} else {
+				drop(q, "outbox_expired")
+			}
 			continue
 		}
 		kept = append(kept, q)
@@ -398,5 +409,10 @@ func mergeBodies(sig Signal, bodies [][]byte) ([]byte, error) {
 	}
 }
 
-// OutboxDir is the outbox's directory name under the relay directory.
-const OutboxDir = "outbox"
+// OutboxDir is the outbox's directory name under the relay directory. It is new in this
+// version, so an older relay never sends what this one queued; LegacyOutboxDir is an
+// older relay's.
+const (
+	OutboxDir       = "outbox-v2"
+	LegacyOutboxDir = "outbox"
+)

@@ -45,38 +45,6 @@ func TestUnparkingKeepsTheAccountsEventsWereCollectedUnder(t *testing.T) {
 	}
 }
 
-// An event an older terma parked, from before its sign-ins were retired, stays its: no
-// sign-in that unparks it later takes it. One from after is bound as before.
-func TestUnparkingLeavesAnOlderTermasEventsUnbound(t *testing.T) {
-	root := hookruntest.InitRepo(t)
-	sp, err := spool.Open(t.TempDir())
-	if err != nil {
-		t.Fatal(err)
-	}
-	r := &Repo{GitDir: root + "/.git"}
-	retired := time.Now().Add(-time.Hour)
-	for _, ev := range []spool.Event{
-		{Name: "older", Time: retired.Add(-time.Hour)},
-		{Name: "newer", Time: retired.Add(time.Minute)},
-		// Bound while the sign-in could not be read (auth.AccountUnreadable): maybe another
-		// person's than the one signed in now, so it keeps that account.
-		{Name: "unreadable", Time: retired.Add(time.Minute), Account: unreadable},
-	} {
-		if !(Env{}).park(r, parkedEvents, ev) {
-			t.Fatalf("could not park %s", ev.Name)
-		}
-	}
-	sp.Bind("account-b")
-	Env{Spool: sp, Account: "account-b", AccountSince: retired.Add(-2 * time.Hour), LegacyBefore: func() time.Time { return retired }}.unpark(r)
-	got := map[string]string{}
-	for _, ev := range hookruntest.Spooled(t, sp) {
-		got[ev.Name] = ev.Account
-	}
-	if got["older"] != "" || got["newer"] != "account-b" || got["unreadable"] != unreadable {
-		t.Fatalf("accounts = %v; want the older terma's unbound, the newer bound, the unreadable kept", got)
-	}
-}
-
 // An event bound while the sign-in could not be read is never unparked as no one's: under a
 // server key it keeps its account, and ages out.
 func TestAnUnreadableEventIsNeverUnparkedAsNoOnes(t *testing.T) {

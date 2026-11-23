@@ -166,13 +166,12 @@ func (r *Relay) deliverAttributed(c claim.Claim, pol Policy, p *part, how attrib
 		stamp(p, semconv.TermaVersionKey, r.opts.Version)
 	}
 	stampCheckout(p, r.ranIn(c, p, how), pol.IncludeToolContent)
-	// One time for whose the part is and for its outbox entry, so the two agree: when it
-	// arrived, however long it was held.
+	// Its outbox entry is named by when it arrived, however long it was held.
 	at := p.arrived
 	if at.IsZero() {
 		at = r.opts.Now()
 	}
-	nameUser(p, pol, r.ownerAt(p.account, at))
+	nameUser(p, pol, p.account)
 	if how.how != "" {
 		stamp(p, semconv.TermaRelayAttributionKey, how.how)
 		if how.session != "" {

@@ -148,8 +148,8 @@ func TestSetupWithAServerKey(t *testing.T) {
 	}
 }
 
-// Setup with a server key retires an older terma's sign-ins too, recording first whose
-// they were: what that terma queued is no server key's to send.
+// Setup with a server key retires an older terma's sign-ins too, recording first the
+// machine's decision: what that terma queued is the key's, whoever its sign-ins named.
 func TestServerKeySetupRetiresAnOlderTermasSignIns(t *testing.T) {
 	keySandbox(t)
 	data := `{"default": {"active": "o", "organizations": {"o": {"access_token": "old", "session_id": "s-old", "auth_url": "https://auth.example.test", "organization_id": "o", "user_id": "u-1"}}}}`
@@ -161,8 +161,8 @@ func TestServerKeySetupRetiresAnOlderTermasSignIns(t *testing.T) {
 		t.Fatal("the older sign-ins outlived setup with a server key")
 	}
 	rec, err := auth.ReadLegacyRecord(testApp.stateDir)
-	if err != nil || rec.Account != auth.AccountKey("https://auth.example.test", "u-1") || rec.RetiredAt.IsZero() {
-		t.Fatalf("legacy record = %+v, %v; want the older sign-ins' account", rec, err)
+	if err != nil || rec.Account != auth.LegacyNoPerson || !slices.Equal(rec.SessionIDs, []string{"s-old"}) {
+		t.Fatalf("legacy record = %+v, %v; want no person's, with the session", rec, err)
 	}
 }
 

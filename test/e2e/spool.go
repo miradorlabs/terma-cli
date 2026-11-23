@@ -22,7 +22,7 @@ type Event struct {
 
 // Spool reads every event the sandbox's hooks have written.
 func (sb *Sandbox) Spool() []Event {
-	f, err := os.Open(filepath.Join(sb.TermaConfig, "spool", "events.jsonl"))
+	f, err := os.Open(filepath.Join(sb.TermaConfig, "spool", "events-v2.jsonl"))
 	if err != nil {
 		return nil
 	}

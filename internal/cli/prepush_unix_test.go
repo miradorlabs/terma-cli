@@ -52,7 +52,7 @@ func TestARealPushIsReportedByTheInstalledHook(t *testing.T) {
 		t.Errorf("the push took %s", took)
 	}
 
-	events := filepath.Join(stateDir, spool.Dir, "events.jsonl")
+	events := filepath.Join(stateDir, spool.Dir, spool.EventsFile)
 	deadline := time.Now().Add(30 * time.Second)
 	for {
 		data, _ := os.ReadFile(events)

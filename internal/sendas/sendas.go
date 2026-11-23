@@ -19,6 +19,10 @@ const ProjectHeader = "X-Mirador-Project"
 // had for it. The relay and delivery hold what is bound to it, and it ages out.
 const AccountUnreadable = "unreadable"
 
+// NoPersonLane is the lane of what no person collected, under a server key: it leaves only
+// under a server key. Not hex, so no account key is ever it.
+const NoPersonLane = "no_person"
+
 // ReasonSignInRetired is the reason a gateway gives a sign-in it no longer accepts.
 const ReasonSignInRetired = "SIGN_IN_RETIRED"
 

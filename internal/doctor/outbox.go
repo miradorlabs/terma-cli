@@ -21,6 +21,9 @@ func OutboxCheck(r Relay) Check {
 	if r.OutboxExpired > 0 {
 		lost = append(lost, fmt.Sprintf("%d older than it keeps them", r.OutboxExpired))
 	}
+	if r.OutboxLegacyAmbiguous > 0 {
+		lost = append(lost, fmt.Sprintf("%d an older terma queued that no one sign-in may send, past its age", r.OutboxLegacyAmbiguous))
+	}
 	if r.OutboxHeld > 0 {
 		lost = append(lost, fmt.Sprintf("%d held while their team's policy could not be read, when the relay stopped", r.OutboxHeld))
 	}

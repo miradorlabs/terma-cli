@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"github.com/miradorlabs/terma-cli/internal/account/auth"
-	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -99,11 +98,12 @@ func (u *signInUpstream) requests() []string {
 }
 
 // signedInRelay runs a relay that sends with signIn, its outbox dir, every session claimed
-// for p1 under a policy that names no key.
+// for p1 under a policy that names no key. What an older relay queued, in
+// legacyOutbox(dir), is taken in under the decision legacy, "" for none.
 func signedInRelay(t *testing.T, u *signInUpstream, signIn SignIn, dir, legacy string) *Relay {
 	t.Helper()
-	legacyFn := func() (string, time.Time) { return legacy, time.Now().Add(time.Hour) }
-	r := newRelay(Options{Dir: dir, Token: token, Hold: time.Minute, SignIn: signIn, Legacy: legacyFn,
+	r := newRelay(Options{Dir: dir, Token: token, Hold: time.Minute, SignIn: signIn,
+		LegacyDir: legacyOutbox(dir), LegacyOwner: func() string { return legacy },
 		Lookup: func(string, time.Time) (claim.Claim, bool) { return claim.Claim{ProjectID: "p1"}, true },
 		Resolve: func(claim.Claim) (Policy, error) {
 			return Policy{Endpoint: u.srv.URL, IncludePrompts: true, IncludeToolContent: true}, nil
@@ -120,6 +120,9 @@ func oneLog(session string) []byte {
 		LogRecords: []*logspb.LogRecord{{Attributes: []*commonpb.KeyValue{kv("session.id", session)}}}}}}}})
 	return b
 }
+
+// legacyOutbox is where tests keep an older relay's outbox beside the outbox dir.
+func legacyOutbox(dir string) string { return dir + "-legacy" }
 
 // queue writes a part into dir's outbox under account, as an earlier relay left it.
 func queue(t *testing.T, dir, account string) { t.Helper(); queueAt(t, dir, account, time.Now()) }
@@ -162,23 +165,59 @@ func TestPartsLeaveOnlyUnderTheirOwnSignIn(t *testing.T) {
 	}
 }
 
-// What a relay queued before user tokens leaves under the account its retired sign-ins
-// belonged to, and under no other.
+// What an older relay queued, in its own outbox, is taken into the account the retirement
+// decided, and leaves under that account only: under another sign-in it waits in that
+// account's lane. A route of the older outbox already in a lane moves as it is.
 func TestABacklogFromBeforeUserTokensLeavesUnderItsAccount(t *testing.T) {
 	t.Parallel()
 	u := newSignInUpstream(t)
 	dir := t.TempDir()
-	queue(t, dir, "")
+	queue(t, legacyOutbox(dir), "")
 	signedInRelay(t, u, &testSignIn{account: accountA}, dir, accountA)
 	waitFor(t, func() bool { return len(u.requests()) == 1 })
+	if got := u.requests()[0]; got != "Bearer token-"+accountA+" p1" {
+		t.Fatalf("sent %q, want A's token", got)
+	}
 
 	u2 := newSignInUpstream(t)
 	dir2 := t.TempDir()
-	queue(t, dir2, "")
+	queue(t, legacyOutbox(dir2), "")
+	queue(t, legacyOutbox(dir2), accountA)
 	signedInRelay(t, u2, &testSignIn{account: accountA}, dir2, accountB)
+	waitFor(t, func() bool { return len(u2.requests()) == 1 })
 	time.Sleep(100 * time.Millisecond)
-	if n := len(u2.requests()); n != 0 {
-		t.Fatalf("%d requests: a backlog left under another account", n)
+	if got := u2.requests(); len(got) != 1 || got[0] != "Bearer token-"+accountA+" p1" {
+		t.Fatalf("sent %q: want only A's own part, B's backlog kept", got)
+	}
+	if entries, _ := (outbox{dir: dir2}).list(routeOf(accountB, claim.Claim{ProjectID: "p1"})); len(entries) != 1 {
+		t.Fatalf("B's lane holds %d parts, want the older relay's one", len(entries))
+	}
+	if routes, _ := (outbox{dir: legacyOutbox(dir2)}).routes(); len(routes) != 0 {
+		for _, rt := range routes {
+			if entries, _ := (outbox{dir: legacyOutbox(dir2)}).list(rt); len(entries) != 0 {
+				t.Fatalf("the older outbox kept %d parts on %s", len(entries), rt)
+			}
+		}
+	}
+}
+
+// With no decision yet, an older relay's outbox is left as it is: nothing is taken in.
+func TestNoDecisionTakesNothingFromAnOlderRelay(t *testing.T) {
+	t.Parallel()
+	u := newSignInUpstream(t)
+	dir := t.TempDir()
+	queue(t, legacyOutbox(dir), "")
+	r := signedInRelay(t, u, &testSignIn{account: accountA}, dir, "")
+	r.janitor(time.Now())
+	time.Sleep(100 * time.Millisecond)
+	if n := len(u.requests()); n != 0 {
+		t.Fatalf("%d requests: an older relay's part left with no decision", n)
+	}
+	if entries, _ := (outbox{dir: legacyOutbox(dir)}).list(routeOf("", claim.Claim{ProjectID: "p1"})); len(entries) != 1 {
+		t.Fatalf("the older outbox holds %d parts, want its one left", len(entries))
+	}
+	if routes, _ := (outbox{dir: dir}).routes(); len(routes) != 0 {
+		t.Fatalf("routes %v were made with no decision", routes)
 	}
 }
 
@@ -297,41 +336,18 @@ func TestAHeldPartKeepsTheAccountItArrivedUnder(t *testing.T) {
 	}
 }
 
-// A part bound to no account leaves under the retired sign-ins' account only if it arrived
-// before they were retired; one that arrived after, with no sign-in, leaves under none.
-func TestOnlyABacklogFromBeforeRetirementCountsAsTheOlderSignIns(t *testing.T) {
-	t.Parallel()
-	u := newSignInUpstream(t)
-	dir := t.TempDir()
-	queue(t, dir, "")
-	r := newRelay(Options{Dir: dir, Token: token, SignIn: &testSignIn{account: accountA},
-		Legacy: func() (string, time.Time) { return accountA, time.Now().Add(-time.Hour) },
-		Resolve: func(claim.Claim) (Policy, error) {
-			return Policy{Endpoint: u.srv.URL, IncludePrompts: true, IncludeToolContent: true}, nil
-		}})
-	ctx, cancel := context.WithCancel(context.Background())
-	done := make(chan struct{})
-	go func() { r.Run(ctx); close(done) }()
-	t.Cleanup(func() { cancel(); <-done })
-	time.Sleep(200 * time.Millisecond)
-	if got := u.requests(); len(got) != 0 {
-		t.Fatalf("sent %q: a part from after the retirement left as the older sign-ins'", got)
-	}
-}
-
 // A profile set up with a server key sends only what no person's sign-in collected: a
-// person's bound backlog, or an older terma's that counts as its retired sign-ins', is
+// person's bound backlog, or an older relay's the retirement decided was a person's, is
 // never sent with the key.
 func TestAServerKeyNeverSendsAPersonsBacklog(t *testing.T) {
 	t.Parallel()
 	u := newSignInUpstream(t)
 	dir := t.TempDir()
-	retired := time.Now()
-	queueAt(t, dir, accountA, retired.Add(-time.Minute))
-	queueAt(t, dir, "", retired.Add(-time.Minute)) // an older terma's: the retired sign-ins'
-	queueAt(t, dir, "", retired.Add(time.Minute))  // after the retirement: no person's
+	queue(t, dir, accountA)
+	queue(t, legacyOutbox(dir), "") // an older relay's: the retired sign-ins' person's
+	queue(t, dir, "")               // the key's own
 	r := newRelay(Options{Dir: dir, Token: token, SignIn: &testSignIn{},
-		Legacy: func() (string, time.Time) { return accountB, retired },
+		LegacyDir: legacyOutbox(dir), LegacyOwner: func() string { return accountB },
 		Resolve: func(claim.Claim) (Policy, error) {
 			return Policy{Endpoint: u.srv.URL, Key: "server-key", IncludePrompts: true, IncludeToolContent: true}, nil
 		}})
@@ -351,44 +367,14 @@ func TestOutboxLossesStartOverAfterAQuietWindow(t *testing.T) {
 	t.Parallel()
 	o := outbox{dir: t.TempDir()}
 	start := time.Now()
-	o.recordLosses(3, 0, start)
-	o.recordLosses(0, 1, start.Add(time.Hour))
+	o.recordLosses(3, 0, 0, start)
+	o.recordLosses(0, 1, 0, start.Add(time.Hour))
 	if l, _ := ReadOutboxLosses(o.dir); l.Full != 3 || l.Expired != 1 {
 		t.Fatalf("losses = %+v, want both counted", l)
 	}
-	o.recordLosses(0, 2, start.Add(lossWindow+2*time.Hour))
+	o.recordLosses(0, 2, 0, start.Add(lossWindow+2*time.Hour))
 	if l, _ := ReadOutboxLosses(o.dir); l.Full != 0 || l.Expired != 2 {
 		t.Fatalf("losses = %+v, want only the new loss", l)
-	}
-}
-
-// Under a server key, an older terma's part at the head of one signal holds up no other: the
-// sender takes the oldest signal with a part the key may send.
-func TestABlockedSignalHoldsUpNoOtherUnderAServerKey(t *testing.T) {
-	t.Parallel()
-	u := newSignInUpstream(t)
-	dir := t.TempDir()
-	retired := time.Now()
-	rt := routeOf("", claim.Claim{ProjectID: "p1"})
-	span, _ := proto.Marshal(&tracepb.TracesData{ResourceSpans: []*tracepb.ResourceSpans{{ScopeSpans: []*tracepb.ScopeSpans{{
-		Spans: []*tracepb.Span{{Name: "old", Attributes: []*commonpb.KeyValue{kv("session.id", "old")}}}}}}}})
-	// The older terma's trace is the oldest part on the route; the key's log came after.
-	if err := (outbox{dir: dir}).put(rt, claim.Claim{}.Repository, newEntry(retired.Add(-time.Hour), Traces, 1), span); err != nil {
-		t.Fatal(err)
-	}
-	queueAt(t, dir, "", retired.Add(time.Minute))
-	r := newRelay(Options{Dir: dir, Token: token, SignIn: &testSignIn{},
-		Legacy: func() (string, time.Time) { return "ambiguous", retired },
-		Resolve: func(claim.Claim) (Policy, error) {
-			return Policy{Endpoint: u.srv.URL, Key: "server-key", IncludePrompts: true, IncludeToolContent: true}, nil
-		}})
-	ctx, cancel := context.WithCancel(context.Background())
-	done := make(chan struct{})
-	go func() { r.Run(ctx); close(done) }()
-	t.Cleanup(func() { cancel(); <-done })
-	waitForCounters(t, r, func(c map[string]int) bool { return c["forwarded.logs"] == 1 })
-	if c := r.Stats().Snapshot().Counters; c["forwarded.traces"] != 0 {
-		t.Fatalf("the older terma's trace left under the key: %v", c)
 	}
 }
 
@@ -434,59 +420,12 @@ func TestAnExportKeepsTheSignInItArrivedUnder(t *testing.T) {
 	}
 }
 
-// A part that arrived bound to no account before the older sign-ins were retired is theirs,
-// however long it waited in the hold: released after the retirement, it still leaves under
-// their account.
-func TestAHeldPartKeepsTheTimeItArrived(t *testing.T) {
-	t.Parallel()
-	u := newSignInUpstream(t)
-	signIn := &testSignIn{} // signed out
-	var mu sync.Mutex
-	policyReady := false
-	var retiredAt time.Time // no record yet
-	r := newRelay(Options{Dir: t.TempDir(), Token: token, Hold: time.Minute, SignIn: signIn,
-		Legacy: func() (string, time.Time) {
-			mu.Lock()
-			defer mu.Unlock()
-			return accountA, retiredAt
-		},
-		Lookup: func(string, time.Time) (claim.Claim, bool) { return claim.Claim{ProjectID: "p1"}, true },
-		Resolve: func(claim.Claim) (Policy, error) {
-			mu.Lock()
-			defer mu.Unlock()
-			if !policyReady {
-				return Policy{}, ErrNoKey
-			}
-			return Policy{Endpoint: u.srv.URL, IncludePrompts: true, IncludeToolContent: true}, nil
-		}})
-	ctx, cancel := context.WithCancel(context.Background())
-	done := make(chan struct{})
-	go func() { r.Run(ctx); close(done) }()
-	t.Cleanup(func() { cancel(); <-done })
-	srv := httptest.NewServer(r.Handler())
-	defer srv.Close()
-	post(t, srv, "/v1/logs", oneLog("held"), "application/x-protobuf", token, false)
-	time.Sleep(10 * time.Millisecond)
-	// A signs in, which retires the older sign-ins, A's own; then the policy arrives.
-	mu.Lock()
-	retiredAt, policyReady = time.Now(), true
-	mu.Unlock()
-	signIn.set(accountA)
-	time.Sleep(10 * time.Millisecond)
-	r.cache.expire(time.Now().Add(time.Hour))
-	r.sweep()
-	waitFor(t, func() bool { return len(u.requests()) == 1 })
-	if got := u.requests()[0]; got != "Bearer token-"+accountA+" p1" {
-		t.Fatalf("sent %q, want A's token", got)
-	}
-}
-
-// serverKeyRelay runs a relay on dir under a server key, the older sign-ins named no one
-// and retired at retired.
-func serverKeyRelay(t *testing.T, u *signInUpstream, dir string, retired time.Time) *Relay {
+// serverKeyRelay runs a relay on dir under a server key, what an older relay queued in
+// legacyOutbox(dir) taken in under the decision legacy.
+func serverKeyRelay(t *testing.T, u *signInUpstream, dir, legacy string) *Relay {
 	t.Helper()
 	r := newRelay(Options{Dir: dir, Token: token, SignIn: &testSignIn{},
-		Legacy: func() (string, time.Time) { return "ambiguous", retired },
+		LegacyDir: legacyOutbox(dir), LegacyOwner: func() string { return legacy },
 		Resolve: func(claim.Claim) (Policy, error) {
 			return Policy{Endpoint: u.srv.URL, Key: "server-key", IncludePrompts: true, IncludeToolContent: true}, nil
 		}})
@@ -497,32 +436,14 @@ func serverKeyRelay(t *testing.T, u *signInUpstream, dir string, retired time.Ti
 	return r
 }
 
-// An older terma's backlog longer than a batch, at the head of a signal, holds up none of
-// the key's own parts behind it.
-func TestALongBacklogHoldsUpNoKeysPartBehindIt(t *testing.T) {
-	t.Parallel()
-	u := newSignInUpstream(t)
-	dir := t.TempDir()
-	retired := time.Now()
-	for i := range maxMergeFiles + 1 {
-		queueAt(t, dir, "", retired.Add(-time.Hour+time.Duration(i)*time.Millisecond))
-	}
-	queueAt(t, dir, "", retired.Add(time.Minute))
-	r := serverKeyRelay(t, u, dir, retired)
-	waitForCounters(t, r, func(c map[string]int) bool { return c["forwarded.logs"] == 1 })
-}
-
-// A merged batch refused behind an older terma's part is sent again a part at a time: the
-// part blocked at the head does not stop the key's own parts going one by one.
-func TestARefusedBatchIsSentAPartAtATimePastABlockedHead(t *testing.T) {
+// A merged batch refused is sent again a part at a time.
+func TestARefusedBatchIsSentAPartAtATime(t *testing.T) {
 	t.Parallel()
 	u := newSignInUpstream(t, http.StatusBadRequest)
 	dir := t.TempDir()
-	retired := time.Now()
-	queueAt(t, dir, "", retired.Add(-time.Hour))
-	queueAt(t, dir, "", retired.Add(time.Minute))
-	queueAt(t, dir, "", retired.Add(2*time.Minute))
-	r := serverKeyRelay(t, u, dir, retired)
+	queueAt(t, dir, "", time.Now().Add(time.Minute))
+	queueAt(t, dir, "", time.Now().Add(2*time.Minute))
+	r := serverKeyRelay(t, u, dir, "")
 	waitForCounters(t, r, func(c map[string]int) bool { return c["forwarded.logs"] == 2 })
 	if n := len(u.requests()); n != 3 {
 		t.Fatalf("%d requests; want the refused batch, then each part alone", n)
