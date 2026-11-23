@@ -3,6 +3,33 @@
   "id": "gemini-2.5-flash",
   "steps": [
     {
+      "at": "2026-11-23T19:52:37.422535379Z",
+      "event": "changed",
+      "changes": [
+        {
+          "id": "docs/overview",
+          "category": "docs",
+          "op": "changed",
+          "path": [
+            "docs",
+            "overview"
+          ],
+          "title": "Model page changed (+3215 −45 chars)",
+          "impact": "informational",
+          "before": null,
+          "after": null,
+          "text_diff": "@@ -231,6 +231,207 @@\n \n     {% /section %}\n \n-  * [Pricing](/docs/pricing#gemini-2.5-flash)\n+  * See [Pricing](/docs/models/gemini-2.5-flash#pricing) below.\n {% /table %}\n+\n+## Pricing  {% id=\"pricing\" %}\n+\n+{% tabs %}\n+  {% tab title=\"Standard\" %}\n+  {% table %}\n+  * Feature\n+  * Free Tier\n+  * Paid Tier, per 1M tokens in USD\n+\n+  ---\n+\n+  * Input price\n+  * Free of charge\n+  * $0.30 (text / image / video)    \n+  $1.00 (audio)\n+\n+  ---\n+\n+  * Output price (including thinking tokens)\n+  * Free of charge\n+  * $2.50\n+\n+  ---\n+\n+  * Context caching price\n+  * Not available\n+  * $0.03 (text / image / video)    \n+  $0.1 (audio)    \n+  $1.00 / 1,000,000 tokens per hour (storage price)\n+\n+  ---\n+\n+  * Grounding with Google Search\n+  * Free of charge, up to 500 RPD (limit shared with Flash-Lite RPD)\n+  * 1,500 RPD (free, limit shared with Flash-Lite RPD), then $35 / 1,000\n+  grounded prompts\n+\n+  ---\n+\n+  * Grounding with Google Maps\n+  * 500 RPD\n+  * 1,500 RPD (free), then $25 / 1,000 grounded prompts\n+\n+  ---\n+\n+  * Used to improve our products\n+  * [Yes](/docs/terms)\n+  * [No](/docs/terms)\n+  {% /table %}\n+\n+  {% /tab %}\n+\n+  {% tab title=\"Batch\" %}\n+  {% table %}\n+  * Feature\n+  * Free Tier\n+  * Paid Tier, per 1M tokens in USD\n+\n+  ---\n+\n+  * Input price\n+  * Not available\n+  * $0.15 (text / image / video)    \n+  $0.50 (audio)\n+\n+  ---\n+\n+  * Output price (including thinking tokens)\n+  * Not available\n+  * $1.25\n+\n+  ---\n+\n+  * Context caching price\n+  * Not available\n+  * $0.03 (text / image / video)    \n+  $0.1 (audio)    \n+  $1.00 / 1,000,000 tokens per hour (storage price)\n+\n+  ---\n+\n+  * Grounding with Google Search\n+  * Not available\n+  * 1,500 RPD (free, limit shared with Flash-Lite RPD), then $35 / 1,000\n+  grounded prompts\n+\n+  ---\n+\n+  * Grounding with Google Maps\n+  * Not available\n+  * Not available\n+\n+  ---\n+\n+  * Used to improve our products\n+  * [Yes](/docs/terms)\n+  * [No](/docs/terms)\n+  {% /table %}\n+\n+  {% /tab %}\n+\n+  {% tab title=\"Flex\" %}\n+  {% table %}\n+  * Feature\n+  * Free Tier\n+  * Paid Tier, per 1M tokens in USD\n+\n+  ---\n+\n+  * Input price\n+  * Not available\n+  * $0.15 (text / image / video)    \n+  $0.50 (audio)\n+\n+  ---\n+\n+  * Output price (including thinking tokens)\n+  * Not available\n+  * $1.25\n+\n+  ---\n+\n+  * Context caching price\n+  * Not available\n+  * $0.03 (text / image / video)    \n+  $0.1 (audio)    \n+  $1.00 / 1,000,000 tokens per hour (storage price)\n+\n+  ---\n+\n+  * Grounding with Google Search\n+  * Not available\n+  * 1,500 RPD (free, limit shared with Flash-Lite RPD), then $35 / 1,000\n+  grounded prompts\n+\n+  ---\n+\n+  * Grounding with Google Maps\n+  * Not available\n+  * Not available\n+\n+  ---\n+\n+  * Used to improve our products\n+  * [Yes](/docs/terms)\n+  * [No](/docs/terms)\n+  {% /table %}\n+\n+  {% /tab %}\n+\n+  {% tab title=\"Priority\" %}\n+  {% table %}\n+  * Feature\n+  * Free Tier\n+  * Paid Tier, per 1M tokens in USD\n+\n+  ---\n+\n+  * Input price\n+  * Free of charge\n+  * $0.54 (text / image / video)    \n+  $1.80 (audio)\n+\n+  ---\n+\n+  * Output price (including thinking tokens)\n+  * Free of charge\n+  * $4.50\n+\n+  ---\n+\n+  * Context caching price\n+  * Not available\n+  * $0.054 (text / image / video)    \n+  $0.18 (audio)    \n+  $1.80 / 1,000,000 tokens per hour (storage price)\n+\n+  ---\n+\n+  * Grounding with Google Search\n+  * Free of charge, up to 500 RPD (limit shared with Flash-Lite RPD)\n+  * 1,500 RPD (free, limit shared with Flash-Lite RPD), then $35 / 1,000\n+  grounded prompts\n+\n+  ---\n+\n+  * Grounding with Google Maps\n+  * 500 RPD\n+  * 1,500 RPD (free), then $25 / 1,000 grounded prompts\n+\n+  ---\n+\n+  * Used to improve our products\n+  * [Yes](/docs/terms)\n+  * [No](/docs/terms)\n+  {% /table %}\n+\n+  {% /tab %}\n+\n+{% /tabs %}\n \n",
+          "stats": {
+            "added_chars": 3215,
+            "removed_chars": 45
+          },
+          "terma": null,
+          "source": null,
+          "documented": null
+        }
+      ]
+    },
+    {
       "at": "2026-11-16T14:58:16.292875039Z",
       "event": "changed",
       "changes": [
