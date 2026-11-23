@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"sync"
@@ -622,8 +623,68 @@ func TestMixedAsideEdgeCasesAndConcurrentRead(t *testing.T) {
 	}
 	close(stop)
 	wg.Wait()
-	if _, err := os.Stat(asidePath(pConc)); !os.IsNotExist(err) {
-		t.Fatalf("conc sidecar dir not cleaned after fold: err=%v", err)
+	// On Windows, a concurrent reader's open handle can prevent os.Remove(dir) until
+	// the next Prune, though all mark files inside must already be deleted.
+	if entries, err := os.ReadDir(asidePath(pConc)); !os.IsNotExist(err) && (runtime.GOOS != "windows" || err != nil || len(entries) > 0) {
+		t.Fatalf("conc sidecar dir not cleaned after fold: entries=%d err=%v", len(entries), err)
+	}
+
+	// 4b. Locked earlier-run KindMixed write folds into r1 without overwriting r2 at the tail;
+	// repeating it is idempotent (no duplicate placements, r0 is not evicted), an out-of-order
+	// earlier timestamp lowers Since in place without adding a duplicate, and a post-r2
+	// timestamp clamps Since to r2's start without affecting r2.
+	if !Write(dir, "locked-older-run", placed(KindRepository, "github.com/acme/core", "/src/core", "r0", 5), now.Add(-20*time.Minute)) {
+		t.Fatal("locked r0 write failed")
+	}
+	if !Write(dir, "locked-older-run", placed(KindRepository, "github.com/acme/api", "/src/api", "r1", 10), now.Add(-10*time.Minute)) {
+		t.Fatal("locked r1 write failed")
+	}
+	if !Write(dir, "locked-older-run", placed(KindRepository, "github.com/acme/web", "/src/web", "r2", 20), now.Add(-2*time.Minute)) {
+		t.Fatal("locked r2 write failed")
+	}
+	if !Write(dir, "locked-older-run", placed(KindMixed, "", "", "r1", 10), now.Add(-5*time.Minute)) {
+		t.Fatal("locked delayed r1 KindMixed write failed")
+	}
+	for i := range 10 {
+		if Write(dir, "locked-older-run", placed(KindMixed, "", "", "r1", 10), now.Add(time.Duration(i)*time.Second)) {
+			t.Fatalf("repeat %d of locked earlier-run KindMixed unexpectedly rewrote claim", i)
+		}
+	}
+	// Out-of-order earlier Mixed mark lowers Since in place without growing Placements.
+	if !Write(dir, "locked-older-run", placed(KindMixed, "", "", "r1", 10), now.Add(-7*time.Minute)) {
+		t.Fatal("out-of-order earlier r1 KindMixed write failed")
+	}
+	cLockedOld := mustRead(t, dir, "locked-older-run", now)
+	if cLockedOld.Evicted || len(cLockedOld.Placements) != 4 {
+		t.Fatalf("repeated/out-of-order earlier-run Mixed grew/evicted placements: evicted=%v len=%d", cLockedOld.Evicted, len(cLockedOld.Placements))
+	}
+	if got, ok := cLockedOld.At(10, now.Add(-6*time.Minute)); !ok || got.Kind != KindMixed || got.Run != "r1" {
+		t.Fatalf("r1 at lowered Since = %+v, %v; want KindMixed", got, ok)
+	}
+	if cLockedOld.Kind != KindRepository || cLockedOld.Run != "r2" {
+		t.Fatalf("latest run after locked earlier Mixed = %+v, want KindRepository for r2", cLockedOld)
+	}
+	if got, ok := cLockedOld.At(5, now.Add(-19*time.Minute)); !ok || got.Kind != KindRepository || got.Run != "r0" {
+		t.Fatalf("r0 after repeated earlier Mixed = %+v, %v; want KindRepository for r0", got, ok)
+	}
+	if got, ok := cLockedOld.At(10, now.Add(-4*time.Minute)); !ok || got.Kind != KindMixed || got.Run != "r1" {
+		t.Fatalf("r1 after locked earlier Mixed = %+v, %v; want KindMixed", got, ok)
+	}
+	if got, ok := cLockedOld.At(20, now); !ok || got.Kind != KindRepository || got.Run != "r2" {
+		t.Fatalf("r2 after locked earlier Mixed = %+v, %v; want KindRepository", got, ok)
+	}
+	// Post-r2 timestamp on an earlier run's first Mixed write clamps Since to r2's start.
+	if !Write(dir, "clamped-older-run", placed(KindRepository, "github.com/acme/api", "/src/api", "r1", 10), now.Add(-10*time.Minute)) ||
+		!Write(dir, "clamped-older-run", placed(KindRepository, "github.com/acme/web", "/src/web", "r2", 20), now.Add(-2*time.Minute)) ||
+		!Write(dir, "clamped-older-run", placed(KindMixed, "", "", "r1", 10), now) {
+		t.Fatal("clamped-older-run setup failed")
+	}
+	cClamped := mustRead(t, dir, "clamped-older-run", now)
+	if got, ok := cClamped.At(10, now.Add(-time.Minute)); !ok || got.Kind != KindMixed || got.Run != "r1" {
+		t.Fatalf("clamped r1 = %+v, %v; want KindMixed", got, ok)
+	}
+	if got, ok := cClamped.At(20, now); !ok || got.Kind != KindRepository || got.Run != "r2" {
+		t.Fatalf("clamped r2 = %+v, %v; want KindRepository", got, ok)
 	}
 
 	// 5. Out-of-order Since race: a same-run non-Mixed placement written at t10.1 after a

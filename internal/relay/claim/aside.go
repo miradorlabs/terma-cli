@@ -117,9 +117,11 @@ func applyAside(prev Claim, havePrev bool, marks []asideMark) (Claim, bool, bool
 			continue
 		}
 		sameRun := m.Run == "" || prev.Run == "" || m.Run == prev.Run
-		if !sameRun && foldEarlierRun(&prev, m) {
-			changed = true
-			continue
+		if !sameRun {
+			if matched, ch := foldEarlierRun(&prev, m); matched {
+				changed = changed || ch
+				continue
+			}
 		}
 		sameLane := sameRun && (m.Profile == "" || m.Profile == prev.Profile) && (m.Account == "" || m.Account == prev.Account)
 		claimedAt := prev.ClaimedAt
@@ -156,15 +158,17 @@ func applyAside(prev Claim, havePrev bool, marks []asideMark) (Claim, bool, bool
 	return prev, havePrev, changed
 }
 
-func poisonRun(pls []Placement, run string, since time.Time) {
+func poisonRun(pls []Placement, run string, since time.Time) bool {
+	hit := false
 	for i := range pls {
-		if (run == "" || pls[i].Run == "" || pls[i].Run == run) && !pls[i].Since.Before(since) {
-			pls[i].Kind, pls[i].ProjectID = KindMixed, ""
+		if (run == "" || pls[i].Run == "" || pls[i].Run == run) && !pls[i].Since.Before(since) && (pls[i].Kind != KindMixed || pls[i].ProjectID != "") {
+			pls[i].Kind, pls[i].ProjectID, hit = KindMixed, "", true
 		}
 	}
+	return hit
 }
 
-func foldEarlierRun(prev *Claim, m Claim) bool {
+func foldEarlierRun(prev *Claim, m Claim) (matched, changed bool) {
 	pls, idx := slices.Clone(prev.placements()), -1
 	for i := len(pls) - 1; i >= 0; i-- {
 		if pls[i].Run == m.Run {
@@ -173,11 +177,36 @@ func foldEarlierRun(prev *Claim, m Claim) bool {
 		}
 	}
 	if idx < 0 {
-		return false
+		return false, false
+	}
+	sameLane := (m.Profile == "" || pls[idx].Profile == m.Profile) && (m.Account == "" || pls[idx].Account == m.Account)
+	if pls[idx].Kind == KindMixed && sameLane {
+		mod := false
+		if m.ClaimedAt.Before(pls[idx].Since) {
+			mod = poisonRun(pls[:idx], m.Run, m.ClaimedAt)
+			since := m.ClaimedAt
+			if idx > 0 && since.Before(pls[idx-1].Since) {
+				since = pls[idx-1].Since
+			}
+			if since.Before(pls[idx].Since) {
+				pls[idx].Since, mod = since, true
+			}
+		}
+		if len(pls[idx].PIDs) > 0 {
+			if len(m.PIDs) == 0 {
+				pls[idx].PIDs, mod = nil, true
+			} else if !subset(m.PIDs, pls[idx].PIDs) {
+				pls[idx].PIDs, mod = merge(pls[idx].PIDs, m.PIDs), true
+			}
+		}
+		if mod {
+			prev.Placements = pls
+		}
+		return true, mod
 	}
 	poisonRun(pls[:idx+1], m.Run, m.ClaimedAt)
 	pids := slices.Clone(m.PIDs)
-	if len(m.PIDs) > 0 && (m.Profile == "" || pls[idx].Profile == m.Profile) && (m.Account == "" || pls[idx].Account == m.Account) {
+	if len(m.PIDs) > 0 && sameLane {
 		pids = merge(pls[idx].PIDs, m.PIDs)
 	}
 	since := m.ClaimedAt
@@ -192,7 +221,7 @@ func foldEarlierRun(prev *Claim, m Claim) bool {
 		pls, prev.Evicted = pls[len(pls)-maxPlacements:], true
 	}
 	prev.Placements = pls
-	return true
+	return true, true
 }
 
 func removeAside(claimPath string, files []string) {
@@ -200,7 +229,7 @@ func removeAside(claimPath string, files []string) {
 	for _, name := range files {
 		_ = os.Remove(filepath.Join(dir, name))
 	}
-	_ = os.Remove(dir) // succeeds only when empty
+	_ = os.Remove(dir)
 }
 
 func pruneAside(dir string, now time.Time) {
@@ -210,6 +239,6 @@ func pruneAside(dir string, now time.Time) {
 				_ = os.Remove(filepath.Join(dir, e.Name()))
 			}
 		}
-		_ = os.Remove(dir) // succeeds only when empty
+		_ = os.Remove(dir)
 	}
 }

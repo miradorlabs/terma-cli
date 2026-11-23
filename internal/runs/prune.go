@@ -55,8 +55,6 @@ func Prune(ctx context.Context, stateDir string, now time.Time, queued map[strin
 	pruneAliases(stateDir, now)
 }
 
-// pruneLedger removes path if unlocked, unqueued, and past retention (failing closed on
-// unreadable ledgers/sidecars for MixedRetention).
 func pruneLedger(stateDir, path string, now time.Time, queued map[string]bool) {
 	lock := path + ".lock"
 	unlock, err := flock.TryLock(lock)
@@ -89,8 +87,6 @@ func pruneLedger(stateDir, path string, now time.Time, queued map[string]bool) {
 	flock.Remove(lock, unlock)
 }
 
-// pruneAside removes the sidecar folder once its ledger is gone, unqueued, and past
-// MixedRetention; while the ledger exists, only stale temp files are cleaned.
 func pruneAside(stateDir, name string, now time.Time, queued map[string]bool) {
 	sessionID, ok := sessionOf(name)
 	if !ok {
@@ -98,23 +94,40 @@ func pruneAside(stateDir, name string, now time.Time, queued map[string]bool) {
 	}
 	dir := filepath.Join(stateDir, Dir, name)
 	if _, err := os.Lstat(filepath.Join(stateDir, Dir, sessionID+".json")); !errors.Is(err, fs.ErrNotExist) || queued[sessionID] {
-		if entries, err := os.ReadDir(dir); err == nil {
-			for _, e := range entries {
-				if info, err := e.Info(); err == nil && strings.HasPrefix(e.Name(), config.TempPrefix) && now.Sub(info.ModTime()) > Retention {
-					_ = os.Remove(filepath.Join(dir, e.Name()))
-				}
-			}
-		}
+		cleanAsideEntries(dir, now, Retention, true)
 		return
 	}
-	a, err := loadAside(dir)
-	if err == nil && now.Sub(a.last()) <= MixedRetention {
+	a, loadErr := loadAside(dir)
+	if loadErr == nil && now.Sub(a.last()) <= MixedRetention {
 		return
 	}
 	if info, err := os.Lstat(dir); err != nil || now.Sub(info.ModTime()) <= MixedRetention {
 		return
 	}
-	_ = os.RemoveAll(dir)
+	if loadErr == nil {
+		for _, f := range a.files {
+			_ = os.Remove(filepath.Join(dir, f))
+		}
+		cleanAsideEntries(dir, now, Retention, true)
+	} else {
+		cleanAsideEntries(dir, now, MixedRetention, false)
+	}
+	_ = os.Remove(dir) // succeeds only when empty
+}
+
+func cleanAsideEntries(dir string, now time.Time, age time.Duration, tempsOnly bool) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return
+	}
+	for _, e := range entries {
+		if tempsOnly && !strings.HasPrefix(e.Name(), config.TempPrefix) {
+			continue
+		}
+		if info, err := e.Info(); err == nil && now.Sub(info.ModTime()) > age {
+			_ = os.Remove(filepath.Join(dir, e.Name()))
+		}
+	}
 }
 
 func (l ledger) retention() time.Duration {
@@ -124,7 +137,6 @@ func (l ledger) retention() time.Duration {
 	return Retention
 }
 
-// pruneAliases removes alias files older than Retention whose session's ledger is gone.
 func pruneAliases(stateDir string, now time.Time) {
 	dir := filepath.Join(stateDir, Dir, aliasesDir)
 	entries, err := os.ReadDir(dir)

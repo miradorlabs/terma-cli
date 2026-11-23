@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/flock"
 )
 
@@ -179,6 +180,9 @@ func TestPruneKeepsASidecar(t *testing.T) {
 	must(t, MarkAside(dir, "kept", run, long))
 	must(t, MarkAside(dir, "alone", "", long))
 	must(t, MarkAside(dir, "expired", "", long.Add(-MixedRetention)))
+	staleTmp := filepath.Join(runs, "expired.mixed", config.TempPrefix+"stale")
+	must(t, os.WriteFile(staleTmp, []byte("{"), 0o600))
+	age(t, staleTmp, Retention+24*time.Hour)
 	for _, f := range []string{"kept.json", "kept.mixed", "alone.mixed"} {
 		age(t, filepath.Join(runs, f), Retention+24*time.Hour)
 	}

@@ -17,8 +17,7 @@ type MixedRun struct {
 	Recent  bool
 }
 
-// Mixed lists sessions whose run in force at now is Mixed (including sidecars and
-// unreadable ledgers, which fail closed as recent Mixed).
+// Mixed lists sessions whose run in force at now is Mixed (unreadable ledgers fail closed).
 func Mixed(stateDir string, now time.Time, recent time.Duration) []MixedRun {
 	entries, err := os.ReadDir(filepath.Join(stateDir, Dir))
 	if err != nil {

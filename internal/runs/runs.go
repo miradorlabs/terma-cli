@@ -1,10 +1,5 @@
-// Package runs is the run ledger: each session's runs, where each has been, and when each
-// became Mixed (crossed organizations). Hooks tell a crossing by it; the relay and delivery
-// recheck queued records against it. It outlives the session's claim, and sits outside
-// internal/relay so that delivery may import it.
-//
-// A run begins at a session start or resume. A subagent shares its session's runs (Alias).
-// Mixed only turns on, and only a new run ends it.
+// Package runs is the run ledger (outside internal/relay so delivery may import it).
+// Runs begin at session start/resume; Mixed only turns on and only a new run ends it.
 package runs
 
 import (
@@ -18,8 +13,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/session"
 )
 
-// Ledger paths, retention windows (15d outlives 14d spool/outbox plus skew; 90d for Mixed),
-// refresh cadence, and lock bounds.
+// Ledger paths, retention windows (15d outlives 14d spool/outbox plus skew; 90d for Mixed), and lock bounds.
 const (
 	Dir, aliasesDir = "runs", "aliases"
 	Retention       = 15 * 24 * time.Hour
@@ -86,7 +80,6 @@ type run struct {
 	Locations []string  `json:"locations,omitempty"`
 }
 
-// why is why r turned Mixed: Crossed for a mark that records no reason.
 func (r run) why() Why {
 	if r.MixedWhy.Reason == "" {
 		return Why{Reason: Crossed, Where: r.MixedWhy.Where}
@@ -94,16 +87,13 @@ func (r run) why() Why {
 	return r.MixedWhy
 }
 
-// mark makes r Mixed at at for why, unless it already is from no later: the earlier mark
-// wins, with its reason.
 func (r *run) mark(at time.Time, why Why) {
 	if at = at.UTC(); r.MixedAt.IsZero() || at.Before(r.MixedAt) {
 		r.MixedAt, r.MixedWhy = at, why
 	}
 }
 
-// Start records a new run of sessionID beginning at at (a session start or resume) and
-// returns its ID. The new run is not Mixed and has been nowhere.
+// Start records a new clean run of sessionID beginning at at and returns its ID.
 func Start(stateDir, sessionID string, at time.Time) (string, error) {
 	id, err := newRunID()
 	if err != nil {
@@ -119,8 +109,7 @@ func Start(stateDir, sessionID string, at time.Time) (string, error) {
 	return id, nil
 }
 
-// Alias records that alias, a subagent ID its telemetry may name, shares sessionID's runs,
-// so MixedAt answers for it too.
+// Alias records that alias (e.g. a subagent ID) shares sessionID's runs.
 func Alias(stateDir, sessionID, alias string) error {
 	if !session.ValidID(alias) {
 		return fmt.Errorf("runs: invalid alias %q", alias)
@@ -143,9 +132,7 @@ func Alias(stateDir, sessionID, alias string) error {
 	})
 }
 
-// MarkMixed records that sessionID's current run became Mixed at at, for why; an earlier
-// time wins, with its reason. With no run recorded yet, it starts one that covers every
-// earlier record.
+// MarkMixed marks sessionID's current run Mixed at at (earlier time wins); starts one if absent.
 func MarkMixed(stateDir, sessionID string, at time.Time, why Why) error {
 	id, err := newRunID()
 	if err != nil {
@@ -160,10 +147,7 @@ func MarkMixed(stateDir, sessionID string, at time.Time, why Why) error {
 	})
 }
 
-// Touch adds locations to sessionID's run runID (the current run when runID is empty or
-// unknown), writing only when one is new; with no run recorded it starts one. It returns
-// all the run's locations, read under the write lock: those another hook recorded since
-// this one read the ledger included.
+// Touch adds locations to runID (or current run) and returns all locations under the write lock.
 func Touch(stateDir, sessionID, runID string, locations []string) ([]string, error) {
 	if len(locations) == 0 {
 		return nil, nil
@@ -171,8 +155,7 @@ func Touch(stateDir, sessionID, runID string, locations []string) ([]string, err
 	return touchWith(lockedEdit, stateDir, sessionID, runID, locations)
 }
 
-// TryTouch is Touch only if the ledger's lock is free now: it never waits. With no location
-// to add, it still folds the sidecar in (MarkAside).
+// TryTouch is Touch only if the lock is immediately free; also folds any sidecar marks.
 func TryTouch(stateDir, sessionID, runID string, locations []string) ([]string, error) {
 	return touchWith(tryEdit, stateDir, sessionID, runID, locations)
 }
@@ -225,24 +208,19 @@ func touchWith(edit func(stateDir, sessionID string, edit func(path string, l *l
 	return merged, nil
 }
 
-// MixedAt reports whether the run of idOrAlias (a session or one of its aliases) in force
-// at recordTime is Mixed, and since when: the caller drops a record from then on. The run
-// in force is the latest to begin by recordTime; an older record's is the earliest, and
-// one with no time the current. An unreadable ledger is Mixed from the start; none, never.
+// MixedAt reports whether the run of idOrAlias in force at recordTime is Mixed and since when.
+// Unreadable ledgers count as Mixed from the start; missing ledgers never do.
 func MixedAt(stateDir, idOrAlias string, recordTime time.Time) (time.Time, bool) {
 	return Read(stateDir, idOrAlias).MixedAt(recordTime)
 }
 
-// Snapshot is one read of a session's ledger (Read), for a caller asking MixedAt of many
-// records, as the relay's queue recheck does.
+// Snapshot is one read of a session's ledger (Read) for repeated MixedAt checks.
 type Snapshot struct {
-	runs []run
-	// unreadable: the ledger could not be read, so every record counts as Mixed.
+	runs       []run
 	unreadable bool
 }
 
-// Read reads the ledger of idOrAlias, a session ID or one of its aliases, once, with its
-// sidecar (MarkAside).
+// Read reads idOrAlias's ledger once along with any sidecar marks (MarkAside).
 func Read(stateDir, idOrAlias string) Snapshot {
 	if !session.ValidID(idOrAlias) {
 		return Snapshot{}
@@ -266,8 +244,7 @@ func (s Snapshot) MixedAt(recordTime time.Time) (time.Time, bool) {
 	return r.MixedAt, !r.MixedAt.IsZero()
 }
 
-// Why is why the run in force at recordTime is Mixed (MixedAt): zero for one that is not,
-// and for a ledger that cannot be read.
+// Why returns why the run in force at recordTime is Mixed (zero if not or unreadable).
 func (s Snapshot) Why(recordTime time.Time) Why {
 	if s.unreadable || len(s.runs) == 0 {
 		return Why{}
@@ -278,14 +255,13 @@ func (s Snapshot) Why(recordTime time.Time) Why {
 	return Why{}
 }
 
-// Current is the run idOrAlias is in now, the latest to begin; false when none is recorded
-// or the ledger cannot be read.
+// Current returns idOrAlias's current run ID, or false if unrecorded or unreadable.
 func Current(stateDir, idOrAlias string) (string, bool) {
 	p, ok := Locate(stateDir, idOrAlias)
 	return p.Run, ok
 }
 
-// Locations is Current with the locations that run was placed in or seen touching (Touch).
+// Locations returns Current along with the locations that run has been placed in or touched.
 func Locations(stateDir, idOrAlias string) (run string, locations []string, ok bool) {
 	p, ok := Locate(stateDir, idOrAlias)
 	return p.Run, p.Locations, ok
@@ -301,8 +277,7 @@ type Position struct {
 	Aliases   []string
 }
 
-// Locate reads the ledger once for what a hook needs (current run, locations, Mixed/sidecar
-// state, activity, and aliases).
+// Locate reads the ledger once for a hook's current run, locations, Mixed/sidecar state, and aliases.
 func Locate(stateDir, idOrAlias string) (Position, bool) {
 	if !session.ValidID(idOrAlias) {
 		return Position{}, false

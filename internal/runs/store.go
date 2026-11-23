@@ -119,7 +119,6 @@ func load(path string) (ledger, bool, error) {
 	return l, true, nil
 }
 
-// save writes l durably: a crossing recorded here must survive a crash.
 func save(path string, l *ledger) error {
 	b, err := json.Marshal(l)
 	if err != nil {

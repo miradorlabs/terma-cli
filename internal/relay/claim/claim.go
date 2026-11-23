@@ -185,19 +185,12 @@ func path(dir, sessionID string) (string, bool) {
 	return filepath.Join(Dir(dir), claimsDir, sessionID+".json"), true
 }
 
-// lockWait caps the wait for the claim's lock; if the lock cannot be had, non-Mixed
-// writes back off and KindMixed writes record into the lock-free .mixed sidecar so an
-// active non-Mixed lock holder can never overwrite a Mixed transition. A variable so a
-// loaded machine cannot decide a test.
+// lockWait caps lock waits; on timeout, KindMixed falls back to the lock-free .mixed sidecar.
 var lockWait = 250 * time.Millisecond
 
-// Write merges c into sessionID's claim under the state directory dir, unless a fresh one already names its processes,
-// and reports whether it wrote; a hook never fails for want of a claim. The merge runs
-// under a sidecar lock: unlocked, 14 of 16 concurrent writers' processes were lost.
-// c names a project (which requires an Account), or, with a Kind, may name a location alone.
-// Once the latest placement is Mixed, a write of another kind replaces it only for a new run,
-// and never when the lock could not be had. KindMixed clears ProjectID so a Mixed claim can
-// never route to a project; the runs ledger remains authoritative for Mixed state.
+// Write merges c into sessionID's claim under dir and reports whether it wrote.
+// c names a project (requiring an Account) or, with a Kind, a location alone. KindMixed
+// clears ProjectID and cannot be replaced within the same run; the runs ledger remains authoritative.
 func Write(dir, sessionID string, c Claim, now time.Time) bool {
 	if c.ProjectID == "" && c.Kind == "" {
 		return false
@@ -211,9 +204,7 @@ func Write(dir, sessionID string, c Claim, now time.Time) bool {
 	return write(dir, sessionID, c, now)
 }
 
-// Mark records that sessionID runs, under processes pids, where its team does not collect,
-// so the relay drops what those processes send from now on instead of holding it. The
-// placement names no project and no repository; earlier placements keep their records.
+// Mark records that sessionID runs under pids where its team does not collect.
 func Mark(dir, sessionID, tool string, pids []int, now time.Time) bool {
 	return write(dir, sessionID, Claim{Tool: tool, PIDs: pids}, now)
 }
@@ -227,8 +218,6 @@ func write(dir, sessionID string, c Claim, now time.Time) bool {
 	if !ok {
 		return false
 	}
-	// The fast path needs no lock when no sidecar marks are pending and a fresh claim
-	// already names these processes.
 	if asideMarks, _ := loadAside(p, now); len(asideMarks) == 0 {
 		if prev, ok := read(p); ok && samePlace(prev, c) && sameDirs(prev, c) && sameParent(prev, c) && subset(c.PIDs, prev.PIDs) && sameRun(prev, c) {
 			if info, err := os.Stat(p); err == nil && now.Sub(info.ModTime()) < refresh {
@@ -244,7 +233,6 @@ func write(dir, sessionID string, c Claim, now time.Time) bool {
 	cancel()
 	if err != nil {
 		if c.Kind == KindMixed {
-			// Record in the lock-free sidecar so an active lock holder cannot overwrite it.
 			return writeMixedAside(p, c, now)
 		}
 		return false
@@ -263,6 +251,20 @@ func write(dir, sessionID string, c Claim, now time.Time) bool {
 			removeAside(p, asideFiles)
 		}
 		return false
+	}
+	if havePrev && c.Kind == KindMixed && c.Run != "" && prev.Run != "" && c.Run != prev.Run {
+		c.ClaimedAt = now
+		if matched, ch := foldEarlierRun(&prev, c); matched {
+			if ch || folded {
+				if data, err := json.Marshal(prev); err != nil || config.WriteFileAtomicNoSync(p, data, 0o600) != nil {
+					return false
+				}
+			}
+			if len(asideFiles) > 0 {
+				removeAside(p, asideFiles)
+			}
+			return ch || folded
+		}
 	}
 	if havePrev && c.Parent == "" {
 		c.Parent = prev.Parent
@@ -320,11 +322,7 @@ func write(dir, sessionID string, c Claim, now time.Time) bool {
 	return true
 }
 
-// samePlace reports whether c continues prev's latest run, under the same sign-in and
-// profile. Another working tree of the same repository, or another directory in it, is
-// the same run, whose Root and Cwd are rewritten in place: a placement decides where
-// records go, and a session switching between worktrees must never push an earlier one
-// out. A resume naming another run, or another directory outside git, is another place.
+// samePlace reports whether c continues prev's latest run under the same lane.
 func samePlace(prev, c Claim) bool {
 	if prev.Kind != c.Kind || prev.ProjectID != c.ProjectID || prev.Repository != c.Repository || prev.Profile != c.Profile || prev.Account != c.Account {
 		return false
@@ -335,15 +333,9 @@ func samePlace(prev, c Claim) bool {
 	return c.Kind != KindOutsideGit || prev.Cwd == c.Cwd
 }
 
-// sameRun reports whether c names no run or prev's, so a fresh claim needs no rewrite.
-func sameRun(prev, c Claim) bool {
-	return c.Run == "" || c.Run == prev.Run
-}
+func sameRun(prev, c Claim) bool { return c.Run == "" || c.Run == prev.Run }
 
-// staysMixed reports whether c must not replace prev's latest placement because it is
-// Mixed: Mixed only turns on within a run. Only a write naming another run, made under
-// the lock, may replace it. A write naming no run cannot tell whether its run is new, and
-// one made without the lock could undo a crossing a concurrent hook is recording.
+// staysMixed holds prev's Mixed tail unless a locked write names another run.
 func staysMixed(prev, c Claim, locked bool) bool {
 	if prev.Kind != KindMixed || c.Kind == KindMixed {
 		return false
@@ -351,18 +343,12 @@ func staysMixed(prev, c Claim, locked bool) bool {
 	return !locked || c.Run == "" || c.Run == prev.Run
 }
 
-// sameDirs reports whether c names the working tree, directory, worktree, remote and branch
-// prev does, so a fresh claim needs no rewrite: a checkout of another branch in the same tree
-// is told at the next hook. A claim naming no directory (a git hook's) keeps prev's.
 func sameDirs(prev, c Claim) bool {
 	return prev.Root == c.Root && (c.Cwd == "" || prev.Cwd == c.Cwd) &&
 		prev.Worktree == c.Worktree && prev.Remote == c.Remote && prev.Branch == c.Branch
 }
 
-// sameParent reports whether c names the parent prev does, or none, which keeps prev's.
-func sameParent(prev, c Claim) bool {
-	return c.Parent == "" || c.Parent == prev.Parent
-}
+func sameParent(prev, c Claim) bool { return c.Parent == "" || c.Parent == prev.Parent }
 
 func subset(a, b []int) bool {
 	for _, v := range a {

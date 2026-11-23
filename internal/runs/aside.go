@@ -67,9 +67,7 @@ func MarkAside(stateDir, sessionID, runID string, at time.Time) error {
 	return err
 }
 
-// apply marks l's runs Mixed as a's marks say, an earlier time winning: each mark's run, or
-// the current one when the ledger does not know it, as MarkMixed marks it; with no run
-// recorded, one that covers every earlier record.
+// apply marks l's runs Mixed per a's marks (earlier time wins).
 func (a aside) apply(l *ledger) {
 	for _, m := range a.marks {
 		i := slices.IndexFunc(l.Runs, func(r run) bool { return r.ID == m.Run })
@@ -85,7 +83,6 @@ func (a aside) apply(l *ledger) {
 	}
 }
 
-// last is a's latest mark's time; zero for none.
 func (a aside) last() time.Time {
 	var out time.Time
 	for _, m := range a.marks {
@@ -94,9 +91,7 @@ func (a aside) last() time.Time {
 	return out
 }
 
-// fold takes sessionID's sidecar into l, the ledger at path that the caller holds the lock
-// of, saves it, and only then removes the marks it took: a mark written meanwhile is a file
-// of its own, and stays for the next fold.
+// fold saves sessionID's sidecar marks into the locked ledger before removing them.
 func fold(stateDir, sessionID, path string, l *ledger) error {
 	dir, err := asideDir(stateDir, sessionID)
 	if err != nil {
@@ -119,7 +114,6 @@ func fold(stateDir, sessionID, path string, l *ledger) error {
 	return nil
 }
 
-// readAside is sessionID's sidecar, for a read, which takes it before the ledger.
 func readAside(stateDir, sessionID string) (aside, error) {
 	dir, err := asideDir(stateDir, sessionID)
 	if err != nil {
@@ -135,9 +129,6 @@ func asideDir(stateDir, sessionID string) (string, error) {
 	return filepath.Join(stateDir, Dir, sessionID+asideExt), nil
 }
 
-// loadAside reads the marks in the sidecar dir, skipping a write under way and a mark a
-// fold removed since the folder was listed, which that fold saved in the ledger first. One
-// that cannot be read is an error, as an unreadable ledger is.
 func loadAside(dir string) (aside, error) {
 	entries, err := os.ReadDir(dir)
 	if errors.Is(err, fs.ErrNotExist) {
