@@ -405,9 +405,6 @@ func TestAntigravityStatusLineUnreadableFileAfterSetup(t *testing.T) {
 // it, with the developer's own status line behind it.
 func TestAntigravityStatusLineUnreadableFileKeepsTheRecord(t *testing.T) {
 	a, path := statusLineHome(t)
-	if os.Geteuid() == 0 {
-		t.Skip("root reads a file of any mode")
-	}
 	writeSettings(t, path, agySettings)
 	if _, err := a.InstallStatusLine(); err != nil {
 		t.Fatal(err)
@@ -416,6 +413,9 @@ func TestAntigravityStatusLineUnreadableFileKeepsTheRecord(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = os.Chmod(path, 0o600) })
+	if _, err := os.ReadFile(path); err == nil {
+		t.Skip("this user reads a file of any mode")
+	}
 	if _, err := a.RemoveStatusLine(); err == nil || !strings.Contains(err.Error(), path) {
 		t.Fatalf("remove: %v", err)
 	}
