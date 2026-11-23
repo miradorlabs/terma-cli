@@ -15,40 +15,27 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/session"
 )
 
-// A crossing a hook could not write to the ledger (its lock held past lockWait, or the write
-// failed) is recorded beside it without the lock, in the session's sidecar: runs/<session>.mixed,
-// a folder of marks, each a run and when it became Mixed, in a file of its own written
-// atomically, so that hooks marking at once never lose one another's. It never expires. Every
-// read of the ledger takes it for Mixed (Read, Locate, MixedAt, Mixed); the next edit under
-// the ledger's lock folds it in and removes it (fold); Prune keeps it while it keeps the
-// ledger, and one with no ledger for MixedRetention past its last mark.
-//
-// A read takes the sidecar before the ledger, and a fold saves the ledger before it removes
-// what it folded: so a read that runs alongside a fold finds every mark in one or the other.
+// Crossings a hook could not write under the ledger lock are written lock-free to
+// runs/<session>.mixed/<id>.json. Unlike claim sidecars, runs sidecars never expire;
+// Prune keeps them with their ledger and for MixedRetention after their last mark. Reads
+// check the sidecar before the ledger, and folds save the ledger before removing marks.
+const (
+	asideExt    = ".mixed"
+	asideWrites = 3 // retries if a concurrent fold removed the emptied sidecar directory
+)
 
-// asideExt ends a sidecar's name.
-const asideExt = ".mixed"
-
-// aside is a session's sidecar, as read.
 type aside struct {
 	marks []mark
-	// files are the marks' file names, for fold to remove.
-	files []string
+	files []string // file names for fold to remove
 }
 
-// mark is a crossing recorded aside: its run, and when that run became Mixed.
 type mark struct {
 	Run string    `json:"run"`
 	At  time.Time `json:"at"`
 }
 
-// asideWrites bounds MarkAside's attempts: a fold may remove the emptied folder between
-// the attempt's making it and writing there.
-const asideWrites = 3
-
-// MarkAside records in sessionID's sidecar, without the ledger's lock, that its run runID
-// became Mixed at at, for a crossing MarkMixed could not record; its reason is Aside. With no run ID (the ledger
-// names none) it names a new run that covers every earlier record, as MarkMixed would start.
+// MarkAside records a lock-free Mixed mark for sessionID/runID with reason Aside; an
+// empty runID allocates a new run covering all earlier records, matching MarkMixed.
 func MarkAside(stateDir, sessionID, runID string, at time.Time) error {
 	dir, err := asideDir(stateDir, sessionID)
 	if err != nil {

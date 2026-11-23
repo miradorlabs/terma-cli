@@ -2,6 +2,7 @@ package runs
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -436,5 +437,66 @@ func TestAMixedMarkRecordsWhy(t *testing.T) {
 	must(t, os.WriteFile(filepath.Join(dir, Dir, "bad.json"), []byte("{"), 0o600))
 	if got := Read(dir, "bad").Why(time.Time{}); got != (Why{}) {
 		t.Fatalf("an unreadable ledger: Why = %+v", got)
+	}
+}
+
+// A run holds at most MaxLocations distinct locations: up to MaxLocations (and repeats of
+// them) stays non-Mixed, and the next distinct location caps the slice and marks the run
+// Mixed with LocationBound.
+func TestTouchEnforcesMaxLocations(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	r := start(t, dir, "bounded", t0)
+
+	locs := make([]string, MaxLocations)
+	for i := range locs {
+		locs[i] = fmt.Sprintf("github.com/acme/r%02d", i)
+	}
+	got := touch(t, dir, "bounded", r, locs)
+	if len(got) != MaxLocations {
+		t.Fatalf("len(Locations) = %d, want %d", len(got), MaxLocations)
+	}
+	if _, mixed := mixedAt(t, dir, "bounded", time.Now()); mixed {
+		t.Fatal("run marked Mixed at exactly MaxLocations")
+	}
+	// Repeating already-known locations must not trigger LocationBound.
+	got = touch(t, dir, "bounded", r, []string{locs[0], locs[MaxLocations-1]})
+	if len(got) != MaxLocations {
+		t.Fatalf("len(Locations) after repeats = %d, want %d", len(got), MaxLocations)
+	}
+	if _, mixed := mixedAt(t, dir, "bounded", time.Now()); mixed {
+		t.Fatal("run marked Mixed after repeating known locations")
+	}
+	// The (MaxLocations+1)th distinct location caps the slice and marks Mixed(LocationBound).
+	got = touch(t, dir, "bounded", r, []string{"github.com/acme/overflow"})
+	if len(got) != MaxLocations {
+		t.Fatalf("len(Locations) after overflow = %d, want %d", len(got), MaxLocations)
+	}
+	snap := Read(dir, "bounded")
+	if _, mixed := snap.MixedAt(time.Time{}); !mixed {
+		t.Fatal("run was not marked Mixed after exceeding MaxLocations")
+	}
+	if why := snap.Why(time.Time{}); why != (Why{Reason: LocationBound}) {
+		t.Fatalf("Why = %+v, want LocationBound", why)
+	}
+
+	// One batch that crosses MaxLocations keeps MaxLocations and marks Mixed(LocationBound).
+	rBatch := start(t, dir, "batch", t0)
+	touch(t, dir, "batch", rBatch, locs[:MaxLocations-1])
+	got = touch(t, dir, "batch", rBatch, []string{"github.com/acme/b1", "github.com/acme/b2", "github.com/acme/b3"})
+	if len(got) != MaxLocations {
+		t.Fatalf("batch overflow len = %d, want %d", len(got), MaxLocations)
+	}
+	if why := Read(dir, "batch").Why(time.Time{}); why != (Why{Reason: LocationBound}) {
+		t.Fatalf("batch overflow Why = %+v, want LocationBound", why)
+	}
+
+	// A run already Mixed with Crossed preserves that reason when it later hits MaxLocations.
+	rCrossed := start(t, dir, "crossed-bound", t0)
+	must(t, MarkMixed(dir, "crossed-bound", t0.Add(time.Minute), Why{Reason: Crossed, Where: "github.com/other/repo"}))
+	touch(t, dir, "crossed-bound", rCrossed, locs)
+	touch(t, dir, "crossed-bound", rCrossed, []string{"github.com/acme/overflow"})
+	if why := Read(dir, "crossed-bound").Why(time.Time{}); why != (Why{Reason: Crossed, Where: "github.com/other/repo"}) {
+		t.Fatalf("already-Crossed run Why = %+v, want Crossed preserved", why)
 	}
 }

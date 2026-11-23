@@ -2,23 +2,11 @@ package claim
 
 import "time"
 
-// At is the claim as it applies to a record pid sent at time at: the placement covering
-// pid that was in force when the record was made, whose ProjectID it carries, empty for
-// one Mark wrote. False when no placement is known to cover the record.
-//
-// Among the placements covering pid, the latest to start by at is in force. A record
-// older than all of them is the first export racing the session's first hook, and takes
-// the earliest. A legacy claim, whose placements have no kind, is read that way alone,
-// and a record without a time takes the latest placement.
-//
-// A claim with kinds follows the routing rules as well:
-//   - once a placement has been evicted, a record older than every covering placement
-//     kept is not covered, since it may be the evicted one's;
-//   - a record without a time takes the latest covering placement only if none has been
-//     evicted and every covering placement has the same Kind, Repository, Profile,
-//     Account, and Run, so the time could not have chosen another location, profile,
-//     lane, or run (two KindOutsideGit directories in the same run route alike);
-//     otherwise it is not covered.
+// At returns the claim placement covering pid at time at (empty ProjectID for Mark, false
+// if uncovered). Legacy claims pick the latest covering placement <= at (or earliest if
+// older, latest if untimed). Kinded claims refuse records older than all kept placements
+// once Evicted, and refuse untimed records unless Evicted is false and every covering
+// placement shares the same Kind, Repository, Profile, Account, and Run.
 func (c Claim) At(pid int, at time.Time) (Claim, bool) {
 	all := c.placements()
 	var covering []*Placement

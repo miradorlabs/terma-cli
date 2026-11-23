@@ -186,8 +186,9 @@ func path(dir, sessionID string) (string, bool) {
 }
 
 // lockWait caps the wait for the claim's lock; if the lock cannot be had, non-Mixed
-// writes back off so they can never overwrite a concurrent KindMixed write, while a
-// KindMixed write still lands unlocked. A variable so a loaded machine cannot decide a test.
+// writes back off and KindMixed writes record into the lock-free .mixed sidecar so an
+// active non-Mixed lock holder can never overwrite a Mixed transition. A variable so a
+// loaded machine cannot decide a test.
 var lockWait = 250 * time.Millisecond
 
 // Write merges c into sessionID's claim under the state directory dir, unless a fresh one already names its processes,
@@ -226,10 +227,13 @@ func write(dir, sessionID string, c Claim, now time.Time) bool {
 	if !ok {
 		return false
 	}
-	// The fast path needs no lock: a fresh claim already naming these processes.
-	if prev, ok := read(p); ok && samePlace(prev, c) && sameDirs(prev, c) && sameParent(prev, c) && subset(c.PIDs, prev.PIDs) && sameRun(prev, c) {
-		if info, err := os.Stat(p); err == nil && now.Sub(info.ModTime()) < refresh {
-			return false
+	// The fast path needs no lock when no sidecar marks are pending and a fresh claim
+	// already names these processes.
+	if asideMarks, _ := loadAside(p, now); len(asideMarks) == 0 {
+		if prev, ok := read(p); ok && samePlace(prev, c) && sameDirs(prev, c) && sameParent(prev, c) && subset(c.PIDs, prev.PIDs) && sameRun(prev, c) {
+			if info, err := os.Stat(p); err == nil && now.Sub(info.ModTime()) < refresh {
+				return false
+			}
 		}
 	}
 	if err := os.MkdirAll(filepath.Dir(p), 0o700); err != nil {
@@ -238,16 +242,26 @@ func write(dir, sessionID string, c Claim, now time.Time) bool {
 	ctx, cancel := context.WithTimeout(context.Background(), lockWait)
 	unlock, err := flock.Lock(ctx, p+".lock")
 	cancel()
-	locked := err == nil
-	if locked {
-		defer unlock()
-	} else if c.Kind != KindMixed {
-		// Never risk overwriting a concurrent Mixed write without holding the lock.
+	if err != nil {
+		if c.Kind == KindMixed {
+			// Record in the lock-free sidecar so an active lock holder cannot overwrite it.
+			return writeMixedAside(p, c, now)
+		}
 		return false
 	}
+	defer unlock()
 	now = now.UTC()
+	asideMarks, asideFiles := loadAside(p, now)
 	prev, havePrev := read(p)
-	if havePrev && staysMixed(prev, c, locked) {
+	prev, havePrev, folded := applyAside(prev, havePrev, asideMarks)
+	if havePrev && staysMixed(prev, c, true) {
+		if folded {
+			if data, err := json.Marshal(prev); err == nil && config.WriteFileAtomicNoSync(p, data, 0o600) == nil {
+				removeAside(p, asideFiles)
+			}
+		} else if len(asideFiles) > 0 {
+			removeAside(p, asideFiles)
+		}
 		return false
 	}
 	if havePrev && c.Parent == "" {
@@ -257,8 +271,13 @@ func write(dir, sessionID string, c Claim, now time.Time) bool {
 	switch {
 	case !havePrev:
 	case samePlace(prev, c):
-		if info, err := os.Stat(p); err == nil && now.Sub(info.ModTime()) < refresh && sameDirs(prev, c) && sameParent(prev, c) && subset(c.PIDs, prev.PIDs) && sameRun(prev, c) {
-			return false
+		if !folded {
+			if info, err := os.Stat(p); err == nil && now.Sub(info.ModTime()) < refresh && sameDirs(prev, c) && sameParent(prev, c) && subset(c.PIDs, prev.PIDs) && sameRun(prev, c) {
+				if len(asideFiles) > 0 {
+					removeAside(p, asideFiles)
+				}
+				return false
+			}
 		}
 		c.PIDs = merge(prev.PIDs, c.PIDs)
 		if c.Tool == "" {
@@ -292,7 +311,13 @@ func write(dir, sessionID string, c Claim, now time.Time) bool {
 	if err != nil {
 		return false
 	}
-	return config.WriteFileAtomicNoSync(p, data, 0o600) == nil
+	if config.WriteFileAtomicNoSync(p, data, 0o600) != nil {
+		return false
+	}
+	if len(asideFiles) > 0 {
+		removeAside(p, asideFiles)
+	}
+	return true
 }
 
 // samePlace reports whether c continues prev's latest run, under the same sign-in and
@@ -363,16 +388,21 @@ func merge(old, add []int) []int {
 }
 
 // Read returns sessionID's claim under the state directory dir if written less than TTL ago.
+// It inspects the .mixed sidecar before reading the claim file so a concurrent fold
+// (which saves the claim file before removing sidecar entries) never hides a Mixed mark.
 func Read(dir, sessionID string, now time.Time) (Claim, bool) {
 	p, ok := path(dir, sessionID)
 	if !ok {
 		return Claim{}, false
 	}
-	info, err := os.Stat(p)
-	if err != nil || now.Sub(info.ModTime()) >= TTL {
-		return Claim{}, false
+	marks, _ := loadAside(p, now)
+	var c Claim
+	var have bool
+	if info, err := os.Stat(p); err == nil && now.Sub(info.ModTime()) < TTL {
+		c, have = read(p)
 	}
-	return read(p)
+	merged, ok, _ := applyAside(c, have, marks)
+	return merged, ok
 }
 
 func read(p string) (Claim, bool) {
@@ -396,16 +426,20 @@ func Prune(dir string, now time.Time) {
 		return
 	}
 	for _, e := range entries {
+		p := filepath.Join(claims, e.Name())
+		if e.IsDir() && strings.HasSuffix(p, asideExt) {
+			pruneAside(p, now)
+			continue
+		}
 		info, err := e.Info()
 		if err != nil || now.Sub(info.ModTime()) < TTL {
 			continue
 		}
-		path := filepath.Join(claims, e.Name())
-		if !strings.HasSuffix(path, ".lock") {
-			_ = os.Remove(path)
-		} else if unlock, err := flock.TryLock(path); err == nil {
+		if !strings.HasSuffix(p, ".lock") {
+			_ = os.Remove(p)
+		} else if unlock, err := flock.TryLock(p); err == nil {
 			// A lock's time is its creation, so an old one may still be in use.
-			flock.Remove(path, unlock)
+			flock.Remove(p, unlock)
 		}
 	}
 }

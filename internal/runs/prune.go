@@ -14,12 +14,9 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/flock"
 )
 
-// Prune removes each ledger idle past its retention that no queued record names, with its
-// lock and the alias files naming it, and what a crash left. A sidecar (MarkAside) goes only
-// once its ledger has, MixedRetention after its last mark. queued are the session and
-// subagent IDs records in the spool and the relay outbox name. A ledger whose lock is held
-// waits for the next prune. The relay runs it hourly, and teardown once both queues are gone.
-// It stops at the next file once ctx ends, as the relay does.
+// Prune removes ledgers idle past retention that no queued record names (along with locks
+// and stale aliases). Sidecars are pruned only after their ledger is gone and MixedRetention
+// has elapsed since their last mark. Stops when ctx ends.
 func Prune(ctx context.Context, stateDir string, now time.Time, queued map[string]bool) {
 	dir := filepath.Join(stateDir, Dir)
 	entries, err := os.ReadDir(dir)
@@ -30,7 +27,6 @@ func Prune(ctx context.Context, stateDir string, now time.Time, queued map[strin
 		if ctx.Err() != nil {
 			return
 		}
-		// Every write is activity, so a file written since cannot have been idle that long.
 		info, err := e.Info()
 		if err != nil || now.Sub(info.ModTime()) <= Retention {
 			continue
@@ -46,7 +42,6 @@ func Prune(ctx context.Context, stateDir string, now time.Time, queued map[strin
 		case strings.HasSuffix(name, ".json"):
 			pruneLedger(stateDir, path, now, queued)
 		case strings.HasSuffix(name, ".lock"):
-			// A lock's time is its creation, so an old one may still be in use.
 			if _, err := os.Lstat(strings.TrimSuffix(path, ".lock")); err == nil {
 				continue
 			}
@@ -60,10 +55,8 @@ func Prune(ctx context.Context, stateDir string, now time.Time, queued map[strin
 	pruneAliases(stateDir, now)
 }
 
-// pruneLedger removes the ledger at path, with its lock and alias files, unless a writer
-// holds it, it was active within its retention, or a queued record names its session or an
-// alias. An unreadable ledger or sidecar fails closed: it is kept while queued or within
-// MixedRetention of its file time, because it may record a crossing.
+// pruneLedger removes path if unlocked, unqueued, and past retention (failing closed on
+// unreadable ledgers/sidecars for MixedRetention).
 func pruneLedger(stateDir, path string, now time.Time, queued map[string]bool) {
 	lock := path + ".lock"
 	unlock, err := flock.TryLock(lock)
@@ -76,7 +69,6 @@ func pruneLedger(stateDir, path string, now time.Time, queued map[string]bool) {
 		return
 	}
 	sessionID := strings.TrimSuffix(filepath.Base(path), ".json")
-	// A crossing recorded aside keeps the ledger as one in the ledger would.
 	l, _, _, err := resolve(stateDir, sessionID)
 	if err != nil {
 		if queued[sessionID] || now.Sub(info.ModTime()) <= MixedRetention {
@@ -97,10 +89,8 @@ func pruneLedger(stateDir, path string, now time.Time, queued map[string]bool) {
 	flock.Remove(lock, unlock)
 }
 
-// pruneAside removes the sidecar folder name once its session's ledger is gone and no
-// queued record names the session, MixedRetention after its last mark, with what a write
-// cut short left there; one that cannot be read goes by its folder's time alone. While the
-// ledger is kept, only what a write cut short left goes.
+// pruneAside removes the sidecar folder once its ledger is gone, unqueued, and past
+// MixedRetention; while the ledger exists, only stale temp files are cleaned.
 func pruneAside(stateDir, name string, now time.Time, queued map[string]bool) {
 	sessionID, ok := sessionOf(name)
 	if !ok {
@@ -127,8 +117,6 @@ func pruneAside(stateDir, name string, now time.Time, queued map[string]bool) {
 	_ = os.RemoveAll(dir)
 }
 
-// retention is how long l is kept after its last activity: MixedRetention while its
-// current run is Mixed, else Retention.
 func (l ledger) retention() time.Duration {
 	if n := len(l.Runs); n > 0 && !l.Runs[n-1].MixedAt.IsZero() {
 		return MixedRetention

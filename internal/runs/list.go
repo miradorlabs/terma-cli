@@ -10,18 +10,15 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/session"
 )
 
-// MixedRun is a session whose run in force is Mixed, as doctor lists it: why, and whether
-// it was active within the recent window Mixed was asked for.
+// MixedRun is a session whose run in force is Mixed (for doctor).
 type MixedRun struct {
 	Session string
 	Why     Why
 	Recent  bool
 }
 
-// Mixed lists, sorted by session, for doctor, the sessions whose run in force at now is
-// Mixed, each with why and whether it was active within recent. A sidecar counts with its
-// ledger, or alone (MarkAside), and an unreadable ledger or sidecar counts as recent and
-// Mixed, as MixedAt has it, with no reason.
+// Mixed lists sessions whose run in force at now is Mixed (including sidecars and
+// unreadable ledgers, which fail closed as recent Mixed).
 func Mixed(stateDir string, now time.Time, recent time.Duration) []MixedRun {
 	entries, err := os.ReadDir(filepath.Join(stateDir, Dir))
 	if err != nil {
@@ -42,11 +39,11 @@ func Mixed(stateDir string, now time.Time, recent time.Duration) []MixedRun {
 	var out []MixedRun
 	for id, at := range written {
 		l, found, _, err := resolve(stateDir, id)
-		switch {
-		case err != nil:
+		if err != nil {
 			out = append(out, MixedRun{Session: id, Recent: true})
 			continue
-		case !found || len(l.Runs) == 0:
+		}
+		if !found || len(l.Runs) == 0 {
 			continue
 		}
 		if r := inForce(l.Runs, now); !r.MixedAt.IsZero() {
@@ -57,7 +54,6 @@ func Mixed(stateDir string, now time.Time, recent time.Duration) []MixedRun {
 	return out
 }
 
-// sessionOf is the session whose ledger or sidecar is named name; false for any other file.
 func sessionOf(name string) (string, bool) {
 	for _, ext := range []string{".json", asideExt} {
 		if id, ok := strings.CutSuffix(name, ext); ok && session.ValidID(id) {

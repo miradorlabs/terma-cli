@@ -15,51 +15,31 @@ import (
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/config"
-	"github.com/miradorlabs/terma-cli/internal/flock"
 	"github.com/miradorlabs/terma-cli/internal/session"
 )
 
-// Dir is the ledger's folder under the state directory: a file per session, and aliases/.
-const Dir = "runs"
+// Ledger paths, retention windows (15d outlives 14d spool/outbox plus skew; 90d for Mixed),
+// refresh cadence, and lock bounds.
+const (
+	Dir, aliasesDir = "runs", "aliases"
+	Retention       = 15 * 24 * time.Hour
+	MixedRetention  = 90 * 24 * time.Hour
+	RefreshEvery    = 24 * time.Hour
+	lockWait        = 2 * time.Second
+)
 
-const aliasesDir = "aliases"
-
-// Retention is how long a ledger is kept after its last activity (ledger.Active). Queued
-// records leave the relay outbox and the spool within 14 days; the extra day covers clock
-// skew and when Prune runs. A ledger pruned too early reads as never Mixed. Prune also keeps
-// any ledger a queued record names.
-const Retention = 15 * 24 * time.Hour
-
-// MixedRetention is Retention for a ledger whose current run is Mixed: a session idle past
-// Retention may go on without a new run, and must still read Mixed.
-const MixedRetention = 90 * 24 * time.Hour
-
-// RefreshEvery is how often hooks renew a ledger's activity (Refresh). A run that stays put
-// records nothing new; unrenewed, its ledger and any crossing in it would be pruned.
-const RefreshEvery = 24 * time.Hour
-
-// lockWait bounds the wait for a ledger's lock: a hook gets an error, never a stall.
-const lockWait = 2 * time.Second
-
-// ledger is one session's file.
 type ledger struct {
-	// Runs are in the order they began.
-	Runs []run `json:"runs"`
-	// Aliases are the subagent IDs that share the session's runs.
-	Aliases []string `json:"aliases,omitempty"`
-	// Active is the last run start, crossing, new location or Refresh. Prune goes by it.
-	Active time.Time `json:"active,omitzero"`
+	Runs    []run     `json:"runs"`
+	Aliases []string  `json:"aliases,omitempty"`
+	Active  time.Time `json:"active,omitzero"`
 }
 
-// active records activity at t.
 func (l *ledger) active(t time.Time) {
 	if t = t.UTC(); t.After(l.Active) {
 		l.Active = t
 	}
 }
 
-// lastActive is l's last activity. A ledger from before Active falls back to its runs'
-// latest start or crossing, then to written, its file's time.
 func (l ledger) lastActive(written time.Time) time.Time {
 	last := l.Active
 	for _, r := range l.Runs {
@@ -81,43 +61,29 @@ func latest(ts ...time.Time) time.Time {
 	return out
 }
 
-// Reason is why a run turned Mixed, which doctor and a flush show, so that a run the scan
-// could not read can be told from one that crossed.
+// Reason is why a run turned Mixed (shown by doctor and flush).
 type Reason string
 
+// Reasons a run is marked Mixed.
 const (
-	// Crossed is a run that touched another organization's checkout. A ledger written before
-	// reasons were recorded reads as this.
-	Crossed Reason = "crossed"
-	// UnknownReach is a run with a shell command whose reach could not be resolved.
-	UnknownReach Reason = "unknown_reach"
-	// LocationBound is a run that touched more locations than the ledger keeps for it.
+	Crossed       Reason = "crossed"
+	UnknownReach  Reason = "unknown_reach"
 	LocationBound Reason = "location_bound"
-	// Aside is a crossing made while the ledger was busy: its sidecar took it (MarkAside),
-	// or its mixed placement alone kept it. Why it crossed is in the hook's log.
-	Aside Reason = "aside"
+	Aside         Reason = "aside"
 )
 
-// Why is a Mixed mark's reason, and where it happened: for Crossed the checkout in another
-// organization, as the ledger records a location; for UnknownReach the command's first
-// words. Never a file's contents.
+// Why is a Mixed mark's reason and sanitized location/command prefix (never file contents).
 type Why struct {
 	Reason Reason `json:"reason,omitempty"`
 	Where  string `json:"where,omitempty"`
 }
 
-// run is one run of a session.
 type run struct {
-	ID string `json:"id"`
-	// Started is when the run began; zero for a run first known by its crossing.
-	Started time.Time `json:"started"`
-	// MixedAt is when the run became Mixed; zero while it is not. MixedWhy is why, absent
-	// from a ledger written before reasons were recorded (why).
-	MixedAt  time.Time `json:"mixed_at,omitzero"`
-	MixedWhy Why       `json:"mixed_why,omitzero"`
-	// Locations are where the run was placed or seen touching (Touch), first seen first:
-	// normalised repository IDs, or the hooks' token for outside git. Only hooks read them.
-	Locations []string `json:"locations,omitempty"`
+	ID        string    `json:"id"`
+	Started   time.Time `json:"started"`
+	MixedAt   time.Time `json:"mixed_at,omitzero"`
+	MixedWhy  Why       `json:"mixed_why,omitzero"`
+	Locations []string  `json:"locations,omitempty"`
 }
 
 // why is why r turned Mixed: Crossed for a mark that records no reason.
@@ -211,6 +177,10 @@ func TryTouch(stateDir, sessionID, runID string, locations []string) ([]string, 
 	return touchWith(tryEdit, stateDir, sessionID, runID, locations)
 }
 
+// MaxLocations bounds the distinct locations stored per run in the ledger. Touching more
+// than MaxLocations distinct locations marks the run Mixed with LocationBound.
+const MaxLocations = 64
+
 func touchWith(edit func(stateDir, sessionID string, edit func(path string, l *ledger) error) error, stateDir, sessionID, runID string, locations []string) ([]string, error) {
 	var merged []string
 	err := edit(stateDir, sessionID, func(path string, l *ledger) error {
@@ -227,13 +197,23 @@ func touchWith(edit func(stateDir, sessionID string, edit func(path string, l *l
 		}
 		r := &l.Runs[i]
 		known := len(r.Locations)
+		prevMixedAt, prevMixedWhy := r.MixedAt, r.MixedWhy
+		exceeded := false
 		for _, loc := range locations {
-			if loc != "" && !slices.Contains(r.Locations, loc) {
-				r.Locations = append(r.Locations, loc)
+			if loc == "" || slices.Contains(r.Locations, loc) {
+				continue
 			}
+			if len(r.Locations) >= MaxLocations {
+				exceeded = true
+				break
+			}
+			r.Locations = append(r.Locations, loc)
+		}
+		if exceeded {
+			r.mark(time.Now(), Why{Reason: LocationBound})
 		}
 		merged = r.Locations
-		if len(r.Locations) == known {
+		if len(r.Locations) == known && r.MixedAt.Equal(prevMixedAt) && r.MixedWhy == prevMixedWhy {
 			return nil
 		}
 		l.active(time.Now())
@@ -313,22 +293,16 @@ func Locations(stateDir, idOrAlias string) (run string, locations []string, ok b
 
 // Position is a session's current run, from one read of its ledger (Locate).
 type Position struct {
-	// Run is the current run, and Locations where it has been.
 	Run       string
 	Locations []string
-	// Active is the ledger's last activity, which Prune goes by.
-	Active time.Time
-	// MixedAt is when Run became Mixed; zero while it is not.
-	MixedAt time.Time
-	// Aside: a sidecar records a crossing the ledger has yet to fold in (MarkAside).
-	Aside bool
-	// Aliases are the subagent IDs sharing the session's runs (Aliases).
-	Aliases []string
+	Active    time.Time
+	MixedAt   time.Time
+	Aside     bool
+	Aliases   []string
 }
 
-// Locate reads the ledger once for what a hook needs: the current run, where it has been,
-// whether it is Mixed (its sidecar included), whether the ledger is due a Refresh, and the
-// subagents sharing the session's runs.
+// Locate reads the ledger once for what a hook needs (current run, locations, Mixed/sidecar
+// state, activity, and aliases).
 func Locate(stateDir, idOrAlias string) (Position, bool) {
 	if !session.ValidID(idOrAlias) {
 		return Position{}, false
@@ -338,31 +312,17 @@ func Locate(stateDir, idOrAlias string) (Position, bool) {
 		return Position{}, false
 	}
 	cur := l.Runs[len(l.Runs)-1]
-	return Position{Run: cur.ID, Locations: cur.Locations, Active: l.lastActive(time.Time{}), MixedAt: cur.MixedAt,
-		Aside: aside, Aliases: l.Aliases}, true
+	return Position{Run: cur.ID, Locations: cur.Locations, Active: l.lastActive(time.Time{}), MixedAt: cur.MixedAt, Aside: aside, Aliases: l.Aliases}, true
 }
 
-// Refresh renews sessionID's ledger at now if its last activity is older than
-// RefreshEvery; one with no run, or none, is left alone. Hooks call it only when Locate
-// found it due, so at most once a day.
+// Refresh renews sessionID's ledger at now if its last activity is older than RefreshEvery.
 func Refresh(stateDir, sessionID string, now time.Time) error {
-	path, err := ledgerPath(stateDir, sessionID)
-	if err != nil {
-		return err
-	}
-	return flock.Locked(path, lockWait, func() error {
-		l, _, err := load(path)
-		if err != nil {
-			return err
-		}
-		if err := fold(stateDir, sessionID, path, &l); err != nil {
-			return err
-		}
+	return lockedEdit(stateDir, sessionID, func(path string, l *ledger) error {
 		if len(l.Runs) == 0 || now.Sub(l.lastActive(time.Time{})) <= RefreshEvery {
 			return nil
 		}
 		l.active(now)
-		return save(path, &l)
+		return save(path, l)
 	})
 }
 

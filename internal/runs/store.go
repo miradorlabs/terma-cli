@@ -16,12 +16,8 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/session"
 )
 
-// How the ledger is stored: a file per session, read whole and replaced atomically under
-// its lock, with its sidecar (aside.go) applied on every read.
-
-// resolve reads the ledger idOrAlias names, its own, else its session's through its alias,
-// with that session's sidecar applied (MarkAside); aside reports a sidecar. The sidecar is
-// read first: a fold saves the ledger before it removes what it folded.
+// resolve reads idOrAlias (or its session via alias) with sidecar read first so a
+// concurrent fold (save ledger before removing sidecar) never hides a Mixed mark.
 func resolve(stateDir, idOrAlias string) (l ledger, ok, aside bool, err error) {
 	read := func(sessionID string) error {
 		a, err := readAside(stateDir, sessionID)
@@ -55,7 +51,6 @@ func resolve(stateDir, idOrAlias string) (l ledger, ok, aside bool, err error) {
 	return l, ok, aside, err
 }
 
-// update applies change to sessionID's ledger, made if there is none, under its lock.
 func update(stateDir, sessionID string, change func(*ledger)) error {
 	return lockedEdit(stateDir, sessionID, func(path string, l *ledger) error {
 		change(l)
@@ -63,8 +58,6 @@ func update(stateDir, sessionID string, change func(*ledger)) error {
 	})
 }
 
-// lockedEdit runs edit on sessionID's ledger, empty if there is none, holding its lock, its
-// sidecar folded in first (fold).
 func lockedEdit(stateDir, sessionID string, edit func(path string, l *ledger) error) error {
 	path, err := ledgerPath(stateDir, sessionID)
 	if err != nil {
@@ -73,7 +66,6 @@ func lockedEdit(stateDir, sessionID string, edit func(path string, l *ledger) er
 	return flock.Locked(path, lockWait, func() error { return editLoaded(stateDir, sessionID, path, edit) })
 }
 
-// tryEdit is lockedEdit only if the lock is free now: it never waits.
 func tryEdit(stateDir, sessionID string, edit func(path string, l *ledger) error) error {
 	path, err := ledgerPath(stateDir, sessionID)
 	if err != nil {
@@ -90,8 +82,6 @@ func tryEdit(stateDir, sessionID string, edit func(path string, l *ledger) error
 	return editLoaded(stateDir, sessionID, path, edit)
 }
 
-// editLoaded loads the ledger at path, folds its sidecar in and runs edit on it; the caller
-// holds its lock.
 func editLoaded(stateDir, sessionID, path string, edit func(path string, l *ledger) error) error {
 	l, _, err := load(path)
 	if err != nil {
