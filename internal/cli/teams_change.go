@@ -99,7 +99,9 @@ func (app *App) applyTeamsWithView(cmd *cobra.Command, cfg *config.Config, st ro
 	}
 	for _, tk := range ch.ticks {
 		if committed, ok := next.Team(tk.enrollment); ok {
-			_ = routing.StoreTeamPolicy(app.stateDir, committed)
+			if err := routing.StoreTeamPolicy(app.stateDir, committed); err != nil {
+				return teamsView{}, fmt.Errorf("save policy for %s: %w", orgTeamLabel(tk.orgName, tk.teamName), err)
+			}
 			if r := v.findTeam(committed.OrganizationID, committed.TeamID); r != nil {
 				r.Entries, r.Collects, r.GitHooks, r.Unreadable = committed.Policy.Repositories, collectsSummary(committed.Policy, committed.Personal), committed.Policy.GitHooks, ""
 			}
@@ -151,21 +153,17 @@ func (ch *teamsChange) write(s *routing.State, now time.Time) error {
 				return err
 			}
 		}
-		id, err := s.Select(tk.team)
-		if err != nil {
+		var err error
+		if tk.enrollment, err = s.Select(tk.team); err != nil {
 			return err
 		}
-		tk.enrollment = id
 	}
 	return nil
 }
 
 func (app *App) finishUnticks(next routing.State, ch *teamsChange, names teamNames) {
 	for _, t := range ch.untick {
-		verb := "unticked "
-		if ch.released[t.EnrollmentID] {
-			verb = "released "
-		}
+		verb := map[bool]string{false: "unticked ", true: "released "}[ch.released[t.EnrollmentID]]
 		ch.changes = append(ch.changes, verb+teamLabel(names, t)+": what was queued for it will be discarded")
 		if slices.ContainsFunc(next.Teams, func(o routing.Team) bool { return o.OrganizationID == t.OrganizationID }) {
 			continue

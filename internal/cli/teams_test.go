@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"sync/atomic"
@@ -1197,4 +1198,26 @@ func TestSetupInteractiveChecklistHookup(t *testing.T) {
 			t.Fatalf("reloaded policy = %+v, want Beta Core (%s) in %s", updated.Policy, betaCore, orgB().ID)
 		}
 	})
+}
+
+func TestTeamsSelectFailsWhenPolicyCannotBePersisted(t *testing.T) {
+	routedMachine(t, "u-1", nil)
+	// Replace the policies directory with a regular file so StoreTeamPolicy fails deterministically.
+	polDir := filepath.Join(testApp.stateDir, config.PoliciesDir)
+	if err := os.RemoveAll(polDir); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(polDir, []byte("not-a-dir"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	out, err := runTerma(t, "teams", "--select", betaCore, "--yes")
+	if err == nil {
+		t.Fatalf("expected error when policy persistence fails, got output:\n%s", out)
+	}
+	if !strings.Contains(err.Error(), "save policy for") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if strings.Contains(out, "ticked ") {
+		t.Fatalf("must not report successful tick when policy persistence fails:\n%s", out)
+	}
 }
