@@ -377,37 +377,12 @@ func earliest(msg proto.Message) time.Time {
 		for _, rm := range m.GetResourceMetrics() {
 			for _, sm := range rm.GetScopeMetrics() {
 				for _, mt := range sm.GetMetrics() {
-					eachPointEndTime(mt, see)
+					eachPointTime(mt, func(_, end uint64) { see(end) })
 				}
 			}
 		}
 	}
 	return unixTime(first)
-}
-
-func eachPointEndTime(m *metricspb.Metric, see func(uint64)) {
-	switch d := m.GetData().(type) {
-	case *metricspb.Metric_Sum:
-		for _, p := range d.Sum.GetDataPoints() {
-			see(p.GetTimeUnixNano())
-		}
-	case *metricspb.Metric_Gauge:
-		for _, p := range d.Gauge.GetDataPoints() {
-			see(p.GetTimeUnixNano())
-		}
-	case *metricspb.Metric_Histogram:
-		for _, p := range d.Histogram.GetDataPoints() {
-			see(p.GetTimeUnixNano())
-		}
-	case *metricspb.Metric_ExponentialHistogram:
-		for _, p := range d.ExponentialHistogram.GetDataPoints() {
-			see(p.GetTimeUnixNano())
-		}
-	case *metricspb.Metric_Summary:
-		for _, p := range d.Summary.GetDataPoints() {
-			see(p.GetTimeUnixNano())
-		}
-	}
 }
 
 func intervalOf(msg proto.Message) (time.Time, time.Time) {
@@ -439,7 +414,7 @@ func intervalOf(msg proto.Message) (time.Time, time.Time) {
 		for _, rm := range m.GetResourceMetrics() {
 			for _, sm := range rm.GetScopeMetrics() {
 				for _, mt := range sm.GetMetrics() {
-					eachPointTime(mt, see)
+					eachPointTime(mt, func(start, end uint64) { see(makeInterval(start, end)) })
 				}
 			}
 		}
@@ -447,27 +422,27 @@ func intervalOf(msg proto.Message) (time.Time, time.Time) {
 	return unixTime(first), unixTime(last)
 }
 
-func eachPointTime(m *metricspb.Metric, see func(timeInterval)) {
+func eachPointTime(m *metricspb.Metric, see func(start, end uint64)) {
 	switch d := m.GetData().(type) {
 	case *metricspb.Metric_Sum:
 		for _, p := range d.Sum.GetDataPoints() {
-			see(makeInterval(p.GetStartTimeUnixNano(), p.GetTimeUnixNano()))
+			see(p.GetStartTimeUnixNano(), p.GetTimeUnixNano())
 		}
 	case *metricspb.Metric_Gauge:
 		for _, p := range d.Gauge.GetDataPoints() {
-			see(makeInterval(p.GetStartTimeUnixNano(), p.GetTimeUnixNano()))
+			see(p.GetStartTimeUnixNano(), p.GetTimeUnixNano())
 		}
 	case *metricspb.Metric_Histogram:
 		for _, p := range d.Histogram.GetDataPoints() {
-			see(makeInterval(p.GetStartTimeUnixNano(), p.GetTimeUnixNano()))
+			see(p.GetStartTimeUnixNano(), p.GetTimeUnixNano())
 		}
 	case *metricspb.Metric_ExponentialHistogram:
 		for _, p := range d.ExponentialHistogram.GetDataPoints() {
-			see(makeInterval(p.GetStartTimeUnixNano(), p.GetTimeUnixNano()))
+			see(p.GetStartTimeUnixNano(), p.GetTimeUnixNano())
 		}
 	case *metricspb.Metric_Summary:
 		for _, p := range d.Summary.GetDataPoints() {
-			see(makeInterval(p.GetStartTimeUnixNano(), p.GetTimeUnixNano()))
+			see(p.GetStartTimeUnixNano(), p.GetTimeUnixNano())
 		}
 	}
 }

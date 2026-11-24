@@ -82,6 +82,16 @@ type (
 	}
 )
 
+func newTeamState() teamState {
+	return teamState{
+		pinnedHold:    map[string][]heldPart{},
+		teamSenders:   map[teamRoute]*sender{},
+		teamRecovered: map[teamRoute]bool{},
+		mixedSeen:     map[string]time.Time{},
+		nudging:       map[string]bool{},
+	}
+}
+
 // Routing outcomes, recheck verdicts, and hold/drop reasons.
 const (
 	Hold Outcome = iota

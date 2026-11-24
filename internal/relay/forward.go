@@ -139,6 +139,12 @@ func (s *sender) loop() {
 			return false
 		}
 	}
+	resetScan := func() {
+		backoff = 0
+		s.scanAfter = nil
+		s.scanFound = false
+		s.scanWait = false
+	}
 	sleep := func(d time.Duration) bool {
 		t := time.NewTimer(d)
 		defer t.Stop()
@@ -156,7 +162,7 @@ func (s *sender) loop() {
 		case <-t.C:
 		case <-wake:
 		case <-s.stateChange:
-			backoff, s.scanAfter, s.scanFound, s.scanWait = 0, nil, false, false
+			resetScan()
 		case <-stop:
 			if backoff > 0 {
 				return false // a failing host is not retried on the way out
@@ -167,7 +173,7 @@ func (s *sender) loop() {
 	for ctx.Err() == nil {
 		select {
 		case <-s.stateChange:
-			backoff, s.scanAfter, s.scanFound, s.scanWait = 0, nil, false, false
+			resetScan()
 		default:
 		}
 		limit := maxMergeFiles

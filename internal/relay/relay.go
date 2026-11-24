@@ -8,13 +8,10 @@ package relay
 
 import (
 	"cmp"
-	"compress/gzip"
 	"context"
 	"crypto/subtle"
 	"encoding/json"
 	"errors"
-	"fmt"
-	"io"
 	"net/http"
 	"net/netip"
 	"strings"
@@ -22,10 +19,6 @@ import (
 	"time"
 
 	logspb "go.opentelemetry.io/proto/otlp/logs/v1"
-	metricspb "go.opentelemetry.io/proto/otlp/metrics/v1"
-	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
-	"google.golang.org/protobuf/encoding/protojson"
-	"google.golang.org/protobuf/proto"
 
 	"github.com/miradorlabs/terma-cli/internal/account/auth"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
@@ -238,13 +231,7 @@ func New(opts Options) *Relay {
 		cancelSend:      cancel,
 		stopping:        make(chan struct{}),
 		unreadableRetry: unreadableRetry,
-		teamState: teamState{
-			pinnedHold:    map[string][]heldPart{},
-			teamSenders:   map[teamRoute]*sender{},
-			teamRecovered: map[teamRoute]bool{},
-			mixedSeen:     map[string]time.Time{},
-			nudging:       map[string]bool{},
-		},
+		teamState:       newTeamState(),
 	}
 	r.seedLane()
 	return r
@@ -409,53 +396,4 @@ func (r *Relay) export(w http.ResponseWriter, req *http.Request, s Signal) {
 	}
 	w.Header().Set("Content-Type", "application/x-protobuf")
 	w.WriteHeader(http.StatusOK)
-}
-
-func readBody(req *http.Request) ([]byte, error) {
-	var rd io.Reader = http.MaxBytesReader(nil, req.Body, maxBody)
-	if strings.EqualFold(req.Header.Get("Content-Encoding"), "gzip") {
-		zr, err := gzip.NewReader(rd)
-		if err != nil {
-			return nil, err
-		}
-		defer func() { _ = zr.Close() }()
-		rd = io.LimitReader(zr, maxBody+1)
-	}
-	body, err := io.ReadAll(rd)
-	if err == nil && len(body) > maxBody {
-		err = fmt.Errorf("export larger than %d bytes", maxBody)
-	}
-	return body, err
-}
-
-func (r *Relay) decode(s Signal, body []byte, isJSON bool) (map[string]*part, error) {
-	unmarshal := proto.Unmarshal
-	if isJSON {
-		fixed, err := hexIDsToBase64(body)
-		if err != nil {
-			return nil, err
-		}
-		body = fixed
-		unmarshal = protojson.UnmarshalOptions{DiscardUnknown: true}.Unmarshal
-	}
-	switch s {
-	case Logs:
-		var m logspb.LogsData
-		if err := unmarshal(body, &m); err != nil {
-			return nil, err
-		}
-		return r.rules.splitLogs(&m, r.learnTrace), nil
-	case Traces:
-		var m tracepb.TracesData
-		if err := unmarshal(body, &m); err != nil {
-			return nil, err
-		}
-		return r.rules.splitTraces(&m, r.learnTrace, r.traceOf), nil
-	default:
-		var m metricspb.MetricsData
-		if err := unmarshal(body, &m); err != nil {
-			return nil, err
-		}
-		return r.rules.splitMetrics(&m), nil
-	}
 }

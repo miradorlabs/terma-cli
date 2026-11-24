@@ -1046,9 +1046,9 @@ func TestReviewEdgeCases(t *testing.T) {
 
 	t.Run("process_attributed_metrics_split_across_moved_placements", func(t *testing.T) {
 		t.Parallel()
-		t1 := time.Date(2026, 4, 20, 12, 0, 0, 0, time.UTC)
-		t2 := t1.Add(time.Minute)
-		now := t2.Add(2 * time.Second)
+		now := time.Now().UTC().Truncate(time.Second)
+		t2 := now.Add(-2 * time.Second)
+		t1 := t2.Add(-time.Minute)
 		claims := map[string]claim.Claim{
 			"s_proc": {
 				PIDs: []int{4242},
@@ -1420,7 +1420,8 @@ func TestReviewEdgeCases(t *testing.T) {
 	t.Run("sweepPinned_memoizes_teamReady_per_pass", func(t *testing.T) {
 		t.Parallel()
 		var resolveCalls atomic.Int32
-		verdict := Wait
+		var verdict atomic.Int32
+		verdict.Store(int32(Wait))
 		router := &stubRouter{
 			active: true,
 			routeFn: func(rec Record) Routed {
@@ -1431,7 +1432,7 @@ func TestReviewEdgeCases(t *testing.T) {
 				}
 			},
 			recheckFn: func(_, _ string) Rechecker {
-				if verdict == Wait {
+				if Verdict(verdict.Load()) == Wait {
 					return stubRechecker{waits: true, waitRes: Rechecked{Verdict: Wait, Why: WhyBlocked}}
 				}
 				return stubRechecker{entryFn: func(Queued) Rechecked { return Rechecked{Verdict: SendNow} }}
@@ -1468,7 +1469,7 @@ func TestReviewEdgeCases(t *testing.T) {
 		if r.heldN != pinnedCount {
 			t.Fatalf("heldN = %d, want %d", r.heldN, pinnedCount)
 		}
-		verdict = SendNow
+		verdict.Store(int32(SendNow))
 		r.sweep()
 		if r.heldN != 0 {
 			t.Fatalf("heldN after release = %d, want 0", r.heldN)
