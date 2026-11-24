@@ -2865,4 +2865,81 @@ func TestReachCoreReviewRegressions(t *testing.T) {
 	if got, err := evalSubst(scGo, "go env GOPATH"); err == nil {
 		t.Errorf("user-owned go in PATH: substitute(go env GOPATH) = %q, want error", got)
 	}
+
+	// 12. Set-but-empty Git path overrides fail closed in safeLocate.
+	for _, key := range []string{"GIT_DIR", "GIT_WORK_TREE", "GIT_COMMON_DIR", "GIT_OBJECT_DIRECTORY"} {
+		scEmpty := newScan(repo, makeEnv(map[string]string{
+			"HOME": parent, "USERPROFILE": parent, key: "",
+		}), work{deadline: time.Now().Add(time.Minute)})
+		if got, ok := scEmpty.safeLocate(repo); ok {
+			t.Errorf("%s='' safeLocate = (%q, true), want false", key, got)
+		}
+	}
+
+	// 13. Leading or trailing whitespace in commondir is preserved (not trimmed) and fails closed.
+	wtSpace := filepath.Join(parent, "wt-space")
+	gdSpace := filepath.Join(parent, "gd-space")
+	commonDir := filepath.Join(parent, "common-git")
+	makeValidGitDir(t, commonDir)
+	if err := os.MkdirAll(wtSpace, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(gdSpace, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(gdSpace, "HEAD"), []byte("ref: refs/heads/main\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(wtSpace, ".git"), []byte("gitdir: "+gdSpace+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	for _, val := range []string{" ../common-git\n", "../common-git \n"} {
+		if err := os.WriteFile(filepath.Join(gdSpace, "commondir"), []byte(val), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		scWS := newScan(wtSpace, makeEnv(map[string]string{"HOME": parent, "USERPROFILE": parent}), work{deadline: time.Now().Add(time.Minute)})
+		if got, ok := scWS.safeLocate(wtSpace); ok {
+			t.Errorf("commondir %q: safeLocate = (%q, true), want false", val, got)
+		}
+	}
+
+	// 14. Leading whitespace in HEAD fails closed in validGitDir/safeLocate.
+	headRepo := filepath.Join(parent, "head-ws")
+	makeValidGitDir(t, filepath.Join(headRepo, ".git"))
+	if err := os.WriteFile(filepath.Join(headRepo, ".git", "HEAD"), []byte(" ref: refs/heads/main\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	scHead := newScan(headRepo, makeEnv(map[string]string{"HOME": parent, "USERPROFILE": parent}), work{deadline: time.Now().Add(time.Minute)})
+	if got, ok := scHead.safeLocate(headRepo); ok {
+		t.Errorf("leading-space HEAD: safeLocate = (%q, true), want false", got)
+	}
+
+	// 15. extensions.objectformat requires core.repositoryformatversion = 1.
+	fmtRepo := filepath.Join(parent, "fmt-v0")
+	makeValidGitDir(t, filepath.Join(fmtRepo, ".git"))
+	if err := os.WriteFile(filepath.Join(fmtRepo, ".git", "config"), []byte("[core]\n\trepositoryformatversion = 0\n[extensions]\n\tobjectformat = sha256\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	scFmt := newScan(fmtRepo, makeEnv(map[string]string{"HOME": parent, "USERPROFILE": parent}), work{deadline: time.Now().Add(time.Minute)})
+	if got, ok := scFmt.safeLocate(fmtRepo); ok {
+		t.Errorf("format v0 + objectformat: safeLocate = (%q, true), want false", got)
+	}
+	if err := os.WriteFile(filepath.Join(fmtRepo, ".git", "config"), []byte("[core]\n\trepositoryformatversion = 1\n[extensions]\n\tobjectformat = sha256\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	scFmt1 := newScan(fmtRepo, makeEnv(map[string]string{"HOME": parent, "USERPROFILE": parent}), work{deadline: time.Now().Add(time.Minute)})
+	if got, ok := scFmt1.safeLocate(fmtRepo); !ok || got != fmtRepo {
+		t.Errorf("format v1 + objectformat: safeLocate = (%q, %v), want (%q, true)", got, ok, fmtRepo)
+	}
+
+	// 16. GOFLAGS (set or unresolved) fails closed for go env GOPATH / GOMODCACHE.
+	scFlags := newScan(repo, makeEnv(map[string]string{
+		"HOME": parent, "USERPROFILE": parent, "GOFLAGS": "-C=" + parent,
+	}), work{deadline: time.Now().Add(time.Minute)})
+	if got, err := evalSubst(scFlags, "go env GOPATH"); err == nil {
+		t.Errorf("GOFLAGS set: substitute(go env GOPATH) = %q, want error", got)
+	}
+	if got, err := evalSubst(scFlags, "go env GOMODCACHE"); err == nil {
+		t.Errorf("GOFLAGS set: substitute(go env GOMODCACHE) = %q, want error", got)
+	}
 }
