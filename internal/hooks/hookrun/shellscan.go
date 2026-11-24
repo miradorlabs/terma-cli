@@ -14,7 +14,7 @@ import (
 const UnknownReach, shellTime, maxShellPlaces, maxShellLookups, maxShellWords, maxShellStats, maxShellBytes, maxShellDepth, maxShellBraces, maxGlobSegments, substitutionSize, maxBelowDepth = "\x00unknown", 20 * time.Millisecond, 256, 4096, 16384, 131072, 1 << 20, 4, 16, 3, 4096, 4
 const plain, program, target, folder, creates, data, part, slashedOnly, globbed, walked, physTarget role = 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10
 
-var maxShellTime, errOpaque = shellTime, errors.New("an expansion ShellPaths cannot resolve")
+var maxShellTime, errOpaque, unsetVar = shellTime, errors.New("an expansion ShellPaths cannot resolve"), new(string)
 
 type role uint8
 
@@ -30,10 +30,18 @@ type scan struct {
 	places, created              map[string]bool
 	examined                     map[candidate]cached
 	work
+	src, traps   string
+	dirUncertain bool
+	depth        int
+	pushed       []string
+	funcs        map[string]*syntax.Stmt
+	feedBuf      *strings.Builder
+	loopVars     map[string]bool
 }
 type work struct {
 	lookups, stats, bytes, words int
 	deadline                     time.Time
+	noRecover                    bool
 }
 type candidate struct {
 	word, dir string
@@ -51,7 +59,7 @@ func (r role) whole() bool               { return r == program || r == target ||
 func (r role) needsSlash() bool          { return r == program || r == data || r == part || r == slashedOnly }
 func newScan(cwd string, env func(string) (string, bool), done work) *scan {
 	done.deadline = pick(done.deadline.IsZero(), time.Now().Add(maxShellTime), done.deadline)
-	sc := &scan{cwd: cwd, dir: cwd, env: env, vars: map[string]*string{}, places: map[string]bool{}, created: map[string]bool{}, examined: map[candidate]cached{}, work: done}
+	sc := &scan{cwd: cwd, dir: cwd, env: env, vars: map[string]*string{}, funcs: map[string]*syntax.Stmt{}, loopVars: map[string]bool{}, places: map[string]bool{}, created: map[string]bool{}, examined: map[candidate]cached{}, work: done}
 	sc.cfg = sc.config()
 	return sc
 }
@@ -76,7 +84,7 @@ func (sc *scan) Each(func(string, expand.Variable) bool) { sc.opaque = true }
 func (sc *scan) lookup(name string) (string, bool) {
 	if name == "PWD" || name == "OLDPWD" && sc.prev != "" {
 		return pick(name == "PWD", sc.dir, sc.prev), name != "PWD" || sc.dir != ""
-	} else if v, ok := sc.vars[name]; !isName(name) || name == "_" || ok && v == nil {
+	} else if v, ok := sc.vars[name]; !isName(name) || name == "_" || ok && (v == nil || v == unsetVar) {
 		return "", false
 	} else if ok {
 		return *v, true
@@ -110,7 +118,7 @@ func (sc *scan) size(w *syntax.Word) int { return sc.sizeIn(w, false) }
 func (sc *scan) sizeIn(w *syntax.Word, opaqueSubst bool) (n int) {
 	if w != nil {
 		syntax.Walk(w, func(node syntax.Node) bool {
-			switch x := node.(type) {
+			switch x := pick(n > maxShellBytes, syntax.Node(nil), node).(type) {
 			case *syntax.Lit:
 				n += len(x.Value)
 			case *syntax.SglQuoted:
@@ -133,7 +141,7 @@ func isCaseOp(op syntax.ParExpOperator) bool {
 }
 func (sc *scan) paramValue(pe *syntax.ParamExp) string {
 	v, _ := sc.lookup(pick(pe.Param != nil, pe.Param, &syntax.Lit{}).Value)
-	return pick(pe.Excl, sc.envVal(v), v)
+	return pick(pe.Excl, sc.envVal(pick(pe.Excl, v, "")), v)
 }
 func (sc *scan) paramSize(pe *syntax.ParamExp, opaqueSubst bool) int {
 	if pe.Index != nil || pe.Slice != nil || pe.Names != 0 {

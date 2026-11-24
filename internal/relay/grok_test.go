@@ -9,7 +9,9 @@ import (
 	"testing"
 	"time"
 
+	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
 	logspb "go.opentelemetry.io/proto/otlp/logs/v1"
+	resourcepb "go.opentelemetry.io/proto/otlp/resource/v1"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
@@ -206,5 +208,61 @@ func TestRelayHoldsAnUnclaimedGrokSessionInGlobalMode(t *testing.T) {
 			}
 		}
 		srv.Close()
+	}
+}
+
+// dress is the one step a part goes through on its way out, to a single team's outbox or to a
+// routed team's, and filterQueued the one that applies a team's policy again as a queued body
+// leaves. So the home stamp rides on a grok part by either route: with tool content under the
+// policy the part is dressed with, gone again if that policy has tightened by the time it is
+// sent, and never on a part of an agent that declares no home-relative scope.
+func TestDressStampsHomeOnGrokPartsByEitherRoute(t *testing.T) {
+	t.Parallel()
+	r := newRelay(Options{Dir: t.TempDir(), Token: token, HomeDir: grokHome})
+	ran := claim.Claim{ProjectID: "p1", Tool: "grok", Root: "/work/repo", Cwd: "/work/repo"}
+	open, withheld := Policy{IncludePrompts: true, IncludeToolContent: true}, Policy{IncludePrompts: true}
+	logs := func(scope string) *part {
+		return &part{signal: Logs, records: 1, msg: &logspb.LogsData{ResourceLogs: []*logspb.ResourceLogs{{
+			Resource:  &resourcepb.Resource{},
+			ScopeLogs: []*logspb.ScopeLogs{{Scope: &commonpb.InstrumentationScope{Name: scope}, LogRecords: []*logspb.LogRecord{{}}}},
+		}}}}
+	}
+	stamps := func(m *logspb.LogsData) (home, root string) {
+		res := m.ResourceLogs[0].Resource.Attributes
+		return attr(res, semconv.TermaHomeDirectoryKey), attr(res, semconv.TermaRepositoryRootKey)
+	}
+	const grokScope = "ai.xai.grok_code"
+
+	p := logs(grokScope)
+	if !r.dress(open, p, "p1", ran, attribution{}) {
+		t.Fatal("the part was not dressed")
+	}
+	if home, root := stamps(p.msg.(*logspb.LogsData)); home != grokHome || root != "/work/repo" {
+		t.Errorf("a grok part with tool content: home %q, root %q", home, root)
+	}
+	body, err := proto.Marshal(p.msg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, team := range map[string]*teamRoute{"one team's outbox": nil, "a routed team's outbox": {account: "a", enrollment: "e", tool: "grok"}} {
+		out, _ := r.filterQueued(Logs, body, withheld, team)
+		var sent logspb.LogsData
+		if err := proto.Unmarshal(out, &sent); err != nil || len(sent.ResourceLogs) != 1 {
+			t.Fatalf("%s: the queued body did not come back: %v", name, err)
+		}
+		if home, root := stamps(&sent); home != "" || root != "" {
+			t.Errorf("%s, sent under a policy that now withholds tool content: home %q, root %q", name, home, root)
+		}
+	}
+
+	p = logs(grokScope)
+	r.dress(withheld, p, "p1", ran, attribution{})
+	if home, root := stamps(p.msg.(*logspb.LogsData)); home != "" || root != "" {
+		t.Errorf("a grok part with tool content withheld: home %q, root %q", home, root)
+	}
+	p = logs("some.other.agent")
+	r.dress(open, p, "p1", ran, attribution{})
+	if home, root := stamps(p.msg.(*logspb.LogsData)); home != "" || root != "/work/repo" {
+		t.Errorf("another agent's part with tool content: home %q, root %q", home, root)
 	}
 }

@@ -2,6 +2,7 @@ package relay
 
 import (
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
@@ -33,6 +34,19 @@ type procState struct {
 // sender named, if claimed, under the placement in force at at: a process that moved
 // repositories sent its earlier parts from the earlier one.
 func (r *Relay) decideExited(pid int, at time.Time, narrow bool, lane string) (claim.Claim, Policy, string, bool, attribution) {
+	session, why := r.exitedSession(pid)
+	if session == "" {
+		return claim.Claim{}, Policy{}, why, false, attribution{}
+	}
+	c, pol, why, ok := r.decideClaimed(session, pid, at, narrow, lane)
+	if !ok {
+		return claim.Claim{}, Policy{}, why, false, attribution{}
+	}
+	return c, pol, "", true, attribution{how: semconv.TermaRelayAttributionProcess, session: session}
+}
+
+// exitedSession is the one session pid named, once it has exited; else "" and why not.
+func (r *Relay) exitedSession(pid int) (string, string) {
 	r.mu.Lock()
 	st := r.procs[pid]
 	var sessions []string
@@ -47,18 +61,23 @@ func (r *Relay) decideExited(pid int, at time.Time, narrow bool, lane string) (c
 	r.mu.Unlock()
 	switch {
 	case st == nil || len(sessions) == 0:
-		return claim.Claim{}, Policy{}, whyProcessIdle, false, attribution{}
+		return "", whyProcessIdle
 	case exited.IsZero() || r.opts.Now().Sub(exited) < exitGrace:
-		return claim.Claim{}, Policy{}, whyProcessRunning, false, attribution{}
+		return "", whyProcessRunning
 	case overflow || len(sessions) != 1:
-		return claim.Claim{}, Policy{}, whyAmbiguous, false, attribution{}
+		return "", whyAmbiguous
 	}
-	c, pol, why, ok := r.decideClaimed(sessions[0], pid, at, narrow, lane)
-	how := attribution{how: semconv.TermaRelayAttributionProcess, session: sessions[0]}
+	return sessions[0], ""
+}
+
+// procOf is the process a part keyed by its process (procKey) came from.
+func procOf(key string) (int, bool) {
+	p, ok := strings.CutPrefix(key, procPrefix)
 	if !ok {
-		return claim.Claim{}, Policy{}, why, false, attribution{}
+		return 0, false
 	}
-	return c, pol, "", true, how
+	n, _ := strconv.Atoi(p)
+	return n, true
 }
 
 // collectsNone reports whether every session pid has named is, at at, marked not
@@ -80,7 +99,7 @@ func (r *Relay) collectsNone(pid int, at time.Time) bool {
 		if !ok {
 			return false
 		}
-		if c, ok = c.At(pid, at); !ok || c.ProjectID != "" {
+		if c, ok = c.At(pid, at); !ok || c.ProjectID != "" || c.Kind != "" {
 			return false
 		}
 	}

@@ -113,6 +113,12 @@ func (s *Spool) ImportLosses(path, id string) error {
 // importedPrefix starts the name of a file of losses ImportLosses took in.
 const importedPrefix = "imported~"
 
+// PruneLosses deletes loss files past LossWindow + 24h: daily files by name, imported files
+// by modification time.
+func (s *Spool) PruneLosses(now time.Time) {
+	pruneLosses(filepath.Join(s.dir, lossesDir), now)
+}
+
 // pruneLosses deletes the files past LossWindow, which no hook appends to any more: a day
 // by its name, an imported file by when it was last written.
 func pruneLosses(dir string, now time.Time) {

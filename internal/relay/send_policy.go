@@ -27,7 +27,12 @@ func (r *Relay) count(sig Signal, tl sendTally) {
 // took; nil drops all of it, as does a body that no longer decodes, since it cannot be
 // checked against a stricter policy.
 func (r *Relay) withholdQueued(sig Signal, body []byte, pol Policy) ([]byte, sendTally) {
-	if pol.IncludePrompts && pol.IncludeToolContent && !pol.RequireClaim {
+	return r.filterQueued(sig, body, pol, nil)
+}
+
+func (r *Relay) filterQueued(sig Signal, body []byte, pol Policy, team *teamRoute) ([]byte, sendTally) {
+	restamp := team != nil
+	if !restamp && pol.IncludePrompts && pol.IncludeToolContent && !pol.RequireClaim {
 		return body, sendTally{}
 	}
 	var msg proto.Message
@@ -47,8 +52,14 @@ func (r *Relay) withholdQueued(sig Signal, body []byte, pol Policy) ([]byte, sen
 		return nil, sendTally{}
 	}
 	tl := sendTally{unclassified: map[string]int{}}
-	tl.withheld = r.rules.withhold(p, pol.IncludePrompts, pol.IncludeToolContent, tl.unclassified)
-	if tl.withheld == 0 && len(tl.unclassified) == 0 {
+	if !pol.IncludePrompts || !pol.IncludeToolContent {
+		tl.withheld = r.rules.withhold(p, pol.IncludePrompts, pol.IncludeToolContent, tl.unclassified)
+	}
+	if restamp {
+		p.account = team.account
+		nameUser(p, pol)
+	}
+	if !restamp && tl.withheld == 0 && len(tl.unclassified) == 0 {
 		return body, tl
 	}
 	out, err := proto.Marshal(msg)

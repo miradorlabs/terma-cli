@@ -36,6 +36,10 @@ type Options struct {
 	SignIn SignIn
 	// CatchAll, in global mode, is where a part whose hold ran out unplaced goes instead of being dropped.
 	CatchAll func() (claim.Claim, bool)
+	// Router routes records to selected teams when active (Router.Active()).
+	Router Router
+	// NudgeRefresh triggers a coalesced, non-blocking refresh on ingest 403 ORG_NOT_ACCESSIBLE.
+	NudgeRefresh func(enrollment string)
 	// HeartbeatSend, set, turns the heartbeat on; HeartbeatEvery is its period.
 	HeartbeatSend  func(ctx context.Context, beat *logspb.LogsData) error
 	HeartbeatEvery time.Duration
