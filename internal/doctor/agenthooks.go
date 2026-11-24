@@ -73,13 +73,34 @@ const (
 	hooksRunOther
 )
 
-// judgeAgentHooks says whether a's hooks are in place for terma at exe, or for another
-// terma its file names, which detail then gives; for missing hooks, detail says where.
+// judgeAgentHooks says whether a's hooks are in place for terma at exe in every one of its
+// files, or for another terma a file names, which detail then gives; for missing hooks,
+// detail names each file that lacks them.
 func judgeAgentHooks(a agents.UserHooks, exe string) (hooksVerdict, string) {
-	path, err := a.UserHooksPath()
+	paths, err := agents.UserHooksPaths(a)
 	if err != nil {
 		return hooksMissing, err.Error()
 	}
+	verdict, other := hooksInPlace, ""
+	var missing []string
+	for _, path := range paths {
+		switch v, detail := judgeHooksFile(a, path, exe); v {
+		case hooksMissing:
+			missing = append(missing, detail)
+		case hooksRunOther:
+			if verdict == hooksInPlace {
+				verdict, other = hooksRunOther, detail
+			}
+		}
+	}
+	if len(missing) > 0 {
+		return hooksMissing, strings.Join(missing, ", ")
+	}
+	return verdict, other
+}
+
+// judgeHooksFile is judgeAgentHooks for a's hooks file at path.
+func judgeHooksFile(a agents.UserHooks, path, exe string) (hooksVerdict, string) {
 	dir := filepath.Dir(path)
 	plan, err := a.PlanUserHooks(dir, hookmgr.UserHookCommand(exe), true)
 	if err != nil {

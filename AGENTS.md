@@ -129,9 +129,13 @@ tool content (`terma.home_directory`, `Options.HomeDir`). A subagent's
 claim names the session that opened it where the agent's own telemetry does not (OMP's and
 grok's, `hookrun.Env.StartSubagent`), which the relay stamps as `terma.session.parent.id`
 (`stampParent`). Hook events never pass the relay, so delivery applies
-the same rules when it sends them; a prompt a hook spools (`terma.user.message`) leaves under
-any policy, so it counts, with its text only while the policy collects prompts and the agent
-still has the developer's consent (`delivery.promptContent`). A session marked not collected is dropped on arrival;
+the same rules when it sends them. Antigravity has no export, so its hooks send its content
+too: the prompt and the reply from the transcript, a tool call's arguments from `PostToolUse`
+and each tool's result as `terma.tool.result`. Which of it may go is ruled in
+`internal/agents/antigravity/content_paths.go` and `turn.go`. grok's export often loses the prompt,
+so its prompt hook sends it as the same event (`terma.user.message`), which leaves under any
+policy, so it counts, with its text only while the policy collects prompts and the agent still
+has the developer's consent (`delivery.promptContent`). A session marked not collected is dropped on arrival;
 everything else unclaimed is held briefly and dropped: nothing unclaimed leaves the
 machine. The exception is a policy in global mode, which collects every session on the
 machine: it admits every repository, a hook outside git claims its session for the
@@ -139,24 +143,6 @@ policy's default project, and the relay sends what no claim places there too, ex
 session an agent's hooks claim every one of (`shape.SessionKey.Claimed`): it waits for its
 claim, so a hidden side thread no hook claims stays here. What is held stays in memory,
 never on disk, and a stopping relay drops it.
-
-**Skills.** For each skill a Claude Code, Codex or Antigravity session uses, a hook spools
-one `terma.skill.definition`: the skill's name as the agent reports it, its description,
-and where it is held (`hookrun.SpoolSkills`, once per skill per session). Claude Code's
-come from its transcript at a turn's end: the model's `Skill` calls and a person's `/name`,
-each with the directory it loaded from, and the listing it gives the model, which only
-tells which names are skills. Codex's come from the shell call that prints a `SKILL.md`
-under one of Codex's skill roots, and from the rollout's record of a `$name` skill, which
-goes under the name Codex recorded. Antigravity's come from the `read_file` of a `SKILL.md`
-under one of agy's skill folders, at `PostToolUse`, and the use also rides on that step's
-`terma.tool.call` as `terma.skill.name`; a person's `/name` in the agy CLI puts the skill's
-body into the prompt with no tool call, and is not reported. A description is read from the
-frontmatter of the skill's own file, and only where YAML accepts it, never from a listing
-or a skill's body, so a Claude Code built-in with no directory, or a command file, is
-reported without one. A link leaves only to a repository the policy collects or, for a
-plugin, its GitHub marketplace, with the file's path where it is known. A definition is
-content of both kinds: hooks spool none, and delivery drops a queued one, and a queued tool
-call's `terma.skill.name`, unless the policy collects prompts and tool content.
 
 ### Lanes, ownership, and loss accounting
 

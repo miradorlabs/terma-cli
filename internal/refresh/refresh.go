@@ -1,6 +1,7 @@
 // Package refresh rewrites, with this build's templates, the home-directory files an
 // earlier terma wrote: from disk alone, never creating a file, signing in, or changing a
-// choice, which `terma setup` would.
+// choice, which `terma setup` would; but an agent's home that a client made after setup gets
+// terma's hook when another home of that agent already has it switched on.
 package refresh
 
 import (

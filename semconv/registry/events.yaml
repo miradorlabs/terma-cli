@@ -534,16 +534,6 @@ events:
       - ref: terma.operation.interrupted
       - ref: error.type
         note: error, timeout, permission_denied or _OTHER.
-      - ref: terma.skill.name
-        requirement_level:
-          conditionally_required: >-
-            When the call loaded a skill and the agent reports the use nowhere else
-            (Antigravity's read of a skill's file).
-        note: >
-          Sent only while the team's policy collects prompts and tool content, as the
-          skill's definition is.
-        annotations:
-          content: tool
 
   - name: terma.compaction
     stability: development
@@ -604,6 +594,7 @@ events:
         requirement_level: required
       - ref: terma.message.phase
       - ref: terma.turn.id
+      - ref: terma.step.index
       - ref: gen_ai.request.model
       - ref: terma.agent.id
       - ref: gen_ai.agent.name
@@ -614,8 +605,10 @@ events:
     brief: One prompt to an agent whose export may lose its prompts, from the agent's prompt hook.
     note: >
       Sent for every prompt, with its text only while the team's policy collects prompts and
-      the developer chose the agent; a withheld prompt still counts as one. It names no turn:
-      nothing joins the hook's prompt id to the turn the agent's export names. A subagent's
+      the developer chose the agent; a withheld prompt still counts as one. One from a prompt
+      hook names no turn: nothing joins the hook's prompt id to the turn the agent's export
+      names. An agent whose transcript names the turn (Antigravity) sends the prompt from the
+      transcript, with terma.turn.id, terma.step.index and terma.evidence.source. A subagent's
       prompt names the subagent's kind in gen_ai.agent.name: the parent agent wrote it, not
       the person.
     attributes:
@@ -628,6 +621,37 @@ events:
       - ref: terma.message.text
       - ref: terma.message.truncated
       - ref: gen_ai.agent.name
+      - ref: terma.turn.id
+      - ref: terma.step.index
+      - ref: terma.evidence.source
+
+  - name: terma.tool.result
+    stability: development
+    requirement_level: recommended
+    brief: One tool call's result, read apart from the call; it joins the call's own record by its call id.
+    note: >
+      Sent by an agent that learns a call's result from another source than the call, later
+      (Antigravity's transcript). It names no tool: the result's source does not. Tool content
+      through and through: delivery sends it whole while the team's policy collects tool
+      content and the developer chose the agent, and drops it otherwise.
+    attributes:
+      - ref: session.id
+        requirement_level: required
+      - ref: gen_ai.main_agent.name
+        requirement_level: required
+      - ref: terma.evidence.source
+        requirement_level: required
+      - ref: gen_ai.tool.call.id
+        requirement_level: required
+      - ref: gen_ai.tool.call.result
+        requirement_level: required
+        note: >
+          The result's text, cut at terma's bound with the characters dropped named at its
+          end. Tool content, withheld unless the team's policy collects it.
+        annotations:
+          content: tool
+      - ref: terma.step.index
+      - ref: terma.turn.id
 
   - name: terma.session.title
     stability: development
@@ -697,45 +721,6 @@ events:
         note: Thinking included, where the agent does not count it apart.
       - ref: terma.operation.status
         note: completed or error.
-
-  - name: terma.skill.definition
-    stability: development
-    requirement_level: recommended
-    brief: >
-      What a skill the session used is and where it is held, once per skill per session.
-      Content as a whole: sent only while the team's policy collects prompts and tool content.
-    attributes:
-      - ref: session.id
-        requirement_level: required
-      - ref: gen_ai.main_agent.name
-        requirement_level: required
-      - ref: terma.evidence.source
-        requirement_level: required
-      - ref: terma.skill.name
-        requirement_level: required
-      - ref: terma.skill.description
-        requirement_level:
-          conditionally_required: When the skill's own file gives one within the bound.
-      - ref: terma.skill.origin
-        requirement_level:
-          conditionally_required: When where the agent found the skill can be told.
-      - ref: terma.skill.plugin.name
-        requirement_level:
-          conditionally_required: For a plugin's skill.
-      - ref: terma.skill.marketplace.name
-        requirement_level:
-          conditionally_required: For a plugin's skill.
-      - ref: terma.skill.repository.url
-        requirement_level:
-          conditionally_required: >-
-            When the skill's file is held in a repository the team's policy collects, with
-            terma.skill.path; for a plugin's skill whose marketplace is a GitHub repository,
-            with terma.skill.path where the file's place in it is known.
-      - ref: terma.skill.path
-        requirement_level:
-          conditionally_required: >-
-            With terma.skill.repository.url, when the file's place in that repository is
-            known.
 
   - name: terma.relay.heartbeat
     stability: development

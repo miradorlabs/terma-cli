@@ -1,27 +1,24 @@
 package antigravity
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
 	"time"
 
-	"github.com/miradorlabs/terma-cli/internal/flock"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
 	"github.com/miradorlabs/terma-cli/internal/sendas"
-	"github.com/miradorlabs/terma-cli/internal/session"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
-// agy has no export, but its transcript records every model call as a PLANNER_RESPONSE
-// line with the call's model and token counts, written before the hooks that follow the
-// call run. Each hook reads the lines written since the last one and sends one
-// terma.model_call per call it may send (see turn.go for which). The highest step handled
-// keeps any call from going twice, even after compaction rewrites the file.
+// The transcript as events (the package comment says how it fits): where a conversation's
+// transcript is, a hook's read of it, and what one line sends. agy writes each model call as a
+// PLANNER_RESPONSE line, with its model and token counts, before the hooks that follow the
+// call run, and beside them the prompt (USER_INPUT), the reply (a PLANNER_RESPONSE's content)
+// and each tool's result (GENERIC). The highest step handled keeps any line from going twice,
+// even after compaction rewrites the file.
 
 // antigravityTranscriptName is the transcript that holds the whole of every step; the
 // compact transcript.jsonl beside it cuts long fields.
@@ -59,43 +56,22 @@ func antigravityTranscript(in *antigravityHookInput) string {
 	return p
 }
 
-// captureAntigravityCalls reads the transcript past the last read and sends each model
-// call, and each subagent the conversation opened, that the rule in turn.go lets this hook
-// send; it passes the rest. It reports whether it read the transcript, so the hook's
-// observation says usage travels apart.
-func captureAntigravityCalls(ctx context.Context, e hookrun.Env, r *hookrun.Repo, in *antigravityHookInput) bool {
-	transcript := antigravityTranscript(in)
-	id := in.id()
-	if transcript == "" || e.Spool == nil || !session.ValidID(id) {
+// read reads the transcript past the last read and sends each line the rule in turn.go lets
+// this hook send, through send below; it passes the rest. It reports whether it read the
+// transcript, so the hook's observation says usage travels apart. Without the lock it reads
+// nothing.
+func (c *antigravityConversation) read(ctx context.Context) bool {
+	if !c.held {
 		return false
 	}
-	dir := filepath.Join(e.StateDir, antigravityCallDir)
-	if os.MkdirAll(dir, 0o700) != nil {
-		return false
-	}
-	path := filepath.Join(dir, hookrun.EvidenceID(id)+".json")
-	lockCtx, cancel := context.WithTimeout(ctx, antigravityCallLockWait)
-	defer cancel()
-	unlock, err := flock.Lock(lockCtx, path+".lock")
-	if err != nil {
-		e.Logf("antigravity calls: %v", err)
-		return false
-	}
-	defer unlock()
-	// A state that begins passes what the transcript already holds (see turn.go).
-	last := antigravityCallState{Step: -1}
-	b, readErr := os.ReadFile(path)
-	began := readErr != nil || json.Unmarshal(b, &last) != nil
-	if began {
-		last = antigravityCallState{Step: -1}
-		if info, err := os.Stat(transcript); err == nil {
-			last.Before = info.Size()
-		}
-	}
-	before, _ := json.Marshal(last)
+	e, r, id := c.e, c.r, c.in.id()
 	// The turn this hook saw begin here, and its first step; -1 sends nothing.
 	own := antigravityTurnID(e, r, id)
 	first := antigravityTurnNumber(own)
+	prompt := int64(-1)
+	if first > 0 {
+		prompt = first - 1
+	}
 	passed := 0
 	pass := func(s antigravityStep) bool {
 		if s.Type == "PLANNER_RESPONSE" {
@@ -103,9 +79,11 @@ func captureAntigravityCalls(ctx context.Context, e hookrun.Env, r *hookrun.Repo
 		}
 		return true
 	}
-	next, err := readAntigravitySteps(ctx, transcript, last, func(s antigravityStep) bool {
-		if first < 0 || *s.StepIndex < first {
-			// Before this turn, or no turn of this hook's: passed for good.
+	// A call is refused by the rule its hook judges its own arguments by.
+	next, err := readAntigravitySteps(ctx, antigravityTranscript(c.in), c.state, prompt, c.refuses, func(s antigravityStep) bool {
+		if first < 0 || (*s.StepIndex < first && !s.prompt) {
+			// Before this turn, or no turn of this hook's: passed for good. The one line before
+			// the turn that is its own is the prompt it began with.
 			return pass(s)
 		}
 		// The record must still name this turn right before the send. That is enough: agy
@@ -117,17 +95,7 @@ func captureAntigravityCalls(ctx context.Context, e hookrun.Env, r *hookrun.Repo
 			first = -1
 			return pass(s)
 		}
-		if s.Type == "PLANNER_RESPONSE" {
-			return e.EmitFor(r, antigravityCallEvent(id, s, own))
-		}
-		// Only invoke_subagent's result names a child; other output could quote one.
-		if child := antigravitySubagent(s.Content); child != "" && child != id {
-			// The child's own hooks name no parent: its session start, again, does.
-			return e.EmitFor(r, spool.Event{Name: semconv.TermaSessionStartEvent, SessionID: child, Attrs: map[string]any{
-				semconv.GenAIMainAgentNameKey: antigravityTool, semconv.TermaSessionParentIDKey: id,
-			}})
-		}
-		return true
+		return c.send(s, own)
 	})
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		e.Logf("antigravity transcript: %v", err)
@@ -135,15 +103,62 @@ func captureAntigravityCalls(ctx context.Context, e hookrun.Env, r *hookrun.Repo
 	if passed > 0 {
 		e.CountLost(r, sendas.LostTurnEnded, passed)
 	}
-	// A state that began is saved even unchanged: a subagent's first hook runs before its
-	// transcript exists, and the next must not begin again past the subagent's first call.
-	if b, err := json.Marshal(next); err == nil && (began || !bytes.Equal(b, before)) {
-		if err := hookrun.WriteState(path, b); err != nil {
-			e.Logf("antigravity calls state: %v", err)
-		}
-	}
-	if os.IsNotExist(readErr) {
-		hookrun.PruneState(dir, e.Time().Add(-spool.MaxAge))
-	}
+	// The clock moved as the read's events were stamped.
+	next.Clock = c.state.Clock
+	c.state = next
 	return err == nil
+}
+
+// send spools what one line of this hook's own turn holds: a prompt, a model call and its
+// reply, or a tool's result and the subagent it opened. Content goes only with its kind's
+// consent (antigravityContentFor); a result of a tainted batch does not go, nor a GENERIC
+// line outside a batch, which is no tool's result. It reports false when something could not
+// be spooled, for the line to be read again.
+func (c *antigravityConversation) send(s antigravityStep, turn string) bool {
+	e, r, id := c.e, c.r, c.in.id()
+	at := antigravityLineTime(s, e.Time())
+	switch s.Type {
+	case "USER_INPUT":
+		// DESIGN: design 3.3 says a hook whose workspaces are not all collected "sends what it
+		// sends today and no content". The prompt event is new, and goes here without its text,
+		// as it does with prompts withheld (3.1), so the prompt still counts; it carries no
+		// content. Sending no prompt event at all would be the stricter reading.
+		ev := antigravityPromptEvent(id, s, turn, c.contentFor().prompts)
+		ev.Time = c.stamp(at)
+		return e.EmitFor(r, ev)
+	case "PLANNER_RESPONSE":
+		ev := antigravityCallEvent(id, s, turn)
+		ev.Time = c.stamp(at)
+		if !e.EmitFor(r, ev) {
+			return false
+		}
+		// A reply after a refused read goes, as every agent's does; withholding it would need
+		// the tainted call line's step kept in the state.
+		if s.Content == "" || !c.contentFor().prompts {
+			return true
+		}
+		reply := antigravityReplyEvent(id, s, turn)
+		reply.Time = c.stamp(at)
+		return e.EmitFor(r, reply)
+	case "GENERIC":
+		c.call.meet(*s.StepIndex, func() time.Time { return c.stamp(at) })
+		// Only invoke_subagent's result names a child; other output could quote one. The link
+		// is not content: it goes whether or not the batch is tainted.
+		if child := antigravitySubagent(s.Content); s.subagentResult && child != "" && child != id {
+			// The child's own hooks name no parent: its session start, again, does.
+			link := spool.Event{Name: semconv.TermaSessionStartEvent, SessionID: child, Time: c.stamp(at), Attrs: map[string]any{
+				semconv.GenAIMainAgentNameKey: antigravityTool, semconv.TermaSessionParentIDKey: id,
+			}}
+			if !e.EmitFor(r, link) {
+				return false
+			}
+		}
+		if !s.toolResult || s.withheld || s.Content == "" || !c.contentFor().tools {
+			return true
+		}
+		ev := antigravityResultEvent(id, s, turn)
+		ev.Time = c.stamp(at)
+		return e.EmitFor(r, ev)
+	}
+	return true
 }

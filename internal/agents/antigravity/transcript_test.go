@@ -3,8 +3,10 @@ package antigravity
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -17,10 +19,13 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
-// The fixtures are real agy 1.5.13 transcripts with content scrubbed:
+// The fixtures are real agy 1.5.13 transcripts with content scrubbed, which the rig writes
+// back as made-up text in agy's shapes (said):
 // transcript_turns.jsonl is three completed turns and a fourth cancelled after its first
 // call (steps 17–20, no hook ran); transcript_subagent_*.jsonl a conversation that opened
-// one subagent, and the subagent's own. Line i of transcript_turns.jsonl is step i.
+// one subagent, and the subagent's own. Line i of transcript_turns.jsonl is step i. The tool
+// calls' arguments in transcript_turns.jsonl are made up too, each naming a file of the
+// rig's own checkout or none.
 
 const (
 	turnsConversation  = "81356ffa-7411-49ac-9916-142dea1662dc"
@@ -41,6 +46,14 @@ type transcriptRig struct {
 	id         string
 	// admitted are the checkouts the policy collects; root at first.
 	admitted []string
+	// agents are the agents the developer chose: Antigravity at first, so content may go.
+	agents []string
+	// noPrompts and noToolContent switch the policy's content off.
+	noPrompts, noToolContent bool
+	// workspaces, when set, are every payload's workspacePaths.
+	workspaces []string
+	// seen is every event drain returned.
+	seen []spool.Event
 }
 
 func newTranscriptRig(t *testing.T, id, fixture string) *transcriptRig {
@@ -58,7 +71,56 @@ func newTranscriptRig(t *testing.T, id, fixture string) *transcriptRig {
 	}
 	root := hookruntest.InitRepo(t)
 	return &transcriptRig{t: t, root: root, sp: sp, spDir: spDir, stateDir: t.TempDir(), transcript: transcript,
-		lines: strings.SplitAfter(strings.TrimSuffix(string(data), "\n"), "\n"), id: id, admitted: []string{root}}
+		lines: strings.SplitAfter(strings.TrimSuffix(string(data), "\n"), "\n"), id: id, admitted: []string{root},
+		agents: []string{Agent{}.Name()}}
+}
+
+// said is the made-up content the rig writes for a scrubbed line: a prompt in agy's
+// envelope, a reply, a tool's result or a notice, each naming its step.
+func said(kind string, step int64) string {
+	n := strconv.FormatInt(step, 10)
+	switch kind {
+	case "USER_INPUT":
+		return "<USER_REQUEST>\nmade-up prompt " + n + "\n</USER_REQUEST>\n<ADDITIONAL_METADATA>\nmade-up metadata " + n + "\n</ADDITIONAL_METADATA>"
+	case "PLANNER_RESPONSE":
+		return "made-up reply " + n
+	case "GENERIC":
+		return "Created At: 2026-11-20T16:51:50Z\nmade-up result " + n
+	}
+	return "made-up notice " + n
+}
+
+// fill writes a scrubbed line's content back as said's.
+func fill(line string) string {
+	if !strings.Contains(line, `"content":"<scrubbed>"`) {
+		return line
+	}
+	var s struct {
+		Step int64  `json:"step_index"`
+		Type string `json:"type"`
+	}
+	if json.Unmarshal([]byte(line), &s) != nil {
+		return line
+	}
+	text, _ := json.Marshal(said(s.Type, s.Step))
+	return strings.Replace(line, `"content":"<scrubbed>"`, `"content":`+string(text), 1)
+}
+
+// spoke reports whether any event drain returned carries the made-up content of step, of
+// any kind, in any attribute.
+func (g *transcriptRig) spoke(step int64) bool {
+	n := " " + strconv.FormatInt(step, 10)
+	for _, e := range g.seen {
+		for _, v := range e.Attrs {
+			b, _ := json.Marshal(v)
+			for _, kind := range []string{"prompt", "reply", "result"} {
+				if strings.Contains(string(b), "made-up "+kind+n+`"`) || strings.Contains(string(b), "made-up "+kind+n+`\n`) {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }
 
 // write makes the transcript the fixture's lines [0, n), each ending in a newline.
@@ -66,7 +128,7 @@ func (g *transcriptRig) write(n int) {
 	g.t.Helper()
 	var b strings.Builder
 	for _, l := range g.lines[:n] {
-		b.WriteString(strings.TrimSuffix(l, "\n") + "\n")
+		b.WriteString(fill(strings.TrimSuffix(l, "\n")) + "\n")
 	}
 	if err := os.WriteFile(g.transcript, []byte(b.String()), 0o600); err != nil {
 		g.t.Fatal(err)
@@ -86,12 +148,17 @@ func (g *transcriptRig) policy() config.Policy {
 	for _, root := range g.admitted {
 		p.Repositories = append(p.Repositories, hookruntest.Admitting(root).Repositories...)
 	}
+	p.IncludePrompts, p.IncludeToolContent = !g.noPrompts, !g.noToolContent
 	return p
 }
 
 func (g *transcriptRig) env(cwd, extra string) hookrun.Env {
 	payload := `{"conversationId":"` + g.id + `","modelName":"gemini-3.8-flash-low","cwd":"` + cwd + `","transcriptPath":"` + g.transcript + `",` + extra + `}`
-	return hookrun.Env{StateDir: g.stateDir, Now: time.Now(), Cwd: cwd, Policy: g.policy(), Stdin: strings.NewReader(payload), Stdout: &bytes.Buffer{}, Spool: g.sp, Version: "test"}
+	if len(g.workspaces) > 0 {
+		paths, _ := json.Marshal(g.workspaces)
+		payload = strings.TrimSuffix(payload, "}") + `,"workspacePaths":` + string(paths) + `}`
+	}
+	return hookrun.Env{StateDir: g.stateDir, Now: time.Now(), Cwd: cwd, Policy: g.policy(), Agents: g.agents, Stdin: strings.NewReader(payload), Stdout: &bytes.Buffer{}, Spool: g.sp, Version: "test"}
 }
 
 // hookAt runs h as a hook whose agent works in cwd.
@@ -112,6 +179,7 @@ func (g *transcriptRig) drain() map[string][]spool.Event {
 	out := map[string][]spool.Event{}
 	for _, e := range hookruntest.Spooled(g.t, g.sp) {
 		out[e.Name] = append(out[e.Name], e)
+		g.seen = append(g.seen, e)
 	}
 	return out
 }
@@ -184,8 +252,10 @@ func TestAntigravityCallsGoOnceEachWithTheirTokens(t *testing.T) {
 	if _, ok := c.Attrs[semconv.GenAIUsageReasoningOutputTokensKey]; ok {
 		t.Errorf("a reasoning count agy never gave: %v", c.Attrs)
 	}
-	if want := time.Date(2026, 11, 20, 16, 51, 50, 0, time.UTC); !c.Time.Equal(want) {
-		t.Errorf("call time %v", c.Time)
+	// Stamped from the conversation's clock: when agy wrote the line, raised past every event
+	// stamped before it (here the hooks', which ran at the real time).
+	if want := time.Date(2026, 11, 20, 16, 51, 50, 0, time.UTC); c.Time.Before(want) || !c.Time.After(calls[0].Time) {
+		t.Errorf("call time %v, the call before %v", c.Time, calls[0].Time)
 	}
 	// The hooks that read the transcript make no usage claim of their own.
 	for _, o := range got[semconv.TermaSessionObservationEvent] {
@@ -233,6 +303,10 @@ func TestAntigravityCallsGoOnceEachWithTheirTokens(t *testing.T) {
 	g.hook(stop, stopped)
 	if s := g.calls(); s != "step-22 turn-22" || g.lost() != 1 {
 		t.Fatalf("turn 22 sent %q, lost %d", s, g.lost())
+	}
+	// The cancelled turn's reply was passed with its call, and never leaves.
+	if g.spoke(19) {
+		t.Fatal("the cancelled turn's reply left")
 	}
 }
 

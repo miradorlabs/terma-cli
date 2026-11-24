@@ -129,14 +129,16 @@ func (g *transcriptRig) readCut(n int) {
 	if err != nil {
 		g.t.Fatal(err)
 	}
-	captureAntigravityCalls(&doneAfter{Context: context.Background(), n: n}, env, r, &antigravityHookInput{ConversationID: g.id, TranscriptPath: g.transcript})
+	conv := openAntigravityConversation(context.Background(), env, r, &antigravityHookInput{ConversationID: g.id, TranscriptPath: g.transcript})
+	defer conv.close()
+	conv.read(&doneAfter{Context: context.Background(), n: n})
 }
 
 // size is the bytes of the fixture's first n lines.
 func (g *transcriptRig) size(n int) int64 {
 	var size int64
 	for _, l := range g.lines[:n] {
-		size += int64(len(l))
+		size += int64(len(fill(strings.TrimSuffix(l, "\n")) + "\n"))
 	}
 	return size
 }
@@ -158,8 +160,9 @@ func TestAntigravityDeadlineStopsTheReadBeforeTheTurn(t *testing.T) {
 	if s := g.calls(); s != "" {
 		t.Fatalf("sent %s past the deadline", s)
 	}
-	if s := g.readCallState(); s.Offset != g.size(5) || s.Tail == "" || s.Step != 3 || s.Before != g.size(8) {
-		t.Fatalf("saved %+v, want offset %d, step 3, before %d", s, g.size(5), g.size(8))
+	// Step 4 is the result of step 3's call: the highest step handled.
+	if s := g.readCallState(); s.Offset != g.size(5) || s.Tail == "" || s.Step != 4 || s.Before != g.size(8) {
+		t.Fatalf("saved %+v, want offset %d, step 4, before %d", s, g.size(5), g.size(8))
 	}
 
 	// The turn's calls are written after its first hook; the next hook finishes the first

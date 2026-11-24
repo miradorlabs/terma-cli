@@ -9,6 +9,7 @@
 // Hooks (hooks.go)
 //
 //	UserHooks       the machine-wide hooks setup writes
+//	UserHooksFiles  more than one file of them, one per home of the agent
 //	UserHooksTrust  the step the developer takes before those run
 //	ManagedHooks    the same hooks as configuration an organization deploys
 //	PayloadReader   a hook payload that names its session in keys of its own

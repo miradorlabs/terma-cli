@@ -311,6 +311,22 @@ func TestAntigravityTurnsAreNamedByWhereTheyBegan(t *testing.T) {
 	}
 }
 
+// A PostToolUse with a step but no toolCall still leaves as a call, without arguments.
+func TestAntigravityPostToolUseWithoutAToolCall(t *testing.T) {
+	g := newTranscriptRig(t, turnsConversation, "transcript_turns.jsonl")
+	g.write(1)
+	g.hook(preInvocation, begin("1"))
+	g.write(2)
+	g.hook(postToolUse, `"stepIdx":2`)
+	call, ok := byID(g.drain()[semconv.TermaToolCallEvent])["step-2"]
+	if !ok {
+		t.Fatal("the call did not go")
+	}
+	if _, args := call.Attrs[semconv.GenAIToolCallArgumentsKey]; args {
+		t.Errorf("arguments from no toolCall: %v", call.Attrs)
+	}
+}
+
 // A payload naming neither a tool nor a step is not a call terma can describe.
 func TestAntigravityToolCallNeedsANameOrAStep(t *testing.T) {
 	t.Parallel()
