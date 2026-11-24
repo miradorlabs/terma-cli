@@ -224,14 +224,28 @@ func New(opts Options) *Relay {
 	opts.Grace = cmp.Or(opts.Grace, 5*time.Second)
 	sendCtx, cancel := context.WithCancel(context.Background())
 	r := &Relay{
-		opts: opts, rules: compose(opts.Correlators, opts.Capturers), stats: newStats(),
-		cache:  lookupCache{claims: map[string]cachedClaim{}, policies: map[string]cachedPolicy{}},
-		held:   map[string][]heldPart{},
-		traces: map[string]traceSession{}, procs: map[int]*procState{}, senders: map[route]*sender{}, outbox: outbox{dir: opts.Dir},
-		lastSeen: opts.Now(), sendCtx: sendCtx, cancelSend: cancel, stopping: make(chan struct{}),
+		opts:            opts,
+		rules:           compose(opts.Correlators, opts.Capturers),
+		stats:           newStats(),
+		cache:           lookupCache{claims: map[string]cachedClaim{}, policies: map[string]cachedPolicy{}},
+		held:            map[string][]heldPart{},
+		traces:          map[string]traceSession{},
+		procs:           map[int]*procState{},
+		senders:         map[route]*sender{},
+		outbox:          outbox{dir: opts.Dir},
+		lastSeen:        opts.Now(),
+		sendCtx:         sendCtx,
+		cancelSend:      cancel,
+		stopping:        make(chan struct{}),
 		unreadableRetry: unreadableRetry,
+		teamState: teamState{
+			pinnedHold:    map[string][]heldPart{},
+			teamSenders:   map[teamRoute]*sender{},
+			teamRecovered: map[teamRoute]bool{},
+			mixedSeen:     map[string]time.Time{},
+			nudging:       map[string]bool{},
+		},
 	}
-	r.pinnedHold, r.teamSenders, r.teamRecovered, r.mixedSeen, r.nudging = map[string][]heldPart{}, map[teamRoute]*sender{}, map[teamRoute]bool{}, map[string]time.Time{}, map[string]bool{}
 	r.seedLane()
 	return r
 }
@@ -368,7 +382,8 @@ func (r *Relay) export(w http.ResponseWriter, req *http.Request, s Signal) {
 	narrow := (r.teams() || r.opts.CatchAll != nil) && !r.takesUnplaced()
 	for _, p := range parts {
 		p.pid, p.narrow, p.account, p.lost, p.arrived = pid, narrow, lane, lost, arrived
-		p.at, p.endAt = intervalOf(p.msg)
+		p.at = earliest(p.msg)
+		p.startAt, p.endAt = intervalOf(p.msg)
 		r.stats.received(s, p.records)
 		if p.session != "" && !strings.HasPrefix(p.session, tracePrefix) {
 			r.learnProcess(pid, p.session)

@@ -3,6 +3,7 @@ package relay
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -1099,7 +1100,8 @@ func TestReviewEdgeCases(t *testing.T) {
 			}}}},
 		}}}
 		p := &part{signal: Metrics, msg: md, records: 2, pid: 4242, session: procKey(4242), account: accountA, arrived: now}
-		p.at, p.endAt = intervalOf(p.msg)
+		p.at = earliest(p.msg)
+		p.startAt, p.endAt = intervalOf(p.msg)
 		r.route(p)
 		waitFor(t, func() bool { return len(up1.requests()) == 1 && len(up2.requests()) == 1 })
 		if got, want := up1.requests()[0], "Bearer token-"+accountA+" proj_1"; got != want {
@@ -1245,7 +1247,8 @@ func TestReviewEdgeCases(t *testing.T) {
 			}}}},
 		}}}
 		p := &part{signal: Traces, msg: spans, records: 1, pid: 6161, session: "s_end_nc", account: accountA, arrived: t0.Add(time.Minute)}
-		p.at, p.endAt = intervalOf(p.msg)
+		p.at = earliest(p.msg)
+		p.startAt, p.endAt = intervalOf(p.msg)
 		r.route(p)
 		if routeCalls.Load() != 0 {
 			t.Fatalf("Router.Route called %d times for span ending in not-collected placement, want 0", routeCalls.Load())
@@ -1291,7 +1294,8 @@ func TestReviewEdgeCases(t *testing.T) {
 			}}}},
 		}}}
 		p := &part{signal: Traces, msg: spans, records: 1, pid: 7171, session: "s_cross_ab", account: accountA, arrived: t0.Add(time.Minute)}
-		p.at, p.endAt = intervalOf(p.msg)
+		p.at = earliest(p.msg)
+		p.startAt, p.endAt = intervalOf(p.msg)
 		r.route(p)
 		if routeCalls.Load() != 0 {
 			t.Fatalf("Router.Route called %d times for span crossing A->B, want 0", routeCalls.Load())
@@ -1345,7 +1349,8 @@ func TestReviewEdgeCases(t *testing.T) {
 			}}},
 		}}}
 		p := &part{signal: Traces, msg: spans, records: 4, pid: 8181, session: "s_aba", account: accountA, arrived: t0.Add(time.Minute)}
-		p.at, p.endAt = intervalOf(p.msg)
+		p.at = earliest(p.msg)
+		p.startAt, p.endAt = intervalOf(p.msg)
 		r.route(p)
 		if len(routedOrigins) != 3 {
 			t.Fatalf("routed %d clean segments (%v), want 3", len(routedOrigins), routedOrigins)
@@ -1409,6 +1414,70 @@ func TestReviewEdgeCases(t *testing.T) {
 		s.mu.Unlock()
 		if got != 2 {
 			t.Fatalf("queued entries after retry = %d, want 2 (no duplicates)", got)
+		}
+	})
+
+	t.Run("sweepPinned_memoizes_teamReady_per_pass", func(t *testing.T) {
+		t.Parallel()
+		var resolveCalls atomic.Int32
+		verdict := Wait
+		router := &stubRouter{
+			active: true,
+			routeFn: func(rec Record) Routed {
+				return Routed{
+					Outcome: Hold,
+					Why:     WhyBlocked,
+					Queued:  Queued{Enrollment: "enr_memo", Project: "p_memo", Account: rec.Account, Kind: "repository"},
+				}
+			},
+			recheckFn: func(_, _ string) Rechecker {
+				if verdict == Wait {
+					return stubRechecker{waits: true, waitRes: Rechecked{Verdict: Wait, Why: WhyBlocked}}
+				}
+				return stubRechecker{entryFn: func(Queued) Rechecked { return Rechecked{Verdict: SendNow} }}
+			},
+			resolveFn: func(_, _, account string) (Policy, error) {
+				resolveCalls.Add(1)
+				return Policy{Endpoint: "https://example.invalid", Account: account, IncludePrompts: true, IncludeToolContent: true}, nil
+			},
+		}
+		r := New(Options{
+			Router: router,
+			SignIn: &testSignIn{account: accountA},
+			Now:    func() time.Time { return t0 },
+			Lookup: func(session string, _ time.Time) (claim.Claim, bool) {
+				return claim.Claim{Tool: "claude-code", Kind: claim.KindRepository, Placements: []claim.Placement{{Since: t0.Add(-time.Minute), Kind: claim.KindRepository}}}, true
+			},
+		})
+		t.Cleanup(func() { r.cancelSend(); r.wg.Wait() })
+
+		const pinnedCount = 50
+		for i := range pinnedCount {
+			p := &part{
+				signal:  Logs,
+				msg:     oneSessionLog("s_memo", fmt.Sprintf("msg-%d", i)),
+				records: 1,
+				session: "s_memo",
+				account: accountA,
+				arrived: t0,
+			}
+			p.at = earliest(p.msg)
+			p.startAt, p.endAt = intervalOf(p.msg)
+			r.route(p)
+		}
+		if r.heldN != pinnedCount {
+			t.Fatalf("heldN = %d, want %d", r.heldN, pinnedCount)
+		}
+		verdict = SendNow
+		r.sweep()
+		if r.heldN != 0 {
+			t.Fatalf("heldN after release = %d, want 0", r.heldN)
+		}
+		if got := r.Stats().Snapshot().Counters["released_after_hold"]; got != pinnedCount {
+			t.Fatalf("released_after_hold = %d, want %d", got, pinnedCount)
+		}
+		if got := resolveCalls.Load(); got != 1 {
+			t.Fatalf("Router.Resolve called %d times for %d pinned parts in one sweep, want 1", got, pinnedCount)
 		}
 	})
 }

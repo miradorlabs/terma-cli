@@ -124,7 +124,10 @@ func (s *sender) nextAfter(after map[Signal]string, only Signal) (best entry, fo
 		i := 0
 		if cur := after[sig]; cur != "" {
 			idx, eq := slices.BinarySearchFunc(q, cur, entryCmp)
-			i = idx + map[bool]int{true: 1}[eq]
+			i = idx
+			if eq {
+				i++
+			}
 		}
 		if i < len(q) && (!found || q[i].name < best.name) {
 			best, found = q[i], true
@@ -157,7 +160,9 @@ func (s *sender) nextBatch(limit int) ([]entry, time.Duration) {
 		return s.next(limit), idleWait
 	}
 	if _, has := s.nextAfter(nil, ""); !has {
-		s.scanAfter, s.scanFound, s.scanWait = nil, false, false
+		s.scanAfter = nil
+		s.scanFound = false
+		s.scanWait = false
 		return nil, idleWait
 	}
 	if !s.r.teams() || !s.r.laneActive(s.team.account) {
@@ -168,26 +173,39 @@ func (s *sender) nextBatch(limit int) ([]entry, time.Duration) {
 	s.gen = rc.Generation()
 	if discarded, waited := s.checkTeamWaits(rc); discarded || waited {
 		s.setKeyless(waited)
-		return nil, map[bool]time.Duration{true: keylessRetry, false: idleWait}[waited]
+		if waited {
+			return nil, keylessRetry
+		}
+		return nil, idleWait
 	}
 	after := map[Signal]string{}
 	maps.Copy(after, s.scanAfter)
-	entries, firstSig, firstProj, waiting := []entry(nil), Signal(""), "", false
+	var entries []entry
+	var firstSig Signal
+	var firstProj string
+	waiting := false
 	for scanned := 0; len(entries) < limit && scanned < max(limit*4, maxMergeFiles); scanned++ {
 		e, ok := s.nextAfter(after, firstSig)
 		if !ok {
 			if len(entries) > 0 {
 				break
 			}
-			hadWork, wasWait := s.scanFound, waiting || s.scanWait
-			s.scanAfter, s.scanFound, s.scanWait = nil, false, false
+			hadWork := s.scanFound
+			wasWait := waiting || s.scanWait
+			s.scanAfter = nil
+			s.scanFound = false
+			s.scanWait = false
 			if hadWork {
 				return nil, 0
 			}
 			s.mu.Lock()
-			s.keyless, s.blocked = wasWait, false
+			s.keyless = wasWait
+			s.blocked = false
 			s.mu.Unlock()
-			return nil, map[bool]time.Duration{true: keylessRetry, false: idleWait}[wasWait]
+			if wasWait {
+				return nil, keylessRetry
+			}
+			return nil, idleWait
 		}
 		after[e.signal] = e.name
 		ready, w := !e.unread, false
@@ -197,7 +215,10 @@ func (s *sender) nextBatch(limit int) ([]entry, time.Duration) {
 		}
 		if ready && (len(entries) == 0 || e.q.Project == firstProj) {
 			if v := s.checkEntry(rc, e); v == SendNow {
-				firstSig, firstProj, entries, s.scanFound = cmp.Or(firstSig, e.signal), cmp.Or(firstProj, e.q.Project), append(entries, e), true
+				firstSig = cmp.Or(firstSig, e.signal)
+				firstProj = cmp.Or(firstProj, e.q.Project)
+				entries = append(entries, e)
+				s.scanFound = true
 				continue
 			} else if v == Wait {
 				waiting = true
@@ -208,7 +229,8 @@ func (s *sender) nextBatch(limit int) ([]entry, time.Duration) {
 		}
 	}
 	if len(entries) == 0 {
-		s.scanAfter, s.scanWait = after, s.scanWait || waiting
+		s.scanAfter = after
+		s.scanWait = s.scanWait || waiting
 		return nil, 0
 	}
 	s.setKeyless(false)
@@ -230,13 +252,16 @@ func (s *sender) postBatch(ctx context.Context, pol Policy, batch []entry, body 
 			return keyless, keylessRetry, "lane changed before send"
 		}
 		rc := s.r.opts.Router.Recheck(s.team.enrollment, s.team.account)
-		if discarded, waited := s.checkTeamWaits(rc); discarded || waited {
-			return map[bool]outcome{true: aborted, false: keyless}[discarded], map[bool]time.Duration{true: 0, false: keylessRetry}[discarded], map[bool]string{true: "", false: "team waiting before send"}[discarded]
+		if discarded, waited := s.checkTeamWaits(rc); discarded {
+			return aborted, 0, ""
+		} else if waited {
+			return keyless, keylessRetry, "team waiting before send"
 		}
 		var discarded, waited bool
 		for _, e := range batch {
 			v := s.checkEntry(rc, e)
-			discarded, waited = discarded || v == Discard, waited || v == Wait
+			discarded = discarded || v == Discard
+			waited = waited || v == Wait
 		}
 		if genChanged := rc.Generation() != s.gen; discarded || genChanged {
 			if genChanged {

@@ -47,7 +47,10 @@ func (r *Relay) pieces(key string, p *part) []*part {
 }
 func splitBeforeMixed(p *part, mixedAt time.Time) (before, atOrAfter *part) {
 	parts := partitionPart(p, func(iv timeInterval) string {
-		return map[bool]string{true: "b", false: "m"}[!unixTime(iv.end).IsZero() && unixTime(iv.end).Before(mixedAt)]
+		if end := unixTime(iv.end); !end.IsZero() && end.Before(mixedAt) {
+			return "b"
+		}
+		return "m"
 	})
 	if len(parts) < 2 {
 		return nil, p
@@ -57,15 +60,30 @@ func splitBeforeMixed(p *part, mixedAt time.Time) (before, atOrAfter *part) {
 	}
 	return parts[0], parts[1]
 }
+func emptySignalMessage(sig Signal) proto.Message {
+	switch sig {
+	case Logs:
+		return &logspb.LogsData{}
+	case Traces:
+		return &tracepb.TracesData{}
+	case Metrics:
+		return &metricspb.MetricsData{}
+	default:
+		return nil
+	}
+}
 func partitionPart(p *part, keyOf func(timeInterval) string) []*part {
-	groups, out := map[string]*part{}, []*part(nil)
+	groups := map[string]*part{}
+	var out []*part
 	get := func(k string) *part {
 		if pc := groups[k]; pc != nil {
 			return pc
 		}
 		pc := *p
-		pc.msg, pc.records = map[Signal]proto.Message{Logs: &logspb.LogsData{}, Traces: &tracepb.TracesData{}, Metrics: &metricspb.MetricsData{}}[p.signal], 0
-		groups[k], out = &pc, append(out, &pc)
+		pc.msg = emptySignalMessage(p.signal)
+		pc.records = 0
+		groups[k] = &pc
+		out = append(out, &pc)
 		return &pc
 	}
 	switch m := p.msg.(type) {
@@ -114,7 +132,8 @@ func partitionPart(p *part, keyOf func(timeInterval) string) []*part {
 		return []*part{p}
 	}
 	for _, pc := range out {
-		pc.at, pc.endAt = intervalOf(pc.msg)
+		pc.at = earliest(pc.msg)
+		pc.startAt, pc.endAt = intervalOf(pc.msg)
 	}
 	return out
 }
