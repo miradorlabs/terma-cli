@@ -2,10 +2,10 @@ package antigravity
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
-	"slices"
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
@@ -97,7 +97,9 @@ func (c *antigravityConversation) read(ctx context.Context) bool {
 		}
 		return true
 	}
-	next, err := readAntigravitySteps(ctx, antigravityTranscript(c.in), c.state, prompt, func(s antigravityStep) bool {
+	// A call is refused by the rule its hook judges its own arguments by.
+	refuses := func(args json.RawMessage) bool { return antigravityRefusesArgs(e, e.Cwd, args) }
+	next, err := readAntigravitySteps(ctx, antigravityTranscript(c.in), c.state, prompt, refuses, func(s antigravityStep) bool {
 		if first < 0 || (*s.StepIndex < first && !s.prompt) {
 			// Before this turn, or no turn of this hook's: passed for good. The one line before
 			// the turn that is its own is the prompt it began with.
@@ -120,16 +122,15 @@ func (c *antigravityConversation) read(ctx context.Context) bool {
 	if passed > 0 {
 		e.CountLost(r, sendas.LostTurnEnded, passed)
 	}
-	// What the reader keeps beside the read itself; a step read past has no result to come.
-	next.Refused = slices.DeleteFunc(slices.Clone(c.state.Refused), func(step int64) bool { return step <= next.Step })
-	next.Withheld, next.Clock = c.state.Withheld, c.state.Clock
+	// The clock moved as the read's events were stamped.
+	next.Clock = c.state.Clock
 	c.state = next
 	return err == nil
 }
 
 // send spools what one line of this hook's own turn holds: a prompt, a model call and its
 // reply, or a tool's result and the subagent it opened. Content goes only with its kind's
-// consent (antigravityContentFor); a refused step's result does not go. It reports false when
+// consent (antigravityContentFor); a result of a tainted batch does not go. It reports false when
 // something could not be spooled, for the line to be read again.
 func (c *antigravityConversation) send(s antigravityStep, turn string) bool {
 	e, r, id := c.e, c.r, c.in.id()
@@ -149,7 +150,7 @@ func (c *antigravityConversation) send(s antigravityStep, turn string) bool {
 		if !e.EmitFor(r, ev) {
 			return false
 		}
-		if s.Content == "" || !c.contentFor().prompts || c.repliesWithheld(turn, *s.StepIndex) {
+		if s.Content == "" || !c.contentFor().prompts || antigravityRepliesWithheld(s, turn) {
 			return true
 		}
 		reply := antigravityReplyEvent(id, s, turn)
@@ -160,7 +161,7 @@ func (c *antigravityConversation) send(s antigravityStep, turn string) bool {
 			c.callAt = c.stamp(at)
 		}
 		// Only invoke_subagent's result names a child; other output could quote one. The link
-		// is not content: it goes whether or not the step was refused.
+		// is not content: it goes whether or not the batch is tainted.
 		if child := antigravitySubagent(s.Content); s.subagentResult && child != "" && child != id {
 			// The child's own hooks name no parent: its session start, again, does.
 			link := spool.Event{Name: semconv.TermaSessionStartEvent, SessionID: child, Time: c.stamp(at), Attrs: map[string]any{
@@ -170,7 +171,7 @@ func (c *antigravityConversation) send(s antigravityStep, turn string) bool {
 				return false
 			}
 		}
-		if s.Content == "" || !c.contentFor().tools || c.refused(*s.StepIndex) {
+		if s.Content == "" || !c.contentFor().tools || s.withheld {
 			return true
 		}
 		ev := antigravityResultEvent(id, s, turn)
@@ -178,4 +179,10 @@ func (c *antigravityConversation) send(s antigravityStep, turn string) bool {
 		return e.EmitFor(r, ev)
 	}
 	return true
+}
+
+// antigravityRepliesWithheld reports whether s's reply is withheld: the package's answer
+// withholds replies after a tainted call line, and that line is of turn, the one being read.
+func antigravityRepliesWithheld(s antigravityStep, turn string) bool {
+	return antigravityWithholdsRepliesAfterRefusal && s.withholdsFrom >= 0 && s.withholdsFrom >= antigravityTurnNumber(turn)
 }

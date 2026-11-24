@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 	"unicode/utf8"
 )
 
@@ -54,6 +55,10 @@ func TestAntigravityPromptTakesT3sWrapperOff(t *testing.T) {
 		{"renamed closing instructions", agyWrapped(strings.Replace(t3Wrapped("lost"), "</t3_code_instructions>", "</t3_instructions>", 1)), "", false},
 		{"trailing text after", agyWrapped(t3Wrapped("lost") + "\nmore"), "", false},
 		{"plain prompt naming the tags later", agyWrapped("why does <t3_code_instructions> wrap <user_request>?"), "why does <t3_code_instructions> wrap <user_request>?", true},
+		// A byte order mark and white space before the opening tag are skipped.
+		{"after a byte order mark", agyWrapped("\uFEFF" + t3Wrapped("typed")), "typed", true},
+		{"after white space", agyWrapped(" \n\t" + t3Wrapped("typed")), "typed", true},
+		{"after a mark and white space, broken", agyWrapped("\uFEFF\n" + strings.ReplaceAll(t3Wrapped("lost"), "user_request>", "user_req>")), "", false},
 	} {
 		got, ok := antigravityPrompt(tc.content)
 		if ok != tc.ok || got != tc.want {
@@ -149,6 +154,25 @@ func TestAntigravityCutsArguments(t *testing.T) {
 	for _, raw := range []string{``, `"a string"`, `[1,2]`, `null`, `{bad`} {
 		if _, ok := cutArguments(json.RawMessage(raw)); ok {
 			t.Errorf("arguments %q are not an object", raw)
+		}
+	}
+}
+
+// A line's time is its created_at, but never later than the hook's real time.
+func TestAntigravityLineTimeIsNeverAfterTheHook(t *testing.T) {
+	t.Parallel()
+	now := time.Date(2026, 11, 20, 16, 52, 0, 0, time.UTC)
+	for _, tc := range []struct {
+		created string
+		want    time.Time
+	}{
+		{"2026-11-20T16:51:47Z", time.Date(2026, 11, 20, 16, 51, 47, 0, time.UTC)},
+		{"2026-11-20T16:52:00Z", now},
+		{"2026-11-20T17:00:00Z", now},
+		{"not a time", now},
+	} {
+		if got := antigravityLineTime(antigravityStep{CreatedAt: tc.created}, now); !got.Equal(tc.want) {
+			t.Errorf("%s: %v, want %v", tc.created, got, tc.want)
 		}
 	}
 }

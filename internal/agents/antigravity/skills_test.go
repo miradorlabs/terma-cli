@@ -75,7 +75,8 @@ func skillCapture(t *testing.T) (env hookrun.Env, payloads []string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return hookrun.Env{StateDir: t.TempDir(), Now: time.Now(), Cwd: root, Policy: hookruntest.Admitting(root), Spool: sp, Version: "test"}, payloads
+	// The developer chose Antigravity: a skill's use is content, and goes under that consent.
+	return hookrun.Env{StateDir: t.TempDir(), Now: time.Now(), Cwd: root, Policy: hookruntest.Admitting(root), Agents: []string{Agent{}.Name()}, Spool: sp, Version: "test"}, payloads
 }
 
 // replay runs each payload through postToolUse as agy's hook would.
@@ -192,6 +193,22 @@ func TestPostToolUseReportsNoSkillWhileThePolicyWithholds(t *testing.T) {
 		}
 		checkCalls(t, events, make([]string, len(capturedUses)))
 	}
+}
+
+// A skill's use is content of both kinds and follows the same gates: in a conversation with a
+// workspace the policy does not collect, no skill is named or defined.
+func TestPostToolUseReportsNoSkillWithAWorkspaceElsewhere(t *testing.T) {
+	env, payloads := skillCapture(t)
+	excluded := hookruntest.InitRepo(t)
+	for i, p := range payloads {
+		payloads[i] = strings.Replace(p, `"workspacePaths":[`, `"workspacePaths":["`+hookruntest.InJSON(excluded)+`",`, 1)
+	}
+	replay(t, env, payloads)
+	events := hookruntest.Spooled(t, env.Spool)
+	if defs := hookruntest.Named(events, semconv.TermaSkillDefinitionEvent); len(defs) != 0 {
+		t.Errorf("defined %+v", defs)
+	}
+	checkCalls(t, events, make([]string, len(capturedUses)))
 }
 
 // A step loads a skill only through a read_file of a SKILL.md that succeeded, a relative

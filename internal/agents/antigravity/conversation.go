@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
-	"slices"
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/flock"
@@ -16,8 +15,8 @@ import (
 )
 
 // antigravityConversation is one hook's hold of a conversation's calls state, under its lock,
-// taken once per hook: how far the transcript was read, the steps whose content a hook
-// refused, and the clock every event of the conversation is stamped from. A hook that cannot
+// taken once per hook: how far the transcript was read, whether the batch being read is
+// tainted, and the clock every event of the conversation is stamped from. A hook that cannot
 // have the lock sends what it sends without it, at the real time, and no content.
 type antigravityConversation struct {
 	e   hookrun.Env
@@ -66,7 +65,7 @@ func openAntigravityConversation(ctx context.Context, e hookrun.Env, r *hookrun.
 	}
 	c.held, c.unlock = true, unlock
 	// A state that begins passes what the transcript already holds (see turn.go), and keeps
-	// no refusal or clock of an older one.
+	// no taint or clock of an older one.
 	c.state = antigravityCallState{Step: -1}
 	b, readErr := os.ReadFile(c.path)
 	c.created = os.IsNotExist(readErr)
@@ -119,46 +118,10 @@ func (c *antigravityConversation) callTime() time.Time {
 // contentFor is the content this hook may attach, worked out once.
 func (c *antigravityConversation) contentFor() antigravityContent {
 	if c.content == nil {
-		content := antigravityContentFor(c.ctx, c.e, c.in)
+		content := antigravityContentFor(c.e, c.in)
 		c.content = &content
 	}
 	return *c.content
-}
-
-// refuse records that step's content is refused, before the transcript is read, so the
-// reader withholds its result. It reports false when it cannot be recorded (the lock is not
-// held): the caller then ends the turn, so the result cannot go through.
-func (c *antigravityConversation) refuse(step int64) bool {
-	if !c.held {
-		return false
-	}
-	if !slices.Contains(c.state.Refused, step) {
-		c.state.Refused = append(c.state.Refused, step)
-		slices.Sort(c.state.Refused)
-	}
-	if antigravityWithholdsRepliesAfterRefusal {
-		if turn := antigravityRecordedTurn(c.e, c.in.id()); turn != "" {
-			c.state.Withheld = &antigravityWithheld{Turn: turn, From: step}
-		}
-	}
-	return true
-}
-
-// refused reports whether step's content was refused.
-func (c *antigravityConversation) refused(step int64) bool {
-	_, found := slices.BinarySearch(c.state.Refused, step)
-	return found
-}
-
-// repliesWithheld reports whether a reply at step of turn is withheld after a refusal.
-func (c *antigravityConversation) repliesWithheld(turn string, step int64) bool {
-	w := c.state.Withheld
-	return antigravityWithholdsRepliesAfterRefusal && w != nil && w.Turn == turn && step > w.From
-}
-
-// endTurn clears what a turn's refusals left, at its Stop.
-func (c *antigravityConversation) endTurn() {
-	c.state.Refused, c.state.Withheld = nil, nil
 }
 
 // close saves the state, when it changed or began, and lets the lock go.
@@ -178,18 +141,4 @@ func (c *antigravityConversation) close() {
 	if c.created {
 		hookrun.PruneState(filepath.Dir(c.path), c.e.Time().Add(-spool.MaxAge))
 	}
-}
-
-// antigravityRecordedTurn is the turn the conversation's record names, whatever checkout or
-// lane wrote it; "" for none.
-func antigravityRecordedTurn(e hookrun.Env, sessionID string) string {
-	b := antigravityTurnBegun(e, sessionID)
-	if b == nil || len(b) > 4<<10 {
-		return ""
-	}
-	var turn antigravityTurn
-	if json.Unmarshal(b, &turn) != nil || !hookrun.ShortLabel(turn.TurnID) {
-		return ""
-	}
-	return turn.TurnID
 }

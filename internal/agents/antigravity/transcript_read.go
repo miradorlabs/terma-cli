@@ -26,24 +26,20 @@ type antigravityCallState struct {
 	// Results names the tools of the last call whose results are still to be read: they
 	// follow it in order, one line each.
 	Results []string `json:"results,omitempty"`
+	// Tainted is that the last call line asked for a call whose content is refused
+	// (antigravityRefusesArgs), or could not be read: every result until the next call line
+	// is withheld.
+	Tainted bool `json:"tainted,omitempty"`
 	// Before is the transcript's size when this state began: the lines that start before it
 	// are never sent and never counted, but for the turn's own prompt (readAntigravitySteps).
 	// 0 once a read has passed it, and for a state that began with no transcript.
 	Before int64 `json:"before,omitempty"`
-	// Refused are the steps whose content a hook refused (content_paths.go), sorted: their
-	// results are withheld. Cleared once read past, and at the turn's Stop.
-	Refused []int64 `json:"refused,omitempty"`
-	// Withheld is the turn whose replies are withheld after a refusal, when
-	// antigravityWithholdsRepliesAfterRefusal is on.
-	Withheld *antigravityWithheld `json:"withheld,omitempty"`
+	// WithholdsFrom is the step of the last call line that was tainted, kept only while
+	// antigravityWithholdsRepliesAfterRefusal is on: the replies of its turn after it are
+	// withheld.
+	WithholdsFrom *int64 `json:"withholds_from,omitempty"`
 	// Clock is the last time stamped on an event of the conversation, in Unix milliseconds.
 	Clock int64 `json:"clock,omitempty"`
-}
-
-// antigravityWithheld is a turn whose replies after step From are withheld.
-type antigravityWithheld struct {
-	Turn string `json:"turn"`
-	From int64  `json:"from"`
 }
 
 // antigravityLineLimit bounds a transcript line terma reads; a longer one (a tool's whole
@@ -66,12 +62,20 @@ type antigravityStep struct {
 	Content string `json:"content"`
 	// subagentResult is set on the result of an invoke_subagent call.
 	subagentResult bool
+	// withheld is set on a result of a tainted call line (antigravityCallState.Tainted).
+	withheld bool
+	// withholdsFrom is antigravityCallState.WithholdsFrom as it stood before the line, -1 for
+	// none.
+	withholdsFrom int64
 	// prompt is set on the USER_INPUT the turn being read began with.
 	prompt bool
 }
 
+// antigravityToolCall is one call a PLANNER_RESPONSE line asks for, with the arguments the
+// call's PostToolUse carries.
 type antigravityToolCall struct {
-	Name string `json:"name"`
+	Name string          `json:"name"`
+	Args json.RawMessage `json:"args"`
 }
 
 // antigravityTailLen is how many bytes before the offset identify the file read so far.
@@ -87,7 +91,13 @@ var antigravityKept = map[string]bool{"USER_INPUT": true, "PLANNER_RESPONSE": tr
 // step prompt (-1 for none), the turn's own prompt, written just before the turn's first
 // hook: it is handed on marked, before the boundary or not. emit returning false, or ctx
 // done before a line, stops the read there, for the next hook.
-func readAntigravitySteps(ctx context.Context, path string, last antigravityCallState, prompt int64, emit func(s antigravityStep) bool) (antigravityCallState, error) {
+//
+// A call line is on disk before any of its results, and names its calls with the arguments
+// their hooks get. When refuses refuses any of them, or the line cannot be read, the line
+// taints its batch: every result until the next call line is handed on marked withheld, with
+// no pairing of a result to its call. The taint is tracked for every line read, before the
+// boundary too, as Results is.
+func readAntigravitySteps(ctx context.Context, path string, last antigravityCallState, prompt int64, refuses func(json.RawMessage) bool, emit func(s antigravityStep) bool) (antigravityCallState, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		// Missing too: a subagent's first hooks run before its transcript exists.
@@ -118,6 +128,28 @@ func readAntigravitySteps(ctx context.Context, path string, last antigravityCall
 			state.Before = 0
 		}
 	}
+	// pending are the calls of the last call line read while whether one is refused is not
+	// worked out yet: taint works it out only when a result of the batch is handed on, or the
+	// read stops, so a state that begins does not judge every path the transcript ever named.
+	var pending []antigravityToolCall
+	taint := func() bool {
+		if pending != nil {
+			state.Tainted = antigravityCallsRefused(pending, refuses)
+			pending = nil
+		}
+		return state.Tainted
+	}
+	// withholdReplies marks the replies after step withheld, when the package's answer does.
+	withholdReplies := func(step int64) {
+		if antigravityWithholdsRepliesAfterRefusal {
+			state.WithholdsFrom = &step
+		}
+	}
+	stop := func() antigravityCallState {
+		taint()
+		state.Tail = antigravityTail(f, state.Offset)
+		return state
+	}
 	if _, err := f.Seek(state.Offset, io.SeekStart); err != nil {
 		return last, err
 	}
@@ -125,8 +157,7 @@ func readAntigravitySteps(ctx context.Context, path string, last antigravityCall
 	for {
 		if ctx.Err() != nil {
 			// Out of time: what was handled is saved, the rest goes with the next hook.
-			state.Tail = antigravityTail(f, state.Offset)
-			return state, nil
+			return stop(), nil
 		}
 		line, n, err := antigravityLine(br)
 		if err != nil {
@@ -134,12 +165,12 @@ func readAntigravitySteps(ctx context.Context, path string, last antigravityCall
 			if errors.Is(err, io.EOF) {
 				err = nil
 			}
-			state.Tail = antigravityTail(f, state.Offset)
-			return state, err
+			return stop(), err
 		}
 		if line == nil {
-			// Too long to read: what results it may have held are unknown.
-			state.Results = nil
+			// Too long to read: the calls or results it held are unknown, so it taints.
+			state.Results, state.Tainted, pending = nil, true, nil
+			withholdReplies(state.Step)
 			advance(n)
 			continue
 		}
@@ -149,7 +180,14 @@ func readAntigravitySteps(ctx context.Context, path string, last antigravityCall
 			continue
 		}
 		var s antigravityStep
-		if json.Unmarshal(line, &s) != nil || s.StepIndex == nil || *s.StepIndex < 0 {
+		if json.Unmarshal(line, &s) != nil {
+			// Unreadable, as one too long is: it may be a call line whose calls are unknown.
+			state.Results, state.Tainted, pending = nil, true, nil
+			withholdReplies(state.Step)
+			advance(n)
+			continue
+		}
+		if s.StepIndex == nil || *s.StepIndex < 0 {
 			advance(n)
 			continue
 		}
@@ -157,14 +195,18 @@ func readAntigravitySteps(ctx context.Context, path string, last antigravityCall
 		// What the line moves on, kept only once it is read: a line emit refuses is read again.
 		// A prompt clears nothing: one that joins a running turn leaves its results pending,
 		// and after a cancelled turn the next call resets them.
-		results := state.Results
-		switch s.Type {
-		case "PLANNER_RESPONSE":
+		results, calls := state.Results, []antigravityToolCall(nil)
+		planner := s.Type == "PLANNER_RESPONSE"
+		switch {
+		case planner:
 			results = nil
 			for _, c := range s.ToolCalls {
 				results = append(results, c.Name)
 			}
-		case "GENERIC":
+			if len(s.ToolCalls) > 0 {
+				calls = s.ToolCalls
+			}
+		case s.Type == "GENERIC":
 			if len(results) > 0 {
 				s.subagentResult = results[0] == "invoke_subagent"
 				results = results[1:]
@@ -172,15 +214,40 @@ func readAntigravitySteps(ctx context.Context, path string, last antigravityCall
 		}
 		if step > state.Step && antigravityKept[s.Type] {
 			s.prompt = s.Type == "USER_INPUT" && prompt >= 0 && step == prompt
-			if (state.Offset >= state.Before || s.prompt) && !emit(s) {
-				state.Tail = antigravityTail(f, state.Offset)
-				return state, nil
+			if state.Offset >= state.Before || s.prompt {
+				s.withheld = s.Type == "GENERIC" && taint()
+				s.withholdsFrom = -1
+				if state.WithholdsFrom != nil {
+					s.withholdsFrom = *state.WithholdsFrom
+				}
+				if !emit(s) {
+					return stop(), nil
+				}
 			}
 			state.Step = step
 		}
 		state.Results = results
+		if planner {
+			state.Tainted, pending = false, calls
+			if antigravityWithholdsRepliesAfterRefusal && taint() {
+				withholdReplies(step)
+			}
+		}
 		advance(n)
 	}
+}
+
+// antigravityCallsRefused reports whether refuses refuses the arguments of any of calls.
+func antigravityCallsRefused(calls []antigravityToolCall, refuses func(json.RawMessage) bool) bool {
+	if refuses == nil {
+		return false
+	}
+	for _, c := range calls {
+		if refuses(c.Args) {
+			return true
+		}
+	}
+	return false
 }
 
 // antigravityLine reads one whole line, or nil for one longer than antigravityLineLimit,

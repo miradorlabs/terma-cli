@@ -507,12 +507,16 @@ is lost.
 Two rules keep another repository's content out. A conversation sends no content at all
 while any folder it works in is outside a repository your team's policy collects: resumed
 from such a repository, or from a folder outside git, it sends none for the rest of its
-life. A tool call whose arguments name a file in a repository the policy does not collect
-sends neither its arguments nor its result; links and nested clones are followed to the
-repository that holds the file, and a file terma cannot place counts as not collected. A
-file in no repository at all, such as a note in your home folder, is shown, as Claude Code
-and Codex show it. A shell command or an MCP tool that reads another repository is not
-caught, and neither is a reply that repeats what a refused read returned.
+life. In global mode a folder outside git is collected, as a session outside git is. A
+folder that is a link is judged by the repository it leads to. A tool call whose arguments
+name a file or folder in a repository the policy does not collect sends no arguments, and
+its result is withheld, and so are the results of the other calls the model asked for in the
+same step. Links, nested clones and submodules are followed to the repository that holds
+the file, and a file terma cannot place counts as not collected. A file in no repository at
+all, such as a note in your home folder, is shown, as Claude Code and Codex show it. With
+`GIT_DIR` set in the agent's environment, terma cannot tell which repository a file belongs
+to, so no content is sent. A shell command or an MCP tool that reads another repository is
+not caught, and neither is a reply that repeats what a refused read returned.
 
 T3 Code runs its own copy of Antigravity, with a folder of its own in place of `~/.gemini`.
 Setup writes the same hook into each T3 Code Antigravity provider folder too:

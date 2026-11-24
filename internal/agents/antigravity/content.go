@@ -76,11 +76,13 @@ func agyRequest(content string) string {
 // white space `<user_request>`, and ends with `</user_request>`, optionally followed by one
 // `<runtime_info>` block, is the request between those tags, less one leading and one
 // trailing newline. The closing tag is the last one that fits, so a request that quotes it is
-// not cut short. A text that does not start with the opening tag is not T3's and is the
-// prompt as it is; one that does but breaks the rest is unsure (ok false).
-func t3Request(s string) (string, bool) {
+// not cut short. A byte order mark and white space before the opening tag are skipped. A
+// text that does not start with the opening tag is not T3's and is the prompt as it is; one
+// that does but breaks the rest is unsure (ok false).
+func t3Request(text string) (string, bool) {
+	s := strings.TrimLeft(strings.TrimPrefix(text, "\uFEFF"), " \t\r\n")
 	if !strings.HasPrefix(s, t3InstructionsOpen) {
-		return s, true
+		return text, true
 	}
 	i := strings.Index(s, t3InstructionsClose)
 	if i < 0 {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/miradorlabs/terma-cli/internal/config"
@@ -98,6 +99,12 @@ func TestAntigravityRefusesAFileOfAnExcludedCheckout(t *testing.T) {
 		{"some_mcp_tool", "file_path", filepath.Join(g.nested, "file.txt"), true},
 		{"read_file", "Path", filepath.Join(g.none, "file.txt"), false},
 		{"run_command", "CommandLine", "cat " + filepath.Join(g.excluded, "file.txt"), false},
+		// The folder a tool lists, searches or runs in.
+		{"list_dir", "DirectoryPath", g.excluded, true},
+		{"grep_search", "SearchPath", g.excluded, true},
+		{"find_by_name", "SearchDirectory", g.nested, true},
+		{"run_command", "Cwd", g.excluded, true},
+		{"run_command", "Cwd", g.collected, false},
 	} {
 		if got := refuses(tc.tool, tc.key, tc.path); got != tc.want {
 			t.Errorf("%s %s=%s: refused %v, want %v", tc.tool, tc.key, tc.path, got, tc.want)
@@ -117,9 +124,8 @@ func TestAntigravityRefusesAFileOfAnExcludedCheckout(t *testing.T) {
 // workspace in an excluded checkout, or outside git, stops it; global mode collects both.
 func TestAntigravityWorkspacesMustAllBeCollected(t *testing.T) {
 	g := newPathRig(t)
-	ctx := context.Background()
 	collected := func(pol config.Policy, cwd string, workspaces ...string) bool {
-		return antigravityWorkspacesCollected(ctx, hookrun.Env{Policy: pol, Cwd: cwd}, &antigravityHookInput{WorkspacePaths: workspaces})
+		return antigravityWorkspacesCollected(hookrun.Env{Policy: pol, Cwd: cwd}, &antigravityHookInput{WorkspacePaths: workspaces})
 	}
 	for _, tc := range []struct {
 		name       string
@@ -141,5 +147,87 @@ func TestAntigravityWorkspacesMustAllBeCollected(t *testing.T) {
 	}
 	if !collected(config.Policy{Mode: config.ModeGlobal}, g.collected, g.collected, g.none) {
 		t.Error("global mode withheld a workspace outside git")
+	}
+	// A workspace outside git alone: not collected in repository mode, collected in global
+	// mode, as a session outside git is.
+	if collected(g.pol, g.none, g.none) {
+		t.Error("repository mode collected a workspace outside git")
+	}
+	if !collected(config.Policy{Mode: config.ModeGlobal}, g.none, g.none) {
+		t.Error("global mode withheld a lone workspace outside git")
+	}
+	// A link in a collected checkout to a folder of an excluded one is judged where it leads.
+	sub := filepath.Join(g.excluded, "sub")
+	if err := os.MkdirAll(sub, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(g.collected, "into-excluded-sub")
+	if err := os.Symlink(sub, link); err != nil {
+		t.Skip("no symlinks here")
+	}
+	if collected(g.pol, link, link) {
+		t.Error("a workspace linked into an excluded checkout was collected")
+	}
+}
+
+// Where a path's checkout cannot be trusted, it is unresolved: with GIT_DIR in the hook's
+// environment (no workspace is collected then, global mode or not), a path that starts with
+// "~", and a dangling link. A linked worktree is its main checkout's; a submodule its own.
+func TestAntigravityPathOwnerFailsClosed(t *testing.T) {
+	g := newPathRig(t)
+	dangling := filepath.Join(g.collected, "dangling")
+	if err := os.Symlink(filepath.Join(g.collected, "nowhere"), dangling); err != nil {
+		t.Skip("no symlinks here")
+	}
+	ctx := context.Background()
+	for _, args := range [][]string{{"commit", "-q", "--allow-empty", "-m", "made-up"}, {"worktree", "add", "-q", filepath.Join(t.TempDir(), "wt")}} {
+		if _, err := gitx.Git(ctx, g.collected, args...); err != nil {
+			t.Fatal(err)
+		}
+	}
+	worktree, err := gitx.Git(ctx, g.collected, "worktree", "list", "--porcelain")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var linked string
+	for line := range strings.Lines(worktree) {
+		if p, ok := strings.CutPrefix(strings.TrimSpace(line), "worktree "); ok && p != g.collected {
+			linked = p
+		}
+	}
+	if linked == "" {
+		t.Fatalf("no linked worktree in %q", worktree)
+	}
+	// A submodule: its .git a file naming its git directory in the superproject's modules.
+	sub := filepath.Join(g.collected, "sub")
+	modules := filepath.Join(g.collected, ".git", "modules", "sub")
+	hookruntest.WriteFile(t, modules, "HEAD", "ref: refs/heads/main\n")
+	hookruntest.WriteFile(t, modules, "config", "[remote \"origin\"]\n\turl = https://github.com/acme/submodule-excluded.git\n")
+	hookruntest.WriteFile(t, sub, ".git", "gitdir: ../.git/modules/sub\n")
+	hookruntest.WriteFile(t, sub, "file.txt", "made-up file\n")
+	for _, tc := range []struct {
+		name, cwd, path string
+		want            antigravityOwner
+	}{
+		{"a path from the home folder", g.collected, "~/file.txt", ownerUnresolved},
+		{"the home folder", g.collected, "~", ownerUnresolved},
+		{"a dangling link", "", dangling, ownerUnresolved},
+		{"a file through a dangling link", "", filepath.Join(dangling, "file.txt"), ownerUnresolved},
+		{"a linked worktree", "", filepath.Join(linked, "new.txt"), ownerCollected},
+		{"a submodule", "", filepath.Join(sub, "file.txt"), ownerExcluded},
+	} {
+		if got := antigravityPathOwner(g.pol, tc.cwd, tc.path); got != tc.want {
+			t.Errorf("%s: owner %d, want %d", tc.name, got, tc.want)
+		}
+	}
+
+	t.Setenv("GIT_DIR", filepath.Join(g.collected, ".git"))
+	if got := antigravityPathOwner(g.pol, "", filepath.Join(g.excluded, "file.txt")); got != ownerUnresolved {
+		t.Errorf("with GIT_DIR set: owner %d", got)
+	}
+	for _, pol := range []config.Policy{g.pol, {Mode: config.ModeGlobal}} {
+		if antigravityWorkspacesCollected(hookrun.Env{Policy: pol, Cwd: g.collected}, &antigravityHookInput{}) {
+			t.Errorf("with GIT_DIR set, mode %q collected the workspace", pol.Mode)
+		}
 	}
 }

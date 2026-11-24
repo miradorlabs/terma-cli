@@ -65,9 +65,10 @@ func antigravityCallEvent(id string, s antigravityStep, turn string) spool.Event
 	return spool.Event{Name: semconv.TermaModelCallEvent, SessionID: id, Attrs: a}
 }
 
-// antigravityLineTime is when agy wrote a line, now when it does not say.
+// antigravityLineTime is when agy wrote a line, now when it does not say or says a time later
+// than now, the hook's real time: no line was written after the hook that reads it.
 func antigravityLineTime(s antigravityStep, now time.Time) time.Time {
-	if t, err := time.Parse(time.RFC3339, s.CreatedAt); err == nil {
+	if t, err := time.Parse(time.RFC3339, s.CreatedAt); err == nil && !t.After(now) {
 		return t
 	}
 	return now

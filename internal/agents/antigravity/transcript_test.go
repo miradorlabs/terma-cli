@@ -23,7 +23,9 @@ import (
 // back as made-up text in agy's shapes (said):
 // transcript_turns.jsonl is three completed turns and a fourth cancelled after its first
 // call (steps 17–20, no hook ran); transcript_subagent_*.jsonl a conversation that opened
-// one subagent, and the subagent's own. Line i of transcript_turns.jsonl is step i.
+// one subagent, and the subagent's own. Line i of transcript_turns.jsonl is step i. The tool
+// calls' arguments in transcript_turns.jsonl are made up too, each naming a file of the
+// rig's own checkout or none.
 
 const (
 	turnsConversation  = "81356ffa-7411-49ac-9916-142dea1662dc"

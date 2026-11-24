@@ -651,6 +651,7 @@ events:
       - ref: gen_ai.tool.call.id
         requirement_level: required
       - ref: gen_ai.tool.call.result
+        requirement_level: required
         note: >
           The result's text, cut at terma's bound with the characters dropped named at its
           end. Tool content, withheld unless the team's policy collects it.
