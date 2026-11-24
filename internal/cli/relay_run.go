@@ -45,6 +45,7 @@ func (app *App) newRelayRunCommand() *cobra.Command {
 			log := daemon.NewLog(dir)
 			defer log.Close()
 			engine := deps.Engine(ctx, app.stateDir, cfg, daemon.SettingsFromEnv(), cmd.ErrOrStderr())
+			teamWorker, onRelay := daemon.BindTeams(deps, cfg, &engine)
 			engine.Warnf = log.Printf
 			// Read once: an upgrade restarts the relay.
 			install := app.installed()
@@ -53,7 +54,8 @@ func (app *App) newRelayRunCommand() *cobra.Command {
 			res, err := daemon.Run(ctx, daemon.Config{
 				StateDir: app.stateDir, Addr: addr, Idle: idle, Service: asService, Follow: follow, Launch: launch, Environment: cfg.Environment, Version: app.version, Log: log,
 				Engine:  engine,
-				Workers: []func(context.Context){deps.Refresher().Run, app.sweepHookState},
+				OnRelay: onRelay,
+				Workers: []func(context.Context){deps.Refresher().Run, teamWorker, app.sweepHookState},
 				Updater: app.relayUpdater(install),
 				Listening: func(at net.Addr, hold time.Duration) {
 					if !quiet {

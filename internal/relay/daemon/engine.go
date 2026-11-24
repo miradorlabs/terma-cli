@@ -42,6 +42,14 @@ type Deps struct {
 	LoadConfig func() (*config.Config, error)
 	// RefreshPolicy fetches and stores cfg's project's policy.
 	RefreshPolicy func(ctx context.Context, cfg *config.Config) error
+	// RefreshTeam fetches a routed enrollment's policy without mutating disk state.
+	RefreshTeam func(ctx context.Context, cfg *config.Config, account string, t routing.Team) (routing.Refresh, error)
+	// TeamUser returns the Mirador user ID for a routed team at endpoint ("" on server keys).
+	TeamUser func(cfg *config.Config, team routing.Team, endpoint string) string
+	// ActiveProfile returns the profile hooks currently route by.
+	ActiveProfile func() string
+	// LoadProfile loads the named profile's configuration.
+	LoadProfile func(name string) (*config.Config, error)
 	// Bind gives the relay cfg's sign-in to send and heartbeat with, and what it binds
 	// queued parts to; nil sends only with a server key and sends no heartbeats.
 	Bind func(opts *relay.Options, cfg *config.Config)
@@ -90,6 +98,14 @@ func (d Deps) Engine(ctx context.Context, stateDir string, cfg *config.Config, s
 	return opts
 }
 
+// Teams returns the multi-org relay.Router for cfg's profile.
+func (d Deps) Teams(cfg *config.Config) *Teams {
+	return NewTeams(cfg, TeamsDeps{
+		AgentName: d.AgentName, RelayTargets: d.RelayTargets, Endpoint: d.Endpoint,
+		User: d.TeamUser, Active: d.ActiveProfile, Profile: d.LoadProfile,
+	})
+}
+
 // Resolver turns a claim into its session's policy.
 func (d Deps) Resolver(cfg *config.Config) func(claim.Claim) (relay.Policy, error) {
 	return Resolver(cfg, ResolverDeps{AgentName: d.AgentName, RelayTargets: d.RelayTargets,
@@ -107,7 +123,8 @@ func (d Deps) Resolver(cfg *config.Config) func(claim.Claim) (relay.Policy, erro
 func (d Deps) CatchAll() func() (claim.Claim, bool) { return CatchAll(d.HookPolicy) }
 
 // Refresher keeps fresh, while the relay runs, every team with a key here and the
-// selected team.
+// selected team. On a routed profile (routing/<profile>.json exists) it yields to
+// TeamRefresher so legacy StorePolicy never writes config.json.
 func (d Deps) Refresher() *PolicyRefresher {
 	return &PolicyRefresher{
 		Interval: PolicyRefreshInterval,
@@ -116,6 +133,11 @@ func (d Deps) Refresher() *PolicyRefresher {
 			cfg, err := d.LoadConfig()
 			if err != nil {
 				return nil
+			}
+			if cfg.StateDir != "" && cfg.ProfileName != "" {
+				if _, found, rerr := routing.Load(cfg.StateDir, cfg.ProfileName); found || rerr != nil {
+					return nil
+				}
 			}
 			teams := keystore.CollectionProjects(cfg.Dir)
 			// The selected team even while its policy isn't stored (a fresh or cleared state
