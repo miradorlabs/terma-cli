@@ -1272,7 +1272,7 @@ func TestReachCoreHardeningRegressions(t *testing.T) {
 		}
 	}
 
-	// 9. firstWords masks command/process substitutions (both $(...) and backticks) after secret flags, in arguments, and in redirections.
+	// 9. firstWords masks command/process substitutions, -c/eval payloads, and ${/$IFS expansions.
 	for _, cmd := range []string{
 		`curl -u $(echo alice:SECRET) https://example.com`,
 		"curl -u `echo alice:SECRET` https://example.com",
@@ -1285,6 +1285,10 @@ func TestReachCoreHardeningRegressions(t *testing.T) {
 		"echo >`curl -u alice:SECRET`",
 		`cat <(curl -u alice:SECRET https://example.com)`,
 		`echo hi >(curl -u alice:SECRET https://example.com)`,
+		`bash -c 'curl${IFS}--user${IFS}alice:SECRET'`,
+		`bash -c '{curl,--user,alice:SECRET}'`,
+		`eval '{curl,--user,alice:SECRET}'`,
+		`curl${IFS}-u${IFS}alice:SECRET`,
 	} {
 		if got := firstWords(cmd); strings.Contains(got, "SECRET") {
 			t.Errorf("firstWords(%q) = %q, leaked SECRET", cmd, got)
@@ -1369,6 +1373,32 @@ func TestReachCoreHardeningRegressions(t *testing.T) {
 		scWTCfg := newScan(rdir, func(string) (string, bool) { return "", false }, work{deadline: time.Now().Add(time.Minute)})
 		if got, ok := scWTCfg.safeLocate(rdir); ok {
 			t.Fatalf("safeLocate(%s) = (%q, true), want false", tc.name, got)
+		}
+	}
+
+	// 14. Arithmetic expansions, parameter indices, and parameter slices recursively bound nested parameter explosions.
+	for _, expr := range []string{
+		`echo $(( ${V//a/$V} ))`,
+		`echo ${A[${V//a/$V}]}`,
+		`echo ${A:${V//a/$V}:1}`,
+		`echo ${A:0:${V//a/$V}}`,
+	} {
+		w := parseFirstArg(t, expr)
+		sc := newScan(dir, func(k string) (string, bool) {
+			switch k {
+			case "V":
+				return val, true
+			case "A":
+				return "hello", true
+			}
+			return "", false
+		}, work{deadline: time.Now().Add(time.Minute)})
+		t0 := time.Now()
+		if got, err := sc.fields(w); err == nil || !sc.unknown {
+			t.Fatalf("%s expanded to %q (err=%v, unknown=%v), want opaque fail-closed", expr, got, err, sc.unknown)
+		}
+		if d := time.Since(t0); d > 100*time.Millisecond {
+			t.Fatalf("%s took %v, want <100ms", expr, d)
 		}
 	}
 }

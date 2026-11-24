@@ -10,10 +10,9 @@ import (
 )
 
 var (
-	secretOptions = []string{"-u", "--user", "-U", "--proxy-user", "-H", "--header", "--proxy-header", "-p", "--password", "-b", "--cookie", "-d", "--data", "--data-ascii", "--data-raw", "--data-binary", "--data-urlencode", "--json", "--oauth2-bearer"}
-	secretNames   = []string{"pass", "token", "secret", "key", "auth"}
-	compounds     = []string{"if", "for", "while", "until", "case", "select"}
-	userinfo      = regexp.MustCompile(`://[^/\s]+@`)
+	secretOptions          = []string{"-c", "-u", "--user", "-U", "--proxy-user", "-H", "--header", "--proxy-header", "-p", "--password", "-b", "--cookie", "-d", "--data", "--data-ascii", "--data-raw", "--data-binary", "--data-urlencode", "--json", "--oauth2-bearer"}
+	secretNames, compounds = []string{"pass", "token", "secret", "key", "auth"}, []string{"if", "for", "while", "until", "case", "select"}
+	userinfo               = regexp.MustCompile(`://[^/\s]+@`)
 )
 
 // Pre-parse bounds preventing deep parser recursion or huge expression backtracking.
@@ -22,20 +21,19 @@ const maxShellNesting, maxShellExpr, separators = 4096, 4096, " \t\n;&|()<>"
 // firstWords returns command's first four words (<=60 runes) with secret-like values masked.
 func firstWords(command string) string { return maskWords(command, 0) }
 func maskWords(command string, depth int) string {
-	cut := len(command) > 4096
-	for n := min(len(command), 4096); cut; n-- {
+	more := len(command) > 4096
+	for n := min(len(command), 4096); more; n-- {
 		if n == 0 || utf8.RuneStart(command[n]) {
 			command = command[:n]
 			break
 		}
 	}
 	words, bare := shellFields(command, 5)
-	more := cut || len(words) > 4
-	words, bare = words[:min(len(words), 4)], bare[:min(len(bare), 4)]
+	more, words, bare = more || len(words) > 4, words[:min(len(words), 4)], bare[:min(len(bare), 4)]
 	secret, redir, hasRedis := false, 0, false
 	for i, b := range bare {
 		hasRedis = hasRedis || strings.HasSuffix(b, "redis-cli")
-		hasSubst := strings.Contains(b, "$(") || strings.Contains(b, "`")
+		hasSubst := strings.Contains(b, "$(") || strings.Contains(b, "`") || strings.Contains(b, "${") || strings.Contains(b, "$IFS")
 		if redir > 0 {
 			if redir == 2 || hasSubst || userinfo.MatchString(b) {
 				words[i] = "…"
@@ -73,7 +71,7 @@ func maskWords(command string, depth int) string {
 			words[i] = masked
 		}
 		lower, short := strings.ToLower(b), len(b) > 2 && b[0] == '-' && b[1] != '-'
-		secret = slices.Contains(secretOptions, b) || b == "-a" && hasRedis ||
+		secret = slices.Contains(secretOptions, b) || b == "eval" || b == "-a" && hasRedis ||
 			short && (slices.Contains(secretOptions, "-"+b[len(b)-1:]) || b[len(b)-1] == 'a' && hasRedis) ||
 			strings.HasPrefix(b, "-") && slices.ContainsFunc(secretNames, func(n string) bool { return strings.Contains(lower, n) })
 	}

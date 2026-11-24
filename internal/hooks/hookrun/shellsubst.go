@@ -69,12 +69,11 @@ func toplevel(sc *scan, args []*syntax.Word) (string, bool) {
 }
 func (sc *scan) hasGoEnv(key string) bool {
 	p, _ := sc.lookup("GOENV")
-	switch {
-	case sc.isUnresolvedVar("GOENV") || p != "" && p != "off" && !filepath.IsAbs(p):
+	if sc.isUnresolvedVar("GOENV") || p != "" && p != "off" && !filepath.IsAbs(p) {
 		return true
-	case p == "off":
+	} else if p == "off" {
 		return false
-	case p == "":
+	} else if p == "" {
 		dir := ""
 		if runtime.GOOS == "windows" {
 			dir, _ = sc.lookup("AppData")
@@ -165,14 +164,12 @@ func dirname(_ *scan, p string) (string, bool) {
 		sep = `/\`
 	}
 	rest := strings.TrimRight(p[len(vol):], sep)
-	switch i := strings.LastIndexAny(rest, sep); {
-	case rest == "" && len(p) > len(vol):
-		return vol + string(filepath.Separator), true
-	case i < 0:
-		return vol + ".", true
-	default:
+	if i := strings.LastIndexAny(rest, sep); i >= 0 {
 		return vol + filepath.FromSlash(cmp.Or(strings.TrimRight(rest[:i], sep), string(filepath.Separator))), true
+	} else if rest == "" && len(p) > len(vol) {
+		return vol + string(filepath.Separator), true
 	}
+	return vol + ".", true
 }
 func (sc *scan) real(p string) (string, bool) {
 	if q, ok := sc.path(p, sc.dir); p == "" || !ok || sc.hasRemoteLink(q) {

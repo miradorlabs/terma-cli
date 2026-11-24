@@ -237,14 +237,13 @@ func (sc *scan) cleanSafeAt(base, rel string, hops int) (string, bool) {
 }
 func urlPath(w string) (string, bool) {
 	scheme, rest, ok := strings.Cut(w, "://")
-	switch {
-	case !ok || !isScheme(scheme):
+	if !ok || !isScheme(scheme) {
 		return "", false
-	case !strings.EqualFold(scheme, "file"):
+	} else if !strings.EqualFold(scheme, "file") {
 		return "", true
-	case len(rest) > 2 && rest[0] == '/' && rest[2] == ':':
+	} else if len(rest) > 2 && rest[0] == '/' && rest[2] == ':' {
 		return rest[1:], true
-	case strings.HasPrefix(rest, "/"):
+	} else if strings.HasPrefix(rest, "/") {
 		return rest, true
 	}
 	return "//" + rest, true
@@ -282,12 +281,11 @@ func cutSep(p string) (string, string) {
 	return p, ""
 }
 func shellValue(w string) string {
-	switch name, v, ok := strings.Cut(w, "="); {
-	case ok && (strings.HasPrefix(w, "-") || isName(name)):
+	if name, v, ok := strings.Cut(w, "="); ok && (strings.HasPrefix(w, "-") || isName(name)) {
 		return v
-	case len(w) > 2 && w[0] == '-' && w[1] != '-':
+	} else if len(w) > 2 && w[0] == '-' && w[1] != '-' {
 		return w[2:]
-	case strings.HasPrefix(w, "-"):
+	} else if strings.HasPrefix(w, "-") {
 		return ""
 	}
 	return w

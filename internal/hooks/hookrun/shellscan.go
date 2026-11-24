@@ -110,30 +110,33 @@ func (sc *scan) budget(counter *int, n, limit int) bool {
 	*counter += n
 	return true
 }
-func (sc *scan) spend(n int) bool        { return sc.budget(&sc.lookups, n, maxShellLookups) }
-func (sc *scan) spendStat(n int) bool    { return sc.budget(&sc.stats, n, maxShellStats) }
-func (sc *scan) charge(n int) bool       { return sc.budget(&sc.bytes, n, maxShellBytes) }
-func (sc *scan) size(w *syntax.Word) int { return sc.sizeIn(w, false) }
-func (sc *scan) sizeIn(w *syntax.Word, opaqueSubst bool) int {
+func (sc *scan) spend(n int) bool       { return sc.budget(&sc.lookups, n, maxShellLookups) }
+func (sc *scan) spendStat(n int) bool   { return sc.budget(&sc.stats, n, maxShellStats) }
+func (sc *scan) charge(n int) bool      { return sc.budget(&sc.bytes, n, maxShellBytes) }
+func (sc *scan) size(w syntax.Node) int { return sc.sizeIn(w, false) }
+func (sc *scan) sizeIn(w syntax.Node, opaqueSubst bool) int {
 	n := 0
-	syntax.Walk(w, func(node syntax.Node) bool {
-		switch x := node.(type) {
-		case *syntax.Lit:
-			n += len(x.Value)
-		case *syntax.SglQuoted:
-			n += len(x.Value)
-		case *syntax.ParamExp:
-			n += sc.paramSize(x, opaqueSubst)
-			return false
-		case *syntax.CmdSubst, *syntax.ProcSubst, *syntax.ArithmExp:
-			n += substitutionSize
-			if _, arith := x.(*syntax.ArithmExp); !arith && opaqueSubst {
-				n = maxShellBytes + 1
+	if w != nil {
+		syntax.Walk(w, func(node syntax.Node) bool {
+			switch x := node.(type) {
+			case *syntax.Lit:
+				n += len(x.Value)
+			case *syntax.SglQuoted:
+				n += len(x.Value)
+			case *syntax.ParamExp:
+				n += sc.paramSize(x, opaqueSubst)
+				return false
+			case *syntax.CmdSubst, *syntax.ProcSubst:
+				if n += substitutionSize; opaqueSubst {
+					n = maxShellBytes + 1
+				}
+				return false
+			case *syntax.ArithmExp:
+				n += substitutionSize
 			}
-			return false
-		}
-		return n <= maxShellBytes
-	})
+			return n <= maxShellBytes
+		})
+	}
 	return min(n, maxShellBytes+1)
 }
 func (sc *scan) paramValue(pe *syntax.ParamExp) (v string) {
@@ -166,6 +169,9 @@ func (sc *scan) paramSize(pe *syntax.ParamExp, opaqueSubst bool) int {
 		} else {
 			n += w
 		}
+	}
+	if n += sc.sizeIn(pe.Index, opaqueSubst); pe.Slice != nil {
+		n += sc.sizeIn(pe.Slice.Offset, opaqueSubst) + sc.sizeIn(pe.Slice.Length, opaqueSubst)
 	}
 	return min(n, maxShellBytes+1)
 }
@@ -241,7 +247,7 @@ func countFields(v, ifs string, limit int) int {
 func (sc *scan) fields(w *syntax.Word) ([]string, error) {
 	var out []string
 	for b, err := range sc.braces(w) {
-		if ifs := sc.ifs(); err != nil || len(ifs) > 64 && sc.fail() || !sc.charge(sc.size(b)) || ifs != "" && sc.checkPartsFields(b.Parts, ifs, maxShellWords-len(out), false) < 0 {
+		if ifs := sc.ifs(); err != nil || len(ifs) > 64 && sc.fail() || !sc.charge(sc.sizeIn(b, false)) || ifs != "" && sc.checkPartsFields(b.Parts, ifs, maxShellWords-len(out), false) < 0 {
 			return nil, errOpaque
 		} else if f, err := expand.Fields(sc.cfg, b); err != nil || len(out)+len(f) > maxShellWords && sc.fail() {
 			return nil, errOpaque
