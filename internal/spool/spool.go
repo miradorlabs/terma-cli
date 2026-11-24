@@ -4,6 +4,7 @@
 package spool
 
 import (
+	"bufio"
 	"bytes"
 	"cmp"
 	"context"
@@ -41,8 +42,13 @@ type Event struct {
 	Account string `json:"account,omitempty"`
 	// NoPerson marks an event collected under a server key: no person's, so its empty
 	// Account is final, never bound to a sign-in later (AppendAsCollected). Local only.
-	NoPerson bool           `json:"no_person,omitempty"`
-	Attrs    map[string]any `json:"attrs,omitempty"`
+	NoPerson    bool           `json:"no_person,omitempty"`
+	Profile     string         `json:"profile,omitempty"`      // profile whose routing state routed the event; local only
+	Enrollment  string         `json:"enrollment,omitempty"`   // destination enrollment sent to or holding the event; local only
+	HoldKey     string         `json:"hold_key,omitempty"`     // pending binding holding the event until bound to the team's org; local only
+	Run         string         `json:"run,omitempty"`          // session run the event belongs to (internal/runs); local only
+	OwnLocation bool           `json:"own_location,omitempty"` // event's own checkout/dir; still dropped on Mixed unless runs.Locational
+	Attrs       map[string]any `json:"attrs,omitempty"`
 }
 
 // ValidTraceID reports whether id is an OTel trace id: 32 lowercase hex digits, not all zero.
@@ -289,6 +295,32 @@ func (s *Spool) Writable() error {
 		return err
 	}
 	return f.Sync()
+}
+
+// Sessions calls add with each queued event's session ID without locking. On non-nil error
+// (partial results), callers must skip runs.Prune so queued sessions' ledgers stay intact.
+func (s *Spool) Sessions(ctx context.Context, add func(sessionID string)) error {
+	f, err := os.Open(s.path())
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil
+	} else if err != nil {
+		return err
+	}
+	defer f.Close()
+	lines := bufio.NewScanner(f)
+	lines.Buffer(nil, MaxBytes)
+	for lines.Scan() {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		var e struct {
+			SessionID string `json:"session_id"`
+		}
+		if json.Unmarshal(lines.Bytes(), &e) == nil && e.SessionID != "" {
+			add(e.SessionID)
+		}
+	}
+	return lines.Err()
 }
 
 // Peek returns up to n queued events without consuming them.
