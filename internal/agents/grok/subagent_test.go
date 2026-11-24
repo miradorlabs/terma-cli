@@ -179,7 +179,7 @@ func TestSubagentToolResultsSendOnlyWhatTheySay(t *testing.T) {
 			ends:  []subagentRecord{awaitedEndRecord, killedEndRecord},
 		},
 		"an id of another shape": {
-			edit:  editTool("spawn_subagent", withText("Subagent started in background.\nsubagent_id: secret words\ndescription: x")),
+			edit:  editTool("spawn_subagent", withText("Subagent started in background.\nsubagent_id: not-a-uuid\ndescription: x")),
 			calls: []subagentRecord{foregroundCallRecord, killedCallRecord},
 			ends:  []subagentRecord{awaitedEndRecord, killedEndRecord},
 		},
