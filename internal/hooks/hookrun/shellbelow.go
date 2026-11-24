@@ -41,8 +41,7 @@ func (sc *scan) safeLocate(dir string) (string, bool) {
 		if info, err := os.Lstat(dotGit); err == nil {
 			if info.IsDir() {
 				return cur, true
-			}
-			if info.Mode().IsRegular() {
+			} else if info.Mode().IsRegular() {
 				return sc.locateGitdirFile(dotGit, cur)
 			}
 			return "", false
@@ -54,25 +53,35 @@ func (sc *scan) safeLocate(dir string) (string, bool) {
 	return "", false
 }
 func (sc *scan) isUnresolvedVar(name string) bool { v, set := sc.vars[name]; return set && v == nil }
-func (sc *scan) locateGitdirFile(path, cur string) (string, bool) {
-	f, err := os.Open(path)
+func readSmallFile(path string) (string, error) {
+	f, err := openFileNoBlock(path)
 	if err != nil {
-		return "", false
+		return "", err
 	}
 	defer f.Close()
-	var buf [maxPathBytes]byte
-	n, _ := f.Read(buf[:])
-	line, _, hasNL := strings.Cut(string(buf[:n]), "\n")
-	if !hasNL && n == len(buf) {
-		return "", !sc.fail()
+	if info, err := f.Stat(); err != nil || !info.Mode().IsRegular() {
+		return "", errOpaque
 	}
-	target, ok := strings.CutPrefix(strings.TrimSpace(line), "gitdir:")
-	if target = strings.TrimSpace(target); !ok || target == "" {
+	var buf [maxPathBytes]byte
+	if n, err := io.ReadFull(f, buf[:]); n == len(buf) || err != nil && !errors.Is(err, io.EOF) && !errors.Is(err, io.ErrUnexpectedEOF) {
+		return "", errOpaque
+	} else {
+		return string(buf[:n]), nil
+	}
+}
+func (sc *scan) locateGitdirFile(path, cur string) (string, bool) {
+	data, err := readSmallFile(path)
+	if err != nil {
+		sc.unknown = sc.unknown || errors.Is(err, errOpaque)
 		return "", false
 	}
-	if resolved, ok := sc.resolveTarget(cur, target, 1); ok && !sc.hasRemoteLink(resolved) {
-		info, err := os.Stat(resolved)
-		return cur, err == nil && info.IsDir()
+	line, _, _ := strings.Cut(data, "\n")
+	target, ok := strings.CutPrefix(strings.TrimSpace(line), "gitdir:")
+	if target = strings.TrimSpace(target); ok && target != "" {
+		if resolved, ok := sc.resolveTarget(cur, target, 1); ok && !sc.hasRemoteLink(resolved) {
+			info, err := os.Stat(resolved)
+			return cur, err == nil && info.IsDir()
+		}
 	}
 	return "", false
 }
@@ -166,11 +175,9 @@ func (sc *scan) readDir(dir string) []fs.DirEntry {
 	var entries []fs.DirEntry
 	for room := maxShellLookups - sc.lookups + 1; len(entries) < room; {
 		chunk, err := f.ReadDir(min(256, room-len(entries)))
-		entries = append(entries, chunk...)
-		if errors.Is(err, io.EOF) || err == nil && (len(chunk) == 0 || !sc.spend(0)) {
+		if entries = append(entries, chunk...); errors.Is(err, io.EOF) || err == nil && (len(chunk) == 0 || !sc.spend(0)) {
 			break
-		}
-		if err != nil && sc.fail() {
+		} else if err != nil && sc.fail() {
 			return nil
 		}
 	}

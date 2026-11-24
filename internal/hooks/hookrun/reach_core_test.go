@@ -296,7 +296,7 @@ func TestShellSubstKnownOutputs(t *testing.T) {
 
 	// Persisted `go env -w` file makes unset GOPATH/GOMODCACHE fail closed; GOENV=off or explicit env still resolves.
 	goEnvFile := filepath.Join(parent, "goenv")
-	if err := os.WriteFile(goEnvFile, []byte("GOPATH=/other\n"), 0o600); err != nil {
+	if err := os.WriteFile(goEnvFile, []byte("GOPATH=/other\nGOMODCACHE=/other/mod\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	envWithGoEnv := func(extra map[string]string) func(string) (string, bool) {
@@ -893,13 +893,125 @@ func TestScanBoundsAndSafety(t *testing.T) {
 		t.Fatal("parsable accepted source exceeding maxShellBytes")
 	}
 
-	// On Windows, a rooted volume-less path (\other\repo) resolves on the base volume rather than relative to base.
+	// On Windows, a rooted volume-less path (\other\repo) resolves on the base volume, while a drive-relative path (C:../api) fails closed.
 	if os.IsPathSeparator('\\') {
 		scWin := newScan(dir, os.LookupEnv, work{deadline: time.Now().Add(time.Minute)})
 		want := filepath.VolumeName(dir) + `\other\repo\file`
 		if got, ok := scWin.resolveTarget(dir, `\other\repo\file`, 0); !ok || got != want {
 			t.Fatalf(`resolveTarget(\other\repo\file) = (%q, %v), want (%q, true)`, got, ok, want)
 		}
+		if got, ok := scWin.resolveTarget(dir, `C:..\api\file`, 0); ok || !scWin.unknown {
+			t.Fatalf(`resolveTarget(C:..\api\file) = (%q, %v) unknown=%v, want ("", false, true)`, got, ok, scWin.unknown)
+		}
+	}
+
+	// Nested shell commands in firstWords recursively mask secrets while still masking NAME="value with space".
+	for _, tc := range []struct {
+		cmd, leak string
+	}{
+		{`bash -c 'curl -u alice:supersecret https://example.com'`, "supersecret"},
+		{`bash -c 'echo hi; TOKEN=supersecret'`, "supersecret"},
+		{`bash -c 'curl --header "Authorization: Bearer supersecret"'`, "supersecret"},
+		{`sh -c 'bash -c "eval \"curl -u alice:supersecret\""'`, "supersecret"},
+		{`TOKEN="secret value" cmd`, "secret"},
+	} {
+		if got := firstWords(tc.cmd); strings.Contains(got, tc.leak) {
+			t.Errorf("firstWords(%q) = %q, leaked %q", tc.cmd, got, tc.leak)
+		}
+	}
+	if got := firstWords(`TOKEN="secret value" cmd`); got != "TOKEN=… cmd" {
+		t.Errorf(`firstWords(TOKEN="secret value" cmd) = %q, want "TOKEN=… cmd"`, got)
+	}
+
+	// hasRemoteLink revalidates cwd on every call rather than caching an earlier local check.
+	if !os.IsPathSeparator('\\') {
+		localCwdTarget := filepath.Join(dir, "cwd-local")
+		swappableCwd := filepath.Join(dir, "cwd-link")
+		if err := os.MkdirAll(localCwdTarget, 0o700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Symlink(localCwdTarget, swappableCwd); err != nil {
+			t.Fatal(err)
+		}
+		scSwap := newScan(swappableCwd, os.LookupEnv, work{deadline: time.Now().Add(time.Minute)})
+		if scSwap.hasRemoteLink(swappableCwd) || scSwap.unknown {
+			t.Fatalf("initial local cwd symlink flagged remote: unknown=%v", scSwap.unknown)
+		}
+		if err := os.Remove(swappableCwd); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Symlink("//remote/share", swappableCwd); err != nil {
+			t.Fatal(err)
+		}
+		if !scSwap.hasRemoteLink(swappableCwd) || !scSwap.unknown {
+			t.Fatalf("swapped remote cwd symlink was not detected: unknown=%v", scSwap.unknown)
+		}
+	}
+
+	// real (realpath / readlink -f) resolves nonexistent leaf under existing directory, but fails closed on missing parent, file parent, or dangling symlink.
+	realParent := filepath.Join(dir, "real-parent")
+	realFile := filepath.Join(realParent, "plain.txt")
+	if err := os.MkdirAll(realParent, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(realFile, []byte("ok"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	resolvedRealParent, _ := filepath.EvalSymlinks(realParent)
+	scRealLeaf := newScan(dir, os.LookupEnv, work{deadline: time.Now().Add(time.Minute)})
+	if got, ok := scRealLeaf.real(filepath.Join(realParent, "new.txt")); !ok || got != filepath.Join(resolvedRealParent, "new.txt") {
+		t.Fatalf("real(existing/new.txt) = (%q, %v), want (%q, true)", got, ok, filepath.Join(resolvedRealParent, "new.txt"))
+	}
+	for _, bad := range []string{
+		filepath.Join(realParent, "missing", "new.txt"),
+		filepath.Join(realFile, "new.txt"),
+	} {
+		if got, ok := scRealLeaf.real(bad); ok {
+			t.Fatalf("real(%q) = (%q, true), want false", bad, got)
+		}
+	}
+	if !os.IsPathSeparator('\\') {
+		dangling := filepath.Join(realParent, "dangling")
+		if err := os.Symlink(filepath.Join(realParent, "does-not-exist"), dangling); err != nil {
+			t.Fatal(err)
+		}
+		if got, ok := scRealLeaf.real(dangling); ok {
+			t.Fatalf("real(dangling) = (%q, true), want false", got)
+		}
+	}
+
+	// hasGoEnv only blocks GOPATH/GOMODCACHE when go/env actually overrides that key.
+	goEnvBenign := filepath.Join(dir, "go-env-benign")
+	goEnvOverride := filepath.Join(dir, "go-env-override")
+	if err := os.WriteFile(goEnvBenign, []byte("GOTOOLCHAIN=auto\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(goEnvOverride, []byte("GOPATH=/custom/gopath\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	scGoBenign := newScan(dir, func(k string) (string, bool) {
+		switch k {
+		case "HOME":
+			return dir, true
+		case "GOENV":
+			return goEnvBenign, true
+		}
+		return "", false
+	}, work{deadline: time.Now().Add(time.Minute)})
+	if got, ok := gopath(scGoBenign, nil); !ok || got != filepath.Join(dir, "go") {
+		t.Fatalf("gopath with benign go/env = (%q, %v), want (%q, true)", got, ok, filepath.Join(dir, "go"))
+	}
+	scGoOverride := newScan(dir, func(k string) (string, bool) {
+		switch k {
+		case "HOME":
+			return dir, true
+		case "GOENV":
+			return goEnvOverride, true
+		}
+		return "", false
+	}, work{deadline: time.Now().Add(time.Minute)})
+	if got, ok := gopath(scGoOverride, nil); ok {
+		t.Fatalf("gopath with GOPATH override in go/env = (%q, true), want false", got)
 	}
 
 	// Remote HOME with ~ or ~/... fails closed (sc.unknown = true) without statting.

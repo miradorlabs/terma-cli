@@ -26,10 +26,7 @@ func isUnknownReach(p string) bool       { return strings.HasPrefix(p, UnknownRe
 
 type role uint8
 
-const (
-	plain, program, target, folder, creates  role = 0, 1, 2, 3, 4 // plain: path if present, or new file if slashed
-	data, part, slashedOnly, globbed, walked role = 5, 6, 7, 8, 9
-)
+const plain, program, target, folder, creates, data, part, slashedOnly, globbed, walked role = 0, 1, 2, 3, 4, 5, 6, 7, 8, 9
 
 func (r role) whole() bool      { return r == program || r == target }
 func (r role) needsSlash() bool { return r == program || r == data || r == part || r == slashedOnly }
@@ -42,15 +39,15 @@ func (r role) mustResolve(slashed bool) bool {
 
 // scan holds the state of one bounded shell reach scan.
 type scan struct {
-	cwd, dir, prev, cwdRoot                     string
-	cwdRootDone, cwdChecked, cwdRemote, unknown bool
-	none, out                                   []string
-	env                                         func(string) (string, bool)
-	vars                                        map[string]*string
-	cfg                                         *expand.Config
-	reads                                       *operands
-	places                                      map[string]bool
-	examined                                    map[candidate]cached
+	cwd, dir, prev, cwdRoot string
+	cwdRootDone, unknown    bool
+	none, out               []string
+	env                     func(string) (string, bool)
+	vars                    map[string]*string
+	cfg                     *expand.Config
+	reads                   *operands
+	places                  map[string]bool
+	examined                map[candidate]cached
 	work
 }
 type work struct {
@@ -98,14 +95,11 @@ func (sc *scan) lookup(name string) (string, bool) {
 		}
 		return *v, true
 	}
-	if v, ok := sc.env(name); ok {
-		return v, true
+	if v, ok := sc.env(name); ok || name != "HOME" {
+		return v, ok
 	}
-	if name == "HOME" {
-		home, err := os.UserHomeDir()
-		return home, err == nil
-	}
-	return "", false
+	home, err := os.UserHomeDir()
+	return home, err == nil
 }
 func (sc *scan) fail() bool { sc.unknown = true; return true }
 func (sc *scan) place(p string) {
@@ -164,7 +158,7 @@ func (sc *scan) paramSize(pe *syntax.ParamExp, opaqueSubst bool) int {
 	if pe.Repl != nil && pe.Repl.With != nil {
 		base := max(n, 1)
 		if with := sc.sizeIn(pe.Repl.With, opaqueSubst || pe.Repl.All && n > 0); with >= (maxShellBytes+1)/base {
-			n = maxShellBytes + 1
+			return maxShellBytes + 1
 		} else {
 			n = base * (1 + with)
 		}
@@ -201,9 +195,8 @@ func (sc *scan) checkPartsFields(parts []syntax.WordPart, ifs string, rem int, i
 					if per := 1 + (before - rem); len(v) > rem/per {
 						sc.fail()
 						return -1
-					} else {
-						rem -= len(v) * per
 					}
+					rem -= len(v) * (1 + before - rem)
 				}
 			}
 		} else if inParam {
@@ -220,8 +213,7 @@ func (sc *scan) checkPartsFields(parts []syntax.WordPart, ifs string, rem int, i
 	return rem
 }
 func (sc *scan) consumeFields(v, ifs string, rem int) int {
-	if n := countFields(v, ifs, rem); n > rem {
-		sc.fail()
+	if n := countFields(v, ifs, rem); n > rem && sc.fail() {
 		return -1
 	} else {
 		return rem - max(n-1, 0)
@@ -246,11 +238,9 @@ func (sc *scan) fields(w *syntax.Word) ([]string, error) {
 		if ifs := sc.ifs(); err != nil || !sc.charge(sc.size(b)) || ifs != "" && sc.checkPartsFields(b.Parts, ifs, maxShellWords-len(out), false) < 0 {
 			return nil, errOpaque
 		}
-		f, err := expand.Fields(sc.cfg, b)
-		if err != nil {
+		if f, err := expand.Fields(sc.cfg, b); err != nil {
 			return nil, err
-		}
-		if out = append(out, f...); len(out) > maxShellWords {
+		} else if out = append(out, f...); len(out) > maxShellWords {
 			sc.fail()
 			return nil, errOpaque
 		}
@@ -274,10 +264,9 @@ func (sc *scan) braces(w *syntax.Word) iter.Seq2[*syntax.Word, error] {
 			for b, err := range expand.BracesSeq(sc.cfg, &braced) {
 				if err != nil || !sc.spend(1) {
 					sc.fail()
-					yield(nil, errOpaque)
-					return
+					b, err = nil, errOpaque
 				}
-				if !yield(b, nil) {
+				if !yield(b, err) || err != nil {
 					return
 				}
 			}

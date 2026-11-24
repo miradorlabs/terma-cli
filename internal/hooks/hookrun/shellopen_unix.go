@@ -23,6 +23,9 @@ func openDirNoBlock(dir string) (*os.File, error) {
 	}
 }
 
+func openFileNoBlock(p string) (*os.File, error) {
+	return os.OpenFile(p, os.O_RDONLY|syscall.O_NONBLOCK, 0)
+}
 func isBenignDirErr(err error) bool {
 	return errors.Is(err, fs.ErrNotExist) || errors.Is(err, fs.ErrPermission) ||
 		errors.Is(err, syscall.ENOTDIR) || errors.Is(err, syscall.ELOOP)

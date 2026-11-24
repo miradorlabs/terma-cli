@@ -16,7 +16,8 @@ var (
 )
 
 // firstWords returns command's first four words (<=60 runes) with secret-like values masked.
-func firstWords(command string) string {
+func firstWords(command string) string { return maskWords(command, 0) }
+func maskWords(command string, depth int) string {
 	cut := len(command) > 4096
 	for n := min(len(command), 4096); cut; n-- {
 		if n == 0 || utf8.RuneStart(command[n]) {
@@ -37,8 +38,14 @@ func firstWords(command string) string {
 			words[i] = "…"
 		case len(b) > 2 && b[0] == '-' && b[1] != '-':
 			words[i] = b[:2] + "…"
-		case eq && name != "":
+		case eq && name != "" && !strings.ContainsAny(name, " \t\n"):
 			words[i] = name + "=…"
+		case strings.ContainsAny(b, " \t\n"):
+			if depth >= 2 {
+				words[i] = "…"
+			} else if inner := maskWords(b, depth+1); inner != b {
+				words[i] = inner
+			}
 		case masked != b:
 			words[i] = masked
 		}
@@ -54,9 +61,8 @@ func firstWords(command string) string {
 		return r
 	}, strings.Join(words, " "))
 	if r := []rune(s); len(r) > 60 {
-		s, more = string(r[:60]), true
-	}
-	if more {
+		return string(r[:60]) + " …"
+	} else if more {
 		return s + " …"
 	}
 	return s
@@ -143,21 +149,19 @@ func ansiEscape(s string) (rune, int) {
 	if s[0] == 'c' && len(s) > 1 {
 		return rune(s[1] & 0x1f), 2
 	}
+	base, start, limit, digits := 8, 0, 3, "01234567"
 	if j := strings.IndexByte("xuU", s[0]); j >= 0 {
-		k := 0
-		for k < 2<<j && 1+k < len(s) && strings.ContainsRune("0123456789abcdefABCDEF", rune(s[1+k])) {
-			k++
+		base, start, limit, digits = 16, 1, 2<<j, "0123456789abcdefABCDEF"
+	}
+	k := 0
+	for k < limit && start+k < len(s) && strings.IndexByte(digits, s[start+k]) >= 0 {
+		k++
+	}
+	if v, err := strconv.ParseUint(s[start:start+k], base, 32); k > 0 && err == nil {
+		if base == 8 {
+			v &= 0xff
 		}
-		if v, err := strconv.ParseUint(s[1:1+k], 16, 32); k > 0 && err == nil {
-			return rune(v), 1 + k
-		}
-	} else if s[0] >= '0' && s[0] <= '7' {
-		k := 1
-		for k < 3 && k < len(s) && s[k] >= '0' && s[k] <= '7' {
-			k++
-		}
-		v, _ := strconv.ParseUint(s[:k], 8, 32)
-		return rune(v & 0xff), k
+		return rune(v), start + k
 	}
 	return '\\', 0
 }

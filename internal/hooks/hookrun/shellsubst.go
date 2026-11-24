@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 
 	"mvdan.cc/sh/v3/syntax"
@@ -53,19 +54,19 @@ func where(sc *scan, args []*syntax.Word) (string, bool) {
 	return sc.dir, sc.dir != "" && len(args) == 0
 }
 func whereP(sc *scan, args []*syntax.Word) (string, bool) {
-	if sc.dir == "" || len(args) != 0 {
-		return "", false
-	}
-	r, ok := sc.real(sc.dir)
-	return r, ok && !sc.unknown
-}
-func toplevel(sc *scan, args []*syntax.Word) (string, bool) {
-	if len(args) == 0 {
-		return sc.safeLocate(sc.dir)
+	if sc.dir != "" && len(args) == 0 {
+		r, ok := sc.real(sc.dir)
+		return r, ok && !sc.unknown
 	}
 	return "", false
 }
-func (sc *scan) hasGoEnv() bool {
+func toplevel(sc *scan, args []*syntax.Word) (string, bool) {
+	if len(args) != 0 {
+		return "", false
+	}
+	return sc.safeLocate(sc.dir)
+}
+func (sc *scan) hasGoEnv(key string) bool {
 	if sc.isUnresolvedVar("GOENV") {
 		return true
 	}
@@ -74,14 +75,13 @@ func (sc *scan) hasGoEnv() bool {
 		return false
 	}
 	if p == "" {
-		var dir string
+		dir := ""
 		if runtime.GOOS == "windows" {
 			dir, _ = sc.lookup("AppData")
 		} else if xdg, _ := sc.lookup("XDG_CONFIG_HOME"); runtime.GOOS != "darwin" && xdg != "" {
 			dir = xdg
 		} else if home, ok := sc.lookup("HOME"); ok {
-			dir = filepath.Join(home, ".config")
-			if runtime.GOOS == "darwin" {
+			if dir = filepath.Join(home, ".config"); runtime.GOOS == "darwin" {
 				dir = filepath.Join(home, "Library", "Application Support")
 			}
 		}
@@ -93,8 +93,11 @@ func (sc *scan) hasGoEnv() bool {
 	if !filepath.IsAbs(p) || sc.hasRemoteLink(p) || !sc.spendStat(1) {
 		return true
 	}
-	_, err := os.Lstat(p)
-	return err == nil || !errors.Is(err, fs.ErrNotExist)
+	data, err := readSmallFile(p)
+	if err != nil {
+		return !errors.Is(err, fs.ErrNotExist)
+	}
+	return slices.ContainsFunc(strings.Split(data, "\n"), func(l string) bool { return strings.HasPrefix(strings.TrimSpace(l), key+"=") })
 }
 func gopath(sc *scan, args []*syntax.Word) (string, bool) {
 	if len(args) != 0 || sc.isUnresolvedVar("GOPATH") {
@@ -103,10 +106,8 @@ func gopath(sc *scan, args []*syntax.Word) (string, bool) {
 	if v, ok := sc.lookup("GOPATH"); ok && v != "" {
 		return v, true
 	}
-	if home, ok := sc.lookup("HOME"); !sc.hasGoEnv() && ok {
-		return filepath.Join(home, "go"), true
-	}
-	return "", false
+	home, ok := sc.lookup("HOME")
+	return filepath.Join(home, "go"), !sc.hasGoEnv("GOPATH") && ok
 }
 func modcache(sc *scan, args []*syntax.Word) (string, bool) {
 	if len(args) != 0 || sc.isUnresolvedVar("GOMODCACHE") {
@@ -115,7 +116,7 @@ func modcache(sc *scan, args []*syntax.Word) (string, bool) {
 	if v, ok := sc.lookup("GOMODCACHE"); ok && v != "" {
 		return v, true
 	}
-	if gp, ok := gopath(sc, nil); !sc.hasGoEnv() && ok {
+	if gp, ok := gopath(sc, nil); !sc.hasGoEnv("GOMODCACHE") && ok {
 		if list := filepath.SplitList(gp); len(list) > 0 && list[0] != "" {
 			return filepath.Join(list[0], "pkg", "mod"), true
 		}
@@ -168,18 +169,28 @@ func dirname(_ *scan, p string) (string, bool) {
 	rest := strings.TrimRight(p[len(vol):], sep)
 	if rest == "" && len(p) > len(vol) {
 		return vol + string(filepath.Separator), true
-	}
-	i := strings.LastIndexAny(rest, sep)
-	if i < 0 {
+	} else if i := strings.LastIndexAny(rest, sep); i < 0 {
 		return vol + ".", true
+	} else {
+		return vol + filepath.FromSlash(cmp.Or(strings.TrimRight(rest[:i], sep), string(filepath.Separator))), true
 	}
-	return vol + filepath.FromSlash(cmp.Or(strings.TrimRight(rest[:i], sep), string(filepath.Separator))), true
 }
 func (sc *scan) real(p string) (string, bool) {
 	q, ok := sc.path(p, sc.dir)
 	if !ok || sc.hasRemoteLink(q) {
 		return "", false
 	}
-	r, err := filepath.EvalSymlinks(q)
-	return r, err == nil && r != ""
+	if r, err := filepath.EvalSymlinks(q); err == nil {
+		return r, r != ""
+	} else if !errors.Is(err, fs.ErrNotExist) {
+		return "", false
+	}
+	if _, err := os.Lstat(q); !errors.Is(err, fs.ErrNotExist) || filepath.Dir(q) == q || sc.hasRemoteLink(filepath.Dir(q)) {
+		return "", false
+	}
+	if pr, err := filepath.EvalSymlinks(filepath.Dir(q)); err == nil && pr != "" && !remote(pr, sc.cwd) {
+		info, err := os.Stat(pr)
+		return filepath.Join(pr, filepath.Base(q)), err == nil && info.IsDir()
+	}
+	return "", false
 }
