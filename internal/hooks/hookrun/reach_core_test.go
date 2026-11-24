@@ -904,7 +904,7 @@ func TestScanBoundsAndSafety(t *testing.T) {
 	}
 	resolvedRealSub, _ := filepath.EvalSymlinks(realSub)
 	scPwd := newScan(linkSub, os.LookupEnv, work{deadline: time.Now().Add(time.Minute)})
-	if got, ok := whereP(scPwd, nil); !ok || got != resolvedRealSub {
+	if got, ok := outputs["pwd -P"](scPwd, nil); !ok || got != resolvedRealSub {
 		t.Fatalf("pwd -P = (%q, %v), want (%q, true)", got, ok, resolvedRealSub)
 	}
 	if got, ok := where(scPwd, nil); !ok || got != linkSub {
@@ -1885,6 +1885,98 @@ func TestRealDotAndNestingBound(t *testing.T) {
 		scLink.reach("./link", existing)
 		if !scLink.places[existing] || !scLink.places[other] {
 			t.Fatalf("reach(./link) places = %v, want both %q and %q", scLink.places, existing, other)
+		}
+	}
+}
+
+func TestDirHandleIdentityCheck(t *testing.T) {
+	t.Parallel()
+	dir, _ := filepath.EvalSymlinks(t.TempDir())
+	subA, subB := filepath.Join(dir, "a"), filepath.Join(dir, "b")
+	if err := os.MkdirAll(subA, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(subB, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	fileA, fileB := filepath.Join(dir, "fa"), filepath.Join(dir, "fb")
+	if err := os.WriteFile(fileA, []byte("a"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(fileB, []byte("b"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	dh, err := openRootDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer dh.close()
+	infoA, err := dh.lstat("a")
+	if err != nil {
+		t.Fatal(err)
+	}
+	infoB, err := dh.lstat("b")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sub, err := dh.openSubDir("a", infoA); err != nil {
+		t.Fatalf("openSubDir(a, infoA) err = %v, want nil", err)
+	} else {
+		sub.close()
+	}
+	if sub, err := dh.openSubDir("a", infoB); !errors.Is(err, errOpaque) {
+		if err == nil {
+			sub.close()
+		}
+		t.Fatalf("openSubDir(a, infoB) err = %v, want errOpaque", err)
+	}
+	fiA, err := dh.lstat("fa")
+	if err != nil {
+		t.Fatal(err)
+	}
+	fiB, err := dh.lstat("fb")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if f, err := dh.open("fa", false, fiA); err != nil {
+		t.Fatalf("open(fa, false, fiA) err = %v, want nil", err)
+	} else {
+		_ = f.Close()
+	}
+	if f, err := dh.open("fa", false, fiB); !errors.Is(err, errOpaque) {
+		if f != nil {
+			_ = f.Close()
+		}
+		t.Fatalf("open(fa, false, fiB) err = %v, want errOpaque", err)
+	}
+	if f, err := dh.open("fa", true, fiA); !errors.Is(err, errOpaque) && err == nil {
+		_ = f.Close()
+		t.Fatalf("open(fa, true, fiA) succeeded, want error")
+	}
+
+	// Adjacent quote segments are bounded before parsing.
+	if parsable("echo " + strings.Repeat(`""`, maxShellWords+1)) {
+		t.Fatalf("parsable(adjacent empty double quotes) = true, want false")
+	}
+	if parsable("echo " + strings.Repeat(`''`, maxShellWords+1)) {
+		t.Fatalf("parsable(adjacent empty single quotes) = true, want false")
+	}
+
+	// Unset HOME stays unset for $HOME parameter expansion while tilde path() falls back to UserHomeDir.
+	scNoHome := newScan(dir, func(string) (string, bool) { return "", false }, work{deadline: time.Now().Add(time.Minute)})
+	if scNoHome.Get("HOME").IsSet() {
+		t.Fatalf("Get(HOME).IsSet() = true with empty env, want false")
+	}
+	fHome, err := syntax.NewParser().Parse(strings.NewReader(`echo "$HOME/repo/file"`), "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := scNoHome.fields(fHome.Stmts[0].Cmd.(*syntax.CallExpr).Args[1]); !errors.Is(err, errOpaque) {
+		t.Fatalf(`fields("$HOME/repo/file") with unset HOME err = %v, want errOpaque`, err)
+	}
+	if home, err := os.UserHomeDir(); err == nil && home != "" {
+		if got, ok := scNoHome.path("~/repo/file", dir); !ok || got != filepath.Join(home, "repo", "file") {
+			t.Fatalf("path(~/repo/file) with unset HOME = (%q, %v), want (%q, true)", got, ok, filepath.Join(home, "repo", "file"))
 		}
 	}
 }

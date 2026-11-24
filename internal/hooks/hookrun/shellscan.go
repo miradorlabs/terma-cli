@@ -93,8 +93,12 @@ func (sc *scan) lookup(name string) (string, bool) {
 		return "", false
 	} else if ok {
 		return *v, true
-	} else if v, ok := sc.env(name); ok || name != "HOME" {
-		return v, ok
+	}
+	return sc.env(name)
+}
+func (sc *scan) homeDir() (string, bool) {
+	if home, ok := sc.lookup("HOME"); ok || sc.isUnresolvedVar("HOME") {
+		return home, ok
 	}
 	home, err := os.UserHomeDir()
 	return home, err == nil

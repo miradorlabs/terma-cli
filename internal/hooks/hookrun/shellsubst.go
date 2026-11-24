@@ -22,8 +22,10 @@ type operands struct {
 
 // outputs maps known command-substitution prefixes to static path evaluators.
 var outputs = map[string]func(sc *scan, args []*syntax.Word) (string, bool){
-	"pwd": where, "pwd -L": where, "pwd -P": whereP, "git rev-parse --show-toplevel": toplevel, "mktemp": mktemp,
-	"go env GOPATH": gopath, "go env GOMODCACHE": modcache, "dirname": ofOperand(dirname), "basename": ofOperand(basename),
+	"pwd": where, "pwd -L": where, "pwd -P": noArgs(func(sc *scan) (string, bool) { r, ok := sc.real(sc.dir); return r, ok && !sc.unknown }),
+	"git rev-parse --show-toplevel": noArgs(func(sc *scan) (string, bool) { return sc.safeLocate(sc.dir) }), "mktemp": mktemp,
+	"go env GOPATH": gopath, "go env GOMODCACHE": modcache, "dirname": ofOperand(dirname),
+	"basename": ofOperand(func(_ *scan, p string) (string, bool) { return map[bool]string{true: filepath.Base(p)}[p != ""], true }),
 	"realpath": ofOperand((*scan).real), "readlink -f": ofOperand((*scan).real),
 }
 
@@ -52,18 +54,13 @@ func (sc *scan) substitute(w io.Writer, cs *syntax.CmdSubst) error {
 	return errOpaque
 }
 func where(s *scan, a []*syntax.Word) (string, bool) { return s.dir, s.dir != "" && len(a) == 0 }
-func whereP(sc *scan, a []*syntax.Word) (string, bool) {
-	if sc.dir != "" && len(a) == 0 {
-		r, ok := sc.real(sc.dir)
-		return r, ok && !sc.unknown
-	}
-	return "", false
-}
-func toplevel(sc *scan, a []*syntax.Word) (string, bool) {
-	if len(a) != 0 {
+func noArgs(f func(*scan) (string, bool)) func(*scan, []*syntax.Word) (string, bool) {
+	return func(sc *scan, a []*syntax.Word) (string, bool) {
+		if len(a) == 0 {
+			return f(sc)
+		}
 		return "", false
 	}
-	return sc.safeLocate(sc.dir)
 }
 func (sc *scan) hasGoEnv(key string) bool {
 	p, _ := sc.lookup("GOENV")
@@ -144,9 +141,6 @@ func ofOperand(f func(*scan, string) (string, bool)) func(*scan, []*syntax.Word)
 		return "", false
 	}
 }
-func basename(_ *scan, p string) (string, bool) {
-	return map[bool]string{true: filepath.Base(p)}[p != ""], true
-}
 func dirname(_ *scan, p string) (string, bool) {
 	vol, sep := filepath.VolumeName(p), map[bool]string{true: `/\`, false: "/"}[filepath.Separator == '\\']
 	rest := strings.TrimRight(p[len(vol):], sep)
@@ -158,11 +152,10 @@ func dirname(_ *scan, p string) (string, bool) {
 	return vol + ".", true
 }
 func (sc *scan) real(p string) (string, bool) {
-	q, ok := sc.path(p, sc.dir)
-	if p == "" || !ok {
-		return "", false
-	} else if r, parent, _, found := sc.walkPath(q, true); found || !sc.unknown && r != "" && parent != "" && filepath.Dir(r) == parent {
-		return r, true
+	if q, ok := sc.path(p, sc.dir); p != "" && ok {
+		if r, parent, _, found := sc.walkPath(q, true); found || !sc.unknown && r != "" && parent != "" && filepath.Dir(r) == parent {
+			return r, true
+		}
 	}
 	return "", false
 }
@@ -232,9 +225,6 @@ func (sc *scan) readSmallFile(path string) (string, error) {
 	}
 	defer f.Close()
 	var buf [maxPathBytes]byte
-	if fi, err := f.Stat(); err != nil || !fi.Mode().IsRegular() {
-		return "", errOpaque
-	}
 	n, err := io.ReadFull(f, buf[:])
 	if n == len(buf) || err != nil && !errors.Is(err, io.EOF) && !errors.Is(err, io.ErrUnexpectedEOF) {
 		return "", errOpaque
@@ -292,7 +282,7 @@ func (sc *scan) below(dir string, levels int) {
 	}
 }
 func (sc *scan) enclosingCheckout(root string) bool {
-	if home, ok := sc.lookup("HOME"); ok && home != "" {
+	if home, ok := sc.homeDir(); ok && home != "" {
 		if r, _, _, found := sc.walkPath(home, true); found && samePath(root, r) || !found && !sc.unknown && samePath(root, home) {
 			return true
 		}
@@ -311,7 +301,7 @@ func (sc *scan) holdsNone(p string) bool {
 		if cache, ok := modcache(sc, nil); ok {
 			sc.none = append(sc.none, cache)
 		}
-		if home, ok := sc.lookup("HOME"); ok && home != "" {
+		if home, ok := sc.homeDir(); ok && home != "" {
 			sc.none = append(sc.none, filepath.Join(home, "Library"))
 		}
 	}

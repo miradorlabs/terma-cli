@@ -77,10 +77,8 @@ func maskWords(command string, depth int) string {
 	s := strings.Map(func(r rune) rune { return map[bool]rune{true: ' ', false: r}[r < 0x20 || r == 0x7f] }, strings.Join(words, " "))
 	if r := []rune(s); len(r) > 60 {
 		return string(r[:60]) + " …"
-	} else if more {
-		return s + " …"
 	}
-	return s
+	return s + map[bool]string{true: " …"}[more]
 }
 
 // shellFields returns command's first n words as written alongside their unquoted forms.
@@ -222,7 +220,7 @@ func parsable(src string) bool {
 			top = open[len(open)-1]
 		}
 		double := i+2 < len(src) && src[i+2] == next
-		if top != '"' && top != 'h' && top != 'q' && strings.IndexByte(separators, c) < 0 && strings.IndexByte(separators, prev) >= 0 {
+		if top != '"' && top != 'h' && top != 'q' && (strings.IndexByte(separators, c) < 0 && strings.IndexByte(separators, prev) >= 0 || strings.IndexByte("\"'`([{", c) >= 0) {
 			words++
 		}
 		if (c == '$' || c == '`') && top != 'q' {

@@ -28,7 +28,7 @@ func (sc *scan) candidate(t string, r role) {
 		return
 	}
 	if t == "~" || strings.HasPrefix(t, "~/") {
-		home, _ := sc.lookup("HOME")
+		home, _ := sc.homeDir()
 		keyDir = "\x00" + home
 	}
 	c := candidate{t, keyDir, r}
@@ -222,7 +222,7 @@ func (sc *scan) away(w string, r role) bool {
 }
 func (sc *scan) path(w, dir string) (string, bool) {
 	if w == "~" || strings.HasPrefix(w, "~/") {
-		home, ok := sc.lookup("HOME")
+		home, ok := sc.homeDir()
 		if !ok || home == "" || remote(home, sc.cwd) {
 			sc.unknown = sc.unknown || remote(home, sc.cwd) || sc.isUnresolvedVar("HOME")
 			return "", false
@@ -268,15 +268,13 @@ func remote(p, cwd string) bool {
 	return len(p) >= 2 && os.IsPathSeparator(p[0]) && os.IsPathSeparator(p[1]) && (s == "" || !strings.EqualFold(s, share(cwd)))
 }
 func share(p string) string {
-	if len(p) < 2 || !os.IsPathSeparator(p[0]) || !os.IsPathSeparator(p[1]) {
-		return ""
+	if len(p) >= 2 && os.IsPathSeparator(p[0]) && os.IsPathSeparator(p[1]) {
+		host, rest := cutSep(p[2:])
+		if name, _ := cutSep(rest); host != "" && name != "" && strings.Trim(host, alnum+"-_.$") == "" {
+			return "//" + host + "/" + name
+		}
 	}
-	host, rest := cutSep(p[2:])
-	name, _ := cutSep(rest)
-	if host == "" || name == "" || strings.Trim(host, alnum+"-_.$") != "" {
-		return ""
-	}
-	return "//" + host + "/" + name
+	return ""
 }
 func isSep(r rune) bool { return r < 0x80 && os.IsPathSeparator(byte(r)) }
 func cutSep(p string) (string, string) {
