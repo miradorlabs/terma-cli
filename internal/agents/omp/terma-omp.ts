@@ -35,10 +35,13 @@ const HOOK_TIMEOUT_MS = 2000
 const HOOK_KILL_GRACE_MS = 250
 const MAX_HOOK_QUEUE = 64
 
-function termaHook(event: string, payload: Record<string, unknown>, untilExit = false, timeoutMs = 0): Promise<boolean> {
-  if (!CONFIG) return Promise.resolve(false)
-  return new Promise((resolve) => {
+function spawnHook(event: string, payload: Record<string, unknown>, untilExit = false, timeoutMs = 0): { result: Promise<boolean>; exit: Promise<void> } {
+  if (!CONFIG) return { result: Promise.resolve(false), exit: Promise.resolve() }
+  let resolveExit!: () => void
+  const exit = new Promise<void>((r) => { resolveExit = r })
+  const result = new Promise<boolean>((resolve) => {
     let settled = false
+    let exited = false
     let child: ReturnType<typeof spawn> | null = null
     let timer: any
     let killTimer: any
@@ -49,34 +52,58 @@ function termaHook(event: string, payload: Record<string, unknown>, untilExit = 
       if (killTimer) clearTimeout(killTimer)
       resolve(ok)
     }
+    const markExited = () => {
+      if (exited) return
+      exited = true
+      if (timer) clearTimeout(timer)
+      if (killTimer) clearTimeout(killTimer)
+      resolveExit()
+    }
     try {
       const [cmd, ...args] = CONFIG!.hookCommand
       child = spawn(cmd, [...args, event], { stdio: ["pipe", "ignore", "ignore"], detached: false })
-      child.on("error", () => finish(false))
+      child.on("error", () => {
+        markExited()
+        finish(false)
+      })
+      child.on("close", (code: number | null) => {
+        markExited()
+        if (untilExit) finish(code === 0)
+      })
       child.stdin.on("error", () => { if (!untilExit) finish(false) })
-      if (untilExit) {
-        child.on("close", (code: number | null) => finish(code === 0))
-        if (timeoutMs > 0) {
-          timer = setTimeout(() => {
-            if (!child) return finish(false)
-            try { child.kill("SIGTERM") } catch {}
-            killTimer = setTimeout(() => {
-              try { child?.kill("SIGKILL") } catch {}
-              child?.unref?.()
-              finish(false)
-            }, HOOK_KILL_GRACE_MS)
-            killTimer?.unref?.()
-          }, timeoutMs)
-          timer?.unref?.()
-        }
+      if (untilExit && timeoutMs > 0) {
+        timer = setTimeout(() => {
+          if (!child) {
+            markExited()
+            return finish(false)
+          }
+          try { child.kill("SIGTERM") } catch (err: any) {
+            if (err && err.code === "ESRCH") markExited()
+          }
+          killTimer = setTimeout(() => {
+            try { child?.kill("SIGKILL") } catch (err: any) {
+              if (err && err.code === "ESRCH") markExited()
+            }
+            child?.unref?.()
+            finish(false)
+          }, HOOK_KILL_GRACE_MS)
+          killTimer?.unref?.()
+        }, timeoutMs)
+        timer?.unref?.()
       }
       child.stdin.end(JSON.stringify(payload), () => {
         if (!untilExit) finish(true)
       })
     } catch {
+      markExited()
       finish(false)
     }
   })
+  return { result, exit }
+}
+
+function termaHook(event: string, payload: Record<string, unknown>, untilExit = false, timeoutMs = 0): Promise<boolean> {
+  return spawnHook(event, payload, untilExit, timeoutMs).result
 }
 
 let session = ""
@@ -279,37 +306,64 @@ async function askForContent() {
 export default async function (omp: any) {
   if (!CONFIG) return
   await askForContent()
-  // Serialize lifecycle and reach hooks so session-start always finishes (or is terminated)
-  // before tool-reach; titles keep their own queue.
+  // Serialize lifecycle and reach hooks so session-start always finishes (with confirmed
+  // child exit) before tool-reach; titles keep their own queue.
   let lifecycle: Promise<void> = Promise.resolve()
   let pending = 0
-  const queuedHook = (event: string, payload: Record<string, unknown>): Promise<void> => {
-    if (pending >= MAX_HOOK_QUEUE) return Promise.resolve()
+  const queuedHook = (event: string, payload: Record<string, unknown>): Promise<boolean> => {
+    if (pending >= MAX_HOOK_QUEUE) return Promise.resolve(false)
     pending++
-    const step = lifecycle
-      .then(() => termaHook(event, payload, true, HOOK_TIMEOUT_MS).then(() => undefined))
-      .finally(() => { pending-- })
-    lifecycle = step.then(() => undefined, () => undefined)
-    return step
+    const slot = lifecycle.then(() => spawnHook(event, payload, true, HOOK_TIMEOUT_MS))
+    lifecycle = slot.then((s) => s.exit, () => undefined).finally(() => { pending-- })
+    return new Promise<boolean>((resolve) => {
+      let done = false
+      const settle = (ok: boolean) => {
+        if (done) return
+        done = true
+        clearTimeout(wait)
+        resolve(ok)
+      }
+      const wait: any = setTimeout(() => settle(false), HOOK_TIMEOUT_MS + HOOK_KILL_GRACE_MS + 500)
+      wait?.unref?.()
+      slot.then((s) => s.result, () => false).then(settle, () => settle(false))
+    })
   }
-  const reached = new Set<string>()
-  const emitReach = (event: any, ctx: any): Promise<void> | null => {
+  const tainted = new Set<string>()
+  const taint = (s: string, cwd: unknown, parent: string) => {
+    if (!s || tainted.has(s)) return
+    tainted.add(s)
+    // Fail-closed fence: attempt once after the queue drains to flip the run to Mixed via
+    // an unresolvable shell reach so OMP's native OTLP export cannot route under a stale claim.
+    void lifecycle.then(() => spawnHook("omp-tool-reach", {
+      session_id: s,
+      cwd,
+      tool: "bash",
+      command: "eval $TERMA_REACH_FAILED",
+      parent_session_id: parent || undefined,
+    }, true, HOOK_TIMEOUT_MS).result)
+  }
+  const reached = new Map<string, Promise<boolean>>()
+  const emitReach = (event: any, ctx: any): Promise<boolean> | null => {
     const reach = toolReach(event)
     if (!reach) return null
     const s = sessionOf(ctx)
     if (!s) return null
+    const parent = parentOf(ctx)
     return queuedHook("omp-tool-reach", {
       session_id: s,
       cwd: ctx?.cwd,
       tool: String(event?.toolName ?? ""),
-      parent_session_id: parentOf(ctx) || undefined,
+      parent_session_id: parent || undefined,
       ...reach,
+    }).then((ok) => {
+      if (!ok) taint(s, ctx?.cwd, parent)
+      return ok
     })
   }
 
   omp.on("session_start", (event: any, ctx: any) => {
     session = sessionOf(ctx)
-    return queuedHook("omp-session-start", { session_id: session, cwd: ctx?.cwd, model: ctx?.model?.id, reason: event?.reason, parent_session_id: parentOf(ctx) || undefined })
+    return queuedHook("omp-session-start", { session_id: session, cwd: ctx?.cwd, model: ctx?.model?.id, reason: event?.reason, parent_session_id: parentOf(ctx) || undefined }).then(() => undefined)
   })
 
   // The session's end is handed over first: it must land within OMP's 2 s, or the next
@@ -317,47 +371,56 @@ export default async function (omp: any) {
   // flush is delivered by its own.
   omp.on("session_shutdown", async (_event: any, ctx: any) => {
     const s = sessionOf(ctx)
-    const end = s ? queuedHook("omp-session-end", { session_id: s, cwd: ctx?.cwd }) : Promise.resolve()
-    await Promise.all([end, sendTitleBefore(ctx, 1500)])
+    const end = s ? queuedHook("omp-session-end", { session_id: s, cwd: ctx?.cwd }).then(() => undefined) : Promise.resolve()
+    await Promise.all([end, tainted.has(s) ? Promise.resolve() : sendTitleBefore(ctx, 1500)])
   })
 
   // /new, /resume and a fork leave the session without a shutdown: its name, given or
   // changed since the last turn, goes now. ctx is still the session being left. The handler
   // returns nothing, which lets the switch go ahead.
   omp.on("session_before_switch", async (_event: any, ctx: any) => {
+    if (tainted.has(sessionOf(ctx))) return
     await sendTitleBefore(ctx, 1500)
   })
 
   // Every prompt is a claim too: a session whose start the extension missed, or a relay
   // that stopped between turns, is covered before the turn exports anything.
   omp.on("before_agent_start", (_event: any, ctx: any) => {
-    void queuedHook("omp-prompt", { session_id: sessionOf(ctx), cwd: ctx?.cwd })
+    const s = sessionOf(ctx)
+    if (tainted.has(s)) return
+    void queuedHook("omp-prompt", { session_id: s, cwd: ctx?.cwd })
     sendTitle(ctx)
   })
 
   omp.on("agent_end", (_event: any, ctx: any) => {
+    if (tainted.has(sessionOf(ctx))) return
     sendTitle(ctx)
   })
 
   omp.on("tool_call", async (event: any, ctx: any) => {
-    const pending = emitReach(event, ctx)
-    if (pending && event?.toolCallId) {
-      reached.add(event.toolCallId)
-      if (reached.size > 1024) reached.delete(reached.values().next().value!)
+    const pendingReach = emitReach(event, ctx)
+    if (pendingReach && event?.toolCallId) {
+      reached.set(event.toolCallId, pendingReach)
+      if (reached.size > 1024) reached.delete(reached.keys().next().value!)
     }
-    if (pending) await pending
+    if (pendingReach) await pendingReach
   })
 
-  omp.on("tool_result", (event: any, ctx: any) => {
+  omp.on("tool_result", async (event: any, ctx: any) => {
+    const s = sessionOf(ctx)
     const id = event?.toolCallId
-    const seen = Boolean(id && reached.delete(id))
-    if (!seen || event?.details?.resolvedPath) {
-      void emitReach(event, ctx)
+    const prior = id ? reached.get(id) : undefined
+    if (id) reached.delete(id)
+    if (prior && !(await prior)) return
+    if (!prior || event?.details?.resolvedPath) {
+      const extra = emitReach(event, ctx)
+      if (extra && !(await extra)) return
     }
+    if (s && tainted.has(s)) return
     const files = editedFiles(event)
     if (files.length > 0) {
       void queuedHook("omp-file-edit", {
-        session_id: sessionOf(ctx),
+        session_id: s,
         cwd: ctx?.cwd,
         tool: String(event?.toolName ?? ""),
         files,

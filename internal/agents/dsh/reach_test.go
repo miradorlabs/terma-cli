@@ -323,3 +323,66 @@ await new Promise((r) => setTimeout(r, 200))
 		}
 	}
 }
+
+func TestDshConfigureRefreshDisconnectConcurrentLockSafety(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("DSH_HOME", dir)
+	cfg := pluginConfig{Endpoint: "http://127.0.0.1:43180", Headers: map[string]string{"Authorization": "Bearer tok"}}
+	if _, err := writePlugin(cfg); err != nil {
+		t.Fatalf("initial writePlugin: %v", err)
+	}
+	var wg sync.WaitGroup
+	errs := make(chan error, 60)
+	for range 3 {
+		wg.Add(3)
+		go func() {
+			defer wg.Done()
+			for range 10 {
+				if _, err := writePlugin(cfg); err != nil {
+					errs <- err
+					return
+				}
+			}
+		}()
+		go func() {
+			defer wg.Done()
+			for range 10 {
+				if _, _, err := refreshPlugin(); err != nil {
+					errs <- err
+					return
+				}
+			}
+		}()
+		go func() {
+			defer wg.Done()
+			for range 10 {
+				if _, err := removePlugin(); err != nil {
+					errs <- err
+					return
+				}
+			}
+		}()
+	}
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		t.Fatalf("concurrent dsh write/refresh/remove error: %v", err)
+	}
+	// Check invariant: patch and plugin file must agree (no dangling insert referencing a missing plugin).
+	pluginPath := filepath.Join(dir, "plugins", "terma-relay.mjs")
+	patchPath := filepath.Join(dir, "cordis.patch.yml")
+	_, pluginErr := os.Stat(pluginPath)
+	patchData, patchErr := os.ReadFile(patchPath)
+	if os.IsNotExist(pluginErr) && patchErr == nil && strings.Contains(string(patchData), pluginPath) {
+		t.Fatalf("dangling cordis.patch.yml insert references deleted plugin %s", pluginPath)
+	}
+	if _, err := removePlugin(); err != nil {
+		t.Fatalf("final removePlugin: %v", err)
+	}
+	if _, err := os.Stat(pluginPath); !os.IsNotExist(err) {
+		t.Fatalf("plugin still exists after final removePlugin: err=%v", err)
+	}
+	if _, err := os.Stat(patchPath); !os.IsNotExist(err) {
+		t.Fatalf("patch still exists after final removePlugin: err=%v", err)
+	}
+}

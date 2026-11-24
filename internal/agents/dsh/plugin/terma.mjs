@@ -102,7 +102,10 @@ function schedule() {
   if (!timer) timer = setTimeout(() => void flush(), 1000)
 }
 
+const tainted = new Set()
+
 function span(session, name, start, end, a, error = false) {
+  if (session && tainted.has(session)) return
   spans.push({
     traceId: traceId(session), spanId: hex(8), name, kind: 3,
     startTimeUnixNano: nanos(start), endTimeUnixNano: nanos(end),
@@ -113,6 +116,7 @@ function span(session, name, start, end, a, error = false) {
 }
 
 function record(session, event, body, a) {
+  if (session && tainted.has(session)) return
   const t = nanos(Date.now())
   logs.push({
     timeUnixNano: t, observedTimeUnixNano: t, severityNumber: 9, severityText: "INFO",
@@ -138,7 +142,7 @@ function usageAttrs(u) {
 
 // termaHook hands an event to `terma hook dsh-*` in FIFO order, as this process's child —
 // which lets its claim name this process and ensures session-start finishes before tool-reach.
-// A timed-out child is terminated before the queue advances so it cannot race later hooks.
+// A timed-out child is terminated and the queue only advances once child exit is confirmed.
 const HOOK_TIMEOUT_MS = 2000
 const HOOK_KILL_GRACE_MS = 250
 const MAX_HOOK_QUEUE = 64
@@ -146,24 +150,41 @@ let hookQueue = Promise.resolve()
 let hookPending = 0
 
 function spawnHook(event, payload) {
-  return new Promise((resolve) => {
+  let resolveExit
+  const exit = new Promise((r) => { resolveExit = r })
+  const result = new Promise((resolve) => {
     let settled = false
+    let exited = false
     let child = null
     let killTimer
-    const done = (ok) => {
+    const finish = (ok) => {
       if (settled) return
       settled = true
       clearTimeout(timer)
       if (killTimer) clearTimeout(killTimer)
       resolve(ok)
     }
+    const markExited = () => {
+      if (exited) return
+      exited = true
+      clearTimeout(timer)
+      if (killTimer) clearTimeout(killTimer)
+      resolveExit()
+    }
     const timer = setTimeout(() => {
-      if (!child) return done(false)
-      try { child.kill("SIGTERM") } catch {}
+      if (!child) {
+        markExited()
+        return finish(false)
+      }
+      try { child.kill("SIGTERM") } catch (err) {
+        if (err && err.code === "ESRCH") markExited()
+      }
       killTimer = setTimeout(() => {
-        try { child.kill("SIGKILL") } catch {}
+        try { child.kill("SIGKILL") } catch (err) {
+          if (err && err.code === "ESRCH") markExited()
+        }
         if (typeof child.unref === "function") child.unref()
-        done(false)
+        finish(false)
       }, HOOK_KILL_GRACE_MS)
       if (typeof killTimer.unref === "function") killTimer.unref()
     }, HOOK_TIMEOUT_MS)
@@ -171,22 +192,41 @@ function spawnHook(event, payload) {
     try {
       const [cmd, ...args] = CONFIG.hookCommand
       child = spawn(cmd, [...args, event], { stdio: ["pipe", "ignore", "ignore"] })
-      child.on("error", () => done(false))
-      child.on("close", (code) => done(code === 0))
+      child.on("error", () => {
+        markExited()
+        finish(false)
+      })
+      child.on("close", (code) => {
+        markExited()
+        finish(code === 0)
+      })
       child.stdin.on("error", () => {})
       child.stdin.end(JSON.stringify(payload))
     } catch {
-      done(false)
+      markExited()
+      finish(false)
     }
   })
+  return { result, exit }
 }
 
 function termaHook(event, payload) {
   if (hookPending >= MAX_HOOK_QUEUE) return Promise.resolve(false)
   hookPending++
-  const step = hookQueue.then(() => spawnHook(event, payload)).finally(() => { hookPending-- })
-  hookQueue = step.then(() => undefined, () => undefined)
-  return step
+  const slot = hookQueue.then(() => spawnHook(event, payload))
+  hookQueue = slot.then((s) => s.exit, () => undefined).finally(() => { hookPending-- })
+  return new Promise((resolve) => {
+    let done = false
+    const settle = (ok) => {
+      if (done) return
+      done = true
+      clearTimeout(wait)
+      resolve(ok)
+    }
+    const wait = setTimeout(() => settle(false), HOOK_TIMEOUT_MS + HOOK_KILL_GRACE_MS + 500)
+    if (typeof wait.unref === "function") wait.unref()
+    slot.then((s) => s.result, () => false).then(settle, () => settle(false))
+  })
 }
 
 // --- the plugin -------------------------------------------------------------------------
@@ -320,7 +360,12 @@ export function apply(ctx) {
       case "tool/call": {
         const name = String(d.name || "")
         const reach = toolReach(name, d.arguments)
-        const reachDone = reach ? termaHook("dsh-tool-reach", { session_id: s, cwd, tool: name, ...reach }) : null
+        const reachDone = reach
+          ? termaHook("dsh-tool-reach", { session_id: s, cwd, tool: name, ...reach }).then((ok) => {
+              if (!ok) tainted.add(s)
+              return ok
+            })
+          : null
         if (d.callId) calls.set(d.callId, { name, args: d.arguments, start: at, reachDone })
         if (reachDone) await reachDone
         break
@@ -332,9 +377,13 @@ export function apply(ctx) {
         calls.delete(id)
         let end = at
         if (call.reachDone) {
-          if (!(await call.reachDone)) break
+          if (!(await call.reachDone)) {
+            tainted.add(s)
+            break
+          }
           end = Math.max(at, Date.now())
         }
+        if (tainted.has(s)) break
         span(s, "execute_tool " + call.name, call.start, end, {
           "gen_ai.operation.name": "execute_tool",
           "gen_ai.tool.name": call.name,

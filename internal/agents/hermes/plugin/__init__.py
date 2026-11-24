@@ -81,6 +81,7 @@ SCOPE = {"name": "terma-hermes", "version": "1"}
 _lock = threading.Lock()
 _spans = []
 _logs = []
+_tainted = set()
 _wake = threading.Event()
 
 
@@ -117,6 +118,8 @@ def _sender():
 
 def _span(session, name, start, end, attrs, error=False):
     with _lock:
+        if session and session in _tainted:
+            return
         _spans.append({
             "traceId": _trace_id(session),
             "spanId": secrets.token_hex(8),
@@ -132,6 +135,8 @@ def _span(session, name, start, end, attrs, error=False):
 def _log(session, event, body, attrs):
     t = _nanos(time.time())
     with _lock:
+        if session and session in _tainted:
+            return
         _logs.append({
             "timeUnixNano": t,
             "observedTimeUnixNano": t,
@@ -356,6 +361,8 @@ def _on_post_tool_call(session_id="", tool_name="", args=None, result=None, tool
         return
     reach = _tool_reach(tool_name, args)
     if reach and not _terma_hook("hermes-tool-reach", {"session_id": session_id, "cwd": _cwd(), "tool": tool_name, **reach}, wait=True):
+        with _lock:
+            _tainted.add(session_id)
         return
     end = time.time()
     start = end - (duration_ms or 0) / 1000.0
