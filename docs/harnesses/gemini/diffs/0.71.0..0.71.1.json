@@ -3,7 +3,7 @@
   "harness": "gemini",
   "from": "0.71.0",
   "to": "0.71.1",
-  "generated_at": "2026-11-24T04:24:03.641481502Z",
+  "generated_at": "2026-11-24T07:46:10.022420061Z",
   "source": {
     "compare": "https://github.com/google-gemini/gemini-cli/compare/v0.71.0...v0.71.1"
   },
@@ -37,7 +37,7 @@
       ],
       "title": "On-disk transcript path changed",
       "impact": "informational",
-      "before": "<home>/.gemini<tmp><time>-<id>.jsonl",
+      "before": "<home>/.gemini<tmp><time>579bbe.jsonl",
       "after": "<home>/.gemini<tmp><time>212dea.jsonl",
       "text_diff": null,
       "terma": null,

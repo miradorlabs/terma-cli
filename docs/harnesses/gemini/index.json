@@ -61,7 +61,7 @@
     {
       "version": "0.71.0",
       "released_at": "2026-11-24T01:21:20.379Z",
-      "captured_at": "2026-11-24T01:31:58.466360801Z",
+      "captured_at": "2026-11-24T07:46:10.022420061Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -83,8 +83,8 @@
       ],
       "signing": null,
       "partial": true,
-      "attempted_at": "2026-11-24T01:31:58.466360801Z",
-      "attempts": 1
+      "attempted_at": "2026-11-24T07:46:10.022420061Z",
+      "attempts": 2
     },
     {
       "version": "0.70.0",
