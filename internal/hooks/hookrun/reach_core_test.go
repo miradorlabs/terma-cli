@@ -1401,6 +1401,78 @@ func TestReachCoreHardeningRegressions(t *testing.T) {
 			t.Fatalf("%s took %v, want <100ms", expr, d)
 		}
 	}
+
+	// 15. Quoted or escaped secret values starting with '<' or '>' are not mistaken for redirections.
+	for _, cmd := range []string{
+		`cli --password '<SECRET>'`,
+		`cli --password "<SECRET>"`,
+		`cli --password \<SECRET>`,
+		`cli --password $'<SECRET>'`,
+		`cli --password '>SECRET'`,
+	} {
+		if got := firstWords(cmd); strings.Contains(got, "SECRET") {
+			t.Fatalf("firstWords(%q) = %q, leaked quoted angle-bracket secret", cmd, got)
+		}
+	}
+
+	// 16. Schemeless URL userinfo (user:pass@host, :pass@host) is masked without breaking git scp specs.
+	for _, cmd := range []string{
+		`curl user:SECRET@example.com/path`,
+		`curl :SECRET@example.com/path`,
+		`curl 'user:SECRET@example.com/path'`,
+		`curl >user:SECRET@example.com/path`,
+	} {
+		if got := firstWords(cmd); strings.Contains(got, "SECRET") {
+			t.Fatalf("firstWords(%q) = %q, leaked schemeless URL userinfo", cmd, got)
+		}
+	}
+	if got := firstWords(`git clone git@github.com:org/repo`); !strings.Contains(got, "git@github.com:org/repo") {
+		t.Fatalf("firstWords(git scp) = %q, unexpectedly masked git scp target", got)
+	}
+
+	// 17. Paths exceeding maxPathBytes fail closed (sc.unknown = true) in reach, placeParent, and cleanSafeAt.
+	longRel := strings.Repeat("a/", maxPathBytes/2+10) + "leaf"
+	scLong := newScan(dir, func(string) (string, bool) { return "", false }, work{deadline: time.Now().Add(time.Minute)})
+	scLong.candidate(longRel, plain)
+	if !scLong.unknown {
+		t.Fatalf("oversized candidate failed to set unknown=true")
+	}
+	scLongDot := newScan(dir, func(string) (string, bool) { return "", false }, work{deadline: time.Now().Add(time.Minute)})
+	scLongDot.candidate("../"+longRel, plain)
+	if !scLongDot.unknown {
+		t.Fatalf("oversized ../ candidate failed to set unknown=true")
+	}
+
+	// 18. Unresolved variables (sc.vars[k] == nil) fail closed in fallback/indirect/arith/index/slice expansions,
+	// while genuinely unset variables still use :- defaults.
+	ref := "DIR"
+	for _, expr := range []string{
+		`echo ${DIR:-/safe}/file`,
+		`echo ${DIR-/safe}/file`,
+		`echo ${DIR:+/safe}/file`,
+		`echo ${!REF:-/safe}/file`,
+		`echo $(( DIR + 1 ))/file`,
+		`echo ${A[DIR]}/file`,
+		`echo ${A:DIR:1}/file`,
+	} {
+		w := parseFirstArg(t, expr)
+		scU := newScan(dir, func(k string) (string, bool) {
+			if k == "A" {
+				return "hello", true
+			}
+			return "", false
+		}, work{deadline: time.Now().Add(time.Minute)})
+		scU.vars["DIR"] = nil
+		scU.vars["REF"] = &ref
+		if got, err := scU.fields(w); err == nil {
+			t.Fatalf("%s expanded to %q with unresolved DIR, want errOpaque", expr, got)
+		}
+	}
+	scUnset := newScan(dir, func(string) (string, bool) { return "", false }, work{deadline: time.Now().Add(time.Minute)})
+	gotUnset, err := scUnset.fields(parseFirstArg(t, `echo ${UNSET:-/safe}/file`))
+	if err != nil || len(gotUnset) != 1 || gotUnset[0] != "/safe/file" {
+		t.Fatalf("unset :- default = (%q, %v), want ([\"/safe/file\"], nil)", gotUnset, err)
+	}
 }
 
 func FuzzParsable(f *testing.F) {

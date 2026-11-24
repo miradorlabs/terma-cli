@@ -12,7 +12,7 @@ import (
 var (
 	secretOptions          = []string{"-c", "-u", "--user", "-U", "--proxy-user", "-H", "--header", "--proxy-header", "-p", "--password", "-b", "--cookie", "-d", "--data", "--data-ascii", "--data-raw", "--data-binary", "--data-urlencode", "--json", "--oauth2-bearer"}
 	secretNames, compounds = []string{"pass", "token", "secret", "key", "auth"}, []string{"if", "for", "while", "until", "case", "select"}
-	userinfo               = regexp.MustCompile(`://[^/\s]+@`)
+	userinfo               = regexp.MustCompile(`(://)[^/\s]+@|[^/\s:@]*:[^/\s@]+@`)
 )
 
 // Pre-parse bounds preventing deep parser recursion or huge expression backtracking.
@@ -41,33 +41,31 @@ func maskWords(command string, depth int) string {
 			redir = 0
 			continue
 		}
-		if r := strings.TrimLeft(b, "0123456789"); strings.HasPrefix(r, "<") || strings.HasPrefix(r, ">") {
-			switch {
-			case strings.HasPrefix(r, "<<<") && len(r) > 3:
+		if r := strings.TrimLeft(words[i], "0123456789"); strings.HasPrefix(r, "<") || strings.HasPrefix(r, ">") {
+			if strings.HasPrefix(r, "<<<") && len(r) > 3 {
 				words[i] = "<<<…"
-			case hasSubst || strings.HasPrefix(r, "<(") || strings.HasPrefix(r, ">(") || userinfo.MatchString(b):
+			} else if hasSubst || strings.HasPrefix(r, "<(") || strings.HasPrefix(r, ">(") || userinfo.MatchString(b) {
 				words[i] = "…"
-			case r == "<<<":
+			} else if r == "<<<" {
 				redir = 2
-			case strings.TrimLeft(r, "<>&-") == "":
+			} else if strings.TrimLeft(r, "<>&-") == "" {
 				redir = 1
 			}
 			continue
 		}
-		masked := userinfo.ReplaceAllString(b, "://…@")
+		masked := userinfo.ReplaceAllString(b, "${1}…@")
 		name, _, eq := strings.Cut(masked, "=")
-		switch {
-		case secret || hasSubst || depth >= 2 && strings.ContainsAny(b, " \t\n"):
+		if secret || hasSubst || depth >= 2 && strings.ContainsAny(b, " \t\n") {
 			words[i] = "…"
-		case len(b) > 2 && b[0] == '-' && b[1] != '-':
+		} else if len(b) > 2 && b[0] == '-' && b[1] != '-' {
 			words[i] = b[:2] + "…"
-		case eq && name != "" && !strings.ContainsAny(name, " \t\n"):
+		} else if eq && name != "" && !strings.ContainsAny(name, " \t\n") {
 			words[i] = name + "=…"
-		case strings.ContainsAny(b, " \t\n"):
+		} else if strings.ContainsAny(b, " \t\n") {
 			if inner := maskWords(b, depth+1); inner != b {
 				words[i] = inner
 			}
-		case masked != b:
+		} else if masked != b {
 			words[i] = masked
 		}
 		lower, short := strings.ToLower(b), len(b) > 2 && b[0] == '-' && b[1] != '-'
@@ -190,8 +188,7 @@ func ansiEscape(s string) (rune, int) {
 		base, start, limit, digits = 16, 1, 2<<j, "0123456789abcdefABCDEF"
 	}
 	k := 0
-	for k < limit && start+k < len(s) && strings.IndexByte(digits, s[start+k]) >= 0 {
-		k++
+	for ; k < limit && start+k < len(s) && strings.IndexByte(digits, s[start+k]) >= 0; k++ {
 	}
 	if v, err := strconv.ParseUint(s[start:start+k], base, 32); k > 0 && err == nil {
 		if base == 8 {
@@ -353,26 +350,25 @@ func heredocDelimiter(src string, i int) (heredoc, int) {
 	var d strings.Builder
 	quoted := false
 	for quote := byte(0); i < len(src); i++ {
-		switch c := src[i]; {
-		case quote != 0 && c == '\n':
+		if c := src[i]; quote != 0 && c == '\n' {
 			return heredoc{}, -1
-		case quote == '"' && c == '\\' && i+1 < len(src) && strings.IndexByte("\"\\`$", src[i+1]) >= 0:
+		} else if quote == '"' && c == '\\' && i+1 < len(src) && strings.IndexByte("\"\\`$", src[i+1]) >= 0 {
 			i++
 			d.WriteByte(src[i])
-		case quote != 0 && c == quote:
+		} else if quote != 0 && c == quote {
 			quote = 0
-		case quote != 0:
+		} else if quote != 0 {
 			d.WriteByte(c)
-		case c == '$' && i+1 < len(src) && src[i+1] == '\'':
+		} else if c == '$' && i+1 < len(src) && src[i+1] == '\'' {
 			return heredoc{}, -1
-		case c == '\'' || c == '"':
+		} else if c == '\'' || c == '"' {
 			quote, quoted = c, true
-		case c == '\\' && i+1 < len(src):
+		} else if c == '\\' && i+1 < len(src) {
 			i, quoted = i+1, true
 			d.WriteByte(src[i])
-		case strings.IndexByte(" \t\n;&|<>()", c) >= 0:
+		} else if strings.IndexByte(" \t\n;&|<>()", c) >= 0 {
 			return heredoc{d.String(), quoted, stripTabs}, i - 1
-		default:
+		} else {
 			d.WriteByte(c)
 		}
 	}

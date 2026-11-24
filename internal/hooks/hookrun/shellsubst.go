@@ -42,8 +42,7 @@ func (sc *scan) substitute(w io.Writer, cs *syntax.CmdSubst) error {
 				outer := sc.cfg
 				sc.cfg = sc.config() // expand is not reentrant: an operand expands with its own
 				out, ok := known(sc, ce.Args[n:])
-				sc.cfg = outer
-				if !ok || !sc.charge(len(out)) || !sc.chargeFields(out) {
+				if sc.cfg = outer; !ok || !sc.charge(len(out)) || !sc.chargeFields(out) {
 					return errOpaque
 				}
 				_, err := io.WriteString(w, out)
@@ -121,12 +120,11 @@ func mktemp(sc *scan, args []*syntax.Word) (string, bool) {
 	for _, a := range args {
 		l := a.Lit()
 		short := strings.HasPrefix(l, "-") && !strings.HasPrefix(l, "--")
-		switch {
-		case l == "" || strings.HasPrefix(l, "--tmpdir=") || short && strings.ContainsRune(l[1:], 'p') || !strings.HasPrefix(l, "-") && (name != "" || !strings.Contains(l, "XXX") || pathLike(l)):
+		if l == "" || strings.HasPrefix(l, "--tmpdir=") || short && strings.ContainsRune(l[1:], 'p') || !strings.HasPrefix(l, "-") && (name != "" || !strings.Contains(l, "XXX") || pathLike(l)) {
 			return "", false
-		case l == "--tmpdir" || short && strings.ContainsRune(l[1:], 't'):
+		} else if l == "--tmpdir" || short && strings.ContainsRune(l[1:], 't') {
 			tmp = true
-		case !strings.HasPrefix(l, "-"):
+		} else if !strings.HasPrefix(l, "-") {
 			name = l
 		}
 	}

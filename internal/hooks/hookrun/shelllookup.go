@@ -50,13 +50,12 @@ func (sc *scan) resolve(t string, r role, slashed bool) (res cached) {
 	found := false
 	for i, d := range dirs {
 		if p, info := sc.reach(t, d); p != "" {
-			if found = true; info != nil && info.IsDir() {
+			if found, res.named = true, res.named || info != nil; info != nil && info.IsDir() {
 				if i == 0 {
 					res.dir = p
 				}
 				res.folders = append(res.folders, p)
 			}
-			res.named = res.named || info != nil
 		}
 	}
 	if !found && r.mayCreate(slashed) {
@@ -142,7 +141,7 @@ func (sc *scan) resolveLink(p string, hops int) (string, bool) {
 }
 func (sc *scan) reach(w, dir string) (string, os.FileInfo) {
 	p, ok := sc.path(w, dir)
-	if !ok || len(p) > maxPathBytes || sc.hasRemoteLink(filepath.Dir(p)) {
+	if !ok || len(p) > maxPathBytes && sc.fail() || sc.hasRemoteLink(filepath.Dir(p)) {
 		return "", nil
 	}
 	info, err := os.Lstat(p)
@@ -169,7 +168,7 @@ func (sc *scan) reach(w, dir string) (string, os.FileInfo) {
 	return p, info
 }
 func (sc *scan) placeParent(p string) {
-	if len(p) > maxPathBytes || sc.hasRemoteLink(filepath.Dir(p)) {
+	if len(p) > maxPathBytes && sc.fail() || sc.hasRemoteLink(filepath.Dir(p)) {
 		return
 	}
 	for d, ok := filepath.Dir(p), true; ok && sc.spend(1); d, ok = filepath.Dir(d), filepath.Dir(d) != d {
@@ -211,8 +210,7 @@ func hasDotDot(p string) bool {
 // cleanSafeAt resolves symlinks and checks remote shares before collapsing any ".." segment.
 func (sc *scan) cleanSafeAt(base, rel string, hops int) (string, bool) {
 	if len(base)+len(rel) > maxPathBytes {
-		sc.unknown = sc.unknown || hops > 0
-		return "", false
+		return "", !sc.fail()
 	}
 	cur := filepath.Clean(base)
 	for _, part := range strings.FieldsFunc(rel, isSep) {

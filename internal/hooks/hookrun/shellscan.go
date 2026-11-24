@@ -86,10 +86,9 @@ func (sc *scan) lookup(name string) (string, bool) {
 		return sc.dir, sc.dir != ""
 	} else if name == "OLDPWD" && sc.prev != "" {
 		return sc.prev, true
-	} else if v, ok := sc.vars[name]; ok {
-		if v == nil {
-			return "", false
-		}
+	} else if v, ok := sc.vars[name]; ok && v == nil {
+		return "", false
+	} else if ok {
 		return *v, true
 	} else if v, ok := sc.env(name); ok || name != "HOME" {
 		return v, ok
@@ -113,9 +112,8 @@ func (sc *scan) budget(counter *int, n, limit int) bool {
 func (sc *scan) spend(n int) bool       { return sc.budget(&sc.lookups, n, maxShellLookups) }
 func (sc *scan) spendStat(n int) bool   { return sc.budget(&sc.stats, n, maxShellStats) }
 func (sc *scan) charge(n int) bool      { return sc.budget(&sc.bytes, n, maxShellBytes) }
-func (sc *scan) size(w syntax.Node) int { return sc.sizeIn(w, false) }
-func (sc *scan) sizeIn(w syntax.Node, opaqueSubst bool) int {
-	n := 0
+func (sc *scan) size(w syntax.Node) int { n, _ := sc.sizeIn(w, false, false); return n }
+func (sc *scan) sizeIn(w syntax.Node, opaqueSubst, arith bool) (n int, unres bool) {
 	if w != nil {
 		syntax.Walk(w, func(node syntax.Node) bool {
 			switch x := node.(type) {
@@ -124,7 +122,8 @@ func (sc *scan) sizeIn(w syntax.Node, opaqueSubst bool) int {
 			case *syntax.SglQuoted:
 				n += len(x.Value)
 			case *syntax.ParamExp:
-				n += sc.paramSize(x, opaqueSubst)
+				pn, pu := sc.paramSize(x, opaqueSubst)
+				n, unres = n+pn, unres || pu
 				return false
 			case *syntax.CmdSubst, *syntax.ProcSubst:
 				if n += substitutionSize; opaqueSubst {
@@ -132,48 +131,59 @@ func (sc *scan) sizeIn(w syntax.Node, opaqueSubst bool) int {
 				}
 				return false
 			case *syntax.ArithmExp:
-				n += substitutionSize
+				an, au := sc.sizeIn(x.X, opaqueSubst, true)
+				n, unres = n+substitutionSize+an, unres || au
+				return false
+			case *syntax.Word:
+				unres = unres || arith && sc.isUnresolvedVar(x.Lit())
 			}
 			return n <= maxShellBytes
 		})
 	}
-	return min(n, maxShellBytes+1)
+	return min(n, maxShellBytes+1), unres
 }
-func (sc *scan) paramValue(pe *syntax.ParamExp) (v string) {
+func (sc *scan) paramValue(pe *syntax.ParamExp) (v string, unres bool) {
 	if pe.Param != nil {
-		if v, _ = sc.lookup(pe.Param.Value); pe.Excl {
+		v, _ = sc.lookup(pe.Param.Value)
+		if unres = sc.isUnresolvedVar(pe.Param.Value); pe.Excl {
+			unres = unres || sc.isUnresolvedVar(v)
 			v, _ = sc.lookup(v)
 		}
 	}
-	return v
+	return v, unres
 }
-func (sc *scan) paramSize(pe *syntax.ParamExp, opaqueSubst bool) int {
-	n := len(sc.paramValue(pe))
+func (sc *scan) paramSize(pe *syntax.ParamExp, opaqueSubst bool) (int, bool) {
+	v, unres := sc.paramValue(pe)
+	n := len(v)
 	if pe.Repl != nil && pe.Repl.Orig != nil {
-		if orig := sc.sizeIn(pe.Repl.Orig, true); orig > maxShellExpr || n > maxShellBytes/max(orig, 1) {
-			return maxShellBytes + 1
+		orig, ou := sc.sizeIn(pe.Repl.Orig, true, false)
+		if unres = unres || ou; orig > maxShellExpr || n > maxShellBytes/max(orig, 1) {
+			return maxShellBytes + 1, unres
 		}
 	}
 	if pe.Repl != nil && pe.Repl.With != nil {
-		if base, with := max(n, 1), sc.sizeIn(pe.Repl.With, opaqueSubst || pe.Repl.All && n > 0); with >= (maxShellBytes+1)/base {
-			return maxShellBytes + 1
-		} else {
-			n = base * (1 + with)
+		with, wu := sc.sizeIn(pe.Repl.With, opaqueSubst || pe.Repl.All && n > 0, false)
+		if unres = unres || wu; with >= (maxShellBytes+1)/max(n, 1) {
+			return maxShellBytes + 1, unres
 		}
+		n = max(n, 1) * (1 + with)
 	}
 	if pe.Exp != nil && pe.Exp.Word != nil {
 		op := pe.Exp.Op
 		pat := op == syntax.RemSmallPrefix || op == syntax.RemLargePrefix || op == syntax.RemSmallSuffix || op == syntax.RemLargeSuffix || op == syntax.UpperFirst || op == syntax.UpperAll || op == syntax.LowerFirst || op == syntax.LowerAll
-		if w := sc.sizeIn(pe.Exp.Word, opaqueSubst || pat); pat && (w > maxShellExpr || n > maxShellBytes/max(w, 1)) {
-			return maxShellBytes + 1
-		} else {
-			n += w
+		w, wu := sc.sizeIn(pe.Exp.Word, opaqueSubst || pat, false)
+		if unres = unres || wu; pat && (w > maxShellExpr || n > maxShellBytes/max(w, 1)) {
+			return maxShellBytes + 1, unres
 		}
+		n += w
 	}
-	if n += sc.sizeIn(pe.Index, opaqueSubst); pe.Slice != nil {
-		n += sc.sizeIn(pe.Slice.Offset, opaqueSubst) + sc.sizeIn(pe.Slice.Length, opaqueSubst)
+	in, iu := sc.sizeIn(pe.Index, opaqueSubst, true)
+	if n, unres = n+in, unres || iu; pe.Slice != nil {
+		on, ou := sc.sizeIn(pe.Slice.Offset, opaqueSubst, true)
+		ln, lu := sc.sizeIn(pe.Slice.Length, opaqueSubst, true)
+		n, unres = n+on+ln, unres || ou || lu
 	}
-	return min(n, maxShellBytes+1)
+	return min(n, maxShellBytes+1), unres
 }
 func (sc *scan) ifs() string {
 	if ifs, ok := sc.lookup("IFS"); ok {
@@ -188,7 +198,7 @@ func (sc *scan) chargeFields(v string) bool {
 func (sc *scan) checkPartsFields(parts []syntax.WordPart, ifs string, rem int, inParam bool) int {
 	for i := 0; i < len(parts) && rem >= 0; i++ {
 		if pe, ok := parts[i].(*syntax.ParamExp); ok {
-			v := sc.paramValue(pe)
+			v, _ := sc.paramValue(pe)
 			if (pe.Exp != nil && pe.Exp.Op == syntax.OtherParamOps || pe.Repl != nil && pe.Repl.All && len(v) > rem) && sc.fail() {
 				return -1
 			}
@@ -200,18 +210,16 @@ func (sc *scan) checkPartsFields(parts []syntax.WordPart, ifs string, rem int, i
 				if rem = sc.checkPartsFields(pe.Repl.With.Parts, ifs, rem, true); rem >= 0 && pe.Repl.All && len(v) > 0 {
 					if per := 1 + before - rem; len(v) > rem/per && sc.fail() {
 						return -1
-					} else {
-						rem -= len(v) * per
 					}
+					rem -= len(v) * (1 + before - rem)
 				}
 			}
 		} else if inParam {
-			switch p := parts[i].(type) {
-			case *syntax.DblQuoted:
+			if p, ok := parts[i].(*syntax.DblQuoted); ok {
 				rem = sc.checkPartsFields(p.Parts, ifs, rem, true)
-			case *syntax.Lit:
+			} else if p, ok := parts[i].(*syntax.Lit); ok {
 				rem = sc.consumeFields(p.Value, ifs, rem)
-			case *syntax.SglQuoted:
+			} else if p, ok := parts[i].(*syntax.SglQuoted); ok {
 				rem = sc.consumeFields(p.Value, ifs, rem)
 			}
 		}
@@ -247,7 +255,9 @@ func countFields(v, ifs string, limit int) int {
 func (sc *scan) fields(w *syntax.Word) ([]string, error) {
 	var out []string
 	for b, err := range sc.braces(w) {
-		if ifs := sc.ifs(); err != nil || len(ifs) > 64 && sc.fail() || !sc.charge(sc.sizeIn(b, false)) || ifs != "" && sc.checkPartsFields(b.Parts, ifs, maxShellWords-len(out), false) < 0 {
+		if err != nil {
+			return nil, errOpaque
+		} else if n, unres := sc.sizeIn(b, false, false); len(sc.ifs()) > 64 && sc.fail() || !sc.charge(n) || sc.ifs() != "" && sc.checkPartsFields(b.Parts, sc.ifs(), maxShellWords-len(out), false) < 0 || unres {
 			return nil, errOpaque
 		} else if f, err := expand.Fields(sc.cfg, b); err != nil || len(out)+len(f) > maxShellWords && sc.fail() {
 			return nil, errOpaque
