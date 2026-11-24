@@ -11252,8 +11252,9 @@
     "version": "1.0.115",
     "platform": "darwin/arm64",
     "capability": "relay.content_allowed",
-    "result": "fail",
-    "last_run": "2026-11-24T13:20:34.591975Z",
+    "result": "pass",
+    "last_run": "2026-11-24T19:30:22.769205Z",
+    "first_passed": "2026-11-24T19:30:22.769205Z",
     "terma": "terma version dev",
     "test": "TestRelayCopilot/v1.0.115/content"
   },
@@ -11262,8 +11263,9 @@
     "version": "1.0.115",
     "platform": "darwin/arm64",
     "capability": "relay.content_withheld",
-    "result": "fail",
-    "last_run": "2026-11-24T13:21:08.183289Z",
+    "result": "pass",
+    "last_run": "2026-11-24T19:30:49.037819Z",
+    "first_passed": "2026-11-24T19:30:49.037819Z",
     "terma": "terma version dev",
     "test": "TestRelayCopilot/v1.0.115/withheld"
   },
@@ -11273,7 +11275,7 @@
     "platform": "darwin/arm64",
     "capability": "relay.only_opted_in",
     "result": "pass",
-    "last_run": "2026-11-24T13:21:24.231434Z",
+    "last_run": "2026-11-24T19:31:11.833084Z",
     "first_passed": "2026-11-24T13:21:24.231434Z",
     "terma": "terma version dev",
     "test": "TestRelayCopilotOutsideARepository/v1.0.115"
@@ -11283,8 +11285,9 @@
     "version": "1.0.115",
     "platform": "darwin/arm64",
     "capability": "relay.telemetry",
-    "result": "fail",
-    "last_run": "2026-11-24T13:21:08.183419Z",
+    "result": "pass",
+    "last_run": "2026-11-24T19:30:49.038239Z",
+    "first_passed": "2026-11-24T19:30:49.038239Z",
     "terma": "terma version dev",
     "test": "TestRelayCopilot/v1.0.115"
   },
@@ -11294,7 +11297,7 @@
     "platform": "darwin/arm64",
     "capability": "relay.tools_no_token",
     "result": "pass",
-    "last_run": "2026-11-24T13:21:35.273905Z",
+    "last_run": "2026-11-24T19:31:24.573922Z",
     "first_passed": "2026-11-24T13:21:35.273905Z",
     "terma": "terma version dev",
     "test": "TestRelayCopilotToolsGetNoExporter/v1.0.115"

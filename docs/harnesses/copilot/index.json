@@ -8,22 +8,21 @@
     "source": null,
     "changelog": "https://github.com/github/copilot-cli/blob/main/changelog.md",
     "latest": "1.0.115",
-    "support": "unsupported",
+    "support": "supported",
     "versions_tracked": 11,
     "first_tracked": "2026-10-28",
     "last_change": {
       "from": "1.0.114",
       "to": "1.0.115",
-      "at": "2026-11-24T13:22:34.848451504Z",
+      "at": "2026-11-24T19:32:27.467177502Z",
       "released_at": "2026-11-24T13:03:39.111Z",
-      "changes": 35,
+      "changes": 31,
       "categories": {
         "binary": 2,
         "cli": 9,
         "config": 18,
         "prompt": 1,
-        "storage": 1,
-        "support": 4
+        "storage": 1
       }
     }
   },
@@ -31,37 +30,36 @@
     {
       "version": "1.0.115",
       "released_at": "2026-11-24T13:03:39.111Z",
-      "captured_at": "2026-11-24T13:22:34.848451504Z",
+      "captured_at": "2026-11-24T19:32:27.467177502Z",
       "platforms": [
         "darwin/arm64"
       ],
-      "support": "unsupported",
+      "support": "supported",
       "previous": "1.0.114",
-      "changes": 35,
+      "changes": 31,
       "categories": {
         "binary": 2,
         "cli": 9,
         "config": 18,
         "prompt": 1,
-        "storage": 1,
-        "support": 4
+        "storage": 1
       },
       "impact": {
-        "breaking": 4,
+        "breaking": 0,
         "degrading": 0,
         "informational": 29,
         "notable": 2
       },
       "undocumented": 4,
       "highlights": [
-        "Terma: Prompts and tool content delivered when allowed now fails on darwin/arm64",
-        "Terma: Prompts and tool content withheld when the project says so now fails on darwin/arm64",
-        "Terma: Telemetry reaches the project through the local relay now fails on darwin/arm64"
+        "System prompt changed (+172 −265 chars)",
+        "Default of `copilot login --host`: https://github.com → none",
+        "`copilot --assisted-approval`: description changed (+55 −95 chars)"
       ],
       "signing": "valid",
       "partial": true,
-      "attempted_at": "2026-11-24T13:22:34.848451504Z",
-      "attempts": 1
+      "attempted_at": "2026-11-24T19:32:27.467177502Z",
+      "attempts": 2
     },
     {
       "version": "1.0.114",

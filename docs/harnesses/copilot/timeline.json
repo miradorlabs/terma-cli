@@ -253,38 +253,6 @@
           "title": "Binary size: 202,294,880 → 239,265,088 bytes (202.3 MB → 239.3 MB)",
           "impact": "informational",
           "documented": false
-        },
-        {
-          "id": "support.capabilities.relay.content_allowed@darwin/arm64.result",
-          "category": "support",
-          "op": "changed",
-          "title": "Terma: Prompts and tool content delivered when allowed now fails on darwin/arm64",
-          "impact": "breaking",
-          "documented": true
-        },
-        {
-          "id": "support.capabilities.relay.content_withheld@darwin/arm64.result",
-          "category": "support",
-          "op": "changed",
-          "title": "Terma: Prompts and tool content withheld when the project says so now fails on darwin/arm64",
-          "impact": "breaking",
-          "documented": true
-        },
-        {
-          "id": "support.capabilities.relay.telemetry@darwin/arm64.result",
-          "category": "support",
-          "op": "changed",
-          "title": "Terma: Telemetry reaches the project through the local relay now fails on darwin/arm64",
-          "impact": "breaking",
-          "documented": true
-        },
-        {
-          "id": "support.status",
-          "category": "support",
-          "op": "changed",
-          "title": "Terma support: supported → unsupported",
-          "impact": "breaking",
-          "documented": true
         }
       ]
     },

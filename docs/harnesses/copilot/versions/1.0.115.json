@@ -3,7 +3,7 @@
   "harness": "copilot",
   "version": "1.0.115",
   "platform": "darwin/arm64",
-  "captured_at": "2026-11-24T13:22:34.848451504Z",
+  "captured_at": "2026-11-24T19:32:27.467177502Z",
   "capture": {
     "command": [
       "copilot",
@@ -16,23 +16,23 @@
       "Part of this build's capture did not finish; the frequent check tries it again, up to four attempts."
     ],
     "sections": {
-      "behavior": "2026-11-24T13:22:34.848451504Z",
-      "binary": "2026-11-24T13:22:34.848451504Z",
+      "behavior": "2026-11-24T19:32:27.467177502Z",
+      "binary": "2026-11-24T19:32:27.467177502Z",
       "caching": "2026-11-24T13:22:34.848451504Z",
       "cli": "2026-11-24T13:22:34.848451504Z",
       "config": "2026-11-24T13:22:34.848451504Z",
-      "hooks": "2026-11-24T13:22:34.848451504Z",
+      "hooks": "2026-11-24T19:32:27.467177502Z",
       "model": "2026-11-24T13:22:34.848451504Z",
       "network": "2026-11-24T13:22:34.848451504Z",
       "prompt": "2026-11-24T13:22:34.848451504Z",
       "request": "2026-11-24T13:22:34.848451504Z",
       "side_requests": "2026-11-24T13:22:34.848451504Z",
-      "storage": "2026-11-24T13:22:34.848451504Z",
-      "support": "2026-11-24T13:22:34.848451504Z",
+      "storage": "2026-11-24T19:32:27.467177502Z",
+      "support": "2026-11-24T19:32:27.467177502Z",
       "tools": "2026-11-24T13:22:34.848451504Z"
     },
-    "attempted_at": "2026-11-24T13:22:34.848451504Z",
-    "attempts": 1,
+    "attempted_at": "2026-11-24T19:32:27.467177502Z",
+    "attempts": 2,
     "announced_at": "2026-11-24T13:22:34.848451504Z"
   },
   "model": {
@@ -919,9 +919,9 @@
         "429": {
           "attempts": 4,
           "backoff_ms": [
-            2376,
-            2107,
-            2257
+            2219,
+            2062,
+            2140
           ],
           "failed": 3,
           "failed_first": 3,
@@ -933,9 +933,9 @@
         "529": {
           "attempts": 4,
           "backoff_ms": [
-            2162,
-            2091,
-            2145
+            2267,
+            2093,
+            2073
           ],
           "failed": 3,
           "failed_first": 3,
@@ -1002,7 +1002,7 @@
           "sessionId": "<uuid>",
           "stopReason": "end_turn",
           "stop_hook_active": false,
-          "timestamp": 1795526250589,
+          "timestamp": 1795548454185,
           "transcriptPath": "<home>/.copilot/session-state/<uuid>/events.jsonl"
         },
         "fired": true,
@@ -1065,7 +1065,7 @@
           "hookName": "permissionRequest",
           "permissionSuggestions": [],
           "sessionId": "<uuid>",
-          "timestamp": 1795526250480,
+          "timestamp": 1795548454081,
           "toolInput": {
             "command": "printf hooks-ok"
           },
@@ -1133,7 +1133,7 @@
         "example": {
           "cwd": "<repo>",
           "sessionId": "<uuid>",
-          "timestamp": 1795526250506,
+          "timestamp": 1795548454106,
           "toolArgs": {
             "command": "printf hooks-ok",
             "description": "Print a marker"
@@ -1214,7 +1214,7 @@
           "cwd": "<repo>",
           "error": "Path does not exist",
           "sessionId": "<uuid>",
-          "timestamp": 1795526250554,
+          "timestamp": 1795548454156,
           "toolArgs": {
             "path": "<repo>/missing.txt"
           },
@@ -1283,7 +1283,7 @@
         "example": {
           "cwd": "<repo>",
           "sessionId": "<uuid>",
-          "timestamp": 1795526250420,
+          "timestamp": 1795548454028,
           "toolArgs": {
             "command": "printf hooks-ok",
             "description": "Print a marker"
@@ -1356,7 +1356,7 @@
           "cwd": "<repo>",
           "reason": "complete",
           "sessionId": "<uuid>",
-          "timestamp": 1795526250610
+          "timestamp": 1795548454202
         },
         "fired": true,
         "keys": [
@@ -1414,7 +1414,7 @@
           "initialPrompt": "<prompt>",
           "sessionId": "<uuid>",
           "source": "new",
-          "timestamp": 1795526250293
+          "timestamp": 1795548453901
         },
         "fired": true,
         "keys": [
@@ -1473,7 +1473,7 @@
           "cwd": "<repo>",
           "prompt": "<prompt>",
           "sessionId": "<uuid>",
-          "timestamp": 1795526250330
+          "timestamp": 1795548453939
         },
         "fired": true,
         "keys": [
@@ -1530,7 +1530,7 @@
           "cwd": "<repo>",
           "prompt": "<prompt>",
           "sessionId": "<uuid>",
-          "timestamp": 1795526250349,
+          "timestamp": 1795548453959,
           "transformedPrompt": "<current_datetime><timestamp></current_datetime>\n\n<prompt>"
         },
         "fired": true,
@@ -4841,7 +4841,7 @@
     "logs": {
       "files": 1,
       "format": "text",
-      "path": "<home>/.copilot/logs/process-<n>-4707.log"
+      "path": "<home>/.copilot/logs/process-<n>-4450.log"
     },
     "session-store": {
       "files": 1,
@@ -5124,7 +5124,7 @@
         "sha256": "0ceff8812d4d172f7f565c34522f7c44975f8e42dcb1329d29a153c5cb250a67",
         "subject": "Developer ID Application: GitHub (VEKTX9H2N7)"
       },
-      "checked_at": "2026-11-24T13:19:59.064561Z",
+      "checked_at": "2026-11-24T19:29:48.0778Z",
       "format": "developer-id",
       "hardened_runtime": true,
       "identifier": "copilot",
@@ -5141,13 +5141,13 @@
         "id": "relay.content_allowed",
         "label": "Prompts and tool content delivered when allowed",
         "platform": "darwin/arm64",
-        "result": "fail"
+        "result": "pass"
       },
       {
         "id": "relay.content_withheld",
         "label": "Prompts and tool content withheld when the project says so",
         "platform": "darwin/arm64",
-        "result": "fail"
+        "result": "pass"
       },
       {
         "id": "relay.only_opted_in",
@@ -5159,7 +5159,7 @@
         "id": "relay.telemetry",
         "label": "Telemetry reaches the project through the local relay",
         "platform": "darwin/arm64",
-        "result": "fail"
+        "result": "pass"
       },
       {
         "id": "relay.tools_no_token",
@@ -5168,7 +5168,7 @@
         "result": "pass"
       }
     ],
-    "status": "unsupported"
+    "status": "supported"
   },
   "live": {
     "differs": false,
