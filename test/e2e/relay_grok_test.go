@@ -204,3 +204,46 @@ func TestRelayGrok(t *testing.T) {
 		}
 	})
 }
+
+// grok driven over ACP (`grok agent stdio`), as an editor such as T3 Code drives it: two
+// prompts in one session, both named t3-xai-prompt-1 in _meta.promptId, which grok hands
+// terma's prompt hook as they are. Each prompt reaches Terma as one terma.user.message with
+// its text, and the two do not share an id; no prompt is the editor's id.
+func TestRelayGrokACP(t *testing.T) {
+	forEachGrok(t, func(t *testing.T, b Binary) {
+		track(t)
+		sb := New(t, Isolated)
+		var calls atomic.Int32
+		provider := httptest.NewServer(grokProvider(&calls, ""))
+		t.Cleanup(provider.Close)
+		sb.UseGrok(provider.URL)
+		sb.SetupAgents = append(sb.SetupAgents, "grok")
+		sb.RelayAgents = []string{"grok"}
+		sb.Setup(nil, "--team", sb.ProjectID, "--harness", sb.setupList())
+		sb.UseRelay(RelayOptions{Start: true, Content: true})
+
+		texts := []string{"First prompt. TERMA_GROK_ACP_1", "Second prompt. TERMA_GROK_ACP_2"}
+		sid := sb.GrokACP(b, sb.Repo, "t3-xai-prompt-1", texts...)
+		if calls.Load() < 2 {
+			t.Fatalf("grok made %d model calls, so the turns prove nothing", calls.Load())
+		}
+		var prompts []Event
+		deadline := time.Now().Add(20 * time.Second)
+		for len(prompts) < len(texts) && time.Now().Before(deadline) {
+			time.Sleep(200 * time.Millisecond)
+			prompts = sb.Events("terma.user.message", sid)
+		}
+		if len(prompts) != len(texts) {
+			t.Fatalf("%d prompt events for %d prompts: %+v", len(prompts), len(texts), prompts)
+		}
+		ids := map[string]bool{}
+		for i, p := range prompts {
+			id, _ := p.Attrs["terma.message.id"].(string)
+			if p.Attrs["terma.message.text"] != texts[i] || id == "" || id == "t3-xai-prompt-1" || ids[id] {
+				t.Errorf("prompt %d: %+v", i, p.Attrs)
+			}
+			ids[id] = true
+		}
+		sb.StopRelay()
+	})
+}

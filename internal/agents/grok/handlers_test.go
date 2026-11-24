@@ -29,7 +29,9 @@ import (
 // capture, in order, each the event and the payload on its stdin, unchanged but for the
 // scrub (the space's fixtures-scrubbed): the events terma hooks, and PostToolUse for the
 // tools its matcher names. The capture's repository is /tmp/grokcap/cases/<case>/repo, and a
-// worktree subagent's checkout ~/.grok/worktrees/<repo>/subagent-<child>.
+// worktree subagent's checkout ~/.grok/worktrees/<repo>/subagent-<child>. acp_client_prompt_id
+// is a later probe's, in the same form: an editor drove grok over ACP (grok agent stdio) and
+// gave both its prompts the id t3-xai-prompt-1 in _meta.promptId, as T3 Code does.
 var (
 	captureRepo     = regexp.MustCompile(`/tmp/grokcap/cases/[^/"]+/repo`)
 	captureWorktree = regexp.MustCompile(`/home/dev/\.grok/worktrees/[^/"]+/subagent-[0-9a-f-]+`)
@@ -205,7 +207,12 @@ func (r *replayRun) sessions(t *testing.T) (all, children []string) {
 	return all, children
 }
 
-var fixtures = []string{"headless_subagent_worktree", "tui_multi_turn_compact_new_clear", "headless_edit_background_subagent", "headless_fork_2_fork_session", subagentsFixture}
+var fixtures = []string{"headless_subagent_worktree", "tui_multi_turn_compact_new_clear", "headless_edit_background_subagent", "headless_fork_2_fork_session", subagentsFixture, acpFixture}
+
+const acpFixture = "acp_client_prompt_id"
+
+// uuidShaped is the shape every spooled message id has.
+var uuidShaped = regexp.MustCompile(`^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$`)
 
 // Every session grok ran is claimed for the team, once, as grok's; a subagent's claim names
 // the session that opened it, which SubagentStart named, and no other claim names a parent.
@@ -265,7 +272,9 @@ func TestCapturedSubagentStartNamesItsParent(t *testing.T) {
 }
 
 // Each UserPromptSubmit is one terma.user.message, under its session, with the hook's
-// promptId and, consented and collected, its text; a subagent's names its kind.
+// promptId when grok minted it (a UUID) and, consented and collected, its text; a subagent's
+// names its kind. An editor's own id is replaced by one of terma's, and no two prompts of a
+// session share an id.
 func TestCapturedPromptsAreOneMessageEach(t *testing.T) {
 	for _, fixture := range fixtures {
 		t.Run(fixture, func(t *testing.T) {
@@ -280,10 +289,20 @@ func TestCapturedPromptsAreOneMessageEach(t *testing.T) {
 			if len(messages) != len(prompts) || len(prompts) == 0 {
 				t.Fatalf("%d messages for %d prompts", len(messages), len(prompts))
 			}
+			seen := map[string]bool{}
 			for i, m := range messages {
 				p := prompts[i]
-				if m.SessionID != p.SessionID || m.Attrs[semconv.TermaMessageIDKey] != p.PromptID || m.Attrs[semconv.GenAIMainAgentNameKey] != "grok" {
-					t.Errorf("message %d: %s %v, want session %s, id %s", i, m.SessionID, m.Attrs, p.SessionID, p.PromptID)
+				id, _ := m.Attrs[semconv.TermaMessageIDKey].(string)
+				if m.SessionID != p.SessionID || !uuidShaped.MatchString(id) || m.Attrs[semconv.GenAIMainAgentNameKey] != "grok" {
+					t.Errorf("message %d: %s %v, want session %s", i, m.SessionID, m.Attrs, p.SessionID)
+				}
+				if grokMinted := uuidShaped.MatchString(p.PromptID); grokMinted != (id == p.PromptID) {
+					t.Errorf("message %d: id %s for the hook's promptId %s", i, id, p.PromptID)
+				}
+				if key := m.SessionID + " " + id; seen[key] {
+					t.Errorf("message %d repeats the id %s", i, id)
+				} else {
+					seen[key] = true
 				}
 				if text, _ := m.Attrs[semconv.TermaMessageTextKey].(string); text == "" || m.Attrs[semconv.TermaMessageTruncatedKey] != false {
 					t.Errorf("message %d carries text %q, truncated %v", i, text, m.Attrs[semconv.TermaMessageTruncatedKey])
@@ -348,24 +367,91 @@ func TestPromptTextFollowsConsentAndPolicy(t *testing.T) {
 // id of grok's own making (seen live on 1.0.92; the payload is otherwise a prompt hook's).
 // Nobody wrote it, and grok's export sends no user_prompt for it: no message, and the session
 // is still claimed.
+// The other prefixes are those grok 1.0.92 lists beside it for the turns it starts itself.
 func TestAPromptGrokWroteItselfIsNoMessage(t *testing.T) {
-	run := replay(t, "headless_fork_2_fork_session", replayOpts{edit: func(event string, payload []byte) []byte {
+	for _, id := range []string{
+		"subagent-completed-01a20a78-86a5-72d2-8cb6-2c1d7201fb27", "task-completed-1", "parent-agent-message-1",
+		"parent-message-1", "workflow-completed-1", "notifications-1", "goal-summary-1", "goal-classifier-1",
+		"nudge-1", "plan-resume-1",
+	} {
+		t.Run(id, func(t *testing.T) {
+			run := replay(t, "headless_fork_2_fork_session", replayOpts{edit: setPrompt(id, "<system-reminder>\nWhile you were idle, 1 background subagent completed.\n</system-reminder>")})
+			spooled := hookruntest.Spooled(t, run.sp)
+			if n := len(hookruntest.Named(spooled, semconv.TermaUserMessageEvent)); n != 0 {
+				t.Errorf("%d messages for a prompt grok wrote itself", n)
+			}
+			if len(hookruntest.Named(spooled, semconv.TermaSessionStartEvent)) == 0 {
+				t.Error("the session was not announced")
+			}
+		})
+	}
+}
+
+// setPrompt edits every UserPromptSubmit to carry id and, unless empty, text.
+func setPrompt(id, text string) func(string, []byte) []byte {
+	return func(event string, payload []byte) []byte {
 		if event != "user_prompt_submit" {
 			return payload
 		}
 		var m map[string]any
 		_ = json.Unmarshal(payload, &m)
-		m["promptId"] = "subagent-completed-01a20a78-86a5-72d2-8cb6-2c1d7201fb27"
-		m["prompt"] = "<system-reminder>\nWhile you were idle, 1 background subagent completed.\n</system-reminder>"
+		m["promptId"] = id
+		if text != "" {
+			m["prompt"] = text
+		}
+		out, _ := json.Marshal(m)
+		return out
+	}
+}
+
+// An editor driving grok over ACP may name its prompts itself (T3 Code sends
+// t3-xai-prompt-<n> in _meta.promptId), and grok runs the hook with that id, a repeat in the
+// same session included. Each such prompt is still one message, with its text, under an id
+// terma derives from the session, the editor's id and the hook's time: the same on a replay of
+// the same hooks, and never the editor's.
+func TestAnEditorsPromptIDIsOneMessageEach(t *testing.T) {
+	ids := func() []string {
+		run := replay(t, acpFixture, replayOpts{})
+		var out []string
+		for _, m := range hookruntest.Named(hookruntest.Spooled(t, run.sp), semconv.TermaUserMessageEvent) {
+			id, _ := m.Attrs[semconv.TermaMessageIDKey].(string)
+			if text, _ := m.Attrs[semconv.TermaMessageTextKey].(string); !strings.HasPrefix(text, "probe prompt") {
+				t.Errorf("message %s carries text %q", id, text)
+			}
+			out = append(out, id)
+		}
+		return out
+	}
+	first, again := ids(), ids()
+	if len(first) != 2 || first[0] == first[1] || slices.Contains(first, "t3-xai-prompt-1") {
+		t.Fatalf("ids %v for two prompts both named t3-xai-prompt-1", first)
+	}
+	if !slices.Equal(first, again) {
+		t.Errorf("ids %v, then %v on a replay", first, again)
+	}
+	// A hook that names no time still gets an id of its own.
+	run := replay(t, acpFixture, replayOpts{edit: func(event string, payload []byte) []byte {
+		var m map[string]any
+		_ = json.Unmarshal(payload, &m)
+		delete(m, "timestamp")
 		out, _ := json.Marshal(m)
 		return out
 	}})
-	spooled := hookruntest.Spooled(t, run.sp)
-	if n := len(hookruntest.Named(spooled, semconv.TermaUserMessageEvent)); n != 0 {
-		t.Errorf("%d messages for a prompt grok wrote itself", n)
+	var untimed []string
+	for _, m := range hookruntest.Named(hookruntest.Spooled(t, run.sp), semconv.TermaUserMessageEvent) {
+		id, _ := m.Attrs[semconv.TermaMessageIDKey].(string)
+		untimed = append(untimed, id)
 	}
-	if len(hookruntest.Named(spooled, semconv.TermaSessionStartEvent)) == 0 {
-		t.Error("the session was not announced")
+	if len(untimed) != 2 || untimed[0] == untimed[1] || !uuidShaped.MatchString(untimed[0]) {
+		t.Errorf("ids %v for two untimed prompts", untimed)
+	}
+}
+
+// A prompt with no id at all is no message, as before.
+func TestAPromptWithNoIDIsNoMessage(t *testing.T) {
+	run := replay(t, acpFixture, replayOpts{edit: setPrompt("", "")})
+	if n := len(hookruntest.Named(hookruntest.Spooled(t, run.sp), semconv.TermaUserMessageEvent)); n != 0 {
+		t.Errorf("%d messages for prompts with no id", n)
 	}
 }
 

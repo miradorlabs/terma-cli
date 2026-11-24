@@ -22,6 +22,8 @@ type grokHookInput struct {
 	Source    string `json:"source"`
 	Prompt    string `json:"prompt"`
 	PromptID  string `json:"promptId"`
+	// Timestamp is when grok ran the hook, to the nanosecond.
+	Timestamp string `json:"timestamp"`
 	ToolName  string `json:"tool_name"`
 	ToolUseID string `json:"tool_use_id"`
 	ToolInput struct {

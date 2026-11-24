@@ -1,12 +1,16 @@
 package e2e
 
 import (
+	"bufio"
 	"bytes"
 	"cmp"
 	"context"
+	"encoding/json"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"testing"
 )
 
@@ -99,4 +103,96 @@ func (sb *Sandbox) GrokRun(b Binary, dir, prompt string) string {
 		t.Fatalf("grok -p: %v\n%s", err, out.String())
 	}
 	return out.String()
+}
+
+// GrokACP drives `grok agent stdio` in dir as an editor does over ACP (JSON-RPC, one message a
+// line): it opens one session, sends each prompt in turn, naming it with _meta.promptId when
+// promptID is set (as T3 Code does), approves any permission grok asks for, and returns the
+// session's id.
+func (sb *Sandbox) GrokACP(b Binary, dir, promptID string, prompts ...string) string {
+	t := sb.T
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), scenarioTimeout)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, b.Path, "agent", "stdio")
+	cmd.Dir = dir
+	cmd.Env = sb.termaEnv()
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := cmd.Start(); err != nil {
+		t.Fatalf("grok agent stdio: %v", err)
+	}
+	enc, lines := json.NewEncoder(stdin), bufio.NewScanner(stdout)
+	lines.Buffer(nil, 4<<20)
+	// call sends one request and reads until its response, answering grok's own requests.
+	call := func(id int, method string, params any) json.RawMessage {
+		t.Helper()
+		if err := enc.Encode(map[string]any{"jsonrpc": "2.0", "id": id, "method": method, "params": params}); err != nil {
+			t.Fatalf("%s: %v\n%s", method, err, stderr.String())
+		}
+		for lines.Scan() {
+			var m struct {
+				ID     json.RawMessage `json:"id"`
+				Method string          `json:"method"`
+				Params struct {
+					Options []struct {
+						OptionID string `json:"optionId"`
+						Kind     string `json:"kind"`
+					} `json:"options"`
+				} `json:"params"`
+				Result json.RawMessage `json:"result"`
+				Error  json.RawMessage `json:"error"`
+			}
+			if json.Unmarshal(lines.Bytes(), &m) != nil || len(m.ID) == 0 {
+				continue
+			}
+			if m.Method != "" {
+				option := ""
+				for _, o := range m.Params.Options {
+					if option == "" || strings.Contains(o.Kind, "allow") {
+						option = o.OptionID
+					}
+				}
+				_ = enc.Encode(map[string]any{"jsonrpc": "2.0", "id": m.ID, "result": map[string]any{"outcome": map[string]any{"outcome": "selected", "optionId": option}}})
+				continue
+			}
+			if string(m.ID) != strconv.Itoa(id) {
+				continue
+			}
+			if len(m.Error) > 0 {
+				t.Fatalf("%s: %s\n%s", method, m.Error, stderr.String())
+			}
+			return m.Result
+		}
+		t.Fatalf("%s: grok closed its output: %v\n%s", method, lines.Err(), stderr.String())
+		return nil
+	}
+	call(1, "initialize", map[string]any{"protocolVersion": 1, "clientCapabilities": map[string]any{
+		"fs": map[string]any{"readTextFile": false, "writeTextFile": false}, "terminal": false}})
+	var session struct {
+		SessionID string `json:"sessionId"`
+	}
+	if err := json.Unmarshal(call(2, "session/new", map[string]any{"cwd": dir, "mcpServers": []any{}}), &session); err != nil || session.SessionID == "" {
+		t.Fatalf("session/new gave no session: %v", err)
+	}
+	for i, prompt := range prompts {
+		params := map[string]any{"sessionId": session.SessionID, "prompt": []any{map[string]any{"type": "text", "text": prompt}}}
+		if promptID != "" {
+			params["_meta"] = map[string]any{"promptId": promptID}
+		}
+		call(10+i, "session/prompt", params)
+	}
+	_ = stdin.Close()
+	if err := cmd.Wait(); err != nil {
+		t.Fatalf("grok agent stdio: %v\n%s", err, stderr.String())
+	}
+	return session.SessionID
 }
