@@ -3,6 +3,7 @@ package hookrun
 import (
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -58,7 +59,7 @@ func firstWords(command string) string {
 		s, more = string(r[:60]), true
 	}
 	if more {
-		s += " …"
+		return s + " …"
 	}
 	return s
 }
@@ -66,43 +67,92 @@ func firstWords(command string) string {
 // shellFields returns command's first n words as written alongside their unquoted forms.
 func shellFields(command string, n int) (raw, bare []string) {
 	var buf strings.Builder
-	start, quote, escaped := -1, rune(0), false
-	for i, r := range command + " " {
-		if escaped {
+	start, quote, ansiC, dollar, escaped := -1, rune(0), false, false, false
+	flush := func() {
+		if dollar {
+			buf.WriteByte('$')
+			dollar = false
+		}
+	}
+	for i := 0; i < len(command); {
+		r, w := utf8.DecodeRuneInString(command[i:])
+		switch {
+		case escaped:
 			escaped = false
 			buf.WriteRune(r)
+		case ansiC && r == '\'':
+			quote, ansiC = 0, false
+		case ansiC && r == '\\':
+			ch, adv := ansiEscape(command[i+1:])
+			buf.WriteRune(ch)
+			i += 1 + adv
 			continue
-		}
-		switch {
-		case r == '\\' && quote != '\'':
-			escaped = true
-		case quote != 0:
-			if r == quote {
-				quote = 0
-			} else {
-				buf.WriteRune(r)
-			}
-		case r == '\'' || r == '"':
-			quote = r
-		case !unicode.IsSpace(r):
+		case ansiC:
 			buf.WriteRune(r)
-		case start >= 0:
-			raw, bare = append(raw, command[start:i]), append(bare, buf.String())
-			buf.Reset()
-			if len(raw) == n {
-				return raw, bare
-			}
-			start = -1
-			continue
+		case dollar && (r == '\'' || r == '"'):
+			dollar, quote, ansiC = false, r, r == '\''
 		default:
-			continue
+			flush()
+			switch {
+			case r == '\\' && quote != '\'':
+				escaped = true
+			case quote != 0 && r == quote:
+				quote = 0
+			case quote != 0:
+				buf.WriteRune(r)
+			case r == '\'' || r == '"':
+				quote = r
+			case r == '$':
+				dollar = true
+			case !unicode.IsSpace(r):
+				buf.WriteRune(r)
+			case start >= 0:
+				raw, bare = append(raw, command[start:i]), append(bare, buf.String())
+				if buf.Reset(); len(raw) == n {
+					return raw, bare
+				}
+				start, i = -1, i+w
+				continue
+			default:
+				i += w
+				continue
+			}
 		}
 		if start < 0 {
 			start = i
 		}
+		i += w
 	}
-	if start >= 0 {
+	if flush(); start >= 0 {
 		raw, bare = append(raw, command[start:]), append(bare, buf.String())
 	}
 	return raw, bare
+}
+func ansiEscape(s string) (rune, int) {
+	if s == "" {
+		return '\\', 0
+	}
+	if j := strings.IndexByte("abeEfnrtv\\'\"?", s[0]); j >= 0 {
+		return rune("\a\b\x1b\x1b\f\n\r\t\v\\'\"?"[j]), 1
+	}
+	if s[0] == 'c' && len(s) > 1 {
+		return rune(s[1] & 0x1f), 2
+	}
+	if j := strings.IndexByte("xuU", s[0]); j >= 0 {
+		k := 0
+		for k < 2<<j && 1+k < len(s) && strings.ContainsRune("0123456789abcdefABCDEF", rune(s[1+k])) {
+			k++
+		}
+		if v, err := strconv.ParseUint(s[1:1+k], 16, 32); k > 0 && err == nil {
+			return rune(v), 1 + k
+		}
+	} else if s[0] >= '0' && s[0] <= '7' {
+		k := 1
+		for k < 3 && k < len(s) && s[k] >= '0' && s[k] <= '7' {
+			k++
+		}
+		v, _ := strconv.ParseUint(s[:k], 8, 32)
+		return rune(v & 0xff), k
+	}
+	return '\\', 0
 }

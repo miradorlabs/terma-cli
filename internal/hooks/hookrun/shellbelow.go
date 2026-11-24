@@ -39,10 +39,7 @@ func (sc *scan) safeLocate(dir string) (string, bool) {
 		return "", false
 	}
 	cur, err := filepath.Abs(dir)
-	if err != nil {
-		return "", false
-	}
-	for sc.spend(0) {
+	for err == nil && sc.spend(1) {
 		dotGit := filepath.Join(cur, ".git")
 		if info, err := os.Lstat(dotGit); err == nil {
 			if info.IsDir() {
@@ -53,11 +50,10 @@ func (sc *scan) safeLocate(dir string) (string, bool) {
 			}
 			return "", false
 		}
-		if parent := filepath.Dir(cur); parent == cur {
+		if cur == filepath.Dir(cur) {
 			return "", false
-		} else {
-			cur = parent
 		}
+		cur = filepath.Dir(cur)
 	}
 	return "", false
 }
@@ -85,14 +81,16 @@ func (sc *scan) locateGitdirFile(path, cur string) (string, bool) {
 	}
 	return "", false
 }
-
 func (sc *scan) below(dir string, levels int) {
 	c := candidate{dir, strconv.Itoa(levels), walked}
 	if _, seen := sc.examined[c]; seen || !sc.spend(1) {
 		return
 	}
 	sc.examined[c] = cached{}
-	if root, ok := sc.safeLocate(dir); ok && !sc.enclosingCheckout(root) || sc.unknown || sc.holdsNone(dir) {
+	if sc.holdsNone(dir) {
+		return
+	}
+	if root, ok := sc.safeLocate(dir); ok && !sc.enclosingCheckout(root) || sc.unknown {
 		return
 	}
 	level := []string{dir}
@@ -102,9 +100,6 @@ func (sc *scan) below(dir string, levels int) {
 			for _, e := range sc.readDir(d) {
 				sub := filepath.Join(d, e.Name())
 				if e.Type()&fs.ModeSymlink != 0 {
-					if !sc.spend(1) {
-						return
-					}
 					if _, bad := sc.resolveLink(sub, 0); bad {
 						return
 					}
@@ -182,15 +177,12 @@ func (sc *scan) readDir(dir string) []fs.DirEntry {
 	for room := maxShellLookups - sc.lookups + 1; len(entries) < room; {
 		chunk, err := f.ReadDir(min(256, room-len(entries)))
 		entries = append(entries, chunk...)
-		if err != nil {
-			if !errors.Is(err, io.EOF) {
-				sc.unknown = true
-				return nil
-			}
+		if errors.Is(err, io.EOF) || err == nil && (len(chunk) == 0 || !sc.spend(0)) {
 			break
 		}
-		if len(chunk) == 0 || !sc.spend(0) {
-			break
+		if err != nil {
+			sc.unknown = true
+			return nil
 		}
 	}
 	if !sc.spend(len(entries)) {

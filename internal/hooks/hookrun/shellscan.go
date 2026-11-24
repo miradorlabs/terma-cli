@@ -13,17 +13,10 @@ import (
 
 // Bounds on a shell reach scan (maxShellTime is overridden to 1s in tests).
 const (
-	shellTime        = 20 * time.Millisecond
-	maxShellPlaces   = 256
-	maxShellLookups  = 4096
-	maxShellWords    = 4 * maxShellLookups
-	maxShellBytes    = 1 << 20
-	maxShellDepth    = 4
-	maxShellBraces   = 16
-	maxGlobSegments  = 3
-	substitutionSize = 4096
-	// UnknownReach marks an unresolved reach (NUL-prefixed so it cannot collide with a path).
-	UnknownReach = "\x00unknown"
+	shellTime, maxShellPlaces, maxShellLookups, maxShellWords = 20 * time.Millisecond, 256, 4096, 16384
+	maxShellBytes, maxShellDepth, maxShellBraces              = 1 << 20, 4, 16
+	maxGlobSegments, substitutionSize                         = 3, 4096
+	UnknownReach                                              = "\x00unknown" // NUL-prefixed so it cannot collide with a path
 )
 
 var (
@@ -60,18 +53,17 @@ func (r role) mustResolve(slashed bool) bool {
 
 // scan holds the state of one bounded shell reach scan.
 type scan struct {
-	cwd, dir, prev, cwdRoot string
-	cwdRootDone, unknown    bool
-	none, out               []string
-	env                     func(string) (string, bool)
-	vars                    map[string]*string
-	cfg                     *expand.Config
-	reads                   *operands
-	places                  map[string]bool
-	examined                map[candidate]cached
+	cwd, dir, prev, cwdRoot                     string
+	cwdRootDone, cwdChecked, cwdRemote, unknown bool
+	none, out                                   []string
+	env                                         func(string) (string, bool)
+	vars                                        map[string]*string
+	cfg                                         *expand.Config
+	reads                                       *operands
+	places                                      map[string]bool
+	examined                                    map[candidate]cached
 	work
 }
-
 type work struct {
 	lookups, bytes, words int
 	deadline              time.Time
@@ -126,7 +118,6 @@ func (sc *scan) lookup(name string) (string, bool) {
 	}
 	return "", false
 }
-
 func (sc *scan) place(p string) {
 	if sc.places[p] {
 		return
@@ -135,25 +126,18 @@ func (sc *scan) place(p string) {
 		sc.unknown = true
 		return
 	}
-	sc.places[p] = true
-	sc.out = append(sc.out, p)
+	sc.places[p], sc.out = true, append(sc.out, p)
 }
-func (sc *scan) spend(n int) bool {
-	if sc.unknown || sc.lookups+n > maxShellLookups || time.Now().After(sc.deadline) {
+func (sc *scan) budget(counter *int, n, limit int) bool {
+	if sc.unknown || *counter+n > limit || time.Now().After(sc.deadline) {
 		sc.unknown = true
 		return false
 	}
-	sc.lookups += n
+	*counter += n
 	return true
 }
-func (sc *scan) charge(n int) bool {
-	if sc.unknown || sc.bytes+n > maxShellBytes || time.Now().After(sc.deadline) {
-		sc.unknown = true
-		return false
-	}
-	sc.bytes += n
-	return true
-}
+func (sc *scan) spend(n int) bool  { return sc.budget(&sc.lookups, n, maxShellLookups) }
+func (sc *scan) charge(n int) bool { return sc.budget(&sc.bytes, n, maxShellBytes) }
 func (sc *scan) size(w *syntax.Word) int {
 	n := 0
 	syntax.Walk(w, func(node syntax.Node) bool {
@@ -174,12 +158,12 @@ func (sc *scan) size(w *syntax.Word) int {
 	return min(n, maxShellBytes+1)
 }
 func (sc *scan) paramValue(pe *syntax.ParamExp) string {
-	var v string
-	if pe.Param != nil {
-		v, _ = sc.lookup(pe.Param.Value)
-		if pe.Excl {
-			v, _ = sc.lookup(v)
-		}
+	if pe.Param == nil {
+		return ""
+	}
+	v, _ := sc.lookup(pe.Param.Value)
+	if pe.Excl {
+		v, _ = sc.lookup(v)
 	}
 	return v
 }
@@ -210,18 +194,13 @@ func (sc *scan) fieldsBounded(w *syntax.Word, limit int) bool {
 }
 func (sc *scan) chargeFields(v string) bool {
 	if ifs := sc.ifs(); ifs != "" {
-		if n := countFields(v, ifs, maxShellWords-sc.words); n > maxShellWords-sc.words {
-			sc.unknown = true
-			return false
-		} else {
-			sc.words += n
-		}
+		return sc.budget(&sc.words, countFields(v, ifs, maxShellWords-sc.words), maxShellWords)
 	}
 	return true
 }
 func (sc *scan) checkPartsFields(parts []syntax.WordPart, ifs string, rem int, inParam, noSubst bool) int {
-	for _, p := range parts {
-		if pe, ok := p.(*syntax.ParamExp); ok {
+	for i := 0; i < len(parts) && rem >= 0; i++ {
+		if pe, ok := parts[i].(*syntax.ParamExp); ok {
 			v := sc.paramValue(pe)
 			if pe.Repl != nil && pe.Repl.All && len(v) > rem {
 				sc.unknown = true
@@ -242,7 +221,7 @@ func (sc *scan) checkPartsFields(parts []syntax.WordPart, ifs string, rem int, i
 				}
 			}
 		} else if inParam {
-			switch p := p.(type) {
+			switch p := parts[i].(type) {
 			case *syntax.DblQuoted:
 				rem = sc.checkPartsFields(p.Parts, ifs, rem, true, noSubst)
 			case *syntax.Lit:
@@ -255,9 +234,6 @@ func (sc *scan) checkPartsFields(parts []syntax.WordPart, ifs string, rem int, i
 					return -1
 				}
 			}
-		}
-		if rem < 0 {
-			return -1
 		}
 	}
 	return rem
@@ -276,8 +252,7 @@ func countFields(v, ifs string, limit int) int {
 	for _, r := range v {
 		if !strings.ContainsRune(ifs, r) {
 			if !inWord {
-				inWord = true
-				n++
+				inWord, n = true, n+1
 			}
 		} else {
 			if !inWord && r != ' ' && r != '\t' && r != '\n' {
@@ -316,8 +291,7 @@ func (sc *scan) braces(w *syntax.Word) iter.Seq2[*syntax.Word, error] {
 				n += strings.Count(lit.Value, "{")
 			}
 		}
-		braced := *w // SplitBraces replaces its parts
-		if n > maxShellBraces {
+		if braced := *w; n > maxShellBraces {
 			sc.unknown = true
 			yield(nil, errOpaque)
 		} else if n == 0 || !syntax.SplitBraces(&braced) {

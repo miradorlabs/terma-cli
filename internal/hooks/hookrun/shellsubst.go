@@ -12,17 +12,11 @@ import (
 
 // outputs maps known command-substitution prefixes to static path evaluators.
 var outputs = map[string]func(sc *scan, args []*syntax.Word) (string, bool){
-	"pwd":                           where,
-	"pwd -L":                        where,
-	"pwd -P":                        where,
-	"git rev-parse --show-toplevel": toplevel,
-	"go env GOPATH":                 gopath,
-	"go env GOMODCACHE":             modcache,
-	"mktemp":                        mktemp,
-	"dirname":                       ofOperand(dirname),
-	"basename":                      ofOperand(func(_ *scan, p string) string { return filepath.Base(p) }),
-	"realpath":                      ofOperand((*scan).real),
-	"readlink -f":                   ofOperand((*scan).real),
+	"pwd": where, "pwd -L": where, "pwd -P": where, "git rev-parse --show-toplevel": toplevel,
+	"go env GOPATH": gopath, "go env GOMODCACHE": modcache, "mktemp": mktemp,
+	"dirname":  ofOperand(dirname),
+	"basename": ofOperand(func(_ *scan, p string) string { return filepath.Base(p) }),
+	"realpath": ofOperand((*scan).real), "readlink -f": ofOperand((*scan).real),
 }
 
 func (sc *scan) substitute(w io.Writer, cs *syntax.CmdSubst) error {
@@ -53,7 +47,6 @@ func (sc *scan) substitute(w io.Writer, cs *syntax.CmdSubst) error {
 	}
 	return errOpaque
 }
-
 func where(sc *scan, args []*syntax.Word) (string, bool) {
 	return sc.dir, sc.dir != "" && len(args) == 0
 }
@@ -103,10 +96,8 @@ func mktemp(sc *scan, args []*syntax.Word) (string, bool) {
 	}
 	dir := sc.dir
 	if name == "" || tmp {
-		dir = os.TempDir()
-		if v, ok := sc.lookup("TMPDIR"); ok && v != "" {
-			dir = v
-		}
+		v, _ := sc.lookup("TMPDIR")
+		dir = cmp.Or(v, os.TempDir())
 	}
 	return filepath.Join(dir, cmp.Or(name, "tmp.XXXXXXXXXX")), dir != ""
 }
