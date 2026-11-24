@@ -12,20 +12,12 @@ import (
 )
 
 // UnknownReach is a NUL-prefixed sentinel returned when a shell reach scan fails closed.
-const UnknownReach = "\x00unknown"
-const shellTime, maxShellPlaces, maxShellLookups, maxShellWords, maxShellStats, maxShellBytes, maxShellDepth, maxShellBraces, maxGlobSegments, substitutionSize, maxBelowDepth = 20 * time.Millisecond, 256, 4096, 16384, 131072, 1 << 20, 4, 16, 3, 4096, 4
+const UnknownReach, shellTime, maxShellPlaces, maxShellLookups, maxShellWords, maxShellStats, maxShellBytes, maxShellDepth, maxShellBraces, maxGlobSegments, substitutionSize, maxBelowDepth = "\x00unknown", 20 * time.Millisecond, 256, 4096, 16384, 131072, 1 << 20, 4, 16, 3, 4096, 4
+const plain, program, target, folder, creates, data, part, slashedOnly, globbed, walked, physTarget role = 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10
 
 var maxShellTime, errOpaque = shellTime, errors.New("an expansion ShellPaths cannot resolve")
 
-func unknownReach(command string) string { return UnknownReach + "\x00" + firstWords(command) }
-func isUnknownReach(p string) bool       { return strings.HasPrefix(p, UnknownReach) }
-
 type role uint8
-
-const plain, program, target, folder, creates, data, part, slashedOnly, globbed, walked, physTarget role = 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10
-
-func (r role) whole() bool      { return r == program || r == target || r == physTarget }
-func (r role) needsSlash() bool { return r == program || r == data || r == part || r == slashedOnly }
 
 // scan holds the state of one bounded shell reach scan.
 type scan struct {
@@ -54,6 +46,10 @@ type cached struct {
 	folders []string
 }
 
+func unknownReach(command string) string { return UnknownReach + "\x00" + firstWords(command) }
+func isUnknownReach(p string) bool       { return strings.HasPrefix(p, UnknownReach) }
+func (r role) whole() bool               { return r == program || r == target || r == physTarget }
+func (r role) needsSlash() bool          { return r == program || r == data || r == part || r == slashedOnly }
 func newScan(cwd string, env func(string) (string, bool), done work) *scan {
 	done.deadline = pick(done.deadline.IsZero(), time.Now().Add(maxShellTime), done.deadline)
 	sc := &scan{cwd: cwd, dir: cwd, env: env, vars: map[string]*string{}, places: map[string]bool{}, created: map[string]bool{}, examined: map[candidate]cached{}, work: done}
@@ -184,8 +180,7 @@ func (sc *scan) checkPartsFields(parts []syntax.WordPart, ifs string, rem int, i
 			if rem >= 0 && pe.Repl != nil && pe.Repl.With != nil {
 				before := rem
 				if rem = sc.checkPartsFields(pe.Repl.With.Parts, ifs, rem, true); rem >= 0 && pe.Repl.All && len(v) > 0 {
-					per := 1 + before - rem
-					rem = pick(len(v) > rem/per && sc.fail(), -1, rem-len(v)*per)
+					rem = pick(len(v) > rem/(1+before-rem) && sc.fail(), -1, rem-len(v)*(1+before-rem))
 				}
 			}
 		} else if inParam {

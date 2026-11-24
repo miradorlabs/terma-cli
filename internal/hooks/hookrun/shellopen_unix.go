@@ -12,8 +12,11 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+var effectiveUID, modeBits = os.Geteuid, map[uint32]fs.FileMode{unix.S_IFDIR: fs.ModeDir, unix.S_IFLNK: fs.ModeSymlink, unix.S_IFIFO: fs.ModeNamedPipe, unix.S_IFREG: 0}
+
 // dirHandle wraps a directory FD for TOCTOU-free, non-blocking handle-relative traversal.
 type dirHandle int
+type statInfo struct{ st unix.Stat_t }
 
 func openRootDir(p string) (dirHandle, error) { return openAt(unix.AT_FDCWD, p, unix.O_DIRECTORY, nil) }
 func (d dirHandle) close()                    { _ = unix.Close(int(d)) }
@@ -55,9 +58,6 @@ func openAt(dirfd int, name string, flags int, want fs.FileInfo) (dirHandle, err
 		return dirHandle(fd), nil
 	}
 }
-
-var effectiveUID, modeBits = os.Geteuid, map[uint32]fs.FileMode{unix.S_IFDIR: fs.ModeDir, unix.S_IFLNK: fs.ModeSymlink, unix.S_IFIFO: fs.ModeNamedPipe, unix.S_IFREG: 0}
-
 func statIDs(a fs.FileInfo) (uint64, uint32, bool) {
 	if sa, ok := a.Sys().(*unix.Stat_t); ok {
 		return uint64(sa.Dev), sa.Uid, true
@@ -79,9 +79,6 @@ func isSysBin(_ string, a fs.FileInfo) bool {
 	_, u, ok := statIDs(a)
 	return ok && u == 0 && a.Mode()&0o022 == 0
 }
-
-type statInfo struct{ st unix.Stat_t }
-
 func (s *statInfo) Name() string       { return "" }
 func (s *statInfo) Size() int64        { return s.st.Size }
 func (s *statInfo) ModTime() time.Time { return time.Time{} }

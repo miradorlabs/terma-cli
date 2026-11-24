@@ -17,9 +17,8 @@ import (
 
 // outputs maps known command-substitution prefixes to static path evaluators.
 var outputs = map[string]func(sc *scan, args []*syntax.Word) (string, bool){
-	"pwd": where, "pwd -L": where, "pwd -P": func(sc *scan, a []*syntax.Word) (string, bool) { return sc.real(pick(len(a) == 0, sc.dir, "")) },
-	"git rev-parse --show-toplevel": func(sc *scan, a []*syntax.Word) (string, bool) { return sc.safeLocate(pick(len(a) == 0, sc.dir, "")) },
-	"mktemp":                        mktemp, "go env GOPATH": gopath, "go env GOMODCACHE": modcache, "dirname": ofOperand(dirname), "realpath": ofOperand((*scan).real), "readlink -f": ofOperand((*scan).real), "basename": ofOperand(func(_ *scan, p string) (string, bool) { return pick(p != "", filepath.Base(p), ""), true }),
+	"pwd": (*scan).pwdBare, "pwd -L": func(sc *scan, a []*syntax.Word) (string, bool) { return sc.dir, sc.dir != "" && len(a) == 0 }, "pwd -P": func(sc *scan, a []*syntax.Word) (string, bool) { return sc.real(pick(len(a) == 0, sc.dir, "")) }, "git rev-parse --show-toplevel": func(sc *scan, a []*syntax.Word) (string, bool) { return sc.safeLocate(pick(len(a) == 0, sc.dir, "")) },
+	"mktemp": mktemp, "go env GOPATH": gopath, "go env GOMODCACHE": modcache, "dirname": ofOperand(dirname), "realpath": ofOperand((*scan).real), "readlink -f": ofOperand((*scan).real), "basename": ofOperand(func(_ *scan, p string) (string, bool) { return pick(p != "", filepath.Base(p), ""), true }),
 }
 
 func (sc *scan) substitute(w io.Writer, cs *syntax.CmdSubst) error {
@@ -49,7 +48,7 @@ func (sc *scan) substitute(w io.Writer, cs *syntax.CmdSubst) error {
 }
 func (sc *scan) trustedCmd(name string) (string, bool) {
 	pathEnv, hasPath := sc.lookup("PATH")
-	if bad := slices.ContainsFunc([]string{"BASH_FUNC_" + name + "%%", "BASH_FUNC_" + name + "()"}, func(k string) bool { _, ok := sc.env(k); return ok }) || sc.isUnresolvedVar("BASH_ENV") || sc.envVal("BASH_ENV") != "" || sc.isUnresolvedVar("ENV") || sc.envVal("ENV") != ""; bad || name == "pwd" || !hasPath && !sc.isUnresolvedVar("PATH") {
+	if bad := slices.ContainsFunc([]string{"BASH_FUNC_" + name + "%%", "BASH_FUNC_" + name + "()"}, func(k string) bool { _, ok := sc.env(k); return ok }) || slices.ContainsFunc(pick(name == "pwd", []string{"BASH_ENV", "ENV"}, []string{"BASH_ENV", "ENV", "LD_PRELOAD", "LD_AUDIT", "LD_LIBRARY_PATH", "DYLD_INSERT_LIBRARIES", "DYLD_LIBRARY_PATH", "DYLD_FRAMEWORK_PATH"}), func(k string) bool { return sc.isUnresolvedVar(k) || sc.envVal(k) != "" }); bad || name == "pwd" || !hasPath && !sc.isUnresolvedVar("PATH") {
 		return "", !bad
 	}
 	exts, roots := pick(runtime.GOOS == "windows", []string{"", ".exe", ".cmd", ".bat", ".com"}, []string{""}), pick(runtime.GOOS == "windows", []string{"/program files/", "/program files (x86)/", "/windows/system32/"}, []string{"/bin/", "/usr/bin/", "/usr/lib/", "/usr/local/bin/", "/Library/Developer/", "/Applications/Xcode.app/", "/usr/local/go/bin/"})
@@ -70,9 +69,16 @@ func (sc *scan) trustedCmd(name string) (string, bool) {
 	}
 	return "", false
 }
-func where(s *scan, a []*syntax.Word) (string, bool) { return s.dir, s.dir != "" && len(a) == 0 }
-func (sc *scan) envVal(k string) string              { v, _ := sc.lookup(k); return v }
-func (sc *scan) envSet(k string) bool                { _, ok := sc.lookup(k); return ok }
+func (sc *scan) pwdBare(a []*syntax.Word) (string, bool) {
+	if len(a) != 0 || sc.dir == "" || sc.isUnresolvedVar("SHELLOPTS") {
+		return "", false
+	} else if slices.Contains(strings.Split(sc.envVal("SHELLOPTS"), ":"), "physical") {
+		return sc.real(sc.dir)
+	}
+	return sc.dir, true
+}
+func (sc *scan) envVal(k string) string { v, _ := sc.lookup(k); return v }
+func (sc *scan) envSet(k string) bool   { _, ok := sc.lookup(k); return ok }
 func (sc *scan) hasGoEnv(key string) bool {
 	p, bad := sc.envVal("GOENV"), sc.isUnresolvedVar("GOENV")
 	if !bad && p == "" {
@@ -250,8 +256,7 @@ func (sc *scan) hasWorktreeConfig(gitDir string) bool {
 		paths = append(paths, pick(filepath.Separator == '/', []string{"/etc/gitconfig", "/usr/local/etc/gitconfig", "/opt/homebrew/etc/gitconfig", "/Library/Developer/CommandLineTools/usr/etc/gitconfig"}, pick(sc.envVal("ProgramData") != "", []string{filepath.Join(sc.envVal("ProgramData"), "Git", "config")}, nil))...)
 	}
 	home, hasHome := sc.homeDir()
-	paths = append(append(paths, pick(sc.envVal("XDG_CONFIG_HOME") != "", []string{filepath.Join(sc.envVal("XDG_CONFIG_HOME"), "git", "config")}, nil)...), pick(hasHome && home != "", []string{filepath.Join(home, ".gitconfig"), filepath.Join(home, ".config", "git", "config")}, nil)...)
-	return slices.ContainsFunc(paths, sc.badGitConfig)
+	return slices.ContainsFunc(append(append(paths, pick(sc.envVal("XDG_CONFIG_HOME") != "", []string{filepath.Join(sc.envVal("XDG_CONFIG_HOME"), "git", "config")}, nil)...), pick(hasHome && home != "", []string{filepath.Join(home, ".gitconfig"), filepath.Join(home, ".config", "git", "config")}, nil)...), sc.badGitConfig)
 }
 func (sc *scan) badGitConfig(p string) bool {
 	inSec, curSec, cont, inQ, fmtV1, hasExt := false, "", false, false, false, false

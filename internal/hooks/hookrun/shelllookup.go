@@ -12,6 +12,8 @@ import (
 	"unicode/utf16"
 )
 
+const maxSymlinkHops, maxPathComponents, maxPathBytes, alnum = 8, 128, 4096, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+
 func (sc *scan) candidate(t string, r role) {
 	if v := pick(r.whole(), t, shellValue(t)); v != t {
 		sc.candidatePath(t, r, true)
@@ -68,8 +70,6 @@ func (sc *scan) candidatePath(t string, r role, fallback bool) {
 	}
 }
 
-const maxSymlinkHops, maxPathComponents, maxPathBytes, alnum = 8, 128, 4096, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-
 // walk traverses p component-by-component via dirHandle (openat O_DIRECTORY|O_NOFOLLOW|O_NONBLOCK on Unix,
 // os.Root on Windows), preventing TOCTOU symlink swaps and FIFO hangs. openMode: 0=stat, 1=openFile, 2=openDir.
 func (sc *scan) walk(p string, followFinal bool, openMode uint8) (resolved, parent string, info os.FileInfo, f *os.File, ok bool) {
@@ -85,11 +85,12 @@ func (sc *scan) walk(p string, followFinal bool, openMode uint8) (resolved, pare
 		return "", "", nil, nil, false
 	}
 	stack, paths := []dirHandle{root}, []string{vol + string(filepath.Separator)}
-	defer func() {
+	closeStack := func() {
 		for _, h := range stack {
 			h.close()
 		}
-	}()
+	}
+	defer closeStack()
 	for parts, hops := strings.FieldsFunc(p[len(vol):], isSep), 0; len(parts) > 0; {
 		if len(parts)+len(stack) > maxPathComponents || !sc.spendStat(1) {
 			return "", "", nil, nil, !sc.fail()
@@ -125,9 +126,7 @@ func (sc *scan) walk(p string, followFinal bool, openMode uint8) (resolved, pare
 				if err != nil {
 					return "", "", nil, nil, !sc.fail()
 				}
-				for _, h := range stack {
-					h.close()
-				}
+				closeStack()
 				stack, paths = []dirHandle{nr}, []string{newVol}
 			}
 			parts = append(strings.FieldsFunc(target[len(tVol):], isSep), parts...)

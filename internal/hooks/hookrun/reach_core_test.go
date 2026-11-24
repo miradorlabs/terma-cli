@@ -249,7 +249,8 @@ func TestShellSubstKnownOutputs(t *testing.T) {
 			return parent, true
 		case "GOPATH":
 			return filepath.Join(parent, "go"), true
-		case "GOENV", "GOMODCACHE", "XDG_CONFIG_HOME", "AppData", "PATH":
+		case "GOENV", "GOMODCACHE", "GOFLAGS", "GOTOOLCHAIN", "XDG_CONFIG_HOME", "AppData", "PATH",
+			"SHELLOPTS", "LD_PRELOAD", "LD_AUDIT", "LD_LIBRARY_PATH", "DYLD_INSERT_LIBRARIES", "DYLD_LIBRARY_PATH", "DYLD_FRAMEWORK_PATH":
 			return "", false
 		}
 		return os.LookupEnv(k)
@@ -910,7 +911,7 @@ func TestScanBoundsAndSafety(t *testing.T) {
 	if got, ok := outputs["pwd -P"](scPwd, nil); !ok || got != resolvedRealSub {
 		t.Fatalf("pwd -P = (%q, %v), want (%q, true)", got, ok, resolvedRealSub)
 	}
-	if got, ok := where(scPwd, nil); !ok || got != linkSub {
+	if got, ok := outputs["pwd -L"](scPwd, nil); !ok || got != linkSub {
 		t.Fatalf("pwd -L = (%q, %v), want (%q, true)", got, ok, linkSub)
 	}
 
@@ -2971,5 +2972,48 @@ func TestReachCoreReviewRegressions(t *testing.T) {
 	scNoSysOK := newScan(repo, makeEnv(map[string]string{"HOME": parent, "USERPROFILE": parent, "GIT_CONFIG_NOSYSTEM": "1"}), work{deadline: time.Now().Add(time.Minute)})
 	if got, ok := scNoSysOK.safeLocate(repo); !ok || got != repo {
 		t.Errorf("GIT_CONFIG_NOSYSTEM=1: safeLocate = (%q, %v), want (%q, true)", got, ok, repo)
+	}
+
+	// 18. Short (0-1 byte) opaque words after secret options must not panic in maskWords.
+	for cmd, want := range map[string]string{
+		"curl -u x":  "curl -u …",
+		"curl -u ''": "curl -u …",
+		"sh -c x":    "sh -c …",
+	} {
+		if got := firstWords(cmd); got != want {
+			t.Errorf("firstWords(%q) = %q, want %q", cmd, got, want)
+		}
+	}
+
+	// 19. Dynamic-loader injection env vars fail closed for external substitutions (but not builtin pwd).
+	for _, k := range []string{"LD_PRELOAD", "LD_AUDIT", "LD_LIBRARY_PATH", "DYLD_INSERT_LIBRARIES", "DYLD_LIBRARY_PATH", "DYLD_FRAMEWORK_PATH"} {
+		scL := newScan(repo, makeEnv(map[string]string{"HOME": parent, "USERPROFILE": parent, k: "/tmp/hook.so"}), work{deadline: time.Now().Add(time.Minute)})
+		if got, err := evalSubst(scL, "dirname /a/b"); err == nil {
+			t.Errorf("%s set: substitute(dirname) = %q, want error", k, got)
+		}
+		if got, err := evalSubst(scL, "pwd"); err != nil || got != repo {
+			t.Errorf("%s set: substitute(pwd) = (%q, %v), want (%q, nil)", k, got, err, repo)
+		}
+	}
+
+	// 20. Bare pwd honors SHELLOPTS=physical and fails closed when SHELLOPTS is unresolved; pwd -L stays logical.
+	physTarget := filepath.Join(parent, "phys-target")
+	if err := os.MkdirAll(physTarget, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	symLink := filepath.Join(parent, "sym-dir")
+	if err := os.Symlink(physTarget, symLink); err == nil {
+		scPhys := newScan(symLink, makeEnv(map[string]string{"SHELLOPTS": "braceexpand:physical"}), work{deadline: time.Now().Add(time.Minute)})
+		if got, err := evalSubst(scPhys, "pwd"); err != nil || got != physTarget {
+			t.Errorf("SHELLOPTS=physical pwd = (%q, %v), want (%q, nil)", got, err, physTarget)
+		}
+		if got, err := evalSubst(scPhys, "pwd -L"); err != nil || got != symLink {
+			t.Errorf("SHELLOPTS=physical pwd -L = (%q, %v), want (%q, nil)", got, err, symLink)
+		}
+		scUnres := newScan(symLink, makeEnv(nil), work{deadline: time.Now().Add(time.Minute)})
+		scUnres.vars["SHELLOPTS"] = nil
+		if got, err := evalSubst(scUnres, "pwd"); err == nil {
+			t.Errorf("unresolved SHELLOPTS pwd = %q, want error", got)
+		}
 	}
 }

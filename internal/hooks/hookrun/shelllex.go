@@ -10,10 +10,14 @@ import (
 	"unicode/utf8"
 )
 
-var secretOptions, secretNames, compounds = []string{"-c", "-e", "--eval", "-u", "--user", "-U", "--proxy-user", "-H", "--header", "--proxy-header", "-p", "--password", "-b", "--cookie", "-d", "--data", "--data-ascii", "--data-raw", "--data-binary", "--data-urlencode", "--url-query", "--json", "--oauth2-bearer", "-E", "--cert", "--proxy-cert", "--post-data", "--body-data", "--post-file", "--body-file", "-F", "--form", "--form-string"}, []string{"pass", "token", "secret", "key", "auth"}, []string{"if", "for", "while", "until", "case", "select"}
-var userinfo, shellMeta = regexp.MustCompile(`(://)[^/\s]+@|[^/\s:@]*:[^/\s@]+@`), [256]bool{' ': true, '\t': true, '\n': true, '\\': true, '$': true, '`': true, '"': true, '\'': true, '(': true, ')': true, '[': true, ']': true, '{': true, '}': true, '|': true, '&': true, '<': true, '>': true, ';': true}
-
 const maxShellNesting, maxShellExpr, separators = 256, 4096, " \t\n;&|()<>"
+
+var secretOptions, secretNames, compounds, userinfo, shellMeta = []string{"-c", "-e", "--eval", "-u", "--user", "-U", "--proxy-user", "-H", "--header", "--proxy-header", "-p", "--password", "-b", "--cookie", "-d", "--data", "--data-ascii", "--data-raw", "--data-binary", "--data-urlencode", "--url-query", "--json", "--oauth2-bearer", "-E", "--cert", "--proxy-cert", "--post-data", "--body-data", "--post-file", "--body-file", "-F", "--form", "--form-string"}, []string{"pass", "token", "secret", "key", "auth"}, []string{"if", "for", "while", "until", "case", "select"}, regexp.MustCompile(`(://)[^/\s]+@|[^/\s:@]*:[^/\s@]+@`), [256]bool{' ': true, '\t': true, '\n': true, '\\': true, '$': true, '`': true, '"': true, '\'': true, '(': true, ')': true, '[': true, ']': true, '{': true, '}': true, '|': true, '&': true, '<': true, '>': true, ';': true}
+
+type heredoc struct {
+	delim             string
+	quoted, stripTabs bool
+}
 
 // firstWords returns command's first four words (<=60 runes) with secret-like values masked.
 func firstWords(command string) string { return maskWords(command, 0) }
@@ -42,8 +46,12 @@ func maskWords(command string, depth int) string {
 		} else {
 			masked, short := userinfo.ReplaceAllString(b, "${1}…@"), len(b) > 2 && b[0] == '-' && b[1] != '-'
 			name, _, eq := strings.Cut(masked, "=")
-			if opaque := secret > 0 || hasSubst || depth >= 2 && strings.ContainsAny(b, " \t\n"); opaque || short || eq && name != "" && !strings.ContainsAny(name, " \t\n") {
-				words[i] = pick(opaque, "…", pick(short, b[:2]+"…", name+"=…"))
+			if secret > 0 || hasSubst || depth >= 2 && strings.ContainsAny(b, " \t\n") {
+				words[i] = "…"
+			} else if short {
+				words[i] = b[:2] + "…"
+			} else if eq && name != "" && !strings.ContainsAny(name, " \t\n") {
+				words[i] = name + "=…"
 			} else if strings.ContainsAny(b, " \t\n") {
 				inner := maskWords(b, depth+1)
 				words[i] = pick(inner != b, inner, words[i])
@@ -145,11 +153,6 @@ func ansiEscape(s string) (rune, int) {
 		return rune(v & pick(base == 8, uint64(0xff), ^uint64(0))), start + k
 	}
 	return '\\', 0
-}
-
-type heredoc struct {
-	delim             string
-	quoted, stripTabs bool
 }
 
 // parsable reports whether src is within maxShellBytes, maxShellNesting, maxShellExpr, and maxShellWords.
