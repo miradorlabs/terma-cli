@@ -561,6 +561,10 @@ func TestScanBoundsAndSafety(t *testing.T) {
 		`echo ${VAR/a/"$BIG"}`,
 		`echo ${V//a/` + fortyWords + `}`,
 		`echo ${V//a/"$REP"}`,
+		`echo "${!WORK_@}/file"`,
+		`echo "${!WORK_*}/file"`,
+		`echo ${!WORK_@}`,
+		`echo "${UNSET:-${!WORK_@}}"`,
 	} {
 		fBig, err := syntax.NewParser().Parse(strings.NewReader(cmd), "")
 		if err != nil {

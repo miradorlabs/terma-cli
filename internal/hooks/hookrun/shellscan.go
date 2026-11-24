@@ -88,7 +88,7 @@ func (sc *scan) Get(name string) expand.Variable {
 	v, ok := sc.lookup(name)
 	return expand.Variable{Set: ok, Kind: pick(ok, expand.String, expand.Unknown), Str: v}
 }
-func (sc *scan) Each(func(string, expand.Variable) bool) {}
+func (sc *scan) Each(func(string, expand.Variable) bool) { sc.opaque = true }
 func (sc *scan) lookup(name string) (string, bool) {
 	if name == "PWD" {
 		return sc.dir, sc.dir != ""
@@ -158,7 +158,7 @@ func (sc *scan) paramValue(pe *syntax.ParamExp) (v string) {
 	return v
 }
 func (sc *scan) paramSize(pe *syntax.ParamExp, opaqueSubst bool) int {
-	if pe.Index != nil || pe.Slice != nil {
+	if pe.Index != nil || pe.Slice != nil || pe.Names != 0 {
 		return maxShellBytes + 1
 	}
 	n := len(sc.paramValue(pe))
