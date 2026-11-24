@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -20,12 +21,13 @@ import (
 // environment name neither, but the process that starts a hook is that binary, through one
 // shell: agy for the CLI, or the copy T3 Code bundles, run as `antigravity acp`. Asking it
 // takes 70 to 90 ms, so each binary's answer is kept under the state directory, keyed by
-// the binary's path and checked against its size and modification time.
+// the binary's path, size and modification time.
 
-// antigravityVersionDir keeps one entry per Antigravity binary, named by its path's hash. An
-// update in place overwrites its binary's entry. T3 Code keeps each release at a path of its
-// own, so each adds an entry; the relay's sweep ages entries out like other hook state
-// (hookrun.Sweep), and a binary whose entry went is asked once more.
+// antigravityVersionDir keeps one entry per Antigravity binary file, named by the hash of
+// its path, size and modification time. An update is another file, so it has an entry of its
+// own, and a session that outlives the update keeps finding the old one. The relay's sweep
+// ages entries out like other hook state (hookrun.Sweep), and a binary whose entry went is
+// asked once more.
 var antigravityVersionDir = hookrun.AgentStateDir(Agent{}.Name(), "versions")
 
 const (
@@ -35,6 +37,10 @@ const (
 	// antigravityVersionLimit bounds asking a binary; one that has not answered by then is
 	// stopped and kept as not saying.
 	antigravityVersionLimit = 2 * time.Second
+	// antigravityVersionRetry is how long "would not say" is kept before the binary is asked
+	// again: a hang costs its limit once in that time, not at every hook, and a first run
+	// that was only slow is not held against the binary for good.
+	antigravityVersionRetry = time.Hour
 	// antigravityVersionOutput is as much of the answer as is read.
 	antigravityVersionOutput = 4 << 10
 )
@@ -93,12 +99,13 @@ func antigravityVersion(ctx context.Context, stateDir string) string {
 	entry := antigravityVersionEntry{Path: exe.Path, Size: info.Size(), ModTime: info.ModTime().UnixNano()}
 	path := ""
 	if stateDir != "" {
-		path = filepath.Join(stateDir, antigravityVersionDir, hookrun.EvidenceID(exe.Path)+".json")
+		key := fmt.Sprintf("%s|%d|%d", entry.Path, entry.Size, entry.ModTime)
+		path = filepath.Join(stateDir, antigravityVersionDir, hookrun.EvidenceID(key)+".json")
 	}
 	if kept, ok := readAntigravityVersion(path); ok && kept.Path == entry.Path && kept.Size == entry.Size && kept.ModTime == entry.ModTime {
 		return kept.Version
 	}
-	out, asked := askVersion(ctx, exe.Run)
+	out, asked := askVersion(ctx, exe)
 	if !asked {
 		return ""
 	}
@@ -123,7 +130,7 @@ func runningAntigravity() (procinfo.Executable, bool) {
 }
 
 // readAntigravityVersion is the kept entry at path, if it reads and holds a version terma
-// would have kept.
+// would have kept. One that holds none stands for antigravityVersionRetry, by the file's age.
 func readAntigravityVersion(path string) (antigravityVersionEntry, bool) {
 	var e antigravityVersionEntry
 	if path == "" {
@@ -132,6 +139,11 @@ func readAntigravityVersion(path string) (antigravityVersionEntry, bool) {
 	b, err := os.ReadFile(path)
 	if err != nil || json.Unmarshal(b, &e) != nil || agyVersionRE.FindString(e.Version) != e.Version {
 		return antigravityVersionEntry{}, false
+	}
+	if e.Version == "" {
+		if info, err := os.Stat(path); err != nil || time.Since(info.ModTime()) > antigravityVersionRetry {
+			return antigravityVersionEntry{}, false
+		}
 	}
 	return e, true
 }
@@ -149,20 +161,26 @@ func writeAntigravityVersion(path string, e antigravityVersionEntry) {
 	_ = hookrun.WriteState(path, b)
 }
 
-// askBinaryVersion runs path --version with no input and a deadline, and returns what it
-// printed and whether it ran: a binary that started is answered for, even by a timeout or
-// an exit status.
-func askBinaryVersion(ctx context.Context, path string) (string, bool) {
-	ctx, cancel := context.WithTimeout(ctx, antigravityVersionLimit)
+// askBinaryVersion runs exe with --version, no input and a deadline, and returns what it
+// printed and whether it was asked: a binary that started is answered for, even by its own
+// deadline or an exit status. One the hook's own deadline cut short was not asked, so
+// nothing is kept against it. It runs under the name it started as, also when it is reached
+// through another path (procinfo.Executable).
+func askBinaryVersion(parent context.Context, exe procinfo.Executable) (string, bool) {
+	ctx, cancel := context.WithTimeout(parent, antigravityVersionLimit)
 	defer cancel()
 	var out cappedBuffer
-	cmd := exec.CommandContext(ctx, path, "--version")
+	cmd := exec.CommandContext(ctx, exe.Run, "--version")
+	cmd.Args[0] = exe.Path
 	cmd.Stdout = &out
 	cmd.WaitDelay = 100 * time.Millisecond
 	if err := cmd.Start(); err != nil {
 		return "", false
 	}
 	_ = cmd.Wait()
+	if parent.Err() != nil {
+		return "", false
+	}
 	return out.String(), true
 }
 

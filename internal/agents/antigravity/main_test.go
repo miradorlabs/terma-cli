@@ -24,7 +24,8 @@ func runIsolated(m *testing.M) int {
 		_ = os.Setenv(k, home)
 	}
 	_ = os.Unsetenv("T3CODE_HOME")
-	// No hook in a test looks for the binary running it, nor runs one, unless the test says.
+	// No hook in this package's tests looks for the binary running it, nor runs one, unless the
+	// test says. Another package's tests that run these hooks (internal/cli) use the real lookup.
 	versionAncestors = func() []int { return nil }
 	return m.Run()
 }

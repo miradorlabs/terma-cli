@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 
@@ -40,8 +41,8 @@ func fakeVersions(t *testing.T, answer string, exes ...procinfo.Executable) *ver
 	}
 	versionAncestors = func() []int { s.lookups++; return pids }
 	versionExecutable = func(pid int) (procinfo.Executable, bool) { exe, ok := byPID[pid]; return exe, ok }
-	askVersion = func(_ context.Context, path string) (string, bool) {
-		s.asked = append(s.asked, path)
+	askVersion = func(_ context.Context, exe procinfo.Executable) (string, bool) {
+		s.asked = append(s.asked, exe.Run)
 		return s.answer, true
 	}
 	return s
@@ -100,8 +101,9 @@ func TestAntigravityVersionIsKeptPerBinary(t *testing.T) {
 		if got := antigravityVersion(ctx, stateDir); got != want || len(s.asked) != asks {
 			t.Fatalf("version %q after %d asks, want %q after %d", got, len(s.asked), want, asks)
 		}
-		if entries, _ := os.ReadDir(dir); len(entries) != 1 {
-			t.Fatalf("the folder holds %d entries, want the binary's one", len(entries))
+		// One entry per file asked: an update is another file, and leaves the old one's entry.
+		if entries, _ := os.ReadDir(dir); len(entries) != asks {
+			t.Fatalf("the folder holds %d entries, want %d", len(entries), asks)
 		}
 	}
 	ask("1.5.14", 1) // a miss asks and keeps the answer
@@ -110,7 +112,7 @@ func TestAntigravityVersionIsKeptPerBinary(t *testing.T) {
 		t.Fatal(err)
 	}
 	s.answer = "1.5.15"
-	ask("1.5.15", 2) // a new size asks again, over the same entry
+	ask("1.5.15", 2) // a new size asks again, into an entry of its own
 	ask("1.5.15", 2)
 	later := time.Now().Add(time.Hour)
 	if err := os.Chtimes(cli.Run, later, later); err != nil {
@@ -119,8 +121,48 @@ func TestAntigravityVersionIsKeptPerBinary(t *testing.T) {
 	s.answer = "made-up: no version here"
 	ask("", 3) // a new modification time asks again, and an answer with no version is kept
 	ask("", 3)
-	if b, err := os.ReadFile(filepath.Join(dir, readOne(t, dir))); err != nil || string(b) == "" {
-		t.Fatalf("entry %q: %v", b, err)
+}
+
+// "Would not say" is kept for antigravityVersionRetry, then the binary is asked again.
+func TestAntigravityVersionAsksAgainAfterNoAnswer(t *testing.T) {
+	ctx, stateDir := context.Background(), t.TempDir()
+	s := fakeVersions(t, "", binary(t, "agy", 3))
+	dir := filepath.Join(stateDir, antigravityVersionDir)
+	for range 2 {
+		if got := antigravityVersion(ctx, stateDir); got != "" || len(s.asked) != 1 {
+			t.Fatalf("version %q after %d asks, want none after one", got, len(s.asked))
+		}
+	}
+	old := time.Now().Add(-antigravityVersionRetry - time.Minute)
+	if err := os.Chtimes(filepath.Join(dir, readOne(t, dir)), old, old); err != nil {
+		t.Fatal(err)
+	}
+	s.answer = "1.5.14"
+	for range 2 {
+		if got := antigravityVersion(ctx, stateDir); got != "1.5.14" || len(s.asked) != 2 {
+			t.Fatalf("version %q after %d asks, want 1.5.14 after two", got, len(s.asked))
+		}
+	}
+}
+
+// A binary the hook's own deadline cut short was not asked: nothing is kept against it, and
+// the next hook asks. One that outlasts its own limit is answered for.
+func TestAskBinaryVersionDoesNotAnswerForTheHooksDeadline(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("a shell script stands in for the binary")
+	}
+	path := filepath.Join(t.TempDir(), "agy")
+	if err := os.WriteFile(path, []byte("#!/bin/sh\nsleep 0.3\necho 1.5.14\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	exe := procinfo.Executable{Path: path, Run: path}
+	short, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+	if out, asked := askBinaryVersion(short, exe); asked || out != "" {
+		t.Fatalf("answered %q, asked %v, for a hook out of time", out, asked)
+	}
+	if out, asked := askBinaryVersion(context.Background(), exe); !asked || agyVersionRE.FindString(out) != "1.5.14" {
+		t.Fatalf("answered %q, asked %v, with time to spare", out, asked)
 	}
 }
 
@@ -242,12 +284,12 @@ func BenchmarkAntigravityVersionKept(b *testing.B) {
 		}
 		return exe, ok
 	}
-	askVersion = func(context.Context, string) (string, bool) { return "1.5.14", true }
+	askVersion = func(context.Context, procinfo.Executable) (string, bool) { return "1.5.14", true }
 	ctx, stateDir := context.Background(), b.TempDir()
 	if antigravityVersion(ctx, stateDir) != "1.5.14" {
 		b.Skip("this system cannot tell a process's file")
 	}
-	askVersion = func(context.Context, string) (string, bool) { b.Fatal("asked on a hit"); return "", false }
+	askVersion = func(context.Context, procinfo.Executable) (string, bool) { b.Fatal("asked on a hit"); return "", false }
 	for b.Loop() {
 		antigravityVersion(ctx, stateDir)
 	}
