@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-24T04:24:03.641481502Z",
+  "generated_at": "2026-11-24T07:01:28.525274966Z",
   "versions": [
     {
       "harness": "gemini",
@@ -87,8 +87,8 @@
       "highlights": [],
       "signing": null,
       "partial": true,
-      "attempted_at": "2026-11-24T00:54:11.23591465Z",
-      "attempts": 1
+      "attempted_at": "2026-11-24T07:01:28.525274966Z",
+      "attempts": 2
     },
     {
       "harness": "codex",
