@@ -3,6 +3,9 @@ package opencode
 import (
 	"context"
 	"encoding/json"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -300,5 +303,101 @@ await hooks["tool.execute.before"]({ tool: "read", sessionID: "ses_hang", callID
 	}
 	if strings.TrimSpace(string(got)) != "dead" {
 		t.Fatalf("previous hung hook status when next hook started = %q; want dead", strings.TrimSpace(string(got)))
+	}
+}
+
+func TestOpenCodeToolReachFailsClosedUnderNode(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("POSIX shell hook test")
+	}
+	node, err := exec.LookPath("node")
+	if err != nil {
+		t.Skip("node is not installed")
+	}
+	dir := t.TempDir()
+	var mu sync.Mutex
+	var spanNames []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		if r.URL.Path == "/v1/traces" {
+			var req struct {
+				ResourceSpans []struct {
+					ScopeSpans []struct {
+						Spans []struct {
+							Name string `json:"name"`
+						} `json:"spans"`
+					} `json:"scopeSpans"`
+				} `json:"resourceSpans"`
+			}
+			if json.Unmarshal(body, &req) == nil {
+				mu.Lock()
+				for _, rs := range req.ResourceSpans {
+					for _, ss := range rs.ScopeSpans {
+						for _, sp := range ss.Spans {
+							spanNames = append(spanNames, sp.Name)
+						}
+					}
+				}
+				mu.Unlock()
+			}
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	hook := filepath.Join(dir, "hook.sh")
+	hookSrc := "#!/bin/sh\nif [ \"$1\" = \"opencode-tool-reach\" ]; then exit 1; fi\nexit 0\n"
+	if err := os.WriteFile(hook, []byte(hookSrc), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	src, err := renderPlugin(opencodeConfig{
+		Version:            1,
+		Endpoint:           srv.URL,
+		Signals:            []string{"traces"},
+		IncludePrompts:     true,
+		IncludeToolContent: true,
+		HookCommand:        []string{hook},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	pluginPath := filepath.Join(dir, "terma.mjs")
+	if err := os.WriteFile(pluginPath, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	driver := `
+import { pathToFileURL } from "node:url"
+const mod = await import(pathToFileURL(process.argv[2]).href)
+const hooks = await mod.TermaPlugin({ directory: "/repoA", worktree: "/repoA" })
+await hooks.event({ event: { type: "session.created", properties: { info: { id: "ses_fail", directory: "/repoA" } } } })
+await hooks["tool.execute.before"]({ tool: "read", sessionID: "ses_fail", callID: "c1" }, { args: { filePath: "/repoB/secret.go" } })
+await hooks["tool.execute.after"]({ tool: "read", sessionID: "ses_fail", callID: "c1", args: { filePath: "/repoB/secret.go" } }, { title: "read", output: "SECRET" })
+await hooks.event({ event: { type: "message.updated", properties: { info: { id: "m1", sessionID: "ses_fail", role: "assistant", modelID: "m", time: { created: Date.now() - 10, completed: Date.now() } } } } })
+// Separate clean session still exports.
+await hooks.event({ event: { type: "session.created", properties: { info: { id: "ses_ok", directory: "/repoA" } } } })
+await hooks["tool.execute.before"]({ tool: "edit", sessionID: "ses_ok", callID: "c2" }, { args: { filePath: "/repoA/a.go" } })
+await hooks["tool.execute.after"]({ tool: "edit", sessionID: "ses_ok", callID: "c2", args: { filePath: "/repoA/a.go" } }, { title: "edit", output: "ok" })
+await hooks.dispose()
+`
+	script := filepath.Join(dir, "driver.mjs")
+	if err := os.WriteFile(script, []byte(driver), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if out, err := exec.Command(node, script, pluginPath).CombinedOutput(); err != nil {
+		t.Fatalf("node: %v\n%s", err, out)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	var sawEdit bool
+	for _, name := range spanNames {
+		if name == "execute_tool read" || name == "chat m" {
+			t.Fatalf("failed opencode-tool-reach leaked span %q (all=%v)", name, spanNames)
+		}
+		if name == "execute_tool edit" {
+			sawEdit = true
+		}
+	}
+	if !sawEdit {
+		t.Fatalf("expected execute_tool edit span for clean session; got %v", spanNames)
 	}
 }

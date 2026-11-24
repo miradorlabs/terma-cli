@@ -112,7 +112,10 @@ function schedule() {
   if (!timer) timer = setTimeout(() => void flush(), 1000)
 }
 
+const tainted = new Set<string>()
+
 function span(session: string, name: string, start: number, end: number, a: Record<string, unknown>, error = false) {
+  if (session && tainted.has(session)) return
   spans.push({
     traceId: traceId(session),
     spanId: hex(8),
@@ -127,6 +130,7 @@ function span(session: string, name: string, start: number, end: number, a: Reco
 }
 
 function record(session: string, event: string, body: string, a: Record<string, unknown>) {
+  if (session && tainted.has(session)) return
   const t = nanos(Date.now())
   logs.push({
     timeUnixNano: t,
@@ -144,34 +148,51 @@ function record(session: string, event: string, body: string, a: Record<string, 
 
 // termaHook hands an event to `terma hook pi-*` in FIFO order so session-start always
 // finishes before tool-reach (preventing a late StartRun from clearing an earlier Mixed
-// mark) and reach completes before the session exits. A timed-out child is terminated before
-// the queue advances so it cannot race later hooks.
+// mark) and reach completes before the session exits. A timed-out child is terminated and
+// the FIFO queue only advances once child exit is confirmed.
 const HOOK_TIMEOUT_MS = 2000
 const HOOK_KILL_GRACE_MS = 250
 const MAX_HOOK_QUEUE = 64
 let hookQueue: Promise<void> = Promise.resolve()
 let hookPending = 0
 
-function spawnHook(event: string, payload: Record<string, unknown>): Promise<void> {
-  if (!CONFIG) return Promise.resolve()
-  return new Promise((resolve) => {
+function spawnHook(event: string, payload: Record<string, unknown>): { result: Promise<boolean>; exit: Promise<void> } {
+  if (!CONFIG) return { result: Promise.resolve(false), exit: Promise.resolve() }
+  let resolveExit!: () => void
+  const exit = new Promise<void>((r) => { resolveExit = r })
+  const result = new Promise<boolean>((resolve) => {
     let settled = false
+    let exited = false
     let child: ReturnType<typeof spawn> | null = null
     let killTimer: any
-    const done = () => {
+    const finish = (ok: boolean) => {
       if (settled) return
       settled = true
       clearTimeout(timer)
       if (killTimer) clearTimeout(killTimer)
-      resolve()
+      resolve(ok)
+    }
+    const markExited = () => {
+      if (exited) return
+      exited = true
+      clearTimeout(timer)
+      if (killTimer) clearTimeout(killTimer)
+      resolveExit()
     }
     const timer: any = setTimeout(() => {
-      if (!child) return done()
-      try { child.kill("SIGTERM") } catch {}
+      if (!child) {
+        markExited()
+        return finish(false)
+      }
+      try { child.kill("SIGTERM") } catch (err: any) {
+        if (err && err.code === "ESRCH") markExited()
+      }
       killTimer = setTimeout(() => {
-        try { child?.kill("SIGKILL") } catch {}
+        try { child?.kill("SIGKILL") } catch (err: any) {
+          if (err && err.code === "ESRCH") markExited()
+        }
         child?.unref?.()
-        done()
+        finish(false)
       }, HOOK_KILL_GRACE_MS)
       killTimer?.unref?.()
     }, HOOK_TIMEOUT_MS)
@@ -179,30 +200,48 @@ function spawnHook(event: string, payload: Record<string, unknown>): Promise<voi
     try {
       const [cmd, ...args] = CONFIG!.hookCommand
       child = spawn(cmd, [...args, event], { stdio: ["pipe", "ignore", "ignore"], detached: false })
-      child.on("error", done)
-      child.on("close", done)
+      child.on("error", () => {
+        markExited()
+        finish(false)
+      })
+      child.on("close", (code: number | null) => {
+        markExited()
+        finish(code === 0)
+      })
       child.stdin.on("error", () => {})
       child.stdin.end(JSON.stringify(payload))
     } catch {
-      done()
+      markExited()
+      finish(false)
     }
   })
+  return { result, exit }
 }
 
-function termaHook(event: string, payload: Record<string, unknown>): Promise<void> {
-  if (!CONFIG || hookPending >= MAX_HOOK_QUEUE) return Promise.resolve()
+function termaHook(event: string, payload: Record<string, unknown>): Promise<boolean> {
+  if (!CONFIG || hookPending >= MAX_HOOK_QUEUE) return Promise.resolve(false)
   hookPending++
-  const step = hookQueue.then(() => spawnHook(event, payload)).finally(() => { hookPending-- })
-  hookQueue = step.then(() => undefined, () => undefined)
-  return step
+  const slot = hookQueue.then(() => spawnHook(event, payload))
+  hookQueue = slot.then((s) => s.exit, () => undefined).finally(() => { hookPending-- })
+  return new Promise<boolean>((resolve) => {
+    let done = false
+    const settle = (ok: boolean) => {
+      if (done) return
+      done = true
+      clearTimeout(wait)
+      resolve(ok)
+    }
+    const wait: any = setTimeout(() => settle(false), HOOK_TIMEOUT_MS + HOOK_KILL_GRACE_MS + 500)
+    wait?.unref?.()
+    slot.then((s) => s.result, () => false).then(settle, () => settle(false))
+  })
 }
 
 // --- the extension -------------------------------------------------------------------
 
 let session = ""
 let turnStart = Date.now()
-const toolStarts = new Map<string, number>()
-const reachedCalls = new Set<string>()
+const toolCalls = new Map<string, { start: number; reach: Promise<boolean> | null }>()
 
 function sessionOf(ctx: any): string {
   const own = ctx && ctx.sessionManager && typeof ctx.sessionManager.getSessionId === "function" ? ctx.sessionManager.getSessionId() : ""
@@ -246,17 +285,20 @@ function toolReach(event: any): Record<string, unknown> | null {
 export default function (pi: any) {
   if (!CONFIG) return
 
-  const emitReach = (event: any, ctx: any): Promise<void> | null => {
+  const emitReach = (event: any, ctx: any): Promise<boolean> | null => {
     const reach = toolReach(event)
     if (!reach) return null
     const s = sessionOf(ctx)
     if (!s) return null
-    return termaHook(AGENT + "-tool-reach", { session_id: s, cwd: ctx?.cwd, tool: String(event?.toolName ?? ""), ...reach })
+    return termaHook(AGENT + "-tool-reach", { session_id: s, cwd: ctx?.cwd, tool: String(event?.toolName ?? ""), ...reach }).then((ok) => {
+      if (!ok) tainted.add(s)
+      return ok
+    })
   }
 
   pi.on("session_start", (event: any, ctx: any) => {
     session = sessionOf(ctx)
-    return termaHook(AGENT + "-session-start", { session_id: session, cwd: ctx?.cwd, model: ctx?.model?.id, reason: event?.reason })
+    return termaHook(AGENT + "-session-start", { session_id: session, cwd: ctx?.cwd, model: ctx?.model?.id, reason: event?.reason }).then(() => undefined)
   })
 
   pi.on("session_shutdown", async (_event: any, ctx: any) => {
@@ -301,23 +343,28 @@ export default function (pi: any) {
   })
 
   pi.on("tool_call", async (event: any, ctx: any) => {
-    if (event?.toolCallId) toolStarts.set(event.toolCallId, Date.now())
-    const pending = emitReach(event, ctx)
-    if (pending && event?.toolCallId) {
-      reachedCalls.add(event.toolCallId)
-      if (reachedCalls.size > 1024) reachedCalls.delete(reachedCalls.values().next().value!)
+    const reach = emitReach(event, ctx)
+    if (event?.toolCallId) {
+      toolCalls.set(event.toolCallId, { start: Date.now(), reach })
+      if (toolCalls.size > 1024) toolCalls.delete(toolCalls.keys().next().value!)
     }
-    if (pending) await pending
+    if (reach) await reach
   })
 
-  pi.on("tool_result", (event: any, ctx: any) => {
+  pi.on("tool_result", async (event: any, ctx: any) => {
     const s = sessionOf(ctx)
-    const start = toolStarts.get(event?.toolCallId) ?? Date.now()
-    toolStarts.delete(event?.toolCallId)
-    const seen = Boolean(event?.toolCallId && reachedCalls.delete(event.toolCallId))
-    if (!seen) void emitReach(event, ctx)
+    const call = event?.toolCallId ? toolCalls.get(event.toolCallId) : undefined
+    if (event?.toolCallId) toolCalls.delete(event.toolCallId)
+    const start = call?.start ?? Date.now()
+    const reachDone = call?.reach ?? emitReach(event, ctx)
+    if (reachDone && !(await reachDone)) {
+      if (s) tainted.add(s)
+      return
+    }
+    if (s && tainted.has(s)) return
+    const end = Date.now()
     const name = String(event?.toolName ?? "")
-    span(s, "execute_tool " + name, start, Date.now(), {
+    span(s, "execute_tool " + name, start, end, {
       "gen_ai.operation.name": "execute_tool",
       "gen_ai.tool.name": name,
       "gen_ai.tool.call.id": event?.toolCallId,

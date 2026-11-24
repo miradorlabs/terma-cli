@@ -314,8 +314,8 @@ class Exporter {
 // --- attribution hooks --------------------------------------------------------------
 
 // hookRunner hands session and file events to `terma hook <event>` in FIFO order so
-// session-start always finishes before tool-reach. A timed-out child is terminated before
-// the queue advances so it cannot race later hooks. A missing terma binary is noticed once.
+// session-start always finishes before tool-reach. A timed-out child is terminated and the
+// queue only advances once child exit is confirmed. Returns true iff the hook exited 0.
 const HOOK_TIMEOUT_MS = 2000
 const HOOK_KILL_GRACE_MS = 250
 const MAX_HOOK_QUEUE = 64
@@ -326,25 +326,42 @@ function hookRunner(cfg) {
   let queue = Promise.resolve()
   let pending = 0
   const runOnce = (event, payload) => {
-    if (missing) return Promise.resolve()
-    return new Promise((resolve) => {
+    if (missing) return { result: Promise.resolve(false), exit: Promise.resolve() }
+    let resolveExit
+    const exit = new Promise((r) => { resolveExit = r })
+    const result = new Promise((resolve) => {
       let settled = false
+      let exited = false
       let child = null
       let killTimer
-      const done = () => {
+      const finish = (ok) => {
         if (settled) return
         settled = true
         clearTimeout(timer)
         if (killTimer) clearTimeout(killTimer)
-        resolve()
+        resolve(ok)
+      }
+      const markExited = () => {
+        if (exited) return
+        exited = true
+        clearTimeout(timer)
+        if (killTimer) clearTimeout(killTimer)
+        resolveExit()
       }
       const timer = setTimeout(() => {
-        if (!child) return done()
-        try { child.kill("SIGTERM") } catch {}
+        if (!child) {
+          markExited()
+          return finish(false)
+        }
+        try { child.kill("SIGTERM") } catch (err) {
+          if (err && err.code === "ESRCH") markExited()
+        }
         killTimer = setTimeout(() => {
-          try { child.kill("SIGKILL") } catch {}
+          try { child.kill("SIGKILL") } catch (err) {
+            if (err && err.code === "ESRCH") markExited()
+          }
           if (typeof child.unref === "function") child.unref()
-          done()
+          finish(false)
         }, HOOK_KILL_GRACE_MS)
         if (typeof killTimer.unref === "function") killTimer.unref()
       }, HOOK_TIMEOUT_MS)
@@ -353,23 +370,39 @@ function hookRunner(cfg) {
         child = spawn(argv[0], [...argv.slice(1), event], { stdio: ["pipe", "ignore", "ignore"] })
         child.on("error", (err) => {
           if (err && err.code === "ENOENT") missing = true
-          done()
+          markExited()
+          finish(false)
         })
-        child.on("close", done)
+        child.on("close", (code) => {
+          markExited()
+          finish(code === 0)
+        })
         child.stdin.on("error", () => {})
         child.stdin.end(JSON.stringify(payload))
       } catch {
-        // Attribution is best effort.
-        done()
+        markExited()
+        finish(false)
       }
     })
+    return { result, exit }
   }
   return function run(event, payload) {
-    if (missing || pending >= MAX_HOOK_QUEUE) return Promise.resolve()
+    if (missing || pending >= MAX_HOOK_QUEUE) return Promise.resolve(false)
     pending++
-    const step = queue.then(() => runOnce(event, payload)).finally(() => { pending-- })
-    queue = step.then(() => undefined, () => undefined)
-    return step
+    const slot = queue.then(() => runOnce(event, payload))
+    queue = slot.then((s) => s.exit, () => undefined).finally(() => { pending-- })
+    return new Promise((resolve) => {
+      let done = false
+      const settle = (ok) => {
+        if (done) return
+        done = true
+        clearTimeout(wait)
+        resolve(ok)
+      }
+      const wait = setTimeout(() => settle(false), HOOK_TIMEOUT_MS + HOOK_KILL_GRACE_MS + 500)
+      if (typeof wait.unref === "function") wait.unref()
+      slot.then((s) => s.result, () => false).then(settle, () => settle(false))
+    })
   }
 }
 
@@ -385,8 +418,9 @@ export const TermaPlugin = async ({ directory, worktree }) => {
 
   // Per-process bookkeeping, bounded so a long session cannot grow it without limit.
   const seenMessages = new Set() // assistant messages already exported
+  const tainted = new Set() // sessions whose reach hook failed (fail closed)
   const texts = new Map() // messageID -> latest assistant text (only when prompts are on)
-  const tools = new Map() // callID -> { sessionID, start }
+  const tools = new Map() // callID -> { sessionID, start, reachKey, reachPromise }
   let lastSession = "" // the session the most recent activity belonged to
   const remember = (set, key) => {
     set.add(key)
@@ -408,6 +442,7 @@ export const TermaPlugin = async ({ directory, worktree }) => {
   }
 
   function record(sessionID, name, body, extra = {}, severity = 9, time = Date.now()) {
+    if (sessionID && tainted.has(sessionID)) return
     exporter.record({
       timeUnixNano: nanos(time),
       severityNumber: severity,
@@ -423,6 +458,7 @@ export const TermaPlugin = async ({ directory, worktree }) => {
     if (seenMessages.has(info.id)) return
     remember(seenMessages, info.id)
     const sid = sessionOf(info.sessionID)
+    if (sid && tainted.has(sid)) return
     const tokens = info.tokens ?? {}
     const cache = tokens.cache ?? {}
     const attributes = {
@@ -530,7 +566,7 @@ export const TermaPlugin = async ({ directory, worktree }) => {
             break
           }
           case "file.edited":
-            if (p.file) hook("opencode-file-edit", { session_id: lastSession, cwd: worktree || directory, file: p.file, parent_session_id: parentOf(lastSession) })
+            if (p.file && !tainted.has(lastSession)) hook("opencode-file-edit", { session_id: lastSession, cwd: worktree || directory, file: p.file, parent_session_id: parentOf(lastSession) })
             break
           case "message.updated":
             modelCall(p.info)
@@ -586,17 +622,21 @@ export const TermaPlugin = async ({ directory, worktree }) => {
         const sid = sessionOf(input.sessionID)
         const reach = toolReach(input.tool, output?.args ?? input.args)
         const reachKey = reach && sid ? JSON.stringify(reach) : ""
-        tools.set(input.callID, { sessionID: sid, start: Date.now(), reachKey })
+        const reachPromise = reach && sid
+          ? hook("opencode-tool-reach", {
+              session_id: sid,
+              cwd: worktree || directory,
+              tool: input.tool,
+              parent_session_id: parentOf(sid),
+              ...reach,
+            }).then((ok) => {
+              if (!ok) remember(tainted, sid)
+              return ok
+            })
+          : null
+        tools.set(input.callID, { sessionID: sid, start: Date.now(), reachKey, reachPromise })
         if (tools.size > 1024) tools.delete(tools.keys().next().value)
-        if (reach && sid) {
-          await hook("opencode-tool-reach", {
-            session_id: sid,
-            cwd: worktree || directory,
-            tool: input.tool,
-            parent_session_id: parentOf(sid),
-            ...reach,
-          })
-        }
+        if (reachPromise) await reachPromise
       } catch {}
     },
 
@@ -607,17 +647,26 @@ export const TermaPlugin = async ({ directory, worktree }) => {
         tools.delete(input.callID)
         const sid = sessionOf(input.sessionID || started?.sessionID)
         const args = input.args ?? {}
+        if (started?.reachPromise && !(await started.reachPromise)) {
+          if (sid) remember(tainted, sid)
+          return
+        }
         if (sid) {
           const reach = toolReach(input.tool, args)
           if (reach && JSON.stringify(reach) !== started?.reachKey) {
-            await hook("opencode-tool-reach", {
+            const ok = await hook("opencode-tool-reach", {
               session_id: sid,
               cwd: worktree || directory,
               tool: input.tool,
               parent_session_id: parentOf(sid),
               ...reach,
             })
+            if (!ok) {
+              remember(tainted, sid)
+              return
+            }
           }
+          if (tainted.has(sid)) return
         }
         const end = Date.now()
         const start = started?.start ?? end
