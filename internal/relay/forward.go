@@ -35,6 +35,12 @@ type sender struct {
 	// lists the directory again after recoverOutbox: a backed-up route drains in linear time.
 	queue   map[Signal][]entry
 	keyless bool // a keyless route waits and keeps no relay awake
+
+	team        *teamRoute
+	dir, name   string
+	stateChange chan struct{}
+	blocked     bool
+	gen         int64
 }
 
 func (r *Relay) sender(rt route) *sender {
@@ -42,7 +48,7 @@ func (r *Relay) sender(rt route) *sender {
 	defer r.mu.Unlock()
 	s := r.senders[rt]
 	if s == nil {
-		s = &sender{r: r, route: rt, wake: make(chan struct{}, 1), queue: map[Signal][]entry{}}
+		s = &sender{r: r, route: rt, dir: r.outbox.routeDir(rt), name: rt.String(), wake: make(chan struct{}, 1), queue: map[Signal][]entry{}}
 		r.senders[rt] = s
 		r.wg.Add(1)
 		go s.loop()
@@ -94,6 +100,9 @@ func (s *sender) busy() bool {
 func (s *sender) setKeyless(v bool) {
 	s.mu.Lock()
 	s.keyless = v
+	if s.team != nil {
+		s.blocked = v
+	}
 	s.mu.Unlock()
 }
 
@@ -104,7 +113,10 @@ func (s *sender) loop() {
 	backoff := time.Duration(0)
 	// single sends one file per request after a merged request was refused, so one bad file is set aside alone.
 	single := false
-	c := claim.Claim{ProjectID: s.route.project, Tool: s.route.toolLabel(), Repository: s.r.outbox.identity(s.route), Account: s.route.account}
+	var c claim.Claim
+	if s.team == nil {
+		c = claim.Claim{ProjectID: s.route.project, Tool: s.route.toolLabel(), Repository: s.r.outbox.identity(s.route), Account: s.route.account}
+	}
 	stopping := func() bool {
 		select {
 		case <-s.r.stopping:
@@ -129,6 +141,8 @@ func (s *sender) loop() {
 			return false
 		case <-t.C:
 		case <-wake:
+		case <-s.stateChange:
+			backoff = 0
 		case <-stop:
 			if backoff > 0 {
 				return false // a failing host is not retried on the way out
@@ -137,24 +151,29 @@ func (s *sender) loop() {
 		return true
 	}
 	for ctx.Err() == nil {
+		select {
+		case <-s.stateChange:
+			backoff = 0
+		default:
+		}
 		limit := maxMergeFiles
 		if single {
 			limit = 1
 		}
-		entries := s.next(limit)
+		entries, idle := s.nextBatch(limit)
 		if len(entries) == 0 {
 			if stopping() {
 				return
 			}
-			if !sleep(idleWait) {
+			if !sleep(idle) {
 				return
 			}
 			continue
 		}
-		pol, ok := s.r.resolve(c, s.route.account)
+		pol, ok := s.resolveBatchPolicy(c)
 		// Another person's or environment's backlog waits for its own sign-in, and ages out;
 		// a server key sends only what no person's sign-in collected.
-		if !ok || !s.r.mayLeave(s.route, pol.Key != "") {
+		if !ok {
 			s.setKeyless(true)
 			if stopping() || !sleep(keylessRetry) {
 				return
@@ -163,12 +182,11 @@ func (s *sender) loop() {
 		}
 		s.setKeyless(false)
 		// The repository list as it stands now: a repository removed since sends none still queued.
-		if pol.Unadmitted {
+		if s.team == nil && pol.Unadmitted {
 			for _, e := range entries {
 				s.r.stats.dropped(e.signal, "policy_repository", e.records)
 			}
-			s.r.outbox.remove(s.route, entries)
-			s.forget(entries)
+			s.removeFiles(entries)
 			continue
 		}
 		batch, body, err := s.take(entries)
@@ -180,18 +198,17 @@ func (s *sender) loop() {
 		}
 		// The content policy as it stands now: a project that turned prompts off since sends none still queued.
 		// Counted only once the batch leaves the outbox: a retry filters it again.
-		body, tl := s.r.withholdQueued(batch[0].signal, body, pol)
+		body, tl := s.prepareBody(batch[0].signal, body, pol)
 		if pol.Signals != nil && !contains(pol.Signals, string(batch[0].signal)) || body == nil {
 			reason, records := "policy_signal_or_content", 0
 			for _, e := range batch {
 				records += e.records
 			}
 			s.r.stats.dropped(batch[0].signal, reason, records)
-			s.r.outbox.remove(s.route, batch)
-			s.forget(batch)
+			s.removeFiles(batch)
 			continue
 		}
-		out, wait, detail, rejected := s.send(ctx, pol, batch[0], body)
+		out, wait, detail, rejected := s.postBatch(ctx, pol, batch, body)
 		switch out {
 		case sent:
 			s.r.count(batch[0].signal, tl)
@@ -204,9 +221,10 @@ func (s *sender) loop() {
 				// Resending a partial success would only duplicate what was kept.
 				s.r.stats.add("upstream_rejected."+string(batch[0].signal), int(rejected))
 			}
-			s.r.outbox.remove(s.route, batch)
-			s.forget(batch)
+			s.removeFiles(batch)
 			single, backoff = false, 0
+		case aborted:
+			continue
 		case refused:
 			if len(batch) > 1 {
 				single = true
@@ -214,17 +232,16 @@ func (s *sender) loop() {
 			}
 			single = false
 			s.r.stats.dropped(batch[0].signal, "upstream_"+detail, batch[0].records)
-			s.r.warnf("upstream %s refused %d %s: %s", s.route, batch[0].records, batch[0].signal, detail)
-			s.r.outbox.bury(s.route, batch[0])
-			s.forget(batch[:1])
+			s.r.warnf("upstream %s refused %d %s: %s", s.name, batch[0].records, batch[0].signal, detail)
+			s.buryFile(batch[0])
 		case keyless:
 			// Waiting for a sign-in, as a route no sign-in may send is: idle, not retrying.
 			s.setKeyless(true)
 			backoff = 0 // no host is at fault: new parts may wake it
 			if strings.HasPrefix(detail, signInErrPrefix) {
-				s.r.warnf("relay %s: %s; waiting for a sign-in", s.route, detail)
+				s.r.warnf("relay %s: %s; waiting for a sign-in", s.name, detail)
 			} else if s.r.opts.Logf != nil {
-				s.r.opts.Logf("relay %s: %s; waiting", s.route, detail)
+				s.r.opts.Logf("relay %s: %s; waiting", s.name, detail)
 			}
 			if stopping() || !sleep(keylessRetry) {
 				return
@@ -234,7 +251,7 @@ func (s *sender) loop() {
 				return
 			}
 			s.r.stats.add("upstream_retries", 1)
-			s.r.warnf("upstream %s: %s; retrying", s.route, detail)
+			s.r.warnf("upstream %s: %s; retrying", s.name, detail)
 			backoff = nextBackoff(backoff, wait)
 			if !sleep(jitter(backoff, wait)) {
 				return
@@ -245,12 +262,11 @@ func (s *sender) loop() {
 
 func (s *sender) take(entries []entry) ([]entry, []byte, error) {
 	first := entries[0]
-	body, err := s.r.outbox.read(s.route, first)
+	body, err := s.readFile(first)
 	if err != nil {
 		// A file that cannot be read never will be; it must not hold the rest back.
 		s.r.stats.dropped(first.signal, "outbox_unreadable", first.records)
-		s.r.outbox.bury(s.route, first)
-		s.forget([]entry{first})
+		s.buryFile(first)
 		return nil, nil, err
 	}
 	batch := []entry{first}
@@ -260,7 +276,7 @@ func (s *sender) take(entries []entry) ([]entry, []byte, error) {
 		if len(batch) >= maxMergeFiles || e.signal != first.signal {
 			break
 		}
-		b, err := s.r.outbox.read(s.route, e)
+		b, err := s.readFile(e)
 		if err != nil || size+len(b) > maxMergeBytes {
 			break
 		}
@@ -287,4 +303,6 @@ const (
 	// keyless is a send no sign-in may make now (retired, another person's, or one whose
 	// token can't be had): the route waits as one with no policy does, no host at fault.
 	keyless
+	// aborted is stopped by the pre-POST admission fence: re-evaluated without backoff.
+	aborted
 )

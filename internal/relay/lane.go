@@ -155,8 +155,16 @@ func (r *Relay) account() string {
 // person's only under a server key. Every other route, one without a lane among them,
 // waits, and ages out with the outbox.
 func (r *Relay) mayLeave(rt route, serverKey bool) bool {
+	return r.mayLeaveAccount(rt.account, serverKey)
+}
+
+func (r *Relay) mayLeaveAccount(account string, serverKey bool) bool {
 	if serverKey {
-		return rt.account == sendas.NoPersonLane
+		return account == sendas.NoPersonLane
 	}
-	return auth.ValidAccountKey(rt.account) && rt.account == r.account()
+	return auth.ValidAccountKey(account) && account == r.account()
+}
+
+func (r *Relay) laneActive(account string) bool {
+	return r.account() == account && (account == sendas.NoPersonLane || auth.ValidAccountKey(account))
 }

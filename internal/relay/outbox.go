@@ -104,6 +104,8 @@ type entry struct {
 	name    string
 	signal  Signal
 	records int
+	q       Queued
+	corrupt bool
 }
 
 var seq atomic.Uint64
@@ -236,10 +238,6 @@ func (o outbox) identity(rt route) config.Repository {
 	return repo
 }
 
-func (o outbox) read(rt route, e entry) ([]byte, error) {
-	return os.ReadFile(filepath.Join(o.routeDir(rt), e.name))
-}
-
 // remove deletes delivered parts. A part left behind is sent again, so on Windows the delete
 // waits out a handle someone else holds, such as a virus scanner reading the new file.
 func (o outbox) remove(rt route, batch []entry) {
@@ -248,24 +246,17 @@ func (o outbox) remove(rt route, batch []entry) {
 	}
 }
 
-func (o outbox) bury(rt route, e entry) {
-	dead := filepath.Join(o.dir, deadDir)
-	src := filepath.Join(o.routeDir(rt), e.name)
-	if os.MkdirAll(dead, 0o700) != nil || config.Rename(src, filepath.Join(dead, deadName(rt, e))) != nil {
-		_ = config.Remove(src)
-	}
-}
-
 type queued struct {
 	rt    route
+	team  *teamRoute
 	e     entry
 	path  string
 	size  int64
 	mtime time.Time
 }
 
-// sweepOutbox enforces the bounds, oldest first, and returns the parts it removed per route
-// so their senders stop queueing them.
+// sweepOutbox enforces the bounds, oldest first, across both legacy routes and .teams/
+// queues, returning the parts removed per route so their senders stop queueing them.
 func (r *Relay) sweepOutbox(now time.Time) map[route][]entry {
 	o := r.outbox
 	routes, _ := o.routes()
@@ -274,29 +265,45 @@ func (r *Relay) sweepOutbox(now time.Time) map[route][]entry {
 		entries, _ := o.list(rt)
 		for _, e := range entries {
 			p := filepath.Join(o.routeDir(rt), e.name)
-			info, err := os.Stat(p)
-			if err != nil {
-				continue
+			if info, err := os.Stat(p); err == nil {
+				all = append(all, queued{rt: rt, e: e, path: p, size: info.Size(), mtime: info.ModTime()})
 			}
-			all = append(all, queued{rt, e, p, info.Size(), info.ModTime()})
+		}
+	}
+	teams, _ := o.teamRoutes()
+	for _, rt := range teams {
+		entries, _ := o.listTeam(rt)
+		for _, e := range entries {
+			p := filepath.Join(o.teamDir(rt), e.name)
+			if info, err := os.Stat(p); err == nil {
+				rtCopy := rt
+				all = append(all, queued{team: &rtCopy, e: e, path: p, size: info.Size(), mtime: info.ModTime()})
+			}
 		}
 	}
 	slices.SortFunc(all, func(a, b queued) int { return strings.Compare(a.e.name, b.e.name) })
 	removed := map[route][]entry{}
+	teamRemoved := map[teamRoute][]entry{}
 	lost := map[string]int{}
 	defer func() { r.recordLosses(lost, now) }()
 	drop := func(q queued, why string) {
 		if os.Remove(q.path) == nil {
 			r.stats.dropped(q.e.signal, why, q.e.records)
-			removed[q.rt] = append(removed[q.rt], q.e)
 			lost[why] += q.e.records
+			if q.team != nil {
+				teamRemoved[*q.team] = append(teamRemoved[*q.team], q.e)
+				return
+			}
+			removed[q.rt] = append(removed[q.rt], q.e)
 		}
 	}
 	var total int64
 	var kept []queued
 	for _, q := range all {
-		// Aged from when the part arrived, which its name keeps, so the time it waited in
-		// the hold counts too: one retention clock, not a hold's and then an outbox's.
+		if q.e.corrupt {
+			drop(q, "outbox_unreadable")
+			continue
+		}
 		age := q.mtime
 		if at := q.e.received(); !at.IsZero() && at.Before(age) {
 			age = at
@@ -335,14 +342,22 @@ func (r *Relay) sweepOutbox(now time.Time) map[route][]entry {
 		_ = os.Remove(q.path)
 		deadTotal -= q.size
 	}
-	r.removeEmptyRoutes(routes)
+	for rt, gone := range teamRemoved {
+		r.mu.Lock()
+		s := r.teamSenders[rt]
+		r.mu.Unlock()
+		if s != nil {
+			s.forget(gone)
+		}
+	}
+	r.removeEmptyRoutes(routes, teams)
 	return removed
 }
 
 // removeEmptyRoutes removes each route directory holding nothing but its identity, under deliverMu so no
 // put is between creating one and writing its part; the next part recreates it. Under it,
 // a temporary file is one a crashed put left.
-func (r *Relay) removeEmptyRoutes(routes []route) {
+func (r *Relay) removeEmptyRoutes(routes []route, teams []teamRoute) {
 	r.deliverMu.Lock()
 	defer r.deliverMu.Unlock()
 	o := r.outbox
@@ -363,6 +378,9 @@ func (r *Relay) removeEmptyRoutes(routes []route) {
 		if rt.account != "" {
 			_ = os.Remove(filepath.Dir(filepath.Dir(filepath.Dir(dir))))
 		}
+	}
+	for _, rt := range teams {
+		pruneEmptyUp(o.teamDir(rt), 3)
 	}
 }
 

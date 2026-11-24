@@ -1,6 +1,7 @@
 package relay
 
 import (
+	"cmp"
 	"context"
 	"maps"
 	"time"
@@ -68,15 +69,17 @@ func (r *Relay) janitor(now time.Time) {
 	}
 }
 
-// dropHeldAtExit drops what is still held: it lives in memory only, never on disk. Each
-// drop is named by what held the part (decide's reason), or "claimed" when a claim, or its
-// team's policy, landed too late; a claimed one is lost as lostPolicyTimeout.
+// dropHeldAtExit drops what is still held in unknownHold and pinnedHold: it lives in memory
+// only, never on disk. Each drop is named by what held the part, or "claimed" when a claim,
+// or its team's policy, landed too late; a policy-waiting part is lost as lostPolicyTimeout.
 func (r *Relay) dropHeldAtExit() {
 	r.deliverMu.Lock()
 	defer r.deliverMu.Unlock()
 	r.mu.Lock()
 	held := maps.Clone(r.held)
 	clear(r.held)
+	pinned := maps.Clone(r.pinnedHold)
+	clear(r.pinnedHold)
 	r.heldN, r.heldBytes = 0, 0
 	lost := r.policyLost
 	r.policyLost = 0
@@ -84,19 +87,28 @@ func (r *Relay) dropHeldAtExit() {
 	defer func() { r.recordLosses(map[string]int{lostPolicyTimeout: lost}, r.opts.Now()) }()
 	for key, parts := range held {
 		for _, h := range parts {
-			_, _, why, ok, _ := r.decide(key, h.p.pid, h.p.at, h.p.narrow, h.p.claimed, h.p.account)
-			if ok {
+			v := r.judge(key, h.p)
+			why := v.why
+			if v.ok {
 				why = "claimed"
 			}
-			// A claimed part, the developer's work, lost: its policy or key came too late.
-			if ok || why == whyNoKey {
+			if v.ok || why == whyNoKey {
 				lost += h.p.records
 			}
-			r.stats.dropped(h.p.signal, why+"_at_exit", h.p.records)
+			r.dropStats(h.p.signal, why+"_at_exit", v.blocker, h.p.records)
 			if r.opts.Logf != nil {
 				c, _ := r.lookup(r.sessionFor(key))
 				r.opts.Logf("drop %s_at_exit %s: %d %s from pid %d; claim %q pids %v", why, key, h.p.records, h.p.signal, h.p.pid, c.ProjectID, c.PIDs)
 			}
+		}
+	}
+	for _, parts := range pinned {
+		for _, h := range parts {
+			why := cmp.Or(h.pin.why, "claimed")
+			if !h.awaitingPolicy.IsZero() || why == whyNoKey || why == "claimed" {
+				lost += h.p.records
+			}
+			r.dropStats(h.p.signal, why+"_at_exit", h.pin.blocker, h.p.records)
 		}
 	}
 }
@@ -106,6 +118,13 @@ func (r *Relay) countQueuedAtExit() {
 	routes, _ := r.outbox.routes()
 	for _, rt := range routes {
 		entries, _ := r.outbox.list(rt)
+		for _, e := range entries {
+			r.stats.add("queued_at_exit."+string(e.signal), e.records)
+		}
+	}
+	teams, _ := r.outbox.teamRoutes()
+	for _, rt := range teams {
+		entries, _ := r.outbox.listTeam(rt)
 		for _, e := range entries {
 			r.stats.add("queued_at_exit."+string(e.signal), e.records)
 		}
@@ -143,6 +162,13 @@ func (r *Relay) quiesce(quiet time.Duration, dropPolicyWaits bool) bool {
 				}
 			}
 		}
+		for _, parts := range r.pinnedHold {
+			for _, hp := range parts {
+				if !hp.awaitingPolicy.IsZero() {
+					waiting -= hp.p.records
+				}
+			}
+		}
 	}
 	if waiting > 0 || r.inflight > 0 || r.opts.Now().Sub(r.lastSeen) < quiet {
 		return false
@@ -159,6 +185,11 @@ func (r *Relay) Idle() (time.Duration, bool) {
 		return 0, false
 	}
 	for _, s := range r.senders {
+		if s.busy() {
+			return 0, false
+		}
+	}
+	for _, s := range r.teamSenders {
 		if s.busy() {
 			return 0, false
 		}

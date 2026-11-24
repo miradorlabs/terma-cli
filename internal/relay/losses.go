@@ -31,6 +31,10 @@ const (
 // room, or as the relay stopped.
 const lostPolicyTimeout = "policy_timeout"
 
+// lostNoDestination is the loss reason of pre-cutover outbox parts purged at cutover,
+// which carry no routing destination and are never re-routed.
+const lostNoDestination = "no_destination"
+
 // OutboxLosses are the claimed records the relay lost, counted from the first loss since a
 // quiet lossWindow, for doctor to report. Nothing else it queues is ever lost: a refused
 // send, another account's backlog and a sign-in that cannot send now all wait.
@@ -38,7 +42,7 @@ type OutboxLosses struct {
 	// Counts are the records lost by reason: outbox_full and outbox_expired, past the
 	// outbox's room or age; policy_timeout, dropped from memory while they waited for a
 	// team's policy or key the relay couldn't read; signed_out and unreadable, collected
-	// with no sign-in to bind them to.
+	// with no sign-in to bind them to; no_destination, pre-cutover parts dropped at cutover.
 	Counts map[string]int `json:"counts,omitempty"`
 	Last   time.Time      `json:"last,omitzero"`
 }
@@ -65,13 +69,17 @@ func (r *Relay) recordLosses(lost map[string]int, now time.Time) {
 	}
 	r.lossMu.Lock()
 	defer r.lossMu.Unlock()
+	recordLossesDir(r.outbox.dir, lost, now)
+}
+
+func recordLossesDir(dir string, lost map[string]int, now time.Time) {
 	var l OutboxLosses
 	for reason, n := range lost {
 		if n == 0 {
 			continue
 		}
 		if l.Counts == nil {
-			if l, _ = ReadOutboxLosses(r.outbox.dir); now.Sub(l.Last) > lossWindow || l.Counts == nil {
+			if l, _ = ReadOutboxLosses(dir); now.Sub(l.Last) > lossWindow || l.Counts == nil {
 				l = OutboxLosses{Counts: map[string]int{}}
 			}
 		}
@@ -81,5 +89,5 @@ func (r *Relay) recordLosses(lost map[string]int, now time.Time) {
 		return
 	}
 	l.Last = now.UTC()
-	_ = config.WriteJSON(filepath.Join(r.outbox.dir, lossesFile), l, 0o600)
+	_ = config.WriteJSON(filepath.Join(dir, lossesFile), l, 0o600)
 }

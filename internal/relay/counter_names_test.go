@@ -16,21 +16,29 @@ import (
 var pinnedCounterNames = []string{
 	"attributed_by_", "caught_by_default.", "dropped.ambiguous_process.",
 	"dropped.ambiguous_process_at_exit.", "dropped.claimed_at_exit.", "dropped.encode_failed.",
-	"dropped.no_key.", "dropped.no_key_at_exit.", "dropped.no_session_id.",
+	"dropped.mixed_run.", "dropped.mixed_run_at_exit.", "dropped.no_destination.",
+	"dropped.no_key.", "dropped.no_key_at_exit.", "dropped.no_routing_state.",
+	"dropped.no_routing_state_at_exit.", "dropped.no_session_id.",
 	"dropped.no_session_process.", "dropped.no_session_process_at_exit.",
-	"dropped.no_session_trace.", "dropped.no_session_trace_at_exit.", "dropped.not_collected.",
-	"dropped.not_collected_at_exit.", "dropped.outbox_expired.", "dropped.outbox_full.",
-	"dropped.outbox_unreadable.", "dropped.outbox_write_failed.", "dropped.policy_repository.",
-	"dropped.policy_signal.", "dropped.policy_signal_or_content.", "dropped.policy_timeout.", "dropped.policy_widened.",
-	"dropped.policy_widened_at_exit.", "dropped.process_running.",
-	"dropped.process_running_at_exit.", "dropped.signed_out.", "dropped.unclaimed_evicted.",
+	"dropped.no_session_trace.", "dropped.no_session_trace_at_exit.", "dropped.no_team.",
+	"dropped.no_team_at_exit.", "dropped.not_collected.", "dropped.not_collected_at_exit.",
+	"dropped.outbox_expired.", "dropped.outbox_full.", "dropped.outbox_unreadable.",
+	"dropped.outbox_write_failed.", "dropped.pending_binding.",
+	"dropped.pending_binding_at_exit.", "dropped.policy_repository.",
+	"dropped.policy_signal.", "dropped.policy_signal_or_content.", "dropped.policy_timeout.",
+	"dropped.policy_widened.", "dropped.policy_widened_at_exit.", "dropped.process_running.",
+	"dropped.process_running_at_exit.", "dropped.signed_out.", "dropped.team_blocked.",
+	"dropped.team_blocked_at_exit.", "dropped.team_deselected.",
+	"dropped.team_deselected_at_exit.", "dropped.unclaimed_evicted.",
 	"dropped.unclaimed_expired.", "dropped.unclaimed_expired_at_exit.",
 	"dropped.unclaimed_overflow.", "dropped.uncovered_process.",
-	"dropped.uncovered_process_at_exit.", "dropped.unreadable.", "dropped.upstream_", "forwarded.", "heartbeats_failed",
-	"heartbeats_sent", "held_parts", "process_index_full", "queued_at_exit.", "received.",
-	"recovered_from_outbox", "refused_restarting", "refused_unauthorized", "refused_undecodable",
-	"refused_unreadable", "released_after_hold", "sender_unresolved", "trace_index_full",
-	"unclassified", "upstream_rejected.", "upstream_retries", "withheld_at_send_records",
+	"dropped.uncovered_process_at_exit.", "dropped.unknown_location.",
+	"dropped.unknown_location_at_exit.", "dropped.unreadable.", "dropped.upstream_",
+	"forwarded.", "heartbeats_failed", "heartbeats_sent", "held_parts", "process_index_full",
+	"queued_at_exit.", "received.", "recovered_from_outbox", "refused_restarting",
+	"refused_unauthorized", "refused_undecodable", "refused_unreadable",
+	"released_after_hold", "sender_unresolved", "trace_index_full", "unclassified",
+	"upstream_rejected.", "upstream_retries", "withheld_at_send_records",
 	"withheld_content_records",
 }
 
@@ -46,7 +54,7 @@ func TestCounterNamesArePinned(t *testing.T) {
 	}
 	add := regexp.MustCompile(`stats\.add\("([a-z_.]+)"`)
 	drop := regexp.MustCompile(`stats\.dropped\([^,]+, "([a-z_]+)"(\+?)`)
-	why := regexp.MustCompile(`\bwhy[A-Z][A-Za-z]*\s*=\s*"([a-z_]+)"`)
+	why := regexp.MustCompile(`\b[Ww]hy[A-Z][A-Za-z]*\s*(?:Why\s*)?=\s*"([a-z_]+)"`)
 	// Why a part collected with no sign-in is lost (part.lost), dropped by that name.
 	lost := regexp.MustCompile(`\blost[A-Z][A-Za-z]*\s*=\s*"([a-z_]+)"`)
 	// The outbox's drop(q, "outbox_full") and a reason held in a variable before it is dropped.

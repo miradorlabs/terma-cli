@@ -16,11 +16,25 @@ type Stats struct {
 	mu       sync.Mutex
 	started  time.Time
 	counters map[string]int
+	blocked  map[string]int // local-only blocker counts; never sent on heartbeat
 	// beat is the counters as of the last heartbeat that took them.
 	beat map[string]int
 }
 
-func newStats() *Stats { return &Stats{started: time.Now(), counters: map[string]int{}} }
+func newStats() *Stats {
+	return &Stats{started: time.Now(), counters: map[string]int{}, blocked: map[string]int{}}
+}
+
+const maxBlocked = 1024
+
+func (s *Stats) block(blocker string, n int) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.blocked[blocker]; !ok && len(s.blocked) >= maxBlocked {
+		blocker = "overflow"
+	}
+	s.blocked[blocker] += n
+}
 
 func (s *Stats) add(key string, n int) {
 	s.mu.Lock()
@@ -83,6 +97,9 @@ func (s *Stats) dropped(sig Signal, reason string, n int) {
 type Snapshot struct {
 	Since    time.Time      `json:"since"`
 	Counters map[string]int `json:"counters"`
+	// Blocked is, on a routed machine, the records each blocker kept from leaving, by
+	// "pending:<binding>", "team:<enrollment>" and "mixed:<session>": local only, never sent.
+	Blocked map[string]int `json:"blocked,omitempty"`
 }
 
 // Snapshot copies the counters.
@@ -91,7 +108,11 @@ func (s *Stats) Snapshot() Snapshot {
 	defer s.mu.Unlock()
 	c := make(map[string]int, len(s.counters))
 	maps.Copy(c, s.counters)
-	return Snapshot{Since: s.started, Counters: c}
+	snap := Snapshot{Since: s.started, Counters: c}
+	if len(s.blocked) > 0 {
+		snap.Blocked = maps.Clone(s.blocked)
+	}
+	return snap
 }
 
 // Keys lists the counters in order, for printing.

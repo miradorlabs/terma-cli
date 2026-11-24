@@ -30,6 +30,10 @@ func (r *Relay) withholdQueued(sig Signal, body []byte, pol Policy) ([]byte, sen
 	if pol.IncludePrompts && pol.IncludeToolContent && !pol.RequireClaim {
 		return body, sendTally{}
 	}
+	return r.filterQueued(sig, body, pol, "", false)
+}
+
+func (r *Relay) filterQueued(sig Signal, body []byte, pol Policy, account string, restampUser bool) ([]byte, sendTally) {
 	var msg proto.Message
 	switch sig {
 	case Logs:
@@ -42,13 +46,18 @@ func (r *Relay) withholdQueued(sig Signal, body []byte, pol Policy) ([]byte, sen
 	if proto.Unmarshal(body, msg) != nil {
 		return nil, sendTally{}
 	}
-	p := &part{signal: sig, msg: msg}
+	p := &part{signal: sig, msg: msg, account: account}
 	if pol.RequireClaim && hasCatchAll(p) {
 		return nil, sendTally{}
 	}
 	tl := sendTally{unclassified: map[string]int{}}
-	tl.withheld = r.rules.withhold(p, pol.IncludePrompts, pol.IncludeToolContent, tl.unclassified)
-	if tl.withheld == 0 && len(tl.unclassified) == 0 {
+	if !pol.IncludePrompts || !pol.IncludeToolContent {
+		tl.withheld = r.rules.withhold(p, pol.IncludePrompts, pol.IncludeToolContent, tl.unclassified)
+	}
+	if restampUser {
+		nameUser(p, pol)
+	}
+	if !restampUser && tl.withheld == 0 && len(tl.unclassified) == 0 {
 		return body, tl
 	}
 	out, err := proto.Marshal(msg)
