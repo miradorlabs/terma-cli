@@ -15,14 +15,6 @@
           "documented": false
         },
         {
-          "id": "storage.transcript.path",
-          "category": "storage",
-          "op": "changed",
-          "title": "On-disk transcript path changed",
-          "impact": "informational",
-          "documented": false
-        },
-        {
           "id": "binary.size_bytes",
           "category": "binary",
           "op": "changed",

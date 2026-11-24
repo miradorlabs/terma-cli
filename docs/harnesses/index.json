@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-24T13:22:34.848451504Z",
+  "generated_at": "2026-11-24T14:02:30.079399036Z",
   "harnesses": [
     {
       "id": "claude",
@@ -181,11 +181,10 @@
         "to": "0.71.1",
         "at": "2026-11-24T10:32:48.676090095Z",
         "released_at": "2026-11-24T03:57:09.158Z",
-        "changes": 3,
+        "changes": 2,
         "categories": {
           "binary": 1,
-          "prompt": 1,
-          "storage": 1
+          "prompt": 1
         }
       }
     },

@@ -20,11 +20,10 @@
       "to": "0.71.1",
       "at": "2026-11-24T10:32:48.676090095Z",
       "released_at": "2026-11-24T03:57:09.158Z",
-      "changes": 3,
+      "changes": 2,
       "categories": {
         "binary": 1,
-        "prompt": 1,
-        "storage": 1
+        "prompt": 1
       }
     }
   },
@@ -38,22 +37,20 @@
       ],
       "support": "supported",
       "previous": "0.71.0",
-      "changes": 3,
+      "changes": 2,
       "categories": {
         "binary": 1,
-        "prompt": 1,
-        "storage": 1
+        "prompt": 1
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 2,
+        "informational": 1,
         "notable": 1
       },
-      "undocumented": 3,
+      "undocumented": 2,
       "highlights": [
         "System prompt changed (+382 −382 chars)",
-        "On-disk transcript path changed",
         "Binary size: 98,574,960 → 121,875,875 bytes (98.6 MB → 121.9 MB)"
       ],
       "signing": null,
@@ -64,7 +61,7 @@
     {
       "version": "0.71.0",
       "released_at": "2026-11-24T01:21:20.379Z",
-      "captured_at": "2026-11-24T07:46:10.022420061Z",
+      "captured_at": "2026-11-24T14:02:30.079399036Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -89,8 +86,8 @@
       ],
       "signing": null,
       "partial": true,
-      "attempted_at": "2026-11-24T07:46:10.022420061Z",
-      "attempts": 2
+      "attempted_at": "2026-11-24T14:02:30.079399036Z",
+      "attempts": 3
     },
     {
       "version": "0.70.0",
