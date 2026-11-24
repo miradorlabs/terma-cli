@@ -71,6 +71,8 @@ type fakeAuth struct {
 	// revoking, when set, is told of each revoke, which then waits for holdRevokes to close.
 	revoking    chan struct{}
 	holdRevokes chan struct{}
+	// onPolicy, when set, intercepts /v1/policy requests; returning true finishes the response.
+	onPolicy func(w http.ResponseWriter, r *http.Request) bool
 }
 
 // fakeGrant is who a code signs in, and whether a desktop delegated it.
@@ -168,6 +170,9 @@ func (f *fakeAuth) serve(w http.ResponseWriter, r *http.Request) {
 		}
 	case "/v1/policy":
 		f.policies.Add(1)
+		if f.onPolicy != nil && f.onPolicy(w, r) {
+			return
+		}
 		team := r.URL.Query().Get("project_id")
 		if team == "" {
 			http.Error(w, "missing project_id", http.StatusBadRequest)

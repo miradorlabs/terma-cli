@@ -11,25 +11,37 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/miradorlabs/terma-cli/internal/account/auth"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/relay"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
 	"github.com/miradorlabs/terma-cli/internal/routing"
 	"github.com/miradorlabs/terma-cli/internal/sendas"
-	"github.com/miradorlabs/terma-cli/internal/ui/prompt"
 )
 
-type bindingChoice struct {
-	key    string
-	org    string
-	refuse bool
+type setupBaseline struct {
+	found       bool
+	loadErr     error
+	sameAccount bool
+	state       routing.State
+	// expectPrev pins Account + StateID for an intentional cross-account Replace so an
+	// in-flight background refresh on the old account does not block cutover while any
+	// concurrent replacement by another account (or ABA reuse) is rejected.
+	expectPrev *routing.Expect
 }
 
-// setupTeams gates activation on a routing-capable relay, fetches the chosen team's policy
-// (plus refreshes all existing same-account enrollments for sign-in recovery), commits
-// routing/<profile>.json via CAS (Create, Update, or Replace on account switch), persists
-// committed policies/<team>.json files, and updates profile display metadata.
+type setupRefresh struct {
+	refresh   routing.Refresh
+	orgID     string
+	authURL   string
+	orgEpochs map[string]int64
+}
+
+// setupTeams gates activation on a routing-capable relay, snapshots pre-fetch routing
+// state, fetches the chosen team's policy (plus refreshes sibling enrollments of the same
+// account for sign-in recovery), commits routing/<profile>.json via CAS under the relay
+// gate, persists committed policies/<team>.json files, and updates profile metadata.
 func (app *App) setupTeams(cmd *cobra.Command, cfg *config.Config, org *organization, f setupFlags, ui *setupUI) (config.Policy, string, error) {
 	ctx := cmd.Context()
 	if err := app.gateRoutingActivation(); err != nil {
@@ -39,15 +51,16 @@ func (app *App) setupTeams(cmd *cobra.Command, cfg *config.Config, org *organiza
 	if !routing.ValidAccount(account) {
 		return config.Policy{}, "", fmt.Errorf("invalid account %q for routing state", account)
 	}
-	target, teamName, err := app.fetchSetupTarget(cmd, cfg, org, account, !f.assumeYes && canPrompt())
+	// Snapshot pre-setup state BEFORE any network fetch so target epoch fencing, sibling
+	// OrgAccessLost epochs, and cross-account Replace CAS all anchor to pre-fetch truth.
+	baseline := app.loadSetupBaseline(cfg.ProfileName, account)
+	target, teamName, err := app.fetchSetupTarget(cmd, cfg, org, account, f.desktopGrant, !f.assumeYes && canPrompt())
 	if err != nil {
 		return config.Policy{}, "", err
 	}
-	// Load existing state to plan bindings and sign-in recovery refreshes outside the lock.
-	existing, found, loadErr := routing.Load(app.stateDir, cfg.ProfileName)
 	var existingBindings map[string]routing.Binding
-	if found && loadErr == nil && existing.Account == account {
-		existingBindings = existing.Bindings
+	if baseline.sameAccount {
+		existingBindings = baseline.state.Bindings
 	}
 	orgLabel := cmp.Or(cfg.OrganizationName, cfg.OrganizationID)
 	if org != nil && org.Name != "" {
@@ -58,11 +71,17 @@ func (app *App) setupTeams(cmd *cobra.Command, cfg *config.Config, org *organiza
 		return config.Policy{}, "", err
 	}
 	// Sign-in recovery: refresh all other enrollments of the same account before taking the lock.
-	var refreshes []routing.Refresh
-	if found && loadErr == nil && existing.Account == account {
-		refreshes = app.refreshExistingTeams(ctx, cfg, account, existing.Teams, target.TeamID)
+	var refreshes []setupRefresh
+	if baseline.sameAccount {
+		refreshes = app.refreshExistingTeams(ctx, cfg, account, baseline.state.Teams, target.TeamID)
 	}
-	committed, accountSwitched, err := app.commitRoutingState(cfg.ProfileName, account, target, refreshes, bindings, false)
+	var committed routing.State
+	var accountSwitched bool
+	err = daemon.WithRoutingRelayGate(app.stateDir, app.version, func() error {
+		var cerr error
+		committed, accountSwitched, cerr = app.commitRoutingStateLocked(cfg.ProfileName, account, baseline, target, refreshes, bindings, false)
+		return cerr
+	})
 	if err != nil {
 		return config.Policy{}, "", err
 	}
@@ -95,8 +114,26 @@ func (app *App) gateRoutingActivation() error {
 	return nil
 }
 
-func (app *App) fetchSetupTarget(cmd *cobra.Command, cfg *config.Config, org *organization, account string, ask bool) (routing.Team, string, error) {
+func (app *App) loadSetupBaseline(profile, account string) setupBaseline {
+	st, found, err := routing.Load(app.stateDir, profile)
+	b := setupBaseline{found: found, loadErr: err}
+	if found && err == nil {
+		b.state = st
+		b.sameAccount = st.Account == account
+		b.expectPrev = &routing.Expect{Account: st.Account, StateID: st.StateID}
+	}
+	return b
+}
+
+func (app *App) fetchSetupTarget(cmd *cobra.Command, cfg *config.Config, org *organization, account string, desktopGrant, ask bool) (routing.Team, string, error) {
 	ctx := cmd.Context()
+	personal := org != nil && strings.EqualFold(org.Type, "personal")
+	if desktopGrant && personal {
+		return routing.Team{}, "", &auth.GrantError{
+			Code:    auth.GrantBadInput,
+			Message: "Personal cannot be enabled via --desktop-grant; run `terma setup` interactively",
+		}
+	}
 	if config.PolicyStub() != "" {
 		pol, err := app.policies().Fetch(ctx, cfg)
 		if err != nil {
@@ -105,10 +142,13 @@ func (app *App) fetchSetupTarget(cmd *cobra.Command, cfg *config.Config, org *or
 		teamID := cmp.Or(cfg.ProjectID, cfg.Team, pol.TeamID, pol.DefaultProjectID, "stub")
 		orgID := cmp.Or(cfg.OrganizationID, pol.OrganizationID, "org_stub")
 		authURL := cmp.Or(cfg.AuthURL, pol.AuthURL)
-		personal := org != nil && org.Type == "personal"
 		if pol.Global() && !personal {
-			personal = true
-			orgID = "org_personal_stub"
+			if desktopGrant {
+				pol.Mode, pol.Repositories = config.ModeRepo, nil
+			} else {
+				personal = true
+				orgID = "org_personal_stub"
+			}
 		}
 		pol.TeamID, pol.OrganizationID, pol.AuthURL = teamID, orgID, authURL
 		return routing.Team{
@@ -123,7 +163,6 @@ func (app *App) fetchSetupTarget(cmd *cobra.Command, cfg *config.Config, org *or
 	if err != nil {
 		return routing.Team{}, "", err
 	}
-	personal := org != nil && org.Type == "personal"
 	target := routing.Team{
 		OrganizationID: cfg.OrganizationID,
 		AuthURL:        cfg.AuthURL,
@@ -141,26 +180,72 @@ func (app *App) fetchSetupTarget(cmd *cobra.Command, cfg *config.Config, org *or
 	return target, teamName, nil
 }
 
-func (app *App) refreshExistingTeams(ctx context.Context, cfg *config.Config, account string, teams []routing.Team, skipTeamID string) []routing.Refresh {
-	var out []routing.Refresh
+func (app *App) refreshExistingTeams(ctx context.Context, cfg *config.Config, account string, teams []routing.Team, skipTeamID string) []setupRefresh {
+	var out []setupRefresh
 	for _, t := range teams {
 		if t.TeamID == skipTeamID || t.AuthURL != cfg.AuthURL {
 			continue
 		}
+		orgEpochs := make(map[string]int64)
+		for _, sib := range teams {
+			if sib.OrganizationID == t.OrganizationID && sib.AuthURL == t.AuthURL {
+				orgEpochs[sib.EnrollmentID] = sib.Epoch
+			}
+		}
 		ref, _ := app.policies().RefreshTeam(ctx, cfg, account, t)
-		out = append(out, ref)
+		out = append(out, setupRefresh{
+			refresh:   ref,
+			orgID:     t.OrganizationID,
+			authURL:   t.AuthURL,
+			orgEpochs: orgEpochs,
+		})
 	}
 	return out
 }
 
-// commitRoutingState writes target into routing/<profile>.json via CAS:
-//   - Create when absent;
-//   - Replace(nil) when corrupt/unreadable on disk;
-//   - Replace(&existing.Expect()) when switching accounts (alice -> bob) or when
-//     singleTeamOnly is set and the existing state holds a different team set (server-key);
-//   - Update(existing.ExpectConsent()) when preserving existing same-account enrollments.
-func (app *App) commitRoutingState(profile, account string, target routing.Team, refreshes []routing.Refresh, bindings []bindingChoice, singleTeamOnly bool) (routing.State, bool, error) {
+func (app *App) verifyActiveLane(account string) error {
+	liveCfg, err := app.loadConfig()
+	if err != nil {
+		return err
+	}
+	if app.profileLane(liveCfg) != account {
+		return fmt.Errorf("%w: active profile lane changed during setup", routing.ErrAccountMismatch)
+	}
+	return nil
+}
+
+// checkSetupBaseline verifies before mutating server-key storage that routing/<profile>.json
+// has not moved to a different account than baseline observed before network calls.
+func (app *App) checkSetupBaseline(profile, account string, b setupBaseline) error {
+	existing, found, loadErr := routing.Load(app.stateDir, profile)
+	if loadErr != nil {
+		if b.loadErr != nil {
+			return nil
+		}
+		return loadErr
+	}
+	if !found || existing.Account == account {
+		return nil
+	}
+	if b.expectPrev != nil && existing.Account == b.expectPrev.Account && existing.StateID == b.expectPrev.StateID {
+		return nil
+	}
+	return fmt.Errorf("%w: on disk %s, expected %s", routing.ErrAccountMismatch, existing.Account, account)
+}
+
+// commitRoutingStateLocked writes target into routing/<profile>.json via CAS while the
+// caller holds the routing relay activation gate:
+//   - Verifies the live profile lane still belongs to account before every CAS attempt;
+//   - ReplaceCorrupt only when baseline observed a corrupt file (never clobbering a
+//     concurrently repaired foreign account's state);
+//   - Create when absent (failing closed with ErrNoState if same-account state was torn down);
+//   - Replace(b.expectPrev) ONLY when the foreign state on disk is the exact state instance
+//     observed before network calls; never substitutes a newly loaded foreign Expect;
+//   - Update(existing.ExpectConsent()) with epoch-fenced target upsert and org-wide
+//     ApplyOrgAccessLost for sibling refreshes.
+func (app *App) commitRoutingStateLocked(profile, account string, b setupBaseline, target routing.Team, refreshes []setupRefresh, bindings []bindingChoice, singleTeamOnly bool) (routing.State, bool, error) {
 	now := time.Now().UTC()
+	preEnrID, preEpoch, hadPre := preFetchTarget(b, target)
 	applyFresh := func(s *routing.State) error {
 		if _, err := s.Select(target); err != nil {
 			return err
@@ -168,33 +253,55 @@ func (app *App) commitRoutingState(profile, account string, target routing.Team,
 		return applySetupBindings(s, target, bindings)
 	}
 	for range 3 {
+		if err := app.verifyActiveLane(account); err != nil {
+			return routing.State{}, false, err
+		}
 		existing, found, loadErr := routing.Load(app.stateDir, profile)
 		switch {
 		case loadErr != nil:
-			st, err := routing.Replace(app.stateDir, profile, nil, account, applyFresh)
+			if b.loadErr == nil {
+				return routing.State{}, false, loadErr
+			}
+			st, err := routing.ReplaceCorrupt(app.stateDir, profile, account, applyFresh)
+			if errors.Is(err, routing.ErrStateExists) || errors.Is(err, routing.ErrNoState) {
+				continue
+			}
 			return st, true, err
 		case !found:
+			if b.found && b.loadErr == nil && b.sameAccount {
+				return routing.State{}, false, routing.ErrNoState
+			}
 			st, err := routing.Create(app.stateDir, profile, account, applyFresh)
 			if errors.Is(err, routing.ErrStateExists) {
 				continue
 			}
 			return st, false, err
-		case existing.Account != account || (singleTeamOnly && !sameSingleTeam(existing, target)):
+		case existing.Account != account:
+			if b.expectPrev == nil || existing.Account != b.expectPrev.Account || existing.StateID != b.expectPrev.StateID {
+				return routing.State{}, false, fmt.Errorf("%w: on disk %s, expected %s", routing.ErrAccountMismatch, existing.Account, account)
+			}
+			st, err := routing.Replace(app.stateDir, profile, b.expectPrev, account, applyFresh)
+			return st, true, err
+		case singleTeamOnly && !sameSingleTeam(existing, target):
 			expectPrev := existing.Expect()
 			st, err := routing.Replace(app.stateDir, profile, &expectPrev, account, applyFresh)
 			if errors.Is(err, routing.ErrStaleGeneration) {
 				continue
 			}
-			return st, existing.Account != account, err
+			return st, false, err
 		default:
 			st, err := routing.Update(app.stateDir, profile, existing.ExpectConsent(), func(s *routing.State) error {
+				if err := upsertTeam(s, target, preEnrID, preEpoch, hadPre, now); err != nil {
+					return err
+				}
 				for _, r := range refreshes {
-					if _, rerr := s.ApplyRefresh(r); rerr != nil {
+					if r.refresh.Failure == routing.OrgAccessLost {
+						s.ApplyOrgAccessLost(r.orgID, r.authURL, r.orgEpochs, r.refresh.At)
+						continue
+					}
+					if _, rerr := s.ApplyRefresh(r.refresh); rerr != nil {
 						return rerr
 					}
-				}
-				if err := upsertTeam(s, target, now); err != nil {
-					return err
 				}
 				return applySetupBindings(s, target, bindings)
 			})
@@ -207,19 +314,35 @@ func (app *App) commitRoutingState(profile, account string, target routing.Team,
 	return routing.State{}, false, routing.ErrStaleGeneration
 }
 
+func preFetchTarget(b setupBaseline, target routing.Team) (string, int64, bool) {
+	if !b.sameAccount {
+		return "", 0, false
+	}
+	for _, t := range b.state.Teams {
+		if t.TeamID == target.TeamID && t.OrganizationID == target.OrganizationID &&
+			t.AuthURL == target.AuthURL && t.Personal == target.Personal {
+			return t.EnrollmentID, t.Epoch, true
+		}
+	}
+	return "", 0, false
+}
+
 func sameSingleTeam(st routing.State, target routing.Team) bool {
 	return len(st.Teams) == 1 && st.Teams[0].TeamID == target.TeamID &&
 		st.Teams[0].OrganizationID == target.OrganizationID && st.Teams[0].AuthURL == target.AuthURL
 }
 
-func upsertTeam(s *routing.State, target routing.Team, now time.Time) error {
+func upsertTeam(s *routing.State, target routing.Team, preEnrID string, preEpoch int64, hadPre bool, now time.Time) error {
 	for _, cur := range s.Teams {
 		if cur.TeamID == target.TeamID {
 			if cur.OrganizationID == target.OrganizationID && cur.AuthURL == target.AuthURL && cur.Personal == target.Personal {
+				if !hadPre || cur.EnrollmentID != preEnrID {
+					return nil
+				}
 				pol := target.Policy
 				_, err := s.ApplyRefresh(routing.Refresh{
 					EnrollmentID: cur.EnrollmentID,
-					Epoch:        cur.Epoch,
+					Epoch:        preEpoch,
 					Policy:       &pol,
 					At:           now,
 				})
@@ -281,149 +404,4 @@ func (app *App) recordSetupTeam(cfg *config.Config, account, teamID, teamName st
 		return err
 	}
 	return rejected
-}
-
-// decideSetupBindings computes the binding decisions for target's listed repositories.
-// Personal and global teams need no bindings; entries already covered in existing are
-// skipped so existing developer decisions are never overwritten. Under non-interactive or
-// -y mode (ask == false), safe defaults bind each needed entry key (exact repo for exact
-// entries, owner for wildcards) to target.OrganizationID.
-func decideSetupBindings(target routing.Team, orgLabel string, existing map[string]routing.Binding, ask bool) ([]bindingChoice, error) {
-	if target.Personal || target.Policy.Global() || len(target.Policy.Repositories) == 0 {
-		return nil, nil
-	}
-	var needed []routing.Entry
-	seen := map[string]bool{}
-	var owners []string
-	seenOwner := map[string]bool{}
-	anyWildcard := false
-	for _, raw := range target.Policy.Repositories {
-		e, ok := routing.ParseEntry(raw, target.Policy.Wildcards)
-		if !ok || alreadyDecided(existing, e) || seen[e.Key()] {
-			continue
-		}
-		seen[e.Key()] = true
-		needed = append(needed, e)
-		if e.Wildcard() {
-			anyWildcard = true
-		}
-		owner := routing.Owner(e.Key())
-		if !seenOwner[owner] {
-			seenOwner[owner] = true
-			owners = append(owners, owner)
-		}
-	}
-	if len(needed) == 0 {
-		return nil, nil
-	}
-	if !ask {
-		out := make([]bindingChoice, 0, len(needed))
-		for _, e := range needed {
-			out = append(out, bindingChoice{key: e.Key(), org: target.OrganizationID})
-		}
-		return out, nil
-	}
-	if !anyWildcard {
-		items := []prompt.Item{
-			{Label: fmt.Sprintf("Bind just these %d repositor%s to %s", len(needed), pluralY(len(needed)), orgLabel), Selected: true},
-			{Label: fmt.Sprintf("Bind whole owner (%s) to %s", strings.Join(owners, ", "), orgLabel)},
-			{Label: "Decide later (hold matching sessions until bound)"},
-		}
-		choice, err := prompt.Choose("Bind repositories to "+orgLabel+"?", items)
-		if errors.Is(err, prompt.ErrCancelled) {
-			return nil, errCancelled
-		}
-		if err != nil {
-			return nil, err
-		}
-		switch choice {
-		case 0:
-			out := make([]bindingChoice, 0, len(needed))
-			for _, e := range needed {
-				out = append(out, bindingChoice{key: e.Key(), org: target.OrganizationID})
-			}
-			return out, nil
-		case 1:
-			out := make([]bindingChoice, 0, len(owners))
-			for _, o := range owners {
-				out = append(out, bindingChoice{key: o, org: target.OrganizationID})
-			}
-			return out, nil
-		default:
-			return nil, nil
-		}
-	}
-	items := []prompt.Item{
-		{Label: fmt.Sprintf("Bind %s to %s", strings.Join(owners, ", "), orgLabel), Selected: true},
-		{Label: "Refuse (do not collect these repositories for any organization)"},
-		{Label: "Decide later (hold matching sessions until bound)"},
-	}
-	choice, err := prompt.Choose("Bind repositories to "+orgLabel+"?", items)
-	if errors.Is(err, prompt.ErrCancelled) {
-		return nil, errCancelled
-	}
-	if err != nil {
-		return nil, err
-	}
-	switch choice {
-	case 0:
-		out := make([]bindingChoice, 0, len(needed))
-		for _, e := range needed {
-			out = append(out, bindingChoice{key: e.Key(), org: target.OrganizationID})
-		}
-		return out, nil
-	case 1:
-		out := make([]bindingChoice, 0, len(needed))
-		for _, e := range needed {
-			out = append(out, bindingChoice{key: e.Key(), refuse: true})
-		}
-		return out, nil
-	default:
-		return nil, nil
-	}
-}
-
-func applySetupBindings(s *routing.State, target routing.Team, choices []bindingChoice) error {
-	if target.Personal || len(choices) == 0 {
-		return nil
-	}
-	for _, c := range choices {
-		if _, decided := s.Bindings[c.key]; decided {
-			continue
-		}
-		if config.IsRepositoryKey(c.key) {
-			if _, ownerDecided := s.Bindings[routing.Owner(c.key)]; ownerDecided {
-				continue
-			}
-		}
-		if c.refuse {
-			if err := s.Refuse(c.key); err != nil {
-				return err
-			}
-		} else if err := s.Bind(c.key, c.org, false); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func alreadyDecided(bindings map[string]routing.Binding, e routing.Entry) bool {
-	if len(bindings) == 0 {
-		return false
-	}
-	if _, ok := bindings[e.Key()]; ok {
-		return true
-	}
-	if !e.Wildcard() {
-		_, ok := bindings[routing.Owner(e.Key())]
-		return ok
-	}
-	return false
-}
-
-func pluralY(n int) string {
-	if n == 1 {
-		return "y"
-	}
-	return "ies"
 }

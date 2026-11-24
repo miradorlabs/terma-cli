@@ -152,34 +152,32 @@ func (app *App) undoSetup(ctx context.Context, out io.Writer, keepToken bool) er
 }
 
 // removeRoutingState deletes the active profile's routing/<profile>.json via CAS Delete
-// (retrying once on a concurrent refresh), and removes unreadable corrupt files directly.
+// (or DeleteCorrupt under the lock when the file is unreadable), retrying on a concurrent
+// refresh or repair.
 func (app *App) removeRoutingState() error {
 	profile := config.DefaultProfile
 	if cfg, err := app.loadConfig(); err == nil && cfg.ProfileName != "" {
 		profile = cfg.ProfileName
 	}
-	for range 2 {
+	for range 3 {
 		st, found, err := routing.Load(app.stateDir, profile)
 		if err != nil {
-			if path, perr := routing.StatePath(app.stateDir, profile); perr == nil {
-				_ = os.Remove(path)
-			}
-			break
+			err = routing.DeleteCorrupt(app.stateDir, profile)
+		} else if !found {
+			err = routing.ErrNoState
+		} else {
+			err = routing.Delete(app.stateDir, profile, st.Expect())
 		}
-		if !found {
-			break
-		}
-		err = routing.Delete(app.stateDir, profile, st.Expect())
 		if err == nil || errors.Is(err, routing.ErrNoState) {
-			break
+			_ = os.Remove(filepath.Join(app.stateDir, routing.StatesDir))
+			return nil
 		}
 		if errors.Is(err, routing.ErrStaleGeneration) {
 			continue
 		}
 		return err
 	}
-	_ = os.Remove(filepath.Join(app.stateDir, routing.StatesDir))
-	return nil
+	return routing.ErrStaleGeneration
 }
 
 // removeHookState removes what hooks kept per session, which only they would prune, and

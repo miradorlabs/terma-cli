@@ -146,3 +146,63 @@ func TestMachineRefreshUpdatesInstalledUserHooks(t *testing.T) {
 		t.Fatalf("absent hooks file should not have been created: err=%v", err)
 	}
 }
+
+type trustingUserHooked struct {
+	agentstest.UserHooked
+	syncCalls int
+	syncFn    func(hooksFile string, command func(event string) string) (agents.TrustSync, error)
+}
+
+func (a *trustingUserHooked) SyncHookTrust(hooksFile string, command func(event string) string) (agents.TrustSync, error) {
+	a.syncCalls++
+	return a.syncFn(hooksFile, command)
+}
+
+// A SyncHookTrust failure fails the refresh so the release remains due, and a retry still
+// reconciles hook trust even when the hooks file plan is already empty.
+func TestMachineRefreshPropagatesHookTrustFailureAndRetriesWhenPlanEmpty(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	stateDir := t.TempDir()
+	hooksPath := filepath.Join(dir, "hooks.json")
+	stale := `{"hooks":{"SessionStart":[{"hooks":[{"type":"command","command":"[ -x '/usr/local/bin/terma' ] && '/usr/local/bin/terma' hook --user old-event || true"}]}]}}`
+	if err := os.WriteFile(hooksPath, []byte(stale), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	failTrust := true
+	ag := &trustingUserHooked{
+		UserHooked: agentstest.UserHooked{Agent: agentstest.Agent{ID: "trusting"}, Path: hooksPath},
+		syncFn: func(string, func(string) string) (agents.TrustSync, error) {
+			if failTrust {
+				return agents.TrustSync{}, errors.New("config.toml locked")
+			}
+			return agents.TrustSync{Approved: 1}, nil
+		},
+	}
+	r := Refresher{
+		StateDir: stateDir,
+		Version:  "v8.0.0",
+		Agents:   agents.New(ag).Support(ag),
+	}
+	if _, err := r.Run(t.Context()); err == nil || !strings.Contains(err.Error(), "config.toml locked") {
+		t.Fatalf("first Run = %v, want trust failure", err)
+	}
+	if !selfupdate.NeedsRefresh(stateDir, "v8.0.0") {
+		t.Fatal("failed SyncHookTrust was recorded as refreshed")
+	}
+	// Retry: the hooks file is now up-to-date (plan.Empty()), yet SyncHookTrust must still run.
+	failTrust = false
+	changed, err := r.Run(t.Context())
+	if err != nil {
+		t.Fatalf("retry Run: %v", err)
+	}
+	if ag.syncCalls != 2 {
+		t.Fatalf("syncCalls = %d, want 2", ag.syncCalls)
+	}
+	if !slices.Equal(changed, []string{hooksPath}) {
+		t.Fatalf("retry changed = %v, want [%s]", changed, hooksPath)
+	}
+	if selfupdate.NeedsRefresh(stateDir, "v8.0.0") {
+		t.Fatal("successful retry was not recorded as refreshed")
+	}
+}

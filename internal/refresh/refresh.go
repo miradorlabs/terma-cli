@@ -86,16 +86,26 @@ func refreshUserHooks(a agents.UserHooks) (string, bool, error) {
 	dir := filepath.Dir(path)
 	cmd := hookmgr.UserHookCommand(termas[0])
 	plan, err := a.PlanUserHooks(dir, cmd, true)
-	if err != nil || plan.Empty() {
+	if err != nil {
 		return path, false, err
 	}
-	if err := hookmgr.ApplyThroughLinks(dir, plan); err != nil {
-		return path, false, err
+	changed := false
+	if !plan.Empty() {
+		if err := hookmgr.ApplyThroughLinks(dir, plan); err != nil {
+			return path, false, err
+		}
+		changed = true
 	}
 	if t, ok := a.(agents.HookTrusting); ok {
-		_, _ = t.SyncHookTrust(path, cmd)
+		done, err := t.SyncHookTrust(path, cmd)
+		if err != nil {
+			return path, changed, err
+		}
+		if done.Approved > 0 || done.Withdrawn > 0 {
+			changed = true
+		}
 	}
-	return path, true, nil
+	return path, changed, nil
 }
 
 // Run is `terma update --refresh`: it refreshes the machine's files and returns the paths

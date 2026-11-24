@@ -53,14 +53,10 @@ func (app *App) useServerKey(s *setup.Steps, ui *setupUI, org orgRef, team *stri
 		if err := app.gateRoutingActivation(); err != nil {
 			return config.Policy{}, err
 		}
+		baseline := app.loadSetupBaseline(cfg.ProfileName, sendas.NoPersonLane)
 		cfg.ProjectID, *team = cfg.Team, cfg.Team
 		pol, err := app.policies().FetchWithKey(ctx, cfg, cfg.APIKey)
 		if err != nil {
-			return config.Policy{}, err
-		}
-		// Keep the key only once it has proved it reads the policy and no pre-routing relay
-		// blocks activation, so a failed fetch or gate writes nothing.
-		if err := app.keepServerKey(cfg, insecure); err != nil {
 			return config.Policy{}, err
 		}
 		if pol.Global() {
@@ -73,15 +69,32 @@ func (app *App) useServerKey(s *setup.Steps, ui *setupUI, org orgRef, team *stri
 			Personal:       false,
 			Policy:         pol,
 		}
+		// Only reuse existing bindings when updating the same server-key team in place;
+		// switching to a different server-key team replaces routing.State with blank
+		// bindings, so all bindings for the new team must be computed fresh.
 		var existingBindings map[string]routing.Binding
-		if existing, found, loadErr := routing.Load(app.stateDir, cfg.ProfileName); found && loadErr == nil && existing.Account == sendas.NoPersonLane {
-			existingBindings = existing.Bindings
+		if baseline.sameAccount && sameSingleTeam(baseline.state, target) {
+			existingBindings = baseline.state.Bindings
 		}
 		bindings, err := decideSetupBindings(target, cmp.Or(cfg.OrganizationName, cfg.OrganizationID), existingBindings, false)
 		if err != nil {
 			return config.Policy{}, err
 		}
-		committed, switched, err := app.commitRoutingState(cfg.ProfileName, sendas.NoPersonLane, target, nil, bindings, true)
+		var committed routing.State
+		var switched bool
+		err = daemon.WithRoutingRelayGate(app.stateDir, app.version, func() error {
+			if err := app.checkSetupBaseline(cfg.ProfileName, sendas.NoPersonLane, baseline); err != nil {
+				return err
+			}
+			// Keep the key only once it has proved it reads the policy, the routing state
+			// still matches baseline, and no pre-routing relay blocks activation.
+			if err := app.keepServerKey(cfg, insecure); err != nil {
+				return err
+			}
+			var cerr error
+			committed, switched, cerr = app.commitRoutingStateLocked(cfg.ProfileName, sendas.NoPersonLane, baseline, target, nil, bindings, true)
+			return cerr
+		})
 		if err != nil {
 			return config.Policy{}, err
 		}

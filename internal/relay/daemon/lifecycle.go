@@ -15,6 +15,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/flock"
 	"github.com/miradorlabs/terma-cli/internal/procinfo"
+	"github.com/miradorlabs/terma-cli/internal/relay"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/selfupdate"
 )
@@ -192,6 +193,39 @@ func EnsureRoutingRelay(stateDir, version string) error {
 	}
 	if preRoutingGone(dir) {
 		return nil
+	}
+	return errors.New("a pre-routing relay is still running and must stop before activating team routing")
+}
+
+// WithRoutingRelayGate executes fn only while no pre-routing relay (!RunInfo.Routing)
+// can run for stateDir. When no relay is running it holds the relay lock across fn (and
+// purges leftover pre-cutover outbox parts); when a routing-capable relay already holds
+// the lock it verifies RunInfo.Routing before running fn. Lock order (relay/lock before
+// routing/<profile>.lock) matches the relay daemon.
+func WithRoutingRelayGate(stateDir, version string, fn func() error) error {
+	if stateDir == "" {
+		return fn()
+	}
+	dir := claim.Dir(stateDir)
+	for range 2 {
+		if err := EnsureRoutingRelay(stateDir, version); err != nil {
+			return err
+		}
+		if err := os.MkdirAll(dir, 0o700); err != nil {
+			return err
+		}
+		unlock, err := flock.TryLock(filepath.Join(dir, LockFile))
+		if err == nil {
+			defer unlock()
+			_, _ = relay.PurgeOldOutbox(filepath.Join(dir, relay.OutboxDir), time.Now())
+			return fn()
+		}
+		if !flock.IsBusy(err) {
+			return err
+		}
+		if info, ok := RunningRelay(dir); ok && info.Routing {
+			return fn()
+		}
 	}
 	return errors.New("a pre-routing relay is still running and must stop before activating team routing")
 }

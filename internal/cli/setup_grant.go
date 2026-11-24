@@ -158,6 +158,9 @@ func grantOrganization(orgs []organization, err error, orgID string) (*organizat
 	if errors.As(err, new(noMatchError)) {
 		return nil, &auth.GrantError{Code: auth.GrantBadInput, Message: "--org is not an organization the signed-in user belongs to", Err: err}
 	}
+	if err == nil && org != nil && strings.EqualFold(org.Type, "personal") {
+		return nil, &auth.GrantError{Code: auth.GrantBadInput, Message: "Personal cannot be enabled via --desktop-grant; run `terma setup` interactively"}
+	}
 	return org, err
 }
 
