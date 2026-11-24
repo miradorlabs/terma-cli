@@ -326,7 +326,8 @@ func (rt *Routing) noteWriteErr(err error) {
 	rt.mu.Unlock()
 }
 
-func (rt *Routing) takeWriteErr() error {
+// TakeWriteErr returns and clears the first persistence error recorded on rt.
+func (rt *Routing) TakeWriteErr() error {
 	if rt == nil {
 		return nil
 	}
@@ -336,4 +337,3 @@ func (rt *Routing) takeWriteErr() error {
 	rt.mu.Unlock()
 	return err
 }
-

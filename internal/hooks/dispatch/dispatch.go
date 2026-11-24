@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
@@ -153,6 +154,7 @@ func run(ctx context.Context, d Deps, r Request, handler agents.Handler, flush b
 	}
 	ctx, cancel := context.WithTimeout(ctx, handlerTimeout)
 	defer cancel()
+	_ = env.Routing.TakeWriteErr()
 	if err := handler(ctx, env); errors.Is(err, hookrun.ErrFailClosed) {
 		return 1
 	}
@@ -160,6 +162,9 @@ func run(ctx context.Context, d Deps, r Request, handler agents.Handler, flush b
 		if s, ok := d.Agents.PayloadSession(r.Event, payload.Bytes()); ok {
 			claimed, claimedIn = hookrun.ClaimFromPayload(ctx, env, s, tool), cmp.Or(s.Cwd, r.Cwd)
 		}
+	}
+	if strings.HasSuffix(r.Event, "-tool-reach") && env.Routing.TakeWriteErr() != nil {
+		return 1
 	}
 	switch {
 	case claimed && p.Routing != nil && d.ClaimedRouted != nil:
