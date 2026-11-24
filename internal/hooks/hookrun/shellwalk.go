@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 
+	"mvdan.cc/sh/v3/expand"
 	"mvdan.cc/sh/v3/syntax"
 )
 
@@ -22,13 +23,8 @@ func (sc *scan) stmts(list []*syntax.Stmt, feeds bool) {
 // stmt reads one statement and its redirects; backgrounded commands and pipeline stages run in subshells.
 func (sc *scan) stmt(s *syntax.Stmt, feeds bool) {
 	if s.Background {
-		sc.subshell(func() { sc.stmtBody(s, feeds) })
-		return
+		defer sc.restore(sc.snapshot())
 	}
-	sc.stmtBody(s, feeds)
-}
-
-func (sc *scan) stmtBody(s *syntax.Stmt, feeds bool) {
 	switch c := s.Cmd.(type) {
 	case *syntax.CallExpr:
 		sc.call(c)
@@ -36,7 +32,10 @@ func (sc *scan) stmtBody(s *syntax.Stmt, feeds bool) {
 			sc.feed(c, s.Redirs)
 		}
 	case *syntax.BinaryCmd:
-		if c.Op == syntax.Pipe || c.Op == syntax.PipeAll {
+		if c.Op != syntax.Pipe && c.Op != syntax.PipeAll {
+			sc.stmt(c.X, feeds)
+			sc.stmt(c.Y, feeds)
+		} else {
 			if runsShell(c.Y.Cmd) {
 				var buf strings.Builder
 				prev := sc.feedBuf
@@ -50,32 +49,22 @@ func (sc *scan) stmtBody(s *syntax.Stmt, feeds bool) {
 				sc.subshell(func() { sc.stmt(c.X, false) })
 			}
 			sc.subshell(func() { sc.stmt(c.Y, feeds) })
-		} else {
-			sc.stmt(c.X, feeds)
-			sc.stmt(c.Y, feeds)
 		}
 	case *syntax.Subshell:
 		sc.subshell(func() { sc.stmts(c.Stmts, false) })
 	case *syntax.Block:
 		sc.stmts(c.Stmts, feeds)
 	case *syntax.IfClause:
-		for ; c != nil; c = c.Else {
-			sc.stmts(c.Cond, false)
-			sc.stmts(c.Then, false)
-		}
+		sc.ifClause(c)
 	case *syntax.WhileClause:
 		sc.stmts(c.Cond, false)
+		before := sc.snapshot()
 		sc.stmts(c.Do, false)
+		sc.mergeBranches([]branchState{before, sc.snapshot()})
 	case *syntax.ForClause:
 		sc.loop(c)
 	case *syntax.CaseClause:
-		sc.substitutions(c.Word)
-		for _, item := range c.Items {
-			for _, pat := range item.Patterns {
-				sc.substitutions(pat)
-			}
-			sc.stmts(item.Stmts, false)
-		}
+		sc.caseClause(c)
 	case *syntax.FuncDecl:
 		sc.stmt(c.Body, false)
 	case *syntax.DeclClause:
@@ -108,13 +97,7 @@ func (sc *scan) stmtBody(s *syntax.Stmt, feeds bool) {
 		sc.redirect(r, feeds || runsShell(s.Cmd))
 	}
 }
-
-func (sc *scan) subshell(f func()) {
-	dir, prev, pushed, vars := sc.dir, sc.prev, slices.Clone(sc.pushed), maps.Clone(sc.vars)
-	f()
-	sc.dir, sc.prev, sc.pushed, sc.vars = dir, prev, pushed, vars
-}
-
+func (sc *scan) subshell(f func()) { saved := sc.snapshot(); f(); sc.restore(saved) }
 func (sc *scan) feed(ce *syntax.CallExpr, redirs []*syntax.Redirect) {
 	if slices.ContainsFunc(redirs, func(r *syntax.Redirect) bool {
 		return r.Op == syntax.Hdoc || r.Op == syntax.DashHdoc || r.Op == syntax.WordHdoc
@@ -138,7 +121,6 @@ func (sc *scan) feed(ce *syntax.CallExpr, redirs []*syntax.Redirect) {
 		sc.unknown = true
 	}
 }
-
 func (sc *scan) echoed(words []*syntax.Word, sep string, printf bool) {
 	var text []string
 	for i, w := range words {
@@ -151,7 +133,6 @@ func (sc *scan) echoed(words []*syntax.Word, sep string, printf bool) {
 	}
 	sc.body(strings.ReplaceAll(strings.Join(text, sep), `\n`, "\n"), true)
 }
-
 func (sc *scan) call(ce *syntax.CallExpr) {
 	if len(ce.Args) == 0 {
 		for _, a := range ce.Assigns {
@@ -161,61 +142,54 @@ func (sc *scan) call(ce *syntax.CallExpr) {
 	}
 	u := unwrap(ce.Args)
 	if len(ce.Assigns) > 0 || slices.ContainsFunc(u.before, isAssignment) {
-		saved := maps.Clone(sc.vars)
-		defer func() { sc.vars = saved }()
+		savedVars, savedLoops := maps.Clone(sc.vars), maps.Clone(sc.loopVars)
+		defer func() { sc.vars, sc.loopVars = savedVars, savedLoops }()
 	}
 	for _, a := range ce.Assigns {
 		sc.assign(a)
 	}
-	read := func() {
-		for j, w := range u.before {
-			if isAssignment(w) {
-				sc.export(w)
-			} else if opt, ok := u.attachedChdir[j]; ok {
-				sc.arg(w, folder)
-				if fields, err := sc.fields(w); err == nil && len(fields) == 1 {
-					val := strings.TrimPrefix(fields[0], opt)
-					if strings.HasPrefix(opt, "--") {
-						val = strings.TrimPrefix(val, "=")
-					}
-					sc.intoPath(val)
-				} else {
-					sc.unknown = true
-				}
+	if slices.Contains(u.roles, target) || len(u.attachedChdir) > 0 {
+		defer sc.restore(sc.snapshot())
+	}
+	for j, w := range u.before {
+		if isAssignment(w) {
+			sc.export(w)
+		} else if opt, ok := u.attachedChdir[j]; ok {
+			sc.arg(w, folder)
+			if fields, err := sc.fields(w); err != nil || len(fields) != 1 {
+				sc.unknown = true
+			} else if strings.HasPrefix(opt, "--") {
+				sc.intoPath(strings.TrimPrefix(fields[0], opt+"="))
 			} else {
-				sc.arg(w, u.roles[j])
+				sc.intoPath(strings.TrimPrefix(fields[0], opt))
 			}
-		}
-		switch {
-		case u.split != nil:
-			sc.splitScript(u.split, u.command)
-		case u.each:
-			for i := range u.script {
-				sc.inline(u.script[i:i+1], true)
-			}
-		case u.script != nil:
-			sc.inline(u.script, true)
-		case len(u.command) > 0:
-			sc.run(u.command)
+		} else {
+			sc.arg(w, u.roles[j])
 		}
 	}
-	if slices.Contains(u.roles, target) || len(u.attachedChdir) > 0 {
-		sc.subshell(read)
-	} else {
-		read()
+	switch {
+	case u.split != nil:
+		sc.splitScript(u.split, u.command)
+	case u.each:
+		for i := range u.script {
+			sc.inline(u.script[i:i+1], true)
+		}
+	case u.script != nil:
+		sc.inline(u.script, true)
+	case len(u.command) > 0:
+		sc.run(u.command)
 	}
 }
-
+func (sc *scan) setVar(name string, val *string) { sc.vars[name] = val; delete(sc.loopVars, name) }
 func (sc *scan) export(w *syntax.Word) {
 	sc.arg(w, slashedOnly)
 	name, _, _ := strings.Cut(leadingLit(w), "=")
-	sc.vars[name] = nil
+	sc.setVar(name, nil)
 	if fields, err := sc.fields(w); err == nil {
 		_, v, _ := strings.Cut(strings.Join(fields, " "), "=")
 		sc.vars[name] = &v
 	}
 }
-
 func (sc *scan) splitScript(s *syntax.Word, rest []*syntax.Word) {
 	fields, err := sc.fields(s)
 	if err != nil {
@@ -228,7 +202,6 @@ func (sc *scan) splitScript(s *syntax.Word, rest []*syntax.Word) {
 	}
 	sc.subshell(func() { sc.script(text) })
 }
-
 func (sc *scan) cd(args []*syntax.Word, push bool) {
 	for len(args) > 0 && len(args[0].Lit()) > 1 && args[0].Lit()[0] == '-' {
 		args = args[1:]
@@ -242,7 +215,12 @@ func (sc *scan) cd(args []*syntax.Word, push bool) {
 	case len(args) > 0:
 		sc.cdpath(args[0])
 		sc.arg(args[0], target)
-		pushed = sc.dir != from || sc.sameDirTarget(args[0])
+		if pushed = sc.dir != from; !pushed {
+			if fields, err := sc.fields(args[0]); err == nil && len(fields) == 1 {
+				p, ok := sc.path(fields[0], sc.dir)
+				pushed = ok && p == sc.dir
+			}
+		}
 	case push:
 		if n := len(sc.pushed); n > 0 {
 			sc.dir, sc.pushed[n-1] = sc.pushed[n-1], sc.dir
@@ -256,15 +234,6 @@ func (sc *scan) cd(args []*syntax.Word, push bool) {
 		sc.pushed = append(sc.pushed, from)
 	}
 }
-
-func (sc *scan) sameDirTarget(w *syntax.Word) bool {
-	if fields, err := sc.fields(w); err == nil && len(fields) == 1 {
-		p, ok := sc.path(fields[0], sc.dir)
-		return ok && p == sc.dir
-	}
-	return false
-}
-
 func (sc *scan) cdpath(w *syntax.Word) {
 	cdpath, ok := sc.lookup("CDPATH")
 	if !ok || cdpath == "" {
@@ -281,10 +250,8 @@ func (sc *scan) cdpath(w *syntax.Word) {
 		}
 	}
 }
-
 func (sc *scan) assign(a *syntax.Assign) {
-	sc.substitutions(a.Index)
-	if a.Array != nil {
+	if sc.substitutions(a.Index); a.Array != nil {
 		for _, elem := range a.Array.Elems {
 			sc.substitutions(elem.Index)
 			if elem.Value != nil {
@@ -292,28 +259,28 @@ func (sc *scan) assign(a *syntax.Assign) {
 			}
 		}
 		if a.Name != nil {
-			sc.vars[a.Name.Value] = nil
+			sc.setVar(a.Name.Value, nil)
 		}
 		return
 	}
-	switch {
-	case a.Value == nil:
-	case a.Name == nil || a.Naked:
+	if a.Value == nil {
+		return
+	}
+	if a.Name == nil || a.Naked {
 		sc.arg(a.Value, plain)
-	default:
-		sc.arg(a.Value, slashedOnly)
-		prior, hadPrior := sc.lookup(a.Name.Value)
-		sc.vars[a.Name.Value] = nil
-		if fields, err := sc.fields(a.Value); err == nil {
-			v := strings.Join(fields, " ")
-			if a.Append && hadPrior {
-				v = prior + v
-			}
-			sc.vars[a.Name.Value] = &v
+		return
+	}
+	sc.arg(a.Value, slashedOnly)
+	prior, hadPrior := sc.lookup(a.Name.Value)
+	sc.setVar(a.Name.Value, nil)
+	if fields, err := sc.fields(a.Value); err == nil {
+		v := strings.Join(fields, " ")
+		if a.Append && hadPrior {
+			v = prior + v
 		}
+		sc.vars[a.Name.Value] = &v
 	}
 }
-
 func (sc *scan) loop(fc *syntax.ForClause) {
 	iter, ok := fc.Loop.(*syntax.WordIter)
 	if !ok {
@@ -335,14 +302,17 @@ func (sc *scan) loop(fc *syntax.ForClause) {
 			}
 		}
 	}
+	name, prevLoop := iter.Name.Value, sc.loopVars[iter.Name.Value]
+	defer func() { sc.setLoopVar(name, prevLoop) }()
 	for _, v := range values {
-		if sc.vars[iter.Name.Value] = v; !sc.spend(len(fc.Do)) {
+		sc.vars[name] = v
+		sc.setLoopVar(name, v == nil)
+		if !sc.spend(len(fc.Do)) {
 			return
 		}
 		sc.stmts(fc.Do, false)
 	}
 }
-
 func (sc *scan) redirect(r *syntax.Redirect, shell bool) {
 	switch r.Op {
 	case syntax.Hdoc, syntax.DashHdoc:
@@ -361,12 +331,11 @@ func (sc *scan) redirect(r *syntax.Redirect, shell bool) {
 		if l := r.Word.Lit(); l == "-" || strings.Trim(l, "0123456789") == "" {
 			return
 		}
-		fallthrough
+		sc.arg(r.Word, creates)
 	default:
 		sc.arg(r.Word, creates)
 	}
 }
-
 func (sc *scan) heredoc(body *syntax.Word, shell bool) {
 	if body == nil || len(body.Parts) == 0 {
 		return
@@ -374,28 +343,23 @@ func (sc *scan) heredoc(body *syntax.Word, shell bool) {
 	text := sc.src[body.Parts[0].Pos().Offset():body.Parts[len(body.Parts)-1].End().Offset()]
 	if !shell && body.Lit() == "" {
 		sc.substitutions(body)
-		if expanded, err := sc.document(body); err == nil {
+		if expanded, err := sc.expandWord(body, expand.Document); err == nil {
 			text = expanded
 		}
 	}
 	sc.body(text, shell)
 }
-
 func (sc *scan) body(text string, shell bool) {
 	if !shell {
 		sc.fragments(text, data)
-		return
-	}
-	if sc.feedBuf != nil {
+	} else if sc.feedBuf != nil {
 		if sc.charge(len(text) + 1) {
-			sc.feedBuf.WriteString(text)
-			sc.feedBuf.WriteByte('\n')
+			sc.feedBuf.WriteString(text + "\n")
 		}
-		return
+	} else {
+		sc.subshell(func() { sc.script(text) })
 	}
-	sc.subshell(func() { sc.script(text) })
 }
-
 func (sc *scan) fragments(text string, r role) {
 	for f := range fragments(text) {
 		if sc.unknown {
@@ -404,44 +368,41 @@ func (sc *scan) fragments(text string, r role) {
 		sc.candidate(f, r)
 	}
 }
-
+func (sc *scan) withoutFeed(f func()) { prev := sc.feedBuf; sc.feedBuf = nil; f(); sc.feedBuf = prev }
 func (sc *scan) inline(words []*syntax.Word, shell bool) {
-	outerFeed := sc.feedBuf
-	sc.feedBuf = nil
-	defer func() { sc.feedBuf = outerFeed }()
-	var script []string
-	for _, w := range words {
-		sc.substitutions(w)
-		fields, err := sc.fields(w)
-		if err != nil {
-			sc.unknown = sc.unknown || shell || slashed(w)
-			return
+	sc.withoutFeed(func() {
+		var script []string
+		for _, w := range words {
+			sc.substitutions(w)
+			fields, err := sc.fields(w)
+			if err != nil {
+				sc.unknown = sc.unknown || shell || sc.mustResolveWord(w)
+				return
+			}
+			script = append(script, fields...)
 		}
-		script = append(script, fields...)
-	}
-	if shell {
-		sc.subshell(func() { sc.script(strings.Join(script, " ")) })
-		return
-	}
-	sc.fragments(strings.Join(script, " "), slashedOnly)
+		if shell {
+			sc.subshell(func() { sc.script(strings.Join(script, " ")) })
+		} else {
+			sc.fragments(strings.Join(script, " "), slashedOnly)
+		}
+	})
 }
-
 func (sc *scan) substitutions(node syntax.Node) {
 	if node == nil {
 		return
 	}
-	outerFeed := sc.feedBuf
-	sc.feedBuf = nil
-	defer func() { sc.feedBuf = outerFeed }()
-	syntax.Walk(node, func(n syntax.Node) bool {
-		switch n := n.(type) {
-		case *syntax.CmdSubst:
-			sc.stmts(n.Stmts, false)
-			return false
-		case *syntax.ProcSubst:
-			sc.stmts(n.Stmts, false)
-			return false
-		}
-		return true
+	sc.withoutFeed(func() {
+		syntax.Walk(node, func(n syntax.Node) bool {
+			if c, ok := n.(*syntax.CmdSubst); ok {
+				sc.subshell(func() { sc.stmts(c.Stmts, false) })
+				return false
+			}
+			if p, ok := n.(*syntax.ProcSubst); ok {
+				sc.subshell(func() { sc.stmts(p.Stmts, false) })
+				return false
+			}
+			return true
+		})
 	})
 }

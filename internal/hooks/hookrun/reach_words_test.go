@@ -87,10 +87,18 @@ func TestShellPathsReadACdToASubstitution(t *testing.T) {
 	t.Parallel()
 	m := newWordsMachine(t)
 	m.check(t, m.side, map[string][]string{
-		`cd "$(pwd)/../acme-api" && cat NOTES.md`: {m.api},
-		"cd `pwd`/../acme-api; ls":                {m.api},
-		`echo "$(cd)" && ls proj`:                 {m.home, filepath.Join(m.home, "proj")},
-		`cd "$(cd ..; pwd)"`:                      {m.parent, UnknownReach},
+		`cd "$(pwd)/../acme-api" && cat NOTES.md`:                         {m.api},
+		"cd `pwd`/../acme-api; ls":                                        {m.api},
+		`echo "$(cd && ls proj)"`:                                         {m.home, filepath.Join(m.home, "proj")},
+		`echo "$(cd)" && ls proj`:                                         {m.home},
+		`cd ..; x=$(cd side); cat acme-api/NOTES.md`:                      {m.parent, m.side, m.api},
+		`cd "$(cd ..; pwd)"`:                                              {m.parent, UnknownReach},
+		`if true; then D=acme-api; else D=side; fi; cat ../$D/NOTES.md`:   {UnknownReach},
+		`if true; then cd ../acme-api; else cd .; fi; cat NOTES.md`:       {m.api, m.side, UnknownReach},
+		`case $X in a) D=acme-api;; b) D=side;; esac; cat ../$D/NOTES.md`: {UnknownReach},
+		`x=$(cat p); cat "$x"`:                                            {UnknownReach},
+		`if true; then D=../acme-api; else D=side; fi; cat "$D"`:          {m.api, UnknownReach},
+		`builtin export CDPATH=..; cd acme-api && cat NOTES.md`:           {m.api},
 	})
 }
 

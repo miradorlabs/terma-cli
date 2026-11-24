@@ -20,70 +20,52 @@ type wrapper struct {
 
 var (
 	wrappers = map[string]wrapper{
-		"timeout":    {values: []string{"-s", "--signal", "-k", "--kill-after"}, operands: 1},
-		"env":        {values: []string{"-u", "--unset"}, chdir: []string{"-C", "--chdir"}, split: []string{"-S", "--split-string"}},
-		"sudo":       {values: []string{"-u", "--user", "-g", "--group", "-h", "--host", "-p", "--prompt", "-r", "--role", "-t", "--type", "-C", "--close-from", "-T", "--command-timeout", "-U", "--other-user"}, chdir: []string{"-D", "--chdir"}},
-		"doas":       {values: []string{"-u", "-C"}},
-		"nice":       {values: []string{"-n", "--adjustment"}},
-		"ionice":     {values: []string{"-c", "--class", "-n", "--classdata"}},
-		"stdbuf":     {values: []string{"-i", "-o", "-e", "--input", "--output", "--error"}},
-		"nohup":      {},
-		"exec":       {values: []string{"-a"}},
-		"time":       {values: []string{"-f", "--format", "-o", "--output"}},
-		"command":    {names: []string{"-v", "-V"}},
-		"builtin":    {},
-		"caffeinate": {values: []string{"-t", "-w"}},
-		"xargs":      {values: []string{"-I", "-n", "-L", "-P", "-s", "-E", "-d", "-a", "--replace", "--max-args", "--max-lines", "--max-procs", "--max-chars", "--eof", "--delimiter", "--arg-file"}},
-		"watch":      {values: []string{"-n", "--interval"}, script: true},
-		"hyperfine":  {script: true, each: true},
-		"flock":      {values: []string{"-w", "--timeout", "-E", "--conflict-exit-code"}, shell: []string{"-c", "--command"}, operands: 1},
-		"uv":         {sub: "run", values: []string{"--with", "--python", "-p", "--package", "--extra", "--group", "--env-file", "--index"}, chdir: []string{"--project", "--directory"}},
-		"poetry":     {sub: "run"},
-		"pipenv":     {sub: "run"},
-		"bundle":     {sub: "exec"},
-		"pnpm":       {sub: "exec", values: []string{"--filter", "-F"}},
-		"npm":        {sub: "exec", values: []string{"--package", "-w", "--workspace"}, shell: []string{"-c", "--call"}},
-		"npx":        {values: []string{"-p", "--package"}, shell: []string{"-c", "--call"}},
+		"timeout": {values: []string{"-s", "--signal", "-k", "--kill-after"}, operands: 1},
+		"env":     {values: []string{"-u", "--unset"}, chdir: []string{"-C", "--chdir"}, split: []string{"-S", "--split-string"}},
+		"sudo":    {values: []string{"-u", "--user", "-g", "--group", "-h", "--host", "-p", "--prompt", "-r", "--role", "-t", "--type", "-C", "--close-from", "-T", "--command-timeout", "-U", "--other-user"}, chdir: []string{"-D", "--chdir"}},
+		"doas":    {values: []string{"-u", "-C"}}, "nice": {values: []string{"-n", "--adjustment"}},
+		"ionice": {values: []string{"-c", "--class", "-n", "--classdata"}}, "stdbuf": {values: []string{"-i", "-o", "-e", "--input", "--output", "--error"}},
+		"nohup": {}, "builtin": {}, "exec": {values: []string{"-a"}}, "command": {names: []string{"-v", "-V"}},
+		"time": {values: []string{"-f", "--format", "-o", "--output"}}, "caffeinate": {values: []string{"-t", "-w"}},
+		"xargs": {values: []string{"-I", "-n", "-L", "-P", "-s", "-E", "-d", "-a", "--replace", "--max-args", "--max-lines", "--max-procs", "--max-chars", "--eof", "--delimiter", "--arg-file"}},
+		"watch": {values: []string{"-n", "--interval"}, script: true}, "hyperfine": {script: true, each: true},
+		"flock":  {values: []string{"-w", "--timeout", "-E", "--conflict-exit-code"}, shell: []string{"-c", "--command"}, operands: 1},
+		"uv":     {sub: "run", values: []string{"--with", "--python", "-p", "--package", "--extra", "--group", "--env-file", "--index"}, chdir: []string{"--project", "--directory"}},
+		"poetry": {sub: "run"}, "pipenv": {sub: "run"}, "bundle": {sub: "exec"}, "pnpm": {sub: "exec", values: []string{"--filter", "-F"}},
+		"npm": {sub: "exec", values: []string{"--package", "-w", "--workspace"}, shell: []string{"-c", "--call"}}, "npx": {values: []string{"-p", "--package"}, shell: []string{"-c", "--call"}},
 	}
 	shellScript = script{letters: "c", words: []string{"--command"}, shell: true}
 	scripts     = map[string]script{
 		"bash": shellScript, "sh": shellScript, "zsh": shellScript, "dash": shellScript, "ksh": shellScript, "ash": shellScript, "fish": shellScript, "su": shellScript,
-		"python": {letters: "c"}, "pypy": {letters: "c"},
+		"python": {letters: "c"}, "pypy": {letters: "c"}, "ruby": {letters: "e"}, "perl": {letters: "eE"}, "php": {letters: "r"},
 		"node": {letters: "ep", words: []string{"--eval", "--print"}}, "nodejs": {letters: "ep", words: []string{"--eval", "--print"}},
 		"bun": {letters: "e", words: []string{"--eval", "--print"}}, "deno": {words: []string{"eval"}},
-		"ruby": {letters: "e"}, "perl": {letters: "eE"}, "php": {letters: "r"},
 	}
 	folderOptions = []string{"--git-dir", "--work-tree", "--prefix", "--cwd", "--dir", "--directory"}
 	dashC         = []string{"git", "make", "tar", "env"}
 	valueOptions  = map[string][]string{"git": {"-c", "--config-env", "--namespace", "--super-prefix"}}
 	grep          = reader{letters: "rR", words: []string{"--recursive", "--dereference-recursive", "--directories=recurse", "-d recurse"}}
 	shallow       = map[string]reader{
-		"ls": {letters: "R", words: []string{"--recursive"}}, "git": {sub: "grep"},
-		"grep": grep, "egrep": grep, "fgrep": grep, "zgrep": grep,
+		"ls": {letters: "R", words: []string{"--recursive"}}, "git": {sub: "grep"}, "grep": grep, "egrep": grep, "fgrep": grep, "zgrep": grep,
 		"cp":  {letters: "rRa", words: []string{"--recursive", "--archive"}},
-		"tar": {letters: "c", words: []string{"--create"}, bare: true},
-		"zip": {letters: "r", words: []string{"--recurse-paths"}},
-		"cd":  {}, "pushd": {}, "popd": {}, "pwd": {}, "mkdir": {}, "rmdir": {}, "touch": {}, "mv": {}, "ln": {},
+		"tar": {letters: "c", words: []string{"--create"}, bare: true}, "zip": {letters: "r", words: []string{"--recurse-paths"}},
+		"cd": {}, "pushd": {}, "popd": {}, "pwd": {}, "mkdir": {}, "rmdir": {}, "touch": {}, "mv": {}, "ln": {},
 		"stat": {}, "file": {}, "test": {}, "[": {}, "echo": {}, "printf": {}, "realpath": {}, "readlink": {},
 		"basename": {}, "dirname": {}, "which": {}, "command": {}, "true": {}, "false": {},
+		"export": {}, "declare": {}, "typeset": {}, "local": {}, "readonly": {}, "unset": {},
 	}
 	depthOptions = map[string]string{"fd": "-d", "tree": "-L"}
 )
 
 func depthOption(name, opt string) bool {
-	d, ok := depthOptions[name]
-	return opt == "-maxdepth" || opt == "--max-depth" || ok && d == opt
+	return opt == "-maxdepth" || opt == "--max-depth" || depthOptions[name] == opt && opt != ""
 }
-
 func execAction(name, opt string) bool {
-	switch name {
-	case "find":
+	if name == "find" {
 		return opt == "-exec" || opt == "-execdir" || opt == "-ok" || opt == "-okdir"
-	case "fd":
-		return opt == "-x" || opt == "--exec" || opt == "-X" || opt == "--exec-batch" ||
-			strings.HasPrefix(opt, "--exec=") || strings.HasPrefix(opt, "--exec-batch=")
 	}
-	return false
+	return name == "fd" && (opt == "-x" || opt == "--exec" || opt == "-X" || opt == "--exec-batch" ||
+		strings.HasPrefix(opt, "--exec=") || strings.HasPrefix(opt, "--exec-batch="))
 }
 
 type script struct {
@@ -95,7 +77,6 @@ type script struct {
 func (s script) takes(opt string) bool {
 	return scriptFlag(opt, s.letters, s.shell) || slices.Contains(s.words, opt)
 }
-
 func scriptOf(name string) (script, bool) {
 	s, ok := scripts[strings.TrimRight(name, "0123456789.")]
 	return s, ok
@@ -116,16 +97,14 @@ func (r reader) recursive(opt, next string, first bool) bool {
 // shellAt is the index among args of a shell given its script with -c past its options, or -1.
 func shellAt(args []*syntax.Word) int {
 	for k, w := range args {
-		s, ok := scriptOf(programName(w))
-		if !ok || !s.shell {
-			continue
-		}
-		for _, o := range args[k+1:] {
-			if s.takes(o.Lit()) {
-				return k
-			}
-			if !strings.HasPrefix(o.Lit(), "-") {
-				break
+		if s, ok := scriptOf(programName(w)); ok && s.shell {
+			for _, o := range args[k+1:] {
+				if s.takes(o.Lit()) {
+					return k
+				}
+				if !strings.HasPrefix(o.Lit(), "-") {
+					break
+				}
 			}
 		}
 	}
@@ -160,8 +139,7 @@ func unwrap(args []*syntax.Word) wrapped {
 			case slices.Contains(w.names, opt):
 				return u // command -v runs nothing
 			case opt == "--":
-				n++
-				roles = append(roles, program)
+				n, roles = n+1, append(roles, program)
 				break options
 			case value && slices.Contains(w.split, opt):
 				u.before, u.roles = append(u.before, u.command[:n+1]...), append(append(u.roles, roles...), program)
@@ -172,15 +150,9 @@ func unwrap(args []*syntax.Word) wrapped {
 				u.script, u.command = u.command[n+1:n+2], nil
 				return u
 			case value && slices.Contains(w.chdir, opt):
-				n++
-				roles = append(roles, program, target)
+				n, roles = n+1, append(roles, program, target)
 			case value && slices.Contains(w.values, opt):
-				n++
-				r := program
-				if slices.Contains(folderOptions, opt) {
-					r = folder
-				}
-				roles = append(roles, program, r)
+				n, roles = n+1, append(roles, program, program)
 			case attachedOpt(word, w.chdir) != "":
 				if u.attachedChdir == nil {
 					u.attachedChdir = map[int]string{}
@@ -190,8 +162,7 @@ func unwrap(args []*syntax.Word) wrapped {
 			case strings.HasPrefix(lead, "-") && lead != "-", isAssignment(word):
 				roles = append(roles, program)
 			case operands < w.operands:
-				operands++
-				roles = append(roles, program)
+				operands, roles = operands+1, append(roles, program)
 			default:
 				break options
 			}
@@ -203,17 +174,14 @@ func unwrap(args []*syntax.Word) wrapped {
 	}
 	return u
 }
-
 func leadingLit(w *syntax.Word) string {
-	if len(w.Parts) == 0 {
-		return ""
-	}
-	if lead, ok := w.Parts[0].(*syntax.Lit); ok {
-		return lead.Value
+	if len(w.Parts) > 0 {
+		if lead, ok := w.Parts[0].(*syntax.Lit); ok {
+			return lead.Value
+		}
 	}
 	return ""
 }
-
 func attachedOpt(w *syntax.Word, opts []string) string {
 	lead := leadingLit(w)
 	for _, opt := range opts {
@@ -223,19 +191,16 @@ func attachedOpt(w *syntax.Word, opts []string) string {
 	}
 	return ""
 }
-
 func isAssignment(w *syntax.Word) bool {
 	name, _, eq := strings.Cut(leadingLit(w), "=")
 	return eq && isName(name)
 }
-
 func programName(w *syntax.Word) string {
 	if name := w.Lit(); name != "" {
 		return strings.TrimSuffix(filepath.Base(name), ".exe")
 	}
 	return ""
 }
-
 func scriptFlag(opt, letters string, anywhere bool) bool {
 	if len(opt) < 2 || opt[0] != '-' || strings.ContainsFunc(opt[1:], func(r rune) bool { return (r < 'a' || r > 'z') && (r < 'A' || r > 'Z') }) {
 		return false
@@ -245,7 +210,6 @@ func scriptFlag(opt, letters string, anywhere bool) bool {
 	}
 	return len(opt) <= 4 && strings.ContainsRune(letters, rune(opt[len(opt)-1]))
 }
-
 func folderValue(w *syntax.Word, dashCFolder bool) role {
 	if opt, _, eq := strings.Cut(leadingLit(w), "="); eq && slices.Contains(folderOptions, opt) || dashCFolder && strings.HasPrefix(opt, "-C") && w.Lit() != "-C" {
 		return folder
@@ -267,11 +231,20 @@ func (sc *scan) run(args []*syntax.Word) {
 			sc.prev, sc.dir, sc.pushed = sc.dir, sc.pushed[n-1], sc.pushed[:n-1]
 		}
 		return
-	case "eval":
+	case "eval", "trap":
+		if name == "trap" {
+			args = args[:min(len(args), 1)]
+		}
 		sc.inline(args, true)
 		return
-	case "trap":
-		sc.inline(args[:min(len(args), 1)], true)
+	case "export", "declare", "typeset", "local", "readonly":
+		for _, w := range args {
+			if isAssignment(w) {
+				sc.export(w)
+			} else if !strings.HasPrefix(w.Lit(), "-") {
+				sc.arg(w, plain)
+			}
+		}
 		return
 	}
 	if k := shellAt(args); k >= 0 {
@@ -342,7 +315,6 @@ func (sc *scan) run(args []*syntax.Word) {
 		sc.below(d, levels)
 	}
 }
-
 func (sc *scan) into(w *syntax.Word) bool {
 	fields, err := sc.fields(w)
 	if err != nil {
@@ -351,7 +323,6 @@ func (sc *scan) into(w *syntax.Word) bool {
 	}
 	return len(fields) == 1 && sc.intoPath(fields[0])
 }
-
 func (sc *scan) intoPath(val string) bool {
 	if p, ok := sc.path(val, sc.dir); ok && val != "" && sc.spend(1) && !sc.hasRemoteLink(p) {
 		if info, err := os.Stat(p); err == nil && info.IsDir() {
@@ -361,8 +332,6 @@ func (sc *scan) intoPath(val string) bool {
 	}
 	return false
 }
-
-// runsShell reports whether cmd runs a shell reading commands from stdin.
 func runsShell(cmd syntax.Command) bool {
 	ce, ok := cmd.(*syntax.CallExpr)
 	if !ok || len(ce.Args) == 0 {

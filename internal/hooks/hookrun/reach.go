@@ -25,14 +25,11 @@ func Alone(paths ...string) []string {
 }
 
 // Search returns dir and the base folder each glob names before its first wildcard.
-func Search(dir string, globs ...string) []string {
-	return searchEnv(dir, os.LookupEnv, globs...)
-}
-
+func Search(dir string, globs ...string) []string { return searchEnv(dir, os.LookupEnv, globs...) }
 func searchEnv(dir string, env func(string) (string, bool), globs ...string) []string {
 	out := []string{dir}
 	for _, g := range globs {
-		alts, ok := expandGlobBraces(filepath.ToSlash(g), 32)
+		alts, ok := expandGlobBraces(globToSlash(g), 32)
 		if !ok {
 			out = append(out, unknownReach(g))
 			continue
@@ -53,6 +50,8 @@ func searchEnv(dir string, env func(string) (string, bool), globs ...string) []s
 			if prefix := literalPrefix(slashed); prefix != "" {
 				if !filepath.IsAbs(prefix) {
 					prefix = filepath.Join(dir, prefix)
+				} else if !strings.HasPrefix(prefix, "//") {
+					prefix = filepath.FromSlash(prefix)
 				}
 				out = append(out, prefix)
 			}
@@ -60,35 +59,41 @@ func searchEnv(dir string, env func(string) (string, bool), globs ...string) []s
 	}
 	return out
 }
-
+func globToSlash(g string) string {
+	if filepath.Separator != '\\' || !strings.ContainsRune(g, '\\') {
+		return g
+	}
+	if !strings.ContainsRune(g, '/') {
+		return filepath.ToSlash(g)
+	}
+	b := []byte(g)
+	for i := range b {
+		if b[i] == '\\' && (i+1 >= len(b) || strings.IndexByte("*?[]{}", b[i+1]) < 0) {
+			b[i] = '/'
+		}
+	}
+	return string(b)
+}
 func expandGlobBraces(s string, limit int) ([]string, bool) {
 	if strings.Count(s, "{") > limit {
 		return nil, false
 	}
-	return expandGlobBracesRec(s, limit)
-}
-
-func expandGlobBracesRec(s string, limit int) ([]string, bool) {
 	open := strings.IndexByte(s, '{')
 	if open < 0 {
 		return []string{s}, true
 	}
 	closeIdx := strings.IndexByte(s[open+1:], '}')
 	if closeIdx < 0 {
-		if !strings.ContainsRune(s[open:], '/') {
-			return []string{s}, true
-		}
-		return nil, false
+		return []string{s}, !strings.ContainsRune(s[open:], '/')
 	}
 	body := s[open+1 : open+1+closeIdx]
 	parts := strings.Split(body, ",")
-	if strings.ContainsRune(body, '{') || len(parts) > limit {
+	if strings.ContainsRune(body, '{') || len(parts) < 2 || len(parts) > limit {
 		return nil, false
 	}
-	prefix, suffix := s[:open], s[open+closeIdx+2:]
-	var out []string
+	prefix, suffix, out := s[:open], s[open+closeIdx+2:], []string(nil)
 	for _, p := range parts {
-		sub, ok := expandGlobBracesRec(prefix+p+suffix, limit-len(out))
+		sub, ok := expandGlobBraces(prefix+p+suffix, limit-len(out))
 		if !ok || len(out)+len(sub) > limit {
 			return nil, false
 		}
@@ -96,7 +101,6 @@ func expandGlobBracesRec(s string, limit int) ([]string, bool) {
 	}
 	return out, true
 }
-
 func literalPrefix(glob string) string {
 	segs := strings.Split(glob, "/")
 	n := slices.IndexFunc(segs, func(s string) bool { return pattern.HasMeta(s, 0) })
@@ -111,11 +115,9 @@ func literalPrefix(glob string) string {
 	}
 	return strings.Join(segs[:n], "/")
 }
-
 func searchedEnv(paths []string, cwd string, env func(string) (string, bool)) []string {
 	return searchedBy(paths, cwd, env, time.Now().Add(maxShellTime))
 }
-
 func searchedBy(paths []string, cwd string, env func(string) (string, bool), deadline time.Time) []string {
 	var sc *scan
 	var unknownDir string

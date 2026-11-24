@@ -42,21 +42,23 @@ func (r role) mustResolve(slashed bool) bool {
 
 // scan holds the state of one bounded shell reach scan.
 type scan struct {
-	cwd, dir, prev, cwdRoot, src                string
+	cwd, dir, prev, cwdRoot                     string
 	cwdRootDone, cwdChecked, cwdRemote, unknown bool
-	depth                                       int
-	pushed, none, out                           []string
+	none, out                                   []string
 	env                                         func(string) (string, bool)
 	vars                                        map[string]*string
 	cfg                                         *expand.Config
-	feedBuf                                     *strings.Builder
 	reads                                       *operands
 	places                                      map[string]bool
 	examined                                    map[candidate]cached
 	work
+	src      string
+	depth    int
+	pushed   []string
+	loopVars map[string]bool
+	feedBuf  *strings.Builder
 }
 
-// work tracks lookup, word, byte, and deadline budgets across nested scans.
 type work struct {
 	lookups, stats, bytes, words int
 	deadline                     time.Time

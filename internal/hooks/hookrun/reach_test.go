@@ -293,6 +293,22 @@ func TestABackslashSeparatesOnlyInTheWindowsReading(t *testing.T) {
 			t.Errorf("%d places, read as on Windows %v: somewhere not known %v", len(got), windows, unknown)
 		}
 	}
+	// POSIX '\'' escapes inside wrapped bash -c heredocs are preserved by windowsReading.
+	wrappedHdoc := underTimeout("git commit -m \"$(cat <<'EOF'\nfix: x\nEOF\n)\"")
+	if got := readShell(wrappedHdoc, shellReadings(wrappedHdoc, true), cwd, none, time.Now().Add(time.Minute)); slices.ContainsFunc(got, isUnknownReach) {
+		t.Errorf("windowsReading broke wrapped heredoc: %q", got)
+	}
+	// Wrapped export PATH=... is treated as shallow and does not recursively walk PATH dirs.
+	deep := deepTree(t)
+	withDeepPath := func(k string) (string, bool) {
+		if k == "PATH" {
+			return deep, true
+		}
+		return none(k)
+	}
+	if got := shellPathsBy("builtin export PATH=$PATH:/bin", cwd, withDeepPath, time.Now().Add(time.Minute)); slices.ContainsFunc(got, isUnknownReach) {
+		t.Errorf("builtin export PATH walked deep tree: %q", got)
+	}
 }
 
 // Alone tags each path so a caller can distinguish a path alone from a folder search; Search
@@ -338,6 +354,7 @@ func TestAloneAndSearchResolveFoldersAndGlobs(t *testing.T) {
 		{"glob below folder", side, []string{"**/*.go"}, []string{side}, false},
 		{"glob above folder", side, []string{"../**/*.go"}, []string{side, parent}, false},
 		{"brace alternation", side, []string{"../{acme-api,side}/**/*.go"}, []string{side, api, side}, false},
+		{"brace range fails closed", side, []string{"../repo{1..3}/**"}, []string{side}, true},
 		{"nested braces fail closed", side, []string{"../{a,{acme-api,side}}/*.go"}, []string{side}, true},
 		{"unclosed non-slashed brace literal", side, []string{"src/file{a.go"}, []string{side, filepath.Join(side, "src")}, false},
 		{"escaped wildcard literal", side, []string{`src/foo\[x\]/*.go`}, []string{side, filepath.Join(side, "src", "foo[x]")}, false},
