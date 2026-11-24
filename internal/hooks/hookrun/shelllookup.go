@@ -45,7 +45,7 @@ func (sc *scan) candidate(t string, r role) {
 	if sc.reads != nil && res.named && (r == plain || r == folder || r == part) {
 		sc.reads.named, sc.reads.folders = true, append(sc.reads.folders, res.folders...)
 	}
-	if r == target && res.dir != "" {
+	if (r == target || r == physTarget) && res.dir != "" {
 		sc.prev, sc.dir = sc.dir, res.dir
 	}
 }
@@ -54,7 +54,7 @@ func (sc *scan) resolve(t string, r role, slashed bool) (res cached) {
 		if i == 1 && d == sc.dir {
 			break
 		}
-		if p, info := sc.reach(t, d); p != "" {
+		if p, info := sc.reachRole(t, d, r); p != "" {
 			if res.named = res.named || info != nil; info != nil && info.IsDir() {
 				if i == 0 {
 					res.dir = p
@@ -178,6 +178,9 @@ func (sc *scan) walkPath(p string, followFinal bool) (string, string, os.FileInf
 }
 func (sc *scan) hasRemoteLink(p string) bool { _, _, _, _ = sc.walkPath(p, true); return sc.unknown }
 func (sc *scan) resolveTarget(base, raw string, _ int) (string, bool) {
+	return sc.resolveJoined(base, raw, false)
+}
+func (sc *scan) resolveJoined(base, raw string, logical bool) (string, bool) {
 	if remote(raw, sc.cwd) || filepath.VolumeName(raw) != "" && !filepath.IsAbs(raw) {
 		return "", !sc.fail()
 	}
@@ -188,14 +191,37 @@ func (sc *scan) resolveTarget(base, raw string, _ int) (string, bool) {
 	}
 	if len(raw) > maxPathBytes {
 		return "", !sc.fail()
-	} else if !hasDot(raw) {
-		return filepath.Clean(raw), true
+	} else if !logical {
+		if !hasDot(raw) {
+			return filepath.Clean(raw), true
+		}
+		res, _, _, found := sc.walkPath(raw, false)
+		return res, found || !sc.unknown && res != ""
+	} else if !filepath.IsAbs(raw) {
+		return "", false
 	}
-	res, _, _, found := sc.walkPath(raw, false)
-	return res, found || !sc.unknown && res != ""
+	vol, sep := cmp.Or(filepath.VolumeName(raw), share(raw)), string(filepath.Separator)
+	parts := strings.FieldsFunc(raw[len(vol):], isSep)
+	if len(parts) > maxPathComponents {
+		return "", !sc.fail()
+	}
+	var out []string
+	for _, part := range parts {
+		if part == "" || part == "." {
+			continue
+		} else if part != ".." {
+			out = append(out, part)
+		} else if t, _, info, found := sc.walkPath(vol+sep+strings.Join(out, sep), true); !found || !info.IsDir() {
+			return "", false
+		} else if sc.place(t); len(out) > 0 {
+			out = out[:len(out)-1]
+		}
+	}
+	return vol + sep + strings.Join(out, sep), true
 }
-func (sc *scan) reach(w, dir string) (string, os.FileInfo) {
-	p, ok := sc.path(w, dir)
+func (sc *scan) reach(w, dir string) (string, os.FileInfo) { return sc.reachRole(w, dir, plain) }
+func (sc *scan) reachRole(w, dir string, r role) (string, os.FileInfo) {
+	p, ok := sc.resolvePath(w, dir, r == target)
 	if !ok {
 		return "", nil
 	}
@@ -204,13 +230,13 @@ func (sc *scan) reach(w, dir string) (string, os.FileInfo) {
 		return "", nil
 	} else if info.IsDir() {
 		sc.place(res)
-		return res, info
+		return map[bool]string{true: p, false: res}[r == target], info
 	} else if sc.place(parent); info.Mode()&fs.ModeSymlink == 0 {
 		return res, info
 	}
-	if target, tParent, tInfo, tFound := sc.walkPath(p, true); tFound {
-		sc.place(map[bool]string{true: target, false: tParent}[tInfo.IsDir()])
-		return res, tInfo
+	if dst, tParent, tInfo, tFound := sc.walkPath(p, true); tFound {
+		sc.place(map[bool]string{true: dst, false: tParent}[tInfo.IsDir()])
+		return map[bool]string{true: dst, false: map[bool]string{true: p, false: res}[r == target]}[r == physTarget], tInfo
 	} else if !sc.unknown && tParent != "" {
 		sc.place(tParent)
 	}
@@ -223,18 +249,19 @@ func (sc *scan) away(w string, r role) bool {
 	sc.unknown = sc.unknown || (share(w) != "" || len(w) > 2 && !strings.ContainsAny(w, " \t\n") && strings.TrimLeft(w, `/\`) != "") && r.mustResolve(true)
 	return true
 }
-func (sc *scan) path(w, dir string) (string, bool) {
+func (sc *scan) path(w, dir string) (string, bool) { return sc.resolvePath(w, dir, false) }
+func (sc *scan) resolvePath(w, dir string, logical bool) (string, bool) {
 	if w == "~" || strings.HasPrefix(w, "~/") {
 		home, ok := sc.homeDir()
 		if !ok || home == "" || remote(home, sc.cwd) {
 			sc.unknown = sc.unknown || remote(home, sc.cwd) || sc.isUnresolvedVar("HOME")
 			return "", false
 		}
-		return sc.resolveTarget(home, strings.TrimLeft(w[1:], "/"), 0)
+		return sc.resolveJoined(home, strings.TrimLeft(w[1:], "/"), logical)
 	} else if remote(w, sc.cwd) || !filepath.IsAbs(w) && dir == "" {
 		return "", false
 	}
-	return sc.resolveTarget(dir, w, 0)
+	return sc.resolveJoined(dir, w, logical)
 }
 
 const alnum = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
@@ -256,7 +283,7 @@ func urlPath(w string) (string, bool, bool) {
 	u, err := url.PathUnescape(rest)
 	if err != nil || strings.ContainsRune(u, 0) {
 		return "", true, true
-	} else if len(u) > 2 && u[0] == '/' && u[2] == ':' {
+	} else if filepath.Separator == '\\' && len(u) > 2 && u[0] == '/' && u[2] == ':' {
 		return u[1:], true, false
 	}
 	return map[bool]string{true: u, false: "//" + u}[strings.HasPrefix(u, "/")], true, false

@@ -193,6 +193,7 @@ func TestBelowDoesNotStopAtDotfilesOrEnclosingCheckout(t *testing.T) {
 // local or share path, and remote() guards against off-share UNC paths.
 func TestURLPathAndRemote(t *testing.T) {
 	t.Parallel()
+	wantDrive := map[bool]string{true: "C:/work/api", false: "/C:/work/api"}[filepath.Separator == '\\']
 	for _, tc := range []struct {
 		in    string
 		path  string
@@ -203,10 +204,10 @@ func TestURLPathAndRemote(t *testing.T) {
 		{"git+ssh://github.com/acme/api", "", true, false},
 		{"file:///tmp/acme-api/NOTES.md", "/tmp/acme-api/NOTES.md", true, false},
 		{"file://localhost/tmp/acme-api/NOTES.md", "/tmp/acme-api/NOTES.md", true, false},
-		{"file://LOCALHOST/C:/work/api", "C:/work/api", true, false},
+		{"file://LOCALHOST/C:/work/api", wantDrive, true, false},
 		{"file:///ws/priva%74e/README", "/ws/private/README", true, false},
 		{"file:///ws/%2e%2e/acme-api/README", "/ws/../acme-api/README", true, false},
-		{"file:///C:/work/api", "C:/work/api", true, false},
+		{"file:///C:/work/api", wantDrive, true, false},
 		{"file://server/share/api", "//server/share/api", true, false},
 		{"file:///ws/%ZZ/README", "", true, true},
 		{"file:///ws/%00/README", "", true, true},
@@ -2047,6 +2048,104 @@ func TestGitfilePrefixCommentsOverlongAndResolveMayCreate(t *testing.T) {
 	scDir.candidate("acme-api/NOTES.md", plain)
 	if !slices.Equal(scDir.out, []string{api}) {
 		t.Fatalf("out after dir-matched relative file = %q, want [%q]", scDir.out, api)
+	}
+}
+
+func TestAbbreviatedSecretOptionsAndLogicalCd(t *testing.T) {
+	t.Parallel()
+	// Curl-style abbreviated long secret options mask their following value, while non-secret flags do not.
+	for _, cmd := range []string{
+		"curl --oauth2-b SECRET https://example.com",
+		"curl --proxy-u alice:SECRET https://example.com",
+		"curl --proxy-h 'Authorization: SECRET' https://example.com",
+		"curl --data-u token=SECRET https://example.com",
+	} {
+		if got := firstWords(cmd); strings.Contains(got, "SECRET") {
+			t.Errorf("firstWords(%q) = %q, leaked SECRET", cmd, got)
+		}
+	}
+	if got := firstWords("curl --config app.cfg --help"); !strings.Contains(got, "app.cfg") {
+		t.Errorf("firstWords(benign --config) = %q, unexpectedly masked app.cfg", got)
+	}
+
+	// Default target (cd -L) normalizes .. logically across symlinks; plain operands and physTarget (cd -P) stay physical.
+	root, _ := filepath.EvalSymlinks(t.TempDir())
+	logicalBase := filepath.Join(root, "logical")
+	logicalSibling := filepath.Join(logicalBase, "sibling")
+	outside := filepath.Join(root, "outside")
+	outsideSub := filepath.Join(outside, "subdir")
+	for _, d := range []string{logicalSibling, outsideSub} {
+		if err := os.MkdirAll(d, 0o700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(logicalBase, "NOTES.md"), []byte("logical"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(outside, "OUTSIDE.md"), []byte("outside"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(logicalBase, "link")
+	if err := os.Symlink(outsideSub, link); err != nil {
+		t.Skipf("no symlinks here: %v", err)
+	}
+
+	sep := string(filepath.Separator)
+	// 1. cd /logical/link/.. enters /logical logically, so subsequent NOTES.md reaches /logical.
+	sc1 := newScan(root, os.LookupEnv, work{deadline: time.Now().Add(time.Minute)})
+	sc1.candidate(link+sep+"..", target)
+	if sc1.dir != logicalBase {
+		t.Fatalf("target(link/..).dir = %q, want %q", sc1.dir, logicalBase)
+	}
+	sc1.candidate("NOTES.md", plain)
+	if !slices.Contains(sc1.out, logicalBase) || !slices.Contains(sc1.out, outsideSub) {
+		t.Fatalf("target(link/..) out = %q, want both %q and %q", sc1.out, logicalBase, outsideSub)
+	}
+
+	// 2. cd /logical/link/../sibling succeeds logically even though /outside/sibling does not exist.
+	sc2 := newScan(root, os.LookupEnv, work{deadline: time.Now().Add(time.Minute)})
+	sc2.candidate(link+sep+".."+sep+"sibling", target)
+	if sc2.dir != logicalSibling || !slices.Contains(sc2.out, logicalSibling) {
+		t.Fatalf("target(link/../sibling) dir=%q out=%q, want %q", sc2.dir, sc2.out, logicalSibling)
+	}
+
+	// 3. cd /logical/link preserves logical dir; plain ../OUTSIDE.md traverses physically, while target .. goes logically to /logical.
+	sc3 := newScan(root, os.LookupEnv, work{deadline: time.Now().Add(time.Minute)})
+	sc3.candidate(link, target)
+	if sc3.dir != link {
+		t.Fatalf("target(link).dir = %q, want %q", sc3.dir, link)
+	}
+	sc3.candidate("../OUTSIDE.md", plain)
+	if !slices.Contains(sc3.out, outside) {
+		t.Fatalf("plain(../OUTSIDE.md) from logical symlink dir out = %q, want %q", sc3.out, outside)
+	}
+	sc3.candidate("..", target)
+	if sc3.dir != logicalBase {
+		t.Fatalf("target(..) after target(link) dir = %q, want %q", sc3.dir, logicalBase)
+	}
+
+	// 4. physTarget (cd -P) resolves symlinks physically for both link/.. and link && cd ...
+	sc4 := newScan(root, os.LookupEnv, work{deadline: time.Now().Add(time.Minute)})
+	sc4.candidate(link+sep+"..", physTarget)
+	if sc4.dir != outside {
+		t.Fatalf("physTarget(link/..).dir = %q, want %q", sc4.dir, outside)
+	}
+	sc5 := newScan(root, os.LookupEnv, work{deadline: time.Now().Add(time.Minute)})
+	sc5.candidate(link, physTarget)
+	if sc5.dir != outsideSub {
+		t.Fatalf("physTarget(link).dir = %q, want %q", sc5.dir, outsideSub)
+	}
+	sc5.candidate("..", target)
+	if sc5.dir != outside {
+		t.Fatalf("target(..) after physTarget(link) dir = %q, want %q", sc5.dir, outside)
+	}
+
+	// 5. Missing or regular-file component before .. fails logical cd without mutating sc.dir.
+	sc6 := newScan(root, os.LookupEnv, work{deadline: time.Now().Add(time.Minute)})
+	sc6.candidate(filepath.Join(logicalBase, "missing")+sep+"..", target)
+	sc6.candidate(filepath.Join(logicalBase, "NOTES.md")+sep+"..", target)
+	if sc6.dir != root {
+		t.Fatalf("invalid logical target mutated dir to %q, want %q", sc6.dir, root)
 	}
 }
 

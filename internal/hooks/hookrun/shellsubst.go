@@ -22,8 +22,12 @@ type operands struct {
 
 // outputs maps known command-substitution prefixes to static path evaluators.
 var outputs = map[string]func(sc *scan, args []*syntax.Word) (string, bool){
-	"pwd": where, "pwd -L": where, "pwd -P": noArgs(func(sc *scan) (string, bool) { r, ok := sc.real(sc.dir); return r, ok && !sc.unknown }),
-	"git rev-parse --show-toplevel": noArgs(func(sc *scan) (string, bool) { return sc.safeLocate(sc.dir) }), "mktemp": mktemp,
+	"pwd": where, "pwd -L": where, "pwd -P": func(sc *scan, a []*syntax.Word) (string, bool) {
+		return sc.real(map[bool]string{true: sc.dir}[len(a) == 0])
+	},
+	"git rev-parse --show-toplevel": func(sc *scan, a []*syntax.Word) (string, bool) {
+		return sc.safeLocate(map[bool]string{true: sc.dir}[len(a) == 0])
+	}, "mktemp": mktemp,
 	"go env GOPATH": gopath, "go env GOMODCACHE": modcache, "dirname": ofOperand(dirname),
 	"basename": ofOperand(func(_ *scan, p string) (string, bool) { return map[bool]string{true: filepath.Base(p)}[p != ""], true }),
 	"realpath": ofOperand((*scan).real), "readlink -f": ofOperand((*scan).real),
@@ -54,14 +58,6 @@ func (sc *scan) substitute(w io.Writer, cs *syntax.CmdSubst) error {
 	return errOpaque
 }
 func where(s *scan, a []*syntax.Word) (string, bool) { return s.dir, s.dir != "" && len(a) == 0 }
-func noArgs(f func(*scan) (string, bool)) func(*scan, []*syntax.Word) (string, bool) {
-	return func(sc *scan, a []*syntax.Word) (string, bool) {
-		if len(a) == 0 {
-			return f(sc)
-		}
-		return "", false
-	}
-}
 func (sc *scan) hasGoEnv(key string) bool {
 	p, _ := sc.lookup("GOENV")
 	if sc.isUnresolvedVar("GOENV") || p != "" && p != "off" && !filepath.IsAbs(p) {
@@ -153,9 +149,8 @@ func dirname(_ *scan, p string) (string, bool) {
 }
 func (sc *scan) real(p string) (string, bool) {
 	if q, ok := sc.path(p, sc.dir); p != "" && ok {
-		if r, parent, _, found := sc.walkPath(q, true); found || !sc.unknown && r != "" && parent != "" && filepath.Dir(r) == parent {
-			return r, true
-		}
+		r, parent, _, found := sc.walkPath(q, true)
+		return r, found || !sc.unknown && r != "" && parent != "" && filepath.Dir(r) == parent
 	}
 	return "", false
 }
@@ -210,12 +205,11 @@ func (sc *scan) hasWorktreeConfig(gitDir string) bool {
 	return sc.fileHasLine(filepath.Join(gitDir, "config"), match) || sc.fileHasLine(filepath.Join(gitDir, "config.worktree"), match)
 }
 func (sc *scan) fileHasLine(path string, match func(string) bool) bool {
-	p, ok := sc.resolveTarget(sc.dir, path, 0)
-	if !ok {
-		return true
+	if p, ok := sc.resolveTarget(sc.dir, path, 0); ok {
+		data, err := sc.readSmallFile(p)
+		return err != nil && !errors.Is(err, fs.ErrNotExist) || err == nil && slices.ContainsFunc(strings.Split(data, "\n"), match)
 	}
-	data, err := sc.readSmallFile(p)
-	return err != nil && !errors.Is(err, fs.ErrNotExist) || err == nil && slices.ContainsFunc(strings.Split(data, "\n"), match)
+	return true
 }
 func (sc *scan) isUnresolvedVar(name string) bool { v, set := sc.vars[name]; return set && v == nil }
 func (sc *scan) readSmallFile(path string) (string, error) {
@@ -311,8 +305,7 @@ func (sc *scan) holdsNone(p string) bool {
 func (sc *scan) readDir(dir string) []fs.DirEntry {
 	if !sc.spend(1) {
 		return nil
-	}
-	if _, _, _, f, ok := sc.walk(dir, true, 2); ok {
+	} else if _, _, _, f, ok := sc.walk(dir, true, 2); ok {
 		defer f.Close()
 		var entries []fs.DirEntry
 		for room := maxShellLookups - sc.lookups + 1; len(entries) < room; {

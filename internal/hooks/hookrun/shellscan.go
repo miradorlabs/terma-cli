@@ -25,15 +25,15 @@ func isUnknownReach(p string) bool       { return strings.HasPrefix(p, UnknownRe
 
 type role uint8
 
-const plain, program, target, folder, creates, data, part, slashedOnly, globbed, walked role = 0, 1, 2, 3, 4, 5, 6, 7, 8, 9
+const plain, program, target, folder, creates, data, part, slashedOnly, globbed, walked, physTarget role = 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10
 
-func (r role) whole() bool      { return r == program || r == target }
+func (r role) whole() bool      { return r == program || r == target || r == physTarget }
 func (r role) needsSlash() bool { return r == program || r == data || r == part || r == slashedOnly }
 func (r role) mayCreate(slashed bool) bool {
 	return r == creates || slashed && (r == plain || r == folder || r == slashedOnly)
 }
 func (r role) mustResolve(slashed bool) bool {
-	return r == target || r == folder || slashed && r != program && r != data && r != part
+	return r == target || r == physTarget || r == folder || slashed && r != program && r != data && r != part
 }
 
 // scan holds the state of one bounded shell reach scan.
@@ -148,13 +148,11 @@ func (sc *scan) sizeIn(w syntax.Node, opaqueSubst bool) (n int) {
 func isCaseOp(op syntax.ParExpOperator) bool {
 	return op == syntax.UpperFirst || op == syntax.UpperAll || op == syntax.LowerFirst || op == syntax.LowerAll
 }
-func (sc *scan) paramValue(pe *syntax.ParamExp) string {
-	if pe.Param == nil {
-		return ""
-	}
-	v, _ := sc.lookup(pe.Param.Value)
-	if pe.Excl {
-		v, _ = sc.lookup(v)
+func (sc *scan) paramValue(pe *syntax.ParamExp) (v string) {
+	if pe.Param != nil {
+		if v, _ = sc.lookup(pe.Param.Value); pe.Excl {
+			v, _ = sc.lookup(v)
+		}
 	}
 	return v
 }
@@ -231,19 +229,17 @@ func (sc *scan) checkPartsFields(parts []syntax.WordPart, ifs string, rem int, i
 	return rem
 }
 func (sc *scan) consumeFields(v, ifs string, rem int) int {
-	n := countFields(v, ifs, rem)
-	if n > rem && sc.fail() {
+	if n := countFields(v, ifs, rem); n > rem && sc.fail() {
 		return -1
+	} else {
+		return rem - max(n-1, 0)
 	}
-	return rem - max(n-1, 0)
 }
 func countFields(v, ifs string, limit int) int {
 	n, inWord := 0, false
 	for _, r := range v {
 		sep := strings.ContainsRune(ifs, r)
-		if !inWord && (!sep || r != ' ' && r != '\t' && r != '\n') {
-			n++
-		}
+		n += map[bool]int{true: 1}[!inWord && (!sep || r != ' ' && r != '\t' && r != '\n')]
 		if inWord = !sep; n > limit {
 			return n
 		}

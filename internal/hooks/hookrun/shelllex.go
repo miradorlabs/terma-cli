@@ -69,7 +69,7 @@ func maskWords(command string, depth int) string {
 				words[i] = masked
 			}
 			lower := strings.ToLower(b)
-			secret = hasSubst || slices.Contains(secretOptions, b) || b == "eval" || b == "-a" && hasRedis ||
+			secret = hasSubst || slices.Contains(secretOptions, b) || len(b) >= 4 && strings.HasPrefix(b, "--") && slices.ContainsFunc(secretOptions, func(o string) bool { return strings.HasPrefix(o, b) }) || b == "eval" || b == "-a" && hasRedis ||
 				short && (strings.ContainsRune(b[1:], 'c') || slices.Contains(secretOptions, "-"+b[len(b)-1:]) || b[len(b)-1] == 'a' && hasRedis) ||
 				strings.HasPrefix(b, "-") && slices.ContainsFunc(secretNames, func(n string) bool { return strings.Contains(lower, n) })
 		}
@@ -149,16 +149,11 @@ func shellFields(command string, n int) (raw, bare []string) {
 				continue
 			}
 		}
-		if start < 0 {
-			start = i
-		}
+		start = map[bool]int{true: i, false: start}[start < 0]
 		i += w
 	}
 	if start >= 0 {
-		if dollar {
-			buf.WriteByte('$')
-		}
-		raw, bare = append(raw, command[start:]), append(bare, buf.String())
+		raw, bare = append(raw, command[start:]), append(bare, buf.String()+map[bool]string{true: "$"}[dollar])
 	}
 	return raw, bare
 }
@@ -220,15 +215,9 @@ func parsable(src string) bool {
 			top = open[len(open)-1]
 		}
 		double := i+2 < len(src) && src[i+2] == next
-		if top != '"' && top != 'h' && top != 'q' && (strings.IndexByte(separators, c) < 0 && strings.IndexByte(separators, prev) >= 0 || strings.IndexByte("\"'`([{", c) >= 0) {
-			words++
-		}
-		if (c == '$' || c == '`') && top != 'q' {
-			dollars++
-		}
-		if strings.IndexByte("\n;&|", c) >= 0 {
-			letUntil = -1
-		}
+		words += map[bool]int{true: 1}[top != '"' && top != 'h' && top != 'q' && (strings.IndexByte(separators, c) < 0 && strings.IndexByte(separators, prev) >= 0 || strings.IndexByte("\"'`([{", c) >= 0)]
+		dollars += map[bool]int{true: 1}[(c == '$' || c == '`') && top != 'q']
+		letUntil = map[bool]int{true: -1, false: letUntil}[strings.IndexByte("\n;&|", c) >= 0]
 		switch {
 		case c == '\n' && (len(bodies) > 0 || len(docs) > 0 && top != '"' && top != '`'):
 			if len(bodies) == 0 {
@@ -237,9 +226,7 @@ func parsable(src string) bool {
 			}
 			for len(bodies) > 0 && i < len(src) {
 				line := src[i+1 : lineEnd(src, i+1)]
-				if bodies[0].stripTabs {
-					line = strings.TrimLeft(line, "\t")
-				}
+				line = map[bool]string{true: strings.TrimLeft(line, "\t"), false: line}[bodies[0].stripTabs]
 				if strings.TrimRight(line, "\r") != bodies[0].delim {
 					break
 				}
@@ -299,9 +286,7 @@ func parsable(src string) bool {
 			}
 			i = j - 1
 		}
-		if expr >= 0 && len(open) <= exprDepth {
-			expr = -1
-		}
+		expr = map[bool]int{true: -1, false: expr}[expr >= 0 && len(open) <= exprDepth]
 		if len(open) > maxShellNesting || links > maxShellNesting || expr >= 0 && i-expr > maxShellExpr || words > maxShellWords || dollars > maxShellWords {
 			return false
 		}
