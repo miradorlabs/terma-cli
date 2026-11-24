@@ -174,8 +174,9 @@ func (p *antigravityPaths) workspacesCollected(cwd string, in *antigravityHookIn
 //
 // Past antigravityPathsPerCall values judged, the call is refused unplaced.
 //
-// A folder of a folder key in no repository is refused, but in global mode; any other path in
-// no repository is refused only when antigravityShowsFilesInNoRepository is false. A value that
+// A folder in no repository is refused, but in global mode: one that is there, under any
+// key, and any value of a folder key. A file in no repository is refused only when
+// antigravityShowsFilesInNoRepository is false. A value that
 // merely looks like a path in free text (an edit's Replacement of "/api/v1/users") resolves to
 // its nearest existing folder, which is in no repository, and is shown; a text that happens to
 // name a real excluded checkout is refused, which errs toward sending less.
@@ -233,14 +234,25 @@ func (p *antigravityPaths) refusesPath(cwd, key, value string, judged *int) bool
 	case ownerCollected:
 		return false
 	case ownerNone:
-		// Global mode collects every repository on the machine and a session outside git, so
-		// a folder outside git holds nothing the policy excludes.
-		if folder {
+		// A folder in no repository may hold several, whatever key names it: an MCP tool
+		// lists or searches one under "path". Global mode collects every repository on the
+		// machine and a session outside git, so there it holds nothing the policy excludes.
+		if folder || antigravityIsFolder(cwd, value) {
 			return !p.pol.Global()
 		}
 		return !antigravityShowsFilesInNoRepository
 	}
 	return true
+}
+
+// antigravityIsFolder reports whether value, absolute or relative to cwd, names a folder that
+// is there, links followed.
+func antigravityIsFolder(cwd, value string) bool {
+	if !filepath.IsAbs(value) {
+		value = filepath.Join(cwd, value)
+	}
+	info, err := os.Stat(value)
+	return err == nil && info.IsDir()
 }
 
 // antigravityLooksLikePath reports whether an argument value looks like a path whatever its

@@ -46,9 +46,13 @@ func TestAntigravityRefusesAPathUnderAnyKey(t *testing.T) {
 		{"a URL under a file key's sibling", `{"Path":"file.txt","Source":"https://example.com/a/b"}`, false},
 		{"a relative path inside the checkout", `{"Path":"sub/dir/new-file.txt"}`, false},
 		{"a relative folder inside the checkout", `{"SearchPath":"."}`, false},
-		// A folder in no repository under an unknown key follows the files' answer, not the
-		// folder keys' stricter one.
-		{"a folder in no repository under an unknown key", `{"TargetDirectories":[` + q(g.none) + `]}`, false},
+		// A folder in no repository is refused under any key, as under a folder key: an MCP
+		// filesystem tool lists or searches one under "path". A file there, and a path that is
+		// not there yet, follow the files' answer.
+		{"a folder in no repository under an unknown key", `{"TargetDirectories":[` + q(g.none) + `]}`, true},
+		{"a folder in no repository under a file key", `{"path":` + q(g.none) + `,"pattern":"made-up"}`, true},
+		{"a file in no repository under an unknown key", `{"File":` + q(filepath.Join(g.none, "file.txt")) + `}`, false},
+		{"a path not there yet in no repository", `{"File":` + q(filepath.Join(g.none, "new", "file.txt")) + `}`, false},
 		{"a folder in no repository under a folder key, nested", `{"options":{"SearchPath":` + q(g.none) + `}}`, true},
 	} {
 		if got := newAntigravityPaths(g.pol).refuses(g.collected, json.RawMessage(tc.args)); got != tc.want {
