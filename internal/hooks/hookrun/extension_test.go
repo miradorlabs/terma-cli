@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -34,10 +35,11 @@ func TestExtensionStartRunAndSubagentStart(t *testing.T) {
 
 	parentID := "018f3a2c-9001-7000-8000-000000000001"
 	childID := "018f3a2c-9001-7000-8000-000000000002"
+	qA := strconv.Quote(repoA)
 
 	// Non-subagent session-start calls StartRun.
 	e1 := env
-	e1.Stdin = strings.NewReader(`{"session_id":"` + parentID + `","cwd":"` + repoA + `"}`)
+	e1.Stdin = strings.NewReader(`{"session_id":"` + parentID + `","cwd":` + qA + `}`)
 	if err := events["omp-session-start"](ctx, e1); err != nil {
 		t.Fatalf("omp-session-start(parent): %v", err)
 	}
@@ -48,7 +50,7 @@ func TestExtensionStartRunAndSubagentStart(t *testing.T) {
 
 	// Subagent session-start joins the parent's run (never calls StartRun) and links alias.
 	e2 := env
-	e2.Stdin = strings.NewReader(`{"session_id":"` + childID + `","cwd":"` + repoA + `","parent_session_id":"` + parentID + `"}`)
+	e2.Stdin = strings.NewReader(`{"session_id":"` + childID + `","cwd":` + qA + `,"parent_session_id":"` + parentID + `"}`)
 	if err := events["omp-session-start"](ctx, e2); err != nil {
 		t.Fatalf("omp-session-start(child): %v", err)
 	}
@@ -61,7 +63,7 @@ func TestExtensionStartRunAndSubagentStart(t *testing.T) {
 
 	// Subagent crossing into another org marks BOTH the subagent and parent Mixed.
 	eCross := env
-	eCross.Stdin = strings.NewReader(`{"session_id":"` + childID + `","parent_session_id":"` + parentID + `","cwd":"` + repoA + `","tool":"read","paths":["` + filepath.ToSlash(fileB) + `"]}`)
+	eCross.Stdin = strings.NewReader(`{"session_id":"` + childID + `","parent_session_id":"` + parentID + `","cwd":` + qA + `,"tool":"read","paths":[` + strconv.Quote(fileB) + `]}`)
 	if err := events["omp-tool-reach"](ctx, eCross); err != nil {
 		t.Fatalf("omp-tool-reach(child): %v", err)
 	}
@@ -77,13 +79,69 @@ func TestExtensionStartRunAndSubagentStart(t *testing.T) {
 
 	// Second non-subagent session-start starts a fresh clean run id.
 	e3 := env
-	e3.Stdin = strings.NewReader(`{"session_id":"` + parentID + `","cwd":"` + repoA + `"}`)
+	e3.Stdin = strings.NewReader(`{"session_id":"` + parentID + `","cwd":` + qA + `}`)
 	if err := events["omp-session-start"](ctx, e3); err != nil {
 		t.Fatalf("second omp-session-start: %v", err)
 	}
 	run2, ok := runs.Locate(stateDir, parentID)
 	if !ok || run2.Run == "" || run2.Run == run1.Run || !run2.MixedAt.IsZero() {
 		t.Fatalf("second session-start run = %+v; want new clean id != %q", run2, run1.Run)
+	}
+}
+
+func TestExtensionMixedPropagatesParentToChildrenAndSiblings(t *testing.T) {
+	stateDir := t.TempDir()
+	repoA := namedRepo(t, "alpha", "git@github.com:orgA/alpha.git")
+	repoB := namedRepo(t, "beta", "git@github.com:orgB/beta.git")
+	fileB := filepath.Join(repoB, "secret.go")
+	if err := os.WriteFile(fileB, []byte("package b\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	rt := routedState(t, stateDir, testAccountA, []routing.Team{
+		makeTeam("orgA", "team-a", []string{"github.com/orgA/alpha"}, true),
+		makeTeam("orgB", "team-b", []string{"github.com/orgB/beta"}, true),
+	}, map[string]string{
+		"github.com/orgA/alpha": "orgA",
+		"github.com/orgB/beta":  "orgB",
+	})
+	ctx := context.Background()
+	events := Extension{Tool: "omp", ClaimParent: true}.Events("omp")
+	call := func(name string, payload map[string]any) {
+		t.Helper()
+		b, err := json.Marshal(payload)
+		if err != nil {
+			t.Fatal(err)
+		}
+		e, _, _ := routedEnv(t, stateDir, repoA, testAccountA, LoadRouting(stateDir, "default"))
+		e.Stdin = strings.NewReader(string(b))
+		if err := events[name](ctx, e); err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+	}
+	_ = rt
+
+	// Case 1: parent crosses orgs -> parent AND both children become KindMixed.
+	p1, c1a, c1b := "018f3a2c-9010-7000-8000-000000000001", "018f3a2c-9010-7000-8000-000000000002", "018f3a2c-9010-7000-8000-000000000003"
+	call("omp-session-start", map[string]any{"session_id": p1, "cwd": repoA})
+	call("omp-session-start", map[string]any{"session_id": c1a, "parent_session_id": p1, "cwd": repoA})
+	call("omp-session-start", map[string]any{"session_id": c1b, "parent_session_id": p1, "cwd": repoA})
+	call("omp-tool-reach", map[string]any{"session_id": p1, "cwd": repoA, "tool": "read", "paths": []string{fileB}})
+	for _, id := range []string{p1, c1a, c1b} {
+		if c, ok := claim.Read(stateDir, id, rt.state.Teams[0].Policy.FetchedAt); !ok || c.Kind != claim.KindMixed {
+			t.Fatalf("parent-cross: claim(%s) = %+v (ok=%v); want KindMixed", id, c, ok)
+		}
+	}
+
+	// Case 2: child1 crosses orgs -> parent, child1, AND sibling child2 ALL become KindMixed.
+	p2, c2a, c2b := "018f3a2c-9011-7000-8000-000000000001", "018f3a2c-9011-7000-8000-000000000002", "018f3a2c-9011-7000-8000-000000000003"
+	call("omp-session-start", map[string]any{"session_id": p2, "cwd": repoA})
+	call("omp-session-start", map[string]any{"session_id": c2a, "parent_session_id": p2, "cwd": repoA})
+	call("omp-session-start", map[string]any{"session_id": c2b, "parent_session_id": p2, "cwd": repoA})
+	call("omp-tool-reach", map[string]any{"session_id": c2a, "parent_session_id": p2, "cwd": repoA, "tool": "read", "paths": []string{fileB}})
+	for _, id := range []string{p2, c2a, c2b} {
+		if c, ok := claim.Read(stateDir, id, rt.state.Teams[0].Policy.FetchedAt); !ok || c.Kind != claim.KindMixed {
+			t.Fatalf("sibling-cross: claim(%s) = %+v (ok=%v); want KindMixed", id, c, ok)
+		}
 	}
 }
 
@@ -179,7 +237,7 @@ func TestExtensionToolReachCrossOrgMixed(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			sid := "018f3a2c-9002-7000-8000-00000000000" + string(rune('1'+i))
 			eStart := env
-			eStart.Stdin = strings.NewReader(`{"session_id":"` + sid + `","cwd":"` + repoA + `"}`)
+			eStart.Stdin = strings.NewReader(`{"session_id":"` + sid + `","cwd":` + strconv.Quote(repoA) + `}`)
 			if err := events["pi-session-start"](ctx, eStart); err != nil {
 				t.Fatalf("session-start: %v", err)
 			}

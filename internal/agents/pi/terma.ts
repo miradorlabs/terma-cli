@@ -144,24 +144,41 @@ function record(session: string, event: string, body: string, a: Record<string, 
 
 // termaHook hands an event to `terma hook pi-*` in FIFO order so session-start always
 // finishes before tool-reach (preventing a late StartRun from clearing an earlier Mixed
-// mark) and reach completes before the session exits.
+// mark) and reach completes before the session exits. A timed-out child is terminated before
+// the queue advances so it cannot race later hooks.
+const HOOK_TIMEOUT_MS = 2000
+const HOOK_KILL_GRACE_MS = 250
+const MAX_HOOK_QUEUE = 64
 let hookQueue: Promise<void> = Promise.resolve()
+let hookPending = 0
 
 function spawnHook(event: string, payload: Record<string, unknown>): Promise<void> {
   if (!CONFIG) return Promise.resolve()
   return new Promise((resolve) => {
     let settled = false
+    let child: ReturnType<typeof spawn> | null = null
+    let killTimer: any
     const done = () => {
       if (settled) return
       settled = true
       clearTimeout(timer)
+      if (killTimer) clearTimeout(killTimer)
       resolve()
     }
-    const timer: any = setTimeout(done, 2000)
+    const timer: any = setTimeout(() => {
+      if (!child) return done()
+      try { child.kill("SIGTERM") } catch {}
+      killTimer = setTimeout(() => {
+        try { child?.kill("SIGKILL") } catch {}
+        child?.unref?.()
+        done()
+      }, HOOK_KILL_GRACE_MS)
+      killTimer?.unref?.()
+    }, HOOK_TIMEOUT_MS)
     timer?.unref?.()
     try {
       const [cmd, ...args] = CONFIG!.hookCommand
-      const child = spawn(cmd, [...args, event], { stdio: ["pipe", "ignore", "ignore"], detached: false })
+      child = spawn(cmd, [...args, event], { stdio: ["pipe", "ignore", "ignore"], detached: false })
       child.on("error", done)
       child.on("close", done)
       child.stdin.on("error", () => {})
@@ -173,8 +190,9 @@ function spawnHook(event: string, payload: Record<string, unknown>): Promise<voi
 }
 
 function termaHook(event: string, payload: Record<string, unknown>): Promise<void> {
-  if (!CONFIG) return Promise.resolve()
-  const step = hookQueue.then(() => spawnHook(event, payload))
+  if (!CONFIG || hookPending >= MAX_HOOK_QUEUE) return Promise.resolve()
+  hookPending++
+  const step = hookQueue.then(() => spawnHook(event, payload)).finally(() => { hookPending-- })
   hookQueue = step.then(() => undefined, () => undefined)
   return step
 }

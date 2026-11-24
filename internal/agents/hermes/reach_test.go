@@ -3,10 +3,16 @@ package hermes
 import (
 	"context"
 	"encoding/json"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
+	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -62,14 +68,14 @@ func TestHermesStartRunAndToolReachCrossOrgMixed(t *testing.T) {
 
 	parentID := "hermes-parent-1"
 	childID := "hermes-child-1"
-	if err := events["hermes-session-start"](ctx, env(`{"session_id":"`+parentID+`","cwd":"`+repoA+`"}`)); err != nil {
+	if err := events["hermes-session-start"](ctx, env(`{"session_id":"`+parentID+`","cwd":`+strconv.Quote(repoA)+`}`)); err != nil {
 		t.Fatal(err)
 	}
 	parentRun, ok := runs.Locate(stateDir, parentID)
 	if !ok || parentRun.Run == "" {
 		t.Fatalf("hermes-session-start did not start run: %+v (ok=%v)", parentRun, ok)
 	}
-	if err := events["hermes-session-start"](ctx, env(`{"session_id":"`+childID+`","cwd":"`+repoA+`","parent_session_id":"`+parentID+`"}`)); err != nil {
+	if err := events["hermes-session-start"](ctx, env(`{"session_id":"`+childID+`","cwd":`+strconv.Quote(repoA)+`,"parent_session_id":"`+parentID+`"}`)); err != nil {
 		t.Fatal(err)
 	}
 	if p, ok := runs.Locate(stateDir, childID); !ok || p.Run != parentRun.Run {
@@ -84,7 +90,7 @@ func TestHermesStartRunAndToolReachCrossOrgMixed(t *testing.T) {
 	}
 	for i, payload := range reaches {
 		sid := "hermes-reach-" + string(rune('1'+i))
-		if err := events["hermes-session-start"](ctx, env(`{"session_id":"`+sid+`","cwd":"`+repoA+`"}`)); err != nil {
+		if err := events["hermes-session-start"](ctx, env(`{"session_id":"`+sid+`","cwd":`+strconv.Quote(repoA)+`}`)); err != nil {
 			t.Fatal(err)
 		}
 		payload["session_id"] = sid
@@ -135,6 +141,9 @@ def register(ctx): pass
 }
 
 func TestHermesPluginToolReachContractUnderPython(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("POSIX shell hook test")
+	}
 	python, err := exec.LookPath("python3")
 	if err != nil {
 		t.Skip("no python3")
@@ -205,5 +214,93 @@ time.sleep(0.2)
 	}
 	if term := byTool["terminal"]; len(term) != 1 || term[0]["command"] != "cat ../repoB/a" || term[0]["dir"] != "/repoB" {
 		t.Fatalf("terminal reach = %v", term)
+	}
+}
+
+func TestHermesToolReachFailsClosedOnHookFailureUnderPython(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("POSIX shell hook test")
+	}
+	python, err := exec.LookPath("python3")
+	if err != nil {
+		t.Skip("no python3")
+	}
+	dir := t.TempDir()
+
+	var mu sync.Mutex
+	var spanNames []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		if r.URL.Path == "/v1/traces" {
+			var req struct {
+				ResourceSpans []struct {
+					ScopeSpans []struct {
+						Spans []struct {
+							Name string `json:"name"`
+						} `json:"spans"`
+					} `json:"scopeSpans"`
+				} `json:"resourceSpans"`
+			}
+			if json.Unmarshal(body, &req) == nil {
+				mu.Lock()
+				for _, rs := range req.ResourceSpans {
+					for _, ss := range rs.ScopeSpans {
+						for _, sp := range ss.Spans {
+							spanNames = append(spanNames, sp.Name)
+						}
+					}
+				}
+				mu.Unlock()
+			}
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	hook := filepath.Join(dir, "hook.sh")
+	hookSrc := "#!/bin/sh\n" +
+		"if [ \"$1\" = \"hermes-tool-reach\" ]; then exit 1; fi\n" +
+		"exit 0\n"
+	if err := os.WriteFile(hook, []byte(hookSrc), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	text, err := renderPlugin(pluginConfig{Endpoint: srv.URL, Headers: map[string]string{}, HookCommand: []string{hook}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "terma_plugin.py"), []byte(text), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	driver := `
+import sys, threading
+sys.path.insert(0, sys.argv[1])
+import terma_plugin as p
+# 1. Reach hook exits non-zero -> must fail closed and drop execute_tool read_file span.
+p._on_post_tool_call(session_id="s1", tool_name="read_file", args={"path": "/repoB/secret.go"})
+# 2. Non-reach tool still emits execute_tool write_file span.
+p._on_post_tool_call(session_id="s1", tool_name="write_file", args={"path": "/repoA/a.go"})
+# 3. Overflowing the bounded hook queue also fails closed for reach tools.
+p._hook_worker_started = True
+while not p._hook_queue.full():
+    p._hook_queue.put_nowait(("noop", {}, threading.Event(), [False]))
+p._on_post_tool_call(session_id="s1", tool_name="terminal", args={"command": "cat ../repoB/secret.go"})
+p._flush()
+`
+	if out, err := exec.Command(python, "-c", driver, dir).CombinedOutput(); err != nil {
+		t.Fatalf("python: %v\n%s", err, out)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	var sawWrite bool
+	for _, name := range spanNames {
+		if name == "execute_tool read_file" || name == "execute_tool terminal" {
+			t.Fatalf("failed/overflowed hermes-tool-reach leaked span %q (all=%v)", name, spanNames)
+		}
+		if name == "execute_tool write_file" {
+			sawWrite = true
+		}
+	}
+	if !sawWrite {
+		t.Fatalf("expected execute_tool write_file span; got %v", spanNames)
 	}
 }

@@ -157,14 +157,15 @@ def _cwd():
         return os.getcwd()
 
 
-_hook_queue = queue.Queue()
+_hook_queue = queue.Queue(maxsize=128)
 _hook_worker_lock = threading.Lock()
 _hook_worker_started = False
 
 
 def _hook_worker():
     while True:
-        event, payload, done = _hook_queue.get()
+        event, payload, done, result = _hook_queue.get()
+        ok = False
         try:
             proc = subprocess.Popen(
                 [*CONFIG["hookCommand"], event],
@@ -174,6 +175,7 @@ def _hook_worker():
             )
             try:
                 proc.communicate(json.dumps(payload).encode(), timeout=2.0)
+                ok = proc.returncode == 0
             except Exception:
                 try:
                     proc.kill()
@@ -183,6 +185,7 @@ def _hook_worker():
         except Exception:
             pass
         finally:
+            result[0] = ok
             done.set()
             _hook_queue.task_done()
 
@@ -199,15 +202,17 @@ def _ensure_hook_worker():
 
 def _terma_hook(event, payload, wait=False):
     """Hands an event to `terma hook` in FIFO order so session-start always finishes before
-    tool-reach. When wait=True, blocks until this hook (and earlier ones) finish, up to 2s."""
+    tool-reach. When wait=True, blocks up to 2s and returns True only if the hook exited 0."""
     try:
         _ensure_hook_worker()
         done = threading.Event()
-        _hook_queue.put((event, payload, done))
-        if wait:
-            done.wait(timeout=2.0)
+        result = [False]
+        _hook_queue.put_nowait((event, payload, done, result))
+        if not wait:
+            return True
+        return done.wait(timeout=2.0) and result[0]
     except Exception:
-        pass
+        return False
 
 
 # --- hooks ------------------------------------------------------------------------------
@@ -350,8 +355,8 @@ def _on_post_tool_call(session_id="", tool_name="", args=None, result=None, tool
     if not session_id:
         return
     reach = _tool_reach(tool_name, args)
-    if reach:
-        _terma_hook("hermes-tool-reach", {"session_id": session_id, "cwd": _cwd(), "tool": tool_name, **reach}, wait=True)
+    if reach and not _terma_hook("hermes-tool-reach", {"session_id": session_id, "cwd": _cwd(), "tool": tool_name, **reach}, wait=True):
+        return
     end = time.time()
     start = end - (duration_ms or 0) / 1000.0
     content = CONFIG["includeToolContent"]

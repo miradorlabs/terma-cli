@@ -314,27 +314,40 @@ class Exporter {
 // --- attribution hooks --------------------------------------------------------------
 
 // hookRunner hands session and file events to `terma hook <event>` in FIFO order so
-// session-start always finishes before tool-reach. A terma binary that is not on PATH
-// is noticed once and then left alone.
+// session-start always finishes before tool-reach. A timed-out child is terminated before
+// the queue advances so it cannot race later hooks. A missing terma binary is noticed once.
+const HOOK_TIMEOUT_MS = 2000
+const HOOK_KILL_GRACE_MS = 250
+const MAX_HOOK_QUEUE = 64
+
 function hookRunner(cfg) {
   const argv = Array.isArray(cfg.hookCommand) && cfg.hookCommand.length > 0 ? cfg.hookCommand : ["terma", "hook"]
   let missing = false
   let queue = Promise.resolve()
+  let pending = 0
   const runOnce = (event, payload) => {
     if (missing) return Promise.resolve()
     return new Promise((resolve) => {
       let settled = false
       let child = null
+      let killTimer
       const done = () => {
         if (settled) return
         settled = true
         clearTimeout(timer)
+        if (killTimer) clearTimeout(killTimer)
         resolve()
       }
       const timer = setTimeout(() => {
-        if (child && typeof child.unref === "function") child.unref()
-        done()
-      }, 2000)
+        if (!child) return done()
+        try { child.kill("SIGTERM") } catch {}
+        killTimer = setTimeout(() => {
+          try { child.kill("SIGKILL") } catch {}
+          if (typeof child.unref === "function") child.unref()
+          done()
+        }, HOOK_KILL_GRACE_MS)
+        if (typeof killTimer.unref === "function") killTimer.unref()
+      }, HOOK_TIMEOUT_MS)
       if (typeof timer.unref === "function") timer.unref()
       try {
         child = spawn(argv[0], [...argv.slice(1), event], { stdio: ["pipe", "ignore", "ignore"] })
@@ -352,8 +365,9 @@ function hookRunner(cfg) {
     })
   }
   return function run(event, payload) {
-    if (missing) return Promise.resolve()
-    const step = queue.then(() => runOnce(event, payload))
+    if (missing || pending >= MAX_HOOK_QUEUE) return Promise.resolve()
+    pending++
+    const step = queue.then(() => runOnce(event, payload)).finally(() => { pending-- })
     queue = step.then(() => undefined, () => undefined)
     return step
   }

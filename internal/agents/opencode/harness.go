@@ -1,7 +1,6 @@
 package opencode
 
 import (
-	"bytes"
 	"context"
 	_ "embed"
 	"encoding/json"
@@ -14,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/miradorlabs/terma-cli/internal/account/serverkey"
+	"github.com/miradorlabs/terma-cli/internal/agents/internal/relayexport"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/harness"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
@@ -261,35 +261,36 @@ func (c exporter) Connect(e harness.Exporter, _ bool) error {
 	if err != nil {
 		return err
 	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return fmt.Errorf("create %s: %w", filepath.Dir(path), err)
-	}
 	cfg := c.config(e)
+	return relayexport.WithTemplateLock(path, func() error {
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			return fmt.Errorf("create %s: %w", filepath.Dir(path), err)
+		}
+		if c.root != "" {
+			data, err := json.MarshalIndent(opencodePolicy{Signals: cfg.Signals}, "", "  ")
+			if err != nil {
+				return err
+			}
+			return config.WriteFileAtomic(path, append(data, '\n'), 0o644)
+		}
 
-	if c.root != "" {
-		data, err := json.MarshalIndent(opencodePolicy{Signals: cfg.Signals}, "", "  ")
+		// The helper first: an OpenCode starting between the two writes must find the credential.
+		if e.HelperPath != "" {
+			if err := harness.WriteHelper(e.HelperPath, e.APIKey); err != nil {
+				return err
+			}
+		}
+		src, err := renderPlugin(cfg)
 		if err != nil {
 			return err
 		}
-		return config.WriteFileAtomic(path, append(data, '\n'), 0o644)
-	}
-
-	// The helper first: an OpenCode starting between the two writes must find the credential.
-	if e.HelperPath != "" {
-		if err := harness.WriteHelper(e.HelperPath, e.APIKey); err != nil {
-			return err
+		// 0600 only when the key is inline; with the helper the file holds no secret.
+		mode := fs.FileMode(0o644)
+		if len(cfg.Headers) > 0 {
+			mode = harness.SettingsMode
 		}
-	}
-	src, err := renderPlugin(cfg)
-	if err != nil {
-		return err
-	}
-	// 0600 only when the key is inline; with the helper the file holds no secret.
-	mode := fs.FileMode(0o644)
-	if len(cfg.Headers) > 0 {
-		mode = harness.SettingsMode
-	}
-	return config.WriteFileAtomic(path, src, mode)
+		return config.WriteFileAtomic(path, src, mode)
+	})
 }
 
 // RefreshPlugin re-splices an installed plugin's configuration into this build's source,
@@ -299,26 +300,14 @@ func (exporter) RefreshPlugin() (string, bool, error) {
 	if err != nil {
 		return "", false, err
 	}
-	info, err := os.Stat(path)
-	if errors.Is(err, fs.ErrNotExist) {
-		return path, false, nil
-	}
-	if err != nil {
-		return path, false, err
-	}
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return path, false, err
-	}
-	cfg, ok := readPluginConfig(data)
-	if !ok {
-		return path, false, nil
-	}
-	src, err := renderPlugin(*cfg)
-	if err != nil || bytes.Equal(src, data) {
-		return path, false, err
-	}
-	return path, true, config.WriteFileAtomic(path, src, info.Mode().Perm())
+	return relayexport.RefreshTemplate(path, func(data []byte) ([]byte, bool, error) {
+		cfg, ok := readPluginConfig(data)
+		if !ok {
+			return nil, false, nil
+		}
+		src, err := renderPlugin(*cfg)
+		return src, true, err
+	})
 }
 
 // Disconnect removes the plugin and terma's helper, or the repository's policy file.
@@ -327,24 +316,32 @@ func (c exporter) Disconnect() (harness.DisconnectResult, error) {
 	if err != nil {
 		return harness.DisconnectResult{}, err
 	}
-	data, err := os.ReadFile(path)
-	if errors.Is(err, fs.ErrNotExist) {
+	if _, err := os.Lstat(path); errors.Is(err, fs.ErrNotExist) {
 		return harness.DisconnectResult{}, nil
 	}
-	if err != nil {
-		return harness.DisconnectResult{}, fmt.Errorf("read %s: %w", path, err)
-	}
-	if c.root == "" {
-		if cfg, ok := readPluginConfig(data); ok && cfg.HeadersHelper != "" && harness.IsOwnHelper(c.dir, cfg.HeadersHelper) {
-			if err := harness.DeleteHelper(cfg.HeadersHelper); err != nil {
-				return harness.DisconnectResult{}, err
+	var removed int
+	err = relayexport.WithTemplateLock(path, func() error {
+		data, err := os.ReadFile(path)
+		if errors.Is(err, fs.ErrNotExist) {
+			return nil
+		}
+		if err != nil {
+			return fmt.Errorf("read %s: %w", path, err)
+		}
+		if c.root == "" {
+			if cfg, ok := readPluginConfig(data); ok && cfg.HeadersHelper != "" && harness.IsOwnHelper(c.dir, cfg.HeadersHelper) {
+				if err := harness.DeleteHelper(cfg.HeadersHelper); err != nil {
+					return err
+				}
 			}
 		}
-	}
-	if err := os.Remove(path); err != nil && !errors.Is(err, fs.ErrNotExist) {
-		return harness.DisconnectResult{}, fmt.Errorf("remove %s: %w", path, err)
-	}
-	return harness.DisconnectResult{Removed: 1}, nil
+		if err := os.Remove(path); err != nil && !errors.Is(err, fs.ErrNotExist) {
+			return fmt.Errorf("remove %s: %w", path, err)
+		}
+		removed = 1
+		return nil
+	})
+	return harness.DisconnectResult{Removed: removed}, err
 }
 
 // CurrentCredential returns the key the plugin presents to endpoint for projectID, so a
