@@ -2428,6 +2428,10 @@ func TestAbbreviatedSecretOptionsAndLogicalCd(t *testing.T) {
 		{"unterminated-section", "[core\n\tfilemode = true\n"},
 		{"garbage-before-section", "bare = true\n"},
 		{"bad-section-header", "[core bad]\n\tbare = false\n"},
+		{"unterminated-quote", "[core]\n\tfoo = \"unterminated\n"},
+		{"unterminated-quote-cont", "[core]\n\tfoo = \"unterminated\\"},
+		{"bare-true", "[core]\n\tbare = true\n"},
+		{"bare-valueless", "[core]\n\tbare\n"},
 	} {
 		badCfgRepo := filepath.Join(litDir, tc.name)
 		makeValidGitDir(t, filepath.Join(badCfgRepo, ".git"))
@@ -2437,6 +2441,43 @@ func TestAbbreviatedSecretOptionsAndLogicalCd(t *testing.T) {
 		if got, ok := newScan(badCfgRepo, noEnv, work{deadline: time.Now().Add(time.Minute)}).safeLocate(badCfgRepo); ok {
 			t.Errorf("safeLocate(%s) = (%q, true), want false", tc.name, got)
 		}
+	}
+	// Valid bare=false with escaped quotes and comments still locates the worktree.
+	goodCfgRepo := filepath.Join(litDir, "valid-cfg")
+	makeValidGitDir(t, filepath.Join(goodCfgRepo, ".git"))
+	if err := os.WriteFile(filepath.Join(goodCfgRepo, ".git", "config"), []byte("[core]\n\tbare = false\n\tfoo = \"a\\\"b\" # \"comment\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if got, ok := newScan(goodCfgRepo, noEnv, work{deadline: time.Now().Add(time.Minute)}).safeLocate(goodCfgRepo); !ok || got != goodCfgRepo {
+		t.Errorf("safeLocate(valid-cfg) = (%q, %v), want (%q, true)", got, ok, goodCfgRepo)
+	}
+	// Bare repository nested inside an outer checkout must not walk past the bare repo to the outer checkout.
+	outerRepo := filepath.Join(litDir, "outer-with-bare")
+	makeValidGitDir(t, filepath.Join(outerRepo, ".git"))
+	nestedBare := filepath.Join(outerRepo, "nested.git")
+	makeValidGitDir(t, nestedBare)
+	for _, probe := range []string{nestedBare, filepath.Join(nestedBare, "objects")} {
+		if got, ok := newScan(probe, noEnv, work{deadline: time.Now().Add(time.Minute)}).safeLocate(probe); ok {
+			t.Errorf("safeLocate(%s) = (%q, true), want false inside bare repo", probe, got)
+		}
+	}
+	// Relative XDG_CONFIG_HOME pointing to a malformed git/config fails closed.
+	relXDGRepo := filepath.Join(litDir, "rel-xdg")
+	makeValidGitDir(t, filepath.Join(relXDGRepo, ".git"))
+	if err := os.MkdirAll(filepath.Join(relXDGRepo, "xdg", "git"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(relXDGRepo, "xdg", "git", "config"), []byte("[core]\n\tfoo = \"unterminated\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	relXDGEnv := func(k string) (string, bool) {
+		if k == "XDG_CONFIG_HOME" {
+			return "xdg", true
+		}
+		return "", false
+	}
+	if got, ok := newScan(relXDGRepo, relXDGEnv, work{deadline: time.Now().Add(time.Minute)}).safeLocate(relXDGRepo); ok {
+		t.Errorf("safeLocate(rel-xdg malformed) = (%q, true), want false", got)
 	}
 	// On POSIX, non-file URL-shaped operands still scan their literal relative path.
 	if runtime.GOOS != "windows" {

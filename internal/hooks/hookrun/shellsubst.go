@@ -101,10 +101,8 @@ func mktemp(sc *scan, args []*syntax.Word) (string, bool) {
 	for _, a := range args {
 		if l := a.Lit(); l == "" || opts && l != "--" && strings.HasPrefix(l, "-") && l != "--tmpdir" && l != "--directory" && l != "--quiet" && l != "--dry-run" && (len(l) < 2 || l[1] == '-' || strings.Trim(l[1:], "dqut") != "") {
 			return "", false
-		} else if opts && l == "--" {
-			opts = false
 		} else if opts && strings.HasPrefix(l, "-") {
-			tmp = tmp || l == "--tmpdir" || l[1] != '-' && strings.ContainsRune(l[1:], 't')
+			opts, tmp = l != "--", tmp || l == "--tmpdir" || l[1] != '-' && strings.ContainsRune(l[1:], 't')
 		} else if opts = false; name != "" || !strings.Contains(l, "XXX") || pathLike(l) {
 			return "", false
 		} else {
@@ -180,7 +178,7 @@ func (sc *scan) safeLocate(dir string) (string, bool) {
 					}
 				}
 				return "", false
-			} else if cur == filepath.Dir(cur) {
+			} else if cur == filepath.Dir(cur) || sc.validGitDir(cur) {
 				break
 			}
 		}
@@ -209,17 +207,24 @@ func (sc *scan) hasWorktreeConfig(gitDir string) bool {
 	if filepath.Separator == '/' || sc.envVal("ProgramData") != "" {
 		paths = append(paths, pick(filepath.Separator == '/', "/etc/gitconfig", filepath.Join(sc.envVal("ProgramData"), "Git", "config")))
 	}
-	if xdg := sc.envVal("XDG_CONFIG_HOME"); filepath.IsAbs(xdg) {
+	if xdg := sc.envVal("XDG_CONFIG_HOME"); xdg != "" {
 		paths = append(paths, filepath.Join(xdg, "git", "config"))
 	}
 	if home, ok := sc.homeDir(); ok && home != "" {
 		paths = append(paths, filepath.Join(home, ".gitconfig"), filepath.Join(home, ".config", "git", "config"))
 	}
 	return slices.ContainsFunc(paths, func(p string) bool {
-		inSec, cont := false, false
+		inSec, cont, inQ := false, false, false
+		scanVal := func(v string) bool {
+			cont = false
+			for i := 0; i < len(v) && (inQ || cont || v[i] != '#' && v[i] != ';'); i++ {
+				inQ, cont = pick(!cont && v[i] == '"', !inQ, inQ), !cont && v[i] == '\\'
+			}
+			return !cont && inQ
+		}
 		return sc.fileHasLine(p, func(l string) bool {
-			if t := strings.TrimSpace(strings.TrimPrefix(l, "\ufeff")); cont {
-				cont = (len(t)-len(strings.TrimRight(t, `\`)))%2 == 1
+			if t := strings.TrimRight(strings.TrimLeft(strings.TrimPrefix(l, "\ufeff"), " \t"), "\r"); cont {
+				return scanVal(t)
 			} else if t != "" && t[0] != '#' && t[0] != ';' {
 				if t[0] == '[' {
 					head, after, br := strings.Cut(t[1:], "]")
@@ -227,16 +232,16 @@ func (sc *scan) hasWorktreeConfig(gitDir string) bool {
 					if s := strings.TrimSpace(sec); !br || s == "" || strings.Trim(s, alnum+"-.") != "" || hasQ && !strings.HasSuffix(sub, `"`) || strings.HasPrefix(strings.ToLower(s), "include") {
 						return true
 					}
-					if inSec, t = true, strings.TrimSpace(after); t == "" || t[0] == '#' || t[0] == ';' {
+					if inSec, t = true, strings.TrimLeft(after, " \t"); t == "" || t[0] == '#' || t[0] == ';' {
 						return false
 					}
 				}
-				cont = (len(t)-len(strings.TrimRight(t, `\`)))%2 == 1
-				f := strings.FieldsFunc(t, func(r rune) bool { return r == '=' || r <= ' ' })
-				return !inSec || len(f) == 0 || strings.EqualFold(f[0], "worktree") || strings.IndexByte(alnum[:52], f[0][0]) < 0 || strings.Trim(f[0], alnum+"-") != ""
+				key, val, hasEq := strings.Cut(t, "=")
+				k := strings.TrimSpace(key)
+				return !inSec || k == "" || strings.EqualFold(k, "worktree") || strings.EqualFold(k, "bare") && (!hasEq || !slices.Contains([]string{"false", "no", "off", "0"}, strings.ToLower(strings.TrimSpace(val)))) || strings.IndexByte(alnum[:52], k[0]) < 0 || strings.Trim(k, alnum+"-") != "" || hasEq && scanVal(val)
 			}
 			return false
-		})
+		}) || inQ
 	})
 }
 func (sc *scan) fileHasLine(path string, match func(string) bool) bool {
