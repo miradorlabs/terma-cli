@@ -60,7 +60,7 @@ func TestTheEngineStartsNothing(t *testing.T) {
 	}
 	var log bytes.Buffer
 	opts := d.Engine(t.Context(), t.TempDir(), &config.Config{}, Settings{Hold: time.Second, Heartbeat: time.Minute}, &log)
-	if opts.Hold != time.Second || opts.HeartbeatEvery != time.Minute || opts.Resolve == nil || opts.CatchAll == nil || opts.Logf != nil {
+	if opts.Hold != time.Second || opts.HeartbeatEvery != time.Minute || opts.Resolve != nil || opts.CatchAll != nil || opts.Logf != nil {
 		t.Fatalf("Engine = %+v", opts)
 	}
 	if opts := d.Engine(t.Context(), t.TempDir(), &config.Config{}, Settings{Debug: true}, &log); opts.Logf == nil {

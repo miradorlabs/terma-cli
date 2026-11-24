@@ -47,7 +47,19 @@ func captureCodexReplies(ctx context.Context, e hookrun.Env, r *hookrun.Repo, in
 	// long voice turn's backlog is read at once rather than one batch per turn's end.
 	ctx, cancel := context.WithTimeout(ctx, codexCaptureTimeout)
 	defer cancel()
-	admits := turnAdmission(ctx, e)
+	turns := e.Turns(ctx)
+	titleDest, titleMixed := cursor.TitleDest, cursor.TitleMixed
+	admits := func(cwd string) bool {
+		ok := turns.Admits(cwd)
+		if e.Routing != nil {
+			if key := turns.RouteKey(cwd); !ok || key == "" || (titleDest != "" && titleDest != key) {
+				titleMixed = true
+			} else {
+				titleDest = key
+			}
+		}
+		return ok
+	}
 	status := ""
 	for {
 		next, s, err := readRolloutReplies(ctx, rollout, in.TranscriptPath, cursor, codexReplyMaxText, admits, func(reply reply) error {
@@ -67,9 +79,10 @@ func captureCodexReplies(ctx context.Context, e hookrun.Env, r *hookrun.Repo, in
 			if !reply.At.IsZero() && !reply.At.After(at) {
 				at = reply.At
 			}
-			return e.Spool.Append(spool.Event{Time: at, Name: semconv.TermaAssistantMessageEvent, SessionID: in.SessionID, TraceID: reply.TraceID, Repository: r.Repository, Global: e.Policy.Global(), Attrs: attrs})
+			return e.Spool.Append(turns.Routed(r, reply.Cwd, spool.Event{Time: at, Name: semconv.TermaAssistantMessageEvent, SessionID: in.SessionID, TraceID: reply.TraceID, Repository: r.Repository, Global: e.Policy.Global(), Attrs: attrs}))
 		})
 		status = s
+		next.TitleDest, next.TitleMixed = titleDest, titleMixed
 		if err != nil {
 			e.Logf("codex replies (%s): %v", status, err)
 		}
@@ -90,6 +103,9 @@ func captureCodexReplies(ctx context.Context, e hookrun.Env, r *hookrun.Repo, in
 		hookrun.PruneState(dir, e.Time().Add(-spool.MaxAge))
 	}
 	// A half-written record may be the turn_context that withholds the newest turn.
+	if e.Routing != nil {
+		return status == "caught_up" && !cursor.Withheld && !cursor.TitleMixed && (cursor.TitleDest == "" || cursor.TitleDest == r.RouteKey())
+	}
 	return status == "caught_up" && !cursor.Withheld
 }
 

@@ -42,7 +42,7 @@ func (app *App) checkDesktopGrant(f setupFlags) error {
 // desktop delegates a user session of its own to this CLI's PKCE challenge
 // (auth.LoginWithGrant). A sign-in of another user is never kept. Then the organization
 // is --org, which must be one the user belongs to, and the desktop's when it names one.
-func (app *App) signInWithGrant(cmd *cobra.Command, cfg *config.Config, orgID string) (*config.Config, error) {
+func (app *App) signInWithGrant(cmd *cobra.Command, cfg *config.Config, orgID string) (*config.Config, *organization, error) {
 	ctx := cmd.Context()
 	in, out := cmd.InOrStdin(), cmd.OutOrStdout()
 	if f, ok := in.(*os.File); ok && term.IsTerminal(int(f.Fd())) {
@@ -50,10 +50,10 @@ func (app *App) signInWithGrant(cmd *cobra.Command, cfg *config.Config, orgID st
 	}
 	desktop, err := auth.ReadGrantIdentity(ctx, in, 0)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if desktop.OrgID != "" && !strings.EqualFold(desktop.OrgID, orgID) {
-		return nil, &auth.GrantError{Code: auth.GrantBadInput, Message: "org_id does not match --org"}
+		return nil, nil, &auth.GrantError{Code: auth.GrantBadInput, Message: "org_id does not match --org"}
 	}
 	// The user is the one the auth host answers for. Ids compare without regard to case,
 	// as ReadGrantIdentity reads them.
@@ -76,24 +76,24 @@ func (app *App) signInWithGrant(cmd *cobra.Command, cfg *config.Config, orgID st
 	}
 	signedIn, reused, err := app.reuseStoredSession(ctx, cfg, sameDesktop)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	// A reused sign-in is announced only once --org is checked below, so stdout says
 	// {"reused":true} or {"error":…}, never both.
 	if !reused {
 		installation, err := config.InstallationID(app.dir)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		client := api.NewSignIn(cfg.AuthURL, app.version, installation)
 		cred, err := auth.LoginWithGrant(ctx, client, auth.GrantOptions{Label: auth.DesktopLabel(), In: in, Out: out})
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		if !strings.EqualFold(cred.UserID, desktop.UserID) {
 			// Never kept, and best-effort ended, so it does not linger on the web.
 			_ = app.revokeSession(ctx, cfg, cred)
-			return nil, &auth.GrantError{Code: auth.GrantIdentityMismatch,
+			return nil, nil, &auth.GrantError{Code: auth.GrantIdentityMismatch,
 				Message: "the code signed in another user than Terma Desktop's"}
 		}
 		cred.Label = auth.DesktopLabel()
@@ -107,24 +107,25 @@ func (app *App) signInWithGrant(cmd *cobra.Command, cfg *config.Config, orgID st
 			if _, refused := errors.AsType[*auth.GrantError](err); refused {
 				_ = app.revokeSession(ctx, cfg, cred)
 			}
-			return nil, err
+			return nil, nil, err
 		}
 		// Another user's stored sign-in is replaced and ended.
 		if err := app.storeLogin(ctx, cfg, cred); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		signedIn = cred
 	}
 	// The organization checked above, from the account service's own list, is recorded.
 	if err := recordOrganization(app.dir, cfg.ProfileName, signedIn, chosen); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if reused {
 		if err := auth.WriteGrantReused(out); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	}
-	return app.loadConfig()
+	cfg, err = app.loadConfig()
+	return cfg, chosen, err
 }
 
 // checkGrantOrganization refuses, as bad input, an --org the signed-in user does not belong
@@ -156,6 +157,9 @@ func grantOrganization(orgs []organization, err error, orgID string) (*organizat
 	org, err := matchOrganization(orgs, orgID)
 	if errors.As(err, new(noMatchError)) {
 		return nil, &auth.GrantError{Code: auth.GrantBadInput, Message: "--org is not an organization the signed-in user belongs to", Err: err}
+	}
+	if err == nil && org != nil && strings.EqualFold(org.Type, "personal") {
+		return nil, &auth.GrantError{Code: auth.GrantBadInput, Message: "Personal cannot be enabled via --desktop-grant; run `terma setup` interactively"}
 	}
 	return org, err
 }

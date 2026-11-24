@@ -32,7 +32,11 @@ func (Agent) Coverage() (attribution, telemetry agents.CapabilitySupport) {
 		agents.CapabilitySupport{Level: agents.SupportPartial, Note: "Hermes has no usable OTLP export; terma's plugin exports tokens, cost and tool calls through the local relay only; auxiliary calls (titles, compression) fire no hook"}
 }
 
+// RefreshMachine rewrites an installed Hermes plugin with this build's template.
+func (Agent) RefreshMachine() (string, bool, error) { return refreshPlugin() }
+
 var (
-	_ agents.Covered = Agent{}
-	_ agents.Agent   = Agent{}
+	_ agents.Covered          = Agent{}
+	_ agents.Agent            = Agent{}
+	_ agents.MachineRefresher = Agent{}
 )

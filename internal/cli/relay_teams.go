@@ -47,24 +47,19 @@ func (app *App) loadProfileConfig(name string) (*config.Config, error) {
 	return config.Load(app.dir, app.stateDir, overrides)
 }
 
-// teamHeartbeatSend delivers a heartbeat on a routed profile (when routing/<profile>.json
-// exists) to the first Active team of cfg's environment (Personal first, then selected org
-// teams). On HTTP 403 ORG_NOT_ACCESSIBLE it neither retires nor refreshes the user token
-// and skips to the next Active team. Returns handled=false only when no routing state file
-// exists yet so pre-cutover profiles keep using the legacy heartbeat path until cutover.
-func (app *App) teamHeartbeatSend(ctx context.Context, src *signInSource, cfg *config.Config, lane string, beat *logspb.LogsData) (handled bool, err error) {
+// teamHeartbeatSend delivers a heartbeat to the first Active team of cfg's environment
+// (Personal first, then selected org teams) from routing/<profile>.json. Missing, corrupt,
+// or wrong-account routing state fails closed without falling back to Profile.Team.
+func (app *App) teamHeartbeatSend(ctx context.Context, src *signInSource, cfg *config.Config, lane string, beat *logspb.LogsData) error {
 	if app.stateDir == "" || cfg.ProfileName == "" {
-		return false, nil
+		return relay.ErrNoKey
 	}
 	st, found, err := routing.Load(app.stateDir, cfg.ProfileName)
 	if err != nil {
-		return true, err
+		return err
 	}
-	if !found {
-		return false, nil
-	}
-	if lane == "" || lane == sendas.AccountUnreadable || st.Account != lane {
-		return true, relay.ErrNoKey
+	if !found || lane == "" || lane == sendas.AccountUnreadable || st.Account != lane {
+		return relay.ErrNoKey
 	}
 	order := make([]routing.Team, 0, len(st.Teams))
 	if n := len(st.Teams); n > 0 && st.Teams[n-1].Personal {
@@ -89,23 +84,23 @@ func (app *App) teamHeartbeatSend(ctx context.Context, src *signInSource, cfg *c
 			}
 			key, kerr := keystore.Get(app.dir, t.TeamID)
 			if kerr != nil {
-				return true, kerr
+				return kerr
 			}
 			if key == "" {
 				continue
 			}
-			return true, sendHeartbeat(ctx, endpoint, key, "", b)
+			return sendHeartbeat(ctx, endpoint, key, "", b)
 		}
 		if !auth.ValidAccountKey(lane) || lane != cfg.Account || src == nil || src.cfg == nil || !sameHost(cfg.AuthURL, src.cfg.AuthURL) {
-			return true, relay.ErrNoKey
+			return relay.ErrNoKey
 		}
 		if !tokenLoaded {
 			tok, terr := src.Token(ctx, lane)
 			if terr != nil {
-				return true, terr
+				return terr
 			}
 			if tok == "" {
-				return true, relay.ErrNoKey
+				return relay.ErrNoKey
 			}
 			token, tokenLoaded = tok, true
 		}
@@ -114,25 +109,25 @@ func (app *App) teamHeartbeatSend(ctx context.Context, src *signInSource, cfg *c
 		}
 		serr := sendHeartbeat(ctx, endpoint, token, t.TeamID, b)
 		if serr == nil {
-			return true, nil
+			return nil
 		}
 		if refusal, ok := errors.AsType[*heartbeatError](serr); ok {
 			switch {
 			case refusal.reason == sendas.ReasonSignInRetired:
 				src.Retired(token)
-				return true, serr
+				return serr
 			case refusal.status == http.StatusUnauthorized:
 				src.Refused(ctx, token)
-				return true, serr
+				return serr
 			case refusal.status == http.StatusForbidden && refusal.reason == heartbeatOrgNotAccessible:
 				lastErr = serr
 				continue
 			}
 		}
-		return true, serr
+		return serr
 	}
 	if lastErr != nil {
-		return true, lastErr
+		return lastErr
 	}
-	return true, relay.ErrNoKey
+	return relay.ErrNoKey
 }

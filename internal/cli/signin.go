@@ -58,21 +58,21 @@ type orgAsker func(orgs []organization, current string) (*organization, error)
 // chooses the organization setup works in: --org, else the one chosen before, asking
 // first when the person belongs to several. The count is how many organizations the
 // current one was kept among without asking.
-func (app *App) setupSignIn(cmd *cobra.Command, cfg *config.Config, opts signInOptions, ask orgAsker) (*config.Config, int, error) {
+func (app *App) setupSignIn(cmd *cobra.Command, cfg *config.Config, opts signInOptions, ask orgAsker) (*config.Config, *organization, int, error) {
 	cred, err := app.signIn(cmd, cfg, opts)
 	if err != nil {
-		return nil, 0, err
+		return nil, nil, 0, err
 	}
 	cfg, err = app.loadConfig()
 	if err != nil {
-		return nil, 0, err
+		return nil, nil, 0, err
 	}
-	kept, err := app.chooseOrganization(cmd.Context(), cfg, cred, opts.org, ask)
+	org, kept, err := app.chooseOrganization(cmd.Context(), cfg, cred, opts.org, ask)
 	if err != nil {
-		return nil, 0, err
+		return nil, nil, 0, err
 	}
 	cfg, err = app.loadConfig()
-	return cfg, kept, err
+	return cfg, org, kept, err
 }
 
 // askOrganization is setup's orgAsker: a picker on a terminal a person watches, else nil.
@@ -278,17 +278,17 @@ var errNoOrganization = errors.New("you belong to no Terma organization yet: cre
 // (--org), else the profile's current one when ask is nil or it is their only one, else
 // their only one, else ask's pick. kept is how many the current one was kept among without
 // asking. Only an organization the person's sign-in lists is ever recorded.
-func (app *App) chooseOrganization(ctx context.Context, cfg *config.Config, cred *auth.Credential, want orgRef, ask orgAsker) (int, error) {
+func (app *App) chooseOrganization(ctx context.Context, cfg *config.Config, cred *auth.Credential, want orgRef, ask orgAsker) (*organization, int, error) {
 	client, err := api.New(cfg, api.Options{Version: app.version, Credential: cred})
 	if err != nil {
-		return 0, err
+		return nil, 0, err
 	}
 	orgs, err := fetchOrganizations(ctx, client)
 	if err != nil {
-		return 0, fmt.Errorf("list your organizations: %w", err)
+		return nil, 0, fmt.Errorf("list your organizations: %w", err)
 	}
 	if len(orgs) == 0 {
-		return 0, errNoOrganization
+		return nil, 0, errNoOrganization
 	}
 	current := slices.IndexFunc(orgs, func(o organization) bool { return o.ID == cfg.OrganizationID })
 	var org *organization
@@ -305,12 +305,12 @@ func (app *App) chooseOrganization(ctx context.Context, cfg *config.Config, cred
 	case current >= 0:
 		org, kept = &orgs[current], len(orgs)
 	default:
-		return 0, fmt.Errorf("you belong to %d organizations: pass --org to choose one", len(orgs))
+		return nil, 0, fmt.Errorf("you belong to %d organizations: pass --org to choose one", len(orgs))
 	}
 	if err != nil {
-		return 0, err
+		return nil, 0, err
 	}
-	return kept, recordOrganization(app.dir, cfg.ProfileName, cred, org)
+	return org, kept, recordOrganization(app.dir, cfg.ProfileName, cred, org)
 }
 
 // errNotYourOrganization is an --org the person's organizations, as the account service

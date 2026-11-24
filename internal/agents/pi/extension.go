@@ -4,13 +4,11 @@ import (
 	_ "embed"
 	"encoding/json"
 	"errors"
-	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/agents/internal/relayexport"
-	"github.com/miradorlabs/terma-cli/internal/config"
 )
 
 // Pi has no OpenTelemetry of its own, so terma's extension is its exporter, spliced with
@@ -19,7 +17,11 @@ import (
 //go:embed terma.ts
 var extensionTemplate string
 
-const extensionConfigMarker = "const CONFIG: TermaConfig | null = null /* terma:config */"
+const (
+	extensionConfigPrefix = "const CONFIG: TermaConfig | null = "
+	extensionConfigSuffix = " /* terma:config */"
+	extensionConfigMarker = extensionConfigPrefix + "null" + extensionConfigSuffix
+)
 
 type extensionConfig struct {
 	Version            int               `json:"version"`
@@ -48,7 +50,7 @@ func renderExtension(cfg extensionConfig) (string, error) {
 	if !strings.Contains(extensionTemplate, extensionConfigMarker) {
 		return "", errors.New("pi extension template has no configuration line")
 	}
-	return strings.Replace(extensionTemplate, extensionConfigMarker, "const CONFIG: TermaConfig | null = "+string(data)+" /* terma:config */", 1), nil
+	return strings.Replace(extensionTemplate, extensionConfigMarker, extensionConfigPrefix+string(data)+extensionConfigSuffix, 1), nil
 }
 
 // writeExtension renders cfg to path, private to this user since it holds the relay's token.
@@ -57,8 +59,26 @@ func writeExtension(path string, cfg extensionConfig) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
-		return "", err
+	return path, relayexport.WriteOwn(path, []byte(text), 0o600)
+}
+
+// refreshExtension re-splices an installed Pi extension's configuration into this build's template.
+func refreshExtension() (string, bool, error) {
+	dir, err := agentDir()
+	if err != nil {
+		return "", false, err
 	}
-	return path, config.WriteFileAtomic(path, []byte(text), 0o600)
+	return relayexport.RefreshTemplate(filepath.Join(dir, "extensions", "terma.ts"), func(data []byte) ([]byte, bool, error) {
+		_, rest, ok := strings.Cut(string(data), extensionConfigPrefix)
+		if !ok {
+			return nil, false, nil
+		}
+		literal, _, ok := strings.Cut(rest, extensionConfigSuffix)
+		var cfg extensionConfig
+		if !ok || json.Unmarshal([]byte(literal), &cfg) != nil || cfg.Version != 1 || cfg.Endpoint == "" {
+			return nil, false, nil
+		}
+		text, err := renderExtension(cfg)
+		return []byte(text), err == nil, err
+	})
 }

@@ -35,6 +35,7 @@ func (app *App) doctorEnv(ctx context.Context) doctor.Env {
 	env.Root, env.GitDir, env.RepoErr = workspaceHere(ctx)
 	if env.Config != nil {
 		env.Probes = app.doctorProbes(env.Config)
+		env.Routing = app.routingFacts(env.Config)
 	}
 	return env
 }

@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -19,6 +20,8 @@ import (
 	termaproject "github.com/miradorlabs/terma-cli/internal/project"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
+	"github.com/miradorlabs/terma-cli/internal/routing"
+	"github.com/miradorlabs/terma-cli/internal/runs"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
@@ -139,6 +142,9 @@ func (app *App) undoSetup(ctx context.Context, out io.Writer, keepToken bool) er
 		}
 		fmt.Fprintln(out, "Stopped the relay and removed its state.")
 	}
+	if err := app.removeRoutingState(); err != nil {
+		return fmt.Errorf("remove routing state: %w", err)
+	}
 	// Only a warning: everything that had to happen in order has, and --sign-out still should.
 	if err := app.removeHookState(); err != nil {
 		fmt.Fprintf(out, "Warning: %v; run `terma teardown` again to finish.\n", err)
@@ -146,11 +152,89 @@ func (app *App) undoSetup(ctx context.Context, out io.Writer, keepToken bool) er
 	return nil
 }
 
+// removeRoutingState deletes every profile's routing/<profile>.json via CAS Delete (or
+// DeleteCorrupt under the lock when a file is unreadable), retrying on a concurrent
+// refresh or repair.
+func (app *App) removeRoutingState() error {
+	profiles, err := app.routingProfilesToRemove()
+	if err != nil {
+		return err
+	}
+	var errs []error
+	for _, profile := range profiles {
+		if derr := app.removeProfileRoutingState(profile); derr != nil {
+			errs = append(errs, fmt.Errorf("profile %q: %w", profile, derr))
+		}
+	}
+	if err := errors.Join(errs...); err != nil {
+		return err
+	}
+	_ = os.Remove(filepath.Join(app.stateDir, routing.StatesDir))
+	return nil
+}
+
+func (app *App) routingProfilesToRemove() ([]string, error) {
+	seen := map[string]struct{}{}
+	add := func(name string) {
+		if _, err := routing.StatePath(app.stateDir, name); err == nil {
+			seen[name] = struct{}{}
+		}
+	}
+	add(config.DefaultProfile)
+	if cfg, err := app.loadConfig(); err == nil {
+		add(cfg.ProfileName)
+	}
+	if file, err := config.LoadFile(app.dir); err == nil && file != nil {
+		add(file.ActiveProfile)
+		for name := range file.Profiles {
+			add(name)
+		}
+	}
+	entries, err := os.ReadDir(filepath.Join(app.stateDir, routing.StatesDir))
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return nil, err
+	}
+	for _, entry := range entries {
+		name := entry.Name()
+		if entry.IsDir() || strings.HasPrefix(name, ".") || !strings.HasSuffix(name, ".json") {
+			continue
+		}
+		add(strings.TrimSuffix(name, ".json"))
+	}
+	profiles := make([]string, 0, len(seen))
+	for profile := range seen {
+		profiles = append(profiles, profile)
+	}
+	slices.Sort(profiles)
+	return profiles, nil
+}
+
+func (app *App) removeProfileRoutingState(profile string) error {
+	for range 3 {
+		st, found, err := routing.Load(app.stateDir, profile)
+		if err != nil {
+			err = routing.DeleteCorrupt(app.stateDir, profile)
+		} else if !found {
+			err = routing.ErrNoState
+		} else {
+			err = routing.Delete(app.stateDir, profile, st.Expect())
+		}
+		if err == nil || errors.Is(err, routing.ErrNoState) {
+			return nil
+		}
+		if errors.Is(err, routing.ErrStaleGeneration) {
+			continue
+		}
+		return err
+	}
+	return routing.ErrStaleGeneration
+}
+
 // removeHookState removes what hooks kept per session, which only they would prune, and
 // the policies they ran under.
 func (app *App) removeHookState() error {
 	var errs []error
-	for _, name := range append(app.hookStateDirs(), hookrun.AgentsDir, termaproject.WorkspacesDir, spool.Dir, config.PoliciesDir) {
+	for _, name := range append(app.hookStateDirs(), hookrun.AgentsDir, hookrun.PushesDir, runs.Dir, termaproject.WorkspacesDir, spool.Dir, config.PoliciesDir) {
 		errs = append(errs, os.RemoveAll(filepath.Join(app.stateDir, name)))
 	}
 	if err := errors.Join(errs...); err != nil {

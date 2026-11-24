@@ -48,6 +48,17 @@ type fakeAuth struct {
 	// orgGone answers /v1/projects and /v1/policy for this organization with the 403 that
 	// says the person lost access.
 	orgGone string
+	// orgGonePolicyOnly answers /v1/projects normally but returns 403 ORG_NOT_ACCESSIBLE on
+	// /v1/policy for teams in this organization.
+	orgGonePolicyOnly string
+	// projects overrides projectsIn(org) per organization when set.
+	projects map[string][]project
+	// goneTeams answers /v1/policy with 403 PROJECT_NOT_FOUND for these team IDs.
+	goneTeams map[string]bool
+	// forbiddenTeams answers /v1/policy with a bare 403 PERMISSION_DENIED (no reason).
+	forbiddenTeams map[string]bool
+	// slow, when set, runs at the start of /v1/projects and /v1/policy handling.
+	slow func(*http.Request)
 	// serverKeys are live team server keys, each to its team (serveServerKey).
 	serverKeys map[string]string
 	// keyPolicies counts the policies read with a server key.
@@ -71,6 +82,8 @@ type fakeAuth struct {
 	// revoking, when set, is told of each revoke, which then waits for holdRevokes to close.
 	revoking    chan struct{}
 	holdRevokes chan struct{}
+	// onPolicy, when set, intercepts /v1/policy requests; returning true finishes the response.
+	onPolicy func(w http.ResponseWriter, r *http.Request) bool
 }
 
 // fakeGrant is who a code signs in, and whether a desktop delegated it.
@@ -140,6 +153,12 @@ func (f *fakeAuth) serve(w http.ResponseWriter, r *http.Request) {
 	member := func(org string) bool {
 		return slices.ContainsFunc(orgs, func(o organization) bool { return o.ID == org })
 	}
+	projectsOf := func(org string) []project {
+		if f.projects != nil {
+			return f.projects[org]
+		}
+		return projectsIn(org)
+	}
 	switch r.URL.Path {
 	case "/v1/whoami":
 		f.whoamis.Add(1)
@@ -154,6 +173,9 @@ func (f *fakeAuth) serve(w http.ResponseWriter, r *http.Request) {
 		}
 		_ = json.NewEncoder(w).Encode(listOrganizationsResponse{Organizations: orgs})
 	case "/v1/projects":
+		if f.slow != nil {
+			f.slow(r)
+		}
 		org := r.URL.Query().Get("organization_id")
 		switch {
 		case org == "":
@@ -164,21 +186,41 @@ func (f *fakeAuth) serve(w http.ResponseWriter, r *http.Request) {
 		case f.projectsUnavailable || !member(org):
 			unavailable(w)
 		default:
-			_ = json.NewEncoder(w).Encode(listProjectsResponse{Projects: projectsIn(org)})
+			_ = json.NewEncoder(w).Encode(listProjectsResponse{Projects: projectsOf(org)})
 		}
 	case "/v1/policy":
+		if f.slow != nil {
+			f.slow(r)
+		}
 		f.policies.Add(1)
+		if f.onPolicy != nil && f.onPolicy(w, r) {
+			return
+		}
 		team := r.URL.Query().Get("project_id")
 		if team == "" {
 			http.Error(w, "missing project_id", http.StatusBadRequest)
 			return
 		}
-		if f.orgGone != "" && slices.ContainsFunc(projectsIn(f.orgGone), func(p project) bool { return p.ID == team }) {
+		if f.goneTeams[team] {
+			w.WriteHeader(http.StatusForbidden)
+			fmt.Fprint(w, `{"error":{"code":"PERMISSION_DENIED","reason":"PROJECT_NOT_FOUND","message":"team not found"}}`)
+			return
+		}
+		if f.forbiddenTeams[team] {
+			w.WriteHeader(http.StatusForbidden)
+			fmt.Fprint(w, `{"error":{"code":"PERMISSION_DENIED","message":"forbidden"}}`)
+			return
+		}
+		if f.orgGone != "" && slices.ContainsFunc(projectsOf(f.orgGone), func(p project) bool { return p.ID == team }) {
+			orgNotAccessible(w)
+			return
+		}
+		if f.orgGonePolicyOnly != "" && slices.ContainsFunc(projectsOf(f.orgGonePolicyOnly), func(p project) bool { return p.ID == team }) {
 			orgNotAccessible(w)
 			return
 		}
 		if f.scopedPolicies && !slices.ContainsFunc(orgs, func(o organization) bool {
-			return slices.ContainsFunc(projectsIn(o.ID), func(p project) bool { return p.ID == team })
+			return slices.ContainsFunc(projectsOf(o.ID), func(p project) bool { return p.ID == team })
 		}) {
 			unavailable(w)
 			return

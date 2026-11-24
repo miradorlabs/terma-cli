@@ -124,7 +124,10 @@ func PrePush(ctx context.Context, env Env) error {
 		return nil
 	}
 	r, err := env.Repo(ctx)
-	if err != nil || r.GitDir == "" {
+	if err != nil {
+		r = env.sandboxedGitRepo(ctx)
+	}
+	if r == nil || r.GitDir == "" {
 		return nil
 	}
 	input, err := io.ReadAll(io.LimitReader(env.Stdin, maxPushInput))
@@ -174,8 +177,12 @@ func PrePush(ctx context.Context, env Env) error {
 	}
 	vcsAttrs(attrs, r)
 	// No relay claim: the sessions stamped into pushed commits did not make the push.
-	rec.Event = env.stamp(r, spool.Event{Name: semconv.TermaPushEvent, Time: rec.Time, Attrs: attrs})
+	rec.Event = env.stampFor(r, spool.Event{Name: semconv.TermaPushEvent, Time: rec.Time, Attrs: attrs}, true, false)
 	path := filepath.Join(env.StateDir, PushesDir, rec.ID+".json")
+	if env.Routing != nil && r.dest == nil {
+		env.park(r, parkedPushes, rec)
+		return nil
+	}
 	if err := config.WriteJSON(path, rec, 0o600); err != nil {
 		env.Logf("record push: %v", err)
 		env.park(r, parkedPushes, rec)
@@ -193,18 +200,27 @@ func (e Env) unparkPushes(r *Repo) {
 	}
 	var recorded []string
 	err := r.parking().Unpark(parkedPushes, func(lines []byte) error {
+		var kept []pushRecord
+		noDest := 0
 		for line := range bytes.Lines(lines) {
 			var rec pushRecord
 			if json.Unmarshal(line, &rec) != nil || rec.ID == "" {
 				continue
 			}
+			if e.Routing != nil && rec.Event.Enrollment == "" && rec.Event.HoldKey == "" {
+				noDest += max(len(rec.Refs), 1)
+			} else {
+				kept = append(kept, rec)
+			}
+		}
+		for _, rec := range kept {
 			path := filepath.Join(e.StateDir, PushesDir, rec.ID+".json")
 			if err := config.WriteJSON(path, rec, 0o600); err != nil {
 				return err
 			}
 			recorded = append(recorded, path)
 		}
-		return nil
+		return e.countUnparkNoDest(r, len(kept) > 0, noDest)
 	})
 	if err != nil {
 		// Still parked: the next hook records them all again and awaits each once.
@@ -309,6 +325,11 @@ func reportPush(ctx context.Context, env Env, path string, rec pushRecord) {
 			env.CountLost(nil, sendas.LostAmbiguousPush, 1)
 			rec.Refs[i].Reported = true
 		default:
+			if env.Routing != nil && ev.Enrollment == "" && ev.HoldKey == "" {
+				env.CountLost(nil, LostNoDestination, 1)
+				rec.Refs[i].Reported = true
+				continue
+			}
 			lane, owned := pushLane(rec.lane(), pushStore(env, rec), sessions)
 			if !owned {
 				env.CountLost(nil, sendas.LostAmbiguousPush, 1)

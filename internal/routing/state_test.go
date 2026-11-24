@@ -717,3 +717,47 @@ func TestTeamReturnsDefensiveCopy(t *testing.T) {
 		t.Fatalf("State.Team aliased internal state: %+v", fresh)
 	}
 }
+
+func TestDeleteCorruptAndReplaceCorruptUnderLock(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+
+	if err := DeleteCorrupt(dir, "default"); !errors.Is(err, ErrNoState) {
+		t.Fatalf("DeleteCorrupt absent = %v, want ErrNoState", err)
+	}
+	if _, err := ReplaceCorrupt(dir, "default", testAccount, func(*State) error { return nil }); !errors.Is(err, ErrNoState) {
+		t.Fatalf("ReplaceCorrupt absent = %v, want ErrNoState", err)
+	}
+
+	st, err := Create(dir, "default", testAccount, func(s *State) error {
+		return s.Bind("github.com/acme/api", "acme", false)
+	})
+	must(t, err)
+	if err := DeleteCorrupt(dir, "default"); !errors.Is(err, ErrStaleGeneration) {
+		t.Fatalf("DeleteCorrupt on valid state = %v, want ErrStaleGeneration", err)
+	}
+	if _, err := ReplaceCorrupt(dir, "default", bobAccount, func(*State) error { return nil }); !errors.Is(err, ErrStateExists) {
+		t.Fatalf("ReplaceCorrupt on valid state = %v, want ErrStateExists", err)
+	}
+	still, ok, err := Load(dir, "default")
+	if err != nil || !ok || still.StateID != st.StateID || still.Account != testAccount {
+		t.Fatalf("valid state altered by corrupt helpers: %+v ok=%v err=%v", still, ok, err)
+	}
+
+	path, err := StatePath(dir, "default")
+	must(t, err)
+	must(t, os.WriteFile(path, []byte("{corrupt"), 0o600))
+	repaired, err := ReplaceCorrupt(dir, "default", bobAccount, func(s *State) error {
+		return s.Bind("github.com/bob/app", "bobco", false)
+	})
+	must(t, err)
+	if repaired.Account != bobAccount || repaired.Generation != 1 || repaired.Bindings["github.com/bob/app"].Organization != "bobco" {
+		t.Fatalf("repaired = %+v", repaired)
+	}
+
+	must(t, os.WriteFile(path, []byte("{corrupt-again"), 0o600))
+	must(t, DeleteCorrupt(dir, "default"))
+	if _, ok, err := Load(dir, "default"); err != nil || ok {
+		t.Fatalf("corrupt file survived DeleteCorrupt: ok=%v err=%v", ok, err)
+	}
+}

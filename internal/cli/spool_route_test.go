@@ -13,6 +13,8 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/doctor"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
+	"github.com/miradorlabs/terma-cli/internal/routing"
+	"github.com/miradorlabs/terma-cli/internal/sendas"
 )
 
 const (
@@ -59,8 +61,12 @@ func routingSandbox(t *testing.T) {
 	t.Helper()
 	useConfigDir(t, t.TempDir())
 	t.Setenv("TERMA_OTLP_URL", "")
+	cfg, err := testApp.loadConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
 	if err := config.UpdateProfile(testApp.dir, config.DefaultProfile, func(p *config.Profile) {
-		p.OTLPURL, p.ServerKeySignIn = "http://127.0.0.1:1", true
+		p.OTLPURL, p.ServerKeySignIn, p.ServerKeyAuthURL = "http://127.0.0.1:1", true, cfg.AuthURL
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -70,15 +76,60 @@ func routingSandbox(t *testing.T) {
 // with the keys the keystore holds.
 func serverKeyProfile(t *testing.T) {
 	t.Helper()
-	if err := config.UpdateProfile(testApp.dir, config.DefaultProfile, func(p *config.Profile) { p.ServerKeySignIn = true }); err != nil {
+	cfg, err := testApp.loadConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := config.UpdateProfile(testApp.dir, config.DefaultProfile, func(p *config.Profile) {
+		p.ServerKeySignIn, p.ServerKeyAuthURL = true, cfg.AuthURL
+	}); err != nil {
 		t.Fatal(err)
 	}
 }
 
-// routeProject stores a project's key with the host it belongs to.
+// routeProject stores a project's key with the host it belongs to and enrolls the team in
+// routing.State under sendas.NoPersonLane.
 func routeProject(t *testing.T, projectID, key, endpoint string) {
 	t.Helper()
 	if err := keystore.Set(testApp.dir, projectID, key, keystore.Hosts{OTLP: endpoint}); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := testApp.loadConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	orgID := "org-" + projectID
+	repo := "github.com/acme/" + projectID
+	tm := routing.Team{
+		OrganizationID: orgID,
+		AuthURL:        cfg.AuthURL,
+		TeamID:         projectID,
+		Policy: config.Policy{
+			Mode: config.ModeRepo, Repositories: []string{repo},
+			TeamID: projectID, OrganizationID: orgID, AuthURL: cfg.AuthURL,
+			Revision: 1, FetchedAt: time.Now(),
+		},
+	}
+	add := func(s *routing.State) error {
+		for _, cur := range s.Teams {
+			if cur.TeamID == projectID {
+				s.Deselect(cur.EnrollmentID)
+				break
+			}
+		}
+		if _, err := s.Select(tm); err != nil {
+			return err
+		}
+		return s.Bind(repo, orgID, false)
+	}
+	st, found, err := routing.Load(testApp.stateDir, config.DefaultProfile)
+	switch {
+	case err != nil || !found || st.Account != sendas.NoPersonLane:
+		_, err = routing.Replace(testApp.stateDir, config.DefaultProfile, nil, sendas.NoPersonLane, add)
+	default:
+		_, err = routing.Update(testApp.stateDir, config.DefaultProfile, st.ExpectConsent(), add)
+	}
+	if err != nil {
 		t.Fatal(err)
 	}
 }
@@ -204,9 +255,19 @@ func TestSpoolFlushARefusedProjectWaitsAlone(t *testing.T) {
 	if queued := queuedProjects(t); len(queued) != 1 || queued[0] != routeDevProject {
 		t.Fatalf("queue = %v, want the refused project's event only", queued)
 	}
-	// Only the refused project waits out a retry window (doctor reports it as failing delivery).
-	if windows := testApp.openSpool().RetryWindows(time.Now()); len(windows) != 1 || windows[routeDevProject].IsZero() {
-		t.Fatalf("retry windows = %v, want only %s's", windows, routeDevProject)
+	// Only the refused enrollment waits out a retry window (keyed by enrollment/<enrollmentID>).
+	st, _, err := routing.Load(testApp.stateDir, config.DefaultProfile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var devEnr string
+	for _, tm := range st.Teams {
+		if tm.TeamID == routeDevProject {
+			devEnr = "enrollment/" + tm.EnrollmentID
+		}
+	}
+	if windows := testApp.openSpool().RetryWindows(time.Now()); len(windows) != 1 || windows[devEnr].IsZero() {
+		t.Fatalf("retry windows = %v, want only %s's (%s)", windows, routeDevProject, devEnr)
 	}
 
 	if _, err := runTerma(t, "spool", "flush", "--force"); err == nil {

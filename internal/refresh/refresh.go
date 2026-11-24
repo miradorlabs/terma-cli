@@ -8,8 +8,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"path/filepath"
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
+	"github.com/miradorlabs/terma-cli/internal/hooks/hookmgr"
 	"github.com/miradorlabs/terma-cli/internal/selfupdate"
 )
 
@@ -44,14 +46,67 @@ func (r Refresher) machine(ctx context.Context) ([]string, error) {
 func (r Refresher) Machine() ([]string, error) {
 	var changed []string
 	var errs []error
+	refreshed := map[string]bool{}
 	for _, a := range r.Agents.With[agents.MachineRefresher]() {
+		refreshed[a.Name()] = true
 		if path, ok, err := a.RefreshMachine(); err != nil {
 			errs = append(errs, fmt.Errorf("%s: %w", a.Name(), err))
 		} else if ok {
 			changed = append(changed, path)
 		}
 	}
+	for _, a := range r.Agents.With[agents.UserHooks]() {
+		if refreshed[a.Name()] || !r.Agents.IsSupported(a.Name()) {
+			continue
+		}
+		if path, ok, err := refreshUserHooks(a); err != nil {
+			errs = append(errs, fmt.Errorf("%s: %w", a.Name(), err))
+		} else if ok {
+			changed = append(changed, path)
+		}
+	}
 	return changed, errors.Join(errs...)
+}
+
+// refreshUserHooks updates an already-installed machine-wide hooks file for a to this
+// build's hook set without creating a file that does not exist or changing an agent terma
+// did not install into.
+func refreshUserHooks(a agents.UserHooks) (string, bool, error) {
+	path, err := a.UserHooksPath()
+	if err != nil || path == "" {
+		return "", false, err
+	}
+	data, err := hookmgr.ReadFile(path)
+	if err != nil || data == nil {
+		return path, false, err
+	}
+	termas := hookmgr.TermaPaths(data)
+	if len(termas) != 1 {
+		return path, false, nil
+	}
+	dir := filepath.Dir(path)
+	cmd := hookmgr.UserHookCommand(termas[0])
+	plan, err := a.PlanUserHooks(dir, cmd, true)
+	if err != nil {
+		return path, false, err
+	}
+	changed := false
+	if !plan.Empty() {
+		if err := hookmgr.ApplyThroughLinks(dir, plan); err != nil {
+			return path, false, err
+		}
+		changed = true
+	}
+	if t, ok := a.(agents.HookTrusting); ok {
+		done, err := t.SyncHookTrust(path, cmd)
+		if err != nil {
+			return path, changed, err
+		}
+		if done.Approved > 0 || done.Withdrawn > 0 {
+			changed = true
+		}
+	}
+	return path, changed, nil
 }
 
 // Run is `terma update --refresh`: it refreshes the machine's files and returns the paths

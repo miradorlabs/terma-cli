@@ -95,7 +95,7 @@ func TestSetupSignInChoosesAmongSeveralOrganizations(t *testing.T) {
 			cmd.SetOut(io.Discard)
 			cmd.SetErr(io.Discard)
 			cmd.SetIn(strings.NewReader(""))
-			got, kept, err := testApp.setupSignIn(cmd, cfg, signInOptions{org: parseOrgRef(tc.org), noBrowser: true}, ask)
+			got, _, kept, err := testApp.setupSignIn(cmd, cfg, signInOptions{org: parseOrgRef(tc.org), noBrowser: true}, ask)
 			if asked != tc.wantAsked {
 				t.Errorf("asked = %v, want %v", asked, tc.wantAsked)
 			}

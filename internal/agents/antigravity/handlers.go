@@ -9,6 +9,7 @@ import (
 	"os"
 	"strconv"
 
+	"github.com/miradorlabs/terma-cli/internal/agents/internal/reach"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
 	"github.com/miradorlabs/terma-cli/internal/session"
@@ -111,6 +112,12 @@ func preInvocation(ctx context.Context, env hookrun.Env) error {
 		return nil
 	}
 	env.Cwd = in.cwd(env.Cwd)
+	invocation, _, invocationKnown := hookrun.JSONNumber(in.InvocationNum, true)
+	steps, _, stepsKnown := hookrun.JSONNumber(in.InitialNumSteps, true)
+	first := (!invocationKnown || invocation == 0) && (!stepsKnown || steps <= 1)
+	if first {
+		env.StartRun(in.id())
+	}
 	r, err := env.Repo(ctx)
 	if err != nil {
 		// At any invocation, not only the turn's first.
@@ -118,7 +125,6 @@ func preInvocation(ctx context.Context, env hookrun.Env) error {
 		antigravitySkipCalls(env, in)
 		return nil
 	}
-	invocation, _, invocationKnown := hookrun.JSONNumber(in.InvocationNum, true)
 	if invocationKnown && invocation != 0 {
 		// A model call in the middle of a turn.
 		return nil
@@ -138,7 +144,7 @@ func preInvocation(ctx context.Context, env hookrun.Env) error {
 	}
 	env.SetActive(r, sess)
 	// A later turn, or a resumed conversation, was announced before.
-	if steps, _, stepsKnown := hookrun.JSONNumber(in.InitialNumSteps, true); !stepsKnown || steps <= 1 {
+	if first {
 		env.PruneManifests(r, now)
 		conv.at(env).EmitStart(r, sess, withAgentVersion(map[string]any{}, version))
 	}
@@ -191,7 +197,8 @@ func antigravityEditedPaths(in *antigravityHookInput) []string {
 }
 
 // postToolUse records every tool step as a `terma.tool.call`, since agy has no other
-// export, with its arguments where the content rules allow, and the file an edit changed.
+// export, with its arguments where the content rules allow, the file an edit changed,
+// and (when routing is active) reached locations classified from `toolCall.args`.
 // Under one hold of the conversation it reads the transcript, then spools the call, so the
 // model call that asked for the tool sorts before it. Whether the call's content is refused
 // is judged from its own arguments, with nothing stored: the reader judges the call line's
@@ -203,12 +210,25 @@ func postToolUse(ctx context.Context, env hookrun.Env) error {
 		return nil
 	}
 	env.Cwd = in.cwd(env.Cwd)
-	r, err := env.Repo(ctx)
+	id := in.id()
+	sess := session.Session{ID: id, Tool: antigravityTool, Model: in.ModelName}
+	files := antigravityEditedPaths(in)
+	var located *hookrun.Repo
+	if env.Routing != nil && in.ToolCall != nil && len(files) == 0 {
+		spec := reach.Antigravity
+		if in.ToolCall.Name == "str_replace_editor" {
+			spec.Commands = nil // its command is view, create or str_replace
+		}
+		located = env.Classify(ctx, nil, sess, spec.Of(in.ToolCall.Args, env.Cwd), nil)
+	}
+	r, err := env.RepoAt(ctx, located)
 	if err != nil {
+		if len(files) > 0 {
+			env.Classify(ctx, nil, sess, files, nil)
+		}
 		antigravitySkipCalls(env, in)
 		return nil
 	}
-	id := in.id()
 	conv := openAntigravityConversation(ctx, env, r, in)
 	defer conv.close()
 	refused := in.ToolCall != nil && conv.refuses(in.ToolCall.Name, in.ToolCall.Args)
@@ -237,7 +257,6 @@ func postToolUse(ctx context.Context, env hookrun.Env) error {
 
 	// A failed edit changed nothing. No toolCall yields no paths, so this guard also makes
 	// in.ToolCall safe below.
-	files := antigravityEditedPaths(in)
 	if len(files) == 0 || in.Error != "" {
 		return nil
 	}
@@ -249,7 +268,7 @@ func postToolUse(ctx context.Context, env hookrun.Env) error {
 			ids[k] = v
 		}
 	}
-	env.Touch(r, session.Session{ID: id, Tool: antigravityTool, Model: in.ModelName}, in.ToolCall.Name, files, ids)
+	env.Touch(r, sess, in.ToolCall.Name, files, ids)
 	return nil
 }
 

@@ -1,23 +1,18 @@
 package delivery
 
 import (
-	"cmp"
 	"context"
-	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"path/filepath"
 	"slices"
 	"strings"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/account/keystore"
 	"github.com/miradorlabs/terma-cli/internal/config"
-	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
+	"github.com/miradorlabs/terma-cli/internal/routing"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
 	"github.com/miradorlabs/terma-cli/internal/sendas"
 	"github.com/miradorlabs/terma-cli/internal/spool"
@@ -75,39 +70,26 @@ func recordingIngest(t *testing.T, status int) (*httptest.Server, func() []sentR
 	}
 }
 
-func signInRouter(signIn *fakeSignIn) Router {
-	pol := config.Policy{Mode: config.ModeRepo, Repositories: listed, FetchedAt: time.Now()}
-	return Router{OTLPPinned: true, SignIn: signIn,
-		Policy: func(context.Context, *config.Config, string) (config.Policy, error) { return pol, nil }}
-}
-
-// spoolOf is a queue holding events as they are, tagged or not, which no append does: an
-// untagged line is one an older terma, or anything else, could leave there.
-func spoolOf(t *testing.T, events ...spool.Event) *spool.Spool {
+func signInMachine(t *testing.T, account string, signIn *fakeSignIn, teamIDs ...string) (*routedMachine, Router, map[string]string) {
 	t.Helper()
-	dir := t.TempDir()
-	s, err := spool.Open(dir)
-	if err != nil {
-		t.Fatal(err)
+	m := newRoutedMachine(t)
+	teams := make([]routing.Team, 0, len(teamIDs))
+	for _, id := range teamIDs {
+		tm := orgTeam("org-a", id, listed...)
+		tm.Policy.IncludePrompts, tm.Policy.IncludeToolContent = false, false
+		teams = append(teams, tm)
 	}
-	var lines []byte
-	for _, e := range events {
-		e.Time = cmp.Or(e.Time, time.Now())
-		line, err := json.Marshal(e)
-		if err != nil {
-			t.Fatal(err)
-		}
-		lines = append(append(lines, line...), '\n')
-	}
-	if err := os.WriteFile(filepath.Join(dir, spool.EventsFile), lines, 0o600); err != nil {
-		t.Fatal(err)
-	}
-	return s
+	enr := m.createState(config.DefaultProfile, account, teams, func(s *routing.State, _ map[string]string) error {
+		return s.Bind(app.Origin, "org-a", false)
+	})
+	r := m.router(signIn)
+	r.OTLPPinned = true
+	return m, r, enr
 }
 
-func eventFor(project, session, account string) spool.Event {
+func eventFor(enrollment, session, account string) spool.Event {
 	return spool.Event{Repository: app, Name: semconv.TermaSessionQuotaEvent, SessionID: session, Account: account,
-		Attrs: map[string]any{hookrun.AttrProjectID: project}}
+		Profile: config.DefaultProfile, Enrollment: enrollment, Attrs: map[string]any{}}
 }
 
 // On a person's profile, events leave with the sign-in's token, naming their team, and
@@ -116,24 +98,25 @@ func eventFor(project, session, account string) spool.Event {
 func TestEventsLeaveOnlyUnderTheAccountThatCollectedThem(t *testing.T) {
 	t.Parallel()
 	srv, sent := recordingIngest(t, http.StatusOK)
-	signIn := &fakeSignIn{account: "aaaaaaaaaaaaaaaa", token: "token-a"}
-	s := spoolOf(t,
-		eventFor("p1", "mine", "aaaaaaaaaaaaaaaa"),
-		eventFor("p1", "someone-elses", "bbbbbbbbbbbbbbbb"),
-		eventFor("p2", "before-user-tokens", ""))
-	res := signInRouter(signIn).Flush(t.Context(), s, &config.Config{OTLPURL: srv.URL}, true, 0)
+	signIn := &fakeSignIn{account: aliceLane, token: "token-a"}
+	m, r, enr := signInMachine(t, aliceLane, signIn, "p1", "p2")
+	m.queueRaw(
+		eventFor(enr["p1"], "mine", aliceLane),
+		eventFor(enr["p1"], "someone-elses", bobLane),
+		eventFor(enr["p2"], "before-user-tokens", ""))
+	res := r.Flush(t.Context(), m.spool, &config.Config{ProfileName: config.DefaultProfile, AuthURL: routedAuth, OTLPURL: srv.URL}, true, 0)
 	if res.Sent != 1 || res.Held != 1 || res.Dropped != 1 || res.Err != nil {
 		t.Fatalf("Flush = %+v", res)
 	}
-	for _, r := range sent() {
-		if r.auth != "Bearer token-a" || r.project == "" || !strings.Contains(r.body, `"stringValue":"`+r.project+`"`) {
-			t.Errorf("sent with %q naming %q", r.auth, r.project)
+	for _, req := range sent() {
+		if req.auth != "Bearer token-a" || req.project == "" || !strings.Contains(req.body, `"stringValue":"`+req.project+`"`) {
+			t.Errorf("sent with %q naming %q", req.auth, req.project)
 		}
-		if strings.Contains(r.body, "someone-elses") || strings.Contains(r.body, "before-user-tokens") {
+		if strings.Contains(req.body, "someone-elses") || strings.Contains(req.body, "before-user-tokens") {
 			t.Error("another person's event, or no one's, left under this sign-in")
 		}
 	}
-	if n, _, _ := s.Pending(); n != 1 {
+	if n, _, _ := m.spool.Pending(); n != 1 {
 		t.Fatalf("%d events queued, want only the other person's kept", n)
 	}
 }
@@ -142,8 +125,9 @@ func TestEventsLeaveOnlyUnderTheAccountThatCollectedThem(t *testing.T) {
 func TestEventsWaitForASignIn(t *testing.T) {
 	t.Parallel()
 	srv, sent := recordingIngest(t, http.StatusOK)
-	s := spoolOf(t, eventFor("p1", "mine", "aaaaaaaaaaaaaaaa"))
-	res := signInRouter(&fakeSignIn{}).Flush(t.Context(), s, &config.Config{OTLPURL: srv.URL}, true, 0)
+	m, r, enr := signInMachine(t, aliceLane, &fakeSignIn{}, "p1")
+	m.queueRaw(eventFor(enr["p1"], "mine", aliceLane))
+	res := r.Flush(t.Context(), m.spool, &config.Config{ProfileName: config.DefaultProfile, AuthURL: routedAuth, OTLPURL: srv.URL}, true, 0)
 	if res.Sent != 0 || res.Held != 1 || len(res.Failures) != 0 || len(sent()) != 0 {
 		t.Fatalf("Flush = %+v, %d sent", res, len(sent()))
 	}
@@ -167,14 +151,15 @@ func TestARefusedTokenIsRotatedAndKeepsTheEvents(t *testing.T) {
 			w.WriteHeader(tc.status)
 			_, _ = io.WriteString(w, tc.body)
 		}))
-		signIn := &fakeSignIn{account: "aaaaaaaaaaaaaaaa", token: "token-a"}
-		s := spoolOf(t, eventFor("p1", "mine", "aaaaaaaaaaaaaaaa"))
-		res := signInRouter(signIn).Flush(t.Context(), s, &config.Config{OTLPURL: srv.URL}, true, 0)
+		signIn := &fakeSignIn{account: aliceLane, token: "token-a"}
+		m, r, enr := signInMachine(t, aliceLane, signIn, "p1")
+		m.queueRaw(eventFor(enr["p1"], "mine", aliceLane))
+		res := r.Flush(t.Context(), m.spool, &config.Config{ProfileName: config.DefaultProfile, AuthURL: routedAuth, OTLPURL: srv.URL}, true, 0)
 		srv.Close()
 		if res.Sent != 0 || len(res.Failures) != 1 {
 			t.Fatalf("%d: Flush = %+v", tc.status, res)
 		}
-		if n, _, _ := s.Pending(); n != 1 {
+		if n, _, _ := m.spool.Pending(); n != 1 {
 			t.Fatalf("%d: the event was not kept", tc.status)
 		}
 		if wantRefused := tc.status == http.StatusUnauthorized && !tc.retired; wantRefused != (len(signIn.refused) == 1 && signIn.refused[0] == "token-a") || !wantRefused && len(signIn.refused) != 0 {
@@ -191,22 +176,23 @@ func TestARefusedTokenIsRotatedAndKeepsTheEvents(t *testing.T) {
 func TestAServerKeyNeverSendsAPersonsEvents(t *testing.T) {
 	t.Parallel()
 	srv, sent := recordingIngest(t, http.StatusOK)
-	dir := t.TempDir()
-	if err := keystore.Set(dir, "p1", testKey, keystore.Hosts{}); err != nil {
+	m, r, enr := signInMachine(t, sendas.NoPersonLane, &fakeSignIn{}, "p1")
+	if err := keystore.Set(m.config, "p1", testKey, keystore.Hosts{}); err != nil {
 		t.Fatal(err)
 	}
-	keys := eventFor("p1", "the-keys", "")
+	keys := eventFor(enr["p1"], "the-keys", "")
 	keys.NoPerson = true
-	s := spoolOf(t, eventFor("p1", "a-persons", "aaaaaaaaaaaaaaaa"), keys, eventFor("p1", "older-termas", ""))
-	r := signInRouter(&fakeSignIn{})
-	r.ConfigDir = dir
-	res := r.Flush(t.Context(), s, &config.Config{OTLPURL: srv.URL, ServerKeySignIn: true}, true, 0)
+	m.queueRaw(eventFor(enr["p1"], "a-persons", aliceLane), keys, eventFor(enr["p1"], "older-termas", ""))
+	res := r.Flush(t.Context(), m.spool, &config.Config{ProfileName: config.DefaultProfile, AuthURL: routedAuth, ServerKeyAuthURL: routedAuth, OTLPURL: srv.URL, ServerKeySignIn: true}, true, 0)
 	if res.Sent != 1 || res.Held != 1 || res.Dropped != 1 {
 		t.Fatalf("Flush = %+v", res)
 	}
 	for _, req := range sent() {
 		if strings.Contains(req.body, "a-persons") || strings.Contains(req.body, "older-termas") {
 			t.Fatal("a person's event left with the server key")
+		}
+		if req.project != "" {
+			t.Fatalf("server key sent X-Mirador-Project = %q, want empty", req.project)
 		}
 	}
 }
@@ -216,31 +202,35 @@ func TestAServerKeyNeverSendsAPersonsEvents(t *testing.T) {
 func TestEventsAskForTheUserOfTheAccountWhoseTokenSendsThem(t *testing.T) {
 	t.Parallel()
 	srv, _ := recordingIngest(t, http.StatusOK)
-	r := signInRouter(&fakeSignIn{account: "aaaaaaaaaaaaaaaa", token: "token-a"})
+	m, r, enr := signInMachine(t, aliceLane, &fakeSignIn{account: aliceLane, token: "token-a"}, "p1")
 	var asked []string
-	r.User = func(_ *config.Config, _, _, account string) string { asked = append(asked, account); return "" }
-	if res := r.Flush(t.Context(), spoolOf(t, eventFor("p1", "mine", "aaaaaaaaaaaaaaaa")), &config.Config{OTLPURL: srv.URL}, true, 0); res.Sent != 1 || res.Err != nil {
+	r.EnrolledUser = func(_ string, _ routing.Team, _, account string) string { asked = append(asked, account); return "" }
+	m.queueRaw(eventFor(enr["p1"], "mine", aliceLane))
+	if res := r.Flush(t.Context(), m.spool, &config.Config{ProfileName: config.DefaultProfile, AuthURL: routedAuth, OTLPURL: srv.URL}, true, 0); res.Sent != 1 || res.Err != nil {
 		t.Fatalf("Flush = %+v", res)
 	}
-	if !slices.Equal(asked, []string{"aaaaaaaaaaaaaaaa"}) {
+	if !slices.Equal(asked, []string{aliceLane}) {
 		t.Fatalf("asked for the user of %q, want A's account", asked)
 	}
 }
 
-// Events no credential here may send ask for no policy: another person's team's is never
-// fetched, or overwritten, under this sign-in.
-func TestEventsThatCantLeaveAskForNoPolicy(t *testing.T) {
+// Events no credential here may send never read routing state: another person's events
+// wait untouched under this sign-in.
+func TestEventsThatCantLeaveAskForNoRoutingState(t *testing.T) {
 	t.Parallel()
 	srv, sent := recordingIngest(t, http.StatusOK)
-	r := signInRouter(&fakeSignIn{account: "aaaaaaaaaaaaaaaa", token: "token-a"})
+	m, r, enr := signInMachine(t, aliceLane, &fakeSignIn{account: aliceLane, token: "token-a"}, "team-b")
 	asked := 0
-	pol := config.Policy{Mode: config.ModeRepo, Repositories: listed, FetchedAt: time.Now()}
-	r.Policy = func(context.Context, *config.Config, string) (config.Policy, error) { asked++; return pol, nil }
-	res := r.Flush(t.Context(), spoolOf(t, eventFor("team-b", "someone-elses", "bbbbbbbbbbbbbbbb")), &config.Config{OTLPURL: srv.URL}, true, 0)
+	r.loadState = func(dir, profile string) (routing.State, bool, error) {
+		asked++
+		return routing.Load(dir, profile)
+	}
+	m.queueRaw(eventFor(enr["team-b"], "someone-elses", bobLane))
+	res := r.Flush(t.Context(), m.spool, &config.Config{ProfileName: config.DefaultProfile, AuthURL: routedAuth, OTLPURL: srv.URL}, true, 0)
 	if res.Sent != 0 || res.Held != 1 || len(sent()) != 0 {
 		t.Fatalf("Flush = %+v", res)
 	}
 	if asked != 0 {
-		t.Fatalf("asked for %d policies for events that can't leave", asked)
+		t.Fatalf("loaded routing state %d times for events that can't leave", asked)
 	}
 }

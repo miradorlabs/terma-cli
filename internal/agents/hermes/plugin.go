@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/miradorlabs/terma-cli/internal/agents/internal/relayexport"
 	"github.com/miradorlabs/terma-cli/internal/config"
 )
 
@@ -24,7 +25,11 @@ var hermesPluginTemplate string
 //go:embed plugin/plugin.yaml
 var hermesPluginManifest string
 
-const hermesConfigMarker = "CONFIG_JSON = None  # terma:config"
+const (
+	hermesConfigPrefix = "CONFIG_JSON = "
+	hermesConfigSuffix = "  # terma:config"
+	hermesConfigMarker = hermesConfigPrefix + "None" + hermesConfigSuffix
+)
 
 type pluginConfig struct {
 	Version            int               `json:"version"`
@@ -68,7 +73,32 @@ func renderPlugin(cfg pluginConfig) (string, error) {
 	if !strings.Contains(hermesPluginTemplate, hermesConfigMarker) {
 		return "", errors.New("hermes plugin template has no configuration line")
 	}
-	return strings.Replace(hermesPluginTemplate, hermesConfigMarker, "CONFIG_JSON = "+strconv.Quote(string(data))+"  # terma:config", 1), nil
+	return strings.Replace(hermesPluginTemplate, hermesConfigMarker, hermesConfigPrefix+strconv.Quote(string(data))+hermesConfigSuffix, 1), nil
+}
+
+// refreshPlugin re-splices an installed Hermes plugin's configuration into this build's template.
+func refreshPlugin() (string, bool, error) {
+	dir, err := pluginDir()
+	if err != nil {
+		return "", false, err
+	}
+	return relayexport.RefreshTemplate(filepath.Join(dir, "__init__.py"), func(data []byte) ([]byte, bool, error) {
+		_, rest, ok := strings.Cut(string(data), hermesConfigPrefix)
+		if !ok {
+			return nil, false, nil
+		}
+		literal, _, ok := strings.Cut(rest, hermesConfigSuffix)
+		if !ok {
+			return nil, false, nil
+		}
+		raw, err := strconv.Unquote(strings.TrimSpace(literal))
+		var cfg pluginConfig
+		if err != nil || json.Unmarshal([]byte(raw), &cfg) != nil || cfg.Version != 1 || cfg.Endpoint == "" {
+			return nil, false, nil
+		}
+		text, err := renderPlugin(cfg)
+		return []byte(text), err == nil, err
+	})
 }
 
 // writePlugin writes terma's plugin and returns its directory, private to this user
@@ -82,13 +112,17 @@ func writePlugin(cfg pluginConfig) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if err := os.MkdirAll(dir, 0o700); err != nil {
-		return "", err
-	}
-	if err := config.WriteFileAtomic(filepath.Join(dir, "plugin.yaml"), []byte(hermesPluginManifest), 0o600); err != nil {
-		return "", err
-	}
-	return dir, config.WriteFileAtomic(filepath.Join(dir, "__init__.py"), []byte(text), 0o600)
+	initPath := filepath.Join(dir, "__init__.py")
+	err = relayexport.WithTemplateLock(initPath, func() error {
+		if err := os.MkdirAll(dir, 0o700); err != nil {
+			return err
+		}
+		if err := config.WriteFileAtomic(filepath.Join(dir, "plugin.yaml"), []byte(hermesPluginManifest), 0o600); err != nil {
+			return err
+		}
+		return config.WriteFileAtomic(initPath, []byte(text), 0o600)
+	})
+	return dir, err
 }
 
 // enablePlugin runs `hermes plugins enable`, the supported writer of plugins.enabled;

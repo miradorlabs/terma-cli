@@ -1,6 +1,7 @@
 package hookrun
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"slices"
@@ -8,7 +9,75 @@ import (
 	"time"
 
 	"mvdan.cc/sh/v3/pattern"
+
+	"github.com/miradorlabs/terma-cli/internal/relay/claim"
+	"github.com/miradorlabs/terma-cli/internal/routing"
+	"github.com/miradorlabs/terma-cli/internal/runs"
+	"github.com/miradorlabs/terma-cli/internal/semconv"
+	"github.com/miradorlabs/terma-cli/internal/session"
 )
+
+// Classify classifies the checkouts paths reach (including symlinks and subdirs unless Alone)
+// against r and the run's earlier locations. UnknownReach marks the run Mixed. Returns r or located.
+func (e Env) Classify(ctx context.Context, r *Repo, sess session.Session, paths []string, extra map[string]any) *Repo {
+	if !e.Routing.Usable() || !session.ValidID(sess.ID) {
+		return r
+	}
+	var unknown runs.Why
+	paths = slices.DeleteFunc(searchedBy(paths, e.Cwd, os.LookupEnv, time.Now().Add(maxShellTime)), func(p string) bool {
+		if isUnknownReach(p) {
+			_, cmd, _ := strings.Cut(p[len(UnknownReach):], "\x00")
+			unknown = runs.Why{Reason: runs.UnknownReach, Where: cmd}
+		}
+		return p == "" || isUnknownReach(p)
+	})
+	if len(paths) == 0 && unknown.Reason == "" {
+		return r
+	}
+	if r == nil {
+		var err error
+		if r, err = e.routeHere(ctx); err != nil {
+			var locs []routing.Location
+			for _, t := range e.reached(nil, paths) {
+				if t.repo.dest != nil {
+					locs = append(locs, t.repo.dest.loc)
+				}
+			}
+			if len(locs) > 0 || unknown.Reason != "" {
+				agent, _ := extra[semconv.TermaAgentIDKey].(string)
+				e.judge(sess.ID, agent, claim.Claim{Tool: sess.Tool, PIDs: claimPIDs(), Parent: e.parent}, locs, false, unknown)
+			}
+			return nil
+		}
+	}
+	e.classifyTouches(r, sess, extra, e.reached(r, paths), unknown)
+	return r
+}
+func (e Env) reached(r *Repo, paths []string) (out []touched) {
+	dirs := map[string]bool{}
+	for _, p := range paths {
+		if !filepath.IsAbs(p) {
+			p = filepath.Join(e.Cwd, p)
+		}
+		p = filepath.Clean(p)
+		at := []string{p}
+		if target, err := filepath.EvalSymlinks(p); err == nil && target != p {
+			at = append(at, target)
+		}
+		for _, dir := range at {
+			if info, err := os.Stat(dir); err != nil || !info.IsDir() {
+				dir = filepath.Dir(dir)
+			}
+			if !dirs[dir] {
+				dirs[dir] = true
+				if repo := e.checkoutOf(r, dir); repo != nil && repo != r && !slices.ContainsFunc(out, func(t touched) bool { return samePath(t.repo.Root, repo.Root) }) {
+					out = append(out, touched{repo: repo})
+				}
+			}
+		}
+	}
+	return out
+}
 
 const aloneMark = "\x00alone\x00"
 

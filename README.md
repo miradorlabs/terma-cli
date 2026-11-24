@@ -79,11 +79,11 @@ The installer script takes `TERMA_INSTALL_DIR` to change the destination,
 `TERMA_VERSION=vX.Y.Z` to pin a release, and `TERMA_NO_MODIFY_PATH` (set to anything,
 even empty) to leave your shell's startup file alone. It is POSIX `sh`, so `| sh` works too.
 
-`terma setup` signs you in through your browser, then asks:
+`terma setup` signs you in once through your browser with your Terma account, then asks:
 
-1. **Organization**, when you belong to several.
-2. **Coding agents**: the ones installed on this machine are preselected.
-3. **Team**, the first time, when your organization has several.
+1. **Coding agents**: the ones installed on this machine are preselected.
+2. **Teams**: one checklist across every organization you belong to (and Personal, if you want
+   it), with repository bindings confirmed for any shared organization teams.
 
 It then points your agents at terma's local relay and writes their machine-wide hooks.
 Restart any agent that was already running so it loads the new configuration, then check
@@ -103,51 +103,54 @@ flowchart LR
   agent["Claude Code / Codex / Copilot / OMP"] -- "telemetry" --> relay["terma relay<br/>(127.0.0.1)"]
   agent -- "hook events" --> hook["terma hook"]
   git["git commit"] -- "commit hooks" --> hook
-  hook -- "claims the session<br/>for your team" --> relay
+  hook -- "routes & claims session<br/>for matching team" --> relay
   hook --> queue["local queue"]
-  relay -- "claimed sessions,<br/>filtered by your team's policy" --> terma[("Terma")]
+  relay -- "claimed sessions,<br/>filtered by team policy" --> terma[("Terma")]
   queue -- "delivered after<br/>commits and session ends" --> terma
 ```
 
-Your team's collection policy, set in the Terma web app, lists the repositories it
-collects. A hook that runs in one of them claims the session for your team; the relay
-forwards only claimed sessions, and only the content the policy collects. Everything else,
-personal work and other repositories included, never leaves your machine. When the policy
-asks for commit stamping, a commit of files an agent session edited gets an
-`Agent-Session-Id` trailer.
+Each selected team's collection policy, set in the Terma web app, lists the repositories it
+collects. Using your one sign-in, hooks route each session to the matching team and the
+relay forwards only claimed sessions — filtered by that team's policy — never mixing
+organizations. If a session crosses into another organization's repository, collection stops
+at the crossing (Mixed). Everything else — uncollected repositories and folders outside git —
+never leaves your machine unless you also enabled Personal. When a team's policy asks for
+commit stamping, a commit of files an agent session edited gets an `Agent-Session-Id` trailer.
 
 ## Commands
 
 Every command is safe to run again:
 
 ```bash
-terma setup       # sign in, choose your organization, agents and team, write machine-wide hooks
-terma switch      # sign out and set up again: another account, organization or team
-terma doctor      # show what this machine collects and check the chain end to end
-terma update      # install the latest release, or refresh what terma installed
-terma teardown    # undo setup on this machine (--sign-out also signs out)
+terma setup          # sign in once, choose agents and teams, write machine-wide hooks
+terma teams          # pick which teams collect across organizations and manage bindings
+terma doctor         # check routing state, per-team health, Mixed runs, losses, and delivery
+terma update         # install the latest release, or refresh what terma installed
+terma teardown       # undo setup on this machine (--sign-out also signs out)
 ```
 
-Run `terma setup` again to repair the machine; it reuses a working sign-in and offers the
-team you chose as the default. `terma doctor` opens with what this machine
-collects and what the repository has in progress (the active session, uncommitted agent
-edits), then checks every link: sign-in, whether the team collects this repository (and
-the origin terma sees), the hooks, the agents' export, the queue, and delivery. Every
-failure names its fix.
+Run `terma setup` again to repair the machine or refresh a sign-in; it reuses a working
+sign-in and updates all selected teams. Run `terma teams` to tick or untick teams across
+your organizations, bind or refuse contested owners/repositories, or release a suspended team.
+Run `terma route explain [path]` (or `--json`) to see which team a directory or repository
+routes to and why using the exact same router hooks and the relay use.
 
-### Switching account, organization or team
+`terma doctor` opens with your selected teams and what this repository has in progress (the
+active session, uncommitted agent edits), then checks every link: sign-in, `routing/<profile>.json`
+account ownership, per-team policy health (refused/suspended teams, lost organization access,
+expired policies, pending bindings), Mixed sessions, hooks, agent export, spool/outbox losses,
+and delivery. Every failure names its fix (including a single `terma setup` when your user
+sign-in needs re-authentication).
 
-`terma switch` signs this machine out and runs `terma setup` again, so you can sign in as
-any account and choose its organization, team and agents. It revokes the sign-in, as
-`terma teardown --sign-out` does, stops the relay, which runs on that sign-in, and
-forgets the organization and team setup chose; your agents' hooks stay in place.
+### Managing teams and switching accounts
 
-The browser approves the sign-in as whoever is signed in to the Terma app there. To use
-another account, sign out of the app in that browser first, or open the link in a private
-window (`terma switch --no-browser` prints it).
+Use `terma teams` to change which organizations and teams collect on this machine — no extra
+per-organization sign-ins are needed. To sign in as another account, run
+`terma teardown --sign-out` and then `terma setup` (open the sign-in link in a private window
+if the Terma app is signed in as another account; `terma setup --no-browser` prints it).
 
-Hidden commands remain for the programs that run them — hook execution, the local
-relay, spool delivery, shell completion — and for Terma's own engineers.
+Hidden commands remain for diagnostics (`terma route explain`), hook execution, the local
+relay, spool delivery, shell completion, and Terma's own engineers.
 
 ## Updates
 
@@ -253,26 +256,23 @@ Every question `terma setup` asks has a flag:
 terma setup --org acme --team platform --harness claude,codex,copilot,omp --yes
 ```
 
-- `--org <name-or-id>` signs in to that organization. Without it, setup asks when you
-  belong to several, or, when it cannot ask, keeps the current one and says so.
-- `--team <name-or-id>` sets up that team; without it, setup asks when your organization
-  has several teams, with the one you chose before as the default, else takes the only
-  one; when it cannot ask (`--yes` or no terminal), it keeps the team you chose before.
+- `--org <name-or-id>` narrows non-interactive team selection to that organization (your
+  single Terma account sign-in covers every organization you belong to).
+- `--team <name-or-id>` selects that team alongside any already-selected teams for your
+  account; with `--yes` and no `--team`, setup keeps your current selection (or picks the
+  only available team on a fresh machine). Use `terma teams` to tick, untick, bind, or refuse
+  teams at any time.
 - `--harness <agents>` records those agents (`claude`, `codex`, `copilot`, `omp`, and on macOS and Linux `antigravity`); with `--yes` or no
   terminal and no `--harness`, setup records the agents recorded before and every
   supported agent installed on this machine.
-- `--yes` skips the browser prompt and the organization and agents questions. The team
-  picker still asks the first time when your organization has several, so name it with
-  `--team`.
+- `--yes` skips interactive prompts and accepts binding defaults for the selected team(s).
+  On a fresh machine with several teams, pass `--team` (and `--org` if ambiguous).
 - `--no-browser` prints the sign-in URL instead of opening a browser.
 - `--relay-service off` starts the relay on demand from hooks instead of as a background
   service; `--relay-addr <host:port>` moves it off a loopback port another program holds.
 - `--insecure-storage` saves credentials in plain text instead of the system keychain.
 - `--managed-config <dir>` writes the machine-wide hooks as managed configuration for your
   organization to deploy, and exits; each developer still runs `terma setup` once.
-
-Every other command reads the team you chose at setup; `--team <name-or-id>` overrides it
-for one command.
 
 A machine with no one to sign in, such as CI or an ephemeral VM, signs in with a team server
 key instead. Create one in the Terma web app under **Team settings → API keys**, with
@@ -282,13 +282,14 @@ key instead. Create one in the Terma web app under **Team settings → API keys*
 TERMA_API_KEY=ter_srv_… terma setup --yes --harness claude
 ```
 
-Setup sets up the key's team, with no browser, and keeps the key, so the hooks, the relay,
-`terma doctor` and `terma status` need no `TERMA_API_KEY` afterwards. Setup itself does: run
-it again with the key set, or with a new key to rotate it. It refuses a key that cannot
-ingest, and warns about one that can also read or write the team's data, since anything on
-the machine can use it. On a machine with no system keychain, setup keeps the key in a
-plain-text file and says so; `--insecure-storage` chooses that up front. The
-[headless setup guide](https://docs.terma.ai/cli/headless-setup) covers rotation, sign-out
+Setup configures a single-team routing state for the key's team, with no browser, and stores
+the server key in the system keychain (indexed by `keys.json`) so hooks, the relay,
+`terma doctor`, `terma route explain`, and `terma status` need no `TERMA_API_KEY` afterwards.
+Setup itself does: run it again with the key set, or with a new key to rotate it. It refuses
+a key that cannot ingest, and warns about one that can also read or write the team's data,
+since anything on the machine can use it. On a machine with no system keychain, setup keeps
+the key in `keys.json` in plain text and says so; `--insecure-storage` chooses that up front.
+The [headless setup guide](https://docs.terma.ai/cli/headless-setup) covers rotation, sign-out
 and what `terma doctor` reports.
 
 ## Collection
@@ -326,9 +327,13 @@ So a clone in any folder, a subdirectory of it, and a worktree of it at
 `github.com/you/api` is not. An SSH host alias (`git@github-work:acme/api` through
 `~/.ssh/config`) normalises to host `github-work` and does not match
 `github.com/acme/api`: point origin at the real host and choose the key with
-`core.sshCommand`, as `terma doctor` shows. In global mode the policy collects every
-session, inside git or not. Each session reports to the team of the developer who ran it,
-so two developers on different teams in one repository each report to their own.
+`core.sshCommand`, as `terma doctor` shows. When you select teams across organizations, each
+organization collects only the owners or repositories you bind to it (`terma teams`), and an
+exact repository entry beats a wildcard entry within the bound organization. Personal's
+global policy collects everything outside any organization-bound repository (including
+folders outside git), and never collects an organization-bound repository. Each session
+reports to the matching team on your machine, so two developers on different teams in one
+repository each report to their own.
 
 ### Which commits are stamped
 
@@ -374,19 +379,22 @@ its veto — if it exits non-zero the commit stops — and once terma is gone it
 
 Your agents export to a relay terma runs on your machine (on `127.0.0.1`), from their own
 user-level settings — which is also what Claude Desktop, Codex Desktop and IDE extensions
-read, so they are covered too. A machine-wide hook claims each session that runs in a
-repository your team collects, for your team; the relay forwards only claimed sessions,
-with your team's key. Everything else — personal work, other repositories, folders
-outside git — never leaves your machine. A session in a repository the list does not
-name, or outside git, is dropped as soon as its first hook runs; anything else unclaimed
-waits briefly in memory, never on disk, then is dropped; a relay restart drops it too.
-A session that moves to a repository the list does not name, or whose repository leaves
-the list, stops being forwarded; one that moves into a listed repository is forwarded
-from the move on, and what it sent before stays dropped.
+read, so they are covered too. A machine-wide hook routes each session against your selected
+teams (`terma teams`) and claims it for the matching team; the relay forwards only claimed
+sessions using your single user sign-in and `X-Mirador-Project` (or the stored server key on
+a `TERMA_API_KEY` profile). Everything else — uncollected repositories and folders outside
+git — never leaves your machine unless Personal is enabled. A session in an uncollected
+location is dropped as soon as its first hook runs; anything else unclaimed waits briefly in
+memory, never on disk, then is dropped; a relay restart drops it too. If a session crosses
+into another organization's repository, its run becomes Mixed and conversation/telemetry
+records from the crossing onward are dropped so organizations never mix. Run
+`terma route explain [path]` to see how any directory or repository routes and why.
 
-What content leaves is your team's collection policy, set in the Terma web app, and nothing else.
-The relay and the hook queue's delivery fetch it with your login; until they have,
-nothing they would send leaves. Agents send prompts, model responses and tool input and
+What content leaves is the routed team's collection policy, set in the Terma web app, and
+nothing else. The relay and the hook queue's delivery refresh each selected team's policy
+with your login; until they have, nothing they would send leaves. If an organization revokes
+your access (`ORG_NOT_ACCESSIBLE`), terma refuses that organization's teams without retiring
+your sign-in, while your other organizations and Personal continue uninterrupted. Agents send prompts, model responses and tool input and
 output to the relay, and the relay removes what the policy does not collect before
 anything leaves. The relay also names the checkout a session's hooks last ran in, which
 the agents' own records do not: its repository's origin and branch (`vcs.repository.url.full`,
@@ -596,17 +604,18 @@ tested against a sub-50 ms budget.
 
 Authentication uses a browser handoff with PKCE and a loopback callback, which accepts the
 one-time code in a form POST so it need not appear in a URL, or, with
-`TERMA_API_KEY`, a team server key, which terma keeps as the team's key and sends only to
-the auth host it was set up against. Credentials and
-team keys stay in the user's configuration directory (`~/.config/terma`, or
-`%APPDATA%\terma` on Windows) with restrictive file permissions. What terma writes as it
-runs — the event queue, the relay and its local token, the hooks' state, the record of the
-repositories its commit hooks are installed in — stays in its state directory
-(`~/.local/state/terma`, or `%LOCALAPPDATA%\terma` on Windows), with the same restrictive
-permissions. The only thing terma writes inside a repository is its git hooks, under
-`.git/hooks`, which git neither tracks nor carries in a commit; nothing reaches the working
-tree or committed files. What content leaves is the team's collection policy alone, applied
-on this machine before anything is sent.
+`TERMA_API_KEY`, a team server key, which terma keeps for that headless profile and sends
+only to the auth host it was set up against. Your user sign-in (and any `TERMA_API_KEY`
+server key) stays in the system keychain, indexed from your configuration directory
+(`~/.config/terma`, or `%APPDATA%\terma` on Windows) with restrictive file permissions. What
+terma writes as it runs — routing state (`routing/<profile>.json`), run ledgers, the event
+queue, the relay and its local token, the hooks' state, and the record of repositories its
+commit hooks are installed in — stays in its state directory (`~/.local/state/terma`, or
+`%LOCALAPPDATA%\terma` on Windows), with the same restrictive permissions. The only thing
+terma writes inside a repository is its git hooks, under `.git/hooks`, which git neither
+tracks nor carries in a commit; nothing reaches the working tree or committed files. What
+content leaves is each routed team's collection policy alone, applied on this machine before
+anything is sent.
 
 ## Architecture
 
@@ -614,10 +623,9 @@ terma is one binary with three roles:
 
 - the **command line** (`internal/cli`), which `cmd/terma` starts;
 - the **hooks** that coding agents and git run machine-wide (`terma hook <event>`,
-  `internal/hooks`);
+  `internal/hooks`), routed via `internal/routing` and guarded by `internal/runs`;
 - a **local relay daemon** (`terma relay run`, `internal/relay`). It forwards an
-  agent's own telemetry only for sessions a hook claimed in a repository the team
-  collects.
+  agent's own telemetry only for sessions a hook claimed for a routed team.
 
 Each coding agent is a plugin: one package under `internal/agents/<name>`, behind the
 interfaces in `internal/agents`, and registered in `internal/agents/builtin`. Nothing

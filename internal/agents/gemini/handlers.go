@@ -3,21 +3,19 @@ package gemini
 import (
 	"cmp"
 	"context"
+	"encoding/json"
 
+	"github.com/miradorlabs/terma-cli/internal/agents/internal/reach"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/session"
 )
 
 // geminiHookInput is a hook's stdin; session_id is the session.id its telemetry carries.
 type geminiHookInput struct {
-	SessionID string `json:"session_id"`
-	Cwd       string `json:"cwd"`
-	ToolName  string `json:"tool_name"`
-	ToolInput struct {
-		FilePath     string `json:"file_path"`
-		Path         string `json:"path"`
-		AbsolutePath string `json:"absolute_path"`
-	} `json:"tool_input"`
+	SessionID string          `json:"session_id"`
+	Cwd       string          `json:"cwd"`
+	ToolName  string          `json:"tool_name"`
+	ToolInput json.RawMessage `json:"tool_input"`
 }
 
 const geminiTool = "gemini"
@@ -43,6 +41,7 @@ func sessionStart(ctx context.Context, env hookrun.Env) error {
 		return nil
 	}
 	env.Cwd = cmp.Or(in.Cwd, env.Cwd)
+	env.StartRun(in.SessionID)
 	r, err := env.Repo(ctx)
 	if err != nil {
 		return nil
@@ -51,27 +50,45 @@ func sessionStart(ctx context.Context, env hookrun.Env) error {
 	return nil
 }
 
-// prompt is BeforeAgent: the caller claims the session from the payload; nothing is recorded.
+// prompt is BeforeAgent: the caller claims the session and records the turn start for post-tool reach cutoffs.
 func prompt(_ context.Context, env hookrun.Env) error {
-	_, _ = readGeminiInput(env)
+	if in, ok := readGeminiInput(env); ok {
+		env.StartTurn(in.SessionID)
+	}
 	return nil
 }
 
 func afterTool(ctx context.Context, env hookrun.Env) error {
 	in, ok := readGeminiInput(env)
-	if !ok || !geminiEditTools[in.ToolName] {
+	if !ok {
 		return nil
 	}
-	file := cmp.Or(in.ToolInput.FilePath, in.ToolInput.AbsolutePath, in.ToolInput.Path)
+	if env.Routing != nil {
+		env.MixedSince = env.TurnSince(in.SessionID)
+	}
+	env.Cwd = cmp.Or(in.Cwd, env.Cwd)
+	sess := session.Session{ID: in.SessionID, Tool: geminiTool}
+	if !geminiEditTools[in.ToolName] {
+		if env.Routing != nil {
+			env.Classify(ctx, nil, sess, reach.Gemini.Of(in.ToolInput, env.Cwd), nil)
+		}
+		return nil
+	}
+	var input struct {
+		FilePath     string `json:"file_path"`
+		Path         string `json:"path"`
+		AbsolutePath string `json:"absolute_path"`
+	}
+	_ = json.Unmarshal(in.ToolInput, &input)
+	file := cmp.Or(input.FilePath, input.AbsolutePath, input.Path)
 	if file == "" {
 		return nil
 	}
-	env.Cwd = cmp.Or(in.Cwd, env.Cwd)
-	r, err := env.Repo(ctx)
-	if err != nil {
-		return nil
+	if r, err := env.Repo(ctx); err != nil {
+		env.Classify(ctx, nil, sess, []string{file}, nil)
+	} else {
+		env.Touch(r, sess, in.ToolName, []string{file}, nil)
 	}
-	env.Touch(r, session.Session{ID: in.SessionID, Tool: geminiTool}, in.ToolName, []string{file}, nil)
 	return nil
 }
 

@@ -6,8 +6,10 @@ package dispatch
 import (
 	"cmp"
 	"context"
+	"errors"
 	"fmt"
 	"io"
+	"strings"
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
@@ -51,7 +53,10 @@ type Deps struct {
 	// Claimed runs once a hook has claimed its session, with the checkout it claimed and
 	// the policy in force: the relay, and that repository's commit hooks.
 	Claimed func(cwd string, policy config.Policy)
-	Flush   func()
+	// ClaimedRouted runs in Claimed's place when routing is active, once routing sends or
+	// holds the checkout a hook placed its session in.
+	ClaimedRouted func(cwd string, routing *hookrun.Routing)
+	Flush         func()
 	// AwaitPush starts a detached hookrun.AwaitPush for a recorded push.
 	AwaitPush func(path string)
 }
@@ -62,6 +67,8 @@ type Profile struct {
 	Agents []string
 	// Policy is the collection policy, NoPolicy until one is validated.
 	Policy config.Policy
+	// Routing is the profile's routing state when active, replacing Team and Policy.
+	Routing *hookrun.Routing
 	// Account is the sign-in in place as auth.Account names it, which what the hook queues
 	// is bound to: its account key; "" signed out, or under a server key; or
 	// sendas.AccountUnreadable, when what the hook collects is lost (spool.LaneOf).
@@ -87,9 +94,12 @@ func Run(ctx context.Context, d Deps, r Request) int {
 	}
 	if render, ok := d.Agents.Render(r.Event); ok {
 		p := d.Profile()
+		if p.Routing == nil {
+			p.Routing = hookrun.NewRouting("", nil)
+		}
 		env := hookrun.Env{Now: time.Now(), Cwd: r.Cwd, Args: r.Args, Stdin: r.Stdin, Stdout: r.Stdout, Stderr: r.Stderr,
-			ConfigDir: d.ConfigDir, StateDir: d.StateDir, Version: r.Version, Debug: r.Debug, Flush: d.Flush, Policy: p.Policy, Team: p.Team,
-			Account: p.Account, ServerKey: p.ServerKey}
+			ConfigDir: d.ConfigDir, StateDir: d.StateDir, Version: r.Version, Debug: r.Debug, Flush: d.Flush, Policy: config.NoPolicy("", ""),
+			Routing: p.Routing, Account: p.Account, ServerKey: p.ServerKey}
 		if !r.HooksOff {
 			env.Spool = bound(d.Spool(), p)
 		}
@@ -106,17 +116,19 @@ func Run(ctx context.Context, d Deps, r Request) int {
 		fmt.Fprintf(r.Stderr, "terma hook: unknown event %q (ignored)\n", r.Event)
 		return 0
 	}
-	run(ctx, d, r, e.Handler, e.Flush, agents.Tool(e.Agent))
-	return 0
+	return run(ctx, d, r, e.Handler, e.Flush, agents.Tool(e.Agent))
 }
 
-func run(ctx context.Context, d Deps, r Request, handler agents.Handler, flush bool, tool string) {
+func run(ctx context.Context, d Deps, r Request, handler agents.Handler, flush bool, tool string) int {
 	if r.HooksOff {
-		return
+		return 0
 	}
 	p := d.Profile()
+	if p.Routing == nil {
+		p.Routing = hookrun.NewRouting("", nil)
+	}
 	if r.Cwd == "" {
-		return
+		return 0
 	}
 	// Stdout is the hook's reply to the agent, which may feed it to the model. A bounded
 	// copy of the payload lets a hook that spooled nothing still claim its session.
@@ -139,26 +151,33 @@ func run(ctx context.Context, d Deps, r Request, handler agents.Handler, flush b
 		Version:   r.Version,
 		Debug:     r.Debug,
 		Spool:     bound(d.Spool(), p),
-		Policy:    p.Policy,
-		Team:      p.Team,
+		Policy:    config.NoPolicy("", ""),
 		Agents:    p.Agents,
+		Routing:   p.Routing,
 		Account:   p.Account,
 		ServerKey: p.ServerKey,
 	}
 	ctx, cancel := context.WithTimeout(ctx, handlerTimeout)
 	defer cancel()
-	_ = handler(ctx, env)
+	_ = env.Routing.TakeWriteErr()
+	if err := handler(ctx, env); errors.Is(err, hookrun.ErrFailClosed) {
+		return 1
+	}
 	if !claimed && tool != "" {
 		if s, ok := d.Agents.PayloadSession(r.Event, payload.Bytes()); ok {
 			claimed, claimedIn = hookrun.ClaimFromPayload(ctx, env, s, tool), cmp.Or(s.Cwd, r.Cwd)
 		}
 	}
-	if claimed {
-		d.Claimed(claimedIn, p.Policy)
+	if strings.HasSuffix(r.Event, "-tool-reach") && env.Routing.TakeWriteErr() != nil {
+		return 1
+	}
+	if claimed && d.ClaimedRouted != nil {
+		d.ClaimedRouted(claimedIn, p.Routing)
 	}
 	if flush && env.Spool != nil && !flushed {
 		d.Flush()
 	}
+	return 0
 }
 
 // boundedBuffer keeps the first max bytes, so an oversized payload cannot inflate it.

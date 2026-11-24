@@ -12,9 +12,12 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/account/auth"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/hooks/dispatch"
+	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/procinfo"
+	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
 	"github.com/miradorlabs/terma-cli/internal/repohooks"
+	"github.com/miradorlabs/terma-cli/internal/routing"
 	"github.com/miradorlabs/terma-cli/internal/sendas"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
@@ -59,46 +62,63 @@ func (app *App) hookDeps() dispatch.Deps {
 		Agents:    app.agents,
 		Profile:   app.hookProfile,
 		Spool:     app.openSpool,
-		Claimed: func(cwd string, policy config.Policy) {
-			daemon.Spawn(app.stateDir, app.version)
-			// The repository's commit hooks are installed here, the first time a session is
-			// claimed in it while the policy asks for them.
-			terma, err := app.hookExecutable()
-			if err == nil {
-				// The record of what was installed where is runtime state, like the spool.
-				_, err = repohooks.Sync(app.stateDir, terma, policy, time.Now(), cwd)
-			}
-			// A hook never fails on this, but a developer debugging one should see why a
-			// repository has no hooks, or a half-finished install.
-			if err != nil && os.Getenv("TERMA_DEBUG") != "" {
-				fmt.Fprintf(os.Stderr, "terma hook: this repository's commit hooks: %v\n", err)
-			}
+		ClaimedRouted: func(cwd string, rt *hookrun.Routing) {
+			app.claimed(cwd, func(gitDir string) bool { return rt.GitHooks(gitDir, time.Now()) })
 		},
 		Flush:     spawnFlush,
 		AwaitPush: func(path string) { spawnDetached("spool", "await-push", path) },
 	}
 }
 
-// hookProfile is one small local read. Hooks run on the last validated policy even once
-// it has expired, so a refresh outage stops no claim: what leaves is decided downstream,
-// under the policy in force then. config.json and the sign-in are read as one snapshot
-// (readLaneAsOne): a sign-in as someone else between the two reads makes the account
-// unreadable, so what the hook collects is lost, never bound to the new sign-in. So does one
-// stored before the profile is paired with it (pairedLane): the team is the last person's.
+func (app *App) claimed(cwd string, wanted func(gitDir string) bool) {
+	daemon.Spawn(app.stateDir, app.version)
+	terma, err := app.hookExecutable()
+	if err == nil {
+		_, err = repohooks.SyncIf(app.stateDir, terma, wanted, cwd)
+	}
+	if err != nil && os.Getenv("TERMA_DEBUG") != "" {
+		fmt.Fprintf(os.Stderr, "terma hook: this repository's commit hooks: %v\n", err)
+	}
+}
+
+// hookProfile reads config.json, sign-in, and routing/<profile>.json as one snapshot;
+// missing, mid-read changed, corrupt, or wrong-account routing state fails closed with
+// zero fallback to Profile.Team.
 func (app *App) hookProfile() dispatch.Profile {
-	// NoPolicy admits no repository, so nothing is collected under it; and the profile
-	// can't be read, so what a path that skipped Repo's admission collects is lost.
-	p := dispatch.Profile{Policy: config.NoPolicy("", "")}
+	p := dispatch.Profile{Policy: config.NoPolicy("", ""), Routing: hookrun.NewRouting("", nil)}
 	lane, _ := readLaneAsOne(app.dir, func() string {
 		cfg, err := config.Load(app.dir, app.stateDir, config.Overrides{})
 		if err != nil {
 			return sendas.AccountUnreadable
 		}
-		p = dispatch.Profile{Team: cfg.Policy.TeamID, Agents: cfg.Harnesses, Policy: cfg.Policy.InForce(cfg.OrganizationID, cfg.AuthURL)}
-		return app.profileLane(cfg)
+		p = dispatch.Profile{Agents: cfg.Harnesses, Policy: config.NoPolicy("", ""), Routing: hookrun.NewRouting(cfg.ProfileName, nil)}
+		rpath, rperr := routing.StatePath(app.stateDir, cfg.ProfileName)
+		before := statOrNil(rpath)
+		lane := app.profileLane(cfg)
+		st, found, rerr := routing.Load(app.stateDir, cfg.ProfileName)
+		stable := rperr == nil && unchanged(before, statOrNil(rpath))
+		if stable && found && rerr == nil && lane != "" && lane != sendas.AccountUnreadable && st.Account == lane {
+			p.Routing = hookrun.NewRouting(cfg.ProfileName, &st)
+			return lane
+		}
+		if stable && lane == "" {
+			return ""
+		}
+		return sendas.AccountUnreadable
 	})
+	if lane == sendas.AccountUnreadable {
+		p.Routing = hookrun.NewRouting(p.Routing.Profile, nil)
+	}
 	if p.ServerKey = lane == sendas.NoPersonLane; !p.ServerKey {
 		p.Account = lane
+	}
+	if p.Routing.Usable() && daemon.Running(claim.Dir(app.stateDir)) {
+		if info, ok := daemon.RunningRelay(claim.Dir(app.stateDir)); !ok || !info.Routing {
+			if ok {
+				daemon.Supersede(app.stateDir, app.version)
+			}
+			p.Routing.WithholdPlacements = true
+		}
 	}
 	return p
 }

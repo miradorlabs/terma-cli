@@ -31,6 +31,10 @@ type claudeHookInput struct {
 	ToolInput           struct {
 		FilePath     string `json:"file_path"`
 		NotebookPath string `json:"notebook_path"`
+		Path         string `json:"path"`
+		Pattern      string `json:"pattern"`
+		Glob         string `json:"glob"`
+		Command      string `json:"command"`
 		Edits        []struct {
 			FilePath string `json:"file_path"`
 		} `json:"edits"`
@@ -61,6 +65,9 @@ func sessionStart(ctx context.Context, env hookrun.Env) error {
 		env.Logf("%v", err)
 		return nil
 	}
+	if in.Source != "compact" {
+		env.StartRun(in.SessionID)
+	}
 	r, ok := env.Open(ctx, in.SessionID, in.Cwd)
 	if !ok {
 		return nil
@@ -88,7 +95,7 @@ func sessionEnd(ctx context.Context, env hookrun.Env) error {
 	captureClaudeCallResponses(env, r, in.SessionID, in.TranscriptPath)
 	env.EndSession(r, in.SessionID, claudeTool)
 	// A /rename after the last turn ends no turn.
-	captureClaudeTitle(env, r, in)
+	captureClaudeTitle(ctx, env, r, in)
 	return nil
 }
 
@@ -106,8 +113,26 @@ func stop(ctx context.Context, env hookrun.Env) error {
 		return nil
 	}
 	captureClaudeAccount(env, r, in)
-	captureClaudeTitle(env, r, in)
+	captureClaudeTitle(ctx, env, r, in)
 	captureClaudeCallResponses(env, r, in.SessionID, in.TranscriptPath)
+	return nil
+}
+
+// preToolUse classifies what a read, search or shell call is about to reach before it runs.
+// Prints nothing: Claude Code reads PreToolUse stdout as a decision on the call.
+func preToolUse(ctx context.Context, env hookrun.Env) error {
+	if env.Routing == nil {
+		return nil
+	}
+	in, err := readClaudeInput(env.Stdin)
+	if err != nil {
+		env.Logf("%v", err)
+		return nil
+	}
+	if session.ValidID(in.SessionID) && claudeReadTools[in.ToolName] {
+		env.Cwd = cmp.Or(in.Cwd, env.Cwd)
+		env.Classify(ctx, nil, session.Session{ID: in.SessionID, Tool: claudeTool, Model: in.Model}, reachedPaths(in, env.Cwd), hookrun.AgentAttrs(map[string]any{}, in.AgentID, in.AgentType))
+	}
 	return nil
 }
 
@@ -117,30 +142,47 @@ func postToolUse(ctx context.Context, env hookrun.Env) error {
 		env.Logf("%v", err)
 		return nil
 	}
-	if !session.ValidID(in.SessionID) {
+	if !session.ValidID(in.SessionID) || claudeReadTools[in.ToolName] {
 		return nil
 	}
 	env.Cwd = cmp.Or(in.Cwd, env.Cwd)
+	sess := session.Session{ID: in.SessionID, Tool: claudeTool, Model: in.Model}
+	// Inside a subagent the manifest stays the session's; the event names the agent.
+	attrs := hookrun.AgentAttrs(map[string]any{}, in.AgentID, in.AgentType)
 	r, err := env.Repo(ctx)
 	if err != nil {
+		env.Classify(ctx, nil, sess, reachedPaths(in, env.Cwd), attrs)
 		return nil
 	}
 	if isClaudeAgentTool(in.ToolName) {
 		claudeSubagentCall(env, r, in)
 		return nil
 	}
-	paths := append([]string{in.ToolInput.FilePath, in.ToolInput.NotebookPath}, editPaths(in)...)
-	// Inside a subagent the manifest stays the session's; the event names the agent.
-	attrs := hookrun.AgentAttrs(map[string]any{}, in.AgentID, in.AgentType)
 	hookrun.BoundedAttr(attrs, semconv.GenAIToolCallIDKey, in.ToolUseID)
-	env.Touch(r, session.Session{ID: in.SessionID, Tool: claudeTool, Model: in.Model}, in.ToolName, paths, attrs)
+	env.Touch(r, sess, in.ToolName, editedPaths(in), attrs)
 	return nil
 }
 
-func editPaths(in *claudeHookInput) []string {
-	var out []string
+var claudeReadTools = map[string]bool{"Read": true, "Grep": true, "Glob": true, "NotebookRead": true, "LS": true, "Bash": true}
+
+func editedPaths(in *claudeHookInput) []string {
+	out := []string{in.ToolInput.FilePath, in.ToolInput.NotebookPath}
 	for _, e := range in.ToolInput.Edits {
 		out = append(out, e.FilePath)
 	}
 	return out
+}
+
+func reachedPaths(in *claudeHookInput, cwd string) []string {
+	switch in.ToolName {
+	case "Bash":
+		return hookrun.Alone(hookrun.ShellPaths(in.ToolInput.Command, cwd)...)
+	case "Grep":
+		return hookrun.Search(cmp.Or(in.ToolInput.Path, cwd), in.ToolInput.Glob)
+	case "Glob":
+		return hookrun.Search(cmp.Or(in.ToolInput.Path, cwd), in.ToolInput.Pattern)
+	case "LS":
+		return hookrun.Alone(in.ToolInput.Path)
+	}
+	return append(editedPaths(in), in.ToolInput.Path)
 }

@@ -5,15 +5,10 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"os"
 	"path/filepath"
 	"sync"
-	"time"
 
-	"github.com/miradorlabs/terma-cli/internal/config"
-	"github.com/miradorlabs/terma-cli/internal/flock"
 	"github.com/miradorlabs/terma-cli/internal/procinfo"
-
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 )
 
@@ -46,6 +41,9 @@ func ClaimFromPayload(ctx context.Context, env Env, s PayloadSession, tool strin
 	if s.ID == "" {
 		return false
 	}
+	if env.Routing != nil {
+		return claimRouted(ctx, env, s, tool)
+	}
 	id := s.ID
 	env.Cwd = cmp.Or(s.Cwd, env.Cwd)
 	var c claim.Claim
@@ -57,9 +55,6 @@ func ClaimFromPayload(ctx context.Context, env Env, s PayloadSession, tool strin
 			if sid != "" {
 				notCollected(env, sid, tool)
 			}
-		}
-		if env.Policy.Stale(env.Time()) {
-			refreshPolicy(env)
 		}
 		return false
 	case err != nil && env.Policy.Global() && env.Policy.DefaultProjectID != "":
@@ -106,40 +101,6 @@ func notCollected(env Env, sessionID, tool string) {
 		}
 	}
 	claim.Mark(env.StateDir, sessionID, tool, claimPIDs(), env.Time())
-}
-
-// refreshedDir is the policies' folder of one file per team whose age keeps hooks to one
-// policy refresh per refreshEvery.
-const (
-	refreshedDir = "refreshed"
-	refreshEvery = time.Minute
-)
-
-// refreshPolicy starts the detached flush, which refreshes a stale policy first: with no
-// relay running, nothing else learns of a repository the team has since listed, and the
-// next hook would mark its sessions too. Of hooks racing past the stamp, the one holding
-// its lock starts the flush.
-func refreshPolicy(env Env) {
-	team := env.Policy.Team()
-	if env.Flush == nil || team == "" || team != filepath.Base(team) {
-		return
-	}
-	stamp, now := filepath.Join(env.StateDir, config.PoliciesDir, refreshedDir, team), env.Time()
-	if os.MkdirAll(filepath.Dir(stamp), 0o700) != nil {
-		return
-	}
-	unlock, err := flock.TryLock(stamp + ".lock")
-	if err != nil {
-		return
-	}
-	defer unlock()
-	if info, err := os.Stat(stamp); err == nil && now.Sub(info.ModTime()) < refreshEvery {
-		return
-	}
-	if err := os.WriteFile(stamp, nil, 0o600); err != nil || os.Chtimes(stamp, now, now) != nil {
-		return
-	}
-	env.Flush()
 }
 
 // claimPIDs are this hook's ancestors, one of them the agent: a claim covers only their records.

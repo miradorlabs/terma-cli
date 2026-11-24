@@ -20,8 +20,35 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/relay"
 	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
+	"github.com/miradorlabs/terma-cli/internal/routing"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
 )
+
+const acmeWeb = "aaaaaaaa-0000-4000-8000-000000000001"
+
+// pairingSandbox is u-1 (A) signed in with Acme and its team acmeWeb enrolled in routing
+// state under that sign-in, with every delivery going to ingest.
+func pairingSandbox(t *testing.T) (*fakeAuth, *recordingIngest) {
+	t.Helper()
+	f := newFakeAuth(t)
+	authSandbox(t, f)
+	sandboxMachine(t)
+	if err := saveSignIn(testApp.dir, storedSession(f)); err != nil {
+		t.Fatal(err)
+	}
+	if err := config.UpdateProfile(testApp.dir, config.DefaultProfile, func(p *config.Profile) {
+		p.SelectOrganization(orgA().ID, orgA().Name)
+		p.Team = acmeWeb
+	}); err != nil {
+		t.Fatal(err)
+	}
+	ingest := newRecordingIngest(t)
+	t.Setenv("TERMA_OTLP_URL", ingest.URL)
+	pol := config.Policy{Mode: config.ModeRepo, Repositories: []string{appRepo.Origin}, IncludePrompts: true, IncludeToolContent: true,
+		TeamID: acmeWeb, OrganizationID: orgA().ID, AuthURL: f.srv.URL, Revision: 1, FetchedAt: time.Now()}
+	selectPolicy(t, pol)
+	return f, ingest
+}
 
 func testHeartbeatOpts(t *testing.T) relay.Options {
 	t.Helper()
@@ -85,8 +112,9 @@ func TestHeartbeatGoesWithTheSignIn(t *testing.T) {
 	}
 }
 
-// On a profile set up with a server key, a beat goes with the selected team's key, else
-// another key held here, and names no one: a key is no person's.
+// On a profile set up with a server key, a beat goes only to the team enrolled in its
+// routing state (never falling back to other keys held on disk), with no X-Mirador-Project
+// header and naming no user.
 func TestServerKeyHeartbeatNamesNoOne(t *testing.T) {
 	var sent []string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -100,8 +128,8 @@ func TestServerKeyHeartbeatNamesNoOne(t *testing.T) {
 		t.Fatal(err)
 	}
 	send := testHeartbeatOpts(t).HeartbeatSend
-	if err := send(context.Background(), emptyBeat()); err != nil {
-		t.Fatal(err)
+	if err := send(context.Background(), emptyBeat()); !errors.Is(err, relay.ErrNoKey) {
+		t.Fatalf("heartbeat without routing state = %v, want ErrNoKey", err)
 	}
 	if err := keystore.Set(testApp.dir, "team", "ter_srv_team", hosts); err != nil {
 		t.Fatal(err)
@@ -110,7 +138,7 @@ func TestServerKeyHeartbeatNamesNoOne(t *testing.T) {
 	if err := send(context.Background(), emptyBeat()); err != nil {
 		t.Fatal(err)
 	}
-	if want := []string{"ter_srv_elsewhere ", "ter_srv_team "}; strings.Join(sent, "|") != strings.Join(want, "|") {
+	if want := []string{"ter_srv_team "}; strings.Join(sent, "|") != strings.Join(want, "|") {
 		t.Fatalf("beats sent %q, want %q", sent, want)
 	}
 }
@@ -353,7 +381,14 @@ func TestHeartbeatNeverPairsAnothersTokenWithTheLastTeam(t *testing.T) {
 		}); err != nil {
 			t.Fatal(err)
 		}
-		selectPolicy(t, config.Policy{Mode: config.ModeRepo, TeamID: betaCore, OrganizationID: orgB().ID, AuthURL: f.srv.URL, Revision: 1, FetchedAt: time.Now()})
+		polB := config.Policy{Mode: config.ModeRepo, TeamID: betaCore, OrganizationID: orgB().ID, AuthURL: f.srv.URL, Revision: 1, FetchedAt: time.Now()}
+		selectPolicy(t, polB)
+		if _, err := routing.Replace(testApp.stateDir, config.DefaultProfile, nil, auth.AccountKey(f.srv.URL, "u-2"), func(s *routing.State) error {
+			_, err := s.Select(routing.Team{OrganizationID: orgB().ID, AuthURL: f.srv.URL, TeamID: betaCore, Policy: polB})
+			return err
+		}); err != nil {
+			t.Fatal(err)
+		}
 		if err := opts.HeartbeatSend(t.Context(), emptyBeat()); err != nil {
 			t.Fatalf("beat under B's own team: %v", err)
 		}

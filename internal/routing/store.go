@@ -198,23 +198,7 @@ func Create(stateDir, profile, account string, change func(*State) error) (State
 		if ok {
 			return fmt.Errorf("%w: %s", ErrStateExists, profile)
 		}
-		stateID, err := NewEnrollmentID()
-		if err != nil {
-			return err
-		}
-		s := State{StateID: stateID, Profile: profile, Account: account}
-		if err := change(&s); err != nil {
-			return err
-		}
-		if s.Profile != profile || s.Account != account || s.StateID != stateID || s.Generation != 0 || s.ConsentGeneration != 0 {
-			return errors.New("routing create may not change profile, account, state_id, generation, or consent_generation")
-		}
-		if err := s.check(); err != nil {
-			return err
-		}
-		s.Generation = 1
-		s.ConsentGeneration = 1
-		return writeAtomic(path, s, &out)
+		return writeFresh(path, profile, account, 1, 1, change, &out)
 	})
 	return out, err
 }
@@ -255,25 +239,54 @@ func Replace(stateDir, profile string, expectPrev *Expect, newAccount string, ch
 		} else if err == nil && ok {
 			nextGen, nextConsent = prev.Generation+1, prev.ConsentGeneration+1
 		}
-		stateID, err := NewEnrollmentID()
-		if err != nil {
-			return err
-		}
-		s := State{StateID: stateID, Profile: profile, Account: newAccount}
-		if err := change(&s); err != nil {
-			return err
-		}
-		if s.Profile != profile || s.Account != newAccount || s.StateID != stateID || s.Generation != 0 || s.ConsentGeneration != 0 {
-			return errors.New("routing replace may not change profile, account, state_id, generation, or consent_generation")
-		}
-		if err := s.check(); err != nil {
-			return err
-		}
-		s.Generation = nextGen
-		s.ConsentGeneration = nextConsent
-		return writeAtomic(path, s, &out)
+		return writeFresh(path, profile, newAccount, nextGen, nextConsent, change, &out)
 	})
 	return out, err
+}
+
+// ReplaceCorrupt atomically replaces a corrupt or unreadable routing state file with a
+// fresh state stamped with newAccount under the lock. Returns ErrStateExists if a valid
+// state now exists on disk, or ErrNoState if the file was removed concurrently.
+func ReplaceCorrupt(stateDir, profile, newAccount string, change func(*State) error) (State, error) {
+	if !ValidAccount(newAccount) {
+		return State{}, fmt.Errorf("invalid new account %q", newAccount)
+	}
+	path, err := StatePath(stateDir, profile)
+	if err != nil {
+		return State{}, err
+	}
+	var out State
+	err = flock.Locked(path, lockWait, func() error {
+		_, ok, err := load(path, profile)
+		if err == nil {
+			if ok {
+				return fmt.Errorf("%w: %s", ErrStateExists, profile)
+			}
+			return ErrNoState
+		}
+		return writeFresh(path, profile, newAccount, 1, 1, change, &out)
+	})
+	return out, err
+}
+
+func writeFresh(path, profile, account string, nextGen, nextConsent int64, change func(*State) error, out *State) error {
+	stateID, err := NewEnrollmentID()
+	if err != nil {
+		return err
+	}
+	s := State{StateID: stateID, Profile: profile, Account: account}
+	if err := change(&s); err != nil {
+		return err
+	}
+	if s.Profile != profile || s.Account != account || s.StateID != stateID || s.Generation != 0 || s.ConsentGeneration != 0 {
+		return errors.New("routing write may not change profile, account, state_id, generation, or consent_generation")
+	}
+	if err := s.check(); err != nil {
+		return err
+	}
+	s.Generation = nextGen
+	s.ConsentGeneration = nextConsent
+	return writeAtomic(path, s, out)
 }
 
 type teamConsent struct {
@@ -348,6 +361,26 @@ func Delete(stateDir, profile string, expect Expect) error {
 		}
 		if err := expect.check(s); err != nil {
 			return err
+		}
+		return os.Remove(path)
+	})
+}
+
+// DeleteCorrupt removes a corrupt or unreadable routing state file under the lock.
+// Returns ErrNoState if the file is already absent, or ErrStaleGeneration if a valid
+// routing state now exists on disk (requiring a CAS Delete with its Expect).
+func DeleteCorrupt(stateDir, profile string) error {
+	path, err := StatePath(stateDir, profile)
+	if err != nil {
+		return err
+	}
+	return flock.Locked(path, lockWait, func() error {
+		_, ok, err := load(path, profile)
+		if err == nil {
+			if !ok {
+				return ErrNoState
+			}
+			return ErrStaleGeneration
 		}
 		return os.Remove(path)
 	})

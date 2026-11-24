@@ -7,6 +7,7 @@ import (
 	"slices"
 
 	"github.com/miradorlabs/terma-cli/internal/agents/internal/applypatch"
+	"github.com/miradorlabs/terma-cli/internal/agents/internal/reach"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/session"
 )
@@ -51,6 +52,7 @@ func sessionStart(ctx context.Context, env hookrun.Env) error {
 		return nil
 	}
 	env.Cwd = cmp.Or(in.Cwd, env.Cwd)
+	env.StartRun(in.SessionID)
 	r, err := env.Repo(ctx)
 	if err != nil {
 		return nil
@@ -60,28 +62,43 @@ func sessionStart(ctx context.Context, env hookrun.Env) error {
 }
 
 // prompt is UserPromptSubmit, which the CLI fires before SessionStart: the caller claims
-// the session from the payload; nothing is recorded.
+// the session from the payload and records the turn start for post-tool reach cutoffs.
 func prompt(_ context.Context, env hookrun.Env) error {
-	_, _ = readInput(env)
+	if in, ok := readInput(env); ok {
+		env.StartTurn(in.SessionID)
+	}
 	return nil
 }
 
 func postToolUse(ctx context.Context, env hookrun.Env) error {
 	in, ok := readInput(env)
+	if !ok {
+		return nil
+	}
+	if env.Routing != nil {
+		env.MixedSince = env.TurnSince(in.SessionID)
+	}
+	env.Cwd = cmp.Or(in.Cwd, env.Cwd)
+	sess := session.Session{ID: in.SessionID, Tool: name}
+	if !editTools[in.ToolName] {
+		if env.Routing != nil {
+			env.Classify(ctx, nil, sess, reach.Copilot.Of(in.ToolInput, env.Cwd), nil)
+		}
+		return nil
+	}
 	// A result the runtime names as anything but a success wrote nothing.
-	if !ok || !editTools[in.ToolName] || in.ToolResult.ResultType != "" && in.ToolResult.ResultType != "success" {
+	if in.ToolResult.ResultType != "" && in.ToolResult.ResultType != "success" {
 		return nil
 	}
 	paths := editedPaths(in.ToolInput)
 	if len(paths) == 0 {
 		return nil
 	}
-	env.Cwd = cmp.Or(in.Cwd, env.Cwd)
-	r, err := env.Repo(ctx)
-	if err != nil {
-		return nil
+	if r, err := env.Repo(ctx); err != nil {
+		env.Classify(ctx, nil, sess, paths, nil)
+	} else {
+		env.Touch(r, sess, in.ToolName, paths, nil)
 	}
-	env.Touch(r, session.Session{ID: in.SessionID, Tool: name}, in.ToolName, paths, nil)
 	return nil
 }
 
@@ -134,7 +151,7 @@ func stop(ctx context.Context, env hookrun.Env) error {
 	if err != nil {
 		return nil
 	}
-	captureTitle(env, r, in.SessionID)
+	captureTitle(ctx, env, r, in.SessionID)
 	return nil
 }
 
@@ -149,7 +166,7 @@ func sessionEnd(ctx context.Context, env hookrun.Env) error {
 	if err != nil {
 		return nil
 	}
-	captureTitle(env, r, in.SessionID)
+	captureTitle(ctx, env, r, in.SessionID)
 	env.EndSession(r, in.SessionID, name)
 	return nil
 }
