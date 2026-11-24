@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-24T16:48:07.081917625Z",
+  "generated_at": "2026-11-24T19:02:34.375476835Z",
   "versions": [
     {
       "harness": "copilot",
@@ -37,6 +37,44 @@
       "signing": "valid",
       "partial": true,
       "attempted_at": "2026-11-24T13:22:34.848451504Z",
+      "attempts": 1
+    },
+    {
+      "harness": "claude-desktop",
+      "name": "Claude Desktop (Code)",
+      "version": "7.37095.0",
+      "released_at": "2026-11-24T07:16:44.904Z",
+      "captured_at": "2026-11-24T19:02:34.375476835Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "6.28899.6",
+      "changes": 99,
+      "categories": {
+        "binary": 4,
+        "cli": 18,
+        "config": 5,
+        "model": 18,
+        "network": 22,
+        "prompt": 6,
+        "request": 1,
+        "tools": 25
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 10,
+        "notable": 89
+      },
+      "undocumented": null,
+      "highlights": [
+        "Model parameter safeguards.0.classifier_context.refused_calls: none → []",
+        "Model parameter safeguards.0.classifier_context.rules.deny.1.pattern: /**/ccd-*h.501 → /L?brary/Appl?cat?on ?upport/Claude",
+        "Model parameter safeguards.0.classifier_context.rules.deny.1.rule: Edit(//**/ccd-*h.501) → Edit(//L?brary/Appl?cat?on ?upport/Claude/**)"
+      ],
+      "signing": "valid",
+      "attempted_at": "2026-11-24T19:02:34.375476835Z",
       "attempts": 1
     },
     {
@@ -6179,42 +6217,6 @@
       "highlights": [
         "New environment variable: CLAUDE_REMOTE_TOOLS_BRIDGE_URL",
         "New environment variable: CLAUDE_WORKSHOP_PROGRESS"
-      ],
-      "signing": "valid"
-    },
-    {
-      "harness": "codex",
-      "name": "Codex CLI",
-      "version": "0.147.0",
-      "released_at": "2026-08-07T01:47:21.081Z",
-      "captured_at": "2026-11-05T09:54:28.532441Z",
-      "platforms": [
-        "darwin/arm64",
-        "linux/amd64"
-      ],
-      "support": "untested",
-      "previous": "0.146.1",
-      "changes": 85,
-      "categories": {
-        "behavior": 5,
-        "binary": 2,
-        "cli": 39,
-        "config": 11,
-        "filesystem": 22,
-        "prompt": 3,
-        "tools": 3
-      },
-      "impact": {
-        "breaking": 0,
-        "degrading": 0,
-        "informational": 74,
-        "notable": 11
-      },
-      "undocumented": 35,
-      "highlights": [
-        "System prompt changed (+2815 −498 chars)",
-        "System prompt changed (+498 −2850 chars)",
-        "System prompt changed (+79 −0 chars)"
       ],
       "signing": "valid"
     }

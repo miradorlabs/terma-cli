@@ -22565,7 +22565,7 @@
         "read": true
       },
       "CLAUDE_CODE_DISABLE_MCP_TASK_BACKGROUND": {
-        "description": "Set to `1` so that Claude waits for the result of an MCP task in an interactive session. While automatic backgrounding is on, it still moves the call to the background after two minutes by default. Requires Claude Code v2.1.304 or later",
+        "description": "Set to `1` so that Claude waits for the result of an MCP task in an interactive terminal session. While automatic backgrounding is on, it still moves the call to the background after two minutes by default. Requires Claude Code v2.1.304 or later",
         "read": true
       },
       "CLAUDE_CODE_DISABLE_MODEL_ACCESS_FALLBACK": {
@@ -22885,7 +22885,7 @@
         "read": true
       },
       "CLAUDE_CODE_MCP_AUTO_BACKGROUND_MS": {
-        "description": "Elapsed time in milliseconds before a still-running MCP tool call moves to a background task (default: 120000, or 2 minutes). Set to `0` to turn automatic backgrounding off and, in an interactive session, to make Claude wait for MCP tasks. Requires Claude Code v2.1.212 or later",
+        "description": "Elapsed time in milliseconds before a still-running MCP tool call moves to a background task (default: 120000, or 2 minutes). Set to `0` to turn automatic backgrounding off. In an interactive terminal session, `0` also makes Claude wait for MCP tasks. Requires Claude Code v2.1.212 or later",
         "read": true
       },
       "CLAUDE_CODE_MCP_STARTUP_WAIT_MS": {
@@ -23069,7 +23069,7 @@
         "read": true
       },
       "CLAUDE_CODE_RETRY_WATCHDOG": {
-        "description": "Set to `1` for unattended sessions such as eval harnesses, CI jobs, or remote workers. Retries `429` and `529` capacity errors indefinitely instead of failing after `CLAUDE_CODE_MAX_RETRIES` attempts. Claude Code fails at once when a standard-speed request gets a `429` that reports a spend limit or exhausted usage credits, even one from a gateway spend cap that resets on a schedule. Before v2.1.239, the watchdog retried these indefinitely. For fast mode requests, see Handle rate limits. The watchdog backs off up to 5 minutes between attempts, or until the limit resets when the response carries a rate-limit reset time, so a session that hits a usage limit waits out the remaining window. On v2.1.199 or later it also raises the default retry count for other transient errors, such as server errors, timeouts, and dropped connections, to 300, roughly three hours of backoff, and removes the cap of 15 on `CLAUDE_CODE_MAX_RETRIES` if you set that variable explicitly. Requires Claude Code v2.1.186 or later",
+        "description": "Set to `1` for unattended sessions. Keeps retrying `429` and `529` capacity errors past `CLAUDE_CODE_MAX_RETRIES`. Spend limits and exhausted usage credits can end the retries. See retry limits and fast mode. Requires Claude Code v2.1.186 or later",
         "read": true
       },
       "CLAUDE_CODE_RETRY_WATCHDOG_MAX_WAIT_MS": {
@@ -23729,7 +23729,7 @@
         "read": false
       }
     },
-    "fetched_at": "2026-11-24T16:48:07.081917625Z",
+    "fetched_at": "2026-11-24T19:02:34.375476835Z",
     "settings": {
       "advisorModel": {
         "default": "unset, so the advisor is off",
@@ -24286,6 +24286,15 @@
         "scope_note": "By default, the desktop app reads the key from one managed source.",
         "topic": "Remote, desktop, and notifications",
         "type": "Boolean; only the JSON Boolean `true` takes effect"
+      },
+      "disableDirectMcpSkills": {
+        "default": "unset. These skills are off for Team and Enterprise members who sign in to claude.ai with `/login`. For other sign-ins, see MCP skill availability",
+        "description": "Turn skills from MCP servers on or off for your organization. This key covers every server except claude.ai connectors. For connectors, an Owner uses the **Skills over MCP** switch in **Organization settings > Connectors** instead. Skills from MCP servers require Claude Code v2.1.331 or later.",
+        "read": true,
+        "scope": "Managed",
+        "scope_note": "If you use several managed sources, set `false` in the highest-ranked one. Claude Code ignores a `false` in the Windows HKCU registry",
+        "topic": "MCP",
+        "type": "Boolean"
       },
       "disableMobileSimulatorTools": {
         "default": "unset, so Claude's simulator tools follow each person's settings toggle in the desktop app",
@@ -26870,7 +26879,6 @@
       "daemonColdStart",
       "defaultView",
       "desktopMcpServersListScope",
-      "disableDirectMcpSkills",
       "disableReplyCheck",
       "disableWindowsBashCommandSplit",
       "doneMeansMerged",

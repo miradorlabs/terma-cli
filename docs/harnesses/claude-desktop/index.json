@@ -6,29 +6,65 @@
     "vendor": "Anthropic",
     "homepage": "https://claude.ai/download",
     "source": null,
-    "latest": "6.28899.6",
+    "latest": "7.37095.0",
     "support": "supported",
-    "versions_tracked": 10,
+    "versions_tracked": 11,
     "first_tracked": "2026-11-03",
     "last_change": {
-      "from": "6.28899.2",
-      "to": "6.28899.6",
-      "at": "2026-11-21T12:26:45.690660582Z",
-      "released_at": "2026-11-20T22:21:45.581Z",
-      "changes": 30,
+      "from": "6.28899.6",
+      "to": "7.37095.0",
+      "at": "2026-11-24T19:02:34.375476835Z",
+      "released_at": "2026-11-24T07:16:44.904Z",
+      "changes": 99,
       "categories": {
-        "binary": 3,
-        "cli": 8,
-        "config": 6,
-        "model": 1,
-        "network": 4,
-        "prompt": 2,
+        "binary": 4,
+        "cli": 18,
+        "config": 5,
+        "model": 18,
+        "network": 22,
+        "prompt": 6,
         "request": 1,
-        "tools": 5
+        "tools": 25
       }
     }
   },
   "versions": [
+    {
+      "version": "7.37095.0",
+      "released_at": "2026-11-24T07:16:44.904Z",
+      "captured_at": "2026-11-24T19:02:34.375476835Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "6.28899.6",
+      "changes": 99,
+      "categories": {
+        "binary": 4,
+        "cli": 18,
+        "config": 5,
+        "model": 18,
+        "network": 22,
+        "prompt": 6,
+        "request": 1,
+        "tools": 25
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 10,
+        "notable": 89
+      },
+      "undocumented": null,
+      "highlights": [
+        "Model parameter safeguards.0.classifier_context.refused_calls: none → []",
+        "Model parameter safeguards.0.classifier_context.rules.deny.1.pattern: /**/ccd-*h.501 → /L?brary/Appl?cat?on ?upport/Claude",
+        "Model parameter safeguards.0.classifier_context.rules.deny.1.rule: Edit(//**/ccd-*h.501) → Edit(//L?brary/Appl?cat?on ?upport/Claude/**)"
+      ],
+      "signing": "valid",
+      "attempted_at": "2026-11-24T19:02:34.375476835Z",
+      "attempts": 1
+    },
     {
       "version": "6.28899.6",
       "released_at": "2026-11-20T22:21:45.581Z",
