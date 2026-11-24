@@ -3,443 +3,39 @@
   "harness": "claude",
   "steps": [
     {
-      "version": "2.1.331",
-      "previous": "2.1.330",
+      "version": "2.1.332",
+      "previous": "2.1.331",
       "changes": [
         {
-          "id": "telemetry.surfaces.traces/claude_code.llm_request.keys.gen_ai.operation.name",
-          "category": "telemetry",
-          "op": "added",
-          "title": "New telemetry field: gen_ai.operation.name on traces/claude_code.llm_request",
-          "impact": "informational",
-          "documented": null
-        },
-        {
-          "id": "telemetry.surfaces.traces/claude_code.llm_request.keys.gen_ai.response.model",
-          "category": "telemetry",
-          "op": "added",
-          "title": "New telemetry field: gen_ai.response.model on traces/claude_code.llm_request",
-          "impact": "informational",
-          "documented": null
-        },
-        {
-          "id": "telemetry.surfaces.traces/claude_code.llm_request.keys.gen_ai.usage.cache_read.input_tokens",
-          "category": "telemetry",
-          "op": "added",
-          "title": "New telemetry field: gen_ai.usage.cache_read.input_tokens on traces/claude_code.llm_request",
-          "impact": "informational",
-          "documented": null
-        },
-        {
-          "id": "telemetry.surfaces.traces/claude_code.llm_request.keys.gen_ai.usage.cache_write.input_tokens",
-          "category": "telemetry",
-          "op": "added",
-          "title": "New telemetry field: gen_ai.usage.cache_write.input_tokens on traces/claude_code.llm_request",
-          "impact": "informational",
-          "documented": null
-        },
-        {
-          "id": "telemetry.surfaces.traces/claude_code.llm_request.keys.gen_ai.usage.input_tokens",
-          "category": "telemetry",
-          "op": "added",
-          "title": "New telemetry field: gen_ai.usage.input_tokens on traces/claude_code.llm_request",
-          "impact": "informational",
-          "documented": null
-        },
-        {
-          "id": "telemetry.surfaces.traces/claude_code.llm_request.keys.gen_ai.usage.output_tokens",
-          "category": "telemetry",
-          "op": "added",
-          "title": "New telemetry field: gen_ai.usage.output_tokens on traces/claude_code.llm_request",
-          "impact": "informational",
-          "documented": null
-        },
-        {
-          "id": "cli.help.auth --help",
-          "category": "cli",
-          "op": "changed",
-          "title": "Full help text of `auth --help` changed (+55 −55 chars)",
-          "impact": "informational",
-          "documented": null
-        },
-        {
-          "id": "config.options.downloadsMirrorUrl",
-          "category": "config",
-          "op": "added",
-          "title": "New setting: downloadsMirrorUrl",
-          "impact": "informational",
-          "documented": null
-        },
-        {
-          "id": "config.options.fileCheckpointingEnabled.description",
-          "category": "config",
-          "op": "changed",
-          "title": "fileCheckpointingEnabled description changed (+122 −55 chars)",
-          "impact": "informational",
-          "documented": null
-        },
-        {
-          "id": "config.options.modelCatalogPublicKey",
-          "category": "config",
-          "op": "added",
-          "title": "New setting: modelCatalogPublicKey",
-          "impact": "informational",
-          "documented": null
-        },
-        {
-          "id": "config.options.modelCatalogUrl",
-          "category": "config",
-          "op": "added",
-          "title": "New setting: modelCatalogUrl",
-          "impact": "informational",
-          "documented": null
-        },
-        {
-          "id": "config.env_vars",
-          "category": "config",
-          "op": "changed",
-          "title": "Environment variables: +22 −3",
-          "impact": "informational",
-          "documented": null
-        },
-        {
-          "id": "filesystem.darwin/arm64.exec.git -c core.askPass= -c protocol.ext.allow=never -c core.alternateRefsCommand=f() { git --git-dir=\"$1\" for-each-ref --format='%(objectname)'; }; f -c submodule.recurse=false -c log.showSignature=false -c format.pretty=medium -c gc.auto=0 -c maintenance.auto=false -c diff.autoRefreshIndex=false -c hook.applypatch-msg.enabled=false -c hook.pre-applypatch.enabled=false -c hook.post-applypatch.enabled=false -c hook.pre-commit.enabled=false -c hook.pre-merge-commit.enabled=false -c hook.prepare-commit-msg.enabled=false -c hook.commit-msg.enabled=false -c hook.post-commit.enabled=false -c hook.pre-rebase.enabled=false -c hook.post-checkout.enabled=false -c hook.post-merge.enabled=false -c hook.pre-push.enabled=false -c hook.pre-receive.enabled=false -c hook.update.enabled=false -c hook.proc-receive.enabled=false -c hook.post-receive.enabled=false -c hook.post-update.enabled=false -c hook.reference-transaction.enabled=false -c hook.push-to-checkout.enabled=false -c hook.pre-auto-gc.enabled=false -c hook.post-rewrite.enabled=false -c hook.sendemail-validate.enabled=false -c hook.fsmonitor-watchman.enabled=false -c hook.p4-changelist.enabled=false -c hook.p4-prepare-changelist.enabled=false -c hook.p4-post-changelist.enabled=false -c hook.p4-pre-submit.enabled=false -c hook.post-index-change.enabled=false -c core.hooksPath=/dev/null -c core.fsmonitor= remote get-url origin.phases.turn",
-          "category": "filesystem",
-          "op": "added",
-          "title": "`git -c core.askPass= -c protocol.ext.allow=never -c core.alternateRefsCommand=f() { git --git-dir=\"$ …` now also runs at turn (darwin/arm64)",
-          "impact": "informational",
-          "documented": null
-        },
-        {
-          "id": "filesystem.darwin/arm64.exec.git -c core.askPass= -c protocol.ext.allow=never -c core.alternateRefsCommand=f() { git --git-dir=\"$1\" for-each-ref --format='%(objectname)'; }; f -c submodule.recurse=false -c log.showSignature=false -c format.pretty=medium -c gc.auto=0 -c maintenance.auto=false -c diff.autoRefreshIndex=false -c hook.applypatch-msg.enabled=false -c hook.pre-applypatch.enabled=false -c hook.post-applypatch.enabled=false -c hook.pre-commit.enabled=false -c hook.pre-merge-commit.enabled=false -c hook.prepare-commit-msg.enabled=false -c hook.commit-msg.enabled=false -c hook.post-commit.enabled=false -c hook.pre-rebase.enabled=false -c hook.post-checkout.enabled=false -c hook.post-merge.enabled=false -c hook.pre-push.enabled=false -c hook.pre-receive.enabled=false -c hook.update.enabled=false -c hook.proc-receive.enabled=false -c hook.post-receive.enabled=false -c hook.post-update.enabled=false -c hook.reference-transaction.enabled=false -c hook.push-to-checkout.enabled=false -c hook.pre-auto-gc.enabled=false -c hook.post-rewrite.enabled=false -c hook.sendemail-validate.enabled=false -c hook.fsmonitor-watchman.enabled=false -c hook.p4-changelist.enabled=false -c hook.p4-prepare-changelist.enabled=false -c hook.p4-post-changelist.enabled=false -c hook.p4-pre-submit.enabled=false -c hook.post-index-change.enabled=false -c core.hooksPath=/dev/null -c core.fsmonitor= remote get-url origin.phases.startup",
-          "category": "filesystem",
+          "id": "tools.ToolSearch.input_schema.required.max_results",
+          "category": "tools",
           "op": "removed",
-          "title": "`git -c core.askPass= -c protocol.ext.allow=never -c core.alternateRefsCommand=f() { git --git-dir=\"$ …` no longer runs at startup (darwin/arm64)",
-          "impact": "informational",
-          "documented": null
-        },
-        {
-          "id": "filesystem.linux/amd64.paths.<home>/.claude/remote/run",
-          "category": "filesystem",
-          "op": "added",
-          "title": "Now looks for ~/.claude/remote/run (linux/amd64)",
-          "impact": "informational",
-          "documented": null
-        },
-        {
-          "id": "binary.runtime",
-          "category": "binary",
-          "op": "changed",
-          "title": "Binary runtime: bun 1.4.4 → bun 1.4.6",
-          "impact": "informational",
-          "documented": null
-        }
-      ]
-    },
-    {
-      "version": "2.1.330",
-      "previous": "2.1.329",
-      "changes": [
-        {
-          "id": "config.options.deniedMcpServers.serverUrl.description",
-          "category": "config",
-          "op": "changed",
-          "title": "deniedMcpServers.serverUrl description changed (+232 −98 chars)",
-          "impact": "informational",
-          "documented": null
-        },
-        {
-          "id": "config.options.disableDirectMcpSkills",
-          "category": "config",
-          "op": "added",
-          "title": "New setting: disableDirectMcpSkills",
-          "impact": "informational",
-          "documented": null
-        },
-        {
-          "id": "config.options.maxEffortLevel.enum.$ZodCatch",
-          "category": "config",
-          "op": "removed",
-          "title": "Setting maxEffortLevel lost value $ZodCatch",
+          "title": "ToolSearch tool parameters removed",
           "impact": "notable",
           "documented": null
         },
         {
-          "id": "config.options.statusLine.type.enum.command",
-          "category": "config",
+          "id": "hooks.supported.PreSkillShellCommand",
+          "category": "hooks",
           "op": "added",
-          "title": "Setting statusLine.type gained value command",
+          "title": "New hook event: PreSkillShellCommand",
+          "impact": "notable",
+          "documented": null
+        },
+        {
+          "id": "config.options.desktopMcpServersListScope.description",
+          "category": "config",
+          "op": "changed",
+          "title": "desktopMcpServersListScope description changed (+632 −469 chars)",
           "impact": "informational",
           "documented": null
         },
         {
-          "id": "config.options.subagentStatusLine.type.enum.command",
-          "category": "config",
-          "op": "added",
-          "title": "Setting subagentStatusLine.type gained value command",
-          "impact": "informational",
-          "documented": null
-        },
-        {
-          "id": "config.env_vars.CLAUDE_AI_AUTHORIZE_URL",
-          "category": "config",
-          "op": "added",
-          "title": "New environment variable: CLAUDE_AI_AUTHORIZE_URL",
-          "impact": "informational",
-          "documented": null
-        },
-        {
-          "id": "config.env_vars.CLAUDE_CODE_COWORK_SHELL_CHECK",
-          "category": "config",
-          "op": "added",
-          "title": "New environment variable: CLAUDE_CODE_COWORK_SHELL_CHECK",
-          "impact": "informational",
-          "documented": null
-        },
-        {
-          "id": "config.env_vars.CLAUDE_CODE_DISABLE_REDIRECT_DENY_RECHECK",
-          "category": "config",
-          "op": "added",
-          "title": "New environment variable: CLAUDE_CODE_DISABLE_REDIRECT_DENY_RECHECK",
-          "impact": "informational",
-          "documented": null
-        },
-        {
-          "id": "config.env_vars.CLAUDE_CODE_FULL_SIGN_IN_LINK",
-          "category": "config",
-          "op": "added",
-          "title": "New environment variable: CLAUDE_CODE_FULL_SIGN_IN_LINK",
-          "impact": "informational",
-          "documented": null
-        },
-        {
-          "id": "config.env_vars.CLAUDE_CODE_HOST_ALLOW_RESETS_DENIAL_STREAK",
-          "category": "config",
-          "op": "added",
-          "title": "New environment variable: CLAUDE_CODE_HOST_ALLOW_RESETS_DENIAL_STREAK",
-          "impact": "informational",
-          "documented": null
-        },
-        {
-          "id": "config.env_vars.CLAUDE_CODE_HOST_READS_NO_BASH_EDIT_DIFF",
-          "category": "config",
-          "op": "added",
-          "title": "New environment variable: CLAUDE_CODE_HOST_READS_NO_BASH_EDIT_DIFF",
-          "impact": "informational",
-          "documented": null
-        },
-        {
-          "id": "config.env_vars.CLAUDE_CODE_MODEL_NOBODY_CHOSE",
-          "category": "config",
-          "op": "added",
-          "title": "New environment variable: CLAUDE_CODE_MODEL_NOBODY_CHOSE",
-          "impact": "informational",
-          "documented": null
-        },
-        {
-          "id": "config.env_vars.CLAUDE_CODE_PROJECTS_FEATURE_FLAGS",
-          "category": "config",
-          "op": "added",
-          "title": "New environment variable: CLAUDE_CODE_PROJECTS_FEATURE_FLAGS",
-          "impact": "informational",
-          "documented": null
-        },
-        {
-          "id": "config.env_vars.CLAUDE_CODE_RELAUNCH_BYPASS_SWITCH",
-          "category": "config",
-          "op": "added",
-          "title": "New environment variable: CLAUDE_CODE_RELAUNCH_BYPASS_SWITCH",
-          "impact": "informational",
-          "documented": null
-        },
-        {
-          "id": "config.env_vars.CLAUDE_CODE_RUNNER_START_NOTES",
-          "category": "config",
-          "op": "added",
-          "title": "New environment variable: CLAUDE_CODE_RUNNER_START_NOTES",
-          "impact": "informational",
-          "documented": null
-        },
-        {
-          "id": "config.env_vars.CLAUDE_CODE_STARTER_MAY_HOLD_CONNECTOR_FILE",
-          "category": "config",
-          "op": "added",
-          "title": "New environment variable: CLAUDE_CODE_STARTER_MAY_HOLD_CONNECTOR_FILE",
-          "impact": "informational",
-          "documented": null
-        },
-        {
-          "id": "config.env_vars.CLAUDE_RUNNER_START_FOLDER",
-          "category": "config",
-          "op": "added",
-          "title": "New environment variable: CLAUDE_RUNNER_START_FOLDER",
-          "impact": "informational",
-          "documented": null
-        },
-        {
-          "id": "config.env_vars.SELF_HOSTED_RUNNER_START_DIR",
-          "category": "config",
-          "op": "added",
-          "title": "New environment variable: SELF_HOSTED_RUNNER_START_DIR",
-          "impact": "informational",
-          "documented": null
-        },
-        {
-          "id": "config.env_vars.API_FORCE_IDLE_TIMEOUT",
+          "id": "config.options.fileSuggestion.type.enum.command",
           "category": "config",
           "op": "removed",
-          "title": "Environment variable no longer read: API_FORCE_IDLE_TIMEOUT",
-          "impact": "informational",
-          "documented": null
-        },
-        {
-          "id": "config.env_vars.AWS_BEARER_TOKEN_BEDROCK",
-          "category": "config",
-          "op": "removed",
-          "title": "Environment variable no longer read: AWS_BEARER_TOKEN_BEDROCK",
-          "impact": "informational",
-          "documented": null
-        },
-        {
-          "id": "config.env_vars.BROWSER",
-          "category": "config",
-          "op": "removed",
-          "title": "Environment variable no longer read: BROWSER",
-          "impact": "informational",
-          "documented": null
-        },
-        {
-          "id": "config.env_vars.BUF_BIGINT_DISABLE",
-          "category": "config",
-          "op": "removed",
-          "title": "Environment variable no longer read: BUF_BIGINT_DISABLE",
-          "impact": "informational",
-          "documented": null
-        },
-        {
-          "id": "filesystem.darwin/arm64.exec.git -c core.askPass= -c protocol.ext.allow=never -c core.alternateRefsCommand=f() { git --git-dir=\"$1\" for-each-ref --format='%(objectname)'; }; f -c submodule.recurse=false -c log.showSignature=false -c format.pretty=medium -c gc.auto=0 -c maintenance.auto=false -c diff.autoRefreshIndex=false -c hook.applypatch-msg.enabled=false -c hook.pre-applypatch.enabled=false -c hook.post-applypatch.enabled=false -c hook.pre-commit.enabled=false -c hook.pre-merge-commit.enabled=false -c hook.prepare-commit-msg.enabled=false -c hook.commit-msg.enabled=false -c hook.post-commit.enabled=false -c hook.pre-rebase.enabled=false -c hook.post-checkout.enabled=false -c hook.post-merge.enabled=false -c hook.pre-push.enabled=false -c hook.pre-receive.enabled=false -c hook.update.enabled=false -c hook.proc-receive.enabled=false -c hook.post-receive.enabled=false -c hook.post-update.enabled=false -c hook.reference-transaction.enabled=false -c hook.push-to-checkout.enabled=false -c hook.pre-auto-gc.enabled=false -c hook.post-rewrite.enabled=false -c hook.sendemail-validate.enabled=false -c hook.fsmonitor-watchman.enabled=false -c hook.p4-changelist.enabled=false -c hook.p4-prepare-changelist.enabled=false -c hook.p4-post-changelist.enabled=false -c hook.p4-pre-submit.enabled=false -c hook.post-index-change.enabled=false -c core.hooksPath=/dev/null -c core.fsmonitor= remote get-url origin.phases.startup",
-          "category": "filesystem",
-          "op": "added",
-          "title": "`git -c core.askPass= -c protocol.ext.allow=never -c core.alternateRefsCommand=f() { git --git-dir=\"$ …` now also runs at startup (darwin/arm64)",
-          "impact": "informational",
-          "documented": null
-        },
-        {
-          "id": "filesystem.darwin/arm64.exec.git -c core.askPass= -c protocol.ext.allow=never -c core.alternateRefsCommand=f() { git --git-dir=\"$1\" for-each-ref --format='%(objectname)'; }; f -c submodule.recurse=false -c log.showSignature=false -c format.pretty=medium -c gc.auto=0 -c maintenance.auto=false -c diff.autoRefreshIndex=false -c hook.applypatch-msg.enabled=false -c hook.pre-applypatch.enabled=false -c hook.post-applypatch.enabled=false -c hook.pre-commit.enabled=false -c hook.pre-merge-commit.enabled=false -c hook.prepare-commit-msg.enabled=false -c hook.commit-msg.enabled=false -c hook.post-commit.enabled=false -c hook.pre-rebase.enabled=false -c hook.post-checkout.enabled=false -c hook.post-merge.enabled=false -c hook.pre-push.enabled=false -c hook.pre-receive.enabled=false -c hook.update.enabled=false -c hook.proc-receive.enabled=false -c hook.post-receive.enabled=false -c hook.post-update.enabled=false -c hook.reference-transaction.enabled=false -c hook.push-to-checkout.enabled=false -c hook.pre-auto-gc.enabled=false -c hook.post-rewrite.enabled=false -c hook.sendemail-validate.enabled=false -c hook.fsmonitor-watchman.enabled=false -c hook.p4-changelist.enabled=false -c hook.p4-prepare-changelist.enabled=false -c hook.p4-post-changelist.enabled=false -c hook.p4-pre-submit.enabled=false -c hook.post-index-change.enabled=false -c core.hooksPath=/dev/null -c core.fsmonitor= remote get-url origin.phases.turn",
-          "category": "filesystem",
-          "op": "removed",
-          "title": "`git -c core.askPass= -c protocol.ext.allow=never -c core.alternateRefsCommand=f() { git --git-dir=\"$ …` no longer runs at turn (darwin/arm64)",
-          "impact": "informational",
-          "documented": null
-        },
-        {
-          "id": "filesystem.darwin/arm64.exec./bin/zsh -c -l SNAPSHOT_FILE=<claude-config>/shell-snapshots/snapshot-zsh-<n>-<id>.sh\n      \n      # No user config file to source\n      \n      \n\n      # First, create/clear the snapshot file\n      echo \"# Snapshot file\" >| \"$SNAPSHOT_FILE\"\n\n      # When this file is sourced, we first unalias to avoid conflicts\n      # This is necessary because aliases get \"frozen\" inside function definitions at definition time,\n      # which can cause unexpected behavior when functions use commands that conflict with aliases\n      echo \"# Unset all aliases to avoid conflicts with functions\" >> \"$SNAPSHOT_FILE\"\n      echo \"unalias -a 2>/dev/null || true\" >> \"$SNAPSHOT_FILE\"\n\n      \n\n      \n      cat >> \"$SNAPSHOT_FILE\" << 'CLAUDE_CODE_END_<id>'\n# Check for rg availability\nif ! hash rg 2>/dev/null && ! typeset -f rg >/dev/null 2>&1; then\n  function rg {\n  if [[ -x <install>/claude ]]; then\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=rg <install>/claude ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=rg <install>/claude ${1+\"$@\"}\n  else\n    (exec -a rg <install>/claude ${1+\"$@\"})\n  fi\n  elif [[ -x <home>/.local/bin/claude ]]; then\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=rg <home>/.local/bin/claude ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=rg <home>/.local/bin/claude ${1+\"$@\"}\n  else\n    (exec -a rg <home>/.local/bin/claude ${1+\"$@\"})\n  fi\n  else command rg ${1+\"$@\"}; fi\n}\nfi\n# Shadow find/grep with embedded bfs/ugrep\nunalias find 2>/dev/null || true\nunalias grep 2>/dev/null || true\nfunction find {\n  if [[ -x <install>/claude ]]; then\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=bfs <install>/claude -S dfs -regextype findutils-default ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=bfs <install>/claude -S dfs -regextype findutils-default ${1+\"$@\"}\n  else\n    (exec -a bfs <install>/claude -S dfs -regextype findutils-default ${1+\"$@\"})\n  fi\n  elif [[ -x <home>/.local/bin/claude ]]; then\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=bfs <home>/.local/bin/claude -S dfs -regextype findutils-default ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=bfs <home>/.local/bin/claude -S dfs -regextype findutils-default ${1+\"$@\"}\n  else\n    (exec -a bfs <home>/.local/bin/claude -S dfs -regextype findutils-default ${1+\"$@\"})\n  fi\n  else command find ${1+\"$@\"}; fi\n}\nfunction grep {\n  local _cc_a\n  for _cc_a in ${1+\"$@\"}; do\n    case \"$_cc_a\" in -*-filter*|-*-pager*|-*-view*|-*-format-open*|-*-config*|---*|-@*|-*-save-config*|-[Zz]*|-[!-]*[Zz]*|--null|--null-data) command grep ${1+\"$@\"}; return ;; esac\n  done\n  if [[ -x <install>/claude ]]; then\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=ugrep <install>/claude -G --ignore-files --hidden -I --encoding=UTF-8 --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=ugrep <install>/claude -G --ignore-files --hidden -I --encoding=UTF-8 --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"}\n  else\n    (exec -a ugrep <install>/claude -G --ignore-files --hidden -I --encoding=UTF-8 --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"})\n  fi\n  elif [[ -x <home>/.local/bin/claude ]]; then\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=ugrep <home>/.local/bin/claude -G --ignore-files --hidden -I --encoding=UTF-8 --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=ugrep <home>/.local/bin/claude -G --ignore-files --hidden -I --encoding=UTF-8 --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"}\n  else\n    (exec -a ugrep <home>/.local/bin/claude -G --ignore-files --hidden -I --encoding=UTF-8 --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"})\n  fi\n  else command grep ${1+\"$@\"}; fi\n}\n# Shadow pkill to refuse patterns matching the CLI process\nunalias pkill 2>/dev/null || true\nfunction pkill {\n  if [ -n \"${CLAUDE_PID:-}\" ] && [ -r \"/proc/${CLAUDE_PID}/comm\" ]; then\n    local _cc_skip=\"\" _cc_a\n    local -a _cc_probe=()\n    for _cc_a in ${1+\"$@\"}; do\n      if [ -n \"$_cc_skip\" ]; then _cc_skip=\"\"; continue; fi\n      case \"$_cc_a\" in\n        --signal) _cc_skip=1 ;;\n        --signal=*|-e|--echo) ;;\n        -[0-9]*) ;;\n        -[PUGOF]?*) _cc_probe+=(\"$_cc_a\") ;;\n        -[ABCDEFGHIJKLMNOPQRSTUVWXYZ][ABCDEFGHIJKLMNOPQRSTUVWXYZ0-9]*) ;;\n        *) _cc_probe+=(\"$_cc_a\") ;;\n      esac\n    done\n    if command pgrep ${_cc_probe[@]+\"${_cc_probe[@]}\"} 2>/dev/null | command grep -qx \"${CLAUDE_PID}\"; then\n      printf 'pkill: refusing to run — this pattern matches the Claude CLI process (PID %s). Narrow the pattern, or target your own children with `pkill -P $$ ...`.\\n' \"${CLAUDE_PID}\" >&2\n      return 1\n    fi\n  fi\n  command pkill ${1+\"$@\"}\n}\nexport PATH=<path>\nCLAUDE_CODE_END_<id>\n  \n\n      # Exit silently on success, only report errors\n      if [ ! -f \"$SNAPSHOT_FILE\" ]; then\n        echo \"Error: Snapshot file was not created at $SNAPSHOT_FILE\" >&2\n        exit 1\n      fi\n    ",
-          "category": "filesystem",
-          "op": "changed",
-          "title": "Command changed: `/bin/zsh -c -l SNAPSHOT_FILE=<claude-config>/shell-snapshots/snapshot-zsh-<n>-<id>.sh …` (+6 −0 chars) (darwin/arm64)",
-          "impact": "informational",
-          "documented": null
-        },
-        {
-          "id": "filesystem.linux/amd64.paths.<claude-config>/cache",
-          "category": "filesystem",
-          "op": "added",
-          "title": "Now looks for <claude-config>/cache (linux/amd64)",
-          "impact": "informational",
-          "documented": null
-        },
-        {
-          "id": "filesystem.linux/amd64.paths.<claude-config>/cache/model-catalog",
-          "category": "filesystem",
-          "op": "added",
-          "title": "Now looks for <claude-config>/cache/model-catalog (linux/amd64)",
-          "impact": "informational",
-          "documented": null
-        },
-        {
-          "id": "filesystem.linux/amd64.paths.<home>/.claude/cache",
-          "category": "filesystem",
-          "op": "added",
-          "title": "Now looks for ~/.claude/cache (linux/amd64)",
-          "impact": "informational",
-          "documented": null
-        },
-        {
-          "id": "filesystem.linux/amd64.paths.<home>/.claude/cache/model-catalog",
-          "category": "filesystem",
-          "op": "added",
-          "title": "Now looks for ~/.claude/cache/model-catalog (linux/amd64)",
-          "impact": "informational",
-          "documented": null
-        },
-        {
-          "id": "filesystem.linux/amd64.exec./bin/bash -c -l SNAPSHOT_FILE=<claude-config>/shell-snapshots/snapshot-bash-<n>-<id>.sh\n      \n      # No user config file to source\n      \n      \n\n      # First, create/clear the snapshot file\n      echo \"# Snapshot file\" >| \"$SNAPSHOT_FILE\"\n\n      # When this file is sourced, we first unalias to avoid conflicts\n      # This is necessary because aliases get \"frozen\" inside function definitions at definition time,\n…",
-          "category": "filesystem",
-          "op": "changed",
-          "title": "Command changed: `/bin/bash -c -l SNAPSHOT_FILE=<claude-config>/shell-snapshots/snapshot-bash-<n>-<id>.sh …` (+6 −0 chars) (linux/amd64)",
-          "impact": "informational",
-          "documented": null
-        }
-      ]
-    },
-    {
-      "version": "2.1.329",
-      "previous": "2.1.328",
-      "changes": [
-        {
-          "id": "cli.commands.claude.options.--name.description",
-          "category": "cli",
-          "op": "changed",
-          "title": "`claude --name`: description changed (+130 −97 chars)",
-          "impact": "informational",
-          "documented": null
-        },
-        {
-          "id": "cli.commands.claude.options.--restricted.description",
-          "category": "cli",
-          "op": "changed",
-          "title": "`claude --restricted`: description changed (+261 −226 chars)",
-          "impact": "informational",
-          "documented": null
-        },
-        {
-          "id": "cli.help.--help",
-          "category": "cli",
-          "op": "changed",
-          "title": "Full help text of `--help` changed (+364 −218 chars)",
-          "impact": "informational",
-          "documented": null
-        },
-        {
-          "id": "config.options.additionalDirectoryConfigRoots",
-          "category": "config",
-          "op": "added",
-          "title": "New setting: additionalDirectoryConfigRoots",
-          "impact": "informational",
-          "documented": null
-        },
-        {
-          "id": "config.options.desktopMcpServersListScope",
-          "category": "config",
-          "op": "added",
-          "title": "New setting: desktopMcpServersListScope",
-          "impact": "informational",
-          "documented": null
-        },
-        {
-          "id": "config.options.maxEffortLevel.enum.$ZodCatch",
-          "category": "config",
-          "op": "added",
-          "title": "Setting maxEffortLevel gained value $ZodCatch",
-          "impact": "informational",
-          "documented": null
-        },
-        {
-          "id": "config.options.sandbox.windows.backend.description",
-          "category": "config",
-          "op": "changed",
-          "title": "sandbox.windows.backend description changed (+560 −668 chars)",
-          "impact": "informational",
+          "title": "Setting fileSuggestion.type lost value command",
+          "impact": "notable",
           "documented": null
         },
         {
@@ -459,12 +55,638 @@
           "documented": null
         },
         {
+          "id": "config.env_vars.AWS_CONFIG_FILE",
+          "category": "config",
+          "op": "added",
+          "title": "New environment variable: AWS_CONFIG_FILE",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.env_vars.AWS_SHARED_CREDENTIALS_FILE",
+          "category": "config",
+          "op": "added",
+          "title": "New environment variable: AWS_SHARED_CREDENTIALS_FILE",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.env_vars.CLAUDE_CODE_DISABLE_POWERSHELL_LIBRARY_LOAD_GUARD",
+          "category": "config",
+          "op": "added",
+          "title": "New environment variable: CLAUDE_CODE_DISABLE_POWERSHELL_LIBRARY_LOAD_GUARD",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.env_vars.CLAUDE_CODE_HOST_SHORT_SCRATCHPAD",
+          "category": "config",
+          "op": "added",
+          "title": "New environment variable: CLAUDE_CODE_HOST_SHORT_SCRATCHPAD",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.env_vars.CLAUDE_CODE_INDEXED_SALAMANDER",
+          "category": "config",
+          "op": "added",
+          "title": "New environment variable: CLAUDE_CODE_INDEXED_SALAMANDER",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.env_vars.CLAUDE_CODE_RELAUNCH_SEAT_LAUNCH",
+          "category": "config",
+          "op": "added",
+          "title": "New environment variable: CLAUDE_CODE_RELAUNCH_SEAT_LAUNCH",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.env_vars.CLAUDE_CODE_SPEND_PROJECT",
+          "category": "config",
+          "op": "added",
+          "title": "New environment variable: CLAUDE_CODE_SPEND_PROJECT",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.env_vars.NODE_ENVdefaultdevelopmentnode",
+          "category": "config",
+          "op": "added",
+          "title": "New environment variable: NODE_ENVdefaultdevelopmentnode",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.env_vars.NODE_ENVexecutablePathexecutablePath",
+          "category": "config",
+          "op": "added",
+          "title": "New environment variable: NODE_ENVexecutablePathexecutablePath",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.env_vars.UnsupportedTarget",
+          "category": "config",
+          "op": "added",
+          "title": "New environment variable: UnsupportedTarget",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.env_vars.AllocUnsupportedTargetBufferTooSmallSysLexerMissingResolveDirInvalidResolveDirParseErrorAlreadyLoggedSecurityScannerConfiguredThrown",
+          "category": "config",
+          "op": "removed",
+          "title": "Environment variable no longer read: AllocUnsupportedTargetBufferTooSmallSysLexerMissingResolveDirInvalidResolveDirParseErrorAlreadyLoggedSecurityScannerConfiguredThrown",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.env_vars.CLAUDE_CODE_MCP_SERVE_MEMORY_WALKS_DEADLINE_MS",
+          "category": "config",
+          "op": "removed",
+          "title": "Environment variable no longer read: CLAUDE_CODE_MCP_SERVE_MEMORY_WALKS_DEADLINE_MS",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.env_vars.CLAUDE_LOCAL_OAUTH_APPS_BASE",
+          "category": "config",
+          "op": "removed",
+          "title": "Environment variable no longer read: CLAUDE_LOCAL_OAUTH_APPS_BASE",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.env_vars.CLAUDE_LOCAL_OAUTH_CONSOLE_BASE",
+          "category": "config",
+          "op": "removed",
+          "title": "Environment variable no longer read: CLAUDE_LOCAL_OAUTH_CONSOLE_BASE",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "config.env_vars.NODE_ENVexecutablePath",
+          "category": "config",
+          "op": "removed",
+          "title": "Environment variable no longer read: NODE_ENVexecutablePath",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "filesystem.darwin/arm64.exec./bin/zsh -c source <claude-config>/shell-snapshots/snapshot-zsh-<n>-<id>.sh 2>/dev/null || true && \\builtin setopt NO_EXTENDED_GLOB NO_BARE_GLOB_QUAL NO_BRACE_CCL NO_MAGIC_EQUAL_SUBST NO_RC_QUOTES NO_EQUALS 2>/dev/null || true && { \\builtin unalias -- 'which'; \\builtin unset -f -- 'which'; } >/dev/null 2>&1 || true && { \\builtin unalias -- 'unsetenv'; \\builtin unset -f -- 'unsetenv'; } >/dev/null 2>&1 || true && eval 'git status --short && git log --oneline -1' < /dev/null && pwd -P >| <tmp>/claude-<id>-cwd",
+          "category": "filesystem",
+          "op": "changed",
+          "title": "Command changed: `/bin/zsh -c source <claude-config>/shell-snapshots/snapshot-zsh-<n>-<id>.sh 2>/dev/null || true && \\ …` (+239 −226 chars) (darwin/arm64)",
+          "impact": "informational",
+          "documented": null
+        },
+        {
+          "id": "support.capabilities.global.commits@darwin/arm64.result",
+          "category": "support",
+          "op": "changed",
+          "title": "Terma: Global mode: every commit carries its session now fails on darwin/arm64",
+          "impact": "breaking",
+          "documented": null
+        },
+        {
+          "id": "support.capabilities.global.commits@linux/amd64.result",
+          "category": "support",
+          "op": "changed",
+          "title": "Terma: Global mode: every commit carries its session now fails on linux/amd64",
+          "impact": "breaking",
+          "documented": null
+        },
+        {
+          "id": "support.capabilities.global.placement@darwin/arm64.result",
+          "category": "support",
+          "op": "changed",
+          "title": "Terma: Global mode: every session placed in its project now fails on darwin/arm64",
+          "impact": "breaking",
+          "documented": null
+        },
+        {
+          "id": "support.capabilities.global.placement@linux/amd64.result",
+          "category": "support",
+          "op": "changed",
+          "title": "Terma: Global mode: every session placed in its project now fails on linux/amd64",
+          "impact": "breaking",
+          "documented": null
+        },
+        {
+          "id": "support.status",
+          "category": "support",
+          "op": "changed",
+          "title": "Terma support: supported → degraded",
+          "impact": "breaking",
+          "documented": null
+        }
+      ]
+    },
+    {
+      "version": "2.1.331",
+      "previous": "2.1.330",
+      "changes": [
+        {
+          "id": "telemetry.surfaces.traces/claude_code.llm_request.keys.gen_ai.operation.name",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry field: gen_ai.operation.name on traces/claude_code.llm_request",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "telemetry.surfaces.traces/claude_code.llm_request.keys.gen_ai.response.model",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry field: gen_ai.response.model on traces/claude_code.llm_request",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "telemetry.surfaces.traces/claude_code.llm_request.keys.gen_ai.usage.cache_read.input_tokens",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry field: gen_ai.usage.cache_read.input_tokens on traces/claude_code.llm_request",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "telemetry.surfaces.traces/claude_code.llm_request.keys.gen_ai.usage.cache_write.input_tokens",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry field: gen_ai.usage.cache_write.input_tokens on traces/claude_code.llm_request",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "telemetry.surfaces.traces/claude_code.llm_request.keys.gen_ai.usage.input_tokens",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry field: gen_ai.usage.input_tokens on traces/claude_code.llm_request",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "telemetry.surfaces.traces/claude_code.llm_request.keys.gen_ai.usage.output_tokens",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry field: gen_ai.usage.output_tokens on traces/claude_code.llm_request",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "cli.help.auth --help",
+          "category": "cli",
+          "op": "changed",
+          "title": "Full help text of `auth --help` changed (+55 −55 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.downloadsMirrorUrl",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: downloadsMirrorUrl",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.fileCheckpointingEnabled.description",
+          "category": "config",
+          "op": "changed",
+          "title": "fileCheckpointingEnabled description changed (+122 −55 chars)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.modelCatalogPublicKey",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: modelCatalogPublicKey",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.modelCatalogUrl",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: modelCatalogUrl",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.env_vars",
+          "category": "config",
+          "op": "changed",
+          "title": "Environment variables: +22 −3",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "filesystem.darwin/arm64.exec.git -c core.askPass= -c protocol.ext.allow=never -c core.alternateRefsCommand=f() { git --git-dir=\"$1\" for-each-ref --format='%(objectname)'; }; f -c submodule.recurse=false -c log.showSignature=false -c format.pretty=medium -c gc.auto=0 -c maintenance.auto=false -c diff.autoRefreshIndex=false -c hook.applypatch-msg.enabled=false -c hook.pre-applypatch.enabled=false -c hook.post-applypatch.enabled=false -c hook.pre-commit.enabled=false -c hook.pre-merge-commit.enabled=false -c hook.prepare-commit-msg.enabled=false -c hook.commit-msg.enabled=false -c hook.post-commit.enabled=false -c hook.pre-rebase.enabled=false -c hook.post-checkout.enabled=false -c hook.post-merge.enabled=false -c hook.pre-push.enabled=false -c hook.pre-receive.enabled=false -c hook.update.enabled=false -c hook.proc-receive.enabled=false -c hook.post-receive.enabled=false -c hook.post-update.enabled=false -c hook.reference-transaction.enabled=false -c hook.push-to-checkout.enabled=false -c hook.pre-auto-gc.enabled=false -c hook.post-rewrite.enabled=false -c hook.sendemail-validate.enabled=false -c hook.fsmonitor-watchman.enabled=false -c hook.p4-changelist.enabled=false -c hook.p4-prepare-changelist.enabled=false -c hook.p4-post-changelist.enabled=false -c hook.p4-pre-submit.enabled=false -c hook.post-index-change.enabled=false -c core.hooksPath=/dev/null -c core.fsmonitor= remote get-url origin.phases.turn",
+          "category": "filesystem",
+          "op": "added",
+          "title": "`git -c core.askPass= -c protocol.ext.allow=never -c core.alternateRefsCommand=f() { git --git-dir=\"$ …` now also runs at turn (darwin/arm64)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "filesystem.darwin/arm64.exec.git -c core.askPass= -c protocol.ext.allow=never -c core.alternateRefsCommand=f() { git --git-dir=\"$1\" for-each-ref --format='%(objectname)'; }; f -c submodule.recurse=false -c log.showSignature=false -c format.pretty=medium -c gc.auto=0 -c maintenance.auto=false -c diff.autoRefreshIndex=false -c hook.applypatch-msg.enabled=false -c hook.pre-applypatch.enabled=false -c hook.post-applypatch.enabled=false -c hook.pre-commit.enabled=false -c hook.pre-merge-commit.enabled=false -c hook.prepare-commit-msg.enabled=false -c hook.commit-msg.enabled=false -c hook.post-commit.enabled=false -c hook.pre-rebase.enabled=false -c hook.post-checkout.enabled=false -c hook.post-merge.enabled=false -c hook.pre-push.enabled=false -c hook.pre-receive.enabled=false -c hook.update.enabled=false -c hook.proc-receive.enabled=false -c hook.post-receive.enabled=false -c hook.post-update.enabled=false -c hook.reference-transaction.enabled=false -c hook.push-to-checkout.enabled=false -c hook.pre-auto-gc.enabled=false -c hook.post-rewrite.enabled=false -c hook.sendemail-validate.enabled=false -c hook.fsmonitor-watchman.enabled=false -c hook.p4-changelist.enabled=false -c hook.p4-prepare-changelist.enabled=false -c hook.p4-post-changelist.enabled=false -c hook.p4-pre-submit.enabled=false -c hook.post-index-change.enabled=false -c core.hooksPath=/dev/null -c core.fsmonitor= remote get-url origin.phases.startup",
+          "category": "filesystem",
+          "op": "removed",
+          "title": "`git -c core.askPass= -c protocol.ext.allow=never -c core.alternateRefsCommand=f() { git --git-dir=\"$ …` no longer runs at startup (darwin/arm64)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "filesystem.linux/amd64.paths.<home>/.claude/remote/run",
+          "category": "filesystem",
+          "op": "added",
+          "title": "Now looks for ~/.claude/remote/run (linux/amd64)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "binary.runtime",
+          "category": "binary",
+          "op": "changed",
+          "title": "Binary runtime: bun 1.4.4 → bun 1.4.6",
+          "impact": "informational",
+          "documented": false
+        }
+      ]
+    },
+    {
+      "version": "2.1.330",
+      "previous": "2.1.329",
+      "changes": [
+        {
+          "id": "config.options.deniedMcpServers.serverUrl.description",
+          "category": "config",
+          "op": "changed",
+          "title": "deniedMcpServers.serverUrl description changed (+232 −98 chars)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.disableDirectMcpSkills",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: disableDirectMcpSkills",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.maxEffortLevel.enum.$ZodCatch",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting maxEffortLevel lost value $ZodCatch",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "config.options.statusLine.type.enum.command",
+          "category": "config",
+          "op": "added",
+          "title": "Setting statusLine.type gained value command",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.subagentStatusLine.type.enum.command",
+          "category": "config",
+          "op": "added",
+          "title": "Setting subagentStatusLine.type gained value command",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.env_vars.CLAUDE_AI_AUTHORIZE_URL",
+          "category": "config",
+          "op": "added",
+          "title": "New environment variable: CLAUDE_AI_AUTHORIZE_URL",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.env_vars.CLAUDE_CODE_COWORK_SHELL_CHECK",
+          "category": "config",
+          "op": "added",
+          "title": "New environment variable: CLAUDE_CODE_COWORK_SHELL_CHECK",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.env_vars.CLAUDE_CODE_DISABLE_REDIRECT_DENY_RECHECK",
+          "category": "config",
+          "op": "added",
+          "title": "New environment variable: CLAUDE_CODE_DISABLE_REDIRECT_DENY_RECHECK",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.env_vars.CLAUDE_CODE_FULL_SIGN_IN_LINK",
+          "category": "config",
+          "op": "added",
+          "title": "New environment variable: CLAUDE_CODE_FULL_SIGN_IN_LINK",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.env_vars.CLAUDE_CODE_HOST_ALLOW_RESETS_DENIAL_STREAK",
+          "category": "config",
+          "op": "added",
+          "title": "New environment variable: CLAUDE_CODE_HOST_ALLOW_RESETS_DENIAL_STREAK",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.env_vars.CLAUDE_CODE_HOST_READS_NO_BASH_EDIT_DIFF",
+          "category": "config",
+          "op": "added",
+          "title": "New environment variable: CLAUDE_CODE_HOST_READS_NO_BASH_EDIT_DIFF",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.env_vars.CLAUDE_CODE_MODEL_NOBODY_CHOSE",
+          "category": "config",
+          "op": "added",
+          "title": "New environment variable: CLAUDE_CODE_MODEL_NOBODY_CHOSE",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.env_vars.CLAUDE_CODE_PROJECTS_FEATURE_FLAGS",
+          "category": "config",
+          "op": "added",
+          "title": "New environment variable: CLAUDE_CODE_PROJECTS_FEATURE_FLAGS",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.env_vars.CLAUDE_CODE_RELAUNCH_BYPASS_SWITCH",
+          "category": "config",
+          "op": "added",
+          "title": "New environment variable: CLAUDE_CODE_RELAUNCH_BYPASS_SWITCH",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.env_vars.CLAUDE_CODE_RUNNER_START_NOTES",
+          "category": "config",
+          "op": "added",
+          "title": "New environment variable: CLAUDE_CODE_RUNNER_START_NOTES",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.env_vars.CLAUDE_CODE_STARTER_MAY_HOLD_CONNECTOR_FILE",
+          "category": "config",
+          "op": "added",
+          "title": "New environment variable: CLAUDE_CODE_STARTER_MAY_HOLD_CONNECTOR_FILE",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.env_vars.CLAUDE_RUNNER_START_FOLDER",
+          "category": "config",
+          "op": "added",
+          "title": "New environment variable: CLAUDE_RUNNER_START_FOLDER",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.env_vars.SELF_HOSTED_RUNNER_START_DIR",
+          "category": "config",
+          "op": "added",
+          "title": "New environment variable: SELF_HOSTED_RUNNER_START_DIR",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.env_vars.API_FORCE_IDLE_TIMEOUT",
+          "category": "config",
+          "op": "removed",
+          "title": "Environment variable no longer read: API_FORCE_IDLE_TIMEOUT",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.env_vars.AWS_BEARER_TOKEN_BEDROCK",
+          "category": "config",
+          "op": "removed",
+          "title": "Environment variable no longer read: AWS_BEARER_TOKEN_BEDROCK",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.env_vars.BROWSER",
+          "category": "config",
+          "op": "removed",
+          "title": "Environment variable no longer read: BROWSER",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.env_vars.BUF_BIGINT_DISABLE",
+          "category": "config",
+          "op": "removed",
+          "title": "Environment variable no longer read: BUF_BIGINT_DISABLE",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "filesystem.darwin/arm64.exec.git -c core.askPass= -c protocol.ext.allow=never -c core.alternateRefsCommand=f() { git --git-dir=\"$1\" for-each-ref --format='%(objectname)'; }; f -c submodule.recurse=false -c log.showSignature=false -c format.pretty=medium -c gc.auto=0 -c maintenance.auto=false -c diff.autoRefreshIndex=false -c hook.applypatch-msg.enabled=false -c hook.pre-applypatch.enabled=false -c hook.post-applypatch.enabled=false -c hook.pre-commit.enabled=false -c hook.pre-merge-commit.enabled=false -c hook.prepare-commit-msg.enabled=false -c hook.commit-msg.enabled=false -c hook.post-commit.enabled=false -c hook.pre-rebase.enabled=false -c hook.post-checkout.enabled=false -c hook.post-merge.enabled=false -c hook.pre-push.enabled=false -c hook.pre-receive.enabled=false -c hook.update.enabled=false -c hook.proc-receive.enabled=false -c hook.post-receive.enabled=false -c hook.post-update.enabled=false -c hook.reference-transaction.enabled=false -c hook.push-to-checkout.enabled=false -c hook.pre-auto-gc.enabled=false -c hook.post-rewrite.enabled=false -c hook.sendemail-validate.enabled=false -c hook.fsmonitor-watchman.enabled=false -c hook.p4-changelist.enabled=false -c hook.p4-prepare-changelist.enabled=false -c hook.p4-post-changelist.enabled=false -c hook.p4-pre-submit.enabled=false -c hook.post-index-change.enabled=false -c core.hooksPath=/dev/null -c core.fsmonitor= remote get-url origin.phases.startup",
+          "category": "filesystem",
+          "op": "added",
+          "title": "`git -c core.askPass= -c protocol.ext.allow=never -c core.alternateRefsCommand=f() { git --git-dir=\"$ …` now also runs at startup (darwin/arm64)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "filesystem.darwin/arm64.exec.git -c core.askPass= -c protocol.ext.allow=never -c core.alternateRefsCommand=f() { git --git-dir=\"$1\" for-each-ref --format='%(objectname)'; }; f -c submodule.recurse=false -c log.showSignature=false -c format.pretty=medium -c gc.auto=0 -c maintenance.auto=false -c diff.autoRefreshIndex=false -c hook.applypatch-msg.enabled=false -c hook.pre-applypatch.enabled=false -c hook.post-applypatch.enabled=false -c hook.pre-commit.enabled=false -c hook.pre-merge-commit.enabled=false -c hook.prepare-commit-msg.enabled=false -c hook.commit-msg.enabled=false -c hook.post-commit.enabled=false -c hook.pre-rebase.enabled=false -c hook.post-checkout.enabled=false -c hook.post-merge.enabled=false -c hook.pre-push.enabled=false -c hook.pre-receive.enabled=false -c hook.update.enabled=false -c hook.proc-receive.enabled=false -c hook.post-receive.enabled=false -c hook.post-update.enabled=false -c hook.reference-transaction.enabled=false -c hook.push-to-checkout.enabled=false -c hook.pre-auto-gc.enabled=false -c hook.post-rewrite.enabled=false -c hook.sendemail-validate.enabled=false -c hook.fsmonitor-watchman.enabled=false -c hook.p4-changelist.enabled=false -c hook.p4-prepare-changelist.enabled=false -c hook.p4-post-changelist.enabled=false -c hook.p4-pre-submit.enabled=false -c hook.post-index-change.enabled=false -c core.hooksPath=/dev/null -c core.fsmonitor= remote get-url origin.phases.turn",
+          "category": "filesystem",
+          "op": "removed",
+          "title": "`git -c core.askPass= -c protocol.ext.allow=never -c core.alternateRefsCommand=f() { git --git-dir=\"$ …` no longer runs at turn (darwin/arm64)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "filesystem.darwin/arm64.exec./bin/zsh -c -l SNAPSHOT_FILE=<claude-config>/shell-snapshots/snapshot-zsh-<n>-<id>.sh\n      \n      # No user config file to source\n      \n      \n\n      # First, create/clear the snapshot file\n      echo \"# Snapshot file\" >| \"$SNAPSHOT_FILE\"\n\n      # When this file is sourced, we first unalias to avoid conflicts\n      # This is necessary because aliases get \"frozen\" inside function definitions at definition time,\n      # which can cause unexpected behavior when functions use commands that conflict with aliases\n      echo \"# Unset all aliases to avoid conflicts with functions\" >> \"$SNAPSHOT_FILE\"\n      echo \"unalias -a 2>/dev/null || true\" >> \"$SNAPSHOT_FILE\"\n\n      \n\n      \n      cat >> \"$SNAPSHOT_FILE\" << 'CLAUDE_CODE_END_<id>'\n# Check for rg availability\nif ! hash rg 2>/dev/null && ! typeset -f rg >/dev/null 2>&1; then\n  function rg {\n  if [[ -x <install>/claude ]]; then\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=rg <install>/claude ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=rg <install>/claude ${1+\"$@\"}\n  else\n    (exec -a rg <install>/claude ${1+\"$@\"})\n  fi\n  elif [[ -x <home>/.local/bin/claude ]]; then\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=rg <home>/.local/bin/claude ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=rg <home>/.local/bin/claude ${1+\"$@\"}\n  else\n    (exec -a rg <home>/.local/bin/claude ${1+\"$@\"})\n  fi\n  else command rg ${1+\"$@\"}; fi\n}\nfi\n# Shadow find/grep with embedded bfs/ugrep\nunalias find 2>/dev/null || true\nunalias grep 2>/dev/null || true\nfunction find {\n  if [[ -x <install>/claude ]]; then\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=bfs <install>/claude -S dfs -regextype findutils-default ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=bfs <install>/claude -S dfs -regextype findutils-default ${1+\"$@\"}\n  else\n    (exec -a bfs <install>/claude -S dfs -regextype findutils-default ${1+\"$@\"})\n  fi\n  elif [[ -x <home>/.local/bin/claude ]]; then\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=bfs <home>/.local/bin/claude -S dfs -regextype findutils-default ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=bfs <home>/.local/bin/claude -S dfs -regextype findutils-default ${1+\"$@\"}\n  else\n    (exec -a bfs <home>/.local/bin/claude -S dfs -regextype findutils-default ${1+\"$@\"})\n  fi\n  else command find ${1+\"$@\"}; fi\n}\nfunction grep {\n  local _cc_a\n  for _cc_a in ${1+\"$@\"}; do\n    case \"$_cc_a\" in -*-filter*|-*-pager*|-*-view*|-*-format-open*|-*-config*|---*|-@*|-*-save-config*|-[Zz]*|-[!-]*[Zz]*|--null|--null-data) command grep ${1+\"$@\"}; return ;; esac\n  done\n  if [[ -x <install>/claude ]]; then\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=ugrep <install>/claude -G --ignore-files --hidden -I --encoding=UTF-8 --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=ugrep <install>/claude -G --ignore-files --hidden -I --encoding=UTF-8 --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"}\n  else\n    (exec -a ugrep <install>/claude -G --ignore-files --hidden -I --encoding=UTF-8 --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"})\n  fi\n  elif [[ -x <home>/.local/bin/claude ]]; then\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=ugrep <home>/.local/bin/claude -G --ignore-files --hidden -I --encoding=UTF-8 --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=ugrep <home>/.local/bin/claude -G --ignore-files --hidden -I --encoding=UTF-8 --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"}\n  else\n    (exec -a ugrep <home>/.local/bin/claude -G --ignore-files --hidden -I --encoding=UTF-8 --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"})\n  fi\n  else command grep ${1+\"$@\"}; fi\n}\n# Shadow pkill to refuse patterns matching the CLI process\nunalias pkill 2>/dev/null || true\nfunction pkill {\n  if [ -n \"${CLAUDE_PID:-}\" ] && [ -r \"/proc/${CLAUDE_PID}/comm\" ]; then\n    local _cc_skip=\"\" _cc_a\n    local -a _cc_probe=()\n    for _cc_a in ${1+\"$@\"}; do\n      if [ -n \"$_cc_skip\" ]; then _cc_skip=\"\"; continue; fi\n      case \"$_cc_a\" in\n        --signal) _cc_skip=1 ;;\n        --signal=*|-e|--echo) ;;\n        -[0-9]*) ;;\n        -[PUGOF]?*) _cc_probe+=(\"$_cc_a\") ;;\n        -[ABCDEFGHIJKLMNOPQRSTUVWXYZ][ABCDEFGHIJKLMNOPQRSTUVWXYZ0-9]*) ;;\n        *) _cc_probe+=(\"$_cc_a\") ;;\n      esac\n    done\n    if command pgrep ${_cc_probe[@]+\"${_cc_probe[@]}\"} 2>/dev/null | command grep -qx \"${CLAUDE_PID}\"; then\n      printf 'pkill: refusing to run — this pattern matches the Claude CLI process (PID %s). Narrow the pattern, or target your own children with `pkill -P $$ ...`.\\n' \"${CLAUDE_PID}\" >&2\n      return 1\n    fi\n  fi\n  command pkill ${1+\"$@\"}\n}\nexport PATH=<path>\nCLAUDE_CODE_END_<id>\n  \n\n      # Exit silently on success, only report errors\n      if [ ! -f \"$SNAPSHOT_FILE\" ]; then\n        echo \"Error: Snapshot file was not created at $SNAPSHOT_FILE\" >&2\n        exit 1\n      fi\n    ",
+          "category": "filesystem",
+          "op": "changed",
+          "title": "Command changed: `/bin/zsh -c -l SNAPSHOT_FILE=<claude-config>/shell-snapshots/snapshot-zsh-<n>-<id>.sh …` (+6 −0 chars) (darwin/arm64)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "filesystem.linux/amd64.paths.<claude-config>/cache",
+          "category": "filesystem",
+          "op": "added",
+          "title": "Now looks for <claude-config>/cache (linux/amd64)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "filesystem.linux/amd64.paths.<claude-config>/cache/model-catalog",
+          "category": "filesystem",
+          "op": "added",
+          "title": "Now looks for <claude-config>/cache/model-catalog (linux/amd64)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "filesystem.linux/amd64.paths.<home>/.claude/cache",
+          "category": "filesystem",
+          "op": "added",
+          "title": "Now looks for ~/.claude/cache (linux/amd64)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "filesystem.linux/amd64.paths.<home>/.claude/cache/model-catalog",
+          "category": "filesystem",
+          "op": "added",
+          "title": "Now looks for ~/.claude/cache/model-catalog (linux/amd64)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "filesystem.linux/amd64.exec./bin/bash -c -l SNAPSHOT_FILE=<claude-config>/shell-snapshots/snapshot-bash-<n>-<id>.sh\n      \n      # No user config file to source\n      \n      \n\n      # First, create/clear the snapshot file\n      echo \"# Snapshot file\" >| \"$SNAPSHOT_FILE\"\n\n      # When this file is sourced, we first unalias to avoid conflicts\n      # This is necessary because aliases get \"frozen\" inside function definitions at definition time,\n…",
+          "category": "filesystem",
+          "op": "changed",
+          "title": "Command changed: `/bin/bash -c -l SNAPSHOT_FILE=<claude-config>/shell-snapshots/snapshot-bash-<n>-<id>.sh …` (+6 −0 chars) (linux/amd64)",
+          "impact": "informational",
+          "documented": false
+        }
+      ]
+    },
+    {
+      "version": "2.1.329",
+      "previous": "2.1.328",
+      "changes": [
+        {
+          "id": "cli.commands.claude.options.--name.description",
+          "category": "cli",
+          "op": "changed",
+          "title": "`claude --name`: description changed (+130 −97 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "cli.commands.claude.options.--restricted.description",
+          "category": "cli",
+          "op": "changed",
+          "title": "`claude --restricted`: description changed (+261 −226 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "cli.help.--help",
+          "category": "cli",
+          "op": "changed",
+          "title": "Full help text of `--help` changed (+364 −218 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.additionalDirectoryConfigRoots",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: additionalDirectoryConfigRoots",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.desktopMcpServersListScope",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: desktopMcpServersListScope",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.maxEffortLevel.enum.$ZodCatch",
+          "category": "config",
+          "op": "added",
+          "title": "Setting maxEffortLevel gained value $ZodCatch",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.sandbox.windows.backend.description",
+          "category": "config",
+          "op": "changed",
+          "title": "sandbox.windows.backend description changed (+560 −668 chars)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.statusLine.type.enum.command",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting statusLine.type lost value command",
+          "impact": "notable",
+          "documented": true
+        },
+        {
+          "id": "config.options.subagentStatusLine.type.enum.command",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting subagentStatusLine.type lost value command",
+          "impact": "notable",
+          "documented": true
+        },
+        {
           "id": "config.env_vars.CLAUDE_CODE_CFC_REFUSED",
           "category": "config",
           "op": "added",
           "title": "New environment variable: CLAUDE_CODE_CFC_REFUSED",
           "impact": "informational",
-          "documented": null
+          "documented": false
         },
         {
           "id": "config.env_vars.CLAUDE_CODE_HOST_HYBRID_ORGANIZATION_UUID",
@@ -472,7 +694,7 @@
           "op": "added",
           "title": "New environment variable: CLAUDE_CODE_HOST_HYBRID_ORGANIZATION_UUID",
           "impact": "informational",
-          "documented": null
+          "documented": false
         },
         {
           "id": "config.env_vars.CLAUDE_CODE_HOST_SHOWS_CONNECTION_NOTICE",
@@ -480,7 +702,7 @@
           "op": "added",
           "title": "New environment variable: CLAUDE_CODE_HOST_SHOWS_CONNECTION_NOTICE",
           "impact": "informational",
-          "documented": null
+          "documented": false
         },
         {
           "id": "config.env_vars.CLAUDE_CODE_LINKED_SPINDLE",
@@ -488,7 +710,7 @@
           "op": "added",
           "title": "New environment variable: CLAUDE_CODE_LINKED_SPINDLE",
           "impact": "informational",
-          "documented": null
+          "documented": false
         },
         {
           "id": "config.env_vars.CLAUDE_CODE_QUEUED_NOTIFICATIONS_BY_POLL",
@@ -496,7 +718,7 @@
           "op": "added",
           "title": "New environment variable: CLAUDE_CODE_QUEUED_NOTIFICATIONS_BY_POLL",
           "impact": "informational",
-          "documented": null
+          "documented": false
         },
         {
           "id": "config.env_vars.CLAUDE_CODE_REPORT_REPO_PROVENANCE",
@@ -504,7 +726,7 @@
           "op": "added",
           "title": "New environment variable: CLAUDE_CODE_REPORT_REPO_PROVENANCE",
           "impact": "informational",
-          "documented": null
+          "documented": false
         },
         {
           "id": "config.env_vars.CLAUDE_CODE_SCRATCHPAD_DIR",
@@ -512,7 +734,7 @@
           "op": "added",
           "title": "New environment variable: CLAUDE_CODE_SCRATCHPAD_DIR",
           "impact": "informational",
-          "documented": null
+          "documented": false
         },
         {
           "id": "config.env_vars.CLAUDE_CODE_SERVED_PATHS",
@@ -520,7 +742,7 @@
           "op": "added",
           "title": "New environment variable: CLAUDE_CODE_SERVED_PATHS",
           "impact": "informational",
-          "documented": null
+          "documented": false
         },
         {
           "id": "config.env_vars.CLAUDE_CODE_SERVED_SCHEMA_VERSION",
@@ -528,7 +750,7 @@
           "op": "added",
           "title": "New environment variable: CLAUDE_CODE_SERVED_SCHEMA_VERSION",
           "impact": "informational",
-          "documented": null
+          "documented": false
         },
         {
           "id": "config.env_vars.CLAUDE_CODE_WEBFETCH_MCP_TOOL",
@@ -536,7 +758,7 @@
           "op": "added",
           "title": "New environment variable: CLAUDE_CODE_WEBFETCH_MCP_TOOL",
           "impact": "informational",
-          "documented": null
+          "documented": false
         },
         {
           "id": "config.env_vars.CLAUDE_RUNNER_DISABLE_START_HEARTBEATS",
@@ -544,7 +766,7 @@
           "op": "added",
           "title": "New environment variable: CLAUDE_RUNNER_DISABLE_START_HEARTBEATS",
           "impact": "informational",
-          "documented": null
+          "documented": false
         },
         {
           "id": "config.env_vars.SELF_HOSTED_RUNNER_SKIP_AGENT_PROXY_CHECK",
@@ -552,7 +774,7 @@
           "op": "added",
           "title": "New environment variable: SELF_HOSTED_RUNNER_SKIP_AGENT_PROXY_CHECK",
           "impact": "informational",
-          "documented": null
+          "documented": false
         },
         {
           "id": "config.env_vars.SYSTEMROOT",
@@ -560,7 +782,7 @@
           "op": "added",
           "title": "New environment variable: SYSTEMROOT",
           "impact": "informational",
-          "documented": null
+          "documented": false
         },
         {
           "id": "config.env_vars.CHOKIDAR_INTERVAL",
@@ -568,7 +790,7 @@
           "op": "removed",
           "title": "Environment variable no longer read: CHOKIDAR_INTERVAL",
           "impact": "informational",
-          "documented": null
+          "documented": false
         },
         {
           "id": "config.env_vars.CHOKIDAR_USEPOLLING",
@@ -576,7 +798,7 @@
           "op": "removed",
           "title": "Environment variable no longer read: CHOKIDAR_USEPOLLING",
           "impact": "informational",
-          "documented": null
+          "documented": false
         },
         {
           "id": "config.env_vars.CLAUDE_CODE_TEST_ALLOW_REAL_NETWORK",
@@ -584,7 +806,7 @@
           "op": "removed",
           "title": "Environment variable no longer read: CLAUDE_CODE_TEST_ALLOW_REAL_NETWORK",
           "impact": "informational",
-          "documented": null
+          "documented": false
         },
         {
           "id": "config.env_vars.CLAUDE_CODE_TEST_FIXTURES_ROOT",
@@ -592,7 +814,7 @@
           "op": "removed",
           "title": "Environment variable no longer read: CLAUDE_CODE_TEST_FIXTURES_ROOT",
           "impact": "informational",
-          "documented": null
+          "documented": false
         },
         {
           "id": "config.env_vars.CLAUDE_CODE_ULTRAREVIEW_PREFLIGHT_FIXTURE",
@@ -600,7 +822,7 @@
           "op": "removed",
           "title": "Environment variable no longer read: CLAUDE_CODE_ULTRAREVIEW_PREFLIGHT_FIXTURE",
           "impact": "informational",
-          "documented": null
+          "documented": false
         },
         {
           "id": "config.env_vars.CLAUDE_CODE_ULTRAREVIEW_QUOTA_FIXTURE",
@@ -608,7 +830,7 @@
           "op": "removed",
           "title": "Environment variable no longer read: CLAUDE_CODE_ULTRAREVIEW_QUOTA_FIXTURE",
           "impact": "informational",
-          "documented": null
+          "documented": false
         },
         {
           "id": "filesystem.linux/amd64.paths.<claude-config>/state",
@@ -616,7 +838,7 @@
           "op": "added",
           "title": "Now looks for <claude-config>/state (linux/amd64)",
           "impact": "informational",
-          "documented": null
+          "documented": false
         },
         {
           "id": "filesystem.linux/amd64.paths.<claude-config>/state/hybrid-settings.json",
@@ -624,7 +846,7 @@
           "op": "added",
           "title": "Now looks for <claude-config>/state/hybrid-settings.json (linux/amd64)",
           "impact": "informational",
-          "documented": null
+          "documented": false
         }
       ]
     },
@@ -2458,7 +2680,7 @@
           "op": "changed",
           "title": "Workflow tool parameter resumeFromRunId: description changed (+564 −251 chars)",
           "impact": "notable",
-          "documented": null
+          "documented": true
         },
         {
           "id": "cli.commands.claude.options.--add-dir.description",
@@ -2466,7 +2688,7 @@
           "op": "changed",
           "title": "`claude --add-dir`: description changed",
           "impact": "informational",
-          "documented": null
+          "documented": true
         },
         {
           "id": "cli.commands.claude.options.--append-system-prompt.description",
@@ -2474,7 +2696,7 @@
           "op": "changed",
           "title": "`claude --append-system-prompt`: description changed",
           "impact": "informational",
-          "documented": null
+          "documented": true
         },
         {
           "id": "cli.commands.claude.options.--bare.description",
@@ -2482,7 +2704,7 @@
           "op": "changed",
           "title": "`claude --bare`: description changed (+365 −303 chars)",
           "impact": "informational",
-          "documented": null
+          "documented": true
         },
         {
           "id": "cli.commands.claude.options.--brief.description",
@@ -2490,7 +2712,7 @@
           "op": "changed",
           "title": "`claude --brief`: description changed",
           "impact": "informational",
-          "documented": null
+          "documented": true
         },
         {
           "id": "cli.commands.claude.options.--chrome.description",
@@ -2498,7 +2720,7 @@
           "op": "changed",
           "title": "`claude --chrome`: description changed",
           "impact": "informational",
-          "documented": null
+          "documented": true
         },
         {
           "id": "cli.commands.claude.options.--fallback-model.description",
@@ -2506,7 +2728,7 @@
           "op": "changed",
           "title": "`claude --fallback-model`: description changed (+151 −208 chars)",
           "impact": "informational",
-          "documented": null
+          "documented": true
         },
         {
           "id": "cli.commands.claude.options.--file.description",
@@ -2514,7 +2736,7 @@
           "op": "changed",
           "title": "`claude --file`: description changed",
           "impact": "informational",
-          "documented": null
+          "documented": true
         },
         {
           "id": "cli.commands.claude.options.--from-pr.description",
@@ -2522,7 +2744,7 @@
           "op": "changed",
           "title": "`claude --from-pr`: description changed",
           "impact": "informational",
-          "documented": null
+          "documented": true
         },
         {
           "id": "cli.commands.claude.options.--model.description",
@@ -2530,7 +2752,7 @@
           "op": "changed",
           "title": "`claude --model`: description changed (+124 −128 chars)",
           "impact": "informational",
-          "documented": null
+          "documented": true
         },
         {
           "id": "cli.commands.claude.options.--no-chrome.description",
@@ -2538,7 +2760,7 @@
           "op": "changed",
           "title": "`claude --no-chrome`: description changed",
           "impact": "informational",
-          "documented": null
+          "documented": true
         },
         {
           "id": "cli.commands.claude.options.--no-session-persistence.description",
@@ -2546,7 +2768,7 @@
           "op": "changed",
           "title": "`claude --no-session-persistence`: description changed",
           "impact": "informational",
-          "documented": null
+          "documented": true
         },
         {
           "id": "cli.commands.claude.options.--prompt-suggestions.description",
@@ -2554,7 +2776,7 @@
           "op": "changed",
           "title": "`claude --prompt-suggestions`: description changed (+130 −129 chars)",
           "impact": "informational",
-          "documented": null
+          "documented": true
         },
         {
           "id": "cli.commands.claude.options.--resume.description",
@@ -2562,7 +2784,7 @@
           "op": "changed",
           "title": "`claude --resume`: description changed",
           "impact": "informational",
-          "documented": null
+          "documented": true
         },
         {
           "id": "cli.commands.claude.options.--safe-mode.description",
@@ -2570,7 +2792,7 @@
           "op": "changed",
           "title": "`claude --safe-mode`: description changed (+77 −44 chars)",
           "impact": "informational",
-          "documented": null
+          "documented": true
         },
         {
           "id": "cli.commands.claude.options.--settings.description",
@@ -2578,7 +2800,7 @@
           "op": "changed",
           "title": "`claude --settings`: description changed",
           "impact": "informational",
-          "documented": null
+          "documented": true
         },
         {
           "id": "cli.commands.claude.options.--tools.description",
@@ -2586,7 +2808,7 @@
           "op": "changed",
           "title": "`claude --tools`: description changed (+115 −168 chars)",
           "impact": "informational",
-          "documented": null
+          "documented": true
         },
         {
           "id": "cli.commands.claude.options.--verbose.description",
@@ -2594,7 +2816,7 @@
           "op": "changed",
           "title": "`claude --verbose`: description changed",
           "impact": "informational",
-          "documented": null
+          "documented": true
         },
         {
           "id": "cli.commands.claude.options.--worktree.description",
@@ -2602,7 +2824,7 @@
           "op": "changed",
           "title": "`claude --worktree`: description changed",
           "impact": "informational",
-          "documented": null
+          "documented": true
         },
         {
           "id": "cli.commands.claude agents.options.--add-dir.description",
@@ -2610,7 +2832,7 @@
           "op": "changed",
           "title": "`claude agents --add-dir`: description changed",
           "impact": "informational",
-          "documented": null
+          "documented": true
         },
         {
           "id": "cli.commands.claude agents.options.--json.description",
@@ -2618,7 +2840,7 @@
           "op": "changed",
           "title": "`claude agents --json`: description changed",
           "impact": "informational",
-          "documented": null
+          "documented": true
         },
         {
           "id": "cli.commands.claude agents.options.--plugin-dir.description",
@@ -2626,7 +2848,7 @@
           "op": "changed",
           "title": "`claude agents --plugin-dir`: description changed (+126 −131 chars)",
           "impact": "informational",
-          "documented": null
+          "documented": true
         },
         {
           "id": "cli.commands.claude auto-mode config.description",
@@ -2634,7 +2856,7 @@
           "op": "changed",
           "title": "Description of `claude auto-mode config` changed",
           "impact": "informational",
-          "documented": null
+          "documented": true
         },
         {
           "id": "cli.commands.claude auto-mode reset.description",
@@ -2642,7 +2864,7 @@
           "op": "changed",
           "title": "Description of `claude auto-mode reset` changed",
           "impact": "informational",
-          "documented": null
+          "documented": true
         },
         {
           "id": "cli.commands.claude import.options.--yes.description",
@@ -2650,7 +2872,7 @@
           "op": "changed",
           "title": "`claude import --yes`: description changed",
           "impact": "informational",
-          "documented": null
+          "documented": true
         },
         {
           "id": "cli.commands.claude install.description",
@@ -2658,7 +2880,7 @@
           "op": "changed",
           "title": "Description of `claude install` changed",
           "impact": "informational",
-          "documented": null
+          "documented": true
         },
         {
           "id": "cli.commands.claude install.options.--force.description",
@@ -2666,7 +2888,7 @@
           "op": "changed",
           "title": "`claude install --force`: description changed",
           "impact": "informational",
-          "documented": null
+          "documented": true
         },
         {
           "id": "cli.commands.claude purge.options.--all.description",
@@ -2674,7 +2896,7 @@
           "op": "changed",
           "title": "`claude purge --all`: description changed",
           "impact": "informational",
-          "documented": null
+          "documented": true
         },
         {
           "id": "cli.commands.claude purge.options.--interactive.description",
@@ -2682,7 +2904,7 @@
           "op": "changed",
           "title": "`claude purge --interactive`: description changed",
           "impact": "informational",
-          "documented": null
+          "documented": true
         },
         {
           "id": "cli.commands.claude ultrareview.options.--no-post.description",
@@ -2690,7 +2912,7 @@
           "op": "changed",
           "title": "`claude ultrareview --no-post`: description changed",
           "impact": "informational",
-          "documented": null
+          "documented": true
         },
         {
           "id": "cli.help.--help",
@@ -2698,7 +2920,7 @@
           "op": "changed",
           "title": "Full help text of `--help` changed (+3635 −3932 chars)",
           "impact": "informational",
-          "documented": null
+          "documented": true
         },
         {
           "id": "cli.help.agents --help",
@@ -2706,7 +2928,7 @@
           "op": "changed",
           "title": "Full help text of `agents --help` changed (+512 −565 chars)",
           "impact": "informational",
-          "documented": null
+          "documented": true
         },
         {
           "id": "cli.help.auto-mode --help",
@@ -2714,7 +2936,7 @@
           "op": "changed",
           "title": "Full help text of `auto-mode --help` changed (+265 −290 chars)",
           "impact": "informational",
-          "documented": null
+          "documented": true
         },
         {
           "id": "cli.help.import --help",
@@ -2722,7 +2944,7 @@
           "op": "changed",
           "title": "Full help text of `import --help` changed (+72 −69 chars)",
           "impact": "informational",
-          "documented": null
+          "documented": true
         },
         {
           "id": "cli.help.install --help",
@@ -2730,7 +2952,7 @@
           "op": "changed",
           "title": "Full help text of `install --help` changed (+152 −160 chars)",
           "impact": "informational",
-          "documented": null
+          "documented": true
         },
         {
           "id": "cli.help.purge --help",
@@ -2738,7 +2960,7 @@
           "op": "changed",
           "title": "Full help text of `purge --help` changed (+128 −160 chars)",
           "impact": "informational",
-          "documented": null
+          "documented": true
         },
         {
           "id": "cli.help.ultrareview --help",
@@ -2746,7 +2968,7 @@
           "op": "changed",
           "title": "Full help text of `ultrareview --help` changed (+70 −187 chars)",
           "impact": "informational",
-          "documented": null
+          "documented": true
         },
         {
           "id": "config.options.allowedHttpHookUrls.description",
@@ -2754,7 +2976,7 @@
           "op": "changed",
           "title": "allowedHttpHookUrls description changed (+202 −0 chars)",
           "impact": "informational",
-          "documented": null
+          "documented": false
         },
         {
           "id": "config.options.disableArtifact.description",
@@ -2762,7 +2984,7 @@
           "op": "changed",
           "title": "disableArtifact description changed (+100 −107 chars)",
           "impact": "informational",
-          "documented": null
+          "documented": false
         },
         {
           "id": "config.options.enableArtifact.description",
@@ -2770,7 +2992,7 @@
           "op": "changed",
           "title": "enableArtifact description changed (+184 −192 chars)",
           "impact": "informational",
-          "documented": null
+          "documented": false
         },
         {
           "id": "config.options.httpHookAllowedEnvVars.description",
@@ -2778,7 +3000,7 @@
           "op": "changed",
           "title": "httpHookAllowedEnvVars description changed (+479 −280 chars)",
           "impact": "informational",
-          "documented": null
+          "documented": false
         },
         {
           "id": "config.options.subagentStatusLine.description",
@@ -2786,7 +3008,7 @@
           "op": "changed",
           "title": "subagentStatusLine description changed (+163 −80 chars)",
           "impact": "informational",
-          "documented": null
+          "documented": false
         },
         {
           "id": "config.env_vars.CLAUDE_CODE_ARTIFACT_LIVE_WATCH",
@@ -2794,7 +3016,7 @@
           "op": "added",
           "title": "New environment variable: CLAUDE_CODE_ARTIFACT_LIVE_WATCH",
           "impact": "informational",
-          "documented": null
+          "documented": false
         },
         {
           "id": "config.env_vars.CLAUDE_CODE_CHILD_NOTES_DIR",
@@ -2802,7 +3024,7 @@
           "op": "added",
           "title": "New environment variable: CLAUDE_CODE_CHILD_NOTES_DIR",
           "impact": "informational",
-          "documented": null
+          "documented": false
         },
         {
           "id": "config.env_vars.CLAUDE_CODE_DISABLE_EARLY_KEY_GUARD",
@@ -2810,7 +3032,7 @@
           "op": "added",
           "title": "New environment variable: CLAUDE_CODE_DISABLE_EARLY_KEY_GUARD",
           "impact": "informational",
-          "documented": null
+          "documented": false
         },
         {
           "id": "config.env_vars.CLAUDE_CODE_DISABLE_MCP_INDEX_ROOM_COUNT",
@@ -2818,7 +3040,7 @@
           "op": "added",
           "title": "New environment variable: CLAUDE_CODE_DISABLE_MCP_INDEX_ROOM_COUNT",
           "impact": "informational",
-          "documented": null
+          "documented": false
         },
         {
           "id": "config.env_vars.CLAUDE_CODE_DISABLE_POWERSHELL_ALIAS_SHADOW_CHECK",
@@ -2826,7 +3048,7 @@
           "op": "added",
           "title": "New environment variable: CLAUDE_CODE_DISABLE_POWERSHELL_ALIAS_SHADOW_CHECK",
           "impact": "informational",
-          "documented": null
+          "documented": false
         },
         {
           "id": "config.env_vars.CLAUDE_CODE_FIRST_CALL_THINKING_TITLES",
@@ -2834,7 +3056,7 @@
           "op": "added",
           "title": "New environment variable: CLAUDE_CODE_FIRST_CALL_THINKING_TITLES",
           "impact": "informational",
-          "documented": null
+          "documented": false
         },
         {
           "id": "config.env_vars.CLAUDE_CODE_HOST_OWNED_SPAWN_ENV",
@@ -2842,7 +3064,7 @@
           "op": "added",
           "title": "New environment variable: CLAUDE_CODE_HOST_OWNED_SPAWN_ENV",
           "impact": "informational",
-          "documented": null
+          "documented": false
         },
         {
           "id": "config.env_vars.CLAUDE_CODE_LAUNCHED_BY_SESSION_IDS",
@@ -2850,7 +3072,7 @@
           "op": "added",
           "title": "New environment variable: CLAUDE_CODE_LAUNCHED_BY_SESSION_IDS",
           "impact": "informational",
-          "documented": null
+          "documented": false
         },
         {
           "id": "config.env_vars.CLAUDE_CODE_MCP_PREWAIT_SERVERS_MS_BY_NAME",
@@ -2858,7 +3080,7 @@
           "op": "added",
           "title": "New environment variable: CLAUDE_CODE_MCP_PREWAIT_SERVERS_MS_BY_NAME",
           "impact": "informational",
-          "documented": null
+          "documented": false
         },
         {
           "id": "config.env_vars.CLAUDE_CODE_NEW_RENDERER",
@@ -2866,7 +3088,7 @@
           "op": "added",
           "title": "New environment variable: CLAUDE_CODE_NEW_RENDERER",
           "impact": "informational",
-          "documented": null
+          "documented": false
         },
         {
           "id": "config.env_vars.CLAUDE_CODE_OFF_PERSONS_MACHINE",
@@ -2874,7 +3096,7 @@
           "op": "added",
           "title": "New environment variable: CLAUDE_CODE_OFF_PERSONS_MACHINE",
           "impact": "informational",
-          "documented": null
+          "documented": false
         },
         {
           "id": "config.env_vars.CLAUDE_CODE_REQUIRED_PLUGINS_HOLD",
@@ -2882,7 +3104,7 @@
           "op": "added",
           "title": "New environment variable: CLAUDE_CODE_REQUIRED_PLUGINS_HOLD",
           "impact": "informational",
-          "documented": null
+          "documented": false
         },
         {
           "id": "config.env_vars.CLAUDE_CODE_SHOW_HIDDEN_CHARACTERS",
@@ -2890,7 +3112,7 @@
           "op": "added",
           "title": "New environment variable: CLAUDE_CODE_SHOW_HIDDEN_CHARACTERS",
           "impact": "informational",
-          "documented": null
+          "documented": false
         },
         {
           "id": "config.env_vars.CLAUDE_CODE_TUI_ASKED",
@@ -2898,7 +3120,7 @@
           "op": "added",
           "title": "New environment variable: CLAUDE_CODE_TUI_ASKED",
           "impact": "informational",
-          "documented": null
+          "documented": false
         },
         {
           "id": "config.env_vars.CLAUDE_CODE_WITHHOLD_PRODUCT_EVENTS",
@@ -2906,7 +3128,7 @@
           "op": "added",
           "title": "New environment variable: CLAUDE_CODE_WITHHOLD_PRODUCT_EVENTS",
           "impact": "informational",
-          "documented": null
+          "documented": false
         },
         {
           "id": "config.env_vars.OTEL_RESOURCE_INCLUDE_HOST",
@@ -2914,7 +3136,7 @@
           "op": "added",
           "title": "New environment variable: OTEL_RESOURCE_INCLUDE_HOST",
           "impact": "informational",
-          "documented": null
+          "documented": true
         },
         {
           "id": "config.env_vars.SELF_HOSTED_RUNNER_USE_ANTHROPIC_GH",
@@ -2922,7 +3144,7 @@
           "op": "added",
           "title": "New environment variable: SELF_HOSTED_RUNNER_USE_ANTHROPIC_GH",
           "impact": "informational",
-          "documented": null
+          "documented": false
         },
         {
           "id": "config.env_vars.CLAUDE_CODE_DECSTBM",
@@ -2930,7 +3152,7 @@
           "op": "removed",
           "title": "Environment variable no longer read: CLAUDE_CODE_DECSTBM",
           "impact": "informational",
-          "documented": null
+          "documented": false
         },
         {
           "id": "network.telemetry.POST api.anthropic.com/api/event_logging/v2/batch.events.tengu_startup_timing",
@@ -2938,7 +3160,7 @@
           "op": "added",
           "title": "New vendor telemetry event: tengu_startup_timing",
           "impact": "notable",
-          "documented": null
+          "documented": true
         },
         {
           "id": "filesystem.darwin/arm64.exec./bin/zsh -c -l SNAPSHOT_FILE=<claude-config>/shell-snapshots/snapshot-zsh-<n>-<id>.sh\n      # No user config file to source\n      \n\n      # First, create/clear the snapshot file\n      echo \"# Snapshot file\" >| \"$SNAPSHOT_FILE\"\n\n      # When this file is sourced, we first unalias to avoid conflicts\n      # This is necessary because aliases get \"frozen\" inside function definitions at definition time,\n      # which can cause unexpected behavior when functions use commands that conflict with aliases\n      echo \"# Unset all aliases to avoid conflicts with functions\" >> \"$SNAPSHOT_FILE\"\n      echo \"unalias -a 2>/dev/null || true\" >> \"$SNAPSHOT_FILE\"\n\n      \n\n      \n      cat >> \"$SNAPSHOT_FILE\" << 'CLAUDE_CODE_END_<id>'\n# Check for rg availability\nif ! hash rg 2>/dev/null && ! typeset -f rg >/dev/null 2>&1; then\n  function rg {\n  if [[ -x <install>/claude ]]; then\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=rg <install>/claude ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=rg <install>/claude ${1+\"$@\"}\n  else\n    (exec -a rg <install>/claude ${1+\"$@\"})\n  fi\n  elif [[ -x <home>/.local/bin/claude ]]; then\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=rg <home>/.local/bin/claude ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=rg <home>/.local/bin/claude ${1+\"$@\"}\n  else\n    (exec -a rg <home>/.local/bin/claude ${1+\"$@\"})\n  fi\n  else command rg ${1+\"$@\"}; fi\n}\nfi\n# Shadow find/grep with embedded bfs/ugrep\nunalias find 2>/dev/null || true\nunalias grep 2>/dev/null || true\nfunction find {\n  if [[ -x <install>/claude ]]; then\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=bfs <install>/claude -S dfs -regextype findutils-default ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=bfs <install>/claude -S dfs -regextype findutils-default ${1+\"$@\"}\n  else\n    (exec -a bfs <install>/claude -S dfs -regextype findutils-default ${1+\"$@\"})\n  fi\n  elif [[ -x <home>/.local/bin/claude ]]; then\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=bfs <home>/.local/bin/claude -S dfs -regextype findutils-default ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=bfs <home>/.local/bin/claude -S dfs -regextype findutils-default ${1+\"$@\"}\n  else\n    (exec -a bfs <home>/.local/bin/claude -S dfs -regextype findutils-default ${1+\"$@\"})\n  fi\n  else command find ${1+\"$@\"}; fi\n}\nfunction grep {\n  local _cc_a\n  for _cc_a in ${1+\"$@\"}; do\n    case \"$_cc_a\" in -*-filter*|-*-pager*|-*-view*|-*-format-open*|-*-config*|---*|-@*|-*-save-config*|-[Zz]*|-[!-]*[Zz]*|--null|--null-data) command grep ${1+\"$@\"}; return ;; esac\n  done\n  if [[ -x <install>/claude ]]; then\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=ugrep <install>/claude -G --ignore-files --hidden -I --encoding=UTF-8 --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=ugrep <install>/claude -G --ignore-files --hidden -I --encoding=UTF-8 --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"}\n  else\n    (exec -a ugrep <install>/claude -G --ignore-files --hidden -I --encoding=UTF-8 --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"})\n  fi\n  elif [[ -x <home>/.local/bin/claude ]]; then\n  if [[ -n ${ZSH_VERSION:-} ]]; then\n    ARGV0=ugrep <home>/.local/bin/claude -G --ignore-files --hidden -I --encoding=UTF-8 --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"}\n  elif [[ \"$OSTYPE\" == \"msys\" ]] || [[ \"$OSTYPE\" == \"cygwin\" ]] || [[ \"$OSTYPE\" == \"win32\" ]]; then\n    ARGV0=ugrep <home>/.local/bin/claude -G --ignore-files --hidden -I --encoding=UTF-8 --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"}\n  else\n    (exec -a ugrep <home>/.local/bin/claude -G --ignore-files --hidden -I --encoding=UTF-8 --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg --exclude-dir=.bzr --exclude-dir=.jj --exclude-dir=.sl ${1+\"$@\"})\n  fi\n  else command grep ${1+\"$@\"}; fi\n}\n# Shadow pkill to refuse patterns matching the CLI process\nunalias pkill 2>/dev/null || true\nfunction pkill {\n  if [ -n \"${CLAUDE_PID:-}\" ] && [ -r \"/proc/${CLAUDE_PID}/comm\" ]; then\n    local _cc_skip=\"\" _cc_a\n    local -a _cc_probe=()\n    for _cc_a in ${1+\"$@\"}; do\n      if [ -n \"$_cc_skip\" ]; then _cc_skip=\"\"; continue; fi\n      case \"$_cc_a\" in\n        --signal) _cc_skip=1 ;;\n        --signal=*|-e|--echo) ;;\n        -[0-9]*) ;;\n        -[PUGOF]?*) _cc_probe+=(\"$_cc_a\") ;;\n        -[ABCDEFGHIJKLMNOPQRSTUVWXYZ][ABCDEFGHIJKLMNOPQRSTUVWXYZ0-9]*) ;;\n        *) _cc_probe+=(\"$_cc_a\") ;;\n      esac\n    done\n    if command pgrep ${_cc_probe[@]+\"${_cc_probe[@]}\"} 2>/dev/null | command grep -qx \"${CLAUDE_PID}\"; then\n      printf 'pkill: refusing to run — this pattern matches the Claude CLI process (PID %s). Narrow the pattern, or target your own children with `pkill -P $$ ...`.\\n' \"${CLAUDE_PID}\" >&2\n      return 1\n    fi\n  fi\n  command pkill ${1+\"$@\"}\n}\nexport PATH=<path>\nCLAUDE_CODE_END_<id>\n  \n\n      # Exit silently on success, only report errors\n      if [ ! -f \"$SNAPSHOT_FILE\" ]; then\n        echo \"Error: Snapshot file was not created at $SNAPSHOT_FILE\" >&2\n        exit 1\n      fi\n    ",
@@ -2946,7 +3168,7 @@
           "op": "changed",
           "title": "Command changed: `/bin/zsh -c -l SNAPSHOT_FILE=<claude-config>/shell-snapshots/snapshot-zsh-<n>-<id>.sh …` (+96 −0 chars) (darwin/arm64)",
           "impact": "informational",
-          "documented": null
+          "documented": false
         },
         {
           "id": "filesystem.linux/amd64.paths.<repo>/.claude/rules",
@@ -2954,7 +3176,7 @@
           "op": "removed",
           "title": "No longer looks for <repo>/.claude/rules (linux/amd64)",
           "impact": "informational",
-          "documented": null
+          "documented": false
         },
         {
           "id": "filesystem.linux/amd64.paths.<sandbox>/../.claude/rules",
@@ -2962,7 +3184,7 @@
           "op": "removed",
           "title": "No longer looks for <sandbox>/../.claude/rules (linux/amd64)",
           "impact": "informational",
-          "documented": null
+          "documented": false
         },
         {
           "id": "filesystem.linux/amd64.paths.<sandbox>/.claude/rules",
@@ -2970,7 +3192,7 @@
           "op": "removed",
           "title": "No longer looks for <sandbox>/.claude/rules (linux/amd64)",
           "impact": "informational",
-          "documented": null
+          "documented": false
         },
         {
           "id": "filesystem.linux/amd64.paths.<tmp>/.claude/rules",
@@ -2978,7 +3200,7 @@
           "op": "removed",
           "title": "No longer looks for <tmp>/.claude/rules (linux/amd64)",
           "impact": "informational",
-          "documented": null
+          "documented": false
         }
       ]
     },

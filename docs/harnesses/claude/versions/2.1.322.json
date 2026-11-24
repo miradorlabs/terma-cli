@@ -22328,7 +22328,12 @@
           }
         }
       },
-      "tracer": "strace"
+      "tracer": "strace",
+      "unobserved": {
+        "paths": [
+          "<claude-config>/.claude.json.tmp.<n>.<n>"
+        ]
+      }
     }
   },
   "binary": {

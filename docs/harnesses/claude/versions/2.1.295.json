@@ -20280,6 +20280,7 @@
           "/bin/bash -c -l SNAPSHOT_FILE=<claude-config>/shell-snapshots/snapshot-bash-<n>-<id>.sh\n      # No user config file to source\n      \n\n      # First, create/clear the snapshot file\n      echo \"# Snapshot file\" >| \"$SNAPSHOT_FILE\"\n\n      # When this file is sourced, we first unalias to avoid conflicts\n      # This is necessary because aliases get \"frozen\" inside function definitions at definition time,\n…"
         ],
         "paths": [
+          "<claude-config>/.claude.json.tmp.<n>.<n>",
           "<claude-config>/daemon",
           "<claude-config>/daemon.json",
           "<claude-config>/jobs",

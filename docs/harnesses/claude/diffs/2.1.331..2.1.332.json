@@ -1,0 +1,551 @@
+{
+  "schema_version": 1,
+  "harness": "claude",
+  "from": "2.1.331",
+  "to": "2.1.332",
+  "generated_at": "2026-11-24T22:27:23.849040294Z",
+  "source": null,
+  "changelog": null,
+  "summary": {
+    "changes": 27,
+    "categories": {
+      "config": 19,
+      "filesystem": 1,
+      "hooks": 1,
+      "support": 5,
+      "tools": 1
+    },
+    "impact": {
+      "breaking": 5,
+      "degrading": 0,
+      "informational": 17,
+      "notable": 5
+    },
+    "undocumented": null
+  },
+  "changes": [
+    {
+      "id": "tools.ToolSearch.input_schema.required.max_results",
+      "category": "tools",
+      "op": "removed",
+      "path": [
+        "tools",
+        "ToolSearch",
+        "input_schema",
+        "required",
+        "max_results"
+      ],
+      "title": "ToolSearch tool parameters removed",
+      "impact": "notable",
+      "before": "max_results",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "hooks.supported.PreSkillShellCommand",
+      "category": "hooks",
+      "op": "added",
+      "path": [
+        "hooks",
+        "supported",
+        "PreSkillShellCommand"
+      ],
+      "title": "New hook event: PreSkillShellCommand",
+      "impact": "notable",
+      "before": null,
+      "after": "PreSkillShellCommand",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.desktopMcpServersListScope.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "desktopMcpServersListScope",
+        "description"
+      ],
+      "title": "desktopMcpServersListScope description changed (+632 −469 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,13 +1,14 @@\n Claude desktop app only.\n Where your allow list and deny list apply to MCP servers added in the Claude desktop app.\n-\"code\" (default): Your allow list also governs MCP servers added in the Claude desktop app, in Code tab sessions and the Artifact pane.\n-\"all\": Your allow list and your deny list also govern MCP servers added in the Claude desktop app, in every tab (including Chat and Cowork).\n+\"code\" (default): Your allow list also governs MCP servers added in the Claude desktop app, in local Code tab sessions and the Artifact pane.\n+\"all\": Same as \"code\".\n+Your allow list and deny list also govern MCP servers in the app's config file (Settings > Developer > Edit config), in every tab (including Chat and Cowork) and when the app sends them to an SSH host.\n \"off\": Your allow list doesn't govern MCP servers added in the Claude desktop app.\n Read only from managed settings.\n Any other value counts as `all`.\n Where sources are merged or mixed, `off` counts as `all`.\n Leave the key out, or set it only in the managed source that holds your list.\n-`deniedMcpServers` applies in Code tab sessions and the Artifact pane with every value, and in every tab with `all`.\n-MCP servers sent to SSH hosts are not governed by these lists in this release.\n+`deniedMcpServers` applies in local Code tab sessions and the Artifact pane with every value.\n+MCP servers that the app sends to SSH hosts are governed by these lists, and by `strictPluginOnlyCustomization` for MCP, only with `all`, and not by older versions of the app.\n The Claude Code CLI reads nothing from this key, but written alone in a higher managed source it makes that source lead, and Claude Code skips the managed sources beneath it.\n Write it only beside the list it scopes.\n",
+      "stats": {
+        "added_chars": 632,
+        "removed_chars": 469
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.fileSuggestion.type.enum.command",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "fileSuggestion.type",
+        "enum",
+        "command"
+      ],
+      "title": "Setting fileSuggestion.type lost value command",
+      "impact": "notable",
+      "before": "command",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.statusLine.type.enum.command",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "statusLine.type",
+        "enum",
+        "command"
+      ],
+      "title": "Setting statusLine.type lost value command",
+      "impact": "notable",
+      "before": "command",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.options.subagentStatusLine.type.enum.command",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "subagentStatusLine.type",
+        "enum",
+        "command"
+      ],
+      "title": "Setting subagentStatusLine.type lost value command",
+      "impact": "notable",
+      "before": "command",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.AWS_CONFIG_FILE",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "AWS_CONFIG_FILE"
+      ],
+      "title": "New environment variable: AWS_CONFIG_FILE",
+      "impact": "informational",
+      "before": null,
+      "after": "AWS_CONFIG_FILE",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.AWS_SHARED_CREDENTIALS_FILE",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "AWS_SHARED_CREDENTIALS_FILE"
+      ],
+      "title": "New environment variable: AWS_SHARED_CREDENTIALS_FILE",
+      "impact": "informational",
+      "before": null,
+      "after": "AWS_SHARED_CREDENTIALS_FILE",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_DISABLE_POWERSHELL_LIBRARY_LOAD_GUARD",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_DISABLE_POWERSHELL_LIBRARY_LOAD_GUARD"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_DISABLE_POWERSHELL_LIBRARY_LOAD_GUARD",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_DISABLE_POWERSHELL_LIBRARY_LOAD_GUARD",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_HOST_SHORT_SCRATCHPAD",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_HOST_SHORT_SCRATCHPAD"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_HOST_SHORT_SCRATCHPAD",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_HOST_SHORT_SCRATCHPAD",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_INDEXED_SALAMANDER",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_INDEXED_SALAMANDER"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_INDEXED_SALAMANDER",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_INDEXED_SALAMANDER",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_RELAUNCH_SEAT_LAUNCH",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_RELAUNCH_SEAT_LAUNCH"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_RELAUNCH_SEAT_LAUNCH",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_RELAUNCH_SEAT_LAUNCH",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_SPEND_PROJECT",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_SPEND_PROJECT"
+      ],
+      "title": "New environment variable: CLAUDE_CODE_SPEND_PROJECT",
+      "impact": "informational",
+      "before": null,
+      "after": "CLAUDE_CODE_SPEND_PROJECT",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.NODE_ENVdefaultdevelopmentnode",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "NODE_ENVdefaultdevelopmentnode"
+      ],
+      "title": "New environment variable: NODE_ENVdefaultdevelopmentnode",
+      "impact": "informational",
+      "before": null,
+      "after": "NODE_ENVdefaultdevelopmentnode",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.NODE_ENVexecutablePathexecutablePath",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "NODE_ENVexecutablePathexecutablePath"
+      ],
+      "title": "New environment variable: NODE_ENVexecutablePathexecutablePath",
+      "impact": "informational",
+      "before": null,
+      "after": "NODE_ENVexecutablePathexecutablePath",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.UnsupportedTarget",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "env_vars",
+        "UnsupportedTarget"
+      ],
+      "title": "New environment variable: UnsupportedTarget",
+      "impact": "informational",
+      "before": null,
+      "after": "UnsupportedTarget",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.AllocUnsupportedTargetBufferTooSmallSysLexerMissingResolveDirInvalidResolveDirParseErrorAlreadyLoggedSecurityScannerConfiguredThrown",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "AllocUnsupportedTargetBufferTooSmallSysLexerMissingResolveDirInvalidResolveDirParseErrorAlreadyLoggedSecurityScannerConfiguredThrown"
+      ],
+      "title": "Environment variable no longer read: AllocUnsupportedTargetBufferTooSmallSysLexerMissingResolveDirInvalidResolveDirParseErrorAlreadyLoggedSecurityScannerConfiguredThrown",
+      "impact": "informational",
+      "before": "AllocUnsupportedTargetBufferTooSmallSysLexerMissingResolveDirInvalidResolveDirParseErrorAlreadyLoggedSecurityScannerConfiguredThrown",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.CLAUDE_CODE_MCP_SERVE_MEMORY_WALKS_DEADLINE_MS",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_CODE_MCP_SERVE_MEMORY_WALKS_DEADLINE_MS"
+      ],
+      "title": "Environment variable no longer read: CLAUDE_CODE_MCP_SERVE_MEMORY_WALKS_DEADLINE_MS",
+      "impact": "informational",
+      "before": "CLAUDE_CODE_MCP_SERVE_MEMORY_WALKS_DEADLINE_MS",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.CLAUDE_LOCAL_OAUTH_APPS_BASE",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_LOCAL_OAUTH_APPS_BASE"
+      ],
+      "title": "Environment variable no longer read: CLAUDE_LOCAL_OAUTH_APPS_BASE",
+      "impact": "informational",
+      "before": "CLAUDE_LOCAL_OAUTH_APPS_BASE",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.CLAUDE_LOCAL_OAUTH_CONSOLE_BASE",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "CLAUDE_LOCAL_OAUTH_CONSOLE_BASE"
+      ],
+      "title": "Environment variable no longer read: CLAUDE_LOCAL_OAUTH_CONSOLE_BASE",
+      "impact": "informational",
+      "before": "CLAUDE_LOCAL_OAUTH_CONSOLE_BASE",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "config.env_vars.NODE_ENVexecutablePath",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "NODE_ENVexecutablePath"
+      ],
+      "title": "Environment variable no longer read: NODE_ENVexecutablePath",
+      "impact": "informational",
+      "before": "NODE_ENVexecutablePath",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "filesystem.darwin/arm64.exec./bin/zsh -c source <claude-config>/shell-snapshots/snapshot-zsh-<n>-<id>.sh 2>/dev/null || true && \\builtin setopt NO_EXTENDED_GLOB NO_BARE_GLOB_QUAL NO_BRACE_CCL NO_MAGIC_EQUAL_SUBST NO_RC_QUOTES NO_EQUALS 2>/dev/null || true && { \\builtin unalias -- 'which'; \\builtin unset -f -- 'which'; } >/dev/null 2>&1 || true && { \\builtin unalias -- 'unsetenv'; \\builtin unset -f -- 'unsetenv'; } >/dev/null 2>&1 || true && eval 'git status --short && git log --oneline -1' < /dev/null && pwd -P >| <tmp>/claude-<id>-cwd",
+      "category": "filesystem",
+      "op": "changed",
+      "path": [
+        "filesystem",
+        "darwin/arm64",
+        "exec",
+        "/bin/zsh -c source <claude-config>/shell-snapshots/snapshot-zsh-<n>-<id>.sh 2>/dev/null || true && \\builtin setopt NO_EXTENDED_GLOB NO_BARE_GLOB_QUAL NO_BRACE_CCL NO_MAGIC_EQUAL_SUBST NO_RC_QUOTES NO_EQUALS 2>/dev/null || true && { \\builtin unalias -- 'which'; \\builtin unset -f -- 'which'; } >/dev/null 2>&1 || true && { \\builtin unalias -- 'unsetenv'; \\builtin unset -f -- 'unsetenv'; } >/dev/null 2>&1 || true && eval 'git status --short && git log --oneline -1' < /dev/null && pwd -P >| <tmp>/claude-<id>-cwd"
+      ],
+      "title": "Command changed: `/bin/zsh -c source <claude-config>/shell-snapshots/snapshot-zsh-<n>-<id>.sh 2>/dev/null || true && \\ …` (+239 −226 chars) (darwin/arm64)",
+      "impact": "informational",
+      "before": "/bin/zsh -c source <claude-config>/shell-snapshots/snapshot-zsh-<n>-<id>.sh 2>/dev/null || true && \\builtin setopt NO_EXTENDED_GLOB NO_BARE_GLOB_QUAL NO_BRACE_CCL NO_MAGIC_EQUAL_SUBST NO_EQUALS 2>/dev/null || true && { \\builtin unalias -- 'which'; \\builtin unset -f -- 'which'; } >/dev/null 2>&1 || true && { \\builtin unalias -- 'unsetenv'; \\builtin unset -f -- 'unsetenv'; } >/dev/null 2>&1 || true && eval 'git status --short && git log --oneline -1' < /dev/null && pwd -P >| <tmp>/claude-<id>-cwd",
+      "after": "/bin/zsh -c source <claude-config>/shell-snapshots/snapshot-zsh-<n>-<id>.sh 2>/dev/null || true && \\builtin setopt NO_EXTENDED_GLOB NO_BARE_GLOB_QUAL NO_BRACE_CCL NO_MAGIC_EQUAL_SUBST NO_RC_QUOTES NO_EQUALS 2>/dev/null || true && { \\builtin unalias -- 'which'; \\builtin unset -f -- 'which'; } >/dev/null 2>&1 || true && { \\builtin unalias -- 'unsetenv'; \\builtin unset -f -- 'unsetenv'; } >/dev/null 2>&1 || true && eval 'git status --short && git log --oneline -1' < /dev/null && pwd -P >| <tmp>/claude-<id>-cwd",
+      "text_diff": "@@ -1,5 +1,5 @@\n /bin/zsh\n--c source <claude-config>/shell-snapshots/snapshot-zsh-<n>-<id>.sh 2>/dev/null || true && \\builtin setopt NO_EXTENDED_GLOB NO_BARE_GLOB_QUAL NO_BRACE_CCL NO_MAGIC_EQUAL_SUBST NO_EQUALS 2>/dev/null || true && { \\builtin unalias\n+-c source <claude-config>/shell-snapshots/snapshot-zsh-<n>-<id>.sh 2>/dev/null || true && \\builtin setopt NO_EXTENDED_GLOB NO_BARE_GLOB_QUAL NO_BRACE_CCL NO_MAGIC_EQUAL_SUBST NO_RC_QUOTES NO_EQUALS 2>/dev/null || true && { \\builtin unalias\n -- 'which'; \\builtin unset\n -f\n -- 'which'; } >/dev/null 2>&1 || true && { \\builtin unalias\n",
+      "stats": {
+        "added_chars": 239,
+        "removed_chars": 226
+      },
+      "terma": null,
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "support.capabilities.global.commits@darwin/arm64.result",
+      "category": "support",
+      "op": "changed",
+      "path": [
+        "support",
+        "capabilities",
+        "global.commits@darwin/arm64",
+        "result"
+      ],
+      "title": "Terma: Global mode: every commit carries its session now fails on darwin/arm64",
+      "impact": "breaking",
+      "before": "pass",
+      "after": "fail",
+      "text_diff": null,
+      "terma": {
+        "capabilities": [
+          "global.commits"
+        ]
+      },
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "support.capabilities.global.commits@linux/amd64.result",
+      "category": "support",
+      "op": "changed",
+      "path": [
+        "support",
+        "capabilities",
+        "global.commits@linux/amd64",
+        "result"
+      ],
+      "title": "Terma: Global mode: every commit carries its session now fails on linux/amd64",
+      "impact": "breaking",
+      "before": "pass",
+      "after": "fail",
+      "text_diff": null,
+      "terma": {
+        "capabilities": [
+          "global.commits"
+        ]
+      },
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "support.capabilities.global.placement@darwin/arm64.result",
+      "category": "support",
+      "op": "changed",
+      "path": [
+        "support",
+        "capabilities",
+        "global.placement@darwin/arm64",
+        "result"
+      ],
+      "title": "Terma: Global mode: every session placed in its project now fails on darwin/arm64",
+      "impact": "breaking",
+      "before": "pass",
+      "after": "fail",
+      "text_diff": null,
+      "terma": {
+        "capabilities": [
+          "global.placement"
+        ]
+      },
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "support.capabilities.global.placement@linux/amd64.result",
+      "category": "support",
+      "op": "changed",
+      "path": [
+        "support",
+        "capabilities",
+        "global.placement@linux/amd64",
+        "result"
+      ],
+      "title": "Terma: Global mode: every session placed in its project now fails on linux/amd64",
+      "impact": "breaking",
+      "before": "pass",
+      "after": "fail",
+      "text_diff": null,
+      "terma": {
+        "capabilities": [
+          "global.placement"
+        ]
+      },
+      "source": null,
+      "documented": null
+    },
+    {
+      "id": "support.status",
+      "category": "support",
+      "op": "changed",
+      "path": [
+        "support",
+        "status"
+      ],
+      "title": "Terma support: supported → degraded",
+      "impact": "breaking",
+      "before": "supported",
+      "after": "degraded",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": null
+    }
+  ]
+}

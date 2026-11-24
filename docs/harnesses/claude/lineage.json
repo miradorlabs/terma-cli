@@ -3,8 +3,8 @@
   "harness": "claude",
   "window": {
     "oldest": "2.1.206",
-    "newest": "2.1.331",
-    "builds": 112
+    "newest": "2.1.332",
+    "builds": 113
   },
   "items": {
     "cli.commands.claude agents": {
@@ -2588,6 +2588,11 @@
           "since": "2.1.206",
           "until": "2.1.238",
           "removed": "2.1.239"
+        },
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
         }
       ],
       "since_bounded": false
@@ -2736,6 +2741,11 @@
           "since": "2.1.206",
           "until": "2.1.238",
           "removed": "2.1.239"
+        },
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
         }
       ],
       "since_bounded": false
@@ -2937,8 +2947,8 @@
       "ranges": [
         {
           "since": "2.1.331",
-          "until": null,
-          "removed": null
+          "until": "2.1.331",
+          "removed": "2.1.332"
         }
       ],
       "since_bounded": true
@@ -7316,6 +7326,17 @@
       ],
       "since_bounded": true
     },
+    "config.env_vars.CLAUDE_CODE_DISABLE_POWERSHELL_LIBRARY_LOAD_GUARD": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.env_vars.CLAUDE_CODE_DISABLE_PRECOMPACT_SKIP": {
       "kind": "env_var",
       "ranges": [
@@ -9235,6 +9256,17 @@
       ],
       "since_bounded": true
     },
+    "config.env_vars.CLAUDE_CODE_HOST_SHORT_SCRATCHPAD": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.env_vars.CLAUDE_CODE_HOST_SHORT_TEMP_DIRS": {
       "kind": "env_var",
       "ranges": [
@@ -9438,6 +9470,17 @@
       "ranges": [
         {
           "since": "2.1.311",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.env_vars.CLAUDE_CODE_INDEXED_SALAMANDER": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "2.1.332",
           "until": null,
           "removed": null
         }
@@ -9988,8 +10031,8 @@
       "ranges": [
         {
           "since": "2.1.323",
-          "until": null,
-          "removed": null
+          "until": "2.1.331",
+          "removed": "2.1.332"
         }
       ],
       "since_bounded": true
@@ -11319,6 +11362,17 @@
       "ranges": [
         {
           "since": "2.1.328",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.env_vars.CLAUDE_CODE_RELAUNCH_SEAT_LAUNCH": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "2.1.332",
           "until": null,
           "removed": null
         }
@@ -12786,6 +12840,17 @@
         }
       ],
       "since_bounded": false
+    },
+    "config.env_vars.CLAUDE_CODE_SPEND_PROJECT": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
     },
     "config.env_vars.CLAUDE_CODE_SQUISHY_NEWT": {
       "kind": "env_var",
@@ -14530,8 +14595,8 @@
       "ranges": [
         {
           "since": "2.1.206",
-          "until": null,
-          "removed": null
+          "until": "2.1.331",
+          "removed": "2.1.332"
         }
       ],
       "since_bounded": false
@@ -14541,8 +14606,8 @@
       "ranges": [
         {
           "since": "2.1.206",
-          "until": null,
-          "removed": null
+          "until": "2.1.331",
+          "removed": "2.1.332"
         }
       ],
       "since_bounded": false
@@ -17165,6 +17230,17 @@
       ],
       "since_bounded": true
     },
+    "config.env_vars.NODE_ENVdefaultdevelopmentnode": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.env_vars.NODE_ENVdevelopment": {
       "kind": "env_var",
       "ranges": [
@@ -17181,6 +17257,17 @@
       "ranges": [
         {
           "since": "2.1.331",
+          "until": "2.1.331",
+          "removed": "2.1.332"
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.env_vars.NODE_ENVexecutablePathexecutablePath": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "2.1.332",
           "until": null,
           "removed": null
         }
@@ -19025,6 +19112,11 @@
           "since": "2.1.315",
           "until": "2.1.322",
           "removed": "2.1.323"
+        },
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
         }
       ],
       "since_bounded": true
@@ -19711,6 +19803,39 @@
       ],
       "since_bounded": false
     },
+    "config.options.additionalMarketplaces.pluginDigests.storageDir": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.additionalMarketplaces.pluginDigests.storagePath": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.additionalMarketplaces.pluginDigests.storagePath.hooks": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
     "config.options.additionalMarketplaces.source": {
       "kind": "setting",
       "ranges": [
@@ -19854,6 +19979,28 @@
       ],
       "since_bounded": false
     },
+    "config.options.allowedChannelPlugins.launchAncestry": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.allowedChannelPlugins.literalLinkText": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
     "config.options.allowedChannelPlugins.marketplace": {
       "kind": "setting",
       "ranges": [
@@ -19920,6 +20067,28 @@
       ],
       "since_bounded": false
     },
+    "config.options.allowedChannelPlugins.surfaceNetworkRaw": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.allowedChannelPlugins.unreadableAncestry": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
     "config.options.allowedChannelPlugins[].marketplace": {
       "kind": "setting",
       "ranges": [
@@ -19964,6 +20133,28 @@
       ],
       "since_bounded": false
     },
+    "config.options.allowedHttpHookUrls.launchAncestry": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.allowedHttpHookUrls.literalLinkText": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
     "config.options.allowedHttpHookUrls.storageDir": {
       "kind": "setting",
       "ranges": [
@@ -19986,6 +20177,28 @@
       ],
       "since_bounded": false
     },
+    "config.options.allowedHttpHookUrls.surfaceNetworkRaw": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.allowedHttpHookUrls.unreadableAncestry": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
     "config.options.allowedMarketplaces": {
       "kind": "setting",
       "ranges": [
@@ -19996,6 +20209,28 @@
         }
       ],
       "since_bounded": true
+    },
+    "config.options.allowedMarketplaces.launchAncestry": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.allowedMarketplaces.literalLinkText": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
     },
     "config.options.allowedMarketplaces.storageDir": {
       "kind": "setting",
@@ -20013,6 +20248,28 @@
       "ranges": [
         {
           "since": "2.1.329",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.allowedMarketplaces.surfaceNetworkRaw": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.allowedMarketplaces.unreadableAncestry": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
           "until": null,
           "removed": null
         }
@@ -20635,6 +20892,28 @@
       ],
       "since_bounded": false
     },
+    "config.options.allowedMcpServers.launchAncestry": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.allowedMcpServers.literalLinkText": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
     "config.options.allowedMcpServers.serverCommand": {
       "kind": "setting",
       "ranges": [
@@ -20662,6 +20941,17 @@
       "ranges": [
         {
           "since": "2.1.328",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.allowedMcpServers.surfaceNetworkRaw": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
           "until": null,
           "removed": null
         }
@@ -20739,6 +21029,17 @@
       "ranges": [
         {
           "since": "2.1.247",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.allowedMcpServers.unreadableAncestry": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
           "until": null,
           "removed": null
         }
@@ -20855,6 +21156,28 @@
       ],
       "since_bounded": true
     },
+    "config.options.appendPlugins.launchAncestry": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.appendPlugins.literalLinkText": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
     "config.options.appendPlugins.storageDir": {
       "kind": "setting",
       "ranges": [
@@ -20871,6 +21194,28 @@
       "ranges": [
         {
           "since": "2.1.329",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.appendPlugins.surfaceNetworkRaw": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.appendPlugins.unreadableAncestry": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
           "until": null,
           "removed": null
         }
@@ -21152,6 +21497,39 @@
       ],
       "since_bounded": false
     },
+    "config.options.autoMode.allow.storageDir": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.autoMode.allow.storagePath": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.autoMode.allow.storagePath.hooks": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
     "config.options.autoMode.classifyAllShell": {
       "kind": "setting",
       "ranges": [
@@ -21174,6 +21552,39 @@
       ],
       "since_bounded": false
     },
+    "config.options.autoMode.environment.storageDir": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.autoMode.environment.storagePath": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.autoMode.environment.storagePath.hooks": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
     "config.options.autoMode.hard_deny": {
       "kind": "setting",
       "ranges": [
@@ -21185,11 +21596,77 @@
       ],
       "since_bounded": false
     },
+    "config.options.autoMode.hard_deny.storageDir": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.autoMode.hard_deny.storagePath": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.autoMode.hard_deny.storagePath.hooks": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
     "config.options.autoMode.soft_deny": {
       "kind": "setting",
       "ranges": [
         {
           "since": "2.1.206",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.autoMode.soft_deny.storageDir": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.autoMode.soft_deny.storagePath": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.autoMode.soft_deny.storagePath.hooks": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
           "until": null,
           "removed": null
         }
@@ -21234,6 +21711,50 @@
       "ranges": [
         {
           "since": "2.1.206",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.availableModels.launchAncestry": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.availableModels.literalLinkText": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.availableModels.surfaceNetworkRaw": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.availableModels.unreadableAncestry": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
           "until": null,
           "removed": null
         }
@@ -21328,6 +21849,28 @@
       ],
       "since_bounded": false
     },
+    "config.options.blockedMarketplaces.launchAncestry": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.blockedMarketplaces.literalLinkText": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
     "config.options.blockedMarketplaces.storageDir": {
       "kind": "setting",
       "ranges": [
@@ -21344,6 +21887,28 @@
       "ranges": [
         {
           "since": "2.1.329",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.blockedMarketplaces.surfaceNetworkRaw": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.blockedMarketplaces.unreadableAncestry": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
           "until": null,
           "removed": null
         }
@@ -22043,6 +22608,28 @@
       ],
       "since_bounded": false
     },
+    "config.options.claudeMdExcludes.launchAncestry": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.claudeMdExcludes.literalLinkText": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
     "config.options.claudeMdExcludes.storageDir": {
       "kind": "setting",
       "ranges": [
@@ -22059,6 +22646,28 @@
       "ranges": [
         {
           "since": "2.1.329",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.claudeMdExcludes.surfaceNetworkRaw": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.claudeMdExcludes.unreadableAncestry": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
           "until": null,
           "removed": null
         }
@@ -22120,6 +22729,28 @@
       ],
       "since_bounded": false
     },
+    "config.options.companyAnnouncements.launchAncestry": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.companyAnnouncements.literalLinkText": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
     "config.options.companyAnnouncements.storageDir": {
       "kind": "setting",
       "ranges": [
@@ -22136,6 +22767,28 @@
       "ranges": [
         {
           "since": "2.1.329",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.companyAnnouncements.surfaceNetworkRaw": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.companyAnnouncements.unreadableAncestry": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
           "until": null,
           "removed": null
         }
@@ -22219,6 +22872,28 @@
       ],
       "since_bounded": false
     },
+    "config.options.deniedMcpServers.launchAncestry": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.deniedMcpServers.literalLinkText": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
     "config.options.deniedMcpServers.remote": {
       "kind": "setting",
       "ranges": [
@@ -22257,6 +22932,28 @@
       "ranges": [
         {
           "since": "2.1.328",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.deniedMcpServers.surfaceNetworkRaw": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.deniedMcpServers.unreadableAncestry": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
           "until": null,
           "removed": null
         }
@@ -22317,6 +23014,50 @@
         }
       ],
       "since_bounded": true
+    },
+    "config.options.deniedModels.launchAncestry": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.deniedModels.literalLinkText": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.deniedModels.surfaceNetworkRaw": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.deniedModels.unreadableAncestry": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
     },
     "config.options.description": {
       "kind": "setting",
@@ -22560,6 +23301,50 @@
       ],
       "since_bounded": false
     },
+    "config.options.disabledMcpjsonServers.launchAncestry": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.disabledMcpjsonServers.literalLinkText": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.disabledMcpjsonServers.surfaceNetworkRaw": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.disabledMcpjsonServers.unreadableAncestry": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
     "config.options.displayName": {
       "kind": "setting",
       "ranges": [
@@ -22664,6 +23449,50 @@
       "ranges": [
         {
           "since": "2.1.206",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.enabledMcpjsonServers.launchAncestry": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.enabledMcpjsonServers.literalLinkText": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.enabledMcpjsonServers.surfaceNetworkRaw": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.enabledMcpjsonServers.unreadableAncestry": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
           "until": null,
           "removed": null
         }
@@ -23176,6 +24005,39 @@
       ],
       "since_bounded": false
     },
+    "config.options.extraKnownMarketplaces.pluginDigests.storageDir": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.extraKnownMarketplaces.pluginDigests.storagePath": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.extraKnownMarketplaces.pluginDigests.storagePath.hooks": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
     "config.options.extraKnownMarketplaces.source": {
       "kind": "setting",
       "ranges": [
@@ -23192,6 +24054,50 @@
       "ranges": [
         {
           "since": "2.1.206",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.fallbackModel.launchAncestry": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.fallbackModel.literalLinkText": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.fallbackModel.surfaceNetworkRaw": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.fallbackModel.unreadableAncestry": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
           "until": null,
           "removed": null
         }
@@ -23297,6 +24203,116 @@
       ],
       "since_bounded": false
     },
+    "config.options.fileSuggestion.type.active": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.fileSuggestion.type.claimLegacyKeyOwner": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.fileSuggestion.type.claimedMayNotOwn": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.fileSuggestion.type.enforcesGrants": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.fileSuggestion.type.formerKeys": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.fileSuggestion.type.formerSessionKeys": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.fileSuggestion.type.internalByWire": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.fileSuggestion.type.internalKeyByWireKey": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.fileSuggestion.type.keptLegacyNames": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.fileSuggestion.type.legacyKeyOwners": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
     "config.options.fileSuggestion.type.namespace": {
       "kind": "setting",
       "ranges": [
@@ -23308,11 +24324,209 @@
       ],
       "since_bounded": false
     },
+    "config.options.fileSuggestion.type.needsRebuild": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.fileSuggestion.type.notedMayNotOwn": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.fileSuggestion.type.otherDenyOrAskNames": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.fileSuggestion.type.readLegacyKeyOwner": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.fileSuggestion.type.refusedLegacyKeys": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.fileSuggestion.type.retiredWireNames": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.fileSuggestion.type.sentWires": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.fileSuggestion.type.serverKeyMoved": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.fileSuggestion.type.servers": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.fileSuggestion.type.sessionKeyById": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.fileSuggestion.type.spelledKeys": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.fileSuggestion.type.tools": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.fileSuggestion.type.unsavedLegacyKeys": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.fileSuggestion.type.wireByInternal": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.fileSuggestion.type.wireHolders": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.fileSuggestion.type.wireKeyByInternalKey": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
     "config.options.footerLinksRegexes": {
       "kind": "setting",
       "ranges": [
         {
           "since": "2.1.206",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.footerLinksRegexes.launchAncestry": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.footerLinksRegexes.literalLinkText": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
           "until": null,
           "removed": null
         }
@@ -23335,6 +24549,28 @@
       "ranges": [
         {
           "since": "2.1.329",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.footerLinksRegexes.surfaceNetworkRaw": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.footerLinksRegexes.unreadableAncestry": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
           "until": null,
           "removed": null
         }
@@ -23451,6 +24687,28 @@
       ],
       "since_bounded": true
     },
+    "config.options.gatewayInternalNetworks.launchAncestry": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.gatewayInternalNetworks.literalLinkText": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
     "config.options.gatewayInternalNetworks.storageDir": {
       "kind": "setting",
       "ranges": [
@@ -23467,6 +24725,28 @@
       "ranges": [
         {
           "since": "2.1.329",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.gatewayInternalNetworks.surfaceNetworkRaw": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.gatewayInternalNetworks.unreadableAncestry": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
           "until": null,
           "removed": null
         }
@@ -23814,6 +25094,28 @@
       ],
       "since_bounded": false
     },
+    "config.options.httpHookAllowedEnvVars.launchAncestry": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.httpHookAllowedEnvVars.literalLinkText": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
     "config.options.httpHookAllowedEnvVars.storageDir": {
       "kind": "setting",
       "ranges": [
@@ -23830,6 +25132,28 @@
       "ranges": [
         {
           "since": "2.1.329",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.httpHookAllowedEnvVars.surfaceNetworkRaw": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.httpHookAllowedEnvVars.unreadableAncestry": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
           "until": null,
           "removed": null
         }
@@ -24144,6 +25468,28 @@
       ],
       "since_bounded": true
     },
+    "config.options.modelPicker.options.launchAncestry": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.modelPicker.options.literalLinkText": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
     "config.options.modelPicker.options.model": {
       "kind": "setting",
       "ranges": [
@@ -24154,6 +25500,28 @@
         }
       ],
       "since_bounded": true
+    },
+    "config.options.modelPicker.options.surfaceNetworkRaw": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.modelPicker.options.unreadableAncestry": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
     },
     "config.options.modelPicker.options[].behavesAs": {
       "kind": "setting",
@@ -24749,11 +26117,77 @@
       ],
       "since_bounded": false
     },
+    "config.options.permissions.additionalDirectories.storageDir": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.permissions.additionalDirectories.storagePath": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.permissions.additionalDirectories.storagePath.hooks": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
     "config.options.permissions.allow": {
       "kind": "setting",
       "ranges": [
         {
           "since": "2.1.206",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.permissions.allow.storageDir": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.permissions.allow.storagePath": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.permissions.allow.storagePath.hooks": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
           "until": null,
           "removed": null
         }
@@ -24831,6 +26265,39 @@
       "ranges": [
         {
           "since": "2.1.206",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.permissions.ask.storageDir": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.permissions.ask.storagePath": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.permissions.ask.storagePath.hooks": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
           "until": null,
           "removed": null
         }
@@ -24974,6 +26441,39 @@
       "ranges": [
         {
           "since": "2.1.315",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.permissions.blockReadsExemptPaths.storageDir": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.permissions.blockReadsExemptPaths.storagePath": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.permissions.blockReadsExemptPaths.storagePath.hooks": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
           "until": null,
           "removed": null
         }
@@ -25387,6 +26887,39 @@
       ],
       "since_bounded": false
     },
+    "config.options.permissions.deny.storageDir": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.permissions.deny.storagePath": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.permissions.deny.storagePath.hooks": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
     "config.options.permissions.denyInsteadOfPrompting": {
       "kind": "setting",
       "ranges": [
@@ -25519,11 +27052,77 @@
       ],
       "since_bounded": false
     },
+    "config.options.permissions.workingDirectoriesAsGiven.storageDir": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.permissions.workingDirectoriesAsGiven.storagePath": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.permissions.workingDirectoriesAsGiven.storagePath.hooks": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
     "config.options.permissions.workingDirectoriesExclude": {
       "kind": "setting",
       "ranges": [
         {
           "since": "2.1.329",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.permissions.workingDirectoriesExclude.storageDir": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.permissions.workingDirectoriesExclude.storagePath": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.permissions.workingDirectoriesExclude.storagePath.hooks": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
           "until": null,
           "removed": null
         }
@@ -26146,6 +27745,28 @@
       ],
       "since_bounded": false
     },
+    "config.options.pluginSuggestionMarketplaces.launchAncestry": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.pluginSuggestionMarketplaces.literalLinkText": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
     "config.options.pluginSuggestionMarketplaces.storageDir": {
       "kind": "setting",
       "ranges": [
@@ -26162,6 +27783,28 @@
       "ranges": [
         {
           "since": "2.1.329",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.pluginSuggestionMarketplaces.surfaceNetworkRaw": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.pluginSuggestionMarketplaces.unreadableAncestry": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
           "until": null,
           "removed": null
         }
@@ -26399,6 +28042,28 @@
       ],
       "since_bounded": true
     },
+    "config.options.prependPlugins.launchAncestry": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.prependPlugins.literalLinkText": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
     "config.options.prependPlugins.storageDir": {
       "kind": "setting",
       "ranges": [
@@ -26415,6 +28080,28 @@
       "ranges": [
         {
           "since": "2.1.329",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.prependPlugins.surfaceNetworkRaw": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.prependPlugins.unreadableAncestry": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
           "until": null,
           "removed": null
         }
@@ -27059,6 +28746,28 @@
       ],
       "since_bounded": false
     },
+    "config.options.sandbox.credentials.awsPairs.storageDir": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.sandbox.credentials.awsPairs.storagePath": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
     "config.options.sandbox.credentials.awsPairs[].accessKeyIdVar": {
       "kind": "setting",
       "ranges": [
@@ -27328,6 +29037,28 @@
       "ranges": [
         {
           "since": "2.1.246",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.sandbox.credentials.envVars.storageDir": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.sandbox.credentials.envVars.storagePath": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
           "until": null,
           "removed": null
         }
@@ -27906,6 +29637,28 @@
       ],
       "since_bounded": false
     },
+    "config.options.sandbox.credentials.files.storageDir": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.sandbox.credentials.files.storagePath": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
     "config.options.sandbox.credentials.files.timeout": {
       "kind": "setting",
       "ranges": [
@@ -28324,6 +30077,39 @@
       ],
       "since_bounded": false
     },
+    "config.options.sandbox.excludedCommands.storageDir": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.sandbox.excludedCommands.storagePath": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.sandbox.excludedCommands.storagePath.hooks": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
     "config.options.sandbox.failIfUnavailable": {
       "kind": "setting",
       "ranges": [
@@ -28368,11 +30154,55 @@
       ],
       "since_bounded": false
     },
+    "config.options.sandbox.filesystem.allowRead.storageDir": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.sandbox.filesystem.allowRead.storagePath": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
     "config.options.sandbox.filesystem.allowWrite": {
       "kind": "setting",
       "ranges": [
         {
           "since": "2.1.206",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.sandbox.filesystem.allowWrite.storageDir": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.sandbox.filesystem.allowWrite.storagePath": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
           "until": null,
           "removed": null
         }
@@ -28390,11 +30220,55 @@
       ],
       "since_bounded": false
     },
+    "config.options.sandbox.filesystem.denyRead.storageDir": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.sandbox.filesystem.denyRead.storagePath": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
     "config.options.sandbox.filesystem.denyWrite": {
       "kind": "setting",
       "ranges": [
         {
           "since": "2.1.206",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.sandbox.filesystem.denyWrite.storageDir": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.sandbox.filesystem.denyWrite.storagePath": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
           "until": null,
           "removed": null
         }
@@ -28428,6 +30302,39 @@
       "ranges": [
         {
           "since": "2.1.206",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.sandbox.ignoreViolations.storageDir": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.sandbox.ignoreViolations.storagePath": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.sandbox.ignoreViolations.storagePath.hooks": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
           "until": null,
           "removed": null
         }
@@ -28478,6 +30385,28 @@
       ],
       "since_bounded": false
     },
+    "config.options.sandbox.network.allowMachLookup.storageDir": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.sandbox.network.allowMachLookup.storagePath": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
     "config.options.sandbox.network.allowManagedDomainsOnly": {
       "kind": "setting",
       "ranges": [
@@ -28500,6 +30429,28 @@
       ],
       "since_bounded": false
     },
+    "config.options.sandbox.network.allowUnixSockets.storageDir": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.sandbox.network.allowUnixSockets.storagePath": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
     "config.options.sandbox.network.allowedDomains": {
       "kind": "setting",
       "ranges": [
@@ -28511,11 +30462,55 @@
       ],
       "since_bounded": false
     },
+    "config.options.sandbox.network.allowedDomains.storageDir": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.sandbox.network.allowedDomains.storagePath": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
     "config.options.sandbox.network.deniedDomains": {
       "kind": "setting",
       "ranges": [
         {
           "since": "2.1.206",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.sandbox.network.deniedDomains.storageDir": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.sandbox.network.deniedDomains.storagePath": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
           "until": null,
           "removed": null
         }
@@ -28604,6 +30599,28 @@
       "ranges": [
         {
           "since": "2.1.206",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.sandbox.ripgrep.args.storageDir": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.sandbox.ripgrep.args.storagePath": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
           "until": null,
           "removed": null
         }
@@ -29182,6 +31199,39 @@
       ],
       "since_bounded": false
     },
+    "config.options.spinnerTipsOverride.tips.storageDir": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.spinnerTipsOverride.tips.storagePath": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.spinnerTipsOverride.tips.storagePath.hooks": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
     "config.options.spinnerTipsOverride.tipsFile": {
       "kind": "setting",
       "ranges": [
@@ -29237,6 +31287,28 @@
       ],
       "since_bounded": false
     },
+    "config.options.spinnerVerbs.verbs.launchAncestry": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.spinnerVerbs.verbs.literalLinkText": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
     "config.options.spinnerVerbs.verbs.storageDir": {
       "kind": "setting",
       "ranges": [
@@ -29253,6 +31325,28 @@
       "ranges": [
         {
           "since": "2.1.329",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.spinnerVerbs.verbs.surfaceNetworkRaw": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.spinnerVerbs.verbs.unreadableAncestry": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
           "until": null,
           "removed": null
         }
@@ -29286,6 +31380,28 @@
       "ranges": [
         {
           "since": "2.1.246",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.sshConfigs.launchAncestry": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.sshConfigs.literalLinkText": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
           "until": null,
           "removed": null
         }
@@ -29407,6 +31523,28 @@
       "ranges": [
         {
           "since": "2.1.329",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.sshConfigs.surfaceNetworkRaw": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.sshConfigs.unreadableAncestry": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
           "until": null,
           "removed": null
         }
@@ -29567,6 +31705,116 @@
       ],
       "since_bounded": false
     },
+    "config.options.statusLine.type.active": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.statusLine.type.claimLegacyKeyOwner": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.statusLine.type.claimedMayNotOwn": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.statusLine.type.enforcesGrants": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.statusLine.type.formerKeys": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.statusLine.type.formerSessionKeys": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.statusLine.type.internalByWire": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.statusLine.type.internalKeyByWireKey": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.statusLine.type.keptLegacyNames": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.statusLine.type.legacyKeyOwners": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
     "config.options.statusLine.type.namespace": {
       "kind": "setting",
       "ranges": [
@@ -29578,11 +31826,209 @@
       ],
       "since_bounded": false
     },
+    "config.options.statusLine.type.needsRebuild": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.statusLine.type.notedMayNotOwn": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.statusLine.type.otherDenyOrAskNames": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.statusLine.type.readLegacyKeyOwner": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.statusLine.type.refusedLegacyKeys": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.statusLine.type.retiredWireNames": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.statusLine.type.sentWires": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.statusLine.type.serverKeyMoved": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.statusLine.type.servers": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.statusLine.type.sessionKeyById": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.statusLine.type.spelledKeys": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.statusLine.type.tools": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.statusLine.type.unsavedLegacyKeys": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.statusLine.type.wireByInternal": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.statusLine.type.wireHolders": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.statusLine.type.wireKeyByInternalKey": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
     "config.options.strictKnownMarketplaces": {
       "kind": "setting",
       "ranges": [
         {
           "since": "2.1.206",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.strictKnownMarketplaces.launchAncestry": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.strictKnownMarketplaces.literalLinkText": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
           "until": null,
           "removed": null
         }
@@ -29605,6 +32051,28 @@
       "ranges": [
         {
           "since": "2.1.329",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.strictKnownMarketplaces.surfaceNetworkRaw": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.strictKnownMarketplaces.unreadableAncestry": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
           "until": null,
           "removed": null
         }
@@ -30502,11 +32970,297 @@
       ],
       "since_bounded": false
     },
+    "config.options.subagentStatusLine.type.active": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.subagentStatusLine.type.claimLegacyKeyOwner": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.subagentStatusLine.type.claimedMayNotOwn": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.subagentStatusLine.type.enforcesGrants": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.subagentStatusLine.type.formerKeys": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.subagentStatusLine.type.formerSessionKeys": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.subagentStatusLine.type.internalByWire": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.subagentStatusLine.type.internalKeyByWireKey": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.subagentStatusLine.type.keptLegacyNames": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.subagentStatusLine.type.legacyKeyOwners": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
     "config.options.subagentStatusLine.type.namespace": {
       "kind": "setting",
       "ranges": [
         {
           "since": "2.1.246",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.subagentStatusLine.type.needsRebuild": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.subagentStatusLine.type.notedMayNotOwn": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.subagentStatusLine.type.otherDenyOrAskNames": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.subagentStatusLine.type.readLegacyKeyOwner": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.subagentStatusLine.type.refusedLegacyKeys": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.subagentStatusLine.type.retiredWireNames": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.subagentStatusLine.type.sentWires": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.subagentStatusLine.type.serverKeyMoved": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.subagentStatusLine.type.servers": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.subagentStatusLine.type.sessionKeyById": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.subagentStatusLine.type.spelledKeys": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.subagentStatusLine.type.tools": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.subagentStatusLine.type.unsavedLegacyKeys": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.subagentStatusLine.type.wireByInternal": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.subagentStatusLine.type.wireHolders": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.subagentStatusLine.type.wireKeyByInternalKey": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
           "until": null,
           "removed": null
         }
@@ -31118,6 +33872,50 @@
       ],
       "since_bounded": false
     },
+    "config.options.worktree.sparsePaths.launchAncestry": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.worktree.sparsePaths.literalLinkText": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.worktree.sparsePaths.surfaceNetworkRaw": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.worktree.sparsePaths.unreadableAncestry": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
     "config.options.worktree.symlinkDirectories": {
       "kind": "setting",
       "ranges": [
@@ -31134,6 +33932,50 @@
       "ranges": [
         {
           "since": "2.1.246",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.worktree.symlinkDirectories.launchAncestry": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.worktree.symlinkDirectories.literalLinkText": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.worktree.symlinkDirectories.surfaceNetworkRaw": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": false
+    },
+    "config.options.worktree.symlinkDirectories.unreadableAncestry": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "2.1.332",
           "until": null,
           "removed": null
         }

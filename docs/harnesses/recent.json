@@ -1,7 +1,43 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-24T21:18:42.115934938Z",
+  "generated_at": "2026-11-24T22:27:23.849040294Z",
   "versions": [
+    {
+      "harness": "claude",
+      "name": "Claude Code",
+      "version": "2.1.332",
+      "released_at": "2026-11-24T22:06:38.097Z",
+      "captured_at": "2026-11-24T22:27:23.849040294Z",
+      "platforms": [
+        "darwin/arm64",
+        "linux/amd64"
+      ],
+      "support": "degraded",
+      "previous": "2.1.331",
+      "changes": 27,
+      "categories": {
+        "config": 19,
+        "filesystem": 1,
+        "hooks": 1,
+        "support": 5,
+        "tools": 1
+      },
+      "impact": {
+        "breaking": 5,
+        "degrading": 0,
+        "informational": 17,
+        "notable": 5
+      },
+      "undocumented": null,
+      "highlights": [
+        "Terma: Global mode: every commit carries its session now fails on darwin/arm64",
+        "Terma: Global mode: every commit carries its session now fails on linux/amd64",
+        "Terma: Global mode: every session placed in its project now fails on darwin/arm64"
+      ],
+      "signing": "valid",
+      "attempted_at": "2026-11-24T22:27:23.849040294Z",
+      "attempts": 1
+    },
     {
       "harness": "codex-desktop",
       "name": "Codex app",
@@ -205,25 +241,26 @@
         "darwin/arm64",
         "linux/amd64"
       ],
-      "support": "supported",
+      "support": "degraded",
       "previous": "0.171.0",
-      "changes": 27,
+      "changes": 30,
       "categories": {
         "config": 13,
         "filesystem": 2,
+        "support": 3,
         "telemetry": 12
       },
       "impact": {
-        "breaking": 0,
+        "breaking": 3,
         "degrading": 3,
         "informational": 22,
         "notable": 2
       },
       "undocumented": 23,
       "highlights": [
-        "Telemetry surface no longer sent: metrics/codex.sandbox_integrity.check",
-        "Telemetry surface no longer sent: metrics/codex.sandbox_integrity.duration_ms",
-        "Telemetry surface no longer sent: metrics/codex.sandbox_integrity.preparation_ms"
+        "Terma: Global mode: organization-managed hooks, no trust step now fails on linux/amd64",
+        "Terma: Global mode: every session placed in its project now fails on linux/amd64",
+        "Terma support: supported → degraded"
       ],
       "signing": "valid",
       "attempted_at": "2026-11-24T00:44:18.786549385Z",
@@ -255,7 +292,7 @@
         "informational": 16,
         "notable": 0
       },
-      "undocumented": null,
+      "undocumented": 7,
       "highlights": [
         "New telemetry field: gen_ai.operation.name on traces/claude_code.llm_request",
         "New telemetry field: gen_ai.response.model on traces/claude_code.llm_request",
@@ -352,7 +389,7 @@
         "informational": 29,
         "notable": 1
       },
-      "undocumented": null,
+      "undocumented": 24,
       "highlights": [
         "Setting maxEffortLevel lost value $ZodCatch",
         "deniedMcpServers.serverUrl description changed (+232 −98 chars)",
@@ -581,7 +618,7 @@
         "informational": 28,
         "notable": 2
       },
-      "undocumented": null,
+      "undocumented": 25,
       "highlights": [
         "Setting statusLine.type lost value command",
         "Setting subagentStatusLine.type lost value command",
@@ -1071,7 +1108,7 @@
         "informational": 64,
         "notable": 2
       },
-      "undocumented": null,
+      "undocumented": 27,
       "highlights": [
         "Workflow tool parameter resumeFromRunId: description changed (+564 −251 chars)",
         "New vendor telemetry event: tengu_startup_timing",
@@ -6192,30 +6229,6 @@
         "System prompt changed (+839 −862 chars)",
         "Agent tool description changed (+193 −97 chars)"
       ],
-      "signing": "valid"
-    },
-    {
-      "harness": "claude",
-      "name": "Claude Code",
-      "version": "2.1.226",
-      "released_at": "2026-08-08T01:53:22.182Z",
-      "captured_at": "2026-11-05T09:54:28.532441Z",
-      "platforms": [
-        "darwin/arm64",
-        "linux/amd64"
-      ],
-      "support": "untested",
-      "previous": "2.1.225",
-      "changes": 0,
-      "categories": {},
-      "impact": {
-        "breaking": 0,
-        "degrading": 0,
-        "informational": 0,
-        "notable": 0
-      },
-      "undocumented": 0,
-      "highlights": [],
       "signing": "valid"
     }
   ]

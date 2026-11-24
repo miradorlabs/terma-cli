@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-24T21:18:42.115934938Z",
+  "generated_at": "2026-11-24T22:27:23.849040294Z",
   "harnesses": [
     {
       "id": "claude",
@@ -9,22 +9,22 @@
       "homepage": "https://claude.com/claude-code",
       "source": null,
       "changelog": "https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md",
-      "latest": "2.1.331",
-      "support": "supported",
-      "versions_tracked": 112,
+      "latest": "2.1.332",
+      "support": "degraded",
+      "versions_tracked": 113,
       "first_tracked": "2026-07-09",
       "last_change": {
-        "from": "2.1.330",
-        "to": "2.1.331",
-        "at": "2026-11-23T18:53:04.497531851Z",
-        "released_at": "2026-11-23T18:36:26.468Z",
-        "changes": 16,
+        "from": "2.1.331",
+        "to": "2.1.332",
+        "at": "2026-11-24T22:27:23.849040294Z",
+        "released_at": "2026-11-24T22:06:38.097Z",
+        "changes": 27,
         "categories": {
-          "binary": 1,
-          "cli": 1,
-          "config": 5,
-          "filesystem": 3,
-          "telemetry": 6
+          "config": 19,
+          "filesystem": 1,
+          "hooks": 1,
+          "support": 5,
+          "tools": 1
         }
       }
     },
@@ -68,7 +68,7 @@
       },
       "changelog": "https://github.com/openai/codex/releases",
       "latest": "0.172.0",
-      "support": "supported",
+      "support": "degraded",
       "versions_tracked": 109,
       "first_tracked": "2026-01-25",
       "last_change": {
@@ -76,10 +76,11 @@
         "to": "0.172.0",
         "at": "2026-11-24T00:44:18.786549385Z",
         "released_at": "2026-11-24T00:09:39.503Z",
-        "changes": 27,
+        "changes": 30,
         "categories": {
           "config": 13,
           "filesystem": 2,
+          "support": 3,
           "telemetry": 12
         }
       }

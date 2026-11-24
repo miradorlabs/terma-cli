@@ -48,7 +48,7 @@
       "request": "2026-11-24T00:44:18.786549385Z",
       "side_requests": "2026-11-24T00:44:18.786549385Z",
       "storage": "2026-11-24T00:44:18.786549385Z",
-      "support": "2026-11-24T00:44:18.786549385Z",
+      "support": "2026-11-24T22:27:23.849040294Z",
       "telemetry": "2026-11-24T00:44:18.786549385Z",
       "tools": "2026-11-24T00:44:18.786549385Z"
     },
@@ -77287,7 +77287,7 @@
         "id": "global.managed",
         "label": "Global mode: organization-managed hooks, no trust step",
         "platform": "linux/amd64",
-        "result": "pass"
+        "result": "fail"
       },
       {
         "id": "global.placement",
@@ -77299,7 +77299,7 @@
         "id": "global.placement",
         "label": "Global mode: every session placed in its project",
         "platform": "linux/amd64",
-        "result": "pass"
+        "result": "fail"
       },
       {
         "id": "relay.cold_start",
@@ -77368,7 +77368,7 @@
         "result": "pass"
       }
     ],
-    "status": "supported"
+    "status": "degraded"
   },
   "live": {
     "differs": false,

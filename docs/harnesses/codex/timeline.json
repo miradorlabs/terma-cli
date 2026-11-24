@@ -221,6 +221,30 @@
           "title": "`git -c safe.bareRepository=explicit config --null --get core.fsmonitor` no longer runs at exit (linux/amd64)",
           "impact": "informational",
           "documented": false
+        },
+        {
+          "id": "support.capabilities.global.managed@linux/amd64.result",
+          "category": "support",
+          "op": "changed",
+          "title": "Terma: Global mode: organization-managed hooks, no trust step now fails on linux/amd64",
+          "impact": "breaking",
+          "documented": true
+        },
+        {
+          "id": "support.capabilities.global.placement@linux/amd64.result",
+          "category": "support",
+          "op": "changed",
+          "title": "Terma: Global mode: every session placed in its project now fails on linux/amd64",
+          "impact": "breaking",
+          "documented": true
+        },
+        {
+          "id": "support.status",
+          "category": "support",
+          "op": "changed",
+          "title": "Terma support: supported → degraded",
+          "impact": "breaking",
+          "documented": true
         }
       ]
     },

@@ -19303,6 +19303,7 @@
       "tracer": "strace",
       "unobserved": {
         "paths": [
+          "<claude-config>/.claude.json.tmp.<n>.<n>",
           "<claude-config>/daemon",
           "<claude-config>/daemon.json",
           "<claude-config>/jobs",
