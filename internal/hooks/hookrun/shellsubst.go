@@ -56,7 +56,8 @@ func (sc *scan) trustedCmd(name string) (string, bool) {
 		return "", !f1 && !f2
 	}
 	exts := pick(runtime.GOOS == "windows", []string{"", ".exe", ".cmd", ".bat", ".com"}, []string{""})
-	roots := pick(runtime.GOOS == "windows", []string{"/program files/", "/program files (x86)/", "/windows/system32/", "/hostedtoolcache/"}, []string{"/bin/", "/usr/bin/", "/usr/local/", "/usr/lib/", "/opt/homebrew/", "/opt/hostedtoolcache/", "/Library/Developer/", "/Applications/Xcode.app/"})
+	roots := pick(runtime.GOOS == "windows", []string{"/program files/", "/program files (x86)/", "/windows/system32/"}, []string{"/bin/", "/usr/bin/", "/usr/lib/", "/Library/Developer/", "/Applications/Xcode.app/", "/usr/local/go/bin/"})
+	goRoots := pick(runtime.GOOS == "windows", []string{"/hostedtoolcache/windows/go/"}, []string{"/opt/hostedtoolcache/go/", "/opt/homebrew/Cellar/go/", "/usr/local/Cellar/go/"})
 	for _, d := range pick(sc.isUnresolvedVar("PATH") || pathEnv == "", []string{""}, filepath.SplitList(pathEnv)) {
 		if d == "" || !filepath.IsAbs(d) {
 			return "", false
@@ -67,7 +68,8 @@ func (sc *scan) trustedCmd(name string) (string, bool) {
 			} else if found && !info.IsDir() && (runtime.GOOS == "windows" || info.Mode()&0o111 != 0) {
 				p := filepath.ToSlash(r[len(filepath.VolumeName(r)):])
 				p = pick(runtime.GOOS == "windows", strings.ToLower(p), p)
-				return r, slices.ContainsFunc(roots, func(pre string) bool { return strings.HasPrefix(p, pre) })
+				same := pick(runtime.GOOS == "windows", strings.EqualFold(filepath.Base(r), name+ext), filepath.Base(r) == name)
+				return r, same && (isSysBin(info) && slices.ContainsFunc(roots, func(pre string) bool { return strings.HasPrefix(p, pre) }) || name == "go" && info.Mode()&0o022 == 0 && slices.ContainsFunc(goRoots, func(pre string) bool { return strings.HasPrefix(p, pre) }))
 			}
 		}
 	}

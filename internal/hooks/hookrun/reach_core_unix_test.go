@@ -55,3 +55,28 @@ func TestSafeLocateRejectsForeignOwnedRepo(t *testing.T) {
 		t.Fatalf("safeLocate with GIT_DIR/GIT_WORK_TREE on foreign-owned repo = (%q, true), want false", got)
 	}
 }
+
+func TestTrustedCmdRejectsSymlinkAliasAndNonRoot(t *testing.T) {
+	dir := t.TempDir()
+	// Symlink named "dirname" pointing to a different root-owned system binary (/bin/echo) must be rejected.
+	if err := os.Symlink("/bin/echo", filepath.Join(dir, "dirname")); err != nil {
+		t.Fatal(err)
+	}
+	sc := newScan(dir, func(k string) (string, bool) {
+		if k == "PATH" {
+			return dir + ":/usr/bin:/bin", true
+		}
+		return "", false
+	}, work{deadline: time.Now().Add(time.Minute)})
+	if r, ok := sc.trustedCmd("dirname"); ok {
+		t.Fatalf("trustedCmd(symlink dirname->/bin/echo) = (%q, true), want false", r)
+	}
+	// User-owned executable is not root-owned so isSysBin rejects it.
+	fi, err := os.Stat(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if os.Geteuid() != 0 && isSysBin(fi) {
+		t.Fatalf("isSysBin(user-owned dir) = true, want false")
+	}
+}

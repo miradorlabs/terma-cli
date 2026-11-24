@@ -45,3 +45,4 @@ func (d dirHandle) open(name string, dir bool, want fs.FileInfo) (*os.File, erro
 }
 func sameDevice(_, _ fs.FileInfo) bool { return true }
 func sameOwner(_ fs.FileInfo) bool     { return true }
+func isSysBin(_ fs.FileInfo) bool      { return true }

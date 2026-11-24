@@ -72,6 +72,7 @@ func sameDevice(a, b fs.FileInfo) bool {
 	return ok1 && ok2 && d1 == d2
 }
 func sameOwner(a fs.FileInfo) bool { _, u, ok := statIDs(a); return ok && u == uint32(effectiveUID()) }
+func isSysBin(a fs.FileInfo) bool  { _, u, ok := statIDs(a); return ok && u == 0 && a.Mode()&0o022 == 0 }
 
 type statInfo struct{ st unix.Stat_t }
 
