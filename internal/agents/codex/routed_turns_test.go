@@ -203,3 +203,53 @@ func TestCodexResumedCrossOrgWithholdsThreadTitle(t *testing.T) {
 		t.Fatalf("spooled titles = %+v; want exactly 1 title for orgA (%q) and none for orgB (%q)", titles, enrollments["orgA"], enrollments["orgB"])
 	}
 }
+
+func TestCodexPostToolUseNonShellCrossOrgBackdatesMixedToTurnStart(t *testing.T) {
+	t.Setenv("CODEX_HOME", t.TempDir())
+	stateDir, configDir := t.TempDir(), t.TempDir()
+	repoA := initCodexOriginRepo(t, "alpha", "git@github.com:orgA/alpha.git")
+	repoB := initCodexOriginRepo(t, "beta", "git@github.com:orgB/beta.git")
+	fileB := filepath.Join(repoB, "shot.png")
+	if err := os.WriteFile(fileB, []byte("png"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	env, _ := makeRoutedCodexEnv(t, stateDir, configDir, repoA)
+	ctx := context.Background()
+	t0 := time.Date(2026, 9, 19, 18, 0, 0, 0, time.UTC)
+	tTurn := t0.Add(10 * time.Second)
+	tPost := t0.Add(15 * time.Second)
+
+	sid := "018f3a2c-cx04-7000-8000-000000000004"
+	env.Now = t0
+	startJSON, _ := json.Marshal(map[string]any{"session_id": sid, "cwd": repoA})
+	env.Stdin = bytes.NewReader(startJSON)
+	if err := sessionStart(ctx, env); err != nil {
+		t.Fatal(err)
+	}
+
+	env.Now = tTurn
+	promptJSON, _ := json.Marshal(map[string]any{"session_id": sid, "cwd": repoA, "prompt": "inspect shot"})
+	env.Stdin = bytes.NewReader(promptJSON)
+	if err := userPromptSubmit(ctx, env); err != nil {
+		t.Fatal(err)
+	}
+
+	env.Now = tPost
+	postJSON, _ := json.Marshal(map[string]any{
+		"session_id": sid, "cwd": repoA, "tool_name": "view_image",
+		"tool_input": map[string]any{"path": fileB},
+	})
+	env.Stdin = bytes.NewReader(postJSON)
+	if err := postToolUse(ctx, env); err != nil {
+		t.Fatal(err)
+	}
+
+	c, ok := claim.Read(stateDir, sid, tPost)
+	if !ok || c.Kind != claim.KindMixed {
+		t.Fatalf("claim after view_image cross-org = %+v (ok=%v); want KindMixed", c, ok)
+	}
+	if len(c.Placements) == 0 || !c.Placements[len(c.Placements)-1].Since.Equal(tTurn) {
+		t.Fatalf("mixed placement Since = %+v; want backdated turn start %v", c.Placements, tTurn)
+	}
+}

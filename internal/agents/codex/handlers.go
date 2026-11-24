@@ -155,17 +155,14 @@ func sessionStart(ctx context.Context, env hookrun.Env) error {
 	return nil
 }
 
-// userPromptSubmit sends nothing, since Codex reports the prompt itself; the hook stays for
-// the claim and relay start that follow it at the start of every turn.
-func userPromptSubmit(_ context.Context, env hookrun.Env) error { return consumePayload(env) }
-
-// consumePayload reads the hook's payload, bounded as every hook's is, and sends nothing:
-// dispatch claims the session from what a handler read, so one that reads nothing claims
-// nothing.
-func consumePayload(env hookrun.Env) error {
-	if env.Stdin != nil {
-		_, _ = io.CopyN(io.Discard, env.Stdin, hookrun.MaxInput+1)
+// userPromptSubmit records when the turn began so PostToolUse crossings for non-shell tools
+// backdate the Mixed cutoff before the tool ran; dispatch still claims the session from stdin.
+func userPromptSubmit(_ context.Context, env hookrun.Env) error {
+	in, err := readCodexHookInput(env.Stdin)
+	if err != nil {
+		return nil
 	}
+	env.StartTurn(in.SessionID)
 	return nil
 }
 
@@ -224,19 +221,24 @@ func postToolUse(ctx context.Context, env hookrun.Env) error {
 		return nil
 	}
 	env.Cwd = cmp.Or(in.Cwd, env.Cwd)
+	if env.Routing != nil {
+		env.MixedSince = env.TurnSince(in.SessionID)
+	}
 	sess := session.Session{ID: in.SessionID, Tool: codexTool, Model: in.Model}
 	attrs := hookrun.AgentAttrs(map[string]any{}, in.AgentID, in.AgentType)
+	candidates, commits := codexEditedPaths(in, env.Cwd)
 	r, err := env.Repo(ctx)
 	if err != nil {
-		candidates, _ := codexEditedPaths(in, env.Cwd)
 		env.Classify(ctx, nil, sess, candidates, attrs)
 		return nil
+	}
+	if env.Routing != nil && len(candidates) > 0 {
+		env.Classify(ctx, r, sess, candidates, attrs)
 	}
 	captureCodexFunding(ctx, env, r, in)
 	captureCodexDesktopActivity(ctx, env, r, in)
 	captureCodexTitle(ctx, env, r, in, captureCodexReplies(ctx, env, r, in))
 	captureCodexSkillReads(env, r, in)
-	candidates, commits := codexEditedPaths(in, env.Cwd)
 	if len(candidates) == 0 {
 		return nil
 	}
