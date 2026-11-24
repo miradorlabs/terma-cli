@@ -51,8 +51,7 @@ func planClaude(root, path string, command func(event string) string, install bo
 	return hookmgr.MergeEventHooks(root, hookmgr.HooksFile{Path: path}, own, install)
 }
 
-// refreshUserHooks rewrites terma's machine-wide entries in settings.json at path to this
-// build's, running the terma they already run; never installs if absent or ambiguous.
+// refreshUserHooks rewrites terma's machine-wide entries in settings.json to this build's.
 func refreshUserHooks(path string) (bool, error) {
 	data, err := hookmgr.ReadFile(path)
 	if err != nil || data == nil {

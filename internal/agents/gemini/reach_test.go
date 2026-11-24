@@ -14,6 +14,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/routing"
+	"github.com/miradorlabs/terma-cli/internal/runs"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
@@ -52,20 +53,39 @@ func TestGeminiStartRunAndCrossOrgReachMixed(t *testing.T) {
 	ctx := context.Background()
 	sid := "018f3a2c-gm01-7000-8000-000000000001"
 
+	t0 := now
 	bStart, _ := json.Marshal(map[string]any{"session_id": sid, "cwd": repoA})
-	env.Stdin = bytes.NewReader(bStart)
+	env.Now, env.Stdin = t0, bytes.NewReader(bStart)
 	if err := sessionStart(ctx, env); err != nil {
+		t.Fatal(err)
+	}
+	turn1, turn2 := t0.Add(10*time.Second), t0.Add(60*time.Second)
+	bPrompt, _ := json.Marshal(map[string]any{"session_id": sid, "cwd": repoA})
+	env.Now, env.Stdin = turn1, bytes.NewReader(bPrompt)
+	if err := prompt(ctx, env); err != nil {
+		t.Fatal(err)
+	}
+	env.Now, env.Stdin = turn2, bytes.NewReader(bPrompt)
+	if err := prompt(ctx, env); err != nil {
 		t.Fatal(err)
 	}
 	bRead, _ := json.Marshal(map[string]any{
 		"session_id": sid, "cwd": repoA, "tool_name": "read_file",
 		"tool_input": map[string]any{"absolute_path": fileB},
 	})
-	env.Stdin = bytes.NewReader(bRead)
+	env.Now, env.Stdin = turn2.Add(5*time.Second), bytes.NewReader(bRead)
 	if err := afterTool(ctx, env); err != nil {
 		t.Fatal(err)
 	}
-	if c, ok := claim.Read(stateDir, sid, env.Time()); !ok || c.Kind != claim.KindMixed {
+	c, ok := claim.Read(stateDir, sid, env.Time())
+	if !ok || c.Kind != claim.KindMixed {
 		t.Fatalf("claim after cross-org read_file = %+v (ok=%v); want KindMixed", c, ok)
+	}
+	snap := runs.Read(stateDir, sid)
+	if _, mixed := snap.MixedInterval(turn1.Add(time.Second), turn1.Add(4*time.Second)); mixed {
+		t.Fatal("prior clean turn span was wrongly marked Mixed")
+	}
+	if at, mixed := snap.MixedInterval(turn2.Add(time.Second), turn2.Add(4*time.Second)); !mixed || at.After(turn2) {
+		t.Fatalf("offending tool span [turn2+1s, turn2+4s] not dropped: mixed=%v at=%v want <= %v", mixed, at, turn2)
 	}
 }

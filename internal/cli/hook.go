@@ -84,11 +84,8 @@ func (app *App) claimed(cwd string, wanted func(gitDir string) bool) {
 	}
 }
 
-// hookProfile is one small local read. config.json, the sign-in, and routing/<profile>.json
-// (when present) are read as one snapshot (readLaneAsOne): a change to any of the three
-// mid-read, a corrupt routing state, or routing.State.Account != lane fails closed and never
-// falls back to config.Profile.Team. When no routing.State exists yet, the pre-cutover
-// single-team policy remains active.
+// hookProfile reads config.json, sign-in, and routing/<profile>.json (when present) as one
+// snapshot; mid-read changes, corrupt routing state, or Account != lane fail closed.
 func (app *App) hookProfile() dispatch.Profile {
 	p := dispatch.Profile{Policy: config.NoPolicy("", "")}
 	lane, _ := readLaneAsOne(app.dir, func() string {
@@ -100,17 +97,13 @@ func (app *App) hookProfile() dispatch.Profile {
 		before := statOrNil(rpath)
 		lane := app.profileLane(cfg)
 		st, found, rerr := routing.Load(app.stateDir, cfg.ProfileName)
-		if rperr != nil || !unchanged(before, statOrNil(rpath)) {
+		if stable := rperr == nil && unchanged(before, statOrNil(rpath)); !stable || found || rerr != nil {
 			p = dispatch.Profile{Agents: cfg.Harnesses, Policy: config.NoPolicy("", ""), Routing: hookrun.NewRouting(cfg.ProfileName, nil)}
-			return sendas.AccountUnreadable
-		}
-		if found || rerr != nil {
-			p = dispatch.Profile{Agents: cfg.Harnesses, Policy: config.NoPolicy("", ""), Routing: hookrun.NewRouting(cfg.ProfileName, nil)}
-			if rerr == nil && lane != "" && lane != sendas.AccountUnreadable && st.Account == lane {
+			if stable && rerr == nil && lane != "" && lane != sendas.AccountUnreadable && st.Account == lane {
 				p.Routing = hookrun.NewRouting(cfg.ProfileName, &st)
 				return lane
 			}
-			if lane == "" {
+			if stable && lane == "" {
 				return ""
 			}
 			return sendas.AccountUnreadable
@@ -124,7 +117,6 @@ func (app *App) hookProfile() dispatch.Profile {
 	if p.ServerKey = lane == sendas.NoPersonLane; !p.ServerKey {
 		p.Account = lane
 	}
-	// Council 7 skew guard: supersede any live pre-routing relay (!RunInfo.Routing) and withhold placements.
 	if p.Routing.Usable() && daemon.Running(claim.Dir(app.stateDir)) {
 		if info, ok := daemon.RunningRelay(claim.Dir(app.stateDir)); !ok || !info.Routing {
 			if ok {

@@ -211,9 +211,7 @@ func (e Env) classifyTouches(r *Repo, sess session.Session, extra map[string]any
 		return
 	}
 	agent, _ := extra[semconv.TermaAgentIDKey].(string)
-	c := r.claim(sess.Tool)
-	c.Cwd, c.PIDs, c.Parent = e.workingDir(), claimPIDs(), e.parent
-	e.judge(sess.ID, agent, c, append([]routing.Location{r.dest.loc}, locs...), true, unknown)
+	e.judge(sess.ID, agent, e.repoClaim(r, sess.Tool), append([]routing.Location{r.dest.loc}, locs...), true, unknown)
 }
 
 // touched is the files of one checkout, repo-relative, as a set.

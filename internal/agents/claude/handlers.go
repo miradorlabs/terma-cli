@@ -131,12 +131,10 @@ func preToolUse(ctx context.Context, env hookrun.Env) error {
 		env.Logf("%v", err)
 		return nil
 	}
-	if !session.ValidID(in.SessionID) || !claudeReadTools[in.ToolName] {
-		return nil
+	if session.ValidID(in.SessionID) && claudeReadTools[in.ToolName] {
+		env.Cwd = cmp.Or(in.Cwd, env.Cwd)
+		env.Classify(ctx, nil, session.Session{ID: in.SessionID, Tool: claudeTool, Model: in.Model}, reachedPaths(in, env.Cwd), hookrun.AgentAttrs(map[string]any{}, in.AgentID, in.AgentType))
 	}
-	env.Cwd = cmp.Or(in.Cwd, env.Cwd)
-	sess := session.Session{ID: in.SessionID, Tool: claudeTool, Model: in.Model}
-	env.Classify(ctx, nil, sess, reachedPaths(in, env.Cwd), hookrun.AgentAttrs(map[string]any{}, in.AgentID, in.AgentType))
 	return nil
 }
 

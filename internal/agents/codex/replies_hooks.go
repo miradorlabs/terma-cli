@@ -52,13 +52,10 @@ func captureCodexReplies(ctx context.Context, e hookrun.Env, r *hookrun.Repo, in
 	admits := func(cwd string) bool {
 		ok := turns.Admits(cwd)
 		if e.Routing != nil {
-			key := turns.RouteKey(cwd)
-			if !ok || key == "" {
+			if key := turns.RouteKey(cwd); !ok || key == "" || (titleDest != "" && titleDest != key) {
 				titleMixed = true
-			} else if titleDest == "" {
+			} else {
 				titleDest = key
-			} else if titleDest != key {
-				titleMixed = true
 			}
 		}
 		return ok

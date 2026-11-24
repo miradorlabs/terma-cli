@@ -320,13 +320,10 @@ func codexEditedPaths(in *codexHookInput, cwd string) (paths []string, commits [
 }
 
 func codexShellPaths(in *codexHookInput, cwd string) []string {
-	if in.ToolName != codexShellTool {
+	var input struct{ Command string }
+	if in.ToolName != codexShellTool || json.Unmarshal(in.ToolInput, &input) != nil {
 		return nil
 	}
-	var input struct {
-		Command string `json:"command"`
-	}
-	_ = json.Unmarshal(in.ToolInput, &input)
 	return hookrun.Alone(hookrun.ShellPaths(input.Command, cwd)...)
 }
 

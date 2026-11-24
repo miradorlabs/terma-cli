@@ -209,9 +209,9 @@ func (e Env) unparkPushes(r *Repo) {
 			}
 			if e.Routing != nil && rec.Event.Enrollment == "" && rec.Event.HoldKey == "" {
 				noDest += max(len(rec.Refs), 1)
-				continue
+			} else {
+				kept = append(kept, rec)
 			}
-			kept = append(kept, rec)
 		}
 		for _, rec := range kept {
 			path := filepath.Join(e.StateDir, PushesDir, rec.ID+".json")
@@ -220,16 +220,7 @@ func (e Env) unparkPushes(r *Repo) {
 			}
 			recorded = append(recorded, path)
 		}
-		if noDest > 0 {
-			if len(kept) == 0 {
-				if e.Spool == nil {
-					return errors.New("no spool for no_destination loss count")
-				}
-				return e.Spool.CountLost(LostNoDestination, noDest)
-			}
-			e.countLost(r, LostNoDestination, noDest)
-		}
-		return nil
+		return e.countUnparkNoDest(r, len(kept) > 0, noDest)
 	})
 	if err != nil {
 		// Still parked: the next hook records them all again and awaits each once.

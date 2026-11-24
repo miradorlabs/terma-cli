@@ -35,8 +35,7 @@ func (s Spec) Of(input json.RawMessage, cwd string) (out []string) {
 	dir := cwd
 	for _, k := range s.Dirs {
 		if v := readStrings(args[k]); len(v) > 0 {
-			dir = v[0]
-			if !filepath.IsAbs(dir) && cwd != "" {
+			if dir = v[0]; !filepath.IsAbs(dir) && cwd != "" {
 				dir = filepath.Join(cwd, dir)
 			}
 			out = append(out, hookrun.Alone(dir)...)
@@ -44,8 +43,8 @@ func (s Spec) Of(input json.RawMessage, cwd string) (out []string) {
 		}
 	}
 	for _, k := range s.Commands {
-		for _, command := range readStrings(args[k]) {
-			out = append(out, hookrun.Alone(hookrun.ShellPaths(command, dir)...)...)
+		for _, c := range readStrings(args[k]) {
+			out = append(out, hookrun.Alone(hookrun.ShellPaths(c, dir)...)...)
 		}
 	}
 	return out
@@ -56,15 +55,11 @@ var (
 	Copilot     = Spec{Paths: []string{"path", "file_path", "filePath", "notebook_path", "directory"}, Lists: []string{"dirPath"}, Globs: []string{"pattern", "glob", "includePattern"}, Commands: []string{"command"}, Dirs: []string{"cwd"}}
 	Cursor      = Spec{Paths: []string{"target_file", "file_path", "path", "target_directory", "directory", "filePath"}, Globs: []string{"glob", "glob_pattern"}, Commands: []string{"command"}, Dirs: []string{"cwd", "working_directory"}}
 	Gemini      = Spec{Paths: []string{"file_path", "absolute_path", "path", "dir_path", "paths"}, Globs: []string{"pattern", "include"}, Commands: []string{"command"}, Dirs: []string{"directory", "dir_path"}}
-	Antigravity = Spec{
-		Paths: []string{"AbsolutePath", "SearchPath", "SearchDirectory", "Directory", "File", "Path", "TargetFile", "TargetDirectories", "target_file", "file_path", "path", "paths", "notebook_path", "dir_path"},
-		Lists: []string{"DirectoryPath"}, Globs: []string{"Pattern", "pattern", "glob"}, Commands: []string{"CommandLine", "command"}, Dirs: []string{"Cwd", "cwd"},
-	}
+	Antigravity = Spec{Paths: []string{"AbsolutePath", "SearchPath", "SearchDirectory", "Directory", "File", "Path", "TargetFile", "TargetDirectories", "target_file", "file_path", "path", "paths", "notebook_path", "dir_path"}, Lists: []string{"DirectoryPath"}, Globs: []string{"Pattern", "pattern", "glob"}, Commands: []string{"CommandLine", "command"}, Dirs: []string{"Cwd", "cwd"}}
 )
 
 func readStrings(raw json.RawMessage) (many []string) {
-	var one string
-	if json.Unmarshal(raw, &one) == nil && one != "" {
+	if one := ""; json.Unmarshal(raw, &one) == nil && one != "" {
 		return []string{one}
 	}
 	_ = json.Unmarshal(raw, &many)

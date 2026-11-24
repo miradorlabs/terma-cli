@@ -2,6 +2,7 @@ package hookrun
 
 import (
 	"context"
+	"os"
 	"path/filepath"
 	"slices"
 	"sync"
@@ -10,7 +11,6 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/gitx"
 	"github.com/miradorlabs/terma-cli/internal/project"
-	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/routing"
 	"github.com/miradorlabs/terma-cli/internal/runs"
 	"github.com/miradorlabs/terma-cli/internal/spool"
@@ -26,12 +26,11 @@ type Routing struct {
 	mu                 sync.Mutex
 	runs               map[string]*ledgerRun
 }
-
 type ledgerRun struct {
-	id                  string
-	locations, aliases  []string
-	active, mixedAt     time.Time
-	aside, aliasesKnown bool
+	id              string
+	locations       []string
+	active, mixedAt time.Time
+	aside           bool
 }
 
 // NewRouting builds a Routing for profile from st; nil fails closed (Usable() == false).
@@ -63,7 +62,6 @@ func (rt *Routing) stampsCommits(d routing.Decision) bool {
 	t, ok := rt.state.Team(d.EnrollmentID)
 	return d.Outcome == routing.Send && ok && t.Policy.GitHooks
 }
-
 func (rt *Routing) skillsCollectedFor(r *Repo) bool {
 	if !rt.Usable() {
 		return false
@@ -100,12 +98,12 @@ func (e Env) resolveRouted(ctx context.Context, r *Repo) (*Repo, error) {
 	if !r.dest.collected() {
 		return nil, ErrNotAdmitted
 	}
-	storeDir, err := project.StoreDir(e.StateDir, r.Root, r.GitDir)
-	if err != nil {
+	if storeDir, err := project.StoreDir(e.StateDir, r.Root, r.GitDir); err != nil {
 		return nil, err
+	} else {
+		r.Store = e.store(storeDir)
+		return r, nil
 	}
-	r.Store = e.store(storeDir)
-	return r, nil
 }
 func (e Env) routeHere(ctx context.Context) (*Repo, error) {
 	root, gitDir, id, remote, err := e.locate(ctx)
@@ -146,12 +144,6 @@ type dest struct {
 
 func (d *dest) collected() bool {
 	return d != nil && (d.d.Outcome == routing.Send || d.d.Outcome == routing.Hold)
-}
-func (d *dest) kind() claim.Kind {
-	if d.loc.Kind == routing.Repository {
-		return claim.KindRepository
-	}
-	return claim.KindOutsideGit
 }
 
 // Collected reports whether records in r may leave the machine.
@@ -213,7 +205,7 @@ func (e Env) currentRun(sessionID string) ledgerRun {
 	cur, ok := rt.runs[sessionID]
 	if !ok {
 		p, _ := runs.Locate(e.StateDir, sessionID)
-		cur = &ledgerRun{id: p.Run, locations: p.Locations, active: p.Active, mixedAt: p.MixedAt, aside: p.Aside, aliases: p.Aliases, aliasesKnown: true}
+		cur = &ledgerRun{id: p.Run, locations: p.Locations, active: p.Active, mixedAt: p.MixedAt, aside: p.Aside}
 		rt.runs[sessionID] = cur
 	}
 	out := *cur
@@ -223,33 +215,7 @@ func (e Env) currentRun(sessionID string) ledgerRun {
 func (rt *Routing) setRun(sessionID, run string, at time.Time) {
 	rt.mu.Lock()
 	defer rt.mu.Unlock()
-	next := &ledgerRun{id: run, active: at}
-	if prev, ok := rt.runs[sessionID]; ok {
-		next.aliases, next.aliasesKnown = prev.aliases, prev.aliasesKnown
-	}
-	rt.runs[sessionID] = next
-}
-func (rt *Routing) aliases(stateDir, sessionID string) ([]string, error) {
-	rt.mu.Lock()
-	if cur, ok := rt.runs[sessionID]; ok && cur.aliasesKnown {
-		out := slices.Clone(cur.aliases)
-		rt.mu.Unlock()
-		return out, nil
-	}
-	rt.mu.Unlock()
-	aliases, err := runs.Aliases(stateDir, sessionID)
-	if err != nil {
-		return nil, err
-	}
-	rt.updateRun(sessionID, func(cur *ledgerRun) {
-		for _, a := range cur.aliases {
-			if !slices.Contains(aliases, a) {
-				aliases = append(aliases, a)
-			}
-		}
-		cur.aliases, cur.aliasesKnown = aliases, true
-	})
-	return slices.Clone(aliases), nil
+	rt.runs[sessionID] = &ledgerRun{id: run, active: at}
 }
 func (e Env) keepRun(sessionID string, now time.Time) {
 	due := false
@@ -270,4 +236,68 @@ func (rt *Routing) updateRun(sessionID string, fn func(*ledgerRun)) {
 	if cur, ok := rt.runs[sessionID]; ok {
 		fn(cur)
 	}
+}
+
+// Turns judges and routes per-turn agent records by each turn's working directory.
+type Turns struct {
+	ctx    context.Context
+	env    Env
+	admits map[string]bool
+	dests  map[string]*dest
+}
+
+// Turns returns a per-turn judge for this hook invocation.
+func (e Env) Turns(ctx context.Context) *Turns {
+	return &Turns{ctx: ctx, env: e, admits: map[string]bool{}, dests: map[string]*dest{}}
+}
+
+// Admits reports whether a turn in cwd may be spooled.
+func (t *Turns) Admits(cwd string) bool {
+	if cwd == "" {
+		return false
+	}
+	if t.env.Routing != nil {
+		return t.dest(cwd).collected()
+	}
+	if ok, seen := t.admits[cwd]; seen {
+		return ok
+	}
+	t.admits[cwd] = t.env.Admits(t.ctx, cwd)
+	return t.admits[cwd]
+}
+
+// RouteKey returns cwd's routed destination key (matching Repo.RouteKey), or "" if unrouted/uncollected.
+func (t *Turns) RouteKey(cwd string) string {
+	if d := t.dest(cwd); t.env.Routing != nil && cwd != "" && d.collected() {
+		return d.d.EnrollmentID + "\x00" + holdKey(d.d)
+	}
+	return ""
+}
+
+// Exclusive reports whether cwd is admitted, respects GIT_DIR isolation, and routes to r.
+func (t *Turns) Exclusive(r *Repo, cwd string) bool {
+	return cwd != "" && (os.Getenv("GIT_DIR") == "" || cwd == t.env.Cwd) && t.Admits(cwd) && (t.env.Routing == nil || (r != nil && r.dest != nil && t.RouteKey(cwd) == r.RouteKey()))
+}
+
+// Routed stamps ev using cwd's routed destination (OwnLocation: true) while keeping the session run.
+func (t *Turns) Routed(r *Repo, cwd string, ev spool.Event) spool.Event {
+	if t.env.Routing == nil || cwd == "" {
+		return t.env.Routed(r, ev)
+	}
+	return t.env.destine(ev, t.dest(cwd), true, t.env.runOf(ev.SessionID))
+}
+func (t *Turns) dest(cwd string) *dest {
+	if d, ok := t.dests[cwd]; ok {
+		return d
+	}
+	d := &dest{loc: routing.Location{Kind: routing.Unknown}, d: routing.Decision{Outcome: routing.Drop}}
+	if t.env.Routing.Usable() && cwd != "" {
+		e := t.env
+		e.Cwd = cwd
+		if r, err := e.routeHere(t.ctx); err == nil {
+			d = r.dest
+		}
+	}
+	t.dests[cwd] = d
+	return d
 }

@@ -50,9 +50,11 @@ func sessionStart(ctx context.Context, env hookrun.Env) error {
 	return nil
 }
 
-// prompt is BeforeAgent: the caller claims the session from the payload; nothing is recorded.
+// prompt is BeforeAgent: the caller claims the session and records the turn start for post-tool reach cutoffs.
 func prompt(_ context.Context, env hookrun.Env) error {
-	_, _ = readGeminiInput(env)
+	if in, ok := readGeminiInput(env); ok {
+		env.StartTurn(in.SessionID)
+	}
 	return nil
 }
 
@@ -61,10 +63,14 @@ func afterTool(ctx context.Context, env hookrun.Env) error {
 	if !ok {
 		return nil
 	}
+	if env.Routing != nil {
+		env.MixedSince = env.TurnSince(in.SessionID)
+	}
+	env.Cwd = cmp.Or(in.Cwd, env.Cwd)
+	sess := session.Session{ID: in.SessionID, Tool: geminiTool}
 	if !geminiEditTools[in.ToolName] {
 		if env.Routing != nil {
-			env.Cwd = cmp.Or(in.Cwd, env.Cwd)
-			env.Classify(ctx, nil, session.Session{ID: in.SessionID, Tool: geminiTool}, reach.Gemini.Of(in.ToolInput, env.Cwd), nil)
+			env.Classify(ctx, nil, sess, reach.Gemini.Of(in.ToolInput, env.Cwd), nil)
 		}
 		return nil
 	}
@@ -78,14 +84,11 @@ func afterTool(ctx context.Context, env hookrun.Env) error {
 	if file == "" {
 		return nil
 	}
-	env.Cwd = cmp.Or(in.Cwd, env.Cwd)
-	sess := session.Session{ID: in.SessionID, Tool: geminiTool}
-	r, err := env.Repo(ctx)
-	if err != nil {
+	if r, err := env.Repo(ctx); err != nil {
 		env.Classify(ctx, nil, sess, []string{file}, nil)
-		return nil
+	} else {
+		env.Touch(r, sess, in.ToolName, []string{file}, nil)
 	}
-	env.Touch(r, sess, in.ToolName, []string{file}, nil)
 	return nil
 }
 

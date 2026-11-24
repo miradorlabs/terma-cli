@@ -20,7 +20,7 @@ import (
 // Classify classifies the checkouts paths reach (including symlinks and subdirs unless Alone)
 // against r and the run's earlier locations. UnknownReach marks the run Mixed. Returns r or located.
 func (e Env) Classify(ctx context.Context, r *Repo, sess session.Session, paths []string, extra map[string]any) *Repo {
-	if e.Routing == nil || !e.Routing.Usable() || !session.ValidID(sess.ID) {
+	if !e.Routing.Usable() || !session.ValidID(sess.ID) {
 		return r
 	}
 	var unknown runs.Why
@@ -64,17 +64,15 @@ func (e Env) reached(r *Repo, paths []string) (out []touched) {
 		if target, err := filepath.EvalSymlinks(p); err == nil && target != p {
 			at = append(at, target)
 		}
-		for _, p := range at {
-			dir := p
+		for _, dir := range at {
 			if info, err := os.Stat(dir); err != nil || !info.IsDir() {
 				dir = filepath.Dir(dir)
 			}
-			if dirs[dir] {
-				continue
-			}
-			dirs[dir] = true
-			if repo := e.checkoutOf(r, dir); repo != nil && repo != r && !slices.ContainsFunc(out, func(t touched) bool { return samePath(t.repo.Root, repo.Root) }) {
-				out = append(out, touched{repo: repo})
+			if !dirs[dir] {
+				dirs[dir] = true
+				if repo := e.checkoutOf(r, dir); repo != nil && repo != r && !slices.ContainsFunc(out, func(t touched) bool { return samePath(t.repo.Root, repo.Root) }) {
+					out = append(out, touched{repo: repo})
+				}
 			}
 		}
 	}

@@ -3,6 +3,7 @@ package hookrun
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"path/filepath"
 	"slices"
 
@@ -98,23 +99,16 @@ func (e Env) unpark(r *Repo) {
 			}
 			if e.Routing != nil && ev.Enrollment == "" && ev.HoldKey == "" {
 				noDest++
-				continue
+			} else {
+				events = append(events, ev)
 			}
-			events = append(events, ev)
 		}
-		moved = len(events) > 0
-		if moved {
+		if moved = len(events) > 0; moved {
 			if err := e.Spool.AppendAsCollected(events...); err != nil {
 				return err
 			}
 		}
-		if noDest > 0 {
-			if !moved {
-				return e.Spool.CountLost(LostNoDestination, noDest)
-			}
-			e.countLost(r, LostNoDestination, noDest)
-		}
-		return nil
+		return e.countUnparkNoDest(r, moved, noDest)
 	})
 	if err != nil {
 		e.Logf("unpark events: %v", err)
@@ -123,6 +117,20 @@ func (e Env) unpark(r *Repo) {
 	if moved && e.Flush != nil {
 		e.Flush()
 	}
+}
+
+func (e Env) countUnparkNoDest(r *Repo, kept bool, n int) error {
+	if n == 0 {
+		return nil
+	}
+	if kept {
+		e.countLost(r, LostNoDestination, n)
+		return nil
+	}
+	if e.Spool == nil {
+		return errors.New("no spool for no_destination loss count")
+	}
+	return e.Spool.CountLost(LostNoDestination, n)
 }
 
 // emitRecord is EmitFor for a git hook's record of sessions, a commit's, whose manifests

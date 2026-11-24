@@ -62,37 +62,43 @@ func sessionStart(ctx context.Context, env hookrun.Env) error {
 }
 
 // prompt is UserPromptSubmit, which the CLI fires before SessionStart: the caller claims
-// the session from the payload; nothing is recorded.
+// the session from the payload and records the turn start for post-tool reach cutoffs.
 func prompt(_ context.Context, env hookrun.Env) error {
-	_, _ = readInput(env)
+	if in, ok := readInput(env); ok {
+		env.StartTurn(in.SessionID)
+	}
 	return nil
 }
 
 func postToolUse(ctx context.Context, env hookrun.Env) error {
 	in, ok := readInput(env)
-	if ok && !editTools[in.ToolName] {
+	if !ok {
+		return nil
+	}
+	if env.Routing != nil {
+		env.MixedSince = env.TurnSince(in.SessionID)
+	}
+	env.Cwd = cmp.Or(in.Cwd, env.Cwd)
+	sess := session.Session{ID: in.SessionID, Tool: name}
+	if !editTools[in.ToolName] {
 		if env.Routing != nil {
-			env.Cwd = cmp.Or(in.Cwd, env.Cwd)
-			env.Classify(ctx, nil, session.Session{ID: in.SessionID, Tool: name}, reach.Copilot.Of(in.ToolInput, env.Cwd), nil)
+			env.Classify(ctx, nil, sess, reach.Copilot.Of(in.ToolInput, env.Cwd), nil)
 		}
 		return nil
 	}
 	// A result the runtime names as anything but a success wrote nothing.
-	if !ok || in.ToolResult.ResultType != "" && in.ToolResult.ResultType != "success" {
+	if in.ToolResult.ResultType != "" && in.ToolResult.ResultType != "success" {
 		return nil
 	}
 	paths := editedPaths(in.ToolInput)
 	if len(paths) == 0 {
 		return nil
 	}
-	env.Cwd = cmp.Or(in.Cwd, env.Cwd)
-	sess := session.Session{ID: in.SessionID, Tool: name}
-	r, err := env.Repo(ctx)
-	if err != nil {
+	if r, err := env.Repo(ctx); err != nil {
 		env.Classify(ctx, nil, sess, paths, nil)
-		return nil
+	} else {
+		env.Touch(r, sess, in.ToolName, paths, nil)
 	}
-	env.Touch(r, sess, in.ToolName, paths, nil)
 	return nil
 }
 

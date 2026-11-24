@@ -17,6 +17,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/gitx"
 	"github.com/miradorlabs/terma-cli/internal/project"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
+	"github.com/miradorlabs/terma-cli/internal/routing"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
 	"github.com/miradorlabs/terma-cli/internal/session"
 	"github.com/miradorlabs/terma-cli/internal/spool"
@@ -65,6 +66,8 @@ type Env struct {
 	Agents []string
 	// Routing is the profile's multi-org routing state when active, replacing Policy and Team.
 	Routing *Routing
+	// MixedSince backdates a newly Mixed run cutoff before a post-tool reach hook ran.
+	MixedSince time.Time
 	// afterOwns, in tests, runs once owns has read a session's manifest, before the record.
 	afterOwns func()
 	// pushWalk, in tests, lowers maxPushWalk.
@@ -138,9 +141,10 @@ func (r *Repo) claim(tool string) claim.Claim {
 	c := claim.Claim{ProjectID: r.ProjectID, Tool: tool, Repo: r.Name, Worktree: r.Worktree, Repository: r.Repository,
 		Root: r.workTree(), Remote: r.Remote, Branch: gitx.BranchFS(r.GitDir)}
 	if r.dest != nil {
-		c.Kind = r.dest.kind()
-		if c.Kind == claim.KindOutsideGit {
-			c.Repository = config.Repository{}
+		if r.dest.loc.Kind == routing.Repository {
+			c.Kind = claim.KindRepository
+		} else {
+			c.Kind, c.Repository = claim.KindOutsideGit, config.Repository{}
 		}
 	}
 	return c
