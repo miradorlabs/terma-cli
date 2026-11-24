@@ -237,6 +237,21 @@ func TestURLPathAndRemote(t *testing.T) {
 	}
 }
 
+func testSysPath() string {
+	if runtime.GOOS == "windows" {
+		drive := os.Getenv("SystemDrive")
+		if drive == "" {
+			drive = "C:"
+		}
+		return strings.Join([]string{
+			filepath.Join(drive+`\`, "Program Files", "Git", "cmd"),
+			filepath.Join(drive+`\`, "Program Files", "Git", "usr", "bin"),
+			filepath.Join(drive+`\`, "Windows", "System32"),
+		}, string(os.PathListSeparator))
+	}
+	return "/usr/bin:/bin"
+}
+
 // Known command substitutions resolve deterministically against the scan's directory and env.
 func TestShellSubstKnownOutputs(t *testing.T) {
 	t.Parallel()
@@ -249,7 +264,11 @@ func TestShellSubstKnownOutputs(t *testing.T) {
 			return parent, true
 		case "GOPATH":
 			return filepath.Join(parent, "go"), true
-		case "GOENV", "GOMODCACHE", "GOFLAGS", "GOTOOLCHAIN", "XDG_CONFIG_HOME", "AppData", "PATH",
+		case "PATH":
+			return testSysPath(), true
+		case "GIT_CONFIG_NOSYSTEM":
+			return "1", true
+		case "GOENV", "GOMODCACHE", "GOFLAGS", "GOTOOLCHAIN", "XDG_CONFIG_HOME", "AppData",
 			"SHELLOPTS", "GCONV_PATH", "LOCPATH":
 			return "", false
 		}
@@ -273,8 +292,6 @@ func TestShellSubstKnownOutputs(t *testing.T) {
 	for src, want := range map[string]string{
 		"pwd":                           side,
 		"git rev-parse --show-toplevel": side,
-		"go env GOPATH":                 filepath.Join(parent, "go"),
-		"go env GOMODCACHE":             filepath.Join(parent, "go", "pkg", "mod"),
 		"dirname /a/b/c":                filepath.FromSlash("/a/b"),
 		"dirname link/../file":          filepath.FromSlash("link/.."),
 		"dirname /foo":                  string(filepath.Separator),
@@ -290,6 +307,12 @@ func TestShellSubstKnownOutputs(t *testing.T) {
 		if err != nil || got != want {
 			t.Errorf("substitute(%q) = (%q, %v), want (%q, nil)", src, got, err, want)
 		}
+	}
+	if got, ok := gopath(sc, nil); !ok || got != filepath.Join(parent, "go") {
+		t.Errorf("gopath() = (%q, %v), want (%q, true)", got, ok, filepath.Join(parent, "go"))
+	}
+	if got, ok := modcache(sc, nil); !ok || got != filepath.Join(parent, "go", "pkg", "mod") {
+		t.Errorf("modcache() = (%q, %v), want (%q, true)", got, ok, filepath.Join(parent, "go", "pkg", "mod"))
 	}
 	if got, err := evalSubst(sc, "mktemp -d"); err != nil || !strings.HasPrefix(got, os.TempDir()) {
 		t.Errorf("substitute(mktemp -d) = (%q, %v)", got, err)
@@ -328,26 +351,27 @@ func TestShellSubstKnownOutputs(t *testing.T) {
 		}
 	}
 	scGoEnv := newScan(side, envWithGoEnv(map[string]string{"GOENV": goEnvFile}), work{deadline: time.Now().Add(time.Minute)})
-	for _, cmd := range []string{"go env GOPATH", "go env GOMODCACHE"} {
-		if _, err := evalSubst(scGoEnv, cmd); err == nil {
-			t.Errorf("substitute(%q) with existing GOENV succeeded, want error", cmd)
-		}
+	if _, ok := gopath(scGoEnv, nil); ok {
+		t.Error("gopath with existing GOENV succeeded, want false")
+	}
+	if _, ok := modcache(scGoEnv, nil); ok {
+		t.Error("modcache with existing GOENV succeeded, want false")
 	}
 	scGoEnvExplicit := newScan(side, envWithGoEnv(map[string]string{"GOENV": goEnvFile, "GOPATH": filepath.Join(parent, "custom")}), work{deadline: time.Now().Add(time.Minute)})
-	if got, err := evalSubst(scGoEnvExplicit, "go env GOPATH"); err != nil || got != filepath.Join(parent, "custom") {
-		t.Errorf("explicit GOPATH with GOENV = (%q, %v), want custom", got, err)
+	if got, ok := gopath(scGoEnvExplicit, nil); !ok || got != filepath.Join(parent, "custom") {
+		t.Errorf("explicit GOPATH with GOENV = (%q, %v), want custom", got, ok)
 	}
-	if _, err := evalSubst(scGoEnvExplicit, "go env GOMODCACHE"); err == nil {
-		t.Error("unset GOMODCACHE with GOENV succeeded, want error")
+	if _, ok := modcache(scGoEnvExplicit, nil); ok {
+		t.Error("unset GOMODCACHE with GOENV succeeded, want false")
 	}
 	scGoEnvOff := newScan(side, envWithGoEnv(map[string]string{"GOENV": "off"}), work{deadline: time.Now().Add(time.Minute)})
-	if got, err := evalSubst(scGoEnvOff, "go env GOPATH"); err != nil || got != filepath.Join(parent, "go") {
-		t.Errorf("GOENV=off go env GOPATH = (%q, %v), want default", got, err)
+	if got, ok := gopath(scGoEnvOff, nil); !ok || got != filepath.Join(parent, "go") {
+		t.Errorf("GOENV=off gopath = (%q, %v), want default", got, ok)
 	}
 	scUnresolvedGoEnv := newScan(side, envWithGoEnv(nil), work{deadline: time.Now().Add(time.Minute)})
 	scUnresolvedGoEnv.vars["GOENV"] = nil
-	if _, err := evalSubst(scUnresolvedGoEnv, "go env GOPATH"); err == nil {
-		t.Error("unresolved GOENV var succeeded, want error")
+	if _, ok := gopath(scUnresolvedGoEnv, nil); ok {
+		t.Error("unresolved GOENV var succeeded, want false")
 	}
 }
 
@@ -666,23 +690,18 @@ func TestScanBoundsAndSafety(t *testing.T) {
 	}
 
 	// Whitespace-heavy known command substitution fails closed before expand.Fields materializes fields.
-	hugeGP := filepath.Join(dir, strings.Repeat("x ", 250_000))
-	fGP, err := syntax.NewParser().Parse(strings.NewReader("echo $(go env GOPATH)"), "")
+	hugeDir := filepath.Join(dir, strings.Repeat("x ", 250_000))
+	fGP, err := syntax.NewParser().Parse(strings.NewReader("echo $(pwd)"), "")
 	if err != nil {
 		t.Fatal(err)
 	}
 	startGP := time.Now()
-	scGopath := newScan(dir, func(k string) (string, bool) {
-		if k == "GOPATH" {
-			return hugeGP, true
-		}
-		return "", false
-	}, work{deadline: startGP.Add(time.Minute)})
+	scGopath := newScan(hugeDir, func(string) (string, bool) { return "", false }, work{deadline: startGP.Add(time.Minute)})
 	if _, err := scGopath.fields(fGP.Stmts[0].Cmd.(*syntax.CallExpr).Args[1]); err == nil || !scGopath.unknown {
-		t.Fatalf("whitespace-heavy $(go env GOPATH) did not fail closed: err=%v unknown=%v", err, scGopath.unknown)
+		t.Fatalf("whitespace-heavy $(pwd) did not fail closed: err=%v unknown=%v", err, scGopath.unknown)
 	}
 	if took := time.Since(startGP); took > 50*time.Millisecond {
-		t.Fatalf("whitespace-heavy $(go env GOPATH) took %v, want < 50ms", took)
+		t.Fatalf("whitespace-heavy $(pwd) took %v, want < 50ms", took)
 	}
 
 	// Dangling symlink (out -> ../api/new.txt) records the target's nearest existing parent.
@@ -724,8 +743,11 @@ func TestScanBoundsAndSafety(t *testing.T) {
 	}
 	csGit := fGit.Stmts[0].Cmd.(*syntax.CallExpr).Args[1].Parts[0].(*syntax.CmdSubst)
 	scGitEnv := newScan(dir, func(k string) (string, bool) {
-		if k == "GIT_DIR" {
+		switch k {
+		case "GIT_DIR":
 			return "//server/share/repo.git", true
+		case "PATH":
+			return testSysPath(), true
 		}
 		return "", false
 	}, work{deadline: time.Now().Add(time.Minute)})
@@ -740,7 +762,12 @@ func TestScanBoundsAndSafety(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(gitFileDir, ".git"), []byte("gitdir: //server/share/repo.git\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	scGitFile := newScan(gitFileDir, func(string) (string, bool) { return "", false }, work{deadline: time.Now().Add(time.Minute)})
+	scGitFile := newScan(gitFileDir, func(k string) (string, bool) {
+		if k == "PATH" {
+			return testSysPath(), true
+		}
+		return "", false
+	}, work{deadline: time.Now().Add(time.Minute)})
 	if err := scGitFile.substitute(&gitBuf, csGit); err == nil || !scGitFile.unknown {
 		t.Fatalf("remote .git gitdir file did not fail closed: err=%v unknown=%v", err, scGitFile.unknown)
 	}
@@ -757,6 +784,10 @@ func TestScanBoundsAndSafety(t *testing.T) {
 			return customGD, true
 		case "GIT_WORK_TREE":
 			return customWT, true
+		case "PATH":
+			return testSysPath(), true
+		case "GIT_CONFIG_NOSYSTEM":
+			return "1", true
 		}
 		return "", false
 	}, work{deadline: time.Now().Add(time.Minute)})
@@ -783,23 +814,20 @@ func TestScanBoundsAndSafety(t *testing.T) {
 		t.Fatal("comment-like // tokens should not mark unknown")
 	}
 
-	// Global replacement with command substitution (${V//a/$(go env GOPATH)}) fails closed before expand.Fields.
-	fReplSubst, err := syntax.NewParser().Parse(strings.NewReader("echo ${V//a/$(go env GOPATH)}"), "")
+	// Global replacement with command substitution (${V//a/$(pwd)}) fails closed before expand.Fields.
+	fReplSubst, err := syntax.NewParser().Parse(strings.NewReader("echo ${V//a/$(pwd)}"), "")
 	if err != nil {
 		t.Fatal(err)
 	}
 	startRS := time.Now()
-	scRS := newScan(dir, func(k string) (string, bool) {
-		switch k {
-		case "V":
+	scRS := newScan(filepath.Join(dir, strings.Repeat("x ", 5000)), func(k string) (string, bool) {
+		if k == "V" {
 			return strings.Repeat("a", 100), true
-		case "GOPATH":
-			return strings.Repeat("x ", 5000), true
 		}
 		return "", false
 	}, work{deadline: startRS.Add(time.Minute)})
 	if _, err := scRS.fields(fReplSubst.Stmts[0].Cmd.(*syntax.CallExpr).Args[1]); err == nil || !scRS.unknown {
-		t.Fatalf("${V//a/$(go env GOPATH)} did not fail closed: err=%v unknown=%v", err, scRS.unknown)
+		t.Fatalf("${V//a/$(pwd)} did not fail closed: err=%v unknown=%v", err, scRS.unknown)
 	}
 	if took := time.Since(startRS); took > 50*time.Millisecond {
 		t.Fatalf("${V//a/$(go env GOPATH)} took %v, want < 50ms", took)
@@ -1382,7 +1410,12 @@ func TestReachCoreHardeningRegressions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	scCross := newScan(crossLink, func(string) (string, bool) { return "", false }, work{deadline: time.Now().Add(time.Minute)})
+	scCross := newScan(crossLink, func(k string) (string, bool) {
+		if k == "GIT_CONFIG_NOSYSTEM" {
+			return "1", true
+		}
+		return "", false
+	}, work{deadline: time.Now().Add(time.Minute)})
 	if got, ok := scCross.safeLocate(crossLink); !ok || !samePath(got, resolvedRepoB) {
 		t.Fatalf("safeLocate(repoA/link -> repoB/sub) = (%q, %v), want (%q, true)", got, ok, resolvedRepoB)
 	}
@@ -2015,6 +2048,9 @@ func TestGitfilePrefixCommentsOverlongAndResolveMayCreate(t *testing.T) {
 			if k == "HOME" || k == "USERPROFILE" {
 				return root, true
 			}
+			if k == "GIT_CONFIG_NOSYSTEM" {
+				return "1", true
+			}
 			return "", false
 		}, work{deadline: time.Now().Add(time.Minute)})
 		got, ok := sc.safeLocate(wt)
@@ -2317,6 +2353,8 @@ func TestAbbreviatedSecretOptionsAndLogicalCd(t *testing.T) {
 			return filepath.Join(specDir, "missing-tmp"), true
 		case "GOENV":
 			return "off", true
+		case "PATH":
+			return testSysPath(), true
 		}
 		return "", false
 	}, work{deadline: time.Now().Add(time.Minute)})
@@ -2425,7 +2463,13 @@ func TestAbbreviatedSecretOptionsAndLogicalCd(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(wtDir, ".git"), []byte("gitdir: "+wtGit+"\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if got, ok := newScan(wtDir, noEnv, work{deadline: time.Now().Add(time.Minute)}).safeLocate(wtDir); !ok || !samePath(got, wtDir) {
+	noSysEnv := func(k string) (string, bool) {
+		if k == "GIT_CONFIG_NOSYSTEM" {
+			return "1", true
+		}
+		return "", false
+	}
+	if got, ok := newScan(wtDir, noSysEnv, work{deadline: time.Now().Add(time.Minute)}).safeLocate(wtDir); !ok || !samePath(got, wtDir) {
 		t.Errorf("safeLocate(linked worktree) = (%q, %v), want (%q, true)", got, ok, wtDir)
 	}
 	// Malformed .git/config fails closed in safeLocate.
@@ -2450,7 +2494,7 @@ func TestAbbreviatedSecretOptionsAndLogicalCd(t *testing.T) {
 		if err := os.WriteFile(filepath.Join(badCfgRepo, ".git", "config"), []byte(tc.cfg), 0o600); err != nil {
 			t.Fatal(err)
 		}
-		if got, ok := newScan(badCfgRepo, noEnv, work{deadline: time.Now().Add(time.Minute)}).safeLocate(badCfgRepo); ok {
+		if got, ok := newScan(badCfgRepo, noSysEnv, work{deadline: time.Now().Add(time.Minute)}).safeLocate(badCfgRepo); ok {
 			t.Errorf("safeLocate(%s) = (%q, true), want false", tc.name, got)
 		}
 	}
@@ -2458,7 +2502,7 @@ func TestAbbreviatedSecretOptionsAndLogicalCd(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(commonGit, "config"), []byte("[core]\n\tworktree = /elsewhere\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if got, ok := newScan(wtDir, noEnv, work{deadline: time.Now().Add(time.Minute)}).safeLocate(wtDir); ok {
+	if got, ok := newScan(wtDir, noSysEnv, work{deadline: time.Now().Add(time.Minute)}).safeLocate(wtDir); ok {
 		t.Errorf("safeLocate(linked worktree with commondir worktree override) = (%q, true), want false", got)
 	}
 	// mktemp falls back to /tmp on Unix when TMPDIR is cleared in the scanned shell, ignoring host os.TempDir().
@@ -2481,7 +2525,7 @@ func TestAbbreviatedSecretOptionsAndLogicalCd(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(goodCfgRepo, ".git", "config"), []byte("[core]\n\trepositoryformatversion = 1\n\tbare = false\n\tfoo = \"a\\\"b\" # \"comment\n[branch \"a]b\"]\n\tremote = origin\n[extensions]\n\tobjectformat = sha256\n\tpartialclone = origin\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if got, ok := newScan(goodCfgRepo, noEnv, work{deadline: time.Now().Add(time.Minute)}).safeLocate(goodCfgRepo); !ok || got != goodCfgRepo {
+	if got, ok := newScan(goodCfgRepo, noSysEnv, work{deadline: time.Now().Add(time.Minute)}).safeLocate(goodCfgRepo); !ok || got != goodCfgRepo {
 		t.Errorf("safeLocate(valid-cfg) = (%q, %v), want (%q, true)", got, ok, goodCfgRepo)
 	}
 	// Bare repository nested inside an outer checkout must not walk past the bare repo to the outer checkout.
@@ -2735,7 +2779,7 @@ func TestReachCoreReviewRegressions(t *testing.T) {
 
 	// 5. Invented mktemp paths fail closed on traversal via ../. or cd, while direct children place the parent dir.
 	scMk := newScan(repo, makeEnv(map[string]string{
-		"HOME": parent, "USERPROFILE": parent, "TMPDIR": parent, "TMP": parent,
+		"HOME": parent, "USERPROFILE": parent, "TMPDIR": parent, "TMP": parent, "PATH": testSysPath(),
 	}), work{deadline: time.Now().Add(time.Minute)})
 	mkPath, err := evalSubst(scMk, "mktemp -d")
 	if err != nil {
@@ -2756,7 +2800,7 @@ func TestReachCoreReviewRegressions(t *testing.T) {
 		{"cd into mktemp", mkPath, target},
 	} {
 		scCase := newScan(repo, makeEnv(map[string]string{
-			"HOME": parent, "USERPROFILE": parent, "TMPDIR": parent, "TMP": parent,
+			"HOME": parent, "USERPROFILE": parent, "TMPDIR": parent, "TMP": parent, "PATH": testSysPath(),
 		}), work{deadline: time.Now().Add(time.Minute)})
 		if _, err := evalSubst(scCase, "mktemp -d"); err != nil {
 			t.Fatalf("mktemp -d (%s): %v", tc.name, err)
@@ -2940,7 +2984,7 @@ func TestReachCoreReviewRegressions(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(fmtRepo, ".git", "config"), []byte("[core]\n\trepositoryformatversion = 1\n[extensions]\n\tobjectformat = sha256\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	scFmt1 := newScan(fmtRepo, makeEnv(map[string]string{"HOME": parent, "USERPROFILE": parent}), work{deadline: time.Now().Add(time.Minute)})
+	scFmt1 := newScan(fmtRepo, makeEnv(map[string]string{"HOME": parent, "USERPROFILE": parent, "GIT_CONFIG_NOSYSTEM": "1"}), work{deadline: time.Now().Add(time.Minute)})
 	if got, ok := scFmt1.safeLocate(fmtRepo); !ok || got != fmtRepo {
 		t.Errorf("format v1 + objectformat: safeLocate = (%q, %v), want (%q, true)", got, ok, fmtRepo)
 	}
@@ -2951,11 +2995,11 @@ func TestReachCoreReviewRegressions(t *testing.T) {
 		{"HOME": parent, "USERPROFILE": parent, "GOTOOLCHAIN": "bogus"},
 	} {
 		scGo := newScan(repo, makeEnv(env), work{deadline: time.Now().Add(time.Minute)})
-		if got, err := evalSubst(scGo, "go env GOPATH"); err == nil {
-			t.Errorf("%v: substitute(go env GOPATH) = %q, want error", env, got)
+		if got, ok := gopath(scGo, nil); ok {
+			t.Errorf("%v: gopath = %q, want false", env, got)
 		}
-		if got, err := evalSubst(scGo, "go env GOMODCACHE"); err == nil {
-			t.Errorf("%v: substitute(go env GOMODCACHE) = %q, want error", env, got)
+		if got, ok := modcache(scGo, nil); ok {
+			t.Errorf("%v: modcache = %q, want false", env, got)
 		}
 	}
 	goEnvTC := filepath.Join(parent, "goenv-tc")
@@ -2963,8 +3007,8 @@ func TestReachCoreReviewRegressions(t *testing.T) {
 		t.Fatal(err)
 	}
 	scGoTC := newScan(repo, makeEnv(map[string]string{"HOME": parent, "USERPROFILE": parent, "GOENV": goEnvTC}), work{deadline: time.Now().Add(time.Minute)})
-	if got, err := evalSubst(scGoTC, "go env GOPATH"); err == nil {
-		t.Errorf("GOENV GOTOOLCHAIN: substitute(go env GOPATH) = %q, want error", got)
+	if got, ok := gopath(scGoTC, nil); ok {
+		t.Errorf("GOENV GOTOOLCHAIN: gopath = %q, want false", got)
 	}
 
 	// 17. Invalid GIT_CONFIG_NOSYSTEM boolean fails closed in safeLocate.
@@ -2996,7 +3040,7 @@ func TestReachCoreReviewRegressions(t *testing.T) {
 		"DYLD_FALLBACK_LIBRARY_PATH", "DYLD_FALLBACK_FRAMEWORK_PATH",
 		"DYLD_ROOT_PATH", "DYLD_IMAGE_SUFFIX", "DYLD_SHARED_CACHE_DIR",
 	} {
-		scL := newScan(repo, makeEnv(map[string]string{"HOME": parent, "USERPROFILE": parent, k: "/tmp/hook.so"}), work{deadline: time.Now().Add(time.Minute)})
+		scL := newScan(repo, makeEnv(map[string]string{"HOME": parent, "USERPROFILE": parent, "PATH": testSysPath(), k: "/tmp/hook.so"}), work{deadline: time.Now().Add(time.Minute)})
 		if got, err := evalSubst(scL, "dirname /a/b"); err == nil {
 			t.Errorf("%s set: substitute(dirname) = %q, want error", k, got)
 		}
@@ -3023,6 +3067,29 @@ func TestReachCoreReviewRegressions(t *testing.T) {
 		scUnres.vars["SHELLOPTS"] = nil
 		if got, err := evalSubst(scUnres, "pwd"); err == nil {
 			t.Errorf("unresolved SHELLOPTS pwd = %q, want error", got)
+		}
+	}
+
+	// 21. Unset PATH fails closed for external command substitutions (only builtin pwd succeeds).
+	scNoPath := newScan(repo, makeEnv(map[string]string{"HOME": parent, "USERPROFILE": parent, "TMPDIR": parent, "TMP": parent, "GIT_CONFIG_NOSYSTEM": "1"}), work{deadline: time.Now().Add(time.Minute)})
+	for _, cmd := range []string{"dirname /a/b", "basename /a/b", "realpath .", "readlink -f .", "mktemp -d", "git rev-parse --show-toplevel", "go env GOPATH"} {
+		if got, err := evalSubst(scNoPath, cmd); err == nil {
+			t.Errorf("unset PATH substitute(%q) = %q, want error", cmd, got)
+		}
+	}
+	if got, err := evalSubst(scNoPath, "pwd"); err != nil || got != repo {
+		t.Errorf("unset PATH substitute(pwd) = (%q, %v), want (%q, nil)", got, err, repo)
+	}
+
+	// 22. mktemp fails closed when its synthetic template name already exists on disk (e.g. as a symlink).
+	collideTmp := filepath.Join(parent, "mktemp-collide")
+	if err := os.MkdirAll(collideTmp, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(repo, filepath.Join(collideTmp, "tmp.XXXXXXXXXX")); err == nil {
+		scCol := newScan(repo, makeEnv(map[string]string{"HOME": parent, "USERPROFILE": parent, "TMPDIR": collideTmp, "TMP": collideTmp, "PATH": testSysPath()}), work{deadline: time.Now().Add(time.Minute)})
+		if got, err := evalSubst(scCol, "mktemp -d"); err == nil {
+			t.Errorf("mktemp colliding symlink = %q, want error", got)
 		}
 	}
 }

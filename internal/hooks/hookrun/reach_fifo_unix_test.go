@@ -77,21 +77,43 @@ func TestWalkAndOpenNeverBlockOnDirToFIFOSwap(t *testing.T) {
 		t.Fatal(err)
 	}
 	slot := filepath.Join(dir, "slot")
-	tmp := filepath.Join(dir, "tmp-fifo")
+	link := filepath.Join(dir, "slot-link")
+	tmpLink := filepath.Join(dir, "tmp-link")
 	stop := make(chan struct{})
 	done := make(chan struct{})
+	swapErr := make(chan error, 1)
 	go func() {
 		defer close(done)
+		toFIFO := false
 		for {
 			select {
 			case <-stop:
 				return
 			default:
+				toFIFO = !toFIFO
 				_ = os.Remove(slot)
-				_ = os.Mkdir(slot, 0o700)
-				_ = os.Remove(tmp)
-				_ = syscall.Mkfifo(tmp, 0o600)
-				_ = os.Rename(tmp, slot)
+				if toFIFO {
+					if err := syscall.Mkfifo(slot, 0o600); err != nil {
+						swapErr <- err
+						return
+					}
+				} else if err := os.Mkdir(slot, 0o700); err != nil {
+					swapErr <- err
+					return
+				}
+				_ = os.Remove(tmpLink)
+				target := sub
+				if toFIFO {
+					target = fifo
+				}
+				if err := os.Symlink(target, tmpLink); err != nil {
+					swapErr <- err
+					return
+				}
+				if err := os.Rename(tmpLink, link); err != nil {
+					swapErr <- err
+					return
+				}
 			}
 		}
 	}()
@@ -100,12 +122,19 @@ func TestWalkAndOpenNeverBlockOnDirToFIFOSwap(t *testing.T) {
 		for range 40 {
 			sc := newScan(dir, func(string) (string, bool) { return "", false }, work{deadline: time.Now().Add(2 * time.Second)})
 			sc.candidate("slot/leaf", plain)
+			sc.candidate("slot-link/leaf", plain)
 			_ = sc.readDir(slot)
+			_ = sc.readDir(link)
 			_, _ = sc.readSmallFile(fifo)
+			_, _ = sc.readSmallFile(link)
 		}
 		errCh <- struct{}{}
 	}()
 	select {
+	case err := <-swapErr:
+		close(stop)
+		<-done
+		t.Fatalf("swapper failed: %v", err)
 	case <-errCh:
 	case <-time.After(3 * time.Second):
 		close(stop)

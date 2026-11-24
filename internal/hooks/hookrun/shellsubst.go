@@ -47,12 +47,11 @@ func (sc *scan) substitute(w io.Writer, cs *syntax.CmdSubst) error {
 	return errOpaque
 }
 func (sc *scan) trustedCmd(name string) (string, bool) {
-	pathEnv, hasPath := sc.lookup("PATH")
-	if bad := slices.ContainsFunc([]string{"BASH_FUNC_" + name + "%%", "BASH_FUNC_" + name + "()"}, func(k string) bool { _, ok := sc.env(k); return ok }) || slices.ContainsFunc(pick(name == "pwd", []string{"BASH_ENV", "ENV"}, []string{"BASH_ENV", "ENV", "LD_PRELOAD", "LD_AUDIT", "LD_LIBRARY_PATH", "LD_ORIGIN_PATH", "GCONV_PATH", "LOCPATH", "DYLD_INSERT_LIBRARIES", "DYLD_LIBRARY_PATH", "DYLD_FRAMEWORK_PATH", "DYLD_VERSIONED_LIBRARY_PATH", "DYLD_VERSIONED_FRAMEWORK_PATH", "DYLD_FALLBACK_LIBRARY_PATH", "DYLD_FALLBACK_FRAMEWORK_PATH", "DYLD_ROOT_PATH", "DYLD_IMAGE_SUFFIX", "DYLD_SHARED_CACHE_DIR"}), func(k string) bool { return sc.isUnresolvedVar(k) || sc.envVal(k) != "" }); bad || name == "pwd" || !hasPath && !sc.isUnresolvedVar("PATH") {
+	if bad := slices.ContainsFunc([]string{"BASH_FUNC_" + name + "%%", "BASH_FUNC_" + name + "()"}, func(k string) bool { _, ok := sc.env(k); return ok }) || slices.ContainsFunc(pick(name == "pwd", []string{"BASH_ENV", "ENV"}, []string{"BASH_ENV", "ENV", "LD_PRELOAD", "LD_AUDIT", "LD_LIBRARY_PATH", "LD_ORIGIN_PATH", "GCONV_PATH", "LOCPATH", "DYLD_INSERT_LIBRARIES", "DYLD_LIBRARY_PATH", "DYLD_FRAMEWORK_PATH", "DYLD_VERSIONED_LIBRARY_PATH", "DYLD_VERSIONED_FRAMEWORK_PATH", "DYLD_FALLBACK_LIBRARY_PATH", "DYLD_FALLBACK_FRAMEWORK_PATH", "DYLD_ROOT_PATH", "DYLD_IMAGE_SUFFIX", "DYLD_SHARED_CACHE_DIR"}), func(k string) bool { return sc.isUnresolvedVar(k) || sc.envVal(k) != "" }); bad || name == "pwd" {
 		return "", !bad
 	}
 	exts, roots := pick(runtime.GOOS == "windows", []string{"", ".exe", ".cmd", ".bat", ".com"}, []string{""}), pick(runtime.GOOS == "windows", []string{"/program files/", "/program files (x86)/", "/windows/system32/"}, []string{"/bin/", "/usr/bin/", "/usr/lib/", "/usr/local/bin/", "/Library/Developer/", "/Applications/Xcode.app/", "/usr/local/go/bin/"})
-	for _, d := range pick(sc.isUnresolvedVar("PATH") || pathEnv == "", []string{""}, filepath.SplitList(pathEnv)) {
+	for _, d := range pick(sc.isUnresolvedVar("PATH") || sc.envVal("PATH") == "", []string{""}, filepath.SplitList(sc.envVal("PATH"))) {
 		if d == "" || !filepath.IsAbs(d) {
 			return "", false
 		}
@@ -133,8 +132,10 @@ func mktemp(sc *scan, args []*syntax.Word) (string, bool) {
 	}
 	dir, base := pick(name == "" || tmp, pick(runtime.GOOS == "windows", cmp.Or(sc.envVal("TMP"), sc.envVal("TEMP"), sc.envVal("USERPROFILE")), cmp.Or(sc.envVal("TMPDIR"), "/tmp")), sc.dir), cmp.Or(name, "tmp.XXXXXXXXXX")
 	if rDir, _, info, found := sc.walkPath(dir, true); dir != "" && found && info.IsDir() {
-		sc.created[pick(runtime.GOOS == "windows", strings.ToLower(filepath.Join(rDir, base)), filepath.Join(rDir, base))] = true
-		return filepath.Join(dir, base), true
+		if _, _, _, exists := sc.walkPath(filepath.Join(rDir, base), false); !exists && !sc.unknown {
+			sc.created[pick(runtime.GOOS == "windows", strings.ToLower(filepath.Join(rDir, base)), filepath.Join(rDir, base))] = true
+			return filepath.Join(dir, base), true
+		}
 	}
 	return "", false
 }
