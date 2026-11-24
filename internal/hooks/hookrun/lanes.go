@@ -102,14 +102,16 @@ func (e Env) unpark(r *Repo) {
 			}
 			events = append(events, ev)
 		}
+		moved = len(events) > 0
+		if moved {
+			if err := e.Spool.AppendAsCollected(events...); err != nil {
+				return err
+			}
+		}
 		if noDest > 0 {
 			if err := e.Spool.CountLost(LostNoDestination, noDest); err != nil {
 				return err
 			}
-		}
-		moved = len(events) > 0
-		if moved {
-			return e.Spool.AppendAsCollected(events...)
 		}
 		return nil
 	})
