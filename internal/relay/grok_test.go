@@ -211,12 +211,13 @@ func TestRelayHoldsAnUnclaimedGrokSessionInGlobalMode(t *testing.T) {
 	}
 }
 
-// dress is the one step a part goes through on its way out, to a single team's outbox or to a
-// routed team's, and filterQueued the one that applies a team's policy again as a queued body
-// leaves. So the home stamp rides on a grok part by either route: with tool content under the
-// policy the part is dressed with, gone again if that policy has tightened by the time it is
-// sent, and never on a part of an agent that declares no home-relative scope.
-func TestDressStampsHomeOnGrokPartsByEitherRoute(t *testing.T) {
+// dress is the one step a part goes through on its way out, and filterQueued the one that
+// applies a team's policy again as a queued body leaves, from one team's outbox or a routed
+// team's. Called directly here: dress stamps the home directory on a grok part with tool
+// content under the policy it is given and on no other agent's part, and filterQueued takes
+// it off again if the policy has tightened by the time the body is sent.
+// TestRoutedGrokPartCarriesItsStamps drives the routed path itself.
+func TestDressAndFilterQueuedCarryTheHomeStamp(t *testing.T) {
 	t.Parallel()
 	r := newRelay(Options{Dir: t.TempDir(), Token: token, HomeDir: grokHome})
 	ran := claim.Claim{ProjectID: "p1", Tool: "grok", Root: "/work/repo", Cwd: "/work/repo"}
@@ -264,5 +265,63 @@ func TestDressStampsHomeOnGrokPartsByEitherRoute(t *testing.T) {
 	r.dress(open, p, "p1", ran, attribution{})
 	if home, root := stamps(p.msg.(*logspb.LogsData)); home != "" || root != "/work/repo" {
 		t.Errorf("another agent's part with tool content: home %q, root %q", home, root)
+	}
+}
+
+// The routed path itself: a grok subagent's part, sent by a Router to a team's queue, leaves
+// with the home directory, its own checkout and its parent under a team policy that collects
+// tool content, and with its parent alone under one that withholds it.
+func TestRoutedGrokPartCarriesItsStamps(t *testing.T) {
+	t.Parallel()
+	for name, content := range map[string]bool{"tool content collected": true, "tool content withheld": false} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			u := newSignInUpstream(t)
+			router := &stubRouter{
+				active: true,
+				routeFn: func(rec Record) Routed {
+					return Routed{Outcome: Send, Queued: Queued{Enrollment: "enr_1", Project: "proj_1", Account: accountA, Kind: "team", Session: rec.Session, At: rec.At, EndAt: rec.EndAt}}
+				},
+				resolveFn: func(_, _, account string) (Policy, error) {
+					return Policy{Endpoint: u.srv.URL, Account: account, User: "usr_a", UserAccount: account, IncludePrompts: true, IncludeToolContent: content}, nil
+				},
+			}
+			_, srv := startTeamRelay(t, Options{
+				SignIn: &testSignIn{account: accountA}, Router: router, HomeDir: grokHome,
+				Lookup: func(string, time.Time) (claim.Claim, bool) {
+					return claim.Claim{ProjectID: "proj_1", Tool: "grok", Parent: grokParent, Root: "/work/repo-child", Cwd: "/work/repo-child", Worktree: "subagent"}, true
+				},
+			})
+			logs := &logspb.LogsData{ResourceLogs: []*logspb.ResourceLogs{{
+				Resource: &resourcepb.Resource{},
+				ScopeLogs: []*logspb.ScopeLogs{{
+					Scope: &commonpb.InstrumentationScope{Name: "ai.xai.grok_code"},
+					LogRecords: []*logspb.LogRecord{{
+						TimeUnixNano: uint64(time.Now().UnixNano()),
+						Attributes:   []*commonpb.KeyValue{kv("session.id", grokChild)},
+					}},
+				}},
+			}}}
+			if code := post(t, srv, "/v1/logs", mustMarshal(t, logs), "application/x-protobuf", token, false); code != http.StatusOK {
+				t.Fatalf("the relay answered %d", code)
+			}
+			waitFor(t, func() bool { return len(u.requests()) == 1 })
+			var got logspb.LogsData
+			if err := proto.Unmarshal(u.bodies()[0], &got); err != nil || len(got.ResourceLogs) != 1 {
+				t.Fatalf("the routed body: %v", err)
+			}
+			res := got.ResourceLogs[0].Resource.Attributes
+			home, root, parent := attr(res, semconv.TermaHomeDirectoryKey), attr(res, semconv.TermaRepositoryRootKey), attr(res, semconv.TermaSessionParentIDKey)
+			wantHome, wantRoot := "", ""
+			if content {
+				wantHome, wantRoot = grokHome, "/work/repo-child"
+			}
+			if home != wantHome || root != wantRoot || parent != grokParent {
+				t.Errorf("home %q, root %q, parent %q; want %q, %q, %q", home, root, parent, wantHome, wantRoot, grokParent)
+			}
+			if project := attr(res, semconv.MiradorProjectIDKey); project != "proj_1" {
+				t.Errorf("project %q", project)
+			}
+		})
 	}
 }
