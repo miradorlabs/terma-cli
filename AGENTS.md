@@ -128,7 +128,9 @@ other (`shape.CaptureRules.HomeRelativeScopes`: grok's), it also stamps that dir
 tool content (`terma.home_directory`, `Options.HomeDir`). A subagent's
 claim names the session that opened it where the agent's own telemetry does not (OMP's and
 grok's, `hookrun.Env.StartSubagent`), which the relay stamps as `terma.session.parent.id`
-(`stampParent`). Hook events never pass the relay, so delivery applies
+(`stampParent`). grok's `PostToolUse` hook also sends the call that launched a subagent
+(`terma.subagent.call`) and, when the parent waits on or kills a background one, how it
+ended (`terma.subagent.end`). Hook events never pass the relay, so delivery applies
 the same rules when it sends them. Antigravity has no export, so its hooks send its content
 too: the prompt and the reply from the transcript, a tool call's arguments from `PostToolUse`
 and each tool's result as `terma.tool.result`. Which of it may go is ruled in

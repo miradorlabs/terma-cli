@@ -2,7 +2,7 @@
   "hooks": {
     "PostToolUse": [
       {
-        "matcher": "search_replace|write",
+        "matcher": "search_replace|write|spawn_subagent|get_command_or_subagent_output|kill_command_or_subagent",
         "hooks": [
           {
             "type": "command",

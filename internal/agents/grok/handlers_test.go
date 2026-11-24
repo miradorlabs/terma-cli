@@ -205,7 +205,7 @@ func (r *replayRun) sessions(t *testing.T) (all, children []string) {
 	return all, children
 }
 
-var fixtures = []string{"headless_subagent_worktree", "tui_multi_turn_compact_new_clear", "headless_edit_background_subagent", "headless_fork_2_fork_session"}
+var fixtures = []string{"headless_subagent_worktree", "tui_multi_turn_compact_new_clear", "headless_edit_background_subagent", "headless_fork_2_fork_session", subagentsFixture}
 
 // Every session grok ran is claimed for the team, once, as grok's; a subagent's claim names
 // the session that opened it, which SubagentStart named, and no other claim names a parent.

@@ -26,8 +26,11 @@ type grokHookInput struct {
 	ToolUseID string `json:"tool_use_id"`
 	ToolInput struct {
 		FilePath string `json:"file_path"`
+		// Background is spawn_subagent's: whether the subagent runs while the parent goes on.
+		Background json.RawMessage `json:"background"`
 	} `json:"tool_input"`
-	// ToolResponse is the tool's result; only its type and whether it applied an edit are read.
+	// ToolResponse is the tool's result; only its type, whether it applied an edit, and the
+	// subagent fields subagent.go names are read.
 	ToolResponse json.RawMessage `json:"tool_response"`
 	// SubagentID is the child's session, on SubagentStart, where session_id is the parent.
 	SubagentID string `json:"subagentId"`
@@ -69,6 +72,7 @@ func sessionStart(ctx context.Context, env hookrun.Env) error {
 		return nil
 	}
 	env.Announce(r, sess, nil)
+	env.PruneSubagents(subagentDir)
 	return nil
 }
 
@@ -97,9 +101,10 @@ func stop(_ context.Context, env hookrun.Env) error {
 	return nil
 }
 
-// postToolUse records an edit grok's tool applied, with its call id, which the export's
-// tool_use_id joins: a touch names its checkout, and the platform reads that as proof the file
-// changed. So only a result that proves the edit sends one, search_replace's
+// postToolUse records an edit grok's tool applied, or, for the subagent tools, what the
+// parent's call says of a subagent (subagentTool). An edit is touched with its call id, which
+// the export's tool_use_id joins: a touch names its checkout, and the platform reads that as
+// proof the file changed. So only a result that proves the edit sends one, search_replace's
 // {"type":"SearchReplace","EditsApplied":{…}}; any other result, a write's included, whose
 // shape is not known, sends none. A subagent's touch names its agent; the manifest stays the
 // session's.
@@ -107,6 +112,11 @@ func postToolUse(ctx context.Context, env hookrun.Env) error {
 	in, err := readInput(env.Stdin)
 	if err != nil {
 		env.Logf("%v", err)
+		return nil
+	}
+	switch in.ToolName {
+	case toolSpawnSubagent, toolTaskOutput, toolKillTask:
+		subagentTool(ctx, env, in)
 		return nil
 	}
 	if !session.ValidID(in.SessionID) || in.ToolInput.FilePath == "" || !editsApplied(in.ToolResponse) {

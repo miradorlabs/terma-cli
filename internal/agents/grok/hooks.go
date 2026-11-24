@@ -18,7 +18,8 @@ const (
 )
 
 // grokHooks are the hooks terma's file runs. No PreToolUse (a process per tool call for
-// nothing), and no compaction, notification or permission hooks.
+// nothing), no SubagentStop (it says only that a subagent stopped, not how), and no
+// compaction, notification or permission hooks.
 var grokHooks = []struct {
 	Event   string
 	Matcher string
@@ -28,8 +29,9 @@ var grokHooks = []struct {
 	// The one hook before a turn exports anything, so the relay is up and the session claimed
 	// first. It must print nothing: grok hands its stdout to the model.
 	{"UserPromptSubmit", "", eventUserPromptSubmit},
-	// Only an edit tool's result can prove an edit.
-	{"PostToolUse", "search_replace|write", eventPostToolUse},
+	// Only an edit tool's result can prove an edit; the subagent tools' results in the parent
+	// say which call launched a subagent and, for a background one, how it ended.
+	{"PostToolUse", "search_replace|write|spawn_subagent|get_command_or_subagent_output|kill_command_or_subagent", eventPostToolUse},
 	{"SubagentStart", "", eventSubagentStart},
 	{"Stop", "", eventStop},
 	{"SessionEnd", "", eventSessionEnd},

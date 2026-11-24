@@ -1,8 +1,8 @@
 // Package grok integrates xAI's grok CLI (Grok Build): its native OTLP log export, pointed at
 // the local relay through [telemetry] in grok's config.toml (harness.go), and terma's own
 // hooks file in grok's hooks directory, which claims each session for its repository, carries
-// the prompt (prompt.go), names a subagent's parent (subagent.go) and reports file edits
-// (handlers.go).
+// the prompt (prompt.go), names a subagent's parent, the call that launched it and how a
+// background one ended (subagent.go), and reports file edits (handlers.go).
 package grok
 
 import (
@@ -91,6 +91,9 @@ func (Agent) Coverage() (attribution, telemetry agents.CapabilitySupport) {
 		agents.CapabilitySupport{Level: agents.SupportFull, Note: "model calls with tokens and grok's own cost, replies, tool calls and compaction ride grok's native OTLP logs to the local relay; terma's hooks report sessions, prompts, subagent parents and edits. A sandboxed session is not collected"}
 }
 
+// StateDirs are the directories its hooks keep state in.
+func (Agent) StateDirs() []string { return []string{subagentDir} }
+
 // ContentConsented is the consent a prompt's text travels under: grok among the developer's
 // agents, or global mode.
 func (Agent) ContentConsented(c hookrun.Consent) bool {
@@ -106,4 +109,5 @@ var (
 	_ agents.HookStarter     = Agent{}
 	_ agents.ContentConsent  = Agent{}
 	_ agents.VersionReporter = Agent{}
+	_ agents.StateKeeper     = Agent{}
 )

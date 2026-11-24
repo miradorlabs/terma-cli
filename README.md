@@ -575,13 +575,14 @@ reach the relay. grok rewrites the file in its own form when it saves a setting,
 its comments; terma compares the keys by value, so that rewrite does not undo setup.
 
 Setup also writes its own hooks file, `~/.grok/hooks/terma.json`, and leaves grok's other
-hooks files alone. Its hooks claim each session for your team, send each prompt, name the
-session a subagent was opened from, and report the files grok's `search_replace` tool edits,
-for commit attribution. grok's export can lose the prompt of a headless run, so the prompt
-comes from the hook: always counted, with its text only while you chose Grok Build at setup
-(or in global mode) and the team's policy collects prompts. grok also runs the entries in
-Claude Code's and Cursor's hooks files; terma's Claude Code and Cursor hooks do nothing inside
-grok, so a grok session is never recorded as theirs.
+hooks files alone. Its hooks claim each session for your team, send each prompt, and report
+the files grok's `search_replace` tool edits, for commit attribution. For a subagent they name
+the session it was opened from and the call that launched it, and how a background one ended
+when its parent waits on it or kills it. grok's export can lose the prompt of a headless run,
+so the prompt comes from the hook: always counted, with its text only while you chose Grok
+Build at setup (or in global mode) and the team's policy collects prompts. grok also runs the
+entries in Claude Code's and Cursor's hooks files; terma's Claude Code and Cursor hooks do
+nothing inside grok, so a grok session is never recorded as theirs.
 
 Adding terma's hooks file gives grok a user hook. In a folder grok does not trust yet, its
 interactive mode then asks "Do you trust the contents of this directory?" before anything
