@@ -103,11 +103,9 @@ func decideBindings(planned *routing.State, tk *tick, a tickAsker) error {
 		}
 	} else {
 		for _, e := range need {
-			op, err := askBinding(a, tk, e.Key(), "needed by "+e.Raw)
-			if err != nil {
+			if op, err := askBinding(a, tk, e.Key(), "needed by "+e.Raw); err != nil {
 				return err
-			}
-			if op != nil {
+			} else if op != nil {
 				if err := addTickOp(planned, tk, a, *op); err != nil {
 					return err
 				}
@@ -169,13 +167,12 @@ func decideOwners(planned *routing.State, tk *tick, need []routing.Entry, a tick
 				{Label: "the whole owner " + owner, Note: "every repository under it belongs to " + cmp.Or(tk.orgName, "the organization")},
 				{Label: "decide later", Note: "what they match is held until you decide"},
 			})
-			if err != nil {
+			switch {
+			case err != nil:
 				return err
-			}
-			if i == 2 {
+			case i == 2:
 				continue
-			}
-			if i == 1 {
+			case i == 1:
 				keys = []string{owner}
 			}
 		} else if !a.assumeYes {

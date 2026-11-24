@@ -2,7 +2,6 @@ package cli
 
 import (
 	"cmp"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -15,6 +14,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/routing"
 	"github.com/miradorlabs/terma-cli/internal/sendas"
+	"github.com/miradorlabs/terma-cli/internal/ui/output"
 	"github.com/miradorlabs/terma-cli/internal/ui/style"
 )
 
@@ -62,6 +62,16 @@ Each record goes to the most specific ticked team policy that matches where it r
 }
 
 func (app *App) runTeams(cmd *cobra.Command, f teamsFlags) error {
+	if app.flags.output != "" {
+		switch format, err := app.resolveFormat(); {
+		case err != nil:
+			return err
+		case format == output.FormatJSON:
+			f.json = true
+		case format != output.FormatTable:
+			return fmt.Errorf("`terma teams` supports table and json output, not %s", format)
+		}
+	}
 	cfg, err := app.loadConfig()
 	if err != nil {
 		return err
@@ -96,9 +106,7 @@ func (app *App) runTeams(cmd *cobra.Command, f teamsFlags) error {
 		return err
 	}
 	if f.json {
-		enc := json.NewEncoder(cmd.OutOrStdout())
-		enc.SetIndent("", "  ")
-		return enc.Encode(v)
+		return output.Render(cmd.OutOrStdout(), output.FormatJSON, output.Table{}, v)
 	}
 	renderTeams(cmd.OutOrStdout(), v)
 	return nil

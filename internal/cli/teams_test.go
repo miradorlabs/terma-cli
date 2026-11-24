@@ -140,6 +140,35 @@ func TestTeamsHasNoAuthorizeOrOrgReauthFlags(t *testing.T) {
 	}
 }
 
+func TestTeamsHonorsPersistentOutputFlag(t *testing.T) {
+	routedMachine(t, "alice", nil)
+	prevAsk, prevForm := testApp.canAsk, testApp.runForm
+	t.Cleanup(func() { testApp.canAsk, testApp.runForm = prevAsk, prevForm })
+	testApp.canAsk = func() bool { return true }
+	testApp.runForm = func(*prompt.Form) ([]prompt.Item, error) {
+		t.Fatal("interactive checklist must not open under --output json")
+		return nil, nil
+	}
+
+	stdout, stderr, err := termaRun{}.exec(t, "teams", "--output", "json")
+	if err != nil {
+		t.Fatalf("teams --output json: %v\n%s\n%s", err, stdout, stderr)
+	}
+	var v teamsView
+	if err := json.Unmarshal([]byte(stdout), &v); err != nil {
+		t.Fatalf("teams --output json emitted non-JSON (%v):\n%s", err, stdout)
+	}
+	if _, _, ok := v.row(orgA().ID, acmeAPI); !ok {
+		t.Fatalf("teams --output json missing Acme API: %+v", v.Organizations)
+	}
+	for _, bad := range []string{"yaml", "csv", "bogus"} {
+		_, _, err := termaRun{}.exec(t, "teams", "--output", bad)
+		if err == nil {
+			t.Errorf("teams --output %s succeeded, want error", bad)
+		}
+	}
+}
+
 // Invariant 1 & 5: single user token lists all organizations and teams immediately without
 // per-org authorization; 403 PROJECT_NOT_FOUND hides deleted teams cleanly while bare 403
 // stays listed as unreadable.

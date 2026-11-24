@@ -2,6 +2,7 @@ package cli
 
 import (
 	"encoding/json"
+	"maps"
 	"os"
 	"path/filepath"
 
@@ -25,17 +26,13 @@ func teamNamesPath(stateDir, profile string) (string, bool) {
 }
 
 func loadTeamNames(stateDir, profile string) teamNames {
-	var n teamNames
+	n := teamNames{Teams: map[string]string{}, Orgs: map[string]string{}}
 	if path, ok := teamNamesPath(stateDir, profile); ok {
-		if b, err := os.ReadFile(path); err == nil {
-			_ = json.Unmarshal(b, &n)
+		var raw teamNames
+		if b, err := os.ReadFile(path); err == nil && json.Unmarshal(b, &raw) == nil {
+			maps.Copy(n.Teams, raw.Teams)
+			maps.Copy(n.Orgs, raw.Orgs)
 		}
-	}
-	if n.Teams == nil {
-		n.Teams = map[string]string{}
-	}
-	if n.Orgs == nil {
-		n.Orgs = map[string]string{}
 	}
 	return n
 }

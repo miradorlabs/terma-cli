@@ -140,7 +140,6 @@ type listedOrg struct {
 	err   error
 	teams []listedTeam
 }
-
 type listedTeam struct {
 	project
 	policy config.Policy
@@ -197,13 +196,12 @@ func (app *App) teamsAPIClient(cfg *config.Config, account string) (*api.Client,
 		return nil, errServerKeyTeams
 	}
 	cred, err := auth.LoadCredential(app.dir, cfg.ProfileName)
-	if errors.Is(err, auth.ErrNotLoggedIn) {
+	switch {
+	case errors.Is(err, auth.ErrNotLoggedIn):
 		return nil, errors.New(app.notSignedIn())
-	}
-	if err != nil {
+	case err != nil:
 		return nil, err
-	}
-	if account != "" && cred.Account() != account {
+	case account != "" && cred.Account() != account:
 		return nil, fmt.Errorf("%w: stored sign-in belongs to another account — run `terma setup`", routing.ErrAccountMismatch)
 	}
 	return api.New(cfg, api.Options{Version: app.version, Credential: cred})
