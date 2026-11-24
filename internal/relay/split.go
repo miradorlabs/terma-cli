@@ -330,31 +330,25 @@ func (ru *rules) conversationStart(p *part) bool {
 type timeInterval struct{ start, end uint64 }
 
 func makeInterval(a, b uint64) timeInterval {
-	if a == 0 {
-		return timeInterval{b, b}
-	}
-	if b == 0 {
-		return timeInterval{a, a}
+	if a == 0 || b == 0 {
+		v := max(a, b)
+		return timeInterval{v, v}
 	}
 	return timeInterval{min(a, b), max(a, b)}
 }
-
 func unixTime(ns uint64) time.Time {
 	if ns == 0 || ns > math.MaxInt64 {
 		return time.Time{}
 	}
 	return time.Unix(0, int64(ns))
 }
-
 func intervalOf(msg proto.Message) (time.Time, time.Time) {
 	var first, last uint64
 	see := func(iv timeInterval) {
 		if iv.start != 0 && (first == 0 || iv.start < first) {
 			first = iv.start
 		}
-		if iv.end > last {
-			last = iv.end
-		}
+		last = max(last, iv.end)
 	}
 	switch m := msg.(type) {
 	case *logspb.LogsData:

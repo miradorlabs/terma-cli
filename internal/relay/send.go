@@ -193,15 +193,17 @@ func (r *Relay) recoverOutbox() {
 	teams, _ := r.outbox.teamRoutes()
 	for _, rt := range teams {
 		r.deliverMu.Lock()
-		if entries, err := r.outbox.listTeam(rt); err == nil {
-			entries = slices.DeleteFunc(entries, func(e entry) bool { return e.corrupt })
-			if len(entries) > 0 {
-				s := r.teamSender(rt)
-				for _, e := range s.recover(entries) {
-					r.stats.add("recovered_from_outbox", e.records)
-				}
-				s.poke()
+		entries, err := r.outbox.listTeam(rt)
+		if err != nil {
+			r.warnf("outbox %s: %v", rt, err)
+		}
+		entries = slices.DeleteFunc(entries, func(e entry) bool { return e.corrupt })
+		if len(entries) > 0 {
+			s := r.teamSender(rt)
+			for _, e := range s.recover(entries) {
+				r.stats.add("recovered_from_outbox", e.records)
 			}
+			s.poke()
 		}
 		r.deliverMu.Unlock()
 	}

@@ -21,37 +21,70 @@ type Router interface {
 	Selected(enrollment, account string) bool
 }
 
-// Record is the telemetry interval and placement metadata supplied to Router.Route.
-type Record struct {
-	Session         string
-	Placement       claim.Claim
-	Placed          bool
-	At, EndAt       time.Time
-	Account         string
-	Narrow, Claimed bool
+// Rechecker re-evaluates destination-pinned parts under a single routing state snapshot.
+type Rechecker interface {
+	Generation() int64
+	TeamWaits() (Rechecked, bool)
+	Entry(q Queued) Rechecked
 }
 
-// EffectiveEnd returns EndAt when set, otherwise At.
-func (rec Record) EffectiveEnd() time.Time { return nonZeroTime(rec.EndAt, rec.At) }
+type (
+	// Outcome classifies Router.Route's placement decision for a telemetry part.
+	Outcome int
+	// Why names the reason a routed part is held or dropped.
+	Why string
+	// Verdict classifies a Rechecker's decision for a destination-pinned or queued part.
+	Verdict int
+	// Record is the telemetry interval and placement metadata supplied to Router.Route.
+	Record struct {
+		Session, Account        string
+		Placement               claim.Claim
+		At, EndAt               time.Time
+		Placed, Narrow, Claimed bool
+	}
+	// Routed is the decision returned by Router.Route for a telemetry part.
+	Routed struct {
+		Outcome Outcome
+		Queued  Queued
+		Why     Why
+		Blocker string
+		MixedAt time.Time
+	}
+	// Rechecked is the verdict returned by a Rechecker for a pinned or queued entry.
+	Rechecked struct {
+		Verdict Verdict
+		Why     Why
+		Blocker string
+		MixedAt time.Time
+	}
+	// Queued is a routed record's pinned destination in pinnedHold and .teams/ outbox headers.
+	Queued struct {
+		Profile    string    `json:"profile,omitempty"`
+		Enrollment string    `json:"enrollment"`
+		Project    string    `json:"project"`
+		Account    string    `json:"account,omitempty"`
+		Kind       string    `json:"kind"`
+		Repository string    `json:"repository,omitempty"`
+		Narrow     bool      `json:"narrow,omitempty"`
+		HoldKey    string    `json:"hold_key,omitempty"`
+		Session    string    `json:"session,omitempty"`
+		Run        string    `json:"run,omitempty"`
+		At         time.Time `json:"at,omitzero"`
+		EndAt      time.Time `json:"end_at,omitzero"`
+	}
+	teamState struct {
+		pinnedHold  map[string][]heldPart
+		teamSenders map[teamRoute]*sender
+		mixedSeen   map[string]time.Time
+		nudging     map[string]bool
+	}
+)
 
-// Outcome is the routing decision returned by Router.Route.
-type Outcome int
-
-// Why is the canonical routing drop or hold reason code.
-type Why string
-
-// Verdict is the recheck decision returned by Rechecker.
-type Verdict int
-
-// Routing outcomes returned by Router.Route.
+// Routing outcomes, recheck verdicts, and hold/drop reasons.
 const (
 	Hold Outcome = iota
 	Send
 	Drop
-)
-
-// Recheck verdicts and canonical routing drop/hold reasons.
-const (
 	Wait Verdict = iota
 	SendNow
 	Discard
@@ -66,67 +99,15 @@ const (
 
 func (w Why) reason() string { return cmp.Or(string(w), string(WhyUnknown)) }
 
-// Routed is the decision returned by Router.Route for a telemetry part.
-type Routed struct {
-	Outcome Outcome
-	Queued  Queued
-	Why     Why
-	Blocker string
-	MixedAt time.Time
-}
+// EffectiveEnd returns rec.EndAt when present, falling back to rec.At.
+func (rec Record) EffectiveEnd() time.Time { return nonZeroTime(rec.EndAt, rec.At) }
 
-// Rechecker re-evaluates destination-pinned parts under a single routing state snapshot.
-type Rechecker interface {
-	Generation() int64
-	TeamWaits() (Rechecked, bool)
-	Entry(q Queued) Rechecked
-}
-
-// Rechecked is the verdict returned by a Rechecker for a pinned or queued entry.
-type Rechecked struct {
-	Verdict Verdict
-	Why     Why
-	Blocker string
-	MixedAt time.Time
-}
-
-// Queued is a routed record's pinned destination in pinnedHold and .teams/ outbox headers.
-type Queued struct {
-	Profile    string    `json:"profile,omitempty"`
-	Enrollment string    `json:"enrollment"`
-	Project    string    `json:"project"`
-	Account    string    `json:"account,omitempty"`
-	Kind       string    `json:"kind"`
-	Repository string    `json:"repository,omitempty"`
-	Narrow     bool      `json:"narrow,omitempty"`
-	HoldKey    string    `json:"hold_key,omitempty"`
-	Session    string    `json:"session,omitempty"`
-	Run        string    `json:"run,omitempty"`
-	At         time.Time `json:"at,omitzero"`
-	EndAt      time.Time `json:"end_at,omitzero"`
-}
-
-// EffectiveEnd returns EndAt when set, otherwise At.
-func (q Queued) EffectiveEnd() time.Time { return nonZeroTime(q.EndAt, q.At) }
-func nonZeroTime(a, b time.Time) time.Time {
-	if !a.IsZero() {
-		return a
-	}
-	return b
-}
-
-type teamState struct {
-	pinnedHold  map[string][]heldPart
-	teamSenders map[teamRoute]*sender
-	mixedSeen   map[string]time.Time
-	nudging     map[string]bool
-}
-
+// EffectiveEnd returns q.EndAt when present, falling back to q.At.
+func (q Queued) EffectiveEnd() time.Time   { return nonZeroTime(q.EndAt, q.At) }
+func nonZeroTime(a, b time.Time) time.Time { return map[bool]time.Time{true: a, false: b}[!a.IsZero()] }
 func (r *Relay) initTeams() {
-	r.pinnedHold, r.teamSenders = map[string][]heldPart{}, map[teamRoute]*sender{}
-	r.mixedSeen, r.nudging = map[string]time.Time{}, map[string]bool{}
+	r.pinnedHold, r.teamSenders, r.mixedSeen, r.nudging = map[string][]heldPart{}, map[teamRoute]*sender{}, map[string]time.Time{}, map[string]bool{}
 }
-
 func (r *Relay) teams() bool { return r.opts.Router != nil && r.opts.Router.Active() }
 func (r *Relay) takesUnplaced() bool {
 	if r.teams() {
@@ -135,11 +116,8 @@ func (r *Relay) takesUnplaced() bool {
 	_, global := r.catchAll()
 	return global
 }
-
 func (r *Relay) decideTeams(key string, p *part) verdict {
-	rec := Record{At: p.at, EndAt: p.endAt, Account: p.account, Narrow: p.narrow, Claimed: p.claimed}
-	var how attribution
-	var held string
+	rec, how, held := Record{At: p.at, EndAt: p.endAt, Account: p.account, Narrow: p.narrow, Claimed: p.claimed}, attribution{}, ""
 	if pid, ok := procOf(key); ok {
 		rec.Session, held = r.exitedSession(pid)
 	} else if rec.Session = r.sessionFor(key); rec.Session == "" {
@@ -187,7 +165,7 @@ func (r *Relay) decideTeams(key string, p *part) verdict {
 			v.why = held
 		}
 	case Send:
-		if pol, ok := r.resolveTeam(q.Enrollment, rec.Placement.Tool, p.account, 0); ok && r.mayLeaveAccount(p.account, pol.Key != "") && pol.resolvedFor(p.account) {
+		if pol, ok := r.resolveTeam(q.Enrollment, rec.Placement.Tool, p.account, false); ok && r.mayLeaveAccount(p.account, pol.Key != "") && pol.resolvedFor(p.account) {
 			v.ok, v.why, v.pol, v.q, v.how = true, "", pol, &q, how
 		} else {
 			v.why, v.pin, v.how = whyNoKey, &q, how
@@ -195,10 +173,9 @@ func (r *Relay) decideTeams(key string, p *part) verdict {
 	}
 	return v
 }
-
-func (r *Relay) resolveTeam(enrollment, tool, account string, gen int64) (Policy, bool) {
+func (r *Relay) resolveTeam(enrollment, tool, account string, fresh bool) (Policy, bool) {
 	now, key := r.opts.Now(), "\x01team\x00"+account+"\x00"+enrollment+"\x00"+tool
-	if ttl := r.opts.PolicyCacheTTL; ttl > 0 && gen == 0 {
+	if ttl := r.opts.PolicyCacheTTL; ttl > 0 && !fresh {
 		r.cache.mu.Lock()
 		e, hit := r.cache.policies[key]
 		r.cache.mu.Unlock()
@@ -215,19 +192,15 @@ func (r *Relay) resolveTeam(enrollment, tool, account string, gen int64) (Policy
 	}
 	return pol, ok
 }
-
 func (r *Relay) invalidateTeamPolicy(enrollments ...string) {
 	r.cache.mu.Lock()
 	defer r.cache.mu.Unlock()
 	for k := range r.cache.policies {
-		if rest, ok := strings.CutPrefix(k, "\x01team\x00"); ok {
-			if parts := strings.Split(rest, "\x00"); len(enrollments) == 0 || (len(parts) >= 2 && slices.Contains(enrollments, parts[1])) {
-				delete(r.cache.policies, k)
-			}
+		if rest, ok := strings.CutPrefix(k, "\x01team\x00"); ok && (len(enrollments) == 0 || slices.Contains(enrollments, strings.Split(rest, "\x00")[1])) {
+			delete(r.cache.policies, k)
 		}
 	}
 }
-
 func (r *Relay) allTeamSenders() []*sender {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -239,19 +212,19 @@ func (r *Relay) allTeamSenders() []*sender {
 func (r *Relay) OnStateChange(enrollments ...string) {
 	r.invalidateTeamPolicy(enrollments...)
 	for _, s := range r.allTeamSenders() {
-		if len(enrollments) == 0 || slices.Contains(enrollments, s.team.enrollment) {
-			s.mu.Lock()
-			s.blocked = false
-			s.mu.Unlock()
-			select {
-			case s.stateChange <- struct{}{}:
-			default:
-			}
-			s.poke()
+		if len(enrollments) > 0 && !slices.Contains(enrollments, s.team.enrollment) {
+			continue
 		}
+		s.mu.Lock()
+		s.blocked = false
+		s.mu.Unlock()
+		select {
+		case s.stateChange <- struct{}{}:
+		default:
+		}
+		s.poke()
 	}
 }
-
 func (r *Relay) dropStats(sig Signal, why, blocker string, n int) {
 	r.stats.dropped(sig, why, n)
 	if blocker != "" {

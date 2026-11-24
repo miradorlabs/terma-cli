@@ -123,18 +123,12 @@ func (r *Relay) judge(key string, p *part) verdict {
 	c, pol, why, ok, how := r.decide(key, p.pid, p.at, p.narrow, p.claimed, p.account)
 	return verdict{c: c, pol: pol, why: why, ok: ok, how: how}
 }
-
 func (r *Relay) splitMixed(p *part, v verdict) (*part, *part) {
 	if !r.teams() || v.why != string(WhyMixed) || v.mixedAt.IsZero() || p.records <= 1 || p.at.IsZero() || !p.at.Before(v.mixedAt) {
 		return nil, nil
 	}
 	return splitBeforeMixed(p, v.mixedAt)
 }
-
-// route sends a part on only if nothing is held for its key, so arrival order holds, and
-// drops a part of a session marked not collected without holding it. A part collected with
-// no sign-in to bind it to (part.lost) is never held, since it can never leave: it is lost
-// now, counted by its reason when it is a team's, or dropped by why it can't be placed.
 func (r *Relay) route(p *part) {
 	r.deliverMu.Lock()
 	defer r.deliverMu.Unlock()
@@ -142,7 +136,6 @@ func (r *Relay) route(p *part) {
 		r.routePiece(piece, true)
 	}
 }
-
 func (r *Relay) routePiece(p *part, allowSplit bool) {
 	if r.teams() && p.lost != "" {
 		r.lose(p)
@@ -162,34 +155,22 @@ func (r *Relay) routePiece(p *part, allowSplit bool) {
 	switch {
 	case why == whyNotCollected || v.final:
 		r.dropStats(p.signal, why, v.blocker, p.records)
-		return
 	case p.lost != "" && ok:
-		r.deliverAttributed(c, pol, p, how) // the policy's own drops first
-		return
+		r.deliverAttributed(c, pol, p, how)
 	case p.lost != "" && why == whyNoKey:
 		r.lose(p)
-		return
 	case p.lost != "":
 		r.stats.dropped(p.signal, why, p.records)
-		return
-	}
-	if ok {
-		if !r.hasHeld(p.session) {
-			r.deliver(v, p)
-			return
-		}
-		if v.q != nil {
-			r.holdInto(p, false, &pinnedDest{q: *v.q, c: c, how: how})
-			return
-		}
-	}
-	if v.pin != nil {
+	case ok && !r.hasHeld(p.session):
+		r.deliver(v, p)
+	case ok && v.q != nil:
+		r.holdInto(p, false, &pinnedDest{q: *v.q, c: c, how: how})
+	case v.pin != nil:
 		r.holdInto(p, why == whyNoKey || why == string(WhyBlocked) || why == string(WhyNoState), &pinnedDest{*v.pin, c, how, why, v.blocker})
-		return
+	default:
+		r.hold(p, why == whyNoKey)
 	}
-	r.hold(p, why == whyNoKey)
 }
-
 func (r *Relay) deliver(v verdict, p *part) {
 	if v.q != nil {
 		if r.dress(v.pol, p, v.q.Project, v.c, v.how) {

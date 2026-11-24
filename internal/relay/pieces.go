@@ -14,6 +14,10 @@ type timedPoint interface {
 	GetStartTimeUnixNano() uint64
 	GetTimeUnixNano() uint64
 }
+type grouped[T any] struct {
+	k string
+	v []T
+}
 
 func (r *Relay) pieces(key string, p *part) []*part {
 	if !r.teams() {
@@ -32,15 +36,12 @@ func (r *Relay) pieces(key string, p *part) []*part {
 	}
 	return partitionPart(p, func(iv timeInterval) string {
 		ks := placeKey(iv.start)
-		if iv.end != iv.start {
-			if ke := placeKey(iv.end); ke != ks {
-				return ks + "\x01" + ke
-			}
+		if ke := placeKey(iv.end); iv.end != iv.start && ke != ks {
+			return ks + "\x01" + ke
 		}
 		return ks
 	})
 }
-
 func splitBeforeMixed(p *part, mixedAt time.Time) (before, atOrAfter *part) {
 	if p.records <= 1 || mixedAt.IsZero() {
 		return nil, p
@@ -56,7 +57,6 @@ func splitBeforeMixed(p *part, mixedAt time.Time) (before, atOrAfter *part) {
 	}
 	return parts[1], parts[0]
 }
-
 func partitionPart(p *part, keyOf func(timeInterval) string) []*part {
 	groups, out := map[string]*part{}, []*part(nil)
 	get := func(k string) *part {
@@ -72,26 +72,24 @@ func partitionPart(p *part, keyOf func(timeInterval) string) []*part {
 	case *logspb.LogsData:
 		for _, rl := range m.GetResourceLogs() {
 			for _, sl := range rl.GetScopeLogs() {
-				by, ks := groupBy(sl.GetLogRecords(), func(x *logspb.LogRecord) timeInterval {
+				for _, g := range groupBy(sl.GetLogRecords(), func(x *logspb.LogRecord) timeInterval {
 					return makeInterval(x.GetTimeUnixNano(), x.GetObservedTimeUnixNano())
-				}, keyOf)
-				for _, k := range ks {
-					pc := get(k)
-					pc.msg.(*logspb.LogsData).ResourceLogs = append(pc.msg.(*logspb.LogsData).ResourceLogs, &logspb.ResourceLogs{Resource: cloneResource(rl.GetResource()), SchemaUrl: rl.GetSchemaUrl(), ScopeLogs: []*logspb.ScopeLogs{{Scope: sl.GetScope(), SchemaUrl: sl.GetSchemaUrl(), LogRecords: by[k]}}})
-					pc.records += len(by[k])
+				}, keyOf) {
+					pc := get(g.k)
+					pc.msg.(*logspb.LogsData).ResourceLogs = append(pc.msg.(*logspb.LogsData).ResourceLogs, &logspb.ResourceLogs{Resource: cloneResource(rl.GetResource()), SchemaUrl: rl.GetSchemaUrl(), ScopeLogs: []*logspb.ScopeLogs{{Scope: sl.GetScope(), SchemaUrl: sl.GetSchemaUrl(), LogRecords: g.v}}})
+					pc.records += len(g.v)
 				}
 			}
 		}
 	case *tracepb.TracesData:
 		for _, rs := range m.GetResourceSpans() {
 			for _, ss := range rs.GetScopeSpans() {
-				by, ks := groupBy(ss.GetSpans(), func(x *tracepb.Span) timeInterval {
+				for _, g := range groupBy(ss.GetSpans(), func(x *tracepb.Span) timeInterval {
 					return makeInterval(x.GetStartTimeUnixNano(), x.GetEndTimeUnixNano())
-				}, keyOf)
-				for _, k := range ks {
-					pc := get(k)
-					pc.msg.(*tracepb.TracesData).ResourceSpans = append(pc.msg.(*tracepb.TracesData).ResourceSpans, &tracepb.ResourceSpans{Resource: cloneResource(rs.GetResource()), SchemaUrl: rs.GetSchemaUrl(), ScopeSpans: []*tracepb.ScopeSpans{{Scope: ss.GetScope(), SchemaUrl: ss.GetSchemaUrl(), Spans: by[k]}}})
-					pc.records += len(by[k])
+				}, keyOf) {
+					pc := get(g.k)
+					pc.msg.(*tracepb.TracesData).ResourceSpans = append(pc.msg.(*tracepb.TracesData).ResourceSpans, &tracepb.ResourceSpans{Resource: cloneResource(rs.GetResource()), SchemaUrl: rs.GetSchemaUrl(), ScopeSpans: []*tracepb.ScopeSpans{{Scope: ss.GetScope(), SchemaUrl: ss.GetSchemaUrl(), Spans: g.v}}})
+					pc.records += len(g.v)
 				}
 			}
 		}
@@ -123,49 +121,46 @@ func partitionPart(p *part, keyOf func(timeInterval) string) []*part {
 	}
 	return out
 }
-
-func groupBy[T any](items []T, ivOf func(T) timeInterval, keyOf func(timeInterval) string) (map[string][]T, []string) {
-	by, keys := map[string][]T{}, []string(nil)
+func groupBy[T any](items []T, ivOf func(T) timeInterval, keyOf func(timeInterval) string) []grouped[T] {
+	idx, out := map[string]int{}, []grouped[T](nil)
 	for _, it := range items {
 		k := keyOf(ivOf(it))
-		if _, seen := by[k]; !seen {
-			keys = append(keys, k)
+		i, seen := idx[k]
+		if !seen {
+			i, idx[k], out = len(out), len(out), append(out, grouped[T]{k: k})
 		}
-		by[k] = append(by[k], it)
+		out[i].v = append(out[i].v, it)
 	}
-	return by, keys
+	return out
 }
-
 func splitPoints[P timedPoint](m *metricspb.Metric, pts []P, keyOf func(timeInterval) string, emit func(string, *metricspb.Metric, int), set func(*metricspb.Metric, []P)) {
-	by, ks := groupBy(pts, func(p P) timeInterval { return makeInterval(p.GetStartTimeUnixNano(), p.GetTimeUnixNano()) }, keyOf)
-	for _, k := range ks {
+	for _, g := range groupBy(pts, func(p P) timeInterval { return makeInterval(p.GetStartTimeUnixNano(), p.GetTimeUnixNano()) }, keyOf) {
 		c := &metricspb.Metric{Name: m.GetName(), Description: m.GetDescription(), Unit: m.GetUnit(), Metadata: m.GetMetadata()}
-		set(c, by[k])
-		emit(k, c, len(by[k]))
+		set(c, g.v)
+		emit(g.k, c, len(g.v))
 	}
 }
-
 func splitMetricBy(m *metricspb.Metric, keyOf func(timeInterval) string, emit func(string, *metricspb.Metric, int)) {
 	switch d := m.GetData().(type) {
 	case *metricspb.Metric_Sum:
-		splitPoints(m, d.Sum.GetDataPoints(), keyOf, emit, func(c *metricspb.Metric, pts []*metricspb.NumberDataPoint) {
-			c.Data = &metricspb.Metric_Sum{Sum: &metricspb.Sum{DataPoints: pts, AggregationTemporality: d.Sum.GetAggregationTemporality(), IsMonotonic: d.Sum.GetIsMonotonic()}}
+		splitPoints(m, d.Sum.GetDataPoints(), keyOf, emit, func(c *metricspb.Metric, v []*metricspb.NumberDataPoint) {
+			c.Data = &metricspb.Metric_Sum{Sum: &metricspb.Sum{DataPoints: v, AggregationTemporality: d.Sum.GetAggregationTemporality(), IsMonotonic: d.Sum.GetIsMonotonic()}}
 		})
 	case *metricspb.Metric_Gauge:
-		splitPoints(m, d.Gauge.GetDataPoints(), keyOf, emit, func(c *metricspb.Metric, pts []*metricspb.NumberDataPoint) {
-			c.Data = &metricspb.Metric_Gauge{Gauge: &metricspb.Gauge{DataPoints: pts}}
+		splitPoints(m, d.Gauge.GetDataPoints(), keyOf, emit, func(c *metricspb.Metric, v []*metricspb.NumberDataPoint) {
+			c.Data = &metricspb.Metric_Gauge{Gauge: &metricspb.Gauge{DataPoints: v}}
 		})
 	case *metricspb.Metric_Histogram:
-		splitPoints(m, d.Histogram.GetDataPoints(), keyOf, emit, func(c *metricspb.Metric, pts []*metricspb.HistogramDataPoint) {
-			c.Data = &metricspb.Metric_Histogram{Histogram: &metricspb.Histogram{DataPoints: pts, AggregationTemporality: d.Histogram.GetAggregationTemporality()}}
+		splitPoints(m, d.Histogram.GetDataPoints(), keyOf, emit, func(c *metricspb.Metric, v []*metricspb.HistogramDataPoint) {
+			c.Data = &metricspb.Metric_Histogram{Histogram: &metricspb.Histogram{DataPoints: v, AggregationTemporality: d.Histogram.GetAggregationTemporality()}}
 		})
 	case *metricspb.Metric_ExponentialHistogram:
-		splitPoints(m, d.ExponentialHistogram.GetDataPoints(), keyOf, emit, func(c *metricspb.Metric, pts []*metricspb.ExponentialHistogramDataPoint) {
-			c.Data = &metricspb.Metric_ExponentialHistogram{ExponentialHistogram: &metricspb.ExponentialHistogram{DataPoints: pts, AggregationTemporality: d.ExponentialHistogram.GetAggregationTemporality()}}
+		splitPoints(m, d.ExponentialHistogram.GetDataPoints(), keyOf, emit, func(c *metricspb.Metric, v []*metricspb.ExponentialHistogramDataPoint) {
+			c.Data = &metricspb.Metric_ExponentialHistogram{ExponentialHistogram: &metricspb.ExponentialHistogram{DataPoints: v, AggregationTemporality: d.ExponentialHistogram.GetAggregationTemporality()}}
 		})
 	case *metricspb.Metric_Summary:
-		splitPoints(m, d.Summary.GetDataPoints(), keyOf, emit, func(c *metricspb.Metric, pts []*metricspb.SummaryDataPoint) {
-			c.Data = &metricspb.Metric_Summary{Summary: &metricspb.Summary{DataPoints: pts}}
+		splitPoints(m, d.Summary.GetDataPoints(), keyOf, emit, func(c *metricspb.Metric, v []*metricspb.SummaryDataPoint) {
+			c.Data = &metricspb.Metric_Summary{Summary: &metricspb.Summary{DataPoints: v}}
 		})
 	}
 }

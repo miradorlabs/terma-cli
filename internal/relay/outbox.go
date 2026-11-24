@@ -101,11 +101,11 @@ func (rt route) String() string {
 }
 
 type entry struct {
-	name    string
-	signal  Signal
-	records int
-	q       Queued
-	corrupt bool
+	name            string
+	signal          Signal
+	records         int
+	q               Queued
+	corrupt, unread bool
 }
 
 var seq atomic.Uint64

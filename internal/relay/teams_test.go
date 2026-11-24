@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -803,6 +804,143 @@ func TestReviewEdgeCases(t *testing.T) {
 		case <-time.After(2 * time.Second):
 			t.Fatal("Relay.Run hung on blocked NudgeRefresh callback")
 		}
+	})
+
+	t.Run("fence_aborts_on_zero_to_one_generation_transition", func(t *testing.T) {
+		t.Parallel()
+		up := newSignInUpstream(t)
+		si := &testSignIn{account: accountA}
+		var gen atomic.Int64 // starts at 0
+		var includePrompts atomic.Bool
+		includePrompts.Store(true)
+		var resolveCalls atomic.Int32
+		router := &stubRouter{
+			active: true,
+			routeFn: func(rec Record) Routed {
+				return Routed{Outcome: Send, Queued: Queued{Enrollment: "enr_g0", Project: "proj_g0", Account: rec.Account, Session: rec.Session}}
+			},
+			recheckFn: func(_, _ string) Rechecker {
+				return stubRechecker{gen: gen.Load(), entryFn: func(Queued) Rechecked { return Rechecked{Verdict: SendNow} }}
+			},
+			resolveFn: func(_, _, account string) (Policy, error) {
+				if resolveCalls.Add(1) == 2 { // first sender batch resolve: bump gen 0 -> 1 before fence
+					includePrompts.Store(false)
+					gen.Store(1)
+				}
+				return Policy{Endpoint: up.srv.URL, Account: account, IncludePrompts: includePrompts.Load(), IncludeToolContent: true}, nil
+			},
+		}
+		r, srv := startTeamRelay(t, Options{
+			Dir: t.TempDir(), SignIn: si, Router: router,
+			Lookup: func(string, time.Time) (claim.Claim, bool) {
+				return claim.Claim{ProjectID: "proj_g0", Kind: claim.KindRepository, Tool: "claude-code", PIDs: []int{1}}, true
+			},
+		})
+		logs := &logspb.LogsData{ResourceLogs: []*logspb.ResourceLogs{{
+			Resource: &resourcepb.Resource{Attributes: []*commonpb.KeyValue{kv("session.id", "s1")}},
+			ScopeLogs: []*logspb.ScopeLogs{{LogRecords: []*logspb.LogRecord{{
+				TimeUnixNano: uint64(time.Now().UnixNano()),
+				Attributes:   []*commonpb.KeyValue{kv("event.name", "user_prompt"), kv("prompt", "secret-prompt")},
+			}}}},
+		}}}
+		if code := post(t, srv, "/v1/logs", mustMarshal(t, logs), "application/x-protobuf", token, false); code != http.StatusOK {
+			t.Fatalf("post logs = %d", code)
+		}
+		waitForCounters(t, r, func(c map[string]int) bool { return c["forwarded.logs"] == 1 })
+		for _, body := range up.bodies() {
+			if bytes.Contains(body, []byte("secret-prompt")) {
+				t.Fatal("fence allowed gen 0->1 batch through with stale prompt policy")
+			}
+		}
+	})
+
+	t.Run("team_waits_discard_drops_queued_in_nextBatch_and_fence", func(t *testing.T) {
+		t.Parallel()
+		for _, inFence := range []bool{false, true} {
+			name := "nextBatch"
+			if inFence {
+				name = "fence"
+			}
+			t.Run(name, func(t *testing.T) {
+				t.Parallel()
+				up := newSignInUpstream(t)
+				si := &testSignIn{account: accountA}
+				dir := t.TempDir()
+				rt := teamRoute{accountA, "enr_tw", "claude-code"}
+				o := outbox{dir: dir}
+				e := newEntry(time.Now(), Logs, 2)
+				if err := o.putTeam(rt, Queued{Enrollment: "enr_tw", Project: "proj_tw", Account: accountA, Session: "s1"}, e, mustMarshal(t, oneSessionLog("s1", "hi"))); err != nil {
+					t.Fatal(err)
+				}
+				var discardNow atomic.Bool
+				if !inFence {
+					discardNow.Store(true)
+				}
+				router := &stubRouter{
+					active: true,
+					recheckFn: func(_, _ string) Rechecker {
+						if discardNow.Load() {
+							return stubRechecker{gen: 1, waits: true, waitRes: Rechecked{Verdict: Discard, Why: WhyDeselected}}
+						}
+						return stubRechecker{gen: 1, entryFn: func(Queued) Rechecked { return Rechecked{Verdict: SendNow} }}
+					},
+					resolveFn: func(_, _, account string) (Policy, error) {
+						if inFence {
+							discardNow.Store(true)
+						}
+						return Policy{Endpoint: up.srv.URL, Account: account, IncludePrompts: true, IncludeToolContent: true}, nil
+					},
+				}
+				r, _ := startTeamRelay(t, Options{Dir: dir, SignIn: si, Router: router})
+				waitForCounters(t, r, func(c map[string]int) bool { return c["dropped.team_deselected.logs"] == 2 })
+				if len(up.bodies()) != 0 {
+					t.Fatalf("expected 0 upstream posts when TeamWaits returned Discard, got %d", len(up.bodies()))
+				}
+				if entries, err := o.listTeam(rt); err != nil || len(entries) != 0 {
+					t.Fatalf("expected empty outbox after TeamWaits Discard, got entries=%d err=%v", len(entries), err)
+				}
+			})
+		}
+	})
+
+	t.Run("transient_unreadable_team_file_fails_queued_sessions_and_recovers", func(t *testing.T) {
+		if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+			t.Skip("POSIX chmod 0000 test")
+		}
+		t.Parallel()
+		up := newSignInUpstream(t)
+		si := &testSignIn{account: accountA}
+		dir := t.TempDir()
+		rt := teamRoute{accountA, "enr_perm", "claude-code"}
+		o := outbox{dir: dir}
+		e := newEntry(time.Now(), Logs, 1)
+		if err := o.putTeam(rt, Queued{Enrollment: "enr_perm", Project: "proj_perm", Account: accountA, Session: "sess-unreadable"}, e, mustMarshal(t, oneSessionLog("sess-unreadable", "hello"))); err != nil {
+			t.Fatal(err)
+		}
+		p := filepath.Join(o.teamDir(rt), e.name)
+		if err := os.Chmod(p, 0o000); err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = os.Chmod(p, 0o600) })
+
+		if _, err := QueuedSessions(dir); err == nil {
+			t.Fatal("QueuedSessions returned nil error for unreadable team file")
+		}
+		router := &stubRouter{
+			active: true,
+			recheckFn: func(_, _ string) Rechecker {
+				return stubRechecker{gen: 1, entryFn: func(Queued) Rechecked { return Rechecked{Verdict: SendNow} }}
+			},
+			resolveFn: func(_, _, account string) (Policy, error) {
+				return Policy{Endpoint: up.srv.URL, Account: account, IncludePrompts: true, IncludeToolContent: true}, nil
+			},
+		}
+		r, _ := startTeamRelay(t, Options{Dir: dir, SignIn: si, Router: router})
+		if err := os.Chmod(p, 0o600); err != nil {
+			t.Fatal(err)
+		}
+		r.OnStateChange("enr_perm")
+		waitForCounters(t, r, func(c map[string]int) bool { return c["forwarded.logs"] == 1 })
 	})
 }
 

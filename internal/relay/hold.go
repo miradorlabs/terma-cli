@@ -58,8 +58,6 @@ func (r *Relay) hasHeld(key string) bool {
 	defer r.mu.Unlock()
 	return len(r.held[key]) > 0 || len(r.pinnedHold[key]) > 0
 }
-
-// hold keeps p until it may leave; awaitingPolicy is that it waits for its team's policy.
 func (r *Relay) hold(p *part, awaitingPolicy bool) { r.holdInto(p, awaitingPolicy, nil) }
 
 func (r *Relay) holdInto(p *part, awaitingPolicy bool, pin *pinnedDest) {
@@ -87,10 +85,7 @@ func (r *Relay) holdInto(p *part, awaitingPolicy bool, pin *pinnedDest) {
 	if awaitingPolicy {
 		h.awaitingPolicy = h.at
 	}
-	dst := r.held
-	if pin != nil {
-		dst = r.pinnedHold
-	}
+	dst := map[bool]map[string][]heldPart{true: r.pinnedHold, false: r.held}[pin != nil]
 	dst[p.session] = append(dst[p.session], h)
 	r.heldN += p.records
 	r.heldBytes += size
@@ -255,19 +250,18 @@ func (r *Relay) expandHeldPieces(key string, parts []heldPart) []heldPart {
 	if !r.teams() {
 		return parts
 	}
-	out := make([]heldPart, 0, len(parts))
+	var out []heldPart
 	for _, h := range parts {
 		for _, pc := range r.pieces(key, h.p) {
+			hp := h
 			if pc != h.p {
-				h = heldPart{p: pc, at: h.at, size: proto.Size(pc.msg), awaitingPolicy: h.awaitingPolicy}
+				hp.p, hp.size = pc, proto.Size(pc.msg)
 			}
-			out = append(out, h)
+			out = append(out, hp)
 		}
 	}
 	return out
 }
-
-// sweepPinned rechecks destination-pinned parts via Recheck ONLY (never Router.Route).
 func (r *Relay) sweepPinned(keys []string, now time.Time, lost *int) {
 	rcs := map[[2]string]Rechecker{}
 	for _, key := range keys {
@@ -276,7 +270,7 @@ func (r *Relay) sweepPinned(keys []string, now time.Time, lost *int) {
 		parts := r.pinnedHold[key]
 		r.mu.Unlock()
 		keep, out, dn, db := []heldPart(nil), []verdictPart(nil), 0, 0
-		retain := func(h heldPart) { keep = append(keep, h); dn, db = dn+h.p.records, db+h.size }
+		retain := func(h heldPart) { keep, dn, db = append(keep, h), dn+h.p.records, db+h.size }
 		for _, h := range parts {
 			dn, db = dn-h.p.records, db-h.size
 			pn := h.pin
@@ -295,10 +289,9 @@ func (r *Relay) sweepPinned(keys []string, now time.Time, lost *int) {
 			if rcs[rk] == nil {
 				rcs[rk] = r.opts.Router.Recheck(rk[0], rk[1])
 			}
-			rc := rcs[rk]
-			res, waits := rc.TeamWaits()
+			res, waits := rcs[rk].TeamWaits()
 			if !waits {
-				res = rc.Entry(pn.q)
+				res = rcs[rk].Entry(pn.q)
 			}
 			if res.Verdict == Discard && res.Why == WhyMixed && !res.MixedAt.IsZero() && h.p.records > 1 {
 				if before, after := splitBeforeMixed(h.p, res.MixedAt); before != nil {
@@ -306,21 +299,21 @@ func (r *Relay) sweepPinned(keys []string, now time.Time, lost *int) {
 						r.dropStats(after.signal, res.Why.reason(), res.Blocker, after.records)
 					}
 					h.p, h.size, pn.q.At, pn.q.EndAt = before, proto.Size(before.msg), before.at, before.endAt
-					res = rc.Entry(pn.q)
+					res = rcs[rk].Entry(pn.q)
 				}
 			}
-			if res.Verdict == Discard {
+			switch res.Verdict {
+			case Discard:
 				r.dropStats(h.p.signal, res.Why.reason(), res.Blocker, h.p.records)
 				continue
-			}
-			if res.Verdict == SendNow {
-				if pol, ok := r.resolveTeam(pn.q.Enrollment, pn.c.Tool, h.p.account, rc.Generation()); ok && r.mayLeaveAccount(h.p.account, pol.Key != "") && pol.resolvedFor(h.p.account) {
+			case SendNow:
+				if pol, ok := r.resolveTeam(pn.q.Enrollment, pn.c.Tool, h.p.account, true); ok && r.mayLeaveAccount(h.p.account, pol.Key != "") && pol.resolvedFor(h.p.account) {
 					q := pn.q
 					out = append(out, verdictPart{verdict{ok: true, pol: pol, c: pn.c, q: &q, how: pn.how}, h.p})
 					continue
 				}
 				pn.why, res.Why = whyNoKey, WhyNoState
-			} else {
+			default:
 				pn.why, pn.blocker = res.Why.reason(), res.Blocker
 			}
 			if res.Why == WhyBlocked || res.Why == WhyNoState {
