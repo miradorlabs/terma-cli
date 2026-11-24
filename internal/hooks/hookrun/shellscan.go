@@ -64,9 +64,7 @@ type cached struct {
 }
 
 func newScan(cwd string, env func(string) (string, bool), done work) *scan {
-	if done.deadline.IsZero() {
-		done.deadline = time.Now().Add(maxShellTime)
-	}
+	done.deadline = pick(done.deadline.IsZero(), time.Now().Add(maxShellTime), done.deadline)
 	sc := &scan{cwd: cwd, dir: cwd, env: env, vars: map[string]*string{}, places: map[string]bool{}, examined: map[candidate]cached{}, work: done}
 	sc.cfg = sc.config()
 	return sc
@@ -162,15 +160,14 @@ func (sc *scan) paramSize(pe *syntax.ParamExp, opaqueSubst bool) int {
 		return maxShellBytes + 1
 	}
 	n := len(sc.paramValue(pe))
-	if pe.Repl != nil && pe.Repl.Orig != nil {
-		if orig := sc.sizeIn(pe.Repl.Orig, true); orig > maxShellExpr || n > maxShellBytes/max(orig, 1) {
+	if pe.Repl != nil {
+		if orig := sc.sizeIn(pe.Repl.Orig, true); pe.Repl.Orig != nil && (orig > maxShellExpr || n > maxShellBytes/max(orig, 1)) {
 			return maxShellBytes + 1
 		}
-	}
-	if pe.Repl != nil && pe.Repl.With != nil {
-		if with := sc.sizeIn(pe.Repl.With, opaqueSubst || pe.Repl.All && n > 0); with >= (maxShellBytes+1)/max(n, 1) {
-			return maxShellBytes + 1
-		} else {
+		if with := sc.sizeIn(pe.Repl.With, opaqueSubst || pe.Repl.All && n > 0); pe.Repl.With != nil {
+			if with >= (maxShellBytes+1)/max(n, 1) {
+				return maxShellBytes + 1
+			}
 			n = max(n, 1) * (1 + with)
 		}
 	}
@@ -184,12 +181,9 @@ func (sc *scan) paramSize(pe *syntax.ParamExp, opaqueSubst bool) int {
 	}
 	return min(n, maxShellBytes+1)
 }
-func (sc *scan) ifs() string {
-	ifs, ok := sc.lookup("IFS")
-	return pick(ok, ifs, " \t\n")
-}
 func (sc *scan) chargeFields(v string) bool {
-	ifs := sc.ifs()
+	ifs, ok := sc.lookup("IFS")
+	ifs = pick(ok, ifs, " \t\n")
 	return !sc.isUnresolvedVar("IFS") && (ifs == "" || (len(ifs) <= 64 || !sc.fail()) && sc.budget(&sc.words, countFields(v, ifs, maxShellWords-sc.words), maxShellWords))
 }
 func (sc *scan) checkPartsFields(parts []syntax.WordPart, ifs string, rem int, inParam bool) int {
@@ -246,8 +240,10 @@ func countFields(v, ifs string, limit int) int {
 }
 func (sc *scan) fields(w *syntax.Word) ([]string, error) {
 	var out []string
+	ifs, ok := sc.lookup("IFS")
+	ifs = pick(ok, ifs, " \t\n")
 	for b, err := range sc.braces(w) {
-		if ifs := sc.ifs(); err != nil || len(ifs) > 64 && sc.fail() || !sc.charge(sc.size(b)) || ifs != "" && sc.checkPartsFields(b.Parts, ifs, maxShellWords-len(out), false) < 0 {
+		if err != nil || len(ifs) > 64 && sc.fail() || !sc.charge(sc.size(b)) || ifs != "" && sc.checkPartsFields(b.Parts, ifs, maxShellWords-len(out), false) < 0 {
 			return nil, errOpaque
 		}
 		prev := sc.opaque

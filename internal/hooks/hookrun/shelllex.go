@@ -10,7 +10,7 @@ import (
 	"unicode/utf8"
 )
 
-var secretOptions, secretNames, compounds = []string{"-c", "-e", "--eval", "-u", "--user", "-U", "--proxy-user", "-H", "--header", "--proxy-header", "-p", "--password", "-b", "--cookie", "-d", "--data", "--data-ascii", "--data-raw", "--data-binary", "--data-urlencode", "--url-query", "--json", "--oauth2-bearer", "-E", "--cert", "--proxy-cert"}, []string{"pass", "token", "secret", "key", "auth"}, []string{"if", "for", "while", "until", "case", "select"}
+var secretOptions, secretNames, compounds = []string{"-c", "-e", "--eval", "-u", "--user", "-U", "--proxy-user", "-H", "--header", "--proxy-header", "-p", "--password", "-b", "--cookie", "-d", "--data", "--data-ascii", "--data-raw", "--data-binary", "--data-urlencode", "--url-query", "--json", "--oauth2-bearer", "-E", "--cert", "--proxy-cert", "--post-data", "--body-data", "--post-file", "--body-file"}, []string{"pass", "token", "secret", "key", "auth"}, []string{"if", "for", "while", "until", "case", "select"}
 var userinfo = regexp.MustCompile(`(://)[^/\s]+@|[^/\s:@]*:[^/\s@]+@`)
 
 const maxShellNesting, maxShellExpr, separators = 256, 4096, " \t\n;&|()<>"
@@ -64,10 +64,8 @@ func maskWords(command string, depth int) string {
 		}
 	}
 	s := strings.Map(func(r rune) rune { return pick(r < 0x20 || r == 0x7f, ' ', r) }, strings.Join(words, " "))
-	if r := []rune(s); len(r) > 60 {
-		return string(r[:60]) + " …"
-	}
-	return s + pick(more, " …", "")
+	r := []rune(s)
+	return pick(len(r) > 60, string(r[:min(len(r), 60)])+" …", s+pick(more, " …", ""))
 }
 
 // shellFields returns command's first n words as written alongside their unquoted forms.
@@ -186,9 +184,7 @@ func parsable(src string) bool {
 		if k := strings.IndexByte("({[", c); k >= 0 {
 			c = ")}]"[k]
 		}
-		for range n {
-			open = append(open, c)
-		}
+		open = append(open, slices.Repeat([]byte{c}, n)...)
 	}
 	read := func() { body, open = len(open), append(open, pick(bodies[0].quoted, byte('q'), byte('h'))) }
 	for i := 0; i < len(src); i++ {
@@ -251,8 +247,7 @@ func parsable(src string) bool {
 		case c == top && len(open) > 0: // a NUL is no context's close
 			open = open[:len(open)-1]
 		case c == '|' || c == '&' && next == '&':
-			links++
-			i = pick(c == '&', ni, i)
+			links, i = links+1, pick(c == '&', ni, i)
 		case c == '<' && next == '<' && prev != '<' && expr < 0 && i >= letUntil && !double:
 			if d, end := heredocDelimiter(src, ni+1); end < 0 {
 				return false
@@ -270,11 +265,9 @@ func parsable(src string) bool {
 			if word := string(buf[:min(n, 8)]); n <= 7 && slices.Contains(compounds, word) {
 				links++
 			} else if n == 3 && word == "let" { // its words are expressions
-				end := j
-				for end < len(src) && strings.IndexByte("\n;&|", src[end]) < 0 {
-					end = max(skipCont(src, end), end+1)
+				for letUntil = j; letUntil < len(src) && strings.IndexByte("\n;&|", src[letUntil]) < 0; letUntil = max(skipCont(src, letUntil), letUntil+1) {
 				}
-				if letUntil = end; end-j > maxShellExpr {
+				if letUntil-j > maxShellExpr {
 					return false
 				}
 			}

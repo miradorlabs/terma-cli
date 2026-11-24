@@ -22,7 +22,7 @@ func (sc *scan) candidate(t string, r role) {
 	if p, isURL, bad := urlPath(t); bad && sc.fail() {
 		return
 	} else if isURL {
-		if filepath.Separator == '/' && p != "" {
+		if filepath.Separator == '/' {
 			sc.candidatePath(t, r, true)
 		}
 		t = p
@@ -113,10 +113,9 @@ func (sc *scan) walk(p string, followFinal bool, openMode uint8) (resolved, pare
 		fi, err := cur.lstat(part)
 		if err != nil && !errors.Is(err, fs.ErrNotExist) && !errors.Is(err, fs.ErrInvalid) {
 			return "", "", nil, nil, !sc.fail()
-		} else if err != nil && (slices.Contains(parts, "..") || slices.Contains(parts, ".")) {
-			return "", "", nil, nil, false
 		} else if err != nil {
-			return filepath.Join(append([]string{curPath, part}, parts...)...), curPath, nil, nil, false
+			dot := slices.Contains(parts, "..") || slices.Contains(parts, ".")
+			return pick(dot, "", filepath.Join(append([]string{curPath, part}, parts...)...)), pick(dot, "", curPath), nil, nil, false
 		}
 		if fi.Mode()&fs.ModeSymlink != 0 {
 			if !followFinal && len(parts) == 0 {
@@ -198,11 +197,9 @@ func (sc *scan) resolveJoined(base, raw string, logical bool) (string, bool) {
 	}
 	var out []string
 	for _, part := range parts {
-		if part == "" || part == "." {
-			continue
-		} else if part != ".." {
+		if part != "" && part != "." && part != ".." {
 			out = append(out, part)
-		} else if cur := vol + sep + strings.Join(out, sep); cur != "" {
+		} else if cur := vol + sep + strings.Join(out, sep); part == ".." && cur != "" {
 			if t, _, info, found := sc.walkPath(cur, true); !found || !info.IsDir() {
 				return "", false
 			} else if _, _, li, ok := sc.walkPath(cur, false); ok && li.Mode()&fs.ModeSymlink != 0 {

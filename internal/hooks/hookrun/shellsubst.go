@@ -30,24 +30,23 @@ var outputs = map[string]func(sc *scan, args []*syntax.Word) (string, bool){
 }
 
 func (sc *scan) substitute(w io.Writer, cs *syntax.CmdSubst) error {
-	if len(cs.Stmts) != 1 || len(cs.Stmts[0].Redirs) != 0 {
-		return errOpaque
-	}
-	if ce, ok := cs.Stmts[0].Cmd.(*syntax.CallExpr); ok && len(ce.Assigns) == 0 {
-		words := make([]string, min(len(ce.Args), 4))
-		for i := range words {
-			words[i] = ce.Args[i].Lit()
-		}
-		for n := len(words); n > 0; n-- {
-			if known, ok := outputs[strings.Join(words[:n], " ")]; ok {
-				outer := sc.cfg
-				sc.cfg = sc.config() // expand is not reentrant: an operand expands with its own
-				out, ok := known(sc, ce.Args[n:])
-				if sc.cfg, out = outer, strings.TrimRight(out, "\n"); !ok || !sc.charge(len(out)) || !sc.chargeFields(out) {
-					return errOpaque
+	if len(cs.Stmts) == 1 && len(cs.Stmts[0].Redirs) == 0 {
+		if ce, ok := cs.Stmts[0].Cmd.(*syntax.CallExpr); ok && len(ce.Assigns) == 0 {
+			words := make([]string, min(len(ce.Args), 4))
+			for i := range words {
+				words[i] = ce.Args[i].Lit()
+			}
+			for n := len(words); n > 0; n-- {
+				if known, ok := outputs[strings.Join(words[:n], " ")]; ok {
+					outer := sc.cfg
+					sc.cfg = sc.config() // expand is not reentrant: an operand expands with its own
+					out, ok := known(sc, ce.Args[n:])
+					if sc.cfg, out = outer, strings.TrimRight(out, "\n"); !ok || !sc.charge(len(out)) || !sc.chargeFields(out) {
+						return errOpaque
+					}
+					_, err := io.WriteString(w, out)
+					return err
 				}
-				_, err := io.WriteString(w, out)
-				return err
 			}
 		}
 	}
@@ -132,9 +131,8 @@ func ofOperand(f func(*scan, string) (string, bool)) func(*scan, []*syntax.Word)
 }
 func dirname(_ *scan, p string) (string, bool) {
 	vol, sep := filepath.VolumeName(p), pick(filepath.Separator == '\\', `/\`, "/")
-	rest := strings.TrimRight(p[len(vol):], sep)
-	if i := strings.LastIndexAny(rest, sep); i >= 0 {
-		return vol + filepath.FromSlash(cmp.Or(strings.TrimRight(rest[:i], sep), string(filepath.Separator))), true
+	if rest := strings.TrimRight(p[len(vol):], sep); strings.LastIndexAny(rest, sep) >= 0 {
+		return vol + filepath.FromSlash(cmp.Or(strings.TrimRight(rest[:strings.LastIndexAny(rest, sep)], sep), string(filepath.Separator))), true
 	} else if rest == "" && len(p) > len(vol) {
 		return vol + string(filepath.Separator), true
 	}
@@ -197,8 +195,7 @@ func (sc *scan) validGitDir(dir string) bool {
 	hasDir := func(p string) bool { _, _, info, ok := sc.walkPath(p, true); return ok && info.IsDir() }
 	if hasDir(filepath.Join(dir, "objects")) && (hasDir(filepath.Join(dir, "refs")) || hasDir(filepath.Join(dir, "reftable"))) {
 		return true
-	}
-	if common, err := sc.readSmallFile(filepath.Join(dir, "commondir")); err == nil && strings.TrimSpace(common) != "" {
+	} else if common, err := sc.readSmallFile(filepath.Join(dir, "commondir")); err == nil && strings.TrimSpace(common) != "" {
 		r, ok := sc.resolveJoined(dir, strings.TrimSpace(common), false)
 		return ok && hasDir(filepath.Join(r, "objects"))
 	}
@@ -207,12 +204,6 @@ func (sc *scan) validGitDir(dir string) bool {
 func (sc *scan) hasWorktreeConfig(gitDir string) bool {
 	if sc.isUnresolvedVar("HOME") || sc.isUnresolvedVar("USERPROFILE") || sc.isUnresolvedVar("XDG_CONFIG_HOME") || sc.isUnresolvedVar("ProgramData") {
 		return true
-	}
-	match := func(l string) bool {
-		t := strings.TrimSpace(strings.TrimPrefix(l, "\ufeff"))
-		_, after, bracket := strings.Cut(t, "]")
-		f := strings.FieldsFunc(pick(strings.HasPrefix(t, "[") && bracket, after, t), func(r rune) bool { return r == '=' || r <= ' ' })
-		return strings.HasPrefix(strings.ToLower(t), "[include") || len(f) > 0 && strings.EqualFold(f[0], "worktree")
 	}
 	paths := []string{filepath.Join(gitDir, "config"), filepath.Join(gitDir, "config.worktree")}
 	if filepath.Separator == '/' || sc.envVal("ProgramData") != "" {
@@ -224,7 +215,29 @@ func (sc *scan) hasWorktreeConfig(gitDir string) bool {
 	if home, ok := sc.homeDir(); ok && home != "" {
 		paths = append(paths, filepath.Join(home, ".gitconfig"), filepath.Join(home, ".config", "git", "config"))
 	}
-	return slices.ContainsFunc(paths, func(p string) bool { return sc.fileHasLine(p, match) })
+	return slices.ContainsFunc(paths, func(p string) bool {
+		inSec, cont := false, false
+		return sc.fileHasLine(p, func(l string) bool {
+			if t := strings.TrimSpace(strings.TrimPrefix(l, "\ufeff")); cont {
+				cont = (len(t)-len(strings.TrimRight(t, `\`)))%2 == 1
+			} else if t != "" && t[0] != '#' && t[0] != ';' {
+				if t[0] == '[' {
+					head, after, br := strings.Cut(t[1:], "]")
+					sec, sub, hasQ := strings.Cut(head, `"`)
+					if s := strings.TrimSpace(sec); !br || s == "" || strings.Trim(s, alnum+"-.") != "" || hasQ && !strings.HasSuffix(sub, `"`) || strings.HasPrefix(strings.ToLower(s), "include") {
+						return true
+					}
+					if inSec, t = true, strings.TrimSpace(after); t == "" || t[0] == '#' || t[0] == ';' {
+						return false
+					}
+				}
+				cont = (len(t)-len(strings.TrimRight(t, `\`)))%2 == 1
+				f := strings.FieldsFunc(t, func(r rune) bool { return r == '=' || r <= ' ' })
+				return !inSec || len(f) == 0 || strings.EqualFold(f[0], "worktree") || strings.IndexByte(alnum[:52], f[0][0]) < 0 || strings.Trim(f[0], alnum+"-") != ""
+			}
+			return false
+		})
+	})
 }
 func (sc *scan) fileHasLine(path string, match func(string) bool) bool {
 	if p, ok := sc.resolveJoined(sc.dir, path, false); ok {
@@ -242,10 +255,8 @@ func (sc *scan) readSmallFile(path string) (string, error) {
 	defer f.Close()
 	var buf [maxPathBytes]byte
 	n, err := io.ReadFull(f, buf[:])
-	if n == len(buf) || err != nil && !errors.Is(err, io.EOF) && !errors.Is(err, io.ErrUnexpectedEOF) {
-		return "", errOpaque
-	}
-	return string(buf[:n]), nil
+	bad := n == len(buf) || err != nil && !errors.Is(err, io.EOF) && !errors.Is(err, io.ErrUnexpectedEOF)
+	return pick(bad, "", string(buf[:n])), pick(bad, errOpaque, nil)
 }
 func (sc *scan) below(dir string, levels int) {
 	c := candidate{dir, strconv.Itoa(levels), walked}

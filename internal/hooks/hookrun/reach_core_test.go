@@ -2423,6 +2423,46 @@ func TestAbbreviatedSecretOptionsAndLogicalCd(t *testing.T) {
 	if got, ok := newScan(wtDir, noEnv, work{deadline: time.Now().Add(time.Minute)}).safeLocate(wtDir); !ok || !samePath(got, wtDir) {
 		t.Errorf("safeLocate(linked worktree) = (%q, %v), want (%q, true)", got, ok, wtDir)
 	}
+	// Malformed .git/config fails closed in safeLocate.
+	for _, tc := range []struct{ name, cfg string }{
+		{"unterminated-section", "[core\n\tfilemode = true\n"},
+		{"garbage-before-section", "bare = true\n"},
+		{"bad-section-header", "[core bad]\n\tbare = false\n"},
+	} {
+		badCfgRepo := filepath.Join(litDir, tc.name)
+		makeValidGitDir(t, filepath.Join(badCfgRepo, ".git"))
+		if err := os.WriteFile(filepath.Join(badCfgRepo, ".git", "config"), []byte(tc.cfg), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if got, ok := newScan(badCfgRepo, noEnv, work{deadline: time.Now().Add(time.Minute)}).safeLocate(badCfgRepo); ok {
+			t.Errorf("safeLocate(%s) = (%q, true), want false", tc.name, got)
+		}
+	}
+	// On POSIX, non-file URL-shaped operands still scan their literal relative path.
+	if runtime.GOOS != "windows" {
+		httpsRoot := filepath.Join(litDir, "https:", "repo")
+		if err := os.MkdirAll(httpsRoot, 0o700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(httpsRoot, "file"), nil, 0o600); err != nil {
+			t.Fatal(err)
+		}
+		scHTTPS := newScan(litDir, noEnv, work{deadline: time.Now().Add(time.Minute)})
+		scHTTPS.candidate("https://repo/file", plain)
+		if !slices.Contains(scHTTPS.out, httpsRoot) {
+			t.Errorf("candidate(https://repo/file) = %q, want %q", scHTTPS.out, httpsRoot)
+		}
+	}
+	// wget request-body flags are masked by firstWords.
+	for _, cmd := range []string{
+		"wget --post-data SECRET /missing",
+		"wget --body-data SECRET --method POST /missing",
+		"wget --post-file SECRET /missing",
+	} {
+		if got := firstWords(cmd); strings.Contains(got, "SECRET") {
+			t.Errorf("firstWords(%q) = %q, leaked SECRET", cmd, got)
+		}
+	}
 }
 
 func makeValidGitDir(t *testing.T, gitDir string) {
