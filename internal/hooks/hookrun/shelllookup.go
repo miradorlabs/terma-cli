@@ -247,12 +247,9 @@ func urlPath(w string) (string, bool) {
 	return "//" + rest, true
 }
 func isScheme(s string) bool {
-	for i, r := range s {
-		if (r < 'a' || r > 'z') && (r < 'A' || r > 'Z') && (i == 0 || (r < '0' || r > '9') && r != '+' && r != '-' && r != '.') {
-			return false
-		}
-	}
-	return len(s) > 1
+	return len(s) > 1 && (s[0] >= 'a' && s[0] <= 'z' || s[0] >= 'A' && s[0] <= 'Z') && !strings.ContainsFunc(s, func(r rune) bool {
+		return (r < 'a' || r > 'z') && (r < 'A' || r > 'Z') && (r < '0' || r > '9') && r != '+' && r != '-' && r != '.'
+	})
 }
 
 // remote reports whether p starts with two separators (UNC/device path) outside cwd's share.

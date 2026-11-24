@@ -169,8 +169,7 @@ func (sc *scan) paramSize(pe *syntax.ParamExp, opaqueSubst bool) (int, bool) {
 		n = max(n, 1) * (1 + with)
 	}
 	if pe.Exp != nil && pe.Exp.Word != nil {
-		op := pe.Exp.Op
-		pat := op == syntax.RemSmallPrefix || op == syntax.RemLargePrefix || op == syntax.RemSmallSuffix || op == syntax.RemLargeSuffix || op == syntax.UpperFirst || op == syntax.UpperAll || op == syntax.LowerFirst || op == syntax.LowerAll
+		pat := pe.Exp.Op == syntax.RemSmallPrefix || pe.Exp.Op == syntax.RemLargePrefix || pe.Exp.Op == syntax.RemSmallSuffix || pe.Exp.Op == syntax.RemLargeSuffix || pe.Exp.Op == syntax.UpperFirst || pe.Exp.Op == syntax.UpperAll || pe.Exp.Op == syntax.LowerFirst || pe.Exp.Op == syntax.LowerAll
 		w, wu := sc.sizeIn(pe.Exp.Word, opaqueSubst || pat, false)
 		if unres = unres || wu; pat && (w > maxShellExpr || n > maxShellBytes/max(w, 1)) {
 			return maxShellBytes + 1, unres
