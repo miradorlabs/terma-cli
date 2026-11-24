@@ -39,13 +39,14 @@ func (sc *scan) stmt(s *syntax.Stmt, feeds bool) {
 			sc.mergeBranches(states)
 		} else {
 			var buf strings.Builder
-			run, prev := runsShell(c.Y.Cmd), sc.feedBuf
+			run, prev, after := runsShell(c.Y.Cmd), sc.feedBuf, branchState{} // lastpipe runs the last stage in this shell
 			sc.feedBuf = pick(run, &buf, sc.feedBuf)
 			sc.subshell(func() { sc.stmt(c.X, run) })
 			if sc.feedBuf = prev; run && !sc.unknown && buf.Len() > 0 {
 				sc.subshell(func() { sc.script(buf.String()) })
 			}
-			sc.subshell(func() { sc.stmt(c.Y, feeds) })
+			sc.subshell(func() { sc.stmt(c.Y, feeds); after = sc.snapshot() })
+			sc.mergeBranches(pick(strings.Contains(sc.src, "lastpipe") || strings.Contains(sc.envVal("BASHOPTS"), "lastpipe") || sc.isUnresolvedVar("BASHOPTS"), []branchState{sc.snapshot(), after}, nil))
 			sc.unknown = runsXargs(c.Y.Cmd) && !sc.xargsSafeFeed(c.X) || sc.unknown // after the feed check, which may fail closed
 		}
 	case *syntax.Subshell:
@@ -114,9 +115,6 @@ func (sc *scan) feed(ce *syntax.CallExpr, redirs []*syntax.Redirect) {
 		return
 	}
 	name, text := programName(u.command[0]), []string(nil)
-	if name != "echo" && name != "printf" && sc.fail() {
-		return
-	}
 	for _, w := range u.command[1:] {
 		fields, err := sc.fields(w)
 		if err != nil && sc.fail() {
@@ -127,7 +125,7 @@ func (sc *scan) feed(ce *syntax.CallExpr, redirs []*syntax.Redirect) {
 	for ; name == "echo" && len(text) > 0 && slices.Contains([]string{"-n", "-E"}, text[0]); text = text[1:] {
 	}
 	s := strings.Join(text, pick(name == "printf", "\n", " "))
-	if (name == "echo" && (len(text) > 0 && len(text[0]) > 1 && text[0][0] == '-' && strings.Trim(text[0][1:], "neE") == "" || strings.ContainsRune(s, '\\')) || name == "printf" && len(text) > 0 && (strings.HasPrefix(text[0], "-") || strings.ContainsRune(text[0], '%') || strings.ContainsRune(strings.ReplaceAll(text[0], `\n`, ""), '\\'))) && sc.fail() {
+	if (name != "echo" && name != "printf" || name == "echo" && (len(text) > 0 && len(text[0]) > 1 && text[0][0] == '-' && strings.Trim(text[0][1:], "neE") == "" || strings.ContainsRune(s, '\\')) || name == "printf" && len(text) > 0 && (strings.HasPrefix(text[0], "-") || strings.ContainsRune(text[0], '%') || strings.ContainsRune(strings.ReplaceAll(text[0], `\n`, ""), '\\'))) && sc.fail() {
 		return
 	}
 	sc.body(pick(name == "printf", strings.ReplaceAll(s, `\n`, "\n"), s), true)
@@ -318,17 +316,14 @@ func (sc *scan) loop(fc *syntax.ForClause) {
 		sc.repeatLoop(fc.Do)
 		return
 	}
-	values := []*string{nil}
-	if iter.InPos.IsValid() {
-		values = nil
-		for _, w := range iter.Items {
-			sc.arg(w, plain)
-			if fields, err := sc.fields(w); err != nil {
-				values = append(values, nil)
-			} else {
-				for _, f := range fields {
-					values = append(values, &f)
-				}
+	values := pick(iter.InPos.IsValid(), []*string(nil), []*string{nil}) // no in: the positional parameters
+	for _, w := range iter.Items {
+		sc.arg(w, plain)
+		if fields, err := sc.fields(w); err != nil {
+			values = append(values, nil)
+		} else {
+			for _, f := range fields {
+				values = append(values, &f)
 			}
 		}
 	}

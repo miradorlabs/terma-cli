@@ -46,6 +46,7 @@ func scanShell(src, cwd string, env func(string) (string, bool), done work) (sc 
 	sc = newScan(cwd, env, done)
 	defer func() { sc.unknown = sc.unknown || !done.noRecover && recover() != nil }()
 	sc.script(src)
+	sc.script(sc.traps)
 	return sc
 }
 func (sc *scan) snapshot() branchState {

@@ -30,7 +30,7 @@ type scan struct {
 	places, created              map[string]bool
 	examined                     map[candidate]cached
 	work
-	src          string
+	src, traps   string
 	dirUncertain bool
 	depth        int
 	pushed       []string
@@ -118,7 +118,7 @@ func (sc *scan) size(w *syntax.Word) int { return sc.sizeIn(w, false) }
 func (sc *scan) sizeIn(w *syntax.Word, opaqueSubst bool) (n int) {
 	if w != nil {
 		syntax.Walk(w, func(node syntax.Node) bool {
-			switch x := node.(type) {
+			switch x := pick(n > maxShellBytes, syntax.Node(nil), node).(type) {
 			case *syntax.Lit:
 				n += len(x.Value)
 			case *syntax.SglQuoted:
@@ -141,7 +141,7 @@ func isCaseOp(op syntax.ParExpOperator) bool {
 }
 func (sc *scan) paramValue(pe *syntax.ParamExp) string {
 	v, _ := sc.lookup(pick(pe.Param != nil, pe.Param, &syntax.Lit{}).Value)
-	return pick(pe.Excl, sc.envVal(v), v)
+	return pick(pe.Excl, sc.envVal(pick(pe.Excl, v, "")), v)
 }
 func (sc *scan) paramSize(pe *syntax.ParamExp, opaqueSubst bool) int {
 	if pe.Index != nil || pe.Slice != nil || pe.Names != 0 {

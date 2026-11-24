@@ -1086,3 +1086,39 @@ func TestShellPathsKeepPersistedAssignmentsTrapsAndUvFiles(t *testing.T) {
 		}
 	}
 }
+
+// A trap's handler also runs on exit, with the variables then; a startup file BASH_ENV names
+// runs before bash's script; and under lastpipe a pipeline's last stage sets this shell's
+// variables.
+func TestShellPathsReadExitTrapsStartupFilesAndLastpipe(t *testing.T) {
+	t.Parallel()
+	m := newWordsMachine(t)
+	writeCorpusFile(t, m.side, "p", "../acme-api\n")
+	writeCorpusFile(t, m.side, "env.sh", "cat ../acme-api/NOTES.md\n")
+	src := filepath.Join(m.side, "src")
+	m.check(t, m.side, map[string][]string{
+		`D=src; trap 'ls "$D"' EXIT; D=../acme-api`:          {src, m.api},
+		`D=src; trap -- 'ls "$D"' EXIT INT; D=../acme-api`:   {src, m.api},
+		`trap 'rm -rf "$tmp"' EXIT; tmp=src`:                 {src},
+		`D=src; echo x | read D; ls $D`:                      {src},
+		`bash -c 'ls src'`:                                   {src},
+		`D=src; shopt -s lastpipe; echo x | D=y true; ls $D`: {src},
+	})
+	for _, command := range []string{
+		`D=.; trap 'cat "$D/NOTES.md"' EXIT; read D < p`,
+		`BASH_ENV=env.sh bash -c true`,
+		`export BASH_ENV=env.sh; bash -c true`,
+		`env BASH_ENV=env.sh bash -c true`,
+		`BASH_ENV=$X bash -c true`,
+		`D=.; shopt -s lastpipe; cat p | read D; cat "$D/NOTES.md"`,
+		`D=.; cat p | read D; cat "$D/NOTES.md"` + "\nshopt -s lastpipe",
+	} {
+		if got := m.paths(command, m.side); !slices.Contains(got, UnknownReach) {
+			t.Errorf("ShellPaths(%q) = %q, without UnknownReach", command, got)
+		}
+	}
+	m.env["BASHOPTS"] = "checkwinsize:lastpipe"
+	if got := m.paths(`D=.; cat p | read D; cat "$D/NOTES.md"`, m.side); !slices.Contains(got, UnknownReach) {
+		t.Errorf("BASHOPTS with lastpipe: %q, without UnknownReach", got)
+	}
+}

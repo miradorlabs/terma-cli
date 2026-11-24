@@ -151,7 +151,8 @@ func isScriptCmd(p string) bool {
 	_, s := scriptOf(p)
 	return s || slices.Contains([]string{"eval", "exec", "source", ".", "cd", "pushd"}, p)
 }
-func isShortFlag(s string) bool { return strings.HasPrefix(s, "-") && !strings.HasPrefix(s, "--") }
+func atoiOr(s string, d int) int { n, err := strconv.Atoi(s); return pick(err == nil, n, d) }
+func isShortFlag(s string) bool  { return strings.HasPrefix(s, "-") && !strings.HasPrefix(s, "--") }
 func leadingLit(w *syntax.Word) string {
 	if lead, ok := pick(len(w.Parts) > 0, w.Parts, []syntax.WordPart{nil})[0].(*syntax.Lit); ok {
 		return lead.Value
@@ -204,6 +205,9 @@ func (sc *scan) run(args []*syntax.Word) {
 		}
 	case "eval", "trap":
 		args = args[pick(len(args) > 0 && args[0].Lit() == "--", 1, 0):]
+		for _, w := range pick(name == "trap", args[:min(len(args), 1)], nil) { // runs again on exit, with the variables then
+			sc.traps += "\neval " + sc.src[w.Pos().Offset():w.End().Offset()]
+		}
 		sc.inline(pick(name == "trap", args[:min(len(args), 1)], args), "", true, name == "trap")
 	case "source", ".":
 		for _, w := range args {
@@ -248,6 +252,7 @@ func isFindExec(name, opt string) bool {
 func (sc *scan) runExternal(name string, args []*syntax.Word) {
 	s, scripted := scriptOf(name)
 	r, isShallow := shallow[name]
+	sc.unknown = sc.unknown || scripted && s.shell && (sc.isUnresolvedVar("BASH_ENV") || sc.envVal("BASH_ENV") != "") // a startup file bash runs first
 	if k := shellAt(args); k >= 0 && !isShallow && !slices.Contains([]string{"rg", "ag", "ack"}, name) {
 		if name != "find" && name != "fd" {
 			for _, w := range args[:k] {
@@ -304,15 +309,10 @@ func (sc *scan) runExternal(name string, args []*syntax.Word) {
 			j++
 			sc.arg(args[j], plain)
 		case next && (opt == "-maxdepth" || opt == "--max-depth" || name == "fd" && opt == "-d" || name == "tree" && opt == "-L"):
-			j++
-			if n, err := strconv.Atoi(after); err == nil {
-				levels = n
-			}
+			j, levels = j+1, atoiOr(after, levels)
 		default:
 			deep = deep || isShallow && r.recursive(opt, after, j == 0)
-			if n, err := strconv.Atoi(strings.TrimPrefix(opt, "--max-depth=")); strings.HasPrefix(opt, "--max-depth=") && err == nil {
-				levels = n
-			}
+			levels = pick(strings.HasPrefix(opt, "--max-depth="), atoiOr(strings.TrimPrefix(opt, "--max-depth="), levels), levels)
 			sub = pick(sub == "" && !strings.HasPrefix(opt, "-"), opt, sub)
 			sc.arg(args[j], folderValue(args[j], dashCFolder))
 			if scripted && !hasInline && !skipScript {
