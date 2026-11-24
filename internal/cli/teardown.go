@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -151,14 +152,64 @@ func (app *App) undoSetup(ctx context.Context, out io.Writer, keepToken bool) er
 	return nil
 }
 
-// removeRoutingState deletes the active profile's routing/<profile>.json via CAS Delete
-// (or DeleteCorrupt under the lock when the file is unreadable), retrying on a concurrent
+// removeRoutingState deletes every profile's routing/<profile>.json via CAS Delete (or
+// DeleteCorrupt under the lock when a file is unreadable), retrying on a concurrent
 // refresh or repair.
 func (app *App) removeRoutingState() error {
-	profile := config.DefaultProfile
-	if cfg, err := app.loadConfig(); err == nil && cfg.ProfileName != "" {
-		profile = cfg.ProfileName
+	profiles, err := app.routingProfilesToRemove()
+	if err != nil {
+		return err
 	}
+	var errs []error
+	for _, profile := range profiles {
+		if derr := app.removeProfileRoutingState(profile); derr != nil {
+			errs = append(errs, fmt.Errorf("profile %q: %w", profile, derr))
+		}
+	}
+	if err := errors.Join(errs...); err != nil {
+		return err
+	}
+	_ = os.Remove(filepath.Join(app.stateDir, routing.StatesDir))
+	return nil
+}
+
+func (app *App) routingProfilesToRemove() ([]string, error) {
+	seen := map[string]struct{}{}
+	add := func(name string) {
+		if _, err := routing.StatePath(app.stateDir, name); err == nil {
+			seen[name] = struct{}{}
+		}
+	}
+	add(config.DefaultProfile)
+	if cfg, err := app.loadConfig(); err == nil {
+		add(cfg.ProfileName)
+	}
+	if file, err := config.LoadFile(app.dir); err == nil && file != nil {
+		add(file.ActiveProfile)
+		for name := range file.Profiles {
+			add(name)
+		}
+	}
+	entries, err := os.ReadDir(filepath.Join(app.stateDir, routing.StatesDir))
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return nil, err
+	}
+	for _, entry := range entries {
+		name := entry.Name()
+		if entry.IsDir() || strings.HasPrefix(name, ".") || !strings.HasSuffix(name, ".json") {
+			continue
+		}
+		add(strings.TrimSuffix(name, ".json"))
+	}
+	profiles := make([]string, 0, len(seen))
+	for profile := range seen {
+		profiles = append(profiles, profile)
+	}
+	slices.Sort(profiles)
+	return profiles, nil
+}
+
+func (app *App) removeProfileRoutingState(profile string) error {
 	for range 3 {
 		st, found, err := routing.Load(app.stateDir, profile)
 		if err != nil {
@@ -169,7 +220,6 @@ func (app *App) removeRoutingState() error {
 			err = routing.Delete(app.stateDir, profile, st.Expect())
 		}
 		if err == nil || errors.Is(err, routing.ErrNoState) {
-			_ = os.Remove(filepath.Join(app.stateDir, routing.StatesDir))
 			return nil
 		}
 		if errors.Is(err, routing.ErrStaleGeneration) {

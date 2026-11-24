@@ -25,6 +25,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/runs"
 	"github.com/miradorlabs/terma-cli/internal/sendas"
 	"github.com/miradorlabs/terma-cli/internal/spool"
+	"github.com/miradorlabs/terma-cli/internal/ui/prompt"
 )
 
 // Missing, corrupt, or wrong-account routing.State fails closed across hooks, relay,
@@ -1082,5 +1083,101 @@ func TestLiveAccountCheckUnderRoutingLockPreventsStaleReplace(t *testing.T) {
 	after, found, err := routing.Load(testApp.stateDir, config.DefaultProfile)
 	if err != nil || !found || after.Account != bobAcct || after.StateID != bobState.StateID {
 		t.Fatalf("Bob's routing.State was overwritten while Bob was active: %+v", after)
+	}
+}
+
+func TestDecideSetupBindingsWildcardPrompt(t *testing.T) {
+	var captured []prompt.Item
+	choose := func(_ string, items []prompt.Item) (int, error) {
+		captured = slices.Clone(items)
+		return 0, nil
+	}
+
+	t.Run("pure wildcard shows owner key directly", func(t *testing.T) {
+		captured = nil
+		target := routing.Team{
+			OrganizationID: "org_acme",
+			Policy: config.Policy{
+				Mode:         config.ModeRepo,
+				Wildcards:    true,
+				Repositories: []string{"github.com/acme/*"},
+			},
+		}
+		choices, err := decideSetupBindingsWith(target, "Acme", nil, true, choose)
+		if err != nil {
+			t.Fatalf("decideSetupBindings: %v", err)
+		}
+		if len(captured) == 0 || captured[0].Label != "Bind github.com/acme to Acme" {
+			t.Fatalf("prompt label = %q, want %q", captured[0].Label, "Bind github.com/acme to Acme")
+		}
+		if len(choices) != 1 || choices[0].key != "github.com/acme" || choices[0].org != "org_acme" {
+			t.Fatalf("choices = %+v, want [{key:github.com/acme org:org_acme}]", choices)
+		}
+	})
+
+	t.Run("mixed wildcard and exact lists exact binding scope", func(t *testing.T) {
+		captured = nil
+		target := routing.Team{
+			OrganizationID: "org_acme",
+			Policy: config.Policy{
+				Mode:         config.ModeRepo,
+				Wildcards:    true,
+				Repositories: []string{"github.com/acme/*", "github.com/other/repo"},
+			},
+		}
+		choices, err := decideSetupBindingsWith(target, "Acme", nil, true, choose)
+		if err != nil {
+			t.Fatalf("decideSetupBindings: %v", err)
+		}
+		wantLabel := "Bind github.com/acme, github.com/other/repo to Acme"
+		if len(captured) == 0 || captured[0].Label != wantLabel {
+			t.Fatalf("prompt label = %q, want %q", captured[0].Label, wantLabel)
+		}
+		if len(choices) != 2 || choices[0].key != "github.com/acme" || choices[1].key != "github.com/other/repo" {
+			t.Fatalf("choices = %+v, want [github.com/acme github.com/other/repo]", choices)
+		}
+	})
+}
+
+func TestTeardownRemovesRoutingStateForAllProfiles(t *testing.T) {
+	gateway := newFakeAuth(t)
+	authSandbox(t, gateway)
+	sandboxMachine(t)
+	signInTo(t, gateway, orgA())
+
+	acct := auth.AccountKey(gateway.srv.URL, "user-1")
+	for _, profile := range []string{config.DefaultProfile, "work"} {
+		if _, err := routing.Create(testApp.stateDir, profile, acct, func(s *routing.State) error {
+			_, err := s.Select(routing.Team{
+				OrganizationID: orgA().ID,
+				AuthURL:        gateway.srv.URL,
+				TeamID:         "team-" + profile,
+				Policy: config.Policy{
+					Mode: config.ModeRepo, Repositories: []string{"github.com/acme/" + profile},
+					TeamID: "team-" + profile, OrganizationID: orgA().ID, AuthURL: gateway.srv.URL,
+					Revision: 1, FetchedAt: time.Now(),
+				},
+			})
+			return err
+		}); err != nil {
+			t.Fatalf("routing.Create(%s): %v", profile, err)
+		}
+	}
+	// Also place a corrupt routing state under an unconfigured/stale profile name.
+	corruptPath, err := routing.StatePath(testApp.stateDir, "staging")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(corruptPath, []byte("{corrupt"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	if out, err := runTerma(t, "teardown", "--yes"); err != nil {
+		t.Fatalf("teardown: %v\n%s", err, out)
+	}
+	for _, profile := range []string{config.DefaultProfile, "work", "staging"} {
+		if st, found, err := routing.Load(testApp.stateDir, profile); err != nil || found {
+			t.Fatalf("profile %q still has routing state after teardown: found=%v err=%v state=%+v", profile, found, err, st)
+		}
 	}
 }

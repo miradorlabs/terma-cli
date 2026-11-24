@@ -23,10 +23,15 @@ type bindingChoice struct {
 // -y mode (ask == false), safe defaults bind each needed entry key (exact repo for exact
 // entries, owner for wildcards) to target.OrganizationID.
 func decideSetupBindings(target routing.Team, orgLabel string, existing map[string]routing.Binding, ask bool) ([]bindingChoice, error) {
+	return decideSetupBindingsWith(target, orgLabel, existing, ask, prompt.Choose)
+}
+
+func decideSetupBindingsWith(target routing.Team, orgLabel string, existing map[string]routing.Binding, ask bool, choose func(string, []prompt.Item) (int, error)) ([]bindingChoice, error) {
 	if target.Personal || target.Policy.Global() || len(target.Policy.Repositories) == 0 {
 		return nil, nil
 	}
 	var needed []routing.Entry
+	var keys []string
 	seen := map[string]bool{}
 	var owners []string
 	seenOwner := map[string]bool{}
@@ -38,11 +43,13 @@ func decideSetupBindings(target routing.Team, orgLabel string, existing map[stri
 		}
 		seen[e.Key()] = true
 		needed = append(needed, e)
+		keys = append(keys, e.Key())
+		owner := routing.Owner(e.Key())
 		if e.Wildcard() {
 			anyWildcard = true
+			owner = e.Key()
 		}
-		owner := routing.Owner(e.Key())
-		if !seenOwner[owner] {
+		if owner != "" && !seenOwner[owner] {
 			seenOwner[owner] = true
 			owners = append(owners, owner)
 		}
@@ -63,7 +70,7 @@ func decideSetupBindings(target routing.Team, orgLabel string, existing map[stri
 			{Label: fmt.Sprintf("Bind whole owner (%s) to %s", strings.Join(owners, ", "), orgLabel)},
 			{Label: "Decide later (hold matching sessions until bound)"},
 		}
-		choice, err := prompt.Choose("Bind repositories to "+orgLabel+"?", items)
+		choice, err := choose("Bind repositories to "+orgLabel+"?", items)
 		if errors.Is(err, prompt.ErrCancelled) {
 			return nil, errCancelled
 		}
@@ -88,11 +95,11 @@ func decideSetupBindings(target routing.Team, orgLabel string, existing map[stri
 		}
 	}
 	items := []prompt.Item{
-		{Label: fmt.Sprintf("Bind %s to %s", strings.Join(owners, ", "), orgLabel), Selected: true},
+		{Label: fmt.Sprintf("Bind %s to %s", strings.Join(keys, ", "), orgLabel), Selected: true},
 		{Label: "Refuse (do not collect these repositories for any organization)"},
 		{Label: "Decide later (hold matching sessions until bound)"},
 	}
-	choice, err := prompt.Choose("Bind repositories to "+orgLabel+"?", items)
+	choice, err := choose("Bind repositories to "+orgLabel+"?", items)
 	if errors.Is(err, prompt.ErrCancelled) {
 		return nil, errCancelled
 	}
