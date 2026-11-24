@@ -95,7 +95,7 @@ func Resolver(cfg *config.Config, r ResolverDeps) func(claim.Claim) (relay.Polic
 		if serverKey {
 			want = sendas.NoPersonLane
 		}
-		if !c.Profile && c.Account != want {
+		if !c.CatchAll && c.Account != want {
 			return relay.Policy{}, errors.New("the session was claimed under another sign-in")
 		}
 		key := ""
@@ -145,6 +145,6 @@ func CatchAll(policy func() config.Policy) func() (claim.Claim, bool) {
 		if !cached.Global() || cached.DefaultProjectID == "" {
 			return claim.Claim{}, false
 		}
-		return claim.Claim{ProjectID: cached.DefaultProjectID, Profile: true}, true
+		return claim.Claim{ProjectID: cached.DefaultProjectID, CatchAll: true}, true
 	}
 }
