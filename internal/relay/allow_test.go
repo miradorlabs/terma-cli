@@ -12,6 +12,7 @@ import (
 	metricspb "go.opentelemetry.io/proto/otlp/metrics/v1"
 	resourcepb "go.opentelemetry.io/proto/otlp/resource/v1"
 	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/miradorlabs/terma-cli/internal/semconv"
 )
@@ -287,5 +288,181 @@ func TestToolContentEventsKeepTheirOutput(t *testing.T) {
 	testRules.withhold(p, true, false, map[string]int{})
 	if events := span(p).Events; len(events) != 0 {
 		t.Fatalf("tool.output survived withheld tool content: %v", events)
+	}
+}
+
+// terma.session.historical is non-content metadata: it leaves intact on both resource and
+// log record attributes under every withholding policy (as boolean true or string "true"),
+// while withheld prompts, replies, tool content, and unclassified text stay off the wire.
+func TestWithheldContentKeepsHistoricalSessionMarker(t *testing.T) {
+	t.Parallel()
+	values := []struct {
+		name string
+		val  *commonpb.AnyValue
+	}{
+		{"bool", &commonpb.AnyValue{Value: &commonpb.AnyValue_BoolValue{BoolValue: true}}},
+		{"string", strValue("true")},
+	}
+	findAttr := func(attrs []*commonpb.KeyValue, key string) *commonpb.AnyValue {
+		for _, a := range attrs {
+			if a.GetKey() == key {
+				return a.GetValue()
+			}
+		}
+		return nil
+	}
+	for _, vc := range values {
+		for _, flags := range [][2]bool{{false, false}, {false, true}, {true, false}, {true, true}} {
+			prompts, toolContent := flags[0], flags[1]
+			resHist := &commonpb.KeyValue{Key: semconv.TermaSessionHistoricalKey, Value: proto.CloneOf(vc.val)}
+			recHist := &commonpb.KeyValue{Key: semconv.TermaSessionHistoricalKey, Value: proto.CloneOf(vc.val)}
+			msg := &logspb.LogsData{ResourceLogs: []*logspb.ResourceLogs{{
+				Resource: &resourcepb.Resource{Attributes: []*commonpb.KeyValue{
+					kv("service.name", "claude-code"),
+					resHist,
+					kv("process.command_args", "SECRET-ARGS"),
+					kv("cwd", "/Users/dev/SECRET-CWD"),
+					kv("host.secret", "SECRET-HOST"),
+				}},
+				ScopeLogs: []*logspb.ScopeLogs{{LogRecords: []*logspb.LogRecord{{
+					Body: strValue("SECRET-BODY"),
+					Attributes: []*commonpb.KeyValue{
+						kv("event.name", "user_prompt"),
+						kv("session.id", "hist-1"),
+						recHist,
+						kv("prompt", "SECRET-PROMPT"),
+						kv("gen_ai.prompt", "SECRET-GENAI-PROMPT"),
+						kv("response", "SECRET-REPLY"),
+						kv("gen_ai.completion", "SECRET-COMPLETION"),
+						kv("tool_parameters", "SECRET-TOOL-PARAMS"),
+						kv("gen_ai.tool.call.arguments", "SECRET-TOOL-ARGS"),
+						kv("gen_ai.tool.call.result", "SECRET-TOOL-RESULT"),
+						kv("x.unknown", "SECRET-UNKNOWN"),
+					},
+				}}}},
+			}}}
+			unclassified := map[string]int{}
+			testRules.withhold(&part{signal: Logs, session: "hist-1", msg: msg}, prompts, toolContent, unclassified)
+
+			rl := msg.ResourceLogs[0]
+			rec := rl.ScopeLogs[0].LogRecords[0]
+			if got := findAttr(rl.Resource.Attributes, semconv.TermaSessionHistoricalKey); !proto.Equal(got, vc.val) {
+				t.Errorf("%s prompts=%v tools=%v: resource %s = %v, want %v", vc.name, prompts, toolContent, semconv.TermaSessionHistoricalKey, got, vc.val)
+			}
+			if got := findAttr(rec.Attributes, semconv.TermaSessionHistoricalKey); !proto.Equal(got, vc.val) {
+				t.Errorf("%s prompts=%v tools=%v: record %s = %v, want %v", vc.name, prompts, toolContent, semconv.TermaSessionHistoricalKey, got, vc.val)
+			}
+			if unclassified[semconv.TermaSessionHistoricalKey] != 0 || unclassified["resource/"+semconv.TermaSessionHistoricalKey] != 0 {
+				t.Errorf("%s prompts=%v tools=%v: historical marker counted unclassified: %v", vc.name, prompts, toolContent, unclassified)
+			}
+
+			wire, err := proto.Marshal(msg)
+			if err != nil {
+				t.Fatal(err)
+			}
+			text := string(wire)
+			for _, secret := range []string{"SECRET-ARGS", "SECRET-PROMPT", "SECRET-GENAI-PROMPT", "SECRET-REPLY", "SECRET-COMPLETION"} {
+				if leaked := strings.Contains(text, secret); leaked != prompts {
+					t.Errorf("%s prompts=%v tools=%v: %s on wire = %v, want %v", vc.name, prompts, toolContent, secret, leaked, prompts)
+				}
+			}
+			for _, secret := range []string{"SECRET-CWD", "SECRET-TOOL-PARAMS", "SECRET-TOOL-ARGS", "SECRET-TOOL-RESULT"} {
+				if leaked := strings.Contains(text, secret); leaked != toolContent {
+					t.Errorf("%s prompts=%v tools=%v: %s on wire = %v, want %v", vc.name, prompts, toolContent, secret, leaked, toolContent)
+				}
+			}
+			both := prompts && toolContent
+			for _, secret := range []string{"SECRET-HOST", "SECRET-BODY", "SECRET-UNKNOWN"} {
+				if leaked := strings.Contains(text, secret); leaked != both {
+					t.Errorf("%s prompts=%v tools=%v: %s on wire = %v, want %v", vc.name, prompts, toolContent, secret, leaked, both)
+				}
+			}
+		}
+	}
+
+	verdicts := Classify(testCapturers, []FieldQuery{
+		{Site: SiteResource, Key: semconv.TermaSessionHistoricalKey},
+		{Site: SiteRecord, Key: semconv.TermaSessionHistoricalKey},
+	})
+	for i, site := range []FieldSite{SiteResource, SiteRecord} {
+		if verdicts[i].Class != FieldSafe {
+			t.Errorf("Classify(%s, %s) = %+v, want %s", site, semconv.TermaSessionHistoricalKey, verdicts[i], FieldSafe)
+		}
+	}
+}
+
+// End-to-end through the relay (dress, outbox, queued policy re-filter, upstream delivery):
+// under a restrictive policy, withheld prompt, reply, and tool content stay off the wire while
+// terma.session.historical=true survives on both resource and log record attributes.
+func TestRelayPreservesHistoricalSessionMarkerUnderRestrictivePolicy(t *testing.T) {
+	t.Parallel()
+	u := newUpstream(t)
+	f := newFixture()
+	r, srv := f.relay(t, u, map[string]Policy{
+		"p1": {Endpoint: u.srv.URL, Key: "key-p1", IncludePrompts: false, IncludeToolContent: false},
+	})
+	boolTrue := &commonpb.AnyValue{Value: &commonpb.AnyValue_BoolValue{BoolValue: true}}
+	msg := &logspb.LogsData{ResourceLogs: []*logspb.ResourceLogs{{
+		Resource: &resourcepb.Resource{Attributes: []*commonpb.KeyValue{
+			kv("service.name", "claude-code"),
+			{Key: semconv.TermaSessionHistoricalKey, Value: proto.CloneOf(boolTrue)},
+			kv("process.command_args", "SECRET-ARGS"),
+			kv("cwd", "/work/SECRET-CWD"),
+		}},
+		ScopeLogs: []*logspb.ScopeLogs{{LogRecords: []*logspb.LogRecord{{
+			Body: strValue("SECRET-BODY"),
+			Attributes: []*commonpb.KeyValue{
+				kv("event.name", "user_prompt"),
+				kv("session.id", "A"),
+				{Key: semconv.TermaSessionHistoricalKey, Value: proto.CloneOf(boolTrue)},
+				kv("prompt", "SECRET-PROMPT"),
+				kv("response", "SECRET-REPLY"),
+				kv("gen_ai.tool.call.arguments", "SECRET-TOOL-ARGS"),
+				kv("gen_ai.tool.call.result", "SECRET-TOOL-RESULT"),
+			},
+		}}}},
+	}}}
+	postProto(t, srv, "/v1/logs", msg)
+	waitForCounters(t, r, func(c map[string]int) bool { return c["forwarded.logs"] == 1 })
+
+	u.mu.Lock()
+	var sent []byte
+	for _, req := range u.requests {
+		if req.path == "/v1/logs" && req.auth == "Bearer key-p1" {
+			sent = req.body
+		}
+	}
+	u.mu.Unlock()
+	if len(sent) == 0 {
+		t.Fatal("no log export reached upstream")
+	}
+	if strings.Contains(string(sent), "SECRET-") {
+		t.Fatalf("withheld content reached upstream: %q", string(sent))
+	}
+	var got logspb.LogsData
+	if err := proto.Unmarshal(sent, &got); err != nil {
+		t.Fatal(err)
+	}
+	rl := got.ResourceLogs[0]
+	rec := rl.ScopeLogs[0].LogRecords[0]
+	checkBoolTrue := func(where string, attrs []*commonpb.KeyValue) {
+		t.Helper()
+		for _, a := range attrs {
+			if a.GetKey() == semconv.TermaSessionHistoricalKey {
+				b, ok := a.GetValue().GetValue().(*commonpb.AnyValue_BoolValue)
+				if !ok || !b.BoolValue {
+					t.Errorf("%s %s = %v, want bool true", where, semconv.TermaSessionHistoricalKey, a.GetValue())
+				}
+				return
+			}
+		}
+		t.Errorf("%s missing %s", where, semconv.TermaSessionHistoricalKey)
+	}
+	checkBoolTrue("resource", rl.Resource.Attributes)
+	checkBoolTrue("log record", rec.Attributes)
+	for name := range r.Stats().Snapshot().Counters {
+		if strings.Contains(name, semconv.TermaSessionHistoricalKey) {
+			t.Errorf("historical marker counted in relay stats: %s", name)
+		}
 	}
 }
