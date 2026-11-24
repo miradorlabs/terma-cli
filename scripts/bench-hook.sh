@@ -78,6 +78,6 @@ bench() {
 
 bench "$repo" checkout "$tmp/wt"
 bench "$tmp/wt" worktree "$repo"
-(cd "$ROOT" && go run ./scripts/benchhooks -routed "$BIN" "$repo")
+rm -rf "$repo/.git/hooks/"* "$TERMA_STATE_DIR/repo-hooks"* && (cd "$ROOT" && go run ./scripts/benchhooks -routed "$BIN" "$repo")
 bench "$repo" routed-checkout "$tmp/wt"
 bench "$tmp/wt" routed-worktree "$repo"
