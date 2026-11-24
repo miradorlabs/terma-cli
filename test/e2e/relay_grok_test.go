@@ -223,7 +223,7 @@ func TestRelayGrokACP(t *testing.T) {
 		sb.UseRelay(RelayOptions{Start: true, Content: true})
 
 		texts := []string{"First prompt. TERMA_GROK_ACP_1", "Second prompt. TERMA_GROK_ACP_2"}
-		sid := sb.GrokACP(b, sb.Repo, "t3-xai-prompt-1", texts...)
+		sid := sb.GrokACP(b, sb.Repo, "", "t3-xai-prompt-1", texts...)
 		if calls.Load() < 2 {
 			t.Fatalf("grok made %d model calls, so the turns prove nothing", calls.Load())
 		}
@@ -245,5 +245,52 @@ func TestRelayGrokACP(t *testing.T) {
 			ids[id] = true
 		}
 		sb.StopRelay()
+	})
+}
+
+// T3 Code runs each turn of a grok session after the first in a new `grok agent stdio`
+// process, which loads the session, and names that turn's prompt t3-xai-prompt-1 again. The
+// second process's turn reaches Terma as the first's does: its prompt, and grok's own model
+// call and reply through the relay.
+func TestRelayGrokACPResumed(t *testing.T) {
+	forEachGrok(t, func(t *testing.T, b Binary) {
+		track(t)
+		sb := New(t, Isolated)
+		var calls atomic.Int32
+		provider := httptest.NewServer(grokProvider(&calls, ""))
+		t.Cleanup(provider.Close)
+		sb.UseGrok(provider.URL)
+		sb.SetupAgents = append(sb.SetupAgents, "grok")
+		sb.RelayAgents = []string{"grok"}
+		sb.Setup(nil, "--team", sb.ProjectID, "--harness", sb.setupList())
+		sb.UseRelay(RelayOptions{Start: true, Content: true})
+
+		texts := []string{"First turn. TERMA_GROK_RESUME_1", "Second turn, new process. TERMA_GROK_RESUME_2"}
+		sid := sb.GrokACP(b, sb.Repo, "", "t3-xai-prompt-1", texts[0])
+		if again := sb.GrokACP(b, sb.Repo, sid, "t3-xai-prompt-1", texts[1]); again != sid {
+			t.Fatalf("the second process ran session %s, not %s", again, sid)
+		}
+		var prompts []Event
+		deadline := time.Now().Add(20 * time.Second)
+		for len(prompts) < len(texts) && time.Now().Before(deadline) {
+			time.Sleep(200 * time.Millisecond)
+			prompts = sb.Events("terma.user.message", sid)
+		}
+		if len(prompts) != len(texts) || prompts[0].Attrs["terma.message.id"] == prompts[1].Attrs["terma.message.id"] {
+			t.Errorf("prompt events %+v", prompts)
+		}
+		replies := map[string]int{}
+		sb.Receiver.WaitLogs(20*time.Second, func(l LogRecord) bool {
+			if l.EventName == "grok_code.assistant_response" && l.Attrs["session.id"] == sid {
+				replies[l.Resource["service.instance.id"]]++
+			}
+			return len(replies) == 2
+		})
+		sb.StopRelay()
+		c := sb.RelayStats()
+		t.Logf("replies by process %v, relay %v", replies, c)
+		if len(replies) != 2 {
+			t.Errorf("grok's replies reached Terma from %d of 2 processes", len(replies))
+		}
 	})
 }

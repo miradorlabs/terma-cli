@@ -106,10 +106,11 @@ func (sb *Sandbox) GrokRun(b Binary, dir, prompt string) string {
 }
 
 // GrokACP drives `grok agent stdio` in dir as an editor does over ACP (JSON-RPC, one message a
-// line): it opens one session, sends each prompt in turn, naming it with _meta.promptId when
+// line): it opens a session, or loads session when given (as T3 Code does for each turn after
+// the first, in a new process), sends each prompt in turn, naming it with _meta.promptId when
 // promptID is set (as T3 Code does), approves any permission grok asks for, and returns the
 // session's id.
-func (sb *Sandbox) GrokACP(b Binary, dir, promptID string, prompts ...string) string {
+func (sb *Sandbox) GrokACP(b Binary, dir, session, promptID string, prompts ...string) string {
 	t := sb.T
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), scenarioTimeout)
@@ -177,14 +178,19 @@ func (sb *Sandbox) GrokACP(b Binary, dir, promptID string, prompts ...string) st
 	}
 	call(1, "initialize", map[string]any{"protocolVersion": 1, "clientCapabilities": map[string]any{
 		"fs": map[string]any{"readTextFile": false, "writeTextFile": false}, "terminal": false}})
-	var session struct {
-		SessionID string `json:"sessionId"`
-	}
-	if err := json.Unmarshal(call(2, "session/new", map[string]any{"cwd": dir, "mcpServers": []any{}}), &session); err != nil || session.SessionID == "" {
-		t.Fatalf("session/new gave no session: %v", err)
+	if session == "" {
+		var opened struct {
+			SessionID string `json:"sessionId"`
+		}
+		if err := json.Unmarshal(call(2, "session/new", map[string]any{"cwd": dir, "mcpServers": []any{}}), &opened); err != nil || opened.SessionID == "" {
+			t.Fatalf("session/new gave no session: %v", err)
+		}
+		session = opened.SessionID
+	} else {
+		call(2, "session/load", map[string]any{"sessionId": session, "cwd": dir, "mcpServers": []any{}})
 	}
 	for i, prompt := range prompts {
-		params := map[string]any{"sessionId": session.SessionID, "prompt": []any{map[string]any{"type": "text", "text": prompt}}}
+		params := map[string]any{"sessionId": session, "prompt": []any{map[string]any{"type": "text", "text": prompt}}}
 		if promptID != "" {
 			params["_meta"] = map[string]any{"promptId": promptID}
 		}
@@ -194,5 +200,5 @@ func (sb *Sandbox) GrokACP(b Binary, dir, promptID string, prompts ...string) st
 	if err := cmd.Wait(); err != nil {
 		t.Fatalf("grok agent stdio: %v\n%s", err, stderr.String())
 	}
-	return session.SessionID
+	return session
 }
