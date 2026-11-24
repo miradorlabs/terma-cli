@@ -73,6 +73,7 @@ func (e Env) StartRun(sessionID string) {
 	}
 	if run, err := runs.Start(e.StateDir, sessionID, e.Time()); err != nil {
 		e.Logf("start run: %v", err)
+		e.Routing.noteWriteErr(err)
 	} else {
 		e.Routing.mu.Lock()
 		e.Routing.runs[sessionID] = &ledgerRun{id: run, active: e.Time()}

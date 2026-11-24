@@ -157,4 +157,13 @@ func TestDispatchToolReachFailsClosedOnWriteError(t *testing.T) {
 	if code := Run(ctx, unusableDeps, Request{Event: "extfake-tool-reach", Cwd: repoA, Stdin: strings.NewReader(reachBody)}); code == 0 {
 		t.Fatalf("unusable routing tool-reach exited 0; want non-zero")
 	}
+	// Session-start must also exit non-zero when the clean run cannot be persisted or routing is unusable,
+	// so extension integrations keep local taint instead of clearing it against a stale Mixed run.
+	startBody := `{"session_id":"` + sid + `","cwd":` + strconv.Quote(repoA) + `}`
+	if code := Run(ctx, deps, Request{Event: "extfake-session-start", Cwd: repoA, Stdin: strings.NewReader(startBody)}); code == 0 {
+		t.Fatalf("extfake-session-start exited 0 despite unwritable runsDir; want non-zero")
+	}
+	if code := Run(ctx, unusableDeps, Request{Event: "extfake-session-start", Cwd: repoA, Stdin: strings.NewReader(startBody)}); code == 0 {
+		t.Fatalf("unusable routing extfake-session-start exited 0; want non-zero")
+	}
 }

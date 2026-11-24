@@ -74,7 +74,14 @@ func (x Extension) sessionStart(ctx context.Context, env Env) error {
 	if subagent {
 		env.AliasRun(in.ParentSessionID, in.SessionID)
 	} else {
+		if env.Routing != nil && !env.Routing.Usable() {
+			return ErrFailClosed
+		}
+		_ = env.Routing.TakeWriteErr()
 		env.StartRun(in.SessionID)
+		if err := env.Routing.TakeWriteErr(); err != nil {
+			return fmt.Errorf("%w: %w", ErrFailClosed, err)
+		}
 	}
 	r, ok := env.Open(ctx, in.SessionID, in.Cwd)
 	if !ok {
