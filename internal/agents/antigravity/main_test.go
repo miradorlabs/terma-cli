@@ -8,7 +8,7 @@ import (
 
 // TestMain gives the package a private HOME and no T3CODE_HOME, so no test reads or writes
 // the developer's Antigravity homes, ~/.gemini or T3 Code's; a test that needs a home sets
-// its own.
+// its own. No test asks a real binary its version (version.go).
 func TestMain(m *testing.M) {
 	os.Exit(runIsolated(m))
 }
@@ -24,5 +24,7 @@ func runIsolated(m *testing.M) int {
 		_ = os.Setenv(k, home)
 	}
 	_ = os.Unsetenv("T3CODE_HOME")
+	// No hook in a test looks for the binary running it, nor runs one, unless the test says.
+	versionAncestors = func() []int { return nil }
 	return m.Run()
 }

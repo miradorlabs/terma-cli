@@ -130,6 +130,7 @@ func preInvocation(ctx context.Context, env hookrun.Env) error {
 	// turn's prompt, and a cancelled turn's last call passed, see turn.go), each stamped.
 	conv := openAntigravityConversation(ctx, env, r, in)
 	defer conv.close()
+	version := lazyAntigravityVersion(ctx, env)
 	sess := env.NewSession(r, id, antigravityTool, in.ModelName)
 	now := sess.UpdatedAt
 	if active, _ := r.Store.Active(now, 0); active != nil && active.ID == id && !active.StartedAt.IsZero() {
@@ -139,14 +140,14 @@ func preInvocation(ctx context.Context, env hookrun.Env) error {
 	// A later turn, or a resumed conversation, was announced before.
 	if steps, _, stepsKnown := hookrun.JSONNumber(in.InitialNumSteps, true); !stepsKnown || steps <= 1 {
 		env.PruneManifests(r, now)
-		conv.at(env).EmitStart(r, sess, nil)
+		conv.at(env).EmitStart(r, sess, withAgentVersion(map[string]any{}, version))
 	}
 	// After the session start, so on a conversation's first turn the start sorts before its
 	// prompt.
 	read := conv.read(ctx)
 	conv.at(env).CaptureObservation(ctx, r, hookrun.Observation{
 		Tool: antigravityTool, Source: sourceAntigravityHook, StateDir: antigravityObservationDir,
-		SessionID: id, Hook: "PreInvocation", TurnID: turn, Attrs: antigravityObservationAttrs(in, "PreInvocation", turn, read),
+		SessionID: id, Hook: "PreInvocation", TurnID: turn, Attrs: antigravityObservationAttrs(in, "PreInvocation", turn, read, version),
 	})
 	return nil
 }
@@ -213,7 +214,7 @@ func postToolUse(ctx context.Context, env hookrun.Env) error {
 	refused := in.ToolCall != nil && conv.refuses(in.ToolCall.Name, in.ToolCall.Args)
 	// The turn as it stands once this hook holds the conversation.
 	turn := antigravityTurnID(env, r, id)
-	call, called := antigravityToolCallAttrs(in, turn)
+	call, called := antigravityToolCallAttrs(in, turn, lazyAntigravityVersion(ctx, env))
 	if step, stepped := call[semconv.TermaStepIndexKey].(int64); stepped {
 		conv.call.step = step
 	}
@@ -268,7 +269,8 @@ func postToolUse(ctx context.Context, env hookrun.Env) error {
 // antigravityToolCallAttrs is the body of a step's terma.tool.call. agy issues no call id;
 // its step index only grows within a conversation, so it becomes the gen_ai.tool.call.id.
 // terma.operation.status is agy's: a shell command that exits non-zero is a completed step.
-func antigravityToolCallAttrs(in *antigravityHookInput, turn string) (map[string]any, bool) {
+// version is asked only for a call that goes.
+func antigravityToolCallAttrs(in *antigravityHookInput, turn string, version func() string) (map[string]any, bool) {
 	a := hookrun.EvidenceAttrs(antigravityTool, sourceAntigravityHook, "PostToolUse")
 	if in.ToolCall != nil && hookrun.ShortLabel(in.ToolCall.Name) {
 		a[semconv.GenAIToolNameKey] = in.ToolCall.Name
@@ -290,7 +292,7 @@ func antigravityToolCallAttrs(in *antigravityHookInput, turn string) (map[string
 	if in.Error != "" {
 		a[semconv.TermaOperationStatusKey] = "error"
 	}
-	return a, true
+	return withAgentVersion(a, version), true
 }
 
 // postInvocation and stop record the turn's shape as observations, and send the calls
@@ -343,7 +345,7 @@ func antigravityObserve(ctx context.Context, env hookrun.Env, hook string) error
 	}
 	conv.at(env).CaptureObservation(ctx, r, hookrun.Observation{
 		Tool: antigravityTool, Source: sourceAntigravityHook, StateDir: antigravityObservationDir,
-		SessionID: in.id(), Hook: hook, TurnID: turn, Attrs: antigravityObservationAttrs(in, hook, turn, read),
+		SessionID: in.id(), Hook: hook, TurnID: turn, Attrs: antigravityObservationAttrs(in, hook, turn, read, lazyAntigravityVersion(ctx, env)),
 	})
 	return nil
 }
@@ -351,8 +353,8 @@ func antigravityObserve(ctx context.Context, env hookrun.Env, hook string) error
 // antigravityObservationAttrs is a hook's observation. A hook carries no plan, quota or
 // account (the status line does), and no token counts: when the hook read the transcript,
 // the calls carry them as terma.model_call, so the observation makes no claim about usage;
-// when it could not, its usage is unavailable.
-func antigravityObservationAttrs(in *antigravityHookInput, hook, turn string, callsRead bool) map[string]any {
+// when it could not, its usage is unavailable. version is the running binary's (version.go).
+func antigravityObservationAttrs(in *antigravityHookInput, hook, turn string, callsRead bool, version func() string) map[string]any {
 	a := hookrun.EvidenceAttrs(antigravityTool, sourceAntigravityHook, hook)
 	for _, k := range []string{semconv.TermaFundingStatusKey, semconv.TermaQuotaStatusKey, semconv.TermaAccountStatusKey} {
 		a[k] = hookrun.StatusUnavailable
@@ -384,7 +386,7 @@ func antigravityObservationAttrs(in *antigravityHookInput, hook, turn string, ca
 			a[semconv.TermaOperationStatusKey] = "error"
 		}
 	}
-	return a
+	return withAgentVersion(a, version)
 }
 
 // antigravitySkipCalls is a hook that could not resolve where it ran, or ran where the

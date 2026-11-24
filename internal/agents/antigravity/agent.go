@@ -110,7 +110,7 @@ func (Agent) PayloadSession(payload []byte) (hookrun.PayloadSession, bool) {
 // Coverage is how completely terma supports the agent.
 func (Agent) Coverage() (attribution, telemetry agents.CapabilitySupport) {
 	return agents.CapabilitySupport{Level: agents.SupportPartial, Note: "files its file tools write; a file a shell command writes is not recorded"},
-		agents.CapabilitySupport{Level: agents.SupportPartial, Note: "hooks and its transcript, no OTLP export: each model call's tokens (thinking not counted apart), every turn and tool step; under the team's content policy, each prompt, reply, tool call's arguments and tool's result, cut at 16 KiB; no thinking; plan, quota and account from the status line, interactive agy sessions only, so none from T3 Code threads; no cost or tool durations"}
+		agents.CapabilitySupport{Level: agents.SupportPartial, Note: "hooks and its transcript, no OTLP export: each model call's tokens (thinking not counted apart), every turn and tool step; under the team's content policy, each prompt, reply, tool call's arguments and tool's result, cut at 16 KiB; no thinking; plan, quota and account from the status line, interactive agy sessions only, so none from T3 Code threads; the version of the running agy or of T3 Code's own copy, none when terma cannot tell or on Windows; no cost or tool durations"}
 }
 
 // ContentConsented is the consent prompts, replies, tool arguments and results travel under.
@@ -134,5 +134,5 @@ var (
 
 // StateDirs are the directories its hooks keep state in.
 func (Agent) StateDirs() []string {
-	return []string{antigravityObservationDir, antigravityTurnDir, antigravityCallDir, antigravityStatusLineDir, antigravitySkillStateDir}
+	return []string{antigravityObservationDir, antigravityTurnDir, antigravityCallDir, antigravityStatusLineDir, antigravitySkillStateDir, antigravityVersionDir}
 }

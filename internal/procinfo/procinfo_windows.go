@@ -141,3 +141,6 @@ func tcpTable(af int) ([]byte, bool) {
 	}
 	return nil, false
 }
+
+// executableOf cannot tell here: what a process runs is not looked up on Windows.
+func executableOf(int) (Executable, bool) { return Executable{}, false }

@@ -474,7 +474,10 @@ one named hook, `terma`, to `~/.gemini/config/hooks.json`, which every `agy` ses
 and leaves the file's other hooks, and its comments, as they are. It needs `agy` 1.2.4 or later,
 the first whose Stop hook runs reliably; `terma doctor` names the version it finds. Those hooks report the model, each turn,
 each tool step (its name and whether it failed) and how the turn
-ended, and the files `agy`'s own file tools write are stamped on your commits. Each hook
+ended, and the files `agy`'s own file tools write are stamped on your commits. They also
+send the version of the program running the session, read from that program itself: the `agy`
+CLI's, or in a T3 Code thread, that of T3 Code's own copy. When terma cannot tell, and on
+Windows, no version is sent. Each hook
 also reads the conversation's transcript and sends every model call written since the last
 one: its model and its input, cache-read and output tokens. `agy` does not count thinking
 apart from output, or cache writes, so neither is sent; there is no cost, which the
