@@ -268,8 +268,8 @@ func TestShellSubstKnownOutputs(t *testing.T) {
 			return testSysPath(), true
 		case "GIT_CONFIG_NOSYSTEM":
 			return "1", true
-		case "GOENV", "GOMODCACHE", "GOFLAGS", "GOTOOLCHAIN", "XDG_CONFIG_HOME", "AppData",
-			"SHELLOPTS", "GCONV_PATH", "LOCPATH":
+		case "GOENV", "GOMODCACHE", "GOFLAGS", "GOTOOLCHAIN", "GOROOT", "GO111MODULE", "GOWORK", "GOEXPERIMENT", "GOFIPS140",
+			"XDG_CONFIG_HOME", "AppData", "SHELLOPTS", "GCONV_PATH", "LOCPATH":
 			return "", false
 		}
 		if strings.HasPrefix(k, "LD_") || strings.HasPrefix(k, "DYLD_") {
@@ -3341,5 +3341,93 @@ func TestPR175ReviewRegressions(t *testing.T) {
 	scRelGPEnv := newScan(parent, makeEnv(map[string]string{"HOME": parent, "USERPROFILE": parent, "GOPATH": "relative", "GOMODCACHE": filepath.Join(parent, "mod")}), work{deadline: time.Now().Add(time.Minute)})
 	if got, ok := modcache(scRelGPEnv, nil); ok {
 		t.Errorf("env GOPATH=relative: modcache = %q, want false", got)
+	}
+
+	// 9. GOROOT overrides (set or unresolved) fail closed before modeling go env; empty GOROOT is allowed.
+	absGP, absMC := filepath.Join(parent, "gp"), filepath.Join(parent, "mc")
+	scGoroot := newScan(parent, makeEnv(map[string]string{
+		"HOME": parent, "USERPROFILE": parent, "GOENV": "off", "GOTOOLCHAIN": "local",
+		"GOROOT": filepath.Join(parent, "nonexistent-goroot"), "GOPATH": absGP, "GOMODCACHE": absMC,
+	}), work{deadline: time.Now().Add(time.Minute)})
+	if got, ok := gopath(scGoroot, nil); ok {
+		t.Errorf("GOROOT override: gopath = %q, want false", got)
+	}
+	if got, ok := modcache(scGoroot, nil); ok {
+		t.Errorf("GOROOT override: modcache = %q, want false", got)
+	}
+	scGorootUnres := newScan(parent, makeEnv(map[string]string{
+		"HOME": parent, "USERPROFILE": parent, "GOENV": "off", "GOTOOLCHAIN": "local",
+	}), work{deadline: time.Now().Add(time.Minute)})
+	scGorootUnres.vars["GOROOT"] = nil
+	if got, ok := gopath(scGorootUnres, nil); ok {
+		t.Errorf("unresolved GOROOT: gopath = %q, want false", got)
+	}
+	if got, ok := modcache(scGorootUnres, nil); ok {
+		t.Errorf("unresolved GOROOT: modcache = %q, want false", got)
+	}
+	scGorootEmpty := newScan(parent, makeEnv(map[string]string{
+		"HOME": parent, "USERPROFILE": parent, "GOENV": "off", "GOTOOLCHAIN": "local", "GOROOT": "",
+	}), work{deadline: time.Now().Add(time.Minute)})
+	if got, ok := gopath(scGorootEmpty, nil); !ok || got != filepath.Join(parent, "go") {
+		t.Errorf("empty GOROOT: gopath = (%q, %v), want (%q, true)", got, ok, filepath.Join(parent, "go"))
+	}
+
+	// 10. Implicit Go toolchain selection via ancestor go.mod/go.work fails closed unless disabled by GOTOOLCHAIN=local, GO111MODULE=off, or GOWORK=off.
+	modDir := filepath.Join(parent, "gomod-tc")
+	modSub := filepath.Join(modDir, "sub")
+	if err := os.MkdirAll(modSub, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	for _, body := range []string{"module example.com/test\n\ngo 1.99\n", "module example.com/test\n\ntoolchain go1.99.0\n"} {
+		if err := os.WriteFile(filepath.Join(modDir, "go.mod"), []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		scTC := newScan(modSub, makeEnv(map[string]string{"HOME": parent, "USERPROFILE": parent, "GOENV": "off"}), work{deadline: time.Now().Add(time.Minute)})
+		if got, ok := gopath(scTC, nil); ok {
+			t.Errorf("go.mod %q with unset GOTOOLCHAIN: gopath = %q, want false", body, got)
+		}
+		if got, ok := modcache(scTC, nil); ok {
+			t.Errorf("go.mod %q with unset GOTOOLCHAIN: modcache = %q, want false", body, got)
+		}
+		for _, extra := range []map[string]string{
+			{"HOME": parent, "USERPROFILE": parent, "GOENV": "off", "GOTOOLCHAIN": "local"},
+			{"HOME": parent, "USERPROFILE": parent, "GOENV": "off", "GO111MODULE": "off"},
+		} {
+			scOK := newScan(modSub, makeEnv(extra), work{deadline: time.Now().Add(time.Minute)})
+			if got, ok := gopath(scOK, nil); !ok || got != filepath.Join(parent, "go") {
+				t.Errorf("go.mod %q with %v: gopath = (%q, %v), want (%q, true)", body, extra, got, ok, filepath.Join(parent, "go"))
+			}
+		}
+	}
+	// A go.mod without go/toolchain directives does not trigger toolchain switching.
+	if err := os.WriteFile(filepath.Join(modDir, "go.mod"), []byte("module example.com/test\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	scNoTC := newScan(modSub, makeEnv(map[string]string{"HOME": parent, "USERPROFILE": parent, "GOENV": "off"}), work{deadline: time.Now().Add(time.Minute)})
+	if got, ok := gopath(scNoTC, nil); !ok || got != filepath.Join(parent, "go") {
+		t.Errorf("go.mod without go/toolchain directive: gopath = (%q, %v), want (%q, true)", got, ok, filepath.Join(parent, "go"))
+	}
+	// An ancestor go.work with a go directive fails closed unless GOWORK=off, GOTOOLCHAIN=local, or GO111MODULE=off.
+	workDir := filepath.Join(parent, "gowork-tc")
+	workSub := filepath.Join(workDir, "pkg")
+	if err := os.MkdirAll(workSub, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(workDir, "go.work"), []byte("go 1.99\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	scWorkTC := newScan(workSub, makeEnv(map[string]string{"HOME": parent, "USERPROFILE": parent, "GOENV": "off"}), work{deadline: time.Now().Add(time.Minute)})
+	if got, ok := gopath(scWorkTC, nil); ok {
+		t.Errorf("go.work with go 1.99: gopath = %q, want false", got)
+	}
+	for _, extra := range []map[string]string{
+		{"HOME": parent, "USERPROFILE": parent, "GOENV": "off", "GOWORK": "off"},
+		{"HOME": parent, "USERPROFILE": parent, "GOENV": "off", "GOTOOLCHAIN": "local"},
+		{"HOME": parent, "USERPROFILE": parent, "GOENV": "off", "GO111MODULE": "off"},
+	} {
+		scWorkOK := newScan(workSub, makeEnv(extra), work{deadline: time.Now().Add(time.Minute)})
+		if got, ok := gopath(scWorkOK, nil); !ok || got != filepath.Join(parent, "go") {
+			t.Errorf("go.work with %v: gopath = (%q, %v), want (%q, true)", extra, got, ok, filepath.Join(parent, "go"))
+		}
 	}
 }

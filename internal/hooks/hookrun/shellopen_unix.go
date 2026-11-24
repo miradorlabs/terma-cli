@@ -59,10 +59,9 @@ func openAt(dirfd int, name string, flags int, want fs.FileInfo) (dirHandle, err
 	}
 }
 func statIDs(a fs.FileInfo) (uint64, uint32, bool) {
-	switch sa := a.Sys().(type) {
-	case *unix.Stat_t:
+	if sa, ok := a.Sys().(*unix.Stat_t); ok {
 		return uint64(sa.Dev), sa.Uid, true
-	case *syscall.Stat_t:
+	} else if sa, ok := a.Sys().(*syscall.Stat_t); ok {
 		return uint64(sa.Dev), sa.Uid, true
 	}
 	return 0, 0, false

@@ -33,8 +33,7 @@ func maskWords(command string, depth int) string {
 		if heredoc {
 			words[i] = "…"
 		} else if redir > 0 {
-			words[i] = pick(redir == 2 || hasSubst || userinfo.MatchString(b), "…", words[i])
-			heredoc, redir = redir == 3, 0
+			words[i], heredoc, redir = pick(redir == 2 || hasSubst || userinfo.MatchString(b), "…", words[i]), redir == 3, 0
 		} else if r := strings.TrimLeft(words[i], "0123456789"); strings.HasPrefix(r, "<") || strings.HasPrefix(r, ">") {
 			if strings.HasPrefix(r, "<<") && !strings.HasPrefix(r, "<<<") && r != "<<" && r != "<<-" {
 				heredoc, words[i] = true, pick(hasSubst || userinfo.MatchString(b), "…", words[i])
@@ -157,9 +156,6 @@ func ansiEscape(s string) (rune, int) {
 
 // parsable reports whether src is within maxShellBytes, maxShellNesting, maxShellExpr, and maxShellWords.
 func parsable(src string) bool {
-	if len(src) > maxShellBytes {
-		return false
-	}
 	open, docs, bodies, body, expr, exprDepth, letUntil, links, words, dollars := []byte{0}, []heredoc(nil), []heredoc(nil), 0, -1, 0, -1, 0, 0, 0
 	push := func(c byte, n, i int, isExpr bool) {
 		expr, exprDepth = pick(isExpr && expr < 0, i, expr), pick(isExpr && expr < 0, len(open), exprDepth)
@@ -167,7 +163,7 @@ func parsable(src string) bool {
 		open = append(open, slices.Repeat([]byte{pick(k >= 0, ")}]"[max(k, 0)], c)}, n)...)
 	}
 	read := func() { body, open = len(open), append(open, pick(bodies[0].quoted, byte('q'), byte('h'))) }
-	for i := 0; i < len(src); i++ {
+	for i := 0; len(src) <= maxShellBytes && i < len(src); i++ {
 		c, top := src[i], open[len(open)-1]
 		if top == 0 && (c == ' ' || c == '\t' || c == '\n' && len(bodies) == 0 && len(docs) == 0) {
 			for letUntil = pick(c == '\n', -1, letUntil); i+1 < len(src) && (src[i+1] == ' ' || src[i+1] == '\t' || src[i+1] == '\n' && len(bodies) == 0 && len(docs) == 0); i, letUntil = i+1, pick(src[i+1] == '\n', -1, letUntil) {
@@ -187,8 +183,7 @@ func parsable(src string) bool {
 				read()
 			}
 			for len(bodies) > 0 && i < len(src) {
-				line := src[i+1 : lineEnd(src, i+1)]
-				if strings.TrimRight(pick(bodies[0].stripTabs, strings.TrimLeft(line, "\t"), line), "\r") != bodies[0].delim {
+				if line := src[i+1 : lineEnd(src, i+1)]; strings.TrimRight(pick(bodies[0].stripTabs, strings.TrimLeft(line, "\t"), line), "\r") != bodies[0].delim {
 					break
 				}
 				i, open = lineEnd(src, i+1), slices.Delete(open, body, body+1)
@@ -253,7 +248,7 @@ func parsable(src string) bool {
 			return false
 		}
 	}
-	return len(bodies) == 0 && len(docs) == 0
+	return len(src) <= maxShellBytes && len(bodies) == 0 && len(docs) == 0
 }
 func byteAt(s string, i int) byte {
 	return pick(i >= 0 && i < len(s), s, "\x00")[pick(i >= 0 && i < len(s), i, 0)]

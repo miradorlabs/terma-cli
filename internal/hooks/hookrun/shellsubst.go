@@ -22,25 +22,23 @@ var outputs = map[string]func(sc *scan, args []*syntax.Word) (string, bool){
 }
 
 func (sc *scan) substitute(w io.Writer, cs *syntax.CmdSubst) error {
-	if len(cs.Stmts) == 1 && len(cs.Stmts[0].Redirs) == 0 {
-		if ce, ok := cs.Stmts[0].Cmd.(*syntax.CallExpr); ok && len(ce.Assigns) == 0 {
-			words := make([]string, min(len(ce.Args), 4))
-			for i := range words {
-				words[i] = ce.Args[i].Lit()
-			}
-			for n := len(words); n > 0; n-- {
-				if known, ok := outputs[strings.Join(words[:n], " ")]; ok {
-					if _, ok := sc.trustedCmd(words[0]); ok {
-						outer := sc.cfg
-						sc.cfg = sc.config() // expand is not reentrant
-						out, ok := known(sc, ce.Args[n:])
-						if sc.cfg, out = outer, strings.TrimRight(out, "\n"); ok && sc.charge(len(out)) && sc.chargeFields(out) {
-							_, err := io.WriteString(w, out)
-							return err
-						}
+	if ce, ok := pick(len(cs.Stmts) == 1 && len(cs.Stmts[0].Redirs) == 0, cs.Stmts, []*syntax.Stmt{{}})[0].Cmd.(*syntax.CallExpr); ok && len(ce.Assigns) == 0 {
+		words := make([]string, min(len(ce.Args), 4))
+		for i := range words {
+			words[i] = ce.Args[i].Lit()
+		}
+		for n := len(words); n > 0; n-- {
+			if known, ok := outputs[strings.Join(words[:n], " ")]; ok {
+				if _, ok := sc.trustedCmd(words[0]); ok {
+					outer := sc.cfg
+					sc.cfg = sc.config() // expand is not reentrant
+					out, ok := known(sc, ce.Args[n:])
+					if sc.cfg, out = outer, strings.TrimRight(out, "\n"); ok && sc.charge(len(out)) && sc.chargeFields(out) {
+						_, err := io.WriteString(w, out)
+						return err
 					}
-					return errOpaque
 				}
+				return errOpaque
 			}
 		}
 	}
@@ -62,8 +60,9 @@ func (sc *scan) trustedCmd(name string) (string, bool) {
 			} else if found && !info.IsDir() && (runtime.GOOS == "windows" || info.Mode()&0o111 != 0) {
 				r2, _, info2, _, trusted := sc.walk(cand, true, 3)
 				p, same := filepath.ToSlash(r2[len(filepath.VolumeName(r2)):]), pick(runtime.GOOS == "windows", strings.EqualFold(filepath.Base(r2), name+ext), filepath.Base(r2) == name)
-				p = pick(runtime.GOOS == "windows", strings.ToLower(p), p)
-				return r2, trusted && info2 != nil && !info2.IsDir() && same && slices.ContainsFunc(roots, func(pre string) bool { return strings.HasPrefix(p, pre) })
+				return r2, trusted && info2 != nil && !info2.IsDir() && same && slices.ContainsFunc(roots, func(pre string) bool {
+					return strings.HasPrefix(pick(runtime.GOOS == "windows", strings.ToLower(p), p), pre)
+				})
 			}
 		}
 	}
@@ -80,7 +79,7 @@ func (sc *scan) pwdBare(a []*syntax.Word) (string, bool) {
 func (sc *scan) envVal(k string) string { v, _ := sc.lookup(k); return v }
 func (sc *scan) envSet(k string) bool   { _, ok := sc.lookup(k); return ok }
 func (sc *scan) hasGoEnv(key string) bool {
-	if slices.ContainsFunc([]string{"GOFLAGS", "GOTOOLCHAIN", "GOEXPERIMENT", "GOFIPS140"}, func(k string) bool { return sc.isUnresolvedVar(k) || sc.envVal(k) != "" }) || sc.isUnresolvedVar("GO111MODULE") || !slices.Contains([]string{"", "on", "off", "auto"}, sc.envVal("GO111MODULE")) || sc.isUnresolvedVar("GOWORK") || sc.envVal("GOWORK") != "" && sc.envVal("GOWORK") != "off" || sc.isUnresolvedVar("GOMODCACHE") || sc.envVal("GOMODCACHE") != "" && !filepath.IsAbs(sc.envVal("GOMODCACHE")) || sc.isUnresolvedVar("GOPATH") || sc.envVal("GOPATH") != "" && slices.ContainsFunc(filepath.SplitList(sc.envVal("GOPATH")), func(e string) bool { return !filepath.IsAbs(e) }) {
+	if slices.ContainsFunc([]string{"GOFLAGS", "GOEXPERIMENT", "GOFIPS140", "GOROOT"}, func(k string) bool { return sc.isUnresolvedVar(k) || sc.envVal(k) != "" }) || sc.isUnresolvedVar("GOTOOLCHAIN") || sc.envVal("GOTOOLCHAIN") != "" && sc.envVal("GOTOOLCHAIN") != "local" || sc.isUnresolvedVar("GO111MODULE") || !slices.Contains([]string{"", "on", "off", "auto"}, sc.envVal("GO111MODULE")) || sc.isUnresolvedVar("GOWORK") || sc.envVal("GOWORK") != "" && sc.envVal("GOWORK") != "off" || sc.isUnresolvedVar("GOMODCACHE") || sc.envVal("GOMODCACHE") != "" && !filepath.IsAbs(sc.envVal("GOMODCACHE")) || sc.isUnresolvedVar("GOPATH") || sc.envVal("GOPATH") != "" && slices.ContainsFunc(filepath.SplitList(sc.envVal("GOPATH")), func(e string) bool { return !filepath.IsAbs(e) }) || sc.envVal("GOTOOLCHAIN") != "local" && sc.envVal("GO111MODULE") != "off" && sc.hasGoModToolchain() {
 		return true
 	}
 	p, bad := sc.envVal("GOENV"), sc.isUnresolvedVar("GOENV")
@@ -99,26 +98,39 @@ func (sc *scan) hasGoEnv(key string) bool {
 		return t != "" && t[0] != '#' && (!ok || k == key || !slices.Contains([]string{"GOPATH", "GOMODCACHE", "GOPROXY", "GOPRIVATE", "GONOPROXY", "GONOSUMDB"}, k) || k == "GOMODCACHE" && v != "" && !filepath.IsAbs(v) || k == "GOPATH" && v != "" && slices.ContainsFunc(filepath.SplitList(v), func(e string) bool { return !filepath.IsAbs(e) }))
 	}))
 }
+func (sc *scan) hasGoModToolchain() bool {
+	start, ok := sc.real(sc.dir)
+	for _, d := range pick(!ok || sc.unknown, nil, pick(samePath(start, filepath.Clean(sc.dir)) || !filepath.IsAbs(sc.dir), []string{start}, []string{start, filepath.Clean(sc.dir)})) {
+		for cur, next := d, ""; cur != next && sc.spendStat(1); cur, next = filepath.Dir(cur), cur {
+			for _, n := range pick(sc.envVal("GOWORK") == "off", []string{"go.mod"}, []string{"go.work", "go.mod"}) {
+				if sc.fileHasLine(filepath.Join(cur, n), func(l string) bool {
+					t := strings.TrimSpace(strings.TrimPrefix(l, "\ufeff"))
+					return strings.HasPrefix(t, "go") && (len(t) == 2 || t[2] < 'a' || t[2] > 'z') || strings.HasPrefix(t, "toolchain") && (len(t) == 9 || t[9] < 'a' || t[9] > 'z')
+				}) {
+					return true
+				}
+			}
+		}
+	}
+	return !ok || sc.unknown
+}
 func gopath(sc *scan, args []*syntax.Word) (string, bool) {
-	if v, ok := sc.lookup("GOPATH"); len(args) != 0 || sc.isUnresolvedVar("GOPATH") {
+	if v, ok := sc.lookup("GOPATH"); len(args) != 0 || sc.hasGoEnv(pick(ok && v != "", "", "GOPATH")) {
 		return "", false
 	} else if ok && v != "" {
-		ok = !sc.hasGoEnv("") && !slices.ContainsFunc(filepath.SplitList(v), func(p string) bool { return !filepath.IsAbs(p) })
-		return pick(ok, v, ""), ok
+		return v, true
 	}
-	key := pick(runtime.GOOS == "windows", "USERPROFILE", "HOME")
-	home, ok := sc.lookup(key)
-	return filepath.Join(home, "go"), !sc.isUnresolvedVar(key) && !sc.hasGoEnv("GOPATH") && ok && filepath.IsAbs(home)
+	home, ok := sc.lookup(pick(runtime.GOOS == "windows", "USERPROFILE", "HOME"))
+	return filepath.Join(home, "go"), !sc.isUnresolvedVar(pick(runtime.GOOS == "windows", "USERPROFILE", "HOME")) && ok && filepath.IsAbs(home)
 }
 func modcache(sc *scan, args []*syntax.Word) (string, bool) {
-	if v, ok := sc.lookup("GOMODCACHE"); len(args) == 0 && !sc.isUnresolvedVar("GOMODCACHE") {
-		if ok && v != "" {
-			ok = !sc.hasGoEnv("") && filepath.IsAbs(v)
-			return pick(ok, v, ""), ok
-		} else if gp, ok := gopath(sc, nil); !sc.hasGoEnv("GOMODCACHE") && ok {
-			first, _, _ := strings.Cut(gp, string(os.PathListSeparator))
-			return filepath.Join(first, "pkg", "mod"), first != ""
-		}
+	if v, ok := sc.lookup("GOMODCACHE"); len(args) != 0 || sc.hasGoEnv(pick(ok && v != "", "", "GOMODCACHE")) {
+		return "", false
+	} else if ok && v != "" {
+		return v, true
+	} else if gp, ok := gopath(sc, nil); ok {
+		first, _, _ := strings.Cut(gp, string(os.PathListSeparator))
+		return filepath.Join(first, "pkg", "mod"), first != ""
 	}
 	return "", false
 }
@@ -345,8 +357,7 @@ func (sc *scan) readSmallFile(path string) (string, error) {
 	return pick(bad, "", string(buf[:n])), pick(bad, errOpaque, nil)
 }
 func (sc *scan) below(dir string, levels int) {
-	c := candidate{dir, strconv.Itoa(levels), walked}
-	if _, seen := sc.examined[c]; seen || !sc.spend(1) {
+	if c := (candidate{dir, strconv.Itoa(levels), walked}); func() bool { _, seen := sc.examined[c]; return seen }() || !sc.spend(1) {
 		return
 	} else if sc.examined[c] = (cached{}); sc.holdsNone(dir) || sc.unknown || func() bool { r, ok := sc.walkUpGit(dir, false); return ok && !sc.enclosingCheckout(r) }() || sc.unknown {
 		return
@@ -387,13 +398,12 @@ func (sc *scan) enclosingCheckout(root string) bool {
 	return sc.cwdRoot != "" && !samePath(root, sc.cwdRoot) && err == nil && rel != "." && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
 }
 func (sc *scan) holdsNone(p string) bool {
-	sep := string(filepath.Separator)
 	if sc.none == nil {
 		cache, hasCache := modcache(sc, nil)
 		home, hasHome := sc.homeDir()
-		sc.none = append(append(pick(runtime.GOOS == "darwin", []string{sep + "System"}, []string{}), pick(hasCache, []string{cache}, nil)...), pick(runtime.GOOS == "darwin" && hasHome && home != "", []string{filepath.Join(home, "Library")}, nil)...)
+		sc.none = append(append(pick(runtime.GOOS == "darwin", []string{string(filepath.Separator) + "System"}, []string{}), pick(hasCache, []string{cache}, nil)...), pick(runtime.GOOS == "darwin" && hasHome && home != "", []string{filepath.Join(home, "Library")}, nil)...)
 	}
-	return filepath.Base(p) == "node_modules" || strings.Contains(p, sep+"node_modules"+sep) || slices.ContainsFunc(sc.none, func(root string) bool { return p == root || strings.HasPrefix(p, root+sep) })
+	return filepath.Base(p) == "node_modules" || strings.Contains(p, string(filepath.Separator)+"node_modules"+string(filepath.Separator)) || slices.ContainsFunc(sc.none, func(root string) bool { return p == root || strings.HasPrefix(p, root+string(filepath.Separator)) })
 }
 
 // readDir lists dir via validated dirHandle (FIFO- and TOCTOU-safe), failing closed on unexpected errors.

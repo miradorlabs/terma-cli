@@ -41,12 +41,11 @@ func (sc *scan) candidatePath(t string, r role, fallback bool) {
 		sc.unknown = sc.unknown || r == target || r == physTarget || r == folder || slashed && r != program && r != data && r != part
 		return
 	}
-	keyDir := sc.dir
+	c := candidate{t, sc.dir, r}
 	if t == "~" || strings.HasPrefix(t, "~/") {
 		home, _ := sc.homeDir()
-		keyDir = "\x00" + home
+		c.dir = "\x00" + home
 	}
-	c := candidate{t, keyDir, r}
 	res, seen := sc.examined[c]
 	if !seen && !sc.spend(1) {
 		return
@@ -150,10 +149,9 @@ func (sc *scan) walk(p string, followFinal bool, openMode uint8) (resolved, pare
 			return "", pick(errors.Is(err, fs.ErrNotExist), curPath, ""), nil, nil, false
 		}
 	}
-	cur, curPath := stack[len(stack)-1], paths[len(paths)-1]
-	if fi, err := cur.lstat("."); err == nil {
-		f, ok = sc.openLeaf(cur, ".", fi, openMode)
-		return curPath, filepath.Dir(curPath), fi, f, ok
+	if fi, err := stack[len(stack)-1].lstat("."); err == nil {
+		f, ok = sc.openLeaf(stack[len(stack)-1], ".", fi, openMode)
+		return paths[len(paths)-1], filepath.Dir(paths[len(paths)-1]), fi, f, ok
 	}
 	return "", "", nil, nil, !sc.fail()
 }
@@ -253,10 +251,8 @@ func urlPath(w string) (string, bool, bool) {
 	rest, _, _ = strings.Cut(strings.Split(rest, "?")[0], "#")
 	rest = pick(len(rest) > 9 && strings.EqualFold(rest[:9], "localhost") && rest[9] == '/', rest[min(len(rest), 9):], rest)
 	u, err := url.PathUnescape(rest)
-	if err != nil || strings.ContainsRune(u, 0) {
-		return "", true, true
-	}
-	return pick(filepath.Separator == '\\' && len(u) > 2 && u[0] == '/' && u[2] == ':', u[min(len(u), 1):], pick(strings.HasPrefix(u, "/"), u, "//"+u)), true, false
+	bad := err != nil || strings.ContainsRune(u, 0)
+	return pick(bad, "", pick(filepath.Separator == '\\' && len(u) > 2 && u[0] == '/' && u[2] == ':', u[min(len(u), 1):], pick(strings.HasPrefix(u, "/"), u, "//"+u))), true, bad
 }
 
 // remote reports whether p starts with two separators (UNC/device path) outside cwd's share.

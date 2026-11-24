@@ -172,8 +172,7 @@ func (sc *scan) checkPartsFields(parts []syntax.WordPart, ifs string, rem int, i
 			if rem >= 0 && pe.Exp != nil && pe.Exp.Word != nil {
 				rem = sc.checkPartsFields(pe.Exp.Word.Parts, ifs, rem, true)
 			}
-			if rem >= 0 && pe.Repl != nil && pe.Repl.With != nil {
-				before := rem
+			if before := rem; rem >= 0 && pe.Repl != nil && pe.Repl.With != nil {
 				if rem = sc.checkPartsFields(pe.Repl.With.Parts, ifs, rem, true); rem >= 0 && pe.Repl.All && len(v) > 0 {
 					rem = pick(len(v) > rem/(1+before-rem) && sc.fail(), -1, rem-len(v)*(1+before-rem))
 				}
