@@ -8,7 +8,6 @@ import (
 	"os"
 )
 
-// openDirNoBlock verifies dir is a directory before opening it on non-Unix platforms.
 func openDirNoBlock(dir string) (*os.File, error) {
 	if info, err := os.Stat(dir); err != nil {
 		return nil, err
@@ -17,7 +16,6 @@ func openDirNoBlock(dir string) (*os.File, error) {
 	}
 	return os.Open(dir)
 }
-
 func openFileNoBlock(p string) (*os.File, error) { return os.Open(p) }
 func isBenignDirErr(err error) bool {
 	return errors.Is(err, fs.ErrNotExist) || errors.Is(err, fs.ErrPermission) || errors.Is(err, fs.ErrInvalid)

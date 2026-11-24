@@ -9,17 +9,22 @@ import (
 	"path/filepath"
 	"runtime"
 	"slices"
+	"strconv"
 	"strings"
 
 	"mvdan.cc/sh/v3/syntax"
 )
 
+type operands struct {
+	folders []string
+	named   bool
+}
+
 // outputs maps known command-substitution prefixes to static path evaluators.
 var outputs = map[string]func(sc *scan, args []*syntax.Word) (string, bool){
 	"pwd": where, "pwd -L": where, "pwd -P": whereP, "git rev-parse --show-toplevel": toplevel,
 	"go env GOPATH": gopath, "go env GOMODCACHE": modcache, "mktemp": mktemp,
-	"dirname":  ofOperand(dirname),
-	"basename": ofOperand(basename),
+	"dirname": ofOperand(dirname), "basename": ofOperand(basename),
 	"realpath": ofOperand((*scan).real), "readlink -f": ofOperand((*scan).real),
 }
 
@@ -90,20 +95,12 @@ func (sc *scan) hasGoEnv(key string) bool {
 		}
 		p = filepath.Join(dir, "go", "env")
 	}
-	if !filepath.IsAbs(p) || sc.hasRemoteLink(p) || !sc.spendStat(1) {
-		return true
-	}
-	if data, err := readSmallFile(p); err != nil {
-		return !errors.Is(err, fs.ErrNotExist)
-	} else {
-		return slices.ContainsFunc(strings.Split(data, "\n"), func(l string) bool { return strings.HasPrefix(strings.TrimSpace(l), key+"=") })
-	}
+	return !filepath.IsAbs(p) || sc.fileHasLine(p, func(l string) bool { return strings.HasPrefix(strings.TrimSpace(l), key+"=") })
 }
 func gopath(sc *scan, args []*syntax.Word) (string, bool) {
 	if len(args) != 0 || sc.isUnresolvedVar("GOPATH") {
 		return "", false
-	}
-	if v, ok := sc.lookup("GOPATH"); ok && v != "" {
+	} else if v, ok := sc.lookup("GOPATH"); ok && v != "" {
 		return v, true
 	}
 	key := "HOME"
@@ -116,11 +113,9 @@ func gopath(sc *scan, args []*syntax.Word) (string, bool) {
 func modcache(sc *scan, args []*syntax.Word) (string, bool) {
 	if len(args) != 0 || sc.isUnresolvedVar("GOMODCACHE") {
 		return "", false
-	}
-	if v, ok := sc.lookup("GOMODCACHE"); ok && v != "" {
+	} else if v, ok := sc.lookup("GOMODCACHE"); ok && v != "" {
 		return v, true
-	}
-	if gp, ok := gopath(sc, nil); !sc.hasGoEnv("GOMODCACHE") && ok {
+	} else if gp, ok := gopath(sc, nil); !sc.hasGoEnv("GOMODCACHE") && ok {
 		if first, _, _ := strings.Cut(gp, string(os.PathListSeparator)); first != "" {
 			return filepath.Join(first, "pkg", "mod"), true
 		}
@@ -133,7 +128,7 @@ func mktemp(sc *scan, args []*syntax.Word) (string, bool) {
 		l := a.Lit()
 		short := strings.HasPrefix(l, "-") && !strings.HasPrefix(l, "--")
 		switch {
-		case l == "" || strings.HasPrefix(l, "--tmpdir=") || short && strings.ContainsRune(l[1:], 'p') || !strings.HasPrefix(l, "-") && pathLike(l):
+		case l == "" || strings.HasPrefix(l, "--tmpdir=") || short && strings.ContainsRune(l[1:], 'p') || !strings.HasPrefix(l, "-") && (name != "" || pathLike(l)):
 			return "", false
 		case l == "--tmpdir" || short && strings.ContainsRune(l[1:], 't'):
 			tmp = true
@@ -177,29 +172,199 @@ func dirname(_ *scan, p string) (string, bool) {
 	}
 	vol := filepath.VolumeName(p)
 	rest := strings.TrimRight(p[len(vol):], sep)
-	if rest == "" && len(p) > len(vol) {
+	switch i := strings.LastIndexAny(rest, sep); {
+	case rest == "" && len(p) > len(vol):
 		return vol + string(filepath.Separator), true
-	} else if i := strings.LastIndexAny(rest, sep); i < 0 {
+	case i < 0:
 		return vol + ".", true
-	} else {
+	default:
 		return vol + filepath.FromSlash(cmp.Or(strings.TrimRight(rest[:i], sep), string(filepath.Separator))), true
 	}
 }
 func (sc *scan) real(p string) (string, bool) {
-	q, ok := sc.path(p, sc.dir)
-	if !ok || sc.hasRemoteLink(q) {
+	if q, ok := sc.path(p, sc.dir); p == "" || !ok || sc.hasRemoteLink(q) {
 		return "", false
-	}
-	if r, err := filepath.EvalSymlinks(q); err == nil {
+	} else if r, err := filepath.EvalSymlinks(q); err == nil {
 		return r, r != ""
 	} else if !errors.Is(err, fs.ErrNotExist) {
 		return "", false
-	}
-	if _, err := os.Lstat(q); errors.Is(err, fs.ErrNotExist) && filepath.Dir(q) != q && !sc.hasRemoteLink(filepath.Dir(q)) {
+	} else if _, err := os.Lstat(q); errors.Is(err, fs.ErrNotExist) && filepath.Dir(q) != q && !sc.hasRemoteLink(filepath.Dir(q)) {
 		if pr, err := filepath.EvalSymlinks(filepath.Dir(q)); err == nil && pr != "" && !remote(pr, sc.cwd) {
 			info, err := os.Stat(pr)
 			return filepath.Join(pr, filepath.Base(q)), err == nil && info.IsDir()
 		}
 	}
 	return "", false
+}
+
+// safeLocate finds the git worktree root for dir without statting remote GIT_DIR or .git gitdir targets.
+func (sc *scan) safeLocate(dir string) (string, bool) {
+	if v, _ := sc.lookup("GIT_CEILING_DIRECTORIES"); v != "" || dir == "" || sc.hasRemoteLink(dir) ||
+		slices.ContainsFunc([]string{"GIT_DIR", "GIT_WORK_TREE", "GIT_CEILING_DIRECTORIES", "GIT_DISCOVERY_ACROSS_FILESYSTEM"}, sc.isUnresolvedVar) {
+		return "", false
+	}
+	gd, _ := sc.lookup("GIT_DIR")
+	wt, _ := sc.lookup("GIT_WORK_TREE")
+	if gd != "" || wt != "" {
+		base := cmp.Or(sc.dir, sc.cwd)
+		absGD, ok1 := sc.resolveTarget(base, gd, 1)
+		absWT, ok2 := sc.resolveTarget(base, wt, 1)
+		if gd != "" && (!ok1 || sc.hasRemoteLink(absGD)) || wt != "" && (!ok2 || sc.hasRemoteLink(absWT)) || gd == "" || wt == "" {
+			return "", false
+		}
+		info, err := os.Stat(absGD)
+		return absWT, err == nil && info.IsDir()
+	}
+	for cur, err := filepath.Abs(dir); err == nil && sc.spendStat(1); cur = filepath.Dir(cur) {
+		dotGit := filepath.Join(cur, ".git")
+		if info, err := os.Lstat(dotGit); err == nil {
+			if info.IsDir() {
+				return cur, !sc.hasWorktreeConfig(dotGit)
+			} else if info.Mode().IsRegular() {
+				return sc.locateGitdirFile(dotGit, cur)
+			}
+			return "", false
+		} else if cur == filepath.Dir(cur) {
+			break
+		}
+	}
+	return "", false
+}
+func (sc *scan) hasWorktreeConfig(gitDir string) bool {
+	return sc.fileHasLine(filepath.Join(gitDir, "config"), func(l string) bool {
+		k, _, eq := strings.Cut(l, "=")
+		return eq && strings.EqualFold(strings.TrimSpace(k), "worktree")
+	})
+}
+func (sc *scan) fileHasLine(path string, match func(string) bool) bool {
+	p, ok := sc.resolveTarget(sc.dir, path, 0)
+	if !ok || sc.hasRemoteLink(p) {
+		return true
+	}
+	data, err := readSmallFile(p)
+	return err != nil && !errors.Is(err, fs.ErrNotExist) || err == nil && slices.ContainsFunc(strings.Split(data, "\n"), match)
+}
+func (sc *scan) isUnresolvedVar(name string) bool { v, set := sc.vars[name]; return set && v == nil }
+func readSmallFile(path string) (string, error) {
+	f, err := openFileNoBlock(path)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+	if info, err := f.Stat(); err != nil || !info.Mode().IsRegular() {
+		return "", errOpaque
+	}
+	var buf [maxPathBytes]byte
+	n, err := io.ReadFull(f, buf[:])
+	if n == len(buf) || err != nil && !errors.Is(err, io.EOF) && !errors.Is(err, io.ErrUnexpectedEOF) {
+		return "", errOpaque
+	}
+	return string(buf[:n]), nil
+}
+func (sc *scan) locateGitdirFile(path, cur string) (string, bool) {
+	if data, err := readSmallFile(path); err != nil {
+		sc.unknown = sc.unknown || errors.Is(err, errOpaque)
+	} else if line, _, _ := strings.Cut(data, "\n"); strings.HasPrefix(strings.TrimSpace(line), "gitdir:") {
+		if target := strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(line), "gitdir:")); target != "" {
+			if resolved, ok := sc.resolveTarget(cur, target, 1); ok && !sc.hasRemoteLink(resolved) {
+				info, err := os.Stat(resolved)
+				return cur, err == nil && info.IsDir() && !sc.hasWorktreeConfig(resolved)
+			}
+		}
+	}
+	return "", false
+}
+func (sc *scan) below(dir string, levels int) {
+	c := candidate{dir, strconv.Itoa(levels), walked}
+	if _, seen := sc.examined[c]; seen || !sc.spend(1) {
+		return
+	}
+	sc.examined[c] = cached{}
+	if sc.holdsNone(dir) {
+		return
+	} else if root, ok := sc.safeLocate(dir); ok && !sc.enclosingCheckout(root) || sc.unknown {
+		return
+	}
+	for depth, level := 0, []string{dir}; len(level) > 0 && !sc.unknown && depth+1 < levels; depth++ {
+		var next []string
+		for _, d := range level {
+			for _, e := range sc.readDir(d) {
+				sub := filepath.Join(d, e.Name())
+				if e.Type()&fs.ModeSymlink != 0 {
+					if _, bad := sc.resolveLink(sub, 0); bad {
+						return
+					} else if info, err := os.Stat(sub); err != nil || !info.IsDir() {
+						continue
+					}
+				} else if !e.IsDir() {
+					continue
+				}
+				if depth == maxBelowDepth && sc.fail() || !sc.spend(1) {
+					return
+				}
+				if _, err := os.Lstat(filepath.Join(sub, ".git")); err == nil {
+					sc.place(sub)
+				} else if !sc.holdsNone(sub) {
+					next = append(next, sub)
+				}
+			}
+		}
+		level = next
+	}
+}
+func (sc *scan) enclosingCheckout(root string) bool {
+	if home, ok := sc.lookup("HOME"); ok && home != "" && !sc.hasRemoteLink(home) {
+		if r, err := filepath.EvalSymlinks(home); err == nil && samePath(root, r) || err != nil && samePath(root, home) {
+			return true
+		}
+	}
+	if !sc.cwdRootDone {
+		sc.cwdRootDone = true
+		sc.cwdRoot, _ = sc.safeLocate(sc.cwd)
+	}
+	rel, err := filepath.Rel(root, sc.cwdRoot)
+	return sc.cwdRoot != "" && !samePath(root, sc.cwdRoot) && err == nil && rel != "." && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
+}
+func (sc *scan) holdsNone(p string) bool {
+	sep := string(filepath.Separator)
+	if filepath.Base(p) == "node_modules" || strings.Contains(p, sep+"node_modules"+sep) {
+		return true
+	}
+	if sc.none == nil {
+		sc.none = []string{sep + "System"}
+		if cache, ok := modcache(sc, nil); ok {
+			sc.none = append(sc.none, cache)
+		}
+		if home, ok := sc.lookup("HOME"); ok && home != "" {
+			sc.none = append(sc.none, filepath.Join(home, "Library"))
+		}
+	}
+	return slices.ContainsFunc(sc.none, func(root string) bool { return p == root || strings.HasPrefix(p, root+sep) })
+}
+
+// readDir lists dir via O_DIRECTORY|O_CLOEXEC (FIFO-safe), failing closed on unexpected errors.
+func (sc *scan) readDir(dir string) []fs.DirEntry {
+	if !sc.spend(1) {
+		return nil
+	}
+	f, err := openDirNoBlock(dir)
+	if err != nil {
+		sc.unknown = sc.unknown || !isBenignDirErr(err)
+		return nil
+	}
+	defer f.Close()
+	var entries []fs.DirEntry
+	for room := maxShellLookups - sc.lookups + 1; len(entries) < room; {
+		chunk, err := f.ReadDir(min(256, room-len(entries)))
+		if entries = append(entries, chunk...); errors.Is(err, io.EOF) || err == nil && (len(chunk) == 0 || !sc.spend(0)) {
+			break
+		} else if err != nil && sc.fail() {
+			return nil
+		}
+	}
+	if !sc.spend(len(entries)) {
+		return nil
+	}
+	slices.SortFunc(entries, func(a, b fs.DirEntry) int { return strings.Compare(a.Name(), b.Name()) })
+	return entries
 }

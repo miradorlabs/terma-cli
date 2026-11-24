@@ -28,9 +28,27 @@ func maskWords(command string, depth int) string {
 	words, bare := shellFields(command, 5)
 	more := cut || len(words) > 4
 	words, bare = words[:min(len(words), 4)], bare[:min(len(bare), 4)]
-	secret, hasRedis := false, false
+	secret, redir, hasRedis := false, 0, false
 	for i, b := range bare {
 		hasRedis = hasRedis || strings.HasSuffix(b, "redis-cli")
+		if redir > 0 {
+			if redir == 2 {
+				words[i] = "…"
+			}
+			redir = 0
+			continue
+		}
+		if r := strings.TrimLeft(b, "0123456789"); strings.HasPrefix(r, "<") || strings.HasPrefix(r, ">") {
+			switch {
+			case strings.HasPrefix(r, "<<<") && len(r) > 3:
+				words[i] = "<<<…"
+			case r == "<<<":
+				redir = 2
+			case strings.TrimLeft(r, "<>&-") == "":
+				redir = 1
+			}
+			continue
+		}
 		masked := userinfo.ReplaceAllString(b, "://…@")
 		name, _, eq := strings.Cut(masked, "=")
 		switch {
@@ -82,9 +100,8 @@ func shellFields(command string, n int) (raw, bare []string) {
 			quote, ansiC, ansiNul = 0, false, false
 		case ansiC:
 			if r == '\\' {
-				var adv int
-				r, adv = ansiEscape(command[i+1:])
-				w = 1 + adv
+				r, w = ansiEscape(command[i+1:])
+				w++
 			}
 			if ansiNul = ansiNul || r == 0; !ansiNul {
 				buf.WriteRune(r)
@@ -112,12 +129,17 @@ func shellFields(command string, n int) (raw, bare []string) {
 				quote = r
 			case r == '$':
 				dollar = true
-			case !unicode.IsSpace(r):
+			case !unicode.IsSpace(r) && (r != '<' && r != '>' || start < 0 || strings.Trim(buf.String(), "0123456789<>&") == ""):
 				buf.WriteRune(r)
 			case start >= 0:
 				raw, bare = append(raw, command[start:i]), append(bare, buf.String())
 				if buf.Reset(); len(raw) == n {
 					return raw, bare
+				}
+				if r == '<' || r == '>' {
+					start = i
+					buf.WriteRune(r)
+					break
 				}
 				start = -1
 				fallthrough
@@ -142,11 +164,9 @@ func shellFields(command string, n int) (raw, bare []string) {
 func ansiEscape(s string) (rune, int) {
 	if s == "" {
 		return '\\', 0
-	}
-	if j := strings.IndexByte("abeEfnrtv\\'\"?", s[0]); j >= 0 {
+	} else if j := strings.IndexByte("abeEfnrtv\\'\"?", s[0]); j >= 0 {
 		return rune("\a\b\x1b\x1b\f\n\r\t\v\\'\"?"[j]), 1
-	}
-	if s[0] == 'c' && len(s) > 1 {
+	} else if s[0] == 'c' && len(s) > 1 {
 		return rune(s[1] & 0x1f), 2
 	}
 	base, start, limit, digits := 8, 0, 3, "01234567"

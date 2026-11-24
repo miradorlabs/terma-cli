@@ -134,12 +134,13 @@ func parsable(src string) bool {
 				links++
 			} else if word == "let" { // its words are expressions
 				end := strings.IndexAny(src[j:], "\n;&|")
-				if end > maxShellExpr || end < 0 && len(src)-j > maxShellExpr {
+				if end < 0 {
+					end = len(src) - j
+				}
+				if end > maxShellExpr {
 					return false
 				}
-				if letUntil = len(src); end >= 0 {
-					letUntil = j + end
-				}
+				letUntil = j + end
 			}
 			i = j - 1
 		}
@@ -158,9 +159,7 @@ func heredocDelimiter(src string, i int) (heredoc, int) {
 	if stripTabs {
 		i++
 	}
-	for i < len(src) && (src[i] == ' ' || src[i] == '\t') {
-		i++
-	}
+	i += len(src[i:]) - len(strings.TrimLeft(src[i:], " \t"))
 	var d strings.Builder
 	quoted := false
 	for quote := byte(0); i < len(src); i++ {

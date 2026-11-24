@@ -83,19 +83,16 @@ func (sc *scan) Get(name string) expand.Variable {
 }
 func (sc *scan) Each(func(string, expand.Variable) bool) {}
 func (sc *scan) lookup(name string) (string, bool) {
-	switch {
-	case name == "PWD":
+	if name == "PWD" {
 		return sc.dir, sc.dir != ""
-	case name == "OLDPWD" && sc.prev != "":
+	} else if name == "OLDPWD" && sc.prev != "" {
 		return sc.prev, true
-	}
-	if v, ok := sc.vars[name]; ok {
+	} else if v, ok := sc.vars[name]; ok {
 		if v == nil {
 			return "", false
 		}
 		return *v, true
-	}
-	if v, ok := sc.env(name); ok || name != "HOME" {
+	} else if v, ok := sc.env(name); ok || name != "HOME" {
 		return v, ok
 	}
 	home, err := os.UserHomeDir()
@@ -130,9 +127,10 @@ func (sc *scan) sizeIn(w *syntax.Word, opaqueSubst bool) int {
 			n += sc.paramSize(x, opaqueSubst)
 			return false
 		case *syntax.CmdSubst, *syntax.ProcSubst, *syntax.ArithmExp:
-			n += substitutionSize
 			if _, arith := x.(*syntax.ArithmExp); !arith && opaqueSubst {
 				n = maxShellBytes + 1
+			} else {
+				n += substitutionSize
 			}
 			return false
 		}
@@ -152,19 +150,26 @@ func (sc *scan) paramValue(pe *syntax.ParamExp) string {
 }
 func (sc *scan) paramSize(pe *syntax.ParamExp, opaqueSubst bool) int {
 	n := len(sc.paramValue(pe))
-	if pe.Repl != nil && pe.Repl.Orig != nil && sc.sizeIn(pe.Repl.Orig, true) > maxShellExpr {
-		return maxShellBytes + 1
+	if pe.Repl != nil && pe.Repl.Orig != nil {
+		if orig := sc.sizeIn(pe.Repl.Orig, true); orig > maxShellExpr || n > maxShellBytes/max(orig, 1) {
+			return maxShellBytes + 1
+		}
 	}
 	if pe.Repl != nil && pe.Repl.With != nil {
-		base := max(n, 1)
-		if with := sc.sizeIn(pe.Repl.With, opaqueSubst || pe.Repl.All && n > 0); with >= (maxShellBytes+1)/base {
+		if base, with := max(n, 1), sc.sizeIn(pe.Repl.With, opaqueSubst || pe.Repl.All && n > 0); with >= (maxShellBytes+1)/base {
 			return maxShellBytes + 1
 		} else {
 			n = base * (1 + with)
 		}
 	}
 	if pe.Exp != nil && pe.Exp.Word != nil {
-		n += sc.sizeIn(pe.Exp.Word, opaqueSubst)
+		op := pe.Exp.Op
+		pat := op == syntax.RemSmallPrefix || op == syntax.RemLargePrefix || op == syntax.RemSmallSuffix || op == syntax.RemLargeSuffix || op == syntax.UpperFirst || op == syntax.UpperAll || op == syntax.LowerFirst || op == syntax.LowerAll
+		if w := sc.sizeIn(pe.Exp.Word, opaqueSubst || pat); pat && (w > maxShellExpr || n > maxShellBytes/max(w, 1)) {
+			return maxShellBytes + 1
+		} else {
+			n += w
+		}
 	}
 	return min(n, maxShellBytes+1)
 }
@@ -176,7 +181,7 @@ func (sc *scan) ifs() string {
 }
 func (sc *scan) chargeFields(v string) bool {
 	ifs := sc.ifs()
-	return ifs == "" || sc.budget(&sc.words, countFields(v, ifs, maxShellWords-sc.words), maxShellWords)
+	return ifs == "" || (len(ifs) <= 64 || !sc.fail()) && sc.budget(&sc.words, countFields(v, ifs, maxShellWords-sc.words), maxShellWords)
 }
 func (sc *scan) checkPartsFields(parts []syntax.WordPart, ifs string, rem int, inParam bool) int {
 	for i := 0; i < len(parts) && rem >= 0; i++ {
@@ -211,16 +216,22 @@ func (sc *scan) checkPartsFields(parts []syntax.WordPart, ifs string, rem int, i
 	return rem
 }
 func (sc *scan) consumeFields(v, ifs string, rem int) int {
-	if n := countFields(v, ifs, rem); n > rem && sc.fail() {
+	n := countFields(v, ifs, rem)
+	if n > rem && sc.fail() {
 		return -1
-	} else {
-		return rem - max(n-1, 0)
 	}
+	return rem - max(n-1, 0)
 }
 func countFields(v, ifs string, limit int) int {
+	var ascii [128]bool
+	for _, r := range ifs {
+		if r < 128 {
+			ascii[r] = true
+		}
+	}
 	n, inWord := 0, false
 	for _, r := range v {
-		sep := strings.ContainsRune(ifs, r)
+		sep := r < 128 && ascii[r] || r >= 128 && strings.ContainsRune(ifs, r)
 		if !inWord && (!sep || r != ' ' && r != '\t' && r != '\n') {
 			n++
 		}
@@ -233,14 +244,14 @@ func countFields(v, ifs string, limit int) int {
 func (sc *scan) fields(w *syntax.Word) ([]string, error) {
 	var out []string
 	for b, err := range sc.braces(w) {
-		if ifs := sc.ifs(); err != nil || !sc.charge(sc.size(b)) || ifs != "" && sc.checkPartsFields(b.Parts, ifs, maxShellWords-len(out), false) < 0 {
+		if ifs := sc.ifs(); err != nil || len(ifs) > 64 && sc.fail() || !sc.charge(sc.size(b)) || ifs != "" && sc.checkPartsFields(b.Parts, ifs, maxShellWords-len(out), false) < 0 {
 			return nil, errOpaque
 		}
-		if f, err := expand.Fields(sc.cfg, b); err != nil || len(out)+len(f) > maxShellWords && sc.fail() {
+		f, err := expand.Fields(sc.cfg, b)
+		if err != nil || len(out)+len(f) > maxShellWords && sc.fail() {
 			return nil, errOpaque
-		} else {
-			out = append(out, f...)
 		}
+		out = append(out, f...)
 	}
 	return out, nil
 }

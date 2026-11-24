@@ -1096,6 +1096,181 @@ func TestScanBoundsAndSafety(t *testing.T) {
 	}
 }
 
+func parseFirstArg(t *testing.T, cmd string) *syntax.Word {
+	t.Helper()
+	f, err := syntax.NewParser(syntax.Variant(syntax.LangBash)).Parse(strings.NewReader(cmd), "")
+	if err != nil {
+		t.Fatalf("parse %q: %v", cmd, err)
+	}
+	return f.Stmts[0].Cmd.(*syntax.CallExpr).Args[1]
+}
+
+func TestReachCoreHardeningRegressions(t *testing.T) {
+	// 1. firstWords preserves secret-option masking across attached/spaced redirections and masks here-strings.
+	for _, tc := range []struct {
+		cmd, leaked string
+	}{
+		{"curl --user</dev/null alice:LEAK https://example.com", "LEAK"},
+		{"curl --user < /dev/null alice:LEAK https://example.com", "LEAK"},
+		{"curl --user 2>/dev/null alice:LEAK https://example.com", "LEAK"},
+		{"curl -u<<<LEAK https://example.com", "LEAK"},
+		{"curl -u <<< LEAK https://example.com", "LEAK"},
+	} {
+		if got := firstWords(tc.cmd); strings.Contains(got, tc.leaked) {
+			t.Fatalf("firstWords(%q) = %q, leaked %q", tc.cmd, got, tc.leaked)
+		}
+	}
+
+	dir := t.TempDir()
+
+	// 2. hasRemoteLink / fileHasLine / hasGoEnv check ".." segments before cleaning so /safe/jump/../env with remote jump fails closed.
+	if !os.IsPathSeparator('\\') {
+		jump := filepath.Join(dir, "jump")
+		if err := os.Symlink("//remote/share", jump); err != nil {
+			t.Fatal(err)
+		}
+		tricky := jump + string(filepath.Separator) + ".." + string(filepath.Separator) + "go-env"
+		if err := os.WriteFile(filepath.Join(dir, "go-env"), []byte("GOTOOLCHAIN=auto\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		scJump := newScan(dir, func(k string) (string, bool) {
+			switch k {
+			case "HOME", "USERPROFILE":
+				return dir, true
+			case "GOENV":
+				return tricky, true
+			}
+			return "", false
+		}, work{deadline: time.Now().Add(time.Minute)})
+		if !scJump.hasRemoteLink(tricky) || !scJump.unknown {
+			t.Fatalf("hasRemoteLink(%q) did not fail closed on remote symlink before ..", tricky)
+		}
+		scGoJump := newScan(dir, func(k string) (string, bool) {
+			switch k {
+			case "HOME", "USERPROFILE":
+				return dir, true
+			case "GOENV":
+				return tricky, true
+			}
+			return "", false
+		}, work{deadline: time.Now().Add(time.Minute)})
+		if got, ok := gopath(scGoJump, nil); ok {
+			t.Fatalf("gopath with GOENV=%q = (%q, true), want false", tricky, got)
+		}
+	}
+
+	// 3. realpath '' and readlink -f '' reject empty operands.
+	for _, cmd := range []string{"echo $(realpath '')", "echo $(readlink -f '')"} {
+		w := parseFirstArg(t, cmd)
+		sc := newScan(dir, os.LookupEnv, work{deadline: time.Now().Add(time.Minute)})
+		if got, err := sc.fields(w); err == nil {
+			t.Fatalf("%s expanded to %q, want error", cmd, got)
+		}
+	}
+
+	// 4. Huge IFS fails closed immediately without quadratic scanning.
+	bigIFS := strings.Repeat(":", 65536)
+	bigVal := strings.Repeat("a", 512*1024)
+	wIFS := parseFirstArg(t, "echo $V")
+	scIFS := newScan(dir, func(k string) (string, bool) {
+		switch k {
+		case "IFS":
+			return bigIFS, true
+		case "V":
+			return bigVal, true
+		}
+		return "", false
+	}, work{deadline: time.Now().Add(time.Minute)})
+	start := time.Now()
+	if got, err := scIFS.fields(wIFS); err == nil || !scIFS.unknown {
+		t.Fatalf("huge IFS expanded to %q (err=%v, unknown=%v), want opaque fail-closed", got, err, scIFS.unknown)
+	}
+	if d := time.Since(start); d > 100*time.Millisecond {
+		t.Fatalf("huge IFS took %v, want <100ms", d)
+	}
+
+	// 5. Large removal (##) and case-conversion (^^) patterns fail closed quickly.
+	pat := strings.Repeat("a", 4097)
+	val := strings.Repeat("a", 50000)
+	for _, expr := range []string{"echo ${V##$PAT}", "echo ${V^^$PAT}", "echo ${V//$PAT/x}"} {
+		w := parseFirstArg(t, expr)
+		sc := newScan(dir, func(k string) (string, bool) {
+			switch k {
+			case "V":
+				return val, true
+			case "PAT":
+				return pat, true
+			}
+			return "", false
+		}, work{deadline: time.Now().Add(time.Minute)})
+		t0 := time.Now()
+		if got, err := sc.fields(w); err == nil || !sc.unknown {
+			t.Fatalf("%s expanded to %q (err=%v, unknown=%v), want opaque fail-closed", expr, got, err, sc.unknown)
+		}
+		if d := time.Since(t0); d > 100*time.Millisecond {
+			t.Fatalf("%s took %v, want <100ms", expr, d)
+		}
+	}
+
+	// 6. GIT_CEILING_DIRECTORIES (set or unresolved) and unresolved GIT_DISCOVERY_ACROSS_FILESYSTEM fail closed in safeLocate.
+	repo := filepath.Join(dir, "repo")
+	if err := os.MkdirAll(filepath.Join(repo, ".git"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	scCeil := newScan(repo, func(k string) (string, bool) {
+		if k == "GIT_CEILING_DIRECTORIES" {
+			return dir, true
+		}
+		return "", false
+	}, work{deadline: time.Now().Add(time.Minute)})
+	if got, ok := scCeil.safeLocate(repo); ok {
+		t.Fatalf("safeLocate with GIT_CEILING_DIRECTORIES = (%q, true), want false", got)
+	}
+	scUnres := newScan(repo, os.LookupEnv, work{deadline: time.Now().Add(time.Minute)})
+	scUnres.vars["GIT_DISCOVERY_ACROSS_FILESYSTEM"] = nil
+	if got, ok := scUnres.safeLocate(repo); ok {
+		t.Fatalf("safeLocate with unresolved GIT_DISCOVERY_ACROSS_FILESYSTEM = (%q, true), want false", got)
+	}
+
+	// 7. core.worktree in .git/config or gitdir-target/config fails closed in safeLocate.
+	wtRepo := filepath.Join(dir, "wt-dir-repo")
+	if err := os.MkdirAll(filepath.Join(wtRepo, ".git"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(wtRepo, ".git", "config"), []byte("[core]\n\tworktree = /elsewhere\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	scWTDir := newScan(wtRepo, func(string) (string, bool) { return "", false }, work{deadline: time.Now().Add(time.Minute)})
+	if got, ok := scWTDir.safeLocate(wtRepo); ok {
+		t.Fatalf("safeLocate on .git dir with core.worktree = (%q, true), want false", got)
+	}
+	wtFileRepo := filepath.Join(dir, "wt-file-repo")
+	wtExtGit := filepath.Join(dir, "ext-gitdir")
+	if err := os.MkdirAll(wtFileRepo, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(wtExtGit, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(wtFileRepo, ".git"), []byte("gitdir: "+wtExtGit+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(wtExtGit, "config"), []byte("[core]\n\tworktree = /elsewhere\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	scWTFile := newScan(wtFileRepo, func(string) (string, bool) { return "", false }, work{deadline: time.Now().Add(time.Minute)})
+	if got, ok := scWTFile.safeLocate(wtFileRepo); ok {
+		t.Fatalf("safeLocate on .git file with core.worktree = (%q, true), want false", got)
+	}
+
+	// 8. mktemp rejects a second template operand.
+	wMktemp := parseFirstArg(t, "echo $(mktemp foo.XXX bar.XXX)")
+	scMktemp := newScan(dir, os.LookupEnv, work{deadline: time.Now().Add(time.Minute)})
+	if got, err := scMktemp.fields(wMktemp); err == nil {
+		t.Fatalf("mktemp with two templates expanded to %q, want error", got)
+	}
+}
+
 func FuzzParsable(f *testing.F) {
 	for _, seed := range []string{
 		"ls -la",

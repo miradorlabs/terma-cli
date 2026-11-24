@@ -50,14 +50,13 @@ func (sc *scan) resolve(t string, r role, slashed bool) (res cached) {
 	found := false
 	for i, d := range dirs {
 		if p, info := sc.reach(t, d); p != "" {
-			if found = true; info != nil {
-				if res.named = true; info.IsDir() {
-					if i == 0 {
-						res.dir = p
-					}
-					res.folders = append(res.folders, p)
+			if found = true; info != nil && info.IsDir() {
+				if i == 0 {
+					res.dir = p
 				}
+				res.folders = append(res.folders, p)
 			}
+			res.named = res.named || info != nil
 		}
 	}
 	if !found && r.mayCreate(slashed) {
@@ -74,7 +73,13 @@ const maxSymlinkHops, maxPathComponents, maxPathBytes = 8, 128, 4096
 
 // hasRemoteLink walks components of p top-down without following symlinks, failing closed on remote shares or >maxSymlinkHops.
 func (sc *scan) hasRemoteLink(p string) bool {
-	return sc.unknown || sc.hasRemoteLinkAt(filepath.Clean(p), 0)
+	if sc.unknown {
+		return true
+	} else if hasDotDot(p) {
+		p, ok := sc.resolveTarget(sc.dir, p, 0)
+		return !ok || sc.hasRemoteLinkAt(filepath.Clean(p), 0)
+	}
+	return sc.hasRemoteLinkAt(filepath.Clean(p), 0)
 }
 func (sc *scan) hasRemoteLinkAt(p string, hops int) bool {
 	if remote(p, sc.cwd) || len(p) > maxPathBytes {
@@ -109,20 +114,17 @@ func (sc *scan) resolveTarget(base, raw string, hops int) (string, bool) {
 		raw = cmp.Or(filepath.VolumeName(base), filepath.VolumeName(sc.cwd)) + raw
 	}
 	if hasDotDot(raw) {
-		if filepath.IsAbs(raw) {
-			vol := filepath.VolumeName(raw)
+		if vol := filepath.VolumeName(raw); filepath.IsAbs(raw) {
 			base, raw = vol+string(filepath.Separator), raw[len(vol):]
 		}
 		return sc.cleanSafeAt(base, raw, hops)
-	}
-	if !filepath.IsAbs(raw) {
+	} else if !filepath.IsAbs(raw) {
 		raw = filepath.Join(base, raw)
 	}
 	return filepath.Clean(raw), true
 }
 
-// resolveLink chases up to maxSymlinkHops hops via Readlink without statting targets,
-// checking target ancestors and ".." segments and failing closed on remote targets or hop exhaustion.
+// resolveLink chases up to maxSymlinkHops hops via Readlink, checking ancestors and failing closed on remote targets.
 func (sc *scan) resolveLink(p string, hops int) (string, bool) {
 	cur := p
 	for ; hops < maxSymlinkHops; hops++ {
@@ -147,29 +149,23 @@ func (sc *scan) reach(w, dir string) (string, os.FileInfo) {
 	info, err := os.Lstat(p)
 	if err != nil {
 		return "", nil
-	}
-	switch {
-	case info.IsDir():
+	} else if info.IsDir() {
 		sc.place(p)
-	case info.Mode()&fs.ModeSymlink != 0:
-		sc.place(filepath.Dir(p))
-		if target, bad := sc.resolveLink(p, 0); bad {
-			return p, nil
-		} else if resolved, err := filepath.EvalSymlinks(p); err != nil {
-			sc.placeParent(target)
-			return p, nil
-		} else if remote(resolved, sc.cwd) && sc.fail() {
-			return p, nil
-		} else if info, err = os.Stat(resolved); err != nil {
-			sc.place(filepath.Dir(resolved))
-			return p, nil
-		} else if info.IsDir() {
-			sc.place(resolved)
-		} else {
-			sc.place(filepath.Dir(resolved))
-		}
-	default:
-		sc.place(filepath.Dir(p))
+		return p, info
+	} else if sc.place(filepath.Dir(p)); info.Mode()&fs.ModeSymlink == 0 {
+		return p, info
+	}
+	if target, bad := sc.resolveLink(p, 0); bad {
+		return p, nil
+	} else if resolved, err := filepath.EvalSymlinks(p); err != nil {
+		sc.placeParent(target)
+		return p, nil
+	} else if remote(resolved, sc.cwd) && sc.fail() {
+		return p, nil
+	} else if info, err = os.Stat(resolved); err == nil && info.IsDir() {
+		sc.place(resolved)
+	} else {
+		sc.place(filepath.Dir(resolved))
 	}
 	return p, info
 }
@@ -223,23 +219,23 @@ func (sc *scan) cleanSafeAt(base, rel string, hops int) (string, bool) {
 	}
 	cur := filepath.Clean(base)
 	for _, part := range strings.FieldsFunc(rel, isSep) {
-		switch part {
-		case "", ".":
-		case "..":
-			if sc.hasRemoteLinkAt(cur, hops) || !sc.spend(1) {
-				return "", false
-			}
-			if info, err := os.Lstat(cur); err == nil && info.Mode()&fs.ModeSymlink != 0 {
-				resolved, err := filepath.EvalSymlinks(cur)
-				if err != nil || remote(resolved, sc.cwd) {
-					return "", !sc.fail()
-				}
+		if part == "" || part == "." {
+			continue
+		} else if part != ".." {
+			cur = filepath.Join(cur, part)
+			continue
+		}
+		if sc.hasRemoteLinkAt(cur, hops) || !sc.spend(1) {
+			return "", false
+		}
+		if info, err := os.Lstat(cur); err == nil && info.Mode()&fs.ModeSymlink != 0 {
+			if resolved, err := filepath.EvalSymlinks(cur); err != nil || remote(resolved, sc.cwd) {
+				return "", !sc.fail()
+			} else {
 				cur = resolved
 			}
-			cur = filepath.Dir(cur)
-		default:
-			cur = filepath.Join(cur, part)
 		}
+		cur = filepath.Dir(cur)
 	}
 	return filepath.Clean(cur), true
 }
@@ -277,14 +273,11 @@ func share(p string) string {
 	}
 	host, rest := cutSep(p[2:])
 	name, _ := cutSep(rest)
-	if host == "" || name == "" || strings.Trim(host, hostBytes) != "" {
+	if host == "" || name == "" || strings.Trim(host, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_.$") != "" {
 		return ""
 	}
 	return "//" + host + "/" + name
 }
-
-const hostBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_.$"
-
 func isSep(r rune) bool { return r < 0x80 && os.IsPathSeparator(byte(r)) }
 func cutSep(p string) (string, string) {
 	if i := strings.IndexFunc(p, isSep); i >= 0 {
