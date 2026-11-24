@@ -228,8 +228,8 @@
       "name": "Codex CLI",
       "role": "default",
       "first": "0.169.1",
-      "last": "0.171.0",
-      "builds": 3,
+      "last": "0.172.0",
+      "builds": 4,
       "current": true,
       "params": {
         "include": [
@@ -251,8 +251,8 @@
       "name": "Codex CLI",
       "role": "subagents",
       "first": "0.169.1",
-      "last": "0.171.0",
-      "builds": 3,
+      "last": "0.172.0",
+      "builds": 4,
       "current": true
     },
     {
@@ -260,8 +260,8 @@
       "name": "Codex CLI",
       "role": "compaction",
       "first": "0.169.1",
-      "last": "0.171.0",
-      "builds": 3,
+      "last": "0.172.0",
+      "builds": 4,
       "current": true
     }
   ]

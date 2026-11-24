@@ -11545,7 +11545,7 @@
           ]
         },
         "0.168.0": {
-          "captured_at": "2026-11-13T09:01:26.428937767Z",
+          "captured_at": "2026-11-24T00:44:18.786549385Z",
           "captured": true,
           "uses": [
             {
@@ -11674,6 +11674,38 @@
         },
         "0.171.0": {
           "captured_at": "2026-11-20T01:10:01.695546758Z",
+          "captured": true,
+          "uses": [
+            {
+              "model": "gpt-6.2-sol",
+              "role": "default",
+              "params": {
+                "include": [
+                  "reasoning.encrypted_content"
+                ],
+                "parallel_tool_calls": false,
+                "reasoning": {
+                  "context": "all_turns",
+                  "effort": "low"
+                },
+                "text": {
+                  "verbosity": "low"
+                },
+                "tool_choice": "auto"
+              }
+            },
+            {
+              "model": "gpt-6.2-sol",
+              "role": "compaction"
+            },
+            {
+              "model": "gpt-6.2-sol",
+              "role": "subagents"
+            }
+          ]
+        },
+        "0.172.0": {
+          "captured_at": "2026-11-24T00:44:18.786549385Z",
           "captured": true,
           "uses": [
             {
