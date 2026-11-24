@@ -83,7 +83,7 @@ func (app *App) useServerKey(s *setup.Steps, ui *setupUI, org orgRef, team *stri
 		var committed routing.State
 		var switched bool
 		err = daemon.WithRoutingRelayGate(app.stateDir, app.version, func() error {
-			if err := app.checkSetupBaseline(cfg.ProfileName, sendas.NoPersonLane, baseline); err != nil {
+			if err := app.checkSetupBaseline(cfg.ProfileName, sendas.NoPersonLane, baseline, true); err != nil {
 				return err
 			}
 			// Keep the key only once it has proved it reads the policy, the routing state

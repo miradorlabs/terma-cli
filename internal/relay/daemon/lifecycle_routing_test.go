@@ -104,3 +104,60 @@ func writeRunInfo(t *testing.T, dir string, info RunInfo) {
 		t.Fatal(err)
 	}
 }
+
+func TestWithRoutingRelayGateHoldsRelayLockExclusively(t *testing.T) {
+	origWait := preRoutingWait
+	preRoutingWait = 120 * time.Millisecond
+	t.Cleanup(func() { preRoutingWait = origWait })
+
+	t.Run("holds relay lock across fn when idle", func(t *testing.T) {
+		stateDir := t.TempDir()
+		dir := claim.Dir(stateDir)
+		called := false
+		if err := WithRoutingRelayGate(stateDir, "2.0.0", func() error {
+			called = true
+			if unlock, err := flock.TryLock(filepath.Join(dir, LockFile)); err == nil {
+				unlock()
+				t.Fatal("relay lock was NOT held exclusively inside WithRoutingRelayGate")
+			} else if !flock.IsBusy(err) {
+				t.Fatalf("unexpected TryLock error: %v", err)
+			}
+			return nil
+		}); err != nil {
+			t.Fatalf("WithRoutingRelayGate = %v, want nil", err)
+		}
+		if !called {
+			t.Fatal("fn was not called")
+		}
+		// Lock must be released after WithRoutingRelayGate returns.
+		unlock, err := flock.TryLock(filepath.Join(dir, LockFile))
+		if err != nil {
+			t.Fatalf("relay lock stayed held after return: %v", err)
+		}
+		unlock()
+	})
+
+	t.Run("refuses to run fn without lock when relay refuses to release", func(t *testing.T) {
+		stateDir := t.TempDir()
+		dir := claim.Dir(stateDir)
+		if err := os.MkdirAll(dir, 0o700); err != nil {
+			t.Fatal(err)
+		}
+		unlock, err := flock.TryLock(filepath.Join(dir, LockFile))
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer unlock()
+		writeRunInfo(t, dir, RunInfo{PID: os.Getpid(), Version: "2.0.0", Routing: true})
+		called := false
+		if err := WithRoutingRelayGate(stateDir, "2.0.0", func() error {
+			called = true
+			return nil
+		}); err == nil {
+			t.Fatal("WithRoutingRelayGate succeeded without acquiring relay lock")
+		}
+		if called {
+			t.Fatal("fn ran while another process still held relay lock")
+		}
+	})
+}

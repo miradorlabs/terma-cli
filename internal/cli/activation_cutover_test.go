@@ -849,3 +849,230 @@ func TestServerKeyTeamSwitchComputesFreshBindingsForSharedRepo(t *testing.T) {
 		t.Fatalf("Bindings after server-key team switch = %+v, want github.com/acme/app -> %s (not Pending)", stB.Bindings, orgB().ID)
 	}
 }
+
+// When an enrolled target team returns 403 ORG_NOT_ACCESSIBLE during setup, setup records
+// org-wide OrgAccessLost for the target and all its org siblings AND still recovers
+// other-org enrollments from SignInNeeded before returning the error.
+func TestSetupTargetOrgAccessLostRefusesAllOrgSiblingsAndRecoversOthers(t *testing.T) {
+	gateway := grantSandbox(t)
+	t.Setenv("TERMA_POLICY_STUB", "")
+	teamA1 := projectsIn(orgA().ID)[0].ID
+	teamA2 := projectsIn(orgA().ID)[1].ID
+	teamB := projectsIn(orgB().ID)[0].ID
+	gateway.policyBodies = map[string]string{
+		teamA1: `{"policy":{"version":"1.1","terma":{"per_repository":{"repositories":["github.com/acme/web"]},"git_hooks":false,"capture":{"exclude_prompts":false,"exclude_tool_content":false}}},"revision":1,"updated_at":"2026-11-01T00:00:00Z"}`,
+		teamA2: `{"policy":{"version":"1.1","terma":{"per_repository":{"repositories":["github.com/acme/api"]},"git_hooks":false,"capture":{"exclude_prompts":false,"exclude_tool_content":false}}},"revision":1,"updated_at":"2026-11-01T00:00:00Z"}`,
+		teamB:  `{"policy":{"version":"1.1","terma":{"per_repository":{"repositories":["github.com/beta/core"]},"git_hooks":false,"capture":{"exclude_prompts":false,"exclude_tool_content":false}}},"revision":1,"updated_at":"2026-11-01T00:00:00Z"}`,
+	}
+	gateway.grant("target403-init", deskUser)
+	if out, stderr, err := desktopSetup(t, identityLine(deskUser, orgA().ID)+`{"code":"target403-init"}`+"\n", orgA().ID, teamA1); err != nil {
+		t.Fatalf("setup teamA1: %v\n%s%s", err, out, stderr)
+	}
+	if out, stderr, err := desktopSetup(t, identityLine(deskUser, orgA().ID), orgA().ID, teamA2); err != nil {
+		t.Fatalf("setup teamA2: %v\n%s%s", err, out, stderr)
+	}
+	if out, stderr, err := desktopSetup(t, identityLine(deskUser, orgB().ID), orgB().ID, teamB); err != nil {
+		t.Fatalf("setup teamB: %v\n%s%s", err, out, stderr)
+	}
+	// Mark teamB SignInNeeded to prove other-org recovery still happens when target orgA returns 403.
+	st, found, err := routing.Load(testApp.stateDir, config.DefaultProfile)
+	if err != nil || !found {
+		t.Fatalf("routing.Load: found=%v err=%v", found, err)
+	}
+	if _, err := routing.Update(testApp.stateDir, config.DefaultProfile, st.Expect(), func(s *routing.State) error {
+		for _, tm := range s.Teams {
+			if tm.TeamID == teamB {
+				_, err := s.ApplyRefresh(routing.Refresh{EnrollmentID: tm.EnrollmentID, Epoch: tm.Epoch, Failure: routing.SignIn, At: time.Now()})
+				return err
+			}
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	// Target orgA/teamA1 returns 403 ORG_NOT_ACCESSIBLE while sibling orgA/teamA2 returns 503.
+	gateway.onPolicy = func(w http.ResponseWriter, r *http.Request) bool {
+		switch r.URL.Query().Get("project_id") {
+		case teamA1:
+			orgNotAccessible(w)
+			return true
+		case teamA2:
+			unavailable(w)
+			return true
+		}
+		return false
+	}
+	if _, _, err := desktopSetup(t, identityLine(deskUser, orgA().ID), orgA().ID, teamA1); err == nil {
+		t.Fatal("setup targeting 403 ORG_NOT_ACCESSIBLE team succeeded, want error")
+	}
+
+	after, found, err := routing.Load(testApp.stateDir, config.DefaultProfile)
+	if err != nil || !found || len(after.Teams) != 3 {
+		t.Fatalf("after routing.Load: found=%v len=%d err=%v", found, len(after.Teams), err)
+	}
+	now := time.Now()
+	for _, tm := range after.Teams {
+		switch tm.TeamID {
+		case teamA1, teamA2:
+			if tm.StateAt(now) != routing.Refused || tm.LastError != routing.OrgAccessLost {
+				t.Fatalf("orgA team %s state=%s lastError=%q, want Refused/OrgAccessLost", tm.TeamID, tm.StateAt(now), tm.LastError)
+			}
+		case teamB:
+			if tm.SignInNeeded || tm.StateAt(now) != routing.Active {
+				t.Fatalf("orgB teamB SignInNeeded=%v state=%s, want false/Active", tm.SignInNeeded, tm.StateAt(now))
+			}
+		}
+	}
+}
+
+// If a server-key setup snapshots teamA (skipping already-bound repos) and another setup
+// switches the profile to teamB before the first commits, the stale setup is rejected so
+// teamB is untouched and no repo is ever left Pending.
+func TestConcurrentServerKeySetupRejectsStaleReplacement(t *testing.T) {
+	f := newFakeAuth(t)
+	authSandbox(t, f)
+	sandboxMachine(t)
+	t.Setenv("TERMA_POLICY_STUB", "")
+	teamA := projectsIn(orgA().ID)[0].ID
+	teamB := projectsIn(orgB().ID)[0].ID
+	keyA := "ter" + "_srv_1111aaaa2222bbbb3333cccc"
+	keyB := "ter" + "_srv_4444dddd5555eeee6666ffff"
+	f.serverKeys = map[string]string{keyA: teamA, keyB: teamB}
+	f.policyBody = `{"policy":{"version":"1.1","terma":{"per_repository":{"repositories":["github.com/acme/app"]},"git_hooks":false,"capture":{"exclude_prompts":false,"exclude_tool_content":false}}},"revision":1,"updated_at":"2026-11-01T00:00:00Z"}`
+
+	t.Setenv("TERMA_API_KEY", keyA)
+	if out, err := runTerma(t, "setup", "-y", "--relay-service", "off"); err != nil {
+		t.Fatalf("initial server-key setup A: %v\n%s", err, out)
+	}
+
+	// Setup A re-runs for teamA and blocks in /v1/policy while Setup B switches to teamB.
+	entered := make(chan struct{})
+	release := make(chan struct{})
+	f.onPolicy = func(_ http.ResponseWriter, r *http.Request) bool {
+		if r.Header.Get("Authorization") == "Bearer "+keyA {
+			close(entered)
+			<-release
+		}
+		return false
+	}
+
+	appA := cloneTestApp()
+	doneA := make(chan error, 1)
+	go func() {
+		cmd := appA.NewRootCommand()
+		var out bytes.Buffer
+		cmd.SetOut(&out)
+		cmd.SetErr(&out)
+		cmd.SetArgs([]string{"setup", "-y", "--relay-service", "off"})
+		doneA <- cmd.Execute()
+	}()
+
+	<-entered
+	// Switch profile to keyB via a separate command with keyB in config override / env:
+	// since env is process-wide, directly run server-key commit for teamB via routing.Replace
+	// (simulating concurrent server-key setup B completing while A is blocked in FetchWithKey).
+	stA, found, err := routing.Load(testApp.stateDir, config.DefaultProfile)
+	if err != nil || !found {
+		close(release)
+		t.Fatalf("routing.Load A: found=%v err=%v", found, err)
+	}
+	polB := config.Policy{Mode: config.ModeRepo, Repositories: []string{"github.com/acme/app"},
+		TeamID: teamB, OrganizationID: orgB().ID, AuthURL: f.srv.URL, Revision: 1, FetchedAt: time.Now()}
+	expA := stA.Expect()
+	stB, err := routing.Replace(testApp.stateDir, config.DefaultProfile, &expA, sendas.NoPersonLane, func(s *routing.State) error {
+		if _, err := s.Select(routing.Team{OrganizationID: orgB().ID, AuthURL: f.srv.URL, TeamID: teamB, Policy: polB}); err != nil {
+			return err
+		}
+		return s.Bind("github.com/acme/app", orgB().ID, false)
+	})
+	if err != nil {
+		close(release)
+		t.Fatalf("concurrent setup B replace: %v", err)
+	}
+
+	close(release)
+	if err := <-doneA; !errors.Is(err, routing.ErrStaleGeneration) {
+		t.Fatalf("stale server-key setup A = %v, want ErrStaleGeneration", err)
+	}
+
+	after, found, err := routing.Load(testApp.stateDir, config.DefaultProfile)
+	if err != nil || !found || after.StateID != stB.StateID || len(after.Teams) != 1 || after.Teams[0].TeamID != teamB || after.Bindings["github.com/acme/app"].Organization != orgB().ID {
+		t.Fatalf("concurrent teamB state altered by stale setup A: %+v", after)
+	}
+}
+
+// Live-account validation runs under routing/<profile>.lock: if Bob signs back in while
+// Alice waits for the routing lock to replace Bob's unchanged StateID, Alice's Replace
+// aborts under the lock and leaves Bob's routing.State untouched.
+func TestLiveAccountCheckUnderRoutingLockPreventsStaleReplace(t *testing.T) {
+	gateway := grantSandbox(t)
+	t.Setenv("TERMA_POLICY_STUB", "")
+	teamA := projectsIn(orgA().ID)[0].ID
+	teamB := projectsIn(orgB().ID)[0].ID
+	gateway.policyBodies = map[string]string{
+		teamA: `{"policy":{"version":"1.1","terma":{"per_repository":{"repositories":["github.com/acme/app"]},"git_hooks":false,"capture":{"exclude_prompts":false,"exclude_tool_content":false}}},"revision":1,"updated_at":"2026-11-01T00:00:00Z"}`,
+		teamB: `{"policy":{"version":"1.1","terma":{"per_repository":{"repositories":["github.com/beta/web"]},"git_hooks":false,"capture":{"exclude_prompts":false,"exclude_tool_content":false}}},"revision":1,"updated_at":"2026-11-01T00:00:00Z"}`,
+	}
+	const (
+		alice = "11111111-1111-4111-8111-aaaaaaaaaaaa"
+		bob   = "22222222-2222-4222-8222-bbbbbbbbbbbb"
+	)
+	gateway.grant("bob-first", bob)
+	if out, stderr, err := desktopSetup(t, identityLine(bob, orgB().ID)+`{"code":"bob-first"}`+"\n", orgB().ID, teamB); err != nil {
+		t.Fatalf("bob initial setup: %v\n%s%s", err, out, stderr)
+	}
+	bobState, found, err := routing.Load(testApp.stateDir, config.DefaultProfile)
+	if err != nil || !found {
+		t.Fatalf("bob routing.Load: found=%v err=%v", found, err)
+	}
+	aliceAcct := auth.AccountKey(gateway.srv.URL, alice)
+	bobAcct := auth.AccountKey(gateway.srv.URL, bob)
+
+	// Alice signs in and snapshots Bob's routing state as baseline.
+	if err := saveSignIn(testApp.dir, storedSessionOf(gateway, alice)); err != nil {
+		t.Fatal(err)
+	}
+	baseline := testApp.loadSetupBaseline(config.DefaultProfile, aliceAcct)
+	target := routing.Team{
+		OrganizationID: orgA().ID,
+		AuthURL:        gateway.srv.URL,
+		TeamID:         teamA,
+		Policy: config.Policy{
+			Mode: config.ModeRepo, Repositories: []string{"github.com/acme/app"},
+			TeamID: teamA, OrganizationID: orgA().ID, AuthURL: gateway.srv.URL, Revision: 1, FetchedAt: time.Now(),
+		},
+	}
+
+	// Hold routing/<profile>.json.lock so Alice's Replace blocks waiting on the lock after
+	// its pre-lock check passes, then switch live sign-in back to Bob before releasing lock!
+	statePath, err := routing.StatePath(testApp.stateDir, config.DefaultProfile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	unlockRouting, err := flock.TryLock(statePath + ".lock")
+	if err != nil {
+		t.Fatalf("TryLock routing sidecar: %v", err)
+	}
+	aliceDone := make(chan error, 1)
+	go func() {
+		_, _, cerr := cloneTestApp().commitRoutingStateLocked(config.DefaultProfile, aliceAcct, baseline, target, nil, nil, false)
+		aliceDone <- cerr
+	}()
+
+	// Give Alice a moment to pass the pre-lock check and block on flock.Locked, then sign Bob back in.
+	time.Sleep(30 * time.Millisecond)
+	if err := saveSignIn(testApp.dir, storedSessionOf(gateway, bob)); err != nil {
+		unlockRouting()
+		t.Fatal(err)
+	}
+	unlockRouting()
+
+	if err := <-aliceDone; !errors.Is(err, routing.ErrAccountMismatch) {
+		t.Fatalf("stale Alice Replace after Bob re-signed in = %v, want ErrAccountMismatch", err)
+	}
+	after, found, err := routing.Load(testApp.stateDir, config.DefaultProfile)
+	if err != nil || !found || after.Account != bobAcct || after.StateID != bobState.StateID {
+		t.Fatalf("Bob's routing.State was overwritten while Bob was active: %+v", after)
+	}
+}

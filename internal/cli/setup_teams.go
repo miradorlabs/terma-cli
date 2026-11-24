@@ -13,11 +13,11 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/account/auth"
 	"github.com/miradorlabs/terma-cli/internal/config"
+	"github.com/miradorlabs/terma-cli/internal/policy"
 	"github.com/miradorlabs/terma-cli/internal/relay"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
 	"github.com/miradorlabs/terma-cli/internal/routing"
-	"github.com/miradorlabs/terma-cli/internal/sendas"
 )
 
 type setupBaseline struct {
@@ -25,9 +25,9 @@ type setupBaseline struct {
 	loadErr     error
 	sameAccount bool
 	state       routing.State
-	// expectPrev pins Account + StateID for an intentional cross-account Replace so an
-	// in-flight background refresh on the old account does not block cutover while any
-	// concurrent replacement by another account (or ABA reuse) is rejected.
+	// expectPrev pins Account + StateID for an intentional cross-account Replace (or
+	// single-team replacement) so an in-flight background refresh on the prior state
+	// does not block cutover while any concurrent replacement or ABA reuse is rejected.
 	expectPrev *routing.Expect
 }
 
@@ -56,6 +56,9 @@ func (app *App) setupTeams(cmd *cobra.Command, cfg *config.Config, org *organiza
 	baseline := app.loadSetupBaseline(cfg.ProfileName, account)
 	target, teamName, err := app.fetchSetupTarget(cmd, cfg, org, account, f.desktopGrant, !f.assumeYes && canPrompt())
 	if err != nil {
+		if baseline.sameAccount && target.TeamID != "" && policy.Classify(err) == routing.OrgAccessLost {
+			app.commitTargetOrgAccessLost(ctx, cfg, account, baseline, target)
+		}
 		return config.Policy{}, "", err
 	}
 	var existingBindings map[string]routing.Binding
@@ -171,7 +174,7 @@ func (app *App) fetchSetupTarget(cmd *cobra.Command, cfg *config.Config, org *or
 	}
 	pol, err := app.policies().FetchTeam(ctx, cfg, account, target)
 	if err != nil {
-		return routing.Team{}, "", err
+		return target, teamName, err
 	}
 	if !personal && pol.Global() {
 		pol.Mode, pol.Repositories = config.ModeRepo, nil
@@ -180,18 +183,23 @@ func (app *App) fetchSetupTarget(cmd *cobra.Command, cfg *config.Config, org *or
 	return target, teamName, nil
 }
 
+func orgEpochSnapshot(teams []routing.Team, orgID, authURL string) map[string]int64 {
+	epochs := make(map[string]int64)
+	for _, sib := range teams {
+		if sib.OrganizationID == orgID && sib.AuthURL == authURL {
+			epochs[sib.EnrollmentID] = sib.Epoch
+		}
+	}
+	return epochs
+}
+
 func (app *App) refreshExistingTeams(ctx context.Context, cfg *config.Config, account string, teams []routing.Team, skipTeamID string) []setupRefresh {
 	var out []setupRefresh
 	for _, t := range teams {
 		if t.TeamID == skipTeamID || t.AuthURL != cfg.AuthURL {
 			continue
 		}
-		orgEpochs := make(map[string]int64)
-		for _, sib := range teams {
-			if sib.OrganizationID == t.OrganizationID && sib.AuthURL == t.AuthURL {
-				orgEpochs[sib.EnrollmentID] = sib.Epoch
-			}
-		}
+		orgEpochs := orgEpochSnapshot(teams, t.OrganizationID, t.AuthURL)
 		ref, _ := app.policies().RefreshTeam(ctx, cfg, account, t)
 		out = append(out, setupRefresh{
 			refresh:   ref,
@@ -201,6 +209,46 @@ func (app *App) refreshExistingTeams(ctx context.Context, cfg *config.Config, ac
 		})
 	}
 	return out
+}
+
+func applySetupRefreshes(s *routing.State, refreshes []setupRefresh) error {
+	for _, r := range refreshes {
+		if r.refresh.Failure == routing.OrgAccessLost {
+			s.ApplyOrgAccessLost(r.orgID, r.authURL, r.orgEpochs, r.refresh.At)
+			continue
+		}
+		if _, err := s.ApplyRefresh(r.refresh); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// commitTargetOrgAccessLost records an org-wide OrgAccessLost for a target fetch that
+// returned 403 ORG_NOT_ACCESSIBLE and still refreshes sibling enrollments in other orgs
+// so sign-in recovery does not leave Active grants in the lost org or SignInNeeded elsewhere.
+func (app *App) commitTargetOrgAccessLost(ctx context.Context, cfg *config.Config, account string, b setupBaseline, target routing.Team) {
+	orgEpochs := orgEpochSnapshot(b.state.Teams, target.OrganizationID, target.AuthURL)
+	refreshes := app.refreshExistingTeams(ctx, cfg, account, b.state.Teams, target.TeamID)
+	if len(orgEpochs) == 0 && len(refreshes) == 0 {
+		return
+	}
+	now := time.Now().UTC()
+	var committed routing.State
+	err := daemon.WithRoutingRelayGate(app.stateDir, app.version, func() error {
+		st, uerr := routing.Update(app.stateDir, cfg.ProfileName, routing.Expect{Account: account}, func(s *routing.State) error {
+			if err := app.verifyActiveLane(account); err != nil {
+				return err
+			}
+			s.ApplyOrgAccessLost(target.OrganizationID, target.AuthURL, orgEpochs, now)
+			return applySetupRefreshes(s, refreshes)
+		})
+		committed = st
+		return uerr
+	})
+	if err == nil {
+		_ = app.persistCommittedPolicies(committed)
+	}
 }
 
 func (app *App) verifyActiveLane(account string) error {
@@ -215,8 +263,8 @@ func (app *App) verifyActiveLane(account string) error {
 }
 
 // checkSetupBaseline verifies before mutating server-key storage that routing/<profile>.json
-// has not moved to a different account than baseline observed before network calls.
-func (app *App) checkSetupBaseline(profile, account string, b setupBaseline) error {
+// still matches baseline (and for singleTeamOnly, has not been concurrently replaced).
+func (app *App) checkSetupBaseline(profile, account string, b setupBaseline, singleTeamOnly bool) error {
 	existing, found, loadErr := routing.Load(app.stateDir, profile)
 	if loadErr != nil {
 		if b.loadErr != nil {
@@ -224,29 +272,38 @@ func (app *App) checkSetupBaseline(profile, account string, b setupBaseline) err
 		}
 		return loadErr
 	}
-	if !found || existing.Account == account {
+	if !found {
+		if b.found && b.loadErr == nil && b.sameAccount {
+			return routing.ErrNoState
+		}
 		return nil
 	}
-	if b.expectPrev != nil && existing.Account == b.expectPrev.Account && existing.StateID == b.expectPrev.StateID {
-		return nil
+	if existing.Account != account {
+		if b.expectPrev != nil && existing.Account == b.expectPrev.Account && existing.StateID == b.expectPrev.StateID {
+			return nil
+		}
+		return fmt.Errorf("%w: on disk %s, expected %s", routing.ErrAccountMismatch, existing.Account, account)
 	}
-	return fmt.Errorf("%w: on disk %s, expected %s", routing.ErrAccountMismatch, existing.Account, account)
+	if singleTeamOnly && (b.expectPrev == nil || existing.StateID != b.expectPrev.StateID) {
+		return routing.ErrStaleGeneration
+	}
+	return nil
 }
 
 // commitRoutingStateLocked writes target into routing/<profile>.json via CAS while the
-// caller holds the routing relay activation gate:
-//   - Verifies the live profile lane still belongs to account before every CAS attempt;
-//   - ReplaceCorrupt only when baseline observed a corrupt file (never clobbering a
-//     concurrently repaired foreign account's state);
+// caller exclusively holds the relay lock:
+//   - Verifies the live profile lane under routing/<profile>.lock before every write;
+//   - ReplaceCorrupt only when baseline observed a corrupt file;
 //   - Create when absent (failing closed with ErrNoState if same-account state was torn down);
-//   - Replace(b.expectPrev) ONLY when the foreign state on disk is the exact state instance
-//     observed before network calls; never substitutes a newly loaded foreign Expect;
-//   - Update(existing.ExpectConsent()) with epoch-fenced target upsert and org-wide
-//     ApplyOrgAccessLost for sibling refreshes.
+//   - Replace(b.expectPrev) ONLY when the prior state on disk is the exact baseline StateID;
+//   - Update(existing.ExpectConsent()) with epoch-fenced target upsert and org-wide recovery.
 func (app *App) commitRoutingStateLocked(profile, account string, b setupBaseline, target routing.Team, refreshes []setupRefresh, bindings []bindingChoice, singleTeamOnly bool) (routing.State, bool, error) {
 	now := time.Now().UTC()
 	preEnrID, preEpoch, hadPre := preFetchTarget(b, target)
 	applyFresh := func(s *routing.State) error {
+		if err := app.verifyActiveLane(account); err != nil {
+			return err
+		}
 		if _, err := s.Select(target); err != nil {
 			return err
 		}
@@ -283,6 +340,9 @@ func (app *App) commitRoutingStateLocked(profile, account string, b setupBaselin
 			st, err := routing.Replace(app.stateDir, profile, b.expectPrev, account, applyFresh)
 			return st, true, err
 		case singleTeamOnly && !sameSingleTeam(existing, target):
+			if b.expectPrev == nil || existing.StateID != b.expectPrev.StateID {
+				return routing.State{}, false, routing.ErrStaleGeneration
+			}
 			expectPrev := existing.Expect()
 			st, err := routing.Replace(app.stateDir, profile, &expectPrev, account, applyFresh)
 			if errors.Is(err, routing.ErrStaleGeneration) {
@@ -290,18 +350,18 @@ func (app *App) commitRoutingStateLocked(profile, account string, b setupBaselin
 			}
 			return st, false, err
 		default:
+			if singleTeamOnly && (b.expectPrev == nil || existing.StateID != b.expectPrev.StateID) {
+				return routing.State{}, false, routing.ErrStaleGeneration
+			}
 			st, err := routing.Update(app.stateDir, profile, existing.ExpectConsent(), func(s *routing.State) error {
+				if err := app.verifyActiveLane(account); err != nil {
+					return err
+				}
 				if err := upsertTeam(s, target, preEnrID, preEpoch, hadPre, now); err != nil {
 					return err
 				}
-				for _, r := range refreshes {
-					if r.refresh.Failure == routing.OrgAccessLost {
-						s.ApplyOrgAccessLost(r.orgID, r.authURL, r.orgEpochs, r.refresh.At)
-						continue
-					}
-					if _, rerr := s.ApplyRefresh(r.refresh); rerr != nil {
-						return rerr
-					}
+				if err := applySetupRefreshes(s, refreshes); err != nil {
+					return err
 				}
 				return applySetupBindings(s, target, bindings)
 			})
@@ -362,46 +422,4 @@ func upsertTeam(s *routing.State, target routing.Team, preEnrID string, preEpoch
 	}
 	_, err := s.Select(target)
 	return err
-}
-
-func committedPrimary(st routing.State, fallback routing.Team) routing.Team {
-	for _, t := range st.Teams {
-		if t.TeamID == fallback.TeamID {
-			return t
-		}
-	}
-	return fallback
-}
-
-func (app *App) persistCommittedPolicies(st routing.State) error {
-	for _, t := range st.Teams {
-		if t.Policy.FetchedAt.IsZero() {
-			continue
-		}
-		if err := routing.StoreTeamPolicy(app.stateDir, t); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (app *App) recordSetupTeam(cfg *config.Config, account, teamID, teamName string) error {
-	var rejected error
-	err := config.UpdateProfile(app.dir, cfg.ProfileName, func(p *config.Profile) {
-		if account != sendas.NoPersonLane && p.Account != account {
-			rejected = errors.New("signed in as someone else while setting up teams")
-			return
-		}
-		if p.Team != teamID {
-			p.TeamName = ""
-		}
-		p.Team = teamID
-		if teamName != "" && teamName != teamID {
-			p.TeamName = teamName
-		}
-	})
-	if err != nil {
-		return err
-	}
-	return rejected
 }

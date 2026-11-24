@@ -197,11 +197,12 @@ func EnsureRoutingRelay(stateDir, version string) error {
 	return errors.New("a pre-routing relay is still running and must stop before activating team routing")
 }
 
-// WithRoutingRelayGate executes fn only while no pre-routing relay (!RunInfo.Routing)
-// can run for stateDir. When no relay is running it holds the relay lock across fn (and
-// purges leftover pre-cutover outbox parts); when a routing-capable relay already holds
-// the lock it verifies RunInfo.Routing before running fn. Lock order (relay/lock before
-// routing/<profile>.lock) matches the relay daemon.
+// WithRoutingRelayGate executes fn while exclusively holding the relay lock for stateDir,
+// ensuring no pre-routing relay (!RunInfo.Routing) can start or take over during commit.
+// If a pre-routing relay holds the lock, EnsureRoutingRelay supersedes/stops it first; if
+// another relay holds the lock, it is asked to stop and its lock is captured immediately
+// so no handoff can occur before fn completes (ConnectRelay starts the relay next).
+// Lock order (relay/lock before routing/<profile>.lock) matches the relay daemon.
 func WithRoutingRelayGate(stateDir, version string, fn func() error) error {
 	if stateDir == "" {
 		return fn()
@@ -223,11 +224,31 @@ func WithRoutingRelayGate(stateDir, version string, fn func() error) error {
 		if !flock.IsBusy(err) {
 			return err
 		}
-		if info, ok := RunningRelay(dir); ok && info.Routing {
+		if unlock, ok := stopAndLock(dir, preRoutingWait); ok {
+			defer unlock()
+			_, _ = relay.PurgeOldOutbox(filepath.Join(dir, relay.OutboxDir), time.Now())
 			return fn()
 		}
 	}
-	return errors.New("a pre-routing relay is still running and must stop before activating team routing")
+	return errors.New("a pre-routing relay is still running or holding the relay lock; stop it before activating team routing")
+}
+
+func stopAndLock(dir string, wait time.Duration) (func(), bool) {
+	if pid := relayPID(dir); pid > 1 && pid != os.Getpid() {
+		if proc, err := os.FindProcess(pid); err == nil {
+			if proc.Signal(syscall.SIGTERM) != nil {
+				_ = config.WriteFileAtomicNoSync(filepath.Join(dir, StopFile), []byte(strconv.Itoa(pid)+"\n"), 0o600)
+			}
+		}
+	}
+	for deadline := time.Now().Add(wait); ; time.Sleep(10 * time.Millisecond) {
+		if unlock, err := flock.TryLock(filepath.Join(dir, LockFile)); err == nil {
+			return unlock, true
+		}
+		if time.Now().After(deadline) {
+			return nil, false
+		}
+	}
 }
 
 func preRoutingGone(dir string) bool {
