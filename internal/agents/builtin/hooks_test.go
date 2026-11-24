@@ -163,6 +163,8 @@ func TestUserHooksInstallIdempotentlyAndRemoveCleanly(t *testing.T) {
 		"copilot": `{"version":1,"hooks":{"Stop":[{"type":"command","bash":"say done"}]}}`,
 		// agy names each hook at the top level.
 		"antigravity": `{"notify":{"Stop":[{"type":"command","command":"say done"}]}}`,
+		// terma's file is its own in grok's hooks directory; one already there keeps its entries.
+		"grok": `{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"say done"}]}]}}`,
 	}
 	for _, a := range reg.With[agents.UserHooks]() {
 		t.Run(a.Name(), func(t *testing.T) {

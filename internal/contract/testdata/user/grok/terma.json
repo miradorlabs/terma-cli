@@ -1,0 +1,71 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "search_replace|write|spawn_subagent|get_command_or_subagent_output|kill_command_or_subagent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ -x '/usr/local/bin/terma' ] && '/usr/local/bin/terma' hook --user grok-post-tool-use || true",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ -x '/usr/local/bin/terma' ] && '/usr/local/bin/terma' hook --user grok-session-end || true",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ -x '/usr/local/bin/terma' ] && '/usr/local/bin/terma' hook --user grok-session-start || true",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ -x '/usr/local/bin/terma' ] && '/usr/local/bin/terma' hook --user grok-stop || true",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ -x '/usr/local/bin/terma' ] && '/usr/local/bin/terma' hook --user grok-subagent-start || true",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ -x '/usr/local/bin/terma' ] && '/usr/local/bin/terma' hook --user grok-user-prompt-submit || true",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -66,6 +66,10 @@ type CaptureRules struct {
 	// SafeKeys and SafePrefixes pass with content withheld, unless another agent declares them content.
 	SafeKeys     []string
 	SafePrefixes []string
+	// HomeRelativeScopes are the instrumentation scopes whose records write the home directory
+	// as `~` in the paths they carry: the relay names that directory on the resource of a part
+	// holding records of one (terma.home_directory), with tool content, and on no other part.
+	HomeRelativeScopes []string
 	// MetricSafeKeys pass with content withheld on the data points of the metric they are
 	// listed under, and nowhere else: a key too generic a name to be safe everywhere that one
 	// metric fills from a fixed vocabulary. Unless another agent declares them content.

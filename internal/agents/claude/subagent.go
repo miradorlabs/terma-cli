@@ -4,8 +4,6 @@ import (
 	"cmp"
 	"context"
 	"encoding/json"
-	"os"
-	"path/filepath"
 
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
@@ -17,36 +15,20 @@ import (
 var claudeSubagentDir = hookrun.AgentStateDir(name, "subagents")
 
 // Claude Code's internal forks mint agent ids and fire SubagentStop without a launch, so only a
-// recorded launch proves delegation. One marker per (session, agent), written whole, so concurrent
-// launches never overwrite one another; the repository is not in the key, since a subagent can run
-// in another worktree.
+// recorded launch proves delegation (hookrun.Env.RememberSubagent).
 func claudeSubagentPath(dir, sessionID, agentID string) string {
-	return filepath.Join(dir, claudeSubagentDir, hookrun.EvidenceID(sessionID+"\x00"+agentID)+".json")
+	return hookrun.SubagentEvidencePath(dir, claudeSubagentDir, sessionID, agentID)
 }
 
 func rememberClaudeSubagent(e hookrun.Env, sessionID, agentID string) {
-	if e.Spool == nil {
-		return
-	}
-	path := claudeSubagentPath(e.StateDir, sessionID, agentID)
-	err := os.MkdirAll(filepath.Dir(path), 0o700)
-	if err == nil {
-		err = hookrun.WriteState(path, []byte("{}\n"))
-	}
-	if err != nil {
-		e.Logf("record Claude subagent launch: %v", err)
-	}
+	e.RememberSubagent(claudeSubagentDir, sessionID, agentID)
 }
 
 func knownClaudeSubagent(e hookrun.Env, sessionID, agentID string) bool {
-	info, err := os.Lstat(claudeSubagentPath(e.StateDir, sessionID, agentID))
-	// Kept after a stop, since an agent can be resumed; aged out like the spool.
-	return err == nil && info.Mode().IsRegular() && !info.ModTime().Before(e.Time().Add(-spool.MaxAge))
+	return e.KnownSubagent(claudeSubagentDir, sessionID, agentID)
 }
 
-func pruneClaudeSubagents(e hookrun.Env) {
-	hookrun.PruneState(filepath.Join(e.StateDir, claudeSubagentDir), e.Time().Add(-spool.MaxAge))
-}
+func pruneClaudeSubagents(e hookrun.Env) { e.PruneSubagents(claudeSubagentDir) }
 
 // subagentStart handles SubagentStart; the transcript path and last message are never read.
 func subagentStart(ctx context.Context, env hookrun.Env) error {

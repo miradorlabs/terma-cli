@@ -50,7 +50,7 @@ var Capabilities = []Capability{
 // Harnesses are the matrix's columns' groups, with the name docs show.
 var Harnesses = []struct{ ID, Name string }{
 	{"claude", "Claude Code"}, {"codex", "Codex CLI"}, {"opencode", "OpenCode"}, {"gemini", "Gemini CLI"},
-	{"omp", "OMP"}, {"pi", "Pi"}, {"hermes", "Hermes"}, {"dsh", "DeepSeek Harness"},
+	{"omp", "OMP"}, {"grok", "Grok Build"}, {"pi", "Pi"}, {"hermes", "Hermes"}, {"dsh", "DeepSeek Harness"},
 	{"t3", "T3 Code"}, {"cursor", "Cursor"}, {"claude-desktop", "Claude Desktop"}, {"codex-desktop", "Codex Desktop"},
 }
 

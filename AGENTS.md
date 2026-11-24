@@ -4,7 +4,7 @@ This file provides guidance to coding agents (Claude Code, Codex and others) whe
 with code in this repository.
 
 `terma` is a Go CLI that connects coding agents (Claude Code, Codex, GitHub Copilot, OMP,
-Antigravity) to Terma and stamps the commits they produce with the agent session that
+Antigravity, Grok Build) to Terma and stamps the commits they produce with the agent session that
 wrote them.
 
 ## Commands
@@ -66,7 +66,11 @@ policy's repository list (`config.Policy.Admits`); in repository mode, in a repo
 name, or outside git, it writes no manifest, spool line, trailer or claim for a project,
 only a placement with no project that marks the session not collected (`claim.Mark`), and
 under a policy no relay has refreshed for minutes it also starts a refresh. Each
-session is claimed for the developer's own team from setup.
+session is claimed for the developer's own team from setup. A harness may run the entries
+in another agent's hooks file (the grok agent's grok runs Claude Code's and Cursor's), so an
+agent marks the hook processes it starts (`agents.HookStarter`), and `terma hook` stands down in a process a
+harness other than the event's owner started: no claim, no spool line, no reply. The git
+hooks are not subject to it.
 
 **Commits.** The agent hooks announce the session and record the files it edits in a
 session manifest. At commit time, `prepare-commit-msg` matches the staged files against
@@ -118,14 +122,22 @@ leaves (`config.Policy.Content`). The claim also names the checkout the hook ran
 the relay stamps on the session's records (`stampCheckout`): its origin, branch and whether
 it is a linked worktree under any policy (`vcs.*`, `terma.repository.worktree.linked`), and
 its working tree, the directory in it and the worktree's name with tool content only
-(`terma.repository.root`, `terma.working_directory`, `terma.repository.worktree.name`). A subagent's
-claim names the session that opened it where the agent's own telemetry does not (OMP's,
-`hookrun.Extension.ClaimParent`), which the relay stamps as `terma.session.parent.id`
-(`stampParent`). Hook events never pass the relay, so delivery applies
+(`terma.repository.root`, `terma.working_directory`, `terma.repository.worktree.name`). On the
+parts of an agent that writes the home directory as `~` in its exported paths, and on no
+other (`shape.CaptureRules.HomeRelativeScopes`: grok's), it also stamps that directory with
+tool content (`terma.home_directory`, `Options.HomeDir`). A subagent's
+claim names the session that opened it where the agent's own telemetry does not (OMP's and
+grok's, `hookrun.Env.StartSubagent`), which the relay stamps as `terma.session.parent.id`
+(`stampParent`). grok's `PostToolUse` hook also sends the call that launched a subagent
+(`terma.subagent.call`) and, when the parent waits on or kills a background one, how it
+ended (`terma.subagent.end`). Hook events never pass the relay, so delivery applies
 the same rules when it sends them. Antigravity has no export, so its hooks send its content
 too: the prompt and the reply from the transcript, a tool call's arguments from `PostToolUse`
 and each tool's result as `terma.tool.result`. Which of it may go is ruled in
-`internal/agents/antigravity/content_paths.go` and `turn.go`. A session marked not collected is dropped on arrival;
+`internal/agents/antigravity/content_paths.go` and `turn.go`. grok's export often loses the prompt,
+so its prompt hook sends it as the same event (`terma.user.message`), which leaves under any
+policy, so it counts, with its text only while the policy collects prompts and the agent still
+has the developer's consent (`delivery.promptContent`). A session marked not collected is dropped on arrival;
 everything else unclaimed is held briefly and dropped: nothing unclaimed leaves the
 machine. The exception is a policy in global mode, which collects every session on the
 machine: it admits every repository, a hook outside git claims its session for the

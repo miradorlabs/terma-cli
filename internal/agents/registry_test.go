@@ -77,3 +77,47 @@ func TestTwoOwnersOfAnEventPanic(t *testing.T) {
 	}()
 	r.Event("edit")
 }
+
+// marking is plain that marks the hook processes it starts with MARK_<name>.
+type marking struct{ plain }
+
+func (m marking) StartedHook(getenv func(string) string) bool { return getenv("MARK_"+m.name) != "" }
+
+// starter marks hook processes as a harness the build has no agent for.
+type starter string
+
+func (s starter) StartedHook(getenv func(string) string) bool { return getenv(string(s)) != "" }
+
+// envOf reads only the variables set.
+func envOf(set ...string) func(string) string {
+	return func(k string) string {
+		if slices.Contains(set, k) {
+			return "1"
+		}
+		return ""
+	}
+}
+
+// A hook process another harness started is that harness's, whichever agent its event
+// belongs to; an agent's own mark never stands its own events down.
+func TestStartedElsewhere(t *testing.T) {
+	t.Parallel()
+	r := New(marking{plain{name: "a", events: []string{"a-edit"}}}, plain{name: "b", events: []string{"b-edit"}}).Starters(starter("MARK_x"))
+	for _, tc := range []struct {
+		event string
+		env   func(string) string
+		want  bool
+	}{
+		{"a-edit", envOf("MARK_a"), false},
+		{"b-edit", envOf("MARK_a"), true},
+		{"a-edit", envOf("MARK_x"), true},
+		{"b-edit", envOf("MARK_x"), true},
+		{"a-edit", envOf(), false},
+		{"b-edit", envOf(), false},
+		{"nobody", envOf("MARK_a", "MARK_x"), false},
+	} {
+		if got := r.StartedElsewhere(tc.event, tc.env); got != tc.want {
+			t.Errorf("StartedElsewhere(%s) = %v, want %v", tc.event, got, tc.want)
+		}
+	}
+}

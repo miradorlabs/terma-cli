@@ -39,10 +39,11 @@ var (
 		"github.copilot.git.repository", "github.copilot.github.org", "github.copilot.git.branch", "github.copilot.git.commit_sha",
 		"github.copilot.context.skills", "github.copilot.context.custom_agent_names",
 		"omp.gen_ai.request.messages", "omp.gen_ai.response.tool_calls",
+		"tool_output", "error_message",
 		"file_path", "result", "cwd"}
 	pinnedMessageFields     = []string{"gen_ai.input.messages", "gen_ai.output.messages"}
 	pinnedToolContentEvents = []string{"tool.output", "tool.input"}
-	pinnedSessionKeys       = []string{"session.id", "conversation.id", "gen_ai.conversation.id@@oh-my-pi/pi-agent-core", "gen_ai.conversation.id", "thread.id", "thread_id"}
+	pinnedSessionKeys       = []string{"session.id@ai.xai.grok_code", "session.id", "conversation.id", "gen_ai.conversation.id@@oh-my-pi/pi-agent-core", "gen_ai.conversation.id", "thread.id", "thread_id"}
 )
 
 func TestComposedRulesArePinned(t *testing.T) {
