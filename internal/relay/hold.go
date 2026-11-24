@@ -245,12 +245,11 @@ func (r *Relay) sweep() {
 	}
 	r.sweepPinned(pinnedKeys, now, &lost)
 }
-
 func (r *Relay) expandHeldPieces(key string, parts []heldPart) []heldPart {
 	if !r.teams() {
 		return parts
 	}
-	var out []heldPart
+	out := make([]heldPart, 0, len(parts))
 	for _, h := range parts {
 		for _, pc := range r.pieces(key, h.p) {
 			hp := h
@@ -277,12 +276,12 @@ func (r *Relay) sweepPinned(keys []string, now time.Time, lost *int) {
 			if !r.teams() || !r.laneActive(h.p.account) {
 				if r.teams() && now.Sub(h.at) < hold {
 					retain(h)
-					continue
+				} else {
+					if !h.awaitingPolicy.IsZero() {
+						*lost += h.p.records
+					}
+					r.dropStats(h.p.signal, cmp.Or(pn.why, string(WhyBlocked)), pn.blocker, h.p.records)
 				}
-				if !h.awaitingPolicy.IsZero() {
-					*lost += h.p.records
-				}
-				r.dropStats(h.p.signal, cmp.Or(pn.why, string(WhyBlocked)), pn.blocker, h.p.records)
 				continue
 			}
 			rk := [2]string{pn.q.Enrollment, h.p.account}
@@ -293,23 +292,20 @@ func (r *Relay) sweepPinned(keys []string, now time.Time, lost *int) {
 			if !waits {
 				res = rcs[rk].Entry(pn.q)
 			}
-			if res.Verdict == Discard && res.Why == WhyMixed && !res.MixedAt.IsZero() && h.p.records > 1 {
-				if before, after := splitBeforeMixed(h.p, res.MixedAt); before != nil {
-					if after != nil {
-						r.dropStats(after.signal, res.Why.reason(), res.Blocker, after.records)
-					}
-					h.p, h.size, pn.q.At, pn.q.EndAt = before, proto.Size(before.msg), before.at, before.endAt
-					res = rcs[rk].Entry(pn.q)
+			if before, after := r.splitMixed(h.p, verdict{why: string(res.Why), mixedAt: res.MixedAt}); res.Verdict == Discard && before != nil {
+				if after != nil {
+					r.dropStats(after.signal, res.Why.reason(), res.Blocker, after.records)
 				}
+				h.p, h.size, pn.q.At, pn.q.EndAt = before, proto.Size(before.msg), before.at, before.endAt
+				res = rcs[rk].Entry(pn.q)
 			}
 			switch res.Verdict {
 			case Discard:
 				r.dropStats(h.p.signal, res.Why.reason(), res.Blocker, h.p.records)
 				continue
 			case SendNow:
-				if pol, ok := r.resolveTeam(pn.q.Enrollment, pn.c.Tool, h.p.account, true); ok && r.mayLeaveAccount(h.p.account, pol.Key != "") && pol.resolvedFor(h.p.account) {
-					q := pn.q
-					out = append(out, verdictPart{verdict{ok: true, pol: pol, c: pn.c, q: &q, how: pn.how}, h.p})
+				if pol, ok := r.teamReady(pn.q.Enrollment, pn.c.Tool, h.p.account, true); ok {
+					out = append(out, verdictPart{verdict{ok: true, pol: pol, c: pn.c, q: &pn.q, how: pn.how}, h.p})
 					continue
 				}
 				pn.why, res.Why = whyNoKey, WhyNoState
@@ -322,9 +318,7 @@ func (r *Relay) sweepPinned(keys []string, now time.Time, lost *int) {
 					continue
 				}
 				*lost += h.p.records
-				if res.Why == WhyNoState {
-					pn.why = lostPolicyTimeout
-				}
+				pn.why = map[bool]string{true: lostPolicyTimeout, false: pn.why}[res.Why == WhyNoState]
 			} else if now.Sub(h.at) < hold {
 				h.awaitingPolicy = time.Time{}
 				retain(h)

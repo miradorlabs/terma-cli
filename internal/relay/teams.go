@@ -73,10 +73,12 @@ type (
 		EndAt      time.Time `json:"end_at,omitzero"`
 	}
 	teamState struct {
-		pinnedHold  map[string][]heldPart
-		teamSenders map[teamRoute]*sender
-		mixedSeen   map[string]time.Time
-		nudging     map[string]bool
+		pinnedHold      map[string][]heldPart
+		teamSenders     map[teamRoute]*sender
+		teamRecovered   map[teamRoute]bool
+		teamDiscoverErr bool
+		mixedSeen       map[string]time.Time
+		nudging         map[string]bool
 	}
 )
 
@@ -99,14 +101,14 @@ const (
 
 func (w Why) reason() string { return cmp.Or(string(w), string(WhyUnknown)) }
 
-// EffectiveEnd returns rec.EndAt when present, falling back to rec.At.
+// EffectiveEnd returns EndAt when non-zero, falling back to At.
 func (rec Record) EffectiveEnd() time.Time { return nonZeroTime(rec.EndAt, rec.At) }
 
-// EffectiveEnd returns q.EndAt when present, falling back to q.At.
+// EffectiveEnd returns EndAt when non-zero, falling back to At.
 func (q Queued) EffectiveEnd() time.Time   { return nonZeroTime(q.EndAt, q.At) }
 func nonZeroTime(a, b time.Time) time.Time { return map[bool]time.Time{true: a, false: b}[!a.IsZero()] }
 func (r *Relay) initTeams() {
-	r.pinnedHold, r.teamSenders, r.mixedSeen, r.nudging = map[string][]heldPart{}, map[teamRoute]*sender{}, map[string]time.Time{}, map[string]bool{}
+	r.pinnedHold, r.teamSenders, r.teamRecovered, r.mixedSeen, r.nudging = map[string][]heldPart{}, map[teamRoute]*sender{}, map[teamRoute]bool{}, map[string]time.Time{}, map[string]bool{}
 }
 func (r *Relay) teams() bool { return r.opts.Router != nil && r.opts.Router.Active() }
 func (r *Relay) takesUnplaced() bool {
@@ -134,10 +136,8 @@ func (r *Relay) decideTeams(key string, p *part) verdict {
 		if raw, ok := r.lookup(rec.Session); ok {
 			held = whyProcess
 			if c, ok := raw.At(p.pid, p.at); ok {
-				if !p.endAt.IsZero() && !p.endAt.Equal(p.at) {
-					if endC, ok := raw.At(p.pid, p.endAt); ok && endC.Kind == claim.KindMixed {
-						c = endC
-					}
+				if endC, ok := raw.At(p.pid, p.endAt); !p.endAt.IsZero() && !p.endAt.Equal(p.at) && ok && endC.Kind == claim.KindMixed {
+					c = endC
 				}
 				if c.Kind == "" && c.ProjectID == "" {
 					return verdict{why: whyNotCollected, final: true}
@@ -149,8 +149,7 @@ func (r *Relay) decideTeams(key string, p *part) verdict {
 	routed := r.opts.Router.Route(rec)
 	v, q := verdict{why: routed.Why.reason(), blocker: routed.Blocker, mixedAt: routed.MixedAt, session: rec.Session, c: rec.Placement}, routed.Queued
 	if q.Enrollment != "" {
-		q.Account, q.Session, q.Run = cmp.Or(q.Account, p.account), cmp.Or(q.Session, rec.Session), cmp.Or(q.Run, rec.Placement.Run)
-		q.At, q.EndAt = nonZeroTime(q.At, p.at), nonZeroTime(q.EndAt, p.endAt)
+		q.Account, q.Session, q.Run, q.At, q.EndAt = cmp.Or(q.Account, p.account), cmp.Or(q.Session, rec.Session), cmp.Or(q.Run, rec.Placement.Run), nonZeroTime(q.At, p.at), nonZeroTime(q.EndAt, p.endAt)
 	}
 	if !rec.Placed {
 		how = attribution{how: semconv.TermaRelayAttributionCatchAll}
@@ -165,7 +164,7 @@ func (r *Relay) decideTeams(key string, p *part) verdict {
 			v.why = held
 		}
 	case Send:
-		if pol, ok := r.resolveTeam(q.Enrollment, rec.Placement.Tool, p.account, false); ok && r.mayLeaveAccount(p.account, pol.Key != "") && pol.resolvedFor(p.account) {
+		if pol, ok := r.teamReady(q.Enrollment, rec.Placement.Tool, p.account, false); ok {
 			v.ok, v.why, v.pol, v.q, v.how = true, "", pol, &q, how
 		} else {
 			v.why, v.pin, v.how = whyNoKey, &q, how
@@ -173,24 +172,27 @@ func (r *Relay) decideTeams(key string, p *part) verdict {
 	}
 	return v
 }
-func (r *Relay) resolveTeam(enrollment, tool, account string, fresh bool) (Policy, bool) {
-	now, key := r.opts.Now(), "\x01team\x00"+account+"\x00"+enrollment+"\x00"+tool
-	if ttl := r.opts.PolicyCacheTTL; ttl > 0 && !fresh {
+func (r *Relay) teamReady(enrollment, tool, account string, fresh bool) (Policy, bool) {
+	if !r.laneActive(account) {
+		return Policy{}, false
+	}
+	now, key, ttl := r.opts.Now(), "\x01team\x00"+account+"\x00"+enrollment+"\x00"+tool, r.opts.PolicyCacheTTL
+	if ttl > 0 && !fresh {
 		r.cache.mu.Lock()
 		e, hit := r.cache.policies[key]
 		r.cache.mu.Unlock()
 		if hit && now.Sub(e.at) < ttl && (!e.ok || e.pol.resolvedFor(account)) {
-			return e.pol, e.ok
+			return e.pol, e.ok && r.mayLeaveAccount(account, e.pol.Key != "")
 		}
 	}
 	pol, err := r.opts.Router.Resolve(enrollment, tool, account)
 	ok := err == nil && pol.Endpoint != "" && (pol.Key != "" || r.opts.SignIn != nil) && pol.resolvedFor(account)
-	if r.opts.PolicyCacheTTL > 0 {
+	if ttl > 0 {
 		r.cache.mu.Lock()
 		r.cache.policies[key] = cachedPolicy{pol, ok, now}
 		r.cache.mu.Unlock()
 	}
-	return pol, ok
+	return pol, ok && r.mayLeaveAccount(account, pol.Key != "")
 }
 func (r *Relay) invalidateTeamPolicy(enrollments ...string) {
 	r.cache.mu.Lock()
@@ -207,22 +209,20 @@ func (r *Relay) allTeamSenders() []*sender {
 	return slices.Collect(maps.Values(r.teamSenders))
 }
 
-// OnStateChange invalidates cached team policies and immediately wakes matching teamSenders
-// past refusedBackoff, resetting backoff to 0 on recovery or Refused purge.
+// OnStateChange invalidates cached team policies and immediately wakes matching teamSenders.
 func (r *Relay) OnStateChange(enrollments ...string) {
 	r.invalidateTeamPolicy(enrollments...)
 	for _, s := range r.allTeamSenders() {
-		if len(enrollments) > 0 && !slices.Contains(enrollments, s.team.enrollment) {
-			continue
+		if len(enrollments) == 0 || slices.Contains(enrollments, s.team.enrollment) {
+			s.mu.Lock()
+			s.blocked = false
+			s.mu.Unlock()
+			select {
+			case s.stateChange <- struct{}{}:
+			default:
+			}
+			s.poke()
 		}
-		s.mu.Lock()
-		s.blocked = false
-		s.mu.Unlock()
-		select {
-		case s.stateChange <- struct{}{}:
-		default:
-		}
-		s.poke()
 	}
 }
 func (r *Relay) dropStats(sig Signal, why, blocker string, n int) {

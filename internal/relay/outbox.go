@@ -255,8 +255,8 @@ type queued struct {
 	mtime time.Time
 }
 
-// sweepOutbox enforces the bounds, oldest first, across both legacy routes and .teams/
-// queues, returning the parts removed per route so their senders stop queueing them.
+// sweepOutbox enforces the bounds, oldest first, and returns the parts it removed per route
+// so their senders stop queueing them.
 func (r *Relay) sweepOutbox(now time.Time) map[route][]entry {
 	o := r.outbox
 	routes, _ := o.routes()
@@ -265,9 +265,11 @@ func (r *Relay) sweepOutbox(now time.Time) map[route][]entry {
 		entries, _ := o.list(rt)
 		for _, e := range entries {
 			p := filepath.Join(o.routeDir(rt), e.name)
-			if info, err := os.Stat(p); err == nil {
-				all = append(all, queued{rt: rt, e: e, path: p, size: info.Size(), mtime: info.ModTime()})
+			info, err := os.Stat(p)
+			if err != nil {
+				continue
 			}
+			all = append(all, queued{rt: rt, e: e, path: p, size: info.Size(), mtime: info.ModTime()})
 		}
 	}
 	teams, _ := o.teamRoutes()
@@ -276,8 +278,7 @@ func (r *Relay) sweepOutbox(now time.Time) map[route][]entry {
 		for _, e := range entries {
 			p := filepath.Join(o.teamDir(rt), e.name)
 			if info, err := os.Stat(p); err == nil {
-				rtCopy := rt
-				all = append(all, queued{team: &rtCopy, e: e, path: p, size: info.Size(), mtime: info.ModTime()})
+				all = append(all, queued{team: &rt, e: e, path: p, size: info.Size(), mtime: info.ModTime()})
 			}
 		}
 	}

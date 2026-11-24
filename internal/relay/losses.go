@@ -31,8 +31,7 @@ const (
 // room, or as the relay stopped.
 const lostPolicyTimeout = "policy_timeout"
 
-// lostNoDestination is the loss reason of pre-cutover outbox parts purged at cutover,
-// which carry no routing destination and are never re-routed.
+// lostNoDestination counts pre-cutover outbox parts purged at cutover.
 const lostNoDestination = "no_destination"
 
 // OutboxLosses are the claimed records the relay lost, counted from the first loss since a
@@ -42,7 +41,7 @@ type OutboxLosses struct {
 	// Counts are the records lost by reason: outbox_full and outbox_expired, past the
 	// outbox's room or age; policy_timeout, dropped from memory while they waited for a
 	// team's policy or key the relay couldn't read; signed_out and unreadable, collected
-	// with no sign-in to bind them to; no_destination, pre-cutover parts dropped at cutover.
+	// with no sign-in to bind them to.
 	Counts map[string]int `json:"counts,omitempty"`
 	Last   time.Time      `json:"last,omitzero"`
 }

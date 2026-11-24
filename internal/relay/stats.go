@@ -25,12 +25,10 @@ func newStats() *Stats {
 	return &Stats{started: time.Now(), counters: map[string]int{}, blocked: map[string]int{}}
 }
 
-const maxBlocked = 1024
-
 func (s *Stats) block(blocker string, n int) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if _, ok := s.blocked[blocker]; !ok && len(s.blocked) >= maxBlocked {
+	if _, ok := s.blocked[blocker]; !ok && len(s.blocked) >= 1024 {
 		blocker = "overflow"
 	}
 	s.blocked[blocker] += n
@@ -108,11 +106,7 @@ func (s *Stats) Snapshot() Snapshot {
 	defer s.mu.Unlock()
 	c := make(map[string]int, len(s.counters))
 	maps.Copy(c, s.counters)
-	snap := Snapshot{Since: s.started, Counters: c}
-	if len(s.blocked) > 0 {
-		snap.Blocked = maps.Clone(s.blocked)
-	}
-	return snap
+	return Snapshot{Since: s.started, Counters: c, Blocked: map[bool]map[string]int{true: maps.Clone(s.blocked)}[len(s.blocked) > 0]}
 }
 
 // Keys lists the counters in order, for printing.

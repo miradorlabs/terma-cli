@@ -67,11 +67,17 @@ func (r *Relay) janitor(now time.Time) {
 			s.forget(gone)
 		}
 	}
+	r.mu.Lock()
+	retry := r.teamDiscoverErr
+	r.mu.Unlock()
+	if retry {
+		r.recoverTeamOutbox()
+	}
 }
 
-// dropHeldAtExit drops what is still held in unknownHold and pinnedHold: it lives in memory
-// only, never on disk. Each drop is named by what held the part, or "claimed" when a claim,
-// or its team's policy, landed too late; a policy-waiting part is lost as lostPolicyTimeout.
+// dropHeldAtExit drops what is still held: it lives in memory only, never on disk. Each
+// drop is named by what held the part (decide's reason), or "claimed" when a claim, or its
+// team's policy, landed too late; a claimed one is lost as lostPolicyTimeout.
 func (r *Relay) dropHeldAtExit() {
 	r.deliverMu.Lock()
 	defer r.deliverMu.Unlock()

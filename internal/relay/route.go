@@ -142,14 +142,12 @@ func (r *Relay) routePiece(p *part, allowSplit bool) {
 		return
 	}
 	v := r.judge(p.session, p)
-	if allowSplit {
-		if before, after := r.splitMixed(p, v); before != nil {
-			r.routePiece(before, false)
-			if after != nil {
-				r.routePiece(after, false)
-			}
-			return
+	if before, after := r.splitMixed(p, v); allowSplit && before != nil {
+		r.routePiece(before, false)
+		if after != nil {
+			r.routePiece(after, false)
 		}
+		return
 	}
 	c, pol, why, ok, how := v.c, v.pol, v.why, v.ok, v.how
 	switch {
@@ -172,13 +170,11 @@ func (r *Relay) routePiece(p *part, allowSplit bool) {
 	}
 }
 func (r *Relay) deliver(v verdict, p *part) {
-	if v.q != nil {
-		if r.dress(v.pol, p, v.q.Project, v.c, v.how) {
-			r.enqueueTeam(*v.q, v.c.Tool, p)
-		}
-		return
+	if v.q == nil {
+		r.deliverAttributed(v.c, v.pol, p, v.how)
+	} else if r.dress(v.pol, p, v.q.Project, v.c, v.how) {
+		r.enqueueTeam(*v.q, v.c.Tool, p)
 	}
-	r.deliverAttributed(v.c, v.pol, p, v.how)
 }
 
 // deliverAttributed applies the content policy, stamps the project and enqueues. deliverMu is held.

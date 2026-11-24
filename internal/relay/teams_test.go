@@ -942,6 +942,152 @@ func TestReviewEdgeCases(t *testing.T) {
 		r.OnStateChange("enr_perm")
 		waitForCounters(t, r, func(c map[string]int) bool { return c["forwarded.logs"] == 1 })
 	})
+
+	t.Run("server_key_lane_switch_blocked_by_pre_post_fence", func(t *testing.T) {
+		t.Parallel()
+		up := newSignInUpstream(t)
+		si := &testSignIn{account: sendas.NoPersonLane} // starts in no_person lane
+		dir := t.TempDir()
+		rt := teamRoute{sendas.NoPersonLane, "enr_sk", "claude-code"}
+		o := outbox{dir: dir}
+		if err := o.putTeam(rt, Queued{Enrollment: "enr_sk", Project: "proj_sk", Account: sendas.NoPersonLane, Session: "s_sk"}, newEntry(time.Now(), Logs, 1), mustMarshal(t, oneSessionLog("s_sk", "server-key"))); err != nil {
+			t.Fatal(err)
+		}
+		var switched atomic.Bool
+		router := &stubRouter{
+			active: true,
+			recheckFn: func(_, _ string) Rechecker {
+				return stubRechecker{gen: 1, entryFn: func(Queued) Rechecked { return Rechecked{Verdict: SendNow} }}
+			},
+			resolveFn: func(_, _, account string) (Policy, error) {
+				if switched.CompareAndSwap(false, true) {
+					si.set(accountA) // user signs in after batch selection, before HTTP.Do
+				}
+				return Policy{Endpoint: up.srv.URL, Key: "srv-key-fence", Account: account, IncludePrompts: true, IncludeToolContent: true}, nil
+			},
+		}
+		r, _ := startTeamRelay(t, Options{Dir: dir, SignIn: si, Router: router})
+		waitFor(t, func() bool {
+			if !switched.Load() {
+				return false
+			}
+			r.mu.Lock()
+			s := r.teamSenders[rt]
+			r.mu.Unlock()
+			return s != nil && !s.busy()
+		})
+		if got := len(up.bodies()); got != 0 {
+			t.Fatalf("expected 0 HTTP posts after no_person -> user lane switch, got %d", got)
+		}
+		si.set(sendas.NoPersonLane)
+		r.OnStateChange("enr_sk")
+		waitForCounters(t, r, func(c map[string]int) bool { return c["forwarded.logs"] == 1 })
+	})
+
+	t.Run("bounded_candidate_scan_delivers_tail_without_starvation", func(t *testing.T) {
+		t.Parallel()
+		up := newSignInUpstream(t)
+		si := &testSignIn{account: accountA}
+		dir := t.TempDir()
+		rt := teamRoute{accountA, "enr_scan", "claude-code"}
+		o := outbox{dir: dir}
+		t0 := time.Now().Add(-time.Minute)
+		const waitCount = 140
+		for i := range waitCount {
+			if err := o.putTeam(rt, Queued{Enrollment: "enr_scan", Project: "proj_scan", Account: accountA, Session: "wait"}, newEntry(t0.Add(time.Duration(i)*time.Millisecond), Logs, 1), mustMarshal(t, oneSessionLog("wait", "w"))); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if err := o.putTeam(rt, Queued{Enrollment: "enr_scan", Project: "proj_scan", Account: accountA, Session: "go"}, newEntry(t0.Add(waitCount*time.Millisecond), Logs, 1), mustMarshal(t, oneSessionLog("go", "tail"))); err != nil {
+			t.Fatal(err)
+		}
+		var maxPerCall atomic.Int32
+		router := &stubRouter{
+			active: true,
+			recheckFn: func(_, _ string) Rechecker {
+				var calls atomic.Int32
+				return stubRechecker{gen: 1, entryFn: func(q Queued) Rechecked {
+					n := calls.Add(1)
+					for {
+						cur := maxPerCall.Load()
+						if n <= cur || maxPerCall.CompareAndSwap(cur, n) {
+							break
+						}
+					}
+					if q.Session == "go" {
+						return Rechecked{Verdict: SendNow}
+					}
+					return Rechecked{Verdict: Wait, Why: WhyPending}
+				}}
+			},
+			resolveFn: func(_, _, account string) (Policy, error) {
+				return Policy{Endpoint: up.srv.URL, Account: account, IncludePrompts: true, IncludeToolContent: true}, nil
+			},
+		}
+		r, _ := startTeamRelay(t, Options{Dir: dir, SignIn: si, Router: router})
+		waitForCounters(t, r, func(c map[string]int) bool { return c["forwarded.logs"] == 1 })
+		if got := maxPerCall.Load(); got > int32(maxMergeFiles*4) {
+			t.Fatalf("single Recheck scanned %d entries, want <= %d", got, maxMergeFiles*4)
+		}
+		waitFor(t, func() bool {
+			r.mu.Lock()
+			s := r.teamSenders[rt]
+			r.mu.Unlock()
+			return s != nil && !s.busy()
+		})
+		// Entry-level Wait must leave s.blocked=false so a newly pushed SendNow part wakes the sender immediately.
+		r.enqueueTeam(Queued{Enrollment: "enr_scan", Project: "proj_scan", Account: accountA, Session: "go"}, "claude-code", &part{
+			signal: Logs, records: 1, account: accountA, arrived: time.Now(), msg: oneSessionLog("go", "pushed"),
+		})
+		waitForCounters(t, r, func(c map[string]int) bool { return c["forwarded.logs"] == 2 })
+	})
+
+	t.Run("startup_team_routes_discovery_failure_retried_by_janitor", func(t *testing.T) {
+		if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+			t.Skip("POSIX chmod 0000 test")
+		}
+		t.Parallel()
+		up := newSignInUpstream(t)
+		si := &testSignIn{account: accountA}
+		dir := t.TempDir()
+		rt := teamRoute{accountA, "enr_disc", "claude-code"}
+		o := outbox{dir: dir}
+		if err := o.putTeam(rt, Queued{Enrollment: "enr_disc", Project: "proj_disc", Account: accountA, Session: "s_disc"}, newEntry(time.Now(), Logs, 1), mustMarshal(t, oneSessionLog("s_disc", "retry-discover"))); err != nil {
+			t.Fatal(err)
+		}
+		acctDir := filepath.Join(dir, teamsDir, accountPrefix+accountA)
+		if err := os.Chmod(acctDir, 0o000); err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = os.Chmod(acctDir, 0o700) })
+
+		router := &stubRouter{
+			active: true,
+			recheckFn: func(_, _ string) Rechecker {
+				return stubRechecker{gen: 1, entryFn: func(Queued) Rechecked { return Rechecked{Verdict: SendNow} }}
+			},
+			resolveFn: func(_, _, account string) (Policy, error) {
+				return Policy{Endpoint: up.srv.URL, Account: account, IncludePrompts: true, IncludeToolContent: true}, nil
+			},
+		}
+		r, _ := startTeamRelay(t, Options{Dir: dir, SignIn: si, Router: router})
+		waitFor(t, func() bool {
+			r.mu.Lock()
+			defer r.mu.Unlock()
+			return r.teamDiscoverErr
+		})
+		if err := os.Chmod(acctDir, 0o700); err != nil {
+			t.Fatal(err)
+		}
+		r.janitor(time.Now())
+		waitForCounters(t, r, func(c map[string]int) bool { return c["forwarded.logs"] == 1 })
+		r.mu.Lock()
+		stillErr := r.teamDiscoverErr
+		r.mu.Unlock()
+		if stillErr {
+			t.Fatal("expected teamDiscoverErr=false after janitor retry succeeded")
+		}
+	})
 }
 
 func oneSessionLog(session, body string) *logspb.LogsData {

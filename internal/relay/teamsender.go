@@ -5,6 +5,7 @@ import (
 	"cmp"
 	"context"
 	"errors"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -24,8 +25,7 @@ func (r *Relay) teamSender(rt teamRoute) *sender {
 	if s := r.teamSenders[rt]; s != nil {
 		return s
 	}
-	rtCopy := rt
-	s := &sender{r: r, team: &rtCopy, dir: r.outbox.teamDir(rt), name: rt.String(), queue: map[Signal][]entry{}, wake: make(chan struct{}, 1), stateChange: make(chan struct{}, 1)}
+	s := &sender{r: r, team: &rt, dir: r.outbox.teamDir(rt), name: rt.String(), queue: map[Signal][]entry{}, wake: make(chan struct{}, 1), stateChange: make(chan struct{}, 1)}
 	r.teamSenders[rt] = s
 	r.wg.Add(1)
 	go s.loop()
@@ -78,12 +78,6 @@ func (s *sender) buryFile(e entry) {
 		_ = config.Remove(src)
 	}
 	s.forget([]entry{e})
-}
-func (s *sender) prepareBody(sig Signal, body []byte, pol Policy) ([]byte, sendTally) {
-	if s.team != nil {
-		return s.r.filterQueued(sig, body, pol, s.team.account, true)
-	}
-	return s.r.withholdQueued(sig, body, pol)
 }
 func (s *sender) dropMatching(match func(entry) bool, why, blocker string) {
 	s.mu.Lock()
@@ -163,6 +157,7 @@ func (s *sender) nextBatch(limit int) ([]entry, time.Duration) {
 		return s.next(limit), idleWait
 	}
 	if _, has := s.nextAfter(nil, ""); !has {
+		s.scanAfter, s.scanFound, s.scanWait = nil, false, false
 		return nil, idleWait
 	}
 	if !s.r.teams() || !s.r.laneActive(s.team.account) {
@@ -175,49 +170,63 @@ func (s *sender) nextBatch(limit int) ([]entry, time.Duration) {
 		s.setKeyless(waited)
 		return nil, map[bool]time.Duration{true: keylessRetry, false: idleWait}[waited]
 	}
-	after, entries, firstSig, firstProj, waiting := map[Signal]string{}, []entry(nil), Signal(""), "", false
-	for len(entries) < limit {
+	after := map[Signal]string{}
+	maps.Copy(after, s.scanAfter)
+	entries, firstSig, firstProj, waiting := []entry(nil), Signal(""), "", false
+	for scanned := 0; len(entries) < limit && scanned < max(limit*4, maxMergeFiles); scanned++ {
 		e, ok := s.nextAfter(after, firstSig)
 		if !ok {
-			break
+			if len(entries) > 0 {
+				break
+			}
+			hadWork, wasWait := s.scanFound, waiting || s.scanWait
+			s.scanAfter, s.scanFound, s.scanWait = nil, false, false
+			if hadWork {
+				return nil, 0
+			}
+			s.mu.Lock()
+			s.keyless, s.blocked = wasWait, false
+			s.mu.Unlock()
+			return nil, map[bool]time.Duration{true: keylessRetry, false: idleWait}[wasWait]
 		}
 		after[e.signal] = e.name
+		ready, w := !e.unread, false
 		if e.unread {
-			if ready, w := s.resolveUnread(&e); !ready {
-				waiting = waiting || w
+			ready, w = s.resolveUnread(&e)
+			waiting = waiting || w
+		}
+		if ready && (len(entries) == 0 || e.q.Project == firstProj) {
+			if v := s.checkEntry(rc, e); v == SendNow {
+				firstSig, firstProj, entries, s.scanFound = cmp.Or(firstSig, e.signal), cmp.Or(firstProj, e.q.Project), append(entries, e), true
 				continue
+			} else if v == Wait {
+				waiting = true
 			}
 		}
-		if len(entries) > 0 && e.q.Project != firstProj {
-			continue
-		}
-		switch s.checkEntry(rc, e) {
-		case Wait:
-			waiting = true
-		case SendNow:
-			firstSig, firstProj, entries = cmp.Or(firstSig, e.signal), cmp.Or(firstProj, e.q.Project), append(entries, e)
+		if len(entries) == 0 {
+			s.scanAfter = maps.Clone(after)
 		}
 	}
-	wait := len(entries) == 0 && waiting
-	s.mu.Lock()
-	s.keyless, s.blocked = wait, false
-	s.mu.Unlock()
-	return entries, map[bool]time.Duration{true: keylessRetry, false: idleWait}[wait]
+	if len(entries) == 0 {
+		s.scanAfter, s.scanWait = after, s.scanWait || waiting
+		return nil, 0
+	}
+	s.setKeyless(false)
+	return entries, idleWait
 }
 func (s *sender) resolveBatchPolicy(c claim.Claim) (Policy, bool) {
 	if s.team == nil {
 		pol, ok := s.r.resolve(c, s.route.account)
 		return pol, ok && s.r.mayLeave(s.route, pol.Key != "")
 	}
-	pol, ok := s.r.resolveTeam(s.team.enrollment, s.team.toolLabel(), s.team.account, true)
-	return pol, ok && s.r.mayLeaveAccount(s.team.account, pol.Key != "") && pol.resolvedFor(s.team.account)
+	return s.r.teamReady(s.team.enrollment, s.team.toolLabel(), s.team.account, true)
 }
 func (s *sender) postBatch(ctx context.Context, pol Policy, batch []entry, body []byte) (outcome, time.Duration, string, int64) {
 	if s.team == nil {
-		return s.send(ctx, pol, batch[0], body)
+		return s.send(ctx, pol, batch[0], body, nil)
 	}
 	fence := func() (outcome, time.Duration, string) {
-		if !s.r.mayLeaveAccount(s.team.account, pol.Key != "") {
+		if !s.r.laneActive(s.team.account) || !s.r.mayLeaveAccount(s.team.account, pol.Key != "") {
 			return keyless, keylessRetry, "lane changed before send"
 		}
 		rc := s.r.opts.Router.Recheck(s.team.enrollment, s.team.account)
@@ -240,7 +249,7 @@ func (s *sender) postBatch(ctx context.Context, pol Policy, batch []entry, body 
 		}
 		return sent, 0, ""
 	}
-	return s.r.post(ctx, pol, s.team.account, batch[0].q.Project, s.team.enrollment, batch[0].signal, body, fence)
+	return s.send(ctx, pol, batch[0], body, fence)
 }
 func (r *Relay) dropMixed(session, run string, from time.Time) {
 	key := session + "\x00" + run

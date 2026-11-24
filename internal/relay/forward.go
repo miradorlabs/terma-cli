@@ -36,11 +36,12 @@ type sender struct {
 	queue   map[Signal][]entry
 	keyless bool // a keyless route waits and keeps no relay awake
 
-	team        *teamRoute
-	dir, name   string
-	stateChange chan struct{}
-	blocked     bool
-	gen         int64
+	team                         *teamRoute
+	dir, name                    string
+	stateChange                  chan struct{}
+	blocked, scanFound, scanWait bool
+	gen                          int64
+	scanAfter                    map[Signal]string
 }
 
 func (r *Relay) sender(rt route) *sender {
@@ -142,7 +143,7 @@ func (s *sender) loop() {
 		case <-t.C:
 		case <-wake:
 		case <-s.stateChange:
-			backoff = 0
+			backoff, s.scanAfter, s.scanFound, s.scanWait = 0, nil, false, false
 		case <-stop:
 			if backoff > 0 {
 				return false // a failing host is not retried on the way out
@@ -153,7 +154,7 @@ func (s *sender) loop() {
 	for ctx.Err() == nil {
 		select {
 		case <-s.stateChange:
-			backoff = 0
+			backoff, s.scanAfter, s.scanFound, s.scanWait = 0, nil, false, false
 		default:
 		}
 		limit := maxMergeFiles
@@ -162,6 +163,9 @@ func (s *sender) loop() {
 		}
 		entries, idle := s.nextBatch(limit)
 		if len(entries) == 0 {
+			if idle == 0 {
+				continue
+			}
 			if stopping() {
 				return
 			}
@@ -198,7 +202,11 @@ func (s *sender) loop() {
 		}
 		// The content policy as it stands now: a project that turned prompts off since sends none still queued.
 		// Counted only once the batch leaves the outbox: a retry filters it again.
-		body, tl := s.prepareBody(batch[0].signal, body, pol)
+		account := ""
+		if s.team != nil {
+			account = s.team.account
+		}
+		body, tl := s.r.filterQueued(batch[0].signal, body, pol, account, s.team != nil)
 		if pol.Signals != nil && !contains(pol.Signals, string(batch[0].signal)) || body == nil {
 			reason, records := "policy_signal_or_content", 0
 			for _, e := range batch {

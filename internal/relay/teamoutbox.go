@@ -105,13 +105,11 @@ func QueuedSessions(dir string) (map[string]bool, error) {
 
 // QueuedSessions lists session/subagent IDs queued in this relay's .teams/ outbox.
 func (r *Relay) QueuedSessions() (map[string]bool, error) { return QueuedSessions(r.outbox.dir) }
-
 func readSubdirs(dir string) ([]os.DirEntry, error) {
-	des, err := os.ReadDir(dir)
-	if errors.Is(err, fs.ErrNotExist) {
-		return nil, nil
+	if des, err := os.ReadDir(dir); !errors.Is(err, fs.ErrNotExist) {
+		return des, err
 	}
-	return des, err
+	return nil, nil
 }
 func (o outbox) teamRoutes() ([]teamRoute, error) {
 	root := filepath.Join(o.dir, teamsDir)
@@ -137,8 +135,8 @@ func (o outbox) teamRoutes() ([]teamRoute, error) {
 	return out, err
 }
 func pruneEmptyUp(dir string, levels int) {
-	matches, _ := filepath.Glob(filepath.Join(dir, config.TempPrefix+"*"))
-	for _, p := range matches {
+	tmp, _ := filepath.Glob(filepath.Join(dir, config.TempPrefix+"*"))
+	for _, p := range tmp {
 		_ = os.Remove(p)
 	}
 	for range levels {

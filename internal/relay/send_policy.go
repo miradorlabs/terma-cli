@@ -27,13 +27,13 @@ func (r *Relay) count(sig Signal, tl sendTally) {
 // took; nil drops all of it, as does a body that no longer decodes, since it cannot be
 // checked against a stricter policy.
 func (r *Relay) withholdQueued(sig Signal, body []byte, pol Policy) ([]byte, sendTally) {
-	if pol.IncludePrompts && pol.IncludeToolContent && !pol.RequireClaim {
-		return body, sendTally{}
-	}
 	return r.filterQueued(sig, body, pol, "", false)
 }
 
 func (r *Relay) filterQueued(sig Signal, body []byte, pol Policy, account string, restampUser bool) ([]byte, sendTally) {
+	if !restampUser && pol.IncludePrompts && pol.IncludeToolContent && !pol.RequireClaim {
+		return body, sendTally{}
+	}
 	var msg proto.Message
 	switch sig {
 	case Logs:
