@@ -1251,10 +1251,13 @@ func TestPreActivationFailsClosedOnProfileOnlyRoutedEvent(t *testing.T) {
 	}
 }
 
-// Idempotent no_destination loss recording: a flush whose context expires during a slow
-// parcel must not record premature losses, a crash between ImportLosses and ackBatch must
-// deduplicate per event even when intervening hooks append distinct or identical events
-// before retry, and expired imported~nodest-* loss files are pruned independently.
+// Idempotent no_destination loss recording:
+//  1. A canceled flush must not record premature losses.
+//  2. A crash between ImportLosses and ackBatch must deduplicate per event even when
+//     intervening hooks append distinct or identical events before retry.
+//  3. Expired imported~nodest-* loss files are pruned independently (and throttled).
+//  4. Byte-identical events across spool batch boundaries (>200 events) and across
+//     separate flushes get distinct queue-file identities and never undercount.
 func TestRoutedNoDestinationLossIsIdempotentOnCanceledFlush(t *testing.T) {
 	t.Parallel()
 	m := newRoutedMachine(t)
@@ -1265,11 +1268,16 @@ func TestRoutedNoDestinationLossIsIdempotentOnCanceledFlush(t *testing.T) {
 	})
 
 	release := make(chan struct{})
+	stalledEntered := make(chan struct{}, 1)
 	var stall atomic.Bool
 	stall.Store(true)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, _ = io.Copy(io.Discard, r.Body)
 		if stall.Load() {
+			select {
+			case stalledEntered <- struct{}{}:
+			default:
+			}
 			select {
 			case <-r.Context().Done():
 			case <-release:
@@ -1289,10 +1297,13 @@ func TestRoutedNoDestinationLossIsIdempotentOnCanceledFlush(t *testing.T) {
 		evA,
 	)
 
-	// Pass 1: flush context expires while team-slow is stalled -> batch cannot ack, and
-	// no premature no_destination loss is written.
-	ctx1, cancel1 := context.WithTimeout(t.Context(), 150*time.Millisecond)
-	defer cancel1()
+	// Pass 1: flush context is canceled while team-slow is in-flight -> batch cannot ack,
+	// and no premature no_destination loss is written.
+	ctx1, cancel1 := context.WithCancel(t.Context())
+	go func() {
+		<-stalledEntered
+		cancel1()
+	}()
 	cfg := &config.Config{OTLPURL: srv.URL, ProfileName: config.DefaultProfile, AuthURL: routedAuth}
 	r := m.router(&fakeSignIn{account: aliceLane, token: "tok"})
 	res1 := r.Flush(ctx1, m.spool, cfg, true, 0)
@@ -1308,13 +1319,14 @@ func TestRoutedNoDestinationLossIsIdempotentOnCanceledFlush(t *testing.T) {
 	// intervening hooks appending a distinct event evB and an identical copy of evA before
 	// the retry flush reads all three together as one batch.
 	crashed := &pass{r: r, s: m.spool}
-	if err := crashed.recordNoDestination([]spool.Event{evA}); err != nil {
+	if err := crashed.recordNoDestination(t.Context(), []spool.Event{evA}); err != nil {
 		t.Fatalf("simulated pre-crash recordNoDestination: %v", err)
 	}
 	evB := routedEvent(aliceLane, config.DefaultProfile, "", "github.com/acme/other", semconv.TermaToolCallEvent)
 	m.queueRaw(evB, evA)
 
-	// Also plant an expired imported~nodest-* loss file to prove independent pruning.
+	// Also plant an expired imported~nodest-* loss file (and clear throttle marker) to
+	// prove independent retention pruning runs.
 	stalePath := filepath.Join(spoolDir, "losses", "imported~nodest-stale.jsonl")
 	if err := os.WriteFile(stalePath, spool.EncodeLoss(LossNoDestination, 1, time.Now().Add(-spool.LossWindow-48*time.Hour)), 0o600); err != nil {
 		t.Fatal(err)
@@ -1323,6 +1335,7 @@ func TestRoutedNoDestinationLossIsIdempotentOnCanceledFlush(t *testing.T) {
 	if err := os.Chtimes(stalePath, oldTime, oldTime); err != nil {
 		t.Fatal(err)
 	}
+	_ = os.Remove(filepath.Join(spoolDir, "losses", noDestPruneMarker))
 
 	// Pass 2: endpoint recovers -> spool replays [team-slow, evA, evB, evA] in one batch.
 	// evA-0 overwrites the pre-crash file with identical bytes; evB-0 and evA-1 are new,
@@ -1341,19 +1354,47 @@ func TestRoutedNoDestinationLossIsIdempotentOnCanceledFlush(t *testing.T) {
 	if _, err := os.Stat(stalePath); !os.IsNotExist(err) {
 		t.Fatalf("expired imported~nodest-* loss file must be pruned, stat err = %v", err)
 	}
+
+	// Pass 3: 201 byte-identical events spanning two default spool batches (200 + 1) must
+	// all be counted without collision because ackBatch atomically replaces events.jsonl.
+	identicalBatch := make([]spool.Event, 201)
+	for i := range identicalBatch {
+		identicalBatch[i] = evA
+	}
+	m.queueRaw(identicalBatch...)
+	res3 := r.Flush(t.Context(), m.spool, cfg, true, 0)
+	if res3.Unroutable != 201 || res3.Err != nil || m.pending() != 0 {
+		t.Fatalf("multi-batch identical pass 3 = %+v, pending=%d", res3, m.pending())
+	}
+	if taken, err := spool.TakeNewLosses(spoolDir); err != nil || taken[LossNoDestination] != 201 {
+		t.Fatalf("TakeNewLosses for 201 identical events across batches = %v (err=%v), want 201", taken, err)
+	}
+
+	// Pass 4: another byte-identical event in a separate subsequent flush must also count.
+	m.queueRaw(evA)
+	res4 := r.Flush(t.Context(), m.spool, cfg, true, 0)
+	if res4.Unroutable != 1 || res4.Err != nil || m.pending() != 0 {
+		t.Fatalf("separate-flush identical pass 4 = %+v, pending=%d", res4, m.pending())
+	}
+	if taken, err := spool.TakeNewLosses(spoolDir); err != nil || taken[LossNoDestination] != 1 {
+		t.Fatalf("TakeNewLosses for separate-flush identical event = %v (err=%v), want 1", taken, err)
+	}
+	if losses, err := spool.ReadLosses(spoolDir, time.Now()); err != nil || losses.Counts[LossNoDestination] != 205 {
+		t.Fatalf("total ReadLosses = %+v (err=%v), want 205 (3+201+1)", losses, err)
+	}
 }
 
 // Full-slot saturation + early-403/late-cancellation:
-//  1. When all maxParcelConcurrency (4) worker slots are saturated by stalled enrollments,
-//     wave budgeting still gives a 5th queued healthy enrollment a turn and reserves
-//     acknowledgement headroom so the healthy delivery commits durably.
+//  1. When all maxParcelConcurrency (4) worker slots are simultaneously occupied by stalled
+//     enrollments under a sub-second (<1s) remaining deadline, proportional ack headroom
+//     and wave budgeting still let a 5th queued healthy enrollment deliver and commit durably.
 //  2. When one enrollment fails early with 403 ORG_NOT_ACCESSIBLE and a stalled sibling
-//     subsequently expires the flush context, the 403 enrollment still persists its
-//     per-enrollment retry backoff without retiring the shared user token.
+//     remains in-flight until the flush context is canceled, the 403 enrollment still
+//     persists its per-enrollment retry backoff without retiring the shared user token.
 func TestRoutedFullSlotSaturationAndEarly403Backoff(t *testing.T) {
 	t.Parallel()
 
-	t.Run("full-slot saturation progresses queued healthy parcel", func(t *testing.T) {
+	t.Run("full-slot saturation under sub-second deadline progresses queued healthy parcel", func(t *testing.T) {
 		t.Parallel()
 		m := newRoutedMachine(t)
 		teams := []routing.Team{
@@ -1372,7 +1413,7 @@ func TestRoutedFullSlotSaturationAndEarly403Backoff(t *testing.T) {
 			return nil
 		})
 		// Pick the lexicographically last enrollment ID as the healthy team so the 4
-		// stalled enrollments sort ahead of it and saturate all maxParcelConcurrency slots.
+		// stalled enrollments acquire all 4 FIFO semaphore slots first.
 		fastTeam := ""
 		maxEnr := ""
 		for _, tm := range teams {
@@ -1382,6 +1423,9 @@ func TestRoutedFullSlotSaturationAndEarly403Backoff(t *testing.T) {
 			}
 		}
 
+		var mu sync.Mutex
+		var stalledNow, maxStalled int
+		allSaturated := make(chan struct{})
 		release := make(chan struct{})
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			_, _ = io.Copy(io.Discard, r.Body)
@@ -1389,6 +1433,24 @@ func TestRoutedFullSlotSaturationAndEarly403Backoff(t *testing.T) {
 				w.WriteHeader(http.StatusOK)
 				return
 			}
+			mu.Lock()
+			stalledNow++
+			if stalledNow > maxStalled {
+				maxStalled = stalledNow
+			}
+			if stalledNow == maxParcelConcurrency {
+				select {
+				case <-allSaturated:
+				default:
+					close(allSaturated)
+				}
+			}
+			mu.Unlock()
+			defer func() {
+				mu.Lock()
+				stalledNow--
+				mu.Unlock()
+			}()
 			select {
 			case <-r.Context().Done():
 			case <-release:
@@ -1403,17 +1465,25 @@ func TestRoutedFullSlotSaturationAndEarly403Backoff(t *testing.T) {
 			m.queueRaw(routedEvent(aliceLane, config.DefaultProfile, enr[tm.TeamID], fmt.Sprintf("github.com/acme/r%d", i+1), semconv.TermaToolCallEvent))
 		}
 
-		ctx, cancel := context.WithTimeout(t.Context(), 1500*time.Millisecond)
+		// Sub-second deadline (800ms) proves proportional headroom and wave budgeting hold
+		// even on late batches of a flush with < 1s remaining.
+		ctx, cancel := context.WithTimeout(t.Context(), 800*time.Millisecond)
 		defer cancel()
 		res := m.router(&fakeSignIn{account: aliceLane, token: "shared-tok"}).Flush(
 			ctx, m.spool, &config.Config{OTLPURL: srv.URL, ProfileName: config.DefaultProfile, AuthURL: routedAuth}, true, 0,
 		)
+		mu.Lock()
+		gotMaxStalled := maxStalled
+		mu.Unlock()
+		if gotMaxStalled != maxParcelConcurrency {
+			t.Fatalf("expected all %d worker slots saturated by stalled parcels, got peak %d", maxParcelConcurrency, gotMaxStalled)
+		}
 		if res.Sent != 1 || res.Failed != 4 || m.pending() != 4 {
 			t.Fatalf("full-slot saturation must durably commit queued healthy parcel: res=%+v pending=%d", res, m.pending())
 		}
 	})
 
-	t.Run("early 403 keeps retry backoff despite sibling context timeout", func(t *testing.T) {
+	t.Run("early 403 keeps retry backoff despite sibling context cancellation", func(t *testing.T) {
 		t.Parallel()
 		m := newRoutedMachine(t)
 		enr := m.createState(config.DefaultProfile, aliceLane, []routing.Team{
@@ -1426,6 +1496,8 @@ func TestRoutedFullSlotSaturationAndEarly403Backoff(t *testing.T) {
 			return s.Bind("github.com/acme/stall", "org-stall", false)
 		})
 
+		got403 := make(chan struct{}, 1)
+		stallEntered := make(chan struct{}, 1)
 		release := make(chan struct{})
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			_, _ = io.Copy(io.Discard, r.Body)
@@ -1433,7 +1505,15 @@ func TestRoutedFullSlotSaturationAndEarly403Backoff(t *testing.T) {
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusForbidden)
 				_, _ = w.Write([]byte(`{"error":"ORG_NOT_ACCESSIBLE"}`))
+				select {
+				case got403 <- struct{}{}:
+				default:
+				}
 				return
+			}
+			select {
+			case stallEntered <- struct{}{}:
+			default:
 			}
 			select {
 			case <-r.Context().Done():
@@ -1451,10 +1531,15 @@ func TestRoutedFullSlotSaturationAndEarly403Backoff(t *testing.T) {
 		)
 
 		si := &fakeSignIn{account: aliceLane, token: "shared-tok"}
-		// Short timeout (< 1s) expires outer ctx while team-stall blocks after team-403
-		// already received 403 ORG_NOT_ACCESSIBLE.
-		ctx, cancel := context.WithTimeout(t.Context(), 200*time.Millisecond)
-		defer cancel()
+		ctx, cancel := context.WithCancel(t.Context())
+		go func() {
+			<-got403
+			<-stallEntered
+			// Give team-403's HTTP client a brief moment to read the 403 response before
+			// canceling the shared flush context while team-stall is still blocked.
+			time.Sleep(30 * time.Millisecond)
+			cancel()
+		}()
 		r := m.router(si)
 		res := r.Flush(ctx, m.spool, &config.Config{OTLPURL: srv.URL, ProfileName: config.DefaultProfile, AuthURL: routedAuth}, true, 0)
 		var retry403 time.Time
@@ -1464,7 +1549,7 @@ func TestRoutedFullSlotSaturationAndEarly403Backoff(t *testing.T) {
 			}
 		}
 		if retry403.IsZero() {
-			t.Fatalf("early 403 must still record per-enrollment RetryAt when sibling expires ctx: failures=%+v", res.Failures)
+			t.Fatalf("early 403 must still record per-enrollment RetryAt when sibling cancels ctx: failures=%+v", res.Failures)
 		}
 		if len(si.refused) != 0 || si.retired {
 			t.Fatalf("403 ORG_NOT_ACCESSIBLE must not call Refused/Retired: refused=%v retired=%v", si.refused, si.retired)

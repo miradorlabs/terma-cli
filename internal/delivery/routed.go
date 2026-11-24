@@ -134,6 +134,11 @@ func (p *pass) routed(ctx context.Context, events []spool.Event) ([]spool.Event,
 		for i, job := range jobs {
 			out := outcomes[i]
 			held = append(held, out.reheld...)
+			if out.deferred {
+				undelivered = append(undelivered, out.sendRaw...)
+				errs = append(errs, out.err)
+				continue
+			}
 			if !out.sent {
 				continue
 			}
@@ -149,7 +154,7 @@ func (p *pass) routed(ctx context.Context, events []spool.Event) ([]spool.Event,
 		// will replay; leave noDest undelivered without recording a premature loss.
 		if ctx.Err() != nil {
 			undelivered = append(undelivered, noDest...)
-		} else if err := p.recordNoDestination(noDest); err != nil {
+		} else if err := p.recordNoDestination(ctx, noDest); err != nil {
 			errs = append(errs, fmt.Errorf("record dropped events: %w", err))
 			undelivered = append(undelivered, noDest...)
 		} else {
@@ -168,6 +173,7 @@ type parcelJob struct {
 
 type parcelOutcome struct {
 	sent      bool
+	deferred  bool
 	team      routing.Team
 	endpoint  string
 	sendRaw   []spool.Event
@@ -176,14 +182,19 @@ type parcelOutcome struct {
 	err       error
 }
 
+const (
+	minAckHeadroom = 50 * time.Millisecond
+	maxAckHeadroom = 2 * time.Second
+)
+
 // sendParcels revalidates each job immediately before POST and executes HTTP sends with
 // bounded concurrency so slow enrollments cannot starve healthy sibling enrollments.
 // Shared routing cache and admission counters are guarded by mu only for local checks,
 // never held across network I/O; spool retry windows and result settlement run serially
-// in the caller after all goroutines return. When the flush carries a deadline >= 1s,
-// sendParcels reserves acknowledgement headroom before the outer deadline and shares the
-// send budget across waves so full-slot saturation by stalled hosts still lets queued
-// healthy parcels deliver and be durably acknowledged.
+// in the caller after all goroutines return. Whenever ctx carries a deadline, sendParcels
+// reserves proportional acknowledgement headroom (deferring sends if insufficient budget
+// remains) and shares the send budget across waves so full-slot saturation by stalled
+// hosts still lets queued healthy parcels deliver and be durably acknowledged.
 func (p *pass) sendParcels(ctx context.Context, jobs []parcelJob, lane string) []parcelOutcome {
 	outcomes := make([]parcelOutcome, len(jobs))
 	limit := p.r.maxConcurrency
@@ -193,15 +204,20 @@ func (p *pass) sendParcels(ctx context.Context, jobs []parcelJob, lane string) [
 	sendCtx := ctx
 	var waveTimeout time.Duration
 	if deadline, ok := ctx.Deadline(); ok {
-		if rem := time.Until(deadline); rem >= time.Second {
-			headroom := min(2*time.Second, rem/5)
-			sendDeadline := deadline.Add(-headroom)
-			var cancelSend context.CancelFunc
-			sendCtx, cancelSend = context.WithDeadline(ctx, sendDeadline)
-			defer cancelSend()
-			if waves := (len(jobs) + limit - 1) / limit; waves > 1 {
-				waveTimeout = time.Until(sendDeadline) / time.Duration(waves)
+		rem := time.Until(deadline)
+		headroom := min(maxAckHeadroom, max(minAckHeadroom, rem/5))
+		if rem <= headroom {
+			for i, job := range jobs {
+				outcomes[i] = parcelOutcome{deferred: true, sendRaw: job.pc.raw, err: context.DeadlineExceeded}
 			}
+			return outcomes
+		}
+		sendBudget := rem - headroom
+		var cancelSend context.CancelFunc
+		sendCtx, cancelSend = context.WithDeadline(ctx, deadline.Add(-headroom))
+		defer cancelSend()
+		if waves := (len(jobs) + limit - 1) / limit; waves > 1 {
+			waveTimeout = sendBudget / time.Duration(waves)
 		}
 	}
 
@@ -264,10 +280,10 @@ func (p *pass) sendParcels(ctx context.Context, jobs []parcelJob, lane string) [
 	sem := make(chan struct{}, min(limit, len(jobs)))
 	var wg sync.WaitGroup
 	for i, job := range jobs {
+		sem <- struct{}{}
 		wg.Add(1)
 		go func(idx int, j parcelJob) {
 			defer wg.Done()
-			sem <- struct{}{}
 			defer func() { <-sem }()
 			runOne(idx, j)
 		}(i, job)

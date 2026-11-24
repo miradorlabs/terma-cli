@@ -209,6 +209,8 @@ type pass struct {
 	// profiles caches non-active profile configs loaded for cross-profile routed parcels
 	// (nil entry records a missing or unreadable profile so it fails closed).
 	profiles map[string]*config.Config
+	// prunedNoDest ensures no_destination loss retention pruning runs at most once per pass.
+	prunedNoDest bool
 }
 
 // byProject sends a batch on a pre-activation machine: each event to the project its

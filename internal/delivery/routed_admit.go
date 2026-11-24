@@ -229,19 +229,31 @@ func isContextErr(err error) bool {
 	return errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)
 }
 
-const noDestImportPrefix = "nodest-"
+const (
+	noDestImportPrefix = "nodest-"
+	noDestPruneMarker  = ".nodest-pruned"
+	noDestPruneEvery   = time.Hour
+)
 
 // recordNoDestination persists each destination-less event's no_destination loss
-// atomically under a stable per-event ImportLosses ID (nodest-<sha256>-<occ>) with
-// deterministic timestamp. Because the loss record and its deduplication identity are the
-// same atomic file, a crash or canceled ackBatch at any point cannot double-count on retry
-// even when intervening hooks append distinct or identical events before the next flush.
-func (p *pass) recordNoDestination(noDest []spool.Event) error {
+// atomically under a stable per-event ImportLosses ID (nodest-<queueFileID>-<sha256>-<occ>)
+// with deterministic timestamp. Because hooks append with O_APPEND (preserving the queue
+// file's OS identity) while spool.ackBatch atomically renames a fresh file (changing it),
+// crash-before-ack retries deduplicate even with intervening appends, while byte-identical
+// events in later batches or later flushes receive distinct identities and never undercount.
+func (p *pass) recordNoDestination(ctx context.Context, noDest []spool.Event) error {
 	occ := make(map[string]int, len(noDest))
 	now := p.r.currentTime().UTC()
+	queueID := ""
+	if p.r.StateDir != "" {
+		queueID = fileIdentity(filepath.Join(p.r.StateDir, spool.Dir, spool.EventsFile))
+	}
 	for _, e := range noDest {
 		fp := eventFingerprint(e)
 		id := fmt.Sprintf("%s%s-%d", noDestImportPrefix, fp, occ[fp])
+		if queueID != "" {
+			id = fmt.Sprintf("%s%s-%s-%d", noDestImportPrefix, queueID, fp, occ[fp])
+		}
 		occ[fp]++
 		at := e.Time
 		if at.IsZero() {
@@ -251,7 +263,7 @@ func (p *pass) recordNoDestination(noDest []spool.Event) error {
 			return err
 		}
 	}
-	p.pruneNoDestLosses(now)
+	p.pruneNoDestLosses(ctx, now)
 	return nil
 }
 
@@ -273,19 +285,28 @@ func (p *pass) importNoDestLoss(id string, at time.Time) error {
 }
 
 // pruneNoDestLosses removes expired imported~nodest-*.jsonl loss files past
-// spool.LossWindow+24h so workloads with only destination-less losses never accumulate
-// files indefinitely even when CountLost is not called.
-func (p *pass) pruneNoDestLosses(now time.Time) {
-	if p.r.StateDir == "" {
+// spool.LossWindow+24h. It runs at most once per pass and at most once per hour
+// (throttled via .nodest-pruned) and stops immediately on ctx cancellation so large
+// backlogs stay O(N) rather than scanning on every batch.
+func (p *pass) pruneNoDestLosses(ctx context.Context, now time.Time) {
+	if p.prunedNoDest || p.r.StateDir == "" || ctx.Err() != nil {
 		return
 	}
+	p.prunedNoDest = true
 	dir := filepath.Join(p.r.StateDir, spool.Dir, "losses")
+	marker := filepath.Join(dir, noDestPruneMarker)
+	if info, err := os.Stat(marker); err == nil && now.Sub(info.ModTime()) < noDestPruneEvery {
+		return
+	}
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return
 	}
 	const prefix = "imported~" + noDestImportPrefix
 	for _, e := range entries {
+		if ctx.Err() != nil {
+			return
+		}
 		if !strings.HasPrefix(e.Name(), prefix) || !strings.HasSuffix(e.Name(), ".jsonl") {
 			continue
 		}
@@ -294,6 +315,7 @@ func (p *pass) pruneNoDestLosses(now time.Time) {
 			_ = os.Remove(filepath.Join(dir, e.Name()))
 		}
 	}
+	_ = os.WriteFile(marker, nil, 0o600)
 }
 
 func eventFingerprint(e spool.Event) string {
