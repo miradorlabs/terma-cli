@@ -3,9 +3,12 @@ package cli
 import (
 	"cmp"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"maps"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"sync"
@@ -227,15 +230,13 @@ func (v *teamsView) mergeState(st routing.State, names teamNames, now time.Time)
 			Name: cmp.Or(names.Orgs[b.Organization], v.orgName(b.Organization))})
 	}
 	v.Pending = pendingBindings(st)
-	slices.SortStableFunc(v.Organizations, func(a, b orgRow) int {
-		if (a.Type == "personal") == (b.Type == "personal") {
-			return 0
-		}
-		if a.Type == "personal" {
+	orgRank := func(o orgRow) int {
+		if o.Type == "personal" {
 			return 1
 		}
-		return -1
-	})
+		return 0
+	}
+	slices.SortStableFunc(v.Organizations, func(a, b orgRow) int { return cmp.Compare(orgRank(a), orgRank(b)) })
 }
 
 func (v *teamsView) org(id string, names teamNames) *orgRow {
@@ -295,4 +296,44 @@ func orgTeamLabel(org, team string) string {
 		return team
 	}
 	return org + " " + team
+}
+
+type teamNames struct {
+	Teams   map[string]string `json:"teams"`
+	Orgs    map[string]string `json:"organizations"`
+	changed bool
+}
+
+func teamNamesPath(stateDir, profile string) (string, bool) {
+	if stateDir == "" || profile == "" || profile != filepath.Base(profile) {
+		return "", false
+	}
+	return filepath.Join(stateDir, "team-names", profile+".json"), true
+}
+
+func loadTeamNames(stateDir, profile string) teamNames {
+	n := teamNames{Teams: map[string]string{}, Orgs: map[string]string{}}
+	if path, ok := teamNamesPath(stateDir, profile); ok {
+		var raw teamNames
+		if b, err := os.ReadFile(path); err == nil && json.Unmarshal(b, &raw) == nil {
+			maps.Copy(n.Teams, raw.Teams)
+			maps.Copy(n.Orgs, raw.Orgs)
+		}
+	}
+	return n
+}
+
+func (n *teamNames) set(m map[string]string, id, name string) {
+	if id != "" && name != "" && m[id] != name {
+		m[id], n.changed = name, true
+	}
+}
+func (n *teamNames) team(id, name string) { n.set(n.Teams, id, name) }
+func (n *teamNames) org(id, name string)  { n.set(n.Orgs, id, name) }
+func (n teamNames) save(stateDir, profile string) {
+	if path, ok := teamNamesPath(stateDir, profile); n.changed && ok && os.MkdirAll(filepath.Dir(path), 0o700) == nil {
+		if b, err := json.MarshalIndent(n, "", "  "); err == nil {
+			_ = config.WriteFileAtomic(path, b, 0o600)
+		}
+	}
 }

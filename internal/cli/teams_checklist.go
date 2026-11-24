@@ -73,17 +73,17 @@ func (app *App) runTeamsChecklist(cmd *cobra.Command, cfg *config.Config, st rou
 	return v, nil
 }
 
-func (app *App) setupMultiTeamChecklist(cmd *cobra.Command, cfg *config.Config, st routing.State, primary routing.Team, primaryName string, ui *setupUI) (routing.Team, string, bool, error) {
+func (app *App) setupMultiTeamChecklist(cmd *cobra.Command, cfg *config.Config, st routing.State, primary routing.Team, orgName, primaryName string, ui *setupUI) (routing.Team, string, string, bool, error) {
 	v, count := app.listTeams(cmd.Context(), cfg, st), 0
 	for _, o := range v.Organizations {
 		count += len(o.Teams)
 	}
 	if count <= 1 {
-		return primary, primaryName, false, nil
+		return primary, orgName, primaryName, false, nil
 	}
 	v, err := app.runTeamsChecklist(cmd, cfg, st, v, teamsFlags{})
 	if err != nil || len(v.Changes) == 0 {
-		return primary, primaryName, false, err
+		return primary, orgName, primaryName, false, err
 	}
 	var ticked []string
 	for _, o := range v.Organizations {
@@ -106,16 +106,17 @@ func (app *App) setupMultiTeamChecklist(cmd *cobra.Command, cfg *config.Config, 
 		ui.Then("Run `terma teams` to decide pending repository bindings.")
 	}
 	if len(v.state.Teams) == 0 {
-		return routing.Team{}, "", true, nil
+		return routing.Team{}, "", "", true, nil
 	}
 	if i := slices.IndexFunc(v.state.Teams, func(tm routing.Team) bool {
 		return tm.TeamID == primary.TeamID && tm.OrganizationID == primary.OrganizationID
 	}); i >= 0 {
-		return v.state.Teams[i], primaryName, true, nil
+		return v.state.Teams[i], cmp.Or(v.orgName(primary.OrganizationID), orgName), primaryName, true, nil
 	}
 	chosen := v.state.Teams[0]
-	if r := v.findTeam(chosen.OrganizationID, chosen.TeamID); r != nil && r.Name != "" {
-		return chosen, r.Name, true, nil
+	name := chosen.TeamID
+	if r := v.findTeam(chosen.OrganizationID, chosen.TeamID); r != nil {
+		name = cmp.Or(r.Name, name)
 	}
-	return chosen, chosen.TeamID, true, nil
+	return chosen, v.orgName(chosen.OrganizationID), name, true, nil
 }

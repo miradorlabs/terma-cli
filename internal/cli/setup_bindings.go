@@ -190,12 +190,21 @@ func (app *App) persistCommittedPolicies(st routing.State) error {
 	return nil
 }
 
-func (app *App) recordSetupTeam(cfg *config.Config, account, teamID, teamName string) error {
+func (app *App) recordSetupTeam(cfg *config.Config, account, orgID, orgName, teamID, teamName string) error {
 	var rejected error
 	err := config.UpdateProfile(app.dir, cfg.ProfileName, func(p *config.Profile) {
 		if account != sendas.NoPersonLane && p.Account != account {
 			rejected = errors.New("signed in as someone else while setting up teams")
 			return
+		}
+		if orgID != "" {
+			if p.OrganizationID != orgID {
+				p.OrganizationName = ""
+			}
+			p.OrganizationID = orgID
+			if orgName != "" {
+				p.OrganizationName = orgName
+			}
 		}
 		if p.Team != teamID {
 			p.TeamName = ""

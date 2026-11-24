@@ -92,18 +92,18 @@ func (app *App) setupTeams(cmd *cobra.Command, cfg *config.Config, org *organiza
 	if err := app.persistCommittedPolicies(committed); err != nil {
 		return config.Policy{}, "", err
 	}
-	if err := app.recordSetupTeam(cfg, account, primary.TeamID, teamName); err != nil {
+	if err := app.recordSetupTeam(cfg, account, "", "", primary.TeamID, teamName); err != nil {
 		return config.Policy{}, "", err
 	}
 	changed := false
 	if !f.desktopGrant && !f.assumeYes && app.canAsk != nil && app.canAsk() && config.PolicyStub() == "" && app.flags.projectID == "" && f.org == "" {
-		next, name, didChange, err := app.setupMultiTeamChecklist(cmd, cfg, committed, primary, teamName, ui)
+		next, nextOrgName, name, didChange, err := app.setupMultiTeamChecklist(cmd, cfg, committed, primary, orgLabel, teamName, ui)
 		if err != nil {
 			return config.Policy{}, cmp.Or(teamName, primary.TeamID), err
 		}
 		if didChange {
 			primary, teamName, changed = next, name, true
-			if err := app.recordSetupTeam(cfg, account, primary.TeamID, teamName); err != nil {
+			if err := app.recordSetupTeam(cfg, account, primary.OrganizationID, nextOrgName, primary.TeamID, teamName); err != nil {
 				return config.Policy{}, "", err
 			}
 		}

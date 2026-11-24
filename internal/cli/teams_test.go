@@ -1190,5 +1190,11 @@ func TestSetupInteractiveChecklistHookup(t *testing.T) {
 		if updated.Team != betaCore || updated.TeamName != "Beta Core" {
 			t.Fatalf("recorded team = (%q, %q), want (%q, %q)", updated.Team, updated.TeamName, betaCore, "Beta Core")
 		}
+		if updated.OrganizationID != orgB().ID || updated.OrganizationName != orgB().Name {
+			t.Fatalf("recorded org = (%q, %q), want (%q, %q)", updated.OrganizationID, updated.OrganizationName, orgB().ID, orgB().Name)
+		}
+		if updated.Policy.TeamID != betaCore || updated.Policy.OrganizationID != orgB().ID || updated.Policy.Global() {
+			t.Fatalf("reloaded policy = %+v, want Beta Core (%s) in %s", updated.Policy, betaCore, orgB().ID)
+		}
 	})
 }

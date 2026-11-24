@@ -244,7 +244,7 @@ func (app *App) runSetup(cmd *cobra.Command, f setupFlags) error {
 	if errors.Is(err, errCancelled) {
 		switch {
 		case team != "":
-			fmt.Fprintln(out, "Cancelled; the agents and initial team above stay recorded. Run `terma setup` again to finish.")
+			fmt.Fprintf(out, "Cancelled; your chosen agents and initial team (%s) stay recorded. Run `terma setup` again to finish.\n", team)
 		case recorded:
 			fmt.Fprintln(out, "Cancelled before a team was selected; the agents above stay recorded.")
 		default:
