@@ -1,7 +1,20 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-23T19:52:37.422535379Z",
+  "generated_at": "2026-11-24T02:19:02.404243696Z",
   "events": [
+    {
+      "at": "2026-11-24T02:19:02.404243696Z",
+      "model": "grok-build-0.1",
+      "vendor": "xai",
+      "name": "grok-build-0.1",
+      "event": "unlisted",
+      "changes": 14,
+      "highlights": [
+        "No longer listed by its vendor",
+        "Batch API: no longer stated (was no)",
+        "Context window: no longer stated (was 500K)"
+      ]
+    },
     {
       "at": "2026-11-23T18:52:43.50051894Z",
       "model": "claude-opus-4-5-20251101",
