@@ -2,6 +2,7 @@ package antigravity
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -105,10 +106,23 @@ func TestAntigravityRefusesAFileOfAnExcludedCheckout(t *testing.T) {
 		{"find_by_name", "SearchDirectory", g.nested, true},
 		{"run_command", "Cwd", g.excluded, true},
 		{"run_command", "Cwd", g.collected, false},
+		// A folder in no repository is refused whatever the answer for files: a search of one
+		// above several repositories returns their files.
+		{"grep_search", "SearchPath", g.none, true},
+		{"list_dir", "DirectoryPath", g.none, true},
+		{"run_command", "Cwd", g.none, true},
 	} {
 		if got := refuses(tc.tool, tc.key, tc.path); got != tc.want {
 			t.Errorf("%s %s=%s: refused %v, want %v", tc.tool, tc.key, tc.path, got, tc.want)
 		}
+	}
+	// Global mode collects a session outside git, so a folder outside git is searched freely.
+	global := &antigravityHookInput{}
+	if err := jsonUnmarshalInto(`{"name":"grep_search","args":{"SearchPath":"`+hookruntest.InJSON(g.none)+`"}}`, global); err != nil {
+		t.Fatal(err)
+	}
+	if antigravityRefuses(hookrun.Env{Policy: config.Policy{Mode: config.ModeGlobal}, Cwd: g.collected}, global) {
+		t.Error("global mode refused a search of a folder outside git")
 	}
 	defer func(was bool) { antigravityShowsFilesInNoRepository = was }(antigravityShowsFilesInNoRepository)
 	antigravityShowsFilesInNoRepository = false
@@ -140,6 +154,10 @@ func TestAntigravityWorkspacesMustAllBeCollected(t *testing.T) {
 		{"no list: the cwd", g.collected, nil, true},
 		{"no list, the cwd excluded", g.excluded, nil, false},
 		{"a relative entry", g.collected, []string{"."}, false},
+		// A removed clone nested in a collected checkout is not judged by the checkout above it.
+		{"a workspace that does not exist", g.collected, []string{g.collected, filepath.Join(g.collected, "vendor", "removed")}, false},
+		{"no list, the cwd removed", filepath.Join(g.collected, "removed"), nil, false},
+		{"a file", g.collected, []string{filepath.Join(g.collected, "file.txt")}, false},
 	} {
 		if got := collected(g.pol, tc.cwd, tc.workspaces...); got != tc.want {
 			t.Errorf("%s: %v, want %v", tc.name, got, tc.want)
@@ -228,6 +246,32 @@ func TestAntigravityPathOwnerFailsClosed(t *testing.T) {
 	for _, pol := range []config.Policy{g.pol, {Mode: config.ModeGlobal}} {
 		if antigravityWorkspacesCollected(hookrun.Env{Policy: pol, Cwd: g.collected}, &antigravityHookInput{}) {
 			t.Errorf("with GIT_DIR set, mode %q collected the workspace", pol.Mode)
+		}
+	}
+}
+
+// The transcript's reader refuses a call whose arguments it cannot judge: none at all, or not
+// a JSON object. {} and null name no file.
+func TestAntigravityCallsRefusedWithArgumentsItCannotJudge(t *testing.T) {
+	never := func(json.RawMessage) bool { return false }
+	for _, tc := range []struct {
+		name, call string
+		want       bool
+	}{
+		{"no args", `{"name":"read_file"}`, true},
+		{"a string", `{"name":"read_file","args":"made-up"}`, true},
+		{"a number", `{"name":"read_file","args":1}`, true},
+		{"an array", `{"name":"read_file","args":["made-up"]}`, true},
+		{"an empty object", `{"name":"read_file","args":{}}`, false},
+		{"null", `{"name":"read_file","args":null}`, false},
+		{"an object", `{"name":"run_command","args":{"CommandLine":"made-up"}}`, false},
+	} {
+		var calls []antigravityToolCall
+		if err := json.Unmarshal([]byte(`[{"name":"run_command","args":{}},`+tc.call+`]`), &calls); err != nil {
+			t.Fatal(err)
+		}
+		if got := antigravityCallsRefused(calls, never); got != tc.want {
+			t.Errorf("%s: refused %v, want %v", tc.name, got, tc.want)
 		}
 	}
 }

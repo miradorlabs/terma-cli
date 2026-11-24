@@ -181,6 +181,25 @@ func TestAntigravityRepliesAfterARefusalFollowTheAnswer(t *testing.T) {
 		if s := g.readCallState(); (s.WithholdsFrom != nil) != withholds {
 			t.Errorf("withholds %v: the state keeps %+v", withholds, s)
 		}
+
+		// A turn whose first call line cannot be read or placed: its reply follows the answer
+		// too, though the last step handled before it is the turn's prompt.
+		for name, first := range map[string]string{
+			"too long":   strings.Replace(replyLine(1), `"content":"<scrubbed>"`, `"content":"`+strings.Repeat("x", antigravityLineLimit)+`"`, 1),
+			"unreadable": `{"step_index":1,"type":"PLANNER_RESPONSE","tool_calls":[`,
+			"no step":    strings.Replace(callLine(1, readCall(filepath.Join(t.TempDir(), "made-up.txt"))), `"step_index":1,`, "", 1),
+		} {
+			g := newTranscriptRig(t, turnsConversation, "transcript_turns.jsonl")
+			g.lines = []string{g.lines[0], first, resultLine(2), replyLine(3)}
+			g.write(1)
+			g.hook(preInvocation, begin("1"))
+			g.write(4)
+			g.hook(stop, stopped)
+			g.drain()
+			if g.spoke(3) == withholds {
+				t.Errorf("withholds %v, a first call line %s: the turn's reply went %v", withholds, name, g.spoke(3))
+			}
+		}
 	}
 }
 
@@ -189,10 +208,15 @@ func TestAntigravityRepliesAfterARefusalFollowTheAnswer(t *testing.T) {
 func TestAntigravityWorkspaceElsewhereSendsNoContent(t *testing.T) {
 	excluded := hookruntest.InitRepo(t)
 	none, _ := filepath.EvalSymlinks(t.TempDir())
-	for name, second := range map[string]string{"an excluded repository": excluded, "outside git": none} {
+	for name, second := range map[string]func(root string) string{
+		"an excluded repository": func(string) string { return excluded },
+		"outside git":            func(string) string { return none },
+		// A removed clone that was nested in the collected checkout.
+		"a folder that does not exist": func(root string) string { return filepath.Join(root, "vendor", "removed") },
+	} {
 		t.Run(name, func(t *testing.T) {
 			g := newTranscriptRig(t, turnsConversation, "transcript_turns.jsonl")
-			g.workspaces = []string{g.root, second}
+			g.workspaces = []string{g.root, second(g.root)}
 			g.turnOne()
 			got := g.drain()
 			if len(got[semconv.TermaModelCallEvent]) != 3 || len(got[semconv.TermaToolCallEvent]) != 2 || len(got[semconv.TermaUserMessageEvent]) != 1 {
@@ -305,6 +329,39 @@ func TestAntigravityOverlongCallLineTaints(t *testing.T) {
 	}
 	if _, result := stepContent(got, "step-4"); !result {
 		t.Error("the next batch's result was withheld")
+	}
+}
+
+// A call line whose step is missing or negative cannot be placed: its calls are unknown, so it
+// taints until the next call line, though the batch before it was clean.
+func TestAntigravityCallLineWithNoStepTaints(t *testing.T) {
+	for name, edit := range map[string]string{"missing": "", "negative": `"step_index":-1,`} {
+		t.Run(name, func(t *testing.T) {
+			g := newTranscriptRig(t, turnsConversation, "transcript_turns.jsonl")
+			own := filepath.Join(g.root, "a.txt")
+			stepless := strings.Replace(callLine(3, readCall(own)), `"step_index":3,`, edit, 1)
+			g.lines = []string{g.lines[0], callLine(1, readCall(own)), resultLine(2), stepless, resultLine(3),
+				callLine(4, `{"name":"run_command","args":{"CommandLine":"made-up"}}`), resultLine(5), replyLine(6)}
+			g.write(1)
+			g.hook(preInvocation, begin("1"))
+			g.write(5)
+			g.hook(postInvocation, invoked)
+			if s := g.readCallState(); !s.Tainted {
+				t.Fatalf("after a call line with no step, the state is %+v", s)
+			}
+			g.write(8)
+			g.hook(stop, stopped)
+			got := g.drain()
+			if _, result := stepContent(got, "step-2"); !result {
+				t.Error("the clean batch's result before it was withheld")
+			}
+			if _, result := stepContent(got, "step-3"); result {
+				t.Error("a result after a call line with no step went")
+			}
+			if _, result := stepContent(got, "step-5"); !result {
+				t.Error("the next batch's result was withheld")
+			}
+		})
 	}
 }
 

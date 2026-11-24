@@ -140,6 +140,8 @@ func readAntigravitySteps(ctx context.Context, path string, last antigravityCall
 		return state.Tainted
 	}
 	// withholdReplies marks the replies after step withheld, when the package's answer does.
+	// A line that taints without a step of its own passes the step after the last handled:
+	// were it a turn's first call, the last handled is the turn's prompt, of the turn before.
 	withholdReplies := func(step int64) {
 		if antigravityWithholdsRepliesAfterRefusal {
 			state.WithholdsFrom = &step
@@ -170,7 +172,7 @@ func readAntigravitySteps(ctx context.Context, path string, last antigravityCall
 		if line == nil {
 			// Too long to read: the calls or results it held are unknown, so it taints.
 			state.Results, state.Tainted, pending = nil, true, nil
-			withholdReplies(state.Step)
+			withholdReplies(state.Step + 1)
 			advance(n)
 			continue
 		}
@@ -183,11 +185,17 @@ func readAntigravitySteps(ctx context.Context, path string, last antigravityCall
 		if json.Unmarshal(line, &s) != nil {
 			// Unreadable, as one too long is: it may be a call line whose calls are unknown.
 			state.Results, state.Tainted, pending = nil, true, nil
-			withholdReplies(state.Step)
+			withholdReplies(state.Step + 1)
 			advance(n)
 			continue
 		}
 		if s.StepIndex == nil || *s.StepIndex < 0 {
+			if s.Type == "PLANNER_RESPONSE" {
+				// A call line with no step to place it: its calls are unknown, as an unreadable
+				// line's are, so it taints until the next call line.
+				state.Results, state.Tainted, pending = nil, true, nil
+				withholdReplies(state.Step + 1)
+			}
 			advance(n)
 			continue
 		}
@@ -237,13 +245,16 @@ func readAntigravitySteps(ctx context.Context, path string, last antigravityCall
 	}
 }
 
-// antigravityCallsRefused reports whether refuses refuses the arguments of any of calls.
+// antigravityCallsRefused reports whether refuses refuses the arguments of any of calls, or
+// one has arguments the reader cannot judge: none at all, or not a JSON object. {} and null
+// name no file.
 func antigravityCallsRefused(calls []antigravityToolCall, refuses func(json.RawMessage) bool) bool {
 	if refuses == nil {
 		return false
 	}
 	for _, c := range calls {
-		if refuses(c.Args) {
+		var args map[string]json.RawMessage
+		if len(c.Args) == 0 || json.Unmarshal(c.Args, &args) != nil || refuses(c.Args) {
 			return true
 		}
 	}

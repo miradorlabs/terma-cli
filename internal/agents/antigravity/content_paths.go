@@ -18,7 +18,8 @@ import (
 
 // antigravityShowsFilesInNoRepository is the answer for a file in no repository at all (a
 // skill file, a note in the home folder): shown, as Claude Code and Codex show such reads.
-// false refuses it as a file in a repository the policy does not collect.
+// false refuses it as a file in a repository the policy does not collect. It decides the
+// file keys alone (antigravityFileKeys): a folder in no repository is always refused.
 var antigravityShowsFilesInNoRepository = true
 
 // antigravityWithholdsRepliesAfterRefusal withholds the replies of a turn after a tainted call
@@ -26,10 +27,14 @@ var antigravityShowsFilesInNoRepository = true
 // read. false sends them, as every other agent's are.
 var antigravityWithholdsRepliesAfterRefusal = false
 
-// antigravityContentKeys are the argument keys that name a file or a folder, for any tool:
-// the edit tools' (antigravityPathKeys), view_file's, and the folder a tool lists, searches or
+// antigravityFileKeys are the argument keys that name a file, for any tool: the edit tools'
+// (antigravityPathKeys) and view_file's.
+var antigravityFileKeys = append(slices.Clone(antigravityPathKeys), "AbsolutePath")
+
+// antigravityFolderKeys are the argument keys that name a folder a tool lists, searches or
 // runs in (list_dir, grep_search, find_by_name, and run_command where a version sends Cwd).
-var antigravityContentKeys = append(slices.Clone(antigravityPathKeys), "AbsolutePath", "DirectoryPath", "SearchPath", "SearchDirectory", "Cwd")
+// A folder in no repository may hold several: a search of one returns their files.
+var antigravityFolderKeys = []string{"DirectoryPath", "SearchPath", "SearchDirectory", "Cwd"}
 
 // contentConsented reports whether the developer chose Antigravity, or global mode collects
 // every session: what was said travels under it, the team's policy deciding which kinds.
@@ -53,7 +58,9 @@ func antigravityContentFor(e hookrun.Env, in *antigravityHookInput) antigravityC
 // antigravityWorkspacesCollected reports whether every one of the conversation's workspaces
 // (workspacePaths, the cwd when the list is empty) is in a checkout the policy collects,
 // judged by the owner of its resolved path, as a file is (antigravityPathOwner), so a
-// workspace that is a link into an excluded checkout is not collected. One outside git is
+// workspace that is a link into an excluded checkout is not collected. A workspace must be
+// an existing folder: one removed is not judged by the folder above it, which may be the
+// collected checkout an excluded clone was nested in. One outside git is
 // not, unless global mode collects it, as it collects a session outside git. agy reports a
 // conversation's first folder as cwd for good, and adds the folder it is resumed from to the
 // list, so a conversation resumed from another repository sends no content.
@@ -64,6 +71,9 @@ func antigravityWorkspacesCollected(e hookrun.Env, in *antigravityHookInput) boo
 	}
 	for _, p := range paths {
 		if p == "" || !filepath.IsAbs(p) {
+			return false
+		}
+		if info, err := os.Stat(p); err != nil || !info.IsDir() {
 			return false
 		}
 		switch antigravityPathOwner(e.Policy, "", p) {
@@ -179,11 +189,13 @@ func antigravityRefuses(e hookrun.Env, in *antigravityHookInput) bool {
 }
 
 // antigravityRefusesArgs reports whether a tool call's content is refused: its arguments name
-// a file or folder (antigravityContentKeys, any tool) in a checkout the policy does not
-// collect, or one terma cannot place, a relative path joined to cwd; a path in no repository
-// is refused only when antigravityShowsFilesInNoRepository is false. Arguments terma cannot
-// read as an object name no file it knows of. The hook judges its own call's arguments by it,
-// and the transcript's reader every call a call line asks for, so both refuse the same calls.
+// a file or folder (antigravityFileKeys, antigravityFolderKeys, any tool) in a checkout the
+// policy does not collect, or one terma cannot place, a relative path joined to cwd. A folder
+// in no repository is refused, but in global mode; a file in no repository only when
+// antigravityShowsFilesInNoRepository is false. Arguments terma cannot read as an object name
+// no file it knows of: the hook attaches none of them, and the transcript's reader refuses
+// them itself (antigravityCallsRefused). The hook judges its own call's arguments by it, and
+// the reader every call a call line asks for, so both refuse the same calls.
 func antigravityRefusesArgs(e hookrun.Env, cwd string, raw json.RawMessage) bool {
 	if len(raw) == 0 {
 		return false
@@ -192,18 +204,28 @@ func antigravityRefusesArgs(e hookrun.Env, cwd string, raw json.RawMessage) bool
 	if json.Unmarshal(raw, &args) != nil {
 		return false
 	}
-	for _, key := range antigravityContentKeys {
+	refused := func(key string, showsNone bool) bool {
 		var p string
 		if json.Unmarshal(args[key], &p) != nil || p == "" {
-			continue
+			return false
 		}
 		switch antigravityPathOwner(e.Policy, cwd, p) {
 		case ownerCollected:
+			return false
 		case ownerNone:
-			if !antigravityShowsFilesInNoRepository {
-				return true
-			}
-		default:
+			return !showsNone
+		}
+		return true
+	}
+	for _, key := range antigravityFileKeys {
+		if refused(key, antigravityShowsFilesInNoRepository) {
+			return true
+		}
+	}
+	// Global mode collects every repository on the machine and a session outside git, so a
+	// folder outside git holds nothing the policy excludes.
+	for _, key := range antigravityFolderKeys {
+		if refused(key, e.Policy.Global()) {
 			return true
 		}
 	}
