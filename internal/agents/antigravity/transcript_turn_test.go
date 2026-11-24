@@ -86,6 +86,15 @@ func TestAntigravityExcludedTurnNeverLeavesAfterARewrite(t *testing.T) {
 			g.add(orig[18], orig[19])
 			g.hook(stop, stopped)
 			check("the next collected turn", "step-19 turn-18")
+			// Nothing turn 13 said ever left; turn 18's prompt and reply did.
+			for step := int64(12); step <= 16; step++ {
+				if g.spoke(step) {
+					t.Errorf("turn 13's step %d left", step)
+				}
+			}
+			if !g.spoke(17) || !g.spoke(19) {
+				t.Error("turn 18's prompt and reply did not leave")
+			}
 		})
 	}
 }
@@ -165,6 +174,11 @@ func TestAntigravityCancelledCallNeverLeavesPastAnExcludedTurn(t *testing.T) {
 	if s := g.calls(); s != "step-24 turn-24" {
 		t.Fatalf("sent %s", s)
 	}
+	// The cancelled call's reply (step 19) and the excluded turn's prompt (step 21) never
+	// left; each collected turn's own prompt did.
+	if g.spoke(19) || g.spoke(21) || !g.spoke(17) || !g.spoke(23) {
+		t.Errorf("spoke 19 %v, 21 %v, 17 %v, 23 %v", g.spoke(19), g.spoke(21), g.spoke(17), g.spoke(23))
+	}
 }
 
 // A hook of a turn begun in another collected checkout sends nothing; a turn begun in the
@@ -198,6 +212,16 @@ func TestAntigravityTurnBegunElsewhereSendsNothingHere(t *testing.T) {
 	if s := g.calls(); s != "" {
 		t.Fatalf("the first checkout sent %s of a turn begun in the second", s)
 	}
+	// Turn 18's reply, passed by the hook in the second checkout, never left; turn 22's
+	// prompt left from the second checkout, its own.
+	if g.spoke(19) {
+		t.Error("turn 18's reply left from another checkout")
+	}
+	for _, e := range g.seen {
+		if e.Name == semconv.TermaUserMessageEvent && e.Attrs[semconv.TermaMessageIDKey] == "step-21" && !strings.HasSuffix(e.Repository.Origin, filepath.Base(second)) {
+			t.Errorf("turn 22's prompt left under %s", e.Repository.Origin)
+		}
+	}
 }
 
 // A hook of a running turn where the policy collects nothing ends the turn: the rest of it
@@ -223,6 +247,10 @@ func TestAntigravityTurnEndsAtAHookWhereThePolicyCollectsNothing(t *testing.T) {
 	if n := g.lost(); n != 2 {
 		t.Fatalf("counted %d lost, want steps 9 and 11", n)
 	}
+	// What the rest of the turn said never left either.
+	if g.spoke(10) || g.spoke(11) {
+		t.Error("the rest of the turn's result or reply left")
+	}
 }
 
 // A call of a turn begun under one sign-in is never sent under another's, nor later under
@@ -242,8 +270,14 @@ func TestAntigravityCallNeverGoesInAnotherSignInsLane(t *testing.T) {
 	other.Bind("fedcba9876543210")
 	g.sp = other
 	g.hook(stop, stopped)
-	if got := hookruntest.Named(hookruntest.Spooled(t, other), semconv.TermaModelCallEvent); len(got) != 0 {
+	otherSpooled := hookruntest.Spooled(t, other)
+	if got := hookruntest.Named(otherSpooled, semconv.TermaModelCallEvent); len(got) != 0 {
 		t.Fatalf("turn 18's call went in another sign-in's lane: %v", got)
+	}
+	for _, kind := range []string{semconv.TermaAssistantMessageEvent, semconv.TermaToolResultEvent, semconv.TermaUserMessageEvent} {
+		if got := hookruntest.Named(otherSpooled, kind); len(got) != 0 {
+			t.Fatalf("turn 18's content went in another sign-in's lane: %v", got)
+		}
 	}
 	if l, _ := spool.ReadLosses(otherDir, time.Now()); l.Counts[sendas.LostTurnEnded] != 1 {
 		t.Fatalf("the other lane counted %v", l.Counts)
@@ -252,6 +286,9 @@ func TestAntigravityCallNeverGoesInAnotherSignInsLane(t *testing.T) {
 	g.hook(stop, stopped)
 	if s := g.calls(); s != "" {
 		t.Fatalf("turn 18's call went later in its own lane: %s", s)
+	}
+	if g.spoke(19) {
+		t.Fatal("turn 18's reply went later in its own lane")
 	}
 }
 

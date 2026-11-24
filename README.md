@@ -473,7 +473,7 @@ Antigravity's `agy` has no telemetry export, so nothing of it passes the relay. 
 one named hook, `terma`, to `~/.gemini/config/hooks.json`, which every `agy` session loads,
 and leaves the file's other hooks, and its comments, as they are. It needs `agy` 1.2.4 or later,
 the first whose Stop hook runs reliably; `terma doctor` names the version it finds. Those hooks report the model, each turn,
-each tool step (its name and whether it failed, never its arguments) and how the turn
+each tool step (its name and whether it failed) and how the turn
 ended, and the files `agy`'s own file tools write are stamped on your commits. Each hook
 also reads the conversation's transcript and sends every model call written since the last
 one: its model and its input, cache-read and output tokens. `agy` does not count thinking
@@ -491,6 +491,51 @@ conversation lasts, so one you resume from a second repository is still recorded
 first, whichever of the two your team's policy collects
 ([#174](https://github.com/miradorlabs/terma-cli/issues/174)).
 
+What a conversation says goes by the same rule, from the same hooks, while you chose
+Antigravity at setup (or in global mode). Each prompt and each reply goes while your team's
+policy collects prompts. A prompt still counts when its text is withheld. Each tool call's
+arguments and each tool's result go while the policy collects tool content. The prompt and
+the reply come from the transcript, never from the copy `agy` repeats in every hook. A
+prompt from T3 Code loses T3 Code's own instructions and notes first, and keeps only the
+request; when terma cannot tell where the request starts and ends, the prompt goes without
+its text. A prompt or a reply longer than 16 KiB is cut there and marked as cut. A result is
+cut at 16 KiB and ends with how many characters were dropped. Arguments longer than 16 KiB
+keep their short values, such as a path or a command, and each long value is cut to 2 KiB
+and ends the same way. Thinking is not sent. A tool's result on a transcript line over 8 MiB
+is lost.
+
+Two rules keep another repository's content out. A conversation sends no content at all
+while any folder it works in is outside a repository your team's policy collects: resumed
+from such a repository, or from a folder outside git, it sends none for the rest of its
+life. In global mode a folder outside git is collected, as a session outside git is. A
+folder that is a link is judged by the repository it leads to. terma reads every argument
+value that looks like a path, under any key and inside lists and nested objects: one line of
+at most 4,096 bytes that is an absolute path, or `~` or a path under it. Under a key that
+names a file or folder, such as `Path`, a relative value is read as a path too. Under any
+other key, a relative value is read as one when it climbs with `..`, such as
+`../other-repo/file.txt`, or names a file or folder that is there in the folder the agent
+works in. So a word that happens to be a file name there is read as a path, and shown. A
+`file://` link is read as the file it names, a path used as an object's key is read too, and
+so is one inside a JSON-encoded string. A command's text, a web URL and other text are not
+read as paths. A tool call whose arguments
+name a file or folder in a repository the policy does not collect sends no arguments, and
+its result is withheld. When the model asked for several calls in one response, the results
+of the others are withheld too, though their arguments are sent: `agy`'s transcript does
+not say which result belongs to which call. Links, nested clones and submodules are followed
+to the repository that holds the file, and a file terma cannot place counts as not
+collected. A file in no repository at all, such as a note in your home folder, is shown, as
+Claude Code and Codex show it. Whether a value names a file or a folder is read from the
+disk, not from its key. A tool that lists or searches a folder returns what is under it, so
+outside global mode a folder is refused when it is in no repository, or when it holds a
+nested clone or a submodule the policy does not collect. A folder that holds 20,000 folders
+or more, or one terma cannot read, is refused too, since terma cannot tell what the rest
+holds. A folder that is not there yet is refused in no repository only under a key that
+names a folder, such as `DirectoryPath`. With `GIT_DIR` set in the agent's environment,
+terma cannot tell which repository a file belongs to, so no content is sent. Not caught: a
+shell command that reads another repository, a tool that searches the folder the agent
+works in without naming it when that folder holds a clone the policy does not collect, and
+a reply that repeats what a refused read returned.
+
 T3 Code runs its own copy of Antigravity, with a folder of its own in place of `~/.gemini`.
 Setup writes the same hook into each T3 Code Antigravity provider folder too:
 `~/.t3/userdata/providers/<instance>/<id>/config/hooks.json`, or the same path under
@@ -506,8 +551,8 @@ time terma runs after an upgrade, when another folder has terma's hook switched 
 `terma` hook you set `"enabled": false` in one folder stays off there and is never copied
 to another. While a folder lacks the hook, `terma doctor` names its file. T3 Code
 threads report what `agy` sessions do: the session, each turn, each tool step, each model
-call with its tokens, and the files its file tools write. They report no plan, quota or
-account, since T3 Code runs Antigravity with no status line.
+call with its tokens, what was said, and the files its file tools write. They report no
+plan, quota or account, since T3 Code runs Antigravity with no status line.
 
 Setup also puts `terma hook antigravity-statusline` in `statusLine` in
 `~/.gemini/antigravity-cli/settings.json`. Its payload is the only place `agy` names your

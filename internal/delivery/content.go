@@ -14,17 +14,24 @@ import (
 
 // hookContent is where each hook event kind carries a tool's input: the one list delivery
 // withholds by. Hooks spool events whole and know no policy; the team's policy when an
-// event leaves decides what of it does, as the relay decides for exports. A reply or a
-// thread's name is what was said through and through, so Allowed sends it or not, whole.
+// event leaves decides what of it does, as the relay decides for exports. A reply, a
+// thread's name or a tool's result is content through and through, so Allowed sends it or
+// not, whole. These keys are also removed once the agent that spooled the event no longer
+// has the developer's consent, whatever the policy.
+//
+// They are always removed for an agent that does not implement agents.ContentConsent, and
+// for an event that names no agent: an agent that starts sending a tool's input must
+// implement it.
 var hookContent = map[string][]string{
 	semconv.TermaToolCallEvent:          {semconv.GenAIToolCallArgumentsKey},
 	semconv.TermaApprovalRequestedEvent: {semconv.TermaApprovalReasonKey},
 }
 
-// contentFree are the event kinds that carry no content, or (a reply, a thread's name) that
-// Allowed sends or withholds whole; terma.repository.root, which some of them name, Outgoing
-// withholds with tool content. A kind in none of the three lists is withheld whenever the
-// policy withholds any content, so a new kind leaks nothing until it is classified.
+// contentFree are the event kinds that carry no content, or (a reply, a thread's name, a
+// tool's result) that Allowed sends or withholds whole; terma.repository.root, which some of
+// them name, Outgoing withholds with tool content. A kind in none of the four lists is
+// withheld whenever the policy withholds any content, so a new kind leaks nothing until it
+// is classified.
 var contentFree = map[string]bool{
 	semconv.TermaSessionStartEvent: true, semconv.TermaSessionEndEvent: true,
 	semconv.TermaCompactionEvent: true, semconv.TermaFilesTouchedEvent: true,
@@ -34,6 +41,7 @@ var contentFree = map[string]bool{
 	semconv.TermaSubagentCallEvent: true, semconv.TermaSessionObservationEvent: true,
 	semconv.TermaAssistantMessageEvent: true, semconv.TermaSessionTitleEvent: true,
 	semconv.TermaModelCallResponseEvent: true, semconv.TermaModelCallEvent: true,
+	semconv.TermaToolResultEvent: true,
 }
 
 // contentWhole are the event kinds that are content through and through, of both kinds, so
@@ -43,6 +51,14 @@ var contentFree = map[string]bool{
 // one queued before the policy changed. A tool call that names the skill it loaded
 // (terma.skill.name) loses that name by the same rule, and the call still leaves.
 var contentWhole = map[string]bool{semconv.TermaSkillDefinitionEvent: true}
+
+// promptContent is where each hook event kind that leaves under any policy carries what was
+// said: removed when the policy withholds prompts, or the agent that spooled it no longer has
+// the developer's consent (a prompt a hook spooled while it had), and the rest of the event
+// sent. Withholding tool content alone leaves it.
+var promptContent = map[string][]string{
+	semconv.TermaUserMessageEvent: {semconv.TermaMessageTextKey, semconv.TermaMessageTruncatedKey},
+}
 
 // Outgoing is e as it may leave for projectID under org, the team's policy now, without
 // the content that policy withholds (config.Policy.Content, the relay's rule); false when
@@ -54,11 +70,26 @@ func (r Router) Outgoing(org config.Policy, projectID string, e spool.Event) (sp
 	}
 	pol := routing.EffectivePolicy(r.StateDir, org, projectID)
 	prompts, toolContent := pol.Content()
+	promptKeys, said := promptContent[e.Name]
+	if said && (!prompts || !r.consented(e, pol.Global())) {
+		e.Attrs = maps.Clone(e.Attrs)
+		for _, k := range promptKeys {
+			delete(e.Attrs, k)
+		}
+	}
+	toolKeys, ok := hookContent[e.Name]
+	// A tool's input spooled while its agent had the developer's consent leaves only while it
+	// still has it: checked before an open policy sends the rest whole.
+	if ok && !r.consented(e, pol.Global()) {
+		e.Attrs = maps.Clone(e.Attrs)
+		for _, k := range toolKeys {
+			delete(e.Attrs, k)
+		}
+	}
 	if prompts && toolContent {
 		return skillLinkAdmitted(pol, e), true
 	}
-	toolKeys, ok := hookContent[e.Name]
-	if contentWhole[e.Name] || !ok && !contentFree[e.Name] {
+	if contentWhole[e.Name] || !ok && !contentFree[e.Name] && !said {
 		return spool.Event{}, false
 	}
 	e.Attrs = maps.Clone(e.Attrs)
