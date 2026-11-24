@@ -577,3 +577,96 @@ func TestRoutedSkillsGatedPerDestinationTeam(t *testing.T) {
 		t.Fatalf("spooled skills = %+v; want 1 event for teamB %q", got, rB.dest.d.EnrollmentID)
 	}
 }
+
+func TestSpoolTitleWithholdsAfterRouteChange(t *testing.T) {
+	stateDir := t.TempDir()
+	repoA := namedRepo(t, "alpha", "git@github.com:orgA/alpha.git")
+	repoB := namedRepo(t, "beta", "git@github.com:orgB/beta.git")
+	teamA := makeTeam("orgA", "team-a", []string{"github.com/orgA/alpha"}, true)
+	teamB := makeTeam("orgB", "team-b", []string{"github.com/orgB/beta"}, true)
+	rt := routedState(t, stateDir, testAccountA, []routing.Team{teamA, teamB}, map[string]string{
+		"github.com/orgA/alpha": "orgA",
+		"github.com/orgB/beta":  "orgB",
+	})
+	ctx := context.Background()
+	sid := "018f3a2c-0009-7000-8000-000000000001"
+	envA, _, _ := routedEnv(t, stateDir, repoA, testAccountA, rt)
+	rA, err := envA.Repo(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	SpoolTitle(envA, rA, "titles", sid, map[string]any{}, func() (string, bool, error) { return "Title A", true, nil })
+	envB, _, _ := routedEnv(t, stateDir, repoB, testAccountA, LoadRouting(stateDir, "default"))
+	rB, err := envB.Repo(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	SpoolTitle(envB, rB, "titles", sid, map[string]any{}, func() (string, bool, error) { return "Title B", true, nil })
+	SpoolTitle(envA, rA, "titles", sid, map[string]any{}, func() (string, bool, error) { return "Title A2", true, nil })
+	got := hookruntest.Named(hookruntest.Spooled(t, envA.Spool), semconv.TermaSessionTitleEvent)
+	if len(got) != 1 || got[0].Attrs[semconv.TermaSessionTitleKey] != "Title A" || got[0].Enrollment != rA.dest.d.EnrollmentID {
+		t.Fatalf("titles = %+v; want only initial Title A for orgA", got)
+	}
+}
+
+func TestUnparkMixedEventsAndPushesPreserveIdempotency(t *testing.T) {
+	stateDir := t.TempDir()
+	repoA := namedRepo(t, "alpha", "git@github.com:orgA/alpha.git")
+	teamA := makeTeam("orgA", "team-a", []string{"github.com/orgA/alpha"}, true)
+	rt := routedState(t, stateDir, testAccountA, []routing.Team{teamA}, map[string]string{"github.com/orgA/alpha": "orgA"})
+	env, _, _ := routedEnv(t, stateDir, repoA, testAccountA, rt)
+	r, err := env.Repo(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Mixed parked events: block spool/losses so CountLost fails after AppendAsCollected commits.
+	lossesDir := filepath.Join(stateDir, spool.Dir, "losses")
+	if err := os.WriteFile(lossesDir, []byte("block"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	env.park(r, parkedEvents, spool.Event{Time: env.Time(), Name: "terma.git.commit", Enrollment: r.dest.d.EnrollmentID, Account: testAccountA})
+	env.park(r, parkedEvents, spool.Event{Time: env.Time(), Name: "terma.git.commit", Account: testAccountA})
+	env.unpark(r)
+	if err := os.Remove(lossesDir); err != nil {
+		t.Fatal(err)
+	}
+	env.unpark(r)
+	if got := hookruntest.Named(hookruntest.Spooled(t, env.Spool), "terma.git.commit"); len(got) != 1 {
+		t.Fatalf("spooled commits after mixed unpark retry = %d, want 1 (no duplicate replay)", len(got))
+	}
+	readNoDest := func() int {
+		l, err := spool.ReadLosses(filepath.Join(stateDir, spool.Dir), env.Time())
+		if err != nil {
+			t.Fatal(err)
+		}
+		return l.Counts[LostNoDestination]
+	}
+	if lost := readNoDest(); lost != 1 {
+		t.Fatalf("no_destination lost after parked-loss import = %d, want 1", lost)
+	}
+
+	// Mixed parked pushes: block pushes dir so WriteJSON fails; CountLost must NOT run until writes commit.
+	pushesPath := filepath.Join(stateDir, PushesDir)
+	if err := os.WriteFile(pushesPath, []byte("block"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	var awaited []string
+	env.AwaitPush = func(p string) { awaited = append(awaited, p) }
+	env.park(r, parkedPushes, pushRecord{ID: "p-valid", Root: r.Root, GitDir: r.GitDir, Event: spool.Event{Enrollment: r.dest.d.EnrollmentID}, Refs: []PushRef{{LocalRef: "refs/heads/main"}}})
+	env.park(r, parkedPushes, pushRecord{ID: "p-nodest", Root: r.Root, GitDir: r.GitDir, Refs: []PushRef{{LocalRef: "refs/heads/main"}}})
+	env.unparkPushes(r)
+	if lost := readNoDest(); lost != 1 {
+		t.Fatalf("no_destination inflated while push WriteJSON failed: got %d, want 1", lost)
+	}
+	if err := os.Remove(pushesPath); err != nil {
+		t.Fatal(err)
+	}
+	env.unparkPushes(r)
+	if len(awaited) != 1 {
+		t.Fatalf("awaited pushes = %v, want 1", awaited)
+	}
+	if lost := readNoDest(); lost != 2 {
+		t.Fatalf("no_destination after push retry = %d, want 2", lost)
+	}
+}

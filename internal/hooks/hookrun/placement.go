@@ -1,6 +1,8 @@
 package hookrun
 
 import (
+	"cmp"
+	"context"
 	"slices"
 	"time"
 
@@ -23,7 +25,23 @@ func (e Env) StartRun(sessionID string) {
 		e.Routing.setRun(sessionID, run, e.Time())
 	}
 }
-
+func claimRouted(ctx context.Context, env Env, s PayloadSession, tool string) bool {
+	if !env.Routing.Usable() || env.lane().Lost != "" {
+		return false
+	}
+	env.Cwd = cmp.Or(s.Cwd, env.Cwd)
+	r, err := env.routeHere(ctx)
+	if err != nil {
+		return false
+	}
+	if r.dest.collected() {
+		env.unpark(r)
+	}
+	c := r.claim(tool)
+	c.PIDs, c.Cwd, c.Parent = claimPIDs(), env.workingDir(), env.parent
+	env.judge(s.ID, s.AgentID, c, []routing.Location{r.dest.loc}, true, runs.Why{})
+	return r.dest.collected()
+}
 func (e Env) placeFor(r *Repo, ev spool.Event) {
 	if r == nil || r.dest == nil || ev.SessionID == "" || e.lane().Lost != "" {
 		return
@@ -37,11 +55,6 @@ func (e Env) placeFor(r *Repo, ev spool.Event) {
 		e.OnClaim(r.Root)
 	}
 }
-
-func (e Env) place(sessionID, agentID string, c claim.Claim, loc routing.Location, touched []routing.Location) {
-	e.judge(sessionID, agentID, c, append([]routing.Location{loc}, touched...), true, runs.Why{})
-}
-
 func (e Env) judge(sessionID, agentID string, c claim.Claim, locs []routing.Location, placed bool, unknown runs.Why) {
 	if !e.Routing.Usable() || !session.ValidID(sessionID) {
 		return
@@ -121,7 +134,6 @@ func (e Env) recordRun(sessionID string, cur ledgerRun, locs []routing.Location,
 	}
 	return mixed
 }
-
 func (e Env) placeRun(sessionID, agentID string, c claim.Claim, mixed bool, now time.Time) {
 	if e.Routing.WithholdPlacements {
 		return
@@ -157,7 +169,6 @@ func (e Env) placeRun(sessionID, agentID string, c claim.Claim, mixed bool, now 
 		}
 	}
 }
-
 func (e Env) markMixed(sessionID, run string, at time.Time, why runs.Why) bool {
 	set := func() {
 		e.Routing.updateRun(sessionID, func(lr *ledgerRun) {
@@ -179,7 +190,6 @@ func (e Env) markMixed(sessionID, run string, at time.Time, why runs.Why) bool {
 	set()
 	return false
 }
-
 func (rt *Routing) crossing(prev claim.Claim, havePrev bool, run string, locs []routing.Location, been []string, now time.Time) (runs.Why, bool) {
 	all := slices.Clone(locs)
 	if havePrev {
@@ -239,8 +249,7 @@ func (rt *Routing) crossing(prev claim.Claim, havePrev bool, run string, locs []
 
 const ledgerOutsideGit = "outside-git"
 
-func newLocations(been []string, locs []routing.Location) []string {
-	var out []string
+func newLocations(been []string, locs []routing.Location) (out []string) {
 	for _, loc := range locs {
 		l := ""
 		if loc.Kind == routing.OutsideGit {

@@ -53,9 +53,7 @@ func (e Env) Classify(ctx context.Context, r *Repo, sess session.Session, paths 
 	e.classifyTouches(r, sess, extra, e.reached(r, paths), unknown)
 	return r
 }
-
-func (e Env) reached(r *Repo, paths []string) []touched {
-	var out []touched
+func (e Env) reached(r *Repo, paths []string) (out []touched) {
 	dirs := map[string]bool{}
 	for _, p := range paths {
 		if !filepath.IsAbs(p) {

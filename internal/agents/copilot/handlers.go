@@ -145,7 +145,7 @@ func stop(ctx context.Context, env hookrun.Env) error {
 	if err != nil {
 		return nil
 	}
-	captureTitle(env, r, in.SessionID)
+	captureTitle(ctx, env, r, in.SessionID)
 	return nil
 }
 
@@ -160,7 +160,7 @@ func sessionEnd(ctx context.Context, env hookrun.Env) error {
 	if err != nil {
 		return nil
 	}
-	captureTitle(env, r, in.SessionID)
+	captureTitle(ctx, env, r, in.SessionID)
 	env.EndSession(r, in.SessionID, name)
 	return nil
 }

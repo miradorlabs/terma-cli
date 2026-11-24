@@ -47,11 +47,7 @@ func captureClaudeSkills(ctx context.Context, e hookrun.Env, r *hookrun.Repo, se
 	}
 	// Each use is judged by where the session ran when it was written and must match r's destination.
 	turns := e.Turns(ctx)
-	gitDir := os.Getenv("GIT_DIR") != ""
-	admits := func(cwd string) bool {
-		return cwd != "" && (!gitDir || cwd == e.Cwd) && turns.Admits(cwd) && turns.Matches(r, cwd)
-	}
-	uses, next, err := readClaudeSkillUses(transcript, cur, admits)
+	uses, next, err := readClaudeSkillUses(transcript, cur, func(cwd string) bool { return turns.Exclusive(r, cwd) })
 	if err != nil {
 		e.Logf("skills: %v", err)
 		return

@@ -96,7 +96,7 @@ func sessionEnd(ctx context.Context, env hookrun.Env) error {
 	captureClaudeSkills(ctx, env, r, in.SessionID, in.TranscriptPath)
 	env.EndSession(r, in.SessionID, claudeTool)
 	// A /rename after the last turn ends no turn.
-	captureClaudeTitle(env, r, in)
+	captureClaudeTitle(ctx, env, r, in)
 	return nil
 }
 
@@ -114,7 +114,7 @@ func stop(ctx context.Context, env hookrun.Env) error {
 		return nil
 	}
 	captureClaudeAccount(env, r, in)
-	captureClaudeTitle(env, r, in)
+	captureClaudeTitle(ctx, env, r, in)
 	captureClaudeCallResponses(env, r, in.SessionID, in.TranscriptPath)
 	captureClaudeSkills(ctx, env, r, in.SessionID, in.TranscriptPath)
 	return nil
@@ -131,7 +131,7 @@ func preToolUse(ctx context.Context, env hookrun.Env) error {
 		env.Logf("%v", err)
 		return nil
 	}
-	if !session.ValidID(in.SessionID) || !claudeReadsOnly(in.ToolName) {
+	if !session.ValidID(in.SessionID) || !claudeReadTools[in.ToolName] {
 		return nil
 	}
 	env.Cwd = cmp.Or(in.Cwd, env.Cwd)
@@ -146,7 +146,7 @@ func postToolUse(ctx context.Context, env hookrun.Env) error {
 		env.Logf("%v", err)
 		return nil
 	}
-	if !session.ValidID(in.SessionID) || claudeReadsOnly(in.ToolName) {
+	if !session.ValidID(in.SessionID) || claudeReadTools[in.ToolName] {
 		return nil
 	}
 	env.Cwd = cmp.Or(in.Cwd, env.Cwd)
@@ -167,13 +167,7 @@ func postToolUse(ctx context.Context, env hookrun.Env) error {
 	return nil
 }
 
-func claudeReadsOnly(tool string) bool {
-	switch tool {
-	case "Read", "Grep", "Glob", "NotebookRead", "LS", "Bash":
-		return true
-	}
-	return false
-}
+var claudeReadTools = map[string]bool{"Read": true, "Grep": true, "Glob": true, "NotebookRead": true, "LS": true, "Bash": true}
 
 func editedPaths(in *claudeHookInput) []string {
 	out := []string{in.ToolInput.FilePath, in.ToolInput.NotebookPath}

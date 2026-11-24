@@ -275,3 +275,74 @@ func TestClaudeRoutedSkillBacklogDoesNotLeakAcrossOrgs(t *testing.T) {
 		t.Fatalf("spooled skills = %+v; want only public-b for orgB (%q)", got, enrollments["orgB"])
 	}
 }
+
+func TestClaudeRoutedTitleWithheldAcrossDestinations(t *testing.T) {
+	stateDir := t.TempDir()
+	repoA := initOriginRepo(t, "alpha", "git@github.com:orgA/alpha.git")
+	repoB := initOriginRepo(t, "beta", "git@github.com:orgB/beta.git")
+	env, _ := makeRoutedClaudeEnv(t, stateDir, repoB)
+	env.Agents = []string{name}
+	ctx := context.Background()
+	cwdA, _ := json.Marshal(repoA)
+	cwdB, _ := json.Marshal(repoB)
+
+	// Session begins in orgA, produces an ai-title before capture, then resumes cleanly in orgB.
+	sidCross := "018f3a2c-cl03-7000-8000-000000000001"
+	startB, _ := json.Marshal(map[string]any{"session_id": sidCross, "cwd": repoB, "source": "resume"})
+	env.Stdin = bytes.NewReader(startB)
+	if err := sessionStart(ctx, env); err != nil {
+		t.Fatal(err)
+	}
+	crossPath := filepath.Join(t.TempDir(), "cross.jsonl")
+	crossLines := strings.Join([]string{
+		`{"type":"user","sessionId":"` + sidCross + `","cwd":` + string(cwdA) + `}`,
+		`{"type":"ai-title","sessionId":"` + sidCross + `","aiTitle":"Org A secret prompt"}`,
+		`{"type":"user","sessionId":"` + sidCross + `","cwd":` + string(cwdB) + `}`,
+	}, "\n") + "\n"
+	if err := os.WriteFile(crossPath, []byte(crossLines), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	stopB, _ := json.Marshal(map[string]any{"session_id": sidCross, "cwd": repoB, "transcript_path": crossPath})
+	env.Stdin = bytes.NewReader(stopB)
+	if err := stop(ctx, env); err != nil {
+		t.Fatal(err)
+	}
+	if got := hookruntest.Named(hookruntest.Spooled(t, env.Spool), semconv.TermaSessionTitleEvent); len(got) != 0 {
+		t.Fatalf("cross-org transcript spooled title to orgB: %+v", got)
+	}
+
+	// Transcript without cwd provenance fails closed under routing.
+	sidNoCwd := "018f3a2c-cl03-7000-8000-000000000002"
+	noCwdPath := filepath.Join(t.TempDir(), "nocwd.jsonl")
+	if err := os.WriteFile(noCwdPath, []byte(`{"type":"ai-title","sessionId":"`+sidNoCwd+`","aiTitle":"Unknown origin"}`+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	stopNoCwd, _ := json.Marshal(map[string]any{"session_id": sidNoCwd, "cwd": repoB, "transcript_path": noCwdPath})
+	env.Stdin = bytes.NewReader(stopNoCwd)
+	if err := stop(ctx, env); err != nil {
+		t.Fatal(err)
+	}
+	if got := hookruntest.Named(hookruntest.Spooled(t, env.Spool), semconv.TermaSessionTitleEvent); len(got) != 0 {
+		t.Fatalf("provenance-less transcript spooled title: %+v", got)
+	}
+
+	// Single-destination orgB transcript spools its title exclusively to orgB.
+	sidPure := "018f3a2c-cl03-7000-8000-000000000003"
+	purePath := filepath.Join(t.TempDir(), "pure.jsonl")
+	pureLines := strings.Join([]string{
+		`{"type":"user","sessionId":"` + sidPure + `","cwd":` + string(cwdB) + `}`,
+		`{"type":"ai-title","sessionId":"` + sidPure + `","aiTitle":"Org B pure title"}`,
+	}, "\n") + "\n"
+	if err := os.WriteFile(purePath, []byte(pureLines), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	stopPure, _ := json.Marshal(map[string]any{"session_id": sidPure, "cwd": repoB, "transcript_path": purePath})
+	env.Stdin = bytes.NewReader(stopPure)
+	if err := stop(ctx, env); err != nil {
+		t.Fatal(err)
+	}
+	got := hookruntest.Named(hookruntest.Spooled(t, env.Spool), semconv.TermaSessionTitleEvent)
+	if len(got) != 1 || got[0].Attrs[semconv.TermaSessionTitleKey] != "Org B pure title" || got[0].SessionID != sidPure {
+		t.Fatalf("pure orgB titles = %+v; want 1 title for %s", got, sidPure)
+	}
+}

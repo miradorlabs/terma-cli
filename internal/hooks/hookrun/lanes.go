@@ -109,9 +109,10 @@ func (e Env) unpark(r *Repo) {
 			}
 		}
 		if noDest > 0 {
-			if err := e.Spool.CountLost(LostNoDestination, noDest); err != nil {
-				return err
+			if !moved {
+				return e.Spool.CountLost(LostNoDestination, noDest)
 			}
+			e.countLost(r, LostNoDestination, noDest)
 		}
 		return nil
 	})

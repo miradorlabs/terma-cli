@@ -40,10 +40,10 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	now := time.Now()
-	var changed bool
+	now, changed := time.Now(), false
 	if *routed {
-		pol := config.Policy{Mode: config.ModeRepo, Repositories: []string{"github.com/acme/repo"}, GitHooks: true, IncludePrompts: true, IncludeToolContent: true, Revision: 1, FetchedAt: now.UTC(), TeamID: "proj_bench", OrganizationID: "org_bench", AuthURL: cfg.AuthURL}
+		pol := cfg.Policy
+		pol.OrganizationID, pol.AuthURL = "org_bench", cfg.AuthURL
 		_, err = routing.Create(stateDir, cfg.ProfileName, sendas.NoPersonLane, func(s *routing.State) error {
 			if _, err := s.Select(routing.Team{OrganizationID: "org_bench", AuthURL: cfg.AuthURL, TeamID: "proj_bench", Policy: pol}); err != nil {
 				return err

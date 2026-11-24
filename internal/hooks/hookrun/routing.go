@@ -28,13 +28,10 @@ type Routing struct {
 }
 
 type ledgerRun struct {
-	id           string
-	locations    []string
-	active       time.Time
-	mixedAt      time.Time
-	aside        bool
-	aliases      []string
-	aliasesKnown bool
+	id                  string
+	locations, aliases  []string
+	active, mixedAt     time.Time
+	aside, aliasesKnown bool
 }
 
 // NewRouting builds a Routing for profile from st; nil fails closed (Usable() == false).
@@ -62,7 +59,6 @@ func (rt *Routing) Usable() bool { return rt != nil && rt.router != nil }
 func (rt *Routing) GitHooks(gitDir string, now time.Time) bool {
 	return rt.Usable() && gitDir != "" && rt.stampsCommits(rt.router.Route(locationOf(gitDir, gitx.RepositoryFS(gitDir)), now))
 }
-
 func (rt *Routing) stampsCommits(d routing.Decision) bool {
 	t, ok := rt.state.Team(d.EnrollmentID)
 	return d.Outcome == routing.Send && ok && t.Policy.GitHooks
@@ -77,34 +73,26 @@ func (rt *Routing) skillsCollectedFor(r *Repo) bool {
 		p, tc := t.Policy.Content()
 		return r.dest.d.Outcome == routing.Send && ok && p && tc
 	}
-	for _, t := range rt.state.Teams {
-		if p, tc := t.Policy.Content(); p && tc {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(rt.state.Teams, func(t routing.Team) bool { p, tc := t.Policy.Content(); return p && tc })
 }
-
 func (e Env) admitsOrigin(origin string) bool {
-	if e.Routing != nil {
-		return e.Routing.route(routing.Location{Kind: routing.Repository, Repository: origin}, e.Time()).collected()
+	if e.Routing == nil {
+		return e.Policy.Admits(config.Repository{Origin: origin})
 	}
-	return e.Policy.Admits(config.Repository{Origin: origin})
+	return e.Routing.route(routing.Location{Kind: routing.Repository, Repository: origin}, e.Time()).collected()
 }
-
 func (rt *Routing) route(loc routing.Location, now time.Time) *dest {
 	if !rt.Usable() {
 		return &dest{loc: loc, d: routing.Decision{Outcome: routing.Drop}}
 	}
 	return &dest{loc: loc, d: rt.router.Route(loc, now)}
 }
-
 func (e Env) resolveRouted(ctx context.Context, r *Repo) (*Repo, error) {
 	if !e.Routing.Usable() {
 		return nil, ErrNotAdmitted
 	}
-	var err error
 	if r == nil {
+		var err error
 		if r, err = e.routeHere(ctx); err != nil {
 			return nil, err
 		}
@@ -119,7 +107,6 @@ func (e Env) resolveRouted(ctx context.Context, r *Repo) (*Repo, error) {
 	r.Store = e.store(storeDir)
 	return r, nil
 }
-
 func (e Env) routeHere(ctx context.Context) (*Repo, error) {
 	root, gitDir, id, remote, err := e.locate(ctx)
 	if err != nil {
@@ -129,9 +116,6 @@ func (e Env) routeHere(ctx context.Context) (*Repo, error) {
 	r.Name, r.Worktree = CheckoutNames(root, gitDir)
 	return r, nil
 }
-
-// sandboxedGitRepo locates a git checkout when a sandboxed git hook cannot read routing.State
-// (Council 12e), leaving dest nil so the record parks with Enrollment == "" for unpark to count no_destination.
 func (e Env) sandboxedGitRepo(ctx context.Context) *Repo {
 	if e.Routing == nil || e.Routing.Usable() || !e.inSandbox() {
 		return nil
@@ -140,16 +124,14 @@ func (e Env) sandboxedGitRepo(ctx context.Context) *Repo {
 	if err != nil || gitDir == "" {
 		return nil
 	}
-	r := &Repo{Root: root, GitDir: gitDir, Repository: id, Remote: remote}
-	r.Name, r.Worktree = CheckoutNames(root, gitDir)
 	storeDir, err := project.StoreDir(e.StateDir, root, gitDir)
 	if err != nil {
 		storeDir = filepath.Join(gitDir, project.GitStoreDir)
 	}
-	r.Store = e.store(storeDir)
+	r := &Repo{Root: root, GitDir: gitDir, Repository: id, Remote: remote, Store: e.store(storeDir)}
+	r.Name, r.Worktree = CheckoutNames(root, gitDir)
 	return r
 }
-
 func locationOf(gitDir, origin string) routing.Location {
 	if gitDir != "" && routing.Owner(origin) != "" {
 		return routing.Location{Kind: routing.Repository, Repository: origin}
@@ -165,7 +147,6 @@ type dest struct {
 func (d *dest) collected() bool {
 	return d != nil && (d.d.Outcome == routing.Send || d.d.Outcome == routing.Hold)
 }
-
 func (d *dest) kind() claim.Kind {
 	if d.loc.Kind == routing.Repository {
 		return claim.KindRepository
@@ -173,7 +154,7 @@ func (d *dest) kind() claim.Kind {
 	return claim.KindOutsideGit
 }
 
-// Collected reports whether records in r may leave the machine (project or routed destination).
+// Collected reports whether records in r may leave the machine.
 func (r *Repo) Collected() bool {
 	if r.dest != nil {
 		return r.dest.collected()
@@ -188,14 +169,12 @@ func (r *Repo) RouteKey() string {
 	}
 	return r.ProjectID
 }
-
 func (r *Repo) routeSalt() string {
 	if r.dest == nil {
 		return ""
 	}
 	return "\x00" + r.RouteKey()
 }
-
 func holdKey(d routing.Decision) string {
 	if d.Outcome == routing.Hold && d.Reason == routing.ReasonPending {
 		return d.Authority.Key
@@ -210,14 +189,12 @@ func (e Env) Routed(r *Repo, ev spool.Event) spool.Event {
 	}
 	return e.destine(ev, r.dest, false, e.runOf(ev.SessionID))
 }
-
 func (e Env) destine(ev spool.Event, d *dest, own bool, run string) spool.Event {
 	if ev.Account == "" && !ev.NoPerson {
 		l := e.lane()
 		ev.Account, ev.NoPerson = l.Account, l.NoPerson
 	}
-	ev.Profile, ev.Enrollment, ev.HoldKey = e.Routing.Profile, d.d.EnrollmentID, holdKey(d.d)
-	ev.Repository = config.Repository{}
+	ev.Profile, ev.Enrollment, ev.HoldKey, ev.Repository = e.Routing.Profile, d.d.EnrollmentID, holdKey(d.d), config.Repository{}
 	if d.loc.Kind == routing.Repository {
 		ev.Repository.Origin = d.loc.Repository
 	}
@@ -225,9 +202,7 @@ func (e Env) destine(ev spool.Event, d *dest, own bool, run string) spool.Event 
 	delete(ev.Attrs, AttrProjectID)
 	return ev
 }
-
 func (e Env) runOf(sessionID string) string { return e.currentRun(sessionID).id }
-
 func (e Env) currentRun(sessionID string) ledgerRun {
 	rt := e.Routing
 	if rt == nil || sessionID == "" {
@@ -245,7 +220,6 @@ func (e Env) currentRun(sessionID string) ledgerRun {
 	out.locations = slices.Clip(out.locations)
 	return out
 }
-
 func (rt *Routing) setRun(sessionID, run string, at time.Time) {
 	rt.mu.Lock()
 	defer rt.mu.Unlock()
@@ -255,7 +229,6 @@ func (rt *Routing) setRun(sessionID, run string, at time.Time) {
 	}
 	rt.runs[sessionID] = next
 }
-
 func (rt *Routing) aliases(stateDir, sessionID string) ([]string, error) {
 	rt.mu.Lock()
 	if cur, ok := rt.runs[sessionID]; ok && cur.aliasesKnown {
@@ -278,7 +251,6 @@ func (rt *Routing) aliases(stateDir, sessionID string) ([]string, error) {
 	})
 	return slices.Clone(aliases), nil
 }
-
 func (e Env) keepRun(sessionID string, now time.Time) {
 	due := false
 	e.Routing.updateRun(sessionID, func(cur *ledgerRun) {
@@ -292,7 +264,6 @@ func (e Env) keepRun(sessionID string, now time.Time) {
 		}
 	}
 }
-
 func (rt *Routing) updateRun(sessionID string, fn func(*ledgerRun)) {
 	rt.mu.Lock()
 	defer rt.mu.Unlock()

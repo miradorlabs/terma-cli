@@ -213,20 +213,21 @@ func (e Env) unparkPushes(r *Repo) {
 			}
 			kept = append(kept, rec)
 		}
-		if noDest > 0 {
-			if e.Spool == nil {
-				return errors.New("no spool for no_destination loss count")
-			}
-			if err := e.Spool.CountLost(LostNoDestination, noDest); err != nil {
-				return err
-			}
-		}
 		for _, rec := range kept {
 			path := filepath.Join(e.StateDir, PushesDir, rec.ID+".json")
 			if err := config.WriteJSON(path, rec, 0o600); err != nil {
 				return err
 			}
 			recorded = append(recorded, path)
+		}
+		if noDest > 0 {
+			if len(kept) == 0 {
+				if e.Spool == nil {
+					return errors.New("no spool for no_destination loss count")
+				}
+				return e.Spool.CountLost(LostNoDestination, noDest)
+			}
+			e.countLost(r, LostNoDestination, noDest)
 		}
 		return nil
 	})

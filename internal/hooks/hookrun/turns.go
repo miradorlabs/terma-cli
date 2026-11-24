@@ -2,6 +2,7 @@ package hookrun
 
 import (
 	"context"
+	"os"
 
 	"github.com/miradorlabs/terma-cli/internal/routing"
 	"github.com/miradorlabs/terma-cli/internal/spool"
@@ -38,21 +39,17 @@ func (t *Turns) Admits(cwd string) bool {
 
 // RouteKey returns cwd's routed destination key (matching Repo.RouteKey), or "" if unrouted/uncollected.
 func (t *Turns) RouteKey(cwd string) string {
-	if t.env.Routing == nil || cwd == "" {
-		return ""
-	}
-	if d := t.dest(cwd); d.collected() {
-		return d.d.EnrollmentID + "\x00" + holdKey(d.d)
+	if t.env.Routing != nil && cwd != "" {
+		if d := t.dest(cwd); d.collected() {
+			return d.d.EnrollmentID + "\x00" + holdKey(d.d)
+		}
 	}
 	return ""
 }
 
-// Matches reports whether cwd routes to the same destination as r (always true when unrouted).
-func (t *Turns) Matches(r *Repo, cwd string) bool {
-	if t.env.Routing == nil {
-		return true
-	}
-	return r != nil && r.dest != nil && t.RouteKey(cwd) == r.RouteKey()
+// Exclusive reports whether cwd is admitted, respects GIT_DIR isolation, and routes to r.
+func (t *Turns) Exclusive(r *Repo, cwd string) bool {
+	return cwd != "" && (os.Getenv("GIT_DIR") == "" || cwd == t.env.Cwd) && t.Admits(cwd) && (t.env.Routing == nil || (r != nil && r.dest != nil && t.RouteKey(cwd) == r.RouteKey()))
 }
 
 // Routed stamps ev using cwd's routed destination (OwnLocation: true) while keeping the session run.
@@ -62,7 +59,6 @@ func (t *Turns) Routed(r *Repo, cwd string, ev spool.Event) spool.Event {
 	}
 	return t.env.destine(ev, t.dest(cwd), true, t.env.runOf(ev.SessionID))
 }
-
 func (t *Turns) dest(cwd string) *dest {
 	if d, ok := t.dests[cwd]; ok {
 		return d
