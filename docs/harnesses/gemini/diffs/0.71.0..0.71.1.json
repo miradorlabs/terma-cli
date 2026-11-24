@@ -3,7 +3,7 @@
   "harness": "gemini",
   "from": "0.71.0",
   "to": "0.71.1",
-  "generated_at": "2026-11-24T07:46:10.022420061Z",
+  "generated_at": "2026-11-24T10:32:48.676090095Z",
   "source": {
     "compare": "https://github.com/google-gemini/gemini-cli/compare/v0.71.0...v0.71.1"
   },
@@ -12,20 +12,53 @@
     "text": "## What's Changed\n* fix(patch): cherry-pick aafdfdf to release/v0.71.0-pr-30420 to patch version v0.71.0 and create version 0.71.1 by @gemini-cli-robot in https://github.com/google-gemini/gemini-cli/pull/30429\n\n\n**Full Changelog**: https://github.com/google-gemini/gemini-cli/compare/v0.71.0...v0.71.1"
   },
   "summary": {
-    "changes": 2,
+    "changes": 3,
     "categories": {
       "binary": 1,
+      "prompt": 1,
       "storage": 1
     },
     "impact": {
       "breaking": 0,
       "degrading": 0,
       "informational": 2,
-      "notable": 0
+      "notable": 1
     },
-    "undocumented": 2
+    "undocumented": 3
   },
   "changes": [
+    {
+      "id": "prompt.system.0.text",
+      "category": "prompt",
+      "op": "changed",
+      "path": [
+        "prompt",
+        "system",
+        "0",
+        "text"
+      ],
+      "title": "System prompt changed (+382 −382 chars)",
+      "impact": "notable",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -156,15 +156,15 @@\n \n <available_skills>\n   <skill>\n-    <name>skill-creator</name>\n-    <description>Guide for creating effective skills. This skill should be used when users want to create a new skill (or update an existing skill) that extends Gemini CLI's capabilities with specialized knowledge, workflows, or tool integrations.</description>\n-    <location><install>/bundle/builtin/skill-creator/SKILL.md</location>\n-  </skill>\n-  <skill>\n     <name>antigravity-support</name>\n     <description>Use when the user asks questions, seeks help, or requests instructions related to installing, setting up, or migrating to Antigravity CLI.\n This skill provides the latest up to date details, requirements, and commands sourced from the official Antigravity CLI documentation.</description>\n     <location><install>/bundle/builtin/antigravity-support/SKILL.md</location>\n+  </skill>\n+  <skill>\n+    <name>skill-creator</name>\n+    <description>Guide for creating effective skills. This skill should be used when users want to create a new skill (or update an existing skill) that extends Gemini CLI's capabilities with specialized knowledge, workflows, or tool integrations.</description>\n+    <location><install>/bundle/builtin/skill-creator/SKILL.md</location>\n   </skill>\n </available_skills>\n \n",
+      "stats": {
+        "added_chars": 382,
+        "removed_chars": 382
+      },
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/core/src/skills/builtin/skill-creator/SKILL.md",
+            "line": 5,
+            "url": "https://github.com/google-gemini/gemini-cli/blob/v0.71.1/packages/core/src/skills/builtin/skill-creator/SKILL.md#L5-L6"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
     {
       "id": "storage.transcript.path",
       "category": "storage",
@@ -38,7 +71,7 @@
       "title": "On-disk transcript path changed",
       "impact": "informational",
       "before": "<home>/.gemini<tmp><time>579bbe.jsonl",
-      "after": "<home>/.gemini<tmp><time>212dea.jsonl",
+      "after": "<home>/.gemini<tmp><time>-<id>.jsonl",
       "text_diff": null,
       "terma": null,
       "source": null,

@@ -7,6 +7,14 @@
       "previous": "0.71.0",
       "changes": [
         {
+          "id": "prompt.system.0.text",
+          "category": "prompt",
+          "op": "changed",
+          "title": "System prompt changed (+382 −382 chars)",
+          "impact": "notable",
+          "documented": false
+        },
+        {
           "id": "storage.transcript.path",
           "category": "storage",
           "op": "changed",
@@ -28,6 +36,62 @@
       "version": "0.71.0",
       "previous": "0.70.0",
       "changes": [
+        {
+          "id": "network.telemetry.POST play.googleapis.com/log.events.api_request",
+          "category": "network",
+          "op": "removed",
+          "title": "Vendor telemetry event no longer sent: api_request",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "network.telemetry.POST play.googleapis.com/log.events.api_response",
+          "category": "network",
+          "op": "removed",
+          "title": "Vendor telemetry event no longer sent: api_response",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "network.telemetry.POST play.googleapis.com/log.events.hook_call",
+          "category": "network",
+          "op": "removed",
+          "title": "Vendor telemetry event no longer sent: hook_call",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "network.telemetry.POST play.googleapis.com/log.events.model_routing",
+          "category": "network",
+          "op": "removed",
+          "title": "Vendor telemetry event no longer sent: model_routing",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "network.telemetry.POST play.googleapis.com/log.events.new_prompt",
+          "category": "network",
+          "op": "removed",
+          "title": "Vendor telemetry event no longer sent: new_prompt",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "network.telemetry.POST play.googleapis.com/log.events.start_session",
+          "category": "network",
+          "op": "removed",
+          "title": "Vendor telemetry event no longer sent: start_session",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "network.telemetry.POST play.googleapis.com/log.events.startup_stats",
+          "category": "network",
+          "op": "removed",
+          "title": "Vendor telemetry event no longer sent: startup_stats",
+          "impact": "notable",
+          "documented": false
+        },
         {
           "id": "storage.transcript.path",
           "category": "storage",

@@ -1,38 +1,40 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-24T07:46:10.022420061Z",
+  "generated_at": "2026-11-24T10:32:48.676090095Z",
   "versions": [
     {
       "harness": "gemini",
       "name": "Gemini CLI",
       "version": "0.71.1",
       "released_at": "2026-11-24T03:57:09.158Z",
-      "captured_at": "2026-11-24T04:24:03.641481502Z",
+      "captured_at": "2026-11-24T10:32:48.676090095Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "supported",
       "previous": "0.71.0",
-      "changes": 2,
+      "changes": 3,
       "categories": {
         "binary": 1,
+        "prompt": 1,
         "storage": 1
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
         "informational": 2,
-        "notable": 0
+        "notable": 1
       },
-      "undocumented": 2,
+      "undocumented": 3,
       "highlights": [
+        "System prompt changed (+382 −382 chars)",
         "On-disk transcript path changed",
         "Binary size: 98,574,960 → 121,875,875 bytes (98.6 MB → 121.9 MB)"
       ],
       "signing": null,
       "partial": true,
-      "attempted_at": "2026-11-24T04:24:03.641481502Z",
-      "attempts": 1
+      "attempted_at": "2026-11-24T10:32:48.676090095Z",
+      "attempts": 2
     },
     {
       "harness": "gemini",
@@ -45,19 +47,22 @@
       ],
       "support": "supported",
       "previous": "0.70.0",
-      "changes": 1,
+      "changes": 8,
       "categories": {
+        "network": 7,
         "storage": 1
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
         "informational": 1,
-        "notable": 0
+        "notable": 7
       },
-      "undocumented": 1,
+      "undocumented": 8,
       "highlights": [
-        "On-disk transcript path changed"
+        "Vendor telemetry event no longer sent: api_request",
+        "Vendor telemetry event no longer sent: api_response",
+        "Vendor telemetry event no longer sent: hook_call"
       ],
       "signing": null,
       "partial": true,

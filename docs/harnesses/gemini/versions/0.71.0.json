@@ -7801,16 +7801,7 @@
               "event_name"
             ]
           }
-        },
-        "unobserved": [
-          "api_request",
-          "api_response",
-          "hook_call",
-          "model_routing",
-          "new_prompt",
-          "start_session",
-          "startup_stats"
-        ]
+        }
       }
     }
   },
