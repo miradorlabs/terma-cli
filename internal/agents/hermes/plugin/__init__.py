@@ -276,8 +276,13 @@ def _cost(model, usage, provider, base_url):
 
 
 def _on_session_start(session_id="", model="", **_):
-    if session_id:
-        _terma_hook("hermes-session-start", {"session_id": session_id, "cwd": _cwd(), "model": model})
+    if not session_id:
+        return
+    with _lock:
+        tainted = session_id in _tainted
+    if _terma_hook("hermes-session-start", {"session_id": session_id, "cwd": _cwd(), "model": model}, wait=tainted) and tainted:
+        with _lock:
+            _tainted.discard(session_id)
 
 
 def _on_pre_llm_call(session_id="", user_message="", model="", turn_id="", **_):

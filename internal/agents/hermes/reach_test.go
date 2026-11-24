@@ -257,9 +257,14 @@ func TestHermesToolReachFailsClosedOnHookFailureUnderPython(t *testing.T) {
 	}))
 	defer srv.Close()
 
+	failStart := filepath.Join(dir, "fail-start")
+	if err := os.WriteFile(failStart, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
 	hook := filepath.Join(dir, "hook.sh")
 	hookSrc := "#!/bin/sh\n" +
 		"if [ \"$1\" = \"hermes-tool-reach\" ]; then exit 1; fi\n" +
+		"if [ \"$1\" = \"hermes-session-start\" ] && [ -f " + strconv.Quote(failStart) + " ]; then exit 1; fi\n" +
 		"exit 0\n"
 	if err := os.WriteFile(hook, []byte(hookSrc), 0o700); err != nil {
 		t.Fatal(err)
@@ -272,12 +277,19 @@ func TestHermesToolReachFailsClosedOnHookFailureUnderPython(t *testing.T) {
 		t.Fatal(err)
 	}
 	driver := `
-import sys, threading
+import os, sys, threading
 sys.path.insert(0, sys.argv[1])
 import terma_plugin as p
 # 1. Reach hook exits non-zero -> fails closed and taints s1 (drops read_file AND follow-up spans).
 p._on_post_tool_call(session_id="s1", tool_name="read_file", args={"path": "/repoB/secret.go"})
 p._on_post_tool_call(session_id="s1", tool_name="write_file", args={"path": "/repoA/after_taint.go"})
+# 1b. Resumed session start that fails keeps s1 tainted.
+p._on_session_start(session_id="s1")
+p._on_post_tool_call(session_id="s1", tool_name="patch", args={"path": "/repoA/still_tainted.go"})
+# 1c. Resumed session start that succeeds clears taint so subsequent spans emit again.
+os.remove(sys.argv[2])
+p._on_session_start(session_id="s1")
+p._on_post_tool_call(session_id="s1", tool_name="write_file", args={"path": "/repoA/resumed.go"})
 # 2. Separate clean session still emits execute_tool write_file span.
 p._on_post_tool_call(session_id="s_clean", tool_name="write_file", args={"path": "/repoA/a.go"})
 # 3. Overflowing the bounded hook queue also fails closed for reach tools.
@@ -287,22 +299,22 @@ while not p._hook_queue.full():
 p._on_post_tool_call(session_id="s2", tool_name="terminal", args={"command": "cat ../repoB/secret.go"})
 p._flush()
 `
-	if out, err := exec.Command(python, "-c", driver, dir).CombinedOutput(); err != nil {
+	if out, err := exec.Command(python, "-c", driver, dir, failStart).CombinedOutput(); err != nil {
 		t.Fatalf("python: %v\n%s", err, out)
 	}
 	mu.Lock()
 	defer mu.Unlock()
 	var writeCount int
 	for _, name := range spanNames {
-		if name == "execute_tool read_file" || name == "execute_tool terminal" {
-			t.Fatalf("failed/overflowed hermes-tool-reach leaked span %q (all=%v)", name, spanNames)
+		if name == "execute_tool read_file" || name == "execute_tool terminal" || name == "execute_tool patch" {
+			t.Fatalf("failed/tainted session leaked span %q (all=%v)", name, spanNames)
 		}
 		if name == "execute_tool write_file" {
 			writeCount++
 		}
 	}
-	if writeCount != 1 {
-		t.Fatalf("expected exactly 1 execute_tool write_file span (s_clean only, s1 tainted); got %v", spanNames)
+	if writeCount != 2 {
+		t.Fatalf("expected 2 execute_tool write_file spans (s1 after resumed start + s_clean); got %v", spanNames)
 	}
 }
 
