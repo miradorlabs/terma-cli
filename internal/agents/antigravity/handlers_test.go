@@ -330,10 +330,10 @@ func TestAntigravityPostToolUseWithoutAToolCall(t *testing.T) {
 // A payload naming neither a tool nor a step is not a call terma can describe.
 func TestAntigravityToolCallNeedsANameOrAStep(t *testing.T) {
 	t.Parallel()
-	if _, ok := antigravityToolCallAttrs(&antigravityHookInput{}, "turn-1"); ok {
+	if _, ok := antigravityToolCallAttrs(&antigravityHookInput{}, "turn-1", nil); ok {
 		t.Fatal("a payload with no tool and no step made a tool call")
 	}
-	a, ok := antigravityToolCallAttrs(&antigravityHookInput{StepIdx: []byte("5")}, "")
+	a, ok := antigravityToolCallAttrs(&antigravityHookInput{StepIdx: []byte("5")}, "", nil)
 	if !ok || a[semconv.GenAIToolCallIDKey] != "step-5" || a[semconv.TermaStepIndexKey] != int64(5) {
 		t.Fatalf("a step alone identifies a call: %v %v", a, ok)
 	}

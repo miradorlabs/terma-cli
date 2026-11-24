@@ -45,3 +45,24 @@ func sameFile(a, b string) bool {
 	bi, err := os.Stat(b)
 	return err == nil && os.SameFile(ai, bi)
 }
+
+// Executable is the file a process runs.
+type Executable struct {
+	// Path is the file's path, for its name. On Linux it stays the path the process started
+	// from after an update replaced or removed that file.
+	Path string
+	// Run reaches the file the process runs, to stat or start: Path, or on Linux
+	// /proc/<pid>/exe once the file at Path is no longer the one running.
+	Run string
+}
+
+// ExecutableOf is the file process pid runs, and whether that could be told: from
+// /proc/<pid>/exe on Linux, from the kernel's proc_info call on macOS. macOS answers with the
+// path alone, so after an update replaced the file there, Run is the new file. Windows and
+// other systems cannot tell.
+func ExecutableOf(pid int) (Executable, bool) {
+	if pid <= 0 {
+		return Executable{}, false
+	}
+	return executableOf(pid)
+}

@@ -3,6 +3,8 @@ package procinfo
 import (
 	"encoding/binary"
 	"net/netip"
+	"path/filepath"
+	"strings"
 	"syscall"
 	"unsafe"
 
@@ -42,17 +44,42 @@ const (
 	iniIPv4              = 0x1 // INI_IPV4: the addresses are in4in6_addr, IPv4 in the last 4 bytes
 	sockInfoTCP          = 2   // SOCKINFO_TCP
 	maxFDsPerProcess     = 4096
+	procPIDPathInfo      = 11   // PROC_PIDPATHINFO
+	procPIDPathMaxSize   = 4096 // PROC_PIDPATHINFO_MAXSIZE
 )
 
 func procInfo(callnum, pid, flavor int, arg uint64, buf []byte) (int, bool) {
+	n, ok := procInfoCall(callnum, pid, flavor, arg, buf)
+	if !ok || n <= 0 {
+		return 0, false
+	}
+	return n, true
+}
+
+// procInfoCall is proc_info's answer and whether it succeeded, a zero answer included.
+func procInfoCall(callnum, pid, flavor int, arg uint64, buf []byte) (int, bool) {
 	if len(buf) == 0 {
 		return 0, false
 	}
 	n, _, errno := syscall.Syscall6(sysProcInfo, uintptr(callnum), uintptr(pid), uintptr(flavor), uintptr(arg), uintptr(unsafe.Pointer(&buf[0])), uintptr(len(buf)))
-	if errno != 0 || int(n) <= 0 {
+	if errno != 0 {
 		return 0, false
 	}
 	return int(n), true
+}
+
+// executableOf asks for the process's path, as libproc's proc_pidpath does: the kernel
+// writes it NUL-terminated and may answer 0, so the path is read up to its NUL.
+func executableOf(pid int) (Executable, bool) {
+	buf := make([]byte, procPIDPathMaxSize)
+	if _, ok := procInfoCall(procInfoCallPIDInfo, pid, procPIDPathInfo, 0, buf); !ok {
+		return Executable{}, false
+	}
+	path, _, _ := strings.Cut(string(buf), "\x00")
+	if !filepath.IsAbs(path) {
+		return Executable{}, false
+	}
+	return Executable{Path: path, Run: path}, true
 }
 
 // ownsConn reports whether pid holds c's client end.

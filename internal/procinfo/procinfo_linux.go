@@ -99,3 +99,22 @@ func procAddr(s string) (netip.AddrPort, bool) {
 	addr, _ := netip.AddrFromSlice(raw)
 	return netip.AddrPortFrom(addr, uint16(port)), true
 }
+
+// deletedSuffix ends /proc/<pid>/exe's text once the file it names was replaced or removed.
+const deletedSuffix = " (deleted)"
+
+func executableOf(pid int) (Executable, bool) {
+	exe := filepath.Join("/proc", strconv.Itoa(pid), "exe")
+	link, err := os.Readlink(exe)
+	if err != nil {
+		return Executable{}, false
+	}
+	path, deleted := strings.CutSuffix(link, deletedSuffix)
+	if !filepath.IsAbs(path) {
+		return Executable{}, false
+	}
+	if deleted {
+		return Executable{Path: path, Run: exe}, true
+	}
+	return Executable{Path: path, Run: path}, true
+}

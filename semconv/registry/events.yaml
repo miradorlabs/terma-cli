@@ -106,6 +106,7 @@ events:
       - ref: terma.agent.nickname
       - ref: terma.agent.path
       - ref: terma.capture.surface
+      - ref: terma.main_agent.version
 
   - name: terma.session.end
     stability: development
