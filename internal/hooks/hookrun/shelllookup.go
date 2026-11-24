@@ -14,6 +14,9 @@ func (sc *scan) candidate(t string, r role) {
 	if p, isURL := urlPath(t); isURL {
 		t = p
 	}
+	if filepath.Separator == '/' && strings.HasPrefix(t, "///") && strings.TrimLeft(t, "/") != "" {
+		t = "/" + strings.TrimLeft(t, "/")
+	}
 	slashed := pathLike(t)
 	if t == "" || !slashed && r.needsSlash() || sc.away(t, r) {
 		return
@@ -83,7 +86,8 @@ func (sc *scan) hasRemoteLinkAt(p string, hops int) bool {
 		return true
 	}
 	if len(p) > maxPathBytes {
-		return false
+		sc.unknown = true
+		return true
 	}
 	var chain []string
 	for cur := p; ; cur = filepath.Dir(cur) {
@@ -158,7 +162,6 @@ func (sc *scan) resolveLink(p string, hops int) (string, bool) {
 	}
 	return cur, false
 }
-
 func (sc *scan) reach(w, dir string) (string, os.FileInfo) {
 	p, ok := sc.path(w, dir)
 	if !ok || len(p) > maxPathBytes || sc.hasRemoteLink(filepath.Dir(p)) {
@@ -222,7 +225,8 @@ func (sc *scan) away(w string, r role) bool {
 	if !remote(w, sc.cwd) {
 		return false
 	}
-	sc.unknown = sc.unknown || share(w) != "" && r.mustResolve(true)
+	isPath := share(w) != "" || len(w) > 2 && !strings.ContainsAny(w, " \t\n") && strings.TrimLeft(w, `/\`) != ""
+	sc.unknown = sc.unknown || isPath && r.mustResolve(true)
 	return true
 }
 func (sc *scan) path(w, dir string) (string, bool) {
@@ -240,7 +244,8 @@ func (sc *scan) path(w, dir string) (string, bool) {
 	return sc.resolveTarget(base, rel, 0)
 }
 func hasDotDot(p string) bool {
-	return p == ".." || strings.HasPrefix(p, "../") || strings.HasPrefix(p, `..\`) || strings.Contains(p, "/..") || strings.Contains(p, `\..`)
+	return p == ".." || strings.HasPrefix(p, "../") || strings.Contains(p, "/..") ||
+		os.IsPathSeparator('\\') && (strings.HasPrefix(p, `..\`) || strings.Contains(p, `\..`))
 }
 
 // cleanSafeAt resolves symlinks and checks remote shares before collapsing any ".." segment.
@@ -250,7 +255,7 @@ func (sc *scan) cleanSafeAt(base, rel string, hops int) (string, bool) {
 		return "", false
 	}
 	cur := filepath.Clean(base)
-	for _, part := range strings.FieldsFunc(rel, func(r rune) bool { return r == '/' || r == '\\' }) {
+	for _, part := range strings.FieldsFunc(rel, func(r rune) bool { return r < 0x80 && os.IsPathSeparator(byte(r)) }) {
 		switch part {
 		case "", ".":
 		case "..":
