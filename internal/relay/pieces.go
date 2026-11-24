@@ -23,9 +23,9 @@ func (r *Relay) pieces(key string, p *part) []*part {
 	if !r.teams() {
 		return []*part{p}
 	}
-	session := r.sessionFor(key)
+	session, _ := r.sessionOf(key, p.pid)
 	c, ok := r.lookup(session)
-	if session == "" || strings.HasPrefix(session, procPrefix) || !ok || len(c.Placements) < 2 {
+	if session == "" || !ok || len(c.Placements) < 2 {
 		return []*part{p}
 	}
 	placeKey := func(t uint64) string {

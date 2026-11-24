@@ -118,16 +118,21 @@ func (r *Relay) takesUnplaced() bool {
 	_, global := r.catchAll()
 	return global
 }
-func (r *Relay) decideTeams(key string, p *part) verdict {
-	rec, how, held := Record{At: p.at, EndAt: p.endAt, Account: p.account, Narrow: p.narrow, Claimed: p.claimed}, attribution{}, ""
-	if pid, ok := procOf(key); ok {
-		rec.Session, held = r.exitedSession(pid)
-	} else if rec.Session = r.sessionFor(key); rec.Session == "" {
-		if p.pid != 0 {
-			rec.Session, held = r.exitedSession(p.pid)
-		}
-		held = cmp.Or(held, whyNoTrace)
+func (r *Relay) sessionOf(key string, pid int) (session, held string) {
+	if ppid, ok := procOf(key); ok {
+		return r.exitedSession(ppid)
 	}
+	if session = r.sessionFor(key); session != "" {
+		return session, ""
+	}
+	if pid != 0 {
+		session, held = r.exitedSession(pid)
+	}
+	return session, cmp.Or(held, whyNoTrace)
+}
+func (r *Relay) decideTeams(key string, p *part) verdict {
+	session, held := r.sessionOf(key, p.pid)
+	rec, how := Record{Session: session, At: p.at, EndAt: p.endAt, Account: p.account, Narrow: p.narrow, Claimed: p.claimed}, attribution{}
 	if rec.Session != "" {
 		if strings.HasPrefix(key, procPrefix) || r.sessionFor(key) == "" {
 			how = attribution{how: semconv.TermaRelayAttributionProcess, session: rec.Session}

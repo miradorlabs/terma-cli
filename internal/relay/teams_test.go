@@ -992,7 +992,7 @@ func TestReviewEdgeCases(t *testing.T) {
 		rt := teamRoute{accountA, "enr_scan", "claude-code"}
 		o := outbox{dir: dir}
 		t0 := time.Now().Add(-time.Minute)
-		const waitCount = 140
+		const waitCount = 600 // > 2 scan windows (maxMergeFiles*4 = 256)
 		for i := range waitCount {
 			if err := o.putTeam(rt, Queued{Enrollment: "enr_scan", Project: "proj_scan", Account: accountA, Session: "wait"}, newEntry(t0.Add(time.Duration(i)*time.Millisecond), Logs, 1), mustMarshal(t, oneSessionLog("wait", "w"))); err != nil {
 				t.Fatal(err)
@@ -1040,6 +1040,73 @@ func TestReviewEdgeCases(t *testing.T) {
 			signal: Logs, records: 1, account: accountA, arrived: time.Now(), msg: oneSessionLog("go", "pushed"),
 		})
 		waitForCounters(t, r, func(c map[string]int) bool { return c["forwarded.logs"] == 2 })
+	})
+
+	t.Run("process_attributed_metrics_split_across_moved_placements", func(t *testing.T) {
+		t.Parallel()
+		t1 := time.Date(2026, 4, 20, 12, 0, 0, 0, time.UTC)
+		t2 := t1.Add(time.Minute)
+		now := t2.Add(2 * time.Second)
+		claims := map[string]claim.Claim{
+			"s_proc": {
+				PIDs: []int{4242},
+				Placements: []claim.Placement{
+					{Since: t1.Add(-time.Second), Kind: claim.KindRepository, ProjectID: "proj_1", Tool: "codex", PIDs: []int{4242}},
+					{Since: t2, Kind: claim.KindRepository, ProjectID: "proj_2", Tool: "codex", PIDs: []int{4242}},
+				},
+			},
+		}
+		up1, up2 := newSignInUpstream(t), newSignInUpstream(t)
+		router := &stubRouter{
+			active: true,
+			routeFn: func(rec Record) Routed {
+				if !rec.Placed {
+					return Routed{Outcome: Hold, Why: WhyUnknown}
+				}
+				enr := "enr_1"
+				if rec.Placement.ProjectID == "proj_2" {
+					enr = "enr_2"
+				}
+				return Routed{Outcome: Send, Queued: Queued{Enrollment: enr, Project: rec.Placement.ProjectID, Account: rec.Account, Kind: "team", Session: rec.Session}}
+			},
+			resolveFn: func(enr, _, account string) (Policy, error) {
+				ep := up1.srv.URL
+				if enr == "enr_2" {
+					ep = up2.srv.URL
+				}
+				return Policy{Endpoint: ep, Account: account, IncludePrompts: true, IncludeToolContent: true}, nil
+			},
+		}
+		r := newRelay(Options{
+			Dir: t.TempDir(), Now: func() time.Time { return now }, Hold: time.Hour, TraceHold: time.Hour,
+			SignIn: &testSignIn{account: accountA}, Router: router,
+			Lookup: func(session string, _ time.Time) (claim.Claim, bool) { c, ok := claims[session]; return c, ok },
+		})
+		runRelay(t, r)
+		r.learnProcess(4242, "s_proc")
+		r.mu.Lock()
+		r.procs[4242].exitedAt = now.Add(-exitGrace - time.Second)
+		r.mu.Unlock()
+		// Sessionless metrics batch with one point before the move (t1) and one after (t2+1s).
+		md := &metricspb.MetricsData{ResourceMetrics: []*metricspb.ResourceMetrics{{
+			ScopeMetrics: []*metricspb.ScopeMetrics{{Metrics: []*metricspb.Metric{{
+				Name: "m",
+				Data: &metricspb.Metric_Gauge{Gauge: &metricspb.Gauge{DataPoints: []*metricspb.NumberDataPoint{
+					{StartTimeUnixNano: uint64(t1.UnixNano()), TimeUnixNano: uint64(t1.UnixNano())},
+					{StartTimeUnixNano: uint64(t2.Add(time.Second).UnixNano()), TimeUnixNano: uint64(t2.Add(time.Second).UnixNano())},
+				}}},
+			}}}},
+		}}}
+		p := &part{signal: Metrics, msg: md, records: 2, pid: 4242, session: procKey(4242), account: accountA, arrived: now}
+		p.at, p.endAt = intervalOf(p.msg)
+		r.route(p)
+		waitFor(t, func() bool { return len(up1.requests()) == 1 && len(up2.requests()) == 1 })
+		if got, want := up1.requests()[0], "Bearer token-"+accountA+" proj_1"; got != want {
+			t.Fatalf("pre-move metric routed to %q, want %q", got, want)
+		}
+		if got, want := up2.requests()[0], "Bearer token-"+accountA+" proj_2"; got != want {
+			t.Fatalf("post-move metric routed to %q, want %q", got, want)
+		}
 	})
 
 	t.Run("startup_team_routes_discovery_failure_retried_by_janitor", func(t *testing.T) {

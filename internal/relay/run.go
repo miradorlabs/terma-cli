@@ -161,17 +161,12 @@ func (r *Relay) quiesce(quiet time.Duration, dropPolicyWaits bool) bool {
 	defer r.mu.Unlock()
 	waiting := r.heldN
 	if dropPolicyWaits {
-		for _, parts := range r.held {
-			for _, h := range parts {
-				if !h.awaitingPolicy.IsZero() {
-					waiting -= h.p.records
-				}
-			}
-		}
-		for _, parts := range r.pinnedHold {
-			for _, hp := range parts {
-				if !hp.awaitingPolicy.IsZero() {
-					waiting -= hp.p.records
+		for _, m := range []map[string][]heldPart{r.held, r.pinnedHold} {
+			for _, parts := range m {
+				for _, h := range parts {
+					if !h.awaitingPolicy.IsZero() {
+						waiting -= h.p.records
+					}
 				}
 			}
 		}

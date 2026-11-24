@@ -246,9 +246,6 @@ func (r *Relay) sweep() {
 	r.sweepPinned(pinnedKeys, now, &lost)
 }
 func (r *Relay) expandHeldPieces(key string, parts []heldPart) []heldPart {
-	if !r.teams() {
-		return parts
-	}
 	out := make([]heldPart, 0, len(parts))
 	for _, h := range parts {
 		for _, pc := range r.pieces(key, h.p) {
