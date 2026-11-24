@@ -43,7 +43,7 @@ func (sc *scan) substitute(w io.Writer, cs *syntax.CmdSubst) error {
 				outer := sc.cfg
 				sc.cfg = sc.config() // expand is not reentrant: an operand expands with its own
 				out, ok := known(sc, ce.Args[n:])
-				if sc.cfg = outer; !ok || !sc.charge(len(out)) || !sc.chargeFields(out) {
+				if sc.cfg, out = outer, strings.TrimRight(out, "\n"); !ok || !sc.charge(len(out)) || !sc.chargeFields(out) {
 					return errOpaque
 				}
 				_, err := io.WriteString(w, out)
@@ -84,7 +84,7 @@ func gopath(sc *scan, args []*syntax.Word) (string, bool) {
 	}
 	key := pick(runtime.GOOS == "windows", "USERPROFILE", "HOME")
 	home, ok := sc.lookup(key)
-	return filepath.Join(home, "go"), !sc.isUnresolvedVar(key) && !sc.hasGoEnv("GOPATH") && ok && home != ""
+	return filepath.Join(home, "go"), !sc.isUnresolvedVar(key) && !sc.hasGoEnv("GOPATH") && ok && filepath.IsAbs(home)
 }
 func modcache(sc *scan, args []*syntax.Word) (string, bool) {
 	if len(args) != 0 || sc.isUnresolvedVar("GOMODCACHE") {
@@ -98,15 +98,17 @@ func modcache(sc *scan, args []*syntax.Word) (string, bool) {
 	return "", false
 }
 func mktemp(sc *scan, args []*syntax.Word) (string, bool) {
-	name, tmp := "", false
+	name, tmp, opts := "", false, true
 	for _, a := range args {
-		l := a.Lit()
-		short := strings.HasPrefix(l, "-") && !strings.HasPrefix(l, "--")
-		if l == "" || strings.HasPrefix(l, "--tmpdir=") || short && strings.ContainsRune(l[1:], 'p') || !strings.HasPrefix(l, "-") && (name != "" || !strings.Contains(l, "XXX") || pathLike(l)) {
+		if l := a.Lit(); l == "" || opts && l != "--" && strings.HasPrefix(l, "-") && l != "--tmpdir" && l != "--directory" && l != "--quiet" && l != "--dry-run" && (len(l) < 2 || l[1] == '-' || strings.Trim(l[1:], "dqut") != "") {
 			return "", false
-		} else if l == "--tmpdir" || short && strings.ContainsRune(l[1:], 't') {
-			tmp = true
-		} else if !strings.HasPrefix(l, "-") {
+		} else if opts && l == "--" {
+			opts = false
+		} else if opts && strings.HasPrefix(l, "-") {
+			tmp = tmp || l == "--tmpdir" || l[1] != '-' && strings.ContainsRune(l[1:], 't')
+		} else if opts = false; name != "" || !strings.Contains(l, "XXX") || pathLike(l) {
+			return "", false
+		} else {
 			name = l
 		}
 	}
@@ -116,15 +118,14 @@ func mktemp(sc *scan, args []*syntax.Word) (string, bool) {
 			return "", false
 		}
 	}
-	return filepath.Join(dir, cmp.Or(name, "tmp.XXXXXXXXXX")), dir != ""
+	_, _, info, found := sc.walkPath(dir, true)
+	return filepath.Join(dir, cmp.Or(name, "tmp.XXXXXXXXXX")), dir != "" && found && info.IsDir()
 }
 func ofOperand(f func(*scan, string) (string, bool)) func(*scan, []*syntax.Word) (string, bool) {
 	return func(sc *scan, args []*syntax.Word) (string, bool) {
-		if len(args) > 0 && args[0].Lit() == "--" {
-			args = args[1:]
-		}
-		if len(args) == 1 {
-			if fields, err := sc.fields(args[0]); err == nil && len(fields) == 1 {
+		ended := len(args) > 0 && args[0].Lit() == "--"
+		if args = args[pick(ended, 1, 0):]; len(args) == 1 {
+			if fields, err := sc.fields(args[0]); err == nil && len(fields) == 1 && (ended || !strings.HasPrefix(fields[0], "-")) {
 				return f(sc, fields[0])
 			}
 		}
@@ -293,11 +294,11 @@ func (sc *scan) enclosingCheckout(root string) bool {
 func (sc *scan) holdsNone(p string) bool {
 	sep := string(filepath.Separator)
 	if sc.none == nil {
-		sc.none = []string{sep + "System"}
+		sc.none = pick(runtime.GOOS == "darwin", []string{sep + "System"}, []string{})
 		if cache, ok := modcache(sc, nil); ok {
 			sc.none = append(sc.none, cache)
 		}
-		if home, ok := sc.homeDir(); ok && home != "" {
+		if home, ok := sc.homeDir(); runtime.GOOS == "darwin" && ok && home != "" {
 			sc.none = append(sc.none, filepath.Join(home, "Library"))
 		}
 	}

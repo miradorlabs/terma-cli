@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -463,7 +464,7 @@ func TestScanBoundsAndSafety(t *testing.T) {
 		t.Fatal("symlink loop deeper than maxBelowDepth did not mark unknown")
 	}
 
-	// holdsNone skips node_modules, ~/Library, and GOMODCACHE.
+	// holdsNone skips node_modules, GOMODCACHE, and (on darwin) ~/Library.
 	scNone := newScan(dir, func(k string) (string, bool) {
 		switch k {
 		case "HOME":
@@ -474,9 +475,9 @@ func TestScanBoundsAndSafety(t *testing.T) {
 		return "", false
 	}, work{deadline: time.Now().Add(time.Minute)})
 	if !scNone.holdsNone(filepath.Join(dir, "node_modules")) ||
-		!scNone.holdsNone(filepath.Join(dir, "Library", "Caches")) ||
+		scNone.holdsNone(filepath.Join(dir, "Library", "Caches")) != (runtime.GOOS == "darwin") ||
 		!scNone.holdsNone(filepath.Join(dir, "modcache", "pkg")) {
-		t.Fatal("holdsNone missed node_modules, ~/Library, or GOMODCACHE")
+		t.Fatal("holdsNone mismatch for node_modules, ~/Library, or GOMODCACHE")
 	}
 
 	// Remote parent symlink on a nonexistent child (link/new) must fail closed in reachNew and real without statting.
@@ -2295,6 +2296,44 @@ func TestAbbreviatedSecretOptionsAndLogicalCd(t *testing.T) {
 	for _, cmd := range []string{"curl --url-query =SECRET /missing", "curl --url-q =SECRET /missing"} {
 		if got := firstWords(cmd); strings.Contains(got, "SECRET") {
 			t.Errorf("firstWords(%q) = %q, leaked SECRET", cmd, got)
+		}
+	}
+
+	// 15. Static command substitutions trim trailing newlines, reject option-like operands without --,
+	// reject unsupported mktemp options or missing TMPDIR, and reject relative HOME for default GOPATH.
+	scSub := newScan(specDir, func(k string) (string, bool) {
+		switch k {
+		case "HOME", "USERPROFILE":
+			return "relative/home", true
+		case "TMPDIR":
+			return filepath.Join(specDir, "missing-tmp"), true
+		case "GOENV":
+			return "off", true
+		}
+		return "", false
+	}, work{deadline: time.Now().Add(time.Minute)})
+	evalSub := func(cmd string) (string, error) {
+		f, err := syntax.NewParser().Parse(strings.NewReader("echo \"$("+cmd+")\""), "")
+		if err != nil {
+			t.Fatalf("parse %q: %v", cmd, err)
+		}
+		var out bytes.Buffer
+		cs := f.Stmts[0].Cmd.(*syntax.CallExpr).Args[1].Parts[0].(*syntax.DblQuoted).Parts[0].(*syntax.CmdSubst)
+		err = scSub.substitute(&out, cs)
+		return out.String(), err
+	}
+	if got, err := evalSub("basename $'repo\\n\\n'"); err != nil || got != "repo" {
+		t.Errorf("substitute(basename $'repo\\n\\n') = (%q, %v), want (\"repo\", nil)", got, err)
+	}
+	if got, err := evalSub("dirname -- -foo/bar"); err != nil || got != "-foo" {
+		t.Errorf("substitute(dirname -- -foo/bar) = (%q, %v), want (\"-foo\", nil)", got, err)
+	}
+	for _, opaque := range []string{
+		"dirname --bogus", "dirname -z", "basename -a", "realpath --help",
+		"mktemp --bogus", "mktemp -z", "mktemp -", "mktemp -d", "go env GOPATH",
+	} {
+		if got, err := evalSub(opaque); err == nil {
+			t.Errorf("substitute(%q) = %q, want opaque error", opaque, got)
 		}
 	}
 }
