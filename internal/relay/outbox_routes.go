@@ -8,15 +8,6 @@ import (
 	"strings"
 )
 
-// deadName is where a refused part is set aside, its route in its name.
-func deadName(rt route, e entry) string {
-	name := rt.project + "-" + rt.tool + "-" + rt.repo + "-" + e.name
-	if rt.account != "" {
-		name = rt.account + "-" + name
-	}
-	return name
-}
-
 func (o outbox) routes() ([]route, error) {
 	top, err := os.ReadDir(o.dir)
 	if errors.Is(err, fs.ErrNotExist) {

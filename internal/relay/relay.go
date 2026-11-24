@@ -7,6 +7,7 @@
 package relay
 
 import (
+	"cmp"
 	"compress/gzip"
 	"context"
 	"crypto/subtle"
@@ -105,6 +106,10 @@ type Options struct {
 	SignIn SignIn
 	// CatchAll, in global mode, is where a part whose hold ran out unplaced goes instead of being dropped.
 	CatchAll func() (claim.Claim, bool)
+	// Router routes records to selected teams when active (Router.Active()).
+	Router Router
+	// NudgeRefresh triggers a coalesced, non-blocking refresh on ingest 403 ORG_NOT_ACCESSIBLE.
+	NudgeRefresh func(enrollment string)
 	// HeartbeatSend, set, turns the heartbeat on; HeartbeatEvery is its period.
 	HeartbeatSend  func(ctx context.Context, beat *logspb.LogsData) error
 	HeartbeatEvery time.Duration
@@ -175,6 +180,7 @@ type Relay struct {
 	outbox     outbox
 	senders    map[route]*sender
 	lastSeen   time.Time
+	teamState
 	// inflight counts the exports being read and routed; refusing, set by Quiesce, answers
 	// each new one 503 so its exporter sends it again, to the next relay.
 	inflight   int
@@ -194,12 +200,8 @@ type Relay struct {
 
 // New returns a relay. Run must be started for anything to leave.
 func New(opts Options) *Relay {
-	if opts.Hold == 0 {
-		opts.Hold = DefaultHold
-	}
-	if opts.TraceHold == 0 {
-		opts.TraceHold = max(DefaultTraceHold, opts.Hold)
-	}
+	opts.Hold = cmp.Or(opts.Hold, DefaultHold)
+	opts.TraceHold = cmp.Or(opts.TraceHold, max(DefaultTraceHold, opts.Hold))
 	if opts.Lookup == nil {
 		opts.Lookup = func(string, time.Time) (claim.Claim, bool) { return claim.Claim{}, false }
 	}
@@ -218,12 +220,8 @@ func New(opts Options) *Relay {
 			CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
 		}
 	}
-	if opts.HeartbeatEvery == 0 {
-		opts.HeartbeatEvery = DefaultHeartbeatEvery
-	}
-	if opts.Grace == 0 {
-		opts.Grace = 5 * time.Second
-	}
+	opts.HeartbeatEvery = cmp.Or(opts.HeartbeatEvery, DefaultHeartbeatEvery)
+	opts.Grace = cmp.Or(opts.Grace, 5*time.Second)
 	sendCtx, cancel := context.WithCancel(context.Background())
 	r := &Relay{
 		opts: opts, rules: compose(opts.Correlators, opts.Capturers), stats: newStats(),
@@ -233,6 +231,7 @@ func New(opts Options) *Relay {
 		lastSeen: opts.Now(), sendCtx: sendCtx, cancelSend: cancel, stopping: make(chan struct{}),
 		unreadableRetry: unreadableRetry,
 	}
+	r.pinnedHold, r.teamSenders, r.teamRecovered, r.mixedSeen, r.nudging = map[string][]heldPart{}, map[teamRoute]*sender{}, map[teamRoute]bool{}, map[string]time.Time{}, map[string]bool{}
 	r.seedLane()
 	return r
 }
@@ -366,11 +365,10 @@ func (r *Relay) export(w http.ResponseWriter, req *http.Request, s Signal) {
 		return
 	}
 	pid := r.senderPID(req)
-	_, global := r.catchAll()
-	narrow := r.opts.CatchAll != nil && !global
+	narrow := (r.teams() || r.opts.CatchAll != nil) && !r.takesUnplaced()
 	for _, p := range parts {
 		p.pid, p.narrow, p.account, p.lost, p.arrived = pid, narrow, lane, lost, arrived
-		p.at = earliest(p.msg)
+		p.at, p.endAt = intervalOf(p.msg)
 		r.stats.received(s, p.records)
 		if p.session != "" && !strings.HasPrefix(p.session, tracePrefix) {
 			r.learnProcess(pid, p.session)
@@ -380,11 +378,9 @@ func (r *Relay) export(w http.ResponseWriter, req *http.Request, s Signal) {
 	for _, p := range parts {
 		if p.session == "" {
 			// A part naming no session may still go by its process once it exits (decideExited).
-			if pid == 0 {
-				if _, global := r.catchAll(); !global {
-					r.stats.dropped(s, "no_session_id", p.records)
-					continue
-				}
+			if pid == 0 && !r.takesUnplaced() {
+				r.stats.dropped(s, "no_session_id", p.records)
+				continue
 			}
 			p.session = procKey(pid)
 		}

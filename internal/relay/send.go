@@ -7,6 +7,7 @@ import (
 	"io"
 	"math/rand/v2"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -21,8 +22,11 @@ import (
 // Without a server key it sends with the sign-in the route's parts were collected under,
 // naming the team; a sign-in it cannot have now (none, or its token can't be had) leaves the
 // route waiting for one (keyless), as a route no sign-in may send does.
-func (s *sender) send(ctx context.Context, pol Policy, first entry, body []byte) (outcome, time.Duration, string, int64) {
-	sig := first.signal
+func (s *sender) send(ctx context.Context, pol Policy, first entry, body []byte, fence func() (outcome, time.Duration, string)) (outcome, time.Duration, string, int64) {
+	sig, account, project, enrollment := first.signal, s.route.account, s.route.project, ""
+	if s.team != nil {
+		account, project, enrollment = s.team.account, first.q.Project, s.team.enrollment
+	}
 	ctx, cancel := context.WithTimeout(ctx, sendTimeout)
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, strings.TrimRight(pol.Endpoint, "/")+"/v1/"+string(sig), bytes.NewReader(body))
@@ -33,7 +37,7 @@ func (s *sender) send(ctx context.Context, pol Policy, first entry, body []byte)
 	if bearer == "" {
 		// The sign-in of the account that collected the parts (mayLeave), never whoever is
 		// signed in now: Token gives none for another.
-		token, err := s.r.opts.SignIn.Token(ctx, s.route.account)
+		token, err := s.r.opts.SignIn.Token(ctx, account)
 		if err != nil {
 			return keyless, keylessRetry, signInErrPrefix + err.Error(), 0
 		}
@@ -41,11 +45,16 @@ func (s *sender) send(ctx context.Context, pol Policy, first entry, body []byte)
 			return keyless, keylessRetry, "no sign-in that may send these parts now", 0
 		}
 		bearer = token
-		req.Header.Set(ProjectHeader, s.route.project)
+		req.Header.Set(ProjectHeader, project)
 	}
 	req.Header.Set("Content-Type", "application/x-protobuf")
 	req.Header.Set("Authorization", "Bearer "+bearer)
 	req.Header.Set("User-Agent", "terma-relay/"+s.r.opts.Version)
+	if fence != nil {
+		if out, wait, detail := fence(); out != sent {
+			return out, wait, detail, 0
+		}
+	}
 	resp, err := s.r.opts.HTTP.Do(req)
 	if err != nil {
 		return retry, 0, err.Error(), 0
@@ -65,10 +74,11 @@ func (s *sender) send(ctx context.Context, pol Policy, first entry, body []byte)
 		s.r.opts.SignIn.Refused(ctx, bearer)
 		return retry, minBackoff, "HTTP 401: the sign-in's token was refused", 0
 	case code == http.StatusForbidden && pol.Key == "":
-		// Only ORG_NOT_ACCESSIBLE is a lost membership, and even then nothing is dropped:
-		// a membership granted back is refused until it is published, and the outbox ages
-		// out what never leaves.
+		// Never call SignIn.Refused/Retired; nudge policy refresh on ORG_NOT_ACCESSIBLE.
 		reason := sendas.Reason(answer)
+		if reason == "ORG_NOT_ACCESSIBLE" && enrollment != "" {
+			s.r.nudgeRefresh(enrollment)
+		}
 		return retry, refusedBackoff, fmt.Sprintf("HTTP 403 %s: the sign-in may not send to this team", reason), 0
 	case code == http.StatusUnauthorized || code == http.StatusForbidden:
 		return retry, refusedBackoff, fmt.Sprintf("HTTP %d: the team's key was refused", code), 0
@@ -76,6 +86,22 @@ func (s *sender) send(ctx context.Context, pol Policy, first entry, body []byte)
 		return retry, retryAfter(resp.Header.Get("Retry-After")), fmt.Sprintf("HTTP %d", code), 0
 	default:
 		return refused, 0, "refused_" + strconv.Itoa(code), 0
+	}
+}
+
+func (r *Relay) nudgeRefresh(enrollment string) {
+	if r.opts.NudgeRefresh == nil {
+		return
+	}
+	r.mu.Lock()
+	busy := r.nudging[enrollment]
+	r.nudging[enrollment] = true
+	r.mu.Unlock()
+	if !busy {
+		go func() {
+			defer func() { r.mu.Lock(); delete(r.nudging, enrollment); r.mu.Unlock() }()
+			r.opts.NudgeRefresh(enrollment)
+		}()
 	}
 }
 
@@ -166,6 +192,36 @@ func (r *Relay) recoverOutbox() {
 	for _, rt := range routes {
 		r.recoverRoute(rt)
 	}
+	r.recoverTeamOutbox()
+}
+func (r *Relay) recoverTeamOutbox() {
+	teams, err := r.outbox.teamRoutes()
+	retry := err != nil
+	if err != nil {
+		r.warnf("outbox .teams: %v", err)
+	}
+	for _, rt := range teams {
+		r.deliverMu.Lock()
+		if !r.teamRecovered[rt] {
+			entries, lerr := r.outbox.listTeam(rt)
+			if lerr != nil {
+				r.warnf("outbox %s: %v", rt, lerr)
+				retry = true
+			}
+			if entries = slices.DeleteFunc(entries, func(e entry) bool { return e.corrupt }); len(entries) > 0 {
+				s := r.teamSender(rt)
+				for _, e := range s.recover(entries) {
+					r.stats.add("recovered_from_outbox", e.records)
+				}
+				s.poke()
+			}
+			r.teamRecovered[rt] = lerr == nil
+		}
+		r.deliverMu.Unlock()
+	}
+	r.mu.Lock()
+	r.teamDiscoverErr = retry
+	r.mu.Unlock()
 }
 
 // recoverRoute queues what a previous relay left on rt. It holds deliverMu so an export

@@ -102,38 +102,79 @@ func (r *Relay) decideClaimed(session string, pid int, at time.Time, narrow bool
 	return c, pol, "", true
 }
 
-// route sends a part on only if nothing is held for its key, so arrival order holds, and
-// drops a part of a session marked not collected without holding it. A part collected with
-// no sign-in to bind it to (part.lost) is never held, since it can never leave: it is lost
-// now, counted by its reason when it is a team's, or dropped by why it can't be placed.
+type verdict struct {
+	c                     claim.Claim
+	pol                   Policy
+	how                   attribution
+	q, pin                *Queued
+	why, blocker, session string
+	ok, final             bool
+	mixedAt               time.Time
+}
+
+func (r *Relay) judge(key string, p *part) verdict {
+	if r.teams() {
+		v := r.decideTeams(key, p)
+		if !v.mixedAt.IsZero() && v.session != "" {
+			r.dropMixed(v.session, v.c.Run, v.mixedAt)
+		}
+		return v
+	}
+	c, pol, why, ok, how := r.decide(key, p.pid, p.at, p.narrow, p.claimed, p.account)
+	return verdict{c: c, pol: pol, why: why, ok: ok, how: how}
+}
+func (r *Relay) splitMixed(p *part, v verdict) (*part, *part) {
+	if !r.teams() || v.why != string(WhyMixed) || v.mixedAt.IsZero() || p.records <= 1 || p.at.IsZero() || !p.at.Before(v.mixedAt) {
+		return nil, nil
+	}
+	return splitBeforeMixed(p, v.mixedAt)
+}
 func (r *Relay) route(p *part) {
 	r.deliverMu.Lock()
 	defer r.deliverMu.Unlock()
-	c, pol, why, ok, how := r.decide(p.session, p.pid, p.at, p.narrow, p.claimed, p.account)
-	switch {
-	case why == whyNotCollected:
-		r.stats.dropped(p.signal, why, p.records)
-		return
-	case p.lost != "" && ok:
-		r.deliverAttributed(c, pol, p, how) // the policy's own drops first
-		return
-	case p.lost != "" && why == whyNoKey:
+	for _, piece := range r.pieces(p.session, p) {
+		r.routePiece(piece, true)
+	}
+}
+func (r *Relay) routePiece(p *part, allowSplit bool) {
+	if r.teams() && p.lost != "" {
 		r.lose(p)
 		return
-	case p.lost != "":
-		r.stats.dropped(p.signal, why, p.records)
+	}
+	v := r.judge(p.session, p)
+	if before, after := r.splitMixed(p, v); allowSplit && before != nil {
+		r.routePiece(before, false)
+		if after != nil {
+			r.routePiece(after, false)
+		}
 		return
 	}
-	if ok {
-		r.mu.Lock()
-		waiting := len(r.held[p.session]) > 0
-		r.mu.Unlock()
-		if !waiting {
-			r.deliverAttributed(c, pol, p, how)
-			return
-		}
+	c, pol, why, ok, how := v.c, v.pol, v.why, v.ok, v.how
+	switch {
+	case why == whyNotCollected || v.final:
+		r.dropStats(p.signal, why, v.blocker, p.records)
+	case p.lost != "" && ok:
+		r.deliverAttributed(c, pol, p, how)
+	case p.lost != "" && why == whyNoKey:
+		r.lose(p)
+	case p.lost != "":
+		r.stats.dropped(p.signal, why, p.records)
+	case ok && !r.hasHeld(p.session):
+		r.deliver(v, p)
+	case ok && v.q != nil:
+		r.holdInto(p, false, &pinnedDest{q: *v.q, c: c, how: how})
+	case v.pin != nil:
+		r.holdInto(p, why == whyNoKey || why == string(WhyBlocked) || why == string(WhyNoState), &pinnedDest{*v.pin, c, how, why, v.blocker})
+	default:
+		r.hold(p, why == whyNoKey)
 	}
-	r.hold(p, why == whyNoKey)
+}
+func (r *Relay) deliver(v verdict, p *part) {
+	if v.q == nil {
+		r.deliverAttributed(v.c, v.pol, p, v.how)
+	} else if r.dress(v.pol, p, v.q.Project, v.c, v.how) {
+		r.enqueueTeam(*v.q, v.c.Tool, p)
+	}
 }
 
 // deliverAttributed applies the content policy, stamps the project and enqueues. deliverMu is held.
@@ -142,13 +183,21 @@ func (r *Relay) deliverAttributed(c claim.Claim, pol Policy, p *part, how attrib
 		r.stats.dropped(p.signal, "policy_repository", p.records)
 		return
 	}
+	if !r.dress(pol, p, c.ProjectID, r.ranIn(c, p, how), how) {
+		return
+	}
+	// Its outbox entry is named by when it arrived, however long it was held.
+	r.enqueue(c, p, nonZeroTime(p.arrived, r.opts.Now()))
+}
+
+func (r *Relay) dress(pol Policy, p *part, project string, ran claim.Claim, how attribution) bool {
 	if pol.Signals != nil && !contains(pol.Signals, string(p.signal)) {
 		r.stats.dropped(p.signal, "policy_signal", p.records)
-		return
+		return false
 	}
 	if p.lost != "" {
 		r.lose(p)
-		return
+		return false
 	}
 	unclassified := map[string]int{}
 	if n := r.rules.withhold(p, pol.IncludePrompts, pol.IncludeToolContent, unclassified); n > 0 {
@@ -159,19 +208,13 @@ func (r *Relay) deliverAttributed(c claim.Claim, pol Policy, p *part, how attrib
 	}
 	// terma.relay.attribution and terma.relay.session.id mark a part the relay placed by
 	// inference, so the backend can tell the relay's join from its own.
-	stamp(p, semconv.MiradorProjectIDKey, c.ProjectID)
+	stamp(p, semconv.MiradorProjectIDKey, project)
 	// terma.version is the relay that accepted the part: the outbox keeps it across an upgrade.
 	if r.opts.Version != "" {
 		stamp(p, semconv.TermaVersionKey, r.opts.Version)
 	}
-	ran := r.ranIn(c, p, how)
 	stampCheckout(p, ran, pol.IncludeToolContent)
 	stampParent(p, ran)
-	// Its outbox entry is named by when it arrived, however long it was held.
-	at := p.arrived
-	if at.IsZero() {
-		at = r.opts.Now()
-	}
 	nameUser(p, pol)
 	if how.how != "" {
 		stamp(p, semconv.TermaRelayAttributionKey, how.how)
@@ -181,7 +224,7 @@ func (r *Relay) deliverAttributed(c claim.Claim, pol Policy, p *part, how attrib
 		// attributed_by_process or attributed_by_catch_all: global mode's default project is no process's.
 		r.stats.add("attributed_by_"+strings.ReplaceAll(how.how, "-", "_")+"."+string(p.signal), p.records)
 	}
-	r.enqueue(c, p, at)
+	return true
 }
 
 // lose drops a team's part collected with no sign-in to bind it to: never written, and
@@ -214,7 +257,7 @@ func (r *Relay) ranIn(c claim.Claim, p *part, how attribution) claim.Claim {
 }
 
 func (r *Relay) catchAll() (claim.Claim, bool) {
-	if r.opts.CatchAll == nil {
+	if r.opts.CatchAll == nil || r.teams() {
 		return claim.Claim{}, false
 	}
 	return r.opts.CatchAll()

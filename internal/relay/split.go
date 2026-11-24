@@ -34,8 +34,10 @@ type part struct {
 	records int
 	// pid is the process that exported it, 0 when unknown.
 	pid int
-	// at picks the placement of a resumed session when its process does not decide (claim.At).
-	at time.Time
+	// at and endAt are the record's [start, end] interval (intervalOf): at picks the
+	// placement of a resumed session (claim.At), and !endAt.Before(mixedAt) gates Mixed.
+	at    time.Time
+	endAt time.Time
 	// start marks a conversation start, which waits as long as a trace: its claiming hook may be far off.
 	start bool
 	// narrow marks a part that arrived outside global mode, while the relay has one to
@@ -325,23 +327,35 @@ func (ru *rules) conversationStart(p *part) bool {
 	return false
 }
 
-func earliest(msg proto.Message) time.Time {
-	var first uint64
-	see := func(t uint64) {
-		if t != 0 && (first == 0 || t < first) {
-			first = t
+type timeInterval struct{ start, end uint64 }
+
+func makeInterval(a, b uint64) timeInterval {
+	if a == 0 || b == 0 {
+		v := max(a, b)
+		return timeInterval{v, v}
+	}
+	return timeInterval{min(a, b), max(a, b)}
+}
+func unixTime(ns uint64) time.Time {
+	if ns == 0 || ns > math.MaxInt64 {
+		return time.Time{}
+	}
+	return time.Unix(0, int64(ns))
+}
+func intervalOf(msg proto.Message) (time.Time, time.Time) {
+	var first, last uint64
+	see := func(iv timeInterval) {
+		if iv.start != 0 && (first == 0 || iv.start < first) {
+			first = iv.start
 		}
+		last = max(last, iv.end)
 	}
 	switch m := msg.(type) {
 	case *logspb.LogsData:
 		for _, rl := range m.GetResourceLogs() {
 			for _, sl := range rl.GetScopeLogs() {
 				for _, lr := range sl.GetLogRecords() {
-					if t := lr.GetTimeUnixNano(); t != 0 {
-						see(t)
-					} else {
-						see(lr.GetObservedTimeUnixNano())
-					}
+					see(makeInterval(lr.GetTimeUnixNano(), lr.GetObservedTimeUnixNano()))
 				}
 			}
 		}
@@ -349,7 +363,7 @@ func earliest(msg proto.Message) time.Time {
 		for _, rs := range m.GetResourceSpans() {
 			for _, ss := range rs.GetScopeSpans() {
 				for _, sp := range ss.GetSpans() {
-					see(sp.GetStartTimeUnixNano())
+					see(makeInterval(sp.GetStartTimeUnixNano(), sp.GetEndTimeUnixNano()))
 				}
 			}
 		}
@@ -362,33 +376,30 @@ func earliest(msg proto.Message) time.Time {
 			}
 		}
 	}
-	if first == 0 || first > math.MaxInt64 {
-		return time.Time{}
-	}
-	return time.Unix(0, int64(first))
+	return unixTime(first), unixTime(last)
 }
 
-func eachPointTime(m *metricspb.Metric, see func(uint64)) {
+func eachPointTime(m *metricspb.Metric, see func(timeInterval)) {
 	switch d := m.GetData().(type) {
 	case *metricspb.Metric_Sum:
 		for _, p := range d.Sum.GetDataPoints() {
-			see(p.GetTimeUnixNano())
+			see(makeInterval(p.GetStartTimeUnixNano(), p.GetTimeUnixNano()))
 		}
 	case *metricspb.Metric_Gauge:
 		for _, p := range d.Gauge.GetDataPoints() {
-			see(p.GetTimeUnixNano())
+			see(makeInterval(p.GetStartTimeUnixNano(), p.GetTimeUnixNano()))
 		}
 	case *metricspb.Metric_Histogram:
 		for _, p := range d.Histogram.GetDataPoints() {
-			see(p.GetTimeUnixNano())
+			see(makeInterval(p.GetStartTimeUnixNano(), p.GetTimeUnixNano()))
 		}
 	case *metricspb.Metric_ExponentialHistogram:
 		for _, p := range d.ExponentialHistogram.GetDataPoints() {
-			see(p.GetTimeUnixNano())
+			see(makeInterval(p.GetStartTimeUnixNano(), p.GetTimeUnixNano()))
 		}
 	case *metricspb.Metric_Summary:
 		for _, p := range d.Summary.GetDataPoints() {
-			see(p.GetTimeUnixNano())
+			see(makeInterval(p.GetStartTimeUnixNano(), p.GetTimeUnixNano()))
 		}
 	}
 }
