@@ -791,28 +791,65 @@ func TestScanBoundsAndSafety(t *testing.T) {
 		{"curl \"--us\\\ner\" alice:hunter2 https://example.com", "hunter2"},
 		{"curl \\\n  --user alice:hunter2 https://example.com", "hunter2"},
 		{"curl $\\\n'--user' alice:hunter2 https://example.com", "hunter2"},
+		{`curl $'--user\x00ignored' alice:supersecret https://example.com`, "supersecret"},
+		{`curl $'--us\0ignored''er' alice:supersecret https://example.com`, "supersecret"},
+		{`curl $'--password\c@ignored' hunter2 https://example.com`, "hunter2"},
 	} {
 		if got := firstWords(tc.cmd); strings.Contains(got, tc.leak) {
 			t.Errorf("firstWords(%q) = %q, leaked %q", tc.cmd, got, tc.leak)
 		}
 	}
 
-	// Quoted global replacement with CmdSubst ("${V//a/$(go env GOPATH)}") fails closed before allocating > maxShellBytes.
-	fQuotedRepl, err := syntax.NewParser().Parse(strings.NewReader(`echo "${V//a/$(go env GOPATH)}"`), "")
-	if err != nil {
+	// Quoted global replacement with CmdSubst ("${V//a/$(go env GOPATH)}") and oversized Repl.Orig (${V//$PAT/x}) fail closed.
+	for _, cmd := range []string{`echo "${V//a/$(go env GOPATH)}"`, `echo "${V//$PAT/x}"`} {
+		fRepl, err := syntax.NewParser().Parse(strings.NewReader(cmd), "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		scRepl := newScan(dir, func(k string) (string, bool) {
+			switch k {
+			case "V":
+				return strings.Repeat("a", 200), true
+			case "GOPATH", "PAT":
+				return strings.Repeat("x", 64<<10), true
+			}
+			return "", false
+		}, work{deadline: time.Now().Add(time.Minute)})
+		if _, err := scRepl.fields(fRepl.Stmts[0].Cmd.(*syntax.CallExpr).Args[1]); err == nil || !scRepl.unknown {
+			t.Fatalf("%s did not fail closed: err=%v unknown=%v", cmd, err, scRepl.unknown)
+		}
+	}
+
+	// pwd -P resolves symlinked directories physically while pwd -L keeps the logical path.
+	realSub := filepath.Join(dir, "real-sub")
+	linkSub := filepath.Join(dir, "link-sub")
+	if err := os.MkdirAll(realSub, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	scQuotedRepl := newScan(dir, func(k string) (string, bool) {
-		switch k {
-		case "V":
-			return strings.Repeat("a", 200), true
-		case "GOPATH":
-			return strings.Repeat("x", 64<<10), true
+	if err := os.Symlink(realSub, linkSub); err != nil {
+		t.Fatal(err)
+	}
+	resolvedRealSub, _ := filepath.EvalSymlinks(realSub)
+	scPwd := newScan(linkSub, os.LookupEnv, work{deadline: time.Now().Add(time.Minute)})
+	if got, ok := whereP(scPwd, nil); !ok || got != resolvedRealSub {
+		t.Fatalf("pwd -P = (%q, %v), want (%q, true)", got, ok, resolvedRealSub)
+	}
+	if got, ok := where(scPwd, nil); !ok || got != linkSub {
+		t.Fatalf("pwd -L = (%q, %v), want (%q, true)", got, ok, linkSub)
+	}
+
+	// parsable rejects oversized single-word shell payloads before scanning or parsing.
+	if parsable(strings.Repeat("a", maxShellBytes+1)) {
+		t.Fatal("parsable accepted source exceeding maxShellBytes")
+	}
+
+	// On Windows, a rooted volume-less path (\other\repo) resolves on the base volume rather than relative to base.
+	if os.IsPathSeparator('\\') {
+		scWin := newScan(dir, os.LookupEnv, work{deadline: time.Now().Add(time.Minute)})
+		want := filepath.VolumeName(dir) + `\other\repo\file`
+		if got, ok := scWin.resolveTarget(dir, `\other\repo\file`, 0); !ok || got != want {
+			t.Fatalf(`resolveTarget(\other\repo\file) = (%q, %v), want (%q, true)`, got, ok, want)
 		}
-		return "", false
-	}, work{deadline: time.Now().Add(time.Minute)})
-	if _, err := scQuotedRepl.fields(fQuotedRepl.Stmts[0].Cmd.(*syntax.CallExpr).Args[1]); err == nil || !scQuotedRepl.unknown {
-		t.Fatalf(`"${V//a/$(go env GOPATH)}" did not fail closed: err=%v unknown=%v`, err, scQuotedRepl.unknown)
 	}
 
 	// Remote HOME with ~ or ~/... fails closed (sc.unknown = true) without statting.

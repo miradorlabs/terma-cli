@@ -15,8 +15,11 @@ type heredoc struct {
 	quoted, stripTabs bool
 }
 
-// parsable reports whether src is within maxShellNesting, maxShellExpr, and maxShellWords.
+// parsable reports whether src is within maxShellBytes, maxShellNesting, maxShellExpr, and maxShellWords.
 func parsable(src string) bool {
+	if len(src) > maxShellBytes {
+		return false
+	}
 	var open []byte // what closes each context open: ) } ] " `; h and q a body's (nothing)
 	var docs, bodies []heredoc
 	body, expr, exprDepth, letUntil, links, words, dollars := 0, -1, 0, -1, 0, 0, 0
@@ -24,8 +27,11 @@ func parsable(src string) bool {
 		if isExpr && expr < 0 {
 			expr, exprDepth = i, len(open)
 		}
+		if k := strings.IndexByte("({[", c); k >= 0 {
+			c = ")}]"[k]
+		}
 		for range n {
-			open = append(open, closing(c))
+			open = append(open, c)
 		}
 	}
 	read := func() {
@@ -107,10 +113,9 @@ func parsable(src string) bool {
 		case c == '|' || c == '&' && next == '&':
 			links++
 		case c == '<' && next == '<' && prev != '<' && expr < 0 && i >= letUntil && !double:
-			var d heredoc
-			if d, i = heredocDelimiter(src, i+2); i < 0 {
+			if d, end := heredocDelimiter(src, i+2); end < 0 {
 				return false
-			} else if d.delim != "" {
+			} else if i = end; d.delim != "" {
 				docs = append(docs, d)
 			}
 		case 'a' <= c && c <= 'z' && strings.IndexByte(" \t\n;&|(){}`", prev) >= 0:
@@ -125,9 +130,8 @@ func parsable(src string) bool {
 				if end > maxShellExpr || end < 0 && len(src)-j > maxShellExpr {
 					return false
 				}
-				letUntil = j + end
-				if end < 0 {
-					letUntil = len(src)
+				if letUntil = len(src); end >= 0 {
+					letUntil = j + end
 				}
 			}
 			i = j - 1
@@ -141,12 +145,6 @@ func parsable(src string) bool {
 		}
 	}
 	return len(bodies) == 0 && len(docs) == 0
-}
-func closing(c byte) byte {
-	if i := strings.IndexByte("({[", c); i >= 0 {
-		return ")}]"[i]
-	}
-	return c
 }
 func heredocDelimiter(src string, i int) (heredoc, int) {
 	stripTabs := i < len(src) && src[i] == '-'

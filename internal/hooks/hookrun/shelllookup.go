@@ -1,6 +1,7 @@
 package hookrun
 
 import (
+	"cmp"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -119,6 +120,9 @@ func (sc *scan) resolveTarget(base, raw string, hops int) (string, bool) {
 		sc.unknown = true
 		return "", false
 	}
+	if !filepath.IsAbs(raw) && len(raw) > 0 && os.IsPathSeparator(raw[0]) {
+		raw = cmp.Or(filepath.VolumeName(base), filepath.VolumeName(sc.cwd)) + raw
+	}
 	if hasDotDot(raw) {
 		if filepath.IsAbs(raw) {
 			vol := filepath.VolumeName(raw)
@@ -198,7 +202,7 @@ func (sc *scan) placeParent(p string) {
 	if len(p) > maxPathBytes || sc.hasRemoteLink(filepath.Dir(p)) {
 		return
 	}
-	for d, ok := filepath.Dir(p), true; ok && sc.spend(1); d = filepath.Dir(d) {
+	for d, ok := filepath.Dir(p), true; ok && sc.spend(1); d, ok = filepath.Dir(d), filepath.Dir(d) != d {
 		if info, err := os.Stat(d); err == nil {
 			if info.IsDir() {
 				if r, err := filepath.EvalSymlinks(d); err == nil && !remote(r, sc.cwd) {
@@ -208,7 +212,6 @@ func (sc *scan) placeParent(p string) {
 			}
 			return
 		}
-		ok = filepath.Dir(d) != d
 	}
 }
 func (sc *scan) reachNew(w, dir string) {
@@ -251,25 +254,24 @@ func (sc *scan) cleanSafeAt(base, rel string, hops int) (string, bool) {
 	}
 	cur := filepath.Clean(base)
 	for _, part := range strings.FieldsFunc(rel, func(r rune) bool { return r < 0x80 && os.IsPathSeparator(byte(r)) }) {
-		if part == "" || part == "." {
-			continue
-		}
-		if part != ".." {
-			cur = filepath.Join(cur, part)
-			continue
-		}
-		if sc.hasRemoteLinkAt(cur, hops) || !sc.spend(1) {
-			return "", false
-		}
-		if info, err := os.Lstat(cur); err == nil && info.Mode()&fs.ModeSymlink != 0 {
-			resolved, err := filepath.EvalSymlinks(cur)
-			if err != nil || remote(resolved, sc.cwd) {
-				sc.unknown = true
+		switch part {
+		case "", ".":
+		case "..":
+			if sc.hasRemoteLinkAt(cur, hops) || !sc.spend(1) {
 				return "", false
 			}
-			cur = resolved
+			if info, err := os.Lstat(cur); err == nil && info.Mode()&fs.ModeSymlink != 0 {
+				resolved, err := filepath.EvalSymlinks(cur)
+				if err != nil || remote(resolved, sc.cwd) {
+					sc.unknown = true
+					return "", false
+				}
+				cur = resolved
+			}
+			cur = filepath.Dir(cur)
+		default:
+			cur = filepath.Join(cur, part)
 		}
-		cur = filepath.Dir(cur)
 	}
 	return filepath.Clean(cur), true
 }

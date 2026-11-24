@@ -15,7 +15,7 @@ import (
 const (
 	shellTime, maxShellPlaces, maxShellLookups, maxShellWords     = 20 * time.Millisecond, 256, 4096, 16384
 	maxShellBytes, maxShellDepth, maxShellBraces, maxGlobSegments = 1 << 20, 4, 16, 3
-	substitutionSize, maxShellStats                               = 4096, 32768
+	substitutionSize, maxShellStats, maxBelowDepth                = 4096, 32768, 4
 	UnknownReach                                                  = "\x00unknown" // NUL-prefixed so it cannot collide with a path
 )
 
@@ -171,6 +171,9 @@ func (sc *scan) paramValue(pe *syntax.ParamExp) string {
 }
 func (sc *scan) paramSize(pe *syntax.ParamExp, opaqueSubst bool) int {
 	n := len(sc.paramValue(pe))
+	if pe.Repl != nil && pe.Repl.Orig != nil && sc.sizeIn(pe.Repl.Orig, true) > maxShellExpr {
+		return maxShellBytes + 1
+	}
 	if pe.Repl != nil && pe.Repl.With != nil {
 		base := max(n, 1)
 		if with := sc.sizeIn(pe.Repl.With, opaqueSubst || pe.Repl.All && n > 0); with >= (maxShellBytes+1)/base {
@@ -190,15 +193,9 @@ func (sc *scan) ifs() string {
 	}
 	return " \t\n"
 }
-func (sc *scan) fieldsBounded(w *syntax.Word, limit int) bool {
-	ifs := sc.ifs()
-	return ifs == "" || sc.checkPartsFields(w.Parts, ifs, limit, false) >= 0
-}
 func (sc *scan) chargeFields(v string) bool {
-	if ifs := sc.ifs(); ifs != "" {
-		return sc.budget(&sc.words, countFields(v, ifs, maxShellWords-sc.words), maxShellWords)
-	}
-	return true
+	ifs := sc.ifs()
+	return ifs == "" || sc.budget(&sc.words, countFields(v, ifs, maxShellWords-sc.words), maxShellWords)
 }
 func (sc *scan) checkPartsFields(parts []syntax.WordPart, ifs string, rem int, inParam bool) int {
 	for i := 0; i < len(parts) && rem >= 0; i++ {
@@ -266,7 +263,7 @@ func countFields(v, ifs string, limit int) int {
 func (sc *scan) fields(w *syntax.Word) ([]string, error) {
 	var out []string
 	for b, err := range sc.braces(w) {
-		if err != nil || !sc.charge(sc.size(b)) || !sc.fieldsBounded(b, maxShellWords-len(out)) {
+		if ifs := sc.ifs(); err != nil || !sc.charge(sc.size(b)) || ifs != "" && sc.checkPartsFields(b.Parts, ifs, maxShellWords-len(out), false) < 0 {
 			return nil, errOpaque
 		}
 		f, err := expand.Fields(sc.cfg, b)
