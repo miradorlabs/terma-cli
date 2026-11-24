@@ -13,12 +13,23 @@ import (
 )
 
 func (sc *scan) candidate(t string, r role) {
-	t = pick(r.whole(), t, shellValue(t))
+	if v := pick(r.whole(), t, shellValue(t)); v != t {
+		if !strings.HasPrefix(t, "-") {
+			sc.candidatePath(t, r)
+		}
+		t = v
+	}
 	if p, isURL, bad := urlPath(t); bad && sc.fail() {
 		return
 	} else if isURL {
+		if filepath.Separator == '/' && p != "" {
+			sc.candidatePath(t, r)
+		}
 		t = p
 	}
+	sc.candidatePath(t, r)
+}
+func (sc *scan) candidatePath(t string, r role) {
 	t = pick(filepath.Separator == '/' && strings.HasPrefix(t, "///") && strings.TrimLeft(t, "/") != "", "/"+strings.TrimLeft(t, "/"), t)
 	slashed, keyDir := pathLike(t), sc.dir
 	if t == "" || !slashed && r.needsSlash() || sc.away(t, r) {
@@ -36,7 +47,19 @@ func (sc *scan) candidate(t string, r role) {
 	if !seen && !sc.spend(1) {
 		return
 	} else if !seen {
-		res = sc.resolve(t, r, slashed)
+		for i, d := range pick(sc.dir == sc.cwd, []string{sc.dir}, []string{sc.dir, sc.cwd}) {
+			if p, info := sc.reachRole(t, d, r); p != "" {
+				if res.named = res.named || info != nil; info != nil && info.IsDir() {
+					res.dir, res.folders = pick(i == 0, p, res.dir), append(res.folders, p)
+				}
+			} else if r.mayCreate(slashed) && !res.named {
+				if p, ok := sc.path(t, d); ok {
+					if _, parent, _, found := sc.walkPath(p, true); !found && !sc.unknown && parent != "" {
+						sc.place(parent)
+					}
+				}
+			}
+		}
 		sc.examined[c] = res
 	}
 	if sc.reads != nil && res.named && (r == plain || r == folder || r == part) {
@@ -45,22 +68,6 @@ func (sc *scan) candidate(t string, r role) {
 	if (r == target || r == physTarget) && res.dir != "" {
 		sc.prev, sc.dir = sc.dir, res.dir
 	}
-}
-func (sc *scan) resolve(t string, r role, slashed bool) (res cached) {
-	for i, d := range pick(sc.dir == sc.cwd, []string{sc.dir}, []string{sc.dir, sc.cwd}) {
-		if p, info := sc.reachRole(t, d, r); p != "" {
-			if res.named = res.named || info != nil; info != nil && info.IsDir() {
-				res.dir, res.folders = pick(i == 0, p, res.dir), append(res.folders, p)
-			}
-		} else if r.mayCreate(slashed) && !res.named {
-			if p, ok := sc.path(t, d); ok {
-				if _, parent, _, found := sc.walkPath(p, true); !found && !sc.unknown && parent != "" {
-					sc.place(parent)
-				}
-			}
-		}
-	}
-	return res
 }
 
 const maxSymlinkHops, maxPathComponents, maxPathBytes = 8, 128, 4096
@@ -283,8 +290,7 @@ func isScheme(s string) bool {
 
 // remote reports whether p starts with two separators (UNC/device path) outside cwd's share.
 func remote(p, cwd string) bool {
-	s := share(p)
-	return len(p) >= 2 && os.IsPathSeparator(p[0]) && os.IsPathSeparator(p[1]) && (s == "" || !strings.EqualFold(s, share(cwd)))
+	return len(p) >= 2 && os.IsPathSeparator(p[0]) && os.IsPathSeparator(p[1]) && (share(p) == "" || !strings.EqualFold(share(p), share(cwd)))
 }
 func share(p string) string {
 	if len(p) >= 2 && os.IsPathSeparator(p[0]) && os.IsPathSeparator(p[1]) {

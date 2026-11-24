@@ -2340,6 +2340,49 @@ func TestAbbreviatedSecretOptionsAndLogicalCd(t *testing.T) {
 			t.Errorf("substitute(%q) = %q, want opaque error", opaque, got)
 		}
 	}
+	// Long runs of unquoted top-level separators are bounded early by parsable.
+	for _, sep := range []string{";", "&", ">"} {
+		start := time.Now()
+		if parsable(strings.Repeat(sep, maxShellBytes)) {
+			t.Errorf("parsable(%q*maxShellBytes) = true, want false", sep)
+		}
+		if took := time.Since(start); took > 20*time.Millisecond {
+			t.Errorf("parsable(%q*maxShellBytes) took %v, want < 20ms", sep, took)
+		}
+	}
+	// Plain operands containing '=' preserve their literal path alongside value extraction.
+	litDir, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	eqRoot := filepath.Join(litDir, "config=prod", "repo")
+	if err := os.MkdirAll(eqRoot, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(eqRoot, "file"), nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	noEnv := func(string) (string, bool) { return "", false }
+	scLit := newScan(litDir, noEnv, work{deadline: time.Now().Add(time.Minute)})
+	scLit.candidate("config=prod/repo/file", plain)
+	if !slices.Contains(scLit.out, eqRoot) {
+		t.Errorf("candidate(config=prod/repo/file) = %q, want %q", scLit.out, eqRoot)
+	}
+	// On POSIX, file:-prefixed plain operands preserve their literal relative path alongside URL decoding.
+	if runtime.GOOS != "windows" {
+		fileColonRoot := filepath.Join(litDir, "file:", "repo")
+		if err := os.MkdirAll(fileColonRoot, 0o700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(fileColonRoot, "file"), nil, 0o600); err != nil {
+			t.Fatal(err)
+		}
+		scLit2 := newScan(litDir, noEnv, work{deadline: time.Now().Add(time.Minute)})
+		scLit2.candidate("file:/repo/file", plain)
+		if !slices.Contains(scLit2.out, fileColonRoot) {
+			t.Errorf("candidate(file:/repo/file) = %q, want %q", scLit2.out, fileColonRoot)
+		}
+	}
 }
 
 func FuzzParsable(f *testing.F) {

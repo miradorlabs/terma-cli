@@ -112,11 +112,9 @@ func mktemp(sc *scan, args []*syntax.Word) (string, bool) {
 			name = l
 		}
 	}
-	dir := sc.dir
-	if name == "" || tmp {
-		if dir = cmp.Or(sc.envVal("TMPDIR"), os.TempDir()); sc.isUnresolvedVar("TMPDIR") {
-			return "", false
-		}
+	dir := pick(name == "" || tmp, cmp.Or(sc.envVal("TMPDIR"), os.TempDir()), sc.dir)
+	if (name == "" || tmp) && sc.isUnresolvedVar("TMPDIR") {
+		return "", false
 	}
 	_, _, info, found := sc.walkPath(dir, true)
 	return filepath.Join(dir, cmp.Or(name, "tmp.XXXXXXXXXX")), dir != "" && found && info.IsDir()

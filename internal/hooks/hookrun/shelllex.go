@@ -10,11 +10,9 @@ import (
 	"unicode/utf8"
 )
 
-var secretOptions = []string{"-c", "-e", "--eval", "-u", "--user", "-U", "--proxy-user", "-H", "--header", "--proxy-header", "-p", "--password", "-b", "--cookie", "-d", "--data", "--data-ascii", "--data-raw", "--data-binary", "--data-urlencode", "--url-query", "--json", "--oauth2-bearer", "-E", "--cert", "--proxy-cert"}
-var secretNames, compounds = []string{"pass", "token", "secret", "key", "auth"}, []string{"if", "for", "while", "until", "case", "select"}
+var secretOptions, secretNames, compounds = []string{"-c", "-e", "--eval", "-u", "--user", "-U", "--proxy-user", "-H", "--header", "--proxy-header", "-p", "--password", "-b", "--cookie", "-d", "--data", "--data-ascii", "--data-raw", "--data-binary", "--data-urlencode", "--url-query", "--json", "--oauth2-bearer", "-E", "--cert", "--proxy-cert"}, []string{"pass", "token", "secret", "key", "auth"}, []string{"if", "for", "while", "until", "case", "select"}
 var userinfo = regexp.MustCompile(`(://)[^/\s]+@|[^/\s:@]*:[^/\s@]+@`)
 
-// Pre-parse bounds preventing deep parser recursion or huge expression backtracking.
 const maxShellNesting, maxShellExpr, separators = 256, 4096, " \t\n;&|()<>"
 
 // firstWords returns command's first four words (<=60 runes) with secret-like values masked.
@@ -261,6 +259,8 @@ func parsable(src string) bool {
 			} else if i = end; d.delim != "" {
 				docs = append(docs, d)
 			}
+		case strings.IndexByte(";&<>)]}", c) >= 0:
+			words += 16
 		case 'a' <= c && c <= 'z' && strings.IndexByte(" \t\n;&|(){}`", prev) >= 0:
 			var buf [8]byte
 			n, j := 0, i
@@ -299,8 +299,7 @@ func skipCont(src string, i int) int {
 func heredocDelimiter(src string, i int) (heredoc, int) {
 	i = skipCont(src, i)
 	stripTabs, quoted := i < len(src) && src[i] == '-', false
-	i += pick(stripTabs, 1, 0)
-	i += len(src[i:]) - len(strings.TrimLeft(src[i:], " \t"))
+	i = len(src) - len(strings.TrimLeft(src[i+pick(stripTabs, 1, 0):], " \t"))
 	var d strings.Builder
 	for quote := byte(0); i < len(src); i++ {
 		switch c := src[i]; {
