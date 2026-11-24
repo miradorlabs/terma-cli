@@ -394,4 +394,79 @@ await h.tool_call({ toolName: "read", toolCallId: "p1", input: { path: "/other/p
 			t.Fatalf("resumed parent skipped omp-tool-reach after concurrent child fence; log:\n%s", logBytes)
 		}
 	})
+
+	// Subtest 5: resuming a tainted session when omp-session-start fails must keep the session
+	// tainted (no prompts, tool_call fails closed) until a subsequent session_start succeeds.
+	t.Run("keeps_taint_when_resumed_session_start_fails", func(t *testing.T) {
+		dir := t.TempDir()
+		logFile := filepath.Join(dir, "events.log")
+		failStart := filepath.Join(dir, "fail_start")
+		failReach := filepath.Join(dir, "fail_reach")
+		hook := filepath.Join(dir, "hook.sh")
+		hookSrc := "#!/bin/sh\nbody=$(cat)\n" +
+			"echo \"$1:$body\" >> " + strconv.Quote(logFile) + "\n" +
+			"if [ \"$1\" = \"omp-session-start\" ] && [ -e " + strconv.Quote(failStart) + " ]; then exit 1; fi\n" +
+			"if [ \"$1\" = \"omp-tool-reach\" ] && [ -e " + strconv.Quote(failReach) + " ]; then exit 1; fi\n" +
+			"exit 0\n"
+		if err := os.WriteFile(hook, []byte(hookSrc), 0o700); err != nil {
+			t.Fatal(err)
+		}
+		ext := filepath.Join(dir, "terma-ext.ts")
+		if _, err := writeExtension(ext, []string{hook}, relayConfig().Endpoint); err != nil {
+			t.Fatal(err)
+		}
+		script := `
+import { unlinkSync, writeFileSync } from "node:fs"
+const [ext, failStart, failReach] = process.argv.slice(2)
+const h = {}
+const mod = await import(ext)
+await mod.default({ on: (n, fn) => { h[n] = fn } })
+const ctx = { cwd: "/work", sessionManager: { getSessionId: () => "ses_taint", getSessionFile: () => "", getHeader: () => ({}) } }
+await h.session_start({ reason: "startup" }, ctx)
+writeFileSync(failReach, "1")
+const taintedCall = await h.tool_call({ toolName: "read", toolCallId: "c1", input: { path: "/other/a.go" } }, ctx)
+// Resume while omp-session-start fails: must remain tainted and block even when normal reach would pass.
+writeFileSync(failStart, "1")
+await h.session_start({ reason: "resume" }, ctx)
+h.before_agent_start({}, ctx)
+const blockedAfterFailedStart = await h.tool_call({ toolName: "read", toolCallId: "c2", input: { path: "/other/b.go" } }, ctx)
+// Now let omp-session-start and reach succeed: taint must clear and prompt/reach resume.
+unlinkSync(failStart)
+unlinkSync(failReach)
+await h.session_start({ reason: "resume" }, ctx)
+h.before_agent_start({}, ctx)
+const okAfterGoodStart = await h.tool_call({ toolName: "read", toolCallId: "c3", input: { path: "/other/c.go" } }, ctx)
+console.log(JSON.stringify({ taintedCall, blockedAfterFailedStart, okAfterGoodStart: okAfterGoodStart ?? null }))
+`
+		driverPath := filepath.Join(dir, "driver.mjs")
+		if err := os.WriteFile(driverPath, []byte(script), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		out, err := exec.Command(node, driverPath, ext, failStart, failReach).CombinedOutput()
+		if err != nil {
+			t.Fatalf("node: %v\n%s", err, out)
+		}
+		var got struct {
+			TaintedCall             struct{ Block bool } `json:"taintedCall"`
+			BlockedAfterFailedStart struct{ Block bool } `json:"blockedAfterFailedStart"`
+			OkAfterGoodStart        map[string]any       `json:"okAfterGoodStart"`
+		}
+		if err := json.Unmarshal(out, &got); err != nil {
+			t.Fatalf("parse output %q: %v", out, err)
+		}
+		if !got.TaintedCall.Block || !got.BlockedAfterFailedStart.Block {
+			t.Fatalf("expected failed start to keep session tainted and block tool_call; got %s", out)
+		}
+		if got.OkAfterGoodStart != nil {
+			t.Fatalf("expected successful resumed start to clear taint; got %s", out)
+		}
+		logBytes, _ := os.ReadFile(logFile)
+		logStr := string(logBytes)
+		if strings.Count(logStr, "omp-prompt:") != 1 {
+			t.Fatalf("expected exactly 1 omp-prompt (only after successful resume); log:\n%s", logStr)
+		}
+		if !strings.Contains(logStr, "/other/c.go") {
+			t.Fatalf("expected /other/c.go reach after successful resume; log:\n%s", logStr)
+		}
+	})
 }

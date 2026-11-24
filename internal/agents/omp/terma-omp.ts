@@ -362,15 +362,20 @@ export default async function (omp: any) {
   }
 
   omp.on("session_start", (event: any, ctx: any) => {
-    session = sessionOf(ctx)
+    const s = sessionOf(ctx)
+    session = s
     const parent = parentOf(ctx)
-    if (session) {
-      runGen.set(session, (runGen.get(session) ?? 0) + 1)
-      fenced.delete(session)
-      fencing.delete(session)
-      if (!parent) tainted.delete(session)
+    let gen = 0
+    const wasTainted = !!(s && !parent && tainted.has(s))
+    if (s) {
+      gen = (runGen.get(s) ?? 0) + 1
+      runGen.set(s, gen)
+      fenced.delete(s)
+      fencing.delete(s)
     }
-    return queuedHook("omp-session-start", { session_id: session, cwd: ctx?.cwd, model: ctx?.model?.id, reason: event?.reason, parent_session_id: parent || undefined }).then(() => undefined)
+    return queuedHook("omp-session-start", { session_id: s, cwd: ctx?.cwd, model: ctx?.model?.id, reason: event?.reason, parent_session_id: parent || undefined }).then((ok) => {
+      if (ok && wasTainted && runGen.get(s) === gen) tainted.delete(s)
+    })
   })
 
   // The session's end is handed over first: it must land within OMP's 2 s, or the next
