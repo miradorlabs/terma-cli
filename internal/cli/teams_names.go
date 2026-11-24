@@ -17,17 +17,19 @@ type teamNames struct {
 	changed bool
 }
 
-func teamNamesPath(stateDir, profile string) string {
-	return filepath.Join(stateDir, teamNamesDir, profile+".json")
+func teamNamesPath(stateDir, profile string) (string, bool) {
+	if stateDir == "" || profile == "" || profile != filepath.Base(profile) {
+		return "", false
+	}
+	return filepath.Join(stateDir, teamNamesDir, profile+".json"), true
 }
 
 func loadTeamNames(stateDir, profile string) teamNames {
-	n := teamNames{Teams: map[string]string{}, Orgs: map[string]string{}}
-	if stateDir == "" || profile == "" || profile != filepath.Base(profile) {
-		return n
-	}
-	if b, err := os.ReadFile(teamNamesPath(stateDir, profile)); err == nil {
-		_ = json.Unmarshal(b, &n)
+	var n teamNames
+	if path, ok := teamNamesPath(stateDir, profile); ok {
+		if b, err := os.ReadFile(path); err == nil {
+			_ = json.Unmarshal(b, &n)
+		}
 	}
 	if n.Teams == nil {
 		n.Teams = map[string]string{}
@@ -43,17 +45,13 @@ func (n *teamNames) org(id, name string)  { n.set(n.Orgs, id, name) }
 
 func (n *teamNames) set(m map[string]string, id, name string) {
 	if id != "" && name != "" && m[id] != name {
-		m[id] = name
-		n.changed = true
+		m[id], n.changed = name, true
 	}
 }
 
 func (n teamNames) save(stateDir, profile string) {
-	if !n.changed || stateDir == "" || profile == "" || profile != filepath.Base(profile) {
-		return
-	}
-	path := teamNamesPath(stateDir, profile)
-	if os.MkdirAll(filepath.Dir(path), 0o700) != nil {
+	path, ok := teamNamesPath(stateDir, profile)
+	if !n.changed || !ok || os.MkdirAll(filepath.Dir(path), 0o700) != nil {
 		return
 	}
 	if b, err := json.MarshalIndent(n, "", "  "); err == nil {

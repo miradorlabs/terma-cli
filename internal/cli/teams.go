@@ -44,8 +44,8 @@ which organization an owner (github.com/acme) or a repository belongs to on this
 machine: only that organization collects it, and personal never does. Bindings outlive
 unticking: what stays bound to an organization collects nowhere until you unbind it.
 
-Each record goes to the first ticked team whose policy matches where it ran,
-organizations first and personal last.`,
+Each record goes to the most specific ticked team policy that matches where it ran
+(exact repository before wildcard, then selection order), with personal last.`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error { return app.runTeams(cmd, f) },
 	}

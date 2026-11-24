@@ -826,4 +826,64 @@ func TestTeamsSignInNeededMessageAndInvalidStateFailure(t *testing.T) {
 			}
 		}
 	})
+
+	t.Run("refusing an owner warns about existing child repository exceptions", func(t *testing.T) {
+		routedMachine(t, "alice", func(_ *fakeAuth, s *routing.State) error {
+			return s.Bind("github.com/acme/api", orgA().ID, false)
+		})
+		v, out, err := teamsJSON(t, "--refuse", "github.com/acme")
+		if err != nil {
+			t.Fatalf("--refuse owner: %v\n%s", err, out)
+		}
+		if !slices.ContainsFunc(v.Warnings, func(w string) bool {
+			return strings.Contains(w, "kept github.com/acme/api") && strings.Contains(w, "under github.com/acme")
+		}) {
+			t.Fatalf("warnings = %v, want warning about kept child exception", v.Warnings)
+		}
+	})
+
+	t.Run("binding to personal organization is rejected by name and id even when unselected", func(t *testing.T) {
+		f, _ := routedMachine(t, "alice", nil)
+		f.orgs = []organization{orgA(), orgB(), orgPersonal()}
+		if _, _, err := teamsJSON(t, "--bind", "github.com/acme/api=Personal"); err == nil || !strings.Contains(err.Error(), "personal") {
+			t.Fatalf("bind Personal by name err = %v, want personal rejection", err)
+		}
+		if _, _, err := teamsJSON(t, "--bind", "github.com/acme/api="+teamsPersonalOrg); err == nil || !strings.Contains(err.Error(), "personal") {
+			t.Fatalf("bind Personal by id err = %v, want personal rejection", err)
+		}
+	})
+
+	t.Run("unbinding a repository reports inherited owner decision", func(t *testing.T) {
+		routedMachine(t, "alice", func(_ *fakeAuth, s *routing.State) error {
+			if err := s.Bind("github.com/acme", orgA().ID, false); err != nil {
+				return err
+			}
+			return s.Bind("github.com/acme/api", orgB().ID, true)
+		})
+		v, out, err := teamsJSON(t, "--unbind", "github.com/acme/api")
+		if err != nil {
+			t.Fatalf("--unbind repo: %v\n%s", err, out)
+		}
+		joined := strings.Join(v.Changes, "\n")
+		if !strings.Contains(joined, "under github.com/acme") || strings.Contains(joined, "free: personal may collect it") {
+			t.Fatalf("changes = %v, want inherited owner status", v.Changes)
+		}
+	})
+
+	t.Run("combined bind flags validate against evolving planned bindings", func(t *testing.T) {
+		routedMachine(t, "alice", nil)
+		if _, _, err := teamsJSON(t, "--bind", "github.com/acme=Acme", "--bind", "github.com/acme/api=Beta"); err == nil {
+			t.Fatal("expected conflict error without --yes on combined owner+repo binds")
+		}
+		if _, out, err := teamsJSON(t, "--bind", "github.com/acme=Acme", "--bind", "github.com/acme/api=Beta", "--yes"); err != nil {
+			t.Fatalf("combined --bind --yes: %v\n%s", err, out)
+		}
+		st, _, err := routing.Load(testApp.stateDir, config.DefaultProfile)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if st.Bindings["github.com/acme"].Organization != orgA().ID || st.Bindings["github.com/acme/api"].Organization != orgB().ID {
+			t.Fatalf("bindings = %+v", st.Bindings)
+		}
+	})
 }

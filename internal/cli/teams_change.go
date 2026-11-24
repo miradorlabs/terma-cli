@@ -50,7 +50,9 @@ func (app *App) applyTeamsWithView(cmd *cobra.Command, cfg *config.Config, st ro
 		return v
 	}
 
-	if err := resolveBindingFlags(cmd, st, f, ask, names, list, ch); err != nil {
+	planned := st
+	planned.Bindings = maps.Clone(st.Bindings)
+	if err := resolveBindingFlags(cmd, &planned, f, ask, &names, list, ch); err != nil {
 		return teamsView{}, err
 	}
 	for _, group := range []struct {
@@ -70,14 +72,6 @@ func (app *App) applyTeamsWithView(cmd *cobra.Command, cfg *config.Config, st ro
 			}
 			ch.untick = append(ch.untick, t)
 			ch.released[t.EnrollmentID] = group.release
-		}
-	}
-
-	planned := st
-	planned.Bindings = maps.Clone(st.Bindings)
-	for _, op := range ch.ops {
-		if err := op.apply(&planned); err != nil {
-			return teamsView{}, err
 		}
 	}
 	if len(f.selects) > 0 {

@@ -129,21 +129,17 @@ func decisionFor(st routing.State, e routing.Entry) (string, bool) {
 
 func decideOwners(tk *tick, need []routing.Entry, a tickAsker) error {
 	var owners []string
+	byOwner := map[string][]string{}
 	for _, e := range need {
-		if o := routing.Owner(e.Key()); !slices.Contains(owners, o) {
+		o := routing.Owner(e.Key())
+		if len(byOwner[o]) == 0 {
 			owners = append(owners, o)
 		}
+		byOwner[o] = append(byOwner[o], e.Key())
 	}
 	for _, owner := range owners {
-		var repos []string
-		for _, e := range need {
-			if routing.Owner(e.Key()) == owner {
-				repos = append(repos, e.Key())
-			}
-		}
-		whole := false
-		switch {
-		case a.ask:
+		repos, whole := byOwner[owner], false
+		if a.ask {
 			i, err := pick(a.cmd, fmt.Sprintf("%s lists %d of %s's repositories. Bind to %s:", tk.teamName, len(repos), owner, cmp.Or(tk.orgName, tk.team.OrganizationID)), []pickRow{
 				{Label: "just the listed repositories", Note: "the owner's other repositories stay free: personal may collect them", Default: true},
 				{Label: "the whole owner " + owner, Note: "every repository under it belongs to " + cmp.Or(tk.orgName, "the organization")},
@@ -156,7 +152,7 @@ func decideOwners(tk *tick, need []routing.Entry, a tickAsker) error {
 				continue
 			}
 			whole = i == 1
-		case !a.assumeYes:
+		} else if !a.assumeYes {
 			continue
 		}
 		if whole {
@@ -171,25 +167,23 @@ func decideOwners(tk *tick, need []routing.Entry, a tickAsker) error {
 }
 
 func askBinding(a tickAsker, tk *tick, key, why string) (*bindingOp, error) {
-	org := cmp.Or(tk.orgName, tk.team.OrganizationID)
-	switch {
-	case a.ask:
-		i, err := pick(a.cmd, fmt.Sprintf("%s (%s):", key, why), []pickRow{
-			{Label: "bind it to " + org, Note: "only " + org + " collects it; personal never does", Default: true},
-			{Label: "refuse it", Note: "no organization collects it; personal may"},
-			{Label: "decide later", Note: "what it matches is held until you decide"},
-		}, func(string) (int, error) { return -1, errors.New("answer with a number") })
-		switch {
-		case err != nil:
-			return nil, err
-		case i == 0:
+	if !a.ask {
+		if a.assumeYes {
 			return &bindingOp{key: key, org: tk.team.OrganizationID}, nil
-		case i == 1:
-			return &bindingOp{key: key, refuse: true}, nil
 		}
 		return nil, nil
-	case a.assumeYes:
-		return &bindingOp{key: key, org: tk.team.OrganizationID}, nil
 	}
-	return nil, nil
+	org := cmp.Or(tk.orgName, tk.team.OrganizationID)
+	i, err := pick(a.cmd, fmt.Sprintf("%s (%s):", key, why), []pickRow{
+		{Label: "bind it to " + org, Note: "only " + org + " collects it; personal never does", Default: true},
+		{Label: "refuse it", Note: "no organization collects it; personal may"},
+		{Label: "decide later", Note: "what it matches is held until you decide"},
+	}, func(string) (int, error) { return -1, errors.New("answer with a number") })
+	if err != nil || i == 2 {
+		return nil, err
+	}
+	if i == 1 {
+		return &bindingOp{key: key, refuse: true}, nil
+	}
+	return &bindingOp{key: key, org: tk.team.OrganizationID}, nil
 }

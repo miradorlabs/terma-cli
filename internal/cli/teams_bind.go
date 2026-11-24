@@ -13,7 +13,9 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/routing"
 )
 
-func resolveBindingFlags(cmd *cobra.Command, st routing.State, f teamsFlags, ask bool, names teamNames, list func() teamsView, ch *teamsChange) error {
+var errPersonalBinding = errors.New("a personal organization cannot be bound: unbind or refuse so personal may collect it")
+
+func resolveBindingFlags(cmd *cobra.Command, planned *routing.State, f teamsFlags, ask bool, names *teamNames, list func() teamsView, ch *teamsChange) error {
 	for _, raw := range f.binds {
 		keyRaw, orgRaw, ok := strings.Cut(raw, "=")
 		if !ok || strings.TrimSpace(keyRaw) == "" || strings.TrimSpace(orgRaw) == "" {
@@ -23,53 +25,71 @@ func resolveBindingFlags(cmd *cobra.Command, st routing.State, f teamsFlags, ask
 		if err != nil {
 			return err
 		}
-		org, orgName, err := resolveOrg(strings.TrimSpace(orgRaw), names, list)
+		org, orgName, err := resolveOrg(strings.TrimSpace(orgRaw), *names, list)
 		if err != nil {
 			return err
 		}
 		op := bindingOp{key: key, org: org}
 		if owner := routing.Owner(key); owner != "" {
-			if b, ok := st.Bindings[owner]; ok && (b.Refused || b.Organization != org) {
-				conflict := owner + " is " + bindingWords(b, names) + ": bind " + key + " to " + cmp.Or(orgName, org) + " against it?"
+			if b, ok := planned.Bindings[owner]; ok && (b.Refused || b.Organization != org) {
+				conflict := owner + " is " + bindingWords(b, *names) + ": bind " + key + " to " + cmp.Or(orgName, org) + " against it?"
 				if err := confirmConflict(cmd, conflict, ask, f.assumeYes); err != nil {
 					return err
 				}
 				op.override = true
 			}
-		} else if err := keepRepositoryDecisions(cmd, st, key, org, orgName, names, ask, ch); err != nil {
+		} else if err := keepRepositoryDecisions(cmd, planned, key, org, orgName, false, *names, ask, ch); err != nil {
 			return err
 		}
-		ch.ops = append(ch.ops, op)
-		ch.changes = append(ch.changes, describeOp(op, orgName))
+		if err := op.apply(planned); err != nil {
+			return err
+		}
+		ch.ops, ch.changes = append(ch.ops, op), append(ch.changes, describeOp(op, orgName))
 	}
 	for _, raw := range f.refuses {
 		key, err := bindingKeyOf(raw)
 		if err != nil {
 			return err
 		}
+		if routing.Owner(key) == "" {
+			if err := keepRepositoryDecisions(cmd, planned, key, "", "", true, *names, ask, ch); err != nil {
+				return err
+			}
+		}
 		op := bindingOp{key: key, refuse: true}
-		ch.ops = append(ch.ops, op)
-		ch.changes = append(ch.changes, describeOp(op, ""))
+		if err := op.apply(planned); err != nil {
+			return err
+		}
+		ch.ops, ch.changes = append(ch.ops, op), append(ch.changes, describeOp(op, ""))
 	}
 	for _, raw := range f.unbinds {
 		key, err := bindingKeyOf(raw)
 		if err != nil {
 			return err
 		}
-		if _, ok := st.Bindings[key]; !ok {
+		if _, ok := planned.Bindings[key]; !ok {
 			return fmt.Errorf("%s has no decision to remove", key)
 		}
-		ch.ops = append(ch.ops, bindingOp{key: key})
-		after := st
-		after.Bindings = maps.Clone(st.Bindings)
-		delete(after.Bindings, key)
-		what := "free: personal may collect it"
-		if slices.ContainsFunc(pendingBindings(after), func(p pendingRow) bool { return p.Key == key }) {
-			what = "pending: a ticked organization's entry needs it, so what it matches is held until you decide"
+		op := bindingOp{key: key}
+		if err := op.apply(planned); err != nil {
+			return err
 		}
-		ch.changes = append(ch.changes, "unbound "+key+"; it is now "+what)
+		ch.ops = append(ch.ops, op)
+		ch.changes = append(ch.changes, "unbound "+key+"; it is now "+unboundStatus(*planned, key, *names))
 	}
 	return nil
+}
+
+func unboundStatus(st routing.State, key string, names teamNames) string {
+	if owner := routing.Owner(key); owner != "" {
+		if b, ok := st.Bindings[owner]; ok {
+			return "under " + owner + " (" + bindingWords(b, names) + ")"
+		}
+	}
+	if slices.ContainsFunc(pendingBindings(st), func(p pendingRow) bool { return p.Key == key }) {
+		return "pending: a ticked organization's entry needs it, so what it matches is held until you decide"
+	}
+	return "free: personal may collect it"
 }
 
 func bindingKeyOf(raw string) (string, error) {
@@ -91,32 +111,33 @@ func bindingWords(b routing.Binding, names teamNames) string {
 }
 
 func confirmConflict(cmd *cobra.Command, question string, ask, assumeYes bool) error {
-	switch {
-	case assumeYes:
+	if assumeYes {
 		return nil
-	case !ask:
+	}
+	if !ask {
 		return errors.New(question + " Pass --yes to make it")
 	}
 	ok, err := confirmDefault(cmd, question, false)
-	if err != nil {
+	if err != nil || ok {
 		return err
 	}
-	if !ok {
-		return errCancelled
-	}
-	return nil
+	return errCancelled
 }
 
-func keepRepositoryDecisions(cmd *cobra.Command, st routing.State, owner, org, orgName string, names teamNames, ask bool, ch *teamsChange) error {
-	for _, k := range slices.Sorted(maps.Keys(st.Bindings)) {
-		b := st.Bindings[k]
-		if routing.Owner(k) != owner || !b.Refused && b.Organization == org {
+func keepRepositoryDecisions(cmd *cobra.Command, planned *routing.State, owner, org, orgName string, refuse bool, names teamNames, ask bool, ch *teamsChange) error {
+	ownerAction := "bound to " + cmp.Or(orgName, org)
+	if refuse {
+		ownerAction = "refused to every organization"
+	}
+	for _, k := range slices.Sorted(maps.Keys(planned.Bindings)) {
+		b := planned.Bindings[k]
+		if routing.Owner(k) != owner || (refuse && b.Refused) || (!refuse && !b.Refused && b.Organization == org) {
 			continue
 		}
 		keep := true
 		if ask {
 			var err error
-			if keep, err = confirmDefault(cmd, fmt.Sprintf("%s is %s. Keep that decision under %s bound to %s?", k, bindingWords(b, names), owner, cmp.Or(orgName, org)), true); err != nil {
+			if keep, err = confirmDefault(cmd, fmt.Sprintf("%s is %s. Keep that decision under %s %s?", k, bindingWords(b, names), owner, ownerAction), true); err != nil {
 				return err
 			}
 		}
@@ -125,23 +146,33 @@ func keepRepositoryDecisions(cmd *cobra.Command, st routing.State, owner, org, o
 			continue
 		}
 		op := bindingOp{key: k}
-		ch.ops = append(ch.ops, op)
-		ch.changes = append(ch.changes, describeOp(op, ""))
+		if err := op.apply(planned); err != nil {
+			return err
+		}
+		ch.ops, ch.changes = append(ch.ops, op), append(ch.changes, describeOp(op, ""))
 	}
 	return nil
 }
 
 func resolveOrg(ref string, names teamNames, list func() teamsView) (id, name string, err error) {
+	v := list()
 	if parseOrgRef(ref).ID != "" {
+		if i := slices.IndexFunc(v.Organizations, func(o orgRow) bool { return o.ID == ref }); i >= 0 {
+			if v.Organizations[i].Type == "personal" {
+				return "", "", errPersonalBinding
+			}
+			return ref, cmp.Or(v.Organizations[i].Name, names.Orgs[ref]), nil
+		}
 		return ref, names.Orgs[ref], nil
 	}
-	v := list()
 	if v.Unlisted != "" {
 		return "", "", fmt.Errorf("cannot resolve organization name %q while organizations cannot be listed (%s); pass the organization id", ref, v.Unlisted)
 	}
-	orgs := make([]organization, 0, len(v.Organizations))
+	orgs, personalMatch := make([]organization, 0, len(v.Organizations)), false
 	for _, o := range v.Organizations {
-		if !o.Inaccessible {
+		if o.Type == "personal" {
+			personalMatch = personalMatch || strings.EqualFold(o.Name, strings.TrimSpace(ref))
+		} else if !o.Inaccessible {
 			orgs = append(orgs, organization{ID: o.ID, Name: o.Name})
 		}
 	}
@@ -149,6 +180,9 @@ func resolveOrg(ref string, names teamNames, list func() teamsView) (id, name st
 		return fmt.Sprintf("%s (%s)", cmp.Or(o.Name, o.ID), o.ID)
 	})
 	if err != nil {
+		if personalMatch {
+			return "", "", errPersonalBinding
+		}
 		return "", "", err
 	}
 	return orgs[idx].ID, orgs[idx].Name, nil
