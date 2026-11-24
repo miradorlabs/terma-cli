@@ -401,3 +401,105 @@ await hooks.dispose()
 		t.Fatalf("expected execute_tool edit span for clean session; got %v", spanNames)
 	}
 }
+
+func TestOpenCodeChildTaintSuppressesParentExportsUnderNode(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("POSIX shell hook test")
+	}
+	node, err := exec.LookPath("node")
+	if err != nil {
+		t.Skip("node is not installed")
+	}
+	dir := t.TempDir()
+	var mu sync.Mutex
+	var spanNames []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		if r.URL.Path == "/v1/traces" {
+			var req struct {
+				ResourceSpans []struct {
+					ScopeSpans []struct {
+						Spans []struct {
+							Name string `json:"name"`
+						} `json:"spans"`
+					} `json:"scopeSpans"`
+				} `json:"resourceSpans"`
+			}
+			if json.Unmarshal(body, &req) == nil {
+				mu.Lock()
+				for _, rs := range req.ResourceSpans {
+					for _, ss := range rs.ScopeSpans {
+						for _, sp := range ss.Spans {
+							spanNames = append(spanNames, sp.Name)
+						}
+					}
+				}
+				mu.Unlock()
+			}
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	hook := filepath.Join(dir, "hook.sh")
+	hookSrc := "#!/bin/sh\nif [ \"$1\" = \"opencode-tool-reach\" ]; then exit 1; fi\nexit 0\n"
+	if err := os.WriteFile(hook, []byte(hookSrc), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	src, err := renderPlugin(opencodeConfig{
+		Version:            1,
+		Endpoint:           srv.URL,
+		Signals:            []string{"traces"},
+		IncludePrompts:     true,
+		IncludeToolContent: true,
+		HookCommand:        []string{hook},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	pluginPath := filepath.Join(dir, "terma.mjs")
+	if err := os.WriteFile(pluginPath, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	driver := `
+import { pathToFileURL } from "node:url"
+const mod = await import(pathToFileURL(process.argv[2]).href)
+const hooks = await mod.TermaPlugin({ directory: "/repoA", worktree: "/repoA" })
+await hooks.event({ event: { type: "session.created", properties: { info: { id: "ses_parent", directory: "/repoA" } } } })
+await hooks["tool.execute.before"]({ tool: "task", sessionID: "ses_parent", callID: "t1" }, { args: { prompt: "inspect" } })
+await hooks.event({ event: { type: "session.created", properties: { info: { id: "ses_child", parentID: "ses_parent", directory: "/repoA" } } } })
+await hooks["tool.execute.before"]({ tool: "read", sessionID: "ses_child", callID: "c1" }, { args: { filePath: "/repoB/secret.go" } })
+await hooks["tool.execute.after"]({ tool: "read", sessionID: "ses_child", callID: "c1", args: { filePath: "/repoB/secret.go" } }, { title: "read", output: "SECRET" })
+// Parent task finishes and emits follow-up chat; sibling also runs: all must be suppressed.
+await hooks["tool.execute.after"]({ tool: "task", sessionID: "ses_parent", callID: "t1", args: { prompt: "inspect" } }, { title: "task", output: "SECRET SUMMARY" })
+await hooks.event({ event: { type: "message.updated", properties: { info: { id: "mp1", sessionID: "ses_parent", role: "assistant", modelID: "parent-m", time: { created: Date.now() - 10, completed: Date.now() } } } } })
+await hooks.event({ event: { type: "session.created", properties: { info: { id: "ses_sibling", parentID: "ses_parent", directory: "/repoA" } } } })
+await hooks["tool.execute.after"]({ tool: "edit", sessionID: "ses_sibling", callID: "s1", args: { filePath: "/repoA/s.go" } }, { title: "edit", output: "ok" })
+// Unrelated session still exports.
+await hooks.event({ event: { type: "session.created", properties: { info: { id: "ses_other", directory: "/repoA" } } } })
+await hooks["tool.execute.after"]({ tool: "write", sessionID: "ses_other", callID: "o1", args: { filePath: "/repoA/ok.go" } }, { title: "write", output: "ok" })
+await hooks.dispose()
+`
+	script := filepath.Join(dir, "driver.mjs")
+	if err := os.WriteFile(script, []byte(driver), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if out, err := exec.Command(node, script, pluginPath).CombinedOutput(); err != nil {
+		t.Fatalf("node: %v\n%s", err, out)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	var sawOther bool
+	for _, name := range spanNames {
+		switch name {
+		case "execute_tool read", "execute_tool task", "chat parent-m", "execute_tool edit":
+			t.Fatalf("child reach failure leaked parent/child/sibling span %q (all=%v)", name, spanNames)
+		case "execute_tool write":
+			sawOther = true
+		}
+	}
+	if !sawOther {
+		t.Fatalf("expected execute_tool write span for unrelated session; got %v", spanNames)
+	}
+}
+
