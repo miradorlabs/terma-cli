@@ -3,6 +3,11 @@
   "harness": "codex-desktop",
   "steps": [
     {
+      "version": "26.1120.41243",
+      "previous": "26.1117.41037",
+      "changes": []
+    },
+    {
       "version": "26.1117.41037",
       "previous": "26.1117.31558",
       "changes": []

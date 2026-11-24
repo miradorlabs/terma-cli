@@ -1,7 +1,33 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-24T00:44:18.786549385Z",
+  "generated_at": "2026-11-24T00:54:11.23591465Z",
   "versions": [
+    {
+      "harness": "codex-desktop",
+      "name": "Codex app",
+      "version": "26.1120.41243",
+      "released_at": "2026-11-24T00:35:29Z",
+      "captured_at": "2026-11-24T00:54:11.23591465Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "26.1117.41037",
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": null,
+      "highlights": [],
+      "signing": null,
+      "partial": true,
+      "attempted_at": "2026-11-24T00:54:11.23591465Z",
+      "attempts": 1
+    },
     {
       "harness": "codex",
       "name": "Codex CLI",
@@ -6183,37 +6209,6 @@
         "Behaviour: subagents added",
         "Behaviour: tool_output added",
         "Description of `codex exec` changed"
-      ],
-      "signing": "valid"
-    },
-    {
-      "harness": "claude",
-      "name": "Claude Code",
-      "version": "2.1.222",
-      "released_at": "2026-08-04T20:37:17.953Z",
-      "captured_at": "2026-11-05T09:54:28.532441Z",
-      "platforms": [
-        "darwin/arm64",
-        "linux/amd64"
-      ],
-      "support": "untested",
-      "previous": "2.1.221",
-      "changes": 5,
-      "categories": {
-        "cli": 3,
-        "tools": 2
-      },
-      "impact": {
-        "breaking": 0,
-        "degrading": 0,
-        "informational": 3,
-        "notable": 2
-      },
-      "undocumented": 3,
-      "highlights": [
-        "SendMessage tool parameter summary: description changed (+199 −84 chars)",
-        "SendMessage tool parameter to: pattern added",
-        "New command: `claude import`"
       ],
       "signing": "valid"
     }
