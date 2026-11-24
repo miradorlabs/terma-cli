@@ -39,6 +39,10 @@ func (app *App) relayDeps() daemon.Deps {
 		HookPolicy:    app.hookPolicy,
 		LoadConfig:    app.loadConfig,
 		RefreshPolicy: pols.Refresh,
+		RefreshTeam:   pols.RefreshTeam,
+		TeamUser:      app.selectedTeamUser,
+		ActiveProfile: app.activeProfileName,
+		LoadProfile:   app.loadProfileConfig,
 		Bind:          app.bindRelay,
 	}
 }
@@ -84,6 +88,9 @@ func (app *App) relayHeartbeatSend(ctx context.Context, src *signInSource, beat 
 	})
 	if loadErr != nil {
 		return loadErr
+	}
+	if handled, err := app.teamHeartbeatSend(ctx, src, cfg, lane, beat); handled {
+		return err
 	}
 	selected := cmp.Or(cfg.Policy.TeamID, cfg.Policy.DefaultProjectID, cfg.ProjectID)
 	// The profile decides, as for the relay, the hooks and delivery: TERMA_API_KEY is setup's

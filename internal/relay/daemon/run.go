@@ -52,6 +52,7 @@ type Config struct {
 	// restarts on it.
 	Updater   *Updater
 	Listening func(addr net.Addr, hold time.Duration)
+	OnRelay   func(*relay.Relay)
 	// Log, when set, is told of the relay's start and exit, with its counters.
 	Log *Log
 }
@@ -164,13 +165,16 @@ func Run(ctx context.Context, c Config) (Result, error) {
 	}
 	opts.Launch = string(launch)
 	r := relay.New(opts)
+	if c.OnRelay != nil {
+		c.OnRelay(r)
+	}
 	c.Log.Printf("relay pid %d (%s, %s) listening on %s", os.Getpid(), launch, cmp.Or(c.Environment, "prod"), ln.Addr())
 	if c.Listening != nil {
 		c.Listening(ln.Addr(), opts.Hold)
 	}
-	claim.Prune(c.StateDir, time.Now())
+	pruneState(ctx, c.StateDir, r, time.Now())
 	runPath := filepath.Join(dir, RunFile)
-	if data, err := json.Marshal(RunInfo{PID: os.Getpid(), Environment: c.Environment, Launch: launch, Service: res.Service, Version: c.Version}); err == nil {
+	if data, err := json.Marshal(RunInfo{PID: os.Getpid(), Environment: c.Environment, Launch: launch, Service: res.Service, Version: c.Version, Routing: true}); err == nil {
 		_ = config.WriteFileAtomicNoSync(runPath, append(data, '\n'), 0o600)
 	}
 	// Gone before the lock is, so the next relay's records are never removed.
@@ -326,6 +330,8 @@ type RunInfo struct {
 	Service bool `json:"service"`
 	// Version is the terma it runs.
 	Version string `json:"version,omitempty"`
+	// Routing reports that this relay supports multi-org routing.State and pinned holds.
+	Routing bool `json:"routing,omitempty"`
 }
 
 // RunningRelay is what the relay holding dir's lock recorded about itself; false when none
@@ -419,7 +425,7 @@ func watch(ctx context.Context, r *relay.Relay, stateDir string, idle time.Durat
 			return stopReplaced, installed.Installed, nil
 		}
 		if time.Since(lastPrune) > time.Hour {
-			claim.Prune(stateDir, time.Now())
+			pruneState(ctx, stateDir, r, time.Now())
 			lastPrune = time.Now()
 		}
 		if d, quiet := r.Idle(); quiet && idle > 0 && d >= idle {
