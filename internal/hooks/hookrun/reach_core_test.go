@@ -2430,6 +2430,11 @@ func TestAbbreviatedSecretOptionsAndLogicalCd(t *testing.T) {
 		{"dangling-cont-eof", "[core]\n\tfoo = bar\\"},
 		{"bare-true", "[core]\n\tbare = true\n"},
 		{"bare-valueless", "[core]\n\tbare\n"},
+		{"double-subsection", "[core \"x\" \"y\"]\n\tbare = false\n"},
+		{"repo-format-999", "[core]\n\trepositoryformatversion = 999\n"},
+		{"repo-format-valueless", "[core]\n\trepositoryformatversion\n"},
+		{"unknown-extension", "[core]\n\trepositoryformatversion = 1\n[extensions]\n\tunknownext = true\n"},
+		{"bad-objectformat", "[core]\n\trepositoryformatversion = 1\n[extensions]\n\tobjectformat = md5\n"},
 	} {
 		badCfgRepo := filepath.Join(litDir, tc.name)
 		makeValidGitDir(t, filepath.Join(badCfgRepo, ".git"))
@@ -2439,6 +2444,13 @@ func TestAbbreviatedSecretOptionsAndLogicalCd(t *testing.T) {
 		if got, ok := newScan(badCfgRepo, noEnv, work{deadline: time.Now().Add(time.Minute)}).safeLocate(badCfgRepo); ok {
 			t.Errorf("safeLocate(%s) = (%q, true), want false", tc.name, got)
 		}
+	}
+	// Linked worktree whose commondir/config overrides core.worktree or sets unsupported format fails closed.
+	if err := os.WriteFile(filepath.Join(commonGit, "config"), []byte("[core]\n\tworktree = /elsewhere\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if got, ok := newScan(wtDir, noEnv, work{deadline: time.Now().Add(time.Minute)}).safeLocate(wtDir); ok {
+		t.Errorf("safeLocate(linked worktree with commondir worktree override) = (%q, true), want false", got)
 	}
 	// mktemp falls back to /tmp on Unix when TMPDIR is cleared in the scanned shell, ignoring host os.TempDir().
 	if runtime.GOOS != "windows" {
@@ -2454,10 +2466,10 @@ func TestAbbreviatedSecretOptionsAndLogicalCd(t *testing.T) {
 			t.Errorf("mktemp(cleared TMPDIR) = (%q, %v), want under /tmp", got, ok)
 		}
 	}
-	// Valid bare=false with escaped quotes and comments still locates the worktree.
+	// Valid bare=false, repositoryformatversion=1 with standard extensions, and bracket-in-subsection locate the worktree.
 	goodCfgRepo := filepath.Join(litDir, "valid-cfg")
 	makeValidGitDir(t, filepath.Join(goodCfgRepo, ".git"))
-	if err := os.WriteFile(filepath.Join(goodCfgRepo, ".git", "config"), []byte("[core]\n\tbare = false\n\tfoo = \"a\\\"b\" # \"comment\n"), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(goodCfgRepo, ".git", "config"), []byte("[core]\n\trepositoryformatversion = 1\n\tbare = false\n\tfoo = \"a\\\"b\" # \"comment\n[branch \"a]b\"]\n\tremote = origin\n[extensions]\n\tobjectformat = sha256\n\tpartialclone = origin\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	if got, ok := newScan(goodCfgRepo, noEnv, work{deadline: time.Now().Add(time.Minute)}).safeLocate(goodCfgRepo); !ok || got != goodCfgRepo {
@@ -2551,13 +2563,27 @@ func TestAbbreviatedSecretOptionsAndLogicalCd(t *testing.T) {
 }
 
 func TestParsableSeparatorRunsBounded(t *testing.T) {
-	for _, sep := range []string{";", "&", ">"} {
+	for _, tc := range []struct {
+		name string
+		src  string
+		want bool
+	}{
+		{"semicolons", strings.Repeat(";", maxShellBytes), false},
+		{"ampersands", strings.Repeat("&", maxShellBytes), false},
+		{"gt", strings.Repeat(">", maxShellBytes), false},
+		{"commas", strings.Repeat(",", maxShellBytes), true},
+		{"colons", strings.Repeat(":", maxShellBytes), true},
+		{"hashes-in-word", "a" + strings.Repeat("#", maxShellBytes-1), true},
+		{"backslashes", strings.Repeat("\\a", maxShellBytes/2), true},
+		{"quoted-commas", `"` + strings.Repeat(",", maxShellBytes-2) + `"`, true},
+		{"heredoc-commas", "cat <<'EOF'\n" + strings.Repeat(",", maxShellBytes-20) + "\nEOF", true},
+	} {
 		start := time.Now()
-		if parsable(strings.Repeat(sep, maxShellBytes)) {
-			t.Errorf("parsable(%q*maxShellBytes) = true, want false", sep)
+		if got := parsable(tc.src); got != tc.want {
+			t.Errorf("parsable(%s) = %v, want %v", tc.name, got, tc.want)
 		}
-		if took := time.Since(start); took > 200*time.Millisecond {
-			t.Errorf("parsable(%q*maxShellBytes) took %v, want < 200ms", sep, took)
+		if took := time.Since(start); took > 50*time.Millisecond {
+			t.Errorf("parsable(%s) took %v, want < 50ms", tc.name, took)
 		}
 	}
 }

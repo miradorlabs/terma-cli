@@ -70,17 +70,15 @@ func (sc *scan) candidatePath(t string, r role, fallback bool) {
 	}
 }
 
-const maxSymlinkHops, maxPathComponents, maxPathBytes = 8, 128, 4096
+const maxSymlinkHops, maxPathComponents, maxPathBytes, alnum = 8, 128, 4096, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
 // walk traverses p component-by-component via dirHandle (openat O_DIRECTORY|O_NOFOLLOW|O_NONBLOCK on Unix,
 // os.Root on Windows), preventing TOCTOU symlink swaps and FIFO hangs. openMode: 0=stat, 1=openFile, 2=openDir.
 func (sc *scan) walk(p string, followFinal bool, openMode uint8) (resolved, parent string, info os.FileInfo, f *os.File, ok bool) {
 	if !filepath.IsAbs(p) && !filepath.IsAbs(sc.dir) {
 		return "", "", nil, nil, false
-	} else if !filepath.IsAbs(p) {
-		p = sc.dir + string(filepath.Separator) + p
 	}
-	if sc.unknown || remote(p, sc.cwd) || len(p) > maxPathBytes {
+	if p = pick(filepath.IsAbs(p), p, sc.dir+string(filepath.Separator)+p); sc.unknown || remote(p, sc.cwd) || len(p) > maxPathBytes {
 		return "", "", nil, nil, !sc.fail()
 	}
 	vol := filepath.VolumeName(p)
@@ -128,12 +126,12 @@ func (sc *scan) walk(p string, followFinal bool, openMode uint8) (resolved, pare
 			tVol := filepath.VolumeName(target)
 			if filepath.IsAbs(target) || os.IsPathSeparator(target[0]) {
 				newVol := cmp.Or(tVol, filepath.VolumeName(curPath), filepath.VolumeName(sc.cwd)) + string(filepath.Separator)
-				nr, err := openRootDir(newVol)
-				if err != nil {
+				if nr, err := openRootDir(newVol); err != nil {
 					return "", "", nil, nil, !sc.fail()
+				} else {
+					closeAll()
+					stack, paths = []dirHandle{nr}, []string{newVol}
 				}
-				closeAll()
-				stack, paths = []dirHandle{nr}, []string{newVol}
 			}
 			parts = append(strings.FieldsFunc(target[len(tVol):], isSep), parts...)
 			continue
@@ -143,12 +141,11 @@ func (sc *scan) walk(p string, followFinal bool, openMode uint8) (resolved, pare
 			return nextPath, curPath, fi, f, ok
 		} else if !fi.IsDir() {
 			return "", "", nil, nil, false
-		} else if next, err := cur.openSubDir(part, fi); errors.Is(err, fs.ErrNotExist) {
-			return "", curPath, nil, nil, false
-		} else if err != nil {
-			return "", "", nil, nil, !sc.fail()
-		} else {
+		} else if next, err := cur.openSubDir(part, fi); err == nil {
 			stack, paths = append(stack, next), append(paths, nextPath)
+		} else {
+			sc.unknown = sc.unknown || !errors.Is(err, fs.ErrNotExist)
+			return "", pick(errors.Is(err, fs.ErrNotExist), curPath, ""), nil, nil, false
 		}
 	}
 	cur, curPath := stack[len(stack)-1], paths[len(paths)-1]
@@ -191,12 +188,11 @@ func (sc *scan) resolveJoined(base, raw string, logical bool) (string, bool) {
 	} else if !filepath.IsAbs(raw) {
 		return "", false
 	}
-	vol, sep := cmp.Or(filepath.VolumeName(raw), share(raw)), string(filepath.Separator)
+	vol, sep, out := cmp.Or(filepath.VolumeName(raw), share(raw)), string(filepath.Separator), []string(nil)
 	parts := strings.FieldsFunc(raw[len(vol):], isSep)
 	if len(parts) > maxPathComponents {
 		return "", !sc.fail()
 	}
-	var out []string
 	for _, part := range parts {
 		if part != "" && part != "." && part != ".." {
 			out = append(out, part)
@@ -240,41 +236,34 @@ func (sc *scan) away(w string, r role) bool {
 func (sc *scan) path(w, dir string) (string, bool) { return sc.resolvePath(w, dir, false) }
 func (sc *scan) resolvePath(w, dir string, logical bool) (string, bool) {
 	if w == "~" || strings.HasPrefix(w, "~/") {
-		home, ok := sc.homeDir()
-		if !ok || home == "" || remote(home, sc.cwd) {
+		if home, ok := sc.homeDir(); !ok || home == "" || remote(home, sc.cwd) {
 			sc.unknown = sc.unknown || remote(home, sc.cwd) || sc.isUnresolvedVar("HOME")
 			return "", false
+		} else {
+			return sc.resolveJoined(home, strings.TrimLeft(w[1:], "/"), logical)
 		}
-		return sc.resolveJoined(home, strings.TrimLeft(w[1:], "/"), logical)
 	} else if remote(w, sc.cwd) || !filepath.IsAbs(w) && dir == "" {
 		return "", false
 	}
 	return sc.resolveJoined(dir, w, logical)
 }
 
-const alnum = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-
 func urlPath(w string) (string, bool, bool) {
 	scheme, rest, ok := strings.Cut(w, "://")
 	if !ok && len(w) > 5 && strings.EqualFold(w[:5], "file:") && w[5] == '/' {
 		scheme, rest, ok = "file", w[5:], true
 	}
-	if !ok || !isScheme(scheme) || !strings.EqualFold(scheme, "file") {
-		return "", ok && isScheme(scheme), false
+	if ok = ok && len(scheme) > 1 && strings.IndexByte(alnum[:52], scheme[0]) >= 0 && strings.Trim(scheme, alnum+"+-.") == ""; !ok || !strings.EqualFold(scheme, "file") {
+		return "", ok, false
 	}
 	rest, _, _ = strings.Cut(rest, "?")
 	rest, _, _ = strings.Cut(rest, "#")
 	rest = pick(len(rest) > 9 && strings.EqualFold(rest[:9], "localhost") && rest[9] == '/', rest[min(len(rest), 9):], rest)
-	u, err := url.PathUnescape(rest)
-	if err != nil || strings.ContainsRune(u, 0) {
+	if u, err := url.PathUnescape(rest); err != nil || strings.ContainsRune(u, 0) {
 		return "", true, true
-	} else if filepath.Separator == '\\' && len(u) > 2 && u[0] == '/' && u[2] == ':' {
-		return u[1:], true, false
+	} else {
+		return pick(filepath.Separator == '\\' && len(u) > 2 && u[0] == '/' && u[2] == ':', u[min(len(u), 1):], pick(strings.HasPrefix(u, "/"), u, "//"+u)), true, false
 	}
-	return pick(strings.HasPrefix(u, "/"), u, "//"+u), true, false
-}
-func isScheme(s string) bool {
-	return len(s) > 1 && strings.IndexByte(alnum[:52], s[0]) >= 0 && strings.Trim(s, alnum+"+-.") == ""
 }
 
 // remote reports whether p starts with two separators (UNC/device path) outside cwd's share.

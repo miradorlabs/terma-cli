@@ -21,18 +21,16 @@ func (d dirHandle) openSubDir(n string, w fs.FileInfo) (dirHandle, error) {
 	return openAt(int(d), n, unix.O_DIRECTORY|unix.O_NOFOLLOW|unix.O_NONBLOCK, w)
 }
 func (d dirHandle) open(name string, dir bool, want fs.FileInfo) (*os.File, error) {
-	fd, err := openAt(int(d), name, unix.O_NOFOLLOW|unix.O_NONBLOCK|pick(dir, unix.O_DIRECTORY, 0), want)
-	if err != nil {
+	if fd, err := openAt(int(d), name, unix.O_NOFOLLOW|unix.O_NONBLOCK|pick(dir, unix.O_DIRECTORY, 0), want); err != nil {
 		return nil, err
+	} else {
+		return os.NewFile(uintptr(fd), name), nil
 	}
-	return os.NewFile(uintptr(fd), name), nil
 }
 func (d dirHandle) lstat(name string) (fs.FileInfo, error) {
 	var st unix.Stat_t
-	if err := unix.Fstatat(int(d), name, &st, unix.AT_SYMLINK_NOFOLLOW); err != nil {
-		return nil, err
-	}
-	return &statInfo{st}, nil
+	err := unix.Fstatat(int(d), name, &st, unix.AT_SYMLINK_NOFOLLOW)
+	return pick(err == nil, fs.FileInfo(&statInfo{st}), nil), err
 }
 func (d dirHandle) readlink(name string) (string, error) {
 	var buf [maxPathBytes]byte
@@ -44,15 +42,13 @@ func (d dirHandle) readlink(name string) (string, error) {
 func openAt(dirfd int, name string, flags int, want fs.FileInfo) (dirHandle, error) {
 	for {
 		fd, err := unix.Openat(dirfd, name, unix.O_RDONLY|unix.O_CLOEXEC|flags, 0)
-		if errors.Is(err, syscall.EINTR) {
+		if errors.Is(err, unix.EINTR) {
 			continue
 		} else if err != nil || want == nil {
 			return dirHandle(fd), err
 		}
 		var st unix.Stat_t
-		ws, ok := want.Sys().(*unix.Stat_t)
-		wantType := pick(flags&unix.O_DIRECTORY != 0, uint32(unix.S_IFDIR), uint32(unix.S_IFREG))
-		if !ok || unix.Fstat(fd, &st) != nil || st.Dev != ws.Dev || st.Ino != ws.Ino || uint32(st.Mode&unix.S_IFMT) != wantType {
+		if ws, ok := want.Sys().(*unix.Stat_t); !ok || unix.Fstat(fd, &st) != nil || st.Dev != ws.Dev || st.Ino != ws.Ino || uint32(st.Mode&unix.S_IFMT) != pick(flags&unix.O_DIRECTORY != 0, uint32(unix.S_IFDIR), uint32(unix.S_IFREG)) {
 			_ = unix.Close(fd)
 			return -1, errOpaque
 		}

@@ -12,6 +12,7 @@ import (
 
 var secretOptions, secretNames, compounds = []string{"-c", "-e", "--eval", "-u", "--user", "-U", "--proxy-user", "-H", "--header", "--proxy-header", "-p", "--password", "-b", "--cookie", "-d", "--data", "--data-ascii", "--data-raw", "--data-binary", "--data-urlencode", "--url-query", "--json", "--oauth2-bearer", "-E", "--cert", "--proxy-cert", "--post-data", "--body-data", "--post-file", "--body-file"}, []string{"pass", "token", "secret", "key", "auth"}, []string{"if", "for", "while", "until", "case", "select"}
 var userinfo = regexp.MustCompile(`(://)[^/\s]+@|[^/\s:@]*:[^/\s@]+@`)
+var shellMeta = [256]bool{' ': true, '\t': true, '\n': true, '\\': true, '$': true, '`': true, '"': true, '\'': true, '(': true, ')': true, '[': true, ']': true, '{': true, '}': true, '|': true, '&': true, '<': true, '>': true, ';': true}
 
 const maxShellNesting, maxShellExpr, separators = 256, 4096, " \t\n;&|()<>"
 
@@ -58,9 +59,7 @@ func maskWords(command string, depth int) string {
 				words[i] = masked
 			}
 			lower := strings.ToLower(b)
-			secret = hasSubst || slices.Contains(secretOptions, b) || len(b) >= 4 && strings.HasPrefix(b, "--") && slices.ContainsFunc(secretOptions, func(o string) bool { return strings.HasPrefix(o, b) }) || b == "eval" || b == "-a" && hasRedis ||
-				short && (strings.ContainsRune(b[1:], 'c') || slices.Contains(secretOptions, "-"+b[len(b)-1:]) || b[len(b)-1] == 'a' && hasRedis) ||
-				strings.HasPrefix(b, "-") && slices.ContainsFunc(secretNames, func(n string) bool { return strings.Contains(lower, n) })
+			secret = hasSubst || slices.Contains(secretOptions, b) || len(b) >= 4 && strings.HasPrefix(b, "--") && slices.ContainsFunc(secretOptions, func(o string) bool { return strings.HasPrefix(o, b) }) || b == "eval" || b == "-a" && hasRedis || short && (strings.ContainsRune(b[1:], 'c') || slices.Contains(secretOptions, "-"+b[len(b)-1:]) || b[len(b)-1] == 'a' && hasRedis) || strings.HasPrefix(b, "-") && slices.ContainsFunc(secretNames, func(n string) bool { return strings.Contains(lower, n) })
 		}
 	}
 	s := strings.Map(func(r rune) rune { return pick(r < 0x20 || r == 0x7f, ' ', r) }, strings.Join(words, " "))
@@ -125,8 +124,7 @@ func shellFields(command string, n int) (raw, bare []string) {
 				if buf.Reset(); len(raw) == n {
 					return raw, bare
 				}
-				if start = -1; r == '<' || r == '>' {
-					start = i
+				if start = pick(r == '<' || r == '>', i, -1); start >= 0 {
 					buf.WriteRune(r)
 					break
 				}
@@ -152,11 +150,10 @@ func ansiEscape(s string) (rune, int) {
 	} else if s[0] == 'c' && len(s) > 1 {
 		return rune(s[1] & 0x1f), 2
 	}
-	base, start, limit, digits := 8, 0, 3, "01234567"
+	base, start, limit, digits, k := 8, 0, 3, "01234567", 0
 	if j := strings.IndexByte("xuU", s[0]); j >= 0 {
 		base, start, limit, digits = 16, 1, 2<<j, "0123456789abcdefABCDEF"
 	}
-	k := 0
 	for ; k < limit && start+k < len(s) && strings.IndexByte(digits, s[start+k]) >= 0; k++ {
 	}
 	if v, err := strconv.ParseUint(s[start:start+k], base, 32); k > 0 && err == nil {
@@ -175,28 +172,22 @@ func parsable(src string) bool {
 	if len(src) > maxShellBytes {
 		return false
 	}
-	open, docs, bodies := []byte(nil), []heredoc(nil), []heredoc(nil)
+	open, docs, bodies := []byte{0}, []heredoc(nil), []heredoc(nil)
 	body, expr, exprDepth, letUntil, links, words, dollars := 0, -1, 0, -1, 0, 0, 0
 	push := func(c byte, n, i int, isExpr bool) {
 		if isExpr && expr < 0 {
 			expr, exprDepth = i, len(open)
 		}
-		if k := strings.IndexByte("({[", c); k >= 0 {
-			c = ")}]"[k]
-		}
-		open = append(open, slices.Repeat([]byte{c}, n)...)
+		k := strings.IndexByte("({[", c)
+		open = append(open, slices.Repeat([]byte{pick(k >= 0, ")}]"[max(k, 0)], c)}, n)...)
 	}
 	read := func() { body, open = len(open), append(open, pick(bodies[0].quoted, byte('q'), byte('h'))) }
 	for i := 0; i < len(src); i++ {
-		c, top := src[i], byte(0)
-		if len(open) > 0 {
-			top = open[len(open)-1]
-		}
+		c, top := src[i], open[len(open)-1]
 		if top == 0 && (c == ' ' || c == '\t' || c == '\n' && len(bodies) == 0 && len(docs) == 0) {
-			for ; i < len(src) && (src[i] == ' ' || src[i] == '\t' || src[i] == '\n' && len(bodies) == 0 && len(docs) == 0); i++ {
-				letUntil = pick(src[i] == '\n', -1, letUntil)
+			for letUntil = pick(c == '\n', -1, letUntil); i+1 < len(src) && (src[i+1] == ' ' || src[i+1] == '\t' || src[i+1] == '\n' && len(bodies) == 0 && len(docs) == 0); i++ {
+				letUntil = pick(src[i+1] == '\n', -1, letUntil)
 			}
-			i--
 			continue
 		}
 		prev, ni := pick(i > 0, byteAt(src, i-1), byte('\n')), pick(top == 'q', i+1, skipCont(src, i+1))
@@ -213,8 +204,7 @@ func parsable(src string) bool {
 			}
 			for len(bodies) > 0 && i < len(src) {
 				line := src[i+1 : lineEnd(src, i+1)]
-				line = pick(bodies[0].stripTabs, strings.TrimLeft(line, "\t"), line)
-				if strings.TrimRight(line, "\r") != bodies[0].delim {
+				if strings.TrimRight(pick(bodies[0].stripTabs, strings.TrimLeft(line, "\t"), line), "\r") != bodies[0].delim {
 					break
 				}
 				i, open = lineEnd(src, i+1), slices.Delete(open, body, body+1)
@@ -223,8 +213,10 @@ func parsable(src string) bool {
 				}
 			}
 		case top == 'q':
+			i = lineEnd(src, i) - 1
 		case c == '\\':
-			i = max(skipCont(src, i)-1, i+1)
+			for i = max(skipCont(src, i)-1, i+1); i+2 < len(src) && src[i] != '\n' && src[i+1] == '\\' && src[i+2] != '\n' && src[i+2] != '\r'; i += 2 {
+			}
 		case c == '$' && (next == '(' || next == '{' || next == '['): // $( $(( ${ $[
 			i = pick(next == '(' && double, di, ni)
 			push(next, pick(next == '(' && double, 2, 1), i, next == '(' && double || next != '(')
@@ -233,6 +225,8 @@ func parsable(src string) bool {
 		case c == '`', c == '"' && top != 'h':
 			push(c, 1, i, false)
 		case top == '"' || top == 'h':
+			j := strings.IndexAny(src[i+1:], pick(top == 'h', "\n\\$`", "\\$`\""))
+			i = pick(j >= 0, i+j, len(src)-1)
 		case c == '\'':
 			for i++; i < len(src) && src[i] != '\''; i++ {
 				i += pick(src[i] == '\\' && prev == '$', 1, 0) // $'\''
@@ -242,7 +236,7 @@ func parsable(src string) bool {
 		case c == '(' || c == '[' || c == '{': // (( [[ [ open expressions
 			i = pick(c != '{' && next == c, ni, i)
 			push(c, pick(c != '{' && next == c, 2, 1), i, c != '{' && next == c || c == '[')
-		case c == top && len(open) > 0: // a NUL is no context's close
+		case c == top && len(open) > 1: // a NUL is no context's close
 			open = open[:len(open)-1]
 		case c == '|' || c == '&' && next == '&':
 			links, i = links+1, pick(c == '&', ni, i)
@@ -255,8 +249,7 @@ func parsable(src string) bool {
 		case strings.IndexByte(";&<>)]}", c) >= 0:
 			words += 16
 		case 'a' <= c && c <= 'z' && strings.IndexByte(" \t\n;&|(){}`", prev) >= 0:
-			var buf [8]byte
-			n, j := 0, i
+			n, j, buf := 0, i, [8]byte{}
 			for ; j < len(src) && 'a' <= src[j] && src[j] <= 'z'; j = skipCont(src, j+1) {
 				buf[min(n, 7)], n = src[j], n+1
 			}
@@ -270,9 +263,12 @@ func parsable(src string) bool {
 				}
 			}
 			i = j - 1
+		case !shellMeta[c]:
+			for ; i+1 < len(src) && !shellMeta[src[i+1]]; i++ {
+			}
 		}
 		expr = pick(expr >= 0 && len(open) <= exprDepth, -1, expr)
-		if len(open) > maxShellNesting || links > maxShellNesting || expr >= 0 && i-expr > maxShellExpr || words > maxShellWords || dollars > maxShellWords {
+		if len(open) > maxShellNesting+1 || links > maxShellNesting || expr >= 0 && i-expr > maxShellExpr || words > maxShellWords || dollars > maxShellWords {
 			return false
 		}
 	}

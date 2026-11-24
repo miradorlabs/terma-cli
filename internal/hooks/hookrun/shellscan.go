@@ -11,12 +11,10 @@ import (
 	"mvdan.cc/sh/v3/syntax"
 )
 
-// Bounds on a shell reach scan (maxShellTime is overridden to 1s in tests).
-const (
-	shellTime, maxShellPlaces, maxShellLookups, maxShellWords, maxShellStats                       = 20 * time.Millisecond, 256, 4096, 16384, 131072
-	maxShellBytes, maxShellDepth, maxShellBraces, maxGlobSegments, substitutionSize, maxBelowDepth = 1 << 20, 4, 16, 3, 4096, 4
-	UnknownReach                                                                                   = "\x00unknown" // NUL-prefixed so it cannot collide with a path
-)
+// UnknownReach is a NUL-prefixed sentinel returned when a shell reach scan fails closed.
+const UnknownReach = "\x00unknown"
+const shellTime, maxShellPlaces, maxShellLookups, maxShellWords, maxShellStats = 20 * time.Millisecond, 256, 4096, 16384, 131072
+const maxShellBytes, maxShellDepth, maxShellBraces, maxGlobSegments, substitutionSize, maxBelowDepth = 1 << 20, 4, 16, 3, 4096, 4
 
 var maxShellTime, errOpaque = shellTime, errors.New("an expansion ShellPaths cannot resolve")
 
@@ -88,10 +86,8 @@ func (sc *scan) Get(name string) expand.Variable {
 }
 func (sc *scan) Each(func(string, expand.Variable) bool) { sc.opaque = true }
 func (sc *scan) lookup(name string) (string, bool) {
-	if name == "PWD" {
-		return sc.dir, sc.dir != ""
-	} else if name == "OLDPWD" && sc.prev != "" {
-		return sc.prev, true
+	if name == "PWD" || name == "OLDPWD" && sc.prev != "" {
+		return pick(name == "PWD", sc.dir, sc.prev), name != "PWD" || sc.dir != ""
 	} else if v, ok := sc.vars[name]; !isName(name) || name == "_" || ok && v == nil {
 		return "", false
 	} else if ok {
@@ -163,8 +159,7 @@ func (sc *scan) paramSize(pe *syntax.ParamExp, opaqueSubst bool) int {
 	if pe.Repl != nil {
 		if orig := sc.sizeIn(pe.Repl.Orig, true); pe.Repl.Orig != nil && (orig > maxShellExpr || n > maxShellBytes/max(orig, 1)) {
 			return maxShellBytes + 1
-		}
-		if with := sc.sizeIn(pe.Repl.With, opaqueSubst || pe.Repl.All && n > 0); pe.Repl.With != nil {
+		} else if with := sc.sizeIn(pe.Repl.With, opaqueSubst || pe.Repl.All && n > 0); pe.Repl.With != nil {
 			if with >= (maxShellBytes+1)/max(n, 1) {
 				return maxShellBytes + 1
 			}
@@ -173,11 +168,11 @@ func (sc *scan) paramSize(pe *syntax.ParamExp, opaqueSubst bool) int {
 	}
 	if pe.Exp != nil && pe.Exp.Word != nil {
 		pat := isCaseOp(pe.Exp.Op) || pe.Exp.Op == syntax.RemSmallPrefix || pe.Exp.Op == syntax.RemLargePrefix || pe.Exp.Op == syntax.RemSmallSuffix || pe.Exp.Op == syntax.RemLargeSuffix
-		w := sc.sizeIn(pe.Exp.Word, opaqueSubst || pat)
-		if pat && (w > maxShellExpr || n > maxShellBytes/max(w, 1)) {
+		if w := sc.sizeIn(pe.Exp.Word, opaqueSubst || pat); pat && (w > maxShellExpr || n > maxShellBytes/max(w, 1)) {
 			return maxShellBytes + 1
+		} else {
+			n += w
 		}
-		n += w
 	}
 	return min(n, maxShellBytes+1)
 }
@@ -195,19 +190,17 @@ func (sc *scan) checkPartsFields(parts []syntax.WordPart, ifs string, rem int, i
 			}
 			if isCase {
 				rem -= len(v)
-			} else if rem = sc.consumeFields(v, ifs, rem); rem < 0 {
-				return -1
+			} else {
+				rem = sc.consumeFields(v, ifs, rem)
 			}
-			if pe.Exp != nil && pe.Exp.Word != nil {
+			if rem >= 0 && pe.Exp != nil && pe.Exp.Word != nil {
 				rem = sc.checkPartsFields(pe.Exp.Word.Parts, ifs, rem, true)
 			}
 			if rem >= 0 && pe.Repl != nil && pe.Repl.With != nil {
 				before := rem
 				if rem = sc.checkPartsFields(pe.Repl.With.Parts, ifs, rem, true); rem >= 0 && pe.Repl.All && len(v) > 0 {
-					if per := 1 + before - rem; len(v) > rem/per && sc.fail() {
-						return -1
-					}
-					rem -= len(v) * (1 + before - rem)
+					per := 1 + before - rem
+					rem = pick(len(v) > rem/per && sc.fail(), -1, rem-len(v)*per)
 				}
 			}
 		} else if inParam {

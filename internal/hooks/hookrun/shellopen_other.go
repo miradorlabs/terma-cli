@@ -27,23 +27,23 @@ func (d dirHandle) lstat(name string) (fs.FileInfo, error) {
 	return fi, pick(errors.Is(err, syscall.Errno(123)) || errors.Is(err, syscall.Errno(161)), fs.ErrNotExist, err)
 }
 func (d dirHandle) openSubDir(name string, want fs.FileInfo) (dirHandle, error) {
-	r, err := d.r.OpenRoot(name)
-	if err != nil {
+	if r, err := d.r.OpenRoot(name); err != nil {
 		return dirHandle{}, err
 	} else if got, sErr := r.Stat("."); sErr == nil && os.SameFile(want, got) {
 		return dirHandle{r}, nil
+	} else {
+		_ = r.Close()
+		return dirHandle{}, errOpaque
 	}
-	_ = r.Close()
-	return dirHandle{}, errOpaque
 }
 func (d dirHandle) open(name string, dir bool, want fs.FileInfo) (*os.File, error) {
-	f, err := d.r.Open(name)
-	if err != nil {
+	if f, err := d.r.Open(name); err != nil {
 		return nil, err
 	} else if got, sErr := f.Stat(); sErr == nil && os.SameFile(want, got) && (dir && got.IsDir() || !dir && got.Mode().IsRegular()) {
 		return f, nil
+	} else {
+		_ = f.Close()
+		return nil, errOpaque
 	}
-	_ = f.Close()
-	return nil, errOpaque
 }
 func sameDevice(_, _ fs.FileInfo) bool { return true }

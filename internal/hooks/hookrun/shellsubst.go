@@ -24,9 +24,7 @@ type operands struct {
 var outputs = map[string]func(sc *scan, args []*syntax.Word) (string, bool){
 	"pwd": where, "pwd -L": where, "pwd -P": func(sc *scan, a []*syntax.Word) (string, bool) { return sc.real(pick(len(a) == 0, sc.dir, "")) },
 	"git rev-parse --show-toplevel": func(sc *scan, a []*syntax.Word) (string, bool) { return sc.safeLocate(pick(len(a) == 0, sc.dir, "")) },
-	"mktemp":                        mktemp, "go env GOPATH": gopath, "go env GOMODCACHE": modcache, "dirname": ofOperand(dirname),
-	"basename": ofOperand(func(_ *scan, p string) (string, bool) { return pick(p != "", filepath.Base(p), ""), true }),
-	"realpath": ofOperand((*scan).real), "readlink -f": ofOperand((*scan).real),
+	"mktemp":                        mktemp, "go env GOPATH": gopath, "go env GOMODCACHE": modcache, "dirname": ofOperand(dirname), "realpath": ofOperand((*scan).real), "readlink -f": ofOperand((*scan).real), "basename": ofOperand(func(_ *scan, p string) (string, bool) { return pick(p != "", filepath.Base(p), ""), true }),
 }
 
 func (sc *scan) substitute(w io.Writer, cs *syntax.CmdSubst) error {
@@ -39,7 +37,7 @@ func (sc *scan) substitute(w io.Writer, cs *syntax.CmdSubst) error {
 			for n := len(words); n > 0; n-- {
 				if known, ok := outputs[strings.Join(words[:n], " ")]; ok {
 					outer := sc.cfg
-					sc.cfg = sc.config() // expand is not reentrant: an operand expands with its own
+					sc.cfg = sc.config() // expand is not reentrant
 					out, ok := known(sc, ce.Args[n:])
 					if sc.cfg, out = outer, strings.TrimRight(out, "\n"); !ok || !sc.charge(len(out)) || !sc.chargeFields(out) {
 						return errOpaque
@@ -58,22 +56,18 @@ func (sc *scan) hasGoEnv(key string) bool {
 	p := sc.envVal("GOENV")
 	if sc.isUnresolvedVar("GOENV") || p != "" && p != "off" && !filepath.IsAbs(p) {
 		return true
-	} else if p == "off" {
-		return false
 	} else if p == "" {
-		dir, bad := "", false
-		if runtime.GOOS == "windows" {
-			dir, bad = sc.envVal("AppData"), sc.isUnresolvedVar("AppData")
-		} else if xdg := sc.envVal("XDG_CONFIG_HOME"); runtime.GOOS != "darwin" && (xdg != "" || sc.isUnresolvedVar("XDG_CONFIG_HOME")) {
+		dir, bad := sc.envVal("AppData"), sc.isUnresolvedVar("AppData")
+		if xdg := sc.envVal("XDG_CONFIG_HOME"); runtime.GOOS != "windows" && runtime.GOOS != "darwin" && (xdg != "" || sc.isUnresolvedVar("XDG_CONFIG_HOME")) {
 			dir, bad = xdg, sc.isUnresolvedVar("XDG_CONFIG_HOME")
-		} else if home, ok := sc.lookup("HOME"); ok || sc.isUnresolvedVar("HOME") {
-			dir, bad = filepath.Join(home, pick(runtime.GOOS == "darwin", "Library/Application Support", ".config")), sc.isUnresolvedVar("HOME")
+		} else if home, ok := sc.lookup("HOME"); runtime.GOOS != "windows" {
+			dir, bad = pick(ok, filepath.Join(home, pick(runtime.GOOS == "darwin", "Library/Application Support", ".config")), ""), sc.isUnresolvedVar("HOME")
 		}
 		if p = filepath.Join(dir, "go", "env"); bad || dir == "" {
 			return bad
 		}
 	}
-	return sc.fileHasLine(p, func(l string) bool { return strings.HasPrefix(strings.TrimSpace(l), key+"=") })
+	return p != "off" && sc.fileHasLine(p, func(l string) bool { return strings.HasPrefix(strings.TrimSpace(l), key+"=") })
 }
 func gopath(sc *scan, args []*syntax.Word) (string, bool) {
 	if len(args) != 0 || sc.isUnresolvedVar("GOPATH") {
@@ -99,7 +93,7 @@ func modcache(sc *scan, args []*syntax.Word) (string, bool) {
 func mktemp(sc *scan, args []*syntax.Word) (string, bool) {
 	name, tmp, opts := "", false, true
 	for _, a := range args {
-		if l := a.Lit(); l == "" || opts && l != "--" && strings.HasPrefix(l, "-") && l != "--tmpdir" && l != "--directory" && l != "--quiet" && l != "--dry-run" && (len(l) < 2 || l[1] == '-' || strings.Trim(l[1:], "dqut") != "") {
+		if l := a.Lit(); l == "" || opts && l != "--" && strings.HasPrefix(l, "-") && !slices.Contains([]string{"--tmpdir", "--directory", "--quiet", "--dry-run"}, l) && (len(l) < 2 || l[1] == '-' || strings.Trim(l[1:], "dqut") != "") {
 			return "", false
 		} else if opts && strings.HasPrefix(l, "-") {
 			opts, tmp = l != "--", tmp || l == "--tmpdir" || l[1] != '-' && strings.ContainsRune(l[1:], 't')
@@ -118,9 +112,8 @@ func mktemp(sc *scan, args []*syntax.Word) (string, bool) {
 }
 func ofOperand(f func(*scan, string) (string, bool)) func(*scan, []*syntax.Word) (string, bool) {
 	return func(sc *scan, args []*syntax.Word) (string, bool) {
-		ended := len(args) > 0 && args[0].Lit() == "--"
-		if args = args[pick(ended, 1, 0):]; len(args) == 1 {
-			if fields, err := sc.fields(args[0]); err == nil && len(fields) == 1 && (ended || !strings.HasPrefix(fields[0], "-")) {
+		if ended := len(args) > 0 && args[0].Lit() == "--"; len(args) == pick(ended, 2, 1) {
+			if fields, err := sc.fields(args[pick(ended, 1, 0)]); err == nil && len(fields) == 1 && (ended || !strings.HasPrefix(fields[0], "-")) {
 				return f(sc, fields[0])
 			}
 		}
@@ -129,12 +122,11 @@ func ofOperand(f func(*scan, string) (string, bool)) func(*scan, []*syntax.Word)
 }
 func dirname(_ *scan, p string) (string, bool) {
 	vol, sep := filepath.VolumeName(p), pick(filepath.Separator == '\\', `/\`, "/")
-	if rest := strings.TrimRight(p[len(vol):], sep); strings.LastIndexAny(rest, sep) >= 0 {
-		return vol + filepath.FromSlash(cmp.Or(strings.TrimRight(rest[:strings.LastIndexAny(rest, sep)], sep), string(filepath.Separator))), true
-	} else if rest == "" && len(p) > len(vol) {
-		return vol + string(filepath.Separator), true
+	rest := strings.TrimRight(p[len(vol):], sep)
+	if j := strings.LastIndexAny(rest, sep); j >= 0 {
+		return vol + filepath.FromSlash(cmp.Or(strings.TrimRight(rest[:j], sep), string(filepath.Separator))), true
 	}
-	return vol + ".", true
+	return vol + pick(rest == "" && len(p) > len(vol), string(filepath.Separator), "."), true
 }
 func (sc *scan) real(p string) (string, bool) {
 	if q, ok := sc.path(p, sc.dir); p != "" && ok {
@@ -147,8 +139,7 @@ func (sc *scan) real(p string) (string, bool) {
 // safeLocate finds the git worktree root for dir without statting remote targets or crossing mounts.
 func (sc *scan) safeLocate(dir string) (string, bool) {
 	gitEnv := []string{"GIT_CEILING_DIRECTORIES", "GIT_DISCOVERY_ACROSS_FILESYSTEM", "GIT_CONFIG", "GIT_CONFIG_GLOBAL", "GIT_CONFIG_SYSTEM", "GIT_CONFIG_COUNT", "GIT_CONFIG_PARAMETERS", "GIT_COMMON_DIR", "GIT_OBJECT_DIRECTORY"}
-	if dir == "" || sc.hasRemoteLink(dir) || sc.isUnresolvedVar("GIT_DIR") || sc.isUnresolvedVar("GIT_WORK_TREE") ||
-		slices.ContainsFunc(gitEnv, func(k string) bool { return sc.isUnresolvedVar(k) || sc.envVal(k) != "" }) {
+	if dir == "" || sc.hasRemoteLink(dir) || sc.isUnresolvedVar("GIT_DIR") || sc.isUnresolvedVar("GIT_WORK_TREE") || slices.ContainsFunc(gitEnv, func(k string) bool { return sc.isUnresolvedVar(k) || sc.envVal(k) != "" }) {
 		return "", false
 	}
 	if gd, wt := sc.envVal("GIT_DIR"), sc.envVal("GIT_WORK_TREE"); gd != "" || wt != "" {
@@ -171,9 +162,9 @@ func (sc *scan) safeLocate(dir string) (string, bool) {
 						sc.unknown = sc.unknown || errors.Is(err, errOpaque)
 					} else if target, ok := strings.CutPrefix(strings.TrimSuffix(strings.TrimSuffix(data, "\n"), "\r"), "gitdir: "); ok && target != "" {
 						if resolved, ok := sc.resolveJoined(cur, target, false); ok {
-							if r, _, gInfo, gFound := sc.walkPath(resolved, true); gFound && gInfo.IsDir() && sc.validGitDir(r) {
-								return cur, !sc.hasWorktreeConfig(r)
-							}
+							r, _, gInfo, gFound := sc.walkPath(resolved, true)
+							ok := gFound && gInfo.IsDir() && sc.validGitDir(r) && !sc.hasWorktreeConfig(r)
+							return pick(ok, cur, ""), ok
 						}
 					}
 				}
@@ -185,6 +176,15 @@ func (sc *scan) safeLocate(dir string) (string, bool) {
 	}
 	return "", false
 }
+func (sc *scan) gitCommonDir(dir string) (string, bool, bool) {
+	if common, err := sc.readSmallFile(filepath.Join(dir, "commondir")); errors.Is(err, fs.ErrNotExist) {
+		return "", false, true
+	} else if c := strings.TrimSpace(common); err == nil && c != "" {
+		r, ok := sc.resolveJoined(dir, c, false)
+		return r, true, ok
+	}
+	return "", true, false
+}
 func (sc *scan) validGitDir(dir string) bool {
 	head, err := sc.readSmallFile(filepath.Join(dir, "HEAD"))
 	h, ref := strings.TrimSpace(head), strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(head), "ref:"))
@@ -194,17 +194,20 @@ func (sc *scan) validGitDir(dir string) bool {
 	hasDir := func(p string) bool { _, _, info, ok := sc.walkPath(p, true); return ok && info.IsDir() }
 	if hasDir(filepath.Join(dir, "objects")) && (hasDir(filepath.Join(dir, "refs")) || hasDir(filepath.Join(dir, "reftable"))) {
 		return true
-	} else if common, err := sc.readSmallFile(filepath.Join(dir, "commondir")); err == nil && strings.TrimSpace(common) != "" {
-		r, ok := sc.resolveJoined(dir, strings.TrimSpace(common), false)
-		return ok && hasDir(filepath.Join(r, "objects"))
 	}
-	return false
+	r, present, ok := sc.gitCommonDir(dir)
+	return present && ok && hasDir(filepath.Join(r, "objects"))
 }
 func (sc *scan) hasWorktreeConfig(gitDir string) bool {
 	if sc.isUnresolvedVar("HOME") || sc.isUnresolvedVar("USERPROFILE") || sc.isUnresolvedVar("XDG_CONFIG_HOME") || sc.isUnresolvedVar("ProgramData") {
 		return true
 	}
 	paths := []string{filepath.Join(gitDir, "config"), filepath.Join(gitDir, "config.worktree")}
+	if r, present, ok := sc.gitCommonDir(gitDir); !ok {
+		return true
+	} else if present {
+		paths = append(paths, filepath.Join(r, "config"))
+	}
 	if filepath.Separator == '/' || sc.envVal("ProgramData") != "" {
 		paths = append(paths, pick(filepath.Separator == '/', "/etc/gitconfig", filepath.Join(sc.envVal("ProgramData"), "Git", "config")))
 	}
@@ -214,39 +217,59 @@ func (sc *scan) hasWorktreeConfig(gitDir string) bool {
 	if home, ok := sc.homeDir(); ok && home != "" {
 		paths = append(paths, filepath.Join(home, ".gitconfig"), filepath.Join(home, ".config", "git", "config"))
 	}
-	return slices.ContainsFunc(paths, func(p string) bool {
-		inSec, cont, inQ := false, false, false
-		scanVal := func(v string) bool {
-			cont = false
-			for i := 0; i < len(v) && (inQ || cont || v[i] != '#' && v[i] != ';'); i++ {
-				if cont && strings.IndexByte(`\"ntb`, v[i]) < 0 {
-					return true
-				}
-				inQ, cont = pick(!cont && v[i] == '"', !inQ, inQ), !cont && v[i] == '\\'
+	return slices.ContainsFunc(paths, sc.badGitConfig)
+}
+func (sc *scan) badGitConfig(p string) bool {
+	inSec, curSec, cont, inQ := false, "", false, false
+	scanVal := func(v string) (string, bool) {
+		out, end := []byte(nil), 0
+		cont = false
+		for i := 0; i < len(v) && (inQ || cont || v[i] != '#' && v[i] != ';'); i++ {
+			if cont && strings.IndexByte(`\"ntb`, v[i]) < 0 {
+				return "", true
+			} else if !cont && (v[i] == '\\' || v[i] == '"') {
+				inQ, cont = pick(v[i] == '"', !inQ, inQ), v[i] == '\\'
+			} else if cont || inQ || v[i] != ' ' && v[i] != '\t' || len(out) > 0 {
+				out, end, cont = append(out, v[i]), pick(cont || inQ || v[i] != ' ' && v[i] != '\t', len(out)+1, end), false
 			}
-			return !cont && inQ
 		}
-		return sc.fileHasLine(p, func(l string) bool {
-			if t := strings.TrimRight(strings.TrimLeft(strings.TrimPrefix(l, "\ufeff"), " \t"), "\r"); cont {
-				return scanVal(t)
-			} else if t != "" && t[0] != '#' && t[0] != ';' {
-				if t[0] == '[' {
-					head, after, br := strings.Cut(t[1:], "]")
-					sec, sub, hasQ := strings.Cut(head, `"`)
-					if s := strings.TrimSpace(sec); !br || s == "" || strings.Trim(s, alnum+"-.") != "" || hasQ && !strings.HasSuffix(sub, `"`) || strings.HasPrefix(strings.ToLower(s), "include") {
-						return true
-					}
-					if inSec, t = true, strings.TrimLeft(after, " \t"); t == "" || t[0] == '#' || t[0] == ';' {
-						return false
-					}
-				}
-				key, val, hasEq := strings.Cut(t, "=")
-				k := strings.TrimSpace(key)
-				return !inSec || k == "" || strings.EqualFold(k, "worktree") || strings.EqualFold(k, "bare") && (!hasEq || !slices.Contains([]string{"false", "no", "off", "0"}, strings.ToLower(strings.TrimSpace(val)))) || strings.IndexByte(alnum[:52], k[0]) < 0 || strings.Trim(k, alnum+"-") != "" || hasEq && scanVal(val)
-			}
+		return string(out[:end]), !cont && inQ
+	}
+	return sc.fileHasLine(p, func(l string) bool {
+		t := strings.TrimRight(strings.TrimLeft(strings.TrimPrefix(l, "\ufeff"), " \t"), "\r")
+		if cont {
+			_, bad := scanVal(t)
+			return bad
+		} else if t == "" || t[0] == '#' || t[0] == ';' {
 			return false
-		}) || inQ || cont
-	})
+		} else if t[0] == '[' {
+			if sec, after, hasSub, ok := parseGitSection(t); !ok || strings.HasPrefix(sec, "include") {
+				return true
+			} else if inSec, curSec, t = true, pick(hasSub, "", sec), strings.TrimLeft(after, " \t"); t == "" || t[0] == '#' || t[0] == ';' {
+				return false
+			}
+		}
+		key, raw, hasEq := strings.Cut(t, "=")
+		val, bad := scanVal(raw)
+		k := strings.TrimSpace(key)
+		return !inSec || k == "" || strings.IndexByte(alnum[:52], k[0]) < 0 || strings.Trim(k, alnum+"-") != "" || bad || badGitKey(curSec, strings.ToLower(k), strings.ToLower(val), hasEq, cont)
+	}) || inQ || cont
+}
+func parseGitSection(t string) (sec, after string, hasSub, ok bool) {
+	i := 1
+	for ; i < len(t) && strings.IndexByte(alnum+"-.", t[i]) >= 0; i++ {
+	}
+	sec = strings.ToLower(t[1:i])
+	if j := len(t) - len(strings.TrimLeft(t[i:], " \t")); sec != "" && j > i {
+		for hasSub, i = true, pick(j < len(t) && t[j] == '"', j+1, len(t)); i < len(t) && t[i] != '"'; i++ {
+			i += pick(t[i] == '\\', 1, 0)
+		}
+		i++
+	}
+	return sec, t[min(i+1, len(t)):], hasSub, sec != "" && i < len(t) && t[i] == ']'
+}
+func badGitKey(sec, k, val string, hasEq, cont bool) bool {
+	return sec == "core" && (k == "worktree" || k == "bare" && (!hasEq || cont || !slices.Contains([]string{"false", "no", "off", "0"}, val)) || k == "repositoryformatversion" && (!hasEq || cont || val != "0" && val != "1")) || sec == "extensions" && (cont || k == "objectformat" && (!hasEq || val != "sha1" && val != "sha256") || k == "partialclone" && (!hasEq || val == "") || (k == "worktreeconfig" || k == "preciousobjects") && hasEq && !slices.Contains([]string{"true", "false", "yes", "no", "on", "off", "1", "0"}, val) || !slices.Contains([]string{"objectformat", "partialclone", "worktreeconfig", "preciousobjects"}, k))
 }
 func (sc *scan) fileHasLine(path string, match func(string) bool) bool {
 	if p, ok := sc.resolveJoined(sc.dir, path, false); ok {
@@ -305,7 +328,7 @@ func (sc *scan) below(dir string, levels int) {
 }
 func (sc *scan) enclosingCheckout(root string) bool {
 	if home, ok := sc.homeDir(); ok && home != "" {
-		if r, _, _, found := sc.walkPath(home, true); found && samePath(root, r) || !found && !sc.unknown && samePath(root, home) {
+		if r, _, _, found := sc.walkPath(home, true); (found || !sc.unknown) && samePath(root, pick(found, r, home)) {
 			return true
 		}
 	}
@@ -327,8 +350,7 @@ func (sc *scan) holdsNone(p string) bool {
 			sc.none = append(sc.none, filepath.Join(home, "Library"))
 		}
 	}
-	return filepath.Base(p) == "node_modules" || strings.Contains(p, sep+"node_modules"+sep) ||
-		slices.ContainsFunc(sc.none, func(root string) bool { return p == root || strings.HasPrefix(p, root+sep) })
+	return filepath.Base(p) == "node_modules" || strings.Contains(p, sep+"node_modules"+sep) || slices.ContainsFunc(sc.none, func(root string) bool { return p == root || strings.HasPrefix(p, root+sep) })
 }
 
 // readDir lists dir via validated dirHandle (FIFO- and TOCTOU-safe), failing closed on unexpected errors.
