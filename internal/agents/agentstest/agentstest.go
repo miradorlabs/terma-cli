@@ -40,13 +40,20 @@ func (Agent) FlushAfter() []string { return nil }
 // Tool is the agent's label.
 func (a Agent) Tool() string { return cmp.Or(a.Label, a.ID) }
 
-// UserHooked is an Agent with machine-wide hooks: a JSON file at Path, and at each of
-// Others, with one Stop hook running the command it is given for "<id>-stop".
+// UserHooked is an Agent with machine-wide hooks: a JSON hooks file, with one Stop hook
+// running the command it is given for "<id>-stop".
 type UserHooked struct {
 	Agent
-	Path   string
+	// Path is the agent's hooks file.
+	Path string
+	// Others are more hooks files beside Path, for an agent with several homes on one
+	// machine: its own, and one for each copy another app runs with a folder of its own.
+	// Each home has a hooks file, and setup, teardown and doctor treat every file alike
+	// (agents.UserHooksFiles).
 	Others []string
-	// LeftOut, when set, is the note an install plans instead, changing nothing.
+	// LeftOut is the note a setup returns instead of writing anything: when it is set, an
+	// install changes no file and reports the note. A real agent does this for a home whose
+	// installed version is too old to run the hooks.
 	LeftOut string
 }
 
