@@ -50,8 +50,16 @@ func TestRelayCopilot(t *testing.T) {
 				// The turn arrived whole: its agent span, a request with its token counts, and the edit.
 				names := map[string]bool{}
 				tokens := false
+				// A span that names no session is its trace's, as the relay places it: the
+				// runtime's session.timing.* spans, one per phase of a turn, carry no id.
+				traces := map[string]bool{}
 				for _, s := range e.spans {
-					if v := s.Attrs["gen_ai.conversation.id"]; v != sid {
+					if s.Attrs["gen_ai.conversation.id"] == sid {
+						traces[string(s.Proto.GetTraceId())] = true
+					}
+				}
+				for _, s := range e.spans {
+					if v := s.Attrs["gen_ai.conversation.id"]; v != sid && (v != "" || !traces[string(s.Proto.GetTraceId())]) {
 						t.Errorf("relay forwarded span %s of another session: gen_ai.conversation.id=%q", s.Name, v)
 					}
 					names[strings.Fields(s.Name)[0]] = true
