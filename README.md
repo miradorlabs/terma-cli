@@ -504,25 +504,33 @@ keep their short values, such as a path or a command, and each long value is cut
 and ends the same way. Thinking is not sent. A tool's result on a transcript line over 8 MiB
 is lost.
 
-Two rules keep another repository's content out. A conversation sends no content at all
+Two rules limit what a session sends of another repository's content. They do not cover
+every tool. terma checks what a call names for `agy`'s own file and folder tools only. A
+shell command or an MCP tool that reads a repository your team's policy does not collect
+sends its arguments and its result under the session's consent, as it does for Claude Code
+and Codex.
+
+The first rule is about where the conversation works. A conversation sends no content at all
 while any folder it works in is outside a repository your team's policy collects: resumed
 from such a repository, or from a folder outside git, it sends none for the rest of its
 life. In global mode a folder outside git is collected, as a session outside git is. A
-folder that is a link is judged by the repository it leads to. The second rule covers
-`agy`'s own file and folder tools only: the tools that read, write and edit a file, and
-`list_dir`, `grep_search` and `find_by_name`. A call of one of them that names a file or
-folder in a repository the policy does not collect sends no arguments, and its result is
-withheld. So are the results of the other calls the model asked for in the same response,
-though their arguments are sent: `agy`'s transcript does not say which result belongs to
-which call. Links, nested clones and submodules are followed to the repository that holds
-the path. A path terma cannot place counts as not collected, and so does one under `~`, or
-any path with `GIT_DIR` set in the agent's environment. A file in no repository at all,
-such as a note in your home folder, is shown, as Claude Code and Codex show it. A folder in
-no repository is not, outside global mode, since a listing or a search of it returns what
-is under it. Every other tool's content, an MCP tool's and a shell command's among them, is
-sent under the session's consent with no check of what its arguments name, as Claude
-Code's and Codex's is. A search of a collected repository returns the files of a clone
-nested in it, and a reply can repeat what a refused read returned.
+folder that is a link is judged by the repository it leads to.
+
+The second rule covers `agy`'s own file and folder tools: the tools that read, write and
+edit a file, and `list_dir`, `grep_search` and `find_by_name`. A call of one of them that
+names a file or folder in a repository the policy does not collect sends no arguments, and
+its result is withheld. So are the results of the other calls the model asked for in the
+same response, though their arguments are sent: `agy`'s transcript does not say which result
+belongs to which call. Links, nested clones and submodules are followed to the repository
+that holds the path. A path terma cannot place counts as not collected, and so does one
+under `~`, or any path with `GIT_DIR` set in the agent's environment. A file in no
+repository at all, such as a note in your home folder, is shown, as Claude Code and Codex
+show it. A folder in no repository is not, outside global mode, since a listing or a search
+of it returns what is under it.
+
+What the two rules leave: every tool outside that list is sent with no check of what its
+arguments name. A search of a collected repository returns the files of a clone nested in
+it. A reply can repeat what a refused read returned.
 
 T3 Code runs its own copy of Antigravity, with a folder of its own in place of `~/.gemini`.
 Setup writes the same hook into each T3 Code Antigravity provider folder too:
