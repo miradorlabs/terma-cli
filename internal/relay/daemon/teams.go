@@ -89,7 +89,7 @@ var _ relay.Router = (*Teams)(nil)
 
 // UnknownToPersonal reports whether unplaced records currently route to Personal.
 func (t *Teams) UnknownToPersonal() bool {
-	pr := t.route("")
+	pr := t.route("", false)
 	return pr.ok && routing.UnknownToPersonal(pr.st, t.deps.Now())
 }
 
@@ -101,8 +101,11 @@ func (t *Teams) Route(rec relay.Record) relay.Routed {
 	if rec.Placed {
 		profile = rec.Placement.Profile
 	}
-	pr := t.route(profile)
+	pr := t.route(profile, false)
 	if !pr.ok || (rec.Account != "" && pr.st.Account != rec.Account) {
+		return relay.Routed{Outcome: relay.Hold, Why: relay.WhyNoState}
+	}
+	if rec.Placed && (rec.Placement.Account == "" || rec.Placement.Account != pr.st.Account) {
 		return relay.Routed{Outcome: relay.Hold, Why: relay.WhyNoState}
 	}
 	if from, mixed := t.mixedInterval(rec.Session, rec.At, rec.EffectiveEnd()); mixed || rec.Placed && rec.Placement.Kind == claim.KindMixed {
@@ -145,7 +148,7 @@ func (t *Teams) Route(rec relay.Record) relay.Routed {
 
 // Recheck starts a recheck pass over enrollment's pinned/queued records for account.
 func (t *Teams) Recheck(enrollment, account string) relay.Rechecker {
-	pr, found, waits := t.owner(enrollment, account)
+	pr, found, waits := t.owner(enrollment, account, true)
 	return &recheck{
 		stateDir: t.cfg.StateDir, enrollment: enrollment, st: pr.st, router: pr.router,
 		ok: found || !waits, now: t.deps.Now(), runs: map[string]runs.Snapshot{},
@@ -214,7 +217,7 @@ func (p *recheck) Entry(q relay.Queued) relay.Rechecked {
 // Selected reports whether enrollment is still selected for account, returning true while a
 // potentially owning routing state cannot be read or belongs to another account.
 func (t *Teams) Selected(enrollment, account string) bool {
-	_, found, waits := t.owner(enrollment, account)
+	_, found, waits := t.owner(enrollment, account, true)
 	return found || waits
 }
 
@@ -223,7 +226,7 @@ func (t *Teams) Selected(enrollment, account string) bool {
 // server-key profiles validate cfg.Team and cfg.ServerKeyAuthURL and populate Policy.Key
 // from keys.json so no X-Mirador-Project header is sent.
 func (t *Teams) Resolve(enrollment, tool, account string) (relay.Policy, error) {
-	pr, found, _ := t.owner(enrollment, account)
+	pr, found, _ := t.owner(enrollment, account, true)
 	if !found {
 		return relay.Policy{}, errNoTeam
 	}
@@ -260,7 +263,7 @@ func (t *Teams) Resolve(enrollment, tool, account string) (relay.Policy, error) 
 		if pr.st.Account == "" || pr.st.Account == sendas.NoPersonLane {
 			return relay.Policy{}, errWrongAccount
 		}
-		if u := t.user(cfg, tm, endpoint); u != "" {
+		if u := t.user(cfg, pr.st.Account, tm, endpoint); u != "" {
 			pol.User, pol.UserAccount = u, auth.AccountKey(cfg.AuthURL, u)
 		}
 	}
@@ -315,11 +318,11 @@ func (t *Teams) serverKey(dir, teamID string) (string, error) {
 	return key, err
 }
 
-func (t *Teams) user(cfg *config.Config, tm routing.Team, endpoint string) string {
+func (t *Teams) user(cfg *config.Config, account string, tm routing.Team, endpoint string) string {
 	if t.deps.User == nil {
 		return ""
 	}
-	key := cfg.ProfileName + "\x00" + tm.OrganizationID + "\x00" + tm.AuthURL + "\x00" + endpoint
+	key := cfg.ProfileName + "\x00" + account + "\x00" + tm.OrganizationID + "\x00" + tm.AuthURL + "\x00" + endpoint
 	now := t.deps.Now()
 	t.userMu.Lock()
 	defer t.userMu.Unlock()

@@ -39,7 +39,7 @@ func expectedAccount(cfg *config.Config) string {
 // Active reports whether routing is active for the relay's profile (routing/<profile>.json
 // exists on disk, even if corrupt or mismatched so it fails closed rather than falling
 // back to the pre-cutover single-team path).
-func (t *Teams) Active() bool { return t.route("").exists }
+func (t *Teams) Active() bool { return t.route("", false).exists }
 
 // Invalidate clears cached routing-state snapshots so the next lookup reloads from disk.
 func (t *Teams) Invalidate() {
@@ -51,14 +51,16 @@ func (t *Teams) Invalidate() {
 	}
 }
 
-func (t *Teams) activeProfile() string {
+func (t *Teams) activeProfile(fresh bool) string {
 	now := t.deps.Now()
-	t.mu.Lock()
-	if t.active != "" && now.Sub(t.activeAt) < t.ttl {
-		defer t.mu.Unlock()
-		return t.active
+	if !fresh {
+		t.mu.Lock()
+		if t.active != "" && now.Sub(t.activeAt) < t.ttl {
+			defer t.mu.Unlock()
+			return t.active
+		}
+		t.mu.Unlock()
 	}
-	t.mu.Unlock()
 	name := t.cfg.ProfileName
 	if t.deps.Active != nil {
 		name = cmp.Or(t.deps.Active(), name)
@@ -69,7 +71,7 @@ func (t *Teams) activeProfile() string {
 	return name
 }
 
-func (t *Teams) route(profile string) profileRoute {
+func (t *Teams) route(profile string, fresh bool) profileRoute {
 	if profile == "" {
 		profile = t.cfg.ProfileName
 	}
@@ -81,7 +83,7 @@ func (t *Teams) route(profile string) profileRoute {
 		pr = &profileRoute{}
 		t.profiles[profile] = pr
 	}
-	if !pr.loadedAt.IsZero() && now.Sub(pr.loadedAt) < t.ttl {
+	if !fresh && !pr.loadedAt.IsZero() && now.Sub(pr.loadedAt) < t.ttl {
 		return *pr
 	}
 	pr.loadedAt = now
@@ -122,7 +124,7 @@ func (t *Teams) profileConfig(name string) *config.Config {
 // enrollment was not found and some profile's routing state could not be read, failed
 // account verification, or currently belongs to another account — preventing transient
 // errors or another user's state from falsely discarding queued telemetry.
-func (t *Teams) owner(enrollment, account string) (pr profileRoute, found, waits bool) {
+func (t *Teams) owner(enrollment, account string, fresh bool) (pr profileRoute, found, waits bool) {
 	t.mu.Lock()
 	last := t.owners[enrollment]
 	read := slices.Collect(maps.Keys(t.profiles))
@@ -134,7 +136,7 @@ func (t *Teams) owner(enrollment, account string) (pr profileRoute, found, waits
 				continue
 			}
 			tried[name] = true
-			pr = t.route(name)
+			pr = t.route(name, fresh)
 			if !pr.ok {
 				waits = true
 				continue
@@ -152,7 +154,7 @@ func (t *Teams) owner(enrollment, account string) (pr profileRoute, found, waits
 		}
 		return false
 	}
-	if try(last, t.activeProfile()) {
+	if try(last, t.activeProfile(fresh)) {
 		return pr, true, false
 	}
 	if f, err := config.LoadFile(t.cfg.Dir); err != nil {

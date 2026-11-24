@@ -24,6 +24,7 @@ type PolicyRefresher struct {
 
 	mu       sync.Mutex
 	next     map[string]time.Time
+	every    map[string]time.Duration
 	inFlight map[string]bool
 	pending  map[string]bool
 	wake     chan struct{}
@@ -55,6 +56,9 @@ func (p *PolicyRefresher) Nudge(team string) {
 	if p.next == nil {
 		p.next = map[string]time.Time{}
 	}
+	if p.every == nil {
+		p.every = map[string]time.Duration{}
+	}
 	if p.pending == nil {
 		p.pending = map[string]bool{}
 	}
@@ -62,6 +66,7 @@ func (p *PolicyRefresher) Nudge(team string) {
 		p.pending[team] = true
 	} else {
 		p.next[team] = time.Time{}
+		delete(p.every, team)
 	}
 	ch := p.wakeChan()
 	p.mu.Unlock()
@@ -83,6 +88,9 @@ func (p *PolicyRefresher) Run(ctx context.Context) {
 	if p.next == nil {
 		p.next = map[string]time.Time{}
 	}
+	if p.every == nil {
+		p.every = map[string]time.Duration{}
+	}
 	if p.inFlight == nil {
 		p.inFlight = map[string]bool{}
 	}
@@ -103,6 +111,7 @@ func (p *PolicyRefresher) Run(ctx context.Context) {
 				if p.pending[team] {
 					delete(p.pending, team)
 					p.next[team] = time.Time{}
+					delete(p.every, team)
 					p.mu.Unlock()
 					select {
 					case wake <- struct{}{}:
@@ -110,6 +119,7 @@ func (p *PolicyRefresher) Run(ctx context.Context) {
 					}
 					return
 				}
+				p.every[team] = every
 				p.next[team] = p.Now().Add(every)
 				p.mu.Unlock()
 			})
@@ -133,12 +143,14 @@ func (p *PolicyRefresher) due() []string {
 		if p.inFlight[team] {
 			continue
 		}
+		curEvery := p.intervalFor(team)
 		next, known := p.next[team]
-		if !known {
+		if !known || (!next.IsZero() && p.every[team] != curEvery) {
 			next = now
 			if at := p.Fetched(team); !at.IsZero() {
-				next = at.Add(p.intervalFor(team))
+				next = at.Add(curEvery)
 			}
+			p.every[team] = curEvery
 		}
 		if now.Before(next) {
 			p.next[team] = next

@@ -37,8 +37,14 @@ func BindTeams(d Deps, cfg *config.Config, opts *relay.Options) (worker func(con
 // teams every RefusedRecheck, and committing every result through CAS routing.Update with
 // pre-request per-enrollment epoch snapshots.
 func (d Deps) TeamRefresher(onChange func(enrollments ...string)) *PolicyRefresher {
-	now := time.Now
-	return &PolicyRefresher{
+	var ref *PolicyRefresher
+	clock := func() time.Time {
+		if ref != nil && ref.Now != nil {
+			return ref.Now()
+		}
+		return time.Now()
+	}
+	ref = &PolicyRefresher{
 		Interval: PolicyRefreshInterval,
 		Discover: 5 * time.Second,
 		Teams: func() []string {
@@ -61,14 +67,14 @@ func (d Deps) TeamRefresher(onChange func(enrollments ...string)) *PolicyRefresh
 			switch {
 			case !has:
 				return time.Time{}
-			case t.StateAt(now()) == routing.Refused:
+			case t.StateAt(clock()) == routing.Refused:
 				return t.RefusedAt
 			}
 			return t.Policy.FetchedAt
 		},
 		Every: func(enrollment string) time.Duration {
 			if _, st, ok := d.committedRouting(); ok {
-				if t, has := st.Team(enrollment); has && t.StateAt(now()) == routing.Refused {
+				if t, has := st.Team(enrollment); has && t.StateAt(clock()) == routing.Refused {
 					return RefusedRecheck
 				}
 			}
@@ -78,6 +84,7 @@ func (d Deps) TeamRefresher(onChange func(enrollments ...string)) *PolicyRefresh
 			return d.refreshTeam(ctx, enrollment, onChange)
 		},
 	}
+	return ref
 }
 
 // committedRouting loads the profile's config and routing.State, failing closed (ok=false)

@@ -1,9 +1,12 @@
 package daemon
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"slices"
@@ -12,12 +15,18 @@ import (
 	"testing"
 	"time"
 
+	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
+	logspb "go.opentelemetry.io/proto/otlp/logs/v1"
+	resourcepb "go.opentelemetry.io/proto/otlp/resource/v1"
+	"google.golang.org/protobuf/proto"
+
 	"github.com/miradorlabs/terma-cli/internal/account/auth"
 	"github.com/miradorlabs/terma-cli/internal/account/keystore"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/policy"
 	"github.com/miradorlabs/terma-cli/internal/relay"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
+	"github.com/miradorlabs/terma-cli/internal/relay/shape"
 	"github.com/miradorlabs/terma-cli/internal/routing"
 	"github.com/miradorlabs/terma-cli/internal/runs"
 	"github.com/miradorlabs/terma-cli/internal/sendas"
@@ -501,7 +510,7 @@ func TestTeamsActiveMixedAndResolve(t *testing.T) {
 	// Straddling interval [mixedAt-1m, mixedAt+1m] MUST drop as Mixed!
 	straddle := relay.Record{
 		Session: "sess-mixed", Account: alice, Placed: true,
-		Placement: claim.Claim{Profile: "default", Kind: claim.KindRepository, Repository: config.Repository{Origin: "github.com/a/r1"}},
+		Placement: claim.Claim{Profile: "default", Account: alice, Kind: claim.KindRepository, Repository: config.Repository{Origin: "github.com/a/r1"}},
 		At:        mixedAt.Add(-time.Minute), EndAt: mixedAt.Add(time.Minute),
 	}
 	if got := teams.Route(straddle); got.Outcome != relay.Drop || got.Why != relay.WhyMixed || !got.MixedAt.Equal(mixedAt) {
@@ -586,5 +595,458 @@ func TestTeamsActiveMixedAndResolve(t *testing.T) {
 	badTeamTeams := NewTeams(&badTeamCfg, TeamsDeps{Now: func() time.Time { return now }})
 	if _, err := badTeamTeams.Resolve("e-srv", "claude", sendas.NoPersonLane); err == nil {
 		t.Fatal("server-key Resolve succeeded with mismatched cfg.Team")
+	}
+}
+
+type fakeSignIn struct {
+	account string
+	tokenFn func(ctx context.Context, account string) (string, error)
+	refused atomic.Int32
+	retired atomic.Int32
+}
+
+func (f *fakeSignIn) Account() string { return f.account }
+func (f *fakeSignIn) Token(ctx context.Context, account string) (string, error) {
+	if f.tokenFn != nil {
+		return f.tokenFn(ctx, account)
+	}
+	if account != f.account {
+		return "", nil
+	}
+	return "tok-" + account, nil
+}
+func (f *fakeSignIn) Refused(context.Context, string) { f.refused.Add(1) }
+func (f *fakeSignIn) Retired(string)                  { f.retired.Add(1) }
+
+type sessionCorrelator struct{}
+
+func (sessionCorrelator) Correlation() shape.Correlation {
+	return shape.Correlation{SessionKeys: []shape.SessionKey{shape.SessionID}}
+}
+
+func sessionLogBytes(t *testing.T, session, body string, at time.Time) []byte {
+	t.Helper()
+	b, err := proto.Marshal(&logspb.LogsData{ResourceLogs: []*logspb.ResourceLogs{{
+		Resource: &resourcepb.Resource{Attributes: []*commonpb.KeyValue{{
+			Key:   "session.id",
+			Value: &commonpb.AnyValue{Value: &commonpb.AnyValue_StringValue{StringValue: session}},
+		}}},
+		ScopeLogs: []*logspb.ScopeLogs{{LogRecords: []*logspb.LogRecord{{
+			TimeUnixNano: uint64(at.UnixNano()),
+			Body:         &commonpb.AnyValue{Value: &commonpb.AnyValue_StringValue{StringValue: body}},
+		}}}},
+	}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return b
+}
+
+// Surviving foreign-account (or empty-account) placements fail closed after Alice->Bob replacement.
+func TestTeamsRouteRejectsForeignPlacementAccount(t *testing.T) {
+	t.Parallel()
+	stateDir, cfgDir := t.TempDir(), t.TempDir()
+	now := time.Now().UTC().Truncate(time.Second)
+	alice, bob := testAccount("alice"), testAccount("bob")
+	setupProfileDir(t, cfgDir, "default", []string{"claude"})
+
+	tm := activeTeam("e-bob", "team-bob", testOrgA, false, now, "github.com/a/r1")
+	writeRoutingState(t, stateDir, routing.State{
+		Profile:  "default",
+		Account:  bob,
+		Teams:    []routing.Team{tm},
+		Bindings: map[string]routing.Binding{"github.com/a/r1": {Organization: testOrgA}},
+	})
+	cfg := &config.Config{Dir: cfgDir, StateDir: stateDir, ProfileName: "default", AuthURL: testAuthURL, OTLPURL: testOTLPURL, Account: bob}
+	teams := NewTeams(cfg, TeamsDeps{Now: func() time.Time { return now }})
+
+	for name, claimAcct := range map[string]string{"foreign_alice": alice, "empty_account": ""} {
+		got := teams.Route(relay.Record{
+			Session: "s1", Account: bob, Placed: true, At: now, EndAt: now,
+			Placement: claim.Claim{Profile: "default", Account: claimAcct, Kind: claim.KindRepository, Repository: config.Repository{Origin: "github.com/a/r1"}},
+		})
+		if got.Outcome != relay.Hold || got.Why != relay.WhyNoState {
+			t.Fatalf("%s: Route = %+v, want Hold(WhyNoState)", name, got)
+		}
+	}
+	// Matching Bob placement routes cleanly.
+	ok := teams.Route(relay.Record{
+		Session: "s1", Account: bob, Placed: true, At: now, EndAt: now,
+		Placement: claim.Claim{Profile: "default", Account: bob, Kind: claim.KindRepository, Repository: config.Repository{Origin: "github.com/a/r1"}},
+	})
+	if ok.Outcome != relay.Send || ok.Queued.Enrollment != "e-bob" {
+		t.Fatalf("bob placement Route = %+v, want Send(e-bob)", ok)
+	}
+}
+
+// Intervals spanning a Mixed run followed by a clean resumed run are caught by Route and Recheck.
+func TestTeamsMixedIntervalSpanningCleanResume(t *testing.T) {
+	t.Parallel()
+	stateDir, cfgDir := t.TempDir(), t.TempDir()
+	t0 := time.Date(2026, 4, 20, 12, 0, 0, 0, time.UTC)
+	now := t0.Add(time.Minute)
+	alice := testAccount("alice")
+	setupProfileDir(t, cfgDir, "default", []string{"claude"})
+
+	tm := activeTeam("e1", "team-1", testOrgA, false, now, "github.com/a/r1")
+	writeRoutingState(t, stateDir, routing.State{
+		Profile:  "default",
+		Account:  alice,
+		Teams:    []routing.Team{tm},
+		Bindings: map[string]routing.Binding{"github.com/a/r1": {Organization: testOrgA}},
+	})
+	// Run 1 starts at t0, turns Mixed at t0+10s; Run 2 resumes cleanly at t0+20s.
+	if _, err := runs.Start(stateDir, "sess-resume", t0); err != nil {
+		t.Fatal(err)
+	}
+	mixedAt := t0.Add(10 * time.Second)
+	if err := runs.MarkMixed(stateDir, "sess-resume", mixedAt, runs.Why{Reason: runs.Crossed}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := runs.Start(stateDir, "sess-resume", t0.Add(20*time.Second)); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := &config.Config{Dir: cfgDir, StateDir: stateDir, ProfileName: "default", AuthURL: testAuthURL, OTLPURL: testOTLPURL, Account: alice}
+	teams := NewTeams(cfg, TeamsDeps{Now: func() time.Time { return now }})
+	base := relay.Record{
+		Session: "sess-resume", Account: alice, Placed: true,
+		Placement: claim.Claim{Profile: "default", Account: alice, Kind: claim.KindRepository, Repository: config.Repository{Origin: "github.com/a/r1"}},
+	}
+
+	// Span/metric [t0+5s, t0+25s] starts before MixedAt and ends inside clean Run 2 -> MUST Drop!
+	spanning := base
+	spanning.At, spanning.EndAt = t0.Add(5*time.Second), t0.Add(25*time.Second)
+	if got := teams.Route(spanning); got.Outcome != relay.Drop || got.Why != relay.WhyMixed || !got.MixedAt.Equal(mixedAt) {
+		t.Fatalf("spanning resume Route = %+v, want Drop(WhyMixed, %v)", got, mixedAt)
+	}
+	// Clean pre-Mixed [t0+5s, t0+9s] and clean post-resume [t0+21s, t0+25s] MUST Send!
+	for name, iv := range map[string][2]time.Time{
+		"before_mixed": {t0.Add(5 * time.Second), t0.Add(9 * time.Second)},
+		"after_resume": {t0.Add(21 * time.Second), t0.Add(25 * time.Second)},
+	} {
+		rec := base
+		rec.At, rec.EndAt = iv[0], iv[1]
+		if got := teams.Route(rec); got.Outcome != relay.Send {
+			t.Fatalf("%s Route = %+v, want Send", name, got)
+		}
+	}
+	// Recheck catches spanning queued entry too.
+	rc := teams.Recheck("e1", alice)
+	q := relay.Queued{
+		Profile: "default", Enrollment: "e1", Project: "team-1", Account: alice,
+		Kind: string(routing.Repository), Repository: "github.com/a/r1",
+		Session: "sess-resume", At: t0.Add(5 * time.Second), EndAt: t0.Add(25 * time.Second),
+	}
+	if ver := rc.Entry(q); ver.Verdict != relay.Discard || ver.Why != relay.WhyMixed || !ver.MixedAt.Equal(mixedAt) {
+		t.Fatalf("spanning resume Recheck = %+v, want Discard(WhyMixed, %v)", ver, mixedAt)
+	}
+}
+
+// Pre-POST send fence reads fresh routing state even without Invalidate when CAS deselects
+// an enrollment while Token acquisition is blocked (within the 1s route cache TTL).
+func TestTeamsSendFenceReadsFreshStateWithoutInvalidate(t *testing.T) {
+	t.Parallel()
+	stateDir, cfgDir, outboxDir := t.TempDir(), t.TempDir(), t.TempDir()
+	now := time.Now().UTC().Truncate(time.Second)
+	alice := testAccount("alice")
+	setupProfileDir(t, cfgDir, "default", []string{"claude"})
+
+	var posts atomic.Int32
+	up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		posts.Add(1)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer up.Close()
+
+	tm := activeTeam("e1", "team-1", testOrgA, false, now, "github.com/a/r1")
+	writeRoutingState(t, stateDir, routing.State{
+		Profile:  "default",
+		Account:  alice,
+		Teams:    []routing.Team{tm},
+		Bindings: map[string]routing.Binding{"github.com/a/r1": {Organization: testOrgA}},
+	})
+	cfg := &config.Config{Dir: cfgDir, StateDir: stateDir, ProfileName: "default", AuthURL: testAuthURL, OTLPURL: up.URL, Account: alice}
+	// Fixed clock keeps Route's 1s cache perpetually fresh if Recheck doesn't bypass it.
+	teams := NewTeams(cfg, TeamsDeps{Now: func() time.Time { return now }, AgentName: func(s string) string { return s }})
+
+	tokEntered := make(chan struct{})
+	tokRelease := make(chan struct{})
+	var tokOnce sync.Once
+	si := &fakeSignIn{
+		account: alice,
+		tokenFn: func(_ context.Context, acct string) (string, error) {
+			tokOnce.Do(func() { close(tokEntered) })
+			<-tokRelease
+			return "tok-" + acct, nil
+		},
+	}
+
+	r := relay.New(relay.Options{
+		Dir: outboxDir, Token: "relay-tok", SignIn: si, Router: teams,
+		Correlators: []shape.Correlator{sessionCorrelator{}},
+		Now:         func() time.Time { return now },
+		Lookup: func(session string, _ time.Time) (claim.Claim, bool) {
+			if session != "s-fence" {
+				return claim.Claim{}, false
+			}
+			return claim.Claim{Profile: "default", Account: alice, Kind: claim.KindRepository, Tool: "claude", Repository: config.Repository{Origin: "github.com/a/r1"}}, true
+		},
+	})
+	ctx, cancel := context.WithCancel(t.Context())
+	done := make(chan struct{})
+	go func() { defer close(done); r.Run(ctx) }()
+	defer func() { cancel(); <-done }()
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/logs", bytes.NewReader(sessionLogBytes(t, "s-fence", "hello", now)))
+	req.Header.Set("Authorization", "Bearer relay-tok")
+	req.Header.Set("Content-Type", "application/x-protobuf")
+	rec := httptest.NewRecorder()
+	r.Handler().ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("ingest = %d", rec.Code)
+	}
+
+	select {
+	case <-tokEntered:
+	case <-time.After(3 * time.Second):
+		t.Fatal("timed out waiting for teamSender to enter Token()")
+	}
+	// Deselect e1 via CAS WITHOUT calling teams.Invalidate() and with frozen clock!
+	if _, err := routing.Update(stateDir, "default", routing.Expect{Account: alice}, func(s *routing.State) error {
+		s.Deselect("e1")
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	close(tokRelease)
+
+	deadline := time.Now().Add(3 * time.Second)
+	for r.Stats().Snapshot().Counters["dropped.team_deselected.logs"] < 1 && time.Now().Before(deadline) {
+		time.Sleep(15 * time.Millisecond)
+	}
+	if posts.Load() != 0 {
+		t.Fatalf("upstream received %d POSTs after concurrent CAS deselect, want 0", posts.Load())
+	}
+	if got := r.Stats().Snapshot().Counters["dropped.team_deselected.logs"]; got != 1 {
+		t.Fatalf("dropped.team_deselected.logs = %d, want 1", got)
+	}
+}
+
+// PolicyRefresher recalculates cached deadlines when Every changes (sibling refusal 1m->24h
+// and external Refused->Active recovery 24h->1m) while preserving failure throttling.
+func TestPolicyRefresherRecalculatesDeadlinesOnStateTransitions(t *testing.T) {
+	t.Parallel()
+	var mu sync.Mutex
+	now := time.Date(2026, 4, 20, 12, 0, 0, 0, time.UTC)
+	getNow := func() time.Time { mu.Lock(); defer mu.Unlock(); return now }
+	advance := func(d time.Duration) { mu.Lock(); now = now.Add(d); mu.Unlock() }
+
+	everyMap := map[string]time.Duration{"e-sib": PolicyRefreshInterval}
+	fetchedMap := map[string]time.Time{"e-sib": now}
+	refreshes := make(chan string, 10)
+	tickCh := make(chan time.Time, 1)
+
+	ref := &PolicyRefresher{
+		Interval: PolicyRefreshInterval,
+		Discover: time.Second,
+		Now:      getNow,
+		After:    func(time.Duration) <-chan time.Time { return tickCh },
+		Teams:    func() []string { return []string{"e-sib"} },
+		Every: func(team string) time.Duration {
+			mu.Lock()
+			defer mu.Unlock()
+			return everyMap[team]
+		},
+		Fetched: func(team string) time.Time {
+			mu.Lock()
+			defer mu.Unlock()
+			return fetchedMap[team]
+		},
+		Refresh: func(_ context.Context, team string) error {
+			refreshes <- team
+			return errors.New("transient")
+		},
+	}
+	ctx, cancel := context.WithCancel(t.Context())
+	done := make(chan struct{})
+	go func() { defer close(done); ref.Run(ctx) }()
+	defer func() { cancel(); <-done }()
+
+	// Initial due() caches 1m deadline (now + 1m). Now sibling is refused org-wide (24h).
+	tickCh <- getNow()
+	time.Sleep(25 * time.Millisecond)
+	mu.Lock()
+	everyMap["e-sib"] = RefusedRecheck
+	fetchedMap["e-sib"] = now
+	mu.Unlock()
+
+	// Advancing 2m must NOT trigger a refresh because the sibling adopted RefusedRecheck (24h).
+	advance(2 * time.Minute)
+	tickCh <- getNow()
+	select {
+	case got := <-refreshes:
+		t.Fatalf("refused sibling %q refreshed after 2m despite 24h RefusedRecheck", got)
+	case <-time.After(80 * time.Millisecond):
+	}
+
+	// External recovery back to Active (1m) with an older FetchedAt triggers refresh on next tick!
+	mu.Lock()
+	everyMap["e-sib"] = PolicyRefreshInterval
+	fetchedMap["e-sib"] = now.Add(-2 * time.Minute)
+	mu.Unlock()
+	tickCh <- getNow()
+	select {
+	case <-refreshes:
+	case <-time.After(2 * time.Second):
+		t.Fatal("externally recovered Active team did not recalculate past 24h deadline")
+	}
+
+	// Transient failure with unchanged 1m interval preserves failure throttling (no immediate spin).
+	time.Sleep(30 * time.Millisecond)
+	tickCh <- getNow()
+	select {
+	case got := <-refreshes:
+		t.Fatalf("failed refresh for %q spun immediately instead of throttling", got)
+	case <-time.After(80 * time.Millisecond):
+	}
+}
+
+// User identity cache is scoped by account so Alice->Bob switch in the same org stamps Bob.
+func TestTeamsUserCacheScopedByAccount(t *testing.T) {
+	t.Parallel()
+	stateDir, cfgDir := t.TempDir(), t.TempDir()
+	now := time.Now().UTC().Truncate(time.Second)
+	alice, bob := testAccount("alice"), testAccount("bob")
+	setupProfileDir(t, cfgDir, "default", []string{"claude"})
+
+	var mu sync.Mutex
+	curAcct, curUser := alice, "alice"
+	cfg := &config.Config{Dir: cfgDir, StateDir: stateDir, ProfileName: "default", AuthURL: testAuthURL, OTLPURL: testOTLPURL, Account: alice}
+	teams := NewTeams(cfg, TeamsDeps{
+		Now: func() time.Time { return now },
+		Profile: func(string) (*config.Config, error) {
+			mu.Lock()
+			defer mu.Unlock()
+			c := *cfg
+			c.Account = curAcct
+			return &c, nil
+		},
+		User: func(_ *config.Config, _ routing.Team, _ string) string {
+			mu.Lock()
+			defer mu.Unlock()
+			return curUser
+		},
+	})
+
+	tAlice := activeTeam("e-a", "team-1", testOrgA, false, now, "github.com/a/r1")
+	writeRoutingState(t, stateDir, routing.State{Profile: "default", Account: alice, Teams: []routing.Team{tAlice}})
+	polA, err := teams.Resolve("e-a", "claude", alice)
+	if err != nil || polA.User != "alice" || polA.UserAccount != alice {
+		t.Fatalf("alice Resolve = %+v, %v", polA, err)
+	}
+
+	// Switch to Bob in the SAME org, profile, authURL, and endpoint within userTTL!
+	mu.Lock()
+	curAcct, curUser = bob, "bob"
+	mu.Unlock()
+	tBob := activeTeam("e-b", "team-1", testOrgA, false, now, "github.com/a/r1")
+	writeRoutingState(t, stateDir, routing.State{Profile: "default", Account: bob, Teams: []routing.Team{tBob}})
+	polB, err := teams.Resolve("e-b", "claude", bob)
+	if err != nil || polB.User != "bob" || polB.UserAccount != bob {
+		t.Fatalf("bob Resolve reused stale cache: %+v, %v", polB, err)
+	}
+}
+
+// End-to-end 403 ORG_NOT_ACCESSIBLE -> coalesced Nudge -> CAS ApplyOrgAccessLost ->
+// OnStateChange wakes teamSender immediately past refusedBackoff and purges the dead queue.
+func TestBindTeams403RefreshesCommitsRefusedAndPurgesQueue(t *testing.T) {
+	t.Parallel()
+	stateDir, cfgDir, outboxDir := t.TempDir(), t.TempDir(), t.TempDir()
+	now := time.Now().UTC().Truncate(time.Second)
+	alice := testAccount("alice")
+	setupProfileDir(t, cfgDir, "default", []string{"claude"})
+
+	up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = w.Write([]byte(`{"code":7,"message":"denied","details":[{"@type":"type.googleapis.com/google.rpc.ErrorInfo","reason":"ORG_NOT_ACCESSIBLE"}]}`))
+	}))
+	defer up.Close()
+
+	tm := activeTeam("e-403", "team-403", testOrgA, false, now, "github.com/a/r1")
+	writeRoutingState(t, stateDir, routing.State{
+		Profile:  "default",
+		Account:  alice,
+		Teams:    []routing.Team{tm},
+		Bindings: map[string]routing.Binding{"github.com/a/r1": {Organization: testOrgA}},
+	})
+	cfg := &config.Config{Dir: cfgDir, StateDir: stateDir, ProfileName: "default", AuthURL: testAuthURL, OTLPURL: up.URL, Account: alice}
+
+	var refreshed atomic.Int32
+	d := Deps{
+		LoadConfig: func() (*config.Config, error) { return cfg, nil },
+		AgentName:  func(s string) string { return s },
+		RefreshTeam: func(_ context.Context, _ *config.Config, _ string, team routing.Team) (routing.Refresh, error) {
+			refreshed.Add(1)
+			return routing.Refresh{
+				EnrollmentID: team.EnrollmentID, Epoch: team.Epoch,
+				Failure: routing.OrgAccessLost, At: time.Now().UTC(),
+			}, nil
+		},
+	}
+
+	si := &fakeSignIn{account: alice}
+	opts := relay.Options{
+		Dir: outboxDir, Token: "relay-tok", SignIn: si,
+		Correlators: []shape.Correlator{sessionCorrelator{}},
+		Lookup: func(session string, _ time.Time) (claim.Claim, bool) {
+			if session != "s-403" {
+				return claim.Claim{}, false
+			}
+			return claim.Claim{Profile: "default", Account: alice, Kind: claim.KindRepository, Tool: "claude", Repository: config.Repository{Origin: "github.com/a/r1"}}, true
+		},
+	}
+	worker, onRelay := BindTeams(d, cfg, &opts)
+	r := relay.New(opts)
+	onRelay(r)
+
+	ctx, cancel := context.WithCancel(t.Context())
+	var wg sync.WaitGroup
+	wg.Go(func() { worker(ctx) })
+	wg.Go(func() { r.Run(ctx) })
+	defer func() { cancel(); wg.Wait() }()
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/logs", bytes.NewReader(sessionLogBytes(t, "s-403", "hello", now)))
+	req.Header.Set("Authorization", "Bearer relay-tok")
+	req.Header.Set("Content-Type", "application/x-protobuf")
+	rec := httptest.NewRecorder()
+	r.Handler().ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("ingest = %d", rec.Code)
+	}
+
+	// Must refresh, commit Refused, wake past 5m refusedBackoff, and purge within 5s.
+	deadline := time.Now().Add(5 * time.Second)
+	for r.Stats().Snapshot().Counters["dropped.team_blocked.logs"] < 1 && time.Now().Before(deadline) {
+		time.Sleep(20 * time.Millisecond)
+	}
+	if got := r.Stats().Snapshot().Counters["dropped.team_blocked.logs"]; got != 1 {
+		t.Fatalf("dropped.team_blocked.logs = %d (refreshed=%d, counters=%v), want 1", got, refreshed.Load(), r.Stats().Snapshot().Counters)
+	}
+	if si.refused.Load() != 0 || si.retired.Load() != 0 {
+		t.Fatalf("403 ORG_NOT_ACCESSIBLE mutated sign-in: refused=%d retired=%d", si.refused.Load(), si.retired.Load())
+	}
+	st, ok, err := routing.Load(stateDir, "default")
+	if err != nil || !ok {
+		t.Fatalf("routing.Load: %v, %v", ok, err)
+	}
+	gotTeam, _ := st.Team("e-403")
+	if gotTeam.StateAt(time.Now().UTC()) != routing.Refused || gotTeam.LastError != routing.OrgAccessLost {
+		t.Fatalf("team state = %+v, want Refused(OrgAccessLost)", gotTeam)
+	}
+	queued, err := r.QueuedSessions()
+	if err != nil || len(queued) != 0 {
+		t.Fatalf("outbox not purged: queued=%v err=%v", queued, err)
 	}
 }

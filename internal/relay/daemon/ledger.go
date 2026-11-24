@@ -81,24 +81,8 @@ func (p *recheck) mixedInterval(session string, start, end time.Time) (time.Time
 }
 
 func mixedIntervalFrom(l runs.Snapshot, start, end time.Time) (time.Time, bool) {
-	effEnd := end
-	if effEnd.IsZero() {
-		effEnd = start
-	}
-	if from, mixed := mixedPoint(l, effEnd); mixed {
-		return from, true
-	}
-	if !start.IsZero() && !end.IsZero() && !start.Equal(end) {
-		if from, mixed := mixedPoint(l, start); mixed {
-			return from, true
-		}
-	}
-	return time.Time{}, false
-}
-
-func mixedPoint(l runs.Snapshot, at time.Time) (time.Time, bool) {
-	from, mixed := l.MixedAt(at)
-	if !mixed || !at.IsZero() && at.Before(from) {
+	from, mixed := l.MixedInterval(start, end)
+	if !mixed {
 		return time.Time{}, false
 	}
 	if from.IsZero() {
