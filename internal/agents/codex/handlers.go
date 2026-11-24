@@ -113,7 +113,7 @@ type codexHookInput struct {
 // developer's agents and the session has a project. What content they carry is the team
 // policy's call.
 func codexDesktopRoute(e hookrun.Env, r *hookrun.Repo) bool {
-	return r.ProjectID != "" && slices.Contains(e.Agents, name)
+	return r.Collected() && slices.Contains(e.Agents, name)
 }
 
 func readCodexHookInput(r io.Reader) (*codexHookInput, error) {
@@ -134,6 +134,7 @@ func sessionStart(ctx context.Context, env hookrun.Env) error {
 		env.Logf("%v", err)
 		return nil
 	}
+	env.StartRun(in.SessionID)
 	r, ok := env.Open(ctx, in.SessionID, in.Cwd)
 	if !ok {
 		return nil
@@ -223,8 +224,12 @@ func postToolUse(ctx context.Context, env hookrun.Env) error {
 		return nil
 	}
 	env.Cwd = cmp.Or(in.Cwd, env.Cwd)
+	sess := session.Session{ID: in.SessionID, Tool: codexTool, Model: in.Model}
+	attrs := hookrun.AgentAttrs(map[string]any{}, in.AgentID, in.AgentType)
 	r, err := env.Repo(ctx)
 	if err != nil {
+		candidates, _ := codexEditedPaths(in, env.Cwd)
+		env.Classify(ctx, nil, sess, candidates, attrs)
 		return nil
 	}
 	captureCodexFunding(ctx, env, r, in)
@@ -235,12 +240,10 @@ func postToolUse(ctx context.Context, env hookrun.Env) error {
 	if len(candidates) == 0 {
 		return nil
 	}
-	attrs := hookrun.AgentAttrs(map[string]any{}, in.AgentID, in.AgentType)
 	hookrun.BoundedAttr(attrs, semconv.GenAIToolCallIDKey, in.ToolUseID)
 	if codexDesktopRoute(env, r) {
 		attrs[semconv.TermaCaptureSurfaceKey] = semconv.TermaCaptureSurfaceDesktop
 	}
-	sess := session.Session{ID: in.SessionID, Tool: codexTool, Model: in.Model}
 	if len(commits) == 0 {
 		switch in.ToolName {
 		case codexPatchTool:
@@ -252,10 +255,6 @@ func postToolUse(ctx context.Context, env hookrun.Env) error {
 		default:
 			// Any other tool's path may only have been read (view_image, an MCP tool): it is
 			// recorded, mirrored to sibling checkouts, as an edit would be, but names no checkout.
-			// Accepted risk: a path such a tool only read stays claimed until retention, so the
-			// developer's own later commit of it is stamped too; recording no claim would stop
-			// an MCP write stamping its commit. Upgrade path: Report alone for Codex's read-only
-			// built-ins.
 			env.TouchGuessed(r, sess, in.ToolName, candidates, attrs)
 		}
 		return nil
@@ -266,11 +265,8 @@ func postToolUse(ctx context.Context, env hookrun.Env) error {
 	return nil
 }
 
-// preToolUse records the files a shell call writes before its first commit, so that commit
-// is stamped: the call's PostToolUse comes after it. A write between two commits is left
-// out, since it would claim the first. A call that makes no commit has all its files
-// recorded, since Codex sends no PostToolUse for a patch it runs from the shell. The turn's
-// Stop withdraws the claims on files the call left unchanged (expected.go).
+// preToolUse classifies what a shell call is about to reach and records the files it writes
+// before its first commit so that commit is stamped.
 func preToolUse(ctx context.Context, env hookrun.Env) error {
 	in, err := readCodexHookInput(env.Stdin)
 	if err != nil {
@@ -281,6 +277,11 @@ func preToolUse(ctx context.Context, env hookrun.Env) error {
 		return nil
 	}
 	env.Cwd = cmp.Or(in.Cwd, env.Cwd)
+	sess := session.Session{ID: in.SessionID, Tool: codexTool, Model: in.Model}
+	var located *hookrun.Repo
+	if env.Routing != nil {
+		located = env.Classify(ctx, nil, sess, codexShellPaths(in, env.Cwd), hookrun.AgentAttrs(map[string]any{}, in.AgentID, in.AgentType))
+	}
 	paths, commits := codexEditedPaths(in, env.Cwd)
 	if len(commits) > 0 {
 		paths = paths[:commits[0]] // a write after a commit must not claim it
@@ -288,11 +289,10 @@ func preToolUse(ctx context.Context, env hookrun.Env) error {
 	if len(paths) == 0 {
 		return nil
 	}
-	r, err := env.Repo(ctx)
+	r, err := env.RepoAt(ctx, located)
 	if err != nil {
 		return nil
 	}
-	sess := session.Session{ID: in.SessionID, Tool: codexTool, Model: in.Model}
 	held := heldFiles(r, sess.Key())
 	expect(env, r, sess, held, env.Expect(r, sess, paths))
 	return nil
@@ -317,6 +317,17 @@ func codexEditedPaths(in *codexHookInput, cwd string) (paths []string, commits [
 		}
 	}
 	return append(out, applypatch.Paths(input.Command)...), nil
+}
+
+func codexShellPaths(in *codexHookInput, cwd string) []string {
+	if in.ToolName != codexShellTool {
+		return nil
+	}
+	var input struct {
+		Command string `json:"command"`
+	}
+	_ = json.Unmarshal(in.ToolInput, &input)
+	return hookrun.Alone(hookrun.ShellPaths(input.Command, cwd)...)
 }
 
 // codexShellTool is the tool_name Codex gives every shell call (exec_command and the rest).

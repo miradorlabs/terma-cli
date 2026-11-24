@@ -11,7 +11,6 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/flock"
 	"github.com/miradorlabs/terma-cli/internal/gitx"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
@@ -51,6 +50,9 @@ type skillState struct {
 // kinds, a description written for the model and a tool's file, so only a policy that
 // withholds nothing sends it.
 func (e Env) SkillsCollected() bool {
+	if e.Routing != nil {
+		return e.Routing.skillsCollected()
+	}
 	prompts, toolContent := e.Policy.Content()
 	return prompts && toolContent
 }
@@ -216,7 +218,7 @@ func (e Env) SkillLink(file string) (repositoryURL, path string) {
 		return "", ""
 	}
 	id, _ := gitx.OriginFS(gitDir)
-	if id == "" || !e.Policy.Admits(config.Repository{Origin: id}) {
+	if id == "" || !e.admitsOrigin(id) {
 		return "", ""
 	}
 	if r, err := filepath.EvalSymlinks(root); err == nil {

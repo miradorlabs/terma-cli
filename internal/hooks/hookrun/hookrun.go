@@ -63,6 +63,8 @@ type Env struct {
 	Team string
 	// Agents are the agents the developer chose at setup.
 	Agents []string
+	// Routing is the profile's multi-org routing state when active, replacing Policy and Team.
+	Routing *Routing
 	// afterOwns, in tests, runs once owns has read a session's manifest, before the record.
 	afterOwns func()
 	// pushWalk, in tests, lowers maxPushWalk.
@@ -127,13 +129,21 @@ type Repo struct {
 	Repository config.Repository
 	// Remote is origin's browsable URL, without credentials: "" for a local path or no origin.
 	Remote string
+	// dest is where routing sends what the checkout records, when Routing is active.
+	dest *dest
 }
 
-// claim is the relay's claim of a session for r's project: the working copy, by its checkout,
-// its origin and the branch its HEAD is on (read from git's files, with no git subprocess).
+// claim is the relay's claim of a session for r's project or routed location.
 func (r *Repo) claim(tool string) claim.Claim {
-	return claim.Claim{ProjectID: r.ProjectID, Tool: tool, Repo: r.Name, Worktree: r.Worktree, Repository: r.Repository,
+	c := claim.Claim{ProjectID: r.ProjectID, Tool: tool, Repo: r.Name, Worktree: r.Worktree, Repository: r.Repository,
 		Root: r.workTree(), Remote: r.Remote, Branch: gitx.BranchFS(r.GitDir)}
+	if r.dest != nil {
+		c.Kind = r.dest.kind()
+		if c.Kind == claim.KindOutsideGit {
+			c.Repository = config.Repository{}
+		}
+	}
+	return c
 }
 
 // workTree is the checkout's root inside git, "" for a folder outside it: only a working
@@ -173,7 +183,18 @@ func (e *Env) Open(ctx context.Context, sessionID, cwd string) (*Repo, bool) {
 // or ErrNotAdmitted, before anything is written, for one the team policy does not collect.
 // It first hands on what hooks in an agent's sandbox parked there (unpark).
 func (e Env) Repo(ctx context.Context) (*Repo, error) {
-	r, err := e.resolve(ctx)
+	return e.RepoAt(ctx, nil)
+}
+
+// RepoAt is Repo reusing a checkout already located by Classify.
+func (e Env) RepoAt(ctx context.Context, located *Repo) (*Repo, error) {
+	var r *Repo
+	var err error
+	if e.Routing != nil {
+		r, err = e.resolveRouted(ctx, located)
+	} else {
+		r, err = e.resolve(ctx)
+	}
 	if err == nil {
 		e.unpark(r)
 	}
@@ -183,6 +204,9 @@ func (e Env) Repo(ctx context.Context) (*Repo, error) {
 // resolve is Repo without the unpark, for prepare-commit-msg, which has a commit's latency
 // budget to keep: the next hook hands the parked records on.
 func (e Env) resolve(ctx context.Context) (*Repo, error) {
+	if e.Routing != nil {
+		return e.resolveRouted(ctx, nil)
+	}
 	root, gitDir, id, remote, err := e.locate(ctx)
 	if err != nil {
 		return nil, err
@@ -203,10 +227,16 @@ func (e Env) resolve(ctx context.Context) (*Repo, error) {
 	return r, nil
 }
 
-// Admits reports whether the team policy collects the working copy at dir, judged as Repo
-// judges the current directory.
+// Admits reports whether the working copy at dir is collected (policy or routing).
 func (e Env) Admits(ctx context.Context, dir string) bool {
 	e.Cwd = dir
+	if e.Routing != nil {
+		if !e.Routing.Usable() {
+			return false
+		}
+		r, err := e.routeHere(ctx)
+		return err == nil && r.dest.collected()
+	}
 	_, _, id, _, err := e.locate(ctx)
 	return err == nil && e.Policy.Admits(id)
 }
@@ -225,16 +255,17 @@ func (e Env) locate(ctx context.Context) (root, gitDir string, id config.Reposit
 	return root, gitDir, id, remote, nil
 }
 
-// EmitFor spools an event stamped with the repository's project, parking it in the
-// repository's store when the spool cannot be written, and reports whether it is done with:
-// false only when it could be neither, for the caller to try again. Collected with no lane
-// (signed out, or a sign-in that can't be read), it is done with too: lost, and counted, so
-// a retry never hands it to whoever signs in next.
+// EmitFor spools an event stamped with r's project or routed destination, parking it when
+// the spool cannot be written.
 func (e Env) EmitFor(r *Repo, ev spool.Event) bool {
+	return e.emitFor(r, ev, false, true)
+}
+
+func (e Env) emitFor(r *Repo, ev spool.Event, own, inRun bool) bool {
 	if e.lost(r, 1) {
 		return true
 	}
-	ev = e.stamp(r, ev)
+	ev = e.stampFor(r, ev, own, inRun)
 	e.claimForRelay(r, ev)
 	return e.emitOrPark(r, ev)
 }
@@ -244,6 +275,17 @@ func (e Env) emitOrPark(r *Repo, ev spool.Event) bool {
 		ev.Time = e.Time()
 	}
 	return e.emit(ev) || e.park(r, parkedEvents, ev)
+}
+
+func (e Env) stampFor(r *Repo, ev spool.Event, own, inRun bool) spool.Event {
+	if e.Routing == nil || r == nil || r.dest == nil {
+		return e.stamp(r, ev)
+	}
+	run := ""
+	if inRun {
+		run = e.runOf(ev.SessionID)
+	}
+	return e.destine(ev, r.dest, own, run)
 }
 
 // stamp names the event's repository, for delivery's admission, its project and the
@@ -266,10 +308,13 @@ func (e Env) stamp(r *Repo, ev spool.Event) spool.Event {
 	return ev
 }
 
-// claimForRelay claims the event's session for the repository's project on every hook,
-// not only at start, since a start hook may never have fired. With no lane (signed out,
-// or an unreadable sign-in), it writes nothing and skips OnClaim.
+// claimForRelay claims the event's session for the repository's project or routed location
+// on every hook, not only at start. With no lane it writes nothing and skips OnClaim.
 func (e Env) claimForRelay(r *Repo, ev spool.Event) {
+	if e.Routing != nil {
+		e.placeFor(r, ev)
+		return
+	}
 	if r == nil || r.ProjectID == "" || ev.SessionID == "" || e.lane().Lost != "" {
 		return
 	}

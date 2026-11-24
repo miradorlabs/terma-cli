@@ -9,6 +9,7 @@ import (
 	"os"
 	"strconv"
 
+	"github.com/miradorlabs/terma-cli/internal/agents/internal/reach"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
 	"github.com/miradorlabs/terma-cli/internal/session"
@@ -101,6 +102,11 @@ func preInvocation(ctx context.Context, env hookrun.Env) error {
 		return nil
 	}
 	env.Cwd = in.cwd(env.Cwd)
+	steps, _, stepsKnown := hookrun.JSONNumber(in.InitialNumSteps, true)
+	first := !stepsKnown || steps <= 1
+	if first {
+		env.StartRun(in.id())
+	}
 	r, err := env.Repo(ctx)
 	if err != nil {
 		env.Logf("not in a git repository: %v", err)
@@ -114,8 +120,7 @@ func preInvocation(ctx context.Context, env hookrun.Env) error {
 	}
 	env.SetActive(r, sess)
 	turn := beginAntigravityTurn(env, r, in)
-	// A later turn, or a resumed conversation, was announced before.
-	if steps, _, stepsKnown := hookrun.JSONNumber(in.InitialNumSteps, true); !stepsKnown || steps <= 1 {
+	if first {
 		env.PruneManifests(r, now)
 		env.EmitStart(r, sess, nil)
 	}
@@ -166,7 +171,7 @@ func antigravityEditedPaths(in *antigravityHookInput) []string {
 
 // postToolUse records every tool step as a `terma.tool.call`, since agy has no other
 // export, the file an edit changed and the skill a read loaded; `toolCall.args` is opened
-// only for those paths.
+// only for those paths and (when routing is active) to classify reached locations.
 func postToolUse(ctx context.Context, env hookrun.Env) error {
 	defer antigravityAck(env)
 	in, err := readAntigravityInput(env.Stdin)
@@ -175,11 +180,24 @@ func postToolUse(ctx context.Context, env hookrun.Env) error {
 		return nil
 	}
 	env.Cwd = in.cwd(env.Cwd)
-	r, err := env.Repo(ctx)
+	id := in.id()
+	sess := session.Session{ID: id, Tool: antigravityTool, Model: in.ModelName}
+	files := antigravityEditedPaths(in)
+	var located *hookrun.Repo
+	if env.Routing != nil && in.ToolCall != nil && len(files) == 0 {
+		spec := reach.Antigravity
+		if in.ToolCall.Name == "str_replace_editor" {
+			spec.Commands = nil // its command is view, create or str_replace
+		}
+		located = env.Classify(ctx, nil, sess, spec.Of(in.ToolCall.Args, env.Cwd), nil)
+	}
+	r, err := env.RepoAt(ctx, located)
 	if err != nil {
+		if len(files) > 0 {
+			env.Classify(ctx, nil, sess, files, nil)
+		}
 		return nil
 	}
-	id := in.id()
 	turn := antigravityTurnID(env, r, id)
 	call, called := antigravityToolCallAttrs(in, turn)
 	// A skill's use rides on the read that loaded it; its definition goes once per conversation.
@@ -196,7 +214,6 @@ func postToolUse(ctx context.Context, env hookrun.Env) error {
 
 	// A failed edit changed nothing. No toolCall yields no paths, so this guard also makes
 	// in.ToolCall safe below.
-	files := antigravityEditedPaths(in)
 	if len(files) == 0 || in.Error != "" {
 		return nil
 	}
@@ -207,7 +224,7 @@ func postToolUse(ctx context.Context, env hookrun.Env) error {
 			ids[k] = v
 		}
 	}
-	env.Touch(r, session.Session{ID: id, Tool: antigravityTool, Model: in.ModelName}, in.ToolCall.Name, files, ids)
+	env.Touch(r, sess, in.ToolCall.Name, files, ids)
 	return nil
 }
 

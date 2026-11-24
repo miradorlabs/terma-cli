@@ -49,6 +49,7 @@ type cursorHookInput struct {
 	ToolCallCount        json.RawMessage `json:"tool_call_count"`
 	ModifiedFiles        []string        `json:"modified_files"`
 	ToolName             string          `json:"tool_name"`
+	ToolInput            json.RawMessage `json:"tool_input"`
 	ToolUseID            string          `json:"tool_use_id"`
 	Duration             json.RawMessage `json:"duration"`
 	FailureType          string          `json:"failure_type"`
@@ -114,6 +115,7 @@ func sessionStart(ctx context.Context, env hookrun.Env) error {
 		return nil
 	}
 	env.Cwd = in.cwd(env.Cwd)
+	env.StartRun(in.id())
 	r, err := env.Repo(ctx)
 	if err != nil {
 		env.Logf("not in a git repository: %v", err)
@@ -151,12 +153,14 @@ func fileEdit(ctx context.Context, env hookrun.Env) error {
 		return nil
 	}
 	env.Cwd = in.cwd(env.Cwd)
+	sess := session.Session{ID: in.id(), Tool: cursorTool, Model: in.Model}
 	r, err := env.Repo(ctx)
 	if err != nil {
+		env.Classify(ctx, nil, sess, []string{in.FilePath}, nil)
 		return nil
 	}
 	extra := map[string]any{}
 	hookrun.BoundedAttr(extra, semconv.TermaTurnIDKey, in.GenerationID)
-	env.Touch(r, session.Session{ID: in.id(), Tool: cursorTool, Model: in.Model}, "afterFileEdit", []string{in.FilePath}, extra)
+	env.Touch(r, sess, "afterFileEdit", []string{in.FilePath}, extra)
 	return nil
 }

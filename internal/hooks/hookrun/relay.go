@@ -46,6 +46,9 @@ func ClaimFromPayload(ctx context.Context, env Env, s PayloadSession, tool strin
 	if s.ID == "" {
 		return false
 	}
+	if env.Routing != nil {
+		return claimRouted(ctx, env, s, tool)
+	}
 	id := s.ID
 	env.Cwd = cmp.Or(s.Cwd, env.Cwd)
 	var c claim.Claim
@@ -81,6 +84,26 @@ func ClaimFromPayload(ctx context.Context, env Env, s PayloadSession, tool strin
 		return live && prev.ProjectID != ""
 	}
 	return true
+}
+
+// claimRouted records the session's location-only placement wherever it runs, reporting
+// whether Route sends or holds the location.
+func claimRouted(ctx context.Context, env Env, s PayloadSession, tool string) bool {
+	if !env.Routing.Usable() || env.lane().Lost != "" {
+		return false
+	}
+	env.Cwd = cmp.Or(s.Cwd, env.Cwd)
+	r, err := env.routeHere(ctx)
+	if err != nil {
+		return false
+	}
+	if r.dest.collected() {
+		env.unpark(r)
+	}
+	c := r.claim(tool)
+	c.PIDs, c.Cwd, c.Parent = claimPIDs(), env.workingDir(), env.parent
+	env.place(s.ID, s.AgentID, c, r.dest.loc, nil)
+	return r.dest.collected()
 }
 
 // workingDir is the directory the hook ran in, symlink-resolved as Repo.workTree is: where

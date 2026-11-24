@@ -74,11 +74,11 @@ func captureCodexSkillMentions(ctx context.Context, e hookrun.Env, r *hookrun.Re
 	}
 	ctx, cancel := context.WithTimeout(ctx, codexCaptureTimeout)
 	defer cancel()
-	turnAdmits := turnAdmission(ctx, e)
+	turns := e.Turns(ctx)
 	// With GIT_DIR set every directory reads as that one checkout, so only a turn that ran in
 	// the hook's own is judged; one that ran anywhere else stays here.
 	gitDir := os.Getenv("GIT_DIR") != ""
-	admits := func(cwd string) bool { return (!gitDir || cwd == e.Cwd) && turnAdmits(cwd) }
+	admits := func(cwd string) bool { return (!gitDir || cwd == e.Cwd) && turns.Admits(cwd) && turns.Matches(r, cwd) }
 	// A resumed thread's earlier turns may have run in another collected checkout: a skill is
 	// judged against the checkout its own turn ran in, where a repository's skills are found.
 	// Its definition is still placed with this hook's checkout, which the session is claimed for.
