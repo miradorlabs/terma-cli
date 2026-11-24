@@ -163,8 +163,10 @@ func (r Router) Flush(ctx context.Context, s *spool.Spool, cfg *config.Config, f
 	if !serverKey && r.SignIn != nil {
 		account = r.SignIn.Account()
 	}
+	httpClient := newHTTPClient()
+	defer httpClient.CloseIdleConnections()
 	p := &pass{
-		r: r, s: s, cfg: cfg, force: force, now: now, res: &res,
+		r: r, s: s, cfg: cfg, force: force, now: now, res: &res, http: httpClient,
 		serverKey: serverKey, account: account,
 		failed: map[string]bool{}, waiting: map[string]bool{}, accepted: map[string]bool{},
 	}
@@ -197,6 +199,7 @@ type pass struct {
 	force     bool
 	now       time.Time
 	res       *Result
+	http      *http.Client
 	serverKey bool
 	account   string
 	// failed and waiting are keyed as retry windows are, by project or enrollment
@@ -322,7 +325,7 @@ func (p *pass) deliver(ctx context.Context, dest, id, key, endpoint string, user
 	if p.skipSend(dest, id) {
 		return batch, nil
 	}
-	sender := &otlpSender{Endpoint: endpoint, APIKey: key, ProjectID: id, NameProject: !p.serverKey, Version: p.r.Version}
+	sender := &otlpSender{Endpoint: endpoint, APIKey: key, ProjectID: id, NameProject: !p.serverKey, Version: p.r.Version, HTTP: p.http}
 	if user != nil {
 		sender.UserID = user(endpoint)
 	}

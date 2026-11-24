@@ -674,7 +674,8 @@ func TestRoutedAuthHeadersUserTokenVsServerKey(t *testing.T) {
 		m.queueRaw(routedEvent(sendas.NoPersonLane, config.DefaultProfile, enr["team-srv"], "github.com/acme/app", semconv.TermaToolCallEvent))
 
 		res := r.Flush(t.Context(), m.spool, &config.Config{
-			OTLPURL: "http://127.0.0.1:1", ProfileName: config.DefaultProfile, AuthURL: routedAuth, ServerKeySignIn: true, ServerKeyAuthURL: routedAuth,
+			OTLPURL: "http://127.0.0.1:1", ProfileName: config.DefaultProfile, AuthURL: routedAuth,
+			ServerKeySignIn: true, Team: "team-srv", ServerKeyAuthURL: routedAuth,
 		}, true, 0)
 		if res.Sent != 1 || res.Err != nil {
 			t.Fatalf("server-key Flush = %+v", res)
@@ -693,19 +694,37 @@ func TestRoutedAuthHeadersUserTokenVsServerKey(t *testing.T) {
 			t.Errorf("server-key delivery must not stamp terma.user.id: %s", reqs[0].body)
 		}
 
-		// Server-key cross-environment guard: mismatched ServerKeyAuthURL or cfg.AuthURL holds.
+		// Server-key cross-environment and team-binding guards: mismatched ServerKeyAuthURL,
+		// mismatched cfg.AuthURL, or a changed/empty cfg.Team holds even while team-srv's key
+		// remains in keystore.
 		m.queueRaw(routedEvent(sendas.NoPersonLane, config.DefaultProfile, enr["team-srv"], "github.com/acme/app", semconv.TermaToolCallEvent))
 		resWrongSrvAuth := r.Flush(t.Context(), m.spool, &config.Config{
-			OTLPURL: keyHost.URL, ProfileName: config.DefaultProfile, AuthURL: routedAuth, ServerKeySignIn: true, ServerKeyAuthURL: "https://other-env.example",
+			OTLPURL: keyHost.URL, ProfileName: config.DefaultProfile, AuthURL: routedAuth,
+			ServerKeySignIn: true, Team: "team-srv", ServerKeyAuthURL: "https://other-env.example",
 		}, true, 0)
 		if resWrongSrvAuth.Sent != 0 || resWrongSrvAuth.Held != 1 || len(keySent()) != 1 {
 			t.Fatalf("mismatched ServerKeyAuthURL should hold: res=%+v sent=%d", resWrongSrvAuth, len(keySent()))
 		}
 		resWrongEnv := r.Flush(t.Context(), m.spool, &config.Config{
-			OTLPURL: keyHost.URL, ProfileName: config.DefaultProfile, AuthURL: "https://other-env.example", ServerKeySignIn: true, ServerKeyAuthURL: "https://other-env.example",
+			OTLPURL: keyHost.URL, ProfileName: config.DefaultProfile, AuthURL: "https://other-env.example",
+			ServerKeySignIn: true, Team: "team-srv", ServerKeyAuthURL: "https://other-env.example",
 		}, true, 0)
 		if resWrongEnv.Sent != 0 || resWrongEnv.Held != 1 || len(keySent()) != 1 {
 			t.Fatalf("mismatched team.AuthURL should hold: res=%+v sent=%d", resWrongEnv, len(keySent()))
+		}
+		resWrongTeam := r.Flush(t.Context(), m.spool, &config.Config{
+			OTLPURL: keyHost.URL, ProfileName: config.DefaultProfile, AuthURL: routedAuth,
+			ServerKeySignIn: true, Team: "team-other", ServerKeyAuthURL: routedAuth,
+		}, true, 0)
+		if resWrongTeam.Sent != 0 || resWrongTeam.Held != 1 || len(keySent()) != 1 {
+			t.Fatalf("changed server-key cfg.Team should hold: res=%+v sent=%d", resWrongTeam, len(keySent()))
+		}
+		resEmptyTeam := r.Flush(t.Context(), m.spool, &config.Config{
+			OTLPURL: keyHost.URL, ProfileName: config.DefaultProfile, AuthURL: routedAuth,
+			ServerKeySignIn: true, ServerKeyAuthURL: routedAuth,
+		}, true, 0)
+		if resEmptyTeam.Sent != 0 || resEmptyTeam.Held != 1 || len(keySent()) != 1 {
+			t.Fatalf("empty server-key cfg.Team should hold: res=%+v sent=%d", resEmptyTeam, len(keySent()))
 		}
 	})
 }

@@ -3,6 +3,9 @@ package daemon
 import (
 	"context"
 	"errors"
+	"maps"
+	"slices"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -32,10 +35,13 @@ func BindTeams(d Deps, cfg *config.Config, opts *relay.Options) (worker func(con
 	return ref.Run, func(r *relay.Relay) { activeRelay.Store(r) }
 }
 
-// TeamRefresher keeps every selected team's collection policy fresh while the relay runs,
-// skipping and failing closed when State.Account != Profile.Account, checking Refused
-// teams every RefusedRecheck, and committing every result through CAS routing.Update with
-// pre-request per-enrollment epoch snapshots.
+// TeamRefresher keeps every selected team's collection policy fresh while the relay runs
+// across the active profile and any other configured profile whose routing state is
+// account-verified (State.Account == expectedAccount(cfg)). That ensures queued outbox
+// entries from a previous profile keep refreshing after an active-profile switch, while
+// failing closed on account mismatches, checking Refused teams every RefusedRecheck, and
+// committing every result through CAS routing.Update with pre-request per-enrollment
+// epoch snapshots.
 func (d Deps) TeamRefresher(onChange func(enrollments ...string)) *PolicyRefresher {
 	var ref *PolicyRefresher
 	clock := func() time.Time {
@@ -44,76 +50,175 @@ func (d Deps) TeamRefresher(onChange func(enrollments ...string)) *PolicyRefresh
 		}
 		return time.Now()
 	}
+	var ownerMu sync.Mutex
+	owners := map[string]string{}
+	find := func(enrollment string) (committedProfile, routing.Team, bool) {
+		ownerMu.Lock()
+		hint := owners[enrollment]
+		ownerMu.Unlock()
+		cp, t, ok := d.findCommitted(enrollment, hint)
+		if ok {
+			ownerMu.Lock()
+			owners[enrollment] = cp.cfg.ProfileName
+			ownerMu.Unlock()
+		}
+		return cp, t, ok
+	}
 	ref = &PolicyRefresher{
 		Interval: PolicyRefreshInterval,
 		Discover: 5 * time.Second,
 		Teams: func() []string {
-			_, st, ok := d.committedRouting()
-			if !ok {
+			profiles := d.committedRoutings()
+			if len(profiles) == 0 {
 				return nil
 			}
-			ids := make([]string, len(st.Teams))
-			for i, t := range st.Teams {
-				ids[i] = t.EnrollmentID
+			var ids []string
+			seen := map[string]bool{}
+			ownerMu.Lock()
+			for _, cp := range profiles {
+				for _, t := range cp.st.Teams {
+					if seen[t.EnrollmentID] {
+						continue
+					}
+					seen[t.EnrollmentID] = true
+					owners[t.EnrollmentID] = cp.cfg.ProfileName
+					ids = append(ids, t.EnrollmentID)
+				}
 			}
+			ownerMu.Unlock()
 			return ids
 		},
 		Fetched: func(enrollment string) time.Time {
-			_, st, ok := d.committedRouting()
+			_, t, ok := find(enrollment)
 			if !ok {
 				return time.Time{}
 			}
-			t, has := st.Team(enrollment)
-			switch {
-			case !has:
-				return time.Time{}
-			case t.StateAt(clock()) == routing.Refused:
+			if t.StateAt(clock()) == routing.Refused {
 				return t.RefusedAt
 			}
 			return t.Policy.FetchedAt
 		},
 		Every: func(enrollment string) time.Duration {
-			if _, st, ok := d.committedRouting(); ok {
-				if t, has := st.Team(enrollment); has && t.StateAt(clock()) == routing.Refused {
-					return RefusedRecheck
-				}
+			if _, t, ok := find(enrollment); ok && t.StateAt(clock()) == routing.Refused {
+				return RefusedRecheck
 			}
 			return PolicyRefreshInterval
 		},
 		Refresh: func(ctx context.Context, enrollment string) error {
-			return d.refreshTeam(ctx, enrollment, onChange)
+			cp, t, ok := find(enrollment)
+			if !ok || d.RefreshTeam == nil {
+				return nil
+			}
+			return d.refreshTeam(ctx, cp, t, onChange)
 		},
 	}
 	return ref
 }
 
-// committedRouting loads the profile's config and routing.State, failing closed (ok=false)
-// when no routing state exists, it cannot be read, or State.Account != expectedAccount(cfg).
-func (d Deps) committedRouting() (*config.Config, routing.State, bool) {
-	if d.LoadConfig == nil {
-		return nil, routing.State{}, false
+type committedProfile struct {
+	cfg *config.Config
+	st  routing.State
+}
+
+// committedFor loads name's config and routing.State, failing closed (ok=false) when the
+// profile or routing state cannot be read or State.Account != expectedAccount(cfg).
+func (d Deps) committedFor(name string, active *config.Config) (committedProfile, bool) {
+	cfg := active
+	if active == nil || name != active.ProfileName {
+		var err error
+		switch {
+		case d.LoadProfile != nil:
+			cfg, err = d.LoadProfile(name)
+		case active != nil && active.Dir != "":
+			cfg, err = config.Load(active.Dir, active.StateDir, config.Overrides{Profile: name})
+		default:
+			return committedProfile{}, false
+		}
+		if err != nil || cfg == nil {
+			return committedProfile{}, false
+		}
 	}
-	cfg, err := d.LoadConfig()
-	if err != nil {
-		return nil, routing.State{}, false
+	return loadCommitted(cfg)
+}
+
+func loadCommitted(cfg *config.Config) (committedProfile, bool) {
+	if cfg == nil {
+		return committedProfile{}, false
 	}
 	st, ok, err := routing.Load(cfg.StateDir, cfg.ProfileName)
 	want := expectedAccount(cfg)
 	if err != nil || !ok || want == "" || st.Account != want {
-		return cfg, routing.State{}, false
+		return committedProfile{}, false
 	}
-	return cfg, st, true
+	return committedProfile{cfg: cfg, st: st}, true
 }
 
-func (d Deps) refreshTeam(ctx context.Context, enrollment string, onChange func(...string)) error {
-	cfg, st, ok := d.committedRouting()
-	if !ok || d.RefreshTeam == nil {
+// committedRoutings returns every account-verified profile routing state: the active
+// profile first, then any ActiveProfile override and every remaining profile declared in
+// config.json in sorted order. Profiles with missing, unreadable, or account-mismatched
+// routing states are skipped (fail closed).
+func (d Deps) committedRoutings() []committedProfile {
+	if d.LoadConfig == nil {
 		return nil
 	}
-	t, has := st.Team(enrollment)
-	if !has {
+	active, err := d.LoadConfig()
+	if err != nil || active == nil {
 		return nil
 	}
+	var out []committedProfile
+	seen := map[string]bool{}
+	try := func(name string) {
+		if name != "" {
+			if seen[name] {
+				return
+			}
+			seen[name] = true
+		}
+		if cp, ok := d.committedFor(name, active); ok {
+			out = append(out, cp)
+		}
+	}
+	try(active.ProfileName)
+	if d.ActiveProfile != nil {
+		if name := d.ActiveProfile(); name != "" {
+			try(name)
+		}
+	}
+	if active.Dir != "" {
+		if f, err := config.LoadFile(active.Dir); err == nil {
+			for _, name := range slices.Sorted(maps.Keys(f.Profiles)) {
+				if name != "" {
+					try(name)
+				}
+			}
+		}
+	}
+	return out
+}
+
+// findCommitted locates enrollment's account-verified owning profile, checking hint first
+// so per-enrollment lookups stay O(1) before falling back to scanning all profiles.
+func (d Deps) findCommitted(enrollment, hint string) (committedProfile, routing.Team, bool) {
+	if hint != "" && d.LoadConfig != nil {
+		if active, err := d.LoadConfig(); err == nil && active != nil {
+			if cp, ok := d.committedFor(hint, active); ok {
+				if t, has := cp.st.Team(enrollment); has {
+					return cp, t, true
+				}
+			}
+		}
+	}
+	for _, cp := range d.committedRoutings() {
+		if t, has := cp.st.Team(enrollment); has {
+			return cp, t, true
+		}
+	}
+	return committedProfile{}, routing.Team{}, false
+}
+
+func (d Deps) refreshTeam(ctx context.Context, cp committedProfile, t routing.Team, onChange func(...string)) error {
+	cfg, st := cp.cfg, cp.st
+	enrollment := t.EnrollmentID
 	epochs := map[string]int64{}
 	for _, tm := range st.Teams {
 		if tm.OrganizationID == t.OrganizationID && tm.AuthURL == t.AuthURL {

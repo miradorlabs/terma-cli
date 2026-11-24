@@ -1050,3 +1050,119 @@ func TestBindTeams403RefreshesCommitsRefusedAndPurgesQueue(t *testing.T) {
 		t.Fatalf("outbox not purged: queued=%v err=%v", queued, err)
 	}
 }
+
+// TeamRefresher enumerates and refreshes enrollments from every account-verified profile
+// (not just the active profile), so queued outbox entries from a previous profile continue
+// refreshing after switching active profiles while mismatched profiles still fail closed.
+func TestTeamRefresherRefreshesNonActiveProfileAfterSwitch(t *testing.T) {
+	t.Parallel()
+	stateDir, cfgDir := t.TempDir(), t.TempDir()
+	now := time.Now().UTC().Truncate(time.Second)
+	alice, bob := testAccount("alice"), testAccount("bob")
+
+	for name, acct := range map[string]string{
+		"work":       alice,
+		"home":       alice,
+		"mismatched": bob,
+		"fresh":      alice,
+	} {
+		if err := config.UpdateProfile(cfgDir, name, func(p *config.Profile) {
+			p.Account = acct
+			p.AuthURL = testAuthURL
+			p.OTLPURL = testOTLPURL
+		}); err != nil {
+			t.Fatalf("UpdateProfile(%s): %v", name, err)
+		}
+	}
+
+	tWork := activeTeam("e-work", "team-work", testOrgA, false, now.Add(-2*time.Minute), "github.com/a/r1")
+	tWorkRef := activeTeam("e-work-ref", "team-work-ref", testOrgA, false, now.Add(-time.Hour), "github.com/a/r2")
+	tWorkRef.Refusals = 2
+	tWorkRef.RefusedAt = now.Add(-3 * time.Hour)
+	writeRoutingState(t, stateDir, routing.State{Profile: "work", Account: alice, Teams: []routing.Team{tWork, tWorkRef}})
+
+	tHome := activeTeam("e-home", "team-home", testOrgB, false, now.Add(-2*time.Minute), "github.com/b/r1")
+	writeRoutingState(t, stateDir, routing.State{Profile: "home", Account: alice, Teams: []routing.Team{tHome}})
+
+	// Mismatched profile: routing/mismatched.json belongs to alice, config says bob -> must fail closed.
+	tBad := activeTeam("e-mismatch", "team-bad", testOrgB, false, now.Add(-2*time.Minute), "github.com/b/bad")
+	writeRoutingState(t, stateDir, routing.State{Profile: "mismatched", Account: alice, Teams: []routing.Team{tBad}})
+
+	activeName := "home"
+	var mu sync.Mutex
+	var refreshedProfiles []string
+	var changed []string
+	d := Deps{
+		LoadConfig: func() (*config.Config, error) {
+			mu.Lock()
+			name := activeName
+			mu.Unlock()
+			return config.Load(cfgDir, stateDir, config.Overrides{Profile: name})
+		},
+		LoadProfile: func(name string) (*config.Config, error) {
+			return config.Load(cfgDir, stateDir, config.Overrides{Profile: name})
+		},
+		RefreshTeam: func(_ context.Context, cfg *config.Config, acct string, tm routing.Team) (routing.Refresh, error) {
+			mu.Lock()
+			refreshedProfiles = append(refreshedProfiles, cfg.ProfileName+":"+tm.EnrollmentID+":"+acct)
+			mu.Unlock()
+			p := tm.Policy
+			p.Revision++
+			p.FetchedAt = now
+			return routing.Refresh{EnrollmentID: tm.EnrollmentID, Epoch: tm.Epoch, Policy: &p, At: now}, nil
+		},
+	}
+	ref := d.TeamRefresher(func(ids ...string) {
+		mu.Lock()
+		changed = append(changed, ids...)
+		mu.Unlock()
+	})
+
+	// Active profile is "home"; "work" enrollments must still be discovered and "mismatched" excluded.
+	if got := ref.Teams(); !slices.Equal(got, []string{"e-home", "e-work", "e-work-ref"}) {
+		t.Fatalf("Teams() = %v, want [e-home e-work e-work-ref]", got)
+	}
+	if got := ref.Every("e-work-ref"); got != RefusedRecheck {
+		t.Fatalf("Every(e-work-ref) = %v, want %v", got, RefusedRecheck)
+	}
+	if !ref.Fetched("e-work-ref").Equal(tWorkRef.RefusedAt) {
+		t.Fatalf("Fetched(e-work-ref) = %v, want %v", ref.Fetched("e-work-ref"), tWorkRef.RefusedAt)
+	}
+
+	// Refreshing non-active profile "work" uses work's config, commits CAS update, stores policy, and notifies onChange.
+	if err := ref.Refresh(t.Context(), "e-work"); err != nil {
+		t.Fatalf("Refresh(e-work): %v", err)
+	}
+	if err := ref.Refresh(t.Context(), "e-mismatch"); err != nil {
+		t.Fatalf("Refresh(e-mismatch): %v", err)
+	}
+	mu.Lock()
+	gotRefreshed := slices.Clone(refreshedProfiles)
+	gotChanged := slices.Clone(changed)
+	mu.Unlock()
+	if !slices.Equal(gotRefreshed, []string{"work:e-work:" + alice}) {
+		t.Fatalf("refreshed = %v, want [work:e-work:%s]", gotRefreshed, alice)
+	}
+	if !slices.Equal(gotChanged, []string{"e-work"}) {
+		t.Fatalf("onChange = %v, want [e-work]", gotChanged)
+	}
+	workState, ok, err := routing.Load(stateDir, "work")
+	if err != nil || !ok {
+		t.Fatalf("routing.Load(work): ok=%v err=%v", ok, err)
+	}
+	gotWork, _ := workState.Team("e-work")
+	if gotWork.Policy.Revision != 2 || !gotWork.Policy.FetchedAt.Equal(now) {
+		t.Fatalf("updated work team = %+v, want Revision=2 FetchedAt=%v", gotWork.Policy, now)
+	}
+	if pol, ok, err := config.ReadPolicy(stateDir, "team-work"); err != nil || !ok || pol.Revision != 2 {
+		t.Fatalf("stored policy for team-work: ok=%v err=%v rev=%d", ok, err, pol.Revision)
+	}
+
+	// Switching active profile to "fresh" (which has no routing state) still discovers "home" and "work".
+	mu.Lock()
+	activeName = "fresh"
+	mu.Unlock()
+	if got := ref.Teams(); !slices.Equal(got, []string{"e-home", "e-work", "e-work-ref"}) {
+		t.Fatalf("Teams() with fresh active profile = %v, want [e-home e-work e-work-ref]", got)
+	}
+}

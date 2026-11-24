@@ -95,7 +95,7 @@ func (p *pass) routed(ctx context.Context, events []spool.Event) ([]spool.Event,
 	for _, k := range keys {
 		pc := parcels[k]
 		cfg, ok := p.profileConfig(pc.profile)
-		if !ok || p.wrongEnvironment(cfg, pc.team) {
+		if !ok || p.wrongEnvironment(cfg, pc.team) || p.wrongServerKeyTeam(cfg, pc.team) {
 			held = append(held, pc.raw...)
 			continue
 		}
@@ -229,7 +229,7 @@ func (p *pass) sendParcels(ctx context.Context, jobs []parcelJob, lane string) [
 		var wireEvents []spool.Event
 		var endpoint string
 		if len(sendEvents) > 0 {
-			if p.wrongEnvironment(job.cfg, team) || (p.serverKey && team.TeamID != job.pc.team.TeamID) {
+			if p.wrongEnvironment(job.cfg, team) || p.wrongServerKeyTeam(job.cfg, team) || (p.serverKey && team.TeamID != job.pc.team.TeamID) {
 				reheld = append(reheld, sendRaw...)
 				sendEvents = nil
 			} else {
@@ -240,6 +240,7 @@ func (p *pass) sendParcels(ctx context.Context, jobs []parcelJob, lane string) [
 					ProjectID:   team.TeamID,
 					NameProject: !p.serverKey,
 					Version:     p.r.Version,
+					HTTP:        p.http,
 				}
 				if !p.serverKey && p.r.EnrolledUser != nil {
 					sender.UserID = p.r.EnrolledUser(job.pc.profile, team, endpoint, p.account)
@@ -342,6 +343,14 @@ func (p *pass) wrongEnvironment(cfg *config.Config, team routing.Team) bool {
 		return true
 	}
 	return false
+}
+
+// wrongServerKeyTeam reports whether a server-key pass's parcel targets a team other than
+// cfg's configured server-key team. Matching daemon.Teams.Resolve and heartbeat, a
+// server-key profile may only send for cfg.Team even if keys.json still retains another
+// team's key.
+func (p *pass) wrongServerKeyTeam(cfg *config.Config, team routing.Team) bool {
+	return p.serverKey && (cfg == nil || !cfg.ServerKeySignIn || cfg.Team == "" || team.TeamID != cfg.Team)
 }
 
 // retryDest is the retry window key enrollment's sends keep, isolating backoff per
