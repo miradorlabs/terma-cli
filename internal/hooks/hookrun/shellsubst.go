@@ -22,9 +22,8 @@ type operands struct {
 
 // outputs maps known command-substitution prefixes to static path evaluators.
 var outputs = map[string]func(sc *scan, args []*syntax.Word) (string, bool){
-	"pwd": where, "pwd -L": where, "pwd -P": whereP, "git rev-parse --show-toplevel": toplevel,
-	"go env GOPATH": gopath, "go env GOMODCACHE": modcache, "mktemp": mktemp,
-	"dirname": ofOperand(dirname), "basename": ofOperand(basename),
+	"pwd": where, "pwd -L": where, "pwd -P": whereP, "git rev-parse --show-toplevel": toplevel, "mktemp": mktemp,
+	"go env GOPATH": gopath, "go env GOMODCACHE": modcache, "dirname": ofOperand(dirname), "basename": ofOperand(basename),
 	"realpath": ofOperand((*scan).real), "readlink -f": ofOperand((*scan).real),
 }
 
@@ -235,11 +234,12 @@ func (sc *scan) safeLocate(dir string) (string, bool) {
 func (sc *scan) hasWorktreeConfig(gitDir string) bool {
 	match := func(l string) bool {
 		t := strings.TrimSpace(l)
+		incl := strings.HasPrefix(strings.ToLower(t), "[include")
 		if strings.HasPrefix(t, "[") {
 			_, t, _ = strings.Cut(t, "]")
 		}
 		k, _, eq := strings.Cut(t, "=")
-		return strings.HasPrefix(strings.ToLower(strings.TrimSpace(l)), "[include") || eq && strings.EqualFold(strings.TrimSpace(k), "worktree")
+		return incl || eq && strings.EqualFold(strings.TrimSpace(k), "worktree")
 	}
 	return sc.fileHasLine(filepath.Join(gitDir, "config"), match) || sc.fileHasLine(filepath.Join(gitDir, "config.worktree"), match)
 }

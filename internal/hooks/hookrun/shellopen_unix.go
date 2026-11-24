@@ -12,11 +12,10 @@ import (
 // openDirNoBlock opens dir via O_DIRECTORY so FIFOs fail immediately with ENOTDIR.
 func openDirNoBlock(dir string) (*os.File, error) {
 	for {
-		if fd, err := syscall.Open(dir, syscall.O_RDONLY|syscall.O_DIRECTORY|syscall.O_CLOEXEC, 0); !errors.Is(err, syscall.EINTR) {
-			if err != nil {
-				return nil, err
-			}
+		if fd, err := syscall.Open(dir, syscall.O_RDONLY|syscall.O_DIRECTORY|syscall.O_CLOEXEC, 0); err == nil {
 			return os.NewFile(uintptr(fd), dir), nil
+		} else if !errors.Is(err, syscall.EINTR) {
+			return nil, err
 		}
 	}
 }

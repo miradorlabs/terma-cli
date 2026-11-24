@@ -13,10 +13,9 @@ import (
 
 // Bounds on a shell reach scan (maxShellTime is overridden to 1s in tests).
 const (
-	shellTime, maxShellPlaces, maxShellLookups, maxShellWords     = 20 * time.Millisecond, 256, 4096, 16384
-	maxShellBytes, maxShellDepth, maxShellBraces, maxGlobSegments = 1 << 20, 4, 16, 3
-	substitutionSize, maxShellStats, maxBelowDepth                = 4096, 32768, 4
-	UnknownReach                                                  = "\x00unknown" // NUL-prefixed so it cannot collide with a path
+	shellTime, maxShellPlaces, maxShellLookups, maxShellWords, maxShellStats                       = 20 * time.Millisecond, 256, 4096, 16384, 32768
+	maxShellBytes, maxShellDepth, maxShellBraces, maxGlobSegments, substitutionSize, maxBelowDepth = 1 << 20, 4, 16, 3, 4096, 4
+	UnknownReach                                                                                   = "\x00unknown" // NUL-prefixed so it cannot collide with a path
 )
 
 var maxShellTime, errOpaque = shellTime, errors.New("an expansion ShellPaths cannot resolve")

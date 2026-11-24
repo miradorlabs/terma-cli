@@ -1272,7 +1272,7 @@ func TestReachCoreHardeningRegressions(t *testing.T) {
 		}
 	}
 
-	// 9. firstWords masks command substitutions (both $(...) and backticks) after secret flags and in arguments, even without whitespace.
+	// 9. firstWords masks command/process substitutions (both $(...) and backticks) after secret flags, in arguments, and in redirections.
 	for _, cmd := range []string{
 		`curl -u $(echo alice:SECRET) https://example.com`,
 		"curl -u `echo alice:SECRET` https://example.com",
@@ -1280,6 +1280,11 @@ func TestReachCoreHardeningRegressions(t *testing.T) {
 		"echo `curl -u alice:SECRET https://example.com`",
 		`echo $(curl${IFS}-u${IFS}alice:SECRET)`,
 		"echo `curl${IFS}-u${IFS}alice:SECRET`",
+		`echo >$(curl -u alice:SECRET)`,
+		`echo > $(curl -u alice:SECRET)`,
+		"echo >`curl -u alice:SECRET`",
+		`cat <(curl -u alice:SECRET https://example.com)`,
+		`echo hi >(curl -u alice:SECRET https://example.com)`,
 	} {
 		if got := firstWords(cmd); strings.Contains(got, "SECRET") {
 			t.Errorf("firstWords(%q) = %q, leaked SECRET", cmd, got)

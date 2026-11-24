@@ -35,8 +35,9 @@ func maskWords(command string, depth int) string {
 	secret, redir, hasRedis := false, 0, false
 	for i, b := range bare {
 		hasRedis = hasRedis || strings.HasSuffix(b, "redis-cli")
+		hasSubst := strings.Contains(b, "$(") || strings.Contains(b, "`")
 		if redir > 0 {
-			if redir == 2 {
+			if redir == 2 || hasSubst || userinfo.MatchString(b) {
 				words[i] = "…"
 			}
 			redir = 0
@@ -46,6 +47,8 @@ func maskWords(command string, depth int) string {
 			switch {
 			case strings.HasPrefix(r, "<<<") && len(r) > 3:
 				words[i] = "<<<…"
+			case hasSubst || strings.HasPrefix(r, "<(") || strings.HasPrefix(r, ">(") || userinfo.MatchString(b):
+				words[i] = "…"
 			case r == "<<<":
 				redir = 2
 			case strings.TrimLeft(r, "<>&-") == "":
@@ -56,7 +59,7 @@ func maskWords(command string, depth int) string {
 		masked := userinfo.ReplaceAllString(b, "://…@")
 		name, _, eq := strings.Cut(masked, "=")
 		switch {
-		case secret || strings.Contains(b, "$(") || strings.Contains(b, "`") || depth >= 2 && strings.ContainsAny(b, " \t\n"):
+		case secret || hasSubst || depth >= 2 && strings.ContainsAny(b, " \t\n"):
 			words[i] = "…"
 		case len(b) > 2 && b[0] == '-' && b[1] != '-':
 			words[i] = b[:2] + "…"
@@ -137,13 +140,13 @@ func shellFields(command string, n int) (raw, bare []string) {
 			case r == '`':
 				backtick = !backtick
 				buf.WriteRune(r)
+			case r == '(' && (cmdDepth > 0 || buf.String() == "<" || buf.String() == ">"):
+				cmdDepth++
+				buf.WriteRune(r)
+			case r == ')' && cmdDepth > 0:
+				cmdDepth--
+				buf.WriteRune(r)
 			case cmdDepth > 0:
-				switch r {
-				case '(':
-					cmdDepth++
-				case ')':
-					cmdDepth--
-				}
 				buf.WriteRune(r)
 			case backtick || !unicode.IsSpace(r) && (r != '<' && r != '>' || start < 0 || strings.Trim(buf.String(), "0123456789<>&") == ""):
 				buf.WriteRune(r)

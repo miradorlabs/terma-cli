@@ -126,20 +126,19 @@ func (sc *scan) resolveTarget(base, raw string, hops int) (string, bool) {
 
 // resolveLink chases up to maxSymlinkHops hops via Readlink, checking ancestors and failing closed on remote targets.
 func (sc *scan) resolveLink(p string, hops int) (string, bool) {
-	cur := p
 	for ; hops < maxSymlinkHops; hops++ {
 		if !sc.spend(1) {
 			return "", true
-		} else if raw, err := os.Readlink(cur); err != nil {
-			return cur, false
-		} else if next, ok := sc.resolveTarget(filepath.Dir(cur), raw, hops+1); !ok || filepath.Dir(next) != next && sc.hasRemoteLinkAt(filepath.Dir(next), hops+1) {
+		} else if raw, err := os.Readlink(p); err != nil {
+			return p, false
+		} else if next, ok := sc.resolveTarget(filepath.Dir(p), raw, hops+1); !ok || filepath.Dir(next) != next && sc.hasRemoteLinkAt(filepath.Dir(next), hops+1) {
 			return "", true
 		} else {
-			cur = next
+			p = next
 		}
 	}
-	_, err := os.Readlink(cur)
-	return cur, err == nil && sc.fail()
+	_, err := os.Readlink(p)
+	return p, err == nil && sc.fail()
 }
 func (sc *scan) reach(w, dir string) (string, os.FileInfo) {
 	p, ok := sc.path(w, dir)
@@ -194,12 +193,12 @@ func (sc *scan) away(w string, r role) bool {
 }
 func (sc *scan) path(w, dir string) (string, bool) {
 	if w == "~" || strings.HasPrefix(w, "~/") {
-		if home, ok := sc.lookup("HOME"); !ok || home == "" || remote(home, sc.cwd) {
+		home, ok := sc.lookup("HOME")
+		if !ok || home == "" || remote(home, sc.cwd) {
 			sc.unknown = sc.unknown || remote(home, sc.cwd)
 			return "", false
-		} else {
-			return sc.resolveTarget(home, strings.TrimLeft(w[1:], "/"), 0)
 		}
+		return sc.resolveTarget(home, strings.TrimLeft(w[1:], "/"), 0)
 	} else if remote(w, sc.cwd) || !filepath.IsAbs(w) && dir == "" {
 		return "", false
 	}
@@ -225,11 +224,11 @@ func (sc *scan) cleanSafeAt(base, rel string, hops int) (string, bool) {
 			return "", false
 		} else {
 			if info, err := os.Lstat(cur); err == nil && info.Mode()&fs.ModeSymlink != 0 {
-				if resolved, err := filepath.EvalSymlinks(cur); err != nil || remote(resolved, sc.cwd) {
+				resolved, err := filepath.EvalSymlinks(cur)
+				if err != nil || remote(resolved, sc.cwd) {
 					return "", !sc.fail()
-				} else {
-					cur = resolved
 				}
+				cur = resolved
 			}
 			cur = filepath.Dir(cur)
 		}
