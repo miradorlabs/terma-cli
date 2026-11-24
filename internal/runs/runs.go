@@ -174,6 +174,43 @@ func (s Snapshot) MixedAt(recordTime time.Time) (time.Time, bool) {
 	return r.MixedAt, !r.MixedAt.IsZero()
 }
 
+// MixedInterval reports whether any run intersecting [start, end] is Mixed at or before
+// end, returning the earliest MixedAt across all intersecting Mixed runs. An unreadable
+// ledger fails closed (zero time, true).
+func (s Snapshot) MixedInterval(start, end time.Time) (time.Time, bool) {
+	if s.unreadable || len(s.runs) == 0 {
+		return time.Time{}, s.unreadable
+	}
+	if start.IsZero() && end.IsZero() {
+		return s.MixedAt(time.Time{})
+	}
+	if end.IsZero() || (!start.IsZero() && end.Before(start)) {
+		end = start
+	}
+	if start.IsZero() {
+		start = end
+	}
+	ordered := slices.Clone(s.runs)
+	slices.SortStableFunc(ordered, func(a, b run) int { return a.Started.Compare(b.Started) })
+	var earliest time.Time
+	found := false
+	for i, r := range ordered {
+		if i > 0 && end.Before(r.Started) {
+			continue
+		}
+		if i+1 < len(ordered) && !start.Before(ordered[i+1].Started) {
+			continue
+		}
+		if r.MixedAt.IsZero() || end.Before(r.MixedAt) {
+			continue
+		}
+		if !found || r.MixedAt.Before(earliest) {
+			earliest, found = r.MixedAt, true
+		}
+	}
+	return earliest, found
+}
+
 // Why returns why the run in force at recordTime is Mixed (zero if not or unreadable).
 func (s Snapshot) Why(recordTime time.Time) Why {
 	if !s.unreadable && len(s.runs) > 0 {

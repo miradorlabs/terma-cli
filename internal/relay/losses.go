@@ -30,6 +30,7 @@ const (
 // waited for their team's policy or key, which the relay couldn't read: past policyHold, for
 // room, or as the relay stopped.
 const lostPolicyTimeout = "policy_timeout"
+const lostNoDestination = "no_destination"
 
 // OutboxLosses are the claimed records the relay lost, counted from the first loss since a
 // quiet lossWindow, for doctor to report. Nothing else it queues is ever lost: a refused
@@ -65,13 +66,17 @@ func (r *Relay) recordLosses(lost map[string]int, now time.Time) {
 	}
 	r.lossMu.Lock()
 	defer r.lossMu.Unlock()
+	recordLossesDir(r.outbox.dir, lost, now)
+}
+
+func recordLossesDir(dir string, lost map[string]int, now time.Time) {
 	var l OutboxLosses
 	for reason, n := range lost {
 		if n == 0 {
 			continue
 		}
 		if l.Counts == nil {
-			if l, _ = ReadOutboxLosses(r.outbox.dir); now.Sub(l.Last) > lossWindow || l.Counts == nil {
+			if l, _ = ReadOutboxLosses(dir); now.Sub(l.Last) > lossWindow || l.Counts == nil {
 				l = OutboxLosses{Counts: map[string]int{}}
 			}
 		}
@@ -81,5 +86,5 @@ func (r *Relay) recordLosses(lost map[string]int, now time.Time) {
 		return
 	}
 	l.Last = now.UTC()
-	_ = config.WriteJSON(filepath.Join(r.outbox.dir, lossesFile), l, 0o600)
+	_ = config.WriteJSON(filepath.Join(dir, lossesFile), l, 0o600)
 }

@@ -1,13 +1,17 @@
 package cli
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
+	"slices"
 	"strings"
 	"time"
 
+	"github.com/miradorlabs/terma-cli/internal/account/auth"
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/delivery"
@@ -16,6 +20,8 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
+	"github.com/miradorlabs/terma-cli/internal/routing"
+	"github.com/miradorlabs/terma-cli/internal/runs"
 	"github.com/miradorlabs/terma-cli/internal/sendas"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
@@ -88,9 +94,13 @@ The exit status distinguishes the outcomes a script needs apart:
   1  delivery failed for at least one team; its events stay queued and that
      team backs off on its own, while every other team's are delivered
   2  nothing was attempted: an earlier failure's retry window is open (--force overrides)
-  3  the pass ran but left work: events held for a sign-in or a key, or waiting out
-     their team's retry window (--force overrides), or given up on for age,
-     disk pressure, or being unreadable`,
+  3  the pass ran but left work: events held for a sign-in, key, or until their
+     team can send, or waiting out their team's retry window (--force overrides),
+     or given up on for age, disk pressure, no destination, or being unreadable
+
+Events dropped by policy are reported but are not a failure: those a team's
+policy withholds or no longer collects, and those of a session that crossed
+organizations.`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			res, err := app.flushSpool(cmd.Context(), force, minInterval)
 			if quiet {
@@ -134,8 +144,14 @@ The exit status distinguishes the outcomes a script needs apart:
 // event was not; `terma spool flush` and doctor share it so they agree on the terms.
 func describeFlush(res delivery.Result, signInFix string) (delivered string, undelivered []string) {
 	delivered = fmt.Sprintf("%d event%s", res.Sent, plural(res.Sent))
-	if res.Held > 0 {
-		undelivered = append(undelivered, fmt.Sprintf("holding %d for a sign-in that may send them (run `%s`)", res.Held, signInFix))
+	if forSignIn := res.Held - res.Blocked - res.Unrouted; forSignIn > 0 {
+		undelivered = append(undelivered, fmt.Sprintf("holding %d for a sign-in that may send them (run `%s`)", forSignIn, signInFix))
+	}
+	if res.Blocked > 0 {
+		undelivered = append(undelivered, fmt.Sprintf("holding %d until their team can send again (run `terma doctor`)", res.Blocked))
+	}
+	if res.Unrouted > 0 {
+		undelivered = append(undelivered, fmt.Sprintf("holding %d until this machine's routing state can be read (run `terma doctor`)", res.Unrouted))
 	}
 	if res.Failed > 0 {
 		undelivered = append(undelivered, fmt.Sprintf("keeping %d queued after a failed delivery", res.Failed))
@@ -155,7 +171,11 @@ func describeFlush(res delivery.Result, signInFix string) (delivered string, und
 		undelivered = append(undelivered, fmt.Sprintf("pruned %d to stay under the size limit", res.Pruned))
 	}
 	if res.Unroutable > 0 {
-		undelivered = append(undelivered, fmt.Sprintf("dropped %d with no team id", res.Unroutable))
+		if res.Routed {
+			undelivered = append(undelivered, fmt.Sprintf("dropped %d with no destination", res.Unroutable))
+		} else {
+			undelivered = append(undelivered, fmt.Sprintf("dropped %d with no team id", res.Unroutable))
+		}
 	}
 	if res.Dropped > 0 {
 		undelivered = append(undelivered, fmt.Sprintf("dropped %d unreadable", res.Dropped))
@@ -163,7 +183,41 @@ func describeFlush(res delivery.Result, signInFix string) (delivered string, und
 	if res.Withheld > 0 {
 		undelivered = append(undelivered, fmt.Sprintf("withheld %d by capture policy", res.Withheld))
 	}
+	if res.Discarded > 0 {
+		undelivered = append(undelivered, fmt.Sprintf("dropped %d their team no longer collects", res.Discarded))
+	}
+	if res.Mixed > 0 {
+		s := fmt.Sprintf("dropped %d because their session's run is Mixed", res.Mixed)
+		if len(res.MixedBy) > 0 {
+			s += " (" + mixedReasonCounts(res.MixedBy) + ")"
+		}
+		undelivered = append(undelivered, s)
+	}
 	return delivered, undelivered
+}
+
+func mixedReasonCounts(by map[runs.Reason]int) string {
+	reasons := slices.Collect(maps.Keys(by))
+	slices.SortFunc(reasons, func(a, b runs.Reason) int { return cmp.Or(by[b]-by[a], strings.Compare(string(a), string(b))) })
+	parts := make([]string, 0, len(reasons))
+	for _, r := range reasons {
+		parts = append(parts, fmt.Sprintf("%d %s", by[r], mixedReasonWords(r)))
+	}
+	return strings.Join(parts, ", ")
+}
+
+func mixedReasonWords(r runs.Reason) string {
+	switch r {
+	case runs.Crossed:
+		return "crossed organizations"
+	case runs.UnknownReach:
+		return "ran a shell command whose reach is not known"
+	case runs.LocationBound:
+		return "touched more places than the run ledger keeps"
+	case runs.Aside:
+		return "crossed while the run ledger was busy"
+	}
+	return "with a run ledger that cannot be read"
 }
 
 func plural(n int) string {
@@ -176,12 +230,13 @@ func plural(n int) string {
 // delivery is how this build sends the spool.
 func (app *App) delivery() delivery.Router {
 	return delivery.Router{
-		ConfigDir:  app.dir,
-		StateDir:   app.stateDir,
-		Version:    app.version,
-		OTLPPinned: app.flags.otlpURL != "" || os.Getenv("TERMA_OTLP_URL") != "",
-		Policy:     app.policies().Current,
-		User:       app.accountUser,
+		ConfigDir:    app.dir,
+		StateDir:     app.stateDir,
+		Version:      app.version,
+		OTLPPinned:   app.flags.otlpURL != "" || os.Getenv("TERMA_OTLP_URL") != "",
+		Policy:       app.policies().Current,
+		User:         app.accountUser,
+		EnrolledUser: app.enrolledUser,
 		Consent: func(tool string, c hookrun.Consent) bool {
 			a, ok := app.agents.ForTool(tool)
 			if !ok {
@@ -214,10 +269,37 @@ func (app *App) flushSpool(ctx context.Context, force bool, minInterval time.Dur
 	r := app.delivery()
 	r.SignIn = app.signInSource(cfg)
 	// A hook that found the policy stale started this flush to refresh it (hookrun refreshPolicy).
-	if cfg.Policy.Stale(time.Now()) {
+	// Under multi-org routing, policies live in routing.State (refreshed by the relay daemon):
+	// single-team refresh would fetch the wrong team and write Profile.Team back to config.json.
+	if !delivery.RoutingActive(app.stateDir, cfg.ProfileName) && cfg.Policy.Stale(time.Now()) {
 		r.Policy = refreshOnce(ctx, cfg, cfg.Policy.Team(), r.Policy)
 	}
 	return r.Flush(ctx, s, cfg, force, minInterval), nil
+}
+
+// enrolledUser is accountUser under multi-org routing: who what terma sends to team, an
+// enrollment in profile's routing state, at endpoint under account names, by Mirador user
+// id. It reads user-credentials.json alone, never the keychain, and names only account's
+// user in team's and profile's environment, never a server-key profile or someone who
+// signed in since.
+func (app *App) enrolledUser(profile string, team routing.Team, endpoint, account string) string {
+	if account == "" || account == sendas.NoPersonLane {
+		return ""
+	}
+	o := app.configOverrides()
+	o.Profile = profile
+	cfg, err := config.Load(app.dir, app.stateDir, o)
+	if err != nil || cfg.ServerKeySignIn || !sameHost(endpoint, cfg.OTLPURL) {
+		return ""
+	}
+	cred, err := auth.LoadIdentity(cfg.Dir, cfg.ProfileName)
+	if err != nil || cred.CheckEnvironment(cfg.AuthURL) != nil || cred.CheckEnvironment(team.AuthURL) != nil {
+		return ""
+	}
+	if auth.AccountKey(cred.AuthURL, cred.UserID) != account {
+		return ""
+	}
+	return cred.UserID
 }
 
 var errTornDown = errors.New("terma is not set up on this machine; run `terma setup`")

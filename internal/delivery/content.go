@@ -60,7 +60,12 @@ func (r Router) Outgoing(org config.Policy, projectID string, e spool.Event) (sp
 	if !r.Allowed(org, projectID, e) {
 		return spool.Event{}, false
 	}
-	pol := routing.EffectivePolicy(r.StateDir, org, projectID)
+	return r.withhold(routing.EffectivePolicy(r.StateDir, org, projectID), e)
+}
+
+// withhold is e without the content pol withholds; false when an event kind that carries
+// content whole (or an unclassified kind) cannot leave under pol.
+func (r Router) withhold(pol config.Policy, e spool.Event) (spool.Event, bool) {
 	prompts, toolContent := pol.Content()
 	promptKeys, said := promptContent[e.Name]
 	if said && (!prompts || !r.consented(e, pol.Global())) {

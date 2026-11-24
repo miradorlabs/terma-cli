@@ -121,11 +121,18 @@ func arrayOf[T any](items []T) *otlpValues {
 	return &otlpValues{Values: values}
 }
 
-// newHTTPClient refuses redirects: Go keeps the Authorization header on a same-host
-// https→http downgrade, which would send the server key in cleartext.
+// newHTTPClient clones http.DefaultTransport so each delivery pass owns an isolated
+// connection pool (never closed out from under concurrent callers) and refuses redirects:
+// Go keeps the Authorization header on a same-host https→http downgrade, which would
+// send the server key in cleartext.
 func newHTTPClient() *http.Client {
+	var transport http.RoundTripper
+	if t, ok := http.DefaultTransport.(*http.Transport); ok {
+		transport = t.Clone()
+	}
 	return &http.Client{
-		Timeout: sendTimeout,
+		Timeout:   sendTimeout,
+		Transport: transport,
 		CheckRedirect: func(req *http.Request, _ []*http.Request) error {
 			return fmt.Errorf("refusing to follow redirect to %s: the OTLP endpoint does not redirect log exports", req.URL.Redacted())
 		},
@@ -187,6 +194,7 @@ func (o *otlpSender) send(ctx context.Context, events []spool.Event) error {
 	client := o.HTTP
 	if client == nil {
 		client = newHTTPClient()
+		defer client.CloseIdleConnections()
 	}
 	ctx, cancel := context.WithTimeout(ctx, sendTimeout)
 	defer cancel()
