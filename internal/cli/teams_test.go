@@ -846,12 +846,16 @@ func TestTeamsSignInNeededMessageAndInvalidStateFailure(t *testing.T) {
 
 	t.Run("binding to personal organization is rejected by name and id even when unselected", func(t *testing.T) {
 		f, _ := routedMachine(t, "alice", nil)
-		f.orgs = []organization{orgA(), orgB(), orgPersonal()}
+		hexPersonal := "99999999-aaaa-4999-8999-999999999999"
+		f.orgs = []organization{orgA(), orgB(), {ID: hexPersonal, Name: "Personal", Type: "personal"}}
 		if _, _, err := teamsJSON(t, "--bind", "github.com/acme/api=Personal"); err == nil || !strings.Contains(err.Error(), "personal") {
 			t.Fatalf("bind Personal by name err = %v, want personal rejection", err)
 		}
-		if _, _, err := teamsJSON(t, "--bind", "github.com/acme/api="+teamsPersonalOrg); err == nil || !strings.Contains(err.Error(), "personal") {
+		if _, _, err := teamsJSON(t, "--bind", "github.com/acme/api="+hexPersonal); err == nil || !strings.Contains(err.Error(), "personal") {
 			t.Fatalf("bind Personal by id err = %v, want personal rejection", err)
+		}
+		if _, _, err := teamsJSON(t, "--bind", "github.com/acme/api="+strings.ToUpper(hexPersonal)); err == nil || !strings.Contains(err.Error(), "personal") {
+			t.Fatalf("bind Personal by uppercase id err = %v, want personal rejection", err)
 		}
 	})
 

@@ -159,14 +159,14 @@ func keepRepositoryDecisions(cmd *cobra.Command, planned *routing.State, owner, 
 
 func resolveOrg(ref string, names teamNames, list func() teamsView) (id, name string, err error) {
 	v := list()
-	if parseOrgRef(ref).ID != "" {
-		if i := slices.IndexFunc(v.Organizations, func(o orgRow) bool { return o.ID == ref }); i >= 0 {
+	if orgID := strings.ToLower(parseOrgRef(ref).ID); orgID != "" {
+		if i := slices.IndexFunc(v.Organizations, func(o orgRow) bool { return strings.EqualFold(o.ID, orgID) }); i >= 0 {
 			if v.Organizations[i].Type == "personal" {
 				return "", "", errPersonalBinding
 			}
-			return ref, cmp.Or(v.Organizations[i].Name, names.Orgs[ref]), nil
+			return v.Organizations[i].ID, cmp.Or(v.Organizations[i].Name, names.Orgs[v.Organizations[i].ID]), nil
 		}
-		return ref, names.Orgs[ref], nil
+		return orgID, names.Orgs[orgID], nil
 	}
 	if v.Unlisted != "" {
 		return "", "", fmt.Errorf("cannot resolve organization name %q while organizations cannot be listed (%s); pass the organization id", ref, v.Unlisted)
