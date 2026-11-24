@@ -167,10 +167,28 @@ _hook_worker_lock = threading.Lock()
 _hook_worker_started = False
 
 
+def _reap_proc(proc):
+    while proc.poll() is None:
+        try:
+            proc.kill()
+        except Exception:
+            pass
+        try:
+            proc.wait(timeout=0.5)
+            return
+        except (ChildProcessError, ProcessLookupError):
+            return
+        except subprocess.TimeoutExpired:
+            pass
+        except Exception:
+            time.sleep(0.05)
+
+
 def _hook_worker():
     while True:
         event, payload, done, result = _hook_queue.get()
         ok = False
+        proc = None
         try:
             proc = subprocess.Popen(
                 [*CONFIG["hookCommand"], event],
@@ -182,16 +200,15 @@ def _hook_worker():
                 proc.communicate(json.dumps(payload).encode(), timeout=2.0)
                 ok = proc.returncode == 0
             except Exception:
-                try:
-                    proc.kill()
-                    proc.wait(timeout=1.0)
-                except Exception:
-                    pass
+                ok = False
         except Exception:
-            pass
+            ok = False
+        result[0] = ok
+        done.set()
+        try:
+            if proc is not None and proc.poll() is None:
+                _reap_proc(proc)
         finally:
-            result[0] = ok
-            done.set()
             _hook_queue.task_done()
 
 

@@ -106,6 +106,7 @@ func (e Env) AliasRun(parentID, childID string) {
 	}
 	if err := runs.Alias(e.StateDir, parentID, childID); err != nil {
 		e.Logf("alias subagent: %v", err)
+		e.Routing.noteWriteErr(err)
 		return
 	}
 	e.Routing.dropRunCache(parentID, childID)
@@ -126,12 +127,21 @@ func (e Env) propagateMixed(parentID, childID, tool string) {
 	}
 	now := e.Time()
 	c := claim.Claim{Kind: claim.KindMixed, Run: cur.id, Tool: tool, Profile: e.Routing.Profile, Account: e.claimAccount()}
-	claim.Write(e.StateDir, parentID, c, now)
+	e.writeClaim(parentID, c, now)
 	for _, alias := range cur.aliases {
 		if alias != childID && alias != parentID {
-			claim.Write(e.StateDir, alias, c, now)
+			e.writeClaim(alias, c, now)
 		}
 	}
+}
+func (e Env) writeClaim(sessionID string, c claim.Claim, now time.Time) {
+	if claim.Write(e.StateDir, sessionID, c, now) {
+		return
+	}
+	if prev, ok := claim.Read(e.StateDir, sessionID, now); ok && prev.Kind == c.Kind && prev.Run == c.Run {
+		return
+	}
+	e.Routing.noteWriteErr(ErrFailClosed)
 }
 func (e Env) placeFor(r *Repo, ev spool.Event) {
 	if r == nil || r.dest == nil || ev.SessionID == "" || e.lane().Lost != "" {
@@ -197,6 +207,7 @@ func (e Env) recordRun(sessionID string, cur ledgerRun, locs []routing.Location,
 	merged, err := touch(e.StateDir, sessionID, cur.id, seen)
 	if err != nil {
 		e.Logf("record run locations: %v", err)
+		e.Routing.noteWriteErr(err)
 		return mixed
 	}
 	if len(seen) > 0 {
@@ -229,7 +240,7 @@ func (e Env) placeRun(sessionID, agentID string, c claim.Claim, mixed bool, now 
 		return
 	}
 	c.Profile, c.Account = e.Routing.Profile, e.claimAccount()
-	claim.Write(e.StateDir, sessionID, c, at)
+	e.writeClaim(sessionID, c, at)
 	if agentID != "" && agentID != sessionID && session.ValidID(agentID) && claim.Write(e.StateDir, agentID, c, at) {
 		if err := runs.Alias(e.StateDir, sessionID, agentID); err != nil {
 			e.Logf("alias subagent: %v", err)
@@ -242,7 +253,7 @@ func (e Env) placeRun(sessionID, agentID string, c claim.Claim, mixed bool, now 
 		}
 		for _, alias := range aliases {
 			if alias != agentID {
-				claim.Write(e.StateDir, alias, c, at)
+				e.writeClaim(alias, c, at)
 			}
 		}
 	}
@@ -251,8 +262,10 @@ func (e Env) markMixed(sessionID, run string, at time.Time, why runs.Why) bool {
 	ok := true
 	if err := runs.MarkMixed(e.StateDir, sessionID, at, why); err != nil {
 		e.Logf("mark run mixed (%s %s): %v", why.Reason, why.Where, err)
-		if ok = false; runs.MarkAside(e.StateDir, sessionID, run, at) != nil {
-			e.Logf("mark run mixed aside: failed")
+		ok = false
+		if err := runs.MarkAside(e.StateDir, sessionID, run, at); err != nil {
+			e.Logf("mark run mixed aside: %v", err)
+			e.Routing.noteWriteErr(err)
 			return false
 		}
 	}

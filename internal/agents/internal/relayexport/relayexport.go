@@ -48,18 +48,31 @@ func Unnative(h harness.Harness) (agents.RelayResult, error) {
 	return out, nil
 }
 
-// WithTemplateLock serializes setup, teardown, and refresh on a template path using a lock
-// file in the temp directory (keeping agent extension directories free of lock files).
+// WithTemplateLock serializes setup, teardown, and refresh on a template path using a
+// canonicalized lock key in the temp directory (keeping HOME and extension dirs clean).
 func WithTemplateLock(path string, fn func() error) error {
-	key := filepath.Clean(path)
-	if abs, err := filepath.Abs(key); err == nil {
-		key = abs
+	key, err := filepath.Abs(filepath.Clean(path))
+	if err != nil {
+		key = filepath.Clean(path)
+	}
+	for cur, tail := key, []string(nil); ; {
+		if resolved, err := filepath.EvalSymlinks(cur); err == nil {
+			for i := len(tail) - 1; i >= 0; i-- {
+				resolved = filepath.Join(resolved, tail[i])
+			}
+			key = resolved
+			break
+		}
+		if parent := filepath.Dir(cur); parent == cur {
+			break
+		} else {
+			tail, cur = append(tail, filepath.Base(cur)), parent
+		}
 	}
 	sum := sha256.Sum256([]byte(key))
-	lockPath := filepath.Join(os.TempDir(), "terma-template-"+hex.EncodeToString(sum[:16])+".lock")
 	ctx, cancel := context.WithTimeout(context.Background(), harness.RecordLockWait)
 	defer cancel()
-	unlock, err := flock.Lock(ctx, lockPath)
+	unlock, err := flock.Lock(ctx, filepath.Join(os.TempDir(), "terma-template-"+hex.EncodeToString(sum[:16])+".lock"))
 	if err != nil {
 		return err
 	}

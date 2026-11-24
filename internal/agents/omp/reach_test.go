@@ -268,5 +268,71 @@ console.log(JSON.stringify({ first, second }))
 			t.Fatalf("expected tool_call to fail closed with block=true when fence fails; got %s", out)
 		}
 	})
+
+	// Subtest 3: after a successful fence, resuming the same session (new session_start)
+	// must reset fence state so subsequent tool_call runs omp-tool-reach again.
+	t.Run("resets_fence_on_session_resume", func(t *testing.T) {
+		dir := t.TempDir()
+		logFile := filepath.Join(dir, "reach.log")
+		failAll := filepath.Join(dir, "fail_all")
+		hook := filepath.Join(dir, "hook.sh")
+		hookSrc := "#!/bin/sh\nbody=$(cat)\n" +
+			"if [ \"$1\" = \"omp-tool-reach\" ]; then\n" +
+			"  echo \"$body\" >> " + strconv.Quote(logFile) + "\n" +
+			"  if [ -e " + strconv.Quote(failAll) + " ]; then exit 1; fi\n" +
+			"  case \"$body\" in\n" +
+			"    *TERMA_REACH_FAILED*) exit 0 ;;\n" +
+			"    *) exit 1 ;;\n" +
+			"  esac\n" +
+			"fi\n" +
+			"exit 0\n"
+		if err := os.WriteFile(hook, []byte(hookSrc), 0o700); err != nil {
+			t.Fatal(err)
+		}
+		ext := filepath.Join(dir, "terma-ext.ts")
+		if _, err := writeExtension(ext, []string{hook}, relayConfig().Endpoint); err != nil {
+			t.Fatal(err)
+		}
+		script := `
+import { writeFileSync } from "node:fs"
+const [ext, failAll] = process.argv.slice(2)
+const h = {}
+const mod = await import(ext)
+await mod.default({ on: (n, fn) => { h[n] = fn } })
+const ctx = { cwd: "/work", sessionManager: { getSessionId: () => "ses_resume", getSessionFile: () => "", getHeader: () => ({}) } }
+await h.session_start({ reason: "startup" }, ctx)
+const first = await h.tool_call({ toolName: "read", toolCallId: "c1", input: { path: "/other/a.go" } }, ctx)
+// Resume the same session id: StartRun clears persistent Mixed, so fence must reset too.
+writeFileSync(failAll, "1")
+await h.session_start({ reason: "resume" }, ctx)
+const afterResume = await h.tool_call({ toolName: "read", toolCallId: "c2", input: { path: "/other/b.go" } }, ctx)
+console.log(JSON.stringify({ first: first ?? null, afterResume: afterResume ?? null }))
+`
+		driverPath := filepath.Join(dir, "driver.mjs")
+		if err := os.WriteFile(driverPath, []byte(script), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		out, err := exec.Command(node, driverPath, ext, failAll).CombinedOutput()
+		if err != nil {
+			t.Fatalf("node: %v\n%s", err, out)
+		}
+		var got struct {
+			First       map[string]any              `json:"first"`
+			AfterResume struct{ Block bool `json:"block"` } `json:"afterResume"`
+		}
+		if err := json.Unmarshal(out, &got); err != nil {
+			t.Fatalf("parse output %q: %v", out, err)
+		}
+		if got.First != nil {
+			t.Fatalf("first call unexpectedly blocked: %+v", got.First)
+		}
+		if !got.AfterResume.Block {
+			t.Fatalf("resumed session reused stale fence instead of running reach & failing closed: %s", out)
+		}
+		logBytes, _ := os.ReadFile(logFile)
+		if !strings.Contains(string(logBytes), "/other/b.go") {
+			t.Fatalf("resumed session did not invoke omp-tool-reach for /other/b.go; log:\n%s", logBytes)
+		}
+	})
 }
 
