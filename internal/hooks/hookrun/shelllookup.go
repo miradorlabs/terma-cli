@@ -109,7 +109,9 @@ func (sc *scan) walk(p string, followFinal bool, openMode uint8) (resolved, pare
 			continue
 		}
 		fi, err := cur.lstat(part)
-		if err != nil && slices.Contains(parts, "..") {
+		if err != nil && !errors.Is(err, fs.ErrNotExist) && !errors.Is(err, fs.ErrInvalid) {
+			return "", "", nil, nil, !sc.fail()
+		} else if err != nil && slices.Contains(parts, "..") {
 			return "", "", nil, nil, false
 		} else if err != nil {
 			return filepath.Join(append([]string{curPath, part}, parts...)...), curPath, nil, nil, false
@@ -141,7 +143,7 @@ func (sc *scan) walk(p string, followFinal bool, openMode uint8) (resolved, pare
 			return nextPath, curPath, fi, f, ok
 		} else if !fi.IsDir() {
 			return "", "", nil, nil, false
-		} else if next, err := cur.openSubDir(part); errors.Is(err, fs.ErrNotExist) {
+		} else if next, err := cur.openSubDir(part, fi); errors.Is(err, fs.ErrNotExist) {
 			return "", curPath, nil, nil, false
 		} else if err != nil {
 			return "", "", nil, nil, !sc.fail()
@@ -160,7 +162,7 @@ func (sc *scan) openLeaf(cur dirHandle, part string, fi fs.FileInfo, openMode ui
 	if openMode == 0 || openMode == 1 && !fi.Mode().IsRegular() || openMode == 2 && !fi.IsDir() {
 		return nil, openMode == 0
 	}
-	f, err := cur.open(part, openMode == 2)
+	f, err := cur.open(part, openMode == 2, fi)
 	if err != nil {
 		sc.unknown = sc.unknown || !errors.Is(err, fs.ErrNotExist) && (openMode != 2 || !errors.Is(err, fs.ErrPermission))
 	}
@@ -243,6 +245,9 @@ func urlPath(w string) (string, bool, bool) {
 	}
 	if !ok || !isScheme(scheme) || !strings.EqualFold(scheme, "file") {
 		return "", ok && isScheme(scheme), false
+	}
+	if len(rest) > 9 && strings.EqualFold(rest[:9], "localhost") && rest[9] == '/' {
+		rest = rest[9:]
 	}
 	u, err := url.PathUnescape(rest)
 	if err != nil || strings.ContainsRune(u, 0) {

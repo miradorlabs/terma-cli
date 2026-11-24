@@ -72,16 +72,17 @@ func (sc *scan) hasGoEnv(key string) bool {
 	} else if p == "off" {
 		return false
 	} else if p == "" {
-		var dir string
+		dir, bad := "", false
 		if runtime.GOOS == "windows" {
 			dir, _ = sc.lookup("AppData")
-		} else if xdg, _ := sc.lookup("XDG_CONFIG_HOME"); runtime.GOOS != "darwin" && xdg != "" {
-			dir = xdg
-		} else if home, ok := sc.lookup("HOME"); ok {
-			dir = filepath.Join(home, map[bool]string{true: "Library/Application Support", false: ".config"}[runtime.GOOS == "darwin"])
+			bad = sc.isUnresolvedVar("AppData")
+		} else if xdg, _ := sc.lookup("XDG_CONFIG_HOME"); runtime.GOOS != "darwin" && (xdg != "" || sc.isUnresolvedVar("XDG_CONFIG_HOME")) {
+			dir, bad = xdg, sc.isUnresolvedVar("XDG_CONFIG_HOME")
+		} else if home, ok := sc.lookup("HOME"); ok || sc.isUnresolvedVar("HOME") {
+			dir, bad = filepath.Join(home, map[bool]string{true: "Library/Application Support", false: ".config"}[runtime.GOOS == "darwin"]), sc.isUnresolvedVar("HOME")
 		}
-		if p = filepath.Join(dir, "go", "env"); dir == "" {
-			return false
+		if p = filepath.Join(dir, "go", "env"); bad || dir == "" {
+			return bad
 		}
 	}
 	return sc.fileHasLine(p, func(l string) bool { return strings.HasPrefix(strings.TrimSpace(l), key+"=") })
@@ -160,14 +161,8 @@ func (sc *scan) real(p string) (string, bool) {
 	q, ok := sc.path(p, sc.dir)
 	if p == "" || !ok {
 		return "", false
-	} else if r, _, _, found := sc.walkPath(q, true); found {
+	} else if r, parent, _, found := sc.walkPath(q, true); found || !sc.unknown && r != "" && parent != "" && filepath.Dir(r) == parent {
 		return r, true
-	} else if sc.unknown || filepath.Dir(q) == q {
-		return "", false
-	} else if _, _, _, exists := sc.walkPath(q, false); exists || sc.unknown {
-		return "", false
-	} else if pr, _, pInfo, pFound := sc.walkPath(filepath.Dir(q), true); pFound && pInfo.IsDir() {
-		return filepath.Join(pr, filepath.Base(q)), true
 	}
 	return "", false
 }
@@ -326,22 +321,23 @@ func (sc *scan) holdsNone(p string) bool {
 
 // readDir lists dir via validated dirHandle (FIFO- and TOCTOU-safe), failing closed on unexpected errors.
 func (sc *scan) readDir(dir string) []fs.DirEntry {
-	if sc.spend(1) {
-		if _, _, _, f, ok := sc.walk(dir, true, 2); ok {
-			defer f.Close()
-			var entries []fs.DirEntry
-			for room := maxShellLookups - sc.lookups + 1; len(entries) < room; {
-				chunk, err := f.ReadDir(min(256, room-len(entries)))
-				if entries = append(entries, chunk...); errors.Is(err, io.EOF) || err == nil && (len(chunk) == 0 || !sc.spend(0)) {
-					break
-				} else if err != nil && sc.fail() {
-					return nil
-				}
+	if !sc.spend(1) {
+		return nil
+	}
+	if _, _, _, f, ok := sc.walk(dir, true, 2); ok {
+		defer f.Close()
+		var entries []fs.DirEntry
+		for room := maxShellLookups - sc.lookups + 1; len(entries) < room; {
+			chunk, err := f.ReadDir(min(256, room-len(entries)))
+			if entries = append(entries, chunk...); errors.Is(err, io.EOF) || err == nil && (len(chunk) == 0 || !sc.spend(0)) {
+				break
+			} else if err != nil && sc.fail() {
+				return nil
 			}
-			if sc.spend(len(entries)) {
-				slices.SortFunc(entries, func(a, b fs.DirEntry) int { return strings.Compare(a.Name(), b.Name()) })
-				return entries
-			}
+		}
+		if sc.spend(len(entries)) {
+			slices.SortFunc(entries, func(a, b fs.DirEntry) int { return strings.Compare(a.Name(), b.Name()) })
+			return entries
 		}
 	}
 	return nil

@@ -10,11 +10,9 @@ import (
 	"unicode/utf8"
 )
 
-var (
-	secretOptions          = []string{"-c", "-u", "--user", "-U", "--proxy-user", "-H", "--header", "--proxy-header", "-p", "--password", "-b", "--cookie", "-d", "--data", "--data-ascii", "--data-raw", "--data-binary", "--data-urlencode", "--json", "--oauth2-bearer", "-E", "--cert", "--proxy-cert"}
-	secretNames, compounds = []string{"pass", "token", "secret", "key", "auth"}, []string{"if", "for", "while", "until", "case", "select"}
-	userinfo               = regexp.MustCompile(`(://)[^/\s]+@|[^/\s:@]*:[^/\s@]+@`)
-)
+var secretOptions = []string{"-c", "-u", "--user", "-U", "--proxy-user", "-H", "--header", "--proxy-header", "-p", "--password", "-b", "--cookie", "-d", "--data", "--data-ascii", "--data-raw", "--data-binary", "--data-urlencode", "--json", "--oauth2-bearer", "-E", "--cert", "--proxy-cert"}
+var secretNames, compounds = []string{"pass", "token", "secret", "key", "auth"}, []string{"if", "for", "while", "until", "case", "select"}
+var userinfo = regexp.MustCompile(`(://)[^/\s]+@|[^/\s:@]*:[^/\s@]+@`)
 
 // Pre-parse bounds preventing deep parser recursion or huge expression backtracking.
 const maxShellNesting, maxShellExpr, separators = 4096, 4096, " \t\n;&|()<>"
@@ -106,9 +104,7 @@ func shellFields(command string, n int) (raw, bare []string) {
 				buf.WriteRune(r)
 			}
 		case r == '\\' && quote != '\'' && i+1 < len(command) && (command[i+1] == '\n' || command[i+1] == '\r' && i+2 < len(command) && command[i+2] == '\n'):
-			if i += 2; command[i-1] == '\r' {
-				i++
-			}
+			i += map[bool]int{true: 3, false: 2}[command[i+1] == '\r']
 			continue
 		case dollar && (r == '\'' || r == '"'):
 			dollar, quote, ansiC, ansiNul = false, r, r == '\'', false
@@ -134,11 +130,8 @@ func shellFields(command string, n int) (raw, bare []string) {
 			case r == '`':
 				backtick = !backtick
 				buf.WriteRune(r)
-			case r == '(' && (cmdDepth > 0 || buf.String() == "<" || buf.String() == ">"):
-				cmdDepth++
-				buf.WriteRune(r)
-			case r == ')' && cmdDepth > 0:
-				cmdDepth--
+			case r == '(' && (cmdDepth > 0 || buf.String() == "<" || buf.String() == ">"), r == ')' && cmdDepth > 0:
+				cmdDepth += map[bool]int{true: 1, false: -1}[r == '(']
 				buf.WriteRune(r)
 			case backtick || !unicode.IsSpace(r) && (r != '<' && r != '>' || start < 0 || strings.Trim(buf.String(), "0123456789<>&") == ""):
 				buf.WriteRune(r)
@@ -187,10 +180,7 @@ func ansiEscape(s string) (rune, int) {
 	for ; k < limit && start+k < len(s) && strings.IndexByte(digits, s[start+k]) >= 0; k++ {
 	}
 	if v, err := strconv.ParseUint(s[start:start+k], base, 32); k > 0 && err == nil {
-		if base == 8 {
-			v &= 0xff
-		}
-		return rune(v), start + k
+		return rune(v & map[bool]uint64{true: 0xff, false: ^uint64(0)}[base == 8]), start + k
 	}
 	return '\\', 0
 }

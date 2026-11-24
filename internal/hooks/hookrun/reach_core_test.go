@@ -202,6 +202,8 @@ func TestURLPathAndRemote(t *testing.T) {
 		{"https://example.com/a/b", "", true, false},
 		{"git+ssh://github.com/acme/api", "", true, false},
 		{"file:///tmp/acme-api/NOTES.md", "/tmp/acme-api/NOTES.md", true, false},
+		{"file://localhost/tmp/acme-api/NOTES.md", "/tmp/acme-api/NOTES.md", true, false},
+		{"file://LOCALHOST/C:/work/api", "C:/work/api", true, false},
 		{"file:///ws/priva%74e/README", "/ws/private/README", true, false},
 		{"file:///ws/%2e%2e/acme-api/README", "/ws/../acme-api/README", true, false},
 		{"file:///C:/work/api", "C:/work/api", true, false},
@@ -1029,8 +1031,16 @@ func TestScanBoundsAndSafety(t *testing.T) {
 		if err := os.Symlink(filepath.Join(realParent, "does-not-exist"), dangling); err != nil {
 			t.Fatal(err)
 		}
-		if got, ok := scRealLeaf.real(dangling); ok {
-			t.Fatalf("real(dangling) = (%q, true), want false", got)
+		wantDangling := filepath.Join(resolvedRealParent, "does-not-exist")
+		if got, ok := scRealLeaf.real(dangling); !ok || got != wantDangling {
+			t.Fatalf("real(dangling -> existing/does-not-exist) = (%q, %v), want (%q, true)", got, ok, wantDangling)
+		}
+		danglingDeep := filepath.Join(realParent, "dangling-deep")
+		if err := os.Symlink(filepath.Join(realParent, "missing", "does-not-exist"), danglingDeep); err != nil {
+			t.Fatal(err)
+		}
+		if got, ok := scRealLeaf.real(danglingDeep); ok {
+			t.Fatalf("real(dangling -> missing/does-not-exist) = (%q, true), want false", got)
 		}
 	}
 
@@ -1774,6 +1784,35 @@ func TestReachCoreHardeningRegressions(t *testing.T) {
 		if !scExec.unknown {
 			t.Fatalf("traversal through execute-only dir failed to set unknown=true")
 		}
+		// 27. Non-ENOENT lstat errors (e.g. EACCES in a read-only non-searchable 0400 dir) fail closed instead of pretending missing.
+		readOnlyDir := filepath.Join(dir, "readonly-nosearch")
+		if err := os.MkdirAll(readOnlyDir, 0o700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(readOnlyDir, "config"), []byte("[core]\n\tworktree = /private\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Chmod(readOnlyDir, 0o400); err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = os.Chmod(readOnlyDir, 0o700) })
+		scNoSearch := newScan(dir, func(string) (string, bool) { return "", false }, work{deadline: time.Now().Add(time.Minute)})
+		if _, err := scNoSearch.readSmallFile(filepath.Join(readOnlyDir, "config")); !errors.Is(err, errOpaque) || !scNoSearch.unknown {
+			t.Fatalf("readSmallFile(0400 dir/config) = (err=%v, unknown=%v), want (errOpaque, true)", err, scNoSearch.unknown)
+		}
+	}
+	// Unresolved config-dir env vars prevent hasGoEnv from predicting default GOPATH.
+	scGoEnv := newScan(dir, func(k string) (string, bool) {
+		if k == "HOME" || k == "USERPROFILE" {
+			return dir, true
+		}
+		return "", false
+	}, work{deadline: time.Now().Add(time.Minute)})
+	scGoEnv.vars["AppData"] = nil
+	scGoEnv.vars["XDG_CONFIG_HOME"] = nil
+	scGoEnv.vars["HOME"] = nil
+	if !scGoEnv.hasGoEnv("GOPATH") {
+		t.Fatalf("hasGoEnv(GOPATH) = false with unresolved config-dir vars, want true")
 	}
 }
 

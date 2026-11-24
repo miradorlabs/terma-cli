@@ -15,12 +15,12 @@ import (
 // dirHandle wraps a directory FD for TOCTOU-free, non-blocking handle-relative traversal.
 type dirHandle int
 
-const dirOpenFlags = unix.O_DIRECTORY | unix.O_NOFOLLOW | unix.O_NONBLOCK
-
-func openRootDir(p string) (dirHandle, error)              { return openAt(unix.AT_FDCWD, p, unix.O_DIRECTORY) }
-func (d dirHandle) close()                                 { _ = unix.Close(int(d)) }
-func (d dirHandle) openSubDir(n string) (dirHandle, error) { return openAt(int(d), n, dirOpenFlags) }
-func (d dirHandle) open(name string, dir bool) (*os.File, error) {
+func openRootDir(p string) (dirHandle, error) { return openAt(unix.AT_FDCWD, p, unix.O_DIRECTORY) }
+func (d dirHandle) close()                    { _ = unix.Close(int(d)) }
+func (d dirHandle) openSubDir(n string, _ fs.FileInfo) (dirHandle, error) {
+	return openAt(int(d), n, unix.O_DIRECTORY|unix.O_NOFOLLOW|unix.O_NONBLOCK)
+}
+func (d dirHandle) open(name string, dir bool, _ fs.FileInfo) (*os.File, error) {
 	fd, err := openAt(int(d), name, unix.O_NOFOLLOW|unix.O_NONBLOCK|map[bool]int{true: unix.O_DIRECTORY}[dir])
 	if err != nil {
 		return nil, err
