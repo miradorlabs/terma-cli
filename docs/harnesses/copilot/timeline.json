@@ -3,6 +3,292 @@
   "harness": "copilot",
   "steps": [
     {
+      "version": "1.0.115",
+      "previous": "1.0.114",
+      "changes": [
+        {
+          "id": "prompt.system.1.text",
+          "category": "prompt",
+          "op": "changed",
+          "title": "System prompt changed (+172 −265 chars)",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "cli.commands.copilot.options.--assisted-approval.description",
+          "category": "cli",
+          "op": "changed",
+          "title": "`copilot --assisted-approval`: description changed (+55 −95 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "cli.commands.copilot.options.--sandbox",
+          "category": "cli",
+          "op": "added",
+          "title": "New flag `copilot --sandbox`",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "cli.commands.copilot login.description",
+          "category": "cli",
+          "op": "changed",
+          "title": "Description of `copilot login` changed",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "cli.commands.copilot login.options.--host.default",
+          "category": "cli",
+          "op": "removed",
+          "title": "Default of `copilot login --host`: https://github.com → none",
+          "impact": "notable",
+          "documented": true
+        },
+        {
+          "id": "cli.commands.copilot login.options.--host.description",
+          "category": "cli",
+          "op": "changed",
+          "title": "`copilot login --host`: description changed",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "cli.help.--help",
+          "category": "cli",
+          "op": "changed",
+          "title": "Full help text of `--help` changed (+335 −133 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "cli.help.help environment",
+          "category": "cli",
+          "op": "changed",
+          "title": "Full help text of `help environment` changed (+705 −0 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "cli.help.login --help",
+          "category": "cli",
+          "op": "changed",
+          "title": "Full help text of `login --help` changed (+203 −101 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "cli.help.login -h",
+          "category": "cli",
+          "op": "changed",
+          "title": "Full help text of `login -h` changed (+76 −66 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.defaultPermissionMode.description",
+          "category": "config",
+          "op": "changed",
+          "title": "defaultPermissionMode description changed (+276 −315 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.disableAllHooks.description",
+          "category": "config",
+          "op": "changed",
+          "title": "disableAllHooks description changed (+82 −50 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.footer.showQuota.description",
+          "category": "config",
+          "op": "changed",
+          "title": "footer.showQuota description changed (+172 −31 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.imageGeneration.description",
+          "category": "config",
+          "op": "changed",
+          "title": "imageGeneration description changed (+168 −156 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.sandbox.allowDevToolAccess.description",
+          "category": "config",
+          "op": "changed",
+          "title": "sandbox.allowDevToolAccess description changed (+174 −287 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.sandbox.userPolicy.capabilities",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: sandbox.userPolicy.capabilities",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.sandbox.userPolicy.filesystem.deniedPaths.description",
+          "category": "config",
+          "op": "changed",
+          "title": "sandbox.userPolicy.filesystem.deniedPaths description changed (+190 −0 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.sandbox.userPolicy.seatbelt.extraMachLookups",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: sandbox.userPolicy.seatbelt.extraMachLookups",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.screenReader.description",
+          "category": "config",
+          "op": "changed",
+          "title": "screenReader description changed (+233 −35 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.showTimelineTimestamps",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: showTimelineTimestamps",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.showTimestamps.description",
+          "category": "config",
+          "op": "changed",
+          "title": "showTimestamps description changed (+180 −145 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.workflows.defaultLimits.maxAiCredits.description",
+          "category": "config",
+          "op": "changed",
+          "title": "workflows.defaultLimits.maxAiCredits description changed (+159 −133 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.workflows.defaultLimits.maxConcurrentSubagents.description",
+          "category": "config",
+          "op": "changed",
+          "title": "workflows.defaultLimits.maxConcurrentSubagents description changed (+159 −133 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.workflows.defaultLimits.maxTotalSubagents.description",
+          "category": "config",
+          "op": "changed",
+          "title": "workflows.defaultLimits.maxTotalSubagents description changed (+159 −133 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.workflows.defaultLimits.timeoutSeconds.description",
+          "category": "config",
+          "op": "changed",
+          "title": "workflows.defaultLimits.timeoutSeconds description changed (+159 −133 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.workflows.logPhaseNames.description",
+          "category": "config",
+          "op": "changed",
+          "title": "workflows.logPhaseNames description changed (+227 −201 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.workflows.maxConcurrentRuns.description",
+          "category": "config",
+          "op": "changed",
+          "title": "workflows.maxConcurrentRuns description changed (+253 −227 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.env_vars",
+          "category": "config",
+          "op": "changed",
+          "title": "Environment variables: +10 −15",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "storage.logs.path",
+          "category": "storage",
+          "op": "changed",
+          "title": "On-disk logs path changed",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "binary.runtime",
+          "category": "binary",
+          "op": "changed",
+          "title": "Binary runtime: node v24.22.1 (single executable application) → node v24.22.3 (single executable application)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "binary.size_bytes",
+          "category": "binary",
+          "op": "changed",
+          "title": "Binary size: 202,294,880 → 239,265,088 bytes (202.3 MB → 239.3 MB)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "support.capabilities.relay.content_allowed@darwin/arm64.result",
+          "category": "support",
+          "op": "changed",
+          "title": "Terma: Prompts and tool content delivered when allowed now fails on darwin/arm64",
+          "impact": "breaking",
+          "documented": true
+        },
+        {
+          "id": "support.capabilities.relay.content_withheld@darwin/arm64.result",
+          "category": "support",
+          "op": "changed",
+          "title": "Terma: Prompts and tool content withheld when the project says so now fails on darwin/arm64",
+          "impact": "breaking",
+          "documented": true
+        },
+        {
+          "id": "support.capabilities.relay.telemetry@darwin/arm64.result",
+          "category": "support",
+          "op": "changed",
+          "title": "Terma: Telemetry reaches the project through the local relay now fails on darwin/arm64",
+          "impact": "breaking",
+          "documented": true
+        },
+        {
+          "id": "support.status",
+          "category": "support",
+          "op": "changed",
+          "title": "Terma support: supported → unsupported",
+          "impact": "breaking",
+          "documented": true
+        }
+      ]
+    },
+    {
       "version": "1.0.114",
       "previous": "1.0.113",
       "changes": [

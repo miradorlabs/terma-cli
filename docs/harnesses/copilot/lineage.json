@@ -3,8 +3,8 @@
   "harness": "copilot",
   "window": {
     "oldest": "1.0.105",
-    "newest": "1.0.114",
-    "builds": 10
+    "newest": "1.0.115",
+    "builds": 11
   },
   "items": {
     "cli.commands.copilot app": {
@@ -1481,6 +1481,17 @@
       ],
       "since_bounded": false
     },
+    "cli.commands.copilot.options.--sandbox": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "1.0.115",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "cli.commands.copilot.options.--screen-reader": {
       "kind": "option",
       "ranges": [
@@ -1761,8 +1772,8 @@
       "ranges": [
         {
           "since": "1.0.105",
-          "until": null,
-          "removed": null
+          "until": "1.0.114",
+          "removed": "1.0.115"
         }
       ],
       "since_bounded": false
@@ -1800,6 +1811,39 @@
       ],
       "since_bounded": false
     },
+    "config.env_vars.COPILOT_AUTOIMPROVE_ACTIVATED": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.0.115",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.env_vars.COPILOT_AUTOIMPROVE_DEVELOPER": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.0.115",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.env_vars.COPILOT_AUTOIMPROVE_EXECUTION_TOKEN": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.0.115",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.env_vars.COPILOT_AUTO_TIER": {
       "kind": "env_var",
       "ranges": [
@@ -1822,6 +1866,17 @@
       ],
       "since_bounded": false
     },
+    "config.env_vars.COPILOT_BROWSER_SESSION_ID": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.0.115",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.env_vars.COPILOT_BROWSER_TELEMETRY_SMOKE": {
       "kind": "env_var",
       "ranges": [
@@ -1832,6 +1887,17 @@
         }
       ],
       "since_bounded": false
+    },
+    "config.env_vars.COPILOT_BROWSER_TURN_ID": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.0.115",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
     },
     "config.env_vars.COPILOT_CACHE_HOME": {
       "kind": "env_var",
@@ -1931,6 +1997,17 @@
         }
       ],
       "since_bounded": false
+    },
+    "config.env_vars.COPILOT_CLI_SANDBOX_MANAGED_EMPTY_ALLOWLIST": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.0.115",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
     },
     "config.env_vars.COPILOT_CLI_VERSION": {
       "kind": "env_var",
@@ -2157,8 +2234,8 @@
       "ranges": [
         {
           "since": "1.0.105",
-          "until": null,
-          "removed": null
+          "until": "1.0.114",
+          "removed": "1.0.115"
         }
       ],
       "since_bounded": false
@@ -2256,8 +2333,8 @@
       "ranges": [
         {
           "since": "1.0.105",
-          "until": null,
-          "removed": null
+          "until": "1.0.114",
+          "removed": "1.0.115"
         }
       ],
       "since_bounded": false
@@ -2267,8 +2344,8 @@
       "ranges": [
         {
           "since": "1.0.105",
-          "until": null,
-          "removed": null
+          "until": "1.0.114",
+          "removed": "1.0.115"
         }
       ],
       "since_bounded": false
@@ -2278,8 +2355,8 @@
       "ranges": [
         {
           "since": "1.0.105",
-          "until": null,
-          "removed": null
+          "until": "1.0.114",
+          "removed": "1.0.115"
         }
       ],
       "since_bounded": false
@@ -2410,8 +2487,8 @@
       "ranges": [
         {
           "since": "1.0.105",
-          "until": null,
-          "removed": null
+          "until": "1.0.114",
+          "removed": "1.0.115"
         }
       ],
       "since_bounded": false
@@ -2647,6 +2724,28 @@
       ],
       "since_bounded": true
     },
+    "config.env_vars.COPILOT_TEST_ABANDONED_SESSION_CLOSE_GATE_FILE": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.0.115",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.env_vars.COPILOT_TEST_ABANDONED_SESSION_CLOSING_GATE_FILE": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.0.115",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.env_vars.COPILOT_TEST_ASK_USER_VARIANT": {
       "kind": "env_var",
       "ranges": [
@@ -2850,8 +2949,8 @@
       "ranges": [
         {
           "since": "1.0.106",
-          "until": null,
-          "removed": null
+          "until": "1.0.114",
+          "removed": "1.0.115"
         }
       ],
       "since_bounded": true
@@ -3065,6 +3164,17 @@
       ],
       "since_bounded": false
     },
+    "config.env_vars.COPILOT_TEST_SESSION_OPTIONS_FAILURE_FILE": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.0.115",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.env_vars.COPILOT_TEST_SESSION_RESUME_HANDOFF_GATE_FILE": {
       "kind": "env_var",
       "ranges": [
@@ -3086,6 +3196,17 @@
         }
       ],
       "since_bounded": false
+    },
+    "config.env_vars.COPILOT_TEST_SUBMISSION_ACKNOWLEDGEMENT_GATE_FILE": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.0.115",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
     },
     "config.env_vars.COPILOT_TEST_SUBMISSION_ADMISSION_GATE_FILE": {
       "kind": "env_var",
@@ -3158,8 +3279,8 @@
       "ranges": [
         {
           "since": "1.0.105",
-          "until": null,
-          "removed": null
+          "until": "1.0.114",
+          "removed": "1.0.115"
         }
       ],
       "since_bounded": false
@@ -3235,8 +3356,8 @@
       "ranges": [
         {
           "since": "1.0.105",
-          "until": null,
-          "removed": null
+          "until": "1.0.114",
+          "removed": "1.0.115"
         }
       ],
       "since_bounded": false
@@ -3257,8 +3378,8 @@
       "ranges": [
         {
           "since": "1.0.105",
-          "until": null,
-          "removed": null
+          "until": "1.0.114",
+          "removed": "1.0.115"
         }
       ],
       "since_bounded": false
@@ -3334,8 +3455,8 @@
       "ranges": [
         {
           "since": "1.0.105",
-          "until": null,
-          "removed": null
+          "until": "1.0.114",
+          "removed": "1.0.115"
         }
       ],
       "since_bounded": false
@@ -3466,8 +3587,8 @@
       "ranges": [
         {
           "since": "1.0.105",
-          "until": null,
-          "removed": null
+          "until": "1.0.114",
+          "removed": "1.0.115"
         }
       ],
       "since_bounded": false
@@ -3521,8 +3642,8 @@
       "ranges": [
         {
           "since": "1.0.105",
-          "until": null,
-          "removed": null
+          "until": "1.0.114",
+          "removed": "1.0.115"
         }
       ],
       "since_bounded": false
@@ -3565,8 +3686,8 @@
       "ranges": [
         {
           "since": "1.0.105",
-          "until": null,
-          "removed": null
+          "until": "1.0.114",
+          "removed": "1.0.115"
         }
       ],
       "since_bounded": false
@@ -3576,8 +3697,8 @@
       "ranges": [
         {
           "since": "1.0.105",
-          "until": null,
-          "removed": null
+          "until": "1.0.114",
+          "removed": "1.0.115"
         }
       ],
       "since_bounded": false
@@ -5441,6 +5562,17 @@
       ],
       "since_bounded": false
     },
+    "config.options.sandbox.userPolicy.capabilities": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.0.115",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.options.sandbox.userPolicy.experimental.seatbelt.keychainAccess": {
       "kind": "setting",
       "ranges": [
@@ -5573,6 +5705,17 @@
       ],
       "since_bounded": false
     },
+    "config.options.sandbox.userPolicy.seatbelt.extraMachLookups": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.0.115",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.options.sandbox.userPolicy.seatbelt.keychainAccess": {
       "kind": "setting",
       "ranges": [
@@ -5693,6 +5836,17 @@
         }
       ],
       "since_bounded": false
+    },
+    "config.options.showTimelineTimestamps": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.0.115",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
     },
     "config.options.showTimestamps": {
       "kind": "setting",

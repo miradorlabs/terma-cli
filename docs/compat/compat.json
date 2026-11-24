@@ -73,7 +73,7 @@
       "label": "The machine's heartbeat reaches the project's ingest"
     }
   ],
-  "generated_at": "2026-11-24T10:32:46Z",
+  "generated_at": "2026-11-24T13:22:33Z",
   "harnesses": [
     {
       "ID": "claude",
@@ -11372,6 +11372,58 @@
       "first_passed": "2026-11-18T06:29:50.115206Z",
       "terma": "terma version dev",
       "test": "TestRelayCopilotToolsGetNoExporter/v1.0.114"
+    },
+    {
+      "harness": "copilot",
+      "version": "1.0.115",
+      "platform": "darwin/arm64",
+      "capability": "relay.content_allowed",
+      "result": "fail",
+      "last_run": "2026-11-24T13:20:34.591975Z",
+      "terma": "terma version dev",
+      "test": "TestRelayCopilot/v1.0.115/content"
+    },
+    {
+      "harness": "copilot",
+      "version": "1.0.115",
+      "platform": "darwin/arm64",
+      "capability": "relay.content_withheld",
+      "result": "fail",
+      "last_run": "2026-11-24T13:21:08.183289Z",
+      "terma": "terma version dev",
+      "test": "TestRelayCopilot/v1.0.115/withheld"
+    },
+    {
+      "harness": "copilot",
+      "version": "1.0.115",
+      "platform": "darwin/arm64",
+      "capability": "relay.only_opted_in",
+      "result": "pass",
+      "last_run": "2026-11-24T13:21:24.231434Z",
+      "first_passed": "2026-11-24T13:21:24.231434Z",
+      "terma": "terma version dev",
+      "test": "TestRelayCopilotOutsideARepository/v1.0.115"
+    },
+    {
+      "harness": "copilot",
+      "version": "1.0.115",
+      "platform": "darwin/arm64",
+      "capability": "relay.telemetry",
+      "result": "fail",
+      "last_run": "2026-11-24T13:21:08.183419Z",
+      "terma": "terma version dev",
+      "test": "TestRelayCopilot/v1.0.115"
+    },
+    {
+      "harness": "copilot",
+      "version": "1.0.115",
+      "platform": "darwin/arm64",
+      "capability": "relay.tools_no_token",
+      "result": "pass",
+      "last_run": "2026-11-24T13:21:35.273905Z",
+      "first_passed": "2026-11-24T13:21:35.273905Z",
+      "terma": "terma version dev",
+      "test": "TestRelayCopilotToolsGetNoExporter/v1.0.115"
     },
     {
       "harness": "dsh",
