@@ -120,10 +120,10 @@ func subagentCall(env hookrun.Env, in *grokHookInput) (ev spool.Event, child str
 		return spool.Event{}, "", false
 	}
 	status, child := hookrun.UnknownValue, res.SubagentID
-	switch {
-	case res.Type == "SubagentCompleted":
+	switch res.Type {
+	case "SubagentCompleted":
 		status = "completed"
-	case res.Type == "Text":
+	case "Text":
 		status, child = "async_launched", launchedInBackground(res.Text)
 	}
 	// A subagent's id is its session's, a UUID: nothing of another shape is taken for one.
