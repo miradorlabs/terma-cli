@@ -136,15 +136,38 @@ function usageAttrs(u) {
 
 // --- terma hook ------------------------------------------------------------------------
 
-// termaHook hands an event to `terma hook dsh-*`, as this process's child — which is
-// what lets its claim name this process. Best-effort; it never delays the agent.
+// termaHook hands an event to `terma hook dsh-*` in FIFO order, as this process's child —
+// which lets its claim name this process and ensures session-start finishes before tool-reach.
+let hookQueue = Promise.resolve()
+
+function spawnHook(event, payload) {
+  return new Promise((resolve) => {
+    let settled = false
+    const done = () => {
+      if (settled) return
+      settled = true
+      clearTimeout(timer)
+      resolve()
+    }
+    const timer = setTimeout(done, 2000)
+    if (typeof timer.unref === "function") timer.unref()
+    try {
+      const [cmd, ...args] = CONFIG.hookCommand
+      const child = spawn(cmd, [...args, event], { stdio: ["pipe", "ignore", "ignore"] })
+      child.on("error", done)
+      child.on("close", done)
+      child.stdin.on("error", () => {})
+      child.stdin.end(JSON.stringify(payload))
+    } catch {
+      done()
+    }
+  })
+}
+
 function termaHook(event, payload) {
-  try {
-    const [cmd, ...args] = CONFIG.hookCommand
-    const child = spawn(cmd, [...args, event], { stdio: ["pipe", "ignore", "ignore"] })
-    child.on("error", () => {})
-    child.stdin.end(JSON.stringify(payload))
-  } catch {}
+  const step = hookQueue.then(() => spawnHook(event, payload))
+  hookQueue = step.then(() => undefined, () => undefined)
+  return step
 }
 
 // --- the plugin -------------------------------------------------------------------------
@@ -174,6 +197,59 @@ function args(raw) {
   } catch {
     return {}
   }
+}
+
+// toolReach describes what a read, search, glob, list or shell tool call can reach.
+function toolReach(tool, raw) {
+  const a = args(raw)
+  const out = {}
+  const str = (...keys) => {
+    for (const k of keys) if (typeof a[k] === "string" && a[k]) return a[k]
+    return ""
+  }
+  const path = str("file_path", "path", "dir_path", "filePath")
+  switch (String(tool || "").toLowerCase()) {
+    case "read":
+    case "read_file":
+    case "view_file":
+      if (path) out.paths = [path]
+      break
+    case "grep":
+    case "grep_search":
+    case "search": {
+      out.paths = [path || "."]
+      const g = str("glob", "include")
+      if (g) out.globs = [g]
+      break
+    }
+    case "glob":
+    case "find":
+    case "find_files": {
+      out.paths = [path || "."]
+      const g = str("pattern", "glob")
+      if (g) out.globs = [g]
+      break
+    }
+    case "ls":
+    case "list":
+    case "list_dir":
+    case "list_files":
+      if (path) out.lists = [path]
+      break
+    case "bash":
+    case "shell":
+    case "exec":
+    case "run_command": {
+      const cmd = str("command", "cmd")
+      if (cmd) out.command = cmd
+      const dir = str("cwd", "workdir")
+      if (dir) out.dir = dir
+      break
+    }
+    default:
+      return null
+  }
+  return Object.keys(out).length > 0 ? out : null
 }
 
 export function apply(ctx) {
@@ -222,9 +298,13 @@ export function apply(ctx) {
         if (reply) record(s, "dsh.assistant_response", CONFIG.includePrompts ? truncate(reply, MAX_TEXT) : "", { response_length: reply.length })
         break
       }
-      case "tool/call":
-        if (d.callId) calls.set(d.callId, { name: String(d.name || ""), args: d.arguments, start: at })
+      case "tool/call": {
+        const name = String(d.name || "")
+        if (d.callId) calls.set(d.callId, { name, args: d.arguments, start: at })
+        const reach = toolReach(name, d.arguments)
+        if (reach) termaHook("dsh-tool-reach", { session_id: s, cwd, tool: name, ...reach })
         break
+      }
       case "tool/result": {
         const id = d.message && d.message.source && d.message.source.callId
         const call = calls.get(id)

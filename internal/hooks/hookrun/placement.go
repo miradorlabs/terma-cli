@@ -99,6 +99,42 @@ func claimRouted(ctx context.Context, env Env, s PayloadSession, tool string) bo
 	env.judge(s.ID, s.AgentID, env.repoClaim(r, tool), []routing.Location{r.dest.loc}, true, runs.Why{})
 	return r.dest.collected()
 }
+
+// AliasRun shares parentID's run ledger with childID (e.g. an extension subagent) so
+// crossings in either session mark their shared run Mixed.
+func (e Env) AliasRun(parentID, childID string) {
+	if e.Routing == nil || !e.Routing.Usable() || !session.ValidID(parentID) || !session.ValidID(childID) || parentID == childID {
+		return
+	}
+	if err := runs.Alias(e.StateDir, parentID, childID); err != nil {
+		e.Logf("alias subagent: %v", err)
+		return
+	}
+	e.Routing.dropRunCache(parentID, childID)
+}
+
+// propagateMixed mirrors a subagent's Mixed run onto its parent (and any sibling aliases)
+// so a crossing inside a subagent immediately marks the parent claim Mixed too.
+func (e Env) propagateMixed(parentID, childID, tool string) {
+	if e.Routing == nil || !e.Routing.Usable() || e.Routing.WithholdPlacements {
+		return
+	}
+	if !session.ValidID(parentID) || !session.ValidID(childID) || parentID == childID {
+		return
+	}
+	cur := e.currentRun(childID)
+	if cur.mixedAt.IsZero() {
+		return
+	}
+	now := e.Time()
+	c := claim.Claim{Kind: claim.KindMixed, Run: cur.id, Tool: tool, Profile: e.Routing.Profile, Account: e.claimAccount()}
+	claim.Write(e.StateDir, parentID, c, now)
+	for _, alias := range cur.aliases {
+		if alias != childID && alias != parentID {
+			claim.Write(e.StateDir, alias, c, now)
+		}
+	}
+}
 func (e Env) placeFor(r *Repo, ev spool.Event) {
 	if r == nil || r.dest == nil || ev.SessionID == "" || e.lane().Lost != "" {
 		return

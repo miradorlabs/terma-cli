@@ -159,6 +159,74 @@ function editedFiles(event: any): string[] {
   return files
 }
 
+// nonURLPath returns p when it is a filesystem path rather than an OMP internal URL.
+function nonURLPath(p: unknown): string {
+  return typeof p === "string" && p && !/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(p) ? p : ""
+}
+
+// toolReach describes what a read, search, glob, list or shell tool call can reach.
+function toolReach(event: any): Record<string, unknown> | null {
+  const name = String(event?.toolName ?? "")
+  const input = event?.input ?? {}
+  const out: Record<string, unknown> = {}
+  const paths: string[] = []
+  const addPath = (p: unknown) => {
+    const s = typeof p === "string" ? p : ""
+    if (s && !paths.includes(s)) paths.push(s)
+  }
+  const addFile = (p: unknown) => {
+    const s = nonURLPath(p)
+    if (s) addPath(s)
+  }
+  // OMP search tools accept semicolon-separated multi-target paths (e.g. "src;../beta").
+  const addSearchPaths = (p: unknown) => {
+    if (typeof p === "string" && p) {
+      if (p.includes(";")) {
+        for (const seg of p.split(";")) addFile(seg.trim())
+      } else {
+        addFile(p)
+      }
+    }
+    if (Array.isArray(input.paths)) for (const q of input.paths) addFile(q)
+  }
+  switch (name) {
+    case "read":
+      addPath(event?.details?.resolvedPath)
+      addFile(input.path)
+      if (Array.isArray(input.paths)) for (const p of input.paths) addFile(p)
+      break
+    case "grep":
+    case "ast_grep": {
+      addSearchPaths(input.path)
+      const g = typeof input.glob === "string" ? input.glob : typeof input.include === "string" ? input.include : ""
+      if (g) out.globs = [g]
+      if (paths.length === 0) paths.push(".")
+      break
+    }
+    case "find":
+    case "glob": {
+      addSearchPaths(input.path)
+      const g = typeof input.pattern === "string" ? input.pattern : typeof input.glob === "string" ? input.glob : ""
+      if (g) out.globs = [g]
+      if (paths.length === 0) paths.push(".")
+      break
+    }
+    case "ls": {
+      const p = nonURLPath(input.path)
+      if (p) out.lists = [p]
+      break
+    }
+    case "bash":
+      if (typeof input.command === "string" && input.command) out.command = input.command
+      if (typeof input.cwd === "string" && input.cwd) out.dir = input.cwd
+      break
+    default:
+      return null
+  }
+  if (paths.length > 0) out.paths = paths
+  return Object.keys(out).length > 0 ? out : null
+}
+
 // askForContent asks OMP for full content, which the relay applies the team's policy to, as if
 // OMP's agent .env asked: OMP keeps that from the tools it runs. It asks only where every
 // signal goes to the relay as OMP resolves it, the shell and the launch directory's .env
@@ -181,10 +249,40 @@ async function askForContent() {
 export default async function (omp: any) {
   if (!CONFIG) return
   await askForContent()
+  // Serialize lifecycle and reach hooks so session-start always finishes before tool-reach
+  // (a delayed StartRun can never clear an earlier Mixed mark); titles keep their own queue.
+  let lifecycle: Promise<void> = Promise.resolve()
+  const queuedHook = (event: string, payload: Record<string, unknown>): Promise<void> => {
+    const step = lifecycle.then(() =>
+      Promise.race([
+        termaHook(event, payload, true).then(() => undefined),
+        new Promise<void>((resolve) => {
+          const t: any = setTimeout(resolve, 2000)
+          t?.unref?.()
+        }),
+      ]),
+    )
+    lifecycle = step.then(() => undefined, () => undefined)
+    return step
+  }
+  const reached = new Set<string>()
+  const emitReach = (event: any, ctx: any): Promise<void> | null => {
+    const reach = toolReach(event)
+    if (!reach) return null
+    const s = sessionOf(ctx)
+    if (!s) return null
+    return queuedHook("omp-tool-reach", {
+      session_id: s,
+      cwd: ctx?.cwd,
+      tool: String(event?.toolName ?? ""),
+      parent_session_id: parentOf(ctx) || undefined,
+      ...reach,
+    })
+  }
 
   omp.on("session_start", (event: any, ctx: any) => {
     session = sessionOf(ctx)
-    termaHook("omp-session-start", { session_id: session, cwd: ctx?.cwd, model: ctx?.model?.id, reason: event?.reason, parent_session_id: parentOf(ctx) || undefined })
+    return queuedHook("omp-session-start", { session_id: session, cwd: ctx?.cwd, model: ctx?.model?.id, reason: event?.reason, parent_session_id: parentOf(ctx) || undefined })
   })
 
   // The session's end is handed over first: it must land within OMP's 2 s, or the next
@@ -192,7 +290,7 @@ export default async function (omp: any) {
   // flush is delivered by its own.
   omp.on("session_shutdown", async (_event: any, ctx: any) => {
     const s = sessionOf(ctx)
-    const end = s ? termaHook("omp-session-end", { session_id: s, cwd: ctx?.cwd }) : Promise.resolve()
+    const end = s ? queuedHook("omp-session-end", { session_id: s, cwd: ctx?.cwd }) : Promise.resolve()
     await Promise.all([end, sendTitleBefore(ctx, 1500)])
   })
 
@@ -206,7 +304,7 @@ export default async function (omp: any) {
   // Every prompt is a claim too: a session whose start the extension missed, or a relay
   // that stopped between turns, is covered before the turn exports anything.
   omp.on("before_agent_start", (_event: any, ctx: any) => {
-    termaHook("omp-prompt", { session_id: sessionOf(ctx), cwd: ctx?.cwd })
+    void queuedHook("omp-prompt", { session_id: sessionOf(ctx), cwd: ctx?.cwd })
     sendTitle(ctx)
   })
 
@@ -214,10 +312,31 @@ export default async function (omp: any) {
     sendTitle(ctx)
   })
 
+  omp.on("tool_call", async (event: any, ctx: any) => {
+    const pending = emitReach(event, ctx)
+    if (pending && event?.toolCallId) {
+      reached.add(event.toolCallId)
+      if (reached.size > 1024) reached.delete(reached.values().next().value!)
+    }
+    if (pending) await pending
+  })
+
   omp.on("tool_result", (event: any, ctx: any) => {
+    const id = event?.toolCallId
+    const seen = Boolean(id && reached.delete(id))
+    if (!seen || event?.details?.resolvedPath) {
+      void emitReach(event, ctx)
+    }
     const files = editedFiles(event)
     if (files.length > 0) {
-      termaHook("omp-file-edit", { session_id: sessionOf(ctx), cwd: ctx?.cwd, tool: String(event?.toolName ?? ""), files, tool_call_id: event?.toolCallId })
+      void queuedHook("omp-file-edit", {
+        session_id: sessionOf(ctx),
+        cwd: ctx?.cwd,
+        tool: String(event?.toolName ?? ""),
+        files,
+        tool_call_id: event?.toolCallId,
+        parent_session_id: parentOf(ctx) || undefined,
+      })
     }
   })
 }

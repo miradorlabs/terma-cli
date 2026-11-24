@@ -142,22 +142,41 @@ function record(session: string, event: string, body: string, a: Record<string, 
 
 // --- terma hook ----------------------------------------------------------------------
 
-// termaHook hands an event to `terma hook pi-*`, detached: attribution is best-effort
-// and never delays the agent. It settles once the payload is written, which a handler that
-// runs as the agent exits awaits: the agent's exit would otherwise cut the payload off.
-function termaHook(event: string, payload: Record<string, unknown>): Promise<void> {
+// termaHook hands an event to `terma hook pi-*` in FIFO order so session-start always
+// finishes before tool-reach (preventing a late StartRun from clearing an earlier Mixed
+// mark) and reach completes before the session exits.
+let hookQueue: Promise<void> = Promise.resolve()
+
+function spawnHook(event: string, payload: Record<string, unknown>): Promise<void> {
   if (!CONFIG) return Promise.resolve()
   return new Promise((resolve) => {
+    let settled = false
+    const done = () => {
+      if (settled) return
+      settled = true
+      clearTimeout(timer)
+      resolve()
+    }
+    const timer: any = setTimeout(done, 2000)
+    timer?.unref?.()
     try {
       const [cmd, ...args] = CONFIG!.hookCommand
       const child = spawn(cmd, [...args, event], { stdio: ["pipe", "ignore", "ignore"], detached: false })
-      child.on("error", () => resolve())
-      child.stdin.on("error", () => resolve())
-      child.stdin.end(JSON.stringify(payload), () => resolve())
+      child.on("error", done)
+      child.on("close", done)
+      child.stdin.on("error", () => {})
+      child.stdin.end(JSON.stringify(payload))
     } catch {
-      resolve()
+      done()
     }
   })
+}
+
+function termaHook(event: string, payload: Record<string, unknown>): Promise<void> {
+  if (!CONFIG) return Promise.resolve()
+  const step = hookQueue.then(() => spawnHook(event, payload))
+  hookQueue = step.then(() => undefined, () => undefined)
+  return step
 }
 
 // --- the extension -------------------------------------------------------------------
@@ -165,18 +184,61 @@ function termaHook(event: string, payload: Record<string, unknown>): Promise<voi
 let session = ""
 let turnStart = Date.now()
 const toolStarts = new Map<string, number>()
+const reachedCalls = new Set<string>()
 
 function sessionOf(ctx: any): string {
   const own = ctx && ctx.sessionManager && typeof ctx.sessionManager.getSessionId === "function" ? ctx.sessionManager.getSessionId() : ""
   return own ? String(own) : session
 }
 
+// toolReach describes what a read, search, glob, list or shell tool call can reach.
+function toolReach(event: any): Record<string, unknown> | null {
+  const name = String(event?.toolName ?? "")
+  const input = event?.input ?? {}
+  const out: Record<string, unknown> = {}
+  const path = typeof input.path === "string" && input.path ? input.path : ""
+  switch (name) {
+    case "read":
+      if (path) out.paths = [path]
+      break
+    case "grep":
+      out.paths = [path || "."]
+      if (typeof input.glob === "string" && input.glob) out.globs = [input.glob]
+      break
+    case "find":
+    case "glob": {
+      out.paths = [path || "."]
+      const g = typeof input.pattern === "string" ? input.pattern : typeof input.glob === "string" ? input.glob : ""
+      if (g) out.globs = [g]
+      break
+    }
+    case "ls":
+      if (path) out.lists = [path]
+      break
+    case "bash":
+      if (typeof input.command === "string" && input.command) out.command = input.command
+      if (typeof input.cwd === "string" && input.cwd) out.dir = input.cwd
+      break
+    default:
+      return null
+  }
+  return Object.keys(out).length > 0 ? out : null
+}
+
 export default function (pi: any) {
   if (!CONFIG) return
 
+  const emitReach = (event: any, ctx: any): Promise<void> | null => {
+    const reach = toolReach(event)
+    if (!reach) return null
+    const s = sessionOf(ctx)
+    if (!s) return null
+    return termaHook(AGENT + "-tool-reach", { session_id: s, cwd: ctx?.cwd, tool: String(event?.toolName ?? ""), ...reach })
+  }
+
   pi.on("session_start", (event: any, ctx: any) => {
     session = sessionOf(ctx)
-    termaHook(AGENT + "-session-start", { session_id: session, cwd: ctx?.cwd, model: ctx?.model?.id, reason: event?.reason })
+    return termaHook(AGENT + "-session-start", { session_id: session, cwd: ctx?.cwd, model: ctx?.model?.id, reason: event?.reason })
   })
 
   pi.on("session_shutdown", async (_event: any, ctx: any) => {
@@ -192,7 +254,7 @@ export default function (pi: any) {
     record(s, AGENT + ".user_prompt", CONFIG!.includePrompts ? truncate(prompt, MAX_TEXT) : "", { prompt_length: prompt.length })
     // Every prompt is a claim too: a session whose start the extension missed, or a
     // relay that stopped between turns, is covered before the turn exports anything.
-    termaHook(AGENT + "-prompt", { session_id: s, cwd: ctx?.cwd })
+    void termaHook(AGENT + "-prompt", { session_id: s, cwd: ctx?.cwd })
   })
 
   pi.on("message_end", (event: any, ctx: any) => {
@@ -220,14 +282,22 @@ export default function (pi: any) {
     turnStart = end
   })
 
-  pi.on("tool_call", (event: any) => {
+  pi.on("tool_call", async (event: any, ctx: any) => {
     if (event?.toolCallId) toolStarts.set(event.toolCallId, Date.now())
+    const pending = emitReach(event, ctx)
+    if (pending && event?.toolCallId) {
+      reachedCalls.add(event.toolCallId)
+      if (reachedCalls.size > 1024) reachedCalls.delete(reachedCalls.values().next().value!)
+    }
+    if (pending) await pending
   })
 
   pi.on("tool_result", (event: any, ctx: any) => {
     const s = sessionOf(ctx)
     const start = toolStarts.get(event?.toolCallId) ?? Date.now()
     toolStarts.delete(event?.toolCallId)
+    const seen = Boolean(event?.toolCallId && reachedCalls.delete(event.toolCallId))
+    if (!seen) void emitReach(event, ctx)
     const name = String(event?.toolName ?? "")
     span(s, "execute_tool " + name, start, Date.now(), {
       "gen_ai.operation.name": "execute_tool",
@@ -238,7 +308,7 @@ export default function (pi: any) {
     }, event?.isError === true)
     const file = event?.input && typeof event.input.path === "string" ? event.input.path : ""
     if ((name === "write" || name === "edit") && file) {
-      termaHook(AGENT + "-file-edit", { session_id: s, cwd: ctx?.cwd, tool: name, file })
+      void termaHook(AGENT + "-file-edit", { session_id: s, cwd: ctx?.cwd, tool: name, file })
     }
   })
 

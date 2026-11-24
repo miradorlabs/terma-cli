@@ -313,25 +313,49 @@ class Exporter {
 
 // --- attribution hooks --------------------------------------------------------------
 
-// hookRunner hands session and file events to `terma hook <event>`, fire and forget.
-// A terma binary that is not on PATH is noticed once and then left alone: the
-// telemetry export does not depend on it, and a spawn error per event would be noise.
+// hookRunner hands session and file events to `terma hook <event>` in FIFO order so
+// session-start always finishes before tool-reach. A terma binary that is not on PATH
+// is noticed once and then left alone.
 function hookRunner(cfg) {
   const argv = Array.isArray(cfg.hookCommand) && cfg.hookCommand.length > 0 ? cfg.hookCommand : ["terma", "hook"]
   let missing = false
+  let queue = Promise.resolve()
+  const runOnce = (event, payload) => {
+    if (missing) return Promise.resolve()
+    return new Promise((resolve) => {
+      let settled = false
+      let child = null
+      const done = () => {
+        if (settled) return
+        settled = true
+        clearTimeout(timer)
+        resolve()
+      }
+      const timer = setTimeout(() => {
+        if (child && typeof child.unref === "function") child.unref()
+        done()
+      }, 2000)
+      if (typeof timer.unref === "function") timer.unref()
+      try {
+        child = spawn(argv[0], [...argv.slice(1), event], { stdio: ["pipe", "ignore", "ignore"] })
+        child.on("error", (err) => {
+          if (err && err.code === "ENOENT") missing = true
+          done()
+        })
+        child.on("close", done)
+        child.stdin.on("error", () => {})
+        child.stdin.end(JSON.stringify(payload))
+      } catch {
+        // Attribution is best effort.
+        done()
+      }
+    })
+  }
   return function run(event, payload) {
-    if (missing) return
-    try {
-      const child = spawn(argv[0], [...argv.slice(1), event], { stdio: ["pipe", "ignore", "ignore"] })
-      child.on("error", (err) => {
-        if (err && err.code === "ENOENT") missing = true
-      })
-      child.stdin.on("error", () => {})
-      child.stdin.end(JSON.stringify(payload))
-      if (typeof child.unref === "function") child.unref()
-    } catch {
-      // Attribution is best effort.
-    }
+    if (missing) return Promise.resolve()
+    const step = queue.then(() => runOnce(event, payload))
+    queue = step.then(() => undefined, () => undefined)
+    return step
   }
 }
 
@@ -421,6 +445,38 @@ export const TermaPlugin = async ({ directory, worktree }) => {
     })
   }
 
+  // toolReach describes what a read, search, glob, list or shell tool call can reach.
+  function toolReach(tool, args) {
+    if (!args || typeof args !== "object") return null
+    const out = {}
+    const path = typeof args.filePath === "string" && args.filePath ? args.filePath : typeof args.path === "string" && args.path ? args.path : ""
+    switch (tool) {
+      case "read":
+        if (path) out.paths = [path]
+        break
+      case "grep":
+        out.paths = [path || "."]
+        if (typeof args.include === "string" && args.include) out.globs = [args.include]
+        break
+      case "glob":
+        out.paths = [path || "."]
+        if (typeof args.pattern === "string" && args.pattern) out.globs = [args.pattern]
+        break
+      case "list":
+        if (path) out.lists = [path]
+        break
+      case "bash": {
+        if (typeof args.command === "string" && args.command) out.command = args.command
+        const dir = typeof args.workdir === "string" && args.workdir ? args.workdir : typeof args.cwd === "string" && args.cwd ? args.cwd : ""
+        if (dir) out.dir = dir
+        break
+      }
+      default:
+        return null
+    }
+    return Object.keys(out).length > 0 ? out : null
+  }
+
   return {
     event: async ({ event }) => {
       try {
@@ -460,7 +516,7 @@ export const TermaPlugin = async ({ directory, worktree }) => {
             break
           }
           case "file.edited":
-            if (p.file) hook("opencode-file-edit", { session_id: lastSession, cwd: worktree || directory, file: p.file })
+            if (p.file) hook("opencode-file-edit", { session_id: lastSession, cwd: worktree || directory, file: p.file, parent_session_id: parentOf(lastSession) })
             break
           case "message.updated":
             modelCall(p.info)
@@ -510,11 +566,23 @@ export const TermaPlugin = async ({ directory, worktree }) => {
       } catch {}
     },
 
-    "tool.execute.before": async (input) => {
+    "tool.execute.before": async (input, output) => {
       try {
         if (!input?.callID) return
-        tools.set(input.callID, { sessionID: sessionOf(input.sessionID), start: Date.now() })
+        const sid = sessionOf(input.sessionID)
+        const reach = toolReach(input.tool, output?.args ?? input.args)
+        const reachKey = reach && sid ? JSON.stringify(reach) : ""
+        tools.set(input.callID, { sessionID: sid, start: Date.now(), reachKey })
         if (tools.size > 1024) tools.delete(tools.keys().next().value)
+        if (reach && sid) {
+          await hook("opencode-tool-reach", {
+            session_id: sid,
+            cwd: worktree || directory,
+            tool: input.tool,
+            parent_session_id: parentOf(sid),
+            ...reach,
+          })
+        }
       } catch {}
     },
 
@@ -524,9 +592,21 @@ export const TermaPlugin = async ({ directory, worktree }) => {
         const started = tools.get(input.callID)
         tools.delete(input.callID)
         const sid = sessionOf(input.sessionID || started?.sessionID)
+        const args = input.args ?? {}
+        if (sid) {
+          const reach = toolReach(input.tool, args)
+          if (reach && JSON.stringify(reach) !== started?.reachKey) {
+            await hook("opencode-tool-reach", {
+              session_id: sid,
+              cwd: worktree || directory,
+              tool: input.tool,
+              parent_session_id: parentOf(sid),
+              ...reach,
+            })
+          }
+        }
         const end = Date.now()
         const start = started?.start ?? end
-        const args = input.args ?? {}
         const attributes = {
           "gen_ai.operation.name": "execute_tool",
           "gen_ai.tool.name": input.tool,

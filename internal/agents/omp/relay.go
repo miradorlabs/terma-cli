@@ -128,20 +128,33 @@ func removeOwn(dir string, rels []string) ([]string, error) {
 	var removed []string
 	for _, rel := range rels {
 		path := filepath.Join(dir, rel)
-		data, err := os.ReadFile(path)
-		if errors.Is(err, fs.ErrNotExist) {
+		if _, err := os.Lstat(path); errors.Is(err, fs.ErrNotExist) {
 			continue
 		}
+		var deleted bool
+		err := relayexport.WithTemplateLock(path, func() error {
+			data, err := os.ReadFile(path)
+			if errors.Is(err, fs.ErrNotExist) {
+				return nil
+			}
+			if err != nil {
+				return err
+			}
+			if !bytes.HasPrefix(data, []byte("// Terma ")) {
+				return nil
+			}
+			if err := os.Remove(path); err != nil && !errors.Is(err, fs.ErrNotExist) {
+				return err
+			}
+			deleted = true
+			return nil
+		})
 		if err != nil {
 			return removed, err
 		}
-		if !bytes.HasPrefix(data, []byte("// Terma ")) {
-			continue
+		if deleted {
+			removed = append(removed, path)
 		}
-		if err := os.Remove(path); err != nil && !errors.Is(err, fs.ErrNotExist) {
-			return removed, err
-		}
-		removed = append(removed, path)
 	}
 	return removed, nil
 }

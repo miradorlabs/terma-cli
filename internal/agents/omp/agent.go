@@ -69,11 +69,15 @@ func (Agent) StateDirs() []string { return []string{ompTitleStateDir} }
 // ContentConsented is the consent session titles travel under.
 func (Agent) ContentConsented(c hookrun.Consent) bool { return titleConsented(c) }
 
+// RefreshMachine rewrites an installed OMP extension with this build's template.
+func (Agent) RefreshMachine() (string, bool, error) { return refreshExtension() }
+
 var (
-	_ agents.Covered        = Agent{}
-	_ agents.Exporting      = Agent{}
-	_ agents.Agent          = Agent{}
-	_ agents.Surfaced       = Agent{}
-	_ agents.StateKeeper    = Agent{}
-	_ agents.ContentConsent = Agent{}
+	_ agents.Covered          = Agent{}
+	_ agents.Exporting        = Agent{}
+	_ agents.Agent            = Agent{}
+	_ agents.Surfaced         = Agent{}
+	_ agents.StateKeeper      = Agent{}
+	_ agents.ContentConsent   = Agent{}
+	_ agents.MachineRefresher = Agent{}
 )
