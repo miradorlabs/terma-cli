@@ -181,9 +181,7 @@ func (sc *scan) checkPartsFields(parts []syntax.WordPart, ifs string, rem int, i
 			if (pe.Exp != nil && pe.Exp.Op == syntax.OtherParamOps || (isCase || pe.Repl != nil && pe.Repl.All) && len(v) > rem) && sc.fail() {
 				return -1
 			}
-			if isCase {
-				rem -= len(v)
-			} else {
+			if rem = pick(isCase, rem-len(v), rem); !isCase {
 				rem = sc.consumeFields(v, ifs, rem)
 			}
 			if rem >= 0 && pe.Exp != nil && pe.Exp.Word != nil {
@@ -225,13 +223,12 @@ func countFields(v, ifs string, limit int) int {
 	return n
 }
 func (sc *scan) fields(w *syntax.Word) ([]string, error) {
-	out, ifs := []string(nil), sc.ifs()
+	out, ifs, prev := []string(nil), sc.ifs(), false
 	for b, err := range sc.braces(w) {
 		if err != nil || len(ifs) > 64 && sc.fail() || !sc.charge(sc.size(b)) || ifs != "" && sc.checkPartsFields(b.Parts, ifs, maxShellWords-len(out), false) < 0 {
 			return nil, errOpaque
 		}
-		prev := sc.opaque
-		sc.opaque = false
+		prev, sc.opaque = sc.opaque, false
 		f, err := expand.Fields(sc.cfg, b)
 		if sc.opaque, prev = prev, sc.opaque; err != nil || prev || len(out)+len(f) > maxShellWords && sc.fail() {
 			return nil, errOpaque

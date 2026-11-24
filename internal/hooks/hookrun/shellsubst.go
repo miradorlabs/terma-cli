@@ -31,17 +31,16 @@ func (sc *scan) substitute(w io.Writer, cs *syntax.CmdSubst) error {
 			}
 			for n := len(words); n > 0; n-- {
 				if known, ok := outputs[strings.Join(words[:n], " ")]; ok {
-					if _, ok := sc.trustedCmd(words[0]); !ok {
-						return errOpaque
+					if _, ok := sc.trustedCmd(words[0]); ok {
+						outer := sc.cfg
+						sc.cfg = sc.config() // expand is not reentrant
+						out, ok := known(sc, ce.Args[n:])
+						if sc.cfg, out = outer, strings.TrimRight(out, "\n"); ok && sc.charge(len(out)) && sc.chargeFields(out) {
+							_, err := io.WriteString(w, out)
+							return err
+						}
 					}
-					outer := sc.cfg
-					sc.cfg = sc.config() // expand is not reentrant
-					out, ok := known(sc, ce.Args[n:])
-					if sc.cfg, out = outer, strings.TrimRight(out, "\n"); !ok || !sc.charge(len(out)) || !sc.chargeFields(out) {
-						return errOpaque
-					}
-					_, err := io.WriteString(w, out)
-					return err
+					return errOpaque
 				}
 			}
 		}
@@ -49,15 +48,12 @@ func (sc *scan) substitute(w io.Writer, cs *syntax.CmdSubst) error {
 	return errOpaque
 }
 func (sc *scan) trustedCmd(name string) (string, bool) {
-	_, f1 := sc.env("BASH_FUNC_" + name + "%%")
-	_, f2 := sc.env("BASH_FUNC_" + name + "()")
 	pathEnv, hasPath := sc.lookup("PATH")
-	if f1 || f2 || name == "pwd" || !hasPath && !sc.isUnresolvedVar("PATH") {
-		return "", !f1 && !f2
+	if bad := slices.ContainsFunc([]string{"BASH_FUNC_" + name + "%%", "BASH_FUNC_" + name + "()"}, func(k string) bool { _, ok := sc.env(k); return ok }) || sc.isUnresolvedVar("BASH_ENV") || sc.envVal("BASH_ENV") != "" || sc.isUnresolvedVar("ENV") || sc.envVal("ENV") != ""; bad || name == "pwd" || !hasPath && !sc.isUnresolvedVar("PATH") {
+		return "", !bad
 	}
 	exts := pick(runtime.GOOS == "windows", []string{"", ".exe", ".cmd", ".bat", ".com"}, []string{""})
 	roots := pick(runtime.GOOS == "windows", []string{"/program files/", "/program files (x86)/", "/windows/system32/"}, []string{"/bin/", "/usr/bin/", "/usr/lib/", "/Library/Developer/", "/Applications/Xcode.app/", "/usr/local/go/bin/"})
-	goRoots := pick(runtime.GOOS == "windows", []string{"/hostedtoolcache/windows/go/"}, []string{"/opt/hostedtoolcache/go/", "/opt/homebrew/Cellar/go/", "/usr/local/Cellar/go/"})
 	for _, d := range pick(sc.isUnresolvedVar("PATH") || pathEnv == "", []string{""}, filepath.SplitList(pathEnv)) {
 		if d == "" || !filepath.IsAbs(d) {
 			return "", false
@@ -69,7 +65,7 @@ func (sc *scan) trustedCmd(name string) (string, bool) {
 				p := filepath.ToSlash(r[len(filepath.VolumeName(r)):])
 				p = pick(runtime.GOOS == "windows", strings.ToLower(p), p)
 				same := pick(runtime.GOOS == "windows", strings.EqualFold(filepath.Base(r), name+ext), filepath.Base(r) == name)
-				return r, same && (isSysBin(info) && slices.ContainsFunc(roots, func(pre string) bool { return strings.HasPrefix(p, pre) }) || name == "go" && info.Mode()&0o022 == 0 && slices.ContainsFunc(goRoots, func(pre string) bool { return strings.HasPrefix(p, pre) }))
+				return r, same && isSysBin(info) && slices.ContainsFunc(roots, func(pre string) bool { return strings.HasPrefix(p, pre) })
 			}
 		}
 	}
@@ -166,22 +162,22 @@ func (sc *scan) safeLocate(dir string) (string, bool) {
 		absGD, ok1 := sc.resolveJoined(cmp.Or(sc.dir, sc.cwd), gd, false)
 		absWT, ok2 := sc.resolveJoined(cmp.Or(sc.dir, sc.cwd), wt, false)
 		if gd != "" && wt != "" && ok1 && ok2 && !sc.hasRemoteLink(absGD) && !sc.hasRemoteLink(absWT) {
-			if _, _, wi, okW := sc.walkPath(absWT, true); okW && sameOwner(wi) && sc.validGitDir(absGD, true) && !sc.hasWorktreeConfig(absGD) {
-				return absWT, true
-			}
+			rw, _, wi, okW := sc.walkPath(absWT, true)
+			ok := okW && sameOwner(rw, wi) && sc.validGitDir(absGD, true) && !sc.hasWorktreeConfig(absGD)
+			return pick(ok, absWT, ""), ok
 		}
 		return "", false
 	}
 	if start, ok := sc.real(dir); ok {
 		_, _, startInfo, found := sc.walkPath(start, true)
 		for cur := start; found && startInfo.IsDir() && sc.spendStat(1); cur = filepath.Dir(cur) {
-			_, _, ci, ok := sc.walkPath(cur, true)
+			rc, _, ci, ok := sc.walkPath(cur, true)
 			if !ok || cur != start && !sameDevice(startInfo, ci) {
 				break
 			}
 			dotGit := filepath.Join(cur, ".git")
-			if _, _, info, ok := sc.walkPath(dotGit, false); ok {
-				if !sameOwner(ci) || !sameOwner(info) {
+			if rdg, _, info, ok := sc.walkPath(dotGit, false); ok {
+				if !sameOwner(rc, ci) || !sameOwner(rdg, info) {
 					return "", false
 				} else if info.IsDir() {
 					ok := sc.validGitDir(dotGit, true) && !sc.hasWorktreeConfig(dotGit)
@@ -215,7 +211,7 @@ func (sc *scan) gitCommonDir(dir string) (string, bool, bool) {
 	return "", true, false
 }
 func (sc *scan) validGitDir(dir string, owned bool) bool {
-	if _, _, di, ok := sc.walkPath(dir, true); owned && (!ok || !sameOwner(di)) {
+	if rd, _, di, ok := sc.walkPath(dir, true); owned && (!ok || !sameOwner(rd, di)) {
 		return false
 	}
 	head, err := sc.readSmallFile(filepath.Join(dir, "HEAD"))
@@ -227,8 +223,8 @@ func (sc *scan) validGitDir(dir string, owned bool) bool {
 	if hasDir(filepath.Join(dir, "objects")) && (hasDir(filepath.Join(dir, "refs")) || hasDir(filepath.Join(dir, "reftable"))) {
 		return true
 	} else if r, present, ok := sc.gitCommonDir(dir); present && ok && hasDir(filepath.Join(r, "objects")) {
-		_, _, ri, rOk := sc.walkPath(r, true)
-		return !owned || rOk && sameOwner(ri)
+		rr, _, ri, rOk := sc.walkPath(r, true)
+		return !owned || rOk && sameOwner(rr, ri)
 	}
 	return false
 }

@@ -21,11 +21,11 @@ func (d dirHandle) openSubDir(n string, w fs.FileInfo) (dirHandle, error) {
 	return openAt(int(d), n, unix.O_DIRECTORY|unix.O_NOFOLLOW|unix.O_NONBLOCK, w)
 }
 func (d dirHandle) open(name string, dir bool, want fs.FileInfo) (*os.File, error) {
-	fd, err := openAt(int(d), name, unix.O_NOFOLLOW|unix.O_NONBLOCK|pick(dir, unix.O_DIRECTORY, 0), want)
-	if err != nil {
+	if fd, err := openAt(int(d), name, unix.O_NOFOLLOW|unix.O_NONBLOCK|pick(dir, unix.O_DIRECTORY, 0), want); err != nil {
 		return nil, err
+	} else {
+		return os.NewFile(uintptr(fd), name), nil
 	}
-	return os.NewFile(uintptr(fd), name), nil
 }
 func (d dirHandle) lstat(name string) (fs.FileInfo, error) {
 	var st unix.Stat_t
@@ -71,8 +71,11 @@ func sameDevice(a, b fs.FileInfo) bool {
 	d2, _, ok2 := statIDs(b)
 	return ok1 && ok2 && d1 == d2
 }
-func sameOwner(a fs.FileInfo) bool { _, u, ok := statIDs(a); return ok && u == uint32(effectiveUID()) }
-func isSysBin(a fs.FileInfo) bool  { _, u, ok := statIDs(a); return ok && u == 0 && a.Mode()&0o022 == 0 }
+func sameOwner(_ string, a fs.FileInfo) bool {
+	_, u, ok := statIDs(a)
+	return ok && u == uint32(effectiveUID())
+}
+func isSysBin(a fs.FileInfo) bool { _, u, ok := statIDs(a); return ok && u == 0 && a.Mode()&0o022 == 0 }
 
 type statInfo struct{ st unix.Stat_t }
 

@@ -2800,4 +2800,69 @@ func TestReachCoreReviewRegressions(t *testing.T) {
 	if got, ok := scSudo.safeLocate(repo); ok {
 		t.Errorf("safeLocate with SUDO_UID = (%q, true), want false", got)
 	}
+
+	// 9. Leading-hyphen file operands (e.g. cat -- --repo/file, cat -- -file) are preserved by candidate.
+	other := filepath.Join(parent, "other-checkout")
+	if err := os.MkdirAll(other, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(other, "secret.txt"), []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	dashLink := filepath.Join(repo, "--repo")
+	if err := os.Symlink(other, dashLink); err != nil {
+		t.Fatal(err)
+	}
+	singleDashLink := filepath.Join(repo, "-file")
+	if err := os.Symlink(filepath.Join(other, "secret.txt"), singleDashLink); err != nil {
+		t.Fatal(err)
+	}
+	for _, arg := range []string{"--repo/secret.txt", "--repo/newfile.txt", "-file"} {
+		scDash := newScan(repo, makeEnv(map[string]string{"HOME": parent}), work{deadline: time.Now().Add(time.Minute)})
+		scDash.candidate(arg, plain)
+		if !scDash.places[other] {
+			t.Errorf("candidate(%q, plain): places = %v, want %q", arg, scDash.out, other)
+		}
+	}
+
+	// 10. BASH_ENV and ENV (set or unresolved) fail closed in trustedCmd / command substitutions.
+	for _, tc := range []struct {
+		key string
+		cmd string
+	}{
+		{"BASH_ENV", "pwd"},
+		{"BASH_ENV", "dirname /a/b"},
+		{"ENV", "pwd"},
+		{"ENV", "git rev-parse --show-toplevel"},
+	} {
+		scStartup := newScan(repo, makeEnv(map[string]string{
+			"HOME": parent, "USERPROFILE": parent, tc.key: filepath.Join(parent, "hook.sh"),
+		}), work{deadline: time.Now().Add(time.Minute)})
+		if got, err := evalSubst(scStartup, tc.cmd); err == nil {
+			t.Errorf("%s set: substitute(%q) = %q, want error", tc.key, tc.cmd, got)
+		}
+		scUnres := newScan(repo, makeEnv(map[string]string{
+			"HOME": parent, "USERPROFILE": parent,
+		}), work{deadline: time.Now().Add(time.Minute)})
+		scUnres.vars[tc.key] = nil
+		if got, err := evalSubst(scUnres, tc.cmd); err == nil {
+			t.Errorf("%s unresolved: substitute(%q) = %q, want error", tc.key, tc.cmd, got)
+		}
+	}
+
+	// 11. User-owned go binary in PATH (no goRoots bypass) fails closed in trustedCmd.
+	fakeGoDir := filepath.Join(parent, "go-bin")
+	if err := os.MkdirAll(fakeGoDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	goBin := filepath.Join(fakeGoDir, pick(runtime.GOOS == "windows", "go.exe", "go"))
+	if err := os.WriteFile(goBin, []byte("#!/bin/sh\necho /other\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	scGo := newScan(repo, makeEnv(map[string]string{
+		"HOME": parent, "USERPROFILE": parent, "PATH": fakeGoDir, "GOPATH": filepath.Join(parent, "gp"),
+	}), work{deadline: time.Now().Add(time.Minute)})
+	if got, err := evalSubst(scGo, "go env GOPATH"); err == nil {
+		t.Errorf("user-owned go in PATH: substitute(go env GOPATH) = %q, want error", got)
+	}
 }

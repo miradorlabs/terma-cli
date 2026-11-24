@@ -14,9 +14,7 @@ import (
 
 func (sc *scan) candidate(t string, r role) {
 	if v := pick(r.whole(), t, shellValue(t)); v != t {
-		if !strings.HasPrefix(t, "-") {
-			sc.candidatePath(t, r, true)
-		}
+		sc.candidatePath(t, r, true)
 		t = v
 	}
 	if p, isURL, bad := urlPath(t); bad && sc.fail() {
@@ -77,8 +75,7 @@ const maxSymlinkHops, maxPathComponents, maxPathBytes, alnum = 8, 128, 4096, "ab
 func (sc *scan) walk(p string, followFinal bool, openMode uint8) (resolved, parent string, info os.FileInfo, f *os.File, ok bool) {
 	if !filepath.IsAbs(p) && !filepath.IsAbs(sc.dir) {
 		return "", "", nil, nil, false
-	}
-	if p = pick(filepath.IsAbs(p), p, sc.dir+string(filepath.Separator)+p); sc.unknown || remote(p, sc.cwd) || len(p) > maxPathBytes {
+	} else if p = pick(filepath.IsAbs(p), p, sc.dir+string(filepath.Separator)+p); sc.unknown || remote(p, sc.cwd) || len(p) > maxPathBytes {
 		return "", "", nil, nil, !sc.fail()
 	}
 	vol := filepath.VolumeName(p)
@@ -99,10 +96,8 @@ func (sc *scan) walk(p string, followFinal bool, openMode uint8) (resolved, pare
 			return "", "", nil, nil, !sc.fail()
 		}
 		part, cur, curPath := parts[0], stack[len(stack)-1], paths[len(paths)-1]
-		if parts = parts[1:]; part == "" || part == "." {
-			continue
-		} else if part == ".." {
-			if len(stack) > 1 {
+		if parts = parts[1:]; part == "" || part == "." || part == ".." {
+			if part == ".." && len(stack) > 1 {
 				cur.close()
 				stack, paths = stack[:len(stack)-1], paths[:len(paths)-1]
 			}

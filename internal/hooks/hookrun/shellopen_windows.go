@@ -1,4 +1,4 @@
-//go:build !unix
+//go:build windows
 
 package hookrun
 
@@ -8,9 +8,11 @@ import (
 	"os"
 	"strings"
 	"syscall"
+
+	"golang.org/x/sys/windows"
 )
 
-// dirHandle wraps os.Root with post-open os.SameFile verification against the lstat result on non-Unix platforms.
+// dirHandle wraps os.Root with post-open os.SameFile verification against the lstat result on Windows.
 type dirHandle struct{ r *os.Root }
 
 func openRootDir(v string) (dirHandle, error)         { r, e := os.OpenRoot(v); return dirHandle{r}, e }
@@ -44,5 +46,12 @@ func (d dirHandle) open(name string, dir bool, want fs.FileInfo) (*os.File, erro
 	}
 }
 func sameDevice(_, _ fs.FileInfo) bool { return true }
-func sameOwner(_ fs.FileInfo) bool     { return true }
 func isSysBin(_ fs.FileInfo) bool      { return true }
+func sameOwner(p string, _ fs.FileInfo) bool {
+	if sd, err := windows.GetNamedSecurityInfo(p, windows.SE_FILE_OBJECT, windows.OWNER_SECURITY_INFORMATION); err == nil && sd != nil {
+		owner, _, err := sd.Owner()
+		tu, tErr := windows.GetCurrentProcessToken().GetTokenUser()
+		return err == nil && tErr == nil && owner != nil && (owner.Equals(tu.User.Sid) || owner.IsWellKnown(windows.WinBuiltinAdministratorsSid) && windows.GetCurrentProcessToken().IsElevated())
+	}
+	return false
+}
