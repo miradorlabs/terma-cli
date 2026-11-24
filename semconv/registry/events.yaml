@@ -535,6 +535,16 @@ events:
       - ref: terma.operation.interrupted
       - ref: error.type
         note: error, timeout, permission_denied or _OTHER.
+      - ref: terma.skill.name
+        requirement_level:
+          conditionally_required: >-
+            When the call loaded a skill and the agent reports the use nowhere else
+            (Antigravity's read of a skill's file).
+        note: >-
+          Sent only where the call's arguments may go (the developer's consent, and content
+          the policy collects) and the policy collects prompts too.
+        annotations:
+          content: tool
 
   - name: terma.compaction
     stability: development

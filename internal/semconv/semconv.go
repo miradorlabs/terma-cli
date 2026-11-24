@@ -281,6 +281,8 @@ const (
 	TermaSessionParentIDKey = "terma.session.parent.id"
 	// TermaSessionTitleKey is terma.session.title: The name the agent gave the session.
 	TermaSessionTitleKey = "terma.session.title"
+	// TermaSkillNameKey is terma.skill.name: The skill's name as the agent itself reports it, case kept.
+	TermaSkillNameKey = "terma.skill.name"
 	// TermaSpendControlReachedKey is terma.spend_control.reached: Whether the account reached its spend control.
 	TermaSpendControlReachedKey = "terma.spend_control.reached"
 	// TermaStepIndexKey is terma.step.index: The step's index in its conversation, which only grows.

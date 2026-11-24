@@ -197,7 +197,8 @@ func antigravityEditedPaths(in *antigravityHookInput) []string {
 }
 
 // postToolUse records every tool step as a `terma.tool.call`, since agy has no other
-// export, with its arguments where the content rules allow, the file an edit changed,
+// export, with its arguments where the content rules allow, the skill a read loaded where its
+// arguments may go and the policy collects prompts too (skills.go), the file an edit changed,
 // and (when routing is active) reached locations classified from `toolCall.args`.
 // Under one hold of the conversation it reads the transcript, then spools the call, so the
 // model call that asked for the tool sorts before it. Whether the call's content is refused
@@ -242,14 +243,21 @@ func postToolUse(ctx context.Context, env hookrun.Env) error {
 	if called {
 		// Arguments go only in this hook's own turn, under the lock, unless refused.
 		//
-		// Accepted risk: arguments and a result are queued under the hook's checkout, though the
-		// file they name may be in another collected checkout; if the policy drops that other
-		// checkout before the queue is flushed, delivery, which judges the hook's checkout,
-		// still sends them. Upgrade path: queue the file's repository with the event and recheck
-		// it at delivery.
+		// Accepted risk: arguments, a result and a skill's name are queued under the hook's
+		// checkout, though the file they name may be in another collected checkout; if the
+		// policy drops that other checkout before the queue is flushed, delivery, which judges
+		// the hook's checkout, still sends them. Upgrade path: queue the file's repository with
+		// the event and recheck it at delivery.
 		if turn != "" && conv.held && !refused && in.ToolCall != nil && conv.contentFor().tools {
 			if args, ok := cutArguments(in.ToolCall.Args); ok {
 				call[semconv.GenAIToolCallArgumentsKey] = args
+			}
+			// agy reports a skill's use nowhere else, so it rides on the read that loaded it:
+			// content of both kinds, under the arguments' rule and the prompts switch.
+			if conv.contentFor().prompts {
+				if name, used := antigravityUsedSkill(in, r.Root, env.Cwd); used {
+					nameSkill(call, name)
+				}
 			}
 		}
 		env.EmitFor(r, spool.Event{Name: semconv.TermaToolCallEvent, SessionID: id, Time: conv.callTime(), Attrs: call})

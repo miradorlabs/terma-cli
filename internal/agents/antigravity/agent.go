@@ -18,6 +18,9 @@
 //   - What is sent (call.go, content.go): a model call, a prompt, a reply and a tool's result,
 //     cut to size. transcript.go's send picks them for a line; PostToolUse sends the tool
 //     call with its arguments.
+//   - The skill a read loaded (skills.go): named on its tool call where the call's arguments
+//     may go and the policy collects prompts too, from the skill folders of the checkout and of
+//     the session's own home.
 package antigravity
 
 import (

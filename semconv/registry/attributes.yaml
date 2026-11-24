@@ -215,6 +215,19 @@ attributes:
     stability: development
     brief: How many messages the run exchanged.
 
+  # Skills.
+  - key: terma.skill.name
+    type: string
+    stability: development
+    brief: The skill's name as the agent itself reports it, case kept.
+    note: >
+      A plugin's skill is `plugin:skill`. Sent only where the call's arguments may go (the
+      developer's consent, and content the policy collects) and the policy collects prompts too:
+      a terma.tool.call leaves without it otherwise.
+    examples: ["release-notes", "tools:release-notes"]
+    annotations:
+      content: tool
+
   # Usage, as an agent without an export reports it.
   - key: terma.usage.status
     type:

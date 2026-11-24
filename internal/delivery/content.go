@@ -76,12 +76,14 @@ func (r Router) withhold(pol config.Policy, e spool.Event) (spool.Event, bool) {
 	}
 	toolKeys, ok := hookContent[e.Name]
 	// A tool's input spooled while its agent had the developer's consent leaves only while it
-	// still has it: checked before an open policy sends the rest whole.
+	// still has it: checked before an open policy sends the rest whole. The skill a tool call
+	// names (terma.skill.name) goes or stays with it, on the one answer.
 	if ok && !r.consented(e, pol.Global()) {
 		e.Attrs = maps.Clone(e.Attrs)
 		for _, k := range toolKeys {
 			delete(e.Attrs, k)
 		}
+		delete(e.Attrs, semconv.TermaSkillNameKey)
 	}
 	if prompts && toolContent {
 		return e, true
@@ -91,6 +93,10 @@ func (r Router) withhold(pol config.Policy, e spool.Event) (spool.Event, bool) {
 	}
 	e.Attrs = maps.Clone(e.Attrs)
 	delete(e.Attrs, semconv.UserEmailKey)
+	// The skill a tool call names is content of both kinds, withheld with either. Hooks check
+	// before adding it; this catches a call queued before the policy changed. The call still
+	// leaves.
+	delete(e.Attrs, semconv.TermaSkillNameKey)
 	if !toolContent {
 		for _, k := range toolKeys {
 			delete(e.Attrs, k)

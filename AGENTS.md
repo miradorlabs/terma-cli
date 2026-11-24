@@ -161,6 +161,19 @@ teams and bindings, `terma route explain` to trace `routing.Router.Route` for a 
 pending bindings, and single `terma setup` remediation for `SignInNeeded`), Mixed runs, and
 combined outbox/spool losses.
 
+**Skills.** Antigravity reports a skill's use nowhere, so the `read_file` of a `SKILL.md`
+one folder below a `skills` folder agy reads (a repository's `.agents`, `.agent`,
+`_agents` or `_agent`, from the working directory up to the root, the session's own
+Antigravity home's `config` and built-ins, in `~/.gemini` or a client's home such as T3
+Code's, or a plugin's folder under any of them) names the skill on that step's
+`terma.tool.call` as `terma.skill.name`: the frontmatter's `name`, else the folder's, a
+plugin's as `plugin:name`. The name is content of both kinds, so it is added only where the
+call's arguments may go (the developer's consent, the conversation's workspaces collected, a
+file `internal/agents/antigravity/content_paths.go` does not refuse) and only while the
+policy collects prompts too; delivery removes it from a queued call once the policy
+withholds either or the consent is gone, and the call still leaves. A person's `/name` in
+the agy CLI puts the skill's body in the prompt with no tool call, and is not reported.
+
 ### Lanes, ownership, and loss accounting
 
 - **Account-bound lanes.** Everything that leaves is bound to the sign-in in place when it
