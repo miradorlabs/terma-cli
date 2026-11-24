@@ -3,7 +3,7 @@
   "harness": "gemini",
   "from": "0.71.0",
   "to": "0.71.1",
-  "generated_at": "2026-11-24T14:02:30.079399036Z",
+  "generated_at": "2026-11-24T16:48:07.081917625Z",
   "source": {
     "compare": "https://github.com/google-gemini/gemini-cli/compare/v0.71.0...v0.71.1"
   },
@@ -15,47 +15,33 @@
     "changes": 2,
     "categories": {
       "binary": 1,
-      "prompt": 1
+      "storage": 1
     },
     "impact": {
       "breaking": 0,
       "degrading": 0,
-      "informational": 1,
-      "notable": 1
+      "informational": 2,
+      "notable": 0
     },
     "undocumented": 2
   },
   "changes": [
     {
-      "id": "prompt.system.0.text",
-      "category": "prompt",
+      "id": "storage.transcript.path",
+      "category": "storage",
       "op": "changed",
       "path": [
-        "prompt",
-        "system",
-        "0",
-        "text"
+        "storage",
+        "transcript",
+        "path"
       ],
-      "title": "System prompt changed (+382 −382 chars)",
-      "impact": "notable",
-      "before": null,
-      "after": null,
-      "text_diff": "@@ -156,15 +156,15 @@\n \n <available_skills>\n   <skill>\n-    <name>skill-creator</name>\n-    <description>Guide for creating effective skills. This skill should be used when users want to create a new skill (or update an existing skill) that extends Gemini CLI's capabilities with specialized knowledge, workflows, or tool integrations.</description>\n-    <location><install>/bundle/builtin/skill-creator/SKILL.md</location>\n-  </skill>\n-  <skill>\n     <name>antigravity-support</name>\n     <description>Use when the user asks questions, seeks help, or requests instructions related to installing, setting up, or migrating to Antigravity CLI.\n This skill provides the latest up to date details, requirements, and commands sourced from the official Antigravity CLI documentation.</description>\n     <location><install>/bundle/builtin/antigravity-support/SKILL.md</location>\n+  </skill>\n+  <skill>\n+    <name>skill-creator</name>\n+    <description>Guide for creating effective skills. This skill should be used when users want to create a new skill (or update an existing skill) that extends Gemini CLI's capabilities with specialized knowledge, workflows, or tool integrations.</description>\n+    <location><install>/bundle/builtin/skill-creator/SKILL.md</location>\n   </skill>\n </available_skills>\n \n",
-      "stats": {
-        "added_chars": 382,
-        "removed_chars": 382
-      },
+      "title": "On-disk transcript path changed",
+      "impact": "informational",
+      "before": "<home>/.gemini<tmp><time>-<id>.jsonl",
+      "after": "<home>/.gemini<tmp><time>aca227d.jsonl",
+      "text_diff": null,
       "terma": null,
-      "source": {
-        "refs": [
-          {
-            "path": "packages/core/src/skills/builtin/skill-creator/SKILL.md",
-            "line": 5,
-            "url": "https://github.com/google-gemini/gemini-cli/blob/v0.71.1/packages/core/src/skills/builtin/skill-creator/SKILL.md#L5-L6"
-          }
-        ],
-        "gone": false
-      },
+      "source": null,
       "documented": false
     },
     {

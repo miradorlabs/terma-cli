@@ -7,11 +7,11 @@
       "previous": "0.71.0",
       "changes": [
         {
-          "id": "prompt.system.0.text",
-          "category": "prompt",
+          "id": "storage.transcript.path",
+          "category": "storage",
           "op": "changed",
-          "title": "System prompt changed (+382 −382 chars)",
-          "impact": "notable",
+          "title": "On-disk transcript path changed",
+          "impact": "informational",
           "documented": false
         },
         {

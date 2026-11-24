@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-24T14:02:30.079399036Z",
+  "generated_at": "2026-11-24T16:48:07.081917625Z",
   "versions": [
     {
       "harness": "copilot",
@@ -44,7 +44,7 @@
       "name": "Gemini CLI",
       "version": "0.71.1",
       "released_at": "2026-11-24T03:57:09.158Z",
-      "captured_at": "2026-11-24T10:32:48.676090095Z",
+      "captured_at": "2026-11-24T16:48:07.081917625Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -53,23 +53,23 @@
       "changes": 2,
       "categories": {
         "binary": 1,
-        "prompt": 1
+        "storage": 1
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 1,
-        "notable": 1
+        "informational": 2,
+        "notable": 0
       },
       "undocumented": 2,
       "highlights": [
-        "System prompt changed (+382 −382 chars)",
+        "On-disk transcript path changed",
         "Binary size: 98,574,960 → 121,875,875 bytes (98.6 MB → 121.9 MB)"
       ],
       "signing": null,
       "partial": true,
-      "attempted_at": "2026-11-24T10:32:48.676090095Z",
-      "attempts": 2
+      "attempted_at": "2026-11-24T16:48:07.081917625Z",
+      "attempts": 3
     },
     {
       "harness": "gemini",
