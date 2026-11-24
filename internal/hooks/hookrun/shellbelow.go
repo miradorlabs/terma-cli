@@ -25,15 +25,10 @@ func (sc *scan) safeLocate(dir string) (string, bool) {
 		return "", false
 	}
 	if gd, ok := sc.lookup("GIT_DIR"); ok && gd != "" {
-		if r, ok := sc.resolveTarget(sc.dir, gd, 1); !ok || sc.hasRemoteLink(r) {
-			return "", false
-		}
-	}
-	if gd := os.Getenv("GIT_DIR"); gd != "" {
-		wd, _ := os.Getwd()
-		base := cmp.Or(wd, sc.cwd)
+		wt, _ := sc.lookup("GIT_WORK_TREE")
+		base := cmp.Or(sc.dir, sc.cwd)
 		absGD, ok1 := sc.resolveTarget(base, gd, 1)
-		absWT, ok2 := sc.resolveTarget(base, cmp.Or(os.Getenv("GIT_WORK_TREE"), dir), 1)
+		absWT, ok2 := sc.resolveTarget(base, cmp.Or(wt, dir), 1)
 		if !ok1 || !ok2 || sc.hasRemoteLink(absGD) || sc.hasRemoteLink(absWT) {
 			return "", false
 		}

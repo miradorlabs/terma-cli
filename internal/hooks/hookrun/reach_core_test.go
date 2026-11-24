@@ -24,6 +24,9 @@ func TestFirstWordsMasksSecretsAndCapsLength(t *testing.T) {
 	cases := map[string]string{
 		"TOKEN=abc123 curl -H 'Authorization: Bearer xyz' https://user:pw@example.com/a": "TOKEN=… curl -H … …",
 		"curl -u alice:secret https://example.com":                                       "curl -u … https://example.com",
+		"curl -U alice:secret https://example.com":                                       "curl -U … https://example.com",
+		"curl --proxy-user alice:secret https://example.com":                             "curl --proxy-user … https://example.com",
+		"curl -sU alice:secret https://example.com":                                      "curl -s… … https://example.com",
 		"redis-cli -a mypass ping":                                                       "redis-cli -a … ping",
 		"ENV=x redis-cli -a mypass":                                                      "ENV=… redis-cli -a …",
 		"sudo redis-cli -a mypass":                                                       "sudo redis-cli -a …",
@@ -659,6 +662,88 @@ func TestScanBoundsAndSafety(t *testing.T) {
 	scGitFile := newScan(gitFileDir, os.LookupEnv, work{deadline: time.Now().Add(time.Minute)})
 	if err := scGitFile.substitute(&gitBuf, csGit); err == nil || !scGitFile.unknown {
 		t.Fatalf("remote .git gitdir file did not fail closed: err=%v unknown=%v", err, scGitFile.unknown)
+	}
+	// Scan-provided local GIT_DIR/GIT_WORK_TREE resolves consistently using scan's env.
+	customWT := filepath.Join(dir, "custom-wt")
+	customGD := filepath.Join(dir, "custom-gd")
+	for _, d := range []string{customWT, customGD} {
+		if err := os.MkdirAll(d, 0o700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	scGitCustom := newScan(dir, func(k string) (string, bool) {
+		switch k {
+		case "GIT_DIR":
+			return customGD, true
+		case "GIT_WORK_TREE":
+			return customWT, true
+		}
+		return "", false
+	}, work{deadline: time.Now().Add(time.Minute)})
+	gitBuf.Reset()
+	if err := scGitCustom.substitute(&gitBuf, csGit); err != nil || gitBuf.String() != customWT {
+		t.Fatalf("scan GIT_DIR/GIT_WORK_TREE substitute = (%q, %v), want (%q, nil)", gitBuf.String(), err, customWT)
+	}
+	// Triple-slash path (///...) is resolved on POSIX (never silently dropped) while "// TODO" stays clean.
+	if filepath.Separator == '/' {
+		tripleFile := filepath.Join(apiDir, "triple.txt")
+		if err := os.WriteFile(tripleFile, nil, 0o600); err != nil {
+			t.Fatal(err)
+		}
+		scTriple := newScan(sideDir, os.LookupEnv, work{deadline: time.Now().Add(time.Minute)})
+		scTriple.candidate("//"+tripleFile, plain)
+		if scTriple.unknown || !slices.Contains(scTriple.out, apiDir) {
+			t.Fatalf("triple-slash path //%s: out=%q unknown=%v, want %q", tripleFile, scTriple.out, scTriple.unknown, apiDir)
+		}
+	}
+	scComment := newScan(sideDir, os.LookupEnv, work{deadline: time.Now().Add(time.Minute)})
+	scComment.candidate("// TODO", plain)
+	scComment.candidate("//", plain)
+	if scComment.unknown {
+		t.Fatal("comment-like // tokens should not mark unknown")
+	}
+
+	// Global replacement with command substitution (${V//a/$(go env GOPATH)}) fails closed before expand.Fields.
+	fReplSubst, err := syntax.NewParser().Parse(strings.NewReader("echo ${V//a/$(go env GOPATH)}"), "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	startRS := time.Now()
+	scRS := newScan(dir, func(k string) (string, bool) {
+		switch k {
+		case "V":
+			return strings.Repeat("a", 100), true
+		case "GOPATH":
+			return strings.Repeat("x ", 5000), true
+		}
+		return "", false
+	}, work{deadline: startRS.Add(time.Minute)})
+	if _, err := scRS.fields(fReplSubst.Stmts[0].Cmd.(*syntax.CallExpr).Args[1]); err == nil || !scRS.unknown {
+		t.Fatalf("${V//a/$(go env GOPATH)} did not fail closed: err=%v unknown=%v", err, scRS.unknown)
+	}
+	if took := time.Since(startRS); took > 50*time.Millisecond {
+		t.Fatalf("${V//a/$(go env GOPATH)} took %v, want < 50ms", took)
+	}
+
+	// Oversized path passed to hasRemoteLink/real fails closed rather than claiming safe.
+	scBigPath := newScan(dir, os.LookupEnv, work{deadline: time.Now().Add(time.Minute)})
+	if !scBigPath.hasRemoteLink(filepath.Join(dir, strings.Repeat("a/", 2200)+"leaf")) || !scBigPath.unknown {
+		t.Fatal("oversized path in hasRemoteLink did not fail closed")
+	}
+
+	// On Unix, backslash is a literal filename character and not a path separator for "..".
+	if !os.IsPathSeparator('\\') {
+		bsDir := filepath.Join(dir, `foo\..`)
+		if err := os.MkdirAll(bsDir, 0o700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(bsDir, "file"), nil, 0o600); err != nil {
+			t.Fatal(err)
+		}
+		scBS := newScan(dir, os.LookupEnv, work{deadline: time.Now().Add(time.Minute)})
+		if got, ok := scBS.path(`foo\../file`, dir); !ok || got != filepath.Join(bsDir, "file") {
+			t.Fatalf("path(`foo\\../file`) = (%q, %v), want %q", got, ok, filepath.Join(bsDir, "file"))
+		}
 	}
 }
 

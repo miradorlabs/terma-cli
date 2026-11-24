@@ -206,7 +206,7 @@ func (sc *scan) ifs() string {
 }
 func (sc *scan) fieldsBounded(w *syntax.Word, limit int) bool {
 	ifs := sc.ifs()
-	return ifs == "" || sc.checkPartsFields(w.Parts, ifs, limit, false) >= 0
+	return ifs == "" || sc.checkPartsFields(w.Parts, ifs, limit, false, false) >= 0
 }
 func (sc *scan) chargeFields(v string) bool {
 	if ifs := sc.ifs(); ifs != "" {
@@ -220,7 +220,7 @@ func (sc *scan) chargeFields(v string) bool {
 	}
 	return true
 }
-func (sc *scan) checkPartsFields(parts []syntax.WordPart, ifs string, rem int, inParam bool) int {
+func (sc *scan) checkPartsFields(parts []syntax.WordPart, ifs string, rem int, inParam, noSubst bool) int {
 	for _, p := range parts {
 		if pe, ok := p.(*syntax.ParamExp); ok {
 			v := sc.paramValue(pe)
@@ -229,11 +229,11 @@ func (sc *scan) checkPartsFields(parts []syntax.WordPart, ifs string, rem int, i
 				return -1
 			}
 			if rem = sc.consumeFields(v, ifs, rem); rem >= 0 && pe.Exp != nil && pe.Exp.Word != nil {
-				rem = sc.checkPartsFields(pe.Exp.Word.Parts, ifs, rem, true)
+				rem = sc.checkPartsFields(pe.Exp.Word.Parts, ifs, rem, true, noSubst)
 			}
 			if rem >= 0 && pe.Repl != nil && pe.Repl.With != nil {
 				before := rem
-				if rem = sc.checkPartsFields(pe.Repl.With.Parts, ifs, rem, true); rem >= 0 && pe.Repl.All && len(v) > 0 {
+				if rem = sc.checkPartsFields(pe.Repl.With.Parts, ifs, rem, true, noSubst || pe.Repl.All && len(v) > 1); rem >= 0 && pe.Repl.All && len(v) > 0 {
 					if per := 1 + (before - rem); len(v) > rem/per {
 						sc.unknown = true
 						return -1
@@ -245,11 +245,16 @@ func (sc *scan) checkPartsFields(parts []syntax.WordPart, ifs string, rem int, i
 		} else if inParam {
 			switch p := p.(type) {
 			case *syntax.DblQuoted:
-				rem = sc.checkPartsFields(p.Parts, ifs, rem, true)
+				rem = sc.checkPartsFields(p.Parts, ifs, rem, true, noSubst)
 			case *syntax.Lit:
 				rem = sc.consumeFields(p.Value, ifs, rem)
 			case *syntax.SglQuoted:
 				rem = sc.consumeFields(p.Value, ifs, rem)
+			case *syntax.CmdSubst:
+				if noSubst {
+					sc.unknown = true
+					return -1
+				}
 			}
 		}
 		if rem < 0 {

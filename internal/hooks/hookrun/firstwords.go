@@ -9,7 +9,7 @@ import (
 )
 
 var (
-	secretOptions = []string{"-u", "--user", "-H", "--header", "-p", "--password", "-b", "--cookie", "-d", "--data", "--data-raw", "--data-binary", "--data-urlencode", "--oauth2-bearer"}
+	secretOptions = []string{"-u", "--user", "-U", "--proxy-user", "-H", "--header", "--proxy-header", "-p", "--password", "-b", "--cookie", "-d", "--data", "--data-raw", "--data-binary", "--data-urlencode", "--oauth2-bearer"}
 	secretNames   = []string{"pass", "token", "secret", "key", "auth"}
 	userinfo      = regexp.MustCompile(`://[^/\s]+@`)
 )
