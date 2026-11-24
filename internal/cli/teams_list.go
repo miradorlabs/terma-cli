@@ -99,41 +99,37 @@ func (app *App) listTeamsWithClient(ctx context.Context, cfg *config.Config, st 
 	var orgs []organization
 	if clientErr != nil {
 		v.Unlisted = clientErr.Error()
-	} else if listed, err := fetchOrganizations(ctx, client); err != nil {
-		v.Unlisted = err.Error()
-	} else {
-		orgs = listed
+	} else if orgs, clientErr = fetchOrganizations(ctx, client); clientErr != nil {
+		v.Unlisted = clientErr.Error()
 	}
-	if len(orgs) > 0 {
-		for i, listed := range app.fetchTeams(ctx, client, cfg.AuthURL, orgs) {
-			o := orgs[i]
-			row := orgRow{ID: o.ID, Name: o.Name, Type: o.Type}
-			names.org(o.ID, o.Name)
-			switch {
-			case orgNotAccessibleErr(listed.err):
-				row.Inaccessible, row.Note = true, orgInaccessibleNote
-			case listed.err != nil:
-				row.Note = "its teams could not be listed: " + listed.err.Error()
-			}
-			for _, p := range listed.teams {
-				names.team(p.ID, p.Name)
-				if teamNotFound(p.err) {
-					continue
-				}
-				t := teamRow{ID: p.ID, Name: p.Name}
-				switch {
-				case orgNotAccessibleErr(p.err):
-					row.Inaccessible, row.Note = true, orgInaccessibleNote
-					t.Unreadable, t.Collects = orgInaccessibleNote, "its policy could not be read"
-				case p.err != nil:
-					t.Unreadable, t.Collects = p.err.Error(), "its policy could not be read"
-				default:
-					t.Entries, t.Collects, t.GitHooks = p.policy.Repositories, collectsSummary(p.policy, o.Type == "personal"), p.policy.GitHooks
-				}
-				row.Teams = append(row.Teams, t)
-			}
-			v.Organizations = append(v.Organizations, row)
+	for i, listed := range app.fetchTeams(ctx, client, cfg.AuthURL, orgs) {
+		o := orgs[i]
+		row := orgRow{ID: o.ID, Name: o.Name, Type: o.Type}
+		names.org(o.ID, o.Name)
+		switch {
+		case orgNotAccessibleErr(listed.err):
+			row.Inaccessible, row.Note = true, orgInaccessibleNote
+		case listed.err != nil:
+			row.Note = "its teams could not be listed: " + listed.err.Error()
 		}
+		for _, p := range listed.teams {
+			names.team(p.ID, p.Name)
+			if teamNotFound(p.err) {
+				continue
+			}
+			t := teamRow{ID: p.ID, Name: p.Name}
+			switch {
+			case orgNotAccessibleErr(p.err):
+				row.Inaccessible, row.Note = true, orgInaccessibleNote
+				t.Unreadable, t.Collects = orgInaccessibleNote, "its policy could not be read"
+			case p.err != nil:
+				t.Unreadable, t.Collects = p.err.Error(), "its policy could not be read"
+			default:
+				t.Entries, t.Collects, t.GitHooks = p.policy.Repositories, collectsSummary(p.policy, o.Type == "personal"), p.policy.GitHooks
+			}
+			row.Teams = append(row.Teams, t)
+		}
+		v.Organizations = append(v.Organizations, row)
 	}
 	names.save(app.stateDir, cfg.ProfileName)
 	v.mergeState(st, names, time.Now())
@@ -174,7 +170,6 @@ func (app *App) fetchTeams(ctx context.Context, client *api.Client, authURL stri
 			var projects []project
 			if !limited(func() { projects, org.err = fetchProjects(ctx, client, o.ID) }) {
 				org.err = ctx.Err()
-				return
 			}
 			if org.err != nil {
 				return
@@ -303,6 +298,15 @@ func pendingBindings(st routing.State) []pendingRow {
 		}
 	}
 	return out
+}
+
+func (v *teamsView) findTeam(orgID, teamID string) *teamRow {
+	if oi := slices.IndexFunc(v.Organizations, func(o orgRow) bool { return o.ID == orgID }); oi >= 0 {
+		if ti := slices.IndexFunc(v.Organizations[oi].Teams, func(r teamRow) bool { return r.ID == teamID }); ti >= 0 {
+			return &v.Organizations[oi].Teams[ti]
+		}
+	}
+	return nil
 }
 
 func teamNotFound(err error) bool {

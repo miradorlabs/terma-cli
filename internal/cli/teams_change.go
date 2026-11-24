@@ -103,6 +103,9 @@ func (app *App) applyTeamsWithView(cmd *cobra.Command, cfg *config.Config, st ro
 	for _, tk := range ch.ticks {
 		if committed, ok := next.Team(tk.enrollment); ok {
 			_ = routing.StoreTeamPolicy(app.stateDir, committed)
+			if r := v.findTeam(committed.OrganizationID, committed.TeamID); r != nil {
+				r.Entries, r.Collects, r.GitHooks, r.Unreadable = committed.Policy.Repositories, collectsSummary(committed.Policy, committed.Personal), committed.Policy.GitHooks, ""
+			}
 		}
 		ch.changes = append(ch.changes, "ticked "+orgTeamLabel(tk.orgName, tk.teamName))
 		for _, op := range tk.ops {
@@ -233,7 +236,11 @@ func selectedTeam(st routing.State, ref string, names teamNames, list func() tea
 	live := list()
 	candidates := make([]project, 0, len(st.Teams))
 	for _, t := range st.Teams {
-		candidates = append(candidates, project{ID: t.TeamID, Name: cmp.Or(live.teamName(t.TeamID), names.Teams[t.TeamID])})
+		name := names.Teams[t.TeamID]
+		if r := live.findTeam(t.OrganizationID, t.TeamID); r != nil && r.Name != "" {
+			name = r.Name
+		}
+		candidates = append(candidates, project{ID: t.TeamID, Name: name})
 	}
 	k := matchKind[project]{noun: "ticked team", id: projectKind.id, name: projectKind.name}
 	idx, err := matchUniqueRef(k, candidates, ref, func(p project) string {
@@ -243,17 +250,6 @@ func selectedTeam(st routing.State, ref string, names teamNames, list func() tea
 		return routing.Team{}, err
 	}
 	return st.Teams[idx], nil
-}
-
-func (v teamsView) teamName(id string) string {
-	for _, o := range v.Organizations {
-		for _, t := range o.Teams {
-			if t.ID == id {
-				return t.Name
-			}
-		}
-	}
-	return ""
 }
 
 func unselectedTeam(v teamsView, ref string) (orgRow, teamRow, error) {

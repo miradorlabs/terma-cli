@@ -340,6 +340,32 @@ func TestTeamsPreservesFreshGlobalPolicyOverStaleState(t *testing.T) {
 	}
 }
 
+func TestTeamsSelectRefreshesViewWhenPolicyChangesBetweenListAndTick(t *testing.T) {
+	f, _ := routedMachine(t, "alice", nil)
+	prevAsk, prevForm := testApp.canAsk, testApp.runForm
+	t.Cleanup(func() { testApp.canAsk, testApp.runForm = prevAsk, prevForm })
+	testApp.canAsk = func() bool { return true }
+	testApp.runForm = func(form *prompt.Form) ([]prompt.Item, error) {
+		// While the checklist is open, an admin updates Acme API's policy from api -> payments.
+		f.policyBodies[acmeAPI] = policyBody("github.com/acme/payments")
+		items := slices.Clone(form.Items)
+		for i := range items {
+			if items[i].Label == "Acme API" {
+				items[i].Selected = true
+			}
+		}
+		return items, nil
+	}
+
+	stdout, stderr, err := termaRun{}.exec(t, "teams", "--yes")
+	if err != nil {
+		t.Fatalf("teams --yes: %v\n%s\n%s", err, stdout, stderr)
+	}
+	if !strings.Contains(stdout, "github.com/acme/payments") || strings.Contains(stdout, "github.com/acme/api") {
+		t.Fatalf("returned view still has stale policy:\n%s", stdout)
+	}
+}
+
 // Invariant 2 (Council 1): an open interactive `terma teams` session captures
 // (Account, StateID, ConsentGeneration) before prompting. A concurrent consent edit or a
 // cross-account switch (Alice -> Bob) rejects Alice's confirm without replaying stale
