@@ -301,16 +301,12 @@ func write(dir, sessionID string, c Claim, now time.Time) bool {
 	c.ClaimedAt = now
 	return persist(p, c, asideFiles)
 }
-
 func tombstoneFailClosed(mixed []string, c Claim) bool {
-	return c.Kind != KindMixed && (c.Kind != "" || c.ProjectID != "") &&
-		(slices.Contains(mixed, "*") || c.Run == "" && len(mixed) > 0)
+	return c.Kind != KindMixed && (c.Kind != "" || c.ProjectID != "") && (slices.Contains(mixed, "*") || c.Run == "" && len(mixed) > 0)
 }
 func canSkipRefresh(p string, prev, c Claim, now time.Time, refresh time.Duration) bool {
-	if !samePlace(prev, c) || !sameDirs(prev, c) || !sameParent(prev, c) || !subset(c.PIDs, prev.PIDs) || !sameRun(prev, c) || tombstoneFailClosed(prev.MixedRuns, c) {
-		return false
-	}
-	if c.Kind == KindMixed && (!coveredPIDs(c.PIDs, prev.PIDs) || now.Before(prev.placements()[len(prev.placements())-1].Since)) {
+	if !samePlace(prev, c) || !sameDirs(prev, c) || !sameParent(prev, c) || !subset(c.PIDs, prev.PIDs) || !sameRun(prev, c) || tombstoneFailClosed(prev.MixedRuns, c) ||
+		c.Kind == KindMixed && (!coveredPIDs(c.PIDs, prev.PIDs) || now.Before(prev.placements()[len(prev.placements())-1].Since)) {
 		return false
 	}
 	info, err := os.Stat(p)
@@ -335,8 +331,7 @@ func staysMixed(prev, c Claim) bool {
 			slices.ContainsFunc(prev.placements(), func(p Placement) bool { return p.Kind == KindMixed && (c.Run == "" || p.Run == c.Run) })))
 }
 func sameDirs(prev, c Claim) bool {
-	return prev.Root == c.Root && (c.Cwd == "" || prev.Cwd == c.Cwd) &&
-		prev.Worktree == c.Worktree && prev.Remote == c.Remote && prev.Branch == c.Branch
+	return prev.Root == c.Root && (c.Cwd == "" || prev.Cwd == c.Cwd) && prev.Worktree == c.Worktree && prev.Remote == c.Remote && prev.Branch == c.Branch
 }
 func sameParent(prev, c Claim) bool { return c.Parent == "" || c.Parent == prev.Parent }
 func subset(a, b []int) bool {

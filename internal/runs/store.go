@@ -24,10 +24,9 @@ func aliasTarget(stateDir, id string) (string, error) {
 	cur := id
 	for range 8 {
 		b, err := os.ReadFile(aliasPath(stateDir, cur))
-		if err != nil {
-			if errors.Is(err, fs.ErrNotExist) {
-				return cur, nil
-			}
+		if errors.Is(err, fs.ErrNotExist) {
+			return cur, nil
+		} else if err != nil {
 			return "", err
 		}
 		target := strings.TrimSpace(string(b))
@@ -43,10 +42,9 @@ func aliasTarget(stateDir, id string) (string, error) {
 }
 func resolve(stateDir, idOrAlias string) (ledger, bool, bool, error) {
 	target, err := aliasTarget(stateDir, idOrAlias)
-	if err != nil || target == idOrAlias {
-		if err != nil {
-			return ledger{}, false, false, err
-		}
+	if err != nil {
+		return ledger{}, false, false, err
+	} else if target == idOrAlias {
 		return readLedger(stateDir, idOrAlias)
 	}
 	tl, tok, ta, err := readLedger(stateDir, target)
@@ -138,8 +136,7 @@ func withCanonical(stateDir, sessionID, extra string, try bool, fn func(canon, p
 		if err != nil || extra == canon {
 			return err
 		}
-		var oldExtra string
-		ids := []string{canon}
+		oldExtra, ids := "", []string{canon}
 		if extra != "" {
 			if oldExtra, err = aliasTarget(stateDir, extra); err != nil {
 				return err
@@ -197,17 +194,14 @@ func ledgerPath(stateDir, sessionID string) (string, error) {
 	return filepath.Join(stateDir, Dir, sessionID+".json"), nil
 }
 func aliasPath(stateDir, alias string) string { return filepath.Join(stateDir, Dir, aliasesDir, alias) }
-func load(path string) (ledger, bool, error) {
+func load(path string) (l ledger, ok bool, err error) {
 	b, err := os.ReadFile(path)
-	if err != nil {
-		if errors.Is(err, fs.ErrNotExist) {
-			return ledger{}, false, nil
-		}
-		return ledger{}, false, err
-	}
-	var l ledger
-	if err := json.Unmarshal(b, &l); err != nil {
-		return ledger{}, false, fmt.Errorf("parse %s: %w", path, err)
+	if errors.Is(err, fs.ErrNotExist) {
+		return l, false, nil
+	} else if err != nil {
+		return l, false, err
+	} else if err := json.Unmarshal(b, &l); err != nil {
+		return l, false, fmt.Errorf("parse %s: %w", path, err)
 	}
 	return l, true, nil
 }

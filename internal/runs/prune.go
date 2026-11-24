@@ -35,25 +35,22 @@ func Prune(ctx context.Context, stateDir string, now time.Time, queued map[strin
 		if ctx.Err() != nil {
 			return
 		}
-		info, err := e.Info()
-		if err != nil || now.Sub(info.ModTime()) <= Retention {
+		if info, err := e.Info(); err != nil || now.Sub(info.ModTime()) <= Retention {
 			continue
 		}
 		path := filepath.Join(dir, e.Name())
 		switch name := e.Name(); {
-		case e.IsDir():
-			if strings.HasSuffix(name, asideExt) {
-				pruneAside(stateDir, name, now, keep)
-			}
-		case strings.HasSuffix(name, ".json"):
+		case e.IsDir() && strings.HasSuffix(name, asideExt):
+			pruneAside(stateDir, name, now, keep)
+		case !e.IsDir() && strings.HasSuffix(name, ".json"):
 			pruneLedger(stateDir, path, now, keep)
-		case strings.HasSuffix(name, ".lock"):
+		case !e.IsDir() && strings.HasSuffix(name, ".lock"):
 			if _, err := os.Lstat(strings.TrimSuffix(path, ".lock")); err != nil {
 				if unlock, err := flock.TryLock(path); err == nil {
 					flock.Remove(path, unlock)
 				}
 			}
-		case strings.HasPrefix(name, config.TempPrefix):
+		case !e.IsDir() && strings.HasPrefix(name, config.TempPrefix):
 			_ = os.Remove(path)
 		}
 	}
@@ -72,20 +69,19 @@ func pruneLedger(stateDir, path string, now time.Time, queued map[string]bool) {
 	}
 	sessionID := strings.TrimSuffix(filepath.Base(path), ".json")
 	l, _, _, err := resolve(stateDir, sessionID)
-	if err != nil {
-		if raw, ok, rerr := load(path); rerr == nil && ok {
-			l = raw
-		}
+	if raw, ok, rerr := load(path); err != nil && rerr == nil && ok {
+		l = raw
 	}
 	if queued[sessionID] || slices.ContainsFunc(l.Aliases, func(a string) bool { return queued[a] }) ||
-		(err != nil && now.Sub(info.ModTime()) <= MixedRetention) ||
-		(err == nil && now.Sub(l.lastActive(info.ModTime())) <= l.retention()) {
+		(err != nil && now.Sub(info.ModTime()) <= MixedRetention) || (err == nil && now.Sub(l.lastActive(info.ModTime())) <= l.retention()) {
 		unlock()
 		return
 	}
 	if cur, aerr := aliasTarget(stateDir, sessionID); aerr == nil && cur == sessionID {
-		for _, alias := range l.Aliases {
-			removeAliasIf(stateDir, alias, func(target string) bool { return target == sessionID })
+		if _, serr := os.Lstat(asidePath(path)); errors.Is(serr, fs.ErrNotExist) {
+			for _, alias := range l.Aliases {
+				removeAliasIf(stateDir, alias, "", func(target string) bool { return alias != sessionID && target == sessionID })
+			}
 		}
 	}
 	_ = os.Remove(path)
@@ -118,10 +114,8 @@ func pruneAside(stateDir, name string, now time.Time, queued map[string]bool) {
 func cleanAsideEntries(dir string, now time.Time, age time.Duration, tempsOnly bool) {
 	entries, _ := os.ReadDir(dir)
 	for _, e := range entries {
-		if !tempsOnly || strings.HasPrefix(e.Name(), config.TempPrefix) {
-			if info, err := e.Info(); err == nil && now.Sub(info.ModTime()) > age {
-				_ = os.Remove(filepath.Join(dir, e.Name()))
-			}
+		if info, err := e.Info(); (!tempsOnly || strings.HasPrefix(e.Name(), config.TempPrefix)) && err == nil && now.Sub(info.ModTime()) > age {
+			_ = os.Remove(filepath.Join(dir, e.Name()))
 		}
 	}
 }
@@ -137,37 +131,66 @@ func pruneAliases(stateDir string, now time.Time, queued map[string]bool) {
 		if info, err := e.Info(); err != nil || e.IsDir() || now.Sub(info.ModTime()) <= Retention || queued[e.Name()] {
 			continue
 		}
-		if strings.HasPrefix(e.Name(), config.TempPrefix) {
-			_ = os.Remove(aliasPath(stateDir, e.Name()))
-			continue
+		if p := aliasPath(stateDir, e.Name()); strings.HasPrefix(e.Name(), config.TempPrefix) {
+			_ = os.Remove(p)
+		} else if b, err := os.ReadFile(p); err == nil {
+			var canon string
+			if t := strings.TrimSpace(string(b)); session.ValidID(t) {
+				if canon, err = aliasTarget(stateDir, t); err != nil || queued[canon] {
+					continue
+				}
+			}
+			removeAliasIf(stateDir, e.Name(), canon, func(cur string) bool {
+				if info, err := os.Lstat(p); err != nil || now.Sub(info.ModTime()) <= Retention {
+					return false
+				}
+				if !session.ValidID(cur) {
+					return canon == ""
+				}
+				resolved, err := aliasTarget(stateDir, cur)
+				if err != nil || resolved != canon || queued[resolved] {
+					return false
+				}
+				cp := filepath.Join(stateDir, Dir, resolved+".json")
+				_, jerr := os.Lstat(cp)
+				_, aerr := os.Lstat(asidePath(cp))
+				return errors.Is(jerr, fs.ErrNotExist) && errors.Is(aerr, fs.ErrNotExist)
+			})
 		}
-		removeAliasIf(stateDir, e.Name(), func(target string) bool {
-			if info, err := os.Lstat(aliasPath(stateDir, e.Name())); err != nil || now.Sub(info.ModTime()) <= Retention {
-				return false
-			}
-			if !session.ValidID(target) {
-				return true
-			}
-			canon, err := aliasTarget(stateDir, target)
-			if err != nil || queued[canon] {
-				return false
-			}
-			_, err = os.Lstat(filepath.Join(stateDir, Dir, canon+".json"))
-			return errors.Is(err, fs.ErrNotExist)
-		})
 	}
 }
-func removeAliasIf(stateDir, alias string, match func(target string) bool) {
+func removeAliasIf(stateDir, alias, canon string, match func(target string) bool) {
 	if !session.ValidID(alias) {
 		return
 	}
-	unlock, err := flock.TryLock(filepath.Join(stateDir, Dir, alias+".json.lock"))
+	ids := []string{alias}
+	if canon != "" && canon != alias {
+		ids = append(ids, canon)
+		slices.Sort(ids)
+	}
+	tryLockAll(stateDir, ids, func() {
+		p := aliasPath(stateDir, alias)
+		if raw, err := os.ReadFile(p); err == nil && match(strings.TrimSpace(string(raw))) {
+			_ = os.Remove(p)
+		}
+	})
+}
+func tryLockAll(stateDir string, ids []string, fn func()) {
+	if len(ids) == 0 {
+		fn()
+		return
+	}
+	p := filepath.Join(stateDir, Dir, ids[0]+".json")
+	u, err := flock.TryLock(p + ".lock")
 	if err != nil {
 		return
 	}
-	defer unlock()
-	p := aliasPath(stateDir, alias)
-	if b, err := os.ReadFile(p); err == nil && match(strings.TrimSpace(string(b))) {
-		_ = os.Remove(p)
-	}
+	defer func() {
+		if _, err := os.Lstat(p); errors.Is(err, fs.ErrNotExist) {
+			flock.Remove(p+".lock", u)
+		} else {
+			u()
+		}
+	}()
+	tryLockAll(stateDir, ids[1:], fn)
 }

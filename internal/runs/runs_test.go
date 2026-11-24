@@ -1,6 +1,7 @@
 package runs
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -834,5 +835,55 @@ func TestMarkAsideChainedAliasAndMergeBeforePointer(t *testing.T) {
 		if at, mixed := mixedAt(t, dir, id, t0.Add(6*time.Minute)); !mixed || !at.Equal(cross) {
 			t.Fatalf("MarkAside re-alias: %s MixedAt = %v, %v; want %v, true", id, at, mixed, cross)
 		}
+	}
+}
+
+func TestPruneAliasSidecarAndCanonicalLock(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	cross := t0.Add(5 * time.Minute)
+	agePastRetention := t0.Add(Retention + 24*time.Hour)
+	agePastMixed := t0.Add(MixedRetention + 24*time.Hour)
+
+	// 1. Sidecar-only canonical state: <canon>.json is absent, <canon>.mixed exists.
+	//    After Retention, Prune must keep the alias so Read(alias) still sees Mixed.
+	must(t, Alias(dir, "side-canon", "side-alias"))
+	must(t, MarkAside(dir, "side-canon", "r1", cross))
+	must(t, os.Remove(filepath.Join(dir, Dir, "side-canon.json")))
+	old := t0
+	must(t, os.Chtimes(aliasPath(dir, "side-alias"), old, old))
+	Prune(context.Background(), dir, agePastRetention, nil)
+	if at, mixed := mixedAt(t, dir, "side-alias", t0.Add(6*time.Minute)); !mixed || !at.Equal(cross) {
+		t.Fatalf("after Retention prune over sidecar-only canon: MixedAt = %v, %v; want %v, true", at, mixed, cross)
+	}
+	// Once MixedRetention elapses, both the sidecar and the stale alias are pruned.
+	sideDir := filepath.Join(dir, Dir, "side-canon"+asideExt)
+	entries, err := os.ReadDir(sideDir)
+	must(t, err)
+	for _, e := range entries {
+		must(t, os.Chtimes(filepath.Join(sideDir, e.Name()), old, old))
+	}
+	must(t, os.Chtimes(sideDir, old, old))
+	Prune(context.Background(), dir, agePastMixed, nil)
+	if _, err := os.Lstat(aliasPath(dir, "side-alias")); !os.IsNotExist(err) {
+		t.Fatalf("stale alias survived past MixedRetention after sidecar prune: %v", err)
+	}
+
+	// 2. Canonical lock held while pruning a stale alias pointing to an absent canonical ledger:
+	//    Prune must not unlink the alias while a canonical writer holds <canon>.json.lock.
+	must(t, Alias(dir, "lock-canon", "lock-alias"))
+	must(t, os.Remove(filepath.Join(dir, Dir, "lock-canon.json")))
+	must(t, os.Chtimes(aliasPath(dir, "lock-alias"), old, old))
+	unlock, err := flock.TryLock(filepath.Join(dir, Dir, "lock-canon.json.lock"))
+	must(t, err)
+	Prune(context.Background(), dir, agePastRetention, nil)
+	if _, err := os.Lstat(aliasPath(dir, "lock-alias")); err != nil {
+		unlock()
+		t.Fatalf("Prune unlinked alias while canonical lock was held: %v", err)
+	}
+	unlock()
+	must(t, MarkMixed(dir, "lock-alias", cross, Why{Reason: Crossed}))
+	if at, mixed := mixedAt(t, dir, "lock-alias", t0.Add(6*time.Minute)); !mixed || !at.Equal(cross) {
+		t.Fatalf("after canonical write: lock-alias MixedAt = %v, %v; want %v, true", at, mixed, cross)
 	}
 }

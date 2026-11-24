@@ -77,11 +77,12 @@ func (r *run) mark(at time.Time, why Why) {
 // Start records a new clean run of sessionID beginning at at and returns its ID.
 func Start(stateDir, sessionID string, at time.Time) (string, error) {
 	id := newRunID()
-	if err := update(stateDir, sessionID, func(l *ledger) {
+	err := update(stateDir, sessionID, func(l *ledger) {
 		l.Runs = append(l.Runs, run{ID: id, Started: at.UTC()})
 		slices.SortStableFunc(l.Runs, func(a, b run) int { return a.Started.Compare(b.Started) })
 		l.active(at)
-	}); err != nil {
+	})
+	if err != nil {
 		return "", err
 	}
 	return id, nil
@@ -113,9 +114,8 @@ func Touch(stateDir, sessionID, runID string, locations []string) ([]string, err
 func TryTouch(stateDir, sessionID, runID string, locations []string) ([]string, error) {
 	return touchWith(true, stateDir, sessionID, runID, locations)
 }
-func touchWith(try bool, stateDir, sessionID, runID string, locations []string) ([]string, error) {
-	var merged []string
-	err := editLedger(stateDir, sessionID, try, func(path string, l *ledger) error {
+func touchWith(try bool, stateDir, sessionID, runID string, locations []string) (merged []string, err error) {
+	err = editLedger(stateDir, sessionID, try, func(path string, l *ledger) error {
 		if len(l.Runs) == 0 {
 			l.Runs = append(l.Runs, run{ID: newRunID()})
 		}
@@ -161,11 +161,8 @@ func Read(stateDir, idOrAlias string) Snapshot {
 	if !session.ValidID(idOrAlias) {
 		return Snapshot{}
 	}
-	if l, _, _, err := resolve(stateDir, idOrAlias); err != nil {
-		return Snapshot{unreadable: true}
-	} else {
-		return Snapshot{runs: l.Runs}
-	}
+	l, _, _, err := resolve(stateDir, idOrAlias)
+	return Snapshot{runs: l.Runs, unreadable: err != nil}
 }
 
 // MixedAt is the package's MixedAt, answered from this read of the ledger.
@@ -201,12 +198,10 @@ func Locations(stateDir, idOrAlias string) (string, []string, bool) {
 
 // Position is a session's current run, from one read of its ledger (Locate).
 type Position struct {
-	Run       string
-	Locations []string
-	Active    time.Time
-	MixedAt   time.Time
-	Aside     bool
-	Aliases   []string
+	Run                string
+	Locations, Aliases []string
+	Active, MixedAt    time.Time
+	Aside              bool
 }
 
 // Locate reads the ledger once for a hook's current run, locations, Mixed/sidecar state, and aliases.

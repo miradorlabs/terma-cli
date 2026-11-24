@@ -1290,5 +1290,22 @@ func TestMixedAsideEdgeCasesAndConcurrentRead(t *testing.T) {
 		if got, ok := cAside.At(10, t0.Add(45*time.Second)); !ok || got.Kind != KindMixed || got.Parent != "parent-sess" {
 			t.Fatalf("At(10) after earlier-run sidecar fold = %+v, %v; want KindMixed with parent-sess", got, ok)
 		}
+
+		// Untimed At must refuse when covering placements differ in ProjectID (e.g. team switch in same profile/repo/run).
+		sameRepo := repoAt("github.com/acme/shared")
+		if !Write(dir, "project-switch", Claim{ProjectID: "p1", Account: testAccount, Profile: "work", Kind: KindRepository, Run: "r1", Repository: sameRepo, PIDs: []int{10}}, t0) ||
+			!Write(dir, "project-switch", Claim{ProjectID: "p2", Account: testAccount, Profile: "work", Kind: KindRepository, Run: "r1", Repository: sameRepo, PIDs: []int{10}}, t0.Add(time.Minute)) {
+			t.Fatal("project-switch setup failed")
+		}
+		cSwitch := mustRead(t, dir, "project-switch", now)
+		if got, ok := cSwitch.At(10, time.Time{}); ok {
+			t.Fatalf("untimed At across ProjectID change = %+v, true; want false", got)
+		}
+		if got, ok := cSwitch.At(10, t0.Add(30*time.Second)); !ok || got.ProjectID != "p1" {
+			t.Fatalf("timed At before switch = %+v, %v; want p1", got, ok)
+		}
+		if got, ok := cSwitch.At(10, t0.Add(2*time.Minute)); !ok || got.ProjectID != "p2" {
+			t.Fatalf("timed At after switch = %+v, %v; want p2", got, ok)
+		}
 	})
 }

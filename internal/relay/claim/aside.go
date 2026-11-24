@@ -48,11 +48,8 @@ func writeMixedAside(claimPath string, c Claim, now time.Time) bool {
 		if err = os.MkdirAll(dir, 0o700); err == nil {
 			err = config.WriteFileAtomicNoSync(filepath.Join(dir, name), data, 0o600)
 		}
-		if err == nil {
-			return true
-		}
-		if !errors.Is(err, fs.ErrNotExist) {
-			return false
+		if err == nil || !errors.Is(err, fs.ErrNotExist) {
+			return err == nil
 		}
 	}
 	return false
@@ -64,8 +61,7 @@ func loadAside(claimPath string, now time.Time) (marks []asideMark, files []stri
 	for range 2 {
 		if entries, err = os.ReadDir(dir); err == nil {
 			break
-		}
-		if info, statErr := os.Lstat(dir); errors.Is(err, fs.ErrNotExist) && errors.Is(statErr, fs.ErrNotExist) {
+		} else if info, statErr := os.Lstat(dir); errors.Is(err, fs.ErrNotExist) && errors.Is(statErr, fs.ErrNotExist) {
 			return nil, nil
 		} else if !errors.Is(err, fs.ErrNotExist) || statErr != nil || !info.IsDir() {
 			return fail, nil
@@ -84,8 +80,7 @@ func loadAside(claimPath string, now time.Time) (marks []asideMark, files []stri
 				marks = append(marks, fail[0])
 			}
 			continue
-		}
-		if now.Sub(info.ModTime()) >= TTL {
+		} else if now.Sub(info.ModTime()) >= TTL {
 			files = append(files, e.Name())
 			continue
 		}
@@ -203,10 +198,7 @@ func sameLane(pl Placement, run, profile, account string) bool {
 func prepareMixed(pls []Placement, run, profile, account string, add []int, since time.Time) ([]Placement, []int, bool) {
 	pids := slices.Clone(add)
 	for _, pl := range pls {
-		if len(pids) == 0 {
-			break
-		}
-		if sameLane(pl, run, profile, account) {
+		if len(pids) > 0 && sameLane(pl, run, profile, account) {
 			pids = unionPIDs(pids, pl.PIDs)
 		}
 	}
@@ -273,11 +265,10 @@ func trimPlacements(pls []Placement, evicted bool, mixed []string) ([]Placement,
 }
 func removeAside(claimPath string, files []string) {
 	if len(files) > 0 {
-		dir := asidePath(claimPath)
 		for _, name := range files {
-			_ = os.Remove(filepath.Join(dir, name))
+			_ = os.Remove(filepath.Join(asidePath(claimPath), name))
 		}
-		_ = os.Remove(dir)
+		_ = os.Remove(asidePath(claimPath))
 	}
 }
 func pruneAside(dir string, now time.Time) {

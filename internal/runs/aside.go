@@ -1,6 +1,7 @@
 package runs
 
 import (
+	"cmp"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -33,9 +34,7 @@ var afterAsideWrite func(id string) // test hook for deterministic interleavings
 
 // MarkAside records a lock-free Mixed mark for sessionID/runID with reason Aside.
 func MarkAside(stateDir, sessionID, runID string, at time.Time) error {
-	if runID == "" {
-		runID = newRunID()
-	}
+	runID = cmp.Or(runID, newRunID())
 	b, err := json.Marshal(mark{Run: runID, At: at.UTC()})
 	if err != nil {
 		return err
@@ -60,11 +59,11 @@ func MarkAside(stateDir, sessionID, runID string, at time.Time) error {
 		if afterAsideWrite != nil {
 			afterAsideWrite(cur)
 		}
-		next, err := aliasTarget(stateDir, sessionID)
-		if err != nil || next == cur {
+		if next, err := aliasTarget(stateDir, sessionID); err != nil || next == cur {
 			return err
+		} else {
+			cur = next
 		}
-		cur = next
 	}
 	return fmt.Errorf("runs: alias loop for %q", sessionID)
 }
@@ -110,8 +109,7 @@ func loadAside(dir string) (a aside, err error) {
 	for range 2 {
 		if entries, err = os.ReadDir(dir); err == nil {
 			break
-		}
-		if info, statErr := os.Lstat(dir); errors.Is(err, fs.ErrNotExist) && errors.Is(statErr, fs.ErrNotExist) {
+		} else if info, statErr := os.Lstat(dir); errors.Is(err, fs.ErrNotExist) && errors.Is(statErr, fs.ErrNotExist) {
 			return aside{}, nil
 		} else if !errors.Is(err, fs.ErrNotExist) || statErr != nil || !info.IsDir() {
 			return aside{}, err

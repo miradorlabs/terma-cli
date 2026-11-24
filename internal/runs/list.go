@@ -25,17 +25,16 @@ func Mixed(stateDir string, now time.Time, recent time.Duration) []MixedRun {
 	if err != nil {
 		return nil
 	}
-	written := map[string]time.Time{}
+	written, seen := map[string]time.Time{}, map[string]MixedRun{}
 	for _, e := range entries {
 		if id, ok := sessionOf(e.Name()); ok && e.IsDir() == strings.HasSuffix(e.Name(), asideExt) {
-			var at time.Time
+			at := time.Time{}
 			if info, err := e.Info(); err == nil {
 				at = info.ModTime()
 			}
 			written[id] = latest(written[id], at)
 		}
 	}
-	seen := map[string]MixedRun{}
 	for id, at := range written {
 		t, _ := aliasTarget(stateDir, id)
 		canon := cmp.Or(t, id)

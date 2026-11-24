@@ -7,7 +7,7 @@ import (
 
 // At returns the placement covering pid at time at (empty ProjectID for Mark, false if
 // uncovered). Kinded claims refuse records before kept placements once Evicted and refuse
-// untimed records unless Evicted is false and covering placements agree on Kind/Repository/Profile/Account/Run.
+// untimed records unless Evicted is false and covering placements agree on ProjectID/Kind/Repository/Profile/Account/Run.
 func (c Claim) At(pid int, at time.Time) (Claim, bool) {
 	all := c.placements()
 	var covering []*Placement
@@ -43,7 +43,7 @@ func inForce(covering []*Placement, at time.Time) *Placement {
 func locate(covering []*Placement, at time.Time, evicted bool) *Placement {
 	if at.IsZero() {
 		if evicted || slices.ContainsFunc(covering, func(p *Placement) bool {
-			return p.Kind != covering[0].Kind || p.Repository != covering[0].Repository || p.Profile != covering[0].Profile || p.Account != covering[0].Account || p.Run != covering[0].Run
+			return p.ProjectID != covering[0].ProjectID || p.Kind != covering[0].Kind || p.Repository != covering[0].Repository || p.Profile != covering[0].Profile || p.Account != covering[0].Account || p.Run != covering[0].Run
 		}) {
 			return nil
 		}
