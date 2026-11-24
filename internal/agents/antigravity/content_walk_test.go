@@ -10,7 +10,8 @@ import (
 )
 
 // Every value in a call's arguments that looks like a path is judged, under any key and at any
-// depth; a relative one only under a key known to name a path.
+// depth; a relative one under a key known to name a path, or one that climbs or names
+// something in the cwd (TestAntigravityJudgesARelativePathUnderAnUnknownKey).
 func TestAntigravityRefusesAPathUnderAnyKey(t *testing.T) {
 	g := newPathRig(t)
 	q := func(path string) string { return `"` + hookruntest.InJSON(path) + `"` }
@@ -26,7 +27,7 @@ func TestAntigravityRefusesAPathUnderAnyKey(t *testing.T) {
 		{"an unknown key naming an excluded file", `{"File":` + q(excluded) + `}`, true},
 		{"an unknown key naming a collected file", `{"File":` + q(collected) + `}`, false},
 		{"a list of paths, one excluded", `{"TargetDirectories":[` + q(g.collected) + `,` + q(g.excluded) + `]}`, true},
-		{"a list of collected paths", `{"TargetDirectories":[` + q(g.collected) + `,` + q(g.other) + `]}`, false},
+		{"a list of collected paths", `{"TargetDirectories":[` + q(g.sub) + `,` + q(g.other) + `]}`, false},
 		{"a nested object", `{"options":{"source":{"File":` + q(excluded) + `}}}`, true},
 		{"an object in a list", `{"edits":[{"File":` + q(collected) + `},{"File":` + q(excluded) + `}]}`, true},
 		{"a path from the home folder", `{"File":"~/x"}`, true},
@@ -34,7 +35,7 @@ func TestAntigravityRefusesAPathUnderAnyKey(t *testing.T) {
 		{"a multi-line value that starts with a path", `{"Text":` + q(excluded+"\nmade-up text") + `}`, false},
 		{"a value longer than a path", `{"Text":` + q(excluded+"/"+strings.Repeat("x", antigravityPathLimit)) + `}`, false},
 		{"text that looks like a path", `{"Replacement":"/api/v1/users"}`, false},
-		{"relative text under an unknown key", `{"Text":` + q(relative) + `}`, false},
+		{"a relative path that climbs, under an unknown key", `{"Text":` + q(relative) + `}`, true},
 		{"the same relative path under a file key", `{"Path":` + q(relative) + `}`, true},
 		{"a number and a bool", `{"Count":1,"Recursive":true,"Nothing":null}`, false},
 		// What is not a path is not refused by accident: a shell command's text, also one that
@@ -45,7 +46,7 @@ func TestAntigravityRefusesAPathUnderAnyKey(t *testing.T) {
 		{"a URL", `{"Url":"https://example.com/docs/page?x=1"}`, false},
 		{"a URL under a file key's sibling", `{"Path":"file.txt","Source":"https://example.com/a/b"}`, false},
 		{"a relative path inside the checkout", `{"Path":"sub/dir/new-file.txt"}`, false},
-		{"a relative folder inside the checkout", `{"SearchPath":"."}`, false},
+		{"a relative folder inside the checkout", `{"SearchPath":"sub"}`, false},
 		// A folder in no repository is refused under any key, as under a folder key: an MCP
 		// filesystem tool lists or searches one under "path". A file there, and a path that is
 		// not there yet, follow the files' answer.

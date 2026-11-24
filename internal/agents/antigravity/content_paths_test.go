@@ -13,10 +13,11 @@ import (
 )
 
 // pathRig is a collected checkout, a second collected one, an excluded one, an excluded clone
-// nested in the collected one, and a folder in no repository.
+// nested in the collected one, a folder of the collected one that does not hold the clone,
+// and a folder in no repository.
 type pathRig struct {
-	collected, other, excluded, nested, none string
-	pol                                      config.Policy
+	collected, other, excluded, nested, sub, none string
+	pol                                           config.Policy
 }
 
 func newPathRig(t *testing.T) pathRig {
@@ -33,7 +34,8 @@ func newPathRig(t *testing.T) pathRig {
 	}
 	none, _ := filepath.EvalSymlinks(t.TempDir())
 	g.none = none
-	for _, dir := range []string{g.collected, g.other, g.excluded, g.nested, g.none} {
+	g.sub = filepath.Join(g.collected, "sub")
+	for _, dir := range []string{g.collected, g.other, g.excluded, g.nested, g.sub, g.none} {
 		hookruntest.WriteFile(t, dir, "file.txt", "made-up file\n")
 	}
 	g.pol = config.DefaultPolicy()
@@ -102,7 +104,9 @@ func TestAntigravityRefusesAFileOfAnExcludedCheckout(t *testing.T) {
 		{"grep_search", "SearchPath", g.excluded, true},
 		{"find_by_name", "SearchDirectory", g.nested, true},
 		{"run_command", "Cwd", g.excluded, true},
-		{"run_command", "Cwd", g.collected, false},
+		{"run_command", "Cwd", g.sub, false},
+		// The checkout's root holds the excluded clone nested in it.
+		{"run_command", "Cwd", g.collected, true},
 		// A folder in no repository is refused whatever the answer for files: a search of one
 		// above several repositories returns their files.
 		{"grep_search", "SearchPath", g.none, true},

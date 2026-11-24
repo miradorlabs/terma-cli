@@ -2,6 +2,7 @@ package antigravity
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"slices"
@@ -13,23 +14,27 @@ import (
 )
 
 // Which content a hook may attach (the package comment says how it fits), and the two rules
-// for content of another repository (design 3.3). Both ask one question of a path: which
-// checkout owns it (gitx places it, the policy judges the checkout).
+// for content of another repository (design 3.3). Both ask which checkout owns a path (gitx
+// places it, the policy judges the checkout); for a folder a tool names, also which checkouts
+// it holds (gitx.NestedCheckoutsFS).
 
 // antigravityShowsFilesInNoRepository is the answer for a file in no repository at all (a
 // skill file, a note in the home folder): shown, as Claude Code and Codex show such reads.
 // false refuses it as a file in a repository the policy does not collect. It decides every
-// path but a folder key's (antigravityFolderKeys), which has its own, stricter rule.
+// path but a folder's, which has its own, stricter rule (refusesPath).
 var antigravityShowsFilesInNoRepository = true
 
 // antigravityFileKeys are the argument keys known to name a file, for any tool: the edit
-// tools' (antigravityPathKeys) and view_file's. A relative path is judged only under one of
-// them or antigravityFolderKeys.
+// tools' (antigravityPathKeys) and view_file's. A relative value under one of them, or under
+// antigravityFolderKeys, is always judged; under any other key, by its form
+// (antigravityLooksLikePath). What a value names, a file or a folder, is never read from its
+// key: a file key that names a folder is a folder.
 var antigravityFileKeys = append(slices.Clone(antigravityPathKeys), "AbsolutePath")
 
 // antigravityFolderKeys are the argument keys that name a folder a tool lists, searches or
 // runs in (list_dir, grep_search, find_by_name, and run_command where a version sends Cwd).
-// A folder in no repository may hold several: a search of one returns their files.
+// They say one thing only a key can: a value under one that is not there yet names a folder,
+// not a file (refusesPath).
 var antigravityFolderKeys = []string{"DirectoryPath", "SearchPath", "SearchDirectory", "Cwd"}
 
 // contentConsented reports whether the developer chose Antigravity, or global mode collects
@@ -82,13 +87,17 @@ const (
 type antigravityPaths struct {
 	pol    config.Policy
 	owners map[string]antigravityOwner
-	// placed counts the folders placed, the lookups the cache saved excluded.
-	placed int
+	// holds remembers, per resolved folder, whether it holds a checkout the policy does not
+	// collect, or one terma cannot tell (holdsExcluded).
+	holds map[string]bool
+	// placed counts the folders placed, the lookups the cache saved excluded; walked the
+	// folders walked.
+	placed, walked int
 }
 
 // newAntigravityPaths judges paths under pol, with nothing placed yet.
 func newAntigravityPaths(pol config.Policy) *antigravityPaths {
-	return &antigravityPaths{pol: pol, owners: map[string]antigravityOwner{}}
+	return &antigravityPaths{pol: pol, owners: map[string]antigravityOwner{}, holds: map[string]bool{}}
 }
 
 // owner places path, absolute or relative to cwd: the checkout that holds its resolved folder
@@ -97,22 +106,37 @@ func newAntigravityPaths(pol config.Policy) *antigravityPaths {
 // hook's environment every path is unresolved, and with every workspace unresolved such a
 // session sends no content at all.
 func (p *antigravityPaths) owner(cwd, path string) antigravityOwner {
-	if strings.HasPrefix(path, "~") {
-		return ownerUnresolved
+	owner, _ := p.place(antigravityAbsolute(cwd, path))
+	return owner
+}
+
+// antigravityAbsolute is path joined to cwd when it is relative, or "" when it cannot be
+// placed: it starts with "~", or is relative with no cwd. Not filepath.Join, which would
+// clean away a ".." the resolution refuses.
+func antigravityAbsolute(cwd, path string) string {
+	switch {
+	case strings.HasPrefix(path, "~"):
+		return ""
+	case filepath.IsAbs(path):
+		return path
+	case cwd == "":
+		return ""
 	}
-	if !filepath.IsAbs(path) {
-		if cwd == "" {
-			return ownerUnresolved
-		}
-		// Not filepath.Join, which would clean away a ".." the resolution refuses.
-		path = cwd + string(filepath.Separator) + path
+	return cwd + string(filepath.Separator) + path
+}
+
+// place is the owner of path, absolute or "" (antigravityAbsolute), and the resolved folder
+// it was placed by, "" when it was not.
+func (p *antigravityPaths) place(path string) (antigravityOwner, string) {
+	if path == "" {
+		return ownerUnresolved, ""
 	}
 	dir, ok := gitx.ResolveFolderFS(path)
 	if !ok {
-		return ownerUnresolved
+		return ownerUnresolved, ""
 	}
 	if owner, ok := p.owners[dir]; ok {
-		return owner
+		return owner, dir
 	}
 	p.placed++
 	owner := ownerUnresolved
@@ -126,7 +150,32 @@ func (p *antigravityPaths) owner(cwd, path string) antigravityOwner {
 		}
 	}
 	p.owners[dir] = owner
-	return owner
+	return owner, dir
+}
+
+// holdsExcluded reports whether dir, a resolved folder in a checkout the policy collects,
+// holds a checkout nested below it that the policy does not collect: a clone or a submodule
+// (gitx.NestedCheckoutsFS). A tool that lists or searches dir returns what is under it. A
+// nested checkout terma cannot place counts as excluded, and so does a walk that cannot read
+// a folder or passes gitx.NestedWalkLimit folders: what the rest holds is unknown. The answer
+// is remembered per folder for the life of the hook, as owners are.
+func (p *antigravityPaths) holdsExcluded(dir string) bool {
+	if held, ok := p.holds[dir]; ok {
+		return held
+	}
+	p.walked++
+	held := false
+	err := gitx.NestedCheckoutsFS(dir, func(_, gitDir string) bool {
+		origin := ""
+		if gitDir != "" {
+			origin, _ = gitx.OriginFS(gitDir)
+		}
+		held = gitDir == "" || !p.pol.Admits(config.Repository{Origin: origin})
+		return !held
+	})
+	held = held || err != nil
+	p.holds[dir] = held
+	return held
 }
 
 // workspacesCollected reports whether every one of the conversation's workspaces
@@ -170,16 +219,21 @@ func (p *antigravityPaths) workspacesCollected(cwd string, in *antigravityHookIn
 //   - every one that looks like a path (antigravityLooksLikePath), under any key: what an MCP
 //     filesystem tool or a tool agy adds names a file with is not known in advance;
 //   - every one under a key known to name a path (antigravityFileKeys, antigravityFolderKeys),
-//     a relative one joined to cwd. Elsewhere a relative value is text, not judged.
+//     a relative one joined to cwd.
 //
 // Past antigravityPathsPerCall values judged, the call is refused unplaced.
 //
-// A folder in no repository is refused, but in global mode: one that is there, under any
-// key, and any value of a folder key. A file in no repository is refused only when
-// antigravityShowsFilesInNoRepository is false. A value that
-// merely looks like a path in free text (an edit's Replacement of "/api/v1/users") resolves to
-// its nearest existing folder, which is in no repository, and is shown; a text that happens to
-// name a real excluded checkout is refused, which errs toward sending less.
+// What a value names is decided by what is there (os.Stat, links followed), never by its key.
+// A folder that is there is refused, but in global mode, which collects everything, when it
+// is in no repository, or when it is in a collected checkout but holds one the policy does
+// not collect below it (holdsExcluded): a tool that lists or searches a folder returns what is
+// under it. A value that is not there yet is a file, but under a folder key
+// (antigravityFolderKeys), which a tool may name a folder by before it makes it: that is the
+// one thing a key decides. A file in no repository is refused only when
+// antigravityShowsFilesInNoRepository is false. A value that merely looks like a path in free
+// text (an edit's Replacement of "/api/v1/users") resolves to its nearest existing folder,
+// which is in no repository, and is shown; a text that happens to name a real excluded
+// checkout, or a folder above one, is refused, which errs toward sending less.
 //
 // Arguments terma cannot read as an object name no file it knows of: the hook attaches none of
 // them, and the transcript's reader refuses them itself (antigravityCallsRefused). The hook
@@ -222,43 +276,61 @@ func (p *antigravityPaths) refusesValue(cwd, key string, v any, judged *int) boo
 
 // refusesPath reports whether one string value under key is refused, by refuses's rules.
 func (p *antigravityPaths) refusesPath(cwd, key, value string, judged *int) bool {
-	folder := slices.Contains(antigravityFolderKeys, key)
-	named := folder || slices.Contains(antigravityFileKeys, key)
-	if value == "" || !named && !antigravityLooksLikePath(value) {
+	folderKey := slices.Contains(antigravityFolderKeys, key)
+	named := folderKey || slices.Contains(antigravityFileKeys, key)
+	if value == "" || !named && !antigravityLooksLikePath(cwd, value) {
 		return false
 	}
 	if *judged++; *judged > antigravityPathsPerCall {
 		return true
 	}
-	switch p.owner(cwd, value) {
-	case ownerCollected:
-		return false
-	case ownerNone:
-		// A folder in no repository may hold several, whatever key names it: an MCP tool
-		// lists or searches one under "path". Global mode collects every repository on the
-		// machine and a session outside git, so there it holds nothing the policy excludes.
-		if folder || antigravityIsFolder(cwd, value) {
-			return !p.pol.Global()
-		}
-		return !antigravityShowsFilesInNoRepository
+	path := antigravityAbsolute(cwd, value)
+	owner, dir := p.place(path)
+	if owner != ownerCollected && owner != ownerNone {
+		return true
 	}
-	return true
-}
-
-// antigravityIsFolder reports whether value, absolute or relative to cwd, names a folder that
-// is there, links followed.
-func antigravityIsFolder(cwd, value string) bool {
-	if !filepath.IsAbs(value) {
-		value = filepath.Join(cwd, value)
+	info, err := os.Stat(path)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return true
 	}
-	info, err := os.Stat(value)
-	return err == nil && info.IsDir()
+	isDir := err == nil && info.IsDir()
+	// Global mode collects every repository on the machine and a session outside git, so
+	// there a folder holds nothing the policy excludes.
+	switch {
+	case owner == ownerCollected:
+		return isDir && !p.pol.Global() && p.holdsExcluded(dir)
+	case isDir || err != nil && folderKey:
+		// A folder in no repository may hold several: an MCP tool lists or searches one
+		// under "path".
+		return !p.pol.Global()
+	}
+	return !antigravityShowsFilesInNoRepository
 }
 
 // antigravityLooksLikePath reports whether an argument value looks like a path whatever its
-// key: one line, at most antigravityPathLimit bytes, absolute, or the home folder or a path
-// in it ("~", "~/...").
-func antigravityLooksLikePath(s string) bool {
-	return len(s) <= antigravityPathLimit && !strings.Contains(s, "\n") &&
-		(filepath.IsAbs(s) || s == "~" || strings.HasPrefix(s, "~/"))
+// key: one line of at most antigravityPathLimit bytes that is absolute, the home folder or a
+// path in it ("~", "~/..."), or relative to cwd and either climbing out of it (a segment that
+// is exactly "..", split on "/" and on the system's separator) or naming something there
+// (os.Lstat). A tool terma has never seen may name "../other-repo/file.txt" under a key of its
+// own.
+//
+// The cost: any word under any key that happens to name a file or folder in cwd is judged as
+// a path. cwd is the turn's own checkout, so such a file is collected and shown, but such a
+// folder is refused when it holds a checkout the policy does not collect. Other relative text,
+// a command line among it ("cd ../x && ls" has no segment that is exactly ".."), is not a path.
+func antigravityLooksLikePath(cwd, s string) bool {
+	if len(s) > antigravityPathLimit || strings.Contains(s, "\n") {
+		return false
+	}
+	if filepath.IsAbs(s) || s == "~" || strings.HasPrefix(s, "~/") {
+		return true
+	}
+	if slices.Contains(strings.FieldsFunc(s, func(r rune) bool { return r == '/' || r == filepath.Separator }), "..") {
+		return true
+	}
+	if cwd == "" {
+		return false
+	}
+	_, err := os.Lstat(filepath.Join(cwd, s))
+	return err == nil
 }
