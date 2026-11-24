@@ -168,11 +168,11 @@ func (sc *scan) paramSize(pe *syntax.ParamExp, opaqueSubst bool) int {
 		}
 	}
 	if pe.Repl != nil && pe.Repl.With != nil {
-		with := sc.sizeIn(pe.Repl.With, opaqueSubst || pe.Repl.All && n > 0)
-		if with >= (maxShellBytes+1)/max(n, 1) {
+		if with := sc.sizeIn(pe.Repl.With, opaqueSubst || pe.Repl.All && n > 0); with >= (maxShellBytes+1)/max(n, 1) {
 			return maxShellBytes + 1
+		} else {
+			n = max(n, 1) * (1 + with)
 		}
-		n = max(n, 1) * (1 + with)
 	}
 	if pe.Exp != nil && pe.Exp.Word != nil {
 		pat := isCaseOp(pe.Exp.Op) || pe.Exp.Op == syntax.RemSmallPrefix || pe.Exp.Op == syntax.RemLargePrefix || pe.Exp.Op == syntax.RemSmallSuffix || pe.Exp.Op == syntax.RemLargeSuffix

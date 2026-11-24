@@ -242,9 +242,7 @@ func TestShellSubstKnownOutputs(t *testing.T) {
 	t.Parallel()
 	parent, _ := filepath.EvalSymlinks(t.TempDir())
 	side := filepath.Join(parent, "side")
-	if err := os.MkdirAll(filepath.Join(side, ".git"), 0o700); err != nil {
-		t.Fatal(err)
-	}
+	makeValidGitDir(t, filepath.Join(side, ".git"))
 	env := func(k string) (string, bool) {
 		switch k {
 		case "HOME", "USERPROFILE":
@@ -745,11 +743,10 @@ func TestScanBoundsAndSafety(t *testing.T) {
 	// Scan-provided local GIT_DIR/GIT_WORK_TREE resolves consistently using scan's env.
 	customWT := filepath.Join(dir, "custom-wt")
 	customGD := filepath.Join(dir, "custom-gd")
-	for _, d := range []string{customWT, customGD} {
-		if err := os.MkdirAll(d, 0o700); err != nil {
-			t.Fatal(err)
-		}
+	if err := os.MkdirAll(customWT, 0o700); err != nil {
+		t.Fatal(err)
 	}
+	makeValidGitDir(t, customGD)
 	scGitCustom := newScan(dir, func(k string) (string, bool) {
 		switch k {
 		case "GIT_DIR":
@@ -1368,10 +1365,10 @@ func TestReachCoreHardeningRegressions(t *testing.T) {
 	repoA := filepath.Join(dir, "repoA")
 	repoB := filepath.Join(dir, "repoB")
 	repoBSub := filepath.Join(repoB, "sub")
-	for _, d := range []string{filepath.Join(repoA, ".git"), filepath.Join(repoB, ".git"), repoBSub} {
-		if err := os.MkdirAll(d, 0o700); err != nil {
-			t.Fatal(err)
-		}
+	makeValidGitDir(t, filepath.Join(repoA, ".git"))
+	makeValidGitDir(t, filepath.Join(repoB, ".git"))
+	if err := os.MkdirAll(repoBSub, 0o700); err != nil {
+		t.Fatal(err)
 	}
 	crossLink := filepath.Join(repoA, "link")
 	if err := os.Symlink(repoBSub, crossLink); err != nil {
@@ -1991,9 +1988,7 @@ func TestGitfilePrefixCommentsOverlongAndResolveMayCreate(t *testing.T) {
 	t.Parallel()
 	root, _ := filepath.EvalSymlinks(t.TempDir())
 	realGit := filepath.Join(root, "real.git")
-	if err := os.MkdirAll(realGit, 0o700); err != nil {
-		t.Fatal(err)
-	}
+	makeValidGitDir(t, realGit)
 	for _, tc := range []struct {
 		name    string
 		content string
@@ -2382,6 +2377,63 @@ func TestAbbreviatedSecretOptionsAndLogicalCd(t *testing.T) {
 		if !slices.Contains(scLit2.out, fileColonRoot) {
 			t.Errorf("candidate(file:/repo/file) = %q, want %q", scLit2.out, fileColonRoot)
 		}
+	}
+	// Non-existent literal fallbacks for URLs and key=value operands do not spuriously place cwd.
+	scNoSpurious := newScan(litDir, noEnv, work{deadline: time.Now().Add(time.Minute)})
+	scNoSpurious.candidate("URL=git+ssh://example.com/acme-api", plain)
+	scNoSpurious.candidate("file:///nonexistent-root-mir708/acme-api/NOTES.md", plain)
+	if slices.Contains(scNoSpurious.out, litDir) {
+		t.Errorf("non-existent literal fallback spuriously placed cwd: %q", scNoSpurious.out)
+	}
+	// Empty or malformed .git directories fail closed in safeLocate; linked worktrees with commondir succeed.
+	emptyRepo := filepath.Join(litDir, "empty-git")
+	if err := os.MkdirAll(filepath.Join(emptyRepo, ".git"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if got, ok := newScan(emptyRepo, noEnv, work{deadline: time.Now().Add(time.Minute)}).safeLocate(emptyRepo); ok {
+		t.Errorf("safeLocate(empty .git) = (%q, true), want false", got)
+	}
+	badHeadRepo := filepath.Join(litDir, "bad-head")
+	makeValidGitDir(t, filepath.Join(badHeadRepo, ".git"))
+	if err := os.WriteFile(filepath.Join(badHeadRepo, ".git", "HEAD"), []byte("not-a-valid-head\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if got, ok := newScan(badHeadRepo, noEnv, work{deadline: time.Now().Add(time.Minute)}).safeLocate(badHeadRepo); ok {
+		t.Errorf("safeLocate(malformed HEAD) = (%q, true), want false", got)
+	}
+	commonGit := filepath.Join(litDir, "common.git")
+	makeValidGitDir(t, commonGit)
+	wtGit := filepath.Join(commonGit, "worktrees", "feat")
+	if err := os.MkdirAll(wtGit, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(wtGit, "HEAD"), []byte("ref: refs/heads/feat\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(wtGit, "commondir"), []byte("../..\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	wtDir := filepath.Join(litDir, "linked-wt")
+	if err := os.MkdirAll(wtDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(wtDir, ".git"), []byte("gitdir: "+wtGit+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if got, ok := newScan(wtDir, noEnv, work{deadline: time.Now().Add(time.Minute)}).safeLocate(wtDir); !ok || !samePath(got, wtDir) {
+		t.Errorf("safeLocate(linked worktree) = (%q, %v), want (%q, true)", got, ok, wtDir)
+	}
+}
+
+func makeValidGitDir(t *testing.T, gitDir string) {
+	t.Helper()
+	for _, sub := range []string{"objects", "refs"} {
+		if err := os.MkdirAll(filepath.Join(gitDir, sub), 0o700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(gitDir, "HEAD"), []byte("ref: refs/heads/main\n"), 0o600); err != nil {
+		t.Fatal(err)
 	}
 }
 

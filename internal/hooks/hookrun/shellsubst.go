@@ -150,7 +150,7 @@ func (sc *scan) real(p string) (string, bool) {
 
 // safeLocate finds the git worktree root for dir without statting remote targets or crossing mounts.
 func (sc *scan) safeLocate(dir string) (string, bool) {
-	gitEnv := []string{"GIT_CEILING_DIRECTORIES", "GIT_DISCOVERY_ACROSS_FILESYSTEM", "GIT_CONFIG", "GIT_CONFIG_GLOBAL", "GIT_CONFIG_SYSTEM", "GIT_CONFIG_COUNT", "GIT_CONFIG_PARAMETERS", "GIT_COMMON_DIR"}
+	gitEnv := []string{"GIT_CEILING_DIRECTORIES", "GIT_DISCOVERY_ACROSS_FILESYSTEM", "GIT_CONFIG", "GIT_CONFIG_GLOBAL", "GIT_CONFIG_SYSTEM", "GIT_CONFIG_COUNT", "GIT_CONFIG_PARAMETERS", "GIT_COMMON_DIR", "GIT_OBJECT_DIRECTORY"}
 	if dir == "" || sc.hasRemoteLink(dir) || sc.isUnresolvedVar("GIT_DIR") || sc.isUnresolvedVar("GIT_WORK_TREE") ||
 		slices.ContainsFunc(gitEnv, func(k string) bool { return sc.isUnresolvedVar(k) || sc.envVal(k) != "" }) {
 		return "", false
@@ -158,11 +158,7 @@ func (sc *scan) safeLocate(dir string) (string, bool) {
 	if gd, wt := sc.envVal("GIT_DIR"), sc.envVal("GIT_WORK_TREE"); gd != "" || wt != "" {
 		absGD, ok1 := sc.resolveJoined(cmp.Or(sc.dir, sc.cwd), gd, false)
 		absWT, ok2 := sc.resolveJoined(cmp.Or(sc.dir, sc.cwd), wt, false)
-		if gd == "" || wt == "" || !ok1 || !ok2 || sc.hasRemoteLink(absGD) || sc.hasRemoteLink(absWT) {
-			return "", false
-		}
-		_, _, info, found := sc.walkPath(absGD, true)
-		return absWT, found && info.IsDir()
+		return absWT, gd != "" && wt != "" && ok1 && ok2 && !sc.hasRemoteLink(absGD) && !sc.hasRemoteLink(absWT) && sc.validGitDir(absGD)
 	}
 	if start, ok := sc.real(dir); ok {
 		_, _, startInfo, found := sc.walkPath(start, true)
@@ -173,9 +169,17 @@ func (sc *scan) safeLocate(dir string) (string, bool) {
 			dotGit := filepath.Join(cur, ".git")
 			if _, _, info, ok := sc.walkPath(dotGit, false); ok {
 				if info.IsDir() {
-					return cur, !sc.hasWorktreeConfig(dotGit)
+					return cur, sc.validGitDir(dotGit) && !sc.hasWorktreeConfig(dotGit)
 				} else if info.Mode().IsRegular() {
-					return sc.locateGitdirFile(dotGit, cur)
+					if data, err := sc.readSmallFile(dotGit); err != nil {
+						sc.unknown = sc.unknown || errors.Is(err, errOpaque)
+					} else if target, ok := strings.CutPrefix(strings.TrimSuffix(strings.TrimSuffix(data, "\n"), "\r"), "gitdir: "); ok && target != "" {
+						if resolved, ok := sc.resolveJoined(cur, target, false); ok {
+							if r, _, gInfo, gFound := sc.walkPath(resolved, true); gFound && gInfo.IsDir() && sc.validGitDir(r) {
+								return cur, !sc.hasWorktreeConfig(r)
+							}
+						}
+					}
 				}
 				return "", false
 			} else if cur == filepath.Dir(cur) {
@@ -184,6 +188,21 @@ func (sc *scan) safeLocate(dir string) (string, bool) {
 		}
 	}
 	return "", false
+}
+func (sc *scan) validGitDir(dir string) bool {
+	head, err := sc.readSmallFile(filepath.Join(dir, "HEAD"))
+	if h := strings.TrimSpace(head); err != nil || (!strings.HasPrefix(h, "ref:") || strings.TrimSpace(h[4:]) == "") && (len(h) != 40 && len(h) != 64 || strings.Trim(h, "0123456789abcdefABCDEF") != "") {
+		return false
+	}
+	hasDir := func(p string) bool { _, _, info, ok := sc.walkPath(p, true); return ok && info.IsDir() }
+	if hasDir(filepath.Join(dir, "objects")) && (hasDir(filepath.Join(dir, "refs")) || hasDir(filepath.Join(dir, "reftable"))) {
+		return true
+	}
+	if common, err := sc.readSmallFile(filepath.Join(dir, "commondir")); err == nil && strings.TrimSpace(common) != "" {
+		r, ok := sc.resolveJoined(dir, strings.TrimSpace(common), false)
+		return ok && hasDir(filepath.Join(r, "objects"))
+	}
+	return false
 }
 func (sc *scan) hasWorktreeConfig(gitDir string) bool {
 	if sc.isUnresolvedVar("HOME") || sc.isUnresolvedVar("USERPROFILE") || sc.isUnresolvedVar("XDG_CONFIG_HOME") || sc.isUnresolvedVar("ProgramData") {
@@ -227,18 +246,6 @@ func (sc *scan) readSmallFile(path string) (string, error) {
 		return "", errOpaque
 	}
 	return string(buf[:n]), nil
-}
-func (sc *scan) locateGitdirFile(path, cur string) (string, bool) {
-	if data, err := sc.readSmallFile(path); err != nil {
-		sc.unknown = sc.unknown || errors.Is(err, errOpaque)
-	} else if target, ok := strings.CutPrefix(strings.TrimSuffix(strings.TrimSuffix(data, "\n"), "\r"), "gitdir: "); ok && target != "" {
-		if resolved, ok := sc.resolveJoined(cur, target, false); ok {
-			if r, _, info, found := sc.walkPath(resolved, true); found && info.IsDir() {
-				return cur, !sc.hasWorktreeConfig(r)
-			}
-		}
-	}
-	return "", false
 }
 func (sc *scan) below(dir string, levels int) {
 	c := candidate{dir, strconv.Itoa(levels), walked}

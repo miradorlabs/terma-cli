@@ -15,7 +15,7 @@ import (
 func (sc *scan) candidate(t string, r role) {
 	if v := pick(r.whole(), t, shellValue(t)); v != t {
 		if !strings.HasPrefix(t, "-") {
-			sc.candidatePath(t, r)
+			sc.candidatePath(t, r, true)
 		}
 		t = v
 	}
@@ -23,13 +23,13 @@ func (sc *scan) candidate(t string, r role) {
 		return
 	} else if isURL {
 		if filepath.Separator == '/' && p != "" {
-			sc.candidatePath(t, r)
+			sc.candidatePath(t, r, true)
 		}
 		t = p
 	}
-	sc.candidatePath(t, r)
+	sc.candidatePath(t, r, false)
 }
-func (sc *scan) candidatePath(t string, r role) {
+func (sc *scan) candidatePath(t string, r role, fallback bool) {
 	t = pick(filepath.Separator == '/' && strings.HasPrefix(t, "///") && strings.TrimLeft(t, "/") != "", "/"+strings.TrimLeft(t, "/"), t)
 	slashed, keyDir := pathLike(t), sc.dir
 	if t == "" || !slashed && r.needsSlash() || sc.away(t, r) {
@@ -54,7 +54,7 @@ func (sc *scan) candidatePath(t string, r role) {
 				}
 			} else if r.mayCreate(slashed) && !res.named {
 				if p, ok := sc.path(t, d); ok {
-					if _, parent, _, found := sc.walkPath(p, true); !found && !sc.unknown && parent != "" {
+					if rPath, parent, _, found := sc.walkPath(p, true); !found && !sc.unknown && parent != "" && (!fallback || filepath.Dir(rPath) == parent && strings.ContainsAny(strings.TrimRight(t, `/\`), `/\`)) {
 						sc.place(parent)
 					}
 				}
@@ -139,8 +139,7 @@ func (sc *scan) walk(p string, followFinal bool, openMode uint8) (resolved, pare
 			parts = append(strings.FieldsFunc(target[len(tVol):], isSep), parts...)
 			continue
 		}
-		nextPath := filepath.Join(curPath, part)
-		if len(parts) == 0 {
+		if nextPath := filepath.Join(curPath, part); len(parts) == 0 {
 			f, ok = sc.openLeaf(cur, part, fi, openMode)
 			return nextPath, curPath, fi, f, ok
 		} else if !fi.IsDir() {
@@ -184,7 +183,7 @@ func (sc *scan) resolveJoined(base, raw string, logical bool) (string, bool) {
 	}
 	if len(raw) > maxPathBytes {
 		return "", !sc.fail()
-	} else if !logical && !hasDot(raw) {
+	} else if !logical && !slices.ContainsFunc(strings.FieldsFunc(raw, isSep), func(s string) bool { return s == "." || s == ".." }) {
 		return filepath.Clean(raw), true
 	} else if !logical {
 		res, _, _, found := sc.walkPath(raw, false)
@@ -216,26 +215,24 @@ func (sc *scan) resolveJoined(base, raw string, logical bool) (string, bool) {
 }
 func (sc *scan) reach(w, dir string) (string, os.FileInfo) { return sc.reachRole(w, dir, plain) }
 func (sc *scan) reachRole(w, dir string, r role) (string, os.FileInfo) {
-	p, ok := sc.resolvePath(w, dir, r == target)
-	if !ok {
+	if p, ok := sc.resolvePath(w, dir, r == target); !ok {
 		return "", nil
-	}
-	res, parent, info, found := sc.walkPath(p, false)
-	if !found {
+	} else if res, parent, info, found := sc.walkPath(p, false); !found {
 		return "", nil
 	} else if info.IsDir() {
 		sc.place(res)
 		return pick(r == target, p, res), info
 	} else if sc.place(parent); info.Mode()&fs.ModeSymlink == 0 {
 		return res, info
-	}
-	if dst, tParent, tInfo, tFound := sc.walkPath(p, true); tFound {
+	} else if dst, tParent, tInfo, tFound := sc.walkPath(p, true); tFound {
 		sc.place(pick(tInfo.IsDir(), dst, tParent))
 		return pick(r == physTarget, dst, pick(r == target, p, res)), tInfo
-	} else if !sc.unknown && tParent != "" {
-		sc.place(tParent)
+	} else {
+		if !sc.unknown && tParent != "" {
+			sc.place(tParent)
+		}
+		return res, nil
 	}
-	return res, nil
 }
 func (sc *scan) away(w string, r role) bool {
 	rem := remote(w, sc.cwd)
@@ -259,9 +256,6 @@ func (sc *scan) resolvePath(w, dir string, logical bool) (string, bool) {
 
 const alnum = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
-func hasDot(p string) bool {
-	return slices.ContainsFunc(strings.FieldsFunc(p, isSep), func(s string) bool { return s == "." || s == ".." })
-}
 func urlPath(w string) (string, bool, bool) {
 	scheme, rest, ok := strings.Cut(w, "://")
 	if !ok && len(w) > 5 && strings.EqualFold(w[:5], "file:") && w[5] == '/' {
@@ -294,20 +288,16 @@ func remote(p, cwd string) bool {
 }
 func share(p string) string {
 	if len(p) >= 2 && os.IsPathSeparator(p[0]) && os.IsPathSeparator(p[1]) {
-		host, rest := cutSep(p[2:])
-		if name, _ := cutSep(rest); host != "" && name != "" && strings.Trim(host, alnum+"-_.$") == "" {
-			return "//" + host + "/" + name
+		if i := strings.IndexFunc(p[2:], isSep); i > 0 {
+			host, rest := p[2:2+i], p[3+i:]
+			if j := strings.IndexFunc(rest, isSep); j != 0 && rest != "" && strings.Trim(host, alnum+"-_.$") == "" {
+				return "//" + host + "/" + pick(j > 0, rest[:max(j, 0)], rest)
+			}
 		}
 	}
 	return ""
 }
 func isSep(r rune) bool { return r < 0x80 && os.IsPathSeparator(byte(r)) }
-func cutSep(p string) (string, string) {
-	if i := strings.IndexFunc(p, isSep); i >= 0 {
-		return p[:i], p[i+1:]
-	}
-	return p, ""
-}
 func shellValue(w string) string {
 	if name, v, ok := strings.Cut(w, "="); ok && (strings.HasPrefix(w, "-") || isName(name)) {
 		return v
