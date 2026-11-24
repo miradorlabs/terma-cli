@@ -16,8 +16,7 @@ func openDirNoBlock(dir string) (*os.File, error) {
 		fd, err := syscall.Open(dir, syscall.O_RDONLY|syscall.O_DIRECTORY|syscall.O_CLOEXEC, 0)
 		if errors.Is(err, syscall.EINTR) {
 			continue
-		}
-		if err != nil {
+		} else if err != nil {
 			return nil, err
 		}
 		return os.NewFile(uintptr(fd), dir), nil

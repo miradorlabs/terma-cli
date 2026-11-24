@@ -27,16 +27,8 @@ func isUnknownReach(p string) bool       { return strings.HasPrefix(p, UnknownRe
 type role uint8
 
 const (
-	plain role = iota // argument: path if present, or new file if slashed
-	program
-	target
-	folder
-	creates
-	data
-	part
-	slashedOnly
-	globbed
-	walked
+	plain, program, target, folder, creates  role = 0, 1, 2, 3, 4 // plain: path if present, or new file if slashed
+	data, part, slashedOnly, globbed, walked role = 5, 6, 7, 8, 9
 )
 
 func (r role) whole() bool      { return r == program || r == target }
@@ -115,20 +107,15 @@ func (sc *scan) lookup(name string) (string, bool) {
 	}
 	return "", false
 }
+func (sc *scan) fail() bool { sc.unknown = true; return true }
 func (sc *scan) place(p string) {
-	if sc.places[p] {
-		return
+	if !sc.places[p] && (len(sc.places) < maxShellPlaces || !sc.fail()) {
+		sc.places[p], sc.out = true, append(sc.out, p)
 	}
-	if len(sc.places) == maxShellPlaces {
-		sc.unknown = true
-		return
-	}
-	sc.places[p], sc.out = true, append(sc.out, p)
 }
 func (sc *scan) budget(counter *int, n, limit int) bool {
 	if sc.unknown || *counter+n > limit || time.Now().After(sc.deadline) {
-		sc.unknown = true
-		return false
+		return !sc.fail()
 	}
 	*counter += n
 	return true
@@ -202,7 +189,7 @@ func (sc *scan) checkPartsFields(parts []syntax.WordPart, ifs string, rem int, i
 		if pe, ok := parts[i].(*syntax.ParamExp); ok {
 			v := sc.paramValue(pe)
 			if pe.Repl != nil && pe.Repl.All && len(v) > rem {
-				sc.unknown = true
+				sc.fail()
 				return -1
 			}
 			if rem = sc.consumeFields(v, ifs, rem); rem >= 0 && pe.Exp != nil && pe.Exp.Word != nil {
@@ -212,7 +199,7 @@ func (sc *scan) checkPartsFields(parts []syntax.WordPart, ifs string, rem int, i
 				before := rem
 				if rem = sc.checkPartsFields(pe.Repl.With.Parts, ifs, rem, true); rem >= 0 && pe.Repl.All && len(v) > 0 {
 					if per := 1 + (before - rem); len(v) > rem/per {
-						sc.unknown = true
+						sc.fail()
 						return -1
 					} else {
 						rem -= len(v) * per
@@ -234,27 +221,20 @@ func (sc *scan) checkPartsFields(parts []syntax.WordPart, ifs string, rem int, i
 }
 func (sc *scan) consumeFields(v, ifs string, rem int) int {
 	if n := countFields(v, ifs, rem); n > rem {
-		sc.unknown = true
+		sc.fail()
 		return -1
-	} else if n > 1 {
-		return rem - (n - 1)
+	} else {
+		return rem - max(n-1, 0)
 	}
-	return rem
 }
 func countFields(v, ifs string, limit int) int {
 	n, inWord := 0, false
 	for _, r := range v {
-		if !strings.ContainsRune(ifs, r) {
-			if !inWord {
-				inWord, n = true, n+1
-			}
-		} else {
-			if !inWord && r != ' ' && r != '\t' && r != '\n' {
-				n++
-			}
-			inWord = false
+		sep := strings.ContainsRune(ifs, r)
+		if !inWord && (!sep || r != ' ' && r != '\t' && r != '\n') {
+			n++
 		}
-		if n > limit {
+		if inWord = !sep; n > limit {
 			return n
 		}
 	}
@@ -271,7 +251,7 @@ func (sc *scan) fields(w *syntax.Word) ([]string, error) {
 			return nil, err
 		}
 		if out = append(out, f...); len(out) > maxShellWords {
-			sc.unknown = true
+			sc.fail()
 			return nil, errOpaque
 		}
 	}
@@ -286,14 +266,14 @@ func (sc *scan) braces(w *syntax.Word) iter.Seq2[*syntax.Word, error] {
 			}
 		}
 		if braced := *w; n > maxShellBraces {
-			sc.unknown = true
+			sc.fail()
 			yield(nil, errOpaque)
 		} else if n == 0 || !syntax.SplitBraces(&braced) {
 			yield(w, nil)
 		} else {
 			for b, err := range expand.BracesSeq(sc.cfg, &braced) {
 				if err != nil || !sc.spend(1) {
-					sc.unknown = true
+					sc.fail()
 					yield(nil, errOpaque)
 					return
 				}

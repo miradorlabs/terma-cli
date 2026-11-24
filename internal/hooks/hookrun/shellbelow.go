@@ -36,8 +36,7 @@ func (sc *scan) safeLocate(dir string) (string, bool) {
 	if wt, ok := sc.lookup("GIT_WORK_TREE"); ok && wt != "" {
 		return "", false
 	}
-	cur, err := filepath.Abs(dir)
-	for err == nil && sc.spendStat(1) {
+	for cur, err := filepath.Abs(dir); err == nil && sc.spendStat(1); cur = filepath.Dir(cur) {
 		dotGit := filepath.Join(cur, ".git")
 		if info, err := os.Lstat(dotGit); err == nil {
 			if info.IsDir() {
@@ -49,9 +48,8 @@ func (sc *scan) safeLocate(dir string) (string, bool) {
 			return "", false
 		}
 		if cur == filepath.Dir(cur) {
-			return "", false
+			break
 		}
-		cur = filepath.Dir(cur)
 	}
 	return "", false
 }
@@ -66,8 +64,7 @@ func (sc *scan) locateGitdirFile(path, cur string) (string, bool) {
 	n, _ := f.Read(buf[:])
 	line, _, hasNL := strings.Cut(string(buf[:n]), "\n")
 	if !hasNL && n == len(buf) {
-		sc.unknown = true
-		return "", false
+		return "", !sc.fail()
 	}
 	target, ok := strings.CutPrefix(strings.TrimSpace(line), "gitdir:")
 	if target = strings.TrimSpace(target); !ok || target == "" {
@@ -91,8 +88,7 @@ func (sc *scan) below(dir string, levels int) {
 	if root, ok := sc.safeLocate(dir); ok && !sc.enclosingCheckout(root) || sc.unknown {
 		return
 	}
-	level := []string{dir}
-	for depth := 0; len(level) > 0 && !sc.unknown && depth+1 < levels; depth++ {
+	for depth, level := 0, []string{dir}; len(level) > 0 && !sc.unknown && depth+1 < levels; depth++ {
 		var next []string
 		for _, d := range level {
 			for _, e := range sc.readDir(d) {
@@ -107,8 +103,7 @@ func (sc *scan) below(dir string, levels int) {
 				} else if !e.IsDir() {
 					continue
 				}
-				if depth == maxBelowDepth || !sc.spend(1) {
-					sc.unknown = true
+				if depth == maxBelowDepth && sc.fail() || !sc.spend(1) {
 					return
 				}
 				if _, err := os.Lstat(filepath.Join(sub, ".git")); err == nil {
@@ -175,8 +170,7 @@ func (sc *scan) readDir(dir string) []fs.DirEntry {
 		if errors.Is(err, io.EOF) || err == nil && (len(chunk) == 0 || !sc.spend(0)) {
 			break
 		}
-		if err != nil {
-			sc.unknown = true
+		if err != nil && sc.fail() {
 			return nil
 		}
 	}

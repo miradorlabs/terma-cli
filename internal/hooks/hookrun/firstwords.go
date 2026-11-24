@@ -30,7 +30,8 @@ func firstWords(command string) string {
 	secret, hasRedis := false, false
 	for i, b := range bare {
 		hasRedis = hasRedis || strings.HasSuffix(b, "redis-cli")
-		name, _, eq := strings.Cut(b, "=")
+		masked := userinfo.ReplaceAllString(b, "://…@")
+		name, _, eq := strings.Cut(masked, "=")
 		switch {
 		case secret:
 			words[i] = "…"
@@ -38,14 +39,12 @@ func firstWords(command string) string {
 			words[i] = b[:2] + "…"
 		case eq && name != "":
 			words[i] = name + "=…"
-		case userinfo.MatchString(b):
-			words[i] = b
+		case masked != b:
+			words[i] = masked
 		}
-		words[i] = userinfo.ReplaceAllString(words[i], "://…@")
-		lower := strings.ToLower(b)
-		tail := len(b) > 2 && b[0] == '-' && b[1] != '-' &&
-			(slices.Contains(secretOptions, "-"+b[len(b)-1:]) || b[len(b)-1] == 'a' && hasRedis)
-		secret = slices.Contains(secretOptions, b) || b == "-a" && hasRedis || tail ||
+		lower, short := strings.ToLower(b), len(b) > 2 && b[0] == '-' && b[1] != '-'
+		secret = slices.Contains(secretOptions, b) || b == "-a" && hasRedis ||
+			short && (slices.Contains(secretOptions, "-"+b[len(b)-1:]) || b[len(b)-1] == 'a' && hasRedis) ||
 			strings.HasPrefix(b, "-") && slices.ContainsFunc(secretNames, func(n string) bool { return strings.Contains(lower, n) })
 	}
 	s := strings.Map(func(r rune) rune {
@@ -87,9 +86,7 @@ func shellFields(command string, n int) (raw, bare []string) {
 				r, adv = ansiEscape(command[i+1:])
 				w = 1 + adv
 			}
-			if r == 0 {
-				ansiNul = true
-			} else if !ansiNul {
+			if ansiNul = ansiNul || r == 0; !ansiNul {
 				buf.WriteRune(r)
 			}
 		case r == '\\' && quote != '\'' && i+1 < len(command) && (command[i+1] == '\n' || command[i+1] == '\r' && i+2 < len(command) && command[i+2] == '\n'):

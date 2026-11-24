@@ -43,28 +43,28 @@ func (sc *scan) candidate(t string, r role) {
 		sc.prev, sc.dir = sc.dir, res.dir
 	}
 }
-func (sc *scan) resolve(t string, r role, slashed bool) cached {
-	var res cached
-	record := func(dir string, primary bool) string {
-		p, info := sc.reach(t, dir)
-		if info != nil {
-			res.named = true
-			if info.IsDir() {
-				if primary {
-					res.dir = p
+func (sc *scan) resolve(t string, r role, slashed bool) (res cached) {
+	found := false
+	for i, d := range []string{sc.dir, sc.cwd} {
+		if i > 0 && d == sc.dir {
+			break
+		}
+		if p, info := sc.reach(t, d); p != "" {
+			if found = true; info != nil {
+				if res.named = true; info.IsDir() {
+					if i == 0 {
+						res.dir = p
+					}
+					res.folders = append(res.folders, p)
 				}
-				res.folders = append(res.folders, p)
 			}
 		}
-		return p
 	}
-	p, back := record(sc.dir, true), ""
-	if sc.dir != sc.cwd {
-		back = record(sc.cwd, false)
-	}
-	if p == "" && back == "" && r.mayCreate(slashed) {
-		if sc.reachNew(t, sc.dir); sc.dir != sc.cwd {
-			sc.reachNew(t, sc.cwd)
+	if !found && r.mayCreate(slashed) {
+		for i, d := range []string{sc.dir, sc.cwd} {
+			if p, ok := sc.path(t, d); (i == 0 || d != sc.dir) && ok {
+				sc.placeParent(p)
+			}
 		}
 	}
 	return res
@@ -74,28 +74,24 @@ const maxSymlinkHops, maxPathComponents, maxPathBytes = 8, 128, 4096
 
 // hasRemoteLink walks components of p top-down without following symlinks, failing closed on remote shares or >maxSymlinkHops.
 func (sc *scan) hasRemoteLink(p string) bool {
-	if sc.unknown {
-		return true
-	}
 	clean := filepath.Clean(p)
-	if sc.cwd != "" && clean == filepath.Clean(sc.cwd) {
-		if !sc.cwdChecked {
-			sc.cwdChecked, sc.cwdRemote = true, sc.hasRemoteLinkAt(clean, 0)
-		}
-		return sc.cwdRemote
+	if sc.unknown || sc.cwd != "" && clean == filepath.Clean(sc.cwd) && sc.cwdChecked {
+		return sc.unknown || sc.cwdRemote
 	}
-	return sc.hasRemoteLinkAt(clean, 0)
+	bad := sc.hasRemoteLinkAt(clean, 0)
+	if sc.cwd != "" && clean == filepath.Clean(sc.cwd) {
+		sc.cwdChecked, sc.cwdRemote = true, bad
+	}
+	return bad
 }
 func (sc *scan) hasRemoteLinkAt(p string, hops int) bool {
 	if remote(p, sc.cwd) || len(p) > maxPathBytes {
-		sc.unknown = true
-		return true
+		return sc.fail()
 	}
 	var chain []string
 	for cur := p; ; cur = filepath.Dir(cur) {
 		if chain = append(chain, cur); len(chain) > maxPathComponents {
-			sc.unknown = true
-			return true
+			return sc.fail()
 		}
 		if filepath.Dir(cur) == cur {
 			break
@@ -117,8 +113,7 @@ func (sc *scan) hasRemoteLinkAt(p string, hops int) bool {
 }
 func (sc *scan) resolveTarget(base, raw string, hops int) (string, bool) {
 	if remote(raw, sc.cwd) {
-		sc.unknown = true
-		return "", false
+		return "", !sc.fail()
 	}
 	if !filepath.IsAbs(raw) && len(raw) > 0 && os.IsPathSeparator(raw[0]) {
 		raw = cmp.Or(filepath.VolumeName(base), filepath.VolumeName(sc.cwd)) + raw
@@ -126,7 +121,7 @@ func (sc *scan) resolveTarget(base, raw string, hops int) (string, bool) {
 	if hasDotDot(raw) {
 		if filepath.IsAbs(raw) {
 			vol := filepath.VolumeName(raw)
-			return sc.cleanSafeAt(vol+string(filepath.Separator), raw[len(vol):], hops)
+			base, raw = vol+string(filepath.Separator), raw[len(vol):]
 		}
 		return sc.cleanSafeAt(base, raw, hops)
 	}
@@ -140,7 +135,7 @@ func (sc *scan) resolveTarget(base, raw string, hops int) (string, bool) {
 // checking target ancestors and ".." segments and failing closed on remote targets or hop exhaustion.
 func (sc *scan) resolveLink(p string, hops int) (string, bool) {
 	cur := p
-	for hops < maxSymlinkHops {
+	for ; hops < maxSymlinkHops; hops++ {
 		if !sc.spend(1) {
 			return "", true
 		}
@@ -149,16 +144,13 @@ func (sc *scan) resolveLink(p string, hops int) (string, bool) {
 			return cur, false
 		}
 		next, ok := sc.resolveTarget(filepath.Dir(cur), raw, hops+1)
-		if !ok {
+		if !ok || filepath.Dir(next) != next && sc.hasRemoteLinkAt(filepath.Dir(next), hops+1) {
 			return "", true
 		}
-		if cur, hops = next, hops+1; filepath.Dir(cur) != cur && sc.hasRemoteLinkAt(filepath.Dir(cur), hops) {
-			return "", true
-		}
+		cur = next
 	}
 	if _, err := os.Readlink(cur); err == nil {
-		sc.unknown = true
-		return "", true
+		return "", sc.fail()
 	}
 	return cur, false
 }
@@ -183,7 +175,7 @@ func (sc *scan) reach(w, dir string) (string, os.FileInfo) {
 		if resolved, err := filepath.EvalSymlinks(p); err != nil {
 			sc.placeParent(target)
 		} else if remote(resolved, sc.cwd) {
-			sc.unknown = true
+			sc.fail()
 			return p, nil
 		} else if t, err := os.Stat(resolved); err == nil && t.IsDir() {
 			sc.place(resolved)
@@ -212,11 +204,6 @@ func (sc *scan) placeParent(p string) {
 			}
 			return
 		}
-	}
-}
-func (sc *scan) reachNew(w, dir string) {
-	if p, ok := sc.path(w, dir); ok {
-		sc.placeParent(p)
 	}
 }
 func (sc *scan) away(w string, r role) bool {
@@ -253,7 +240,7 @@ func (sc *scan) cleanSafeAt(base, rel string, hops int) (string, bool) {
 		return "", false
 	}
 	cur := filepath.Clean(base)
-	for _, part := range strings.FieldsFunc(rel, func(r rune) bool { return r < 0x80 && os.IsPathSeparator(byte(r)) }) {
+	for _, part := range strings.FieldsFunc(rel, isSep) {
 		switch part {
 		case "", ".":
 		case "..":
@@ -263,8 +250,7 @@ func (sc *scan) cleanSafeAt(base, rel string, hops int) (string, bool) {
 			if info, err := os.Lstat(cur); err == nil && info.Mode()&fs.ModeSymlink != 0 {
 				resolved, err := filepath.EvalSymlinks(cur)
 				if err != nil || remote(resolved, sc.cwd) {
-					sc.unknown = true
-					return "", false
+					return "", !sc.fail()
 				}
 				cur = resolved
 			}
@@ -317,24 +303,22 @@ func share(p string) string {
 
 const hostBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_.$"
 
+func isSep(r rune) bool { return r < 0x80 && os.IsPathSeparator(byte(r)) }
 func cutSeparator(p string) (string, string, bool) {
-	if i := strings.IndexFunc(p, func(r rune) bool { return r < 0x80 && os.IsPathSeparator(byte(r)) }); i >= 0 {
+	if i := strings.IndexFunc(p, isSep); i >= 0 {
 		return p[:i], p[i+1:], true
 	}
 	return p, "", false
 }
 func shellValue(w string) string {
+	if name, v, ok := strings.Cut(w, "="); ok && (strings.HasPrefix(w, "-") || isName(name)) {
+		return v
+	}
 	if strings.HasPrefix(w, "-") {
-		if _, v, ok := strings.Cut(w, "="); ok {
-			return v
-		}
 		if len(w) > 2 && w[1] != '-' {
 			return w[2:]
 		}
 		return ""
-	}
-	if name, v, ok := strings.Cut(w, "="); ok && isName(name) {
-		return v
 	}
 	return w
 }
