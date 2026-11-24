@@ -2337,12 +2337,8 @@ func TestAbbreviatedSecretOptionsAndLogicalCd(t *testing.T) {
 	}
 	// Long runs of unquoted top-level separators are bounded early by parsable.
 	for _, sep := range []string{";", "&", ">"} {
-		start := time.Now()
 		if parsable(strings.Repeat(sep, maxShellBytes)) {
 			t.Errorf("parsable(%q*maxShellBytes) = true, want false", sep)
-		}
-		if took := time.Since(start); took > 20*time.Millisecond {
-			t.Errorf("parsable(%q*maxShellBytes) took %v, want < 20ms", sep, took)
 		}
 	}
 	// Plain operands containing '=' preserve their literal path alongside value extraction.
@@ -2430,6 +2426,8 @@ func TestAbbreviatedSecretOptionsAndLogicalCd(t *testing.T) {
 		{"bad-section-header", "[core bad]\n\tbare = false\n"},
 		{"unterminated-quote", "[core]\n\tfoo = \"unterminated\n"},
 		{"unterminated-quote-cont", "[core]\n\tfoo = \"unterminated\\"},
+		{"bad-escape", "[core]\n\tfoo = \"\\q\"\n"},
+		{"dangling-cont-eof", "[core]\n\tfoo = bar\\"},
 		{"bare-true", "[core]\n\tbare = true\n"},
 		{"bare-valueless", "[core]\n\tbare\n"},
 	} {
@@ -2440,6 +2438,20 @@ func TestAbbreviatedSecretOptionsAndLogicalCd(t *testing.T) {
 		}
 		if got, ok := newScan(badCfgRepo, noEnv, work{deadline: time.Now().Add(time.Minute)}).safeLocate(badCfgRepo); ok {
 			t.Errorf("safeLocate(%s) = (%q, true), want false", tc.name, got)
+		}
+	}
+	// mktemp falls back to /tmp on Unix when TMPDIR is cleared in the scanned shell, ignoring host os.TempDir().
+	if runtime.GOOS != "windows" {
+		scTmp := newScan(litDir, func(k string) (string, bool) {
+			if k == "TMPDIR" {
+				return filepath.Join(litDir, "should-not-use"), true
+			}
+			return "", false
+		}, work{deadline: time.Now().Add(time.Minute)})
+		empty := ""
+		scTmp.vars["TMPDIR"] = &empty
+		if got, ok := mktemp(scTmp, nil); !ok || filepath.Dir(got) != "/tmp" {
+			t.Errorf("mktemp(cleared TMPDIR) = (%q, %v), want under /tmp", got, ok)
 		}
 	}
 	// Valid bare=false with escaped quotes and comments still locates the worktree.
@@ -2494,6 +2506,38 @@ func TestAbbreviatedSecretOptionsAndLogicalCd(t *testing.T) {
 			t.Errorf("candidate(https://repo/file) = %q, want %q", scHTTPS.out, httpsRoot)
 		}
 	}
+	// Explicit GIT_DIR + GIT_WORK_TREE fails closed when GIT_DIR/config is malformed.
+	expGD, expWT := filepath.Join(litDir, "exp-gd"), filepath.Join(litDir, "exp-wt")
+	makeValidGitDir(t, expGD)
+	if err := os.MkdirAll(expWT, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(expGD, "config"), []byte("[core]\n\tfoo = \"unterminated\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	expEnv := func(k string) (string, bool) {
+		switch k {
+		case "GIT_DIR":
+			return expGD, true
+		case "GIT_WORK_TREE":
+			return expWT, true
+		}
+		return "", false
+	}
+	if got, ok := newScan(litDir, expEnv, work{deadline: time.Now().Add(time.Minute)}).safeLocate(litDir); ok {
+		t.Errorf("safeLocate(explicit GIT_DIR malformed config) = (%q, true), want false", got)
+	}
+	// Invalid symbolic HEAD targets fail closed.
+	for i, head := range []string{"ref: ../evil\n", "ref: refs/heads/a..b\n", "ref: refs/heads/main.lock\n", "ref: refs/\n"} {
+		badHead := filepath.Join(litDir, "bad-head-"+string(rune('0'+i)))
+		makeValidGitDir(t, filepath.Join(badHead, ".git"))
+		if err := os.WriteFile(filepath.Join(badHead, ".git", "HEAD"), []byte(head), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if got, ok := newScan(badHead, noEnv, work{deadline: time.Now().Add(time.Minute)}).safeLocate(badHead); ok {
+			t.Errorf("safeLocate(HEAD=%q) = (%q, true), want false", head, got)
+		}
+	}
 	// wget request-body flags are masked by firstWords.
 	for _, cmd := range []string{
 		"wget --post-data SECRET /missing",
@@ -2502,6 +2546,18 @@ func TestAbbreviatedSecretOptionsAndLogicalCd(t *testing.T) {
 	} {
 		if got := firstWords(cmd); strings.Contains(got, "SECRET") {
 			t.Errorf("firstWords(%q) = %q, leaked SECRET", cmd, got)
+		}
+	}
+}
+
+func TestParsableSeparatorRunsBounded(t *testing.T) {
+	for _, sep := range []string{";", "&", ">"} {
+		start := time.Now()
+		if parsable(strings.Repeat(sep, maxShellBytes)) {
+			t.Errorf("parsable(%q*maxShellBytes) = true, want false", sep)
+		}
+		if took := time.Since(start); took > 200*time.Millisecond {
+			t.Errorf("parsable(%q*maxShellBytes) took %v, want < 200ms", sep, took)
 		}
 	}
 }

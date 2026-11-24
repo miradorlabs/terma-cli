@@ -109,10 +109,10 @@ func mktemp(sc *scan, args []*syntax.Word) (string, bool) {
 			name = l
 		}
 	}
-	dir := pick(name == "" || tmp, cmp.Or(sc.envVal("TMPDIR"), os.TempDir()), sc.dir)
-	if (name == "" || tmp) && sc.isUnresolvedVar("TMPDIR") {
+	if (name == "" || tmp) && (sc.isUnresolvedVar("TMPDIR") || runtime.GOOS == "windows" && (sc.isUnresolvedVar("TMP") || sc.isUnresolvedVar("TEMP") || sc.isUnresolvedVar("USERPROFILE"))) {
 		return "", false
 	}
+	dir := pick(name == "" || tmp, pick(runtime.GOOS == "windows", cmp.Or(sc.envVal("TMP"), sc.envVal("TEMP"), sc.envVal("USERPROFILE")), cmp.Or(sc.envVal("TMPDIR"), "/tmp")), sc.dir)
 	_, _, info, found := sc.walkPath(dir, true)
 	return filepath.Join(dir, cmp.Or(name, "tmp.XXXXXXXXXX")), dir != "" && found && info.IsDir()
 }
@@ -154,7 +154,7 @@ func (sc *scan) safeLocate(dir string) (string, bool) {
 	if gd, wt := sc.envVal("GIT_DIR"), sc.envVal("GIT_WORK_TREE"); gd != "" || wt != "" {
 		absGD, ok1 := sc.resolveJoined(cmp.Or(sc.dir, sc.cwd), gd, false)
 		absWT, ok2 := sc.resolveJoined(cmp.Or(sc.dir, sc.cwd), wt, false)
-		return absWT, gd != "" && wt != "" && ok1 && ok2 && !sc.hasRemoteLink(absGD) && !sc.hasRemoteLink(absWT) && sc.validGitDir(absGD)
+		return absWT, gd != "" && wt != "" && ok1 && ok2 && !sc.hasRemoteLink(absGD) && !sc.hasRemoteLink(absWT) && sc.validGitDir(absGD) && !sc.hasWorktreeConfig(absGD)
 	}
 	if start, ok := sc.real(dir); ok {
 		_, _, startInfo, found := sc.walkPath(start, true)
@@ -187,7 +187,8 @@ func (sc *scan) safeLocate(dir string) (string, bool) {
 }
 func (sc *scan) validGitDir(dir string) bool {
 	head, err := sc.readSmallFile(filepath.Join(dir, "HEAD"))
-	if h := strings.TrimSpace(head); err != nil || (!strings.HasPrefix(h, "ref:") || strings.TrimSpace(h[4:]) == "") && (len(h) != 40 && len(h) != 64 || strings.Trim(h, "0123456789abcdefABCDEF") != "") {
+	h, ref := strings.TrimSpace(head), strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(head), "ref:"))
+	if err != nil || (!strings.HasPrefix(h, "ref:") || !strings.HasPrefix(ref, "refs/") || strings.Contains(ref, "..") || strings.Contains(ref, "//") || strings.Contains(ref, "/.") || strings.Contains(ref, "@{") || strings.Contains(ref, ".lock/") || strings.HasSuffix(ref, "/") || strings.HasSuffix(ref, ".") || strings.HasSuffix(ref, ".lock") || strings.ContainsFunc(ref, func(r rune) bool { return r <= ' ' || r == 0x7f || strings.ContainsRune(`~^:?*[\`, r) })) && (len(h) != 40 && len(h) != 64 || strings.Trim(h, "0123456789abcdefABCDEF") != "") {
 		return false
 	}
 	hasDir := func(p string) bool { _, _, info, ok := sc.walkPath(p, true); return ok && info.IsDir() }
@@ -218,6 +219,9 @@ func (sc *scan) hasWorktreeConfig(gitDir string) bool {
 		scanVal := func(v string) bool {
 			cont = false
 			for i := 0; i < len(v) && (inQ || cont || v[i] != '#' && v[i] != ';'); i++ {
+				if cont && strings.IndexByte(`\"ntb`, v[i]) < 0 {
+					return true
+				}
 				inQ, cont = pick(!cont && v[i] == '"', !inQ, inQ), !cont && v[i] == '\\'
 			}
 			return !cont && inQ
@@ -241,7 +245,7 @@ func (sc *scan) hasWorktreeConfig(gitDir string) bool {
 				return !inSec || k == "" || strings.EqualFold(k, "worktree") || strings.EqualFold(k, "bare") && (!hasEq || !slices.Contains([]string{"false", "no", "off", "0"}, strings.ToLower(strings.TrimSpace(val)))) || strings.IndexByte(alnum[:52], k[0]) < 0 || strings.Trim(k, alnum+"-") != "" || hasEq && scanVal(val)
 			}
 			return false
-		}) || inQ
+		}) || inQ || cont
 	})
 }
 func (sc *scan) fileHasLine(path string, match func(string) bool) bool {

@@ -172,8 +172,9 @@ func (sc *scan) walkPath(p string, followFinal bool) (string, string, os.FileInf
 }
 func (sc *scan) hasRemoteLink(p string) bool { _, _, _, _ = sc.walkPath(p, true); return sc.unknown }
 func (sc *scan) resolveJoined(base, raw string, logical bool) (string, bool) {
-	if remote(raw, sc.cwd) || filepath.VolumeName(raw) != "" && !filepath.IsAbs(raw) {
-		return "", !sc.fail()
+	if vol := filepath.VolumeName(raw); remote(raw, sc.cwd) || vol != "" && !filepath.IsAbs(raw) {
+		sc.unknown = sc.unknown || remote(raw, sc.cwd) || len(vol) != 2 || vol[1] != ':' || strings.IndexByte(alnum[:52], vol[0]) >= 0
+		return "", false
 	}
 	if !filepath.IsAbs(raw) && len(raw) > 0 && os.IsPathSeparator(raw[0]) {
 		raw = cmp.Or(filepath.VolumeName(base), filepath.VolumeName(sc.cwd)) + raw
@@ -261,12 +262,9 @@ func urlPath(w string) (string, bool, bool) {
 	if !ok || !isScheme(scheme) || !strings.EqualFold(scheme, "file") {
 		return "", ok && isScheme(scheme), false
 	}
-	if k := strings.IndexAny(rest, "?#"); k >= 0 {
-		rest = rest[:k]
-	}
-	if len(rest) > 9 && strings.EqualFold(rest[:9], "localhost") && rest[9] == '/' {
-		rest = rest[9:]
-	}
+	rest, _, _ = strings.Cut(rest, "?")
+	rest, _, _ = strings.Cut(rest, "#")
+	rest = pick(len(rest) > 9 && strings.EqualFold(rest[:9], "localhost") && rest[9] == '/', rest[min(len(rest), 9):], rest)
 	u, err := url.PathUnescape(rest)
 	if err != nil || strings.ContainsRune(u, 0) {
 		return "", true, true

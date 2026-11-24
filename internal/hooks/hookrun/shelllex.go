@@ -226,9 +226,8 @@ func parsable(src string) bool {
 		case c == '\\':
 			i = max(skipCont(src, i)-1, i+1)
 		case c == '$' && (next == '(' || next == '{' || next == '['): // $( $(( ${ $[
-			n := pick(next == '(' && double, 2, 1)
-			i = pick(n == 2, di, ni)
-			push(next, n, i, n == 2 || next != '(')
+			i = pick(next == '(' && double, di, ni)
+			push(next, pick(next == '(' && double, 2, 1), i, next == '(' && double || next != '(')
 		case c == '`' && top == '`', c == '"' && top == '"':
 			open = open[:len(open)-1]
 		case c == '`', c == '"' && top != 'h':
@@ -241,9 +240,8 @@ func parsable(src string) bool {
 		case c == '#' && strings.IndexByte(" \t\n;&|()", prev) >= 0:
 			words, i = words+1, lineEnd(src, i)-1
 		case c == '(' || c == '[' || c == '{': // (( [[ [ open expressions
-			n := pick(c != '{' && next == c, 2, 1)
-			i = pick(n == 2, ni, i)
-			push(c, n, i, n == 2 || c == '[')
+			i = pick(c != '{' && next == c, ni, i)
+			push(c, pick(c != '{' && next == c, 2, 1), i, c != '{' && next == c || c == '[')
 		case c == top && len(open) > 0: // a NUL is no context's close
 			open = open[:len(open)-1]
 		case c == '|' || c == '&' && next == '&':
