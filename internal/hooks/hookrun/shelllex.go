@@ -10,7 +10,7 @@ import (
 	"unicode/utf8"
 )
 
-var secretOptions, secretNames, compounds = []string{"-c", "-e", "--eval", "-u", "--user", "-U", "--proxy-user", "-H", "--header", "--proxy-header", "-p", "--password", "-b", "--cookie", "-d", "--data", "--data-ascii", "--data-raw", "--data-binary", "--data-urlencode", "--url-query", "--json", "--oauth2-bearer", "-E", "--cert", "--proxy-cert", "--post-data", "--body-data", "--post-file", "--body-file"}, []string{"pass", "token", "secret", "key", "auth"}, []string{"if", "for", "while", "until", "case", "select"}
+var secretOptions, secretNames, compounds = []string{"-c", "-e", "--eval", "-u", "--user", "-U", "--proxy-user", "-H", "--header", "--proxy-header", "-p", "--password", "-b", "--cookie", "-d", "--data", "--data-ascii", "--data-raw", "--data-binary", "--data-urlencode", "--url-query", "--json", "--oauth2-bearer", "-E", "--cert", "--proxy-cert", "--post-data", "--body-data", "--post-file", "--body-file", "-F", "--form", "--form-string"}, []string{"pass", "token", "secret", "key", "auth"}, []string{"if", "for", "while", "until", "case", "select"}
 var userinfo = regexp.MustCompile(`(://)[^/\s]+@|[^/\s:@]*:[^/\s@]+@`)
 var shellMeta = [256]bool{' ': true, '\t': true, '\n': true, '\\': true, '$': true, '`': true, '"': true, '\'': true, '(': true, ')': true, '[': true, ']': true, '{': true, '}': true, '|': true, '&': true, '<': true, '>': true, ';': true}
 
@@ -43,9 +43,8 @@ func maskWords(command string, depth int) string {
 				redir = cmp.Or(map[string]int{"<<": 3, "<<-": 3, "<<<": 2}[r], 1)
 			}
 		} else {
-			masked := userinfo.ReplaceAllString(b, "${1}…@")
+			masked, short := userinfo.ReplaceAllString(b, "${1}…@"), len(b) > 2 && b[0] == '-' && b[1] != '-'
 			name, _, eq := strings.Cut(masked, "=")
-			short := len(b) > 2 && b[0] == '-' && b[1] != '-'
 			if secret || hasSubst || depth >= 2 && strings.ContainsAny(b, " \t\n") {
 				words[i] = "…"
 			} else if short {
@@ -62,9 +61,8 @@ func maskWords(command string, depth int) string {
 			secret = hasSubst || slices.Contains(secretOptions, b) || len(b) >= 4 && strings.HasPrefix(b, "--") && slices.ContainsFunc(secretOptions, func(o string) bool { return strings.HasPrefix(o, b) }) || b == "eval" || b == "-a" && hasRedis || short && (strings.ContainsRune(b[1:], 'c') || slices.Contains(secretOptions, "-"+b[len(b)-1:]) || b[len(b)-1] == 'a' && hasRedis) || strings.HasPrefix(b, "-") && slices.ContainsFunc(secretNames, func(n string) bool { return strings.Contains(lower, n) })
 		}
 	}
-	s := strings.Map(func(r rune) rune { return pick(r < 0x20 || r == 0x7f, ' ', r) }, strings.Join(words, " "))
-	r := []rune(s)
-	return pick(len(r) > 60, string(r[:min(len(r), 60)])+" …", s+pick(more, " …", ""))
+	r := []rune(strings.Map(func(r rune) rune { return pick(r < 0x20 || r == 0x7f, ' ', r) }, strings.Join(words, " ")))
+	return pick(len(r) > 60, string(r[:min(len(r), 60)])+" …", string(r)+pick(more, " …", ""))
 }
 
 // shellFields returns command's first n words as written alongside their unquoted forms.
@@ -124,18 +122,17 @@ func shellFields(command string, n int) (raw, bare []string) {
 				if buf.Reset(); len(raw) == n {
 					return raw, bare
 				}
-				if start = pick(r == '<' || r == '>', i, -1); start >= 0 {
-					buf.WriteRune(r)
-					break
+				if start = pick(r == '<' || r == '>', i, -1); start < 0 {
+					i += w
+					continue
 				}
-				fallthrough
+				buf.WriteRune(r)
 			default:
 				i += w
 				continue
 			}
 		}
-		start = pick(start < 0, i, start)
-		i += w
+		start, i = pick(start < 0, i, start), i+w
 	}
 	if start >= 0 {
 		raw, bare = append(raw, command[start:]), append(bare, buf.String()+pick(dollar, "$", ""))
@@ -143,17 +140,13 @@ func shellFields(command string, n int) (raw, bare []string) {
 	return raw, bare
 }
 func ansiEscape(s string) (rune, int) {
-	if s == "" {
-		return '\\', 0
-	} else if j := strings.IndexByte("abeEfnrtv\\'\"?", s[0]); j >= 0 {
+	if j := pick(s != "", strings.IndexByte("abeEfnrtv\\'\"?", byteAt(s, 0)), -1); j >= 0 {
 		return rune("\a\b\x1b\x1b\f\n\r\t\v\\'\"?"[j]), 1
-	} else if s[0] == 'c' && len(s) > 1 {
+	} else if len(s) > 1 && s[0] == 'c' {
 		return rune(s[1] & 0x1f), 2
 	}
-	base, start, limit, digits, k := 8, 0, 3, "01234567", 0
-	if j := strings.IndexByte("xuU", s[0]); j >= 0 {
-		base, start, limit, digits = 16, 1, 2<<j, "0123456789abcdefABCDEF"
-	}
+	j := pick(s != "", strings.IndexByte("xuU", byteAt(s, 0)), -1)
+	base, start, limit, digits, k := pick(j >= 0, 16, 8), pick(j >= 0, 1, 0), pick(j >= 0, 2<<max(j, 0), 3), pick(j >= 0, "0123456789abcdefABCDEF", "01234567"), 0
 	for ; k < limit && start+k < len(s) && strings.IndexByte(digits, s[start+k]) >= 0; k++ {
 	}
 	if v, err := strconv.ParseUint(s[start:start+k], base, 32); k > 0 && err == nil {
@@ -172,8 +165,7 @@ func parsable(src string) bool {
 	if len(src) > maxShellBytes {
 		return false
 	}
-	open, docs, bodies := []byte{0}, []heredoc(nil), []heredoc(nil)
-	body, expr, exprDepth, letUntil, links, words, dollars := 0, -1, 0, -1, 0, 0, 0
+	open, docs, bodies, body, expr, exprDepth, letUntil, links, words, dollars := []byte{0}, []heredoc(nil), []heredoc(nil), 0, -1, 0, -1, 0, 0, 0
 	push := func(c byte, n, i int, isExpr bool) {
 		if isExpr && expr < 0 {
 			expr, exprDepth = i, len(open)

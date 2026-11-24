@@ -168,17 +168,17 @@ func (sc *scan) paramSize(pe *syntax.ParamExp, opaqueSubst bool) int {
 	}
 	if pe.Exp != nil && pe.Exp.Word != nil {
 		pat := isCaseOp(pe.Exp.Op) || pe.Exp.Op == syntax.RemSmallPrefix || pe.Exp.Op == syntax.RemLargePrefix || pe.Exp.Op == syntax.RemSmallSuffix || pe.Exp.Op == syntax.RemLargeSuffix
-		if w := sc.sizeIn(pe.Exp.Word, opaqueSubst || pat); pat && (w > maxShellExpr || n > maxShellBytes/max(w, 1)) {
+		w := sc.sizeIn(pe.Exp.Word, opaqueSubst || pat)
+		if pat && (w > maxShellExpr || n > maxShellBytes/max(w, 1)) {
 			return maxShellBytes + 1
-		} else {
-			n += w
 		}
+		n += w
 	}
 	return min(n, maxShellBytes+1)
 }
+func (sc *scan) ifs() string { v, ok := sc.lookup("IFS"); return pick(ok, v, " \t\n") }
 func (sc *scan) chargeFields(v string) bool {
-	ifs, ok := sc.lookup("IFS")
-	ifs = pick(ok, ifs, " \t\n")
+	ifs := sc.ifs()
 	return !sc.isUnresolvedVar("IFS") && (ifs == "" || (len(ifs) <= 64 || !sc.fail()) && sc.budget(&sc.words, countFields(v, ifs, maxShellWords-sc.words), maxShellWords))
 }
 func (sc *scan) checkPartsFields(parts []syntax.WordPart, ifs string, rem int, inParam bool) int {
@@ -232,9 +232,7 @@ func countFields(v, ifs string, limit int) int {
 	return n
 }
 func (sc *scan) fields(w *syntax.Word) ([]string, error) {
-	var out []string
-	ifs, ok := sc.lookup("IFS")
-	ifs = pick(ok, ifs, " \t\n")
+	out, ifs := []string(nil), sc.ifs()
 	for b, err := range sc.braces(w) {
 		if err != nil || len(ifs) > 64 && sc.fail() || !sc.charge(sc.size(b)) || ifs != "" && sc.checkPartsFields(b.Parts, ifs, maxShellWords-len(out), false) < 0 {
 			return nil, errOpaque

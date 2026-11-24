@@ -36,6 +36,9 @@ func (sc *scan) substitute(w io.Writer, cs *syntax.CmdSubst) error {
 			}
 			for n := len(words); n > 0; n-- {
 				if known, ok := outputs[strings.Join(words[:n], " ")]; ok {
+					if _, ok := sc.trustedCmd(words[0]); !ok {
+						return errOpaque
+					}
 					outer := sc.cfg
 					sc.cfg = sc.config() // expand is not reentrant
 					out, ok := known(sc, ce.Args[n:])
@@ -50,24 +53,44 @@ func (sc *scan) substitute(w io.Writer, cs *syntax.CmdSubst) error {
 	}
 	return errOpaque
 }
+func (sc *scan) trustedCmd(name string) (string, bool) {
+	pathEnv, hasPath := sc.lookup("PATH")
+	if name == "pwd" || !hasPath && !sc.isUnresolvedVar("PATH") {
+		return "", true
+	}
+	exts := pick(runtime.GOOS == "windows", []string{"", ".exe", ".cmd", ".bat", ".com"}, []string{""})
+	roots := pick(runtime.GOOS == "windows", []string{"/program files/", "/program files (x86)/", "/windows/system32/", "/hostedtoolcache/"}, []string{"/bin/", "/usr/bin/", "/usr/local/", "/usr/lib/", "/opt/homebrew/", "/opt/hostedtoolcache/", "/Library/Developer/", "/Applications/Xcode.app/"})
+	for _, d := range pick(sc.isUnresolvedVar("PATH") || pathEnv == "", []string{""}, filepath.SplitList(pathEnv)) {
+		if d == "" || !filepath.IsAbs(d) {
+			return "", false
+		}
+		for _, ext := range exts {
+			if r, _, info, found := sc.walkPath(filepath.Join(d, name+ext), true); sc.unknown {
+				return "", false
+			} else if found && !info.IsDir() && (runtime.GOOS == "windows" || info.Mode()&0o111 != 0) {
+				p := filepath.ToSlash(r[len(filepath.VolumeName(r)):])
+				p = pick(runtime.GOOS == "windows", strings.ToLower(p), p)
+				return r, slices.ContainsFunc(roots, func(pre string) bool { return strings.HasPrefix(p, pre) })
+			}
+		}
+	}
+	return "", runtime.GOOS == "windows" && name != "git" && name != "go"
+}
 func where(s *scan, a []*syntax.Word) (string, bool) { return s.dir, s.dir != "" && len(a) == 0 }
 func (sc *scan) envVal(k string) string              { v, _ := sc.lookup(k); return v }
 func (sc *scan) hasGoEnv(key string) bool {
-	p := sc.envVal("GOENV")
-	if sc.isUnresolvedVar("GOENV") || p != "" && p != "off" && !filepath.IsAbs(p) {
+	if p := sc.envVal("GOENV"); sc.isUnresolvedVar("GOENV") || p != "" && p != "off" && !filepath.IsAbs(p) {
 		return true
-	} else if p == "" {
-		dir, bad := sc.envVal("AppData"), sc.isUnresolvedVar("AppData")
-		if xdg := sc.envVal("XDG_CONFIG_HOME"); runtime.GOOS != "windows" && runtime.GOOS != "darwin" && (xdg != "" || sc.isUnresolvedVar("XDG_CONFIG_HOME")) {
-			dir, bad = xdg, sc.isUnresolvedVar("XDG_CONFIG_HOME")
-		} else if home, ok := sc.lookup("HOME"); runtime.GOOS != "windows" {
-			dir, bad = pick(ok, filepath.Join(home, pick(runtime.GOOS == "darwin", "Library/Application Support", ".config")), ""), sc.isUnresolvedVar("HOME")
-		}
-		if p = filepath.Join(dir, "go", "env"); bad || dir == "" {
-			return bad
-		}
+	} else if p != "" {
+		return p != "off" && sc.fileHasLine(p, func(l string) bool { return strings.HasPrefix(strings.TrimSpace(l), key+"=") })
 	}
-	return p != "off" && sc.fileHasLine(p, func(l string) bool { return strings.HasPrefix(strings.TrimSpace(l), key+"=") })
+	dir, bad := sc.envVal("AppData"), sc.isUnresolvedVar("AppData")
+	if xdg := sc.envVal("XDG_CONFIG_HOME"); runtime.GOOS != "windows" && runtime.GOOS != "darwin" && (xdg != "" || sc.isUnresolvedVar("XDG_CONFIG_HOME")) {
+		dir, bad = xdg, sc.isUnresolvedVar("XDG_CONFIG_HOME")
+	} else if home, ok := sc.lookup("HOME"); runtime.GOOS != "windows" {
+		dir, bad = pick(ok, filepath.Join(home, pick(runtime.GOOS == "darwin", "Library/Application Support", ".config")), ""), sc.isUnresolvedVar("HOME")
+	}
+	return bad || dir != "" && sc.fileHasLine(filepath.Join(dir, "go", "env"), func(l string) bool { return strings.HasPrefix(strings.TrimSpace(l), key+"=") })
 }
 func gopath(sc *scan, args []*syntax.Word) (string, bool) {
 	if len(args) != 0 || sc.isUnresolvedVar("GOPATH") {
@@ -162,9 +185,9 @@ func (sc *scan) safeLocate(dir string) (string, bool) {
 						sc.unknown = sc.unknown || errors.Is(err, errOpaque)
 					} else if target, ok := strings.CutPrefix(strings.TrimSuffix(strings.TrimSuffix(data, "\n"), "\r"), "gitdir: "); ok && target != "" {
 						if resolved, ok := sc.resolveJoined(cur, target, false); ok {
-							r, _, gInfo, gFound := sc.walkPath(resolved, true)
-							ok := gFound && gInfo.IsDir() && sc.validGitDir(r) && !sc.hasWorktreeConfig(r)
-							return pick(ok, cur, ""), ok
+							if r, _, gInfo, gFound := sc.walkPath(resolved, true); gFound && gInfo.IsDir() && sc.validGitDir(r) && !sc.hasWorktreeConfig(r) {
+								return cur, true
+							}
 						}
 					}
 				}
@@ -199,24 +222,25 @@ func (sc *scan) validGitDir(dir string) bool {
 	return present && ok && hasDir(filepath.Join(r, "objects"))
 }
 func (sc *scan) hasWorktreeConfig(gitDir string) bool {
-	if sc.isUnresolvedVar("HOME") || sc.isUnresolvedVar("USERPROFILE") || sc.isUnresolvedVar("XDG_CONFIG_HOME") || sc.isUnresolvedVar("ProgramData") {
+	if slices.ContainsFunc([]string{"HOME", "USERPROFILE", "XDG_CONFIG_HOME", "ProgramData", "GIT_CONFIG_NOSYSTEM"}, sc.isUnresolvedVar) {
 		return true
 	}
-	paths := []string{filepath.Join(gitDir, "config"), filepath.Join(gitDir, "config.worktree")}
-	if r, present, ok := sc.gitCommonDir(gitDir); !ok {
+	r, present, ok := sc.gitCommonDir(gitDir)
+	if !ok {
 		return true
-	} else if present {
-		paths = append(paths, filepath.Join(r, "config"))
 	}
-	if filepath.Separator == '/' || sc.envVal("ProgramData") != "" {
-		paths = append(paths, pick(filepath.Separator == '/', "/etc/gitconfig", filepath.Join(sc.envVal("ProgramData"), "Git", "config")))
+	paths := append([]string{filepath.Join(gitDir, "config"), filepath.Join(gitDir, "config.worktree")}, pick(present, []string{filepath.Join(r, "config")}, nil)...)
+	if !slices.Contains([]string{"1", "true", "yes", "on"}, strings.ToLower(sc.envVal("GIT_CONFIG_NOSYSTEM"))) {
+		if gitBin, ok := sc.trustedCmd("git"); !ok {
+			return true
+		} else if gitBin != "" {
+			p2 := filepath.Dir(filepath.Dir(gitBin))
+			paths = append(paths, filepath.Join(p2, "etc", "gitconfig"), filepath.Join(filepath.Dir(p2), "etc", "gitconfig"), filepath.Join(p2, "mingw64", "etc", "gitconfig"))
+		}
+		paths = append(paths, pick(filepath.Separator == '/', []string{"/etc/gitconfig", "/usr/local/etc/gitconfig", "/opt/homebrew/etc/gitconfig", "/Library/Developer/CommandLineTools/usr/etc/gitconfig"}, pick(sc.envVal("ProgramData") != "", []string{filepath.Join(sc.envVal("ProgramData"), "Git", "config")}, nil))...)
 	}
-	if xdg := sc.envVal("XDG_CONFIG_HOME"); xdg != "" {
-		paths = append(paths, filepath.Join(xdg, "git", "config"))
-	}
-	if home, ok := sc.homeDir(); ok && home != "" {
-		paths = append(paths, filepath.Join(home, ".gitconfig"), filepath.Join(home, ".config", "git", "config"))
-	}
+	home, hasHome := sc.homeDir()
+	paths = append(append(paths, pick(sc.envVal("XDG_CONFIG_HOME") != "", []string{filepath.Join(sc.envVal("XDG_CONFIG_HOME"), "git", "config")}, nil)...), pick(hasHome && home != "", []string{filepath.Join(home, ".gitconfig"), filepath.Join(home, ".config", "git", "config")}, nil)...)
 	return slices.ContainsFunc(paths, sc.badGitConfig)
 }
 func (sc *scan) badGitConfig(p string) bool {
@@ -315,8 +339,7 @@ func (sc *scan) below(dir string, levels int) {
 				}
 				if depth == maxBelowDepth && sc.fail() || !sc.spend(1) {
 					return
-				}
-				if _, _, _, ok := sc.walkPath(filepath.Join(sub, ".git"), false); ok {
+				} else if _, _, _, ok := sc.walkPath(filepath.Join(sub, ".git"), false); ok {
 					sc.place(sub)
 				} else if !sc.holdsNone(sub) {
 					next = append(next, sub)
@@ -342,13 +365,9 @@ func (sc *scan) enclosingCheckout(root string) bool {
 func (sc *scan) holdsNone(p string) bool {
 	sep := string(filepath.Separator)
 	if sc.none == nil {
-		sc.none = pick(runtime.GOOS == "darwin", []string{sep + "System"}, []string{})
-		if cache, ok := modcache(sc, nil); ok {
-			sc.none = append(sc.none, cache)
-		}
-		if home, ok := sc.homeDir(); runtime.GOOS == "darwin" && ok && home != "" {
-			sc.none = append(sc.none, filepath.Join(home, "Library"))
-		}
+		cache, hasCache := modcache(sc, nil)
+		home, hasHome := sc.homeDir()
+		sc.none = append(append(pick(runtime.GOOS == "darwin", []string{sep + "System"}, []string{}), pick(hasCache, []string{cache}, nil)...), pick(runtime.GOOS == "darwin" && hasHome && home != "", []string{filepath.Join(home, "Library")}, nil)...)
 	}
 	return filepath.Base(p) == "node_modules" || strings.Contains(p, sep+"node_modules"+sep) || slices.ContainsFunc(sc.none, func(root string) bool { return p == root || strings.HasPrefix(p, root+sep) })
 }

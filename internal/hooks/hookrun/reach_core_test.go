@@ -249,7 +249,7 @@ func TestShellSubstKnownOutputs(t *testing.T) {
 			return parent, true
 		case "GOPATH":
 			return filepath.Join(parent, "go"), true
-		case "GOENV", "GOMODCACHE", "XDG_CONFIG_HOME", "AppData":
+		case "GOENV", "GOMODCACHE", "XDG_CONFIG_HOME", "AppData", "PATH":
 			return "", false
 		}
 		return os.LookupEnv(k)
@@ -2618,4 +2618,95 @@ func FuzzParsable(f *testing.F) {
 		}
 		_ = parsable(src)
 	})
+}
+
+// Regression tests for curl -F/--form masking, PATH command shadowing, and GIT_CONFIG_NOSYSTEM handling.
+func TestReachCoreReviewRegressions(t *testing.T) {
+	t.Parallel()
+	// 1. curl multipart form options (-F, --form, --form-string) mask secrets including leading '=' values.
+	for _, cmd := range []string{
+		"curl -F '=SUPERSECRET' /missing",
+		"curl --form '=SUPERSECRET' /missing",
+		"curl --form-string '=SUPERSECRET' /missing",
+		"curl -F token=SUPERSECRET /missing",
+	} {
+		if got := firstWords(cmd); strings.Contains(got, "SUPERSECRET") {
+			t.Errorf("firstWords(%q) leaked secret: %q", cmd, got)
+		}
+	}
+
+	// 2. PATH wrapper shadowing, empty/relative/unresolved PATH fail closed in substitute and hasWorktreeConfig.
+	parent, _ := filepath.EvalSymlinks(t.TempDir())
+	repo := filepath.Join(parent, "repo")
+	makeValidGitDir(t, filepath.Join(repo, ".git"))
+	fakeBin := filepath.Join(parent, "fakebin")
+	if err := os.MkdirAll(fakeBin, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"git", "go", "dirname"} {
+		binName := name
+		if runtime.GOOS == "windows" {
+			binName += ".cmd"
+		}
+		if err := os.WriteFile(filepath.Join(fakeBin, binName), []byte("#!/bin/sh\necho /other\n"), 0o700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	evalSubst := func(s *scan, src string) (string, error) {
+		f, err := syntax.NewParser().Parse(strings.NewReader("echo $("+src+")"), "")
+		if err != nil {
+			t.Fatalf("parse %q: %v", src, err)
+		}
+		ce := f.Stmts[0].Cmd.(*syntax.CallExpr)
+		cs := ce.Args[1].Parts[0].(*syntax.CmdSubst)
+		var buf bytes.Buffer
+		err = s.substitute(&buf, cs)
+		return buf.String(), err
+	}
+	makeEnv := func(m map[string]string) func(string) (string, bool) {
+		return func(k string) (string, bool) { v, ok := m[k]; return v, ok }
+	}
+	// Shadowed binaries on PATH fail closed, while shell builtin pwd still resolves.
+	scShadow := newScan(repo, makeEnv(map[string]string{
+		"PATH": fakeBin + string(os.PathListSeparator) + os.Getenv("PATH"),
+		"HOME": parent, "USERPROFILE": parent, "GOPATH": filepath.Join(parent, "go"),
+	}), work{deadline: time.Now().Add(time.Minute)})
+	for _, cmd := range []string{"git rev-parse --show-toplevel", "go env GOPATH", "dirname /a/b"} {
+		if got, err := evalSubst(scShadow, cmd); err == nil {
+			t.Errorf("shadowed PATH substitute(%q) = %q, want error", cmd, got)
+		}
+	}
+	if got, err := evalSubst(scShadow, "pwd"); err != nil || got != repo {
+		t.Errorf("shadowed PATH substitute(pwd) = (%q, %v), want (%q, nil)", got, err, repo)
+	}
+	if _, ok := scShadow.safeLocate(repo); ok {
+		t.Errorf("safeLocate with shadowed git on PATH succeeded, want false")
+	}
+
+	// Empty, relative, leading-empty, and unresolved PATH all fail closed for external commands.
+	for _, badPath := range []string{"", "./bin", string(os.PathListSeparator) + fakeBin} {
+		scBad := newScan(repo, makeEnv(map[string]string{"PATH": badPath, "HOME": parent, "USERPROFILE": parent}), work{deadline: time.Now().Add(time.Minute)})
+		if _, err := evalSubst(scBad, "dirname /a/b"); err == nil {
+			t.Errorf("PATH=%q substitute(dirname) succeeded, want error", badPath)
+		}
+	}
+	scUnresPath := newScan(repo, makeEnv(map[string]string{"HOME": parent, "USERPROFILE": parent}), work{deadline: time.Now().Add(time.Minute)})
+	scUnresPath.vars["PATH"] = nil
+	if _, err := evalSubst(scUnresPath, "dirname /a/b"); err == nil {
+		t.Errorf("unresolved PATH substitute(dirname) succeeded, want error")
+	}
+
+	// 3. GIT_CONFIG_NOSYSTEM unresolved fails closed; GIT_CONFIG_NOSYSTEM=1 skips system gitconfig lookup.
+	scUnresNoSys := newScan(repo, makeEnv(map[string]string{"HOME": parent, "USERPROFILE": parent}), work{deadline: time.Now().Add(time.Minute)})
+	scUnresNoSys.vars["GIT_CONFIG_NOSYSTEM"] = nil
+	if !scUnresNoSys.hasWorktreeConfig(filepath.Join(repo, ".git")) {
+		t.Errorf("hasWorktreeConfig with unresolved GIT_CONFIG_NOSYSTEM = false, want true")
+	}
+	scNoSys := newScan(repo, makeEnv(map[string]string{
+		"HOME": parent, "USERPROFILE": parent, "GIT_CONFIG_NOSYSTEM": "1",
+		"PATH": fakeBin, // skipped for system gitconfig when GIT_CONFIG_NOSYSTEM=1
+	}), work{deadline: time.Now().Add(time.Minute)})
+	if scNoSys.hasWorktreeConfig(filepath.Join(repo, ".git")) {
+		t.Errorf("hasWorktreeConfig with GIT_CONFIG_NOSYSTEM=1 = true, want false")
+	}
 }

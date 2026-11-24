@@ -208,12 +208,12 @@ func (sc *scan) resolveJoined(base, raw string, logical bool) (string, bool) {
 	return vol + sep + strings.Join(out, sep), true
 }
 func (sc *scan) reach(w, dir string) (string, os.FileInfo) { return sc.reachRole(w, dir, plain) }
-func (sc *scan) reachRole(w, dir string, r role) (string, os.FileInfo) {
+func (sc *scan) reachRole(w, dir string, r role) (res string, _ os.FileInfo) {
 	if p, ok := sc.resolvePath(w, dir, r == target); !ok {
 		return "", nil
-	} else if res, parent, info, found := sc.walkPath(p, false); !found {
+	} else if r0, parent, info, found := sc.walkPath(p, false); !found {
 		return "", nil
-	} else if info.IsDir() {
+	} else if res = r0; info.IsDir() {
 		sc.place(res)
 		return pick(r == target, p, res), info
 	} else if sc.place(parent); info.Mode()&fs.ModeSymlink == 0 {
@@ -221,12 +221,10 @@ func (sc *scan) reachRole(w, dir string, r role) (string, os.FileInfo) {
 	} else if dst, tParent, tInfo, tFound := sc.walkPath(p, true); tFound {
 		sc.place(pick(tInfo.IsDir(), dst, tParent))
 		return pick(r == physTarget, dst, pick(r == target, p, res)), tInfo
-	} else {
-		if !sc.unknown && tParent != "" {
-			sc.place(tParent)
-		}
-		return res, nil
+	} else if !sc.unknown && tParent != "" {
+		sc.place(tParent)
 	}
+	return res, nil
 }
 func (sc *scan) away(w string, r role) bool {
 	rem := remote(w, sc.cwd)
@@ -271,12 +269,10 @@ func remote(p, cwd string) bool {
 	return len(p) >= 2 && os.IsPathSeparator(p[0]) && os.IsPathSeparator(p[1]) && (share(p) == "" || !strings.EqualFold(share(p), share(cwd)))
 }
 func share(p string) string {
-	if len(p) >= 2 && os.IsPathSeparator(p[0]) && os.IsPathSeparator(p[1]) {
-		if i := strings.IndexFunc(p[2:], isSep); i > 0 {
-			host, rest := p[2:2+i], p[3+i:]
-			if j := strings.IndexFunc(rest, isSep); j != 0 && rest != "" && strings.Trim(host, alnum+"-_.$") == "" {
-				return "//" + host + "/" + pick(j > 0, rest[:max(j, 0)], rest)
-			}
+	if i := pick(len(p) >= 2 && os.IsPathSeparator(p[0]) && os.IsPathSeparator(p[1]), strings.IndexFunc(p[min(len(p), 2):], isSep), -1); i > 0 {
+		host, rest := p[2:2+i], p[3+i:]
+		if j := strings.IndexFunc(rest, isSep); j != 0 && rest != "" && strings.Trim(host, alnum+"-_.$") == "" {
+			return "//" + host + "/" + pick(j > 0, rest[:max(j, 0)], rest)
 		}
 	}
 	return ""
@@ -285,10 +281,8 @@ func isSep(r rune) bool { return r < 0x80 && os.IsPathSeparator(byte(r)) }
 func shellValue(w string) string {
 	if name, v, ok := strings.Cut(w, "="); ok && (strings.HasPrefix(w, "-") || isName(name)) {
 		return v
-	} else if len(w) > 2 && w[0] == '-' && w[1] != '-' {
-		return w[2:]
 	}
-	return pick(strings.HasPrefix(w, "-"), "", w)
+	return pick(len(w) > 2 && w[0] == '-' && w[1] != '-', w[min(len(w), 2):], pick(strings.HasPrefix(w, "-"), "", w))
 }
 func isName(s string) bool {
 	return s != "" && (s[0] < '0' || s[0] > '9') && strings.Trim(s, alnum+"_") == ""
