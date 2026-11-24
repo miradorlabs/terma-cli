@@ -52,7 +52,12 @@ func (r Router) Outgoing(org config.Policy, projectID string, e spool.Event) (sp
 	if !r.Allowed(org, projectID, e) {
 		return spool.Event{}, false
 	}
-	pol := routing.EffectivePolicy(r.StateDir, org, projectID)
+	return withhold(routing.EffectivePolicy(r.StateDir, org, projectID), e)
+}
+
+// withhold is e without the content pol withholds; false when an event kind that carries
+// content whole (or an unclassified kind) cannot leave under pol.
+func withhold(pol config.Policy, e spool.Event) (spool.Event, bool) {
 	prompts, toolContent := pol.Content()
 	if prompts && toolContent {
 		return skillLinkAdmitted(pol, e), true
