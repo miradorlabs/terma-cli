@@ -20,3 +20,4 @@ func openFileNoBlock(p string) (*os.File, error) { return os.Open(p) }
 func isBenignDirErr(err error) bool {
 	return errors.Is(err, fs.ErrNotExist) || errors.Is(err, fs.ErrPermission) || errors.Is(err, fs.ErrInvalid)
 }
+func sameDevice(_, _ fs.FileInfo) bool { return true }

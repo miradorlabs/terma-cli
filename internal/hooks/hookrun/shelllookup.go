@@ -193,19 +193,17 @@ func (sc *scan) away(w string, r role) bool {
 	return true
 }
 func (sc *scan) path(w, dir string) (string, bool) {
-	base, rel := dir, w
-	switch {
-	case w == "~" || strings.HasPrefix(w, "~/"):
-		home, ok := sc.lookup("HOME")
-		if !ok || home == "" || remote(home, sc.cwd) {
+	if w == "~" || strings.HasPrefix(w, "~/") {
+		if home, ok := sc.lookup("HOME"); !ok || home == "" || remote(home, sc.cwd) {
 			sc.unknown = sc.unknown || remote(home, sc.cwd)
 			return "", false
+		} else {
+			return sc.resolveTarget(home, strings.TrimLeft(w[1:], "/"), 0)
 		}
-		base, rel = home, strings.TrimLeft(w[1:], "/")
-	case remote(w, sc.cwd) || !filepath.IsAbs(w) && dir == "":
+	} else if remote(w, sc.cwd) || !filepath.IsAbs(w) && dir == "" {
 		return "", false
 	}
-	return sc.resolveTarget(base, rel, 0)
+	return sc.resolveTarget(dir, w, 0)
 }
 func hasDotDot(p string) bool {
 	return p == ".." || strings.HasPrefix(p, "../") || strings.Contains(p, "/..") || os.IsPathSeparator('\\') && (strings.HasPrefix(p, `..\`) || strings.Contains(p, `\..`))
@@ -223,19 +221,18 @@ func (sc *scan) cleanSafeAt(base, rel string, hops int) (string, bool) {
 			continue
 		} else if part != ".." {
 			cur = filepath.Join(cur, part)
-			continue
-		}
-		if sc.hasRemoteLinkAt(cur, hops) || !sc.spend(1) {
+		} else if sc.hasRemoteLinkAt(cur, hops) || !sc.spend(1) {
 			return "", false
-		}
-		if info, err := os.Lstat(cur); err == nil && info.Mode()&fs.ModeSymlink != 0 {
-			if resolved, err := filepath.EvalSymlinks(cur); err != nil || remote(resolved, sc.cwd) {
-				return "", !sc.fail()
-			} else {
-				cur = resolved
+		} else {
+			if info, err := os.Lstat(cur); err == nil && info.Mode()&fs.ModeSymlink != 0 {
+				if resolved, err := filepath.EvalSymlinks(cur); err != nil || remote(resolved, sc.cwd) {
+					return "", !sc.fail()
+				} else {
+					cur = resolved
+				}
 			}
+			cur = filepath.Dir(cur)
 		}
-		cur = filepath.Dir(cur)
 	}
 	return filepath.Clean(cur), true
 }

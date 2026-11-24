@@ -641,7 +641,7 @@ func TestScanBoundsAndSafety(t *testing.T) {
 	}
 
 	// Whitespace-heavy known command substitution fails closed before expand.Fields materializes fields.
-	hugeGP := strings.Repeat("x ", 250_000)
+	hugeGP := filepath.Join(dir, strings.Repeat("x ", 250_000))
 	fGP, err := syntax.NewParser().Parse(strings.NewReader("echo $(go env GOPATH)"), "")
 	if err != nil {
 		t.Fatal(err)
@@ -1263,11 +1263,98 @@ func TestReachCoreHardeningRegressions(t *testing.T) {
 		t.Fatalf("safeLocate on .git file with core.worktree = (%q, true), want false", got)
 	}
 
-	// 8. mktemp rejects a second template operand.
-	wMktemp := parseFirstArg(t, "echo $(mktemp foo.XXX bar.XXX)")
-	scMktemp := newScan(dir, os.LookupEnv, work{deadline: time.Now().Add(time.Minute)})
-	if got, err := scMktemp.fields(wMktemp); err == nil {
-		t.Fatalf("mktemp with two templates expanded to %q, want error", got)
+	// 8. mktemp rejects a second template operand or a template without XXX.
+	for _, cmd := range []string{"echo $(mktemp foo.XXX bar.XXX)", "echo $(mktemp abc)"} {
+		wMktemp := parseFirstArg(t, cmd)
+		scMktemp := newScan(dir, os.LookupEnv, work{deadline: time.Now().Add(time.Minute)})
+		if got, err := scMktemp.fields(wMktemp); err == nil {
+			t.Fatalf("%s expanded to %q, want error", cmd, got)
+		}
+	}
+
+	// 9. firstWords masks command substitutions (both $(...) and backticks) after secret flags and in arguments.
+	for _, cmd := range []string{
+		`curl -u $(echo alice:SECRET) https://example.com`,
+		"curl -u `echo alice:SECRET` https://example.com",
+		`echo $(curl -u alice:SECRET https://example.com)`,
+		"echo `curl -u alice:SECRET https://example.com`",
+	} {
+		if got := firstWords(cmd); strings.Contains(got, "SECRET") {
+			t.Errorf("firstWords(%q) = %q, leaked SECRET", cmd, got)
+		}
+	}
+
+	// 10. gopath and modcache fail closed on relative GOPATH entries or relative GOMODCACHE.
+	for _, tc := range []struct {
+		name string
+		env  map[string]string
+		fn   func(*scan, []*syntax.Word) (string, bool)
+	}{
+		{"relative GOPATH", map[string]string{"GOPATH": "relative"}, gopath},
+		{"mixed GOPATH", map[string]string{"GOPATH": dir + string(os.PathListSeparator) + "relative"}, gopath},
+		{"relative GOMODCACHE", map[string]string{"GOMODCACHE": "relative/mod"}, modcache},
+	} {
+		scRel := newScan(dir, func(k string) (string, bool) { v, ok := tc.env[k]; return v, ok }, work{deadline: time.Now().Add(time.Minute)})
+		if got, ok := tc.fn(scRel, nil); ok {
+			t.Fatalf("%s = (%q, true), want false", tc.name, got)
+		}
+	}
+
+	// 11. safeLocate fails closed when GIT_DISCOVERY_ACROSS_FILESYSTEM is set, and sameDevice agrees on same filesystem.
+	scAcross := newScan(repo, func(k string) (string, bool) {
+		if k == "GIT_DISCOVERY_ACROSS_FILESYSTEM" {
+			return "true", true
+		}
+		return "", false
+	}, work{deadline: time.Now().Add(time.Minute)})
+	if got, ok := scAcross.safeLocate(repo); ok {
+		t.Fatalf("safeLocate with GIT_DISCOVERY_ACROSS_FILESYSTEM=true = (%q, true), want false", got)
+	}
+	infoA, err := os.Stat(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	infoB, err := os.Stat(repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !sameDevice(infoA, infoB) {
+		t.Fatal("sameDevice returned false for sibling directory on same filesystem")
+	}
+
+	// 12. safeLocate resolves symlinked directories physically before ascending (repoA/link -> repoB/sub discovers repoB).
+	repoA := filepath.Join(dir, "repoA")
+	repoB := filepath.Join(dir, "repoB")
+	repoBSub := filepath.Join(repoB, "sub")
+	for _, d := range []string{filepath.Join(repoA, ".git"), filepath.Join(repoB, ".git"), repoBSub} {
+		if err := os.MkdirAll(d, 0o700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	crossLink := filepath.Join(repoA, "link")
+	if err := os.Symlink(repoBSub, crossLink); err != nil {
+		t.Fatal(err)
+	}
+	resolvedRepoB, err := filepath.EvalSymlinks(repoB)
+	if err != nil {
+		t.Fatal(err)
+	}
+	scCross := newScan(crossLink, func(string) (string, bool) { return "", false }, work{deadline: time.Now().Add(time.Minute)})
+	if got, ok := scCross.safeLocate(crossLink); !ok || !samePath(got, resolvedRepoB) {
+		t.Fatalf("safeLocate(repoA/link -> repoB/sub) = (%q, %v), want (%q, true)", got, ok, resolvedRepoB)
+	}
+
+	// 13. core.worktree in .git/config.worktree fails closed in safeLocate.
+	wtCfgRepo := filepath.Join(dir, "wt-cfg-repo")
+	if err := os.MkdirAll(filepath.Join(wtCfgRepo, ".git"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(wtCfgRepo, ".git", "config.worktree"), []byte("[core]\n\tworktree = /elsewhere\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	scWTCfg := newScan(wtCfgRepo, func(string) (string, bool) { return "", false }, work{deadline: time.Now().Add(time.Minute)})
+	if got, ok := scWTCfg.safeLocate(wtCfgRepo); ok {
+		t.Fatalf("safeLocate with .git/config.worktree = (%q, true), want false", got)
 	}
 }
 

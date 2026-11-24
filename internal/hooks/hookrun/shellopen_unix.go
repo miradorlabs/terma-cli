@@ -26,3 +26,8 @@ func openFileNoBlock(p string) (*os.File, error) {
 func isBenignDirErr(err error) bool {
 	return errors.Is(err, fs.ErrNotExist) || errors.Is(err, fs.ErrPermission) || errors.Is(err, syscall.ENOTDIR) || errors.Is(err, syscall.ELOOP)
 }
+func sameDevice(a, b fs.FileInfo) bool {
+	sa, ok1 := a.Sys().(*syscall.Stat_t)
+	sb, ok2 := b.Sys().(*syscall.Stat_t)
+	return ok1 && ok2 && sa.Dev == sb.Dev
+}

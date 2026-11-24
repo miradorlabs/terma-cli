@@ -127,10 +127,9 @@ func (sc *scan) sizeIn(w *syntax.Word, opaqueSubst bool) int {
 			n += sc.paramSize(x, opaqueSubst)
 			return false
 		case *syntax.CmdSubst, *syntax.ProcSubst, *syntax.ArithmExp:
+			n += substitutionSize
 			if _, arith := x.(*syntax.ArithmExp); !arith && opaqueSubst {
 				n = maxShellBytes + 1
-			} else {
-				n += substitutionSize
 			}
 			return false
 		}
@@ -138,13 +137,11 @@ func (sc *scan) sizeIn(w *syntax.Word, opaqueSubst bool) int {
 	})
 	return min(n, maxShellBytes+1)
 }
-func (sc *scan) paramValue(pe *syntax.ParamExp) string {
-	if pe.Param == nil {
-		return ""
-	}
-	v, _ := sc.lookup(pe.Param.Value)
-	if pe.Excl {
-		v, _ = sc.lookup(v)
+func (sc *scan) paramValue(pe *syntax.ParamExp) (v string) {
+	if pe.Param != nil {
+		if v, _ = sc.lookup(pe.Param.Value); pe.Excl {
+			v, _ = sc.lookup(v)
+		}
 	}
 	return v
 }
@@ -196,10 +193,11 @@ func (sc *scan) checkPartsFields(parts []syntax.WordPart, ifs string, rem int, i
 			if rem >= 0 && pe.Repl != nil && pe.Repl.With != nil {
 				before := rem
 				if rem = sc.checkPartsFields(pe.Repl.With.Parts, ifs, rem, true); rem >= 0 && pe.Repl.All && len(v) > 0 {
-					if per := 1 + (before - rem); len(v) > rem/per && sc.fail() {
+					if per := 1 + before - rem; len(v) > rem/per && sc.fail() {
 						return -1
+					} else {
+						rem -= len(v) * per
 					}
-					rem -= len(v) * (1 + before - rem)
 				}
 			}
 		} else if inParam {
@@ -246,12 +244,11 @@ func (sc *scan) fields(w *syntax.Word) ([]string, error) {
 	for b, err := range sc.braces(w) {
 		if ifs := sc.ifs(); err != nil || len(ifs) > 64 && sc.fail() || !sc.charge(sc.size(b)) || ifs != "" && sc.checkPartsFields(b.Parts, ifs, maxShellWords-len(out), false) < 0 {
 			return nil, errOpaque
-		}
-		f, err := expand.Fields(sc.cfg, b)
-		if err != nil || len(out)+len(f) > maxShellWords && sc.fail() {
+		} else if f, err := expand.Fields(sc.cfg, b); err != nil || len(out)+len(f) > maxShellWords && sc.fail() {
 			return nil, errOpaque
+		} else {
+			out = append(out, f...)
 		}
-		out = append(out, f...)
 	}
 	return out, nil
 }

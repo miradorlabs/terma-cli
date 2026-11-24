@@ -31,33 +31,30 @@ var outputs = map[string]func(sc *scan, args []*syntax.Word) (string, bool){
 func (sc *scan) substitute(w io.Writer, cs *syntax.CmdSubst) error {
 	if len(cs.Stmts) != 1 || len(cs.Stmts[0].Redirs) != 0 {
 		return errOpaque
-	}
-	ce, ok := cs.Stmts[0].Cmd.(*syntax.CallExpr)
-	if !ok || len(ce.Assigns) != 0 {
+	} else if ce, ok := cs.Stmts[0].Cmd.(*syntax.CallExpr); !ok || len(ce.Assigns) != 0 {
 		return errOpaque
-	}
-	words := make([]string, min(len(ce.Args), 4))
-	for i := range words {
-		words[i] = ce.Args[i].Lit()
-	}
-	for n := len(words); n > 0; n-- {
-		if known, ok := outputs[strings.Join(words[:n], " ")]; ok {
-			outer := sc.cfg
-			sc.cfg = sc.config() // expand is not reentrant: an operand expands with its own
-			out, ok := known(sc, ce.Args[n:])
-			sc.cfg = outer
-			if !ok || !sc.charge(len(out)) || !sc.chargeFields(out) {
-				return errOpaque
+	} else {
+		words := make([]string, min(len(ce.Args), 4))
+		for i := range words {
+			words[i] = ce.Args[i].Lit()
+		}
+		for n := len(words); n > 0; n-- {
+			if known, ok := outputs[strings.Join(words[:n], " ")]; ok {
+				outer := sc.cfg
+				sc.cfg = sc.config() // expand is not reentrant: an operand expands with its own
+				out, ok := known(sc, ce.Args[n:])
+				sc.cfg = outer
+				if !ok || !sc.charge(len(out)) || !sc.chargeFields(out) {
+					return errOpaque
+				}
+				_, err := io.WriteString(w, out)
+				return err
 			}
-			_, err := io.WriteString(w, out)
-			return err
 		}
 	}
 	return errOpaque
 }
-func where(sc *scan, args []*syntax.Word) (string, bool) {
-	return sc.dir, sc.dir != "" && len(args) == 0
-}
+func where(s *scan, a []*syntax.Word) (string, bool) { return s.dir, s.dir != "" && len(a) == 0 }
 func whereP(sc *scan, args []*syntax.Word) (string, bool) {
 	if sc.dir != "" && len(args) == 0 {
 		r, ok := sc.real(sc.dir)
@@ -66,20 +63,19 @@ func whereP(sc *scan, args []*syntax.Word) (string, bool) {
 	return "", false
 }
 func toplevel(sc *scan, args []*syntax.Word) (string, bool) {
-	if len(args) != 0 {
-		return "", false
+	if len(args) == 0 {
+		return sc.safeLocate(sc.dir)
 	}
-	return sc.safeLocate(sc.dir)
+	return "", false
 }
 func (sc *scan) hasGoEnv(key string) bool {
-	if sc.isUnresolvedVar("GOENV") {
-		return true
-	}
 	p, _ := sc.lookup("GOENV")
-	if p == "off" {
+	switch {
+	case sc.isUnresolvedVar("GOENV") || p != "" && p != "off" && !filepath.IsAbs(p):
+		return true
+	case p == "off":
 		return false
-	}
-	if p == "" {
+	case p == "":
 		dir := ""
 		if runtime.GOOS == "windows" {
 			dir, _ = sc.lookup("AppData")
@@ -95,13 +91,13 @@ func (sc *scan) hasGoEnv(key string) bool {
 		}
 		p = filepath.Join(dir, "go", "env")
 	}
-	return !filepath.IsAbs(p) || sc.fileHasLine(p, func(l string) bool { return strings.HasPrefix(strings.TrimSpace(l), key+"=") })
+	return sc.fileHasLine(p, func(l string) bool { return strings.HasPrefix(strings.TrimSpace(l), key+"=") })
 }
 func gopath(sc *scan, args []*syntax.Word) (string, bool) {
 	if len(args) != 0 || sc.isUnresolvedVar("GOPATH") {
 		return "", false
 	} else if v, ok := sc.lookup("GOPATH"); ok && v != "" {
-		return v, true
+		return v, !slices.ContainsFunc(filepath.SplitList(v), func(p string) bool { return !filepath.IsAbs(p) })
 	}
 	key := "HOME"
 	if runtime.GOOS == "windows" {
@@ -114,7 +110,7 @@ func modcache(sc *scan, args []*syntax.Word) (string, bool) {
 	if len(args) != 0 || sc.isUnresolvedVar("GOMODCACHE") {
 		return "", false
 	} else if v, ok := sc.lookup("GOMODCACHE"); ok && v != "" {
-		return v, true
+		return v, filepath.IsAbs(v)
 	} else if gp, ok := gopath(sc, nil); !sc.hasGoEnv("GOMODCACHE") && ok {
 		if first, _, _ := strings.Cut(gp, string(os.PathListSeparator)); first != "" {
 			return filepath.Join(first, "pkg", "mod"), true
@@ -128,7 +124,7 @@ func mktemp(sc *scan, args []*syntax.Word) (string, bool) {
 		l := a.Lit()
 		short := strings.HasPrefix(l, "-") && !strings.HasPrefix(l, "--")
 		switch {
-		case l == "" || strings.HasPrefix(l, "--tmpdir=") || short && strings.ContainsRune(l[1:], 'p') || !strings.HasPrefix(l, "-") && (name != "" || pathLike(l)):
+		case l == "" || strings.HasPrefix(l, "--tmpdir=") || short && strings.ContainsRune(l[1:], 'p') || !strings.HasPrefix(l, "-") && (name != "" || !strings.Contains(l, "XXX") || pathLike(l)):
 			return "", false
 		case l == "--tmpdir" || short && strings.ContainsRune(l[1:], 't'):
 			tmp = true
@@ -138,11 +134,10 @@ func mktemp(sc *scan, args []*syntax.Word) (string, bool) {
 	}
 	dir := sc.dir
 	if name == "" || tmp {
-		if sc.isUnresolvedVar("TMPDIR") {
+		v, _ := sc.lookup("TMPDIR")
+		if dir = cmp.Or(v, os.TempDir()); sc.isUnresolvedVar("TMPDIR") {
 			return "", false
 		}
-		v, _ := sc.lookup("TMPDIR")
-		dir = cmp.Or(v, os.TempDir())
 	}
 	return filepath.Join(dir, cmp.Or(name, "tmp.XXXXXXXXXX")), dir != ""
 }
@@ -161,16 +156,15 @@ func ofOperand(f func(*scan, string) (string, bool)) func(*scan, []*syntax.Word)
 }
 func basename(_ *scan, p string) (string, bool) {
 	if p != "" {
-		p = filepath.Base(p)
+		return filepath.Base(p), true
 	}
-	return p, true
+	return "", true
 }
 func dirname(_ *scan, p string) (string, bool) {
-	sep := "/"
+	vol, sep := filepath.VolumeName(p), "/"
 	if filepath.Separator == '\\' {
 		sep = `/\`
 	}
-	vol := filepath.VolumeName(p)
 	rest := strings.TrimRight(p[len(vol):], sep)
 	switch i := strings.LastIndexAny(rest, sep); {
 	case rest == "" && len(p) > len(vol):
@@ -185,7 +179,7 @@ func (sc *scan) real(p string) (string, bool) {
 	if q, ok := sc.path(p, sc.dir); p == "" || !ok || sc.hasRemoteLink(q) {
 		return "", false
 	} else if r, err := filepath.EvalSymlinks(q); err == nil {
-		return r, r != ""
+		return r, r != "" && !remote(r, sc.cwd)
 	} else if !errors.Is(err, fs.ErrNotExist) {
 		return "", false
 	} else if _, err := os.Lstat(q); errors.Is(err, fs.ErrNotExist) && filepath.Dir(q) != q && !sc.hasRemoteLink(filepath.Dir(q)) {
@@ -197,10 +191,11 @@ func (sc *scan) real(p string) (string, bool) {
 	return "", false
 }
 
-// safeLocate finds the git worktree root for dir without statting remote GIT_DIR or .git gitdir targets.
+// safeLocate finds the git worktree root for dir without statting remote targets or crossing mounts.
 func (sc *scan) safeLocate(dir string) (string, bool) {
-	if v, _ := sc.lookup("GIT_CEILING_DIRECTORIES"); v != "" || dir == "" || sc.hasRemoteLink(dir) ||
-		slices.ContainsFunc([]string{"GIT_DIR", "GIT_WORK_TREE", "GIT_CEILING_DIRECTORIES", "GIT_DISCOVERY_ACROSS_FILESYSTEM"}, sc.isUnresolvedVar) {
+	if dir == "" || sc.hasRemoteLink(dir) ||
+		slices.ContainsFunc([]string{"GIT_DIR", "GIT_WORK_TREE", "GIT_CEILING_DIRECTORIES", "GIT_DISCOVERY_ACROSS_FILESYSTEM"}, sc.isUnresolvedVar) ||
+		slices.ContainsFunc([]string{"GIT_CEILING_DIRECTORIES", "GIT_DISCOVERY_ACROSS_FILESYSTEM"}, func(k string) bool { v, _ := sc.lookup(k); return v != "" }) {
 		return "", false
 	}
 	gd, _ := sc.lookup("GIT_DIR")
@@ -215,26 +210,34 @@ func (sc *scan) safeLocate(dir string) (string, bool) {
 		info, err := os.Stat(absGD)
 		return absWT, err == nil && info.IsDir()
 	}
-	for cur, err := filepath.Abs(dir); err == nil && sc.spendStat(1); cur = filepath.Dir(cur) {
-		dotGit := filepath.Join(cur, ".git")
-		if info, err := os.Lstat(dotGit); err == nil {
-			if info.IsDir() {
-				return cur, !sc.hasWorktreeConfig(dotGit)
-			} else if info.Mode().IsRegular() {
-				return sc.locateGitdirFile(dotGit, cur)
+	if start, ok := sc.real(dir); !ok {
+		return "", false
+	} else if startInfo, err := os.Stat(start); err == nil && startInfo.IsDir() {
+		for cur := start; sc.spendStat(1); cur = filepath.Dir(cur) {
+			if ci, err := os.Stat(cur); cur != start && (err != nil || !sameDevice(startInfo, ci)) {
+				break
 			}
-			return "", false
-		} else if cur == filepath.Dir(cur) {
-			break
+			dotGit := filepath.Join(cur, ".git")
+			if info, err := os.Lstat(dotGit); err == nil {
+				if info.IsDir() {
+					return cur, !sc.hasWorktreeConfig(dotGit)
+				} else if info.Mode().IsRegular() {
+					return sc.locateGitdirFile(dotGit, cur)
+				}
+				return "", false
+			} else if cur == filepath.Dir(cur) {
+				break
+			}
 		}
 	}
 	return "", false
 }
 func (sc *scan) hasWorktreeConfig(gitDir string) bool {
-	return sc.fileHasLine(filepath.Join(gitDir, "config"), func(l string) bool {
+	match := func(l string) bool {
 		k, _, eq := strings.Cut(l, "=")
 		return eq && strings.EqualFold(strings.TrimSpace(k), "worktree")
-	})
+	}
+	return sc.fileHasLine(filepath.Join(gitDir, "config"), match) || sc.fileHasLine(filepath.Join(gitDir, "config.worktree"), match)
 }
 func (sc *scan) fileHasLine(path string, match func(string) bool) bool {
 	p, ok := sc.resolveTarget(sc.dir, path, 0)
@@ -251,15 +254,14 @@ func readSmallFile(path string) (string, error) {
 		return "", err
 	}
 	defer f.Close()
+	var buf [maxPathBytes]byte
 	if info, err := f.Stat(); err != nil || !info.Mode().IsRegular() {
 		return "", errOpaque
-	}
-	var buf [maxPathBytes]byte
-	n, err := io.ReadFull(f, buf[:])
-	if n == len(buf) || err != nil && !errors.Is(err, io.EOF) && !errors.Is(err, io.ErrUnexpectedEOF) {
+	} else if n, err := io.ReadFull(f, buf[:]); n == len(buf) || err != nil && !errors.Is(err, io.EOF) && !errors.Is(err, io.ErrUnexpectedEOF) {
 		return "", errOpaque
+	} else {
+		return string(buf[:n]), nil
 	}
-	return string(buf[:n]), nil
 }
 func (sc *scan) locateGitdirFile(path, cur string) (string, bool) {
 	if data, err := readSmallFile(path); err != nil {
@@ -279,8 +281,7 @@ func (sc *scan) below(dir string, levels int) {
 	if _, seen := sc.examined[c]; seen || !sc.spend(1) {
 		return
 	}
-	sc.examined[c] = cached{}
-	if sc.holdsNone(dir) {
+	if sc.examined[c] = (cached{}); sc.holdsNone(dir) {
 		return
 	} else if root, ok := sc.safeLocate(dir); ok && !sc.enclosingCheckout(root) || sc.unknown {
 		return
@@ -346,25 +347,24 @@ func (sc *scan) holdsNone(p string) bool {
 func (sc *scan) readDir(dir string) []fs.DirEntry {
 	if !sc.spend(1) {
 		return nil
-	}
-	f, err := openDirNoBlock(dir)
-	if err != nil {
+	} else if f, err := openDirNoBlock(dir); err != nil {
 		sc.unknown = sc.unknown || !isBenignDirErr(err)
 		return nil
-	}
-	defer f.Close()
-	var entries []fs.DirEntry
-	for room := maxShellLookups - sc.lookups + 1; len(entries) < room; {
-		chunk, err := f.ReadDir(min(256, room-len(entries)))
-		if entries = append(entries, chunk...); errors.Is(err, io.EOF) || err == nil && (len(chunk) == 0 || !sc.spend(0)) {
-			break
-		} else if err != nil && sc.fail() {
+	} else {
+		defer f.Close()
+		var entries []fs.DirEntry
+		for room := maxShellLookups - sc.lookups + 1; len(entries) < room; {
+			chunk, err := f.ReadDir(min(256, room-len(entries)))
+			if entries = append(entries, chunk...); errors.Is(err, io.EOF) || err == nil && (len(chunk) == 0 || !sc.spend(0)) {
+				break
+			} else if err != nil && sc.fail() {
+				return nil
+			}
+		}
+		if !sc.spend(len(entries)) {
 			return nil
 		}
+		slices.SortFunc(entries, func(a, b fs.DirEntry) int { return strings.Compare(a.Name(), b.Name()) })
+		return entries
 	}
-	if !sc.spend(len(entries)) {
-		return nil
-	}
-	slices.SortFunc(entries, func(a, b fs.DirEntry) int { return strings.Compare(a.Name(), b.Name()) })
-	return entries
 }
