@@ -29,6 +29,9 @@ func (sc *scan) substitute(w io.Writer, cs *syntax.CmdSubst) error {
 		}
 		for n := len(words); n > 0; n-- {
 			if known, ok := outputs[strings.Join(words[:n], " ")]; ok {
+				if _, shadowed := sc.funcs[words[0]]; shadowed {
+					return errOpaque
+				}
 				if _, ok := sc.trustedCmd(words[0]); ok {
 					outer := sc.cfg
 					sc.cfg = sc.config() // expand is not reentrant
