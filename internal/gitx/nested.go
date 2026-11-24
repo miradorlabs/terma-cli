@@ -32,13 +32,15 @@ func NestedCheckoutsFS(dir string, yield func(root, gitDir string) bool) error {
 	if !filepath.IsAbs(dir) {
 		return errors.New("gitx: a relative folder")
 	}
+	// queue[read] is the next folder to read; each one read is cleared, so the folders
+	// already walked are not kept for the rest of the walk.
 	queue := []string{filepath.Clean(dir)}
-	for read := 0; len(queue) > 0; read++ {
+	for read := 0; read < len(queue); read++ {
 		if read >= NestedWalkLimit {
 			return ErrNestedWalkBound
 		}
-		cur := queue[0]
-		queue = queue[1:]
+		cur := queue[read]
+		queue[read] = ""
 		entries, err := os.ReadDir(cur)
 		if err != nil {
 			return err

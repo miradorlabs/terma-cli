@@ -195,6 +195,21 @@ func TestPostToolUseReportsNoSkillWhileThePolicyWithholds(t *testing.T) {
 	}
 }
 
+// A skill's use goes under the developer's consent: with the policy collecting prompts and
+// tool content, but Antigravity not among the agents the developer chose, no skill is named
+// or defined, though each read would load one.
+func TestPostToolUseReportsNoSkillWithoutConsent(t *testing.T) {
+	env, payloads := skillCapture(t)
+	env.Policy.IncludePrompts, env.Policy.IncludeToolContent = true, true
+	env.Agents = []string{"some-other-agent"}
+	replay(t, env, payloads)
+	events := hookruntest.Spooled(t, env.Spool)
+	if defs := hookruntest.Named(events, semconv.TermaSkillDefinitionEvent); len(defs) != 0 {
+		t.Errorf("defined %+v", defs)
+	}
+	checkCalls(t, events, make([]string, len(capturedUses)))
+}
+
 // A skill's use is content of both kinds and follows the same gates: in a conversation with a
 // workspace the policy does not collect, no skill is named or defined.
 func TestPostToolUseReportsNoSkillWithAWorkspaceElsewhere(t *testing.T) {

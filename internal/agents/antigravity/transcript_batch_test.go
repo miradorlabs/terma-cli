@@ -53,7 +53,7 @@ func TestAntigravityBatch(t *testing.T) {
 		if got := b.isTainted(); got != tc.want {
 			t.Errorf("%s: tainted %v, want %v", tc.name, got, tc.want)
 		}
-		if b.isTainted() != tc.want || b.saved() != tc.want {
+		if b.isTainted() != tc.want || b.judged() != tc.want {
 			t.Errorf("%s: asked again, the answer changed", tc.name)
 		}
 		if judged != tc.judged {

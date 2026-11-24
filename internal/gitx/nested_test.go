@@ -2,6 +2,7 @@ package gitx
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -170,4 +171,58 @@ func BenchmarkNestedCheckoutsFS(b *testing.B) {
 			b.Fatal(err)
 		}
 	}
+}
+
+// BenchmarkNestedCheckoutsFSLargeTree walks the worst case a tool may name: a folder shaped
+// like a large node_modules, every package a few levels deep with a file in each folder. Under
+// the bound the walk reads one folder fewer than NestedWalkLimit and finishes; hitting it, it
+// reads NestedWalkLimit folders and stops with ErrNestedWalkBound.
+func BenchmarkNestedCheckoutsFSLargeTree(b *testing.B) {
+	for _, tc := range []struct {
+		name    string
+		folders int
+		want    error
+	}{
+		{"under-the-bound", NestedWalkLimit - 1, nil},
+		{"hitting-the-bound", NestedWalkLimit + 1000, ErrNestedWalkBound},
+	} {
+		b.Run(tc.name, func(b *testing.B) {
+			root := nodeModulesTree(b, tc.folders)
+			for b.Loop() {
+				if err := NestedCheckoutsFS(root, func(string, string) bool { return true }); !errors.Is(err, tc.want) {
+					b.Fatalf("walk: %v, want %v", err, tc.want)
+				}
+			}
+		})
+	}
+}
+
+// nodeModulesTree makes a tree of exactly folders folders, the root included, shaped like a
+// node_modules: each package a folder of lib, dist and src, with a dependency of its own
+// nested below it, and a made-up file in every folder. It is made once, in b.TempDir().
+func nodeModulesTree(b *testing.B, folders int) string {
+	b.Helper()
+	root, err := filepath.EvalSymlinks(b.TempDir())
+	if err != nil {
+		b.Fatal(err)
+	}
+	pkg := []string{"", "lib", "lib/internal", "dist", "dist/esm", "dist/cjs", "src",
+		"node_modules", "node_modules/dep", "node_modules/dep/lib"}
+	// Parents come before their children, so stopping anywhere leaves a whole tree.
+	dirs := []string{"node_modules"}
+	for p := 0; len(dirs) < folders-1; p++ {
+		for _, d := range pkg {
+			dirs = append(dirs, filepath.Join("node_modules", fmt.Sprintf("pkg-%d", p), filepath.FromSlash(d)))
+		}
+	}
+	for _, d := range dirs[:folders-1] {
+		dir := filepath.Join(root, d)
+		if err := os.Mkdir(dir, 0o755); err != nil {
+			b.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(dir, "index.js"), []byte("made-up\n"), 0o644); err != nil {
+			b.Fatal(err)
+		}
+	}
+	return root
 }

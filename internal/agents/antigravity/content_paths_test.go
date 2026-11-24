@@ -240,7 +240,7 @@ func TestAntigravityPathOwnerFailsClosed(t *testing.T) {
 }
 
 // The transcript's reader refuses a call whose arguments it cannot judge: none at all, or not
-// a JSON object. {} and null name no file.
+// a JSON object. {} and null name no file. With no rule to judge by, it refuses any call.
 func TestAntigravityCallsRefusedWithArgumentsItCannotJudge(t *testing.T) {
 	never := func(json.RawMessage) bool { return false }
 	for _, tc := range []struct {
@@ -262,5 +262,11 @@ func TestAntigravityCallsRefusedWithArgumentsItCannotJudge(t *testing.T) {
 		if got := antigravityCallsRefused(calls, never); got != tc.want {
 			t.Errorf("%s: refused %v, want %v", tc.name, got, tc.want)
 		}
+		if !antigravityCallsRefused(calls, nil) {
+			t.Errorf("%s: shown with no rule to judge by", tc.name)
+		}
+	}
+	if antigravityCallsRefused(nil, nil) {
+		t.Error("no calls refused with no rule to judge by")
 	}
 }

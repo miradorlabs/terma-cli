@@ -128,7 +128,7 @@ func preInvocation(ctx context.Context, env hookrun.Env) error {
 	id := in.id()
 	// One hold of the conversation: this hook's session start, then the transcript read (the
 	// turn's prompt, and a cancelled turn's last call passed, see turn.go), each stamped.
-	conv := openAntigravityConversation(ctx, env, r, in)
+	conv := openAntigravityConversation(ctx, env, r, in, nil)
 	defer conv.close()
 	sess := env.NewSession(r, id, antigravityTool, in.ModelName)
 	now := sess.UpdatedAt
@@ -194,7 +194,12 @@ func antigravityEditedPaths(in *antigravityHookInput) []string {
 // skill a read loaded. Under one hold of the conversation it reads the transcript, then spools
 // the call, so the model call that asked for the tool sorts before it. Whether the call's
 // content is refused is judged from its own arguments, with nothing stored: the reader judges
-// the call line's copy of them by the same rule (transcript_read.go).
+// the call line's copy of them by the same rule (transcript_read.go). The hook judges them
+// before it takes the conversation's lock, so a folder's walk (holdsExcluded) does not keep
+// the conversation's other hooks waiting, and the reader, judging the same call line under
+// the lock, finds each folder's answer in the same paths. The answers live only as long as
+// the hook: kept between hooks they would go stale exactly when a clone is made between two
+// calls.
 func postToolUse(ctx context.Context, env hookrun.Env) error {
 	defer antigravityAck(env)
 	in, ok := antigravityInput(env)
@@ -208,7 +213,9 @@ func postToolUse(ctx context.Context, env hookrun.Env) error {
 		return nil
 	}
 	id := in.id()
-	conv := openAntigravityConversation(ctx, env, r, in)
+	paths := newAntigravityPaths(env.Policy)
+	refused := in.ToolCall != nil && paths.refuses(env.Cwd, in.ToolCall.Args)
+	conv := openAntigravityConversation(ctx, env, r, in, paths)
 	defer conv.close()
 	// The turn as it stands once this hook holds the conversation.
 	turn := antigravityTurnID(env, r, id)
@@ -216,7 +223,6 @@ func postToolUse(ctx context.Context, env hookrun.Env) error {
 	if step, stepped := call[semconv.TermaStepIndexKey].(int64); stepped {
 		conv.call.step = step
 	}
-	refused := in.ToolCall != nil && conv.refuses(in.ToolCall.Args)
 	conv.read(ctx)
 	// A skill's use rides on the read that loaded it; its definition goes once per conversation.
 	// Both are content of both kinds: they go only where the call's arguments and a prompt may.
@@ -333,7 +339,7 @@ func antigravityObserve(ctx context.Context, env hookrun.Env, hook string) error
 	}
 	begun := antigravityTurnBegun(env, in.id())
 	turn := antigravityTurnID(env, r, in.id())
-	conv := openAntigravityConversation(ctx, env, r, in)
+	conv := openAntigravityConversation(ctx, env, r, in, nil)
 	defer conv.close()
 	read := conv.read(ctx)
 	if hook == "Stop" {

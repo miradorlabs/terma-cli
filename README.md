@@ -515,7 +515,9 @@ names a file or folder, such as `Path`, a relative value is read as a path too. 
 other key, a relative value is read as one when it climbs with `..`, such as
 `../other-repo/file.txt`, or names a file or folder that is there in the folder the agent
 works in. So a word that happens to be a file name there is read as a path, and shown. A
-command's text, a URL and other text are not read as paths. A tool call whose arguments
+`file://` link is read as the file it names, a path used as an object's key is read too, and
+so is one inside a JSON-encoded string. A command's text, a web URL and other text are not
+read as paths. A tool call whose arguments
 name a file or folder in a repository the policy does not collect sends no arguments, and
 its result is withheld. When the model asked for several calls in one response, the results
 of the others are withheld too, though their arguments are sent: `agy`'s transcript does

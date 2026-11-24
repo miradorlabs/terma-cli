@@ -18,15 +18,20 @@ import (
 // thread's name or a tool's result is content through and through, so Allowed sends it or
 // not, whole. These keys are also removed once the agent that spooled the event no longer
 // has the developer's consent, whatever the policy.
+//
+// They are always removed for an agent that does not implement agents.ContentConsent, and
+// for an event that names no agent: an agent that starts sending a tool's input must
+// implement it.
 var hookContent = map[string][]string{
 	semconv.TermaToolCallEvent:          {semconv.GenAIToolCallArgumentsKey},
 	semconv.TermaApprovalRequestedEvent: {semconv.TermaApprovalReasonKey},
 }
 
 // contentFree are the event kinds that carry no content, or (a reply, a thread's name, a
-// tool's result) that Allowed sends or withholds whole; terma.repository.root, which some of them name, Outgoing
-// withholds with tool content. A kind in none of the four lists is withheld whenever the
-// policy withholds any content, so a new kind leaks nothing until it is classified.
+// tool's result) that Allowed sends or withholds whole; terma.repository.root, which some of
+// them name, Outgoing withholds with tool content. A kind in none of the four lists is
+// withheld whenever the policy withholds any content, so a new kind leaks nothing until it
+// is classified.
 var contentFree = map[string]bool{
 	semconv.TermaSessionStartEvent: true, semconv.TermaSessionEndEvent: true,
 	semconv.TermaCompactionEvent: true, semconv.TermaFilesTouchedEvent: true,

@@ -133,7 +133,7 @@ func readAntigravitySteps(ctx context.Context, path string, last antigravityCall
 	}
 	batch := antigravityBatch{open: state.Batch, tainted: state.Tainted, refuses: refuses}
 	stop := func() antigravityCallState {
-		state.Batch, state.Tainted = batch.open, batch.saved()
+		state.Batch, state.Tainted = batch.open, batch.judged()
 		state.Tail = antigravityTail(f, state.Offset)
 		return state
 	}
@@ -259,16 +259,23 @@ func (b *antigravityBatch) isTainted() bool {
 	return b.tainted
 }
 
-// saved is the taint a read that stops keeps in the state (antigravityCallState.Tainted), for
-// the next hook's read to begin from.
-func (b *antigravityBatch) saved() bool { return b.isTainted() }
+// judged judges the batch's calls now, if no result has yet, and is the taint a read that
+// stops keeps in the state (antigravityCallState.Tainted): the next hook's read begins from it
+// and never judges the calls again.
+func (b *antigravityBatch) judged() bool { return b.isTainted() }
 
 // antigravityCallsRefused reports whether refuses refuses the arguments of any of calls, or
 // one has arguments the reader cannot judge: none at all, or not a JSON object. {} and null
-// name no file.
+// name no file. With no refuses to judge by, any call is refused.
+//
+// The hook judges its own call's arguments by the same rule, with one difference: a call with
+// no args, or args that are not an object, is refused here, so its batch's results are
+// withheld, while its hook, which then has no arguments to attach, sends the call as it would
+// any other. No transcript seen has such a call: 243 of them, 12,180 tool calls of 57 tools,
+// argument-less MCP calls included, all carry an object.
 func antigravityCallsRefused(calls []antigravityToolCall, refuses func(json.RawMessage) bool) bool {
 	if refuses == nil {
-		return false
+		return len(calls) > 0
 	}
 	for _, c := range calls {
 		var args map[string]json.RawMessage

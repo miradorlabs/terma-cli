@@ -3,6 +3,7 @@ package antigravity
 import (
 	"encoding/json"
 	"errors"
+	"net/url"
 	"os"
 	"path/filepath"
 	"slices"
@@ -219,9 +220,16 @@ func (p *antigravityPaths) workspacesCollected(cwd string, in *antigravityHookIn
 //   - every one that looks like a path (antigravityLooksLikePath), under any key: what an MCP
 //     filesystem tool or a tool agy adds names a file with is not known in advance;
 //   - every one under a key known to name a path (antigravityFileKeys, antigravityFolderKeys),
-//     a relative one joined to cwd.
+//     a relative one joined to cwd;
+//   - every file:// URI, under any key, by the path it names (antigravityFileURI);
+//   - every object key that is absolute, starts with "~" or is a file:// URI, as a value under
+//     a key no tool is known by is: a tool may key a map by the files it names;
+//   - every value within a string that holds JSON, an object or a list, walked as if it were
+//     nested, to antigravityJSONDepth such strings within one another: deeper, the call is
+//     refused. A string that does not parse as JSON is text.
 //
-// Past antigravityPathsPerCall values judged, the call is refused unplaced.
+// Past antigravityPathsPerCall values judged, nested JSON included, the call is refused
+// unplaced.
 //
 // What a value names is decided by what is there (os.Stat, links followed), never by its key.
 // A folder that is there is refused, but in global mode, which collects everything, when it
@@ -236,9 +244,9 @@ func (p *antigravityPaths) workspacesCollected(cwd string, in *antigravityHookIn
 // checkout, or a folder above one, is refused, which errs toward sending less.
 //
 // Arguments terma cannot read as an object name no file it knows of: the hook attaches none of
-// them, and the transcript's reader refuses them itself (antigravityCallsRefused). The hook
-// judges its own call's arguments by it, and the reader every call a call line asks for, so
-// both refuse the same calls.
+// them, and the transcript's reader refuses them itself (antigravityCallsRefused says where the
+// two differ). The hook judges its own call's arguments by this rule, and the reader every call
+// a call line asks for.
 func (p *antigravityPaths) refuses(cwd string, raw json.RawMessage) bool {
 	if len(raw) == 0 {
 		return false
@@ -247,44 +255,115 @@ func (p *antigravityPaths) refuses(cwd string, raw json.RawMessage) bool {
 	if json.Unmarshal(raw, &args) != nil {
 		return false
 	}
-	judged := 0
-	return p.refusesValue(cwd, "", args, &judged)
+	return (&antigravityArgs{p: p, cwd: cwd}).refusesValue("", args)
 }
 
-// refusesValue reports whether v, the value under key, or any value within it is refused; the
-// items of a list are judged under the list's key. judged counts the values judged as paths
-// in the call so far.
-func (p *antigravityPaths) refusesValue(cwd, key string, v any, judged *int) bool {
+// antigravityJSONDepth bounds how many strings holding JSON, one within another, a call's
+// arguments are walked through.
+const antigravityJSONDepth = 3
+
+// antigravityArgs is the judging of one call's arguments: what it has judged so far.
+type antigravityArgs struct {
+	p   *antigravityPaths
+	cwd string
+	// judged counts the values judged as paths so far; depth the strings holding JSON entered.
+	judged, depth int
+}
+
+// refusesValue reports whether v, the value under key, or any value or object key within it is
+// refused; the items of a list, and the values of a string holding JSON, are judged under the
+// key that holds them.
+func (a *antigravityArgs) refusesValue(key string, v any) bool {
 	switch v := v.(type) {
 	case map[string]any:
 		for k, item := range v {
-			if p.refusesValue(cwd, k, item, judged) {
+			if antigravityKeyLooksLikePath(k) && a.refusesPath("", k) {
+				return true
+			}
+			if a.refusesValue(k, item) {
 				return true
 			}
 		}
 	case []any:
 		for _, item := range v {
-			if p.refusesValue(cwd, key, item, judged) {
+			if a.refusesValue(key, item) {
 				return true
 			}
 		}
 	case string:
-		return p.refusesPath(cwd, key, v, judged)
+		if nested, ok := antigravityJSONIn(v); ok {
+			if a.depth >= antigravityJSONDepth {
+				return true
+			}
+			a.depth++
+			defer func() { a.depth-- }()
+			return a.refusesValue(key, nested)
+		}
+		return a.refusesPath(key, v)
 	}
 	return false
 }
 
+// antigravityJSONIn is the object or list a string holds as JSON, when it does: trimmed, it
+// starts with "{" or "[" and parses whole.
+func antigravityJSONIn(s string) (any, bool) {
+	t := strings.TrimSpace(s)
+	if !strings.HasPrefix(t, "{") && !strings.HasPrefix(t, "[") {
+		return nil, false
+	}
+	var v any
+	if json.Unmarshal([]byte(t), &v) != nil {
+		return nil, false
+	}
+	return v, true
+}
+
+// antigravityKeyLooksLikePath reports whether an object key is judged as a path: absolute, the
+// home folder or a path in it, or a file:// URI. Not the relative rules, which would cost an
+// os.Lstat per key.
+func antigravityKeyLooksLikePath(k string) bool {
+	_, uri := antigravityFileURI(k)
+	return uri || filepath.IsAbs(k) || k == "~" || strings.HasPrefix(k, "~/")
+}
+
+// antigravityFileURI is the absolute path a file:// URI names, and whether s is one: a single
+// line that starts with "file://", any case. The path is "" for one terma cannot place: it
+// does not parse as a URL, names a host but localhost, or names no absolute path here.
+func antigravityFileURI(s string) (string, bool) {
+	if len(s) < len("file://") || !strings.EqualFold(s[:len("file://")], "file://") || strings.ContainsAny(s, "\r\n") {
+		return "", false
+	}
+	u, err := url.Parse(s)
+	if err != nil || u.Scheme != "file" || u.Host != "" && !strings.EqualFold(u.Hostname(), "localhost") || u.Port() != "" {
+		return "", true
+	}
+	p := u.Path
+	// file:///C:/dir names C:/dir on Windows.
+	if len(p) >= 3 && p[0] == '/' && p[2] == ':' && filepath.VolumeName(p[1:]) != "" {
+		p = p[1:]
+	}
+	p = filepath.FromSlash(p)
+	if !filepath.IsAbs(p) {
+		return "", true
+	}
+	return p, true
+}
+
 // refusesPath reports whether one string value under key is refused, by refuses's rules.
-func (p *antigravityPaths) refusesPath(cwd, key, value string, judged *int) bool {
+func (a *antigravityArgs) refusesPath(key, value string) bool {
+	p, cwd := a.p, a.cwd
+	path, uri := antigravityFileURI(value)
 	folderKey := slices.Contains(antigravityFolderKeys, key)
-	named := folderKey || slices.Contains(antigravityFileKeys, key)
+	named := uri || folderKey || slices.Contains(antigravityFileKeys, key)
 	if value == "" || !named && !antigravityLooksLikePath(cwd, value) {
 		return false
 	}
-	if *judged++; *judged > antigravityPathsPerCall {
+	if a.judged++; a.judged > antigravityPathsPerCall {
 		return true
 	}
-	path := antigravityAbsolute(cwd, value)
+	if !uri {
+		path = antigravityAbsolute(cwd, value)
+	}
 	owner, dir := p.place(path)
 	if owner != ownerCollected && owner != ownerNone {
 		return true
