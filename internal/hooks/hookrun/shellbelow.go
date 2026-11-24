@@ -17,8 +17,6 @@ type operands struct {
 	named   bool
 }
 
-const maxBelowDepth = 4
-
 // safeLocate finds the git worktree root for dir without statting remote GIT_DIR or .git gitdir targets.
 func (sc *scan) safeLocate(dir string) (string, bool) {
 	if dir == "" || sc.hasRemoteLink(dir) || sc.isUnresolvedVar("GIT_DIR") || sc.isUnresolvedVar("GIT_WORK_TREE") {
@@ -124,9 +122,6 @@ func (sc *scan) below(dir string, levels int) {
 	}
 }
 func (sc *scan) enclosingCheckout(root string) bool {
-	if root == "" {
-		return false
-	}
 	if home, ok := sc.lookup("HOME"); ok && home != "" && !sc.hasRemoteLink(home) {
 		if resolved, err := filepath.EvalSymlinks(home); err == nil {
 			home = resolved

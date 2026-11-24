@@ -66,7 +66,7 @@ func firstWords(command string) string {
 // shellFields returns command's first n words as written alongside their unquoted forms.
 func shellFields(command string, n int) (raw, bare []string) {
 	var buf strings.Builder
-	start, quote, ansiC, dollar, escaped := -1, rune(0), false, false, false
+	start, quote, ansiC, ansiNul, dollar, escaped := -1, rune(0), false, false, false, false
 	flush := func() {
 		if dollar {
 			buf.WriteByte('$')
@@ -80,21 +80,25 @@ func shellFields(command string, n int) (raw, bare []string) {
 			escaped = false
 			buf.WriteRune(r)
 		case ansiC && r == '\'':
-			quote, ansiC = 0, false
-		case ansiC && r == '\\':
-			ch, adv := ansiEscape(command[i+1:])
-			buf.WriteRune(ch)
-			i += 1 + adv
-			continue
+			quote, ansiC, ansiNul = 0, false, false
 		case ansiC:
-			buf.WriteRune(r)
+			if r == '\\' {
+				var adv int
+				r, adv = ansiEscape(command[i+1:])
+				w = 1 + adv
+			}
+			if r == 0 {
+				ansiNul = true
+			} else if !ansiNul {
+				buf.WriteRune(r)
+			}
 		case r == '\\' && quote != '\'' && i+1 < len(command) && (command[i+1] == '\n' || command[i+1] == '\r' && i+2 < len(command) && command[i+2] == '\n'):
 			if i += 2; command[i-1] == '\r' {
 				i++
 			}
 			continue
 		case dollar && (r == '\'' || r == '"'):
-			dollar, quote, ansiC = false, r, r == '\''
+			dollar, quote, ansiC, ansiNul = false, r, r == '\'', false
 		default:
 			flush()
 			switch {
@@ -115,8 +119,8 @@ func shellFields(command string, n int) (raw, bare []string) {
 				if buf.Reset(); len(raw) == n {
 					return raw, bare
 				}
-				start, i = -1, i+w
-				continue
+				start = -1
+				fallthrough
 			default:
 				i += w
 				continue

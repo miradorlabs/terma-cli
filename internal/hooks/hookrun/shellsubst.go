@@ -12,7 +12,7 @@ import (
 
 // outputs maps known command-substitution prefixes to static path evaluators.
 var outputs = map[string]func(sc *scan, args []*syntax.Word) (string, bool){
-	"pwd": where, "pwd -L": where, "pwd -P": where, "git rev-parse --show-toplevel": toplevel,
+	"pwd": where, "pwd -L": where, "pwd -P": whereP, "git rev-parse --show-toplevel": toplevel,
 	"go env GOPATH": gopath, "go env GOMODCACHE": modcache, "mktemp": mktemp,
 	"dirname":  ofOperand(dirname),
 	"basename": ofOperand(func(_ *scan, p string) string { return filepath.Base(p) }),
@@ -49,6 +49,12 @@ func (sc *scan) substitute(w io.Writer, cs *syntax.CmdSubst) error {
 }
 func where(sc *scan, args []*syntax.Word) (string, bool) {
 	return sc.dir, sc.dir != "" && len(args) == 0
+}
+func whereP(sc *scan, args []*syntax.Word) (string, bool) {
+	if sc.dir == "" || len(args) != 0 {
+		return "", false
+	}
+	return sc.real(sc.dir), !sc.unknown
 }
 func toplevel(sc *scan, args []*syntax.Word) (string, bool) {
 	if len(args) == 0 {
@@ -125,8 +131,6 @@ func (sc *scan) real(p string) string {
 	if !ok || sc.hasRemoteLink(q) {
 		return cmp.Or(q, p)
 	}
-	if r, err := filepath.EvalSymlinks(q); err == nil {
-		return r
-	}
-	return q
+	r, _ := filepath.EvalSymlinks(q)
+	return cmp.Or(r, q)
 }
