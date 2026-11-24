@@ -144,8 +144,12 @@ func TestNestedCheckoutsFSFailsClosed(t *testing.T) {
 			t.Fatal(err)
 		}
 		defer func() { _ = os.Chmod(locked, 0o755) }()
-		if _, err := nestedOf(root); err == nil {
-			t.Error("a folder that cannot be read was walked past")
+		// Some users read a folder its mode forbids (root, and a sandbox's user with that
+		// capability): there is nothing unreadable to walk past then.
+		if _, readErr := os.ReadDir(locked); readErr != nil {
+			if _, err := nestedOf(root); err == nil {
+				t.Error("a folder that cannot be read was walked past")
+			}
 		}
 	}
 
