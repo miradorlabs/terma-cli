@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-24T01:31:58.466360801Z",
+  "generated_at": "2026-11-24T04:24:03.641481502Z",
   "harnesses": [
     {
       "id": "claude",
@@ -167,18 +167,18 @@
         "language": "typescript"
       },
       "changelog": "https://github.com/google-gemini/gemini-cli/releases",
-      "latest": "0.71.0",
+      "latest": "0.71.1",
       "support": "supported",
-      "versions_tracked": 11,
+      "versions_tracked": 12,
       "first_tracked": "2026-09-24",
       "last_change": {
-        "from": "0.70.0",
-        "to": "0.71.0",
-        "at": "2026-11-24T01:31:58.466360801Z",
-        "released_at": "2026-11-24T01:21:20.379Z",
-        "changes": 8,
+        "from": "0.71.0",
+        "to": "0.71.1",
+        "at": "2026-11-24T04:24:03.641481502Z",
+        "released_at": "2026-11-24T03:57:09.158Z",
+        "changes": 2,
         "categories": {
-          "network": 7,
+          "binary": 1,
           "storage": 1
         }
       }

@@ -41,6 +41,10 @@
     "0.71.0": {
       "url": "https://github.com/google-gemini/gemini-cli/releases/tag/v0.71.0",
       "text": "## What's Changed\n* Changelog for v0.70.0-preview.0 by @gemini-cli-robot in https://github.com/google-gemini/gemini-cli/pull/30361\n* chore(release): bump version to 0.71.0-nightly.20261118.g615d6bc8c by @gemini-cli-robot in https://github.com/google-gemini/gemini-cli/pull/30366\n* Changelog for v0.69.0 by @gemini-cli-robot in https://github.com/google-gemini/gemini-cli/pull/30365\n* fix(core,cli): parse PowerShell commands asynchronously to prevent UI spinner freeze by @tadipavan in https://github.com/google-gemini/gemini-cli/pull/30334\n* chore(gcp): push development worker to private artifact registry by @DavidAPierce in https://github.com/google-gemini/gemini-cli/pull/30319\n\n\n**Full Changelog**: https://github.com/google-gemini/gemini-cli/compare/v0.70.0...v0.71.0"
+    },
+    "0.71.1": {
+      "url": "https://github.com/google-gemini/gemini-cli/releases/tag/v0.71.1",
+      "text": "## What's Changed\n* fix(patch): cherry-pick aafdfdf to release/v0.71.0-pr-30420 to patch version v0.71.0 and create version 0.71.1 by @gemini-cli-robot in https://github.com/google-gemini/gemini-cli/pull/30429\n\n\n**Full Changelog**: https://github.com/google-gemini/gemini-cli/compare/v0.71.0...v0.71.1"
     }
   }
 }

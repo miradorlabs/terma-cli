@@ -11,23 +11,53 @@
       "language": "typescript"
     },
     "changelog": "https://github.com/google-gemini/gemini-cli/releases",
-    "latest": "0.71.0",
+    "latest": "0.71.1",
     "support": "supported",
-    "versions_tracked": 11,
+    "versions_tracked": 12,
     "first_tracked": "2026-09-24",
     "last_change": {
-      "from": "0.70.0",
-      "to": "0.71.0",
-      "at": "2026-11-24T01:31:58.466360801Z",
-      "released_at": "2026-11-24T01:21:20.379Z",
-      "changes": 8,
+      "from": "0.71.0",
+      "to": "0.71.1",
+      "at": "2026-11-24T04:24:03.641481502Z",
+      "released_at": "2026-11-24T03:57:09.158Z",
+      "changes": 2,
       "categories": {
-        "network": 7,
+        "binary": 1,
         "storage": 1
       }
     }
   },
   "versions": [
+    {
+      "version": "0.71.1",
+      "released_at": "2026-11-24T03:57:09.158Z",
+      "captured_at": "2026-11-24T04:24:03.641481502Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "0.71.0",
+      "changes": 2,
+      "categories": {
+        "binary": 1,
+        "storage": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 2,
+        "notable": 0
+      },
+      "undocumented": 2,
+      "highlights": [
+        "On-disk transcript path changed",
+        "Binary size: 98,574,960 → 121,875,875 bytes (98.6 MB → 121.9 MB)"
+      ],
+      "signing": null,
+      "partial": true,
+      "attempted_at": "2026-11-24T04:24:03.641481502Z",
+      "attempts": 1
+    },
     {
       "version": "0.71.0",
       "released_at": "2026-11-24T01:21:20.379Z",
@@ -37,22 +67,19 @@
       ],
       "support": "supported",
       "previous": "0.70.0",
-      "changes": 8,
+      "changes": 1,
       "categories": {
-        "network": 7,
         "storage": 1
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
         "informational": 1,
-        "notable": 7
+        "notable": 0
       },
-      "undocumented": 8,
+      "undocumented": 1,
       "highlights": [
-        "Vendor telemetry event no longer sent: api_request",
-        "Vendor telemetry event no longer sent: api_response",
-        "Vendor telemetry event no longer sent: hook_call"
+        "On-disk transcript path changed"
       ],
       "signing": null,
       "partial": true,

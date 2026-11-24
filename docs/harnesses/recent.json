@@ -1,7 +1,39 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-24T01:31:58.466360801Z",
+  "generated_at": "2026-11-24T04:24:03.641481502Z",
   "versions": [
+    {
+      "harness": "gemini",
+      "name": "Gemini CLI",
+      "version": "0.71.1",
+      "released_at": "2026-11-24T03:57:09.158Z",
+      "captured_at": "2026-11-24T04:24:03.641481502Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "0.71.0",
+      "changes": 2,
+      "categories": {
+        "binary": 1,
+        "storage": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 2,
+        "notable": 0
+      },
+      "undocumented": 2,
+      "highlights": [
+        "On-disk transcript path changed",
+        "Binary size: 98,574,960 → 121,875,875 bytes (98.6 MB → 121.9 MB)"
+      ],
+      "signing": null,
+      "partial": true,
+      "attempted_at": "2026-11-24T04:24:03.641481502Z",
+      "attempts": 1
+    },
     {
       "harness": "gemini",
       "name": "Gemini CLI",
@@ -13,22 +45,19 @@
       ],
       "support": "supported",
       "previous": "0.70.0",
-      "changes": 8,
+      "changes": 1,
       "categories": {
-        "network": 7,
         "storage": 1
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
         "informational": 1,
-        "notable": 7
+        "notable": 0
       },
-      "undocumented": 8,
+      "undocumented": 1,
       "highlights": [
-        "Vendor telemetry event no longer sent: api_request",
-        "Vendor telemetry event no longer sent: api_response",
-        "Vendor telemetry event no longer sent: hook_call"
+        "On-disk transcript path changed"
       ],
       "signing": null,
       "partial": true,
@@ -6179,37 +6208,6 @@
         "Behaviour: compaction_command tools changed: 27 → 28",
         "ConfigChange hook environment variable CLAUDE_CODE_MESSAGING_SOCKET added",
         "DirectoryAdded hook environment variable CLAUDE_CODE_MESSAGING_SOCKET added"
-      ],
-      "signing": "valid"
-    },
-    {
-      "harness": "claude",
-      "name": "Claude Code",
-      "version": "2.1.223",
-      "released_at": "2026-08-05T22:51:13.206Z",
-      "captured_at": "2026-11-05T09:54:28.532441Z",
-      "platforms": [
-        "darwin/arm64",
-        "linux/amd64"
-      ],
-      "support": "untested",
-      "previous": "2.1.222",
-      "changes": 11,
-      "categories": {
-        "config": 9,
-        "prompt": 2
-      },
-      "impact": {
-        "breaking": 0,
-        "degrading": 0,
-        "informational": 9,
-        "notable": 2
-      },
-      "undocumented": 10,
-      "highlights": [
-        "Injected context changed (+0 −78 chars)",
-        "Interactive session's injected context changed (+0 −78 chars)",
-        "blockedMarketplaces description changed (+379 −225 chars)"
       ],
       "signing": "valid"
     }

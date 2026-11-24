@@ -3,8 +3,8 @@
   "harness": "gemini",
   "window": {
     "oldest": "0.61.0",
-    "newest": "0.71.0",
-    "builds": 11
+    "newest": "0.71.1",
+    "builds": 12
   },
   "items": {
     "cli.commands.gemini extensions": {

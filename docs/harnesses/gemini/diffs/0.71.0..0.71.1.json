@@ -1,0 +1,65 @@
+{
+  "schema_version": 1,
+  "harness": "gemini",
+  "from": "0.71.0",
+  "to": "0.71.1",
+  "generated_at": "2026-11-24T04:24:03.641481502Z",
+  "source": {
+    "compare": "https://github.com/google-gemini/gemini-cli/compare/v0.71.0...v0.71.1"
+  },
+  "changelog": {
+    "url": "https://github.com/google-gemini/gemini-cli/releases/tag/v0.71.1",
+    "text": "## What's Changed\n* fix(patch): cherry-pick aafdfdf to release/v0.71.0-pr-30420 to patch version v0.71.0 and create version 0.71.1 by @gemini-cli-robot in https://github.com/google-gemini/gemini-cli/pull/30429\n\n\n**Full Changelog**: https://github.com/google-gemini/gemini-cli/compare/v0.71.0...v0.71.1"
+  },
+  "summary": {
+    "changes": 2,
+    "categories": {
+      "binary": 1,
+      "storage": 1
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 2,
+      "notable": 0
+    },
+    "undocumented": 2
+  },
+  "changes": [
+    {
+      "id": "storage.transcript.path",
+      "category": "storage",
+      "op": "changed",
+      "path": [
+        "storage",
+        "transcript",
+        "path"
+      ],
+      "title": "On-disk transcript path changed",
+      "impact": "informational",
+      "before": "<home>/.gemini<tmp><time>-<id>.jsonl",
+      "after": "<home>/.gemini<tmp><time>212dea.jsonl",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "binary.size_bytes",
+      "category": "binary",
+      "op": "changed",
+      "path": [
+        "binary",
+        "size_bytes"
+      ],
+      "title": "Binary size: 98,574,960 → 121,875,875 bytes (98.6 MB → 121.9 MB)",
+      "impact": "informational",
+      "before": 98574960,
+      "after": 121875875,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    }
+  ]
+}
