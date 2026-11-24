@@ -190,11 +190,11 @@ func antigravityEditedPaths(in *antigravityHookInput) []string {
 }
 
 // postToolUse records every tool step as a `terma.tool.call`, since agy has no other
-// export, with its arguments where the content rules allow, the file an edit changed and the
-// skill a read loaded. Under one hold of the conversation it reads the transcript, then spools
-// the call, so the model call that asked for the tool sorts before it. Whether the call's
-// content is refused is judged from its own arguments, with nothing stored: the reader judges
-// the call line's copy of them by the same rule (transcript_read.go).
+// export, with its arguments where the content rules allow, and the file an edit changed.
+// Under one hold of the conversation it reads the transcript, then spools the call, so the
+// model call that asked for the tool sorts before it. Whether the call's content is refused
+// is judged from its own arguments, with nothing stored: the reader judges the call line's
+// copy of them by the same rule (transcript_read.go).
 func postToolUse(ctx context.Context, env hookrun.Env) error {
 	defer antigravityAck(env)
 	in, ok := antigravityInput(env)
@@ -218,17 +218,7 @@ func postToolUse(ctx context.Context, env hookrun.Env) error {
 		conv.call.step = step
 	}
 	conv.read(ctx)
-	// A skill's use rides on the read that loaded it; its definition goes once per conversation.
-	// Both are content of both kinds: they go only where the call's arguments and a prompt may.
-	var skill hookrun.Skill
-	used := false
-	if content := conv.contentFor(); !refused && content.prompts && content.tools {
-		skill, used = antigravityUsedSkill(env, r, in)
-	}
 	if called {
-		if used {
-			nameSkill(call, skill)
-		}
 		// Arguments go only in this hook's own turn, under the lock, unless refused.
 		//
 		// Accepted risk: arguments and a result are queued under the hook's checkout, though the
@@ -242,9 +232,6 @@ func postToolUse(ctx context.Context, env hookrun.Env) error {
 			}
 		}
 		env.EmitFor(r, spool.Event{Name: semconv.TermaToolCallEvent, SessionID: id, Time: conv.callTime(), Attrs: call})
-	}
-	if used {
-		hookrun.SpoolSkills(conv.at(env), r, antigravitySkillStateDir, id, antigravitySkillAttrs(), []hookrun.Skill{skill})
 	}
 
 	// A failed edit changed nothing. No toolCall yields no paths, so this guard also makes
