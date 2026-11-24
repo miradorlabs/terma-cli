@@ -116,7 +116,7 @@ func (sb *Sandbox) StartAccount() *Account {
 			// A user session belongs to no organization.
 			_ = json.NewEncoder(w).Encode(map[string]any{"organization_id": "", "auth_type": "user_token", "user_id": accountUser, "email": "live@terma.test"})
 		case "/v1/organizations":
-			_ = json.NewEncoder(w).Encode(map[string]any{"organizations": []map[string]any{{"id": accountOrg, "name": "Live", "role": "admin", "type": "personal"}}})
+			_ = json.NewEncoder(w).Encode(map[string]any{"organizations": []map[string]any{{"id": accountOrg, "name": "Live", "role": "admin", "type": "shared"}}})
 		case "/v1/projects":
 			// A user token reads every organization's teams, so it must name one.
 			if r.URL.Query().Get("organization_id") != accountOrg {
