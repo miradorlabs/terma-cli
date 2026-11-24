@@ -33,7 +33,7 @@ now="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 printf '{"active_profile":"default","profiles":{"default":{"team":"proj_bench","server_key_sign_in":true}}}' > "$TERMA_CONFIG_DIR/config.json"
 mkdir -p "$TERMA_STATE_DIR/policies"
 printf '{"mode":"repo","repositories":["github.com/acme/repo"],"git_hooks":true,"include_prompts":true,"include_tool_content":true,"revision":1,"updated_at":"%s","team_id":"proj_bench","fetched_at":"%s"}' "$now" "$now" > "$TERMA_STATE_DIR/policies/proj_bench.json"
-(cd "$ROOT" && go run ./scripts/benchhooks "$BIN" "$repo")
+(cd "$ROOT" && go run ./scripts/benchhooks -routed "$BIN" "$repo")
 # One install in the common git directory serves the checkout and its worktree.
 hook="$repo/.git/hooks/prepare-commit-msg"
 
@@ -78,6 +78,3 @@ bench() {
 
 bench "$repo" checkout "$tmp/wt"
 bench "$tmp/wt" worktree "$repo"
-rm -rf "$repo/.git/hooks/"* "$TERMA_STATE_DIR/repo-hooks"* && (cd "$ROOT" && go run ./scripts/benchhooks -routed "$BIN" "$repo")
-bench "$repo" routed-checkout "$tmp/wt"
-bench "$tmp/wt" routed-worktree "$repo"
