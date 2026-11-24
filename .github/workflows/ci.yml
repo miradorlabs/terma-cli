@@ -8,15 +8,17 @@ on:
 permissions:
   contents: read
 
-# macOS runners are few and harness-telemetry holds five for ~5 minutes: a pull request's
-# superseded runs are cancelled rather than queued ahead of its latest. Each push to main
+# harness-telemetry holds five macOS runners for 5 to 10 minutes: a pull request's
+# superseded runs are cancelled rather than left running beside its latest. Each push to main
 # runs in a group of its own.
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 # Linux jobs run on Blacksmith (Ubuntu 24.04), as mirador-platform's do: their apt mirrors
-# and network are not GitHub-hosted runners'. macOS and Windows stay on GitHub's.
+# and network are not GitHub-hosted runners'. The slow macOS and Windows jobs
+# (harness-telemetry, windows) run on Blacksmith too, on the same OS releases as GitHub's
+# macos-latest and windows-latest; the short ones stay on GitHub's.
 jobs:
   npm-installer:
     # The check keeps its name (`npm-installer (ubuntu-latest)` is required): a matrix job's
@@ -97,7 +99,7 @@ jobs:
   # supervisor, the stop file, the zip archive and the rename-aside swap — and what setup
   # writes and hooks read, on Windows paths. Also vets the whole module for Windows, so nothing Unix-only creeps back in.
   windows:
-    runs-on: windows-latest
+    runs-on: blacksmith-4vcpu-windows-2025
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v7
@@ -168,7 +170,7 @@ jobs:
   # scripts/e2e-shard.sh says which test runs where, and any new test runs in `others`.
   harness-telemetry:
     name: harness-telemetry (${{ matrix.shard }})
-    runs-on: macos-latest
+    runs-on: blacksmith-6vcpu-macos-latest
     timeout-minutes: 30
     # copilot-requests lets the Copilot CLI run on this job's own token, its AI credits
     # billed to the organization (its "Copilot CLI billed to the organization" policy).
