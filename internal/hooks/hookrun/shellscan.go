@@ -133,13 +133,16 @@ func (sc *scan) sizeIn(w syntax.Node, opaqueSubst bool) (n int) {
 				}
 				return false
 			case *syntax.ArithmExp:
-				n += substitutionSize + sc.sizeIn(x.X, opaqueSubst)
+				n = maxShellBytes + 1
 				return false
 			}
 			return n <= maxShellBytes
 		})
 	}
 	return min(n, maxShellBytes+1)
+}
+func isCaseOp(op syntax.ParExpOperator) bool {
+	return op == syntax.UpperFirst || op == syntax.UpperAll || op == syntax.LowerFirst || op == syntax.LowerAll
 }
 func (sc *scan) paramValue(pe *syntax.ParamExp) string {
 	if pe.Param == nil {
@@ -152,6 +155,9 @@ func (sc *scan) paramValue(pe *syntax.ParamExp) string {
 	return v
 }
 func (sc *scan) paramSize(pe *syntax.ParamExp, opaqueSubst bool) int {
+	if pe.Index != nil || pe.Slice != nil {
+		return maxShellBytes + 1
+	}
 	n := len(sc.paramValue(pe))
 	if pe.Repl != nil && pe.Repl.Orig != nil {
 		if orig := sc.sizeIn(pe.Repl.Orig, true); orig > maxShellExpr || n > maxShellBytes/max(orig, 1) {
@@ -166,24 +172,18 @@ func (sc *scan) paramSize(pe *syntax.ParamExp, opaqueSubst bool) int {
 		n = max(n, 1) * (1 + with)
 	}
 	if pe.Exp != nil && pe.Exp.Word != nil {
-		pat := pe.Exp.Op == syntax.RemSmallPrefix || pe.Exp.Op == syntax.RemLargePrefix || pe.Exp.Op == syntax.RemSmallSuffix || pe.Exp.Op == syntax.RemLargeSuffix || pe.Exp.Op == syntax.UpperFirst || pe.Exp.Op == syntax.UpperAll || pe.Exp.Op == syntax.LowerFirst || pe.Exp.Op == syntax.LowerAll
+		pat := isCaseOp(pe.Exp.Op) || pe.Exp.Op == syntax.RemSmallPrefix || pe.Exp.Op == syntax.RemLargePrefix || pe.Exp.Op == syntax.RemSmallSuffix || pe.Exp.Op == syntax.RemLargeSuffix
 		w := sc.sizeIn(pe.Exp.Word, opaqueSubst || pat)
 		if pat && (w > maxShellExpr || n > maxShellBytes/max(w, 1)) {
 			return maxShellBytes + 1
 		}
 		n += w
 	}
-	n += sc.sizeIn(pe.Index, opaqueSubst)
-	if pe.Slice != nil {
-		n += sc.sizeIn(pe.Slice.Offset, opaqueSubst) + sc.sizeIn(pe.Slice.Length, opaqueSubst)
-	}
 	return min(n, maxShellBytes+1)
 }
 func (sc *scan) ifs() string {
-	if ifs, ok := sc.lookup("IFS"); ok {
-		return ifs
-	}
-	return " \t\n"
+	ifs, ok := sc.lookup("IFS")
+	return map[bool]string{true: ifs, false: " \t\n"}[ok]
 }
 func (sc *scan) chargeFields(v string) bool {
 	ifs := sc.ifs()
@@ -192,11 +192,16 @@ func (sc *scan) chargeFields(v string) bool {
 func (sc *scan) checkPartsFields(parts []syntax.WordPart, ifs string, rem int, inParam bool) int {
 	for i := 0; i < len(parts) && rem >= 0; i++ {
 		if pe, ok := parts[i].(*syntax.ParamExp); ok {
-			v := sc.paramValue(pe)
-			if (pe.Exp != nil && pe.Exp.Op == syntax.OtherParamOps || pe.Repl != nil && pe.Repl.All && len(v) > rem) && sc.fail() {
+			v, isCase := sc.paramValue(pe), pe.Exp != nil && isCaseOp(pe.Exp.Op)
+			if (pe.Exp != nil && pe.Exp.Op == syntax.OtherParamOps || (isCase || pe.Repl != nil && pe.Repl.All) && len(v) > rem) && sc.fail() {
 				return -1
 			}
-			if rem = sc.consumeFields(v, ifs, rem); rem >= 0 && pe.Exp != nil && pe.Exp.Word != nil {
+			if isCase {
+				rem -= len(v)
+			} else if rem = sc.consumeFields(v, ifs, rem); rem < 0 {
+				return -1
+			}
+			if pe.Exp != nil && pe.Exp.Word != nil {
 				rem = sc.checkPartsFields(pe.Exp.Word.Parts, ifs, rem, true)
 			}
 			if rem >= 0 && pe.Repl != nil && pe.Repl.With != nil {
@@ -251,8 +256,7 @@ func (sc *scan) fields(w *syntax.Word) ([]string, error) {
 		sc.opaque = false
 		f, err := expand.Fields(sc.cfg, b)
 		bad := sc.opaque
-		sc.opaque = prev
-		if err != nil || bad || len(out)+len(f) > maxShellWords && sc.fail() {
+		if sc.opaque = prev; err != nil || bad || len(out)+len(f) > maxShellWords && sc.fail() {
 			return nil, errOpaque
 		}
 		out = append(out, f...)

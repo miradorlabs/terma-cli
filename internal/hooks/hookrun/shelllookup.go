@@ -4,8 +4,10 @@ import (
 	"cmp"
 	"errors"
 	"io/fs"
+	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 )
 
@@ -13,7 +15,10 @@ func (sc *scan) candidate(t string, r role) {
 	if !r.whole() {
 		t = shellValue(t)
 	}
-	if p, isURL := urlPath(t); isURL {
+	if p, isURL, bad := urlPath(t); bad {
+		sc.fail()
+		return
+	} else if isURL {
 		t = p
 	}
 	if filepath.Separator == '/' && strings.HasPrefix(t, "///") && strings.TrimLeft(t, "/") != "" {
@@ -105,7 +110,9 @@ func (sc *scan) walk(p string, followFinal bool, openMode uint8) (resolved, pare
 			continue
 		}
 		fi, err := cur.lstat(part)
-		if err != nil {
+		if err != nil && slices.Contains(parts, "..") {
+			return "", "", nil, nil, false
+		} else if err != nil {
 			return filepath.Join(append([]string{curPath, part}, parts...)...), curPath, nil, nil, false
 		}
 		if fi.Mode()&fs.ModeSymlink != 0 {
@@ -233,16 +240,18 @@ const alnum = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 func hasDotDot(p string) bool {
 	return p == ".." || strings.HasPrefix(p, "../") || strings.Contains(p, "/..") || os.IsPathSeparator('\\') && (strings.HasPrefix(p, `..\`) || strings.Contains(p, `\..`))
 }
-func urlPath(w string) (string, bool) {
+func urlPath(w string) (string, bool, bool) {
 	scheme, rest, ok := strings.Cut(w, "://")
-	if !ok || !isScheme(scheme) {
-		return "", false
-	} else if !strings.EqualFold(scheme, "file") {
-		return "", true
-	} else if len(rest) > 2 && rest[0] == '/' && rest[2] == ':' {
-		return rest[1:], true
+	if !ok || !isScheme(scheme) || !strings.EqualFold(scheme, "file") {
+		return "", ok && isScheme(scheme), false
 	}
-	return map[bool]string{true: rest, false: "//" + rest}[strings.HasPrefix(rest, "/")], true
+	u, err := url.PathUnescape(rest)
+	if err != nil || strings.ContainsRune(u, 0) {
+		return "", true, true
+	} else if len(u) > 2 && u[0] == '/' && u[2] == ':' {
+		return u[1:], true, false
+	}
+	return map[bool]string{true: u, false: "//" + u}[strings.HasPrefix(u, "/")], true, false
 }
 func isScheme(s string) bool {
 	return len(s) > 1 && strings.IndexByte(alnum[:52], s[0]) >= 0 && strings.Trim(s, alnum+"+-.") == ""

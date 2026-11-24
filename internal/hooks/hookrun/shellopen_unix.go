@@ -69,8 +69,6 @@ func (s *statInfo) ModTime() time.Time { return time.Time{} }
 func (s *statInfo) IsDir() bool        { return s.st.Mode&unix.S_IFMT == unix.S_IFDIR }
 func (s *statInfo) Sys() any           { return &s.st }
 func (s *statInfo) Mode() fs.FileMode {
-	if bit, ok := modeBits[uint32(s.st.Mode&unix.S_IFMT)]; ok {
-		return bit | fs.FileMode(s.st.Mode&0o777)
-	}
-	return fs.ModeIrregular | fs.FileMode(s.st.Mode&0o777)
+	bit, ok := modeBits[uint32(s.st.Mode&unix.S_IFMT)]
+	return map[bool]fs.FileMode{true: bit, false: fs.ModeIrregular}[ok] | fs.FileMode(s.st.Mode&0o777)
 }

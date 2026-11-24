@@ -33,7 +33,7 @@ func maskWords(command string, depth int) string {
 	more, words, bare = more || len(words) > 4, words[:min(len(words), 4)], bare[:min(len(bare), 4)]
 	secret, redir, heredoc, hasRedis, hasSubst := false, 0, false, false, false
 	for i, b := range bare {
-		hasRedis, hasSubst = hasRedis || strings.HasSuffix(b, "redis-cli"), strings.ContainsAny(b, "`$")
+		hasRedis, hasSubst = hasRedis || strings.HasSuffix(b, "redis-cli"), strings.ContainsAny(b, "`$") || strings.ContainsRune(b, '{') && (strings.ContainsRune(b, ',') || strings.Contains(b, ".."))
 		if heredoc {
 			words[i] = "…"
 		} else if redir > 0 {
@@ -76,12 +76,7 @@ func maskWords(command string, depth int) string {
 				strings.HasPrefix(b, "-") && slices.ContainsFunc(secretNames, func(n string) bool { return strings.Contains(lower, n) })
 		}
 	}
-	s := strings.Map(func(r rune) rune {
-		if r < 0x20 || r == 0x7f {
-			return ' '
-		}
-		return r
-	}, strings.Join(words, " "))
+	s := strings.Map(func(r rune) rune { return map[bool]rune{true: ' ', false: r}[r < 0x20 || r == 0x7f] }, strings.Join(words, " "))
 	if r := []rune(s); len(r) > 60 {
 		return string(r[:60]) + " …"
 	} else if more {

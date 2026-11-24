@@ -144,10 +144,7 @@ func ofOperand(f func(*scan, string) (string, bool)) func(*scan, []*syntax.Word)
 	}
 }
 func basename(_ *scan, p string) (string, bool) {
-	if p != "" {
-		p = filepath.Base(p)
-	}
-	return p, true
+	return map[bool]string{true: filepath.Base(p)}[p != ""], true
 }
 func dirname(_ *scan, p string) (string, bool) {
 	vol, sep := filepath.VolumeName(p), map[bool]string{true: `/\`, false: "/"}[filepath.Separator == '\\']

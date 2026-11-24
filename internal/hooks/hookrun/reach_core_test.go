@@ -197,18 +197,23 @@ func TestURLPathAndRemote(t *testing.T) {
 		in    string
 		path  string
 		isURL bool
+		bad   bool
 	}{
-		{"https://example.com/a/b", "", true},
-		{"git+ssh://github.com/acme/api", "", true},
-		{"file:///tmp/acme-api/NOTES.md", "/tmp/acme-api/NOTES.md", true},
-		{"file:///C:/work/api", "C:/work/api", true},
-		{"file://server/share/api", "//server/share/api", true},
-		{"../acme-api/NOTES.md", "", false},
-		{"C:/work/api", "", false},
+		{"https://example.com/a/b", "", true, false},
+		{"git+ssh://github.com/acme/api", "", true, false},
+		{"file:///tmp/acme-api/NOTES.md", "/tmp/acme-api/NOTES.md", true, false},
+		{"file:///ws/priva%74e/README", "/ws/private/README", true, false},
+		{"file:///ws/%2e%2e/acme-api/README", "/ws/../acme-api/README", true, false},
+		{"file:///C:/work/api", "C:/work/api", true, false},
+		{"file://server/share/api", "//server/share/api", true, false},
+		{"file:///ws/%ZZ/README", "", true, true},
+		{"file:///ws/%00/README", "", true, true},
+		{"../acme-api/NOTES.md", "", false, false},
+		{"C:/work/api", "", false, false},
 	} {
-		p, ok := urlPath(tc.in)
-		if p != tc.path || ok != tc.isURL {
-			t.Errorf("urlPath(%q) = (%q, %v), want (%q, %v)", tc.in, p, ok, tc.path, tc.isURL)
+		p, ok, bad := urlPath(tc.in)
+		if p != tc.path || ok != tc.isURL || bad != tc.bad {
+			t.Errorf("urlPath(%q) = (%q, %v, %v), want (%q, %v, %v)", tc.in, p, ok, bad, tc.path, tc.isURL, tc.bad)
 		}
 	}
 	for _, tc := range []struct {
@@ -1626,6 +1631,91 @@ func TestReachCoreHardeningRegressions(t *testing.T) {
 		scRoot := newScan(dir, func(string) (string, bool) { return "", false }, work{deadline: time.Now().Add(time.Minute)})
 		if _, err := scRoot.readSmallFile(string(filepath.Separator)); !errors.Is(err, errOpaque) {
 			t.Fatalf("readSmallFile(/) = %v, want errOpaque", err)
+		}
+	}
+
+	// 25. Brace masking, arithmetic/index/slice fail-closed, case-op IFS bound, percent-encoded file:// URLs, and missing/.. non-collapse.
+	for _, cmd := range []string{
+		`{curl,--user,alice:SECRET}`,
+		`curl --us{e,a}r alice:SECRET https://example.com`,
+		`curl --header{,s} Bearer:SECRET https://example.com`,
+	} {
+		if got := firstWords(cmd); strings.Contains(got, "SECRET") {
+			t.Fatalf("firstWords(%q) = %q, leaked brace-expanded secret", cmd, got)
+		}
+	}
+	if got := firstWords(`echo {}`); got != "echo {}" {
+		t.Fatalf("firstWords(echo {}) = %q, want %q", got, "echo {}")
+	}
+
+	exprVal := "1+1"
+	for _, expr := range []string{
+		`echo ../repo$((N))/file`,
+		`echo ../repo$((1+1))/file`,
+		`echo ../repo${A:0:1}/file`,
+		`echo ../repo${A[0]}/file`,
+	} {
+		scArith := newScan(dir, func(k string) (string, bool) {
+			if k == "A" {
+				return "hello", true
+			}
+			return "", false
+		}, work{deadline: time.Now().Add(time.Minute)})
+		scArith.vars["N"] = &exprVal
+		if got, err := scArith.fields(parseFirstArg(t, expr)); err == nil || !scArith.unknown {
+			t.Fatalf("%s expanded to %q (err=%v, unknown=%v), want opaque fail-closed", expr, got, err, scArith.unknown)
+		}
+	}
+
+	caseVal := strings.Repeat("xa", 250000)
+	scCaseIFS := newScan(dir, func(k string) (string, bool) {
+		switch k {
+		case "IFS":
+			return "A", true
+		case "V":
+			return caseVal, true
+		}
+		return "", false
+	}, work{deadline: time.Now().Add(time.Minute)})
+	tCase := time.Now()
+	if got, err := scCaseIFS.fields(parseFirstArg(t, `echo ${V^^}`)); err == nil || !scCaseIFS.unknown {
+		t.Fatalf("case-op IFS blowup expanded to %d fields (err=%v, unknown=%v), want fail-closed", len(got), err, scCaseIFS.unknown)
+	}
+	if d := time.Since(tCase); d > 100*time.Millisecond {
+		t.Fatalf("case-op IFS check took %v, want <100ms", d)
+	}
+
+	privDir := filepath.Join(dir, "private")
+	if err := os.MkdirAll(privDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	privFile := filepath.Join(privDir, "README")
+	if err := os.WriteFile(privFile, []byte("ok"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	encURL := "file://" + filepath.ToSlash(dir) + "/priva%74e/README"
+	if !strings.HasPrefix(filepath.ToSlash(dir), "/") {
+		encURL = "file:///" + filepath.ToSlash(dir) + "/priva%74e/README"
+	}
+	scEnc := newScan(dir, func(string) (string, bool) { return "", false }, work{deadline: time.Now().Add(time.Minute)})
+	scEnc.candidate(encURL, plain)
+	if !scEnc.places[privDir] {
+		t.Fatalf("percent-encoded file:// URL %q did not place %q (out=%q)", encURL, privDir, scEnc.out)
+	}
+	scBadURL := newScan(dir, func(string) (string, bool) { return "", false }, work{deadline: time.Now().Add(time.Minute)})
+	scBadURL.candidate("file:///ws/%ZZ/README", plain)
+	if !scBadURL.unknown {
+		t.Fatalf("malformed file:// URL failed to set unknown=true")
+	}
+
+	existingDir := filepath.Join(dir, "existing")
+	if err := os.MkdirAll(existingDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	scReal := newScan(dir, func(string) (string, bool) { return "", false }, work{deadline: time.Now().Add(time.Minute)})
+	for _, p := range []string{"existing/missing/../new", existingDir + string(filepath.Separator) + "missing" + string(filepath.Separator) + ".." + string(filepath.Separator) + "new"} {
+		if got, ok := scReal.real(p); ok {
+			t.Fatalf("real(%q) = (%q, true), want false", p, got)
 		}
 	}
 }
