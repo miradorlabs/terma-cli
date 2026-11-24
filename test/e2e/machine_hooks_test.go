@@ -20,6 +20,8 @@ import (
 // claimFile is the relay claim terma's hooks write for a session.
 type claimFile struct {
 	ProjectID  string           `json:"project_id"`
+	Kind       string           `json:"kind"`
+	Run        string           `json:"run"`
 	Repository claimRepository  `json:"repository"`
 	Placements []claimPlacement `json:"placements"`
 }
@@ -30,6 +32,8 @@ type claimRepository struct {
 
 type claimPlacement struct {
 	ProjectID  string          `json:"project_id"`
+	Kind       string          `json:"kind"`
+	Run        string          `json:"run"`
 	Repository claimRepository `json:"repository"`
 }
 
@@ -52,13 +56,14 @@ func (sb *Sandbox) claimFileOf(session string) (*claimFile, string) {
 	return &c, string(data)
 }
 
-// marked reports whether c is a mark alone: every placement names no project and no repository.
-func (c *claimFile) marked() bool {
-	if c == nil || c.ProjectID != "" || len(c.Placements) == 0 {
+// routedUncollected reports whether c is a routed claim that never names a project or
+// the admitted repository.
+func (c *claimFile) routedUncollected(admittedOrigin string) bool {
+	if c == nil || c.ProjectID != "" || c.Run == "" || len(c.Placements) == 0 {
 		return false
 	}
 	for _, p := range c.Placements {
-		if p.ProjectID != "" || p.Repository.Origin != "" {
+		if p.ProjectID != "" || strings.EqualFold(p.Repository.Origin, admittedOrigin) {
 			return false
 		}
 	}
@@ -205,13 +210,11 @@ func TestMachineHooksAdmission(t *testing.T) {
 					}
 					time.Sleep(2 * time.Second) // any flush the hooks started
 					c, raw := sb.claimFileOf(sid)
-					if !c.marked() {
-						t.Errorf("an unlisted working copy's session was not marked, or was claimed: %+v\n%s", c, raw)
+					if !c.routedUncollected("github.com/acme/repo") {
+						t.Errorf("an unlisted working copy's session claim carried a project or admitted origin: %+v\n%s", c, raw)
 					}
-					for _, leak := range []string{sb.ProjectID, filepath.Base(place.dir), filepath.ToSlash(place.dir), "github.com"} {
-						if strings.Contains(raw, leak) {
-							t.Errorf("the mark holds %q: %s", leak, raw)
-						}
+					if strings.Contains(raw, sb.ProjectID) {
+						t.Errorf("an unlisted claim named %q: %s", sb.ProjectID, raw)
 					}
 					if n := sb.hookEventsOf(sid); n != 0 {
 						t.Errorf("hooks recorded %d events for an unlisted working copy's session", n)
@@ -225,8 +228,8 @@ func TestMachineHooksAdmission(t *testing.T) {
 					return
 				}
 				c := sb.claimOf(sid)
-				if c == nil || c.ProjectID != sb.ProjectID || !strings.EqualFold(c.Repository.Origin, "github.com/acme/repo") {
-					t.Errorf("claim = %+v, want project %s with origin github.com/acme/repo", c, sb.ProjectID)
+				if c == nil || c.ProjectID != "" || c.Kind != "repository" || c.Run == "" || !strings.EqualFold(c.Repository.Origin, "github.com/acme/repo") {
+					t.Errorf("claim = %+v, want routed repository claim with origin github.com/acme/repo", c)
 				}
 				if len(sb.Delivered("terma.session.start", sid, 30*time.Second)) == 0 || len(sb.Delivered("terma.files.touched", sid, 30*time.Second)) == 0 {
 					t.Errorf("the session's hook events were not delivered; spool: %+v", sb.Spool())
@@ -240,9 +243,9 @@ func TestMachineHooksAdmission(t *testing.T) {
 }
 
 // A Codex thread resumed between an admitted repository and an unlisted one, either way:
-// the unlisted run is marked, a placement with no project and no origin, and the relay
-// drops what it exports; the admitted run is collected, from the move on. The admitted
-// run's hooks read the whole rollout, and send none of the unlisted run's replies.
+// the unlisted run is placed outside git with no project or origin, and the relay drops
+// what it exports; the admitted run is collected, from the move on. The admitted run's
+// hooks read the whole rollout, and send none of the unlisted run's replies.
 func TestMachineHooksCodexResumedUnlisted(t *testing.T) {
 	forEachCodex(t, func(t *testing.T, b Binary, _ bool) {
 		for _, listedFirst := range []bool{true, false} {
@@ -294,8 +297,8 @@ func codexResumedAcross(t *testing.T, b Binary, listedFirst bool) {
 	if !listedFirst {
 		mark, claimed = claimed, mark
 	}
-	if mark.ProjectID != "" || mark.Repository.Origin != "" || claimed.ProjectID != sb.ProjectID || claimed.Repository.Origin != "github.com/acme/repo" {
-		t.Errorf("placements = %+v, want the repository's and a mark with no project or origin", c.Placements)
+	if mark.ProjectID != "" || mark.Kind != "outside_git" || mark.Repository.Origin != "" || claimed.ProjectID != "" || claimed.Kind != "repository" || claimed.Repository.Origin != "github.com/acme/repo" {
+		t.Errorf("placements = %+v, want a routed repository placement and an outside_git placement with no project or origin", c.Placements)
 	}
 	deadline := time.Now().Add(30 * time.Second)
 	for (len(leakedFieldsOf(sb.Receiver.evidence(), "TERMA_LISTED_WORK")) == 0 || len(sb.Delivered("terma.assistant.message", first.ThreadID, 0)) == 0) && time.Now().Before(deadline) {
@@ -312,7 +315,7 @@ func codexResumedAcross(t *testing.T, b Binary, listedFirst bool) {
 	if len(leakedFieldsOf(e, "TERMA_LISTED_REPLY")) == 0 {
 		t.Errorf("the listed run's reply never reached the project; delivered: %+v", sb.Delivered("terma.assistant.message", first.ThreadID, 0))
 	}
-	if leaked := leakedFieldsOf(e, "TERMA_UNLISTED_WORK", "TERMA_UNLISTED_REPLY"); len(leaked) > 0 || sum(stats, "dropped.not_collected.") == 0 {
-		t.Errorf("want the unlisted run's records dropped as not_collected, none leaked (%v): %v", leaked, stats)
+	if leaked := leakedFieldsOf(e, "TERMA_UNLISTED_WORK", "TERMA_UNLISTED_REPLY"); len(leaked) > 0 || sum(stats, "dropped.no_team.") == 0 {
+		t.Errorf("want the unlisted run's records dropped as no_team, none leaked (%v): %v", leaked, stats)
 	}
 }
