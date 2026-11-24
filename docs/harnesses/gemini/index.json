@@ -11,24 +11,54 @@
       "language": "typescript"
     },
     "changelog": "https://github.com/google-gemini/gemini-cli/releases",
-    "latest": "0.70.0",
+    "latest": "0.71.0",
     "support": "supported",
-    "versions_tracked": 10,
+    "versions_tracked": 11,
     "first_tracked": "2026-09-24",
     "last_change": {
-      "from": "0.69.0",
-      "to": "0.70.0",
-      "at": "2026-11-20T16:01:28.225877704Z",
-      "released_at": "2026-11-19T21:13:43.733Z",
-      "changes": 9,
+      "from": "0.70.0",
+      "to": "0.71.0",
+      "at": "2026-11-24T01:31:58.466360801Z",
+      "released_at": "2026-11-24T01:21:20.379Z",
+      "changes": 8,
       "categories": {
         "network": 7,
-        "request": 1,
         "storage": 1
       }
     }
   },
   "versions": [
+    {
+      "version": "0.71.0",
+      "released_at": "2026-11-24T01:21:20.379Z",
+      "captured_at": "2026-11-24T01:31:58.466360801Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "0.70.0",
+      "changes": 8,
+      "categories": {
+        "network": 7,
+        "storage": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 1,
+        "notable": 7
+      },
+      "undocumented": 8,
+      "highlights": [
+        "Vendor telemetry event no longer sent: api_request",
+        "Vendor telemetry event no longer sent: api_response",
+        "Vendor telemetry event no longer sent: hook_call"
+      ],
+      "signing": null,
+      "partial": true,
+      "attempted_at": "2026-11-24T01:31:58.466360801Z",
+      "attempts": 1
+    },
     {
       "version": "0.70.0",
       "released_at": "2026-11-19T21:13:43.733Z",

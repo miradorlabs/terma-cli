@@ -1,7 +1,40 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-24T00:54:11.23591465Z",
+  "generated_at": "2026-11-24T01:31:58.466360801Z",
   "versions": [
+    {
+      "harness": "gemini",
+      "name": "Gemini CLI",
+      "version": "0.71.0",
+      "released_at": "2026-11-24T01:21:20.379Z",
+      "captured_at": "2026-11-24T01:31:58.466360801Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "0.70.0",
+      "changes": 8,
+      "categories": {
+        "network": 7,
+        "storage": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 1,
+        "notable": 7
+      },
+      "undocumented": 8,
+      "highlights": [
+        "Vendor telemetry event no longer sent: api_request",
+        "Vendor telemetry event no longer sent: api_response",
+        "Vendor telemetry event no longer sent: hook_call"
+      ],
+      "signing": null,
+      "partial": true,
+      "attempted_at": "2026-11-24T01:31:58.466360801Z",
+      "attempts": 1
+    },
     {
       "harness": "codex-desktop",
       "name": "Codex app",
@@ -6177,38 +6210,6 @@
         "Injected context changed (+0 −78 chars)",
         "Interactive session's injected context changed (+0 −78 chars)",
         "blockedMarketplaces description changed (+379 −225 chars)"
-      ],
-      "signing": "valid"
-    },
-    {
-      "harness": "codex",
-      "name": "Codex CLI",
-      "version": "0.146.1",
-      "released_at": "2026-08-05T16:00:31.441Z",
-      "captured_at": "2026-11-05T09:54:28.532441Z",
-      "platforms": [
-        "darwin/arm64",
-        "linux/amd64"
-      ],
-      "support": "untested",
-      "previous": "0.146.0",
-      "changes": 8,
-      "categories": {
-        "behavior": 2,
-        "cli": 3,
-        "filesystem": 3
-      },
-      "impact": {
-        "breaking": 0,
-        "degrading": 0,
-        "informational": 6,
-        "notable": 2
-      },
-      "undocumented": 8,
-      "highlights": [
-        "Behaviour: subagents added",
-        "Behaviour: tool_output added",
-        "Description of `codex exec` changed"
       ],
       "signing": "valid"
     }
